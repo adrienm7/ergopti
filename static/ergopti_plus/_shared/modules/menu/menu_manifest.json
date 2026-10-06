@@ -3158,5 +3158,158 @@
 			],
 			"unavailable": "hide"
 		}
+	],
+	"llm_profile_lua_frame": [
+		{
+			"type": "include",
+			"section": "llm_profile_recommendation",
+			"present_when": "llm_profile_recommendation_present"
+		},
+		{
+			"type": "include",
+			"section": "llm_profile_paused_recommendation",
+			"present_when": "llm_profile_recommendation_paused"
+		},
+		{
+			"type": "include",
+			"section": "llm_profile_auto_detect_control"
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "include",
+			"section": "llm_profile_builtin_heading",
+			"on_refusal": "omit_presentation"
+		},
+		{
+			"type": "list",
+			"id": "llm_profile_builtin_rows"
+		},
+		{
+			"type": "include",
+			"section": "llm_profile_custom_section",
+			"present_when": "llm_profile_custom_present"
+		},
+		{
+			"type": "include",
+			"section": "llm_profile_clone_section",
+			"present_when": "llm_profile_clone_present"
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "include",
+			"section": "llm_profile_commands",
+			"row_id": "llm_profile_create"
+		}
+	],
+	"llm_profile_windows_frame": [
+		{
+			"type": "include",
+			"section": "llm_profile_builtin_heading",
+			"on_refusal": "omit_presentation"
+		},
+		{
+			"type": "list",
+			"id": "llm_profile_builtin_rows"
+		},
+		{
+			"type": "include",
+			"section": "llm_profile_custom_section",
+			"present_when": "llm_profile_custom_present"
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "include",
+			"section": "llm_profile_commands",
+			"row_id": "llm_profile_create"
+		},
+		{
+			"type": "include",
+			"section": "llm_profile_commands",
+			"row_id": "llm_profile_clone",
+			"present_when": "llm_profile_clone_present"
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "include",
+			"section": "llm_profile_auto_detect_control"
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "group",
+			"id": "llm_profile_app_overrides",
+			"i18n": "menu.profiles.per_app_overrides",
+			"platforms": [
+				"ahk"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"llm_profile_custom_section": [
+		{
+			"type": "include",
+			"section": "llm_profile_custom_heading",
+			"on_refusal": "omit_presentation"
+		},
+		{
+			"type": "list",
+			"id": "llm_profile_custom_rows"
+		}
+	],
+	"llm_profile_clone_section": [
+		{
+			"type": "---"
+		},
+		{
+			"type": "include",
+			"section": "llm_profile_commands",
+			"row_id": "llm_profile_clone"
+		}
+	],
+	"llm_profile_recommendation": [
+		{
+			"type": "command",
+			"id": "llm_profile_recommend",
+			"i18n": "menu.profiles.auto_detect",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"llm_profile_paused_recommendation": [
+		{
+			"type": "label",
+			"id": "llm_profile_recommend_paused",
+			"i18n": "menu.profiles.auto_detect",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"llm_profile_auto_detect_control": [
+		{
+			"type": "check",
+			"id": "llm_profile_auto_detect",
+			"i18n": "menu.profiles.auto_detect",
+			"checked_when": [
+				"llm_profile_auto_detect_checked"
+			],
+			"platforms": [
+				"ahk",
+				"linux"
+			],
+			"unavailable": "hide"
+		}
 	]
 }

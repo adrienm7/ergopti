@@ -999,3 +999,211 @@ helpers.describe("invalid inert selector refuses before identity comparison", fu
 		helpers.assert_nil(errors[1]:find("presentation omitted", 1, true))
 	end)
 end)
+
+-- The complete shared frame reuses the actual canonical store and unchanged data/callback owners.
+helpers.describe("complete ordered profile frame: actual Linux native owner", function()
+	local function shared(relative) return helpers.driver_root():gsub("/linux$", "/_shared/") .. relative end
+	local function read(relative)
+		local handle = assert(io.open(shared(relative), "rb"))
+		local value = Json.decode(handle:read("*a")); handle:close(); return value
+	end
+	local oracle = read("tests/corpus/menus/profile_ordered_frame.json")
+	-- Handwritten policy amendment; the original independent frame corpus stays byte-exact.
+	oracle.sections.llm_profile_lua_frame[5].on_refusal = "omit_presentation"
+	oracle.sections.llm_profile_windows_frame[1].on_refusal = "omit_presentation"
+	oracle.sections.llm_profile_custom_section[1].on_refusal = "omit_presentation"
+	local function with_frame(options, body)
+		options = options or {}
+		local registry = options.custom and { profile() } or Json.array({})
+		local initial = '[llm]\nfuture = "keep"\nuser_profiles = "v1:' .. Base64.encode(Json.encode(registry))
+			.. '"\n[llm.profiles]\nactive = "' .. (options.active or "basic") .. '"\nauto_profile_for_model = false\n'
+		with_config(initial, function(settings, path)
+			local names = { "infra.manifest_menu", "infra.i18n", "ui.menu.menu_builder", "ui.prompt_editor.bridge" }
+			local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+			local ok, err = xpcall(function()
+				local document = read("modules/menu/menu_manifest.json")
+				local i18n = setmetatable({ get = function(key) return key end }, { __index = require("infra.i18n") })
+				package.loaded["infra.i18n"] = i18n
+				package.loaded["infra.manifest_menu"] = assert(require("menu.renderer").new({
+					platform = "linux", manifest_path = function() return shared("modules/menu/menu_manifest.json") end,
+					json_decode = function() return document end, i18n = i18n, logger = require("logger.shim"),
+				}))
+				local redraws, editors, opened = 0, 0, nil
+				package.loaded["ui.prompt_editor.bridge"] = { open = function(existing, on_save, opts)
+					editors = editors + 1; opened = { existing = existing, on_save = on_save, opts = opts }; return true
+				end }
+				local ctx = { paused = options.paused == true, is_paused = function() return options.paused == true end,
+					llm = { is_enabled = function() return true end, get_models = function() return {} end,
+						get_current_model = function() return "small" end, get_prediction_model = function() return "small" end },
+					on_menu_changed = function() redraws = redraws + 1 end }
+				local builder = helpers.load_module("ui.menu.menu_builder")
+				local function find(rows)
+					for _, row in ipairs(rows or {}) do
+						if row.menu then
+							for _, child in ipairs(row.menu) do if child.title == i18n.get(oracle.labels.auto_detect) then return row.menu end end
+							local result = find(row.menu); if result then return result end
+						end
+					end
+				end
+				body({ document = document, i18n = i18n, settings = settings, path = path, initial = initial, ctx = ctx,
+					rows = function() return find(builder.build(ctx)) end, opened = function() return opened end,
+					counts = function() return { redraws, editors } end })
+			end, debug.traceback)
+			for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+			if not ok then error(err, 0) end
+		end)
+	end
+	local function at(rows, title)
+		for _, row in ipairs(rows or {}) do if row.title == title then return row end end
+	end
+	local function roles(f, rows)
+		local native = {}
+		for _, entry in ipairs(f.settings.list_built_in()) do native[f.settings.menu_label(entry, f.settings.get("num_predictions") or 1)] = true end
+		local result, counted_native = {}, false
+		for _, row in ipairs(rows) do
+			local role
+			if row.title == "-" then role = "---"
+			elseif native[row.title] then
+				if not counted_native then role, counted_native = "builtin_catalogue", true end
+			elseif row.title == "Canonical" then role = "custom:user_canonical"
+			else for id, key in pairs(oracle.labels) do if row.title == f.i18n.get(key) then role = id end end end
+			helpers.assert_true(role ~= nil or native[row.title], "every physical native row belongs to the independent frame or original catalogue")
+			if role then result[#result + 1] = role end
+		end
+		return result
+	end
+	helpers.it("pins the full frame around the unchanged canonical builtin catalogue and custom data", function()
+		with_frame({ custom = true }, function(f)
+			local rows = assert(f.rows())
+			helpers.assert_eq(roles(f, rows), oracle.expected.linux_custom_builtin)
+			local catalogue = f.settings.list_built_in()
+			for index, entry in ipairs(catalogue) do
+				helpers.assert_eq(rows[index + 3].title, f.settings.menu_label(entry, f.settings.get("num_predictions") or 1))
+				helpers.assert_eq(rows[index + 3].checked == true, entry.id == "basic")
+				helpers.assert_not_nil(rows[index + 3].fn)
+			end
+			helpers.assert_eq(Sandbox.read_bytes(f.path), f.initial)
+			helpers.assert_eq(f.counts(), { 0, 0 })
+		end)
+	end)
+	helpers.it("empty custom registry and custom active profile keep the original conditional boundaries", function()
+		with_frame({}, function(f)
+			local rows = assert(f.rows())
+			helpers.assert_nil(at(rows, f.i18n.get(oracle.labels.custom_heading)))
+			helpers.assert_not_nil(at(rows, f.i18n.get(oracle.labels.clone)))
+		end)
+		with_frame({ custom = true, active = "user_canonical" }, function(f)
+			local rows = assert(f.rows())
+			helpers.assert_nil(at(rows, f.i18n.get(oracle.labels.clone)))
+			helpers.assert_true(at(rows, "Canonical").menu[1].checked)
+		end)
+	end)
+	helpers.it("consumes the exact independent shared declarations and explicit inert omission policy", function()
+		with_frame({}, function(f)
+			for section, expected in pairs(oracle.sections) do helpers.assert_eq(f.document[section], expected, section) end
+		end)
+	end)
+	helpers.it("actual declared checkbox persists the real canonical value and refreshes its native check", function()
+		with_frame({}, function(f)
+			local row = assert(at(f.rows(), f.i18n.get(oracle.labels.auto_detect)))
+			helpers.assert_eq(row.checked, false)
+			helpers.assert_true(row.fn())
+			helpers.assert_eq(f.settings.get("auto_profile_for_model"), true)
+			helpers.assert_true(at(f.rows(), f.i18n.get(oracle.labels.auto_detect)).checked)
+			helpers.assert_eq(Toml.decode(Sandbox.read_bytes(f.path)).llm.future, "keep")
+			helpers.assert_eq(f.counts(), { 1, 0 })
+		end)
+	end)
+	for _, action in ipairs({ "auto_detect", "create", "clone" }) do
+		helpers.it("retained " .. action .. " refuses declaration withdrawal before file/editor effects", function()
+			with_frame({}, function(f)
+				local row = assert(at(f.rows(), f.i18n.get(oracle.labels[action])))
+				if action == "auto_detect" then f.document.llm_profile_auto_detect_control = nil
+				else
+					for _, declared in ipairs(f.document.llm_profile_commands) do
+						if declared.id == "llm_profile_" .. action then declared.id = "withdrawn" end
+					end
+				end
+				helpers.assert_eq(row.fn(), false)
+				helpers.assert_eq(Sandbox.read_bytes(f.path), f.initial)
+				helpers.assert_eq(f.counts(), { 0, 0 })
+			end)
+		end)
+	end
+	helpers.it("retained controls keep original live pause refusal while builtin selection keeps its native nil receipt", function()
+		with_frame({}, function(f)
+			local rows = assert(f.rows())
+			local auto, create, clone = at(rows, oracle.labels.auto_detect), at(rows, oracle.labels.create), at(rows, oracle.labels.clone)
+			f.ctx.paused = true; f.ctx.is_paused = function() return true end
+			helpers.assert_eq(auto.fn(), false); helpers.assert_eq(create.fn(), false); helpers.assert_eq(clone.fn(), false)
+			helpers.assert_eq(Sandbox.read_bytes(f.path), f.initial); helpers.assert_eq(f.counts(), { 0, 0 })
+			local catalogue = f.settings.list_built_in()
+			local last = catalogue[#catalogue]
+			helpers.assert_nil(assert(at(rows, f.settings.menu_label(last, f.settings.get("num_predictions") or 1))).fn())
+			helpers.assert_eq(f.settings.get("active"), last.id)
+			helpers.assert_eq(f.counts(), { 1, 0 })
+		end)
+	end)
+	helpers.it("create and clone keep their real editor seeds and conditional-save callback", function()
+		with_frame({}, function(f)
+			helpers.assert_true(assert(at(f.rows(), oracle.labels.clone)).fn())
+			helpers.assert_not_nil(f.opened().existing)
+			helpers.assert_true(f.opened().opts.as_new)
+			local candidate = profile(); candidate.id = f.opened().opts.profile_id; candidate.label = "Clone owned"
+			helpers.assert_true(f.opened().on_save(candidate))
+			helpers.assert_eq(f.settings.list_user()[1].label, "Clone owned")
+			helpers.assert_eq(Toml.decode(Sandbox.read_bytes(f.path)).llm.future, "keep")
+			helpers.assert_eq(f.counts(), { 1, 1 })
+		end)
+		with_frame({}, function(f)
+			helpers.assert_true(assert(at(f.rows(), oracle.labels.create)).fn())
+			helpers.assert_nil(f.opened().existing)
+			helpers.assert_eq(f.counts(), { 0, 1 })
+		end)
+	end)
+	helpers.it("materializes actual source order changes rather than a native fixed frame", function()
+		with_frame({}, function(f)
+			local frame = f.document.llm_profile_lua_frame
+			frame[3], frame[10] = frame[10], frame[3]
+			local rows = assert(f.rows())
+			helpers.assert_eq(rows[1].title, oracle.labels.create)
+			helpers.assert_eq(rows[#rows].title, oracle.labels.auto_detect)
+		end)
+	end)
+	local faults = {
+		{ "missing frame", function(f) f.document.llm_profile_lua_frame = nil end },
+		{ "wrong list binding", function(f) f.document.llm_profile_lua_frame[6].id = "wrong_native_slot" end },
+		{ "missing presence binding", function(f) f.document.llm_profile_lua_frame[7].present_when = "wrong_getter" end },
+		{ "wrong command selector", function(f) f.document.llm_profile_lua_frame[10].row_id = "missing" end },
+	}
+	for _, fault in ipairs(faults) do
+		helpers.it("refuses " .. fault[1] .. " without fabricating a parent or writing canonical files", function()
+			with_frame({ custom = true }, function(f)
+				fault[2](f)
+				helpers.assert_nil(f.rows())
+				helpers.assert_eq(Sandbox.read_bytes(f.path), f.initial)
+				helpers.assert_eq(f.counts(), { 0, 0 })
+			end)
+		end)
+	end
+	helpers.it("all 21 original fixed captions reach the actual complete Linux frame without ported Mac-only rows", function()
+		with_frame({ custom = true }, function(f)
+			local languages = read("data/locale_order.json").order
+			helpers.assert_eq(#languages, 21)
+			for _, language in ipairs(languages) do
+				local values = read("data/locales/" .. language .. ".json")
+				f.i18n.get = function(key) return values[key] or key end
+				local rows = assert(f.rows())
+				for _, id in ipairs({ "auto_detect", "builtin_heading", "custom_heading", "clone", "create" }) do
+					local key = oracle.labels[id]
+					helpers.assert_not_nil(values[key], language)
+					helpers.assert_not_nil(at(rows, values[key]), language .. ": native shared-caption publication")
+				end
+				helpers.assert_eq(roles(f, rows), oracle.expected.linux_custom_builtin)
+				helpers.assert_eq(Sandbox.read_bytes(f.path), f.initial)
+				helpers.assert_eq(f.counts(), { 0, 0 })
+			end
+		end)
+	end)
+
+end)

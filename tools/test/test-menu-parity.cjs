@@ -362,16 +362,21 @@ const OPENS_SUBMENU = {
 	llm_profile: [
 		'llm_profile_commands',
 		{ menu: 'llm_custom_profile_controls', platforms: ['hs', 'linux'] },
-		...['llm_profile_builtin_heading', 'llm_profile_custom_heading'].map((menu) => ({
-			menu,
-			platforms: ['ahk', 'hs', 'linux'],
+		{
+			menu: 'llm_profile_windows_frame',
+			platforms: ['ahk'],
+			kind: 'compose',
+			native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_profiles.ahk' }
+		},
+		{
+			menu: 'llm_profile_lua_frame',
+			platforms: ['hs', 'linux'],
 			kind: 'compose',
 			native_sources: {
-				ahk: 'windows/ui/menu/menu_llm/menu_profiles.ahk',
 				hs: 'macos/ui/menu/menu_llm/profiles_manager.lua',
 				linux: 'linux/ui/menu/menu_builder.lua'
 			}
-		}))
+		}
 	],
 	// Optional category-file providers return this declared opening command.
 	hotstring_category_file: 'hotstring_file_commands',
@@ -555,14 +560,21 @@ function identityOf(row) {
  * @param {string} platform "ahk", "hs" or "linux".
  * @returns {object[]}
  */
-function project(menuKey, platform, visiting = new Set()) {
+function project(menuKey, platform, visiting = new Set(), rowId) {
 	if (visiting.has(menuKey)) throw new Error(`cyclic menu include: ${menuKey}`);
 	if (!Array.isArray(manifest[menuKey])) throw new Error(`missing menu include: ${menuKey}`);
+	let declaration = manifest[menuKey];
+	if (rowId !== undefined) {
+		const selected = declaration.filter((row) => row.id === rowId);
+		if (typeof rowId !== 'string' || rowId === '' || selected.length !== 1)
+			throw new Error(`invalid direct menu row selector: ${menuKey}.${rowId}`);
+		declaration = selected;
+	}
 	visiting.add(menuKey);
 	const rows = [];
-	for (const row of manifest[menuKey] || []) {
+	for (const row of declaration) {
 		if (!visibleOn(row, platform)) continue;
-		if (row.type === 'include') rows.push(...project(row.section, platform, visiting));
+		if (row.type === 'include') rows.push(...project(row.section, platform, visiting, row.row_id));
 		else rows.push(row);
 	}
 	visiting.delete(menuKey);
@@ -1344,3 +1356,38 @@ console.log(
 		`${unreasoned.length} hidden row(s) still unreasoned (baseline ${UNREASONED_BASELINE}); shared ` +
 		`renderer covers macOS ${renderedCounts.hs}, Linux ${renderedCounts.linux} menu(s).\x1b[0m`
 );
+
+// Static projection selects the same direct declaration as the actual template include.
+{
+	const assert = require('node:assert/strict');
+	const names = ['__selected_frame_probe', '__selected_commands_probe'];
+	for (const key of names) assert(!Object.hasOwn(manifest, key));
+	manifest[names[0]] = [{ type: 'include', section: names[1], row_id: 'clone' }];
+	manifest[names[1]] = [
+		{ type: 'command', id: 'create', i18n: 'menu.profiles.create_profile' },
+		{ type: 'command', id: 'clone', i18n: 'menu.profiles.clone_builtin', platforms: ['hs'] }
+	];
+	try {
+		assert.deepEqual(
+			project(names[0], 'hs').map((row) => row.id),
+			['clone']
+		);
+		assert.deepEqual(project(names[0], 'ahk'), []);
+		assert.deepEqual(project(names[0], 'linux'), []);
+		for (const selector of ['', false, 'missing', 'Clone']) {
+			manifest[names[0]][0].row_id = selector;
+			assert.throws(() => project(names[0], 'hs'), /invalid direct menu row selector/);
+		}
+		manifest[names[0]][0].row_id = 'clone';
+		manifest[names[1]][0].id = 'clone';
+		assert.throws(() => project(names[0], 'hs'), /invalid direct menu row selector/);
+		manifest[names[1]][0].id = 'create';
+		delete manifest[names[0]][0].row_id;
+		assert.deepEqual(
+			project(names[0], 'hs').map((row) => row.id),
+			['create', 'clone']
+		);
+	} finally {
+		for (const key of names) delete manifest[key];
+	}
+}
