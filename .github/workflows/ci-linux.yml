@@ -1306,6 +1306,14 @@ jobs:
           sudo apt-get install -y --no-install-recommends luajit lua-luv glib-networking gsettings-desktop-schemas
           npm run test:linux:network-runtime | tee "$RUNNER_TEMP/linux-network-runtime.log"
         timeout-minutes: 3
+      # Independent NIST vectors use retained, already unlinked descriptors.
+      - name: Qualify native retained FD SHA-256
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          npm run --silent test:linux:fd-sha256-native | tee "$RUNNER_TEMP/linux-fd-sha256-native.log"
+        timeout-minutes: 3
+
       # This prerequisite proof is independent of official runtime/model downloads.
       - name: Qualify native runtime prerequisites
         if: ${{ !cancelled() }}
@@ -1590,6 +1598,7 @@ jobs:
           xkb_source_assertions=$(sed -n 's/^=== \([0-9][0-9]*\) check(s), 0 failure(s) ===$/\1/p' "$RUNNER_TEMP/linux-xkb-source.log" | tail -1)
           http_stream_assertions=$(sed -n 's/^PASS native HTTP streaming receipts: \([0-9][0-9]*\) checks$/\1/p' "$RUNNER_TEMP/linux-http-stream.log" | tail -1)
           network_runtime_assertions=$(node tools/test/linux-network-runtime-evidence.cjs "$RUNNER_TEMP/linux-network-runtime.log")
+          fd_sha256_assertions=$(node tools/test/run-linux-fd-sha256-native.cjs --evidence "$RUNNER_TEMP/linux-fd-sha256-native.log")
           node tools/test/linux-ci-evidence.cjs record \
               --job e2e-linux \
               --output "$RUNNER_TEMP/linux-ci-evidence/e2e-linux.json" \
@@ -1604,6 +1613,7 @@ jobs:
               --subject "xkb-source-qualification=$xkb_source_assertions" \
               --subject "http-stream-receipts=$http_stream_assertions" \
               --subject "managed-network-runtime=$network_runtime_assertions" \
+              --subject "retained-fd-sha256=$fd_sha256_assertions" \
               --subject x11-display=1 \
               --subject wayland-display=1 \
               --subject tray-symbols=1 \

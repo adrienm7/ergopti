@@ -1477,6 +1477,7 @@ assert.ok(
 	'the actual runtime count must come from its independently validated native receipt'
 );
 assert.strictEqual(MANIFEST.jobs['e2e-linux'].subjects['managed-network-runtime'], 4);
+assert.strictEqual(MANIFEST.jobs['e2e-linux'].subjects['retained-fd-sha256'], 12);
 const recorded = [...recordScript.join('\n').matchAll(/--subject "?([a-z0-9-]+)=([^\s"]+)"?/g)];
 assert.deepStrictEqual(
 	recorded.map((match) => match[1]).sort(),
@@ -1493,7 +1494,8 @@ for (const [, subject, value] of recorded) {
 			'hotstring-e2e': '$e2e_assertions',
 			'xkb-source-qualification': '$xkb_source_assertions',
 			'http-stream-receipts': '$http_stream_assertions',
-			'managed-network-runtime': '$network_runtime_assertions'
+			'managed-network-runtime': '$network_runtime_assertions',
+			'retained-fd-sha256': '$fd_sha256_assertions'
 		}[subject] ?? '1';
 	assert.strictEqual(
 		value,
