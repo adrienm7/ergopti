@@ -2220,6 +2220,7 @@ _FMS_FullSnapshotParent(Path, Literal, Scenario := "complete") {
 	global _I18nLocale, LOGGER_MIN_LEVEL, ScriptInformation
 	global ScriptShortcutAssignments, KeyboardShortcutAssignments, GestureAssignments
 	global CategoryEnabled, UPDATER_CHECK_INTERVAL, UPDATER_CHANNEL, _IniCache
+	global KEYBOARD_SHORTCUT_DEFAULTS
 	global _ConfigBootRejectedOverrides, _ConfigBootOutdatedEntries, Features
 	global _ParseTomlCache, _TomlFileCache, _ConfigTomlSnapshots, _LOGGER_TEST_SINK
 	Runtime := _CFGFS_CaptureRuntime(), Coordinator := _ConfigFullSaveCoordinator()
@@ -2229,6 +2230,7 @@ _FMS_FullSnapshotParent(Path, Literal, Scenario := "complete") {
 	SavedScriptInformation := IsSet(ScriptInformation) ? ScriptInformation : unset
 	SavedScriptShortcutAssignments := IsSet(ScriptShortcutAssignments) ? ScriptShortcutAssignments : unset
 	SavedKeyboardShortcutAssignments := IsSet(KeyboardShortcutAssignments) ? KeyboardShortcutAssignments : unset
+	SavedKeyboardDefaults := IsSet(KEYBOARD_SHORTCUT_DEFAULTS) ? KEYBOARD_SHORTCUT_DEFAULTS : unset
 	SavedGestureAssignments := IsSet(GestureAssignments) ? GestureAssignments : unset
 	SavedCategoryEnabled := IsSet(CategoryEnabled) ? CategoryEnabled : unset
 	SavedUPDATERCHECKINTERVAL := IsSet(UPDATER_CHECK_INTERVAL) ? UPDATER_CHECK_INTERVAL : unset
@@ -2279,6 +2281,11 @@ _FMS_FullSnapshotParent(Path, Literal, Scenario := "complete") {
 		_I18nLocale := "fr", LOGGER_MIN_LEVEL := "INFO"
 		ScriptInformation := Map("MagicKey", "★")
 		ScriptShortcutAssignments := Map(), KeyboardShortcutAssignments := Map()
+		; The headless runner omits feature_state; use its exact manifest default projection.
+		KEYBOARD_SHORTCUT_DEFAULTS := Map()
+		for Entry in ManifestFeaturesForSection("shortcuts.keyboard")
+			KEYBOARD_SHORTCUT_DEFAULTS[Entry["id"]] := ManifestDefaultFor(Entry["path"])
+		Assert(KEYBOARD_SHORTCUT_DEFAULTS.Count > 0, "the real collector receives the native manifest-derived keyboard defaults")
 		GestureAssignments := Map(), CategoryEnabled := Map(), _IniCache := Map()
 		UPDATER_CHECK_INTERVAL := unset, UPDATER_CHANNEL := unset
 		MetricsFilters.disabled_apps := Map()
@@ -2406,6 +2413,7 @@ _FMS_FullSnapshotParent(Path, Literal, Scenario := "complete") {
 		ScriptInformation := IsSet(SavedScriptInformation) ? SavedScriptInformation : unset
 		ScriptShortcutAssignments := IsSet(SavedScriptShortcutAssignments) ? SavedScriptShortcutAssignments : unset
 		KeyboardShortcutAssignments := IsSet(SavedKeyboardShortcutAssignments) ? SavedKeyboardShortcutAssignments : unset
+		KEYBOARD_SHORTCUT_DEFAULTS := IsSet(SavedKeyboardDefaults) ? SavedKeyboardDefaults : unset
 		GestureAssignments := IsSet(SavedGestureAssignments) ? SavedGestureAssignments : unset
 		CategoryEnabled := IsSet(SavedCategoryEnabled) ? SavedCategoryEnabled : unset
 		UPDATER_CHECK_INTERVAL := IsSet(SavedUPDATERCHECKINTERVAL) ? SavedUPDATERCHECKINTERVAL : unset
