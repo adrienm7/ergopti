@@ -3463,6 +3463,16 @@ Archive-distro unit validation now provisions only measured LuaJIT/Python/curl r
 
 The current Windows native read/write-exclusion and foreign TOML record-parent fixes are composed with the configuration document owner. Canonical source-span arguments keep their original positions; the native container-stop argument is appended, with a registered fourteen-assert combined lexer regression. Native-reader child fixtures discover and copy complete genuine modules through canonical source ownership; all original sixty-nine assertions and child effects remain. Local selected encoding and361 JS checks pass; native Windows execution remains required.
 
+The actual macOS saved-model reader admits only intrinsically valid nonempty string backend/name records. Ordinary edits, removal, clear and immediate inverse preserve invalid physical members and surviving unknown fields. Explicit cleanup uses source/file/ordinal-bound native receipts with raw token identity; custom names and backend identifiers remain valid. Independent owning84/0 and shared55/0 on both Lua engines pass, including genuine original producer failures and two physical forged-token refusals. Full final-source native qualification and the remaining configuration inventories remain separate.
+
+The native callback error regression fixture now arms its same 5 ms continuation only after the first actual bad callback, preserving the original 30 ms watchdog and all nine assertions. A real 10 ms startup delay reproduces the original failure on Lua 5.4 and LuaJIT and passes the candidate. The full local Linux suite passes 9537/0; hosted packaging and installation still require the next exact-source manual CI.
+
+Seven Windows failures exposed a typo in four new fixture subjects: the manifest owns layout.ergopti_alt_gr, not ergopti_altgr. The corrected subjects retain every original predicate and add an actual manifest assertion plus a native unknown-neighbor preservation case. Independent exact-source review passes; the 19 registered obsolete-scope cases require Windows CI before native qualification.
+
+The Windows persistence census now audits the actual added scope build-only consumer, retaining the previous 36 consumers and requiring its captured-source, typed finalizer and status-before-target chain. The new closed census is 37 total / 9 internal, with executable-code offsets and genuine quoted-data counterexamples; no publisher assertion is relaxed. Actual Windows qualification remains pending.
+
+The exact personal snapshot regression now selects its handwritten semantic fixture identity among the real initialized defaults. All original name/type/value/two-row assertions remain; genuine sibling, case-twin, descendant and literal-dot decoys are rejected. Actual Windows execution remains pending.
+
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
   The shared AHK override policy now writes an explicit recommended delay only
@@ -3975,6 +3985,8 @@ Shortcut scopes preserve source-proven obsolete scalar/array parents rather than
 The real Windows recursive full-state collector now renders each semantic key segment with the canonical TOML key owner. Its configuration-only sparse adapter consumes the resulting exact semantic parts, preserving literal dots, empty/non-BMP keys and supplied case-sensitive map entries. Generic sparse API semantics remain unchanged. New registered actual-collector/full-save cases are appended; native execution is pending. Simultaneous case-twin boot maps and obsolete-parent full-state safe refusal remain separate software work.
 
 Windows scope recommendation/clear preserves source-classified obsolete values until explicit cleanup, including new external-source and late schema-session refusals. This covers the detached scope owner, not the still-open whole-state obsolete-parent refusal or unclassified table-array boundaries.
+
+Saved-model scalar edits and explicit intrinsic obsolete-record cleanup now use authenticated canonical inline-array/table-array physical row spans. Whole-source backup, native CAS, exact readback and refusal recovery remain authoritative; generic arrays do not gain record-list ownership. Ordinary saves keep opaque invalid members until explicit cleanup.
 
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
@@ -4669,6 +4681,8 @@ The actual Windows CI profile-heading failures were caused by an unset native LL
 Whole profile frames now consume shared child templates on all three drivers, preserving each native registry phase, platform-specific creation order, paused macOS presentation and lazy per-application reads. Executable owner guards reject decorative/comment/qualified decoys. Canonical generators retire eleven additional allocator sites: Windows75/macOS106/Linux77 at this slice. Other native menu families and physical-device acceptance remain open. The previously recorded macOS Wrap refusal defect and Windows timing prompt are already implemented by 9bae9a340, with the later arity and finite-adapter corrections; neither is reimplemented.
 
 The existing model-picker providers now obtain their inert tail separator from the shared provider status declaration. Native callback/browser phases and platform-specific conditional presence remain unchanged. Actual canonical generators retire exactly one more allocator per driver, giving the current baseline Windows74/macOS105/Linux76. Existing labels retain all21 translations; remaining native families and device qualification are still open.
+
+The Windows profile uniqueness audit now follows both actual frame providers and their shared native counter. Existing duplicate-label and disambiguator assertions remain; executable-source data decoys and four genuinely colliding Win32 rows add causal controls. Static/source review passes, while the actual native menu cases require Windows CI.
 
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama

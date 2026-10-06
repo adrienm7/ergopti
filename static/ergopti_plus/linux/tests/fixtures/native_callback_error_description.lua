@@ -18,19 +18,26 @@ local Loop = require("adapters.event_loop")
 local scenario = assert(arg[1])
 local bad_calls, sibling_calls, watchdog_calls, formatter_calls = 0, 0, 0, 0
 local object = arg[2] == "string" and "owned ordinary callback failure" or setmetatable({}, { __tostring = function() formatter_calls = formatter_calls + 1; error("owned error formatter failure", 0) end })
-local function bad() bad_calls = bad_calls + 1; error(object, 0) end
+local bad_token, sibling
+local function bad()
+	bad_calls = bad_calls + 1
+	if bad_calls == 1 then
+		-- A timer armed before run admission can stop the loop before any idle
+		-- callback. Start continuation only after this actual failing callback.
+		sibling = Scheduler.after(0.005, function()
+			sibling_calls = sibling_calls + 1
+			if bad_token then assert(Scheduler.cancel(bad_token)) end
+			if Loop.isRunning() then Loop.stop() else uv.stop() end
+		end)
+	end
+	error(object, 0)
+end
 local watchdog = assert(uv.new_timer())
 assert(uv.timer_start(watchdog, 30, 0, function()
 	watchdog_calls = watchdog_calls + 1
 	Scheduler.cancelAll()
 	if Loop.isRunning() then Loop.stop() else uv.stop() end
 end) == 0)
-local bad_token
-local sibling = Scheduler.after(0.005, function()
-	sibling_calls = sibling_calls + 1
-	if bad_token then assert(Scheduler.cancel(bad_token)) end
-	if Loop.isRunning() then Loop.stop() else uv.stop() end
-end)
 print("START actual native " .. scenario)
 local options = {}
 if scenario == "after" then bad_token = Scheduler.after(0.001, bad)
@@ -43,6 +50,10 @@ else error("unknown scenario") end
 local ok, err
 if scenario == "after" or scenario == "every" then ok, err = pcall(uv.run)
 else ok, err = pcall(Loop.run, options) end
+if sibling then
+	assert(Scheduler.cancel(sibling))
+	sibling = nil
+end
 Scheduler.cancelAll()
 for _ = 1, 4 do uv.run("nowait") end
 local resources = {}

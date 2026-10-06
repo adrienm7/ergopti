@@ -38,3 +38,7 @@ helpers.describe("unused-key scanner source shape receipt", function()
 		helpers.assert_eq(calls, 0)
 	end)
 end)
+
+local model_records = require("test.user_model_records_contract")
+model_records.register_pure(helpers)
+model_records.register_native(helpers)

@@ -2065,7 +2065,7 @@ _FMS_ConfigExactWholeCollector(Path, Fixture) {
 		Found := 0
 		for Update in Updates {
 			Parts := TOML_ParseKeyPath(Update.Section, true)
-			if Parts.Length != 3 || Parts[1] != "hotstrings" || Parts[2] != "personal"
+			if !_FMS_ConfigExactPersonalRow(Parts, Fixture.name)
 				continue
 			AssertEqual(Fixture.name, Parts[3], "the real full-state collector retains the exact admitted name")
 			AssertTrue(Update.Key == "enabled" || Update.Key == "time_activation_seconds")
@@ -2173,3 +2173,35 @@ _FMS_ConfigExactCaseTwins() {
 }
 Test("configuration snapshot: config-row adapter preserves twins and unchanged generic domains (config-full-state-exact-path)",
 	_FMS_ConfigExactCaseTwins)
+
+
+; Full-save traverses initialized personal defaults too. Select the exact fixture
+; identity without relying on Map iteration order or flattening semantic segments.
+_FMS_ConfigExactPersonalRow(Parts, Name) {
+	return Parts is Array && Parts.Length == 3
+		&& StrCompare(Parts[1], "hotstrings", true) == 0
+		&& StrCompare(Parts[2], "personal", true) == 0
+		&& StrCompare(Parts[3], Name, true) == 0
+}
+_FMS_ConfigExactPersonalRowSelection() {
+	for Fixture in _FMS_ConfigExactNameFixtures() {
+		Parts := TOML_ParseKeyPath(SubStr(Fixture.header, 2, StrLen(Fixture.header) - 2), true)
+		AssertTrue(_FMS_ConfigExactPersonalRow(Parts, Fixture.name),
+			"the handwritten physical header resolves to the exact fixture identity")
+		AssertFalse(_FMS_ConfigExactPersonalRow(["hotstrings", "personal", "autocorrection"], Fixture.name),
+			"an initialized default sibling is not the fixture under test")
+		AssertFalse(_FMS_ConfigExactPersonalRow(["hotstrings", "personal", Fixture.name, "child"], Fixture.name),
+			"a descendant must not be mistaken for its literal parent name")
+		AssertFalse(_FMS_ConfigExactPersonalRow(["hotstrings", "Personal", Fixture.name], Fixture.name),
+			"a case-distinct category cannot acquire the fixture identity")
+	}
+	AssertFalse(_FMS_ConfigExactPersonalRow(["hotstrings", "personal", "Twin"], "twin"),
+		"two actual admitted case twins remain distinct")
+	AssertFalse(_FMS_ConfigExactPersonalRow(TOML_ParseKeyPath("hotstrings.personal.literal.ok", true), "literal.ok"),
+		"nested syntax is not the admitted literal-dot name")
+	Defaults := ManifestBuildFeaturesMap()
+	AssertTrue(Defaults["hotstrings"]["personal"].Has("autocorrection"),
+		"the real collector input contains the default sibling that exposed the old premise")
+}
+Test("configuration snapshot: exact fixture row selection rejects initialized siblings and semantic-name decoys",
+	_FMS_ConfigExactPersonalRowSelection)
