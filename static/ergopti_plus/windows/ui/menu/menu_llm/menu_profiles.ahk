@@ -141,7 +141,9 @@ _LLM_Menu_ProfileRows() {
 	seen_labels := Map()
 
 	; Section header: built-in profiles
-	Rows.Push(Map("label", t("menu.profiles.header_default_profiles")))
+	BuiltinHeadingRows := MenuRenderer_TemplateRows("llm_profile_builtin_heading", Map(), Map(), Map())
+	if BuiltinHeadingRows is Array
+		Rows.Push(BuiltinHeadingRows*)
 
 	for id in LLM_PROFILE_BUILTIN_ORDER {
 		base_label := LLM_Menu_GetProfileLabel(id)
@@ -156,8 +158,9 @@ _LLM_Menu_ProfileRows() {
 	; Section: user profiles
 	user_profiles := _LLM_Menu["user_profiles"]
 	if (user_profiles.Length > 0) {
-		Rows.Push(Map("separator", true))
-		Rows.Push(Map("label", t("menu.profiles.header_custom_profiles")))
+		CustomHeadingRows := MenuRenderer_TemplateRows("llm_profile_custom_heading", Map(), Map(), Map())
+		if CustomHeadingRows is Array
+			Rows.Push(CustomHeadingRows*)
 
 		for p in user_profiles {
 			pid         := p.Has("id") ? p["id"] : ""

@@ -3113,5 +3113,50 @@
 			],
 			"unavailable": "hide"
 		}
+	],
+	"llm_profile_builtin_heading": [
+		{
+			"type": "label",
+			"id": "llm_profile_builtin_plain_heading",
+			"i18n": "menu.profiles.header_default_profiles",
+			"platforms": [
+				"ahk",
+				"linux"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "section_header",
+			"id": "llm_profile_builtin_decorated_heading",
+			"i18n": "menu.profiles.header_default_profiles",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"llm_profile_custom_heading": [
+		{
+			"type": "---"
+		},
+		{
+			"type": "label",
+			"id": "llm_profile_custom_plain_heading",
+			"i18n": "menu.profiles.header_custom_profiles",
+			"platforms": [
+				"ahk",
+				"linux"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "section_header",
+			"id": "llm_profile_custom_decorated_heading",
+			"i18n": "menu.profiles.header_custom_profiles",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
 	]
 }

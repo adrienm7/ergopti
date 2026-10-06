@@ -6858,3 +6858,35 @@ id = "llm_numeric_custom_value"
 i18n = "menu.llm.generation.custom_value"
 platforms = ["linux"]
 unavailable = "hide"
+
+# Fixed native profile headings retain each platform's existing decoration.
+[[menu.llm_profile_builtin_heading]]
+type = "label"
+id = "llm_profile_builtin_plain_heading"
+i18n = "menu.profiles.header_default_profiles"
+platforms = ["ahk", "linux"]
+unavailable = "hide"
+
+[[menu.llm_profile_builtin_heading]]
+type = "section_header"
+id = "llm_profile_builtin_decorated_heading"
+i18n = "menu.profiles.header_default_profiles"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.llm_profile_custom_heading]]
+type = "---"
+
+[[menu.llm_profile_custom_heading]]
+type = "label"
+id = "llm_profile_custom_plain_heading"
+i18n = "menu.profiles.header_custom_profiles"
+platforms = ["ahk", "linux"]
+unavailable = "hide"
+
+[[menu.llm_profile_custom_heading]]
+type = "section_header"
+id = "llm_profile_custom_decorated_heading"
+i18n = "menu.profiles.header_custom_profiles"
+platforms = ["hs"]
+unavailable = "hide"

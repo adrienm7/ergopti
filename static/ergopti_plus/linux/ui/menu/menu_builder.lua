@@ -2207,11 +2207,10 @@ local function _build_llm(ctx)
 				end,
 			},
 			{ separator = true },
-			{
-				label = i18n_safe("menu.profiles.header_default_profiles"),
-				disabled = true,
-			},
 		}
+		for _, row in ipairs(ManifestMenu.template_rows("llm_profile_builtin_heading", {}, {}, {}) or {}) do
+			rows[#rows + 1] = row
+		end
 		local active_builtin = nil
 		for _, profile in ipairs(ProfileSettings.list_built_in()) do
 			local profile_id = profile.id
@@ -2233,11 +2232,9 @@ local function _build_llm(ctx)
 
 		local user_profiles = ProfileSettings.list_user()
 		if #user_profiles > 0 then
-			rows[#rows + 1] = { separator = true }
-			rows[#rows + 1] = {
-				label = i18n_safe("menu.profiles.header_custom_profiles"),
-				disabled = true,
-			}
+			for _, row in ipairs(ManifestMenu.template_rows("llm_profile_custom_heading", {}, {}, {}) or {}) do
+				rows[#rows + 1] = row
+			end
 		end
 		for _, profile in ipairs(user_profiles) do
 			local owned_profile = profile

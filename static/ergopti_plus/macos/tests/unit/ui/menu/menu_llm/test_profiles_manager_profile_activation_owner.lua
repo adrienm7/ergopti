@@ -712,4 +712,140 @@ helpers.describe("shared custom profile child: native macOS owner", function()
 
 end)
 
+
+-- The native list and callbacks keep ownership; only the inert profile headings are declared.
+helpers.describe("shared profile section headings: actual macOS provider", function()
+	local Json = require("json")
+	local function read_json(relative)
+		local file = assert(io.open(helpers.shared(relative), "rb"))
+		local value = Json.decode(file:read("*a")); file:close(); return value
+	end
+	local expected = read_json("tests/corpus/menus/profile_section_headings.json")
+	local function with_headings(custom, body)
+		with_profiles_fixture({user_profiles = custom and {{id="user_canonical",label="Canonical"}} or {}}, function(fixture)
+			local document = read_json("modules/menu/menu_manifest.json")
+			local i18n = package.loaded["infra.i18n"]
+			i18n.section = function(key) return "— " .. i18n.get(key) .. " —" end
+			local renderer = assert(require("menu.renderer").new({platform="hs",
+				manifest_path=function() return helpers.shared("modules/menu/menu_manifest.json") end,
+				json_decode=function() return document end,i18n=i18n,logger=package.loaded["infra.logger"]}))
+			local binding = package.loaded["infra.manifest_menu"]
+			binding.template_rows, binding.render_rows = renderer.template_rows, renderer.render_rows
+			body({document=document,i18n=i18n,heading_index=3,other_platform="linux",
+				caption=function(key) return i18n.section(key) end,
+				decorate=function(value) return "— " .. value .. " —" end,
+				rows=function() return fixture.manager.get_menu_item().menu end,
+				untouched=function()
+					helpers.assert_eq(#fixture.selections,0); helpers.assert_eq(fixture.direct_saves(),0)
+					helpers.assert_eq(fixture.editor_calls(),0); helpers.assert_eq(fixture.registry_calls(),1, "the initial native registry sync is the only publication")
+				end,fixture=fixture})
+		end)
+	end
+
+	local function titles(rows)
+		local result = {}
+		for _, row in ipairs(rows) do result[#result + 1] = row.title end
+		return result
+	end
+	local function position(rows, title)
+		for index, row in ipairs(rows) do if row.title == title then return index, row end end
+	end
+	local sections = { "llm_profile_builtin_heading", "llm_profile_custom_heading" }
+	helpers.it("profile-headings: handwritten shared declaration exactly matches the independent oracle", function()
+		with_headings(true, function(f)
+			for _, section in ipairs(sections) do helpers.assert_eq(f.document[section], expected.sections[section]) end
+			local rows = f.rows()
+			local builtin, builtin_row = position(rows, f.caption(expected.keys[1]))
+			local custom, custom_row = position(rows, f.caption(expected.keys[2]))
+			helpers.assert_type(builtin, "number"); helpers.assert_type(custom, "number")
+			helpers.assert_true(builtin < custom)
+			helpers.assert_true(builtin_row.disabled); helpers.assert_nil(builtin_row.fn)
+			helpers.assert_true(custom_row.disabled); helpers.assert_nil(custom_row.fn)
+			helpers.assert_eq(rows[custom - 1].title, "-")
+			helpers.assert_eq(rows[custom + 1].title, "Canonical")
+			f.untouched()
+		end)
+	end)
+	helpers.it("profile-headings: empty native registry has no custom heading or custom separator", function()
+		with_headings(false, function(f)
+			local rows = f.rows()
+			helpers.assert_not_nil(position(rows, f.caption(expected.keys[1])))
+			helpers.assert_nil(position(rows, f.caption(expected.keys[2])))
+			local before = titles(rows)
+			f.document[sections[2]] = { {type="label",id="empty_registry_probe",i18n="button.cancel"} }
+			helpers.assert_eq(titles(f.rows()), before, "custom presentation is conditional on the actual native registry")
+			f.untouched()
+		end)
+	end)
+	helpers.it("profile-headings: actual native menu consumes changed caption and shared custom source order", function()
+		with_headings(true, function(f)
+			local custom = f.document[sections[2]]
+			local heading = custom[f.heading_index]
+			heading.i18n = "button.cancel"
+			custom[1], custom[f.heading_index] = heading, custom[1]
+			local rows = f.rows()
+			local index = position(rows, f.caption("button.cancel"))
+			helpers.assert_type(index, "number")
+			helpers.assert_eq(rows[index + 1].title, "-")
+			helpers.assert_eq(rows[index + 2].title, "Canonical")
+			helpers.assert_nil(position(rows, f.caption(expected.keys[2])))
+			f.untouched()
+		end)
+	end)
+	for _, mutation in ipairs({"missing", "empty", "invalid caption", "hidden platform"}) do
+		helpers.it("profile-headings: no native fallback repairs " .. mutation .. " declaration", function()
+			with_headings(true, function(f)
+				for _, section in ipairs(sections) do
+					if mutation == "missing" then f.document[section] = nil
+					elseif mutation == "empty" then f.document[section] = {}
+					elseif mutation == "invalid caption" then
+						for _, row in ipairs(f.document[section]) do if row.i18n then row.i18n = false end end
+					else for _, row in ipairs(f.document[section]) do row.platforms = {f.other_platform} end end
+				end
+				local rows = f.rows()
+				helpers.assert_nil(position(rows, f.caption(expected.keys[1])))
+				helpers.assert_nil(position(rows, f.caption(expected.keys[2])))
+				helpers.assert_not_nil(position(rows, "Canonical"), "native data rows must survive absent presentation")
+				f.untouched()
+			end)
+		end)
+	end
+	helpers.it("profile-headings: all 21 original caption pairs keep the platform decoration", function()
+		with_headings(true, function(f)
+			local count = 0
+			for language, pair in pairs(expected.captions) do
+				count = count + 1
+				local values = read_json("data/locales/" .. language .. ".json")
+				helpers.assert_eq({values[expected.keys[1]], values[expected.keys[2]]}, pair, language)
+				f.i18n.get = function(key) return values[key] or key end
+				local rows = f.rows()
+				helpers.assert_not_nil(position(rows, f.decorate(pair[1])), language)
+				helpers.assert_not_nil(position(rows, f.decorate(pair[2])), language)
+			end
+			helpers.assert_eq(count, 21)
+			f.untouched()
+		end)
+	end)
+
+	helpers.it("profile-headings: withdrawing inert declarations keeps the existing native activation receipt", function()
+		with_headings(true, function(f)
+			local _, builtin = position(f.rows(), "Advanced")
+			helpers.assert_type(builtin.fn,"function")
+			for _, section in ipairs(sections) do f.document[section] = nil end
+			helpers.assert_eq(builtin.fn(),true)
+			helpers.assert_eq(#f.fixture.selections,1)
+			helpers.assert_eq(f.fixture.selections[1].id,"advanced")
+			helpers.assert_eq(f.fixture.state.llm_active_profile,"advanced")
+		end)
+	end)
+	helpers.it("profile-headings: native pause still disables actual builtin choices", function()
+		with_headings(true, function(f)
+			f.fixture.native_dependencies.script_control.is_paused=function() return true end
+			local _, builtin = position(f.rows(), "Advanced")
+			helpers.assert_true(builtin.disabled); helpers.assert_nil(builtin.fn)
+			f.untouched()
+		end)
+	end)
+end)
+
 return true

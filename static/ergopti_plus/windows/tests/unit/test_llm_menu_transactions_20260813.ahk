@@ -2691,3 +2691,144 @@ _LMT_ApiSemanticDetachedBuilder() {
 }
 Test("LLM API entries: actual detached config builder preserves inline and future records (config-full-semantic-successor)",
 	_LMT_ApiSemanticDetachedBuilder)
+
+; Fixed headings use the real provider, declared row materializer, and Win32 menu.
+_LMT_ProfileHeadingsNativeOwner() {
+	global _LLM_Menu, _SharedDir, _LMT_WriterCalls, _LMT_ApplyCalls
+	Root := _MR_GetManifestRoot()
+	Corpus := JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\menus\profile_section_headings.json"))
+	SavedBuiltin := Root["llm_profile_builtin_heading"]
+	SavedCustom := Root["llm_profile_custom_heading"]
+	Previous := _LMT_InstallFixture()
+	try {
+		for Section in ["llm_profile_builtin_heading", "llm_profile_custom_heading"] {
+			Expected := Corpus["sections"][Section]
+			AssertEqual(Expected.Length, Root[Section].Length)
+			for Index, Row in Expected {
+				for Key, Value in Row {
+					if Value is Array {
+						AssertEqual(Value.Length, Root[Section][Index][Key].Length)
+						for Position, Platform in Value
+							AssertEqual(Platform, Root[Section][Index][Key][Position])
+					} else AssertEqual(Value, Root[Section][Index][Key])
+				}
+			}
+		}
+		Rows := _LLM_Menu_ProfileRows()
+		AssertEqual(t("menu.profiles.header_default_profiles"), Rows[1]["label"])
+		AssertTrue(Rows[1]["disabled"])
+		AssertFalse(Rows[1].Has("action"))
+		Built := LLM_Menu_BuildProfileMenu()
+		try {
+			AssertEqual(t("menu.profiles.header_default_profiles"), _CTC_LabelAt(Built, 0))
+			State := DllCall("GetMenuState", "ptr", Built.Handle, "uint", 0, "uint", 0x400, "uint")
+			AssertFalse(State == 0xFFFFFFFF, "the native heading state must be a real Win32 receipt")
+			AssertTrue((State & 3) != 0)
+			Position := _LMT_ShowAllPosition(Built, t("menu.profiles.header_custom_profiles"))
+			AssertTrue(Position > 0)
+			AssertTrue((DllCall("GetMenuState", "ptr", Built.Handle, "uint", Position - 1, "uint", 0x400, "uint") & 0x800) != 0)
+			AssertTrue((DllCall("GetMenuState", "ptr", Built.Handle, "uint", Position, "uint", 0x400, "uint") & 3) != 0)
+			AssertTrue(InStr(_CTC_LabelAt(Built, Position + 1), "Live label") == 1)
+		} finally _CTC_ReleaseMenu(Built)
+		Changed := []
+		for Row in SavedCustom
+			Changed.Push(Row.Clone())
+		Changed[2]["i18n"] := "button.cancel"
+		Separator := Changed[1]
+		Changed[1] := Changed[2]
+		Changed[2] := Separator
+		Root["llm_profile_custom_heading"] := Changed
+		Built := LLM_Menu_BuildProfileMenu()
+		try {
+			Position := _LMT_ShowAllPosition(Built, t("button.cancel"))
+			AssertTrue((DllCall("GetMenuState", "ptr", Built.Handle, "uint", Position + 1, "uint", 0x400, "uint") & 0x800) != 0)
+			AssertTrue(InStr(_CTC_LabelAt(Built, Position + 2), "Live label") == 1)
+		} finally _CTC_ReleaseMenu(Built)
+		AssertEqual(0, _LMT_WriterCalls)
+		AssertEqual(0, _LMT_ApplyCalls)
+	} finally {
+		Root["llm_profile_builtin_heading"] := SavedBuiltin
+		Root["llm_profile_custom_heading"] := SavedCustom
+		_LMT_RestoreFixture(Previous)
+	}
+}
+Test("LLM profile headings: real declared source order caption disabled states and native data", _LMT_ProfileHeadingsNativeOwner)
+
+_LMT_ProfileHeadingsMissingDeclaration() {
+	global _LLM_Menu, _LMT_WriterCalls, _LMT_ApplyCalls
+	Root := _MR_GetManifestRoot()
+	SavedBuiltin := Root["llm_profile_builtin_heading"]
+	SavedCustom := Root["llm_profile_custom_heading"]
+	Previous := _LMT_InstallFixture()
+	try {
+		OriginalLength := _LLM_Menu_ProfileRows().Length
+		for Mode in ["missing", "empty", "invalid caption", "hidden platform"] {
+			for Section, Original in Map("llm_profile_builtin_heading", SavedBuiltin, "llm_profile_custom_heading", SavedCustom) {
+				if Mode == "missing" {
+					Root.Delete(Section)
+				} else if Mode == "empty" {
+					Root[Section] := []
+				} else {
+					Changed := []
+					for Row in Original {
+						Copy := Row.Clone()
+						if Mode == "invalid caption" && Copy.Has("i18n")
+							Copy["i18n"] := 2
+						if Mode == "hidden platform"
+							Copy["platforms"] := ["hs"]
+						Changed.Push(Copy)
+					}
+					Root[Section] := Changed
+				}
+			}
+			Rows := _LLM_Menu_ProfileRows()
+			AssertEqual(OriginalLength - 3, Rows.Length, Mode . " removes exactly the inert headings and their shared boundary")
+			SawCustom := false
+			for Row in Rows {
+				if Row.Has("label") {
+					AssertFalse(Row["label"] == t("menu.profiles.header_default_profiles"))
+					AssertFalse(Row["label"] == t("menu.profiles.header_custom_profiles"))
+					if InStr(Row["label"], "Live label") == 1 {
+						SawCustom := true
+						AssertTrue(HasMethod(Row["action"], "Call"))
+					}
+				}
+			}
+			AssertTrue(SawCustom, "native selectable profile data survives missing inert presentation")
+		}
+		AssertEqual(0, _LMT_WriterCalls)
+		AssertEqual(0, _LMT_ApplyCalls)
+	} finally {
+		Root["llm_profile_builtin_heading"] := SavedBuiltin
+		Root["llm_profile_custom_heading"] := SavedCustom
+		_LMT_RestoreFixture(Previous)
+	}
+}
+Test("LLM profile headings: actual provider refuses missing invalid or hidden shared presentation without fallback", _LMT_ProfileHeadingsMissingDeclaration)
+
+_LMT_ProfileHeadingsEmptyRegistry() {
+	global _LLM_Menu, _LMT_WriterCalls, _LMT_ApplyCalls
+	Root := _MR_GetManifestRoot()
+	SavedCustom := Root["llm_profile_custom_heading"]
+	Previous := _LMT_InstallFixture()
+	try {
+		_LLM_Menu["user_profiles"] := []
+		Before := _LLM_Menu_ProfileRows()
+		Root["llm_profile_custom_heading"] := [Map("type", "label", "id", "empty_registry_probe", "i18n", "button.cancel")]
+		After := _LLM_Menu_ProfileRows()
+		AssertEqual(Before.Length, After.Length)
+		for Index, Row in After {
+			if Row.Has("label") {
+				AssertEqual(Before[Index]["label"], Row["label"])
+				AssertFalse(Row["label"] == t("menu.profiles.header_custom_profiles"))
+				AssertFalse(Row["label"] == t("button.cancel"))
+			}
+		}
+		AssertEqual(0, _LMT_WriterCalls)
+		AssertEqual(0, _LMT_ApplyCalls)
+	} finally {
+		Root["llm_profile_custom_heading"] := SavedCustom
+		_LMT_RestoreFixture(Previous)
+	}
+}
+Test("LLM profile headings: empty native registry never materializes custom heading or boundary", _LMT_ProfileHeadingsEmptyRegistry)
