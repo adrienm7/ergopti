@@ -38,10 +38,11 @@ _RTP_Record(Kind, Result := 1, *) {
 ; test instead of the OS and the message loop.
 _RTP_NewPort() {
 	Probe := Map("alive", true, "terminated", 0, "closed", 0, "armed", [],
-		"now", 1000)
+		"now", 1000, "terminate_result", true, "terminate_throw", false,
+		"alive_throw", false, "delivery_throw", false)
 	return Map(
 		"probe", Probe,
-		"alive", (Successor) => Probe["alive"],
+		"alive", _RTP_PortAlive.Bind(Probe),
 		"terminate", _RTP_PortTerminate.Bind(Probe),
 		"close", _RTP_PortClose.Bind(Probe),
 		"arm", _RTP_PortArm.Bind(Probe),
@@ -50,8 +51,15 @@ _RTP_NewPort() {
 
 _RTP_PortTerminate(Probe, Successor) {
 	Probe["terminated"] += 1
-	Probe["alive"] := false
-	return true
+	if Probe["terminate_throw"]
+		throw Error("Injected native termination failure.")
+	return Probe["terminate_result"]
+}
+
+_RTP_PortAlive(Probe, Successor) {
+	if Probe["alive_throw"]
+		throw Error("Injected native liveness failure.")
+	return Probe["alive"]
 }
 
 _RTP_PortClose(Probe, Successor) {
@@ -60,6 +68,8 @@ _RTP_PortClose(Probe, Successor) {
 }
 
 _RTP_PortArm(Probe, Callback, DelayMs) {
+	if DelayMs == 1 && Probe["delivery_throw"]
+		throw Error("Injected deferred callback arming failure.")
 	Probe["armed"].Push(Map("fn", Callback, "ms", DelayMs))
 }
 
@@ -100,9 +110,32 @@ _RTP_Pending(Bundle, Port, SuccessFn := 0, CommitFn := 0, AbortFn := 0,
 
 ; Withdraws whatever record a failed assertion left behind.
 _RTP_Cleanup(Bundle) {
-	global _ReloadTerminalHandoff
-	if (_ReloadTerminalHandoff is Map)
-		ReloadTerminalHandoffCancel(_ReloadTerminalHandoff)
+	global _ReloadTerminalHandoff, _ReloadTerminalRetirements
+	Records := []
+	if (_ReloadTerminalHandoff is Map) && _ReloadTerminalHandoff["bundle"] == Bundle
+		Records.Push(_ReloadTerminalHandoff)
+	for Id, Record in _ReloadTerminalRetirements {
+		if Record["bundle"] == Bundle && !((_ReloadTerminalHandoff is Map) && _ReloadTerminalHandoff == Record)
+			Records.Push(Record)
+	}
+	for Record in Records {
+		if Record["state"] == "authorized"
+			ReloadTerminalHandoffCancel(Record)
+		else {
+			Port := Record["port"]
+			AssertTrue(Port.Get("probe", 0) is Map, "Direct cleanup must own its data-only successor model.")
+			Port["probe"]["alive_throw"] := false
+			Port["probe"]["delivery_throw"] := false
+			Port["probe"]["alive"] := false
+			if Record["state"] != "stopping" && Record["state"] != "refusal_ready" && Record["state"] != "abandon_ready"
+				ReloadTerminalHandoffRefuse(Record, "direct test cleanup")
+			loop 4
+				_RTP_RunArmed(Port)
+			if Record["state"] == "abandon_ready"
+				ReloadTerminalHandoffAbandon(Record, "direct test cleanup")
+		}
+		AssertFalse(_ReloadTerminalHandoffOwns(Record), "Cleanup cannot release a still-owned successor or callback.")
+	}
 	_ConfigWriteTerminalRelease(Bundle)
 }
 
@@ -275,6 +308,9 @@ _RTP_OnExitVetoStopsTheWaitingSuccessor() {
 				Stage . ": a vetoed Reload close request refuses the reload")
 			AssertEqual(1, Port["probe"]["terminated"],
 				Stage . ": the successor waiting on this window must be stopped")
+			AssertEqual(0, Port["probe"]["closed"], "No close occurs on the termination request alone.")
+			Port["probe"]["alive"] := false
+			_RTP_RunArmed(Port)
 			_RTP_RunArmed(Port)
 			Expected := (Stage == "committed" || Stage == "commit_failed")
 				? "launch,commit,abort,retract,refused,release"
@@ -297,15 +333,18 @@ _RTP_ExitSupersedesThePendingReload() {
 		Record := _RTP_Pending(Bundle, Port, _RTP_Record.Bind("success"),
 			_RTP_Record.Bind("commit"), _RTP_Record.Bind("abort"),
 			_RTP_Record.Bind("refused"), _RTP_Record.Bind("release"))
+		AssertFalse(ReloadTerminalHandoffAbandon(Record, "Exit"), "A request cannot acknowledge a still-live process.")
+		Port["probe"]["alive"] := false
+		_RTP_RunArmed(Port)
 		AssertTrue(ReloadTerminalHandoffAbandon(Record, "Exit"))
 		AssertEqual(1, Port["probe"]["terminated"],
 			"an accepted exit must stop the successor it supersedes")
 		AssertEqual("launch,abort", _RTP_Join(_RTP_Events),
 			"an exit keeps the committed configuration and rolls nothing back")
 		AssertFalse(ReloadTerminalHandoffPending())
-		AssertEqual(1, _RTP_RunArmed(Port))
+		AssertEqual(0, _RTP_RunArmed(Port))
 		AssertEqual(0, Port["probe"]["armed"].Length,
-			"the stale probe must find no record and stop")
+			"the physical stop poll already drained the stale pending probe")
 		AssertEqual(1, Port["probe"]["closed"])
 	} finally _RTP_Cleanup(Bundle)
 }
