@@ -203,6 +203,12 @@ const STEP_CONDITIONS = [
 	[
 		MACOS_BOX,
 		'package-macos',
+		'Retain installed-VHD ancestry diagnostic evidence',
+		"${{ always() && steps.installed-vhd-acl.outputs.evidence_parent != '' }}"
+	],
+	[
+		MACOS_BOX,
+		'package-macos',
 		'Retain archive diagnostic session',
 		"${{ always() && steps.swift-launcher-tests.outputs.archive_session_dir != '' }}"
 	],
@@ -1343,6 +1349,26 @@ for (const [name, expected] of [
 	);
 }
 errors.push(...stepProblems(pipeline.files()));
+for (const condition of ['', 'false', 'success()']) {
+	const head = '      - name: Retain installed-VHD ancestry diagnostic evidence\n';
+	const from =
+		head + "        if: ${{ always() && steps.installed-vhd-acl.outputs.evidence_parent != '' }}\n";
+	mustCatch(
+		'installed-VHD ancestry retained evidence condition ' + condition,
+		MACOS_BOX,
+		from,
+		head + (condition ? '        if: ' + condition + '\n' : ''),
+		stepProblems
+	);
+}
+mustCatch(
+	'missing mandatory installed-VHD ancestry evidence upload',
+	MACOS_BOX,
+	'      - name: Retain installed-VHD ancestry diagnostic evidence\n',
+	'      - name: Omitted installed-VHD ancestry diagnostic evidence\n',
+	stepProblems
+);
+
 for (const condition of ['', 'false', 'success()']) {
 	const head = '      - name: Retain archive diagnostic session\n';
 	const from =

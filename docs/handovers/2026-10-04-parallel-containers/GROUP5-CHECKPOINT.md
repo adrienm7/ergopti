@@ -959,3 +959,22 @@ The fixture also scopes its child shell-runner substitution through the existing
 cache owner, restoring its exact prior module on success or exception. The full
 local hygiene guard rejected the original unscoped fixture; independent causal
 replays now pass that unchanged guard and both normal/optimized persistence runs.
+
+A read-only installed-VHD ancestry prerequisite is now consumed by the macOS CI
+before the unchanged Swift tests. The existing guardian owns actual current
+Darwin C compilation and held-descriptor ACL sampling of / and /Library; the
+new caller retains its real process, WNOWAIT/group retirement, status and closed
+receipt before admitting a diagnostic. Current captured source/runtime/root
+identities and the absolute25-second success deadline fence acquisition, reads,
+retirement and final persistence. Worker30/observer35/retirement10 limits remain
+unchanged. Unknown or denied ACL samples grant no reference, fixture, installed
+runtime or capture authority; no ancestor mutation or package installation occurs.
+The workflow explicitly runs all19 new portable controls normally and optimized;
+the caller runs the unchanged22 controls in both modes. Independent actual private
+controls, mutation rejection, exact source/application and complete two-hunk YAML
+inverse pass. Genuine Darwin compilation, ACL samples and caller timing remain
+UNEXECUTED until the exact-SHA macOS run. Protected disposable references and
+both signature slices remain separate WP6 requirements; TODO31 stays partial.
+The pipeline wiring guard now registers only the exact ancestry artifact condition
+and adds three changed-condition and one missing-step refusal controls. Every
+previous guard and mutation assertion is preserved byte-exact by inverse removal.

@@ -271,6 +271,18 @@ jobs:
 
       # Keep XCTest serial: the lease tests install process-wide signal handlers
       # and fork/reap real children, so parallel workers would race each other.
+      - name: Observe native installed-VHD ancestry prerequisites
+        id: installed-vhd-acl
+        run: |
+          set -euo pipefail
+          evidence_parent="$(mktemp -d "$RUNNER_TEMP/installed-vhd-acl-evidence.XXXXXX")"
+          echo "evidence_parent=$evidence_parent" >> "$GITHUB_OUTPUT"
+          git rev-parse HEAD > "$evidence_parent/tested-sha.txt"
+          python3 -B -m unittest discover -s tools/diagnostics -p installed_vhd_acl_ci_test.py
+          python3 -O -B -m unittest discover -s tools/diagnostics -p installed_vhd_acl_ci_test.py
+          python3 -B tools/diagnostics/installed_vhd_acl_ci.py "$evidence_parent"
+        timeout-minutes: 2
+
       - name: Run Swift launcher tests
         id: swift-launcher-tests
         env:
@@ -315,6 +327,14 @@ jobs:
               exit 1
           fi
         timeout-minutes: 10
+
+      - name: Retain installed-VHD ancestry diagnostic evidence
+        if: ${{ always() && steps.installed-vhd-acl.outputs.evidence_parent != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: installed-vhd-acl-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ steps.installed-vhd-acl.outputs.evidence_parent }}
+          if-no-files-found: error
 
       - name: Upload Swift launcher failure transcript
         if: ${{ failure() && steps.swift-launcher-tests.outcome == 'failure' }}
