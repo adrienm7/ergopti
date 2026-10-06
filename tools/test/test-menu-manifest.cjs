@@ -4050,3 +4050,127 @@ checkPrivacyTriggerControls();
 		'Profile headings: independent declaration, original 21 captions, real three-driver fragment publication and clicked-child preservation.'
 	);
 }
+
+// Exact direct-row selectors reuse canonical commands without a second policy.
+{
+	const assertFrame = require('node:assert/strict');
+	const { validateChildTemplates } = require('../lib/menu-row-availability.cjs');
+	const originalFrame = {
+		frame: [
+			{ type: 'list', id: 'native_data' },
+			{ type: 'include', section: 'commands', row_id: 'clone', present_when: 'clone_present' },
+			{ type: 'include', section: 'commands', row_id: 'create' }
+		],
+		commands: [
+			{ type: 'command', id: 'create', i18n: 'menu.profiles.create_profile' },
+			{ type: 'command', id: 'clone', i18n: 'menu.profiles.clone_builtin' }
+		]
+	};
+	assertFrame.doesNotThrow(() => validateChildTemplates(originalFrame));
+	const controls = [
+		['empty selector', (m) => (m.frame[1].row_id = '')],
+		['unknown selector', (m) => (m.frame[1].row_id = 'absent')],
+		['wrong-case selector', (m) => (m.frame[1].row_id = 'Clone')],
+		['nonstring selector', (m) => (m.frame[1].row_id = false)],
+		['duplicate selector', (m) => (m.commands[0].id = 'clone')],
+		[
+			'nested selector',
+			(m) => {
+				m.commands[1] = { type: 'include', section: 'nested' };
+				m.nested = [{ type: 'command', id: 'clone' }];
+			}
+		],
+		['empty presence', (m) => (m.frame[1].present_when = '')],
+		['nonstring presence', (m) => (m.frame[1].present_when = true)],
+		['absent section', (m) => (m.frame[1].section = 'missing')],
+		['competing caption', (m) => (m.frame[1].i18n = 'native caption')]
+	];
+	for (const [name, mutate] of controls) {
+		const m = structuredClone(originalFrame);
+		mutate(m);
+		assertFrame.throws(() => validateChildTemplates(m), undefined, name);
+	}
+	const legacyFrame = structuredClone(originalFrame);
+	delete legacyFrame.frame[1].row_id;
+	delete legacyFrame.frame[1].present_when;
+	assertFrame.doesNotThrow(() => validateChildTemplates(legacyFrame));
+}
+
+// Presentation omission is opt-in and compiler-proven inert throughout its target.
+{
+	const assertPresentation = require('node:assert/strict');
+	const { validateChildTemplates } = require('../lib/menu-row-availability.cjs');
+	const original = {
+		frame: [
+			{ type: 'include', section: 'presentation', on_refusal: 'omit_presentation' },
+			{ type: 'list', id: 'native' }
+		],
+		presentation: [
+			{ type: 'section_header', i18n: 'menu.profiles.header_default_profiles' },
+			{ type: '---' },
+			{ type: 'include', section: 'nested' }
+		],
+		nested: [{ type: 'label', id: 'custom', i18n: 'menu.profiles.header_custom_profiles' }]
+	};
+	assertPresentation.doesNotThrow(() => validateChildTemplates(original));
+	const controls = [
+		['empty enum', (m) => (m.frame[0].on_refusal = '')],
+		['unknown enum', (m) => (m.frame[0].on_refusal = 'ignore')],
+		['wrong-case enum', (m) => (m.frame[0].on_refusal = 'OMIT_PRESENTATION')],
+		['false enum', (m) => (m.frame[0].on_refusal = false)],
+		['wrong owner', (m) => (m.frame[1].on_refusal = 'omit_presentation')],
+		['missing target', (m) => (m.frame[0].section = 'missing')],
+		['empty target', (m) => (m.presentation = [])],
+		['malformed header', (m) => (m.presentation[0].i18n = '')],
+		['header action', (m) => (m.presentation[0].action = 'native')],
+		['header getter', (m) => (m.presentation[0].caption_getter = 'read')],
+		['header children', (m) => (m.presentation[0].items = [])],
+		['nested presence', (m) => (m.presentation[2].present_when = 'read')],
+		['nested omission', (m) => (m.presentation[2].on_refusal = 'omit_presentation')],
+		['nested cycle', (m) => (m.presentation[2].section = 'presentation')],
+		['unknown row', (m) => (m.nested[0].type = 'unknown')],
+		['command', (m) => (m.nested[0].type = 'command')],
+		['check', (m) => (m.nested[0].type = 'check')],
+		['group', (m) => (m.nested[0].type = 'group')],
+		['list', (m) => (m.nested[0] = { type: 'list', id: 'native' })],
+		['feature', (m) => (m.nested[0].type = 'feature')],
+		[
+			'hidden clicked row',
+			(m) =>
+				(m.nested[0] = {
+					type: 'command',
+					id: 'native',
+					i18n: 'caption',
+					platforms: ['ahk'],
+					unavailable: 'hide'
+				})
+		],
+		[
+			'mixed target selected safe row',
+			(m) => {
+				m.frame[0].row_id = 'safe';
+				m.presentation[0].id = 'safe';
+				m.presentation.push({ type: 'command', id: 'unsafe', i18n: 'caption' });
+			}
+		],
+		['wrong platform shape', (m) => (m.presentation[0].platforms = 'hs')],
+		['unknown platform', (m) => (m.presentation[0].platforms = ['other'])],
+		['duplicate platform', (m) => (m.presentation[0].platforms = ['hs', 'hs'])]
+	];
+	for (const [name, mutate] of controls) {
+		const menu = structuredClone(original);
+		mutate(menu);
+		assertPresentation.throws(() => validateChildTemplates(menu), undefined, name);
+	}
+	const selected = structuredClone(original);
+	selected.presentation[0].id = 'safe';
+	selected.frame[0].row_id = 'safe';
+	assertPresentation.doesNotThrow(() => validateChildTemplates(selected));
+	const conditional = structuredClone(original);
+	conditional.frame[0].present_when = 'native_present';
+	assertPresentation.doesNotThrow(() => validateChildTemplates(conditional));
+	const ordinary = structuredClone(original);
+	delete ordinary.frame[0].on_refusal;
+	ordinary.nested[0].type = 'command';
+	assertPresentation.doesNotThrow(() => validateChildTemplates(ordinary));
+}

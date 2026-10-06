@@ -578,9 +578,105 @@ MenuRenderer_StatusRows(ManifestKey, RowId, Status) {
 	return _MR_TemplateRows(ManifestKey, Map(), Map(), Map(), Map(), Def)
 }
 
+; Preflight the complete presentation target before collecting any callback/getter rows.
+_MR_TemplateInertPresentation(ManifestKey, Checking, RowId := unset) {
+	Def := _MR_GetMenuDef(ManifestKey)
+	if Checking.Has(ManifestKey) || Def.Length == 0
+		return false
+	if IsSet(RowId) {
+		Matches := 0
+		for Item in Def {
+			if _MR_Get(Item, "id") == RowId {
+				Matches += 1
+			}
+		}
+		if Matches != 1
+			return false
+	}
+	Checking[ManifestKey] := true
+	Loop Def.Length
+		if !Def.Has(A_Index)
+			return false
+	for Item in Def {
+		if !(Item is Map)
+			return false
+		Kind := _MR_Get(Item, "type")
+		if Kind == "include" {
+			Fields := Map("type", true, "section", true, "row_id", true)
+			Section := _MR_Get(Item, "section")
+			if Type(Section) != "String" || Section == ""
+				|| (Item.Has("row_id") && (Type(Item["row_id"]) != "String" || Item["row_id"] == ""))
+				return false
+			Valid := Item.Has("row_id")
+				? _MR_TemplateInertPresentation(Section, Checking, Item["row_id"])
+				: _MR_TemplateInertPresentation(Section, Checking)
+			if !Valid
+				return false
+		} else if Kind == "---" {
+			Fields := Map("type", true, "platforms", true, "unavailable", true)
+			if Item.Has("unavailable") && !(Item["unavailable"] == "hide")
+				return false
+		} else if Kind == "label" || Kind == "section_header" {
+			Fields := Map("type", true, "id", true, "i18n", true, "platforms", true, "unavailable", true)
+			Id := _MR_Get(Item, "id")
+			Caption := _MR_Get(Item, "i18n")
+			Unavailable := _MR_Get(Item, "unavailable")
+			if Type(Caption) != "String" || Caption == ""
+				|| (Item.Has("id") && (Type(Id) != "String" || Id == ""))
+				|| (Kind == "label" && !Item.Has("id"))
+				return false
+			if Kind == "section_header" {
+				Fields["reason_key"] := true
+				if Item.Has("unavailable") && !(Unavailable == "hide") && !(Unavailable == "grey")
+					return false
+				if Unavailable == "grey" && !Item.Has("reason_key")
+					return false
+				if Item.Has("reason_key") && (Type(Item["reason_key"]) != "String" || Item["reason_key"] == "" || Unavailable == "hide")
+					return false
+			} else if Item.Has("unavailable") && !(Unavailable == "hide")
+				return false
+		} else
+			return false
+		for Field in Item
+			if !Fields.Has(Field)
+				return false
+		if Item.Has("platforms") {
+			Platforms := Item["platforms"]
+			if !(Platforms is Array) || Platforms.Length == 0
+				return false
+			Seen := Map()
+			Loop Platforms.Length {
+				if !Platforms.Has(A_Index)
+					return false
+				Platform := Platforms[A_Index]
+				if Type(Platform) != "String" || (!(Platform == "ahk") && !(Platform == "hs") && !(Platform == "linux")) || Seen.Has(Platform)
+					return false
+				Seen[Platform] := true
+			}
+		}
+	}
+	Checking.Delete(ManifestKey)
+	return true
+}
+
 ; Includes retain their declaration's original command readiness policy.
-_MR_TemplateRows(ManifestKey, Commands, StateGetters, Children, Visiting, StatusDefinition := unset) {
+_MR_TemplateRows(ManifestKey, Commands, StateGetters, Children, Visiting, StatusDefinition := unset, RowId := unset) {
 	Def := IsSet(StatusDefinition) ? StatusDefinition : _MR_GetMenuDef(ManifestKey)
+	if IsSet(RowId) {
+		Selected := false
+		Matches := 0
+		for Item in Def {
+			if _MR_Get(Item, "id") == RowId {
+				Selected := Item
+				Matches += 1
+			}
+		}
+		if Type(RowId) != "String" || RowId == "" || Matches != 1 {
+			try LoggerError("MenuRenderer", "Missing or ambiguous child-template row '{1}.{2}' — rows refused.", ManifestKey, RowId)
+			return false
+		}
+		Def := [Selected]
+	}
 	if Visiting.Has(ManifestKey) || Def.Length == 0 {
 		try LoggerError("MenuRenderer", "Missing or cyclic child template '{1}' — provider rows refused.", ManifestKey)
 		return false
@@ -588,15 +684,72 @@ _MR_TemplateRows(ManifestKey, Commands, StateGetters, Children, Visiting, Status
 	Visiting[ManifestKey] := true
 	Rows := []
 	for Item in Def {
+		if Item.Has("on_refusal") && _MR_Get(Item, "type") != "include" {
+			try LoggerError("MenuRenderer", "Invalid presentation omission policy in '{1}' — rows refused.", ManifestKey)
+			return false
+		}
 		if !_MR_IsForAhk(Item) && !(_MR_Get(Item, "type") == "section_header" && _MR_Get(Item, "unavailable") == "grey")
 			continue
 		ItemType := _MR_Get(Item, "type")
 		Id := _MR_Get(Item, "id")
 		if ItemType == "include" {
-			Included := _MR_TemplateRows(_MR_Get(Item, "section"), Commands, StateGetters, Children, Visiting)
-			if !(Included is Array)
+			Fields := Map("type", true, "section", true, "row_id", true, "present_when", true, "on_refusal", true)
+			for Field in Item
+				if !Fields.Has(Field)
+					return false
+			Section := _MR_Get(Item, "section")
+			if Type(Section) != "String" || Section == ""
 				return false
-			for Child in Included
+			Target := _MR_GetMenuDef(Section)
+			Omit := Item.Has("on_refusal") && Item["on_refusal"] == "omit_presentation"
+			if (Item.Has("on_refusal") && !Omit) || (!Omit && Target.Length == 0)
+				return false
+			if Item.Has("row_id") {
+				SelectedId := Item["row_id"]
+				Matches := 0
+				for Child in Target
+					if _MR_Get(Child, "id") == SelectedId
+						Matches += 1
+				if Type(SelectedId) != "String" || SelectedId == "" || Matches != 1
+					return false
+			}
+			Present := true
+			if Item.Has("present_when") {
+				GetterKey := Item["present_when"]
+				if Type(GetterKey) != "String" || GetterKey == "" || !StateGetters.Has(GetterKey)
+					|| !HasMethod(StateGetters[GetterKey], "Call")
+					return false
+				try Present := StateGetters[GetterKey].Call()
+				catch
+					return false
+				if Type(Present) != "Integer" || (Present != 0 && Present != 1)
+					return false
+			}
+			PresentationValid := !Omit || (Item.Has("row_id")
+				? _MR_TemplateInertPresentation(Section, Map(), Item["row_id"])
+				: _MR_TemplateInertPresentation(Section, Map()))
+			if !PresentationValid {
+				try LoggerError("MenuRenderer", "Invalid inert presentation include '{1}' in '{2}' — presentation omitted.", Section, ManifestKey)
+			} else if Present {
+				Included := Item.Has("row_id")
+					? _MR_TemplateRows(_MR_Get(Item, "section"), Commands, StateGetters, Children, Visiting, , Item["row_id"])
+					: _MR_TemplateRows(_MR_Get(Item, "section"), Commands, StateGetters, Children, Visiting)
+				if !(Included is Array)
+					return false
+				for Child in Included
+					Rows.Push(Child)
+			}
+			continue
+		}
+		if ItemType == "list" {
+			Fields := Map("type", true, "id", true, "platforms", true, "unavailable", true)
+			for Field in Item
+				if !Fields.Has(Field)
+					return false
+			Supplied := Children.Has(Id) ? _MR_TemplateNativeChildren(Id, Children[Id]) : false
+			if !(Supplied is Array)
+				return false
+			for Child in Supplied
 				Rows.Push(Child)
 			continue
 		}
@@ -653,8 +806,11 @@ _MR_TemplateRows(ManifestKey, Commands, StateGetters, Children, Visiting, Status
 			Row := MenuRenderer_CheckRow(ManifestKey, Id, Commands, StateGetters)
 			if !(Row is Map)
 				return false
-		} else if ItemType == "group" && Children.Has(Id) && Children[Id] is Array {
-			Row := Map("label", t(_MR_Get(Item, "i18n")), "items", Children[Id])
+		} else if ItemType == "group" && Children.Has(Id) && (Children[Id] is Array || HasMethod(Children[Id], "Call")) {
+			Items := Children[Id] is Array ? Children[Id] : _MR_TemplateNativeChildren(Id, Children[Id])
+			if !(Items is Array)
+				return false
+			Row := Map("label", t(_MR_Get(Item, "i18n")), "items", Items)
 			if Item.Has("disabled_when") && MenuRenderer_ResolveDisabledWhen(ManifestKey, Id, StateGetters) {
 				Row["disabled"] := true
 				if Item.Has("disabled_reason_key")
@@ -683,6 +839,32 @@ _MR_TemplateRows(ManifestKey, Commands, StateGetters, Children, Visiting, Status
 	}
 	Visiting.Delete(ManifestKey)
 	return Rows
+}
+
+; Shares strict native provider admission between template lists and lazy groups.
+_MR_TemplateNativeChildren(Id, Provider) {
+	if Type(Id) != "String" || Id == "" || !HasMethod(Provider, "Call")
+		return false
+	try Supplied := Provider.Call()
+	catch
+		return false
+	if !(Supplied is Array)
+		return false
+	loop Supplied.Length {
+		if !Supplied.Has(A_Index)
+			return false
+		Child := Supplied[A_Index]
+		if !(Child is Map) || Child.Has("title") || Child.Has("fn") || Child.Has("menu")
+			|| (Child.Has("separator") && (Type(Child["separator"]) != "Integer"
+				|| (Child["separator"] != 0 && Child["separator"] != 1)))
+			|| (!(Child.Has("separator") && Child["separator"] == 1)
+				&& !(Child.Has("label") && Type(Child["label"]) == "String" && Child["label"] != ""))
+			return false
+	}
+	Canonical := []
+	for Child in Supplied
+		Canonical.Push(Child)
+	return Canonical
 }
 
 MenuRenderer_CheckRow(ManifestKey, CheckId, Commands, StateGetters := unset) {
