@@ -1,0 +1,57 @@
+{
+	"corpus_comment": "Independent existing Refresh caption snapshots and handwritten declaration/port expectations, captured before provider migration. Shared presentation; native cached-status and deferred-refresh callbacks remain their original owners. Linux has no existing system refresh operation.",
+	"section": "gesture_system_status_controls",
+	"rows": [
+		{
+			"type": "command",
+			"id": "gesture_system_refresh",
+			"i18n": "ui_apps.btn_refresh",
+			"platforms": ["ahk", "hs"],
+			"unavailable": "hide"
+		}
+	],
+	"platform_rows": {
+		"ahk": ["gesture_system_refresh"],
+		"hs": ["gesture_system_refresh"],
+		"linux": []
+	},
+	"cached_children": {
+		"hs": ["conflict", "pinch", "refresh"],
+		"ahk": [
+			"tap_3",
+			"swipe_3_up",
+			"swipe_3_down",
+			"swipe_3_left",
+			"swipe_3_right",
+			"tap_4",
+			"swipe_4_up",
+			"swipe_4_down",
+			"swipe_4_left",
+			"swipe_4_right",
+			"refresh"
+		]
+	},
+	"captions": {
+		"ar": "تحديث",
+		"cs": "Obnovit",
+		"da": "Opdatér",
+		"de": "Aktualisieren",
+		"en": "Refresh",
+		"es": "Actualizar",
+		"fr": "Rafraîchir",
+		"he": "רענן",
+		"hi": "ताज़ा करें",
+		"it": "Aggiorna",
+		"ja": "更新",
+		"ko": "새로 고침",
+		"nl": "Vernieuwen",
+		"no": "Oppdater",
+		"pl": "Odśwież",
+		"pt": "Atualizar",
+		"ru": "Обновить",
+		"sv": "Uppdatera",
+		"tr": "Yenile",
+		"uk": "Оновити",
+		"zh": "刷新"
+	}
+}

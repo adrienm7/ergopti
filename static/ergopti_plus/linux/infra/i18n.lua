@@ -18,6 +18,8 @@
 --- ==============================================================================
 
 local M = {}
+local _scope_busy = false
+local _scope_owner, _scope_generation, _scope_receipts = nil, 0, setmetatable({}, { __mode = "k" })
 
 local locale_mod = require("infra.locale")
 local Logger     = require("logger.shim")
@@ -159,6 +161,8 @@ end
 --- Initialises the i18n module: loads the persisted locale and applies it.
 --- Must be called once at daemon startup. Idempotent.
 function M.init()
+	if _scope_owner ~= nil or _scope_busy then return false end
+	_scope_generation = _scope_generation + 1
 	if _available and #_available > 0 then
 		-- Already initialised — skip.
 		return
@@ -213,6 +217,8 @@ end
 --- @param code string Locale code (must be in _available).
 --- @return boolean True only after storage confirms the explicit selection.
 function M.persist_locale(code)
+	if _scope_owner ~= nil or _scope_busy then return false end
+	_scope_generation = _scope_generation + 1
 	if type(code) ~= "string" or code == "" then return false end
 
 	-- Verify the locale is available.
@@ -240,6 +246,8 @@ end
 --- @param code string Locale code (must be in _available).
 --- @return boolean True when the active locale needs no change or was persisted.
 function M.set_locale(code)
+	if _scope_owner ~= nil or _scope_busy then return false end
+	_scope_generation = _scope_generation + 1
 	if code == _locale then return true end
 	return M.persist_locale(code)
 end
@@ -286,6 +294,8 @@ end
 --- Passthrough for macOS API parity.
 --- @param fn function|nil
 function M.set_locale_injector(fn)
+	if _scope_owner ~= nil or _scope_busy then return false end
+	_scope_generation = _scope_generation + 1
 	-- On Linux, persistence is handled by storage.lua (see _save_locale).
 	-- Kept for API parity with macOS.
 end
@@ -315,6 +325,165 @@ end
 --- @return string
 function M.section(key)
 	return M.decorate_section(M.get(key))
+end
+
+local function scope_known(value)
+	if type(value) ~= "string" then return false end
+	for _, code in ipairs(_available or {}) do if code == value then return true end end
+	return false
+end
+
+local function scope_ready()
+	if not rawequal(package.loaded["infra.locale"], locale_mod) then return false end
+	if not (type(_available) == "table" and #_available > 0) or not scope_known(_locale) or locale_mod.current_locale() ~= _locale then return false end
+	local strings = locale_mod.all()
+	return type(strings) == "table" and next(strings) ~= nil
+end
+
+--- Reads only the declared locale state this module owns; no persistence occurs here.
+local function scope_state()
+	return { module = package.loaded["infra.i18n"], locale = _locale, backend = locale_mod.current_locale(),
+		setter = locale_mod.set_locale, getter = locale_mod.current_locale, loader = locale_mod.all, backend_parent = package.loaded["infra.locale"],
+		core_parent = package.loaded["locale.core"] }
+end
+
+local function scope_equal(left, right)
+	return rawequal(left.module, right.module) and left.locale == right.locale and left.backend == right.backend and left.setter == right.setter and left.getter == right.getter and left.loader == right.loader
+		and rawequal(left.backend_parent, right.backend_parent) and rawequal(left.core_parent, right.core_parent)
+end
+
+--- Acquires the declared runtime field for one primary transaction token.
+--- @param owner table Exact token; pending() describes primary compensation only.
+--- @return boolean acquired
+local function scope_acquire_impl(owner)
+	if type(owner) ~= "table" or type(owner.pending) ~= "function" or _scope_owner ~= nil
+		or not rawequal(package.loaded["infra.i18n"], M) then return false end
+	if not scope_ready() or not rawequal(package.loaded["infra.i18n"], M) then return false end
+	_scope_owner = owner
+	return true
+end
+
+function M.scope_acquire(owner)
+	if _scope_busy then return false end
+	_scope_busy = true
+	local called, acquired = pcall(scope_acquire_impl, owner)
+	_scope_busy = false
+	return called and acquired == true
+end
+
+--- Releases the admission gate while retaining opaque inverse receipts.
+--- @param owner table Exact token.
+--- @return boolean released
+function M.scope_release(owner)
+	if _scope_busy or not rawequal(_scope_owner, owner) or owner.pending() ~= false then return false end
+	_scope_owner = nil
+	return true
+end
+
+--- Captures an opaque, source-bound runtime inverse under the native claim.
+--- @param owner table Exact token.
+--- @return table|nil receipt
+local function scope_capture_impl(owner)
+	if not rawequal(_scope_owner, owner) or not rawequal(package.loaded["infra.i18n"], M) then return nil end
+	local generation = _scope_generation
+	local receipt, before = {}, scope_state()
+	if not rawequal(_scope_owner, owner) or not rawequal(package.loaded["infra.i18n"], M) or _scope_generation ~= generation then return nil end
+	_scope_receipts[receipt] = { owner = owner, before = before, expected = before, generation = _scope_generation }
+	return receipt
+end
+
+function M.scope_capture(owner)
+	if _scope_busy then return nil end
+	_scope_busy = true
+	local called, result = pcall(scope_capture_impl, owner)
+	_scope_busy = false
+	if not called then return nil end
+	return result
+end
+
+--- Applies one canonical value after proving the captured runtime still owns it.
+--- @param owner table Exact token.
+--- @param receipt table Native opaque receipt.
+--- @param value string Available canonical locale.
+--- @return boolean applied
+local function scope_apply_impl(owner, receipt, value)
+	local data = _scope_receipts[receipt]
+	if not rawequal(_scope_owner, owner) or not data or not rawequal(data.owner, owner) or data.forgotten or data.attempted
+		or data.generation ~= _scope_generation or not scope_equal(scope_state(), data.expected)
+		or not rawequal(package.loaded["infra.i18n"], M) then return false end
+	if type(value) ~= "string" or not scope_known(value) then return false end
+	local next_value = {}
+	for key, child in pairs(data.before) do next_value[key] = child end
+	next_value.locale, next_value.backend = value, value
+	_scope_generation = _scope_generation + 1
+	data.generation, data.expected, data.attempted = _scope_generation, next_value, true
+	local called = pcall(function()
+		if locale_mod.set_locale(next_value.locale) == false then error("native translation backend refused") end
+		local strings = locale_mod.all()
+		if type(strings) ~= "table" or next(strings) == nil then error("native locale strings are unavailable") end
+		_locale = next_value.locale
+	end)
+	local observed = scope_state()
+	return called and scope_equal(observed, next_value) and rawequal(_scope_owner, owner)
+		and rawequal(package.loaded["infra.i18n"], M) and data.generation == _scope_generation
+end
+
+function M.scope_apply(owner, receipt, value)
+	if _scope_busy then return false end
+	_scope_busy = true
+	local called, result = pcall(scope_apply_impl, owner, receipt, value)
+	_scope_busy = false
+	if not called then return false end
+	return result
+end
+
+--- Restores only this receipt's acknowledged or interrupted scalar publication.
+--- @param owner table Exact token.
+--- @param receipt table Native opaque receipt.
+--- @return boolean restored
+local function scope_restore_impl(owner, receipt)
+	local data = _scope_receipts[receipt]
+	if not rawequal(_scope_owner, owner) or not data or not rawequal(data.owner, owner) or data.forgotten or data.generation ~= _scope_generation then return false end
+	local current = scope_state()
+	if not rawequal(current.module, M) or not rawequal(package.loaded["infra.i18n"], M) or not (rawequal(current.module, data.before.module) and current.setter == data.before.setter and current.getter == data.before.getter and current.loader == data.before.loader
+		and rawequal(current.backend_parent, data.before.backend_parent) and rawequal(current.core_parent, data.before.core_parent)
+		and (current.locale == data.before.locale or current.locale == data.expected.locale)
+		and (current.backend == data.before.backend or current.backend == data.expected.backend)) then return false end
+	if not data.attempted or data.restored then return scope_equal(current, data.before) end
+	local called = pcall(function()
+		if locale_mod.set_locale(data.before.locale) == false then error("native translation backend restore refused") end
+		local strings = locale_mod.all()
+		if type(strings) ~= "table" or next(strings) == nil then error("native locale strings are unavailable") end
+		_locale = data.before.locale
+	end)
+	local observed = scope_state()
+	if not called or not scope_equal(observed, data.before) or not rawequal(_scope_owner, owner)
+		or not rawequal(package.loaded["infra.i18n"], M) or data.generation ~= _scope_generation then return false end
+	_scope_generation = _scope_generation + 1
+	data.generation, data.expected, data.restored = _scope_generation, data.before, true
+	return true
+end
+
+function M.scope_restore(owner, receipt)
+	if _scope_busy then return false end
+	_scope_busy = true
+	local called, result = pcall(scope_restore_impl, owner, receipt)
+	_scope_busy = false
+	if not called then return false end
+	return result
+end
+
+--- Forgets only a finalized inverse, without changing live native state.
+--- @param owner table Exact primary token.
+--- @param receipt table Native opaque receipt.
+--- @return boolean forgotten
+function M.scope_forget(owner, receipt)
+	local data = _scope_receipts[receipt]
+	if _scope_busy or rawequal(_scope_owner, owner) or not data or not rawequal(data.owner, owner) or owner.pending() ~= false then return false end
+	if data.forgotten then return true end
+	data.before, data.expected, data.generation = nil, nil, nil
+	data.forgotten = true
+	return true
 end
 
 return M

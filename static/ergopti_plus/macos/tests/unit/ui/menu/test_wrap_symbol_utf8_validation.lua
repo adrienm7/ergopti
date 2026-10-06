@@ -62,7 +62,9 @@ local function run_action(responses)
 			decorate_section = function(value) return value end,
 		}
 		package.loaded["ui.menu.menu_utils"] = {}
+		local NativeManifestMenu = require("infra.manifest_menu")
 		package.loaded["infra.manifest_menu"] = {
+			template_rows = NativeManifestMenu.template_rows,
 			build = function(_, _, _, _, _, providers)
 				return providers.wrap_symbols_menu()
 			end,

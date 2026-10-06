@@ -32,6 +32,7 @@ import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { runInNewContext } from 'vm';
 import sharedPaths from '../lib/paths.cjs';
+import menuAvailability from '../lib/menu-row-availability.cjs';
 import { validateTiming } from '../../static/ergopti_plus/_shared/modules/updater/schedule.js';
 
 const { shared } = sharedPaths;
@@ -54,7 +55,7 @@ const HEADER = {
 		"'feature' = manifest-path toggle, " +
 		"'action' = stateless button, 'dynamic' = rendered by platform code, " +
 		"'group' = named submenu, 'include' = reused child-template section, " +
-		"'section_header' = disabled label, '---' = separator, " +
+		"'label' = inert provider-template caption, 'section_header' = disabled header, '---' = separator, " +
 		"'list' = rows supplied at build time by a named provider, 'letter_picker' = " +
 		'the A-Z chooser. The last two were in use and undocumented here, which matters ' +
 		"because 'list' is the ONLY type that moves a row from the driver into the " +
@@ -89,40 +90,7 @@ const PLATFORMS = ['ahk', 'hs', 'linux'];
  * @param {object} menu The parsed [menu] tables.
  */
 function validateGreyedRows(menu) {
-	for (const [key, rows] of Object.entries(menu)) {
-		if (!Array.isArray(rows)) continue;
-		for (const row of rows) {
-			if (!row || typeof row !== 'object') continue;
-			const where = `menu.${key} row "${row.id || row.path || row.i18n || row.type}"`;
-			const labelled = typeof row.i18n === 'string' && row.i18n !== '';
-			if (row.unavailable !== undefined) {
-				if (row.unavailable !== 'hide' && row.unavailable !== 'grey')
-					throw new Error(`${where}: unavailable must be "hide" or "grey"`);
-				const restricted =
-					Array.isArray(row.platforms) && PLATFORMS.some((p) => !row.platforms.includes(p));
-				if (!restricted)
-					throw new Error(`${where}: unavailable needs platforms that leave some platform out`);
-				if (row.unavailable === 'hide' && row.reason_key !== undefined)
-					throw new Error(`${where}: a hidden row carries no reason_key`);
-				if (row.unavailable === 'grey') {
-					if (typeof row.reason_key !== 'string' || row.reason_key === '')
-						throw new Error(`${where}: a greyed row needs its reason_key`);
-					if (!labelled) throw new Error(`${where}: a greyed row needs an i18n label`);
-				}
-			}
-			if (row.disabled_reason_key !== undefined) {
-				if (typeof row.disabled_reason_key !== 'string' || row.disabled_reason_key === '')
-					throw new Error(`${where}: disabled_reason_key must name a locale key`);
-				if (row.type !== 'command')
-					throw new Error(`${where}: disabled_reason_key is read on command rows only`);
-				if (!Array.isArray(row.disabled_when) || row.disabled_when.length === 0)
-					throw new Error(
-						`${where}: disabled_reason_key needs the disabled_when that greys the row`
-					);
-				if (!labelled) throw new Error(`${where}: a greyed row needs an i18n label`);
-			}
-		}
-	}
+	menuAvailability.validateMenuAvailability(menu);
 }
 
 /** Refuses effects or ambiguous fields in an existing provider's inert status. */
@@ -167,40 +135,7 @@ function validateProviderStatus(menu) {
 
 /** Validates the child-template composition and caption-reader vocabulary. */
 function validateChildTemplates(menu) {
-	for (const [key, rows] of Object.entries(menu)) {
-		if (!Array.isArray(rows)) continue;
-		for (const row of rows) {
-			const where = `menu.${key} row "${row.id || row.type}"`;
-			if (row.type === 'include') {
-				if (typeof row.section !== 'string' || !Array.isArray(menu[row.section]))
-					throw new Error(`${where}: include needs an existing menu section`);
-				if (Object.keys(row).some((field) => !['type', 'section'].includes(field)))
-					throw new Error(`${where}: include only composes an existing section`);
-			}
-			if (
-				row.caption_getter !== undefined &&
-				(!['command', 'group'].includes(row.type) ||
-					typeof row.caption_getter !== 'string' ||
-					row.caption_getter === '' ||
-					typeof row.id !== 'string' ||
-					row.id === '' ||
-					typeof row.i18n !== 'string' ||
-					row.i18n === '')
-			)
-				throw new Error(`${where}: caption_getter needs a labelled command or group identity`);
-		}
-	}
-	const visiting = new Set();
-	const visited = new Set();
-	function visit(key) {
-		if (visiting.has(key)) throw new Error(`menu.${key}: cyclic child-template include`);
-		if (visited.has(key)) return;
-		visiting.add(key);
-		for (const row of menu[key]) if (row.type === 'include') visit(row.section);
-		visiting.delete(key);
-		visited.add(key);
-	}
-	for (const [key, rows] of Object.entries(menu)) if (Array.isArray(rows)) visit(key);
+	menuAvailability.validateChildTemplates(menu);
 }
 
 /** Projects the updater's actual validated registry without inventing a feature enum. */

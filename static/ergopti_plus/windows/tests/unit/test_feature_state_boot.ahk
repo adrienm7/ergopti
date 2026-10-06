@@ -124,3 +124,37 @@ TestFeatureStateBootSemanticSources() {
 }
 Test("feature-state startup: semantic root and section sources reach actual readers (config-semantic-snapshot)",
 	TestFeatureStateBootSemanticSources)
+
+
+TestFeatureStateBootScriptBindingPublication() {
+	_FeatureStateBootRun("script_binding_publication")
+}
+Test("feature-state startup: actual compiled script declaration publishes a complete binding receipt (script-binding-identity)",
+	TestFeatureStateBootScriptBindingPublication)
+
+TestFeatureStateBootTapBindingPublication() {
+	_FeatureStateBootRun("tap_binding_publication")
+}
+Test("feature-state startup: actual compiled tap declarations publish before config consumers (tap-binding-identity)",
+	TestFeatureStateBootTapBindingPublication)
+
+TestFeatureStateBootTapBindingSourceWiring() {
+	Source := FileRead(A_ScriptDir . "\..\ErgoptiPlus.ahk", "UTF-8")
+	State := FileRead(A_ScriptDir . "\..\infra\feature_state.ahk", "UTF-8")
+	KeyStatePos := InStr(Source, "#Include adapters/key_state.ahk")
+	StatePos := InStr(Source, "#Include infra/feature_state.ahk")
+	ApplyPos := InStr(Source, "_BootConfigApplied := ApplyBootConfigToml(")
+	GesturePos := InStr(Source, "#Include modules/gestures/init.ahk")
+	LaterTapPos := InStr(Source, "#Include infra/tap_keys.ahk")
+	TapReadPos := InStr(Source, "TapKeysReadConfig(_IniCache)")
+	AssertTrue(KeyStatePos > 0 && StatePos > 0 && ApplyPos > 0 && GesturePos > 0 && LaterTapPos > 0 && TapReadPos > 0,
+		"all actual declaration, reader and native prerequisite source bindings must exist")
+	AssertTrue(KeyStatePos < StatePos && StatePos < ApplyPos && ApplyPos < GesturePos && GesturePos < LaterTapPos && LaterTapPos < TapReadPos,
+		"native declarations precede both config readers while actual tap configuration stays in its original stage")
+	IncludePos := InStr(State, "#Include %A_LineFile%\..\tap_keys.ahk")
+	PublishPos := InStr(State, "global _TapKeyBindingPublication := ConfigBindingIdentityTapPublication(TAP_KEY_ORDER, TAP_KEY_SCANCODES)")
+	AssertTrue(IncludePos > 0 && PublishPos > IncludePos,
+		"the exact existing native source publishes only after its ordinary early include")
+}
+Test("feature-state startup: tap publication source ordering retains the later native read stage (tap-binding-identity)",
+	TestFeatureStateBootTapBindingSourceWiring)

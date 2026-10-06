@@ -158,6 +158,11 @@ platforms = ["ahk", "hs", "linux"]
 description_key = "menu.hotstrings.personal"
 platforms = ["ahk", "hs", "linux"]
 
+# macOS alone persists optional per-category menu orders; this data has no toggle.
+[sections.hotstrings.order_overrides]
+description_key = "menu.hotstrings"
+platforms = ["hs"]
+
 
 
 # ===================
@@ -216,7 +221,7 @@ platforms = ["ahk", "hs", "linux"]
 [sections.shortcuts]
 description_key = "menu.shortcuts"
 platforms = ["ahk", "hs", "linux"]
-subsections = ["key_combination_taps", "keyboard", "personal", "script_control", "tap_keys"]
+subsections = ["key_combination_taps", "keyboard", "personal", "script_control", "tap_keys", "wrap_symbols"]
 
 [sections.category_enabled]
 description_key = "menu.category_enabled"
@@ -247,6 +252,11 @@ platforms = ["ahk"]
 [sections.shortcuts.script_control]
 description_key = "menu.shortcuts.script_control"
 platforms = ["ahk", "hs", "linux"]
+
+# macOS persists its native wrap choices in this optional canonical namespace.
+[sections.shortcuts.wrap_symbols]
+description_key = "menu.shortcuts.wrap_symbols"
+platforms = ["hs"]
 
 [sections.shortcuts.tap_keys]
 description_key = "menu.shortcuts.header_tap_keys"
@@ -1300,6 +1310,7 @@ input_altering = false
 type = "array"
 description_key = "menu.llm.title"
 platforms = ["hs"]
+reason_key = "platform_reason.llm_saved_user_models_are_macos"
 
 [[features.llm.models]]
 id = "selected"
@@ -3973,6 +3984,7 @@ reason_key = "platform_reason.llm_configuration_surface_is_not_on_linux"
 [[menu.llm_menu]]
 type = "dynamic"
 id = "llm_model"
+status_rows.model_picker_tail = [{ type = "---" }]
 i18n = "menu.llm.model_label"
 disabled_when_off = false
 health_dot = true
@@ -3982,6 +3994,7 @@ reason_key = "platform_reason.llm_configuration_surface_is_not_on_linux"
 [[menu.llm_menu]]
 type = "list"
 id = "llm_models"
+status_rows.model_picker_tail = [{ type = "---" }]
 platforms = ["linux"]
 reason_key = "platform_reason.llm_lists_are_inline_on_linux"
 
@@ -4002,7 +4015,7 @@ platforms = ["ahk", "hs", "linux"]
 # `llm_generation_settings` submenu, or Linux's inline `llm_generation` handler),
 # not a row of this top level.
 [[menu.llm_menu]]
-type = "dynamic"
+type = "group"
 id = "llm_trigger"
 i18n = "menu.llm.trigger_menu_title"
 disabled_when_off = true
@@ -4041,7 +4054,7 @@ platforms = ["linux"]
 reason_key = "platform_reason.llm_lists_are_inline_on_linux"
 
 [[menu.llm_menu]]
-type = "dynamic"
+type = "group"
 id = "llm_display"
 i18n = "menu.llm.display_menu_title"
 disabled_when_off = true
@@ -4049,7 +4062,7 @@ health_dot = false
 platforms = ["ahk", "hs", "linux"]
 
 [[menu.llm_menu]]
-type = "dynamic"
+type = "group"
 id = "llm_navigation"
 i18n = "menu.llm.nav_menu_title"
 disabled_when_off = true
@@ -4141,6 +4154,22 @@ disabled_reason_key = "menu.about.source_run_reason"
 # The two automatic prediction triggers share row identity, labels and admission.
 # Numeric debounce and application exclusions retain native row owners.
 # Privacy checks use shared identity and native source-fenced transactions.
+# Native leading settings and live choices retain their existing construction boundaries.
+[[menu.llm_trigger_provider_boundary]]
+type = "---"
+platforms = ["ahk", "linux"]
+unavailable = "hide"
+
+[[menu.llm_display_provider_boundary]]
+type = "---"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.llm_live_off_boundary]]
+type = "---"
+platforms = ["hs"]
+unavailable = "hide"
+
 [[menu.llm_trigger_menu]]
 type = "list"
 id = "llm_trigger_leading"
@@ -4279,6 +4308,36 @@ id = "agent_system_off"
 i18n = "menu.agent.off"
 checked_when = ["agent_system_is_off"]
 disabled_when = ["agent_system_off_ready"]
+
+# The fixed Model control of each native Agent system; backend choices stay data.
+[[menu.agent_system_model_controls]]
+type = "---"
+
+[[menu.agent_system_model_controls]]
+type = "command"
+id = "agent_system_model"
+i18n = "menu.agent.model"
+disabled_when = ["agent_system_model_ready"]
+
+# The native observed installed status uses the same model command owner.
+[[menu.agent_system_model_installed_controls]]
+type = "---"
+
+[[menu.agent_system_model_installed_controls]]
+type = "command"
+id = "agent_system_model"
+i18n = "menu.agent.model_installed"
+disabled_when = ["agent_system_model_ready"]
+
+# The native observed missing status uses the same model command owner.
+[[menu.agent_system_model_missing_controls]]
+type = "---"
+
+[[menu.agent_system_model_missing_controls]]
+type = "command"
+id = "agent_system_model"
+i18n = "menu.agent.model_missing"
+disabled_when = ["agent_system_model_ready"]
 
 # The Applications submenu, macOS only: it lists the bundled applications
 # found on disk and launches them. Linux's copy held only the config-folder row,
@@ -4709,6 +4768,158 @@ id = "extensions_shortcuts"
 # own switch, the only one the combinations follow on every OS: macOS
 # persists it as [mod_combos] enabled in config_karabiner.toml, Windows as
 # [category_enabled] key_combinations; absent, it is on.
+# Complete per-key menus reuse the head and expose the existing native timing owner.
+[[menu.tap_hold_karabiner_off_rows]]
+type = "label"
+id = "tap_hold_karabiner_off"
+i18n = "menu.tapholds.karabiner_off_hint"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.tap_hold_guardian_approval_rows]]
+type = "label"
+id = "tap_hold_guardian_approval"
+i18n = "menu.tapholds.guardian_requires_approval"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.tap_hold_guardian_approval_rows]]
+type = "command"
+id = "tap_hold_login_items_steps"
+i18n = "menu.tapholds.show_login_items_steps"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.tap_hold_guardian_unavailable_rows]]
+type = "label"
+id = "tap_hold_guardian_unavailable"
+i18n = "menu.tapholds.guardian_unavailable"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.tap_hold_login_items_open_rows]]
+type = "command"
+id = "tap_hold_login_items_open"
+i18n = "menu.tapholds.open_login_items"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.tap_hold_legacy_rules_rows]]
+type = "command"
+id = "tap_hold_legacy_rules_cleanup"
+i18n = "menu.tapholds.legacy_rules_pending"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.tap_hold_key_rows]]
+type = "include"
+section = "tap_hold_key_head"
+
+[[menu.tap_hold_key_rows]]
+type = "include"
+section = "tap_hold_key_delay_tail"
+
+[[menu.tap_hold_key_delay_tail]]
+type = "---"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.tap_hold_key_delay_tail]]
+type = "group"
+id = "tap_hold_key_delay"
+i18n = "menu.tapholds.key_tap_delay"
+caption_getter = "tap_hold_key_delay_caption"
+
+[[menu.tap_hold_key_delay_rows]]
+type = "command"
+id = "tap_hold_key_delay_set"
+i18n = "menu.tapholds.key_tap_delay_set"
+
+[[menu.tap_hold_key_delay_rows]]
+type = "check"
+id = "tap_hold_key_delay_use_global"
+i18n = "menu.tapholds.key_tap_delay_use_global"
+caption_getter = "tap_hold_key_global_delay_caption"
+checked_when = ["tap_hold_key_delay_is_global"]
+disabled_when = ["tap_hold_key_delay_has_override"]
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.wrap_symbols_global_controls]]
+type = "command"
+id = "wrap_symbols_enable_all"
+i18n = "menu.shortcuts.wrap_symbols_check_all"
+disabled_when = ["wrap_symbols_ready"]
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.wrap_symbols_global_controls]]
+type = "command"
+id = "wrap_symbols_disable_all"
+i18n = "menu.shortcuts.wrap_symbols_uncheck_all"
+disabled_when = ["wrap_symbols_ready"]
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.wrap_symbols_global_controls]]
+type = "command"
+id = "wrap_symbols_restore"
+i18n = "common.restore_recommended"
+disabled_when = ["wrap_symbols_ready"]
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.wrap_symbols_global_controls]]
+type = "---"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.wrap_symbols_group_controls]]
+type = "command"
+id = "wrap_symbols_enable_group"
+i18n = "menu.shortcuts.wrap_symbols_check_all"
+disabled_when = ["wrap_symbols_ready"]
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.wrap_symbols_group_controls]]
+type = "command"
+id = "wrap_symbols_disable_group"
+i18n = "menu.shortcuts.wrap_symbols_uncheck_all"
+disabled_when = ["wrap_symbols_ready"]
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.wrap_symbols_group_controls]]
+type = "---"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.wrap_symbols_custom_separator]]
+type = "---"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.wrap_symbols_custom_controls]]
+type = "command"
+id = "wrap_symbols_delete_custom"
+i18n = "button.delete"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.wrap_symbols_add_controls]]
+type = "---"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.wrap_symbols_add_controls]]
+type = "command"
+id = "wrap_symbols_add_custom"
+i18n = "menu.shortcuts.wrap_symbols_add_custom"
+disabled_when = ["wrap_symbols_ready"]
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
 [[menu.key_combinations_group]]
 type = "toggle"
 id = "key_combinations_toggle"
@@ -5131,6 +5342,7 @@ i18n = "menu.layout.header_custom"
 [[menu.layout_menu]]
 type = "list"
 id = "custom_layouts"
+status_rows.none_installed = [{ type = "label", i18n = "menu.layout.none_installed" }]
 
 # Opens the shared layout manager window (_shared/ui/layout_manager): the
 # catalogue of the layout registry, to install, update or uninstall a layout.
@@ -5151,6 +5363,7 @@ i18n = "menu.layout.manage"
 [[menu.layout_menu]]
 type = "list"
 id = "layout_bundle"
+status_rows.no_bundle = [{ type = "label", i18n = "menu.layout.no_bundle" }]
 platforms = ["hs"]
 reason_key = "platform_reason.layout_bundle_and_menubar_are_macos"
 
@@ -5681,6 +5894,7 @@ type = "list"
 id = "gesture_slots_ahk"
 platforms = ["ahk"]
 reason_key = "platform_reason.touchpad_stack_is_per_driver"
+status_rows.tap_group_boundary = [{ type = "---" }]
 
 # One flat list rather than the per-finger-count groups macOS uses. The slots come
 # from gestures.DEFAULT_GESTURES, which is keyed by slot name and not by finger
@@ -5708,6 +5922,49 @@ type = "list"
 id = "gesture_reading_linux"
 platforms = ["linux"]
 reason_key = "platform_reason.libinput_reader_is_linux_only"
+
+[[menu.gesture_slot_mode_commands]]
+type = "check"
+id = "gesture_mode_single"
+i18n = "menu.gestures.mode_single"
+checked_when = ["gesture_mode_is_single"]
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.gesture_slot_mode_commands]]
+type = "check"
+id = "gesture_mode_incremental"
+i18n = "menu.gestures.mode_incremental"
+checked_when = ["gesture_mode_is_incremental"]
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.gesture_sensitivity_head]]
+type = "section_header"
+id = "gesture_sensitivity_heading"
+i18n = "menu.gestures.sensitivity_label"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.gesture_sensitivity_head]]
+type = "label"
+id = "gesture_sensitivity_hint"
+i18n = "menu.gestures.sensitivity_hint"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.gesture_sensitivity_head]]
+type = "---"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.gesture_change_action]]
+type = "command"
+id = "gesture_slot_change_action"
+i18n = "menu.gestures.change_action"
+disabled_when = ["gesture_slot_choice_ready"]
+platforms = ["hs"]
+unavailable = "hide"
 
 [[menu.tap_holds_menu]]
 type = "toggle"
@@ -6374,6 +6631,118 @@ id = "hotstring_file_open"
 i18n = "menu.hotstrings.open_file"
 disabled_when = ["hotstring_file_ready"]
 
+# The actual per-model hardware owners retain their distinct availability predicates.
+[[menu.llm_model_hardware_boundary]]
+type = "---"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+# Curated catalogue families and per-model origins retain their existing native boundaries.
+[[menu.llm_model_family_boundary]]
+type = "---"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.llm_model_origin_boundary]]
+type = "---"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+# Nonempty shortcut-extension menus retain the Windows/macOS presentation boundary.
+[[menu.shortcut_extension_boundary]]
+type = "---"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.shortcut_extension_boundary]]
+type = "section_header"
+id = "shortcut_extension_heading"
+i18n = "menu.extensions.header"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+# Native generation groups retain their existing per-driver presentation boundaries.
+[[menu.llm_generation_count_boundary]]
+type = "---"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.llm_generation_context_boundary]]
+type = "---"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.llm_generation_words_boundary]]
+type = "---"
+platforms = ["ahk"]
+unavailable = "hide"
+
+# Per-model detail sheets exist on Windows/macOS; Linux has no corresponding frames.
+[[menu.llm_model_specs_frame]]
+type = "---"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.llm_model_specs_frame]]
+type = "label"
+id = "llm_model_specs_readout"
+i18n = "menu.llm.specs_header"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.llm_model_specs_frame]]
+type = "section_header"
+id = "llm_model_specs_heading"
+i18n = "menu.llm.specs_header"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.llm_model_caps_frame]]
+type = "---"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.llm_model_caps_frame]]
+type = "label"
+id = "llm_model_caps_readout"
+i18n = "menu.llm.caps_header"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.llm_model_caps_frame]]
+type = "section_header"
+id = "llm_model_caps_heading"
+i18n = "menu.llm.caps_header"
+platforms = ["hs"]
+unavailable = "hide"
+
+# Windows/Linux allocate this boundary after their native backend choices.
+# macOS appends local-server rows directly and has no corresponding separator.
+[[menu.llm_backend_choice_boundary]]
+type = "---"
+platforms = ["ahk", "linux"]
+unavailable = "hide"
+
+# API creation uses the native dialog on Windows and provider children on Lua.
+# The fixed affordance and separator share captions; native order stays per driver.
+[[menu.llm_api_add_command]]
+type = "command"
+id = "api_add_entry"
+i18n = "menu.llm.api_add_entry"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.llm_api_add_provider_group]]
+type = "group"
+id = "api_add_entry"
+i18n = "menu.llm.api_add_entry"
+disabled_when = ["llm_api_add_group_ready"]
+platforms = ["hs", "linux"]
+unavailable = "hide"
+
+[[menu.llm_api_add_separator]]
+type = "---"
+
 # The fixed active API-entry commands share captions, order and live readiness.
 # Native adapters keep the existing probe and acknowledged removal owners.
 [[menu.llm_api_active_commands]]
@@ -6387,6 +6756,17 @@ type = "command"
 id = "api_remove_active"
 i18n = "menu.llm.api_remove_entry"
 disabled_when = ["llm_api_active_ready"]
+
+# The Linux selection provider retains its two fixed boundaries around the case trio.
+[[menu.selection_case_boundary]]
+type = "---"
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.selection_helper_boundary]]
+type = "---"
+platforms = ["linux"]
+unavailable = "hide"
 
 # Selection case commands use each driver's existing action bindings. The Linux
 # selection provider offers these direct tray actions without duplicate native
@@ -6500,6 +6880,65 @@ caption_getter = "tap_hold_key_hold_caption"
 platforms = ["hs"]
 unavailable = "hide"
 
+# Native absent-module branches retain disabled status without acquiring an action.
+[[menu.linux_hotstrings_absent_rows]]
+type = "label"
+id = "linux_hotstrings_unavailable"
+i18n = "menu.hotstrings.unavailable"
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.linux_llm_absent_rows]]
+type = "label"
+id = "linux_llm_unavailable"
+i18n = "menu.llm.unavailable"
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.linux_llm_absent_rows]]
+type = "label"
+id = "linux_llm_start_hint"
+i18n = "menu.llm.ollama_start_hint"
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.linux_metrics_absent_rows]]
+type = "label"
+id = "linux_metrics_unavailable"
+i18n = "menu.metrics.unavailable"
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.linux_shortcuts_absent_rows]]
+type = "label"
+id = "linux_shortcuts_unavailable"
+i18n = "menu.shortcuts.unavailable"
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.linux_gestures_absent_rows]]
+type = "label"
+id = "linux_gestures_unavailable"
+i18n = "menu.gestures.unavailable"
+platforms = ["linux"]
+unavailable = "hide"
+
+# Linux's idle/unavailable migration readouts are inert, not dummy commands.
+# The native provider retains progress-state selection and the running callback.
+[[menu.metrics_migration_unavailable_rows]]
+type = "label"
+id = "metrics_migration_unavailable"
+i18n = "menu.metrics.migration_unavailable"
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.metrics_migration_idle_rows]]
+type = "label"
+id = "metrics_migration_idle"
+i18n = "menu.metrics.migration_idle"
+platforms = ["linux"]
+unavailable = "hide"
+
 # Native prompts and modifier picker subtrees retain their own settings owners.
 [[menu.llm_navigation_rows]]
 type = "list"
@@ -6519,3 +6958,329 @@ id = "number_row_mode"
 path = "layout.direct_access_digits"
 i18n = "menu.layout.number_row"
 choice_label_prefix = "menu.layout.number_row_"
+
+[[menu.apps_empty_rows]]
+type = "label"
+id = "apps_empty"
+i18n = "menu.apps.no_apps"
+platforms = ["hs"]
+unavailable = "hide"
+
+# Existing native refresh capability only; Linux cached desktop rows have no refresh command.
+[[menu.gesture_system_status_controls]]
+type = "command"
+id = "gesture_system_refresh"
+i18n = "ui_apps.btn_refresh"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+# Fixed swipe child presentation only; native payloads remain actual child owners.
+[[menu.gesture_swipe_slot_menu]]
+type = "include"
+section = "gesture_change_action"
+
+[[menu.gesture_swipe_slot_menu]]
+type = "---"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.gesture_swipe_slot_menu]]
+type = "group"
+id = "gesture_mode_options"
+i18n = "menu.gestures.mode_current"
+caption_getter = "gesture_mode_current_label"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.gesture_swipe_slot_menu]]
+type = "group"
+id = "gesture_sensitivity_options"
+i18n = "menu.gestures.sensitivity_current"
+caption_getter = "gesture_sensitivity_current_label"
+disabled_when = ["gesture_mode_incremental_ready"]
+platforms = ["hs"]
+unavailable = "hide"
+
+# The fixed separator after each native About version/build identity row.
+[[menu.about_version_separator]]
+type = "---"
+
+# The empty native Input Sources list still offers macOS Keyboard preferences.
+# The native owner retains its URL and launch behavior; the shared command owns presentation.
+[[menu.layout_active_source_empty_commands]]
+type = "command"
+id = "layout_open_preferences"
+i18n = "menu.layout.open_prefs"
+platforms = ["hs"]
+unavailable = "hide"
+
+# A custom profile's child menu is shared; native ports own the exact transactions.
+# Windows retains its existing profile row click/dialog instead of a nested menu.
+[[menu.llm_custom_profile_controls]]
+type = "check"
+id = "llm_profile_use"
+i18n = "menu.profiles.use_profile"
+checked_when = ["llm_custom_profile_active"]
+disabled_when = ["llm_custom_profile_ready"]
+platforms = ["hs", "linux"]
+unavailable = "hide"
+
+# Only the macOS native profile child exposes its existing shortcut prompt here.
+[[menu.llm_custom_profile_controls]]
+type = "command"
+id = "llm_profile_shortcut"
+i18n = "menu.profiles.shortcut_prefix"
+disabled_when = ["llm_custom_profile_ready"]
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.llm_custom_profile_controls]]
+type = "---"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.llm_custom_profile_controls]]
+type = "command"
+id = "llm_profile_edit"
+i18n = "menu.profiles.edit_profile"
+disabled_when = ["llm_custom_profile_ready"]
+platforms = ["hs", "linux"]
+unavailable = "hide"
+
+[[menu.llm_custom_profile_controls]]
+type = "command"
+id = "llm_profile_delete"
+i18n = "menu.profiles.delete_profile"
+disabled_when = ["llm_custom_profile_ready"]
+platforms = ["hs", "linux"]
+unavailable = "hide"
+
+# Empty remote entries are inert status rows; macOS uses a selectable model command.
+[[menu.llm_api_empty_status]]
+type = "label"
+id = "llm_api_empty_hint"
+i18n = "menu.llm.api_no_entry"
+platforms = ["ahk", "linux"]
+unavailable = "hide"
+
+# macOS alone nests a local server's discovered model list under each System.
+[[menu.agent_server_empty_status]]
+type = "label"
+id = "agent_server_empty_hint"
+i18n = "menu.llm.local_servers.no_models"
+platforms = ["hs"]
+unavailable = "hide"
+
+# Per-user-added-model child controls; outer dynamic model rows remain native.
+[[menu.llm_user_model_controls]]
+type = "check"
+id = "llm_user_model_select"
+i18n = "menu.llm.select_model"
+platforms = ["hs"]
+unavailable = "hide"
+checked_when = ["llm_user_model_selected"]
+disabled_when = ["llm_user_model_selection_ready", "llm_user_model_live"]
+
+[[menu.llm_user_model_controls]]
+type = "command"
+id = "llm_user_model_remove"
+i18n = "menu.llm.remove_user_model"
+platforms = ["hs"]
+unavailable = "hide"
+disabled_when = ["llm_user_model_live"]
+
+# Linux adds a free numeric prompt after preset choices. Other native menus
+# already open their numeric dialogs directly rather than this preset tail.
+[[menu.llm_numeric_custom_rows]]
+type = "---"
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.llm_numeric_custom_rows]]
+type = "command"
+id = "llm_numeric_custom_value"
+i18n = "menu.llm.generation.custom_value"
+platforms = ["linux"]
+unavailable = "hide"
+
+# Fixed native profile headings retain each platform's existing decoration.
+[[menu.llm_profile_builtin_heading]]
+type = "label"
+id = "llm_profile_builtin_plain_heading"
+i18n = "menu.profiles.header_default_profiles"
+platforms = ["ahk", "linux"]
+unavailable = "hide"
+
+[[menu.llm_profile_builtin_heading]]
+type = "section_header"
+id = "llm_profile_builtin_decorated_heading"
+i18n = "menu.profiles.header_default_profiles"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.llm_profile_custom_heading]]
+type = "---"
+
+[[menu.llm_profile_custom_heading]]
+type = "label"
+id = "llm_profile_custom_plain_heading"
+i18n = "menu.profiles.header_custom_profiles"
+platforms = ["ahk", "linux"]
+unavailable = "hide"
+
+[[menu.llm_profile_custom_heading]]
+type = "section_header"
+id = "llm_profile_custom_decorated_heading"
+i18n = "menu.profiles.header_custom_profiles"
+platforms = ["hs"]
+unavailable = "hide"
+
+# Ordered frames consume native profile data without owning its callbacks.
+
+[[menu.llm_profile_lua_frame]]
+type = "include"
+section = "llm_profile_recommendation"
+present_when = "llm_profile_recommendation_present"
+
+[[menu.llm_profile_lua_frame]]
+type = "include"
+section = "llm_profile_paused_recommendation"
+present_when = "llm_profile_recommendation_paused"
+
+[[menu.llm_profile_lua_frame]]
+type = "include"
+section = "llm_profile_auto_detect_control"
+
+[[menu.llm_profile_lua_frame]]
+type = "---"
+
+[[menu.llm_profile_lua_frame]]
+type = "include"
+section = "llm_profile_builtin_heading"
+on_refusal = "omit_presentation"
+
+[[menu.llm_profile_lua_frame]]
+type = "list"
+id = "llm_profile_builtin_rows"
+
+[[menu.llm_profile_lua_frame]]
+type = "include"
+section = "llm_profile_custom_section"
+present_when = "llm_profile_custom_present"
+
+[[menu.llm_profile_lua_frame]]
+type = "include"
+section = "llm_profile_clone_section"
+present_when = "llm_profile_clone_present"
+
+[[menu.llm_profile_lua_frame]]
+type = "---"
+
+[[menu.llm_profile_lua_frame]]
+type = "include"
+section = "llm_profile_commands"
+row_id = "llm_profile_create"
+
+[[menu.llm_profile_windows_frame]]
+type = "include"
+section = "llm_profile_builtin_heading"
+on_refusal = "omit_presentation"
+
+[[menu.llm_profile_windows_frame]]
+type = "list"
+id = "llm_profile_builtin_rows"
+
+[[menu.llm_profile_windows_frame]]
+type = "include"
+section = "llm_profile_custom_section"
+present_when = "llm_profile_custom_present"
+
+[[menu.llm_profile_windows_frame]]
+type = "---"
+
+[[menu.llm_profile_windows_frame]]
+type = "include"
+section = "llm_profile_commands"
+row_id = "llm_profile_create"
+
+[[menu.llm_profile_windows_frame]]
+type = "include"
+section = "llm_profile_commands"
+row_id = "llm_profile_clone"
+present_when = "llm_profile_clone_present"
+
+[[menu.llm_profile_windows_frame]]
+type = "---"
+
+[[menu.llm_profile_windows_frame]]
+type = "include"
+section = "llm_profile_auto_detect_control"
+
+[[menu.llm_profile_windows_frame]]
+type = "---"
+
+[[menu.llm_profile_windows_frame]]
+type = "group"
+id = "llm_profile_app_overrides"
+i18n = "menu.profiles.per_app_overrides"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.llm_profile_custom_section]]
+type = "include"
+section = "llm_profile_custom_heading"
+on_refusal = "omit_presentation"
+
+[[menu.llm_profile_custom_section]]
+type = "list"
+id = "llm_profile_custom_rows"
+
+[[menu.llm_profile_clone_section]]
+type = "---"
+
+[[menu.llm_profile_clone_section]]
+type = "include"
+section = "llm_profile_commands"
+row_id = "llm_profile_clone"
+
+[[menu.llm_profile_recommendation]]
+type = "command"
+id = "llm_profile_recommend"
+i18n = "menu.profiles.auto_detect"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.llm_profile_paused_recommendation]]
+type = "label"
+id = "llm_profile_recommend_paused"
+i18n = "menu.profiles.auto_detect"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.llm_profile_auto_detect_control]]
+type = "check"
+id = "llm_profile_auto_detect"
+i18n = "menu.profiles.auto_detect"
+checked_when = ["llm_profile_auto_detect_checked"]
+platforms = ["ahk", "linux"]
+unavailable = "hide"
+
+# The picker header is native to Windows and macOS; Linux starts with model rows.
+[[menu.llm_model_header_boundary]]
+type = "---"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+# Windows alone owns an ordered runtime registry of personal shortcut switches.
+# The other drivers keep their existing personal-file and general shortcut controls.
+[[menu.personal_shortcuts_frame]]
+type = "---"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.personal_shortcuts_frame]]
+type = "group"
+id = "personal_shortcuts_registered"
+i18n = "menu.shortcuts.personal"
+platforms = ["ahk"]
+unavailable = "hide"

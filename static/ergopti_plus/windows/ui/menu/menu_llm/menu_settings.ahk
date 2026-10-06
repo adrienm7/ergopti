@@ -186,7 +186,11 @@ _LLM_Menu_TriggerRows(Position := "all") {
 		(*) => _LLM_AssignAndRebuild("debounce_ms",
 			_LLM_DefaultFor("llm_debounce_ms", 500)))
 
-	Rows.Push(Map("separator", true))
+	BoundaryRows := MenuRenderer_TemplateRows("llm_trigger_provider_boundary", Map(), Map(), Map())
+	if !(BoundaryRows is Array)
+		return []
+	for Row in BoundaryRows
+		Rows.Push(Row)
 
 	LeadingRows := Rows
 	Rows := []
@@ -314,7 +318,11 @@ _LLM_Menu_GenerationRows() {
 		_LLM_DefaultFor("llm_num_predictions"),
 		(*) => _LLM_AssignAndRebuild("n_predictions", _LLM_DefaultFor("llm_num_predictions")))
 
-	Rows.Push(Map("separator", true))
+	CountBoundaryRows := MenuRenderer_TemplateRows("llm_generation_count_boundary", Map(), Map(), Map())
+	if !(CountBoundaryRows is Array)
+		return []
+	for Row in CountBoundaryRows
+		Rows.Push(Row)
 
 	; Context length — dialog
 	Rows.Push(Map(
@@ -332,7 +340,11 @@ _LLM_Menu_GenerationRows() {
 		"checked", _LLM_Menu["reset_on_nav"],
 		"action",  (*) => LLM_Menu_ToggleBool("reset_on_nav")))
 
-	Rows.Push(Map("separator", true))
+	ContextBoundaryRows := MenuRenderer_TemplateRows("llm_generation_context_boundary", Map(), Map(), Map())
+	if !(ContextBoundaryRows is Array)
+		return []
+	for Row in ContextBoundaryRows
+		Rows.Push(Row)
 
 	; Min words — dialog
 	Rows.Push(Map(
@@ -356,7 +368,11 @@ _LLM_Menu_GenerationRows() {
 		(*) => _LLM_AssignAndRebuild("max_words",
 			_LLM_DefaultFor("llm_max_words", 15)))
 
-	Rows.Push(Map("separator", true))
+	WordsBoundaryRows := MenuRenderer_TemplateRows("llm_generation_words_boundary", Map(), Map(), Map())
+	if !(WordsBoundaryRows is Array)
+		return []
+	for Row in WordsBoundaryRows
+		Rows.Push(Row)
 
 	; Temperature — dialog
 	Rows.Push(Map(
@@ -582,7 +598,11 @@ _LLM_Menu_DisplayRows(Position := "all") {
 		"checked", _LLM_Menu["inline_autotype"],
 		"action",  (*) => LLM_Menu_ToggleBool("inline_autotype")))
 
-	Rows.Push(Map("separator", true))
+	BoundaryRows := MenuRenderer_TemplateRows("llm_display_provider_boundary", Map(), Map(), Map())
+	if !(BoundaryRows is Array)
+		return []
+	for Row in BoundaryRows
+		Rows.Push(Row)
 
 	LeadingRows := Rows
 	Rows := []

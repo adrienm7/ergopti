@@ -15,7 +15,7 @@ local Codec = require("toml_codec")
 
 local DEFAULTS = require("infra.paths").shared("tap_hold/defaults.toml")
 local OWNER_MODULES = { "infra.tap_hold_scope", "infra.shortcuts_scope", "infra.llm_scope", "infra.metrics_scope",
-	"infra.hotstrings_scope" }
+	"infra.hotstrings_scope", "infra.script_scope" }
 
 --- A stub participant journaling into a shared trace.
 local function stub(trace, name, refuse)
@@ -39,7 +39,8 @@ local function with_modules(body)
 	saved["infra.global_scope"] = package.loaded["infra.global_scope"]
 	package.loaded["infra.global_scope"] = nil
 	local ok, err = pcall(body)
-	for name, value in pairs(saved) do package.loaded[name] = value end
+	for _, name in ipairs(OWNER_MODULES) do package.loaded[name] = saved[name] end
+	package.loaded["infra.global_scope"] = saved["infra.global_scope"]
 	if not ok then error(err, 0) end
 end
 
@@ -58,7 +59,7 @@ helpers.describe("Linux global scope: registry and composition", function()
 			local ids = {}
 			for id in pairs(registry) do ids[#ids + 1] = id end
 			table.sort(ids)
-			helpers.assert_eq(ids, { "llm", "tap_holds" })
+			helpers.assert_eq(ids, { "global", "llm", "tap_holds" })
 			local gestures = { scope_participant = function() return stub(trace, "gestures") end,
 				scope_available = function() return true end }
 			registry = GlobalScope.participants({ shortcuts = {}, gestures = gestures, keylogger = {} })
@@ -78,6 +79,7 @@ helpers.describe("Linux global scope: registry and composition", function()
 		}
 		package.loaded["modules.gestures.manager"] = nil
 		local ok, err = pcall(with_modules, function()
+			package.loaded["infra.script_scope"] = { participant = function() return stub({}, "global") end }
 			local Manager = require("modules.gestures.manager")
 			helpers.assert_eq(Manager.scope_available(), false)
 			local GlobalScope = require("infra.global_scope")

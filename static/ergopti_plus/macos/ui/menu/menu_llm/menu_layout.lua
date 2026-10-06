@@ -124,7 +124,7 @@ local function load_policy()
 				-- Only the rows this driver renders carry a greying policy: the
 				-- separator and Linux's two inline lists have no submenu to grey.
 				if type(row) == "table" and type(row.id) == "string"
-					and row.type == "dynamic" and is_for_this_driver(row) then
+					and (row.type == "dynamic" or row.type == "group") and is_for_this_driver(row) then
 					policy[row.id] = (row.disabled_when_off == true)
 					dots[row.id] = (row.health_dot == true)
 					ids[#ids + 1] = row.id

@@ -1,0 +1,57 @@
+{
+	"_comment": "Independent existing macOS mode contract; caption snapshots captured from unchanged locale sources before migrating the native provider. Windows/Linux have no per-slot macOS mode capability. Native callbacks remain their existing owner.",
+	"section": "gesture_slot_mode_commands",
+	"rows": [
+		{
+			"id": "gesture_mode_single",
+			"type": "check",
+			"i18n": "menu.gestures.mode_single",
+			"checked_when": ["gesture_mode_is_single"],
+			"platforms": ["hs"],
+			"unavailable": "hide",
+			"value": "x1"
+		},
+		{
+			"id": "gesture_mode_incremental",
+			"type": "check",
+			"i18n": "menu.gestures.mode_incremental",
+			"checked_when": ["gesture_mode_is_incremental"],
+			"platforms": ["hs"],
+			"unavailable": "hide",
+			"value": "incremental"
+		}
+	],
+	"states": [
+		{ "mode": "x1", "checked": [true, false] },
+		{ "mode": "incremental", "checked": [false, true] },
+		{ "mode": "future_mode", "checked": [false, false] }
+	],
+	"platform_rows": {
+		"ahk": [],
+		"hs": ["gesture_mode_single", "gesture_mode_incremental"],
+		"linux": []
+	},
+	"captions": {
+		"ar": ["إجراء واحد (x1)", "إرسال تدريجي (مسافة)"],
+		"cs": ["Jednoduchá akce (x1)", "Inkrementální odeslání (vzdálenost)"],
+		"da": ["Enkelt handling (x1)", "Inkrementel afsendelse (afstand)"],
+		"de": ["Einzelaktion (x1)", "Inkrementell senden (Distanz)"],
+		"en": ["Single action (x1)", "Incremental send (distance)"],
+		"es": ["Acción única (x1)", "Envío incremental (distancia)"],
+		"fr": ["Action unique (x1)", "Envoi incrémental (distance)"],
+		"he": ["פעולה יחידה (x1)", "שליחה מצטברת (מרחק)"],
+		"hi": ["एकल क्रिया (x1)", "वृद्धिशील भेजना (दूरी)"],
+		"it": ["Azione singola (x1)", "Invio incrementale (distanza)"],
+		"ja": ["シングルアクション (x1)", "インクリメンタル送信（距離）"],
+		"ko": ["단일 동작 (x1)", "점진적 전송 (거리)"],
+		"nl": ["Enkele actie (x1)", "Incrementeel verzenden (afstand)"],
+		"no": ["Enkel handling (x1)", "Inkrementell sending (avstand)"],
+		"pl": ["Pojedyncza akcja (x1)", "Wysyłanie przyrostowe (odległość)"],
+		"pt": ["Ação única (x1)", "Envio incremental (distância)"],
+		"ru": ["Единственное действие (x1)", "Инкрементальная отправка (расстояние)"],
+		"sv": ["Enskild åtgärd (x1)", "Inkrementell skickning (distans)"],
+		"tr": ["Tek eylem (x1)", "Artımlı gönderme (mesafe)"],
+		"uk": ["Одинична дія (x1)", "Інкрементальне надсилання (відстань)"],
+		"zh": ["单次动作（x1）", "增量发送（距离）"]
+	}
+}

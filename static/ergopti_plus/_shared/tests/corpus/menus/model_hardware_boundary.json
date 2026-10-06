@@ -1,0 +1,51 @@
+{
+	"section": "llm_model_hardware_boundary",
+	"rows": [
+		{
+			"type": "---",
+			"platforms": ["ahk", "hs"],
+			"unavailable": "hide"
+		}
+	],
+	"projections": {
+		"ahk": [
+			{
+				"separator": true
+			}
+		],
+		"hs": [
+			{
+				"separator": true
+			}
+		],
+		"linux": []
+	},
+	"native_model": "Qwen3-Coder-30B-A3B-Instruct",
+	"hardware_ollama": {
+		"download_gb": 19.0,
+		"ram_gb": 22.8
+	},
+	"header": {
+		"ahk": "REQUIREMENTS (Ollama)",
+		"hs": "— REQUIREMENTS (Ollama 🦙) —"
+	},
+	"marker_key": "button.cancel",
+	"marker_english": "Cancel",
+	"caption_keys": [
+		"menu.llm.hw_header",
+		"menu.llm.hw_download",
+		"menu.llm.hw_disk",
+		"menu.llm.hw_ram",
+		"button.cancel"
+	],
+	"empty_ollama_map_header_visible": {
+		"ahk": true,
+		"hs": false
+	},
+	"missing_hardware_header_visible": {
+		"ahk": false,
+		"hs": false
+	},
+	"native_counts_before": [60, 93, 67],
+	"native_counts_after": [59, 92, 67]
+}
