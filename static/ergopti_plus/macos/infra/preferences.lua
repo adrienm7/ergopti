@@ -46,6 +46,7 @@ local WrapPreferences = require("menu.wrap_preferences")
 local UserModels = require("config_user_models")
 local RecordList = require("toml_codec.record_list")
 local LOG       = "preferences"
+local OperationReporter = require("diagnostics.operation_reporter")
 
 
 --- Top-level TOML section names in the order they appear on disk.
@@ -962,8 +963,8 @@ local _load_outdated = {}
 --- Classifies one preference source without interpreting its contents.
 --- @param prefs_file string Destination path.
 --- @return table|nil snapshot Exact `ok`/`absent` source classification.
-local function classify_source(prefs_file)
-	local content, read_status = FileSystem.read_with_status(prefs_file)
+local function classify_source(prefs_file, on_error)
+	local content, read_status = FileSystem.read_with_status(prefs_file, on_error)
 	if read_status == "ok" and type(content) == "string" then
 		return { status = "ok", content = content }
 	end
@@ -1023,8 +1024,8 @@ end
 --- @param prefs_file string Destination path.
 --- @param expected_source table Snapshot used by the rejected publication.
 --- @return boolean adopted Whether the exact external source became the baseline.
-local function adopt_changed_source(prefs_file, expected_source)
-	local current_source = classify_source(prefs_file)
+local function adopt_changed_source(prefs_file, expected_source, on_error)
+	local current_source = classify_source(prefs_file, on_error)
 	if type(current_source) ~= "table" or same_source(expected_source, current_source) then
 		return false
 	end
@@ -1201,6 +1202,16 @@ end
 --- Captures the exact source acknowledged by load or the last publication.
 --- @param path string Configuration path.
 --- @return table|nil snapshot Classified source snapshot.
+--- Captures exact private source ownership across native read callbacks.
+function M.capture_source_delivery_guard(path)
+	local source = _source_snapshots[path]
+	local status, content = source and source.status, source and source.content
+	return function()
+		return _source_snapshots[path] == source and source ~= nil
+			and source.status == status and source.content == content
+	end
+end
+
 function M.source_snapshot(path)
 	local source = _source_snapshots[path]
 	return source and { status = source.status, content = source.content } or nil
@@ -1502,6 +1513,35 @@ function M.prepare_hotstring_updates(source, updates)
 	return prepare_inline_updates(source, updates, "hotstrings")
 end
 
+--- Hands one verified call-scoped native publication to its private transaction.
+--- Partial physical publication updates only its owned source view; it does not
+--- acknowledge a save or advance the ordinary full-save/checkpoint receipt.
+local function handoff_native_publication(path, expected, candidate, native, on_error, observer, acknowledged)
+	if type(observer) ~= "function" or type(FileSystem.publication_receipt_view) ~= "function"
+		or type(candidate) ~= "string" then return false end
+	local verified = FileSystem.publication_receipt_view(native, path, expected, candidate, on_error)
+	if type(verified) ~= "table" or type(verified.source) ~= "table" then return false end
+	local source = { status = verified.source.status, content = verified.source.content }
+	local function adopt()
+		if FileSystem.publication_receipt_view(native, path, expected, candidate, on_error) == nil
+			or native.matches_source() ~= true then return false end
+		local baseline = _source_snapshots[path]
+		if baseline and not same_source(baseline, expected) and not same_source(baseline, source) then return false end
+		_source_snapshots[path] = { status = source.status, content = source.content }
+		return true
+	end
+	-- Deliver the capability even when a foreign source currently prevents its
+	-- adoption, so exact later reinstatement can resume without inventing ownership.
+	adopt()
+	local received, result = pcall(observer, { native = native, path = path,
+		expected = { status = expected.status, content = expected.content }, source = source,
+		published = verified.published, acknowledged = acknowledged == true, adopt = adopt })
+	if not received or result ~= true then
+		OperationReporter.new(on_error, Logger, LOG)("publication_receipt", "error", "Private publication receipt handoff was refused.")
+	end
+	return true
+end
+
 --- Preflights canonical personal choices through this preferences source owner.
 --- Native callers separately hold the actual source and registry bindings.
 --- @param changes table Declared canonical group/section Boolean choices.
@@ -1531,16 +1571,20 @@ end
 --- @param path string Canonical configuration path.
 --- @param updates table Already validated owned operations.
 --- @param source table Exact classified source used by the domain owner.
+--- @param on_error function|nil Receives only fixed failure categories.
+--- @param publication_observer function|nil Accepts a verified call-scoped native handoff.
 --- @return boolean committed
-function M.publish_owned(path, updates, source)
+function M.publish_owned(path, updates, source, on_error, publication_observer)
+	local report = OperationReporter.new(on_error, Logger, LOG)
 	if _owned_publications[path] then return false end
 	local baseline = _source_snapshots[path]
 	if baseline and not same_source(baseline, source) then return false end
 	_owned_publications[path] = true
-	local called, committed, detail, encoded = pcall(TomlWriter.batch_write, path, updates, FileSystem, source)
+	local called, committed, detail, encoded, native, candidate = pcall(TomlWriter.batch_write, path, updates, FileSystem, source, on_error)
 	_owned_publications[path] = nil
+	if called then handoff_native_publication(path, source, candidate, native, on_error, publication_observer, committed) end
 	if not called or committed ~= true then
-		Logger.error(LOG, "Owned preferences were not published: %s.", tostring(called and detail or committed))
+		report("publication", "error", "Owned preferences were not published: %s.", tostring(called and detail or committed))
 		return false
 	end
 	_source_snapshots[path] = { status = "ok", content = encoded }
@@ -1715,23 +1759,26 @@ end
 --- @param hotfiles table List of hotstring files.
 --- @param core_mods table Loaded core modules.
 --- @param snapshot_view function|nil Transforms the complete runtime snapshot for disk.
+--- @param on_error function|nil Receives only fixed failure categories.
+--- @param publication_observer function|nil Accepts a verified call-scoped native handoff.
 --- @return boolean committed
 --- @return table|nil persisted Snapshot written to disk.
 --- @return table|nil runtime Snapshot before session-only preservation.
-function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view)
+function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view, on_error, publication_observer)
+	local report = OperationReporter.new(on_error, Logger, LOG)
 	if _owned_publications[prefs_file] then return false end
 	if snapshot_view ~= nil and type(snapshot_view) ~= "function" then
 		error("snapshot_view must be a function", 2)
 	end
 	if type(prefs_file) ~= "string" or prefs_file == "" then
-		Logger.error(LOG, "Cannot save preferences without a destination path.")
+		report("validation", "error", "Cannot save preferences without a destination path.")
 		return false
 	end
 	-- The boot migration could not version this file (a newer schema, a failed
 	-- migration): this session never writes it.
 	local refusal = TomlWriter.write_refusal(prefs_file)
 	if refusal then
-		Logger.error(LOG, "Preferences NOT saved: writes to '%s' are refused for this session (%s).",
+		report("admission", "error", "Preferences NOT saved: writes to '%s' are refused for this session (%s).",
 			prefs_file, refusal)
 		return false
 	end
@@ -1743,9 +1790,9 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view)
 	end
 	local expected_source = _source_snapshots[prefs_file]
 	if type(expected_source) ~= "table" then
-		expected_source = classify_source(prefs_file)
+		expected_source = classify_source(prefs_file, on_error)
 		if type(expected_source) ~= "table" then
-			Logger.error(LOG, "Cannot classify '%s' before saving preferences.",
+			report("read", "error", "Cannot classify '%s' before saving preferences.",
 				tostring(prefs_file))
 			return false
 		end
@@ -1819,23 +1866,25 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view)
 	if not ok then
 		-- A silent return here looks exactly like a successful save until the next
 		-- reload restores the previous file and the user's change is simply gone.
-		Logger.error(LOG, "Cannot prepare preferences — settings NOT saved: %s.", tostring(updates))
+		report("preparation", "error", "Cannot prepare preferences — settings NOT saved: %s.", tostring(updates))
 		return false
 	end
 
-	local write_ok, written, detail, encoded = pcall(
+	local write_ok, written, detail, encoded, native, candidate = pcall(
 		TomlWriter.batch_write,
 		prefs_file,
 		updates,
 		FileSystem,
-		expected_source
+		expected_source,
+		on_error
 	)
+	local owned_native = write_ok and handoff_native_publication(prefs_file, expected_source, candidate, native, on_error, publication_observer, written)
 	if not write_ok or written ~= true then
-		if adopt_changed_source(prefs_file, expected_source) then
-			Logger.warn(LOG, "Preferences changed externally; the stale save was refused. "
+		if not owned_native and adopt_changed_source(prefs_file, expected_source, on_error) then
+			report("source_changed", "warn", "Preferences changed externally; the stale save was refused. "
 				.. "Review the external edit, then repeat the setting change to save it.")
 		else
-			Logger.error(LOG, "Cannot atomically replace '%s' — settings NOT saved: %s.",
+			report("publication", "error", "Cannot atomically replace '%s' — settings NOT saved: %s.",
 				tostring(prefs_file), tostring(write_ok and detail or written))
 		end
 		return false

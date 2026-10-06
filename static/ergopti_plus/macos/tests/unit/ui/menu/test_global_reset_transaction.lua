@@ -67,6 +67,7 @@ local MODULE_KEYS = {
 	"modules.gestures",
 	"infra.personal_shortcuts",
 	"ui.menu.preferences_transaction",
+	"ui.menu.program_parameter_transaction",
 	"ui.menu.init",
 }
 
@@ -599,6 +600,11 @@ local function with_menu_fixture(options, callback)
 	package.loaded["modules.shortcuts"] = shortcuts
 
 	local gestures = {
+		configure_program_admission = function(callback)
+			if type(callback) ~= "function" or observations.program_admission ~= nil then return false end
+			observations.program_admission = callback
+			return true
+		end,
 		get_action = function(slot) return observations.gestures[slot] end,
 		enable_all = function()
 			return perform(observations, "gesture-master", function()
@@ -1287,6 +1293,24 @@ helpers.describe("hotstrings scope menu composition", function()
 			helpers.assert_nil(composed.owners.hotstrings(), "an owner that cannot serve its files is skipped")
 			reason = nil
 			helpers.assert_eq(composed.owners.hotstrings(), owner, "an available owner takes part")
+		end)
+	end)
+end)
+
+helpers.describe("private program admission uses the actual global writer fence", function()
+	helpers.it("registers once and closes while another writer owns a mutation", function()
+		with_menu_fixture({}, function(observations)
+			helpers.assert_type(observations.program_admission, "function")
+			helpers.assert_eq(observations.program_admission(), true)
+			local reads = 0
+			observations.hooks["gesture:swipe_left:before"] = function()
+				reads = reads + 1
+				helpers.assert_eq(observations.program_admission(), false)
+			end
+			observations.failures["setting:llm_api_entries"] = fail("false")
+			helpers.assert_eq(observations.actions.factory_reset(), false)
+			helpers.assert_eq(reads, 1)
+			helpers.assert_eq(observations.program_admission(), true)
 		end)
 	end)
 end)

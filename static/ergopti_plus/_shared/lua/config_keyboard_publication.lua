@@ -120,4 +120,31 @@ function M.publish(keys, groups, contextual)
 	end
 end
 
+--- Composes both acknowledged native identity domains without loading either source.
+--- Unavailable or withdrawn constituents never imply retirement in the other domain.
+--- @param logical table|nil Complete logical and contextual catalogue.
+--- @param physical table|nil Complete physical catalogue from its genuine constructor.
+--- @return table|nil catalogue Detached union, or unavailable authority.
+function M.compose(logical, physical)
+	if logical == nil or physical == nil then return nil end
+	local ids, seen = {}, {}
+	for index, catalogue in ipairs({ logical, physical }) do
+		assert(type(catalogue) == "table" and getmetatable(catalogue) == nil
+			and rawget(catalogue, "prefix") == "keyboard__"
+			and type(rawget(catalogue, "slots")) == "table"
+			and getmetatable(catalogue.slots) == nil and next(catalogue.slots) ~= nil,
+			"config_keyboard_publication: invalid native composition")
+		for field in next, catalogue do
+			assert(field == "prefix" or field == "slots", "config_keyboard_publication: invalid native composition")
+		end
+		for id, present in next, catalogue.slots do
+			assert(type(id) == "string" and id ~= "" and present == true and not seen[id]
+				and (id:sub(1, 9) == "physical_") == (index == 2),
+				"config_keyboard_publication: invalid native composition")
+			seen[id], ids[#ids + 1] = true, id
+		end
+	end
+	return Identity.keyboard_binding_catalogue(ids)
+end
+
 return M

@@ -606,8 +606,9 @@ function M.build(ctx)
 					end
 				})
 
-				table.insert(model_submenu, { separator = true })
-				table.insert(model_submenu, { label = i18n.section("menu.llm.specs_header"), disabled = true })
+				local specs_rows = ManifestMenu.template_rows("llm_model_specs_frame", {}, {}, {})
+				if not specs_rows then return {} end
+				for _, row in ipairs(specs_rows) do model_submenu[#model_submenu + 1] = row end
 
 				local m_type    = m.type or info.type or "Inconnu"
 				local type_label = i18n.get((m_type == "completion")
@@ -643,8 +644,9 @@ function M.build(ctx)
 				end
 
 				if m.capabilities then
-					table.insert(model_submenu, { separator = true })
-					table.insert(model_submenu, { label = i18n.section("menu.llm.caps_header"), disabled = true })
+					local caps_rows = ManifestMenu.template_rows("llm_model_caps_frame", {}, {}, {})
+					if not caps_rows then return {} end
+					for _, row in ipairs(caps_rows) do model_submenu[#model_submenu + 1] = row end
 					if m.capabilities.speed_tok_s then
 						table.insert(model_submenu, {
 							label = string.format(i18n.get("menu.llm.model_speed"), m.capabilities.speed_tok_s),

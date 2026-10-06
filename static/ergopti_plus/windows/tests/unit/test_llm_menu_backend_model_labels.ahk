@@ -314,3 +314,81 @@ _LBMD_BackendBoundary() {
 }
 Test("backend choices: actual shared boundary and native control owners (backend-choice-boundary)",
 	_LBMD_BackendBoundary)
+
+
+/** Reads the genuine catalogue record used by the actual per-model allocator. */
+_LBMD_ReadoutCatalogueModel(Name) {
+	global _SharedDir
+	Providers := JsonParse(FileRead(_SharedDir . "\modules\llm\models.json", "UTF-8"))
+	for Provider in Providers {
+		for Family in Provider["families"] {
+			for Model in Family["models"] {
+				if Model.Get("name", "") == Name
+					return Model
+			}
+		}
+	}
+	throw Error("Actual curated model missing: " . Name)
+}
+
+/** Proves genuine native frames consume shared metadata without acquiring actions. */
+_LBMD_PerModelReadoutFrame(Key) {
+	global _SharedDir
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\model_readout_frames.json", "UTF-8"))
+	Expected := Corpus[Key]
+	Model := _LBMD_ReadoutCatalogueModel(Corpus["native_model"])
+	Name := Model["name"]
+	Url := Model["urls"]["ollama"]
+	Frame := _MR_GetMenuDef(Expected["section"])
+	Original := Frame[2]
+	Native := 0
+	try {
+		Rows := _LLM_Menu_PerModelRows(Name, Model, Url, Name, false)
+		Position := 0
+		for Index, Row in Rows {
+			if Row.Get("label", "") == t(Expected["key"])
+				Position := Index
+		}
+		Assert(Position > 1, "the real model allocator must reach the current native heading")
+		AssertTrue(Rows[Position - 1]["separator"])
+		AssertTrue(Rows[Position]["disabled"], "shared bare Windows headings are inert")
+		AssertFalse(Rows[Position].Has("action"))
+		AssertEqual(t(Corpus["selection_key"]), Rows[1]["label"])
+		AssertTrue(Rows[1]["checked"])
+		AssertTrue(HasMethod(Rows[1]["action"], "Call"))
+		AssertTrue(HasMethod(Rows[2]["action"], "Call"), "the existing Download closure remains native")
+		Native := Menu()
+		MenuRenderer_AppendRows(Native, "llm_menu", "llm_model", Rows)
+		AssertEqual(Rows.Length, DllCall("GetMenuItemCount", "ptr", Native.Handle, "int"))
+		State := DllCall("GetMenuState", "ptr", Native.Handle, "uint", Position - 1, "uint", 0x400, "uint")
+		Assert(State != 0xFFFFFFFF && (State & 3) != 0 && (State & 0x800) == 0,
+			"the actual Win32 heading is disabled text, never a separator or live command")
+		Frame[2] := Map("type", "label", "id", Original["id"], "i18n", Corpus["marker_key"],
+			"platforms", ["ahk"], "unavailable", "hide")
+		Rows := _LLM_Menu_PerModelRows(Name, Model, Url, Name, false)
+		AssertEqual(t(Corpus["marker_key"]), Rows[Position]["label"], "the genuine native allocator consumes its current declaration")
+		AssertTrue(Rows[Position]["disabled"])
+		AssertFalse(Rows[Position].Has("action"))
+		Frame[2] := Map("type", "command", "id", "unowned_readout", "i18n", Corpus["marker_key"],
+			"platforms", ["ahk"], "unavailable", "hide")
+		AssertEqual(0, _LLM_Menu_PerModelRows(Name, Model, Url, Name, false).Length,
+			"an unowned shared command refuses before publishing any native row")
+		Frame[2] := Original
+		if Key == "caps" {
+			Capabilities := Model["capabilities"]
+			try {
+				Model.Delete("capabilities")
+				Rows := _LLM_Menu_PerModelRows(Name, Model, Url, Name, false)
+				for Row in Rows
+					AssertFalse(Row.Get("label", "") == t(Expected["key"]), "the existing capability absence predicate is retained")
+			} finally Model["capabilities"] := Capabilities
+		}
+	} finally {
+		Frame[2] := Original
+		if Native is Menu
+			_CTC_ReleaseMenu(Native)
+	}
+}
+for Key in ["specs", "caps"]
+	Test("per-model readout: authentic native sheet and shared frame " . Key,
+		_LBMD_PerModelReadoutFrame.Bind(Key))
