@@ -4651,6 +4651,8 @@ Default/custom profile headings and their custom boundary now consume two shared
 
 Shared renderers now support ordered list/group child templates, direct unique row selectors and strict presence predicates. Narrow presentation-only refusal omits a wholly inert heading while retaining native data; callback, mixed, cyclic and clicked-row refusals remain strict. Category coverage follows the actual declared transitive include graph from executable native publication roots, with genuine malformed, foreign, withdrawn and clicked counterexamples. The API alone does not retire native allocator sites.
 
+The actual Windows CI profile-heading failures were caused by an unset native LLM_PROFILE_HOTKEY_LIMIT. The existing fixture now supplies the real nine-number-row protocol and restores the exact prior unset/value state. Every original assertion and heading withdrawal case remains. This is a fixture prerequisite; corrected native execution is pending the next manual CI.
+
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote
