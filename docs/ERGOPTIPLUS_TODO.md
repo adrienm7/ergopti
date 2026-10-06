@@ -3107,8 +3107,8 @@ lock refusal. No physical magic-key acceptance is inferred.
   `_shared/data/keycodes/hid_usages.json`, a key-identity policy). Remaining, in
   order: WP3 production consumer owner (plan section WP3 lists the review notes:
   settle held modifiers when the source changes, map a refused producer version
-  to one unavailable WARNING), WP4 headless fork producer emitting baseline v2
-  (the native harness refuses early until then), WP5 reproducible runtime
+  to one unavailable WARNING), WP4 headless fork runtime integration (the reviewed diagnostic baseline-v2
+  producer is already promoted), WP5 reproducible runtime
   artifact, WP6 install/launchd ownership and the default-on "close other
   Karabiner instances" option, WP7 owned configuration, WP8 native acceptance,
   WP9 real-Mac acceptance (internal keyboard: verify the ISO 0x35/0x64
@@ -3190,23 +3190,26 @@ must cover the final slice.
 WP4 remains partial. The diagnostic producer now retains usage page in its
 internal inventory, reconciliation and immutable snapshots. A changed page on
 an admitted element cookie faults the exact state and interrupts its lease;
-an unrelated auxiliary cookie remains auxiliary. Its native acquisition still
-filters page 7, and baseline v1 refuses non-page-7 snapshots rather than losing
+an unrelated auxiliary cookie remains auxiliary. At this earlier prerequisite, native acquisition still
+filtered page 7, and baseline v1 refused non-page-7 snapshots rather than losing
 identity on serialization. Existing wire fields, fixture-only coverage and the
-independent native JSON corpora are unchanged. Two actual C++ regressions failed
-against the original producer; six complete matching programs pass under both
+independent native JSON corpora were unchanged. Two actual C++ regressions failed
+against the original producer; six complete matching programs passed under both
 C++17 and C++23 with warnings treated as errors. Native probe/producer compilation
-and per-device keyboard-type classification remain pending. The consumer still
-requires baseline v2 and the native contract continues to refuse that mismatch;
-this prerequisite does not enable consumer or physical acceptance.
+and per-device keyboard-type classification were then pending. The consumer
+required baseline v2 and the native contract refused that earlier mismatch.
+The later baseline2 promotion below supersedes this source state; neither
+prerequisite enables consumer or physical acceptance.
 
 The cheap baseline preflight now also checks the actual CLI transfer boundary.
 A handwritten consumer-v2/producer-v2/Python-v2 tree with a CLI-v1 reader passed
 the original gate incorrectly; it now refuses with the existing named reason
 and exit3. Aligned controls pass, while duplicate or missing declarations fail
-closed. The current producer, CLI and Python reader remain v1, and the consumer
-remains v2: native consumer admission is still deliberately refused. Independent
-native JSON corpora and all live wire versions are unchanged.
+closed. At this earlier prerequisite, the producer, CLI and Python reader were v1,
+and the consumer was v2: native consumer admission was deliberately refused.
+The later baseline2 promotion below supersedes that mismatch; the cheap
+preflight now accepts the aligned current declarations. Independent native
+JSON corpora and the outer transport version remain unchanged.
 
 The dormant capture stop port now retains one optional exact-session observer
 until native verifier/clock/capture retirement and accounting release commit.
@@ -3792,6 +3795,23 @@ and93 assertion calls are conserved, with all16 combinations of canonical/aliase
 temporary roots, umask022/002 and normal/inherited optimization passing. Production
 source guards, native code, guardian and workflow remain unchanged. Actual Darwin
 sampling, Swift packaging/install acceptance and WP6 remain unqualified.
+
+The next macOS run, [37421771641](https://github.com/adrienm7/ergopti/actions/runs/37421771641),
+again stopped before Swift. Its actual raw transcript identifies the boundary:
+the current Python runtime image fails the unchanged ordinary-image predicate
+before native acquisition (19 controls:9 pass,2 fail,8 errors). The failing
+metadata predicate is not yet observed. Portable caller fixtures now retain a
+readonly task-owned image copy for explicitly modeled subprocesses, independent
+of the host toolcache. Every original test body/assertion remains exact; a new
+real-file group-write refusal control requires zero native acquisitions. Native
+refusal diagnostics retain bounded same-descriptor mode/size/owner/link facts
+without changing admission, status, deadlines or guards. No runtime permission
+normalization, Darwin ACL sample, Swift or package/install success is inferred.
+The earlier diagnostic-v1 TODO language is historical: baseline-v2 producer,
+CLI and Python promotion already exists in0761ae3f3. Its current preflight,
+67 Python controls per mode and six strict C++17/C++23 programs pass; all14
+historical native artifacts remain byte-exact. Owned runtime/native acceptance
+and TODO31 stay partial.
 
 The registered Linux physical-hold dashboard harness now loads its actual
 shared selection enum and predicates before the unchanged Typing KPI consumer.

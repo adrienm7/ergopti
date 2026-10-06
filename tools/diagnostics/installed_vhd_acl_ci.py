@@ -79,7 +79,10 @@ def read_input(path, maximum, *, source=True):
             and 0 < before.st_size <= maximum
             and (not source or before.st_uid == os.geteuid() and before.st_nlink == 1)
             and not before.st_mode & 0o022,
-            "Caller ordinary input owner refused",
+            "Caller ordinary input owner refused: "
+            f"regular={stat.S_ISREG(before.st_mode)} size={before.st_size} maximum={maximum} "
+            f"mode={oct(before.st_mode)} uid={before.st_uid} euid={os.geteuid()} "
+            f"links={before.st_nlink} source={source}",
         )
         data = bytearray()
         while len(data) <= maximum:

@@ -57,6 +57,10 @@ class CallerControls(unittest.TestCase):
             copied = self.inputs / path.name
             shutil.copyfile(path, copied)
             copied.chmod(0o600)
+        # Modeled subprocesses never execute this task-owned runtime-image fixture.
+        self.runtime = self.root / "modeled-python-image"
+        shutil.copyfile(Path(subject.sys.executable).resolve(strict=True), self.runtime)
+        self.runtime.chmod(0o700)
         self.clock = [100.0]
         self.calls = []
         self.groups = []
@@ -144,10 +148,22 @@ class CallerControls(unittest.TestCase):
         with (
             mock.patch.object(subject, "ROOT", self.inputs),
             mock.patch.object(subject.sys, "platform", "darwin"),
+            mock.patch.object(subject.sys, "executable", str(self.runtime)),
             mock.patch.object(subject.time, "monotonic", side_effect=lambda: self.clock[0]),
             mock.patch.object(subject, "load_captured", side_effect=self.loaded),
         ):
             return subject.run(self.root)
+
+    def test_actual_group_writable_runtime_refuses_before_native_ownership(self):
+        self.runtime.chmod(0o720)
+        with self.assertRaisesRegex(
+            ValueError,
+            r"Caller ordinary input owner refused: regular=True size=\d+ maximum=67108864 "
+            r"mode=0o100720 uid=\d+ euid=\d+ links=1 source=False",
+        ):
+            self.execute()
+        self.assertEqual(self.calls, [])
+        self.assertEqual(self.groups, [])
 
     def test_healthy_retained_three_stages_have_no_authority(self):
         root, record = self.execute()

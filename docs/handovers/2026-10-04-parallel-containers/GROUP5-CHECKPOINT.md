@@ -991,6 +991,23 @@ temporary roots, umask022/002 and normal/inherited optimization passing. Product
 source guards, native code, guardian and workflow remain unchanged. Actual Darwin
 sampling, Swift packaging/install acceptance and WP6 remain unqualified.
 
+The next macOS run, [37421771641](https://github.com/adrienm7/ergopti/actions/runs/37421771641),
+again stopped before Swift. Its actual raw transcript identifies the boundary:
+the current Python runtime image fails the unchanged ordinary-image predicate
+before native acquisition (19 controls:9 pass,2 fail,8 errors). The failing
+metadata predicate is not yet observed. Portable caller fixtures now retain a
+readonly task-owned image copy for explicitly modeled subprocesses, independent
+of the host toolcache. Every original test body/assertion remains exact; a new
+real-file group-write refusal control requires zero native acquisitions. Native
+refusal diagnostics retain bounded same-descriptor mode/size/owner/link facts
+without changing admission, status, deadlines or guards. No runtime permission
+normalization, Darwin ACL sample, Swift or package/install success is inferred.
+The earlier diagnostic-v1 TODO language is historical: baseline-v2 producer,
+CLI and Python promotion already exists in0761ae3f3. Its current preflight,
+67 Python controls per mode and six strict C++17/C++23 programs pass; all14
+historical native artifacts remain byte-exact. Owned runtime/native acceptance
+and TODO31 stay partial.
+
 Managed physical sessions now request one fresh correlated app/window/secure
 sample after capture readiness and before baseline acknowledgement or first-batch
 delivery. The existing framed context owner validates the exact subscription,
