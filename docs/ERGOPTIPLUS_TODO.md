@@ -3961,6 +3961,18 @@ watch and MAIN leaves remain modeled. Actual macOS source-control execution,
 broader AUTH, protected provisioning, owned compilation, installation and
 physical input remain unqualified; this registration does not complete TODO31.
 
+A pure, inactive diagnostic now recognizes only the three complete captured
+pkgutil signature-text forms for VirtualHIDDevice 8.4/8.5/8.6. Its independent
+before-code corpus preserves exact bytes, version/timestamp coupling and
+negative expectations. Nonzero status, stderr, malformed/truncated/localized
+text, unexpected fields and version mismatches are refused without granting
+trust, installation or reference authority. Six test methods exercise 53 frozen
+families and 11,796 mutations in normal and inherited Python optimization.
+This recognizes reported text only; it does not verify package bytes, signer
+identity, expiry, provenance or installed protection. There is no production
+consumer, native execution or provisioning approval in this tranche. Actual
+native signature qualification and the remaining WP4-WP10 scope stay open.
+
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
   listed; see `docs/memory/text-input-and-config.md`. Still open everywhere:
