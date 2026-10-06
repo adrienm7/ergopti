@@ -50,6 +50,12 @@ _SFND_StripComments(Src) {
 	return Out
 }
 
+_SFND_CapturedPublisherPosition(Body) {
+	Position := RegExMatch(Body, 'm)^[ \t]*Written := _TOML_BatchWriteImpl\(BoundPath, Updates, \[\], "write",[ \t]*\n[ \t]*SourceImage\["source_content"\], SourceImage\["source_present"\], true\)[ \t]*$', &Matched)
+	Code := _DriverMaskNonCode(&Body)
+	return Position && SubStr(Code, Position + InStr(Matched[0], "Written", true) - 1, 7) == "Written" ? Position : 0
+}
+
 _SFND_SaveFullConfigNoDelete() {
 	Raw := _DriverSourceConcat()
 	Src := _SFND_StripComments(Raw)
@@ -59,8 +65,8 @@ _SFND_SaveFullConfigNoDelete() {
 	Assert(InStr(Body, "FileDelete(") = 0,
 		"SaveFullConfig must not call FileDelete before TOML_BatchWrite — TOML_BatchWrite already uses atomic FileMove(overwrite=true); pre-deleting creates a data-loss window on crash (savefullconfig-filedelete-data-loss)")
 
-	; Confirm TOML_BatchWrite is still called (the write must still happen)
-	Assert(InStr(Body, "TOML_ConfigBatchWrite(BoundPath, Updates)") > 0,
+	; Confirm the captured-source semantic write is still called.
+	Assert(_SFND_CapturedPublisherPosition(Body) > 0,
 		"SaveFullConfig must persist through its leased semantic configuration writer")
 }
 Test("ErgoptiPlus: SaveFullConfig has no FileDelete before TOML_BatchWrite (savefullconfig-filedelete-data-loss)", _SFND_SaveFullConfigNoDelete)
@@ -125,10 +131,16 @@ _SFND_SaveFullConfigOwnsOneCausalBatchWrite() {
 	Assert(InStr(Body, "PrevCanonState") = 0
 		and InStr(Body, "_TOML_STRICT_CANON_IN_PROGRESS") = 0,
 		"SaveFullConfig must not carry the obsolete guard for a nested full save that the batch writer no longer performs")
-	WriteNeedle := "TOML_ConfigBatchWrite(BoundPath, Updates)"
-	WritePos := InStr(Body, WriteNeedle)
+	WriteNeedle := 'Written := _TOML_BatchWriteImpl(BoundPath, Updates, [], "write",`n'
+		. '`t`t`t`t`t`tSourceImage["source_content"], SourceImage["source_present"], true)'
+	WritePos := _SFND_CapturedPublisherPosition(Body)
 	Assert(WritePos > 0,
 		"SaveFullConfig must write through the path selected by its exact lease owner")
+	SourcePos := InStr(Body, "SourceImage := TOML_BuildConfigUpdatedContent(BoundPath, [])")
+	ClassifyPos := InStr(Body, 'ObsoleteSource := ConfigFullSnapshotCaptureObsoleteSource(SourceImage["source_content"])')
+	CollectPos := InStr(Body, "_ConfigCollectFullSaveUpdates()")
+	Assert(SourcePos > 0 && ClassifyPos > SourcePos && CollectPos > ClassifyPos && WritePos > CollectPos,
+		"the exact physical source must be admitted and classified before collection and publication")
 	StrictPos := InStr(Body, "Written is Integer", true, WritePos)
 	ResultPos := InStr(Body, "Result := CONFIG_SAVE_OK", true, StrictPos)
 	AckPos := InStr(Body, "_ConfigFullSaveAcknowledge(TargetGeneration)")

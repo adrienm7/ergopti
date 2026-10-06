@@ -3485,6 +3485,8 @@ The actual Windows global-clear image from manual run37451318736 contains the fi
 
 Manual run37451318736 reports9974 successful and16 failed Windows cases, including nine actual full-snapshot cases whose ordinary saves refuse. A fixture-only diagnostic now retains the genuine ConfigIO/TomlWrite logger, collector count and complete expected/actual physical images in the first annotation line. All574 measured textual assertions and expected outcomes remain unchanged; the exact prior logger sink is restored even on exceptions. Manual diagnostic run37456524038 locates all9 remaining errors inside the actual collector at an unassigned global. The subsequent genuine keyboard-default fixture prerequisite is recorded separately and must receive its own native qualification. No production guard or schema refusal is weakened.
 
+The five Windows source guards still naming the former public two-argument full-save gateway now follow the actual captured-source native publisher. They retain path-bound ownership, source capture and classification before collection, exact physical content/presence arguments, no pre-write deletion and strict Integer-1 acknowledgement. Independently reproduced quoted/comment-only source-receipt and ACK mutants are rejected by executable-token checks;158 portable source predicates pass. These structural repairs preserve the safety assertions and do not identify or repair the separate actual ordinary-save refusal. Native AHK execution remains pending.
+
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
   The shared AHK override policy now writes an explicit recommended delay only
