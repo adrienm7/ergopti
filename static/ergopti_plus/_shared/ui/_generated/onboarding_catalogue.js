@@ -4637,6 +4637,50 @@
 										]
 									},
 									{
+										"path": "shortcuts.key_combination_taps.alt_gr_then_left_alt",
+										"value": "ctrl_backspace",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "tap_hold.group.alt_gr"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"key": "tap_hold.group.left_alt"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.ctrl_backspace"
+											}
+										]
+									},
+									{
+										"path": "shortcuts.key_combination_taps.alt_gr_then_caps_lock",
+										"value": "ctrl_delete",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "tap_hold.group.alt_gr"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"key": "tap_hold.group.caps_lock"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.ctrl_delete"
+											}
+										]
+									},
+									{
 										"path": "shortcuts.keyboard.ctrl_g",
 										"value": "open_chatgpt",
 										"default": "none",
@@ -4693,6 +4737,14 @@
 						"master": {
 							"path": "shortcuts.enabled",
 							"default": false
+						},
+						"sub_switch": {
+							"path": "category_enabled.key_combinations",
+							"default": true,
+							"items": [
+								"shortcuts.key_combination_taps.alt_gr_then_left_alt",
+								"shortcuts.key_combination_taps.alt_gr_then_caps_lock"
+							]
 						}
 					},
 					{

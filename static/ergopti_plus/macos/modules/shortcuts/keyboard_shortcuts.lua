@@ -27,6 +27,7 @@ local Registrar   = require("adapters.hotkey_registrar")
 local FileSystem  = require("adapters.file_system")
 local Paths       = require("infra.paths")
 local Logger      = require("infra.logger")
+local OperationReporter = require("diagnostics.operation_reporter")
 local GestActions = nil
 local Codec       = require("toml_codec")
 local Writer      = require("toml_codec.writer")
@@ -36,7 +37,12 @@ local Manifest    = require("infra.manifest_reader")
 local ConfigOutdated = require("config_outdated")
 local MagicPolicy = require("shortcuts.magic_editor")
 local KeyboardPublication = require("config_keyboard_publication")
+local KeyboardComposition = KeyboardPublication.compose
+local KeyboardOwnerCurrent = KeyboardPublication.owner_is_current
 local Assignment = require("shortcuts.assignment")
+local PhysicalSlots = require("shortcuts.physical_slots")
+local PhysicalSlotConstructor = PhysicalSlots.new
+local PhysicalAvailability = require("shortcuts.physical_availability")
 local i18n = require("infra.i18n")
 
 local LOG = "shortcuts.keyboard_shortcuts"
@@ -52,6 +58,9 @@ end
 -- under it too, so a menu that asks for one must use this spelling.
 local BINDING_PREFIX = "keyboard__"
 
+local _physical_model, _physical_owner, _physical_publication = nil, nil, nil
+local _physical_binding_publication = nil
+local _physical_publication_epoch = 0
 local _hotkeys   = {}  -- slot_id → registrar handle
 local _actions   = {}  -- slot_id → action_id
 local _started   = false
@@ -200,8 +209,8 @@ end
 --- Reads the canonical source without migrating or consulting legacy storage.
 --- @return table decoded
 --- @return table source Exact classification for conditional publication.
-local function read_config()
-	local content, status, detail = Writer.read_classified(ConfigPaths.get("ConfigTomlPath"), FileSystem)
+local function read_config(on_error)
+	local content, status, detail = Writer.read_classified(ConfigPaths.get("ConfigTomlPath"), FileSystem, on_error)
 	assert(status == "ok" or status == "absent", "keyboard configuration unavailable: " .. tostring(detail))
 	local decoded = Codec.decode(content or "")
 	assert(type(decoded) == "table", "keyboard configuration is malformed")
@@ -217,6 +226,39 @@ local function owned_slots()
 		for _, key in ipairs(keys) do index[group[1] .. key.id] = true end
 	end
 	return index
+end
+
+--- Loads the immutable shared physical registry without a host key fallback.
+local function physical_model()
+	if _physical_model == nil then
+		assert(rawequal(rawget(package.loaded, "shortcuts.physical_slots"), PhysicalSlots)
+			and getmetatable(PhysicalSlots) == nil and rawequal(rawget(PhysicalSlots, "new"), PhysicalSlotConstructor),
+			"physical-key constructor ownership changed")
+		local raw = assert(FileSystem.read(Paths.shared("data/keycodes/physical_keys.json")), "physical registry unavailable")
+		local decoded, detail = JsonCodec.decode(raw)
+		assert(decoded and not detail, "physical registry malformed")
+		_physical_model, _physical_binding_publication = PhysicalSlotConstructor(decoded)
+	end
+	return _physical_model
+end
+
+local function owns_slot(slot)
+	if PhysicalSlots.is_namespace(slot) then return physical_model().owns(slot) end
+	return owned_slots()[slot] == true
+end
+
+--- Returns canonical user physical position and exact modifiers.
+function M.physical_slot_descriptor(slot)
+	if not PhysicalSlots.is_namespace(slot) then return nil end
+	return physical_model().parse(slot)
+end
+
+local function physical_modifiers(mods)
+	local native = {}
+	for _, name in ipairs(PhysicalSlots.modifiers()) do
+		if mods[name] then native[#native + 1] = name == "super" and "cmd" or name end
+	end
+	return native
 end
 
 --- Visits the stored assignments of the owned slots. A [shortcuts] or
@@ -238,9 +280,12 @@ local function walk_assignments(decoded, consume, candidate)
 	if shortcuts == nil then return end
 	local assignments = ConfigOutdated.settings_table(shortcuts.keyboard, { "shortcuts", "keyboard" }, Logger)
 	if assignments == nil then return end
-	local known = owned_slots()
 	for slot, action in pairs(assignments) do
-		if known[slot] then consume(slot, action) end
+		if owns_slot(slot) then consume(slot, action)
+		elseif PhysicalSlots.is_namespace(slot) then
+			assert(not candidate, "physical keyboard candidate contains an invalid slot")
+			ConfigOutdated.report({ "shortcuts", "keyboard", slot }, "invalid physical shortcut identity", Logger)
+		end
 	end
 end
 
@@ -269,9 +314,8 @@ local function load_assignments(candidate, raw_claims)
 	end, candidate ~= nil)
 	if raw_claims ~= nil then
 		assert(type(raw_claims) == "table", "keyboard raw claims must be a table")
-		local known = owned_slots()
 		for slot, claimed in pairs(raw_claims) do
-			assert(known[slot] and claimed == true, "keyboard raw claim is not owned")
+			assert(owns_slot(slot) and claimed == true, "keyboard raw claim is not owned")
 			if physical[slot] == nil then physical[slot] = false end
 		end
 	end
@@ -305,9 +349,8 @@ end
 function M.get_owned_config_paths()
 	local decoded, found = read_config(), {}
 	walk_assignments(decoded, function(slot) found[slot] = true end)
-	local known = owned_slots()
 	for slot, action in pairs(_actions) do
-		if known[slot] and action ~= "none" then found[slot] = true end
+		if owns_slot(slot) and action ~= "none" then found[slot] = true end
 	end
 	local result = {}
 	for slot in pairs(found) do result[#result + 1] = KEYBOARD_SECTION .. "." .. slot end
@@ -347,6 +390,13 @@ end
 --- @param slot_id string
 --- @return string
 local function slot_label(slot_id)
+	local descriptor = M.physical_slot_descriptor(slot_id)
+	if descriptor then
+		local parts = {}
+		for _, mod in ipairs(physical_modifiers(descriptor.mods)) do parts[#parts + 1] = MOD_SYMBOLS[mod] or mod end
+		parts[#parts + 1] = descriptor.code
+		return table.concat(parts, " ")
+	end
 	if slot_id == MagicPolicy.SLOT_ID then
 		local label = i18n.get("menu.shortcuts.keyboard.magic_editor")
 		local reason = _magic_owner and _magic_owner.reason()
@@ -373,13 +423,194 @@ local function refresh_claims(assignments)
 	local rows = {}
 	for slot, action in pairs(assignments or _physical_assignments) do
 		if slot ~= MagicPolicy.SLOT_ID then
-			local chord = slot_to_chord(slot)
-			if chord then rows[#rows + 1] = {
+			local descriptor = M.physical_slot_descriptor(slot)
+			local native = descriptor and physical_model().stable_native_code(slot, "hs")
+			local chord = not descriptor and slot_to_chord(slot) or nil
+			if native then rows[#rows + 1] = {
+				mods = physical_modifiers(descriptor.mods), native_code = native,
+				action = action, binding_id = BINDING_PREFIX .. slot,
+			}
+			elseif chord then rows[#rows + 1] = {
 				chord = chord, action = action, binding_id = BINDING_PREFIX .. slot,
 			} end
 		end
 	end
 	return Registrar.replace_physical_claims(LOG, rows)
+end
+
+--- Fences a scope candidate through native admission and publication.
+function M.acquire_physical_publication(owner)
+	if type(owner) ~= "table" or _physical_publication ~= nil then return false end
+	_physical_publication = owner
+	_physical_publication_epoch = _physical_publication_epoch + 1
+	return true
+end
+
+--- Releases only the exact acknowledged publisher or settled inverse.
+function M.release_physical_publication(owner)
+	if type(owner) ~= "table" or _physical_publication ~= owner then return false end
+	_physical_publication = nil
+	_physical_publication_epoch = _physical_publication_epoch + 1
+	return true
+end
+
+--- Rechecks private lifecycle/configuration/publication currency after every port.
+local function physical_receipt_current(receipt)
+	if type(receipt) ~= "table" or not _started or not _delivery_enabled or _editing or _lifecycle_paused
+		or _physical_publication ~= nil or receipt.lifecycle ~= _lifecycle_epoch
+		or receipt.configuration ~= _configuration_generation or receipt.publication ~= _physical_publication_epoch
+		or receipt.actions ~= _explicit_actions then return false end
+	if type(receipt.parameters) ~= "function" then return false end
+	if receipt.source_guard ~= nil then
+		local read, current = pcall(receipt.source_guard)
+		if not read or current ~= true then return false end
+	end
+	local called, current = pcall(receipt.parameters)
+	return called and current == true and _started and _delivery_enabled and not _editing and not _lifecycle_paused
+		and _physical_publication == nil and receipt.lifecycle == _lifecycle_epoch
+		and receipt.configuration == _configuration_generation and receipt.publication == _physical_publication_epoch
+		and receipt.actions == _explicit_actions
+end
+
+--- Reports whether native source, all-owner collisions and output custody are joined.
+--- The physical broker/output integration is not yet qualified on macOS. Existing
+--- named shortcuts and contextual native owners retain their separate lifecycles.
+--- @return boolean available Native physical delivery capability.
+function M.physical_delivery_available()
+	return false
+end
+
+--- Carries one private receipt across source and runtime callbacks.
+local function physical_admission(previous)
+	if not PhysicalAvailability.ready(M.physical_delivery_available) then return false end
+	local receipt = previous
+	if receipt == nil then
+		receipt = { lifecycle = _lifecycle_epoch, configuration = _configuration_generation,
+			publication = _physical_publication_epoch, actions = _explicit_actions }
+		local catalogue = action_catalogue()
+		if type(catalogue.capture_parameter_delivery_guard) ~= "function" then return false end
+		receipt.parameters = catalogue.capture_parameter_delivery_guard()
+	end
+	if not physical_receipt_current(receipt) then return false end
+	local path = ConfigPaths.get("ConfigTomlPath")
+	if not physical_receipt_current(receipt) then return false end
+	if receipt.source_guard == nil then
+		if type(Preferences.capture_source_delivery_guard) ~= "function" then return false end
+		receipt.source_guard = Preferences.capture_source_delivery_guard(path)
+		if not physical_receipt_current(receipt) then return false end
+	end
+	local source = Preferences.source_snapshot(path)
+	if not physical_receipt_current(receipt) or type(source) ~= "table" or source.status ~= "ok"
+		or type(source.content) ~= "string" then return false end
+	local expected = source.content
+	if receipt.source ~= nil and receipt.source ~= expected then return false end
+	local content, status = FileSystem.read_with_status(path)
+	if not physical_receipt_current(receipt) or status ~= "ok" or content ~= expected then return false end
+	if _magic_context ~= nil then
+		local context = _magic_context
+		if context.paused() ~= false or not physical_receipt_current(receipt) or _magic_context ~= context then return false end
+		if context.inhibited() ~= false or not physical_receipt_current(receipt) or _magic_context ~= context then return false end
+	end
+	receipt.source = expected
+	return physical_receipt_current(receipt), receipt
+end
+
+--- Captures private native intent for the detached editor, without publication.
+function M.capture_physical_editor_inventory()
+	if _physical_publication ~= nil or _editing then return nil end
+	local configuration, publication, lifecycle, actual = _configuration_generation,
+		_physical_publication_epoch, _lifecycle_epoch, _explicit_actions
+	local assignments = {}
+	for slot, action in pairs(actual) do if PhysicalSlots.is_namespace(slot) then assignments[slot] = action end end
+	return { assignments = assignments, current = function()
+		return _physical_publication == nil and not _editing and _explicit_actions == actual
+			and _configuration_generation == configuration and _physical_publication_epoch == publication
+			and _lifecycle_epoch == lifecycle
+	end }
+end
+
+--- Checks prior explicit identities independently of conditional recommendations.
+local function physical_conflict(slot, mods, native)
+	-- Existing named assignments, including None, retain their identity.
+	local identity = Registrar.physical_identity(physical_modifiers(mods), native)
+	if identity == nil then return true end
+	for existing in pairs(_physical_assignments) do
+		if not PhysicalSlots.is_namespace(existing) and existing ~= MagicPolicy.SLOT_ID then
+			local chord = slot_to_chord(existing)
+			local parsed = chord and Chord.parse(chord)
+			if parsed and Registrar.physical_identity(parsed.mods, parsed.key) == identity then return true end
+		end
+	end
+	return Registrar.has_physical_conflict(physical_modifiers(mods), native, LOG, BINDING_PREFIX .. slot)
+end
+
+--- Checks actual candidate collisions while the editor's exact publisher is held.
+--- Both native admission and publication finalization use this same check.
+function M.validate_physical_edits(rows, claim)
+	if type(rows) ~= "table" or type(claim) ~= "table" or _physical_publication ~= claim then return false, "source_changed" end
+	local publication_epoch, lifecycle, config, assignments = _physical_publication_epoch, _lifecycle_epoch,
+		_configuration_generation, _explicit_actions
+	local function current()
+		return _physical_publication == claim and _physical_publication_epoch == publication_epoch
+			and _lifecycle_epoch == lifecycle and _configuration_generation == config and _explicit_actions == assignments
+	end
+	for _, row in ipairs(rows) do
+		if row.section == "shortcuts.keyboard" and row.delete ~= true then
+			local descriptor = M.physical_slot_descriptor(row.key)
+			if not current() then return false, "source_changed" end
+			if not descriptor then return false, "unavailable" end
+			local native = physical_model().stable_native_code(row.key, "hs")
+			if not current() then return false, "source_changed" end
+			if not native or physical_model().key_group(row.key) == "media" then return false, "unavailable" end
+			local called, conflict = pcall(physical_conflict, row.key, descriptor.mods, native)
+			if not current() then return false, "source_changed" end
+			if not called or type(conflict) ~= "boolean" then return false, "unavailable" end
+			if conflict then return false, "collision" end
+		end
+	end
+	if not current() then return false, "source_changed" end
+	return true
+end
+
+--- Acquires a provenance-aware owner while the shared lifecycle remains fenced.
+local function start_physical(assignments)
+	if not PhysicalAvailability.ready(M.physical_delivery_available) then
+		return _physical_owner == nil or _physical_owner.stop() == true
+	end
+	local rows = {}
+	for slot, action in pairs(assignments or _explicit_actions) do
+		if PhysicalSlots.is_namespace(slot) then rows[slot] = action end
+	end
+	if _physical_owner == nil then
+		if next(rows) == nil then return true end
+		_physical_owner = require("adapters.physical_shortcut_hook").new(physical_model())
+	end
+	if _physical_owner.stop() ~= true then return false end
+	local epoch = _lifecycle_epoch
+	_native_acquisition_depth = _native_acquisition_depth + 1
+	local called, started = xpcall(_physical_owner.start, debug.traceback, {
+		assignments = rows,
+		admitted = physical_admission,
+		action = function(slot) return _explicit_actions[slot] end,
+		conflicts = physical_conflict,
+		execute = function(slot, action, receipt)
+			local admitted = physical_admission(receipt)
+			if admitted ~= true or _explicit_actions[slot] ~= action then return false end
+			local catalogue = action_catalogue()
+			local ok, handled = Logger.callback(LOG, "Physical configurable shortcut", function()
+				if physical_admission(receipt) ~= true or not physical_receipt_current(receipt)
+					or _explicit_actions[slot] ~= action then return false end
+				return catalogue.execute_single(action, M.binding_id(slot))
+			end)
+			return ok and handled == true
+		end,
+	})
+	_native_acquisition_depth = _native_acquisition_depth - 1
+	if not called or started ~= true or _lifecycle_paused or epoch ~= _lifecycle_epoch then
+		_physical_owner.stop()
+		return false
+	end
+	return true
 end
 
 local function start_magic(action)
@@ -422,6 +653,7 @@ end
 --- @param action_id string
 --- @return boolean committed True when no binding is needed or one is owned.
 local function bind_slot(slot_id, action_id)
+	if PhysicalSlots.is_namespace(slot_id) then return true end
 	if action_id == "none" then return true end
 	if _hotkeys[slot_id] then
 		local retained_handle = _hotkeys[slot_id]
@@ -630,6 +862,18 @@ function M.assigned_slots(prefix)
 	return out
 end
 
+--- Lists actual user entries; explicit None remains an editable reservation.
+function M.physical_assignments()
+	ensure_loaded()
+	local slots, result = {}, {}
+	for slot in pairs(_explicit_actions) do
+		if PhysicalSlots.is_namespace(slot) then slots[#slots + 1] = slot end
+	end
+	table.sort(slots)
+	for _, slot in ipairs(slots) do result[#result + 1] = { id = slot, label = slot_label(slot), action = _explicit_actions[slot] } end
+	return result
+end
+
 --- The binding a slot's action is dispatched under, and its parameter stored under.
 --- @param slot_id string
 --- @return string
@@ -641,7 +885,7 @@ end
 --- Publishes the canonical sparse assignment only after native admission.
 --- @param slot_id string
 --- @param action_id string
-local function set_action(slot_id, action_id)
+local function set_action(slot_id, action_id, on_error, publication_observer)
 	if type(slot_id) ~= "string" or type(action_id) ~= "string" then
 		Logger.error(LOG, "set_action(): both arguments must be strings.")
 		return false
@@ -653,12 +897,16 @@ local function set_action(slot_id, action_id)
 		return false
 	end
 	if _lifecycle_paused == true or _start_attempt ~= nil then return false end
-	if not owned_slots()[slot_id] then return false end
+	if not owns_slot(slot_id) then return false end
+	if PhysicalSlots.is_namespace(slot_id) and action_id ~= "none" then
+		if not PhysicalAvailability.ready(M.physical_delivery_available) then return false end
+	end
+	if PhysicalSlots.is_namespace(slot_id) and _started then return false end
 	ensure_loaded()
 	local old_action = _actions[slot_id] or "none"
-	local _, source = read_config()
+	local _, source = read_config(on_error)
 	local operation = Assignment.operation(slot_id, action_id, function(id)
-		return owned_slots()[id] == true
+		return owns_slot(id)
 	end, action_catalogue().is_assignable)
 	local rows = Preferences.prepare_shortcut_updates(source, { operation }, { "keyboard" })
 
@@ -689,7 +937,7 @@ local function set_action(slot_id, action_id)
 	local conditional_admitted = refresh_claims() == true
 		and (not _started or start_magic(candidate_magic) == true)
 	if not conditional_admitted
-		or Preferences.publish_owned(ConfigPaths.get("ConfigTomlPath"), rows, source) ~= true then
+		or Preferences.publish_owned(ConfigPaths.get("ConfigTomlPath"), rows, source, on_error, publication_observer) ~= true then
 		restore_conditional()
 		if native_transition == "enabled" then
 			if set_slot_enabled(slot_id, false) ~= true then
@@ -718,12 +966,12 @@ end
 --- @param slot_id string Canonical catalogue slot.
 --- @param action_id string Catalogue action identifier.
 --- @return boolean committed
-function M.set_action(slot_id, action_id)
+function M.set_action(slot_id, action_id, on_error, publication_observer)
 	if _editing then return false end
 	_editing = true
-	local called, committed = xpcall(set_action, debug.traceback, slot_id, action_id)
+	local called, committed = xpcall(set_action, debug.traceback, slot_id, action_id, on_error, publication_observer)
 	_editing = false
-	if not called then Logger.error(LOG, "Keyboard assignment failed: %s.", tostring(committed)) end
+	if not called then OperationReporter.new(on_error, Logger, LOG)("assignment", "error", "Keyboard assignment failed: %s.", tostring(committed)) end
 	return called and committed == true
 end
 
@@ -734,6 +982,7 @@ end
 function M.apply_configuration(decoded, raw_claims)
 	if type(decoded) ~= "table" or _editing or _started or _start_attempt ~= nil
 		or _native_acquisition_depth ~= 0 or next(_hotkeys) ~= nil then return false end
+	if _physical_owner and _physical_owner.stop() ~= true then return false end
 	if _magic_owner and _magic_owner.stop() ~= true then return false end
 	_editing = true
 	local called, detail = xpcall(load_assignments, debug.traceback, decoded, raw_claims)
@@ -789,7 +1038,7 @@ function M.start(candidate, raw_claims)
 		Logger.debug(LOG, "M.start() called again after menu-state synchronization; bindings already active.")
 		return true
 	end
-	if next(_hotkeys) ~= nil and M.stop() ~= true then
+	if (next(_hotkeys) ~= nil or _physical_owner and _physical_owner.has_debt()) and M.stop() ~= true then
 		Logger.error(LOG, "Keyboard shortcuts cannot start while native cleanup is pending.")
 		return false
 	end
@@ -823,6 +1072,8 @@ function M.start(candidate, raw_claims)
 			return false
 		end
 	end
+	if start_physical() ~= true then M.stop(); return false end
+	if not start_is_current(attempt) then M.stop(); return false end
 	if start_magic(_explicit_actions[MagicPolicy.SLOT_ID]) ~= true then M.stop(); return false end
 	if not start_is_current(attempt) then
 		M.stop()
@@ -843,8 +1094,9 @@ function M.stop()
 	_delivery_enabled = false
 	invalidate_lifecycle()
 	_start_attempt = nil
+	local physical_settled = _physical_owner == nil or _physical_owner.stop() == true
 	local conditional_settled = _magic_owner == nil or _magic_owner.stop() == true
-	if not _started and next(_hotkeys) == nil and _native_acquisition_depth == 0 and conditional_settled then
+	if not _started and next(_hotkeys) == nil and _native_acquisition_depth == 0 and conditional_settled and physical_settled then
 		Logger.debug(LOG, "stop() called before start() — nothing to stop.")
 		return true
 	end
@@ -856,7 +1108,7 @@ function M.stop()
 	for _, slot in ipairs(slots) do
 		if unbind_slot(slot) ~= true then settled = false end
 	end
-	if _native_acquisition_depth ~= 0 or not settled or not conditional_settled then
+	if _native_acquisition_depth ~= 0 or not settled or not conditional_settled or not physical_settled then
 		Logger.error(LOG, "Keyboard shortcuts stop is incomplete and remains retryable.")
 		return false
 	end
@@ -893,9 +1145,16 @@ end
 --- Returns a detached complete native publication without reading or binding input.
 --- @return table|nil catalogue Unavailable or withdrawn sources remain unjudged.
 function M.published_binding_catalogue()
-	if not KeyboardPublication.owner_is_current(M)
-		or _binding_publication == nil or type(_catalogue) ~= "table" then return nil end
-	return _binding_publication(rawget(_catalogue, "keys"), SLOT_MODS, MagicPolicy.SLOT_ID)
+	if not rawequal(rawget(package.loaded, "config_keyboard_publication"), KeyboardPublication)
+		or getmetatable(KeyboardPublication) ~= nil or type(KeyboardComposition) ~= "function"
+		or type(KeyboardOwnerCurrent) ~= "function"
+		or not rawequal(rawget(KeyboardPublication, "compose"), KeyboardComposition)
+		or not rawequal(rawget(KeyboardPublication, "owner_is_current"), KeyboardOwnerCurrent)
+		or not KeyboardOwnerCurrent(M)
+		or _binding_publication == nil or _physical_binding_publication == nil
+		or type(_catalogue) ~= "table" then return nil end
+	return KeyboardComposition(_binding_publication(rawget(_catalogue, "keys"), SLOT_MODS, MagicPolicy.SLOT_ID),
+		_physical_binding_publication(_physical_model))
 end
 
 KeyboardPublication.register(M, M.published_binding_catalogue)

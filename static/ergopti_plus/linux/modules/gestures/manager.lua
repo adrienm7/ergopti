@@ -47,6 +47,9 @@ local Timings = require("infra.timings")
 local Monotonic = require("infra.monotonic")
 local Manifest = require("infra.manifest_reader")
 local ParameterLabel = require("action_parameter_label")
+local ProgramParameter = require("program_parameter")
+local ProgramOwner = require("modules.gestures.program_owner")
+local WindowSwitch = require("adapters.window_switch")
 local PromptAction = require("llm.prompt_action")
 local Vision = require("llm.vision")
 local AppParameter = require("app_parameter")
@@ -488,6 +491,8 @@ local SETTINGS_APPLICATIONS = {
 --- Actions that need more than one fixed command, by action id. Each receives
 --- the binding that fired it, which parameterized actions read their value by.
 local BUILTIN_HANDLERS = {
+	["run_program"] = function(binding) return M.run_program(binding) end,
+	["alt_tab_monitor"] = function(binding) return M.run_window_switch(binding) end,
 	["open_system_settings"] = function()
 		local Shell = require("adapters.shell_runner")
 		for _, application in ipairs(SETTINGS_APPLICATIONS) do
@@ -889,6 +894,17 @@ function M.get_picker_items()
 	local items, probed = {}, {}
 	--- Resolves one action's availability, probing each token once per build.
 	local function availability(action_name)
+		if action_name == "run_program" and not ProgramOwner.available() then
+			return false, i18n.get("platform_reason.program_runner_unavailable")
+		end
+		if action_name == "alt_tab_monitor" then
+			local available, reason, tool = WindowSwitch.available()
+			if available ~= true then
+				local hint = i18n.get(reason)
+				if tool then hint = hint:gsub("{1}", function() return tool end) end
+				return false, hint
+			end
+		end
 		local meta = Catalogue.actions[action_name]
 		for _, token in ipairs(meta and meta.requires or {}) do
 			if probed[token] == nil then
@@ -949,13 +965,28 @@ local _reader_stop_error = nil -- an unacknowledged close must fence reacquisiti
 local _decoder       = nil   -- the multitouch frame decoder for that device
 local _touchpad      = nil   -- what touchpad_finder chose, and what it can express
 local _parameter_configuration_owner = nil
+local _parameter_delivery_epoch = 0
 local _scope_owner   = nil   -- retains refused runtime compensation
 local _scope_native = false -- admits only the scope's synchronous native inverse
 local _scope_sequence = 0
+local _program_owner = nil
+local _window_owner = nil
+local _program_revision = 0
+
+--- Revokes scoped native activation before configuration gains publication rights.
+--- @return boolean retired Exact window process, files and timer are settled.
+local function retire_window_operation()
+	if not _window_owner or not _window_owner.has_pending() then return true end
+	local owner, revision = _window_owner, _program_revision
+	return owner.invalidate() == true and _window_owner == owner and _program_revision == revision
+		and not owner.has_pending()
+end
 
 --- Keeps captured preferences exclusively owned until compensation completes.
 --- @return boolean admitted
-local function admit_mutation()
+local function admit_mutation(owner)
+	local bindings = package.loaded["infra.program_binding_transaction"]
+	if type(bindings) == "table" and bindings.pending() and not bindings.owns(owner) then return false end
 	if _parameter_configuration_owner ~= nil then return false end
 	if _scope_owner and _scope_owner.pending() then
 		Logger.error(LOG, "Gesture configuration remains owned by a pending scope transaction.")
@@ -1102,6 +1133,7 @@ function M.set_action(slot, action_name)
 		return false
 	end
 	_actions = staged
+	_program_revision = _program_revision + 1
 	Logger.info(LOG, "Gesture '%s' → '%s'.", slot, tostring(action_name))
 	return true
 end
@@ -1166,6 +1198,7 @@ function M.validate_action_parameter(action_name, value)
 	if spec == "llm_language" then return require("modules.llm.translation").is_valid(value) end
 	-- Syntax only: whether the desktop entry exists is gtk-launch's to say.
 	if spec == "app" then return AppParameter.is_valid(value) end
+	if spec == "program" then return ProgramParameter.parse(value, "linux") ~= nil end
 	if type(value) ~= "string" or not value:match("^https?://%S+$") then return false end
 	if spec == "search_url" then
 		local _, placeholders = value:gsub("%%s", "")
@@ -1185,6 +1218,7 @@ function M.get_action_parameter_prompt(action_name)
 	if spec == "search_url" then return i18n.get("dialog.gestures.param_search_url") end
 	if spec == "url" then return i18n.get("dialog.gestures.param_link") end
 	if spec == "app" then return i18n.get("dialog.gestures.param_app") end
+	if spec == "program" then return i18n.get("dialog.gestures.param_program") end
 	if spec == "wrap_pair" then
 		local Shortcuts = shortcuts_manager()
 		local WrapPair = require("wrap_pair")
@@ -1234,6 +1268,7 @@ function M.get_action_parameter_error(action_name)
 	if spec == "llm_vision" then return i18n.get("dialog.gestures.param_err_llm_vision") end
 	if spec == "llm_language" then return i18n.get("dialog.gestures.param_err_llm_language") end
 	if spec == "app" then return i18n.get("dialog.gestures.param_err_app") end
+	if spec == "program" then return i18n.get("dialog.gestures.param_err_program") end
 	if SEND_INPUT_KINDS[spec] then
 		return fill_placeholder(i18n.get("dialog.gestures.param_err_" .. spec),
 			tostring(send_vocabulary().text_max_code_points))
@@ -1276,6 +1311,161 @@ function M.get_action_parameter(binding, action_name)
 	return _action_params[parameter_key(binding, action_name)] or ""
 end
 
+local function binding_action(binding)
+	if M.DEFAULT_GESTURES[binding] ~= nil then return M.get_action(binding), "gestures", binding end
+	local tap_id = type(binding) == "string" and binding:match("^tap_hold__(.+)$") or nil
+	if tap_id then
+		return require("platform.remap.tap_hold_manager").get_tap_action(tap_id), "tap_hold", tap_id
+	end
+	local descriptors = {
+		{ "keyboard__", "modules.shortcuts.keyboard_shortcuts", "keyboard" },
+		{ "script__", "modules.shortcuts.script_chords", "script_control" },
+		{ "tap_key__", "modules.shortcuts.tap_keys", "tap_keys" },
+		{ "combination__", "modules.shortcuts.key_combinations", "key_combination_taps" },
+	}
+	for _, descriptor in ipairs(descriptors) do
+		if binding:sub(1, #descriptor[1]) == descriptor[1] then
+			local id = binding:sub(#descriptor[1] + 1)
+			local loaded, provider = pcall(require, descriptor[2])
+			if not loaded or type(provider) ~= "table" or type(provider.get_action) ~= "function" then return nil end
+			return provider.get_action(id), descriptor[3], id
+		end
+	end
+	return nil
+end
+
+--- Captures the actual binding and exact canonical source before native acquisition.
+local function capture_program(binding)
+	if _persist ~= true or type(binding) ~= "string" or not admit_mutation() then return nil end
+	local FileSystem = require("adapters.file_system")
+
+	local runtime, section, id = binding_action(binding)
+	if runtime ~= "run_program" then return nil end
+	local pair_guard
+	if section == "key_combination_taps" then
+		pair_guard = require("modules.shortcuts.key_combinations").capture_action(binding, "run_program")
+		if type(pair_guard) ~= "function" or pair_guard() ~= true then return nil end
+	end
+	local scalar = M.get_action_parameter(binding, "run_program")
+	if ProgramParameter.parse(scalar, "linux") == nil then return nil end
+	local content, status = FileSystem.read_with_status(_config_path)
+	if status ~= "ok" or type(content) ~= "string" then return nil end
+	local decoded, config = pcall(TomlCodec.decode, content)
+	if not decoded or type(config) ~= "table" then return nil end
+	local parameters = config[CONFIG_SECTION_PARAMS]
+	local actions = section == "gestures" and config.gestures
+		or type(config.shortcuts) == "table" and config.shortcuts[section]
+	if type(actions) ~= "table" or actions[id] ~= "run_program" or type(parameters) ~= "table"
+		or parameters[parameter_key(binding, "run_program")] ~= scalar then return nil end
+	local revision = _program_revision
+	return scalar, function()
+		local paused_ok, paused = pcall(_is_paused)
+		if pair_guard and pair_guard() ~= true then return false end
+		if not paused_ok or paused ~= false or revision ~= _program_revision or not admit_mutation()
+			or M.get_action_parameter(binding, "run_program") ~= scalar or binding_action(binding) ~= "run_program" then return false end
+		local current, current_status = FileSystem.read_with_status(_config_path)
+		return current_status == "ok" and current == content
+	end
+end
+
+--- Returns the physical native start receipt, independently of dispatch ownership.
+function M.run_program(binding)
+	if _program_owner == nil then _program_owner = ProgramOwner.new(capture_program) end
+	return _program_owner.run(binding)
+end
+
+function M.set_program_paused(paused)
+	if _program_owner == nil then return type(paused) == "boolean" end
+	return _program_owner.set_paused(paused)
+end
+
+function M.stop_programs()
+	if _program_owner == nil then return true end
+	return _program_owner.stop()
+end
+
+function M.when_programs_settled(callback)
+	if _program_owner == nil then
+		if type(callback) ~= "function" then return false end
+		pcall(callback); return true
+	end
+	return _program_owner.when_settled(callback)
+end
+
+--- Captures canonical action ownership and the current physical input generation.
+local function capture_window(binding)
+	if _persist ~= true or type(binding) ~= "string" or not admit_mutation() then return nil end
+	local action, section, id = binding_action(binding)
+	if action ~= "alt_tab_monitor" then return nil end
+	local pair_guard
+	if section == "key_combination_taps" then
+		pair_guard = require("modules.shortcuts.key_combinations").capture_action(binding, action)
+		if type(pair_guard) ~= "function" or pair_guard() ~= true then return nil end
+	end
+	local FileSystem = require("adapters.file_system")
+	local Keyboard = require("adapters.keyboard_hook")
+	local physical = Keyboard.physical_source_receipt()
+	if type(physical) ~= "table" or physical.ready ~= true then return nil end
+	if section == "tap_hold" then
+		local tap_guard, path = require("platform.remap.tap_hold_manager").capture_tap_action(binding, "alt_tab_monitor")
+		if type(tap_guard) ~= "function" then return nil end
+		local revision = _program_revision
+		return function()
+			local ok, paused = pcall(_is_paused)
+			if not ok or paused ~= false or revision ~= _program_revision or not admit_mutation()
+				or binding_action(binding) ~= "alt_tab_monitor" or tap_guard() ~= true then return false end
+			local current = Keyboard.physical_source_receipt()
+			return type(current) == "table" and current.ready == true and current.generation == physical.generation
+		end, path
+	end
+	local content, status = FileSystem.read_with_status(_config_path)
+	if status ~= "ok" or type(content) ~= "string" then return nil end
+	local decoded, config = pcall(TomlCodec.decode, content)
+	if not decoded or type(config) ~= "table" then return nil end
+	local actions = section == "gestures" and config.gestures
+		or type(config.shortcuts) == "table" and config.shortcuts[section]
+	if type(actions) ~= "table" or actions[id] ~= "alt_tab_monitor" then return nil end
+	local revision = _program_revision
+	return function()
+		local ok, paused = pcall(_is_paused)
+		if pair_guard and pair_guard() ~= true then return false end
+		if not ok or paused ~= false or revision ~= _program_revision or not admit_mutation()
+			or binding_action(binding) ~= "alt_tab_monitor" then return false end
+		local current = Keyboard.physical_source_receipt()
+		if type(current) ~= "table" or current.ready ~= true or current.generation ~= physical.generation then return false end
+		local text, current_status = FileSystem.read_with_status(_config_path)
+		return current_status == "ok" and text == content
+	end, _config_path
+end
+
+--- Starts the scoped operation; completion never substitutes global Alt+Tab.
+function M.run_window_switch(binding, done)
+	if _window_owner == nil then _window_owner = WindowSwitch.new(capture_window) end
+	return _window_owner.run(binding, done)
+end
+
+function M.set_window_switch_paused(paused)
+	if _window_owner == nil then return type(paused) == "boolean" end
+	return _window_owner.set_paused(paused)
+end
+
+function M.window_switches_pending()
+	return _window_owner ~= nil and _window_owner.has_pending()
+end
+
+function M.stop_window_switches()
+	if _window_owner == nil then return true end
+	return _window_owner.stop()
+end
+
+function M.when_window_switches_settled(callback)
+	if _window_owner == nil then
+		if type(callback) ~= "function" then return false end
+		pcall(callback); return true
+	end
+	return _window_owner.when_settled(callback)
+end
+
 --- Readies picker items for the picker's own parameter editor: each action that
 --- takes a parameter is marked with its kind and the value `binding` holds for
 --- it, so the page's "edit the current action" button can reopen any of them.
@@ -1290,12 +1480,20 @@ end
 ---   the options the picker bridge's open() reads.
 function M.get_picker_parameter_fields(items, binding)
 	local prompts, errors = {}, {}
+	local combination = type(binding) == "string" and binding:match("^combination__") ~= nil
+		and require("modules.shortcuts.key_combinations").configuration_domain(binding) == "combination"
 	for _, item in ipairs(items) do
 		local kind = item.type == "action" and M.get_action_parameter_spec(item.id) or nil
 		if kind then
+			if kind == "program" and (type(binding) ~= "string"
+				or (M.DEFAULT_GESTURES[binding] == nil and not binding:match("^keyboard__.+$")
+					and not binding:match("^script__.+$") and not binding:match("^tap_key__.+$") and not combination)) then
+				item.disabled = true
+				item.hint = i18n.get("platform_reason.program_runner_unavailable")
+			end
 			item.parameter = kind
 			item.parameterValue = binding and M.get_action_parameter(binding, item.id) or ""
-			if SEND_INPUT_KINDS[kind] or kind == "llm_prompt" or kind == "llm_vision" or kind == "llm_language" then
+			if SEND_INPUT_KINDS[kind] or kind == "llm_prompt" or kind == "llm_vision" or kind == "llm_language" or kind == "program" then
 				prompts[kind] = M.get_action_parameter_prompt(item.id)
 				errors[kind] = M.get_action_parameter_error(item.id)
 			end
@@ -1323,6 +1521,10 @@ function M.get_picker_parameter_fields(items, binding)
 			visionModelDefault = i18n.get("dialog.action_picker.vision_model_default"),
 			visionModelRequired = i18n.get("dialog.action_picker.vision_model_required"),
 			languageLabel = i18n.get("dialog.action_picker.language_label"),
+			programExecutableLabel = i18n.get("dialog.action_picker.program_executable"),
+			programArgumentsLabel = i18n.get("dialog.action_picker.program_arguments"),
+			programAddLabel = i18n.get("dialog.action_picker.program_add_argument"),
+			programRemoveLabel = i18n.get("dialog.action_picker.program_remove_argument"),
 			prompts = prompts,
 			errors = errors,
 		},
@@ -1351,6 +1553,23 @@ function M.action_parameter_binding_fits(binding)
 	return BindingIdentity.gesture_binding_fits(binding, parameter_binding_catalogue), BindingIdentity.RETIRED_GESTURE
 end
 
+--- Builds a validated detached row for the canonical parameter publisher.
+--- No source, native owner or runtime state is modified by this constructor.
+--- @param binding string Exact binding identifier.
+--- @param action_name string Declared parameter-bearing action.
+--- @param value string Validated parameter scalar.
+--- @return table|nil update Canonical section/key/value row, or refusal.
+function M.action_parameter_update(binding, action_name, value)
+	local physical = type(binding) == "string" and binding:match("^keyboard__physical_[a-z_]+_[A-Za-z][A-Za-z0-9]*$")
+	if type(binding) ~= "string" or binding == ""
+		or (not binding:match("^[a-z0-9_]+$") and not physical)
+		or M.action_parameter_binding_fits(binding) == false
+		or type(action_name) ~= "string" or type(value) ~= "string"
+		or M.get_action_parameter_spec(action_name) == nil
+		or M.validate_action_parameter(action_name, value) ~= true then return nil end
+	return { section = CONFIG_SECTION_PARAMS, key = parameter_key(binding, action_name), value = value }
+end
+
 function M.set_action_parameter(binding, action_name, value)
 	if not admit_mutation() then return false end
 	if M.action_parameter_binding_fits(binding) == false then return false end
@@ -1358,12 +1577,22 @@ function M.set_action_parameter(binding, action_name, value)
 	local key = parameter_key(binding, action_name)
 	local staged = copy_state(_action_params)
 	staged[key] = value
-	if not M._persist_updates({ { section = CONFIG_SECTION_PARAMS, key = key, value = value } }) then
+	if not M._persist_updates({ { section = CONFIG_SECTION_PARAMS, key = key, value = value } }, action_name == "run_program") then
 		Logger.error(LOG, "Gesture action parameter was not persisted — nothing changed.")
 		return false
 	end
 	_action_params = staged
+	_program_revision = _program_revision + 1
 	return true
+end
+
+--- Captures private revision/lease currency across physical input callbacks.
+function M.capture_parameter_delivery_guard()
+	local revision, epoch, parameters = _program_revision, _parameter_delivery_epoch, _action_params
+	return function()
+		return _parameter_configuration_owner == nil and _program_revision == revision
+			and _parameter_delivery_epoch == epoch and _action_params == parameters
+	end
 end
 
 function M.get_all_action_parameters()
@@ -1376,6 +1605,7 @@ function M.get_action_display_label(slot)
 	local action = M.get_action(slot) or "none"
 	local label = M.get_action_label(action)
 	local value = M.get_action_parameter(slot, action)
+	if M.get_action_parameter_spec(action) == "program" then return label end
 	return ParameterLabel.format(label, value)
 end
 
@@ -1420,6 +1650,7 @@ function M.apply_scope_state(candidate)
 		if not binding or not action or not M.validate_action_parameter(action, value) then return false end
 		parameters[key] = value
 	end
+	if not retire_window_operation() then return false end
 	_scope_native = true
 	local called, acknowledged = pcall(function()
 		if candidate.reading then return M.start_reading() == true and M.is_reading() end
@@ -1429,6 +1660,7 @@ function M.apply_scope_state(candidate)
 	if not called or acknowledged ~= true then return false end
 	_enabled = candidate.enabled
 	_actions, _action_params = actions, parameters
+	_program_revision = _program_revision + 1
 	return true
 end
 
@@ -1439,6 +1671,7 @@ end
 function M.apply_scope(mode)
 	if _parameter_configuration_owner ~= nil then return false end
 	if mode ~= "recommended" and mode ~= "clear" then return false, "invalid gesture scope mode" end
+	if not retire_window_operation() then return false, "native window retirement remains pending" end
 	if _is_paused() then return false, "gesture configuration is paused" end
 	if not _persist or type(_config_path) ~= "string" then return false, "gesture persistence is not initialized" end
 	if _scope_owner and _scope_owner.pending() then
@@ -1488,6 +1721,7 @@ function M.reset_defaults()
 		return false
 	end
 	_actions = staged
+	_program_revision = _program_revision + 1
 	Logger.info(LOG, "Gestures reset to defaults.")
 	return true
 end
@@ -1507,6 +1741,7 @@ function M.disable_all_actions()
 		return false
 	end
 	_actions = staged
+	_program_revision = _program_revision + 1
 	Logger.info(LOG, "Every gesture binding was set to none.")
 	return true
 end
@@ -1730,7 +1965,9 @@ end
 -- =========================================
 -- =========================================
 
-function M._persist_updates(updates)
+function M._persist_updates(updates, private)
+	-- Configuration cannot supersede a still-owned native window activation.
+	if not retire_window_operation() then return false end
 	if not admit_mutation() then return false end
 	if not _persist then return true end
 	if type(updates) ~= "table" or #updates == 0 then
@@ -1748,8 +1985,12 @@ function M._persist_updates(updates)
 
 	local call_ok, committed, err = pcall(TomlWriter.batch_write, _config_path, updates)
 	if not call_ok or committed ~= true then
-		Logger.error(LOG, "Could not persist gesture configuration: %s",
+		if private == true then
+			Logger.error(LOG, "Could not persist private user program configuration.")
+		else
+			Logger.error(LOG, "Could not persist gesture configuration: %s",
 			tostring(call_ok and err or committed))
+		end
 		return false
 	end
 	return true
@@ -1921,6 +2162,11 @@ end
 ---   monotonic clock. action_handlers owns daemon lifecycle operations.
 function M.init(opts)
 	if not admit_mutation() then return false end
+	if _program_owner and _program_owner.stop() ~= true then return false end
+	if _window_owner and _window_owner.stop() ~= true then return false end
+	_program_owner = ProgramOwner.new(capture_program)
+	_window_owner = WindowSwitch.new(capture_window)
+	_program_revision = _program_revision + 1
 	opts = type(opts) == "table" and opts or {}
 	if opts.action_handlers ~= nil and type(opts.action_handlers) ~= "table" then
 		error("gestures action_handlers must be a table")
@@ -1959,8 +2205,9 @@ end
 --- @param owner table Exact transaction token.
 --- @return boolean acquired
 function M.acquire_parameter_configuration(owner)
-	if type(owner) ~= "table" or not admit_mutation() then return false end
+	if type(owner) ~= "table" or not admit_mutation(owner) or not retire_window_operation() or not admit_mutation(owner) then return false end
 	_parameter_configuration_owner = owner
+	_parameter_delivery_epoch = _parameter_delivery_epoch + 1
 	return true
 end
 
@@ -1970,6 +2217,7 @@ end
 function M.release_parameter_configuration(owner)
 	if type(owner) ~= "table" or _parameter_configuration_owner ~= owner then return false end
 	_parameter_configuration_owner = nil
+	_parameter_delivery_epoch = _parameter_delivery_epoch + 1
 	return true
 end
 
@@ -1979,6 +2227,33 @@ end
 function M.parameter_configuration_snapshot(owner)
 	if _parameter_configuration_owner ~= owner then return nil end
 	return M.get_all_action_parameters()
+end
+
+--- Captures gesture assignments under the same exact parameter transaction.
+--- @param owner table Exact transaction token.
+--- @return table|nil actions Detached assignments.
+function M.parameter_configuration_actions_snapshot(owner)
+	if type(owner) ~= "table" or _parameter_configuration_owner ~= owner then return nil end
+	return M.get_all_actions()
+end
+
+--- Applies only assignments without changing input-reader ownership or files.
+--- @param owner table Exact transaction token.
+--- @param candidate table Detached assignments or exact prior snapshot.
+--- @return boolean acknowledged
+function M.apply_parameter_configuration_actions(owner, candidate)
+	if type(owner) ~= "table" or _parameter_configuration_owner ~= owner or type(candidate) ~= "table" then return false end
+	local actions = {}
+	for slot in pairs(M.DEFAULT_GESTURES) do
+		local action = candidate[slot]
+		if type(action) ~= "string" or not M.is_assignable(action) then return false end
+		actions[slot] = action
+	end
+	for slot in pairs(candidate) do if M.DEFAULT_GESTURES[slot] == nil then return false end end
+	if not retire_window_operation() then return false end
+	_actions = actions
+	_program_revision = _program_revision + 1
+	return true
 end
 
 --- Applies a detached parameter map without changing gesture actions or devices.
@@ -1993,8 +2268,41 @@ function M.apply_parameter_configuration(owner, parameters)
 		if not binding or not M.validate_action_parameter(action, value) then return false end
 		copy[key] = value
 	end
+	if not retire_window_operation() then return false end
 	_action_params = copy
+	_program_revision = _program_revision + 1
 	return true
+end
+
+--- Compares the actual loader's canonical/legacy frame with private runtime intent.
+--- The exact lease (or neutral nil for a detached editor capture) must survive
+--- every external validator/domain callback. Unowned parameters stay untouched.
+function M.parameter_configuration_matches(owner, document, recognizes)
+	if _parameter_configuration_owner ~= owner or type(document) ~= "table" or type(recognizes) ~= "function" then return false end
+	local revision, epoch, runtime = _program_revision, _parameter_delivery_epoch, _action_params
+	local expected = {}
+	walk_user_config(document, { param = function(_, key, value)
+		local binding = M.split_action_parameter_key(key)
+		if recognizes(binding) then expected[key] = value end
+	end })
+	for key, value in pairs(runtime) do
+		local binding = M.split_action_parameter_key(key)
+		if binding and recognizes(binding) and expected[key] ~= value then return false end
+	end
+	for key, value in pairs(expected) do if runtime[key] ~= value then return false end end
+	return _parameter_configuration_owner == owner and _action_params == runtime
+		and _program_revision == revision and _parameter_delivery_epoch == epoch
+end
+
+--- Captures source agreement without acquiring or retiring native work.
+function M.capture_parameter_source_guard(document, recognizes)
+	local revision, epoch, runtime = _program_revision, _parameter_delivery_epoch, _action_params
+	local function current()
+		return _parameter_configuration_owner == nil and _action_params == runtime
+			and _program_revision == revision and _parameter_delivery_epoch == epoch
+	end
+	if not current() or M.parameter_configuration_matches(nil, document, recognizes) ~= true or not current() then return nil end
+	return current
 end
 
 --- Enumerates only recognized parameter bindings consumed by this loader.

@@ -42,9 +42,10 @@ function M.register(helpers, driver)
 		return require(native)
 	end
 	local function publish(owner)
+		assert(owner.physical_slot_descriptor("physical_none_KeyJ"), "the genuine physical source must initialize")
 		return owner.available_slots(driver == "macos" and "hs_ctrl_" or "ctrl_")
 	end
-	local function with_file(published, body)
+	local function with_file(published, body, physical_rows)
 		scope(function()
 			local parameters, preferences, logger
 			if driver == "macos" then
@@ -69,6 +70,7 @@ function M.register(helpers, driver)
 				.. 'keyboard__removed_keyboard_slot__open_url = "https://obsolete.example" # explicit cleanup owns this\n'
 				.. current_key .. ' = "https://current.example"\n'
 				.. 'tap_hold__future_unjudged__open_url = "https://unjudged.example"\n'
+				.. (physical_rows or "")
 				.. '[future]\nnumber = 0.12345678901234566\nlarge = 9223372036854775807\n'
 				.. 'when = 1979-05-27T07:32:00-08:00\n"literal.dot" = [[1], [2, 3]]\n'
 			local path = os.tmpname()
@@ -155,6 +157,42 @@ function M.register(helpers, driver)
 		end)
 	end)
 	helpers.describe("keyboard-binding: actual source ownership", function()
+		helpers.it("retains actual case-exact physical parameters and preserves obsolete physical source until cleanup", function()
+			local physical = "keyboard__physical_ctrl_KeyK"
+			local physical_key = physical .. "__open_url"
+			local unknown = "keyboard__physical_ctrl_KeyFuture"
+			local unknown_key = unknown .. "__open_url"
+			with_file(true, function(f)
+				helpers.assert_eq(stored(f)[physical_key], "https://physical.example")
+				helpers.assert_nil(stored(f)[unknown_key])
+				helpers.assert_eq(f.marks[f.section .. "." .. physical_key], true)
+				helpers.assert_nil(f.marks[f.section .. "." .. unknown_key])
+				helpers.assert_eq(f.reports[f.section .. "." .. unknown_key], true)
+				if driver == "macos" then
+					for key, value in pairs(stored(f)) do
+						local binding, action = f.parameters.split_action_parameter_key(key)
+						helpers.assert_eq(f.parameters.set_action_parameter(binding, action, value), true)
+					end
+				else
+					helpers.assert_eq(f.parameters.action_parameter_update(physical, "open_url", "https://changed.example"), {
+						section = f.section, key = physical_key, value = "https://changed.example",
+					})
+					for _, invalid in ipairs({ unknown, "Opaque__KeyK", "keyboard__physical_CTRL_KeyK", physical .. "\n" }) do
+						helpers.assert_nil(f.parameters.action_parameter_update(invalid, "open_url", "https://changed.example"))
+					end
+				end
+				helpers.assert_eq(f.parameters.get_action_parameter(physical, "open_url"), "https://physical.example")
+				helpers.assert_eq(f.parameters.set_action_parameter(unknown, "open_url", "https://must-not-publish.example"), false)
+				helpers.assert_eq(f.read(), f.source)
+				helpers.assert_eq(f.parameters.set_action_parameter(physical, "open_url", "https://changed.example"), true)
+				if driver == "macos" then helpers.assert_eq(f.save(), true) end
+				helpers.assert_eq(f.parameters.get_action_parameter(physical, "open_url"), "https://changed.example")
+				helpers.assert_contains(f.read(), unknown_key .. ' = "https://future-physical.example" # explicit cleanup owns this')
+				helpers.assert_contains(f.read(), f.source:match("(%[future%].*)"))
+				helpers.assert_contains(f.read(), retired_key .. ' = "https://obsolete.example" # explicit cleanup owns this')
+			end, physical_key .. ' = "https://physical.example"\n'
+				.. unknown_key .. ' = "https://future-physical.example" # explicit cleanup owns this\n')
+		end)
 		helpers.it("ignores only actual published retirement and warns once without reading its source leaf", function()
 			with_file(true, function(f)
 				helpers.assert_nil(stored(f)[retired_key])

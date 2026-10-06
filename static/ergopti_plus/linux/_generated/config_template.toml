@@ -333,6 +333,11 @@ enabled = false
 chatgpt_url = "https://chat.openai.com"
 wrap_text_if_selected = false
 
+[shortcuts.key_combination_taps]
+alt_gr_then_left_alt = "none"
+alt_gr_then_caps_lock = "none"
+left_alt_then_caps_lock = "none"
+
 [shortcuts.script_control]
 chords_enabled = true
 script_altgr_backspace = "script_reload"
@@ -392,6 +397,9 @@ tap_5 = "none"
 
 [layout]
 direct_access_digits = "native"
+
+[category_enabled]
+key_combinations = true
 
 [tap_holds]
 enabled = false

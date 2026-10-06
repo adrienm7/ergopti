@@ -263,6 +263,11 @@ function M.boot(opts)
 		refuse_gesture_assignment_at = fixture.gesture_assignment_calls + count
 	end
 	local gestures = {
+		configure_program_admission = function(callback)
+			helpers.assert_type(callback, "function")
+			fixture.program_admission = callback
+			return true
+		end,
 		-- `runtime.refuse_enable` lets a case refuse ON after a successful boot.
 		enable_all = function()
 			if opts.gestures_enable == false or runtime.refuse_enable == true then return false end
@@ -315,6 +320,7 @@ function M.boot(opts)
 		restore_settings = function() return true end,
 	}
 	fixture.menu = Menu.start("/virtual/", {}, gestures, keymap, {}, {}, karabiner, {})
+	helpers.assert_type(fixture.program_admission, "function", "menu startup registers its required program admission owner")
 	fixture.boot_saves = #saves
 
 	--- Returns the transactional save the menu hands to every row callback.

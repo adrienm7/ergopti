@@ -26,6 +26,7 @@
 --- ==============================================================================
 
 local M = {}
+local ProgramProviderPicker = require("program_provider_picker")
 M.bridge_name = "action_picker_bridge"
 
 local Logger = require("logger.shim")
@@ -110,6 +111,8 @@ function M.build_init_payload(opts)
 		languageChoices   = o.language_choices,
 		defaultCount      = o.default_count,
 		editCurrentLabel  = o.edit_current_label,
+		programProviders = _active_session and _active_session.providers.packet or nil,
+		programProviderStrings = ProgramProviderPicker.strings(i18n.get),
 	}
 end
 
@@ -140,6 +143,7 @@ local function close_session(session, context)
 		return false
 	end
 	_active_session = nil
+	ProgramProviderPicker.close(session.providers)
 	M.pending_opts = nil
 	return true
 end
@@ -169,6 +173,7 @@ function M.open(opts, on_confirm, on_cancel)
 			Logger.error(LOG, "Action picker replacement refused; prior session retained.")
 			return false
 		end
+		ProgramProviderPicker.close(_active_session.providers)
 		_active_session = nil
 		M.pending_opts = nil
 	end
@@ -179,10 +184,18 @@ function M.open(opts, on_confirm, on_cancel)
 		on_confirm = on_confirm,
 		on_cancel = on_cancel,
 		settling = false,
+		providers = { packet = { unavailable = true } },
 	}
 	_active_session = session
+	local adapter_ok, adapter = pcall(require, "adapters.program_providers")
+	session.providers = ProgramProviderPicker.capture(adapter_ok and adapter or nil)
+	if _active_session ~= session then
+		ProgramProviderPicker.close(session.providers)
+		return false
+	end
 	M.pending_opts = type(opts) == "table" and opts or {}
 	if Manager.show("action_picker") ~= true then
+		ProgramProviderPicker.close(session.providers)
 		_active_session = nil
 		M.pending_opts = nil
 		Logger.error(LOG, "Action picker native window could not be opened.")
@@ -252,7 +265,19 @@ local function _handle_table(data, state, context)
 			session.settling = true
 			local id = type(data.id) == "string" and data.id or "none"
 			-- A value the page's editor collected travels with the pick.
-			local parameter = type(data.parameter) == "string" and data.parameter or nil
+			local admitted, parameter = ProgramProviderPicker.confirm(session.providers, id, data)
+			if _active_session ~= session then
+				session.settling = false
+				return nil
+			end
+			if not admitted then
+				session.settling = false
+				local ok_manager, manager = pcall(require, "ui.webview_manager")
+				if ok_manager and type(manager.eval_js) == "function" and _active_session == session then
+					manager.eval_js("action_picker", "programProviderRefused()")
+				end
+				return nil
+			end
 			local ok_callback, accepted = pcall(session.on_confirm, id, state, parameter)
 			session.settling = false
 			if not ok_callback then

@@ -146,8 +146,15 @@ local function load_menu_quit_action()
 
 	package.loaded["ui.menu.init"] = nil
 	local menu = require("ui.menu.init")
-	local started, start_err = pcall(menu.start, ".", {}, nil, nil, nil, {}, nil, {})
+	local program_admission
+	local gestures = { configure_program_admission = function(callback)
+		helpers.assert_type(callback, "function")
+		program_admission = callback
+		return true
+	end }
+	local started, start_err = pcall(menu.start, ".", {}, gestures, nil, nil, {}, nil, {})
 	helpers.assert_true(started, "ui.menu.init must start over the quit harness: " .. tostring(start_err))
+	helpers.assert_type(program_admission, "function", "quit startup retains its required program admission callback")
 	helpers.assert_true(type(captured_actions) == "table" and type(captured_actions.quit) == "function",
 		"the real menu start must publish its quit action")
 	return captured_actions.quit, exit_calls, stock_calls, exit_mode

@@ -239,7 +239,7 @@ platforms = ["hs"]
 
 [sections.shortcuts.key_combination_taps]
 description_key = "menu.shortcuts.key_combinations"
-platforms = ["ahk"]
+platforms = ["ahk", "linux"]
 
 [sections.shortcuts.keyboard]
 description_key = "menu.shortcuts.keyboard"
@@ -1934,7 +1934,7 @@ platforms = ["ahk"]
 # three pairs only and in that order only (2026-10-01).
 [[features.shortcuts.key_combination_taps]]
 id = "alt_gr_then_left_alt"
-platforms = ["ahk"]
+platforms = ["ahk", "linux"]
 default = "none"
 recommended = "ctrl_backspace"
 input_altering = true
@@ -1943,7 +1943,7 @@ description_key = "menu.shortcuts.key_combinations"
 
 [[features.shortcuts.key_combination_taps]]
 id = "alt_gr_then_caps_lock"
-platforms = ["ahk"]
+platforms = ["ahk", "linux"]
 default = "none"
 recommended = "ctrl_delete"
 input_altering = true
@@ -1952,9 +1952,9 @@ description_key = "menu.shortcuts.key_combinations"
 
 [[features.shortcuts.key_combination_taps]]
 id = "left_alt_then_caps_lock"
-platforms = ["ahk"]
+platforms = ["ahk", "linux"]
 default = "none"
-recommended = "caps_word"
+recommended_per_platform = { ahk = "caps_word", linux = "none" }
 input_altering = true
 type = "action"
 description_key = "menu.shortcuts.key_combinations"
@@ -3550,7 +3550,7 @@ description_key = "menu.category_enabled.tap_holds"
 # would both disable upgraded configs and never persist.
 [[features.category_enabled]]
 id = "key_combinations"
-platforms = ["ahk"]
+platforms = ["ahk", "linux"]
 default = true
 recommended = true
 input_altering = false
@@ -4637,6 +4637,19 @@ unavailable = "hide"
 type = "---"
 
 [[menu.shortcuts_menu]]
+type = "command"
+id = "physical_shortcuts_editor"
+i18n = "physical_shortcuts.window_title"
+platforms = ["hs", "linux"]
+unavailable = "grey"
+reason_key = "physical_shortcuts.windows_unavailable"
+disabled_when = ["physical_shortcuts_editor_ready"]
+disabled_reason_key = "physical_shortcuts.window_unavailable"
+
+[[menu.shortcuts_menu]]
+type = "---"
+
+[[menu.shortcuts_menu]]
 type = "list"
 id = "keyboard_slots"
 # The configurable keyboard-shortcut groups. A "list" rather than a "group"
@@ -4666,7 +4679,8 @@ platforms = ["ahk", "hs", "linux"]
 
 # « Combinaisons de touches »: every combination of two tap-hold keys, in one
 # group with a first-row switch of its own. Its rows are
-# key_combinations_group. Linux's tap-hold engine binds no combination yet.
+# key_combinations_group. Linux owns ordered tap/hold slots; simultaneous
+# first-press chord buffering remains unavailable there.
 # A separator sets it apart from the submenus above, which each create
 # shortcuts under one modifier.
 [[menu.shortcuts_menu]]
@@ -4677,7 +4691,7 @@ type = "group"
 id = "key_combinations"
 i18n = "menu.shortcuts.key_combinations"
 checked_when = ["key_combinations_enabled"]
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 reason_key = "platform_reason.remap_engine_is_per_driver"
 # « Raccourcis de gestion du script »: the script chords, a group whose title
 # is ticked while its first-row switch is on. Its rows are
@@ -4896,7 +4910,7 @@ id = "key_combinations_toggle"
 i18n = "menu.shortcuts.key_combinations_enable"
 checked_when = ["key_combinations_enabled"]
 category = "KeyCombinations"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 reason_key = "platform_reason.remap_engine_is_per_driver"
 
 [[menu.key_combinations_group]]
@@ -4955,7 +4969,7 @@ type = "---"
 [[menu.key_combinations_group]]
 type = "list"
 id = "key_combination_rows_left"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 reason_key = "platform_reason.remap_engine_is_per_driver"
 
 [[menu.key_combinations_group]]
@@ -4965,7 +4979,7 @@ platforms = ["ahk", "hs"]
 [[menu.key_combinations_group]]
 type = "list"
 id = "key_combination_rows_right"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 reason_key = "platform_reason.remap_engine_is_per_driver"
 
 # Every category has explicit commands: neither command depends on its current
@@ -5005,7 +5019,7 @@ type = "command"
 id = "key_combination_clear"
 i18n = "menu.tapholds.nothing_combo"
 disabled_when = ["key_combination_pair_assigned"]
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 reason_key = "platform_reason.remap_engine_is_per_driver"
 
 [[menu.key_combination_pair_menu]]
@@ -5015,7 +5029,7 @@ platforms = ["ahk", "hs"]
 [[menu.key_combination_pair_menu]]
 type = "list"
 id = "key_combination_slots"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 reason_key = "platform_reason.remap_engine_is_per_driver"
 
 # « Raccourcis de gestion du script », the maintainer's first group of every
@@ -6480,8 +6494,8 @@ exclude = ["shortcuts.personal"]
 # which the Shortcuts master no longer reaches, while this page still lists the
 # Windows pairs that ship a recommendation: a re-run answered No must leave
 # them off as the master once did. macOS lists no combination here and Linux
-# has no combination engine.
-sub_switch = { ahk = { path = "category_enabled.key_combinations", sections = ["shortcuts.key_combination_taps"] } }
+# owns ordered combinations independently of the Shortcuts master.
+sub_switch = { ahk = { path = "category_enabled.key_combinations", sections = ["shortcuts.key_combination_taps"] }, linux = { path = "category_enabled.key_combinations", sections = ["shortcuts.key_combination_taps"] } }
 
 [onboarding.pages.shortcuts.labels]
 "shortcuts.select_line" = "sg_actions.select_line"

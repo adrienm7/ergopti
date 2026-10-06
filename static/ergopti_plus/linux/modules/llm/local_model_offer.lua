@@ -67,7 +67,7 @@ local function dependencies()
 	return {
 		confirm = deps.confirm or confirm,
 		notify = deps.notify or function(text, title)
-			return require("adapters.notifier").send(text, { title = title, level = "warning" })
+			return require("adapters.application_notifier").send(text, { title = title, level = "warning" })
 		end,
 		install = deps.install or function(base_url, model, on_done, current)
 			return require("modules.llm.model_download").start(base_url, model, model, on_done, current)

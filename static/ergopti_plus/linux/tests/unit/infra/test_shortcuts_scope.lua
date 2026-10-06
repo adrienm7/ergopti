@@ -18,17 +18,18 @@ local SOURCE = '[shortcuts]\nenabled = true\nwrap_text_if_selected = true\nchatg
 --- Uses real state owners and only controlled native/file publication ports.
 --- @param body function Test body.
 --- @param source string|nil config.toml content; SOURCE by default.
-local function with_scope(body, source)
+--- @param options table|nil Explicit uninitialized-pair negative fixture.
+local function with_scope(body, source, options)
 	local loaded = {}
 	for name, value in pairs(package.loaded) do loaded[name] = value end
 	local ok, err = pcall(function()
 		Sandbox.with_config(source or SOURCE, function(path)
 			for _, name in ipairs({ "modules.shortcuts.manager", "modules.shortcuts.keyboard_shortcuts", "modules.shortcuts.tap_keys",
-				"modules.shortcuts.chatgpt", "modules.shortcuts.script_chords", "modules.gestures.manager",
+				"modules.shortcuts.chatgpt", "modules.shortcuts.script_chords", "modules.shortcuts.key_combinations", "modules.gestures.manager",
 				"infra.shortcuts_scope", "ui.menu.menu_builder" }) do
 				package.loaded[name] = nil
 			end
-			local controls = { backups = {}, queued = {}, executed = {}, paused = false, device_calls = 0, runtime_calls = 0 }
+			local controls = { backups = {}, queued = {}, executed = {}, paused = false, device_calls = 0, runtime_calls = 0, pair_changes = 0 }
 			package.loaded["infra.config_paths"] = { config = function() return path end }
 			package.loaded["adapters.storage"] = {
 				get = function(_, default) return default end,
@@ -68,6 +69,22 @@ local function with_scope(body, source)
 				end,
 			}
 			package.loaded["adapters.file_system"] = files
+			-- The global shortcut scope now includes the daemon's canonical pair
+			-- owner. Build its actual policy from the physical catalogue; only
+			-- native retirement/installation acknowledgements are controlled here.
+			local combinations = require("modules.shortcuts.key_combinations")
+			if not options or options.initialize_pairs ~= false then
+				local Loader = require("platform.remap.tap_hold_loader")
+				local defaults = require("infra.paths").shared("tap_hold/defaults.toml")
+				local loaded_pairs = Loader.load_document(defaults,
+					{ tap_hold = { enabled = false, inherit_defaults = true } }, nil, path .. ".tap_hold.toml")
+				helpers.assert_true(combinations.install({ keys = loaded_pairs.catalog, hold_picker = loaded_pairs.hold_picker,
+					files = files, route = function() return path end, is_paused = function() return controls.paused end,
+					actions = { is_assignable = function(action)
+						return action ~= "one_shot_shift" and action ~= "caps_word" and gestures.is_assignable(action) == true
+					end },
+					changed = function() controls.pair_changes = controls.pair_changes + 1; return true end }))
+			end
 			local apply_keyboard = keyboard.apply_configuration
 			keyboard.apply_configuration = function(token, state)
 				controls.runtime_calls = controls.runtime_calls + 1
@@ -88,7 +105,7 @@ local function with_scope(body, source)
 				files = files, is_paused = function() return controls.paused end })
 			controls.files = files
 			local owners = { manager = manager, keyboard = keyboard, taps = taps, url = url, gestures = gestures,
-				chords = chords }
+				chords = chords, combinations = combinations }
 			local passed, failure = pcall(body, scope, owners, controls, path, backup)
 			for _, created in ipairs(controls.backups) do os.remove(created); os.remove(created .. ".tmp") end
 			os.remove(backup)
@@ -570,6 +587,9 @@ helpers.describe("Linux script chords in the Shortcuts scope", function()
 			with_scope(function(_, owners, controls, path, backup)
 				Sandbox.write_bytes(path, Sandbox.read_bytes(path):gsub("%[gesture_parameters%]\n",
 					"[gesture_parameters]\n" .. CHORD_PARAMETER .. ' = "https://script.example"\n', 1))
+				-- Model the daemon reload of the newly persisted parameter before
+				-- the scope requires agreement with that exact canonical frame.
+				owners.gestures.init({ persist = true, config_path = path, enabled = false })
 				owners.chords._reset()
 				owners.chords.init({ is_paused = function() return controls.paused end,
 					defer = function(callback) controls.queued[#controls.queued + 1] = callback; return true end })
@@ -908,3 +928,135 @@ helpers.describe("Linux ordinary obsolete shortcut parent policy", function()
 end)
 
 require("test.config_obsolete_parents_contract").register(helpers)
+helpers.describe("Linux shortcut scope pair initialization", function()
+	helpers.it("refuses an uninitialized actual pair owner before backup or other runtime mutation", function()
+		with_scope(function(scope, owners, controls, path)
+			local before = Sandbox.read_bytes(path)
+			local committed, detail = scope.apply("clear")
+			helpers.assert_eq(committed, false)
+			helpers.assert_eq(detail, "shortcut configuration acquisition refused")
+			helpers.assert_eq(Sandbox.read_bytes(path), before)
+			helpers.assert_eq(#controls.backups, 0)
+			helpers.assert_eq(controls.runtime_calls, 0)
+			helpers.assert_eq(controls.pair_changes, 0)
+			helpers.assert_eq(controls.device_calls, 0)
+			helpers.assert_eq(owners.combinations.configuration_pending(), nil)
+			helpers.assert_true(owners.manager.configuration_admitted())
+		end, nil, { initialize_pairs = false })
+	end)
+end)
+
+helpers.describe("Linux paused shortcut compensation source custody", function()
+	helpers.it("settles a pause refusal through its exact fence while ordinary source admission stays closed", function()
+		with_scope(function(_, owners, controls)
+			local pairs, token = owners.combinations, {}
+			helpers.assert_true(pairs.acquire_configuration(token))
+			helpers.assert_true(pairs.acquire_delivery_fence(token))
+			controls.paused = true
+			helpers.assert_eq(pairs.configuration_source(token), nil)
+			local source = pairs.configuration_source(token, true)
+			helpers.assert_type(source, "table")
+			helpers.assert_eq(pairs.configuration_source_matches(token, source), false)
+			helpers.assert_true(pairs.configuration_source_matches(token, source, true))
+			helpers.assert_eq(pairs.configuration_source_matches({}, source, true), false)
+			helpers.assert_eq(pairs.capture_runtime(), nil)
+			helpers.assert_true(pairs.release_configuration(token))
+			local restored = pairs.capture_edit_source(token, true)
+			helpers.assert_type(restored, "table")
+			helpers.assert_true(restored.guard())
+			helpers.assert_eq(pairs.capture_edit_source(token), nil)
+			helpers.assert_eq(pairs.capture_edit_source(nil, true), nil)
+			helpers.assert_eq(pairs.capture_edit_source({}, true), nil)
+			local alias = setmetatable({}, { __eq = function() return true end })
+			helpers.assert_eq(pairs.capture_edit_source(alias, true), nil)
+			controls.paused = "unknown"
+			helpers.assert_eq(restored.guard(), false)
+			helpers.assert_eq(pairs.capture_edit_source(token, true), nil)
+			controls.paused = true
+			helpers.assert_true(pairs.release_delivery_fence(token))
+			helpers.assert_eq(restored.guard(), false, "settled fence cannot grant later paused source currency")
+			helpers.assert_eq(pairs.capture_runtime(), nil)
+		end)
+	end)
+
+	helpers.it("retains a foreign pair edit during paused rollback until the original frame is restored", function()
+		with_scope(function(scope, owners, controls, path)
+			local foreign = SOURCE .. '[shortcuts.key_combination_taps]\ncaps_lock_then_tab = "copy"\n'
+			controls.before_publish = function(target)
+				if target ~= path then
+					controls.paused = true
+					Sandbox.write_bytes(path, foreign)
+				end
+			end
+			helpers.assert_eq(scope.apply("clear"), false)
+			helpers.assert_true(scope.pending())
+			helpers.assert_eq(Sandbox.read_bytes(path), foreign)
+			helpers.assert_eq(owners.manager.configuration_admitted(), false)
+			helpers.assert_true(owners.combinations.configuration_pending())
+			helpers.assert_eq(owners.combinations.capture_runtime(), nil)
+			helpers.assert_eq(scope.retry_restore(), false)
+			helpers.assert_eq(Sandbox.read_bytes(path), foreign)
+			controls.before_publish = nil
+			Sandbox.write_bytes(path, SOURCE)
+			helpers.assert_true(scope.retry_restore())
+			helpers.assert_eq(scope.pending(), false)
+			helpers.assert_true(owners.manager.configuration_admitted())
+			helpers.assert_eq(owners.combinations.configuration_pending(), false)
+			helpers.assert_eq(owners.combinations.capture_runtime(), nil, "paused recovery does not enable native delivery")
+			helpers.assert_eq(Sandbox.read_bytes(path), SOURCE)
+		end)
+	end)
+end)
+
+helpers.describe("Linux shortcut scope canonical parameter admission", function()
+	helpers.it("refuses a live canonical parameter replacement without inventing a runtime reload", function()
+		with_scope(function(scope, owners, controls, path)
+			local foreign = SOURCE:gsub('keyboard__ctrl_j__open_url = "https://old.example"',
+				'keyboard__ctrl_j__open_url = "https://foreign.example"')
+			Sandbox.write_bytes(path, foreign)
+			helpers.assert_eq(scope.apply("clear"), false)
+			helpers.assert_eq(Sandbox.read_bytes(path), foreign)
+			helpers.assert_eq(#controls.backups, 0)
+			helpers.assert_eq(controls.runtime_calls, 0)
+			helpers.assert_eq(owners.gestures.get_action_parameter("keyboard__ctrl_j", "open_url"), "https://old.example")
+		end)
+	end)
+end)
+
+helpers.describe("Linux merged shortcut acquisition custody", function()
+	helpers.it("reclaims only previously held ports after a partial acquisition and refused release", function()
+		with_scope(function(_, owners, controls, path)
+			local attempts, blocked = { keyboard = 0, taps = 0, chords = 0 }, true
+			owners.keyboard.acquire_configuration = function()
+				attempts.keyboard = attempts.keyboard + 1
+				return false
+			end
+			for _, name in ipairs({ "taps", "chords" }) do
+				local native, acquire = owners[name], owners[name].acquire_configuration
+				native.acquire_configuration = function(token)
+					attempts[name] = attempts[name] + 1
+					return acquire(token)
+				end
+			end
+			local release = owners.manager.release_configuration
+			owners.manager.release_configuration = function(token)
+				if blocked then return false end
+				return release(token)
+			end
+			local scope = require("infra.shortcuts_scope").new({ path = path, backup_path = path .. ".acquisition-backup",
+				files = controls.files, is_paused = function() return controls.paused end })
+			local original = Sandbox.read_bytes(path)
+			helpers.assert_eq(scope.apply("clear"), false)
+			helpers.assert_eq(scope.pending(), true)
+			helpers.assert_eq(attempts, { keyboard = 1, taps = 0, chords = 0 }, "a release debt never acquires a never-held sibling")
+			helpers.assert_eq(Sandbox.read_bytes(path), original)
+			helpers.assert_eq(#controls.backups, 0)
+			helpers.assert_eq(controls.runtime_calls, 0)
+			blocked = false
+			helpers.assert_eq(scope.retry_restore(), true)
+			helpers.assert_eq(scope.pending(), false)
+			helpers.assert_eq(attempts, { keyboard = 1, taps = 0, chords = 0 })
+			helpers.assert_eq(Sandbox.read_bytes(path), original)
+		end)
+	end)
+end)

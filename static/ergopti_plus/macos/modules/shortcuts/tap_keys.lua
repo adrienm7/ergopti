@@ -115,8 +115,8 @@ end
 --- Reads a complete canonical source without consulting or migrating legacy storage.
 --- @return table decoded
 --- @return table source Classified source for conditional publication.
-local function read_config()
-	local content, status, detail = Writer.read_classified(ConfigPaths.get("ConfigTomlPath"), FileSystem)
+local function read_config(on_error)
+	local content, status, detail = Writer.read_classified(ConfigPaths.get("ConfigTomlPath"), FileSystem, on_error)
 	assert(status == "ok" or status == "absent", "tap-key configuration unavailable: " .. tostring(detail))
 	local decoded = Codec.decode(content or "")
 	assert(type(decoded) == "table", "tap-key configuration is malformed")
@@ -241,7 +241,7 @@ end
 --- @param action_id string
 --- @param is_assignable function The catalogue check.
 --- @return boolean Whether the assignment was stored.
-function M.set_action(id, action_id, is_assignable)
+function M.set_action(id, action_id, is_assignable, on_error, publication_observer)
 	M.ensure_loaded(is_assignable)
 	if _assignments[id] == nil then
 		Logger.error(LOG, "set_action(): '%s' is not a tap key.", tostring(id))
@@ -253,10 +253,10 @@ function M.set_action(id, action_id, is_assignable)
 		return false
 	end
 	local called, committed = pcall(function()
-		local _, source = read_config()
+		local _, source = read_config(on_error)
 		local rows = Preferences.prepare_shortcut_updates(source,
 			{ Manifest.sparse_operation(CONFIG_SECTION .. "." .. id, action_id) }, { "tap_keys" })
-		return Preferences.publish_owned(ConfigPaths.get("ConfigTomlPath"), rows, source)
+		return Preferences.publish_owned(ConfigPaths.get("ConfigTomlPath"), rows, source, on_error, publication_observer)
 	end)
 	if not called or committed ~= true then
 		Logger.error(LOG, "set_action(): tap key '%s' could not be persisted.", id)

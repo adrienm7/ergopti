@@ -1,0 +1,45 @@
+{
+	"version": 1,
+	"providers": [
+		{
+			"id": "shell",
+			"mode": "script",
+			"extensions": ["sh"],
+			"commands": {
+				"linux": ["sh"],
+				"hs": ["sh"]
+			},
+			"prefix": []
+		},
+		{
+			"id": "bash",
+			"mode": "script",
+			"extensions": ["bash"],
+			"commands": {
+				"linux": ["bash"],
+				"hs": ["bash"]
+			},
+			"prefix": []
+		},
+		{
+			"id": "python",
+			"mode": "script",
+			"extensions": ["py"],
+			"commands": {
+				"linux": ["python3"],
+				"hs": ["python3"]
+			},
+			"prefix": []
+		},
+		{
+			"id": "executable",
+			"mode": "executable",
+			"extensions": [],
+			"commands": {
+				"linux": [],
+				"hs": []
+			},
+			"prefix": []
+		}
+	]
+}

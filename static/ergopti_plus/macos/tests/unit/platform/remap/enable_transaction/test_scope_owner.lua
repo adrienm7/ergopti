@@ -200,8 +200,10 @@ end
 local function removable(disk)
 	local files = require("adapters.file_system")
 	disk.removal_calls = {}
+	disk.removals = {}
 	files.remove_exact = function() error("layer compensation must use conditional removal") end
 	files.remove_if_unchanged = function(path, expected, on_error)
+		disk.removals[#disk.removals + 1] = { path = path, status = expected.status, content = expected.content }
 		disk.removal_calls[#disk.removal_calls + 1] = { path = path,
 			expected = { status = expected.status, content = expected.content }, on_error = on_error }
 		if path ~= LAYERS or expected.status ~= "ok" or type(expected.content) ~= "string"
@@ -321,6 +323,8 @@ helpers.describe("remap scope transaction: the recommended navigation layer", fu
 			disk.terminal(true, "ready")
 			helpers.assert_eq(settled[1].ok, false)
 			helpers.assert_nil(disk.files[LAYERS], "no layer file outlives a refused restore")
+			helpers.assert_eq(disk.removals, { { path = LAYERS, status = "ok", content = preset() } },
+				"the inverse conditionally removes only the exact created preset")
 			assert_layer_removal(disk)
 			helpers.assert_eq(wheel.reconciles, 0, "a refused restore leaves the wheel as it was")
 		end) end)
@@ -391,6 +395,8 @@ helpers.describe("remap setters: a hold that enters the layer brings it along", 
 				calls.set_save_succeeds(false)
 				helpers.assert_eq(setter.set(remap, "layer"), false, setter.name)
 				helpers.assert_nil(disk.files[LAYERS], setter.name .. ": no layer file outlives a refused save")
+				helpers.assert_eq(disk.removals, { { path = LAYERS, status = "ok", content = preset() } },
+					setter.name .. ": the native conditional inverse owns the exact preset bytes")
 				assert_layer_removal(disk)
 				helpers.assert_eq(wheel.reconciles, 0, setter.name .. ": the wheel is left as it was")
 			end) end)
