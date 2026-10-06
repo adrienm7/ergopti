@@ -26,8 +26,39 @@ The previous 47 owned commits are already in the `origin/dev` ancestor
   modeled private authority to captured identities and exclusive creation.
 
 The provider source tree is `95770d66443288d13229f8126a5d925c55024172`.
-These feature commits must not be described as integrated until their ancestry
-is confirmed in actual `origin/dev` after serialized integration.
+The no-squash integration `7a75da439661caf8cb94295c809ebf2607a4ef97`
+is confirmed in actual remote `dev`; all feature commits are ancestors.
+
+## Integrated qualification and clone repair
+
+[Manual run 37539552261](https://github.com/adrienm7/ergopti/actions/runs/37539552261)
+tested `codex/ci-validation` SHA `532aad27f4e393a62d150e77a8649ca5cd01ea1d`,
+exactly integrated dev tree `98b7f1115450d7eef847851dc6f73003e35dd7a4`.
+All 37 jobs terminated: 27 PASS, five FAIL and five SKIP. Release/Publish
+SKIPPED; no manual run was canceled. The complete Linux unit/E2E/package
+and seventeen installation/run scenarios passed, as did Core JS/properties,
+macOS simulated unit/E2E and native tooltip captures.
+
+The native signed Hammerspoon provider inventory passed all sixteen full
+and five shim cases on this integrated source, including actual interpreter
+symlink resolution, literal argv and acknowledged directory retirement.
+The separate Swift program cohort passed fourteen cases; its successful
+collector does not qualify the failed complete XCTest root. Native macOS
+TIS selection/glyph assertions, an expired Brew AppleEvent receiver and
+refused switcher/Shortcuts prerequisites keep package/install unqualified.
+These foreign failures were sent to their owners; none becomes device-only.
+
+Windows passed all 9,734 AHK records and ten native source-observer ownership
+scenarios, then failed before boot: Git could not check out long archived
+evidence paths beneath the temporary clone. The clone invocation now sets
+repository-local `core.longpaths=true` before checkout and verifies it;
+developer/global configuration, the complete checkout, exact tested HEAD
+and all startup/retirement assertions remain unchanged. Native Windows
+requalification is pending; its previous downstream E2E/package/install
+were skipped. Group 3 retains its owned `323873fd` lock for this repair.
+
+The terminal log archive contains 548 members; SHA-256:
+`713896102044d474f04f86b24a01233d6a82fbb98b6f4579b99e0c08958a2be1`.
 
 ## Actual provider qualification
 
