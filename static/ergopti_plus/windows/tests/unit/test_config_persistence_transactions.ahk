@@ -592,6 +592,8 @@ _CPT_RefusedPausedReloadCanRetrySameTerminalBundle() {
 		AssertEqual(First, ReloadTerminalHandoffClaim("Reload"))
 		AssertTrue(ReloadTerminalHandoffRefuseForShutdown("Reload", "test"),
 			"a late refusal must refuse the first terminal claim")
+		AssertTrue(FSExists(Path . ".pending"), "The exact pending marker survives before physical stop.")
+		_CPT_ObserveRefusedSuccessorTerminal(First, Bundle)
 		AssertFalse(FSExists(Path))
 		AssertFalse(FSExists(Path . ".pending"),
 			"the refused paused attempt must leave no live or pending marker")
@@ -644,6 +646,8 @@ _CPT_RefusalAfterCommitRetractsOnlyItsMarker() {
 				AssertTrue(FSWriteDurable(Path, "1"), "another transition republishes the marker")
 			AssertTrue(ReloadTerminalHandoffRefuseForShutdown("Reload", "test"),
 				"a refusal after the commit must still refuse and clean up")
+			AssertEqual(Foreign ? "1" : Content, FSRead(Path), "No live marker is retracted before physical stop.")
+			_CPT_ObserveRefusedSuccessorTerminal(Record, Bundle)
 			if Foreign {
 				AssertEqual("1", FSRead(Path),
 					"a marker holding another transition's intent is not this refusal's to retract")
@@ -934,10 +938,13 @@ _CPT_TerminalCommitFailureAbortsWithoutSuccess() {
 		["C:\ergopti-tests\terminal-commit-failure.toml"])
 	AssertTrue(Bundle is Object)
 	try {
-		_RTP_Pending(Bundle, _RTP_NewPort(), _CPT_TerminalSuccess,
+		Record := _RTP_Pending(Bundle, _RTP_NewPort(), _CPT_TerminalSuccess,
 			_CPT_TerminalCommit, _CPT_TerminalAbort)
 		AssertFalse(_CPT_TerminalOnExit("commit"),
 			"a failed terminal commit must make OnExit refuse")
+		AssertEqual(1, _CPT_TerminalEvents.Length, "Only commit has run while native stop remains unproven.")
+		AssertEqual("commit", _CPT_TerminalEvents[1])
+		_CPT_ObserveRefusedSuccessorTerminal(Record, Bundle)
 		AssertEqual(1, _CPT_TerminalClaimCalls)
 		AssertEqual(0, _CPT_TerminalSuccessCalls,
 			"a failed terminal commit must never report success")
@@ -1089,3 +1096,22 @@ _CPT_SourceAndClaimCoalesceIntoOneRestore() {
 }
 Test("AHK-15-persistence: source and retained claim coalesce into one restore",
 	_CPT_SourceAndClaimCoalesceIntoOneRestore)
+
+; The recording port cannot infer physical exit from a termination request.
+_CPT_ObserveRefusedSuccessorTerminal(Record, Bundle) {
+	Port := Record["port"]
+	loop 2 {
+		AssertTrue(_ReloadTerminalHandoffOwns(Record), "The exact refusal owner stays registered before terminal.")
+		AssertEqual(Bundle, Record["bundle"])
+		AssertTrue(Bundle.authorized && Bundle.shutdown_claimed, "Claim authority cannot rearm while the child is live.")
+		AssertFalse(Record["stop_acknowledged"])
+		AssertEqual(0, Port["probe"]["closed"])
+		AssertEqual(1, Port["probe"]["terminated"], "The same native request is not retried.")
+		_RTP_RunArmed(Port)
+	}
+	Port["probe"]["alive"] := false
+	_RTP_RunArmed(Port)
+	_RTP_RunArmed(Port)
+	AssertTrue(Record["stop_acknowledged"])
+	AssertFalse(_ReloadTerminalHandoffOwns(Record), "The caller gets its bundle only after terminal delivery.")
+}
