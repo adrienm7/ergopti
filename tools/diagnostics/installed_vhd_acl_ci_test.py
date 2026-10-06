@@ -54,7 +54,9 @@ class CallerControls(unittest.TestCase):
         self.inputs = self.root / "inputs"
         self.inputs.mkdir(mode=0o700)
         for path in subject.source_paths().values():
-            shutil.copyfile(path, self.inputs / path.name)
+            copied = self.inputs / path.name
+            shutil.copyfile(path, copied)
+            copied.chmod(0o600)
         self.clock = [100.0]
         self.calls = []
         self.groups = []

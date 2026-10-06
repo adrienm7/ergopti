@@ -204,7 +204,7 @@ class PortableAncestryControls(unittest.TestCase):
 
     def test_actual_json_duplicate_and_nonfinite_fields_refuse(self):
         with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "receipt"
+            path = Path(directory).resolve(strict=True) / "receipt"
             for data in ('{"a":1,"\\u0061":2}', '{"a":{"x":1,"x":2}}', '{"a":NaN}', '{"a":1e999}'):
                 path.write_text(data)
                 with self.assertRaises(ValueError):
@@ -214,7 +214,7 @@ class PortableAncestryControls(unittest.TestCase):
 
     def test_actual_alias_fifo_hardlink_and_size_inputs_refuse(self):
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = Path(directory).resolve(strict=True)
             original = root / "original"
             original.write_text("{}")
             alias = root / "alias"

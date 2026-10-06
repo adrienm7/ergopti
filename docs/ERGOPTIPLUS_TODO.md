@@ -3781,6 +3781,18 @@ The pipeline wiring guard now registers only the exact ancestry artifact conditi
 and adds three changed-condition and one missing-step refusal controls. Every
 previous guard and mutation assertion is preserved byte-exact by inverse removal.
 
+The first macOS run of this diagnostic, [37418772555](https://github.com/adrienm7/ergopti/actions/runs/37418772555),
+failed before Swift execution; the native failure cause remains unknown until its
+actual logs are available. Portable replays independently reproduce two fixture
+preparation defects: group-writable copied inputs under umask002 and an aliased
+temporary root rejected before the intended JSON boundary. Fixture copies now
+have mode0600 and genuine temporary roots use their canonical spelling; explicit
+alias, FIFO and hardlink refusal cases remain unchanged. All41 original methods
+and93 assertion calls are conserved, with all16 combinations of canonical/aliased
+temporary roots, umask022/002 and normal/inherited optimization passing. Production
+source guards, native code, guardian and workflow remain unchanged. Actual Darwin
+sampling, Swift packaging/install acceptance and WP6 remain unqualified.
+
 The registered Linux physical-hold dashboard harness now loads its actual
 shared selection enum and predicates before the unchanged Typing KPI consumer.
 The original assertion and independent hold/app/text expectations are preserved.
