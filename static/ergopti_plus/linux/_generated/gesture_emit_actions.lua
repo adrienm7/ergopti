@@ -16,7 +16,6 @@
 --- ==============================================================================
 
 return {
-	["alt_tab_monitor"] = "alt+Tab",
 	["app_switcher"] = "alt+Tab",
 	["app_window_previous"] = "alt+Escape",
 	["arrow_down"] = "Down",

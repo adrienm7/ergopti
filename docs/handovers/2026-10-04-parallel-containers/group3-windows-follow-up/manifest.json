@@ -1,0 +1,68 @@
+{
+	"format": 1,
+	"scope": "Group 3 Windows continuation, 2026-10-04",
+	"packet_status": "inactive; not installed",
+	"native_windows_status": "not executed",
+	"source_review_status": "v3 bounded source review clear; not native qualification or ownership grant",
+	"producer_preimage_sha256": "8f8539df2026523b13a325b81f126f35e78724b4dc6a6463c8416b4fbd6b656f",
+	"producer_preimage_kind": "Group 3 basic Windows106 composition, not plain origin/dev689d",
+	"native_fixture_cases": 12,
+	"native_fixture_registered": false,
+	"files": [
+		{
+			"path": "README.md",
+			"sha256": "a7d922c4e416bbf8e30746b9424f0cf77c89b62a8457853308f1487720805283",
+			"bytes": 49132
+		},
+		{
+			"path": "inactive/windows106-ctor-handoff/DESIGN.md.txt",
+			"sha256": "a20013b40deb61e08d50e09199438c5628dd4ebbc5485ca1e6c03ab24bb6e369",
+			"bytes": 8015
+		},
+		{
+			"path": "inactive/windows106-ctor-handoff/base-shell_runner.ahk",
+			"sha256": "8f8539df2026523b13a325b81f126f35e78724b4dc6a6463c8416b4fbd6b656f",
+			"bytes": 100074
+		},
+		{
+			"path": "inactive/windows106-ctor-handoff/candidate-shell_runner.ahk",
+			"sha256": "49ea8b6ca63cf189e8d3e07d5f2dfb01d1698c454b774551bcc446af8b41f98a",
+			"bytes": 105256
+		},
+		{
+			"path": "inactive/windows106-ctor-handoff/candidate.patch",
+			"sha256": "6000a0ac5a7a6bd680794090356781fede03aed97b37a433f4b91e9d9021c052",
+			"bytes": 10091
+		},
+		{
+			"path": "inactive/windows106-ctor-handoff/check_source.py.txt",
+			"sha256": "3474baae61758bdd025db991e75c0f53547a14a1b346b3883b6e302526e5860a",
+			"bytes": 4783
+		},
+		{
+			"path": "inactive/windows106-ctor-handoff/preimages.txt",
+			"sha256": "b4fb578b9a21914f67ce490db1eca1b8cfefef911bf3820843ebbcbc67814d2c",
+			"bytes": 447
+		},
+		{
+			"path": "inactive/windows106-ctor-handoff/test_run_program_constructor_failure.ahk",
+			"sha256": "4cda45f678cc8f2799e7884c5cf3b3ec7c45b796c637b1870d4c48419e464b4e",
+			"bytes": 16205
+		},
+		{
+			"path": "verify_packet.py",
+			"sha256": "d254edafcdaf70aca1e1abc6a2c9371a11c28ff05cf3523e39af6ef34cce2bac",
+			"bytes": 2147
+		},
+		{
+			"path": "inactive/program-provider-drafts/program_providers.json.txt",
+			"sha256": "31b0de56ff54f215a9443ededa5e7b8e9173da887002aa813f732f7d19836373",
+			"bytes": 1742
+		},
+		{
+			"path": "inactive/program-provider-drafts/program_providers.lua.txt",
+			"sha256": "a6811b938fdc24181e51a7370ab23abd41d1de7d23ac530ee4b2802684b03e52",
+			"bytes": 10259
+		}
+	]
+}

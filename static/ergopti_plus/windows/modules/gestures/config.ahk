@@ -71,6 +71,8 @@ GestureGetActionParameter(BindingId, ActionName) {
 }
 
 GestureSetActionParameter(BindingId, ActionName, Value, WriterFn := 0, NotifyFn := 0) {
+		if IsSet(ProgramActions_Stop) && ProgramActions_Stop() != true
+				return false
 		global GestureActionParameters, ConfigurationFile
 		Key := GestureActionParameterKey(BindingId, ActionName)
 		CandidateParameters := GestureActionParameters.Clone()
@@ -94,6 +96,12 @@ GestureActionParameterSpec(ActionName) {
 
 GestureValidateActionParameter(ActionName, Value, &ErrorText := "") {
 		Spec := GestureActionParameterSpec(ActionName)
+		if Spec == "program" {
+				if IsSet(ProgramParameterParse) && (ProgramParameterParse(Value) is Map)
+						return true
+				ErrorText := t("dialog.gestures.param_err_program")
+				return false
+		}
 		if (Spec = "")
 				return true
 		; Checked before the trim below: the spaces of a text to type are part of it,
@@ -169,6 +177,8 @@ GestureValidateActionParameter(ActionName, Value, &ErrorText := "") {
 GestureActionParameterPrompt(ActionName) {
 		global _WS_BUILTIN_PAIRS
 		switch GestureActionParameterSpec(ActionName) {
+				case "program":
+						return t("dialog.gestures.param_program")
 				case "search_url":
 						return t("dialog.gestures.param_search_url")
 				case "url":
@@ -246,6 +256,8 @@ GesturePromptActionParameter(BindingId, ActionName) {
 		}
 		Prompt := GestureActionParameterPrompt(ActionName)
 		Title  := StrReplace(t("dialog.gestures.param_title"), "{1}", _GestureActionLabel(ActionName))
+		if Spec == "program"
+				return _GesturePickProgram(BindingId, ActionName, Title, Existing)
 		if (Spec = "app")
 				return _GesturePickApplication(BindingId, ActionName, Prompt)
 		loop {
@@ -310,6 +322,8 @@ _GestureCommitAssignment(&AssignmentsTarget, &ParametersTarget, AssignmentSectio
 				try LoggerWarn("gestures", "Refusing unknown action '{1}' for slot '{2}'.", ActionName, Slot)
 				return false
 		}
+		if IsSet(ProgramActions_Stop) && ProgramActions_Stop() != true
+				return false
 		CandidateAssignments := AssignmentsTarget.Clone()
 		CandidateParameters := ParametersTarget.Clone()
 		CandidateAssignments[Slot] := ActionName
@@ -337,6 +351,9 @@ _GestureCommitAssignment(&AssignmentsTarget, &ParametersTarget, AssignmentSectio
 
 ; Prompts when needed, then commits the related parameter + assignment once.
 GestureAssignConfiguredAction(&AssignmentsTarget, Scope, AssignmentSection, Slot, ActionName, WriterFn := 0, NotifyFn := 0) {
+		if ActionName == "run_program" && (!IsSet(ProgramActions_BindingSupported)
+				|| !ProgramActions_BindingSupported(GestureBindingId(Scope, Slot)))
+				return false
 		global GestureActionParameters
 		if !GestureActionIsAssignable(ActionName) {
 				try LoggerWarn("gestures", "Refusing unknown action '{1}' for slot '{2}'.", ActionName, Slot)
@@ -364,6 +381,8 @@ GestureEnsureActionParameter(BindingId, ActionName, WriterFn := 0, NotifyFn := 0
 
 GestureActionDisplayLabel(ActionName, BindingId := "") {
 		Label := _GestureActionLabel(ActionName)
+		if GestureActionParameterSpec(ActionName) == "program"
+				return Label
 		if (BindingId = "")
 				return Label
 		Value := GestureGetActionParameter(BindingId, ActionName)
@@ -958,4 +977,54 @@ _DeferredGestureAutoConfigureDone(Ok) {
 				LoggerSuccess("gestures", "Deferred touchpad auto-configuration completed.")
 		else
 				LoggerError("gestures", "Deferred touchpad auto-configuration failed — user can retry from the tray menu.")
+}
+
+; Native fallback edits the same executable and literal argv, never a command line.
+_GesturePickProgram(BindingId, ActionName, Title, Existing) {
+	if !IsSet(ProgramActions_Available) || !IsSet(ProgramActions_BindingSupported)
+				|| !ProgramActions_Available() || !ProgramActions_BindingSupported(BindingId)
+		return false
+	Current := ProgramParameterParse(Existing)
+	Arguments := (Current is Map) ? Current["arguments"].Clone() : []
+	W := Gui_Create("", Title)
+	W.Add("Text", "xm", t("dialog.action_picker.program_executable"))
+	Executable := W.Add("Edit", "xm w560", (Current is Map) ? Current["executable"] : "")
+	W.Add("Text", "xm", t("dialog.action_picker.program_arguments"))
+	List := W.Add("ListBox", "xm w560 r6", Arguments)
+	W.Add("Button", "xm", t("dialog.action_picker.program_add_argument")).OnEvent("Click", AddArgument)
+	W.Add("Button", "x+8", t("dialog.action_picker.program_remove_argument")).OnEvent("Click", RemoveArgument)
+	W.Add("Button", "xm", t("button.save")).OnEvent("Click", Save)
+	W.Add("Button", "x+8", t("button.cancel")).OnEvent("Click", (*) => W.Destroy())
+	Result := false
+	W.OnEvent("Close", (*) => W.Destroy())
+	W.OnEvent("Escape", (*) => W.Destroy())
+	W.Show()
+	WinWaitClose("ahk_id " . W.Hwnd)
+	return Result
+	AddArgument(*) {
+		Picked := Ui_InputBox(t("dialog.action_picker.program_arguments"), Title, "w560 h240", "")
+		if Picked.Result != "OK"
+			return
+		Arguments.Push(Picked.Value)
+		List.Delete()
+		List.Add(Arguments)
+	}
+	RemoveArgument(*) {
+		Index := List.Value
+		if Index <= 0
+			return
+		Arguments.RemoveAt(Index)
+		List.Delete()
+		List.Add(Arguments)
+	}
+	Save(*) {
+		Items := ""
+		for Index, Argument in Arguments
+			Items .= (Index == 1 ? "" : ",") . JsonStringLiteral(Argument)
+		Scalar := '{"version":1,"executable":' . JsonStringLiteral(Executable.Value) . ',"arguments":[' . Items . "]}"
+		if !(ProgramParameterParse(Scalar) is Map)
+			return
+		Result := Map("has_value", true, "key", GestureActionParameterKey(BindingId, ActionName), "value", Scalar)
+		W.Destroy()
+	}
 }

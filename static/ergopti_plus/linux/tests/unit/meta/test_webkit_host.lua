@@ -3,6 +3,28 @@
 local helpers = require("tests.helpers")
 local WH      = helpers.load_module("ui.webkit_host")
 
+local EXPECTED_BRIDGES = {
+  "physical_shortcuts_bridge", "action_picker_bridge", "changelog_bridge", "dl_bridge",
+  "hsEditor", "hotstrings_config_bridge", "hsOnboarding",
+  "hsPaths", "hsPersonalInfo", "metrics_apps_bridge", "metrics_typing_bridge",
+  "model_browser_bridge", "numeric_prompt_bridge", "prompt_bridge",
+  "token_bridge", "healthcheck", "error_dialog", "config_cleanup_bridge", "layer_editor_bridge", "layout_manager_bridge",
+  "update_check_bridge",
+}
+
+-- This independently authored contract rejects missing, duplicate and foreign names.
+local function exact_bridge_registry(names)
+  if type(names) ~= "table" or #names ~= 21 then return false end
+  local expected, seen = {}, {}
+  for _, name in ipairs(EXPECTED_BRIDGES) do expected[name] = true end
+  for _, name in ipairs(names) do
+    if not expected[name] or seen[name] then return false end
+    seen[name] = true
+  end
+  for _, name in ipairs(EXPECTED_BRIDGES) do if not seen[name] then return false end end
+  return true
+end
+
 -- Resolve the driver root so we can test path resolution against real directories.
 -- helpers.driver_root() returns .../linux; the _shared/ui/ dir is at
 -- .../ergopti_plus/_shared/ui/ relative to the linux driver.
@@ -37,14 +59,7 @@ helpers.describe("ui.webkit_host", function()
 
     helpers.it("contains all expected bridge names from host_bridge.js", function()
       local names = WH.get_bridge_names()
-      local expected = {
-        "action_picker_bridge", "changelog_bridge", "dl_bridge",
-        "hsEditor", "hotstrings_config_bridge", "hsOnboarding",
-        "hsPaths", "hsPersonalInfo", "metrics_apps_bridge", "metrics_typing_bridge",
-        "model_browser_bridge", "numeric_prompt_bridge", "prompt_bridge",
-        "token_bridge", "healthcheck", "error_dialog", "config_cleanup_bridge", "layer_editor_bridge", "layout_manager_bridge",
-        "update_check_bridge",
-      }
+      local expected = EXPECTED_BRIDGES
       local set = {}
       for _, n in ipairs(names) do set[n] = true end
       for _, e in ipairs(expected) do
@@ -52,8 +67,29 @@ helpers.describe("ui.webkit_host", function()
       end
     end)
 
-    helpers.it("has exactly 20 bridges", function()
-      helpers.assert_eq(#WH.get_bridge_names(), 20)
+    helpers.it("has exactly 21 bridges including the physical editor", function()
+      helpers.assert_eq(#WH.get_bridge_names(), 21)
+      helpers.assert_true(exact_bridge_registry(WH.get_bridge_names()))
+    end)
+  end)
+
+  helpers.describe("independent physical bridge registry contract", function()
+    helpers.it("owns the explicit physical editor bridge", function()
+      helpers.assert_eq(WH.bridge_for_app("physical_shortcuts"), "physical_shortcuts_bridge")
+      helpers.assert_true(WH.is_valid_bridge("physical_shortcuts_bridge"))
+    end)
+
+    helpers.it("refuses a missing physical bridge and a duplicate legacy bridge", function()
+      local missing, duplicate = {}, {}
+      for _, name in ipairs(EXPECTED_BRIDGES) do
+        if name ~= "physical_shortcuts_bridge" then missing[#missing + 1] = name end
+        duplicate[#duplicate + 1] = name == "physical_shortcuts_bridge" and "healthcheck" or name
+      end
+      helpers.assert_true(not exact_bridge_registry(missing))
+      helpers.assert_eq(#duplicate, 21)
+      helpers.assert_true(not exact_bridge_registry(duplicate))
+      duplicate[1] = "foreign_bridge"
+      helpers.assert_true(not exact_bridge_registry(duplicate))
     end)
   end)
 

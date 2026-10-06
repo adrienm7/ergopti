@@ -60,6 +60,11 @@ function M.new(options)
 	-- reverse. Each settled step is recorded so a retry never repeats it.
 	local function compensate()
 		if debt == nil then return true end
+		if not debt.restoration_started and type(options.before_restore) == "function" then
+			local called, admitted = pcall(options.before_restore, debt.snapshot)
+			if not called or admitted ~= true then return false end
+			debt.restoration_started = true
+		end
 		for _, receipt in ipairs(debt.cleanup or {}) do
 			if Writer.retry_publication_cleanup(receipt) ~= true then return false end
 		end
@@ -77,6 +82,10 @@ function M.new(options)
 				if not FileInverse.restore(file, options.files) then return false end
 				file.restored = true
 			end
+		end
+		if type(options.after_restore) == "function" then
+			local called, settled = pcall(options.after_restore, debt.snapshot)
+			if not called or settled ~= true then return false end
 		end
 		debt = nil
 		return true
@@ -136,21 +145,29 @@ function M.new(options)
 		if compensate() then return true end
 		return false, "the reverted configuration remains pending"
 	end
-	function owner.apply(scope, mode)
+	local function perform(scope, mode, requested)
 		if busy or debt ~= nil then return false, "a configuration transaction is still pending" end
 		busy, committed = true, nil
 		local published = {}
 		local called, ok, detail, content = pcall(function()
 			-- Preset ownership is proven before any inventory can read a file.
 			local presets = {}
-			for _, request in ipairs(options.manifest.scope_plan(scope, mode).presets) do
+			local initial_plan = options.manifest.scope_plan(scope, requested and "clear" or mode)
+			if requested and #initial_plan.presets > 0 then return false, "edit requires a single-file scope" end
+			for _, request in ipairs(initial_plan.presets) do
 				local port = options.presets and options.presets[request.preset]
 				if port == nil then return false, "scope requires separate preset ownership" end
 				presets[#presets + 1] = { id = request.preset, port = port, rows = {} }
 			end
 			local owned_paths = type(options.owned_paths) == "function" and options.owned_paths() or {}
 			assert(type(owned_paths) == "table", "dynamic configuration ownership is unavailable")
-			local plan = options.manifest.scope_plan(scope, mode, owned_paths, options.owners)
+			local plan
+			if requested then
+				for _, row in ipairs(requested) do
+					if options.validate_update(scope, row) ~= true then return false, "edit row is not owned or valid" end
+				end
+				plan = { operations = requested }
+			else plan = options.manifest.scope_plan(scope, mode, owned_paths, options.owners) end
 			local updates = {}
 			for _, row in ipairs(plan.operations) do
 				local path, target = row.section .. "." .. row.key, nil
@@ -211,6 +228,9 @@ function M.new(options)
 				end
 				if done ~= true then return false, publish_error end
 			end
+			if type(options.after_publish) == "function" and options.after_publish(snapshot) ~= true then
+				return false, "publication delivery acknowledgement refused"
+			end
 			debt = nil
 			committed = { snapshot = snapshot, files = published }
 			return true, nil, candidate
@@ -222,6 +242,35 @@ function M.new(options)
 			return false, restored and tostring(called and detail or ok) or "runtime rollback remains pending"
 		end
 		return true, nil, content
+	end
+	function owner.apply(scope, mode) return perform(scope, mode) end
+	--- Applies detached owned edits through the same backup and exact inverse.
+	--- The host's opt-in validator must acknowledge every assignment/parameter.
+	function owner.apply_updates(scope, updates)
+		if type(options.validate_update) ~= "function" or options.select ~= nil
+			or type(updates) ~= "table" or getmetatable(updates) ~= nil or #updates == 0 then
+			return false, "scope does not own edit rows"
+		end
+		local rows, paths, count = {}, {}, 0
+		for index, row in pairs(updates) do
+			if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > #updates
+				or type(row) ~= "table" or getmetatable(row) ~= nil then return false, "invalid edit rows" end
+			for key in pairs(row) do
+				if key ~= "section" and key ~= "key" and key ~= "value" and key ~= "delete" and key ~= "intent" then return false, "invalid edit row field" end
+			end
+			if type(row.section) ~= "string" or row.section == "" or type(row.key) ~= "string" or row.key == ""
+				or (row.delete ~= nil and row.delete ~= true)
+				or (row.delete == true and row.value ~= nil)
+				or (row.delete ~= true and type(row.value) ~= "string") then return false, "invalid edit row value" end
+			local intentional, valid = pcall(require("shortcuts.assignment").is_intentional, row)
+			if not intentional then return false, "invalid assignment intent" end
+			local path = row.section .. "." .. row.key
+			if paths[path] then return false, "duplicate edit row" end
+			paths[path], count = true, count + 1
+			rows[index] = { section = row.section, key = row.key, value = row.value, delete = row.delete, intent = row.intent }
+		end
+		if count ~= #updates then return false, "sparse edit rows" end
+		return perform(scope, "edit", rows)
 	end
 	return owner
 end

@@ -172,7 +172,12 @@ const ratio = union.size === 0 ? 0 : (shared.length / union.size) * 100;
 //                    three drivers; the shared ratio rises from 59.3 %.
 //   34/56 (60.7 %) — ui/update_check hosts the shared update-check window on
 //                    all three drivers (the union took the path with macOS).
-const BASELINE_SHARED = 34;
+//   35/58 (60.3 %) — ui/physical_shortcuts adds one symmetric feature path.
+//                    macOS and Linux host the shared editor; Windows records
+//                    its unavailable native host in a Convention S README.
+//                    That marker declares absence, not runtime support; the
+//                    canonical source predicate below remains unchanged.
+const BASELINE_SHARED = 35;
 
 // The union is ratcheted too, downward: a driver that grows a new unshared
 // directory dilutes the ratio even when nothing was removed. Bounding it stops
@@ -213,7 +218,11 @@ const BASELINE_SHARED = 34;
 //   the TCC entry of the embedded runtime), which neither Windows nor Linux
 //   has: a counterpart folder there would host nothing. The geometry gate
 //   records the same exemption for Windows.
-const BASELINE_UNION = 57;
+//   57 → 58 on 2026-10-06 — ui/physical_shortcuts, one path on all three
+//   drivers. Windows carries the explicit Convention S unavailable marker;
+//   the shared-count floor rises to 35 at the same time. No asymmetric path
+//   allowance is added and no native implementation is inferred from a README.
+const BASELINE_UNION = 58;
 
 // ── The canonical features, the third measurement this gate never had ───────
 //

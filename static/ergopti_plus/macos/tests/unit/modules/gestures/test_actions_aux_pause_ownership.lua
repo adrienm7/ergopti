@@ -103,6 +103,7 @@ local function fresh_owner()
 			self.observers = {}
 			for _, observer in ipairs(observers) do observer() end
 		end
+		function shell.hasCleanupDebt() return not shell.settled and shell.terminate_calls > 0 end
 		function shell.terminate()
 			shell.terminate_calls = shell.terminate_calls + 1
 			shell.terminate_identities[shell.terminate_calls] = shell
@@ -132,6 +133,11 @@ local function fresh_owner()
 		return true, shell
 	end
 	package.loaded["adapters.shell_runner"] = {
+		spawn_private = function(executable, arguments, terminal)
+			local accepted, handle = start_shell("program", { executable, arguments }, terminal)
+			handle.start = function() return accepted end
+			return handle
+		end,
 		open = function(target, callback) return start_shell("open", target, callback) end,
 		applescript = function(script, callback)
 			return start_shell("applescript", script, callback)
@@ -168,6 +174,48 @@ helpers.describe("gesture auxiliary owner: positive controls", function()
 		f.shells[1]:deliver(true)
 		f.shells[1]:deliver(true)
 		helpers.assert_eq(f.business, 2)
+		helpers.assert_eq(f.subject.has_pending(), false)
+	end)
+end)
+
+helpers.describe("gesture auxiliary owner: strict private programs", function()
+	helpers.it("retains program debt past legacy degradation and blocks its successor", function()
+		local f = fresh_owner()
+		helpers.assert_eq(f.subject.run_program("/fixture/private", { "opaque" }, function() return true end), true)
+		local shell = f.shells[1]
+		f.timers[1]:fire()
+		f.timers[2]:fire()
+		f.timers[3]:fire()
+		helpers.assert_eq(shell.terminate_calls, 3)
+		helpers.assert_eq(f.subject.has_pending(), true)
+		helpers.assert_eq(f.subject.pause(), false)
+		helpers.assert_eq(f.subject.resume(), false)
+		helpers.assert_eq(f.subject.run_program("/fixture/next", {}, function() return true end), false)
+		helpers.assert_eq(#f.shells, 1)
+		shell:deliver(false)
+		helpers.assert_eq(f.subject.has_pending(), false)
+		helpers.assert_eq(f.subject.resume(), true)
+	end)
+
+	helpers.it("retires only user programs without cancelling an ordinary sibling action", function()
+		local f = fresh_owner()
+		helpers.assert_eq(f.subject.open("/tmp/legacy", "legacy", function() end), true)
+		helpers.assert_eq(f.subject.run_program("/fixture/private", {}, function() return true end), true)
+		helpers.assert_eq(f.subject.stop_programs(), false)
+		helpers.assert_eq(f.shells[1].terminate_calls, 0)
+		helpers.assert_eq(f.shells[2].terminate_calls, 1)
+		f.shells[2]:deliver(false)
+		helpers.assert_eq(f.subject.stop_programs(), true)
+		f.shells[1]:deliver(true)
+	end)
+
+	helpers.it("requires strict fresh admission before any native construction", function()
+		local f = fresh_owner()
+		for _, value in ipairs({ false, 0, 1, "true", {} }) do
+			helpers.assert_eq(f.subject.run_program("/fixture/private", {}, function() return value end), false)
+		end
+		helpers.assert_eq(f.subject.run_program("/fixture/private", {}, function() error("private admission") end), false)
+		helpers.assert_eq(#f.shells, 0)
 		helpers.assert_eq(f.subject.has_pending(), false)
 	end)
 end)
