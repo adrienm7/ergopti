@@ -4647,6 +4647,8 @@ Custom-profile actions, saved-user-model children and Linux free-entry numeric t
 
 Default/custom profile headings and their custom boundary now consume two shared inert fragments on all three drivers. The composition guard follows executable native publication and retains clicked-child requirements; independent source-withdrawal, malformed header, mixed/real clicked orphan and old-loop controls remain red. All old callback bodies, native registry phases, conditional custom presence and 21 caption sets retain their behavior. Canonical generators retire exactly nine genuine native allocator sites, yielding Windows78/macOS110/Linux81. Complete ordered profile frames/list splicing and other scanner families remain software work; actual Windows/Hammerspoon and installed-device acceptance stay separate.
 
+Shared renderers now support ordered list/group child templates, direct unique row selectors and strict presence predicates. Narrow presentation-only refusal omits a wholly inert heading while retaining native data; callback, mixed, cyclic and clicked-row refusals remain strict. Category coverage follows the actual declared transitive include graph from executable native publication roots, with genuine malformed, foreign, withdrawn and clicked counterexamples. The API alone does not retire native allocator sites.
+
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote
