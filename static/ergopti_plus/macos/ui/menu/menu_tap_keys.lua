@@ -86,6 +86,23 @@ local function choose_action_for(id, name, ctx)
 		-- collected it, under the binding the key dispatches with, and bound only
 		-- once the value is stored.
 		DeferredWork.after(0.05, function()
+			if spec == "program" then
+				local committed = ShortcutUtils.prompt_action_parameter(ctx.gestures, TapKeys.binding_id(id), action_id, spec,
+					picked, {
+						publishes_assignment = true, section = "shortcuts.tap_keys", key = id,
+						read = function() return TapKeys.get_action(id) end,
+						apply = function(on_error, publication_observer)
+							if TapKeys.set_action(id, action_id, ctx.gestures.is_assignable, on_error, publication_observer) ~= true then return false end
+							return Bindings.reconcile_tap_keys() == true
+						end,
+						restore = function(previous, on_error, publication_observer)
+							if TapKeys.set_action(id, previous, ctx.gestures.is_assignable, on_error, publication_observer) ~= true then return false end
+							return Bindings.reconcile_tap_keys() == true
+						end,
+					}, ctx.commit_program_parameter)
+				if committed and type(ctx.updateMenu) == "function" then ctx.updateMenu() end
+				return committed
+			end
 			if ShortcutUtils.prompt_action_parameter(ctx.gestures, TapKeys.binding_id(id), action_id, spec,
 				picked) then
 				bind()

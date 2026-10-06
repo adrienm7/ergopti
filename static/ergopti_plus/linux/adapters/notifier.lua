@@ -122,7 +122,7 @@ end
 ---        notification is posted and cannot report a click without holding the
 ---        process open, which this daemon will not do on a keystroke path.
 --- @return boolean Whether the notification command was admitted; not a delivery receipt.
-function M.send(message, opts)
+local function send(message, opts, caption)
 	if type(message) ~= "string" or message == "" then
 		Logger.error(LOG, "send(): a message is required — nothing was shown.")
 		return false
@@ -138,14 +138,19 @@ function M.send(message, opts)
 		level, urgency = "info", URGENCY_FOR_LEVEL.info
 	end
 
-	if not available() then
-		-- The log is the fallback surface, so the message is not simply dropped.
-		Logger.info(LOG, "[notification] %s: %s", tostring(options.title or DEFAULT_TITLE), message)
-		return false
+	local title
+	if caption then
+		title = caption(options.title, PREFIX_FOR_LEVEL[level])
+	else
+		title = (PREFIX_FOR_LEVEL[level] or "")
+			.. (type(options.title) == "string" and options.title ~= "" and options.title or DEFAULT_TITLE)
 	end
 
-	local title = (PREFIX_FOR_LEVEL[level] or "")
-		.. (type(options.title) == "string" and options.title ~= "" and options.title or DEFAULT_TITLE)
+	if not available() then
+		-- The log is the fallback surface, so the message is not simply dropped.
+		Logger.info(LOG, "[notification] %s: %s", caption and title or tostring(options.title or DEFAULT_TITLE), message)
+		return false
+	end
 
 	-- Backgrounded, and its output discarded. notify-send returns once the
 	-- daemon acknowledges, which is fast but not instant, and this can be
@@ -162,6 +167,25 @@ function M.send(message, opts)
 		Logger.error(LOG, "send(): notify-send failed — the message stays in the log: %s", message)
 	end
 	return ok == true
+end
+
+--- Sends a generic notice with the port's original literal-title contract.
+--- @param message string Original notification body.
+--- @param opts table|nil Native title, level and click options.
+--- @return boolean admitted Exact native command admission result.
+function M.send(message, opts)
+	return send(message, opts)
+end
+
+--- Dispatches an application notice through its injected shared caption policy.
+--- This private adapter helper does not extend the generic Notifier port.
+--- @param caption function Shared application-caption callback.
+--- @param message string Original notification body.
+--- @param opts table|nil Native title, level and click options.
+--- @return boolean admitted Exact native command admission result.
+function M._send_application(caption, message, opts)
+	assert(type(caption) == "function", "application caption callback is required")
+	return send(message, opts, caption)
 end
 
 return M

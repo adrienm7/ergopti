@@ -1027,6 +1027,12 @@ const CHECKS = [
 		repro: 'npm run test:linux-ci-evidence'
 	},
 	{
+		name: 'Linux native window receipts retain mandatory npm, planner and CI owners',
+		cmd: 'node',
+		args: ['tools/test/test-linux-window-switch-registration.cjs'],
+		repro: 'npm run test:linux-window-switch-registration'
+	},
+	{
 		name: 'Linux native streaming receipts retain mandatory npm, planner and CI owners',
 		cmd: 'node',
 		args: ['tools/test/test-linux-http-stream-registration.cjs'],

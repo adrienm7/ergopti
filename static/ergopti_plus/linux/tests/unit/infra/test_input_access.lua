@@ -50,7 +50,7 @@ helpers.describe("input_access: telling the user", function()
 			"/dev/input/event3")
 		helpers.assert_eq(#sent, 1, "exactly one on-screen notification")
 		helpers.assert_eq(sent[1].body, "<startup.linux_input_access_body>")
-		helpers.assert_eq(sent[1].opts.title, "<startup.linux_input_access_title>")
+		helpers.assert_eq(sent[1].opts.title, "<startup.linux_input_access_label>")
 		helpers.assert_eq(sent[1].opts.level, "error")
 		helpers.assert_eq(status, 78, "EX_CONFIG, the status the unit refuses to retry")
 	end)
@@ -65,7 +65,7 @@ helpers.describe("input_access: telling the user", function()
 			local fh = assert(io.open(Paths.shared("data/locales/" .. code .. ".json"), "r"))
 			local text = fh:read("*a")
 			fh:close()
-			for _, key in ipairs({ "startup.linux_input_access_title", "startup.linux_input_access_body" }) do
+			for _, key in ipairs({ "startup.linux_input_access_title", "startup.linux_input_access_body", "startup.linux_input_access_label" }) do
 				helpers.assert_true(text:find('"' .. key .. '": "', 1, true) ~= nil,
 					code .. ".json lacks " .. key)
 			end

@@ -13,24 +13,57 @@ import tempfile
 
 
 WORKER = r"""
+io.stderr:write("ERGOPTI_APPLICATION_STAGE=load\n")
 local Chooser = require("ui.app_chooser")
 local Actions = require("modules.gestures.manager")
+io.stderr:write("ERGOPTI_APPLICATION_STAGE=chooser\n")
 local id = assert(Chooser.desktop_id(os.getenv("ERGOPTI_NATIVE_APPLICATION_ENTRY")))
+io.stderr:write("ERGOPTI_APPLICATION_STAGE=assignment\n")
 assert(Actions.set_action_parameter("tap_3", "open_app", id))
+io.stderr:write("ERGOPTI_APPLICATION_STAGE=execution\n")
 assert(Actions.execute_action("open_app", "tap_3"))
+io.stderr:write("ERGOPTI_APPLICATION_STAGE=receipt\n")
 local receipt = os.getenv("ERGOPTI_NATIVE_APPLICATION_RECEIPT")
 for _ = 1, 100 do
 	local file = io.open(receipt, "r")
 	if file then
 		local actual = file:read("*a")
 		file:close()
+		if actual ~= id then
+			io.stderr:write("ERGOPTI_APPLICATION_RECEIPT=identity_mismatch\n")
+		end
 		assert(actual == id, "the selected application identity changed")
 		return
 	end
 	os.execute("sleep 0.02")
 end
+io.stderr:write("ERGOPTI_APPLICATION_RECEIPT=not_observed\n")
 error("the selected desktop entry did not launch: " .. id)
 """
+
+
+def application_stage(stderr):
+    """Reduce owned worker diagnostics to one closed stage without payload text."""
+    prefix = "ERGOPTI_APPLICATION_STAGE="
+    allowed = {"load", "chooser", "assignment", "execution", "receipt"}
+    stage = "unknown"
+    for line in stderr.splitlines():
+        if line.startswith(prefix):
+            value = line[len(prefix) :]
+            stage = value if value in allowed else "unknown"
+    return stage
+
+
+def application_receipt_state(stderr):
+    """Report only closed reader observations, never receipt bytes or paths."""
+    prefix = "ERGOPTI_APPLICATION_RECEIPT="
+    allowed = {"not_observed", "identity_mismatch"}
+    state = "unknown"
+    for line in stderr.splitlines():
+        if line.startswith(prefix):
+            value = line[len(prefix) :]
+            state = value if value in allowed else "unknown"
+    return state
 
 
 def main():
@@ -40,7 +73,12 @@ def main():
         applications = root / "data" / "applications"
         applications.mkdir(parents=True)
         launcher = root / "record-application"
-        launcher.write_text('#!/bin/sh\nprintf %s "$1" > "$ERGOPTI_NATIVE_APPLICATION_RECEIPT"\n')
+        launcher.write_text(
+            "#!/bin/sh\nset -eu\n"
+            'pending="${ERGOPTI_NATIVE_APPLICATION_RECEIPT}.pending"\n'
+            'printf %s "$1" > "$pending"\n'
+            'mv -- "$pending" "$ERGOPTI_NATIVE_APPLICATION_RECEIPT"\n'
+        )
         launcher.chmod(0o700)
         read_fd, write_fd = os.pipe()
         with (root / "display.log").open("w") as log:
@@ -94,6 +132,17 @@ def main():
                     )
                     if child.returncode:
                         failures += 1
+                        stage = application_stage(child.stderr)
+                        receipt_detail = (
+                            f";receipt_state={application_receipt_state(child.stderr)}"
+                            if stage == "receipt"
+                            else ""
+                        )
+                        print(
+                            "::error title=Native application operand::"
+                            f"stage={stage};case={index};native_exit={child.returncode}"
+                            f"{receipt_detail}"
+                        )
                         print(
                             f"FAIL native application operand {identity!r}: {child.stderr.strip()}"
                         )

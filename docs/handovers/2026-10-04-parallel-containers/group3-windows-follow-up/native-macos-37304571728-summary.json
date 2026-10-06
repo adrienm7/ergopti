@@ -1,0 +1,66 @@
+{
+	"run_id": 37304571728,
+	"source_sha": "9d89453278dd9455fd4cc3ddebbc732b988a029e",
+	"url": "https://github.com/adrienm7/ergopti/actions/runs/37304571728",
+	"event": "workflow_dispatch",
+	"os_lanes": "macos",
+	"terminal": "failure",
+	"release": "skipped",
+	"shared_js": {
+		"passed": 360,
+		"failed": 0
+	},
+	"macos_unit": "passed-controlled",
+	"macos_e2e": "passed-controlled",
+	"native_swift": {
+		"methods_executed": 322,
+		"assertion_failures": 7,
+		"unexpected_failures": 2,
+		"failed_methods": [
+			"HomebrewArchiveAcceptanceTests.testRealBrewZIPInstallXZUpgradeAndRefusalsPreserveInstalledState",
+			"SparkleArchiveUpdateAcceptanceTests.testActualSparkleTarXZUpdateRefusesWrongKeyPreservesOldAppAndRetriesThroughRelaunch"
+		]
+	},
+	"owned_program_swift": {
+		"passed": 14,
+		"failed": 0,
+		"skipped": 0,
+		"unexecuted": 0
+	},
+	"native_notification_constructors": {
+		"passed": 9,
+		"failed": 0,
+		"skipped": 0,
+		"native_process_retired": true,
+		"notification_delivery": false,
+		"callback_invocation": false
+	},
+	"native_hammerspoon_inventory": {
+		"passed": 15,
+		"failed": 1,
+		"failed_case": "real_interpreter_symlink",
+		"actual_native_runtime": "passed",
+		"shim_cases_unexecuted": 5
+	},
+	"global_switcher": {
+		"portable_cases": 26,
+		"portable_failed": 2,
+		"native": "unexecuted",
+		"blocker": "Lexical versus canonical library paths in portable wrapper fixture."
+	},
+	"apple_shortcuts": {
+		"identifier_help": "passed",
+		"catalogue": "20-second-timeout",
+		"permission": "not_determined",
+		"invocation": "unexecuted"
+	},
+	"installation": "skipped",
+	"windows": "not-selected",
+	"linux": "not-selected",
+	"closed_artifact_download": "proxy-forbidden",
+	"evidence": "Exact manual job logs and terminal job records; notification controller reports validated receipt and physical retirement.",
+	"feature_sha": "7ae2f6e251d7cdadbdfc8ca1575c54e2a8f6395f",
+	"feature_tree_sha": "d141119953bbcc5d3845b400a4d7181bd090cbf6",
+	"ci_tree_sha": "d141119953bbcc5d3845b400a4d7181bd090cbf6",
+	"scope": "Preparatory macOS run; neither complete group delivery nor installation qualification."
+}

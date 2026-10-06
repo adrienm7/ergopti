@@ -42,6 +42,29 @@ const passed = [
 	'◇ Test run started.',
 	'✔ Test run with 0 tests passed after 0.001 seconds.'
 ].join('\n');
+// Add the frozen independent14 start/pass receipts only to workflow replays.
+// The original two-case collector corpus and every existing verdict oracle stay intact.
+const ownedProgramCases = fs
+	.readFileSync(path.join(__dirname, 'fixtures/owned-program-xctest/complete.xctest.txt'), 'utf8')
+	.split('\n')
+	.filter((line) => /^Test Case '-\[ErgoptiPlusTests\.OwnedProgramWorkerTests /.test(line));
+assert.equal(
+	ownedProgramCases.length,
+	28,
+	'the independently pinned14 corpus contains14 starts and14 passes'
+);
+function withOwnedProgramCases(text) {
+	return text
+		.replace(
+			/^(Test Suite 'All tests' (?:passed|failed) at .+)$/m,
+			ownedProgramCases.join('\n') + '\n$1'
+		)
+		.replace('Executed 2 tests', 'Executed 16 tests');
+}
+// Git metadata is an inert producer in these genuine workflow-literal replays,
+// just like their existing script/tee producers; no native execution is claimed.
+const controlledCheckout =
+	'git() { [ "$#" -eq 2 ] && [ "$1" = "rev-parse" ] && [ "$2" = "HEAD" ] || return 64; printf "%s\\n" "fad2fde93dbfe8a53a943eb9fdfd3afd3160283c"; }\n';
 const verdict = evaluate(passed, 0, 0);
 assert.equal(verdict.exit_status, 0);
 assert.equal(verdict.complete, true);
@@ -341,15 +364,42 @@ try {
 		commands.push(line.slice(indentation));
 	}
 	const run = commands.join('\n');
-	for (const [text, script, tee, expected] of [
+	for (const [
+		text,
+		script,
+		tee,
+		expected,
+		includeOwned = true,
+		mutation = '',
+		expectedCollector = expected
+	] of [
 		[passed, 0, 0, 0],
 		[failed, 0, 0, 1],
 		[passed, 42, 0, 42],
-		[passed, 0, 17, 17]
+		[passed, 0, 17, 17],
+		[passed, 0, 0, 1, false, '', 0],
+		[passed, 42, 0, 42, false],
+		[passed, 0, 17, 17, false],
+		[passed, 0, 0, 1, true, 'duplicate-start', 0],
+		[passed, 0, 0, 1, true, 'skip']
 	]) {
-		const fixture = path.join(root, 'pipeline-' + script + '-' + tee + '-' + expected);
+		const fixture = path.join(
+			root,
+			'pipeline-' + script + '-' + tee + '-' + expected + '-' + includeOwned + '-' + mutation
+		);
 		fs.mkdirSync(fixture);
-		fs.writeFileSync(log, text);
+		let publishedText = includeOwned ? withOwnedProgramCases(text) : text;
+		if (mutation === 'duplicate-start')
+			publishedText = publishedText.replace(
+				ownedProgramCases[0],
+				ownedProgramCases[0] + '\n' + ownedProgramCases[0]
+			);
+		if (mutation === 'skip')
+			publishedText = publishedText.replace(
+				ownedProgramCases[1],
+				ownedProgramCases[1].replace(' passed ', ' skipped ')
+			);
+		fs.writeFileSync(log, publishedText);
 		const fixturePublisher = path.join(fixture, 'publish.cjs');
 		fs.writeFileSync(
 			fixturePublisher,
@@ -358,6 +408,7 @@ try {
 				')(process.env.ERGOPTI_TIS_EVIDENCE_DIR,process.env.ERGOPTI_TIS_EVIDENCE_SESSION);'
 		);
 		const harness =
+			controlledCheckout +
 			fixtureCheckpointHarness(run, fixture) +
 			'script() { node "$SWIFT_FIXTURE_PUBLISHER" || return $?; cat "$SWIFT_FIXTURE_LOG"; return "$SWIFT_FIXTURE_SCRIPT_STATUS"; }\n' +
 			'tee() { command tee "$@"; return "$SWIFT_FIXTURE_TEE_STATUS"; }\n' +
@@ -396,10 +447,10 @@ try {
 			1,
 			'every failure retains one exact PTY transcript for upload'
 		);
-		assert.equal(fs.readFileSync(path.join(evidence, transcripts[0]), 'utf8'), text);
+		assert.equal(fs.readFileSync(path.join(evidence, transcripts[0]), 'utf8'), publishedText);
 		assert.equal(
 			JSON.parse(fs.readFileSync(path.join(evidence, 'verdict.json'), 'utf8')).exit_status,
-			expected
+			expectedCollector
 		);
 	}
 } finally {
@@ -607,7 +658,7 @@ try {
 		const runner = path.join(transportRoot, 'workflow-' + lost);
 		fs.mkdirSync(runner, { mode: 0o700 });
 		const transcript = path.join(runner, 'native.log');
-		fs.writeFileSync(transcript, passed);
+		fs.writeFileSync(transcript, withOwnedProgramCases(passed));
 		const producer = path.join(runner, 'producer.cjs');
 		fs.writeFileSync(
 			producer,
@@ -619,6 +670,7 @@ try {
 				'));'
 		);
 		const harness =
+			controlledCheckout +
 			fixtureCheckpointHarness(commands, runner) +
 			'script() { node "$SWIFT_FIXTURE_PUBLISHER" || return $?; cat "$SWIFT_FIXTURE_LOG"; }\n' +
 			commands;

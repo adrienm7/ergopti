@@ -340,15 +340,23 @@ function _magicValue(page) {
  * it alone. It follows only what the answers change against the values in
  * force: off when the answer turns a category switch in force from Yes to No,
  * as that switch once turned those items off, and on when the answer imports
- * one of its items that was not on. A page the user left alone, a first No
- * over nothing in force and a Yes that imports nothing new write nothing, so a
- * choice made in the tray is never overwritten.
+ * one of its items that was not on. Ordinary pages leave a first No and a Yes
+ * importing nothing new unwritten. Linux ordered pairs have an independent
+ * master: every No disables it, including a first run or an already-off
+ * ordinary shortcuts master. A Yes importing no pair preserves the tray choice.
  * @param {object} page
  * @param {object} state Page state.
  * @returns {boolean|null}
  */
 function _subSwitchValue(page, state) {
-	if (!state.answer) return _currentValue(page.master) === true ? false : null;
+	// Ordered Linux pairs have their own master: No also covers a first run
+	// and existing pairs while the ordinary shortcuts master is already off.
+	if (!state.answer)
+		return (_platform === 'linux' &&
+			page.sub_switch.path === 'category_enabled.key_combinations') ||
+			_currentValue(page.master) === true
+			? false
+			: null;
 	var governed = {};
 	page.sub_switch.items.forEach(function (itemPath) {
 		governed[itemPath] = true;

@@ -161,6 +161,7 @@ GestureActionCatalogueData() {
 	Items.Push({ Kind: "action", Id: "clear_clipboard" })
 	Items.Push({ Kind: "action", Id: "center_mouse" })
 	Items.Push({ Kind: "action", Id: "open_app" })
+	Items.Push({ Kind: "action", Id: "run_program" })
 	Items.Push({ Kind: "action", Id: "quit_frontmost_app" })
 	Items.Push({ Kind: "action", Id: "force_quit_frontmost" })
 	Items.Push({ Kind: "action", Id: "empty_trash" })
@@ -329,6 +330,7 @@ GestureActionCatalogueData() {
 	Actions["quit_frontmost_app"] := { Family: "sg", LabelKey: "sg_actions.quit_frontmost_app", Parameter: "", Confirm: false }
 	Actions["redo"] := { Family: "sg", LabelKey: "sg_actions.redo", Parameter: "", Confirm: false }
 	Actions["right_click_toggle"] := { Family: "sg", LabelKey: "sg_actions.right_click_toggle", Parameter: "", Confirm: false }
+	Actions["run_program"] := { Family: "sg", LabelKey: "sg_actions.run_program", Parameter: "program", Confirm: false }
 	Actions["screen_capture"] := { Family: "sg", LabelKey: "sg_actions.screen_capture", Parameter: "", Confirm: false }
 	Actions["screen_capture_instant"] := { Family: "sg", LabelKey: "sg_actions.screen_capture_instant", Parameter: "", Confirm: false }
 	Actions["screen_record"] := { Family: "sg", LabelKey: "sg_actions.screen_record", Parameter: "", Confirm: false }
