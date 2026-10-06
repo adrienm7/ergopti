@@ -649,8 +649,11 @@ _ScopeObsoleteGlobal(Mode) {
 			AssertEqual("pending", Receipt["status"])
 			Assert(Backups >= 4, "the genuine global file cohort crosses its coordinated backup boundary")
 			AssertEqual(1, Launches)
-			AssertEqual(StrReplace(Source, "ergopti_alt_gr = true`n", ""), FSReadUtf8Exact(Fixture.path),
-				"global clear preserves obsolete leaf and array parent while applying its unrelated effect")
+			Expected := StrReplace(Source, "ergopti_alt_gr = true`n", "")
+			Actual := FSReadUtf8Exact(Fixture.path)
+			AssertEqual(Expected, Actual,
+				"global clear preserves obsolete leaf and array parent while applying its unrelated effect"
+				. " [expected=" . JsonStringLiteral(Expected) . "; actual=" . JsonStringLiteral(Actual) . "]")
 			AssertEqual(Source, FSReadUtf8Exact(Receipt["backup"]))
 			Refusal.Call("native global replacement refused")
 			AssertEqual("refused", Receipt["status"])
