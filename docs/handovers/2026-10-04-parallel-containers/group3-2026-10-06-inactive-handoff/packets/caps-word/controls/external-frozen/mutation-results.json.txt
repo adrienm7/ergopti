@@ -1,0 +1,62 @@
+[
+  {
+    "abi": "luajit",
+    "name": "omit-probe-revision",
+    "exit": 1,
+    "evidence": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/omit-probe-revision-luajit.log"
+  },
+  {
+    "abi": "luajit",
+    "name": "omit-native-publication-refusal",
+    "exit": 1,
+    "evidence": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/omit-native-publication-refusal-luajit.log"
+  },
+  {
+    "abi": "luajit",
+    "name": "omit-casing-retirement-wave",
+    "exit": 1,
+    "evidence": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/omit-casing-retirement-wave-luajit.log"
+  },
+  {
+    "abi": "luajit",
+    "name": "omit-private-resumption",
+    "exit": 1,
+    "evidence": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/omit-private-resumption-luajit.log"
+  },
+  {
+    "abi": "luajit",
+    "name": "omit-native-output-refusal",
+    "exit": 1,
+    "evidence": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/omit-native-output-refusal-luajit.log"
+  },
+  {
+    "abi": "lua5.4",
+    "name": "omit-probe-revision",
+    "exit": 1,
+    "evidence": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/omit-probe-revision-lua5.4.log"
+  },
+  {
+    "abi": "lua5.4",
+    "name": "omit-native-publication-refusal",
+    "exit": 1,
+    "evidence": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/omit-native-publication-refusal-lua5.4.log"
+  },
+  {
+    "abi": "lua5.4",
+    "name": "omit-casing-retirement-wave",
+    "exit": 1,
+    "evidence": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/omit-casing-retirement-wave-lua5.4.log"
+  },
+  {
+    "abi": "lua5.4",
+    "name": "omit-private-resumption",
+    "exit": 1,
+    "evidence": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/omit-private-resumption-lua5.4.log"
+  },
+  {
+    "abi": "lua5.4",
+    "name": "omit-native-output-refusal",
+    "exit": 1,
+    "evidence": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/omit-native-output-refusal-lua5.4.log"
+  }
+]

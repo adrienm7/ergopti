@@ -1,0 +1,25 @@
+-- Fully isolated actual-consumer replay with controlled syscall/layout providers.
+local directory = assert(arg[1])
+local selected = arg[2] or "current"
+local snapshot = directory .. "/snapshot"
+package.path = snapshot .. "/static/ergopti_plus/linux/?.lua;" .. snapshot .. "/static/ergopti_plus/_shared/lua/?.lua;" .. snapshot .. "/static/ergopti_plus/_shared/lua/?/init.lua"
+assert(not package.path:find("/workspace/ergopti", 1, true))
+local helpers = require("tests.helpers")
+package.loaded["logger.shim"] = helpers.make_logger_stub()
+package.loaded.luv = { hrtime = function() return 1000000 end, sleep = function() end }
+package.loaded["adapters.window_info"] = { getFocused = function() return { appId = "controlled", windowTitle = "" } end }
+if selected == "skip-only-up" or selected == "forbid-retirement" then
+	package.preload["adapters.keyboard_hook"] = function()
+		return assert(loadfile(directory .. "/counterfactuals/" .. selected .. ".lua"))()
+	end
+elseif selected == "weaken-baseline" then
+	package.preload["adapters.uinput_writer"] = function()
+		return assert(loadfile(directory .. "/counterfactuals/weaken-baseline.lua"))()
+	end
+end
+local tap_only = selected == "legacy-retirement" or selected == "forbid-retirement"
+local file = tap_only and "tests/unit/meta/test_keyboard_hook_tap_hold.lua" or "tests/unit/adapters/test_keyboard_hook_device_watchdog.lua"
+assert(loadfile(snapshot .. "/static/ergopti_plus/linux/" .. file))()
+local result = helpers.get_results()
+print(string.format("AGGREGATE_CONSUMER_INVENTORY %d %d", result.passed, result.failed))
+os.exit(result.failed == 0 and 0 or 1)

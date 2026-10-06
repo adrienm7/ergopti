@@ -1,0 +1,385 @@
+--- a/static/ergopti_plus/linux/adapters/evdev_reader.lua
++++ b/static/ergopti_plus/linux/adapters/evdev_reader.lua
+@@ -123,6 +123,7 @@
+ local _generation = 0
+ local _events = setmetatable({}, { __mode = "kv" })
+ local _receipts = setmetatable({}, { __mode = "k" })
++local _held_receipts = setmetatable({}, { __mode = "k" })
+ local _codec = {}
+ for _, name in ipairs({ "decode", "native_size", "unpack_u16_le", "unpack_i32_le", "unpack_uint_le", "EV_KEY", "EV_SYN" }) do
+ 	_codec[name] = rawget(InputEvent, name)
+@@ -243,6 +244,12 @@
+ 			if native_ioctl(fd, request, bits) < 0 then
+ 				return nil, "ioctl failed (errno=" .. tostring(native_errno()) .. ")"
+ 			end
++			return native_string(bits, count)
++		end,
++		read_owned_key_bits = function(fd, request, count)
++			local bits = native_new("uint8_t[?]", count)
++			local copied = tonumber(native_ioctl(fd, request, bits))
++			if copied ~= count then return nil, "pressed-key ioctl did not acknowledge the full bitset" end
+ 			return native_string(bits, count)
+ 		end,
+ 		read = function(fd, count)
+@@ -289,7 +296,7 @@
+ 	end
+ 	_backend, _native_backend = backend, backend
+ 	_native_ports = {}
+-	for _, name in ipairs({ "open", "read", "ioctl", "read_bits", "poll", "close" }) do
++	for _, name in ipairs({ "open", "read", "ioctl", "read_bits", "read_owned_key_bits", "poll", "close" }) do
+ 		_native_ports[name] = rawget(backend, name)
+ 	end
+ 	pcall(Logger.debug, LOG, "FFI backend bound.")
+@@ -478,6 +485,7 @@
+ 	if not _backend or type(_backend.read_bits) ~= "function" then
+ 		return nil, "backend cannot query evdev state"
+ 	end
++	if number == EVIOCGKEY_NR then st.key_query_epoch = (st.key_query_epoch or 0) + 1 end
+ 	local last = math.max(0, math.floor(tonumber(max_code) or 0))
+ 	local count = math.floor(last / 8) + 1
+ 	_busy = true
+@@ -556,6 +564,70 @@
+ 		if not rawequal(rawget(InputEvent, name), port) then return false end
+ 	end
+ 	return true
++end
++
++--- Reads the full requested native key bitmap on this exact grabbed session.
++--- This is a last-observed per-source state, not a lease excluding later kernel input.
++--- Custom providers and ordinary detached pressed_keys tables cannot mint receipts.
++--- @param slot string|table|nil Exact reader slot.
++--- @param max_code integer|nil Last observed code, defaults to evdev KEY_MAX.
++--- @return table|nil capability Opaque native held-state receipt.
++function M.capture_pressed_keys(slot, max_code)
++	local last = max_code == nil and 0x2ff or max_code
++	if type(last) ~= "number" or last ~= last or last < 0 or last > 0x2ff or last % 1 ~= 0 then return nil end
++	local key = slot or M.KEYBOARD
++	local st = _slots[key]
++	if not st then return nil end
++	local record = { state = st, slot = key, backend = _backend, fd = st.fd,
++		generation = st.generation, path = st.path, read_epoch = st.read_epoch, max_code = last }
++	if not native_session_current(record) then return nil end
++	st.key_query_epoch = (st.key_query_epoch or 0) + 1
++	record.query_epoch = st.key_query_epoch
++	local count = math.floor(last / 8) + 1
++	_busy = true
++	local called, bytes = pcall(_native_ports.read_owned_key_bits, record.fd,
++		ioctl_read_request(EVIOCGKEY_NR, count), count)
++	_busy = false
++	if not called or type(bytes) ~= "string" or #bytes ~= count
++		or record.read_epoch ~= st.read_epoch or record.query_epoch ~= st.key_query_epoch
++		or not native_session_current(record) then return nil end
++	local down = {}
++	for code = 0, last do
++		if math.floor(bytes:byte(math.floor(code / 8) + 1) / (2 ^ (code % 8))) % 2 == 1 then
++			down[#down + 1] = code
++		end
++	end
++	record.down = down
++	local capability = {}
++	_held_receipts[capability] = record
++	return capability
++end
++
++--- Observes issuer/session/query/read currency without provider callbacks.
++--- A later read or pressed-key query revokes this observation even if bytes match.
++--- @param capability table Opaque native held-state receipt.
++--- @return boolean current
++local function held_receipt_current(capability)
++	local record = _held_receipts[capability]
++	return record ~= nil and record.read_epoch == record.state.read_epoch
++		and record.query_epoch == record.state.key_query_epoch and native_session_current(record)
++end
++
++function M.pressed_keys_current(capability)
++	return held_receipt_current(capability)
++end
++
++--- Returns detached observed codes while this exact receipt is current.
++--- @param capability table Opaque native held-state receipt.
++--- @return table|nil view Never exposes a descriptor, backend or mutable native bitmap.
++function M.pressed_keys_view(capability)
++	local record = _held_receipts[capability]
++	if not held_receipt_current(capability) then return nil end
++	local down = {}
++	for index, code in ipairs(record.down) do down[index] = code end
++	return { source = record.path, slot = record.slot, generation = record.generation,
++		read_epoch = record.read_epoch, query_epoch = record.query_epoch,
++		max_code = record.max_code, down = down, origin = "native-evdev" }
+ end
+ 
+ --- Rejects replaced, remapped or mutated decoded objects without metatable callbacks.
+--- a/static/ergopti_plus/linux/tests/unit/adapters/test_evdev_reader.lua
++++ b/static/ergopti_plus/linux/tests/unit/adapters/test_evdev_reader.lua
+@@ -1005,3 +1005,271 @@
+ 	end)
+ 
+ end)
++
++--- Provides controlled native syscall symbols for held-key receipt tests.
++--- No kernel descriptor or physical device is acquired by this fixture.
++local function controlled_held_reader(options, body)
++	options = options or {}
++	local saved_ffi, saved_preload = package.loaded.ffi, package.preload.ffi
++	local codec = require("infra.input_event")
++	local reader
++	local log = { queries = 0, opens = 0, closes = 0 }
++	local function bitmap(count)
++		local values = {}
++		for index = 1, count do values[index] = 0 end
++		for _, code in ipairs(options.down or { 29, 42 }) do
++			local index = math.floor(code / 8) + 1
++			if index <= count then values[index] = values[index] + 2 ^ (code % 8) end
++		end
++		local bytes = {}
++		for index, value in ipairs(values) do bytes[index] = string.char(value) end
++		return table.concat(bytes)
++	end
++	local symbols = {
++		open = function() log.opens = log.opens + 1; return log.opens + 6 end,
++		close = function() log.closes = log.closes + 1; return options.close_fails and -1 or 0 end,
++		ioctl = function(_, request, buffer)
++			if request % 256 == 0x18 then
++				log.queries = log.queries + 1
++				local count = math.floor(request / 0x10000) % 0x4000
++				if options.before_query then options.before_query(reader) end
++				buffer.bytes = options.bytes or bitmap(count)
++				return options.copied == nil and count or options.copied
++			end
++			return options.grab_fails and -1 or 0
++		end,
++		read = function(_, buffer)
++			local bytes = table.remove(options.rows or {}, 1)
++			if not bytes then return -1 end
++			buffer.bytes = bytes; return #bytes
++		end,
++		poll = function() return 1 end,
++	}
++	package.loaded.ffi = nil
++	package.preload.ffi = function()
++		return {
++			cdef = function() end, sizeof = function() return 24 end,
++			new = function(kind) return kind == "struct pollfd[1]" and { [0] = {} } or { bytes = "" } end,
++			cast = function(_, value) return value end,
++			string = function(buffer, count)
++				if options.before_string then options.before_string(reader) end
++				return buffer.bytes:sub(1, count)
++			end,
++			errno = function() return 11 end, C = symbols,
++		}
++	end
++	codec._reset_measurement()
++	local called, reason = pcall(function()
++		reader = helpers.load_module("adapters.evdev_reader")
++		body(reader, options, log, symbols)
++	end)
++	package.loaded.ffi, package.preload.ffi = saved_ffi, saved_preload
++	codec._reset_measurement()
++	if not called then error(reason, 0) end
++end
++
++helpers.describe("evdev_reader: controlled fresh native held-state receipts", function()
++
++	helpers.it("issues detached opaque full-key state including nonzero Ctrl and Shift", function()
++		controlled_held_reader(nil, function(reader)
++			assert(reader.open("/controlled/native-a", "a")); assert(reader.grab("a"))
++			local cap = assert(reader.capture_pressed_keys("a"))
++			helpers.assert_eq(next(cap), nil)
++			helpers.assert_eq(reader.pressed_keys_current(cap), true)
++			local view = assert(reader.pressed_keys_view(cap))
++			helpers.assert_eq(view.down, { 29, 42 })
++			helpers.assert_eq(view.max_code, 0x2ff)
++			helpers.assert_eq(view.source, "/controlled/native-a")
++			helpers.assert_eq(view.slot, "a")
++			helpers.assert_eq(view.fd, nil); helpers.assert_eq(view.backend, nil)
++			view.down[1], view.slot = 1, "foreign"
++			helpers.assert_eq(reader.pressed_keys_view(cap).down, { 29, 42 })
++			helpers.assert_eq(reader.close("a"), true)
++		end)
++	end)
++
++	helpers.it("does not mint native held authority from a custom bitset provider", function()
++		local reader = helpers.load_module("adapters.evdev_reader")
++		local backend = recorder()
++		local queries = 0
++		backend.native = true
++		backend.read_bits = function() queries = queries + 1; return string.rep("\0", 96) end
++		reader._set_backend(backend); assert(reader.open("/controlled/custom")); assert(reader.grab())
++		local cap = reader.capture_pressed_keys()
++		reader.close(); reader._reset_backend()
++		helpers.assert_eq(cap, nil); helpers.assert_eq(queries, 0)
++	end)
++
++	helpers.it("requires literal native grab acknowledgement before the held ioctl", function()
++		controlled_held_reader(nil, function(reader, _, log)
++			assert(reader.open("/controlled/native-a"))
++			helpers.assert_eq(reader.capture_pressed_keys(), nil)
++			helpers.assert_eq(log.queries, 0)
++			reader.close()
++		end)
++		controlled_held_reader({ grab_fails = true }, function(reader, _, log)
++			assert(reader.open("/controlled/native-a")); helpers.assert_eq(reader.grab(), false)
++			helpers.assert_eq(reader.capture_pressed_keys(), nil); helpers.assert_eq(log.queries, 0)
++			reader.close()
++		end)
++	end)
++
++	helpers.it("rejects short, failed and unknown native ioctl copy acknowledgements", function()
++		for _, copied in ipairs({ 0, 95, -1, 97, 1.5, false }) do
++			controlled_held_reader({ copied = copied }, function(reader)
++				assert(reader.open("/controlled/native-a")); assert(reader.grab())
++				helpers.assert_eq(reader.capture_pressed_keys(), nil)
++				reader.close()
++			end)
++		end
++	end)
++
++	helpers.it("refuses invalid native buffers and provider exceptions", function()
++		for _, options in ipairs({ { bytes = "\0" }, { before_query = function() error("controlled") end },
++			{ before_string = function() error("controlled") end } }) do
++			controlled_held_reader(options, function(reader)
++				assert(reader.open("/controlled/native-a")); assert(reader.grab())
++				helpers.assert_eq(reader.capture_pressed_keys(), nil)
++				reader.close()
++			end)
++		end
++	end)
++
++	helpers.it("seals query callbacks against lifecycle reentry and old-current observations", function()
++		controlled_held_reader(nil, function(reader, options, log)
++			assert(reader.open("/controlled/native-a")); assert(reader.grab())
++			local old = assert(reader.capture_pressed_keys())
++			options.before_query = function(current)
++				helpers.assert_eq(current.pressed_keys_current(old), false)
++				helpers.assert_eq(current.capture_pressed_keys(), nil)
++				helpers.assert_eq(current.close(), false)
++				helpers.assert_eq(current.ungrab(), false)
++				helpers.assert_eq(current.use_ffi_backend(), false)
++				helpers.assert_eq(current._reset_backend(), false)
++			end
++			local cap = assert(reader.capture_pressed_keys())
++			helpers.assert_eq(reader.pressed_keys_current(old), false)
++			helpers.assert_eq(reader.pressed_keys_current(cap), true)
++			helpers.assert_eq(log.closes, 0)
++			options.before_query = nil
++			options.copied = 0
++			helpers.assert_eq(reader.capture_pressed_keys(), nil)
++			helpers.assert_eq(reader.pressed_keys_current(cap), false, "even a refused native query revokes its older observation")
++			options.copied = nil
++			options.down = { 42 }
++			local fresh = assert(reader.capture_pressed_keys())
++			helpers.assert_eq(reader.pressed_keys_view(fresh).down, { 42 })
++			reader.close()
++		end)
++	end)
++
++	helpers.it("rechecks decoder/provider currency after the last external buffer callback", function()
++		controlled_held_reader(nil, function(reader, options)
++			assert(reader.open("/controlled/native-a")); assert(reader.grab())
++			local codec = require("infra.input_event")
++			local original = codec.decode
++			options.before_string = function() codec.decode = function() return {} end end
++			local cap = reader.capture_pressed_keys()
++			codec.decode = original; options.before_string = nil; reader.close()
++			helpers.assert_eq(cap, nil)
++		end)
++	end)
++
++	helpers.it("revokes held observations on the next read even if event session provenance survives", function()
++		controlled_held_reader({ rows = { encoded(1, 42, 1), encoded(1, 30, 1) } }, function(reader)
++			assert(reader.open("/controlled/native-a")); assert(reader.grab())
++			local event = assert(reader.read_event())
++			local origin = assert(reader.capture_event(event))
++			local held = assert(reader.capture_pressed_keys())
++			reader.read_event()
++			helpers.assert_eq(reader.source_current(origin), true)
++			helpers.assert_eq(reader.pressed_keys_current(held), false)
++			local fresh = assert(reader.capture_pressed_keys())
++			reader.read_event()
++			helpers.assert_eq(reader.pressed_keys_current(fresh), false, "an empty queue read still ends the observation")
++			reader.close()
++		end)
++	end)
++
++	helpers.it("revokes observations after ordinary held queries and preserves independent source epochs", function()
++		controlled_held_reader(nil, function(reader)
++			for _, slot in ipairs({ "a", "b" }) do assert(reader.open("/controlled/native-" .. slot, slot)); assert(reader.grab(slot)) end
++			local a = assert(reader.capture_pressed_keys("a"))
++			local b = assert(reader.capture_pressed_keys("b"))
++			reader.read_event("b")
++			helpers.assert_eq(reader.pressed_keys_current(a), true)
++			helpers.assert_eq(reader.pressed_keys_current(b), false)
++			reader.pressed_keys("a", 0x2ff)
++			helpers.assert_eq(reader.pressed_keys_current(a), false)
++			reader.close("a"); reader.close("b")
++		end)
++	end)
++
++	helpers.it("revokes held receipts on ungrab, reused fd/session and native close debt", function()
++		controlled_held_reader(nil, function(reader, options)
++			assert(reader.open("/controlled/native-a")); assert(reader.grab())
++			local cap = assert(reader.capture_pressed_keys())
++			assert(reader.ungrab()); assert(reader.grab())
++			helpers.assert_eq(reader.pressed_keys_current(cap), false)
++			local next_cap = assert(reader.capture_pressed_keys())
++			options.close_fails = true; helpers.assert_eq(reader.close(), false)
++			helpers.assert_eq(reader.pressed_keys_current(next_cap), false)
++			helpers.assert_eq(reader.has_native_origin_debt(), true)
++			helpers.assert_eq(reader.capture_pressed_keys(), nil)
++		end)
++	end)
++
++	helpers.it("refuses query-loss authority until acknowledged native retirement and reopen", function()
++		controlled_held_reader({ rows = { encoded(0, 3, 0) } }, function(reader)
++			assert(reader.open("/controlled/native-a")); assert(reader.grab())
++			local cap = assert(reader.capture_pressed_keys())
++			reader.read_event()
++			helpers.assert_eq(reader.pressed_keys_current(cap), false)
++			helpers.assert_eq(reader.capture_pressed_keys(), nil)
++			assert(reader.close()); assert(reader.open("/controlled/native-a")); assert(reader.grab())
++			helpers.assert_eq(type(reader.capture_pressed_keys()), "table")
++			reader.close()
++		end)
++	end)
++
++	helpers.it("does not invoke capability or slot equality metamethods for forged observations", function()
++		controlled_held_reader(nil, function(reader)
++			local calls = 0
++			local meta = { __eq = function() calls = calls + 1; return true end }
++			local slot, alias = setmetatable({}, meta), setmetatable({}, meta)
++			assert(reader.open("/controlled/native-a", slot)); assert(reader.grab(slot))
++			local cap = assert(reader.capture_pressed_keys(slot))
++			setmetatable(cap, meta)
++			helpers.assert_eq(reader.capture_pressed_keys(alias), nil)
++			helpers.assert_eq(reader.pressed_keys_current(setmetatable({}, meta)), false)
++			helpers.assert_eq(reader.pressed_keys_view(setmetatable({}, meta)), nil)
++			helpers.assert_eq(calls, 0)
++			reader.close(slot)
++		end)
++	end)
++
++	helpers.it("records bounded partial coverage and rejects invalid query ranges before native calls", function()
++		controlled_held_reader(nil, function(reader, _, log)
++			assert(reader.open("/controlled/native-a")); assert(reader.grab())
++			for _, last in ipairs({ -1, 768, 1.5, false, "767", math.huge }) do
++				helpers.assert_eq(reader.capture_pressed_keys(nil, last), nil)
++			end
++			helpers.assert_eq(log.queries, 0)
++			local cap = assert(reader.capture_pressed_keys(nil, 31))
++			local view = reader.pressed_keys_view(cap)
++			helpers.assert_eq(view.max_code, 31); helpers.assert_eq(view.down, { 29 })
++			reader.close()
++		end)
++	end)
++
++	helpers.it("retains private view validation even if a public current method is replaced", function()
++		controlled_held_reader(nil, function(reader)
++			assert(reader.open("/controlled/native-a")); assert(reader.grab())
++			local cap = assert(reader.capture_pressed_keys())
++			reader.close()
++			reader.pressed_keys_current = function() return true end
++			helpers.assert_eq(reader.pressed_keys_view(cap), nil)
++		end)
++	end)
++
++end)

@@ -54,6 +54,12 @@ global _ActPickWeb_NavSub     := unset
 ; crash this mirrors). The flag makes the second call a true no-op instead.
 global _ActPickWeb_ResetDone  := false
 global _ActPickWeb_SessionEpoch := 0
+global _ActPickWeb_ProgramOwner := 0
+global _ActPickWeb_ProgramPacket := Map("unavailable", true)
+global _ActPickWeb_ProgramDebt := []
+global _ActPickWeb_ProgramCapturing := false
+global _ActPickWeb_ProgramRetiring := false
+global _ActPickWeb_Confirming := false
 
 ; The chosen-action callback + the init payload captured at open time.
 global _ActPickWeb_OnConfirm  := 0
@@ -98,6 +104,7 @@ _ActPickWeb_TryOpen(Title, Current, Items, OnConfirm, ShowNative := false, Bindi
 	_ActPickWeb_ResetDone := false
 
 	_ActPickWeb_OnConfirm := OnConfirm
+	_ActPickWeb_ProgramCapture()
 	_ActPickWeb_InitJs    := _ActPickWeb_BuildInitJs(Title, Current, Items, ShowNative, BindingId)
 
 	g := Gui_Create("+Resize +MinSize360x360", Title)
@@ -194,7 +201,10 @@ _ActPickWeb_OnWebMessage(SessionEpoch, Handler, Args) {
 		; A send_* value the page's own editor collected travels with the pick.
 		HasParameter := Payload.Has("parameter") && (Payload["parameter"] is String)
 		Parameter := HasParameter ? Payload["parameter"] : ""
-		SetTimer(_ActPickWeb_SessionCall.Bind(SessionEpoch, _ActPickWeb_Confirm, Id, HasParameter, Parameter), -1)
+		HasProvider := Payload.Has("providerKey")
+		Provider := HasProvider ? ProgramProviderMessage(Msg) : false
+		SetTimer(_ActPickWeb_SessionCall.Bind(SessionEpoch, _ActPickWeb_Confirm,
+			Id, HasParameter, Parameter, HasProvider, Provider), -1)
 	}
 }
 
@@ -224,19 +234,49 @@ _ActPickWeb_PushInit() {
 ; native dialog did), close the window, then invoke the caller's callback.
 ; A value the page's editor collected is offered to the parameter prompt the
 ; callback's assignment runs, for this action only, and withdrawn afterwards.
-_ActPickWeb_Confirm(Id, HasParameter := false, Parameter := "") {
-	global _ActPickWeb_OnConfirm
-	if A_IsSuspended
+_ActPickWeb_Confirm(Id, HasParameter := false, Parameter := "", HasProvider := false, Provider := false) {
+	global _ActPickWeb_OnConfirm, _ActPickWeb_ProgramOwner, _ActPickWeb_SessionEpoch
+	global _ActPickWeb_Confirming, _ActPickWeb_ResetDone
+	if A_IsSuspended || _ActPickWeb_Confirming
 		return false
-	cb := _ActPickWeb_OnConfirm
-	Mapped := (Id == "__native__") ? "" : Id
-	_ActPickWeb_Close()
-	if (cb == 0 || cb == "")
-		return
-	if HasParameter
-		GestureOfferPickedParameter(Mapped, Parameter)
-	try cb(Mapped)
-	GestureClearPickedParameter()
+	_ActPickWeb_Confirming := true
+	Epoch := _ActPickWeb_SessionEpoch
+	try {
+		if HasProvider {
+			Owner := _ActPickWeb_ProgramOwner
+			if Id != "run_program" || !(Provider is Map) || !(Owner is ProgramProviderSession)
+				return false
+			Resolved := Owner.Resolve(Provider["key"], Provider["arguments"])
+			if !(Resolved is String) || A_IsSuspended || !_ActPickWeb_SessionCurrent(Epoch)
+					|| _ActPickWeb_ProgramOwner != Owner {
+				if _ActPickWeb_SessionCurrent(Epoch)
+					_ActPickWeb_Eval("if(window.programProviderRefused)window.programProviderRefused()")
+				return false
+			}
+			HasParameter := true
+			Parameter := Resolved
+		}
+		; Manual and ordinary picks also retire discovery before assigning anything.
+		; Refusal still closes this session; it cannot lend its callback to a new one.
+		cb := _ActPickWeb_OnConfirm
+		Retired := _ActPickWeb_ProgramRetire()
+		if !_ActPickWeb_SessionCurrent(Epoch)
+			return false
+		Mapped := (Id == "__native__") ? "" : Id
+		_ActPickWeb_Close()
+		if !Retired || A_IsSuspended || !_ActPickWeb_ResetDone
+				|| _ActPickWeb_SessionEpoch != Epoch + 1
+			return false
+		if (cb == 0 || cb == "")
+			return false
+		if HasParameter
+			GestureOfferPickedParameter(Mapped, Parameter)
+		try cb(Mapped)
+		finally GestureClearPickedParameter()
+		return true
+	} catch Any {
+		return false
+	} finally _ActPickWeb_Confirming := false
 }
 
 
@@ -296,7 +336,7 @@ _ActPickWeb_BuildInitJs(Title, Current, Items, ShowNative, BindingId := "") {
 		. _ActPickWeb_Kv("platform", "ahk") . ","
 		. '"sendVocabulary":' . SendInputVocabularyJson() . ","
 		. '"parameterStrings":' . _ActPickWeb_ParameterStringsJson() . ","
-		. '"programProviders":{"unavailable":true},'
+		. '"programProviders":' . _ActPickWeb_ProgramPacketJson() . ","
 		. '"programProviderStrings":{'
 		. _ActPickWeb_Kv("label", t("dialog.action_picker.program_provider_label")) . ","
 		. _ActPickWeb_Kv("manual", t("dialog.action_picker.program_provider_manual")) . ","
@@ -493,6 +533,7 @@ _ActPickWeb_Reset() {
 		return
 	_ActPickWeb_ResetDone := true
 	_ActPickWeb_SessionEpoch += 1
+	_ActPickWeb_ProgramRetire()
 
 	; The whole teardown runs under one try: a hard COM access violation can
 	; occur mid-sequence, and a bare per-line `try` only catches ordinary AHK
@@ -513,4 +554,77 @@ _ActPickWeb_Reset() {
 	_ActPickWeb_Controller := unset
 	_ActPickWeb_WebView    := unset
 	_ActPickWeb_OnConfirm  := 0
+}
+
+; Discovery closes its resources independently from WebView COM teardown. An
+; unknown/refused native receipt retains exact ownership and fences capture.
+_ActPickWeb_ProgramRetire() {
+	global _ActPickWeb_ProgramOwner, _ActPickWeb_ProgramDebt, _ActPickWeb_ProgramPacket
+	global _ActPickWeb_ProgramRetiring
+	if _ActPickWeb_ProgramRetiring
+		return false
+	_ActPickWeb_ProgramRetiring := true
+	try {
+		Owner := _ActPickWeb_ProgramOwner
+		_ActPickWeb_ProgramOwner := 0
+		_ActPickWeb_ProgramPacket := Map("unavailable", true)
+		if Owner is ProgramProviderSession
+			_ActPickWeb_ProgramDebt.Push(Owner)
+		Index := _ActPickWeb_ProgramDebt.Length
+		while Index > 0 {
+			Pending := _ActPickWeb_ProgramDebt[Index]
+			if Pending.Invalidate()
+				_ActPickWeb_ProgramDebt.RemoveAt(Index)
+			Index--
+		}
+		return _ActPickWeb_ProgramDebt.Length == 0
+	} finally _ActPickWeb_ProgramRetiring := false
+}
+
+_ActPickWeb_ProgramCapture() {
+	global _ActPickWeb_ProgramOwner, _ActPickWeb_ProgramPacket
+	global _ActPickWeb_ProgramDebt, _ActPickWeb_ProgramCapturing, _ActPickWeb_SessionEpoch
+	global _ActPickWeb_ProgramRetiring
+	if A_IsSuspended || _ActPickWeb_ProgramCapturing || _ActPickWeb_ProgramRetiring
+		return false
+	_ActPickWeb_ProgramCapturing := true
+	Epoch := _ActPickWeb_SessionEpoch
+	try {
+		if !_ActPickWeb_ProgramRetire() || A_IsSuspended || !_ActPickWeb_SessionCurrent(Epoch)
+			return false
+		Owner := ProgramProviders_Create()
+		if !(Owner is ProgramProviderSession)
+			return false
+		; Publish custody before discovery can enter a native acquisition.
+		_ActPickWeb_ProgramOwner := Owner
+		Packet := Owner.Discover()
+		if !(Packet is Map) || !_ActPickWeb_SessionCurrent(Epoch) || A_IsSuspended
+				|| _ActPickWeb_ProgramOwner != Owner {
+			if _ActPickWeb_ProgramOwner == Owner
+				_ActPickWeb_ProgramRetire()
+			return false
+		}
+		_ActPickWeb_ProgramPacket := Packet
+		return true
+	} catch Any {
+		_ActPickWeb_ProgramRetire()
+		return false
+	} finally _ActPickWeb_ProgramCapturing := false
+}
+
+_ActPickWeb_ProgramPacketJson() {
+	global _ActPickWeb_ProgramPacket
+	Packet := _ActPickWeb_ProgramPacket
+	if Packet.Get("unavailable", false)
+		return '{"unavailable":true}'
+	Choices := "", Providers := ""
+	for Choice in Packet["choices"]
+		Choices .= (Choices == "" ? "" : ",") . '{"key":' . JsonStringLiteral(Choice["key"])
+			. ',"provider":' . JsonStringLiteral(Choice["provider"])
+			. ',"label":' . JsonStringLiteral(Choice["label"]) . "}"
+	for Provider in Packet["providers"]
+		Providers .= (Providers == "" ? "" : ",") . '{"id":' . JsonStringLiteral(Provider["id"])
+			. ',"available":' . (Provider["available"] ? "true" : "false") . "}"
+	return '{"choices":[' . Choices . '],"providers":[' . Providers . '],"truncated":'
+		. (Packet["truncated"] ? "true" : "false") . "}"
 }

@@ -1,0 +1,43 @@
+{
+  "verdict": "SOURCE CLEAR four-path base plus terminal successor; native UNQUALIFIED",
+  "receipt_sha256": "06ca05debe77798750e868eea2b417adb5bb2dbb512748ededafe53909f63c37",
+  "base_receipt_sha256": "b88a1f2eb20d20c3d74b0f5459a5c3f8c4a3ab89a827f247c98b72cee66c67ad",
+  "artifact_pins_verified": 41,
+  "archive_members_verified": 8,
+  "Root_paths_all_absent": true,
+  "old_test_whole_reverse_exact": true,
+  "old_facade_and_facade_test_exact": true,
+  "source_review": [
+    "input/timer exact capability retained through strict native retirement ACK",
+    "publication reservation stays held across cleanup and full current/provider checks",
+    "final cached source seal occurs after cleanup callbacks; no later native call before terminal publication",
+    "cancellation/reentrant successor acquisition cannot bypass reserved operation",
+    "opaque capabilities raw identity; returned statuses closed; weak terminal registry has no owner cycle",
+    "init requires all actual native exports; no app activation loop or post-return visible-effect claim"
+  ],
+  "pinned_controlled_evidence": {
+    "lua54_final": [
+      37,
+      0
+    ],
+    "luajit_core_final": [
+      27,
+      0
+    ],
+    "exact_old_against_same_tests_lua54": [
+      31,
+      6
+    ],
+    "exact_old_against_same_tests_jit": [
+      21,
+      6
+    ],
+    "Root_independent_both_ABIs": [
+      2,
+      0
+    ]
+  },
+  "native": "UNEXECUTED; G5 exports/timing/registration/genuine AX-HID-session observation/visible effect/installation remain required",
+  "reviewer_execution": "read-only source/hash/evidence; no suites/native processes",
+  "Root_writes": 0
+}

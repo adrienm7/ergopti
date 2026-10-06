@@ -5596,6 +5596,16 @@ revalidation remains pending; these checks do not qualify physical input.
 
 Current Group 3 source checkpoint (item 93, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Preserve ordered Linux pairs and historical fifth GTK 4/4; diagnose the current delayed-identity poll miss, then complete simultaneous chords, cross-device ownership, remaining native actions and physical-host/input/distribution acceptance. Separate device/evidence boundary: Genuine evdev/device/seat delivery and multi-keyboard acceptance.
 
+The existing GTK wrapper now retains its after-spawn timestamp and samples one
+additional timestamp after durable start-receipt publication. The terminal
+observation exposes only nonnegative signed-64-bit integer phase values or
+unknown, so hosted evidence can separate process creation, receipt publication
+and native wait. All 17 original diagnostic tests and their 71 assertions,
+native commands, ownership, polling and deadlines remain intact. Six new
+portable controls fail before the addition; the candidate passes all 23.
+This is diagnostic instrumentation, not a repair or native qualification; the
+observed hosted delay's cause and the original failed verdict remain unresolved.
+
 - [ ] **96.** Remove the separate Ergopti+ AltGr-adjustments option from the
       Layout menu. Selecting the Ergopti+ keylayout in the emulation picker must
       suffice. Verify that the layout supplies every intended change, retire
@@ -5680,6 +5690,20 @@ retains historical commands and packet ownership; the earlier PC-only software
 deferral is superseded. This item and items16/38 remain open.
 
 Current Group 3 source checkpoint (item 97, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Complete native capture, all-owner collisions, joint source/modifier/output custody, Unicode/dead-key delivery and accent migration; qualify actual GUI/bridge and retain legacy menus. Separate device/evidence boundary: Real physical positions/modifiers and output across layouts/devices.
+
+The frozen [modifier-consumer inventory](handovers/2026-10-04-parallel-containers/group3-2026-10-06-modifier-consumer-inventory/README.md)
+preserves the original fourteen watchdog cases and overlap assertion. Actual
+controlled consumers record 17 PASS / 8 FAIL on each Lua ABI. In addition to
+the two-source Shift overlap, withdrawing a Caps remapper can swallow the
+remaining physical Shift release as an orphan and leave the Writer held roster
+set. A skip-only-UP change remains red (19/6), weakened temporary restoration
+regresses further (16/9), and blanket reentry refusal breaks an original
+TapHold retirement assertion (25/1 versus unchanged 26/0). Independent review
+is CLEAR for the inventory only. Implement a coherent single-channel owner
+broker across Hook, Reader, Writer, TapHold, Injector, ComboEmitter,
+OutputTransaction and daemon; coordinate source ownership before admission.
+No production repair, native capability, kernel output or physical qualification
+is claimed. This remains software work, not a device-only check.
 
 - [~] **98.** Replace the fixed "make J the star key" setting with a physical
   key and output chosen by the user: any keyboard position and arbitrary
@@ -6116,12 +6140,43 @@ and installation qualification are still required.
   scripts, paths/arguments with spaces and Unicode, process-start refusal,
   execution errors, lifecycle/cancellation and cross-consumer parity.
 
-The recovered executable/argument candidate is being qualified against the
-current `origin/dev`; the saved patch and incomplete review receipt are not
-integration evidence. Independent regressions exposed refused macOS parameter
+The original executable/argument tranche is integrated in `origin/dev`; the
+broader automation-provider scope remains partial. A saved patch or incomplete
+review receipt is not integration evidence. Independent regressions exposed
+refused macOS parameter
 transactions, overly broad source admission, Windows shutdown cancellation
 ordering and Linux descendants surviving their original process leader. Their
 bounded fixes retain source/privacy and strict ownership requirements.
+The Windows provider tranche now uses the canonical shared command metadata
+and one native inventory adapter. Discovery performs bounded regular-file and
+PATH metadata checks without launching programs or reading user scripts;
+interpreter prefixes and literal arguments use the existing owned execution
+path. Refused native cleanup remains reserved before assignment or confirmation
+callbacks. The shared reader preserves POSIX prefixes and rejects mismatched
+Windows provider metadata. Independent source review covers the native consumer,
+assignment/confirmation paths and retained-handle cleanup; all 27 previous
+program cases remain intact, with 34 composed registered cases. Exact-source
+manual run 37523199350 on CI `3cb5ff1f` / feature `7d305622` passes all 34
+program/provider records within 9,722 native units, 70 E2E cases, compilation,
+packaging, installation and launch. This includes actual AutoHotkey, Python
+and PowerShell script arguments and native retained-handle retirement. The run
+is globally FAILED: Core, Linux and the Ubuntu-hosted macOS portable job stop
+at `Ubuntu archive authority ownership refused`; Release is SKIPPED. The shared
+metadata still needs exact-source Linux/macOS hosted qualification after that
+separately owned prerequisite repair. Real interpreter invocation does not
+qualify broader automation inventory, Apple Shortcuts or physical keyboard
+acceptance, and this tranche does not complete item 106.
+
+The latest retained native macOS inventory baseline is run 37494746572 on
+CI `ad22d308` / dev `4dfbb9a5`: all 16 inventory and five shim cases PASS,
+including `real_interpreter_symlink`. The current native adapter, directory
+owner, full/shim fixtures and controller are byte-identical to that qualified
+baseline. Older 15/16 notes below are historical failures, not a demonstrated
+current symlink regression. The Windows additions changed shared provider
+policy/data while preserving the macOS projection, so the current complete
+source still requires hosted macOS qualification. Preserve the 21 existing
+cases; Apple Shortcuts, broader inventory and full package/install remain open.
+
 Complete selected gates, hosted native execution, packaging and installation
 remain required. Automation-provider discovery and Apple Shortcuts are still
 outside this executable slice; item106 remains partial.
@@ -6198,7 +6253,8 @@ The shared picker now inventories explicit `config_dir/scripts` on Linux and
 macOS through bounded native adapters, with opaque session choices and the
 existing literal executable/argv persistence. Selection rechecks script,
 interpreter, configured route and captured identity before assignment; manual
-entry remains available. Windows honestly reports discovery unavailable.
+entry remains available. Windows discovery was unavailable at this historical
+checkpoint; the exact-source Windows provider results above supersede that status.
 Seven new labels are translated in all21 locales. Real Linux child fixtures
 cover discovered shell, Python and executable scripts, literal Unicode/empty
 arguments, refused starts, exit37 and cancellation with closed process groups.
@@ -6465,6 +6521,22 @@ prerequisites, changed budgets and shared setup/native clocks. Fresh hosted
 qualification remains required; no native assertion or item is waived.
 
 Current Group 3 source checkpoint (item 106, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Preserve the qualified 21-case inventory and owned-program provider; diagnose the current GTK delayed-identity observation with its original poll unchanged; record Windows discovery/invocation for the maintainer workstation, then complete Linux/macOS providers and real Shortcuts discovery/invocation. Separate device/evidence boundary: Only device-dependent automation workflows require external device acceptance.
+
+The Ubuntu prerequisite is now separately published and integrated upstream:
+`b70f98236` restores actual native acquisition; dev `a576915cf` CI
+37533343559 passes the complete Windows and Linux lanes. Its non-root fixture
+failure has a published thirty-case successor (`509795692`, dev `de4f253c1`).
+The Group 3 test-only successor keeps all thirty methods/assertions and
+constrains modeled private UID facts to captured directory/file identity,
+original UID and exclusive creation. Thirty-one controls pass under UID 1000;
+the same boundary corpus has eleven failing subtests against the published
+pathname-only model. Production root/signature policy is unchanged. Selected
+formatting and all 364 JS checks pass; final integrated CI remains required.
+The earlier dev macOS package
+still fails owned Brew receiver lifetime and Sparkle server retirement; its
+complete native/package/install scope is unqualified. These are automated
+software/ownership prerequisites, not device-only checks. Item 106 remains
+partial, and items 16 and 38 retain their validation requirements.
 
 - [~] **107.** Make the number-row policy explicit: native behavior, digits
   directly or symbols directly, with an acknowledged migration of the old

@@ -1,0 +1,16 @@
+[
+  {
+    "abi": "luajit",
+    "exit": 1,
+    "summary": "READER_ORIGIN 47 1",
+    "log": "luajit-slot-alias.log",
+    "sha256": "0fdb0b63f6b127638e37bd754a63d6112ed36c1cb123db5823477e3b02c45cfa"
+  },
+  {
+    "abi": "lua5.4",
+    "exit": 1,
+    "summary": "READER_ORIGIN 47 1",
+    "log": "lua5.4-slot-alias.log",
+    "sha256": "0fdb0b63f6b127638e37bd754a63d6112ed36c1cb123db5823477e3b02c45cfa"
+  }
+]

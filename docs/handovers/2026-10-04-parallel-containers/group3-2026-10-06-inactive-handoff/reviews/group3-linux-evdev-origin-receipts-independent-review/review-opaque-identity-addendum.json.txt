@@ -1,0 +1,44 @@
+{
+  "verdict": "BLOCKED_ORIGINAL_ADDITIONAL_OPAQUE_COMPARISON_EVIDENCE",
+  "prior_blocked_review_sha256": "fa78219d4a12fc4def3b037668e85c73a3606b90a43f39bd7427e68b676ecdc0",
+  "original_packet_receipt": "f69b51fd4c5e9075a1a48ab5c0a658c1518416593149455ced72e95d63a34840",
+  "audit": "Only new slot ~= identity comparison can invoke __eq; token/backend/state/provider identities are rawequal, registry lookups identityhashed, row/fd/generation/epoch comparison right-handfacts are private numeric scalars.",
+  "results": [
+    {
+      "abi": "luajit",
+      "exit": 1,
+      "summary": "READER_ORIGIN 48 2",
+      "log": "luajit-slot-combined.log",
+      "sha256": "50fb038f6c6a81d2a2fe6c74f2b829df8a14a258843186149557e2c075831b72"
+    },
+    {
+      "abi": "lua5.4",
+      "exit": 1,
+      "summary": "READER_ORIGIN 47 3",
+      "log": "lua5.4-slot-combined.log",
+      "sha256": "6cd9677e35bf9a504f08f6a380091ed33844784a69c98133b042f14f9492bcd5"
+    }
+  ],
+  "finding": "Lua54 single-sided __eq can execute supplied callback and trigger exactcontrollednative close during pure capture_event. Dualsided callback also triggers onLuaJIT; original source retained47passes.",
+  "requested_fix": "rawequal(record.slot, slot orM.KEYBOARD), preserving legacy ordinaryslot APIs.",
+  "native_kernel_allocation": false,
+  "Root_mutation": false,
+  "evidence": [
+    {
+      "path": "slot-combined-extra.lua",
+      "sha256": "6c6a639e655ed429c19dfff531e81931dc46f7e873377583d935a8caa26aba64"
+    },
+    {
+      "path": "slot-combined-results.json",
+      "sha256": "98a893e12f97060d0b240ad3ad139d530502926fc73e852f14cbfddbdf4f3b57"
+    },
+    {
+      "path": "luajit-slot-combined.log",
+      "sha256": "50fb038f6c6a81d2a2fe6c74f2b829df8a14a258843186149557e2c075831b72"
+    },
+    {
+      "path": "lua5.4-slot-combined.log",
+      "sha256": "6cd9677e35bf9a504f08f6a380091ed33844784a69c98133b042f14f9492bcd5"
+    }
+  ]
+}
