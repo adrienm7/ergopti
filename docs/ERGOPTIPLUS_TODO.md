@@ -4658,6 +4658,22 @@ Actual matching-source Swift execution, remote successful receipt retention,
 confirmation UI and physical input remain unqualified; the original25-rule backup
 is unavailable. This fixes evidence retention without completing TODO43.
 
+Exact-source macOS run [37434603543](https://github.com/adrienm7/ergopti/actions/runs/37434603543)
+completes all357 discovered Swift cases:338 pass,4 fail and15 skip, with11 failed
+assertions (3 unexpected). The unchanged actual cleanup passes its six cases;
+its separate bounded console summary reports a436081-byte sibling receipt and
+no case-completion marker is lost. Upload succeeds, but downloaded sibling bytes
+remain unavailable behind the running network policy and are not qualified.
+The new full-byte Foundation control fails at the initial parent/name guard;
+the two generic negative controls pass without proving their intended branches.
+Only these three already-created private fixture URLs are now canonicalized
+inside their callers, with explicit canonical preconditions. All35 original
+assertion statement lines, the strict persistence helper, cleanup and controller,
+and shared fixture remain byte-exact. Genuine Foundation API source supports
+the directory-URL representation hypothesis; the correction still requires an
+exact-SHA native run. Core compilation and the separate release-group native
+failures also keep the full suite, packaging and installation unqualified.
+
 - [~] **44.** CapsWord is no longer cancelled by the pointer when Karabiner
   activated it (AltGr + CapsLock): the watcher probed the variable with
   `karabiner_cli --get-variable`, an option karabiner_cli has never had (exit

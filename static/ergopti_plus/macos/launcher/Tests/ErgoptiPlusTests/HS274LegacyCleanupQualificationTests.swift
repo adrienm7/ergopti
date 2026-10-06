@@ -124,7 +124,9 @@ extension HS274NativePolicyQualificationTests {
 	}
 
 	func testLegacyCleanupReceiptArtifactPreservesFullBytesAndSurvivesChildCleanup() throws {
-		try fixture { parent in
+		try fixture { fixtureParent in
+			let parent = fixtureParent.resolvingSymlinksInPath()
+			XCTAssertEqual(parent.resolvingSymlinksInPath(), parent)
 			let child = parent.appendingPathComponent("disposable-fixture")
 			try FileManager.default.createDirectory(at: child, withIntermediateDirectories: false,
 				attributes: [.posixPermissions: 0o700])
@@ -148,7 +150,9 @@ extension HS274NativePolicyQualificationTests {
 	}
 
 	func testLegacyCleanupReceiptArtifactRefusesExistingFileAndSymlinkWithoutOverwrite() throws {
-		try fixture { parent in
+		try fixture { fixtureParent in
+			let parent = fixtureParent.resolvingSymlinksInPath()
+			XCTAssertEqual(parent.resolvingSymlinksInPath(), parent)
 			let name = "legacy-cleanup-receipt-00000000-0000-0000-0000-000000000002.json"
 			let path = parent.appendingPathComponent(name)
 			let foreign = Data("EXISTING RECEIPT MUST SURVIVE\n".utf8)
@@ -165,7 +169,9 @@ extension HS274NativePolicyQualificationTests {
 	}
 
 	func testLegacyCleanupReceiptArtifactRefusesAliasedParentAndInvalidName() throws {
-		try fixture { parent in
+		try fixture { fixtureParent in
+			let parent = fixtureParent.resolvingSymlinksInPath()
+			XCTAssertEqual(parent.resolvingSymlinksInPath(), parent)
 			let name = "legacy-cleanup-receipt-00000000-0000-0000-0000-000000000004.json"
 			let alias = parent.appendingPathComponent("alias")
 			try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: parent)
