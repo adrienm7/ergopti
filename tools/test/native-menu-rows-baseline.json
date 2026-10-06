@@ -1,7 +1,7 @@
 {
 	"_comment": "Native menu rows still built in driver code (tools/test/test-native-menu-rows.cjs). Lower with --update-baseline as rows move to the shared manifest; never raise.",
 	"windows": {
-		"count": 74,
+		"count": 73,
 		"sites": [
 			"windows/infra/tray_bootstrap.ahk:54 add",
 			"windows/ui/editors.ahk:372 static",
@@ -37,7 +37,6 @@
 			"windows/ui/menu/menu_init.ahk:66 add",
 			"windows/ui/menu/menu_llm/menu_agent.ahk:50 append",
 			"windows/ui/menu/menu_llm/menu_agent.ahk:55 append",
-			"windows/ui/menu/menu_llm/menu_agent.ahk:98 separator",
 			"windows/ui/menu/menu_llm/menu_api_entries.ahk:57 static",
 			"windows/ui/menu/menu_llm/menu_api_entries.ahk:72 static",
 			"windows/ui/menu/menu_llm/menu_api_entries.ahk:75 separator",
@@ -80,7 +79,7 @@
 		]
 	},
 	"macos": {
-		"count": 105,
+		"count": 104,
 		"sites": [
 			"macos/ui/menu/builder.lua:320 separator",
 			"macos/ui/menu/builder.lua:354 separator",
@@ -133,9 +132,8 @@
 			"macos/ui/menu/menu_keyboard_slots.lua:204 static",
 			"macos/ui/menu/menu_keyboard_slots.lua:243 separator",
 			"macos/ui/menu/menu_llm/agent_panel.lua:240 static",
-			"macos/ui/menu/menu_llm/agent_panel.lua:287 separator",
-			"macos/ui/menu/menu_llm/agent_panel.lua:304 static",
-			"macos/ui/menu/menu_llm/agent_panel.lua:391 static",
+			"macos/ui/menu/menu_llm/agent_panel.lua:317 static",
+			"macos/ui/menu/menu_llm/agent_panel.lua:404 static",
 			"macos/ui/menu/menu_llm/api_panel.lua:631 static",
 			"macos/ui/menu/menu_llm/api_panel.lua:640 separator",
 			"macos/ui/menu/menu_llm/api_panel.lua:665 separator",
@@ -190,10 +188,9 @@
 		]
 	},
 	"linux": {
-		"count": 76,
+		"count": 75,
 		"sites": [
-			"linux/ui/menu/agent_rows.lua:109 separator",
-			"linux/ui/menu/agent_rows.lua:195 separator",
+			"linux/ui/menu/agent_rows.lua:199 separator",
 			"linux/ui/menu/llm_backend_rows.lua:217 separator",
 			"linux/ui/menu/llm_backend_rows.lua:260 separator",
 			"linux/ui/menu/menu_builder.lua:250 static",

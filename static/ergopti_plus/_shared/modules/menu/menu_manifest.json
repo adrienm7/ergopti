@@ -901,6 +901,45 @@
 			]
 		}
 	],
+	"agent_system_model_controls": [
+		{
+			"type": "---"
+		},
+		{
+			"type": "command",
+			"id": "agent_system_model",
+			"i18n": "menu.agent.model",
+			"disabled_when": [
+				"agent_system_model_ready"
+			]
+		}
+	],
+	"agent_system_model_installed_controls": [
+		{
+			"type": "---"
+		},
+		{
+			"type": "command",
+			"id": "agent_system_model",
+			"i18n": "menu.agent.model_installed",
+			"disabled_when": [
+				"agent_system_model_ready"
+			]
+		}
+	],
+	"agent_system_model_missing_controls": [
+		{
+			"type": "---"
+		},
+		{
+			"type": "command",
+			"id": "agent_system_model",
+			"i18n": "menu.agent.model_missing",
+			"disabled_when": [
+				"agent_system_model_ready"
+			]
+		}
+	],
 	"apps_menu": [
 		{
 			"type": "list",

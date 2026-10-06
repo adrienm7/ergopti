@@ -115,8 +115,38 @@ const OPENS_SUBMENU = {
 	],
 	// Every native live-mode provider renders the shared fixed Off choice.
 	llm_live_mode: 'llm_live_controls',
-	agent_system1: 'agent_system_controls',
-	agent_system2: 'agent_system_controls',
+	agent_system1: [
+		'agent_system_controls',
+		'agent_system_model_controls',
+		{
+			menu: 'agent_system_model_installed_controls',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_llm/agent_panel.lua' }
+		},
+		{
+			menu: 'agent_system_model_missing_controls',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_llm/agent_panel.lua' }
+		}
+	],
+	agent_system2: [
+		'agent_system_controls',
+		'agent_system_model_controls',
+		{
+			menu: 'agent_system_model_installed_controls',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_llm/agent_panel.lua' }
+		},
+		{
+			menu: 'agent_system_model_missing_controls',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_llm/agent_panel.lua' }
+		}
+	],
 	configuration: 'configuration_menu',
 	debug: 'debug_menu',
 	shortcuts: 'shortcuts_menu',
