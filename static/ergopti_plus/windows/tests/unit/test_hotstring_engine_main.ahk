@@ -112,6 +112,9 @@ Test("HSE backspace on empty buffer marks unknown context",
 
 /** Replays the driver's actual burst into an owned hidden native Edit control. */
 TestHSE_UnicodeNativeErase(Paste := false, EndChar := "", Admission := false) {
+	if Paste
+		return _HUE_NativeNotepad()
+
 	global CategoryEnabled, Features, _PrefixBuffer, _PrefixFocusedControlToken
 	global _HSResolveCache, _HSResolveGen
 	SavedCallback := { Categories: CategoryEnabled, Features: Features,
@@ -120,10 +123,7 @@ TestHSE_UnicodeNativeErase(Paste := false, EndChar := "", Admission := false) {
 	SavedTerminators := HSE_WORD_TERMINATORS
 	SavedConsumed := HSE_CONSUMED_DELIMITERS
 	ResetHotstringRecorders()
-	if Paste
-		SimulateNotepadActive()
-	else
-		SimulateRegularApp()
+	SimulateRegularApp()
 	HSE_TestReset()
 	Emoji := Chr(0x1F600)
 	Trigger := Emoji . "x"
@@ -161,12 +161,7 @@ TestHSE_UnicodeNativeErase(Paste := false, EndChar := "", Admission := false) {
 			AssertTrue(IsObject(Match), "the non-BMP trigger must match")
 			AssertTrue(HSE_DispatchMatch(Match, EndChar), "the actual dispatcher must send")
 		}
-		if Paste {
-			SendRecord := _Stub_RecordedSends[_Stub_RecordedSends.Length]
-			AssertEqual("SendInstant", SendRecord.fn, "the actual clipboard branch must run")
-			ControlSend(SendRecord.args[2] . "{Text}" . SendRecord.args[1], EditControl)
-		} else
-			ControlSend(_ConformDF_LastBurst(), EditControl)
+		ControlSend(_ConformDF_LastBurst(), EditControl)
 		Sleep(30)
 		AssertEqual("AR", EditControl.Value, "native Backspace must preserve the preceding character")
 		AssertEqual(EditControl.Value, HSE_Buffer, "UTF-16 buffer edits must match native output")
@@ -2021,3 +2016,174 @@ _UCAP_EngineReplacement() {
 }
 Test("HSE unicode-context-cap: committed replacement retains a valid bounded suffix", (*) =>
 	_UCAP_WithEngine(_UCAP_EngineReplacement))
+
+/** Exercises pending output through TextSender and an owned native Edit boundary. */
+_HUE_NativeNotepad() {
+	_HNP_Run(_HUE_NativeNotepadBody)
+}
+
+_HUE_NativeNotepadBody() {
+	global HSE_Buffer, _PrefixBuffer, _LLM_Bridge_Buffer, _LSC_LEN
+	global _TEXT_NATIVE_OWNER, _TEXT_NATIVE_SERIAL, _TEXT_CLIPBOARD_QUEUE
+	global _HSE_FireLogQueue, _PrefixWatcherSuppressed, _Stub_RecordedSends
+	AssertFalse(_TEXT_NATIVE_OWNER, "the Unicode fixture cannot adopt a native output")
+	SavedSerial := _TEXT_NATIVE_SERIAL
+	QueueLength := _TEXT_CLIPBOARD_QUEUE.Length
+	PreviousCritical := Critical("Off")
+	Receiver := Gui()
+	State := { NativeOwner: 0, Replaced: false }
+	try {
+		Emoji := Chr(0x1F600)
+		Seed := "A" . Emoji . "x"
+		Editor := Receiver.AddEdit(, Seed)
+		State := { Receiver: Receiver, Editor: Editor, Seed: Seed, Phase: 1,
+			Requests: [], Scheduled: 0, NativeOwner: 0, Begins: 0, Decisions: 0,
+			Closes: 0, Callbacks: 0, Replaced: false, RingLength: 0, CallbackError: "" }
+		Receiver.Show("Hide")
+		SendMessage(0xB1, 4, 4, Editor)
+		_HUE_AssertCaret(Editor, 4, 4)
+		ResetHotstringRecorders()
+		SimulateNotepadActive()
+		HSE_TestReset()
+		CreateHotstring("*?C", Emoji . "x", "R",
+			Map("Category", "_unicode_probe", "Section", "native"))
+		HSE_FeedChar("A")
+		HSE_FeedChar(Emoji)
+		Match := HSE_FeedChar("x")
+		AssertTrue(IsObject(Match), "the supplementary trigger must match")
+		_PrefixBuffer := Seed
+		_LLM_Bridge_Buffer := Seed
+		_LSCResetFrom(["A", Emoji, "x"])
+		State.RingLength := _LSC_LEN
+		State.Port := Map("focus", _HUE_Focus.Bind(State), "begin", _HUE_Begin.Bind(State),
+			"poll", _HUE_Poll.Bind(State), "decide", _HUE_Decide.Bind(State),
+			"close", _HUE_Close.Bind(State), "schedule", _HUE_Schedule.Bind(State))
+		Effect := 0
+		Pending := HSE_DispatchMatch(Match, "", &Effect, false, _HUE_Send.Bind(State))
+		AssertEqual("", State.CallbackError, "the recording native port must not refuse before admission")
+		AssertTrue(Pending is Map, "the actual dispatcher returns its pending native owner")
+		AssertTrue(Pending["Pending"], "queueing cannot claim receiving success")
+		AssertEqual(1, State.Requests.Length, "one real request owns completion")
+		Request := State.Requests[1]
+		AssertEqual("native", Request.Opts["mode"], "Notepad uses its native owner")
+		AssertEqual(2, Request.Opts["erase_before"], "the erasure counts two Unicode scalars")
+		AssertEqual(Emoji . "x", Request.Opts["deleted_text"], "the exact typed tail is retained")
+		AssertEqual(3, StrLen(Request.Opts["deleted_text"]), "the native range spans three UTF-16 units")
+		AssertEqual("R", Request.Text, "the literal replacement remains exact")
+		_HUE_AssertPending(State)
+		State.Scheduled.Call()
+		AssertEqual(1, State.Begins, "the real TextSender scheduler begins once")
+		_HUE_AssertPending(State)
+		State.Phase := 2
+		State.Scheduled.Call()
+		AssertEqual(1, State.Decisions, "ready admission authorizes one owned editor mutation")
+		AssertEqual("AR", Editor.Value, "native replacement preserves the preceding character")
+		_HUE_AssertCaret(Editor, 2, 2)
+		_HUE_AssertPending(State)
+		State.Scheduled.Call()
+		AssertTrue(Pending["FinalSucceeded"], "verified output completes the canonical owner")
+		AssertEqual(Editor.Value, HSE_Buffer, "the complete HSE mirror equals native output")
+		AssertEqual(Editor.Value, _LLM_Bridge_Buffer, "the complete LLM mirror equals native output")
+		AssertEqual("R", GetLastSentCharacterAt(-1), "completion updates the real last-character ring")
+		AssertEqual(1, _HSE_FireLogQueue.Length, "completion records one verified fire")
+		AssertEqual(0, _PrefixWatcherSuppressed, "completion releases suppression once")
+		AssertEqual(1, State.Callbacks, "TextSender publishes one completion callback")
+		AssertEqual(1, State.Closes, "the recording native job closes once")
+		State.Scheduled.Call()
+		AssertEqual(1, State.Callbacks, "duplicate polling cannot publish another callback")
+		AssertEqual(1, State.Decisions, "duplicate polling cannot repeat the editor mutation")
+		AssertEqual(1, _HSE_FireLogQueue.Length, "duplicate polling cannot repeat the fire")
+		AssertEqual(0, _Stub_RecordedSends.Length, "no keyboard or clipboard sender runs")
+		AssertEqual(QueueLength, _TEXT_CLIPBOARD_QUEUE.Length, "no clipboard output is queued")
+	} finally {
+		try {
+			if State.NativeOwner && _TEXT_NATIVE_OWNER == State.NativeOwner
+				_TextSenderFinishNative(State.NativeOwner, State.Replaced ? 6 : 5,
+					0, "Unicode fixture cleanup")
+		} finally {
+			try Receiver.Destroy()
+			finally {
+				_TEXT_NATIVE_SERIAL := SavedSerial
+				HSE_TestReset()
+				Critical(PreviousCritical)
+			}
+		}
+	}
+}
+
+_HUE_AssertPending(State) {
+	global HSE_Buffer, _LLM_Bridge_Buffer, _LSC_LEN, _HSE_FireLogQueue
+	AssertEqual(State.Seed, HSE_Buffer, "pending output cannot rewrite HSE")
+	AssertEqual(State.Seed, _LLM_Bridge_Buffer, "pending output cannot rewrite LLM")
+	AssertEqual(State.RingLength, _LSC_LEN, "pending output cannot edit the ring length")
+	AssertEqual("x", GetLastSentCharacterAt(-1), "pending output cannot edit the last character")
+	AssertEqual(0, _HSE_FireLogQueue.Length, "pending output is not a fire")
+	AssertEqual(0, State.Callbacks, "receiving verification precedes completion")
+}
+
+_HUE_AssertCaret(Editor, Start, Finish) {
+	StartBuffer := Buffer(4, 0)
+	FinishBuffer := Buffer(4, 0)
+	SendMessage(0xB0, StartBuffer.Ptr, FinishBuffer.Ptr, Editor)
+	AssertEqual(Start, NumGet(StartBuffer, 0, "UInt"), "the full DWORD selection start is exact")
+	AssertEqual(Finish, NumGet(FinishBuffer, 0, "UInt"), "the full DWORD selection end is exact")
+}
+
+_HUE_Send(State, Text, Opts, Callback) {
+	global _TEXT_NATIVE_OWNER
+	State.Requests.Push({ Text: Text, Opts: Opts, Callback: Callback })
+	Options := Opts.Clone()
+	Options["native_port"] := State.Port
+	TextSend(Text, Options, _HUE_Completed.Bind(State, Callback))
+	State.NativeOwner := _TEXT_NATIVE_OWNER
+}
+
+_HUE_Completed(State, Callback, Ok, ErrorMessage := "") {
+	State.Callbacks += 1
+	State.CallbackError := ErrorMessage
+	Callback.Call(Ok, ErrorMessage)
+}
+
+_HUE_Focus(State) {
+	global DriverPid
+	return Map("hwnd", State.Receiver.Hwnd, "control", State.Editor.Hwnd, "pid", DriverPid)
+}
+
+_HUE_Begin(State, Owner) {
+	State.Begins += 1
+	AssertTrue(Owner == State.NativeOwner, "the recording boundary receives the real queued owner")
+	return 0
+}
+
+_HUE_Poll(State, Token) {
+	AssertEqual(State.NativeOwner.Token, Token, "poll uses the exact native request token")
+	return Map("phase", State.Phase, "os_error", 0)
+}
+
+_HUE_Decide(State, Token, Commit) {
+	AssertEqual(State.NativeOwner.Token, Token, "decision uses the exact native request token")
+	AssertEqual(1, Commit, "the immutable request remains admitted")
+	State.Decisions += 1
+	AssertEqual(State.Seed, State.Editor.Value, "the owned receiver retains the complete pre-edit document")
+	_HUE_AssertCaret(State.Editor, 4, 4)
+	SendMessage(0xB1, 1, 4, State.Editor)
+	_HUE_AssertCaret(State.Editor, 1, 4)
+	Literal := Buffer(4, 0)
+	StrPut("R", Literal, "UTF-16")
+	SendMessage(0xC2, 1, Literal.Ptr, State.Editor)
+	State.Replaced := true
+	AssertEqual("AR", State.Editor.Value, "the receiving editor independently verifies the complete document")
+	_HUE_AssertCaret(State.Editor, 2, 2)
+	State.Phase := 4
+	return 0
+}
+
+_HUE_Close(State, Token) {
+	AssertEqual(State.NativeOwner.Token, Token, "close uses the exact native request token")
+	State.Closes += 1
+	return 0
+}
+
+_HUE_Schedule(State, Callback) {
+	State.Scheduled := Callback
+}

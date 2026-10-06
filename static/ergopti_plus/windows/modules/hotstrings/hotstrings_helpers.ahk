@@ -114,7 +114,8 @@ CreateDeadkeyHotstring(MapKey, MappedValue, Delay) {
 		"*?C", Combination,
 		(EndChar := "", PrepareOnly := false) =>
 			ShouldActivateDeadkey(Combination, MappedValue, Delay, PrepareOnly),
-		Map("TimeActivationSeconds", Delay, "Category", "distancesreduction", "Section", "dead_key_e_circumflex")
+		Map("TimeActivationSeconds", Delay, "Category", "distancesreduction", "Section", "dead_key_e_circumflex",
+			"SupportsPreparation", true)
 	)
 }
 

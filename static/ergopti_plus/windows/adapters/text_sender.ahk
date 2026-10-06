@@ -18,9 +18,8 @@
 ; CLIPBOARD THRESHOLD:
 ; Payloads longer than TEXT_CLIPBOARD_THRESHOLD characters (1000, matching
 ; TextSender.spec.js) are injected via the clipboard to avoid the overhead
-; of simulating keystrokes for large expansions. In "auto" mode a payload of
-; any length is pasted into an application that garbles typed text (Windows
-; 11's Notepad, see _TextSenderHostTakesTextByPaste).
+; of simulating keystrokes for large expansions. In "auto" mode Windows
+; Notepad uses verified native editor messages at any payload length instead.
 ;
 ; CLIPBOARD DEPENDENCY:
 ; The clipboard path uses CB_SaveAll / CB_Write / CB_RestoreAll from the Clipboard
@@ -34,8 +33,80 @@
 ; Mirrors TextSender.spec.js CLIPBOARD_THRESHOLD = 1000.
 global TEXT_CLIPBOARD_THRESHOLD := 1000
 
+#Include %A_LineFile%\..\..\adapters\editor_replace.ahk
+
+; Metadata only: never retain document, prediction or clipboard text in a log.
+_TextSenderReadClipboardDiagnosticState() {
+	Hwnd := WinExist("A")
+	Pid := Hwnd ? WinGetPID("ahk_id " . Hwnd) : 0
+	ProcessName := Hwnd ? WinGetProcessName("ahk_id " . Hwnd) : ""
+	WindowClass := Hwnd ? WinGetClass("ahk_id " . Hwnd) : ""
+	FocusedControlHwnd := Hwnd ? ControlGetFocus("ahk_id " . Hwnd) : 0
+	ControlClass := FocusedControlHwnd ? WinGetClass(FocusedControlHwnd) : ""
+	Logical := 0
+	Physical := 0
+	for Index, Key in ["Ctrl", "Shift", "Alt"] {
+		if GetKeyState(Key)
+			Logical |= 1 << (Index - 1)
+		if GetKeyState(Key, "P")
+			Physical |= 1 << (Index - 1)
+	}
+	ClipboardText := CB_Read()
+	return Map("hwnd", Hwnd, "pid", Pid, "process_name", ProcessName, "window_class", WindowClass,
+		"control_class", ControlClass, "logical", Logical, "physical", Physical,
+		"sequence", CB_GetSequenceNumber(), "clipboard_units",
+		(ClipboardText is String) ? StrLen(ClipboardText) : -1,
+		"observed_tick", DllCall("GetTickCount64", "UInt64"))
+}
+
+; Emit outside both the owned output transaction and any Critical caller.
+; The modifier masks use Ctrl=1, Shift=2 and Alt=4. Emitted records only that
+; the primitive returned, not that the receiving application processed a paste.
+_TextSenderClipboardDiagnostic(Stage, TextUnits, EraseCount, Generation,
+		OwnedSequence, Emitted := -1, ReadFn := unset, InfoFn := unset, TimerFn := unset) {
+	if !IsSet(ReadFn)
+		ReadFn := _TextSenderReadClipboardDiagnosticState
+	if !IsSet(InfoFn)
+		InfoFn := LoggerInfo
+	if !IsSet(TimerFn)
+		TimerFn := SetTimer
+	if A_IsCritical {
+		TimerFn.Call(_TextSenderClipboardDiagnostic.Bind(Stage, TextUnits, EraseCount,
+			Generation, OwnedSequence, Emitted, ReadFn, InfoFn, TimerFn), -1)
+		return
+	}
+	State := ReadFn.Call()
+	; Stage and generation changes are the news, so the central repeat key
+	; must contain the formatted body (logger spec section 4.2).
+	Message := Format("Clipboard injection {1}: mode=clipboard, generation={2}, owned_sequence={3}, current_sequence={4}, payload_units={5}, erase_before={6}, hwnd={7}, pid={8}, process_name={9}, window_class={10}, control_class={11}, logical_modifiers={12}, physical_modifiers={13}, clipboard_units={14}, primitive_returned={15}, observed_tick={16}.",
+		Stage, Generation, OwnedSequence, State["sequence"], TextUnits, EraseCount,
+		State["hwnd"], State["pid"], State["process_name"], State["window_class"], State["control_class"],
+		State["logical"], State["physical"], State["clipboard_units"], Emitted,
+		State["observed_tick"])
+	InfoFn.Call("TextSender", Message)
+}
+
+; Diagnostic failures are explicit but cannot turn an emitted edit into a retry.
+_TextSenderTryClipboardDiagnostic(Stage, TextUnits, EraseCount, Generation,
+		OwnedSequence, Emitted := -1) {
+	try {
+		if A_IsCritical {
+			SetTimer(_TextSenderTryClipboardDiagnostic.Bind(Stage, TextUnits,
+				EraseCount, Generation, OwnedSequence, Emitted), -1)
+			return
+		}
+		_TextSenderClipboardDiagnostic(Stage, TextUnits, EraseCount, Generation,
+			OwnedSequence, Emitted)
+	} catch as Err {
+		; A failed deferral cannot safely log on a Critical caller. Diagnostics
+		; remain best effort; losing metadata must not interrupt the output owner.
+		if !A_IsCritical
+			try LoggerWarn("TextSender", "Clipboard diagnostic {1} failed ({2}); output policy is unchanged.", Stage, Type(Err))
+	}
+}
+
 ; Delay in milliseconds before the clipboard is restored after a paste injection.
-; Long enough for the receiving application to process Ctrl+V before we overwrite.
+; A scheduling window only; elapsed time does not acknowledge application paste processing.
 global TEXT_CLIPBOARD_RESTORE_DELAY_MS := 150
 
 ; Maximum time (seconds) to wait for CB_Write to settle on the clipboard before
@@ -477,9 +548,9 @@ _TextSenderSendInput(Keys, Operation := "SendInput", LogFailure := true) {
 ; this timer and pass the resulting snapshot as Saved — this eliminates the TOCTOU
 ; race where a second rapid injection would capture the first injection's clipboard
 ; text rather than the user's original clipboard content.
-; Callback is invoked after Ctrl+V is sent (still on the timer thread) so callers
-; are never notified before the paste lands — fixing the race where the direct
-; try Callback() in TextSend would fire before the deferred timer even started.
+; Callback is invoked after Ctrl+V is emitted (still on the timer thread) so callers
+; are notified after the primitive returns, without an application acknowledgement. The direct
+; callback previously ran before the deferred timer even started.
 ; @param Text     {String}             The Unicode text to inject via clipboard paste.
 ; @param Saved    {ClipboardAll|String} Snapshot already captured by the caller.
 ; @param Callback {Func|0}             Optional zero-arity completion callback.
@@ -508,6 +579,7 @@ _TextSendClipboard(Text, Saved, Callback := 0, Opts := 0) {
 	; snapshot and no-ops if a newer clipboard-mode TextSend has since taken over.
 	_TEXT_CLIPBOARD_GENERATION += 1
 	Generation := _TEXT_CLIPBOARD_GENERATION
+	EraseCount := (Opts is Map) ? Opts.Get("erase_before", 0) : 0
 
 	; A failed write leaves the previous clipboard content intact. Never continue
 	; to ClipWait/^v in that state or the user receives unrelated stale text.
@@ -519,15 +591,11 @@ _TextSendClipboard(Text, Saved, Callback := 0, Opts := 0) {
 	OwnedSequence := CB_GetSequenceNumber()
 	if !OwnedSequence {
 		LoggerError("TextSender", "TextSend: clipboard sequence is unavailable - skipping paste because ownership cannot be proven.")
-		; CB_Write above SUCCEEDED, so the payload is already sitting in the user's
-		; clipboard. Every other bail-out hands this to _TextSendRestoreClipboard,
-		; which refuses to act without a sequence number — so on this one path the
-		; injected text would survive until the user next copied something, which is
-		; how a password or an expansion ends up pasted into an unrelated window.
-		; Restore directly. The sequence guard exists to avoid clobbering a NEWER
-		; user copy and cannot answer here; leaving our own payload behind is the
-		; certain harm, a user copy landing in the microseconds since CB_Write is
-		; the speculative one.
+		; Delegate rollback to the central clipboard owner. The process generation
+		; excludes newer driver injections, but cannot exclude an external copy.
+		; With no recorded ownership sequence, any positive observable sequence
+		; wins even on the first attempt. An observed zero retains the existing
+		; unfenced rollback policy; it does not prove that this payload is still ours.
 		_TextSendForceRestoreClipboard(Saved, Generation)
 		_TextSenderInvokeCallback(Callback, false, "clipboard ownership unavailable")
 		return
@@ -542,6 +610,10 @@ _TextSendClipboard(Text, Saved, Callback := 0, Opts := 0) {
 		_TextSenderInvokeCallback(Callback, false, "clipboard did not settle")
 		return
 	}
+
+	; Host probes and logging may yield: keep them before all final guards.
+	_TextSenderTryClipboardDiagnostic("write-ready", StrLen(Text), EraseCount,
+		Generation, OwnedSequence)
 
 	; A newer injection may have taken over the clipboard slot while we were
 	; blocked inside ClipWait; pasting now would clobber its content.
@@ -568,23 +640,30 @@ _TextSendClipboard(Text, Saved, Callback := 0, Opts := 0) {
 		Result := _TextSenderRunAtomicOutput(
 			_AHK_SendInput.Bind(_TextSenderErasePrefix(Opts) . "^v"), Opts, "clipboard paste")
 		if !Result.Ok {
+			_TextSenderTryClipboardDiagnostic("send-refused", StrLen(Text), EraseCount,
+				Generation, OwnedSequence, false)
 			_TextSendRestoreClipboard(Saved, Generation, OwnedSequence)
 			_TextSenderInvokeCallback(Callback, false, Result.ErrorMessage)
 			return
 		}
 		CompletionError := Result.ErrorMessage
 	} else if !_TextSenderSendInput("^v", "clipboard paste") {
+		_TextSenderTryClipboardDiagnostic("send-refused", StrLen(Text), EraseCount,
+			Generation, OwnedSequence, false)
 		_TextSendRestoreClipboard(Saved, Generation, OwnedSequence)
 		_TextSenderInvokeCallback(Callback, false, "clipboard paste failed")
 		return
 	}
 
+	_TextSenderTryClipboardDiagnostic("send-returned", StrLen(Text), EraseCount,
+		Generation, OwnedSequence, true)
+
 	; Fire the completion callback now that the paste keystroke has been emitted.
 	; Placed before the restore timer so callers can inspect A_Clipboard while it
-	; still holds the injected text, but after ^v so the paste is guaranteed to land.
+	; still holds the injected text. Emission does not acknowledge application processing.
 	_TextSenderInvokeCallback(Callback, true, CompletionError)
 
-	; Restore after a short delay so the paste completes before we overwrite.
+	; Schedule restoration after the existing delay; this is not an application acknowledgement.
 	; The closure no-ops if a newer injection advanced the generation counter,
 	; so two rapid clipboard sends never let an earlier restore clobber the later.
 	SavedForTimer := Saved
@@ -604,22 +683,29 @@ _TextSendRestoreClipboard(Saved, Generation, OwnedSequence) {
 	; above. Restoring the clipboard is harmless while paused (it undoes the
 	; write _TextSendClipboard already made before any pause could have
 	; started), so this still runs; only a NEW clipboard write is guarded.
-	if (Generation != _TEXT_CLIPBOARD_GENERATION)
+	if (Generation != _TEXT_CLIPBOARD_GENERATION) {
+		_TextSenderTryClipboardDiagnostic("restore-skipped-generation", 0, 0, Generation, OwnedSequence)
 		return
+	}
 	; The user may have copied something after this request pasted. Restore only
 	; while this transaction still owns the exact clipboard sequence; otherwise
 	; any restore would silently overwrite the user's newer clipboard content.
-	if (!OwnedSequence or CB_GetSequenceNumber() != OwnedSequence)
+	if (!OwnedSequence or CB_GetSequenceNumber() != OwnedSequence) {
+		_TextSenderTryClipboardDiagnostic("restore-skipped-sequence", 0, 0, Generation, OwnedSequence)
 		return
-	CB_RestoreOwnedAllEventually(Saved, OwnedSequence,
+	}
+	RestoreSettled := CB_RestoreOwnedAllEventually(Saved, OwnedSequence,
 		_TEXT_CLIPBOARD_OWNER_TOKEN, "text_sender", false)
+	; Observe the request after it is owned: logging cannot open a new admission gap.
+	_TextSenderTryClipboardDiagnostic(RestoreSettled ? "restore-owner-settled"
+		: "restore-owner-pending", 0, 0, Generation, OwnedSequence)
 }
 
-; Restores the pre-injection snapshot WITHOUT the ownership proof its sibling
-; requires. Reserved for the one bail-out where CB_GetSequenceNumber() itself
-; failed: no proof can exist there, and the sibling would therefore no-op and
-; leave the injected payload in the user's clipboard. The generation check is
-; kept — a newer injection owning the slot must still win.
+; Delegates the ownership-unavailable rollback to the central clipboard owner.
+; The generation check rejects newer driver injections, not external copies.
+; Without a recorded sequence, a positive observable sequence wins on every
+; attempt, including the first. A zero observation preserves the existing
+; unfenced rollback policy and remains unresolved ownership risk.
 ; @param Saved      {ClipboardAll|String} Snapshot returned by CB_SaveAll().
 ; @param Generation {Integer}             Counter value captured before the write.
 _TextSendForceRestoreClipboard(Saved, Generation) {
@@ -731,10 +817,10 @@ _TextSenderHostTakesTextByPaste() {
 ; path so the interaction is mockable and the driver has one canonical clipboard
 ; code path.
 ; @param Text     {String}   The Unicode text to insert.
-; @param Opts     {Map|0}    { mode?: "direct"|"clipboard"|"auto",
-;                              erase_before?: Integer — Backspaces sent first, in
-;                              the same batch; atomic (admission-owned) output only }
-; @param Callback {Func|0}   Called with no arguments on completion.
+; @param Opts     {Map|0}    { mode?: "direct"|"clipboard"|"native"|"auto",
+;                              erase_before?: Integer — admission-owned deletion;
+;                              deleted_text?: String — exact native deleted suffix }
+; @param Callback {Func|0}   Called with the completion Boolean and error message.
 TextSend(Text, Opts, Callback) {
 	global TEXT_CLIPBOARD_THRESHOLD, _TEXT_CLIPBOARD_QUEUE
 	Mode := "auto"
@@ -754,11 +840,15 @@ TextSend(Text, Opts, Callback) {
 		return
 	}
 
-	; Resolve "auto" to a concrete strategy: a long payload is pasted, and so is
-	; any payload for an application that garbles typed text.
+	; Notepad uses its verified editor worker; other long payloads use the paste FIFO.
 	if Mode = "auto"
-		Mode := (StrLen(Text) > TEXT_CLIPBOARD_THRESHOLD or _TextSenderHostTakesTextByPaste())
-			? "clipboard" : "direct"
+		Mode := _TextSenderHostTakesTextByPaste() ? "native"
+			: (StrLen(Text) > TEXT_CLIPBOARD_THRESHOLD ? "clipboard" : "direct")
+
+	if Mode = "native" {
+		_TextSenderQueueNative(Text, Opts, Callback)
+		return
+	}
 
 	if Mode = "clipboard" {
 		; The clipboard round-trip (write + blocking ClipWait + paste) is deferred
@@ -769,8 +859,7 @@ TextSend(Text, Opts, Callback) {
 		; the keyboard caller would make its later restore clobber a user copy made
 		; while this request waited behind an earlier transaction.
 		; Callback is passed into _TextSendClipboard and fired there after Ctrl+V, so
-		; callers that depend on the callback being synchronised with injection completion
-		; are never notified before the paste actually lands.
+		; callers observe primitive emission, not application consumption of the clipboard.
 		RequestOpts := (Opts is Map) ? Opts.Clone() : Opts
 		_TEXT_CLIPBOARD_QUEUE.Push({ Text: Text, Callback: Callback, Opts: RequestOpts })
 		SetTimer(_TextSenderStartClipboard, -1)
