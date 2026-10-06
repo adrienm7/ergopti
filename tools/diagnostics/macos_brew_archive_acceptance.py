@@ -1158,6 +1158,24 @@ def appleevent_sender_fact(value):
         return {}
 
 
+def appleevent_sender_marker_fact(value):
+    """Preserve existing failure facts; add only a closed sender-owned snapshot."""
+    if not isinstance(value, str) or len(value) > 256:
+        return {}
+    delimiter = ", marker2="
+    if delimiter not in value:
+        return appleevent_sender_fact(value)
+    if value.count(delimiter) != 1 or not value.endswith("\n"):
+        return {}
+    original, snapshot = value[:-1].split(delimiter)
+    if snapshot not in ("absent", "conforming", "invalid", "unavailable"):
+        return {}
+    facts = appleevent_sender_fact(original + "\n")
+    if facts.get("phase") not in ("reply-read", "reply-length", "reply-match"):
+        return {}
+    return {**facts, "marker2_snapshot": snapshot}
+
+
 def run_appleevent_sender(children, arguments, control, *, confined=False):
     """Retain normal ownership retirement and admit the exact native sender outcome."""
     require(
@@ -1166,7 +1184,7 @@ def run_appleevent_sender(children, arguments, control, *, confined=False):
     )
     result = children.run(arguments, check=False, confined=confined)
     if result.returncode != 0:
-        facts = appleevent_sender_fact(result.stderr) if result.returncode == 66 else {}
+        facts = appleevent_sender_marker_fact(result.stderr) if result.returncode == 66 else {}
         detail = ", sender_fact=" + json.dumps(facts, sort_keys=True) if facts else ""
         require(
             False,
