@@ -2414,6 +2414,23 @@ These are software implementations; final hardware verification remains below.
   server-retirement, Homebrew owned AppleEvent receiver and global-switcher
   failures. They require source/runner follow-up, not invented device-only
   closure; physical acceptance is unexecuted. Keep exact dated CI receipts.
+
+  The three Linux scope fixtures now require raw object identity for the native
+  luv issuer: five custody assertions use `rawequal` and each fixture rejects
+  the actual native table's detached clone. All registered cases, timer/GC/close
+  assertions and restoration remain unchanged; focused native tests pass 108/0
+  on both LuaJIT and Lua 5.4. The current four distribution artifacts stopped
+  at the same first-module custody assertion (22/1); actual Alpine constants
+  include NaN, so the old recursive comparison can reject even the same table.
+  This is not evidence of the earlier baseline's missing-luv cause. Corrected
+  hosted distro suites are still unexecuted; local passes do not qualify them.
+  The earlier `409b8ee0` observation above was recorded before run 37476981548
+  completed: its terminal result is failure, with Release / Publish skipped.
+  Main Linux unit/E2E gates passed, while Arch/Fedora/openSUSE/Alpine stopped at
+  that custody assertion; macOS native packaging failures remain recorded.
+  The published Windows capture successor `109736e5` has a separate manual
+  run 37482352928 in progress; no new native qualification is inferred.
+
   Hotstrings: Linux
   categories, sections and scalar settings are canonical config.toml leaves,
   with a one-shot import of legacy storage.json choices; both Lua drivers have a
