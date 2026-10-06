@@ -4081,6 +4081,25 @@ Windows scope recommendation/clear preserves source-classified obsolete values u
 
 Saved-model scalar edits and explicit intrinsic obsolete-record cleanup now use authenticated canonical inline-array/table-array physical row spans. Whole-source backup, native CAS, exact readback and refusal recovery remain authoritative; generic arrays do not gain record-list ownership. Ordinary saves keep opaque invalid members until explicit cleanup.
 
+The reviewed signed-zero fixture correction (`493524db`, V2) changes only
+13 request subjects in three test files. Actual Alpine LuaJIT turns the Lua
+fixture literal `-0.0` into positive zero before the writer receives it;
+`tonumber("-0.0")` now establishes the intended request, with numeric-type and
+reciprocal-sign assertions before each producer call. All 382 original
+assertions, expected source images, 465 corpora and production bytes remain
+preserved; wrong positive-zero owned candidates still refuse acknowledgement.
+Independent V2 focused replay passes 204/0 shared cases and 41/0 native
+preference cases on each of actual Alpine LuaJIT, glibc LuaJIT and Lua 5.4;
+the genuine original Alpine fixtures reproduce 195/9 and 37/4.
+
+The author's full V1 Alpine run passes all 433 modules, 10,133/0, under the
+unchanged canonical GNU prerequisite setup and pinned native luv/lfs builds,
+executed as the ordinary CI user. Its earlier incomplete-prerequisite attempt
+(10,123/10) remains recorded. V2 differs from that qualified V1 source only in
+three comments; this is executable-body equivalence evidence, not a claimed
+second full V2 run. Corrected hosted current-source, macOS SDK, Windows and
+physical-device qualification are not inferred. TODO42 remains partial.
+
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
   historical CapsWord anchor »): its karabiner.json keeps an untagged historical

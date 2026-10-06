@@ -3,6 +3,14 @@
 local helpers = require("tests.helpers")
 local Sandbox = require("test.config_unused_keys_contract").sandbox
 local Codec = require("toml_codec")
+-- Source literals can lose their zero sign on some LuaJIT builds.
+-- Establish the intended IEEE sign before calling any producer under test.
+local function negative_zero()
+	local value = tonumber("-0.0")
+	helpers.assert_eq(type(value), "number", "negative-zero request must be numeric")
+	helpers.assert_eq(1 / value, -math.huge, "negative-zero request must retain its actual sign")
+	return value
+end
 local SETTINGS = { "settings", "trigger_settings", "display_settings", "navigation_settings" }
 
 local function with_config(source, body)
@@ -221,7 +229,7 @@ helpers.describe("Linux real finite header numeric admission", function()
 	helpers.it("retains acknowledged negative zero through actual native preference restart", function()
 		with_config('[llm.generation]\ntemperature=0.25\nfuture=9007199254740993\n', function(path)
 			local preferences = require("infra.llm_preferences")
-			helpers.assert_true(preferences.set("llm.generation.temperature", -0.0))
+			helpers.assert_true(preferences.set("llm.generation.temperature", negative_zero()))
 			helpers.assert_eq(Sandbox.read_bytes(path), '[llm.generation]\ntemperature = -0.0\nfuture=9007199254740993\n')
 			package.loaded["infra.llm_preferences"] = nil
 			helpers.assert_eq(1 / require("infra.llm_preferences").get("llm.generation.temperature"), -math.huge)
@@ -243,7 +251,7 @@ helpers.describe("Linux real root inline scalar publication", function()
 	end)
 	helpers.it("retains acknowledged inline negative zero and exact foreign bytes through restart", function()
 		with_config(source, function(path)
-			helpers.assert_true(require("infra.llm_preferences").set("llm.generation.temperature", -0.0))
+			helpers.assert_true(require("infra.llm_preferences").set("llm.generation.temperature", negative_zero()))
 			helpers.assert_eq(Sandbox.read_bytes(path), 'llm = { generation = { temperature=-0.0, future=9007199254740993 }, private="untouched" } # exact trailer\n')
 			package.loaded["infra.llm_preferences"] = nil
 			helpers.assert_eq(1 / require("infra.llm_preferences").get("llm.generation.temperature"), -math.huge)
@@ -302,7 +310,7 @@ helpers.describe("Linux real section-relative dotted scalar publication", functi
 	end)
 	helpers.it("retains acknowledged section-relative dotted negative zero and exact foreign bytes through restart", function()
 		with_config(source, function(path)
-			helpers.assert_true(require("infra.llm_preferences").set("llm.generation.temperature", -0.0))
+			helpers.assert_true(require("infra.llm_preferences").set("llm.generation.temperature", negative_zero()))
 			helpers.assert_eq(Sandbox.read_bytes(path), '[llm] # exact header\ngeneration.temperature = -0.0\ngeneration.future=9007199254740993 # foreign\nprivate="untouched"\n')
 			package.loaded["infra.llm_preferences"] = nil
 			helpers.assert_eq(1 / require("infra.llm_preferences").get("llm.generation.temperature"), -math.huge)
@@ -361,7 +369,7 @@ helpers.describe("Linux real section-relative inline scalar publication", functi
 	end)
 	helpers.it("retains acknowledged section-relative inline negative zero and exact foreign bytes through restart", function()
 		with_config(source, function(path)
-			helpers.assert_true(require("infra.llm_preferences").set("llm.generation.temperature", -0.0))
+			helpers.assert_true(require("infra.llm_preferences").set("llm.generation.temperature", negative_zero()))
 			helpers.assert_eq(Sandbox.read_bytes(path), '[llm] # exact header\ngeneration = { temperature=-0.0, future=9007199254740993, empty=[], map={} } # exact outer trailer\nprivate="untouched"\n')
 			package.loaded["infra.llm_preferences"] = nil
 			helpers.assert_eq(1 / require("infra.llm_preferences").get("llm.generation.temperature"), -math.huge)
