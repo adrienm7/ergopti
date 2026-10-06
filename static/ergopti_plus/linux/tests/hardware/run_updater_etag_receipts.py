@@ -51,7 +51,7 @@ else
 	local _, _, options = Manager._build_fetch_request("main", 1)
 	local file = assert(io.open(options.etag_save, "rb"))
 	local etag = assert(file:read("*a")); assert(file:close())
-	if mode == "http-error" or mode == "http-error-new-validator" then assert(etag:find("E1", 1, true), "HTTP-error control changed its prior native validator")
+	if mode == "http-error" then assert(etag:find("E1", 1, true), "HTTP-error control changed its prior native validator")
 	else assert(etag:find("E2", 1, true), "failed native response did not actually change the file validator") end
 	local third = fetch()
 	if mode == "truncated" then

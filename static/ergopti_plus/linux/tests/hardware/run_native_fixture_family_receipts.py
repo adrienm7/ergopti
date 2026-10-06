@@ -251,12 +251,14 @@ signal.signal(signal.SIGTERM, signal.SIG_IGN)
 child = os.fork()
 if child == 0:
     os.setsid()
-    with open(sys.argv[1] + ".child", "w") as output:
+    with open(sys.argv[1] + ".child.pending", "w") as output:
         output.write(str(os.getpid()))
+    os.replace(sys.argv[1] + ".child.pending", sys.argv[1] + ".child")
     while True: time.sleep(1)
 while not os.path.exists(sys.argv[1] + ".child"): time.sleep(0.001)
-with open(sys.argv[1], "w") as output:
+with open(sys.argv[1] + ".pending", "w") as output:
     output.write(str(os.getpid()) + " " + open(sys.argv[1] + ".child").read())
+os.replace(sys.argv[1] + ".pending", sys.argv[1])
 while True: time.sleep(1)
 """)
         lua = root / "hang.lua"
