@@ -5791,6 +5791,18 @@ remain unchanged. This strengthens setup admission; it does not establish the
 cause of the prior late GTK receipts or qualify physical application delivery.
 Final composed and hosted qualification remains required; item 106 stays partial.
 
+The three native Hammerspoon probes now consume the existing ephemeral CI
+metadata token before any Git or native child allocation. Only the fixed
+official release-metadata request receives Authorization; authenticated
+redirects and supplied-credential refusals fail closed without anonymous
+fallback. Archive requests, native child environments and closed diagnostics
+remain credential-free. CI portable controls, Brew and the log receiver exclude
+the dedicated key. Independent controls pass40/0,19/0,33/0 with every old
+assertion retained and the strict parser census updated only additively.
+The controlled old403/new authenticated asset result proves the request
+boundary, not the cause of the earlier hosted403. Actual hosted acquisition
+and native qualification remain pending; item106 stays partial.
+
 - [~] **107.** Make the number-row policy explicit: native behavior, digits
   directly or symbols directly, with an acknowledged migration of the old
   Windows Boolean and preserved unrelated settings. The earlier Boolean slice
@@ -6235,6 +6247,12 @@ signature admission, nine-case contract, cleanup or failure status. Portable
 pending; first-checkpoint constructor successes do not replace the second
 checkpoint refusal, and no notification delivery/callback is claimed.
 
+The notification constructor probe shares the API-only metadata credential
+owner and removes the dedicated key before native allocation. All19 portable
+controls pass, including the15 prior controls; archive verification, the nine
+native constructor cases, cancellation and physical retirement are unchanged.
+Fresh hosted qualification and delivery/clicks remain separate; item109 is partial.
+
 - [~] **111.** Provide two distinct, explicitly labelled shared window-switching
   actions on Windows, macOS and Linux: the operating system's normal Alt+Tab switcher
   (the native equivalent on macOS), and switching only among windows on the display
@@ -6387,6 +6405,14 @@ specific cold-service cause or production regression is established. Package
 and all distribution lanes are skipped; the new native distro bootstrap has
 not executed on hosted distributions. Release is skipped. Preserve this failure
 and the earlier4/4 success separately; no assertion or deadline is weakened.
+
+The global-switcher probe consumes the metadata key at its actual same-process
+entry, before Git or native allocation. Its portable suite passes33/0 and retains
+all29 prior controls. Brew, independent owner controls and the log receiver
+exclude the key; archive/native ownership and refusal contracts remain intact.
+Fresh native acquisition, broker integration and actual switcher consumption
+remain unqualified. Linux window assertions and deadlines are unchanged.
+Item111 and cross-cutting requirements16/38 remain open.
 
 ## Time estimate
 
