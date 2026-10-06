@@ -1,0 +1,16 @@
+[
+  {
+    "abi": "luajit",
+    "passed": 14,
+    "failed": 1,
+    "log": "luajit-before.log",
+    "sha256": "ab5f91373e62081baa1161a3a5c863b8bfa8119dbe68f9870750e298bdc3f71d"
+  },
+  {
+    "abi": "lua54",
+    "passed": 14,
+    "failed": 1,
+    "log": "lua54-before.log",
+    "sha256": "ab5f91373e62081baa1161a3a5c863b8bfa8119dbe68f9870750e298bdc3f71d"
+  }
+]

@@ -1,0 +1,12 @@
+-- Private replay of actual existing reader unit module; native syscall ports are controlled.
+local directory, selected, root = assert(arg[1]), assert(arg[2]), assert(arg[3])
+package.path = root .. "/static/ergopti_plus/linux/?.lua;" .. root .. "/static/ergopti_plus/_shared/lua/?.lua;" .. package.path
+local helpers = require("tests.helpers")
+package.loaded["logger.shim"] = helpers.make_logger_stub()
+package.preload["adapters.evdev_reader"] = function()
+	return assert(loadfile(directory .. "/" .. selected .. "/static/ergopti_plus/linux/adapters/evdev_reader.lua"))()
+end
+assert(loadfile(directory .. "/candidate/static/ergopti_plus/linux/tests/unit/adapters/test_evdev_reader.lua"))()
+local result = helpers.get_results()
+print(string.format("READER_ORIGIN %d %d", result.passed, result.failed))
+os.exit(result.failed == 0 and 0 or 1)

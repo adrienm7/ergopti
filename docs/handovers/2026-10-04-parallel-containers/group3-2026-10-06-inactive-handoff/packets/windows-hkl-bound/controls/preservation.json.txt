@@ -1,0 +1,7 @@
+{
+  "whole_test_inverse_byte_exact": true,
+  "production_predecessor_exact": true,
+  "registered_cases": 6,
+  "comparison_expected_message_statements": "unchanged except two callable arguments frozen by Bind",
+  "native_execution": "UNEXECUTED"
+}

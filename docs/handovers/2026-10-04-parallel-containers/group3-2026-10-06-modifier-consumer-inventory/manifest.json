@@ -1,0 +1,176 @@
+{
+	"collector_changed_root_checkout_index_or_git": false,
+	"files": [
+		{
+			"byte_exact": true,
+			"bytes": 7876,
+			"original_name": "README.md",
+			"portable_path": "frozen/README.md.txt",
+			"role": "producer_input",
+			"sha256": "3b3fce7502218ba8177bcd8f5463f4ecff61200b099d353c17104c1fc0f76316"
+		},
+		{
+			"byte_exact": true,
+			"bytes": 10275,
+			"original_name": "controls.lua",
+			"portable_path": "frozen/controls.lua.txt",
+			"role": "producer_input",
+			"sha256": "2ee2f7c54fa8c7aa5f3b2eae04f158dc8cca54d3aeae5677b3d6e6746dd6a85d"
+		},
+		{
+			"byte_exact": true,
+			"bytes": 4141,
+			"original_name": "evidence-pins.json",
+			"portable_path": "frozen/evidence-pins.json.txt",
+			"role": "producer_input",
+			"sha256": "95b764ffec5c1970efe5d73d64a7c46d1dc1998eb8492475a3ee8c11a54e42c6"
+		},
+		{
+			"byte_exact": true,
+			"bytes": 439,
+			"original_name": "facts.json",
+			"portable_path": "frozen/facts.json.txt",
+			"role": "producer_input",
+			"sha256": "c7a265335c6ab6c1bdbb68739922b1f03665b02f3fd7c5fe0c19cf5d7715064e"
+		},
+		{
+			"byte_exact": true,
+			"bytes": 6471,
+			"original_name": "receipt.json",
+			"portable_path": "frozen/receipt.json.txt",
+			"role": "producer_input",
+			"sha256": "e22aafd8169ed11844417daf610cdadfc1b2f7de2fdc19e4b020a500031217a9"
+		},
+		{
+			"byte_exact": true,
+			"bytes": 3725,
+			"original_name": "replay.py",
+			"portable_path": "frozen/replay.py.txt",
+			"role": "producer_input",
+			"sha256": "47cbd7bd7482644ab5f9797a5ab5d19f696a549a763ed2c84d79c3aec10bdada"
+		},
+		{
+			"byte_exact": true,
+			"bytes": 1745,
+			"original_name": "results.json",
+			"portable_path": "frozen/results.json.txt",
+			"role": "producer_input",
+			"sha256": "2890fc7946f2c95f38621bd4232a546eef4a7e206696369c6df56569ebc4a415"
+		},
+		{
+			"byte_exact": true,
+			"bytes": 1610,
+			"original_name": "run.lua",
+			"portable_path": "frozen/run.lua.txt",
+			"role": "producer_input",
+			"sha256": "672586a8f0f860299ebc4f5ca06fd0c6f1381711a7c9475802c73257c4564467"
+		},
+		{
+			"byte_exact": true,
+			"bytes": 397045,
+			"original_name": "source-pins.json",
+			"portable_path": "frozen/source-pins.json.txt",
+			"role": "producer_input",
+			"sha256": "1fe97f1355fd1158782740daa5cb008150703399c4d8b2455b168fe478e58c9f"
+		},
+		{
+			"byte_exact": true,
+			"bytes": 7071,
+			"original_name": "independent-review/review.json",
+			"portable_path": "frozen/independent-review/review.json.txt",
+			"role": "independent_review",
+			"sha256": "be41b5280ab31c5c7820a253b3d905c795d40b7a9a61017d9722bdff7c48abf6"
+		},
+		{
+			"byte_exact": true,
+			"bytes": 2718,
+			"original_name": "independent-review/review-receipt.json",
+			"portable_path": "frozen/independent-review/review-receipt.json.txt",
+			"role": "independent_review",
+			"sha256": "975c72429a72df0bac8dc13b7bf7545d135265b9b794f138589dae578ffa9945"
+		}
+	],
+	"format": "ERGOPTIPLUS_INACTIVE_CONSUMER_INVENTORY_V1",
+	"import_commit_may_change_git_state": true,
+	"independent_review_sha256": "be41b5280ab31c5c7820a253b3d905c795d40b7a9a61017d9722bdff7c48abf6",
+	"native_kernel_execution": "NOT_RUN",
+	"original_watchdog_prefix_cases": 14,
+	"original_watchdog_prefix_sha256": "a24127014db0ee5318e11059aca9692b958bbcee873ecd904e264deb9a92a8fb",
+	"physical_delivery_available": false,
+	"producer_receipt_sha256": "e22aafd8169ed11844417daf610cdadfc1b2f7de2fdc19e4b020a500031217a9",
+	"production_source_fix": false,
+	"raw_logs_archived": false,
+	"recorded_both_abi_outcomes": {
+		"current": {
+			"failed": 8,
+			"passed": 17
+		},
+		"forbid_reentrant_retirement": {
+			"failed": 1,
+			"passed": 25
+		},
+		"legacy_tap_hold": {
+			"failed": 0,
+			"passed": 26
+		},
+		"skip_only_up": {
+			"failed": 6,
+			"passed": 19
+		},
+		"weaken_baseline": {
+			"failed": 9,
+			"passed": 16
+		}
+	},
+	"required_original_overlap": {
+		"path": "docs/handovers/2026-10-04-parallel-containers/group3-2026-10-06-inactive-handoff/packets/hook-held-witness/controls/overlap_tests.lua.txt",
+		"sha256": "7657524e5f5ef74c8005ebd3293aa997e21150b3e33ab9fd4a0c7717f5d6c9e0"
+	},
+	"required_predecessor_receipts": [
+		{
+			"path": "docs/handovers/2026-10-04-parallel-containers/group3-2026-10-06-inactive-handoff/packets/writer/receipt.json.txt",
+			"sha256": "0cb1e695ed3e8663047443eac365ab6581e5e0c9cb72dc0e6fe1157a427827dd"
+		},
+		{
+			"path": "docs/handovers/2026-10-04-parallel-containers/group3-2026-10-06-inactive-handoff/packets/writer-transaction/receipt.json.txt",
+			"sha256": "86515273aef7ee344f5524a10d0a07dfeb522fda412f83b8341f4452d36155bc"
+		},
+		{
+			"path": "docs/handovers/2026-10-04-parallel-containers/group3-2026-10-06-inactive-handoff/packets/reader-origin/receipt.json.txt",
+			"sha256": "f69b51fd4c5e9075a1a48ab5c0a658c1518416593149455ced72e95d63a34840"
+		},
+		{
+			"path": "docs/handovers/2026-10-04-parallel-containers/group3-2026-10-06-inactive-handoff/packets/reader-identity/receipt.json.txt",
+			"sha256": "4cca79c2a13de04ee912b62dcd39d7a52e8a8263f556a1bee27f8ec17787d90e"
+		},
+		{
+			"path": "docs/handovers/2026-10-04-parallel-containers/group3-2026-10-06-inactive-handoff/packets/reader-held-query/receipt.json.txt",
+			"sha256": "bda58880bbe238115f1c71c91953d18435fff817794103eb79bf7bf50da04102"
+		},
+		{
+			"path": "docs/handovers/2026-10-04-parallel-containers/group3-2026-10-06-inactive-handoff/packets/hook-held-witness/receipt.json.txt",
+			"sha256": "1685bc33052969a085f30d9138c6b49555e475e82aba6c0422fa9921ee2de650"
+		}
+	],
+	"required_reviewed_overlays": [
+		{
+			"inactive_postimage": "docs/handovers/2026-10-04-parallel-containers/group3-2026-10-06-inactive-handoff/packets/writer-transaction/postimages/static/ergopti_plus/linux/adapters/uinput_writer.lua.txt",
+			"path": "static/ergopti_plus/linux/adapters/uinput_writer.lua",
+			"reviewed_postimage": "fc77df761890ecdc725b2962a78bac7bad898bc989b568b074e6b5d3e788b84a",
+			"snapshot_preimage": "ae65e1727514e7cfef71dacdebe6d034f3513155006045ae061a950724838604"
+		},
+		{
+			"inactive_postimage": "docs/handovers/2026-10-04-parallel-containers/group3-2026-10-06-inactive-handoff/packets/reader-held-query/postimages/static/ergopti_plus/linux/adapters/evdev_reader.lua.txt",
+			"path": "static/ergopti_plus/linux/adapters/evdev_reader.lua",
+			"reviewed_postimage": "6844b07b2f89f9d3729ed610592165419f1769bb758d1745f6bb81693d8da1e1",
+			"snapshot_preimage": "3cf0d9c728d0d53743f5798cbdeb806504acb5da36061d43ef016298948c0ea7"
+		}
+	],
+	"review_status": "BOUNDED_INVENTORY_SOURCE_CLEAR_PRODUCT_UNREPAIRED_RED",
+	"runtime_binaries_archived": false,
+	"scope": "Frozen portable producer inputs and known-red software controls only; no native or hardware qualification and no product repair.",
+	"snapshot_archived": false,
+	"snapshot_sources_count": 1904,
+	"status": "REGRESSION_INVENTORY_AND_DESIGN_NOT_IMPLEMENTATION",
+	"wrapper_source_tests_replayed": false
+}

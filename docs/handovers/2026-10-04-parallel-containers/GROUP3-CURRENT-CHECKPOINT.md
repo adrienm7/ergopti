@@ -2,6 +2,11 @@
 
 # Group 3 current source checkpoint and remaining work
 
+The [6 October continuation](GROUP3-2026-10-06-CONTINUATION.md) records the newer
+Windows provider source, terminal native CI and inactive preparation archive.
+The qualification below remains historical and must not override that newer
+source receipt or qualify unexecuted Linux/macOS work.
+
 ## Current source checkpoint
 
 Group 3 remains **partial**. All 13 assigned TODO items remain open; zero were

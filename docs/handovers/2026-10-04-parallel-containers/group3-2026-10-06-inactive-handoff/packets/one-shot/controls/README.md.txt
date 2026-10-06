@@ -1,0 +1,9 @@
+# Inactive Linux ordered-pair One-shot Shift tranche
+
+The actual PairOwner/manager/Base/hook arms the existing shared OneShotShift state only after exact release-row ACK and source admission. Native activation requires literal true; generic gesture callbacks cannot execute this state action. First hold restoration preserves its original ownership. Subsequent casing output carries owned output receipts and checks source/private epoch after layout callbacks; retirement retains exact UP debt and clears arm state.
+
+Prepared only; no Root changes, commit, registration, shared action metadata, generated outputs, native evdev/uinput proof, packaging or hosted CI. Parent owns metadata/picker admission and the independently meaningful unsupported-guard update in tools/test/test-tap-hold-key-catalog-single-source.cjs. Existing [sg_actions.one_shot_shift] in _shared/modules/actions/actions.toml is AHK-only; do not advertise generic Linux gesture dispatch merely by adding Linux to that global platform row. Native state actions require the exact tap-hold/pair context.
+
+Final new controlled owner/manager/hook cases: 12 PASS / 0 FAIL on each ABI; complete unchanged original Base suite and old pair assertions (one-shot availability assertion replaced by stricter supported-state admission, Caps Word refusal retained): total 134 PASS / 0 FAIL each ABI. Final original production source against the same new 12-case oracle: 4 PASS / 8 FAIL each ABI. No subprocesses are allowed by the runner. Native Luv issuer is retained before fixture cache snapshots; actual hook proof adds zero native handles. Scoped authoritative convention definitions report 5 paths / 0 violations.
+
+Caps Word, simultaneous chords and cross-device pairs remain unsupported. A separate Caps Word draft is mutable and excluded from this packet.

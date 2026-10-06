@@ -1,0 +1,14 @@
+{
+	"_comment": "What a one-shot Shift tap makes of the next character. A character listed in results is replaced by its result; the magic key, whose character the user chooses, gives magic_key_result, before any result its character has; any other character is typed in title case (é gives É, 1 stays 1). Windows (TapHoldOneShotResult in platform/remap/tap_hold_loader.ahk), Linux (platform/remap/tap_hold_manager.lua), and macOS (adapters/one_shot_shift.lua) read this file.",
+	"_enforced_by": "tools/test/test-tap-hold-one-shot-results-single-source.cjs",
+	"results": [
+		{ "char": "=", "result": "º" },
+		{ "char": "%", "result": " %" },
+		{ "char": "$", "result": " €" },
+		{ "char": ".", "result": " :" },
+		{ "char": ",", "result": " ;" },
+		{ "char": "'", "result": " ?" },
+		{ "char": " ", "result": "-" }
+	],
+	"magic_key_result": "J"
+}

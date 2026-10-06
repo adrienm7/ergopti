@@ -1,0 +1,34 @@
+[
+  {
+    "abi": "luajit",
+    "source": "preimages",
+    "passed": 49,
+    "failed": 2,
+    "log": "luajit-preimages.log",
+    "sha256": "f7dae6a4bfa4ba5b4fe7594c6a623ea3e5ca1010f9e0221409c3fed9613807f5"
+  },
+  {
+    "abi": "luajit",
+    "source": "candidate",
+    "passed": 51,
+    "failed": 0,
+    "log": "luajit-candidate.log",
+    "sha256": "a61021d80d496a905c0d260e86987d8d18fc49b1cc2fba5a038f1d26ffc93cc5"
+  },
+  {
+    "abi": "lua5.4",
+    "source": "preimages",
+    "passed": 48,
+    "failed": 3,
+    "log": "lua5.4-preimages.log",
+    "sha256": "b1224a6b21afa9eb0a32818e49758c4be49ba250736c00a5e974c91120363890"
+  },
+  {
+    "abi": "lua5.4",
+    "source": "candidate",
+    "passed": 51,
+    "failed": 0,
+    "log": "lua5.4-candidate.log",
+    "sha256": "a61021d80d496a905c0d260e86987d8d18fc49b1cc2fba5a038f1d26ffc93cc5"
+  }
+]

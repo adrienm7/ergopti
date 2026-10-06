@@ -1,0 +1,87 @@
+from pathlib import Path
+import shutil
+base=Path('/workspace/.ergopti-cloud/preparations/group3-linux-evdev-origin-slot-identity')
+dst=Path('/workspace/.ergopti-cloud/preparations/group3-linux-evdev-held-receipts')
+paths=['static/ergopti_plus/linux/adapters/evdev_reader.lua','static/ergopti_plus/linux/tests/unit/adapters/test_evdev_reader.lua']
+for rel in paths:
+ for folder in ['preimages','candidate']:
+  p=dst/folder/rel;p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes((base/'candidate'/rel).read_bytes())
+(dst/'run.lua').write_bytes((base/'run.lua').read_bytes())
+p=dst/'candidate'/paths[0];s=p.read_text()
+s=s.replace('local _receipts = setmetatable({}, { __mode = "k" })','local _receipts = setmetatable({}, { __mode = "k" })\nlocal _held_receipts = setmetatable({}, { __mode = "k" })',1)
+old='\t\tread = function(fd, count)\n'
+new='''		read_owned_key_bits = function(fd, request, count)
+			local bits = native_new("uint8_t[?]", count)
+			local copied = tonumber(native_ioctl(fd, request, bits))
+			if copied ~= count then return nil, "pressed-key ioctl did not acknowledge the full bitset" end
+			return native_string(bits, count)
+		end,
+'''+old
+assert s.count(old)==1;s=s.replace(old,new,1)
+s=s.replace('{ "open", "read", "ioctl", "read_bits", "poll", "close" }','{ "open", "read", "ioctl", "read_bits", "read_owned_key_bits", "poll", "close" }',1)
+old='\tlocal last = math.max(0, math.floor(tonumber(max_code) or 0))'
+new='\tif number == EVIOCGKEY_NR then st.key_query_epoch = (st.key_query_epoch or 0) + 1 end\n'+old
+assert s.count(old)==1;s=s.replace(old,new,1)
+anchor='--- Rejects replaced, remapped or mutated decoded objects without metatable callbacks.'
+insert='''--- Reads the full requested native key bitmap on this exact grabbed session.
+--- This is a last-observed per-source state, not a lease excluding later kernel input.
+--- Custom providers and ordinary detached pressed_keys tables cannot mint receipts.
+--- @param slot string|table|nil Exact reader slot.
+--- @param max_code integer|nil Last observed code, defaults to evdev KEY_MAX.
+--- @return table|nil capability Opaque native held-state receipt.
+function M.capture_pressed_keys(slot, max_code)
+	local last = max_code == nil and 0x2ff or max_code
+	if type(last) ~= "number" or last ~= last or last < 0 or last > 0x2ff or last % 1 ~= 0 then return nil end
+	local key = slot or M.KEYBOARD
+	local st = _slots[key]
+	if not st then return nil end
+	local record = { state = st, slot = key, backend = _backend, fd = st.fd,
+		generation = st.generation, path = st.path, read_epoch = st.read_epoch, max_code = last }
+	if not native_session_current(record) then return nil end
+	st.key_query_epoch = (st.key_query_epoch or 0) + 1
+	record.query_epoch = st.key_query_epoch
+	local count = math.floor(last / 8) + 1
+	_busy = true
+	local called, bytes = pcall(_native_ports.read_owned_key_bits, record.fd,
+		ioctl_read_request(EVIOCGKEY_NR, count), count)
+	_busy = false
+	if not called or type(bytes) ~= "string" or #bytes ~= count
+		or record.read_epoch ~= st.read_epoch or record.query_epoch ~= st.key_query_epoch
+		or not native_session_current(record) then return nil end
+	local down = {}
+	for code = 0, last do
+		if math.floor(bytes:byte(math.floor(code / 8) + 1) / (2 ^ (code % 8))) % 2 == 1 then
+			down[#down + 1] = code
+		end
+	end
+	record.down = down
+	local capability = {}
+	_held_receipts[capability] = record
+	return capability
+end
+
+--- Observes issuer/session/query/read currency without provider callbacks.
+--- A later read or pressed-key query revokes this observation even if bytes match.
+--- @param capability table Opaque native held-state receipt.
+--- @return boolean current
+function M.pressed_keys_current(capability)
+	local record = _held_receipts[capability]
+	return record ~= nil and record.read_epoch == record.state.read_epoch
+		and record.query_epoch == record.state.key_query_epoch and native_session_current(record)
+end
+
+--- Returns detached observed codes while this exact receipt is current.
+--- @param capability table Opaque native held-state receipt.
+--- @return table|nil view Never exposes a descriptor, backend or mutable native bitmap.
+function M.pressed_keys_view(capability)
+	local record = _held_receipts[capability]
+	if not M.pressed_keys_current(capability) then return nil end
+	local down = {}
+	for index, code in ipairs(record.down) do down[index] = code end
+	return { source = record.path, slot = record.slot, generation = record.generation,
+		read_epoch = record.read_epoch, query_epoch = record.query_epoch,
+		max_code = record.max_code, down = down, origin = "native-evdev" }
+end
+
+'''
+assert s.count(anchor)==1;s=s.replace(anchor,insert+anchor,1);p.write_text(s)
