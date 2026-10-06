@@ -978,3 +978,19 @@ both signature slices remain separate WP6 requirements; TODO31 stays partial.
 The pipeline wiring guard now registers only the exact ancestry artifact condition
 and adds three changed-condition and one missing-step refusal controls. Every
 previous guard and mutation assertion is preserved byte-exact by inverse removal.
+
+Managed physical sessions now request one fresh correlated app/window/secure
+sample after capture readiness and before baseline acknowledgement or first-batch
+delivery. The existing framed context owner validates the exact subscription,
+clears completeness and both PID identities, and fences each native leaf and
+completion clock against current pause, source and state ownership. Legacy app
+start/window/AX owners remain unchanged; a different foreground application is
+denied until its genuine legacy context writer runs. Denied or incomplete sample
+acknowledgements grant no permission. Unmanaged sessions keep their existing ports
+and perform no new sampling. Initial power/screen/session posture remains unknown.
+Twenty-six new actual-owner software cases and260 existing targeted controls pass;
+five causal mutations are rejected normally and with inherited Python optimization.
+The two managed fixture tables gain only exact-owner sample ports, preserving every
+previous assertion and case. The persisted-history fixture remains byte-exact.
+App/window/AX/clock leaves are explicitly modeled; native sampling, production
+startup and capture activation remain UNEXECUTED. TODO31 stays partial.

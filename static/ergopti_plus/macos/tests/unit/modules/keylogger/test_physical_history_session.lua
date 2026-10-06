@@ -1539,7 +1539,11 @@ local function with_managed_session(options, callback)
 			end
 			package.loaded["modules.keylogger"] = { bind_physical_configuration_observer = lifetime_source("configuration", true),
 				bind_physical_lifecycle_observer = actor_source("engine"), may_persist = function() return true end }
-			package.loaded["modules.keylogger.context_tracker"] = { bind_physical_correlated_context_observer = lifetime_source("context", true) }
+			package.loaded["modules.keylogger.context_tracker"] = { bind_physical_correlated_context_observer = lifetime_source("context", true),
+				sample_physical_context = function(owner, token)
+					local binding = d.bindings.context
+					return binding ~= nil and binding.scope.current(owner, token) == true
+				end }
 			package.loaded["modules.keylogger.watchers"] = { bind_physical_lifecycle_observer = actor_source("system") }
 			package.loaded["modules.shortcuts.script_control"] = { bind_physical_pause_observer = actor_source("pause") }
 			package.loaded["adapters.shell_runner"] = { spawn = native.dependencies.spawn }
@@ -2155,7 +2159,11 @@ local function with_managed_session(options, callback)
 			end
 			package.loaded["modules.keylogger"] = { bind_physical_configuration_observer = lifetime_source("configuration", true),
 				bind_physical_lifecycle_observer = actor_source("engine"), may_persist = function() return true end }
-			package.loaded["modules.keylogger.context_tracker"] = { bind_physical_correlated_context_observer = lifetime_source("context", true) }
+			package.loaded["modules.keylogger.context_tracker"] = { bind_physical_correlated_context_observer = lifetime_source("context", true),
+				sample_physical_context = function(owner, token)
+					local binding = d.bindings.context
+					return binding ~= nil and binding.scope.current(owner, token) == true
+				end }
 			package.loaded["modules.keylogger.watchers"] = { bind_physical_lifecycle_observer = actor_source("system") }
 			package.loaded["modules.shortcuts.script_control"] = { bind_physical_pause_observer = actor_source("pause") }
 			package.loaded["adapters.shell_runner"] = { spawn = native.dependencies.spawn }

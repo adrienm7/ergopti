@@ -26,7 +26,7 @@ local function scope_ports(scope, names)
 	return result
 end
 
-local function resolve_native_ports()
+local function resolve_native_ports(managed)
 	local native = rawget(_G, "hs")
 	local json = type(native) == "table" and rawget(native, "json") or nil
 	local decode, encode = port(json, "decode"), port(json, "encode")
@@ -36,12 +36,14 @@ local function resolve_native_ports()
 	local context_bind, may_persist = port(Tracker, "bind_physical_correlated_context_observer"), port(Keylogger, "may_persist")
 	local engine_bind = port(Keylogger, "bind_physical_lifecycle_observer")
 	local system_bind, pause_bind = port(Watchers, "bind_physical_lifecycle_observer"), port(ScriptControl, "bind_physical_pause_observer")
-	return { decode = decode, encode = encode, capture_init = capture_init, capture_bind = capture_bind, capture_stop = capture_stop, clock_bind = clock_bind, project = project, configuration_bind = configuration_bind, context_bind = context_bind, may_persist = may_persist, engine_bind = engine_bind, system_bind = system_bind, pause_bind = pause_bind }
+	local context_sample = managed and port(Tracker, "sample_physical_context") or nil
+	return { context_sample = context_sample, decode = decode, encode = encode, capture_init = capture_init, capture_bind = capture_bind, capture_stop = capture_stop, clock_bind = clock_bind, project = project, configuration_bind = configuration_bind, context_bind = context_bind, may_persist = may_persist, engine_bind = engine_bind, system_bind = system_bind, pause_bind = pause_bind }
 end
 
 local function new_session(capacity, on_refused, native_ports)
 	local decode, encode, capture_init, capture_bind, capture_stop, clock_bind, project, configuration_bind, context_bind, may_persist, engine_bind, system_bind, pause_bind =
 		native_ports.decode, native_ports.encode, native_ports.capture_init, native_ports.capture_bind, native_ports.capture_stop, native_ports.clock_bind, native_ports.project, native_ports.configuration_bind, native_ports.context_bind, native_ports.may_persist, native_ports.engine_bind, native_ports.system_bind, native_ports.pause_bind
+	local context_sample, context_token = native_ports.context_sample, nil
 	local subscriber, session = {}, {}
 	local active, binding, frames, retired = true, false, 0, false
 	local coordinator, capture_scope, clock_scope, capture_token, clock_token
@@ -71,7 +73,7 @@ local function new_session(capacity, on_refused, native_ports)
 		return function(owner, budget, receive, refused)
 			if correlation then
 				local ok, token, scope = operation(owner, budget, receive, refused, may_persist)
-				if ok == true then return token, nil, scope end
+				if ok == true then context_token = token; return token, nil, scope end
 				return nil, token, scope
 			end
 			if boolean_result then
@@ -122,7 +124,19 @@ local function new_session(capacity, on_refused, native_ports)
 	local function baseline_ready()
 		if not active or coordinator == nil or binding then return false end
 		frames = frames + 1
-		local ok, accepted = pcall(coordinator.capture_ready)
+		local ok, accepted = pcall(function()
+			if coordinator.capture_ready() ~= true or not active then return false end
+			if context_sample then
+				local function current()
+					return active and capture_scope.current(capture_token) == true
+						and active and clock_scope.current(subscriber, clock_token) == true and active
+				end
+				if not current() then return false end
+				local acknowledged = context_sample(subscriber, context_token)
+				if not current() or acknowledged ~= true then return false end
+			end
+			return active
+		end)
 		if not ok or accepted ~= true then refuse("physical_history_baseline_ready_refused") end
 		frames = frames - 1
 		stop_capture()
@@ -653,7 +667,7 @@ function M.init(capacity, on_refused, options)
 		"Invalid native history session budget")
 	assert(type(on_refused) == "function", "Missing native history session refusal observer")
 	if initialized or initializing then return nil, "physical_history_session_already_initialized" end
-	local native_ports = resolve_native_ports()
+	local native_ports = resolve_native_ports(managed)
 	if managed then
 		local manager, reason, stop = new_manager(capacity, on_refused, native_ports)
 		if manager then current_owner, current_stop, current_retired = manager, stop, manager.retired end
