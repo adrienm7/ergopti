@@ -1,0 +1,73 @@
+"""Source custody and single-read controls; registered AHK behavior is unexecuted."""
+
+from pathlib import Path
+import json
+
+BASE = Path(__file__).resolve().parent
+REL = "static/ergopti_plus/windows/adapters/key_state.ahk"
+TEST = "static/ergopti_plus/windows/tests/unit/test_layout_digit_row_probe.ahk"
+
+
+def check_single_read(source):
+    body = source.split(
+        "KS_NativeKeyLevel(Vk, Scancode, Hkl, Shift, Caps, ReadFn := 0) {", 1
+    )[1].split("KS_NativeNumberRowLevels(Hkl, Caps, ReadFn := 0, MapFn := 0) {", 1)[0]
+    assert body.count("Observed.Count") == body.count("Observed.Text") == 1
+    assert "Count := Observed.Count" in body and "Text := Observed.Text" in body
+    assert "if !(Count is Integer) || Abs(Count) > 16 || !(Text is String)" in body
+    assert "StrLen(Text) != Abs(Count)" in body
+    assert 'Kind := Count < 0 ? "dead" : (Count > 0 ? "text" : "none")' in body
+    assert 'return Map("Kind", Kind, "Text", Text, "Count", Count)' in body
+    assert "} catch {" in body
+
+
+def main():
+    old = (BASE / "preimages" / REL).read_text(encoding="utf-8-sig")
+    new = (BASE / "candidate" / REL).read_text(encoding="utf-8-sig")
+    check_single_read(new)
+    try:
+        check_single_read(old)
+    except AssertionError:
+        print("EXPECTED RED: previous helper rereads external descriptor properties")
+    else:
+        raise AssertionError(
+            "The predecessor unexpectedly has the single-read contract"
+        )
+    for field in ["Count", "Text"]:
+        mutated = new.replace(
+            f'"{field}", {field})' if field == "Count" else '"Text", Text,',
+            f'"{field}", Observed.{field})'
+            if field == "Count"
+            else '"Text", Observed.Text,',
+        )
+        assert mutated != new
+        try:
+            check_single_read(mutated)
+        except AssertionError:
+            print("EXPECTED RED: publication rereads " + field)
+        else:
+            raise AssertionError("Unchecked property publication survived")
+    before = (BASE / "preimages" / TEST).read_bytes()
+    after = (BASE / "candidate" / TEST).read_bytes()
+    assert after.startswith(before)
+    assert after.count(b'Test("native HKL number row:') == 6
+    for rel in [REL, TEST]:
+        data = (BASE / "candidate" / rel).read_bytes()
+        assert data.startswith(b"\xef\xbb\xbf") and b"\r" not in data
+    result = {
+        "source_single_read": "passed",
+        "old_source_contract": "expected failure",
+        "publication_mutations": 2,
+        "previous_five_cases_whole_byte_prefix": "exact",
+        "registered_native_cases": 6,
+        "native_behavior": "unexecuted",
+    }
+    (BASE / "source-controls.json").write_text(json.dumps(result, indent=2) + "\n")
+    print(
+        "PASS: single-read source projection, previous five cases and BOM/LF retained"
+    )
+    print("UNEXECUTED: actual stateful/throwing getter behavior and native HKL suite")
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,72 @@
+[
+  {
+    "abi": "luajit",
+    "source": "current",
+    "exit_code": 1,
+    "last_line": "AGGREGATE_CONSUMER_INVENTORY 17 8",
+    "log": "luajit-current.log"
+  },
+  {
+    "abi": "luajit",
+    "source": "skip-only-up",
+    "exit_code": 1,
+    "last_line": "AGGREGATE_CONSUMER_INVENTORY 19 6",
+    "log": "luajit-skip-only-up.log"
+  },
+  {
+    "abi": "luajit",
+    "source": "weaken-baseline",
+    "exit_code": 1,
+    "last_line": "AGGREGATE_CONSUMER_INVENTORY 16 9",
+    "log": "luajit-weaken-baseline.log"
+  },
+  {
+    "abi": "luajit",
+    "source": "legacy-retirement",
+    "exit_code": 0,
+    "last_line": "AGGREGATE_CONSUMER_INVENTORY 26 0",
+    "log": "luajit-legacy-retirement.log"
+  },
+  {
+    "abi": "luajit",
+    "source": "forbid-retirement",
+    "exit_code": 1,
+    "last_line": "AGGREGATE_CONSUMER_INVENTORY 25 1",
+    "log": "luajit-forbid-retirement.log"
+  },
+  {
+    "abi": "lua5.4",
+    "source": "current",
+    "exit_code": 1,
+    "last_line": "AGGREGATE_CONSUMER_INVENTORY 17 8",
+    "log": "lua5.4-current.log"
+  },
+  {
+    "abi": "lua5.4",
+    "source": "skip-only-up",
+    "exit_code": 1,
+    "last_line": "AGGREGATE_CONSUMER_INVENTORY 19 6",
+    "log": "lua5.4-skip-only-up.log"
+  },
+  {
+    "abi": "lua5.4",
+    "source": "weaken-baseline",
+    "exit_code": 1,
+    "last_line": "AGGREGATE_CONSUMER_INVENTORY 16 9",
+    "log": "lua5.4-weaken-baseline.log"
+  },
+  {
+    "abi": "lua5.4",
+    "source": "legacy-retirement",
+    "exit_code": 0,
+    "last_line": "AGGREGATE_CONSUMER_INVENTORY 26 0",
+    "log": "lua5.4-legacy-retirement.log"
+  },
+  {
+    "abi": "lua5.4",
+    "source": "forbid-retirement",
+    "exit_code": 1,
+    "last_line": "AGGREGATE_CONSUMER_INVENTORY 25 1",
+    "log": "lua5.4-forbid-retirement.log"
+  }
+]

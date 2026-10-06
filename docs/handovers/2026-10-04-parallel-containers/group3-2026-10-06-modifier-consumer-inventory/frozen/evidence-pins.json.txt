@@ -1,0 +1,102 @@
+[
+  {
+    "abi": "luajit",
+    "source": "current",
+    "exit_code": 1,
+    "last_line": "AGGREGATE_CONSUMER_INVENTORY 17 8",
+    "log": "luajit-current.log",
+    "local_path": "/workspace/.ergopti-cloud/preparations/group3-linux-modifier-aggregation-consumer-inventory/luajit-current.log",
+    "sha256": "b783c7de65250b52cde2aff56e46f87dccebd751b04a9d25f6566e1ccc36814f",
+    "bytes": 3712
+  },
+  {
+    "abi": "luajit",
+    "source": "skip-only-up",
+    "exit_code": 1,
+    "last_line": "AGGREGATE_CONSUMER_INVENTORY 19 6",
+    "log": "luajit-skip-only-up.log",
+    "local_path": "/workspace/.ergopti-cloud/preparations/group3-linux-modifier-aggregation-consumer-inventory/luajit-skip-only-up.log",
+    "sha256": "caf71ebf1b953e736cbeb983ea202ef61487307220863d7c85d683472a8b2dd0",
+    "bytes": 3420
+  },
+  {
+    "abi": "luajit",
+    "source": "weaken-baseline",
+    "exit_code": 1,
+    "last_line": "AGGREGATE_CONSUMER_INVENTORY 16 9",
+    "log": "luajit-weaken-baseline.log",
+    "local_path": "/workspace/.ergopti-cloud/preparations/group3-linux-modifier-aggregation-consumer-inventory/luajit-weaken-baseline.log",
+    "sha256": "e2e749295733a29ffac1a77da8c44d27e13cef09c2df52a474abf820c6baa67e",
+    "bytes": 3806
+  },
+  {
+    "abi": "luajit",
+    "source": "legacy-retirement",
+    "exit_code": 0,
+    "last_line": "AGGREGATE_CONSUMER_INVENTORY 26 0",
+    "log": "luajit-legacy-retirement.log",
+    "local_path": "/workspace/.ergopti-cloud/preparations/group3-linux-modifier-aggregation-consumer-inventory/luajit-legacy-retirement.log",
+    "sha256": "08a6e0f2147532ff7d0ca8b0446e0cc05d03d9cfbb0097fbe8750b53865cf538",
+    "bytes": 2676
+  },
+  {
+    "abi": "luajit",
+    "source": "forbid-retirement",
+    "exit_code": 1,
+    "last_line": "AGGREGATE_CONSUMER_INVENTORY 25 1",
+    "log": "luajit-forbid-retirement.log",
+    "local_path": "/workspace/.ergopti-cloud/preparations/group3-linux-modifier-aggregation-consumer-inventory/luajit-forbid-retirement.log",
+    "sha256": "f4a7ce56f545abe29d9df1a55617d5742e9fc056cb3ea2703a454f9fb7f1ee73",
+    "bytes": 2839
+  },
+  {
+    "abi": "lua5.4",
+    "source": "current",
+    "exit_code": 1,
+    "last_line": "AGGREGATE_CONSUMER_INVENTORY 17 8",
+    "log": "lua5.4-current.log",
+    "local_path": "/workspace/.ergopti-cloud/preparations/group3-linux-modifier-aggregation-consumer-inventory/lua5.4-current.log",
+    "sha256": "b783c7de65250b52cde2aff56e46f87dccebd751b04a9d25f6566e1ccc36814f",
+    "bytes": 3712
+  },
+  {
+    "abi": "lua5.4",
+    "source": "skip-only-up",
+    "exit_code": 1,
+    "last_line": "AGGREGATE_CONSUMER_INVENTORY 19 6",
+    "log": "lua5.4-skip-only-up.log",
+    "local_path": "/workspace/.ergopti-cloud/preparations/group3-linux-modifier-aggregation-consumer-inventory/lua5.4-skip-only-up.log",
+    "sha256": "caf71ebf1b953e736cbeb983ea202ef61487307220863d7c85d683472a8b2dd0",
+    "bytes": 3420
+  },
+  {
+    "abi": "lua5.4",
+    "source": "weaken-baseline",
+    "exit_code": 1,
+    "last_line": "AGGREGATE_CONSUMER_INVENTORY 16 9",
+    "log": "lua5.4-weaken-baseline.log",
+    "local_path": "/workspace/.ergopti-cloud/preparations/group3-linux-modifier-aggregation-consumer-inventory/lua5.4-weaken-baseline.log",
+    "sha256": "e2e749295733a29ffac1a77da8c44d27e13cef09c2df52a474abf820c6baa67e",
+    "bytes": 3806
+  },
+  {
+    "abi": "lua5.4",
+    "source": "legacy-retirement",
+    "exit_code": 0,
+    "last_line": "AGGREGATE_CONSUMER_INVENTORY 26 0",
+    "log": "lua5.4-legacy-retirement.log",
+    "local_path": "/workspace/.ergopti-cloud/preparations/group3-linux-modifier-aggregation-consumer-inventory/lua5.4-legacy-retirement.log",
+    "sha256": "08a6e0f2147532ff7d0ca8b0446e0cc05d03d9cfbb0097fbe8750b53865cf538",
+    "bytes": 2676
+  },
+  {
+    "abi": "lua5.4",
+    "source": "forbid-retirement",
+    "exit_code": 1,
+    "last_line": "AGGREGATE_CONSUMER_INVENTORY 25 1",
+    "log": "lua5.4-forbid-retirement.log",
+    "local_path": "/workspace/.ergopti-cloud/preparations/group3-linux-modifier-aggregation-consumer-inventory/lua5.4-forbid-retirement.log",
+    "sha256": "f4a7ce56f545abe29d9df1a55617d5742e9fc056cb3ea2703a454f9fb7f1ee73",
+    "bytes": 2839
+  }
+]

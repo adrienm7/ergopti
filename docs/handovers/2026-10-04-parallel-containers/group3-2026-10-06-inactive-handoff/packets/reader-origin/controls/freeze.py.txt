@@ -1,0 +1,45 @@
+from pathlib import Path
+import hashlib,json,difflib,subprocess,re
+root=Path('/workspace/.ergopti-cloud/preparations/group3-linux-evdev-origin-receipts');repo=Path('/workspace/ergopti')
+sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
+paths=['static/ergopti_plus/linux/adapters/evdev_reader.lua','static/ergopti_plus/linux/tests/unit/adapters/test_evdev_reader.lua']
+patch=[];sources=[]
+for rel in paths:
+ pre=root/'preimages'/rel;post=root/'candidate'/rel
+ assert pre.read_bytes()==(repo/rel).read_bytes(),rel
+ assert pre.read_bytes()==subprocess.check_output(['git','-C',str(repo),'show','ad937abc84bbecc129f4bea8a42e8cd159fe409f:'+rel]),rel
+ if '/tests/' in rel:assert post.read_bytes().startswith(pre.read_bytes())
+ patch.extend(difflib.unified_diff(pre.read_text().splitlines(True),post.read_text().splitlines(True),fromfile='a/'+rel,tofile='b/'+rel))
+ sources.append({'path':rel,'preimage':sha(pre),'postimage':sha(post)})
+(root/'candidate.patch').write_text(''.join(patch))
+results=[]
+for abi in ['luajit','lua54']:
+ for which in ['before','after']:
+  p=root/(abi+'-'+which+'.log');m=re.fullmatch(r'READER_ORIGIN (\d+) (\d+)',p.read_text().strip().splitlines()[-1]);assert m
+  results.append({'abi':abi,'source':which,'passed':int(m[1]),'failed':int(m[2]),'log':p.name,'sha256':sha(p)})
+(root/'results.json').write_text(json.dumps(results,indent=2)+'\n')
+(root/'README.md').write_text('''# Private evdev native-origin receipt prerequisite
+
+Exact baseline: origin/dev ad937abc84bbecc129f4bea8a42e8cd159fe409f. Both source preimages also matched the actual checkout at freeze. Only the existing reader and its existing registered unit module are candidates. No checkout, index, workflow, registry, manifest or generated file has been changed; admission requires the parent's public ownership acknowledgement and independent review.
+
+The actual reader pins its FFI native symbol providers while binding is reserved. Successful native open and literal-true grabbed-reader state identify a private per-slot session. `capture_event(event,slot)` grants an opaque receipt only to a current native read object from that session, with all fields matching independent pinned primitives over the actual returned input_event byte string. Custom `_set_backend` providers, supplied copies, remapped/modified/metatable-backed tables and alias tokens cannot mint authority. Native-provider and codec currency checks invoke no replaceable public current exports.
+
+`event_current` and `event_view` cover the originating read epoch; the latter returns detached original facts/source/slot/session/read epoch, never descriptor/backend authority. The native-evdev origin tag identifies the actual reader route, not physical-hardware class: an acknowledged virtual evdev device can be used for hosted kernel proof but cannot masquerade as hardware acceptance. `source_current` keeps the same original event/session provenance across later reads, so a Hook can join its own exact held-key/edge ledger. It is explicitly not a current-held-state oracle: a later acknowledged key-up is independently reported and must change that Hook ledger. No zero-depressed editor XKB receipt is reused for held modifier delivery.
+
+Read/bind/grab/ungrab/close operations are reserved before native/loader/cdef callbacks. Session generations revoke on ungrab, close/reopen and queue loss. SYN_DROPPED refuses new origin receipts until native close/reopen; a supplied synchronization table or ordinary SYN_REPORT cannot restore authority. Strict native close failure retains private restart debt and cannot reset/rebind/reopen/retry a possibly recycled descriptor. Custom backend void-close compatibility remains intact. Known peer slots remain ordinarily readable/ungrabbable/retireable after another slot's close debt, while all new origin authority is fenced; the producer must not strand an unrelated grabbed keyboard merely to disable the optional new feature.
+
+The entire old unit file is an exact prefix: 27 original cases/assertions unchanged. Twenty new cases exercise the real implementation through explicitly controlled FFI syscall ports, never kernel calls. Before source: 27 PASS / 20 FAIL; candidate: 47 PASS / 0 FAIL on LuaJIT and Lua 5.4. Six causal omissions fail on both ABIs: native provider custody 46/1; wire-row identity 45/2; session generation 45/2; queue-loss fence 46/1; close debt 45/2; lazy binding reservation 46/1. GC controls qualify held-receipt retention and collection of abandoned records without weak-key value cycles. Finite authoritative Lua convention checks pass on both exact owned source paths.
+
+Actual kernel/EVIOCGRAB/uinput/desktop/physical acceptance, full verify-change and whole driver suites were NOT RUN by this packet. The container exposes neither /dev/input nor /dev/uinput. Existing hosted kernel-roundtrip infrastructure can qualify these native APIs after parent admission; no new kernel node, display, process or native allocation was created here. Reader origin alone does not authorize physical shortcut delivery. Hook original/remapped provenance, per-source modifier/output ACK ledger, native masks/latches/source currency and Injector transaction handoff remain separate implementation prerequisites. `physical_delivery_available` remains false; the writer foundation and transaction successor remain separate immutable/unadmitted packets.
+
+Historical diagnostic logs show a fixture-only first attempt passing multiple read_event returns through assert into capture_event's slot argument; corrected controls explicitly pass one event object and preserve the strict slot check. The diagnostic source is not a candidate. Only candidate/ paths and candidate.patch are production postimages.
+''')
+deps=[]
+for rel in ['static/ergopti_plus/linux/infra/input_event.lua','static/ergopti_plus/linux/tests/helpers.lua','static/ergopti_plus/_shared/lua/logger/shim.lua','tools/lint/lint-conventions.js']:
+ deps.append({'path':rel,'sha256':sha(repo/rel)})
+artifacts=[{'path':str(p.relative_to(root)),'sha256':sha(p),'bytes':p.stat().st_size} for p in sorted(root.rglob('*')) if p.is_file() and p.name!='receipt.json']
+r={'status':'PRIVATE_PENDING_OWNERSHIP_AND_REVIEW','origin_dev':'ad937abc84bbecc129f4bea8a42e8cd159fe409f','owned_paths':sources,'dependencies':deps,'results':results,'artifacts':artifacts,'native_execution':'NOT_RUN','physical_delivery_available':False}
+(root/'receipt.json').write_text(json.dumps(r,indent=2)+'\n')
+print('receipt',sha(root/'receipt.json'));print(json.dumps(sources,indent=2))
+for p in root.rglob('*'):
+ if p.is_file():p.chmod(0o444)

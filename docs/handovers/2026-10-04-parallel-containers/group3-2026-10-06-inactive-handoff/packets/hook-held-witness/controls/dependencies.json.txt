@@ -1,0 +1,10 @@
+[
+  {
+    "path": "static/ergopti_plus/linux/adapters/uinput_writer.lua",
+    "sha256": "fc77df761890ecdc725b2962a78bac7bad898bc989b568b074e6b5d3e788b84a"
+  },
+  {
+    "path": "static/ergopti_plus/linux/adapters/evdev_reader.lua",
+    "sha256": "bcfd7821ef61176afde6eb5de91282b6d7803d02280670ef9ff11249401d0f98"
+  }
+]

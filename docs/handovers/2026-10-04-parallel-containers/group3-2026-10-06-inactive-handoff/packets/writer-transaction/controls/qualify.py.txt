@@ -1,0 +1,36 @@
+from pathlib import Path
+import subprocess,json,shutil
+root=Path('/workspace/.ergopti-cloud/preparations/group3-linux-output-transaction')
+rel='static/ergopti_plus/linux/adapters/uinput_writer.lua'
+s=(root/'candidate'/rel).read_text()
+variants={
+ 'omit_restoration':('if not transaction_current(token) or not transaction_restored(_transaction) then return false end','if not transaction_current(token) then return false end'),
+ 'omit_channel_reservation':('if _busy or _debt or _transaction ~= nil then return false end\n\tif _output ~= nil then return emit_owned','if _busy or _debt then return false end\n\tif _output ~= nil then return emit_owned'),
+ 'omit_known_repeat':('elseif output.down[code] ~= true then output.roster_known = false end','elseif output.down[code] ~= true then output.roster_known = true end'),
+}
+# The channel-reservation omission must remove both ordinary and internal guards.
+reports=[]
+for name,(old,new) in variants.items():
+    assert s.count(old)==1,(name,s.count(old))
+    mutated=s.replace(old,new,1)
+    if name=='omit_channel_reservation':
+        oldguard='\n\t\tor (_transaction ~= nil and not rawequal(transaction, _transaction)) then return false end'
+        assert mutated.count(oldguard)==2
+        # Only the wire guard is omitted; native retirement still denies a borrower.
+        mutated=mutated.replace(oldguard,' then return false end',1)
+    p=root/name/rel;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(mutated)
+    for abi in ['luajit','lua5.4']:
+        env={'LD_LIBRARY_PATH':'/workspace/.ergopti-cloud/runtime/usr/lib/x86_64-linux-gnu'}
+        result=subprocess.run(['/workspace/.ergopti-cloud/runtime/usr/bin/'+abi,str(root/'run.lua'),str(root),name,'/workspace/ergopti'],stdout=subprocess.PIPE,stderr=subprocess.STDOUT,env=env)
+        log=root/(abi+'-'+name+'.log');log.write_bytes(result.stdout)
+        assert result.returncode!=0,(name,abi)
+        reports.append({'case':name,'abi':abi,'exit':result.returncode,'summary':result.stdout.decode().strip().splitlines()[-1]})
+(root/'causal-results.json').write_text(json.dumps(reports,indent=2)+'\n')
+# Finite owned-file linter replay with authoritative current functions.
+base=Path('/workspace/.ergopti-cloud/preparations/group3-linux-physical-output-native-owner')
+check=(base/'check_owned_conventions.cjs').read_text().replace('three owned paths','two owned paths').replace(",\'static/ergopti_plus/linux/tests/hardware/run_uinput_roundtrip.lua\'",'').replace('files.length, 3','files.length, 2')
+(root/'check_owned_conventions.cjs').write_text(check)
+result=subprocess.run(['node',str(root/'check_owned_conventions.cjs')],stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+(root/'conventions.log').write_bytes(result.stdout)
+assert result.returncode==0,result.stdout
+print(json.dumps(reports,indent=2))

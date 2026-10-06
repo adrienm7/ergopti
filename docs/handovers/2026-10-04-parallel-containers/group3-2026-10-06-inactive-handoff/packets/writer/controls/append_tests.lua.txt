@@ -1,0 +1,235 @@
+
+
+
+
+
+-- ======================================================
+-- ======================================================
+-- ======= 5/ Exact owned output acknowledgements =======
+-- ======================================================
+-- ======================================================
+
+--- Opens a recorded native channel with literal retirement acknowledgement.
+--- @return table writer, table recorder, table capability
+local function owned_channel()
+	local writer = helpers.load_module("adapters.uinput_writer")
+	local recorded = recorder()
+	recorded.backend.close = function() recorded.closed = recorded.closed + 1; return true end
+	writer._set_backend(recorded.backend)
+	helpers.assert_eq(writer.open(), true)
+	return writer, recorded, writer.capture_output()
+end
+
+helpers.describe("uinput_writer: exact output custody", function()
+
+	helpers.it("mints one opaque capability before the first native wire attempt", function()
+		local writer, recorded, capability = owned_channel()
+		helpers.assert_true(type(capability) == "table")
+		helpers.assert_eq(next(capability), nil, "the capability must not expose a borrowed descriptor")
+		helpers.assert_true(rawequal(writer.capture_output(), capability))
+		helpers.assert_eq(writer.output_current(capability), true)
+		local view = writer.output_view(capability)
+		helpers.assert_eq(view.write_epoch, 0)
+		helpers.assert_eq(view.fd, nil)
+		helpers.assert_eq(view.backend, nil)
+		view.write_epoch = 99
+		helpers.assert_eq(writer.output_view(capability).write_epoch, 0)
+		helpers.assert_eq(writer.close_owned(capability), true)
+		helpers.assert_eq(recorded.closed, 1)
+	end)
+
+	helpers.it("refuses a forged capability even when __eq claims exact identity", function()
+		local writer, recorded, capability = owned_channel()
+		local equal = { __eq = function() return true end }
+		setmetatable(capability, equal)
+		local forged = setmetatable({}, equal)
+		helpers.assert_eq(writer.output_current(forged), false)
+		helpers.assert_eq(writer.output_view(forged), nil)
+		helpers.assert_eq(writer.emit_owned(forged, 30, 1), false)
+		helpers.assert_eq(writer.close_owned(forged), false)
+		helpers.assert_eq(#recorded.writes, 0)
+		helpers.assert_eq(writer.output_current(capability), true)
+		helpers.assert_eq(writer.close_owned(capability), true)
+	end)
+
+	helpers.it("acknowledges actual KEY then SYN bytes and advances one complete-attempt epoch", function()
+		local writer, recorded, capability = owned_channel()
+		local emit = writer.emit
+		helpers.assert_eq(writer.emit_owned(capability, 30, 1), true)
+		helpers.assert_eq(writer.output_view(capability).write_epoch, 1)
+		helpers.assert_eq(#recorded.writes, 2)
+		helpers.assert_eq(le(recorded.writes[1], 17, 2), 1)
+		helpers.assert_eq(le(recorded.writes[1], 19, 2), 30)
+		helpers.assert_eq(le(recorded.writes[1], 21, 4), 1)
+		helpers.assert_eq(le(recorded.writes[2], 17, 2), 0)
+		helpers.assert_eq(le(recorded.writes[2], 19, 2), 0)
+		helpers.assert_eq(emit(30, 0), true, "already captured ordinary emitters use the same transport")
+		helpers.assert_eq(writer.output_view(capability).write_epoch, 2)
+		helpers.assert_eq(writer.close_owned(capability), true)
+	end)
+
+	helpers.it("never mints ownership after an untracked legacy wire attempt", function()
+		local writer = helpers.load_module("adapters.uinput_writer")
+		local recorded = recorder()
+		recorded.backend.close = function() recorded.closed = recorded.closed + 1; return true end
+		writer._set_backend(recorded.backend)
+		helpers.assert_eq(writer.open(), true)
+		helpers.assert_eq(writer.emit(42, 1), true)
+		helpers.assert_eq(writer.capture_output(), nil,
+			"a held Shift may already be on this wire; no fresh neutral ledger can be inferred")
+		writer.close()
+		helpers.assert_eq(writer.open(), true)
+		local fresh = writer.capture_output()
+		helpers.assert_true(type(fresh) == "table")
+		helpers.assert_eq(writer.close_owned(fresh), true)
+	end)
+
+	for _, unknown in ipairs({ 1, "yes" }) do
+		helpers.it("does not mint a capability from truthy constructor acknowledgements " .. tostring(unknown), function()
+			local writer = helpers.load_module("adapters.uinput_writer")
+			local recorded = recorder()
+			recorded.backend.ioctl = function() return unknown end
+			writer._set_backend(recorded.backend)
+			helpers.assert_eq(writer.open(), true, "ordinary truthy constructor behavior is preserved")
+			helpers.assert_eq(writer.capture_output(), nil)
+			writer.close()
+		end)
+	end
+
+	helpers.it("refuses a constructor reservation reentry before a native handle can be lost", function()
+		local writer = helpers.load_module("adapters.uinput_writer")
+		local recorded = recorder()
+		local open = recorded.backend.open
+		recorded.backend.open = function(path, flags)
+			helpers.assert_eq(writer.open(), false)
+			helpers.assert_eq(writer.capture_output(), nil)
+			helpers.assert_eq(writer._set_backend(recorder().backend), false)
+			helpers.assert_eq(writer._reset_backend(), false)
+			return open(path, flags)
+		end
+		recorded.backend.close = function() recorded.closed = recorded.closed + 1; return true end
+		writer._set_backend(recorded.backend)
+		helpers.assert_eq(writer.open(), true)
+		helpers.assert_eq(#recorded.opened, 1)
+		helpers.assert_eq(writer.close_owned(writer.capture_output()), true)
+		helpers.assert_eq(recorded.closed, 1)
+	end)
+
+	helpers.it("refuses constructor port substitution and retires the actual acquired descriptor", function()
+		local writer = helpers.load_module("adapters.uinput_writer")
+		local recorded = recorder()
+		recorded.backend.close = function() recorded.closed = recorded.closed + 1; return true end
+		local ioctl = recorded.backend.ioctl
+		recorded.backend.ioctl = function(fd, request, argument)
+			recorded.backend.write = function() return true end
+			return ioctl(fd, request, argument)
+		end
+		writer._set_backend(recorded.backend)
+		helpers.assert_eq(writer.open(), false)
+		helpers.assert_eq(writer.capture_output(), nil)
+		helpers.assert_eq(recorded.closed, 1)
+		helpers.assert_eq(writer.has_output_debt(), false)
+	end)
+
+	helpers.it("keeps opaque output observations pure even if the public current export is replaced", function()
+		local writer, _, capability = owned_channel()
+		writer.output_current = function() error("foreign exported callback must not run") end
+		helpers.assert_eq(writer.output_view(capability).write_epoch, 0)
+		helpers.assert_eq(writer.close_owned(capability), true)
+		helpers.assert_eq(writer.output_view(capability), nil)
+	end)
+
+	helpers.it("blocks nested native writes, close and backend swaps inside a reserved KEY/SYN attempt", function()
+		local writer = helpers.load_module("adapters.uinput_writer")
+		local recorded = recorder()
+		local capability
+		local write = recorded.backend.write
+		recorded.backend.write = function(fd, bytes)
+			helpers.assert_eq(writer.output_current(capability), false)
+			helpers.assert_eq(writer.output_view(capability), nil)
+			helpers.assert_eq(writer.emit_owned(capability, 31, 1), false)
+			helpers.assert_eq(writer.emit(31, 1), false)
+			helpers.assert_eq(writer.close_owned(capability), false)
+			helpers.assert_eq(writer._set_backend(recorder().backend), false)
+			helpers.assert_eq(writer.use_ffi_backend(), false)
+			return write(fd, bytes)
+		end
+		recorded.backend.close = function() recorded.closed = recorded.closed + 1; return true end
+		writer._set_backend(recorded.backend)
+		helpers.assert_eq(writer.open(), true)
+		capability = writer.capture_output()
+		helpers.assert_eq(writer.emit_owned(capability, 30, 1), true)
+		helpers.assert_eq(#recorded.writes, 2)
+		helpers.assert_eq(writer.output_view(capability).write_epoch, 1)
+		helpers.assert_eq(writer.close_owned(capability), true)
+	end)
+
+	for _, response in ipairs({ false, 1, "yes" }) do
+		helpers.it("retains actual wire debt when a native write does not acknowledge " .. tostring(response), function()
+			local writer = helpers.load_module("adapters.uinput_writer")
+			local recorded = recorder()
+			local calls = 0
+			recorded.backend.write = function() calls = calls + 1; return response end
+			recorded.backend.close = function() recorded.closed = recorded.closed + 1; return true end
+			writer._set_backend(recorded.backend)
+			helpers.assert_eq(writer.open(), true)
+			local capability = writer.capture_output()
+			helpers.assert_eq(writer.emit_owned(capability, 30, 1), false)
+			helpers.assert_eq(calls, 1, "no SYN after an unacknowledged KEY")
+			helpers.assert_eq(writer.has_output_debt(), true)
+			helpers.assert_eq(writer.output_current(capability), false)
+			helpers.assert_eq(writer.capture_output(), nil)
+			helpers.assert_eq(writer.emit_owned(capability, 30, 0), false)
+			helpers.assert_eq(writer.close_owned(capability), true, "known exact open fd can be retired once")
+			helpers.assert_eq(writer.has_output_debt(), false)
+		end)
+	end
+
+	helpers.it("retains SYN debt and does not pretend that KEY alone reached the application", function()
+		local writer = helpers.load_module("adapters.uinput_writer")
+		local recorded = recorder()
+		local calls = 0
+		recorded.backend.write = function() calls = calls + 1; return calls == 1 end
+		recorded.backend.close = function() recorded.closed = recorded.closed + 1; return true end
+		writer._set_backend(recorded.backend)
+		helpers.assert_eq(writer.open(), true)
+		local capability = writer.capture_output()
+		helpers.assert_eq(writer.emit_owned(capability, 30, 1), false)
+		helpers.assert_eq(calls, 2)
+		helpers.assert_eq(writer.has_output_debt(), true)
+		helpers.assert_eq(writer.close_owned(capability), true)
+	end)
+
+	for _, response in ipairs({ false, 1, "yes" }) do
+		helpers.it("never retries a possibly recycled native fd after close refused " .. tostring(response), function()
+			local writer = helpers.load_module("adapters.uinput_writer")
+			local recorded = recorder()
+			recorded.backend.close = function() recorded.closed = recorded.closed + 1; return response end
+			writer._set_backend(recorded.backend)
+			helpers.assert_eq(writer.open(), true)
+			local capability = writer.capture_output()
+			helpers.assert_eq(writer.close_owned(capability), false)
+			helpers.assert_eq(writer.has_output_debt(), true)
+			helpers.assert_eq(writer.close_owned(capability), false)
+			helpers.assert_eq(writer._reset_backend(), false)
+			helpers.assert_eq(writer.open(), false)
+			helpers.assert_eq(writer.emit_owned(capability, 30, 1), false)
+			helpers.assert_eq(recorded.closed, 1, "no retry on a descriptor the kernel may already have reused")
+		end)
+	end
+
+	helpers.it("invalidates retired capabilities even when the next native open reuses the same fd", function()
+		local writer, recorded, capability = owned_channel()
+		local old = writer.output_view(capability)
+		helpers.assert_eq(writer.close_owned(capability), true)
+		helpers.assert_eq(writer.open(), true)
+		local fresh = writer.capture_output()
+		helpers.assert_true(not rawequal(fresh, capability))
+		helpers.assert_true(writer.output_view(fresh).generation > old.generation)
+		helpers.assert_eq(writer.emit_owned(capability, 30, 1), false)
+		helpers.assert_eq(writer.close_owned(capability), false)
+		helpers.assert_eq(writer.close_owned(fresh), true)
+		helpers.assert_eq(recorded.closed, 2)
+	end)
+
+end)

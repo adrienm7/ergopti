@@ -665,18 +665,63 @@ _LLM_OllamaPingTerminateAcknowledged(ProcessOwner, Port, Handle) {
 	return WaitFn.Call(Handle) == 0
 }
 
-_LLM_OllamaPingDeliver(Owner, Callback, Result, Structured) {
+_LLM_OllamaPingDeliver(Owner, Callback, Result, Structured, ScheduleFn := 0) {
+	global _LLM_CurlCleanupDebt
 	if !Structured
 		return _LLM_OllamaInvokeAuxResult(Owner, Callback, Result)
-	if !LLM_AuxIsCurrent(Owner)
-		return false
-	; Structured receipts leave the auxiliary owner before the caller can enter
-	; persistence. Any refused finalization remains in the existing debt owners.
-	LLM_AuxFinish(Owner)
-	if !LLM_AuxRetryCleanupDebt() || !LLM_CurlRetryCleanupDebt()
-		return false
-	_LLM_InvokeCallback(Callback, "on_result", Result)
-	return true
+	PreviousCritical := Critical("On")
+	try {
+		if !_LLM_AuxOwnerIsCurrentLocked(Owner)
+			return false
+		Ticket := Owner.Get("ping_delivery", 0)
+		if !(Ticket is Map) {
+			Ticket := Map("callback", Callback, "result", Result is Map ? Result.Clone() : Result,
+				"schedule", ScheduleFn, "running", false, "delivered", false, "first_error", "")
+			Owner["ping_delivery"] := Ticket
+		}
+		if Ticket["running"] || Ticket["delivered"]
+			return false
+		Ticket["running"] := true
+	} finally Critical(PreviousCritical)
+	Committed := false
+	try {
+		; A failed/expired native operation can still own a live cleanup debt.
+		; Keep its cancellation and dependent files attached until that handback.
+		if !LLM_AuxRetryCleanupDebt() || !LLM_CurlRetryCleanupDebt()
+			return false
+		; Preparation moves native/finalizer ownership into the existing retry
+		; records, but keeps this exact slot available for cancellation/replacement.
+		if !_LLM_AuxPrepareFinish(Owner)
+			return false
+		if !LLM_AuxRetryCleanupDebt() || !LLM_CurlRetryCleanupDebt()
+			return false
+		PreviousCritical := Critical("On")
+		try {
+			; Cleanup can pump other requests. Consume only the exact surviving
+			; ticket with both global barriers still clear under the same lock.
+			if !_LLM_AuxOwnerIsCurrentLocked(Owner)
+					|| ObjPtr(Owner.Get("ping_delivery", Map())) != ObjPtr(Ticket)
+					|| _LLM_CurlCleanupDebt.Count != 0 || !_LLM_AuxCommitPreparedFinish(Owner)
+				return false
+			Ticket["delivered"] := true
+			Committed := true
+		} finally Critical(PreviousCritical)
+		_LLM_InvokeCallback(Ticket["callback"], "on_result", Ticket["result"])
+		return true
+	} finally {
+		PreviousCritical := Critical("On")
+		try Ticket["running"] := false
+		finally Critical(PreviousCritical)
+		if !Committed && LLM_AuxIsCurrent(Owner) {
+			Retry := () => _LLM_OllamaPingDeliver(Owner, Callback, Result, true, Ticket["schedule"])
+			if !LLM_AuxSchedule(Owner, Retry, -150, Ticket["schedule"], true) {
+				if Ticket["first_error"] == "" {
+					Ticket["first_error"] := "delivery_schedule_refused"
+					try LoggerError("LLM.ollama", "Structured receipt delivery scheduling was refused; retaining its current owner.")
+				}
+			}
+		}
+	}
 }
 
 ; Correlate preparation failures without logging a model, request body, command

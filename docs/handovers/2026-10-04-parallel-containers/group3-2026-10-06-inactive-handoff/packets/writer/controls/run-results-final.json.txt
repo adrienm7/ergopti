@@ -1,0 +1,22 @@
+[
+  {
+    "name": "luajit-preimages-final",
+    "exit": 1,
+    "summary": "OUTPUT_OWNER 20 25"
+  },
+  {
+    "name": "luajit-candidate-final",
+    "exit": 0,
+    "summary": "OUTPUT_OWNER 45 0"
+  },
+  {
+    "name": "lua5.4-preimages-final",
+    "exit": 1,
+    "summary": "OUTPUT_OWNER 20 25"
+  },
+  {
+    "name": "lua5.4-candidate-final",
+    "exit": 0,
+    "summary": "OUTPUT_OWNER 45 0"
+  }
+]
