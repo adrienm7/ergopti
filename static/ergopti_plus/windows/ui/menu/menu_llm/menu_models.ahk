@@ -473,8 +473,11 @@ _LLM_Menu_PerModelRows(name, model, ollama_url, active, deps_ready := true) {
 		"label",  StrReplace(t("menu.llm.model_source"), "%s", ollama_url),
 		"action", _LLM_Menu_MakeOpenUrlHandler(ollama_url)))
 
-	Rows.Push(Map("separator", true))
-	Rows.Push(Map("label", t("menu.llm.specs_header")))
+	SpecsRows := MenuRenderer_TemplateRows("llm_model_specs_frame", Map(), Map(), Map())
+	if !(SpecsRows is Array)
+		return []
+	for Row in SpecsRows
+		Rows.Push(Row)
 
 	type_val := model.Has("type") ? model["type"] : ""
 	type_label_text := t((type_val == "completion") ? "menu.llm.model_type_completion" : "menu.llm.model_type_chat")
@@ -497,8 +500,11 @@ _LLM_Menu_PerModelRows(name, model, ollama_url, active, deps_ready := true) {
 
 	if (model.Has("capabilities") and Type(model["capabilities"]) == "Map") {
 		caps := model["capabilities"]
-		Rows.Push(Map("separator", true))
-		Rows.Push(Map("label", t("menu.llm.caps_header")))
+		CapsRows := MenuRenderer_TemplateRows("llm_model_caps_frame", Map(), Map(), Map())
+		if !(CapsRows is Array)
+			return []
+		for Row in CapsRows
+			Rows.Push(Row)
 		if (caps.Has("speed_tok_s") and _LLM_Menu_IsNumber(caps["speed_tok_s"]))
 			Rows.Push(Map("label", StrReplace(t("menu.llm.model_speed"), "%s", caps["speed_tok_s"])))
 		if (caps.Has("tags") and Type(caps["tags"]) == "Array" and caps["tags"].Length > 0) {

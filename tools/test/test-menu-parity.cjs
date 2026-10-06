@@ -438,6 +438,24 @@ const OPENS_SUBMENU = {
 			platforms: ['hs'],
 			kind: 'submenu',
 			native_sources: { hs: 'macos/ui/menu/menu_llm/models_selector.lua' }
+		},
+		{
+			menu: 'llm_model_specs_frame',
+			platforms: ['ahk', 'hs'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_llm/menu_models.ahk',
+				hs: 'macos/ui/menu/menu_llm/models_selector.lua'
+			}
+		},
+		{
+			menu: 'llm_model_caps_frame',
+			platforms: ['ahk', 'hs'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_llm/menu_models.ahk',
+				hs: 'macos/ui/menu/menu_llm/models_selector.lua'
+			}
 		}
 	],
 	// All three profile providers render the shared Create/Clone command head.
