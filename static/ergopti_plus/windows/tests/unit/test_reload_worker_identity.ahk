@@ -60,8 +60,17 @@ _RWI_EnterStage(Stage, Bundle, Port) {
 _RWI_LeaveStage() {
 	global _ReloadTerminalHandoff
 	AssertTrue(_ReloadTerminalHandoff is Map, "the hand-off must still exist")
-	AssertTrue(ReloadTerminalHandoffCancel(_ReloadTerminalHandoff),
-		"the test must withdraw its hand-off")
+	Record := _ReloadTerminalHandoff
+	if Record["state"] == "authorized" {
+		AssertTrue(ReloadTerminalHandoffCancel(Record), "the unlaunched test hand-off can be withdrawn")
+		return
+	}
+	Port := Record["port"]
+	AssertTrue(ReloadTerminalHandoffRefuse(Record, "worker identity test cleanup"))
+	Port["probe"]["alive"] := false
+	_RTP_RunArmed(Port)
+	_RTP_RunArmed(Port)
+	AssertFalse(_ReloadTerminalHandoff is Map, "The launched test hand-off must physically stop before cleanup.")
 }
 
 
