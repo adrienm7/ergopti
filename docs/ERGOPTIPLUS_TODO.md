@@ -3469,6 +3469,8 @@ The native callback error regression fixture now arms its same 5 ms continuation
 
 Seven Windows failures exposed a typo in four new fixture subjects: the manifest owns layout.ergopti_alt_gr, not ergopti_altgr. The corrected subjects retain every original predicate and add an actual manifest assertion plus a native unknown-neighbor preservation case. Independent exact-source review passes; the 19 registered obsolete-scope cases require Windows CI before native qualification.
 
+The Windows persistence census now audits the actual added scope build-only consumer, retaining the previous 36 consumers and requiring its captured-source, typed finalizer and status-before-target chain. The new closed census is 37 total / 9 internal, with executable-code offsets and genuine quoted-data counterexamples; no publisher assertion is relaxed. Actual Windows qualification remains pending.
+
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
   The shared AHK override policy now writes an explicit recommended delay only

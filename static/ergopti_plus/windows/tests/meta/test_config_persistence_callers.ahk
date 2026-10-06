@@ -146,12 +146,12 @@ _CPC_EveryDirectTomlWriterConsumesItsBoolean() {
 	}
 	; Historical 29 public calls map to 27 unchanged consumption sites, plus
 	; SaveFullConfig's semantic public gateway and cleanup's exact-source private
-	; gateway. The expanded 28 public + 8 internal inventory is 36. Build-mode
+	; gateway. The expanded 28 public + 9 internal inventory is 37. Build-mode
 	; results are qualified maps; write-mode results are native Boolean ACKs.
-	; Every private result is also checked by the independent 8-call guard below.
+	; Every private result is also checked by the independent 9-call guard below and captured scope-build audit.
 	; The exact 29 -> 27 mapping was audited against parent 681cbaf41^: only the
 	; two migrated gateways left the old regex, and no caller disappeared.
-	AssertEqual(36, Calls,
+	AssertEqual(37, Calls,
 		"the production TOML writer/transaction-gateway inventory changed; audit every added or removed caller before updating the expected census")
 }
 Test("AHK-15-persistence: every TOML writer and transaction gateway consumes its boolean",
@@ -215,7 +215,9 @@ _CPC_InternalTomlPublishersConsumeResult() {
 	; and independently exercised by the retained-source race regression.
 	; The configuration-specific build/write gateways and source-bound explicit
 	; cleanup add three consumers, independently audited in the semantic cohort.
-	AssertEqual(8, Calls, "audit every internal publisher before changing its complete inventory")
+	; Scoped build admission adds one qualified-map consumer, audited separately
+	; against its captured source, finalizer and status-before-target chain.
+	AssertEqual(9, Calls, "audit every internal publisher before changing its complete inventory")
 	Writer := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_InfoBarWrite"))
 	Action := _StripFullLineComments(_DriverFuncBody("LLM_Menu_SetInfoBar"))
 	Command := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_InfoBarCommand"))
@@ -570,3 +572,88 @@ _CPC_SemanticCallerInventoryAndRootReceiptMutations() {
 }
 Test("AHK-15-persistence: actual semantic gateways retain census, native ACK and root-receipt mutation controls",
 	_CPC_SemanticCallerInventoryAndRootReceiptMutations)
+
+
+; The scoped builder returns a qualified image, not a write-mode Boolean.
+; Audit its exact captured-source chain before adding that real call to the census.
+_CPC_ScopeBuildUsesCapturedQualifiedImage(Body) {
+	Patterns := [
+		'm)^[ \t]*Image := TOML_BuildConfigUpdatedContent\(Path, \[\]\)',
+		'm)^[ \t]*if !\(Image is Map\) \|\| Image\.Get\("status", ""\) != "ok" \|\| Image\.Get\("kind", ""\) != "rendered"',
+		'm)^[ \t]*Rows := _ConfigPrepareTypedUpdates\(ConfigScopePreserveObsoleteSource\([ \t]*\n[ \t]*Image\["source_content"\], OperationsFn\.Call\(\)\)\)',
+		'm)^[ \t]*Rendered := _TOML_BatchWriteImpl\(Path, Rows, \[\], "build",[ \t]*\n[ \t]*Image\["source_content"\], Image\["source_present"\], true\)',
+		'm)^[ \t]*Image := _TOML_FinalizeBuildResult\(Rendered, Image\["source_present"\], Image\["source_content"\]\)',
+		'm)^[ \t]*if Image\.Get\("status", ""\) != "ok" \|\| Image\.Get\("kind", ""\) != "rendered"',
+		'm)^[ \t]*Expected := ConfigTransitionExpectedOld\(Image\["source_present"\], Image\["source_content"\], Port\)',
+		'm)^[ \t]*Targets := \[ConfigTransitionPresentTarget\(Path, Image\["content"\], Expected\)\]'
+	]
+	Tokens := ["Image", "if", "Rows", "Rendered", "Image", "if", "Expected", "Targets"]
+	Code := _DriverMaskNonCode(&Body)
+	Cursor := 1
+	for Index, Pattern in Patterns {
+		Position := RegExMatch(Body, Pattern, &Matched, Cursor)
+		if !Position
+			return false
+		Offset := InStr(Matched[0], Tokens[Index], true)
+		if !Offset || SubStr(Code, Position + Offset - 1, StrLen(Tokens[Index])) != Tokens[Index]
+			return false
+		Cursor := Position + 1
+	}
+	return _CPC_CountOccurrences(Code, "_TOML_BatchWriteImpl(") == 1
+		&& _CPC_CountOccurrences(Code, "_TOML_FinalizeBuildResult(") == 1
+}
+
+_CPC_ScopeBuildRetainsItsResultAndCapturedSource() {
+	Body := _StripFullLineComments(_DriverFuncBody("ConfigScopeCommitOperations"))
+	Assert(Body != "", "the new scoped build call must come from the real production owner")
+	AssertTrue(_CPC_ScopeBuildUsesCapturedQualifiedImage(Body),
+		"the new build-only caller classifies its actual result before creating any publication target")
+	AssertEqual(1, _CPC_CountOccurrences(Body, "_TOML_BatchWriteImpl("),
+		"exactly one independently audited scope builder joins the closed caller inventory")
+	Mutations := [
+		["Rendered := _TOML_BatchWriteImpl(", "UnrelatedRendered := _TOML_BatchWriteImpl("],
+		["Rendered := _TOML_BatchWriteImpl(", "_TOML_BatchWriteImpl("],
+		['_TOML_FinalizeBuildResult(Rendered,', '_TOML_FinalizeBuildResult(Ignored,'],
+		['Image := _TOML_FinalizeBuildResult(', 'UnrelatedImage := _TOML_FinalizeBuildResult('],
+		['Path, Rows, [], "build",', 'Path, Rows, [], "write",'],
+		['Image["source_content"], Image["source_present"], true)', 'FSReadUtf8Exact(Path), Image["source_present"], true)'],
+		['if Image.Get("status", "") != "ok" || Image.Get("kind", "") != "rendered"', 'if false'],
+		['ConfigTransitionPresentTarget(Path, Image["content"], Expected)', 'ConfigTransitionPresentTarget(Path, Ignored["content"], Expected)']
+	]
+	for Mutation in Mutations {
+		Changed := StrReplace(Body, Mutation[1], Mutation[2], true)
+		AssertFalse(Changed == Body, "each counterexample must change the actual scoped build body")
+		AssertFalse(_CPC_ScopeBuildUsesCapturedQualifiedImage(Changed),
+			"discarded results, successor bindings, write mode and reread sources must not join the inventory")
+	}
+	Finalizer := _StripFullLineComments(_DriverFuncBody("_TOML_FinalizeBuildResult"))
+	Assert(Finalizer != "", "the real qualified-map finalizer must exist")
+	Assert(InStr(Finalizer, 'Result["status"] == "ok"') > 0
+		&& InStr(Finalizer, 'Result["kind"] == "rendered"') > 0
+		&& InStr(Finalizer, 'Result["content"] is String') > 0,
+		"the finalizer must require the actual typed successful build receipt")
+	Ack := _StripFullLineComments(_DriverFuncBody("_ConfigInvokeCommitWriter"))
+	Assert(InStr(Ack, 'if !((Written is Integer) && Written == 1)') > 0,
+		"build admission does not relax the existing strict native publication acknowledgement")
+}
+Test("AHK-15-persistence: scoped build admission retains its actual qualified result and captured source",
+	_CPC_ScopeBuildRetainsItsResultAndCapturedSource)
+
+
+_CPC_ScopeBuildRejectsQuotedSourceAuthority() {
+	Body := _StripFullLineComments(_DriverFuncBody("ConfigScopeCommitOperations"))
+	AssertTrue(_CPC_ScopeBuildUsesCapturedQualifiedImage(Body), "the executable scope source is the positive control")
+	Call := 'Rendered := _TOML_BatchWriteImpl(Path, Rows, [], "build",`n'
+		. '`t`t`tImage["source_content"], Image["source_present"], true)'
+	Assert(InStr(Body, Call, true) > 0, "the decoy must replace the actual native build call")
+	Quoted := "AuditText := " . Chr(39) . "`n(`n`t`t" . Call . "`n)" . Chr(39)
+	Changed := StrReplace(Body, Call, Quoted . '`n`t`tRendered := Map("status", "refused", "kind", "none")', true)
+	AssertFalse(Changed == Body, "the actual build call must be moved into continuation data")
+	AssertFalse(_CPC_ScopeBuildUsesCapturedQualifiedImage(Changed),
+		"quoted continuation data cannot authorize a discarded or absent native builder")
+	Commented := StrReplace(Body, Call, "/*`n" . Call . "`n*/", true)
+	AssertFalse(_CPC_ScopeBuildUsesCapturedQualifiedImage(Commented),
+		"an actual call moved into a block comment is not executable source authority")
+}
+Test("AHK-15-persistence: copied quoted and commented scope calls cannot certify publication authority",
+	_CPC_ScopeBuildRejectsQuotedSourceAuthority)
