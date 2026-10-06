@@ -3224,5 +3224,19 @@
 	"menu.hotstrings.user_code.title": "Programmeerbare tekstafkortingen",
 	"platform_reason.program_runner_unavailable": "Niet beschikbaar: De native programmastarter of deze toewijzing is niet beschikbaar.",
 	"sg_actions.run_program": "▶️ Een programma uitvoeren [instelbaar]",
-	"menu.hotstrings.personal_metadata_unavailable": "Hier niet beschikbaar: bewerk dit veld rechtstreeks in het bronbestand."
+	"menu.hotstrings.personal_metadata_unavailable": "Hier niet beschikbaar: bewerk dit veld rechtstreeks in het bronbestand.",
+	"physical_shortcuts.window_title": "Fysieke sneltoetsen",
+	"physical_shortcuts.position": "Toetspositie",
+	"physical_shortcuts.manual_hint": "Kies een toetspositie, onafhankelijk van het teken dat de toets typt.",
+	"physical_shortcuts.capture": "Toets vastleggen",
+	"physical_shortcuts.capture_unavailable": "Toetsregistratie is niet beschikbaar. Kies een positie.",
+	"physical_shortcuts.empty": "Nog geen fysieke sneltoetsen toegevoegd.",
+	"physical_shortcuts.edit": "Bewerken",
+	"physical_shortcuts.source_changed": "De configuratie is gewijzigd. Sluit dit venster en open het opnieuw.",
+	"physical_shortcuts.save_failed": "Deze sneltoets kon niet worden opgeslagen. Probeer het opnieuw.",
+	"physical_shortcuts.saved_reopen": "Opgeslagen. Open dit venster opnieuw om verder te gaan.",
+	"physical_shortcuts.position_unavailable": "Deze toetspositie is hier niet beschikbaar.",
+	"physical_shortcuts.windows_unavailable": "Nog niet op Windows: De editor voor fysieke sneltoetsen is nog niet beschikbaar op Windows.",
+	"physical_shortcuts.collision": "Deze toetsencombinatie is al in gebruik. Kies een andere.",
+	"physical_shortcuts.window_unavailable": "Dit venster is niet beschikbaar: Probeer het opnieuw te openen."
 }

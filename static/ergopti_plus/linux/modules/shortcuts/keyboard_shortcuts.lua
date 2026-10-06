@@ -45,6 +45,8 @@ local Manifest = require("infra.manifest_reader")
 local Codec = require("toml_codec")
 local Writer = require("toml_codec.writer")
 local MagicEditor = require("shortcuts.magic_editor")
+local PhysicalSlots = require("shortcuts.physical_slots")
+local PhysicalAvailability = require("shortcuts.physical_availability")
 
 local LOG = "modules.shortcuts.keyboard_shortcuts"
 
@@ -113,6 +115,7 @@ local CATALOGUE_REL_PATH = "modules/actions/modifier_chords.json"
 -- Decoded once. `false` after a failed read, so a missing catalogue is reported
 -- once rather than on every menu rebuild.
 local _catalogue = nil
+local _physical_slots = nil
 
 -- slot_id → action_id, for the slots the user has assigned.
 local _assignments = {}
@@ -199,6 +202,43 @@ end
 -- =========================================
 -- =========================================
 
+--- Reads one immutable shared physical-key registry snapshot.
+--- @return table owner Shared physical-slot policy.
+local function physical_slots()
+	if _physical_slots then return _physical_slots end
+	local path = assert(Paths.shared("data/keycodes/physical_keys.json"), "physical-key registry path unavailable")
+	local file = assert(io.open(path, "rb"))
+	local raw = file:read("*a")
+	file:close()
+	_physical_slots = PhysicalSlots.new(require("json").decode(raw))
+	return _physical_slots
+end
+
+--- Resolves a configured user physical slot without logical key fallback.
+--- @param slot string Canonical physical configuration key.
+--- @return table|nil descriptor Shared registry key and modifiers.
+function M.physical_slot_descriptor(slot)
+	if not PhysicalSlots.is_namespace(slot) then return nil end
+	return physical_slots().parse(slot)
+end
+
+--- Names an actual evdev press through canonical registry metadata.
+--- @param detail table Physical hook detail carrying evdev code and held modifiers.
+--- @return string|nil slot Canonical physical configuration key.
+function M.physical_slot(detail)
+	if type(detail) ~= "table" or detail.physical ~= true or type(detail.mods) ~= "table" then return nil end
+	local held = detail.mods
+	if held.altgr or held.fn then return nil end
+	for _, name in ipairs({ "ctrl", "alt", "shift", "meta" }) do
+		if held[name] ~= nil and type(held[name]) ~= "boolean" then return nil end
+	end
+	local code = physical_slots().code_for(detail.code, "evdev")
+	if not code then return nil end
+	return physical_slots().match({ physical = true, code = code,
+		mods = { ctrl = held.ctrl == true, alt = held.alt == true,
+			shift = held.shift == true, super = held.meta == true } })
+end
+
 --- Splits a slot id into its modifier list and its key suffix.
 --- @param slot_id string
 --- @return table|nil mods, string|nil suffix
@@ -221,6 +261,15 @@ function M.get_slot_label(slot_id, reason)
 		local label = MOD_LABELS.meta .. " + " .. require("modules.hotstrings.magic_key").get()
 		if reason then label = label .. " (" .. require("infra.i18n").get("menu.shortcuts.keyboard.magic_editor_reason." .. reason) .. ")" end
 		return label
+	end
+	local physical = M.physical_slot_descriptor(slot_id)
+	if physical then
+		local parts = {}
+		for _, name in ipairs(PhysicalSlots.modifiers()) do
+			if physical.mods[name] then parts[#parts + 1] = name == "super" and MOD_LABELS.meta or MOD_LABELS[name] end
+		end
+		parts[#parts + 1] = physical.code
+		return table.concat(parts, " + ")
 	end
 	local mods, suffix = split_slot(slot_id)
 	if not mods then return tostring(slot_id) end
@@ -255,6 +304,7 @@ end
 --- @param slot_id string Candidate slot identity.
 --- @return boolean owned
 local function owns_slot(slot_id)
+	if PhysicalSlots.is_namespace(slot_id) then return physical_slots().owns(slot_id) end
 	if slot_id == MagicEditor.SLOT_ID then return true end
 	local mods, suffix = split_slot(slot_id)
 	if not mods then return false end
@@ -303,11 +353,15 @@ end
 --- reported once and walked as empty, so the cleanup offers it.
 --- @param decoded table Decoded configuration.
 --- @param consume function Consumer receiving slot and stored value.
-local function walk_assignments(decoded, consume)
+local function walk_assignments(decoded, consume, written)
 	local shortcuts = ConfigOutdated.settings_table(decoded.shortcuts, { "shortcuts" }, Logger) or {}
 	local assignments = ConfigOutdated.settings_table(shortcuts.keyboard, { "shortcuts", "keyboard" }, Logger) or {}
 	for slot, value in pairs(assignments) do
-		if owns_slot(slot) then consume(slot, value) end
+		if owns_slot(slot) then consume(slot, value)
+		elseif PhysicalSlots.is_namespace(slot) then
+			assert(not written, "physical keyboard candidate contains an invalid slot")
+			ConfigOutdated.report({ "shortcuts", "keyboard", slot }, "invalid physical shortcut identity", Logger)
+		end
 	end
 end
 
@@ -401,6 +455,21 @@ function M.get_assignments()
 	return copy
 end
 
+--- Lists exact configured physical entries, including explicit native reservations.
+--- @return table entries Sorted detached records { id, label, action }.
+function M.physical_assignments()
+	load_assignments()
+	local slots, result = {}, {}
+	for slot in pairs(_explicit_assignments) do
+		if PhysicalSlots.is_namespace(slot) then slots[#slots + 1] = slot end
+	end
+	table.sort(slots)
+	for _, slot in ipairs(slots) do
+		result[#result + 1] = { id = slot, label = M.get_slot_label(slot), action = _explicit_assignments[slot] }
+	end
+	return result
+end
+
 --- The action bound to a slot, or "none".
 --- @param slot_id string
 --- @return string
@@ -425,6 +494,9 @@ function M.set_action(slot_id, action_id)
 	local path = require("infra.config_paths").config("config.toml")
 
 	if type(action_id) ~= "string" or action_id == "" then action_id = "none" end
+	if PhysicalSlots.is_namespace(slot_id) and action_id ~= "none" then
+		if not PhysicalAvailability.ready(M.physical_delivery_available) then return false end
+	end
 	local Gestures = action_catalogue()
 	if not Gestures then
 		Logger.error(LOG, "set_action(): '%s' not bound without the action catalogue.", slot_id)
@@ -508,6 +580,11 @@ function M.magic_editor_decision(admission)
 			local slot = suffix and ("super_" .. suffix) or nil
 			local action = slot and _explicit_assignments[slot] or nil
 			if action ~= nil then claims[candidate.identity] = { action = action, binding_id = M.binding_id(slot) } end
+			local physical_slot = physical_slots().encode(candidate.code, { super = true })
+			local physical_action = physical_slot and _explicit_assignments[physical_slot] or nil
+			if physical_action ~= nil then
+				claims[candidate.identity] = { action = physical_action, binding_id = M.binding_id(physical_slot) }
+			end
 		end
 	end
 	local catalogue = assert(action_catalogue(), "magic editor action catalogue is unavailable")
@@ -569,6 +646,93 @@ local function match(detail, only_script)
 	return nil
 end
 
+--- Captures actual physical intent without acquiring or retiring native resources.
+function M.capture_physical_editor_inventory()
+	load_assignments()
+	if _configuration_owner ~= nil then return nil end
+	local epoch, actual, assignments = _dispatch_generation, _explicit_assignments, {}
+	for slot, action in pairs(actual) do if PhysicalSlots.is_namespace(slot) then assignments[slot] = action end end
+	return { assignments = assignments, current = function()
+		return _configuration_owner == nil and _dispatch_generation == epoch and _explicit_assignments == actual
+	end }
+end
+
+--- Reads the actual acknowledged capture-source epoch before physical delivery.
+--- @return number|nil generation Native XKB source generation.
+local function physical_source_generation()
+	local Capture = require("adapters.xkb_capture")
+	local called, generation = pcall(Capture.source_generation)
+	if called and type(generation) == "number" and generation >= 0 and generation % 1 == 0 then return generation end
+	return nil
+end
+
+--- Rechecks private dispatch ownership and parameter currency after callbacks.
+local function physical_current(hit)
+	if _configuration_owner ~= nil or hit.dispatch_generation ~= _dispatch_generation then return false end
+	if hit.slot and _explicit_assignments[hit.slot] ~= hit.action then return false end
+	if hit.parameters ~= nil then
+		local called, current = pcall(hit.parameters)
+		if not called or current ~= true then return false end
+	end
+	return _configuration_owner == nil and hit.dispatch_generation == _dispatch_generation
+		and (hit.slot == nil or _explicit_assignments[hit.slot] == hit.action)
+end
+
+--- Reports whether native source, all-owner collisions and output custody are joined.
+--- The current Linux Hook has no qualified physical delivery capability. Existing
+--- logical shortcuts remain active; physical None still reserves native input.
+--- @return boolean available A native delivery capability, never GUI readiness.
+function M.physical_delivery_available()
+	return false
+end
+
+--- Carries private currency on both sides of live native admission reads.
+local function physical_admitted(opts, hit)
+	if hit.physical then
+		if not PhysicalAvailability.ready(M.physical_delivery_available) then return false end
+	end
+	if not physical_current(hit) or opts.only_script == true or type(opts.admission) ~= "function" then return false end
+	local called, admission = pcall(opts.admission)
+	return called and type(admission) == "table" and admission.master == true and admission.paused == false
+		and admission.inhibited == false and physical_current(hit)
+end
+
+--- Preserves prior logical claims before considering a physical None reservation.
+local function physical_match(detail, opts, epoch)
+	local hit = { dispatch_generation = epoch }
+	local catalogue = action_catalogue()
+	local guarded = catalogue and type(catalogue.capture_parameter_delivery_guard) == "function"
+	if guarded then hit.parameters = catalogue.capture_parameter_delivery_guard() end
+	if not physical_current(hit) then return nil end
+	if not physical_admitted(opts, hit) then return nil end
+	local slot = M.physical_slot(detail)
+	if not slot or not physical_current(hit) then return nil end
+	load_assignments()
+	if not physical_current(hit) then return nil end
+	local explicit = _explicit_assignments[slot]
+	if explicit == nil then return nil end
+	local key, held = suffix_of(detail.key), detail.mods
+	for existing, action in pairs(_explicit_assignments) do
+		if not PhysicalSlots.is_namespace(existing) and existing ~= MagicEditor.SLOT_ID then
+			local _, suffix = split_slot(existing)
+			local required, same = required_modifiers(existing), suffix == key
+			if required then
+				for _, name in ipairs({ "ctrl", "shift", "alt", "meta" }) do
+					if (required[name] == true) ~= (held[name] == true) then same = false end
+				end
+			end
+			if same and required then return nil, action == "none" and existing or nil end
+		end
+	end
+	if explicit == "none" then return nil, slot end
+	if not PhysicalAvailability.ready(M.physical_delivery_available) then return nil end
+	hit.slot, hit.action, hit.physical = slot, explicit, true
+	if not guarded or not physical_current(hit) then return nil end
+	hit.source_generation = physical_source_generation()
+	if hit.source_generation == nil or not physical_current(hit) then return nil end
+	return hit
+end
+
 --- The parameter-store identity used when a keyboard slot dispatches an action.
 --- @param slot string Keyboard slot id.
 --- @return string
@@ -578,10 +742,11 @@ end
 
 --- Runs a matched binding.
 --- @param hit table The record match() returned.
-local function fire(hit)
+local function fire(hit, valid)
 	Logger.debug(LOG, "Keyboard shortcut fired: %s → %s.", hit.slot, hit.action)
 	local ok_gestures, Gestures = pcall(require, "modules.gestures.manager")
 	if ok_gestures and type(Gestures.execute_action) == "function" then
+		if valid ~= nil and valid() ~= true then return false end
 		pcall(Gestures.execute_action, hit.action, M.binding_id(hit.slot))
 	else
 		Logger.error(LOG,
@@ -630,11 +795,20 @@ function M.consume(detail, opts)
 		Logger.error(LOG, "consume(): no deferral seam — bound chords reach the application.")
 		return false, nil
 	end
-	local hit = contextual_match(detail, opts) or match(detail, opts.only_script == true)
-	if not hit or hit.held_back then return false, nil end
+	local entry_generation = _dispatch_generation
+	local physical_hit, native_slot = physical_match(detail, opts, entry_generation)
+	if _configuration_owner ~= nil or entry_generation ~= _dispatch_generation then return false, nil end
+	if native_slot then return false, native_slot end
+	local hit = physical_hit or contextual_match(detail, opts) or match(detail, opts.only_script == true)
+	if not hit or hit.held_back or _configuration_owner ~= nil or entry_generation ~= _dispatch_generation then return false, nil end
 	local generation = _dispatch_generation
 	if opts.defer(function()
 		if _configuration_owner ~= nil or generation ~= _dispatch_generation then return end
+		if hit.physical then
+			if not physical_admitted(opts, hit) then return end
+			local source = physical_source_generation()
+			if source ~= hit.source_generation or not physical_current(hit) then return end
+		end
 		if hit.decision then
 			local admission = opts.admission()
 			local current = M.magic_editor_decision(admission)
@@ -642,11 +816,13 @@ function M.consume(detail, opts)
 				configuration_generation = _dispatch_generation, action = current.action,
 				master = admission.master, paused = admission.paused, inhibited = admission.inhibited }) then return end
 		end
-		fire(hit)
+		if _configuration_owner ~= nil or generation ~= _dispatch_generation then return end
+		fire(hit, hit.physical and function() return physical_current(hit) end or nil)
 	end) ~= true then
 		Logger.error(LOG, "Keyboard shortcut %s could not be queued — the key is typed instead.", hit.slot)
 		return false, nil
 	end
+	if _configuration_owner ~= nil or generation ~= _dispatch_generation then return false, nil end
 	return true, hit.slot
 end
 
@@ -677,6 +853,7 @@ function M._reset()
 	_explicit_assignments = {}
 	_loaded = false
 	_catalogue = nil
+	_physical_slots = nil
 end
 
 
@@ -700,7 +877,7 @@ function M.configuration_candidate(document, written)
 		local known = stored_assignment_known(slot, action, catalogue)
 		assignments[slot] = known and action ~= "none" and action or nil
 		explicit[slot] = known and action or "none"
-	end)
+	end, written)
 	return { assignments = assignments, explicit_assignments = explicit }
 end
 

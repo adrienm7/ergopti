@@ -3224,5 +3224,19 @@
 	"menu.hotstrings.user_code.title": "Programmerbara textgenvägar",
 	"platform_reason.program_runner_unavailable": "Otillgänglig: Den inbyggda programstartaren eller denna koppling är otillgänglig.",
 	"sg_actions.run_program": "▶️ Kör ett program [konfigurerbart]",
-	"menu.hotstrings.personal_metadata_unavailable": "Inte tillgängligt här: redigera fältet direkt i källfilen."
+	"menu.hotstrings.personal_metadata_unavailable": "Inte tillgängligt här: redigera fältet direkt i källfilen.",
+	"physical_shortcuts.window_title": "Fysiska kortkommandon",
+	"physical_shortcuts.position": "Tangentposition",
+	"physical_shortcuts.manual_hint": "Välj en tangentposition oberoende av tecknet som tangenten skriver.",
+	"physical_shortcuts.capture": "Registrera en tangent",
+	"physical_shortcuts.capture_unavailable": "Tangentregistrering är inte tillgänglig. Välj en position.",
+	"physical_shortcuts.empty": "Inga fysiska kortkommandon har lagts till ännu.",
+	"physical_shortcuts.edit": "Redigera",
+	"physical_shortcuts.source_changed": "Konfigurationen har ändrats. Stäng och öppna detta fönster igen.",
+	"physical_shortcuts.save_failed": "Kortkommandot kunde inte sparas. Försök igen.",
+	"physical_shortcuts.saved_reopen": "Sparat. Öppna detta fönster igen för att fortsätta.",
+	"physical_shortcuts.position_unavailable": "Denna tangentposition är inte tillgänglig här.",
+	"physical_shortcuts.windows_unavailable": "Ännu inte för Windows: Redigeraren för fysiska kortkommandon är ännu inte tillgänglig i Windows.",
+	"physical_shortcuts.collision": "Denna tangentkombination används redan. Välj en annan.",
+	"physical_shortcuts.window_unavailable": "Detta fönster är inte tillgängligt: Försök att öppna det igen."
 }

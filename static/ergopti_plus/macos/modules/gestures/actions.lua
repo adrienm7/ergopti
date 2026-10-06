@@ -2548,6 +2548,38 @@ function M.replace_action_parameters(parameters)
 	return true
 end
 
+--- Captures a private parameter revision without exposing mutable state.
+--- Physical delivery carries this proof across all source and admission reads.
+function M.capture_parameter_delivery_guard()
+	local state, revision = _state, _program_revision
+	local parameters = state and state.action_params
+	return function()
+		return state ~= nil and _state == state and _program_revision == revision
+			and (_state and _state.action_params) == parameters
+	end
+end
+
+--- Captures canonical parameter agreement using the actual action owner.
+function M.capture_parameter_source_guard(document, recognizes)
+	local state, revision, runtime = _state, _program_revision, _state and _state.action_params
+	if not state or type(runtime) ~= "table" or type(document) ~= "table" or type(recognizes) ~= "function" then return nil end
+	local source = type(document.gestures) == "table" and document.gestures.action_parameters or nil
+	if source ~= nil and type(source) ~= "table" then return nil end
+	local expected = {}
+	for key, value in pairs(source or {}) do
+		local binding, action = M.split_action_parameter_key(key)
+		if binding and action and M.validate_action_parameter(action, value) == true and recognizes(binding) then expected[key] = value end
+	end
+	for key, value in pairs(runtime) do
+		local binding = M.split_action_parameter_key(key)
+		if binding and recognizes(binding) and expected[key] ~= value then return nil end
+	end
+	for key, value in pairs(expected) do if runtime[key] ~= value then return nil end end
+	local function current() return _state == state and _program_revision == revision and _state.action_params == runtime end
+	if not current() then return nil end
+	return current
+end
+
 function M.get_all_action_parameters()
 	local out = {}
 	for key, value in pairs((_state and _state.action_params) or {}) do out[key] = value end

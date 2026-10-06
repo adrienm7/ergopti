@@ -3224,5 +3224,19 @@
 	"menu.hotstrings.user_code.title": "קיצורי טקסט ניתנים לתכנות",
 	"platform_reason.program_runner_unavailable": "לא זמין: מפעיל התוכניות המובנה או שיוך זה אינם זמינים.",
 	"sg_actions.run_program": "▶️ הפעלת תוכנית [ניתן להגדרה]",
-	"menu.hotstrings.personal_metadata_unavailable": "לא זמין כאן: יש לערוך שדה זה ישירות בקובץ המקור."
+	"menu.hotstrings.personal_metadata_unavailable": "לא זמין כאן: יש לערוך שדה זה ישירות בקובץ המקור.",
+	"physical_shortcuts.window_title": "קיצורי מקשים פיזיים",
+	"physical_shortcuts.position": "מיקום המקש",
+	"physical_shortcuts.manual_hint": "בחרו מיקום מקש ללא תלות בתו שהוא מקליד.",
+	"physical_shortcuts.capture": "לכידת מקש",
+	"physical_shortcuts.capture_unavailable": "לכידת מקשים אינה זמינה. בחרו מיקום במקום זאת.",
+	"physical_shortcuts.empty": "טרם נוספו קיצורי מקשים פיזיים.",
+	"physical_shortcuts.edit": "עריכה",
+	"physical_shortcuts.source_changed": "ההגדרות השתנו. סגרו ופתחו מחדש את החלון.",
+	"physical_shortcuts.save_failed": "לא ניתן לשמור את הקיצור. נסו שוב.",
+	"physical_shortcuts.saved_reopen": "נשמר. פתחו מחדש את החלון כדי להמשיך.",
+	"physical_shortcuts.position_unavailable": "מיקום המקש הזה אינו זמין כאן.",
+	"physical_shortcuts.windows_unavailable": "עדיין לא זמין ב־Windows: עורך קיצורי המקשים הפיזיים עדיין אינו זמין ב־Windows.",
+	"physical_shortcuts.collision": "צירוף המקשים הזה כבר בשימוש. בחרו צירוף אחר.",
+	"physical_shortcuts.window_unavailable": "החלון הזה אינו זמין: נסו לפתוח אותו מחדש."
 }

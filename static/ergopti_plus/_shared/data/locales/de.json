@@ -3224,5 +3224,19 @@
 	"menu.hotstrings.user_code.title": "Programmierbare Textkürzel",
 	"platform_reason.program_runner_unavailable": "Nicht verfügbar: Der native Programmstarter oder diese Zuordnung ist nicht verfügbar.",
 	"sg_actions.run_program": "▶️ Programm ausführen [konfigurierbar]",
-	"menu.hotstrings.personal_metadata_unavailable": "Hier nicht verfügbar: Bearbeiten Sie dieses Feld direkt in der Quelldatei."
+	"menu.hotstrings.personal_metadata_unavailable": "Hier nicht verfügbar: Bearbeiten Sie dieses Feld direkt in der Quelldatei.",
+	"physical_shortcuts.window_title": "Physische Tastenkürzel",
+	"physical_shortcuts.position": "Tastenposition",
+	"physical_shortcuts.manual_hint": "Wählen Sie eine Tastenposition unabhängig vom eingegebenen Zeichen.",
+	"physical_shortcuts.capture": "Taste erfassen",
+	"physical_shortcuts.capture_unavailable": "Die Tastenerfassung ist nicht verfügbar. Wählen Sie eine Position.",
+	"physical_shortcuts.empty": "Noch keine physischen Tastenkürzel hinzugefügt.",
+	"physical_shortcuts.edit": "Bearbeiten",
+	"physical_shortcuts.source_changed": "Die Konfiguration wurde geändert. Schließen und öffnen Sie dieses Fenster erneut.",
+	"physical_shortcuts.save_failed": "Das Tastenkürzel konnte nicht gespeichert werden. Versuchen Sie es erneut.",
+	"physical_shortcuts.saved_reopen": "Gespeichert. Öffnen Sie dieses Fenster erneut, um fortzufahren.",
+	"physical_shortcuts.position_unavailable": "Diese Tastenposition ist hier nicht verfügbar.",
+	"physical_shortcuts.windows_unavailable": "Noch nicht für Windows: Der Editor für physische Tastenkürzel ist unter Windows noch nicht verfügbar.",
+	"physical_shortcuts.collision": "Diese Tastenkombination wird bereits verwendet. Wählen Sie eine andere.",
+	"physical_shortcuts.window_unavailable": "Dieses Fenster ist nicht verfügbar: Versuchen Sie, es erneut zu öffnen."
 }

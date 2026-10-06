@@ -380,6 +380,7 @@
 		"test:changelog-release-install": "node ./tools/test/test-changelog-release-install.cjs",
 		"test:browser:changelog-install": "node ./tools/test/browser/changelog-release-install.playwright.cjs",
 		"test:browser:layer-editor": "node ./tools/test/browser/layer-editor.playwright.cjs",
+		"test:browser:physical-shortcuts": "node ./tools/test/browser/physical-shortcuts.playwright.cjs",
 		"test:release-install-contract": "node ./tools/test/test-release-install-contract.cjs",
 		"test:source-run-single-owner": "node ./tools/test/test-source-run-single-owner.cjs",
 		"test:download-window-session": "node ./tools/test/test-download-window-session.cjs",

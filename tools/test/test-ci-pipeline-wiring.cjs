@@ -174,6 +174,7 @@ const STEP_CONDITIONS = [
 	[LINUX_BOX, 'e2e-linux', 'Qualify native runtime prerequisites', NOT_CANCELLED],
 	[ENTRY, 'core', 'Install shared UI browsers', "matrix.suite == 'js'"],
 	[ENTRY, 'core', 'Test shared layer editor rendering', "matrix.suite == 'js'"],
+	[ENTRY, 'core', 'Test shared physical shortcut rendering', "matrix.suite == 'js'"],
 	[ENTRY, 'validate', 'Check hotstring TOML files are sorted and formatted', NOT_CANCELLED],
 	[ENTRY, 'release', 'Create git tag', "steps.preflight.outputs.create_tag == 'true'"],
 	[
@@ -2403,6 +2404,94 @@ assert.ok(
 	sparkleToolProblems(swappedSparkleSteps).length > 0,
 	'native XCTest before Sparkle tool installation must refuse'
 );
+
+// This qualifies the shared renderer and recorded bridge, not physical input.
+const PHYSICAL_BROWSER_STEP = 'Test shared physical shortcut rendering';
+const PHYSICAL_BROWSER_ALIAS = 'test:browser:physical-shortcuts';
+const PHYSICAL_BROWSER_COMMAND = 'node ./tools/test/browser/physical-shortcuts.playwright.cjs';
+const PHYSICAL_BROWSER_SCRIPTS = require('../../package.json').scripts;
+
+/** Requires the recorded-bridge browser gate immediately after layer rendering. */
+function physicalBrowserProblems(files, scripts = PHYSICAL_BROWSER_SCRIPTS) {
+	const problems = [];
+	const entry = files.find((file) => file.rel === ENTRY);
+	const core = entry && pipeline.jobsOfText(entry.text, ENTRY).find((job) => job.id === 'core');
+	const steps = core ? pipeline.steps(core.body) : [];
+	const physical = steps.filter((step) => step.name === PHYSICAL_BROWSER_STEP);
+	const at = steps.findIndex((step) => step.name === PHYSICAL_BROWSER_STEP);
+	const layerAt = steps.findIndex((step) => step.name === 'Test shared layer editor rendering');
+	const installAt = steps.findIndex((step) => step.name === 'Install shared UI browsers');
+	if (
+		physical.length !== 1 ||
+		at !== layerAt + 1 ||
+		layerAt < 0 ||
+		installAt < 0 ||
+		installAt >= layerAt
+	) {
+		problems.push(
+			'physical shortcut renderer needs one gate immediately after layer rendering and browser installation'
+		);
+	} else if (
+		pipeline.stepField(physical[0].body, 'if') !== "matrix.suite == 'js'" ||
+		pipeline.stepField(physical[0].body, 'run') !== `npm run ${PHYSICAL_BROWSER_ALIAS}`
+	) {
+		problems.push('physical shortcut renderer must run its exact command on the shared JS lane');
+	}
+	if (scripts[PHYSICAL_BROWSER_ALIAS] !== PHYSICAL_BROWSER_COMMAND) {
+		problems.push(
+			'physical shortcut browser alias must execute the existing recorded-bridge fixture'
+		);
+	}
+	return problems;
+}
+errors.push(...physicalBrowserProblems(pipeline.files()));
+const physicalBrowserBody = pipeline.step(pipeline.job('core'), PHYSICAL_BROWSER_STEP);
+for (const [what, changed] of [
+	['missing physical browser step', ''],
+	[
+		'missing physical browser condition',
+		physicalBrowserBody.replace("        if: matrix.suite == 'js'\n", '')
+	],
+	[
+		'disabled physical browser condition',
+		physicalBrowserBody.replace("matrix.suite == 'js'", 'false')
+	],
+	[
+		'wrong physical browser lane',
+		physicalBrowserBody.replace("matrix.suite == 'js'", "matrix.suite == 'properties'")
+	],
+	[
+		'wrong physical browser command',
+		physicalBrowserBody.replace(
+			`npm run ${PHYSICAL_BROWSER_ALIAS}`,
+			'npm run test:browser:layer-editor'
+		)
+	]
+]) {
+	mustCatch(what, ENTRY, physicalBrowserBody, changed, physicalBrowserProblems);
+}
+const layerBrowserBody = pipeline.step(pipeline.job('core'), 'Test shared layer editor rendering');
+const misplacedPhysicalBrowser = pipeline.files().map((entry) =>
+	entry.rel === ENTRY
+		? {
+				...entry,
+				text: entry.text
+					.replace(physicalBrowserBody, '')
+					.replace(layerBrowserBody, physicalBrowserBody + layerBrowserBody)
+			}
+		: entry
+);
+assert.ok(
+	physicalBrowserProblems(misplacedPhysicalBrowser).length > 0,
+	'physical renderer before layer renderer must refuse'
+);
+for (const changed of [undefined, 'node ./tools/test/browser/layer-editor.playwright.cjs']) {
+	const scripts = { ...PHYSICAL_BROWSER_SCRIPTS, [PHYSICAL_BROWSER_ALIAS]: changed };
+	assert.ok(
+		physicalBrowserProblems(pipeline.files(), scripts).length > 0,
+		'missing or redirected physical browser alias must refuse'
+	);
+}
 
 if (errors.length > 0) {
 	console.error(

@@ -73,7 +73,10 @@ const NOT_SUITE_ENTRIES = new Set([
 	'tools/test/browser/changelog-release-install.playwright.cjs',
 	// Real Chromium and WebKit rendering is required separately by Core / js;
 	// test-desktop-ci-evidence.cjs rejects a missing or forgiven browser step.
-	'tools/test/browser/layer-editor.playwright.cjs'
+	'tools/test/browser/layer-editor.playwright.cjs',
+	// Actual Chromium/WebKit rendering runs separately in mandatory Core / js;
+	// test-ci-pipeline-wiring.cjs rejects missing or redirected browser execution.
+	'tools/test/browser/physical-shortcuts.playwright.cjs'
 ]);
 
 // Gates the suite runs with no npm alias. Zero since 2026-08-03, when the last

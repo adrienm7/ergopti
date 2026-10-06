@@ -3224,5 +3224,19 @@
 	"menu.hotstrings.user_code.title": "Programlanabilir metin kısayolları",
 	"platform_reason.program_runner_unavailable": "Kullanılamıyor: Yerel program çalıştırıcısı veya bu atama kullanılamıyor.",
 	"sg_actions.run_program": "▶️ Program çalıştır [yapılandırılabilir]",
-	"menu.hotstrings.personal_metadata_unavailable": "Burada kullanılamıyor: bu alanı doğrudan kaynak dosyasında düzenleyin."
+	"menu.hotstrings.personal_metadata_unavailable": "Burada kullanılamıyor: bu alanı doğrudan kaynak dosyasında düzenleyin.",
+	"physical_shortcuts.window_title": "Fiziksel tuş kısayolları",
+	"physical_shortcuts.position": "Tuş konumu",
+	"physical_shortcuts.manual_hint": "Yazılan karakterden bağımsız olarak bir tuş konumu seçin.",
+	"physical_shortcuts.capture": "Tuş yakala",
+	"physical_shortcuts.capture_unavailable": "Tuş yakalama kullanılamıyor. Bir konum seçin.",
+	"physical_shortcuts.empty": "Henüz fiziksel tuş kısayolu eklenmedi.",
+	"physical_shortcuts.edit": "Düzenle",
+	"physical_shortcuts.source_changed": "Yapılandırma değişti. Bu pencereyi kapatıp yeniden açın.",
+	"physical_shortcuts.save_failed": "Bu kısayol kaydedilemedi. Yeniden deneyin.",
+	"physical_shortcuts.saved_reopen": "Kaydedildi. Devam etmek için bu pencereyi yeniden açın.",
+	"physical_shortcuts.position_unavailable": "Bu tuş konumu burada kullanılamıyor.",
+	"physical_shortcuts.windows_unavailable": "Henüz Windows'ta kullanılamıyor: Fiziksel tuş kısayolu düzenleyicisi Windows üzerinde henüz kullanılamıyor.",
+	"physical_shortcuts.collision": "Bu tuş birleşimi zaten kullanılıyor. Başka bir birleşim seçin.",
+	"physical_shortcuts.window_unavailable": "Bu pencere kullanılamıyor: Yeniden açmayı deneyin."
 }

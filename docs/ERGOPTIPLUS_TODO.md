@@ -4838,9 +4838,18 @@ This deferral does not complete this item or the cross-cutting items16/38.
   library caches survive suite restoration, and actual window-action tests
   use scoped SDK admission rather than accidentally opening GTK headlessly.
   Portable macOS E2E passes 101 cases with one native-host skip.
-  Global bulk clear/recommended composition
-  awaits the physical shortcut scope tranche. Native hosted input,
+  The admitted physical scope tranche now composes global clear/recommended
+  with the ordered pair owner. Pair delivery remains fenced through program
+  retirement, native installation, canonical publication, parameter release
+  and inverse recovery; refused terminal receipts retain exact cleanup debt.
+  The shared physical editor/model and read-only XKB additions do not add
+  simultaneous chords or qualify physical pair input. Native hosted input,
   packaging, installation and physical acceptance remain unqualified.
+  The current composed Linux suite passes 9,126/0 across 433 modules. Its
+  paired-scope compensation retains the exact delivery fence while paused;
+  normal edit and delivery admission still refuse. Native Luv fixture cache
+  custody and current canonical Ctrl+G fixture owners preserve every previous
+  assertion. Final integrated CI and physical input acceptance remain open.
 
 Windows continuation for item93 (explicitly deferred to the maintainer's PC):
 
@@ -4888,16 +4897,36 @@ Detailed commands, test owners and the inactive prepared packet are in
 [group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md).
 This deferral does not complete this item or the cross-cutting items16/38.
 
-- [ ] **97.** Replace the fixed accent/direct-symbol shortcut submenu with
-      user-owned entries, empty by default and offering "+ Add". Let a user on
-      any keyboard layout choose an action from the shared catalogue or enter
-      a character, then assign a physical key or modifier chord. Include é, à,
-      è, ç, ù, circumflex/diaeresis dead keys and arbitrary punctuation (comma,
-      period, colon, etc.). Ergopti emulation/keylayouts already supply their
-      symbol mappings, so do not duplicate them as default shortcuts. Share the
-      entry model, picker and persistence contract across drivers; test capture,
-      custom Unicode output, dead-key composition, neutral defaults and refusal
-      behavior through automated native and parity suites.
+- [~] **97.** Replace the fixed accent/direct-symbol shortcut submenu with
+  user-owned entries, empty by default and offering "+ Add". Let a user on
+  any keyboard layout choose an action from the shared catalogue or enter
+  a character, then assign a physical key or modifier chord. Include é, à,
+  è, ç, ù, circumflex/diaeresis dead keys and arbitrary punctuation (comma,
+  period, colon, etc.). Ergopti emulation/keylayouts already supply their
+  symbol mappings, so do not duplicate them as default shortcuts. Share the
+  entry model, picker and persistence contract across drivers; test capture,
+  custom Unicode output, dead-key composition, neutral defaults and refusal
+  behavior through automated native and parity suites.
+
+  Partial source admission: the shared empty-by-default physical slot/entry
+  model, Add/Edit/Remove editor, Linux/macOS host lifecycle and acknowledged
+  publication scopes are present. The 79-source slice preserves unknown and
+  legacy records, owns fresh operation backups and retains inverse/resource
+  debt. Caller update rows are detached before any admission callback;
+  callbacks cannot turn an allowed None/Delete into an active mapping write.
+  Linux/macOS native physical delivery capability is explicitly false.
+  Missing source, all-owner collision or output-provenance authority must
+  refuse active assignments at scope, setter, intake and deferred dispatch,
+  independently of GUI readiness. None/Delete and established logical owners
+  keep their existing contracts; the new editor remains unavailable with a
+  translated reason. Nine read-only Linux XKB/source/test files and four
+  test registrations supply opaque source/chord observations, numeric symbol
+  and modifier-state inspection. They do not emit user mappings or dead keys.
+  Collision, output-provenance and native GUI work remains unintegrated.
+  Preparations stored only in /tmp before the cloud restart are unavailable
+  and must be reconstructed and reviewed against current sources. No fixed accent menu/default is retired.
+  Real physical capture, Unicode/dead-key delivery, collision refusal, native
+  GUI lifecycle, installation and Windows PC acceptance remain open.
 
 Windows continuation for item97 (explicitly deferred to the maintainer's PC):
 
@@ -4912,11 +4941,21 @@ Detailed commands, test owners and the inactive prepared packet are in
 [group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md).
 This deferral does not complete this item or the cross-cutting items16/38.
 
-- [ ] **98.** Replace the fixed "make J the star key" setting with a physical
-      key and output chosen by the user: any keyboard position and arbitrary
-      character, including choosing no star at all. Integrate with item 97's
-      shared user-owned shortcut model rather than another fixed-layout switch.
-      Windows continuation for item98 (explicitly deferred to the maintainer's PC):
+- [~] **98.** Replace the fixed "make J the star key" setting with a physical
+  key and output chosen by the user: any keyboard position and arbitrary
+  character, including choosing no star at all. Integrate with item 97's
+  shared user-owned shortcut model rather than another fixed-layout switch.
+
+  The admitted shared model can represent an arbitrary physical entry and
+  explicit None without introducing a fixed J/star default. Its Linux/macOS
+  native delivery remains unavailable, so no active star mapping is accepted
+  or consumed through this new model. Existing records remain intact. The
+  Windows legacy logical magic-source character is not proof of a physical
+  J position; no layout-dependent migration or legacy-setting retirement is
+  claimed. Qualify genuine physical source/output and acknowledged migration
+  before replacing the old setting. See the item97 partial handover.
+
+Windows continuation for item98 (explicitly deferred to the maintainer's PC):
 
 1. Fetch the current `origin/dev`, establish the native baseline, and coordinate
    the affected Windows/input owners before changing sources.
@@ -5535,6 +5574,16 @@ Composition préparée après Navigation12/DynamicACK2 et BaselineDelay macOS : 
 
 Windows follow-up: the parse-time number-row criterion now retains native input until the actual Layout category map is admitted with an Integer true switch. A contained call publishes symbols capability only after the existing source owner returns exact true; unpublished emulation dependencies cannot escape during Bundle_Init. The AltGr provider was already excluding the global digit-row policy: its stale marker assertion is replaced by actual provider count/order/action and exact single global placement checks, without changing menu production. Existing digit-row tests retain their whole prefix, and all other accented-shortcut assertions remain unchanged. New registered native tests cover unpublished, malformed, missing, false and true sources, model refusal, and a genuine KLE symbols positive. Portable scoped loop, syntax, convention, BOM/LF and source-envelope checks passed; no local AHK execution is claimed. Full selected root qualification and Windows native CI remain required. Existing unsupported native HKL/Lua and physical input requirements remain open.
 
+Read-only Linux source admission now includes native number-row level
+inspection and its registered fixture, alongside opaque chord/source currency
+and numeric-symbol inspection. This supplies observations for later policy
+owners; it does not acquire held output, rewrite key events or enable forced
+Lua digits/symbols. The joint native input/source/modifier/output provenance
+owner and physical row/repeat/Nav/AltGr/Caps/dead-key qualification remain open.
+The unintegrated number-row runtime/provenance preparation stored only in
+/tmp is unavailable after the cloud restart and needs reconstruction and
+review. Linux/macOS forced native capabilities remain unavailable.
+
 Windows continuation for item107 (explicitly deferred to the maintainer's PC):
 
 1. Fetch the current `origin/dev`, establish the native baseline, and coordinate
@@ -5594,6 +5643,15 @@ existing real US/French Carbon tests remain pending.
 Native CI run 37087943283 exposed six Windows contextual fixture failures. The repair preserves absent global state, uses the actual registrar spelling, separates shifted Digit8 refusal from the direct numpad source, counts the contextual group without an Add row, and keeps the declared editor default behind its closed master. The private native probe retains strict warnings in a local scope. The complete selected local gates pass 353 JS checks; native Windows revalidation remains pending.
 
 The physical magic-key chooser and capture now refuse candidates owned by a configured, recognized tap assignment on Windows, macOS and Linux. The candidate stays visible with the existing translated personal-assignment priority reason; Automatic and explicit none assignments remain available. Canonical physical and tap catalogues resolve native identities, including both existing macOS ISO/ANSI aliases. Refusal preserves source intent, tap action/parameters and unrelated configuration bytes. Previously stored conflicting intent cannot override an acknowledged active tap dispatcher; transient Shortcuts OFF and pause gates retain their established runtime behavior. The actual macOS tap owner retires logical delivery before a refused native stop, while retaining cleanup ownership. Portable real-owner regressions and selected checks pass; Windows native tests, native Hammerspoon ordering and three-OS CI qualification remain pending. This does not complete the physical-hardware acceptance requirements.
+
+The admitted generic physical editor/model preserves existing shortcut and
+magic-source records; it does not qualify a new default hotstring-editor
+binding. Its Linux/macOS physical delivery gate remains false even when the
+native window host is ready. Read-only XKB observations cannot substitute for
+acknowledged effective-source retargeting, all-owner collision checks or actual
+modifier/output custody. Existing conditional/native-owner requirements above
+remain open, including real layout changes, explicit-none precedence and
+physical acceptance; legacy menus remain reachable.
 
 Windows continuation for item108 (explicitly deferred to the maintainer's PC):
 
