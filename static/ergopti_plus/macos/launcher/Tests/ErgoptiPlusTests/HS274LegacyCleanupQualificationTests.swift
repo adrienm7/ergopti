@@ -1,6 +1,11 @@
 // Native private-file acceptance; user UI and the unavailable original backup remain unqualified.
 import Foundation
 import XCTest
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
 
 extension HS274NativePolicyQualificationTests {
 
@@ -54,8 +59,120 @@ extension HS274NativePolicyQualificationTests {
 			XCTAssertEqual(authority["ui_confirmation"] as? String, "unexecuted")
 			XCTAssertEqual(authority["lease_initialized"] as? Bool, false)
 			XCTAssertEqual(authority["installation"] as? Bool, false)
-			// Keep actual source identities and settled process evidence in the CI log.
-			print(receipt.stdout, terminator: "")
+			// Keep the full source/owner receipt outside the disposable fixture. A giant
+			// log line can interleave with XCTest's case-completion marker.
+			let artifact = try Self.persistLegacyCleanupReceipt(receipt.stdout, parent: parent,
+				name: "legacy-cleanup-receipt-" + UUID().uuidString + ".json")
+			print(Self.legacyCleanupReceiptLog(artifact.name, bytes: artifact.bytes, cases: cases.count), terminator: "")
+		}
+	}
+
+	private enum LegacyReceiptArtifactError: Error {
+		case ownership, persistence
+	}
+
+	/// Capture the exact original stdout exclusively, retaining its own file until
+	/// readback and ordinary descriptor closure succeed. No receipt is reserialized.
+	static func persistLegacyCleanupReceipt(_ stdout: String, parent: URL, name: String) throws -> (name: String, bytes: Int) {
+		let prefix = "legacy-cleanup-receipt-"
+		let allowed = Set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-.".utf8)
+		guard parent.path.hasPrefix("/"), parent.resolvingSymlinksInPath() == parent,
+			name.hasPrefix(prefix), name.hasSuffix(".json"), name.utf8.count == prefix.utf8.count + 36 + 5,
+			name.utf8.allSatisfy({ allowed.contains($0) }),
+			UUID(uuidString: String(name.dropFirst(prefix.count).dropLast(5))) != nil else {
+			throw LegacyReceiptArtifactError.ownership
+		}
+		let parentDescriptor = open(parent.path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW)
+		guard parentDescriptor >= 0 else { throw LegacyReceiptArtifactError.ownership }
+		var parentNeedsClose = true
+		defer { if parentNeedsClose { close(parentDescriptor) } }
+		var parentBefore = stat()
+		guard fstat(parentDescriptor, &parentBefore) == 0,
+			parentBefore.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR), parentBefore.st_uid == geteuid() else {
+			throw LegacyReceiptArtifactError.ownership
+		}
+		let descriptor = openat(parentDescriptor, name, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW, 0o600)
+		guard descriptor >= 0 else { throw LegacyReceiptArtifactError.persistence }
+		let stream = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+		var streamNeedsClose = true
+		defer { if streamNeedsClose { try? stream.close() } }
+		let bytes = Data(stdout.utf8)
+		try stream.write(contentsOf: bytes)
+		try stream.synchronize()
+		try stream.seek(toOffset: 0)
+		let readback = try stream.readToEnd() ?? Data()
+		var held = stat(), named = stat(), parentAfter = stat()
+		guard readback == bytes, fstat(descriptor, &held) == 0,
+			fstatat(parentDescriptor, name, &named, AT_SYMLINK_NOFOLLOW) == 0,
+			lstat(parent.path, &parentAfter) == 0, parent.resolvingSymlinksInPath() == parent,
+			parentAfter.st_dev == parentBefore.st_dev, parentAfter.st_ino == parentBefore.st_ino,
+			parentAfter.st_uid == parentBefore.st_uid, parentAfter.st_mode == parentBefore.st_mode,
+			held.st_dev == named.st_dev, held.st_ino == named.st_ino,
+			held.st_mode == named.st_mode, held.st_uid == named.st_uid, held.st_size == named.st_size,
+			held.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG), held.st_uid == geteuid(),
+			held.st_mode & 0o7777 == 0o600, held.st_nlink == 1, named.st_nlink == 1,
+			held.st_size == off_t(bytes.count) else { throw LegacyReceiptArtifactError.persistence }
+		streamNeedsClose = false
+		try stream.close()
+		parentNeedsClose = false
+		guard close(parentDescriptor) == 0 else { throw LegacyReceiptArtifactError.persistence }
+		return (name, bytes.count)
+	}
+
+	static func legacyCleanupReceiptLog(_ name: String, bytes: Int, cases: Int) -> String {
+		"HS274 legacy cleanup receipt file=" + name + " bytes=" + String(bytes) + " cases=" + String(cases) + "\n"
+	}
+
+	func testLegacyCleanupReceiptArtifactPreservesFullBytesAndSurvivesChildCleanup() throws {
+		try fixture { parent in
+			let child = parent.appendingPathComponent("disposable-fixture")
+			try FileManager.default.createDirectory(at: child, withIntermediateDirectories: false,
+				attributes: [.posixPermissions: 0o700])
+			let original = "FULL RECEIPT BEGIN\n" + String(repeating: "é-source-owner-census\n", count: 40_000) + "FULL RECEIPT END\n"
+			let name = "legacy-cleanup-receipt-00000000-0000-0000-0000-000000000001.json"
+			let artifact = try Self.persistLegacyCleanupReceipt(original, parent: parent, name: name)
+			try FileManager.default.removeItem(at: child)
+			let path = parent.appendingPathComponent(name)
+			XCTAssertEqual(try Data(contentsOf: path), Data(original.utf8))
+			XCTAssertEqual(artifact.bytes, original.utf8.count)
+			XCTAssertEqual(artifact.name, name)
+			let attributes = try FileManager.default.attributesOfItem(atPath: path.path)
+			XCTAssertEqual((attributes[.posixPermissions] as? NSNumber)?.intValue, 0o600)
+			XCTAssertEqual(attributes[.type] as? FileAttributeType, .typeRegular)
+			let message = Self.legacyCleanupReceiptLog(artifact.name, bytes: artifact.bytes, cases: 6)
+			XCTAssertEqual(message, "HS274 legacy cleanup receipt file=" + name + " bytes=" + String(original.utf8.count) + " cases=6\n")
+			XCTAssertLessThan(message.utf8.count, 160)
+			XCTAssertEqual(message.filter { $0 == "\n" }.count, 1)
+			XCTAssertTrue(message.hasSuffix("\n"))
+		}
+	}
+
+	func testLegacyCleanupReceiptArtifactRefusesExistingFileAndSymlinkWithoutOverwrite() throws {
+		try fixture { parent in
+			let name = "legacy-cleanup-receipt-00000000-0000-0000-0000-000000000002.json"
+			let path = parent.appendingPathComponent(name)
+			let foreign = Data("EXISTING RECEIPT MUST SURVIVE\n".utf8)
+			try foreign.write(to: path, options: .withoutOverwriting)
+			XCTAssertThrowsError(try Self.persistLegacyCleanupReceipt("replacement", parent: parent, name: name))
+			XCTAssertEqual(try Data(contentsOf: path), foreign)
+			let linkName = "legacy-cleanup-receipt-00000000-0000-0000-0000-000000000003.json"
+			let link = parent.appendingPathComponent(linkName)
+			try FileManager.default.createSymbolicLink(at: link, withDestinationURL: path)
+			XCTAssertThrowsError(try Self.persistLegacyCleanupReceipt("replacement", parent: parent, name: linkName))
+			XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: link.path), path.path)
+			XCTAssertEqual(try Data(contentsOf: path), foreign)
+		}
+	}
+
+	func testLegacyCleanupReceiptArtifactRefusesAliasedParentAndInvalidName() throws {
+		try fixture { parent in
+			let name = "legacy-cleanup-receipt-00000000-0000-0000-0000-000000000004.json"
+			let alias = parent.appendingPathComponent("alias")
+			try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: parent)
+			XCTAssertThrowsError(try Self.persistLegacyCleanupReceipt("receipt", parent: alias, name: name))
+			XCTAssertThrowsError(try Self.persistLegacyCleanupReceipt("receipt", parent: parent, name: "../foreign.json"))
+			XCTAssertFalse(FileManager.default.fileExists(atPath: parent.appendingPathComponent(name).path))
+			XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: parent.path), ["alias"])
 		}
 	}
 

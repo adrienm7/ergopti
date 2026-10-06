@@ -328,6 +328,14 @@ jobs:
           fi
         timeout-minutes: 10
 
+      - name: Retain native legacy-cleanup receipt
+        if: always() && (steps.swift-launcher-tests.outcome == 'success' || steps.swift-launcher-tests.outcome == 'failure')
+        uses: actions/upload-artifact@v4
+        with:
+          name: legacy-cleanup-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/swift-launcher-evidence/legacy-cleanup-receipt-*.json
+          if-no-files-found: ignore
+
       - name: Retain installed-VHD ancestry diagnostic evidence
         if: ${{ always() && steps.installed-vhd-acl.outputs.evidence_parent != '' }}
         uses: actions/upload-artifact@v4

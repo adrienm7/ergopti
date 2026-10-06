@@ -163,6 +163,25 @@ const PLAN_STEPS = ['Load the Linux release artifact contract', 'Compute tag and
 // The only steps of the pipeline that may set an `if`, each with its only
 // accepted value. Every other step runs whenever its job runs, so no edit can
 // skip a gate while its job stays green.
+// This diagnostic upload retains only the successful native cleanup receipt,
+// including a receipt captured before a later Swift failure. It never exports
+// the whole evidence parent or changes the XCTest verdict.
+const LEGACY_RECEIPT_STEP_ORDER = [
+	'Run Swift launcher tests',
+	'Retain native legacy-cleanup receipt'
+];
+const LEGACY_RECEIPT_CONDITION =
+	"always() && (steps.swift-launcher-tests.outcome == 'success' || steps.swift-launcher-tests.outcome == 'failure')";
+const LEGACY_RECEIPT_STEP_TEXT = [
+	`      - name: ${LEGACY_RECEIPT_STEP_ORDER[1]}`,
+	`        if: ${LEGACY_RECEIPT_CONDITION}`,
+	'        uses: actions/upload-artifact@v4',
+	'        with:',
+	'          name: legacy-cleanup-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}',
+	'          path: ${{ runner.temp }}/swift-launcher-evidence/legacy-cleanup-receipt-*.json',
+	'          if-no-files-found: ignore'
+].join('\n');
+
 const STEP_CONDITIONS = [
 	[LINUX_BOX, 'test-linux', 'Run manual official runtime and model acceptance', MANUAL_RUNTIME_IF],
 	[
@@ -200,6 +219,7 @@ const STEP_CONDITIONS = [
 		'Retain packaged application startup evidence',
 		'always() && inputs.release'
 	],
+	[MACOS_BOX, 'package-macos', LEGACY_RECEIPT_STEP_ORDER[1], LEGACY_RECEIPT_CONDITION],
 	[
 		MACOS_BOX,
 		'package-macos',
@@ -1349,6 +1369,119 @@ for (const [name, expected] of [
 	);
 }
 errors.push(...stepProblems(pipeline.files()));
+
+/** Pin the single narrow receipt upload immediately after its actual Swift owner. */
+function legacyReceiptProblems(files) {
+	const problems = [];
+	const mac = files.find((entry) => entry.rel === MACOS_BOX);
+	const job =
+		mac && pipeline.jobsOfText(mac.text, MACOS_BOX).find((entry) => entry.id === 'package-macos');
+	const steps = job ? pipeline.steps(job.body) : [];
+	const native = steps.filter((step) => step.name === LEGACY_RECEIPT_STEP_ORDER[0]);
+	const receipts = steps.filter((step) => step.name === LEGACY_RECEIPT_STEP_ORDER[1]);
+	const nativeAt = steps.findIndex((step) => step.name === LEGACY_RECEIPT_STEP_ORDER[0]);
+	const receiptAt = steps.findIndex((step) => step.name === LEGACY_RECEIPT_STEP_ORDER[1]);
+	if (native.length !== 1 || receipts.length !== 1 || nativeAt < 0 || receiptAt !== nativeAt + 1) {
+		problems.push(
+			'the single legacy cleanup receipt upload must immediately follow its Swift owner'
+		);
+	}
+	if (receipts.length === 1 && codeOf(receipts[0].body) !== LEGACY_RECEIPT_STEP_TEXT) {
+		problems.push(
+			'legacy cleanup must retain only its exact SHA/run/attempt JSON glob on Swift success or failure'
+		);
+	}
+	return problems;
+}
+errors.push(...legacyReceiptProblems(pipeline.files()));
+mustCatch(
+	'missing mandatory native legacy cleanup receipt upload',
+	MACOS_BOX,
+	LEGACY_RECEIPT_STEP_TEXT + '\n',
+	'',
+	legacyReceiptProblems
+);
+for (const changed of [
+	'',
+	'false',
+	'success()',
+	'inputs.release',
+	'always()',
+	"always() && steps.swift-launcher-tests.outcome == 'failure'",
+	"always() && steps.swift-launcher-tests.outcome != 'skipped'"
+]) {
+	const from = `        if: ${LEGACY_RECEIPT_CONDITION}\n`;
+	const to = changed ? `        if: ${changed}\n` : '';
+	mustCatch(
+		'legacy cleanup retained receipt condition ' + (changed || 'missing'),
+		MACOS_BOX,
+		from,
+		to,
+		legacyReceiptProblems
+	);
+	mustCatch(
+		'legacy cleanup generic condition registry ' + (changed || 'missing'),
+		MACOS_BOX,
+		from,
+		to,
+		stepProblems
+	);
+}
+for (const [what, from, to] of [
+	[
+		'broad parent upload',
+		'          path: ${{ runner.temp }}/swift-launcher-evidence/legacy-cleanup-receipt-*.json\n',
+		'          path: ${{ runner.temp }}/swift-launcher-evidence\n'
+	],
+	[
+		'unbounded legacy glob',
+		'          path: ${{ runner.temp }}/swift-launcher-evidence/legacy-cleanup-receipt-*.json\n',
+		'          path: ${{ runner.temp }}/swift-launcher-evidence/legacy-cleanup-receipt-*\n'
+	],
+	[
+		'changed artifact action',
+		'        uses: actions/upload-artifact@v4\n',
+		'        uses: actions/upload-artifact@v3\n'
+	],
+	[
+		'missing SHA binding',
+		'          name: legacy-cleanup-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}\n',
+		'          name: legacy-cleanup-${{ github.run_id }}-${{ github.run_attempt }}\n'
+	],
+	[
+		'wrong missing-file policy',
+		'          if-no-files-found: ignore\n',
+		'          if-no-files-found: error\n'
+	]
+]) {
+	mustCatch(
+		'legacy cleanup receipt ' + what,
+		MACOS_BOX,
+		LEGACY_RECEIPT_STEP_TEXT + '\n',
+		(LEGACY_RECEIPT_STEP_TEXT + '\n').replace(from, to),
+		legacyReceiptProblems
+	);
+}
+const legacyReceiptWorkflow = pipeline.file(MACOS_BOX);
+const earlyLegacyReceipt = legacyReceiptWorkflow
+	.replace(LEGACY_RECEIPT_STEP_TEXT + '\n\n', '')
+	.replace(
+		'      - name: Run Swift launcher tests\n',
+		LEGACY_RECEIPT_STEP_TEXT + '\n\n      - name: Run Swift launcher tests\n'
+	);
+assert.notEqual(
+	earlyLegacyReceipt,
+	legacyReceiptWorkflow,
+	'the early receipt control must change the actual workflow'
+);
+assert.ok(
+	legacyReceiptProblems(
+		pipeline
+			.files()
+			.map((entry) => (entry.rel === MACOS_BOX ? { ...entry, text: earlyLegacyReceipt } : entry))
+	).length > 0,
+	'a receipt upload before its Swift owner must refuse'
+);
 for (const condition of ['', 'false', 'success()']) {
 	const head = '      - name: Retain installed-VHD ancestry diagnostic evidence\n';
 	const from =

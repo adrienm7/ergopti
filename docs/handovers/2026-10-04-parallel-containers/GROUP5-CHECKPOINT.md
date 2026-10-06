@@ -1038,3 +1038,23 @@ The two managed fixture tables gain only exact-owner sample ports, preserving ev
 previous assertion and case. The persisted-history fixture remains byte-exact.
 App/window/AX/clock leaves are explicitly modeled; native sampling, production
 startup and capture activation remain UNEXECUTED. TODO31 stays partial.
+
+The actual native method in [37411747843](https://github.com/adrienm7/ergopti/actions/runs/37411747843)
+passed its six cleanup cases, but printing its full JSON as one huge console line
+interleaved with the XCTest completion marker. The unchanged strict evidence
+judge refused that transcript; it is not whole native/pipeline qualification.
+The Swift owner now preserves its exact original UTF-8 receipt as an exclusive
+0600 sibling under the validated evidence parent, outside the disposable fixture.
+Same-descriptor readback, named/held file and parent currentness, closure and a
+bounded single-newline filename/byte/case summary replace only the old full print.
+Every original assertion/controller byte is conserved. Three normally discovered
+Foundation controls cover full multibyte bytes and sibling survival, file/symlink
+no-overwrite and alias/name refusal; their Swift/native execution is UNEXECUTED
+in this Linux container. The unchanged11 portable receipt cases pass both modes.
+A narrowly leased upload now retains only these receipt JSON files after actual
+Swift success or failure; previous archive/TIS/failure uploads and release guards
+remain exact. The additive registry and receipt/order guard reject13 physical
+workflow mutations; no existing assertion or evidence parser is weakened.
+Actual matching-source Swift execution, remote successful receipt retention,
+confirmation UI and physical input remain unqualified; the original25-rule backup
+is unavailable. This fixes evidence retention without completing TODO43.
