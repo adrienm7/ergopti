@@ -144,6 +144,40 @@ def native_launch_complete(packet):
     )
 
 
+def application_receive_complete(facts, nonce, identity):
+    """Admit only exact reception after the existing owned native settlement."""
+    if (
+        type(facts) is not dict
+        or facts.get("nonce") != nonce
+        or facts.get("identity") != identity
+        or type(facts.get("worker_exit")) is not int
+        or facts["worker_exit"] != 0
+        or facts.get("observer_timed_out") is not False
+    ):
+        return False
+    native = facts.get("gtk")
+    if (
+        not native_launch_complete(native)
+        or native.get("nonce") != nonce
+        or native.get("identity") != identity
+    ):
+        return False
+    expected = identity.encode("utf-8")
+    receipt = facts.get("receipt_after_worker")
+    return (
+        len(expected) <= CAPTURE_LIMIT
+        and type(receipt) is dict
+        and receipt.get("present") is True
+        and receipt.get("truncated") is False
+        and type(receipt.get("bytes_total")) is int
+        and receipt["bytes_total"] == len(expected)
+        and type(receipt.get("captured_bytes")) is int
+        and receipt["captured_bytes"] == len(expected)
+        and receipt.get("text") == identity
+        and receipt.get("prefix_sha256") == hashlib.sha256(expected).hexdigest()
+    )
+
+
 def run_owned_case(arguments, environment):
     """Keep the acquired session process until actual completion, even on observer timeout."""
     child = subprocess.Popen(

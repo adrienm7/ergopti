@@ -106,6 +106,8 @@ const WINDOWS_MECHANICS = {
 	'modules/keylogger/keylogger_prefetch.ahk': 'how a worker process is spawned',
 	'modules/dynamic_hotstrings/user_code.ahk':
 		'launch an owned personal-code worker with the bundled interpreter /script mode',
+	'adapters/program_providers.ahk':
+		'admit A_AhkPath as an interpreter only when the current runtime is interpreted',
 	'modules/updater/core.ahk': 'the owner, Updater_IsLocalSource'
 };
 
@@ -119,6 +121,15 @@ for (const file of sources('windows', '.ahk')) {
 	);
 }
 const readinessPublisher = ahkBody('infra/startup_smoke.ahk', 'StartupSmokePublishReady');
+const programInventory = code('windows', 'adapters/program_providers.ahk', ahkComment);
+expect(
+	programInventory.split('A_IsCompiled').length === 2 &&
+		programInventory.split('A_AhkPath').length === 3 &&
+		/if !A_IsCompiled && ProviderId == "autohotkey" \{\s*Info := this\.Identity\(A_AhkPath\)\s*if Info\["kind"\] == "file" && Info\["executable"\]\s*return Map\("executable", A_AhkPath, "token", Info\["token"\]\)\s*\}/.test(
+			programInventory
+		),
+	'the provider uses the compiled flag only to refuse its executable as an AHK interpreter'
+);
 expect(readinessPublisher !== '', 'the native readiness publisher must exist');
 expect(
 	readinessPublisher.split('A_IsCompiled').length === 3 &&

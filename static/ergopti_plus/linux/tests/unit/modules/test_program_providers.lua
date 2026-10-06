@@ -55,6 +55,50 @@ local function fixture()
 end
 
 helpers.describe("shared private program discovery", function()
+	helpers.it("preserves the POSIX catalogue while validating Windows-only provider metadata", function()
+		for _, platform in ipairs({ "linux", "hs" }) do
+			local providers = assert(Shared.catalogue(RAW, platform))
+			helpers.assert_eq(#providers, 4)
+			for index, id in ipairs({ "shell", "bash", "python", "executable" }) do
+				helpers.assert_eq(providers[index].id, id)
+				helpers.assert_eq(#providers[index].prefix, 0)
+			end
+			helpers.assert_eq(providers[3].commands[platform][1], "python3")
+		end
+		local data = Json.decode_lossless(RAW)
+		local by_id = {}; for _, provider in ipairs(data.providers) do by_id[provider.id] = provider end
+		helpers.assert_eq(by_id.python.commands.ahk[1], "python3.exe")
+		helpers.assert_eq(by_id.python.commands.ahk[2], "python.exe")
+		helpers.assert_eq(by_id.powershell.extensions[1], "ps1")
+		helpers.assert_eq(by_id.powershell.commands.ahk[1], "pwsh.exe")
+		helpers.assert_eq(by_id.powershell.commands.ahk[2], "powershell.exe")
+		for index, value in ipairs({ "-NoProfile", "-NonInteractive", "-File" }) do
+			helpers.assert_eq(by_id.powershell.prefix[index], value)
+		end
+		helpers.assert_eq(by_id.autohotkey.extensions[1], "ahk")
+		helpers.assert_eq(by_id.autohotkey.prefix[1], "/ErrorStdOut=UTF-8")
+		helpers.assert_eq(#by_id.executable.commands.ahk, 0)
+		helpers.assert_eq(Shared.catalogue(RAW, "ahk"), nil)
+	end)
+
+	helpers.it("rejects malformed Windows metadata before allocating a POSIX discovery session", function()
+		for _, kind in ipairs({ "unknown_platform", "command_type", "command_injection", "empty_script_commands", "prefix_nul" }) do
+			local data = Json.decode_lossless(RAW)
+			local provider
+			for _, value in ipairs(data.providers) do if value.id == "powershell" then provider = value end end
+			assert(provider)
+			if kind == "unknown_platform" then provider.commands.other = Json.array({ "shell" })
+			elseif kind == "command_type" then provider.commands.ahk = "powershell.exe"
+			elseif kind == "command_injection" then provider.commands.ahk[1] = "powershell.exe;exit"
+			elseif kind == "empty_script_commands" then provider.commands.ahk = Json.array({})
+			else provider.prefix[1] = "\0" end
+			local f = fixture()
+			local owner, reason = Shared.new("linux", assert(Json.encode(data)), f.ports)
+			helpers.assert_eq(owner, nil); helpers.assert_eq(reason, "invalid_catalogue")
+			helpers.assert_eq(f.closes, 0)
+		end
+	end)
+
 	helpers.it("lowers known scripts and executables to literal argv without leaking paths into choices", function()
 		local f = fixture()
 		local key, packet = f.key("écho.sh")
