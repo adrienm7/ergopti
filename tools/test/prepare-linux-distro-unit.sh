@@ -7,11 +7,11 @@ set -euo pipefail
 
 distro="${1:?distribution is required}"
 case "$distro" in
-	debian) apt-get install -y --no-install-recommends luajit python3 ca-certificates git gcc make cmake pkg-config libluajit-5.1-dev libuv1-dev ;;
-	fedora) dnf install -y luajit python3 ca-certificates git gcc make cmake pkgconf-pkg-config luajit-devel libuv-devel ;;
-	arch) pacman -Sy --noconfirm luajit python ca-certificates git gcc make cmake pkgconf libuv ;;
-	alpine) apk add --no-cache luajit python3 ca-certificates git build-base cmake pkgconf luajit-dev libuv-dev ;;
-	opensuse) zypper --non-interactive install luajit python3 ca-certificates git gcc make cmake pkg-config luajit-devel libuv-devel ;;
+	debian) apt-get install -y --no-install-recommends luajit python3 ca-certificates git gcc libc6-dev make cmake pkg-config libluajit-5.1-dev libuv1-dev curl ;;
+	fedora) dnf install -y luajit python3 ca-certificates git gcc make cmake pkgconf-pkg-config luajit-devel libuv-devel curl ;;
+	arch) pacman -Sy --noconfirm luajit python ca-certificates git gcc make cmake pkgconf libuv curl ;;
+	alpine) apk add --no-cache luajit python3 ca-certificates git build-base cmake pkgconf luajit-dev libuv-dev curl ;;
+	opensuse) zypper --non-interactive install luajit python3 ca-certificates git gcc make cmake pkg-config luajit-devel libuv-devel curl ;;
 	*) echo 'Unsupported mandatory unit distribution.' >&2; exit 1 ;;
 esac
 
@@ -56,6 +56,12 @@ install -m 0644 "$native_root/lfs/src/lfs.so" "$native_root/modules/lfs.so"
 unit_tmp="$(mktemp -d "$native_root/unit.XXXXXXXX")"
 chown ergopti-ci "$unit_tmp"
 
+# These unchanged fixtures create files in the driver root and its tests directory.
+# Only these two directory owners change; checked-out source files and modes remain intact.
+unit_driver="$(pwd -P)"
+test -f "$unit_driver/tests/run.lua"
+chown ergopti-ci "$unit_driver" "$unit_driver/tests"
+
 # Permission refusal must execute under the same real non-root UID as the suite.
 # Requiring native C entry points also refuses missing or wrong-ABI libraries.
 sudo -H -u ergopti-ci env -u SUDO_UID -u SUDO_GID -u SUDO_USER \
@@ -73,5 +79,21 @@ print(jit.version)
 '
 sudo -H -u ergopti-ci env -u SUDO_UID -u SUDO_GID -u SUDO_USER \
 	/usr/bin/python3 -c 'import os; assert(os.geteuid() != 0)'
+sudo -H -u ergopti-ci env -u SUDO_UID -u SUDO_GID -u SUDO_USER \
+	/usr/bin/python3 -c '
+import os
+from pathlib import Path
+import tempfile
+assert(os.geteuid() != 0)
+working = Path.cwd()
+for directory in (working, working / "tests"):
+    assert(directory.stat().st_uid == os.geteuid())
+    with tempfile.TemporaryFile(dir=directory) as receipt:
+        assert(receipt.write(b"ordinary fixture write") == 22)
+        receipt.seek(0)
+        assert(receipt.read() == b"ordinary fixture write")
+assert(Path.cwd() == working)
+print("Native ordinary-user fixture writes: 2 directories admitted")
+'
 sudo -H -u ergopti-ci env -u SUDO_UID -u SUDO_GID -u SUDO_USER \
 	LUA_CPATH="$native_root/modules/?.so;;" TMPDIR="$unit_tmp" "$interpreter" tests/run.lua
