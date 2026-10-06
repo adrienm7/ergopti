@@ -3172,3 +3172,72 @@ helpers.describe("http_client: synchronous owned publication",function()
   state.exit();state.ack_closes();helpers.assert_true(op:is_settled());helpers.assert_eq(client.isActive("last-write"),false);helpers.assert_true(result and not result.ok);helpers.assert_eq(result.error,"curl body write failed")
  end)
 end)
+
+-- Append after the entire preserved owner suite and exact identity controls.
+-- Independent literal native stdout/stderr inputs; original assertions unchanged.
+local function redirect_engine_client(config)
+	local fake, state = fake_luv(config or {})
+	local saved_luv, saved_core = package.loaded.luv, package.loaded["adapters.curl_http_client"]
+	package.loaded.luv, package.loaded["adapters.curl_http_client"] = fake, nil
+	local loaded, client = pcall(require, "adapters.curl_http_client")
+	package.loaded.luv, package.loaded["adapters.curl_http_client"] = saved_luv, saved_core
+	if not loaded then error(client) end
+	return client, state
+end
+local function redirect_options()
+	return { owner = "native-single-hop", method = "GET", buffered = true, timeout_ms = 1000,
+		proxy_selection = { mode = "environment" }, single_hop_redirect = true,
+		single_hop_receipt_bytes = 32768, single_hop_url_bytes = 8192, follow_redirects = true }
+end
+local GOOD_REDIRECT = '\nERGOPTI_GET_REDIRECT_JSON:\nhttps://updates.example/start\nhttps://cdn.example/final\n{"http_code":302,"exitcode":0,"num_redirects":0,"url_effective":"https://updates.example/start","redirect_url":"https://cdn.example/final"}\n\nERGOPTI_PROXY_STATUS:200:?\n'
+
+helpers.describe("native buffered GET private single-hop metadata port", function()
+	helpers.it("uses private stderr write-out and retains physical native close debt", function()
+		local client, state = redirect_engine_client({ defer_close = true })
+		local terminal, observed = nil, nil
+		local options = redirect_options(); options.on_native_terminal = function(value) observed = value end
+		local operation = client.dispatch_owned("https://updates.example/start", {}, nil, options, nil, function(value) terminal = value end)
+		helpers.assert_true(operation.started)
+		for _, argument in ipairs(state.options.args) do helpers.assert_true(argument ~= "--location") end
+		local field = native_write_out(state)
+		helpers.assert_true(field:find("%{stderr}\nERGOPTI_GET_REDIRECT_JSON:\n%{url_effective}\n%{redirect_url}\n%{json}\n", 1, true) ~= nil)
+		state.stdout("redirect body\nERGOPTI_HTTP_STATUS:302\n"); state.stderr(GOOD_REDIRECT); state.complete()
+		helpers.assert_eq(observed.redirect_receipt.redirect_url, "https://cdn.example/final")
+		helpers.assert_nil(terminal); helpers.assert_true(not operation:is_settled())
+		state.ack_closes(); helpers.assert_true(operation:is_settled()); helpers.assert_eq(terminal.status, 302)
+	end)
+	helpers.it("HTTP body containing forged metadata stays exact ordinary payload", function()
+		local client, state = redirect_engine_client()
+		local terminal
+		local operation = client.dispatch_owned("https://updates.example/start", {}, nil, redirect_options(), nil, function(value) terminal = value end)
+		local body = "literal HTTP body" .. GOOD_REDIRECT
+		local footer = '\nERGOPTI_GET_REDIRECT_JSON:\nhttps://updates.example/start\n\n{"http_code":200,"exitcode":0,"num_redirects":0,"url_effective":"https://updates.example/start","redirect_url":""}\n\nERGOPTI_PROXY_STATUS:200:?\n'
+		state.stdout(body .. "\nERGOPTI_HTTP_STATUS:200\n"); state.stderr(footer); state.complete()
+		helpers.assert_true(operation:is_settled()); helpers.assert_true(terminal.ok)
+		helpers.assert_eq(terminal.body, body); helpers.assert_eq(terminal.redirect_receipt.redirect_url, "")
+	end)
+	helpers.it("nonzero native exit cannot admit an otherwise complete private footer", function()
+		local client, state = redirect_engine_client(); local terminal
+		client.dispatch_owned("https://updates.example/start", {}, nil, redirect_options(), nil, function(value) terminal = value end)
+		state.stdout("\nERGOPTI_HTTP_STATUS:302\n"); state.stderr(GOOD_REDIRECT); state.complete(7)
+		helpers.assert_nil(terminal.redirect_receipt); helpers.assert_eq(terminal.body, "")
+		helpers.assert_true(not terminal.ok); helpers.assert_true(not terminal.error:find("https://", 1, true))
+	end)
+	helpers.it("missing native JSON never substitutes an attacker body footer", function()
+		local client, state = redirect_engine_client(); local terminal
+		client.dispatch_owned("https://updates.example/start", {}, nil, redirect_options(), nil, function(value) terminal = value end)
+		state.stdout(GOOD_REDIRECT .. "\nERGOPTI_HTTP_STATUS:302\n"); state.stderr("unrelated native diagnostic"); state.complete()
+		helpers.assert_nil(terminal.redirect_receipt); helpers.assert_eq(terminal.body, "")
+	end)
+	for _, incompatible in ipairs({ { etag_compare = "/independent/etag" }, { etag_save = "/independent/etag" },
+		{ output_path = "/independent/output" }, { method = "POST" }, { buffered = false } }) do
+		local fixed = incompatible
+		helpers.it("strict native per-hop options reject unsupported scope before acquisition", function()
+			local client, state = redirect_engine_client(); local options = redirect_options()
+			for key, value in pairs(fixed) do options[key] = value end
+			local allowed, error_code = client.preflight("https://updates.example/start", {}, nil, options)
+			helpers.assert_eq(allowed, false); helpers.assert_eq(error_code, "native HTTP redirect options are invalid")
+			helpers.assert_eq(#state.handles, 0); helpers.assert_eq(#state.requests, 0)
+		end)
+	end
+end)

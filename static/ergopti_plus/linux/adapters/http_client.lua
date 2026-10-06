@@ -13,6 +13,7 @@ local M = {}
 local Curl = require("adapters.curl_http_client")
 local Proxy = require("adapters.system_proxy")
 local PolicyBinding = require("infra.proxy_policy")
+local RedirectBinding = require("infra.managed_redirect_policy")
 local Managed = require("infra.managed_http")
 local Monotonic = require("infra.monotonic")
 local Deadline = require("infra.managed_http_deadline")
@@ -38,7 +39,7 @@ local function initialize()
 	local policy, err = PolicyBinding.load()
 	if not policy then initialization_error = err; return nil, err end
 	coordinator, initialization_error = Managed.new({
-		policy = policy, proxy = Proxy, curl = Curl.dispatch_owned,
+		policy = policy, proxy = Proxy, curl = Curl.dispatch_owned, redirect = RedirectBinding.load,
 		clock = Monotonic.now_ms, deadline = Deadline.start, environment = PolicyBinding.environment,
 		report = function(message) Logger.error(LOG, "%s", message) end,
 	})
@@ -87,6 +88,7 @@ end
 local function dispatch(url, headers, body, options, method, buffered, owned_api, on_chunk, callback)
 	local request = {}
 	for key, value in pairs(type(options) == "table" and options or {}) do request[key] = value end
+	request.single_hop_redirect, request.single_hop_receipt_bytes, request.single_hop_url_bytes = nil, nil, nil
 	request.owner = owner_name(request.owner)
 	request.timeout_ms = tonumber(request.timeout_ms) or Curl.default_timeout_ms()
 	if request.timeout_ms <= 0 or request.timeout_ms % 1 ~= 0 then return rejected("HTTP timeout is invalid", callback) end
@@ -121,6 +123,7 @@ local function dispatch_owned(url, headers, body, options, method, buffered, on_
 		if type(options) == "table" then
 			for key, value in next, options do captured[key] = value end
 		end
+		captured.single_hop_redirect, captured.single_hop_receipt_bytes, captured.single_hop_url_bytes = nil, nil, nil
 		captured.owner, captured.timeout_ms = owner, timeout
 		captured.method, captured.buffered, captured.owned_api = method, buffered, true
 		captured.authorized = authorized

@@ -1,12 +1,15 @@
 --- tests/unit/adapters/test_managed_owned_authorization.lua
 
 --- ==============================================================================
---- MODULE: Managed Owned Source Authorization Tests
+--- MODULE: Owned HTTP Source Admission Controls
 --- DESCRIPTION:
---- Exercises actual public-wrapper and coordinator admission with independent
---- Curl, GIO, clock and timer ports. Model ACKs do not prove native delivery.
+--- Runs independent fixed expectations through the normal driver test helpers.
+--- These modeled ports do not establish native transport or enterprise coverage.
 --- ==============================================================================
 
+--- tests/unit/adapters/test_managed_owned_authorization.lua
+--- Independent actual public-wrapper/coordinator controls. Curl, GIO, clock and
+--- timer retirement are explicit native ports; no native-wire proof is inferred.
 local helpers = require("tests.helpers")
 local Paths = require("infra.paths")
 local Json = require("json")
