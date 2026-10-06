@@ -3471,6 +3471,8 @@ Seven Windows failures exposed a typo in four new fixture subjects: the manifest
 
 The Windows persistence census now audits the actual added scope build-only consumer, retaining the previous 36 consumers and requiring its captured-source, typed finalizer and status-before-target chain. The new closed census is 37 total / 9 internal, with executable-code offsets and genuine quoted-data counterexamples; no publisher assertion is relaxed. Actual Windows qualification remains pending.
 
+The exact personal snapshot regression now selects its handwritten semantic fixture identity among the real initialized defaults. All original name/type/value/two-row assertions remain; genuine sibling, case-twin, descendant and literal-dot decoys are rejected. Actual Windows execution remains pending.
+
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
   The shared AHK override policy now writes an explicit recommended delay only
