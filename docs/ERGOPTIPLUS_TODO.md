@@ -6810,6 +6810,29 @@ and all distribution lanes are skipped; the new native distro bootstrap has
 not executed on hosted distributions. Release is skipped. Preserve this failure
 and the earlier4/4 success separately; no assertion or deadline is weakened.
 
+- [ ] **112.** Accept an AI prediction immediately with its configured
+      modifier-plus-digit shortcut, with matching shortcut hints on all three OSes.
+
+  Maintainer report on Windows AHK (2026-10-06): the shortcut currently only
+  highlights the corresponding prediction. Pressing the configured shortcut
+  must immediately insert that prediction through the normal acceptance owner,
+  including any correction of previously typed text.
+
+  Each prediction tooltip row must show its effective shortcut in a separate
+  right-aligned, muted gray column. Derive the displayed modifiers and digit
+  from the same current menu configuration that owns the binding. Use one
+  shared visual design on Windows, macOS and Linux, with the existing native
+  modifier labels, and refresh both bindings and hints after configuration
+  changes.
+
+  Regression coverage must distinguish insertion from highlighting, verify
+  every supported prediction index and modifier choice, preserve the existing
+  behavior when no prediction is mapped, and check hint/binding agreement.
+  Native acceptance must cover replacement/correction in Windows Notepad and
+  the supported macOS/Linux editors, plus tooltip alignment and appearance on
+  all three OSes. This is an unimplemented follow-up; it does not complete the
+  existing prediction-input or tooltip validation items.
+
 ## Time estimate
 
 Order-of-magnitude estimate: 40–70 agent-days for the current remaining

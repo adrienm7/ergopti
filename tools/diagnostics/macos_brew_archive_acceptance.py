@@ -178,7 +178,17 @@ def _validate_appleevent_terminal(packet):
         )
     require(
         packet["stderr_phase"]
-        in ("none", "registration", "handler", "receipt", "dispatch", "unclassified", "unavailable")
+        in (
+            "none",
+            "registration",
+            "registration-current-process",
+            "registration-transform",
+            "handler",
+            "receipt",
+            "dispatch",
+            "unclassified",
+            "unavailable",
+        )
         and type(packet["stderr_phase"]) is str,
         "Unadmitted native terminal phase",
     )
@@ -186,7 +196,14 @@ def _validate_appleevent_terminal(packet):
         available == (packet["stderr_phase"] != "unavailable"), "Capture observation phase differs"
     )
     status = packet["stderr_osstatus"]
-    classified = packet["stderr_phase"] in ("registration", "handler", "receipt", "dispatch")
+    classified = packet["stderr_phase"] in (
+        "registration",
+        "registration-current-process",
+        "registration-transform",
+        "handler",
+        "receipt",
+        "dispatch",
+    )
     require(
         (classified and type(status) is int and -(2**31) <= status < 2**31)
         or (not classified and status is None),
@@ -291,13 +308,15 @@ def _appleevent_terminal_packet(children, receiver, group, observation):
     )
     lines = {
         b"recipient registration": "registration",
+        b"recipient current-process registration": "registration-current-process",
+        b"recipient transform registration": "registration-transform",
         b"handler admission": "handler",
         b"receipt": "receipt",
         b"dispatch": "dispatch",
     }
     match = (
         re.fullmatch(
-            rb"Owned AppleEvent (recipient registration|handler admission|receipt|dispatch) failed: (-?[0-9]{1,11})\n",
+            rb"Owned AppleEvent (recipient registration|recipient current-process registration|recipient transform registration|handler admission|receipt|dispatch) failed: (-?[0-9]{1,11})\n",
             errors,
         )
         if available

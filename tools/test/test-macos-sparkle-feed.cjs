@@ -1005,14 +1005,14 @@ try {
 	assert.ifError(result.error);
 	assert.equal(result.signal, null, result.stderr);
 	assert.equal(result.status, 0, result.stderr);
-	assert.match(result.stderr, /Ran 39 tests in /);
-	const skipped = process.platform === 'win32' ? 15 : process.platform === 'darwin' ? 1 : 0;
+	assert.match(result.stderr, /Ran 46 tests in /);
+	const skipped = process.platform === 'win32' ? 17 : process.platform === 'darwin' ? 1 : 0;
 	assert.match(
 		result.stderr,
 		skipped ? new RegExp(`\\nOK \\(skipped=${skipped}\\)\\s*$`) : /\nOK\s*$/
 	);
 	console.log(
-		`Sparkle transport controls: ${39 - skipped} passed, ${skipped} platform cases skipped.`
+		`Sparkle transport controls: ${46 - skipped} passed, ${skipped} platform cases skipped.`
 	);
 	const fixture = fs.readFileSync(
 		path.join(
@@ -1363,10 +1363,7 @@ try {
 			python,
 			/if primary_failure is None and trace_failure is not None:\n            raise trace_failure/
 		);
-		assert.match(
-			python,
-			/signal\.signal\(signal\.SIGTERM, lambda \*_args: state\.update\(stopping=True\)\)/
-		);
+		assert.match(python, /signal\.signal\(signal\.SIGTERM, server\.request_stop\)/);
 		assert.match(source, /workerTimeout: Double = 60, startupDiagnostics: Bool = false/);
 		assert.match(
 			source,

@@ -275,7 +275,7 @@ check('portable Brew ownership controls remain registered and mandatory', () => 
 	assert.ifError(result.error);
 	assert.strictEqual(result.signal, null, result.stderr);
 	assert.strictEqual(result.status, 0, result.stderr);
-	assert.match(result.stderr, /Ran 52 tests in /);
+	assert.match(result.stderr, /Ran 53 tests in /);
 	assert.match(result.stderr, /\nOK\s*$/);
 	assert.doesNotMatch(result.stderr, /skipped=/);
 });
@@ -298,6 +298,19 @@ check(
 		assert.match(receiver, /AEProcessEvent\(event\)/);
 		assert.match(receiver, /ReleaseEvent\(event\)/);
 		assert.doesNotMatch(receiver, /RunApplicationEventLoop\s*\(/);
+		const registration = receiver.slice(
+			receiver.indexOf('ProcessSerialNumber serial;'),
+			receiver.indexOf('const AEEventHandlerUPP handler')
+		);
+		assert.ok(registration.length > 0, 'the actual native registration body must be present');
+		assert.match(
+			registration,
+			/GetCurrentProcess\(&serial\);\s*if \(status != noErr\) \{\s*fprintf\(stderr, "Owned AppleEvent recipient registration failed: phase=get-current-process, osstatus=%d\\n", \(int\)status\);\s*return 65;/
+		);
+		assert.match(
+			registration,
+			/TransformProcessType\(&serial, kProcessTransformToForegroundApplication\);\s*if \(status != noErr\) \{\s*fprintf\(stderr, "Owned AppleEvent recipient registration failed: phase=transform-process-type, osstatus=%d\\n", \(int\)status\);\s*return 65;/
+		);
 		assert.match(helper, /xcode-select", "--print-path"\], confined=True/);
 		assert.match(helper, /-isysroot/);
 		assert.match(helper, /-fmodules-cache-path=/);
