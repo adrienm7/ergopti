@@ -1158,6 +1158,24 @@
 			"type": "---"
 		},
 		{
+			"type": "command",
+			"id": "physical_shortcuts_editor",
+			"i18n": "physical_shortcuts.window_title",
+			"platforms": [
+				"hs",
+				"linux"
+			],
+			"unavailable": "grey",
+			"reason_key": "physical_shortcuts.windows_unavailable",
+			"disabled_when": [
+				"physical_shortcuts_editor_ready"
+			],
+			"disabled_reason_key": "physical_shortcuts.window_unavailable"
+		},
+		{
+			"type": "---"
+		},
+		{
 			"type": "list",
 			"id": "keyboard_slots",
 			"platforms": [
@@ -1178,7 +1196,8 @@
 			],
 			"platforms": [
 				"ahk",
-				"hs"
+				"hs",
+				"linux"
 			],
 			"reason_key": "platform_reason.remap_engine_is_per_driver"
 		},
@@ -1241,7 +1260,8 @@
 			"category": "KeyCombinations",
 			"platforms": [
 				"ahk",
-				"hs"
+				"hs",
+				"linux"
 			],
 			"reason_key": "platform_reason.remap_engine_is_per_driver"
 		},
@@ -1309,7 +1329,8 @@
 			"id": "key_combination_rows_left",
 			"platforms": [
 				"ahk",
-				"hs"
+				"hs",
+				"linux"
 			],
 			"reason_key": "platform_reason.remap_engine_is_per_driver"
 		},
@@ -1325,7 +1346,8 @@
 			"id": "key_combination_rows_right",
 			"platforms": [
 				"ahk",
-				"hs"
+				"hs",
+				"linux"
 			],
 			"reason_key": "platform_reason.remap_engine_is_per_driver"
 		}
@@ -1363,7 +1385,8 @@
 			],
 			"platforms": [
 				"ahk",
-				"hs"
+				"hs",
+				"linux"
 			],
 			"reason_key": "platform_reason.remap_engine_is_per_driver"
 		},
@@ -1379,7 +1402,8 @@
 			"id": "key_combination_slots",
 			"platforms": [
 				"ahk",
-				"hs"
+				"hs",
+				"linux"
 			],
 			"reason_key": "platform_reason.remap_engine_is_per_driver"
 		}

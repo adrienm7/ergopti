@@ -2107,45 +2107,49 @@ local function write_atomic(path, content, expected_source, on_error)
 
 	local native_lock = write_lock
 	local native_staging = owned_staging_cleanup
-	if native_staging and native_staging.released == true then native_staging = nil end
+	if native_staging and (native_staging.released == true or _staging_cleanup_debt ~= native_staging
+		or native_staging.requested_path ~= path or native_staging.on_error ~= on_error) then native_staging = nil end
 	local lock_released, lock_release_err = release_cooperative_write_lock(write_lock)
-	if lock_released or private then write_lock = nil end
-	local receipt
-	if type(on_error) == "function" and type(expected_source) == "table" and native_lock
-		and (payload_published or not lock_released or native_staging ~= nil) then
-		receipt = private_publication_receipt(path, resolved_path, symlink_chain, expected_source, content,
-			payload_published, not lock_released and native_lock or nil, native_staging, on_error, source_identity)
-	end
-	local retry_cleanup = nil
-	if not private and (not lock_released or (payload_published and (not ok or result ~= true))
-		or (owned_staging_cleanup ~= nil and _staging_cleanup_debt == owned_staging_cleanup and result ~= true)) then
-		-- This private callback owns only this operation's lease and staging debt.
-		-- It never repeats publication or touches a successor's live source.
-		local settled, cleanup_group = false, nil
-		retry_cleanup = function()
-			if settled then return true, nil, payload_published end
-			if write_lock ~= nil then
-				local released, detail = release_cooperative_write_lock(write_lock)
-				if released ~= true then return false, detail end
-				write_lock = nil
+	if lock_released then write_lock = nil end
+	local receipt, retry_cleanup
+	if private then
+		if native_lock and (payload_published or not lock_released or native_staging ~= nil) then
+			receipt = private_publication_receipt(path, resolved_path, symlink_chain, expected_source, content,
+				payload_published, not lock_released and native_lock or nil, native_staging, on_error, source_identity)
+			-- The opaque receipt becomes the sole retry owner of this operation.
+			write_lock = nil
+		end
+	else
+		if not lock_released or (payload_published and (not ok or result ~= true))
+			or (owned_staging_cleanup ~= nil and _staging_cleanup_debt == owned_staging_cleanup and result ~= true) then
+			-- This private callback owns only this operation's lease and staging debt.
+			-- It never repeats publication or touches a successor's live source.
+			local settled, cleanup_group = false, nil
+			retry_cleanup = function()
+				if settled then return true, nil, payload_published end
+				if write_lock ~= nil then
+					local released, detail = release_cooperative_write_lock(write_lock)
+					if released ~= true then return false, detail end
+					write_lock = nil
+				end
+				if cleanup_group ~= nil then
+					local released, detail = M.release_write_locks(cleanup_group)
+					if released ~= true then return false, detail end
+					cleanup_group = nil
+				end
+				if owned_staging_cleanup ~= nil and _staging_cleanup_debt == owned_staging_cleanup then
+					local group, acquired, acquire_err = M.acquire_write_locks({ owned_staging_cleanup.requested_path })
+					cleanup_group = group
+					if acquired ~= true then return false, acquire_err end
+					local called, cleaned, clean_err = pcall(release_staging_owner, owned_staging_cleanup, "publication retry")
+					local released, release_err = M.release_write_locks(cleanup_group)
+					if released == true then cleanup_group = nil end
+					if not called or cleaned ~= true then return false, tostring(called and clean_err or cleaned) end
+					if released ~= true then return false, release_err end
+				end
+				settled = true
+				return true, nil, payload_published
 			end
-			if cleanup_group ~= nil then
-				local released, detail = M.release_write_locks(cleanup_group)
-				if released ~= true then return false, detail end
-				cleanup_group = nil
-			end
-			if owned_staging_cleanup ~= nil and _staging_cleanup_debt == owned_staging_cleanup then
-				local group, acquired, acquire_err = M.acquire_write_locks({ owned_staging_cleanup.requested_path })
-				cleanup_group = group
-				if acquired ~= true then return false, acquire_err end
-				local called, cleaned, clean_err = pcall(release_staging_owner, owned_staging_cleanup, "publication retry")
-				local released, release_err = M.release_write_locks(cleanup_group)
-				if released == true then cleanup_group = nil end
-				if not called or cleaned ~= true then return false, tostring(called and clean_err or cleaned) end
-				if released ~= true then return false, release_err end
-			end
-			settled = true
-			return true, nil, payload_published
 		end
 	end
 	local function finish(written, detail)
@@ -2195,7 +2199,7 @@ end
 --- @param on_error function|nil Receives only fixed failure categories.
 --- @return boolean written
 --- @return string|nil error_message
---- @return table|function|nil receipt Private publication owner or ordinary refusal cleanup.
+--- @return function|table|nil receipt Ordinary cleanup callback or opaque private publication owner.
 function M.write_if_unchanged(path, content, expected_source, on_error)
 	if type(expected_source) ~= "table" then
 		return false, "expected_source must be a table"

@@ -272,6 +272,22 @@ function M.build(ctx)
 				return conflict
 			end
 			local spec = type(gestures.get_action_parameter_spec) == "function" and gestures.get_action_parameter_spec(a) or nil
+			if spec == "program" then
+				DeferredWork.after(0.05, function()
+					local committed = shortcut_utils.prompt_action_parameter(gestures, slot, a, spec, picked, {
+						section = "gestures", key = slot,
+						read = function() return gestures.get_action(slot) end,
+						apply = function() return gestures.set_action(slot, a) == true end,
+						restore = function(previous) return gestures.set_action(slot, previous) == true end,
+					}, ctx.commit_program_parameter)
+					if committed then
+						local conflict = type(gestures.on_action_changed) == "function" and gestures.on_action_changed(slot, a) or nil
+						ctx.updateMenu()
+						show_conflict(conflict)
+					end
+				end, "menu_gestures.action_parameter")
+				return
+			end
 			if spec then
 				DeferredWork.after(0.05, function()
 					local prior = type(gestures.get_action_parameter) == "function" and gestures.get_action_parameter(slot, a) or ""
@@ -286,7 +302,12 @@ function M.build(ctx)
 							if value == nil then return end
 						end
 						if type(gestures.validate_action_parameter) == "function" and gestures.validate_action_parameter(a, value) then
-							pcall(gestures.set_action_parameter, slot, a, value)
+
+							local stored_ok, stored = xpcall(gestures.set_action_parameter, debug.traceback, slot, a, value)
+							if not stored_ok or stored ~= true then
+								Logger.error(LOG, "Gesture parameter edit did not commit for '%s': %s.", tostring(slot), tostring(stored))
+								return
+							end
 							local conflict = apply_action()
 							show_conflict(conflict)
 							return
@@ -316,7 +337,10 @@ function M.build(ctx)
 		local actionLbl = type(gestures.get_action_label) == "function" and gestures.get_action_label(current)
 			or (current or "none")
 		local parameter = type(gestures.get_action_parameter) == "function" and gestures.get_action_parameter(slot, current) or ""
-		actionLbl = ParameterLabel.format(actionLbl, parameter)
+		if type(gestures.get_action_parameter_spec) ~= "function"
+			or gestures.get_action_parameter_spec(current) ~= "program" then
+			actionLbl = ParameterLabel.format(actionLbl, parameter)
+		end
 
 		local names = type(gestures.get_sg_names) == "function" and gestures.get_sg_names() or gestures.SG_NAMES
 

@@ -43,6 +43,7 @@ local LOG = "ui.webkit_host"
 M.APP_BRIDGES = {
 	config_cleanup           = "config_cleanup_bridge",
 	action_picker            = "action_picker_bridge",
+	physical_shortcuts       = "physical_shortcuts_bridge",
 	changelog                = "changelog_bridge",
 	download_window          = "dl_bridge",
 	error_dialog             = "error_dialog",

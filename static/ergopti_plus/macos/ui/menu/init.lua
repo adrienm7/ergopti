@@ -35,6 +35,7 @@ local DeferredWork = require("infra.deferred_work")
 local TerminationCoordinator = require("infra.termination_coordinator")
 local PreferencesTransaction = require("ui.menu.preferences_transaction")
 local SessionDemotions = require("ui.menu.session_demotions")
+local ProgramParameterTransaction = require("ui.menu.program_parameter_transaction")
 local GlobalActionsTransaction = require("ui.menu.global_actions_transaction")
 local RecoverableFileMoves = require("ui.menu.recoverable_file_moves")
 local FactoryResetJournal = require("infra.factory_reset_journal")
@@ -522,6 +523,12 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			return TerminationCoordinator.is_pending()
 		end,
 	})
+
+	if gestures.configure_program_admission(function()
+		return global_actions_owner ~= nil and global_actions_owner.is_pending() == false
+	end) ~= true then
+		error("Private program admission could not be registered")
+	end
 
 	-- The factory reset moves both configuration files aside and reloads. No
 	-- menu row runs it since Configuration › « Restore recommended values »
@@ -1374,7 +1381,20 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		state = state, script_control = core_mods.shortcuts_mod, admission = run_global_exclusive,
 		paused = live_pause, save_prefs = transactional_save_prefs,
 	})
+	local program_parameter_owner = ProgramParameterTransaction.new({
+		gestures = gestures, preferences = Preferences, checkpoint = preference_checkpoint,
+		path = MenuPaths.get("ConfigTomlPath"), files = require("adapters.file_system"),
+		admission = run_global_exclusive, paused = live_pause, save_prefs = transactional_save_prefs,
+		current_path = function() return MenuPaths.get("ConfigTomlPath") end,
+		capture_checkpoint_candidate = function()
+			return { state = PreferencesTransaction.clone(state),
+				preferences = Preferences.snapshot(state, hotfiles, core_mods) }
+		end,
+	})
 	local ctx = {
+		physical_shortcuts_scope = function() return preference_scope_owner("shortcuts") end,
+		physical_shortcuts_paused = live_pause,
+		commit_program_parameter = program_parameter_owner.apply,
 		apply_gesture_scope = apply_gesture_scope,
 		apply_preference_scope = apply_preference_scope,
 		apply_script_chords_scope = apply_script_chords_scope,

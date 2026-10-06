@@ -1,0 +1,34 @@
+{
+	"schema": 1,
+	"run_id": 37288850992,
+	"run_url": "https://github.com/adrienm7/ergopti/actions/runs/37288850992",
+	"tested_sha": "2625ae225113a874bc95df64dbca938c61bb6c02",
+	"feature_tree_sha": "5bf40c0a9a22f28a200d14852b536f1897b02200",
+	"windows_unit": {
+		"passed": 9216,
+		"failed": 65,
+		"total": 9281
+	},
+	"group3_cases": {
+		"8988": "user program: actual JSON typed scalar corpus \u2014 windows-literal: actual program scalar parses [test_run_program_actions.ahk:19]",
+		"8989": "user program: real native gesture and keyboard argv \u2014 This global variable has not been assigned a value. [test_run_program_actions.ahk:38]",
+		"8990": "user program: held source and fresh binding refuse foreign replacement \u2014 This global variable has not been assigned a value. [test_run_program_actions.ahk:38]",
+		"8991": "user program: actual native cancellation and retained pause \u2014 This global variable has not been assigned a value. [test_run_program_actions.ahk:38]",
+		"8992": "user program: actual native launch refusal preserves canonical data \u2014 This global variable has not been assigned a value. [test_run_program_actions.ahk:38]",
+		"8995": "user program: actual native nonzero exit exposes only its closed status \u2014 This global variable has not been assigned a value. [test_run_program_actions.ahk:38]",
+		"8996": "user program: independent Unicode script preserves literal bytes private streams and exact native Job retirement \u2014 This global variable has not been assigned a value. [test_run_program_actions.ahk:38]",
+		"8997": "user program: actual completion suppresses cancelled stale paused and successful diagnostics \u2014 This global variable has not been assigned a value. [test_run_program_actions.ahk:38]",
+		"8998": "user program: malformed completion never formats untrusted private status \u2014 This global variable has not been assigned a value. [test_run_program_actions.ahk:38]",
+		"8207": "lifecycle transition: every called owner is registered (system-intervals-lifecycle) \u2014 Ergopti_OnSuspendResume calls an unregistered owner: user-programs - actual: <0> [test_lifecycle_transition.ahk:140]",
+		"9184": "meta timers: no sub-second repeating timer exists outside the inventory \u2014 a repeating timer fires every unreadable interval on the keystroke-dispatch thread and is not in the inventory: ProgramActions_Poll. Add it with its period and a one-line justification, or make it a one-shot. Every poller here is a periodic stall inserted into typing [test_fast_timer_inventory.ahk:246]",
+		"5823": "meta: windows/ OS-call purity ratchet \u2014 modules + lib \u2014 Direct OS calls in windows/modules + windows/lib (outside adapters/) rose to 261 (baseline 252): DllCall=162 COM=4 FileIO=95 \u2014 route new OS access through windows/adapters/, do not raise the baseline. [test_ahk_os_purity_ratchet.ahk:110]",
+		"5826": "meta: windows/ platform-API family ratchet \u2014 modules + lib \u2014 Platform-API family lines in windows/modules + windows/lib rose to 607 (baseline 601): Timer=223 Binding=225 GuiMenu=29 Process=26 Window=49 KeyState=55 \u2014 prefer a manifest row or an existing helper over a new direct binding; do not raise the baseline. [test_ahk_os_purity_ratchet.ahk:254]"
+	},
+	"downstream": [
+		"source E2E unexecuted",
+		"compiled E2E unexecuted",
+		"packaging unexecuted",
+		"installation unexecuted"
+	],
+	"disposition": "Windows implementation and native repair explicitly deferred to maintainer PC; retain assertions and ratchets"
+}

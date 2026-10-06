@@ -61,10 +61,24 @@ end
 
 --- Every list id the menu builder registers a provider for.
 --- @return table Set of ids.
-local function registered_providers()
+local function registered_providers(omitted_delegate)
 	local handle = assert(io.open(helpers.driver_root() .. "/ui/menu/menu_builder.lua", "r"))
 	local source = handle:read("*a")
 	handle:close()
+	-- Providers may be owned by a directly required native menu module. Scan
+	-- those actual delegates, rather than every source file in the tree.
+	local sources, visited = { source }, { ["ui.menu.menu_builder"] = true }
+	local index = 1
+	while index <= #sources do
+		for name in sources[index]:gmatch('require%("(ui%.menu%.[a-z0-9_%.]+)"%)') do
+			if not visited[name] and name ~= omitted_delegate then
+				visited[name] = true
+				local delegate = assert(io.open(helpers.driver_root() .. "/" .. name:gsub("%.", "/") .. ".lua", "r"))
+				sources[#sources + 1] = assert(delegate:read("*a")); assert(delegate:close())
+			end
+		end
+		index = index + 1
+	end
 	local found = {}
 	-- Deliberately broad: a bracketed string key assigned anything. The file
 	-- registers providers three ways — inside a table literal, as
@@ -76,8 +90,10 @@ local function registered_providers()
 	-- something that is NOT a provider would satisfy it. That is intersected with
 	-- the declared LIST ids below, so it would take a dynamic handler and a list
 	-- sharing one id, which the manifest does not do.
-	for id in source:gmatch('%["([a-z0-9_]+)"%]%s*=') do found[id] = true end
-	for id in source:gmatch('providers%.([a-z0-9_]+)%s*=') do found[id] = true end
+	for _, registered_source in ipairs(sources) do
+		for id in registered_source:gmatch('%["([a-z0-9_]+)"%]%s*=') do found[id] = true end
+		for id in registered_source:gmatch('providers%.([a-z0-9_]+)%s*=') do found[id] = true end
+	end
 	return found
 end
 
@@ -128,4 +144,14 @@ helpers.describe("menu lists: what the manifest promises this platform", functio
 				.. "chord capture and an assignment store; it has both now")
 	end)
 
+end)
+
+helpers.describe("actual delegated ordered-pair list coverage", function()
+	helpers.it("requires the actual production delegate for all three declared lists", function()
+		local current, omitted = registered_providers(), registered_providers("ui.menu.key_combinations")
+		for _, id in ipairs({"key_combination_slots", "key_combination_rows_left", "key_combination_rows_right"}) do
+			helpers.assert_true(current[id] == true)
+			helpers.assert_eq(omitted[id], nil, "a missing delegate cannot satisfy a declared list")
+		end
+	end)
 end)

@@ -46,6 +46,12 @@ local ProgrammableHotstrings = require("ui.menu.programmatic_hotstrings")
 local ProgrammableMenuPolicy = require("menu.programmable_hotstrings")
 local LOG = "ui.menu.menu_builder"
 
+--- Keeps private executable/argv data out of persistent menu presentation.
+local function binding_label(label, registry, binding, action)
+	if type(registry.get_action_parameter_spec) == "function" and registry.get_action_parameter_spec(action) == "program" then return label end
+	return ParameterLabel.for_binding(label, registry, binding, action)
+end
+
 -- Delays are stored in seconds and typed in milliseconds: seconds is what the
 -- cascade and the TOMLs speak, milliseconds is what a person means by "wait a
 -- bit longer". The conversion happens only at this boundary.
@@ -186,6 +192,11 @@ end
 local function assign_parameterized_action(ctx, gestures, binding, action, assign, picked)
 	local spec = type(gestures.get_action_parameter_spec) == "function"
 		and gestures.get_action_parameter_spec(action) or nil
+	local bindings = package.loaded["infra.program_binding_transaction"]
+	if spec ~= "program" and type(bindings) == "table" and bindings.pending() then
+		Logger.error(LOG, "Binding edit refused while private user program compensation remains pending.")
+		return false
+	end
 	if not spec then return assign() == true end
 
 	local prior = type(gestures.get_action_parameter) == "function"
@@ -218,6 +229,9 @@ local function assign_parameterized_action(ctx, gestures, binding, action, assig
 		show_error(zenity_plain(gestures.get_action_parameter_error(action)))
 		return false
 	end
+	if spec == "program" then
+		return require("infra.program_binding_transaction").apply(binding, value, ctx.is_paused)
+	end
 	if type(gestures.set_action_parameter) ~= "function"
 		or not gestures.set_action_parameter(binding, action, value)
 	then
@@ -236,14 +250,14 @@ end
 --- @param on_confirm function Transactional assignment callback, given the action
 ---   id and the value the picker's editor collected, if any.
 --- @return boolean opened
-local function open_action_picker(title, current, binding, on_confirm)
+local function open_action_picker(title, current, binding, on_confirm, selected_items)
 	local ok_picker, Picker = pcall(require, "ui.action_picker.bridge")
 	local ok_gestures, Gestures = pcall(require, "modules.gestures.manager")
 	if not ok_picker or type(Picker.open) ~= "function" or not ok_gestures then
 		Logger.error(LOG, "Action picker is unavailable for '%s'.", tostring(title))
 		return false
 	end
-	local items = Gestures.get_picker_items()
+	local items = type(selected_items) == "table" and selected_items or Gestures.get_picker_items()
 	local editor = Gestures.get_picker_parameter_fields(items, binding)
 	return Picker.open({
 		title = title,
@@ -511,7 +525,7 @@ local function _build_layouts(ctx)
 			return {}
 		end
 		local function notify(key, level)
-			local ok_notifier, Notifier = pcall(require, "adapters.notifier")
+			local ok_notifier, Notifier = pcall(require, "adapters.application_notifier")
 			if ok_notifier then
 				Notifier.send(i18n_safe(key), { title = i18n_safe("dialog.magic_key_source.title"), level = level })
 			else
@@ -3338,7 +3352,7 @@ local function _build_shortcuts(ctx)
 					function(option, picked) return assign_slot(slot, option, picked) end)
 				rows[#rows + 1] = {
 					label = slot_label
-						.. " → " .. ParameterLabel.for_binding(Gestures.get_action_label(bound),
+						.. " → " .. binding_label(Gestures.get_action_label(bound),
 							Gestures, Keyboard.binding_id(slot), bound),
 					items = choices,
 				}
@@ -3380,7 +3394,7 @@ local function _build_shortcuts(ctx)
 				return assigned
 			end
 			rows[#rows + 1] = {
-				label = name .. " → " .. (bound ~= "none" and ParameterLabel.for_binding(
+				label = name .. " → " .. (bound ~= "none" and binding_label(
 					Gestures.get_action_label(bound), Gestures, TapKeys.binding_id(key.id), bound)
 					or i18n_safe("menu.shortcuts.tap_keys.unassigned")),
 				items = slot_binding_rows(name, bound, TapKeys.binding_id(key.id), assign),
@@ -3396,6 +3410,30 @@ local function _build_shortcuts(ctx)
 	-- narrowed to the chords; the clear writes "none" in every slot, since an
 	-- absent slot starts with its preset. The title is ticked from the switch.
 	local group_builders = {}
+	group_builders["key_combinations"] = function()
+		return require("ui.menu.key_combinations").build(ctx, {
+			manifest = ManifestMenu, get = i18n_safe, key_label = function(entry)
+				local label = i18n_safe(entry.label_key); return label == entry.label_key and entry.id or label
+			end,
+			action_label = function(action, gestures) return gestures.get_action_label(action) end,
+			open_picker = open_action_picker, error = show_error,
+			prompt_hold = function(label, current, choices)
+				return TextPrompt.ask(label, zenity_plain(string.format(i18n_safe("menu.shortcuts.key_combinations_hold_hold"), current)), current, false, choices)
+			end,
+			parameter = function(context, gestures, binding, action, spec)
+				local prior = gestures.get_action_parameter(binding, action)
+				if type(context.prompt_action_parameter) == "function" then
+					return context.prompt_action_parameter(binding, action, spec, prior)
+				end
+				if spec == "program" then return nil end
+				if spec == "app" then
+					return require("ui.app_chooser").pick(require("adapters.shell_runner"), gestures.get_action_parameter_prompt(action))
+				end
+				local title = _fill(i18n_safe("dialog.gestures.param_title"), "{1}", gestures.get_action_label(action))
+				return prompt_text(title, zenity_plain(gestures.get_action_parameter_prompt(action)), prior)
+			end,
+		})
+	end
 	group_builders["script_control"] = function()
 		local ok_chords, Chords = pcall(require, "modules.shortcuts.script_chords")
 		local ok_gestures, Gestures = pcall(require, "modules.gestures.manager")
@@ -3417,7 +3455,7 @@ local function _build_shortcuts(ctx)
 					return assigned
 				end
 				rows[#rows + 1] = {
-					label = name .. " → " .. ParameterLabel.for_binding(Gestures.get_action_label(bound),
+					label = name .. " → " .. binding_label(Gestures.get_action_label(bound),
 						Gestures, Chords.binding_id(slot.id), bound),
 					items = slot_binding_rows(name, bound, Chords.binding_id(slot.id), assign),
 				}
@@ -3533,7 +3571,21 @@ local function _build_shortcuts(ctx)
 	end
 	sc_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do sc_ctx.state_getters[key] = value end
+	local physical_editor = require("shortcuts.physical_editor_menu").new({
+		paused = function()
+			if ctx.paused == true or type(ctx.is_paused) ~= "function" then return nil end
+			return ctx.is_paused()
+		end,
+		scope = function() return require("infra.shortcuts_scope").editor_owner(ctx.is_paused) end,
+		host = function() return require("ui.physical_shortcuts.bridge") end,
+		refused = function() show_error(i18n_safe("physical_shortcuts.window_unavailable")) end,
+	})
+	sc_ctx.commands["physical_shortcuts_editor"] = physical_editor.open
+	sc_ctx.state_getters["physical_shortcuts_editor_ready"] = physical_editor.ready
 	sc_ctx.state_getters["shortcuts_enabled"] = function() return enabled end
+	sc_ctx.state_getters["key_combinations_enabled"] = function()
+		return require("modules.shortcuts.key_combinations").is_enabled() == true
+	end
 	-- Ticks « Raccourcis de gestion du script » while its switch is on.
 	sc_ctx.state_getters["script_control_enabled"] = function()
 		local ok_chords, Chords = pcall(require, "modules.shortcuts.script_chords")

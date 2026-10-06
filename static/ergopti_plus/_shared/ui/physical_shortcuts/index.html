@@ -1,0 +1,31 @@
+<!-- _shared/ui/physical_shortcuts/index.html -->
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title></title>
+		<link rel="stylesheet" href="style.css" />
+		<script src="../host_bridge.js"></script>
+		<script src="script.js" defer></script>
+	</head>
+	<body>
+		<h1 id="title"></h1>
+		<p id="manual-hint"></p>
+		<button id="capture" type="button" disabled></button>
+		<p id="capture-reason"></p>
+		<div id="entries"></div>
+		<p id="empty"></p>
+		<button id="add" type="button"></button>
+		<form id="editor" hidden>
+			<label id="position-label" for="position"></label>
+			<select id="position" required></select>
+			<fieldset id="modifiers"><legend id="modifier-label"></legend></fieldset>
+			<button id="choose" type="button"></button>
+			<p id="selected-action"></p>
+			<button id="save" type="submit" disabled></button>
+			<button id="cancel" type="button"></button>
+		</form>
+		<p id="status" role="status" aria-live="polite"></p>
+		<button id="close" type="button"></button>
+	</body>
+</html>

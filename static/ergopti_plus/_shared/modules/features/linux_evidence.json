@@ -318,6 +318,30 @@
 				"static/ergopti_plus/linux/tests/unit/ui/test_wpm_readouts.lua",
 				"static/ergopti_plus/linux/tests/hardware/run_wpm_readouts_live.lua"
 			]
+		},
+		"ordered_key_combinations": {
+			"members": [
+				"category_enabled.key_combinations",
+				"shortcuts.key_combination_taps.alt_gr_then_left_alt",
+				"shortcuts.key_combination_taps.alt_gr_then_caps_lock",
+				"shortcuts.key_combination_taps.left_alt_then_caps_lock"
+			],
+			"registered": "yes",
+			"production_caller": "yes",
+			"persisted": "yes",
+			"applied": "yes",
+			"hardware_proven": "no",
+			"proof_tier": "integration",
+			"intentional": true,
+			"evidence": [
+				"static/ergopti_plus/linux/platform/remap/tap_hold_manager.lua",
+				"static/ergopti_plus/linux/platform/remap/key_combination_engine.lua",
+				"static/ergopti_plus/linux/modules/shortcuts/key_combinations.lua",
+				"static/ergopti_plus/linux/infra/key_combinations_scope.lua",
+				"static/ergopti_plus/linux/ui/menu/key_combinations.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/test_key_combinations.lua",
+				"static/ergopti_plus/linux/tests/unit/infra/test_key_combinations_scope.lua"
+			]
 		}
 	},
 	"overrides": {

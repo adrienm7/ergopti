@@ -232,8 +232,12 @@ for (const [before, after] of [
 	['- name: ' + NATIVE_STEP, '- name: omitted native runtime'],
 	['npm run test:linux:network-runtime | tee', 'npm run test:linux-network-runtime | tee'],
 	[
-		'set -euo pipefail\n          sudo apt-get install -y --no-install-recommends luajit',
-		'set -eu\n          sudo apt-get install -y --no-install-recommends luajit'
+		'- name: ' +
+			NATIVE_STEP +
+			'\n        if: ${{ !cancelled() }}\n        run: |\n          set -euo pipefail\n          sudo apt-get install -y --no-install-recommends luajit',
+		'- name: ' +
+			NATIVE_STEP +
+			'\n        if: ${{ !cancelled() }}\n        run: |\n          set -eu\n          sudo apt-get install -y --no-install-recommends luajit'
 	],
 	[COUNT_LINE, 'network_runtime_assertions=4'],
 	[COUNT_LINE, COUNT_LINE + '\n          ' + COUNT_LINE],
@@ -251,6 +255,11 @@ for (const [before, after] of [
 	]
 ]) {
 	assert.ok(workflow.includes(before), 'Causal mutation must hit its intended declaration');
+	assert.equal(
+		workflow.split(before).length - 1,
+		1,
+		'Causal mutation must hit exactly one declaration'
+	);
 	assert.throws(() => validateRuntimeCI(workflow.replace(before, after), coverage));
 	evidenceControls++;
 }

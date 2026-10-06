@@ -26,6 +26,7 @@ local ui_builder = require("ui.ui_builder")
 local Logger     = require("infra.logger")
 local i18n       = require("infra.i18n")
 local Paths      = require("infra.paths")
+local ProgramProviderPicker = require("program_provider_picker")
 
 local LOG = "action_picker"
 
@@ -67,13 +68,16 @@ local ASSETS_DIR = (Paths.shared("ui/action_picker") or "") .. "/"
 --- @return boolean closed Whether this session still owned the window.
 local function close_session(session)
 	if _active_session ~= session then return false end
+	if session.closing then return false end
 	local webview = session.webview
 	if webview then
 		if type(webview.delete) ~= "function" then
 			Logger.error(LOG, "Action picker close refused; owned WebView has no delete method.")
 			return false
 		end
+		session.closing = true
 		local ok, err = xpcall(function() webview:delete() end, debug.traceback)
+		session.closing = false
 		if not ok then
 			-- ui_builder may deliver on_close synchronously before native deletion
 			-- raises. Restore the exact session so replacement and callback retries
@@ -87,6 +91,7 @@ local function close_session(session)
 		end
 	end
 	if _active_session == session then
+		ProgramProviderPicker.close(session.providers)
 		_active_session = nil
 		_webview = nil
 		_usercontent = nil
@@ -128,9 +133,16 @@ function M.open(opts, on_confirm)
 		settling = false,
 		usercontent = uc,
 		webview = nil,
+		providers = { packet = { unavailable = true } },
 	}
 	_active_session = session
 	_usercontent = uc
+	local adapter_ok, adapter = pcall(require, "adapters.program_providers")
+	session.providers = ProgramProviderPicker.capture(adapter_ok and adapter or nil)
+	if _active_session ~= session then
+		ProgramProviderPicker.close(session.providers)
+		return false
+	end
 
 	local payload = {
 		title             = opts.title or "",
@@ -156,6 +168,8 @@ function M.open(opts, on_confirm)
 		-- The llm_language editor's target languages, the interface language first
 		languageChoices   = opts.language_choices,
 		editCurrentLabel  = opts.edit_current_label,
+		programProviders = session.providers.packet,
+		programProviderStrings = ProgramProviderPicker.strings(i18n.get),
 	}
 
 	local function push_init()
@@ -181,11 +195,22 @@ function M.open(opts, on_confirm)
 				return
 			end
 			if session.settling then return end
+			session.settling = true
 			local id = type(body.id) == "string" and body.id or "none"
 			-- A value the page's editor collected travels with the pick.
-			local parameter = type(body.parameter) == "string" and body.parameter or nil
+			local admitted, parameter = ProgramProviderPicker.confirm(session.providers, id, body)
+			if _active_session ~= session then
+				session.settling = false
+				return
+			end
+			if not admitted then
+				session.settling = false
+				if _active_session == session and session.webview then
+					pcall(function() session.webview:evaluateJavaScript("programProviderRefused()") end)
+				end
+				return
+			end
 			local callback = session.on_confirm
-			session.settling = true
 			local callback_ok, callback_result = Logger.callback(
 				LOG, "Action picker confirmation", callback, id, parameter)
 			session.settling = false
@@ -217,7 +242,11 @@ function M.open(opts, on_confirm)
 			return true
 		end,
 		on_close      = function()
+			-- Native deletion can report on_close synchronously and then throw.
+			-- Only the acknowledged caller may retire choices in that interval.
+			if session.closing then return end
 			if _active_session == session then
+				ProgramProviderPicker.close(session.providers)
 				_active_session = nil
 				_webview = nil
 				_usercontent = nil

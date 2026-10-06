@@ -36,6 +36,9 @@ local function recording_manager()
 	local saved = package.loaded["logger.shim"]
 	package.loaded["logger.shim"] = logger
 	package.loaded[MANAGER] = nil
+	-- The workspace provider captures its shell and display dependencies when
+	-- required. Earlier native fixtures may have replaced either table.
+	package.loaded["modules.gestures.workspace_switcher"] = nil
 	local ok, manager = pcall(require, MANAGER)
 	package.loaded["logger.shim"] = saved
 	if not ok then error(manager, 0) end
@@ -77,12 +80,13 @@ end
 
 --- Runs `body` with os.execute and io.popen recorded instead of run.
 --- @param body function
-local function with_recorded_shell(body)
+--- @param native_webview table|nil Controlled native show edge for this fixture.
+local function with_recorded_shell(body, native_webview)
 	local real_execute, real_popen = os.execute, io.popen
 	os.execute = function() return true end
 	io.popen = function() return nil end
 	local saved_webview = package.loaded["ui.webview_manager"]
-	package.loaded["ui.webview_manager"] = { show = function() return true end }
+	package.loaded["ui.webview_manager"] = native_webview or { show = function() return true end }
 	local ok, err = pcall(body)
 	os.execute, io.popen = real_execute, real_popen
 	package.loaded["ui.webview_manager"] = saved_webview
@@ -263,6 +267,33 @@ helpers.describe("action picker items (Linux)", function()
 			(require("infra.i18n").get("dialog.action_picker.requires_tool"):gsub("{1}", "wmctrl")))
 	end)
 
+	helpers.it("does not borrow tool availability from an earlier workspace fixture", function()
+		local name = "modules.gestures.workspace_switcher"
+		local saved = package.loaded[name]
+		local Display = require("infra.display_server")
+		Display._set_for_test(Display.X11, "xfce")
+		local ok, err = pcall(function()
+			local stale = helpers.load_module_with_dependency(name, "adapters.shell_runner", {
+				has_command = function() return true end,
+			})
+			helpers.assert_eq(stale.detect().name, "wmctrl", "the earlier fixture captured a different tool provider")
+			local M = recording_manager()
+			without_tools(function()
+				local by_id = {}
+				for _, item in ipairs(M.get_picker_items()) do
+					if item.type == "action" then by_id[item.id] = item end
+				end
+				helpers.assert_eq(by_id.desktop_prev_wrap.disabled, true,
+					"this fixture must inspect its own absent wmctrl provider")
+				helpers.assert_eq(by_id.desktop_prev_wrap.hint,
+					(require("infra.i18n").get("dialog.action_picker.requires_tool"):gsub("{1}", "wmctrl")))
+			end)
+		end)
+		package.loaded[name] = saved
+		Display._set_for_test(nil, nil)
+		if not ok then error(err, 0) end
+	end)
+
 end)
 
 
@@ -283,7 +314,13 @@ helpers.describe("gesture slots in the tray (Linux)", function()
 		M._test_begin_reading({})
 		helpers.assert_true(M.enable(), "the test reader must permit enabling gestures")
 		local menu_builder = helpers.load_module("ui.menu.menu_builder")
-		local items = menu_builder.build({ _version = "3.0.0", gestures = M })
+		local items, opened = nil, 0
+		-- Building a tray does not open a GTK window. Use the same owned native
+		-- webview edge as the dispatcher cases, even when real lgi is installed.
+		with_recorded_shell(function()
+			items = menu_builder.build({ _version = "3.0.0", gestures = M })
+		end, {show = function() opened = opened + 1; return false end})
+		helpers.assert_eq(opened, 0, "menu construction must not open a native window")
 		M.disable()
 		M.stop_reading()
 
@@ -355,4 +392,51 @@ helpers.describe("gesture assignment validation (Linux)", function()
 		helpers.assert_true(named, "the ignored id must be named in a warning")
 	end)
 
+end)
+
+helpers.describe("Cursor-window native picker admission", function()
+	for _, receipt in ipairs({ "supported", "refused", "unknown", "numeric", "text", "throw" }) do
+		helpers.it("uses actual GNU timeout admission in the picker: " .. receipt, function()
+			local Display = require("infra.display_server")
+			local Runner = require("adapters.program_runner")
+			local Shell = require("adapters.shell_runner")
+			local previous = Display.kind()
+			local cached_switch = package.loaded["adapters.window_switch"]
+			local supported, has_command, exec_checked = Runner.supported, Shell.has_command, Shell.exec_checked
+			local probes = 0
+			Display._set_for_test(Display.X11, "native picker fixture")
+			Runner.supported = function() return true end
+			Shell.has_command = function() return true end
+			Shell.exec_checked = function(command)
+				probes = probes + 1
+				helpers.assert_eq(command, "timeout --foreground 1 sh -c ':' 2>/dev/null")
+				if receipt == "throw" then error("controlled native capability refusal") end
+				if receipt == "supported" then return true, "" end
+				if receipt == "refused" then return false, "" end
+				if receipt == "numeric" then return 0, "" end
+				if receipt == "text" then return "true", "" end
+				return nil
+			end
+			local ok, err = pcall(function()
+				-- Earlier fixtures may replace the dependency tables captured by the adapter.
+				helpers.load_module("adapters.window_switch")
+				local manager = recording_manager()
+				local window
+				for _, item in ipairs(manager.get_picker_items()) do
+					if item.type == "action" and item.id == "alt_tab_monitor" then window = item end
+				end
+				helpers.assert_true(window ~= nil)
+				helpers.assert_eq(window.disabled == true, receipt ~= "supported")
+				helpers.assert_eq(probes, 1)
+				if receipt ~= "supported" then
+					local hint = require("infra.i18n").get("dialog.action_picker.requires_tool")
+					helpers.assert_eq(window.hint, (hint:gsub("{1}", "GNU timeout")))
+				end
+			end)
+			package.loaded["adapters.window_switch"] = cached_switch
+			Runner.supported, Shell.has_command, Shell.exec_checked = supported, has_command, exec_checked
+			Display._set_for_test(previous, "restored")
+			if not ok then error(err, 0) end
+		end)
+	end
 end)
