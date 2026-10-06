@@ -2999,6 +2999,14 @@ Windows PC acceptance, delegated to the maintainer:
   the native permission dialog (once per launch, after the Accessibility dialog,
   closed automatically on approval; not while Tap-Holds are off, where the
   banner stays). Integrated; verify on a Mac.
+  Native permission UI qualification is now registered in the Swift target:
+  ten frozen cases require actual WebKit DOM/bridge callbacks, visible native
+  window identities, retirement, deferred log purge and scheduler cleanup.
+  Guardian and settings endpoints remain explicitly modeled; no permission
+  grant, physical click or tap-hold operation is claimed. Portable receipt
+  controls17 and native-error interpretation controls9 pass; actual macOS UI
+  execution is pending. The Hammerspoon1.1.1 nil-NSError sentinel uses the
+  unchanged canonical WebView adapter. Item24 remains incomplete.
 - [~] **30.** Physical magic-key setting on all three OSes: one
   `hotstrings.magic_key_source` (a KeyboardEvent.code, `auto` by default),
   config schema v5 migrating every spelling of the Windows

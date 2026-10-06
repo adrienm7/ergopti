@@ -1245,3 +1245,20 @@ is reproduced locally and in manual37472772448 before Swift. This repair changes
 neither the owning XCTest verdict nor native budgets. That run supplies no fresh
 Swift, baseline, source-control or owned-four-target execution; the next exact
 macOS qualification remains required. TODO31 and WP4-WP10 stay incomplete.
+
+Item24 adds two automatically discovered Swift qualification cases and a native
+Lua driver for the production permission dialog and Login Items guide. The ten
+handwritten expectations precede implementation and are unchanged. The driver
+uses actual WebKit DOM/usercontent callbacks, native views/window IDs, real
+production timers and deferred log purge; only guardian/enabled/settings leaf
+endpoints are modeled. Retired userdata metatables and native lookup absence
+are both required, followed by unchanged owned-child retirement. The first
+source review missed Hammerspoon1.1.1 successful NSError sentinel handling; its
+clearance is explicitly superseded. A reviewed two-line correction uses the
+canonical WebView adapter, preserving every real error and receiver failure.
+Actual software callback controls reproduce8/1 before and9/0 after under Lua54
+and LuaJIT; unchanged controller17 passes normal/inherited optimization. These
+are portable controls, not native WebKit/AX evidence. Swift compilation, actual
+UI/frame/timing outcomes, permission grants, physical input and guardian approval
+remain unexecuted for this tranche. No production behavior or item completion
+is claimed; existing native and hardware requirements remain open.
