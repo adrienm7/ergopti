@@ -3709,6 +3709,15 @@ production remap caller, installer, driver activation or WP6/TODO31 completion.
 
 ## Remaining work after the 2026-09-30 releases
 
+Required executable and plist paths are now checked component by component
+through the retained no-follow directory descriptors before fixed-byte matching.
+Actual ENOENT remains missing; aliases, special files, wrong types and replaced
+identities remain refused or changed. The original 22 test methods and assertions
+are unchanged. Independent source review and strict patch application passed;
+Darwin compilation, protected fixtures, native ACLs and both signature slices
+remain UNEXECUTED until the exact-source macOS validation. This does not grant
+reference, broker, client, capture or history authority or complete TODO31.
+
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
   listed; see `docs/memory/text-input-and-config.md`. Still open everywhere:

@@ -913,3 +913,12 @@ the current validated b9a43969b merge. Group6 owns final lockd9d56d6d8f;
 Group5 does not modify it. No Group5 final lock is held and no Group5 commits
 have been merged into dev. Retain the feature branch and every unfinished TODO;
 native qualification and final integration remain outstanding.
+
+Required executable and plist paths are now checked component by component
+through the retained no-follow directory descriptors before fixed-byte matching.
+Actual ENOENT remains missing; aliases, special files, wrong types and replaced
+identities remain refused or changed. The original 22 test methods and assertions
+are unchanged. Independent source review and strict patch application passed;
+Darwin compilation, protected fixtures, native ACLs and both signature slices
+remain UNEXECUTED until the exact-source macOS validation. This does not grant
+reference, broker, client, capture or history authority or complete TODO31.

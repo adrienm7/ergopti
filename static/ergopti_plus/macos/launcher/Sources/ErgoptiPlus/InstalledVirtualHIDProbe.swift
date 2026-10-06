@@ -205,6 +205,22 @@ private final class InstalledVHDStaticSnapshot {
 			}
 		}
 	}
+	func requireFile(_ relativePath: String, root: Int32, path: String) throws {
+		let parts = relativePath.split(separator: "/").map(String.init)
+		var parent = root, prefix = path
+		for (index, name) in parts.enumerated() {
+			var named = stat()
+			guard fstatat(parent, name, &named, AT_SYMLINK_NOFOLLOW) == 0 else { throw posix("path_unavailable") }
+			let expectedType = index == parts.count - 1 ? mode_t(S_IFREG) : mode_t(S_IFDIR)
+			guard named.st_mode & mode_t(S_IFMT) == expectedType else { throw InstalledVHDProbeFailure(status: "refused", reason: "nonordinary_path") }
+			prefix += "/" + name
+			guard let retained = nodes.first(where: { $0.parent == parent && $0.name == name && $0.path == prefix }),
+				InstalledVHDFileIdentity(named) == retained.identity else {
+				throw InstalledVHDProbeFailure(status: "changed", reason: "file_identity_changed")
+			}
+			parent = retained.fd
+		}
+	}
 	func verify() throws {
 		for (i, node) in nodes.enumerated() {
 			var held = stat(), named = stat()
@@ -270,6 +286,7 @@ enum InstalledVirtualHIDProbe {
 			try snapshot.inventory(root, path: url.path)
 			try invoke("afterFilesPinned"); try snapshot.verify()
 			let expected = [(reference.executable, reference.executableHash), (reference.plist, reference.plistHash)]
+			for pair in expected { try snapshot.requireFile(pair.0, root: root, path: url.path) }
 			result.matchesFixedBytes = expected.allSatisfy { pair in snapshot.nodes.contains { $0.path == url.path + "/" + pair.0 && $0.digest == pair.1 } }
 			guard result.matchesFixedBytes == true else { throw InstalledVHDProbeFailure(status: "unverified", reason: "unsupported_fixed_reference") }
 			var staticCode: SecStaticCode?
