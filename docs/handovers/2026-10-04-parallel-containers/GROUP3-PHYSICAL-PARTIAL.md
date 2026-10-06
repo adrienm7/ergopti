@@ -2,6 +2,11 @@
 
 # Group 3 physical model and read-only source checkpoint
 
+Current source epoch, native qualification and all thirteen remaining items are
+recorded in [Group 3 current checkpoint](GROUP3-CURRENT-CHECKPOINT.md). Read that
+chapter first. The source-admission and component outcomes below remain a
+historical physical-model checkpoint, not the current integrated verdict.
+
 Source admission on 2026-10-06 covers 79 physical model/editor/scope sources
 and nine read-only Linux XKB/source/test files, with four additional Linux
 registrations. Admission to the current feature tree is distinct from a

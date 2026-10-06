@@ -161,3 +161,44 @@ def run_owned_case(arguments, environment):
     result = subprocess.CompletedProcess(arguments, child.returncode, output, errors)
     result.observer_timed_out = timed_out
     return result
+
+
+def require_x11_ready(display_name, owned_server, *, spawn=subprocess.Popen):
+    """Require one real X11 handshake, retaining its exact client through retirement."""
+    if (
+        not isinstance(display_name, str)
+        or not display_name.startswith(":")
+        or not display_name[1:].isascii()
+        or not display_name[1:].isdecimal()
+        or owned_server.poll() is not None
+    ):
+        raise RuntimeError("Owned virtual display is not available for a handshake")
+    child = spawn(
+        ["/usr/bin/xdpyinfo", "-display", display_name],
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    try:
+        status = child.wait(timeout=5)
+        if type(status) is not int or status != 0 or owned_server.poll() is not None:
+            raise RuntimeError("Owned virtual display refused the X11 handshake")
+    finally:
+        if child.returncode is None:
+            while True:
+                try:
+                    child.kill()
+                    break
+                except ProcessLookupError:
+                    # A native exit can race the signal; only wait can retire that owner.
+                    break
+                except BaseException:
+                    # Retry an interrupted signal before waiting on a live blocked client.
+                    continue
+            while child.returncode is None:
+                try:
+                    child.wait()
+                except BaseException:
+                    # An interrupted observer cannot abandon an acquired native client.
+                    continue
+    return True

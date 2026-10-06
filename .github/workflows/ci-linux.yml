@@ -170,7 +170,7 @@ jobs:
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
-          sudo apt-get install -y --no-install-recommends libgtk-3-bin dbus-x11 xvfb
+          sudo apt-get install -y --no-install-recommends libgtk-3-bin dbus-x11 xvfb x11-utils
           python3 tests/hardware/test_application_operand_diagnostics.py
           python3 tests/hardware/run_application_operand_receipts.py --evidence-dir "$RUNNER_TEMP/linux-application-operands"
         timeout-minutes: 1
@@ -926,13 +926,19 @@ jobs:
           ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_updater_temp_allocation_receipts.py
         timeout-minutes: 1
 
-      - name: Parse native virtual audio state independently of user locale
+      - name: Install native virtual audio locale prerequisites
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
           # Ubuntu ships PulseAudio gettext catalogs in language packs.
           sudo apt-get install -y --no-install-recommends pulseaudio pulseaudio-utils locales language-pack-fr language-pack-de
           sudo locale-gen fr_FR.UTF-8 de_DE.UTF-8
+        timeout-minutes: 10
+
+      - name: Parse native virtual audio state independently of user locale
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
           python3 tests/hardware/run_system_audio_locale_receipts.py
           ERGOPTI_SYSTEM_TEST_LUA=lua5.4 python3 tests/hardware/run_system_audio_locale_receipts.py
         timeout-minutes: 2
