@@ -139,6 +139,7 @@ local function with_fixture(options, callback)
 	if options.privacy_states then
 		state.llm_url_bar_filter_enabled, state.llm_secure_field_filter_enabled = table.unpack(options.privacy_states)
 	end
+	if options.enabled ~= nil then state.llm_enabled = options.enabled end
 	local runtime = clone_value(state)
 	local display_generation = 0
 	local persisted = clone_value(state)
@@ -297,6 +298,17 @@ local function with_fixture(options, callback)
 		manifest_path = function() return helpers.driver_root() .. "../_shared/modules/menu/menu_manifest.json" end,
 		json_decode = function(raw)
 			local root = assert(require("json").decode(raw))
+			if options.parent_id then
+				for index, row in ipairs(root.llm_menu) do
+					if row.id == options.parent_id then
+						if options.parent_absent then table.remove(root.llm_menu, index)
+						elseif options.parent_type then row.type = options.parent_type
+						elseif options.parent_label then row.i18n = options.parent_label
+						elseif options.parent_first then table.remove(root.llm_menu, index); table.insert(root.llm_menu, 1, row) end
+						break
+					end
+				end
+			end
 			if options.navigation_reverse then
 				root.llm_navigation_rows[1], root.llm_navigation_rows[2] = root.llm_navigation_rows[2], root.llm_navigation_rows[1]
 			end
@@ -332,41 +344,10 @@ local function with_fixture(options, callback)
 			end
 			return root
 		end,
-		i18n = { get = function(key) return key end, section = function(key) return key end },
+		i18n = { get = options.translate or function(key) return key end, section = options.translate or function(key) return key end },
 		logger = Logger,
 	}))
-	package.loaded["infra.manifest_menu"] = {
-		command_row = display_renderer.command_row,
-		template_rows = display_renderer.template_rows,
-		check_row = display_renderer.check_row,
-		get_array = display_renderer.get_array,
-		render_rows = function(rows)
-			local items = {}
-			for _, row in ipairs(rows) do
-				items[#items + 1] = {
-					title = row.label or row.title,
-					checked = row.checked,
-					disabled = row.disabled,
-					fn = row.action,
-					menu = row.items or row.submenu,
-				}
-			end
-			return items
-		end,
-		build = function(key, category, handlers, groups, ctx, providers)
-			if key == "llm_display_menu" or key == "llm_generation_menu" or key == "llm_trigger_menu" then
-				return display_renderer.build(key, category, handlers, groups, ctx, providers)
-			end
-			local items = {}
-			for _, id in ipairs({
-				"llm_generation_settings",
-				"llm_navigation",
-			}) do
-				handlers[id](items)
-			end
-			return items
-		end,
-	}
+	package.loaded["infra.manifest_menu"] = display_renderer
 
 	local keymap = {}
 	keymap.set_llm_model = function() return true end
@@ -455,6 +436,18 @@ local function with_fixture(options, callback)
 	local TriggerPanel = require("ui.menu.menu_llm.trigger_panel")
 	local StreamingPanel = require("ui.menu.menu_llm.streaming_panel")
 	local TemperaturePanel = require("ui.menu.menu_llm.temperature_panel")
+	if options.corrupt_trigger_child then
+		local real_build = TriggerPanel.build
+		local detached = {}; for key, value in pairs(TriggerPanel) do detached[key] = value end
+		detached.build = function(...)
+			local children = real_build(...)
+			if options.corrupt_trigger_child == "named" then children.unowned = true
+			elseif options.corrupt_trigger_child == "sparse" then children[#children + 2] = {title = "Unadmitted"}
+			elseif options.corrupt_trigger_child == "cycle" then children[1].menu = children end
+			return children
+		end
+		package.loaded["ui.menu.menu_llm.trigger_panel"] = detached
+	end
 	local manager = Settings.new({
 		state = state,
 		keymap = keymap,
@@ -520,16 +513,8 @@ local function with_fixture(options, callback)
 				}
 			end,
 		}
-		package.loaded["ui.menu.menu_llm.menu_layout"] = {
-			row_ids = function()
-				return {
-					"llm_generation_settings",
-					"llm_navigation",
-				}
-			end,
-			row_disabled = function() return false end,
-			has_health_dot = function() return false end,
-		}
+		package.loaded["ui.menu.menu_llm.menu_layout"] = nil
+
 		package.loaded["modules.llm.mlx_deps_checker"] = require("tests.support.runtime_checker_stub")({
 			check_and_install_deps = noop,
 		})
@@ -545,9 +530,14 @@ local function with_fixture(options, callback)
 			save_prefs = save_prefs,
 			update_menu = update_menu,
 			active_tasks = {},
+			script_control = { is_paused = function() return options.paused == true end },
 		})
 		assert(type(handler.build_item) == "function", table.concat(errors, "\n"))
 		local submenu = handler.build_item().submenu
+		if options.parent_only then
+			reset_observations()
+			return { rebuild = function() return handler.build_item().submenu end }
+		end
 		if options.navigation_only then
 			return { rebuild = function() return handler.build_item().submenu end }
 		end
@@ -2268,4 +2258,97 @@ helpers.describe("LLM navigation: shared native child declarations", function()
 			end
 		end
 	end)
+end)
+
+
+helpers.describe("LLM fixed parents: actual shared group topology", function()
+	local parents = {
+		{ id = "llm_trigger", key = "menu.llm.trigger_menu_title" },
+		{ id = "llm_display", key = "menu.llm.display_menu_title" },
+		{ id = "llm_navigation", key = "menu.llm.nav_menu_title" },
+	}
+	for _, parent in ipairs(parents) do
+		helpers.it("shared group owns the real " .. parent.id .. " caption and child hierarchy", function()
+			with_fixture({parent_only = true, parent_id = parent.id, parent_label = "button.cancel"}, function(fixture)
+				local rows = fixture.top_level_callbacks().rebuild()
+				local row = assert(find_item(rows, "button.cancel"), "current group caption must reach the actual parent")
+				helpers.assert_nil(find_item(rows, parent.key), "the retired literal does not construct a second parent")
+				helpers.assert_true(type(row.menu) == "table" and #row.menu > 0)
+				helpers.assert_nil(row.fn, "a group parent has no competing click action")
+				helpers.assert_eq(fixture.calls.save, 0)
+				helpers.assert_eq(fixture.calls.runtime, 0)
+				helpers.assert_eq(fixture.calls.settings, 0)
+			end)
+		end)
+		helpers.it("withdrawn or wrong-type " .. parent.id .. " declaration cannot publish a fallback parent", function()
+			for _, variant in ipairs({{parent_absent = true}, {parent_type = "dynamic"}}) do
+				variant.parent_only, variant.parent_id = true, parent.id
+				with_fixture(variant, function(fixture)
+					local rows = fixture.top_level_callbacks().rebuild()
+					helpers.assert_nil(find_item(rows, parent.key))
+					helpers.assert_true(find_item(rows, "menu.llm.generation_menu_title") ~= nil, "the genuine unrelated generation owner remains present")
+					helpers.assert_eq(fixture.calls.save, 0)
+					helpers.assert_eq(fixture.calls.runtime, 0)
+				end)
+			end
+		end)
+	end
+	helpers.it("the canonical group position owns the final parent and preserves all child callbacks", function()
+		with_fixture({parent_only = true, parent_id = "llm_navigation", parent_first = true}, function(fixture)
+			local rows = fixture.top_level_callbacks().rebuild()
+			helpers.assert_eq(rows[1].title, "menu.llm.nav_menu_title")
+			helpers.assert_eq(#rows[1].menu, 2)
+			helpers.assert_true(type(rows[1].menu[1].menu[2].fn) == "function")
+			helpers.assert_true(type(rows[1].menu[2].menu[2].fn) == "function")
+			helpers.assert_eq(fixture.calls.runtime, 0, "drawing never synchronizes runtime")
+		end)
+	end)
+	for _, condition in ipairs({{enabled = false}, {paused = true}}) do
+		helpers.it("retains all three native parent gates while " .. (condition.paused and "paused" or "off"), function()
+			condition.parent_only = true
+			with_fixture(condition, function(fixture)
+				local rows = fixture.top_level_callbacks().rebuild()
+				for _, parent in ipairs(parents) do
+					local row = assert(find_item(rows, parent.key))
+					helpers.assert_eq(row.disabled, true)
+					helpers.assert_true(type(row.menu) == "table", "gating retains the genuine child tree")
+				end
+			end)
+		end)
+	end
+end)
+
+helpers.describe("LLM fixed parents: independent original full physical hierarchy", function()
+	helpers.it("retains every original native child, flag and callback through the real outer renderer", function()
+		local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/llm_parent_groups.json"), "rb"))
+		local corpus = assert(require("json").decode(file:read("*a"))); assert(file:close())
+		with_fixture({parent_only = true}, function(fixture)
+			local rows = fixture.top_level_callbacks().rebuild()
+			local parents = {}
+			for _, expected in ipairs(corpus.parents) do
+				parents[#parents + 1] = assert(find_item(rows, expected.i18n))
+			end
+			helpers.assert_eq(#parents, 3, "the independent complete parent set is nonempty")
+			helpers.assert_eq(require("test.menu_native_child_rows").hierarchy(parents), corpus.macos)
+			helpers.assert_eq(fixture.calls.runtime, 0)
+			helpers.assert_eq(fixture.calls.save, 0)
+			helpers.assert_eq(fixture.calls.settings, 0)
+		end)
+	end)
+end)
+
+helpers.describe("LLM fixed parents: complete actual native child admission", function()
+	for _, shape in ipairs({"named", "sparse", "cycle"}) do
+		helpers.it("refuses the entire real Trigger child after " .. shape .. " corruption before parent publication", function()
+			with_fixture({parent_only = true, corrupt_trigger_child = shape}, function(fixture)
+				local rows = fixture.top_level_callbacks().rebuild()
+				helpers.assert_nil(find_item(rows, "menu.llm.trigger_menu_title"))
+				helpers.assert_true(find_item(rows, "menu.llm.display_menu_title") ~= nil)
+				helpers.assert_true(find_item(rows, "menu.llm.nav_menu_title") ~= nil)
+				helpers.assert_eq(fixture.calls.runtime, 0)
+				helpers.assert_eq(fixture.calls.save, 0)
+				helpers.assert_eq(fixture.calls.settings, 0)
+			end)
+		end)
+	end
 end)

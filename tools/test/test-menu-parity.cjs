@@ -137,6 +137,12 @@ const OPENS_SUBMENU = {
 	],
 	agent_system1: [
 		'agent_system_controls',
+		{
+			menu: 'agent_server_empty_status',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_llm/agent_panel.lua' }
+		},
 		'agent_system_model_controls',
 		{
 			menu: 'agent_system_model_installed_controls',
@@ -153,6 +159,12 @@ const OPENS_SUBMENU = {
 	],
 	agent_system2: [
 		'agent_system_controls',
+		{
+			menu: 'agent_server_empty_status',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_llm/agent_panel.lua' }
+		},
 		'agent_system_model_controls',
 		{
 			menu: 'agent_system_model_installed_controls',
@@ -440,6 +452,12 @@ const OPENS_SUBMENU = {
 	llm_models: [
 		'llm_model_commands',
 		{
+			menu: 'llm_api_empty_status',
+			platforms: ['linux'],
+			kind: 'compose',
+			native_sources: { linux: 'linux/ui/menu/llm_backend_rows.lua' }
+		},
+		{
 			menu: 'llm_api_add_provider_group',
 			platforms: ['linux'],
 			kind: 'compose',
@@ -481,6 +499,21 @@ const OPENS_SUBMENU = {
 		}
 	],
 	llm_model: [
+		{
+			menu: 'llm_model_header_boundary',
+			platforms: ['ahk', 'hs'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_llm/menu_models.ahk',
+				hs: 'macos/ui/menu/menu_llm/models_selector.lua'
+			}
+		},
+		{
+			menu: 'llm_api_empty_status',
+			platforms: ['ahk'],
+			kind: 'compose',
+			native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_api_entries.ahk' }
+		},
 		{
 			menu: 'llm_model_hardware_boundary',
 			platforms: ['ahk', 'hs'],

@@ -859,3 +859,6 @@ helpers.describe("selection boundary fragments in the complete native tray", fun
 		end)
 	end)
 end)
+
+
+require("test.menu_native_child_rows").run(helpers, require("infra.manifest_menu"))

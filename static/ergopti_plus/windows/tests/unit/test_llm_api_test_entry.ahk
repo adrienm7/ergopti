@@ -565,3 +565,66 @@ _LAT_AddFrameSeparator() {
 	}
 }
 Test("API Add frame retains its conditional shared separator (api-add-controls)", _LAT_AddFrameSeparator)
+
+
+/** Independent inert status data, separate from selectable NoModel commands. */
+_LAT_EmptyStatusCorpus() {
+	global _SharedDir
+	return JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\llm_empty_status.json", "UTF-8"))
+}
+
+_LAT_EmptyStatusCaption() {
+	global _LLM_Menu
+	Corpus := _LAT_EmptyStatusCorpus()
+	SavedMenu := _LAT_FixtureMenu()
+	Definition := _MR_GetMenuDef(Corpus["api"]["section"])
+	Original := Definition[1]
+	try {
+		_LLM_Menu["api_entries"] := []
+		Rows := _LLM_Menu_ApiEntriesRows()
+		AssertEqual(t(Corpus["api"]["key"]), Rows[1]["label"])
+		AssertTrue(Rows[1].Get("disabled", false), "the original actionless status remains disabled")
+		AssertFalse(Rows[1].Has("action"), "no selectable NoModel action is attached")
+		AssertFalse(Rows[1].Has("items"), "the empty status never becomes a provider subtree")
+		AssertTrue(HasMethod(Rows[2].Get("action", 0), "Call"), "the real Add owner retains the next row")
+		Definition[1] := Map("type", "label", "id", Corpus["api"]["rows"][1]["id"],
+			"i18n", Corpus["marker_key"], "platforms", ["ahk", "linux"], "unavailable", "hide")
+		for Entries in [[], Map()] {
+			_LLM_Menu["api_entries"] := Entries
+			Rows := _LLM_Menu_ApiEntriesRows()
+			AssertEqual(t(Corpus["marker_key"]), Rows[1]["label"], "both actual old fallback predicates read the shared label")
+			AssertTrue(Rows[1].Get("disabled", false))
+			AssertFalse(Rows[1].Has("action"))
+		}
+	} finally {
+		Definition[1] := Original
+		_LAT_RestoreMenu(SavedMenu)
+	}
+}
+Test("API empty status uses the shared inert caption (llm-empty-status)", _LAT_EmptyStatusCaption)
+
+_LAT_EmptyStatusRefusal() {
+	global _LLM_Menu
+	Corpus := _LAT_EmptyStatusCorpus()
+	SavedMenu := _LAT_FixtureMenu()
+	Definition := _MR_GetMenuDef(Corpus["api"]["section"])
+	Original := Definition[1]
+	try {
+		_LLM_Menu["api_entries"] := []
+		Definition.Pop()
+		AssertEqual(0, _LLM_Menu_ApiEntriesRows().Length, "a missing declaration refuses the empty provider before callbacks")
+		Definition.Push(Map("type", "command", "id", "unowned_api_empty", "i18n", Corpus["api"]["key"],
+			"platforms", ["ahk", "linux"], "unavailable", "hide"))
+		AssertEqual(0, _LLM_Menu_ApiEntriesRows().Length, "unbound status cannot acquire an action")
+		AssertEqual(0, _LLM_Menu["api_entries"].Length)
+		Definition[1] := Original
+		AssertEqual(t(Corpus["api"]["key"]), _LLM_Menu_ApiEntriesRows()[1]["label"], "the exact original declaration repairs admission")
+	} finally {
+		if Definition.Length == 0
+			Definition.Push(Original)
+		else
+			Definition[1] := Original
+		_LAT_RestoreMenu(SavedMenu)
+	}
+}
+Test("API empty status refuses missing and unbound owners (llm-empty-status)", _LAT_EmptyStatusRefusal)

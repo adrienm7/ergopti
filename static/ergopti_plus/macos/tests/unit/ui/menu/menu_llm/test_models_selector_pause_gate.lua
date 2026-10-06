@@ -523,3 +523,77 @@ helpers.describe("Actual model hardware boundary (model-hardware-boundary)", fun
 		end)
 	end)
 end)
+
+
+local function model_header_boundary_corpus()
+	local file = assert(io.open(helpers.shared("tests/corpus/menus/model_header_boundary.json"), "rb"))
+	local bytes = assert(file:read("*a")); assert(file:close())
+	return assert(require("adapters.json_codec").decode(bytes))
+end
+
+helpers.describe("Actual model picker header boundary (model-header-boundary)", function()
+	for _, populated in ipairs({ false, true }) do
+		helpers.it("retains selectable header controls and authentic catalogue with default " .. tostring(populated) .. " (model-header-boundary)", function()
+			with_model_readout_owner(function(selector, ctx, menu, _, calls)
+				local expected = model_header_boundary_corpus()
+				local default_name = expected.default_name
+				helpers.assert_true(#ctx.models_mgr.get_presets() > 0, "this is the actual nonempty physical catalogue")
+				ctx.DEFAULT_STATE.llm_model_ollama = populated and default_name or ""
+				ctx.state.llm_model = populated and default_name or ""
+				local disabled = 0
+				ctx.disable_model = function() disabled = disabled + 1; return true end
+				local position = populated and 3 or 2
+				local root, declaration = menu.get_root(), menu.get_array(expected.section)
+				local original = declaration[1]
+				local ok, detail = xpcall(function()
+					local rows = selector.build(ctx)
+					helpers.assert_eq(rows[1].label, expected.english_no_model)
+					helpers.assert_eq(rows[1].checked, not populated)
+					helpers.assert_type(rows[1].action, "function")
+					helpers.assert_eq(rows[1].action(), true)
+					helpers.assert_eq(disabled, 1)
+					if populated then
+						helpers.assert_eq(rows[2].label, expected.english_default)
+						helpers.assert_eq(rows[2].checked, true)
+						rows[2].action()
+						helpers.assert_eq(calls, { default_name })
+					end
+					helpers.assert_eq(rows[position], { separator = true })
+					helpers.assert_true(#rows > position, "the genuine curated model groups remain after the boundary")
+					declaration[1] = { type = "label", id = "hand_header_marker", i18n = expected.marker_key,
+						platforms = { "ahk", "hs" }, unavailable = "hide" }
+					rows = selector.build(ctx)
+					helpers.assert_eq(rows[position].label, expected.marker_english)
+					helpers.assert_eq(rows[position].disabled, true)
+					helpers.assert_nil(rows[position].action)
+					helpers.assert_eq(rows[1].label, expected.english_no_model)
+					if populated then helpers.assert_eq(rows[2].label, expected.english_default) end
+					declaration[1] = { type = "command", id = "unbound_header_marker", i18n = expected.marker_key }
+					helpers.assert_eq(selector.build(ctx), {}, "unbound presentation cannot replace the actual header boundary")
+					root[expected.section] = nil
+					helpers.assert_eq(selector.build(ctx), {}, "a withdrawn declaration has no native separator fallback")
+					helpers.assert_eq(disabled, 1, "construction and refusal never select NoModel")
+					helpers.assert_eq(calls, populated and { default_name } or {})
+				end, debug.traceback)
+				root[expected.section] = declaration; declaration[1] = original
+				if not ok then error(detail, 0) end
+				local rows = selector.build(ctx)
+				helpers.assert_eq(rows[position], { separator = true })
+				helpers.assert_eq(disabled, 1)
+				helpers.assert_eq(calls, populated and { default_name } or {})
+			end)
+		end)
+	end
+
+	helpers.it("projects a true shared separator and genuine Linux flat-model absence (model-header-boundary)", function()
+		with_model_readout_owner(function(_, _, _, native)
+			local expected = model_header_boundary_corpus()
+			for _, platform in ipairs({ "ahk", "hs", "linux" }) do
+				local renderer = assert(require("menu.renderer").new({ platform = platform,
+					manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
+					json_decode = require("adapters.json_codec").decode, i18n = native, logger = require("infra.logger") }))
+				helpers.assert_eq(renderer.template_rows(expected.section, {}, {}, {}), expected.platform_rows[platform])
+			end
+		end)
+	end)
+end)

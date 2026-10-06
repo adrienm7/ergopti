@@ -431,6 +431,57 @@ function M.new(deps)
 		return normalize_separators(render_rows(rows, list_id, 1))
 	end
 
+	--- Admits a completed native child tree as detached provider rows.
+	--- This pure boundary never invokes callbacks or observes a native owner.
+	--- @param children table Dense native rows using title, fn and menu.
+	--- @return table|nil rows Nil refuses the complete tree before publication.
+	function R.native_child_rows(children)
+		local active = {}
+		local function convert(rows, depth)
+			if type(rows) ~= "table" or getmetatable(rows) ~= nil or active[rows]
+				or depth > MAX_LIST_DEPTH then return nil end
+			local count, maximum = 0, 0
+			for index in next, rows do
+				if type(index) ~= "number" or index % 1 ~= 0 or index < 1 then return nil end
+				count, maximum = count + 1, math.max(maximum, index)
+			end
+			if count ~= maximum then return nil end
+			active[rows] = true
+			local result = {}
+			for index = 1, count do
+				local child = rawget(rows, index)
+				if type(child) ~= "table" or getmetatable(child) ~= nil then return nil end
+				for field in next, child do
+					if field ~= "title" and field ~= "fn" and field ~= "menu" and field ~= "checked"
+						and field ~= "disabled" and field ~= "image" then return nil end
+				end
+				local title, action, subtree = rawget(child, "title"), rawget(child, "fn"), rawget(child, "menu")
+				local checked, disabled, image = rawget(child, "checked"), rawget(child, "disabled"), rawget(child, "image")
+				if type(title) ~= "string" or title == "" or (action ~= nil and type(action) ~= "function")
+					or (subtree ~= nil and type(subtree) ~= "table") or (action ~= nil and subtree ~= nil)
+					or (checked ~= nil and type(checked) ~= "boolean")
+					or (disabled ~= nil and type(disabled) ~= "boolean")
+					or (image ~= nil and type(image) ~= "userdata" and type(image) ~= "string") then return nil end
+				local row
+				if title == "-" then
+					if action ~= nil or subtree ~= nil or checked ~= nil or disabled ~= nil or image ~= nil then return nil end
+					row = { separator = true }
+				else
+					row = { label = title, action = action, checked = checked, disabled = disabled, image = image }
+					if subtree ~= nil then
+						row.items = convert(subtree, depth + 1)
+						if row.items == nil then return nil end
+					end
+				end
+				result[index] = row
+			end
+			active[rows] = nil
+			return result
+		end
+		local rows = convert(children, 1)
+		return rows
+	end
+
 	--- Builds a built-in named group that is always rendered the same way.
 	--- @param group_id string
 	--- @param ctx table

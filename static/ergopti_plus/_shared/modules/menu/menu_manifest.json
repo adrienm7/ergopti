@@ -429,7 +429,7 @@
 			]
 		},
 		{
-			"type": "dynamic",
+			"type": "group",
 			"id": "llm_trigger",
 			"i18n": "menu.llm.trigger_menu_title",
 			"disabled_when_off": true,
@@ -473,7 +473,7 @@
 			"reason_key": "platform_reason.llm_lists_are_inline_on_linux"
 		},
 		{
-			"type": "dynamic",
+			"type": "group",
 			"id": "llm_display",
 			"i18n": "menu.llm.display_menu_title",
 			"disabled_when_off": true,
@@ -485,7 +485,7 @@
 			]
 		},
 		{
-			"type": "dynamic",
+			"type": "group",
 			"id": "llm_navigation",
 			"i18n": "menu.llm.nav_menu_title",
 			"disabled_when_off": true,
@@ -3428,6 +3428,29 @@
 			"unavailable": "hide"
 		}
 	],
+	"llm_api_empty_status": [
+		{
+			"type": "label",
+			"id": "llm_api_empty_hint",
+			"i18n": "menu.llm.api_no_entry",
+			"platforms": [
+				"ahk",
+				"linux"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"agent_server_empty_status": [
+		{
+			"type": "label",
+			"id": "agent_server_empty_hint",
+			"i18n": "menu.llm.local_servers.no_models",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
 	"llm_user_model_controls": [
 		{
 			"type": "check",
@@ -3670,6 +3693,16 @@
 			"platforms": [
 				"ahk",
 				"linux"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"llm_model_header_boundary": [
+		{
+			"type": "---",
+			"platforms": [
+				"ahk",
+				"hs"
 			],
 			"unavailable": "hide"
 		}
