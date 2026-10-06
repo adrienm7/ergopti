@@ -80,8 +80,14 @@ adds closed refusal facts, retaining the exact original execution, predicate,
 55-control corpus has fourteen observability failures on the original helper
 and none on the successor; arbitrary execution throws still propagate by
 identity. No stream, error message, private value or getter is projected.
-Actual Windows replay remains pending. The separate runtime-initialization
-workflow preparation is inactive pending source ownership coordination.
+Diagnostic successor `0ce682b1ffbb1854fcfe2ed1842f109da5df453c` is published;
+actual Windows replay remains pending. After bounded public ownership
+coordination, the launch job now initializes Node from `.node-version` and
+Python 3.12 with the same setup actions already used by packaging. This fixes
+the observed Node version drift without changing any admission assertion,
+fixture, receipt, deadline or release policy. Python absence and the original
+refusal cause remain unproved; fresh native installation qualification is
+required.
 
 Both final manual runs are terminal. Group 3 deleted only its owned
 `323873fd` integration lock and preserved CI-validation `6c9d575`; other
