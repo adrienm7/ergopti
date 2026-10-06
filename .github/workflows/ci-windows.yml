@@ -673,6 +673,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up pinned Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+
+      - name: Set up Python for native catalogue reads
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
       - name: Download the compiled application
         uses: actions/download-artifact@v4
         with:

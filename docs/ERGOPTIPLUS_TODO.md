@@ -4720,6 +4720,11 @@ only closed result/status/error/signal facts without streams or private
 values. Independent controls retain 55 assertions: fourteen observability
 failures on the old helper, none on the successor. Native replay remains
 pending; this does not prove the original cause or successful installation.
+Published diagnostic successor `0ce682b1f` preserves those boundaries. The
+Windows launch job now selects the repository Node version and Python 3.12
+using the existing packaging setup policy, after bounded ownership
+coordination. The observed unpinned Node version is corrected; the native
+Python refusal still requires fresh hosted diagnosis and qualification.
 
 - [ ] Software implementation/repair: Keep the completed dedicated Metrics-shortcut retirement and ordinary Metrics actions; repair only demonstrated regressions in unknown retired values/comments, consent or compensation.
 - [ ] Hosted native qualification: Requalify native full-save, installed upgrade/startup and complete three-OS unit/E2E/package/install/launch gates on final sources.
