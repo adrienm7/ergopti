@@ -3453,6 +3453,8 @@ Tap binding identities now come from complete actual native producer publication
 
 One shared fixed-domain constructor registry pins the actual native Tap and Script publication accessors. Replaced, withdrawn, fake or re-registered producers return unjudged without invoking replacement getters. Genuine old-accessor controls fail the new public consumer assertions. Complete remaining domain publication and native installation qualification remain open.
 
+macOS/Linux keyboard bindings now publish their actual complete contextual native inventory through the same authentic fixed-domain authority owner as Tap/Script. Unknown future data remain unjudged and source-preserved; obsolete known bindings read neutral and reject replacement before effects. Both Lua engines and genuine old-producer controls qualify the portable ownership contract. Windows keyboard catalogue publication remains explicit software work because its native four-group producer does not yet own the expanded chord domain.
+
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
   The shared AHK override policy now writes an explicit recommended delay only

@@ -22,6 +22,7 @@ local OWNERS = {
 	"brightness_actions_data",
 	"config_binding_identity",
 	"config_binding_publication",
+	"config_keyboard_publication",
 	"_generated.gesture_emit_actions",
 	"adapters.file_system",
 	"adapters.hotkey_registrar",

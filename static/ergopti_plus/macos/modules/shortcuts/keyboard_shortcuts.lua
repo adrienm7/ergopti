@@ -35,6 +35,7 @@ local ConfigPaths = require("infra.config_paths")
 local Manifest    = require("infra.manifest_reader")
 local ConfigOutdated = require("config_outdated")
 local MagicPolicy = require("shortcuts.magic_editor")
+local KeyboardPublication = require("config_keyboard_publication")
 local Assignment = require("shortcuts.assignment")
 local i18n = require("infra.i18n")
 
@@ -146,6 +147,7 @@ end
 -- The catalogue, decoded once. Nil until the first read; false once a read has
 -- failed, so a missing file is reported once rather than on every menu rebuild.
 local _catalogue = nil
+local _binding_publication = nil
 
 --- Reads the shared key catalogue.
 --- @return table|nil keys The ordered key entries, or nil when unavailable.
@@ -180,6 +182,12 @@ local function catalogue_keys()
 		for _, key in ipairs(decoded.keys) do keys[key.id] = key.chord_key or key.id end
 		SLOT_MODS, SPECIAL_KEYS = groups, keys
 		_catalogue = decoded
+		local admitted, publication = pcall(KeyboardPublication.publish, decoded.keys, SLOT_MODS, MagicPolicy.SLOT_ID)
+		if admitted then
+			_binding_publication = publication
+		else
+			Logger.error(LOG, "The complete keyboard source cannot publish its binding catalogue.")
+		end
 	end
 	return _catalogue.keys
 end
@@ -880,5 +888,16 @@ function M.release_pause_admission()
 	invalidate_lifecycle()
 	return true
 end
+
+
+--- Returns a detached complete native publication without reading or binding input.
+--- @return table|nil catalogue Unavailable or withdrawn sources remain unjudged.
+function M.published_binding_catalogue()
+	if not KeyboardPublication.owner_is_current(M)
+		or _binding_publication == nil or type(_catalogue) ~= "table" then return nil end
+	return _binding_publication(rawget(_catalogue, "keys"), SLOT_MODS, MagicPolicy.SLOT_ID)
+end
+
+KeyboardPublication.register(M, M.published_binding_catalogue)
 
 return M
