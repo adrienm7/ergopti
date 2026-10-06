@@ -1326,6 +1326,29 @@ class AppleEventTerminalControls(unittest.TestCase):
         observed = SimpleNamespace(si_pid=73136, si_code=probe.os.CLD_EXITED, si_status=status)
         return children, receiver, group, observed
 
+    def test_current_process_and_transform_registration_refusals_remain_distinct(self):
+        for stage, phase in (
+            ("current-process", "registration-current-process"),
+            ("transform", "registration-transform"),
+        ):
+            with self.subTest(stage=stage):
+                children, receiver, group, observed = self.world()
+                errors = (
+                    "Owned AppleEvent recipient " + stage + " registration failed: -50\n"
+                ).encode("ascii")
+                with patch.object(probe, "_appleevent_capture", return_value=(b"", errors)):
+                    packet = probe._appleevent_terminal_packet(children, receiver, group, observed)
+                self.assertEqual(packet["si_pid"], 73136)
+                self.assertEqual(packet["si_code"], 1)
+                self.assertEqual(packet["si_status"], 65)
+                self.assertEqual(packet["stderr_phase"], phase)
+                self.assertEqual(packet["stderr_osstatus"], -50)
+                self.assertEqual(packet["stderr_bytes"], len(errors))
+                self.assertEqual(packet["stderr_sha256"], hashlib.sha256(errors).hexdigest())
+                self.assertEqual(packet["stdout_sha256"], hashlib.sha256(b"").hexdigest())
+                self.assertFalse(group.reaped)
+                self.assertIsNone(receiver.returncode)
+
     def test_exact_terminal_status_and_fixed_osstatus_are_retained_without_raw_streams(self):
         children, receiver, group, observed = self.world()
         errors = b"Owned AppleEvent recipient registration failed: -50\n"

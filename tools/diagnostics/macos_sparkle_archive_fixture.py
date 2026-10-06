@@ -53,6 +53,7 @@ import json
 import os
 from pathlib import Path
 import signal
+import socket
 import stat
 import subprocess
 import sys
@@ -234,6 +235,14 @@ def serve(root, nonce):
             pass
 
         def do_GET(self):
+            # Claim admitted handling before checking the stop cut. A stop here
+            # either refuses new work or lets an already admitted response finish.
+            self.server.active_handler_admitted = True
+            if state["stopping"]:
+                # A partial header can parse after stop-generated EOF. No new
+                # resource read, publication or response may start after the cut.
+                self.close_connection = True
+                return
             routes = {"/feed.xml": "feed.xml", "/archive.tar.xz": "archive.tar.xz"}
             if self.path not in routes:
                 self.send_error(404)
@@ -281,12 +290,45 @@ def serve(root, nonce):
             http.server.socketserver.TCPServer.server_bind(self)
             self.server_name, self.server_port = self.server_address[:2]
 
+        def __init__(self, *arguments, **options):
+            self.active_request = None
+            self.active_handler_admitted = False
+            self.active_stop_attempted = False
+            self.stop_failure = None
+            super().__init__(*arguments, **options)
+
+        def request_stop(self, *_arguments):
+            state["stopping"] = True
+            request = self.active_request
+            if request is None or self.active_stop_attempted or self.active_handler_admitted:
+                return
+            self.active_stop_attempted = True
+            try:
+                # This is the exact accepted socket, retained before the handler
+                # reads headers. A flag alone cannot interrupt that blocking read.
+                request.shutdown(socket.SHUT_RDWR)
+            except OSError as failure:
+                # A refused shutdown is never a close ACK or a successful stop.
+                # Keep the first refusal until the original request physically exits.
+                if self.stop_failure is None:
+                    self.stop_failure = failure
+
         def process_request(self, request, client_address):
+            if self.active_request is not None:
+                raise RuntimeError("Private Sparkle accepted-socket owner is already active")
+            self.active_handler_admitted = False
+            self.active_stop_attempted = False
+            self.active_request = request
             # BaseServer's error callback may raise before its own shutdown.
             # The native accepted socket has one unconditional physical owner.
             try:
-                self.finish_request(request, client_address)
+                if not state["stopping"]:
+                    self.finish_request(request, client_address)
             finally:
+                # Header/body handling is now terminal; the local request still
+                # owns its capability while canonical shutdown closes it below.
+                self.active_request = None
+                self.active_handler_admitted = False
                 self.shutdown_request(request)
 
         def handle_error(self, _request, _address):
@@ -297,8 +339,8 @@ def serve(root, nonce):
     try:
         startup_phase("socket-bound")
         server.timeout = 0.2
-        signal.signal(signal.SIGTERM, lambda *_args: state.update(stopping=True))
-        signal.signal(signal.SIGINT, lambda *_args: state.update(stopping=True))
+        signal.signal(signal.SIGTERM, server.request_stop)
+        signal.signal(signal.SIGINT, server.request_stop)
         startup_phase("handlers-installed")
         startup_phase("start-publishing")
         publish(
@@ -313,6 +355,8 @@ def serve(root, nonce):
         startup_phase("loop-entered")
         while not state["stopping"]:
             server.handle_request()
+        if server.stop_failure is not None:
+            raise RuntimeError("Private Sparkle accepted-socket stop refused")
     except BaseException as failure:
         # Reserve the actual serve-body failure, not a caller's active exception.
         primary_failure = failure
