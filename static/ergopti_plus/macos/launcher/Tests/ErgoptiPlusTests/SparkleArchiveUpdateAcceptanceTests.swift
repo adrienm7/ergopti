@@ -303,6 +303,29 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		}
 	}
 
+	private enum SignatureProbe: String { case installedKey = "installed-key", foreignKey = "foreign-key" }
+
+	/// Closed cryptographic observations contain no signature, seed or archive bytes.
+	private func signatureProbeMessage(_ probe: SignatureProbe, signature64: Bool, independentValid: Bool,
+		installedValid: Bool, payloadEqual: Bool?, signatureEqual: Bool?) -> String {
+		func fact(_ value: Bool?) -> String { value.map { $0 ? "true" : "false" } ?? "unavailable" }
+		return "Native Sparkle signature facts: probe=" + probe.rawValue
+			+ " signature64=" + fact(signature64) + " independent_valid=" + fact(independentValid)
+			+ " installed_valid=" + fact(installedValid) + " payload_equal=" + fact(payloadEqual)
+			+ " signature_equal=" + fact(signatureEqual)
+	}
+
+	/// Reuse the already bounded exit formatter; application status uses its own fixed label.
+	private func applicationExitRefusalMessage(_ error: Error, termination: ObservedTermination) -> String {
+		let projected: Error
+		if case Failure.evidence(let fact) = error, fact == "application-retirement" {
+			projected = Failure.evidence("server-retirement")
+		} else { projected = error }
+		return serverExitRefusalMessage(projected, termination: termination)
+			.replacingOccurrences(of: "Native Sparkle server retirement refusal:",
+				with: "Native Sparkle application retirement refusal:")
+	}
+
 	private let manager = FileManager.default
 	private var commands: [OwnedProcess] = []
 	private var retirementDebt = false
@@ -716,6 +739,21 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		}
 	}
 
+	func testSignatureAndApplicationFactsContainOnlyClosedObservations() {
+		XCTAssertEqual(signatureProbeMessage(.installedKey, signature64: true, independentValid: true,
+			installedValid: true, payloadEqual: nil, signatureEqual: nil),
+			"Native Sparkle signature facts: probe=installed-key signature64=true independent_valid=true installed_valid=true payload_equal=unavailable signature_equal=unavailable")
+		XCTAssertEqual(signatureProbeMessage(.foreignKey, signature64: true, independentValid: true,
+			installedValid: false, payloadEqual: true, signatureEqual: false),
+			"Native Sparkle signature facts: probe=foreign-key signature64=true independent_valid=true installed_valid=false payload_equal=true signature_equal=false")
+		XCTAssertEqual(applicationExitRefusalMessage(Failure.evidence("application-retirement"), termination: .exit(78)),
+			"Native Sparkle application retirement refusal: code=exit-status native_reason=exit native_status=78")
+		XCTAssertEqual(applicationExitRefusalMessage(Failure.deadline("private-never-exported"), termination: .signal(15)),
+			"Native Sparkle application retirement refusal: code=deadline native_reason=signal native_status=15")
+		XCTAssertEqual(applicationExitRefusalMessage(Failure.evidence("private-never-exported"), termination: .exit(256)),
+			"Native Sparkle application retirement refusal: code=unavailable native_reason=unavailable native_status=unavailable")
+	}
+
 	func testServerExitRefusalMessageProjectsOnlyClosedFacts() {
 		XCTAssertEqual(serverExitRefusalMessage(Failure.deadline("private-input-never-exported"), termination: .unavailable),
 			"Native Sparkle server retirement refusal: code=deadline native_reason=unavailable native_status=unavailable")
@@ -860,6 +898,9 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 			func attempt(_ label: String, _ action: () throws -> Void) {
 				do { try action() }
 				catch {
+					if label == "application-exit", let application {
+						XCTFail(applicationExitRefusalMessage(error, termination: application.observedTerminationFacts()))
+					}
 					retirementDebt = true
 					checkpoint("cleanup.debt-" + label, status: "cleanup-debt")
 					XCTFail("Private Sparkle retirement refused (" + label + "); fixture retained at " + root.path)
@@ -988,6 +1029,13 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		let signatureBytes = try XCTUnwrap(Data(base64Encoded: signature))
 		XCTAssertEqual(Int(fragment[try XCTUnwrap(Range(match.range(at: 2), in: fragment))]), payload.count)
 		XCTAssertTrue(key.publicKey.isValidSignature(signatureBytes, for: payload), "The native signer and independent Ed25519 public key must agree")
+		let independentInstalledSignature = try? key.signature(for: payload)
+		let installedSignatureEqual = independentInstalledSignature.map { $0 == signatureBytes }
+		print("::notice title=Native Sparkle signature::" + signatureProbeMessage(.installedKey,
+			signature64: signatureBytes.count == 64,
+			independentValid: key.publicKey.isValidSignature(signatureBytes, for: payload),
+			installedValid: key.publicKey.isValidSignature(signatureBytes, for: payload),
+			payloadEqual: nil, signatureEqual: installedSignatureEqual))
 		let wrongSignature = try foreignKey.signature(for: payload)
 		XCTAssertTrue(foreignKey.publicKey.isValidSignature(wrongSignature, for: payload))
 		XCTAssertFalse(key.publicKey.isValidSignature(wrongSignature, for: payload))
@@ -1004,6 +1052,19 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		let foreignFragment = try String(contentsOf: foreignArchives.appendingPathComponent("_ErgoptiPlus.app.tar.xz.sig"), encoding: .utf8)
 		let foreignMatch = try XCTUnwrap(expression.firstMatch(in: foreignFragment, range: NSRange(foreignFragment.startIndex..., in: foreignFragment)))
 		let foreignSignature = String(foreignFragment[try XCTUnwrap(Range(foreignMatch.range(at: 1), in: foreignFragment))])
+		let officialForeignSignature = try XCTUnwrap(Data(base64Encoded: foreignSignature))
+		let copiedForeignPayload = try Data(contentsOf: foreignArchives.appendingPathComponent("ErgoptiPlus.app.tar.xz"))
+		let officialForeignValid = foreignKey.publicKey.isValidSignature(officialForeignSignature, for: payload)
+		let officialInstalledValid = key.publicKey.isValidSignature(officialForeignSignature, for: payload)
+		let foreignPayloadEqual = copiedForeignPayload == payload
+		print("::notice title=Native Sparkle signature::" + signatureProbeMessage(.foreignKey,
+			signature64: officialForeignSignature.count == 64, independentValid: officialForeignValid,
+			installedValid: officialInstalledValid, payloadEqual: foreignPayloadEqual,
+			signatureEqual: officialForeignSignature == wrongSignature))
+		XCTAssertEqual(officialForeignSignature.count, 64, "The official foreign signature has the exact Ed25519 length")
+		XCTAssertTrue(officialForeignValid, "The independent foreign public key must validate the actual official signature")
+		XCTAssertFalse(officialInstalledValid, "The installed public key must refuse the actual official foreign signature")
+		XCTAssertTrue(foreignPayloadEqual, "The foreign signer must consume the same private archive bytes")
 		XCTAssertTrue(Data(base64Encoded: foreignSignature) == wrongSignature, "The official signer must agree with the independent foreign Ed25519 key")
 		XCTAssertEqual(Int(foreignFragment[try XCTUnwrap(Range(foreignMatch.range(at: 2), in: foreignFragment))]), payload.count)
 		try payload.write(to: www.appendingPathComponent("archive.tar.xz"), options: .withoutOverwriting)

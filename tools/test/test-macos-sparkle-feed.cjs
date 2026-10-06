@@ -1507,6 +1507,134 @@ try {
 }
 // SPARKLE_NUMERIC_BIND_CONTROLS_END
 
+// SPARKLE_SIGNATURE_APPLICATION_FACTS_BEGIN
+// Actual signer/exit diagnostics add observations while the original refusal remains mandatory.
+try {
+	const assert = require('node:assert/strict');
+	const { annotation, evaluate } = require('../diagnostics/swift_xctest_evidence.cjs');
+	const nativeFile = path.join(
+		root,
+		'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/SparkleArchiveUpdateAcceptanceTests.swift'
+	);
+	const fixture = fs.readFileSync(nativeFile, 'utf8');
+	function assertSignerApplicationFacts(source) {
+		const start = source.indexOf('private enum SignatureProbe:');
+		const end = source.indexOf('private let manager =', start);
+		assert.ok(start >= 0 && end > start, 'Closed diagnostic source is present');
+		const closed = source.slice(start, end);
+		assert.match(closed, /case installedKey = "installed-key", foreignKey = "foreign-key"/);
+		assert.match(closed, /signature64: Bool, independentValid: Bool/);
+		assert.match(closed, /installedValid: Bool, payloadEqual: Bool\?, signatureEqual: Bool\?/);
+		assert.match(closed, /\? "true" : "false" \} \?\? "unavailable"/);
+		assert.doesNotMatch(
+			closed,
+			/localizedDescription|String\(describing:|Data|stdout|stderr|\.path|nonce|\.wait\(|finish\(|terminate\(|kill\(/
+		);
+		assert.match(closed, /fact == "application-retirement"/);
+		assert.match(closed, /projected = Failure\.evidence\("server-retirement"\)/);
+		assert.match(closed, /else \{ projected = error \}/);
+		assert.match(closed, /serverExitRefusalMessage\(projected, termination: termination\)/);
+		assert.match(
+			source,
+			/if label == "application-exit", let application \{\s*XCTFail\(applicationExitRefusalMessage\(error, termination: application\.observedTerminationFacts\(\)\)\)/
+		);
+		assert.match(
+			source,
+			/let retired = try application\.finish\(15\)\s*guard retired.status == 0 else \{ throw Failure\.evidence\("application-retirement"\) \}/
+		);
+		assert.match(
+			source,
+			/let independentInstalledSignature = try\? key\.signature\(for: payload\)/
+		);
+		assert.match(
+			source,
+			/let installedSignatureEqual = independentInstalledSignature\.map \{ \$0 == signatureBytes \}/
+		);
+		assert.match(
+			source,
+			/let officialForeignSignature = try XCTUnwrap\(Data\(base64Encoded: foreignSignature\)\)/
+		);
+		assert.match(
+			source,
+			/let copiedForeignPayload = try Data\(contentsOf: foreignArchives\.appendingPathComponent\("ErgoptiPlus.app.tar.xz"\)\)/
+		);
+		assert.match(
+			source,
+			/let officialForeignValid = foreignKey\.publicKey\.isValidSignature\(officialForeignSignature, for: payload\)/
+		);
+		assert.match(
+			source,
+			/let officialInstalledValid = key\.publicKey\.isValidSignature\(officialForeignSignature, for: payload\)/
+		);
+		assert.match(source, /let foreignPayloadEqual = copiedForeignPayload == payload/);
+		assert.match(source, /XCTAssertEqual\(officialForeignSignature.count, 64,/);
+		assert.match(source, /XCTAssertTrue\(officialForeignValid,/);
+		assert.match(source, /XCTAssertFalse\(officialInstalledValid,/);
+		assert.match(source, /XCTAssertTrue\(foreignPayloadEqual,/);
+		assert.match(
+			source,
+			/XCTAssertTrue\(Data\(base64Encoded: foreignSignature\) == wrongSignature, "The official signer must agree with the independent foreign Ed25519 key"\)/
+		);
+		assert.match(source, /func testSignatureAndApplicationFactsContainOnlyClosedObservations\(\)/);
+	}
+	assertSignerApplicationFacts(fixture);
+	for (const [label, before, after] of [
+		[
+			'foreign public-key admission replaced',
+			'let officialForeignValid = foreignKey.publicKey.isValidSignature(officialForeignSignature, for: payload)',
+			'let officialForeignValid = true'
+		],
+		[
+			'installed key refusal replaced',
+			'let officialInstalledValid = key.publicKey.isValidSignature(officialForeignSignature, for: payload)',
+			'let officialInstalledValid = false'
+		],
+		[
+			'payload identity replaced',
+			'let foreignPayloadEqual = copiedForeignPayload == payload',
+			'let foreignPayloadEqual = true'
+		],
+		[
+			'original signer equality removed',
+			'XCTAssertTrue(Data(base64Encoded: foreignSignature) == wrongSignature, "The official signer must agree with the independent foreign Ed25519 key")',
+			'XCTAssertTrue(officialForeignValid)'
+		]
+	]) {
+		assert.equal(fixture.split(before).length - 1, 1, 'One exact independent mutation');
+		assert.throws(() => assertSignerApplicationFacts(fixture.replace(before, after)), label);
+	}
+	const fixed =
+		'Native Sparkle application retirement refusal: code=exit-status native_reason=exit native_status=78';
+	const transcript = [
+		"Test Suite 'All tests' started at 2026-10-06 01:00:00.000.",
+		"Test Case '-[ErgoptiPlusTests.SparkleArchiveUpdateAcceptanceTests testArchive]' started.",
+		nativeFile + ':777: error: failed - ' + fixed,
+		"Test Case '-[ErgoptiPlusTests.SparkleArchiveUpdateAcceptanceTests testArchive]' failed (0.100 seconds).",
+		"Test Suite 'All tests' failed at 2026-10-06 01:00:01.000.",
+		'\t Executed 1 test, with 1 failure (0 unexpected) in 0.100 (0.110) seconds'
+	].join('\n');
+	const verdict = evaluate(transcript, 1, 0, root);
+	const refusal = verdict.failures.find((failure) => failure.message.endsWith(fixed));
+	assert.notEqual(refusal, undefined, 'Authentic XCTest carries only fixed application exit facts');
+	assert.match(
+		annotation(refusal),
+		/::failed - Native Sparkle application retirement refusal: code=exit-status native_reason=exit native_status=78$/
+	);
+	assert.equal(verdict.exit_status, 1);
+	assert.equal(verdict.complete, false);
+	assert.equal(
+		evaluate(fixed, 1, 0, root).failures.some((failure) => failure.message.endsWith(fixed)),
+		false,
+		'Raw output never becomes native retirement proof'
+	);
+	console.log(
+		'Sparkle independent signer and already-observed application exit facts preserve original refusal predicates.'
+	);
+} catch (error) {
+	errors.push(`Native Sparkle signer/application diagnostic guard failed: ${error.message}`);
+}
+// SPARKLE_SIGNATURE_APPLICATION_FACTS_END
+
 if (errors.length > 0) {
 	for (const error of errors) console.error(`[FAIL] ${error}`);
 	process.exit(1);
