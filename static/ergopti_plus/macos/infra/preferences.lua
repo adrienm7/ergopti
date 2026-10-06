@@ -43,6 +43,8 @@ local PersonalFiles = require("hotstrings.personal_files")
 local PersonalAdoption = require("infra.personal_file_adoption")
 local Agent     = require("llm.agent")
 local WrapPreferences = require("menu.wrap_preferences")
+local UserModels = require("config_user_models")
+local RecordList = require("toml_codec.record_list")
 local LOG       = "preferences"
 
 
@@ -684,6 +686,10 @@ local function flatten_from_disk(grouped, mark, shapes)
 		return profile_ids, legacy_profile_ids
 	end
 	local function take_value(flat_key, value, ...)
+		if flat_key == "llm_user_models" then
+			flat[flat_key] = UserModels.partition(value, shapes, mark)
+			return
+		end
 		local fits, detail = persisted_units_fit(KEY_MAP[flat_key], value)
 		local spec = KEY_MAP[flat_key]
 		if fits and spec and spec.enum then
@@ -1750,6 +1756,7 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view)
 	-- its default, whose sparse delete must not erase it (see _load_outdated).
 	local outdated = _load_outdated[prefs_file] or {}
 	local replaced = {}
+	local model_operation
 	local ok, updates = pcall(function()
 		local document, shapes
 		if expected_source.status == "ok" then
@@ -1784,6 +1791,9 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view)
 				end
 			end
 		end
+		if existing.llm_user_models ~= nil then
+			model_operation = RecordList.prepare(expected_source.content or "", existing.llm_user_models, prefs_file)
+		end
 		local leaves = {}
 		local proposed = sparse_updates(existing)
 		for _, row in ipairs(cleared_orders) do proposed[#proposed + 1] = row end
@@ -1793,14 +1803,18 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view)
 		for _, row in ipairs(proposed) do
 			local path = row.section .. "." .. row.key
 			local reset = reset_keeping_outdated(row, outdated, document)
-			if reset then
+			if model_operation and path == "llm.models.user_models" then
+				-- The row owner is appended after ordinary parent projections.
+			elseif reset then
 				for _, child in ipairs(reset) do leaves[#leaves + 1] = child end
 			elseif not (row.delete and outdated[path]) then
 				leaves[#leaves + 1] = row
 				if outdated[path] then replaced[#replaced + 1] = path end
 			end
 		end
-		return M.prepare_hotstring_updates(expected_source, M.prepare_shortcut_updates(expected_source, M.prepare_llm_updates(expected_source, M.prepare_gesture_updates(expected_source, leaves))))
+		local prepared = M.prepare_hotstring_updates(expected_source, M.prepare_shortcut_updates(expected_source, M.prepare_llm_updates(expected_source, M.prepare_gesture_updates(expected_source, leaves))))
+		if model_operation then prepared[#prepared + 1] = model_operation end
+		return prepared
 	end)
 	if not ok then
 		-- A silent return here looks exactly like a successful save until the next
@@ -1826,6 +1840,7 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view)
 		end
 		return false
 	end
+	if model_operation then RecordList.acknowledge(model_operation, encoded) end
 	_source_snapshots[prefs_file] = { status = "ok", content = encoded }
 	if type(encoded) == "string" then
 		local prior = _save_receipts[prefs_file]
