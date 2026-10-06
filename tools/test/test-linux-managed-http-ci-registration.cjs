@@ -27,6 +27,8 @@ const sources = [
 	'tools/test/linux-managed-http-evidence.cjs',
 	'tools/test/test-linux-managed-http-ci-registration.cjs',
 	'tools/test/fixtures/validation-curl/setup_validation_curl.py',
+	'tools/test/fixtures/validation-curl/prepare_validation_keyring.py',
+	'tools/test/test_validation_keyring_preparation.py',
 	'tools/test/fixtures/validation-curl/PINS.json'
 ];
 let passed = 0;
@@ -152,7 +154,26 @@ function validateWorkflow(text, entry) {
 	assert.ok(setup.includes('mkdir -m 700 "$validation_parent"'));
 	assert.ok(
 		setup.includes(
-			'if python3 -B tools/test/fixtures/validation-curl/setup_validation_curl.py --repo "$GITHUB_WORKSPACE" --destination "$validation_parent/tools" --openssl-prefix /usr --keyring /usr/share/keyrings/debian-archive-keyring.gpg --jobs 2 > "$validation_parent/setup.stdout.private" 2> "$validation_parent/setup.stderr.private"; then'
+			'if ! python3 -B tools/test/test_validation_keyring_preparation.py > "$validation_parent/keyring.models.stdout.private" 2> "$validation_parent/keyring.models.stderr.private"; then'
+		)
+	);
+	assert.ok(
+		setup.includes(
+			'if ! python3 -B tools/test/fixtures/validation-curl/prepare_validation_keyring.py --repo "$GITHUB_WORKSPACE" --destination "$validation_parent/keyring" > "$validation_parent/keyring.stdout.private" 2> "$validation_parent/keyring.stderr.private"; then'
+		)
+	);
+	assert.ok(
+		setup.includes(
+			'echo "::error::Authenticated private validation keyring preparation failed; private inputs retained."\n  exit 1\nfi'
+		)
+	);
+	assert.ok(
+		setup.indexOf('prepare_validation_keyring.py --repo') <
+			setup.indexOf('setup_validation_curl.py --repo')
+	);
+	assert.ok(
+		setup.includes(
+			'if python3 -B tools/test/fixtures/validation-curl/setup_validation_curl.py --repo "$GITHUB_WORKSPACE" --destination "$validation_parent/tools" --openssl-prefix /usr --keyring "$validation_parent/keyring/trusted.gpg" --jobs 2 > "$validation_parent/setup.stdout.private" 2> "$validation_parent/setup.stderr.private"; then'
 		)
 	);
 	assert.ok(
@@ -221,7 +242,7 @@ for (const [needle, replacement] of [
 		'--jobs 2 > "$validation_parent/changed.stdout"'
 	],
 	[
-		'--keyring /usr/share/keyrings/debian-archive-keyring.gpg --jobs',
+		'--keyring "$validation_parent/keyring/trusted.gpg" --jobs',
 		'--keyring /untrusted/keyring --jobs'
 	],
 	[
@@ -601,6 +622,30 @@ assert.ok(
 	)
 );
 passed++;
+// Independent workflow opponents are constructed before expected rejection.
+for (const [needle, replacement] of [
+	[
+		'python3 -B tools/test/test_validation_keyring_preparation.py >',
+		'python3 -B tools/test/removed_keyring_controls.py >'
+	],
+	[
+		'python3 -B tools/test/fixtures/validation-curl/prepare_validation_keyring.py --repo',
+		'python3 -B tools/test/fixtures/validation-curl/removed_keyring.py --repo'
+	],
+	['--destination "$validation_parent/keyring" >', '--destination "/foreign/keyring" >'],
+	[
+		'> "$validation_parent/keyring.stdout.private" 2>',
+		'> "$validation_parent/public-keyring.stdout" 2>'
+	],
+	[
+		'echo "::error::Authenticated private validation keyring preparation failed; private inputs retained."',
+		'echo "Ignored private keyring preparation failure"'
+	]
+]) {
+	const opponent = uniqueReplace(workflow, needle, replacement);
+	assert.throws(() => validateWorkflow(opponent, entry));
+	passed++;
+}
 console.log(
 	'[OK] Managed HTTP native CI registration: ' +
 		passed +

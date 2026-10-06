@@ -63,5 +63,31 @@
 				"source_basename": "liblber-2.5.so.0.1.8"
 			}
 		]
+	},
+	"validation_keyring": {
+		"authority": "official_debian_signed_distribution_package",
+		"qualification_sha256": "58acaaa4dde2d3a7e806dec460db5c836e3f94e1c96533d742b15d1b0cf30e3f",
+		"inrelease_sha256": "77737fa4b34f2693e982cc9ee35736816c35a7778fc2d326cc1bbf5b301fe1aa",
+		"required_signer": "4D64FEC119C2029067D6E791F8D2585B8783D481",
+		"index": {
+			"path": "main/binary-amd64/Packages.xz",
+			"size": 8790396,
+			"sha256": "9e0b5aabb2465b3d2e7a7fe27f9913846277833f7a2826e7767acccff5b588c5"
+		},
+		"package": {
+			"name": "debian-archive-keyring",
+			"version": "2023.3+deb12u2",
+			"architecture": "all",
+			"publisher": "Debian Release Team <packages@release.debian.org>",
+			"filename": "pool/main/d/debian-archive-keyring/debian-archive-keyring_2023.3+deb12u2_all.deb",
+			"url": "https://deb.debian.org/debian/pool/main/d/debian-archive-keyring/debian-archive-keyring_2023.3+deb12u2_all.deb",
+			"sha256": "f699e2f88dca05212f2a452b58475f2993cb6993dfbafb1d0205a3291eb8b4b8",
+			"size": 178572
+		},
+		"aggregate": {
+			"path": "usr/share/keyrings/debian-archive-keyring.gpg",
+			"sha256": "506b815cbb32d9b6066b4a2aa524071e071761e7e7f68c3ac74f3061ba852017",
+			"size": 55918
+		}
 	}
 }

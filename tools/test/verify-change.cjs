@@ -641,6 +641,8 @@ const RULES = [
 				'tools/test/linux-managed-http-evidence.cjs',
 				'tools/test/test-linux-managed-http-ci-registration.cjs',
 				'tools/test/fixtures/validation-curl/setup_validation_curl.py',
+				'tools/test/fixtures/validation-curl/prepare_validation_keyring.py',
+				'tools/test/test_validation_keyring_preparation.py',
 				'tools/test/fixtures/validation-curl/PINS.json',
 				'tools/test/run-linux-managed-http-phase.py',
 				'static/ergopti_plus/linux/tests/hardware/managed_http_gio_error.c',
