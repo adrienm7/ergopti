@@ -150,6 +150,15 @@ const OPENS_SUBMENU = {
 	configuration: 'configuration_menu',
 	debug: 'debug_menu',
 	shortcuts: 'shortcuts_menu',
+	extensions_shortcuts: {
+		menu: 'shortcut_extension_boundary',
+		platforms: ['ahk', 'hs'],
+		kind: 'compose',
+		native_sources: {
+			ahk: 'windows/ui/menu/menu_shortcuts.ahk',
+			hs: 'macos/ui/menu/menu_shortcuts.lua'
+		}
+	},
 	// Native wrap providers compose these fixed fragments into their existing picker.
 	wrap_symbols_menu: [
 		{

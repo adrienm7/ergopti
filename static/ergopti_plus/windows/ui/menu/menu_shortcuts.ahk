@@ -138,8 +138,11 @@ _SC_ExtensionRows() {
 	if !HasExtShortcuts {
 		return Rows
 	}
-	Rows.Push(Map("separator", true))
-	Rows.Push(Map("label", MenuSectionTitle(t("menu.extensions.header")), "disabled", true))
+	BoundaryRows := MenuRenderer_TemplateRows("shortcut_extension_boundary", Map(), Map(), Map())
+	if !(BoundaryRows is Array)
+		return []
+	for Row in BoundaryRows
+		Rows.Push(Row)
 	Loop Files ExtShortcutsBaseDir . "*", "D" {
 		ExtId       := A_LoopFileName
 		ExtDir      := A_LoopFileFullPath

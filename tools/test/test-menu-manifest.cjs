@@ -4826,3 +4826,41 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		'Generation boundaries: four actual constructors, authentic cross-platform absence and21 unchanged caption sets.'
 	);
 }
+
+// The extension-list boundary has two actual native owners, independent of its children.
+{
+	const assert = require('assert');
+	const manifest = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const contract = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/shortcut_extension_boundary.json'), 'utf8')
+	);
+	assert.deepStrictEqual(manifest[contract.section], contract.rows);
+	assert.deepStrictEqual(contract.projections.linux, []);
+	assert.deepStrictEqual(contract.nonempty_order, ['separator', 'heading', 'extension_group']);
+	for (const [driver, call] of [
+		['windows', 'MenuRenderer_TemplateRows'],
+		['macos', 'ManifestMenu.template_rows']
+	]) {
+		const source = readFileSync(
+			resolve(
+				REPO_ROOT,
+				'static/ergopti_plus',
+				driver,
+				'ui/menu/menu_shortcuts.' + (driver === 'windows' ? 'ahk' : 'lua')
+			),
+			'utf8'
+		);
+		assert.ok(
+			source.includes(call + '("' + contract.section + '"'),
+			driver + ': actual extension boundary owner'
+		);
+	}
+	for (const file of readdirSync(resolve(SHARED, 'data/locales')).filter((name) =>
+		name.endsWith('.json')
+	)) {
+		const locale = JSON.parse(readFileSync(resolve(SHARED, 'data/locales', file), 'utf8'));
+		assert.strictEqual(typeof locale[contract.caption_key], 'string');
+		assert.ok(locale[contract.caption_key].trim().length > 0);
+		assert.ok(locale[contract.caption_key] !== contract.caption_key);
+	}
+}

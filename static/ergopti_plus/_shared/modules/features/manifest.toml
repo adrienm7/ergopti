@@ -6615,6 +6615,19 @@ id = "hotstring_file_open"
 i18n = "menu.hotstrings.open_file"
 disabled_when = ["hotstring_file_ready"]
 
+# Nonempty shortcut-extension menus retain the Windows/macOS presentation boundary.
+[[menu.shortcut_extension_boundary]]
+type = "---"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.shortcut_extension_boundary]]
+type = "section_header"
+id = "shortcut_extension_heading"
+i18n = "menu.extensions.header"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
 # Native generation groups retain their existing per-driver presentation boundaries.
 [[menu.llm_generation_count_boundary]]
 type = "---"

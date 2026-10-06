@@ -4319,7 +4319,7 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 63, macOS 97, Linux 73, each
+  drivers still build (current baseline: Windows 62, macOS 95, Linux 73, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
@@ -4344,6 +4344,23 @@ integrated, then publish one grouped release.
   source alone gives 8/2 and 1/2 respectively. Unchanged Linux whole-tray tests
   pass 9/0 in English and French on both runtimes. Three new Windows Win32
   cases, final composed native CI and installed-device acceptance remain open.
+
+  The nonempty shortcut-extension boundary now consumes one shared separator
+  and decorated disabled heading on Windows and macOS. Linux retains its
+  extension entries without this presentation boundary. All extension scans,
+  builders/fallbacks, sandbox loads, child ordering and callbacks remain
+  byte-identical outside the four genuine constructor replacements. The
+  unchanged owner scanner counts three retired sites, establishing 63/97/73
+  to 62/95/73: the Windows decorated heading was originally uncounted.
+  Independent portable macOS owning and genuine French-warm controls pass
+  5/0 on both Lua runtimes; the genuine old native producer gives 3/2 in both
+  contexts. All 464 predecessor corpora and 21 locale files remain exact.
+  On macOS, missing/unbound presentation refuses after the existing sandbox chunk loads;
+  it does not prevent those earlier loads. The new registered Windows native
+  fixture is unexecuted locally. Current parent-tree CI run 37491143093 tests
+  the aa70/6bf86bfc tree without this extension slice, so it cannot qualify the
+  new family. Composed native CI and installed-device acceptance remain open;
+  all six group items stay partial.
 
 Linux Metrics unavailable/idle migration readouts now consume shared inert label
 templates. Running progress and cancellation retain their native owners. The
@@ -5091,7 +5108,7 @@ deferral is superseded. This item and items16/38 remain open.
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 63, macOS 97 and Linux 73 rows are still built by the
+  Windows 62, macOS 95 and Linux 73 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). Read on
   2026-10-01, the sites are of four kinds, and three of them need the
   manifest to say more than it can today:
@@ -5120,6 +5137,14 @@ deferral is superseded. This item and items16/38 remain open.
   raised ratchet or a claim that remaining provider families are complete.
   Original corpus, locale, native callbacks and prior assertions stay intact;
   final native three-OS qualification remains required.
+
+  The shortcut-extension presentation family now shares the actual Windows
+  and macOS boundary while preserving Linux's boundary absence and extension
+  functionality. Four true native constructors migrate; three were counted
+  by the unchanged scanner, including no previously counted Windows heading.
+  Item 54 records the exact 62/95/73 census, callback/sandbox preservation,
+  qualified portable controls and remaining native/installed acceptance.
+  No item is removed, and all six group items remain partial.
 
   The Windows qualification successor for the shared Tap-Hold head retains its
   real four-row Win32 and refusal assertions; item 54 records the precise
