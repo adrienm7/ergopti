@@ -1471,3 +1471,19 @@ Original native helpers, compile receipts and300/305/10 budgets stay whole.
 Neither retired metadata nor successful portable tests authorize signing,
 shipping, installation or activation. Native Swift and genuine snapshots
 remain unexecuted on this composition; item31 remains partial.
+
+## Nonterminal managed physical-history off/on
+
+The existing managed physical-history owner now accepts temporary suspend and
+resume intents without resetting its process-once initialization. Suspension
+retains selected Accounting GAP; quiescent is true only after actual prior
+lease, source, callback and timer debts settle, and does not mean final owner
+retirement. Resume waits for that same debt; terminal stop always wins. Lifetime
+retry reservations remain capped at3 with1/2/4-second delays, and admission-based
+rotation remains600 seconds. Accepted initial press app/date and whole-hold
+pause/private/gap cancellation are unchanged. Independent software replay passes
+23 new cases,149 unchanged cases including real file/SQLite persistence, and
+9 shared policy controls on both Lua54 and LuaJIT; three causal mutants reject.
+Native task/timer/clock/calendar leaves are modeled. No production activation
+caller or supported initial awake/unlocked fact is added: fresh lease posture
+remains unknown and denied. Native qualification and TODO31 remain incomplete.

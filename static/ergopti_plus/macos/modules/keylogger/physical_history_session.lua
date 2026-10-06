@@ -291,6 +291,7 @@ local function new_manager(capacity, on_refused, native_ports)
 	local terminal, finished, notified, reason, observer = false, false, false, nil, nil
 	local observer_identity, observer_delivered
 	local starting = false
+	local held = false
 	local pump, signal, stop, begin, manager_shutdown, schedule
 	local function source_current() return source.current(owner, source_token) == true end
 	local function source_identity() return source.lease_identity(owner, source_token) end
@@ -365,11 +366,12 @@ local function new_manager(capacity, on_refused, native_ports)
 		elseif action.action == "retry" then
 			candidate.retry = events.arm("retry", action.delay, candidate)
 		elseif action.action == "start" then begin()
+		elseif action.action == "hold" or action.action == "ready" then return
 		elseif action.action == "deny" then stop(reason or "physical_history_manager_stopped")
 		else refuse("physical_history_policy_refused") end
 	end
 	local function capture_identity(candidate)
-		if terminal or not rawequal(lease, candidate) or candidate.stopped then return false end
+		if terminal or held or not rawequal(lease, candidate) or candidate.stopped then return false end
 		local native = source_identity()
 		if type(native) ~= "table" or not source_current() then return false end
 		if candidate.native_token ~= nil and not rawequal(candidate.native_token, native) then return false end
@@ -394,17 +396,17 @@ local function new_manager(capacity, on_refused, native_ports)
 						refuse("physical_history_retirement_signal_refused")
 					end
 				end
-				return not terminal and not candidate.stopped and accepted == true
+				return not terminal and not held and not candidate.stopped and accepted == true
 			elseif method == "baseline_ready" then
-				if candidate.handlers.baseline_ready() ~= true or terminal or candidate.stopped then return false end
+				if candidate.handlers.baseline_ready() ~= true or terminal or held or candidate.stopped then return false end
 				local action = policy.admitted(owner, candidate.request, candidate.native_token)
 				if type(action) ~= "table" or action.action ~= "arm_rotation" then refuse("physical_history_policy_refused"); return false end
 				local record, committed = events.arm("rotation", action.delay, candidate)
 				candidate.rotation = record
-				return committed == true and not terminal and not candidate.stopped
+				return committed == true and not terminal and not held and not candidate.stopped
 			end
 			local decision = candidate.handlers[method](...)
-			if terminal or candidate.stopped or not rawequal(lease, candidate) then return { allowed = false } end
+			if terminal or held or candidate.stopped or not rawequal(lease, candidate) then return { allowed = false } end
 			return decision
 		end, ...)
 	end
@@ -427,8 +429,9 @@ local function new_manager(capacity, on_refused, native_ports)
 		end) == true
 	end
 	begin = function()
-		if terminal or starting then return false, "physical_history_manager_stopped" end
+		if terminal or held or starting then return false, "physical_history_manager_stopped" end
 		local request = policy.begin(owner)
+		if terminal or held then return false, "physical_history_manager_stopped" end
 		if request == nil then return false, "physical_history_manager_not_prepared" end
 		local candidate = { request = request }
 		lease = candidate
@@ -480,7 +483,7 @@ local function new_manager(capacity, on_refused, native_ports)
 			if events.cancel(record) ~= true then stop("physical_history_scheduler_refused"); return end
 			if record.kind == "continuation" then
 				if rawequal(deferred, record) then deferred = nil end
-			elseif not terminal and rawequal(lease, record.request) then
+			elseif not terminal and not held and rawequal(lease, record.request) then
 				local candidate = record.request
 				if record.kind == "rotation" then consume_action(policy.rotate(owner, candidate.request), candidate)
 				elseif record.kind == "retry" then consume_action(policy.retry_ready(owner, candidate.request), candidate) end
@@ -512,6 +515,14 @@ local function new_manager(capacity, on_refused, native_ports)
 				end
 				source.shutdown(owner, source_token, final_observer)
 				if source.retired(owner, source_token) == true then finished, hint_due = true, false end
+			elseif held or policy.status().state == "suspending" then
+				if lease then retire(lease) end
+				if not events.cancel_all() or not lease_retired(lease) then return end
+				if policy.status().state == "suspending" then
+					local action, refusal = policy.continue(owner, lease.request)
+					if action then consume_action(action, lease)
+					elseif refusal ~= "policy_retirement_pending" then refuse("physical_history_policy_refused") end
+				end
 			elseif lease and lease.stopped then
 				retire(lease)
 				if lease.rotation and events.cancel(lease.rotation) ~= true then return end
@@ -525,6 +536,7 @@ local function new_manager(capacity, on_refused, native_ports)
 		frames, pumping = frames - 1, false
 		if not ok then refuse("physical_history_policy_refused") end
 		if not terminal and lease and lease.complete and policy.status().state == "waiting" then hint_due = false end
+		if not terminal and held and policy.status().state == "suspended" and events.retired() then hint_due = false end
 		schedule()
 		notify()
 	end
@@ -552,13 +564,49 @@ local function new_manager(capacity, on_refused, native_ports)
 	assert(type(source_token) == "table", "Missing managed physical source identity")
 	local actual_policy = policy_new(owner, { current = source_current, lease_identity = source_identity,
 		retired = function(request) return lease and rawequal(lease.request, request) and lease_retired(lease) end })
-	policy = scope_ports(actual_policy, { "begin", "captured", "admitted", "verdict", "rotate", "continue", "retry_ready", "stop", "status", "subscription" })
+	policy = scope_ports(actual_policy, { "begin", "captured", "admitted", "verdict", "rotate", "continue", "retry_ready", "stop", "status", "subscription", "suspend", "resume" })
 	policy_scope = scope_ports(policy.subscription(), { "identity", "detach", "retired" }); policy_token = policy_scope.identity(owner)
 	function manager.start(options)
 		if terminal or finished then return false, "physical_history_manager_stopped" end
+		if held then return false, "physical_history_manager_suspended" end
 		if frames > 0 or pumping or policy.status().state ~= "prepared" then return false, "physical_history_manager_not_prepared" end
 		local accepted, failure = wrapped(function() retained_options = start_options(options); return begin() end)
 		return accepted == true, failure
+	end
+	--- Accepts a nonterminal off intent; actual retirement is observed separately.
+	--- @return boolean accepted Selected owner retained, never a native retirement acknowledgement.
+	function manager.suspend()
+		if terminal or finished then return false end
+		held = true
+		return wrapped(function()
+			local action = policy.suspend(owner)
+			if action == nil then refuse("physical_history_policy_refused"); return false end
+			consume_action(action, lease)
+			if lease then retire(lease) end
+			events.cancel_all()
+			return not terminal
+		end) == true
+	end
+	--- Retains one on intent without bypassing old source, callback or timer debt.
+	--- @return boolean accepted Resume requested; an admitted successor is not implied.
+	function manager.resume()
+		if terminal or finished then return false end
+		held = false
+		return wrapped(function()
+			local action = policy.resume(owner)
+			if action == nil then refuse("physical_history_policy_refused"); return false end
+			consume_action(action, lease)
+			return not terminal
+		end) == true
+	end
+	--- Observes a fully parked lease while preserving the selected accounting GAP.
+	--- @return boolean quiescent No retained lease, callback or timer debt; not final retirement.
+	function manager.quiescent()
+		if frames > 0 or pumping or terminal or not held then return false end
+		pump()
+		return held and not terminal and frames == 0 and not pumping
+			and policy.status().state == "suspended" and events.retired()
+			and (lease == nil or lease.complete == true)
 	end
 	manager_shutdown = function(callback)
 		assert(callback == nil or type(callback) == "function", "Invalid physical history stop observer")
@@ -579,6 +627,7 @@ local function new_manager(capacity, on_refused, native_ports)
 	end
 	function manager.status()
 		local state = policy.status()
+		if state.state == "suspended" and (frames > 0 or pumping or not events.retired()) then state.state = "suspending" end
 		return { state = finished and "retired" or terminal and "stopped" or state.state,
 			reason = reason, retries_used = state.retries }
 	end

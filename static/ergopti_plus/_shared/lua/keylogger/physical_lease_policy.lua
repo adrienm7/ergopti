@@ -14,6 +14,7 @@ function M.new(owner, ports)
 	local authority = life.capability()
 	local actual_current = authority.current
 	local state, request, native, retries, pending, busy = "prepared", nil, nil, 0, nil, false
+	local resume_requested = false
 	life.bind_detach(function(candidate_owner, candidate_token)
 		if not rawequal(candidate_owner, owner) or not rawequal(candidate_token, token) then return false end
 		state = "stopped"; life.detach(); return true
@@ -55,6 +56,43 @@ function M.new(owner, ports)
 		if not rawequal(candidate_owner, owner) then return nil, "policy_identity_refused" end
 		if not exact(candidate_owner, candidate_request) or state ~= expected then return nil, "policy_event_refused" end
 		return operate(operation)
+	end
+	local function resume_action()
+		resume_requested = false
+		if pending.prepared then state = "prepared"; return { action = "ready" } end
+		if pending.rotation then state = "prepared"; return { action = "start" } end
+		if pending.terminal then state = "terminal"; life.revoke(); return { action = "deny" } end
+		state = "waiting"
+		return { action = "retry", delay = pending.delay }
+	end
+
+	--- Holds the selected owner without releasing its accounting selection or retry budget.
+	--- @param candidate_owner table Exact initialized owner.
+	--- @return table|nil action Accepted intent, not an acknowledgement of native retirement.
+	function policy.suspend(candidate_owner)
+		if not rawequal(candidate_owner, owner) then return nil, "policy_identity_refused" end
+		if not owned() then return nil, "policy_source_refused" end
+		return operate(function()
+			resume_requested = false
+			if state == "prepared" then pending, state = { prepared = true }, "suspended" end
+			if state == "suspended" then return { action = "hold" } end
+			if pending == nil then pending = { rotation = true } end
+			state = "suspending"
+			return { action = "retire" }
+		end)
+	end
+
+	--- Retains one resume intent until the actual predecessor retirement port acknowledges it.
+	--- @param candidate_owner table Exact initialized owner.
+	--- @return table|nil action Accepted intent or the next already bounded policy action.
+	function policy.resume(candidate_owner)
+		if not rawequal(candidate_owner, owner) then return nil, "policy_identity_refused" end
+		if not owned() then return nil, "policy_source_refused" end
+		return operate(function()
+			if state == "suspending" then resume_requested = true; return { action = "hold" } end
+			if state == "suspended" then return resume_action() end
+			return { action = "hold" }
+		end)
 	end
 
 	function policy.begin(candidate_owner)
@@ -110,6 +148,16 @@ function M.new(owner, ports)
 		end)
 	end
 	function policy.continue(candidate_owner, candidate_request)
+		if state == "suspending" then
+			return event(candidate_owner, candidate_request, "suspending", function()
+				local ok, retired = pcall(source_retired, request)
+				if not ok or not fence() then revoke(); return nil, "policy_source_refused" end
+				if retired ~= true then return nil, "policy_retirement_pending" end
+				state = "suspended"
+				if resume_requested then return resume_action() end
+				return { action = "hold" }
+			end)
+		end
 		return event(candidate_owner, candidate_request, "retiring", function()
 			local ok, retired = pcall(source_retired, request)
 			if not ok or not fence() then revoke(); return nil, "policy_source_refused" end
