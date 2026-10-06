@@ -15,6 +15,7 @@ import json
 import os
 from pathlib import Path
 import plistlib
+import re
 import shutil
 import shlex
 import signal
@@ -131,6 +132,195 @@ def sandbox_profile(root):
     )
 
 
+def _validate_appleevent_terminal(packet):
+    """Admit only bounded, constructed facts from the exact unreaped native child."""
+    keys = {
+        "schema",
+        "si_pid",
+        "si_code",
+        "si_status",
+        "stdout_bytes",
+        "stderr_bytes",
+        "stdout_sha256",
+        "stderr_sha256",
+        "stderr_phase",
+        "stderr_osstatus",
+        "capture_status",
+    }
+    require(type(packet) is dict and set(packet) == keys, "Unadmitted native terminal fact")
+    require(type(packet["schema"]) is int and packet["schema"] == 1, "Invalid terminal schema")
+    require(type(packet["si_pid"]) is int and packet["si_pid"] > 0, "Invalid terminal child")
+    require(
+        type(packet["si_code"]) is int
+        and packet["si_code"] in (os.CLD_EXITED, os.CLD_KILLED, os.CLD_DUMPED)
+        and type(packet["si_status"]) is int
+        and 0 <= packet["si_status"] <= 255,
+        "Invalid native terminal status",
+    )
+    require(
+        packet["capture_status"] in ("available", "unavailable"),
+        "Invalid capture observation status",
+    )
+    available = packet["capture_status"] == "available"
+    for stream in ("stdout", "stderr"):
+        if not available:
+            require(
+                packet[stream + "_bytes"] is None and packet[stream + "_sha256"] is None,
+                "Unavailable capture cannot publish invented bytes",
+            )
+            continue
+        require(
+            type(packet[stream + "_bytes"]) is int
+            and 0 <= packet[stream + "_bytes"] <= 4096
+            and type(packet[stream + "_sha256"]) is str
+            and re.fullmatch(r"[0-9a-f]{64}", packet[stream + "_sha256"]) is not None,
+            "Invalid bounded terminal capture fact",
+        )
+    require(
+        packet["stderr_phase"]
+        in ("none", "registration", "handler", "receipt", "dispatch", "unclassified", "unavailable")
+        and type(packet["stderr_phase"]) is str,
+        "Unadmitted native terminal phase",
+    )
+    require(
+        available == (packet["stderr_phase"] != "unavailable"), "Capture observation phase differs"
+    )
+    status = packet["stderr_osstatus"]
+    classified = packet["stderr_phase"] in ("registration", "handler", "receipt", "dispatch")
+    require(
+        (classified and type(status) is int and -(2**31) <= status < 2**31)
+        or (not classified and status is None),
+        "Invalid native OSStatus fact",
+    )
+    require(
+        packet["stderr_phase"] != "none" or packet["stderr_bytes"] == 0, "Absent stderr differs"
+    )
+    return dict(packet)
+
+
+def _appleevent_capture(children, receiver):
+    """Read only the two acquisition-bound regular captures, never arbitrary paths."""
+    require(
+        receiver in children.captures and receiver in children.capture_identities,
+        "Native receiver capture acquisition is absent",
+    )
+    result = []
+    for path, identity in zip(
+        children.captures[receiver], children.capture_identities[receiver], strict=True
+    ):
+        require(
+            path.parent == children.root and owned_path(children.root, path) == path,
+            "Native receiver capture escaped its private root",
+        )
+        descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+        primary_failure = None
+        try:
+            before = os.fstat(descriptor)
+            require(
+                stat.S_ISREG(before.st_mode)
+                and before.st_uid == os.getuid()
+                and (before.st_dev, before.st_ino) == identity
+                and 0 <= before.st_size <= 4096,
+                "Native receiver capture identity or bound differs",
+            )
+            chunks = []
+            total = 0
+            while True:
+                chunk = os.read(descriptor, 4097 - total)
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                total += len(chunk)
+                require(total <= 4096, "Native receiver capture exceeded its bound")
+            after = os.fstat(descriptor)
+            require(
+                (after.st_dev, after.st_ino, after.st_size)
+                == (before.st_dev, before.st_ino, before.st_size)
+                and total == before.st_size,
+                "Native receiver capture changed during observation",
+            )
+            result.append(b"".join(chunks))
+        except BaseException as failure:
+            primary_failure = failure
+            raise
+        finally:
+            try:
+                os.close(descriptor)
+            except OSError:
+                if primary_failure is None:
+                    raise
+                # Preserve the original interruption/refusal over secondary close failure.
+    require(len(result) == 2, "Native receiver capture pair is incomplete")
+    return tuple(result)
+
+
+def _appleevent_terminal_packet(children, receiver, group, observation):
+    """Keep exact WNOWAIT facts before cleanup; these do not authorize retirement."""
+    require(
+        children.groups.get(receiver) is group
+        and group.process is receiver
+        and not group.reaped
+        and receiver.returncode is None
+        and type(observation.si_pid) is int
+        and observation.si_pid == receiver.pid
+        and type(observation.si_code) is int
+        and observation.si_code in (os.CLD_EXITED, os.CLD_KILLED, os.CLD_DUMPED)
+        and type(observation.si_status) is int
+        and 0 <= observation.si_status <= 255,
+        "Native terminal observation does not belong to the exact unreaped receiver",
+    )
+    output, errors = None, None
+    try:
+        output, errors = _appleevent_capture(children, receiver)
+        require(
+            type(output) is bytes
+            and type(errors) is bytes
+            and len(output) <= 4096
+            and len(errors) <= 4096,
+            "Native receiver capture bytes are not bounded",
+        )
+    except OwnedProcessInterrupted:
+        raise  # Preserve cancellation; never turn it into an optional diagnostic.
+    except Exception:
+        # Native exit remains observed; optional capture failure exports no path or fabricated bytes.
+        output, errors = None, None
+    available = output is not None and errors is not None
+    phase, status = (
+        (("none" if not errors else "unclassified") if available else "unavailable"),
+        None,
+    )
+    lines = {
+        b"recipient registration": "registration",
+        b"handler admission": "handler",
+        b"receipt": "receipt",
+        b"dispatch": "dispatch",
+    }
+    match = (
+        re.fullmatch(
+            rb"Owned AppleEvent (recipient registration|handler admission|receipt|dispatch) failed: (-?[0-9]{1,11})\n",
+            errors,
+        )
+        if available
+        else None
+    )
+    if match is not None and -(2**31) <= int(match[2]) < 2**31:
+        phase, status = lines[match[1]], int(match[2])
+    packet = {
+        "schema": 1,
+        "si_pid": observation.si_pid,
+        "si_code": observation.si_code,
+        "si_status": observation.si_status,
+        "capture_status": "available" if available else "unavailable",
+        "stdout_bytes": len(output) if available else None,
+        "stderr_bytes": len(errors) if available else None,
+        "stdout_sha256": hashlib.sha256(output).hexdigest() if available else None,
+        "stderr_sha256": hashlib.sha256(errors).hexdigest() if available else None,
+        "stderr_phase": phase,
+        "stderr_osstatus": status,
+    }
+    return _validate_appleevent_terminal(packet)
+
+
 class PhaseEvidence:
     """Export constructed bounded facts, never fixture files or raw command streams."""
 
@@ -181,6 +371,7 @@ class PhaseEvidence:
         cases=None,
         command=None,
         debt_kinds=(),
+        native_terminal=None,
     ):
         if self.descriptor is None:
             return True
@@ -236,6 +427,18 @@ class PhaseEvidence:
                 "Unadmitted native cleanup debt",
             )
             packet["debt_kinds"] = kinds
+            if native_terminal is not None:
+                require(
+                    phase == "appleevent.receiver-exit" and status == "refused" and not closed,
+                    "Native terminal observation cannot claim acceptance or closure",
+                )
+                packet["native_terminal"] = _validate_appleevent_terminal(native_terminal)
+                require(
+                    len(packet["groups"]) == 1
+                    and packet["groups"][0]["pid"] == native_terminal["si_pid"]
+                    and not packet["groups"][0]["closed"],
+                    "Native terminal evidence lost its exact unreaped group",
+                )
             semantic = json.dumps(packet, sort_keys=True)
             if semantic == self.previous:
                 return not self.failed
@@ -305,6 +508,7 @@ class Children:
         self.native_groups = NativeProcessGroups()
         self.groups = {}
         self.captures = {}
+        self.capture_identities = {}
 
     def record_debt(self, entry):
         """Repeated retirement attempts keep one diagnostic per exact owned resource."""
@@ -345,6 +549,10 @@ class Children:
                 self.active.append(process)
                 self.groups[process] = group
                 self.captures[process] = (output, errors)
+                self.capture_identities[process] = tuple(
+                    (info.st_dev, info.st_ino)
+                    for info in (os.fstat(out.fileno()), os.fstat(err.fileno()))
+                )
 
             group = acquire_owned(
                 arguments,
@@ -1045,6 +1253,17 @@ def _admit_appleevent_boundary(children, repository):
                 if registration
                 else ""
             )
+            # Preserve the upstream terminal receipt from this same reserved
+            # observation when the actual fixture owns an evidence writer.
+            evidence = getattr(children, "evidence", None)
+            if evidence is not None:
+                terminal = _appleevent_terminal_packet(children, receiver, group, observation)
+                children.evidence.record(
+                    "appleevent.receiver-exit",
+                    status="refused",
+                    groups=[group],
+                    native_terminal=terminal,
+                )
             require(
                 False,
                 "The exact owned AppleEvent receiver is no longer live: "

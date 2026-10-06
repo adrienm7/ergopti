@@ -31,6 +31,12 @@ const FULL = process.argv.includes('--full');
 // Each check mirrors a CI "Validate ·" step. command/args are run from ROOT.
 const CHECKS = [
 	{
+		name: 'native typing consumer retains actual selection and KPI dependencies',
+		cmd: process.execPath,
+		args: ['tools/test/test-linux-typing-consumer-closure.cjs'],
+		repro: 'node tools/test/test-linux-typing-consumer-closure.cjs'
+	},
+	{
 		name: 'Windows packaging stamp preserves exact AHK source encoding',
 		cmd: 'node',
 		args: ['tools/test/test-windows-bundle-stamp-encoding.cjs'],
