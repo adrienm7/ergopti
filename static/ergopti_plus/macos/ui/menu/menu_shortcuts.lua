@@ -651,6 +651,7 @@ function M.build(ctx)
 						disabled = paused or nil,
 						action   = (not paused) and (function(a) return function()
 							local function assign()
+								if a == "run_program" then ctx.updateMenu(); return true end
 								state.script_control_shortcuts[slot_id] = a
 								if type(script_control.set_shortcut_action) == "function" then
 									pcall(script_control.set_shortcut_action, slot_id, a)
@@ -674,7 +675,27 @@ function M.build(ctx)
 									return
 								end
 								DeferredWork.after(0.05, function()
-									if ShortcutUtils.prompt_action_parameter(gestures, prefix .. slot_id, a, spec) then
+									local mutation = spec == "program" and {
+										section = "shortcuts.script_control", key = slot_id,
+										read = function()
+											if type(script_control.get_shortcut_actions) ~= "function" then return nil end
+											local actions = script_control.get_shortcut_actions()
+											return type(actions) == "table" and (actions[slot_id] or "none") or nil
+										end,
+										read_menu = function() return state.script_control_shortcuts[slot_id] or "none" end,
+										apply = function()
+											if type(script_control.set_shortcut_action) ~= "function"
+												or script_control.set_shortcut_action(slot_id, a) ~= true then return false end
+											state.script_control_shortcuts[slot_id] = a
+											return true
+										end,
+										restore = function(previous)
+											state.script_control_shortcuts[slot_id] = previous
+											return script_control.set_shortcut_action(slot_id, previous) == true
+										end,
+									} or nil
+									local transaction = ctx.commit_program_parameter
+									if ShortcutUtils.prompt_action_parameter(gestures, prefix .. slot_id, a, spec, nil, mutation, transaction) then
 										assign()
 									end
 								end, "menu_shortcuts.action_parameter")
@@ -874,6 +895,24 @@ function M.build(ctx)
 	sc_ctx.commands["edit_shortcuts"] = cmd_edit_shortcuts
 	sc_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do sc_ctx.state_getters[key] = value end
+	local physical_editor = require("shortcuts.physical_editor_menu").new({
+		paused = function()
+			if paused then return nil end
+			if type(ctx.physical_shortcuts_paused) ~= "function" then return nil end
+			return ctx.physical_shortcuts_paused()
+		end,
+		scope = function()
+			if type(ctx.physical_shortcuts_scope) == "function" then return ctx.physical_shortcuts_scope() end
+		end,
+		gestures = ctx.gestures,
+		host = function() return require("ui.physical_shortcuts") end,
+		refused = function()
+			dialog.block_alert(i18n.get("physical_shortcuts.window_title"),
+				i18n.get("physical_shortcuts.window_unavailable"), i18n.get("button.ok"))
+		end,
+	})
+	sc_ctx.commands["physical_shortcuts_editor"] = physical_editor.open
+	sc_ctx.state_getters["physical_shortcuts_editor_ready"] = physical_editor.ready
 	sc_ctx.state_getters["shortcuts_enabled"] = function() return state.shortcuts and true or false end
 	-- Ticks « Raccourcis de gestion du script » while its switch is on.
 	sc_ctx.state_getters["script_control_enabled"] = function() return state.script_control_enabled == true end

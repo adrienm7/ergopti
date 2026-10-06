@@ -170,7 +170,22 @@ const typingContext = vm.createContext({
 	KEYCODE_NAMES: { 29: 'Left Ctrl' }
 });
 const typingSource = read('static/ergopti_plus/_shared/ui/metrics_typing/data.js');
-for (const name of ['_foreach_filtered_app', 'render_apps_kpi'])
+// Execute the real app-selection dependencies required by the extracted consumer.
+// Constants stay owned by production state instead of a fixture-specific policy.
+typingContext.APP_SELECTION_MODE = vm.runInNewContext(
+	read('static/ergopti_plus/_shared/ui/metrics_typing/_generated/keycode_data.js') +
+		'\n' +
+		read('static/ergopti_plus/_shared/ui/metrics_typing/state.js') +
+		'\nAPP_SELECTION_MODE;',
+	{ window: {} }
+);
+typingContext.app_state.app_selection_mode = typingContext.APP_SELECTION_MODE.SUBSET;
+for (const name of [
+	'has_typing_app_selection',
+	'matches_typing_app_selection',
+	'_foreach_filtered_app',
+	'render_apps_kpi'
+])
 	vm.runInContext(extractFunction(typingSource, name), typingContext, { filename: name + '.js' });
 typingContext.render_apps_kpi();
 checks++;

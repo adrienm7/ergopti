@@ -188,9 +188,17 @@ local function find_timer(delay)
 	return nil
 end
 
+local program_admissions = {}
+local gestures = { configure_program_admission = function(callback)
+	helpers.assert_type(callback, "function")
+	program_admissions[#program_admissions + 1] = callback
+	return true
+end }
+
 helpers.describe("audit pause fence: startup layout timer live state", function()
 	helpers.it("audit startup layout: never dispatches a stale resume snapshot after a newer pause", function()
-		Menu.start("/tmp/ergopti-test/", {}, {}, {}, {}, {}, nil, {})
+		Menu.start("/tmp/ergopti-test/", {}, gestures, {}, {}, {}, nil, {})
+		helpers.assert_type(program_admissions[#program_admissions], "function", "startup captures the required program policy")
 		collectgarbage("collect")
 		collectgarbage("collect")
 		local startup_timer = find_timer(4)
@@ -211,7 +219,7 @@ helpers.describe("audit pause fence: startup layout timer live state", function(
 		paused = true
 		pause_listener(true)
 		local calls_after_pause = #layout_states
-		Menu.start("/tmp/ergopti-test/", {}, {}, {}, {}, {}, nil, {})
+		Menu.start("/tmp/ergopti-test/", {}, gestures, {}, {}, {}, nil, {})
 		collectgarbage("collect")
 		collectgarbage("collect")
 		local paused_startup_timer = find_timer(4)

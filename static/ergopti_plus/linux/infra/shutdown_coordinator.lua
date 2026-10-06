@@ -38,8 +38,28 @@ function M.new(opts)
 	end
 
 	local requested, complete, polling = false, false, false
-	local pending = {}
+	local registering, input_stopped = false, false
+	local pending, native_claims = {}, {}
 	local coordinator = {}
+
+	local function finish()
+		if not complete and not registering and not polling and input_stopped and next(pending) == nil then
+			complete = true
+			event_loop.stop()
+			Logger.done(LOG, "Shutdown quiescence complete.")
+		end
+	end
+
+	--- Rechecks one immutable native claim without recursively borrowing its acknowledgment.
+	--- @param claim table Captured cleanup and observer callbacks.
+	local function acknowledge(claim)
+		if not pending[claim] or claim.checking then return end
+		claim.checking = true
+		local ok, settled = xpcall(claim.stop, debug.traceback)
+		claim.checking = false
+		if ok and settled == true then pending[claim] = nil end
+		finish()
+	end
 
 	--- Quiesces every registered owner exactly once.
 	--- @param reason string Human-readable shutdown trigger.
@@ -47,13 +67,15 @@ function M.new(opts)
 	--- @return boolean started True only for the first request.
 	function coordinator.request(reason, emergency_reason)
 		if requested then return false end
-		requested, polling = true, true
-		-- Pin every opt-in callback before any diagnostic or earlier owner can reenter.
+		requested, polling, registering = true, true, true
+		-- Pin both polling and observer owners before diagnostics or earlier cleanup can reenter.
 		local owners, claims, waits_for_native = {}, {}, false
 		for index, owner in ipairs(pre_wait) do
 			owners[index] = owner
-			if owner.wait_for_ack == true then
-				claims[index] = { name = owner.name, stop = owner.stop }
+			if owner.wait_for_ack == true or type(owner.when_settled) == "function" then
+				local claim = { name = owner.name, stop = owner.stop, when_settled = owner.when_settled }
+				claims[index] = claim
+				native_claims[#native_claims + 1] = claim
 				waits_for_native = true
 			end
 		end
@@ -65,18 +87,18 @@ function M.new(opts)
 
 		for index, owner in ipairs(owners) do
 			local claim = claims[index]
-			local stop, name, waits = claim and claim.stop or owner.stop,
-				claim and claim.name or owner.name, claim ~= nil
+			local stop, name = claim and claim.stop or owner.stop, claim and claim.name or owner.name
 			local ok, failure = xpcall(stop, debug.traceback)
-			if waits and (not ok or failure ~= true) then
-				pending[#pending + 1] = { name = name, stop = stop }
-			end
+			if claim and (not ok or failure ~= true) then pending[claim] = true end
 			if not ok then
 				if waits_for_native then
 					pcall(Logger.error, LOG, "Shutdown owner '%s' failed: %s", name, tostring(failure))
 				else
 					Logger.error(LOG, "Shutdown owner '%s' failed: %s", name, tostring(failure))
 				end
+			end
+			if claim and pending[claim] and type(claim.when_settled) == "function" then
+				pcall(claim.when_settled, function() acknowledge(claim) end)
 			end
 		end
 
@@ -87,12 +109,8 @@ function M.new(opts)
 				keyboard_hook.stop()
 			end
 		end
-		polling = false
-		if #pending == 0 then
-			complete = true
-			event_loop.stop()
-			Logger.done(LOG, "Shutdown quiescence complete.")
-		end
+		input_stopped, registering, polling = true, false, false
+		finish()
 		return true
 	end
 
@@ -102,18 +120,9 @@ function M.new(opts)
 	function coordinator.poll()
 		if not requested or complete or polling then return complete end
 		polling = true
-		local retained = {}
-		for _, owner in ipairs(pending) do
-			local ok, acknowledged = xpcall(owner.stop, debug.traceback)
-			if not ok or acknowledged ~= true then retained[#retained + 1] = owner end
-		end
-		pending = retained
+		for _, claim in ipairs(native_claims) do acknowledge(claim) end
 		polling = false
-		if #pending == 0 then
-			complete = true
-			event_loop.stop()
-			Logger.done(LOG, "Shutdown quiescence complete.")
-		end
+		finish()
 		return complete
 	end
 

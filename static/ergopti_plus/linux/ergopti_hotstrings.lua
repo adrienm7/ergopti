@@ -123,7 +123,7 @@ local wpm_tray_readout = RuntimeGuard.optional_require("ui.wpm.tray_readout")
 -- Desktop notifications (optional — needs notify-send and a session bus). The
 -- adapter degrades to a log line on a headless machine, so a missing one is not
 -- a reason to refuse to start.
-local notifier = RuntimeGuard.optional_require("adapters.notifier")
+local notifier = RuntimeGuard.optional_require("adapters.application_notifier")
 
 -- Preview tooltip (optional — needs lgi and a display; the daemon expands
 -- hotstrings perfectly well without one, and a driver whose expansions work
@@ -206,6 +206,26 @@ local shutdown_webviews = webview_manager and webview_manager.shutdown
 local runtime_shutdown_ack = not prediction_engine
 local shutdown = ShutdownCoordinator.new({
 	pre_wait = {
+		{
+			name = "cursor-display window operations",
+			stop = function()
+				return not gestures or gestures.stop_window_switches() == true
+			end,
+			when_settled = function(callback)
+				if not gestures then callback(); return true end
+				return gestures.when_window_switches_settled(callback)
+			end,
+		},
+		{
+			name = "user programs",
+			stop = function()
+				return not gestures or gestures.stop_programs() == true
+			end,
+			when_settled = function(callback)
+				if not gestures then callback(); return true end
+				return gestures.when_programs_settled(callback)
+			end,
+		},
 		{
 			name = "app-owned Ollama runtime",
 			wait_for_ack = true,
@@ -462,6 +482,15 @@ end
 --- process to signal itself: the menu now calls this directly.
 --- @param trigger string What asked for the reload, for the log line.
 local function perform_reload(trigger)
+	if gestures and gestures.stop_window_switches() ~= true then
+		Logger.warn(LOG, "Reload postponed while a window operation owns native cleanup debt.")
+		return false
+	end
+	if gestures and gestures.stop_programs() ~= true then
+		Logger.warn(LOG, "Reload postponed while a user program owns native cleanup debt.")
+		return false
+	end
+	if gestures then gestures.set_program_paused(false); gestures.set_window_switch_paused(false) end
 	Logger.info(LOG, "Reload requested by %s — reloading hotstring config…", trigger)
 	local ok, count = pcall(function() return hotstrings_config.reload() end)
 	if ok then
@@ -799,6 +828,7 @@ local function main()
 		-- The tray greys every feature row while paused and its title row
 		-- resumes; without a rebuild here the menu kept showing the old state.
 		on_pause_change = function(paused)
+			if gestures then gestures.set_program_paused(paused); gestures.set_window_switch_paused(paused) end
 			if user_hotstring_native then user_hotstring_native.observe_input() end
 			if dyn_hotstrings then dyn_hotstrings.invalidate_user_code("script pause transition") end
 			-- A paused script remaps nothing: CapsLock is CapsLock again, and a
@@ -1803,13 +1833,13 @@ local function main()
 						body = i18n_mod.get("updater.up_to_date")
 							:gsub("{1}", (tostring(updater.current_version()):gsub("%%", "%%%%")))
 					end
-					notifier.send(body, { title = i18n_mod.get("updater.title_update"), level = "info" })
+					notifier.send(body, { title = i18n_mod.get("updater.window_title"), level = "info" })
 				end
 				if rebuild_tray_menu then rebuild_tray_menu() end
 			end,
 			-- An update downloaded and installed: the daemon restarts on it.
 			on_update_finished = function(installed, tag, stage)
-				local title = ok_i18n and i18n_mod and i18n_mod.get("updater.title_update") or nil
+				local title = ok_i18n and i18n_mod and i18n_mod.get("updater.window_title") or nil
 				if not installed then
 					if notifier and title then
 						notifier.send(i18n_mod.get(stage == "download" and "updater.install_error_download"
@@ -2083,7 +2113,7 @@ local function main()
 			notify_error = function(key)
 				if notifier and ok_i18n and i18n_mod then
 					notifier.send(i18n_mod.get(key), {
-						title = i18n_mod.get("onboarding.error.title"), level = "error",
+						title = i18n_mod.get("common.error_title"), level = "error",
 					})
 				end
 			end,
@@ -2101,7 +2131,7 @@ local function main()
 			Logger.error(LOG, "%s.", reason)
 			if notifier and ok_i18n and i18n_mod then
 				notifier.send(i18n_mod.get("onboarding.error.open_failed"), {
-					title = i18n_mod.get("onboarding.error.title"), level = "error",
+					title = i18n_mod.get("common.error_title"), level = "error",
 				})
 			end
 		end,
@@ -2124,7 +2154,7 @@ local function main()
 				local safe_tag = tostring(release.tag):gsub("%%", "%%%%")
 				local body = i18n_mod.get("updater.tray_new_version_body"):gsub("{1}", safe_tag)
 				accepted = notifier.send(body, {
-					title = i18n_mod.get("updater.tray_new_version_title"),
+					title = i18n_mod.get("updater.tray_new_version_label"),
 					level = "info",
 				})
 			end
@@ -2372,7 +2402,7 @@ local function main()
 	-- quiesced before any final resource is destroyed, and duplicate requests are
 	-- harmless.
 	shutdown.request("event loop returned")
-	if shutdown.is_pending() then error("App-owned Ollama cleanup remains unacknowledged after event-loop return", 0) end
+	if shutdown.is_pending() then error("Native shutdown cleanup remains unacknowledged after event-loop return", 0) end
 	if tooltip_preview then tooltip_preview.destroy() end
 	if llm_overlay then llm_overlay.hide() end
 	injector.close_fast_channel()

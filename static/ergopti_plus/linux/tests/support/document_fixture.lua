@@ -7,7 +7,7 @@
 local M = {}
 local Json = require("json")
 function M.new(app_name, handler, state)
-	local c = { views = {}, windows = {}, timers = {}, now = 100, scripts = {}, effects = {}, notices = {}, idles = {} }
+	local c = { views = {}, windows = {}, timers = {}, now = 100, scripts = {}, effects = {}, notices = {}, idles = {}, signal_serial = 0 }
 	local saved = {}
 	local names = {"lgi","infra.monotonic","infra.timings","infra.managed_http_deadline",
 		"adapters.event_loop","adapters.notifier","ui.webkit_host","ui.webview_manager"}
@@ -26,7 +26,27 @@ function M.new(app_name, handler, state)
 	end
 	local WebKit = {LoadEvent={STARTED="STARTED",FINISHED="FINISHED"}}
 	function WebKit.UserContentManager()
-		return {on_script_message_received={},register_script_message_handler=function()end}
+		local ucm = { connected = {}, signal_details = {} }
+		function ucm:register_script_message_handler(name)
+			assert(type(name) == "string" and name ~= "", "registration requires the actual owned bridge")
+			self.bridge_name = name
+			return true
+		end
+		function ucm:unregister_script_message_handler(name)
+			assert(name == self.bridge_name, "only the exact owned bridge registration retires")
+			self.bridge_name = nil
+			return true
+		end
+		ucm.on_script_message_received = { connect = function(signal, callback, detail)
+			assert(detail == ucm.bridge_name, "detailed signal requires the exact registered bridge")
+			assert(type(callback) == "function", "detailed signal requires a callback")
+			c.signal_serial = c.signal_serial + 1
+			local id = c.signal_serial
+			ucm.connected[id], ucm.signal_details[id] = true, detail
+			signal[detail] = callback
+			return id
+		end }
+		return ucm
 	end
 	local Manager
 	local function arguments(code)
@@ -43,6 +63,11 @@ function M.new(app_name, handler, state)
 				return self.loading
 			end
 		end })
+		function v:destroy()
+			if self.destroyed then return end
+			self.destroyed = true
+			if self.on_destroy then self.on_destroy() end
+		end
 		function v:load_html(_,uri) self.uri=uri end
 		function v:run_javascript(code,_,done)
 			c.scripts[#c.scripts+1]={view=self,code=code}
@@ -64,7 +89,12 @@ function M.new(app_name, handler, state)
 		end
 		c.views[#c.views+1]=v;return v
 	end
-	package.loaded.lgi={Gtk=Gtk,WebKit2=WebKit,GLib={MainContext={default=function()return {iteration=function()end}end}}}
+	package.loaded.lgi={Gtk=Gtk,WebKit2=WebKit,GLib={MainContext={default=function()return {iteration=function()end}end}},
+		GObject={signal_handler_disconnect=function(ucm,id)
+			assert(ucm.connected[id]==true,"only the exact connected native signal retires")
+			ucm.connected[id]=false
+			ucm.on_script_message_received[ucm.signal_details[id]]=nil
+		end,signal_handler_is_connected=function(ucm,id)return ucm.connected[id]==true end}}
 	package.loaded["infra.monotonic"]={now_ms=function()return c.now end,has_hires=function()return true end}
 	package.loaded["infra.timings"]={ms=function(section,key)
 		assert(section=="ui" and key=="document_initialization_ack_timeout_ms");return 5000 end}
@@ -83,6 +113,7 @@ function M.new(app_name, handler, state)
 	package.loaded["ui.webkit_host"]=host
 	package.loaded["ui.webview_manager"]=nil
 	Manager=require("ui.webview_manager");c.manager=Manager
+	local native_shutdown = Manager.shutdown
 	local owned_state={}
 	for key,value in pairs(state or {})do owned_state[key]=value end
 	owned_state.is_paused=owned_state.is_paused or function()return c.paused==true end
@@ -126,11 +157,26 @@ function M.new(app_name, handler, state)
 			return c.send(payload)
 		end},{__index=handler,__newindex=function(_,key,value)handler[key]=value end})
 	end
+	local closing_fixture = false
 	function c.close()
-		pcall(Manager.shutdown)
-		for _,timer in ipairs(c.timers)do timer:ack_close()end
+		if closing_fixture then return false end
+		closing_fixture = true
+		local primary, retired, has_primary
+		local called, first = pcall(native_shutdown)
+		if not called then primary, has_primary = first, true end
+		-- Initial shutdown can retain the document's original deadline close debt.
+		-- Deliver its explicit modeled ACKs, then observe final native retirement.
+		for _,timer in ipairs(c.timers)do
+			local acknowledged, failure = pcall(function() timer:ack_close() end)
+			if not acknowledged and not has_primary then primary, has_primary = failure, true end
+		end
+		called, retired = pcall(native_shutdown)
+		if not called and not has_primary then primary, has_primary = retired, true end
 		package.loaded[c.handler_module]=c.saved_handler.value
 		for _,name in ipairs(names)do package.loaded[name]=saved[name].value end
+		closing_fixture = false
+		if has_primary then error(primary, 0) end
+		return called and retired == true
 	end
 	return c
 end

@@ -14,6 +14,7 @@
 				"grab-race": 1,
 				"system-keymaps": 1,
 				"xkb-source-qualification": 26,
+				"window-switch-receipts": 34,
 				"http-stream-receipts": 55,
 				"managed-network-runtime": 4,
 				"x11-display": 1,
@@ -30,7 +31,8 @@
 				"webview-roundtrip": 1,
 				"page-load-errors": 1,
 				"hotstring-e2e": 100,
-				"retained-fd-sha256": 12
+				"retained-fd-sha256": 12,
+				"native-fixture-family": 5
 			}
 		},
 		"package-linux": {

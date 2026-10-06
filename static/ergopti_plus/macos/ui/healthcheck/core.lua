@@ -226,6 +226,22 @@ end
 -- the flag disagrees with what it finds.
 local ADAPTER_SPECS = {
 	{
+		id       = "adapters.physical_shortcut_hook",
+		contract = { "new" },
+		-- Structural require reachability; runtime native delivery stays unavailable.
+		wired    = true,
+	},
+	{
+		id       = "adapters.program_providers",
+		contract = { "create" },
+		wired    = true,
+	},
+	{
+		id       = "adapters.owned_program_runner",
+		contract = { "available", "spawn" },
+		wired    = true,
+	},
+	{
 		id       = "adapters.keyboard_source_probe",
 		contract = { "current_source_id", "request" },
 		wired    = true,
@@ -345,6 +361,11 @@ local ADAPTER_SPECS = {
 	{
 		id       = "adapters.network_info",
 		contract = { "getSsidHash", "getSignalStrength", "isInternetReachable", "isVpnActive" },
+		wired    = true,
+	},
+	{
+		id       = "adapters.application_notifier",
+		contract = { "send", "new" },
 		wired    = true,
 	},
 	{

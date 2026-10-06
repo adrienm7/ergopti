@@ -172,6 +172,14 @@ ReloadPreservingSuspend(SuccessFn := 0, ExistingBundle := 0, RefusedFn := 0,
 _ReloadPreservingSuspendNonCritical(SuccessFn, ExistingBundle, RefusedFn,
 		StageFailureFn) {
 	global ConfigurationFile
+	if IsSet(ProgramActions_Stop) {
+		ProgramStopped := false
+		try ProgramStopped := ProgramActions_Stop(A_IsSuspended)
+		catch as Err
+			try LoggerError("Lifecycle", "User-program reload preflight failed: {1}.", Err.Message)
+		if !((ProgramStopped is Integer) && ProgramStopped == 1)
+			return false
+	}
 	if (ExistingBundle is Object) && !HasMethod(RefusedFn, "Call")
 		throw TypeError("A reload that borrows a configuration bundle needs a refusal callback to take it back.")
 	ReportStage := HasMethod(StageFailureFn, "Call") ? StageFailureFn : _SuspendHandoffFailure
@@ -460,6 +468,8 @@ Ergopti_OnSuspendEnter() {
 	global _SpaceHoldInputHook
 	global _MagicKeyEditorInputHook
 	Transition := LifecycleTransitionBegin("suspend")
+	if IsSet(ProgramActions_Stop)
+		_LifecycleRunRequiredStep(Transition, "user-programs", () => ProgramActions_Stop(true), true)
 	if IsSet(UserHotstringsInvalidate)
 		_LifecycleRunRequiredStep(Transition, "user-hotstrings", UserHotstringsInvalidate.Bind("suspend"), true)
 	if !_LifecycleRunRequiredStep(Transition, "navigation-event",
@@ -630,6 +640,8 @@ Ergopti_OnSuspendEnter() {
 }
 Ergopti_OnSuspendResume() {
 		Transition := LifecycleTransitionBegin("resume")
+		if IsSet(ProgramActions_Stop)
+			_LifecycleRunRequiredStep(Transition, "user-programs", () => ProgramActions_Stop(false), true)
 		LoggerStart("Lifecycle", "Resuming from suspend…")
 		LifecycleTransitionMarkStarted(Transition)
 		_LifecycleRunRequiredStep(Transition, "navigation-event",
@@ -978,6 +990,22 @@ Ergopti_OnShutdown(reason, code) {
 			try _Updater_DeferExitIntentRetry()
 			try _Updater_DeferRecoveryHandoffRetry()
 			return _LifecycleRefuseShutdown("a synthetic modifier release is still pending")
+		}
+		; Retire user programs only after OS-held input is released. A refused
+		; exit keeps the real pause posture, and the enclosing finally blocks
+		; return the configuration bundle and native admission to the live driver.
+		ProgramStopped := !IsSet(ProgramActions_Stop)
+		try {
+			if IsSet(ProgramActions_Stop)
+				ProgramStopped := ProgramActions_Stop(A_IsSuspended)
+		} catch as Err {
+			try LoggerError("Lifecycle", "User-program shutdown preflight failed: {1}.", Err.Message)
+		}
+		if !((ProgramStopped is Integer) && ProgramStopped == 1) {
+			try LoggerError("Lifecycle", "Shutdown refused because a user program tree is still alive.")
+			try _Updater_DeferExitIntentRetry()
+			try _Updater_DeferRecoveryHandoffRetry()
+			return _LifecycleRefuseShutdown("a user program tree is still alive")
 		}
 		FullSaveSettled := false
 		try FullSaveSettled := _ConfigFullSaveSettleTerminal(ShutdownOwners)

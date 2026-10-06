@@ -267,6 +267,8 @@ _ActPickWeb_BuildInitJs(Title, Current, Items, ShowNative, BindingId := "") {
 			; "edit the current action" button reopens any of them. Other kinds
 			; confirm without a value, and the native prompt asks for it.
 			Kind := GestureActionParameterSpec(It.Id)
+			DisabledProgram := Kind == "program" && (!IsSet(ProgramActions_Available) || !IsSet(ProgramActions_BindingSupported)
+				|| !ProgramActions_Available() || !ProgramActions_BindingSupported(BindingId))
 			Parameter := (Kind != "")
 				? "," . _ActPickWeb_Kv("parameter", Kind) . "," . _ActPickWeb_Kv("parameterValue",
 					(BindingId = "") ? "" : GestureGetActionParameter(BindingId, It.Id))
@@ -276,6 +278,7 @@ _ActPickWeb_BuildInitJs(Title, Current, Items, ShowNative, BindingId := "") {
 				. _ActPickWeb_Kv("id", It.Id) . ","
 				. _ActPickWeb_Kv("label", It.Label)
 				. Parameter
+				. (DisabledProgram ? ',"disabled":true,"hint":' . JsonStringLiteral(t("platform_reason.program_runner_unavailable")) : "")
 				. "}"
 		}
 	}
@@ -293,6 +296,15 @@ _ActPickWeb_BuildInitJs(Title, Current, Items, ShowNative, BindingId := "") {
 		. _ActPickWeb_Kv("platform", "ahk") . ","
 		. '"sendVocabulary":' . SendInputVocabularyJson() . ","
 		. '"parameterStrings":' . _ActPickWeb_ParameterStringsJson() . ","
+		. '"programProviders":{"unavailable":true},'
+		. '"programProviderStrings":{'
+		. _ActPickWeb_Kv("label", t("dialog.action_picker.program_provider_label")) . ","
+		. _ActPickWeb_Kv("manual", t("dialog.action_picker.program_provider_manual")) . ","
+		. _ActPickWeb_Kv("hint", t("dialog.action_picker.program_provider_hint")) . ","
+		. _ActPickWeb_Kv("unavailable", t("dialog.action_picker.program_provider_unavailable")) . ","
+		. _ActPickWeb_Kv("changed", t("dialog.action_picker.program_provider_changed")) . ","
+		. _ActPickWeb_Kv("empty", t("dialog.action_picker.program_provider_empty")) . ","
+		. _ActPickWeb_Kv("truncated", t("dialog.action_picker.program_provider_truncated")) . "},"
 		. '"promptChoices":' . _ActPickWeb_PromptChoicesJson() . ","
 		. '"visionChoices":' . _ActPickWeb_VisionChoicesJson() . ","
 		. '"languageChoices":' . _ActPickWeb_LanguageChoicesJson() . ","
@@ -332,6 +344,8 @@ _ActPickWeb_ParameterStringsJson() {
 	Errors .= "," . _ActPickWeb_Kv("llm_vision", t("dialog.gestures.param_err_llm_vision"))
 	Prompts .= "," . _ActPickWeb_Kv("llm_language", GestureActionParameterPrompt("llm_translate_selection"))
 	Errors .= "," . _ActPickWeb_Kv("llm_language", t("dialog.gestures.param_err_llm_language"))
+	Prompts .= "," . _ActPickWeb_Kv("program", t("dialog.gestures.param_program"))
+	Errors .= "," . _ActPickWeb_Kv("program", t("dialog.gestures.param_err_program"))
 	return "{"
 		. _ActPickWeb_Kv("save", t("button.save")) . ","
 		. _ActPickWeb_Kv("back", t("dialog.action_picker.back")) . ","
@@ -345,6 +359,10 @@ _ActPickWeb_ParameterStringsJson() {
 		. _ActPickWeb_Kv("visionModelDefault", t("dialog.action_picker.vision_model_default")) . ","
 		. _ActPickWeb_Kv("visionModelRequired", t("dialog.action_picker.vision_model_required")) . ","
 		. _ActPickWeb_Kv("languageLabel", t("dialog.action_picker.language_label")) . ","
+		. _ActPickWeb_Kv("programExecutableLabel", t("dialog.action_picker.program_executable")) . ","
+		. _ActPickWeb_Kv("programArgumentsLabel", t("dialog.action_picker.program_arguments")) . ","
+		. _ActPickWeb_Kv("programAddLabel", t("dialog.action_picker.program_add_argument")) . ","
+		. _ActPickWeb_Kv("programRemoveLabel", t("dialog.action_picker.program_remove_argument")) . ","
 		. '"prompts":{' . Prompts . '},"errors":{' . Errors . "}}"
 }
 

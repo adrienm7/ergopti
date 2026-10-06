@@ -45,6 +45,7 @@ const MAC_UTILS = 'static/ergopti_plus/macos/ui/menu/shortcut_utils.lua';
 const LINUX_HOST = 'static/ergopti_plus/linux/ui/action_picker/bridge.lua';
 const LINUX_ACTIONS = 'static/ergopti_plus/linux/modules/gestures/manager.lua';
 const EN_LOCALE = 'static/ergopti_plus/_shared/data/locales/en.json';
+const PROVIDER_PICKER = 'static/ergopti_plus/_shared/lua/program_provider_picker.lua';
 
 let total_pass = 0;
 let total_fail = 0;
@@ -230,8 +231,20 @@ check(
 	'Windows host forwards the collected value to the parameter prompt',
 	/Payload\["parameter"\]/.test(winHost) && /GestureOfferPickedParameter\(/.test(winHost)
 );
-check('macOS host forwards the collected value', /body\.parameter/.test(macHost));
-check('Linux host forwards the collected value', /data\.parameter/.test(linuxHost));
+const providerPicker = read(PROVIDER_PICKER);
+const manualParameter =
+	/body\.providerKey == nil[\s\S]*?type\(body\.parameter\) == "string" and body\.parameter or nil/.test(
+		providerPicker
+	);
+check(
+	'macOS host forwards the collected value',
+	manualParameter && /ProgramProviderPicker\.confirm\(session\.providers, id, body\)/.test(macHost)
+);
+check(
+	'Linux host forwards the collected value',
+	manualParameter &&
+		/ProgramProviderPicker\.confirm\(session\.providers, id, data\)/.test(linuxHost)
+);
 
 // 4c. Hierarchy / fold / TOC features present in the frontend.
 check(
