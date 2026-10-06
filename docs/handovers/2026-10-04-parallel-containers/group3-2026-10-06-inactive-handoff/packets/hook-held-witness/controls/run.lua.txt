@@ -1,0 +1,18 @@
+-- Private controlled multi-source replay; no kernel, native window or hardware ownership.
+local directory, selected, root = assert(arg[1]), assert(arg[2]), assert(arg[3])
+package.path = root .. "/static/ergopti_plus/linux/?.lua;" .. root .. "/static/ergopti_plus/_shared/lua/?.lua;" .. package.path
+local helpers = require("tests.helpers")
+package.loaded["logger.shim"] = helpers.make_logger_stub()
+package.loaded.luv = { hrtime = function() return 1000000 end }
+package.loaded["adapters.window_info"] = { getFocused = function() return { appId = "controlled", windowTitle = "" } end }
+for _, name in ipairs({ "evdev_reader", "uinput_writer" }) do
+	local file = directory .. "/dependencies/static/ergopti_plus/linux/adapters/" .. name .. ".lua"
+	package.preload["adapters." .. name] = function() return assert(loadfile(file))() end
+end
+package.preload["adapters.keyboard_hook"] = function()
+	return assert(loadfile(directory .. "/" .. selected .. "/static/ergopti_plus/linux/adapters/keyboard_hook.lua"))()
+end
+assert(loadfile(directory .. "/candidate/static/ergopti_plus/linux/tests/unit/adapters/test_keyboard_hook_device_watchdog.lua"))()
+local result = helpers.get_results()
+print(string.format("HOOK_SOURCES %d %d", result.passed, result.failed))
+os.exit(result.failed == 0 and 0 or 1)

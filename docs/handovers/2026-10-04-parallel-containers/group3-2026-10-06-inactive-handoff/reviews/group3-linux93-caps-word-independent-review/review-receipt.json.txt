@@ -1,0 +1,28 @@
+{
+  "files": {
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-independent-review/controlled-lua5.4.log": "ad5bb803b6aa13202bacadebff7b4599cda58983b10f0eadf89562b0c756ba5f",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-independent-review/controlled-luajit.log": "ad5bb803b6aa13202bacadebff7b4599cda58983b10f0eadf89562b0c756ba5f",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-independent-review/legacy-lua5.4.log": "81b2faa0e9a264483792108a97dd768a79772456ec5fb649d8b1c5256ac3da00",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-independent-review/legacy-luajit.log": "81b2faa0e9a264483792108a97dd768a79772456ec5fb649d8b1c5256ac3da00",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-independent-review/omit-casing-retirement-wave-lua5.4.log": "5549971e51075eb1a93700e659dfc9caf15c920b98681ce2d9755edbcf24004e",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-independent-review/omit-casing-retirement-wave-luajit.log": "c17be77d211f2fe34cf33888ac49bc3a4b8f184d895cb6e7ad004dd0870647c3",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-independent-review/omit-native-output-refusal-lua5.4.log": "53f7bef3235647dad04a8424909f4eaedc329a4a4ded860c13406ad2b0c2cdb4",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-independent-review/omit-native-output-refusal-luajit.log": "53f7bef3235647dad04a8424909f4eaedc329a4a4ded860c13406ad2b0c2cdb4",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-independent-review/omit-native-publication-refusal-lua5.4.log": "f8a67dd6b885b31fbfa2d6fb51bf7a092f35a0b40cf20ea72a11c93ace0a6e36",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-independent-review/omit-native-publication-refusal-luajit.log": "f8a67dd6b885b31fbfa2d6fb51bf7a092f35a0b40cf20ea72a11c93ace0a6e36",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-independent-review/omit-private-resumption-lua5.4.log": "266c834ec9fcedb05ec6e9c7c0eaa7320a4bdce8faf1ed049cebbf2263cc3516",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-independent-review/omit-private-resumption-luajit.log": "266c834ec9fcedb05ec6e9c7c0eaa7320a4bdce8faf1ed049cebbf2263cc3516",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-independent-review/omit-probe-revision-lua5.4.log": "b71dfea9d96b4d1084aa81788c307ad6fe058f9acfd6bcb5d474470594f4c56b",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-independent-review/omit-probe-revision-luajit.log": "b71dfea9d96b4d1084aa81788c307ad6fe058f9acfd6bcb5d474470594f4c56b",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-independent-review/qualify-all-controlled.lua": "f223f776221ba0484a8ad426cc2731d16a1adaa01d35f64c1c840156781a8779",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-independent-review/qualify-legacy-title-unblocked.lua": "a9e52e1cddfe30977ad528f6b4a785fdb77bc5062870be8c90c1730929bd9bdb",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-independent-review/qualify-mutation.lua": "9b1f85d04cf19a0f54695c3554765c8687b29ab65f49c90b679f61ba9420e278",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-independent-review/replay-results.json": "58cfeed822a5047c8086e188ad70a21589d2c08410f698d5468945fac6934cb0",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-independent-review/review.json": "b170dc66feb68aa58d68df4146708db8fb4aa64e224f72c711c941d42fe31463",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-independent-review/run-replays.py": "47767dbaf71ca1b2b7a799ce35691433e576f0419d0a85b86e557008fad71412",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-independent-review/tick-reentry-lua54.log": "c750a37d0903698c80ca7486ee82dbd3f9b8b5091c20727bbaf51831cba07341",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-independent-review/tick-reentry-luajit.log": "e5c50cfb8d290fd6201f4b68440cc82f54905e9fc79882b1ade0b44b56307de3",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-independent-review/tick-reentry.lua": "15616a5c5185fe7ea7938445987cf97a191a19307840ef0aaba13df71639f8d0"
+  },
+  "review_sha256": "b170dc66feb68aa58d68df4146708db8fb4aa64e224f72c711c941d42fe31463"
+}

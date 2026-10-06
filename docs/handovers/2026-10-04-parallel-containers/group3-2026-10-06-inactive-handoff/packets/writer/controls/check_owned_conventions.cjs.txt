@@ -1,0 +1,27 @@
+// Private finite replay of the authoritative Lua checks on the three owned paths.
+'use strict';
+const fs = require('node:fs');
+const path = require('node:path');
+const assert = require('node:assert/strict');
+const directory = __dirname;
+const linter = fs.readFileSync('/workspace/ergopti/tools/lint/lint-conventions.js', 'utf8');
+const names = ['readLines', 'countTrailingBlanks', 'checkFileHeader', 'checkSectionSpacing', 'checkBannerAlignment', 'checkLuaAntiPatterns'];
+const functions = names.map((name) => {
+ const start = linter.indexOf('function ' + name + '(');
+ assert(start >= 0);
+ const end = linter.indexOf('\n}\n', start);
+ assert(end > start);
+ return linter.slice(start, end + 2);
+}).join('\n');
+const constants = ['AHK_COMMENT', 'LUA_COMMENT', 'PATH_LIKE', 'MAJOR_TITLE_AHK', 'MAJOR_TITLE_LUA', 'MINOR_TITLE_AHK', 'MINOR_TITLE_LUA'].map((name) => {
+ const line = linter.split('\n').find((row) => row.startsWith('const ' + name + ' ='));
+ assert(line);
+ return line;
+}).join('\n');
+const warnings = [];
+const run = new Function('readFileSync', 'extname', 'warn', constants + '\n' + functions + '\nreturn function(file){checkFileHeader(file);checkSectionSpacing(file);checkBannerAlignment(file);checkLuaAntiPatterns(file);};')(fs.readFileSync, path.extname, (file, line, reason) => warnings.push({file, line, reason}));
+const files = ['static/ergopti_plus/linux/adapters/uinput_writer.lua','static/ergopti_plus/linux/tests/unit/adapters/test_uinput_writer.lua','static/ergopti_plus/linux/tests/hardware/run_uinput_roundtrip.lua'];
+assert.equal(files.length, 3);
+for (const file of files) run(path.join(directory, 'candidate', file));
+console.log(JSON.stringify({subject_count:files.length, warnings}));
+process.exit(warnings.length ? 1 : 0);

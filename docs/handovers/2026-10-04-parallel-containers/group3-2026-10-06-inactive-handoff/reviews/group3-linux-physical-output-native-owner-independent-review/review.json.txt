@@ -1,0 +1,31 @@
+{
+  "verdict": "BOUNDED_SOURCE_CLEAR",
+  "packet_receipt": "0cb1e695ed3e8663047443eac365ab6581e5e0c9cb72dc0e6fe1157a427827dd",
+  "patch_sha256": "2647c25a6a2f64392da3ed546979b75bc7429c08a71873de8a3f25c330f2efbf",
+  "all_artifact_external_dependency_pins": "exact",
+  "actual_three_root_preimages": "exact",
+  "whole_old_unit_prefix": "exact (20 cases/50 assertions retained)",
+  "whole_kernel_inverse": "exact after removing only additive10 checks/SYN counting/capability operations; SENT+all old checks+wait budgets unchanged",
+  "native_contract": "reservation precedes lazy require/cdef/symbol callbacks and acquisition; private exact capability/current ports; strict KEY then SYN ACK; one epoch per attempted pair; close/constructor uncertainty retains exact debt without retrying recycled numeric fd",
+  "actual_reviewer_pure_controlled_each_ABI": "47PASS/0FAIL; no kernel or physical allocations",
+  "producer_before": "20PASS/27FAIL per ABI observed logs",
+  "producer_two_causal_omissions": "45PASS/2FAIL each ABI observed logs",
+  "kernel_21_checks": "unexecuted",
+  "fix_linux_source_lease_and_root_admission": "pending",
+  "physical_availability": "unchanged false; this transport is not a physical input/modifier/layout/output ledger",
+  "root_mutations": "none",
+  "evidence": [
+    {
+      "path": "custody.json",
+      "sha256": "707b14f64b1945e665cd7a036ca037a8fb433323c9603f6c02a78d7af43a60a2"
+    },
+    {
+      "path": "luajit.log",
+      "sha256": "e303e64cd28c2be471934e7453370ebcaac5b8d350bec9133c9651c0abbe396a"
+    },
+    {
+      "path": "lua54.log",
+      "sha256": "e303e64cd28c2be471934e7453370ebcaac5b8d350bec9133c9651c0abbe396a"
+    }
+  ]
+}

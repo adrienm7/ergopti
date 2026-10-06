@@ -1,0 +1,46 @@
+
+helpers.describe("keyboard_hook: ordinary overlapping physical-source release", function()
+
+	helpers.it("keeps the single acknowledged output Shift bit held until its last source releases", function()
+		local a, b = fake_node("shared-shift-a"), fake_node("shared-shift-b")
+		local InputEvent = require("infra.input_event")
+		local queues = {
+			[a] = { InputEvent.encode(1, 42, 1, nil, 1), InputEvent.encode(1, 42, 0, nil, 3) },
+			[b] = { InputEvent.encode(1, 42, 1, nil, 2) },
+		}
+		package.loaded["modules.hotstrings.device_finder"] = {
+			find_devices = function() return { a, b }, {} end,
+			is_key_device = function() return true end,
+		}
+		local reader = helpers.load_module("adapters.evdev_reader")
+		local backend = multi_recorder(queues)
+		reader._set_backend(backend)
+		local writer = helpers.load_module("adapters.uinput_writer")
+		local rows = {}
+		writer._set_backend({
+			open = function() return 9 end,
+			ioctl = function() return true end,
+			write = function(_, bytes) rows[#rows + 1] = bytes; return true end,
+			close = function() return true end,
+		})
+		assert(writer.open())
+		local output = assert(writer.capture_output())
+		local hook = load_hook()
+		hook.start({ intercept = true, onEmitRaw = writer.emit })
+		hook.pump()
+		local held = hook.held_text_modifier_codes()
+		local output_after_first_release = writer.output_view(output)
+		queues[b][1] = InputEvent.encode(1, 42, 0, nil, 4)
+		hook.pump()
+		local final = writer.output_view(output)
+		hook.stop()
+		reader._reset_backend()
+		writer.close_owned(output)
+		os.remove(a); os.remove(b)
+		helpers.assert_eq(held, { 42 }, "the second source still physically owns Shift")
+		helpers.assert_eq(output_after_first_release.down, { 42 },
+			"a first-source up must not lift the shared virtual modifier bit")
+		helpers.assert_eq(final.down, {}, "the final-source up must release the virtual bit")
+	end)
+
+end)

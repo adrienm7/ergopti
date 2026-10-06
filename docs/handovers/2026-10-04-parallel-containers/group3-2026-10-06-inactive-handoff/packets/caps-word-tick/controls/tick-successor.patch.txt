@@ -1,0 +1,147 @@
+diff --git a/static/ergopti_plus/linux/platform/remap/key_combination_engine.lua b/static/ergopti_plus/linux/platform/remap/key_combination_engine.lua
+--- a/static/ergopti_plus/linux/platform/remap/key_combination_engine.lua
++++ b/static/ergopti_plus/linux/platform/remap/key_combination_engine.lua
+@@ -203,15 +203,31 @@
+ 	end
+ 	function owner.tick(_, at_ms)
+ 		if retirement or pending or acting or delivery then return {} end
+-		if disabled then return base:tick(at_ms) end
+-		if policy then
+-			local guard = runtime_guard
+-			if not guard or guard() ~= true then return { { owned_rows = owner:release_all(), frame = retired_frame() } } end
+-		end
+-		if native_state and casing_ended() then
+-			return { { owned_rows = owner:release_all(), frame = retired_frame(false, true) } }
+-		end
+-		return base:tick(at_ms)
++		if disabled or not policy then return base:tick(at_ms) end
++		local exact_epoch, exact_serial, exact_policy, exact_guard = epoch, serial, policy, runtime_guard
++		local function current_tick()
++			return not retirement and not disabled and not pending and not acting and not delivery
++				and epoch == exact_epoch and serial == exact_serial and policy == exact_policy
++				and runtime_guard == exact_guard
++		end
++		local function refused_tick(resume)
++			return { { owned_rows = owner:release_all(), frame = retired_frame(false, resume) } }
++		end
++		local admitted = exact_guard and exact_guard() == true
++		local ended = native_state and casing_ended()
++		-- All external reads happen before the final private ownership check.
++		if not admitted or not current_tick() then return refused_tick(false) end
++		if ended then return refused_tick(true) end
++		local ok, rows = pcall(base.tick, base, at_ms)
++		admitted = exact_guard and exact_guard() == true
++		-- Casing is a pure shared-owner observation, evaluated after the source
++		-- guard's route/pause callbacks and before final private tick currency.
++		ended = native_state and casing_ended()
++		-- Delayed roll replay invokes native layout/casing ports just as process
++		-- does. Their callbacks cannot authorize raw rows after source revocation.
++		if not ok or type(rows) ~= "table" or not admitted or not current_tick() then return refused_tick(false) end
++		if ended then return refused_tick(true) end
++		return rows
+ 	end
+ 	function owner.activity() if policy then policy.activity() end; base:activity() end
+ 	function owner.release_all()
+diff --git a/static/ergopti_plus/linux/tests/unit/modules/test_key_combination_caps_word.lua b/static/ergopti_plus/linux/tests/unit/modules/test_key_combination_caps_word.lua
+--- a/static/ergopti_plus/linux/tests/unit/modules/test_key_combination_caps_word.lua
++++ b/static/ergopti_plus/linux/tests/unit/modules/test_key_combination_caps_word.lua
+@@ -261,3 +261,99 @@
+ 		helpers.assert_eq(package.loaded.luv,NativeLoop);if not ok then error(err,0)end
+ 	end)
+ end)
++
++local function delayed_roll(before_arm)
++	local state=make()
++	state.base=Engine.new({casing_owner=state.casing,keys={caps_lock={tap_action="enter",hold_modifier="ctrl",time_activation_seconds=.3},
++		space={tap_action="",hold_modifier="shift",time_activation_seconds=.3}},roll_keys={"space"},tap_min_ms=0,one_shot_timeout_ms=1000,
++		key_text=function(code)return ({[30]="a",[48]="b",[57]=" "})[code]end,one_shot_result=function()end,
++		plan_text=function(text)return {{keycode=text=="A" and 30 or 48,mods={"shift"}}}end})
++	if before_arm then before_arm(state) end
++	state.native=Native.new(state.base,state.owner.engine_options({caps_lock=300,tab=300}))
++	arm(state);process(state,57,1,120);process(state,30,1,130)
++	return state
++end
++local function no_stale_tick(due)
++	for _,row in ipairs(due)do
++		helpers.assert_true(not(row.code==30 and row.value==1),"delayed A must not escape as an unowned DOWN after revocation")
++		helpers.assert_true(row.tap==nil,"revoked delayed effects must not dispatch an unowned tap")
++	end
++	helpers.assert_eq(#due,1);helpers.assert_true(due[1].owned_rows~=nil)
++	return due[1]
++end
++helpers.describe("Caps Word delayed-roll source and casing custody",function()
++	helpers.it("retires delayed casing when its real plan callback revokes canonical bytes",function()
++		local state=delayed_roll();local callbacks=0
++		state.base.plan_text=function(text)helpers.assert_eq(text,"A");callbacks=callbacks+1;state.bytes=state.bytes.."\n# revoked inside tick\n";return {{keycode=30,mods={"shift"}}}end
++		helpers.assert_eq(callbacks,0);local effect=no_stale_tick(state.native:tick(500));helpers.assert_eq(callbacks,1)
++		helpers.assert_eq(state.casing.active(),false);helpers.assert_eq(effect.frame.ack(false),false)
++		helpers.assert_eq(state.native:release_all(),effect.owned_rows);helpers.assert_eq(effect.frame.ack(true),true)
++		helpers.assert_eq(next(state.base.key_refs),nil)
++	end)
++	helpers.it("refuses delayed replay after the layout callback acquires a real configuration owner",function()
++		local state=delayed_roll();local token={}
++		state.base.plan_text=function()helpers.assert_eq(state.owner.acquire_configuration(token),true);return {{keycode=30,mods={"shift"}}}end
++		local effect=no_stale_tick(state.native:tick(500));helpers.assert_eq(state.owner.owns_configuration(token),true)
++		helpers.assert_eq(effect.frame.ack(nil),false);helpers.assert_eq(state.native:release_all(),effect.owned_rows)
++		helpers.assert_eq(state.owner.release_configuration(token),true);helpers.assert_eq(effect.frame.ack(true),true)
++	end)
++	helpers.it("preserves newer title-word intent when a delayed plan replaces native casing",function()
++		local state=delayed_roll()
++		state.base.plan_text=function()state.casing.toggle_title();state.casing.toggle_title();return {{keycode=30,mods={"shift"}}}end
++		local effect=no_stale_tick(state.native:tick(500));helpers.assert_eq(state.casing.mode(),"title_words")
++		helpers.assert_eq(state.casing.active(),true);helpers.assert_eq(effect.frame.ack(false),false)
++		helpers.assert_eq(state.casing.active(),true);helpers.assert_eq(effect.frame.ack(true),true)
++		helpers.assert_eq(state.casing.process_title("b"),"B")
++	end)
++	helpers.it("requires exact retirement ACK after pointer activity inside delayed planning",function()
++		local state=delayed_roll()
++		state.base.plan_text=function()state.native:activity();return {{keycode=30,mods={"shift"}}}end
++		local effect=no_stale_tick(state.native:tick(500));helpers.assert_eq(effect.frame.ack(false),false)
++		helpers.assert_eq(state.native:release_all(),effect.owned_rows);helpers.assert_eq(effect.frame.ack(true),true)
++		helpers.assert_eq(state.casing.active(),false);helpers.assert_eq(next(state.base.key_refs),nil)
++		helpers.assert_eq(state.native:process(48,1,510,origin()),nil)
++	end)
++	helpers.it("preserves the original valid delayed native roll output",function()
++		local state=delayed_roll();local due=state.native:tick(500)
++		local found=false;for _,row in ipairs(due)do if row.code==30 and row.value==1 then found=true end end
++		helpers.assert_eq(found,true);helpers.assert_eq(state.casing.current_native(state.base.caps_word_claim),true)
++		state.native:release_all();helpers.assert_eq(state.native:ack_retirement(true),true)
++	end)
++end)
++
++helpers.describe("Caps Word delayed native port refusal",function()
++	helpers.it("contains a throwing native plan while retaining exact acquired modifier debt",function()
++		local state=delayed_roll();state.base.plan_text=function()error("controlled private plan failure")end
++		local effect=no_stale_tick(state.native:tick(500));helpers.assert_eq(effect.frame.ack(false),false)
++		helpers.assert_eq(state.native:release_all(),effect.owned_rows);helpers.assert_eq(effect.frame.ack(true),true)
++		helpers.assert_eq(next(state.base.key_refs),nil);helpers.assert_eq(state.casing.active(),false)
++	end)
++end)
++
++helpers.describe("delayed native transport ownership currency",function()
++	helpers.it("does not leak queued output when the layout callback acquires delivery custody",function()
++		local state=delayed_roll();local token
++		state.base.plan_text=function()token=state.native:begin_delivery({});helpers.assert_true(token~=nil);return {{keycode=30,mods={"shift"}}}end
++		local effect=no_stale_tick(state.native:tick(500));helpers.assert_eq(effect.frame.ack(true),false)
++		helpers.assert_eq(state.native:release_all(),effect.owned_rows)
++		helpers.assert_eq(state.native:end_delivery(token),false,"transport closes exactly but the old business frame was revoked")
++		helpers.assert_eq(effect.frame.ack(true),true);helpers.assert_eq(next(state.base.key_refs),nil)
++	end)
++end)
++
++helpers.describe("delayed casing after the last source callback",function()
++	helpers.it("retires output when the source guard replaces casing after native planning",function()
++		local state=delayed_roll(function(current)
++			current.owner=Owner.new({keys={{id="caps_lock",key="caps_lock"},{id="tab",key="tab"}},hold_picker={modifiers={"ctrl","shift"},layers={}},
++				files={read_with_status=function()return current.bytes,"ok"end},route=function()return "/controlled/config.toml"end,
++				is_paused=function()
++					if current.after_plan then current.after_plan=false;current.replacements=(current.replacements or 0)+1;current.casing.toggle_title();current.casing.toggle_title() end
++					return false
++				end,changed=function()return true end,actions={is_assignable=function(action)return action=="caps_word"end}})
++		end)
++		state.base.plan_text=function()state.after_plan=true;return {{keycode=30,mods={"shift"}}}end
++		local effect=no_stale_tick(state.native:tick(500));helpers.assert_eq(state.replacements,1)
++		helpers.assert_eq(state.casing.mode(),"title_words");helpers.assert_eq(state.casing.active(),true)
++		helpers.assert_eq(effect.frame.ack(true),true);helpers.assert_eq(state.casing.process_title("b"),"B")
++	end)
++end)
