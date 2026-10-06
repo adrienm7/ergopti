@@ -811,6 +811,19 @@ sealed subjects and current preimages are verified; actual patch adoption is
 zero-fuzz/offset. The change remains dormant with the current runtime; genuine
 macOS process/clock/capture acceptance and TODO31 stay open.
 
+A dormant shared virtual-HID dependency policy now classifies four independently
+bound observations: installed reference, broker, client and current intent.
+Only a qualified current client initialization followed by its later status can
+produce a ready decision; malformed, stale, revoked or incompatible facts refuse.
+Every callback/source/refusal frame and retirement debt retains its exact owner.
+No event-count lifetime budget evicts debt. All36 normally discovered controls
+pass on Lua54 and LuaJIT; their original31-case prefix and five independent
+controls remain byte-exact. The31,376 sealed preparation subjects and absent
+Root preimages are verified; the ordered patches apply zero-fuzz/offset.
+No production caller, native observer, installer, update or capture authority
+exists in this slice. Actual dependency/reference/native qualification and the
+remaining WP6 work stay open; this policy alone cannot complete TODO31.
+
 ## Coordination and setup
 
 Coordination is recorded in GitHub issue86. Group3 owns only its new native
