@@ -650,6 +650,9 @@ _ScopeObsoleteGlobal(Mode) {
 			Assert(Backups >= 4, "the genuine global file cohort crosses its coordinated backup boundary")
 			AssertEqual(1, Launches)
 			Expected := StrReplace(Source, "ergopti_alt_gr = true`n", "")
+				. '[shortcuts.keyboard]`nmagic_editor = "none"`n'
+				. '[shortcuts.script_control]`nscript_altgr_backspace = "none"`n'
+				. 'script_altgr_delete = "none"`nscript_altgr_enter = "none"`nscript_altgr_escape = "none"`n'
 			Actual := FSReadUtf8Exact(Fixture.path)
 			AssertEqual(Expected, Actual,
 				"global clear preserves obsolete leaf and array parent while applying its unrelated effect"
