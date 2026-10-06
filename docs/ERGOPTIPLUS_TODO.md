@@ -4870,6 +4870,15 @@ Detailed commands, test owners and the inactive prepared packet are in
 [group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md).
 This deferral does not complete this item or the cross-cutting items16/38.
 
+The native modifier-hold consumer fixture now loads its actual shared Typing
+selection helpers and production selection constants. The missing dependency
+reproduces on both current sources and dev13 after12 successful SQLite checks
+and four Apps checks. The reviewed fixture-only repair retains every original
+assertion, SQL query and independent expected number; actual LuaJIT and Lua5.4
+replays pass12/0 SQLite and5/0 consumers, with four omission controls rejected.
+Production readers, writers, schemas and consumers are unchanged. Hosted
+revalidation remains pending; these checks do not qualify physical input.
+
 - [ ] **96.** Remove the separate Ergopti+ AltGr-adjustments option from the
       Layout menu. Selecting the Ergopti+ keylayout in the emulation picker must
       suffice. Verify that the layout supplies every intended change, retire
