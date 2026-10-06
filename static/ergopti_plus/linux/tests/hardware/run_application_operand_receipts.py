@@ -6,9 +6,16 @@
 # shell or launcher mocks. The launched application writes its identity receipt;
 # this validates virtual desktop services, not physical keyboard hardware.
 
+import argparse
+from contextlib import contextmanager
+import json
 import os
+import sys
+import time
+import uuid
+
+import application_operand_diagnostics as diagnostic
 import pathlib
-import shutil
 import subprocess
 import tempfile
 
@@ -25,6 +32,27 @@ io.stderr:write("ERGOPTI_APPLICATION_STAGE=execution\n")
 assert(Actions.execute_action("open_app", "tap_3"))
 io.stderr:write("ERGOPTI_APPLICATION_STAGE=receipt\n")
 local receipt = os.getenv("ERGOPTI_NATIVE_APPLICATION_RECEIPT")
+local Clock = require("infra.monotonic")
+local Json = require("json")
+local function snapshot()
+	local file = io.open(receipt, "r")
+	if not file then return { present = false, observed_bytes = 0, text_prefix = "" } end
+	local value = file:read(4097) or ""
+	file:close()
+	return { present = true, observed_bytes = #value, text_prefix = value:sub(1, 4096), truncated = #value > 4096 }
+end
+local before_ms, before_receipt = Clock.now_ms(), snapshot()
+local function trace(phase, after_receipt)
+	local packet = { schema = 1, nonce = os.getenv("ERGOPTI_APPLICATION_NONCE"), identity = id,
+		phase = phase, clock_backend = Clock.backend(), clock_resolution_ms = Clock.resolution_ms(),
+		before_ms = before_ms, after_ms = Clock.now_ms(), before_receipt = before_receipt, after_receipt = after_receipt }
+	local destination = os.getenv("ERGOPTI_APPLICATION_POLL_TRACE")
+	local stream = assert(io.open(destination .. ".stage", "w"))
+	assert(stream:write(assert(Json.encode(packet)) .. "\n"))
+	assert(stream:flush())
+	assert(stream:close())
+	assert(os.rename(destination .. ".stage", destination))
+end
 for _ = 1, 100 do
 	local file = io.open(receipt, "r")
 	if file then
@@ -33,12 +61,14 @@ for _ = 1, 100 do
 		if actual ~= id then
 			io.stderr:write("ERGOPTI_APPLICATION_RECEIPT=identity_mismatch\n")
 		end
+		trace("observed", snapshot())
 		assert(actual == id, "the selected application identity changed")
 		return
 	end
 	os.execute("sleep 0.02")
 end
 io.stderr:write("ERGOPTI_APPLICATION_RECEIPT=not_observed\n")
+trace("missing", snapshot())
 error("the selected desktop entry did not launch: " .. id)
 """
 
@@ -67,100 +97,51 @@ def application_receipt_state(stderr):
     return state
 
 
-# Transparent observer: the real original PATH-selected gtk-launch receives
-# precisely the original "$@". No launcher result or application bytes are faked.
-GTK_TRACE_WRAPPER = '#!/bin/sh\nset +e\narity=other\nboundary=mismatched\noperand=mismatched\nif [ "$#" -eq 2 ]; then\n    arity=expected\n    if [ "$1" = "--" ]; then boundary=matched; fi\n    if [ "$2" = "$ERGOPTI_NATIVE_GTK_EXPECTED" ]; then operand=matched; fi\nfi\npublish() {\n    printf \'phase=%s;arity=%s;boundary=%s;operand=%s;native_exit=%s\\n\' "$1" "$arity" "$boundary" "$operand" "$2" > "${ERGOPTI_NATIVE_GTK_TRACE}.pending"\n    mv -- "${ERGOPTI_NATIVE_GTK_TRACE}.pending" "$ERGOPTI_NATIVE_GTK_TRACE"\n}\npublish entered pending\n"$ERGOPTI_NATIVE_GTK_COMMAND" "$@"\nstatus=$?\npublish returned "$status"\nexit "$status"\n'
-
-
-def native_gtk_observation(trace, entered):
-    """Only finite native-process observations may enter failure annotations."""
-    observation = {
-        "gtk_command": "not_observed",
-        "gtk_arity": "unknown",
-        "gtk_boundary": "unknown",
-        "gtk_operand": "unknown",
-        "gtk_exit": "unknown",
-        "launcher_enter": "not_observed",
-    }
+@contextmanager
+def evidence_directory():
+    """Retain bounded diagnostic files on failure; never auto-delete an unresolved trial."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--evidence-dir")
+    options = parser.parse_args()
+    if options.evidence_dir is None:
+        root = pathlib.Path(tempfile.mkdtemp(prefix="ergopti-app-operands-"))
+    else:
+        root = pathlib.Path(options.evidence_dir)
+        root.mkdir(mode=0o700)
     try:
-        with trace.open("rb") as stream:
-            raw = stream.read(513)
-        if len(raw) > 512:
-            raise ValueError("closed native trace exceeded its bound")
-        fields = raw.decode("ascii").strip().split(";")
-        pairs = [field.split("=", 1) for field in fields]
-        if any(len(pair) != 2 for pair in pairs):
-            raise ValueError("invalid closed trace field")
-        values = dict(pairs)
-        if (
-            len(pairs) != 5
-            or len(values) != 5
-            or set(values) != {"phase", "arity", "boundary", "operand", "native_exit"}
-        ):
-            raise ValueError("invalid closed trace shape")
-        if values["phase"] not in {"entered", "returned"}:
-            raise ValueError("invalid closed trace phase")
-        if values["arity"] not in {"expected", "other"}:
-            raise ValueError("invalid closed trace arity")
-        if any(values[field] not in {"matched", "mismatched"} for field in ["boundary", "operand"]):
-            raise ValueError("invalid closed argument observation")
-        status = values["native_exit"]
-        if values["phase"] == "entered":
-            if status != "pending":
-                raise ValueError("entered native command has no terminal status")
-        elif (
-            not status.isdecimal()
-            or not status.isascii()
-            or str(int(status)) != status
-            or not 0 <= int(status) <= 255
-        ):
-            raise ValueError("invalid closed native status")
-        observation.update(
-            {
-                "gtk_command": values["phase"],
-                "gtk_arity": values["arity"],
-                "gtk_boundary": values["boundary"],
-                "gtk_operand": values["operand"],
-                "gtk_exit": status,
-            }
-        )
-    except FileNotFoundError:
-        pass
-    except (OSError, UnicodeError, ValueError):
-        observation["gtk_command"] = "unknown"
-    try:
-        with entered.open("rb") as stream:
-            entered_bytes = stream.read(2)
-        observation["launcher_enter"] = "observed" if entered_bytes == b"1" else "unknown"
-    except FileNotFoundError:
-        pass
-    except OSError:
-        observation["launcher_enter"] = "unknown"
-    return ";".join(f"{key}={value}" for key, value in observation.items())
+        yield str(root.resolve(strict=True))
+    finally:
+        print("Native application diagnostic files retained: " + str(root))
 
 
 def main():
     checks, failures = 0, 0
-    with tempfile.TemporaryDirectory(prefix="ergopti-app-operands-") as folder:
+    with evidence_directory() as folder:
         root = pathlib.Path(folder)
         applications = root / "data" / "applications"
         applications.mkdir(parents=True)
         launcher = root / "record-application"
         launcher.write_text(
             "#!/bin/sh\nset -eu\n"
-            'printf 1 > "$ERGOPTI_NATIVE_APPLICATION_ENTERED" || :\n'
             'pending="${ERGOPTI_NATIVE_APPLICATION_RECEIPT}.pending"\n'
             'printf %s "$1" > "$pending"\n'
             'mv -- "$pending" "$ERGOPTI_NATIVE_APPLICATION_RECEIPT"\n'
         )
         launcher.chmod(0o700)
-        genuine_gtk = shutil.which("gtk-launch")
-        trace_commands = root / "trace-commands"
-        trace_commands.mkdir()
-        if genuine_gtk is not None:
-            gtk_observer = trace_commands / "gtk-launch"
-            gtk_observer.write_text(GTK_TRACE_WRAPPER)
-            gtk_observer.chmod(0o700)
+        wrapper_directory = root / "bin"
+        wrapper_directory.mkdir(mode=0o700)
+        wrapper = wrapper_directory / "gtk-launch"
+        assert sys.executable.startswith("/") and not any(c.isspace() for c in sys.executable), (
+            "The selected Python executable cannot form a native shebang"
+        )
+        wrapper.write_text(
+            "#!"
+            + sys.executable
+            + "\nimport sys\nsys.path.insert(0, "
+            + repr(str(pathlib.Path(diagnostic.__file__).parent.resolve()))
+            + ")\nfrom application_operand_diagnostics import wrapper_main\nraise SystemExit(wrapper_main())\n"
+        )
+        wrapper.chmod(0o700)
         read_fd, write_fd = os.pipe()
         with (root / "display.log").open("w") as log:
             display = subprocess.Popen(
@@ -192,34 +173,67 @@ def main():
                         f'Exec={launcher} "{identity}"\nTerminal=false\n'
                     )
                     receipt = root / ("receipt-" + str(index))
-                    gtk_trace = root / ("gtk-trace-" + str(index))
-                    entered = root / ("application-entered-" + str(index))
+                    case_root = root / ("diagnostic-" + str(index))
+                    case_root.mkdir(mode=0o700)
+                    nonce = uuid.uuid4().hex
+                    context_path = case_root / "context.json"
+                    diagnostic.publish(
+                        context_path,
+                        {
+                            "directory": str(case_root),
+                            "nonce": nonce,
+                            "identity": identity,
+                            "receipt": str(receipt),
+                        },
+                    )
                     env = dict(os.environ)
-                    if genuine_gtk is not None:
-                        env["PATH"] = str(trace_commands) + os.pathsep + env.get("PATH", "")
-                        env["ERGOPTI_NATIVE_GTK_COMMAND"] = genuine_gtk
-                        env["ERGOPTI_NATIVE_GTK_EXPECTED"] = identity
-                        env["ERGOPTI_NATIVE_GTK_TRACE"] = str(gtk_trace)
                     env.update(
                         {
+                            "PATH": str(wrapper_directory)
+                            + os.pathsep
+                            + os.environ.get("PATH", ""),
+                            "ERGOPTI_APPLICATION_DIAGNOSTIC_CONTEXT": str(context_path),
+                            "ERGOPTI_APPLICATION_NONCE": nonce,
+                            "ERGOPTI_APPLICATION_POLL_TRACE": str(case_root / "poll.json"),
                             "DISPLAY": ":" + number,
                             "XDG_DATA_HOME": str(root / "data"),
                             "XDG_DATA_DIRS": str(root / "empty"),
                             "XDG_CONFIG_HOME": str(root / "config"),
                             "ERGOPTI_NATIVE_APPLICATION_ENTRY": str(entry),
                             "ERGOPTI_NATIVE_APPLICATION_RECEIPT": str(receipt),
-                            "ERGOPTI_NATIVE_APPLICATION_ENTERED": str(entered),
                             "LUA_PATH": "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;",
                         }
                     )
-                    child = subprocess.run(
-                        ["dbus-run-session", "--", "luajit", "-e", WORKER],
-                        env=env,
-                        capture_output=True,
-                        text=True,
-                        timeout=10,
+                    before_child = time.monotonic_ns()
+                    child = diagnostic.run_owned_case(
+                        ["dbus-run-session", "--", "luajit", "-e", WORKER], env
                     )
-                    if child.returncode:
+                    facts = {
+                        "schema": 1,
+                        "nonce": nonce,
+                        "identity": identity,
+                        "before_child_ns": before_child,
+                        "after_child_ns": time.monotonic_ns(),
+                        "worker_exit": child.returncode,
+                        "observer_timed_out": child.observer_timed_out,
+                        "receipt_after_worker": diagnostic.receipt_snapshot(receipt),
+                    }
+                    for label, filename in (("gtk", "gtk-terminal.json"), ("poll", "poll.json")):
+                        diagnostic_path = case_root / filename
+                        facts[label] = (
+                            json.loads(diagnostic_path.read_bytes())
+                            if diagnostic_path.exists()
+                            else None
+                        )
+                        if facts[label] is not None:
+                            assert (
+                                facts[label]["nonce"] == nonce
+                                and facts[label]["identity"] == identity
+                            ), "Diagnostic belongs to a different controlled trial"
+                    diagnostic.publish(case_root / "case.json", facts)
+                    print("APPLICATION_DIAGNOSTIC " + json.dumps(facts, sort_keys=True))
+                    diagnostic_complete = diagnostic.native_launch_complete(facts["gtk"])
+                    if child.returncode or child.observer_timed_out or not diagnostic_complete:
                         failures += 1
                         stage = application_stage(child.stderr)
                         receipt_detail = (
@@ -230,7 +244,7 @@ def main():
                         print(
                             "::error title=Native application operand::"
                             f"stage={stage};case={index};native_exit={child.returncode}"
-                            f"{receipt_detail};{native_gtk_observation(gtk_trace, entered)}"
+                            f"{receipt_detail}"
                         )
                         print(
                             f"FAIL native application operand {identity!r}: {child.stderr.strip()}"

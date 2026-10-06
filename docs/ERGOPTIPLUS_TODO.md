@@ -5757,6 +5757,17 @@ receipts/status/stdout. All12 adopted descendants are physically reaped with
 zero pending/rescue debt;15 closed-parser controls pass. Hosted execution of
 this observer is still required, and its output cannot complete item106.
 
+After this prepared slice was pushed, upstream2afdf3039 introduced structured
+GTK command, native stderr and polling diagnostics. Its entire fixture and
+new diagnostic owner are preserved during the current Dev merge; the earlier
+58690cd9 observer is superseded rather than layered onto another wrapper.
+The old four-case/refusal controls qualify only that historical observer.
+Current GTK sources require fresh hosted qualification, with the original
+identity oracle and poll window retained. Upstream ETag, typing-consumer and
+macOS acceptance/diagnostic corrections are preserved; macOS also requires
+qualification on these new sources. The atomic PID publication correction
+remains active. No TODO item is completed by this diagnostic preparation.
+
 - [~] **107.** Make the number-row policy explicit: native behavior, digits
   directly or symbols directly, with an acknowledged migration of the old
   Windows Boolean and preserved unrelated settings. The earlier Boolean slice
