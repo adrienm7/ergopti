@@ -125,6 +125,18 @@ extension HS274NativePolicyQualificationTests {
 			XCTAssertEqual(products.stdout,
 				"PASS observed native products=4 architectures=2; signing and activation unqualified\n")
 			XCTAssertTrue(products.stderr.isEmpty)
+			guard products.status == 0, products.stdout ==
+				"PASS observed native products=4 architectures=2; signing and activation unqualified\n",
+				products.stderr.isEmpty else { return }
+			let metadata = root.appendingPathComponent("team-metadata")
+			try FileManager.default.createDirectory(at: metadata, withIntermediateDirectories: false,
+				attributes: [.posixPermissions: 0o700])
+			let team = try run(URL(fileURLWithPath: "/usr/bin/env"),
+				["python3", repository.appendingPathComponent("tools/build/remap_runtime_team_metadata.py").path,
+					repository.path, owned.path, metadata.path], root: root)
+			XCTAssertEqual(team.status, 0)
+			XCTAssertEqual(team.stdout, "PASS native CF Team metadata cases=12; signing and authentication unqualified\n")
+			XCTAssertTrue(team.stderr.isEmpty)
 		}
 	}
 

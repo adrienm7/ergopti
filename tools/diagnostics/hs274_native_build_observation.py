@@ -10,7 +10,7 @@ from pathlib import Path
 import stat
 import sys
 
-BUILDER_SHA256 = "9ad98fe222e4de1227e5c8acf62c0dc82242e136f14a7ca2bd4addcea9d6e449"
+BUILDER_SHA256 = "359b1e6bc6f56b136329aeac1ae2bf1a2cfd078e716a5a473e0a82d2a19c2c6f"
 MAX_RECORD_BYTES = 4096
 MAX_CAPTURE_BYTES = 32 * 1024 * 1024
 MAX_PUBLIC_BYTES = 2048

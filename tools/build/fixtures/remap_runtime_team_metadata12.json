@@ -1,0 +1,32 @@
+{
+	"qualification": "ACTUAL_CF_METADATA_ONLY_IF_EXECUTED",
+	"status": "NOT_EXECUTED",
+	"control_sha256": "8ead4c6e4b9100d58d91d3464a6349a4b69891c6017b4e9ffecabb0c233fc947",
+	"cases": [
+		"null-dictionary:refuse",
+		"wrong-dictionary-type:refuse",
+		"absent-team:known-empty",
+		"present-ascii:TEAM1",
+		"present-unicode:utf8-c3a9",
+		"present-empty:refuse",
+		"present-leading-nul:refuse",
+		"present-interior-nul:refuse",
+		"present-high-surrogate:refuse",
+		"present-low-surrogate:refuse",
+		"present-boolean:refuse",
+		"present-data:refuse"
+	],
+	"inventory_case": "12 literal cases; construction failure counts FAIL, no skip",
+	"native_signing_scenarios": [
+		"strict valid signed same-role-route same-leaf both absent:accept subject to all current FD/audit/UID/watch gates",
+		"missing team with invalid strict signature:refuse",
+		"missing team with adhoc flag:refuse",
+		"missing team with unknown role:refuse",
+		"missing team with absent/empty DER:refuse",
+		"changed exact DER with both absent:refuse",
+		"absent versus present Team:refuse",
+		"different present Team:refuse"
+	],
+	"native_signing_status": "SPEC_ONLY_NOT_EXECUTED",
+	"software_scope": "Source-only conservation control may observe ordering; no SDK substitution"
+}

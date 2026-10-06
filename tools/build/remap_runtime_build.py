@@ -865,7 +865,7 @@ def observe_products(source, owner, *, repository=None):
     return validate_products(result)
 
 
-SOURCE_FACTORY_SHA256 = "227cd2a9ace8007b5d46bef1d9617a30d23700320c67f914cc028d51adc124f8"
+SOURCE_FACTORY_SHA256 = "54b41cc2f6d63def8e0f097ee6544302520a0d2f5326a78856c66ee2aff50bb1"
 _SOURCE_FACTORY = None
 
 

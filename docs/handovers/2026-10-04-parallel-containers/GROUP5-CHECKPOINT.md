@@ -1297,3 +1297,19 @@ E2E/GTK/package and first-install lanes pass, while five distribution unit
 lanes fail; those literal preparation/fixture refusals are separate from the
 older GTK failure. These observations complete no item. Current-source hosted
 qualification and original physical requirements remain mandatory.
+
+The non-Apple self-signed route now admits an actually absent TeamIdentifier
+as known-empty after original strict validity/non-ad-hoc/role/DER guards.
+Present empty, mistyped, NUL or malformed values refuse; exact peer leaf/team
+matching and all native socket/audit/watch/lifecycle boundaries remain intact.
+Reviewed header6ece and the exact five cascading constant replacements retain
+all32 factory dependencies and30 unchanged entries, without changing recipes,
+corpora or budgets. The genuine-CF12 caller runs only after the original actual
+four-product guards, through two unchanged phase calls within one SDK30/35/10.
+Verified builder bytes are executed directly. Separate ordinarily discovered
+Python/Swift software controls preserve all seven original assertion bodies
+and frozen historical oracle snapshots. Both author/reviewer loader blockers
+are corrected; original preparation and blocked review receipts remain intact.
+Portable41/22/25/7 controls pass on the coherent private composition. Actual CF12,
+Swift registration, signed-peer8, owned compilation/admission and native AUTH
+remain unexecuted here. No producer, installation or activation is enabled.

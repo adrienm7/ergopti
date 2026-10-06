@@ -14,7 +14,7 @@ import time
 DEPENDENCIES = (
     (
         "tools/build/remap_runtime_auth.hpp",
-        "bdb3673d153c9f96dd6163ef3cd75bd0af6a824ad3e92b3957454fc89edff700",
+        "6ecee6a85daf61005b67b58bff527fef0d3d54a88156407792698817003f150d",
     ),
     (
         "tools/build/remap_runtime_auth_policy.hpp",
@@ -22,7 +22,7 @@ DEPENDENCIES = (
     ),
     (
         "tools/build/remap_runtime_auth_transport.py",
-        "755eda13619660d0fbae1f243b0044d145358580eede36a8339e8ac19100d5a3",
+        "6728d7a77f326e8d237ae1466c1113b9a9a39aa2f0c684f606808e4bead36221",
     ),
     (
         "tools/build/remap_runtime_identity.hpp",

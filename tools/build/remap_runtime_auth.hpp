@@ -85,6 +85,13 @@ struct code_identity final {
   return result;
 }
 
+[[nodiscard]] inline std::optional<std::string> signing_team(CFDictionaryRef information) {
+  if (!information || CFGetTypeID(information) != CFDictionaryGetTypeID()) return std::nullopt;
+  // Team metadata is optional for non-Apple signatures; a present value stays strict.
+  if (!CFDictionaryContainsKey(information, kSecCodeInfoTeamIdentifier)) return std::string{};
+  return exact_string(CFDictionaryGetValue(information, kSecCodeInfoTeamIdentifier));
+}
+
 [[nodiscard]] inline std::optional<code_identity> signing_identity(SecCodeRef live) {
   if (!live || CFGetTypeID(live) != SecCodeGetTypeID() ||
       SecCodeCheckValidity(live, kSecCSStrictValidate, nullptr) != errSecSuccess) return std::nullopt;
@@ -95,9 +102,8 @@ struct code_identity final {
   if (SecCodeCopySigningInformation(static_code.get(), kSecCSSigningInformation, information.out()) != errSecSuccess ||
       !information.get() || CFGetTypeID(information.get()) != CFDictionaryGetTypeID()) return std::nullopt;
   const auto identifier = exact_string(CFDictionaryGetValue(information.get(), kSecCodeInfoIdentifier));
-  const auto team = exact_string(CFDictionaryGetValue(information.get(), kSecCodeInfoTeamIdentifier));
   const auto flags_value = CFDictionaryGetValue(information.get(), kSecCodeInfoFlags);
-  if (!identifier || !team || !flags_value || CFGetTypeID(flags_value) != CFNumberGetTypeID()) return std::nullopt;
+  if (!identifier || !flags_value || CFGetTypeID(flags_value) != CFNumberGetTypeID()) return std::nullopt;
   std::int64_t flags = 0;
   if (!CFNumberGetValue(static_cast<CFNumberRef>(flags_value), kCFNumberSInt64Type, &flags) ||
       flags < 0 || flags > std::numeric_limits<std::uint32_t>::max() ||
@@ -115,6 +121,8 @@ struct code_identity final {
   const auto length = CFDataGetLength(der.get());
   if (length <= 0 || length > 1024 * 1024 || !CFDataGetBytePtr(der.get())) return std::nullopt;
   if (SecCodeCheckValidity(live, kSecCSStrictValidate, nullptr) != errSecSuccess) return std::nullopt;
+  const auto team = signing_team(information.get());
+  if (!team) return std::nullopt;
   return code_identity{role, *team, std::vector<std::uint8_t>(CFDataGetBytePtr(der.get()), CFDataGetBytePtr(der.get()) + length)};
 }
 

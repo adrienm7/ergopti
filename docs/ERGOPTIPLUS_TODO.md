@@ -4028,6 +4028,21 @@ controls report phase_failed without a qualified private cause. Owned-four
 compilation remains unexecuted. The corrected observer25 requires hosted
 requalification; no WP or TODO is complete from these diagnostics.
 
+Owned AUTH signing metadata now distinguishes an absent Apple TeamIdentifier
+from an invalid present value. An absent team is known-empty only after all
+original strict code-validity, non-ad-hoc, role and nonempty DER checks; peers
+still require the same exact certificate leaf and team. Empty, mistyped, NUL
+or malformed present teams refuse. The fixed factory retains32 dependencies,
+with30 unchanged; only reviewed header/transport hashes and their exact builder
+and observer pins cascade. Twelve independent actual-CF metadata cases are
+registered after genuine four-product compilation and admission, within the
+original SDK30/35/10; eight actual signed-peer scenarios remain unexecuted.
+The caller executes captured verified builder bytes and preserves existing
+retirement/source/product fences. Seven frozen software controls run through
+ordinary Python and Swift discovery. Source review and portable qualification
+are complete; actual CF, signing, native AUTH and owned-product qualification
+remain required. This prerequisite enables no runtime and completes no WP.
+
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
   listed; see `docs/memory/text-input-and-config.md`. Still open everywhere:
