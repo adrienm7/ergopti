@@ -4460,6 +4460,22 @@ them. Installed-driver restart and actual menu persistence remain acceptance.
 
 Legacy label candidates coalesce only exact non-semantic aliases. Tap, hold and chord reconstruction accepts only one equivalent class; ambiguous references in selected or inactive historical blocks preserve every source byte and perform no publication. Dense catalogue, unique IDs, key/combo labels, immutable release graph proof, private signatures, managed tags and conditional publication retain their assertions. A descriptive marker-free personal chord remains personal. This fixes the independently reproduced canonical-catalogue obstruction; it does not diagnose an unavailable user's backed-up historical configuration or qualify real Karabiner input.
 
+Six independent, handwritten cleanup cases now exercise the production removal
+method over actual disposable file bytes: selected and inactive signatures,
+repeat without another backup, stale destination after a verified backup,
+create-only backup collision, altered backup readback and malformed input. The
+normally discovered Lua tests use explicit filesystem/JSON SDK fixtures; native
+Hammerspoon acceptance is a separate Swift test and remains UNEXECUTED here.
+Its controller fences the actual configuration.json read by Hammerspoon before
+acquisition, during receipt reads, after genuine child retirement and after
+qualification persistence. Independent mutation controls fail before that
+configuration fence and pass afterwards; original assertions, handwritten
+expectations and SDK30/35/10/controller25 budgets are unchanged. Full local
+repository validation and actual signed-runtime acquisition, native JSON/files,
+process retirement and elapsed-time acceptance remain distinct requirements.
+This does not recover the unavailable 25-rule backup, diagnose that exact report,
+qualify confirmation UI or complete TODO43.
+
 - [~] **44.** CapsWord is no longer cancelled by the pointer when Karabiner
   activated it (AltGr + CapsLock): the watcher probed the variable with
   `karabiner_cli --get-variable`, an option karabiner_cli has never had (exit

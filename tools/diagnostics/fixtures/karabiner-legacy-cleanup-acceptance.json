@@ -1,0 +1,36 @@
+{
+	"schema": 1,
+	"original": "{\n  \"global\":{\"show_in_menu_bar\":false,\"future\":17},\n  \"profiles\":[\n    {\"name\":\"Authored Work\",\"selected\":false,\"complex_modifications\":{\"parameters\":{\"personal\":777},\"rules\":[\n      { \"description\":\"Personal CapsWord note\", \"manipulators\":[{\"type\":\"basic\",\"from\":{\"key_code\":\"f18\"},\"to\":[{\"key_code\":\"f19\"}]}], \"foreign_number\":1e+02, \"foreign_text\":\"caf\\u00e9\" },\n      {\"description\":\"Authored historical left-command signature\",\"manipulators\":[{\"type\":\"basic\",\"from\":{\"key_code\":\"a\"},\"conditions\":[{\"type\":\"variable_if\",\"name\":\"ke_held_left_command\",\"value\":1}],\"to\":[{\"key_code\":\"a\"}]}]}\n    ]}},\n    {\"name\":\"Authored Default\",\"selected\":true,\"complex_modifications\":{\"parameters\":{\"basic.to_if_alone_timeout_milliseconds\":777},\"rules\":[\n      {\"description\":\"Authored historical right-option signature\",\"manipulators\":[{\"type\":\"basic\",\"from\":{\"key_code\":\"b\"},\"conditions\":[{\"type\":\"variable_if\",\"name\":\"ke_held_right_option\",\"value\":1}],\"to\":[{\"key_code\":\"b\"}]}]},\n      {\"description\":\"[ErgoptiPlus managed:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:normal] retained older generation\",\"manipulators\":[{\"type\":\"basic\",\"from\":{\"key_code\":\"f20\"},\"to\":[{\"key_code\":\"f20\"}]}]},\n      {\"description\":\"Personal after\",\"manipulators\":[{\"type\":\"basic\",\"from\":{\"key_code\":\"f16\"},\"to\":[{\"key_code\":\"f17\"}]}],\"custom\":[false,null,\"\\\\ke_held_not_a_variable\"]}\n    ]}}\n  ],\n  \"future_root\":{\"n\":-0.0,\"text\":\"not the missing user's configuration\"}\n}\n",
+	"expected_retained": "{\n  \"global\":{\"show_in_menu_bar\":false,\"future\":17},\n  \"profiles\":[\n    {\"name\":\"Authored Work\",\"selected\":false,\"complex_modifications\":{\"parameters\":{\"personal\":777},\"rules\":[\n      { \"description\":\"Personal CapsWord note\", \"manipulators\":[{\"type\":\"basic\",\"from\":{\"key_code\":\"f18\"},\"to\":[{\"key_code\":\"f19\"}]}], \"foreign_number\":1e+02, \"foreign_text\":\"caf\\u00e9\" }\n    ]}},\n    {\"name\":\"Authored Default\",\"selected\":true,\"complex_modifications\":{\"parameters\":{\"basic.to_if_alone_timeout_milliseconds\":777},\"rules\":[\n      {\"description\":\"[ErgoptiPlus managed:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:normal] retained older generation\",\"manipulators\":[{\"type\":\"basic\",\"from\":{\"key_code\":\"f20\"},\"to\":[{\"key_code\":\"f20\"}]}]},\n      {\"description\":\"Personal after\",\"manipulators\":[{\"type\":\"basic\",\"from\":{\"key_code\":\"f16\"},\"to\":[{\"key_code\":\"f17\"}]}],\"custom\":[false,null,\"\\\\ke_held_not_a_variable\"]}\n    ]}}\n  ],\n  \"future_root\":{\"n\":-0.0,\"text\":\"not the missing user's configuration\"}\n}\n",
+	"foreign_rules": {
+		"personal_before": "{ \"description\":\"Personal CapsWord note\", \"manipulators\":[{\"type\":\"basic\",\"from\":{\"key_code\":\"f18\"},\"to\":[{\"key_code\":\"f19\"}]}], \"foreign_number\":1e+02, \"foreign_text\":\"caf\\u00e9\" }",
+		"personal_after": "{\"description\":\"Personal after\",\"manipulators\":[{\"type\":\"basic\",\"from\":{\"key_code\":\"f16\"},\"to\":[{\"key_code\":\"f17\"}]}],\"custom\":[false,null,\"\\\\ke_held_not_a_variable\"]}",
+		"managed_retained": "{\"description\":\"[ErgoptiPlus managed:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:normal] retained older generation\",\"manipulators\":[{\"type\":\"basic\",\"from\":{\"key_code\":\"f20\"},\"to\":[{\"key_code\":\"f20\"}]}]}"
+	},
+	"foreign_edit": "{\"foreign_edit\":\"after-backup\",\"profiles\":[]}\n",
+	"invalid_original": "{\"profiles\":\n",
+	"backup_collision": "FOREIGN BACKUP BYTES\n",
+	"backup_altered": "INDEPENDENT ALTERED BACKUP\n",
+	"case_ids": [
+		"remove_two_signature_conflicts",
+		"unchanged_second_request",
+		"stale_destination_after_verified_backup",
+		"existing_backup_name",
+		"backup_readback_changed",
+		"invalid_original_refuses"
+	],
+	"expected_conflicts": [
+		{
+			"profile_index": 1,
+			"rule_index": 2,
+			"description": "Authored historical left-command signature",
+			"reasons": ["uses a ke_held_* variable"]
+		},
+		{
+			"profile_index": 2,
+			"rule_index": 1,
+			"description": "Authored historical right-option signature",
+			"reasons": ["uses a ke_held_* variable"]
+		}
+	]
+}

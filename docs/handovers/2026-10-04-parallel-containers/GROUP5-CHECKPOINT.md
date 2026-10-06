@@ -307,6 +307,22 @@ TODO13/35 closure reuses inspected native receipts:
 - TODO43: the maintainer no longer has the original backed-up `karabiner.json`
   behind the 25-ambiguous-rules report. Do not claim that exact configuration was
   diagnosed. Preserve cleanup confirmation, backup and ambiguity refusal.
+  Six independent, handwritten cleanup cases now exercise the production removal
+  method over actual disposable file bytes: selected and inactive signatures,
+  repeat without another backup, stale destination after a verified backup,
+  create-only backup collision, altered backup readback and malformed input. The
+  normally discovered Lua tests use explicit filesystem/JSON SDK fixtures; native
+  Hammerspoon acceptance is a separate Swift test and remains UNEXECUTED here.
+  Its controller fences the actual configuration.json read by Hammerspoon before
+  acquisition, during receipt reads, after genuine child retirement and after
+  qualification persistence. Independent mutation controls fail before that
+  configuration fence and pass afterwards; original assertions, handwritten
+  expectations and SDK30/35/10/controller25 budgets are unchanged. Full local
+  repository validation and actual signed-runtime acquisition, native JSON/files,
+  process retirement and elapsed-time acceptance remain distinct requirements.
+  This does not recover the unavailable 25-rule backup, diagnose that exact report,
+  qualify confirmation UI or complete TODO43.
+
 - TODO44: physical pointer cancellation of Karabiner-activated CapsWord remains
   unqualified. Existing sentinel implementation must not be redone without
   evidence of regression.
