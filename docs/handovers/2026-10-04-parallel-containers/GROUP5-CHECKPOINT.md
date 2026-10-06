@@ -1321,3 +1321,22 @@ unsupported; no private error, URL, payload or native-stage claim is published.
 The original17 portable cases and16 new diagnostic controls pass normally and
 with inherited optimization. Nine Swift summary controls and actual WebKit/UI
 acceptance require native CI. This diagnostic does not complete item24.
+
+The complete Swift observation step now has a fixed25-minute outer window:
+genuine fresh baseline/owned work exceeded408 seconds, followed by source
+controls and an interrupted stock calibration under the old ten-minute window.
+Every300/305/10 native and30/35/10 SDK limit, full-suite command, reporter and
+assertion remains unchanged. Additive pipeline controls reject short/missing
+budgets and filtered commands. This permits each bounded worker's verdict;
+it neither repairs its failure nor qualifies an unexecuted case.
+A separate opt-in transport observation keeps the original seven-field receipt
+and25 controls exact. Only retired, source-current canonical metadata supplies
+closed kind/HTTP/verification/errno fields; authority remains false and the
+native verdict unchanged. The real central compilation helper observes only
+after successful child retirement/admission, with the same returned receipt.
+The owned helper also prints only the existing closed refusal parser code after
+real child retirement, then returns the original receipt. No raw error or new
+parser is introduced. The current native compilation cause stays unknown.
+OwnedRuntime and the frozen CF7 corpus stay whole. CF7/25/24 pass normally and
+with inherited optimization. Actual Swift metadata controls, CF12, signed-peer
+scenarios, owned products and full-suite native completion remain unqualified.

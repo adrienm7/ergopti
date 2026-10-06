@@ -231,6 +231,56 @@ check(
 check(!buildLine.includes('|| true'), 'the Swift build step must not swallow compilation failure');
 
 const testStep = pipeline.step(swiftJob, 'Run Swift launcher tests');
+
+// The aggregate window contains several independently bounded native workers.
+// It must outlive their complete sequence without changing any worker deadline.
+const SWIFT_OBSERVATION_BUDGET_MESSAGE =
+	'(swift-aggregate-observation) the complete Swift suite requires the fixed finite 25-minute step window';
+const SWIFT_UNFILTERED_MESSAGE =
+	'(swift-aggregate-observation) the Swift command must execute the complete unfiltered test target';
+const SWIFT_UNFILTERED_COMMAND = `script -q /dev/null swift test --package-path static/ergopti_plus/macos/launcher ${SWIFT_SCRATCH} 2>&1 | tee "$xctest_log"`;
+function swiftObservationBoundaryFailures(step) {
+	const boundaryFailures = [];
+	if (pipeline.stepField(step, 'timeout-minutes') !== '25')
+		boundaryFailures.push(SWIFT_OBSERVATION_BUDGET_MESSAGE);
+	const commands = (pipeline.runOf(step) ?? []).filter((line) => /\bswift test\b/.test(line));
+	if (commands.length !== 1 || commands[0] !== SWIFT_UNFILTERED_COMMAND)
+		boundaryFailures.push(SWIFT_UNFILTERED_MESSAGE);
+	return boundaryFailures;
+}
+for (const failure of swiftObservationBoundaryFailures(testStep)) check(false, failure);
+
+// Exercise the same rule on mutations of the actual step, preserving the
+// independent literal deadline and complete-suite command above as the oracle.
+const qualifiedSwiftObservationStep = testStep.replace(
+	/^ {8}timeout-minutes:.*$/m,
+	'        timeout-minutes: 25'
+);
+check(
+	swiftObservationBoundaryFailures(qualifiedSwiftObservationStep).length === 0,
+	'(swift-aggregate-observation) the positive observation fixture must qualify before mutations'
+);
+const swiftObservationMutants = [
+	...['10', null, '0', '-1', 'Infinity', '.inf', 'NaN', '${{ inputs.timeout }}'].map((value) => ({
+		name: value === null ? 'omitted budget' : `budget ${value}`,
+		step: qualifiedSwiftObservationStep.replace(
+			/^ {8}timeout-minutes:.*$/m,
+			value === null ? '' : `        timeout-minutes: ${value}`
+		),
+		expected: SWIFT_OBSERVATION_BUDGET_MESSAGE
+	})),
+	...['--skip NoTests', '--filter HS274'].map((selector) => ({
+		name: selector,
+		step: qualifiedSwiftObservationStep.replace('swift test ', `swift test ${selector} `),
+		expected: SWIFT_UNFILTERED_MESSAGE
+	}))
+];
+for (const mutant of swiftObservationMutants) {
+	check(
+		swiftObservationBoundaryFailures(mutant.step).includes(mutant.expected),
+		`(swift-aggregate-observation) the boundary rule missed ${mutant.name}`
+	);
+}
 check(
 	testStep.length > 100,
 	'`Run Swift launcher tests` is absent or too small to enforce a trustworthy XCTest verdict'

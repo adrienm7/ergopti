@@ -271,7 +271,16 @@ final class HS274NativePolicyQualificationTests: XCTestCase {
 			repository: Self.repository, root: root, budget: .sourceCalibration)
 		children.append(child)
 		try child.start()
-		return try child.finish()
+		let receipt = try child.finish()
+		if receipt.status != 0, arguments.count >= 2,
+			arguments[0] == source("hs274_native_build.py").deletingLastPathComponent().path {
+			let owner = URL(fileURLWithPath: arguments[1])
+			if owner.path == arguments[1], owner.resolvingSymlinksInPath() == owner,
+				owner == root || owner == root.appendingPathComponent("baseline") {
+				printRetiredBaselineTransport(owner: owner, status: receipt.status, root: root)
+			}
+		}
+		return receipt
 	}
 
 	/// Only the fixed owned consumer uses this second independent calibration.
@@ -284,7 +293,12 @@ final class HS274NativePolicyQualificationTests: XCTestCase {
 			repository: Self.repository, root: root, budget: .sourceCalibration)
 		children.append(child)
 		try child.start()
-		return try child.finish()
+		let receipt = try child.finish()
+		if receipt.status != 0 {
+			print("Retired owned compilation refusal code: "
+				+ HS274RetiredBuildRefusal.code(receipt.stderr, producer: .owned))
+		}
+		return receipt
 	}
 
 	/// CI already archives this parent. Admit its canonical ordinary owner before

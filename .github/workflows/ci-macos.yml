@@ -367,7 +367,7 @@ jobs:
               echo "::error::the XCTest process ended without its successful suite summary"
               exit 1
           fi
-        timeout-minutes: 10
+        timeout-minutes: 25
 
       - name: Retain native legacy-cleanup receipt
         if: always() && (steps.swift-launcher-tests.outcome == 'success' || steps.swift-launcher-tests.outcome == 'failure')

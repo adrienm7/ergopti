@@ -268,6 +268,35 @@ def packet(status, rows=(), last=None):
     }
 
 
+def transport_packet(evidence=None):
+    """A sibling schema reflects only the already closed transport evidence."""
+    value = {
+        "schema": 1,
+        "kind": "xcodegen_transport_observation",
+        "status": "unsupported",
+        "native_verdict": "unchanged",
+        "authority": False,
+        "acquisition_stage": None,
+        "transport_kind": None,
+        "http_status": None,
+        "verify_code": None,
+        "errno": None,
+    }
+    if evidence is not None:
+        stage, diagnostic = evidence
+        require(stage in {"metadata", "archive"})
+        transport(diagnostic)
+        value.update(
+            status="observed",
+            acquisition_stage=stage,
+            transport_kind=diagnostic["kind"],
+            http_status=diagnostic.get("http_status"),
+            verify_code=diagnostic.get("verify_code"),
+            errno=diagnostic.get("errno"),
+        )
+    return value
+
+
 def render(value):
     body = (
         json.dumps(value, ensure_ascii=True, allow_nan=False, separators=(",", ":"), sort_keys=True)
@@ -277,8 +306,9 @@ def render(value):
     return body
 
 
-def observe(owner):
+def observe(owner, *, transport_only=False):
     """Sample closed metadata only; the caller owns the genuine retirement gate."""
+    require(type(transport_only) is bool)
     builder = load_builder()
     try:
         owner = Path(owner)
@@ -291,6 +321,7 @@ def observe(owner):
             require(identity(os.fstat(directory)) == identity(before))
             rows, retained, last = [], [], None
             stopped = False
+            evidence = None
             for phase in builder.BASELINE_PHASES:
                 begin = leaf(directory, phase + ".begin.json", False, retained)
                 receipt = leaf(directory, phase + ".receipt.json", False, retained)
@@ -312,6 +343,16 @@ def observe(owner):
                     if receipt is not None:
                         status = frame(receipt, phase)
                         if (
+                            transport_only
+                            and phase == "xcodegen_acquisition"
+                            and status == "refused"
+                            and "transport_diagnostic" in receipt
+                        ):
+                            evidence = (
+                                receipt["acquisition_stage"],
+                                receipt["transport_diagnostic"],
+                            )
+                        if (
                             status in {"passed", "failed", "refused"}
                             and phase != "xcodegen_acquisition"
                         ):
@@ -327,6 +368,8 @@ def observe(owner):
             require(identity(os.fstat(directory)) == identity(before) == identity(owner.lstat()))
             require(owner.resolve(strict=True) == owner)
             builder.current()
+            if transport_only:
+                return transport_packet(evidence)
             return packet("observed", rows, last)
         finally:
             os.close(directory)
@@ -335,7 +378,7 @@ def observe(owner):
         builder.close()
 
 
-def retired_failure(original_status, retired, read):
+def retired_failure(original_status, retired, read, *, unsupported=None):
     """A passive observation cannot replace the caller's original native status."""
     require(type(original_status) is int and type(retired) is bool)
     if original_status == 0 or not retired:
@@ -343,20 +386,26 @@ def retired_failure(original_status, retired, read):
     try:
         summary = render(read())
     except Exception:
-        summary = render(packet("unsupported"))
+        summary = render(packet("unsupported") if unsupported is None else unsupported())
     return original_status, summary
 
 
 def main(arguments=None):
     arguments = sys.argv[1:] if arguments is None else arguments
+    transport_only = len(arguments) == 3 and arguments[2] == "--transport"
     try:
-        require(len(arguments) == 2)
+        require(len(arguments) == (3 if transport_only else 2))
         original = int(arguments[1])
         require(str(original) == arguments[1] and -(2**31) <= original <= 2**31 - 1)
-        unchanged, result = retired_failure(original, True, lambda: observe(arguments[0]))
+        unchanged, result = retired_failure(
+            original,
+            True,
+            lambda: observe(arguments[0], transport_only=transport_only),
+            unsupported=transport_packet if transport_only else None,
+        )
         require(unchanged == original and result is not None)
     except Exception:
-        result = render(packet("unsupported"))
+        result = render(transport_packet() if transport_only else packet("unsupported"))
     sys.stdout.write(result)
     return 0
 
