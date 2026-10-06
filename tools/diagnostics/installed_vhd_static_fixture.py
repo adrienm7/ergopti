@@ -7,6 +7,7 @@ driver. Actual native grammar must be acquired and reviewed before admission.
 """
 
 import argparse
+import base64
 import contextlib
 import hashlib
 import json
@@ -151,10 +152,15 @@ def package_url(version):
     )
 
 
-def observe(parent, packages=None):
+def observe(parent, packages=None, *, log_public_pkgutil=False):
     """Return genuine retired-child raw evidence; package trust stays UNKNOWN."""
     require(sys.platform == "darwin", "Raw native package acquisition requires macOS")
     require(os.geteuid() != 0, "Raw package acquisition requires an ordinary caller")
+    require(type(log_public_pkgutil) is bool, "Public transcript opt-in must be boolean")
+    require(
+        not log_public_pkgutil or packages is None,
+        "Public transcript requires fixed official acquisition",
+    )
     deadline = time.monotonic() + SUCCESS_SECONDS
     started = deadline - SUCCESS_SECONDS
     policy = load_policy(deadline)
@@ -189,11 +195,22 @@ def observe(parent, packages=None):
             tool_paths,
             images,
             directories,
+            log_public_pkgutil,
         )
 
 
 def collect_owned(
-    parent, packages, deadline, started, policy, paths, captured, tool_paths, images, directories
+    parent,
+    packages,
+    deadline,
+    started,
+    policy,
+    paths,
+    captured,
+    tool_paths,
+    images,
+    directories,
+    log_public_pkgutil=False,
 ):
     """Keep exact ordinary evidence directories retained through native closure."""
 
@@ -462,6 +479,8 @@ def collect_owned(
             "native_commands_failed": sum(child["exit_status"] != 0 for child in children),
             "elapsed_seconds": elapsed,
         }
+        if log_public_pkgutil:
+            record["public_pkgutil_streams"] = public_pkgutil_streams(record, streams, root)
         data = (json.dumps(record, allow_nan=False, sort_keys=True) + "\n").encode()
         require(0 < len(data) <= MAX_PACKET, "Raw summary size refused")
         path = root / "raw-observations.json"
@@ -479,24 +498,123 @@ def collect_owned(
             signal.signal(signum, handler)
 
 
+def public_pkgutil_streams(record, streams, root):
+    """Encode only completed fixed public tool streams, without opening a path."""
+    operations = ["pkgutil-help"] + ["pkgutil-signature-" + version for version in PACKAGES]
+    children = record["children"][-len(operations) :]
+    require(
+        [child["operation"] for child in children] == operations
+        and all(child["closed"] is True for child in children)
+        and record["trust"] == "unknown"
+        and record["authority"] is False
+        and record["reference_qualified"] is False,
+        "Public fixed observations refused",
+    )
+    observations = []
+    for operation, child in zip(operations, children):
+        channels = []
+        for channel in ("stdout", "stderr"):
+            name = operation + "." + channel
+            body = streams[root / name][0]
+            digest = hashlib.sha256(body).hexdigest()
+            channels.append(
+                {
+                    "channel": channel,
+                    "bytes": len(body),
+                    "sha256": digest,
+                    "base64": base64.b64encode(body).decode("ascii"),
+                }
+            )
+        require(
+            child["streams"]
+            == [
+                {
+                    "file": operation + "." + channel["channel"],
+                    "bytes": channel["bytes"],
+                    "sha256": channel["sha256"],
+                }
+                for channel in channels
+            ],
+            "Public completed stream metadata changed",
+        )
+        observations.append(
+            {"operation": operation, "exit_status": child["exit_status"], "streams": channels}
+        )
+    return {
+        "schema": 1,
+        "kind": "installed_vhd_public_pkgutil_streams",
+        "trust": "unknown",
+        "authority": False,
+        "reference_qualified": False,
+        "source_hashes": record["source_hashes"],
+        "image_hashes": record["image_hashes"],
+        "packages": record["packages"],
+        "operations": observations,
+    }
+
+
+def public_pkgutil_log(record):
+    """Frame a bounded exact envelope so raw tool text cannot control CI logs."""
+    body = json.dumps(
+        record["public_pkgutil_streams"],
+        allow_nan=False,
+        sort_keys=True,
+        ensure_ascii=True,
+        separators=(",", ":"),
+    ).encode("ascii")
+    require(0 < len(body) <= MAX_PACKET, "Public transcript size refused")
+    chunks = [body[index : index + 3072] for index in range(0, len(body), 3072)]
+    digest = hashlib.sha256(body).hexdigest()
+    lines = [
+        json.dumps(
+            {
+                "kind": "installed_vhd_public_pkgutil_chunk",
+                "schema": 1,
+                "index": index,
+                "count": len(chunks),
+                "bytes": len(body),
+                "sha256": digest,
+                "base64": base64.b64encode(chunk).decode("ascii"),
+            },
+            sort_keys=True,
+        )
+        + "\n"
+        for index, chunk in enumerate(chunks, 1)
+    ]
+    result = "".join(lines)
+    require(len(result.encode("ascii")) <= MAX_PACKET, "Public framed transcript size refused")
+    return result
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("parent", type=Path)
     parser.add_argument("--packages", type=Path)
+    parser.add_argument("--log-public-pkgutil", action="store_true")
     options = parser.parse_args()
     try:
-        evidence, packet = observe(options.parent, options.packages)
+        if options.log_public_pkgutil:
+            evidence, packet = observe(options.parent, options.packages, log_public_pkgutil=True)
+            public_log = public_pkgutil_log(packet)
+        else:
+            evidence, packet = observe(options.parent, options.packages)
+            public_log = ""
+        output = (
+            json.dumps(
+                {
+                    "trust": "unknown",
+                    "authority": False,
+                    "diagnostic_root": str(evidence),
+                    "native_commands_failed": packet["native_commands_failed"],
+                },
+                sort_keys=True,
+            )
+            + "\n"
+            + public_log
+        )
+        if options.log_public_pkgutil:
+            require(len(output.encode("utf-8")) <= MAX_PACKET, "Public CLI transcript size refused")
     except (ValueError, OSError, RuntimeError, subprocess.SubprocessError):
         print("Raw VHD package acquisition refused; evidence retained", file=sys.stderr)
         raise SystemExit(1) from None
-    print(
-        json.dumps(
-            {
-                "trust": "unknown",
-                "authority": False,
-                "diagnostic_root": str(evidence),
-                "native_commands_failed": packet["native_commands_failed"],
-            },
-            sort_keys=True,
-        )
-    )
+    print(output, end="")

@@ -2,6 +2,7 @@
 """Portable raw collector controls; native pkgutil/curl/process endpoints are modeled."""
 
 import ast
+import base64
 import contextlib
 import hashlib
 import io
@@ -501,6 +502,276 @@ class RawAcquisitionControls(unittest.TestCase):
             self.execute()
         self.assertTrue(self.groups[-1].reaped)
         self.assertFalse(any(self.root.rglob("raw-observations.json")))
+
+    def execute_public(self, *, download=True, status=0, errors=b"\x00\xffstderr\r\n"):
+        acquired = self.acquired
+
+        def public_acquired(arguments, native, register, **options):
+            downloading = "--output" in arguments
+            self.status = 0 if downloading else status
+            group = acquired(arguments, native, register, **options)
+            waited = group.wait_for_exit
+
+            def wait(timeout):
+                waited(timeout)
+                if downloading:
+                    options["stdout"].seek(0)
+                    options["stdout"].truncate()
+                    options["stdout"].write(b"PRIVATE_DOWNLOAD_STDOUT_SENTINEL")
+                    options["stderr"].write(b"PRIVATE_DOWNLOAD_STDERR_SENTINEL")
+                else:
+                    options["stderr"].write(errors)
+                options["stdout"].flush()
+                options["stderr"].flush()
+
+            group.wait_for_exit = wait
+            return group
+
+        with (
+            mock.patch.object(subject, "ROOT", self.inputs),
+            mock.patch.object(subject, "PACKAGES", MODEL_PINS),
+            mock.patch.object(
+                subject, "TOOLS", {"curl": Path("/usr/bin/true"), "pkgutil": Path("/usr/bin/true")}
+            ),
+            mock.patch.object(subject.sys, "platform", "darwin"),
+            mock.patch.object(subject.time, "monotonic", side_effect=lambda: self.clock[0]),
+            mock.patch.object(subject, "load_policy", side_effect=self.loaded_policy),
+            mock.patch.object(self, "acquired", side_effect=public_acquired),
+        ):
+            return subject.observe(
+                self.root, None if download else self.artifacts, log_public_pkgutil=True
+            )
+
+    def run_public_cli(self, *, packet=None, error=None, opted=True):
+        main = ast.parse(Path(subject.__file__).read_bytes()).body[-1]
+        namespace = dict(subject.__dict__)
+        observer = (
+            mock.Mock(side_effect=error) if error else mock.Mock(return_value=(self.root, packet))
+        )
+        namespace.update(__name__="__main__", observe=observer)
+        output, errors = io.StringIO(), io.StringIO()
+        arguments = [subject.__file__, "/owned"]
+        if opted:
+            arguments.append("--log-public-pkgutil")
+        with (
+            mock.patch.object(subject.sys, "argv", arguments),
+            contextlib.redirect_stdout(output),
+            contextlib.redirect_stderr(errors),
+        ):
+            try:
+                exec(
+                    compile(ast.Module(body=[main], type_ignores=[]), subject.__file__, "exec"),
+                    namespace,
+                )
+            except SystemExit as caught:
+                return caught.code, output.getvalue(), errors.getvalue(), observer
+        return 0, output.getvalue(), errors.getvalue(), observer
+
+    def test_public_default_cli_and_api_preserve_original_summary(self):
+        _, packet = self.execute()
+        self.assertNotIn("public_pkgutil_streams", packet)
+        status, output, errors, observer = self.run_public_cli(packet=packet, opted=False)
+        self.assertEqual(status, 0)
+        self.assertEqual(errors, "")
+        self.assertEqual(
+            output,
+            json.dumps(
+                {
+                    "trust": "unknown",
+                    "authority": False,
+                    "diagnostic_root": str(self.root),
+                    "native_commands_failed": 0,
+                },
+                sort_keys=True,
+            )
+            + "\n",
+        )
+        observer.assert_called_once_with(Path("/owned"), None)
+
+    def test_public_exact_binary_eight_streams_and_no_download_or_private_paths(self):
+        binary = b"\x00\xff\r\n::error::NATIVE_ENDPOINT_MODEL\x80"
+        self.output = binary
+        root, packet = self.execute_public()
+        envelope = packet["public_pkgutil_streams"]
+        self.assertEqual(len(self.calls), 7)
+        self.assertEqual(envelope["trust"], "unknown")
+        self.assertIs(envelope["authority"], False)
+        self.assertIs(envelope["reference_qualified"], False)
+        self.assertEqual(envelope["source_hashes"], packet["source_hashes"])
+        self.assertEqual(envelope["image_hashes"], packet["image_hashes"])
+        self.assertEqual(envelope["packages"], packet["packages"])
+        self.assertEqual(
+            [entry["operation"] for entry in envelope["operations"]],
+            [
+                "pkgutil-help",
+                "pkgutil-signature-8.4.0",
+                "pkgutil-signature-8.5.0",
+                "pkgutil-signature-8.6.0",
+            ],
+        )
+        for entry in envelope["operations"]:
+            self.assertEqual(entry["exit_status"], 0)
+            self.assertEqual(
+                [stream["channel"] for stream in entry["streams"]], ["stdout", "stderr"]
+            )
+            for stream, expected in zip(entry["streams"], [binary, b"\x00\xffstderr\r\n"]):
+                decoded = base64.b64decode(stream["base64"], validate=True)
+                self.assertEqual(decoded, expected)
+                self.assertEqual(stream["bytes"], len(expected))
+                self.assertEqual(stream["sha256"], hashlib.sha256(expected).hexdigest())
+                self.assertNotIn(b"PRIVATE_DOWNLOAD", decoded)
+        self.assertNotIn(str(root), json.dumps(envelope))
+        self.assertNotIn("diagnostic_root", envelope)
+        self.assertEqual(json.loads((root / "raw-observations.json").read_text()), packet)
+        self.assertTrue(all(group.reaped for group in self.groups))
+
+    def test_public_framed_cli_multiline_exact_reconstruction_and_complete_bound(self):
+        self.output = b"\x00\xff::error::MODEL\r\n" * 400
+        _, packet = self.execute_public()
+        status, output, errors, observer = self.run_public_cli(packet=packet)
+        self.assertEqual(status, 0)
+        self.assertEqual(errors, "")
+        observer.assert_called_once_with(Path("/owned"), None, log_public_pkgutil=True)
+        lines = output.splitlines()
+        self.assertEqual(json.loads(lines[0])["authority"], False)
+        self.assertLessEqual(len(output.encode()), 131072)
+        frames = [json.loads(line) for line in lines[1:]]
+        self.assertGreater(len(frames), 1)
+        self.assertEqual([frame["index"] for frame in frames], list(range(1, len(frames) + 1)))
+        for frame in frames:
+            self.assertEqual(frame["kind"], "installed_vhd_public_pkgutil_chunk")
+            self.assertEqual(frame["schema"], 1)
+            self.assertEqual(frame["count"], len(frames))
+            self.assertLessEqual(len(frame["base64"]), 4096)
+        self.assertTrue(all(len(line) < 4500 for line in lines[1:]))
+        decoded = b"".join(base64.b64decode(frame["base64"], validate=True) for frame in frames)
+        self.assertTrue(all(frame["bytes"] == len(decoded) for frame in frames))
+        self.assertTrue(
+            all(frame["sha256"] == hashlib.sha256(decoded).hexdigest() for frame in frames)
+        )
+        self.assertEqual(json.loads(decoded), packet["public_pkgutil_streams"])
+        self.assertNotIn("::error::", output)
+        self.assertNotIn("PRIVATE_DOWNLOAD", output)
+
+    def test_public_nonzero_status_and_empty_stderr_remain_unknown_observations(self):
+        _, packet = self.execute_public(status=7, errors=b"")
+        self.assertEqual(packet["native_commands_failed"], 4)
+        for entry in packet["public_pkgutil_streams"]["operations"]:
+            self.assertEqual(entry["exit_status"], 7)
+            stream = entry["streams"][1]
+            self.assertEqual(stream["channel"], "stderr")
+            self.assertEqual(stream["bytes"], 0)
+            self.assertEqual(stream["base64"], "")
+            self.assertEqual(
+                stream["sha256"], "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            )
+        self.assertIs(packet["reference_qualified"], False)
+        self.assertIs(packet["authority"], False)
+        self.assertEqual(packet["trust"], "unknown")
+
+    def test_public_provided_package_argument_refuses_before_native_acquisition(self):
+        with self.assertRaises(ValueError):
+            self.execute_public(download=False)
+        self.assertEqual(self.calls, [])
+        self.assertFalse(any(self.root.glob("vhd-raw-*")))
+
+    def test_public_record_overbudget_refuses_after_retirement_without_summary(self):
+        self.output = b"x" * 60000
+        with self.assertRaises(ValueError):
+            self.execute_public()
+        self.assertEqual(len(self.calls), 7)
+        self.assertTrue(all(group.reaped for group in self.groups))
+        self.assertFalse(any(self.root.rglob("raw-observations.json")))
+        self.assertEqual(subject.RAW_BYTES, 131072)
+        self.assertEqual(subject.MAX_PACKET, 131072)
+
+    def test_public_framed_budget_includes_encoding_and_never_truncates(self):
+        within = {"public_pkgutil_streams": {"sample": "x" * 64000}}
+        raw_log = subject.public_pkgutil_log(within)
+        self.assertLessEqual(len(raw_log.encode()), 131072)
+        frames = [json.loads(line) for line in raw_log.splitlines()]
+        decoded = b"".join(base64.b64decode(frame["base64"], validate=True) for frame in frames)
+        self.assertEqual(json.loads(decoded), within["public_pkgutil_streams"])
+        # This raw JSON fits MAX_PACKET, but its exact framed representation does not.
+        oversized = {"public_pkgutil_streams": {"sample": "x" * 98000}}
+        self.assertLess(len(json.dumps(oversized["public_pkgutil_streams"]).encode()), 131072)
+        with self.assertRaises(ValueError):
+            subject.public_pkgutil_log(oversized)
+        status, output, errors, _ = self.run_public_cli(packet=oversized)
+        self.assertEqual(status, 1)
+        self.assertEqual(output, "")
+        self.assertEqual(errors, "Raw VHD package acquisition refused; evidence retained\n")
+
+    def test_public_private_cli_exception_retains_exact_closed_refusal(self):
+        status, output, errors, _ = self.run_public_cli(
+            error=subprocess.TimeoutExpired("PRIVATE_EXCEPTION_PAYLOAD", 25)
+        )
+        self.assertEqual(status, 1)
+        self.assertEqual(output, "")
+        self.assertEqual(errors, "Raw VHD package acquisition refused; evidence retained\n")
+
+    def test_public_cli_budget_includes_original_summary_before_any_emission(self):
+        # Frozen framing arithmetic: 93213 envelope bytes in 31 chunks produce
+        # 130289 log bytes. This opaque framing fixture models no native grammar.
+        packet = {
+            "native_commands_failed": 0,
+            "public_pkgutil_streams": {"sample": "x" * 93200},
+        }
+        self.assertEqual(len(subject.public_pkgutil_log(packet).encode()), 130289)
+        self.root = Path("/owned" + "/p" * 450)
+        status, output, errors, _ = self.run_public_cli(packet=packet)
+        self.assertEqual(status, 1)
+        self.assertEqual(output, "")
+        self.assertEqual(errors, "Raw VHD package acquisition refused; evidence retained\n")
+
+    def test_public_source_currentness_and_retirement_refusals_never_return_envelope(self):
+        for scenario in ("source", "stream", "deadline", "reservation", "debt", "close"):
+            with self.subTest(scenario=scenario):
+                fixture = RawAcquisitionControls()
+                fixture.setUp()
+                actual_close = subject.os.close
+                try:
+
+                    def effect(phase, group, _arguments):
+                        if scenario == "source" and phase == "wait":
+                            with (fixture.inputs / "installed_vhd_static_fixture.py").open(
+                                "ab"
+                            ) as stream:
+                                stream.write(b"\n# changed public source\n")
+                        if (
+                            scenario == "stream"
+                            and phase == "registered"
+                            and len(fixture.calls) == 5
+                        ):
+                            next(fixture.root.rglob("pkgutil-help.stdout")).write_bytes(b"changed")
+                        if scenario == "deadline" and phase == "wait":
+                            fixture.clock[0] = 126.0
+                        if scenario == "reservation" and phase == "settle":
+                            group.reservation_lost = True
+
+                    fixture.effect = effect
+                    fixture.closed = scenario != "debt"
+
+                    def close(descriptor):
+                        directory = bool(os.fstat(descriptor).st_mode & 0o40000)
+                        actual_close(descriptor)
+                        if scenario == "close" and directory:
+                            raise OSError("PRIVATE_DIRECTORY_CLOSE_ERROR")
+
+                    output = io.StringIO()
+                    with (
+                        mock.patch.object(subject.os, "close", side_effect=close),
+                        contextlib.redirect_stdout(output),
+                    ):
+                        with self.assertRaises((ValueError, OSError)):
+                            fixture.execute_public()
+                    self.assertEqual(output.getvalue(), "")
+                    if scenario != "debt":
+                        self.assertTrue(all(group.reaped for group in fixture.groups))
+                    else:
+                        self.assertFalse(fixture.groups[0].reaped)
+                finally:
+                    fixture.doCleanups()
 
 
 if __name__ == "__main__":

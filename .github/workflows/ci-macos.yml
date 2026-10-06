@@ -307,7 +307,7 @@ jobs:
           git rev-parse HEAD > "$evidence_parent/tested-sha.txt"
           python3 -B -m unittest discover -s tools/diagnostics -p installed_vhd_static_fixture_test.py
           python3 -O -B -m unittest discover -s tools/diagnostics -p installed_vhd_static_fixture_test.py
-          python3 -B tools/diagnostics/installed_vhd_static_fixture.py "$evidence_parent"
+          python3 -B tools/diagnostics/installed_vhd_static_fixture.py "$evidence_parent" --log-public-pkgutil
         timeout-minutes: 2
 
       - name: Retain read-only VHD raw package evidence

@@ -3874,6 +3874,20 @@ the running network policy despite successful uploads. Protected provisioning,
 WP4-WP10 and physical input remain unfinished. Whole CI fails the separate Brew
 and Sparkle acceptance methods; downstream packaging/install and Release skip.
 
+The read-only collector also supports an explicit public-log opt-in for only
+the eight already-captured fixed pkgutil help/signature streams. Exact bytes,
+lengths and hashes are framed after successful native ownership and directory
+closure; download streams, arbitrary errors and selectors are excluded. The
+unchanged131072-byte limit covers the entire CLI output before any print. Trust
+remains UNKNOWN and authority/reference qualification false. All30 original test
+bodies, policy, guardian, native commands and retirement budgets remain exact;
+40 controls pass in both modes and seven causal mutations are refused in both.
+Independent original30 replays and framing/currentness probes also pass. The
+leased observer enables this flag while retaining previous workflow conditions,
+assertions and mutation operands. Actual native frame reconstruction and package
+grammar require the next exact-SHA macOS run; full artifact receipts, protected
+provisioning and WP4-WP10 remain unqualified. TODO31 stays partial.
+
 The registered Linux physical-hold dashboard harness now loads its actual
 shared selection enum and predicates before the unchanged Typing KPI consumer.
 The original assertion and independent hold/app/text expectations are preserved.

@@ -1133,3 +1133,17 @@ are the separate Brew/Sparkle methods; packaging/install remain skipped. Receipt
 upload succeeds, but actual sibling bytes are not independently downloadable.
 The exact historical25-rule backup, confirmation UI and physical acceptance
 remain unavailable or unqualified; this native correction does not complete43.
+
+The read-only collector also supports an explicit public-log opt-in for only
+the eight already-captured fixed pkgutil help/signature streams. Exact bytes,
+lengths and hashes are framed after successful native ownership and directory
+closure; download streams, arbitrary errors and selectors are excluded. The
+unchanged131072-byte limit covers the entire CLI output before any print. Trust
+remains UNKNOWN and authority/reference qualification false. All30 original test
+bodies, policy, guardian, native commands and retirement budgets remain exact;
+40 controls pass in both modes and seven causal mutations are refused in both.
+Independent original30 replays and framing/currentness probes also pass. The
+leased observer enables this flag while retaining previous workflow conditions,
+assertions and mutation operands. Actual native frame reconstruction and package
+grammar require the next exact-SHA macOS run; full artifact receipts, protected
+provisioning and WP4-WP10 remain unqualified. TODO31 stays partial.

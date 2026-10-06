@@ -201,7 +201,7 @@ const RAW_VHD_OBSERVER_TEXT = [
 	'          git rev-parse HEAD > "$evidence_parent/tested-sha.txt"',
 	'          python3 -B -m unittest discover -s tools/diagnostics -p installed_vhd_static_fixture_test.py',
 	'          python3 -O -B -m unittest discover -s tools/diagnostics -p installed_vhd_static_fixture_test.py',
-	'          python3 -B tools/diagnostics/installed_vhd_static_fixture.py "$evidence_parent"',
+	'          python3 -B tools/diagnostics/installed_vhd_static_fixture.py "$evidence_parent" --log-public-pkgutil',
 	'        timeout-minutes: 2'
 ].join('\n');
 const RAW_VHD_UPLOAD_TEXT = [
@@ -1434,6 +1434,11 @@ function rawVhdProblems(files) {
 }
 errors.push(...rawVhdProblems(pipeline.files()));
 for (const [what, from, to] of [
+	[
+		'missing public transcript opt-in',
+		RAW_VHD_OBSERVER_TEXT,
+		RAW_VHD_OBSERVER_TEXT.replace(' --log-public-pkgutil', '')
+	],
 	['missing observer', RAW_VHD_OBSERVER_TEXT + '\n', ''],
 	['missing retained raw evidence', RAW_VHD_UPLOAD_TEXT + '\n', ''],
 	[
