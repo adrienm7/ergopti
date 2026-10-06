@@ -1655,6 +1655,35 @@ jobs:
           exit $STATUS
         timeout-minutes: 5
 
+      # Standard signed-APT Nix tool, one local store, existing physical phase owner.
+      - name: Qualify genuine Nix installed runtime
+        if: ${{ !cancelled() }}
+        env:
+          ERGOPTI_NIX_EXPECTED_HEAD: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends nix-bin
+          # This dedicated ephemeral runner may not adopt an occupied foreign store.
+          if [ -L /nix ] || [ -L /nix/store ] || [ -L /nix/var ] || [ -L /nix/var/nix ]; then
+            echo "::error::Literal standard Nix store required."
+            exit 1
+          fi
+          if [ -d /nix/store ] && [ -n "$(find /nix/store -mindepth 1 -maxdepth 1 -print -quit)" ]; then
+            echo "::error::Occupied Nix store cannot be adopted."
+            exit 1
+          fi
+          if [ -e /nix/var/nix/db/db.sqlite ]; then
+            echo "::error::Existing Nix database cannot be adopted."
+            exit 1
+          fi
+          runner_uid=$(id -u)
+          runner_gid=$(id -g)
+          sudo install -d -m 0755 -o "$runner_uid" -g "$runner_gid" /nix/store /nix/var/nix
+          umask 077
+          npm run --silent test:linux:nix-native | tee "$RUNNER_TEMP/linux-nix-native.log"
+        timeout-minutes: 35
+
       - name: Record mandatory E2E evidence
         run: |
           set -euo pipefail
@@ -1664,6 +1693,7 @@ jobs:
           window_switch_assertions=$(sed -n 's/^Native window receipts: \([0-9][0-9]*\) passed, 0 failed, 0 skipped$/\1/p' "$RUNNER_TEMP/linux-window-switch.log" | tail -1)
           http_stream_assertions=$(sed -n 's/^PASS native HTTP streaming receipts: \([0-9][0-9]*\) checks$/\1/p' "$RUNNER_TEMP/linux-http-stream.log" | tail -1)
           network_runtime_assertions=$(node tools/test/linux-network-runtime-evidence.cjs "$RUNNER_TEMP/linux-network-runtime.log")
+          nix_runtime_assertions=$(node tools/test/run-linux-nix-native.cjs --evidence "$RUNNER_TEMP/linux-nix-native.log" "$GITHUB_SHA")
           fd_sha256_assertions=$(node tools/test/run-linux-fd-sha256-native.cjs --evidence "$RUNNER_TEMP/linux-fd-sha256-native.log")
           managed_http_output_assertions=$(node tools/test/linux-managed-http-evidence.cjs --count output "$RUNNER_TEMP/linux-managed-http-native.log" "$GITHUB_SHA")
           managed_http_public_assertions=$(node tools/test/linux-managed-http-evidence.cjs --count public "$RUNNER_TEMP/linux-managed-http-native.log" "$GITHUB_SHA")
@@ -1688,6 +1718,7 @@ jobs:
               --subject "native-fixture-family=$native_family_assertions" \
               --subject "http-stream-receipts=$http_stream_assertions" \
               --subject "managed-network-runtime=$network_runtime_assertions" \
+              --subject "nix-installed-runtime=$nix_runtime_assertions" \
               --subject "retained-fd-sha256=$fd_sha256_assertions" \
               --subject "managed-http-output=$managed_http_output_assertions" \
               --subject "managed-http-public=$managed_http_public_assertions" \

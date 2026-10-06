@@ -4733,6 +4733,12 @@ the complete 375-check JavaScript gate then passes. Swift is deferred to native
 macOS. The cloud window-switch supervisor prerequisite remains blocked before
 child allocation. A real Nix user/mount namespace works, but the official cache
 HTTPS prerequisite returns 403; genuine Nix package qualification is pending.
+A reviewed hosted Nix gate now requires seven distinct installed-runtime
+receipts from the actual derivation, unchanged wrapper, packaged LuaJIT/luv,
+shared root, native C ABI, supported GIO/schema and independent NIST digest.
+Its thirty-five source/configuration/receipt controls and the complete
+376-check JavaScript suite pass; none credits a native Nix execution.
+Run the new mandatory Linux gate at the committed SHA before crediting Nix.
 
 Windows remote API readiness and generation now reserve their actual request
 owner before asynchronous system-proxy admission. Native WinHTTP resolves the

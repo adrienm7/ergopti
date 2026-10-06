@@ -63,6 +63,8 @@ const NOT_SUITE_ENTRIES = new Set([
 	'tools/test/run-linux-http-stream-receipts.cjs',
 	// Actual GIO/runtime admission has its own planner gate and mandatory Linux lane.
 	'tools/test/run-linux-network-runtime.cjs',
+	// Genuine Nix store/build/runtime has its own mandatory hosted native gate.
+	'tools/test/run-linux-nix-native.cjs',
 	// Native output/public fixtures retain their own mandatory Linux ownership gate.
 	'tools/test/run-linux-managed-http-native.cjs',
 	// Actual archive and source controls have mandatory separate Linux planner/CI gates.
