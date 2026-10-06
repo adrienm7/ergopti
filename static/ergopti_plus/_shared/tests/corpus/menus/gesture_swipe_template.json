@@ -1,0 +1,170 @@
+{
+	"corpus_comment": "Handwritten ordered swipe-template and native-child policy expectations; existing21 translated prefixes captured before editing provider/locale source. Child mutation/picker callbacks remain their actual native owners.",
+	"section": "gesture_swipe_slot_menu",
+	"rows": [
+		{
+			"type": "include",
+			"section": "gesture_change_action"
+		},
+		{
+			"type": "---",
+			"platforms": ["hs"],
+			"unavailable": "hide"
+		},
+		{
+			"type": "group",
+			"id": "gesture_mode_options",
+			"i18n": "menu.gestures.mode_current",
+			"caption_getter": "gesture_mode_current_label",
+			"platforms": ["hs"],
+			"unavailable": "hide"
+		},
+		{
+			"type": "group",
+			"id": "gesture_sensitivity_options",
+			"i18n": "menu.gestures.sensitivity_current",
+			"caption_getter": "gesture_sensitivity_current_label",
+			"disabled_when": ["gesture_mode_incremental_ready"],
+			"platforms": ["hs"],
+			"unavailable": "hide"
+		}
+	],
+	"platform_rows": {
+		"ahk": [],
+		"hs": [
+			"gesture_slot_change_action",
+			"separator",
+			"gesture_mode_options",
+			"gesture_sensitivity_options"
+		],
+		"linux": []
+	},
+	"child_sections": {
+		"gesture_mode_options": "gesture_slot_mode_commands",
+		"gesture_sensitivity_options": "gesture_sensitivity_head"
+	},
+	"mode_postures": [
+		{
+			"mode": "x1",
+			"mode_label_key": "menu.gestures.mode_single",
+			"sensitivity_disabled": true
+		},
+		{
+			"mode": "incremental",
+			"mode_label_key": "menu.gestures.mode_incremental",
+			"sensitivity_disabled": false
+		},
+		{
+			"mode": "future_mode",
+			"mode_label_key": "menu.gestures.mode_single",
+			"sensitivity_disabled": true
+		}
+	],
+	"captions": {
+		"ar": {
+			"mode_x1": "الوضع: إجراء واحد (x1)",
+			"mode_incremental": "الوضع: إرسال تدريجي (مسافة)",
+			"sensitivity_3_5": "الحساسية: 3.5"
+		},
+		"cs": {
+			"mode_x1": "Režim: Jednoduchá akce (x1)",
+			"mode_incremental": "Režim: Inkrementální odeslání (vzdálenost)",
+			"sensitivity_3_5": "Citlivost: 3.5"
+		},
+		"da": {
+			"mode_x1": "Tilstand: Enkelt handling (x1)",
+			"mode_incremental": "Tilstand: Inkrementel afsendelse (afstand)",
+			"sensitivity_3_5": "Følsomhed: 3.5"
+		},
+		"de": {
+			"mode_x1": "Modus: Einzelaktion (x1)",
+			"mode_incremental": "Modus: Inkrementell senden (Distanz)",
+			"sensitivity_3_5": "Empfindlichkeit: 3.5"
+		},
+		"en": {
+			"mode_x1": "Mode: Single action (x1)",
+			"mode_incremental": "Mode: Incremental send (distance)",
+			"sensitivity_3_5": "Sensitivity: 3.5"
+		},
+		"es": {
+			"mode_x1": "Modo: Acción única (x1)",
+			"mode_incremental": "Modo: Envío incremental (distancia)",
+			"sensitivity_3_5": "Sensibilidad: 3.5"
+		},
+		"fr": {
+			"mode_x1": "Mode : Action unique (x1)",
+			"mode_incremental": "Mode : Envoi incrémental (distance)",
+			"sensitivity_3_5": "Sensibilité : 3.5"
+		},
+		"he": {
+			"mode_x1": "מצב: פעולה יחידה (x1)",
+			"mode_incremental": "מצב: שליחה מצטברת (מרחק)",
+			"sensitivity_3_5": "רגישות: 3.5"
+		},
+		"hi": {
+			"mode_x1": "मोड: एकल क्रिया (x1)",
+			"mode_incremental": "मोड: वृद्धिशील भेजना (दूरी)",
+			"sensitivity_3_5": "संवेदनशीलता: 3.5"
+		},
+		"it": {
+			"mode_x1": "Modalità: Azione singola (x1)",
+			"mode_incremental": "Modalità: Invio incrementale (distanza)",
+			"sensitivity_3_5": "Sensibilità: 3.5"
+		},
+		"ja": {
+			"mode_x1": "モード: シングルアクション (x1)",
+			"mode_incremental": "モード: インクリメンタル送信（距離）",
+			"sensitivity_3_5": "感度: 3.5"
+		},
+		"ko": {
+			"mode_x1": "모드: 단일 동작 (x1)",
+			"mode_incremental": "모드: 점진적 전송 (거리)",
+			"sensitivity_3_5": "감도: 3.5"
+		},
+		"nl": {
+			"mode_x1": "Modus: Enkele actie (x1)",
+			"mode_incremental": "Modus: Incrementeel verzenden (afstand)",
+			"sensitivity_3_5": "Gevoeligheid: 3.5"
+		},
+		"no": {
+			"mode_x1": "Modus: Enkel handling (x1)",
+			"mode_incremental": "Modus: Inkrementell sending (avstand)",
+			"sensitivity_3_5": "Følsomhet: 3.5"
+		},
+		"pl": {
+			"mode_x1": "Tryb: Pojedyncza akcja (x1)",
+			"mode_incremental": "Tryb: Wysyłanie przyrostowe (odległość)",
+			"sensitivity_3_5": "Czułość: 3.5"
+		},
+		"pt": {
+			"mode_x1": "Modo: Ação única (x1)",
+			"mode_incremental": "Modo: Envio incremental (distância)",
+			"sensitivity_3_5": "Sensibilidade: 3.5"
+		},
+		"ru": {
+			"mode_x1": "Режим: Единственное действие (x1)",
+			"mode_incremental": "Режим: Инкрементальная отправка (расстояние)",
+			"sensitivity_3_5": "Чувствительность: 3.5"
+		},
+		"sv": {
+			"mode_x1": "Läge: Enskild åtgärd (x1)",
+			"mode_incremental": "Läge: Inkrementell skickning (distans)",
+			"sensitivity_3_5": "Känslighet: 3.5"
+		},
+		"tr": {
+			"mode_x1": "Mod: Tek eylem (x1)",
+			"mode_incremental": "Mod: Artımlı gönderme (mesafe)",
+			"sensitivity_3_5": "Hassasiyet: 3.5"
+		},
+		"uk": {
+			"mode_x1": "Режим: Одинична дія (x1)",
+			"mode_incremental": "Режим: Інкрементальне надсилання (відстань)",
+			"sensitivity_3_5": "Чутливість: 3.5"
+		},
+		"zh": {
+			"mode_x1": "模式：单次动作（x1）",
+			"mode_incremental": "模式：增量发送（距离）",
+			"sensitivity_3_5": "灵敏度：3.5"
+		}
+	}
+}

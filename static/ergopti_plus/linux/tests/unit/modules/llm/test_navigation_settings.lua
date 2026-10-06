@@ -93,8 +93,8 @@ helpers.describe("tray (linux): shared prediction modifier rows", function()
 	local Json = require("json")
 	local SOURCE = '# private independent neighbor\n[llm.navigation]\nfuture = "retain" # unknown\n[other]\nvalue = 42\n'
 	local function with_native_navigation(variant, body)
-		Sandbox.with_config(SOURCE, function(path)
-			local names = { "infra.config_paths", "infra.llm_preferences", "modules.llm.navigation_settings", "infra.manifest_menu", "ui.menu.menu_builder", "adapters.storage", "ui.error_dialog.bridge", "ui.menu.start_at_login", "infra.i18n" }
+		Sandbox.with_config(type(variant) == "table" and variant.source or SOURCE, function(path)
+			local names = { "infra.config_paths", "infra.llm_preferences", "modules.llm.navigation_settings", "modules.llm.trigger_settings", "modules.llm.display_settings", "modules.llm.profile_settings", "infra.manifest_menu", "ui.menu.menu_builder", "adapters.storage", "ui.error_dialog.bridge", "ui.menu.start_at_login", "infra.i18n" }
 			local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 			local previous_execute, previous_rename = os.execute, os.rename
 			local notices, changed = 0, 0
@@ -115,6 +115,19 @@ helpers.describe("tray (linux): shared prediction modifier rows", function()
 						if variant == "reverse" then root.llm_navigation_rows[1], root.llm_navigation_rows[2] = root.llm_navigation_rows[2], root.llm_navigation_rows[1]; root.llm_navigation_rows[1].i18n = "button.cancel" end
 						if variant == "absent" then root.llm_navigation_rows = {} end
 						if variant == "invalid" then root.llm_navigation_rows[1].i18n = 2 end
+						if type(variant) == "table" and variant.parent_id then
+							for index, row in ipairs(root.llm_menu) do
+								if row.id == variant.parent_id then
+									if variant.parent_absent then table.remove(root.llm_menu, index)
+									else
+										if variant.parent_label then row.i18n = variant.parent_label end
+										if variant.parent_type then row.type = variant.parent_type end
+										if variant.parent_first then table.remove(root.llm_menu, index); table.insert(root.llm_menu, 1, row) end
+									end
+									break
+								end
+							end
+						end
 						return root
 					end,
 					i18n = i18n, logger = require("logger.shim"),
@@ -126,8 +139,16 @@ helpers.describe("tray (linux): shared prediction modifier rows", function()
 					return previous_execute(command)
 				end
 				local settings = require("modules.llm.navigation_settings")
-				local context = { llm = { is_enabled = function() return true end }, on_quit = function() end,
+				local context = { is_paused = function() return type(variant) == "table" and variant.paused == true or false end, llm = { is_enabled = function() return not (type(variant) == "table" and variant.off) end,
+					get_backend = function() return "ollama" end, streaming_revision = function() return 0 end }, on_quit = function() end,
 					on_menu_changed = function() changed = changed + 1 end }
+				local function full()
+					local items = require("ui.menu.menu_builder").build(context)
+					for _, item in ipairs(items) do
+						if item.title == i18n.get("menu.llm.title") then return item.menu end
+					end
+					error("the actual tray AI owner is absent")
+				end
 				local function build()
 					local items = require("ui.menu.menu_builder").build(context)
 					for _, item in ipairs(items) do
@@ -137,7 +158,7 @@ helpers.describe("tray (linux): shared prediction modifier rows", function()
 					end
 					error("the actual tray navigation subtree is absent")
 				end
-				body({ path = path, build = build, settings = settings, i18n = i18n,
+				body({ path = path, build = build, full = full, settings = settings, i18n = i18n,
 					changed = function() return changed end, notices = function() return notices end,
 					fault = function(mode)
 						os.rename = function(source, destination)
@@ -259,4 +280,68 @@ helpers.describe("tray (linux): shared prediction modifier rows", function()
 			helpers.assert_eq(Sandbox.read_bytes(fixture.path), before)
 		end)
 	end)
+	local parents = {
+		{id = "llm_trigger", key = "menu.llm.trigger_menu_title"},
+		{id = "llm_display", key = "menu.llm.display_menu_title"},
+		{id = "llm_navigation", key = "menu.llm.nav_menu_title"},
+	}
+	local function parent_named(rows, title)
+		for _, row in ipairs(rows) do if row.title == title then return row end end
+	end
+	for _, parent in ipairs(parents) do
+		helpers.it("shared group owns the actual Linux " .. parent.id .. " caption and callbacks", function()
+			with_native_navigation({parent_id = parent.id, parent_label = "button.cancel"}, function(fixture)
+				local before = Sandbox.read_bytes(fixture.path)
+				local rows = fixture.full()
+				local current = assert(parent_named(rows, fixture.i18n.get("button.cancel")))
+				helpers.assert_nil(parent_named(rows, fixture.i18n.get(parent.key)))
+				helpers.assert_nil(current.fn)
+				helpers.assert_true(type(current.menu) == "table" and #current.menu > 0)
+				helpers.assert_eq(Sandbox.read_bytes(fixture.path), before)
+				helpers.assert_eq(fixture.changed(), 0)
+			end)
+		end)
+		helpers.it("actual Linux " .. parent.id .. " withdrawal or wrong type never fabricates a parent", function()
+			for _, variant in ipairs({{parent_absent = true}, {parent_type = "dynamic"}}) do
+				variant.parent_id = parent.id
+				with_native_navigation(variant, function(fixture)
+					local before = Sandbox.read_bytes(fixture.path)
+					local rows = fixture.full()
+					helpers.assert_nil(parent_named(rows, fixture.i18n.get(parent.key)))
+					helpers.assert_true(parent_named(rows, fixture.i18n.get("menu.llm.display_menu_title")) ~= nil
+						or parent_named(rows, fixture.i18n.get("menu.llm.trigger_menu_title")) ~= nil)
+					helpers.assert_eq(Sandbox.read_bytes(fixture.path), before)
+					helpers.assert_eq(fixture.changed(), 0)
+				end)
+			end
+		end)
+	end
+	helpers.it("the real Linux parent follows canonical order and remains greyed while off", function()
+		with_native_navigation({parent_id = "llm_navigation", parent_first = true, off = true}, function(fixture)
+			local before = Sandbox.read_bytes(fixture.path)
+			local rows = fixture.full()
+			helpers.assert_eq(rows[1].title, fixture.i18n.get("menu.llm.nav_menu_title"))
+			for _, parent in ipairs(parents) do
+				local row = assert(parent_named(rows, fixture.i18n.get(parent.key)))
+				helpers.assert_eq(row.disabled, true)
+				helpers.assert_true(type(row.menu) == "table")
+			end
+			helpers.assert_eq(Sandbox.read_bytes(fixture.path), before)
+			helpers.assert_eq(fixture.changed(), 0)
+		end)
+	end)
+	helpers.it("retains the independent complete original Linux parent and child hierarchy", function()
+		local input = assert(io.open(helpers.driver_root() .. "/../_shared/tests/corpus/menus/llm_parent_groups.json", "rb"))
+		local expected = assert(Json.decode(input:read("*a"))); assert(input:close())
+		local source = SOURCE .. "[llm]\nenabled = true\n[llm.models]\nselected = \"ollama\"\n[llm.display]\nshow_info_bar = false\nstreaming = true\nstreaming_multi = true\npred_indent = 0\n[llm.profiles]\nnum_predictions = 3\n[llm.trigger]\ninstant_on_word_end = false\nafter_hotstring = false\n"
+		with_native_navigation({source = source}, function(fixture)
+			local before = Sandbox.read_bytes(fixture.path)
+			local rows, selected = fixture.full(), {}
+			for _, parent in ipairs(parents) do selected[#selected + 1] = assert(parent_named(rows, fixture.i18n.get(parent.key))) end
+			helpers.assert_eq(require("test.menu_native_child_rows").hierarchy(selected), expected.linux)
+			helpers.assert_eq(Sandbox.read_bytes(fixture.path), before)
+			helpers.assert_eq(fixture.changed(), 0)
+		end)
+	end)
+
 end)

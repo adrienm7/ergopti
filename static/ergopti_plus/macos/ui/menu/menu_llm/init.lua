@@ -958,6 +958,14 @@ local function create_menu(deps)
 				-- menu inserted its rows as it built them, so the model row sat ninth
 				-- here and second there, from one description.
 				local rows_by_id = {}
+				local group_builders = {}
+				local function child_group_for(id, children, disabled)
+						local rows = ManifestMenu.native_child_rows(children)
+						group_builders[id] = function()
+								if rows == nil then return nil end
+								return { items = rows, disabled = disabled }
+						end
+				end
 				local function row_for(id, row)
 						local bucket = rows_by_id[id]
 						if not bucket then
@@ -1192,7 +1200,7 @@ local function create_menu(deps)
 						settings_mgr       = settings_mgr,
 				})
 
-				row_for("llm_trigger", { title = i18n.get("menu.llm.trigger_menu_title"), disabled = MenuLayout.row_disabled("llm_trigger", is_disabled, paused), menu = trigger_menu })
+				child_group_for("llm_trigger", trigger_menu, MenuLayout.row_disabled("llm_trigger", is_disabled, paused))
 
 
 				-- ===== Live mode submenu =====
@@ -1235,7 +1243,9 @@ local function create_menu(deps)
 								end,
 						})
 				end
-				table.insert(generation_rows, { separator = true })
+				local count_boundary_rows = ManifestMenu.template_rows("llm_generation_count_boundary", {}, {}, {})
+				if not count_boundary_rows then return {} end
+				for _, row in ipairs(count_boundary_rows) do generation_rows[#generation_rows + 1] = row end
 
 				table.insert(generation_rows, { label = string.format(i18n.get("menu.llm.context_length_label"), tostring(state.llm_context_length)), disabled = is_disabled or nil, action = settings_mgr.set_context_length })
 				if state.llm_context_length ~= llm_mod.DEFAULT_STATE.llm_context_length then
@@ -1301,7 +1311,7 @@ local function create_menu(deps)
 						settings_mgr = settings_mgr,
 				})
 
-				row_for("llm_display", { title = i18n.get("menu.llm.display_menu_title"), disabled = MenuLayout.row_disabled("llm_display", is_disabled, paused), menu = display_menu })
+				child_group_for("llm_display", display_menu, MenuLayout.row_disabled("llm_display", is_disabled, paused))
 
 
 				-- ===== Navigation submenu =====
@@ -1339,7 +1349,7 @@ local function create_menu(deps)
 					end
 				end
 
-				row_for("llm_navigation", { title = i18n.get("menu.llm.nav_menu_title"), disabled = MenuLayout.row_disabled("llm_navigation", is_disabled, paused), menu = ManifestMenu.render_rows(nav_rows, "llm_navigation") })
+				child_group_for("llm_navigation", ManifestMenu.render_rows(nav_rows, "llm_navigation"), MenuLayout.row_disabled("llm_navigation", is_disabled, paused))
 
 				-- One handler per declared row, each appending what was collected for
 				-- it. A row the manifest declares and this table does not answer is
@@ -1892,7 +1902,7 @@ local function create_menu(deps)
 												llm_toggle_ready = function() return toggle_ready == true end,
 										},
 								}
-								main_menu = ManifestMenu.build("llm_menu", "LLM", handlers, nil, render_ctx, {}) or {}
+								main_menu = ManifestMenu.build("llm_menu", "LLM", handlers, group_builders, render_ctx, {}) or {}
 						else
 								Logger.error(LOG, "Manifest renderer unavailable — the IA submenu has no settings row.")
 						end

@@ -40,6 +40,7 @@
 
 
 #Include ../../_generated/action_catalogue.ahk
+#Include ../../../_shared/ahk/config_binding_identity.ahk
 
 
 
@@ -139,6 +140,151 @@ TomlConfigKeyCombinationKeys() {
 	return Keys
 }
 
+/**
+ * Publishes the gesture parameter domain from its complete native slot accessor.
+ * This accessor is available before gesture initialization; mutable runtime
+ * assignments cannot prove that a saved binding has been retired.
+ * @returns {Map} Native prefix and complete case-exact slot-id set.
+ * @throws {ValueError} If the native owner publishes an invalid inventory.
+ */
+TomlConfigGestureSlotCatalogue() {
+	Ids := GestureSlotIds()
+	if !(Ids is Array) || Ids.Length == 0
+		throw ValueError("gestures: invalid published slot catalogue")
+	Slots := Map()
+	Slots.CaseSense := "On"
+	Count := 0
+	for Index, Slot in Ids {
+		if Type(Slot) != "String" || Slot == "" || InStr(Slot, "__", true) || Slots.Has(Slot)
+			throw ValueError("gestures: invalid published slot catalogue")
+		Slots[Slot] := true
+		Count += 1
+	}
+	if Count != Ids.Length
+		throw ValueError("gestures: invalid published slot catalogue")
+	return Map("prefix", GestureBindingId("gesture", ""), "slots", Slots)
+}
+
+/**
+ * Judges only a recognized parameter-action suffix against the native domain.
+ * Other binding owners retain their current admission and source ownership.
+ * @param {String} Key Persisted parameter key.
+ * @param {Map} Catalogue Optional already-published native gesture domain.
+ * @returns {String} Shared current/retired/unjudged identity decision.
+ */
+; Returns a detached publication only while its actual compiled declaration lives.
+; Missing or replaced owners cannot prove retirement; no lazy reads occur here.
+TomlConfigScriptSlotCatalogue() {
+	global _ScriptShortcutBindingPublication, SCRIPT_SHORTCUT_SLOTS
+	if !IsSet(_ScriptShortcutBindingPublication) || !IsSet(SCRIPT_SHORTCUT_SLOTS)
+		return false
+	Publication := _ScriptShortcutBindingPublication
+	if !(Publication is Object) || !HasProp(Publication, "Source") || !HasProp(Publication, "Catalogue")
+		throw ValueError("script chords: invalid publication receipt")
+	if Publication.Source != SCRIPT_SHORTCUT_SLOTS
+		return false
+	Current := ConfigBindingIdentityScriptPublication(SCRIPT_SHORTCUT_SLOTS).Catalogue
+	Captured := Publication.Catalogue
+	if !(Captured is Map) || !Captured.Has("prefix") || Captured["prefix"] !== "script__"
+		|| !Captured.Has("slots") || !(Captured["slots"] is Map) || Captured["slots"].CaseSense != "On"
+		throw ValueError("script chords: invalid publication receipt")
+	ConfigBindingIdentityScriptStatus("script__", Captured)
+	if Captured["slots"].Count != Current["slots"].Count
+		return false
+	for Slot in Current["slots"] {
+		if !Captured["slots"].Has(Slot)
+			return false
+	}
+	return Map("prefix", "script__", "slots", Captured["slots"].Clone())
+}
+
+; Returns only the identity projection of the same complete compiled declarations.
+TomlConfigTapSlotCatalogue() {
+	global _TapKeyBindingPublication, TAP_KEY_ORDER, TAP_KEY_SCANCODES
+	if !IsSet(_TapKeyBindingPublication) || !IsSet(TAP_KEY_ORDER) || !IsSet(TAP_KEY_SCANCODES)
+		return false
+	Publication := _TapKeyBindingPublication
+	if !(Publication is Object) || !HasProp(Publication, "Source") || !HasProp(Publication, "ScanSource")
+		|| !HasProp(Publication, "Catalogue") || !HasProp(Publication, "Scans")
+		throw ValueError("tap keys: invalid publication receipt")
+	if Publication.Source != TAP_KEY_ORDER || Publication.ScanSource != TAP_KEY_SCANCODES
+		return false
+	Current := ConfigBindingIdentityTapPublication(TAP_KEY_ORDER, TAP_KEY_SCANCODES)
+	Captured := Publication.Catalogue
+	ConfigBindingIdentityTapStatus("tap_key__", Captured)
+	if Captured["slots"].CaseSense != "On" || !(Publication.Scans is Map) || Publication.Scans.CaseSense != "On"
+		throw ValueError("tap keys: invalid publication receipt")
+	if Captured["slots"].Count != Current.Catalogue["slots"].Count
+		|| Publication.Scans.Count != Current.Scans.Count
+		return false
+	for Slot, Scan in Current.Scans {
+		if !Captured["slots"].Has(Slot) || !Publication.Scans.Has(Slot) || Publication.Scans[Slot] != Scan
+			return false
+	}
+	return Map("prefix", "tap_key__", "slots", Captured["slots"].Clone())
+}
+
+; Judges native bindings only against their actual acknowledged publication.
+TomlConfigParameterBindingStatus(BindingId, Catalogue?) {
+	if Type(BindingId) == "String" && SubStr(BindingId, 1, 9) == "tap_key__" {
+		TapCatalogue := TomlConfigTapSlotCatalogue()
+		return TapCatalogue is Map ? ConfigBindingIdentityTapStatus(BindingId, TapCatalogue) : "unjudged"
+	}
+	if Type(BindingId) == "String" && SubStr(BindingId, 1, 8) == "script__" {
+		ScriptCatalogue := TomlConfigScriptSlotCatalogue()
+		return ScriptCatalogue is Map ? ConfigBindingIdentityScriptStatus(BindingId, ScriptCatalogue) : "unjudged"
+	}
+	if !IsSet(Catalogue)
+		Catalogue := TomlConfigGestureSlotCatalogue()
+	return ConfigBindingIdentityGestureStatus(BindingId, Catalogue)
+}
+
+TomlConfigActionParameterBindingStatus(Key, Catalogue?) {
+	if Type(Key) != "String"
+		return "unjudged"
+	if !IsSet(Catalogue)
+		Catalogue := TomlConfigGestureSlotCatalogue()
+	for Action, Metadata in GestureActionCatalogueData().Actions {
+		if Metadata.Parameter == ""
+			continue
+		Suffix := "__" . Action
+		if StrLen(Key) >= StrLen(Suffix) && SubStr(Key, -StrLen(Suffix)) == Suffix
+			return TomlConfigParameterBindingStatus(SubStr(Key, 1, StrLen(Key) - StrLen(Suffix)), Catalogue)
+	}
+	return "unjudged"
+}
+
+/**
+ * Reports a retired gesture parameter from config.toml once per file and key.
+ * Both the boot loader and direct gesture reload use this configuration owner;
+ * the other-file reporter must not deny that config.toml cleanup owns the row.
+ * @param {String} FilePath Exact persisted configuration identity.
+ * @param {String} Key Retired parameter key.
+ * @returns {Boolean} True when this call records the first warning.
+ */
+TomlConfigReportRetiredGestureParameter(FilePath, Key) {
+	static Reported := Map()
+	if Type(FilePath) != "String" || FilePath == "" || Type(Key) != "String" || Key == ""
+		throw ValueError("A retired gesture parameter requires its configuration file and key.")
+	PreviousCritical := Critical("On")
+	try {
+		if !Reported.Has(FilePath) {
+			Keys := Map()
+			Keys.CaseSense := "On"
+			Reported[FilePath] := Keys
+		}
+		if Reported[FilePath].Has(Key)
+			return false
+		Reported[FilePath][Key] := true
+	} finally Critical(PreviousCritical)
+	Reason := SubStr(Key, 1, 8) == "script__" ? ConfigBindingIdentityScriptRetiredReason()
+		: SubStr(Key, 1, 9) == "tap_key__" ? ConfigBindingIdentityTapRetiredReason()
+		: "no gesture slot of this build has this name"
+	try LoggerWarn("TomlConfigLoader", "Outdated configuration entry '[action_parameters].{1}' in '{2}' ignored "
+		. "({3}); it is offered for explicit cleanup.", TOML_RenderKey(Key), FilePath, Reason)
+	return true
+}
+
 ; Action parameters use the binding grammar written by the gesture, shortcut
 ; and tap-hold owners. Only actions declaring a parameter can consume a value.
 TomlConfigActionParameterIsOwned(Key) {
@@ -146,6 +292,7 @@ TomlConfigActionParameterIsOwned(Key) {
 	if !RegExMatch(Key, "^(?:combination|gesture|keyboard|script|tap_hold|tap_key)__[a-z0-9]+(?:_[a-z0-9]+)*__([a-z0-9]+(?:_[a-z0-9]+)*)$", &Match)
 		return false
 	return Actions.Has(Match[1]) && Actions[Match[1]].Parameter != ""
+		&& TomlConfigActionParameterBindingStatus(Key) != "retired"
 }
 
 TomlConfigForeignOwner(SectionPath, Key) {
@@ -177,8 +324,8 @@ TomlConfigForeignOwner(SectionPath, Key) {
 
 ; Classifies a section header the loader deliberately does not apply.
 ; ``[_*]`` metadata and ``[updater]`` belong to other readers ("foreign");
-; the dissolved ``[ahk.*]`` silo is "obsolete" and the next canonical full save
-; removes it. Returns "" for a section the manifest tree must account for.
+; the dissolved ``[ahk.*]`` silo is "obsolete" and remains on disk until
+; explicit cleanup. Returns "" for a section the manifest tree must account for.
 TomlConfigSectionSkipKind(Header) {
 	Parts := TomlConfigSectionParts(Header)
 	; The record consumer owns its exact namespaces, including unknown row
@@ -600,6 +747,10 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
 		; version. Apply the remaining valid keys and summarize unused entries
 		; once below. TomlConfigUnknownKind owns that rule; the menu's unused-key
 		; cleanup offers to remove exactly these keys.
+		if CurrentSection == "action_parameters" && TomlConfigActionParameterBindingStatus(Key) == "retired" {
+			TomlConfigReportRetiredGestureParameter(FilePath, Key)
+			continue
+		}
 		UnknownKind := TomlConfigUnknownKind(Features, CurrentSection, Key,
 			&ForeignOwner)
 		if (UnknownKind != "") {
@@ -709,7 +860,7 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
 
 	if ObsoleteDriverSections > 0 {
 		try LoggerWarn("TomlConfigLoader",
-			"Ignored {1} obsolete [ahk.*] section(s); the next canonical save removes them.",
+			"Ignored {1} obsolete [ahk.*] section(s); they remain until explicit cleanup.",
 			ObsoleteDriverSections)
 	}
 	if UnknownKeys > 0 {

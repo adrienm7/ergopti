@@ -51,6 +51,7 @@ local function bundle_labels(opts)
 		local input_sources = helpers.load_with_stubs("modules.keymap.input_sources")
 		local install = require("modules.keymap.layout_install")
 		package.loaded["infra.i18n"] = { get = function(key) return LABELS[key] or key end }
+		package.loaded["infra.i18n"].section = function(key) return LABELS[key] or key end
 		package.loaded["infra.notifications"] = { notify = function() end }
 		install.bundle_variants = function()
 			return { { name = "Ergopti_v2_2_2_plus", tis_id = "com.apple.keyboardlayout.ergopti.plus",
@@ -70,7 +71,11 @@ local function bundle_labels(opts)
 			helpers.assert_eq(kl_name, opts.legacy)
 			return opts.legacy_version
 		end
+		-- Status captions stay owned by the actual canonical declaration/renderer.
+		package.loaded["infra.manifest_menu"] = nil
+		local actual_manifest = require("infra.manifest_menu")
 		package.loaded["infra.manifest_menu"] = {
+			status_rows = actual_manifest.status_rows,
 			build = function(_menu_id, _label, _a, _b, _ctx, providers)
 				return providers.layout_bundle()
 			end,
@@ -239,5 +244,149 @@ helpers.describe("layout_install.layout_version", function()
 		}, function(install)
 			helpers.assert_nil(install.layout_version("Ergopti_plus"))
 		end)
+	end)
+end)
+
+
+--- Exercises the real list provider, declaration and native row renderer.
+--- Filesystem/TIS mutation ports remain controlled and must not run during builds.
+local function with_no_bundle_status(body, labels)
+	helpers.with_stub_scope({"modules.keymap.input_sources", "modules.keymap.layout_install",
+		"ui.menu.menu_keyboard_layout", "infra.manifest_menu", "infra.i18n", "infra.notifications"}, function()
+		local sources = helpers.load_with_stubs("modules.keymap.input_sources")
+		local installer = require("modules.keymap.layout_install")
+		local session = {latest = nil, effects = 0}
+		installer.pick_latest_bundle = function() return session.latest end
+		installer.highest_installed = function() return nil end
+		installer.bundle_variants = function() return {} end
+		sources.list_active_keyboard_layouts = function() return {} end
+		sources.build_kl_name_to_tis_id = function() return {} end
+		sources.resolve_installed_ergopti_version = function() return nil end
+		local function forbid_effect() session.effects = session.effects + 1; error("Status presentation must not mutate native layouts") end
+		installer.install_user = forbid_effect
+		installer.install_system = forbid_effect
+		sources.upgrade_active_list_async = forbid_effect
+		sources.set_input_source_async = forbid_effect
+		package.loaded["infra.notifications"] = {notify = forbid_effect}
+		local translator = require("infra.i18n")
+		if labels then translator.get = function(key) return labels[key] or key end end
+		package.loaded["infra.manifest_menu"] = nil
+		local renderer = require("infra.manifest_menu")
+		session.root = renderer.get_root()
+		for _, row in ipairs(session.root.layout_menu) do
+			if row.id == "layout_bundle" then session.owner = row end
+		end
+		helpers.assert_not_nil(session.owner, "the actual bundle list owner must exist")
+		package.loaded["ui.menu.menu_keyboard_layout"] = nil
+		local owner = require("ui.menu.menu_keyboard_layout")
+		session.build = function()
+			local item = owner.build({base_dir = "/no/shipped/bundle/", updateMenu = forbid_effect})
+			return renderer.render_rows({item}, "top_level")[1].menu
+		end
+		session.translate = translator.get
+		body(session)
+		helpers.assert_eq(session.effects, 0, "inert status must never deliver native mutations")
+	end)
+end
+
+local function find_bundle_status(rows, title)
+	for index, row in ipairs(rows) do if row.title == title then return row, index end end
+end
+
+helpers.describe("canonical no-bundle status reaches the actual native layout menu", function()
+	helpers.it("keeps the independent inert declaration and its native status position", function()
+		with_no_bundle_status(function(session)
+			helpers.assert_eq(session.owner.status_rows.no_bundle, {{type = "label", i18n = "menu.layout.no_bundle"}})
+			helpers.assert_eq(session.owner.platforms, {"hs"})
+			helpers.assert_eq(session.owner.reason_key, "platform_reason.layout_bundle_and_menubar_are_macos")
+			local rows = session.build()
+			local status, position = find_bundle_status(rows, "menu.layout.no_bundle")
+			local unchanged, neighbor = find_bundle_status(rows, "menu.layout.install_first")
+			helpers.assert_not_nil(status)
+			helpers.assert_eq(status.disabled, true)
+			helpers.assert_nil(status.fn)
+			helpers.assert_nil(status.menu)
+			helpers.assert_not_nil(unchanged)
+			helpers.assert_eq(neighbor, position + 1, "the unchanged native bundle status follows the shared missing-bundle label")
+		end)
+	end)
+	helpers.it("consumes a caption mutation through the real provider and renderer", function()
+		with_no_bundle_status(function(session)
+			local status = session.owner.status_rows.no_bundle[1]
+			local previous = status.i18n
+			status.i18n = "menu.about.check_for_updates"
+			local ok, err = xpcall(function()
+				local rows = session.build()
+				helpers.assert_nil(find_bundle_status(rows, "menu.layout.no_bundle"))
+				local row = find_bundle_status(rows, "menu.about.check_for_updates")
+				helpers.assert_not_nil(row)
+				helpers.assert_eq(row.disabled, true)
+				helpers.assert_nil(row.fn)
+			end, debug.traceback)
+			status.i18n = previous
+			if not ok then error(err, 0) end
+		end)
+	end)
+	for _, refusal in ipairs({"missing", "obsolete", "effect"}) do
+		helpers.it("refuses " .. refusal .. " status metadata while preserving native neighbors", function()
+			with_no_bundle_status(function(session)
+				local old = session.owner.status_rows
+				local stale = {{type = "label", i18n = "menu.layout.no_bundle"}}
+				if refusal == "missing" then session.owner.status_rows = nil
+				elseif refusal == "obsolete" then session.owner.status_rows = {removed_no_bundle = stale}
+				else stale[1].action = function() error("Metadata must never acquire a native action") end; session.owner.status_rows = {no_bundle = stale} end
+				local ok, err = xpcall(function()
+					local rows = session.build()
+					helpers.assert_nil(find_bundle_status(rows, "menu.layout.no_bundle"))
+					helpers.assert_not_nil(find_bundle_status(rows, "menu.layout.install_first"))
+					helpers.assert_not_nil(find_bundle_status(rows, "menu.layout.manage"))
+				end, debug.traceback)
+				session.owner.status_rows = old
+				if not ok then error(err, 0) end
+			end)
+		end)
+	end
+	helpers.it("honors the actual list owner's platform visibility", function()
+		with_no_bundle_status(function(session)
+			local previous = session.owner.platforms
+			session.owner.platforms = {"linux"}
+			local ok, err = xpcall(function()
+				local rows = session.build()
+				helpers.assert_nil(find_bundle_status(rows, "menu.layout.no_bundle"))
+				helpers.assert_not_nil(find_bundle_status(rows, "menu.layout.manage"))
+			end, debug.traceback)
+			session.owner.platforms = previous
+			if not ok then error(err, 0) end
+		end)
+	end)
+	helpers.it("reads current bundle discovery on every actual provider build", function()
+		with_no_bundle_status(function(session)
+			local held = find_bundle_status(session.build(), "menu.layout.no_bundle")
+			helpers.assert_not_nil(held)
+			session.latest = "Ergopti_v2.2.2.bundle"
+			helpers.assert_nil(find_bundle_status(session.build(), "menu.layout.no_bundle"))
+			helpers.assert_nil(held.fn, "a held inert status never becomes an install action")
+			session.latest = nil
+			local fresh = find_bundle_status(session.build(), "menu.layout.no_bundle")
+			helpers.assert_not_nil(fresh)
+			helpers.assert_true(fresh ~= held)
+		end)
+	end)
+	helpers.it("uses each of the 21 existing real catalogue captions", function()
+		local codec = require("adapters.json_codec")
+		local file = assert(io.open(helpers.shared("data/locale_order.json"), "rb"))
+		local locales = assert(codec.decode(file:read("*a"))).order; assert(file:close())
+		helpers.assert_eq(#locales, 21)
+		for _, locale in ipairs(locales) do
+			file = assert(io.open(helpers.shared("data/locales/" .. locale .. ".json"), "rb"))
+			local labels = assert(codec.decode(file:read("*a"))); assert(file:close())
+			helpers.assert_true(type(labels["menu.layout.no_bundle"]) == "string" and labels["menu.layout.no_bundle"] ~= "")
+			with_no_bundle_status(function(session)
+				local row = find_bundle_status(session.build(), labels["menu.layout.no_bundle"])
+				helpers.assert_not_nil(row, "actual native provider caption: " .. locale)
+				helpers.assert_eq(row.disabled, true)
+				helpers.assert_nil(row.fn)
+			end, labels)
+		end
 	end)
 end)

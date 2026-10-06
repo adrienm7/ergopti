@@ -2399,12 +2399,57 @@ These are software implementations; final hardware verification remains below.
   foreign source or reserved implementation change.
 
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
-  Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
-  composition. Keep unknown fields, verified backups, exact runtime
+  Qualify the implemented macOS/Linux Hotstrings and TapHold owners and the
+  global composition, including its Script participant. Keep unknown fields,
+  verified backups, exact runtime
   acknowledgement, external-write conflict detection and retryable rollback.
-  Recommended delay values must match effective runtime inheritance: deleting
-  `autocorrection.caps` currently inherits 1.0 s while the manifest recommends
-  0.5 s. Do not assume deletion implements the recommendation. Hotstrings: Linux
+  Recommended delay values must match effective runtime inheritance for the
+  currently published feature catalogue. The retired `autocorrection.caps`
+  namespace is obsolete source data, preserved until explicit cleanup; it is
+  not a current recommendation target. Do not assume deletion implements the
+  recommendation.
+  At published `409b8ee0`, manual all-OS run 37476981548 is still in progress:
+  Windows lifecycle capture fails with ENOBUFS before the full native suite;
+  its engine E2E/package/install are skipped. macOS packaging has actual Sparkle
+  server-retirement, Homebrew owned AppleEvent receiver and global-switcher
+  failures. They require source/runner follow-up, not invented device-only
+  closure; physical acceptance is unexecuted. Keep exact dated CI receipts.
+
+  The three Linux scope fixtures now require raw object identity for the native
+  luv issuer: five custody assertions use `rawequal` and each fixture rejects
+  the actual native table's detached clone. All registered cases, timer/GC/close
+  assertions and restoration remain unchanged; focused native tests pass 108/0
+  on both LuaJIT and Lua 5.4. The current four distribution artifacts stopped
+  at the same first-module custody assertion (22/1); actual Alpine constants
+  include NaN, so the old recursive comparison can reject even the same table.
+  This is not evidence of the earlier baseline's missing-luv cause. The
+  local checkpoint for published source `30500346` passes selected
+  verification with exit0: Linux 10,133/0 and JavaScript 363/0, using the
+  admitted private writable temporary directory. The later terminal S1
+  manual run 37491143093 tests `6bf86bfc` from source `aa70bebf`, same tree
+  `135f3667`. Arch, Fedora and openSUSE each execute 433 modules with
+  10,133/0; Alpine executes 433 modules with 10,120/13. Actual Alpine native
+  diagnosis reproduces all 13 signed-zero fixture failures: the numeric
+  request literal normalizes to positive zero before the writer. Genuine
+  runtime negative-zero requests retain their sign through the unchanged
+  parser/writer (13/0 independent native controls); this evidence does not
+  justify a production correction. Debian executes no native suite: compiler
+  linking fails on missing `Scrt1.o`/`crti.o` from the libc6 development
+  prerequisite. S1 Windows units give 10,033/2, with two unsettled native
+  screen-brightness worker cases. S1 excludes the later Extension/db31 tree;
+  it does not qualify those changes, all distributions or complete TODO5.
+  The earlier `409b8ee0` observation above was recorded before run 37476981548
+  completed: its terminal result is failure, with Release / Publish skipped.
+  Main Linux unit/E2E gates passed, while Arch/Fedora/openSUSE/Alpine stopped at
+  that custody assertion; macOS native packaging failures remain recorded.
+  The published Windows capture successor `109736e5` is now qualified by
+  terminal successful manual run 37482352928, tested `458e9cb1` on the same
+  source tree `61bf069d`: Windows units 10,032/0, engine E2E, package and
+  install/launch pass. Release / Publish is skipped; physical acceptance is
+  unexecuted. This dated Windows receipt does not qualify other OS lanes or
+  complete TODO5.
+
+  Hotstrings: Linux
   categories, sections and scalar settings are canonical config.toml leaves,
   with a one-shot import of legacy storage.json choices; both Lua drivers have a
   two-file recommended/clear owner whose planner writes explicit delays where
@@ -2544,9 +2589,65 @@ publication/rollback owners in code before device acceptance. On Windows,
 replay fresh/existing/moved folder recommendation and clear with exact backups,
 strict external-write refusal, restart and actual input; retain items 16/38.
 
+Current global composition now retains its exact admitted participant cohort,
+including refused finalization. Linux Shortcuts, Hotstrings, Metrics and AI
+scope owners keep the actual file/runtime claims through compensation; an
+acknowledged sibling release is reacquired before a retained rollback may run.
+Retry settles only the outstanding phase and does not repeat accepted inverses
+or overwrite successor runtime owners. Independent focused contracts pass;
+current full selected and hosted qualification are recorded separately. Direct
+Script participation is now implemented on Linux/macOS through the shared
+planner, live logger/locale/error owners and acknowledged native settings
+receipts. Initial same-threshold successor defects refuse through raw parent
+identity fences. Final composed, installed and device acceptance remain open.
+
+The current macOS/Linux Script settings cohort owns only declared string and
+Boolean aliases. Linux source-span publication preserves unowned future JSON
+numeric tokens through apply, clear, ordinary foreign updates, exact backup
+and inverse; it does not require whole-document re-encoding. Private actual
+Linux owner replay passes seven selected cases on each of Lua 5.4 and LuaJIT,
+with four independent complete Decimal/TOML image checks. This is bounded
+source evidence, not a full unit/native-suite completion claim. Unsafe numeric
+values captured into the generic owned settings inverse still refuse strictly;
+future numeric-owned aliases need an explicit snapshot contract. Portable
+replay does not prove actual Hammerspoon SDK/storage or atomic cross-process
+publication. TODO5 remains partial.
+
+The Linux formatting corpus now owns a private instance of the actual shared logger. The existing native shutdown owner retains its live suppression debt; every corpus assertion remains strict. Current and incoming-dev causal cohorts reproduce the old fixture failure, and isolated replay preserves the live singleton and its pending lines. This is validation isolation, not a global-reset behavior change.
+
+The existing installed-Hammerspoon supplementary owner now requires a complete actual Script participant publication and inverse after an otherwise successful Karabiner launch scenario. The smoke measures native void set, exact readback and Boolean clear through nonce-only aliases and a private TOML source; runtime locale, logger and error-dialog views must restore. Original launch failures and strict retirement remain authoritative. Portable bootstrap and receipt tests cannot qualify actual SDK execution; final macOS CI is required.
+
+The existing before-package native Canvas gate now requires the same actual Hammerspoon Script SDK and inverse measurement through a private diagnostic source layout. It starts only after the original Canvas process owner settles and reuses the strict native bootstrap, source hashes and retirement receipts. All original Canvas assertions remain. This makes actual SDK execution possible despite independent Sparkle/Brew package failures, but cannot qualify an installed release application; manual macOS CI remains required.
+
+Actual Windows CI exposed two fixture premises in the new semantic snapshot controls: a stale caps raw-row lookup despite a names source, and an applied-record count omitting the independently supplied trigger. The successor retains all other assertions, checks the real trigger positively and expects both valid records. Native Windows execution remains required; no production loader or retirement policy changes.
+
+The canonical JSON codec now offers private strict root-object source receipts and explicit root-member splicing. It retains unowned numeric/container tokens, escaped identities and source trivia without whole-document encoding, and reparses the complete candidate. All122 prior corpus behaviors and registered test prefixes remain unchanged; independent Linux33/0 and macOS25/0 pass on both runtimes, while actual whole-encode controls fail12 cases. This is a pure source primitive: it grants no file liveness or publication authority, and native owned/ordinary Storage adoption remains necessary before the conservative numeric boundary can be lifted.
+
+Windows semantic publication meta controls now follow the actual strict full-save and claimed cleanup gateways. The historical29 callers are independently audited:27 unchanged, two migrated. Coverage expands to28 public plus8 private gateways, retaining the separate private8 guard and distinguishing Map preparation receipts from Boolean publication. Exact binding/order/Integer acknowledgement and causal suffix-renaming controls preserve prior safety predicates. Portable63 source predicates pass; native AHK rerun remains required.
+
+The Windows semantic configuration builder now prunes only empty implicit ancestors of explicit deletions, while retaining source-owned explicit headers, sealed inline containers, populated siblings and update-owned Maps. The generic setter, physical renderer, strict whole-document readback, source fences and backup/publication owners remain unchanged. Fourteen handwritten registered builder/writer subjects retain the entire earlier test prefix; independent tomllib57/0 reproduces eight old expected-model mismatches. Actual AHK and old-native inverse execution remain required; this does not yet attribute the previously observed native cleanup failures.
+
+Linux storage now publishes held projections and ordinary set/set_many/delete/clear requests through authentic shared JSON source spans, preserving unowned raw numeric tokens, order and container kinds. The actual native writer remains the owner; stale terminal/cleanup debt cannot acknowledge a foreign successor. Read recovery is fenced throughout active claims and initialization reentry, while ordinary unclaimed recovery remains available. Independent focused suites pass136/0 on Lua5.4 and LuaJIT, including actual native fault and foreign-source probes. Unsafe values inside captured owned projections still refuse conservatively; no exact floating-point cache or cross-process atomic-CAS guarantee is claimed. Final selected container/native CI and installed acceptance remain separately required.
+
+The Windows semantic builder now retains unowned inline member order, raw tokens and trivia while changing or deleting only owned descendants. This addresses the exact source-image discrepancy observed in native diagnostic failure2; whole-cell explicit updates keep canonical serialization. The strict canonical lexical owner also supplies semantic inline splitting, including the independently authored triple-literal case. Final whole-document typed readback, source/publication fences and backup owners are unchanged. Independent109 plus20 portable/source predicates and the unchanged canonical syntax/loop guards pass; all28 new AHK cases and two original-production-route causal controls remain pending actual native CI.
+
+Root dotted scalar settings now retain their exact requested finite value through the actual shared writer and native preference publication. Independent full-image and restart checks cover precision and source preservation. Header numeric publication is covered by the later finite-scalar corrective slice; broader scope/catalogue and installed-device acceptance are still open.
+
+The first owned Linux storage publication now prepares the configuration directory through the existing quoted shell owner. Fresh user homes reproduce and fix the two actual configuration restore failures. Directory acknowledgement, source bytes and producer/file callbacks are revalidated before spending the write receipt or staging a backup; reread-time callback withdrawals refuse without publication and remain retryable. Native real-file regressions pass on LuaJIT and Lua 5.4. Packaging, installation and installed-device acceptance remain separate checks.
+
+The Windows fresh-bootstrap control now reads the real autocorrection names record at its parent section and asserts its complete three-child shape, refusing the unrelated flattened-section lookup. Float timing, obsolete scalar, future data and read-only assertions are retained. This repairs the fixture consumer; native snapshot publication and fresh process qualification still require Windows CI.
+
+Shared shortcut scope planning now filters only proved neutral deletions beneath an obsolete scalar/array parent. Requested nondelete, ancestor and whole-parent replacements refuse before native IO or runtime changes. Ordinary saves keep obsolete source values until explicit cleanup. Portable current-owner controls preserve all original ordinary-save assertions; physical device and native runner acceptance remain pending.
+
+Windows scopes classify a freshly captured strict source through the existing canonical decoder and obsolete-key owner, then admit only neutral deletion intents beneath proved obsolete scalar/array parents. Nonneutral or ancestor collisions refuse before backup/runtime publication. The candidate is built from the same captured source through existing build-only admission, drift and late session fences. Eighteen registered native controls retain the original full test prefix; native execution is pending.
+
 - [~] **7.** Complete W2: seven-page first-run opt-in wizard, per-category
   recommended choices, consistent WebView behavior and genuine translations in
-  21 locales. The tap-holds page lists each engine's recommended keys from the
+  21 locales. Current source implements the seven-page declaration, native
+  chosen-folder writers and rerun preservation. Remaining acceptance includes
+  the installed fresh/existing/moved-folder wizard and actual trigger/runtime
+  restart on each OS; portable or historical CI alone does not complete it.
+  The tap-holds page lists each engine's recommended keys from the
   shared tap-hold catalogue and imports only the checked ones through each
   driver's tap-hold writer: Windows renders them into the tap_hold.toml beside
   config.toml in the wizard's own transition, macOS goes through the remap
@@ -2608,6 +2709,15 @@ Partial dev handoff (2026-10-05): actual virtual X11 wizard probes are
 qualified separately. Installed Windows and macOS wizard reruns, restart and
 physical input remain device acceptance; work-machine logs/screenshots need
 not be exported. Follow PARTIAL-DELIVERY.md and record the exact artifact.
+
+The shared Lua wizard planner now uses the canonical strict UTF-8 owner for
+single-character answers. Overlong encodings, surrogate values and values above
+U+10FFFF refuse before writes on macOS, while valid BMP/non-BMP symbols and the
+existing Linux rare-symbol policy retain their previous behavior. Independent
+actual-catalogue controls pass on both Lua runtimes; this source qualification
+does not establish native WebView transport or installed-device acceptance.
+
+The wizard WAL control now observes the current terminal-bundle token that owns the actual candidate path during hand-off, with exact token identity and unrelated-path refusal checks. It retains the ordinary Busy=false contract for an active terminal bundle and all original wizard assertions. Native Windows execution and real first-run device acceptance remain pending.
 
 - [~] **13.** Complete F2: honor the Karabiner integration switch before leases
   and guardians; preserve personal rules; back up and restore Windows touchpad
@@ -3083,18 +3193,38 @@ WP3 prerequisite: the actual macOS physical accounting owner now requires exact 
 
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
-  listed; see `docs/memory/text-input-and-config.md`. Still open everywhere:
-  sites 76 (no catalogue of parameter bindings), macOS 14/93 and order overrides
-  (no "catalogue published" signal), 16/91 (expert `[script]`/`[features]`
-  layer), 18 (dynamic model list), 19, 24, 26, 28, a Karabiner key bound to a
-  plain string (saves refused with a generic ERROR), native qualification of
-  Linux whole-file layers.toml boot isolation, Windows sites 32, 34, 36, 37-60 and its
-  whole-file installed.json refusal, and the macOS boot-time unread-entries
-  scan cost (36-56 ms on the
-  main thread). Maintainer decisions are resolved: invalid schema stamps
-  retain strict boot and session-write refusal (site 108); retired keys
-  reported for explicit cleanup are exempt from automatic deletion migrations
-  and remain on disk until that cleanup (site 112).
+  listed; see `docs/memory/text-input-and-config.md`. Current source already
+  admits known expert `[script]`/`[features]` values through their published
+  owners, preserves obsolete scalar user-model and section-order rows, and
+  checks gesture action-parameter bindings against each driver's complete
+  native gesture inventory. The Lua keyboard owners now publish both logical
+  identities and the complete 1,536 physical identities from the actual private
+  registry, with current source and owner checks. Cold or partial publication
+  remains unjudged; Windows keyboard and other binding owners remain pending.
+  Plain-string
+  remap bindings are warned, read as neutral and preserved during unrelated
+  saves; requested replacement still requires explicit source repair. Linux
+  layers.toml boot isolation and obsolete installed-layout entry partitioning
+  are implemented. Remaining software includes complete Windows keyboard
+  parameter-binding publication from its actual input owner (coordinate groups
+  3/7), macOS aggregate Hotstrings category/section/order authority (group 2),
+  Linux dynamic model publication (group 4), and other unfinished binding owners.
+  API-provider publication is implemented. The historical review sites
+  14/93, 19, 24, 26, 28 and Windows 32, 34, 36, 37-60 still require exact current
+  owner audits before their closure can be claimed. Native Windows execution,
+  Linux layers.toml startup, Hammerspoon and installed three-OS qualification
+  remain separate acceptance work. The macOS unread-entry scan is deferred
+  off the boot critical path; its native main-thread cost still needs measurement.
+  Maintainer decisions are resolved: invalid schema stamps retain strict boot
+  and session-write refusal (site 108); retired keys reported for explicit
+  cleanup are exempt from automatic deletion migrations and remain on disk
+  until that cleanup (site 112).
+
+  The integration with current physical shortcuts preserves obsolete parents
+  and releases or reacquires only the exact retained writer cohort. Independent
+  unchanged physical scope cases pass 27/0 on macOS Lua 5.4 and 35/0 on both
+  Linux runtimes, against original failures of 25/2 and 23/12 respectively.
+  Final composed-source CI and native installed acceptance remain pending.
 
   Windows tap_hold.toml now reports each obsolete entry once per exact file,
   rendered path and reason during the process, through the shared warning
@@ -3113,12 +3243,29 @@ assertion across curl versions. Independent old/new native replays pass; hosted
 final-source qualification remains pending. These are fixture prerequisites,
 not completion of the remaining configuration policy or physical acceptance.
 
+Linux native fixture prerequisites now qualify the real GTK launcher in the
+same private X11/D-Bus session before starting each unchanged application-action
+deadline. Application-catalogue isolation retains actual compiled GSettings
+schemas; setup and functional receipts have distinct identities. Independent
+actual launches pass 4/4; a simulated native cold-start delay is explicitly
+separate from the unproven hosted timeout cause. The failed-HTTP ETag control
+now compares exact bytes from an independent direct same-binary curl oracle,
+retaining all seven functional cache/conditional-request/recovery cases across
+curl versions. Hosted Linux E2E, packaging and installation must still finish.
+
 The macOS qualification fixtures now restore the transitive strict UTF-8 owner
 and decode the standard JSON backspace/form-feed escapes in their independent
 Hammerspoon stub. The original twelve hosted failures are reproduced and
 corrected without changing production, corpus expectations or assertions.
 Full selected verification and hosted qualification are recorded separately;
 these fixture repairs do not complete TODO33 or device acceptance.
+
+The Hammerspoon JSON fixture now admits LuaJIT's single numeric model without
+calling absent Lua 5.3 numeric-kind APIs. Independent number, exponent and
+array/object interning controls retain the native LuaSkin value contract and
+all prior assertions. Both focused runtimes pass; the complete portable macOS
+suite passes 14,667 cases. This is test-runtime qualification; actual hosted
+Hammerspoon and installed-device behavior remain separately required.
 
 Windows configuration qualification now seeds the four actual section metadata
 values before testing their preservation, refusing missing seed anchors. The
@@ -3338,6 +3485,77 @@ fixture and production boundaries with group2. Keep strict source fences and
 obsolete-value preservation; do not remove assertions. Full failure annotations
 are truncated; the exact known subjects and limits are in the current partial
 delivery evidence. E2E/package/install remain skipped, not passed.
+
+Additional native macOS source-policy controls preserve carried nonstring
+combination leaves on unrelated saves and refuse requested replacement until
+explicit repair. Known expert script logger thresholds and manifest-declared
+feature values are admitted through their actual published catalogues; invalid
+values remain unread, warned and byte-preserved. Metadata inspection is pure and
+does not resolve a hardware backend. Deliberate arbitrary expert scalar fields
+retain their existing API. These bounded slices do not complete the catalogue,
+whole-file refusal, persisted-legacy-settings or native acceptance requirements.
+
+The 2026-10-05 continuation preserves malformed shortcut-order source rows and source-proven empty arrays instead of treating them as valid maps. Requested replacement refuses until explicit repair; valid reorders and resets retain unrelated source kinds. The Windows known-feature fixtures now target the currently published `names` owner, keeping the removed `caps` namespace as a source-preservation/explicit-cleanup control. The changed-publication/restart timing remains an explicit nondefault Float (0.75), with the separate 0.5 default test retained. Focused portable checks and independent source review pass; final composed and hosted Windows qualification remain pending.
+
+The declared macOS-only optional user-model list now reports obsolete scalar source once, keeps it outside runtime and unmarked for explicit cleanup, and preserves it during unrelated default-carried saves and published scope clear. A nonneutral replacement refuses before publication until explicit source repair. All original assertions remain; real typed-file oracles retain signed integers, precise floats, offset dates, literal dots and nested arrays. Linux has no supported owner for this leaf and preserves it; native Windows was inspected only. This bounded correction does not finish the remaining configuration catalogue.
+
+Persisted macOS llm.enabled now uses the actual published feature value validator before cleanup and bootstrap. Obsolete native text/numbers/containers warn once and cannot supply consent; values and TOML remain untouched until explicit cleanup. Valid true/false precedence, independently valid canonical fallback and logger ERROR are preserved. Independent actual-owner/compiled-init controls pass67/0 versus exact predecessor44/23; all44 prior cases and their assertions remain byte-exact. Equivalent typed Windows/Linux seams were inspected without duplicate changes. Actual Hammerspoon and final source/installed qualification remain required.
+
+Parameter-bearing gesture bindings now use a shared current/retired/unjudged identity policy against each actual complete native gesture catalogue. Windows, macOS and Linux loaders preserve but do not activate proven retired entries, warn once, and ordinary setters refuse them before publication; explicit cleanup remains the removal owner. Windows keeps case-distinct parameter Maps, including unjudged qualified identities. The independent29-case corpus and registered native regressions are retained; Windows native execution is still pending. Other keyboard, tap-hold, script and combination identity owners remain unjudged by this bounded cohort, so site76 and the whole item stay open. The actual gesture fixture now restores its new shared dependency through the existing exact owner scope. All old isolation assertions remain; original2/9 and corrected11/0 independently reproduce the prerequisite, including absent/false/existing owners and construction/callback failure.
+
+The Windows finite-number gate now delegates its unchanged CRT ABI to a native adapter. The existing OS-call purity bound remains 252; the actual source census returns to 252 without raising it. The architecture graph was regenerated through its owner. AHK encoding and private-source JS checks pass; native Windows execution remains pending.
+
+The Windows legacy gesture-snapshot fixture explicitly establishes its case-insensitive map before population and verifies that precondition. Its original final source-policy assertion and all independent case-twin/clone checks remain intact. No native gesture implementation or parameter retirement policy changes; native fixture execution remains pending.
+
+Manual source54 CI exposed four genuine ordinary JSON Storage regressions on links to regular files. The released ordinary writer now uses its established qualified descriptor policy and replaces only the link inode, retaining exact target bytes. Private owned cohorts still refuse links. Each journal pins its own readback route; SourceV2 callback/source, reentry and pending-settlement fences remain intact. The unchanged native special-source fixture passes28/0 on both Lua engines, while the registered adapter module passes160/0 and independent read/close/rename refusal controls pass9/0. Actual final manual Linux CI and installed qualification remain separate; this correction does not close the remaining catalogue domains.
+
+The script-chord parameter domain now consumes each native owner's complete published catalogue through the shared identity policy, alongside the previously qualified gesture domain. Read/close and current registered-owner receipts fence publication; Mac same-API replacements and equality spoofing cannot lend authority. Retired bindings warn once, stay neutral in runtime and remain source data until explicit cleanup; writes refuse before native IO or dispatch. Other/unpublished/missing catalogue domains remain unjudged. Registered source cohorts pass104/0 portable macOS and120/0 on both Linux engines, with genuine old-public-API causal failures and read/close refusal controls. All previous assertions and450 parent corpus files remain unchanged. Native Windows, final packaging/installation and the remaining dynamic parameter/provider/order domains remain separate. Four old Linux positive script subjects now use actual current script_altgr_enter rather than retired reload, preserving every prior predicate/value/full-source/report/mark/refusal/inverse assertion; genuine actual-publisher warm/cold controls and a current-versus-retired native case prove the corrected subject.
+
+The failed native modifier-hold dashboard qualifier now loads canonical actual selection state and helper functions, preserving its editor subset and all original Writer/SQLite/Reader and displayed mean/maximum assertions. The unchanged old harness fails with a missing real helper after12 native and4 Apps checks; the corrected fixture passes all17 on LuaJIT and Lua5.4 against real private SQLite files. No dashboard/runtime/SQLite policy or original expected values change. This is software consumer qualification; physical typing, GUI and final CI remain separate.
+
+macOS provider identities now require a complete same-read native publication and checked close/JSON shape. Malformed, unavailable, partial or changed sources stay unjudged; valid empty local publications remain distinct from unavailable providers. Existing cloud refusal and custom names retain their contracts. The final AI branch is already integrated; complete model-row/order ownership and installed Hammerspoon acceptance remain open.
+
+Tap binding identities now come from complete actual native producer publications on all three drivers, retaining detached identity sets and unchanged boot ordering. Changed or withdrawn owners stay unjudged, retired getters read neutral, unrelated source bytes remain, and replacement refuses before native effects. Existing native callbacks and hotkey activation are preserved. Final AHK/native acceptance is still required.
+
+One shared fixed-domain constructor registry pins the actual native Tap and Script publication accessors. Replaced, withdrawn, fake or re-registered producers return unjudged without invoking replacement getters. Genuine old-accessor controls fail the new public consumer assertions. Complete remaining domain publication and native installation qualification remain open.
+
+macOS/Linux keyboard bindings now publish their actual complete contextual native inventory through the same authentic fixed-domain authority owner as Tap/Script. Unknown future data remain unjudged and source-preserved; obsolete known bindings read neutral and reject replacement before effects. Both Lua engines and genuine old-producer controls qualify the portable ownership contract. Windows keyboard catalogue publication remains explicit software work because its native four-group producer does not yet own the expanded chord domain.
+
+The existing real Storage GC fixture now returns its allocation frame before the original two collections. A receipt remains rooted while the first collection must release its weak owner, then the original token retirement assertions run. The genuine strong-owner-box mutation fails on both Lua engines. No extra collection, timing waiver or production change is added; full final-source Linux qualification remains separate.
+
+Archive-distro unit validation now provisions only measured LuaJIT/Python/curl requirements and verifies real luv/lfs ABI5.1 loading with candidates obtained from the canonical installer function. The unchanged full unit command runs as the ordinary CI user in an owned writable checkout copy. Actual Debian13 Docker execution passes9184/0 with the reviewed GC fixture; Fedora, Arch, Alpine and openSUSE remain unexecuted until manual CI. Existing --no-deps installation, release conditions and all other workflow fields remain unchanged. The earlier Arch first-install exit2 is still unclassified.
+
+The current Windows native read/write-exclusion and foreign TOML record-parent fixes are composed with the configuration document owner. Canonical source-span arguments keep their original positions; the native container-stop argument is appended, with a registered fourteen-assert combined lexer regression. Native-reader child fixtures discover and copy complete genuine modules through canonical source ownership; all original sixty-nine assertions and child effects remain. Local selected encoding and361 JS checks pass; native Windows execution remains required.
+
+The actual macOS saved-model reader admits only intrinsically valid nonempty string backend/name records. Ordinary edits, removal, clear and immediate inverse preserve invalid physical members and surviving unknown fields. Explicit cleanup uses source/file/ordinal-bound native receipts with raw token identity; custom names and backend identifiers remain valid. Independent owning84/0 and shared55/0 on both Lua engines pass, including genuine original producer failures and two physical forged-token refusals. Full final-source native qualification and the remaining configuration inventories remain separate.
+
+The native callback error regression fixture now arms its same 5 ms continuation only after the first actual bad callback, preserving the original 30 ms watchdog and all nine assertions. A real 10 ms startup delay reproduces the original failure on Lua 5.4 and LuaJIT and passes the candidate. The full local Linux suite passes 9537/0; hosted packaging and installation still require the next exact-source manual CI.
+
+Seven Windows failures exposed a typo in four new fixture subjects: the manifest owns layout.ergopti_alt_gr, not ergopti_altgr. The corrected subjects retain every original predicate and add an actual manifest assertion plus a native unknown-neighbor preservation case. Independent exact-source review passes; the 19 registered obsolete-scope cases require Windows CI before native qualification.
+
+The Windows persistence census now audits the actual added scope build-only consumer, retaining the previous 36 consumers and requiring its captured-source, typed finalizer and status-before-target chain. The new closed census is 37 total / 9 internal, with executable-code offsets and genuine quoted-data counterexamples; no publisher assertion is relaxed. Actual Windows qualification remains pending.
+
+The exact personal snapshot regression now selects its handwritten semantic fixture identity among the real initialized defaults. All original name/type/value/two-row assertions remain; genuine sibling, case-twin, descendant and literal-dot decoys are rejected. Actual Windows execution remains pending.
+
+The Windows global-clear source comparison now reports both complete physical images with the existing canonical JSON encoder. Its equality predicate and all other assertions remain unchanged. Manual run37438495454 passed9949 Windows unit/meta cases and failed2, including this comparison; the precise source difference still requires the next native receipt. This diagnostic does not repair or close the remaining global transaction work.
+
+The Windows whole-state save now captures and classifies its exact physical source before the collector runs. It uses the existing shared obsolete-parent policy for each ordered snapshot occurrence, preserving obsolete scalar/array parents and neutral descendants while allowing unrelated accepted changes. Every nonneutral collision refuses the entire request, including one followed by a neutral duplicate. Present invalid, Boolean, fractional, newer or explicitly older schema stamps refuse before collection; ordinary saving performs no migration, and genuinely unstamped sources retain the existing first-save contract. Exact source/presence CAS, strict Integer-1 acknowledgement, generation retry and the injected two-argument writer contract remain owned by their existing native boundaries. Nineteen appended registered native cases and the original-production inverse await Windows execution. Independent V2 source review passes; its complete publisher census remains37 with the single real full-save site moving from public to private (internal9→10). Scope duplicate rejection remains unchanged. All remaining global reset/runtime acknowledgement and complete binding-inventory requirements remain open.
+
+Linux distribution qualification now retains the exact nonroot LuaJIT suite log and annotates the actual native summary and failures without deriving expected results. Both pipeline statuses are captured before reporting; a refused native suite remains failed even if diagnostics or artifact delivery also fail. The new install upload still runs after a failed suite and stops on cancellation, using !cancelled() explicitly in the existing conditional-step guard with seven added negative controls; mandatory success certificates remain separate. Fourteen independent parser controls and six real Bash status controls pass. Prior manual run37438495454 passed16/17 Linux installation scenarios, including Arch and Alpine first-install; the Alpine full native unit scenario failed with only a generic exit annotation. Its precise hosted cause and delivery of the new diagnostic artifact still require a subsequent run. Local signed official Alpine package requests are deniedHTTP403, a separate environment limitation.
+
+The personal-editor source guard now reads the complete actual keymap module through the strict canonical recursive helper, retaining the existing absence and behavior assertions and rejecting empty or unreadable source. Fifteen actual source files participate instead of a location-pinned layout file. The unchanged owning ratchet independently refuses381 paths before this migration and accepts380 afterward against the same380 bound. No native runtime policy, foreign Windows implementation or ratchet assertion is changed. Native Windows execution remains required.
+
+The actual Windows global-clear image from manual run37451318736 contains the five explicit off assignments required by shared policy, while retaining every obsolete/private source byte. Its handwritten full-image expectation now includes those assignments. All188 existing assertions, exact backup and inverse checks remain unchanged. Manual diagnostic run37456524038 passes this corrected native transaction and its retained subsequent assertions; final-source native qualification remains pending.
+
+Manual run37451318736 reports9974 successful and16 failed Windows cases, including nine actual full-snapshot cases whose ordinary saves refuse. A fixture-only diagnostic now retains the genuine ConfigIO/TomlWrite logger, collector count and complete expected/actual physical images in the first annotation line. All574 measured textual assertions and expected outcomes remain unchanged; the exact prior logger sink is restored even on exceptions. Manual diagnostic run37456524038 locates all9 remaining errors inside the actual collector at an unassigned global. The subsequent genuine keyboard-default fixture prerequisite is recorded separately and must receive its own native qualification. No production guard or schema refusal is weakened.
+
+The five Windows source guards still naming the former public two-argument full-save gateway now follow the actual captured-source native publisher. They retain path-bound ownership, source capture and classification before collection, exact physical content/presence arguments, no pre-write deletion and strict Integer-1 acknowledgement. Independently reproduced quoted/comment-only source-receipt and ACK mutants are rejected by executable-token checks;158 portable source predicates pass. These structural repairs preserve the safety assertions and do not identify or repair the separate actual ordinary-save refusal. Native AHK execution remains pending.
+
+Successful native Script-storage finalization now detaches the owner from the retired Linux/macOS journal after all refusals and successful weak-tombstone construction. A real retained native journal and an observed publication closure expose the previous strong-owner edge. Exact source/backup, refused ownership, pending callbacks, allocation refusal, idempotence and old-token rejection remain covered. New authentic-journal cases fail against original production on both Lua runtimes; owning probes pass Linux161/0 and macOS models29/0. The entire old fixtures, including both GC calls, remain byte-identical prefixes. Quiet old and corrected hot runs can both pass; controlled instrumented trace observations are distinguished from hosted reproduction. Manual run37451318736 failed the owner-cycle case, and a new full native receipt is still required to prove this correction resolves its exact assertion.
+
+Windows diagnostic run37456524038 resolves the five publisher source guards, global-clear expectation and native profile frame, with9982 passed and9 remaining full-snapshot failures. The genuine logger locates those failures inside the real collector with an unassigned global. The runner omits FeatureState initialization; the fixture now constructs the mandatory keyboard defaults from the exact native manifest projection and restores its prior value or unset state. All574 existing textual assertions and19 registrations are preserved, with one new real-default prerequisite assertion. Source review is clear; exact native replay remains pending and no production persistence guard is relaxed.
+
+The shared AutoHotkey keyboard identity rule now matches the existing Lua policy and replays17 additive independent handwritten vectors. Native source admission rejects sparse arrays, named metadata and derived prototypes before accessors run; five registered Windows cases cover retirement, omission and callback-free refusal. Independent pure Lua replay passes83/0 on each runtime. This is preparatory policy only: no complete Windows catalogue, loader publication or late parameter getter is changed or claimed implemented. Actual native AHK qualification and coordinated action-owner integration remain required.
 
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
@@ -3697,6 +3915,15 @@ The packaged macOS launch matrix now contains a Karabiner configuration scenario
 The signed native checkpoint 37116923472 reached the actual independent JSON codec and production build/merge owners, then refused its first variant because the canonical French action registry gives distinct Cmd+Tab and Option+F17 outputs the same localized label. Legacy reconstruction now keeps validated action-label candidates: unused descriptive ambiguity cannot block foreign profiles, while a complete historical block referencing distinct candidates remains unowned and refuses publication. The eight real-catalogue default/recommended switch vectors prove merge, exact-source publication and unchanged confirmation locally. Signed native qualification of all eight variants remains pending; the original AppleEvent controls and deadlines remain mandatory.
 
 - [~] **42.** config.toml batch writer follow-ups (`toml-batch-existing-key`):
+  Current source implements the Windows typed dotted/inline document reader,
+  targeted saves and full-state publication. The nineteen FullSnapshot cases
+  passed natively in diagnostic run 37466163822 (feature `682d373e` plus one
+  test); that historical tree does not qualify the published `409b8ee0` source.
+  Final composed native/E2E/package/install/restart qualification remains open.
+  Preserve obsolete scalars until explicit cleanup and strict invalid-schema
+  and requested colliding-subtree refusals. Earlier reader/full-state status
+  below is historical, superseded by current source implementation.
+
   an old build's scalar where a table is now expected (`magickey = true` under
   `[hotstrings.modules]`, `groups = "x"`) still makes a menu save fail with «
   the batch cannot address the destination without ambiguous TOML keys » —
@@ -3704,8 +3931,9 @@ The signed native checkpoint 37116923472 reached the actual independent JSON cod
   ordinary save must refuse a colliding new subtree without replacing them.
   The shared macOS/Linux decoder now resolves hand-written dotted assignments
   (`a.b = 1`) as semantic nested keys while quoted dots remain literal keys.
-  Windows document/config dotted assignments remain unsupported; its existing
-  inline-table reader already resolves them and replays the common corpus.
+  Windows now reads typed document dotted keys and supports targeted semantic
+  configuration saves; full-state publication was then a separate follow-up.
+  Its inline-table reader also replays the common corpus.
   Linux now delegates whole custom-delimiter lists to the shared TOML writer,
   including `[[hotstrings.terminators]]` and quoted table-array headers. The
   obsolete local refusal and its unsupported-format warning are removed.
@@ -3717,8 +3945,19 @@ The signed native checkpoint 37116923472 reached the actual independent JSON cod
   the fix. Local gates passed (349 JS, 4607 Linux unit and 143 Linux E2E
   checks). Full three-OS checkpoint 37033032620 at `6275cac35` passed unit,
   E2E, packaging and installation gates with release skipped. The scalar
-  preservation policy is settled; Windows document dotted-key reader remains
-  open.
+  preservation policy is settled; at that historical checkpoint the Windows
+  document dotted-key reader was still open.
+
+The Windows configuration gateway and detached scope builder now use the
+configuration-only semantic document transformation through the existing atomic
+writer. Dotted/quoted paths, inline descendants, typed Boolean intent, array
+owner generations and no-op comments retain their semantic/source identities.
+Scalar/array collisions, duplicates and changed sources refuse publication;
+ordinary writes never replace an outdated scalar with a new subtree. All prior
+native assertions remain, with independently authored complete-image controls.
+Local format, encoding and 359 JavaScript checks pass; actual AutoHotkey unit,
+compile, E2E, packaging/installation and installed restart remain pending CI.
+Full-state/onboarding/LLM publication stays explicit implementation work.
 
 The shared dotted-key reader now uses the existing strict key-path owner for
 root, section-relative, multiline and inline assignments, including independent
@@ -3797,6 +4036,69 @@ Partial dev handoff (2026-10-05): implement and qualify Windows
 document/config dotted assignments with independent expected models. Preserve
 retired scalar collisions until explicit cleanup; ordinary saves must refuse
 them. Installed-driver restart and actual menu persistence remain acceptance.
+
+Ordinary Windows full-save, onboarding and AI configuration candidates now use
+the same semantic-document writer as targeted configuration updates, preserving
+root-dotted, quoted and inline source identities through the existing leases,
+staging and durable receipt owners. Shared Lua leaf publication and explicit
+unused-key cleanup retain authenticated source array/object kinds and opaque
+scalar lexemes; stale or forged shape hints refuse. Native macOS custom wrap
+choices publish through their canonical typed namespace and conditional writer,
+including future pair metadata. All native Windows causal fixtures and final
+packaging/install acceptance remain separately required.
+
+The 2026-10-05 continuation adds source-bound explicit Windows cleanup of retired physical sections, including empty section headers, exact case identities and verified backup bytes. Ordinary full saves preserve retired entries. New Windows namespace publication now uses an explicit native-readable header only when the semantic parser admits that declaration after explicitly owned drops; closed dotted/inline owners keep their existing legal insertion route. Complete independently written images and actual flat-reader assertions cover first publication and explicit replacement. Native qualification is still in progress; unsupported retired dotted/inline/table-array cleanup projections remain implementation work.
+
+Ordinary macOS snapshot and scope preparation now preserve an obsolete scalar at the optional user-model list. Neutral operations cannot silently delete it; nonneutral replacement refuses before source cleanup. Existing exact-source and typed-neighbor fences stay active.
+
+Windows explicit cleanup now offers the complete retired ahk root in dotted assignments, inline roots and table-array generations. Its private native receipt binds exact record identity, fields and complete source; cloned, forged, mutated, stale, partial and consumed records refuse before publication. Existing backup, lease, typed document writer and host action-only authority remain intact. Twenty-one native regression cases are added; native Windows qualification is pending. Lua collectors still cannot offer these root forms, and retirement policy is not yet centralized, so this slice does not complete the cross-driver item.
+
+The trusted macOS/Linux native cleanup owners now preview and explicitly remove wholly unread dotted, inline and table-array roots through authenticated source ranges. Generic source-only cleanup and ordinary writes retain their previous contracts. Private receipts bind exact record/source/path identity and recheck the actual unread collector before backup, after verified backup and before native conditional publication. Protected or partially consumed roots remain untouched; raw selection identity and plain-array admission refuse equality proxies. Independent actual private-file Linux67/0 passes both runtimes and controlled macOS82/0 passes Lua5.4; previous producers fail22 new cases. No retired-root catalogue is inferred, and quoted root assignments containing equals remain conservatively unavailable. Actual Hammerspoon, Windows and final native/installed qualification remain separate.
+
+Native Windows diagnostics executed the complete root cleanup subjects but three shared neighbor checks used a comma expectation for an existing pipe-delimited diagnostic joiner. The successor additionally requires Array shape, length, Integer kinds and both original ordered values before the correct pipe expectation. Production cleanup and all other asserted neighbors remain unchanged. Source review is clear; actual Windows rerun remains required.
+
+Explicit cleanup meta controls now inspect the authenticated RootReceipt through the actual private publisher and claimed ConfigCommitBuilt chain, retaining backup, exact-current-source and strict acknowledgement gates. Anchored lexical binding controls reject renamed unresolved Publisher/Writer/Receipt aliases. Native Windows execution is still required; no production cleanup rule or assertion was disabled.
+
+Explicit Windows namespace deletion now normalizes its semantic expectation only for emptied implicit parents. Real retained header and inline-container identities are preserved, including quoted literal dots, empty quoted segments and case twins. Two independent source reviews pass57/0 portable predicates and preserve every old assertion; no-op checks measure exact source and modification time, not inode identity. Actual Windows syntax, all14 subjects and native cleanup causality remain pending.
+
+The shared physical record scanner now reuses the existing strict quote-aware assignment splitter instead of taking the first equals sign inside quoted keys. Actual Linux cleanup admits the proven ahk root beside an unowned quoted key containing equals, verifies the exact backup and preserves the complete independently handwritten survivor, including empty-array kind. The original valid-source limitation fixture now has stronger identity/removal/backup predicates; malformed, forged and stale refusals and447 earlier corpora remain unchanged. Independent Linux201/0 on both number models and portable macOS222/0 reproduce18 predecessor failures; actual Hammerspoon and final selected/native CI remain separately required.
+
+Windows inline descendant updates now preserve source-owned order and trivia instead of rebuilding the complete enclosing Map. Three obsolete normalization premises have independently handwritten source-fidelity expectations; all assertions remain, with exact reverse reconstruction and unchanged independent corpora. The new optional canonical lexical splitter is used only by semantic document admission; generic APIs retain their earlier bytes and behavior. Source review and canonical guards pass, but native AHK execution and the original-route causality probes are not yet claimed.
+
+Both Lua drivers can now replace or explicitly remove an existing root dotted scalar through the shared strict source writer, preserving untouched bytes, comments and fresh-reload semantics. Native preference tests cover 17-digit precision and signed zero; nonfinite requests and inexact owned candidates refuse. Root inline tables, section-relative dotted writes and unrelated closed-shape literal-dot destinations remain explicit implementation gaps. This slice does not relax preservation of obsolete scalar parents or alter the default document encoder.
+
+The actual Lua preference writer now preserves requested finite numeric header leaves with the existing optional precise-literal owner and rejects inexact owned readback before native publication. Authentic source literals retain precedence; nonnumeric/container handling, the default codec, backups and source/CAS permissions are unchanged. Native-file setter, full-image and fresh-reload controls cover 17-digit values and signed zero on both Lua drivers. Root inline-table and section-relative dotted write support remain implementation work; packaging and installed-device acceptance remain separate qualifications.
+
+Two Windows cleanup controls now compare their complete handwritten case-sensitive identity sets independently of unspecified native Map enumeration order. Exact cardinality, duplicate refusal and unique semantic section markers strengthen the checks; all original key identities, backup, unknown-data and case-twin assertions remain. Production discovery and cleanup policies are unchanged. Actual Windows execution remains pending CI.
+
+The shared writer now resolves root and section-relative dotted/inline scalar destinations through canonical source spans, including an absent bare inline member with an existing valid parent. Whole-image, typed intent, same-source backup/readback and finite-number admission retain refusal for collisions and ambiguous namespaces. LuaJIT explicitly refuses newly requested integers outside its exact integer range. The obsolete-parent preservation decision remains unchanged. Existing valid inline scope deletion is now checked positively; the original five refusal assertions retain a genuinely malformed duplicate-key subject. Native Windows and installed qualification remain separate.
+
+Shortcut scopes preserve source-proven obsolete scalar/array parents rather than deleting them to create a current subtree. Explicit unsafe descendant replacement raises a retained-parent collision with no native IO. This does not complete the separate Windows full-state obsolete-parent refusal or case-sensitive boot-map work.
+
+The real Windows recursive full-state collector now renders each semantic key segment with the canonical TOML key owner. Its configuration-only sparse adapter consumes the resulting exact semantic parts, preserving literal dots, empty/non-BMP keys and supplied case-sensitive map entries. Generic sparse API semantics remain unchanged. New registered actual-collector/full-save cases are appended; native execution is pending. Simultaneous case-twin boot maps and obsolete-parent full-state safe refusal remain separate software work.
+
+Windows scope recommendation/clear preserves source-classified obsolete values until explicit cleanup, including new external-source and late schema-session refusals. This covers the detached scope owner, not the still-open whole-state obsolete-parent refusal or unclassified table-array boundaries.
+
+Saved-model scalar edits and explicit intrinsic obsolete-record cleanup now use authenticated canonical inline-array/table-array physical row spans. Whole-source backup, native CAS, exact readback and refusal recovery remain authoritative; generic arrays do not gain record-list ownership. Ordinary saves keep opaque invalid members until explicit cleanup.
+
+The reviewed signed-zero fixture correction (`493524db`, V2) changes only
+13 request subjects in three test files. Actual Alpine LuaJIT turns the Lua
+fixture literal `-0.0` into positive zero before the writer receives it;
+`tonumber("-0.0")` now establishes the intended request, with numeric-type and
+reciprocal-sign assertions before each producer call. All 382 original
+assertions, expected source images, 465 corpora and production bytes remain
+preserved; wrong positive-zero owned candidates still refuse acknowledgement.
+Independent V2 focused replay passes 204/0 shared cases and 41/0 native
+preference cases on each of actual Alpine LuaJIT, glibc LuaJIT and Lua 5.4;
+the genuine original Alpine fixtures reproduce 195/9 and 37/4.
+
+The author's full V1 Alpine run passes all 433 modules, 10,133/0, under the
+unchanged canonical GNU prerequisite setup and pinned native luv/lfs builds,
+executed as the ordinary CI user. Its earlier incomplete-prerequisite attempt
+(10,123/10) remains recorded. V2 differs from that qualified V1 source only in
+three comments; this is executable-body equivalence evidence, not a claimed
+second full V2 run. Corrected hosted current-source, macOS SDK, Windows and
+physical-device qualification are not inferred. TODO42 remains partial.
 
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
@@ -4059,13 +4361,255 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 95, macOS 152, Linux 96, each
+  drivers still build (current baseline: Windows 53, macOS 86, Linux 61, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
   existing rows during the migration (proposal in the menu-first-group
   report: most hide; greyed: Linux edit_shortcuts, Linux key
   combinations, Linux metrics shortcut rows, Windows preview_bubbles).
+  Published `409b8ee0` includes the shared model-readout migration and its two
+  owner-generated artifacts; the remaining sites are software migration work.
+  Native allocators and computed user-data captions alone do not prove missing
+  shared policy. Final native binding/order/caption and installed acceptance
+  remain required; source review and the local portable gates are insufficient.
+
+  Current qualification checkpoint: own all-OS CI37541202298 tested exact
+  published cee55e1a/treea17350f2: native AHK10089/0, macOS canvas12 and the
+  entire Linux chain with17 install/launch variants pass, but Windows fresh-clone
+  startup fails with downstream phases skipped, and macOS package fails.
+  Corrected Windows CI37543830928 on exact20352/tree6641 is terminal successful:
+  native10089/0, full/fresh-clone startup, E2E, package, installed compiled
+  admission, programmable qualification, mandatory evidence and verdicts pass;
+  Release is skipped. Both new personal-shortcut cases belong to the actual
+  native runner; only aggregate proof is available (earlier individual manifest
+  download403, current individual/artifact fields not downloaded). All six items
+  remain partial:53/86/61 retains200 software construction sites plus separate
+  final integrated-source and installed/device qualification requirements.
+
+  The current Windows fixture cohort checks the genuine shared-renderer
+  toggle route, captures and restores absent or present dependency state, and
+  loads the real English translation owner while restoring all eleven prior
+  locale references and flags. All 156 existing model/label assertions remain
+  intact; production menus, corpus expectations and locale sources are not
+  regenerated or changed. The component fixes are independently source-reviewed;
+  actual AHK/Win32 execution remains unrun locally and requires fresh Windows
+  CI. These fixture corrections leave all six group items partial.
+
+  The Windows personal-shortcuts separator and fixed submenu caption now
+  consume one shared frame. Its genuine ordered runtime registry remains
+  Windows-only; macOS keeps its arbitrary personal script and Linux its
+  existing shortcut controls, with this frame explicitly not applicable.
+  Registry predicates, descriptions, child order, switch callbacks and
+  native menu lifetimes remain unchanged. The unchanged owner scanner
+  measures 55/86/61 to 53/86/61. Shared renderer controls pass 12/0 on
+  Lua5.4 and LuaJIT; the two registered Windows native cases remain locally
+  unexecuted. Current hosted-native and installed qualification remain
+  required. All six group items stay partial.
+
+  The Windows hardware-boundary fixture now uses the existing typed recursive
+  \_LVS_DeepEqual comparator through AssertEqual with an empty mismatch result,
+  replacing two calls to the undefined AssertDeepEqual helper. Both independent
+  expected hardware Maps and both actual operands remain exact; all other
+  assertions, the strict comparator and its registered negative controls are
+  preserved. The canonical runner includes the owning fixture and comparator
+  before registered callbacks execute. Reversing those two calls recovers the
+  complete published fixture, and the repair commutes exactly with the appended
+  model-header tests. Production, framework, corpus, locales, menu declarations
+  and the 55/86/61 census remain unchanged. Early native CI 37519571990 on
+  source47dec reports Windows 10038 passed/1 failed at the first undefined call;
+  the second defective call was not reached. That run is terminal failed and
+  Release is skipped. Detached source checks pass; local AHK/Win32 execution
+  and the actual Windows retry remain pending. This fixture repair is not a
+  current union/native or installed qualification result. All six group items
+  stay partial.
+
+  The model-picker header boundary now consumes one canonical inert separator
+  on Windows and macOS; Linux retains its genuine flat model-list presentation
+  and hides this fragment, not the model feature. The unchanged owner scanner
+  retires two genuine native constructors, establishing 56/87/61 to 55/86/61.
+  Selectable NoModel/default controls, model/API/catalogue data, pause policies,
+  native callbacks and preceding HF-token reads remain exact. Declaration
+  refusal retains the native empty-Menu/completed-row refusal behavior; it does
+  not prevent those earlier catalogue/token reads. All 472 predecessor corpora
+  and 21 locale files remain exact. Actual supported portable macOS owner tests
+  pass 16/0 and French-warm controls pass 3/0 on both Lua runtimes; genuine old
+  native-only controls give 14/2 and 1/2 with the same tests. Unchanged Linux
+  whole-menu controls pass 41/0 in English and French on both runtimes. Actual
+  source withdrawal/receiver/comment controls and repeated owner generation
+  protect binding and presence. Two new Windows full-picker/native Win32 cases
+  remain locally unexecuted; SDK, GTK, device, installed and final current-Root
+  hosted-native qualification remain pending. All six group items stay partial.
+
+  The first full portable macOS gate of the staged LLM presentation union
+  records 16530 passed and 79 failed, not a qualified union. Two existing
+  fixture renderer seams omit the genuine native_child_rows contract; 77 cases
+  fail on that omission and two activation_scope cases reflect the same
+  boundary consequences. The repair is limited to forwarding the genuine
+  helper through those same two fixture owners; prior assertions and production
+  behavior stay intact. The complete corrected portable rerun and
+  current hosted-native/installed qualification remain pending. The 55/86/61
+  source census is unchanged; all six group items stay partial.
+
+  The LLM Trigger, Display and Navigation parents now consume three canonical
+  group declarations on all three drivers. Existing caption keys, platform
+  projection, disabled/health-dot policy and native child settings, readiness,
+  callbacks and choices remain authoritative. The pure native_child_rows
+  adapter detaches valid completed Lua trees without IO or callback delivery;
+  actual admitted/refused-input controls verify no external hooks. Proper
+  empty Navigation remains valid, while malformed child trees refuse parent
+  attachment. Windows uses the real shared renderer with its original staged
+  Menu, child handles, cleanup/lifetimes and conditional backend warning anchor.
+  The unchanged owner scanner establishes 56/90/64 to 56/87/61, retiring three
+  macOS and three Linux sites with no Windows retirement. All 471 predecessor
+  corpora and 21 locale files remain exact; original behavioral assertions stay
+  retained and one Windows source-route premise is strengthened for genuine
+  canonical renderer binding and dispatch. Thirteen actual source negatives,
+  21 lexical controls and 12 helper-shape controls protect real parent binding.
+  Supported macOS Lua5.4 owning, pure-renderer and layout controls record
+  175/0, 106/0 and 8/0, inherited through exact native/API/test-byte equality.
+  Final Linux owning and adapter/menu controls pass 90/0 and 41/0 freshly on
+  both Lua runtimes. Genuine original native routes with their original dynamic
+  declarations and current APIs give 166/9 on macOS and 84/6 on Linux. The
+  repaired Linux fixture prefix and its unchanged topology registration are
+  exact; separate cumulative fixture-chain qualification remains required.
+  Five actual registered Windows native cases remain locally unexecuted; SDK,
+  GTK, hardware, final Root/full hosted-native and installed qualification
+  remain pending. All six group items stay partial.
+
+  The existing Windows/Linux empty-API status and macOS empty server-model
+  status now consume two shared inert label fragments. Three genuine native
+  leaves migrate, but only the Windows and macOS leaves were counted: the
+  unchanged owner scanner establishes 57/91/64 to 56/90/64. Linux's actual API
+  status remains available; only genuinely absent presentation roles hide.
+  Native empty predicates, retained selected models, selectable NoModel
+  commands, provider actions and runtime owners remain unchanged, with all
+  470 predecessor corpora, 21 translated locale files and prior assertions
+  preserved. Supported macOS Lua5.4 owning and French-warm controls pass 22/0
+  and 3/0; genuine old native source gives 20/2 and 1/2. Linux LuaJIT owning
+  controls pass 50/0, and four new controls pass 4/0 in English and French on
+  Lua5.4 and LuaJIT versus old-native 2/2. The Linux full Lua5.4 fixture remains
+  48/2 versus original 44/2 from its inherited private-write/FFI limits; raw
+  macOS LuaJIT warm controls remain 1/2 on current and old native source from
+  the inherited table.pack formatting limit. No shim or unsupported green
+  result is claimed. Windows native cases and Win32 acceptance, actual
+  Hammerspoon/SDK, GTK, physical devices and final Root/hosted-native
+  qualification remain unexecuted or pending; all six group items stay partial.
+
+  Linux's two existing selection boundaries now consume shared inert
+  fragments between CapsWord, the case-transform trio and the selection-helper
+  trio. Existing native actions, callbacks, readiness and order stay unchanged;
+  Windows and macOS have no corresponding provider boundaries and explicitly
+  hide them. The unchanged owner scanner establishes 57/91/66 to 57/91/64,
+  preserving all 469 predecessor corpora, 21 locale files and prior assertions.
+  Actual Linux case-transform and whole-tray controls pass 72/0 and 22/0 in
+  English and French on Lua5.4 and LuaJIT; the genuine old native producer
+  gives 70/2 and 21/1 with the same tests. Neighbour controls pass 311/0, and
+  eighteen negative source/declaration controls remain red. These portable
+  source receipts do not qualify native GTK, SDK, physical devices, the final
+  Root source or hosted CI. Final composed native and installed acceptance
+  remain pending; all six group items stay partial.
+
+  The existing trigger, display and live-mode control boundaries now consume
+  three shared inert fragments at their genuine Windows, macOS and Linux
+  provider sites. Each original platform-specific presence and placement
+  remains exact; native settings, prompts, pause/source checks, callbacks,
+  catalogues and acknowledgement policies are unchanged. The unchanged owner
+  scanner retires four sites, establishing 59/92/67 to 57/91/66, with all 468
+  predecessor corpora and 21 locale files exact. Supported portable macOS
+  Lua5.4 owning and French-warm controls pass 14/0 and 3/0; the genuine old
+  native producer gives 13/1 and 2/1. Linux whole-tray controls pass 20/0 in
+  English and French on Lua5.4 and LuaJIT, while original native source gives
+  19/1. macOS LuaJIT preparation fails on the inherited raw bitwise operator
+  in key_state.lua before behavioral assertions; original native source and
+  original fixtures reproduce that preparation failure, so no LuaJIT behavior
+  is qualified and no shim is used. Two new Windows Win32 cases, actual
+  Hammerspoon/SDK, final composed hosted-native and installed acceptance remain
+  unexecuted or pending. All six group items stay partial.
+
+  The Windows/macOS separator before per-model hardware details now consumes
+  one shared inert fragment; Linux has no corresponding hardware block and
+  explicitly hides this boundary. Each native availability predicate remains
+  exact: Windows still shows its hardware heading for an empty Ollama Map,
+  while macOS requires download, disk or RAM values. Bare Windows Ollama and
+  decorated macOS Ollama headers, all values, order and native callbacks
+  remain unchanged. The unchanged scanner and two owner-generator fixed-point
+  runs establish 60/93/67 to 59/92/67, with all 467 predecessor corpora and 21
+  locale files exact. Actual portable macOS owning and French-warm controls
+  pass 13/0 and 2/0 on both Lua runtimes; genuine old native source gives 12/1
+  and 1/1. Unchanged Linux whole-tray controls pass 17/0 in English and French
+  on both runtimes. The new real Map/Win32 case is locally unexecuted; final
+  composed native CI, actual Hammerspoon/SDK and installed acceptance remain
+  pending. This source-qualified boundary does not complete either menu item
+  or any of the six group items.
+
+  Linux's six existing absent-module status children now consume five shared
+  inert fragments for Hotstrings, LLM, Metrics, Shortcuts and Gestures. The
+  exact native absence predicates and outer captions remain unchanged; all
+  statuses stay disabled with no action, and all unrelated data, callbacks and
+  IO retain their native owners. Windows and macOS have no such child
+  presentation and explicitly hide these Linux-only fragments. The unchanged
+  owner scanner establishes 60/93/73 to 60/93/67; all 466 predecessor corpora
+  and 21 locale files remain exact. Actual registered Linux whole-tray controls
+  pass 17/0 in English and French on Lua5.4 and LuaJIT, while the genuine old
+  native producer gives 12/5 with the same tests. This is portable source
+  qualification, not a GTK, SDK, Windows or physical-device result. Final
+  composed hosted-native and installed acceptance remain pending; all six
+  group items stay partial.
+
+  The curated model family and per-model origin boundaries now consume two
+  shared inert fragments on Windows and macOS; Linux's installed-model list
+  has no corresponding boundaries and explicitly hides them. Native populated
+  family predicates, catalogue order, selection, download, deletion, readout
+  and hardware callbacks remain unchanged. The unchanged owner scanner retires
+  exactly four sites, establishing 62/95/73 to 60/93/73. All 465 predecessor
+  corpora and 21 locale files remain exact. Independently reviewed portable
+  macOS owning and genuine French-warm controls pass 11/0 and 3/0 on both Lua
+  runtimes; original native producers give 9/2 and 1/2. Unchanged Linux
+  whole-tray controls pass 9/0 in English and French on both runtimes. Two new
+  Windows Win32 cases remain locally unexecuted; final composed native CI,
+  actual Hammerspoon/SDK and installed acceptance remain pending. This bounded
+  source migration does not close either menu item or any group item.
+
+  Generation numeric boundaries now consume three shared inert fragments,
+  retiring the three actual Windows separators and one macOS separator. Later
+  macOS numeric boundaries and all Linux generation boundaries retain genuine
+  absence
+  through explicit `unavailable = "hide"`; no native callback, numeric/reset
+  selection, prompt, state or existing acknowledgement policy changes. The
+  canonical generators establish 66/98/73 to 63/97/73, with all 463 predecessor
+  corpora and 21 locale files byte-identical. Actual macOS owning tests pass
+  10/0 and French warm-owner controls 3/0 on both runtimes; genuine old native
+  source alone gives 8/2 and 1/2 respectively. Unchanged Linux whole-tray tests
+  pass 9/0 in English and French on both runtimes. Three new Windows Win32
+  cases, final composed native CI and installed-device acceptance remain open.
+
+  The nonempty shortcut-extension boundary now consumes one shared separator
+  and decorated disabled heading on Windows and macOS. Linux retains its
+  extension entries without this presentation boundary. All extension scans,
+  builders/fallbacks, sandbox loads, child ordering and callbacks remain
+  byte-identical outside the four genuine constructor replacements. The
+  unchanged owner scanner counts three retired sites, establishing 63/97/73
+  to 62/95/73: the Windows decorated heading was originally uncounted.
+  Independent portable macOS owning and genuine French-warm controls pass
+  5/0 on both Lua runtimes; the genuine old native producer gives 3/2 in both
+  contexts. All 464 predecessor corpora and 21 locale files remain exact.
+  On macOS, missing/unbound presentation refuses after the existing sandbox chunk loads;
+  it does not prevent those earlier loads. The new registered Windows native
+  fixture is unexecuted locally. Current parent-tree CI run 37491143093 tests
+  the aa70/6bf86bfc tree without this extension slice, so it cannot qualify the
+  new family. Composed native CI and installed-device acceptance remain open;
+  all six group items stay partial.
+
+Linux Metrics unavailable/idle migration readouts now consume shared inert label
+templates. Running progress and cancellation retain their native owners. The
+composition graph credits executable template publication per platform and keeps
+clicked-submenu action requirements intact; independent malformed-row and native
+state cases retain the original assertions. The census retires exactly two Linux
+fixed-caption sites. Source-selected local gates pass 359 JavaScript checks,
+14,667 portable macOS and 7,860 Linux unit cases, plus 101/189 portable E2E
+checks (one macOS host-specific skip). Items 54/81 stay partial; native Windows,
+three-OS packaging/installation and installed-device acceptance remain required.
 
 The fixed per-key native/no-action command now consumes one shared command
 declaration on all three drivers, with the existing Windows/Linux and macOS
@@ -4431,15 +4975,70 @@ partial.
 
 Windows workstation handoff (maintainer instruction, 2026-10-04):
 
-- [ ] Execute the existing native per-key command/caption/state/refusal cases and review the still-native Windows menu sites against the actual census (currently 95). Move remaining fixed policy/data to shared declarations without hiding rows or weakening the scanner.
+- [ ] Execute the existing native per-key command/caption/state/refusal cases and review the still-native Windows menu sites against the actual census (currently 82). Move remaining fixed policy/data to shared declarations without hiding rows or weakening the scanner.
 - [ ] Prepared shared menu packets in docs/handovers/2026-10-04-config-menus are unapplied. Verify their recorded dependencies/preimages, regenerate owner artifacts and qualify all affected drivers after any shared change.
 
 Partial dev handoff (2026-10-05): Metrics V3 is reviewed but unapplied.
-Delay needs the existing Windows timing setter exposed honestly; Wrap needs
-macOS refused-deletion durability before integration. Guidance is reviewed but
+The Windows timing prompt and macOS Wrap refusal transaction are implemented
+by 9bae9a340, with subsequent arity and finite-writer refinements. Their native
+and installed-device acceptance remains separate. Guidance is reviewed but
 blocked by those predecessors; Gesture mode has no complete test/generation
 qualification. Continue remaining families to the actual zero-site ratchet.
 These are implementation tasks; separate installed tray/input acceptance.
+
+Further fixed Wrap, Gesture mode/sensitivity/action and Tap-Hold duration and
+Karabiner guidance controls now consume shared declarations through actual
+native templates. Inert labels, named composed headers and checked templates
+retain strict field and getter contracts; clicked submenus still require a
+usable child. Each native composition edge carries executable source evidence,
+and transparent includes retain cycle, missing-target and duplicate-identity
+refusal. The Windows per-key duration path preserves physical TOML source and
+requires the precise native publication witness before reload. Its current-value
+prompt is genuinely translated in all 21 locales. Independent historical
+corpora remain immutable. Full selected and all-OS native qualification remain
+required; the remaining fixed native families and physical acceptance are open.
+
+The 2026-10-05 Swipe continuation declares its fixed action separator, mode group and sensitivity group once in the shared manifest. Native selection, eighteen numeric sensitivity choices and acknowledged compensation remain their existing owners. Two captions use genuine translated prefixes in all 21 locales. Source/graph/callback controls and the old-producer inverse pass; final composed native and physical UI qualification remain pending. This does not complete the remaining fixed provider controls.
+
+Native Linux metrics equivalence now retains the established JSON-quoted token column in its independent raw-row SQL transport. All twenty-one assertions, aggregation rules and date/application filters remain unchanged. Real SQLite compares 648 grouped rows with 2808 raw rows; this repairs a validation prerequisite and changes no production metrics policy.
+
+The native Windows DelayRows provider now supplies all four required renderer arguments. The previous candidate failed loading before any native unit case; all eight production call sites retain the unchanged four-argument API. Two actual-provider regression cases cover complete physical rows, caption propagation, missing commands and withdrawn callback ownership. Native Windows qualification remains required on this successor.
+
+The fixed separator after the native About build/version row now comes from one shared fragment on all three drivers. Existing update/channel/cadence callbacks and shared version wording remain unchanged. Independent actual rendered/provider mutation, platform-hide and missing-declaration controls preserve every original registered assertion. Focused macOS20/0 and Linux29/0 pass on both Lua5.4 and LuaJIT; identical old-source controls fail two cases per driver. The actual scanner measures83/125/93 to82/124/92 (Windows/macOS/Linux). Windows cases are registered but unexecuted locally; final native CI and installed-device acceptance remain required. Items54/81 remain partial for other fixed presentation/data families.
+
+The packaged macOS About check row now consumes its existing shared command and readiness getter. Both manual and offered-release callbacks retain the actual shared live-admission wrapper; the original strict tag/channel consent body and every prior registered assertion remain byte-exact. Independent Lua5.4 passes36/0; original provider30/6 and the discarded direct-callback override34/2 prove the regressions. Raw LuaJIT fails at the inherited fixture table.pack boundary; explicit fixture-only compatibility replay is recorded separately. The unchanged scanner measures Windows82/macOS123/Linux92. Actual native CI, installed menu acceptance and other fixed families remain required. The registered provider dialect guard now verifies actual declared rendering, manual/offered dispatch and stale-offer refusal instead of the retired caption location. Its six other About predicates and original assertion message remain exact; independent current11/0, original/current7/1, original/old8/0 and strengthened/old8/3 distinguish the regression.
+
+The newly registered Windows Wrap provider controls now load the actual seven-group shared catalogue, while the older two-pair transaction fixture and all its assertions remain untouched. Actual renderer acknowledgement counts labelled rows, and independent Win32 item/position/caption checks require all15 native rows including3 separators. The handwritten corpus is unchanged; source review is clear and native rerun remains required.
+
+The Windows gesture-slot tap-group separator now belongs to its existing shared gesture_slots_ahk status fragment. Actual native rows retain all action and persistence owners; three new registered tests measure Win32 positions, declaration withdrawal and invalid effect-free status admission. Every prior test/corpus is unchanged. Owner generators reproduce the artifacts and the unchanged scanner lowers only Windows82 to81, leaving macOS123/Linux92. Available selected format, BOM/LF and361 JS gates pass; AHK unit, parse and E2E are skipped on this Linux container and require targeted native CI.
+
+macOS missing-bundle and macOS/Linux empty installed-layout statuses now consume the existing shared status fragments. Native discovery and installation owners are preserved; independent handwritten expectations cover all21 translated captions. The owning generators reproduce the census Windows81/macOS120/Linux91. Selected container checks are recorded separately from native installed/device acceptance; remaining native row families keep this item open. The empty macOS Input Sources provider also consumes a shared Open preferences command with the unchanged native callback; retained declaration withdrawal refuses before launch, and no true launch acknowledgement is fabricated.
+
+Custom-profile actions, saved-user-model children and Linux free-entry numeric tails now use shared ordered child declarations. Native action, prompt, save, disable and rollback owners remain in their drivers. Existing labels and handwritten caption/order corpora cover all 21 languages; the saved macOS My models capability has a truthful translated reason, while OS-specific child presentations explicitly hide. The compiler and availability report share one strict classifier; the unexplained-capability ledger preserves exactly 104 historical identities and rejects new debt even below the count ceiling. The owning scanner measures Windows81/macOS113/Linux84 remaining fixed native sites. Whole profile frames/list splicing and the other native families remain software work; native runner, packaging/install and physical menu acceptance remain separate qualifications.
+
+Default/custom profile headings and their custom boundary now consume two shared inert fragments on all three drivers. The composition guard follows executable native publication and retains clicked-child requirements; independent source-withdrawal, malformed header, mixed/real clicked orphan and old-loop controls remain red. All old callback bodies, native registry phases, conditional custom presence and 21 caption sets retain their behavior. Canonical generators retire exactly nine genuine native allocator sites, yielding Windows78/macOS110/Linux81. Complete ordered profile frames/list splicing and other scanner families remain software work; actual Windows/Hammerspoon and installed-device acceptance stay separate.
+
+Shared renderers now support ordered list/group child templates, direct unique row selectors and strict presence predicates. Narrow presentation-only refusal omits a wholly inert heading while retaining native data; callback, mixed, cyclic and clicked-row refusals remain strict. Category coverage follows the actual declared transitive include graph from executable native publication roots, with genuine malformed, foreign, withdrawn and clicked counterexamples. The API alone does not retire native allocator sites.
+
+The actual Windows CI profile-heading failures were caused by an unset native LLM_PROFILE_HOTKEY_LIMIT. The existing fixture now supplies the real nine-number-row protocol and restores the exact prior unset/value state. Every original assertion and heading withdrawal case remains. This is a fixture prerequisite; corrected native execution is pending the next manual CI.
+
+Whole profile frames now consume shared child templates on all three drivers, preserving each native registry phase, platform-specific creation order, paused macOS presentation and lazy per-application reads. Executable owner guards reject decorative/comment/qualified decoys. Canonical generators retire eleven additional allocator sites: Windows75/macOS106/Linux77 at this slice. Other native menu families and physical-device acceptance remain open. The previously recorded macOS Wrap refusal defect and Windows timing prompt are already implemented by 9bae9a340, with the later arity and finite-adapter corrections; neither is reimplemented.
+
+The existing model-picker providers now obtain their inert tail separator from the shared provider status declaration. Native callback/browser phases and platform-specific conditional presence remain unchanged. Actual canonical generators retire exactly one more allocator per driver, giving the current baseline Windows74/macOS105/Linux76. Existing labels retain all21 translations; remaining native families and device qualification are still open.
+
+The Windows profile uniqueness audit now follows both actual frame providers and their shared native counter. Existing duplicate-label and disambiguator assertions remain; executable-source data decoys and four genuinely colliding Win32 rows add causal controls. Static/source review passes, while the actual native menu cases require Windows CI.
+
+The Agent per-system Model command and its preceding separator are now declared as shared two-row templates on all three drivers. macOS observed installed/missing captions use the same declared command through separate templates and existing translations. Native callbacks, dialogs, validation and transaction/refusal behavior stay unchanged. This bounded source migration lowers the actual native-row census from Windows74/macOS105/Linux76 to73/104/75. Independently frozen owning probes pass Mac19/0 and Linux23/0 on both Lua runtimes, against genuine original-producer15/4 and21/2 controls. Actual Windows/Hammerspoon execution, CI, packaging, installation and device acceptance remain separately unqualified; the other native sites and all six global TODO items remain partial. The Linux regression uses genuine runtime translation scopes and restores exact prior module identities, including a warm French backend and a raised scenario. Independent warm controls pass5/0 on both Lua runtimes; the unchanged previous fixture reproduces1/2 French-caption failures. No persisted locale choice is changed.
+
+The direct Windows profile-frame regression now initializes its four mandatory number-row dependencies from genuine executable native declarations and restores exact prior absent/value identities in nested finally. All28 prior assertions remain in order. The preceding native run37438495454 stopped this test at an uninitialized tone dependency;19 independent portable source controls pass, while real Win32 execution and restoration still require the next Windows run.
+
+The fixed API Add-entry affordance and its existing separator now consume canonical shared templates on all three drivers. Windows retains its dialog command; macOS/Linux retain their native provider children, callbacks, separator order and availability policy. Existing 21 translated captions are reused. Canonical generators reduce the actual remaining native-row census from73/104/75 to71/102/74. Independent owning portable probes pass Mac59/0 and Linux LuaJIT43/0; genuine French-warm controls pass3/0 on each driver and Lua runtime, while the original native producers fail1/2. Actual AutoHotkey/Hammerspoon/GTK, full final CI, packaging, installation and item38 device acceptance remain separate. Other native families and all six group items remain partial. The whole Linux tray fixture now owns the genuine API entries/backend/builder cohort and a private real JSON source. All old assertions remain; independent whole-tray replay passes9/0 on both Lua runtimes in English and French, preserves the malformed external API file byte-exact and restores module identities/private paths on success and refusal. The original incomplete fixture fails4/1; rejected V3 passes7/0 while quarantining that external file and is not adopted. Full Root and native final qualification remain pending.
+
+The genuine complete Windows profile-frame fixture now initializes its isolated app_profile_overrides collection from the native constructor contract and requires a nonempty Array before enumeration. All35 previous assertions and exact prior-state restoration remain intact. Manual run37451318736 reached this previously missing provider dependency and failed with a non-enumerable frame; manual diagnostic run37456524038 passes the corrected genuine Win32 frame; final-source native qualification remains pending.
+
+The existing Windows/Linux separator after backend choices now uses one canonical shared child template. Actual backend, model and port callbacks and native ordering are unchanged; macOS had no corresponding separator and remains explicitly hidden and byte-exact. Independent handwritten platform/order tests, actual native producer inversions and both owning generators retain all previous assertions and21 translations. The real remaining census falls from71/102/74 to70/102/73; unexplained platform debt remains104. Focused and French-warm portable controls pass3/0 per runtime versus genuine predecessor1/2. Native AHK, full composed qualification and installed-device acceptance remain separate; items54/81 remain partial.
+
+The fixed Specifications and Capabilities frames of the Windows/macOS per-model detail sheets now consume shared child templates. Existing separators, platform decoration, capability predicates and native callbacks are preserved; Linux has no corresponding detail sheet and retains its declared absence without a native change. The owning generators lower Windows 70/macOS 102/Linux 73 to 66/98/73. Independent source review preserves every predecessor corpus file, all 21 locale files and original registered assertions. Portable Mac owning probes pass 8/0 and French-warm probes pass 5/0 in both Lua runtimes; the genuine original producer gives 6/2 and 3/2. The unchanged Linux whole-tray fixture passes 9/0 in English and French on both runtimes. Final composed native CI, Windows allocator execution and installed-device acceptance remain separate; items 54/81 remain partial.
 
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
@@ -4788,7 +5387,7 @@ Current Group 3 source checkpoint (item 73, 2026-10-06): [Group 3 current checkp
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 95, macOS 152 and Linux 96 rows are still built by the
+  Windows 53, macOS 86 and Linux 61 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). Read on
   2026-10-01, the sites are of four kinds, and three of them need the
   manifest to say more than it can today:
@@ -4806,6 +5405,35 @@ Current Group 3 source checkpoint (item 73, 2026-10-06): [Group 3 current checkp
   sites): they follow (b), as part of the template;
   (d) the tray root bootstrap (Windows `tray_bootstrap.ahk`,
   `menu_init.ahk`).
+  Current shared child-template, native-list/lazy-group, presence and inert
+  presentation-refusal APIs are implemented. The historical classification
+  above does not mean these APIs are absent; remaining provider families still
+  need genuine shared data/order/policy consumption on the applicable drivers.
+
+  Current qualification checkpoint: exact cee55e1a/treea17350f2 CI37541202298
+  has native AHK10089/0, macOS canvas12 and the entire Linux chain with17
+  install/launch variants passing; Windows fresh-clone and macOS package still
+  fail on that source. Corrected Windows CI37543830928 on exact20352/tree6641
+  is terminal successful across native10089/0, startup/fresh clone, E2E,
+  package, installed compiled/programmable admission and mandatory verdicts;
+  Release is skipped. The two personal-shortcut cases belong to that native
+  runner: aggregate proof only, no individual manifest or artifact fields
+  inferred.53/86/61 retains200 software sites; all six items remain partial.
+
+  The generation numeric-boundary family consumes actual shared fragments at
+  its four former native constructor sites, preserving cross-driver order and
+  genuine hidden absence. Counts above are the owner-generated result, not a
+  raised ratchet or a claim that remaining provider families are complete.
+  Original corpus, locale, native callbacks and prior assertions stay intact;
+  final native three-OS qualification remains required.
+
+  The shortcut-extension presentation family now shares the actual Windows
+  and macOS boundary while preserving Linux's boundary absence and extension
+  functionality. Four true native constructors migrate; three were counted
+  by the unchanged scanner, including no previously counted Windows heading.
+  Item 54 records the exact 62/95/73 census, callback/sandbox preservation,
+  qualified portable controls and remaining native/installed acceptance.
+  No item is removed, and all six group items remain partial.
 
   The Windows qualification successor for the shared Tap-Hold head retains its
   real four-row Win32 and refusal assertions; item 54 records the precise
@@ -4849,8 +5477,36 @@ Windows workstation handoff (maintainer instruction, 2026-10-04):
 Partial dev handoff (2026-10-05): use the immutable resumed menu archive
 and its independent reviews; no saved packet qualifies an integrated feature.
 Complete the source steps under item 54, then native E2E/package/install and
-real-device menu acceptance. Keep the Windows timing UI and macOS Wrap refusal
-fix as explicit code work rather than unsupported-platform exceptions.
+real-device menu acceptance. The Windows timing UI and macOS Wrap refusal
+transaction are already implemented; retain their native acceptance steps.
+
+The composed 2026-10-05 source census is Windows 83, macOS 126 and Linux 93 after the additional three macOS Swipe sites are migrated. The canonical generator owns the 76 menu sections and the baseline generator owns this lower ceiling. Clicked mode children and the composed sensitivity heading are distinct proof edges; the latter does not claim the eighteen numeric native choices. Other fixed/native provider controls remain source work, so this item stays partial.
+
+The About build/version separator now consumes the same shared fragment on all three drivers. Independent actual provider and mutation controls retain all earlier assertions; the unchanged source scanner measures Windows82/macOS124/Linux92 fixed sites. Native Windows and final three-OS qualification remain required. Other fixed provider families stay open.
+
+The packaged macOS About check uses the existing shared command for both native callbacks, preserving offered-release consent and declaration withdrawal refusal. Its actual owning scanner lowers only macOS124 to123 fixed sites; Windows82 and Linux92 remain. Final native qualification and the remaining fixed families stay open.
+
+Windows Wrap validation now observes its actual shared catalogue and separately checks labelled acknowledgement and all15 Win32 rows with3 separators. Production rendering and independent catalogue expectations remain unchanged; this fixture correction needs actual Windows rerun and does not complete the remaining menu families.
+
+The declared Windows gesture tap boundary retires one more fixed native separator site. The canonical census is Windows81/macOS123/Linux92, reproduced by its owning scanner. Actual Win32 and fail-closed behavioral assertions are registered but not executed locally; remaining families and installed/native acceptance keep this item open.
+
+The missing layout-bundle status and empty installed-layout status rows have moved to their existing shared declarations. The unchanged owning scanner now counts Windows81/macOS120/Linux91 remaining fixed native sites. Earlier corpora and native selection/installation behavior are retained; this is a bounded software slice, not complete menu migration. The empty macOS Input Sources provider also consumes a shared Open preferences command with the unchanged native callback; retained declaration withdrawal refuses before launch, and no true launch acknowledgement is fabricated.
+
+The custom-profile, saved-model and numeric-tail slices retire seven macOS and seven Linux fixed native sites from the preceding 81/120/91 census, yielding 81/113/84. This is a bounded migration using existing child-template APIs, not the complete ordered profile parent frame. The remaining scanner sites, native qualification and item38 device acceptance keep this item open.
+
+The shared profile heading fragments retire three genuine allocator sites per driver, from81/113/84 to78/110/81. Portable actual provider cases and all original assertions/corpora are retained. This bounded source migration does not close the remaining full profile frame, other menu families or item38 device validation.
+
+The ordered profile frame retires three Windows, four macOS and four Linux native allocator sites through the actual shared renderer. All old provider callbacks, main/close/lifecycle boundaries and prior independent corpus files remain. This slice baseline is75/106/77; whole remaining families and item38 acceptance are not completed.
+
+The fixed model-picker tail presentation is shared on all three drivers, retiring one authentic native allocator per platform. Current remaining baseline: Windows74/macOS105/Linux76. This does not classify remaining dynamic native builders as shared or close item38.
+
+The Agent per-system Model command and its preceding separator are now declared as shared two-row templates on all three drivers. macOS observed installed/missing captions use the same declared command through separate templates and existing translations. Native callbacks, dialogs, validation and transaction/refusal behavior stay unchanged. This bounded source migration lowers the actual native-row census from Windows74/macOS105/Linux76 to73/104/75. Independently frozen owning probes pass Mac19/0 and Linux23/0 on both Lua runtimes, against genuine original-producer15/4 and21/2 controls. Actual Windows/Hammerspoon execution, CI, packaging, installation and device acceptance remain separately unqualified; the other native sites and all six global TODO items remain partial. The Linux regression uses genuine runtime translation scopes and restores exact prior module identities, including a warm French backend and a raised scenario. Independent warm controls pass5/0 on both Lua runtimes; the unchanged previous fixture reproduces1/2 French-caption failures. No persisted locale choice is changed.
+
+The fixed API Add-entry affordance and its existing separator now consume canonical shared templates on all three drivers. Windows retains its dialog command; macOS/Linux retain their native provider children, callbacks, separator order and availability policy. Existing 21 translated captions are reused. Canonical generators reduce the actual remaining native-row census from73/104/75 to71/102/74. Independent owning portable probes pass Mac59/0 and Linux LuaJIT43/0; genuine French-warm controls pass3/0 on each driver and Lua runtime, while the original native producers fail1/2. Actual AutoHotkey/Hammerspoon/GTK, full final CI, packaging, installation and item38 device acceptance remain separate. Other native families and all six group items remain partial. The whole Linux tray fixture now owns the genuine API entries/backend/builder cohort and a private real JSON source. All old assertions remain; independent whole-tray replay passes9/0 on both Lua runtimes in English and French, preserves the malformed external API file byte-exact and restores module identities/private paths on success and refusal. The original incomplete fixture fails4/1; rejected V3 passes7/0 while quarantining that external file and is not adopted. Full Root and native final qualification remain pending.
+
+The existing Windows/Linux separator after backend choices now uses one canonical shared child template. Actual backend, model and port callbacks and native ordering are unchanged; macOS had no corresponding separator and remains explicitly hidden and byte-exact. Independent handwritten platform/order tests, actual native producer inversions and both owning generators retain all previous assertions and21 translations. The real remaining census falls from71/102/74 to70/102/73; unexplained platform debt remains104. Focused and French-warm portable controls pass3/0 per runtime versus genuine predecessor1/2. Native AHK, full composed qualification and installed-device acceptance remain separate; items54/81 remain partial.
+
+The shared per-model Specifications and Capabilities frames retire four genuine Windows and four genuine macOS allocator sites, reducing 70/102/73 to 66/98/73. Linux's actual absence is declared; native callbacks and dynamic detail rows retain their existing owners. Independent source, locale, corpus and original-producer controls are qualified. Final composed native CI, the registered Windows cases and item 38 device acceptance remain open; the remaining 66/98/73 sites keep items 54/81 partial.
 
 - [~] **88.** **Partial: native prediction tooltip appearance.** Shared
   llm-line-style policy and the unchanged independent line corpus retain grey
@@ -5972,6 +6628,17 @@ owner and physical row/repeat/Nav/AltGr/Caps/dead-key qualification remain open.
 The unintegrated number-row runtime/provenance preparation stored only in
 /tmp is unavailable after the cloud restart and needs reconstruction and
 review. Linux/macOS forced native capabilities remain unavailable.
+
+The reviewed Windows observation precursor now exposes native key levels and
+number-row descriptors through two append-only native adapter APIs. Captured
+external scalar getters are read once before validation; returned observations
+never grant input, owner, forced-output or dead-state authority. The original
+ToUnicodeEx reader, no-state-change flag `0x4`, independent ten-key corpus and
+every old test assertion remain byte-identical. Six additional registered
+cases require both actual French and US HKLs on hosted Windows. Native replay
+is pending; readonly previews do not complete the forced-output policy or
+item107. The existing layout fixture is unchanged; no new explicit HKL unload
+qualification is claimed.
 
 Remaining work for item107 (CI-feasible software first):
 

@@ -296,7 +296,8 @@ function M.build(ctx)
 	end
 
 	if #rows == 0 then
-		table.insert(rows, { label = i18n.get("menu.apps.no_apps"), disabled = true })
+		rows = ManifestMenu.template_rows("apps_empty_rows")
+		if not rows then return nil end
 	end
 
 	-- The list the manifest declares for this driver. Its rows are the bundles

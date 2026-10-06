@@ -1,0 +1,143 @@
+{
+	"_comment": "Independent handwritten fixed wrap-control expectations. Shared caption/order ownership; native mutation and dynamic pair payload ownership. Linux has no management controls in its wrap-selection picker.",
+	"sections": [
+		{
+			"section": "wrap_symbols_global_controls",
+			"rows": [
+				{
+					"id": "wrap_symbols_enable_all",
+					"i18n": "menu.shortcuts.wrap_symbols_check_all",
+					"disabled_when": ["wrap_symbols_ready"]
+				},
+				{
+					"id": "wrap_symbols_disable_all",
+					"i18n": "menu.shortcuts.wrap_symbols_uncheck_all",
+					"disabled_when": ["wrap_symbols_ready"]
+				},
+				{
+					"id": "wrap_symbols_restore",
+					"i18n": "common.restore_recommended",
+					"disabled_when": ["wrap_symbols_ready"]
+				},
+				{
+					"separator": true
+				}
+			]
+		},
+		{
+			"section": "wrap_symbols_group_controls",
+			"rows": [
+				{
+					"id": "wrap_symbols_enable_group",
+					"i18n": "menu.shortcuts.wrap_symbols_check_all",
+					"disabled_when": ["wrap_symbols_ready"]
+				},
+				{
+					"id": "wrap_symbols_disable_group",
+					"i18n": "menu.shortcuts.wrap_symbols_uncheck_all",
+					"disabled_when": ["wrap_symbols_ready"]
+				},
+				{
+					"separator": true
+				}
+			]
+		},
+		{
+			"section": "wrap_symbols_custom_separator",
+			"rows": [
+				{
+					"separator": true
+				}
+			]
+		},
+		{
+			"section": "wrap_symbols_custom_controls",
+			"rows": [
+				{
+					"id": "wrap_symbols_delete_custom",
+					"i18n": "button.delete"
+				}
+			]
+		},
+		{
+			"section": "wrap_symbols_add_controls",
+			"rows": [
+				{
+					"separator": true
+				},
+				{
+					"id": "wrap_symbols_add_custom",
+					"i18n": "menu.shortcuts.wrap_symbols_add_custom",
+					"disabled_when": ["wrap_symbols_ready"]
+				}
+			]
+		}
+	],
+	"platforms": ["ahk", "hs"],
+	"hidden_platform": "linux",
+	"catalogue_groups": [
+		{
+			"i18n": "menu.shortcuts.wrap_group_brackets",
+			"lefts": ["(", "[", "{", "<"]
+		},
+		{
+			"i18n": "menu.shortcuts.wrap_group_quotes",
+			"lefts": ["\"", "'", "`", "‘", "“", "„", "« "]
+		},
+		{
+			"i18n": "menu.shortcuts.wrap_group_angle",
+			"lefts": ["〈", "❬", "❰", "❲", "❴", "⟦", "⟪"]
+		},
+		{
+			"i18n": "menu.shortcuts.wrap_group_cjk",
+			"lefts": ["「", "【", "〖", "《", "〘", "〚"]
+		},
+		{
+			"i18n": "menu.shortcuts.wrap_group_braces",
+			"lefts": ["⎴", "⏞"]
+		},
+		{
+			"i18n": "menu.shortcuts.wrap_group_markdown",
+			"lefts": ["*", "_", "~", "|", "/", "\\"]
+		},
+		{
+			"i18n": "menu.shortcuts.wrap_group_other",
+			"lefts": ["@", "#", "%", "$", "&", "!", "?", "+", "=", ";", ":"]
+		}
+	],
+	"custom_labels": [
+		"a … b : menu.shortcuts.wrap_symbols_custom_label",
+		"c : menu.shortcuts.wrap_symbols_custom_label"
+	],
+	"counts": {
+		"with_two_custom": 16,
+		"without_custom": 13,
+		"group_controls": 3,
+		"raw_without_catalogue_or_custom": 6,
+		"rendered_without_catalogue_or_custom": 5
+	},
+	"custom_child_label": "button.delete",
+	"locales": [
+		"ar",
+		"cs",
+		"da",
+		"de",
+		"en",
+		"es",
+		"fr",
+		"he",
+		"hi",
+		"it",
+		"ja",
+		"ko",
+		"nl",
+		"no",
+		"pl",
+		"pt",
+		"ru",
+		"sv",
+		"tr",
+		"uk",
+		"zh"
+	]
+}

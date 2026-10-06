@@ -76,22 +76,33 @@ helpers.describe("terminal macOS shortcut scopes", function()
 	end)
 
 	for _, mode in ipairs({ "clear", "recommended" }) do
-		helpers.it("removes a plain keyboard or tap_keys value with its " .. mode .. " reset (config-outdated-shortcuts-reset)",
+		helpers.it("retains obsolete keyboard and tap parents and refuses " .. mode .. " collisions (config-outdated-shortcuts-reset)",
 			function()
-				-- The value an older build left where the scope keeps a table of
-				-- assignments made every row below it unwritable, so the reset the
-				-- user asked for was refused by the very value it replaces.
+				-- Ordinary reset is not explicit cleanup. Clear's personal None
+				-- for the magic editor also differs from neutral absence.
 				local source = '[shortcuts]\nenabled = true\nkeyboard = "legacy"\ntap_keys = ["legacy"]\n[future]\nkeep = 7\n'
 				Fixture.run(function(f)
-					local committed, detail = f.owner.apply(mode)
-					helpers.assert_eq(committed, true, detail)
-					local decoded = Codec.decode(f.files.config)
-					for _, key in ipairs({ "keyboard", "tap_keys" }) do
-						local value = decoded.shortcuts and decoded.shortcuts[key]
-						helpers.assert_true(value == nil or (type(value) == "table" and #value == 0),
-							key .. " holds no outdated value after the reset: " .. f.files.config)
-					end
-					helpers.assert_eq(decoded.future.keep, 7, "the rest of the file is kept")
+					local checkpoint, native = f.checkpoint.capture(), #f.controls.native
+					local actions, claims = f.keyboard.get_configuration_intent()
+					local scripts, started = f.script.get_shortcut_actions(), f.script.is_started()
+					local committed = f.owner.apply(mode)
+					helpers.assert_eq(committed, false)
+					helpers.assert_eq(f.files.config, source, "the entire obsolete source stays intact until cleanup")
+					helpers.assert_eq(f.controls.writes, 0)
+					helpers.assert_nil(f.files.backup)
+					helpers.assert_eq(#f.controls.native, native, "collision refusal precedes native reacquisition")
+					helpers.assert_eq(f.bindings.is_started(), true)
+					helpers.assert_eq(f.keyboard.is_started(), true)
+					helpers.assert_eq(f.script.is_started(), started)
+					helpers.assert_eq(f.script.get_shortcut_actions(), scripts)
+					local after_actions, after_claims = f.keyboard.get_configuration_intent()
+					helpers.assert_eq(after_actions, actions)
+					helpers.assert_eq(after_claims, claims)
+					helpers.assert_eq(f.taps.get_action("number_row_left"), "none")
+					helpers.assert_eq(f.keyboard.get_action("magic_editor"), "open_hotstrings_editor")
+					helpers.assert_eq(f.prefs.source_snapshot("config").content, source)
+					helpers.assert_eq(f.checkpoint.capture(), checkpoint)
+					helpers.assert_eq(f.owner.pending(), false)
 				end, source)
 			end)
 	end
@@ -338,3 +349,85 @@ helpers.describe("macOS script chords in the Shortcuts scope", function()
 		end)
 	end
 end)
+
+helpers.describe("macOS ordinary obsolete shortcut parent policy", function()
+	for _, literal in ipairs({ '"legacy"', '["legacy"]', "[]" }) do
+		helpers.it("clears neutral tap intent while retaining exact obsolete source " .. literal, function()
+			local source = '[shortcuts]\nenabled = true\nkeyboard = { magic_editor = "none", future = "keep" } # keyboard retained\n'
+				.. 'tap_keys = ' .. literal .. ' # taps retained\n[future]\nkeep = 7\n'
+			local expected = '[shortcuts]\nkeyboard = { magic_editor = "none", future = "keep" } # keyboard retained\n'
+				.. 'tap_keys = ' .. literal .. ' # taps retained\n[future]\nkeep = 7\n\n[shortcuts.script_control]\n'
+				.. 'script_altgr_backspace = "none"\nscript_altgr_delete = "none"\nscript_altgr_enter = "none"\nscript_altgr_escape = "none"\n'
+			Fixture.run(function(f)
+				local committed, detail = f.owner.apply("clear")
+				helpers.assert_eq(committed, true, detail)
+				helpers.assert_eq(f.files.config, expected, "hand-authored complete image keeps the obsolete token and comments")
+				helpers.assert_eq(f.files.backup, source)
+				helpers.assert_eq(f.controls.writes, 2, "one backup and one acknowledged source publication")
+				helpers.assert_eq(f.bindings.is_started(), false)
+				helpers.assert_eq(f.keyboard.is_started(), false)
+				helpers.assert_eq(f.script.chords_enabled(), true, "neutral absence retains the actual chord gate default")
+				helpers.assert_eq(f.prefs.source_snapshot("config").content, expected)
+				for _, id in ipairs({ "number_row_left", "number_row_right_1", "number_row_right_2" }) do
+					helpers.assert_eq(f.taps.get_action(id), "none")
+				end
+				helpers.assert_eq(f.taps.decide(50), nil)
+				package.loaded["modules.shortcuts.tap_keys"] = nil
+				local fresh = require("modules.shortcuts.tap_keys")
+				fresh.ensure_loaded(f.gestures.is_assignable)
+				helpers.assert_eq(fresh.get_action("number_row_left"), "none", "fresh actual reader agrees with native ACK")
+				helpers.assert_eq(fresh.decide(50), nil)
+				helpers.assert_eq(fresh.decide(10), nil)
+				helpers.assert_eq(f.owner.pending(), false)
+			end, source)
+		end)
+	end
+
+	for _, owner in ipairs({ "keyboard", "tap" }) do
+		helpers.it("refuses ordinary " .. owner .. " assignment without replacing an obsolete parent", function()
+			local source = '[shortcuts]\nenabled = true\nkeyboard = "legacy"\ntap_keys = ["legacy"]\n[future]\nkeep = 7\n'
+			Fixture.run(function(f)
+				local checkpoint, count = f.checkpoint.capture(), #f.controls.native
+				local accepted
+				if owner == "keyboard" then accepted = f.keyboard.set_action("cmd_a", "send_text")
+				else accepted = f.taps.set_action("number_row_left", "send_text", f.gestures.is_assignable) end
+				helpers.assert_eq(accepted, false)
+				helpers.assert_eq(f.files.config, source)
+				helpers.assert_eq(f.controls.writes, 0)
+				helpers.assert_eq(#f.controls.native, count)
+				helpers.assert_eq(f.checkpoint.capture(), checkpoint)
+				helpers.assert_eq(f.keyboard.get_action("cmd_a"), "none")
+				helpers.assert_eq(f.taps.get_action("number_row_left"), "none")
+				helpers.assert_eq(f.bindings.is_started(), true)
+				helpers.assert_eq(f.prefs.source_snapshot("config").content, source)
+			end, source)
+		end)
+	end
+
+	helpers.it("compensates a refused neutral clear publication without erasing the obsolete parent", function()
+		local source = '[shortcuts]\nenabled = true\nkeyboard = { magic_editor = "none", future = "keep" }\ntap_keys = ["legacy"]\n[future]\nkeep = 7\n'
+		Fixture.run(function(f)
+			local checkpoint = f.checkpoint.capture()
+			f.controls.refuse_write = true
+			helpers.assert_eq(f.owner.apply("clear"), false)
+			helpers.assert_eq(f.files.config, source)
+			helpers.assert_eq(f.files.backup, source)
+			helpers.assert_eq(f.controls.writes, 1, "only the independently acknowledged backup was published")
+			helpers.assert_eq(f.bindings.is_started(), true)
+			helpers.assert_eq(f.keyboard.is_started(), true)
+			helpers.assert_eq(f.taps.get_action("number_row_left"), "none")
+			helpers.assert_eq(f.prefs.source_snapshot("config").content, source)
+			helpers.assert_eq(f.owner.pending(), false)
+			helpers.assert_eq(f.checkpoint.capture().state, checkpoint.state)
+			helpers.assert_eq(f.checkpoint.capture().preferences, checkpoint.preferences)
+			helpers.assert_eq(f.owner.retry_restore(), true, "the actual compensation journal is settled")
+			helpers.assert_eq(f.files.config, source)
+			package.loaded["modules.shortcuts.tap_keys"] = nil
+			local fresh = require("modules.shortcuts.tap_keys")
+			fresh.ensure_loaded(f.gestures.is_assignable)
+			helpers.assert_eq(fresh.get_action("number_row_left"), "none")
+		end, source)
+	end)
+end)
+
+require("test.config_obsolete_parents_contract").register(helpers)

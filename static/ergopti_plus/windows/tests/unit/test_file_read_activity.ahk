@@ -162,15 +162,68 @@ _FRAI_ReplaceOnce(Source, Needle, Replacement) {
 	return StrReplace(Source, Needle, Replacement)
 }
 
+; Locate the whole production module by its genuine symbol, not its source path.
+; The framework rejects absent bodies; the recursive census rejects ambiguity.
+_FRAI_NativeModuleSource(Name) {
+	Body := _DriverFuncBody(Name)
+	AssertTrue(StrLen(Body) > 0, "A native source owner requires its genuine nonempty function body.")
+	AssertTrue(InStr(_StripFullLineComments(_DriverSourceConcat()), Body) > 0,
+		"The native source owner must belong to the canonical complete driver census.")
+	SplitPath(A_ScriptDir, , &Root)
+	Matches := 0, Owner := 0
+	Loop Files, Root . "\*.ahk", "FR" {
+		if !_DriverIsProductionSource(A_LoopFileFullPath)
+			continue
+		Candidate := FileRead(A_LoopFileFullPath, "UTF-8")
+		if !InStr(_StripFullLineComments(Candidate), Body)
+			continue
+		Matches += 1
+		Content := FSReadUtf8Exact(A_LoopFileFullPath)
+		AssertTrue(Content is String, "The actual module requires readable exact UTF-8 source bytes.")
+		AssertTrue(InStr(_StripFullLineComments(Content), Body) > 0,
+			"The captured exact module must still contain the same genuine native source owner.")
+		Owner := {Path: A_LoopFileFullPath, Content: Content}
+	}
+	AssertEqual(1, Matches, "Exactly one production file must own the complete native function body.")
+	return Owner
+}
+
+; Destinations come from the unchanged child fixture's own real include layout.
+; Only these three fixture aliases are admitted; they never select driver paths.
+_FRAI_CopyNativeModules(Directory, Fixture) {
+	Symbols := Map("file_system.ahk", "_FSReadUtf8ExactImpl",
+		"config_write_lease.ahk", "_ConfigWriteLeaseTryAcquire",
+		"file_read_activity.ahk", "FileReadActivityEnter")
+	FixtureSource := FileRead(A_ScriptDir . "\support\" . Fixture, "UTF-8")
+	Published := Map()
+	for Line in StrSplit(FixtureSource, "`n", "`r") {
+		if !RegExMatch(Line, "^#Include[ `t]+([^ `t]+)[ `t]*$", &Include)
+			continue
+		Relative := StrReplace(Include[1], "/", "\")
+		Parts := StrSplit(Relative, "\")
+		AssertTrue(Parts.Length == 2 && (Parts[1] == "infra" || Parts[1] == "adapters")
+			&& Symbols.Has(Parts[2]), "Only the fixture's declared relative module aliases are admitted.")
+		Name := Symbols[Parts[2]]
+		AssertFalse(Published.Has(Name), "A fixture alias cannot copy the same source owner twice.")
+		Owner := _FRAI_NativeModuleSource(Name)
+		Destination := Directory . "\" . Relative
+		FileCopy(Owner.Path, Destination)
+		AssertTrue(FSUtf8ExactMatches(Destination, Owner.Content),
+			"The native child receives the entire exact module, including its declarations and includes.")
+		Published[Name] := Destination
+	}
+	AssertEqual(Symbols.Count, Published.Count, "Every required native source owner must be present before launch.")
+	return Published
+}
+
 _FRAI_RunNative(Mode) {
 	Directory := A_Temp . "\ergopti-read-interlock-" . A_TickCount . "-" . Random(100000, 999999)
 	DirCreate(Directory)
 	DirCreate(Directory . "\infra")
 	DirCreate(Directory . "\adapters")
-	Root := A_ScriptDir . "\..\"
-	for Relative in ["adapters\file_system.ahk", "infra\config_write_lease.ahk", "infra\file_read_activity.ahk"]
-		FileCopy(Root . Relative, Directory . "\" . Relative)
-	Path := Directory . "\adapters\file_system.ahk"
+	Fixture := Mode == "boundaries" ? "read_write_native.ahk" : "read_write_close.ahk"
+	Published := _FRAI_CopyNativeModules(Directory, Fixture)
+	Path := Published["_FSReadUtf8ExactImpl"]
 	Source := FileRead(Path, "UTF-8")
 	Start := InStr(Source, "_FSReadUtf8ExactImpl(Path, MaxBytes, Bounded) {")
 	End := InStr(Source, Chr(10) . "; Admit only the target", true, Start)
@@ -189,11 +242,9 @@ _FRAI_RunNative(Mode) {
 			Body := _FRAI_ReplaceOnce(Body, Needle,
 				Chr(9) . Chr(9) . '_RW_Boundary(Path, "held", Handle)' . Chr(10) . Needle)
 		}
-		Fixture := "read_write_native.ahk"
 	} else {
 		Body := _FRAI_ReplaceOnce(Body,
 			'DllCall("kernel32\CloseHandle", "Ptr", Handle, "Int")', "_FRC_RefuseClose(Handle)")
-		Fixture := "read_write_close.ahk"
 	}
 	Source := SubStr(Source, 1, Start - 1) . Body . SubStr(Source, End)
 	FileDelete(Path)

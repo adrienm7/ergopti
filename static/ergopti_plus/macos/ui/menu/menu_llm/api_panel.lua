@@ -627,17 +627,22 @@ function M.build(ctx)
 		end
 	end
 
-	table.insert(rows, {
-		label    = "➕ " .. i18n.get("menu.llm.api_add_entry"),
-		disabled = (paused or mutation_busy) or nil,
-		items    = add_rows,
-	})
+	local add_controls = ManifestMenu.template_rows("llm_api_add_provider_group", {}, {
+		llm_api_add_group_ready = function() return not paused and not mutation_busy end,
+	}, { api_add_entry = add_rows })
+	if not add_controls then return nil, nil end
+	for _, row in ipairs(add_controls) do
+		row.label = "➕ " .. row.label
+		table.insert(rows, row)
+	end
 
 	-- Add sits before the separator so creating an entry is one glance
 	-- away; the separator only appears with the management rows below,
 	-- never dangling when no entry exists.
 	if #entries > 0 then
-		table.insert(rows, { separator = true })
+		local separators = ManifestMenu.template_rows("llm_api_add_separator", {}, {}, {})
+		if not separators then return nil, nil end
+		for _, row in ipairs(separators) do table.insert(rows, row) end
 	end
 
 
