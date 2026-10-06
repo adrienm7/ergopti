@@ -386,6 +386,14 @@ function M.new(dependencies)
 		return decision
 	end
 
+	--- Preserves only the verified legacy HTTPS refusal's original HTTP result.
+	--- Deliberate managed/archive owners retain their strict protocol refusal.
+	local function redirect_refusal(record, result, decision)
+		if decision.reason == "https_downgrade" and record.options.managed_redirects ~= true
+			and record.options.archive_redirects ~= true then return result end
+		return refusal(decision.error)
+	end
+
 	--- Produces an exact new output capability after actual retired hop receipt.
 	--- Every native/lease probe retains the original parent generation/deadline.
 	local function output_successor(record, result, disposition)
@@ -416,7 +424,7 @@ function M.new(dependencies)
 		local decision = redirect_decision(record, result)
 		if not decision then return end
 		if decision.action == "follow" then return end
-		if decision.action == "refuse" then publish_logical(record, refusal(decision.error)); return end
+		if decision.action == "refuse" then publish_logical(record, redirect_refusal(record, result, decision)); return end
 		local choice = record.choices[record.choice]
 		local file_relay_candidate = record.options.output_target == nil
 			and (not record.options.output_path or type(record.options.proxy_retry_admit) == "function")
@@ -583,7 +591,7 @@ function M.new(dependencies)
 		if type(result) ~= "table" then finish(record, refusal("managed-http-completion-invalid")); return end
 		local decision = redirect_decision(record, result)
 		if not decision then return end
-		if decision.action == "refuse" then finish(record, refusal(decision.error)); return end
+		if decision.action == "refuse" then finish(record, redirect_refusal(record, result, decision)); return end
 		if decision.action == "follow" then
 			if type(decision.url) ~= "string" or type(decision.headers) ~= "table" or type(decision.key) ~= "string"
 				or type(decision.hops) ~= "number" or decision.hops ~= record.hops + 1 then

@@ -921,11 +921,22 @@ end
 --- @param options table
 --- @return boolean
 --- @return string|nil
+--- @return table|nil Prepared private header token.
+--- @return table|nil Detached admitted header view.
+--- @return boolean|nil Canonical native-follow permission.
 function M.preflight(url, headers, body, options)
 	local normalized, err = admit_metadata(url, headers, body, options)
 	if not normalized then return false, err end
 	local captured, rows, view = pcall(HeaderSnapshot.capture, headers, HeaderPolicy.validate)
 	if not captured then return false, "curl configuration refused" end
+	-- Caller keys may be converted exactly once during capture. The detached
+	-- admitted string inventory, rather than the original key types, decides
+	-- whether the actual wire headers may follow in the legacy native mode.
+	if normalized.follow_redirects then
+		local allowed, follow_error = RedirectPolicy.allows_native_follow(view)
+		if allowed == nil then return false, follow_error end
+		normalized.follow_redirects = allowed
+	end
 	local token = {}
 	prepared_headers[token] = { rows = rows, view = view }
 	normalized.prepared_headers = token
@@ -933,7 +944,7 @@ function M.preflight(url, headers, body, options)
 	if not composed then return false, "curl configuration refused" end
 	local refused = ShellRunner.validate_spawn_args(normalized.curl_executable, argv)
 	if refused ~= "" then return false, "curl argument vector refused: " .. refused end
-	return true, nil, token, HeaderSnapshot.copy(view)
+	return true, nil, token, HeaderSnapshot.copy(view), normalized.follow_redirects
 end
 
 --- Rebinds an admitted snapshot after canonical redirect field removal.

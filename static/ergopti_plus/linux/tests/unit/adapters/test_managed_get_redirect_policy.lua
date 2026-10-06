@@ -86,3 +86,24 @@ helpers.describe("successful terminal native observation admission", function()
 		helpers.assert_eq(value.result.error, "HTTP 403")
 	end)
 end)
+
+helpers.describe("typed verified HTTPS downgrade reason", function()
+	local function input(receipt)
+		return { current_url = "https://updates.example/start", https_floor = true, headers = {}, visited = {}, hops = 0,
+			result = { ok = false, status = 307, error = "HTTP 307", body = "", redirect_receipt = receipt } }
+	end
+	helpers.it("only complete consistent HTTPS to HTTP evidence identifies downgrade", function()
+		local decision = law.transition(input({ format = "curl-single-hop-v1", http_status = 307, curl_exit = 0, num_redirects = 0,
+			effective_url = "https://updates.example/start", redirect_url = "http://cdn.example/final" }))
+		assert(decision.action == "refuse" and decision.error == "HTTP redirect protocol refused" and decision.reason == "https_downgrade")
+	end)
+	helpers.it("missing or contradictory receipt cannot identify a preserved native downgrade", function()
+		local missing = law.transition(input(nil)); assert(missing.action == "refuse" and missing.reason == nil)
+		local failed = law.transition(input({ format = "curl-single-hop-v1", http_status = 307, curl_exit = 7, num_redirects = 0,
+			effective_url = "https://updates.example/start", redirect_url = "http://cdn.example/final" }))
+		assert(failed.action == "terminal" and failed.reason == nil)
+		local foreign = law.transition(input({ format = "curl-single-hop-v1", http_status = 307, curl_exit = 0, num_redirects = 0,
+			effective_url = "https://foreign.example/start", redirect_url = "http://cdn.example/final" }))
+		assert(foreign.action == "refuse" and foreign.reason == nil)
+	end)
+end)
