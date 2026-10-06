@@ -836,6 +836,22 @@ Python failed-case identity remains unknown without the blocked artifact trace.
 This fixture reproduction is not attribution or native compilation qualification;
 the native source build, packaging/install and TODO31 remain open.
 
+A read-only installed virtual-HID diagnostic now observes only the fixed
+official daemon and Manager-bundled DEXT files, using native no-follow held
+file descriptors, ownership/ACL checks and strict/all-architecture Security
+validation before per-slice metadata. Its literal reference_qualified=false
+never grants broker, loaded-driver, approval, ready or capture authority. Missing
+ACL evidence remains unknown; writable ancestry permits partial static facts
+only. The closed component-status guard preserves the independent malformed
+payload control. All22 native test methods are registered but UNEXECUTED here.
+The new headless role dispatch follows KeyboardSourceProbeWorker and precedes
+LoginStartupWorker; every other main.swift byte and Group3 insertion slot stays
+unchanged. Three ordered reviewed patches apply zero-fuzz/offset against exact
+current preimages. Actual Darwin compilation, fixed-package trust, both-slice
+reference receipts, descriptor ACL acquisition, protected disposable fixtures
+and task/cancellation acceptance remain required. This diagnostic is not a
+production remap caller, installer, driver activation or WP6/TODO31 completion.
+
 ## Coordination and setup
 
 Coordination is recorded in GitHub issue86. Group3 owns only its new native

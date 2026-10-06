@@ -1114,6 +1114,10 @@ if KeyboardSourceProbeWorker.handles(arguments: CommandLine.arguments) {
 	Darwin.exit(KeyboardSourceProbeWorker.run(arguments: CommandLine.arguments))
 }
 
+if InstalledVirtualHIDProbeWorker.handles(arguments: CommandLine.arguments) {
+	Darwin.exit(InstalledVirtualHIDProbeWorker.run(arguments: CommandLine.arguments))
+}
+
 if LoginStartupWorker.handles(arguments: CommandLine.arguments) {
 	Darwin.exit(LoginStartupWorker.run(arguments: CommandLine.arguments))
 }
