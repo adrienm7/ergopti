@@ -3901,3 +3901,152 @@ checkPrivacyTriggerControls();
 		'Linux numeric tails: independent shared declaration, 21 existing captions, real preset receivers and preserved clicked children.'
 	);
 }
+
+// Profile section headings are real inert fragments, never clicked children.
+{
+	const assert = require('node:assert/strict');
+	const fs = require('node:fs');
+	const path = require('node:path');
+	const vm = require('node:vm');
+	const shared = path.resolve(__dirname, '../../static/ergopti_plus/_shared');
+	const declared = JSON.parse(
+		fs.readFileSync(path.join(shared, 'modules/menu/menu_manifest.json'), 'utf8')
+	);
+	const expected = JSON.parse(
+		fs.readFileSync(path.join(shared, 'tests/corpus/menus/profile_section_headings.json'), 'utf8')
+	);
+	const sections = ['llm_profile_builtin_heading', 'llm_profile_custom_heading'];
+	function declaration(document) {
+		for (const section of sections) assert.deepEqual(document[section], expected.sections[section]);
+	}
+	declaration(declared);
+	for (const mutate of [
+		(d) => delete d.llm_profile_builtin_heading,
+		(d) => d.llm_profile_custom_heading.reverse(),
+		(d) => (d.llm_profile_builtin_heading[0].i18n = 'button.cancel'),
+		(d) => (d.llm_profile_custom_heading[1].platforms = ['hs']),
+		(d) => (d.llm_profile_builtin_heading[1].type = 'label'),
+		(d) => (d.llm_profile_custom_heading[0].type = 'label')
+	]) {
+		const wrong = structuredClone(declared);
+		mutate(wrong);
+		assert.throws(() => declaration(wrong));
+	}
+	assert.equal(Object.keys(expected.captions).length, 21);
+	for (const [language, captions] of Object.entries(expected.captions)) {
+		const values = JSON.parse(
+			fs.readFileSync(path.join(shared, 'data/locales', language + '.json'), 'utf8')
+		);
+		assert.deepEqual(
+			expected.keys.map((key) => values[key]),
+			captions
+		);
+	}
+	const owners = {
+		ahk: 'windows/ui/menu/menu_llm/menu_profiles.ahk',
+		hs: 'macos/ui/menu/menu_llm/profiles_manager.lua',
+		linux: 'linux/ui/menu/menu_builder.lua'
+	};
+	function wiring(source, platform) {
+		if (platform === 'ahk') {
+			for (const [section, variable] of [
+				['llm_profile_builtin_heading', 'BuiltinHeadingRows'],
+				['llm_profile_custom_heading', 'CustomHeadingRows']
+			]) {
+				assert(
+					source.includes(
+						variable + ' := MenuRenderer_TemplateRows("' + section + '", Map(), Map(), Map())'
+					)
+				);
+				assert(
+					source.includes(
+						'if ' +
+							variable +
+							' is Array\n\t' +
+							(section.includes('custom') ? '\t' : '') +
+							'\tRows.Push(' +
+							variable +
+							'*)'
+					)
+				);
+			}
+			assert(source.includes('if (user_profiles.Length > 0) {'));
+		} else {
+			const receiver = platform === 'hs' ? 'table.insert(rows, row)' : 'rows[#rows + 1] = row';
+			for (const section of sections) {
+				const expression = new RegExp(
+					'for _, row in ipairs\\(ManifestMenu\\.template_rows\\("' +
+						section +
+						'", \\{\\}, \\{\\}, \\{\\}\\) or \\{\\}\\) do\\s+' +
+						receiver.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') +
+						'\\s+end'
+				);
+				assert(expression.test(source));
+			}
+			assert(
+				source.includes(
+					platform === 'hs'
+						? 'if type(user_profiles) == "table" and #user_profiles > 0 then'
+						: 'if #user_profiles > 0 then'
+				)
+			);
+		}
+		assert(
+			!/(?:t|i18n_safe|i18n\.section)\("menu\.profiles\.header_(?:default|custom)_profiles"\)/.test(
+				source
+			)
+		);
+	}
+	for (const [platform, owner] of Object.entries(owners)) {
+		const source = fs.readFileSync(path.resolve(shared, '..', owner), 'utf8');
+		wiring(source, platform);
+		for (const mutate of [
+			(s) => s.replace(/llm_profile_builtin_heading/g, 'unreachable_heading'),
+			(s) => s.replace(/llm_profile_custom_heading/g, 'llm_profile_commands'),
+			(s) =>
+				platform === 'ahk'
+					? s.replace('Rows.Push(CustomHeadingRows*)', 'Discarded.Push(CustomHeadingRows*)')
+					: s.replace(
+							platform === 'hs' ? 'table.insert(rows, row)' : 'rows[#rows + 1] = row',
+							'discarded[#discarded + 1] = row'
+						)
+		])
+			assert.throws(() => wiring(mutate(source), platform));
+	}
+	const graphSource = fs.readFileSync(path.resolve(__dirname, 'test-menu-parity.cjs'), 'utf8');
+	const start = graphSource.indexOf('const OPENS_SUBMENU = {');
+	const end = graphSource.indexOf('\n};', start);
+	const graph = vm.runInNewContext(graphSource.slice(start, end + 3) + '; OPENS_SUBMENU');
+	function edges(value) {
+		assert(Array.isArray(value.llm_profile));
+		assert(
+			value.llm_profile.includes('llm_profile_commands'),
+			'the original clicked command child survives'
+		);
+		const original = value.llm_profile.find((edge) => edge?.menu === 'llm_custom_profile_controls');
+		assert(original);
+		assert.deepEqual([...original.platforms], ['hs', 'linux']);
+		for (const section of sections) {
+			const edge = value.llm_profile.find((item) => item?.menu === section);
+			assert(edge);
+			assert.equal(edge.kind, 'compose');
+			assert.deepEqual([...edge.platforms], ['ahk', 'hs', 'linux']);
+			assert.deepEqual({ ...edge.native_sources }, owners);
+		}
+	}
+	edges(graph);
+	for (const mutate of [
+		(g) => (g.llm_profile.find((e) => e?.menu === sections[0]).menu = 'llm_profile_commands'),
+		(g) => (g.llm_profile.find((e) => e?.menu === sections[1]).kind = 'submenu'),
+		(g) => (g.llm_profile.find((e) => e?.menu === sections[0]).platforms = ['hs']),
+		(g) => (g.llm_profile.find((e) => e?.menu === sections[1]).native_sources.linux = owners.hs),
+		(g) => (g.llm_profile = g.llm_profile.filter((e) => e !== 'llm_profile_commands'))
+	]) {
+		const wrong = structuredClone(graph);
+		mutate(wrong);
+		assert.throws(() => edges(wrong));
+	}
+	console.log(
+		'Profile headings: independent declaration, original 21 captions, real three-driver fragment publication and clicked-child preservation.'
+	);
+}

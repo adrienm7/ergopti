@@ -470,3 +470,154 @@ helpers.describe("shared custom profile child: canonical Linux native owner", fu
 		end)
 	end)
 end)
+
+-- Canonical configuration and native choices remain the production owners.
+helpers.describe("shared profile section headings: actual canonical Linux provider", function()
+	local function shared(relative) return helpers.driver_root():gsub("/linux$", "/_shared/") .. relative end
+	local function read_json(relative)
+		local file=assert(io.open(shared(relative),"rb"));local raw=file:read("*a");file:close();return Json.decode(raw)
+	end
+	local expected = read_json("tests/corpus/menus/profile_section_headings.json")
+	local function with_headings(custom, body)
+		local initial='[llm]\nfuture = "keep"\nuser_profiles = "v1:' .. Base64.encode(Json.encode(custom and {profile()} or Json.array({})))
+			.. '"\n[llm.profiles]\nactive = "basic"\nauto_profile_for_model = false\n'
+		with_config(initial,function(settings,path)
+			local names={"infra.manifest_menu","infra.i18n","ui.menu.menu_builder"}
+			local saved={};for _,name in ipairs(names) do saved[name]=package.loaded[name] end
+			local ok,err=xpcall(function()
+				local document=read_json("modules/menu/menu_manifest.json")
+				local native_i18n=require("infra.i18n")
+				local i18n=setmetatable({get=function(key) return key end}, {__index=native_i18n})
+				package.loaded["infra.i18n"]=i18n
+				local renderer=assert(require("menu.renderer").new({platform="linux",
+					manifest_path=function() return shared("modules/menu/menu_manifest.json") end,
+					json_decode=function() return document end,i18n=i18n,logger=require("logger.shim")}))
+				package.loaded["infra.manifest_menu"]=renderer
+				local redraws=0
+				local ctx={is_paused=function() return false end,llm={is_enabled=function() return true end,
+					get_models=function() return {} end,get_current_model=function() return "small" end,
+					get_prediction_model=function() return "small" end},on_menu_changed=function() redraws=redraws+1 end}
+				local builder=helpers.load_module("ui.menu.menu_builder")
+				local function find(rows)
+					for _,row in ipairs(rows or {}) do
+						if row.menu then
+							for _,child in ipairs(row.menu) do if child.title==i18n.get("menu.profiles.auto_detect") then return row.menu end end
+							local result=find(row.menu);if result then return result end
+						end
+					end
+				end
+				body({document=document,i18n=i18n,heading_index=2,other_platform="hs",
+					caption=function(key) return i18n.get(key) end,decorate=function(value) return value end,
+					rows=function() return assert(find(builder.build(ctx)),"actual profile parent missing") end,
+					untouched=function() helpers.assert_eq(Sandbox.read_bytes(path),initial);helpers.assert_eq(redraws,0) end,
+					settings=settings,path=path,ctx=ctx,redraws=function() return redraws end})
+			end,debug.traceback)
+			for _,name in ipairs(names) do package.loaded[name]=saved[name] end
+			if not ok then error(err,0) end
+		end)
+	end
+
+	local function titles(rows)
+		local result = {}
+		for _, row in ipairs(rows) do result[#result + 1] = row.title end
+		return result
+	end
+	local function position(rows, title)
+		for index, row in ipairs(rows) do if row.title == title then return index, row end end
+	end
+	local sections = { "llm_profile_builtin_heading", "llm_profile_custom_heading" }
+	helpers.it("profile-headings: handwritten shared declaration exactly matches the independent oracle", function()
+		with_headings(true, function(f)
+			for _, section in ipairs(sections) do helpers.assert_eq(f.document[section], expected.sections[section]) end
+			local rows = f.rows()
+			local builtin, builtin_row = position(rows, f.caption(expected.keys[1]))
+			local custom, custom_row = position(rows, f.caption(expected.keys[2]))
+			helpers.assert_type(builtin, "number"); helpers.assert_type(custom, "number")
+			helpers.assert_true(builtin < custom)
+			helpers.assert_true(builtin_row.disabled); helpers.assert_nil(builtin_row.fn)
+			helpers.assert_true(custom_row.disabled); helpers.assert_nil(custom_row.fn)
+			helpers.assert_eq(rows[custom - 1].title, "-")
+			helpers.assert_eq(rows[custom + 1].title, "Canonical")
+			f.untouched()
+		end)
+	end)
+	helpers.it("profile-headings: empty native registry has no custom heading or custom separator", function()
+		with_headings(false, function(f)
+			local rows = f.rows()
+			helpers.assert_not_nil(position(rows, f.caption(expected.keys[1])))
+			helpers.assert_nil(position(rows, f.caption(expected.keys[2])))
+			local before = titles(rows)
+			f.document[sections[2]] = { {type="label",id="empty_registry_probe",i18n="button.cancel"} }
+			helpers.assert_eq(titles(f.rows()), before, "custom presentation is conditional on the actual native registry")
+			f.untouched()
+		end)
+	end)
+	helpers.it("profile-headings: actual native menu consumes changed caption and shared custom source order", function()
+		with_headings(true, function(f)
+			local custom = f.document[sections[2]]
+			local heading = custom[f.heading_index]
+			heading.i18n = "button.cancel"
+			custom[1], custom[f.heading_index] = heading, custom[1]
+			local rows = f.rows()
+			local index = position(rows, f.caption("button.cancel"))
+			helpers.assert_type(index, "number")
+			helpers.assert_eq(rows[index + 1].title, "-")
+			helpers.assert_eq(rows[index + 2].title, "Canonical")
+			helpers.assert_nil(position(rows, f.caption(expected.keys[2])))
+			f.untouched()
+		end)
+	end)
+	for _, mutation in ipairs({"missing", "empty", "invalid caption", "hidden platform"}) do
+		helpers.it("profile-headings: no native fallback repairs " .. mutation .. " declaration", function()
+			with_headings(true, function(f)
+				for _, section in ipairs(sections) do
+					if mutation == "missing" then f.document[section] = nil
+					elseif mutation == "empty" then f.document[section] = {}
+					elseif mutation == "invalid caption" then
+						for _, row in ipairs(f.document[section]) do if row.i18n then row.i18n = false end end
+					else for _, row in ipairs(f.document[section]) do row.platforms = {f.other_platform} end end
+				end
+				local rows = f.rows()
+				helpers.assert_nil(position(rows, f.caption(expected.keys[1])))
+				helpers.assert_nil(position(rows, f.caption(expected.keys[2])))
+				helpers.assert_not_nil(position(rows, "Canonical"), "native data rows must survive absent presentation")
+				f.untouched()
+			end)
+		end)
+	end
+	helpers.it("profile-headings: all 21 original caption pairs keep the platform decoration", function()
+		with_headings(true, function(f)
+			local count = 0
+			for language, pair in pairs(expected.captions) do
+				count = count + 1
+				local values = read_json("data/locales/" .. language .. ".json")
+				helpers.assert_eq({values[expected.keys[1]], values[expected.keys[2]]}, pair, language)
+				f.i18n.get = function(key) return values[key] or key end
+				local rows = f.rows()
+				helpers.assert_not_nil(position(rows, f.decorate(pair[1])), language)
+				helpers.assert_not_nil(position(rows, f.decorate(pair[2])), language)
+			end
+			helpers.assert_eq(count, 21)
+			f.untouched()
+		end)
+	end)
+
+	helpers.it("profile-headings: withdrawing inert declarations keeps native automatic-profile persistence", function()
+		with_headings(true,function(f)
+			local _, held=position(f.rows(),"menu.profiles.auto_detect")
+			for _,section in ipairs(sections) do f.document[section]=nil end
+			helpers.assert_eq(held.fn(),true)
+			helpers.assert_eq(f.settings.get("auto_profile_for_model"),true)
+			helpers.assert_eq(Toml.decode(Sandbox.read_bytes(f.path)).llm.future,"keep")
+			helpers.assert_eq(f.redraws(),1)
+		end)
+	end)
+	helpers.it("profile-headings: current native pause still refuses held automatic-profile publication", function()
+		with_headings(true,function(f)
+			local _,held=position(f.rows(),"menu.profiles.auto_detect")
+			f.ctx.is_paused=function() return true end
+			helpers.assert_eq(held.fn(),false)
+			f.untouched()
+		end)
+	end)
+end)

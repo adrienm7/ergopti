@@ -1014,7 +1014,9 @@ local function build_profile_menu(
 	table.insert(rows, { separator = true })
 
 	-- Native profiles section
-	table.insert(rows, { label = i18n.section("menu.profiles.header_default_profiles"), disabled = true })
+	for _, row in ipairs(ManifestMenu.template_rows("llm_profile_builtin_heading", {}, {}, {}) or {}) do
+		table.insert(rows, row)
+	end
 	for _, profile in ipairs(llm_mod.BUILTIN_PROFILES or {}) do
 		local pid = profile.id
 		
@@ -1043,8 +1045,9 @@ local function build_profile_menu(
 	-- Custom profiles section
 	local user_profiles = state.llm_user_profiles or {}
 	if type(user_profiles) == "table" and #user_profiles > 0 then
-		table.insert(rows, { separator = true })
-		table.insert(rows, { label = i18n.section("menu.profiles.header_custom_profiles"), disabled = true })
+		for _, row in ipairs(ManifestMenu.template_rows("llm_profile_custom_heading", {}, {}, {}) or {}) do
+			table.insert(rows, row)
+		end
 		for i, profile in ipairs(user_profiles) do
 			local pid = profile.id
 			local display_label = ProfileLabel.format(profile.label or (i18n.get("menu.profiles.custom_profile_label") .. " " .. i), state.llm_num_predictions)

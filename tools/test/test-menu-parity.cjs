@@ -361,7 +361,17 @@ const OPENS_SUBMENU = {
 	// All three profile providers render the shared Create/Clone command head.
 	llm_profile: [
 		'llm_profile_commands',
-		{ menu: 'llm_custom_profile_controls', platforms: ['hs', 'linux'] }
+		{ menu: 'llm_custom_profile_controls', platforms: ['hs', 'linux'] },
+		...['llm_profile_builtin_heading', 'llm_profile_custom_heading'].map((menu) => ({
+			menu,
+			platforms: ['ahk', 'hs', 'linux'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_llm/menu_profiles.ahk',
+				hs: 'macos/ui/menu/menu_llm/profiles_manager.lua',
+				linux: 'linux/ui/menu/menu_builder.lua'
+			}
+		}))
 	],
 	// Optional category-file providers return this declared opening command.
 	hotstring_category_file: 'hotstring_file_commands',
@@ -799,6 +809,9 @@ for (const menuKey of MENU_KEYS) {
 	const visibility = reachableOn[menuKey] || PLATFORMS;
 	for (const platform of visibility) {
 		const rows = project(menuKey, platform);
+		// Native providers compose these validated inert fragments into their actual lists.
+		// A standalone heading in such a fragment is not an empty clicked submenu.
+		if (isComposedFragment(rows, reachedByKinds[menuKey]?.[platform] || new Set())) continue;
 		rows.forEach((row, index) => {
 			if ((row.type || 'ref') !== 'section_header') return;
 			let under = 0;
