@@ -1257,6 +1257,353 @@ def preflight(repository, owner, seconds):
     )
 
 
+# These companions are independent source controls, not factory generators.
+# Pin the currently published bytes, including the frozen formatted corpora.
+SOURCE_CONTROL_INPUTS = (
+    (
+        "tools/build/remap_runtime_auth_transport_test.py",
+        "958eec8bc543db610956601a39f9074cd9926d18da1339e3c1de069f605d6481",
+    ),
+    (
+        "tools/build/remap_runtime_auth_test.py",
+        "0093ec937550298fed3aaee2f4faf5b11c5fbb898926bb60f8b2ded0407fa42a",
+    ),
+    (
+        "tools/build/remap_runtime_auth_hs274_test.py",
+        "02ecfacf75406969eba420f20f8344c228ebf1e79c017d63c71b4260e068a082",
+    ),
+    (
+        "tools/build/fixtures/remap_runtime_auth_policy26.json",
+        "ef999db672cf22e5dff512c418826bfc3a13ea2ac0581b0a070803a2de1a003a",
+    ),
+    (
+        "tools/build/fixtures/remap_runtime_auth_hs27422.json",
+        "3581dbbe0af267a44d6544a06e0ec25279c0ae9d68660537517cfb91b994b2dc",
+    ),
+)
+SOURCE_CONTROL_GROUPS = (("auth_transport21", 21), ("auth_policy26", 26), ("auth_hs27422", 22))
+SOURCE_CONTROL_PHASES = (
+    "acquisition",
+    "checkout",
+    "submodules",
+    "identity_upstream",
+    "identity_cpm",
+    "identity_vhd",
+    "source_clean",
+) + tuple(name for name, _ in SOURCE_CONTROL_GROUPS)
+SOURCE_CONTROL_PASS = (
+    "PASS owned AUTH source controls=21 policy=26 hs274=22; native authentication unqualified\n"
+)
+
+
+def _source_controls_require(condition):
+    _REQUIRE(
+        condition,
+        "source_controls_refused",
+        "Source controls did not finish with their exact closed evidence",
+    )
+
+
+def auth_source_output(status, stdout, stderr):
+    """A real retired child precedes its exact no-skip unittest summary."""
+    _source_controls_require(
+        type(status) is int and status == 0 and stdout == "" and type(stderr) is str
+    )
+    summary = re.fullmatch(r"\.{21}\n-{70}\nRan 21 tests in ([0-9]+(?:\.[0-9]+)?)s\n\nOK\n", stderr)
+    _source_controls_require(summary is not None)
+    # Bound the decimal text before converting it; huge integers cannot overflow.
+    elapsed = summary.group(1)
+    _source_controls_require(len(elapsed) <= 32)
+    value = float(elapsed)
+    _source_controls_require(0 <= value <= 300 and math.isfinite(value))
+
+
+def policy_source_output(status, stdout, stderr, record, count, oracle_hash, policy_hash):
+    """Keep the independent O0/O2 literal corpora separate from native identity."""
+    _source_controls_require(
+        type(status) is int
+        and status == 0
+        and type(stdout) is str
+        and type(stderr) is str
+        and stderr == ""
+    )
+    _source_controls_require(type(count) is int and count in (26, 22))
+    _source_controls_require(
+        type(record) is dict
+        and set(record)
+        == {
+            "qualification",
+            "native_executed",
+            "oracle_sha256",
+            "policy_sha256",
+            "adapter",
+            "receipts",
+        }
+    )
+    _source_controls_require(parse_json(stdout) == record)
+    _source_controls_require(
+        record["qualification"] == "PORTABLE_LITERAL_POLICY_ONLY"
+        and type(record["native_executed"]) is int
+        and record["native_executed"] == 0
+        and record["oracle_sha256"] == oracle_hash
+        and record["policy_sha256"] == policy_hash
+        and record["adapter"] == {"ordinary_supported_request": "frontmost_application_changed"}
+    )
+    rows = record["receipts"]
+    _source_controls_require(type(rows) is list and len(rows) == 2)
+    for row, mode in zip(rows, ("unoptimized", "optimized"), strict=True):
+        _source_controls_require(
+            type(row) is dict
+            and set(row)
+            == {
+                "mode",
+                "compile_exit",
+                "run_exit",
+                "literal_policy_cases",
+                "native_executed",
+            }
+        )
+        _source_controls_require(row["mode"] == mode)
+        for key, wanted in (
+            ("compile_exit", 0),
+            ("run_exit", 0),
+            ("literal_policy_cases", count),
+            ("native_executed", 0),
+        ):
+            _source_controls_require(type(row[key]) is int and row[key] == wanted)
+
+
+def source_controls_output(status, stdout, stderr):
+    """Persisted evidence cannot substitute for the actual guardian return."""
+    _source_controls_require(
+        type(status) is int and status == 0 and stdout == SOURCE_CONTROL_PASS and stderr == ""
+    )
+
+
+def validate_source_controls_record(record):
+    """Portable metadata only; the caller must first admit real process closure."""
+    _source_controls_require(
+        type(record) is dict
+        and set(record)
+        == {
+            "schema",
+            "status",
+            "qualification",
+            "budget_seconds",
+            "pins",
+            "source_inventory_entries",
+            "companions",
+            "phases",
+            "controls",
+            "native_compilation_executed",
+            "native_capture_executed",
+            "installation_executed",
+            "signing_executed",
+            "auth_executed",
+        }
+    )
+    for key, expected in (
+        ("schema", 1),
+        ("budget_seconds", 300),
+        ("source_inventory_entries", 4505),
+    ):
+        _source_controls_require(type(record[key]) is int and record[key] == expected)
+    _source_controls_require(
+        record["status"] == "passed"
+        and record["qualification"] == "portable_owned_auth_source_controls_on_genuine_pristine"
+    )
+    BASE.verify_pins(record["pins"])
+    _source_controls_require(
+        record["companions"]
+        == [{"path": path, "sha256": digest} for path, digest in SOURCE_CONTROL_INPUTS]
+    )
+    phases = record["phases"]
+    _source_controls_require(type(phases) is list and len(phases) == len(SOURCE_CONTROL_PHASES))
+    for row, phase in zip(phases, SOURCE_CONTROL_PHASES, strict=True):
+        _source_controls_require(
+            type(row) is dict
+            and set(row) == {"schema", "phase", "status", "exit_status", "elapsed_seconds"}
+        )
+        _source_controls_require(
+            type(row["schema"]) is int
+            and row["schema"] == 1
+            and row["phase"] == phase
+            and row["status"] == "passed"
+            and type(row["exit_status"]) is int
+            and row["exit_status"] == 0
+        )
+        elapsed = row["elapsed_seconds"]
+        _source_controls_require(
+            type(elapsed) in (int, float) and 0 <= elapsed <= 300 and math.isfinite(elapsed)
+        )
+    controls = record["controls"]
+    _source_controls_require(type(controls) is list and len(controls) == 3)
+    for row, (name, count) in zip(controls, SOURCE_CONTROL_GROUPS, strict=True):
+        _source_controls_require(
+            type(row) is dict
+            and set(row) == {"name", "tests", "failures", "errors", "skipped", "native_executed"}
+            and row["name"] == name
+        )
+        for key, expected in (
+            ("tests", count),
+            ("failures", 0),
+            ("errors", 0),
+            ("skipped", 0),
+            ("native_executed", 0),
+        ):
+            _source_controls_require(type(row[key]) is int and row[key] == expected)
+    for key in (
+        "native_compilation_executed",
+        "native_capture_executed",
+        "installation_executed",
+        "signing_executed",
+        "auth_executed",
+    ):
+        _source_controls_require(record[key] is False)
+
+
+def source_controls(repository, owner, seconds):
+    """Run actual source controls on one freshly acquired retained pristine tree.
+
+    The existing native phase owner and outer Guardian retain all process debt.
+    AUTH C++ uses modeled identity/UID/watch/MAIN leaves, never native authority.
+    This mode is separate from either native compilation and never stages outputs.
+    """
+    _REQUIRE(
+        type(seconds) is int and seconds == 300,
+        "invalid_budget",
+        "Source controls require exactly 300 seconds",
+    )
+    owner = _OWNER(owner)
+    _REQUIRE(not any(owner.iterdir()), "unsafe_path", "Source controls require a fresh empty owner")
+    owner_identity = _directory_identity(owner.lstat())
+    deadline = time.monotonic() + seconds
+    repository = Path(repository)
+    factory = _source_factory()
+    _factory_operation(factory, factory.capture_dependencies, repository, deadline)
+    companions = snapshot_inputs(repository, dict(SOURCE_CONTROL_INPUTS), deadline)
+    _REQUIRE(
+        sys.platform == "darwin",
+        "tool_unavailable",
+        "The actual source-control phase owner requires Darwin",
+    )
+    executable = shutil.which("git")
+    _REQUIRE(
+        executable is not None, "tool_unavailable", "The genuine Git source tool is unavailable"
+    )
+    phases = []
+    pristine = _acquire_pristine(
+        owner, {"git": str(Path(executable).resolve(strict=True))}, deadline, phases
+    )
+    projection = _factory_operation(
+        factory, factory.prepare_owned_source, repository, pristine, deadline
+    )
+
+    def current():
+        check_deadline(deadline)
+        _REQUIRE(
+            _OWNER(owner) == owner and _directory_identity(owner.lstat()) == owner_identity,
+            "source_identity",
+            "The source-control owner changed",
+        )
+        _factory_operation(factory, factory.revalidate_owned_source, projection, deadline)
+        current_inputs(companions, deadline)
+        check_deadline(deadline)
+
+    current()
+    policy = repository / "tools/build/remap_runtime_auth_policy.hpp"
+    policy_hash = dict(factory.DEPENDENCIES)["tools/build/remap_runtime_auth_policy.hpp"]
+    commands = (
+        [
+            sys.executable,
+            str(repository / SOURCE_CONTROL_INPUTS[0][0]),
+            "--source-root",
+            str(pristine),
+        ],
+        [
+            sys.executable,
+            str(repository / SOURCE_CONTROL_INPUTS[1][0]),
+            str(policy),
+            str(repository / SOURCE_CONTROL_INPUTS[3][0]),
+            str(owner / "policy26"),
+        ],
+        [
+            sys.executable,
+            str(repository / SOURCE_CONTROL_INPUTS[2][0]),
+            str(policy),
+            str(repository / SOURCE_CONTROL_INPUTS[4][0]),
+            str(owner / "hs27422"),
+        ],
+    )
+    for index, ((name, count), command) in enumerate(
+        zip(SOURCE_CONTROL_GROUPS, commands, strict=True)
+    ):
+        current()
+        # run_phase returns only after the genuine foreground child has exited.
+        phases.append(_RUN_PHASE(name, command, owner, owner, deadline))
+        current()
+        stdout = _ordinary(owner / (name + ".stdout"), owner, BASE.MAX_INPUT_BYTES).data.decode(
+            "utf-8"
+        )
+        stderr = _ordinary(owner / (name + ".stderr"), owner, BASE.MAX_INPUT_BYTES).data.decode(
+            "utf-8"
+        )
+        if index == 0:
+            auth_source_output(phases[-1]["exit_status"], stdout, stderr)
+        else:
+            result_dir = owner / ("policy26" if index == 1 else "hs27422")
+            row = _ordinary(result_dir / "RESULT.json", owner, BASE.MAX_INPUT_BYTES)
+            policy_source_output(
+                phases[-1]["exit_status"],
+                stdout,
+                stderr,
+                parse_json(row.data),
+                count,
+                SOURCE_CONTROL_INPUTS[index + 2][1],
+                policy_hash,
+            )
+        current()
+    record = {
+        "schema": 1,
+        "status": "passed",
+        "qualification": "portable_owned_auth_source_controls_on_genuine_pristine",
+        "budget_seconds": seconds,
+        "pins": dict(projection.pins),
+        "source_inventory_entries": len(projection.inventory),
+        "companions": [
+            {"path": row.path, "sha256": BASE.digest(row.data)} for row in companions.files
+        ],
+        "phases": phases,
+        "controls": [
+            {
+                "name": name,
+                "tests": count,
+                "failures": 0,
+                "errors": 0,
+                "skipped": 0,
+                "native_executed": 0,
+            }
+            for name, count in SOURCE_CONTROL_GROUPS
+        ],
+        "native_compilation_executed": False,
+        "native_capture_executed": False,
+        "installation_executed": False,
+        "signing_executed": False,
+        "auth_executed": False,
+    }
+    validate_source_controls_record(record)
+    current()
+    pending = owner / ".owned-source-controls.pending.json"
+    BASE.write_json(pending, record)
+    current()
+    _WRITE_EXCLUSIVE(
+        owner / "owned-source-controls-result.json",
+        _ordinary(pending, owner, BASE.MAX_INPUT_BYTES).data,
+    )
+    current()
+    return record
+
+
 def main(arguments=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("repository", type=Path)
@@ -1265,6 +1612,7 @@ def main(arguments=None):
     parser.add_argument("--preflight", action="store_true")
     parser.add_argument("--ready", action="store_true")
     parser.add_argument("--compile-owned", action="store_true")
+    parser.add_argument("--source-controls", action="store_true")
     parser.add_argument("--upstream", type=Path)
     parser.add_argument("--observe-products", type=Path)
     options = parser.parse_args(arguments)
@@ -1273,6 +1621,7 @@ def main(arguments=None):
             int(options.preflight)
             + int(options.ready)
             + int(options.compile_owned)
+            + int(options.source_controls)
             + int(options.observe_products is not None)
         )
         _REQUIRE(
@@ -1280,6 +1629,10 @@ def main(arguments=None):
             "invalid_budget",
             "Conflicting owned preparation modes",
         )
+        if options.source_controls:
+            source_controls(options.repository, options.owner, options.budget)
+            print(SOURCE_CONTROL_PASS, end="")
+            return 0
         if options.ready:
             dependency_ready(options.repository, options.owner, options.budget)
             print("PASS fixed owned build dependencies; source and compilation unexecuted")

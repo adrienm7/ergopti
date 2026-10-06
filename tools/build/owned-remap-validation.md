@@ -18,7 +18,7 @@ python3 tools/build/remap_runtime_auth_transport_test.py --source-root /absolute
 PYTHONOPTIMIZE=1 python3 tools/build/remap_runtime_auth_transport_test.py --source-root /absolute/pristine/source
 ```
 
-These21 controls execute genuine pqrs dispatcher/Asio/threads, retained channel debt, stored callback destruction and actual filesystem source transforms. Native identity, signature, UID, watch and serial MAIN leaves are explicitly modeled. They are not native authentication or physical input proof. The new Swift compilation case currently does not invoke these21 controls. They require a separate source-control registration; portable41 is not a replacement and SDK30 is not enough for the complete C++ control run. Do not silently skip them or enlarge that SDK budget.
+These21 controls execute genuine pqrs dispatcher/Asio/threads, retained channel debt, stored callback destruction and actual filesystem source transforms. Native identity, signature, UID, watch and serial MAIN leaves are explicitly modeled. They are not native authentication or physical input proof. The compilation case remains independent. `HS274OwnedAuthSourceControlsTests` registers these21 controls and the independent26/additive22 policy corpora in a separate sourceCalibration300/305/10 child, after its own fresh official pinned acquisition. Its22 portable parser/refusal controls keep SDK30/35/10. Neither portable41 nor portable22 substitutes for the actual C++ run, and the source calibration grants no native authentication authority.
 
 The independent original26 role/UID corpus and additive22 hs274 operation corpus remain literal checked-in fixtures. They are not derived from the new policy. Run each against the current combined policy, using separate absent output directories:
 
@@ -42,3 +42,27 @@ python3 tools/build/remap_runtime_build.py /absolute/repository /absolute/empty/
 ```
 
 The optional `--upstream /absolute/pristine/source` consumes an explicitly retained genuine pristine input. It does not accept modified staging as original source. Without it the native entry performs its own fresh fixed acquisition. Generated upstream trees, version files, products, bytecode and diagnostic receipts belong in private build owners, not committed source. Production enablement remains separate from this compilation evidence.
+
+The separately discovered source-controls XCTest calls the same fixed owned helper,
+without relying on a preceding test, baseline receipt or compiled product. Its
+child retains the genuine pristine inventory and exact five companion inputs
+before and after each foreground child. Each child must actually finish with
+status0, its exact count and no errors, failures or skips. The original26 and
+additive22 each execute both O0 and O2. No staging, version generation or native
+four-target compilation runs in this mode; its C++ native identity leaves remain
+modeled. All phases share one300-second absolute deadline and the existing
+Guardian owns process retirement.
+
+```bash
+python3 tools/build/remap_runtime_source_controls_test.py
+PYTHONOPTIMIZE=1 python3 tools/build/remap_runtime_source_controls_test.py
+# macOS, in a separate empty canonical0700 owner:
+python3 tools/build/remap_runtime_build.py /absolute/repository /absolute/empty/owner --source-controls --budget 300
+```
+
+`--source-controls` rejects `--upstream` and all other modes. Its closed
+`owned-source-controls-result.json` records software coverage21/26/22 with zero
+native authentication, capture, compilation, installation and signing. Persisted
+JSON cannot replace the actual Guardian return or child closure. This separate
+registration is for the next source run; it does not change an ongoing native
+compilation run or enable production capture.

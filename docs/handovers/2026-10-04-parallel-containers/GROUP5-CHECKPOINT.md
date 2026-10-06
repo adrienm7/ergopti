@@ -1185,3 +1185,28 @@ build fails at XcodeGen HTTPS acquisition, so it gives no fresh compilation
 credit. Brew/Sparkle failures persist, and packaging/install are skipped. Full
 artifact bytes and package-signature parsing remain unverified or unimplemented;
 these transcript bytes do not authorize provisioning or complete TODO31.
+
+Exact-source macOS run [37456947625](https://github.com/adrienm7/ergopti/actions/runs/37456947625)
+at83c63b1c5 compiles the Swift launcher/tests and completes all359 discovered
+cases:340 pass,4 fail and15 skip. The new portable41 method passes. Its separate
+fresh baseline returns124 in301.163s and nonempty stderr; the unchanged guard
+prevents the owned four-target invocation and product observation. The underlying
+baseline phase/cause is unknown: the new337,954,082-byte failure artifact download
+is refused by the running network policy. The old stock method separately
+refuses XcodeGen HTTPS acquisition. Brew/Sparkle also fail; package/install skip,
+and Release skips. No owned compilation credit follows from these results.
+
+A separate discovered source-control calibration now runs the existing21 real
+pqrs/Asio callback controls and independent26/additive22 policy corpora, each
+policy at O0/O2. It first acquires its own genuine pristine4,505-entry source,
+retains the fixed factory32 and five exact companion inputs, then revalidates
+them before and after every completed child. One300-second absolute budget and
+the existing Guardian305/cleanup10 remain unchanged. The original41 build tests
+and both existing Swift files are whole-byte identical. New22 parser/refusal
+controls pass normal and inherited optimization; three semantic mutations and
+three physical post-child refusal controls preserve the original assertions.
+Actual fresh official acquisition and software21/26/22 pass on Linux in113.625s;
+Clang19 also passes the unchanged21 controls. Native identity, signature, UID,
+watch and MAIN leaves remain modeled. Actual macOS source-control execution,
+broader AUTH, protected provisioning, owned compilation, installation and
+physical input remain unqualified; this registration does not complete TODO31.
