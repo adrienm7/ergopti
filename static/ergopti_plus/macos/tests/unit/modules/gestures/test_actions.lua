@@ -630,3 +630,6 @@ local binding_vectors_path = helpers.shared("tests/corpus/config_binding_identit
 local binding_vectors_file = assert(io.open(binding_vectors_path, "rb"))
 local binding_vectors_source = assert(binding_vectors_file:read("*a")); assert(binding_vectors_file:close())
 require("test.config_binding_identity_contract").register(helpers, assert(require("json").decode(binding_vectors_source)))
+
+
+require("test.script_binding_publication_contract").register(require("tests.helpers"), "macos")

@@ -14,6 +14,7 @@ local M = {}
 
 --- Detail shared by readers and cleanup for a retired gesture binding.
 M.RETIRED_GESTURE = "no gesture slot of this build has this name"
+M.RETIRED_SCRIPT = "no script chord slot of this build has this name"
 
 --- Judges a binding only when its native gesture catalogue is published.
 --- The owner supplies its actual complete slot ids, never an inferred empty
@@ -41,6 +42,20 @@ function M.gesture_binding_fits(binding, catalogue)
 		slot = binding:sub(#prefix + 1)
 	end
 	return catalogue.slots[slot] == true
+end
+
+--- Judges only the qualified script domain against an acknowledged native publication.
+--- Missing publication remains unjudged; the reader never loads the catalogue.
+--- @param binding any Native binding id.
+--- @param catalogue table|nil Complete native publication.
+--- @return boolean|nil fits
+function M.script_binding_fits(binding, catalogue)
+	if catalogue == nil then return nil end
+	assert(type(catalogue) == "table" and catalogue.prefix == "script__",
+		"config_binding_identity: invalid published script catalogue")
+	assert(type(catalogue.slots) == "table" and next(catalogue.slots) ~= nil,
+		"config_binding_identity: invalid published script catalogue")
+	return M.gesture_binding_fits(binding, catalogue)
 end
 
 return M

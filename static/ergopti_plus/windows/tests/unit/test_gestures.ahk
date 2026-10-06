@@ -920,3 +920,109 @@ TestGestures_ParameterSnapshotsKeepCaseTwins() {
 }
 Test("Gestures: detached snapshots and exact native clones retain both case twins (gesture-binding-identity-snapshots)",
 	TestGestures_ParameterSnapshotsKeepCaseTwins)
+
+
+; Keeps compiled publication identity outside runtime assignment fixtures.
+_GSBP_WithPublication(Body) {
+	global SCRIPT_SHORTCUT_SLOTS, _ScriptShortcutBindingPublication
+	PreviousSlots := IsSet(SCRIPT_SHORTCUT_SLOTS) ? SCRIPT_SHORTCUT_SLOTS : unset
+	PreviousPublication := IsSet(_ScriptShortcutBindingPublication) ? _ScriptShortcutBindingPublication : unset
+	try {
+		SCRIPT_SHORTCUT_SLOTS := ["script_altgr_enter", "script_altgr_backspace", "script_altgr_delete", "script_altgr_escape"]
+		_ScriptShortcutBindingPublication := ConfigBindingIdentityScriptPublication(SCRIPT_SHORTCUT_SLOTS)
+		Body.Call()
+	} finally {
+		SCRIPT_SHORTCUT_SLOTS := IsSet(PreviousSlots) ? PreviousSlots : unset
+		_ScriptShortcutBindingPublication := IsSet(PreviousPublication) ? PreviousPublication : unset
+	}
+}
+
+TestGestures_ScriptBindingCorpus() {
+	global _SharedDir
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\config_binding_identity\script_vectors.json", "UTF-8"))
+	Catalogue := ConfigBindingIdentityScriptPublication([
+		"script_altgr_enter", "script_altgr_backspace", "script_altgr_delete", "script_altgr_escape"
+	]).Catalogue
+	AssertEqual(14, Corpus.Length, "independent handwritten script identity corpus")
+	for Row in Corpus {
+		Expected := Type(Row["expected"]) == "String" ? Row["expected"] : Row["expected"] ? "current" : "retired"
+		AssertEqual(Expected, ConfigBindingIdentityScriptStatus(Row["binding"], Catalogue), Row["name"])
+		AssertEqual("unjudged", ConfigBindingIdentityScriptStatus(Row["binding"]), Row["name"] . ": unpublished")
+	}
+}
+Test("Gestures: script bindings replay an independent fourteen-vector corpus (script-binding-identity)",
+	TestGestures_ScriptBindingCorpus)
+
+TestGestures_ScriptPublicationIdentity() {
+	_GSBP_WithPublication(_GSBP_PublicationIdentityBody)
+}
+_GSBP_PublicationIdentityBody() {
+	global SCRIPT_SHORTCUT_SLOTS, _ScriptShortcutBindingPublication
+	OriginalSlots := SCRIPT_SHORTCUT_SLOTS
+	OriginalPublication := _ScriptShortcutBindingPublication
+	Received := TomlConfigScriptSlotCatalogue()
+	AssertEqual("script__", Received["prefix"])
+	AssertEqual(4, Received["slots"].Count)
+	AssertEqual("On", Received["slots"].CaseSense)
+	Received["slots"].Delete("script_altgr_enter")
+	Received["slots"]["removed_script_slot"] := true
+	AssertEqual("current", TomlConfigParameterBindingStatus("script__script_altgr_enter"))
+	AssertEqual("retired", TomlConfigParameterBindingStatus("script__removed_script_slot"))
+	SCRIPT_SHORTCUT_SLOTS := OriginalSlots.Clone()
+	AssertEqual("unjudged", TomlConfigParameterBindingStatus("script__removed_script_slot"), "foreign declaration identity withdraws authority")
+	SCRIPT_SHORTCUT_SLOTS := OriginalSlots
+	SCRIPT_SHORTCUT_SLOTS[1] := "foreign_slot"
+	AssertEqual("unjudged", TomlConfigParameterBindingStatus("script__removed_script_slot"), "changed declaration withdraws authority")
+	SCRIPT_SHORTCUT_SLOTS[1] := "script_altgr_enter"
+	_ScriptShortcutBindingPublication := unset
+	AssertEqual("unjudged", TomlConfigParameterBindingStatus("script__removed_script_slot"))
+	_ScriptShortcutBindingPublication := OriginalPublication
+	AssertEqual("retired", TomlConfigParameterBindingStatus("script__removed_script_slot"))
+	for Binding in ["keyboard__removed_key", "tap_key__removed_key", "tap_hold__removed_key", "combination__removed_pair", "Script__removed_script_slot"]
+		AssertEqual("unjudged", TomlConfigParameterBindingStatus(Binding), Binding)
+}
+Test("Gestures: script publication is detached, pure and bound to the compiled declaration (script-binding-identity)",
+	TestGestures_ScriptPublicationIdentity)
+
+TestGestures_ScriptPublicationRefusesMalformed() {
+	for Ids in [[], [""], ["same", "same"], ["nested__id"], [false]]
+		AssertThrows(ConfigBindingIdentityScriptPublication.Bind(Ids), "invalid compiled script declaration refuses")
+	Sparse := Array()
+	Sparse.Length := 2
+	Sparse[1] := "script_altgr_enter"
+	AssertThrows(ConfigBindingIdentityScriptPublication.Bind(Sparse), "a sparse declaration is not complete")
+	for Catalogue in [Map(), Map("prefix", "script__", "slots", Map()), Map("prefix", "keyboard__", "slots", Map("key", true))]
+		AssertThrows(ConfigBindingIdentityScriptStatus.Bind("script__removed", Catalogue), "malformed script publication refuses")
+}
+Test("Gestures: malformed script publication cannot invent retirement (script-binding-identity)",
+	TestGestures_ScriptPublicationRefusesMalformed)
+
+TestGestures_RetiredScriptSettersRefuse() {
+	_GSBP_WithPublication(_GSBP_RetiredSettersBody)
+}
+_GSBP_RetiredSettersBody() {
+	global GestureActionParameters
+	Previous := GestureActionParameters
+	Calls := []
+	Writer := (*) => (Calls.Push("writer"), false)
+	Notify := (*) => Calls.Push("notify")
+	try {
+		GestureActionParameters := Map()
+		GestureActionParameters.CaseSense := "On"
+		GestureActionParameters["Script__removed_script_slot__open_url"] := "https://unjudged.example"
+		AssertFalse(GestureSetActionParameter("script__removed_script_slot", "open_url", "https://must-not-write.example", Writer, Notify))
+		AssertEqual(0, Calls.Length)
+		AssertEqual(1, GestureActionParameters.Count)
+		Assignments := Map("script_altgr_enter", "none")
+		Parameters := _GestureCloneActionParameters(GestureActionParameters)
+		Candidate := Map("has_value", true, "key", "script__removed_script_slot__open_url", "value", "https://must-not-write.example")
+		AssertFalse(_GestureCommitAssignment(&Assignments, &Parameters, "shortcuts.script_control", "script_altgr_enter", "open_url", Candidate, Writer, Notify))
+		AssertEqual(0, Calls.Length)
+		AssertEqual("none", Assignments["script_altgr_enter"])
+		AssertEqual("https://unjudged.example", Parameters["Script__removed_script_slot__open_url"])
+		Snapshot := _GestureCloneActionParameters(Map("script__removed_script_slot__open_url", "https://inverse.example"))
+		AssertEqual("https://inverse.example", Snapshot["script__removed_script_slot__open_url"], "exact inverse is separate from setter admission")
+	} finally GestureActionParameters := Previous
+}
+Test("Gestures: retired script parameter refuses both setter paths before ports (script-binding-identity)",
+	TestGestures_RetiredScriptSettersRefuse)
