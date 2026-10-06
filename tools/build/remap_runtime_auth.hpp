@@ -401,7 +401,24 @@ private:
           gate(new publication_gate) {}
   };
   using entry_ptr = std::shared_ptr<entry>;
-  inline static std::atomic<entry_ptr> current_{nullptr};
+  // The macOS SDK used by CI lacks atomic<shared_ptr>. Standard shared_ptr
+  // operations retain the same sequential consistency and ownership-aware CAS.
+#if defined(__cpp_lib_atomic_shared_ptr) && __cpp_lib_atomic_shared_ptr >= 201711L
+  using atomic_entry_ptr = std::atomic<entry_ptr>;
+#else
+  class atomic_entry_ptr final {
+    entry_ptr value_;
+  public:
+    atomic_entry_ptr() noexcept : value_(nullptr) {}
+    atomic_entry_ptr(const atomic_entry_ptr&) = delete;
+    atomic_entry_ptr& operator=(const atomic_entry_ptr&) = delete;
+    entry_ptr load() const noexcept { return std::atomic_load(&value_); }
+    bool compare_exchange_strong(entry_ptr& expected, entry_ptr desired) noexcept {
+      return std::atomic_compare_exchange_strong(&value_, &expected, std::move(desired));
+    }
+  };
+#endif
+  inline static atomic_entry_ptr current_;
 
   // Allocation and genuine UID/watch observations occur outside all Runtime
   // and publication locks. This inert object cannot register a channel/frame.

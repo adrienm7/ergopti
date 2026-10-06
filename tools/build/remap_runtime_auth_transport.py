@@ -20,7 +20,7 @@ INPUT_PATHS = (
     "src/apps/CoreService/include/core_service/daemon/console_user_id_changed_receiver.hpp",
     "src/apps/ConsoleUserServer/include/console_user_server/console_user_id_changed_client.hpp",
 )
-AUTH_HEADER_SHA256 = "6ecee6a85daf61005b67b58bff527fef0d3d54a88156407792698817003f150d"
+AUTH_HEADER_SHA256 = "f6b921d8ce74938463b6d28dc50bda457755da1602f62c9e52e8bba760604a75"
 
 
 class AuthTransportRefusal(RuntimeError):

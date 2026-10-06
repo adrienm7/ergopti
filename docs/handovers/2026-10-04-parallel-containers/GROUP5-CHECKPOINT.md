@@ -1369,3 +1369,20 @@ refuse. Swift compilation and all twelve new native cases remain unexecuted
 locally. Existing controller25/acquisition10/probe10 and SDK30/35/10 budgets are
 unchanged; actual UI/token/lease, user backup, packaging and installation remain
 unqualified. Item43 stays partial.
+
+## Runtime atomic shared-pointer compatibility
+
+The actual macOS source-control compiler rejected atomic shared-pointer registry
+storage because its libc++ lacks that specialization. The registry now selects
+native atomic storage through the standard capability macro and otherwise uses
+private noncopyable shared-pointer atomic operations with identical sequential
+consistency and ownership-aware CAS. Independent strict C++23 compilation with
+-Wall/-Wextra/-Werror passes on GNU and genuine Linux libc++19; the original
+header fails on that actual libc++. Nine registry lifetime/concurrency groups
+pass, and the original21 transport,26 policy and22 publication controls remain
+unchanged. The coherent source pins retain32 factory inputs and57 outputs, with
+only the authentication header output changed. A separate discovered Swift test
+requires the real host compiler. Actual macOS SDK execution, owned4/CF12,
+signing, installation and activation remain unqualified. The separate XcodeGen
+metadata HTTP403 and native UI geometry refusal are not resolved by this fix.
+Item31 remains partial.
