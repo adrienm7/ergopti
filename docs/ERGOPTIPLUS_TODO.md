@@ -4142,6 +4142,19 @@ portable controls. A separate discovered XCTest registers the seven controls
 with unchanged SDK30/35/10 budgets. Native compilation, signing, installation
 and activation remain unqualified; TODO31 remains partial.
 
+The fixed three-product unsigned preparation now has separate native XCTest
+registration and a read-only retired-output observer composed with the verified
+builder338352. Complete source/detached inventories, ordinary bytes, modes,
+owner identities and physical ancestor incarnations are retained and recut;
+mutable source-cache replacements cannot execute. Forty-six frozen portable
+controls pass in the independent Root review. The first observer candidate is
+retained rejected for ancestor replacement and foreign bytecode execution.
+The actual native compile/preparation keeps its existing300/305/10 budget and
+fails rather than crediting a refused snapshot; post-retirement observation
+cannot recreate original custody. Native SDK execution, genuine shipping
+capture, stable signing, archives, installation and activation remain
+unqualified. Item31 and WP4-WP10 remain open.
+
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
   listed; see `docs/memory/text-input-and-config.md`. Still open everywhere:
@@ -5867,6 +5880,19 @@ Checkpoint 37116696443 no longer reports the two real full-save retired-Metrics 
 The maintained AHK and Hammerspoon configuration-schema draft examples no longer recommend the retired dedicated Metrics-window shortcut table. The existing CJS retirement gate checks their actual semantic table headers, including quoted and array-table aliases, while literal-dot foreign table names remain distinct. All other draft consent, color and privacy records remain byte-identical, and the generator registry confirms the examples are separate from generated runtime templates. Whole-document draft schema validation remains separate; item71 still requires a complete native three-OS package/install/launch checkpoint.
 
 Remaining work for item71 (CI-feasible software first):
+
+Integrated checkpoint `7a75da439` ran manual CI `37539552261` on its exact
+tree through `codex/ci-validation` SHA `532aad27`. All Linux unit, E2E,
+package and seventeen installation/run scenarios passed; Core JS/properties
+passed. Windows retained 9,734 passing AHK records and ten native observer
+ownership scenarios, but the fresh-clone fixture failed at Git checkout on
+the newly archived evidence's long paths, before application startup. The
+fixture now configures `core.longpaths=true` only in its new private clone,
+before checkout, and verifies the local setting. The complete clone, exact
+HEAD, tracked driver projection and all native boot/retirement assertions
+remain mandatory. Native Windows requalification is pending. Separate
+macOS TIS, Brew receiver, switcher and Shortcuts failures remain explicit;
+downstream Windows/macOS delivery was skipped and Release/Publish skipped.
 
 - [ ] Software implementation/repair: Keep the completed dedicated Metrics-shortcut retirement and ordinary Metrics actions; repair only demonstrated regressions in unknown retired values/comments, consent or compensation.
 - [ ] Hosted native qualification: Requalify native full-save, installed upgrade/startup and complete three-OS unit/E2E/package/install/launch gates on final sources.

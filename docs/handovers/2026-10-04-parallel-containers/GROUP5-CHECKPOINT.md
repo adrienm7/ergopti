@@ -1457,3 +1457,17 @@ these portable controls; no native build/auth/sign/install credit is inferred.
 The independently reviewed Session suspend/resume tranche remains private for
 separate adoption. The new native shipping observer needs its own reviewed
 three-argument loader composition. Item31 and its unfinished packages stay open.
+
+## Actual unsigned preparation qualification registration
+
+Current dev5d1d clone-local Windows longpaths correction is composed without
+changing its assertions or private Git configuration. The reviewed three
+additions register one genuine owned unsigned preparation and separate current
+output observation. Complete inventories and physical ancestors are recut;
+verified retained code bytes supply fixed dependencies. Root rehashed75
+composition subjects and independently passed46 frozen portable controls.
+The rejected first observer and corrective predecessor stay preserved.
+Original native helpers, compile receipts and300/305/10 budgets stay whole.
+Neither retired metadata nor successful portable tests authorize signing,
+shipping, installation or activation. Native Swift and genuine snapshots
+remain unexecuted on this composition; item31 remains partial.
