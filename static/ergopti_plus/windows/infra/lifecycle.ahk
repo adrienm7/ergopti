@@ -172,6 +172,14 @@ ReloadPreservingSuspend(SuccessFn := 0, ExistingBundle := 0, RefusedFn := 0,
 _ReloadPreservingSuspendNonCritical(SuccessFn, ExistingBundle, RefusedFn,
 		StageFailureFn) {
 	global ConfigurationFile
+	if IsSet(ProgramActions_Stop) {
+		ProgramStopped := false
+		try ProgramStopped := ProgramActions_Stop(A_IsSuspended)
+		catch as Err
+			try LoggerError("Lifecycle", "User-program reload preflight failed: {1}.", Err.Message)
+		if !((ProgramStopped is Integer) && ProgramStopped == 1)
+			return false
+	}
 	if (ExistingBundle is Object) && !HasMethod(RefusedFn, "Call")
 		throw TypeError("A reload that borrows a configuration bundle needs a refusal callback to take it back.")
 	ReportStage := HasMethod(StageFailureFn, "Call") ? StageFailureFn : _SuspendHandoffFailure
@@ -460,6 +468,8 @@ Ergopti_OnSuspendEnter() {
 	global _SpaceHoldInputHook
 	global _MagicKeyEditorInputHook
 	Transition := LifecycleTransitionBegin("suspend")
+	if IsSet(ProgramActions_Stop)
+		_LifecycleRunRequiredStep(Transition, "user-programs", () => ProgramActions_Stop(true), true)
 	if IsSet(UserHotstringsInvalidate)
 		_LifecycleRunRequiredStep(Transition, "user-hotstrings", UserHotstringsInvalidate.Bind("suspend"), true)
 	if !_LifecycleRunRequiredStep(Transition, "navigation-event",
@@ -630,6 +640,8 @@ Ergopti_OnSuspendEnter() {
 }
 Ergopti_OnSuspendResume() {
 		Transition := LifecycleTransitionBegin("resume")
+		if IsSet(ProgramActions_Stop)
+			_LifecycleRunRequiredStep(Transition, "user-programs", () => ProgramActions_Stop(false), true)
 		LoggerStart("Lifecycle", "Resuming from suspend…")
 		LifecycleTransitionMarkStarted(Transition)
 		_LifecycleRunRequiredStep(Transition, "navigation-event",
@@ -847,13 +859,20 @@ LifecycleShutdownVetoHonored() {
 ; LifecycleShutdownVetoHonored, the one rule the layout poll also consults.
 ; @param Gate {String} Short name of the refusing gate, for the exhaustion line.
 ; @returns {Integer} 1 to veto the exit, 0 to let it proceed regardless.
-_LifecycleRefuseShutdown(Gate) {
+_LifecycleRefuseShutdown(Gate, RequireNativeRetirement := false) {
 	global _LifecycleShutdownVetoAttempts, _LifecycleShutdownReason
 	global _LifecycleAiShutdownAttempt
 	try UninstallCancel()
 	catch as Err
 		try LoggerError("Lifecycle", "Removal cancellation failed during shutdown refusal: {1}.", Err.Message)
 	Honored := LifecycleShutdownVetoHonored()
+	; Only an exact unsettled reload owner can extend the general veto ceiling.
+	NativeStopPending := !Honored && IsSet(ReloadTerminalHandoffNativeStopPending)
+		&& ReloadTerminalHandoffNativeStopPending.Call()
+	if RequireNativeRetirement || NativeStopPending {
+		Honored := true
+		try KL_CancelShutdown()
+	}
 	_LifecycleShutdownVetoAttempts += 1
 	if Honored {
 		; The successor that asked is now waiting on this window. Stop it and hand
@@ -880,6 +899,19 @@ _LifecycleRefuseShutdown(Gate) {
 		_LifecycleShutdownVetoAttempts, Gate,
 		Released == 1 ? "proven" : "INCOMPLETE")
 	return 0
+}
+
+; This admission protects only the exact unsettled successor retirement.
+_LifecycleRefuseNativeRetirement(Gate) {
+	return _LifecycleRefuseShutdown(Gate, true)
+}
+
+; Resumes only the same explicitly requested ordinary exit after native stop.
+_LifecycleRetrySupersededExit(Code, Record, *) {
+	if ReloadTerminalHandoffPending() != Record || Record["state"] != "abandon_ready"
+			|| !Record["stop_acknowledged"]
+		return false
+	ExitApp(Code)
 }
 
 Ergopti_OnShutdown(reason, code) {
@@ -958,6 +990,22 @@ Ergopti_OnShutdown(reason, code) {
 			try _Updater_DeferExitIntentRetry()
 			try _Updater_DeferRecoveryHandoffRetry()
 			return _LifecycleRefuseShutdown("a synthetic modifier release is still pending")
+		}
+		; Retire user programs only after OS-held input is released. A refused
+		; exit keeps the real pause posture, and the enclosing finally blocks
+		; return the configuration bundle and native admission to the live driver.
+		ProgramStopped := !IsSet(ProgramActions_Stop)
+		try {
+			if IsSet(ProgramActions_Stop)
+				ProgramStopped := ProgramActions_Stop(A_IsSuspended)
+		} catch as Err {
+			try LoggerError("Lifecycle", "User-program shutdown preflight failed: {1}.", Err.Message)
+		}
+		if !((ProgramStopped is Integer) && ProgramStopped == 1) {
+			try LoggerError("Lifecycle", "Shutdown refused because a user program tree is still alive.")
+			try _Updater_DeferExitIntentRetry()
+			try _Updater_DeferRecoveryHandoffRetry()
+			return _LifecycleRefuseShutdown("a user program tree is still alive")
 		}
 		FullSaveSettled := false
 		try FullSaveSettled := _ConfigFullSaveSettleTerminal(ShutdownOwners)
@@ -1116,6 +1164,18 @@ Ergopti_OnShutdown(reason, code) {
 		if FileReadActivityBusy() {
 			try KL_CancelShutdown()
 			return _LifecycleRefuseShutdown("an exact file read still owns native cleanup")
+		}
+		if (SupersededReload is Map) {
+			ResumeExit := StrCompare(reason, "Exit", true) == 0
+				? _LifecycleRetrySupersededExit.Bind(code) : 0
+			StopReady := false
+			try StopReady := ReloadTerminalHandoffPrepareAbandon(SupersededReload, reason, ResumeExit)
+			catch as Err
+				try LoggerError("Lifecycle", "Superseded reload retirement failed: {1}.", Err.Message)
+			if !StopReady {
+				try KL_CancelShutdown()
+				return _LifecycleRefuseNativeRetirement("a reload successor still owns native retirement")
+			}
 		}
 		FinalExitAuthorized := false
 		try FinalExitAuthorized := _Updater_SignalFinalExitForIntent()

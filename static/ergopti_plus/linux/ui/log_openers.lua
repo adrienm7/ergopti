@@ -57,7 +57,7 @@ end
 --- @return boolean delivered
 local function notify_default(key)
 	local message = require("infra.i18n").get(key)
-	return require("adapters.notifier").send(message, { level = "info" }) == true
+	return require("adapters.application_notifier").send(message, { level = "info" }) == true
 end
 
 

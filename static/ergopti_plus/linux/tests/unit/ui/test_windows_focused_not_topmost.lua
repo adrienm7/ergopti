@@ -41,9 +41,23 @@ local function with_gtk(scenario)
 			},
 			WebKit2 = {
 				UserContentManager = function()
-					return { register_script_message_handler = function() end, on_script_message_received = {} }
+					local manager = { connected = {} }
+					manager.register_script_message_handler = function() return true end
+					manager.unregister_script_message_handler = function() end
+					manager.on_script_message_received = { connect = function(_, callback, detail)
+						manager.connected[1] = true; return 1
+					end }
+					return manager
 				end,
-				WebView = function() return { load_html = function() end } end,
+				WebView = function()
+					local view = { load_html = function() end }
+					function view:destroy() if self.on_destroy then self.on_destroy() end end
+					return view
+				end,
+			},
+			GObject = {
+				signal_handler_disconnect = function(manager, id) manager.connected[id] = false end,
+				signal_handler_is_connected = function(manager, id) return manager.connected[id] == true end,
 			},
 			GLib = {},
 		}

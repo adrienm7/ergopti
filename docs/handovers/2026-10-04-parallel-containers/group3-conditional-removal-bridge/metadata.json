@@ -1,0 +1,19 @@
+{
+	"status": "reviewed and imported; native Hammerspoon/SDK qualification pending",
+	"producer_patch_sha256": "15577b88607aa735cf634c5750b9430c167859fe6412ff51825d458accf2d671",
+	"append_only_test_patch_sha256": "1ade6b0e92b1a441616329f316bdaf806d5dda377ccea6842d067cffd5d15e7f",
+	"files": {
+		"static/ergopti_plus/macos/adapters/file_system.lua": {
+			"preimage_sha256": "88af46890a9a0205e7c483e959b32a0030aee4aaff543053d14c09984a96a353",
+			"postimage_sha256": "acf56b74df2a37cdb381eece2a98ba714a6e425b0188b5e4e4e7e28742615b25"
+		},
+		"static/ergopti_plus/_shared/lua/toml_codec/writer.lua": {
+			"preimage_sha256": "d97569637eddf1ab94659a2f9c75979256019fbd13d735a74396bc58a89788fa",
+			"postimage_sha256": "4babc2aadd112a98be191096bc83c71c15b20811111aba76718dc2c982428097"
+		},
+		"static/ergopti_plus/macos/tests/unit/adapters/file_system/test_conditional_remove.lua": {
+			"preimage_sha256": "38fd1d22c3b8f2eedc94143cf47c771c6edba6f261cce674cbc9ed7b84d101fa",
+			"postimage_sha256": "77e6213c943772472acfbb876babf9e6b7dfc6eb2b8ac72d08dc0a0074e61af6"
+		}
+	}
+}

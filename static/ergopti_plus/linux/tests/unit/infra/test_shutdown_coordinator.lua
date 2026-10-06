@@ -278,3 +278,101 @@ helpers.describe("shutdown coordinator: explicit native acknowledgment", functio
 	end)
 
 end)
+
+
+
+helpers.describe("shutdown coordinator: retained user program", function()
+	helpers.it("stops input but retains the event loop until physical settlement", function()
+		local terminal, notify, loop_calls, hook_calls = false, nil, 0, 0
+		local coordinator = ShutdownCoordinator.new({
+			pre_wait = { {
+				name = "user programs",
+				stop = function() return terminal end,
+				when_settled = function(callback) notify = callback; return true end,
+			} },
+			keyboard_hook = {
+				isRunning = function() return true end,
+				stop = function() hook_calls = hook_calls + 1 end,
+				emergency_stop = function() error("unexpected emergency stop") end,
+			},
+			event_loop = { stop = function() loop_calls = loop_calls + 1 end },
+		})
+		helpers.assert_eq(coordinator.request("owned fixture quit"), true)
+		helpers.assert_eq(hook_calls, 1)
+		helpers.assert_eq(loop_calls, 0)
+		notify()
+		helpers.assert_eq(loop_calls, 0, "early observer must not release a live child")
+		terminal = true
+		notify()
+		helpers.assert_eq(loop_calls, 1)
+		notify()
+		helpers.assert_eq(loop_calls, 1, "the physical release is acknowledged once")
+	end)
+end)
+
+helpers.describe("shutdown coordinator: combined native barriers", function()
+	helpers.it("keeps observer and polling debts independent until both acknowledge", function()
+		local program_closed, runtime_closed, notify = false, false, nil
+		local loops, hooks, ordinary = 0, 0, 0
+		local coordinator = ShutdownCoordinator.new({
+			pre_wait = {
+				{ name = "program", stop = function() return program_closed end,
+					when_settled = function(callback) notify = callback; return true end },
+				{ name = "runtime", wait_for_ack = true, stop = function() return runtime_closed end },
+				{ name = "ordinary", stop = function() ordinary = ordinary + 1 end },
+			},
+			keyboard_hook = { isRunning = function() return hooks == 0 end,
+				stop = function() hooks = hooks + 1 end, emergency_stop = function() error("unexpected emergency stop") end },
+			event_loop = { stop = function() loops = loops + 1 end },
+		})
+		helpers.assert_true(coordinator.request("combined quit"))
+		helpers.assert_eq(hooks, 1)
+		helpers.assert_eq(loops, 0)
+		program_closed = true
+		notify()
+		helpers.assert_true(coordinator.is_pending(), "runtime debt must survive program notification")
+		helpers.assert_eq(loops, 0)
+		helpers.assert_eq(coordinator.poll(), false)
+		runtime_closed = true
+		helpers.assert_true(coordinator.poll())
+		helpers.assert_eq(loops, 1)
+		helpers.assert_eq(ordinary, 1, "ordinary cleanup stays one-shot")
+		notify()
+		helpers.assert_true(coordinator.poll())
+		helpers.assert_eq(loops, 1)
+	end)
+
+	helpers.it("pins observer callbacks before earlier cleanup and rejects recursive acknowledgment", function()
+		local closed, notify, coordinator = false, nil, nil
+		local loops, original_calls, replacement_calls = 0, 0, 0
+		local program = { name = "program" }
+		program.stop = function()
+			original_calls = original_calls + 1
+			if notify then notify() end
+			if coordinator then helpers.assert_eq(coordinator.poll(), false, "a live observer cannot retire itself recursively") end
+			return closed
+		end
+		program.when_settled = function(callback) notify = callback; callback(); return true end
+		coordinator = ShutdownCoordinator.new({
+			pre_wait = {
+				{ name = "earlier", stop = function()
+					program.stop = function() replacement_calls = replacement_calls + 1; return true end
+					program.when_settled = function() error("foreign observer registration") end
+				end },
+				program,
+			},
+			keyboard_hook = { isRunning = function() return false end, stop = function() end, emergency_stop = function() end },
+			event_loop = { stop = function() loops = loops + 1 end },
+		})
+		helpers.assert_true(coordinator.request("combined reentry"))
+		helpers.assert_true(coordinator.is_pending())
+		helpers.assert_eq(loops, 0)
+		helpers.assert_eq(replacement_calls, 0)
+		closed = true
+		notify()
+		helpers.assert_eq(loops, 1)
+		helpers.assert_true(coordinator.poll())
+		helpers.assert_eq(replacement_calls, 0)
+		helpers.assert_eq(original_calls, 3, "initial, early observer and final physical readback only")
+	end)
+end)

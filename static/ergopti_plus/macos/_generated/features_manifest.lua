@@ -42,7 +42,7 @@ M.sections = {
 	["llm.navigation"] = { description_key = "menu.llm.navigation", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["metrics"] = { description_key = "menu.metrics", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["shortcuts"] = { description_key = "menu.shortcuts", platforms = { "ahk", "hs", "linux" }, subsections = { "key_combination_taps", "keyboard", "personal", "script_control", "tap_keys" } },
-	["shortcuts.key_combination_taps"] = { description_key = "menu.shortcuts.key_combinations", platforms = { "ahk" }, subsections = {  } },
+	["shortcuts.key_combination_taps"] = { description_key = "menu.shortcuts.key_combinations", platforms = { "ahk", "linux" }, subsections = {  } },
 	["shortcuts.keyboard"] = { description_key = "menu.shortcuts.keyboard", platforms = { "ahk" }, subsections = {  } },
 	["shortcuts.personal"] = { description_key = "menu.shortcuts.personal", platforms = { "ahk" }, subsections = {  } },
 	["shortcuts.script_control"] = { description_key = "menu.shortcuts.script_control", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
@@ -1023,13 +1023,13 @@ M.unavailable = {
 		path = "shortcuts.e_grave.letter", section = "shortcuts.e_grave", reason_key = "", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.key_combination_taps.alt_gr_then_left_alt", section = "shortcuts.key_combination_taps", reason_key = "", platforms = { "ahk" },
+		path = "shortcuts.key_combination_taps.alt_gr_then_left_alt", section = "shortcuts.key_combination_taps", reason_key = "", platforms = { "ahk", "linux" },
 	},
 	{
-		path = "shortcuts.key_combination_taps.alt_gr_then_caps_lock", section = "shortcuts.key_combination_taps", reason_key = "", platforms = { "ahk" },
+		path = "shortcuts.key_combination_taps.alt_gr_then_caps_lock", section = "shortcuts.key_combination_taps", reason_key = "", platforms = { "ahk", "linux" },
 	},
 	{
-		path = "shortcuts.key_combination_taps.left_alt_then_caps_lock", section = "shortcuts.key_combination_taps", reason_key = "", platforms = { "ahk" },
+		path = "shortcuts.key_combination_taps.left_alt_then_caps_lock", section = "shortcuts.key_combination_taps", reason_key = "", platforms = { "ahk", "linux" },
 	},
 	{
 		path = "shortcuts.personal.laptop_broken_key", section = "shortcuts.personal", reason_key = "", platforms = { "ahk" },
@@ -1128,7 +1128,7 @@ M.unavailable = {
 		path = "category_enabled.tap_holds", section = "category_enabled", reason_key = "", platforms = { "ahk" },
 	},
 	{
-		path = "category_enabled.key_combinations", section = "category_enabled", reason_key = "", platforms = { "ahk" },
+		path = "category_enabled.key_combinations", section = "category_enabled", reason_key = "", platforms = { "ahk", "linux" },
 	},
 	{
 		path = "category_enabled.autocorrection", section = "category_enabled", reason_key = "", platforms = { "ahk" },

@@ -61,6 +61,8 @@ const NOT_SUITE_ENTRIES = new Set([
 	// Actual libuv/curl loopback receipts run under verify-change and Linux CI,
 	// independently of the Node-only static registration contract.
 	'tools/test/run-linux-http-stream-receipts.cjs',
+	// Actual owned X11/RandR focus and cleanup run under the native gate.
+	'tools/test/run-linux-window-switch-receipts.cjs',
 	// Real process/file probes run under verify-change and mandatory Linux CI.
 	'tools/test/run-linux-runtime-native.cjs',
 	// Complete pure Python canvas controls have their own planner and Mac CI gate.
@@ -71,7 +73,10 @@ const NOT_SUITE_ENTRIES = new Set([
 	'tools/test/browser/changelog-release-install.playwright.cjs',
 	// Real Chromium and WebKit rendering is required separately by Core / js;
 	// test-desktop-ci-evidence.cjs rejects a missing or forgiven browser step.
-	'tools/test/browser/layer-editor.playwright.cjs'
+	'tools/test/browser/layer-editor.playwright.cjs',
+	// Actual Chromium/WebKit rendering runs separately in mandatory Core / js;
+	// test-ci-pipeline-wiring.cjs rejects missing or redirected browser execution.
+	'tools/test/browser/physical-shortcuts.playwright.cjs'
 ]);
 
 // Gates the suite runs with no npm alias. Zero since 2026-08-03, when the last

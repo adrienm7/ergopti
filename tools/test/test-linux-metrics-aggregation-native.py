@@ -31,6 +31,14 @@ sources = [
     '{ "hotstring": 2, "llm": 3, "other": 4 }',
     '{"hotstring":0.1,"llm":0.1,"other":0.1}',
 ]
+transport_tokens = [
+    'quote"token',
+    "back\\slash",
+    "literal\\u0000",
+    "nul\0tailA",
+    "nul\0tailB",
+    "line\n\tend",
+]
 with tempfile.TemporaryDirectory(prefix="ergopti-aggregation-regression-") as temporary:
     database = pathlib.Path(temporary) / "fixture.sqlite"
     with closing(sqlite3.connect(database)) as connection:
@@ -69,6 +77,22 @@ with tempfile.TemporaryDirectory(prefix="ergopti-aggregation-regression-") as te
                         "{}",
                     ),
                 )
+            for token_index, token in enumerate(transport_tokens):
+                for day in ["2020-01-01", datetime.date.today().isoformat()]:
+                    for app in ["app-a", "app-b"]:
+                        connection.execute(
+                            f"INSERT INTO {table}(device_id,date,app,token,c,td,e,esrc_json) VALUES (?,?,?,?,?,?,?,?)",
+                            (
+                                f"transport-{token_index}",
+                                day,
+                                app,
+                                token,
+                                2,
+                                4,
+                                1,
+                                "{}",
+                            ),
+                        )
             for day in ["2020-01-01", datetime.date.today().isoformat()]:
                 connection.execute(
                     f"INSERT INTO {table}(device_id,date,app,token,c,td,e,esrc_json) VALUES (?,?,?,?,?,?,?,?)",
@@ -84,13 +108,24 @@ with tempfile.TemporaryDirectory(prefix="ergopti-aggregation-regression-") as te
                     ),
                 )
             connection.commit()
-    subprocess.run(
-        [
-            "luajit",
-            str(root / "tools/test/linux-metrics-aggregation-native.lua"),
-            str(root),
-            str(database),
-        ],
-        check=True,
-        timeout=90,
-    )
+    command = [
+        "luajit",
+        str(root / "tools/test/linux-metrics-aggregation-native.lua"),
+        str(root),
+        str(database),
+    ]
+    subprocess.run(command, check=True, timeout=90)
+    # Each legacy projection must independently fail through the real reader,
+    # rather than an argument error or a different missing prerequisite.
+    for control in ["legacy-global-column", "legacy-app-column"]:
+        failed = subprocess.run([*command, control], capture_output=True, text=True, timeout=90)
+        if failed.returncode == 0 or (
+            "SQLite n-gram token returned invalid JSON; token projection skipped."
+            not in failed.stderr
+        ):
+            raise AssertionError(
+                f"The {control} control did not reject the original token contract: "
+                f"status={failed.returncode}, stdout={failed.stdout}, stderr={failed.stderr}"
+            )
+    subprocess.run(command, check=True, timeout=90)
+    print("PASS native metrics token transport: fixed, both legacy aliases refused, restored")
