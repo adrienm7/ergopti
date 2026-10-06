@@ -333,15 +333,22 @@ async function run({
 			'--no-write-lock-file'
 		];
 		checkpoint = 'pinned-source-metadata';
-		const resolved = JSON.parse(
-			(await phase(nix, [...prefix, 'flake', 'metadata', flake, ...override, '--json'], {}, 180000))
-				.stdout
+		const pinnedMetadata = await phase(
+			nix,
+			[...prefix, 'flake', 'metadata', flake, ...override, '--json'],
+			{},
+			180000
 		);
+		checkpoint = 'pinned-source-json';
+		const resolved = JSON.parse(pinnedMetadata.stdout);
+		checkpoint = 'pinned-source-routing';
 		const nodes = resolved.locks && resolved.locks.nodes,
 			rootNode = nodes && nodes[resolved.locks.root];
 		const reference = rootNode && rootNode.inputs && rootNode.inputs.nixpkgs;
 		if (typeof reference !== 'string' || !nodes[reference]) refuse();
+		checkpoint = 'pinned-source-input-lock';
 		const actual = lockReceipt({ locked: nodes[reference].locked });
+		checkpoint = 'pinned-source-pin-agreement';
 		if (
 			actual.revision !== pinned.revision ||
 			actual.narHash !== pinned.narHash ||
