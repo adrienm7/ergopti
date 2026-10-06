@@ -181,3 +181,61 @@ all six generated-cask install/upgrade/refusal/retry cases, actual Sparkle
 wrong-key rejection and successful update/relaunch, exact closure and final
 package/installation/launch acceptance. Diagnostics do not complete these
 functional requirements. Items36/62 and transversal16/38 remain open.
+
+## Final reviewed diagnostic cohort, 2026-10-06
+
+Three independent source tranches are committed as 949eb6ecaad3efeb020a8b411f49227d1ed49fea,
+1016527df89dbfb2f41cdc94edd69bdb46462efc and
+e9db1348625764f7701479f45687b582455c861f. The feature also merges
+origin/dev 5d1d06854b412e91c9350e05f03b20f83b297db8, preserving the other
+groups' work and Windows private-clone long-path correction.
+
+The shared local receiving cohort passed formatting, all 379 JavaScript checks,
+15,154 Hammerspoon stub units in 1,529 modules, and 10,142 Linux units in 496
+modules. Its genuine relative-clock fixture passed all nine original cases,
+including first/second loopback requests 56.24/52.00ms under the unchanged
+100 ms deadline and 40 ms server delay. The private owner acknowledged closure
+with no retained phases. Swift compilation is explicitly deferred to macOS.
+
+The earlier full a5a07 range is FAIL despite these other successes: native
+temporary controls 63/0, archive installation/rollback 3 cases/15 checks,
+streaming 262/API 48, runtime 82 and actual X11 keymap 53. Window supervision
+refuses before child/namespace acquisition; Nix refuses at local-store and
+its seven native cases remain unexecuted. The privileged live updater fixture
+also refuses in this container at exit 127 without sudo/pkexec; this is separate
+from the passed private archive installation/rollback fixture.
+
+Manual run [37540551778](https://github.com/adrienm7/ergopti/actions/runs/37540551778)
+actually tested a5a07d6dbefeefecb578be93e79d82a95da1bdfb and ended FAIL.
+Linux units 10141/1 retain the first HTTP timeout 208.57 ms/status 0; the next
+request succeeds 55.91 ms/status 200. Linux E2E/package/install were skipped.
+Native Windows units 9734/0 passed, but the job refused its private long-path
+clone before later stages; the group 3 correction is now merged from dev.
+Both owned native macOS archive cases failed: Sparkle reported target-root
+with child exit 78, and Brew observed unconfined receiver CLD_EXITED/code 1,
+status 65 before every sender or sandbox-policy comparison. The AppKit reason
+is unknown until the new exact enum diagnostic runs. Packaging/install and
+Release/Publish were skipped. Neither failure establishes a TCC cause.
+
+The Sparkle correction signs and compares captured native POSIX root strings
+instead of Foundation URL spelling; all 117 native assertion/failure lines
+remain intact. The AppKit diagnostic retains all 59 receiving test bodies and
+adds four controls: original 59/current 63 pass, while the new enum case against
+the original reader fails its three expected subcases. These models do not
+qualify authentic AppKit initialization or AppleEvent delivery.
+
+Four serialized genuine clock comparisons pass 9/0: original dev 7a75/current
+a5a07, each once unchanged and once with the reviewed passive diagnostic. The
+first original replay's HTTP 403 is retained separately; only the common child
+NO_PROXY/no_proxy=127.0.0.1,localhost prerequisite was corrected. No timing,
+assertion, native callback, budget, warm-up or retry changed. These local passes
+do not establish the hosted timeout cause. Source packet/cohort bindings,
+original failures, exact captured logs and physical owner receipts remain
+private in the restored container; committed source and this checkpoint own
+the reproducible continuation.
+
+The remaining company-network implementation list above and the twelve
+Windows PC steps still apply. Items 36/62 and transversal requirements 16/38
+remain open. Next qualification uses the group-owned CI test branch; final
+integration reserves codex/ci-lock exclusively and tests the exact integrated
+SHA on codex/ci-validation without publishing any release.
