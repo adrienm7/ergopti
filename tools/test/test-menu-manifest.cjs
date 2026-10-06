@@ -4467,3 +4467,54 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	ordinary.nested[0].type = 'command';
 	assertPresentation.doesNotThrow(() => validateChildTemplates(ordinary));
 }
+
+// Both native Agent systems consume the independent fixed model-control frame.
+{
+	const assert = require('node:assert/strict');
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/agent_system_model.json'), 'utf8')
+	);
+	const manifest = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	assert.deepEqual(corpus.systems, ['system1', 'system2']);
+	assert.deepEqual(
+		manifest[corpus.section],
+		corpus.rows,
+		'the complete two-row frame is independently pinned'
+	);
+	assert.equal(corpus.rows.length, 2);
+	assert.equal(corpus.row_id, 'agent_system_model');
+	assert.equal(corpus.model, 'hand/50%');
+	assert.equal(corpus.caption, 'Model… (hand/50%)');
+	assert.equal(corpus.variants.length, 2);
+	for (const variant of corpus.variants) {
+		assert.deepEqual(manifest[variant.section], [
+			{ type: '---' },
+			{
+				type: 'command',
+				id: 'agent_system_model',
+				i18n: variant.label_key,
+				disabled_when: ['agent_system_model_ready']
+			}
+		]);
+		const mac = readFileSync(
+			resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_llm/agent_panel.lua'),
+			'utf8'
+		);
+		assert(mac.includes('ManifestMenu.template_rows("' + variant.section + '"'));
+	}
+	for (const [driver, relative, call] of [
+		['windows', 'ui/menu/menu_llm/menu_agent.ahk', 'MenuRenderer_TemplateRows'],
+		['macos', 'ui/menu/menu_llm/agent_panel.lua', 'ManifestMenu.template_rows'],
+		['linux', 'ui/menu/agent_rows.lua', 'require("infra.manifest_menu").template_rows']
+	]) {
+		const source = readFileSync(
+			resolve(REPO_ROOT, 'static/ergopti_plus', driver, relative),
+			'utf8'
+		);
+		assert(
+			source.includes(call + '("agent_system_model_controls"'),
+			driver + ' consumes the real shared frame'
+		);
+	}
+	console.log('Agent system Model: canonical two-row frame and three actual native owners.');
+}

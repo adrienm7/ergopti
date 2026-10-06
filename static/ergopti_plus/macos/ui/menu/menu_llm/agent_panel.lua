@@ -284,21 +284,34 @@ local function system_rows(ctx, system)
 		end
 		items[#items + 1] = row
 	end
-	items[#items + 1] = { separator = true }
 	local model = parsed and resolved_model(parsed) or nil
 	-- nil while the local server has not listed its models (or for a remote System)
 	local installed = nil
 	if model ~= nil and parsed.backend == Vision.LOCAL_BACKEND then
 		installed = require("modules.llm.api_ollama").local_model_installed(model)
 	end
-	local model_key = "menu.agent.model"
-	if installed == true then model_key = "menu.agent.model_installed" end
-	if installed == false then model_key = "menu.agent.model_missing" end
-	items[#items + 1] = {
-		label = i18n.format(model_key, model or i18n.get("menu.agent.off")),
-		disabled = parsed == nil or nil,
-		action = parsed and function() return prompt_model(ctx, system, parsed) end or nil,
+	local model_commands = {
+		["agent_system_model"] = function() return prompt_model(ctx, system, parsed) end,
 	}
+	local model_getters = {
+		agent_system_model_ready = function() return parsed ~= nil end,
+	}
+	local model_rows
+	if installed == true then
+		model_rows = ManifestMenu.template_rows("agent_system_model_installed_controls", model_commands, model_getters)
+	elseif installed == false then
+		model_rows = ManifestMenu.template_rows("agent_system_model_missing_controls", model_commands, model_getters)
+	else
+		model_rows = ManifestMenu.template_rows("agent_system_model_controls", model_commands, model_getters)
+	end
+	if not model_rows then return {} end
+	for _, row in ipairs(model_rows) do
+		if row.label then
+			local caption = model or i18n.get("menu.agent.off")
+			row.label = row.label:gsub("{1}", function() return caption end)
+		end
+		items[#items + 1] = row
+	end
 	if installed == false then
 		items[#items + 1] = {
 			label = i18n.format("menu.agent.download_model", model),

@@ -460,3 +460,101 @@ helpers.describe("AI agent shared system Off row (agent-system-off)", function()
 		end)
 	end)
 end)
+
+
+--- Independent fixed model-control contract, separate from the generated declaration.
+local function system_model_corpus()
+	local file = assert(io.open(helpers.shared("tests/corpus/menus/agent_system_model.json"), "rb"))
+	local raw = file:read("*a")
+	file:close()
+	return assert(require("adapters.json_codec").decode(raw))
+end
+
+helpers.describe("Agent shared system model control (agent-system-model)", function()
+	helpers.it("uses both actual model rows, shared caption and transaction refusal (agent-system-model)", function()
+		local corpus = system_model_corpus()
+		local state = base_state()
+		state.llm_agent_system1, state.llm_agent_system2 = corpus.spec, corpus.spec
+		with_panel(state, function(build, world)
+			local root = require("infra.manifest_menu").get_root()
+			local declaration = root[corpus.section][2]
+			local label = declaration.i18n
+			local ok, err = pcall(function()
+				for _, prefix in ipairs({ "⚡", "🧠" }) do
+					local rows = row_starting(build().submenu, prefix).menu
+					helpers.assert_eq(rows[#rows - 1].title, "-")
+					helpers.assert_eq(rows[#rows].title, corpus.caption)
+				end
+				declaration.i18n = corpus.mutated_label_key
+				local retained = row_starting(build().submenu, "⚡").menu
+				retained = retained[#retained]
+				helpers.assert_eq(retained.title, corpus.mutated_caption)
+				world.dialog_answer = { "OK", "changed-model" }
+				world.refuse_write = true
+				helpers.assert_eq(retained.fn(), false)
+				helpers.assert_eq(state.llm_agent_system1, corpus.spec)
+				helpers.assert_eq(state.llm_agent_system2, corpus.spec)
+				helpers.assert_eq(#world.applied, 0)
+				world.refuse_write = false
+				helpers.assert_eq(retained.fn(), true)
+				helpers.assert_eq(state.llm_agent_system1, "cerebras|changed-model")
+				helpers.assert_eq(state.llm_agent_system2, corpus.spec)
+				helpers.assert_eq(#world.applied, 1)
+			end)
+			declaration.i18n = label
+			if not ok then error(err, 0) end
+		end)
+	end)
+
+	helpers.it("takes exact shared order and refuses a malformed command owner (agent-system-model)", function()
+		local corpus = system_model_corpus()
+		local state = base_state()
+		state.llm_agent_system1 = corpus.spec
+		with_panel(state, function(build)
+			local root = require("infra.manifest_menu").get_root()
+			local original = root[corpus.section]
+			local ok, err = pcall(function()
+				root[corpus.section] = { original[2], original[1], {
+					type = "label", id = "model_tail_marker", i18n = "menu.agent.off",
+				} }
+				local rows = row_starting(build().submenu, "⚡").menu
+				helpers.assert_eq(rows[#rows - 2].title, corpus.caption)
+				helpers.assert_eq(rows[#rows - 1].title, "-")
+				helpers.assert_eq(rows[#rows].title, "Off")
+				root[corpus.section] = { { type = "---" }, {
+					type = "command", id = "unowned_agent_model", i18n = corpus.label_key,
+				} }
+				helpers.assert_nil(row_starting(build().submenu, "⚡"))
+				helpers.assert_eq(state.llm_agent_system1, corpus.spec)
+			end)
+			root[corpus.section] = original
+			if not ok then error(err, 0) end
+		end)
+	end)
+end)
+
+helpers.describe("Agent model observed-state frames (agent-system-model)", function()
+	for _, variant in ipairs(system_model_corpus().variants) do
+		helpers.it("uses the real declared " .. variant.section .. " caption (agent-system-model)", function()
+			local state = base_state()
+			state.llm_agent_system2 = "local"
+			with_panel(state, function(build, world)
+				world.listed = { ["qwen2.5:7b"] = variant.installed }
+				local rows = row_starting(build().submenu, "🧠").menu
+				helpers.assert_eq(row_starting(rows, "Model…").title, variant.caption)
+				local declaration = require("infra.manifest_menu").get_root()[variant.section][2]
+				local label = declaration.i18n
+				declaration.i18n = system_model_corpus().label_key
+				local ok, err = pcall(function()
+					rows = row_starting(build().submenu, "🧠").menu
+					helpers.assert_eq(row_starting(rows, "Model…").title, "Model… (qwen2.5:7b)",
+						"even observed installed/missing captions come from their actual shared frame")
+					helpers.assert_eq(state.llm_agent_system2, "local")
+					helpers.assert_eq(#world.applied, 0)
+				end)
+				declaration.i18n = label
+				if not ok then error(err, 0) end
+			end)
+		end)
+	end
+end)
