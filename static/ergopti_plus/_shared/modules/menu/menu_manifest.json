@@ -2777,6 +2777,34 @@
 			]
 		}
 	],
+	"llm_generation_count_boundary": [
+		{
+			"type": "---",
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"llm_generation_context_boundary": [
+		{
+			"type": "---",
+			"platforms": [
+				"ahk"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"llm_generation_words_boundary": [
+		{
+			"type": "---",
+			"platforms": [
+				"ahk"
+			],
+			"unavailable": "hide"
+		}
+	],
 	"llm_model_specs_frame": [
 		{
 			"type": "---",

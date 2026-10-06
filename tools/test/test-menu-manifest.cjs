@@ -4758,3 +4758,71 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		'Model readouts: authentic two-driver frames, genuine Linux absence and21 unchanged captions.'
 	);
 }
+
+// Actual numeric providers retain each driver's existing boundary and caption policy.
+{
+	const assert = require('node:assert/strict');
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/generation_boundaries.json'), 'utf8')
+	);
+	const manifest = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	for (const key of ['count', 'context', 'words']) {
+		const expected = corpus.boundaries[key];
+		assert.deepEqual(manifest[expected.section], expected.rows);
+		assert.deepEqual(expected.projections.linux, [], 'Linux has no native numeric boundary');
+		if (key !== 'count')
+			assert.deepEqual(expected.projections.hs, [], 'macOS has no later numeric boundary');
+		for (const [driver, relative, call] of [
+			['windows', 'ui/menu/menu_llm/menu_settings.ahk', 'MenuRenderer_TemplateRows'],
+			['macos', 'ui/menu/menu_llm/init.lua', 'ManifestMenu.template_rows']
+		]) {
+			const source = readFileSync(
+				resolve(REPO_ROOT, 'static/ergopti_plus', driver, relative),
+				'utf8'
+			);
+			assert.equal(
+				source.includes(call + '("' + expected.section + '"'),
+				driver === 'windows' || key === 'count'
+			);
+		}
+		const linux = readFileSync(
+			resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/menu_builder.lua'),
+			'utf8'
+		);
+		assert(!linux.includes('"' + expected.section + '"'));
+	}
+	for (const code of [
+		'ar',
+		'cs',
+		'da',
+		'de',
+		'en',
+		'es',
+		'fr',
+		'he',
+		'hi',
+		'it',
+		'ja',
+		'ko',
+		'no',
+		'nl',
+		'pl',
+		'pt',
+		'ru',
+		'sv',
+		'tr',
+		'uk',
+		'zh'
+	]) {
+		const strings = JSON.parse(
+			readFileSync(resolve(SHARED, 'data/locales/' + code + '.json'), 'utf8')
+		);
+		for (const key of [...corpus.caption_keys, corpus.published_marker_key]) {
+			assert.equal(typeof strings[key], 'string', code + ': existing numeric caption ' + key);
+			assert(strings[key].trim().length > 0);
+		}
+	}
+	console.log(
+		'Generation boundaries: four actual constructors, authentic cross-platform absence and21 unchanged caption sets.'
+	);
+}
