@@ -26,6 +26,7 @@ from hs_delayed_timer_probe import (
     validate_receipt as validate_timer,
 )
 from hs_karabiner_config_probe import INITIAL_CONFIG, validate_receipt as validate_karabiner
+from hs_script_scope_probe import validate_receipt as validate_script, validate_claim, recover_claim
 
 CONTRACT = "hs.startup.supplementary-feature"
 CONFIG_KEY = "MJConfigFile"
@@ -236,13 +237,23 @@ class SupplementaryNativeBootstrap:
                 raise RuntimeError("Native process retirement did not acknowledge exact exit")
             time.sleep(0.05)
 
+    def observe_script_scope(self):
+        """Use a fresh exact native identity after the original feature retired."""
+        return SupplementaryNativeBootstrap(
+            self.app, self.output, self.domain, self.processes, self.runner
+        ).observe("script_scope")
+
     def observe(self, feature):
         """Measure the unchanged probe, then physically retire and restore the owner."""
-        if feature not in ("delayed_timer", "karabiner_config"):
+        if feature not in ("delayed_timer", "karabiner_config", "script_scope"):
             raise ValueError("Unknown supplementary native feature")
         if self.processes(self.launcher) or self.processes(self.executable):
             raise RuntimeError("The supplementary bootstrap requires all original runtimes settled")
-        root = self.output / "supplementary-native-bootstrap"
+        root = self.output / (
+            "supplementary-native-bootstrap-script_scope"
+            if feature == "script_scope"
+            else "supplementary-native-bootstrap"
+        )
         root.mkdir(mode=0o700)
         macos = self.app / "Contents/Resources/static/ergopti_plus/macos"
         shared = macos.parent / "_shared/lua"
@@ -268,7 +279,9 @@ class SupplementaryNativeBootstrap:
             name: root / (name + ".json")
             for name in ("ready", "admit", "settled", "feature", "context")
         }
-        destination = root / "karabiner-private.json"
+        destination = root / (
+            "script-private.toml" if feature == "script_scope" else "karabiner-private.json"
+        )
         original = (json.dumps(INITIAL_CONFIG, indent=2) + "\n").encode()
         if feature == "karabiner_config":
             with destination.open("xb") as handle:
@@ -276,6 +289,8 @@ class SupplementaryNativeBootstrap:
         fixture = Path(__file__).with_name(
             "hs_delayed_timer_native.lua"
             if feature == "delayed_timer"
+            else "hs_script_scope_native.lua"
+            if feature == "script_scope"
             else "hs_karabiner_config_native.lua"
         )
         # Timers already observe asynchronous receipts for 15 seconds; the
@@ -326,7 +341,13 @@ class SupplementaryNativeBootstrap:
             settled = self.wait_receipt(paths["settled"], feature_timeout)
             self.validate_owner(settled, "settled")
             result = read_receipt(paths["feature"])
-            validator = validate_timer if feature == "delayed_timer" else validate_karabiner
+            validator = (
+                validate_timer
+                if feature == "delayed_timer"
+                else validate_script
+                if feature == "script_scope"
+                else validate_karabiner
+            )
             measured = validator(result, self.nonce, self.pid, self.executable, self.domain)
             if feature == "karabiner_config" and destination.read_bytes() != original:
                 raise RuntimeError(
@@ -349,8 +370,37 @@ class SupplementaryNativeBootstrap:
             primary = error
         finally:
             try:
+                claim, claim_error = None, None
+                claim_path = Path(str(destination) + ".settings-claim.json")
+                if feature == "script_scope" and claim_path.exists():
+                    try:
+                        claim = validate_claim(
+                            read_receipt(claim_path),
+                            self.nonce,
+                            self.pid,
+                            self.executable,
+                            self.domain,
+                        )
+                    except Exception as error:
+                        claim_error = error
                 self.retire()
-                self.preference.restore()
+                try:
+                    if claim_error is not None:
+                        raise claim_error
+                    if claim is not None:
+                        if self.processes(self.executable) or self.processes(self.launcher):
+                            raise RuntimeError(
+                                "A native successor refuses private settings cleanup"
+                            )
+                        recover_claim(
+                            claim,
+                            self.domain,
+                            self.preference.reader,
+                            self.runner,
+                            SCRIPTING_TIMEOUT_SECONDS,
+                        )
+                finally:
+                    self.preference.restore()
                 if summary is not None:
                     summary["process_retired"] = True
                     summary["preference_restored"] = True

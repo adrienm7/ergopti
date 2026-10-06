@@ -1,0 +1,88 @@
+{
+	"boundaries": {
+		"trigger": {
+			"section": "llm_trigger_provider_boundary",
+			"platforms": ["ahk", "linux"],
+			"rows": [
+				{
+					"type": "---",
+					"platforms": ["ahk", "linux"],
+					"unavailable": "hide"
+				}
+			],
+			"projections": {
+				"ahk": [
+					{
+						"separator": true
+					}
+				],
+				"hs": [],
+				"linux": [
+					{
+						"separator": true
+					}
+				]
+			}
+		},
+		"display": {
+			"section": "llm_display_provider_boundary",
+			"platforms": ["ahk"],
+			"rows": [
+				{
+					"type": "---",
+					"platforms": ["ahk"],
+					"unavailable": "hide"
+				}
+			],
+			"projections": {
+				"ahk": [
+					{
+						"separator": true
+					}
+				],
+				"hs": [],
+				"linux": []
+			}
+		},
+		"live": {
+			"section": "llm_live_off_boundary",
+			"platforms": ["hs"],
+			"rows": [
+				{
+					"type": "---",
+					"platforms": ["hs"],
+					"unavailable": "hide"
+				}
+			],
+			"projections": {
+				"ahk": [],
+				"hs": [
+					{
+						"separator": true
+					}
+				],
+				"linux": []
+			}
+		}
+	},
+	"marker_key": "button.cancel",
+	"marker_english": "Cancel",
+	"trigger_delay": 500,
+	"trigger_debounce_english": "Idle time before suggestion: 500 ms",
+	"display_inline_key": "menu.llm.inline_autotype",
+	"live_off_key": "menu.llm.live_mode_off",
+	"native_counts_before": [59, 92, 67],
+	"native_counts_after": [57, 91, 66],
+	"caption_keys": [
+		"menu.llm.debounce_label",
+		"menu.llm.exclude_from_ai",
+		"menu.llm.inline_autotype",
+		"menu.llm.live_mode_off",
+		"menu.llm.disable_url_bars",
+		"menu.llm.disable_password_fields",
+		"button.cancel"
+	],
+	"display_inline_english": "✍️ Inline auto-type (Copilot-style)",
+	"live_off_english": "Off",
+	"trigger_remaining_english": "Exclude from automatic AI generation…"
+}

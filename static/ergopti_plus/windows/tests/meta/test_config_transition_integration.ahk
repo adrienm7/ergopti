@@ -167,7 +167,7 @@ _CTIM_OnboardingOrdersConfigBeforeLocator() {
 		"ConfigTransitionNormalizeConfigDir(CandidateDir)", true)
 	DirCreatePos := InStr(Body, "DirCreate(CandidateDir)", true)
 	Acquire := InStr(Body, "ConfigTransitionAcquireLifecycleBundle(", true)
-	Build := InStr(Body, "TOML_BuildUpdatedContent(CandidateConfig", true)
+	Build := InStr(Body, "TOML_BuildConfigUpdatedContent(CandidateConfig", true)
 	Typed := InStr(Body, "updates := _ConfigPrepareTypedUpdates(updates)", true)
 	ConfigSpec := InStr(Body,
 		"ConfigTransitionPresentTarget(CandidateConfig", true)

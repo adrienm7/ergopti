@@ -6,6 +6,7 @@ local M = {}
 local Manifest = require("infra.manifest_reader")
 local Preferences = require("infra.metrics_preferences")
 local Transaction = require("config_scope_transaction")
+local FencedTransaction = require("config_scope_fenced_transaction")
 local Codec = require("toml_codec")
 local Logger = require("logger.shim")
 local LOG = "infra.metrics_scope"
@@ -67,27 +68,12 @@ function M.new(options)
 		end,
 		restore = apply_state,
 	})
-	local owner = { pending = transaction.pending }
-	function owner.apply(mode)
-		if not Preferences.acquire(owner) then return false, "metrics configuration is already owned" end
-		local committed, detail = transaction.apply("metrics", mode)
-		if not transaction.pending() then Preferences.release(owner) end
-		return committed, detail
-	end
-	function owner.retry_restore()
-		if transaction.retry_restore() ~= true then return false end
-		if not Preferences.admit() then return Preferences.release(owner) end
-		return true
-	end
-	--- Undoes the last commit under the same preference ownership as apply().
-	function owner.revert()
-		if not Preferences.acquire(owner) then return false, "metrics configuration is already owned" end
-		local reverted, detail = transaction.revert()
-		if not transaction.pending() then Preferences.release(owner) end
-		return reverted, detail
-	end
-	function owner.release() transaction.release() end
-	return owner
+	-- Native preferences admit release from the primary compensation predicate;
+	-- the distinct public journal retains busy and release debt until settled.
+	local owner, native_token = {}, { pending = transaction.pending }
+	return FencedTransaction.new({ owner = owner, native_token = native_token, transaction = transaction,
+		scope = "metrics", fences = { { acquire = Preferences.acquire, release = Preferences.release } },
+		available = function() return true end })
 end
 
 --- Executes a menu request, retaining any failed inverse for the next retry.

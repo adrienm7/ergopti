@@ -1,0 +1,24 @@
+[
+	{ "name": "enter-current", "binding": "script__script_altgr_enter", "expected": true },
+	{ "name": "backspace-current", "binding": "script__script_altgr_backspace", "expected": true },
+	{ "name": "delete-current", "binding": "script__script_altgr_delete", "expected": true },
+	{ "name": "escape-current", "binding": "script__script_altgr_escape", "expected": true },
+	{ "name": "removed-script-retired", "binding": "script__removed_script_slot", "expected": false },
+	{ "name": "legacy-unpublished-name-retired", "binding": "script__reload", "expected": false },
+	{ "name": "exact-slot-case", "binding": "script__SCRIPT_ALTGR_ENTER", "expected": false },
+	{ "name": "empty-script-slot", "binding": "script__", "expected": false },
+	{ "name": "exact-prefix-case", "binding": "Script__script_altgr_enter", "expected": "unjudged" },
+	{ "name": "keyboard-owner-unjudged", "binding": "keyboard__removed_key", "expected": "unjudged" },
+	{ "name": "tap-owner-unjudged", "binding": "tap_key__removed_key", "expected": "unjudged" },
+	{ "name": "remap-owner-unjudged", "binding": "tap_hold__removed_key", "expected": "unjudged" },
+	{
+		"name": "combination-owner-unjudged",
+		"binding": "combination__removed_pair",
+		"expected": "unjudged"
+	},
+	{
+		"name": "bare-gesture-owner-unjudged",
+		"binding": "removed_gesture_slot",
+		"expected": "unjudged"
+	}
+]

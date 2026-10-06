@@ -174,6 +174,23 @@ successful hosted Windows qualification. The container has no `/dev/input` or
 kernel child-census prerequisite before allocation. Controlled fixtures do not
 prove physical input, X11/Wayland delivery or hardware brightness.
 
+## Readonly Windows number-row observations
+
+The final two-source HKL packet is adopted from its exact current preimages,
+using only the reviewed joint patch. `KS_NativeKeyLevel` and
+`KS_NativeNumberRowLevels` capture external scalars once and return detached
+observations without granting input/output/owner or dead-state authority. The
+complete old adapter and test prefixes, ToUnicodeEx flag `0x4`, independent
+ten-key expectations and old assertions remain exact. All six new cases are
+registered through the existing test module; hosted Windows requires genuine
+French and US HKLs. Native execution remains pending. The unchanged layout
+fixture does not supply a new explicit unload receipt; no such lifecycle
+qualification or physical forced-output capability is claimed. Item107 stays
+partial, with native-HKL/Lua forced owners and physical delivery still open.
+
+Patch SHA-256: `7c5129fa21873db9c6424fd93c2ec014d519755457666bbc4365ba7f5811f8df`.
+Independent retained review: `49ac33f9b92fcd94543e910290c82bcd6b6e1ebe420b0a5684c92d18366a88bc`.
+
 ## Preserved inactive preparations
 
 [The portable handoff](group3-2026-10-06-inactive-handoff/README.md) retains 17

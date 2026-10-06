@@ -39,6 +39,9 @@ local M = {}
 
 local Logger = require("logger.shim")
 local ConfigOutdated = require("config_outdated")
+local BindingIdentity = require("config_binding_identity")
+local KeyboardPublication = require("config_keyboard_publication")
+local BindingPublication = require("config_binding_publication")
 local Paths = require("infra.paths")
 local Timings = require("infra.timings")
 local Monotonic = require("infra.monotonic")
@@ -95,6 +98,28 @@ if not _ok_catalogue or type(Catalogue) ~= "table" or type(Catalogue.actions) ~=
 	or type(Catalogue.sg_items) ~= "table" or type(Catalogue.slots) ~= "table" then
 	error("_generated/action_catalogue.lua is missing or invalid — run `npm run gen`: "
 		.. tostring(Catalogue))
+end
+
+-- Publish binding identity only from both complete generated inventories.
+-- Runtime assignments and manifest defaults cannot prove a retired slot.
+local parameter_binding_catalogue = { prefix = "", slots = {} }
+for _, family in ipairs({ "single", "axis" }) do
+	local slots = Catalogue.slots[family]
+	assert(type(slots) == "table" and next(slots) ~= nil,
+		"generated gesture " .. family .. " slots must be a nonempty dense string array")
+	local count = 0
+	for index, slot in pairs(slots) do
+		assert(type(index) == "number" and index >= 1 and index % 1 == 0
+			and type(slot) == "string" and slot ~= "" and not slot:find("__", 1, true),
+			"generated gesture " .. family .. " slots must be a nonempty dense string array")
+		assert(parameter_binding_catalogue.slots[slot] == nil,
+			"generated gesture slot occurs more than once: " .. slot)
+		parameter_binding_catalogue.slots[slot] = true
+		count = count + 1
+	end
+	for index = 1, count do
+		assert(slots[index] ~= nil, "generated gesture " .. family .. " slots must be dense")
+	end
 end
 
 -- A confirmation is chained in front of a shell command (system_actions), so
@@ -1274,6 +1299,15 @@ function M.split_action_parameter_key(key)
 end
 
 function M.get_action_parameter(binding, action_name)
+	if type(binding) == "string" and (binding:sub(1, 9) == "tap_key__" or binding:sub(1, 10) == "keyboard__") then
+		local fits, reason = M.action_parameter_binding_fits(binding)
+		if fits == false then
+			if _action_params[parameter_key(binding, action_name)] ~= nil then
+				ConfigOutdated.report({ CONFIG_SECTION_PARAMS, parameter_key(binding, action_name) }, reason, Logger)
+			end
+			return ""
+		end
+	end
 	return _action_params[parameter_key(binding, action_name)] or ""
 end
 
@@ -1497,6 +1531,28 @@ function M.get_picker_parameter_fields(items, binding)
 	}
 end
 
+--- Judges only already-published native parameter domains; no catalogue IO occurs here.
+--- @param binding any Native binding identity.
+--- @return boolean|nil fits
+--- @return string detail
+function M.action_parameter_binding_fits(binding)
+	if type(binding) == "string" and binding:sub(1, 10) == "keyboard__" then
+		local catalogue = KeyboardPublication.current(rawget(package.loaded, "modules.shortcuts.keyboard_shortcuts"))
+		return BindingIdentity.keyboard_binding_fits(binding, catalogue), BindingIdentity.RETIRED_KEYBOARD
+	end
+	if type(binding) == "string" and binding:sub(1, 9) == "tap_key__" then
+		local taps = rawget(package.loaded, "modules.shortcuts.tap_keys")
+		local catalogue = BindingPublication.current("tap", "modules.shortcuts.tap_keys", taps)
+		return BindingIdentity.tap_binding_fits(binding, catalogue), BindingIdentity.RETIRED_TAP
+	end
+	if type(binding) == "string" and binding:sub(1, 8) == "script__" then
+		local chords = rawget(package.loaded, "modules.shortcuts.script_chords")
+		local catalogue = BindingPublication.current("script", "modules.shortcuts.script_chords", chords)
+		return BindingIdentity.script_binding_fits(binding, catalogue), BindingIdentity.RETIRED_SCRIPT
+	end
+	return BindingIdentity.gesture_binding_fits(binding, parameter_binding_catalogue), BindingIdentity.RETIRED_GESTURE
+end
+
 --- Builds a validated detached row for the canonical parameter publisher.
 --- No source, native owner or runtime state is modified by this constructor.
 --- @param binding string Exact binding identifier.
@@ -1504,7 +1560,10 @@ end
 --- @param value string Validated parameter scalar.
 --- @return table|nil update Canonical section/key/value row, or refusal.
 function M.action_parameter_update(binding, action_name, value)
-	if type(binding) ~= "string" or binding == "" or not binding:match("^[a-z0-9_]+$")
+	local physical = type(binding) == "string" and binding:match("^keyboard__physical_[a-z_]+_[A-Za-z][A-Za-z0-9]*$")
+	if type(binding) ~= "string" or binding == ""
+		or (not binding:match("^[a-z0-9_]+$") and not physical)
+		or M.action_parameter_binding_fits(binding) == false
 		or type(action_name) ~= "string" or type(value) ~= "string"
 		or M.get_action_parameter_spec(action_name) == nil
 		or M.validate_action_parameter(action_name, value) ~= true then return nil end
@@ -1513,6 +1572,7 @@ end
 
 function M.set_action_parameter(binding, action_name, value)
 	if not admit_mutation() then return false end
+	if M.action_parameter_binding_fits(binding) == false then return false end
 	if not M.validate_action_parameter(action_name, value) then return false end
 	local key = parameter_key(binding, action_name)
 	local staged = copy_state(_action_params)
@@ -1987,7 +2047,10 @@ local function walk_user_config(config, visit)
 		if type(section) ~= "table" or not visit.param then return end
 		for key, value in pairs(section) do
 			local binding, action = M.split_action_parameter_key(key)
-			if binding and action and M.validate_action_parameter(action, value) then
+			local fits, detail = M.action_parameter_binding_fits(binding)
+			if binding and action and fits == false then
+				ConfigOutdated.report(entry_path(section_name, key), detail, Logger)
+			elseif binding and action and M.validate_action_parameter(action, value) then
 				visit.param(section_name, key, value)
 			else
 				-- Outdated configuration, named once and offered by the cleanup.

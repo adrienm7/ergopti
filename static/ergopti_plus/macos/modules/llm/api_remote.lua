@@ -64,6 +64,8 @@ local Formats        = require("llm.remote_formats")
 local ProviderUses   = require("modules.llm.provider_uses")
 local LocalServers   = require("modules.llm.local_servers")
 local AuthPolicy     = require("llm.local_server_auth")
+local ProviderConfig = require("llm.provider_config_policy")
+local Json           = require("json")
 local LOG            = "llm.api_remote"
 -- One probe client per local server, created at its first sweep with the
 -- registry's local_server_probe_timeout_ms and pinned for the life of the
@@ -197,14 +199,14 @@ local function load_api_providers()
 	-- Wrap the entire parse/validate phase in pcall so a corrupted or schema-
 	-- mismatched file degrades to an empty catalogue instead of raising at require
 	-- time, which would abort the full keymap → llm → api_remote require chain.
-	local ok, providers, order, prices, test_request, decisions_test = pcall(function()
+	local ok, providers, order, prices, test_request, decisions_test, published = pcall(function()
 		local fh = io.open(path, "r")
 		if not fh then
 			Logger.error("llm.api_remote", "api_providers.json unreadable at %s — empty catalogue.", tostring(path))
 			return {}, {}, {}
 		end
 		local raw = fh:read("*a")
-		fh:close()
+		local closed = fh:close()
 		local parse_ok, root = pcall(JsonCodec.decode, raw)
 		if not parse_ok or type(root) ~= "table" then
 			Logger.error("llm.api_remote", "api_providers.json parse failed at %s — empty catalogue.", tostring(path))
@@ -219,6 +221,15 @@ local function load_api_providers()
 			Logger.error("llm.api_remote", "api_providers.json: invalid top-level structure — empty catalogue.")
 			return {}, {}, {}
 		end
+		-- Native JSON erases empty object/array identity. The same raw source
+		-- proves catalogue shape without replacing its existing runtime model.
+		local source = Json.decode_lossless(raw)
+		local complete = closed == true and type(source) == "table"
+			and not Json.is_array(source) and not Json.is_null(source)
+			and Json.is_array(source.provider_order) and type(source.providers) == "table"
+			and not Json.is_array(source.providers) and not Json.is_null(source.providers)
+			and type(source.model_prices) == "table" and not Json.is_array(source.model_prices)
+			and not Json.is_null(source.model_prices)
 		local out_providers = {}
 		local out_order = {}
 		local seen_providers = {}
@@ -259,7 +270,8 @@ local function load_api_providers()
 		local out_test = parse_test_request(root.test_request)
 		local out_decisions_test = parse_decisions_test(root.decisions_test)
 		Logger.info("llm.api_remote", "Loaded API provider catalogue (%d providers) from %s", #out_order, path)
-		return out_providers, out_order, out_prices, out_test, out_decisions_test
+		return out_providers, out_order, out_prices, out_test, out_decisions_test,
+			complete and #out_order == #source.provider_order
 	end)
 
 	if not ok then
@@ -267,19 +279,22 @@ local function load_api_providers()
 		Logger.error("llm.api_remote", "api_providers.json: unexpected error during load — empty catalogue: %s", tostring(providers))
 		return {}, {}, {}, nil, nil
 	end
-	return providers or {}, order or {}, prices or {}, test_request, decisions_test
+	return providers or {}, order or {}, prices or {}, test_request, decisions_test, published == true
 end
 
-local MODEL_PRICES
-M.PROVIDERS, M.PROVIDER_ORDER, MODEL_PRICES, M.TEST_REQUEST, M.DECISIONS_TEST = load_api_providers()
+local MODEL_PRICES, cloud_config_published
+M.PROVIDERS, M.PROVIDER_ORDER, MODEL_PRICES, M.TEST_REQUEST, M.DECISIONS_TEST, cloud_config_published = load_api_providers()
 
 --- Registers the local servers of local_servers.json as providers of the
 --- openai format that need no key. They stay out of PROVIDER_ORDER: the menus
 --- list a local server only while it answers (modules/llm/local_servers.lua).
 local function register_local_servers()
+	local complete = type(LocalServers.config_catalogue_published) == "function"
+		and LocalServers.config_catalogue_published() == true
 	for _, id in ipairs(LocalServers.ORDER) do
 		local server = LocalServers.SERVERS[id]
 		if M.PROVIDERS[id] ~= nil then
+			complete = false
 			Logger.error(LOG, "local_servers.json: '%s' is already a provider of api_providers.json — the local server is skipped.", id)
 		else
 			M.PROVIDERS[id] = {
@@ -292,8 +307,18 @@ local function register_local_servers()
 			}
 		end
 	end
+	return complete
 end
-register_local_servers()
+local local_config_published = register_local_servers()
+local config_provider_ids = ProviderConfig.snapshot(cloud_config_published,
+	local_config_published, M.PROVIDERS).ids
+
+--- Detaches only identities acknowledged by both actual catalogue owners.
+--- Failed publication never acquires authority from usable runtime neighbors.
+--- @return table receipt Configuration identity receipt.
+function M.provider_config_receipt()
+	return ProviderConfig.snapshot(cloud_config_published, local_config_published, config_provider_ids)
+end
 
 --- Tells whether a provider id names a local server (local_servers.json).
 --- @param provider_id any
@@ -386,6 +411,7 @@ local _retired_provider_reported = {}
 --- The entry is named as the AI menu names it, after its provider and model.
 --- @param entry table The stored entry (its token is never logged).
 local function report_retired_provider(entry)
+	if ProviderConfig.classify(entry.provider, M.provider_config_receipt()) ~= "retired" then return end
 	local key = tostring(entry.id) .. "\0" .. tostring(entry.provider)
 	if _retired_provider_reported[key] then return end
 	_retired_provider_reported[key] = true

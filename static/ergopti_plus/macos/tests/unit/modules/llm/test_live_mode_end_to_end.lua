@@ -665,3 +665,140 @@ helpers.describe("declared live Off choice", function()
 		helpers.assert_eq(redraws, 24, "existing Mac redraw-on-refusal ABI is retained")
 	end)
 end)
+
+
+--- Uses the existing genuine live pipeline fixture with a real scoped translator/renderer.
+local function control_boundary_corpus()
+	local file = assert(io.open(helpers.shared("tests/corpus/menus/llm_control_boundaries.json"), "rb"))
+	local bytes = assert(file:read("*a")); assert(file:close())
+	return assert(json.decode(bytes))
+end
+
+local function with_live_boundary_owner(scenario)
+	local previous, previous_hs = {}, rawget(_G, "hs")
+	for name, value in pairs(package.loaded) do previous[name] = value end
+	local world, native, owner, receipt, acquired
+	local ok, detail = xpcall(function()
+		world = build_world()
+		for _, name in ipairs({ "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu",
+			"ui.menu.menu_llm.live_mode_panel", "ui.menu.menu_llm.profile_label" }) do package.loaded[name] = nil end
+		native = require("infra.i18n")
+		local backend = require("infra.locale")
+		native.set_locale_injector(function(code) backend.set_locale(code) end)
+		native.init()
+		owner = { pending = function() return false end }
+		acquired = native.scope_acquire(owner); helpers.assert_eq(acquired, true)
+		receipt = assert(native.scope_capture(owner)); helpers.assert_eq(native.scope_apply(owner, receipt, "en"), true)
+		local menu = require("infra.manifest_menu"); assert(menu.get_root())
+		scenario(world, require("ui.menu.menu_llm.live_mode_panel"), menu, native)
+	end, debug.traceback)
+	local restored, released, forgotten = true, true, true
+	if receipt then restored = native.scope_restore(owner, receipt) == true end
+	if acquired then released = native.scope_release(owner) == true end
+	if receipt then forgotten = native.scope_forget(owner, receipt) == true end
+	local cleaned, cleanup_detail = pcall(function()
+		if world then world.engine.stop_live_prompt("boundary fixture cleanup", true) end
+		local scheduler = package.loaded["adapters.timer_scheduler"]
+		if scheduler and not rawequal(scheduler, previous["adapters.timer_scheduler"]) then
+			helpers.assert_eq(scheduler.cancelAll(), true); helpers.assert_eq(scheduler.activeCount(), 0)
+		end
+		local bridge = package.loaded["modules.keylogger.kc_bridge"]
+		if bridge and not rawequal(bridge, previous["modules.keylogger.kc_bridge"]) then bridge.stop() end
+	end)
+	for name in pairs(package.loaded) do if previous[name] == nil then package.loaded[name] = nil end end
+	for name, value in pairs(previous) do package.loaded[name] = value end
+	_G.hs = previous_hs
+	for name, value in pairs(previous) do helpers.assert_true(rawequal(package.loaded[name], value), name) end
+	helpers.assert_true(rawequal(rawget(_G, "hs"), previous_hs))
+	helpers.assert_eq(restored, true); helpers.assert_eq(released, true); helpers.assert_eq(forgotten, true)
+	helpers.assert_eq(cleaned, true, tostring(cleanup_detail))
+	if not ok then error(detail, 0) end
+end
+
+helpers.describe("llm-control-boundaries: actual live prompt owner", function()
+	helpers.it("consumes the shared boundary without changing Off/prompt admission or callbacks (llm-control-boundaries)", function()
+		with_live_boundary_owner(function(world, panel, menu)
+			local expected = control_boundary_corpus()
+			local boundary = expected.boundaries.live
+			local root, original = menu.get_root(), menu.get_array(boundary.section)
+			local calls, redraws = 0, 0
+			local context = { llm_mod = world.core, count = 1, is_disabled = false,
+				keymap = { get_live_prompt = world.engine.get_live_prompt,
+					set_live_prompt = function(id)
+						calls = calls + 1
+						if id == nil then world.engine.stop_live_prompt("menu", false); return world.engine.get_live_prompt() == nil end
+						return world.engine.start_live_prompt(id)
+					end }, update_menu = function() redraws = redraws + 1 end }
+			local function build() return panel.build(context) end
+			local rows, prompts = build(), panel.live_prompts(world.core, 1)
+			helpers.assert_true(#prompts > 0, "genuine builtin rewrite prompts must be reached")
+			helpers.assert_eq(#rows, #prompts + 2)
+			helpers.assert_eq(rows[1].title, expected.live_off_english)
+			helpers.assert_eq(rows[1].checked, true); helpers.assert_type(rows[1].fn, "function")
+			helpers.assert_eq(rows[2].title, "-")
+			for index, prompt in ipairs(prompts) do
+				helpers.assert_eq(rows[index + 2].title, prompt.label); helpers.assert_type(rows[index + 2].fn, "function")
+			end
+			local ok, detail = xpcall(function()
+				root[boundary.section] = { { type = "label", id = "hand_live_boundary", i18n = expected.marker_key,
+					platforms = { "hs" }, unavailable = "hide" } }
+				rows = build()
+				helpers.assert_eq(rows[2].title, expected.marker_english)
+				helpers.assert_eq(rows[2].disabled, true); helpers.assert_nil(rows[2].fn)
+				helpers.assert_eq(rows[3].title, prompts[1].label)
+				helpers.assert_eq(rows[3].fn(), true)
+				helpers.assert_eq(world.engine.get_live_prompt().profile_id, prompts[1].id)
+				helpers.assert_eq(calls, 1); helpers.assert_eq(redraws, 1)
+				local retained = rows[1]
+				context.is_disabled = true
+				helpers.assert_eq(retained.fn(), false)
+				helpers.assert_eq(calls, 1); helpers.assert_eq(redraws, 1)
+				rows = build(); helpers.assert_eq(rows[1].disabled, true); helpers.assert_nil(rows[3].fn)
+				context.is_disabled = false
+				helpers.assert_eq(build()[1].fn(), true); helpers.assert_nil(world.engine.get_live_prompt())
+				helpers.assert_eq(calls, 2); helpers.assert_eq(redraws, 2)
+				root[boundary.section] = nil
+				helpers.assert_eq(build(), {}, "no native fallback after a real declaration withdrawal")
+				root[boundary.section] = { { type = "command", id = "hand_unbound_live_boundary", i18n = expected.marker_key } }
+				helpers.assert_eq(build(), {})
+				helpers.assert_eq(calls, 2); helpers.assert_eq(redraws, 2)
+				context.keymap = nil
+				rows = build(); helpers.assert_eq(#rows, 1); helpers.assert_eq(rows[1].disabled, true)
+				helpers.assert_eq(rows[1].title, expected.live_off_english)
+			end, debug.traceback)
+			root[boundary.section] = original
+			if not ok then error(detail, 0) end
+			context.keymap = { get_live_prompt = world.engine.get_live_prompt,
+				set_live_prompt = function() error("construction cannot enter the native bridge") end }
+			rows = build(); helpers.assert_eq(rows[2].title, "-")
+			helpers.assert_eq(rows[1].checked, true); helpers.assert_eq(calls, 2); helpers.assert_eq(redraws, 2)
+			assert_menu_untouched(world)
+		end)
+	end)
+
+	helpers.it("projects all three presentation roles and each genuine cross-platform absence (llm-control-boundaries)", function()
+		with_live_boundary_owner(function(_, _, _, native)
+			local expected = control_boundary_corpus()
+			for _, platform in ipairs({ "ahk", "hs", "linux" }) do
+				local renderer = assert(require("menu.renderer").new({ platform = platform,
+					manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
+					json_decode = require("adapters.json_codec").decode, i18n = native, logger = require("infra.logger") }))
+				for _, boundary in pairs(expected.boundaries) do
+					helpers.assert_eq(renderer.template_rows(boundary.section, {}, {}, {}), boundary.projections[platform])
+				end
+			end
+		end)
+	end)
+
+	helpers.it("restores the genuine predecessor cohort after a raised scenario (llm-control-boundaries)", function()
+		local prior, previous_hs = {}, rawget(_G, "hs")
+		for name, value in pairs(package.loaded) do prior[name] = value end
+		local ok, detail = pcall(function()
+			with_live_boundary_owner(function() error("live boundary inverse sentinel") end)
+		end)
+		helpers.assert_eq(ok, false); helpers.assert_contains(detail, "live boundary inverse sentinel")
+		for name, value in pairs(prior) do helpers.assert_true(rawequal(rawget(package.loaded, name), value), name) end
+		for name in pairs(package.loaded) do helpers.assert_true(prior[name] ~= nil, name) end
+		helpers.assert_true(rawequal(rawget(_G, "hs"), previous_hs))
+	end)
+end)

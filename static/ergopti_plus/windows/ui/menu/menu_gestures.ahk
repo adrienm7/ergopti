@@ -80,8 +80,13 @@ _GES_SlotRows() {
 		and Features["gestures"]["enabled"] = true
 	Rows := []
 	for _, Slot in GESTURE_SLOTS {
-		if (Slot == "tap_4")
-			Rows.Push(Map("separator", true))
+		if (Slot == "tap_4") {
+			Boundary := MenuRenderer_StatusRows("gestures_menu", "gesture_slots_ahk", "tap_group_boundary")
+			if !(Boundary is Array)
+				return []
+			for Row in Boundary
+				Rows.Push(Row)
+		}
 		SlotLabel     := t("gesture.slots." . Slot)
 		CurrentAction := GestureAssignments.Has(Slot) ? GestureAssignments[Slot] : "none"
 		CurrentLabel  := GESTURE_ACTIONS.Has(CurrentAction)

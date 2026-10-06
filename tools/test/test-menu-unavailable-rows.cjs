@@ -285,3 +285,274 @@ console.log(
 		`short reason in all 21 locales), ${disabledWithReason} greyed by disabled_when with one; ` +
 		`both renderers draw the stand-in for both.\x1b[0m`
 );
+
+// Canonical declarations and I2 share the actual pure owner; the independent
+// historical assertions above remain unchanged, including their own classifier.
+{
+	const availability = require('../lib/menu-row-availability.cjs');
+	const coverage = require('./test-platform-restrictions-explained.cjs');
+	const { stripComments } = require('../lib/script-source.cjs');
+	const base = { type: 'command', id: 'i2_hand', i18n: 'menu.hand', platforms: ['linux'] };
+	assert.equal(
+		availability.classifyMenuRow({ ...base, unavailable: 'hide' }, 'hand'),
+		'not-applicable'
+	);
+	assert.equal(
+		availability.classifyMenuRow(
+			{ ...base, unavailable: 'grey', reason_key: 'hand.reason' },
+			'hand'
+		),
+		'not-ported'
+	);
+	assert.equal(availability.classifyMenuRow(base, 'hand'), 'unclassified');
+	for (const [patch, message] of [
+		[{ unavailable: true }, /unavailable must be/],
+		[{ unavailable: '' }, /unavailable must be/],
+		[{ unavailable: 'HIDE' }, /unavailable must be/],
+		[{ unavailable: 'hide', reason_key: '' }, /hidden row carries no reason_key/],
+		[{ unavailable: 'hide', reason_key: 'reason' }, /hidden row carries no reason_key/],
+		[{ unavailable: 'hide', platforms: [] }, /unavailable needs platforms/],
+		[{ unavailable: 'hide', platforms: new Array(1) }, /unavailable needs platforms/],
+		[
+			{ unavailable: 'hide', platforms: Object.assign(new Array(2), { 0: 'hs' }) },
+			/unavailable needs platforms/
+		],
+		[{ unavailable: 'hide', platforms: ['linux', 'linux'] }, /unavailable needs platforms/],
+		[{ unavailable: 'hide', platforms: ['unknown'] }, /unavailable needs platforms/],
+		[{ unavailable: 'hide', platforms: ['both'] }, /unavailable needs platforms/],
+		[{ unavailable: 'hide', platforms: PLATFORMS }, /unavailable needs platforms/],
+		[{ unavailable: 'hide', platforms: 'linux' }, /unavailable needs platforms/],
+		[{ unavailable: 'hide', type: 'invented' }, /known menu row type/],
+		[{ unavailable: 'hide', id: '' }, /labelled command identity/],
+		[{ unavailable: 'hide', i18n: '' }, /labelled command identity/],
+		[{ unavailable: 'grey' }, /greyed row needs its reason_key/],
+		[{ unavailable: 'grey', reason_key: '' }, /greyed row needs its reason_key/],
+		[{ unavailable: 'grey', reason_key: 'r', i18n: '' }, /greyed row needs an i18n label/],
+		[{ disabled_reason_key: 'r', disabled_when: [] }, /needs the disabled_when/],
+		[{ disabled_reason_key: 'r', disabled_when: ['ready'], type: 'check' }, /command rows only/]
+	])
+		assert.throws(() => availability.classifyMenuRow({ ...base, ...patch }, 'hand'), message);
+
+	// Exercise the compiler's actual wrappers with the real imported pure owner,
+	// without executing build() or writing generated metadata.
+	const compiler = fs.readFileSync(path.join(ROOT, 'tools/build/build-menu-manifest.js'), 'utf8');
+	for (const name of ['validateGreyedRows', 'validateChildTemplates']) {
+		const owner = compiler.match(new RegExp('function ' + name + '\\(menu\\) \\{[^}]+\\}'));
+		assert.ok(owner, name + ' must retain its actual compiler call boundary');
+		const validate = new Function('menuAvailability', owner[0] + '; return ' + name)(availability);
+		validate({ hand: [{ ...base, unavailable: 'hide' }] });
+		if (name === 'validateGreyedRows')
+			assert.throws(
+				() => validate({ hand: [{ ...base, unavailable: 'hide', reason_key: 'r' }] }),
+				/hidden row carries no reason_key/
+			);
+		else
+			assert.throws(
+				() =>
+					validate({
+						hand: [
+							{
+								type: 'label',
+								id: 'hand',
+								i18n: 'menu.hand',
+								platforms: ['linux'],
+								unavailable: 'hide',
+								command: 'bad'
+							}
+						]
+					}),
+				/inert label/
+			);
+	}
+
+	// Handwritten semantic fixtures carry the real original completeness floor;
+	// they do not import or regenerate the frozen104 identity corpus.
+	const complete =
+		'[menu]\n' +
+		Array.from(
+			{ length: 305 },
+			(_, index) => `[sections.hand_floor_${index}]\ndescription_key = "hand"\n`
+		).join('\n');
+	const knownDebt = '[sections.ui]\nplatforms = ["hs"]\n';
+	const command =
+		'[[menu.hand_commands]]\ntype = "command"\nid = "new_hand_command"\ni18n = "menu.hand"\nplatforms = ["linux"]\n';
+	const hidden = command + 'unavailable = "hide"\n';
+	const separator =
+		'[[menu.hand_tail]]\ntype = "---"\nplatforms = ["linux"]\nunavailable = "hide"\n';
+	function errorsFor(source) {
+		return coverage.coverageErrors(coverage.readCoverage(source));
+	}
+	assert.deepEqual(errorsFor(complete + knownDebt), []);
+	const valid = coverage.readCoverage(complete + knownDebt + hidden + separator);
+	assert.equal(valid.unexplained.length, 1);
+	assert.equal(valid.notApplicable.length, 2);
+	assert.deepEqual(coverage.coverageErrors(valid), []);
+	assert.ok(
+		errorsFor(complete + command).some((error) =>
+			error.includes('new unexplained platform restriction')
+		)
+	);
+	// Retirement creates headroom, but cannot pay for this new command.
+	assert.ok(errorsFor(complete + command).some((error) => error.includes('new_hand_command')));
+	assert.ok(
+		errorsFor(complete + knownDebt + command).some((error) => error.includes('new_hand_command'))
+	);
+	assert.ok(errorsFor('[menu]\n').some((error) => error.includes('floor 300')));
+	const inlineTables =
+		'[menu]\n' +
+		Array.from({ length: 305 }, (_, index) => `inline_${index} = { id = \"hand\" }\n`).join('');
+	assert.ok(errorsFor(inlineTables).some((error) => error.includes('floor 300')));
+	for (const declaration of [
+		'[[features.hand]]\nid = "new_hand_feature"\ntype = "boolean"\nplatforms = ["linux"]\nunavailable = "hide"\n',
+		'[sections.new_hand_section]\nplatforms = ["linux"]\nunavailable = "hide"\n'
+	]) {
+		const observed = coverage.readCoverage(complete + declaration);
+		assert.equal(observed.notApplicable.length, 0);
+		assert.ok(
+			coverage
+				.coverageErrors(observed)
+				.some((error) => error.includes('new unexplained platform restriction'))
+		);
+	}
+	for (const text of [
+		command + '# unavailable = "hide"\n',
+		command + "note = '''\nunavailable = \"hide\"\n'''\n"
+	])
+		assert.ok(errorsFor(complete + text).some((error) => error.includes('new_hand_command')));
+	for (const text of [
+		command + 'unavailable = "grey"\n',
+		command + 'unavailable = true\n',
+		command + 'unavailable = "hide"\nreason_key = "r"\n',
+		hidden.replace('["linux"]', '[]'),
+		hidden.replace('["linux"]', '["unknown"]'),
+		hidden.replace('["linux"]', '["linux", "linux"]'),
+		hidden + 'unavailable = "hide"\n',
+		hidden.replace('type = "command"', 'type = "invented"'),
+		'[[menu.hand_labels]]\ntype = "label"\nid = "hand"\ni18n = "menu.hand"\nplatforms = ["linux"]\nunavailable = "hide"\ncommand = "bad"\n',
+		'[[menu.hand_include]]\ntype = "include"\nsection = "hand_commands"\nplatforms = ["linux"]\nunavailable = "hide"\n' +
+			hidden
+	])
+		assert.throws(() => coverage.readCoverage(complete + text));
+
+	// All four original anonymous separators remain four distinct roles; neither
+	// a fifth separator nor an action borrowing an old index is grandfathered.
+	const anonymous = Array.from({ length: 19 }, (_, index) =>
+		[10, 12, 14, 18].includes(index)
+			? `[[menu.gestures_menu]]\ntype = "---"\nplatforms = ["${index === 18 ? 'linux' : 'hs'}"]\n`
+			: `[[menu.gestures_menu]]\ntype = "label"\nid = "hand_${index}"\ni18n = "menu.hand"\n`
+	).join('\n');
+	const anonymousCoverage = coverage.readCoverage(complete + anonymous);
+	assert.equal(anonymousCoverage.unexplained.length, 4);
+	assert.equal(new Set(anonymousCoverage.unexplained.map((entry) => entry.identity)).size, 4);
+	assert.deepEqual(coverage.coverageErrors(anonymousCoverage), []);
+	assert.ok(
+		errorsFor(
+			complete + anonymous + '[[menu.gestures_menu]]\ntype = "---"\nplatforms = ["hs"]\n'
+		).some((error) => error.includes('new unexplained'))
+	);
+	assert.ok(
+		errorsFor(complete + anonymous.replace('type = "---"', 'type = "command"')).some((error) =>
+			error.includes('new unexplained')
+		)
+	);
+	const namedKnown =
+		'[[menu.apps_menu]]\ntype = "list"\nid = "apps_installed"\nplatforms = ["hs"]\n';
+	assert.deepEqual(errorsFor(complete + namedKnown), []);
+	assert.ok(
+		errorsFor(complete + namedKnown + namedKnown).some((error) =>
+			error.includes('duplicate unexplained identity')
+		)
+	);
+
+	// Source inspection qualifies the numeric row as a presentation difference,
+	// not a removed capability. Strip comments and require each actual owner to
+	// exist before checking prompt, setting and persistence routes.
+	const numericPaths = {
+		linux: path.join(SP, 'linux/ui/menu/menu_builder.lua'),
+		mac: path.join(SP, 'macos/ui/menu/menu_llm/settings_manager.lua'),
+		windows: path.join(SP, 'windows/ui/menu/menu_llm/menu_settings.ahk'),
+		persist: path.join(SP, 'windows/ui/menu/menu_llm/persist.ahk')
+	};
+	const numeric = Object.fromEntries(
+		Object.entries(numericPaths).map(([driver, file]) => [
+			driver,
+			stripComments(fs.readFileSync(file, 'utf8'), path.extname(file))
+		])
+	);
+	function numericCounterparts(source) {
+		const linux = source.linux.match(
+			/local bounds = Settings\.bounds\(setting\.name\)([\s\S]*?)\}, ctx\.webview\)/
+		);
+		const mac = source.mac.match(
+			/local function generic_numeric_prompt\(([\s\S]*?)local function reset_to_default\(/
+		);
+		const windows = ahkOwner(source.windows, 'LLM_Menu_PromptNumeric');
+		const temperature = ahkOwner(source.windows, 'LLM_Menu_PromptTemperature');
+		const context = ahkOwner(source.windows, 'LLM_Menu_PromptCtxChars');
+		return (
+			!!linux &&
+			!!mac &&
+			windows !== '' &&
+			temperature !== '' &&
+			context !== '' &&
+			/Prompt\.ask\(/.test(linux[1]) &&
+			/value = Settings\.get\(setting\.name\)/.test(linux[1]) &&
+			/min = bounds\.min/.test(linux[1]) &&
+			/max = bounds\.max/.test(linux[1]) &&
+			/local saved = Settings\.set\(setting\.name, value\)/.test(linux[1]) &&
+			/if saved and type\(ctx\.on_menu_changed\) == "function" then ctx\.on_menu_changed\(\) end/.test(
+				linux[1]
+			) &&
+			/pcall\(dialog\.text_prompt/.test(mac[1]) &&
+			/apply_setting_transaction\(\{/.test(mac[1]) &&
+			/key = key/.test(mac[1]) &&
+			/value = final_val/.test(mac[1]) &&
+			/runtime_fn = hs_fn/.test(mac[1]) &&
+			/publish_setting = true/.test(mac[1]) &&
+			/"llm_temperature", nil, "set_llm_temperature"/.test(source.mac) &&
+			/"llm_context_length", nil, "set_llm_context_length"/.test(source.mac) &&
+			/Ui_InputBox\(/.test(windows) &&
+			/_LLM_Menu_TryNormalizeIntegerPrompt\(/.test(windows) &&
+			/LLM_Menu_CommitMutation\(/.test(windows) &&
+			/_LLM_Menu_SetCandidateValue\(Candidate, key, val\)/.test(windows) &&
+			/_LLM_Menu_ApplyStandardCommitted/.test(windows) &&
+			/Ui_InputBox\(/.test(temperature) &&
+			/_LLM_Menu_TryNormalizeTemperaturePrompt\(/.test(temperature) &&
+			/"temperature", Normalized/.test(temperature) &&
+			/_LLM_Menu_ApplyStandardCommitted/.test(temperature) &&
+			/LLM_Menu_PromptNumeric\("ctx_chars"/.test(context) &&
+			/\["ctx_chars", llm\["generation"\]\["context_length"\], "llm\.generation\.context_length"\]/.test(
+				source.persist
+			) &&
+			/Format\("\{:\.2f\}", TemperatureRaw \+ 0\), "llm\.generation\.temperature"/.test(
+				source.persist
+			)
+		);
+	}
+	assert.equal(numericCounterparts(numeric), true);
+	for (const driver of Object.keys(numeric))
+		assert.equal(numericCounterparts({ ...numeric, [driver]: '' }), false);
+	for (const [driver, before] of [
+		['linux', 'Settings.set(setting.name, value)'],
+		['linux', 'ctx.on_menu_changed()'],
+		['mac', 'pcall(dialog.text_prompt'],
+		['mac', 'runtime_fn = hs_fn'],
+		['mac', 'publish_setting = true'],
+		['windows', '_LLM_Menu_SetCandidateValue(Candidate, key, val)'],
+		['windows', '"temperature", Normalized'],
+		['persist', '"llm.generation.context_length"'],
+		['persist', '"llm.generation.temperature"']
+	]) {
+		assert.ok(numeric[driver].includes(before));
+		assert.equal(
+			numericCounterparts({
+				...numeric,
+				[driver]: numeric[driver].replaceAll(before, 'REMOVED_OWNER')
+			}),
+			false
+		);
+	}
+	console.log(
+		'[OK] canonical MENU-only HIDE and semantic debt identities; numeric counterpart source routes (native execution not claimed).'
+	);
+}

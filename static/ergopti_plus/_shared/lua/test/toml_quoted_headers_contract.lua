@@ -134,4 +134,54 @@ return function(helpers)
 			helpers.assert_eq(content, '[a."x"]\nw = 1\n')
 		end)
 	end)
+
+	helpers.describe("shared physical TOML equals boundary", function()
+		for _, vector in ipairs({
+			{ source = '"x=y" = true', key = '"x=y"', value = 'true', rhs = ' true', identity = { 'x=y' } },
+			{ source = "'x=y'=false", key = "'x=y'", value = 'false', rhs = 'false', identity = { 'x=y' } },
+			{ source = ' "x\\\"=y".z  =  [1, 2]  ', key = '"x\\\"=y".z', value = '[1, 2]', rhs = '  [1, 2]  ', identity = { 'x"=y', 'z' } },
+			{ source = '"x\\u003dy"=0.1', key = '"x\\u003dy"', value = '0.1', rhs = '0.1', identity = { 'x=y' } },
+			{ source = 'a = "right=side" # = comment', key = 'a', value = '"right=side" # = comment', rhs = ' "right=side" # = comment', identity = { 'a' } },
+			{ source = 'a\t=\t\'literal=rhs\'', key = 'a', value = "'literal=rhs'", rhs = "\t'literal=rhs'", identity = { 'a' } },
+		}) do
+			helpers.it("equals-boundary: authentic splitter keeps key and raw RHS " .. vector.source, function()
+				local key, value, rhs = Scanner.split_assignment(vector.source)
+				helpers.assert_eq(key, vector.key); helpers.assert_eq(value, vector.value); helpers.assert_eq(rhs, vector.rhs)
+				local record = Scanner.scan_records(vector.source .. '\n').records[1]
+				helpers.assert_eq(record.key_text, vector.key)
+				helpers.assert_eq(require('toml_codec.key_path').parse(record.key_text), vector.identity)
+				helpers.assert_eq(record.value_parts[1], vector.value)
+			end)
+		end
+		helpers.it("equals-boundary: an unclosed quoted key never invents a separator", function()
+			for _, source in ipairs({ '"open=x=1', "'open=x=1", '"closed=x"', 'no_assignment' }) do
+				local key, value, rhs = Scanner.split_assignment(source)
+				helpers.assert_nil(key); helpers.assert_nil(value); helpers.assert_nil(rhs)
+				-- Preserve the canonical decoder's existing ignored-line semantics.
+				helpers.assert_eq(Codec.decode(source .. '\n'), {})
+			end
+		end)
+		helpers.it("equals-boundary: actual quoted leaf batch uses its original physical owner", function()
+			for _, spelling in ipairs({ '"x=y"', "'x=y'", '"x\\u003dy"' }) do
+				local source = '[a]\n' .. spelling .. ' = true\nneighbor=1\n'
+				local admitted, detail, content = prepare(source, { { section = 'a', key = 'x=y', value = false } })
+				helpers.assert_eq(admitted, true, detail)
+				helpers.assert_eq(content, '[a]\n"x=y" = false\nneighbor=1\n')
+				helpers.assert_eq(Codec.decode(content), { a = { ['x=y'] = false, neighbor = 1 } })
+				-- Physical-boundary support does not make quoted leaves ordinary
+				-- unused-key rows or enable array-of-table writes.
+				helpers.assert_eq(Scanner.scan_records(source).records[1].addressable, false)
+				helpers.assert_eq(prepare('[[a]]\n' .. spelling .. '=true\n', { { section = 'a', key = 'x=y', value = false } }), false)
+			end
+		end)
+		helpers.it("equals-boundary: complete physical multiline span stays attached to the quoted owner", function()
+			local source = '"x=y"=[\n  "[not=a.header]",\n  { text="right=side" },\n]\n[neighbor]\nkeep=false\n'
+			local scan = Scanner.scan_records(source, { quoted_headers = true })
+			helpers.assert_eq(#scan.records, 2); helpers.assert_eq(#scan.headers, 1)
+			helpers.assert_eq(scan.records[1].key_text, '"x=y"')
+			helpers.assert_eq(scan.records[1].first, 1); helpers.assert_eq(scan.records[1].last, 4)
+			helpers.assert_eq(scan.headers[1].index, 5); helpers.assert_eq(scan.headers[1].segments, { 'neighbor' })
+			helpers.assert_eq(Codec.decode(source), { ['x=y'] = { '[not=a.header]', { text = 'right=side' } }, neighbor = { keep = false } })
+		end)
+	end)
 end

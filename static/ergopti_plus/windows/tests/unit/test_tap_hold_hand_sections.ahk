@@ -110,8 +110,7 @@ _THHS_MenuSeparatesTheHands() {
 		Assert(_THHS_PositionOf(Rendered, MenuSectionTitle("Tap / Hold")) < 0,
 			"no « — Tap / Hold — » header of its own")
 	} finally {
-		Rendered.Delete()
-		MenuDispatcher_PruneMenu(Rendered)
+		_CTC_ReleaseMenu(Rendered)
 	}
 }
 Test("tap-holds: the submenu separates the left-hand keys from the right-hand keys (tap-hold-hand-sections)",
@@ -189,9 +188,22 @@ _THHS_KeyChildren(KeyId) {
 	throw Error("Missing actual key template: " . KeyId)
 }
 
+_THHS_KeyHeadRows(KeyId) {
+	Rows := _THHS_KeyChildren(KeyId)
+	Assert(Rows.Length > 1 && Rows[Rows.Length]["items"] is Array
+		&& Rows[Rows.Length]["items"].Length == 1,
+		"the existing head must be followed by one genuine Windows custom-delay command")
+	Head := []
+	for Index, Row in Rows {
+		if Index < Rows.Length
+			Head.Push(Row)
+	}
+	return Head
+}
+
 _THHS_KeyHeadOrder(TargetPath) {
-	Rows := _THHS_KeyChildren("caps_lock")
-	AssertEqual(4, Rows.Length, "exact shared head, without a new delay tail")
+	Rows := _THHS_KeyHeadRows("caps_lock")
+	AssertEqual(4, Rows.Length, "the original four-row shared head retains its complete order")
 	AssertEqual(t("tap_hold.action.disable"), Rows[1]["label"], "original clearing command remains first")
 	Assert(Rows[2]["separator"], "declared separator is second")
 	AssertEqual(StrReplace(t("tap_hold.picker.tap"), "%s", TapHoldCurrentTapLabel("caps_lock")),
@@ -211,8 +223,7 @@ _THHS_KeyHeadOrder(TargetPath) {
 		AssertEqual(Rows[3]["label"], _THHS_LabelAt(Rendered, 2), "native tap caption")
 		AssertEqual(Rows[4]["label"], _THHS_LabelAt(Rendered, 3), "native hold caption")
 	} finally {
-		Rendered.Delete()
-		MenuDispatcher_PruneMenu(Rendered)
+		_CTC_ReleaseMenu(Rendered)
 	}
 }
 Test("tap-holds: actual key provider follows complete declared head (tap-hold-key-head)",
@@ -250,7 +261,7 @@ _THHS_KeyHeadPlatform(TargetPath) {
 	Previous := Tap["platforms"]
 	try {
 		Tap["platforms"] := ["linux"]
-		Rows := _THHS_KeyChildren("caps_lock")
+		Rows := _THHS_KeyHeadRows("caps_lock")
 		AssertEqual(3, Rows.Length, "only the unavailable tap row is hidden")
 		Assert(Rows[2]["separator"], "the shared separator retains its declared position")
 		Assert(Rows[3]["items"] is Array, "hold payload remains present")
@@ -295,3 +306,71 @@ _THHS_KeyHeadRefusesBrokenData() {
 }
 Test("tap-holds: declared key head refuses missing or cyclic data (tap-hold-key-head)",
 	_THHS_KeyHeadRefusesBrokenData)
+
+_THHS_KeyDelayVisible(TargetPath) {
+	global TapHold
+	TapHold["keys"]["caps_lock"]["time_activation_seconds"] := 0.35
+	Rows := _THHS_KeyChildren("caps_lock")
+	AssertEqual(5, Rows.Length, "Windows exposes the complete head and genuine per-key delay")
+	AssertEqual(StrReplace(t("menu.tapholds.key_tap_delay"), "%s", "350 ms"),
+		Rows[5]["label"], "caption reads the authoritative inherited/effective per-key duration")
+	AssertEqual(1, Rows[5]["items"].Length, "Windows exposes custom delay without an invented global reset")
+	AssertEqual(t("menu.tapholds.key_tap_delay_set"), Rows[5]["items"][1]["label"])
+	Assert(HasMethod(Rows[5]["items"][1]["action"], "Call"), "the actual custom command has a native callback")
+	Rendered := Menu()
+	try {
+		AssertEqual(4, _MR_RenderRows(Rendered, Rows, "tap_hold_key_delay_test", 1),
+			"the complete receipt counts four labelled rows and excludes its separator")
+		AssertEqual(5, DllCall("GetMenuItemCount", "ptr", Rendered.Handle, "int"),
+			"the actual native menu retains all five physical positions")
+		AssertEqual(Rows[5]["label"], _THHS_LabelAt(Rendered, 4), "the genuine delay is last")
+		Assert(TrayMenuIsSeparatorAt(Rendered, 1), "the original separator remains second")
+	} finally {
+		_CTC_ReleaseMenu(Rendered)
+	}
+}
+Test("tap-holds: Windows exposes real per-key delay after the original head (tap-hold-key-delay)",
+	() => _THHS_WithNativeFixture(_THHS_KeyDelayVisible))
+
+; Exercise the real per-key provider and retained command, not a synthetic wrapper call.
+_THHS_KeyDelayProviderContract(TargetPath) {
+	Definition := _MR_GetMenuDef("tap_hold_key_delay_rows")[1]
+	PreviousCaption := Definition["i18n"]
+	PreviousCommand := Definition["id"]
+	try {
+		for Hand in ["left", "right"]
+			AssertEqual(TapHoldKeyDefsOfHand(Hand).Length, _TH_KeyRows(Hand).Length,
+				"the actual provider renders every declared physical key without a construction exception")
+		Definition["i18n"] := "menu.shortcuts.title"
+		Rows := _THHS_KeyChildren("caps_lock")
+		AssertEqual(t("menu.shortcuts.title"), Rows[5]["items"][1]["label"],
+			"the real delay child consumes its shared command caption")
+		Assert(HasMethod(Rows[5]["items"][1]["action"], "Call"),
+			"caption mutation retains the actual native delay owner")
+		Definition["id"] := "unowned_delay_command"
+		AssertEqual(0, _TH_KeyRows("left").Length,
+			"a missing native command owner refuses physical key rows rather than publishing a partial child")
+	} finally {
+		Definition["i18n"] := PreviousCaption
+		Definition["id"] := PreviousCommand
+	}
+	Assert(!FileExist(TargetPath), "building and refusing native rows cannot publish preferences")
+}
+Test("tap-holds: actual delay provider constructs both hands and refuses unowned commands (tap-hold-key-delay)",
+	() => _THHS_WithNativeFixture(_THHS_KeyDelayProviderContract))
+
+_THHS_KeyDelayRetainedOwnerRefusal(TargetPath) {
+	global TapHold
+	Rows := _THHS_KeyChildren("caps_lock")
+	DelayCommand := Rows[5]["items"][1]
+	Previous := TapHold
+	try {
+		TapHold := 0
+		AssertEqual(false, DelayCommand["action"].Call(),
+			"the retained actual delay callback refuses withdrawn native state before opening its prompt")
+		AssertEqual(0, TapHold, "callback refusal cannot rebuild an uninitialized owner")
+		Assert(!FileExist(TargetPath), "callback refusal cannot write the private target")
+	} finally TapHold := Previous
+}
+Test("tap-holds: retained actual delay command refuses native owner withdrawal (tap-hold-key-delay)",
+	() => _THHS_WithNativeFixture(_THHS_KeyDelayRetainedOwnerRefusal))

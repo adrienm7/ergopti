@@ -23,7 +23,7 @@ end
 function M.run(context_path)
 	local context = read_json(context_path)
 	assert(context.schema_version == 1 and context.contract == "hs.startup.supplementary-feature")
-	assert(context.feature == "delayed_timer" or context.feature == "karabiner_config")
+	assert(context.feature == "delayed_timer" or context.feature == "karabiner_config" or context.feature == "script_scope")
 	assert(type(context.nonce) == "string" and #context.nonce == 32)
 	assert(context.admission_timeout == 10)
 	assert(context.feature_timeout == (context.feature == "delayed_timer" and 15 or 10))
