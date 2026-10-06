@@ -653,13 +653,27 @@ helpers.with_stub_scope(MODULES, function()
 					helpers.assert_eq(saved.shortcuts.enabled, changed, "the ordinary change is saved")
 					helpers.assert_eq(saved.shortcuts.keyboard, "legacy", "the outdated keyboard value is kept")
 					helpers.assert_eq(saved.shortcuts.tap_keys, { "legacy" }, "the outdated tap_keys value is kept")
-					local rows = Preferences.prepare_shortcut_updates({ status = "ok", content = source },
-						{ { section = "shortcuts.keyboard", key = "cmd_k", value = "copy" } }, { "keyboard" })
-					local deleted = {}
-					for _, row in ipairs(rows) do
-						if row.delete and row.section == "shortcuts" then deleted[#deleted + 1] = row.key end
+					-- A nondelete descendant must not replace a retained obsolete
+					-- scalar. Only the explicit cleanup may remove that parent.
+					local after_save = Sandbox.read_bytes(path)
+					local native_calls, previous = 0, {}
+					for _, name in ipairs({ "read", "read_with_status", "write", "write_if_unchanged" }) do
+						previous[name] = IoAdapter[name]
+						IoAdapter[name] = function() native_calls = native_calls + 1; error("preparation must not touch native IO") end
 					end
-					helpers.assert_eq(deleted, { "keyboard" }, "a single-slot write replaces only its own container")
+					local admitted, detail = pcall(Preferences.prepare_shortcut_updates,
+						{ status = "ok", content = source },
+						{ { section = "shortcuts.keyboard", key = "cmd_k", value = "copy" } }, { "keyboard" })
+					for name, callback in pairs(previous) do IoAdapter[name] = callback end
+					helpers.assert_eq(admitted, false, "a nondelete child cannot erase its obsolete parent")
+					helpers.assert_true(tostring(detail):find("collides with retained obsolete parent 'shortcuts.keyboard'", 1, true) ~= nil,
+						tostring(detail))
+					helpers.assert_eq(native_calls, 0)
+					helpers.assert_eq(Sandbox.read_bytes(path), after_save)
+					local unchanged = TomlCodec.decode(Sandbox.read_bytes(path))
+					helpers.assert_eq(unchanged.shortcuts.keyboard, "legacy")
+					helpers.assert_eq(unchanged.shortcuts.tap_keys, { "legacy" })
+					helpers.assert_eq(unchanged.shortcuts.enabled, changed, "the earlier valid ordinary write remains saved")
 				end)
 			end)
 

@@ -82,9 +82,9 @@ function M.new(options)
 	ports.transaction_factory = function(config)
 		config.gestures = gestures
 		config.owned_paths = keyboard.get_owned_config_paths
-		-- The scope's reset owns both assignment containers, an older build's
-		-- plain value included; the script chords' submenu (a `select`) owns
-		-- neither, but writes its inline leaves the same way.
+		-- Both assignment owners preserve obsolete parents until explicit
+		-- cleanup; the script chords' submenu (a `select`) writes only its
+		-- own leaves and cannot release another assignment container.
 		local containers = config.select == nil and Preferences.SHORTCUT_CONTAINERS or nil
 		config.prepare_rows = function(source, rows)
 			return Preferences.prepare_shortcut_updates(source, rows, containers)

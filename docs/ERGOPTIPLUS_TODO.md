@@ -2589,6 +2589,8 @@ The first owned Linux storage publication now prepares the configuration directo
 
 The Windows fresh-bootstrap control now reads the real autocorrection names record at its parent section and asserts its complete three-child shape, refusing the unrelated flattened-section lookup. Float timing, obsolete scalar, future data and read-only assertions are retained. This repairs the fixture consumer; native snapshot publication and fresh process qualification still require Windows CI.
 
+Shared shortcut scope planning now filters only proved neutral deletions beneath an obsolete scalar/array parent. Requested nondelete, ancestor and whole-parent replacements refuse before native IO or runtime changes. Ordinary saves keep obsolete source values until explicit cleanup. Portable current-owner controls preserve all original ordinary-save assertions; physical device and native runner acceptance remain pending.
+
 - [~] **7.** Complete W2: seven-page first-run opt-in wizard, per-category
   recommended choices, consistent WebView behavior and genuine translations in
   21 locales. The tap-holds page lists each engine's recommended keys from the
@@ -3951,6 +3953,8 @@ The actual Lua preference writer now preserves requested finite numeric header l
 Two Windows cleanup controls now compare their complete handwritten case-sensitive identity sets independently of unspecified native Map enumeration order. Exact cardinality, duplicate refusal and unique semantic section markers strengthen the checks; all original key identities, backup, unknown-data and case-twin assertions remain. Production discovery and cleanup policies are unchanged. Actual Windows execution remains pending CI.
 
 The shared writer now resolves root and section-relative dotted/inline scalar destinations through canonical source spans, including an absent bare inline member with an existing valid parent. Whole-image, typed intent, same-source backup/readback and finite-number admission retain refusal for collisions and ambiguous namespaces. LuaJIT explicitly refuses newly requested integers outside its exact integer range. The obsolete-parent preservation decision remains unchanged. Existing valid inline scope deletion is now checked positively; the original five refusal assertions retain a genuinely malformed duplicate-key subject. Native Windows and installed qualification remain separate.
+
+Shortcut scopes preserve source-proven obsolete scalar/array parents rather than deleting them to create a current subtree. Explicit unsafe descendant replacement raises a retained-parent collision with no native IO. This does not complete the separate Windows full-state obsolete-parent refusal or case-sensitive boot-map work.
 
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the

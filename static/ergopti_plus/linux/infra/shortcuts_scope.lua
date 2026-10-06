@@ -7,6 +7,7 @@ local Transaction = require("config_scope_transaction")
 local FencedTransaction = require("config_scope_fenced_transaction")
 local Writer = require("toml_codec.writer")
 local Codec = require("toml_codec")
+local Parents = require("config_obsolete_parents")
 local Logger = require("logger.shim")
 local LOG = "infra.shortcuts_scope"
 local _owner, _sequence = nil, 0
@@ -113,22 +114,17 @@ function M.new(options)
 		select = select_row,
 		prepare_batch = function(path, updates, adapter)
 			local operations = {}
-			-- A plain value an older build left where this scope keeps a table of
-			-- assignments (`keyboard = "…"`) would make every row below it
-			-- unwritable. The scope owns that container, so the outdated value
-			-- goes with its reset instead of refusing it.
-			local section = type(document) == "table" and options.only == nil and document.shortcuts or nil
-			for _, key in ipairs(type(section) == "table" and { "keyboard", "tap_keys" } or {}) do
-				local value = section[key]
-				if value ~= nil and (type(value) ~= "table" or #value > 0) then
-					operations[#operations + 1] = { section = "shortcuts", key = key, delete = true }
-				end
-			end
 			for _, row in ipairs(updates) do operations[#operations + 1] = row end
 			for _, row in ipairs(legacy) do
 				if options.only == nil or select_row(row.section .. "." .. row.key) then
 					operations[#operations + 1] = row
 				end
+			end
+			-- Ordinary scope resets retain obsolete assignment parents. Neutral
+			-- delete rows need no replacement; a nondelete collision refuses
+			-- before backup or native publication through the shared policy.
+			if options.only == nil then
+				operations = Parents.preserve(source.content or "", operations, Parents.shortcut_namespaces())
 			end
 			return Writer.prepare_batch(path, operations, adapter, source)
 		end,

@@ -197,18 +197,36 @@ helpers.describe("Linux terminal shortcut scope", function()
 	end)
 
 	for _, mode in ipairs({ "clear", "recommended" }) do
-		helpers.it("resets over a plain keyboard or tap_keys value instead of refusing: " .. mode
-			.. " (config-outdated-shortcut-shape)", function()
-			-- The candidate readers asserted a table, so a value an older build
-			-- left as `keyboard = "…"` refused Restore recommended and Clear.
-			with_scope(function(scope, owners, _, path)
-				local stale = '[shortcuts]\nenabled = true\nkeyboard = "x"\ntap_keys = "y"\n'
-				Sandbox.write_bytes(path, stale)
-				local ok, committed = pcall(owners.keyboard.configuration_candidate, Codec.decode(stale))
-				helpers.assert_true(ok, tostring(committed))
-				helpers.assert_eq(scope.apply(mode), true)
+		helpers.it("retains obsolete keyboard and tap parents and refuses " .. mode
+			.. " collisions (config-outdated-shortcut-shape)", function()
+			-- Ordinary scope reset cannot replace an obsolete parent. Clear's
+			-- explicit magic-editor None also differs from neutral absence.
+			local stale = '[shortcuts]\nenabled = true\nkeyboard = "x"\ntap_keys = "y"\n'
+			with_scope(function(scope, owners, controls, path)
+				local assignments, parameters = owners.keyboard.get_assignments(), owners.gestures.get_all_action_parameters()
+				local actions = {}
+				for _, slot in ipairs(owners.chords.slots()) do actions[slot.id] = owners.chords.get_action(slot.id) end
+				local enabled, wrap = owners.manager.is_enabled(), owners.manager.is_wrap_on_type_enabled()
+				local chords, url = owners.chords.chords_enabled(), owners.url.get_url()
+				local ok, candidate = pcall(owners.keyboard.configuration_candidate, Codec.decode(stale))
+				helpers.assert_true(ok, tostring(candidate), "obsolete source remains readable")
+				helpers.assert_eq(scope.apply(mode), false)
+				helpers.assert_eq(Sandbox.read_bytes(path), stale, "the entire source stays intact until explicit cleanup")
+				helpers.assert_eq(#controls.backups, 0)
+				helpers.assert_eq(controls.device_calls, 0)
+				helpers.assert_eq(controls.runtime_calls, 0)
+				helpers.assert_eq(owners.keyboard.get_assignments(), assignments)
+				helpers.assert_eq(owners.gestures.get_all_action_parameters(), parameters)
+				helpers.assert_eq(owners.manager.is_enabled(), enabled)
+				helpers.assert_eq(owners.manager.is_wrap_on_type_enabled(), wrap)
+				helpers.assert_eq(owners.chords.chords_enabled(), chords)
+				helpers.assert_eq(owners.url.get_url(), url)
+				for id, action in pairs(actions) do helpers.assert_eq(owners.chords.get_action(id), action) end
+				helpers.assert_eq(owners.keyboard.get_action("magic_editor"), "open_hotstrings_editor")
+				helpers.assert_eq(owners.taps.get_action("number_row_left"), "none")
 				helpers.assert_true(owners.manager.configuration_admitted())
-			end)
+				helpers.assert_eq(scope.pending(), false)
+			end, stale)
 		end)
 	end
 
@@ -816,3 +834,77 @@ helpers.describe("shortcut retained native release debt", function()
 		end)
 	end)
 end)
+
+helpers.describe("Linux ordinary obsolete shortcut parent policy", function()
+	for _, literal in ipairs({ '"legacy"', '["legacy"]', "[]" }) do
+		helpers.it("clears neutral tap intent while retaining exact obsolete source " .. literal, function()
+			local source = '[shortcuts]\nenabled = true\ntap_keys = ' .. literal .. ' # taps retained\n'
+				.. '[shortcuts.keyboard]\nfuture = "keep" # keyboard retained\n[future]\nkeep = 7\n'
+			local expected = '[shortcuts]\ntap_keys = ' .. literal .. ' # taps retained\n[shortcuts.keyboard]\n'
+				.. 'magic_editor = "none"\nfuture = "keep" # keyboard retained\n[future]\nkeep = 7\n\n[shortcuts.script_control]\n'
+				.. 'script_altgr_backspace = "none"\nscript_altgr_delete = "none"\nscript_altgr_enter = "none"\nscript_altgr_escape = "none"\n'
+			with_scope(function(scope, owners, controls, path, backup)
+				local committed, detail = scope.apply("clear")
+				helpers.assert_eq(committed, true, detail)
+				helpers.assert_eq(Sandbox.read_bytes(path), expected, "hand-authored full image preserves obsolete token and comments")
+				helpers.assert_eq(Sandbox.read_bytes(backup), source)
+				helpers.assert_eq(#controls.backups, 1)
+				helpers.assert_eq(controls.runtime_calls, 1)
+				helpers.assert_eq(controls.device_calls, 0)
+				helpers.assert_eq(owners.manager.is_enabled(), false)
+				helpers.assert_eq(owners.keyboard.get_action("magic_editor"), "none")
+				for _, id in ipairs({ "number_row_left", "number_row_right_1", "number_row_right_2" }) do
+					helpers.assert_eq(owners.taps.get_action(id), "none")
+				end
+				owners.keyboard._reset()
+				owners.taps._reset()
+				helpers.assert_eq(owners.keyboard.get_action("magic_editor"), "none", "fresh actual keyboard reader agrees with ACK")
+				helpers.assert_eq(owners.taps.get_action("number_row_left"), "none", "fresh actual tap reader agrees with ACK")
+				helpers.assert_eq(scope.pending(), false)
+			end, source)
+		end)
+	end
+
+	helpers.it("compensates refused neutral source publication without erasing obsolete tap intent", function()
+		local source = '[shortcuts]\nenabled = true\ntap_keys = ["legacy"]\n[shortcuts.keyboard]\nfuture = "keep"\n[future]\nkeep = 7\n'
+		with_scope(function(scope, owners, controls, path)
+			local actions = owners.keyboard.get_assignments()
+			controls.refuse = path
+			helpers.assert_eq(scope.apply("clear"), false)
+			helpers.assert_eq(Sandbox.read_bytes(path), source)
+			helpers.assert_eq(#controls.backups, 1)
+			helpers.assert_eq(controls.runtime_calls, 2, "actual candidate and compensation both pass the native owner")
+			helpers.assert_eq(controls.device_calls, 0)
+			helpers.assert_eq(owners.manager.is_enabled(), true)
+			helpers.assert_eq(owners.keyboard.get_assignments(), actions)
+			helpers.assert_eq(owners.taps.get_action("number_row_left"), "none")
+			helpers.assert_eq(scope.pending(), false)
+			helpers.assert_eq(scope.retry_restore(), true, "the actual compensation journal is settled")
+			helpers.assert_eq(Sandbox.read_bytes(path), source)
+			owners.keyboard._reset()
+			owners.taps._reset()
+			helpers.assert_eq(owners.keyboard.get_assignments(), actions)
+			helpers.assert_eq(owners.taps.get_action("number_row_left"), "none")
+		end, source)
+	end)
+
+	for _, owner in ipairs({ "keyboard", "tap" }) do
+		helpers.it("keeps existing ordinary " .. owner .. " collision refusal source and native state", function()
+			local source = '[shortcuts]\nenabled = true\nkeyboard = "legacy"\ntap_keys = ["legacy"]\n[future]\nkeep = 7\n'
+			with_scope(function(_, owners, controls, path)
+				local accepted
+				if owner == "keyboard" then accepted = owners.keyboard.set_action("ctrl_j", "send_text")
+				else accepted = owners.taps.set_action("number_row_left", "send_text") end
+				helpers.assert_eq(accepted, false)
+				helpers.assert_eq(Sandbox.read_bytes(path), source)
+				helpers.assert_eq(#controls.backups, 0)
+				helpers.assert_eq(controls.runtime_calls, 0)
+				helpers.assert_eq(controls.device_calls, 0)
+				helpers.assert_eq(owners.keyboard.get_action("ctrl_j"), "none")
+				helpers.assert_eq(owners.taps.get_action("number_row_left"), "none")
+			end, source)
+		end)
+	end
+end)
+
+require("test.config_obsolete_parents_contract").register(helpers)
