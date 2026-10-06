@@ -1,5 +1,7 @@
 ﻿; infra/config_write_lease.ahk
 
+#Include %A_LineFile%\..\file_read_activity.ahk
+
 ; ==============================================================================
 ; MODULE: Configuration Write Lease
 ; DESCRIPTION:
@@ -39,7 +41,7 @@ _ConfigWriteLeaseOwners() {
 }
 
 _ConfigWriteLeaseKey(Path) {
-	return StrLower(StrReplace(String(Path), "/", "\"))
+	return FileReadActivityKey(Path)
 }
 
 _ConfigWriteLeaseTryAcquire(Path, Kind := "targeted") {
@@ -51,7 +53,7 @@ _ConfigWriteLeaseTryAcquire(Path, Kind := "targeted") {
 		; A path relocation/reload is a machine-wide config transition. Blocking
 		; only config.toml still lets sibling writers (hotstring overrides, prompt
 		; stores, metrics) commit to the directory the next boot is abandoning.
-		if (State.terminal is Object) || Owners.Has(Key)
+		if (State.terminal is Object) || Owners.Has(Key) || FileReadActivityBusy(Path)
 			return false
 		State.next_id += 1
 		Token := { key: Key, id: State.next_id, kind: Kind }
@@ -73,6 +75,13 @@ ConfigWriteLeaseBusy() {
 	State := _ConfigWriteLeaseState()
 	PreviousCritical := Critical("On")
 	try return !(State.terminal is Object) && State.owners.Count > 0
+	finally Critical(PreviousCritical)
+}
+
+/** Defers mutation commands without invalidating concurrent source readers. */
+ConfigMutationBusy() {
+	PreviousCritical := Critical("On")
+	try return ConfigWriteLeaseBusy() || FileReadActivityBusy()
 	finally Critical(PreviousCritical)
 }
 
@@ -120,7 +129,7 @@ _ConfigWriteTerminalTryAcquire(Paths) {
 		return false
 	PreviousCritical := Critical("On")
 	try {
-		if (State.terminal is Object) || State.owners.Count > 0
+		if (State.terminal is Object) || State.owners.Count > 0 || FileReadActivityBusy()
 			return false
 		Tokens := []
 		for Key, _ in Keys {
@@ -206,7 +215,7 @@ _ConfigWriteTerminalAuthorize(Bundle) {
 	State := _ConfigWriteLeaseState()
 	PreviousCritical := Critical("On")
 	try {
-		if !(State.terminal is Object) || State.terminal.id != Bundle.id
+		if !(State.terminal is Object) || State.terminal.id != Bundle.id || FileReadActivityBusy()
 			return false
 		for Token in Bundle.tokens {
 			if !_ConfigWriteLeaseOwns(Token)
@@ -223,7 +232,7 @@ _ConfigWriteTerminalClaimShutdown(Bundle) {
 	State := _ConfigWriteLeaseState()
 	PreviousCritical := Critical("On")
 	try {
-		if !(State.terminal is Object) || State.terminal.id != Bundle.id
+		if !(State.terminal is Object) || State.terminal.id != Bundle.id || FileReadActivityBusy()
 			return false
 		if !Bundle.authorized || Bundle.shutdown_claimed
 			return false

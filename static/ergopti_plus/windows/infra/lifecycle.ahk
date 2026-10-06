@@ -1113,6 +1113,10 @@ Ergopti_OnShutdown(reason, code) {
 		; FinalExit and ownership transfer remain refusal gates, but all live
 		; producers are still installed. A refusal rolls back the terminal handoff
 		; through _LifecycleRefuseShutdown and withdraws the keylogger lease below.
+		if FileReadActivityBusy() {
+			try KL_CancelShutdown()
+			return _LifecycleRefuseShutdown("an exact file read still owns native cleanup")
+		}
 		FinalExitAuthorized := false
 		try FinalExitAuthorized := _Updater_SignalFinalExitForIntent()
 		catch as Err
