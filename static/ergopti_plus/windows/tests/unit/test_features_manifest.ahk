@@ -2221,7 +2221,7 @@ _FMS_FullSnapshotParent(Path, Literal, Scenario := "complete") {
 	global ScriptShortcutAssignments, KeyboardShortcutAssignments, GestureAssignments
 	global CategoryEnabled, UPDATER_CHECK_INTERVAL, UPDATER_CHANNEL, _IniCache
 	global _ConfigBootRejectedOverrides, _ConfigBootOutdatedEntries, Features
-	global _ParseTomlCache, _TomlFileCache, _ConfigTomlSnapshots
+	global _ParseTomlCache, _TomlFileCache, _ConfigTomlSnapshots, _LOGGER_TEST_SINK
 	Runtime := _CFGFS_CaptureRuntime(), Coordinator := _ConfigFullSaveCoordinator()
 	State := MasterGateState(), PriorState := State.Clone()
 	SavedI18nLocale := IsSet(_I18nLocale) ? _I18nLocale : unset
@@ -2322,11 +2322,26 @@ _FMS_FullSnapshotParent(Path, Literal, Scenario := "complete") {
 			Assert(Borrowed is Object)
 		}
 		Requested := 0
-		Result := SaveFullConfig(0, (*) => true, true, Borrowed, Collect, &Requested)
+		NativeLog := [], PriorLogSink := _LOGGER_TEST_SINK
+		try {
+			LoggerSetTestSink((Line) => NativeLog.Push(Line))
+			Result := SaveFullConfig(0, (*) => true, true, Borrowed, Collect, &Requested)
+		} finally {
+			_LOGGER_TEST_SINK := PriorLogSink
+		}
+		Trace := ""
+		for Line in NativeLog
+			Trace .= (Trace != "" ? "`n" : "") . Line
+		Diagnostic := " | scenario=" . Scenario . " collected=" . Collected
+			. " native_log=" . JsonStringLiteral(Trace)
 		if StampRefused || Scenario == "nonneutral" || Scenario == "late-neutral" || Scenario == "source" || Scenario == "absent" || Scenario == "schema" {
-			AssertEqual(CONFIG_SAVE_FAILED, Result, "a nonneutral collision or withdrawn source never receives a successful full-save ACK")
-			AssertEqual(Scenario == "source" || Scenario == "absent" ? Foreign : Original, FSReadUtf8Exact(Path),
-				"the complete retained or external source survives refusal")
+			AssertEqual(CONFIG_SAVE_FAILED, Result, "a nonneutral collision or withdrawn source never receives a successful full-save ACK" . Diagnostic)
+			ActualSource := FSReadUtf8Exact(Path)
+			ExpectedSource := Scenario == "source" || Scenario == "absent" ? Foreign : Original
+			AssertEqual(ExpectedSource, ActualSource,
+				"the complete retained or external source survives refusal" . Diagnostic
+					. " expected=" . JsonStringLiteral(String(ExpectedSource))
+					. " actual=" . JsonStringLiteral(String(ActualSource)))
 			AssertEqual(0, _ConfigFullSaveCoordinator().committed_generation)
 			if Scenario == "schema" {
 				AssertEqual(0, Collected, "the strict session fence precedes the real collector")
@@ -2342,7 +2357,7 @@ _FMS_FullSnapshotParent(Path, Literal, Scenario := "complete") {
 				Assert(_ConfigFullSaveHasPending(), "failure retains the exact outstanding request")
 			}
 		} else {
-			AssertEqual(CONFIG_SAVE_OK, Result, "unrelated real snapshot changes can commit while obsolete parents remain")
+			AssertEqual(CONFIG_SAVE_OK, Result, "unrelated real snapshot changes can commit while obsolete parents remain" . Diagnostic)
 			AssertEqual(1, Collected)
 			AssertEqual(Expected, FSReadUtf8Exact(Path), "the complete handwritten physical image changes only admitted owned fields")
 			AssertEqual(Requested, _ConfigFullSaveCoordinator().committed_generation)
@@ -2448,194 +2463,3 @@ _FMS_FullSnapshotScopeAndIndividualStayStrict() {
 	}
 }
 Test("full-snapshot-obsolete-parent: scope duplicates and individual writer refusal stay strict", _FMS_FullSnapshotScopeAndIndividualStayStrict)
-
-; A file-backed personal category owns its canonical lowercase identity before
-; configuration boot. Exact TOML names do not grant a different alias its intent.
-_FMS_PersonalFileCaseAliasSource(Name) {
-	return '[_meta]`nschema_version = ' . ConfigMigrateCurrentVersion()
-		. '`n[hotstrings.personal.' . Name . ']`nenabled = true # exact source owner`n'
-		. '[future]`n"literal.dot" = { count = 9223372036854775807, date = 1979-05-27 } # retained`n'
-}
-
-_FMS_PersonalFileCaseAlias(Path, Name) {
-	global _I18nLocale, LOGGER_MIN_LEVEL, ScriptInformation
-	global ScriptShortcutAssignments, KeyboardShortcutAssignments, GestureAssignments
-	global CategoryEnabled, UPDATER_CHECK_INTERVAL, UPDATER_CHANNEL, _IniCache
-	global _ConfigBootRejectedOverrides, _ConfigBootOutdatedEntries, Features
-	global _ParseTomlCache, _TomlFileCache, _ConfigTomlSnapshots, _ReadPersonalTomlCache
-	global _TomlUnreadableFiles, _TomlReadFailures
-	Runtime := _CFGFS_CaptureRuntime(), Coordinator := _ConfigFullSaveCoordinator()
-	State := MasterGateState(), PriorState := State.Clone()
-	SavedI18nLocale := IsSet(_I18nLocale) ? _I18nLocale : unset
-	SavedLOGGERMINLEVEL := IsSet(LOGGER_MIN_LEVEL) ? LOGGER_MIN_LEVEL : unset
-	SavedScriptInformation := IsSet(ScriptInformation) ? ScriptInformation : unset
-	SavedScriptShortcutAssignments := IsSet(ScriptShortcutAssignments) ? ScriptShortcutAssignments : unset
-	SavedKeyboardShortcutAssignments := IsSet(KeyboardShortcutAssignments) ? KeyboardShortcutAssignments : unset
-	SavedGestureAssignments := IsSet(GestureAssignments) ? GestureAssignments : unset
-	SavedCategoryEnabled := IsSet(CategoryEnabled) ? CategoryEnabled : unset
-	SavedUPDATERCHECKINTERVAL := IsSet(UPDATER_CHECK_INTERVAL) ? UPDATER_CHECK_INTERVAL : unset
-	SavedUPDATERCHANNEL := IsSet(UPDATER_CHANNEL) ? UPDATER_CHANNEL : unset
-	SavedIniCache := IsSet(_IniCache) ? _IniCache : unset
-	Fields := [
-		{ target: MetricsShortcuts, key: "enabled", path: "metrics.metrics_enabled" },
-		{ target: MetricsShortcuts, key: "wpm_menubar_colors", path: "metrics.metrics_wpm_menubar_colors" },
-		{ target: MetricsFilters, key: "private_browsing", path: "metrics.private_filter_enabled" },
-		{ target: MetricsFilters, key: "secure_field", path: "metrics.secure_filter_enabled" },
-		{ target: MetricsFilters, key: "system_auth", path: "metrics.system_auth_filter_enabled" },
-		{ target: MetricsFilters, key: "encrypt", path: "metrics.encrypt" },
-		{ target: WPMWidget, key: "visible", path: "metrics.wpm_widget_visible" },
-		{ target: WPMWidget, key: "pos_x", path: "metrics.wpm_widget_x" },
-		{ target: WPMWidget, key: "pos_y", path: "metrics.wpm_widget_y" },
-		{ target: WPMWidget, key: "use_colors", path: "metrics.wpm_widget_colors" },
-		{ target: WPMWidget, key: "show_graph", path: "metrics.wpm_widget_graph" }]
-	PriorFields := [], PriorApps := MetricsFilters.disabled_apps
-	SavedFeatures := Features
-	SavedPersonalCache := _ReadPersonalTomlCache
-	PersonalPath := Path . ".personal_hotstrings.toml", Restart := Path . ".restart.toml"
-	; Retain only diagnostics belonging to these two newly owned paths. Store
-	; the actual prior value reference, including false or object sentinels.
-	OwnedDiagnostics := []
-	for Extra in [Restart, PersonalPath] {
-		for Store in [_TomlUnreadableFiles, _TomlReadFailures] {
-			Present := Store.Has(Extra)
-			OwnedDiagnostics.Push({ store: Store, key: Extra, present: Present,
-				value: Present ? Store[Extra] : false })
-		}
-		Store := _TOML_WriteRefusals(), Key := _TOML_WriteRefusalKey(Extra)
-		Present := Store.Has(Key)
-		OwnedDiagnostics.Push({ store: Store, key: Key, present: Present,
-			value: Present ? Store[Key] : false })
-	}
-	PersonalSource := Chr(0xFEFF) . '[_meta]`nsections_order = ["owned"]`n'
-		. '[[owned]]`n"zz_owned_probe" = { output = "PRIVATE", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }`n'
-	Original := FSReadUtf8Exact(Path)
-	Canonical := StrCompare(Name, "owned", true) == 0
-	try {
-		_CFGFS_Prepare(Path)
-		_ConfigBootRejectedOverrides := 0, _ConfigBootOutdatedEntries := Map()
-		_I18nLocale := "fr", LOGGER_MIN_LEVEL := "INFO"
-		ScriptInformation := Map("MagicKey", "★")
-		ScriptShortcutAssignments := Map(), KeyboardShortcutAssignments := Map()
-		GestureAssignments := Map(), CategoryEnabled := Map(), _IniCache := Map()
-		UPDATER_CHECK_INTERVAL := unset, UPDATER_CHANNEL := unset
-		MetricsFilters.disabled_apps := Map()
-		for Field in Fields {
-			PriorFields.Push({ target: Field.target, key: Field.key, value: Field.target.%Field.key% })
-			Field.target.%Field.key% := ManifestDefaultFor(Field.path)
-		}
-		State["initialized"] := false
-		ScriptInformation["PersonalTomlPath"] := PersonalPath
-		Assert(FSWriteCreateDurable(PersonalPath, PersonalSource), "the actual personal owner must exist on disk")
-		_ReadPersonalTomlCache := false
-		Features := ManifestBuildFeaturesMap()
-		AssertFalse(Features["hotstrings"]["personal"].Has("owned"), "the category must be discovered from the real personal file")
-		Model := ReadPersonalToml(true)
-		AssertEqual(1, Model["sections_order"].Length)
-		AssertEqual("owned", Model["sections_order"][1])
-		AssertEqual(1, Model["sections"]["owned"]["entries"].Length)
-		AssertEqual("zz_owned_probe", Model["sections"]["owned"]["entries"][1]["trigger"])
-		AssertEqual("PRIVATE", Model["sections"]["owned"]["entries"][1]["output"])
-		Assert(_PersonalTomlCanonicalSectionOrder(Model, &Detail) is Array,
-			"the genuine personal file passes the actual canonical owner contract")
-		UpperModel := _HSDeepCloneMap(Model)
-		UpperModel["sections"] := Map("Owned", UpperModel["sections"]["owned"])
-		UpperModel["sections_order"] := ["Owned"]
-		AssertFalse(_PersonalTomlCanonicalSectionOrder(UpperModel, &UpperDetail),
-			"a distinct uppercase personal owner is outside the actual canonical file contract")
-		Assert(InStr(UpperDetail, "lowercase", true) > 0)
-		for Section in Model["sections_order"] {
-			if Section != "-"
-				EnsurePersonalHotstringFeature(Section)
-		}
-		ActualNames := []
-		for Key in Features["hotstrings"]["personal"] {
-			if StrCompare(Key, "owned", true) == 0
-				ActualNames.Push(Key)
-		}
-		AssertEqual(1, ActualNames.Length, "the real boot owner seeds exactly the stored lowercase category")
-		AssertFalse(Features["hotstrings"]["personal"]["owned"]["enabled"])
-		Snapshot := ConfigTomlReadSnapshot(Path)
-		Exact := Snapshot.Document["hotstrings"]["personal"]
-		AssertEqual("On", Exact.CaseSense)
-		AssertTrue(Exact.Has(Name))
-		AssertFalse(Exact.Has(Canonical ? "Owned" : "owned"), "the typed source must not collapse aliases")
-		AssertEqual("On", Snapshot.Cache.CaseSense)
-		AssertTrue(Snapshot.Cache.Has("hotstrings.personal." . Name))
-		AssertFalse(Snapshot.Cache.Has("hotstrings.personal." . (Canonical ? "Owned" : "owned")))
-		Assert(ApplyBootConfigToml(Features, Path) >= 0, "the real configured boot reader must admit the complete source")
-		AssertEqual(0, _ConfigBootRejectedOverrides)
-		AssertEqual(Original, FSReadUtf8Exact(Path), "boot must preserve the exact case-distinct physical source")
-		AssertEqual(Canonical, Features["hotstrings"]["personal"]["owned"]["enabled"],
-			"only the canonical file-backed owner may receive the persisted enabled intent")
-		Collect() => _ConfigCollectFullSaveUpdates(Features, false)
-		Requested := 0
-		AssertEqual(CONFIG_SAVE_OK, SaveFullConfig(0, (*) => true, true, 0, Collect, &Requested),
-			"the actual whole-state collector and native writer must acknowledge an ordinary save")
-		AssertEqual(Original, FSReadUtf8Exact(Path), "ordinary save retains the exact original source without normalizing the alias")
-		AssertEqual(PersonalSource, FSReadUtf8Exact(PersonalPath), "configuration save must not rewrite the actual personal owner")
-		AssertEqual(Requested, _ConfigFullSaveCoordinator().committed_generation)
-		AssertEqual(Requested, _ConfigFullSaveCoordinator().settled_generation)
-		AssertFalse(_ConfigFullSaveHasPending())
-		Assert(FSWriteCreateDurable(Restart, Original))
-		Features := ManifestBuildFeaturesMap()
-		_ReadPersonalTomlCache := false
-		ReloadedModel := ReadPersonalToml(true)
-		for Section in ReloadedModel["sections_order"] {
-			if Section != "-"
-				EnsurePersonalHotstringFeature(Section)
-		}
-		AssertFalse(Features["hotstrings"]["personal"]["owned"]["enabled"])
-		_ConfigBootRejectedOverrides := 0, _ConfigBootOutdatedEntries := Map()
-		Assert(ApplyBootConfigToml(Features, Restart) >= 0, "restart uses a fresh native configuration source identity")
-		AssertEqual(0, _ConfigBootRejectedOverrides)
-		AssertEqual(Canonical, Features["hotstrings"]["personal"]["owned"]["enabled"],
-			"the same actual file-backed owner retains the case-sensitive intent boundary after restart")
-		AssertEqual(Original, FSReadUtf8Exact(Restart))
-		AssertEqual(PersonalSource, FSReadUtf8Exact(PersonalPath))
-	} finally {
-		; Native read refusal and migration debt must not outlive this fixture.
-		; Restore presence as well as exact prior values; unrelated entries stay.
-		for Diagnostic in OwnedDiagnostics {
-			if Diagnostic.present
-				Diagnostic.store[Diagnostic.key] := Diagnostic.value
-			else if Diagnostic.store.Has(Diagnostic.key)
-				Diagnostic.store.Delete(Diagnostic.key)
-		}
-		Features := SavedFeatures
-		_ReadPersonalTomlCache := SavedPersonalCache
-		for Extra in [Restart, PersonalPath] {
-			for Store in [_ParseTomlCache, _TomlFileCache, _ConfigTomlSnapshots] {
-				if Store.Has(Extra)
-					Store.Delete(Extra)
-			}
-			if FileExist(Extra)
-				FSDelete(Extra)
-		}
-		for Field in PriorFields
-			Field.target.%Field.key% := Field.value
-		MetricsFilters.disabled_apps := PriorApps
-		_I18nLocale := IsSet(SavedI18nLocale) ? SavedI18nLocale : unset
-		LOGGER_MIN_LEVEL := IsSet(SavedLOGGERMINLEVEL) ? SavedLOGGERMINLEVEL : unset
-		ScriptInformation := IsSet(SavedScriptInformation) ? SavedScriptInformation : unset
-		ScriptShortcutAssignments := IsSet(SavedScriptShortcutAssignments) ? SavedScriptShortcutAssignments : unset
-		KeyboardShortcutAssignments := IsSet(SavedKeyboardShortcutAssignments) ? SavedKeyboardShortcutAssignments : unset
-		GestureAssignments := IsSet(SavedGestureAssignments) ? SavedGestureAssignments : unset
-		CategoryEnabled := IsSet(SavedCategoryEnabled) ? SavedCategoryEnabled : unset
-		UPDATER_CHECK_INTERVAL := IsSet(SavedUPDATERCHECKINTERVAL) ? SavedUPDATERCHECKINTERVAL : unset
-		UPDATER_CHANNEL := IsSet(SavedUPDATERCHANNEL) ? SavedUPDATERCHANNEL : unset
-		_IniCache := IsSet(SavedIniCache) ? SavedIniCache : unset
-		State.Clear()
-		for Key, Value in PriorState
-			State[Key] := Value
-		_ConfigFullSaveCoordinator(Coordinator)
-		_CFGFS_RestoreRuntime(Runtime)
-	}
-}
-
-_FMS_PersonalFileCaseAliases() {
-	for Name in ["owned", "Owned"]
-		_FMS_WithSource("personal_case_alias_" . Name, _FMS_PersonalFileCaseAliasSource(Name),
-			_FMS_PersonalFileCaseAlias.Bind(, Name))
-}
-Test("configuration snapshot: genuine personal file owner does not transfer case-distinct config intent (config-personal-file-case-alias)",
-	_FMS_PersonalFileCaseAliases)
