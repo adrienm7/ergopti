@@ -5126,6 +5126,18 @@ preflight cleanup and fixture retirement failures. Their source corrections
 and causal native replays remain required Linux work, rather than Windows or
 macOS device-only follow-up. Item 62 and transversal items 16/38 remain open.
 
+Native Linux CI run37540551778 at a5a07 retains one first-request timeout
+(208.57ms/status0) and a successful second request (55.91ms/status200);
+10,141 units pass and one fails, with packaging/install skipped. The relative
+HTTP fixture now records bounded passive actual spawn/timer/server/callback
+times after its original verdict. All nine cases, assertions, 100ms timeout,
+40ms server delay and native retirement remain unchanged. On matched genuine
+local runtimes, old origin/dev7a75 and current a5a07 each pass9/0 once without
+and once with this diagnostic, with physical owner closure. The first old
+replay HTTP403 is retained separately; only the common child loopback bypass
+prerequisite was corrected. These local passes do not establish the CI timeout
+cause or qualify the entire managed-network/package matrix. Item62 stays open.
+
 The portable Linux network closure described in item 36 is also a managed
 network prerequisite. Its installed ABI/schema/backend refusal and recovery
 controls pass on genuine host components; they do not prove an enterprise
