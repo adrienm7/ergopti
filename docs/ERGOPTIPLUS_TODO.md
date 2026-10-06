@@ -4635,6 +4635,18 @@ open. Complete feasible software/native unit/E2E/package/install work in CI;
 real-device tasks are separate. Older receipts remain historical evidence
 rather than qualification of final sources.
 
+Fresh minimal run37458316115 records9,700 Windows passes and two brightness
+worker five-second failures, with the owned root still running. All15 program
+cases now pass. The private constructor run37458344080 succeeds completely:
+9,714 Windows unit passes, E2E, compiled packaging, installation and startup;
+Release is skipped. This does not establish why the minimal brightness worker
+stalled. Its fixture now writes only eight closed phase markers, observed via
+a capped64-byte native reader at the unchanged failure deadline. All121
+existing assertions, five provider cases, actual WMI doubles, polling and
+exact tree termination remain unchanged. Marker cleanup requires termination
+acknowledgement; the shipped worker is untouched. Native marker/reader
+qualification and final integrated-source acceptance remain required.
+
 Remaining work for item63 (CI-feasible software first):
 
 - [ ] Software implementation/repair: Preserve the Windows brightness worker/provider and suspend owner; characterize the three private-run five-second failures, repair only demonstrated regressions and requalify final sources; preserve nested LASTEXITCODE, complete WMI readback, unavailable providers and exact Job/process retirement.
