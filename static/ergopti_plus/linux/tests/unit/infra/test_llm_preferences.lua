@@ -154,7 +154,7 @@ helpers.describe("Linux real AI root dotted scalar publication", function()
 	local vectors = {
 		{ name = "header", source = '[llm]\nagent_mode="auto"\nfuture=9007199254740993\n', expected = '[llm]\nagent_mode = "action"\nfuture=9007199254740993\n', accepted = true },
 		{ name = "root dotted", source = 'llm.agent_mode="auto"\nfuture.keep=9007199254740993\n', expected = 'llm.agent_mode = "action"\nfuture.keep=9007199254740993\n', accepted = true },
-		{ name = "root inline", source = 'llm={agent_mode="auto",future=9007199254740993}\n', accepted = false },
+		{ name = "root inline", source = 'llm={agent_mode="auto",future=9007199254740993}\n', expected = 'llm={agent_mode="action",future=9007199254740993}\n', accepted = true },
 		{ name = "obsolete scalar", source = 'llm="obsolete"\nfuture.keep=9007199254740993\n', accepted = false },
 	}
 	for _, vector in ipairs(vectors) do
@@ -225,6 +225,289 @@ helpers.describe("Linux real finite header numeric admission", function()
 			helpers.assert_eq(Sandbox.read_bytes(path), '[llm.generation]\ntemperature = -0.0\nfuture=9007199254740993\n')
 			package.loaded["infra.llm_preferences"] = nil
 			helpers.assert_eq(1 / require("infra.llm_preferences").get("llm.generation.temperature"), -math.huge)
+		end)
+	end)
+end)
+
+helpers.describe("Linux real root inline scalar publication", function()
+	local source = 'llm = { generation = { temperature=0.25, future=9007199254740993 }, private="untouched" } # exact trailer\n'
+	helpers.it("acknowledges precise inline temperature and restarts the actual source owner", function()
+		with_config(source, function(path)
+			local preferences = require("infra.llm_preferences")
+			local wanted = 0.12345678901234567
+			helpers.assert_true(preferences.set("llm.generation.temperature", wanted))
+			helpers.assert_eq(Sandbox.read_bytes(path), 'llm = { generation = { temperature=0.12345678901234566, future=9007199254740993 }, private="untouched" } # exact trailer\n')
+			package.loaded["infra.llm_preferences"] = nil
+			helpers.assert_eq(require("infra.llm_preferences").get("llm.generation.temperature"), wanted)
+		end)
+	end)
+	helpers.it("retains acknowledged inline negative zero and exact foreign bytes through restart", function()
+		with_config(source, function(path)
+			helpers.assert_true(require("infra.llm_preferences").set("llm.generation.temperature", -0.0))
+			helpers.assert_eq(Sandbox.read_bytes(path), 'llm = { generation = { temperature=-0.0, future=9007199254740993 }, private="untouched" } # exact trailer\n')
+			package.loaded["infra.llm_preferences"] = nil
+			helpers.assert_eq(1 / require("infra.llm_preferences").get("llm.generation.temperature"), -math.huge)
+		end)
+	end)
+	helpers.it("deletes only the explicitly reset inline leaf and restarts at its manifest default", function()
+		with_config(source, function(path)
+			helpers.assert_true(require("infra.llm_preferences").delete("llm.generation.temperature"))
+			helpers.assert_eq(Sandbox.read_bytes(path), 'llm = { generation = { future=9007199254740993 }, private="untouched" } # exact trailer\n')
+			package.loaded["infra.llm_preferences"] = nil
+			helpers.assert_nil(require("infra.llm_preferences").get("llm.generation.temperature"), "the native reader owns absence after explicit deletion")
+			helpers.assert_eq(require("modules.llm.settings").get("temperature"), require("infra.manifest_reader").default_for("llm.generation.temperature"))
+		end)
+	end)
+	helpers.it("refuses an inexact inline literal with unchanged revision then accepts a repaired explicit retry", function()
+		with_config(source, function(path)
+			local preferences = require("infra.llm_preferences")
+			local revision = preferences.generation()
+			local LeafRows = require("toml_codec.leaf_rows")
+			local original = LeafRows.value_literal
+			LeafRows.value_literal = function() return "0.12345678901235" end
+			local called, accepted = pcall(preferences.set, "llm.generation.temperature", 0.12345678901234567)
+			LeafRows.value_literal = original
+			helpers.assert_eq(called, true)
+			helpers.assert_eq(accepted, false)
+			helpers.assert_eq(Sandbox.read_bytes(path), source)
+			helpers.assert_eq(preferences.generation(), revision)
+			helpers.assert_true(preferences.set("llm.generation.temperature", 0.12345678901234567))
+			helpers.assert_eq(Sandbox.read_bytes(path), 'llm = { generation = { temperature=0.12345678901234566, future=9007199254740993 }, private="untouched" } # exact trailer\n')
+		end)
+	end)
+	helpers.it("keeps an actual external inline successor and refuses the stale source owner", function()
+		with_config(source, function(path)
+			local successor = source .. '# external successor\n'
+			local file = assert(io.open(path, "wb")); assert(file:write(successor)); assert(file:close())
+			local preferences = require("infra.llm_preferences")
+			helpers.assert_eq(preferences.set_many({ ["llm.generation.temperature"] = 0.75 }, { status = "ok", content = source }), false)
+			helpers.assert_eq(Sandbox.read_bytes(path), successor)
+			helpers.assert_true(preferences.set("llm.generation.temperature", 0.75))
+			helpers.assert_eq(Sandbox.read_bytes(path), 'llm = { generation = { temperature=0.75, future=9007199254740993 }, private="untouched" } # exact trailer\n# external successor\n')
+		end)
+	end)
+end)
+
+helpers.describe("Linux real section-relative dotted scalar publication", function()
+	local source = '[llm] # exact header\ngeneration.temperature=0.25 # owned scalar\ngeneration.future=9007199254740993 # foreign\nprivate="untouched"\n'
+	helpers.it("acknowledges precise section-relative dotted temperature and restarts the actual source owner", function()
+		with_config(source, function(path)
+			local preferences = require("infra.llm_preferences")
+			local wanted = 0.12345678901234567
+			helpers.assert_true(preferences.set("llm.generation.temperature", wanted))
+			helpers.assert_eq(Sandbox.read_bytes(path), '[llm] # exact header\ngeneration.temperature = 0.12345678901234566\ngeneration.future=9007199254740993 # foreign\nprivate="untouched"\n')
+			package.loaded["infra.llm_preferences"] = nil
+			helpers.assert_eq(require("infra.llm_preferences").get("llm.generation.temperature"), wanted)
+		end)
+	end)
+	helpers.it("retains acknowledged section-relative dotted negative zero and exact foreign bytes through restart", function()
+		with_config(source, function(path)
+			helpers.assert_true(require("infra.llm_preferences").set("llm.generation.temperature", -0.0))
+			helpers.assert_eq(Sandbox.read_bytes(path), '[llm] # exact header\ngeneration.temperature = -0.0\ngeneration.future=9007199254740993 # foreign\nprivate="untouched"\n')
+			package.loaded["infra.llm_preferences"] = nil
+			helpers.assert_eq(1 / require("infra.llm_preferences").get("llm.generation.temperature"), -math.huge)
+		end)
+	end)
+	helpers.it("deletes only the explicitly reset section-relative dotted leaf and restarts at its manifest default", function()
+		with_config(source, function(path)
+			helpers.assert_true(require("infra.llm_preferences").delete("llm.generation.temperature"))
+			helpers.assert_eq(Sandbox.read_bytes(path), '[llm] # exact header\ngeneration.future=9007199254740993 # foreign\nprivate="untouched"\n')
+			package.loaded["infra.llm_preferences"] = nil
+			helpers.assert_nil(require("infra.llm_preferences").get("llm.generation.temperature"), "the native reader owns absence after explicit deletion")
+			helpers.assert_eq(require("modules.llm.settings").get("temperature"), require("infra.manifest_reader").default_for("llm.generation.temperature"))
+		end)
+	end)
+	helpers.it("refuses an inexact section-relative dotted literal with unchanged revision then accepts a repaired explicit retry", function()
+		with_config(source, function(path)
+			local preferences = require("infra.llm_preferences")
+			local revision = preferences.generation()
+			local LeafRows = require("toml_codec.leaf_rows")
+			local original = LeafRows.value_literal
+			LeafRows.value_literal = function() return "0.12345678901235" end
+			local called, accepted = pcall(preferences.set, "llm.generation.temperature", 0.12345678901234567)
+			LeafRows.value_literal = original
+			helpers.assert_eq(called, true)
+			helpers.assert_eq(accepted, false)
+			helpers.assert_eq(Sandbox.read_bytes(path), source)
+			helpers.assert_eq(preferences.generation(), revision)
+			helpers.assert_true(preferences.set("llm.generation.temperature", 0.12345678901234567))
+			helpers.assert_eq(Sandbox.read_bytes(path), '[llm] # exact header\ngeneration.temperature = 0.12345678901234566\ngeneration.future=9007199254740993 # foreign\nprivate="untouched"\n')
+		end)
+	end)
+	helpers.it("keeps an actual external section-relative dotted successor and refuses the stale source owner", function()
+		with_config(source, function(path)
+			local successor = source .. '# external successor\n'
+			local file = assert(io.open(path, "wb")); assert(file:write(successor)); assert(file:close())
+			local preferences = require("infra.llm_preferences")
+			helpers.assert_eq(preferences.set_many({ ["llm.generation.temperature"] = 0.75 }, { status = "ok", content = source }), false)
+			helpers.assert_eq(Sandbox.read_bytes(path), successor)
+			helpers.assert_true(preferences.set("llm.generation.temperature", 0.75))
+			helpers.assert_eq(Sandbox.read_bytes(path), '[llm] # exact header\ngeneration.temperature = 0.75\ngeneration.future=9007199254740993 # foreign\nprivate="untouched"\n# external successor\n')
+		end)
+	end)
+end)
+
+helpers.describe("Linux real section-relative inline scalar publication", function()
+	local source = '[llm] # exact header\ngeneration = { temperature=0.25, future=9007199254740993, empty=[], map={} } # exact outer trailer\nprivate="untouched"\n'
+	helpers.it("acknowledges precise section-relative inline temperature and restarts the actual source owner", function()
+		with_config(source, function(path)
+			local preferences = require("infra.llm_preferences")
+			local wanted = 0.12345678901234567
+			helpers.assert_true(preferences.set("llm.generation.temperature", wanted))
+			helpers.assert_eq(Sandbox.read_bytes(path), '[llm] # exact header\ngeneration = { temperature=0.12345678901234566, future=9007199254740993, empty=[], map={} } # exact outer trailer\nprivate="untouched"\n')
+			package.loaded["infra.llm_preferences"] = nil
+			helpers.assert_eq(require("infra.llm_preferences").get("llm.generation.temperature"), wanted)
+		end)
+	end)
+	helpers.it("retains acknowledged section-relative inline negative zero and exact foreign bytes through restart", function()
+		with_config(source, function(path)
+			helpers.assert_true(require("infra.llm_preferences").set("llm.generation.temperature", -0.0))
+			helpers.assert_eq(Sandbox.read_bytes(path), '[llm] # exact header\ngeneration = { temperature=-0.0, future=9007199254740993, empty=[], map={} } # exact outer trailer\nprivate="untouched"\n')
+			package.loaded["infra.llm_preferences"] = nil
+			helpers.assert_eq(1 / require("infra.llm_preferences").get("llm.generation.temperature"), -math.huge)
+		end)
+	end)
+	helpers.it("deletes only the explicitly reset section-relative inline leaf and restarts at its manifest default", function()
+		with_config(source, function(path)
+			helpers.assert_true(require("infra.llm_preferences").delete("llm.generation.temperature"))
+			helpers.assert_eq(Sandbox.read_bytes(path), '[llm] # exact header\ngeneration = { future=9007199254740993, empty=[], map={} } # exact outer trailer\nprivate="untouched"\n')
+			package.loaded["infra.llm_preferences"] = nil
+			helpers.assert_nil(require("infra.llm_preferences").get("llm.generation.temperature"), "the native reader owns absence after explicit deletion")
+			helpers.assert_eq(require("modules.llm.settings").get("temperature"), require("infra.manifest_reader").default_for("llm.generation.temperature"))
+		end)
+	end)
+	helpers.it("refuses an inexact section-relative inline literal with unchanged revision then accepts a repaired explicit retry", function()
+		with_config(source, function(path)
+			local preferences = require("infra.llm_preferences")
+			local revision = preferences.generation()
+			local LeafRows = require("toml_codec.leaf_rows")
+			local original = LeafRows.value_literal
+			LeafRows.value_literal = function() return "0.12345678901235" end
+			local called, accepted = pcall(preferences.set, "llm.generation.temperature", 0.12345678901234567)
+			LeafRows.value_literal = original
+			helpers.assert_eq(called, true)
+			helpers.assert_eq(accepted, false)
+			helpers.assert_eq(Sandbox.read_bytes(path), source)
+			helpers.assert_eq(preferences.generation(), revision)
+			helpers.assert_true(preferences.set("llm.generation.temperature", 0.12345678901234567))
+			helpers.assert_eq(Sandbox.read_bytes(path), '[llm] # exact header\ngeneration = { temperature=0.12345678901234566, future=9007199254740993, empty=[], map={} } # exact outer trailer\nprivate="untouched"\n')
+		end)
+	end)
+	helpers.it("keeps an actual external section-relative inline successor and refuses the stale source owner", function()
+		with_config(source, function(path)
+			local successor = source .. '# external successor\n'
+			local file = assert(io.open(path, "wb")); assert(file:write(successor)); assert(file:close())
+			local preferences = require("infra.llm_preferences")
+			helpers.assert_eq(preferences.set_many({ ["llm.generation.temperature"] = 0.75 }, { status = "ok", content = source }), false)
+			helpers.assert_eq(Sandbox.read_bytes(path), successor)
+			helpers.assert_true(preferences.set("llm.generation.temperature", 0.75))
+			helpers.assert_eq(Sandbox.read_bytes(path), '[llm] # exact header\ngeneration = { temperature=0.75, future=9007199254740993, empty=[], map={} } # exact outer trailer\nprivate="untouched"\n# external successor\n')
+		end)
+	end)
+end)
+
+helpers.describe("Linux actual native exact integer publication", function()
+	helpers.it("writes exact requested integer through root inline and cold-restarts the native reader", function()
+		with_config("llm={generation={temperature=9007199254740993,future=[]}} # exact\n", function(path)
+			local preferences=require("infra.llm_preferences")
+			helpers.assert_true(preferences.set("llm.generation.temperature", 9007199254740992))
+			helpers.assert_eq(Sandbox.read_bytes(path), "llm={generation={temperature=9007199254740992,future=[]}} # exact\n")
+			package.loaded["infra.llm_preferences"]=nil
+			helpers.assert_eq(require("infra.llm_preferences").get("llm.generation.temperature"), 9007199254740992)
+		end)
+	end)
+	helpers.it("writes exact requested integer through root dotted and cold-restarts the native reader", function()
+		with_config("llm.generation.temperature=9007199254740993 # owned\nfuture=[] # exact\n", function(path)
+			local preferences=require("infra.llm_preferences")
+			helpers.assert_true(preferences.set("llm.generation.temperature", 9007199254740992))
+			helpers.assert_eq(Sandbox.read_bytes(path), "llm.generation.temperature = 9007199254740992\nfuture=[] # exact\n")
+			package.loaded["infra.llm_preferences"]=nil
+			helpers.assert_eq(require("infra.llm_preferences").get("llm.generation.temperature"), 9007199254740992)
+		end)
+	end)
+	helpers.it("writes exact requested integer through section dotted and cold-restarts the native reader", function()
+		with_config("[llm]\ngeneration.temperature=9007199254740993 # owned\nfuture=[] # exact\n", function(path)
+			local preferences=require("infra.llm_preferences")
+			helpers.assert_true(preferences.set("llm.generation.temperature", 9007199254740992))
+			helpers.assert_eq(Sandbox.read_bytes(path), "[llm]\ngeneration.temperature = 9007199254740992\nfuture=[] # exact\n")
+			package.loaded["infra.llm_preferences"]=nil
+			helpers.assert_eq(require("infra.llm_preferences").get("llm.generation.temperature"), 9007199254740992)
+		end)
+	end)
+	helpers.it("writes exact requested integer through header leaf and cold-restarts the native reader", function()
+		with_config("[llm.generation]\ntemperature=9007199254740993 # owned\nfuture=[] # exact\n", function(path)
+			local preferences=require("infra.llm_preferences")
+			helpers.assert_true(preferences.set("llm.generation.temperature", 9007199254740992))
+			helpers.assert_eq(Sandbox.read_bytes(path), "[llm.generation]\ntemperature = 9007199254740992\nfuture=[] # exact\n")
+			package.loaded["infra.llm_preferences"]=nil
+			helpers.assert_eq(require("infra.llm_preferences").get("llm.generation.temperature"), 9007199254740992)
+		end)
+	end)
+	helpers.it("writes exact requested integer through section inline and cold-restarts the native reader", function()
+		with_config("[llm]\ngeneration={temperature=9007199254740993,future=[]} # exact\n", function(path)
+			local preferences=require("infra.llm_preferences")
+			helpers.assert_true(preferences.set("llm.generation.temperature", 9007199254740992))
+			helpers.assert_eq(Sandbox.read_bytes(path), "[llm]\ngeneration={temperature=9007199254740992,future=[]} # exact\n")
+			package.loaded["infra.llm_preferences"]=nil
+			helpers.assert_eq(require("infra.llm_preferences").get("llm.generation.temperature"), 9007199254740992)
+		end)
+	end)
+end)
+
+helpers.describe("Linux actual native authenticated integer candidate proof", function()
+	helpers.it("refuses a wrong genuine prepared scalar then cold-reloads a repaired exact publication", function()
+		local source='[llm.generation]\ntemperature=0\nfuture=9223372036854775807 # exact\n'
+		with_config(source,function(path)
+			local LeafRows=require("toml_codec.leaf_rows")
+			local Writer=require("toml_codec.writer")
+			local original=LeafRows.value_literal
+			local capability
+			LeafRows.value_literal=function(value) if value==9007199254740992 then return "9007199254740993" end return original(value) end
+			local called,accepted=pcall(function()
+				local rows=LeafRows.prepare(source,{ {path={"llm","generation","temperature"},value=9007199254740992} })
+				capability=LeafRows.publication_capability(rows[1])
+				return Writer.batch_write(path,rows)
+			end)
+			LeafRows.value_literal=original
+			helpers.assert_eq(called,true,accepted)
+			helpers.assert_true(capability~=nil)
+			helpers.assert_eq(accepted,false)
+			helpers.assert_eq(Sandbox.read_bytes(path),source)
+			local rows=LeafRows.prepare(source,{ {path={"llm","generation","temperature"},value=9007199254740992} })
+			helpers.assert_true(Writer.batch_write(path,rows))
+			helpers.assert_eq(Sandbox.read_bytes(path),'[llm.generation]\ntemperature = 9007199254740992\nfuture=9223372036854775807 # exact\n')
+			package.loaded["infra.llm_preferences"]=nil
+			helpers.assert_eq(require("infra.llm_preferences").get("llm.generation.temperature"),9007199254740992)
+		end)
+	end)
+end)
+
+helpers.describe("Linux native absent inline scalar preference",function()
+	local vectors={
+		{source='llm={generation={top_p=0.75,future=[]}} # keep\n',expected='llm={generation={top_p=0.75,future=[],temperature = 0.25}} # keep\n'},
+		{source='[llm]\ngeneration={top_p=0.75,future=[]} # keep\n',expected='[llm]\ngeneration={top_p=0.75,future=[],temperature = 0.25} # keep\n'},
+	}
+	for index,vector in ipairs(vectors) do
+		helpers.it("inserts absent known scalar through actual native owner "..index,function()
+			with_config(vector.source,function(path)
+				local preferences=require("infra.llm_preferences")
+				helpers.assert_true(preferences.set("llm.generation.temperature",0.25))
+				helpers.assert_eq(Sandbox.read_bytes(path),vector.expected)
+				package.loaded["infra.llm_preferences"]=nil
+				helpers.assert_eq(require("infra.llm_preferences").get("llm.generation.temperature"),0.25)
+			end)
+		end)
+	end
+	helpers.it("refuses stale source before actual scalar insertion and admits repaired fresh intent",function()
+		local source=vectors[2].source
+		with_config(source,function(path)
+			local successor=source..'# foreign successor\n'
+			local file=assert(io.open(path,"wb"));assert(file:write(successor));assert(file:close())
+			local preferences=require("infra.llm_preferences")
+			helpers.assert_eq(preferences.set_many({["llm.generation.temperature"]=0.25},{status="ok",content=source}),false)
+			helpers.assert_eq(Sandbox.read_bytes(path),successor)
+			helpers.assert_true(preferences.set("llm.generation.temperature",0.25))
+			helpers.assert_eq(Sandbox.read_bytes(path),vectors[2].expected..'# foreign successor\n')
 		end)
 	end)
 end)

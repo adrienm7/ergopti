@@ -44,6 +44,8 @@ local RecordScanner = require("toml_codec.record_scanner")
 local Bom = require("toml_codec.bom")
 local KeyPath = require("toml_codec.key_path")
 local Codec = require("toml_codec.codec")
+local inline_member_spans = Codec.inline_member_spans
+local math_type = math.type
 local OperationReporter = require("diagnostics.operation_reporter")
 
 
@@ -538,6 +540,33 @@ local function same_value(left, right)
 	return true
 end
 
+--- Proves an integer token against an explicit native numeric intent.
+--- The canonical decoder already validated the token grammar. Above the exact
+--- double integer range, decoded equality cannot prove source integer identity.
+--- This comparison grants no source, row, or native publication authority.
+local function numeric_source_matches(document, shapes, path, value)
+	if type(value) ~= "number" then return true end
+	local parent = document
+	for index = 1, #path - 1 do
+		if type(parent) ~= "table" then return false end
+		parent = parent[path[index]]
+	end
+	local saved = shapes.numbers[parent]
+	saved = saved and saved[path[#path]]
+	if not saved then return false end
+	if saved.value > -9007199254740992 and saved.value < 9007199254740992 then return true end
+	local token = saved.token
+	local based = token:sub(1, 2):match("^0[box]$") ~= nil
+	if not based and token:find("[%.eE]") then return true end
+	-- Authenticated scalar literal precedence cannot replace proof of the
+	-- explicit native numeric intent. Carried whole models keep their receipts.
+	local desired = math_type and math_type(value) == "integer" and tostring(value)
+		or string.format("%.0f", value)
+	-- Rendering normalization is applied only to an already parsed decimal
+	-- integer. Base-prefixed large integers require a real owned replacement.
+	return not based and token:gsub("_", ""):gsub("^%+", "") == desired
+end
+
 --- The decoded key path a normalized batch row addresses.
 --- @param row table Row with `segments` and `key`.
 --- @return table path Table segments followed by the key.
@@ -563,6 +592,148 @@ local function has_prefix(segments, prefix, fold)
 	return true
 end
 
+--- Classifies an existing scalar, absent deletion or direct scalar insertion.
+--- This is descriptive source evidence; publication still owns every fence.
+local function inline_scalar_state(document, path, row, shapes, allow_absent)
+	if row.key == "" or row.key:find(".", 1, true) then return nil end
+	local value = document
+	for index, segment in ipairs(path) do
+		if type(value) ~= "table" or shapes and shapes.arrays[value] then return nil end
+		local matches = 0
+		for key in pairs(value) do
+			if type(key) == "string" and key:lower() == segment:lower() then matches = matches + 1 end
+		end
+		local child = value[segment]
+		if child == nil then
+			if allow_absent and matches == 0 then
+				if row.delete then return "absent" end
+				local desired, kind = row.value, type(row.value)
+				if index == #path and (kind == "string" or kind == "boolean"
+					or kind == "number" and desired == desired and math.abs(desired) ~= math.huge) then
+					return "insert"
+				end
+			end
+			return nil
+		end
+		if matches ~= 1 then return nil, nil, "ambiguous inline scalar case identity" end
+		value = child
+	end
+	local kind, desired = type(value), row.value
+	local scalar = kind == "string" or kind == "boolean"
+		or kind == "number" and value == value and math.abs(value) ~= math.huge
+	local desired_kind = type(desired)
+	local desired_scalar = desired_kind == "string" or desired_kind == "boolean"
+		or desired_kind == "number" and desired == desired and math.abs(desired) ~= math.huge
+	if scalar and (row.delete or desired_scalar and desired_kind == kind) then return "scalar", value end
+	return nil
+end
+
+--- Whether canonical fragments actually name one selected inline scalar.
+local function inline_has_leaf(raw, path)
+	local spans = inline_member_spans(raw)
+	if not spans then return false end
+	for _, member in ipairs(spans.members) do
+		if has_prefix(path, member.segments, false) then
+			if #path == #member.segments then return true end
+			local remaining = {}
+			for index = #member.segments + 1, #path do remaining[#remaining + 1] = path[index] end
+			return inline_has_leaf(member.value_source, remaining)
+		end
+	end
+	return false
+end
+
+--- Whether existing canonical inline parents own a proven absent final member.
+--- Missing intermediate namespaces, dotted aliases and case twins are refused.
+local function inline_can_insert(raw, path)
+	local spans = inline_member_spans(raw)
+	if not spans or #path == 0 then return false end
+	for _, member in ipairs(spans.members) do
+		if has_prefix(path, member.segments, true) or has_prefix(member.segments, path, true) then
+			if not has_prefix(path, member.segments, false) or #path <= #member.segments then return false end
+			local remaining = {}
+			for index = #member.segments + 1, #path do remaining[#remaining + 1] = path[index] end
+			return inline_can_insert(member.value_source, remaining)
+		end
+	end
+	return #path == 1
+end
+
+--- Describes inline parents whose whole intersecting batch can retain leaves.
+--- A returned path is a forwarding hint, never file or publication authority.
+--- Unsupported groups retain their existing native whole-parent policy.
+--- @param content string Complete exact TOML source.
+--- @param updates table Explicit writer row array.
+--- @return table|nil parents Detached canonical parent path set.
+--- @return string|nil detail Invalid source or row description.
+function M.source_inline_scalar_parents(content, updates)
+	if type(content) ~= "string" or type(updates) ~= "table" then return nil, "inline source and rows are required" end
+	local rows, identities, count = {}, {}, 0
+	for key in pairs(updates) do
+		if type(key) ~= "number" or key < 1 or key % 1 ~= 0 then return nil, "inline rows must be a dense array" end
+		count = count + 1
+	end
+	for index = 1, count do
+		local row = updates[index]
+		if type(row) ~= "table" or type(row.section) ~= "string" or row.section == ""
+			or type(row.key) ~= "string"
+			or row.delete ~= nil and row.delete ~= true
+			or row.delete and row.value ~= nil or not row.delete and row.value == nil then
+			return nil, "invalid inline row at " .. index
+		end
+		local segments = KeyPath.parse(row.section, true)
+		if not segments then return nil, "invalid inline row section" end
+		local path = {}
+		for part, segment in ipairs(segments) do path[part] = segment end
+		path[#path + 1] = row.key
+		local identity = KeyPath.render(segments):lower() .. "\0" .. row.key:lower()
+		if identities[identity] then return nil, "duplicate inline row identity" end
+		identities[identity] = true
+		rows[#rows + 1] = { path = path, row = row }
+	end
+	local overlapping = {}
+	for index, request in ipairs(rows) do
+		for other_index = index + 1, #rows do
+			local other = rows[other_index]
+			if has_prefix(request.path, other.path, true) or has_prefix(other.path, request.path, true) then
+				overlapping[index], overlapping[other_index] = true, true
+			end
+		end
+	end
+	local decoded, shapes = require("toml_codec.leaf_rows").decode_source(content)
+	if type(decoded) ~= "table" or type(shapes) ~= "table" or type(shapes.arrays) ~= "table" then
+		return nil, "inline source has no canonical shape evidence"
+	end
+	local scanned, detail = RecordScanner.scan_records(content, { quoted_headers = true })
+	if not scanned then return nil, detail end
+	local parents = {}
+	for _, record in ipairs(scanned.records) do
+		if record.addressable and #record.key_segments == 1 and record.first == record.last then
+			local _, _, raw = RecordScanner.split_assignment(Bom.strip_prefix(scanned.lines[record.first].text))
+			if raw and inline_member_spans(raw) then
+				local parent_path = record.path
+				local admitted, intersected = true, false
+				for index, request in ipairs(rows) do
+					local path, row = request.path, request.row
+					if has_prefix(path, parent_path, true) or has_prefix(parent_path, path, true) then
+						intersected = true
+						if overlapping[index] or #path <= #parent_path or not has_prefix(path, parent_path, false) then admitted = false
+						else
+							local state = inline_scalar_state(decoded, path, row, shapes, true)
+							local remaining = {}
+							for index = #parent_path + 1, #path do remaining[#remaining + 1] = path[index] end
+							if not state or state == "scalar" and not inline_has_leaf(raw, remaining)
+								or state == "insert" and not inline_can_insert(raw, remaining) then admitted = false end
+						end
+					end
+				end
+				if admitted and intersected then parents[KeyPath.render(parent_path)] = true end
+			end
+		end
+	end
+	return parents
+end
+
 --- Prepares updates to a simple INI-style TOML file without publishing it
 --- (the driver config.toml used by config_overrides and the onboarding wizard).
 --- Each entry in `updates` is a table `{section, key, value}` where:
@@ -577,7 +748,8 @@ end
 --- by table headers (`[t.key]`, `[t.key.sub]`, `[[t.key]]`) is replaced as one
 --- value: those header lines and their assignments go, comments stay. A value
 --- the file already holds in any spelling is left untouched, and a changed key
---- inside an inline table or a root container is refused with its path. Strict
+--- inside an unsupported container is refused with its path. Existing root inline
+--- scalar tokens have canonical source spans; unrelated members stay exact. Strict
 --- root dotted scalar records are replaced or removed through their own span.
 --- @param path    string Absolute path to the config.toml to write.
 --- @param updates table  Array of `{section=string, key=string, value=any}` tables.
@@ -704,8 +876,9 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 		row.source_literal = literal
 		if require("toml_codec.leaf_rows").publication_capability(row.source_row) then row.literal_key = true end
 	end
-	local decoded_ok, decoded = pcall(require("toml_codec.leaf_rows").decode_source, source or "")
-	if not decoded_ok or type(decoded) ~= "table" then
+	local decoded_ok, decoded, source_shapes = pcall(require("toml_codec.leaf_rows").decode_source, source or "")
+	if not decoded_ok or type(decoded) ~= "table" or type(source_shapes) ~= "table"
+		or type(source_shapes.numbers) ~= "table" then
 		return false, "the existing destination is not valid TOML"
 	end
 	if read_status == "absent" then
@@ -767,24 +940,143 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 		if key:match(literal and "^[A-Za-z0-9_%-]+$" or "^[A-Za-z0-9_%-%.]+$") then return key end
 		return KeyPath.render({ key })
 	end
+	--- Edits only selected scalar tokens inside one authentic inline value.
+	--- Canonical member spans retain all surviving fragments and delimiters;
+	--- deleting a leaf never prunes or serializes its explicit parent value.
+	local function edit_inline(raw, requests)
+		local spans = inline_member_spans(raw)
+		if not spans then return nil, "the inline scalar has no canonical source spans" end
+		local fragments, claimed = {}, {}
+		for _, member in ipairs(spans.members) do
+			local direct, nested = nil, {}
+			for index, request in ipairs(requests) do
+				if has_prefix(request.path, member.segments, false) then
+					if claimed[index] then return nil, "ambiguous inline scalar identity" end
+					claimed[index] = true
+					if #request.path == #member.segments then direct = request.row
+					else
+						local remaining = {}
+						for part = #member.segments + 1, #request.path do remaining[#remaining + 1] = request.path[part] end
+						nested[#nested + 1] = { path = remaining, row = request.row }
+					end
+				end
+			end
+			if direct and #nested > 0 then return nil, "the batch replaces an inline parent and its child" end
+			local fragment = raw:sub(member.first, member.last)
+			local replacement
+			if direct and not direct.delete and not direct.inline_unchanged then replacement = to_toml_value(direct) end
+			if #nested > 0 then
+				local detail
+				replacement, detail = edit_inline(member.value_source, nested)
+				if not replacement then return nil, detail end
+			end
+			if replacement then
+				fragment = raw:sub(member.first, member.value_first - 1) .. replacement
+					.. raw:sub(member.value_last + 1, member.last)
+			end
+			if not direct or not direct.delete then fragments[#fragments + 1] = fragment end
+		end
+		local additions = {}
+		for index, request in ipairs(requests) do
+			if not claimed[index] then
+				if request.row.delete or #request.path ~= 1 or not inline_can_insert(raw, request.path) then
+					return nil, "the inline scalar has no exact existing parent"
+				end
+				additions[#additions + 1] = request
+			end
+		end
+		table.sort(additions, function(left, right) return left.path[1] < right.path[1] end)
+		local interior = #spans.members == 0 and raw:sub(spans.first + 1, spans.last - 1) or ""
+		for _, request in ipairs(additions) do
+			fragments[#fragments + 1] = key_text(request.path[1], true) .. " = " .. to_toml_value(request.row)
+		end
+		return raw:sub(1, spans.first) .. interior .. table.concat(fragments, ",") .. raw:sub(spans.last)
+	end
+
 	local applied, replacements, removed = {}, {}, {}
 	local root_owned = {}
 	for _, record in ipairs(scanned.records) do
 		-- A strict root dotted assignment names one scalar leaf without a header.
-		-- Its physical record owns only that leaf; inline descendants and array
-		-- elements still need a different publication capability.
+		-- Its physical record owns only that leaf; inline scalar members use the
+		-- canonical span capability below, and array elements remain unsupported.
 		local root_path = record.header == nil and record.key_text and KeyPath.parse(record.key_text) or nil
-		if root_path and #root_path > 1 and not root_path[#root_path]:find(".", 1, true) then
+		local inline_path, relative_inline = root_path, false
+		if record.addressable and #record.key_segments == 1 then
+			inline_path, relative_inline = record.path, true
+		end
+		if inline_path and (relative_inline or #inline_path == 1) and record.first == record.last then
+			local first_text = scanned.lines[record.first].text
+			local _, _, rhs = RecordScanner.split_assignment(Bom.strip_prefix(first_text))
+			local spans = rhs and inline_member_spans(rhs)
+			if spans then
+				local requests = {}
+				for _, u in ipairs(updates) do
+					local path = row_path(u)
+					if relative_inline and has_prefix(path, inline_path, true) and not has_prefix(path, inline_path, false) then
+						return false, "the section inline scalar has no exact case identity"
+					end
+					if #path > #inline_path and has_prefix(path, inline_path, false) and not u.key:find(".", 1, true) then
+						local state, existing, state_detail = inline_scalar_state(decoded, path, u, source_shapes, true)
+						if state_detail then return false, state_detail end
+						local kind, desired = type(existing), u.value
+						local remaining = {}
+						for index = #inline_path + 1, #path do remaining[#remaining + 1] = path[index] end
+						if state == "insert" and not inline_can_insert(rhs, remaining) then
+							return false, "the inline scalar has no exact existing parent"
+						end
+						if state == "scalar" or state == "insert" then
+							for _, other in ipairs(updates) do
+								local other_path = row_path(other)
+								if other ~= u and (has_prefix(path, other_path, true) or has_prefix(other_path, path, true)) then
+									return false, "the batch replaces an inline parent and its child"
+								end
+							end
+							local identity = u.section:lower() .. "\0" .. u.key:lower()
+							if applied[identity] then return false, "ambiguous batch key identity" end
+							applied[identity] = true
+							root_owned[#root_owned + 1] = { path = path, row = u }
+							u.inline_unchanged = not u.delete and same_value(existing, desired)
+								and (kind ~= "number" or existing ~= 0 or 1 / existing == 1 / desired)
+								and (not u.source_literal or require("toml_codec.leaf_rows").value_literal(existing) == u.source_literal)
+								and numeric_source_matches(decoded, source_shapes, path, desired)
+							requests[#requests + 1] = { path = remaining, row = u }
+						end
+					end
+				end
+				if #requests > 0 then
+					local called, patched, detail = pcall(edit_inline, rhs, requests)
+					if not called then return false, "the inline scalar cannot be encoded exactly" end
+					if not patched then return false, detail end
+					replacements[record.first] = first_text:sub(1, #first_text - #rhs) .. patched
+						.. scanned.lines[record.first].eol
+				end
+			end
+		end
+		-- A section-relative dotted record has the same physical scalar owner:
+		-- its authentic, non-array header contributes the leading path segments.
+		-- Keep single keys, literal dotted leaves, and unaddressable records on
+		-- their existing paths rather than inferring a new table or parent.
+		local scalar_path, relative_scalar = root_path, false
+		if record.addressable and #record.key_segments > 1 then
+			local relative = KeyPath.parse(record.key_text)
+			if relative then
+				scalar_path, relative_scalar = {}, true
+				for _, segment in ipairs(record.header.segments) do scalar_path[#scalar_path + 1] = segment end
+				for _, segment in ipairs(relative) do scalar_path[#scalar_path + 1] = segment end
+			end
+		end
+		if scalar_path and #scalar_path > 1 and not scalar_path[#scalar_path]:find(".", 1, true) then
 			local parents = {}
-			for index = 1, #root_path - 1 do parents[index] = root_path[index] end
-			local sl, kl = KeyPath.render(parents):lower(), root_path[#root_path]:lower()
+			for index = 1, #scalar_path - 1 do parents[index] = scalar_path[index] end
+			local sl, kl = KeyPath.render(parents):lower(), scalar_path[#scalar_path]:lower()
 			local u = lookup[sl] and lookup[sl][kl]
-			local exact = u ~= nil and u.key == root_path[#root_path] and #u.segments == #parents
+			local exact = u ~= nil and u.key == scalar_path[#scalar_path] and #u.segments == #parents
 			for index, segment in ipairs(parents) do
 				if not u or u.segments[index] ~= segment then exact = false end
 			end
+			if relative_scalar and u and not exact then return false, "the section scalar has no exact case identity" end
 			local existing = decoded
-			for _, segment in ipairs(root_path) do
+			for _, segment in ipairs(scalar_path) do
 				if type(existing) ~= "table" then existing = nil; break end
 				existing = existing[segment]
 			end
@@ -795,19 +1087,31 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 			local desired_kind = type(desired)
 			local desired_scalar = desired_kind == "string" or desired_kind == "boolean"
 				or (desired_kind == "number" and desired == desired and math.abs(desired) ~= math.huge)
-			if exact and scalar and (u.delete or desired_scalar) then
+			if exact and scalar and (u.delete or desired_scalar and (not relative_scalar or desired_kind == kind)) then
+				if relative_scalar then
+					local parent = decoded
+					for _, segment in ipairs(scalar_path) do
+						local matches = 0
+						for key in pairs(parent) do
+							if type(key) == "string" and key:lower() == segment:lower() then matches = matches + 1 end
+						end
+						if matches ~= 1 then return false, "ambiguous section scalar case identity" end
+						parent = parent[segment]
+					end
+				end
 				local identity = sl .. "\0" .. kl
 				if applied[identity] then return false, "ambiguous batch key identity" end
 				applied[identity] = true
-				root_owned[#root_owned + 1] = { path = root_path, row = u }
+				root_owned[#root_owned + 1] = { path = scalar_path, row = u }
 				local unchanged = not u.delete and same_value(existing, u.value)
 					and (kind ~= "number" or existing ~= 0 or 1 / existing == 1 / u.value)
 					and (not u.source_literal or require("toml_codec.leaf_rows").value_literal(existing) == u.source_literal)
+					and numeric_source_matches(decoded, source_shapes, scalar_path, u.value)
 				if not unchanged then
 					for _, other in ipairs(updates) do
 						local inner = row_path(other)
-						if other ~= u and #inner > #root_path and has_prefix(inner, root_path, true) then
-							return false, "the batch replaces " .. KeyPath.render(root_path)
+						if other ~= u and #inner > #scalar_path and has_prefix(inner, scalar_path, true) then
+							return false, "the batch replaces " .. KeyPath.render(scalar_path)
 								.. " and also writes " .. KeyPath.render(inner) .. " inside it"
 						end
 					end
@@ -865,7 +1169,8 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 			local existing = nil
 			if type(node) == "table" then existing = node[u.key] end
 			if existing ~= nil and not u.delete and same_value(existing, u.value)
-				and (not u.source_literal or require("toml_codec.leaf_rows").value_literal(existing) == u.source_literal) then
+				and (not u.source_literal or require("toml_codec.leaf_rows").value_literal(existing) == u.source_literal)
+				and numeric_source_matches(decoded, source_shapes, row_path(u), u.value) then
 				applied[identity] = true
 			elseif existing ~= nil then
 				local path = row_path(u)
@@ -933,8 +1238,9 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 	end
 
 	local content = table.concat(lines)
-	local content_ok, content_value = pcall(Codec.decode, content)
-	if not content_ok or type(content_value) ~= "table" then
+	local content_ok, content_value, candidate_shapes = pcall(require("toml_codec.leaf_rows").decode_source, content)
+	if not content_ok or type(content_value) ~= "table" or type(candidate_shapes) ~= "table"
+		or type(candidate_shapes.numbers) ~= "table" then
 		return false, "the batch cannot address the destination without ambiguous TOML keys"
 	end
 	-- Parsing proves syntax; this capability additionally proves the requested
@@ -958,7 +1264,8 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 			actual = actual[segment]
 		end
 		if type(actual) ~= "number" or actual ~= owned.value
-			or owned.value == 0 and 1 / actual ~= 1 / owned.value then
+			or owned.value == 0 and 1 / actual ~= 1 / owned.value
+			or not numeric_source_matches(content_value, candidate_shapes, owned.path, owned.value) then
 			return false, "the numeric scalar candidate differs from the requested value"
 		end
 	end

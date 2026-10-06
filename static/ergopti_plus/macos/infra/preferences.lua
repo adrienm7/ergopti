@@ -1326,6 +1326,15 @@ local function prepare_inline_updates(source, updates, root)
 			end
 		end
 	end
+	-- Only this owner's actual inline groups need the shared forwarding proof.
+	-- The publisher repeats ownership, span, value and native source checks.
+	local direct_parents = {}
+	if next(inline) ~= nil then
+		local direct_detail
+		direct_parents, direct_detail = TomlWriter.source_inline_scalar_parents(source.content or "", updates)
+		assert(direct_parents, direct_detail)
+	end
+
 	for _, row in ipairs(updates) do
 		local path = leaf_path(row.section, row.key)
 		local parent = row.section
@@ -1338,7 +1347,7 @@ local function prepare_inline_updates(source, updates, root)
 		end
 		if path == "llm.profiles.shortcuts" and type(row.value) == "table" and next(row.value) == nil then
 			-- An empty runtime dictionary owns no unknown profile leaves on disk.
-		elseif inline[parent] then
+		elseif inline[parent] and not direct_parents[parent] then
 			local candidate = candidates[parent] or clone_value(inline[parent].value)
 			candidates[parent] = candidate
 			local keys, target = parts(path:sub(#parent + 2)), candidate
