@@ -3,6 +3,48 @@
 
 """Serve private Sparkle archives and observe actual owned macOS executables."""
 
+# Only the explicitly owned native serve child enables these fixed frames.
+# os/sys are interpreter startup modules; heavy imports intentionally follow
+# python-entry so a missing frame remains an honest unavailable prerequisite.
+import os
+import sys
+
+_STARTUP_DIAGNOSTICS = (
+    os.environ.get("ERGOPTI_SPARKLE_STARTUP_DIAGNOSTICS") == "1"
+    and len(sys.argv) == 4
+    and sys.argv[1] == "serve"
+)
+_STARTUP_PHASES = frozenset(
+    {
+        "python-entry",
+        "imports-ready",
+        "cli-dispatch",
+        "directory-admitted",
+        "nonce-admitted",
+        "socket-bound",
+        "handlers-installed",
+        "start-publishing",
+        "start-published",
+        "loop-entered",
+        "retirement-begin",
+        "retired-published",
+    }
+)
+
+
+def startup_phase(phase):
+    """Emit only a closed phase; never a path, argv, exception or private byte."""
+    if not _STARTUP_DIAGNOSTICS:
+        return
+    if type(phase) is not str or phase not in _STARTUP_PHASES:
+        raise RuntimeError("Private Sparkle startup phase refused")
+    frame = b"SPARKLE_STARTUP/1 " + phase.encode("ascii") + b"\n"
+    if os.write(1, frame) != len(frame):
+        raise RuntimeError("Private Sparkle startup capture refused")
+
+
+startup_phase("python-entry")
+
 import ctypes
 import hashlib
 import http.server
@@ -15,6 +57,8 @@ import stat
 import subprocess
 import sys
 import uuid
+
+startup_phase("imports-ready")
 
 
 class NativeCensusRefusal(RuntimeError):
@@ -176,8 +220,10 @@ def private_directory(path):
 def serve(root, nonce):
     """Allow exactly two loopback-only resources; retain each served-byte digest."""
     root = private_directory(root)
+    startup_phase("directory-admitted")
     if len(nonce) != 32 or any(c not in "0123456789abcdef" for c in nonce):
         raise RuntimeError("Private Sparkle session refused")
+    startup_phase("nonce-admitted")
     state = {"stopping": False, "requests": 0}
 
     class Handler(http.server.BaseHTTPRequestHandler):
@@ -239,10 +285,14 @@ def serve(root, nonce):
             raise RuntimeError("Private Sparkle resource handling refused")
 
     server = PrivateServer(("127.0.0.1", 0), Handler)
+    primary_failure = None
     try:
+        startup_phase("socket-bound")
         server.timeout = 0.2
         signal.signal(signal.SIGTERM, lambda *_args: state.update(stopping=True))
         signal.signal(signal.SIGINT, lambda *_args: state.update(stopping=True))
+        startup_phase("handlers-installed")
+        startup_phase("start-publishing")
         publish(
             root / "server-start.json",
             {
@@ -251,10 +301,23 @@ def serve(root, nonce):
                 "port": server.server_port,
             },
         )
+        startup_phase("start-published")
+        startup_phase("loop-entered")
         while not state["stopping"]:
             server.handle_request()
+    except BaseException as failure:
+        # Reserve the actual serve-body failure, not a caller's active exception.
+        primary_failure = failure
+        raise
     finally:
-        server.server_close()
+        trace_failure = None
+        try:
+            try:
+                startup_phase("retirement-begin")
+            except BaseException as failure:
+                trace_failure = failure
+        finally:
+            server.server_close()
         publish(
             root / "server-retired.json",
             {
@@ -263,6 +326,15 @@ def serve(root, nonce):
                 "requests": state["requests"],
             },
         )
+        try:
+            startup_phase("retired-published")
+        except BaseException as failure:
+            if trace_failure is None:
+                trace_failure = failure
+        # Optional instrumentation cannot replace an existing primary. A trace
+        # refusal alone remains a failure after the original retirement work.
+        if primary_failure is None and trace_failure is not None:
+            raise trace_failure
 
 
 def census(roots):
@@ -323,6 +395,7 @@ def census(roots):
 def main(arguments):
     """Fail closed on unsupported native observations or malformed invocations."""
     if len(arguments) == 3 and arguments[0] == "serve":
+        startup_phase("cli-dispatch")
         serve(arguments[1], arguments[2])
     elif len(arguments) >= 2 and arguments[0] == "census":
         print(json.dumps(census(arguments[1:]), sort_keys=True))

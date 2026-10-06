@@ -948,5 +948,121 @@ sys.exit(helper.entrypoint(["serve", str(root), nonce]))
         self.retire_accepted_connection(b"GET /feed.xml HTTP/1.1\r\nHost: localhost\r\n")
 
 
+class PrivateStartupTraceTests(unittest.TestCase):
+    def load_trace(self, enabled=True, serve=True):
+        frames = []
+        arguments = (
+            ["owned-helper", "serve", "unused-owned-root", NONCE] if serve else ["owned-control"]
+        )
+        with (
+            mock.patch.dict(
+                os.environ, {"ERGOPTI_SPARKLE_STARTUP_DIAGNOSTICS": "1" if enabled else "0"}
+            ),
+            mock.patch.object(sys, "argv", arguments),
+            mock.patch(
+                "os.write", side_effect=lambda fd, data: frames.append((fd, data)) or len(data)
+            ),
+        ):
+            spec = importlib.util.spec_from_file_location("private_startup_control", HELPER)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+        return module, frames
+
+    def testNativeServeOptInEmitsIndependentClosedFramesBeforeHeavyImports(self):
+        module, frames = self.load_trace()
+        self.assertEqual(
+            frames,
+            [(1, b"SPARKLE_STARTUP/1 python-entry\n"), (1, b"SPARKLE_STARTUP/1 imports-ready\n")],
+        )
+        with mock.patch(
+            "os.write", side_effect=lambda fd, data: frames.append((fd, data)) or len(data)
+        ):
+            module.startup_phase("socket-bound")
+        self.assertEqual(frames[-1], (1, b"SPARKLE_STARTUP/1 socket-bound\n"))
+
+    def testDefaultOrNonServeInvocationCannotChangeExistingEmptyCapture(self):
+        for enabled, serve in [(False, True), (True, False)]:
+            module, frames = self.load_trace(enabled=enabled, serve=serve)
+            with mock.patch("os.write") as write:
+                module.startup_phase("socket-bound")
+            self.assertEqual(frames, [])
+            write.assert_not_called()
+
+    def testUnknownPrivateOrMalformedStageRefusesWithoutExport(self):
+        module, _frames = self.load_trace()
+        for value in ["private-path/nonce", "", "socket-bound\nprivate", None, True]:
+            with mock.patch("os.write") as write:
+                with self.assertRaisesRegex(RuntimeError, "Private Sparkle startup phase refused"):
+                    module.startup_phase(value)
+            write.assert_not_called()
+
+    def testPartialNativeCaptureWriteCannotPretendCompleteStage(self):
+        module, _frames = self.load_trace()
+        with mock.patch("os.write", return_value=1) as write:
+            with self.assertRaisesRegex(RuntimeError, "Private Sparkle startup capture refused"):
+                module.startup_phase("handlers-installed")
+        write.assert_called_once_with(1, b"SPARKLE_STARTUP/1 handlers-installed\n")
+
+
+@unittest.skipUnless(hasattr(os, "geteuid"), "Physical private sockets need a POSIX host")
+class PrivateStartupPrimaryTests(unittest.TestCase):
+    def exercise_retirement(self, phase, primary=None):
+        spec = importlib.util.spec_from_file_location("private_startup_primary", HELPER)
+        helper = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(helper)
+        original = helper.http.server.HTTPServer.__init__
+        acquired = []
+        trace_failure = RuntimeError("independent trace refusal")
+        phases = []
+
+        def capture(server, *args, **kwargs):
+            original(server, *args, **kwargs)
+            acquired.append(server)
+
+        def emit(observed):
+            phases.append(observed)
+            if observed == phase:
+                raise trace_failure
+
+        def register(number, callback):
+            if primary is not None:
+                raise primary
+            # A successful body exits without a timer, transport or close stub.
+            callback(number, None)
+
+        with tempfile.TemporaryDirectory(prefix="sparkle-primary-") as directory:
+            root = Path(directory).resolve()
+            root.chmod(0o700)
+            with (
+                mock.patch.object(helper.http.server.HTTPServer, "__init__", capture),
+                mock.patch.object(helper.signal, "signal", side_effect=register),
+                mock.patch.object(helper, "startup_phase", side_effect=emit),
+            ):
+                with self.assertRaises(BaseException) as observed:
+                    helper.serve(str(root), NONCE)
+            self.assertIs(observed.exception, primary if primary is not None else trace_failure)
+            self.assertEqual(len(acquired), 1)
+            self.assertEqual(acquired[0].socket.fileno(), -1)
+            terminal = json.loads((root / "server-retired.json").read_bytes())
+            self.assertEqual(terminal, {"nonce": NONCE, "pid": os.getpid(), "requests": 0})
+            self.assertIn("retirement-begin", phases)
+            self.assertIn("retired-published", phases)
+
+    def testRetirementFrameRefusalPreservesExactBodyPrimaryAndRealSocketClose(self):
+        self.exercise_retirement("retirement-begin", RuntimeError("independent body refusal"))
+
+    def testFinalFrameRefusalPreservesExactBodyCancellationAndRealSocketClose(self):
+        self.exercise_retirement("retired-published", KeyboardInterrupt("independent cancellation"))
+
+    def testTraceOnlyRefusalRemainsFailureAfterActualRetirementReceipt(self):
+        self.exercise_retirement("retirement-begin")
+
+    def testInheritedCallerExceptionCannotSuppressTraceOnlyRefusal(self):
+        try:
+            raise RuntimeError("independent caller context")
+        except RuntimeError:
+            self.exercise_retirement("retirement-begin")
+
+
 if __name__ == "__main__":
     unittest.main()

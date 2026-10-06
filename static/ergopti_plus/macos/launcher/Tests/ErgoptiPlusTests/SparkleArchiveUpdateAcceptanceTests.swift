@@ -43,6 +43,49 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		case signal(Int32)
 	}
 
+	private enum StartupPhase: String, CaseIterable {
+		case pythonEntry = "python-entry", importsReady = "imports-ready", cliDispatch = "cli-dispatch"
+		case directoryAdmitted = "directory-admitted", nonceAdmitted = "nonce-admitted", socketBound = "socket-bound"
+		case handlersInstalled = "handlers-installed", startPublishing = "start-publishing"
+		case startPublished = "start-published", loopEntered = "loop-entered"
+		case retirementBegin = "retirement-begin", retiredPublished = "retired-published"
+	}
+
+	private enum StartupCaptureCode: String { case unavailable, empty, malformed, observed }
+
+	private struct StartupFacts {
+		let capture: StartupCaptureCode
+		let phase: StartupPhase?
+		let bytes: Int?
+		static let unavailable = StartupFacts(capture: .unavailable, phase: nil, bytes: nil)
+	}
+
+	/// Complete closed frames only; malformed or missing capture is no progress proof.
+	private static func parseStartupFrames(_ bytes: Data) -> StartupFacts {
+		guard bytes.count <= 512 else { return .unavailable }
+		if bytes.isEmpty { return StartupFacts(capture: .empty, phase: nil, bytes: 0) }
+		guard bytes.allSatisfy({ $0 < 128 }), bytes.last == 10,
+			let text = String(data: bytes, encoding: .utf8) else {
+			return StartupFacts(capture: .malformed, phase: nil, bytes: bytes.count)
+		}
+		let lines = String(text.dropLast()).components(separatedBy: "\n")
+		guard lines.count <= StartupPhase.allCases.count else {
+			return StartupFacts(capture: .malformed, phase: nil, bytes: bytes.count)
+		}
+		var last: StartupPhase?
+		var index = -1
+		for line in lines {
+			let prefix = "SPARKLE_STARTUP/1 "
+			guard line.hasPrefix(prefix), let phase = StartupPhase(rawValue: String(line.dropFirst(prefix.count))),
+				let observed = StartupPhase.allCases.firstIndex(of: phase), observed > index,
+				index != -1 || phase == .pythonEntry else {
+				return StartupFacts(capture: .malformed, phase: nil, bytes: bytes.count)
+			}
+			index = observed; last = phase
+		}
+		return StartupFacts(capture: .observed, phase: last, bytes: bytes.count)
+	}
+
 	private struct Receipt {
 		let status: Int32
 		let stdout: String
@@ -62,20 +105,27 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		private var observedExit = false
 		private var closedStreams: Set<Int> = []
 		private var cachedReceipt: Receipt?
+		private let startupDiagnostics: Bool
+		private var startupObserved = false
+		private var startupNoticeEmitted = false
+		private var startupFacts = StartupFacts.unavailable
 
 		init(_ executable: String, _ arguments: [String], root: URL,
-			guarded: Bool = false, workerTimeout: Double = 60) throws {
+			guarded: Bool = false, workerTimeout: Double = 60, startupDiagnostics: Bool = false) throws {
+			self.startupDiagnostics = startupDiagnostics
 			let identity = UUID().uuidString
 			originalExecutable = executable
 			stdout = root.appendingPathComponent(identity + ".stdout")
 			stderr = root.appendingPathComponent(identity + ".stderr")
 			guardianReceipt = guarded ? root.appendingPathComponent(identity + ".group.json") : nil
-			func capture(_ url: URL) throws -> FileHandle {
-				let descriptor = open(url.path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0o600)
+			func capture(_ url: URL, readable: Bool = false) throws -> FileHandle {
+				let descriptor: Int32
+				if readable { descriptor = open(url.path, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW, 0o600) }
+				else { descriptor = open(url.path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0o600) }
 				guard descriptor >= 0 else { throw Failure.evidence("child-capture") }
 				return FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
 			}
-			let output = try capture(stdout)
+			let output = try capture(stdout, readable: startupDiagnostics)
 			do { streams = [output, try capture(stderr)] }
 			catch { try? output.close(); throw error }
 			if let guardianReceipt {
@@ -90,6 +140,7 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 				process.arguments = arguments
 			}
 			process.environment = NativeFixtureChildEnvironment.make()
+			if startupDiagnostics { process.environment?["ERGOPTI_SPARKLE_STARTUP_DIAGNOSTICS"] = "1" }
 			process.standardOutput = streams[0]
 			process.standardError = streams[1]
 			process.terminationHandler = { [completed] _ in completed.signal() }
@@ -116,7 +167,9 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 			if observedExit { return !process.isRunning }
 			guard completed.wait(timeout: .now() + seconds) == .success else { return false }
 			observedExit = true
-			return !process.isRunning
+			let ended = !process.isRunning
+			if ended { observeStartupCapture() }
+			return ended
 		}
 
 		private func closeCaptures() throws {
@@ -183,10 +236,39 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 			try admitGuardRetirement()
 		}
 
+		/// Reuse the still-owned output descriptor after the existing native exit ACK.
+		/// No path reopen, new FD, wait, signal or closure owner is introduced.
+		private func observeStartupCapture() {
+			guard startupDiagnostics, launched, observedExit, !startupObserved, !closedStreams.contains(0) else { return }
+			startupObserved = true // A refused capture never borrows a later descriptor.
+			var metadata = stat()
+			guard fstat(streams[0].fileDescriptor, &metadata) == 0,
+				metadata.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG), metadata.st_uid == getuid(),
+				metadata.st_mode & 0o777 == 0o600, metadata.st_nlink == 1,
+				metadata.st_size >= 0, metadata.st_size <= 512 else { return }
+			if metadata.st_size == 0 {
+				startupFacts = StartupFacts(capture: .empty, phase: nil, bytes: 0); return
+			}
+			do {
+				try streams[0].seek(toOffset: 0)
+				guard let bytes = try streams[0].read(upToCount: 513), bytes.count == Int(metadata.st_size) else { return }
+				startupFacts = SparkleArchiveUpdateAcceptanceTests.parseStartupFrames(bytes)
+			} catch { startupFacts = .unavailable }
+		}
+
+		private func emitStartupNoticeOnce() {
+			guard startupDiagnostics, !startupNoticeEmitted else { return }
+			startupNoticeEmitted = true
+			let phase = startupFacts.phase?.rawValue ?? "unavailable"
+			let bytes = startupFacts.bytes.map { String($0) } ?? "unavailable"
+			print("::notice title=Native Sparkle startup::phase=" + phase + " capture=" + startupFacts.capture.rawValue + " bytes=" + bytes)
+		}
+
 		/// Report only a native exit already acknowledged by this owner.
 		/// Diagnostics never acquire another wait or alter child retirement.
 		func observedTerminationFacts() -> ObservedTermination {
 			guard launched, observedExit, !process.isRunning else { return .unavailable }
+			emitStartupNoticeOnce()
 			let status = process.terminationStatus
 			switch process.terminationReason {
 			case .exit where (0...255).contains(status): return .exit(status)
@@ -732,6 +814,26 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		passed = testRun?.failureCount == failuresBefore
 	}
 
+	func testStartupFramesDistinguishActualPrefixEmptyAndRefusedCapture() {
+		let valid = Data("SPARKLE_STARTUP/1 python-entry\nSPARKLE_STARTUP/1 imports-ready\nSPARKLE_STARTUP/1 cli-dispatch\n".utf8)
+		let observed = Self.parseStartupFrames(valid)
+		XCTAssertEqual(observed.capture, .observed)
+		XCTAssertEqual(observed.phase, .cliDispatch)
+		XCTAssertEqual(observed.bytes, valid.count)
+		XCTAssertEqual(Self.parseStartupFrames(Data()).capture, .empty)
+		for invalid in [
+			"SPARKLE_STARTUP/1 imports-ready\n", "SPARKLE_STARTUP/1 python-entry",
+			"SPARKLE_STARTUP/1 python-entry\nSPARKLE_STARTUP/1 python-entry\n",
+			"SPARKLE_STARTUP/1 python-entry\nPRIVATE-NOISE\n",
+			"SPARKLE_STARTUP/1 python-entry\nSPARKLE_STARTUP/1 unknown-phase\n",
+		] {
+			let facts = Self.parseStartupFrames(Data(invalid.utf8))
+			XCTAssertEqual(facts.capture, .malformed)
+			XCTAssertNil(facts.phase)
+		}
+		XCTAssertEqual(Self.parseStartupFrames(Data(repeating: 65, count: 513)).capture, .unavailable)
+	}
+
 	func testActualSparkleTarXZUpdateRefusesWrongKeyPreservesOldAppAndRetriesThroughRelaunch() throws {
 		phaseEvidence = try ArchiveAcceptanceEvidence(owner: .sparkle)
 		evidenceRefused = false
@@ -844,7 +946,7 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		let helper = repository.appendingPathComponent("tools/diagnostics/macos_sparkle_archive_fixture.py")
 		let www = root.appendingPathComponent("www")
 		try privateDirectory(www)
-		server = try OwnedProcess("/usr/bin/env", ["python3", helper.path, "serve", try ownedCensusPath(www), nonce], root: root)
+		server = try OwnedProcess("/usr/bin/env", ["python3", helper.path, "serve", try ownedCensusPath(www), nonce], root: root, startupDiagnostics: true)
 		commands.append(try XCTUnwrap(server))
 		try server?.start()
 		let listening = try waitFor("server-start", root: www, seconds: 10)

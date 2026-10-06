@@ -3441,6 +3441,14 @@ publication does not reap or signal the receiver. The merged portable fixture
 contains 48 original controls; native Homebrew containment and Sparkle
 acceptance still require successful macOS execution.
 
+The Sparkle fixture now retains fixed, bounded startup milestones after the
+exact server child has retired, before its capture descriptors close. Diagnostic
+failure preserves the original operation or cancellation exception; deadlines,
+native signals and archive assertions stay unchanged. The exact portable helper
+and 34 controls passed on CPython 3.13/Linux; causal replay retained two failures
+and two errors. These observations do not identify the native startup cause
+or qualify Sparkle update acceptance; hosted macOS verification remains pending.
+
 TODO36 remains partial. The Versions installer's actual release path now reads an ordered archive policy from shared updater defaults: prefer the declared `.app.tar.xz`, accept historical ZIP only when that preferred asset is absent, and refuse a present malformed or ambiguous preferred archive. Both formats retain exact repository URL and GitHub SHA-256 admission. The macOS extraction adapter preserves digest-before-extraction, version, designated signing requirement, bundle modes and relative symlinks before READY; existing swap/backup/rollback remains unchanged. Current ZIP producers, Sparkle feed/signing, Homebrew cask and Hammerspoon ZIP stay unchanged in this consumer prerequisite.
 
 Focused Lua tests pass 20/20 on Linux with the saved subprocess reaper; all 54 pre-existing assertion lines remain exact and ordered. Actual original installer replay fails five added cases, and three independent original/current selection controls prove XZ-only admission, preferred choice and refusal instead of ZIP fallback. A real Linux tar/shasum shell fixture passes four cases after catching and correcting umask-induced mode loss. These portable results do not qualify native macOS extraction. Two registered Swift XCTest cases are authored for actual macOS ZIP/XZ extraction of a privately signed bundle, exact bytes/modes/symlinks/xattrs, native signing and refusal/retirement; they remain unexecuted until the macOS Package job. Shared full selected gates, native macOS verification and the later producer/feed/cask/CI-install migration remain required before closing item36.
