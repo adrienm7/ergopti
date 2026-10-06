@@ -5558,6 +5558,13 @@ native checks, 16 full-provider and 5 shim cases remain unchanged. This corrects
 the case raised in macOS run 37329111337; actual hosted revalidation remains
 required, and no production interpreter/provider behavior was changed.
 
+The Windows tree completion owner now claims finalization before diagnostic
+logging or capture I/O can yield. Ordinary callbacks use the adapter logger;
+private program claims retain the unchanged central redactor. Both existing
+native guards remain byte-exact. Ten independent causal source controls and
+the complete 362-check JS gate pass; actual native AHK revalidation is pending.
+This repair does not admit the inactive Job-constructor packet or finish106.
+
 - [~] **107.** Make the number-row policy explicit: native behavior, digits
   directly or symbols directly, with an acknowledged migration of the old
   Windows Boolean and preserved unrelated settings. The earlier Boolean slice
