@@ -3114,6 +3114,70 @@
 			"unavailable": "hide"
 		}
 	],
+	"linux_hotstrings_absent_rows": [
+		{
+			"type": "label",
+			"id": "linux_hotstrings_unavailable",
+			"i18n": "menu.hotstrings.unavailable",
+			"platforms": [
+				"linux"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"linux_llm_absent_rows": [
+		{
+			"type": "label",
+			"id": "linux_llm_unavailable",
+			"i18n": "menu.llm.unavailable",
+			"platforms": [
+				"linux"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "label",
+			"id": "linux_llm_start_hint",
+			"i18n": "menu.llm.ollama_start_hint",
+			"platforms": [
+				"linux"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"linux_metrics_absent_rows": [
+		{
+			"type": "label",
+			"id": "linux_metrics_unavailable",
+			"i18n": "menu.metrics.unavailable",
+			"platforms": [
+				"linux"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"linux_shortcuts_absent_rows": [
+		{
+			"type": "label",
+			"id": "linux_shortcuts_unavailable",
+			"i18n": "menu.shortcuts.unavailable",
+			"platforms": [
+				"linux"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"linux_gestures_absent_rows": [
+		{
+			"type": "label",
+			"id": "linux_gestures_unavailable",
+			"i18n": "menu.gestures.unavailable",
+			"platforms": [
+				"linux"
+			],
+			"unavailable": "hide"
+		}
+	],
 	"metrics_migration_unavailable_rows": [
 		{
 			"type": "label",

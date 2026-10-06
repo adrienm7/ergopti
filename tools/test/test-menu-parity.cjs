@@ -149,7 +149,15 @@ const OPENS_SUBMENU = {
 	],
 	configuration: 'configuration_menu',
 	debug: 'debug_menu',
-	shortcuts: 'shortcuts_menu',
+	shortcuts: [
+		'shortcuts_menu',
+		{
+			menu: 'linux_shortcuts_absent_rows',
+			platforms: ['linux'],
+			kind: 'compose',
+			native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+		}
+	],
 	extensions_shortcuts: {
 		menu: 'shortcut_extension_boundary',
 		platforms: ['ahk', 'hs'],
@@ -207,7 +215,15 @@ const OPENS_SUBMENU = {
 			}
 		}
 	],
-	metrics: 'metrics_menu',
+	metrics: [
+		'metrics_menu',
+		{
+			menu: 'linux_metrics_absent_rows',
+			platforms: ['linux'],
+			kind: 'compose',
+			native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+		}
+	],
 	// Its native state branches compose readouts into the existing Metrics menu.
 	metrics_migration: ['metrics_migration_unavailable_rows', 'metrics_migration_idle_rows'].map(
 		(menu) => ({
@@ -219,7 +235,15 @@ const OPENS_SUBMENU = {
 	),
 	keyboard_layout: 'layout_menu',
 	number_row_policy: 'number_row_policy_rows',
-	hotstrings: 'hotstrings_menu',
+	hotstrings: [
+		'hotstrings_menu',
+		{
+			menu: 'linux_hotstrings_absent_rows',
+			platforms: ['linux'],
+			kind: 'compose',
+			native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+		}
+	],
 	// The personal provider renders the shared editor command head on every driver.
 	hotstring_personal: [
 		'personal_hotstring_commands',
@@ -235,7 +259,15 @@ const OPENS_SUBMENU = {
 	programmable_hotstrings: { menu: 'programmable_hotstrings', platforms: ['hs', 'linux'] },
 	// Each standard category provider opens the shared explicit command head.
 	hotstring_categories_standard: 'hotstring_category_menu',
-	gestures: 'gestures_menu',
+	gestures: [
+		'gestures_menu',
+		{
+			menu: 'linux_gestures_absent_rows',
+			platforms: ['linux'],
+			kind: 'compose',
+			native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+		}
+	],
 	gesture_slots_2: [
 		{
 			menu: 'gesture_swipe_slot_menu',
@@ -588,7 +620,15 @@ const OPENS_SUBMENU = {
 	// top-level row has existed on all three drivers since the feature shipped
 	// and each built the submenu beneath it by hand, so the section and its six
 	// subsections described capabilities with no rows behind them.
-	llm: 'llm_menu',
+	llm: [
+		'llm_menu',
+		{
+			menu: 'linux_llm_absent_rows',
+			platforms: ['linux'],
+			kind: 'compose',
+			native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+		}
+	],
 	// The AI agent submenu (_shared/modules/llm/agent.json), on every driver.
 	agent: 'agent_menu'
 };
