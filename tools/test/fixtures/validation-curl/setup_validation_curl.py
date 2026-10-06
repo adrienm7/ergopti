@@ -19,8 +19,83 @@ import platform
 import re
 import shutil
 import stat
+import sys
 import tarfile
 import time
+
+
+# Diagnostic protocol only: fixed stage/class, never messages, args or environment.
+SETUP_STAGES = frozenset(
+    (
+        "arguments",
+        "pins-owner-admission",
+        "private-destination",
+        "bootstrap-client",
+        "modern-source-fetch",
+        "modern-source-extract",
+        "openssl-sdk",
+        "modern-configure",
+        "modern-build",
+        "modern-install",
+        "legacy-release-fetch",
+        "legacy-signature",
+        "legacy-release-policy",
+        "legacy-index-fetch",
+        "legacy-index-parse",
+        "legacy-package-identity",
+        "legacy-package-fetch",
+        "legacy-package-extract",
+        "legacy-library-admission",
+        "modern-runtime-admission",
+        "legacy-runtime-admission",
+        "receipt-publication",
+        "completion",
+    )
+)
+_setup_stage = "arguments"
+_native_refusal = None
+_diagnostic_publication_refused = False
+_diagnostic_note_refused = False
+
+
+def mark_setup_stage(stage):
+    global _setup_stage
+    if stage not in SETUP_STAGES:
+        raise RuntimeError("Fixed setup stage required.")
+    _setup_stage = stage
+
+
+def emit_setup_failure(error):
+    classes = (
+        (RuntimeError, "RuntimeError"),
+        (FileNotFoundError, "FileNotFoundError"),
+        (PermissionError, "PermissionError"),
+        (ValueError, "ValueError"),
+        (TypeError, "TypeError"),
+        (KeyError, "KeyError"),
+        (OSError, "OSError"),
+        (json.JSONDecodeError, "JSONDecodeError"),
+        (lzma.LZMAError, "LZMAError"),
+        (tarfile.ReadError, "TarReadError"),
+        (SystemExit, "SystemExit"),
+        (KeyboardInterrupt, "KeyboardInterrupt"),
+    )
+    # Identity comparisons never invoke exception messages or custom class hashing.
+    kind = "Other"
+    for candidate, label in classes:
+        if type(error) is candidate:
+            kind = label
+            break
+    if _native_refusal is not None and type(error) is _native_refusal:
+        kind = "NativeRefused"
+    packet = {
+        "schema_version": 1,
+        "state": "setup_failed",
+        "stage": _setup_stage,
+        "error_class": kind,
+    }
+    sys.stdout.write(json.dumps(packet, separators=(",", ":")) + "\n")
+    sys.stdout.flush()
 
 
 def digest(path):
@@ -53,6 +128,8 @@ def records(text):
 
 
 def main():
+    global _native_refusal
+    mark_setup_stage("arguments")
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo", required=True, type=Path)
     parser.add_argument("--destination", required=True, type=Path)
@@ -64,17 +141,20 @@ def main():
         raise RuntimeError("Linux x86_64 validation tools required.")
     if not 1 <= args.jobs <= 4:
         raise RuntimeError("Build concurrency refused.")
+    mark_setup_stage("pins-owner-admission")
     pins = json.loads(Path(__file__).with_name("PINS.json").read_text())
     owner_path = args.repo.resolve(strict=True) / "tools/build/stage-linux-network-runtime.py"
     checked(owner_path, pins["command_owner_sha256"])
     spec = importlib.util.spec_from_file_location("validation_curl_native_owner", owner_path)
     owner = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(owner)
+    _native_refusal = owner.RuntimeRefused
     owner._STAGE_DEADLINE = time.monotonic() + 1800
     if owner.direct_children():
         raise RuntimeError("Exclusive setup ownership required.")
     # Destination is newly allocated, private, canonical, and belongs to this
     # trusted same-UID setup process. Existing caches are never adopted here.
+    mark_setup_stage("private-destination")
     parent = args.destination.parent.resolve(strict=True)
     root = parent / args.destination.name
     root.mkdir(mode=0o700)
@@ -95,6 +175,7 @@ def main():
         ):
             raise RuntimeError("Setup destination replacement refused.")
 
+    mark_setup_stage("bootstrap-client")
     environment = dict(os.environ)
     command_curl = shutil.which("curl")
     if command_curl is None:
@@ -138,9 +219,11 @@ def main():
         )
         checked(destination, expected, size)
 
+    mark_setup_stage("modern-source-fetch")
     modern = pins["modern"]
     source_archive = root / "modern.tar.xz"
     fetch(modern["url"], source_archive, modern["sha256"], modern["size"])
+    mark_setup_stage("modern-source-extract")
     source_dir = root / "source"
     source_dir.mkdir(mode=0o700)
     with tarfile.open(source_archive, "r:xz") as archive:
@@ -148,6 +231,7 @@ def main():
     source = source_dir / ("curl-" + modern["version"])
     if not source.is_dir() or source.is_symlink():
         raise RuntimeError("Official source root refused.")
+    mark_setup_stage("openssl-sdk")
     prefix = args.openssl_prefix.resolve(strict=True)
     if not prefix.is_dir() or not (prefix / "include/openssl/ssl.h").is_file():
         raise RuntimeError("Selected local OpenSSL SDK unavailable.")
@@ -157,6 +241,7 @@ def main():
     previous_cwd = Path.cwd()
     try:
         os.chdir(build)
+        mark_setup_stage("modern-configure")
         run(
             [
                 source / "configure",
@@ -178,14 +263,18 @@ def main():
             ],
             budget=300,
         )
+        mark_setup_stage("modern-build")
         run(["make", "-s", "-j" + str(args.jobs)], budget=900)
+        mark_setup_stage("modern-install")
         run(["make", "-s", "install"], budget=180)
     finally:
         os.chdir(previous_cwd)
 
+    mark_setup_stage("legacy-release-fetch")
     legacy = pins["legacy"]
     inrelease = root / "InRelease"
     fetch(legacy["inrelease_url"], inrelease, legacy["inrelease_sha256"])
+    mark_setup_stage("legacy-signature")
     keyring = args.keyring.resolve(strict=True)
     if not stat.S_ISREG(keyring.stat().st_mode):
         raise RuntimeError("Distribution trust anchor refused.")
@@ -196,6 +285,7 @@ def main():
     ]
     if legacy["required_signer"] not in valid:
         raise RuntimeError("Required Debian signer refused.")
+    mark_setup_stage("legacy-release-policy")
     release_text = release.read_text()
     release_fields = records(release_text)[0]
     if release_fields.get("Codename") != "bookworm":
@@ -219,6 +309,7 @@ def main():
         sha_rows.append(line.split())
     if exact_row not in sha_rows:
         raise RuntimeError("Signed package index commitment refused.")
+    mark_setup_stage("legacy-index-fetch")
     package_index = root / "Packages.xz"
     fetch(
         "https://deb.debian.org/debian/dists/bookworm/" + metadata["path"],
@@ -226,10 +317,12 @@ def main():
         metadata["sha256"],
         metadata["size"],
     )
+    mark_setup_stage("legacy-index-parse")
     index = records(lzma.decompress(package_index.read_bytes()).decode("utf-8"))
     legacy_root = root / "legacy-root"
     legacy_root.mkdir(mode=0o700)
     for package in legacy["packages"]:
+        mark_setup_stage("legacy-package-identity")
         filename = package["url"].removeprefix("https://deb.debian.org/debian/")
         matches = [
             item
@@ -247,9 +340,12 @@ def main():
             }.items()
         ):
             raise RuntimeError("Signed exact package identity refused.")
+        mark_setup_stage("legacy-package-fetch")
         deb = root / Path(filename).name
         fetch(package["url"], deb, package["sha256"], package["size"])
+        mark_setup_stage("legacy-package-extract")
         run(["dpkg-deb", "--extract", deb, legacy_root])
+    mark_setup_stage("legacy-library-admission")
     legacy_curl = legacy_root / "usr/bin/curl"
     checked(legacy_curl, legacy["curl_file_sha256"])
     legacy_libraries = root / "legacy-libraries"
@@ -271,6 +367,9 @@ def main():
         ("modern", modern_prefix / "bin/curl", modern["version"], environment),
         ("legacy", legacy_curl, legacy["version"], old_env),
     ]:
+        mark_setup_stage(
+            "modern-runtime-admission" if name == "modern" else "legacy-runtime-admission"
+        )
         header = executable.read_bytes()[:20]
         if header[:5] != b"\x7fELF\x02" or header[5] != 1 or header[18:20] != b"\x3e\x00":
             raise RuntimeError("Actual x86_64 ELF required.")
@@ -303,6 +402,7 @@ def main():
             "actual_loader_closure": closure,
         }
     current()
+    mark_setup_stage("receipt-publication")
     receipt = {
         "schema_version": 1,
         "state": "tools_admitted",
@@ -321,8 +421,24 @@ def main():
         output.flush()
         os.fsync(output.fileno())
     current()
+    mark_setup_stage("completion")
     print("Validation-only curl tools admitted; native request suite remains unexecuted.")
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except BaseException as error:
+        if type(error) is SystemExit:
+            code = error.code
+            if type(code) is int and code == 0:
+                raise
+        try:
+            emit_setup_failure(error)
+        except BaseException:
+            _diagnostic_publication_refused = True
+            try:
+                BaseException.add_note(error, "Fixed setup diagnostic publication unavailable.")
+            except BaseException:
+                _diagnostic_note_refused = True
+        raise

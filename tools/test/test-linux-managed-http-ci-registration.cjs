@@ -388,9 +388,127 @@ for (const mutation of [
 	passed++;
 }
 const setupSource = read('tools/test/fixtures/validation-curl/setup_validation_curl.py');
+// Execute the full-file inverse: original source integrity remains independently pinned.
+let preservedSetupSource = setupSource;
+for (const { inserted, original } of [
+	{
+		inserted: 'import sys\n',
+		original: ''
+	},
+	{
+		inserted:
+			'\n\n# Diagnostic protocol only: fixed stage/class, never messages, args or environment.\nSETUP_STAGES = frozenset(\n    (\n        "arguments",\n        "pins-owner-admission",\n        "private-destination",\n        "bootstrap-client",\n        "modern-source-fetch",\n        "modern-source-extract",\n        "openssl-sdk",\n        "modern-configure",\n        "modern-build",\n        "modern-install",\n        "legacy-release-fetch",\n        "legacy-signature",\n        "legacy-release-policy",\n        "legacy-index-fetch",\n        "legacy-index-parse",\n        "legacy-package-identity",\n        "legacy-package-fetch",\n        "legacy-package-extract",\n        "legacy-library-admission",\n        "modern-runtime-admission",\n        "legacy-runtime-admission",\n        "receipt-publication",\n        "completion",\n    )\n)\n_setup_stage = "arguments"\n_native_refusal = None\n_diagnostic_publication_refused = False\n_diagnostic_note_refused = False\n\n\ndef mark_setup_stage(stage):\n    global _setup_stage\n    if stage not in SETUP_STAGES:\n        raise RuntimeError("Fixed setup stage required.")\n    _setup_stage = stage\n\n\ndef emit_setup_failure(error):\n    classes = (\n        (RuntimeError, "RuntimeError"),\n        (FileNotFoundError, "FileNotFoundError"),\n        (PermissionError, "PermissionError"),\n        (ValueError, "ValueError"),\n        (TypeError, "TypeError"),\n        (KeyError, "KeyError"),\n        (OSError, "OSError"),\n        (json.JSONDecodeError, "JSONDecodeError"),\n        (lzma.LZMAError, "LZMAError"),\n        (tarfile.ReadError, "TarReadError"),\n        (SystemExit, "SystemExit"),\n        (KeyboardInterrupt, "KeyboardInterrupt"),\n    )\n    # Identity comparisons never invoke exception messages or custom class hashing.\n    kind = "Other"\n    for candidate, label in classes:\n        if type(error) is candidate:\n            kind = label\n            break\n    if _native_refusal is not None and type(error) is _native_refusal:\n        kind = "NativeRefused"\n    packet = {\n        "schema_version": 1,\n        "state": "setup_failed",\n        "stage": _setup_stage,\n        "error_class": kind,\n    }\n    sys.stdout.write(json.dumps(packet, separators=(",", ":")) + "\\n")\n    sys.stdout.flush()\n',
+		original: ''
+	},
+	{
+		inserted: '    global _native_refusal\n    mark_setup_stage("arguments")\n',
+		original: ''
+	},
+	{
+		inserted: '    mark_setup_stage("pins-owner-admission")\n',
+		original: ''
+	},
+	{
+		inserted: '    _native_refusal = owner.RuntimeRefused\n',
+		original: ''
+	},
+	{
+		inserted: '    mark_setup_stage("private-destination")\n',
+		original: ''
+	},
+	{
+		inserted: '    mark_setup_stage("bootstrap-client")\n',
+		original: ''
+	},
+	{
+		inserted: '    mark_setup_stage("modern-source-fetch")\n',
+		original: ''
+	},
+	{
+		inserted: '    mark_setup_stage("modern-source-extract")\n',
+		original: ''
+	},
+	{
+		inserted: '    mark_setup_stage("openssl-sdk")\n',
+		original: ''
+	},
+	{
+		inserted: '        mark_setup_stage("modern-configure")\n',
+		original: ''
+	},
+	{
+		inserted: '        mark_setup_stage("modern-build")\n',
+		original: ''
+	},
+	{
+		inserted: '        mark_setup_stage("modern-install")\n',
+		original: ''
+	},
+	{
+		inserted: '    mark_setup_stage("legacy-release-fetch")\n',
+		original: ''
+	},
+	{
+		inserted: '    mark_setup_stage("legacy-signature")\n',
+		original: ''
+	},
+	{
+		inserted: '    mark_setup_stage("legacy-release-policy")\n',
+		original: ''
+	},
+	{
+		inserted: '    mark_setup_stage("legacy-index-fetch")\n',
+		original: ''
+	},
+	{
+		inserted: '    mark_setup_stage("legacy-index-parse")\n',
+		original: ''
+	},
+	{
+		inserted: '        mark_setup_stage("legacy-package-identity")\n',
+		original: ''
+	},
+	{
+		inserted: '        mark_setup_stage("legacy-package-fetch")\n',
+		original: ''
+	},
+	{
+		inserted: '        mark_setup_stage("legacy-package-extract")\n',
+		original: ''
+	},
+	{
+		inserted: '    mark_setup_stage("legacy-library-admission")\n',
+		original: ''
+	},
+	{
+		inserted:
+			'        mark_setup_stage(\n            "modern-runtime-admission" if name == "modern" else "legacy-runtime-admission"\n        )\n',
+		original: ''
+	},
+	{
+		inserted: '    mark_setup_stage("receipt-publication")\n',
+		original: ''
+	},
+	{
+		inserted: '    mark_setup_stage("completion")\n',
+		original: ''
+	},
+	{
+		inserted:
+			'    try:\n        main()\n    except BaseException as error:\n        if type(error) is SystemExit:\n            code = error.code\n            if type(code) is int and code == 0:\n                raise\n        try:\n            emit_setup_failure(error)\n        except BaseException:\n            _diagnostic_publication_refused = True\n            try:\n                BaseException.add_note(error, "Fixed setup diagnostic publication unavailable.")\n            except BaseException:\n                _diagnostic_note_refused = True\n        raise\n',
+		original: '    main()\n'
+	}
+]) {
+	assert.equal(preservedSetupSource.split(inserted).length - 1, 1);
+	preservedSetupSource = preservedSetupSource.replace(inserted, original);
+}
+assert.equal(
+	sha256(preservedSetupSource),
+	'73528753dc1c7f1c8a176a3c391f763b772ec999ed6d3adeb9a14f97e42883fe'
+);
 assert.equal(
 	sha256(setupSource),
-	'73528753dc1c7f1c8a176a3c391f763b772ec999ed6d3adeb9a14f97e42883fe'
+	'ebdbdccffab7a17cea7823736f156bb29129e1445aab7bae2d6f33711931f212'
 );
 const pins = JSON.parse(read('tools/test/fixtures/validation-curl/PINS.json'));
 assert.equal(
@@ -406,6 +524,83 @@ assert.equal(
 	pins.legacy.curl_file_sha256,
 	'27125f0331490b7fbf4da11f2bd913ce1b94e071367b2fa8e535ce8c5526e29c'
 );
+// These literal receiving vectors grant diagnostic classification, never native credit.
+const setupFailure = {
+	schema_version: 1,
+	state: 'setup_failed',
+	stage: 'legacy-signature',
+	error_class: 'FileNotFoundError'
+};
+assert.equal(
+	Evidence.readSetupFailure(JSON.stringify(setupFailure) + '\n'),
+	'::error::Authenticated managed HTTP validation setup failed: stage=legacy-signature; kind=FileNotFoundError. Private diagnostics retained.\n'
+);
+passed++;
+for (const mutation of [
+	(value) => {
+		value.stage = 'https://dummy-user:dummy-pass@proxy.invalid';
+	},
+	(value) => {
+		value.error_class = 'secret-token';
+	},
+	(value) => {
+		value.message = 'dummy-secret';
+	},
+	(value) => {
+		value.argv = ['--password', 'dummy-secret'];
+	},
+	(value) => {
+		value.schema_version = 2;
+	},
+	(value) => {
+		value.state = 'tools_admitted';
+	},
+	(value) => {
+		value.stage = null;
+	},
+	(value) => {
+		value.error_class = { name: 'RuntimeError' };
+	},
+	(value) => {
+		delete value.stage;
+	}
+]) {
+	const value = structuredClone(setupFailure);
+	mutation(value);
+	assert.throws(() => Evidence.readSetupFailure(JSON.stringify(value) + '\n'));
+	passed++;
+}
+for (const text of [
+	'',
+	'private raw stderr\n',
+	JSON.stringify(setupFailure),
+	JSON.stringify(setupFailure) + '\n' + JSON.stringify(setupFailure) + '\n',
+	JSON.stringify(setupFailure) + '\nwarning\n',
+	'{"schema_version":1,"state":"setup_failed","stage":"legacy-signature","stage":"legacy-signature","error_class":"FileNotFoundError"}\n',
+	'x'.repeat(513),
+	'[]\n'
+]) {
+	assert.throws(() => Evidence.readSetupFailure(text));
+	passed++;
+}
+// Fixed unknown-class fallback remains safe and does not claim a missing binary.
+assert.equal(
+	Evidence.readSetupFailure(JSON.stringify({ ...setupFailure, error_class: 'Other' }) + '\n'),
+	'::error::Authenticated managed HTTP validation setup failed: stage=legacy-signature; kind=Other. Private diagnostics retained.\n'
+);
+passed++;
+assert.ok(
+	read('.github/workflows/ci-linux.yml').includes(
+		'--setup-diagnostic "$validation_parent/setup.stdout.private"'
+	)
+);
+passed++;
+assert.ok(
+	setupSource.includes(
+		'BaseException.add_note(error, "Fixed setup diagnostic publication unavailable.")'
+	)
+);
+passed++;
 console.log(
 	'[OK] Managed HTTP native CI registration: ' +
 		passed +

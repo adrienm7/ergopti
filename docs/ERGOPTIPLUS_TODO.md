@@ -4692,6 +4692,16 @@ These are implementation tasks; separate installed tray/input acceptance.
       uncommitted in the local worktree of `fix/downloads-on-managed-networks`
       when the session stopped; redo it if that worktree is gone.
 
+Fresh authenticated validation-curl preparation succeeds locally after actual
+signed gpgv installation. Hosted Linux run 37516058879 on
+281ee9a70905d677e5a2e9d7fef8a26114d53760 still refuses preparation and Nix;
+package/install are skipped and publication is skipped. Safe fixed stage/class
+diagnostics preserve each primary failure and expose no private output. All
+73 receiving controls and 11 independent emitter controls pass; the complete
+original setup-source inverse remains pinned. Nix retains all 35 source
+controls and seven mandatory native claims, with a fixed checkpoint diagnostic.
+No diagnostic constitutes native acceptance or identifies the hosted cause.
+
 The CLI orphan-retirement refusal is now reproduced and corrected without
 relaxing physical closure. Actual kernel observations showed the exact adopted
 child as a zombie in the retained group while curl waited for group absence.

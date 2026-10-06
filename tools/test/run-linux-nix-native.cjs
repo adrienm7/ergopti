@@ -164,10 +164,13 @@ async function run({
 		if (cancelled || process.hrtime.bigint() >= deadline) refuse();
 	};
 	let work;
+	// Public diagnostics use only lexical checkpoint literals; no private input.
+	let checkpoint = 'source-admission';
 	try {
 		current();
 		const head = environment.ERGOPTI_NIX_EXPECTED_HEAD || environment.GITHUB_SHA;
 		if (!/^[0-9a-f]{40}$/.test(head || '')) refuse();
+		checkpoint = 'workspace';
 		const temp = environment.TMPDIR || os.tmpdir();
 		if (!path.isAbsolute(temp)) refuse();
 		work = fs.mkdtempSync(path.join(temp, 'ergopti-nix-native-'));
@@ -181,6 +184,7 @@ async function run({
 			'experimental-features = nix-command flakes\nbuild-users-group =\nsandbox = false\nrequire-sigs = true\naccept-flake-config = false\n',
 			{ flag: 'wx', mode: 0o600 }
 		);
+		checkpoint = 'local-store';
 		// CI prepares a standard single-user LOCAL store; this runner never adopts a daemon.
 		for (const directory of ['/nix/store', '/nix/var/nix']) {
 			const fact = fs.lstatSync(directory);
@@ -193,6 +197,7 @@ async function run({
 				refuse();
 			fs.accessSync(directory, fs.constants.W_OK | fs.constants.X_OK);
 		}
+		checkpoint = 'native-cli';
 		const nix = fs.realpathSync('/usr/bin/nix'),
 			nixBytes = bytes(nix);
 		fs.accessSync(nix, fs.constants.X_OK);
@@ -202,6 +207,7 @@ async function run({
 			sha(bytes(path.join(root, NODE_OWNER))) !== capturedNodeOwner
 		)
 			refuse();
+		checkpoint = 'execution-source';
 		const snapshot = path.join(work, 'execution-source');
 		fs.mkdirSync(snapshot, { mode: 0o700 });
 		const inputs = [
@@ -275,6 +281,7 @@ async function run({
 			return (await phase('/usr/bin/git', ['-C', root, ...args], { GIT_OPTIONAL_LOCKS: '0' }))
 				.stdout;
 		}
+		checkpoint = 'checkout';
 		if (
 			(await git(['rev-parse', 'HEAD'])) !== head + '\n' ||
 			(await git(['status', '--porcelain=v1', '--untracked-files=all'])) !== ''
@@ -295,6 +302,7 @@ async function run({
 			flag: 'wx',
 			mode: 0o600
 		});
+		checkpoint = 'cli-version';
 		const version = await phase(nix, ['--version']);
 		if (
 			version.stderr !== '' ||
@@ -302,6 +310,7 @@ async function run({
 		)
 			refuse();
 		const prefix = ['--store', 'local'];
+		checkpoint = 'nixpkgs-metadata';
 		const metadata = await phase(
 			nix,
 			[
@@ -323,6 +332,7 @@ async function run({
 			`github:NixOS/nixpkgs/${pinned.revision}`,
 			'--no-write-lock-file'
 		];
+		checkpoint = 'pinned-source-metadata';
 		const resolved = JSON.parse(
 			(await phase(nix, [...prefix, 'flake', 'metadata', flake, ...override, '--json'], {}, 180000))
 				.stdout
@@ -339,6 +349,7 @@ async function run({
 			resolved.locked.rev !== head
 		)
 			refuse();
+		checkpoint = 'native-build';
 		const build = await phase(
 			nix,
 			[
@@ -357,14 +368,17 @@ async function run({
 			wrapper = path.join(out, 'bin/ergopti-hotstrings');
 		const wrapperHash = sha(bytes(wrapper));
 		fs.accessSync(wrapper, fs.constants.X_OK);
+		checkpoint = 'installed-help';
 		const help = await phase(wrapper, ['--help']);
 		if (!helpReceipt(help)) refuse();
 		// Read-only qualification startup runs under the unchanged generated wrapper.
+		checkpoint = 'installed-runtime';
 		const probe = await phase(wrapper, ['--help'], {
 			LUA_INIT: '@' + path.join(snapshot, PROBE),
 			ERGOPTI_NIX_PACKAGE_ROOT: out
 		});
 		if (probe.stderr !== '' || !runtimeReceipt(probe.stdout)) refuse();
+		checkpoint = 'final-source-and-closure';
 		unchanged(source, inspectSource(root, tracked));
 		if (
 			(await git(['status', '--porcelain=v1', '--untracked-files=all'])) !== '' ||
@@ -375,6 +389,7 @@ async function run({
 			refuse();
 		if (hasRetainedPhases()) refuse();
 		current();
+		checkpoint = 'receipt-publication';
 		fs.writeFileSync(
 			path.join(work, 'ADMISSION.json'),
 			JSON.stringify({
@@ -401,6 +416,9 @@ async function run({
 		error(
 			'[FAIL] Nix native source/build/runtime or physical closure refused; private inputs retained.'
 		);
+		// The fixed GitHub annotation is readable even when private phase logs
+		// are unavailable. It cannot publish raw stderr, paths or environment.
+		error(`::error::Nix native admission failed at checkpoint=${checkpoint}; no native credit.`);
 		return 1;
 	} finally {
 		if (!hasRetainedPhases()) {

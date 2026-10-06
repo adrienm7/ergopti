@@ -1343,7 +1343,7 @@ jobs:
           if python3 -B tools/test/fixtures/validation-curl/setup_validation_curl.py --repo "$GITHUB_WORKSPACE" --destination "$validation_parent/tools" --openssl-prefix /usr --keyring /usr/share/keyrings/debian-archive-keyring.gpg --jobs 2 > "$validation_parent/setup.stdout.private" 2> "$validation_parent/setup.stderr.private"; then
             node tools/test/linux-managed-http-evidence.cjs --tools-env "$validation_parent/tools/TOOLS-ADMISSION.json" "$validation_parent/tools" tools/test/fixtures/validation-curl/PINS.json >> "$GITHUB_ENV"
           else
-            echo "::error::Authenticated managed HTTP validation tool setup refused; private inputs retained."
+            if ! node tools/test/linux-managed-http-evidence.cjs --setup-diagnostic "$validation_parent/setup.stdout.private"; then echo "::error::Authenticated managed HTTP validation setup failed; fixed diagnostic unavailable; private inputs retained."; fi
             exit 1
           fi
         timeout-minutes: 35
