@@ -30,6 +30,39 @@ _RPA_DescriptorPrimitiveStages() {
 	}
 	Assert((Empty is String) && Empty == "" && SubStr(Text, Position) == ",0",
 		"program outer primitive empty argument remains a string at its exact cursor")
+	; Native InStr rejects an empty needle; EOF must short-circuit before that call.
+	LegacyEOFRejected := false
+	try InStr(" `t`r`n", SubStr("x", 2, 1))
+	catch Any as Err {
+		LegacyEOFRejected := Type(Err) == "ValueError"
+	}
+	Assert(LegacyEOFRejected, "program whitespace native empty needle has the observed ValueError class")
+	for Vector in [
+		Map("value", "", "position", 1, "expected", 1),
+		Map("value", "x", "position", 2, "expected", 2),
+		Map("value", " `t`r`n", "position", 1, "expected", 5),
+		Map("value", " `t`r`nx", "position", 1, "expected", 5),
+		Map("value", "x", "position", 1, "expected", 1)
+	] {
+		Position := Vector["position"]
+		try _ProgramParameterWs(Vector["value"], &Position)
+		catch Any {
+			Assert(false, "program whitespace actual owner raised at an authored boundary")
+		}
+		AssertEqual(Vector["expected"], Position, "program whitespace actual owner exact cursor")
+	}
+	Scalar := '{"version":1,"executable":"C:\\missing program\\script.exe","arguments":[]}'
+	for Padding in ["", " `t`r`n"] {
+		Actual := _ProgramParameterParseWithStage(Scalar . Padding, &Stage)
+		Assert(Actual is Map, "program whitespace complete descriptor stage: " . Stage)
+		AssertEqual("done", Stage, "program whitespace complete descriptor terminal stage")
+		AssertEqual("C:\missing program\script.exe", Actual["executable"],
+			"program whitespace complete descriptor executable bytes")
+		AssertEqual(0, Actual["arguments"].Length, "program whitespace complete descriptor empty argv")
+	}
+	AssertFalse(ProgramParameterParse(Scalar . " `t`r`nx"), "program whitespace trailing non-whitespace refuses")
+	AssertFalse(ProgramParameterParse(""), "program whitespace empty descriptor refuses")
+
 }
 Test("user program: closed outer decoder native primitives", _RPA_DescriptorPrimitiveStages)
 
