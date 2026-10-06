@@ -197,7 +197,8 @@ case("literal_v1_independent_argv", function()
     check(native_fs.symlinkAttributes(input.config .. "/INTERPOLATION") == nil)
 end)
 case("real_interpreter_symlink", function()
-    local value = hs.json.decode(assert(observe_scalar(owner.resolve(choices_by_name(initial)["literal.py"].key, {}))))
+    local scalar = assert(observe_scalar(owner.resolve(choices_by_name(initial)["literal.py"].key, {})))
+    local value = hs.json.decode(scalar)
     interpreter_facts.interpreter_equal = value.executable == input.expected_python
     interpreter_facts.argv_count_equal = type(value.arguments) == "table" and #value.arguments == 1
     interpreter_facts.script_argument_equal = type(value.arguments) == "table"
