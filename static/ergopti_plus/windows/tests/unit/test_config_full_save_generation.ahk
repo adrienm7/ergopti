@@ -273,26 +273,46 @@ _CFGFS_WriterReceivesBatchAndStrictStatus() {
 Test("config full save: writer receives batch and status is strict (config-full-save-generation) (config-full-save-writer-contract)",
 	_CFGFS_WriterReceivesBatchAndStrictStatus)
 
-_CFGFS_DefaultWriterRemovesObsoleteDriverNamespace() {
+_CFGFS_DefaultWriterPreservesObsoleteDriverNamespace() {
 	global CONFIG_SAVE_OK
 	Runtime := _CFGFS_CaptureRuntime()
 	Path := A_Temp . "\ergopti_full_save_legacy_namespace_"
 		. A_ScriptHwnd . "_" . A_TickCount . ".toml"
+	Source := "[ahk.layout]`nergopti_base = false`n`n"
+		. "[layout]`nergopti_base = true`n`n"
+		. "[future_extension]`nkeep = 42`n"
+	Expected := Chr(0xFEFF) . Source . "[full_save_test]`n" . 'value = "old"' . "`n"
 	try {
-		FileAppend("[ahk.layout]`nergopti_base = false`n`n"
-			. "[layout]`nergopti_base = true`n`n"
-			. "[future_extension]`nkeep = 42`n", Path, "UTF-8-RAW")
+		FileAppend(Source, Path, "UTF-8-RAW")
+		AssertEqual(Source, FSReadUtf8Exact(Path))
 		_CFGFS_Prepare(Path)
-		AssertEqual(CONFIG_SAVE_OK, SaveFullConfig(
-			0, _CFGFS_Timer, true, 0, _CFGFS_Collect))
+		Before := _ConfigFullSaveCoordinator()
+		AssertEqual(0, Before.requested_generation)
+		AssertEqual(0, Before.committed_generation)
+		AssertEqual(0, Before.settled_generation)
+		Generation := 0
+		Result := SaveFullConfig(0, _CFGFS_Timer, true, 0,
+			_CFGFS_Collect, &Generation)
+		AssertTrue(Result is Integer)
+		AssertEqual(CONFIG_SAVE_OK, Result)
+		AssertEqual(1, Generation)
+		After := _ConfigFullSaveCoordinator()
+		AssertEqual(Generation, After.requested_generation)
+		AssertEqual(Generation, After.committed_generation)
+		AssertEqual(Generation, After.settled_generation)
+		AssertFalse(_ConfigFullSaveHasPending())
+		AssertEqual(Expected, FSReadUtf8Exact(Path),
+			"the complete obsolete and future source remains exact around the collected update")
 		Data := ParseTomlFile(Path)
-		AssertFalse(Data.Has("ahk.layout"),
-			"a canonical full save must retire the obsolete [ahk.*] namespace")
+		AssertTrue(Data.Has("ahk.layout"),
+			"ordinary full saves must preserve the obsolete namespace until explicit cleanup")
 		AssertTrue(Data.Has("layout"),
-			"removing the legacy namespace must preserve canonical sections")
+			"preserving the legacy namespace must preserve canonical sections")
 		AssertTrue(Data.Has("future_extension"),
-			"cleanup must preserve unrelated forward-compatible sections")
+			"ordinary saves must preserve unrelated forward-compatible sections")
 		AssertEqual(42, Data["future_extension"]["keep"])
+		AssertEqual("old", TOML_Read(Path, "full_save_test", "value", "missing"),
+			"the fresh native reader must observe the new explicit namespace")
 	} finally {
 		if FileExist(Path)
 			FileDelete(Path)
@@ -301,9 +321,80 @@ _CFGFS_DefaultWriterRemovesObsoleteDriverNamespace() {
 	}
 }
 
-Test("config full save: canonical writer removes obsolete [ahk.*] sections "
-	. "(config-v2-legacy-namespace-cleanup)",
-	_CFGFS_DefaultWriterRemovesObsoleteDriverNamespace)
+Test("config full save: canonical writer preserves obsolete [ahk.*] sections "
+	. "(config-full-save-obsolete-preservation)",
+	_CFGFS_DefaultWriterPreservesObsoleteDriverNamespace)
+
+_CFGFS_DefaultWriterPreservesCompleteObsoletePrefix() {
+	global CONFIG_SAVE_OK
+	Runtime := _CFGFS_CaptureRuntime()
+	Folder := A_Temp . "\ergopti_full_save_obsolete_"
+		. A_ScriptHwnd . "_" . A_TickCount
+	AssertTrue(DllCall("CreateDirectoryW", "Str", Folder, "Ptr", 0, "Int"),
+		"the fixture must exclusively own its native directory")
+	Path := Folder . "\config.toml"
+	Retired := "# Retired user entries remain until explicit cleanup.`n"
+		. "[ahk]`n" . 'retired = "opaque"' . " # retain exact spelling`n`n"
+		. "[ahk.layout]`nergopti_base = false`n`n"
+		. "[ahk.layout.deep]`n" . 'future = {enabled = true, label = "retain"}' . "`n`n"
+		. "[ahk_future]`nkeep = 42`n`n"
+	Source := Retired . "[full_save_test]`n" . 'value = "before"' . "`n"
+	Expected := Chr(0xFEFF) . Retired . "[full_save_test]`n" . 'value = "old"' . "`n"
+	try {
+		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		AssertEqual(Source, FSReadUtf8Exact(Path))
+		_CFGFS_Prepare(Path)
+		AssertEqual(0, _ConfigFullSaveCoordinator().requested_generation)
+		AssertEqual(0, _ConfigFullSaveCoordinator().committed_generation)
+		AssertEqual(0, _ConfigFullSaveCoordinator().settled_generation)
+		Generation := 0
+		Result := SaveFullConfig(0, _CFGFS_Timer, true, 0,
+			_CFGFS_Collect, &Generation)
+		AssertTrue(Result is Integer)
+		AssertEqual(CONFIG_SAVE_OK, Result)
+		AssertEqual(1, Generation)
+		AssertEqual(Generation, _ConfigFullSaveCoordinator().requested_generation)
+		AssertEqual(Generation, _ConfigFullSaveCoordinator().committed_generation)
+		AssertEqual(Generation, _ConfigFullSaveCoordinator().settled_generation)
+		AssertFalse(_ConfigFullSaveHasPending())
+		AssertEqual(Expected, FSReadUtf8Exact(Path),
+			"root, nested and deeper obsolete sections, comments and future values remain byte-exact")
+		Data := TOML_ParseDocument(FSReadUtf8Exact(Path))
+		AssertEqual("opaque", Data["ahk"]["retired"])
+		AssertTrue(Data["ahk"]["layout"]["ergopti_base"] is TOML_Bool)
+		AssertEqual(false, Data["ahk"]["layout"]["ergopti_base"].Value)
+		AssertTrue(Data["ahk"]["layout"]["deep"]["future"]["enabled"] is TOML_Bool)
+		AssertEqual(true, Data["ahk"]["layout"]["deep"]["future"]["enabled"].Value)
+		AssertEqual("retain", Data["ahk"]["layout"]["deep"]["future"]["label"])
+		AssertEqual(42, Data["ahk_future"]["keep"])
+		AssertEqual("old", Data["full_save_test"]["value"])
+
+		; A semantic no-op still acknowledges its own exact new generation.
+		Generation := 0
+		Result := SaveFullConfig(0, _CFGFS_Timer, true, 0,
+			_CFGFS_Collect, &Generation)
+		AssertTrue(Result is Integer)
+		AssertEqual(CONFIG_SAVE_OK, Result)
+		AssertEqual(2, Generation)
+		AssertEqual(Generation, _ConfigFullSaveCoordinator().requested_generation)
+		AssertEqual(Generation, _ConfigFullSaveCoordinator().committed_generation)
+		AssertEqual(Generation, _ConfigFullSaveCoordinator().settled_generation)
+		AssertFalse(_ConfigFullSaveHasPending())
+		AssertEqual(Expected, FSReadUtf8Exact(Path),
+			"a repeated ordinary save preserves the entire already durable image")
+	} finally {
+		if FileExist(Path)
+			FileDelete(Path)
+		if DirExist(Folder)
+			DirDelete(Folder)
+		_CFGFS_RestoreRuntime(Runtime)
+		_CFGFS_Reset()
+	}
+}
+
+Test("config full save: preserves root and nested obsolete namespaces plus exact no-op generations "
+	. "(config-full-save-obsolete-preservation)",
+	_CFGFS_DefaultWriterPreservesCompleteObsoletePrefix)
 
 _CFGFS_NewGenerationIsNotOverAcknowledged() {
 	global _CFGFS_RequestDuringWrite, _CFGFS_WriterCalls, _CFGFS_TimerCalls

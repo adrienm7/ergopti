@@ -31,6 +31,8 @@
 
 const fs = require('fs');
 const path = require('path');
+const { publishesMenuTemplate } = require('../lib/menu-shared-delegation.cjs');
+const { scriptTokens } = require('../lib/script-source.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
@@ -55,7 +57,8 @@ const RESTORE_IDS = new Set([
 	'restore_defaults',
 	'reset_defaults',
 	'scope_restore',
-	'word_expanders_restore'
+	'word_expanders_restore',
+	'wrap_symbols_restore'
 ]);
 const CLEAR_IDS = new Set(['disable_all', 'clear_to_system', 'scope_clear']);
 
@@ -73,7 +76,8 @@ const EXPECTED_ROWS = {
 	script_control_group: [1, 1],
 	shortcuts_menu: [1, 1],
 	tap_holds_menu: [1, 1],
-	word_expanders_menu: [1, 0]
+	word_expanders_menu: [1, 0],
+	wrap_symbols_global_controls: [1, 0]
 };
 
 const RETIRED_KEYS = [
@@ -84,9 +88,8 @@ const RETIRED_KEYS = [
 	'tap_hold.disable_all'
 ];
 
-// Remaining native wrapping-symbol restore rows must retain their shared key.
-// The word-delimiter controls now delegate to a shared child menu below.
-const DRIVER_BUILT_RESETS = [
+// Wrapping-symbol restore callbacks must reach their shared declaration.
+const WRAP_RESET_CONSUMERS = [
 	'macos/ui/menu/menu_shortcuts.lua',
 	'windows/ui/menu/menu_shortcuts.ahk'
 ];
@@ -168,10 +171,18 @@ for (const file of localeFiles) {
 // ==================================================
 // ==================================================
 
-for (const rel of DRIVER_BUILT_RESETS) {
+for (const rel of WRAP_RESET_CONSUMERS) {
 	const text = fs.readFileSync(path.join(SP, rel), 'utf8');
-	if (!text.includes(`"${RESTORE_KEY}"`)) {
-		errors.push(`${rel} builds a reset row without the shared ${RESTORE_KEY} key.`);
+	const extension = path.extname(rel);
+	if (
+		!publishesMenuTemplate(text, extension, 'wrap_symbols_global_controls') ||
+		!scriptTokens(text, extension).some(
+			(token) => token.kind === 'string' && token.value === 'wrap_symbols_restore'
+		)
+	) {
+		errors.push(
+			`${rel} does not dispatch its restore through the shared wrapping-symbol declaration.`
+		);
 	}
 }
 

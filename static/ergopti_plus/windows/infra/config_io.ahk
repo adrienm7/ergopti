@@ -57,7 +57,6 @@ global CONFIG_SAVE_RESOLVE_DEFERRED := 2
 global CONFIG_FULL_SAVE_RETRY_DELAY_MS := -100
 global CONFIG_FULL_SAVE_FAILURE_RETRY_DELAY_MS := -1000
 global CONFIG_FULL_SAVE_BOOT_DELAY_MS := -500
-global CONFIG_OBSOLETE_SECTION_PREFIXES := ["ahk"]
 
 ; A one-shot timer is only a wake-up mechanism: Reload terminates it. Keep the
 ; actual full-save obligation in a generation counter so a terminal transition
@@ -553,13 +552,14 @@ _ConfigInvokeCommitWriter(Path, Updates, WriterFn, Stage, &FailureDetail) {
 		return false
 	}
 	try {
-		if IsSet(ConfigurationFile) && ConfigurationFile != ""
-				&& _ConfigWriteLeaseKey(Path) == _ConfigWriteLeaseKey(ConfigurationFile)
+		IsConfiguration := IsSet(ConfigurationFile) && ConfigurationFile != ""
+			&& _ConfigWriteLeaseKey(Path) == _ConfigWriteLeaseKey(ConfigurationFile)
+		if IsConfiguration
 			Updates := _ConfigPrepareTypedUpdates(Updates)
 		if HasMethod(WriterFn, "Call")
 			Written := WriterFn.Call(Path, Updates)
 		else
-			Written := TOML_BatchWrite(Path, Updates)
+			Written := IsConfiguration ? TOML_ConfigBatchWrite(Path, Updates) : TOML_BatchWrite(Path, Updates)
 	} catch as Err {
 		FailureDetail .= (FailureDetail != "" ? "; " : "")
 			. Stage . " failed: " . Err.Message
@@ -1151,7 +1151,7 @@ _ConfigCollectFullSaveUpdates(FeaturesSource := unset, MenuSource := unset) {
 ; to the final typed writer boundary, after neutral-value deletion is decided.
 _ConfigSparseOperation(Section, Key, Value) {
 	NativeValue := Value is TOML_Bool ? Value.Value : Value
-	return ManifestSparseOperation(Section . "." . Key, NativeValue)
+	return ManifestConfigSparseOperation(Section, Key, NativeValue)
 }
 
 ; Neutral values delete their previous override in the same atomic batch.
@@ -1245,7 +1245,6 @@ SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
 		global ConfigurationFile
 		global CONFIG_SAVE_FAILED, CONFIG_SAVE_OK, CONFIG_SAVE_DEFERRED
 		global CONFIG_FULL_SAVE_RETRY_DELAY_MS, CONFIG_FULL_SAVE_FAILURE_RETRY_DELAY_MS
-		global CONFIG_OBSOLETE_SECTION_PREFIXES
 		; Guard: the driver must be fully initialised before writing config — prevents
 		; a partial config flush triggered by the -500 ms boot timer from clobbering the
 		; user's file with uninitialised defaults (e.g. before Features or GestureAssignments
@@ -1312,22 +1311,36 @@ SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
 		TargetGeneration := _ConfigFullSaveCapture()
 		Result := CONFIG_SAVE_FAILED
 		try {
-				Phase := "collector"
+				Phase := "source"
 				try {
-						Updates := HasMethod(CollectFn, "Call")
-								? CollectFn.Call()
-								: _ConfigCollectFullSaveUpdates()
-						if !(Updates is Array)
-								throw TypeError("The full configuration collector must return an Array")
-						Updates := _ConfigPrepareTypedUpdates(_ConfigKeepOutdatedEntries(Updates))
-						; Do NOT FileDelete before writing — TOML_BatchWrite already performs an
-						; atomic write (temp file + rename). A FileDelete here creates a data-loss
-						; window: if a Reload() or thread interrupt fires between the delete and the
-						; write, the user's config is permanently gone with no replacement.
-						if FileReadActivityBusy(BoundPath)
-							return _ConfigArmFullSaveRetry(CONFIG_FULL_SAVE_RETRY_DELAY_MS, TimerFn)
-								? CONFIG_SAVE_DEFERRED : CONFIG_SAVE_FAILED
-						Phase := "writer"
+				SourceImage := 0
+				if !HasMethod(WriterFn, "Call") {
+					; Bind full-snapshot preservation to one admitted generation
+					; before collection can run callbacks or change live state.
+					SourceImage := TOML_BuildConfigUpdatedContent(BoundPath, [])
+					if !(SourceImage is Map) || SourceImage.Get("status", "") != "ok"
+							|| SourceImage.Get("kind", "") != "rendered"
+						throw Error("The full configuration source could not be admitted.")
+					ObsoleteSource := ConfigFullSnapshotCaptureObsoleteSource(SourceImage["source_content"])
+				}
+				Phase := "collector"
+				Updates := HasMethod(CollectFn, "Call")
+						? CollectFn.Call()
+						: _ConfigCollectFullSaveUpdates()
+				if !(Updates is Array)
+						throw TypeError("The full configuration collector must return an Array")
+				Updates := _ConfigKeepOutdatedEntries(Updates)
+				if SourceImage is Map
+					Updates := ConfigFullSnapshotPreserveObsoleteSource(ObsoleteSource, Updates)
+				Updates := _ConfigPrepareTypedUpdates(Updates)
+				; Do NOT FileDelete before writing — TOML_BatchWrite already performs an
+				; atomic write (temp file + rename). A FileDelete here creates a data-loss
+				; window: if a Reload() or thread interrupt fires between the delete and the
+				; write, the user's config is permanently gone with no replacement.
+				if FileReadActivityBusy(BoundPath)
+					return _ConfigArmFullSaveRetry(CONFIG_FULL_SAVE_RETRY_DELAY_MS, TimerFn)
+						? CONFIG_SAVE_DEFERRED : CONFIG_SAVE_FAILED
+				Phase := "writer"
 				; RETURNED, not discarded. TOML_BatchWrite fails without throwing when
 				; the staging file cannot be opened or the atomic replace is refused, and
 				; every caller that dropped this boolean turned that into a silent no-op:
@@ -1337,8 +1350,10 @@ SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
 				if HasMethod(WriterFn, "Call")
 					Written := WriterFn.Call(BoundPath, Updates)
 				else
-					Written := TOML_BatchWrite(BoundPath, Updates,
-						CONFIG_OBSOLETE_SECTION_PREFIXES)
+					; Ordinary saves own only collected settings; retired namespaces stay
+					; on disk until the user explicitly removes them.
+					Written := _TOML_BatchWriteImpl(BoundPath, Updates, [], "write",
+						SourceImage["source_content"], SourceImage["source_present"], true)
 				} catch as Err {
 						Written := false
 						try LoggerError("ConfigIO", "The full configuration {1} raised an error: {2}.",
@@ -1425,7 +1440,7 @@ _CollectFeatureUpdates(Updates, SectionPath, Node) {
 		for Key, Value in Node {
 				if (SectionPath == "" and Type(Value) != "Map")
 						continue
-				Sub := (SectionPath == "") ? Key : SectionPath "." Key
+				Sub := (SectionPath == "") ? TOML_RenderKey(Key) : SectionPath "." TOML_RenderKey(Key)
 				if (Type(Value) == "Map")
 						_CollectFeatureUpdates(Updates, Sub, Value)
 				else

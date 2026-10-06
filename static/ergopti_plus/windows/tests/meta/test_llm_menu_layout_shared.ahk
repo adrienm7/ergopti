@@ -61,7 +61,7 @@ _LMLS_SharedDir() {
 	return WindowsDir . "\..\_shared"
 }
 
-; The manifest rows this platform renders: the declared ``dynamic`` rows of
+; The manifest rows this platform renders: the declared ``dynamic`` and ``group`` rows of
 ; llm_menu that are visible on "ahk". Linux's two inline `list` rows and the
 ; separator between them are not settings rows and are filtered out here exactly
 ; as _LLM_MenuLayout_Rows() filters them at runtime.
@@ -74,7 +74,7 @@ _LMLS_ManifestRows() {
 	Assert(parsed is Map && parsed.Has("llm_menu"), "menu_manifest.json must have an 'llm_menu' array")
 	Rows := []
 	for _, Entry in parsed["llm_menu"] {
-		if !(Entry is Map) or !Entry.Has("type") or Entry["type"] != "dynamic"
+		if !(Entry is Map) or !Entry.Has("type") or (Entry["type"] != "dynamic" && Entry["type"] != "group")
 			continue
 		Visible := true
 		if Entry.Has("platforms") {
@@ -147,7 +147,12 @@ _LMLS_BuildIsSpecDriven() {
 	Assert(Seg != "", "LLM_Menu_BuildSubmenu() must exist in menu_main.ahk")
 	Assert(InStr(Seg, "_LLM_MenuLayout_Rows()") > 0,
 		"LLM_Menu_BuildSubmenu must read the row list from _LLM_MenuLayout_Rows() (the shared spec) — not hardcode it")
-	Assert(InStr(Seg, "_LLM_Menu_EmitRow(") > 0,
+	Captured := _DriverFuncBody("_LLM_Menu_EmitCapturedRow")
+	Assert(Captured != "", "the bound native row owner must exist")
+	Assert(_LMLS_ExecutableCall(Seg, "MenuRenderer_Build"), "actual canonical orchestration must execute")
+	Assert(_LMLS_ExecutableCall(Seg, "_LLM_Menu_EmitCapturedRow.Bind"), "row binding must be executable source")
+	Assert(_LMLS_ExecutableCall(Captured, "_LLM_Menu_EmitRow"), "the captured callback reaches the actual native dispatch")
+	Assert(InStr(Seg, "_LLM_Menu_EmitCapturedRow.Bind(") > 0 && InStr(_DriverFuncBody("_LLM_Menu_EmitCapturedRow"), "_LLM_Menu_EmitRow(") > 0,
 		"LLM_Menu_BuildSubmenu must dispatch each row via _LLM_Menu_EmitRow so order + greying come from the shared spec")
 }
 Test("llm-menu-layout-shared: LLM_Menu_Build is driven by the shared layout spec", _LMLS_BuildIsSpecDriven)
@@ -190,3 +195,31 @@ _LMLS_NoSecondDescription() {
 		. "menu manifest's llm_menu key, and a second shared description would drift from it")
 }
 Test("llm-menu-layout-shared: the retired second description has not come back", _LMLS_NoSecondDescription)
+
+; AHK identifiers accept all non-ASCII code units; quoted data is not authority.
+_LMLS_ExecutableCall(Source, Name) {
+	Code := _DriverMaskNonCode(&Source)
+	Identifier := "A-Za-z0-9_\x{80}-\x{10FFFF}"
+	return RegExMatch(Code, "(?<![" . Identifier . ".])\Q" . Name . "\E(?![" . Identifier . "])[ \t]*\(") > 0
+}
+_LMLS_CurrentGroupSourceAndDataControls() {
+	Build := _DriverFuncBody("LLM_Menu_BuildSubmenu")
+	Capture := _DriverFuncBody("_LLM_Menu_EmitCapturedRow")
+	Assert(_LMLS_ExecutableCall(Build, "MenuRenderer_Build"))
+	Assert(_LMLS_ExecutableCall(Capture, "_LLM_Menu_EmitRow"))
+	for Name in ["MenuRenderer_Build", "_LLM_Menu_EmitRow"] {
+		AssertFalse(_LMLS_ExecutableCall('; ' . Name . '()`nreturn false', Name), "commented source cannot credit a native owner")
+		AssertFalse(_LMLS_ExecutableCall('Value := "' . Name . '()"`nreturn false', Name), "quoted source cannot credit a native owner")
+		AssertFalse(_LMLS_ExecutableCall('Unrelated' . Name . '()', Name), "a longer native callable cannot borrow identity")
+		AssertTrue(_LMLS_ExecutableCall(Name . '()', Name), "the same canonical callable remains admitted")
+	}
+	Rows := _LMLS_ManifestRows(), Groups := 0
+	for Row in Rows {
+		if Row["id"] == "llm_trigger" || Row["id"] == "llm_display" || Row["id"] == "llm_navigation" {
+			AssertEqual("group", Row["type"])
+			Groups += 1
+		} else AssertEqual("dynamic", Row["type"], "other native dynamic domains retain their existing API")
+	}
+	AssertEqual(3, Groups, "exactly the selected genuine fixed parents have shared group ownership")
+}
+Test("llm-menu-layout-shared: true canonical groups require executable native source owners", _LMLS_CurrentGroupSourceAndDataControls)

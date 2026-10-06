@@ -445,3 +445,253 @@ helpers.describe("AI agent shared system Off row (agent-system-off)", function()
 		end)
 	end)
 end)
+
+
+--- Independently authored model-control rows, loaded from physical shared data.
+local function system_model_corpus()
+	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/agent_system_model.json"), "rb"))
+	local raw = file:read("*a")
+	file:close()
+	return assert(require("json").decode(raw))
+end
+
+--- Holds genuine locale/backend/renderer identities and restores them on every exit.
+--- @param code string Runtime-only fixture locale.
+--- @param scenario function Receives the authentic production i18n owner.
+local function with_system_model_locale(code, scenario)
+	local names = { "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu" }
+	local previous = {}
+	for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
+	local native, owner, receipt, acquired
+	local ok, err = pcall(function()
+		native = require("infra.i18n")
+		native.init()
+		owner = { pending = function() return false end }
+		acquired = native.scope_acquire(owner)
+		helpers.assert_eq(acquired, true)
+		receipt = native.scope_capture(owner)
+		helpers.assert_not_nil(receipt)
+		helpers.assert_eq(native.scope_apply(owner, receipt, code), true)
+		helpers.assert_eq(native.get_locale(), code)
+		helpers.assert_eq(require("infra.locale").current_locale(), code)
+		scenario(native)
+	end)
+	local restored, released, forgotten = true, true, true
+	if receipt then restored = native.scope_restore(owner, receipt) == true end
+	if acquired then released = native.scope_release(owner) == true end
+	if receipt then forgotten = native.scope_forget(owner, receipt) == true end
+	for _, name in ipairs(names) do package.loaded[name] = previous[name] end
+	for _, name in ipairs(names) do helpers.assert_eq(rawequal(package.loaded[name], previous[name]), true, name) end
+	helpers.assert_eq(restored, true, "the authentic runtime inverse restores its prior locale")
+	helpers.assert_eq(released, true, "the temporary native claim is released even after a raised scenario")
+	helpers.assert_eq(forgotten, true, "the finalized temporary receipt is forgotten")
+	if not ok then error(err, 0) end
+end
+
+helpers.describe("AI agent shared system model control (agent-system-model)", function()
+	helpers.it("uses both actual model rows, shared caption and exact owner ACK (agent-system-model)", function()
+		local corpus = system_model_corpus()
+		Scenario.run({ stored = { ["llm.agent_system1"] = corpus.spec, ["llm.agent_system2"] = corpus.spec } }, function(world)
+			with_system_model_locale("en", function(i18n)
+				local root = require("infra.manifest_menu").get_root()
+				local declaration = root[corpus.section][2]
+				local label = declaration.i18n
+				local settings = require("modules.llm.agent_settings")
+				local original_set = settings.set_spec
+				local ok, err = pcall(function()
+					local function systems(answers)
+						local rows = build_menu(world, answers)
+						world.restore_prompt()
+						return find(rows, i18n.get("menu.agent.title")).menu
+					end
+					local rows = systems({})
+					for index in ipairs(corpus.systems) do
+						local children = rows[index + 2].menu
+						helpers.assert_eq(children[#children - 1].title, "-")
+						helpers.assert_eq(children[#children].title, corpus.caption)
+					end
+					declaration.i18n = corpus.mutated_label_key
+					local retained = systems({ "changed-model", "changed-model" })[3].menu
+					retained = retained[#retained]
+					helpers.assert_eq(retained.title, corpus.mutated_caption)
+					-- Keep the prompt installed while the retained model callback runs.
+					local menu_rows = build_menu(world, { "changed-model", "changed-model" })
+					retained = find(menu_rows, corpus.mutated_caption)
+					settings.set_spec = function() return false end
+					retained.fn()
+					helpers.assert_eq(world.preferences.get("llm.agent_system1"), corpus.spec)
+					helpers.assert_eq(world.preferences.get("llm.agent_system2"), corpus.spec)
+					helpers.assert_eq(world.redraws or 0, 0)
+					settings.set_spec = original_set
+					retained.fn()
+					helpers.assert_eq(world.preferences.get("llm.agent_system1"), "cerebras|changed-model")
+					helpers.assert_eq(world.preferences.get("llm.agent_system2"), corpus.spec)
+					helpers.assert_eq(world.redraws, 1)
+					world.restore_prompt()
+				end)
+				world.restore_prompt()
+				settings.set_spec = original_set
+				declaration.i18n = label
+				if not ok then error(err, 0) end
+			end)
+		end)
+	end)
+
+	helpers.it("takes exact shared order and refuses an unowned command (agent-system-model)", function()
+		local corpus = system_model_corpus()
+		Scenario.run({ stored = { ["llm.agent_system1"] = corpus.spec } }, function(world)
+			with_system_model_locale("en", function(i18n)
+				local root = require("infra.manifest_menu").get_root()
+				local original = root[corpus.section]
+				local ok, err = pcall(function()
+					root[corpus.section] = { original[2], original[1], {
+						type = "label", id = "model_tail_marker", i18n = "menu.agent.off",
+					} }
+					local rows = build_menu(world, {})
+					world.restore_prompt()
+					local children = find(rows, i18n.get("menu.agent.title")).menu[3].menu
+					helpers.assert_eq(children[#children - 2].title, corpus.caption)
+					helpers.assert_eq(children[#children - 1].title, "-")
+					helpers.assert_eq(children[#children].title, "Off")
+					root[corpus.section] = { { type = "---" }, {
+						type = "command", id = "unowned_agent_model", i18n = corpus.label_key,
+					} }
+					rows = build_menu(world, {})
+					world.restore_prompt()
+					helpers.assert_nil(find(rows, corpus.caption))
+					helpers.assert_eq(world.preferences.get("llm.agent_system1"), corpus.spec)
+				end)
+				world.restore_prompt()
+				root[corpus.section] = original
+				if not ok then error(err, 0) end
+			end)
+		end)
+	end)
+end)
+
+helpers.describe("Agent model physical-source ownership (agent-system-model)", function()
+	helpers.it("preserves physical bytes on scope/CAS refusal and retries the real model writer (agent-system-model)", function()
+		local sandbox = require("test.config_unused_keys_contract").sandbox
+		local initial = '[llm]\nagent_system1 = "cerebras|hand/50%"\n[future]\nkeep = "initial"\n'
+		local foreign = '[llm]\nagent_system1 = "cerebras|hand/50%"\n[future]\nkeep = "external"\n'
+		local expected = '[llm]\nagent_system1 = "cerebras|changed-model"\n[future]\nkeep = "external"\n'
+		sandbox.with_config(initial, function(path)
+			local names = { "infra.config_paths", "infra.llm_preferences", "modules.llm.agent_settings", "ui.menu.agent_rows" }
+			local previous = {}
+			for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
+			local writer = require("toml_codec.writer")
+			local original_batch = writer.batch_write
+			local ok, err = pcall(function()
+				package.loaded["infra.config_paths"] = { config = function() return path end }
+				local preferences = require("infra.llm_preferences")
+				local changes = 0
+				local menu = require("ui.menu.agent_rows").build({
+					on_menu_changed = function() changes = changes + 1 end,
+				}, { prompt = function() return "changed-model" end })
+				local children = menu.submenu[3].menu
+				local retained = children[#children]
+				local owner = { pending = function() return false end }
+				helpers.assert_eq(preferences.acquire(owner), true)
+				retained.fn()
+				helpers.assert_eq(sandbox.read_bytes(path), initial)
+				helpers.assert_eq(changes, 0)
+				helpers.assert_eq(preferences.release(owner), true)
+				local observed = {}
+				writer.batch_write = function(target, operations, drop, source)
+					observed.path_matches = target == path
+					observed.source_matches = source.content == initial
+					local file = assert(io.open(path, "wb")); file:write(foreign); file:close()
+					return original_batch(target, operations, drop, source)
+				end
+				local called, result = pcall(retained.fn)
+				writer.batch_write = original_batch
+				helpers.assert_eq(called, true, tostring(result))
+				helpers.assert_eq(observed.path_matches, true)
+				helpers.assert_eq(observed.source_matches, true)
+				helpers.assert_eq(sandbox.read_bytes(path), foreign)
+				helpers.assert_eq(changes, 0)
+				helpers.assert_eq(require("modules.llm.agent_settings").get_spec("system1"), "cerebras|hand/50%")
+				retained.fn()
+				helpers.assert_eq(sandbox.read_bytes(path), expected, "the hand image retains the external future field")
+				helpers.assert_eq(changes, 1)
+				helpers.assert_eq(require("modules.llm.agent_settings").get_spec("system1"), "cerebras|changed-model")
+				package.loaded["infra.llm_preferences"] = nil
+				helpers.assert_eq(require("infra.llm_preferences").get("llm.agent_system1"), "cerebras|changed-model")
+			end)
+			writer.batch_write = original_batch
+			for _, name in ipairs(names) do package.loaded[name] = previous[name] end
+			if not ok then error(err, 0) end
+		end)
+	end)
+end)
+
+--- Reproduces the genuine warm i18n owner surviving a later locale-core reload.
+--- @param scenario function Receives the French owner and newer backend.
+local function with_system_model_french_seed(scenario)
+	with_system_model_locale("fr", function(native)
+		local backend, core = package.loaded["infra.locale"], package.loaded["locale.core"]
+		local ok, err = pcall(function()
+			require("infra.manifest_menu").get_root()
+			local newer = helpers.load_module("infra.locale")
+			newer.set_locale("en")
+			helpers.assert_eq(newer.get("menu.agent.model"), "Model… ({1})")
+			helpers.assert_eq(native.get("menu.agent.model"), "Modèle… ({1})",
+				"the old fixture changes a different genuine backend than the native producer")
+			scenario(native, newer)
+		end)
+		package.loaded["infra.locale"], package.loaded["locale.core"] = backend, core
+		if not ok then error(err, 0) end
+	end)
+end
+
+helpers.describe("Agent model locale cohort isolation (agent-system-model)", function()
+	helpers.it("uses actual English producers and restores the split French cohort exactly (agent-system-model)", function()
+		with_system_model_french_seed(function(native, newer)
+			local names = { "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu" }
+			local before = {}
+			for _, name in ipairs(names) do before[name] = package.loaded[name] end
+			local strings = native.get("menu.agent.model")
+			local backend_locale = newer.current_locale()
+			with_system_model_locale("en", function(scoped)
+				local corpus = system_model_corpus()
+				Scenario.run({ stored = { ["llm.agent_system1"] = corpus.spec } }, function(world)
+					local rows = build_menu(world, {})
+					world.restore_prompt()
+					local children = find(rows, scoped.get("menu.agent.title")).menu[3].menu
+					helpers.assert_eq(children[#children].title, corpus.caption)
+					helpers.assert_eq(scoped.get_locale(), "en")
+				end)
+			end)
+			for _, name in ipairs(names) do helpers.assert_eq(rawequal(package.loaded[name], before[name]), true, name) end
+			helpers.assert_eq(native.get_locale(), "fr")
+			helpers.assert_eq(native.get("menu.agent.model"), strings)
+			helpers.assert_eq(newer.current_locale(), backend_locale)
+		end)
+	end)
+
+	helpers.it("restores prior owners on a raised English scenario and permits a genuine retry (agent-system-model)", function()
+		with_system_model_french_seed(function(native, newer)
+			local names = { "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu" }
+			local before = {}
+			for _, name in ipairs(names) do before[name] = package.loaded[name] end
+			local strings = native.get("menu.agent.model")
+			local backend_locale = newer.current_locale()
+			local called, err = pcall(function()
+				with_system_model_locale("en", function(scoped)
+					helpers.assert_eq(scoped.get("menu.agent.model"), "Model… ({1})")
+					error("intentional-system-model-locale-failure")
+				end)
+			end)
+			helpers.assert_eq(called, false)
+			helpers.assert_true(tostring(err):find("intentional-system-model-locale-failure", 1, true) ~= nil)
+			for _, name in ipairs(names) do helpers.assert_eq(rawequal(package.loaded[name], before[name]), true, name) end
+			helpers.assert_eq(native.get_locale(), "fr")
+			helpers.assert_eq(native.get("menu.agent.model"), strings)
+			helpers.assert_eq(newer.current_locale(), backend_locale)
+			with_system_model_locale("en", function(scoped)
+				helpers.assert_eq(scoped.get_locale(), "en")
+				helpers.assert_eq(scoped.get("menu.agent.model"), "Model… ({1})")
+			end)
+		end)
+	end)
+end)

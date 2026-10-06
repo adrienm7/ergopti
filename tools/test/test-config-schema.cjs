@@ -23,7 +23,7 @@
  * 1. No external validator: there is no ajv in node_modules, so this hand-rolls a
  *    minimal JSON-Schema (draft 2020-12 subset) validator covering exactly the
  *    constructs config.schema.json uses — $ref/$defs, type (incl. unions),
- *    properties, patternProperties, required, additionalProperties
+ *    properties, propertyNames, patternProperties, required, additionalProperties
  *    (false|true|schema), enum, const,
  *    oneOf, allOf, minimum/maximum, minLength/maxLength, pattern, items.
  * 2. TOML via smol-toml: the same parser the rest of the toolchain already uses.
@@ -209,6 +209,8 @@ function validate(value, sch, p, errors) {
 			}
 		}
 		for (const [key, sub] of Object.entries(value)) {
+			if (sch.propertyNames)
+				validate(key, sch.propertyNames, `${p}: property name ${JSON.stringify(key)}`, errors);
 			const kp = p ? `${p}.${key}` : key;
 			const patternMatch = Object.entries(sch.patternProperties || {}).find(([re]) =>
 				new RegExp(re).test(key)
@@ -378,6 +380,44 @@ if (DRIVERS.length < MIN_DRIVERS) {
 	const absentErrors = [];
 	validate({ layout: {} }, schema, '', absentErrors);
 	assert.deepEqual(absentErrors, [], 'absence is not a malformed mode or a default flush');
+}
+
+// Native macOS wrap persistence has typed canonical state and custom-pair shapes.
+{
+	const assert = require('node:assert/strict');
+	const wrap = schema.$defs.shortcuts.properties.wrap_symbols;
+	for (const value of [
+		{},
+		{ states: { '(': true, ')': false, 'literal.dot': false }, custom: [] },
+		{
+			states: {},
+			custom: [
+				{ left: '🙂', right: '🦀', future: [] },
+				{ left: '(', right: ')', future: {} }
+			],
+			future: { empty: [] }
+		}
+	]) {
+		const errors = [];
+		validate(value, wrap, 'shortcuts.wrap_symbols', errors);
+		assert.deepEqual(errors, [], 'typed wrap state and opaque pair metadata remain admissible');
+	}
+	for (const value of [
+		{ states: [] },
+		{ states: { '': true } },
+		{ states: { '(': 'false' } },
+		{ states: { '(': 1 } },
+		{ custom: {} },
+		{ custom: false },
+		{ custom: [{ left: '(' }] },
+		{ custom: [{ left: '', right: ')' }] },
+		{ custom: [{ left: 'ab', right: ')' }] },
+		{ custom: [{ left: '(', right: false }] }
+	]) {
+		const errors = [];
+		validate(value, wrap, 'shortcuts.wrap_symbols', errors);
+		assert(errors.length > 0, 'malformed wrap ownership cannot pass the canonical schema');
+	}
 }
 
 console.log('');

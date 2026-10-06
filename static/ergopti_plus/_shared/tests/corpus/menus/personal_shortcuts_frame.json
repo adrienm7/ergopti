@@ -1,0 +1,30 @@
+{
+	"section": "personal_shortcuts_frame",
+	"rows": [
+		{
+			"type": "---",
+			"platforms": ["ahk"],
+			"unavailable": "hide"
+		},
+		{
+			"type": "group",
+			"id": "personal_shortcuts_registered",
+			"i18n": "menu.shortcuts.personal",
+			"platforms": ["ahk"],
+			"unavailable": "hide"
+		}
+	],
+	"platform_rows": {
+		"ahk": ["separator", "personal_shortcuts_registered"],
+		"hs": [],
+		"linux": []
+	},
+	"english_caption": "Personal shortcuts",
+	"french_caption": "Raccourcis personnels",
+	"registered_names": ["frame first", "frame second"],
+	"registered_labels": ["Personal frame description", "frame second"],
+	"marker_key": "menu.metrics.title",
+	"absent_registry_count": 0,
+	"empty_registry_count": 0,
+	"populated_frame_count": 2
+}

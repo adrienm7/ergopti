@@ -1,0 +1,47 @@
+{
+	"frame": [
+		{
+			"type": "include",
+			"section": "presentation",
+			"on_refusal": "omit_presentation"
+		},
+		{
+			"type": "list",
+			"id": "builtins"
+		},
+		{
+			"type": "list",
+			"id": "customs"
+		}
+	],
+	"presentation": [
+		{
+			"type": "section_header",
+			"i18n": "menu.profiles.header_default_profiles"
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "include",
+			"section": "nested"
+		}
+	],
+	"nested": [
+		{
+			"type": "label",
+			"id": "custom_heading",
+			"i18n": "menu.profiles.header_custom_profiles"
+		}
+	],
+	"_expected": {
+		"present": [
+			"menu.profiles.header_default_profiles",
+			"---",
+			"menu.profiles.header_custom_profiles",
+			"Builtin native",
+			"Custom native"
+		],
+		"omitted": ["Builtin native", "Custom native"]
+	}
+}

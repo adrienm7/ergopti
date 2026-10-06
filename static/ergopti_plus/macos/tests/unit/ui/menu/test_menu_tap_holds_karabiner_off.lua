@@ -116,3 +116,59 @@ helpers.describe("the macOS Tap-Holds submenu when Ergopti does not use Karabine
 		end
 	end)
 end)
+
+helpers.describe("the declared integration-off hint retains cached native children", function()
+	helpers.it("reads the shared hint caption in key and chord providers (tap-hold-guidance)", function()
+		local menu, native = menu_over_double(false)
+		local row = require("infra.manifest_menu").get_array("tap_hold_karabiner_off_rows")[1]
+		local previous = row.i18n
+		local ok, err = pcall(function()
+			row.i18n = "menu.shortcuts.title"
+			local built = menu.build({ karabiner = native, updateMenu = function() end })
+			local combinations = menu.build_key_combinations({ karabiner = native, updateMenu = function() end })
+			local function check(rows, expected_count)
+				local count = 0
+				for _, item in ipairs(rows) do
+					if item.title == "menu.shortcuts.title" then
+						count = count + 1
+						helpers.assert_true(item.disabled)
+						helpers.assert_nil(item.fn)
+					end
+					helpers.assert_true(item.title ~= HINT)
+				end
+				helpers.assert_eq(count, expected_count, "one translated inert explanation per native provider")
+			end
+			check(built.submenu, 1); check(combinations, 2)
+		end)
+		row.i18n = previous
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("hides only the declared hint without mutating cached greyed key rows (tap-hold-guidance)", function()
+		local menu, native = menu_over_double(false)
+		local row = require("infra.manifest_menu").get_array("tap_hold_karabiner_off_rows")[1]
+		local previous = row.platforms
+		local ctx = { karabiner = native, updateMenu = function() end }
+		local before = menu.build(ctx).submenu
+		local ok, err = pcall(function()
+			row.platforms = { "ahk", "linux" }
+			local hidden = menu.build(ctx).submenu
+			helpers.assert_eq(#hidden, #before - 1, "platform policy removes the hint, not key data")
+			local keys_before, keys_after = {}, {}
+			for _, item in ipairs(before) do
+				if type(item.title) == "string" and item.title:match("^tap_hold%.group%.") then keys_before[#keys_before + 1] = item end
+			end
+			for _, item in ipairs(hidden) do
+				helpers.assert_true(item.title ~= HINT)
+				if type(item.title) == "string" and item.title:match("^tap_hold%.group%.") then
+					helpers.assert_true(item.disabled)
+					keys_after[#keys_after + 1] = item
+				end
+			end
+			helpers.assert_true(#keys_before > 0, "real catalogue rows must survive")
+			helpers.assert_eq(keys_after, keys_before, "cached native row data remains exact")
+		end)
+		row.platforms = previous
+		if not ok then error(err, 0) end
+	end)
+end)

@@ -120,13 +120,11 @@ LLM_Menu_BuildProfileMenu() {
 
 /**
  * Row data for the profile submenu.
- * @returns {Array} Built-in profiles, user profiles, the CRUD rows, the
+ * @returns {Array|false} Declared built-ins, user profiles, the CRUD rows, the
  *                  auto-detect toggle and the per-app overrides submenu.
  */
 _LLM_Menu_ProfileRows() {
-	global _LLM_Menu, LLM_PROFILE_BUILTIN_ORDER
-	Rows := []
-
+	global _LLM_Menu
 	; Row labels must be unique WITHIN this menu: AHK v2's Menu.Add with an
 	; already-present label modifies the existing item in place instead of
 	; appending, so a second row carrying the same text silently overwrites the
@@ -139,69 +137,66 @@ _LLM_Menu_ProfileRows() {
 	; LLM_PROFILE_HOTKEY_LIMIT, so two profiles both named "Perso" collide from
 	; the sixth one onward (duplicate-user-profile-label-menu-collapse).
 	seen_labels := Map()
+	FrameState := Map()
+	PausedFn := (*) => A_IsSuspended
+	return MenuRenderer_TemplateRows("llm_profile_windows_frame", Map(
+		"llm_profile_create", LLM_Menu_PromptCreateProfile,
+		"llm_profile_clone", LLM_Menu_CloneActiveBuiltinProfile,
+		"llm_profile_auto_detect", (*) => _LLM_Menu_ToggleAutoProfile()), Map(
+		"llm_profile_custom_present", _LLM_Menu_ProfileCustomPresent.Bind(FrameState),
+		"llm_profile_clone_present", _LLM_Menu_ProfileClonePresent,
+		"llm_profile_auto_detect_checked", () => _LLM_Menu["auto_profile_for_model"],
+		"llm_profile_create_ready", _LLM_Menu_CreateProfileReady.Bind(PausedFn),
+		"llm_profile_clone_ready", _LLM_Menu_CreateProfileReady.Bind(PausedFn)), Map(
+		"llm_profile_builtin_rows", _LLM_Menu_ProfileBuiltinRows.Bind(seen_labels),
+		"llm_profile_custom_rows", _LLM_Menu_ProfileCustomRows.Bind(seen_labels, FrameState),
+		"llm_profile_app_overrides", _LLM_Menu_PerAppProfileRows))
+}
 
-	; Section header: built-in profiles
-	Rows.Push(Map("label", t("menu.profiles.header_default_profiles")))
-
+; Native data reads occur only when the shared frame reaches each provider.
+_LLM_Menu_ProfileBuiltinRows(SeenLabels) {
+	global _LLM_Menu, LLM_PROFILE_BUILTIN_ORDER
+	Rows := []
 	for id in LLM_PROFILE_BUILTIN_ORDER {
 		base_label := LLM_Menu_GetProfileLabel(id)
 		hint := LLM_Menu_GetProfileHotkeyHint(id)
 		label := (hint != "") ? base_label . "  (" . hint . ")" : base_label
 		Rows.Push(Map(
-			"label",   _LLM_Menu_UniqueMenuLabel(seen_labels, label),
+			"label",   _LLM_Menu_UniqueMenuLabel(SeenLabels, label),
 			"checked", (id == _LLM_Menu["profile_id"]),
 			"action",  _LLM_Menu_MakeSetProfileHandler(id)))
 	}
-
-	; Section: user profiles
-	user_profiles := _LLM_Menu["user_profiles"]
-	if (user_profiles.Length > 0) {
-		Rows.Push(Map("separator", true))
-		Rows.Push(Map("label", t("menu.profiles.header_custom_profiles")))
-
-		for p in user_profiles {
-			pid         := p.Has("id") ? p["id"] : ""
-			base_plabel := p.Has("label") ? p["label"] : pid
-			hint := LLM_Menu_GetProfileHotkeyHint(pid)
-			plabel := (hint != "") ? base_plabel . "  (" . hint . ")" : base_plabel
-			Rows.Push(Map(
-				"label",   _LLM_Menu_UniqueMenuLabel(seen_labels, plabel),
-				"checked", (pid == _LLM_Menu["profile_id"]),
-				"action",  _LLM_Menu_MakeUserProfileClickHandler(p)))
-		}
-	}
-
-	Rows.Push(Map("separator", true))
-	Rows.Push(_LLM_Menu_CreateProfileRow(LLM_Menu_PromptCreateProfile))
-
-	; "Clone active built-in" — exposes the built-in system prompt for
-	; editing without requiring the user to type it from scratch. The
-	; built-in profiles in profiles.json are read-only by design (they're
-	; shared across drivers and any local edit would be overwritten on
-	; the next driver update); cloning them into a user profile is the
-	; supported way to customise their prompts.
-	active_id := _LLM_Menu["profile_id"]
-	is_builtin := LLM_Option_IsBuiltinProfileId(active_id)
-	if is_builtin
-		Rows.Push(_LLM_Menu_CloneProfileRow(LLM_Menu_CloneActiveBuiltinProfile))
-
-	; Auto-detect toggle: when ON, switching model in the model submenu also
-	; re-picks the matching profile based on the params count. Mirrors the
-	; HS get_recommended_profile_info path so the two drivers agree on what
-	; profile each model should run with by default.
-	Rows.Push(Map("separator", true))
-	Rows.Push(Map(
-		"label",   t("menu.profiles.auto_detect"),
-		"checked", _LLM_Menu["auto_profile_for_model"],
-		"action",  (*) => _LLM_Menu_ToggleAutoProfile()))
-
-	; Per-app profile overrides — the rows list the current ones; the focused
-	; app is read at click time, not here.
-	Rows.Push(Map("separator", true))
-	Rows.Push(Map(
-		"label", t("menu.profiles.per_app_overrides"),
-		"items", _LLM_Menu_PerAppProfileRows()))
 	return Rows
+}
+
+_LLM_Menu_ProfileCustomPresent(FrameState) {
+	global _LLM_Menu
+	user_profiles := _LLM_Menu["user_profiles"]
+	FrameState["user_profiles"] := user_profiles
+	return user_profiles.Length > 0
+}
+
+_LLM_Menu_ProfileCustomRows(SeenLabels, FrameState) {
+	global _LLM_Menu
+	Rows := []
+	user_profiles := FrameState["user_profiles"]
+	for p in user_profiles {
+		pid         := p.Has("id") ? p["id"] : ""
+		base_plabel := p.Has("label") ? p["label"] : pid
+		hint := LLM_Menu_GetProfileHotkeyHint(pid)
+		plabel := (hint != "") ? base_plabel . "  (" . hint . ")" : base_plabel
+		Rows.Push(Map(
+			"label",   _LLM_Menu_UniqueMenuLabel(SeenLabels, plabel),
+			"checked", (pid == _LLM_Menu["profile_id"]),
+			"action",  _LLM_Menu_MakeUserProfileClickHandler(p)))
+	}
+	return Rows
+}
+
+_LLM_Menu_ProfileClonePresent() {
+	global _LLM_Menu
+	active_id := _LLM_Menu["profile_id"]
+	return LLM_Option_IsBuiltinProfileId(active_id)
 }
 
 

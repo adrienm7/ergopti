@@ -59,7 +59,16 @@ local function with_picker(options, callback)
 			end,
 		}
 		package.loaded["infra.deferred_work"] = { after = function(_, work) work(); return true end }
+		-- The provider's declared child must use a fresh real renderer. Keep
+		-- only the original fixture's parent-provider capture controlled.
+		local renderer = assert(require("menu.renderer").new({
+			platform = "hs",
+			manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
+			json_decode = require("json").decode,
+			i18n = package.loaded["infra.i18n"], logger = logger,
+		}))
 		package.loaded["infra.manifest_menu"] = {
+			template_rows = renderer.template_rows,
 			get_root = function() return { gesture_slots = { ["3"] = { "tap_3" } } } end,
 			build = function(_, _, _, _, _, providers) provider = providers.gesture_slots_3; return {} end,
 		}

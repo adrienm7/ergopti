@@ -1,0 +1,64 @@
+{
+	"api": {
+		"section": "llm_api_empty_status",
+		"key": "menu.llm.api_no_entry",
+		"english": "No API endpoint configured",
+		"rows": [
+			{
+				"type": "label",
+				"id": "llm_api_empty_hint",
+				"i18n": "menu.llm.api_no_entry",
+				"platforms": ["ahk", "linux"],
+				"unavailable": "hide"
+			}
+		],
+		"platform_rows": {
+			"ahk": [
+				{
+					"label": "No API endpoint configured",
+					"disabled": true
+				}
+			],
+			"hs": [],
+			"linux": [
+				{
+					"label": "No API endpoint configured",
+					"disabled": true
+				}
+			]
+		}
+	},
+	"agent": {
+		"section": "agent_server_empty_status",
+		"key": "menu.llm.local_servers.no_models",
+		"english": "No model available",
+		"rows": [
+			{
+				"type": "label",
+				"id": "agent_server_empty_hint",
+				"i18n": "menu.llm.local_servers.no_models",
+				"platforms": ["hs"],
+				"unavailable": "hide"
+			}
+		],
+		"platform_rows": {
+			"ahk": [],
+			"hs": [
+				{
+					"label": "No model available",
+					"disabled": true
+				}
+			],
+			"linux": []
+		}
+	},
+	"marker_key": "menu.agent.off",
+	"marker_english": "Off",
+	"add_english": "+ Add an API",
+	"server_id": "lmstudio",
+	"selected_model": "gone-model",
+	"served_model": "qwen2.5-7b-instruct",
+	"empty_server_body": "{\"data\":[]}",
+	"served_server_body": "{\"data\":[{\"id\":\"qwen2.5-7b-instruct\"}]}",
+	"caption_keys": ["menu.llm.api_no_entry", "menu.llm.local_servers.no_models"]
+}

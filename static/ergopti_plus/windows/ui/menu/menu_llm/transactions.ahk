@@ -438,7 +438,7 @@ _LLM_Menu_CommitApiEntriesMutationNonCritical(Context, MutateFn, ApplyFn,
 			Updates := _ConfigPrepareTypedUpdates(Updates)
 			ConfigBuild := HasMethod(BuildConfigFn, "Call")
 				? BuildConfigFn.Call(ConfigurationFile, Updates)
-				: TOML_BuildUpdatedContent(ConfigurationFile, Updates)
+				: TOML_BuildConfigUpdatedContent(ConfigurationFile, Updates)
 		} catch as Err {
 			return ConfigReportPersistenceFailure(Context, NotifyFn,
 				"config.toml rendering raised: " . _LLM_Menu_ApiTransactionError(Err, RetainedSource))

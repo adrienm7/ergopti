@@ -56,3 +56,5 @@ helpers.describe("llm bridge: a streamed line with an escaped accent", function(
 		helpers.assert_eq(Bridge.parse_stream_line('{"message":{"content":"\\u00e9t\\u00e9"},"done":false}'), "été")
 	end)
 end)
+
+require("test.json_root_source_contract")(helpers, Json)
