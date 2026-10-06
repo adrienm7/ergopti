@@ -4692,6 +4692,19 @@ The maintained AHK and Hammerspoon configuration-schema draft examples no longer
 
 Remaining work for item71 (CI-feasible software first):
 
+Integrated checkpoint `7a75da439` ran manual CI `37539552261` on its exact
+tree through `codex/ci-validation` SHA `532aad27`. All Linux unit, E2E,
+package and seventeen installation/run scenarios passed; Core JS/properties
+passed. Windows retained 9,734 passing AHK records and ten native observer
+ownership scenarios, but the fresh-clone fixture failed at Git checkout on
+the newly archived evidence's long paths, before application startup. The
+fixture now configures `core.longpaths=true` only in its new private clone,
+before checkout, and verifies the local setting. The complete clone, exact
+HEAD, tracked driver projection and all native boot/retirement assertions
+remain mandatory. Native Windows requalification is pending. Separate
+macOS TIS, Brew receiver, switcher and Shortcuts failures remain explicit;
+downstream Windows/macOS delivery was skipped and Release/Publish skipped.
+
 - [ ] Software implementation/repair: Keep the completed dedicated Metrics-shortcut retirement and ordinary Metrics actions; repair only demonstrated regressions in unknown retired values/comments, consent or compensation.
 - [ ] Hosted native qualification: Requalify native full-save, installed upgrade/startup and complete three-OS unit/E2E/package/install/launch gates on final sources.
 - [ ] Separate device/evidence boundary: No new device-only task is established for this retirement; item38 retains its independent physical requirements.
