@@ -51,6 +51,13 @@ int ergopti_archive_publication_allocate_reader(struct ergopti_archive_publicati
  * entry/identity or syscall/close ambiguity refuses and retains physical debt.
  * Uses ONLY retained dir/parent FDs and captured names; never a display path. */
 int ergopti_archive_publication_cleanup(struct ergopti_archive_publication *owner);
+/* Additive ABI1 retirement-only receipt. out is initialized UNKNOWN=0 on every
+ * call. RETAINED_NAMESPACE_CONFLICT=1 is acknowledged only for a known foreign
+ * entry before any namespace mutation/retire, after exact scan closure and
+ * retained-identity checks. Neither errno nor nonzero status grants retry.
+ * Success keeps UNKNOWN and requires the original physical receipt checks. */
+int ergopti_archive_publication_cleanup_with_disposition(
+    struct ergopti_archive_publication *owner, int *out_disposition);
 
 /* Private bootstrap before checksum dispatch. The transaction's existing
  * native selection owns this absolute private directory; public path hints

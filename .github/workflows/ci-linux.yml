@@ -177,7 +177,7 @@ jobs:
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
-          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends lua-luv lua5.4 curl openssl python3 strace
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends lua-luv lua5.4 curl openssl python3 strace build-essential meson ninja-build liblua5.4-dev libffi-dev pkg-config
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_process_groups.lua
         timeout-minutes: 1
 
@@ -910,19 +910,19 @@ jobs:
 
       - name: Preserve native updater temporary-file ownership
         if: ${{ !cancelled() }}
-        working-directory: static/ergopti_plus/linux
         run: |
-          python3 tests/hardware/run_updater_temp_ownership_receipts.py
-          ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_updater_temp_ownership_receipts.py
-        timeout-minutes: 2
+          set -euo pipefail
+          export ERGOPTI_MANAGED_NATIVE_EXPECTED_HEAD="$GITHUB_SHA"
+          npm run --silent test:linux:updater-temp-native -- --fixture ownership | tee "$RUNNER_TEMP/linux-updater-temp-ownership.log"
+        timeout-minutes: 22
 
       - name: Acknowledge native updater temporary-allocation refusals
         if: ${{ !cancelled() }}
-        working-directory: static/ergopti_plus/linux
         run: |
-          python3 tests/hardware/run_updater_temp_allocation_receipts.py
-          ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_updater_temp_allocation_receipts.py
-        timeout-minutes: 1
+          set -euo pipefail
+          export ERGOPTI_MANAGED_NATIVE_EXPECTED_HEAD="$GITHUB_SHA"
+          npm run --silent test:linux:updater-temp-native -- --fixture allocation | tee "$RUNNER_TEMP/linux-updater-temp-allocation.log"
+        timeout-minutes: 22
 
       - name: Install native virtual audio locale prerequisites
         if: ${{ !cancelled() }}
@@ -1702,6 +1702,9 @@ jobs:
           fd_sha256_assertions=$(node tools/test/run-linux-fd-sha256-native.cjs --evidence "$RUNNER_TEMP/linux-fd-sha256-native.log")
           managed_http_output_assertions=$(node tools/test/linux-managed-http-evidence.cjs --count output "$RUNNER_TEMP/linux-managed-http-native.log" "$GITHUB_SHA")
           managed_http_public_assertions=$(node tools/test/linux-managed-http-evidence.cjs --count public "$RUNNER_TEMP/linux-managed-http-native.log" "$GITHUB_SHA")
+          updater_native_namespace_assertions=$(node tools/test/run-linux-updater-temp-native.cjs --evidence namespace "$RUNNER_TEMP/linux-updater-temp-ownership.log" "$GITHUB_SHA")
+          updater_temp_ownership_assertions=$(node tools/test/run-linux-updater-temp-native.cjs --evidence ownership "$RUNNER_TEMP/linux-updater-temp-ownership.log" "$GITHUB_SHA")
+          updater_temp_allocation_assertions=$(node tools/test/run-linux-updater-temp-native.cjs --evidence allocation "$RUNNER_TEMP/linux-updater-temp-allocation.log" "$GITHUB_SHA")
           updater_archive_assertions=$(node tools/test/linux-updater-archive-evidence.cjs archive "$RUNNER_TEMP/linux-updater-archive-native.log")
           archive_crypto_assertions=$(node tools/test/linux-updater-archive-evidence.cjs crypto "$RUNNER_TEMP/linux-archive-source-controls.log")
           archive_bin_parent_assertions=$(node tools/test/linux-updater-archive-evidence.cjs parents "$RUNNER_TEMP/linux-archive-source-controls.log")
@@ -1727,6 +1730,9 @@ jobs:
               --subject "retained-fd-sha256=$fd_sha256_assertions" \
               --subject "managed-http-output=$managed_http_output_assertions" \
               --subject "managed-http-public=$managed_http_public_assertions" \
+              --subject "updater-native-namespace-cleanup=$updater_native_namespace_assertions" \
+              --subject "updater-temp-ownership=$updater_temp_ownership_assertions" \
+              --subject "updater-temp-allocation=$updater_temp_allocation_assertions" \
               --subject "updater-archive-pipeline=$updater_archive_assertions" \
               --subject "archive-source-crypto=$archive_crypto_assertions" \
               --subject "archive-source-bin-parent=$archive_bin_parent_assertions" \

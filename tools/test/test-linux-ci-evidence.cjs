@@ -48,6 +48,15 @@ const updaterProbe = path.join(
 	'static/ergopti_plus/linux/tests/hardware/run_updater_live.lua'
 );
 const updaterDriver = path.join(ROOT, 'static/ergopti_plus/linux');
+// The live probe now loads the real Linux pause owner before any check.
+// These injected refusal observers must resolve driver and shared modules.
+const updaterLuaPath =
+	[
+		path.join(updaterDriver, '?.lua'),
+		path.join(updaterDriver, '?/init.lua'),
+		path.join(ROOT, 'static/ergopti_plus/_shared/lua/?.lua'),
+		path.join(ROOT, 'static/ergopti_plus/_shared/lua/?/init.lua')
+	].join(';') + ';;';
 // The native Linux lane must never certify POSIX observations with Windows Lua.
 const targetCwd = 'C:\\owned checkout\\static\\ergopti_plus\\linux';
 const targetArgv = ['tests/run.lua', '--only', 'an exact case with spaces'];
@@ -793,7 +802,7 @@ end
 			encoding: 'utf8',
 			env: {
 				...process.env,
-				LUA_PATH: `${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?.lua')};${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?/init.lua')};;`,
+				LUA_PATH: updaterLuaPath,
 				GITHUB_ACTIONS: 'true',
 				GITHUB_TOKEN: fixtureToken,
 				ERGOPTI_UPDATER_LIVE_EVIDENCE_DIR: updaterScratch,
@@ -855,7 +864,7 @@ end
 			encoding: 'utf8',
 			env: {
 				...process.env,
-				LUA_PATH: `${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?.lua')};${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?/init.lua')};;`,
+				LUA_PATH: updaterLuaPath,
 				GITHUB_ACTIONS: 'true',
 				GITHUB_TOKEN: fixtureToken,
 				ERGOPTI_UPDATER_LIVE_EVIDENCE_DIR: boundedDir,
@@ -893,7 +902,7 @@ end
 			encoding: 'utf8',
 			env: {
 				...process.env,
-				LUA_PATH: `${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?.lua')};${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?/init.lua')};;`,
+				LUA_PATH: updaterLuaPath,
 				GITHUB_ACTIONS: 'true',
 				GITHUB_TOKEN: fixtureToken,
 				ERGOPTI_UPDATER_LIVE_EVIDENCE_DIR: blockedEvidence,
@@ -1516,6 +1525,9 @@ for (const [, subject, value] of recorded) {
 			'retained-fd-sha256': '$fd_sha256_assertions',
 			'managed-http-output': '$managed_http_output_assertions',
 			'managed-http-public': '$managed_http_public_assertions',
+			'updater-native-namespace-cleanup': '$updater_native_namespace_assertions',
+			'updater-temp-ownership': '$updater_temp_ownership_assertions',
+			'updater-temp-allocation': '$updater_temp_allocation_assertions',
 			'updater-archive-pipeline': '$updater_archive_assertions',
 			'archive-source-crypto': '$archive_crypto_assertions',
 			'archive-source-bin-parent': '$archive_bin_parent_assertions',

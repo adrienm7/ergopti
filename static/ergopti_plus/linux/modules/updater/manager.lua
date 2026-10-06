@@ -1120,7 +1120,8 @@ end
 local function capture_operation(operation)
  if type(operation) ~= "table" then return nil end
  local methods = { is_settled = rawget(operation, "is_settled"),
-  on_settled = rawget(operation, "on_settled"), cancel = rawget(operation, "request_cancel") or rawget(operation, "cancel") }
+  on_settled = rawget(operation, "on_settled"), cancel = rawget(operation, "request_cancel") or rawget(operation, "cancel"),
+  retry_cleanup = rawget(operation, "retry_cleanup") }
  if type(methods.is_settled) ~= "function" or type(methods.on_settled) ~= "function" or type(methods.cancel) ~= "function" then return nil end
  return methods
 end
@@ -1340,6 +1341,10 @@ function M.cancel_update()
   record.cancelled = true
   if record.methods and not record.signalled then
    record.signalled = true; pcall(record.methods.cancel, record.operation)
+  elseif record.methods and type(record.methods.retry_cleanup) == "function" then
+   -- Later explicit cancellation can retry ONLY the captured original known
+   -- namespace conflict. Its operation never resends process signals.
+   pcall(record.methods.retry_cleanup, record.operation)
   end
   return true -- Logical cancellation; state stays busy through actual captured settlement.
  end
