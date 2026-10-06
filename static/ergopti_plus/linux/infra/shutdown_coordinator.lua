@@ -37,16 +37,28 @@ function M.new(opts)
 		end
 	end
 
-	local requested = false
+	local requested, complete, polling = false, false, false
+	local registering, input_stopped = false, false
+	local pending, native_claims = {}, {}
 	local coordinator = {}
-	local pending, registering, input_stopped = {}, false, false
-	local completed = false
+
 	local function finish()
-		if not completed and not registering and input_stopped and next(pending) == nil then
-			completed = true
+		if not complete and not registering and not polling and input_stopped and next(pending) == nil then
+			complete = true
 			event_loop.stop()
 			Logger.done(LOG, "Shutdown quiescence complete.")
 		end
+	end
+
+	--- Rechecks one immutable native claim without recursively borrowing its acknowledgment.
+	--- @param claim table Captured cleanup and observer callbacks.
+	local function acknowledge(claim)
+		if not pending[claim] or claim.checking then return end
+		claim.checking = true
+		local ok, settled = xpcall(claim.stop, debug.traceback)
+		claim.checking = false
+		if ok and settled == true then pending[claim] = nil end
+		finish()
 	end
 
 	--- Quiesces every registered owner exactly once.
@@ -55,25 +67,38 @@ function M.new(opts)
 	--- @return boolean started True only for the first request.
 	function coordinator.request(reason, emergency_reason)
 		if requested then return false end
-		requested = true
-		Logger.start(LOG, "Shutdown quiescence started (%s).", tostring(reason or "unspecified"))
-
-		registering = true
-		for _, owner in ipairs(pre_wait) do
-			local ok, failure = xpcall(owner.stop, debug.traceback)
-			if not ok then
-				Logger.error(LOG, "Shutdown owner '%s' failed: %s", owner.name, tostring(failure))
+		requested, polling, registering = true, true, true
+		-- Pin both polling and observer owners before diagnostics or earlier cleanup can reenter.
+		local owners, claims, waits_for_native = {}, {}, false
+		for index, owner in ipairs(pre_wait) do
+			owners[index] = owner
+			if owner.wait_for_ack == true or type(owner.when_settled) == "function" then
+				local claim = { name = owner.name, stop = owner.stop, when_settled = owner.when_settled }
+				claims[index] = claim
+				native_claims[#native_claims + 1] = claim
+				waits_for_native = true
 			end
-			if type(owner.when_settled) == "function" and (not ok or failure ~= true) then
-				local token = {}
-				pending[token] = owner
-				pcall(owner.when_settled, function()
-					if pending[token] ~= owner then return end
-					local checked, settled = pcall(owner.stop)
-					if not checked or settled ~= true then return end
-					pending[token] = nil
-					finish()
-				end)
+		end
+		if waits_for_native then
+			pcall(Logger.start, LOG, "Shutdown quiescence started (%s).", tostring(reason or "unspecified"))
+		else
+			Logger.start(LOG, "Shutdown quiescence started (%s).", tostring(reason or "unspecified"))
+		end
+
+		for index, owner in ipairs(owners) do
+			local claim = claims[index]
+			local stop, name = claim and claim.stop or owner.stop, claim and claim.name or owner.name
+			local ok, failure = xpcall(stop, debug.traceback)
+			if claim and (not ok or failure ~= true) then pending[claim] = true end
+			if not ok then
+				if waits_for_native then
+					pcall(Logger.error, LOG, "Shutdown owner '%s' failed: %s", name, tostring(failure))
+				else
+					Logger.error(LOG, "Shutdown owner '%s' failed: %s", name, tostring(failure))
+				end
+			end
+			if claim and pending[claim] and type(claim.when_settled) == "function" then
+				pcall(claim.when_settled, function() acknowledge(claim) end)
 			end
 		end
 
@@ -84,10 +109,26 @@ function M.new(opts)
 				keyboard_hook.stop()
 			end
 		end
-		input_stopped, registering = true, false
+		input_stopped, registering, polling = true, false, false
 		finish()
 		return true
 	end
+
+	--- Retries only opt-in native owners while the existing event loop remains alive.
+	--- Ordinary owners retain their original one-shot cleanup contract.
+	--- @return boolean complete Every opt-in owner acknowledged physical retirement.
+	function coordinator.poll()
+		if not requested or complete or polling then return complete end
+		polling = true
+		for _, claim in ipairs(native_claims) do acknowledge(claim) end
+		polling = false
+		finish()
+		return complete
+	end
+
+	--- Reports the retained native cleanup barrier independently of first request.
+	--- @return boolean pending
+	function coordinator.is_pending() return requested and not complete end
 
 	--- Reports whether a request already owns shutdown.
 	--- @return boolean

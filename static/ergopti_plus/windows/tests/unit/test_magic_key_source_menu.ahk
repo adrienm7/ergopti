@@ -55,7 +55,7 @@ _MKS_RowsCase() {
 	}
 }
 
-Test("magic key source: the row sits under the any-layout section, after the replace switch (magic-key-source)",
+Test("magic key source: the row sits under the any-layout section, between switching and shortcut policy (magic-key-source)",
 	_MKS_MenuPlacementCase)
 
 _MKS_MenuPlacementCase() {
@@ -75,8 +75,14 @@ _MKS_MenuPlacementCase() {
 	AssertTrue(Position.Has("magic_key_source"), "the layout menu declares the physical magic key")
 	AssertTrue(Position["magic_key_source"] > Position["menu.layout.header_any"],
 		"the physical magic key works on any layout")
-	AssertEqual(Position["hotstrings.magic_key.replace"] + 1, Position["magic_key_source"],
-		"it follows the switch that turns the key into the magic key")
+	AssertTrue(Position.Has("layout_switching") && Position.Has("layout.ctrl_magic_save"),
+		"the independent surrounding rows must exist")
+	AssertEqual(Position["layout_switching"] + 1, Position["magic_key_source"],
+		"the physical source follows the declared layout-switching provider")
+	AssertEqual(Position["magic_key_source"] + 1, Position["layout.ctrl_magic_save"],
+		"the physical source precedes the declared shortcut policy")
+	AssertFalse(Position.Has("hotstrings.magic_key.replace"),
+		"the removed replacement toggle must not reappear in Layout")
 }
 
 class _MKS_FakeHook {

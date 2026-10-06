@@ -24,6 +24,7 @@ local TITLE_KEYS = {
 	["paths_editor"] = "menu.paths.window_title",
 	["permission_dialog"] = "permission_dialog.window_title",
 	["personal_info_editor"] = "editor.personal_info.window_title",
+	["physical_shortcuts"] = "physical_shortcuts.window_title",
 	["prompt_editor"] = "prompt_editor.title_new",
 	["token_prompt"] = "token_prompt.window_title",
 	["update_check"] = "update_check.window_title",

@@ -108,6 +108,9 @@ _HSCS_ExtensionMenuOwner(Enabled, LateRefusal, Paused := false) {
 	Boot() {
 		global Features, CategoryEnabled, HotstringCategoriesStd, HotstringCategoriesErgopti, SubMenus
 		global _HS_ExtensionsCacheLoaded, _HS_ExtensionsCache, _LegacyTopCategoryMap, HS_LANGUAGE_GATE_KEYS
+		global _FLAT_HOTSTRING_V1_CATS
+		HadFlatCategories := IsSet(_FLAT_HOTSTRING_V1_CATS)
+		SavedFlatCategories := HadFlatCategories ? _FLAT_HOTSTRING_V1_CATS : 0
 		global _FmtCountCache, _MenuDispatchCallbacks
 		SavedCategories := CategoryEnabled, SavedStd := IsSet(HotstringCategoriesStd) ? HotstringCategoriesStd : unset
 		SavedErgopti := IsSet(HotstringCategoriesErgopti) ? HotstringCategoriesErgopti : unset
@@ -138,9 +141,8 @@ _HSCS_ExtensionMenuOwner(Enabled, LateRefusal, Paused := false) {
 			CategoryEnabled := Map("Hotstrings", false, "MagicKey", !Enabled)
 			HS_LANGUAGE_GATE_KEYS := Map()
 			HotstringsSeedLanguageCategoryGates(CategoryEnabled)
-			for Pack in HotstringsLanguageCategories()
-				for Cat in Pack["categories"]
-					_LegacyTopCategoryMap[Cat["v1"]] := "hotstrings." . Cat["v2"]
+			_FLAT_HOTSTRING_V1_CATS := []
+			_HS_RegisterLanguageMenuCategories()
 			State["initialized"] := false
 			MasterGateInitialize(Features, Map("keys", Map()), (*) => false)
 			Groups := MenuManifest_LoadHotstringGroups()
@@ -150,6 +152,7 @@ _HSCS_ExtensionMenuOwner(Enabled, LateRefusal, Paused := false) {
 				SubMenus[Category] := Menu()
 			_EHX_WithRoutes(_LCT_RegistryDir(), Check)
 		} finally {
+			_FLAT_HOTSTRING_V1_CATS := HadFlatCategories ? SavedFlatCategories : unset
 			Suspend(SavedSuspend)
 			if Built is Menu
 				_CTC_ReleaseMenu(Built)
@@ -197,15 +200,16 @@ _HSCS_ExtensionMenuOwner(Enabled, LateRefusal, Paused := false) {
 				if LateRefusal {
 					AssertEqual("pending", Receipt["status"])
 					Parsed := TOML_ParseFreshFile(Fixture.path)
-					AssertEqual(Enabled, Parsed["hotstrings.magic_key.replace"]["enabled"])
-					AssertEqual(Enabled, Parsed["hotstrings.magic_key.repeat_corrections"]["enabled"])
+					for Name in ["replace", "repeat_corrections"]
+						_HSCS_AssertSparseSelection(Parsed, "hotstrings.magic_key." . Name, "enabled",
+							"hotstrings.magic_key." . Name . ".enabled", Enabled)
 					AssertEqual(!Enabled, ReadFeatureStateV2("hotstrings.magic_key.replace")["enabled"],
 						"pending publication leaves the real runtime's desired feature map unchanged")
 					AssertTrue(Parsed["category_enabled"]["magic_key"], "closing bound leaves retains the category gate")
 					for Name in ["text_expansion_symbols", "text_expansion_symbols_typst"]
 						AssertTrue(Parsed["hotstrings.magic_key." . Name]["enabled"], "unrelated MagicKey symbols remain selected")
 					for Key in ["rolls", "distances_reduction", "sfbs_reduction", "french_distancesreduction"]
-						AssertEqual(Enabled, Parsed["category_enabled"][Key], "every whole bound group is in the same cohort")
+						_HSCS_AssertSparseSelection(Parsed, "category_enabled", Key, "category_enabled." . Key, Enabled)
 					AssertFalse(Parsed["category_enabled"]["hotstrings"], "the engine master keeps its independent choice")
 					AssertEqual("retain-extension-fixture", Parsed["private"]["credential"])
 					Refusal.Call("native extension selection refused")
@@ -258,10 +262,19 @@ _HSCS_ExtensionPackOwnedOwner(Enabled, Removed := false) {
 				AssertEqual("pending", Receipt["status"])
 				AssertEqual(1, Launches)
 				Parsed := TOML_ParseFreshFile(Fixture.path)
-				AssertEqual(Enabled, Parsed["hotstrings.groups"]["ext:sample:words"])
-				for Name in ["wanted", "hidden"]
-					AssertEqual(Enabled, Parsed['hotstrings.modules."ext:sample:words"'][Name],
+				GroupPath := "hotstrings.groups.ext:sample:words"
+				GroupRows := Parsed.Get("hotstrings.groups", Map())
+				AssertEqual(Enabled != ManifestDefaultFor(GroupPath), GroupRows.Has("ext:sample:words"),
+					"the group persists only a difference from its declared neutral choice")
+				AssertEqual(Enabled, GroupRows.Get("ext:sample:words", ManifestDefaultFor(GroupPath)))
+				ModuleRows := Parsed.Get('hotstrings.modules."ext:sample:words"', Map())
+				for Name in ["wanted", "hidden"] {
+					ModulePath := "hotstrings.modules.ext:sample:words." . Name
+					AssertEqual(Enabled != ManifestDefaultFor(ModulePath), ModuleRows.Has(Name),
+						"each module persists only a difference from its declared neutral choice")
+					AssertEqual(Enabled, ModuleRows.Get(Name, ManifestDefaultFor(ModulePath)),
 						"all pack-owned sections share the group transaction")
+				}
 				AssertTrue(Parsed["hotstrings.groups"]["ext:foreign:words"])
 				AssertTrue(Parsed["hotstrings.magic_key.replace"]["enabled"], "a different extension cannot alter replacement")
 				Refusal.Call("native pack-owned selection refused")
@@ -573,16 +586,18 @@ _HSCS_TrayMapLiteral(Source, Name) {
 _HSCS_WithDynamicBootState(Body) {
 	Assert(IsSet(MenuLabelFromManifestEntry), "the headless menu must load its real manifest label owner")
 	global Features, _LegacyTopCategoryMap, _LegacyDynamicHotstringsKeyMap, _DYNAMIC_HOTSTRINGS_ORDER
-	global PersonalInformation, _TomlCountCache
+	global PersonalInformation, _TomlCountCache, _V1CatToV2CatMap
 	HadInformation := IsSet(PersonalInformation), OldInformation := HadInformation ? PersonalInformation : 0
 	HadCounts := IsSet(_TomlCountCache), OldCounts := HadCounts ? _TomlCountCache : 0
 	HadFeatures := IsSet(Features), OldFeatures := HadFeatures ? Features : 0
 	HadTop := IsSet(_LegacyTopCategoryMap), OldTop := HadTop ? _LegacyTopCategoryMap : 0
+	HadCategoryMap := IsSet(_V1CatToV2CatMap), OldCategoryMap := HadCategoryMap ? _V1CatToV2CatMap : 0
 	HadKeys := IsSet(_LegacyDynamicHotstringsKeyMap), OldKeys := HadKeys ? _LegacyDynamicHotstringsKeyMap : 0
 	HadOrder := IsSet(_DYNAMIC_HOTSTRINGS_ORDER), OldOrder := HadOrder ? _DYNAMIC_HOTSTRINGS_ORDER : 0
 	try {
 		Source := _StripFullLineComments(FileRead(_DriverDir . "\ui\tray_menu.ahk", "UTF-8"))
 		_LegacyTopCategoryMap := _HSCS_TrayMapLiteral(Source, "_LegacyTopCategoryMap")
+		_V1CatToV2CatMap := _HSCS_TrayMapLiteral(Source, "_V1CatToV2CatMap")
 		Assert(InStr(Source, "global _LegacyDynamicHotstringsKeyMap := _MR_DynamicHotstringsKeyMap()"),
 			"the real tray must consume the shared family alias owner")
 		Assert(InStr(Source, "global _DYNAMIC_HOTSTRINGS_ORDER := _MR_DynamicHotstringsOrder()"),
@@ -607,18 +622,19 @@ _HSCS_WithDynamicBootState(Body) {
 		_TomlCountCache := HadCounts ? OldCounts : unset
 		Features := HadFeatures ? OldFeatures : unset
 		_LegacyTopCategoryMap := HadTop ? OldTop : unset
+		_V1CatToV2CatMap := HadCategoryMap ? OldCategoryMap : unset
 		_LegacyDynamicHotstringsKeyMap := HadKeys ? OldKeys : unset
 		_DYNAMIC_HOTSTRINGS_ORDER := HadOrder ? OldOrder : unset
 	}
 }
 
-; Dynamic scopes have seven canonical families and no separate category gate.
+; Dynamic scopes have eight canonical features and no separate category gate.
 ; The native submenu reaches the same journal while the master or pause is off.
 _HSCS_DynamicMenuOwner(Enabled, Outcome, Paused := false) {
 	global Features, CategoryEnabled, _LegacyTopCategoryMap, _MenuDispatchCallbacks, _TomlFileCache
 	Fixture := _ScopeOwnerFixture(), Built := 0, Bundle := 0, Refusal := 0, Accepted := 0, Launches := 0
 	Names := ["date", "date_fr", "date_long_fr", "phone_prefixes", "ssn_prefixes",
-		"iban_prefixes", "text_expansion_personal_information"]
+		"iban_prefixes", "user_code", "text_expansion_personal_information"]
 	Source := '[category_enabled]`nhotstrings = false`nrolls = true`n[hotstrings.dynamic]`nenabled = false`n'
 	for Index, Name in Names {
 		Source .= '[hotstrings.dynamic.' . Name . ']`nenabled = ' . (Mod(Index, 2) ? "true" : "false") . '`n'
@@ -650,7 +666,7 @@ _HSCS_DynamicMenuOwner(Enabled, Outcome, Paused := false) {
 		AssertEqual(Source, ReadTomlFile(Fixture.path), "fixture primes the live text cache before publication")
 		Cached := ParseTomlFile(Fixture.path)
 		Built := _BuildDynamicHotstringsSubmenu(Fixture.options)
-		AssertEqual(12, TrayMenuItemCount(Built), "two shared commands, two separators, seven families and their editor")
+		AssertEqual(12, TrayMenuItemCount(Built), "two shared commands, two separators, seven displayed families and their editor")
 		AssertEqual(t("menu.hotstrings.scope_enable_all"), _CTC_LabelAt(Built, 0))
 		AssertEqual(t("menu.hotstrings.scope_disable_all"), _CTC_LabelAt(Built, 1))
 		AssertEqual(0, _CTC_CountLabel(Built, t("menu.hotstrings.enable_all_sections")), "the old checkbox is retired")
@@ -1039,3 +1055,53 @@ _HSCS_FileCommand(Receipt) {
 for _HSCS_FileReceipt in [true, false]
 	Test("shared category file: native opening receipt " . _HSCS_FileReceipt,
 		_HSCS_FileCommand.Bind(_HSCS_FileReceipt))
+
+; The actual boot owner must retain extension-bound categories after relocation.
+_HSCS_DeclaredInventory() {
+	_HSCS_WithDynamicBootState(Check)
+	Check() {
+		global _FLAT_HOTSTRING_V1_CATS, _V1CatToV2CatMap, _LegacyTopCategoryMap, HS_LANGUAGE_GATE_KEYS
+		SavedLanguageKeys := HS_LANGUAGE_GATE_KEYS
+		HS_LANGUAGE_GATE_KEYS := Map()
+		HadFlat := IsSet(_FLAT_HOTSTRING_V1_CATS)
+		SavedFlat := HadFlat ? _FLAT_HOTSTRING_V1_CATS : 0
+		try {
+			_FLAT_HOTSTRING_V1_CATS := [], _V1CatToV2CatMap := Map(), _LegacyTopCategoryMap := Map()
+			_HS_RegisterLanguageMenuCategories()
+			AssertEqual("hotstrings.french_distancesreduction", _LegacyTopCategoryMap.Get("FrenchDistancesReduction", ""),
+				"the declared bound category must survive moving out of the language index")
+			Inventory := _HotstringsCategoryScopeInventory(_LegacyTopCategoryMap)
+			Assert(Inventory.Has("FrenchDistancesReduction"))
+			AssertEqual(1, Inventory["FrenchDistancesReduction"].Length)
+			AssertEqual("suffixes_a", Inventory["FrenchDistancesReduction"][1])
+			Gates := Map("FrenchDistancesReduction", true)
+			HotstringsSeedLanguageCategoryGates(Gates)
+			AssertTrue(Gates["FrenchDistancesReduction"], "seeding preserves an explicit existing gate")
+			AssertEqual("french_distancesreduction", _CategoryEnabledKey("FrenchDistancesReduction"))
+			NeutralGates := Map()
+			HotstringsSeedLanguageCategoryGates(NeutralGates)
+			AssertEqual(ManifestDefaultFor("category_enabled.french_distancesreduction"), NeutralGates["FrenchDistancesReduction"])
+			Groups := MenuManifest_LoadHotstringGroups(), Declared := _MG_LoadSubCategories()
+			for Categories in [Groups.standard, Groups.ergopti]
+				for Category in Categories {
+					AssertEqual(Declared[Category], _V1CatToV2CatMap[Category])
+					AssertEqual("hotstrings." . Declared[Category], _LegacyTopCategoryMap[Category])
+				}
+			Count := _FLAT_HOTSTRING_V1_CATS.Length, TopCount := _LegacyTopCategoryMap.Count
+			_HS_RegisterLanguageMenuCategories()
+			AssertEqual(Count, _FLAT_HOTSTRING_V1_CATS.Length, "a rebuild cannot duplicate flat categories")
+			AssertEqual(TopCount, _LegacyTopCategoryMap.Count)
+		} finally {
+			HS_LANGUAGE_GATE_KEYS := SavedLanguageKeys
+			_FLAT_HOTSTRING_V1_CATS := HadFlat ? SavedFlat : unset
+		}
+	}
+}
+Test("hotstring-extension-menu-owner: declared bound category inventory survives relocation", _HSCS_DeclaredInventory)
+
+; Sparse persistence still proves the exact choice and deletion of neutral overrides.
+_HSCS_AssertSparseSelection(Parsed, Section, Key, Path, Enabled) {
+	Rows := Parsed.Get(Section, Map()), Neutral := ManifestDefaultFor(Path)
+	AssertEqual(Enabled != Neutral, Rows.Has(Key), "only an explicit difference belongs in the cohort")
+	AssertEqual(Enabled, Rows.Get(Key, Neutral), "every selected bound choice belongs to the cohort")
+}

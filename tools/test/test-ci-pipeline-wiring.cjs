@@ -54,7 +54,8 @@
  * 4. One root, one lane per OS: ci.yml has exactly one job without needs, the
  *    root; each lane caller needs the root alone; release needs the root and
  *    core and the three lanes, nothing else. Each OS exposes the same five
- *    phases with exactly one entry and one final verdict.
+ *    phases with exactly one entry and one final verdict. macOS also observes
+ *    its native tooltip canvas independently after E2E and before the verdict.
  * 5. Only the steps in STEP_CONDITIONS set an `if`, each exactly its own, and
  *    e2e-linux's harnesses run under !cancelled(). No script swallows a test
  *    runner's failure with `|| true`, and every `| tee` runs under pipefail.
@@ -88,6 +89,10 @@ const ROOT = 'validate';
 const RELEASE_INPUT = `\${{ needs.${ROOT}.outputs.release == 'true' }}`;
 const RELEASE_IF = `github.event_name == 'push' && needs.${ROOT}.outputs.release == 'true'`;
 const NOT_CANCELLED = '${{ !cancelled() }}';
+const MANUAL_RUNTIME_IF =
+	"${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() }}";
+const MANUAL_RUNTIME_EVIDENCE_IF =
+	"${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() }}";
 const MANUAL_VERDICT_IF = "always() && github.event_name == 'workflow_dispatch'";
 const LANE_IF = (os) => `needs.${ROOT}.outputs.lane_${os} == 'true'`;
 // Public by design: SUPublicEDKey ships inside every app, and a CI package
@@ -159,8 +164,17 @@ const PLAN_STEPS = ['Load the Linux release artifact contract', 'Compute tag and
 // accepted value. Every other step runs whenever its job runs, so no edit can
 // skip a gate while its job stays green.
 const STEP_CONDITIONS = [
+	[LINUX_BOX, 'test-linux', 'Run manual official runtime and model acceptance', MANUAL_RUNTIME_IF],
+	[
+		LINUX_BOX,
+		'test-linux',
+		'Upload manual runtime acceptance evidence',
+		MANUAL_RUNTIME_EVIDENCE_IF
+	],
+	[LINUX_BOX, 'e2e-linux', 'Qualify native runtime prerequisites', NOT_CANCELLED],
 	[ENTRY, 'core', 'Install shared UI browsers', "matrix.suite == 'js'"],
 	[ENTRY, 'core', 'Test shared layer editor rendering', "matrix.suite == 'js'"],
+	[ENTRY, 'core', 'Test shared physical shortcut rendering', "matrix.suite == 'js'"],
 	[ENTRY, 'validate', 'Check hotstring TOML files are sorted and formatted', NOT_CANCELLED],
 	[ENTRY, 'release', 'Create git tag', "steps.preflight.outputs.create_tag == 'true'"],
 	[
@@ -232,6 +246,12 @@ const STEP_CONDITIONS = [
 	[MACOS_BOX, 'package-macos', 'Generate Sparkle appcast', 'inputs.release'],
 	[MACOS_BOX, 'package-macos', 'Package latest keylayout bundle', 'inputs.release'],
 	[MACOS_BOX, 'launch', 'Retain launch evidence', 'always()'],
+	[
+		MACOS_BOX,
+		'tooltip-canvas',
+		'Retain native captures, source, provisioning and retirement receipts',
+		'always()'
+	],
 	[
 		WINDOWS_BOX,
 		'test-ahk',
@@ -368,7 +388,7 @@ const GATE_COMMAND = new RegExp(
 		/\btests\/(?:run\.lua|e2e\/run_e2e\.lua|hardware\/|distro\/)/,
 		/\brun_all\.ahk\b|\brun_e2e\.ahk\b|\brun_llm_[a-z_]+\.ahk\b/,
 		/\bswift (?:test|build)\b|\bplutil -lint\b/,
-		/_test\.py\b|\bmacos_launch_gate\.py\b|\bmacos-release-launch\.py\b/,
+		/_test\.py\b|\bmacos_launch_gate\.py\b|\bmacos-release-launch\.py\b|\bmacos_tooltip_canvas\.py\b/,
 		/\blinux-ci-evidence\.cjs (?:verify|record)\b|\bvalidate-ahk-suite-manifest\.cjs\b/,
 		/\btools\/test\/test-[\w-]+\.(?:py|cjs)\b/,
 		/\bnpm run (?:test|build)\b/,
@@ -871,7 +891,12 @@ function graphProblems(files) {
 			[WINDOWS_BOX]: ['test-ahk', 'e2e-ahk', 'package-windows', 'launch-windows', 'windows-ok'],
 			[LINUX_BOX]: ['test-linux', 'e2e-linux', 'package-linux', 'install-linux', 'linux-ok']
 		}[rel];
-		if (JSON.stringify(jobs.map((job) => job.id)) !== JSON.stringify(sequence)) {
+		// Preserve the five original phases and add exactly one independent native observation.
+		const exposed =
+			rel === MACOS_BOX
+				? [...sequence.slice(0, 2), 'tooltip-canvas', ...sequence.slice(2)]
+				: sequence;
+		if (JSON.stringify(jobs.map((job) => job.id)) !== JSON.stringify(exposed)) {
 			problems.push(
 				`${rel} must expose unit tests, E2E, package, installed launch and verdict in order`
 			);
@@ -879,12 +904,25 @@ function graphProblems(files) {
 		for (const [index, id] of sequence.entries()) {
 			const job = jobs.find((candidate) => candidate.id === id);
 			const expected =
-				index === 0 ? [] : index === 4 ? sequence.slice(0, 4) : [sequence[index - 1]];
+				index === 0
+					? []
+					: index === 4
+						? [...sequence.slice(0, 4), ...(rel === MACOS_BOX ? ['tooltip-canvas'] : [])]
+						: [sequence[index - 1]];
 			if (!job || JSON.stringify(pipeline.needsOf(job.body)) !== JSON.stringify(expected)) {
 				problems.push(`${rel} ${id} must need exactly ${expected.join(', ')}`);
 			}
 			if (job && pipeline.field(job.body, 'if') !== (index === 4 ? 'always()' : null)) {
 				problems.push(`${rel} ${id} must run on every profile; only the verdict uses always()`);
+			}
+		}
+		if (rel === MACOS_BOX) {
+			const canvas = jobs.find((candidate) => candidate.id === 'tooltip-canvas');
+			if (!canvas || JSON.stringify(pipeline.needsOf(canvas.body)) !== JSON.stringify(['e2e-hs'])) {
+				problems.push(`${rel} tooltip-canvas must need exactly e2e-hs`);
+			}
+			if (canvas && pipeline.field(canvas.body, 'if') !== null) {
+				problems.push(`${rel} tooltip-canvas must run on every profile without a job condition`);
 			}
 		}
 		const needsOfJob = new Map(
@@ -915,6 +953,23 @@ function graphProblems(files) {
 		}
 	}
 	return problems;
+}
+
+for (const [what, from, to] of [
+	['missing mandatory canvas graph node', '  tooltip-canvas:\n', '  omitted-tooltip-canvas:\n'],
+	[
+		'canvas bypassed by the macOS verdict',
+		'    needs: [test-hs, e2e-hs, package-macos, launch, tooltip-canvas]\n',
+		'    needs: [test-hs, e2e-hs, package-macos, launch]\n'
+	],
+	[
+		'canvas depends on packaging instead of native E2E',
+		"  tooltip-canvas:\n    name: 'Native tooltip canvas · 12 captures'\n    needs: e2e-hs\n",
+		"  tooltip-canvas:\n    name: 'Native tooltip canvas · 12 captures'\n    needs: package-macos\n"
+	],
+	['conditional native canvas job', '  tooltip-canvas:\n', '  tooltip-canvas:\n    if: false\n']
+]) {
+	mustCatch(what, MACOS_BOX, from, to, graphProblems);
 }
 
 errors.push(...graphProblems(pipeline.files()));
@@ -1474,6 +1529,55 @@ for (const spec of NATIVE_ACTION_PROBES) {
 	);
 }
 
+for (const condition of ['', 'false', 'success()']) {
+	const head =
+		'      - name: Retain native captures, source, provisioning and retirement receipts\n';
+	mustCatch(
+		'canvas retained evidence condition ' + condition,
+		MACOS_BOX,
+		head + '        if: always()\n',
+		head + (condition ? '        if: ' + condition + '\n' : ''),
+		stepProblems
+	);
+}
+mustCatch(
+	'missing mandatory native canvas evidence upload',
+	MACOS_BOX,
+	'      - name: Retain native captures, source, provisioning and retirement receipts\n',
+	'      - name: Omitted native canvas evidence upload\n',
+	stepProblems
+);
+mustCatch(
+	'native canvas diagnostic failure swallowed after its continued command',
+	MACOS_BOX,
+	'          --output "$RUNNER_TEMP/tooltip-canvas-evidence"\n',
+	'          --output "$RUNNER_TEMP/tooltip-canvas-evidence" || true\n',
+	stepProblems
+);
+
+for (const [name, expected] of [
+	['Run manual official runtime and model acceptance', MANUAL_RUNTIME_IF],
+	['Upload manual runtime acceptance evidence', MANUAL_RUNTIME_EVIDENCE_IF]
+]) {
+	const head = `      - name: ${name}\n`;
+	const from = head + `        if: ${expected}\n`;
+	for (const changed of ['', 'false', NOT_CANCELLED, "${{ github.event_name == 'push' }}"]) {
+		mustCatch(
+			`manual runtime qualification condition changed: ${name}: ${changed || 'missing'}`,
+			LINUX_BOX,
+			from,
+			head + (changed ? `        if: ${changed}\n` : ''),
+			stepProblems
+		);
+	}
+	mustCatch(
+		`manual runtime qualification step omitted: ${name}`,
+		LINUX_BOX,
+		head,
+		`      - name: Omitted ${name}\n`,
+		stepProblems
+	);
+}
 errors.push(...stepProblems(pipeline.files()));
 for (const name of [
 	'Run signed Hammerspoon program provider inventory',
@@ -2300,6 +2404,94 @@ assert.ok(
 	sparkleToolProblems(swappedSparkleSteps).length > 0,
 	'native XCTest before Sparkle tool installation must refuse'
 );
+
+// This qualifies the shared renderer and recorded bridge, not physical input.
+const PHYSICAL_BROWSER_STEP = 'Test shared physical shortcut rendering';
+const PHYSICAL_BROWSER_ALIAS = 'test:browser:physical-shortcuts';
+const PHYSICAL_BROWSER_COMMAND = 'node ./tools/test/browser/physical-shortcuts.playwright.cjs';
+const PHYSICAL_BROWSER_SCRIPTS = require('../../package.json').scripts;
+
+/** Requires the recorded-bridge browser gate immediately after layer rendering. */
+function physicalBrowserProblems(files, scripts = PHYSICAL_BROWSER_SCRIPTS) {
+	const problems = [];
+	const entry = files.find((file) => file.rel === ENTRY);
+	const core = entry && pipeline.jobsOfText(entry.text, ENTRY).find((job) => job.id === 'core');
+	const steps = core ? pipeline.steps(core.body) : [];
+	const physical = steps.filter((step) => step.name === PHYSICAL_BROWSER_STEP);
+	const at = steps.findIndex((step) => step.name === PHYSICAL_BROWSER_STEP);
+	const layerAt = steps.findIndex((step) => step.name === 'Test shared layer editor rendering');
+	const installAt = steps.findIndex((step) => step.name === 'Install shared UI browsers');
+	if (
+		physical.length !== 1 ||
+		at !== layerAt + 1 ||
+		layerAt < 0 ||
+		installAt < 0 ||
+		installAt >= layerAt
+	) {
+		problems.push(
+			'physical shortcut renderer needs one gate immediately after layer rendering and browser installation'
+		);
+	} else if (
+		pipeline.stepField(physical[0].body, 'if') !== "matrix.suite == 'js'" ||
+		pipeline.stepField(physical[0].body, 'run') !== `npm run ${PHYSICAL_BROWSER_ALIAS}`
+	) {
+		problems.push('physical shortcut renderer must run its exact command on the shared JS lane');
+	}
+	if (scripts[PHYSICAL_BROWSER_ALIAS] !== PHYSICAL_BROWSER_COMMAND) {
+		problems.push(
+			'physical shortcut browser alias must execute the existing recorded-bridge fixture'
+		);
+	}
+	return problems;
+}
+errors.push(...physicalBrowserProblems(pipeline.files()));
+const physicalBrowserBody = pipeline.step(pipeline.job('core'), PHYSICAL_BROWSER_STEP);
+for (const [what, changed] of [
+	['missing physical browser step', ''],
+	[
+		'missing physical browser condition',
+		physicalBrowserBody.replace("        if: matrix.suite == 'js'\n", '')
+	],
+	[
+		'disabled physical browser condition',
+		physicalBrowserBody.replace("matrix.suite == 'js'", 'false')
+	],
+	[
+		'wrong physical browser lane',
+		physicalBrowserBody.replace("matrix.suite == 'js'", "matrix.suite == 'properties'")
+	],
+	[
+		'wrong physical browser command',
+		physicalBrowserBody.replace(
+			`npm run ${PHYSICAL_BROWSER_ALIAS}`,
+			'npm run test:browser:layer-editor'
+		)
+	]
+]) {
+	mustCatch(what, ENTRY, physicalBrowserBody, changed, physicalBrowserProblems);
+}
+const layerBrowserBody = pipeline.step(pipeline.job('core'), 'Test shared layer editor rendering');
+const misplacedPhysicalBrowser = pipeline.files().map((entry) =>
+	entry.rel === ENTRY
+		? {
+				...entry,
+				text: entry.text
+					.replace(physicalBrowserBody, '')
+					.replace(layerBrowserBody, physicalBrowserBody + layerBrowserBody)
+			}
+		: entry
+);
+assert.ok(
+	physicalBrowserProblems(misplacedPhysicalBrowser).length > 0,
+	'physical renderer before layer renderer must refuse'
+);
+for (const changed of [undefined, 'node ./tools/test/browser/layer-editor.playwright.cjs']) {
+	const scripts = { ...PHYSICAL_BROWSER_SCRIPTS, [PHYSICAL_BROWSER_ALIAS]: changed };
+	assert.ok(
+		physicalBrowserProblems(pipeline.files(), scripts).length > 0,
+		'missing or redirected physical browser alias must refuse'
+	);
+}
 
 if (errors.length > 0) {
 	console.error(

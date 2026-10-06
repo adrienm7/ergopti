@@ -346,3 +346,142 @@ _LTN_HotkeysSkipTheLadder() {
 }
 Test("LLM tone: the ladder profiles leave the Ctrl+<n> hotkeys to prediction prompts",
 	_LTN_HotkeysSkipTheLadder)
+
+
+
+
+
+; =======================================================
+; =======================================================
+; ======= 5/ Deferred tone output ownership =============
+; =======================================================
+; =======================================================
+
+_LTQ_Capture(State, Text, Opts, Callback) {
+	State.Text := Text
+	State.Opts := Opts
+	State.Callback := Callback
+	State.Sends += 1
+}
+
+_LTQ_SelectionReader(State, Callback) {
+	State.Reads += 1
+	return State.ReadAccepted
+}
+
+_LTQ_Focus(State) {
+	global _LLM_Tone_Generation
+	if State.RevokeOnProbe {
+		State.RevokeOnProbe := false
+		_LLM_Tone_Generation += 1
+	}
+	return State.Focus
+}
+
+_LTQ_Select(State, Count) {
+	global _LLM_Tone_Generation, _LLM_Tone_Memory
+	State.Selects.Push(Count)
+	if State.RevokeOnSelect {
+		_LLM_Tone_Generation += 1
+		_LLM_Tone_Memory := State.NewMemory
+	}
+	if State.PauseOnSelect
+		Suspend(true)
+	return true
+}
+
+_LTQ_Case(Mode) {
+	global _LLM_Tone_Generation, _LLM_Tone_Memory
+	global _LLM_Tone_ReadSelection, _LLM_Tone_FocusProbe
+	Saved := { Generation: _LLM_Tone_Generation, Memory: _LLM_Tone_Memory,
+		Reader: _LLM_Tone_ReadSelection, Probe: _LLM_Tone_FocusProbe, Suspended: A_IsSuspended }
+	State := { Focus: "owned-control", RevokeOnProbe: false, RevokeOnSelect: false,
+		PauseOnSelect: false,
+		ReadAccepted: false, Reads: 0, Sends: 0, Selects: [],
+		NewMemory: Map("source", "new source", "output", "new output", "level", 2) }
+	InitialMemory := Map("source", "retained source", "output", "retained output", "level", 1)
+	try {
+		_LLM_Tone_Generation := 41
+		_LLM_Tone_Memory := InitialMemory
+		_LLM_Tone_ReadSelection := _LTQ_SelectionReader.Bind(State)
+		_LLM_Tone_FocusProbe := _LTQ_Focus.Bind(State)
+		Plan := Map("source", "original selection", "level", 3, "profile_id", "tone_formal")
+		Rewrite := "Thank you " . Chr(0x1F600)
+		_LLM_Tone_OnAnswer(41, Plan, State.Focus, "REWRITE: " . Rewrite, "",
+			_LTQ_Capture.Bind(State))
+		AssertEqual(1, State.Sends, "the actual answer owner must hand one request to the sender")
+		AssertEqual(Rewrite, State.Text, "the request must contain the extracted rewrite")
+		AssertTrue(HasMethod(State.Opts["admission"], "Call"), "the actual queued request must retain admission")
+		AssertTrue(HasMethod(State.Callback, "Call"), "the actual completion callback must be captured")
+		switch Mode {
+			case "current admission":
+				AssertTrue(State.Opts["admission"].Call(), "the current same-focus request remains admitted")
+			case "accepted supersession", "refused supersession":
+				State.ReadAccepted := Mode == "accepted supersession"
+				AssertEqual(State.ReadAccepted, LLM_Tone_Trigger(LLM_TONE_MORE_FORMAL, false))
+				AssertEqual(42, _LLM_Tone_Generation, "the real trigger revokes even a refused new capture")
+				AssertEqual(1, State.Reads, "the actual trigger must call the selection reader")
+				AssertFalse(State.Opts["admission"].Call(), "queued output of the older step must be refused")
+			case "focus admission":
+				State.Focus := "other-control"
+				AssertFalse(State.Opts["admission"].Call(), "another control must refuse the queued rewrite")
+			case "probe supersession":
+				State.RevokeOnProbe := true
+				AssertFalse(State.Opts["admission"].Call(), "a focus probe may not lend authority to a newer generation")
+				AssertEqual(42, _LLM_Tone_Generation)
+			case "current completion":
+				State.Callback.Call(true, "", _LTQ_Select.Bind(State))
+				AssertEqual(1, State.Selects.Length, "the current completion must select the rewrite")
+				AssertEqual(11, State.Selects[1], "courtesy selection must count the emoji once")
+				AssertEqual("original selection", _LLM_Tone_Memory["source"])
+				AssertEqual(Rewrite, _LLM_Tone_Memory["output"])
+				AssertEqual(3, _LLM_Tone_Memory["level"])
+			case "superseded completion", "focus completion", "probe completion":
+				if Mode == "superseded completion"
+					_LLM_Tone_Generation += 1
+				else if Mode == "focus completion"
+					State.Focus := "other-control"
+				else
+					State.RevokeOnProbe := true
+				State.Callback.Call(true, "", _LTQ_Select.Bind(State))
+				AssertEqual(0, State.Selects.Length, "a retired completion must not select current document text")
+				AssertTrue(_LLM_Tone_Memory == InitialMemory, "a retired completion must leave tone memory intact")
+			case "selection supersession":
+				State.RevokeOnSelect := true
+				State.Callback.Call(true, "", _LTQ_Select.Bind(State))
+				AssertEqual(1, State.Selects.Length, "the old completion owned the admitted selection call")
+				AssertTrue(_LLM_Tone_Memory == State.NewMemory, "after that callout the newer tone memory must win")
+			case "paused completion":
+				Suspend(true)
+				State.Callback.Call(true, "", _LTQ_Select.Bind(State))
+				AssertEqual(0, State.Selects.Length, "a paused completion must not select document text")
+				AssertTrue(_LLM_Tone_Memory == InitialMemory, "a paused completion must not publish tone memory")
+			case "selection pause":
+				State.PauseOnSelect := true
+				State.Callback.Call(true, "", _LTQ_Select.Bind(State))
+				AssertEqual(1, State.Selects.Length, "the selection was admitted before the pause callout")
+				AssertTrue(_LLM_Tone_Memory == InitialMemory, "memory publication must stop after a pause callout")
+			case "failed completion":
+				State.Callback.Call(false, "recorded refusal", _LTQ_Select.Bind(State))
+				AssertEqual(0, State.Selects.Length, "failed output must not select any text")
+				AssertTrue(_LLM_Tone_Memory == InitialMemory)
+			default:
+				throw ValueError("Unknown tone ownership fixture mode.")
+		}
+	} finally {
+		try Suspend(Saved.Suspended)
+		finally {
+			_LLM_Tone_Generation := Saved.Generation
+			_LLM_Tone_Memory := Saved.Memory
+			_LLM_Tone_ReadSelection := Saved.Reader
+			_LLM_Tone_FocusProbe := Saved.Probe
+		}
+	}
+}
+
+for _LTQ_Mode in ["current admission", "accepted supersession", "refused supersession",
+		"focus admission", "probe supersession", "current completion", "superseded completion",
+		"focus completion", "probe completion", "selection supersession", "paused completion",
+		"selection pause", "failed completion"] {
+	Test("LLM tone: deferred " . _LTQ_Mode . " (tone-deferred-owner)", _LTQ_Case.Bind(_LTQ_Mode))
+}

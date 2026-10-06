@@ -19,6 +19,8 @@ class Keylogger {
 
 class KLHook {
 	static registered := false
+	static capture_generation := 1
+	static capture_stopping := false
 }
 
 ; No physical hook is installed by the fixture. Any unexpected removal or

@@ -308,4 +308,7 @@ def entrypoint(arguments):
 
 
 if __name__ == "__main__":
+    # The fixed CLI receipt has the same bytes on every control-test host.
+    sys.stdout.reconfigure(newline="\n")
+    sys.stderr.reconfigure(newline="\n")
     sys.exit(entrypoint(sys.argv[1:]))

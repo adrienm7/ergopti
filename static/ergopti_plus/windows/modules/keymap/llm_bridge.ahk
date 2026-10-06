@@ -322,6 +322,7 @@ _LLM_Bridge_InjectionOptions(Transaction) {
 		"mode", "auto",
 		"atomic_input", true,
 		"erase_before", Transaction.Deletes,
+		"deleted_text", Transaction.DeletedText,
 		"admission", Transaction.Admission,
 		"atomic_prepare", _LLM_Bridge_PrepareOutputJournal.Bind(Transaction),
 		"atomic_journal", _LLM_Bridge_CommitOutputJournal,

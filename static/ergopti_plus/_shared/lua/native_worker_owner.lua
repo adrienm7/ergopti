@@ -9,8 +9,15 @@ local M = {}
 function M.new(capture, ports)
 	assert(type(ports) == "table", "native worker ports are required")
 	local runner, native, parse = ports.runner, ports.native, ports.parse
-	local timeout, retry = ports.timeout_ms / 1000, ports.retry_ms / 1000
-	assert(type(parse) == "function" and timeout > 0 and retry > 0, "native worker policy is invalid")
+	local timeout_ms, retry_ms = ports.timeout_ms, ports.retry_ms
+	local service = timeout_ms == false
+	assert(type(parse) == "function" and type(retry_ms) == "number" and retry_ms > 0
+		and retry_ms < math.huge and (service or (type(timeout_ms) == "number"
+			and timeout_ms > 0 and timeout_ms < math.huge)), "native worker policy is invalid")
+	-- Only literal false selects service lifetime; captured scalar policy stays
+	-- immutable if the caller later changes its ports table.
+	local timeout, retry = false, retry_ms / 1000
+	if not service then timeout = timeout_ms / 1000 end
 	local current, paused, generation = nil, false, 0
 	local desired_paused = false
 	local idle = {}
@@ -161,7 +168,7 @@ function M.new(capture, ports)
 				settled(entry)
 				if current ~= entry then return end
 				entry.ticks = entry.ticks + 1
-				if not admitted() or entry.ticks * retry >= timeout then cancel(entry) end
+				if not admitted() or (timeout ~= false and entry.ticks * retry >= timeout) then cancel(entry) end
 			end)
 			if result ~= 0 and result ~= true then error("native worker timer refused") end
 		end)

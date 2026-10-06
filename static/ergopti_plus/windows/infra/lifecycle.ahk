@@ -471,7 +471,7 @@ Ergopti_OnSuspendEnter() {
 	if IsSet(ProgramActions_Stop)
 		_LifecycleRunRequiredStep(Transition, "user-programs", () => ProgramActions_Stop(true), true)
 	if IsSet(UserHotstringsInvalidate)
-		_LifecycleRunRequiredStep(Transition, "user-hotstrings", UserHotstringsInvalidate.Bind("suspend"))
+		_LifecycleRunRequiredStep(Transition, "user-hotstrings", UserHotstringsInvalidate.Bind("suspend"), true)
 	if !_LifecycleRunRequiredStep(Transition, "navigation-event",
 			() => _LifecycleSetNavEventOwnerSuspended(true), true) {
 		LifecycleTransitionFinish(Transition)
@@ -481,6 +481,9 @@ Ergopti_OnSuspendEnter() {
 	if IsSet(LLM_AuxInvalidate)
 		_LifecycleRunRequiredStep(Transition, "llm-aux-context",
 			LLM_AuxInvalidate.Bind("suspend"))
+	if IsSet(LLM_Menu_LocalServersOnSuspend)
+		_LifecycleRunRequiredStep(Transition, "llm-local-servers",
+			LLM_Menu_LocalServersOnSuspend, true)
 	if IsSet(KL_Watchers_OnSuspend)
 		_LifecycleRunRequiredStep(Transition, "keylogger-system-intervals",
 			KL_Watchers_OnSuspend)
@@ -720,6 +723,11 @@ Ergopti_OnSuspendResume() {
 				_LifecycleLogTransitionDebt(Transition)
 				return false
 		}
+		if IsSet(LLM_Menu_LocalServersResumeFinished) {
+			try LLM_Menu_LocalServersResumeFinished(Transition)
+			catch as Err
+				try LoggerError("Lifecycle", "Local AI server post-transition repair remains owned.")
+		}
 		LoggerSuccess("Lifecycle", "Resumed — suspend-bypassing subsystems restarted.")
 		return true
 }
@@ -870,6 +878,11 @@ _LifecycleRefuseShutdown(Gate) {
 		; reload and cleanup barriers keep their independent authority.
 		if IsSet(LLM_Menu_ApiPrivateRefuseShutdown)
 			LLM_Menu_ApiPrivateRefuseShutdown(_LifecycleAiShutdownAttempt)
+		if IsSet(LLM_Menu_LocalServersShutdownRefused) {
+			try LLM_Menu_LocalServersShutdownRefused(_LifecycleAiShutdownAttempt)
+			catch as Err
+				try LoggerError("Lifecycle", "Local AI server repair remains owned after shutdown refusal.")
+		}
 		return 1
 	}
 	Released := _LifecycleForceReleaseHeldInput()
@@ -1048,6 +1061,19 @@ Ergopti_OnShutdown(reason, code) {
 			try _Updater_DeferRecoveryHandoffRetry()
 			return _LifecycleRefuseShutdown("deferred hotstring records are still pending")
 		}
+		LocalServersSettled := true
+		if IsSet(LLM_Menu_LocalServersPrepareShutdown) {
+			LocalServersSettled := false
+			try LocalServersSettled := LLM_Menu_LocalServersPrepareShutdown()
+			catch as Err
+				try LoggerError("Lifecycle", "Local AI server retirement failed before shutdown: {1}.", Err.Message)
+		}
+		if !LocalServersSettled {
+			try KL_CancelShutdown()
+			try _Updater_DeferExitIntentRetry()
+			try _Updater_DeferRecoveryHandoffRetry()
+			return _LifecycleRefuseShutdown("local AI server requests remain owned")
+		}
 		InstallerStopped := false
 		try InstallerStopped := LLM_Deps_PrepareShutdown()
 		catch as Err
@@ -1115,6 +1141,10 @@ Ergopti_OnShutdown(reason, code) {
 		; FinalExit and ownership transfer remain refusal gates, but all live
 		; producers are still installed. A refusal rolls back the terminal handoff
 		; through _LifecycleRefuseShutdown and withdraws the keylogger lease below.
+		if FileReadActivityBusy() {
+			try KL_CancelShutdown()
+			return _LifecycleRefuseShutdown("an exact file read still owns native cleanup")
+		}
 		FinalExitAuthorized := false
 		try FinalExitAuthorized := _Updater_SignalFinalExitForIntent()
 		catch as Err

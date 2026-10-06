@@ -581,6 +581,10 @@ KLPF_InitializeCleanup()
 #Include modules/llm/parser.ahk
 #Include modules/llm/remote_formats.ahk
 #Include ..\_shared\modules\llm\local_server_auth.ahk
+#Include ..\_shared\modules\llm\local_server_discovery.ahk
+#Include ..\_shared\modules\llm\local_server_menu.ahk
+#Include modules/llm/local_server_models.ahk
+#Include modules/llm/local_servers.ahk
 #Include modules/llm/api_remote.ahk
 #Include modules/llm/models.ahk
 ; LLM_GetSharedPath is now available — load the cross-platform defaults before

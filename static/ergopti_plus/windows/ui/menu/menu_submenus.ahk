@@ -120,12 +120,22 @@ InitSubMenus() {
 	BootProfile_Mark("MENU/InitSub: tapholds submenu")
 }
 
-; Add every language-pack category to the flat category tables the submenu
-; builder, the counters and the bulk actions walk. The neutral five are listed in
-; tray_menu.ahk; the language ones come from the shared hotstring index, so a new
-; language needs no entry here. Idempotent: a tray rebuild calls it again.
+; Register declared native groups before language additions. A category can move
+; from a language pack into a shipped extension while retaining its shared menu
+; identity and feature paths. Rebuilds preserve already registered categories.
 _HS_RegisterLanguageMenuCategories() {
 	global _FLAT_HOTSTRING_V1_CATS, _V1CatToV2CatMap, _LegacyTopCategoryMap
+	Groups := MenuManifest_LoadHotstringGroups(), CategoryGroups := _MG_LoadSubCategories()
+	for Categories in [Groups.standard, Groups.ergopti] {
+		for Category in Categories {
+			if _V1CatToV2CatMap.Has(Category)
+				continue
+			Group := CategoryGroups[Category]
+			_FLAT_HOTSTRING_V1_CATS.Push(Category)
+			_V1CatToV2CatMap[Category] := Group
+			_LegacyTopCategoryMap[Category] := "hotstrings." . Group
+		}
+	}
 	for _, Pack in HotstringsLanguageCategories() {
 		for _, Cat in Pack["categories"] {
 			if _V1CatToV2CatMap.Has(Cat["v1"])

@@ -3958,6 +3958,13 @@ type = "---"
 [[menu.llm_menu]]
 type = "dynamic"
 id = "llm_backend"
+# Static provider status belongs to this live backend row, not another menu.
+# Inert labels are status text, not section headings or executable commands.
+status_rows.unavailable = [
+	{ type = "---" },
+	{ type = "label", i18n = "menu.llm.local_servers.header" },
+	{ type = "label", i18n = "menu.llm.unavailable" },
+]
 disabled_when_off = false
 health_dot = false
 platforms = ["ahk", "hs"]
@@ -4585,6 +4592,16 @@ unavailable = "hide"
 # below are the user's own modifier shortcuts, two distinct blocks.
 [[menu.shortcuts_menu]]
 type = "---"
+
+[[menu.shortcuts_menu]]
+type = "command"
+id = "physical_shortcuts_editor"
+i18n = "physical_shortcuts.window_title"
+platforms = ["hs", "linux"]
+unavailable = "grey"
+reason_key = "physical_shortcuts.windows_unavailable"
+disabled_when = ["physical_shortcuts_editor_ready"]
+disabled_reason_key = "physical_shortcuts.window_unavailable"
 
 [[menu.shortcuts_menu]]
 type = "list"

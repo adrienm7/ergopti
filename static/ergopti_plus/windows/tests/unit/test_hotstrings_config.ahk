@@ -1199,3 +1199,142 @@ TestHotstringsConfig_OverrideIdentifiersCannotInjectToml() {
 }
 Test("HotstringsConfig: override identifiers cannot inject TOML",
 	TestHotstringsConfig_OverrideIdentifiersCannotInjectToml)
+
+
+; Legal TOML comments must not change the current override owner or its values.
+_HCOL_Read(Content) {
+	Root := A_Temp . "\hotstrings-lexical-" . DllCall("GetCurrentProcessId") . "-" . A_TickCount
+	AssertFalse(FileExist(Root), "the lexical fixture must acquire an absent private root")
+	Owned := false
+	try {
+		DirCreate(Root)
+		Owned := true
+		Path := Root . "\overrides.toml"
+		Stream := FileOpen(Path, "w", "UTF-8")
+		Assert(IsObject(Stream), "the owned TOML fixture must open for writing")
+		try Stream.Write(Content)
+		finally Stream.Close()
+		return {
+			Overrides: _ParseOverrides(Path),
+			Word: _ParseGlobalKey(Path, "word_delimiters"),
+			Consumed: _ParseGlobalKey(Path, "consumed_delimiters"),
+		}
+	} finally {
+		if Owned
+			DirDelete(Root, true)
+	}
+}
+
+_HCOL_CategoryHeader() {
+	Read := _HCOL_Read("[rolls]`ndelay = 0.3`n`t[magickey] # own category`t`ndelay = 0.9`n")
+	AssertEqual(0.3, Read.Overrides["rolls"].Delay, "a commented category must not overwrite the previous category")
+	AssertTrue(Read.Overrides.Has("magickey"), "the commented category must have its own identity")
+	AssertEqual(0.9, Read.Overrides["magickey"].Delay, "the value belongs to the new category")
+}
+Test("HotstringsConfig: commented category keeps owner identity (hotstrings-override-lexical)", _HCOL_CategoryHeader)
+
+_HCOL_SectionHeader() {
+	Read := _HCOL_Read("[rolls.first]`ndelay = 0.2`n[rolls.second] # own section`ndelay = 0.8`n")
+	AssertEqual(0.2, Read.Overrides["rolls"].Sections["first"].Delay, "a commented section must not overwrite the previous section")
+	AssertTrue(Read.Overrides["rolls"].Sections.Has("second"), "the new section must exist")
+	AssertEqual(0.8, Read.Overrides["rolls"].Sections["second"].Delay, "the value belongs to the new section")
+}
+Test("HotstringsConfig: commented section keeps owner identity (hotstrings-override-lexical)", _HCOL_SectionHeader)
+
+_HCOL_ExtensionHeader() {
+	Read := _HCOL_Read("[rolls]`ndelay = 0.3`n[ext.Demo-Pack] # own extension`ndelay = 0.7`n")
+	AssertEqual(0.3, Read.Overrides["rolls"].Delay, "a commented extension must not overwrite the previous category")
+	AssertTrue(Read.Overrides.Has("ext.demo-pack"), "the extension retains canonical case folding")
+	AssertEqual(0.7, Read.Overrides["ext.demo-pack"].Delay, "the value belongs to the extension")
+}
+Test("HotstringsConfig: commented extension keeps owner identity (hotstrings-override-lexical)", _HCOL_ExtensionHeader)
+
+_HCOL_ExtensionSectionHeader() {
+	Read := _HCOL_Read("[ext.demo]`ndelay = 0.4`n[ext.demo.symbols] # own section`ndelay = 0.6`n")
+	AssertEqual(0.4, Read.Overrides["ext.demo"].Delay, "a commented extension section must not overwrite its parent")
+	AssertTrue(Read.Overrides["ext.demo"].Sections.Has("symbols"), "the extension section must exist")
+	AssertEqual(0.6, Read.Overrides["ext.demo"].Sections["symbols"].Delay, "the section receives its own value")
+}
+Test("HotstringsConfig: commented extension section keeps owner identity (hotstrings-override-lexical)", _HCOL_ExtensionSectionHeader)
+
+_HCOL_Fields() {
+	Content := "[rolls]`ndelay = 0.9 # timing`n"
+		. 'color = "#112233" # literal color hash' . "`n"
+		. "show_tooltip = false # tooltip`npriority = 7 # priority`n"
+	Read := _HCOL_Read(Content)
+	Entry := Read.Overrides["rolls"]
+	AssertEqual(0.9, Entry.Delay, "a trailing comment must preserve the numeric delay")
+	AssertEqual("#112233", Entry.Color, "the quoted color hash is data")
+	AssertEqual(false, Entry.ShowTooltip, "a trailing comment must preserve the boolean override")
+	AssertEqual(7, Entry.Priority, "a trailing comment must preserve the integer priority")
+}
+Test("HotstringsConfig: comments preserve all override field types (hotstrings-override-lexical)", _HCOL_Fields)
+
+_HCOL_GlobalHeader() {
+	Content := "[__global__] # delimiter owner`n"
+		. 'word_delimiters = ".?!"' . "`n"
+		. 'consumed_delimiters = ";"' . "`n[rolls]`ndelay = 0.2`n"
+	Read := _HCOL_Read(Content)
+	AssertEqual(".?!", Read.Word, "a commented global header must expose its delimiter value")
+	AssertEqual(Chr(59), Read.Consumed, "the consumed delimiters share the global header owner")
+	AssertEqual(0.2, Read.Overrides["rolls"].Delay, "ordinary categories remain readable after global values")
+}
+Test("HotstringsConfig: commented global header owns both delimiter keys (hotstrings-override-lexical)", _HCOL_GlobalHeader)
+
+_HCOL_GlobalFields() {
+	Content := "[__global__]`n"
+		. 'word_delimiters = "." # word' . "`n"
+		. 'consumed_delimiters = "!" # consumed' . "`n"
+	Read := _HCOL_Read(Content)
+	AssertEqual(".", Read.Word, "the global quoted word value accepts a trailing comment")
+	AssertEqual("!", Read.Consumed, "the consumed value uses the same normalization")
+}
+Test("HotstringsConfig: comments preserve global delimiter fields (hotstrings-override-lexical)", _HCOL_GlobalFields)
+
+_HCOL_QuotedData() {
+	Content := "[__global__]`n" . 'word_delimiters = "#\"é\t"' . "`n"
+		. '[rolls]' . "`n" . 'color = "#\"é\t"' . "`n"
+	Read := _HCOL_Read(Content)
+	Expected := "#" . Chr(34) . "é" . Chr(9)
+	AssertEqual(Expected, Read.Word, "an internal hash escaped quote tab and Unicode remain data")
+	AssertEqual(Expected, Read.Overrides["rolls"].Color, "ordinary basic-string decoding remains unchanged")
+}
+Test("HotstringsConfig: quoted hashes and escapes remain data (hotstrings-override-lexical)", _HCOL_QuotedData)
+
+_HCOL_QuotedDataComment() {
+	Content := "[__global__]`n" . 'word_delimiters = "#\"é\t" # comment "quote"' . "`n"
+		. '[rolls]' . "`n" . 'color = "#\"é\t" # comment "quote"' . "`n"
+	Read := _HCOL_Read(Content)
+	Expected := "#" . Chr(34) . "é" . Chr(9)
+	AssertEqual(Expected, Read.Word, "comment quotes must not become delimiter data")
+	AssertEqual(Expected, Read.Overrides["rolls"].Color, "comment stripping must preserve the escaped quote boundary")
+}
+Test("HotstringsConfig: quoted escapes survive trailing comment quotes (hotstrings-override-lexical)", _HCOL_QuotedDataComment)
+
+_HCOL_OrdinaryDefaults() {
+	Content := "[__global__]`n" . 'word_delimiters = "."' . "`n"
+		. "[rolls]`ndelay = 0.3`nshow_tooltip = true`npriority = 4`n"
+		. "[rolls.symbols]`ndelay = 0.2`n[ext.demo]`ndelay = 0.5`n"
+	Read := _HCOL_Read(Content)
+	AssertEqual(".", Read.Word, "an ordinary global key retains its value")
+	AssertEqual("", Read.Consumed, "an absent delimiter key keeps the existing absent sentinel")
+	AssertEqual(0.3, Read.Overrides["rolls"].Delay, "an ordinary category remains unchanged")
+	AssertEqual("", Read.Overrides["rolls"].Color, "an absent override retains its default sentinel")
+	AssertEqual(true, Read.Overrides["rolls"].ShowTooltip, "ordinary true remains true")
+	AssertEqual(4, Read.Overrides["rolls"].Priority, "ordinary integer priority remains intact")
+	AssertEqual(0.2, Read.Overrides["rolls"].Sections["symbols"].Delay, "ordinary sections remain separate")
+	AssertEqual(0.5, Read.Overrides["ext.demo"].Delay, "ordinary extensions remain separate")
+	AssertEqual(0, _ParseOverrides("").Count, "an absent override path retains its empty map")
+	AssertEqual("", _ParseGlobalKey("", "word_delimiters"), "an absent global path retains its empty sentinel")
+}
+Test("HotstringsConfig: ordinary values and absent defaults remain intact (hotstrings-override-lexical)", _HCOL_OrdinaryDefaults)
+
+_HCOL_FullLineComments() {
+	Content := "[rolls]`ndelay = 0.3`n# [magickey]`n# delay = 0.9`n"
+		. "[__global__]`n# word_delimiters = ignored`n" . 'word_delimiters = "."' . "`n"
+	Read := _HCOL_Read(Content)
+	AssertEqual(0.3, Read.Overrides["rolls"].Delay, "full-line comment assignments do not change values")
+	AssertFalse(Read.Overrides.Has("magickey"), "a full-line comment header never creates a category")
+	AssertEqual(".", Read.Word, "the actual delimiter value remains readable after comments")
+}
+Test("HotstringsConfig: full-line comments never create owners (hotstrings-override-lexical)", _HCOL_FullLineComments)

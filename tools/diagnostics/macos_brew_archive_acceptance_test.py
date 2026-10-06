@@ -1,9 +1,11 @@
 # tools/diagnostics/macos_brew_archive_acceptance_test.py
 """Portable refusal/lifecycle controls; these never claim native Brew execution."""
 
+from contextlib import contextmanager
 import json
 import os
 from pathlib import Path, PurePosixPath
+import stat
 import subprocess
 from tempfile import TemporaryDirectory
 import unittest
@@ -12,6 +14,133 @@ from unittest.mock import Mock, patch
 import macos_brew_archive_acceptance as probe
 from macos_owned_process import OwnedProcessGroup
 import macos_owned_process as process_owner
+
+
+@contextmanager
+def owned_directory_link(outer, link, target):
+    """Keep POSIX symlinks; Windows uses a physical, confined directory junction."""
+    outer = outer.resolve(strict=True)
+    target = target.resolve(strict=True)
+    if outer not in target.parents or outer not in link.parent.resolve(strict=True).parents:
+        raise AssertionError("Link fixture must stay below its acquired private root")
+    if link.exists() or link.is_symlink():
+        raise AssertionError("Link fixture destination must be absent")
+    if os.name == "nt":
+        environment = os.environ.copy()
+        environment["ERGOPTI_LINK_FIXTURE_TARGET"] = str(target)
+        environment["ERGOPTI_LINK_FIXTURE_LINK"] = str(link)
+        subprocess.run(
+            [
+                "powershell.exe",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                "$ErrorActionPreference='Stop'; "
+                "New-Item -ItemType Junction -Path $env:ERGOPTI_LINK_FIXTURE_LINK "
+                "-Target $env:ERGOPTI_LINK_FIXTURE_TARGET | Out-Null",
+            ],
+            env=environment,
+            check=True,
+            capture_output=True,
+            timeout=10,
+        )
+    else:
+        link.symlink_to(target, target_is_directory=True)
+    try:
+        if os.name == "nt" and link.lstat().st_reparse_tag != stat.IO_REPARSE_TAG_MOUNT_POINT:
+            raise AssertionError("Directory fixture must be an actual junction")
+        if link.resolve(strict=True) != target:
+            raise AssertionError("Directory link must resolve to the exact owned foreign fixture")
+        yield
+    finally:
+        # Remove only the acquired link, never recursively walk its target.
+        if os.name == "nt":
+            link.rmdir()
+        else:
+            link.unlink()
+
+
+class ReceiptLinkModel:
+    """Schema 1: closed virtual file links; real regular files remain real I/O.
+
+    The ordinary Windows token cannot create file symlinks. Only rglob/lstat/readlink supply
+    virtual entries; the unchanged tree_receipt hashes real bytes and modes.
+    This model never qualifies native Windows file-symlink creation or Brew.
+    """
+
+    schema = 1
+
+    @staticmethod
+    def closed_name(value):
+        return (
+            isinstance(value, str)
+            and value not in ("", ".", "..")
+            and not any(character in value for character in "/\\\0")
+        )
+
+    def __init__(self, root, links):
+        self.root = root.resolve(strict=True)
+        self.links = dict(links)
+        self.observed = []
+        for name, target in self.links.items():
+            if not self.closed_name(name) or not self.closed_name(target):
+                raise AssertionError("Model links must have closed single-component names")
+            if (self.root / name).exists() or (self.root / name).is_symlink():
+                raise AssertionError("Virtual link must not replace a physical entry")
+
+    @contextmanager
+    def installed(self):
+        original_rglob, original_lstat = Path.rglob, Path.lstat
+
+        def rglob(path, pattern, **options):
+            if path != self.root:
+                return original_rglob(path, pattern, **options)
+            if pattern != "*" or options:
+                raise AssertionError("Unexpected tree-receipt enumeration protocol")
+            if not all(
+                self.closed_name(name) and self.closed_name(target)
+                for name, target in self.links.items()
+            ):
+                raise AssertionError("Invalid modeled link descriptor")
+            physical = list(original_rglob(path, pattern))
+            if any(path.name in self.links for path in physical):
+                raise AssertionError("Physical entry collided with a modeled link")
+            return iter(physical + [self.root / name for name in self.links])
+
+        def lstat(path, *arguments, **options):
+            if path.parent == self.root and path.name in self.links:
+                if arguments or options:
+                    raise AssertionError("Unexpected link metadata protocol")
+                self.observed.append(("lstat", path.name))
+                return os.stat_result((stat.S_IFLNK | 0o777, 0, 0, 1, 0, 0, 0, 0, 0, 0))
+            return original_lstat(path, *arguments, **options)
+
+        def readlink(path, *arguments, **options):
+            path = Path(path)
+            if path.parent == self.root and path.name in self.links:
+                if arguments or options:
+                    raise AssertionError("Unexpected link target protocol")
+                self.observed.append(("readlink", path.name))
+                return self.links[path.name]
+            raise AssertionError("Unexpected readlink outside the closed fixture model")
+
+        with (
+            patch.object(Path, "rglob", autospec=True, side_effect=rglob),
+            patch.object(Path, "lstat", autospec=True, side_effect=lstat),
+            patch.object(probe.os, "readlink", side_effect=readlink),
+        ):
+            yield self
+
+
+@contextmanager
+def receipt_file_link(root):
+    """Choose the explicit model only on Windows, never replace the POSIX tier."""
+    if os.name == "nt":
+        with ReceiptLinkModel(root, {"link": "resource"}).installed() as model:
+            yield model
+    else:
+        (root / "link").symlink_to("resource")
+        yield None
 
 
 class ArchiveAcceptanceControls(unittest.TestCase):
@@ -271,10 +400,15 @@ class ArchiveAcceptanceControls(unittest.TestCase):
             foreign = outer / "foreign"
             root.mkdir()
             foreign.mkdir()
-            (root / "tap").symlink_to(foreign, target_is_directory=True)
-            with self.assertRaisesRegex(probe.AdmissionError, "escapes"):
-                probe.owned_path(root, root / "tap")
-            self.assertEqual(probe.owned_path(root, root), root)
+            sentinel = foreign / "sentinel"
+            sentinel.write_bytes(b"Independent foreign directory bytes\n")
+            with owned_directory_link(outer, root / "tap", foreign):
+                with self.assertRaisesRegex(probe.AdmissionError, "escapes"):
+                    probe.owned_path(root, root / "tap")
+                self.assertEqual(probe.owned_path(root, root), root)
+            self.assertFalse((root / "tap").exists())
+            self.assertEqual(list(foreign.iterdir()), [sentinel])
+            self.assertEqual(sentinel.read_bytes(), b"Independent foreign directory bytes\n")
 
     def test_environment_never_inherits_credentials_proxy_ruby_or_brew_injection(self):
         with patch.dict(
@@ -300,25 +434,59 @@ class ArchiveAcceptanceControls(unittest.TestCase):
 
     def test_tree_receipt_detects_signed_byte_mode_symlink_or_missing_artifact_regression(self):
         with TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = Path(directory).resolve(strict=True)
             (root / "resource").write_bytes(b"Independent expected bytes\n")
             (root / "resource").chmod(0o751)
-            (root / "link").symlink_to("resource")
-            expected = {
-                "resource": {
-                    "sha256": "822b2d0a72f6442eb1595796fe43863db2b2a59b4c0ac73012acdf3d44038984",
-                    "mode": 0o666 if os.name == "nt" else 0o751,
-                },
-                "link": {"link": "resource"},
-            }
-            actual = probe.tree_receipt(root)
-            # The hand-authored oracle uses known SHA bytes, independent of the
-            # subject helper's digest implementation.
-            self.assertEqual(actual, expected)
-            (root / "resource").write_bytes(b"Corrupted signed resource\n")
-            self.assertNotEqual(probe.tree_receipt(root), expected)
-            (root / "resource").unlink()
-            self.assertNotEqual(probe.tree_receipt(root), expected)
+            with receipt_file_link(root) as model:
+                expected = {
+                    "resource": {
+                        "sha256": "822b2d0a72f6442eb1595796fe43863db2b2a59b4c0ac73012acdf3d44038984",
+                        "mode": 0o666 if os.name == "nt" else 0o751,
+                    },
+                    "link": {"link": "resource"},
+                }
+                actual = probe.tree_receipt(root)
+                # The hand-authored oracle uses known SHA bytes, independent of the
+                # subject helper's digest implementation.
+                self.assertEqual(actual, expected)
+                (root / "resource").chmod(0o444)
+                self.assertNotEqual(probe.tree_receipt(root), expected)
+                (root / "resource").chmod(0o751)
+                self.assertEqual(probe.tree_receipt(root), expected)
+                (root / "resource").write_bytes(b"Corrupted signed resource\n")
+                self.assertNotEqual(probe.tree_receipt(root), expected)
+                (root / "resource").unlink()
+                self.assertNotEqual(probe.tree_receipt(root), expected)
+                if model is not None:
+                    self.assertEqual(model.schema, 1)
+                    self.assertIn(("lstat", "link"), model.observed)
+                    self.assertIn(("readlink", "link"), model.observed)
+
+    def test_tree_receipt_closed_link_model_conforms_to_real_regular_entries(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory).resolve(strict=True)
+            (root / "resource").write_bytes(b"Independent expected bytes\n")
+            (root / "directory").mkdir()
+            (root / "directory/nested").write_bytes(b"Independent nested bytes\n")
+            physical = probe.tree_receipt(root)
+            model = ReceiptLinkModel(root, {"link": "resource"})
+            with model.installed():
+                actual = probe.tree_receipt(root)
+                self.assertEqual(actual.pop("link"), {"link": "resource"})
+                self.assertEqual(actual, physical)
+                self.assertEqual(model.observed, [("lstat", "link"), ("readlink", "link")])
+                model.links["link"] = "missing"
+                self.assertEqual(probe.tree_receipt(root)["link"], {"link": "missing"})
+                del model.links["link"]
+                self.assertEqual(probe.tree_receipt(root), physical)
+            self.assertEqual(probe.tree_receipt(root), physical)
+            if os.name != "nt":
+                # Conformance against an actual POSIX file link stays mandatory.
+                (root / "link").symlink_to("resource")
+                real_link_receipt = probe.tree_receipt(root)
+                (root / "link").unlink()
+                with ReceiptLinkModel(root, {"link": "resource"}).installed():
+                    self.assertEqual(probe.tree_receipt(root), real_link_receipt)
 
     def test_missing_declared_format_fails_before_cask_install(self):
         with TemporaryDirectory() as directory:

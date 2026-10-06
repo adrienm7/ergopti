@@ -15,7 +15,7 @@ local function with_owner(body, options)
 	options = options or {}
 	local names = { "adapters.http_client", "modules.llm.enable_admission", "ui.llm_enable_refusal",
 		"modules.llm.prediction_engine", "modules.llm.profiles", "infra.llm_preferences",
-		"modules.llm.local_servers", "modules.llm.api_entries", "adapters.keyboard_hook",
+		"modules.llm.local_servers", "modules.llm.api_entries", "modules.llm.runtime_factory", "adapters.keyboard_hook",
 		"adapters.shell_runner", "infra.i18n", "window_titles" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
@@ -33,7 +33,14 @@ local function with_owner(body, options)
 			return world.cancel_ok
 		end,
 	}
-	package.loaded["adapters.http_client"] = Http
+	-- Cached-server admission owns this fixture. Managed runtime choices have
+	-- their separate acquisition fixture and must not depend on the host's
+	-- actual install directory, root-namespace ownership or available tools.
+	package.loaded["modules.llm.runtime_factory"] = {
+		new = function() return nil, "fixture_runtime_unavailable" end,
+	}
+	world.owned_http = {}
+	package.loaded["adapters.http_client"] = require("tests.support.owned_http_fixture").attach(Http, world.owned_http)
 	package.loaded["modules.llm.enable_admission"] = nil
 	world.owner = require("modules.llm.enable_admission").new({
 		snapshot = function()
@@ -46,8 +53,9 @@ local function with_owner(body, options)
 			world.commits[#world.commits + 1] = source
 			return world.write_ok ~= false
 		end,
-		reject = function(origin, reason)
+		reject = function(origin, reason, _, _, _, cleanup_only)
 			world.rejects[#world.rejects + 1] = { origin, reason }
+			world.cleanup_only = cleanup_only
 			if world.on_reject then world.on_reject() end
 			return world.choice
 		end,
@@ -292,6 +300,8 @@ helpers.describe("Linux prediction enable publication", function()
 				local engine, preferences = world.load_engine()
 				world.discovery_stale, world.choice_index = false, 1
 				world.cancel_ok = mode ~= "cleanup_debt"
+				-- This mode explicitly owns a partial native allocation despite refusal.
+				world.owned_http.refused_dispatch_acquired = mode == "cleanup_debt"
 				local Hook = world.use_native_notice()
 				local Reader = require("adapters.evdev_reader")
 				local grab = Reader.grab
@@ -351,9 +361,13 @@ helpers.describe("Linux prediction enable publication", function()
 				local engine, preferences = world.load_engine()
 				world.discovery_stale, world.choice_index = false, 1
 				if enable_refused then
-					-- Backend publication uses set(); the separate master publication
-					-- uses set_many(), whose independent refusal must remain visible.
-					preferences.set_many = function() return false end
+					-- Refuse only master enable; the backend's independent guarded
+					-- batch must still publish before this intended partial refusal.
+					local write = preferences.set_many
+					preferences.set_many = function(values, source, admission)
+						if values["llm.enabled"] ~= nil then return false end
+						return write(values, source, admission)
+					end
 				end
 				helpers.assert_eq(engine.enable(), not enable_refused)
 				helpers.assert_eq(world.applied, 1)
@@ -500,5 +514,127 @@ helpers.describe("Linux prediction enable publication", function()
 			helpers.assert_eq(engine.is_enabled(), false)
 			helpers.assert_true(engine.release_configuration(scope))
 		end)
+	end)
+end)
+
+helpers.describe("enable admission owns actual HTTP creator and physical debt", function()
+	test("cancel signal acceptance does not acknowledge physical version probe retirement", function()
+		with_owner(function(world)
+			world.owned_http.settled = false
+			helpers.assert_true(world.owner.enable())
+			helpers.assert_eq(world.owner.cancel(), false)
+			helpers.assert_eq(#world.cancels, 1, "controlled native termination was accepted")
+			helpers.assert_true(world.owner.pending())
+			world.owned_http.operations[1]:acknowledge()
+			helpers.assert_eq(world.owner.pending(), false)
+			world.answer(world.good)
+			helpers.assert_eq(#world.commits, 0)
+		end)
+	end)
+
+	test("version constructor reserves cleanup before native capability returns", function()
+		with_owner(function(world)
+			world.owned_http.during_create = function()
+				world.cancel_during_create = world.owner.cancel()
+				world.pending_during_create = world.owner.pending()
+			end
+			helpers.assert_eq(world.owner.enable(), false)
+			helpers.assert_eq(world.cancel_during_create, false)
+			helpers.assert_true(world.pending_during_create)
+			helpers.assert_eq(#world.calls, 0, "revoked constructor never dispatches the legacy scripted network effect")
+			helpers.assert_eq(world.owner.pending(), false, "known unwound no-resource constructor may acknowledge")
+		end)
+	end)
+
+	test("version source snapshot cannot acknowledge cancellation before its creator unwinds", function()
+		with_owner(function(world)
+			local owner, cancelled, pending
+			owner = require("modules.llm.enable_admission").new({
+				snapshot = function()
+					cancelled, pending = owner.cancel(), owner.pending()
+					return world.live
+				end,
+				commit = function() return true end,
+				reject = function() return nil end,
+			})
+			helpers.assert_eq(owner.enable(), false)
+			helpers.assert_eq(cancelled, false)
+			helpers.assert_true(pending)
+			helpers.assert_eq(#world.calls, 0)
+			helpers.assert_eq(owner.pending(), false)
+		end)
+	end)
+
+	test("a logical version response waits for the independent physical settlement proof", function()
+		with_owner(function(world)
+			world.owned_http.settled = false
+			helpers.assert_true(world.owner.enable())
+			world.answer(world.good)
+			helpers.assert_eq(#world.commits, 0)
+			helpers.assert_true(world.owner.pending())
+			world.owned_http.operations[1]:acknowledge()
+			helpers.assert_eq(#world.commits, 1)
+			helpers.assert_eq(world.owner.pending(), false)
+		end)
+	end)
+end)
+
+helpers.describe("enable settlement after source withdrawal", function()
+	test("suppressed stale version delivery releases only its exact physically settled owner", function()
+		with_owner(function(world)
+			helpers.assert_true(world.owner.enable())
+			world.live.generation = world.live.generation + 1
+			world.answer(world.good)
+			helpers.assert_eq(world.owner.pending(), false)
+			helpers.assert_eq(#world.commits, 0)
+			helpers.assert_eq(#world.rejects, 0)
+			helpers.assert_true(world.owner.enable(), "settled stale ownership permits a fresh independent source capture")
+			helpers.assert_eq(#world.calls, 2)
+		end)
+	end)
+end)
+
+helpers.describe("enable refusal notice retains physical admission", function()
+	test("known empty false-start does not turn cancel refusal into native debt", function()
+		with_owner(function(world)
+			world.cancel_ok = false
+			helpers.assert_eq(world.owner.enable(), false)
+			helpers.assert_eq(world.owner.pending(), false)
+			helpers.assert_eq(world.cleanup_only, false)
+			helpers.assert_eq(#world.rejects, 1)
+			helpers.assert_eq(#world.commits, 0)
+		end, { dispatched = false })
+	end)
+
+	test("partial false-start shows read-only refusal without retry before physical ACK", function()
+		local options = { dispatched = false }
+		with_owner(function(world)
+			world.owned_http.refused_dispatch_acquired, world.owned_http.settled = true, false
+			world.choice = "retry"
+			helpers.assert_eq(world.owner.enable(), false)
+			helpers.assert_true(world.owner.pending())
+			helpers.assert_eq(world.cleanup_only, true)
+			helpers.assert_eq(#world.calls, 1)
+			helpers.assert_eq(#world.commits, 0)
+			world.owned_http.operations[1]:acknowledge()
+			helpers.assert_eq(world.owner.pending(), false)
+			options.dispatched, world.choice = true, nil
+			helpers.assert_true(world.owner.enable())
+			helpers.assert_eq(#world.calls, 2)
+		end, options)
+	end)
+
+	test("actual native refusal with partial cleanup offers no cached acquisition", function()
+		with_owner(function(world)
+			local engine, preferences = world.load_engine()
+			world.discovery_stale, world.choice_index = false, 1
+			world.owned_http.refused_dispatch_acquired, world.owned_http.settled = true, false
+			helpers.assert_eq(engine.enable(), false)
+			helpers.assert_eq(#world.replacements, 0)
+			helpers.assert_eq(world.applied, nil)
+			helpers.assert_eq(preferences.get("llm.enabled"), false)
+			helpers.assert_eq(engine.disable(), false)
+			world.owned_http.operations[1]:acknowledge()
+		end, { dispatched = false })
 	end)
 end)
