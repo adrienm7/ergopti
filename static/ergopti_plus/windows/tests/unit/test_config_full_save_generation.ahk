@@ -599,10 +599,30 @@ _CFGFS_ReturnedReloadRestoresRejectedGeneration() {
 
 		Bundle := _ConfigWriteTerminalTryAcquire([Path])
 		AssertTrue(Bundle is Object)
-		_RTP_Pending(Bundle, _RTP_NewPort())
+		Port := _RTP_NewPort()
+		Record := _RTP_Pending(Bundle, Port)
 		_CFGFS_ClaimReloadWithoutFinishing()
 		AssertFalse(ReloadTerminalHandoffPending(),
 			"an OnExit refusal must return control to the live driver")
+		; Pending(false) excludes a withdrawing record; it does not acknowledge exit.
+		loop 2 {
+			AssertTrue(_ReloadTerminalHandoffOwns(Record), "The exact withdrawing record remains published before terminal.")
+			AssertEqual(Bundle, Record["bundle"])
+			AssertTrue(_ConfigWriteTerminalIsActive() && Bundle.authorized && Bundle.shutdown_claimed,
+				"The generation fixture retains the exact claimed bundle while its successor lives.")
+			AssertFalse(Record["stop_acknowledged"])
+			AssertEqual(0, Port["probe"]["closed"])
+			AssertEqual(1, Port["probe"]["terminated"], "The native stop request is issued only once.")
+			_RTP_RunArmed(Port)
+		}
+		Port["probe"]["alive"] := false
+		_RTP_RunArmed(Port)
+		_RTP_RunArmed(Port)
+		AssertTrue(Record["stop_acknowledged"] && Record["close_acknowledged"])
+		AssertEqual("refused", Record["state"])
+		AssertFalse(_ReloadTerminalHandoffOwns(Record), "Full handback precedes the original bundle release and generation restoration.")
+		AssertFalse(Bundle.authorized || Bundle.shutdown_claimed)
+		AssertEqual(1, Port["probe"]["closed"])
 		_ConfigWriteTerminalRelease(Bundle)
 		Bundle := false
 
