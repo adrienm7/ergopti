@@ -5493,9 +5493,10 @@ and installation qualification are still required.
   scripts, paths/arguments with spaces and Unicode, process-start refusal,
   execution errors, lifecycle/cancellation and cross-consumer parity.
 
-The recovered executable/argument candidate is being qualified against the
-current `origin/dev`; the saved patch and incomplete review receipt are not
-integration evidence. Independent regressions exposed refused macOS parameter
+The original executable/argument tranche is integrated in `origin/dev`; the
+broader automation-provider scope remains partial. A saved patch or incomplete
+review receipt is not integration evidence. Independent regressions exposed
+refused macOS parameter
 transactions, overly broad source admission, Windows shutdown cancellation
 ordering and Linux descendants surviving their original process leader. Their
 bounded fixes retain source/privacy and strict ownership requirements.
@@ -5518,6 +5519,16 @@ metadata still needs exact-source Linux/macOS hosted qualification after that
 separately owned prerequisite repair. Real interpreter invocation does not
 qualify broader automation inventory, Apple Shortcuts or physical keyboard
 acceptance, and this tranche does not complete item 106.
+
+The latest retained native macOS inventory baseline is run 37494746572 on
+CI `ad22d308` / dev `4dfbb9a5`: all 16 inventory and five shim cases PASS,
+including `real_interpreter_symlink`. The current native adapter, directory
+owner, full/shim fixtures and controller are byte-identical to that qualified
+baseline. Older 15/16 notes below are historical failures, not a demonstrated
+current symlink regression. The Windows additions changed shared provider
+policy/data while preserving the macOS projection, so the current complete
+source still requires hosted macOS qualification. Preserve the 21 existing
+cases; Apple Shortcuts, broader inventory and full package/install remain open.
 
 Complete selected gates, hosted native execution, packaging and installation
 remain required. Automation-provider discovery and Apple Shortcuts are still
@@ -5595,7 +5606,8 @@ The shared picker now inventories explicit `config_dir/scripts` on Linux and
 macOS through bounded native adapters, with opaque session choices and the
 existing literal executable/argv persistence. Selection rechecks script,
 interpreter, configured route and captured identity before assignment; manual
-entry remains available. Windows honestly reports discovery unavailable.
+entry remains available. Windows discovery was unavailable at this historical
+checkpoint; the exact-source Windows provider results above supersede that status.
 Seven new labels are translated in all21 locales. Real Linux child fixtures
 cover discovered shell, Python and executable scripts, literal Unicode/empty
 arguments, refused starts, exit37 and cancellation with closed process groups.
