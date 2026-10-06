@@ -3441,7 +3441,9 @@ fails: the official foreign-signature equality and application lifecycle
 controls refuse, and Brew's unconfined positive sender reports -600/exit66.
 Installation is skipped; publication is skipped. Added fixed signature and
 cached application-exit facts preserve all original assertions and deadlines;
-these diagnostics still require actual macOS execution. The latest complete
+the guarded diagnostics expose only fixed cryptographic/payload booleans and
+an already cached exit acknowledgement. Their source controls pass, but the
+native observations still require actual macOS execution. The latest complete
 Linux-host JavaScript gate passes 375 checks. Physical Sparkle/Brew acceptance
 and transversal requirements 16/38 remain open; item 36 stays partial.
 
