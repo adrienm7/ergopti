@@ -3,6 +3,7 @@
 """Qualify actual pinned Hammerspoon provider inventory, never user-program execution."""
 
 import argparse
+from contextlib import contextmanager
 import ctypes
 import errno
 import hashlib
@@ -15,11 +16,13 @@ import re
 import secrets
 import shutil
 import signal
+import ssl
 import stat
 import subprocess
 import sys
 import tempfile
 import time
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 import zipfile
 
@@ -318,6 +321,53 @@ def source_hashes(root, sha, paths=PINS):
     return result
 
 
+@contextmanager
+def bootstrap_response(phase, request, *, timeout):
+    """Report closed network facts, then preserve the original failure and cleanup."""
+    require(
+        type(phase) is str and phase in ("release_metadata", "archive_download"),
+        "bootstrap_phase_refused",
+    )
+    try:
+        with urlopen(request, timeout=timeout) as response:
+            yield response
+    except (HTTPError, URLError, TimeoutError, ssl.SSLError) as error:
+        # No URL, request/response headers, body, or arbitrary exception text.
+        # A failed diagnostic write cannot replace the original network error;
+        # process interruption remains visible rather than being swallowed.
+        try:
+            status = None
+            if isinstance(error, HTTPError):
+                family = "http_error"
+                code = error.code
+                if type(code) is int and 100 <= code <= 599:
+                    status = code
+            elif isinstance(error, ssl.SSLError) or (
+                isinstance(error, URLError) and isinstance(error.reason, ssl.SSLError)
+            ):
+                family = "tls_error"
+            elif isinstance(error, TimeoutError):
+                family = "read_timeout"
+            else:
+                family = "transport_error"
+            print(
+                json.dumps(
+                    {
+                        "schema": 1,
+                        "contract": "macos-native-bootstrap-failure",
+                        "phase": phase,
+                        "family": family,
+                        "http_status": status,
+                        "native_pass": False,
+                    }
+                ),
+                flush=True,
+            )
+        except Exception:
+            pass
+        raise
+
+
 def trusted_asset(output):
     request = Request(
         API,
@@ -326,7 +376,7 @@ def trusted_asset(output):
             "User-Agent": "ErgoptiPlus-native-qualification",
         },
     )
-    with urlopen(request, timeout=20) as reply:
+    with bootstrap_response("release_metadata", request, timeout=20) as reply:
         raw = reply.read(1048577)
     require(len(raw) <= 1048576, "release_metadata_size_refused")
     release = json.loads(raw)
@@ -678,7 +728,9 @@ def main():
         require(archive is None and app is None, "bootstrap_arguments_refused")
         archive = args.output / ASSET
         with (
-            urlopen(asset["browser_download_url"], timeout=30) as incoming,
+            bootstrap_response(
+                "archive_download", asset["browser_download_url"], timeout=30
+            ) as incoming,
             archive.open("xb") as target,
         ):
             raw = incoming.read(asset["size"] + 1)
