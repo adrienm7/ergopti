@@ -4293,6 +4293,36 @@ i18n = "menu.agent.off"
 checked_when = ["agent_system_is_off"]
 disabled_when = ["agent_system_off_ready"]
 
+# The fixed Model control of each native Agent system; backend choices stay data.
+[[menu.agent_system_model_controls]]
+type = "---"
+
+[[menu.agent_system_model_controls]]
+type = "command"
+id = "agent_system_model"
+i18n = "menu.agent.model"
+disabled_when = ["agent_system_model_ready"]
+
+# The native observed installed status uses the same model command owner.
+[[menu.agent_system_model_installed_controls]]
+type = "---"
+
+[[menu.agent_system_model_installed_controls]]
+type = "command"
+id = "agent_system_model"
+i18n = "menu.agent.model_installed"
+disabled_when = ["agent_system_model_ready"]
+
+# The native observed missing status uses the same model command owner.
+[[menu.agent_system_model_missing_controls]]
+type = "---"
+
+[[menu.agent_system_model_missing_controls]]
+type = "command"
+id = "agent_system_model"
+i18n = "menu.agent.model_missing"
+disabled_when = ["agent_system_model_ready"]
+
 # The Applications submenu, macOS only: it lists the bundled applications
 # found on disk and launches them. Linux's copy held only the config-folder row,
 # which moved to configuration_menu; a row promising per-app settings must not

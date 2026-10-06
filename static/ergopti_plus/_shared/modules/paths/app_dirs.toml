@@ -94,3 +94,14 @@ base = "XDG_STATE_HOME"
 # Used under HOME when XDG_STATE_HOME is unset or empty.
 base_fallback = [".local", "state"]
 segments = ["{app}", "logs"]
+
+# =====================================
+# =====================================
+# ======= 4/ Managed runtime ==========
+# =====================================
+# =====================================
+
+[runtime.windows]
+# A separate direct child of LocalApplicationData owns the runtime-only ACL.
+# Existing logs and the native macOS/Linux runtime hierarchy are unchanged.
+managed_ollama_folder_name = "ergopti_plus_ollama"
