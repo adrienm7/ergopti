@@ -940,3 +940,22 @@ ACL refusal and release checks, and existing budgets. Independent strict forward
 and reverse application restores both complete preimages exactly. Successor
 Darwin compilation and native tests remain UNEXECUTED pending the next macOS CI;
 no reference, capture or completed TODO31 authority is inferred.
+
+A normally discovered persistence regression now exercises the actual production
+Keylogger, correlated context tracker, pause/watchers, managed physical session,
+Capture/History FIFO, LogManager, files and SQLite writers/readers together.
+Fixed independent expectations retain original physical identity, captured app,
+date and hold duration across delayed delivery; pause/private/gap intervals cancel
+the entire hold. Recovery and callback shutdown retain their current owners and
+bounded attempts. Clock/calendar/AX/caffeinate/task/timer/native transport leaves
+remain explicit models. Seven embedded Python checks use explicit equivalent
+AssertionError guards so genuinely inherited optimization cannot erase the SQL
+oracles. Independent actual counter999 corruption fails in both normal and
+optimized modes; three other source mutations also fail, and all99 existing
+session/context controls pass. Strict application and all16130 author/8079 review
+seals are verified. Actual native Context bootstrap, capture and hardware remain
+UNEXECUTED; this test tranche does not activate the dormant owner or close TODO31.
+The fixture also scopes its child shell-runner substitution through the existing
+cache owner, restoring its exact prior module on success or exception. The full
+local hygiene guard rejected the original unscoped fixture; independent causal
+replays now pass that unchanged guard and both normal/optimized persistence runs.
