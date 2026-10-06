@@ -1,0 +1,63 @@
+{
+	"parent_key": "menu.shortcuts.title",
+	"selection_child_order": [
+		{
+			"key": "sg_actions.caps_word",
+			"english": "⇪★ CapsWord",
+			"type": "check"
+		},
+		{
+			"separator": true,
+			"section": "selection_case_boundary"
+		},
+		{
+			"key": "menu.shortcuts.to_uppercase",
+			"english": "AA  Selection to UPPERCASE",
+			"type": "command"
+		},
+		{
+			"key": "menu.shortcuts.to_lowercase",
+			"english": "aa  Selection to lowercase",
+			"type": "command"
+		},
+		{
+			"key": "menu.shortcuts.to_titlecase",
+			"english": "Aa  Selection to Title Case",
+			"type": "command"
+		},
+		{
+			"separator": true,
+			"section": "selection_helper_boundary"
+		},
+		{
+			"key": "menu.shortcuts.select_word",
+			"english": "Select word",
+			"type": "command"
+		},
+		{
+			"key": "sg_actions.select_line",
+			"english": "☰ Select line",
+			"type": "command"
+		},
+		{
+			"key": "sg_actions.paste_plain",
+			"english": "⎘ Paste without formatting",
+			"type": "command"
+		}
+	],
+	"fragment": {
+		"type": "---",
+		"platforms": ["linux"],
+		"unavailable": "hide"
+	},
+	"provenance": "Hand-authored from the genuine preexisting native row order and shipped English locale keys, before declaration generation. No production/rendered output derives expectations.",
+	"platform_rows": {
+		"linux": 1,
+		"hs": 0,
+		"ahk": 0
+	},
+	"marker_key": "button.cancel",
+	"marker_english": "Cancel",
+	"native_counts_before": [57, 91, 66],
+	"native_counts_after": [57, 91, 64]
+}

@@ -5012,3 +5012,65 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		}
 	}
 }
+
+// The Linux selection boundaries are inert fragments of the actual native provider.
+{
+	const assert = require('node:assert/strict');
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const { publishesMenuTemplate } = require('../lib/menu-shared-delegation.cjs');
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/linux_selection_boundaries.json'), 'utf8')
+	);
+	const menu = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const source = readFileSync(
+		resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/menu_builder.lua'),
+		'utf8'
+	);
+	const tokens = scriptTokens(source, '.lua');
+	const sections = ['selection_case_boundary', 'selection_helper_boundary'];
+	assert.equal(corpus.selection_child_order.length, 9);
+	assert.deepEqual(
+		corpus.selection_child_order.filter((row) => row.separator).map((row) => row.section),
+		sections
+	);
+	for (const section of sections) {
+		assert.deepEqual(menu[section], [corpus.fragment]);
+		assert.ok(publishesMenuTemplate(source, '.lua', section));
+	}
+	const methods = {
+		selection_caps_word_control: 'check_row',
+		selection_case_commands: 'get_array',
+		selection_helper_commands: 'get_array',
+		selection_case_boundary: 'template_rows',
+		selection_helper_boundary: 'template_rows'
+	};
+	const at = (value) =>
+		tokens.findIndex(
+			(token, index) =>
+				token.kind === 'string' &&
+				token.value === value &&
+				tokens[index - 1]?.value === '(' &&
+				tokens[index - 2]?.kind === 'identifier' &&
+				tokens[index - 2]?.value === methods[value] &&
+				tokens[index - 3]?.value === '.' &&
+				tokens[index - 4]?.kind === 'identifier' &&
+				tokens[index - 4]?.value === 'ManifestMenu' &&
+				!['function', '.', ':'].includes(tokens[index - 5]?.value)
+		);
+	const order = [
+		'selection_caps_word_control',
+		sections[0],
+		'selection_case_commands',
+		sections[1],
+		'selection_helper_commands'
+	].map(at);
+	assert.ok(order.every((position) => position >= 0));
+	assert.ok(order.every((position, index) => index === 0 || position > order[index - 1]));
+	for (const file of readdirSync(LOCALES_DIR).filter((name) => name.endsWith('.json'))) {
+		const locale = JSON.parse(readFileSync(resolve(LOCALES_DIR, file), 'utf8'));
+		for (const row of corpus.selection_child_order.filter((row) => !row.separator)) {
+			assert.equal(typeof locale[row.key], 'string');
+			assert.ok(locale[row.key].trim().length > 0 && locale[row.key] !== row.key);
+		}
+	}
+}

@@ -4361,7 +4361,7 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 57, macOS 91, Linux 66, each
+  drivers still build (current baseline: Windows 57, macOS 91, Linux 64, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
@@ -4373,6 +4373,20 @@ integrated, then publish one grouped release.
   Native allocators and computed user-data captions alone do not prove missing
   shared policy. Final native binding/order/caption and installed acceptance
   remain required; source review and the local portable gates are insufficient.
+
+  Linux's two existing selection boundaries now consume shared inert
+  fragments between CapsWord, the case-transform trio and the selection-helper
+  trio. Existing native actions, callbacks, readiness and order stay unchanged;
+  Windows and macOS have no corresponding provider boundaries and explicitly
+  hide them. The unchanged owner scanner establishes 57/91/66 to 57/91/64,
+  preserving all 469 predecessor corpora, 21 locale files and prior assertions.
+  Actual Linux case-transform and whole-tray controls pass 72/0 and 22/0 in
+  English and French on Lua5.4 and LuaJIT; the genuine old native producer
+  gives 70/2 and 21/1 with the same tests. Neighbour controls pass 311/0, and
+  eighteen negative source/declaration controls remain red. These portable
+  source receipts do not qualify native GTK, SDK, physical devices, the final
+  Root source or hosted CI. Final composed native and installed acceptance
+  remain pending; all six group items stay partial.
 
   The existing trigger, display and live-mode control boundaries now consume
   three shared inert fragments at their genuine Windows, macOS and Linux
@@ -5211,7 +5225,7 @@ deferral is superseded. This item and items16/38 remain open.
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 57, macOS 91 and Linux 66 rows are still built by the
+  Windows 57, macOS 91 and Linux 64 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). Read on
   2026-10-01, the sites are of four kinds, and three of them need the
   manifest to say more than it can today:
