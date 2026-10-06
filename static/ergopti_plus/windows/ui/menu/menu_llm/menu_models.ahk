@@ -279,13 +279,20 @@ LLM_Menu_BuildModelMenu() {
 	; Visual model browser — exposes the shared models.json catalogue with
 	; params / RAM / speed columns so the user can compare specs before
 	; picking. Mirrors the HS visual chooser in ui/menu/menu_llm/models_manager.
-	TailRows := [Map("separator", true),
-		Map("label", t("menu.llm.add_model_entry"), "action", (*) => LLM_Menu_PromptAddModel())]
+	MenuRenderer_AppendRows(m, "llm_menu", "llm_model", _LLM_Menu_ModelTailRows())
+	return m
+}
+
+
+; The shared inert boundary precedes the unchanged native Add and browser owners.
+_LLM_Menu_ModelTailRows() {
+	BoundaryRows := MenuRenderer_StatusRows("llm_menu", "llm_model", "model_picker_tail")
+	TailRows := BoundaryRows is Array ? BoundaryRows : []
+	TailRows.Push(Map("label", t("menu.llm.add_model_entry"), "action", (*) => LLM_Menu_PromptAddModel()))
 	BrowserRow := _LLM_Menu_ModelBrowserRow()
 	if BrowserRow is Map
 		TailRows.Push(BrowserRow)
-	MenuRenderer_AppendRows(m, "llm_menu", "llm_model", TailRows)
-	return m
+	return TailRows
 }
 
 /**

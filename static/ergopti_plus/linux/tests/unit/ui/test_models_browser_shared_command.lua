@@ -114,3 +114,75 @@ helpers.describe("shared models browser command", function()
 		end)
 	end)
 end)
+
+
+local function picker_boundary_owner(renderer)
+	for _, row in ipairs(renderer.get_array("llm_menu")) do
+		if row.id == "llm_models" then return row end
+	end
+	error("actual Linux model provider is absent")
+end
+
+helpers.describe("declared model picker tail boundary", function()
+	helpers.it("retains the native empty-list condition and installed-model/browser order", function()
+		for _, models in ipairs({{}, {"installed-one", "installed-two"}}) do
+			with_browser(function(f)
+				f.ctx.llm.get_models = function() return models end
+				helpers.assert_eq(picker_boundary_owner(f.renderer).status_rows.model_picker_tail, {{type="---"}})
+				local browser = find_row(f.builder.build(f.ctx), "menu.llm.browse_models_entry")
+				helpers.assert_type(browser.fn, "function")
+				-- Capture the actual canonical rows before their real native lowering.
+				local original = f.renderer.render_rows
+				local actual
+				f.renderer.render_rows = function(rows, id) if id == "llm_models" then actual=rows end;return original(rows,id) end
+				f.builder.build(f.ctx)
+				helpers.assert_eq(#actual, #models > 0 and #models+2 or 1)
+				for i, name in ipairs(models) do helpers.assert_eq(actual[i].label,name) end
+				if #models > 0 then helpers.assert_eq(actual[#models+1].separator,true) end
+				helpers.assert_eq(actual[#actual].label,"menu.llm.browse_models_entry")
+				helpers.assert_eq(f.controls.shows,0)
+			end)
+		end
+	end)
+
+	helpers.it("consumes the shared inert presentation and keeps exact native browser acknowledgement", function()
+		with_browser(function(f)
+			f.ctx.llm.get_models=function()return{"native-model"}end
+			picker_boundary_owner(f.renderer).status_rows.model_picker_tail={{type="label",i18n="common.restore_recommended"}}
+			local rows=f.builder.build(f.ctx)
+			local presentation=find_row(rows,"common.restore_recommended")
+			helpers.assert_type(presentation,"table")
+			helpers.assert_eq(presentation.disabled,true)
+			helpers.assert_eq(presentation.fn,nil)
+			local browser=find_row(rows,"menu.llm.browse_models_entry")
+			helpers.assert_eq(browser.fn(),true)
+			helpers.assert_eq(f.controls.kind,"model_browser")
+			helpers.assert_eq(f.controls.shows,1)
+		end)
+	end)
+
+	for _, mode in ipairs({"missing", "wrong_owner", "clicked", "extra_callback"}) do
+		helpers.it("refuses " .. mode .. " boundary while retaining native model and browser data",function()
+			with_browser(function(f)
+				f.ctx.llm.get_models=function()return{"native-model"}end
+				local owner=picker_boundary_owner(f.renderer)
+				local effects=0
+				if mode=="missing"then owner.status_rows.model_picker_tail=nil
+				elseif mode=="wrong_owner"then owner.id="foreign_models"
+				elseif mode=="clicked"then owner.status_rows.model_picker_tail={{type="command",id="foreign",action=function()effects=effects+1 end}}
+				else owner.status_rows.model_picker_tail={{type="---",action=function()effects=effects+1 end}}end
+				local actual
+				local original=f.renderer.render_rows
+				f.renderer.render_rows=function(rows,id)if id=="llm_models"then actual=rows end;return original(rows,id)end
+				local rows=f.builder.build(f.ctx)
+				helpers.assert_eq(#actual,2)
+				helpers.assert_eq(actual[1].label,"native-model")
+				helpers.assert_eq(actual[2].label,"menu.llm.browse_models_entry")
+				helpers.assert_type(find_row(rows,"native-model").fn,"function")
+				helpers.assert_type(find_row(rows,"menu.llm.browse_models_entry").fn,"function")
+				helpers.assert_eq(effects,0)
+				helpers.assert_eq(f.controls.shows,0)
+			end)
+		end)
+	end
+end)
