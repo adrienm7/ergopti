@@ -3434,6 +3434,15 @@ the complete three-OS checkpoint remain pending.
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 
+The private Sparkle fixture now binds its real numeric loopback socket without
+the HTTP server's unrelated reverse-DNS lookup. Actual bind, assigned port,
+listen refusal, cancellation and physical socket retirement remain required.
+All 34 existing portable controls are retained; the five new actual-socket
+controls bring the CPython 3.13/Linux result to 39 passed with no platform skips.
+The hosted startup trace stopped before constructor completion; it does not
+prove a DNS cause. Native Sparkle acceptance and Homebrew's AppleEvent boundary
+still require successful macOS qualification, so item 36 stays partial.
+
 Current-dev integration preserves both receiver-registration diagnostics and
 the incoming native AppleEvent terminal receipt, from the same reserved
 WNOWAIT observation. Both retain exact ownership and refusal; diagnostic
