@@ -14,7 +14,10 @@ import json
 import os
 from pathlib import Path
 import shutil
+import signal
 import struct
+import socket
+import threading
 import subprocess
 import sys
 import tempfile
@@ -456,6 +459,326 @@ class NativeBSDDiagnosticControls(unittest.TestCase):
             with self.subTest(packet=packet):
                 with self.assertRaisesRegex(RuntimeError, "Native Sparkle diagnostic refused"):
                     self.helper.NativeCensusRefusal(errno.ESRCH, packet)
+
+
+class AcceptedSocketStopControls(unittest.TestCase):
+    """Real loopback EOF/close; filesystem and Windows signal ports are modeled."""
+
+    def observe_stop(
+        self, partial=False, native_signal=False, shutdown_refused=False, publication_cut=False
+    ):
+        spec = importlib.util.spec_from_file_location("sparkle_accepted_socket_control", HELPER)
+        helper = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(helper)
+        ready, accepted, headers = threading.Event(), threading.Event(), threading.Event()
+        ports, publications, captures, failures, peers = [], [], [], [], []
+        handlers = {}
+        old_handlers = {
+            number: signal.getsignal(number) for number in (signal.SIGTERM, signal.SIGINT)
+        }
+        original_finish = helper.http.server.HTTPServer.finish_request
+        original_parse = helper.http.server.BaseHTTPRequestHandler.parse_request
+        original_shutdown = socket.socket.shutdown
+        original_setattr = object.__setattr__
+        shutdown_calls = []
+
+        def publish(file, value):
+            publications.append((file.name, value))
+            if file.name == "server-start.json":
+                ports.append(value["port"])
+                ready.set()
+
+        def finish(server, request, address):
+            self.assertIs(server.active_request, request)
+            captures.append((server, request))
+            accepted.set()
+            return original_finish(server, request, address)
+
+        def install(number, callback):
+            handlers[number] = callback
+
+        def parse(handler):
+            # The real request line has already been read. This additive witness
+            # prevents a partial-header mutant from passing on an earlier EOF.
+            headers.set()
+            return original_parse(handler)
+
+        def publish_attribute(server, name, value):
+            original_setattr(server, name, value)
+            if name == "active_request" and value is not None:
+                captures.append((server, value))
+                accepted.set()
+                handlers[signal.SIGTERM](signal.SIGTERM, None)
+            elif (
+                name == "active_stop_attempted"
+                and value is False
+                and getattr(server, "active_request", None) is not None
+            ):
+                handlers[signal.SIGTERM](signal.SIGTERM, None)
+
+        def shutdown(request, how):
+            if how == socket.SHUT_RDWR:
+                shutdown_calls.append(request)
+            if shutdown_refused and how == socket.SHUT_RDWR:
+                failures.append("shutdown-refused")
+                raise OSError(errno.EPERM, "controlled accepted-socket shutdown refusal")
+            return original_shutdown(request, how)
+
+        def peer():
+            try:
+                if not ready.wait(2):
+                    raise AssertionError("owned loopback server did not acquire readiness")
+                with socket.create_connection(("127.0.0.1", ports[0]), timeout=2) as client:
+                    if partial:
+                        client.sendall(b"GET /feed.xml HTTP/1.1\r\nHost: 127.0.0.1\r\n")
+                    if not accepted.wait(2):
+                        raise AssertionError("actual accepted socket did not enter its exact owner")
+                    if partial and not headers.wait(2):
+                        raise AssertionError("actual request line did not reach header parsing")
+                    if native_signal:
+                        os.kill(os.getpid(), signal.SIGTERM)
+                    else:
+                        # Explicit Windows/portable signal port: invoke the actual
+                        # installed stop callback, never pretend native SIGTERM.
+                        handlers[signal.SIGTERM](signal.SIGTERM, None)
+                    try:
+                        peers.append(client.recv(1))
+                    except TimeoutError:
+                        if not shutdown_refused:
+                            raise
+            except BaseException as error:
+                failures.append(error)
+
+        worker = threading.Thread(target=peer)
+        raised = None
+        filesystem_root = Path.cwd().resolve()
+        try:
+            with (
+                mock.patch.object(helper, "private_directory", return_value=filesystem_root),
+                mock.patch.object(helper, "publish", side_effect=publish),
+                mock.patch.object(helper.http.server.HTTPServer, "finish_request", finish),
+                mock.patch.object(
+                    helper.http.server.BaseHTTPRequestHandler, "parse_request", parse
+                ),
+                mock.patch.object(socket.socket, "shutdown", shutdown),
+                mock.patch.object(
+                    helper.os,
+                    "open",
+                    side_effect=AssertionError("post-stop resource read is forbidden"),
+                ) as reads,
+            ):
+                with contextlib.ExitStack() as scope:
+                    if publication_cut:
+                        scope.enter_context(
+                            mock.patch.object(
+                                helper.http.server.HTTPServer, "__setattr__", publish_attribute
+                            )
+                        )
+                    if not native_signal:
+                        scope.enter_context(
+                            mock.patch.object(helper.signal, "signal", side_effect=install)
+                        )
+                    worker.start()
+                    try:
+                        helper.serve(str(filesystem_root), NONCE)
+                    except BaseException as error:
+                        raised = error
+                    worker.join(2)
+                    self.assertFalse(
+                        worker.is_alive(),
+                        "an acquired native peer must physically finish before fixture disposal",
+                    )
+                reads.assert_not_called()
+        finally:
+            if native_signal:
+                for number, callback in old_handlers.items():
+                    signal.signal(number, callback)
+        self.assertEqual(len(captures), 1)
+        server, request = captures[0]
+        self.assertEqual(request.fileno(), -1, "the exact accepted socket must actually close")
+        self.assertEqual(
+            server.socket.fileno(), -1, "the exact listening socket must actually close"
+        )
+        self.assertIsNone(server.active_request)
+        if publication_cut:
+            self.assertEqual(
+                shutdown_calls,
+                [request],
+                "accepted shutdown must be attempted exactly once across publication",
+            )
+        self.assertEqual(
+            [name for name, _ in publications], ["server-start.json", "server-retired.json"]
+        )
+        self.assertEqual(publications[-1][1], {"nonce": NONCE, "pid": os.getpid(), "requests": 0})
+        if shutdown_refused:
+            self.assertIsInstance(raised, RuntimeError)
+            self.assertEqual(str(raised), "Private Sparkle accepted-socket stop refused")
+            self.assertIsInstance(server.stop_failure, OSError)
+            self.assertEqual(
+                failures,
+                ["shutdown-refused"],
+                "stop may not retry a refused native socket operation",
+            )
+        else:
+            self.assertIsNone(raised)
+            self.assertEqual(failures, [])
+            self.assertEqual(
+                peers, [b""], "the owned live peer must witness real EOF without closing first"
+            )
+
+    def testStopAtCapabilityPublicationCannotResetAndRepeatActualSocketShutdown(self):
+        self.observe_stop(publication_cut=True)
+
+    def testModeledStopInterruptsActualIdleAcceptedSocketAndClosesBothOwners(self):
+        self.observe_stop()
+
+    def testModeledStopInterruptsPartialHeadersWithoutReadingOrPublishingResource(self):
+        self.observe_stop(partial=True)
+
+    def testRefusedAcceptedShutdownRemainsFailureAfterActualSocketRetirement(self):
+        self.observe_stop(shutdown_refused=True)
+
+    @unittest.skipUnless(
+        os.name == "posix",
+        "Native SIGTERM is POSIX; modeled callback/real EOF controls remain mandatory on Windows",
+    )
+    def testActualPOSIXSignalInterruptsBothIdleAndPartialHeaderReads(self):
+        for partial in (False, True):
+            with self.subTest(partial=partial):
+                self.observe_stop(partial=partial, native_signal=True)
+
+    def observe_admitted_response_stop(self, native_signal=False):
+        spec = importlib.util.spec_from_file_location("sparkle_response_stop_control", HELPER)
+        helper = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(helper)
+        ready = threading.Event()
+        ports, publications, captures, failures, responses, cuts = [], [], [], [], [], []
+        handlers = {}
+        old_handlers = {
+            number: signal.getsignal(number) for number in (signal.SIGTERM, signal.SIGINT)
+        }
+        original_finish = helper.http.server.HTTPServer.finish_request
+        original_headers = helper.http.server.BaseHTTPRequestHandler.end_headers
+
+        def publish(file, value):
+            publications.append((file.name, value))
+            if file.name == "server-start.json":
+                ports.append(value["port"])
+                ready.set()
+
+        def finish(server, request, address):
+            captures.append((server, request))
+            return original_finish(server, request, address)
+
+        def install(number, callback):
+            handlers[number] = callback
+
+        def headers(handler):
+            # The real headers have reached the peer; the real body write still
+            # follows this additive cut. Neither operation is replaced or retried.
+            result = original_headers(handler)
+            cuts.append("headers-written-body-pending")
+            if native_signal:
+                os.kill(os.getpid(), signal.SIGTERM)
+            else:
+                handlers[signal.SIGTERM](signal.SIGTERM, None)
+            return result
+
+        def peer():
+            try:
+                if not ready.wait(2):
+                    raise AssertionError("owned response server did not acquire readiness")
+                with socket.create_connection(("127.0.0.1", ports[0]), timeout=2) as client:
+                    client.sendall(b"GET /feed.xml HTTP/1.0\r\nHost: 127.0.0.1\r\n\r\n")
+                    chunks = []
+                    while True:
+                        chunk = client.recv(4096)
+                        if not chunk:
+                            responses.append(b"".join(chunks))
+                            break
+                        chunks.append(chunk)
+            except BaseException as error:
+                failures.append(error)
+
+        worker = threading.Thread(target=peer)
+        raised = None
+        with tempfile.TemporaryDirectory(prefix="sparkle-response-stop-") as temporary:
+            filesystem_root = Path(temporary).resolve()
+            (filesystem_root / "feed.xml").write_bytes(b"abc")
+            try:
+                with contextlib.ExitStack() as scope:
+                    scope.enter_context(
+                        mock.patch.object(helper, "private_directory", return_value=filesystem_root)
+                    )
+                    scope.enter_context(mock.patch.object(helper, "publish", side_effect=publish))
+                    scope.enter_context(
+                        mock.patch.object(helper.http.server.HTTPServer, "finish_request", finish)
+                    )
+                    scope.enter_context(
+                        mock.patch.object(
+                            helper.http.server.BaseHTTPRequestHandler, "end_headers", headers
+                        )
+                    )
+                    if os.name != "posix":
+                        # Windows has no O_NOFOLLOW. This filesystem flag is an
+                        # explicit host seam; the socket and body writes are real.
+                        scope.enter_context(
+                            mock.patch.object(helper.os, "O_NOFOLLOW", 0, create=True)
+                        )
+                    if not native_signal:
+                        scope.enter_context(
+                            mock.patch.object(helper.signal, "signal", side_effect=install)
+                        )
+                    worker.start()
+                    try:
+                        helper.serve(str(filesystem_root), NONCE)
+                    except BaseException as error:
+                        raised = error
+                    worker.join(2)
+                    self.assertFalse(
+                        worker.is_alive(), "owned response peer must finish before disposal"
+                    )
+            finally:
+                if native_signal:
+                    for number, callback in old_handlers.items():
+                        signal.signal(number, callback)
+        self.assertEqual(cuts, ["headers-written-body-pending"])
+        self.assertEqual(len(captures), 1)
+        server, request = captures[0]
+        self.assertEqual(request.fileno(), -1)
+        self.assertEqual(server.socket.fileno(), -1)
+        self.assertIsNone(getattr(server, "active_request", None))
+        self.assertIsNone(raised, "stopping must preserve an already admitted real body write")
+        self.assertEqual(failures, [])
+        self.assertEqual(len(responses), 1)
+        actual_headers, body = responses[0].split(b"\r\n\r\n", 1)
+        self.assertTrue(actual_headers.startswith(b"HTTP/1.0 200 "))
+        self.assertIn(b"Content-Length: 3", actual_headers)
+        self.assertEqual(body, b"abc", "the real response body must complete before EOF")
+        self.assertEqual(
+            [name for name, _ in publications],
+            ["server-start.json", "request-000001.json", "server-retired.json"],
+        )
+        self.assertEqual(
+            publications[1][1],
+            {
+                "nonce": NONCE,
+                "path": "/feed.xml",
+                "bytes": 3,
+                "sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+            },
+        )
+        self.assertEqual(publications[2][1], {"nonce": NONCE, "pid": os.getpid(), "requests": 1})
+
+    def testModeledStopPreservesAdmittedResponseBodyAndExactSocketRetirement(self):
+        self.observe_admitted_response_stop()
+
+    @unittest.skipUnless(
+        os.name == "posix",
+        "Native SIGTERM is POSIX; modeled stop with real body remains mandatory on Windows",
+    )
+    def testActualPOSIXSignalPreservesAdmittedResponseBodyAndExactSocketRetirement(self):
+        self.observe_admitted_response_stop(native_signal=True)
 
 
 if __name__ == "__main__":

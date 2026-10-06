@@ -321,5 +321,131 @@ class BootstrapCallerControls(unittest.TestCase):
             self.assertNotIn(secret, logged.getvalue())
 
 
+class MetadataEntryControls(unittest.TestCase):
+    def test_token_is_consumed_before_non_native_refusal_and_module_loading(self):
+        import os
+        import contextlib
+        import io
+
+        with (
+            mock.patch.dict(os.environ, {"ERGOPTI_NATIVE_HS_METADATA_TOKEN": "ghs_PRIVATE"}),
+            mock.patch.object(run_native.sys, "platform", "linux"),
+            mock.patch.object(run_native, "pinned_module") as loading,
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(
+                run_native.main(["--source-root", ".", "--source-sha", "a" * 40, "--output", "."]),
+                77,
+            )
+            self.assertNotIn("ERGOPTI_NATIVE_HS_METADATA_TOKEN", os.environ)
+        loading.assert_not_called()
+
+    def test_anonymous_non_native_refusal_does_not_allocate_modules(self):
+        import os
+        import contextlib
+        import io
+
+        with (
+            mock.patch.dict(os.environ),
+            mock.patch.object(run_native.sys, "platform", "linux"),
+            mock.patch.object(run_native, "pinned_module") as loading,
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            os.environ.pop("ERGOPTI_NATIVE_HS_METADATA_TOKEN", None)
+            self.assertEqual(
+                run_native.main(["--source-root", ".", "--source-sha", "a" * 40, "--output", "."]),
+                77,
+            )
+        loading.assert_not_called()
+
+
+class NativeEntryTokenBoundary(unittest.TestCase):
+    def inventory(self):
+        path = Path(__file__).resolve().parents[1] / "native_hs_program_providers/run_native.py"
+        return run_native.pinned_module(path, "inventory")
+
+    def test_valid_token_is_absent_before_actual_native_constructor(self):
+        import os
+        import contextlib
+        import io
+        from types import SimpleNamespace
+
+        inventory = self.inventory()
+        error = RuntimeError("CONTROLLED_CONSTRUCTOR_BOUNDARY")
+
+        def construct():
+            self.assertNotIn("ERGOPTI_NATIVE_HS_METADATA_TOKEN", os.environ)
+            raise error
+
+        owner = SimpleNamespace(NativeProcessGroups=construct)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            scratch = root / "scope"
+
+            arguments = [
+                "--source-root",
+                str(root),
+                "--source-sha",
+                "a" * 40,
+                "--output",
+                str(scratch),
+                "--download",
+            ]
+            with (
+                mock.patch.dict(os.environ, {"ERGOPTI_NATIVE_HS_METADATA_TOKEN": "ghs_PRIVATE"}),
+                mock.patch.object(run_native.sys, "platform", "darwin"),
+                mock.patch.object(run_native.sys, "version_info", (3, 13)),
+                mock.patch.object(
+                    run_native,
+                    "pinned_module",
+                    side_effect=lambda path, kind: owner if kind == "ownership" else inventory,
+                ),
+                mock.patch.object(inventory, "source_hashes") as git,
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                with self.assertRaises(RuntimeError) as caught:
+                    run_native.main(arguments)
+                self.assertIs(caught.exception, error)
+            git.assert_not_called()
+
+    def test_malformed_token_refuses_before_actual_native_constructor(self):
+        import os
+        import contextlib
+        import io
+        from types import SimpleNamespace
+
+        inventory = self.inventory()
+        construction = mock.Mock(side_effect=AssertionError("allocation forbidden"))
+        owner = SimpleNamespace(NativeProcessGroups=construction)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            scratch = root / "scope"
+
+            arguments = [
+                "--source-root",
+                str(root),
+                "--source-sha",
+                "a" * 40,
+                "--output",
+                str(scratch),
+                "--download",
+            ]
+            with (
+                mock.patch.dict(os.environ, {"ERGOPTI_NATIVE_HS_METADATA_TOKEN": "PRIVATE\nTOKEN"}),
+                mock.patch.object(run_native.sys, "platform", "darwin"),
+                mock.patch.object(run_native.sys, "version_info", (3, 13)),
+                mock.patch.object(
+                    run_native,
+                    "pinned_module",
+                    side_effect=lambda path, kind: owner if kind == "ownership" else inventory,
+                ),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                with self.assertRaisesRegex(ValueError, "^metadata_token_refused$"):
+                    run_native.main(arguments)
+                self.assertNotIn("ERGOPTI_NATIVE_HS_METADATA_TOKEN", os.environ)
+        construction.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

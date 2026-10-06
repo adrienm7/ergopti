@@ -155,5 +155,155 @@ class DiagnosticControls(unittest.TestCase):
         self.assertEqual(result.stderr, "")
 
 
+class X11ReadinessControls(unittest.TestCase):
+    def client(self, outcomes, *, kill_failure=None):
+        events = []
+        outcomes = iter(outcomes)
+
+        class Child:
+            returncode = None
+
+            def wait(self, **options):
+                events.append(("wait", options))
+                result = next(outcomes)
+                if isinstance(result, BaseException):
+                    raise result
+                self.returncode = result
+                return result
+
+            def kill(self):
+                events.append(("kill", self.returncode))
+                if kill_failure is not None:
+                    raise kill_failure
+
+        return Child(), events
+
+    def server(self):
+        return SimpleNamespace(poll=lambda: None)
+
+    def test_real_client_path_exact_owned_display_and_one_bounded_wait(self):
+        child, events = self.client([0])
+        with patch.object(diagnostic.subprocess, "Popen", return_value=child) as spawn:
+            self.assertTrue(diagnostic.require_x11_ready(":87", self.server(), spawn=spawn))
+        spawn.assert_called_once_with(
+            ["/usr/bin/xdpyinfo", "-display", ":87"],
+            stdin=diagnostic.subprocess.DEVNULL,
+            stdout=diagnostic.subprocess.DEVNULL,
+            stderr=diagnostic.subprocess.DEVNULL,
+        )
+        self.assertEqual(events, [("wait", {"timeout": 5})])
+        self.assertEqual(child.returncode, 0)
+
+    def test_native_nonzero_is_refused_after_actual_terminal_wait(self):
+        child, events = self.client([3])
+        with self.assertRaisesRegex(RuntimeError, "refused"):
+            diagnostic.require_x11_ready(":87", self.server(), spawn=lambda *_a, **_p: child)
+        self.assertEqual(events, [("wait", {"timeout": 5})])
+        self.assertEqual(child.returncode, 3)
+
+    def test_timeout_kills_and_waits_exact_acquired_client_before_refusal(self):
+        child, events = self.client(
+            [diagnostic.subprocess.TimeoutExpired(["/usr/bin/xdpyinfo"], 5), -9]
+        )
+        with self.assertRaises(diagnostic.subprocess.TimeoutExpired):
+            diagnostic.require_x11_ready(":87", self.server(), spawn=lambda *_a, **_p: child)
+        self.assertEqual(events, [("wait", {"timeout": 5}), ("kill", None), ("wait", {})])
+        self.assertEqual(child.returncode, -9)
+
+    def test_interruption_cannot_drop_client_or_become_success(self):
+        child, events = self.client([KeyboardInterrupt("controlled interruption"), -9])
+        with self.assertRaises(KeyboardInterrupt):
+            diagnostic.require_x11_ready(":87", self.server(), spawn=lambda *_a, **_p: child)
+        self.assertEqual(events, [("wait", {"timeout": 5}), ("kill", None), ("wait", {})])
+        self.assertEqual(child.returncode, -9)
+
+    def test_interrupted_retirement_still_waits_the_same_client(self):
+        child, events = self.client(
+            [
+                diagnostic.subprocess.TimeoutExpired(["/usr/bin/xdpyinfo"], 5),
+                KeyboardInterrupt(),
+                -9,
+            ]
+        )
+        with self.assertRaises(diagnostic.subprocess.TimeoutExpired):
+            diagnostic.require_x11_ready(":87", self.server(), spawn=lambda *_a, **_p: child)
+        self.assertEqual(
+            events,
+            [("wait", {"timeout": 5}), ("kill", None), ("wait", {}), ("wait", {})],
+        )
+        self.assertEqual(child.returncode, -9)
+
+    def test_signal_exit_race_still_requires_actual_wait(self):
+        child, events = self.client(
+            [diagnostic.subprocess.TimeoutExpired(["/usr/bin/xdpyinfo"], 5), -9],
+            kill_failure=ProcessLookupError("controlled completed client"),
+        )
+        with self.assertRaises(diagnostic.subprocess.TimeoutExpired):
+            diagnostic.require_x11_ready(":87", self.server(), spawn=lambda *_a, **_p: child)
+        self.assertEqual(events[-1], ("wait", {}))
+        self.assertEqual(child.returncode, -9)
+
+    def test_interrupted_kill_retries_signal_before_waiting_on_blocked_client(self):
+        events = []
+
+        class Child:
+            returncode = None
+            kill_count = 0
+
+            def wait(self, **options):
+                events.append(("wait", options))
+                if options:
+                    raise diagnostic.subprocess.TimeoutExpired(["/usr/bin/xdpyinfo"], 5)
+                self.returncode = -9
+                return -9
+
+            def kill(self):
+                self.kill_count += 1
+                events.append(("kill", self.kill_count))
+                if self.kill_count == 1:
+                    raise KeyboardInterrupt("controlled interruption before native signal")
+
+        child = Child()
+        with self.assertRaises(diagnostic.subprocess.TimeoutExpired):
+            diagnostic.require_x11_ready(":87", self.server(), spawn=lambda *_a, **_p: child)
+        self.assertEqual(
+            events,
+            [("wait", {"timeout": 5}), ("kill", 1), ("kill", 2), ("wait", {})],
+        )
+        self.assertEqual(child.returncode, -9)
+
+    def test_owned_server_exit_after_handshake_still_refuses(self):
+        child, events = self.client([0])
+        states = iter([None, 0])
+        server = SimpleNamespace(poll=lambda: next(states))
+        with self.assertRaisesRegex(RuntimeError, "refused"):
+            diagnostic.require_x11_ready(":87", server, spawn=lambda *_a, **_p: child)
+        self.assertEqual(events, [("wait", {"timeout": 5})])
+        self.assertEqual(child.returncode, 0)
+
+    def test_missing_client_has_no_native_owner_to_invent_or_warm(self):
+        with patch.object(
+            diagnostic.subprocess, "Popen", side_effect=FileNotFoundError("controlled absence")
+        ) as spawn:
+            with self.assertRaises(FileNotFoundError):
+                diagnostic.require_x11_ready(":87", self.server(), spawn=spawn)
+        self.assertEqual(spawn.call_count, 1)
+
+    def test_invalid_or_retired_owned_display_never_spawns_client(self):
+        with patch.object(diagnostic.subprocess, "Popen") as spawn:
+            for name in ("", "87", ":", ":8.0", ":８", "--display", None):
+                with self.subTest(name=name), self.assertRaises(RuntimeError):
+                    diagnostic.require_x11_ready(name, self.server(), spawn=spawn)
+            with self.assertRaises(RuntimeError):
+                diagnostic.require_x11_ready(":87", SimpleNamespace(poll=lambda: 0), spawn=spawn)
+        spawn.assert_not_called()
+
+    def test_unknown_native_success_status_cannot_admit_readiness(self):
+        child, events = self.client([False])
+        with self.assertRaisesRegex(RuntimeError, "refused"):
+            diagnostic.require_x11_ready(":87", self.server(), spawn=lambda *_a, **_p: child)
+        self.assertEqual(events, [("wait", {"timeout": 5})])
+
+
 if __name__ == "__main__":
     unittest.main()
