@@ -66,7 +66,7 @@ _AOPR_CountFiles(Files) {
 				continue
 			for Cat, Needles in Categories {
 				for Needle in Needles {
-					if InStr(Line, Needle) {
+					if _AOPR_IsOsToken(Line, Needle) {
 						Result[Cat] += 1
 						break
 					}
@@ -76,6 +76,25 @@ _AOPR_CountFiles(Files) {
 	}
 	return Result
 }
+
+;
+; A RAM-only helper can contain a built-in's name in its own identifier. Match
+; the entire identifier so such helpers cannot masquerade as direct OS access.
+; First-class references to real built-ins remain counted even without a call.
+_AOPR_IsOsToken(Line, Needle) {
+	return RegExMatch(Line, "i)(?<![\p{L}\p{N}_])" . Needle . "(?![\p{L}\p{N}_])") > 0
+}
+
+_AOPR_WholeIdentifiers() {
+	for Name in ["DllCall", "ComCall", "FileRead", "FileOpen", "FileAppend", "FileDelete", "FileMove", "FileCopy"] {
+		AssertTrue(_AOPR_IsOsToken(Name . "(Value)", Name), "Real native calls must remain visible.")
+		AssertTrue(_AOPR_IsOsToken("Port := " . Name, Name), "Captured native built-ins remain OS references.")
+		for Source in [Name . "Activity(Value)", "Wrapped" . Name . "(Value)", "_" . Name . "(Value)", Name . "É(Value)"]
+			AssertFalse(_AOPR_IsOsToken(Source, Name), "An independent helper identifier is not the native built-in.")
+	}
+}
+
+Test("OS purity counter: whole native identifiers and captured built-ins (os-purity-token-boundaries)", _AOPR_WholeIdentifiers)
 
 ; Every .ahk file under the given driver subdirectories, recursively, with
 ; adapters/ excluded — OS calls there are the legitimate isolation layer.
@@ -144,8 +163,8 @@ _AOPR_AssertTree(Label, Files, Baseline) {
 ;              Not a regression — this tree had never been counted.
 ; entry point: 2026-07-31, first measurement (DllCall=3, FileIO=5).
 _AOPR_BASELINE_CORE  := 252
-_AOPR_BASELINE_UI    := 130
-_AOPR_BASELINE_ENTRY := 8
+_AOPR_BASELINE_UI    := 126
+_AOPR_BASELINE_ENTRY := 7
 
 _AOPR_RatchetCore() {
 	global _AOPR_BASELINE_CORE
