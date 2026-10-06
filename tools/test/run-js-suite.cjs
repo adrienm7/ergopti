@@ -31,6 +31,12 @@ const FULL = process.argv.includes('--full');
 // Each check mirrors a CI "Validate ·" step. command/args are run from ROOT.
 const CHECKS = [
 	{
+		name: 'Nix runtime receipts and hosted registration preserve native admission',
+		cmd: process.execPath,
+		args: ['tools/test/test-linux-nix-native.cjs'],
+		repro: 'node tools/test/test-linux-nix-native.cjs'
+	},
+	{
 		name: 'native typing consumer retains actual selection and KPI dependencies',
 		cmd: process.execPath,
 		args: ['tools/test/test-linux-typing-consumer-closure.cjs'],

@@ -86,3 +86,25 @@ A real read-only user/mount namespace prerequisite passes for a prospective
 private Nix store (`mARqQ5`). The official Nix cache HTTPS prerequisite returns
 HTTP 403 (`ezWQZG`), with physical closure and no retained debt. This does not
 qualify a Nix build; the prepared hosted qualification remains separate.
+
+## Hosted Nix qualification registration
+
+The reviewed source packet adds one bounded Linux E2E step and seven native
+claims; existing subject floors, release decisions, owner retirement and
+package assertions remain intact. Its 35 independent source/configuration/
+receipt controls pass. The complete JavaScript suite passes 376 checks on
+working sources over fd107685ae2ff2cedbe8edb559a54b4886d0954b. The raw log
+SHA-256 is `bbe11c52436b4b3d2b1f93f669ed6ad61574b69d243d7d59970dd901a925ff1b`.
+This is source qualification, not seven native Nix results. The local
+cache prerequisite remains HTTP403; hosted execution is pending.
+
+Manual all-OS CI [37511777225](https://github.com/adrienm7/ergopti/actions/runs/37511777225)
+tests exact fd107685ae2ff2cedbe8edb559a54b4886d0954b. Core JavaScript/properties
+and all three unit lanes pass; portable macOS E2E and native tooltip pass.
+Linux E2E and native macOS packaging fail; macOS installation is skipped.
+The Linux HTTP failures are being reproduced against their original strict
+assertions. The native Sparkle diagnostics prove authentic opposite-key
+signatures and identical copied payload while byte equality is false;
+Brew independently reports an unavailable unconfined AppleEvent boundary
+with send status -600 and exit66. These failures are not native passes.
+The final integrated SHA still requires its own terminal qualification.

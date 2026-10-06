@@ -693,6 +693,34 @@ const RULES = [
 			].includes(f)
 	},
 	{
+		gate: 'linux-nix-native',
+		why: 'Nix package runtime changes require a genuine derivation and installed wrapper/native admission',
+		match: (f) =>
+			[
+				'tools/build/nix/flake.nix',
+				'static/ergopti_plus/linux/ergopti_hotstrings.lua',
+				'tools/test/run-linux-managed-http-native.cjs',
+				'tools/build/stage-linux-network-runtime.py',
+				'tools/build/build-linux-native-output.sh',
+				'tools/lib/git_bash.py',
+				'tools/__init__.py',
+				'static/ergopti_plus/linux/native/archive_output/archive_publication.c',
+				'static/ergopti_plus/linux/native/archive_output/archive_publication.h',
+				'static/ergopti_plus/linux/infra/paths.lua',
+				'static/ergopti_plus/linux/infra/openssl_digest.lua',
+				'static/ergopti_plus/linux/platform/network/native_proxy_runtime.lua',
+				'static/ergopti_plus/linux/_generated/native_runtime.lua',
+				'static/ergopti_plus/_shared/data/linux_native_runtime.json',
+				'tools/codegen/codegen-linux-native-runtime.cjs',
+				'tools/test/run-linux-nix-native.cjs',
+				'tools/test/fixtures/linux-nix-installed-runtime.lua',
+				'tools/test/test-linux-nix-native.cjs',
+				'tools/test/run-linux-managed-http-phase.py',
+				'.github/linux-ci-coverage.json',
+				'.github/workflows/ci-linux.yml'
+			].includes(f)
+	},
+	{
 		gate: 'linux-network-runtime',
 		why: 'managed networking requires actual LuaJIT luv, GIO modules, compiled schemas and installed helper paths',
 		match: (f) =>
@@ -854,6 +882,7 @@ const GATE_COMMANDS = {
 	'linux-xkb-source': { npm: 'test:linux:xkb-source' },
 	'linux-http-stream': { npm: 'test:linux:http-stream' },
 	'linux-network-runtime': { npm: 'test:linux:network-runtime' },
+	'linux-nix-native': { npm: 'test:linux:nix-native', platform: 'linux' },
 	'linux-updater-archive-native': { npm: 'test:linux:updater-archive-native', platform: 'linux' },
 	'linux-archive-source-controls': { npm: 'test:linux:archive-source-controls', platform: 'linux' },
 	'linux-managed-http-native': { npm: 'test:linux:managed-http-native', platform: 'linux' },

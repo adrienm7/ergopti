@@ -3,6 +3,8 @@
 	"version": "3.0.0",
 	"private": true,
 	"scripts": {
+		"test:linux:nix-native": "node ./tools/test/run-linux-nix-native.cjs",
+		"test:linux:nix-source": "node ./tools/test/test-linux-nix-native.cjs",
 		"predev": "node ./tools/dev/write-branch.js",
 		"dev": "vite dev",
 		"prebuild": "node ./tools/dev/write-branch.js",

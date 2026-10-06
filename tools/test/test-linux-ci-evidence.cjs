@@ -1491,6 +1491,7 @@ assert.ok(
 	'the actual runtime count must come from its independently validated native receipt'
 );
 assert.strictEqual(MANIFEST.jobs['e2e-linux'].subjects['managed-network-runtime'], 4);
+assert.strictEqual(MANIFEST.jobs['e2e-linux'].subjects['nix-installed-runtime'], 7);
 assert.strictEqual(MANIFEST.jobs['e2e-linux'].subjects['retained-fd-sha256'], 12);
 assert.strictEqual(MANIFEST.jobs['e2e-linux'].subjects['managed-http-output'], 18);
 assert.strictEqual(MANIFEST.jobs['e2e-linux'].subjects['managed-http-public'], 30);
@@ -1511,6 +1512,7 @@ for (const [, subject, value] of recorded) {
 			'xkb-source-qualification': '$xkb_source_assertions',
 			'http-stream-receipts': '$http_stream_assertions',
 			'managed-network-runtime': '$network_runtime_assertions',
+			'nix-installed-runtime': '$nix_runtime_assertions',
 			'retained-fd-sha256': '$fd_sha256_assertions',
 			'managed-http-output': '$managed_http_output_assertions',
 			'managed-http-public': '$managed_http_public_assertions',

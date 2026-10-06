@@ -17,6 +17,7 @@
 				"window-switch-receipts": 34,
 				"http-stream-receipts": 55,
 				"managed-network-runtime": 4,
+				"nix-installed-runtime": 7,
 				"managed-http-output": 18,
 				"managed-http-public": 30,
 				"updater-archive-pipeline": 15,
