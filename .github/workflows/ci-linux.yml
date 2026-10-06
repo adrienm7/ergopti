@@ -2130,9 +2130,8 @@ jobs:
       # that belongs to the interpreter or the C library is invisible to it —
       # and those are the differences that actually bite here. Alpine is musl
       # rather than glibc; Arch ships whatever LuaJIT released last; several
-      # distributions patch it. The driver is 1600 assertions of pure Lua plus a
-      # thin FFI layer, so running them where the interpreter differs is cheap
-      # certification of exactly the part that varies.
+      # distributions patch it. Native fixtures also require compatible luv/lfs,
+      # Python3 and an ordinary UID: root invalidates permission-refusal checks.
       #
       # LuaJIT is the production interpreter. A distribution lane without it is
       # not evidence about the driver and therefore cannot satisfy this gate.
@@ -2141,23 +2140,7 @@ jobs:
         working-directory: static/ergopti_plus/linux
         shell: bash
         run: |
-          set +e
-          case "${{ matrix.distro }}" in
-            debian)   apt-get install -y --no-install-recommends luajit ;;
-            fedora)   dnf install -y luajit ;;
-            arch)     pacman -Sy --noconfirm luajit ;;
-            alpine)   apk add --no-cache luajit ;;
-            opensuse) zypper --non-interactive install luajit ;;
-          esac
-          if ! command -v luajit >/dev/null 2>&1; then
-            echo "::error::${{ matrix.distro }} has no LuaJIT package — mandatory distro coverage did not run."
-            exit 1
-          fi
-          luajit -v
-          luajit tests/run.lua
-          STATUS=$?
-          set -e
-          exit $STATUS
+          bash "$GITHUB_WORKSPACE/tools/test/prepare-linux-distro-unit.sh" "${{ matrix.distro }}"
         timeout-minutes: 10
 
       - name: Record mandatory distro evidence
