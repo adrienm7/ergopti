@@ -1,0 +1,8 @@
+{
+  "source_contract": "passed",
+  "predecessor": "expected_failure",
+  "mutations": 6,
+  "native_ahk": "unexecuted",
+  "registered_cases": 5,
+  "corpus_sha256": "cec09a9901f2b3b647af1bb46d51c3bccfed5e11c315b14115058db8b09e81b2"
+}

@@ -1,0 +1,180 @@
+{
+  "apply_check_exit": 0,
+  "archive_sha256": "1ebd01d2f7a1b4766779394dc835b5bac295e9f5590f4598bb8e0f378c720def",
+  "dependency_receipts": {
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-native-actions/one-shot-freeze/receipt.json": "4efd7f0a523526140cafa438ac17b067607c028bd22999b512001f1bc4bffb99",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-native-actions/origin-fence-freeze/receipt.json": "ced31ae6b5eab6b213b96d426fe3c73919ce9291b4e04c3aa552f78440817dd6"
+  },
+  "files": {
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/build_receipt.py": "f18fabbf340ba53f72da61fc86cc81a4dc4bf023fdb2ce34de01bc9c346937b0",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/actual-owner-after-lua54.log": "136d0f993315c24deed6bc949680f4e10c7c098b869698d3b22a7c964a9a88ea",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/actual-owner-after-luajit.log": "136d0f993315c24deed6bc949680f4e10c7c098b869698d3b22a7c964a9a88ea",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/after-lua54.log": "59281f83196ae210501ec18f3e70aee1c41bf1eadabfea3387b55295b21dca5f",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/after-luajit.log": "59281f83196ae210501ec18f3e70aee1c41bf1eadabfea3387b55295b21dca5f",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/all-controlled-lua54.log": "2aad93d23b1fb852a03bc4deaabe1960f554fda33567810719574b473088f3c4",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/all-controlled-luajit.log": "2aad93d23b1fb852a03bc4deaabe1960f554fda33567810719574b473088f3c4",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/before-lua54.log": "341a2c0ddc2aaff1c784fd686bea47f9b4ce7169ab187b5b0571875868da112e",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/before-luajit.log": "341a2c0ddc2aaff1c784fd686bea47f9b4ce7169ab187b5b0571875868da112e",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/final-all-lua54.log": "ad5bb803b6aa13202bacadebff7b4599cda58983b10f0eadf89562b0c756ba5f",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/final-all-luajit.log": "ad5bb803b6aa13202bacadebff7b4599cda58983b10f0eadf89562b0c756ba5f",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/final-legacy-title-lua54.log": "81b2faa0e9a264483792108a97dd768a79772456ec5fb649d8b1c5256ac3da00",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/final-legacy-title-luajit.log": "81b2faa0e9a264483792108a97dd768a79772456ec5fb649d8b1c5256ac3da00",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/hook-after-luajit.log": "f99eb2ef41cdc2044d2a931558de164f7e49cbf5edc7dde73121d48e6d24dc01",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/hook-final-lua54.log": "acf605ef5a96190ea3049a7b2ed1636e01763ef741b71e6b96d2e574c4095ae6",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/hook-final-luajit.log": "acf605ef5a96190ea3049a7b2ed1636e01763ef741b71e6b96d2e574c4095ae6",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/legacy-title-actual-after-lua54.log": "81b2faa0e9a264483792108a97dd768a79772456ec5fb649d8b1c5256ac3da00",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/legacy-title-actual-after-luajit.log": "81b2faa0e9a264483792108a97dd768a79772456ec5fb649d8b1c5256ac3da00",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/legacy-title-after-lua54.log": "64d720e9b1c3fd583a2fb67c3e6f84f43e439924c7be8e31f32ad8116e282f06",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/legacy-title-after-luajit.log": "64d720e9b1c3fd583a2fb67c3e6f84f43e439924c7be8e31f32ad8116e282f06",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/lint-owned.log": "db1e9721b95edae7e68ad389bcec6253e7ba6068180efee61f1e0837c9665c87",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/native-plan-after-luajit.log": "3a0f88055e10f151a3b394d04428f83216eef267d941dc04fc129e3fea08bad3",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/native-plan-before-lua54.log": "9c46f598cba42ea867f90418bc25fdbbb818496fecc749b59c7e8435f9593951",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/native-plan-before-luajit.log": "9c46f598cba42ea867f90418bc25fdbbb818496fecc749b59c7e8435f9593951",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/omit-casing-retirement-wave-lua5.4.log": "5549971e51075eb1a93700e659dfc9caf15c920b98681ce2d9755edbcf24004e",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/omit-casing-retirement-wave-luajit.log": "c17be77d211f2fe34cf33888ac49bc3a4b8f184d895cb6e7ad004dd0870647c3",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/omit-native-output-refusal-lua5.4.log": "53f7bef3235647dad04a8424909f4eaedc329a4a4ded860c13406ad2b0c2cdb4",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/omit-native-output-refusal-luajit.log": "53f7bef3235647dad04a8424909f4eaedc329a4a4ded860c13406ad2b0c2cdb4",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/omit-native-publication-refusal-lua5.4.log": "f8a67dd6b885b31fbfa2d6fb51bf7a092f35a0b40cf20ea72a11c93ace0a6e36",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/omit-native-publication-refusal-luajit.log": "f8a67dd6b885b31fbfa2d6fb51bf7a092f35a0b40cf20ea72a11c93ace0a6e36",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/omit-private-resumption-lua5.4.log": "266c834ec9fcedb05ec6e9c7c0eaa7320a4bdce8faf1ed049cebbf2263cc3516",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/omit-private-resumption-luajit.log": "266c834ec9fcedb05ec6e9c7c0eaa7320a4bdce8faf1ed049cebbf2263cc3516",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/omit-probe-revision-lua5.4.log": "b71dfea9d96b4d1084aa81788c307ad6fe058f9acfd6bcb5d474470594f4c56b",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/omit-probe-revision-luajit.log": "b71dfea9d96b4d1084aa81788c307ad6fe058f9acfd6bcb5d474470594f4c56b",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/prototype-policy-reentry-lua54.log": "eea92d92a336fd5a3078608f889d92483635e3dc81599d796f045fdaddc929e9",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/prototype-policy-reentry-luajit.log": "eea92d92a336fd5a3078608f889d92483635e3dc81599d796f045fdaddc929e9",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/publication-before-luajit.log": "c511f0abdca077b4b8f5fd6f283f3bd942339a7b005a03e014ba29773617550d",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/shared-integration-after-lua54.log": "17777bff890efc802aad2cc67d033be58ed285940932760d45be195b314be2fe",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/shared-integration-after-luajit.log": "17777bff890efc802aad2cc67d033be58ed285940932760d45be195b314be2fe",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/shared-owner-after-lua54.log": "17777bff890efc802aad2cc67d033be58ed285940932760d45be195b314be2fe",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/evidence/shared-owner-after-luajit.log": "17777bff890efc802aad2cc67d033be58ed285940932760d45be195b314be2fe",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/lint-scope/package.json": "768e8be6268f4366cbeb5cbd21e416389ed328bdee3dcd8c3e17176f20b82996",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/lint-scope/tools/lib/paths.cjs": "a172a610e402b7dd4535439e748cc8ed2fecb6c81097859aae79a8c022fd664a",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/lint-scope/tools/lint/owned.mjs": "6fef9fe0c2c0b25c21f07be35872294f622dbbcef19afaa3757b80bb34ee4af9",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/mutation-results.json": "69ffd3219bdb7b3685f336445e7269d12359fba896349db0038bfdf0b1cc4671",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/mutations/omit-casing-retirement-wave.lua": "09aef31022a173027384b11f7729a2f5f6fb49bd121d5b6f18225998db8a9ff6",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/mutations/omit-native-output-refusal.lua": "533908442fc390a95bfa479a5f3a692f8b55c8604797c92a7451da1c4478060c",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/mutations/omit-native-publication-refusal.lua": "d2953500c6a2ea22a052ff435e9416a455d5ab340d982409fc8db27daa098833",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/mutations/omit-private-resumption.lua": "587555a8d4407621934173603fbe9bcf69196635e3c439a74da8f29fd648715a",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/mutations/omit-probe-revision.lua": "cca41d5695a649668c2e5fd4df023a2dd34b9d1db84298833c6dbb055463133f",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/prototype-freeze/README.md": "eef3d3ceab186d7849ab579b6a8e4ee14a9023dfc9929e5023afcfd9cb81fc74",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/prototype-freeze/apply-check.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/prototype-freeze/candidate/static/ergopti_plus/_shared/lua/tap_hold/caps_word.lua": "0e0f862bd97ef8c2d929fd48e032d73d6fbfed02c344eeb4b113727300b90e15",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/prototype-freeze/candidate/static/ergopti_plus/linux/ergopti_hotstrings.lua": "1cbf9c9c4b54fc8a0c378f7cd278ab4f65236e5190e2dde856da307ca79d7551",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/prototype-freeze/candidate/static/ergopti_plus/linux/modules/shortcuts/manager.lua": "14f1313d94f5c136e036c145f3024dff2fbc216124c25032b2fabb4aad96ea42",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/prototype-freeze/candidate/static/ergopti_plus/linux/platform/remap/key_combination_engine.lua": "a851868c2c0cb380f35bab04c8254150a89831e2f47505dd166b1a69740b4a3e",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/prototype-freeze/candidate/static/ergopti_plus/linux/platform/remap/tap_hold_engine.lua": "50f9920f7674a9ab9d7419e53337de1de773e4db1ac26e174b7437485a6fc52d",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/prototype-freeze/candidate/static/ergopti_plus/linux/platform/remap/tap_hold_manager.lua": "26921de6ceccb6b7e97b82f348497c3373fd7457f72e34c97f101d4e5a808faa",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/prototype-freeze/candidate/static/ergopti_plus/linux/tests/unit/modules/test_caps_word_policy.lua": "056e40150f7b07ec2af3b20a27a5249ed54f5673d432f76e80c68d86ffbde9b6",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/prototype-freeze/candidate/static/ergopti_plus/linux/tests/unit/modules/test_key_combination_caps_word.lua": "0ee5cfcbe6c05c550e474c46c5be8dd34f0178642011fec2fe8490d9dbaed339",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/prototype-freeze/caps-word-prototype.patch": "f9a51c14472bde8bd3c2c0766e7e8dcfcbb69eab437b97670f9df1a4ae9f5af0",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/prototype-freeze/preimages/static/ergopti_plus/linux/ergopti_hotstrings.lua": "ef8f5a95345e34f5ddf6319571beeaad5ef2615d59459a4445772b61049e3529",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/prototype-freeze/preimages/static/ergopti_plus/linux/modules/shortcuts/manager.lua": "3b7712e469c5e134b9be9ed61eb44b1258a8076a8fcd01740e2ae052fd14dc28",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/prototype-freeze/preimages/static/ergopti_plus/linux/platform/remap/key_combination_engine.lua": "20eff976dcd6fc682bce1bcc2313d9b8935522e4b79a61fe8fdebea225830c89",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/prototype-freeze/preimages/static/ergopti_plus/linux/platform/remap/tap_hold_engine.lua": "39ffc279e68ad50360b9af13c12913345e5d319134feb6e78d428d7d1a6db9be",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/prototype-freeze/preimages/static/ergopti_plus/linux/platform/remap/tap_hold_manager.lua": "d60dacf410e31e77eaaa1d7cc0a2c1074c35fe7dbd8cb6a84577d0644004c3aa",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/prototype-freeze/source-pair.tar": "1ebd01d2f7a1b4766779394dc835b5bac295e9f5590f4598bb8e0f378c720def",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/qualify-all-controlled.lua": "f223f776221ba0484a8ad426cc2731d16a1adaa01d35f64c1c840156781a8779",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/qualify-legacy-title-unblocked.lua": "a9e52e1cddfe30977ad528f6b4a785fdb77bc5062870be8c90c1730929bd9bdb",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/qualify-mutation.lua": "9b1f85d04cf19a0f54695c3554765c8687b29ab65f49c90b679f61ba9420e278",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/qualify-owner.lua": "5b4d2849723483af7045543e765a3eeecbb75cc3d1805de426617967d9091ce5"
+  },
+  "original_test_sources_byte_exact": {
+    "linux/tests/unit/meta/test_shortcuts_manager.lua": true,
+    "linux/tests/unit/meta/test_tap_hold_engine.lua": true,
+    "linux/tests/unit/modules/test_key_combination_native_actions.lua": true,
+    "linux/tests/unit/modules/test_key_combinations.lua": true
+  },
+  "patch_sha256": "f9a51c14472bde8bd3c2c0766e7e8dcfcbb69eab437b97670f9df1a4ae9f5af0",
+  "qualifications": {
+    "availability": "UNCHANGED_UNAVAILABLE",
+    "causal_omissions_per_abi": 5,
+    "controlled_combined": {
+      "lua5.4": {
+        "failed": 0,
+        "passed": 163
+      },
+      "luajit": {
+        "failed": 0,
+        "passed": 163
+      }
+    },
+    "native_xkb_source_output_custody": "UNQUALIFIED",
+    "real_evdev_uinput": "UNEXECUTED",
+    "scoped_conventions": {
+      "sources": 8,
+      "violations": 0
+    },
+    "unchanged_title_words": {
+      "lua5.4": {
+        "failed": 0,
+        "passed": 59
+      },
+      "luajit": {
+        "failed": 0,
+        "passed": 59
+      }
+    }
+  },
+  "root_source_head": "5e622935b7618bb9f8e3e1508141773046ed2134",
+  "source_dependencies": {
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/snapshot/static/ergopti_plus/_shared/lua/tap_hold/key_combinations.lua": "ecf457cc2e8a94ce74748663b1161571e27500e1c00785e97ed7206b748dc312",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/snapshot/static/ergopti_plus/_shared/lua/tap_hold/one_shot_shift.lua": "9ff4f097e014ada2c6755d774c5570b91239f611b4699bdbb317c5af84071b13",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/snapshot/static/ergopti_plus/_shared/lua/unicode_case/init.lua": "4bcde1859108a31bc5f1a61f102d8c57af2244b9475277b1420560275707fe9f",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/snapshot/static/ergopti_plus/linux/adapters/keyboard_hook.lua": "bf7d81db85aec313ccbff2113ca55e45aff58be110955ec8947dd322e00d1eb2",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/snapshot/static/ergopti_plus/linux/adapters/keyboard_layout.lua": "8af675d9b94c449ee9b000a41a3ec37c38f4c63d2c5b63ec1734a4056975cd16",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/snapshot/static/ergopti_plus/linux/modules/shortcuts/key_combinations.lua": "634261734d05247b997695d008ca664d3d594f031353692e92cba08ec7d01baf",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/snapshot/static/ergopti_plus/linux/platform/remap/tap_hold_loader.lua": "ff79e4cc3beb497119b90eccc90d1aaf69b3d611564e0b7ec9bcc3f467d58382",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/snapshot/static/ergopti_plus/linux/tests/unit/meta/test_shortcuts_manager.lua": "c9cff25d7c43722afeddb8eb42f290cb67b71315561da2cc745e65567d65b414",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/snapshot/static/ergopti_plus/linux/tests/unit/meta/test_tap_hold_engine.lua": "752a183d967dfbd387a975cdfb3d110bd28938557ea83fbdf85901b42910b916",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/snapshot/static/ergopti_plus/linux/tests/unit/modules/test_key_combination_native_actions.lua": "d4c50d2f05e46652f89919770b47e696cb3f467bc19baa7faf8716eb8fda7d19",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word/snapshot/static/ergopti_plus/linux/tests/unit/modules/test_key_combinations.lua": "3c63b4aee5e539c5b39962bbb13b8e8108e4c60425ac66daa976b7b618b9b52a"
+  },
+  "source_paths": [
+    {
+      "path": "static/ergopti_plus/_shared/lua/tap_hold/caps_word.lua",
+      "post_sha256": "0e0f862bd97ef8c2d929fd48e032d73d6fbfed02c344eeb4b113727300b90e15",
+      "pre_sha256": null
+    },
+    {
+      "path": "static/ergopti_plus/linux/modules/shortcuts/manager.lua",
+      "post_sha256": "14f1313d94f5c136e036c145f3024dff2fbc216124c25032b2fabb4aad96ea42",
+      "pre_sha256": "3b7712e469c5e134b9be9ed61eb44b1258a8076a8fcd01740e2ae052fd14dc28"
+    },
+    {
+      "path": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
+      "post_sha256": "1cbf9c9c4b54fc8a0c378f7cd278ab4f65236e5190e2dde856da307ca79d7551",
+      "pre_sha256": "ef8f5a95345e34f5ddf6319571beeaad5ef2615d59459a4445772b61049e3529"
+    },
+    {
+      "path": "static/ergopti_plus/linux/platform/remap/tap_hold_engine.lua",
+      "post_sha256": "50f9920f7674a9ab9d7419e53337de1de773e4db1ac26e174b7437485a6fc52d",
+      "pre_sha256": "39ffc279e68ad50360b9af13c12913345e5d319134feb6e78d428d7d1a6db9be"
+    },
+    {
+      "path": "static/ergopti_plus/linux/platform/remap/tap_hold_manager.lua",
+      "post_sha256": "26921de6ceccb6b7e97b82f348497c3373fd7457f72e34c97f101d4e5a808faa",
+      "pre_sha256": "d60dacf410e31e77eaaa1d7cc0a2c1074c35fe7dbd8cb6a84577d0644004c3aa"
+    },
+    {
+      "path": "static/ergopti_plus/linux/platform/remap/key_combination_engine.lua",
+      "post_sha256": "a851868c2c0cb380f35bab04c8254150a89831e2f47505dd166b1a69740b4a3e",
+      "pre_sha256": "20eff976dcd6fc682bce1bcc2313d9b8935522e4b79a61fe8fdebea225830c89"
+    },
+    {
+      "path": "static/ergopti_plus/linux/tests/unit/modules/test_caps_word_policy.lua",
+      "post_sha256": "056e40150f7b07ec2af3b20a27a5249ed54f5673d432f76e80c68d86ffbde9b6",
+      "pre_sha256": null
+    },
+    {
+      "path": "static/ergopti_plus/linux/tests/unit/modules/test_key_combination_caps_word.lua",
+      "post_sha256": "0ee5cfcbe6c05c550e474c46c5be8dd34f0178642011fec2fe8490d9dbaed339",
+      "pre_sha256": null
+    }
+  ],
+  "status": "FROZEN_INACTIVE_SINGLE_SHARED_CASING_OWNER_PROTOTYPE",
+  "warnings": [
+    "INACTIVE: owner injection would admit manual caps_word; native custody qualification required before import",
+    "Controlled Hook ports do not prove physical native input/output",
+    "No contextual metadata or generic gesture handler included"
+  ]
+}

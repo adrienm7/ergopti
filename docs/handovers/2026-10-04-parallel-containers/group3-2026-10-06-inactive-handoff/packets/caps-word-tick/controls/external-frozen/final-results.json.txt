@@ -1,0 +1,74 @@
+[
+  {
+    "abi": "luajit",
+    "role": "original-frozen-tick",
+    "exit": 1,
+    "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-tick-successor/evidence/final-original-frozen-tick-luajit.log"
+  },
+  {
+    "abi": "luajit",
+    "role": "omit-post-source-guard",
+    "exit": 1,
+    "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-tick-successor/evidence/final-omit-post-source-guard-luajit.log"
+  },
+  {
+    "abi": "luajit",
+    "role": "omit-post-private-currency",
+    "exit": 1,
+    "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-tick-successor/evidence/final-omit-post-private-currency-luajit.log"
+  },
+  {
+    "abi": "luajit",
+    "role": "omit-post-casing-guard",
+    "exit": 1,
+    "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-tick-successor/evidence/final-omit-post-casing-guard-luajit.log"
+  },
+  {
+    "abi": "luajit",
+    "role": "omit-final-casing-order",
+    "exit": 1,
+    "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-tick-successor/evidence/final-omit-final-casing-order-luajit.log"
+  },
+  {
+    "abi": "luajit",
+    "role": "independent-new",
+    "exit": 0,
+    "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-tick-successor/evidence/final-independent-new-luajit.log"
+  },
+  {
+    "abi": "lua5.4",
+    "role": "original-frozen-tick",
+    "exit": 1,
+    "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-tick-successor/evidence/final-original-frozen-tick-lua5.4.log"
+  },
+  {
+    "abi": "lua5.4",
+    "role": "omit-post-source-guard",
+    "exit": 1,
+    "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-tick-successor/evidence/final-omit-post-source-guard-lua5.4.log"
+  },
+  {
+    "abi": "lua5.4",
+    "role": "omit-post-private-currency",
+    "exit": 1,
+    "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-tick-successor/evidence/final-omit-post-private-currency-lua5.4.log"
+  },
+  {
+    "abi": "lua5.4",
+    "role": "omit-post-casing-guard",
+    "exit": 1,
+    "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-tick-successor/evidence/final-omit-post-casing-guard-lua5.4.log"
+  },
+  {
+    "abi": "lua5.4",
+    "role": "omit-final-casing-order",
+    "exit": 1,
+    "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-tick-successor/evidence/final-omit-final-casing-order-lua5.4.log"
+  },
+  {
+    "abi": "lua5.4",
+    "role": "independent-new",
+    "exit": 0,
+    "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-tick-successor/evidence/final-independent-new-lua5.4.log"
+  }
+]

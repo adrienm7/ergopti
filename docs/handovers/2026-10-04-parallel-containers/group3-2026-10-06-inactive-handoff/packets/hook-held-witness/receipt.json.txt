@@ -1,0 +1,126 @@
+{
+  "status": "PRIVATE_CONFIRMED_CONTROLLED_REGRESSION_NOT_FOR_ADMISSION",
+  "source_paths": [
+    {
+      "path": "static/ergopti_plus/linux/adapters/keyboard_hook.lua",
+      "preimage": "bf7d81db85aec313ccbff2113ca55e45aff58be110955ec8947dd322e00d1eb2",
+      "witness_postimage": "bf7d81db85aec313ccbff2113ca55e45aff58be110955ec8947dd322e00d1eb2"
+    },
+    {
+      "path": "static/ergopti_plus/linux/tests/unit/adapters/test_keyboard_hook_device_watchdog.lua",
+      "preimage": "a24127014db0ee5318e11059aca9692b958bbcee873ecd904e264deb9a92a8fb",
+      "witness_postimage": "dec63152bbc26cfbd044b00725c1e23d31e807f3fb1efe69dbecb5effa6ce975"
+    }
+  ],
+  "dependencies": [
+    {
+      "path": "static/ergopti_plus/linux/adapters/uinput_writer.lua",
+      "sha256": "fc77df761890ecdc725b2962a78bac7bad898bc989b568b074e6b5d3e788b84a"
+    },
+    {
+      "path": "static/ergopti_plus/linux/adapters/evdev_reader.lua",
+      "sha256": "bcfd7821ef61176afde6eb5de91282b6d7803d02280670ef9ff11249401d0f98"
+    }
+  ],
+  "results": [
+    {
+      "abi": "luajit",
+      "passed": 14,
+      "failed": 1,
+      "log": "luajit-before.log",
+      "sha256": "ab5f91373e62081baa1161a3a5c863b8bfa8119dbe68f9870750e298bdc3f71d"
+    },
+    {
+      "abi": "lua54",
+      "passed": 14,
+      "failed": 1,
+      "log": "lua54-before.log",
+      "sha256": "ab5f91373e62081baa1161a3a5c863b8bfa8119dbe68f9870750e298bdc3f71d"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "README.md",
+      "sha256": "caa3e7693dc7b17249ab7fd120b5e3830946895a444e58d1a755ddb516ccf849",
+      "bytes": 3956
+    },
+    {
+      "path": "candidate/static/ergopti_plus/linux/adapters/keyboard_hook.lua",
+      "sha256": "bf7d81db85aec313ccbff2113ca55e45aff58be110955ec8947dd322e00d1eb2",
+      "bytes": 87292
+    },
+    {
+      "path": "candidate/static/ergopti_plus/linux/tests/unit/adapters/test_keyboard_hook_device_watchdog.lua",
+      "sha256": "dec63152bbc26cfbd044b00725c1e23d31e807f3fb1efe69dbecb5effa6ce975",
+      "bytes": 27901
+    },
+    {
+      "path": "dependencies/static/ergopti_plus/linux/adapters/evdev_reader.lua",
+      "sha256": "bcfd7821ef61176afde6eb5de91282b6d7803d02280670ef9ff11249401d0f98",
+      "bytes": 29365
+    },
+    {
+      "path": "dependencies/static/ergopti_plus/linux/adapters/uinput_writer.lua",
+      "sha256": "fc77df761890ecdc725b2962a78bac7bad898bc989b568b074e6b5d3e788b84a",
+      "bytes": 32087
+    },
+    {
+      "path": "dependencies.json",
+      "sha256": "c4978dcca041631b379639c364c5351fb43869d9f147a75c956abd9200e9e696",
+      "bytes": 318
+    },
+    {
+      "path": "freeze.py",
+      "sha256": "69df47781e2ebca175a77de6933863696b417fbb76a243c854d160ccfd35865b",
+      "bytes": 5751
+    },
+    {
+      "path": "lua54-before.log",
+      "sha256": "ab5f91373e62081baa1161a3a5c863b8bfa8119dbe68f9870750e298bdc3f71d",
+      "bytes": 1394
+    },
+    {
+      "path": "luajit-before.log",
+      "sha256": "ab5f91373e62081baa1161a3a5c863b8bfa8119dbe68f9870750e298bdc3f71d",
+      "bytes": 1394
+    },
+    {
+      "path": "overlap_tests.lua",
+      "sha256": "7657524e5f5ef74c8005ebd3293aa997e21150b3e33ab9fd4a0c7717f5d6c9e0",
+      "bytes": 1882
+    },
+    {
+      "path": "preimages/static/ergopti_plus/linux/adapters/keyboard_hook.lua",
+      "sha256": "bf7d81db85aec313ccbff2113ca55e45aff58be110955ec8947dd322e00d1eb2",
+      "bytes": 87292
+    },
+    {
+      "path": "preimages/static/ergopti_plus/linux/tests/unit/adapters/test_keyboard_hook_device_watchdog.lua",
+      "sha256": "a24127014db0ee5318e11059aca9692b958bbcee873ecd904e264deb9a92a8fb",
+      "bytes": 26019
+    },
+    {
+      "path": "prepare.py",
+      "sha256": "324925e109ba59407de1ff98eae1b2577e8746411724cf8bc13f10a30c52d817",
+      "bytes": 1185
+    },
+    {
+      "path": "prepare_reader.py",
+      "sha256": "6444f0fe955227804490c0d8f796d19c84987a9da8578ba8694fdd6d115e855c",
+      "bytes": 4686
+    },
+    {
+      "path": "results.json",
+      "sha256": "0a4d2bf8e3a8d818cf69757fbae5d66a5cfd212a83c2b2626de3efa14dd07b06",
+      "bytes": 357
+    },
+    {
+      "path": "run.lua",
+      "sha256": "6e63f97a47df600163f91b3182c38962b9fb52a3be6de8c202275691f3516eaf",
+      "bytes": 1292
+    }
+  ],
+  "product_hook_changed": false,
+  "native_kernel_execution": "NOT_RUN",
+  "physical_delivery_available": false
+}

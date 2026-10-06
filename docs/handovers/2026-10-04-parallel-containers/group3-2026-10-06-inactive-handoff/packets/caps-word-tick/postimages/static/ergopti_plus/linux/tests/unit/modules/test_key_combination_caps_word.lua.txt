@@ -1,0 +1,359 @@
+--- tests/unit/modules/test_key_combination_caps_word.lua
+
+--- ==============================================================================
+--- MODULE: Ordered Pair Caps Word Native Ownership
+--- DESCRIPTION:
+--- Actual owners and engines with controlled layout/output ports. These are
+--- software proofs, not physical evdev/uinput or live-layout qualification.
+--- ==============================================================================
+
+local NativeLoop = require("luv")
+local helpers = require("tests.helpers")
+local Owner = require("modules.shortcuts.key_combinations")
+local Engine = require("platform.remap.tap_hold_engine")
+local Native = require("platform.remap.key_combination_engine")
+local Casing = require("tap_hold.caps_word")
+local function origin()return {ready=true,physical=true,source="owned-keyboard",generation=7}end
+local function rows(events)
+	local result={};for _,row in ipairs(events or {})do result[#result+1]=row.code..":"..row.value end
+	return table.concat(result," ")
+end
+local function make()
+	local state={bytes='[shortcuts.key_combination_taps]\ncaps_lock_then_tab="caps_word"\n[shortcuts.key_combination_holds]\ncaps_lock_then_tab="shift"\n',paused=false}
+	state.owner=Owner.new({keys={{id="caps_lock",key="caps_lock"},{id="tab",key="tab"}},hold_picker={modifiers={"ctrl","shift"},layers={}},
+		files={read_with_status=function()return state.bytes,"ok"end},route=function()return "/controlled/config.toml"end,
+		is_paused=function()return state.paused end,changed=function()return true end,actions={is_assignable=function(action)return action=="caps_word"end}})
+	state.casing=Casing.new()
+	state.base=Engine.new({casing_owner=state.casing,keys={caps_lock={tap_action="enter",hold_modifier="ctrl",time_activation_seconds=.3}},tap_min_ms=0,one_shot_timeout_ms=1000,
+		key_text=function(code)return ({[30]="a",[48]="b",[2]="1",[57]=" ",[51]=",",[18]="é"})[code]end,
+		one_shot_result=function()return nil end,plan_text=function(text)
+			return ({A={{keycode=30,mods={"shift"}}},B={{keycode=48,mods={"shift"}}},["É"]={{keycode=18,mods={"shift"}}}})[text]
+		end})
+	state.native=Native.new(state.base,state.owner.engine_options({caps_lock=300,tab=300}));return state
+end
+local function process(state,code,value,at)
+	local out,action,binding,frame=state.native:process(code,value,at,origin())
+	if frame then helpers.assert_eq(frame.ack(true),true)end
+	return out,action,binding,frame
+end
+local function arm(state,at)
+	at=at or 0;process(state,58,1,at);process(state,15,1,at+10)
+	local out,action,binding,frame=process(state,15,0,at+100)
+	helpers.assert_eq(rows(out),"42:0 29:0");helpers.assert_eq(action,"caps_word")
+	helpers.assert_eq(binding,"combination__caps_lock_then_tab")
+	local callbacks=0;helpers.assert_eq(frame.run(function()callbacks=callbacks+1 end,origin()),true)
+	helpers.assert_eq(callbacks,0,"Caps Word owns native state rather than a gesture action")
+	local restored,receipt=frame.restore(origin());helpers.assert_eq(rows(restored),"29:1");helpers.assert_eq(receipt.ack(true),true)
+	process(state,58,0,at+110)
+end
+helpers.describe("ordered pair Caps Word native state",function()
+	helpers.it("uppercases successive native letters while preserving digits and genuine CapsLock",function()
+		local state=make();arm(state);helpers.assert_eq(state.casing.current_native(state.base.caps_word_claim),true)
+		helpers.assert_eq(rows(process(state,30,1,120)),"42:1 30:1")
+		helpers.assert_eq(rows(process(state,30,0,130)),"30:0 42:0")
+		helpers.assert_eq(rows(process(state,2,1,140)),"");helpers.assert_eq(rows(process(state,2,0,150)),"")
+		helpers.assert_eq(rows(process(state,18,1,160)),"42:1 18:1")
+		helpers.assert_eq(rows(process(state,18,0,170)),"18:0 42:0")
+		helpers.assert_eq(state.casing.current_native(state.base.caps_word_claim),true)
+	end)
+	helpers.it("stops on shared Unicode word boundaries without replacing punctuation",function()
+		for _,code in ipairs({57,51,28,15,1})do
+			local state=make();arm(state)
+			process(state,code,1,120);process(state,code,0,130)
+			helpers.assert_eq(state.casing.current_native(state.base.caps_word_claim),false)
+			helpers.assert_eq(rows(process(state,30,1,140)),"")
+		end
+	end)
+	helpers.it("toggles the exact state off on a second pair without leaving modifier references",function()
+		local state=make();arm(state);helpers.assert_eq(state.casing.current_native(state.base.caps_word_claim),true)
+		arm(state,200);helpers.assert_eq(state.casing.current_native(state.base.caps_word_claim),false)
+		helpers.assert_eq(next(state.base.key_refs),nil)
+		helpers.assert_eq(rows(process(state,30,1,320)),"")
+	end)
+	helpers.it("cancels on pointer activity and exact owner retirement",function()
+		local state=make();arm(state);state.native:activity();helpers.assert_eq(state.casing.current_native(state.base.caps_word_claim),false)
+		local second=make();arm(second);process(second,30,1,120)
+		local release=second.native:release_all();local seen={}
+		for _,row in ipairs(release)do seen[row.code..":"..row.value]=true end
+		helpers.assert_eq(seen["42:0"],true);helpers.assert_eq(seen["30:0"],true)
+		helpers.assert_eq(second.casing.current_native(second.base.caps_word_claim),false);helpers.assert_eq(second.native:ack_retirement(false),false)
+		helpers.assert_eq(second.native:release_all(),release);helpers.assert_eq(second.native:ack_retirement(true),true)
+	end)
+	helpers.it("rejects stale native layout callback before any Caps Word Shift down",function()
+		local state=make();arm(state)
+		state.base.key_text=function()state.bytes=state.bytes.."\n# revoked\n";return "a"end
+		local out,_,_,frame=state.native:process(30,1,120,origin())
+		helpers.assert_true(rows(out):find("42:1",1,true)==nil);helpers.assert_eq(state.casing.current_native(state.base.caps_word_claim),false)
+		helpers.assert_eq(frame.ack(true),true)
+	end)
+end)
+
+helpers.describe("Caps Word modifier overlap and policy callback currency",function()
+	helpers.it("keeps each native letter's Shift ownership until its own physical release",function()
+		local state=make();arm(state)
+		helpers.assert_eq(rows(process(state,30,1,120)),"42:1 30:1")
+		state.base.key_text=function(code)return code==48 and "B" or code==30 and "A" or nil end
+		helpers.assert_eq(rows(process(state,48,1,125)),"48:1")
+		helpers.assert_eq(state.base.key_refs[42],2)
+		helpers.assert_eq(rows(process(state,30,0,130)),"30:0")
+		helpers.assert_eq(state.base.key_refs[42],1)
+		helpers.assert_eq(rows(process(state,48,0,135)),"48:0 42:0")
+		helpers.assert_eq(state.base.key_refs[42],nil)
+	end)
+	helpers.it("revokes the exact native physical generation before another letter emits",function()
+		local state=make();arm(state);process(state,30,1,120)
+		local changed={ready=true,physical=true,source="owned-keyboard",generation=8}
+		local out,_,_,frame=state.native:process(48,1,125,changed)
+		helpers.assert_true(rows(out):find("42:1",1,true)==nil)
+		helpers.assert_eq(state.casing.current_native(state.base.caps_word_claim),false)
+		helpers.assert_eq(frame.ack(false),false);helpers.assert_eq(state.native:release_all(),out)
+		helpers.assert_eq(frame.ack(true),true)
+	end)
+	helpers.it("cannot resurrect Caps Word when the layout callback cancels it via pointer activity",function()
+		local state=make();arm(state)
+		state.base.plan_text=function()state.native:activity();return {{keycode=30,mods={"shift"}}}end
+		local out=process(state,30,1,120)
+		helpers.assert_true(rows(out):find("42:1",1,true)==nil)
+		helpers.assert_eq(state.casing.current_native(state.base.caps_word_claim),false)
+	end)
+end)
+
+helpers.describe("Caps Word real-layout output admission and terminal debt",function()
+	helpers.it("refuses AZERTY capitals whose native plan is not the original key under Shift",function()
+		local state=make();arm(state)
+		state.base.plan_text=function(text) helpers.assert_eq(text,"É");return {{keycode=3,mods={"altgr"}}} end
+		local out,action,_,frame=state.native:process(18,1,120,origin())
+		helpers.assert_eq(action,nil,"unsupported native casing must not fall back to the unqualified text injector")
+		helpers.assert_true(rows(out):find("42:1",1,true)==nil)
+		helpers.assert_eq(state.casing.current_native(state.base.caps_word_claim),false)
+		helpers.assert_eq(frame.replay,true);helpers.assert_eq(frame.ack(false),false)
+		helpers.assert_eq(state.native:release_all(),out);helpers.assert_eq(frame.ack(true),true)
+	end)
+	helpers.it("refuses multi-scalar German casing and absent native plans without fabricated output",function()
+		for _,plan in ipairs({false,true})do
+			local state=make();arm(state);state.base.key_text=function()return "ß"end
+			state.base.plan_text=function()if plan then return {{keycode=31,mods={"shift"}},{keycode=31,mods={"shift"}}}end end
+			local out,action,_,frame=state.native:process(31,1,120,origin())
+			helpers.assert_eq(action,nil);helpers.assert_true(rows(out):find("42:1",1,true)==nil)
+			helpers.assert_eq(frame.replay,true);helpers.assert_eq(frame.ack(true),true)
+		end
+	end)
+	helpers.it("keeps exact Shift UP debt before pointer-cancelled casing can replay a neighbour",function()
+		local state=make();arm(state);process(state,30,1,120);state.native:activity()
+		local out,_,_,frame=state.native:process(48,1,125,origin())
+		helpers.assert_true(rows(out):find("42:0",1,true)~=nil)
+		helpers.assert_eq(frame.replay,true);helpers.assert_eq(frame.ack(nil),false)
+		helpers.assert_eq(state.native:release_all(),out);helpers.assert_eq(frame.ack(true),true)
+		helpers.assert_eq(state.native:process(48,1,126,origin()),nil,"the neighbour replays under a fresh source capture")
+		process(state,48,0,130);arm(state,200)
+		helpers.assert_eq(state.casing.current_native(state.base.caps_word_claim),true,"word retirement must not permanently disable configured pairs")
+	end)
+	helpers.it("retires owned Shift before punctuation and preserves a later title-word menu owner",function()
+		local state=make();arm(state);process(state,30,1,120)
+		state.casing.toggle_title();state.casing.toggle_title()
+		local out,_,_,frame=state.native:process(51,1,125,origin())
+		helpers.assert_true(rows(out):find("42:0",1,true)~=nil);helpers.assert_eq(frame.replay,true)
+		helpers.assert_eq(frame.ack(true),true);helpers.assert_eq(state.casing.active(),true)
+		helpers.assert_eq(state.casing.process_title("n"),"N")
+	end)
+end)
+
+local function with_hook(callback)
+	local names = { "adapters.keyboard_hook", "modules.hotstrings.device_finder" }
+	local old = {}
+	for _, name in ipairs(names) do old[name] = package.loaded[name]; package.loaded[name] = nil end
+	package.loaded["modules.hotstrings.device_finder"] = { physical_sources = function(devices)
+		local result = {}
+		for _, device in ipairs(devices) do
+			result[#result + 1] = {path=device,sysfs="/controlled/physical",name="controlled",physical=true}
+		end
+		return result
+	end }
+	local ok, err = pcall(callback, require("adapters.keyboard_hook"))
+	for _, name in ipairs(names) do package.loaded[name] = old[name] end
+	assert(package.loaded.luv == NativeLoop, "The exact process-native loop remains owned")
+	if not ok then error(err, 0) end
+end
+
+helpers.describe("actual hook Caps Word output and release wave",function()
+	helpers.it("releases the cancelled letter cohort before forwarding its neighbour",function()
+		local state=make();with_hook(function(hook)
+			local emitted,callbacks={},0
+			helpers.assert_eq(hook.set_remapper(state.native,function()callbacks=callbacks+1 end),true)
+			hook._test_drive({{type=1,code=58,value=1,at_ms=0},{type=1,code=15,value=1,at_ms=10},
+				{type=1,code=15,value=0,at_ms=100},{type=1,code=58,value=0,at_ms=110},
+				{type=1,code=30,value=1,at_ms=120},{type=1,code=48,value=1,at_ms=130},{type=1,code=48,value=0,at_ms=140}},
+				{onEmitRaw=function(code,value)
+					emitted[#emitted+1]=code..":"..value
+					if code==30 and value==1 then state.native:activity() end
+					return true
+				end},true)
+			helpers.assert_eq(callbacks,0)
+			local trace=table.concat(emitted," ")
+			helpers.assert_true(trace:find("30:0",1,true)~=nil)
+			local last_shift=0;for i,row in ipairs(emitted)do if row=="42:0"then last_shift=i end end
+			local neighbour;for i,row in ipairs(emitted)do if row=="48:1"then neighbour=i end end
+			helpers.assert_true(neighbour and neighbour>last_shift,"actual Shift UP must precede baseline neighbour DOWN")
+			helpers.assert_eq(hook.set_remapper(nil),true);helpers.assert_eq(next(state.base.key_refs),nil)
+		end)
+	end)
+	helpers.it("never forwards the neighbour when exact Caps Word Shift UP is refused",function()
+		local state=make();with_hook(function(hook)
+			local letter,refuse,neighbour=false,true,0
+			helpers.assert_eq(hook.set_remapper(state.native,function()error("No generic native casing dispatch")end),true)
+			hook._test_drive({{type=1,code=58,value=1,at_ms=0},{type=1,code=15,value=1,at_ms=10},
+				{type=1,code=15,value=0,at_ms=100},{type=1,code=58,value=0,at_ms=110},
+				{type=1,code=30,value=1,at_ms=120},{type=1,code=48,value=1,at_ms=130}},
+				{onEmitRaw=function(code,value)
+					if code==30 and value==1 then letter=true;state.native:activity() end
+					if code==48 and value==1 then neighbour=neighbour+1 end
+					return not(letter and code==42 and value==0 and refuse)
+				end},true)
+			helpers.assert_eq(neighbour,0);helpers.assert_eq(hook.set_remapper(nil),false)
+			local debt=state.native:release_all();helpers.assert_eq(state.native:ack_retirement(false),false)
+			helpers.assert_eq(state.native:release_all(),debt)
+			refuse=false
+			local retried=0
+			-- Recovery is attempted while the actual controlled capture session is
+			-- alive; a stopped session cannot truthfully ACK native key delivery.
+			hook._test_drive({{type=0,code=3,value=0,at_ms=150},{type=0,code=0,value=0,at_ms=151}},
+				{onDesync=function()end,onEmitRaw=function(code,value)
+					if code==42 and value==0 then retried=retried+1 end
+					return true
+				end},true)
+			helpers.assert_true(retried>0);helpers.assert_eq(hook.set_remapper(nil),true)
+		end)
+	end)
+end)
+
+helpers.describe("actual configured manager and single casing owner",function()
+	helpers.it("builds native Caps Word only from the explicit shared-owner injection",function()
+		local state=make();local Loader=require("platform.remap.tap_hold_loader")
+		local defaults=require("infra.paths").shared("tap_hold/defaults.toml")
+		local loaded=Loader.load_document(defaults,{tap_hold={enabled=false,inherit_defaults=true}},nil,"/controlled/tap_hold.toml")
+		local modules={
+			["modules.shortcuts.key_combinations"]=false,["platform.remap.tap_hold_manager"]=false,
+			["platform.remap.tap_hold_loader"]={FALLBACK_THRESHOLD_SECONDS=Loader.FALLBACK_THRESHOLD_SECONDS,load=function()return loaded end},
+			["platform.remap.nav_layer"]={load=function()return {}end},
+			["adapters.file_system"]={read_with_status=function()return state.bytes,"ok"end},
+			["infra.config_paths"]={config=function()return "/controlled/config.toml"end},
+		}
+		local previous={};for name,value in pairs(modules)do previous[name]=package.loaded[name];package.loaded[name]=value or nil end
+		local ok,err=pcall(function()
+			local shortcuts=require("modules.shortcuts.manager");shortcuts.init({persist=true,config_path="/controlled/config.toml",enabled=true})
+			local manager=require("platform.remap.tap_hold_manager")
+			local hook={set_remapper=function(engine,callback)state.installed,state.callback=engine,callback;return true end,
+				key_text=state.base.key_text,held_modifiers=function()return {}end,held_text_modifier_codes=function()return {}end,
+				held_shortcut_modifier_codes=function()return {}end}
+			manager.init({casing_owner=shortcuts.native_casing_owner(),keyboard_hook=hook,execute_action=function()error("No generic Caps Word execution")end,
+				action_names=function()return {}end,on_text_injected=function()error("No unqualified text injection")end,defaults_path=defaults,user_path="/controlled/tap_hold.toml"})
+			helpers.assert_eq(manager.is_active(),true);helpers.assert_eq(next(state.installed.by_code),nil)
+			state.installed:process(58,1,0,origin());local _,_,_,taken=state.installed:process(15,1,10,origin())
+			helpers.assert_eq(taken.ack(true),true)
+			local _,action,_,frame=state.installed:process(15,0,100,origin())
+			helpers.assert_eq(action,"caps_word");helpers.assert_eq(frame.ack(true),true)
+			helpers.assert_eq(frame.run(state.callback,origin()),true);helpers.assert_eq(shortcuts.is_caps_word_active(),true)
+			helpers.assert_eq(shortcuts.process_caps_word("a"),nil,"the daemon title-word observer cannot duplicate this native owner")
+			state.installed:release_all();helpers.assert_eq(state.installed:ack_retirement(true),true)
+			helpers.assert_eq(shortcuts.is_caps_word_active(),false)
+		end)
+		for name in pairs(modules)do package.loaded[name]=previous[name]end
+		helpers.assert_eq(package.loaded.luv,NativeLoop);if not ok then error(err,0)end
+	end)
+end)
+
+local function delayed_roll(before_arm)
+	local state=make()
+	state.base=Engine.new({casing_owner=state.casing,keys={caps_lock={tap_action="enter",hold_modifier="ctrl",time_activation_seconds=.3},
+		space={tap_action="",hold_modifier="shift",time_activation_seconds=.3}},roll_keys={"space"},tap_min_ms=0,one_shot_timeout_ms=1000,
+		key_text=function(code)return ({[30]="a",[48]="b",[57]=" "})[code]end,one_shot_result=function()end,
+		plan_text=function(text)return {{keycode=text=="A" and 30 or 48,mods={"shift"}}}end})
+	if before_arm then before_arm(state) end
+	state.native=Native.new(state.base,state.owner.engine_options({caps_lock=300,tab=300}))
+	arm(state);process(state,57,1,120);process(state,30,1,130)
+	return state
+end
+local function no_stale_tick(due)
+	for _,row in ipairs(due)do
+		helpers.assert_true(not(row.code==30 and row.value==1),"delayed A must not escape as an unowned DOWN after revocation")
+		helpers.assert_true(row.tap==nil,"revoked delayed effects must not dispatch an unowned tap")
+	end
+	helpers.assert_eq(#due,1);helpers.assert_true(due[1].owned_rows~=nil)
+	return due[1]
+end
+helpers.describe("Caps Word delayed-roll source and casing custody",function()
+	helpers.it("retires delayed casing when its real plan callback revokes canonical bytes",function()
+		local state=delayed_roll();local callbacks=0
+		state.base.plan_text=function(text)helpers.assert_eq(text,"A");callbacks=callbacks+1;state.bytes=state.bytes.."\n# revoked inside tick\n";return {{keycode=30,mods={"shift"}}}end
+		helpers.assert_eq(callbacks,0);local effect=no_stale_tick(state.native:tick(500));helpers.assert_eq(callbacks,1)
+		helpers.assert_eq(state.casing.active(),false);helpers.assert_eq(effect.frame.ack(false),false)
+		helpers.assert_eq(state.native:release_all(),effect.owned_rows);helpers.assert_eq(effect.frame.ack(true),true)
+		helpers.assert_eq(next(state.base.key_refs),nil)
+	end)
+	helpers.it("refuses delayed replay after the layout callback acquires a real configuration owner",function()
+		local state=delayed_roll();local token={}
+		state.base.plan_text=function()helpers.assert_eq(state.owner.acquire_configuration(token),true);return {{keycode=30,mods={"shift"}}}end
+		local effect=no_stale_tick(state.native:tick(500));helpers.assert_eq(state.owner.owns_configuration(token),true)
+		helpers.assert_eq(effect.frame.ack(nil),false);helpers.assert_eq(state.native:release_all(),effect.owned_rows)
+		helpers.assert_eq(state.owner.release_configuration(token),true);helpers.assert_eq(effect.frame.ack(true),true)
+	end)
+	helpers.it("preserves newer title-word intent when a delayed plan replaces native casing",function()
+		local state=delayed_roll()
+		state.base.plan_text=function()state.casing.toggle_title();state.casing.toggle_title();return {{keycode=30,mods={"shift"}}}end
+		local effect=no_stale_tick(state.native:tick(500));helpers.assert_eq(state.casing.mode(),"title_words")
+		helpers.assert_eq(state.casing.active(),true);helpers.assert_eq(effect.frame.ack(false),false)
+		helpers.assert_eq(state.casing.active(),true);helpers.assert_eq(effect.frame.ack(true),true)
+		helpers.assert_eq(state.casing.process_title("b"),"B")
+	end)
+	helpers.it("requires exact retirement ACK after pointer activity inside delayed planning",function()
+		local state=delayed_roll()
+		state.base.plan_text=function()state.native:activity();return {{keycode=30,mods={"shift"}}}end
+		local effect=no_stale_tick(state.native:tick(500));helpers.assert_eq(effect.frame.ack(false),false)
+		helpers.assert_eq(state.native:release_all(),effect.owned_rows);helpers.assert_eq(effect.frame.ack(true),true)
+		helpers.assert_eq(state.casing.active(),false);helpers.assert_eq(next(state.base.key_refs),nil)
+		helpers.assert_eq(state.native:process(48,1,510,origin()),nil)
+	end)
+	helpers.it("preserves the original valid delayed native roll output",function()
+		local state=delayed_roll();local due=state.native:tick(500)
+		local found=false;for _,row in ipairs(due)do if row.code==30 and row.value==1 then found=true end end
+		helpers.assert_eq(found,true);helpers.assert_eq(state.casing.current_native(state.base.caps_word_claim),true)
+		state.native:release_all();helpers.assert_eq(state.native:ack_retirement(true),true)
+	end)
+end)
+
+helpers.describe("Caps Word delayed native port refusal",function()
+	helpers.it("contains a throwing native plan while retaining exact acquired modifier debt",function()
+		local state=delayed_roll();state.base.plan_text=function()error("controlled private plan failure")end
+		local effect=no_stale_tick(state.native:tick(500));helpers.assert_eq(effect.frame.ack(false),false)
+		helpers.assert_eq(state.native:release_all(),effect.owned_rows);helpers.assert_eq(effect.frame.ack(true),true)
+		helpers.assert_eq(next(state.base.key_refs),nil);helpers.assert_eq(state.casing.active(),false)
+	end)
+end)
+
+helpers.describe("delayed native transport ownership currency",function()
+	helpers.it("does not leak queued output when the layout callback acquires delivery custody",function()
+		local state=delayed_roll();local token
+		state.base.plan_text=function()token=state.native:begin_delivery({});helpers.assert_true(token~=nil);return {{keycode=30,mods={"shift"}}}end
+		local effect=no_stale_tick(state.native:tick(500));helpers.assert_eq(effect.frame.ack(true),false)
+		helpers.assert_eq(state.native:release_all(),effect.owned_rows)
+		helpers.assert_eq(state.native:end_delivery(token),false,"transport closes exactly but the old business frame was revoked")
+		helpers.assert_eq(effect.frame.ack(true),true);helpers.assert_eq(next(state.base.key_refs),nil)
+	end)
+end)
+
+helpers.describe("delayed casing after the last source callback",function()
+	helpers.it("retires output when the source guard replaces casing after native planning",function()
+		local state=delayed_roll(function(current)
+			current.owner=Owner.new({keys={{id="caps_lock",key="caps_lock"},{id="tab",key="tab"}},hold_picker={modifiers={"ctrl","shift"},layers={}},
+				files={read_with_status=function()return current.bytes,"ok"end},route=function()return "/controlled/config.toml"end,
+				is_paused=function()
+					if current.after_plan then current.after_plan=false;current.replacements=(current.replacements or 0)+1;current.casing.toggle_title();current.casing.toggle_title() end
+					return false
+				end,changed=function()return true end,actions={is_assignable=function(action)return action=="caps_word"end}})
+		end)
+		state.base.plan_text=function()state.after_plan=true;return {{keycode=30,mods={"shift"}}}end
+		local effect=no_stale_tick(state.native:tick(500));helpers.assert_eq(state.replacements,1)
+		helpers.assert_eq(state.casing.mode(),"title_words");helpers.assert_eq(state.casing.active(),true)
+		helpers.assert_eq(effect.frame.ack(true),true);helpers.assert_eq(state.casing.process_title("b"),"B")
+	end)
+end)

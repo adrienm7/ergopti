@@ -1,0 +1,84 @@
+--- a/static/ergopti_plus/linux/adapters/evdev_reader.lua
++++ b/static/ergopti_plus/linux/adapters/evdev_reader.lua
+@@ -675,7 +675,7 @@
+ --- @return table|nil capability Opaque native-origin receipt, not a hardware-class claim.
+ function M.capture_event(event, slot)
+ 	local record = _events[event]
+-	if not record or record.slot ~= (slot or M.KEYBOARD) or record.read_epoch ~= record.state.read_epoch
++	if not record or not rawequal(record.slot, slot or M.KEYBOARD) or record.read_epoch ~= record.state.read_epoch
+ 		or not native_session_current(record) or not original_row(record) then return nil end
+ 	local capability = record.capability and record.capability[1] or nil
+ 	if capability == nil then
+--- a/static/ergopti_plus/linux/tests/unit/adapters/test_evdev_reader.lua
++++ b/static/ergopti_plus/linux/tests/unit/adapters/test_evdev_reader.lua
+@@ -938,3 +938,70 @@
+ 	end)
+ 
+ end)
++
++helpers.describe("independent exact native slot identity", function()
++	helpers.it("refuses metamethod-equal foreign slot aliases", function()
++		local mt = { __eq = function() return true end }
++		local owned, foreign = setmetatable({}, mt), setmetatable({}, mt)
++		controlled_native_reader({ encoded(1, 30, 1) }, nil, function(reader)
++			helpers.assert_eq(reader.open("/dev/input/event3", owned), true)
++			helpers.assert_eq(reader.grab(owned), true)
++			local event = assert(reader.read_event(owned))
++			local alias = reader.capture_event(event, foreign)
++			helpers.assert_eq(reader.close(owned), true)
++			helpers.assert_eq(alias, nil, "only the exact issuing slot may capture its native row")
++		end)
++	end)
++end)
++
++--- Runs exact-slot observer controls against explicitly controlled FFI providers.
++--- @param single_sided boolean Lua54 permits an equality callback on only one operand.
++local function independent_slot_observer_case(single_sided)
++	controlled_native_reader({ encoded(1, 30, 1) }, nil, function(reader, log)
++		local callbacks, owned = 0, {}
++		local mt = { __eq = function()
++			callbacks = callbacks + 1
++			assert(reader.close(owned))
++			return true
++		end }
++		if not single_sided then setmetatable(owned, mt) end
++		local foreign = setmetatable({}, mt)
++		assert(reader.open("/dev/input/event3", owned))
++		assert(reader.grab(owned))
++		local event = assert(reader.read_event(owned))
++		local cap = reader.capture_event(event, foreign)
++		local unexpected_close_attempts = log.closes
++		helpers.assert_eq(reader.close(owned), true)
++		helpers.assert_eq(callbacks, 0, "native receipt observation must not invoke a supplied slot metamethod")
++		helpers.assert_eq(unexpected_close_attempts, 0, "an alias comparison cannot trigger native session cleanup")
++		helpers.assert_eq(cap, nil)
++	end)
++end
++helpers.describe("independent opaque slot observer purity", function()
++	helpers.it("never invokes matching two-sided alias callbacks during source observation", function()
++		independent_slot_observer_case(false)
++	end)
++	helpers.it("never invokes Lua54 single-sided alias callbacks during source observation", function()
++		independent_slot_observer_case(true)
++	end)
++end)
++
++helpers.describe("evdev_reader: legitimate opaque slot receipt", function()
++
++	helpers.it("preserves exact owned table slots without invoking their equality handlers", function()
++		local owned = setmetatable({}, { __eq = function() error("opaque slot equality must stay private") end })
++		controlled_native_reader({ encoded(1, 30, 1) }, nil, function(reader, log)
++			helpers.assert_eq(reader.open("/dev/input/event3", owned), true)
++			helpers.assert_eq(reader.grab(owned), true)
++			local event = assert(reader.read_event(owned))
++			local cap = assert(reader.capture_event(event, owned))
++			helpers.assert_eq(reader.event_current(cap), true)
++			helpers.assert_eq(rawequal(reader.event_view(cap).slot, owned), true)
++			helpers.assert_eq(reader.source_current(cap), true)
++			helpers.assert_eq(reader.close(owned), true)
++			helpers.assert_eq(log.closes, 1)
++			helpers.assert_eq(reader.source_current(cap), false)
++		end)
++	end)
++
++end)

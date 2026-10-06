@@ -161,6 +161,7 @@ LLM_AuxRetryCleanupDebt() {
 }
 
 _LLM_AuxCleanupOwner(Owner, CancelWork := true) {
+	global _LLM_AuxCleanupDebt
 	if !(Owner is Map)
 		return false
 	PreviousCritical := Critical("On")
@@ -168,6 +169,14 @@ _LLM_AuxCleanupOwner(Owner, CancelWork := true) {
 		if Owner.Get("cleanup_claimed", false)
 			return false
 		Owner["cleanup_claimed"] := true
+		; A prepared finish keeps its slot current while these exact records drain.
+		; Cancellation transfers the original cancel capability to the same record;
+		; it never fabricates a second finalizer or overlaps its running attempt.
+		for DebtId, Record in Owner.Get("finish_records", Map()) {
+			if _LLM_AuxCleanupDebt.Has(DebtId)
+					&& ObjPtr(_LLM_AuxCleanupDebt[DebtId]) == ObjPtr(Record)
+				Record["cancel_work"] := Record["cancel_work"] || CancelWork
+		}
 		Resources := Map(
 			"timer", Owner.Get("timer", 0),
 			"timer_cancel", Owner.Get("timer_cancel", 0),
@@ -303,7 +312,7 @@ _LLM_AuxRunScheduled(Owner, TimerFn, Callback) {
 	return true
 }
 
-LLM_AuxSchedule(Owner, Callback, Period, ScheduleFn := 0) {
+LLM_AuxSchedule(Owner, Callback, Period, ScheduleFn := 0, RetainOnFailure := false) {
 	if !HasMethod(Callback, "Call")
 		throw TypeError("An auxiliary LLM timer requires a callable callback.")
 	DelayMs := Max(1, Abs(Period))
@@ -347,10 +356,67 @@ LLM_AuxSchedule(Owner, Callback, Period, ScheduleFn := 0) {
 		return false
 	}
 	if IsObject(ScheduleError) {
-		_LLM_AuxRetireOwner(Owner, true)
+		if !RetainOnFailure
+			_LLM_AuxRetireOwner(Owner, true)
 		return false
 	}
 	return true
+}
+
+/** Transfers finish resources while retaining the exact current auxiliary slot. */
+_LLM_AuxPrepareFinish(Owner) {
+	global _LLM_AuxCleanupDebt, _LLM_AuxCleanupDebtCounter
+	PreviousCritical := Critical("On")
+	try {
+		if !_LLM_AuxOwnerIsCurrentLocked(Owner) || Owner.Get("cleanup_claimed", false)
+			return false
+		Records := Owner.Get("finish_records", Map())
+		Settled := []
+		for DebtId, Record in Records {
+			if !_LLM_AuxCleanupDebt.Has(DebtId)
+				Settled.Push(DebtId)
+		}
+		for DebtId in Settled
+			Records.Delete(DebtId)
+		Resources := Map()
+		Acquired := false
+		for Key in ["timer", "timer_cancel", "cancel", "finalizer"] {
+			Resource := Owner.Get(Key, 0)
+			Resources[Key] := Resource
+			Acquired := Acquired || HasMethod(Resource, "Call")
+		}
+		if Acquired {
+			_LLM_AuxCleanupDebtCounter += 1
+			DebtId := _LLM_AuxCleanupDebtCounter
+			Record := Map("resources", Resources, "cancel_work", false, "running", false)
+			_LLM_AuxCleanupDebt[DebtId] := Record
+			Records[DebtId] := Record
+			for Key in ["timer", "timer_cancel", "cancel", "finalizer"]
+				Owner[Key] := 0
+		}
+		Owner["finish_records"] := Records
+		Owner["finish_prepared"] := true
+		return true
+	} finally Critical(PreviousCritical)
+}
+
+/** Consumes a prepared slot only after its resource handback, without native work. */
+_LLM_AuxCommitPreparedFinish(Owner) {
+	global _LLM_AuxOwners, _LLM_AuxCleanupDebt
+	PreviousCritical := Critical("On")
+	try {
+		if !_LLM_AuxOwnerIsCurrentLocked(Owner) || Owner.Get("cleanup_claimed", false)
+				|| !Owner.Get("finish_prepared", false) || _LLM_AuxCleanupDebt.Count != 0
+			return false
+		for Key in ["timer", "timer_cancel", "cancel", "finalizer"] {
+			if HasMethod(Owner.Get(Key, 0), "Call")
+				return false
+		}
+		_LLM_AuxOwners.Delete(Owner["kind"])
+		Owner["cleanup_claimed"] := true
+		Owner["finish_records"] := Map()
+		return true
+	} finally Critical(PreviousCritical)
 }
 
 LLM_AuxFinish(Owner) {

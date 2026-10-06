@@ -1,0 +1,15 @@
+{
+  "whole_original_unit_prefix_exact": true,
+  "original_unit_case_count": 20,
+  "original_unit_assertion_lines": 50,
+  "all_original_kernel_check_calls_exact": true,
+  "original_kernel_SENT_and_emission_loop_exact": true,
+  "node_wait_attempts": 50,
+  "node_wait_seconds": 0.1,
+  "whole_existing_workflow_untouched": true,
+  "new_controlled_cases": 27,
+  "native_kernel_checks_before": 11,
+  "native_kernel_checks_after": 21,
+  "physical_delivery_available_source": "unchanged false",
+  "root_source_preimages_unchanged": true
+}

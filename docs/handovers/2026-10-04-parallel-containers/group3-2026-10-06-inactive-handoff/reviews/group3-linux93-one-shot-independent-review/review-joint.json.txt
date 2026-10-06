@@ -1,0 +1,34 @@
+{
+  "verdict": "JOINT_SOURCE_CLEAR",
+  "original_receipt": "4efd7f0a523526140cafa438ac17b067607c028bd22999b512001f1bc4bffb99",
+  "successor_receipt": "ced31ae6b5eab6b213b96d426fe3c73919ce9291b4e04c3aa552f78440817dd6",
+  "frozen_pins": "all exact",
+  "original_root_preimages": "exact",
+  "preservation": "first twelve controlled case bodies byte-exact in successor; original Base suite preserved; CapsWord refusal retained; prior unsupported OneShot criterion replaced with actual supported native state admission",
+  "blocker_resolution": "untrusted receipt now retires exact pair-owned casing state with immutable release debt and strict ACK baseline replay; no base casing invocation; existing baseline behavior retained when native_state false",
+  "source_refit": "configure/activate/master changes refuse an existing native cohort until exact retirement ACK",
+  "actual_independent_pure_cases_each_ABI": "15 passed / 0 failed (producer14 plus independent previously failing untrusted next-event case)",
+  "original_independent_before_each_ABI": "12 passed / 1 failed",
+  "producer_combined_receipts": "136/0 each ABI inspected, not rerun",
+  "generic_gesture_availability": "unchanged; native pair context only; source metadata/picker registration remain parent work",
+  "native_evdev_uinput_hosted_e2e_packaging": "unexecuted; no hardware claim",
+  "root_mutations": "none",
+  "evidence": [
+    {
+      "path": "successor-luajit.log",
+      "sha256": "f66666c71ea11fe34cf9d7b8d31c89249ce5d1dd7ca7c83700751ba8ad63e9eb"
+    },
+    {
+      "path": "successor-lua54.log",
+      "sha256": "f66666c71ea11fe34cf9d7b8d31c89249ce5d1dd7ca7c83700751ba8ad63e9eb"
+    },
+    {
+      "path": "reproduce.lua",
+      "sha256": "9c1e9b06147b0c8adca0e027e4551bab252c8340a0808fd860166835b00f43ec"
+    },
+    {
+      "path": "test_key_combination_native_actions.lua",
+      "sha256": "8ce0dc03a5aebe6c882db62395060877695bf596fc5bd87377dc5a15e2c1ac46"
+    }
+  ]
+}
