@@ -398,9 +398,10 @@ Test("scope-hash-precondition: extra file hash refusal never publishes a stale i
 ; Actual private source, real lifecycle lease/WAL/backup; only reload launch is
 ; injected, exactly as the existing scope fixture. No boot warning is authority.
 _ScopeObsoleteSource(Literal, Parent := false) {
+	Assert(ManifestBuildFeaturesMap()["layout"].Has("ergopti_alt_gr"), "the fixture sibling must be a real declared layout setting")
 	return Chr(0xFEFF) . (Parent
-		? '[hotstrings]`nautocorrection = ' . Literal . ' # retain until explicit cleanup`n[layout]`nergopti_altgr = true`n[private]`n"literal.dot" = { keep = [1, "x"], date = 1979-05-27 }`n'
-		: '[layout]`nergopti_base = ' . Literal . ' # retain until explicit cleanup`nergopti_altgr = true`n[private]`n"literal.dot" = { keep = [1, "x"], date = 1979-05-27 }`n')
+		? '[hotstrings]`nautocorrection = ' . Literal . ' # retain until explicit cleanup`n[layout]`nergopti_alt_gr = true`n[private]`n"literal.dot" = { keep = [1, "x"], date = 1979-05-27 }`n'
+		: '[layout]`nergopti_base = ' . Literal . ' # retain until explicit cleanup`nergopti_alt_gr = true`n[private]`n"literal.dot" = { keep = [1, "x"], date = 1979-05-27 }`n')
 }
 
 _ScopeObsoleteLeafClear(Literal, Outcome := "complete") {
@@ -420,7 +421,7 @@ _ScopeObsoleteLeafClear(Literal, Outcome := "complete") {
 		AssertEqual(false, Seed["layout"]["ergopti_base"], "outdated source leaves the runtime neutral")
 		Receipt := ConfigScopeApply("keyboard_layout", "clear", Map(), Fixture.options)
 		AssertEqual("pending", Receipt["status"])
-		Expected := StrReplace(Source, "ergopti_altgr = true`n", "")
+		Expected := StrReplace(Source, "ergopti_alt_gr = true`n", "")
 		AssertEqual(Expected, FSReadUtf8Exact(Fixture.path), "clear preserves the complete obsolete/future image while applying a legitimate sibling effect")
 		AssertEqual(Source, FSReadUtf8Exact(Receipt["backup"]), "the actual exclusive backup is exact")
 		Document := TOML_ParseDocument(Expected)
@@ -648,7 +649,7 @@ _ScopeObsoleteGlobal(Mode) {
 			AssertEqual("pending", Receipt["status"])
 			Assert(Backups >= 4, "the genuine global file cohort crosses its coordinated backup boundary")
 			AssertEqual(1, Launches)
-			AssertEqual(StrReplace(Source, "ergopti_altgr = true`n", ""), FSReadUtf8Exact(Fixture.path),
+			AssertEqual(StrReplace(Source, "ergopti_alt_gr = true`n", ""), FSReadUtf8Exact(Fixture.path),
 				"global clear preserves obsolete leaf and array parent while applying its unrelated effect")
 			AssertEqual(Source, FSReadUtf8Exact(Receipt["backup"]))
 			Refusal.Call("native global replacement refused")
@@ -738,3 +739,36 @@ _ScopeObsoletePreparationRace(Scenario) {
 }
 Test("scope-obsolete-source: inventory source drift refuses before any backup", _ScopeObsoletePreparationRace.Bind("source"))
 Test("scope-obsolete-source: inventory schema refusal is rechecked before backup", _ScopeObsoletePreparationRace.Bind("session"))
+
+; The historical misspelling has no manifest owner and must remain user data.
+_ScopeObsoleteUnownedNeighbor() {
+	Fixture := _ScopeOwnerFixture()
+	Source := StrReplace(_ScopeObsoleteSource('"old-shape"'), "ergopti_alt_gr = true`n", "ergopti_altgr = true`n")
+	Bundle := 0, Refusal := 0
+	Launch(_Success, Borrowed, Refused) {
+		Bundle := Borrowed, Refusal := Refused
+		return true
+	}
+	Fixture.options["reload"] := Launch
+	try {
+		Assert(FSWriteDurable(Fixture.path, Source))
+		Seed := ManifestBuildFeaturesMap()
+		ApplyConfigToml(Seed, Fixture.path, &Rejected, , &Outdated)
+		AssertEqual(0, Rejected)
+		Assert(Outdated.Has("layout`nergopti_base"))
+		AssertFalse(Seed["layout"].Has("ergopti_altgr"), "an unknown spelling never becomes a manifest-owned runtime setting")
+		AssertFalse(Seed["layout"]["ergopti_alt_gr"], "the actual sibling remains neutral when only its unknown neighbor is stored")
+		Receipt := ConfigScopeApply("keyboard_layout", "clear", Map(), Fixture.options)
+		AssertEqual("pending", Receipt["status"])
+		AssertEqual(Source, FSReadUtf8Exact(Fixture.path), "clear retains the complete obsolete leaf and unknown-neighbor source")
+		AssertEqual(Source, FSReadUtf8Exact(Receipt["backup"]), "the genuine backup retains the complete unknown-neighbor image")
+		Refusal.Call("native refusal")
+		AssertEqual("refused", Receipt["status"])
+		AssertEqual(Source, FSReadUtf8Exact(Fixture.path), "the actual inverse preserves the unknown-neighbor generation")
+	} finally {
+		if Bundle is Object
+			_ConfigWriteTerminalRelease(Bundle)
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("scope-obsolete-source: misspelled layout neighbor stays unowned and retained", _ScopeObsoleteUnownedNeighbor)

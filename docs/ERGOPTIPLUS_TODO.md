@@ -3467,6 +3467,8 @@ The actual macOS saved-model reader admits only intrinsically valid nonempty str
 
 The native callback error regression fixture now arms its same 5 ms continuation only after the first actual bad callback, preserving the original 30 ms watchdog and all nine assertions. A real 10 ms startup delay reproduces the original failure on Lua 5.4 and LuaJIT and passes the candidate. The full local Linux suite passes 9537/0; hosted packaging and installation still require the next exact-source manual CI.
 
+Seven Windows failures exposed a typo in four new fixture subjects: the manifest owns layout.ergopti_alt_gr, not ergopti_altgr. The corrected subjects retain every original predicate and add an actual manifest assertion plus a native unknown-neighbor preservation case. Independent exact-source review passes; the 19 registered obsolete-scope cases require Windows CI before native qualification.
+
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
   The shared AHK override policy now writes an explicit recommended delay only
