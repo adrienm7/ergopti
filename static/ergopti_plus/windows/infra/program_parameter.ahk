@@ -89,9 +89,13 @@ _ProgramParameterWs(Value, &Position) {
 
 _ProgramParameterString(Value, &Position) {
 	_ProgramParameterWs(Value, &Position)
-	if !RegExMatch(SubStr(Value, Position), '^"(?:[^"\\\x00-\x1f]|\\(?:["\\/bfnrt]|u[0-9A-Fa-f]{4}))*"', &Token)
+	if SubStr(Value, Position, 1) != '"'
 		return false
-	Raw := Token[0]
+	Start := Position
+	; Reuse the canonical lossless JSON string lexer and its exact cursor.
+	; The raw span remains authoritative for NUL that native strings truncate.
+	Decoded := _JsonParseString(&Value, &Position)
+	Raw := SubStr(Value, Start, Position - Start)
 	Index := 2
 	while Index < StrLen(Raw) {
 		if SubStr(Raw, Index, 1) = "\" {
@@ -101,8 +105,6 @@ _ProgramParameterString(Value, &Position) {
 		} else
 			Index++
 	}
-	Position += StrLen(Raw)
-	Decoded := JsonParse(Raw)
 	Index := 0
 	while Index < StrLen(Decoded) {
 		Unit := NumGet(StrPtr(Decoded), Index * 2, "UShort")

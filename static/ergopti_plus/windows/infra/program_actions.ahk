@@ -5,6 +5,7 @@ global _UserProgramEntries := Map()
 global _UserProgramGeneration := 0
 global _UserProgramPaused := false
 global _UserProgramAcquiring := 0
+global _UserProgramPollOwner := 0
 
 ProgramActions_Available() {
 	return IsSet(ShellRunner_SpawnTreeOwned) && IsSet(FSReadUtf8Exact)
@@ -99,6 +100,8 @@ _ProgramActions_Done(Entry, ExitCode := unset, *) {
 		}
 		if _UserProgramEntries.Get(Entry["binding"], 0) == Entry
 			_UserProgramEntries.Delete(Entry["binding"])
+		if _UserProgramEntries.Count == 0
+			_ProgramActions_StopPoll()
 	} catch {
 		return false
 	}
@@ -115,14 +118,77 @@ _ProgramActions_Retire(Entry) {
 		return false
 	if _UserProgramEntries.Get(Entry["binding"], 0) == Entry
 		_UserProgramEntries.Delete(Entry["binding"])
+	if _UserProgramEntries.Count == 0
+		_ProgramActions_StopPoll()
+	return true
+}
+
+; One exact bound callback owns timeout/source retirement between native completions.
+; SetFn is an internal regression seam; production always uses TimerSetCallback.
+_ProgramActions_EnsurePoll(SetFn := 0) {
+	global _UserProgramPollOwner
+	PreviousCritical := Critical("On")
+	try {
+		if !IsObject(_UserProgramPollOwner) {
+			if !HasMethod(SetFn, "Call")
+				SetFn := TimerSetCallback
+			Owner := Map("active", false, "acquiring", false, "scheduled", false,
+				"cancelled", false, "early", false, "set", SetFn)
+			Owner["callback"] := ProgramActions_Poll.Bind(Owner)
+			_UserProgramPollOwner := Owner
+		} else
+			Owner := _UserProgramPollOwner
+		if Owner["cancelled"] || Owner["acquiring"]
+			return false
+		if Owner["active"]
+			return true
+		Owner["early"] := false
+		Owner["acquiring"] := true
+		Owner["scheduled"] := true
+		Receipt := false
+		try {
+			RetryMs := TimingsGet("gestures", "aux_shell_cleanup_retry_ms")
+			if !(RetryMs is Integer) || RetryMs <= 0
+				throw ValueError("User program cleanup requires a positive integer period")
+			Receipt := Owner["set"].Call(Owner["callback"], -RetryMs)
+		}
+		catch Any {
+			Receipt := false
+		} finally Owner["acquiring"] := false
+		if !(Receipt is Integer) || Receipt != 1 || Owner["cancelled"] || Owner["early"]
+			|| _UserProgramPollOwner != Owner {
+			_ProgramActions_StopPoll(Owner)
+			return false
+		}
+		return true
+	} finally Critical(PreviousCritical)
+}
+
+_ProgramActions_StopPoll(ExpectedOwner := 0) {
+	global _UserProgramPollOwner
+	Owner := IsObject(ExpectedOwner) ? ExpectedOwner : _UserProgramPollOwner
+	if !IsObject(Owner)
+		return true
+	Owner["cancelled"] := true
+	try Receipt := Owner["set"].Call(Owner["callback"], 0)
+	catch Any
+		return false
+	if !(Receipt is Integer) || Receipt != 1
+		return false
+	Owner["scheduled"] := false
+	if Owner["active"] || Owner["acquiring"]
+		return false
+	if _UserProgramPollOwner != Owner
+		return false
+	_UserProgramPollOwner := 0
 	return true
 }
 
 ProgramActions_Run(Binding) {
-	global _UserProgramEntries, _UserProgramAcquiring, _UserProgramGeneration
+	global _UserProgramEntries, _UserProgramAcquiring, _UserProgramGeneration, _UserProgramPollOwner
 	PreviousCritical := Critical("On")
 	try {
-		if _UserProgramEntries.Count != 0 || IsObject(_UserProgramAcquiring)
+		if _UserProgramEntries.Count != 0 || IsObject(_UserProgramAcquiring) || IsObject(_UserProgramPollOwner)
 			return false
 		Acquisition := Map("generation", _UserProgramGeneration)
 		_UserProgramAcquiring := Acquisition
@@ -137,7 +203,10 @@ ProgramActions_Run(Binding) {
 			_ProgramActions_Done.Bind(Entry), , _ProgramActions_BeforeAdopt.Bind(Snapshot), 0, false, true)
 		Entry["handle"] := Handle
 		_UserProgramEntries[Binding] := Entry
-		SetTimer(ProgramActions_Poll, TimingsGet("gestures", "aux_shell_cleanup_retry_ms"))
+		if !_ProgramActions_EnsurePoll() {
+			_ProgramActions_Retire(Entry)
+			return false
+		}
 		try Started := Handle.start()
 		catch
 			Started := false
@@ -159,15 +228,34 @@ ProgramActions_Run(Binding) {
 	}
 }
 
-ProgramActions_Poll(*) {
-	global _UserProgramEntries
-	for _, Entry in _UserProgramEntries.Clone() {
-		if Entry["cancelled"] || !_ProgramActions_Admitted(Entry["snapshot"])
-			|| A_TickCount - Entry["started"] >= TimingsGet("gestures", "aux_shell_timeout_ms")
-			_ProgramActions_Retire(Entry)
+ProgramActions_Poll(Owner := 0, *) {
+	global _UserProgramEntries, _UserProgramPollOwner, _UserProgramPaused
+	if !IsObject(Owner)
+		Owner := _UserProgramPollOwner
+	if !IsObject(Owner) || _UserProgramPollOwner != Owner
+		return false
+	if Owner["acquiring"] {
+		Owner["early"] := true
+		return false
 	}
-	if _UserProgramEntries.Count == 0
-		SetTimer(ProgramActions_Poll, 0)
+	if Owner["active"]
+		return false
+	Owner["active"] := true
+	Owner["scheduled"] := false
+	try {
+		for _, Entry in _UserProgramEntries.Clone() {
+			if Owner["cancelled"] || Entry["cancelled"] || !_ProgramActions_Admitted(Entry["snapshot"])
+				|| A_TickCount - Entry["started"] >= TimingsGet("gestures", "aux_shell_timeout_ms")
+				_ProgramActions_Retire(Entry)
+		}
+	} finally {
+		Owner["active"] := false
+		if _UserProgramEntries.Count == 0
+			_ProgramActions_StopPoll(Owner)
+		else if !_ProgramActions_EnsurePoll()
+			ProgramActions_Stop(_UserProgramPaused)
+	}
+	return true
 }
 
 ProgramActions_Stop(Pause := false) {
@@ -178,5 +266,12 @@ ProgramActions_Stop(Pause := false) {
 	for _, Entry in _UserProgramEntries.Clone()
 		if !_ProgramActions_Retire(Entry)
 			Receipt := false
+	if _UserProgramEntries.Count != 0 {
+		; A refused physical retirement still needs a callback to retry its exact handle.
+		_ProgramActions_EnsurePoll()
+		return false
+	}
+	if !_ProgramActions_StopPoll()
+		Receipt := false
 	return Receipt
 }

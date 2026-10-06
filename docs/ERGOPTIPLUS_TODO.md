@@ -5565,6 +5565,16 @@ native guards remain byte-exact. Ten independent causal source controls and
 the complete 362-check JS gate pass; actual native AHK revalidation is pending.
 This repair does not admit the inactive Job-constructor packet or finish106.
 
+The Windows basic program owner now uses an exact, acknowledged one-shot
+callback and keeps cleanup polling while physical program debt remains. Its
+suspend/resume owner is registered, and the fixture preserves an initially
+unset keyboard map. The canonical JSON string lexer replaces the duplicated
+lexical path, with an independent native stage/cursor control before the
+unchanged corpus. All11 original tests and91 assertions remain, with three
+new controls. Source review is clear and the unchanged601 native-call budget
+is met; native parser success, all14 tests and packaging remain unexecuted
+until the next hosted CI. The lexer change is an unproven diagnosis hypothesis.
+
 - [~] **107.** Make the number-row policy explicit: native behavior, digits
   directly or symbols directly, with an acknowledged migration of the old
   Windows Boolean and preserved unrelated settings. The earlier Boolean slice
