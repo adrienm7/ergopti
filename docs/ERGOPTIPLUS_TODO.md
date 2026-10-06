@@ -3973,6 +3973,19 @@ identity, expiry, provenance or installed protection. There is no production
 consumer, native execution or provisioning approval in this tranche. Actual
 native signature qualification and the remaining WP4-WP10 scope stay open.
 
+A bounded failure diagnostic now observes retained baseline phase metadata
+only after the original Guardian invocation has returned and retired. It keeps
+the original status/stderr assertions, guard and 300/305/10 budget. One fixed
+SDK child uses its existing 30/35/10 bounds and emits at most 2,048 public bytes:
+the canonical phase roster, recorded states and capture sizes, without paths,
+arguments, payloads or inferred causes. Source and filesystem identity cuts,
+closed writer schemas and strict Swift output admission fail safely. All 25
+portable controls pass normally and under inherited optimization; original
+Swift bytes restore exactly after removing the three additions. The observer
+does not change the native verdict, retry a phase or authorize compilation.
+Actual Swift admission and the next macOS run remain required. The earlier
+83c63b1c5 failure phase/cause and full artifact remain unqualified.
+
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
   listed; see `docs/memory/text-input-and-config.md`. Still open everywhere:
