@@ -3434,6 +3434,14 @@ the complete three-OS checkpoint remain pending.
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 
+The portable replacement-script fixture now retains its real shell parent
+while that parent waits for its own unchanged sleeper. This avoids abandoning
+a zombie beneath the actual validation subreaper. The exact producer is closed
+before the four original result assertions; no production swap or signalling
+policy changes. The complete focused installer module passes 20 tests with
+zero failures. Full portable and native final-source qualification remain
+separate requirements; item 36 stays open.
+
 Brew sender refusal -600 remains unexplained; it identifies failed native
 AppleEvent port discovery and does not establish target death or a permission
 cause. One exact owned WNOWAIT observation after the failed sender is reused
