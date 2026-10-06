@@ -4977,3 +4977,38 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		}
 	}
 }
+
+// Native trigger, display and live separators keep their true platform-specific roles.
+{
+	const assert = require('node:assert/strict');
+	const expected = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/llm_control_boundaries.json'), 'utf8')
+	);
+	const menu = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	for (const boundary of Object.values(expected.boundaries))
+		assert.deepEqual(menu[boundary.section], boundary.rows);
+	for (const [driver, relative, call, keys] of [
+		[
+			'windows',
+			'ui/menu/menu_llm/menu_settings.ahk',
+			'MenuRenderer_TemplateRows',
+			['trigger', 'display']
+		],
+		['macos', 'ui/menu/menu_llm/live_mode_panel.lua', 'ManifestMenu.template_rows', ['live']],
+		['linux', 'ui/menu/menu_builder.lua', 'ManifestMenu.template_rows', ['trigger']]
+	]) {
+		const source = readFileSync(
+			resolve(REPO_ROOT, 'static/ergopti_plus', driver, relative),
+			'utf8'
+		);
+		for (const key of keys)
+			assert.ok(source.includes(call + '("' + expected.boundaries[key].section + '"'));
+	}
+	for (const file of readdirSync(LOCALES_DIR).filter((name) => name.endsWith('.json'))) {
+		const locale = JSON.parse(readFileSync(resolve(LOCALES_DIR, file), 'utf8'));
+		for (const key of expected.caption_keys) {
+			assert.equal(typeof locale[key], 'string');
+			assert.ok(locale[key].trim().length > 0 && locale[key] !== key);
+		}
+	}
+}

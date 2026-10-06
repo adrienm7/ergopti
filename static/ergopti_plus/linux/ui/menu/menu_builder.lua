@@ -2032,7 +2032,9 @@ local function _build_llm(ctx)
 			label = string.format(i18n_safe("menu.llm.debounce_label"), tostring(current_delay) .. " ms"),
 			items = delay_choices,
 		}
-		rows[#rows + 1] = { separator = true }
+		local boundary_rows = ManifestMenu.template_rows("llm_trigger_provider_boundary", {}, {}, {})
+		if not boundary_rows then return end
+		for _, row in ipairs(boundary_rows) do rows[#rows + 1] = row end
 		local leading_rows = rows
 		rows = {}
 		local Preferences = require("infra.llm_preferences")
