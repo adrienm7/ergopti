@@ -15,8 +15,10 @@ local Logger = require("logger.shim")
 local ShellRunner = require("adapters.shell_runner")
 local LibuvExit = require("infra.libuv_exit")
 local BodyPipe = require("infra.http_body_pipe")
+local OutputTarget = require("infra.http_output_target")
 local NativeTimer = require("infra.native_timer")
 local ExactIdentity = require("infra.curl_identity")
+local RedirectReceipt = require("infra.http_redirect_receipt")
 local Timings = require("infra.timings")
 local ProcessGroup = require("infra.libuv_process_group")
 local RedirectPolicy = require("infra.http_redirect_policy")
@@ -62,6 +64,7 @@ local _active = {}
 local _owned = {}
 local settle_owned
 local retry_owned_cleanup
+local notify_output_reader_closed
 
 --- Resolves a stable request owner without allowing an empty table key.
 --- @param owner any
@@ -99,6 +102,7 @@ local function close_handle(handle, request)
 			attempt.callback_seen = true
 			if attempt.admitted then
 				receipt.state = "closed"
+				if notify_output_reader_closed then notify_output_reader_closed(request, handle, receipt) end
 				settle_owned(request)
 			end
 		end)
@@ -120,6 +124,7 @@ local function close_handle(handle, request)
 		attempt.admitted = true
 		if attempt.callback_seen then
 			receipt.state = "closed"
+			if notify_output_reader_closed then notify_output_reader_closed(request, handle, receipt) end
 			settle_owned(request)
 		end
 		return true
@@ -201,12 +206,30 @@ local function owned_authorized(request)
 	return current
 end
 
+--- Holds native retirement until the exact parent filesystem ledger retires.
+local function output_write_pending(request)
+	return request.output_sink ~= nil and request.output_sink:has_pending_write()
+end
+
+notify_output_reader_closed = function(request, handle, receipt)
+	local input = request.output_input
+	if not input or input.reader ~= handle or input.receipt ~= receipt
+		or receipt.state ~= "closed" or input.notified then return end
+	input.notified = true
+	request.observing_output = true
+	local listeners = input.listeners
+	input.listeners = {}
+	for _, callback in ipairs(listeners) do pcall(callback) end
+	request.observing_output = false
+end
+
 --- Releases only exact physical ownership after group absence and every close ACK.
 --- @param request table
 local function finalize_owned(request)
 	local operation = request.operation
 	if not operation or operation._settled or not request.terminal or request.authorizing
-		or request.observing_terminal or request.observing_identity then return end
+		or request.observing_terminal or request.observing_identity or request.observing_output then return end
+	if output_write_pending(request) then return end
 	if request.identity_owner and not request.identity_owner:is_settled() then return end
 	if request.spawned and not request.exited then return end
 	if not operation._body_cleanup and request.spawned and not request.group_absent then return end
@@ -284,6 +307,7 @@ retry_owned_cleanup = function(request)
 		local ready = (not request.spawned or request.exited) and request.group_absent
 			and request.body_readfd == nil and request.body_writefd == nil
 		if request.identity_owner and not request.identity_owner:is_settled() then ready = false end
+		if output_write_pending(request) then ready = false end
 		for handle, receipt in pairs(request.handles) do
 			if handle ~= request.timer and receipt.state ~= "closed" then ready = false end
 		end
@@ -304,7 +328,7 @@ end
 settle_owned = function(request)
 	local operation = request.operation
 	if not operation or operation._settled or not request.terminal
-		or request.observing_terminal or request.observing_identity then return end
+		or request.observing_terminal or request.observing_identity or request.observing_output then return end
 	if not operation._body_cleanup then
 		retry_owned_cleanup(request)
 	else
@@ -321,6 +345,8 @@ local function finish(request, result, suppress_callback)
 	request.terminal = true
 	request.result = result
 	request.suppress_callback = suppress_callback == true
+	request.observing_terminal = true -- Reserve before output cancellation can reenter native cleanup.
+	if request.output_sink then request.output_sink:stop(result.ok ~= true) end
 	if _active[request.owner] == request then _active[request.owner] = nil end
 	-- Logical observation precedes even an immediately acknowledged close.
 	-- Its copy cannot mutate the pending physical completion receipt.
@@ -335,9 +361,9 @@ local function finish(request, result, suppress_callback)
 			else snapshot[key] = value end
 		end
 		local observed = pcall(request.operation._on_terminal, snapshot)
-		request.observing_terminal = false
 		if not observed then Logger.error(LOG, "Native HTTP terminal observer raised.") end
 	end
+	request.observing_terminal = false
 	if request.operation and not request.operation._body_cleanup then
 		retry_owned_cleanup(request)
 	else
@@ -456,7 +482,7 @@ local function curl_args(url, headers, body, options)
 		private_trailer = "%{stderr}\n" .. PROXY_MARKER .. "%{http_connect}:"
 			.. (options.proxy_metrics_available and "%{proxy_used}" or "?") .. "\n"
 	end
-	args[#args + 1] = private_trailer
+	args[#args + 1] = (options.single_hop_redirect and RedirectReceipt.write_out() or "") .. private_trailer
 		.. (options.buffered and (private_trailer ~= "" and "%{stdout}" or "") or "%{stderr}")
 		.. "\n" .. STATUS_MARKER .. "%{http_code}\n"
 	-- Headers, body and URL go through a config read from stdin. On the command
@@ -611,8 +637,16 @@ local function maybe_complete(request)
 	if request.proxy_selection then
 		request.stderr_text = request.stderr_text:gsub("\n" .. PROXY_MARKER .. "%d%d%d:[01?]\n", "")
 	end
-	if request.buffered then
-		finish(request, native_receipt(request, buffered_result(request)))
+	if output_write_pending(request) then return end
+	if request.output_failure then
+		finish(request, { ok = false, status = 0, body = "", error = "archive output write failed",
+			failure_receipt = request.output_failure })
+	elseif request.buffered then
+		if request.single_hop_redirect then
+			finish(request, RedirectReceipt.attach(request, native_receipt(request, buffered_result(request))))
+		else
+			finish(request, native_receipt(request, buffered_result(request)))
+		end
 	else
 		finish(request, native_receipt(request, streaming_result(request)))
 	end
@@ -653,6 +687,82 @@ local function admit_curl_metrics(options)
 	options.proxy_metrics_available = true
 end
 
+--- Binds one private target to the exact owned request and captured stdout.
+--- Backpressure and reader closure never borrow another operation by owner name.
+local function bind_output_target(request, target)
+	local operation, reader = request.operation, request.stdout
+	local receipt = reader and request.handles[reader]
+	if not operation or operation._body_cleanup or not receipt then return false end
+	local input = { reader = reader, receipt = receipt, listeners = {}, notified = false }
+	local paused, read_callback = false, nil
+	request.output_input = input
+	local function exact()
+		return request.operation == operation and not operation._settled
+			and _owned[request.owner] == operation and request.output_input == input
+	end
+	local function readable()
+		return exact() and not request.terminal and not operation._cancelled
+			and request.stdout == reader and receipt.state == "open" and not request.stdout_eof
+	end
+	function input:live()
+		if not readable() or not owned_authorized(request) then return false end
+		return readable()
+	end
+	function input:pause()
+		if not self:live() then return false end
+		paused = true -- Reserve before reentrant native read-stop.
+		local called, ack, err = pcall(luv.read_stop, reader)
+		return called and ack ~= nil and ack ~= false and err == nil and readable()
+	end
+	function input:resume()
+		if not paused or not read_callback or not self:live() then return false end
+		local inspected, closing = pcall(luv.is_closing, reader)
+		-- Source/native probes precede the original lease's final clock fence.
+		if not inspected or closing ~= false or not OutputTarget.resume_admit(target, operation, function()
+				return owned_authorized(request) and readable()
+			end) or not readable() then return false end
+		paused = false -- A synchronous callback may legitimately pause a new write.
+		local called, ack, err = pcall(luv.read_start, reader, read_callback)
+		return called and ack ~= nil and ack ~= false and err == nil and exact()
+	end
+	function input:abort(ticket, producer)
+		if producer ~= operation or not OutputTarget.owns(target, ticket, producer) or not exact() then return false end
+		local failure = OutputTarget.failure(target)
+		terminate_group(request)
+		if not request.terminal then
+			finish(request, { ok = false, status = 0, body = "", error = "archive output refused",
+				failure_receipt = failure })
+		else settle_owned(request) end
+		return true -- Logical/native cleanup intent; physical ACK is separate.
+	end
+	function input:reader_closed(ticket, producer)
+		return producer == operation and OutputTarget.owns(target, ticket, producer)
+			and input.reader == reader and input.receipt == receipt and receipt.state == "closed"
+	end
+	function input:on_reader_closed(ticket, producer, callback)
+		if producer ~= operation or not OutputTarget.owns(target, ticket, producer)
+			or type(callback) ~= "function" then return false end
+		if receipt.state == "closed" then pcall(callback)
+		else input.listeners[#input.listeners + 1] = callback end
+		return true
+	end
+	function input:write_ack(failure)
+		if not exact() then return end
+		if type(failure) == "table" and request.output_failure == nil then
+			local copy = {}
+			for key, value in next, failure do if type(value) ~= "table" then copy[key] = value end end
+			request.output_failure = copy
+		end
+		-- Exact ACK ledger is already retired by the sink, including final ENOSPC.
+		if not request.terminal then maybe_complete(request) else settle_owned(request) end
+	end
+	function input:set_read_callback(callback) read_callback = callback end
+	local sink = OutputTarget.attach(target, operation, input)
+	if not sink or not exact() then return false end
+	request.output_sink, request.output_target = sink, target
+	return true
+end
+
 --- Normalizes native metadata once without acquiring or cancelling resources.
 --- @param url string
 --- @param headers table
@@ -688,6 +798,17 @@ local function admit_metadata(url, headers, body, options)
 		-- until the adapter owns and filters every redirect hop explicitly.
 		follow_redirects = allowed
 	end
+	local output_target = rawget(options, "output_target")
+	if output_target ~= nil then
+		local limit = rawget(options, "max_download_bytes")
+		if not OutputTarget.valid(output_target) or body ~= nil or options.method ~= "GET"
+			or options.buffered ~= false or options.output_path ~= nil
+			or options.etag_compare ~= nil or options.etag_save ~= nil or follow_redirects
+			or type(limit) ~= "number" or limit ~= limit or limit <= 0
+			or limit % 1 ~= 0 or limit > MAX_SAFE_INTEGER then
+			return nil, "native archive output target is invalid"
+		end
+	end
 	local timeout_ms = tonumber(options.timeout_ms) or DEFAULT_TIMEOUT_MS
 	local request_options = {
 		protocols = protocols,
@@ -699,6 +820,7 @@ local function admit_metadata(url, headers, body, options)
 		etag_compare = options.etag_compare,
 		etag_save = options.etag_save,
 		output_path = options.output_path,
+		output_target = output_target,
 		max_download_bytes = options.max_download_bytes,
 		proxy_selection = options.proxy_selection,
 		curl_executable = options.curl_executable or "curl",
@@ -723,6 +845,24 @@ local function admit_metadata(url, headers, body, options)
 		-- Snapshot private admitted inputs; caller mutation cannot change a child.
 		request_options.proxy_selection = { mode = selection.mode, proxy = selection.proxy, capability = selection.capability,
 			bypass = selection.bypass }
+	end
+	if options.single_hop_redirect ~= nil and type(options.single_hop_redirect) ~= "boolean" then
+		return nil, "native HTTP redirect options are invalid"
+	end
+	if options.single_hop_redirect == true then
+		local json_bytes, url_bytes = options.single_hop_receipt_bytes, options.single_hop_url_bytes
+		local authority = url:match("^[^:]+://([^/?#]*)")
+		if request_options.method ~= "GET" or not request_options.buffered or body ~= nil
+			or request_options.output_path ~= nil or options.etag_compare ~= nil or options.etag_save ~= nil
+			or request_options.proxy_selection == nil or not authority or authority:find("@", 1, true)
+			or type(json_bytes) ~= "number" or json_bytes < 1 or json_bytes > MAX_DIAGNOSTIC_BYTES or json_bytes % 1 ~= 0
+			or type(url_bytes) ~= "number" or url_bytes < 1 or url_bytes > MAX_DIAGNOSTIC_BYTES or url_bytes % 1 ~= 0
+			or RedirectReceipt.allowance(json_bytes, url_bytes) + NATIVE_TRAILER_BYTES > MAX_DIAGNOSTIC_BYTES then
+			return nil, "native HTTP redirect options are invalid"
+		end
+		request_options.single_hop_redirect = true
+		request_options.single_hop_receipt_bytes, request_options.single_hop_url_bytes = json_bytes, url_bytes
+		request_options.follow_redirects = false
 	end
 	return request_options
 end
@@ -805,7 +945,10 @@ local function start_request(url, headers, body, options, on_chunk, on_done, ope
 	local timeout_ms = request_options.timeout_ms
 	-- The new descriptor-bearing representation requires the physical native
 	-- operation used by the managed wrapper. Legacy boolean ports are unchanged.
-	if request_options.curl_executable_identity_exact and not operation then
+	if request_options.single_hop_redirect and not operation then
+		return reject("owned curl redirect observation unavailable")
+	end
+	if (request_options.curl_executable_identity_exact or request_options.output_target) and not operation then
 		return reject("owned curl exact identity observation unavailable")
 	end
 	-- Metadata refusal is transactional too: an invalid replacement must not
@@ -844,6 +987,9 @@ local function start_request(url, headers, body, options, on_chunk, on_done, ope
 	request = request or new_request(owner)
 	request.proxy_selection = request_options.proxy_selection
 	request.proxy_metrics_available = request_options.proxy_metrics_available
+	request.single_hop_redirect = request_options.single_hop_redirect
+	request.single_hop_receipt_bytes = request_options.single_hop_receipt_bytes
+	request.single_hop_url_bytes = request_options.single_hop_url_bytes
 	local handles_ok
 	if operation or request.body_owner then
 		if operation then operation._request = request; _owned[owner] = operation end
@@ -868,6 +1014,13 @@ local function start_request(url, headers, body, options, on_chunk, on_done, ope
 	if not handles_ok or not request.stdin or not request.stdout or not request.stderr or not request.timer then
 		finish(request, { ok = false, status = 0, body = "", error = "libuv handle allocation failed" })
 		return false
+	end
+	if request_options.output_target then
+		request.output_bytes, request.max_download_bytes = 0, request_options.max_download_bytes
+		if not bind_output_target(request, request_options.output_target) then
+			finish(request, { ok = false, status = 0, body = "", error = "archive output binding refused" })
+			return false
+		end
 	end
 	if body ~= nil then
 		local body_ok = pcall(function()
@@ -966,6 +1119,13 @@ local function start_request(url, headers, body, options, on_chunk, on_done, ope
 		finish(request, { ok = false, status = 0, body = "", error = "request authorization withdrawn" }, true)
 		return false
 	end
+	if request.output_target and (not OutputTarget.resume_admit(request.output_target, operation, function()
+		return owned_authorized(request) and not request.terminal and not operation._cancelled
+			and _owned[owner] == operation
+	end) or request.terminal or operation._cancelled or _owned[owner] ~= operation) then
+		finish(request, { ok = false, status = 0, body = "", error = "archive output authorization withdrawn" }, true)
+		return false
+	end
 	local spawn_ok, process, pid, spawn_error = pcall(luv.spawn, request_options.curl_executable, {
 		args = argv,
 		stdio = { request.stdin, request.stdout, request.stderr, request.body_reader },
@@ -1013,14 +1173,27 @@ local function start_request(url, headers, body, options, on_chunk, on_done, ope
 		return false
 	end
 
-	local stdout_ok, stdout_result = pcall(luv.read_start, request.stdout, function(err, chunk)
+	local stdout_callback = function(err, chunk)
 		if request.terminal then return end
 		if err then
 			terminate_group(request)
 			finish(request, { ok = false, status = 0, body = "", error = tostring(err) })
 		elseif chunk == nil then
 			request.stdout_eof = true
+			if request.output_sink then request.output_sink:eof() end
 			maybe_complete(request)
+		elseif request.output_sink then
+			if type(chunk) ~= "string" or #chunk > request.max_download_bytes - request.output_bytes then
+				terminate_group(request)
+				finish(request, { ok = false, status = 0, body = "", error = "archive output exceeds limit" })
+				return
+			end
+			request.output_bytes = request.output_bytes + #chunk
+			if not request.output_sink:consume(chunk) then
+				terminate_group(request)
+				finish(request, { ok = false, status = 0, body = "", error = "archive output refused",
+					failure_receipt = request.output_sink:failure() })
+			end
 		elseif request.buffered then
 			request.stdout_text = request.stdout_text .. chunk
 			if request.max_body_bytes
@@ -1048,7 +1221,9 @@ local function start_request(url, headers, body, options, on_chunk, on_done, ope
 				if not ok then Logger.error(LOG, "HTTP chunk callback raised: %s.", tostring(callback_err)) end
 			end
 		end
-	end)
+	end
+	if request.output_input then request.output_input:set_read_callback(stdout_callback) end
+	local stdout_ok, stdout_result = pcall(luv.read_start, request.stdout, stdout_callback)
 	local stderr_ok, stderr_result = pcall(luv.read_start, request.stderr, function(err, chunk)
 		if request.terminal then return end
 		if err then
@@ -1060,7 +1235,11 @@ local function start_request(url, headers, body, options, on_chunk, on_done, ope
 		else
 			-- Preserve the receipt's final bytes even when preceding diagnostics
 			-- exhaust their budget; stderr can split at every marker boundary.
-			request.stderr_tail = (request.stderr_tail .. chunk):sub(-(request.proxy_selection and NATIVE_TRAILER_BYTES or (#STATUS_MARKER + 16)))
+			local allowance = request.proxy_selection and NATIVE_TRAILER_BYTES or (#STATUS_MARKER + 16)
+			if request.single_hop_redirect then
+				allowance = allowance + RedirectReceipt.allowance(request.single_hop_receipt_bytes, request.single_hop_url_bytes)
+			end
+			request.stderr_tail = (request.stderr_tail .. chunk):sub(-allowance)
 			local remaining = MAX_DIAGNOSTIC_BYTES - #request.stderr_text
 			if remaining > 0 then request.stderr_text = request.stderr_text .. chunk:sub(1, remaining) end
 		end
@@ -1202,7 +1381,9 @@ local function owned_request(url, headers, body, options, on_chunk, on_done, met
 	if method ~= nil then request_options.method = method end
 	-- A streaming owner without an optional source still reserves before caller
 	-- metadata and brackets chunk delivery with its exact retained operation.
-	if request_options.method == "POST" and authorized == nil then authorized = function() return true end end
+	if (request_options.method == "POST" or request_options.output_target ~= nil) and authorized == nil then
+		authorized = function() return true end
+	end
 	if authorized then
 		local ok, started = pcall(start_request, url, type(headers) == "table" and headers or {}, body,
 			request_options, on_chunk, on_done, operation, authorized)

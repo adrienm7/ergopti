@@ -23,6 +23,7 @@ function M.new(dependencies)
 		or type(dependencies.clock) ~= "function" or type(dependencies.environment) ~= "function"
 		or type(dependencies.deadline) ~= "function"
 		or type(dependencies.report) ~= "function" then return nil, "managed-http-initialization-invalid" end
+	if dependencies.redirect ~= nil and type(dependencies.redirect) ~= "function" then return nil, "managed-http-initialization-invalid" end
 	local owned = {}
 	local coordinator = {}
 	local start_curl
@@ -79,12 +80,21 @@ function M.new(dependencies)
 		return math.floor(record.deadline - dependencies.clock())
 	end
 
+	--- Removes only private hop metadata; ordinary result identity is unchanged.
+	local function public_result(result)
+		if type(result) ~= "table" or result.redirect_receipt == nil then return result end
+		local copy = {}
+		for key, value in pairs(result) do if key ~= "redirect_receipt" then copy[key] = value end end
+		return copy
+	end
+
 	--- Publishes a boolean terminal without acknowledging native retirement.
 	--- @param record table
 	--- @param result table
 	local function publish_logical(record, result)
 		if record.options.owned_api or record.logical_done or record.operation._cancelled then return end
 		record.logical_done, record.visible_active = true, false
+		result = public_result(result)
 		result.proxy_selection_receipt = record.selection_metadata
 		if type(record.done) == "function" then
 			local ok = pcall(record.done, result)
@@ -101,7 +111,7 @@ function M.new(dependencies)
 			record.expired, record.visible_active = true, false
 			result = refusal("timeout")
 		end
-		record.pending_result = result
+		record.pending_result = public_result(result)
 		if record.constructing or record.deadline_constructing or record.admitting or record.authorizing or not child_settled(record) then return end
 		if record.deadline_child then
 			if record.finalizing then return end
@@ -267,6 +277,28 @@ function M.new(dependencies)
 		retired()
 	end
 
+	--- Purely inspects a private hop receipt, never dispatching before retirement.
+	local function redirect_decision(record, result)
+		if not record.redirect_policy then return { action = "terminal" } end
+		local generation = record.generation
+		local called, decision = pcall(record.redirect_policy.transition, {
+			current_url = record.url, headers = record.headers, result = result,
+			https_floor = record.https_floor, hops = record.hops, visited = record.visited,
+		})
+		if owned[record.owner] ~= record or record.generation ~= generation
+			or record.operation._cancelled or record.operation._settled then return nil end
+		local budget = remaining(record)
+		-- The clock is a native port and may reenter cancellation or replacement.
+		if owned[record.owner] ~= record or record.generation ~= generation
+			or record.operation._cancelled or record.operation._settled then return nil end
+		if record.expired or budget <= 0 then expire(record); return nil end
+		if not called or type(decision) ~= "table" or (decision.action ~= "follow"
+			and decision.action ~= "terminal" and decision.action ~= "refuse") then
+			return { action = "refuse", error = "HTTP redirect receipt refused" }
+		end
+		return decision
+	end
+
 	--- Publishes the historical boolean-port terminal event without retiring debt.
 	--- @param record table
 	--- @param result table
@@ -274,8 +306,13 @@ function M.new(dependencies)
 		if record.options.owned_api or record.logical_done or record.operation._cancelled then return end
 		if type(result) ~= "table" then return end
 		if record.expired or remaining(record) <= 0 then expire(record); return end
+		local decision = redirect_decision(record, result)
+		if not decision then return end
+		if decision.action == "follow" then return end
+		if decision.action == "refuse" then publish_logical(record, refusal(decision.error)); return end
 		local choice = record.choices[record.choice]
-		local file_relay_candidate = not record.options.output_path or type(record.options.proxy_retry_admit) == "function"
+		local file_relay_candidate = record.options.output_target == nil
+			and (not record.options.output_path or type(record.options.proxy_retry_admit) == "function")
 		local may_relay = file_relay_candidate and record.choice < #record.choices and result.ok == false
 			and dependencies.policy.can_retry(result.failure_receipt, {
 				selection_mode = choice.mode, delivered_bytes = record.delivered_bytes,
@@ -301,6 +338,12 @@ function M.new(dependencies)
 		local options = {}
 		for key, value in pairs(record.options) do options[key] = value end
 		options.owner, options.timeout_ms, options.proxy_selection = record.owner, budget, choice
+		options.single_hop_redirect, options.single_hop_receipt_bytes, options.single_hop_url_bytes = nil, nil, nil
+		if record.redirect_policy then
+			options.single_hop_redirect, options.follow_redirects = true, false
+			options.single_hop_receipt_bytes = record.redirect_policy.max_native_receipt_bytes
+			options.single_hop_url_bytes = record.redirect_policy.max_url_bytes
+		end
 		local capabilities = record.curl_capabilities
 		local executable = type(capabilities) == "table" and capabilities.executable or nil
 		options.curl_executable, options.curl_executable_identity, options.curl_executable_identity_exact = nil, nil, nil
@@ -403,9 +446,41 @@ function M.new(dependencies)
 		end
 		local result = record.result
 		if type(result) ~= "table" then finish(record, refusal("managed-http-completion-invalid")); return end
+		local decision = redirect_decision(record, result)
+		if not decision then return end
+		if decision.action == "refuse" then finish(record, refusal(decision.error)); return end
+		if decision.action == "follow" then
+			if type(decision.url) ~= "string" or type(decision.headers) ~= "table" or type(decision.key) ~= "string"
+				or type(decision.hops) ~= "number" or decision.hops ~= record.hops + 1 then
+				finish(record, refusal("HTTP redirect receipt refused")); return
+			end
+			-- The preceding child's is_settled ACK is observed above. Keep the
+			-- same parent/deadline while replacing only the retired hop's state.
+			record.url, record.headers, record.hops = decision.url, decision.headers, decision.hops
+			record.visited[decision.key] = true
+			record.child, record.result, record.done_received = nil, nil, false
+			record.curl_capabilities, record.selection_metadata = nil, nil
+			record.choices, record.choice = nil, nil
+			local generation = record.generation
+			local fetched, environment = pcall(dependencies.environment)
+			local routed, route, route_error
+			if fetched then routed, route, route_error = pcall(dependencies.policy.route, record.url, environment) end
+			if owned[record.owner] ~= record or record.generation ~= generation
+				or record.operation._cancelled or record.operation._settled then return end
+			local budget = remaining(record)
+			if owned[record.owner] ~= record or record.generation ~= generation
+				or record.operation._cancelled or record.operation._settled then return end
+			if record.expired or budget <= 0 then expire(record); return end
+			if not routed or not route then finish(record, refusal(route_error or "proxy-environment-unavailable")); return end
+			record.route = route
+			dispatch_route(record, route)
+			return
+		end
 		local choice = record.choices[record.choice]
-		local safe_file = not record.options.output_path
-		if not safe_file and type(record.options.proxy_retry_admit) == "function" then
+		-- Retained FD retry needs an exact previous-attempt ticket, not the old
+		-- zero-argument pathname admission callback. No target relay is enabled.
+		local safe_file = not record.options.output_path and record.options.output_target == nil
+		if not safe_file and record.options.output_target == nil and type(record.options.proxy_retry_admit) == "function" then
 			local admitted, acknowledged = pcall(record.options.proxy_retry_admit)
 			safe_file = admitted and acknowledged == true
 		end
@@ -534,6 +609,63 @@ function M.new(dependencies)
 				finish(record, refusal(prepared and preparation_error or "owned request admission failed")); return operation
 			end
 			record.options = native_options
+		end
+		-- Prepared owned metadata is the actual per-hop admission input; the
+		-- reservation/source/absolute deadline established above remain unchanged.
+		local redirect_options = record.options
+		local authority = type(url) == "string" and url:match("^[^:]+://([^/?#]*)") or nil
+		local hop_eligible = dependencies.redirect ~= nil and redirect_options.method == "GET" and redirect_options.buffered == true
+			and redirect_options.follow_redirects and body == nil and redirect_options.output_path == nil and redirect_options.output_target == nil
+			and redirect_options.etag_compare == nil and redirect_options.etag_save == nil and authority and not authority:find("@", 1, true)
+		local function redirect_still_current()
+			local generation = record.generation
+			if admission and not source_admitted(record) then
+				record.admitting = false
+				finish(record, refusal("cancelled")); return false
+			end
+			if record.operation._cancelled or record.operation._settled then
+				record.admitting = false
+				finish(record, refusal("cancelled")); return false
+			end
+			local budget = remaining(record)
+			-- Boolean starts have not reserved an owner yet; owned admission has.
+			if record.operation._cancelled or record.operation._settled or record.generation ~= generation
+				or (admission and owned[record.owner] ~= record) then
+				record.admitting = false
+				finish(record, refusal("cancelled")); return false
+			end
+			if budget <= 0 then
+				record.admitting = false
+				expire(record); return false
+			end
+			return true
+		end
+		if hop_eligible then
+			local loaded, redirect, load_error = pcall(dependencies.redirect)
+			if not redirect_still_current() then return operation end
+			if not loaded or type(redirect) ~= "table" or type(redirect.transition) ~= "function" or type(redirect.address) ~= "function" then
+				record.admitting = false
+				finish(record, refusal(load_error or "HTTP redirect policy unavailable")); return operation
+			end
+			local parsed, initial = pcall(redirect.address, url)
+			if not redirect_still_current() then return operation end
+			if not parsed or type(initial) ~= "table" or type(initial.key) ~= "string" then
+				record.admitting = false
+				finish(record, refusal("HTTP redirect URL refused")); return operation
+			end
+			local copied, headers_copy = pcall(function()
+				local copy = {}
+				for name, value in pairs(headers) do copy[name] = value end
+				return copy
+			end)
+			if not redirect_still_current() then return operation end
+			if not copied then
+				record.admitting = false
+				finish(record, refusal("HTTP redirect headers refused")); return operation
+			end
+			record.redirect_policy, record.hops, record.visited = redirect, 0, { [initial.key] = true }
+			record.https_floor = redirect_options.https_only == true or initial.scheme == "https"
+			record.headers = headers_copy
 		end
 		local fetched, environment = pcall(dependencies.environment)
 		local route, err

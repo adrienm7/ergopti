@@ -4829,6 +4829,32 @@ unchanged fixture passes after activating its documented search path.
 Hosted/package qualification and the HTTP fixture corrections remain
 required. Item 62 stays partial.
 
+The Linux buffered GET owner now follows explicit per-hop redirect policy,
+re-resolves native proxy policy at each hop, strips cross-origin credentials,
+and retains the original operation deadline. Independent literal vectors cover
+loops, HTTPS downgrade refusal, origin changes and native cleanup receipts.
+Archive output has an opaque retained descriptor owner; archive transfer,
+digest sealing and installed artifact delivery are still separate pending work.
+The final local selected gate passes 365 JavaScript checks, macOS stub E2E
+101/101 (one driver-specific vector skipped), macOS stub units 14,731/0,
+Linux E2E 189/189, actual HTTP streaming/API checks, native runtime 82 checks,
+and Linux units 9,167/0 in 441 modules. AutoHotkey is unavailable and its gate
+is skipped. The first local attempt retains actual formatting/source-contract
+failures and canonical temporary-directory permission failures; the corrected
+sources pass after enabling writes to the existing canonical test directory.
+The 198 added normal Linux cases are registered; final-source replay of the
+30 actual managed GET and 18 actual output controls, hosted qualification and
+installed-format closure are still required. No physical enterprise-network,
+macOS installation or Windows acceptance is inferred from these local results.
+
+Hosted run 37430974838 tested the preceding 54493 source cohort and failed:
+macOS Sparkle/Brew native lifecycle controls and Linux E2E did not complete
+successfully; packaging/install and publication were skipped. Retrieved Linux
+logs additionally expose public owned-request predecessor replacement,
+preflight cleanup and fixture retirement failures. Their source corrections
+and causal native replays remain required Linux work, rather than Windows or
+macOS device-only follow-up. Item 62 and transversal items 16/38 remain open.
+
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard
   layers on all three drivers. Windows and macOS also support their existing
