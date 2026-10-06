@@ -271,3 +271,46 @@ _LBMD_ModelPickerBoundaryConsumer() {
 }
 Test("models picker: actual model-menu consumer retains native owners and shared boundary",
 	_LBMD_ModelPickerBoundaryConsumer)
+
+
+/** Exercises the actual backend provider, preserving native option and port state. */
+_LBMD_BackendBoundary() {
+	global _LLM_Menu, LLM_MENU_BACKEND_OPTIONS, _SharedDir
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\backend_choice_boundary.json", "UTF-8"))
+	SavedMenu := _LLM_Menu
+	SavedOptions := LLM_MENU_BACKEND_OPTIONS
+	Frame := _MR_GetMenuDef(Corpus["section"])
+	Original := Frame[1]
+	try {
+		LLM_MENU_BACKEND_OPTIONS := ["api", "ollama"]
+		_LLM_Menu := Map("backend", "api", "ollama_port", 11434)
+		Rows := _LLM_Menu_BackendRows()
+		AssertTrue(Rows[3]["separator"], "the native provider allocates its declared boundary after both choices")
+		Frame[1] := Map("type", "label", "id", "backend_boundary_marker", "i18n", Corpus["marker_key"],
+			"platforms", ["ahk", "linux"], "unavailable", "hide")
+		Rows := _LLM_Menu_BackendRows()
+		AssertEqual(t(Corpus["marker_key"]), Rows[3]["label"], "the actual shared declaration owns the boundary position")
+		AssertTrue(Rows[3]["disabled"])
+		AssertFalse(Rows[3].Has("action"))
+		AssertEqual(StrReplace(t(Corpus["windows_next_key"]), "%s", 11434), Rows[4]["label"],
+			"the unchanged real port control follows the boundary in the current native locale")
+		AssertTrue(HasMethod(Rows[4]["action"], "Call"))
+		AssertTrue(Rows[1]["checked"])
+		AssertFalse(Rows[2]["checked"])
+		AssertTrue(HasMethod(Rows[1]["action"], "Call"))
+		AssertTrue(HasMethod(Rows[2]["action"], "Call"))
+		AssertEqual("api", _LLM_Menu["backend"])
+		AssertEqual(11434, _LLM_Menu["ollama_port"])
+		Frame[1] := Map("type", "command", "id", "unowned_backend_boundary", "i18n", Corpus["marker_key"],
+			"platforms", ["ahk", "linux"], "unavailable", "hide")
+		AssertEqual(0, _LLM_Menu_BackendRows().Length, "an unowned boundary refuses before native port controls")
+		AssertEqual("api", _LLM_Menu["backend"])
+		AssertEqual(11434, _LLM_Menu["ollama_port"])
+	} finally {
+		Frame[1] := Original
+		_LLM_Menu := SavedMenu
+		LLM_MENU_BACKEND_OPTIONS := SavedOptions
+	}
+}
+Test("backend choices: actual shared boundary and native control owners (backend-choice-boundary)",
+	_LBMD_BackendBoundary)
