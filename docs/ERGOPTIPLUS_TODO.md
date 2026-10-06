@@ -4661,6 +4661,8 @@ unexecuted unit, E2E, package, installation and launch gates.
 retains historical commands and packet ownership; the earlier PC-only software
 deferral is superseded. This item and items16/38 remain open.
 
+Current Group 3 source checkpoint (item 63, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Preserve the qualified brightness owner and finish required native package/install acceptance; investigate only demonstrated timeout regressions. Separate device/evidence boundary: Actual display luminance and retained evidence for historical timeouts.
+
 ## Maintainer requests on 2026-10-01
 
 Every request the maintainer makes is written here first and removed once it
@@ -4701,6 +4703,8 @@ unexecuted unit, E2E, package, installation and launch gates.
 [group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md)
 retains historical commands and packet ownership; the earlier PC-only software
 deferral is superseded. This item and items16/38 remain open.
+
+Current Group 3 source checkpoint (item 71, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Preserve completed Metrics retirement and unknown values/comments; finish full-save, upgrade and complete three-OS package/install/startup acceptance. Separate device/evidence boundary: No new device-only task is established for this retirement.
 
 - [ ] **73.** Partial: Windows combination families and pairs already use
       the canonical translated tap-hold key labels; macOS now resolves both
@@ -4745,6 +4749,8 @@ unexecuted unit, E2E, package, installation and launch gates.
 [group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md)
 retains historical commands and packet ownership; the earlier PC-only software
 deferral is superseded. This item and items16/38 remain open.
+
+Current Group 3 source checkpoint (item 73, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Preserve translated labels and the 182-entry matrix; qualify actual providers without guessing a configuration writer regression. Separate device/evidence boundary: Historical writer attribution requires retained evidence; one disabled gate and three boot sections do not prove three disabled categories.
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
@@ -4885,6 +4891,8 @@ unexecuted unit, E2E, package, installation and launch gates.
 retains historical commands and packet ownership; the earlier PC-only software
 deferral is superseded. This item and items16/38 remain open.
 
+Current Group 3 source checkpoint (item 91, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Complete Windows simultaneous chords, delay/copy, hold arbitration and fake-AltGr-LCtrl hook ownership, then native hook/compiled acceptance on the maintainer Windows workstation. Separate device/evidence boundary: Real key ordering and actual AltGr generation.
+
 - [~] **93.** Linux: the key combinations of item 91. The shared ordered-pair
   model now runs through the actual tap-hold engine, keyboard hook and
   native configuration owner, using the same pair IDs, slots and sections.
@@ -4953,6 +4961,8 @@ replays pass12/0 SQLite and5/0 consumers, with four omission controls rejected.
 Production readers, writers, schemas and consumers are unchanged. Hosted
 revalidation remains pending; these checks do not qualify physical input.
 
+Current Group 3 source checkpoint (item 93, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Preserve ordered Linux pairs and historical fifth GTK 4/4; diagnose the current delayed-identity poll miss, then complete simultaneous chords, cross-device ownership, remaining native actions and physical-host/input/distribution acceptance. Separate device/evidence boundary: Genuine evdev/device/seat delivery and multi-keyboard acceptance.
+
 - [ ] **96.** Remove the separate Ergopti+ AltGr-adjustments option from the
       Layout menu. Selecting the Ergopti+ keylayout in the emulation picker must
       suffice. Verify that the layout supplies every intended change, retire
@@ -4986,6 +4996,8 @@ unexecuted unit, E2E, package, installation and launch gates.
 [group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md)
 retains historical commands and packet ownership; the earlier PC-only software
 deferral is superseded. This item and items16/38 remain open.
+
+Current Group 3 source checkpoint (item 96, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Prove picker handoff and layout equivalence, resolve wrap/spacing/shift differences and acknowledge migration before retiring the separate switch. Separate device/evidence boundary: Real precedence, recent-chevron timing and layout/dead-key delivery.
 
 - [~] **97.** Replace the fixed accent/direct-symbol shortcut submenu with
   user-owned entries, empty by default and offering "+ Add". Let a user on
@@ -5034,6 +5046,8 @@ unexecuted unit, E2E, package, installation and launch gates.
 retains historical commands and packet ownership; the earlier PC-only software
 deferral is superseded. This item and items16/38 remain open.
 
+Current Group 3 source checkpoint (item 97, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Complete native capture, all-owner collisions, joint source/modifier/output custody, Unicode/dead-key delivery and accent migration; qualify actual GUI/bridge and retain legacy menus. Separate device/evidence boundary: Real physical positions/modifiers and output across layouts/devices.
+
 - [~] **98.** Replace the fixed "make J the star key" setting with a physical
   key and output chosen by the user: any keyboard position and arbitrary
   character, including choosing no star at all. Integrate with item 97's
@@ -5061,6 +5075,8 @@ unexecuted unit, E2E, package, installation and launch gates.
 [group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md)
 retains historical commands and packet ownership; the earlier PC-only software
 deferral is superseded. This item and items16/38 remain open.
+
+Current Group 3 source checkpoint (item 98, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Complete the same arbitrary physical key/output or None owner and star migration, preserving occupied/unknown records without inferring physical J from a logical character. Separate device/evidence boundary: Chosen output across actual layout changes, modifiers and repeats.
 
 - [~] **101.** Investigate the supplied Windows diagnostic's retained keylogger
   shutdown debt (watchers=0). Keep privacy filtering fail-closed;
@@ -5815,6 +5831,8 @@ budget are unchanged; fifteen additive wiring controls refuse missing
 prerequisites, changed budgets and shared setup/native clocks. Fresh hosted
 qualification remains required; no native assertion or item is waived.
 
+Current Group 3 source checkpoint (item 106, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Preserve the qualified 21-case inventory and owned-program provider; diagnose the current GTK delayed-identity observation with its original poll unchanged; record Windows discovery/invocation for the maintainer workstation, then complete Linux/macOS providers and real Shortcuts discovery/invocation. Separate device/evidence boundary: Only device-dependent automation workflows require external device acceptance.
+
 - [~] **107.** Make the number-row policy explicit: native behavior, digits
   directly or symbols directly, with an acknowledged migration of the old
   Windows Boolean and preserved unrelated settings. The earlier Boolean slice
@@ -5862,6 +5880,8 @@ unexecuted unit, E2E, package, installation and launch gates.
 [group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md)
 retains historical commands and packet ownership; the earlier PC-only software
 deferral is superseded. This item and items16/38 remain open.
+
+Current Group 3 source checkpoint (item 107, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Implement native-HKL and Linux/macOS forced symbol/digit owners with joint provenance, preserving admitted policy/migration and independent descriptor/dead-state expectations. Separate device/evidence boundary: Actual number-row/repeat/Nav/AltGr/Caps and dead-key output.
 
 - [~] **108.** Make the default hotstring-editor shortcut follow the effective
   physical key that directly types the selected magic character: Ctrl on
@@ -5932,6 +5952,8 @@ unexecuted unit, E2E, package, installation and launch gates.
 [group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md)
 retains historical commands and packet ownership; the earlier PC-only software
 deferral is superseded. This item and items16/38 remain open.
+
+Current Group 3 source checkpoint (item 108, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Complete effective-source retargeting, all-owner collisions and modifier/output transactions while preserving None, personal overrides and compensation. Separate device/evidence boundary: Actual layout changes and editor-key delivery on supported keyboards/seats.
 
 - [~] **109.** Give every application window the same "ErgoptiPlus — Title"
   format. GUI/WebView titles now use one prefix/separator policy in
@@ -6265,6 +6287,8 @@ controls pass, including the15 prior controls; archive verification, the nine
 native constructor cases, cancellation and physical retirement are unchanged.
 Fresh hosted qualification and delivery/clicks remain separate; item109 is partial.
 
+Current Group 3 source checkpoint (item 109, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Preserve genuine constructor captions/returns; establish supported fresh invisible Variables/KeyHistory capture before separate owned GUI/title qualification, retaining runtime HWND identity. Separate device/evidence boundary: Physical key history and notification/focus behavior outside observable hosted cases.
+
 - [~] **111.** Provide two distinct, explicitly labelled shared window-switching
   actions on Windows, macOS and Linux: the operating system's normal Alt+Tab switcher
   (the native equivalent on macOS), and switching only among windows on the display
@@ -6440,6 +6464,8 @@ reproduces all three failures and recoveries; the original full suite passes
 Unix-socket harness failure is retained separately. Actual foreign-owner
 chown, all five corrected distributions and integrated package/install
 acceptance still require hosted qualification; item111 stays partial.
+
+Current Group 3 source checkpoint (item 111, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Complete Mac broker/wiring and exact retirement qualification; preserve final Linux supervision five, external recovery one and window 34 successes without rebuilding the switcher. Separate device/evidence boundary: Genuine dual screens, independent cursor/focus and moved/closed windows.
 
 - [ ] **112.** Accept an AI prediction immediately with its configured
       modifier-plus-digit shortcut, with matching shortcut hints on all three OSes.
