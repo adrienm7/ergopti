@@ -5780,6 +5780,17 @@ passes with them. Both callers retain the formatted inventory source pin.
 Fresh native macOS qualification is pending; the prior HTTPError stage/status
 remains unknown. This is diagnostic evidence, not provider invocation.
 
+The owned GTK fixture now requires a real X11 protocol handshake before its
+original four application trials. A live process and published display number
+alone are insufficient: a genuine owned SIGSTOP trial passes that old predicate
+but refuses the five-second xdpyinfo handshake, retires its exact client and
+passes after the same server resumes. Seventeen diagnostic controls, four
+proof-cleanup controls and eight actual X11 observations pass with exact child
+reaping. Original workers, identities, receipt polling and observer deadlines
+remain unchanged. This strengthens setup admission; it does not establish the
+cause of the prior late GTK receipts or qualify physical application delivery.
+Final composed and hosted qualification remains required; item 106 stays partial.
+
 - [~] **107.** Make the number-row policy explicit: native behavior, digits
   directly or symbols directly, with an acknowledged migration of the old
   Windows Boolean and preserved unrelated settings. The earlier Boolean slice
