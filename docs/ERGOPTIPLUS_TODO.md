@@ -3459,6 +3459,8 @@ macOS/Linux keyboard bindings now publish their actual complete contextual nativ
 
 The existing real Storage GC fixture now returns its allocation frame before the original two collections. A receipt remains rooted while the first collection must release its weak owner, then the original token retirement assertions run. The genuine strong-owner-box mutation fails on both Lua engines. No extra collection, timing waiver or production change is added; full final-source Linux qualification remains separate.
 
+Archive-distro unit validation now provisions only measured LuaJIT/Python/curl requirements and verifies real luv/lfs ABI5.1 loading with candidates obtained from the canonical installer function. The unchanged full unit command runs as the ordinary CI user in an owned writable checkout copy. Actual Debian13 Docker execution passes9184/0 with the reviewed GC fixture; Fedora, Arch, Alpine and openSUSE remain unexecuted until manual CI. Existing --no-deps installation, release conditions and all other workflow fields remain unchanged. The earlier Arch first-install exit2 is still unclassified.
+
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
   The shared AHK override policy now writes an explicit recommended delay only
