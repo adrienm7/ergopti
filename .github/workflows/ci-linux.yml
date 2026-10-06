@@ -65,8 +65,7 @@ jobs:
         # The test runner (tests/run.lua) uses LuaJIT. Test discovery falls
         # back to io.popen("find") when lfs is unavailable — no luarocks needed.
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y luajit lua-luv lua-filesystem sqlite3
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y luajit lua-luv lua-filesystem sqlite3
           luajit -e 'assert(require("luv"), "native luv integration is mandatory")'
 
       - name: Verify native metrics aggregation equivalence
@@ -88,7 +87,7 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() }}
         run: |
           set -euo pipefail
-          sudo apt-get install -y --no-install-recommends curl zstd
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends curl zstd
           python3 static/ergopti_plus/linux/tests/hardware/run_ollama_runtime_acceptance.py \
             --repository "$GITHUB_WORKSPACE" \
             --evidence "$RUNNER_TEMP/ollama-runtime-acceptance" \
@@ -142,8 +141,7 @@ jobs:
         # Test discovery alone does not prove their filesystem admission.
         # Canonical XKB controls below require xkbcli before their first use.
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y luajit lua-filesystem sqlite3 libxkbcommon-tools xkb-data
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y luajit lua-filesystem sqlite3 libxkbcommon-tools xkb-data
 
       # The virtual-keyboard harness, stubbed: this step runs on ubuntu-latest
       # against the pure-Lua hotstring engine — no real evdev device, no ydotool
@@ -170,7 +168,7 @@ jobs:
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
-          sudo apt-get install -y --no-install-recommends libgtk-3-bin dbus-x11 xvfb x11-utils
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends libgtk-3-bin dbus-x11 xvfb x11-utils
           python3 tests/hardware/test_application_operand_diagnostics.py
           python3 tests/hardware/run_application_operand_receipts.py --evidence-dir "$RUNNER_TEMP/linux-application-operands"
         timeout-minutes: 1
@@ -179,7 +177,7 @@ jobs:
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
-          sudo apt-get install -y --no-install-recommends lua-luv lua5.4 curl openssl python3 strace
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends lua-luv lua5.4 curl openssl python3 strace
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_process_groups.lua
         timeout-minutes: 1
 
@@ -194,7 +192,7 @@ jobs:
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
-          sudo apt-get install -y --no-install-recommends dbus-x11 util-linux
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends dbus-x11 util-linux
           task_uid=$(id -u)
           task_gid=$(id -g)
           sudo unshare --mount --propagation private bash tests/hardware/run_machine_id_fallback_receipts.sh "$task_uid" "$task_gid"
@@ -931,7 +929,7 @@ jobs:
         working-directory: static/ergopti_plus/linux
         run: |
           # Ubuntu ships PulseAudio gettext catalogs in language packs.
-          sudo apt-get install -y --no-install-recommends pulseaudio pulseaudio-utils locales language-pack-fr language-pack-de
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends pulseaudio pulseaudio-utils locales language-pack-fr language-pack-de
           sudo locale-gen fr_FR.UTF-8 de_DE.UTF-8
         timeout-minutes: 10
 
@@ -1087,7 +1085,7 @@ jobs:
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
-          sudo apt-get install -y --no-install-recommends libxkbcommon-tools xkb-data
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends libxkbcommon-tools xkb-data
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_layout_resolution.lua
         timeout-minutes: 3
 
@@ -1113,7 +1111,7 @@ jobs:
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
-          sudo apt-get install -y --no-install-recommends libxkbcommon-x11-0 libx11-6 libx11-xcb1 libxtst6 xvfb x11-xkb-utils
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends libxkbcommon-x11-0 libx11-6 libx11-xcb1 libxtst6 xvfb x11-xkb-utils
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_xkb_source_qualification.lua | tee "$RUNNER_TEMP/linux-xkb-source.log"
         timeout-minutes: 3
 
@@ -1123,7 +1121,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           set -euo pipefail
-          sudo apt-get install -y --no-install-recommends luajit lua-luv python3 xvfb openbox xdotool x11-utils x11-xserver-utils coreutils xfonts-base
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends luajit lua-luv python3 xvfb openbox xdotool x11-utils x11-xserver-utils coreutils xfonts-base
           npm run test:linux:window-switch | tee "$RUNNER_TEMP/linux-window-switch.log"
         timeout-minutes: 4
 
@@ -1141,7 +1139,7 @@ jobs:
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
-          sudo apt-get install -y --no-install-recommends xvfb sway libxkbcommon-tools xkb-data x11-utils
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends xvfb sway libxkbcommon-tools xkb-data x11-utils
           export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
 
           echo "--- X11 (Xvfb) ---"
@@ -1195,7 +1193,7 @@ jobs:
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
-          sudo apt-get install -y --no-install-recommends libayatana-appindicator3-1 libgtk-3-0
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends libayatana-appindicator3-1 libgtk-3-0
           env LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;' luajit tests/hardware/run_tray_symbols.lua
         timeout-minutes: 4
 
@@ -1211,7 +1209,7 @@ jobs:
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
-          sudo apt-get install -y --no-install-recommends python3-gi gir1.2-glib-2.0 dbus xvfb
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends python3-gi gir1.2-glib-2.0 dbus xvfb
           dbus-run-session -- python3 tests/hardware/test_startup_desktop.py
           export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
           dbus-run-session -- bash -c '
@@ -1245,7 +1243,7 @@ jobs:
       - name: The secure-field probe on a real accessibility bus
         if: ${{ !cancelled() }}
         run: |
-          sudo apt-get install -y --no-install-recommends at-spi2-core openbox python3-gi gir1.2-gtk-3.0 dbus-x11 xvfb
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends at-spi2-core openbox python3-gi gir1.2-gtk-3.0 dbus-x11 xvfb
           bash static/ergopti_plus/linux/tests/hardware/run_atspi_focus.sh
         timeout-minutes: 5
 
@@ -1253,7 +1251,7 @@ jobs:
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
-          sudo apt-get install -y --no-install-recommends xdotool
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends xdotool
           python3 tests/hardware/run_atspi_interpreter_receipts.py
         timeout-minutes: 1
 
@@ -1270,7 +1268,7 @@ jobs:
           sudo modprobe uinput
           # lua-luv as install.sh installs it: the daemon's timers and every
           # HTTP request (the AI phase) run on it.
-          sudo apt-get install -y --no-install-recommends at-spi2-core openbox python3-gi gir1.2-gtk-3.0 \
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends at-spi2-core openbox python3-gi gir1.2-gtk-3.0 \
             dbus-x11 xvfb x11-xkb-utils libayatana-appindicator3-1 lua-luv
           sudo bash static/ergopti_plus/linux/tests/hardware/run_daemon_live.sh
         timeout-minutes: 6
@@ -1287,7 +1285,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           ERGOPTI_UPDATER_LIVE_EVIDENCE_DIR: ${{ runner.temp }}/linux-updater-live
         run: |
-          sudo apt-get install -y --no-install-recommends lua-luv
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends lua-luv
           bash static/ergopti_plus/linux/tests/hardware/run_updater_live.sh
         timeout-minutes: 10
 
@@ -1310,7 +1308,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           set -euo pipefail
-          sudo apt-get install -y --no-install-recommends curl lua-luv
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends curl lua-luv
           npm run test:linux:http-stream | tee "$RUNNER_TEMP/linux-http-stream.log"
         timeout-minutes: 3
 
@@ -1319,7 +1317,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           set -euo pipefail
-          sudo apt-get install -y --no-install-recommends zstd
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends zstd
           npm run test:linux:runtime-native | tee "$RUNNER_TEMP/linux-runtime-native.log"
         timeout-minutes: 5
 
@@ -1332,7 +1330,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           set -euo pipefail
-          sudo apt-get install -y --no-install-recommends lua-luv
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends lua-luv
           curl -fsSL https://ollama.com/install.sh | sh
           (ollama serve > "$RUNNER_TEMP/ollama.log" 2>&1 &) || true
           for _ in $(seq 1 60); do curl -sf http://127.0.0.1:11434/api/tags >/dev/null && break; sleep 1; done
@@ -1409,13 +1407,13 @@ jobs:
       - name: Install WebKit2GTK and lgi
         if: ${{ !cancelled() }}
         run: |
-          sudo apt-get install -y --no-install-recommends \
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends \
             xvfb lua-lgi gir1.2-webkit2-4.1 gir1.2-gtk-3.0
         timeout-minutes: 20
 
       - name: Install virtual screenshot capture tools
         if: ${{ !cancelled() }}
-        run: sudo apt-get install -y --no-install-recommends maim imagemagick lua-luv
+        run: sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends maim imagemagick lua-luv
         timeout-minutes: 20
 
       - name: Keep virtual screenshots inside literal private paths
@@ -1430,7 +1428,7 @@ jobs:
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
-          sudo apt-get install -y --no-install-recommends curl lua-luv dbus-x11
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends curl lua-luv dbus-x11
           export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua;;'
           export LUA_CPATH='/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;'
           dbus-run-session -- xvfb-run -a luajit tests/hardware/run_model_pull_receipts.lua
@@ -1440,7 +1438,7 @@ jobs:
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
-          sudo apt-get install -y --no-install-recommends dunst libnotify-bin lua-luv dbus-x11
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends dunst libnotify-bin lua-luv dbus-x11
           export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
           ERGOPTI_TEST_PRIVATE_DBUS=1 dbus-run-session -- xvfb-run -a luajit tests/hardware/run_notification_text_receipts.lua
         timeout-minutes: 2
@@ -1511,7 +1509,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          sudo apt-get install -y --no-install-recommends lua-luv
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends lua-luv
           export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
           export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
           export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
@@ -1527,7 +1525,7 @@ jobs:
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
-          sudo apt-get install -y --no-install-recommends xdotool python3-gi gir1.2-glib-2.0 dbus xvfb
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends xdotool python3-gi gir1.2-glib-2.0 dbus xvfb
           export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
           export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
           export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
@@ -1673,8 +1671,7 @@ jobs:
         # (without it the AppImage falls back to a luajit the target must
         # already have), and the tarball smoke runs the installed tree with it.
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y luajit
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y luajit
 
       - name: Assemble the driver bundle
         shell: bash
@@ -1717,7 +1714,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sudo apt-get install -y rpm
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y rpm
           rpmbuild --version
           curl -fsSL --retry 3 --retry-delay 5 -o "$RUNNER_TEMP/appimagetool" \
               https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
@@ -1725,7 +1722,7 @@ jobs:
           (cd "$RUNNER_TEMP" && ./appimagetool --appimage-extract >/dev/null)
           sudo ln -sf "$RUNNER_TEMP/squashfs-root/AppRun" /usr/local/bin/appimagetool
           test -x /usr/local/bin/appimagetool
-          sudo apt-get install -y flatpak flatpak-builder
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y flatpak flatpak-builder
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 ||
               echo "::notice::no apparmor_restrict_unprivileged_userns knob here — continuing"
           flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
@@ -2242,8 +2239,7 @@ jobs:
               echo "::error::the assets-linux artifact contains no .deb."
               exit 1
           fi
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends "./$deb"
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends "./$deb"
           dpkg -s ergopti
 
       - name: The package installed the files the daemon reads (deb)
