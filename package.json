@@ -390,6 +390,7 @@
 		"test:metrics-manifest-contract": "node ./tools/test/test-metrics-manifest-contract.cjs",
 		"test:metrics-speed-source-filters": "node ./tools/test/test-metrics-speed-source-filters.cjs",
 		"test:linux-metrics-sqlite-bridge": "node ./tools/test/test-linux-metrics-sqlite-bridge.cjs",
+		"test:linux-typing-consumer-closure": "node ./tools/test/test-linux-typing-consumer-closure.cjs",
 		"test:windows-metrics-range-bridge": "node ./tools/test/test-windows-metrics-range-bridge.cjs",
 		"test:tooltip-corpus-parity": "node ./tools/test/test-tooltip-corpus-parity.cjs",
 		"test:toml-coercion-parity": "node ./tools/test/test-toml-coercion-parity.cjs",
