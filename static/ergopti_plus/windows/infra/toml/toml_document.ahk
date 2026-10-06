@@ -20,7 +20,7 @@ _TOML_DocumentTable() {
 
 ; One lexical owner serves physical records and nested value containers. Only
 ; an unquoted top-level separator ends a token; comments never acquire ownership.
-_TOML_DocumentToken(Text, &Position, Separator, &Separated := 0, &SpanStart := 0, &SpanEnd := 0) {
+_TOML_DocumentToken(Text, &Position, Separator, &Separated := 0, &SpanStart := 0, &SpanEnd := 0, StopAfterContainer := false) {
 	Separated := false
 	SpanStart := 0, SpanEnd := 0
 	Result := "", Quote := "", Closers := [], Length := StrLen(Text)
@@ -77,6 +77,11 @@ _TOML_DocumentToken(Text, &Position, Separator, &Separated := 0, &SpanStart := 0
 			if !Closers.Length || !(Char == Closers[Closers.Length])
 				throw ValueError("Unbalanced TOML document container")
 			Closers.Pop()
+			if StopAfterContainer && !Closers.Length {
+				Result .= Char
+				Position += 1
+				return Trim(Result, " " . Chr(9) . Chr(13) . Chr(10))
+			}
 		} else if Char == Separator && !Closers.Length {
 			Separated := true
 			Position += 1
@@ -404,19 +409,28 @@ _TOML_DocumentUpdatesAreNoOp(Document, Projection, Records, Before, After, Updat
 
 /** Admits the canonical writer only when its source namespaces survive. */
 TOML_AdmitWriterCandidate(Source, Before, After, Candidate, Updates, Prefixes) {
-	Document := TOML_ParseDocument(Source, &Records)
-	Projection := _TOML_FlatDocument(Before)
+	Document := TOML_ParseDocument(Source, &Records, &Physical)
+	Roots := _TOML_ForeignArrayRoots(Physical)
+	Projection := _TOML_FlatDocument(_TOML_ArrayProjectionSections(Before, Roots))
 	TOML_ParseDocument(Candidate)
+	InlineAdmitted := _TOML_AdmitInlineTerminatorParent(Source, Document, Physical, Before, After, Candidate, Updates, Prefixes)
+	if InlineAdmitted is Map
+		return InlineAdmitted
 	if TOML_SameValue(Document, Projection) {
 		Content := _TOML_RetainForeignRecords(Source, Candidate, Updates, Prefixes)
 		if !TOML_SameValue(TOML_ParseDocument(Content), _TOML_FlatDocument(After))
 			throw ValueError("The physical TOML candidate differs from the requested model")
 		return Map("content", Content, "preserve_source", false)
 	}
-	; Only a semantic no-op can authorize retaining an unrepresentable source.
-	; Flat equality alone misses deletes and aliases the old reader cannot see.
-	if !_TOML_DocumentUpdatesAreNoOp(Document, Projection, Records, Before, After, Updates, Prefixes)
+	; A disjoint table-array partition has its own exact source proof. Other
+	; unrepresentable namespaces still require a semantic no-op; flat equality
+	; alone misses deletes and aliases the old reader cannot see.
+	if !_TOML_DocumentUpdatesAreNoOp(Document, Projection, Records, Before, After, Updates, Prefixes) {
+		Retained := _TOML_AdmitForeignTableArrays(Source, Document, Projection, After, Candidate, Updates, Prefixes)
+		if Retained is Map
+			return Retained
 		throw ValueError("The canonical TOML writer cannot preserve the source namespaces")
+	}
 	return Map("content", Source, "preserve_source", true)
 }
 
@@ -932,4 +946,299 @@ TOML_BuildConfigDocumentCandidate(Source, Updates, Prefixes) {
 	if !TOML_SameValue(TOML_ParseDocument(Candidate), Expected)
 		throw ValueError("The physical configuration candidate differs from its requested semantic model")
 	return Map("content", Candidate, "preserve_source", false)
+}
+
+; Foreign table arrays cannot lend their collapsed flat row to the writer.
+; Only independently representable siblings may change; every array subtree
+; and its lexical spans stay with the typed source owner.
+_TOML_AdmitForeignTableArrays(Source, Document, Projection, After, Candidate, Updates, Prefixes) {
+	TOML_ParseDocument(Source, , &Physical)
+	Roots := _TOML_ForeignArrayRoots(Physical)
+	if !Roots.Length
+		return false
+	if !TOML_SameValue(_TOML_WithoutNamespaces(Document, Roots),
+			_TOML_WithoutNamespaces(Projection, Roots))
+		return false
+	for Root in Roots {
+		Original := _TOML_DocumentLookup(Document, Root)
+		if !Original["found"] || !(Original["value"] is Array)
+			return false
+		for Update in Updates {
+			Parts := TOML_ParseKeyPath(Update.Section, true)
+			Parts.Push(Update.Key)
+			; The physical owner uses case-insensitive native identities. Refuse
+			; both spellings rather than allow an alias to acquire the array.
+			if _TOML_NamespaceContains(Root, Parts, false)
+					|| _TOML_NamespaceContains(Parts, Root, false)
+				return false
+		}
+		for Prefix in Prefixes {
+			Parts := TOML_ParseKeyPath(Prefix, true)
+			if _TOML_NamespaceContains(Root, Parts, false)
+					|| _TOML_NamespaceContains(Parts, Root, false)
+				return false
+		}
+	}
+	Content := _TOML_RetainForeignRecords(Source, Candidate, Updates, Prefixes)
+	Result := TOML_ParseDocument(Content)
+	for Root in Roots {
+		Old := _TOML_DocumentLookup(Document, Root)
+		Kept := _TOML_DocumentLookup(Result, Root)
+		if !Kept["found"] || !TOML_SameValue(Old["value"], Kept["value"])
+			throw ValueError("The canonical TOML candidate changed a foreign table array")
+	}
+	if !TOML_SameValue(_TOML_WithoutNamespaces(Result, Roots),
+			_TOML_WithoutNamespaces(_TOML_FlatDocument(_TOML_ArrayProjectionSections(After, Roots)), Roots))
+		throw ValueError("The canonical TOML candidate differs outside its retained table arrays")
+	return Map("content", Content, "preserve_source", false)
+}
+
+; Select the minimal typed namespaces: a nested array belongs to the outer
+; array record, not a second flat destination that could cross its row context.
+_TOML_ForeignArrayRoots(Physical) {
+	Candidates := [], Roots := []
+	for Record in Physical {
+		if Record.Kind != "header"
+			continue
+		Header := Trim(TOML_StripInlineComment(Record.Text), " " . Chr(9) . Chr(13) . Chr(10))
+		if SubStr(Header, 1, 2) == "[["
+			Candidates.Push(TOML_ParseKeyPath(Record.Section, true))
+	}
+	for ArrayCandidateIndex, Parts in Candidates {
+		ArrayIsNested := false
+		for OtherIndex, Other in Candidates {
+			if OtherIndex == ArrayCandidateIndex
+				continue
+			if _TOML_NamespaceContains(Other, Parts)
+					&& (Other.Length < Parts.Length || OtherIndex < ArrayCandidateIndex) {
+				ArrayIsNested := true
+				break
+			}
+		}
+		if !ArrayIsNested
+			Roots.Push(Parts)
+	}
+	return Roots
+}
+
+_TOML_NamespaceContains(Parent, Child, CaseSensitive := true) {
+	if Parent.Length > Child.Length
+		return false
+	loop Parent.Length
+		if StrCompare(Parent[A_Index], Child[A_Index], CaseSensitive) != 0
+			return false
+	return true
+}
+
+; Clone only the traversed Maps. Borrowed array/scalar values are never mutated.
+_TOML_WithoutNamespaces(Document, Roots) {
+	Result := Document.Clone()
+	for Parts in Roots {
+		Node := Result, Found := true
+		loop Parts.Length - 1 {
+			Part := Parts[A_Index]
+			if !Node.Has(Part) || !(Node[Part] is Map) {
+				Found := false
+				break
+			}
+			Node[Part] := Node[Part].Clone()
+			Node := Node[Part]
+		}
+		Last := Parts[Parts.Length]
+		if Found && Node.Has(Last)
+			Node.Delete(Last)
+	}
+	return Result
+}
+
+; Remove only foreign array sections from the rendering model. Implicit table
+; ancestors stay in the semantic partition even when no direct leaf names them.
+_TOML_ArrayProjectionSections(Sections, Roots) {
+	if !Roots.Length
+		return Sections
+	Result := Sections.Clone()
+	for Section in Sections {
+		Parts := TOML_ParseKeyPath(Section, true)
+		for Root in Roots {
+			if _TOML_NamespaceContains(Root, Parts) {
+				Result.Delete(Section)
+				break
+			}
+		}
+	}
+	for Root in Roots {
+		if Root.Length < 2
+			continue
+		Parent := Root.Clone(), Present := false
+		Parent.Pop()
+		for Section in Result {
+			Parts := TOML_ParseKeyPath(Section, true)
+			if Parts.Length == Parent.Length && _TOML_NamespaceContains(Parent, Parts) {
+				Present := true
+				break
+			}
+		}
+		if !Present {
+			Section := ""
+			for Part in Parent
+				Section .= (Section == "" ? "" : ".") . TOML_RenderKey(Part)
+			Result[Section] := Map()
+		}
+	}
+	return Result
+}
+
+_TOML_ForeignArrayRenderingSections(Source, Sections) {
+	RenderingDocument := TOML_ParseDocument(Source, , &Physical)
+	RenderingRoots := _TOML_ForeignArrayRoots(Physical)
+	if _TOML_InlineTerminatorParent(Physical, RenderingDocument)
+		RenderingRoots.Push(["hotstrings"])
+	return _TOML_ArrayProjectionSections(Sections, RenderingRoots)
+}
+
+
+
+
+
+; =======================================================
+; =======================================================
+; ======= 4/ Owned Inline Terminator Parent Edits =======
+; =======================================================
+; =======================================================
+
+; A root inline parent is one physical record. Only its requested member may
+; change; the existing lexical owner locates containers and member boundaries.
+_TOML_InlineTableRewriteRecord(RecordText, Changes) {
+	InlinePosition := 1
+	_TOML_DocumentToken(RecordText, &InlinePosition, "=", &InlineSeparated)
+	if !InlineSeparated
+		throw ValueError("An inline edit requires an assignment record")
+	while InlinePosition <= StrLen(RecordText) && InStr(" " . Chr(9), SubStr(RecordText, InlinePosition, 1))
+		InlinePosition += 1
+	InlineStart := InlinePosition
+	if SubStr(RecordText, InlineStart, 1) != "{"
+		throw ValueError("An inline edit requires a table container")
+	_TOML_DocumentToken(RecordText, &InlinePosition, Chr(0), , , , true)
+	InlineFinish := InlinePosition - 1
+	InlineBody := SubStr(RecordText, InlineStart + 1, InlineFinish - InlineStart - 1)
+	MemberPosition := 1, Fragments := [], SeenMembers := Map()
+	SeenMembers.CaseSense := "On"
+	while MemberPosition <= StrLen(InlineBody) {
+		MemberStart := MemberPosition
+		MemberToken := _TOML_DocumentToken(InlineBody, &MemberPosition, ",", &MemberSeparated)
+		if MemberToken == ""
+			break
+		MemberWidth := MemberPosition - MemberStart - (MemberSeparated ? 1 : 0)
+		KeyPosition := 1
+		MemberKey := _TOML_DocumentToken(MemberToken, &KeyPosition, "=", &KeySeparated)
+		if !KeySeparated
+			throw ValueError("An inline member requires an assignment")
+		MemberParts := TOML_ParseKeyPath(MemberKey), MemberRoot := MemberParts[1]
+		if !Changes.Has(MemberRoot) {
+			Fragments.Push(SubStr(InlineBody, MemberStart, MemberWidth))
+			continue
+		}
+		if SeenMembers.Has(MemberRoot)
+			continue
+		SeenMembers[MemberRoot] := true
+		MemberChange := Changes[MemberRoot]
+		if !MemberChange["delete"]
+			Fragments.Push(" " . TOML_RenderKey(MemberRoot) . " = " . TOML_RenderValue(MemberChange["value"]))
+	}
+	for MemberRoot, MemberChange in Changes
+		if !SeenMembers.Has(MemberRoot) && !MemberChange["delete"]
+			Fragments.Push(" " . TOML_RenderKey(MemberRoot) . " = " . TOML_RenderValue(MemberChange["value"]))
+	InlineImage := ""
+	for Fragment in Fragments
+		InlineImage .= (InlineImage == "" ? "" : ",") . Fragment
+	return SubStr(RecordText, 1, InlineStart) . InlineImage . SubStr(RecordText, InlineFinish)
+}
+
+; Only the declared record parent gets this physical projection. Ignored root
+; assignments and literal dotted root names still lack native write authority.
+_TOML_InlineTerminatorParent(Physical, Document) {
+	ParentTable := Document.Get("hotstrings", 0)
+	if !(ParentTable is Map) || (!ParentTable.Has("terminators") && !ParentTable.Has("terminator_states"))
+		return false
+	for ParentRow in Physical {
+		if ParentRow.Kind != "assignment" || ParentRow.Section != ""
+			continue
+		ParentParts := TOML_ParseKeyPath(ParentRow.Key)
+		if ParentParts.Length == 1 && ParentParts[1] == "hotstrings"
+			return true
+	}
+	return false
+}
+
+; Canonical sibling saves share the typed editor's lexical member owner. They
+; cannot acquire the custom record/state subtree or replace the whole parent.
+_TOML_AdmitInlineTerminatorParent(Source, Document, Physical, Before, After, Candidate, Updates, Prefixes) {
+	if !_TOML_InlineTerminatorParent(Physical, Document)
+		return false
+	InlineRoots := _TOML_ForeignArrayRoots(Physical), ArrayRoots := InlineRoots.Clone()
+	InlineRoots.Push(["hotstrings"])
+	OldProjection := _TOML_FlatDocument(_TOML_ArrayProjectionSections(Before, InlineRoots))
+	if !TOML_SameValue(_TOML_WithoutNamespaces(Document, InlineRoots),
+			_TOML_WithoutNamespaces(OldProjection, InlineRoots))
+		throw ValueError("The inline parent cannot excuse another unrepresented namespace")
+	for ParentPrefix in Prefixes {
+		PrefixParts := TOML_ParseKeyPath(ParentPrefix, true)
+		for ProtectedRoot in InlineRoots
+			if _TOML_NamespaceContains(ProtectedRoot, PrefixParts, false)
+					|| _TOML_NamespaceContains(PrefixParts, ProtectedRoot, false)
+				throw ValueError("An inline or array parent cannot lend namespace replacement authority")
+	}
+	ParentChanges := Map(), OutsideUpdates := [], ParentExpected := Document["hotstrings"].Clone()
+	ParentChanges.CaseSense := "On"
+	for ParentUpdate in Updates {
+		UpdateParts := TOML_ParseKeyPath(ParentUpdate.Section, true)
+		UpdateParts.Push(ParentUpdate.Key)
+		for ProtectedRoot in ArrayRoots
+			if _TOML_NamespaceContains(ProtectedRoot, UpdateParts, false)
+					|| _TOML_NamespaceContains(UpdateParts, ProtectedRoot, false)
+				throw ValueError("An array cannot lend inline sibling write authority")
+		if StrCompare(UpdateParts[1], "hotstrings", false) != 0 {
+			OutsideUpdates.Push(ParentUpdate)
+			continue
+		}
+		if UpdateParts.Length != 2 || StrCompare(UpdateParts[1], "hotstrings", true) != 0
+				|| StrCompare(ParentUpdate.Key, "terminators", false) == 0
+				|| StrCompare(ParentUpdate.Key, "terminator_states", false) == 0
+			throw ValueError("The record owner requires its dedicated typed editor")
+		ParentDelete := ParentUpdate.HasOwnProp("Delete") && ParentUpdate.Delete == 1
+		ParentChanges[ParentUpdate.Key] := Map("delete", ParentDelete)
+		if ParentDelete {
+			if ParentExpected.Has(ParentUpdate.Key)
+				ParentExpected.Delete(ParentUpdate.Key)
+		} else {
+			ParentChanges[ParentUpdate.Key]["value"] := ParentUpdate.Value
+			ParentExpected[ParentUpdate.Key] := ParentUpdate.Value
+		}
+	}
+	NewProjection := _TOML_FlatDocument(_TOML_ArrayProjectionSections(After, InlineRoots))
+	if TOML_SameValue(ParentExpected, Document["hotstrings"])
+			&& TOML_SameValue(_TOML_WithoutNamespaces(NewProjection, InlineRoots),
+				_TOML_WithoutNamespaces(OldProjection, InlineRoots))
+		return Map("content", Source, "preserve_source", true)
+	InlineSource := SubStr(Source, 1, 1) == Chr(0xFEFF) ? Chr(0xFEFF) : ""
+	for ParentRow in Physical {
+		ParentParts := ParentRow.Kind == "assignment" && ParentRow.Section == ""
+			? TOML_ParseKeyPath(ParentRow.Key) : []
+		InlineSource .= ParentParts.Length == 1 && ParentParts[1] == "hotstrings"
+			? _TOML_InlineTableRewriteRecord(ParentRow.Text, ParentChanges) : ParentRow.Text
+	}
+	InlineContent := _TOML_RetainForeignRecords(InlineSource, Candidate, OutsideUpdates, Prefixes)
+	InlineResult := TOML_ParseDocument(InlineContent)
+	if !InlineResult.Has("hotstrings") || !TOML_SameValue(ParentExpected, InlineResult["hotstrings"])
+		throw ValueError("The inline parent changed outside its requested members")
+	for ProtectedRoot in ArrayRoots {
+		OldArray := _TOML_DocumentLookup(Document, ProtectedRoot)
+		NewArray := _TOML_DocumentLookup(InlineResult, ProtectedRoot)
+		if !NewArray["found"] || !TOML_SameValue(OldArray["value"], NewArray["value"])
+			throw ValueError("The inline parent changed a foreign array")
+	}
+	if !TOML_SameValue(_TOML_WithoutNamespaces(InlineResult, InlineRoots),
+			_TOML_WithoutNamespaces(NewProjection, InlineRoots))
+		throw ValueError("The inline candidate differs outside its admitted partitions")
+	return Map("content", InlineContent, "preserve_source", false)
 }

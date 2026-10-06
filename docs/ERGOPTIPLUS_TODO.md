@@ -2589,6 +2589,10 @@ The first owned Linux storage publication now prepares the configuration directo
 
 The Windows fresh-bootstrap control now reads the real autocorrection names record at its parent section and asserts its complete three-child shape, refusing the unrelated flattened-section lookup. Float timing, obsolete scalar, future data and read-only assertions are retained. This repairs the fixture consumer; native snapshot publication and fresh process qualification still require Windows CI.
 
+Shared shortcut scope planning now filters only proved neutral deletions beneath an obsolete scalar/array parent. Requested nondelete, ancestor and whole-parent replacements refuse before native IO or runtime changes. Ordinary saves keep obsolete source values until explicit cleanup. Portable current-owner controls preserve all original ordinary-save assertions; physical device and native runner acceptance remain pending.
+
+Windows scopes classify a freshly captured strict source through the existing canonical decoder and obsolete-key owner, then admit only neutral deletion intents beneath proved obsolete scalar/array parents. Nonneutral or ancestor collisions refuse before backup/runtime publication. The candidate is built from the same captured source through existing build-only admission, drift and late session fences. Eighteen registered native controls retain the original full test prefix; native execution is pending.
+
 - [~] **7.** Complete W2: seven-page first-run opt-in wizard, per-category
   recommended choices, consistent WebView behavior and genuine translations in
   21 locales. The tap-holds page lists each engine's recommended keys from the
@@ -3445,6 +3449,20 @@ The script-chord parameter domain now consumes each native owner's complete publ
 
 The failed native modifier-hold dashboard qualifier now loads canonical actual selection state and helper functions, preserving its editor subset and all original Writer/SQLite/Reader and displayed mean/maximum assertions. The unchanged old harness fails with a missing real helper after12 native and4 Apps checks; the corrected fixture passes all17 on LuaJIT and Lua5.4 against real private SQLite files. No dashboard/runtime/SQLite policy or original expected values change. This is software consumer qualification; physical typing, GUI and final CI remain separate.
 
+macOS provider identities now require a complete same-read native publication and checked close/JSON shape. Malformed, unavailable, partial or changed sources stay unjudged; valid empty local publications remain distinct from unavailable providers. Existing cloud refusal and custom names retain their contracts. The final AI branch is already integrated; complete model-row/order ownership and installed Hammerspoon acceptance remain open.
+
+Tap binding identities now come from complete actual native producer publications on all three drivers, retaining detached identity sets and unchanged boot ordering. Changed or withdrawn owners stay unjudged, retired getters read neutral, unrelated source bytes remain, and replacement refuses before native effects. Existing native callbacks and hotkey activation are preserved. Final AHK/native acceptance is still required.
+
+One shared fixed-domain constructor registry pins the actual native Tap and Script publication accessors. Replaced, withdrawn, fake or re-registered producers return unjudged without invoking replacement getters. Genuine old-accessor controls fail the new public consumer assertions. Complete remaining domain publication and native installation qualification remain open.
+
+macOS/Linux keyboard bindings now publish their actual complete contextual native inventory through the same authentic fixed-domain authority owner as Tap/Script. Unknown future data remain unjudged and source-preserved; obsolete known bindings read neutral and reject replacement before effects. Both Lua engines and genuine old-producer controls qualify the portable ownership contract. Windows keyboard catalogue publication remains explicit software work because its native four-group producer does not yet own the expanded chord domain.
+
+The existing real Storage GC fixture now returns its allocation frame before the original two collections. A receipt remains rooted while the first collection must release its weak owner, then the original token retirement assertions run. The genuine strong-owner-box mutation fails on both Lua engines. No extra collection, timing waiver or production change is added; full final-source Linux qualification remains separate.
+
+Archive-distro unit validation now provisions only measured LuaJIT/Python/curl requirements and verifies real luv/lfs ABI5.1 loading with candidates obtained from the canonical installer function. The unchanged full unit command runs as the ordinary CI user in an owned writable checkout copy. Actual Debian13 Docker execution passes9184/0 with the reviewed GC fixture; Fedora, Arch, Alpine and openSUSE remain unexecuted until manual CI. Existing --no-deps installation, release conditions and all other workflow fields remain unchanged. The earlier Arch first-install exit2 is still unclassified.
+
+The current Windows native read/write-exclusion and foreign TOML record-parent fixes are composed with the configuration document owner. Canonical source-span arguments keep their original positions; the native container-stop argument is appended, with a registered fourteen-assert combined lexer regression. Native-reader child fixtures discover and copy complete genuine modules through canonical source ownership; all original sixty-nine assertions and child effects remain. Local selected encoding and361 JS checks pass; native Windows execution remains required.
+
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
   The shared AHK override policy now writes an explicit recommended delay only
@@ -3950,6 +3968,14 @@ The actual Lua preference writer now preserves requested finite numeric header l
 
 Two Windows cleanup controls now compare their complete handwritten case-sensitive identity sets independently of unspecified native Map enumeration order. Exact cardinality, duplicate refusal and unique semantic section markers strengthen the checks; all original key identities, backup, unknown-data and case-twin assertions remain. Production discovery and cleanup policies are unchanged. Actual Windows execution remains pending CI.
 
+The shared writer now resolves root and section-relative dotted/inline scalar destinations through canonical source spans, including an absent bare inline member with an existing valid parent. Whole-image, typed intent, same-source backup/readback and finite-number admission retain refusal for collisions and ambiguous namespaces. LuaJIT explicitly refuses newly requested integers outside its exact integer range. The obsolete-parent preservation decision remains unchanged. Existing valid inline scope deletion is now checked positively; the original five refusal assertions retain a genuinely malformed duplicate-key subject. Native Windows and installed qualification remain separate.
+
+Shortcut scopes preserve source-proven obsolete scalar/array parents rather than deleting them to create a current subtree. Explicit unsafe descendant replacement raises a retained-parent collision with no native IO. This does not complete the separate Windows full-state obsolete-parent refusal or case-sensitive boot-map work.
+
+The real Windows recursive full-state collector now renders each semantic key segment with the canonical TOML key owner. Its configuration-only sparse adapter consumes the resulting exact semantic parts, preserving literal dots, empty/non-BMP keys and supplied case-sensitive map entries. Generic sparse API semantics remain unchanged. New registered actual-collector/full-save cases are appended; native execution is pending. Simultaneous case-twin boot maps and obsolete-parent full-state safe refusal remain separate software work.
+
+Windows scope recommendation/clear preserves source-classified obsolete values until explicit cleanup, including new external-source and late schema-session refusals. This covers the detached scope owner, not the still-open whole-state obsolete-parent refusal or unclassified table-array boundaries.
+
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
   historical CapsWord anchor »): its karabiner.json keeps an untagged historical
@@ -4211,7 +4237,7 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 78, macOS 110, Linux 81, each
+  drivers still build (current baseline: Windows 74, macOS 105, Linux 76, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
@@ -4597,8 +4623,9 @@ Windows workstation handoff (maintainer instruction, 2026-10-04):
 - [ ] Prepared shared menu packets in docs/handovers/2026-10-04-config-menus are unapplied. Verify their recorded dependencies/preimages, regenerate owner artifacts and qualify all affected drivers after any shared change.
 
 Partial dev handoff (2026-10-05): Metrics V3 is reviewed but unapplied.
-Delay needs the existing Windows timing setter exposed honestly; Wrap needs
-macOS refused-deletion durability before integration. Guidance is reviewed but
+The Windows timing prompt and macOS Wrap refusal transaction are implemented
+by 9bae9a340, with subsequent arity and finite-writer refinements. Their native
+and installed-device acceptance remains separate. Guidance is reviewed but
 blocked by those predecessors; Gesture mode has no complete test/generation
 qualification. Continue remaining families to the actual zero-site ratchet.
 These are implementation tasks; separate installed tray/input acceptance.
@@ -4634,6 +4661,14 @@ macOS missing-bundle and macOS/Linux empty installed-layout statuses now consume
 Custom-profile actions, saved-user-model children and Linux free-entry numeric tails now use shared ordered child declarations. Native action, prompt, save, disable and rollback owners remain in their drivers. Existing labels and handwritten caption/order corpora cover all 21 languages; the saved macOS My models capability has a truthful translated reason, while OS-specific child presentations explicitly hide. The compiler and availability report share one strict classifier; the unexplained-capability ledger preserves exactly 104 historical identities and rejects new debt even below the count ceiling. The owning scanner measures Windows81/macOS113/Linux84 remaining fixed native sites. Whole profile frames/list splicing and the other native families remain software work; native runner, packaging/install and physical menu acceptance remain separate qualifications.
 
 Default/custom profile headings and their custom boundary now consume two shared inert fragments on all three drivers. The composition guard follows executable native publication and retains clicked-child requirements; independent source-withdrawal, malformed header, mixed/real clicked orphan and old-loop controls remain red. All old callback bodies, native registry phases, conditional custom presence and 21 caption sets retain their behavior. Canonical generators retire exactly nine genuine native allocator sites, yielding Windows78/macOS110/Linux81. Complete ordered profile frames/list splicing and other scanner families remain software work; actual Windows/Hammerspoon and installed-device acceptance stay separate.
+
+Shared renderers now support ordered list/group child templates, direct unique row selectors and strict presence predicates. Narrow presentation-only refusal omits a wholly inert heading while retaining native data; callback, mixed, cyclic and clicked-row refusals remain strict. Category coverage follows the actual declared transitive include graph from executable native publication roots, with genuine malformed, foreign, withdrawn and clicked counterexamples. The API alone does not retire native allocator sites.
+
+The actual Windows CI profile-heading failures were caused by an unset native LLM_PROFILE_HOTKEY_LIMIT. The existing fixture now supplies the real nine-number-row protocol and restores the exact prior unset/value state. Every original assertion and heading withdrawal case remains. This is a fixture prerequisite; corrected native execution is pending the next manual CI.
+
+Whole profile frames now consume shared child templates on all three drivers, preserving each native registry phase, platform-specific creation order, paused macOS presentation and lazy per-application reads. Executable owner guards reject decorative/comment/qualified decoys. Canonical generators retire eleven additional allocator sites: Windows75/macOS106/Linux77 at this slice. Other native menu families and physical-device acceptance remain open. The previously recorded macOS Wrap refusal defect and Windows timing prompt are already implemented by 9bae9a340, with the later arity and finite-adapter corrections; neither is reimplemented.
+
+The existing model-picker providers now obtain their inert tail separator from the shared provider status declaration. Native callback/browser phases and platform-specific conditional presence remain unchanged. Actual canonical generators retire exactly one more allocator per driver, giving the current baseline Windows74/macOS105/Linux76. Existing labels retain all21 translations; remaining native families and device qualification are still open.
 
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
@@ -4820,7 +4855,7 @@ pass with all 21 locale catalogues. Full native CI remains required.
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 78, macOS 110 and Linux 81 rows are still built by the
+  Windows 74, macOS 105 and Linux 76 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). Read on
   2026-10-01, the sites are of four kinds, and three of them need the
   manifest to say more than it can today:
@@ -4881,8 +4916,8 @@ Windows workstation handoff (maintainer instruction, 2026-10-04):
 Partial dev handoff (2026-10-05): use the immutable resumed menu archive
 and its independent reviews; no saved packet qualifies an integrated feature.
 Complete the source steps under item 54, then native E2E/package/install and
-real-device menu acceptance. Keep the Windows timing UI and macOS Wrap refusal
-fix as explicit code work rather than unsupported-platform exceptions.
+real-device menu acceptance. The Windows timing UI and macOS Wrap refusal
+transaction are already implemented; retain their native acceptance steps.
 
 The composed 2026-10-05 source census is Windows 83, macOS 126 and Linux 93 after the additional three macOS Swipe sites are migrated. The canonical generator owns the 76 menu sections and the baseline generator owns this lower ceiling. Clicked mode children and the composed sensitivity heading are distinct proof edges; the latter does not claim the eighteen numeric native choices. Other fixed/native provider controls remain source work, so this item stays partial.
 
@@ -4899,6 +4934,10 @@ The missing layout-bundle status and empty installed-layout status rows have mov
 The custom-profile, saved-model and numeric-tail slices retire seven macOS and seven Linux fixed native sites from the preceding 81/120/91 census, yielding 81/113/84. This is a bounded migration using existing child-template APIs, not the complete ordered profile parent frame. The remaining scanner sites, native qualification and item38 device acceptance keep this item open.
 
 The shared profile heading fragments retire three genuine allocator sites per driver, from81/113/84 to78/110/81. Portable actual provider cases and all original assertions/corpora are retained. This bounded source migration does not close the remaining full profile frame, other menu families or item38 device validation.
+
+The ordered profile frame retires three Windows, four macOS and four Linux native allocator sites through the actual shared renderer. All old provider callbacks, main/close/lifecycle boundaries and prior independent corpus files remain. This slice baseline is75/106/77; whole remaining families and item38 acceptance are not completed.
+
+The fixed model-picker tail presentation is shared on all three drivers, retiring one authentic native allocator per platform. Current remaining baseline: Windows74/macOS105/Linux76. This does not classify remaining dynamic native builders as shared or close item38.
 
 - [~] **88.** **Partial: native prediction tooltip appearance.** Shared
   llm-line-style policy and the unchanged independent line corpus retain grey

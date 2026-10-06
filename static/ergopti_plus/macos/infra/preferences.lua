@@ -1326,6 +1326,15 @@ local function prepare_inline_updates(source, updates, root)
 			end
 		end
 	end
+	-- Only this owner's actual inline groups need the shared forwarding proof.
+	-- The publisher repeats ownership, span, value and native source checks.
+	local direct_parents = {}
+	if next(inline) ~= nil then
+		local direct_detail
+		direct_parents, direct_detail = TomlWriter.source_inline_scalar_parents(source.content or "", updates)
+		assert(direct_parents, direct_detail)
+	end
+
 	for _, row in ipairs(updates) do
 		local path = leaf_path(row.section, row.key)
 		local parent = row.section
@@ -1338,7 +1347,7 @@ local function prepare_inline_updates(source, updates, root)
 		end
 		if path == "llm.profiles.shortcuts" and type(row.value) == "table" and next(row.value) == nil then
 			-- An empty runtime dictionary owns no unknown profile leaves on disk.
-		elseif inline[parent] then
+		elseif inline[parent] and not direct_parents[parent] then
 			local candidate = candidates[parent] or clone_value(inline[parent].value)
 			candidates[parent] = candidate
 			local keys, target = parts(path:sub(#parent + 2)), candidate
@@ -1383,31 +1392,23 @@ function M.prepare_llm_updates(source, updates)
 	return prepare_inline_updates(source, updates, "llm")
 end
 
---- The assignment containers of [shortcuts] a write may replace when they
---- hold an older build's plain value: the Shortcuts scope owns both.
-M.SHORTCUT_CONTAINERS = { "keyboard", "tap_keys" }
+--- The existing native shortcut assignment-container owners.
+M.SHORTCUT_CONTAINERS = require("config_obsolete_parents").SHORTCUT_CONTAINERS
 
 --- Prepares declared shortcut leaves while preserving inline neighbors.
+--- Obsolete assignment parents stay on disk until explicit cleanup; only
+--- neutral descendant deletions can proceed without replacing their source.
 --- @param source table Classified source.
 --- @param updates table Owned leaf operations.
---- @param containers table|nil Assignment containers this write fills
----   (`keyboard`, `tap_keys`). A plain value an older build left there (`keyboard
----   = "…"`) would make every row below it unwritable, so the write replaces
----   it. Any other container, and every ordinary save (nil), leaves such a
----   value on disk for the config cleanup, which offers it.
+--- @param containers table|nil Existing native assignment-container owners;
+---   nil retains the unchanged ordinary preference-save route.
 --- @return table Prepared writer operations.
 function M.prepare_shortcut_updates(source, updates, containers)
-	local rows = {}
-	local decoded = TomlCodec.decode(source.content or "")
-	local section = type(decoded) == "table" and decoded.shortcuts or nil
-	for _, key in ipairs(type(section) == "table" and containers or {}) do
-		local value = section[key]
-		if value ~= nil and (type(value) ~= "table" or #value > 0) then
-			rows[#rows + 1] = { section = "shortcuts", key = key, delete = true }
-		end
+	if containers ~= nil then
+		local Parents = require("config_obsolete_parents")
+		updates = Parents.preserve(source.content or "", updates, Parents.shortcut_namespaces(containers))
 	end
-	for _, row in ipairs(prepare_inline_updates(source, updates, "shortcuts")) do rows[#rows + 1] = row end
-	return rows
+	return prepare_inline_updates(source, updates, "shortcuts")
 end
 
 --- Preserves obsolete order rows while admitting only owned order mutations.

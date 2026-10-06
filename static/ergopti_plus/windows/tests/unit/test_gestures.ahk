@@ -1026,3 +1026,144 @@ _GSBP_RetiredSettersBody() {
 }
 Test("Gestures: retired script parameter refuses both setter paths before ports (script-binding-identity)",
 	TestGestures_RetiredScriptSettersRefuse)
+
+; Uses the two actual compiled declarations, never a fixture's copied slot list.
+_GTKP_WithPublication(Body) {
+	global TAP_KEY_ORDER, TAP_KEY_SCANCODES, _TapKeyBindingPublication
+	PreviousPublication := IsSet(_TapKeyBindingPublication) ? _TapKeyBindingPublication : unset
+	try {
+		_TapKeyBindingPublication := ConfigBindingIdentityTapPublication(TAP_KEY_ORDER, TAP_KEY_SCANCODES)
+		Body.Call()
+	} finally _TapKeyBindingPublication := IsSet(PreviousPublication) ? PreviousPublication : unset
+}
+
+TestGestures_TapBindingCorpus() {
+	global _SharedDir, TAP_KEY_ORDER, TAP_KEY_SCANCODES
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\config_binding_identity\tap_vectors.json", "UTF-8"))
+	Catalogue := ConfigBindingIdentityTapPublication(TAP_KEY_ORDER, TAP_KEY_SCANCODES).Catalogue
+	AssertEqual(13, Corpus.Length, "independent handwritten tap identity corpus")
+	for Row in Corpus {
+		Expected := Type(Row["expected"]) == "String" ? Row["expected"] : Row["expected"] ? "current" : "retired"
+		AssertEqual(Expected, ConfigBindingIdentityTapStatus(Row["binding"], Catalogue), Row["name"])
+		AssertEqual("unjudged", ConfigBindingIdentityTapStatus(Row["binding"]), Row["name"] . ": unpublished")
+	}
+}
+Test("Gestures: tap bindings replay the independent actual-slot corpus (tap-binding-identity)",
+	TestGestures_TapBindingCorpus)
+
+TestGestures_TapPublicationIdentity() {
+	_GTKP_WithPublication(_GTKP_PublicationIdentityBody)
+}
+_GTKP_PublicationIdentityBody() {
+	global TAP_KEY_ORDER, TAP_KEY_SCANCODES, _TapKeyBindingPublication
+	OriginalOrder := TAP_KEY_ORDER
+	OriginalScans := TAP_KEY_SCANCODES
+	OriginalPublication := _TapKeyBindingPublication
+	OriginalScan := TAP_KEY_SCANCODES[TAP_KEY_ORDER[1]]
+	try {
+		Received := TomlConfigTapSlotCatalogue()
+		AssertEqual("tap_key__", Received["prefix"])
+		AssertEqual(TAP_KEY_ORDER.Length, Received["slots"].Count)
+		AssertEqual("On", Received["slots"].CaseSense)
+		Received["slots"].Delete(TAP_KEY_ORDER[1])
+		Received["slots"]["removed_tap_key"] := true
+		AssertEqual("current", TomlConfigParameterBindingStatus("tap_key__" . TAP_KEY_ORDER[1]))
+		AssertEqual("retired", TomlConfigParameterBindingStatus("tap_key__removed_tap_key"))
+		TAP_KEY_ORDER := OriginalOrder.Clone()
+		AssertEqual("unjudged", TomlConfigParameterBindingStatus("tap_key__removed_tap_key"))
+		TAP_KEY_ORDER := OriginalOrder
+		TAP_KEY_SCANCODES := OriginalScans.Clone()
+		AssertEqual("unjudged", TomlConfigParameterBindingStatus("tap_key__removed_tap_key"))
+		TAP_KEY_SCANCODES := OriginalScans
+		TAP_KEY_SCANCODES[TAP_KEY_ORDER[1]] := OriginalScan + 1000
+		AssertEqual("unjudged", TomlConfigParameterBindingStatus("tap_key__removed_tap_key"))
+		TAP_KEY_SCANCODES[TAP_KEY_ORDER[1]] := OriginalScan
+		_TapKeyBindingPublication := unset
+		AssertEqual("unjudged", TomlConfigParameterBindingStatus("tap_key__removed_tap_key"))
+		_TapKeyBindingPublication := OriginalPublication
+		AssertEqual("retired", TomlConfigParameterBindingStatus("tap_key__removed_tap_key"))
+		AssertEqual("unjudged", TomlConfigParameterBindingStatus("Tap_key__" . TAP_KEY_ORDER[1]))
+	} finally {
+		TAP_KEY_ORDER := OriginalOrder
+		TAP_KEY_SCANCODES := OriginalScans
+		TAP_KEY_SCANCODES[TAP_KEY_ORDER[1]] := OriginalScan
+		_TapKeyBindingPublication := OriginalPublication
+	}
+}
+Test("Gestures: tap publication binds both actual compiled source identities and scan values (tap-binding-identity)",
+	TestGestures_TapPublicationIdentity)
+
+TestGestures_TapPublicationRefusesMalformed() {
+	for Ids in [[], [""], ["same", "same"], ["nested__id"], [false]]
+		AssertThrows(ConfigBindingIdentityTapPublication.Bind(Ids, Map()), "invalid compiled tap declaration refuses")
+	Sparse := Array()
+	Sparse.Length := 2
+	Sparse[1] := "first"
+	AssertThrows(ConfigBindingIdentityTapPublication.Bind(Sparse, Map("first", 1)), "a sparse declaration is not complete")
+	for Scans in [Map(), Map("other", 1), Map("first", false), Map("first", "1"), Map("first", -1)]
+		AssertThrows(ConfigBindingIdentityTapPublication.Bind(["first"], Scans), "invalid actual scan owner refuses")
+	AssertThrows(ConfigBindingIdentityTapPublication.Bind(["first", "second"], Map("first", 1, "second", 1)),
+		"two IDs cannot borrow one scan identity")
+}
+Test("Gestures: malformed tap order and scan publications cannot prove retirement (tap-binding-identity)",
+	TestGestures_TapPublicationRefusesMalformed)
+
+TestGestures_TapLatePublicationRead() {
+	_GTKP_WithPublication(_GTKP_LatePublicationReadBody)
+}
+_GTKP_LatePublicationReadBody() {
+	global GestureActionParameters, _TapKeyBindingPublication, TAP_KEY_ORDER
+	PreviousParameters := GestureActionParameters
+	Publication := _TapKeyBindingPublication
+	try {
+		GestureActionParameters := Map()
+		GestureActionParameters.CaseSense := "On"
+		Retired := "tap_key__removed_tap_key__open_url"
+		Current := "tap_key__" . TAP_KEY_ORDER[1] . "__open_url"
+		GestureActionParameters[Retired] := "https://obsolete.example"
+		GestureActionParameters[Current] := "https://current.example"
+		_TapKeyBindingPublication := unset
+		AssertEqual("https://obsolete.example", GestureGetActionParameter("tap_key__removed_tap_key", "open_url"))
+		_TapKeyBindingPublication := Publication
+		AssertEqual("", GestureGetActionParameter("tap_key__removed_tap_key", "open_url"))
+		AssertEqual("https://current.example", GestureGetActionParameter("tap_key__" . TAP_KEY_ORDER[1], "open_url"))
+		AssertEqual("https://obsolete.example", GestureActionParameters[Retired], "a read cannot change the exact inverse snapshot")
+		_TapKeyBindingPublication := unset
+		AssertEqual("https://obsolete.example", GestureGetActionParameter("tap_key__removed_tap_key", "open_url"))
+	} finally {
+		GestureActionParameters := PreviousParameters
+		_TapKeyBindingPublication := Publication
+	}
+}
+Test("Gestures: late tap publication neutralizes reads without destroying exact runtime snapshots (tap-binding-identity)",
+	TestGestures_TapLatePublicationRead)
+
+TestGestures_RetiredTapSettersRefuse() {
+	_GTKP_WithPublication(_GTKP_RetiredSettersBody)
+}
+_GTKP_RetiredSettersBody() {
+	global GestureActionParameters
+	Previous := GestureActionParameters
+	Calls := []
+	Writer := (*) => (Calls.Push("writer"), false)
+	Notify := (*) => Calls.Push("notify")
+	try {
+		GestureActionParameters := Map()
+		GestureActionParameters.CaseSense := "On"
+		GestureActionParameters["Tap_key__removed_tap_key__open_url"] := "https://unjudged.example"
+		AssertFalse(GestureSetActionParameter("tap_key__removed_tap_key", "open_url", "https://must-not-write.example", Writer, Notify))
+		AssertEqual(0, Calls.Length)
+		AssertEqual(1, GestureActionParameters.Count)
+		Assignments := Map("number_row_left", "none")
+		Parameters := _GestureCloneActionParameters(GestureActionParameters)
+		Candidate := Map("has_value", true, "key", "tap_key__removed_tap_key__open_url", "value", "https://must-not-write.example")
+		AssertFalse(_GestureCommitAssignment(&Assignments, &Parameters, "shortcuts.tap_keys", "number_row_left", "open_url", Candidate, Writer, Notify))
+		AssertEqual(0, Calls.Length)
+		AssertEqual("none", Assignments["number_row_left"])
+		AssertEqual("https://unjudged.example", Parameters["Tap_key__removed_tap_key__open_url"])
+		Snapshot := _GestureCloneActionParameters(Map("tap_key__removed_tap_key__open_url", "https://inverse.example"))
+		AssertEqual("https://inverse.example", Snapshot["tap_key__removed_tap_key__open_url"], "exact inverse is separate from setter admission")
+	} finally GestureActionParameters := Previous
+}
+Test("Gestures: retired tap parameter refuses both setter paths before ports (tap-binding-identity)",
+	TestGestures_RetiredTapSettersRefuse)

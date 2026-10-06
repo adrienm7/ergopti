@@ -290,12 +290,42 @@ Test("preview index: the engine and the index share one pack enumeration (previe
 
 ; The live pack and its preview must identify the same parsed source without
 ; accidentally adopting bundled-category activation gates from that label.
-_PICR_LivePersonalProvenanceMatchesPreview(Label) {
+/** Compares independent native handles without granting path-alias authority. */
+_PICR_AssertSameNativeFile(ProvenanceExpectedPath, ProvenanceObservedPath) {
+	ProvenanceExpectedFile := 0
+	ProvenanceObservedFile := 0
+	try {
+		ProvenanceExpectedFile := FSOpenReadStrict(ProvenanceExpectedPath)
+		AssertTrue(IsObject(ProvenanceExpectedFile), "the independently authored source acquires a native handle")
+		ProvenanceObservedFile := FSOpenReadStrict(ProvenanceObservedPath)
+		AssertTrue(IsObject(ProvenanceObservedFile), "the catalogue's actual returned route acquires a native handle")
+		ProvenanceExpectedIdentity := FSHandleSnapshot(ProvenanceExpectedFile.Handle)
+		ProvenanceObservedIdentity := FSHandleSnapshot(ProvenanceObservedFile.Handle)
+		AssertTrue(ProvenanceExpectedIdentity.Get("ok", false), "the independent physical source identity is observable")
+		AssertTrue(ProvenanceObservedIdentity.Get("ok", false), "the returned route's physical source identity is observable")
+		for ProvenanceIdentityPart in ["volume", "index_high", "index_low", "size", "write_high", "write_low"]
+			AssertEqual(ProvenanceExpectedIdentity[ProvenanceIdentityPart], ProvenanceObservedIdentity[ProvenanceIdentityPart],
+				"the returned logical route must resolve to the independently authored physical file")
+	} finally {
+		try {
+			if IsObject(ProvenanceExpectedFile)
+				ProvenanceExpectedFile.Close()
+		} finally {
+			if IsObject(ProvenanceObservedFile)
+				ProvenanceObservedFile.Close()
+		}
+	}
+}
+
+
+_PICR_LivePersonalProvenanceMatchesPreview(Label, ProvenanceRouteMode := "temp") {
 	global ScriptInformation, _HotstringRegistrar, HSE_RegistryByGroup, HSE_SeqCounter, CategoryEnabled
 	Root := A_Temp . "\ergopti_picr_provenance_" . A_TickCount
 	DirCreate(Root)
 	DirCreate(Root . "\Équipe")
-	Path := Label == "rolls" ? Root . "\rolls.toml" : Root . "\Équipe\mémoire.toml"
+	ProvenanceLogicalRoot := ProvenanceRouteMode == "dot" ? Root . "\." : Root
+	ProvenanceRelativePath := Label == "rolls" ? "\rolls.toml" : "\Équipe\mémoire.toml"
+	Path := ProvenanceLogicalRoot . ProvenanceRelativePath
 	SavedRegistrar := _HotstringRegistrar
 	HadDirectory := ScriptInformation.Has("PersonalHotstringsDir")
 	SavedDirectory := ScriptInformation.Get("PersonalHotstringsDir", "")
@@ -307,10 +337,11 @@ _PICR_LivePersonalProvenanceMatchesPreview(Label) {
 			. '"plx" = { output = "Literal", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = true, is_case_sensitive_strict = true, priority = 81 }`n'
 			. '[[Other]]`n"pcx★" = { output = "Owned conform", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }`n'
 			. '"pex" = { output = "Explicit", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }`n', Path, "UTF-8")
-		; Native enumeration expands short directory aliases. Obtain the expected
-		; identity independently from Win32 before observing the catalogue owner.
+		; The logical route belongs to the caller. Resolve the independently created
+		; fixture first; matching file handles below proves its physical identity.
+		ProvenanceCanonicalRoot := FSResolveDirectoryPath(Root)
 		CanonicalPaths := []
-		for SourcePath in [Root, Path] {
+		for SourcePath in [ProvenanceCanonicalRoot, ProvenanceCanonicalRoot . ProvenanceRelativePath] {
 			CanonicalBuffer := Buffer(32768 * 2, 0)
 			CanonicalLength := DllCall("GetLongPathNameW", "Str", SourcePath,
 				"Ptr", CanonicalBuffer, "UInt", 32768, "UInt")
@@ -318,17 +349,23 @@ _PICR_LivePersonalProvenanceMatchesPreview(Label) {
 				"Win32 must resolve the existing fixture without truncation")
 			CanonicalPaths.Push(StrGet(CanonicalBuffer, CanonicalLength, "UTF-16"))
 		}
-		ScriptInformation["PersonalHotstringsDir"] := Root
+		ScriptInformation["PersonalHotstringsDir"] := ProvenanceLogicalRoot
 		Packs := HS_EnumeratePersonalExtFiles()
 		AssertEqual(1, Packs.Length, "the actual recursive owner enumerates exactly this personal source")
-		AssertEqual(CanonicalPaths[2], Packs[1]["Path"])
+		_PICR_AssertSameNativeFile(CanonicalPaths[2], Packs[1]["Path"])
+		SplitPath(Packs[1]["Path"], &ProvenanceObservedLeaf, &ProvenanceObservedDirectory)
+		AssertEqual(CanonicalPaths[2], FSResolveDirectoryPath(ProvenanceObservedDirectory) . "\" . ProvenanceObservedLeaf,
+			"native resolution of the actual returned route must retain the independently authored source")
+		if ProvenanceRouteMode == "dot"
+			AssertFalse(CanonicalPaths[2] == Path, "the real dot-root route differs from its independent canonical physical spelling")
+		AssertEqual(Path, Packs[1]["Path"], "live provenance must retain the exact supplied logical route")
 		AssertEqual(Label, Packs[1]["Label"], "the source label comes from the authoritative enumerator")
 		ScriptInformation["PersonalHotstringsDir"] := CanonicalPaths[1]
 		CanonicalPacks := HS_EnumeratePersonalExtFiles()
 		AssertEqual(1, CanonicalPacks.Length, "both native root spellings identify exactly one source")
 		AssertEqual(CanonicalPaths[2], CanonicalPacks[1]["Path"])
 		AssertEqual(Label, CanonicalPacks[1]["Label"], "root aliases preserve the hierarchical Unicode label")
-		ScriptInformation["PersonalHotstringsDir"] := Root
+		ScriptInformation["PersonalHotstringsDir"] := ProvenanceLogicalRoot
 		CategoryEnabled["Hotstrings"] := true
 		_HotstringRegistrar := 0
 		HSE_RegistryClear()
@@ -424,6 +461,8 @@ _PICR_LivePersonalProvenanceMatchesPreview(Label) {
 }
 Test("personal pack provenance: nested Unicode labels and parsed sections match real preview rows", (*) => _PICR_LivePersonalProvenanceMatchesPreview("Équipe / mémoire"))
 Test("personal pack provenance: bundled-label collisions preserve whole-file activation ownership", (*) => _PICR_LivePersonalProvenanceMatchesPreview("rolls"))
+Test("personal pack provenance: dot-root Unicode source retains logical route and native preview provenance", (*) => _PICR_LivePersonalProvenanceMatchesPreview("Équipe / mémoire", "dot"))
+Test("personal pack provenance: dot-root bundled-label collision retains logical route and native activation ownership", (*) => _PICR_LivePersonalProvenanceMatchesPreview("rolls", "dot"))
 
 
 _PICR_DescriptorCorpus() {

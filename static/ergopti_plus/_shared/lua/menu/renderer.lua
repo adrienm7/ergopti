@@ -603,13 +603,108 @@ function M.new(deps)
 	--- @param manifest_key string Owning shared child declaration.
 	--- @param commands table Native command owners.
 	--- @param getters table Native state and caption readers.
-	--- @param children table Native child data indexed by declared group identity.
+	--- @param children table Native group data and zero-argument list providers indexed by identity.
 	--- @return table|nil rows
 	local function template_rows(manifest_key, commands, getters, children, status_definition)
 		commands, getters, children = commands or {}, getters or {}, children or {}
 		local visiting = {}
-		local function collect(key)
+		local function native_children(key, id, provider)
+			local ok, supplied = false, nil
+			if type(provider) == "function" then ok, supplied = pcall(provider) end
+			local valid, count, maximum = ok and type(supplied) == "table", 0, 0
+			if valid then
+				for index, child in next, supplied do
+					count = count + 1
+					if type(index) ~= "number" or index % 1 ~= 0 or index < 1 then
+						valid = false
+					else
+						maximum = math.max(maximum, index)
+					end
+					if type(child) ~= "table" or rawget(child, "title") ~= nil
+						or rawget(child, "fn") ~= nil or rawget(child, "menu") ~= nil
+						or (rawget(child, "separator") ~= nil and type(rawget(child, "separator")) ~= "boolean")
+						or (rawget(child, "separator") ~= true and (type(rawget(child, "label")) ~= "string"
+							or rawget(child, "label") == "")) then valid = false end
+				end
+			end
+			if not valid or count ~= maximum then
+				Logger.error(LOG, "Invalid native child provider '%s.%s' — template rows refused.", key, tostring(id))
+				return nil
+			end
+			local canonical = {}
+			for index = 1, count do canonical[index] = rawget(supplied, index) end
+			return canonical
+		end
+		-- Omission is only for declared inert presentation; preflight before any getter or action.
+		local function inert_presentation(key, row_id, checking)
+			local declaration = get_menu_def(key)
+			if getmetatable(declaration) ~= nil then return false end
+			local count, maximum = 0, 0
+			for index in next, declaration do
+				if type(index) ~= "number" or index % 1 ~= 0 or index < 1 then return false end
+				count, maximum = count + 1, math.max(maximum, index)
+			end
+			if checking[key] or count == 0 or count ~= maximum then return false end
+			if row_id ~= nil then
+				local matches = 0
+				for _, item in ipairs(declaration) do
+					if type(item) == "table" and rawget(item, "id") == row_id then matches = matches + 1 end
+				end
+				if matches ~= 1 then return false end
+			end
+			checking[key] = true
+			for _, item in ipairs(declaration) do
+				if type(item) ~= "table" or getmetatable(item) ~= nil then return false end
+				local fields
+				if item.type == "include" then
+					fields = { type = true, section = true, row_id = true }
+					if type(item.section) ~= "string" or item.section == ""
+						or (item.row_id ~= nil and (type(item.row_id) ~= "string" or item.row_id == ""))
+						or not inert_presentation(item.section, item.row_id, checking) then return false end
+				elseif item.type == "---" then
+					fields = { type = true, platforms = true, unavailable = true }
+					if item.unavailable ~= nil and item.unavailable ~= "hide" then return false end
+				elseif item.type == "label" or item.type == "section_header" then
+					fields = { type = true, id = true, i18n = true, platforms = true, unavailable = true }
+					if type(item.i18n) ~= "string" or item.i18n == ""
+						or (item.id ~= nil and (type(item.id) ~= "string" or item.id == ""))
+						or (item.type == "label" and item.id == nil) then return false end
+					if item.type == "section_header" then
+						fields.reason_key = true
+						if item.unavailable ~= nil and item.unavailable ~= "hide" and item.unavailable ~= "grey" then return false end
+						if item.unavailable == "grey" and item.reason_key == nil then return false end
+						if item.reason_key ~= nil and (type(item.reason_key) ~= "string" or item.reason_key == ""
+							or item.unavailable == "hide") then return false end
+					elseif item.unavailable ~= nil and item.unavailable ~= "hide" then return false end
+				else return false end
+				for field in next, item do if not fields[field] then return false end end
+				if item.platforms ~= nil then
+					if type(item.platforms) ~= "table" or getmetatable(item.platforms) ~= nil then return false end
+					local seen, count, maximum = {}, 0, 0
+					for index, value in next, item.platforms do
+						if type(index) ~= "number" or index % 1 ~= 0 or index < 1
+							or (value ~= "ahk" and value ~= "hs" and value ~= "linux") or seen[value] then return false end
+						seen[value], count, maximum = true, count + 1, math.max(maximum, index)
+					end
+					if count == 0 or count ~= maximum then return false end
+				end
+			end
+			checking[key] = nil
+			return true
+		end
+		local function collect(key, row_id)
 			local declaration = status_definition or get_menu_def(key)
+			if row_id ~= nil then
+				local selected, matches = nil, 0
+				for _, item in ipairs(declaration) do
+					if item.id == row_id then selected, matches = item, matches + 1 end
+				end
+				if type(row_id) ~= "string" or row_id == "" or matches ~= 1 then
+					Logger.error(LOG, "Missing or ambiguous child-template row '%s.%s' — rows refused.", key, tostring(row_id))
+					return nil
+				end
+				declaration = { selected }
+			end
 			if visiting[key] or #declaration == 0 then
 				Logger.error(LOG, "Missing or cyclic child template '%s' — provider rows refused.", key)
 				return nil
@@ -617,12 +712,67 @@ function M.new(deps)
 			visiting[key] = true
 			local rows = {}
 			for _, item in ipairs(declaration) do
+				if item.on_refusal ~= nil and item.type ~= "include" then
+					Logger.error(LOG, "Invalid presentation omission policy in '%s' — rows refused.", key)
+					return nil
+				end
 				if is_for_platform(item) or (item.type == "section_header" and item.unavailable == "grey") then
 					local row
 					if item.type == "include" then
-						local included = type(item.section) == "string" and collect(item.section) or nil
-						if not included then return nil end
-						for _, child in ipairs(included) do rows[#rows + 1] = child end
+						local fields = { type = true, section = true, row_id = true, present_when = true, on_refusal = true }
+						local target = type(item.section) == "string" and get_menu_def(item.section) or {}
+						local omit = item.on_refusal == "omit_presentation"
+						local valid = type(item.section) == "string" and item.section ~= ""
+							and (item.on_refusal == nil or omit) and (omit or #target > 0)
+						for field in pairs(item) do if not fields[field] then valid = false end end
+						if item.row_id ~= nil then
+							local matches = 0
+							if type(item.row_id) ~= "string" or item.row_id == "" then
+								valid = false
+							elseif omit then
+								for _, child in next, target do
+									if type(child) == "table" and rawget(child, "id") == item.row_id then matches = matches + 1 end
+								end
+							else
+								for _, child in ipairs(target) do if child.id == item.row_id then matches = matches + 1 end end
+							end
+							valid = valid and type(item.row_id) == "string" and item.row_id ~= "" and matches == 1
+						end
+						if not valid then
+							Logger.error(LOG, "Invalid child-template include in '%s' — rows refused.", key)
+							return nil
+						end
+						local present = true
+						if item.present_when ~= nil then
+							local getter = type(item.present_when) == "string" and item.present_when ~= "" and getters[item.present_when]
+							local ok, value = false, nil
+							if type(getter) == "function" then ok, value = pcall(getter) end
+							if not ok or type(value) ~= "boolean" then
+								Logger.error(LOG, "Invalid child-template presence getter in '%s' — rows refused.", key)
+								return nil
+							end
+							present = value
+						end
+						local presentation_valid = not omit or inert_presentation(item.section, item.row_id, {})
+						if not presentation_valid then
+							Logger.error(LOG, "Invalid inert presentation include '%s' in '%s' — presentation omitted.", item.section, key)
+						elseif present then
+							local included = type(item.section) == "string" and collect(item.section, item.row_id) or nil
+							if not included then return nil end
+							for _, child in ipairs(included) do rows[#rows + 1] = child end
+						end
+					elseif item.type == "list" then
+						local fields = { type = true, id = true, platforms = true, unavailable = true }
+						for field in pairs(item) do
+							if not fields[field] then
+								Logger.error(LOG, "Invalid child-template list in '%s' — rows refused.", key)
+								return nil
+							end
+						end
+						local provider = type(item.id) == "string" and item.id ~= "" and children[item.id]
+						local supplied = native_children(key, item.id, provider)
+						if not supplied then return nil end
+						for _, child in ipairs(supplied) do rows[#rows + 1] = child end
 					elseif item.type == "---" then
 						row = { separator = true }
 					elseif status_definition and item.type == "label" then
@@ -665,8 +815,11 @@ function M.new(deps)
 					elseif item.type == "check" then
 						row = R.check_row(key, item.id, commands, getters)
 						if not row then return nil end
-					elseif item.type == "group" and type(children[item.id]) == "table" then
-						row = { label = i18n.get(item.i18n), items = children[item.id] }
+					elseif item.type == "group" and (type(children[item.id]) == "table" or type(children[item.id]) == "function") then
+						local items = children[item.id]
+						if type(items) == "function" then items = native_children(key, item.id, items) end
+						if not items then return nil end
+						row = { label = i18n.get(item.i18n), items = items }
 						if item.disabled_when ~= nil and R.resolve_disabled_when(key, item.id, getters) then
 							row.disabled = true
 							row.disabled_reason_key = item.disabled_reason_key

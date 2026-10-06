@@ -38,7 +38,7 @@ helpers.describe("Gesture actions fixture ownership", function()
 					if initial == "existing" then sentinel = {} end
 					for _, name in ipairs({ "modules.gestures.actions", "infra.notifications",
 						"adapters.timer_scheduler", "_generated.gesture_emit_actions",
-						"_generated.action_catalogue", "config_binding_identity", "hs", "hs.timer",
+						"_generated.action_catalogue", "config_binding_identity", "config_binding_publication", "config_keyboard_publication", "hs", "hs.timer",
 						"ui.menu.gesture_fixture_unrelated" }) do
 						package.loaded[name] = sentinel
 					end
@@ -50,8 +50,16 @@ helpers.describe("Gesture actions fixture ownership", function()
 					helpers.load_with_stubs = function(...)
 						local result = loader(...)
 						local identity = package.loaded["config_binding_identity"]
+						local publication = package.loaded["config_binding_publication"]
+						helpers.assert_type(publication, "table", "construction loads the real accessor authority")
+						helpers.assert_type(publication.owner_is_current, "function")
 						helpers.assert_type(identity, "table", "construction loads the real shared admission owner")
 						helpers.assert_type(identity.gesture_binding_fits, "function")
+						local keyboard = package.loaded["config_keyboard_publication"]
+						helpers.assert_type(keyboard, "table", "construction loads the real keyboard publication owner")
+						helpers.assert_type(keyboard.publish, "function")
+						helpers.assert_type(keyboard.current, "function")
+						helpers.assert_nil(keyboard.current(nil), "an absent native owner cannot publish a catalogue")
 						local catalogue = { prefix = "", slots = { tap_3 = true } }
 						helpers.assert_eq(identity.gesture_binding_fits("tap_3", catalogue), true)
 						helpers.assert_eq(identity.gesture_binding_fits("removed_slot", catalogue), false)

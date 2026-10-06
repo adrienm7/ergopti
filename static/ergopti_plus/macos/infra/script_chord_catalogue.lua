@@ -20,6 +20,7 @@
 --- ==============================================================================
 
 local M = {}
+local BindingPublication = require("config_binding_publication")
 
 local Paths        = require("infra.paths")
 local Json         = require("json")
@@ -73,6 +74,7 @@ end
 --- This accessor performs no IO or runtime initialization.
 --- @return table|nil catalogue
 function M.published_binding_catalogue()
+	if not BindingPublication.owner_is_current("script", "infra.script_chord_catalogue", M) then return nil end
 	if _binding_catalogue == nil then return nil end
 	local publication = { prefix = _binding_catalogue.prefix, slots = {} }
 	for id in pairs(_binding_catalogue.slots) do publication.slots[id] = true end
@@ -115,5 +117,7 @@ function M._reset()
 	_catalogue = nil
 	_binding_catalogue = nil
 end
+
+BindingPublication.register("script", "infra.script_chord_catalogue", M, M.published_binding_catalogue)
 
 return M

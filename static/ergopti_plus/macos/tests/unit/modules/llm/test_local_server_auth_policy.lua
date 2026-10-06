@@ -54,3 +54,38 @@ end)
 helpers.describe("Shared local discovery controller", function()
 	require("test.local_server_discovery_contract").run(read("tests/corpus/llm/local_server_discovery.json"), helpers)
 end)
+
+
+helpers.describe("Actual local catalogue publication acknowledgement", function()
+	for _, vector in ipairs({
+		{ name = "valid empty list", source = '{"server_order":[],"servers":{}}', published = true },
+		{ name = "wrong empty order object", source = '{"server_order":{},"servers":{}}', published = false },
+		{ name = "wrong empty descriptor array", source = '{"server_order":[],"servers":[]}', published = false },
+		{ name = "native-erased null order slot", source = '{"server_order":[null],"servers":{}}', published = false },
+		{ name = "malformed source", source = "{ malformed", published = false },
+		{ name = "unsupported optional authentication", source = '{"server_order":["independent"],"servers":{"independent":{"label":"Independent","base_url":"http://localhost:4321/v1","auth":"required"}}}', published = false },
+	}) do
+		helpers.it("(local-provider-publication) " .. vector.name, function()
+			helpers.with_stub_scope({ "modules.llm.local_servers", "infra.paths" }, function()
+				helpers.load_with_stubs("modules.llm.local_servers")
+				local owner_paths = require("infra.paths")
+				local original = owner_paths.shared_llm_path
+				local path = os.tmpname()
+				local file = assert(io.open(path, "wb")); assert(file:write(vector.source)); assert(file:close())
+				owner_paths.shared_llm_path = function(name)
+					if name == "local_servers.json" then return path end
+					return original(name)
+				end
+				local ok, err = xpcall(function()
+					package.loaded["modules.llm.local_servers"] = nil
+					local owner = require("modules.llm.local_servers")
+					helpers.assert_eq(owner.config_catalogue_published(), vector.published)
+					local source = assert(io.open(path, "rb")); local contents = source:read("*a"); assert(source:close())
+					helpers.assert_eq(contents, vector.source)
+				end, debug.traceback)
+				owner_paths.shared_llm_path = original; os.remove(path)
+				if not ok then error(err, 0) end
+			end)
+		end)
+	end
+end)

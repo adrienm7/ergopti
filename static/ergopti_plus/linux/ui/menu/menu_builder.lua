@@ -2192,115 +2192,118 @@ local function _build_llm(ctx)
 			end, opts)
 		end
 		local effective_label = effective
-		local rows = {
-			{
-				label = i18n_safe("menu.profiles.auto_detect"),
-				checked = ProfileSettings.get("auto_profile_for_model") == true,
-				action = function()
-					if not create_ready() then return false end
-					local current = ProfileSettings.get("auto_profile_for_model")
-					if type(current) ~= "boolean" or not create_ready() then return false end
-					local saved = ProfileSettings.set("auto_profile_for_model", not current, current_model)
-					if saved ~= true then return false end
-					refresh()
-					return true
-				end,
-			},
-			{ separator = true },
-		}
-		for _, row in ipairs(ManifestMenu.template_rows("llm_profile_builtin_heading", {}, {}, {}) or {}) do
-			rows[#rows + 1] = row
+		local active_builtin, user_profiles, seed
+		local function auto_profile()
+			if not create_ready() then return false end
+			local current = ProfileSettings.get("auto_profile_for_model")
+			if type(current) ~= "boolean" or not create_ready() then return false end
+			local saved = ProfileSettings.set("auto_profile_for_model", not current, current_model)
+			if saved ~= true then return false end
+			refresh()
+			return true
 		end
-		local active_builtin = nil
-		for _, profile in ipairs(ProfileSettings.list_built_in()) do
-			local profile_id = profile.id
-			-- The same label the action picker lists the profile under. _fill
-			-- appended the count to every label without {n}: "Basic — … 3 s".
-			local label = ProfileSettings.menu_label(profile, count)
-			if effective == profile_id then
-				effective_label = label
-				active_builtin = profile
-			end
-			rows[#rows + 1] = {
-				label = label,
-				checked = effective == profile_id,
-				action = function()
-					select_profile(profile_id)
-				end,
-			}
-		end
-
-		local user_profiles = ProfileSettings.list_user()
-		if #user_profiles > 0 then
-			for _, row in ipairs(ManifestMenu.template_rows("llm_profile_custom_heading", {}, {}, {}) or {}) do
-				rows[#rows + 1] = row
-			end
-		end
-		for _, profile in ipairs(user_profiles) do
-			local owned_profile = profile
-			local profile_id = profile.id
-			local label = profile.label
-			if effective == profile_id then effective_label = label end
-			local function child_ready()
-				if type(ProfileSettings.list_user) ~= "function" then return false end
-				local ok, current = pcall(ProfileSettings.list_user)
-				if not ok or type(current) ~= "table" then return false end
-				local matches = 0
-				for _, entry in ipairs(current) do
-					if entry.id == profile_id then matches = matches + 1 end
+		local function builtin_rows()
+			local rows = {}
+			for _, profile in ipairs(ProfileSettings.list_built_in()) do
+				local profile_id = profile.id
+				-- The same label the action picker lists the profile under. _fill
+				-- appended the count to every label without {n}: "Basic — … 3 s".
+				local label = ProfileSettings.menu_label(profile, count)
+				if effective == profile_id then
+					effective_label = label
+					active_builtin = profile
 				end
-				return matches == 1
-			end
-			rows[#rows + 1] = {
-				label = label,
-				items = ManifestMenu.template_rows("llm_custom_profile_controls", {
-					["llm_profile_use"] = function() return select_profile(profile_id) end,
-					["llm_profile_edit"] = function() return open_editor(owned_profile, false) end,
-					["llm_profile_delete"] = function()
-							local title = string.format(
-								i18n_safe("menu.profiles.delete_confirm_title"), label)
-							local confirmed
-							if type(ctx.confirm_profile_delete) == "function" then
-								confirmed = ctx.confirm_profile_delete(profile_id, label)
-							else
-								confirmed = ask_yes_no(
-									title,
-									i18n_safe("menu.profiles.delete_confirm_body"),
-									i18n_safe("button.delete"),
-									i18n_safe("button.cancel"))
-							end
-							if confirmed ~= true then return false end
-							local deleted = ProfileSettings.delete_user_profile(profile_id)
-							if deleted then refresh() end
-							return deleted
-						end,
-				}, {
-					["llm_custom_profile_active"] = function()
-						return ProfileSettings.effective_profile(current_model) == profile_id
+				rows[#rows + 1] = {
+					label = label,
+					checked = effective == profile_id,
+					action = function()
+						select_profile(profile_id)
 					end,
-					["llm_custom_profile_ready"] = child_ready,
-				}, {}) or {},
-			}
+				}
+			end
+			return rows
 		end
-
-		if active_builtin then
-			local seed = {
+		local function custom_present()
+			user_profiles = ProfileSettings.list_user()
+			return #user_profiles > 0
+		end
+		local function custom_rows()
+			local rows = {}
+			for _, profile in ipairs(user_profiles) do
+				local owned_profile = profile
+				local profile_id = profile.id
+				local label = profile.label
+				if effective == profile_id then effective_label = label end
+				local function child_ready()
+					if type(ProfileSettings.list_user) ~= "function" then return false end
+					local ok, current = pcall(ProfileSettings.list_user)
+					if not ok or type(current) ~= "table" then return false end
+					local matches = 0
+					for _, entry in ipairs(current) do
+						if entry.id == profile_id then matches = matches + 1 end
+					end
+					return matches == 1
+				end
+				rows[#rows + 1] = {
+					label = label,
+					items = ManifestMenu.template_rows("llm_custom_profile_controls", {
+						["llm_profile_use"] = function() return select_profile(profile_id) end,
+						["llm_profile_edit"] = function() return open_editor(owned_profile, false) end,
+						["llm_profile_delete"] = function()
+								local title = string.format(
+									i18n_safe("menu.profiles.delete_confirm_title"), label)
+								local confirmed
+								if type(ctx.confirm_profile_delete) == "function" then
+									confirmed = ctx.confirm_profile_delete(profile_id, label)
+								else
+									confirmed = ask_yes_no(
+										title,
+										i18n_safe("menu.profiles.delete_confirm_body"),
+										i18n_safe("button.delete"),
+										i18n_safe("button.cancel"))
+								end
+								if confirmed ~= true then return false end
+								local deleted = ProfileSettings.delete_user_profile(profile_id)
+								if deleted then refresh() end
+								return deleted
+							end,
+					}, {
+						["llm_custom_profile_active"] = function()
+							return ProfileSettings.effective_profile(current_model) == profile_id
+						end,
+						["llm_custom_profile_ready"] = child_ready,
+					}, {}) or {},
+				}
+			end
+			return rows
+		end
+		local function clone_present()
+			if not active_builtin then return false end
+			seed = {
 				label = effective_label .. " " .. i18n_safe("menu.profiles.copy_suffix"),
 				system_single = active_builtin.system_single,
 				system_multi_template = active_builtin.system_multi_template,
 				batch = active_builtin.batch == true,
 			}
-			rows[#rows + 1] = { separator = true }
-			local clone_row = ManifestMenu.command_row("llm_profile_commands", "llm_profile_clone",
-				{ llm_profile_clone = function() return open_editor(seed, true, { as_new = true }, true) end },
-				{ llm_profile_clone_ready = create_ready })
-			if clone_row then rows[#rows + 1] = clone_row end
+			return true
 		end
-		rows[#rows + 1] = { separator = true }
-		local create_row = ManifestMenu.command_row("llm_profile_commands", "llm_profile_create",
-			{ llm_profile_create = function() return open_editor(nil, true, nil, true) end },
-			{ llm_profile_create_ready = create_ready })
-		if create_row then rows[#rows + 1] = create_row end
+		local rows = ManifestMenu.template_rows("llm_profile_lua_frame", {
+			["llm_profile_auto_detect"] = auto_profile,
+			["llm_profile_clone"] = function() return open_editor(seed, true, { as_new = true }, true) end,
+			["llm_profile_create"] = function() return open_editor(nil, true, nil, true) end,
+		}, {
+			["llm_profile_recommendation_present"] = function() return false end,
+			["llm_profile_recommendation_paused"] = function() return false end,
+			["llm_profile_auto_detect_checked"] = function() return ProfileSettings.get("auto_profile_for_model") == true end,
+			["llm_profile_custom_present"] = custom_present,
+			["llm_profile_clone_present"] = clone_present,
+			["llm_profile_create_ready"] = create_ready,
+			["llm_profile_clone_ready"] = create_ready,
+		}, {
+			["llm_profile_builtin_rows"] = builtin_rows,
+			["llm_profile_custom_rows"] = custom_rows,
+		})
+		if not rows then return end
 		append_rendered_row(target, {
 			label = string.format(i18n_safe("menu.profiles.profile_label_prefix"), effective_label),
 			items = rows,
@@ -2521,7 +2524,11 @@ local function _build_llm(ctx)
 				end,
 			}
 		end
-		if #rows > 0 then rows[#rows + 1] = { separator = true } end
+		if #rows > 0 then
+			for _, row in ipairs(ManifestMenu.status_rows("llm_menu", "llm_models", "model_picker_tail") or {}) do
+				rows[#rows + 1] = row
+			end
+		end
 		local browser_row = ManifestMenu.command_row("llm_model_commands", "llm_browse_models", {
 			["llm_browse_models"] = function()
 				return ctx.webview.show("model_browser") == true

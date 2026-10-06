@@ -1,0 +1,67 @@
+[
+	{
+		"name": "left-current",
+		"binding": "tap_key__number_row_left",
+		"expected": true
+	},
+	{
+		"name": "right-one-current",
+		"binding": "tap_key__number_row_right_1",
+		"expected": true
+	},
+	{
+		"name": "right-two-current",
+		"binding": "tap_key__number_row_right_2",
+		"expected": true
+	},
+	{
+		"name": "removed-tap-retired",
+		"binding": "tap_key__removed_tap_key",
+		"expected": false
+	},
+	{
+		"name": "legacy-name-retired",
+		"binding": "tap_key__left",
+		"expected": false
+	},
+	{
+		"name": "exact-slot-case",
+		"binding": "tap_key__NUMBER_ROW_LEFT",
+		"expected": false
+	},
+	{
+		"name": "empty-tap-slot",
+		"binding": "tap_key__",
+		"expected": false
+	},
+	{
+		"name": "exact-prefix-case",
+		"binding": "Tap_key__number_row_left",
+		"expected": "unjudged"
+	},
+	{
+		"name": "keyboard-owner-unjudged",
+		"binding": "keyboard__removed_key",
+		"expected": "unjudged"
+	},
+	{
+		"name": "script-owner-unjudged",
+		"binding": "script__removed_key",
+		"expected": "unjudged"
+	},
+	{
+		"name": "remap-owner-unjudged",
+		"binding": "tap_hold__removed_key",
+		"expected": "unjudged"
+	},
+	{
+		"name": "combination-owner-unjudged",
+		"binding": "combination__removed_pair",
+		"expected": "unjudged"
+	},
+	{
+		"name": "bare-gesture-owner-unjudged",
+		"binding": "removed_gesture_slot",
+		"expected": "unjudged"
+	}
+]

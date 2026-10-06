@@ -40,6 +40,8 @@ local M = {}
 local Logger = require("logger.shim")
 local ConfigOutdated = require("config_outdated")
 local BindingIdentity = require("config_binding_identity")
+local KeyboardPublication = require("config_keyboard_publication")
+local BindingPublication = require("config_binding_publication")
 local Paths = require("infra.paths")
 local Timings = require("infra.timings")
 local Monotonic = require("infra.monotonic")
@@ -1262,6 +1264,15 @@ function M.split_action_parameter_key(key)
 end
 
 function M.get_action_parameter(binding, action_name)
+	if type(binding) == "string" and (binding:sub(1, 9) == "tap_key__" or binding:sub(1, 10) == "keyboard__") then
+		local fits, reason = M.action_parameter_binding_fits(binding)
+		if fits == false then
+			if _action_params[parameter_key(binding, action_name)] ~= nil then
+				ConfigOutdated.report({ CONFIG_SECTION_PARAMS, parameter_key(binding, action_name) }, reason, Logger)
+			end
+			return ""
+		end
+	end
 	return _action_params[parameter_key(binding, action_name)] or ""
 end
 
@@ -1323,12 +1334,18 @@ end
 --- @return boolean|nil fits
 --- @return string detail
 function M.action_parameter_binding_fits(binding)
+	if type(binding) == "string" and binding:sub(1, 10) == "keyboard__" then
+		local catalogue = KeyboardPublication.current(rawget(package.loaded, "modules.shortcuts.keyboard_shortcuts"))
+		return BindingIdentity.keyboard_binding_fits(binding, catalogue), BindingIdentity.RETIRED_KEYBOARD
+	end
+	if type(binding) == "string" and binding:sub(1, 9) == "tap_key__" then
+		local taps = rawget(package.loaded, "modules.shortcuts.tap_keys")
+		local catalogue = BindingPublication.current("tap", "modules.shortcuts.tap_keys", taps)
+		return BindingIdentity.tap_binding_fits(binding, catalogue), BindingIdentity.RETIRED_TAP
+	end
 	if type(binding) == "string" and binding:sub(1, 8) == "script__" then
-		local chords = package.loaded["modules.shortcuts.script_chords"]
-		local catalogue
-		if type(chords) == "table" and type(chords.published_binding_catalogue) == "function" then
-			catalogue = chords.published_binding_catalogue()
-		end
+		local chords = rawget(package.loaded, "modules.shortcuts.script_chords")
+		local catalogue = BindingPublication.current("script", "modules.shortcuts.script_chords", chords)
 		return BindingIdentity.script_binding_fits(binding, catalogue), BindingIdentity.RETIRED_SCRIPT
 	end
 	return BindingIdentity.gesture_binding_fits(binding, parameter_binding_catalogue), BindingIdentity.RETIRED_GESTURE

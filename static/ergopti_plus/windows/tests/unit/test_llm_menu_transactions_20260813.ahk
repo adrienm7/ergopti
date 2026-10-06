@@ -120,13 +120,18 @@ _LMT_Notify(Message, Options) {
 }
 
 _LMT_InstallFixture() {
-	global Features, _LLM_Menu, ConfigurationFile
+	global Features, _LLM_Menu, ConfigurationFile, LLM_PROFILE_HOTKEY_LIMIT
 	global _LMT_WriterResult, _LMT_WriterCalls, _LMT_ApplyCalls
 	global _LMT_WriterCritical, _LMT_ApplyCritical, _LMT_LiveAtWrite
 	global _LMT_ConfigPath, _LMT_PrepareResult, _LMT_PrepareCalls
 	global _LMT_PublishCalls, _LMT_Events
 	Previous := Map("features", Features, "menu", _LLM_Menu,
-		"path", ConfigurationFile, "test_state", _LMT_CaptureFixtureState())
+		"path", ConfigurationFile, "test_state", _LMT_CaptureFixtureState(),
+		"had_profile_limit", IsSet(LLM_PROFILE_HOTKEY_LIMIT))
+	if IsSet(LLM_PROFILE_HOTKEY_LIMIT)
+		Previous["profile_limit"] := LLM_PROFILE_HOTKEY_LIMIT
+	; The actual profile provider needs the number-row protocol even in a cold fixture.
+	LLM_PROFILE_HOTKEY_LIMIT := 9
 	_LMT_ConfigPath := A_Temp . "\ergopti_llm_menu_transaction.toml"
 	ConfigurationFile := _LMT_ConfigPath
 	Features := _LMT_Features()
@@ -145,10 +150,11 @@ _LMT_InstallFixture() {
 }
 
 _LMT_RestoreFixture(Previous) {
-	global Features, _LLM_Menu, ConfigurationFile
+	global Features, _LLM_Menu, ConfigurationFile, LLM_PROFILE_HOTKEY_LIMIT
 	Features := Previous["features"]
 	_LLM_Menu := Previous["menu"]
 	ConfigurationFile := Previous["path"]
+	LLM_PROFILE_HOTKEY_LIMIT := Previous["had_profile_limit"] ? Previous["profile_limit"] : unset
 	_LMT_RestoreFixtureState(Previous["test_state"])
 }
 
@@ -2832,3 +2838,127 @@ _LMT_ProfileHeadingsEmptyRegistry() {
 	}
 }
 Test("LLM profile headings: empty native registry never materializes custom heading or boundary", _LMT_ProfileHeadingsEmptyRegistry)
+
+; The two shared frame orders surround actual native profile data and callbacks.
+_LMT_FrameAt(Rows, Label) {
+	for Index, Row in Rows
+		if Row.Has("label") && Row["label"] == Label
+			return Index
+	return 0
+}
+_LMT_ProfileFrameNativeOrder(Empty := false) {
+	global _LLM_Menu, _SharedDir, LLM_PROFILE_BUILTIN_ORDER, _LMT_WriterCalls, _LMT_ApplyCalls
+	Previous := _LMT_InstallFixture()
+	Built := false
+	try {
+		_LLM_Menu["profile_id"] := Empty ? "user_one" : "basic"
+		if Empty
+			_LLM_Menu["user_profiles"] := []
+		Rows := _LLM_Menu_ProfileRows()
+		Assert(Rows is Array, "real native profile frame must materialize")
+		AssertEqual(t("menu.profiles.header_default_profiles"), Rows[1]["label"])
+		AssertTrue(Rows[1]["disabled"])
+		AssertFalse(Rows[1].Has("action"))
+		for Index, Id in LLM_PROFILE_BUILTIN_ORDER {
+			Row := Rows[Index + 1]
+			AssertTrue(InStr(Row["label"], LLM_Menu_GetProfileLabel(Id)) == 1, "unchanged native catalogue order and hint ownership")
+			AssertEqual(Id == _LLM_Menu["profile_id"], Row["checked"])
+			AssertTrue(HasMethod(Row["action"], "Call"))
+		}
+		Create := _LMT_FrameAt(Rows, t("menu.profiles.create_profile"))
+		Clone := _LMT_FrameAt(Rows, t("menu.profiles.clone_builtin"))
+		Auto := _LMT_FrameAt(Rows, t("menu.profiles.auto_detect"))
+		Apps := _LMT_FrameAt(Rows, t("menu.profiles.per_app_overrides"))
+		AssertTrue(Create > 1 && Auto > Create && Apps > Auto, "independent Windows Create/Clone then automatic-profile then per-app order")
+		AssertTrue(Rows[Create - 1].Get("separator", false))
+		AssertTrue(Rows[Auto - 1].Get("separator", false))
+		AssertTrue(Rows[Apps - 1].Get("separator", false))
+		AssertTrue(Rows[Apps]["items"] is Array && Rows[Apps]["items"].Length > 0, "actual native per-app child provider is retained")
+		if Empty {
+			AssertEqual(0, Clone, "custom active profile has no builtin clone")
+			AssertEqual(0, _LMT_FrameAt(Rows, t("menu.profiles.header_custom_profiles")))
+		} else {
+			Custom := _LMT_FrameAt(Rows, t("menu.profiles.header_custom_profiles"))
+			AssertEqual(LLM_PROFILE_BUILTIN_ORDER.Length + 3, Custom, "custom heading follows the complete native catalogue and its separator")
+			AssertTrue(Rows[Custom - 1]["separator"])
+			AssertTrue(InStr(Rows[Custom + 1]["label"], "Live label") == 1)
+			AssertEqual(Create + 1, Clone, "Windows clone stays beside Create, without a Lua-only clone boundary")
+		}
+		AssertEqual(_LLM_Menu["auto_profile_for_model"], Rows[Auto]["checked"])
+		Built := LLM_Menu_BuildProfileMenu()
+		State := DllCall("GetMenuState", "ptr", Built.Handle, "uint", 0, "uint", 0x400, "uint")
+		AssertTrue(State != 0xFFFFFFFF && (State & 3) != 0, "actual Win32 menu consumes the inert frame header")
+		AssertTrue(_LMT_ShowAllPosition(Built, t("menu.profiles.per_app_overrides")) > 0)
+		AssertEqual(0, _LMT_WriterCalls)
+		AssertEqual(0, _LMT_ApplyCalls)
+	} finally {
+		if Built is Menu
+			_CTC_ReleaseMenu(Built)
+		_LMT_RestoreFixture(Previous)
+	}
+}
+Test("complete profile frame: actual Windows custom-builtin frame and native menu", _LMT_ProfileFrameNativeOrder.Bind(false))
+Test("complete profile frame: actual Windows empty registry and conditional clone", _LMT_ProfileFrameNativeOrder.Bind(true))
+
+_LMT_ProfileFrameMutation(Mode) {
+	global _LLM_Menu, _LMT_WriterCalls, _LMT_ApplyCalls
+	Root := _MR_GetManifestRoot()
+	Saved := Root["llm_profile_windows_frame"]
+	Previous := _LMT_InstallFixture()
+	try {
+		_LLM_Menu["profile_id"] := "basic"
+		Changed := []
+		for Row in Saved
+			Changed.Push(Row.Clone())
+		Root["llm_profile_windows_frame"] := Changed
+		if Mode == "order" {
+			First := Changed[1]
+			Changed[1] := Changed[5]
+			Changed[5] := First
+		} else if Mode == "missing"
+			Root.Delete("llm_profile_windows_frame")
+		else if Mode == "list"
+			Changed[2]["id"] := "unowned_native_slot"
+		else if Mode == "presence"
+			Changed[3]["present_when"] := "unowned_presence"
+		else if Mode == "selector"
+			Changed[5]["row_id"] := "missing"
+		Rows := _LLM_Menu_ProfileRows()
+		if Mode == "order" {
+			Assert(Rows is Array)
+			AssertEqual(t("menu.profiles.create_profile"), Rows[1]["label"], "actual provider consumes shared frame ordering")
+		} else
+			AssertEqual(false, Rows, "missing policy/native binding cannot fabricate a valid frame")
+		AssertEqual(0, _LMT_WriterCalls)
+		AssertEqual(0, _LMT_ApplyCalls)
+	} finally {
+		Root["llm_profile_windows_frame"] := Saved
+		_LMT_RestoreFixture(Previous)
+	}
+}
+for Mode in ["order", "missing", "list", "presence", "selector"]
+	Test("complete profile frame: actual source mutation " . Mode, _LMT_ProfileFrameMutation.Bind(Mode))
+
+_LMT_ProfileFrameHeldDeclaration(Command) {
+	global _LLM_Menu, _LMT_WriterCalls, _LMT_ApplyCalls
+	Root := _MR_GetManifestRoot()
+	Previous := _LMT_InstallFixture()
+	Section := Command == "auto_detect" ? "llm_profile_auto_detect_control" : "llm_profile_commands"
+	Saved := Root[Section]
+	try {
+		_LLM_Menu["profile_id"] := "basic"
+		Rows := _LLM_Menu_ProfileRows()
+		Label := Command == "auto_detect" ? "menu.profiles.auto_detect" : Command == "create" ? "menu.profiles.create_profile" : "menu.profiles.clone_builtin"
+		Index := _LMT_FrameAt(Rows, t(Label))
+		AssertTrue(Index > 0, "actual declared command must be retained before withdrawal")
+		Root.Delete(Section)
+		AssertEqual(false, Rows[Index]["action"].Call(), "retained action refuses a withdrawn canonical declaration before dialog or publication")
+		AssertEqual(0, _LMT_WriterCalls)
+		AssertEqual(0, _LMT_ApplyCalls)
+	} finally {
+		Root[Section] := Saved
+		_LMT_RestoreFixture(Previous)
+	}
+}
+for Command in ["create", "clone", "auto_detect"]
+	Test("complete profile frame: held native owner declaration withdrawal " . Command, _LMT_ProfileFrameHeldDeclaration.Bind(Command))
