@@ -35,9 +35,13 @@ global HSE_RepeatEnabled := true
 ; This is the production boot dependency order: canonical config helpers,
 ; feature state, then the later-declared category-key normalizer.
 #Include ..\..\adapters\file_system.ahk
+#Include ..\..\adapters\key_state.ahk
 #Include ..\..\infra\toml\toml_helpers.ahk
 #Include ..\..\infra\manifest_reader.ahk
 #Include ..\..\infra\feature_state.ahk
+; A second ordinary include must not reset the already published data owner.
+TapKeyAssignments["feature_state_include_once_probe"] := "none"
+#Include ..\..\infra\tap_keys.ahk
 #Include ..\..\infra\config_io.ahk
 #Include ..\..\infra\first_boot.ahk
 
@@ -46,6 +50,8 @@ try {
 			&& !(A_Args.Length == 2 && A_Args[1] == "persisted_semantic"))
         throw Error("expected exactly one startup fixture name")
     switch A_Args[1] {
+		case "tap_binding_publication":
+			_FeatureStateSmokeTapBindingPublication()
 		case "persisted_semantic":
 			_FeatureStateSmokePersistedSemantic(A_Args[2])
         case "distance_gate":
@@ -383,4 +389,23 @@ _FeatureStateSmokeScriptBindingPublication() {
 	}
 	if ConfigBindingIdentityScriptStatus("script__removed_script_slot", Catalogue) != "retired"
 		throw Error("The compiled publication did not judge an obsolete native script identity")
+}
+
+; Actual feature-state publication precedes configuration readers in this child.
+_FeatureStateSmokeTapBindingPublication() {
+	global TAP_KEY_ORDER, TAP_KEY_SCANCODES, _TapKeyBindingPublication, TapKeyAssignments
+	if !TapKeyAssignments.Has("feature_state_include_once_probe")
+		throw Error("An ordinary repeated include reinitialized the data owner")
+	if _TapKeyBindingPublication.Source != TAP_KEY_ORDER || _TapKeyBindingPublication.ScanSource != TAP_KEY_SCANCODES
+		throw Error("The compiled tap publication lost its actual source identities")
+	Catalogue := _TapKeyBindingPublication.Catalogue
+	if Catalogue["prefix"] !== "tap_key__" || Catalogue["slots"].Count != TAP_KEY_ORDER.Length
+		|| Catalogue["slots"].CaseSense != "On"
+		throw Error("The compiled tap publication is not a complete case-exact domain")
+	for Slot in TAP_KEY_ORDER {
+		if !Catalogue["slots"].Has(Slot) || _TapKeyBindingPublication.Scans[Slot] != TAP_KEY_SCANCODES[Slot]
+			throw Error("The actual scan and order declaration diverged")
+	}
+	if ConfigBindingIdentityTapStatus("tap_key__removed_tap_key", Catalogue) != "retired"
+		throw Error("The actual startup publication cannot identify a retired tap key")
 }

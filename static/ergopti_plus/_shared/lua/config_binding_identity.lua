@@ -15,6 +15,7 @@ local M = {}
 --- Detail shared by readers and cleanup for a retired gesture binding.
 M.RETIRED_GESTURE = "no gesture slot of this build has this name"
 M.RETIRED_SCRIPT = "no script chord slot of this build has this name"
+M.RETIRED_TAP = "no number-row tap key of this build has this name"
 
 --- Judges a binding only when its native gesture catalogue is published.
 --- The owner supplies its actual complete slot ids, never an inferred empty
@@ -55,6 +56,39 @@ function M.script_binding_fits(binding, catalogue)
 		"config_binding_identity: invalid published script catalogue")
 	assert(type(catalogue.slots) == "table" and next(catalogue.slots) ~= nil,
 		"config_binding_identity: invalid published script catalogue")
+	return M.gesture_binding_fits(binding, catalogue)
+end
+
+--- Builds the identity projection of the actual complete native tap-key source.
+--- Native owners acknowledge their own read/close and platform keycodes first.
+--- @param keys table Nonempty dense native array of key records.
+--- @return table catalogue Detached qualified identity projection.
+function M.tap_binding_catalogue(keys)
+	assert(type(keys) == "table" and getmetatable(keys) == nil and next(keys) ~= nil,
+		"config_binding_identity: invalid native tap-key catalogue")
+	local slots, count = {}, 0
+	for index, key in next, keys do
+		assert(type(index) == "number" and index >= 1 and index % 1 == 0
+			and type(key) == "table" and getmetatable(key) == nil and type(key.id) == "string" and key.id ~= ""
+			and not key.id:find("__", 1, true) and slots[key.id] == nil,
+			"config_binding_identity: invalid native tap-key catalogue")
+		slots[key.id], count = true, count + 1
+	end
+	for index = 1, count do
+		assert(rawget(keys, index) ~= nil, "config_binding_identity: invalid native tap-key catalogue")
+	end
+	return { prefix = "tap_key__", slots = slots }
+end
+
+--- Judges only the tap-key domain after an acknowledged native publication.
+--- @param binding any Native binding identity.
+--- @param catalogue table|nil Complete native publication, never assignments.
+--- @return boolean|nil fits
+function M.tap_binding_fits(binding, catalogue)
+	if catalogue == nil then return nil end
+	assert(type(catalogue) == "table" and catalogue.prefix == "tap_key__"
+		and type(catalogue.slots) == "table" and next(catalogue.slots) ~= nil,
+		"config_binding_identity: invalid published tap-key catalogue")
 	return M.gesture_binding_fits(binding, catalogue)
 end
 

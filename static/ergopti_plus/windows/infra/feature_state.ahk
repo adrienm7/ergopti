@@ -85,6 +85,9 @@ _FeatureStateDefaultsForSection(Section) {
 ; modifies, which names the chord hotkeys and the GetKeyState double-check
 ; guarding against AltGr+Enter pause-bug-style misfires.
 #Include ../../_shared/ahk/config_binding_identity.ahk
+; Bring the compiled data owner forward, without running its later config read.
+#Include %A_LineFile%\..\tap_keys.ahk
+global _TapKeyBindingPublication := ConfigBindingIdentityTapPublication(TAP_KEY_ORDER, TAP_KEY_SCANCODES)
 global SCRIPT_SHORTCUT_SLOTS := [
 		"script_altgr_enter",
 		"script_altgr_backspace",
