@@ -1,0 +1,240 @@
+{
+	"schema": 1,
+	"scope": "new low-level confirmed-source/currentness path only; independent handwritten expectations frozen before implementation",
+	"input_corpus": "tools/diagnostics/fixtures/karabiner-legacy-cleanup-acceptance.json",
+	"input_corpus_sha256": "de9e1b6a6f05e222634b3d2c5b5d7c52048f3773de2d74059b535db7b7927ffb",
+	"input_variants": {
+		"original_plus_whitespace": {
+			"base_ref": "original",
+			"append": "\n "
+		}
+	},
+	"case_ids": [
+		"confirmed_remove",
+		"confirmed_noop",
+		"confirmed_raw_changed_before_read",
+		"owner_stale_before_read",
+		"owner_stale_after_read",
+		"owner_stale_before_backup",
+		"owner_stale_after_backup",
+		"owner_callback_raises",
+		"owner_callback_nontrue",
+		"confirmed_invalid_json",
+		"confirmed_absent_destination",
+		"confirmed_destination_changed_after_backup"
+	],
+	"cases": [
+		{
+			"id": "confirmed_remove",
+			"initial_ref": "original",
+			"confirmed_ref": "original",
+			"interleaving": "current",
+			"expect": {
+				"ok": true,
+				"detail": "removed",
+				"removed": 2,
+				"backup_files": 1,
+				"publication_calls": 1,
+				"destination_ref": "expected_retained",
+				"backup_ref": "original",
+				"backup_returned": true
+			},
+			"extra_witness": "actual raw JSON/filesystem behavior; no modeled success return"
+		},
+		{
+			"id": "confirmed_noop",
+			"initial_ref": "expected_retained",
+			"confirmed_ref": "expected_retained",
+			"interleaving": "current",
+			"expect": {
+				"ok": true,
+				"detail": "unchanged",
+				"removed": 0,
+				"backup_files": 0,
+				"publication_calls": 0,
+				"destination_ref": "expected_retained",
+				"backup_ref": null,
+				"backup_returned": false
+			},
+			"extra_witness": "actual raw JSON/filesystem behavior; no modeled success return"
+		},
+		{
+			"id": "confirmed_raw_changed_before_read",
+			"initial_ref": "original_plus_whitespace",
+			"confirmed_ref": "original",
+			"interleaving": "current",
+			"expect": {
+				"ok": false,
+				"detail": "legacy-confirmation-source-changed",
+				"removed": 0,
+				"backup_files": 0,
+				"publication_calls": 0,
+				"destination_ref": "original_plus_whitespace",
+				"backup_ref": null,
+				"backup_returned": false
+			},
+			"extra_witness": "actual raw JSON/filesystem behavior; no modeled success return"
+		},
+		{
+			"id": "owner_stale_before_read",
+			"initial_ref": "original",
+			"confirmed_ref": "original",
+			"interleaving": "expired_before_read",
+			"expect": {
+				"ok": false,
+				"detail": "legacy-confirmation-expired",
+				"removed": 0,
+				"backup_files": 0,
+				"publication_calls": 0,
+				"destination_ref": "original",
+				"backup_ref": null,
+				"backup_returned": false
+			},
+			"extra_witness": "actual destination adapter read must not be called"
+		},
+		{
+			"id": "owner_stale_after_read",
+			"initial_ref": "original",
+			"confirmed_ref": "original",
+			"interleaving": "expire_after_actual_destination_read",
+			"expect": {
+				"ok": false,
+				"detail": "legacy-confirmation-expired",
+				"removed": 0,
+				"backup_files": 0,
+				"publication_calls": 0,
+				"destination_ref": "original",
+				"backup_ref": null,
+				"backup_returned": false
+			},
+			"extra_witness": "actual boundary must be reached before owner is invalidated"
+		},
+		{
+			"id": "owner_stale_before_backup",
+			"initial_ref": "original",
+			"confirmed_ref": "original",
+			"interleaving": "expire_after_actual_classification",
+			"expect": {
+				"ok": false,
+				"detail": "legacy-confirmation-expired",
+				"removed": 0,
+				"backup_files": 0,
+				"publication_calls": 0,
+				"destination_ref": "original",
+				"backup_ref": null,
+				"backup_returned": false
+			},
+			"extra_witness": "actual boundary must be reached before owner is invalidated"
+		},
+		{
+			"id": "owner_stale_after_backup",
+			"initial_ref": "original",
+			"confirmed_ref": "original",
+			"interleaving": "expire_after_actual_backup_readback",
+			"expect": {
+				"ok": false,
+				"detail": "legacy-confirmation-expired",
+				"removed": 0,
+				"backup_files": 1,
+				"publication_calls": 0,
+				"destination_ref": "original",
+				"backup_ref": "original",
+				"backup_returned": true
+			},
+			"extra_witness": "actual boundary must be reached before owner is invalidated"
+		},
+		{
+			"id": "owner_callback_raises",
+			"initial_ref": "original",
+			"confirmed_ref": "original",
+			"interleaving": "callback_raises",
+			"expect": {
+				"ok": false,
+				"detail": "legacy-confirmation-expired",
+				"removed": 0,
+				"backup_files": 0,
+				"publication_calls": 0,
+				"destination_ref": "original",
+				"backup_ref": null,
+				"backup_returned": false
+			},
+			"extra_witness": "actual destination adapter read must not be called"
+		},
+		{
+			"id": "owner_callback_nontrue",
+			"initial_ref": "original",
+			"confirmed_ref": "original",
+			"interleaving": "callback_returns_one",
+			"expect": {
+				"ok": false,
+				"detail": "legacy-confirmation-expired",
+				"removed": 0,
+				"backup_files": 0,
+				"publication_calls": 0,
+				"destination_ref": "original",
+				"backup_ref": null,
+				"backup_returned": false
+			},
+			"extra_witness": "actual destination adapter read must not be called"
+		},
+		{
+			"id": "confirmed_invalid_json",
+			"initial_ref": "invalid_original",
+			"confirmed_ref": "invalid_original",
+			"interleaving": "current",
+			"expect": {
+				"ok": false,
+				"detail": "prefix:karabiner.json is not valid JSON:",
+				"removed": 0,
+				"backup_files": 0,
+				"publication_calls": 0,
+				"destination_ref": "invalid_original",
+				"backup_ref": null,
+				"backup_returned": false
+			},
+			"extra_witness": "actual raw JSON/filesystem behavior; no modeled success return"
+		},
+		{
+			"id": "confirmed_absent_destination",
+			"initial_ref": "absent",
+			"confirmed_ref": "original",
+			"interleaving": "current",
+			"expect": {
+				"ok": false,
+				"detail": "legacy-confirmation-source-changed",
+				"removed": 0,
+				"backup_files": 0,
+				"publication_calls": 0,
+				"destination_ref": "absent",
+				"backup_ref": null,
+				"backup_returned": false
+			},
+			"extra_witness": "actual raw JSON/filesystem behavior; no modeled success return"
+		},
+		{
+			"id": "confirmed_destination_changed_after_backup",
+			"initial_ref": "original",
+			"confirmed_ref": "original",
+			"interleaving": "current_external_write_before_actual_CAS",
+			"expect": {
+				"ok": false,
+				"detail": "prefix:karabiner.json publication refused:",
+				"removed": 0,
+				"backup_files": 1,
+				"publication_calls": 1,
+				"destination_ref": "foreign_edit",
+				"backup_ref": "original",
+				"backup_returned": true
+			},
+			"extra_witness": "actual raw JSON/filesystem behavior; no modeled success return"
+		}
+	],
+	"authority": {
+		"physical_input": "unexecuted",
+		"user_backup": "unavailable",
+		"ui_confirmation": "unexecuted",
+		"lease_initialized": false,
+		"installation": false,
+		"owner_and_interleaving": "modeled callbacks around actual production methods"
+	}
+}

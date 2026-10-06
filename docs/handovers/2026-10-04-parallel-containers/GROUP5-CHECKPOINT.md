@@ -1355,3 +1355,17 @@ and three causal mutations are rejected. This does not recover the missing
 historical25-rule backup or qualify native modal confirmation, the new guards,
 packaging or installation. No TODO item is removed by this slice. Root composed
 verification and subsequent exact-source macOS qualification remain required.
+
+## Native confirmed-source cleanup coverage
+
+Twelve additional handwritten confirmed-source cases are now independently
+reviewed and registered as three fixed native cohorts of four. They exercise the
+production remover with real native JSON, disposable files, verified backups and
+CAS; only owner predicates and interleaving timing are modeled. The original six
+native scenarios, eleven receipt controls and three Foundation methods remain
+unchanged. Independent portable validation passes35 controls in each of normal,
+explicit optimized and inherited optimized modes; six guard-removal mutants
+refuse. Swift compilation and all twelve new native cases remain unexecuted
+locally. Existing controller25/acquisition10/probe10 and SDK30/35/10 budgets are
+unchanged; actual UI/token/lease, user backup, packaging and installation remain
+unqualified. Item43 stays partial.

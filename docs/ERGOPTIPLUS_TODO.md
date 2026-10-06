@@ -4902,6 +4902,18 @@ remain byte-identical. Actual confirmation UI, native execution of these new
 guards, packaging and installation remain unqualified. The historical25-rule
 backup is unavailable, and item43 remains partial.
 
+Twelve additional handwritten confirmed-source cases are now independently
+reviewed and registered as three fixed native cohorts of four. They exercise the
+production remover with real native JSON, disposable files, verified backups and
+CAS; only owner predicates and interleaving timing are modeled. The original six
+native scenarios, eleven receipt controls and three Foundation methods remain
+unchanged. Independent portable validation passes35 controls in each of normal,
+explicit optimized and inherited optimized modes; six guard-removal mutants
+refuse. Swift compilation and all twelve new native cases remain unexecuted
+locally. Existing controller25/acquisition10/probe10 and SDK30/35/10 budgets are
+unchanged; actual UI/token/lease, user backup, packaging and installation remain
+unqualified. Item43 stays partial.
+
 - [~] **44.** CapsWord is no longer cancelled by the pointer when Karabiner
   activated it (AltGr + CapsLock): the watcher probed the variable with
   `karabiner_cli --get-variable`, an option karabiner_cli has never had (exit
