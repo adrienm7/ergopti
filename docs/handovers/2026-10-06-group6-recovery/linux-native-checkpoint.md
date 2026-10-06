@@ -144,3 +144,40 @@ The original Lua5.4 unsigned-byte call fails conversion before hashing; the
 correction copies precisely the original bytes into the declared native input.
 These controls do not qualify enterprise authentication, real installed GUI
 input, Windows or macOS. Final committed/integrated CI remains required.
+
+## Installed live fixture and remaining company-network implementation
+
+The live fixture now uses the real pause lifetime and asynchronous updater
+callback, preserving original release identity, stamps, installed-state,
+restart and rollback checks. Its local genuine installer reaches an unavailable
+privilege prerequisite: UID1000, no sudo/pkexec, command exit127. Controlled
+async/pause controls and normal units are successful; this refused attempt is
+not an installed native success. Hosted installation is required on the final
+candidate. No privilege stub or skipped assertion was introduced.
+
+The current source audit identifies implementation work as well as acceptance
+work. TODO62 must retain these concrete continuations:
+
+- Configure outgoing downloads of an owned Linux Ollama server, whose current
+  runtime inherits the environment and OLLAMA_HOST; supervising its localhost
+  API request does not configure registry/model connections.
+- Implement destination-specific managed redirects for the Ollama archive
+  installer and release-page ETag requests, currently outside the ordinary
+  managed-hop path.
+- Implement PAC/WPAD consumption for macOS installer/Ollama/MLX child paths;
+  the shell network preamble currently declares this unsupported.
+- Implement explicit integrated proxy authentication admission and native
+  negotiation. Selected proxy URLs alone do not prove Kerberos/SSO support.
+- Produce trustworthy outgoing Ollama failure evidence. A remote NDJSON error
+  and a receipt for a localhost connection cannot prove a corporate certificate
+  or proxy cause.
+- Separately qualify genuine corporate CA stores, PAC/WPAD acquisition and
+  authenticated enterprise sessions, then final AppImage/Flatpak/Nix builds,
+  installations and runtime probes. Local cache/store refusals are not passes.
+
+The twelve preserved Windows continuation steps remain the maintainer's PC
+work. macOS additionally requires genuine AppKit AppleEvent delivery/refusal,
+all six generated-cask install/upgrade/refusal/retry cases, actual Sparkle
+wrong-key rejection and successful update/relaunch, exact closure and final
+package/installation/launch acceptance. Diagnostics do not complete these
+functional requirements. Items36/62 and transversal16/38 remain open.
