@@ -3,6 +3,8 @@
 
 from contextlib import contextmanager
 import json
+import hashlib
+from types import SimpleNamespace
 import os
 from pathlib import Path, PurePosixPath
 import stat
@@ -1304,6 +1306,230 @@ class PhaseEvidenceControls(unittest.TestCase):
                 self.assertLessEqual(max(path.stat().st_size for path in root.iterdir()), 4096)
             finally:
                 writer.close()
+
+
+class AppleEventTerminalControls(unittest.TestCase):
+    """Constructed WNOWAIT facts test diagnostics, never native process retirement."""
+
+    def setUp(self):
+        constants = patch.multiple(probe.os, CLD_EXITED=1, CLD_KILLED=2, CLD_DUMPED=3, create=True)
+        constants.start()
+        self.addCleanup(constants.stop)
+
+    def world(self, *, status=65):
+        receiver = SimpleNamespace(pid=73136, returncode=None)
+        group = SimpleNamespace(process=receiver, reaped=False)
+        # Real Popen objects are hashable; preserve that contract in this recording object.
+        receiver = Mock(pid=73136, returncode=None)
+        group.process = receiver
+        children = SimpleNamespace(groups={receiver: group})
+        observed = SimpleNamespace(si_pid=73136, si_code=probe.os.CLD_EXITED, si_status=status)
+        return children, receiver, group, observed
+
+    def test_exact_terminal_status_and_fixed_osstatus_are_retained_without_raw_streams(self):
+        children, receiver, group, observed = self.world()
+        errors = b"Owned AppleEvent recipient registration failed: -50\n"
+        with patch.object(probe, "_appleevent_capture", return_value=(b"", errors)):
+            packet = probe._appleevent_terminal_packet(children, receiver, group, observed)
+        self.assertEqual(packet["si_pid"], 73136)
+        self.assertEqual(packet["si_code"], 1)
+        self.assertEqual(packet["si_status"], 65)
+        self.assertEqual(packet["stderr_phase"], "registration")
+        self.assertEqual(packet["stderr_osstatus"], -50)
+        self.assertEqual(packet["stderr_bytes"], len(errors))
+        self.assertEqual(packet["stderr_sha256"], hashlib.sha256(errors).hexdigest())
+        self.assertEqual(packet["stdout_sha256"], hashlib.sha256(b"").hexdigest())
+        self.assertFalse(group.reaped)
+        self.assertIsNone(receiver.returncode)
+        for unknown in (
+            b"private fixture path and credentials\n",
+            b"Owned AppleEvent receipt failed: 2147483648\n",
+        ):
+            with patch.object(probe, "_appleevent_capture", return_value=(b"", unknown)):
+                redacted = probe._appleevent_terminal_packet(children, receiver, group, observed)
+            self.assertEqual(redacted["stderr_phase"], "unclassified")
+            self.assertIsNone(redacted["stderr_osstatus"])
+            self.assertNotIn(unknown.decode(), json.dumps(redacted))
+
+    def test_foreign_terminal_or_unbounded_capture_cannot_export_a_native_fact(self):
+        children, receiver, group, observed = self.world()
+        for field, value in (
+            ("si_pid", 73137),
+            ("si_code", 4),
+            ("si_status", 256),
+            ("si_status", True),
+        ):
+            with self.subTest(field=field, value=value):
+                invalid = SimpleNamespace(**vars(observed))
+                setattr(invalid, field, value)
+                with patch.object(probe, "_appleevent_capture") as read:
+                    with self.assertRaisesRegex(probe.AdmissionError, "exact unreaped receiver"):
+                        probe._appleevent_terminal_packet(children, receiver, group, invalid)
+                read.assert_not_called()
+        with patch.object(probe, "_appleevent_capture") as read:
+            with self.assertRaisesRegex(probe.AdmissionError, "exact unreaped receiver"):
+                probe._appleevent_terminal_packet(
+                    children, receiver, SimpleNamespace(process=receiver, reaped=False), observed
+                )
+        read.assert_not_called()
+        with patch.object(probe, "_appleevent_capture", return_value=(b"a" * 4097, b"")):
+            unavailable = probe._appleevent_terminal_packet(children, receiver, group, observed)
+        self.assertEqual(unavailable["capture_status"], "unavailable")
+        self.assertEqual(unavailable["si_status"], 65)
+        self.assertIsNone(unavailable["stdout_bytes"])
+
+    def test_terminal_schema_rejects_unknown_facts_and_never_claims_group_closure(self):
+        children, receiver, group, observed = self.world()
+        with patch.object(probe, "_appleevent_capture", return_value=(b"", b"")):
+            packet = probe._appleevent_terminal_packet(children, receiver, group, observed)
+        for changes in (
+            {"private_path": "not exportable"},
+            {"stderr_bytes": 4097},
+            {"stderr_phase": "private"},
+            {"stderr_osstatus": 1},
+        ):
+            invalid = {**packet, **changes}
+            with self.assertRaises(probe.AdmissionError):
+                probe._validate_appleevent_terminal(invalid)
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            root.chmod(0o700)
+            writer = PhaseEvidenceControls().evidence(root)
+            if writer is None:
+                return  # Existing portable no-follow refusal remains explicit.
+            try:
+                self.assertTrue(
+                    writer.record(
+                        "appleevent.receiver-exit",
+                        status="refused",
+                        groups=[group],
+                        native_terminal=packet,
+                    )
+                )
+                expected = (root / "checkpoint.json").read_bytes()
+                actual = json.loads(expected)
+                self.assertEqual(actual["native_terminal"], packet)
+                self.assertFalse(actual["ownership_closed"])
+                self.assertEqual(actual["groups"], [{"pid": 73136, "closed": False}])
+                self.assertFalse(
+                    writer.record(
+                        "appleevent.receiver-exit",
+                        status="accepted",
+                        closed=True,
+                        groups=[group],
+                        native_terminal=packet,
+                    )
+                )
+                self.assertEqual((root / "checkpoint.json").read_bytes(), expected)
+                self.assertTrue(writer.failed)
+            finally:
+                writer.close()
+
+    def test_dead_receiver_diagnostic_precedes_original_refusal_and_cleanup(self):
+        judge = AppleEventBoundaryControls()
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "sandbox.sb").write_text(judge.policy)
+            children = judge.model(root)
+            children.evidence = Mock()
+            original_start = children.start
+
+            def dead_start(arguments):
+                receiver = original_start(arguments)
+                receiver.returncode = None
+                group = children.groups[receiver]
+                group.process = receiver
+                group.observe_exit.return_value = SimpleNamespace(
+                    si_pid=73136, si_code=1, si_status=66
+                )
+                return receiver
+
+            def observe_export(phase, **facts):
+                self.assertEqual(phase, "appleevent.receiver-exit")
+                self.assertFalse(facts["groups"][0].reaped)
+                self.assertEqual(facts["native_terminal"]["si_status"], 66)
+                self.assertEqual(children.sender_calls, [])
+                return True
+
+            children.start = dead_start
+            children.evidence.record.side_effect = observe_export
+            with (
+                patch.object(probe.uuid, "uuid4", return_value=judge.nonce),
+                patch.object(
+                    probe, "native_compiler", return_value=[str(root / "modeled-native-clang")]
+                ),
+                patch.object(
+                    probe,
+                    "_appleevent_capture",
+                    return_value=(b"", b"Owned AppleEvent handler admission failed: -50\n"),
+                ),
+            ):
+                with self.assertRaisesRegex(
+                    probe.AppleEventBoundaryError,
+                    "exact owned AppleEvent receiver is no longer live",
+                ):
+                    probe.admit_appleevent_boundary(children, root)
+            children.evidence.record.assert_called_once()
+            self.assertEqual(len(children.active), 1)
+            self.assertFalse(children.groups[children.active[0]].reaped)
+            self.assertEqual(children.sender_calls, [])
+
+    def test_capture_failure_preserves_exact_exit_without_exporting_exception_path(self):
+        children, receiver, group, observed = self.world(status=68)
+        with patch.object(
+            probe, "_appleevent_capture", side_effect=OSError("private path and secret")
+        ):
+            packet = probe._appleevent_terminal_packet(children, receiver, group, observed)
+        self.assertEqual(packet["si_pid"], 73136)
+        self.assertEqual(packet["si_code"], 1)
+        self.assertEqual(packet["si_status"], 68)
+        self.assertEqual(packet["capture_status"], "unavailable")
+        self.assertEqual(packet["stderr_phase"], "unavailable")
+        self.assertIsNone(packet["stderr_osstatus"])
+        self.assertIsNone(packet["stdout_bytes"])
+        self.assertIsNone(packet["stderr_sha256"])
+        self.assertNotIn("private path", json.dumps(packet))
+        self.assertFalse(group.reaped)
+        with patch.object(
+            probe,
+            "_appleevent_capture",
+            side_effect=process_owner.OwnedProcessInterrupted("original cancellation"),
+        ):
+            with self.assertRaisesRegex(
+                process_owner.OwnedProcessInterrupted, "original cancellation"
+            ):
+                probe._appleevent_terminal_packet(children, receiver, group, observed)
+
+    def test_actual_capture_preserves_primary_interruption_when_close_also_fails(self):
+        children, receiver, group, observed = self.world()
+        root = Path("/recorded-private-capture-root")
+        children.root = root
+        children.captures = {receiver: (root / "owned.stdout", root / "owned.stderr")}
+        children.capture_identities = {receiver: ((11, 22), (11, 23))}
+        entry = SimpleNamespace(
+            st_mode=stat.S_IFREG | 0o600, st_uid=42, st_dev=11, st_ino=22, st_size=0
+        )
+        interruption = process_owner.OwnedProcessInterrupted("original capture cancellation")
+        with (
+            patch.object(probe, "owned_path", side_effect=lambda _root, value: value),
+            patch.object(probe.os, "O_NOFOLLOW", 0x100, create=True),
+            patch.object(probe.os, "getuid", return_value=42, create=True),
+            patch.object(probe.os, "open", return_value=61) as opening,
+            patch.object(probe.os, "fstat", return_value=entry),
+            patch.object(probe.os, "read", side_effect=interruption) as reading,
+            patch.object(
+                probe.os, "close", side_effect=OSError("secondary capture close refusal")
+            ) as closing,
+        ):
+            with self.assertRaises(process_owner.OwnedProcessInterrupted) as captured:
+                # Exercise the actual capture and outer packet functions, not a mocked capture helper.
+                probe._appleevent_terminal_packet(children, receiver, group, observed)
+        self.assertIs(captured.exception, interruption)
+        opening.assert_called_once()
+        reading.assert_called_once_with(61, 4097)
+        closing.assert_called_once_with(61)
+        self.assertFalse(group.reaped)
+        self.assertIsNone(receiver.returncode)
 
 
 class NativeCompilerSelectionControls(unittest.TestCase):
