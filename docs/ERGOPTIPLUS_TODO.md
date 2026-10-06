@@ -4004,6 +4004,17 @@ neither the owning XCTest verdict nor native budgets. That run supplies no fresh
 Swift, baseline, source-control or owned-four-target execution; the next exact
 macOS qualification remains required. TODO31 and WP4-WP10 stay incomplete.
 
+Retired native build failures now report only a predefined diagnostic code in
+their original status assertions. The closed parser discards reasons and
+refuses unknown, multiline, malformed or oversized stderr; all original
+assertions, guards, retirement and budgets remain intact. Its 24 handwritten
+Swift controls await macOS execution. Manual37478982284 at645c8e9c failed:
+fresh baseline and source controls returned1, the stock baseline timed out,
+and Swift hit its outer deadline without a suite summary. The owned four
+products remain unexecuted. No phase observation packet was visible; its
+absence and the actual failure causes are unknown. The new failure archive
+download was refused with zero bytes. This diagnostic completes no WP or item.
+
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
   listed; see `docs/memory/text-input-and-config.md`. Still open everywhere:

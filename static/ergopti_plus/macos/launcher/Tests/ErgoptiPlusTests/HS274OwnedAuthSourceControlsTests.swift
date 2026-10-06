@@ -34,7 +34,8 @@ extension HS274NativePolicyQualificationTests {
 			// Its genuine finish/retirement precedes any inspection of metadata.
 			let controls = try runOwnedRuntimeCompilation(
 				[repository.path, owner.path, "--source-controls", "--budget", "300"], root: root)
-			XCTAssertEqual(controls.status, 0)
+			XCTAssertEqual(controls.status, 0, "Retired owned source-controls refusal code: "
+				+ HS274RetiredBuildRefusal.code(controls.stderr, producer: .owned))
 			XCTAssertEqual(controls.stdout,
 				"PASS owned AUTH source controls=21 policy=26 hs274=22; native authentication unqualified\n")
 			XCTAssertTrue(controls.stderr.isEmpty)

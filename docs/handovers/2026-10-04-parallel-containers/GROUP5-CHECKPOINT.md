@@ -1262,3 +1262,21 @@ are portable controls, not native WebKit/AX evidence. Swift compilation, actual
 UI/frame/timing outcomes, permission grants, physical input and guardian approval
 remain unexecuted for this tranche. No production behavior or item completion
 is claimed; existing native and hardware requirements remain open.
+
+The original retired baseline/source-controls status assertions now attach only
+a closed diagnostic code. A new automatically discovered Swift test preserves
+24 handwritten positive/negative inputs. The parser emits a fixed literal or
+unclassified, discarding the native reason and refusing foreign, multiline,
+malformed or oversized captures. No raw stderr, URL, path or environment value
+is published. All prior asserted values, guards, observer branches, helpers and
+300/305/10 or SDK30/35/10 budgets remain unchanged. Source review and exact
+assertion-message inverses pass; Swift24 requires the next genuine macOS run.
+Manual37478982284 at645c8e9c completed failure: Swift349 starts/348 completions
+(329 PASS/4 FAIL/15 SKIP), no root summary or reporter verdict after the outer
+ten-minute timeout. Portable41/25/22 pass and real Swift source compilation
+passes; fresh baseline/source-controls fail, original stock baseline times out.
+Owned four-target compilation/admission remain unexecuted. No baseline phase
+observation packet is visible, without a proven reason. The new exact failure
+archive acquisition is refused with zero bytes; no current failure cause is
+inferred. Linux atomic fixture5 and window34 pass; GTK fails and package/install
+are skipped. Release is skipped. These results do not complete item31.

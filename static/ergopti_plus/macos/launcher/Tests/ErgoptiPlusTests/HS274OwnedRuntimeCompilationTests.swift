@@ -51,7 +51,8 @@ extension HS274NativePolicyQualificationTests {
 			// The original invoker returns only after actual guardian, worker,
 			// captures and native phase debt have genuinely completed and retired.
 			let baselineReceipt = try runSourceCompilation([diagnostics.path, baseline.path, "--budget", "300"], root: root)
-			XCTAssertEqual(baselineReceipt.status, 0)
+			XCTAssertEqual(baselineReceipt.status, 0, "Retired native baseline refusal code: "
+				+ HS274RetiredBuildRefusal.code(baselineReceipt.stderr, producer: .native))
 			XCTAssertTrue(baselineReceipt.stderr.isEmpty)
 			if baselineReceipt.status != 0 {
 				// The original invoker has already admitted its actual retired ACK.
