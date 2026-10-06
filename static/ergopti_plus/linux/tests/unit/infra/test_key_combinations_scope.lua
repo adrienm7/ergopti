@@ -747,8 +747,10 @@ end)
 helpers.describe("pair fixture native loop ownership", function()
 	helpers.it("retains the exact libuv issuer across fixture teardown and a real callback turn", function()
 		local native = NativeLoop
+		local detached = {}; for key, value in pairs(native) do detached[key] = value end
+		helpers.assert_true(not rawequal(detached, native), "a detached lookalike is not the native issuer")
 		with_owner(function() end)
-		helpers.assert_eq(package.loaded.luv, native, "fixture restoration retains the exact native loop issuer")
+		helpers.assert_true(rawequal(package.loaded.luv, native), "fixture restoration retains the exact native loop issuer")
 		collectgarbage("collect")
 		local timer = assert(native.new_timer())
 		local fired, settled = false, false

@@ -8,6 +8,9 @@
 --- ==============================================================================
 
 local M = {}
+local BindingIdentity = require("config_binding_identity")
+local KeyboardPublication = require("config_keyboard_publication")
+local BindingPublication = require("config_binding_publication")
 
 local hs            = hs
 local notifications = require("infra.notifications")
@@ -2183,6 +2186,29 @@ function M.split_action_parameter_key(key)
 	return nil, nil
 end
 
+--- Judges the bare gesture domain only after its actual owner has published
+--- both slot catalogues. Other owners and unavailable catalogues remain unjudged.
+--- @param binding any Native binding id.
+--- @return boolean|nil fits
+function M.action_parameter_binding_fits(binding)
+	if type(binding) == "string" and binding:sub(1, 10) == "keyboard__" then
+		local catalogue = KeyboardPublication.current(rawget(package.loaded, "modules.shortcuts.keyboard_shortcuts"))
+		return BindingIdentity.keyboard_binding_fits(binding, catalogue), BindingIdentity.RETIRED_KEYBOARD
+	end
+	if type(binding) == "string" and binding:sub(1, 9) == "tap_key__" then
+		local taps = rawget(package.loaded, "modules.shortcuts.tap_keys")
+		local catalogue = BindingPublication.current("tap", "modules.shortcuts.tap_keys", taps)
+		return BindingIdentity.tap_binding_fits(binding, catalogue), BindingIdentity.RETIRED_TAP
+	end
+	if type(binding) == "string" and binding:sub(1, 8) == "script__" then
+		local catalogue = BindingPublication.current("script", "infra.script_chord_catalogue", ChordCatalogue)
+		return BindingIdentity.script_binding_fits(binding, catalogue), BindingIdentity.RETIRED_SCRIPT
+	end
+	local gestures = package.loaded["modules.gestures"]
+	if type(gestures) ~= "table" or type(gestures.gesture_slot_catalogue) ~= "function" then return nil end
+	return BindingIdentity.gesture_binding_fits(binding, gestures.gesture_slot_catalogue())
+end
+
 function M.get_action_parameter_spec(action)
 	local meta = Catalogue.actions[action]
 	return meta and meta.parameter or nil
@@ -2408,6 +2434,15 @@ function M.llm_language_choices()
 end
 
 function M.get_action_parameter(binding, action)
+	if type(binding) == "string" and (binding:sub(1, 9) == "tap_key__" or binding:sub(1, 10) == "keyboard__") then
+		local fits, reason = M.action_parameter_binding_fits(binding)
+		if fits == false then
+			if _state and type(_state.action_params) == "table" and _state.action_params[parameter_key(binding, action)] ~= nil then
+				require("config_outdated").report({ "gestures", "action_parameters", parameter_key(binding, action) }, reason, Logger)
+			end
+			return ""
+		end
+	end
 	if not _state or type(_state.action_params) ~= "table" then return "" end
 	return _state.action_params[parameter_key(binding, action)] or ""
 end
@@ -2521,7 +2556,8 @@ local function retire_program_parameters()
 end
 
 function M.set_action_parameter(binding, action, value)
-	if not _state or not M.validate_action_parameter(action, value) then return false end
+	if not _state or M.action_parameter_binding_fits(binding) == false
+		or not M.validate_action_parameter(action, value) then return false end
 	if not retire_program_parameters() then return false end
 	_state.action_params = _state.action_params or {}
 	_state.action_params[parameter_key(binding, action)] = value

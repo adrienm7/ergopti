@@ -507,3 +507,124 @@ for Origin in [100, 0x100000064]
 for Elapsed in [0x1000004D2, 0x2000004D2]
 	Test("llm api probe clock: long completion elapsed=" . Elapsed,
 		_LAT_ProbeClockCompletion.Bind(100, Elapsed))
+
+
+_LAT_AddFrameCorpus() {
+	global _SharedDir
+	return JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\api_add_controls.json", "UTF-8"))
+}
+
+_LAT_AddFrameCaption() {
+	global _LLM_Menu
+	Corpus := _LAT_AddFrameCorpus()
+	SavedMenu := _LAT_FixtureMenu()
+	Declaration := _MR_GetMenuDef(Corpus["command_section"])[1]
+	Original := Declaration["i18n"]
+	try {
+		Declaration["i18n"] := Corpus["mutated_key"]
+		Found := 0
+		for Row in _LLM_Menu_ApiEntriesRows() {
+			if Row.Get("label", "") == t(Corpus["mutated_key"]) {
+				Found += 1
+				AssertTrue(HasMethod(Row.Get("action", 0), "Call"), "the genuine Add dialog owner remains callable")
+			}
+		}
+		AssertEqual(1, Found, "one native Add command reads the shared caption")
+	} finally {
+		Declaration["i18n"] := Original
+		_LAT_RestoreMenu(SavedMenu)
+	}
+}
+Test("API Add frame uses the shared command caption (api-add-controls)", _LAT_AddFrameCaption)
+
+_LAT_AddFrameSeparator() {
+	global _LLM_Menu
+	Corpus := _LAT_AddFrameCorpus()
+	SavedMenu := _LAT_FixtureMenu()
+	Definition := _MR_GetMenuDef(Corpus["separator_section"])
+	Original := Definition[1]
+	try {
+		Definition[1] := Map("type", "label", "id", "api_add_marker", "i18n", Corpus["mutated_key"])
+		Rows := _LLM_Menu_ApiEntriesRows()
+		Position := 0
+		for Index, Row in Rows {
+			if Row.Get("label", "") == t(Corpus["label_key"])
+				Position := Index
+		}
+		AssertTrue(Position > 0, "the native Add command remains in its original position")
+		Marker := Rows[Position + 1]
+		AssertEqual(t(Corpus["mutated_key"]), Marker.Get("label", ""), "the existing post-Add separator belongs to its declaration")
+		AssertTrue(Marker.Get("disabled", false), "the marker is inert")
+		AssertFalse(Marker.Has("action"), "status data cannot acquire the Add callback")
+		_LLM_Menu["api_entries"] := []
+		for Row in _LLM_Menu_ApiEntriesRows()
+			AssertFalse(Row.Get("label", "") == t(Corpus["mutated_key"]), "empty entries retain the conditional absence")
+	} finally {
+		Definition[1] := Original
+		_LAT_RestoreMenu(SavedMenu)
+	}
+}
+Test("API Add frame retains its conditional shared separator (api-add-controls)", _LAT_AddFrameSeparator)
+
+
+/** Independent inert status data, separate from selectable NoModel commands. */
+_LAT_EmptyStatusCorpus() {
+	global _SharedDir
+	return JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\llm_empty_status.json", "UTF-8"))
+}
+
+_LAT_EmptyStatusCaption() {
+	global _LLM_Menu
+	Corpus := _LAT_EmptyStatusCorpus()
+	SavedMenu := _LAT_FixtureMenu()
+	Definition := _MR_GetMenuDef(Corpus["api"]["section"])
+	Original := Definition[1]
+	try {
+		_LLM_Menu["api_entries"] := []
+		Rows := _LLM_Menu_ApiEntriesRows()
+		AssertEqual(t(Corpus["api"]["key"]), Rows[1]["label"])
+		AssertTrue(Rows[1].Get("disabled", false), "the original actionless status remains disabled")
+		AssertFalse(Rows[1].Has("action"), "no selectable NoModel action is attached")
+		AssertFalse(Rows[1].Has("items"), "the empty status never becomes a provider subtree")
+		AssertTrue(HasMethod(Rows[2].Get("action", 0), "Call"), "the real Add owner retains the next row")
+		Definition[1] := Map("type", "label", "id", Corpus["api"]["rows"][1]["id"],
+			"i18n", Corpus["marker_key"], "platforms", ["ahk", "linux"], "unavailable", "hide")
+		for Entries in [[], Map()] {
+			_LLM_Menu["api_entries"] := Entries
+			Rows := _LLM_Menu_ApiEntriesRows()
+			AssertEqual(t(Corpus["marker_key"]), Rows[1]["label"], "both actual old fallback predicates read the shared label")
+			AssertTrue(Rows[1].Get("disabled", false))
+			AssertFalse(Rows[1].Has("action"))
+		}
+	} finally {
+		Definition[1] := Original
+		_LAT_RestoreMenu(SavedMenu)
+	}
+}
+Test("API empty status uses the shared inert caption (llm-empty-status)", _LAT_EmptyStatusCaption)
+
+_LAT_EmptyStatusRefusal() {
+	global _LLM_Menu
+	Corpus := _LAT_EmptyStatusCorpus()
+	SavedMenu := _LAT_FixtureMenu()
+	Definition := _MR_GetMenuDef(Corpus["api"]["section"])
+	Original := Definition[1]
+	try {
+		_LLM_Menu["api_entries"] := []
+		Definition.Pop()
+		AssertEqual(0, _LLM_Menu_ApiEntriesRows().Length, "a missing declaration refuses the empty provider before callbacks")
+		Definition.Push(Map("type", "command", "id", "unowned_api_empty", "i18n", Corpus["api"]["key"],
+			"platforms", ["ahk", "linux"], "unavailable", "hide"))
+		AssertEqual(0, _LLM_Menu_ApiEntriesRows().Length, "unbound status cannot acquire an action")
+		AssertEqual(0, _LLM_Menu["api_entries"].Length)
+		Definition[1] := Original
+		AssertEqual(t(Corpus["api"]["key"]), _LLM_Menu_ApiEntriesRows()[1]["label"], "the exact original declaration repairs admission")
+	} finally {
+		if Definition.Length == 0
+			Definition.Push(Original)
+		else
+			Definition[1] := Original
+		_LAT_RestoreMenu(SavedMenu)
+	}
+}
+Test("API empty status refuses missing and unbound owners (llm-empty-status)", _LAT_EmptyStatusRefusal)

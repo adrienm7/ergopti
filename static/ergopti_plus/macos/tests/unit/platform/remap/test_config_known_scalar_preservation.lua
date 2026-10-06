@@ -135,4 +135,96 @@ helpers.describe("Known scalar remap binding preservation", function()
 	end)
 end)
 
+helpers.describe("obsolete nonstring combination save preservation", function()
+	local vectors = { { name = "false", token = "false", value = false }, { name = "true", token = "true", value = true },
+		{ name = "integer", token = "17", value = 17 }, { name = "float", token = "1.25e+2", value = 125 } }
+	local function source_for(vector)
+		return '[karabiner]\nintegration_enabled = false\n[mod_combos.config]\nesc_tab = ' .. vector.token .. '\n'
+			.. '[mod_combos.config.future]\nopaque = [1, 2]\n[future]\nkeep = "independent"\n'
+	end
+	for _, vector in ipairs(vectors) do
+		helpers.it("ordinary unrelated save preserves the complete " .. vector.name .. " combination model", function()
+			local original = source_for(vector)
+			with_file(original, function(f)
+				local state, status = f.load()
+				helpers.assert_eq(status, "ok")
+				helpers.assert_eq(state.mod_combos_config.esc_tab, { tap = "none", hold = "none", combo = "none" })
+				helpers.assert_eq(state.enabled, false, "explicit integration consent is unchanged")
+				helpers.assert_eq(f.read(), original)
+				helpers.assert_eq(#f.warnings, 2)
+				helpers.assert_contains(table.concat(f.warnings, "\n"), "'mod_combos.config.esc_tab' in '" .. f.path .. "'")
+				state.tap_hold_config.tab = { tap = "copy", hold = "none" }
+				helpers.assert_eq(f.config.save_user_config(state, f.path), true, "obsolete combination cannot refuse unrelated edits")
+				helpers.assert_eq(f.decode(f.read()), { karabiner = { integration_enabled = false },
+					mod_combos = { config = { esc_tab = vector.value, future = { opaque = { 1, 2 } } } },
+					tap_holds = { config = { tab = { tap = "copy" } } }, future = { keep = "independent" } },
+					"complete handwritten preserved-source model")
+				local reloaded = f.load()
+				helpers.assert_eq(reloaded.mod_combos_config.esc_tab, { tap = "none", hold = "none", combo = "none" })
+				helpers.assert_eq(reloaded.tap_hold_config.tab, { tap = "copy", hold = "none" })
+				helpers.assert_eq(#f.warnings, 2, "read/write/reload retain the same precise warning identity")
+				helpers.assert_eq(f.errors, {})
+				helpers.assert_eq(f.controls.writes, 1)
+			end)
+		end)
+		for _, field in ipairs({ "tap", "hold", "combo" }) do
+			helpers.it("refuses changed " .. field .. " without implicit repair of the " .. vector.name .. " combination", function()
+				local original = source_for(vector)
+				with_file(original, function(f)
+					local state = f.load()
+					state.mod_combos_config.esc_tab[field] = "copy"
+					helpers.assert_eq(f.config.save_user_config(state, f.path), false)
+					helpers.assert_eq(f.controls.writes, 0)
+					helpers.assert_eq(f.read(), original)
+					helpers.assert_eq(#f.errors, 1)
+					helpers.assert_contains(f.errors[1], "mod_combos.config.esc_tab")
+					helpers.assert_contains(f.errors[1], f.path)
+					f.write('[karabiner]\nintegration_enabled = false\n[mod_combos.config.esc_tab]\ntap = "none"\nhold = "none"\ncombo = "none"\n')
+					f.controls.expected = f.read()
+					helpers.assert_eq(f.config.save_user_config(state, f.path), true, "explicit source repair admits the candidate")
+					helpers.assert_eq(f.decode(f.read()), { karabiner = { integration_enabled = false },
+						mod_combos = { config = { esc_tab = { [field] = "copy" } } } }, "complete repaired source model")
+				end)
+			end)
+		end
+	end
+	helpers.it("retains a later unusable source generation instead of overwriting its carried neutral binding", function()
+		with_file(source_for(vectors[1]), function(f)
+			local state = f.load()
+			local latest = source_for(vectors[3]):gsub('keep = "independent"', 'keep = "later"')
+			f.write(latest); f.controls.expected = latest
+			state.tap_hold_config.tab = { tap = "copy", hold = "none" }
+			helpers.assert_eq(f.config.save_user_config(state, f.path), true)
+			helpers.assert_eq(f.decode(f.read()), { karabiner = { integration_enabled = false },
+				mod_combos = { config = { esc_tab = 17, future = { opaque = { 1, 2 } } } },
+				tap_holds = { config = { tab = { tap = "copy" } } }, future = { keep = "later" } },
+				"complete manually authored later source model")
+		end)
+	end)
+	helpers.it("preserves an external replacement at the actual conditional publication fence", function()
+		with_file(source_for(vectors[1]), function(f)
+			local state = f.load()
+			local external = '[future]\nkeep = "external"\n'
+			state.tap_hold_config.tab = { tap = "copy", hold = "none" }
+			f.controls.before_publish = function() f.write(external) end
+			helpers.assert_eq(f.config.save_user_config(state, f.path), false)
+			helpers.assert_eq(f.controls.writes, 1)
+			helpers.assert_eq(f.read(), external)
+		end)
+	end)
+	helpers.it("allows only the explicit whole-file reset to remove the obsolete combination", function()
+		with_file(source_for(vectors[1]), function(f)
+			local state = f.load()
+			helpers.assert_eq(f.config.save_user_config(state, f.path, true), true)
+			helpers.assert_eq(f.decode(f.read()), { karabiner = { integration_enabled = false },
+				tap_holds = { enabled = false, timeout_ms = 250, sticky_timeout_ms = 3000,
+					config = { escape = { tap = "none", hold = "none" }, tab = { tap = "none", hold = "none" } } },
+				mod_combos = { simultaneous_threshold_ms = 100, symmetric = false,
+					config = { esc_tab = { tap = "none", hold = "none", combo = "none" } } } },
+				"explicit reset writes its full neutral intent while dropping source neighbors")
+		end)
+	end)
+
+end)
+
 return true

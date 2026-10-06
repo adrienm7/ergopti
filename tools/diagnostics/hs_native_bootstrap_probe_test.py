@@ -15,6 +15,7 @@ import hs_native_bootstrap_probe as probe
 import hs_delayed_timer_probe_test as timer_cases
 import hs_karabiner_config_probe_test as karabiner_cases
 import macos_launch_gate as gate
+import hs_script_scope_probe as script_probe
 
 DOMAIN = timer_cases.DOMAIN
 NONCE = timer_cases.NONCE
@@ -509,6 +510,319 @@ class PackagedExecutionTests(unittest.TestCase):
         self.assertEqual(gate.evaluate("clean", supplemented), expected)
         self.assertTrue(any("required path refused" in failure for failure in expected))
         self.assertTrue(any("native delayed-timer" in failure for failure in expected))
+
+
+class NativeScriptFixture(NativeFixture):
+    """Exercise actual supervision over documented external-process boundaries."""
+
+    def run(self, arguments, **options):
+        if arguments[0] != "/usr/bin/open":
+            return super().run(arguments, **options)
+        self.calls.append((arguments, options))
+        self.owners = [42]
+        context = probe.read_receipt(
+            self.output / "supplementary-native-bootstrap-script_scope/context.json"
+        )
+        ready = dict(
+            self.owner.identity, schema_version=1, contract=probe.CONTRACT, phase="ready", pid=42
+        )
+        probe.publish(Path(context["paths"]["ready"]), ready)
+        self.preferences["late-unrelated"] = "keep"
+        return subprocess.CompletedProcess(arguments, 0, b"", b"")
+
+    def settle(self, path, timeout):
+        if path.name == "ready.json":
+            return probe.read_receipt(path)
+        self.test.assertEqual(timeout, 10)
+        context = probe.read_receipt(path.with_name("context.json"))
+        self.test.assertEqual(context["feature"], "script_scope")
+        self.test.assertEqual(self.owner.pid, 42)
+        self.test.assertEqual(probe.read_receipt(path.with_name("admit.json"))["phase"], "admit")
+        prefix = "ergopti.scope_probe." + NONCE + "."
+        entries = [
+            {
+                "key": prefix + "sdk_primitive",
+                "before": {"present": False},
+                "allowed_values": [NONCE],
+            }
+        ]
+        aliases = []
+        for index, (declared, value) in enumerate(
+            (
+                ("script.locale", "fr"),
+                ("script.log_level", "INFO"),
+                ("script.show_error_dialog", True),
+            ),
+            1,
+        ):
+            alias = f"scope_probe.{NONCE}.alias_{index}"
+            aliases.append(
+                {
+                    "path": declared,
+                    "alias": alias,
+                    "key": "ergopti." + alias,
+                    "publication": {"present": True, "value": value},
+                }
+            )
+            entries.append(
+                {"key": "ergopti." + alias, "before": {"present": False}, "allowed_values": [value]}
+            )
+        claim = dict(
+            self.owner.identity,
+            schema_version=1,
+            contract=script_probe.CLAIM_CONTRACT,
+            pid=42,
+            entries=entries,
+        )
+        if getattr(self, "claim_mutation", None):
+            self.claim_mutation(claim)
+        probe.publish(Path(context["destination"] + ".settings-claim.json"), claim)
+        before = {"locale": "en", "locale_backend": "en", "log_level": 30, "error_dialog": True}
+        receipt = dict(
+            self.owner.identity,
+            schema_version=1,
+            contract="script.scope-native",
+            pid=42,
+            aliases=aliases,
+            runtime_views={
+                "before": before,
+                "applied": dict(before, locale="fr", locale_backend="fr", log_level=20),
+                "restored": copy.deepcopy(before),
+            },
+            errors=[],
+        )
+        for flag in script_probe.FLAGS:
+            receipt[flag] = True
+        if self.feature_mutation:
+            self.feature_mutation(receipt)
+        probe.publish(path.with_name("feature.json"), receipt)
+        if getattr(self, "leftover", None) is not None:
+            self.preferences[prefix + "alias_1"] = self.leftover
+        settled = dict(
+            self.owner.identity,
+            schema_version=1,
+            contract=probe.CONTRACT,
+            phase="settled",
+            pid=42,
+            complete=True,
+            cleanup_acknowledged=True,
+            errors=[],
+        )
+        probe.publish(path, settled)
+        return settled
+
+
+class NativeScriptOwnershipTests(unittest.TestCase):
+    """Native execution is not claimed by these supervisor-boundary models."""
+
+    def test_script_participant_receipt_requires_exact_native_retirement_and_alias_cleanup(self):
+        with tempfile.TemporaryDirectory() as root:
+            fixture = NativeScriptFixture(Path(root))
+            fixture.leftover = "fr"
+            summary = fixture.observe(self, "script_scope")
+            self.assertEqual(summary["measurement"]["alias_count"], 3)
+            self.assertTrue(summary["measurement"]["participant_inverse"])
+            self.assertTrue(summary["process_retired"])
+            self.assertTrue(summary["preference_restored"])
+            self.assertEqual(fixture.owners, [])
+            self.assertEqual(
+                fixture.preferences, dict(fixture.initial, **{"late-unrelated": "keep"})
+            )
+            deletes = [
+                cmd for cmd, _ in fixture.calls if cmd[:2] == ["/usr/bin/defaults", "delete"]
+            ]
+            self.assertEqual(
+                deletes,
+                [["/usr/bin/defaults", "delete", DOMAIN, f"ergopti.scope_probe.{NONCE}.alias_1"]],
+            )
+
+    def test_incomplete_wrong_identity_and_truthy_flag_measurements_refuse_after_retirement(self):
+        mutations = [
+            lambda r: r.pop("sdk_void_set"),
+            lambda r: r.update(participant_reverted=1),
+            lambda r: r.update(nonce="b" * 32),
+            lambda r: r["runtime_views"]["restored"].update(log_level=99),
+            lambda r: r.update(unoffered=True),
+        ]
+        for mutation in mutations:
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as root:
+                fixture = NativeScriptFixture(Path(root))
+                fixture.feature_mutation = mutation
+                with self.assertRaises((ValueError, RuntimeError)):
+                    fixture.observe(self, "script_scope")
+                self.assertEqual(fixture.owners, [])
+                self.assertEqual(
+                    fixture.preferences[probe.CONFIG_KEY], fixture.initial[probe.CONFIG_KEY]
+                )
+                self.assertEqual(fixture.preferences["unrelated"], 91)
+
+    def test_foreign_settings_successor_survives_conditional_cleanup_and_reports_debt(self):
+        with tempfile.TemporaryDirectory() as root:
+            fixture = NativeScriptFixture(Path(root))
+            fixture.leftover = "foreign"
+            with self.assertRaisesRegex(RuntimeError, "foreign private settings value"):
+                fixture.observe(self, "script_scope")
+            self.assertEqual(fixture.preferences[f"ergopti.scope_probe.{NONCE}.alias_1"], "foreign")
+            self.assertEqual(
+                fixture.preferences[probe.CONFIG_KEY], fixture.initial[probe.CONFIG_KEY]
+            )
+            self.assertEqual(fixture.owners, [])
+
+    def test_malformed_claim_still_retires_native_owner_and_restores_only_startup_key(self):
+        with tempfile.TemporaryDirectory() as root:
+            fixture = NativeScriptFixture(Path(root))
+            fixture.leftover = "fr"
+            fixture.claim_mutation = lambda r: r.update(nonce="b" * 32)
+            with self.assertRaisesRegex(RuntimeError, "identity differs"):
+                fixture.observe(self, "script_scope")
+            self.assertEqual(fixture.owners, [])
+            self.assertEqual(
+                fixture.preferences[probe.CONFIG_KEY], fixture.initial[probe.CONFIG_KEY]
+            )
+            self.assertEqual(fixture.preferences[f"ergopti.scope_probe.{NONCE}.alias_1"], "fr")
+
+    def test_actual_launch_gate_requires_script_smoke_and_preserves_original_failures(self):
+        for mode in ("complete", "missing", "unknown", "false", "cleanup", "exception", "original"):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as root:
+                fixture = NativeScriptFixture(Path(root))
+                complete = fixture.observe(self, "script_scope")
+                outcome = copy.deepcopy(complete)
+                if mode == "missing":
+                    outcome["measurement"].pop("sdk_void_set")
+                elif mode == "unknown":
+                    outcome["measurement"]["unknown"] = True
+                elif mode == "false":
+                    outcome["measurement"]["participant_inverse"] = False
+                elif mode == "cleanup":
+                    outcome["preference_restored"] = False
+                elif mode == "exception":
+                    outcome = RuntimeError("script cleanup refused")
+                fixture.launcher.parent.mkdir(parents=True)
+                fixture.launcher.write_text("fixture launcher")
+                with (fixture.app / "Contents/Info.plist").open("wb") as handle:
+                    plistlib.dump({"CFBundleIdentifier": "com.ergoptiplus.app"}, handle)
+                owner = mock.Mock()
+                owner.scripting_commands = []
+                owner.diagnostic_receipts = []
+                from macos_launch_gate_test import control_summary
+
+                original = karabiner_cases.probe.validate_receipt(
+                    karabiner_cases.receipt(), NONCE, 42, karabiner_cases.EXECUTABLE, DOMAIN
+                )
+                owner.control.return_value = control_summary()
+                owner.observe.return_value = original
+                if mode == "original":
+                    owner.control.side_effect = RuntimeError("original control refused")
+                    owner.observe.side_effect = RuntimeError("original feature refused")
+                supplement = mock.Mock()
+                live = {"value": False}
+
+                def observed_processes(executable):
+                    return [42 if executable == fixture.executable else 41] if live["value"] else []
+
+                def launch(arguments, **options):
+                    if arguments[0] == "open":
+                        live["value"] = True
+                    return subprocess.CompletedProcess(arguments, 0, "arm64", "")
+
+                def quit_native(*_):
+                    live["value"] = False
+                    return 0.5
+
+                if isinstance(outcome, Exception):
+                    supplement.observe_script_scope.side_effect = outcome
+                else:
+                    supplement.observe_script_scope.return_value = outcome
+                with (
+                    mock.patch.object(gate.Path, "home", return_value=Path(root) / "home"),
+                    mock.patch.object(gate, "seed", return_value={"logs_dir": Path(root) / "logs"}),
+                    mock.patch.object(gate, "NativeKarabinerConfigProbe", return_value=owner),
+                    mock.patch.object(
+                        gate, "SupplementaryNativeBootstrap", return_value=supplement
+                    ),
+                    mock.patch.object(gate, "processes", side_effect=observed_processes),
+                    mock.patch.object(gate.subprocess, "run", side_effect=launch),
+                    mock.patch.object(gate, "STARTUP_TIMEOUT_SECONDS", 0),
+                    mock.patch.object(
+                        gate,
+                        "read_text",
+                        return_value="embedded Hammerspoon bootstrap logger configured\n",
+                    ),
+                    mock.patch.object(
+                        gate, "driver_logs", return_value="Onboarding wizard opened.\n"
+                    ),
+                    mock.patch.object(gate, "check_state", return_value=[]),
+                    mock.patch.object(gate, "quit_application", side_effect=quit_native),
+                    mock.patch.object(gate, "collect", return_value={"errors": [], "windows": {}}),
+                ):
+                    report = gate.run(fixture.app, fixture.output, "karabiner_config", "")
+                supplement.observe.assert_called_once_with("karabiner_config")
+                if mode == "original":
+                    supplement.observe_script_scope.assert_not_called()
+                    self.assertEqual(len(report["failures"]), 2)
+                    self.assertTrue(
+                        any("original control refused" in item for item in report["failures"])
+                    )
+                    self.assertTrue(
+                        any("original feature refused" in item for item in report["failures"])
+                    )
+                    self.assertEqual(
+                        report["supplementary_native_script_scope"],
+                        {
+                            "status": "not_executed",
+                            "reason": "blocked by required original launch failure",
+                        },
+                    )
+                else:
+                    supplement.observe_script_scope.assert_called_once_with()
+                    refused = any(
+                        item.startswith(
+                            "Required native Script SDK/participant qualification refused:"
+                        )
+                        for item in report["failures"]
+                    )
+                    self.assertEqual(refused, mode != "complete")
+                    self.assertEqual(len(report["failures"]), 0 if mode == "complete" else 1)
+                    if mode == "complete":
+                        self.assertEqual(report["supplementary_native_script_scope"], complete)
+                    else:
+                        self.assertNotIn("supplementary_native_script_scope", report)
+
+    def test_required_script_summary_rejects_unknown_identity_false_fields_and_cleanup_debt(self):
+        with tempfile.TemporaryDirectory() as root:
+            fixture = NativeScriptFixture(Path(root))
+            result = fixture.observe(self, "script_scope")
+            require = lambda row: script_probe.require_summary(
+                row, fixture.executable, DOMAIN, probe.CONTRACT, probe.QUALIFICATION
+            )
+            self.assertIs(require(result), result)
+            changes = [
+                lambda r: r.update(process_retired=False),
+                lambda r: r.update(preference_restored=1),
+                lambda r: r.update(foreign=True),
+                lambda r: r["measurement"].update(participant_inverse=False),
+                lambda r: r["measurement"].update(sdk_void_set=1),
+                lambda r: r["measurement"].update(nonce="c" * 32),
+                lambda r: r["identity"].update(pid=True),
+            ]
+            for change in changes:
+                rejected = copy.deepcopy(result)
+                change(rejected)
+                with self.assertRaises(ValueError):
+                    require(rejected)
+
+    def test_followup_feature_creates_fresh_exact_owner_without_reusing_retired_pid(self):
+        with tempfile.TemporaryDirectory() as root:
+            fixture = NativeFixture(Path(root))
+            fixture.owner.pid = 42
+            with mock.patch.object(probe, "SupplementaryNativeBootstrap") as constructor:
+                expected = object()
+                constructor.return_value.observe.return_value = expected
+                self.assertIs(fixture.owner.observe_script_scope(), expected)
+                constructor.assert_called_once_with(
+                    fixture.app, fixture.output, DOMAIN, fixture.processes, fixture.run
+                )
+                constructor.return_value.observe.assert_called_once_with("script_scope")
 
 
 if __name__ == "__main__":

@@ -119,7 +119,11 @@ _LLM_Menu_BackendRows() {
 	; Ollama server port — the local daemon's port (11434 by default). Configurable
 	; so a user running Ollama on a non-standard port (or behind a proxy) can still
 	; reach it. Shown unconditionally: the user may set it before switching backend.
-	Rows.Push(Map("separator", true))
+	BoundaryRows := MenuRenderer_TemplateRows("llm_backend_choice_boundary", Map(), Map(), Map())
+	if !(BoundaryRows is Array)
+		return []
+	for Row in BoundaryRows
+		Rows.Push(Row)
 	port_display := _LLM_Menu.Has("ollama_port") ? _LLM_Menu["ollama_port"] : _LLM_DefaultFor("llm_ollama_port")
 	Rows.Push(Map(
 		"label",  StrReplace(t("menu.llm.ollama_port_label"), "%s", port_display),
@@ -240,7 +244,11 @@ LLM_Menu_BuildModelMenu() {
 			"checked", (active == default_name),
 			"action",  _LLM_Menu_MakeSetModelHandler(default_name)))
 	}
-	HeadRows.Push(Map("separator", true))
+	HeaderRows := MenuRenderer_TemplateRows("llm_model_header_boundary", Map(), Map(), Map())
+	if !(HeaderRows is Array)
+		return m
+	for Row in HeaderRows
+		HeadRows.Push(Row)
 	MenuRenderer_AppendRows(m, "llm_menu", "llm_model", HeadRows)
 
 	; Curated catalogue — provider → family → model. Family boundaries are
@@ -279,13 +287,20 @@ LLM_Menu_BuildModelMenu() {
 	; Visual model browser — exposes the shared models.json catalogue with
 	; params / RAM / speed columns so the user can compare specs before
 	; picking. Mirrors the HS visual chooser in ui/menu/menu_llm/models_manager.
-	TailRows := [Map("separator", true),
-		Map("label", t("menu.llm.add_model_entry"), "action", (*) => LLM_Menu_PromptAddModel())]
+	MenuRenderer_AppendRows(m, "llm_menu", "llm_model", _LLM_Menu_ModelTailRows())
+	return m
+}
+
+
+; The shared inert boundary precedes the unchanged native Add and browser owners.
+_LLM_Menu_ModelTailRows() {
+	BoundaryRows := MenuRenderer_StatusRows("llm_menu", "llm_model", "model_picker_tail")
+	TailRows := BoundaryRows is Array ? BoundaryRows : []
+	TailRows.Push(Map("label", t("menu.llm.add_model_entry"), "action", (*) => LLM_Menu_PromptAddModel()))
 	BrowserRow := _LLM_Menu_ModelBrowserRow()
 	if BrowserRow is Map
 		TailRows.Push(BrowserRow)
-	MenuRenderer_AppendRows(m, "llm_menu", "llm_model", TailRows)
-	return m
+	return TailRows
 }
 
 /**
@@ -370,7 +385,11 @@ _LLM_Menu_CatalogueRows(presets, active, deps_ready := true) {
 				; nested sub-sub-menus. Insert it only once per family, and
 				; only if a previous family already contributed rows.
 				if (family_added_any == false and !first_family_with_entries) {
-					ProviderRows.Push(Map("separator", true))
+					FamilyRows := MenuRenderer_TemplateRows("llm_model_family_boundary", Map(), Map(), Map())
+					if !(FamilyRows is Array)
+						return []
+					for Row in FamilyRows
+						ProviderRows.Push(Row)
 				}
 
 				ProviderRows.Push(Map(
@@ -453,7 +472,11 @@ _LLM_Menu_PerModelRows(name, model, ollama_url, active, deps_ready := true) {
 			"action", _LLM_Menu_MakeDownloadModelHandler(name)))
 	}
 
-	Rows.Push(Map("separator", true))
+	OriginRows := MenuRenderer_TemplateRows("llm_model_origin_boundary", Map(), Map(), Map())
+	if !(OriginRows is Array)
+		return []
+	for Row in OriginRows
+		Rows.Push(Row)
 	; A row with no action is drawn disabled by the renderer, which is what every
 	; spec line below is: information, not a click target.
 	Rows.Push(Map("label", StrReplace(t("menu.llm.model_backend"), "%s",
@@ -462,8 +485,11 @@ _LLM_Menu_PerModelRows(name, model, ollama_url, active, deps_ready := true) {
 		"label",  StrReplace(t("menu.llm.model_source"), "%s", ollama_url),
 		"action", _LLM_Menu_MakeOpenUrlHandler(ollama_url)))
 
-	Rows.Push(Map("separator", true))
-	Rows.Push(Map("label", t("menu.llm.specs_header")))
+	SpecsRows := MenuRenderer_TemplateRows("llm_model_specs_frame", Map(), Map(), Map())
+	if !(SpecsRows is Array)
+		return []
+	for Row in SpecsRows
+		Rows.Push(Row)
 
 	type_val := model.Has("type") ? model["type"] : ""
 	type_label_text := t((type_val == "completion") ? "menu.llm.model_type_completion" : "menu.llm.model_type_chat")
@@ -486,8 +512,11 @@ _LLM_Menu_PerModelRows(name, model, ollama_url, active, deps_ready := true) {
 
 	if (model.Has("capabilities") and Type(model["capabilities"]) == "Map") {
 		caps := model["capabilities"]
-		Rows.Push(Map("separator", true))
-		Rows.Push(Map("label", t("menu.llm.caps_header")))
+		CapsRows := MenuRenderer_TemplateRows("llm_model_caps_frame", Map(), Map(), Map())
+		if !(CapsRows is Array)
+			return []
+		for Row in CapsRows
+			Rows.Push(Row)
 		if (caps.Has("speed_tok_s") and _LLM_Menu_IsNumber(caps["speed_tok_s"]))
 			Rows.Push(Map("label", StrReplace(t("menu.llm.model_speed"), "%s", caps["speed_tok_s"])))
 		if (caps.Has("tags") and Type(caps["tags"]) == "Array" and caps["tags"].Length > 0) {
@@ -503,7 +532,11 @@ _LLM_Menu_PerModelRows(name, model, ollama_url, active, deps_ready := true) {
 		hw_root := model["hardware_requirements"]
 		if (hw_root.Has("ollama") and Type(hw_root["ollama"]) == "Map") {
 			hw := hw_root["ollama"]
-			Rows.Push(Map("separator", true))
+			HardwareRows := MenuRenderer_TemplateRows("llm_model_hardware_boundary", Map(), Map(), Map())
+			if !(HardwareRows is Array)
+				return []
+			for Row in HardwareRows
+				Rows.Push(Row)
 			Rows.Push(Map("label", StrReplace(t("menu.llm.hw_header"), "%s", "Ollama")))
 			if (hw.Has("download_gb") and _LLM_Menu_IsNumber(hw["download_gb"]))
 				Rows.Push(Map("label", StrReplace(t("menu.llm.hw_download"), "%s", hw["download_gb"])))

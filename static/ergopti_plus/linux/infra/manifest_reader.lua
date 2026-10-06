@@ -155,5 +155,7 @@ function M.scope_inventory(scope, providers, owners) return _defaults.scope_inve
 --- @param owners table|nil Exact host parameter validators.
 --- @return table plan
 function M.scope_plan(scope, mode, owned_paths, owners) return _defaults.scope_plan(scope, mode, owned_paths, owners) end
+function M.direct_scope_operations(scope, mode, owned_paths, owners) return _defaults.direct_scope_operations(scope, mode, owned_paths, owners) end
+function M.direct_scope_plan(scope, mode, owned_paths, owners) return _defaults.direct_scope_plan(scope, mode, owned_paths, owners) end
 
 return M

@@ -20,7 +20,7 @@
 
 ; Reads gesture assignments from the v2 [gestures] section.
 GesturesReadConfig() {
-		global GestureAssignments, GestureActionParameters, _IniCache, GESTURE_ACTIONS
+		global GestureAssignments, GestureActionParameters, _IniCache, GESTURE_ACTIONS, ConfigurationFile
 
 		for _, Slot in GESTURE_SLOTS {
 				Value := IniCacheGet(_IniCache, "gestures", Slot)
@@ -40,11 +40,19 @@ GesturesReadConfig() {
 		}
 		; Rebuild this map on every read: a reload must reflect the user TOML
 		; exactly and must not retain a value deleted from disk in this process.
-		GestureActionParameters := Map()
+		CandidateParameters := Map()
+		CandidateParameters.CaseSense := "On"
+		Catalogue := TomlConfigGestureSlotCatalogue()
 		if _IniCache.Has("action_parameters") {
-				for BindingAction, Value in _IniCache["action_parameters"]
-						GestureActionParameters[BindingAction] := Value
+				for BindingAction, Value in _IniCache["action_parameters"] {
+						if TomlConfigActionParameterBindingStatus(BindingAction, Catalogue) == "retired" {
+								TomlConfigReportRetiredGestureParameter(ConfigurationFile, BindingAction)
+								continue
+						}
+						CandidateParameters[BindingAction] := Value
+				}
 		}
+		GestureActionParameters := CandidateParameters
 }
 
 ; Saves a single gesture assignment to the v2 [gestures] section.
@@ -65,17 +73,41 @@ GestureActionParameterKey(BindingId, ActionName) {
 }
 
 GestureGetActionParameter(BindingId, ActionName) {
-		global GestureActionParameters
+		global GestureActionParameters, ConfigurationFile
 		Key := GestureActionParameterKey(BindingId, ActionName)
+		if Type(BindingId) == "String" && SubStr(BindingId, 1, 9) == "tap_key__"
+				&& TomlConfigParameterBindingStatus(BindingId) == "retired" {
+				if GestureActionParameters.Has(Key) && IsSet(ConfigurationFile)
+						&& Type(ConfigurationFile) == "String" && ConfigurationFile != ""
+						TomlConfigReportRetiredGestureParameter(ConfigurationFile, Key)
+				return ""
+		}
 		return GestureActionParameters.Has(Key) ? GestureActionParameters[Key] : ""
+}
+
+; Detached parameter snapshots keep exact TOML identities even when an older
+; runtime supplied a default case-insensitive Map. Populated Maps are never
+; switched in place, and both source spellings remain independent.
+_GestureCloneActionParameters(Parameters) {
+		if !(Parameters is Map)
+				throw TypeError("A gesture parameter snapshot must be a Map.")
+		Snapshot := Map()
+		Snapshot.CaseSense := "On"
+		for Key, Value in Parameters
+				Snapshot[Key] := Value
+		return Snapshot
 }
 
 GestureSetActionParameter(BindingId, ActionName, Value, WriterFn := 0, NotifyFn := 0) {
 		if IsSet(ProgramActions_Stop) && ProgramActions_Stop() != true
 				return false
 		global GestureActionParameters, ConfigurationFile
+		if TomlConfigParameterBindingStatus(BindingId) == "retired"
+				return false
 		Key := GestureActionParameterKey(BindingId, ActionName)
-		CandidateParameters := GestureActionParameters.Clone()
+		; TOML identities are case-exact. A preserved, unjudged prefix must never
+		; alias a canonical gesture in a default case-insensitive native Map.
+		CandidateParameters := _GestureCloneActionParameters(GestureActionParameters)
 		CandidateParameters[Key] := Value
 		Updates := [{ Section: "action_parameters", Key: Key, Value: Value }]
 		if !ConfigCommitUpdates(ConfigurationFile, Updates,
@@ -325,7 +357,7 @@ _GestureCommitAssignment(&AssignmentsTarget, &ParametersTarget, AssignmentSectio
 		if IsSet(ProgramActions_Stop) && ProgramActions_Stop() != true
 				return false
 		CandidateAssignments := AssignmentsTarget.Clone()
-		CandidateParameters := ParametersTarget.Clone()
+		CandidateParameters := _GestureCloneActionParameters(ParametersTarget)
 		CandidateAssignments[Slot] := ActionName
 		Updates := [{ Section: AssignmentSection, Key: Slot, Value: ActionName }]
 		if ParameterCandidate.Get("has_value", false) {
@@ -333,6 +365,8 @@ _GestureCommitAssignment(&AssignmentsTarget, &ParametersTarget, AssignmentSectio
 						throw ValueError("Parameterized action candidate is incomplete.")
 				ParameterKey := ParameterCandidate["key"]
 				ParameterValue := ParameterCandidate["value"]
+				if TomlConfigActionParameterBindingStatus(ParameterKey) == "retired"
+						return false
 				CandidateParameters[ParameterKey] := ParameterValue
 				Updates.Push({ Section: "action_parameters", Key: ParameterKey, Value: ParameterValue })
 		}

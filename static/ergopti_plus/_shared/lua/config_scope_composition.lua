@@ -18,11 +18,14 @@
 ---    acknowledgement is asynchronous composes like a file-only one.
 --- 3. Retained Debt: a refused revert keeps the remaining inverse queue; the
 ---    owner stays pending until retry_restore() settles it in the same order.
+--- 4. Finalization Debt: refused inverse release retains its exact ordered
+---    cohort. Retry forgets only remaining inverses; already committed sources
+---    and acknowledged releases are never rolled back or repeated.
 ---
 --- A participant is a table with:
 ---   apply(mode, done)    done(committed, detail) exactly once
 ---   revert(done)         undoes its last commit; done(reverted, detail) once
----   release()            forgets that inverse once the composition commits
+---   release()            nil/true forgets the inverse; other receipts refuse
 ---   pending()            true while it retains its own compensation debt
 ---   retry_restore(done)  settles that debt; done(settled) once
 --- ==============================================================================
@@ -139,6 +142,19 @@ function M.new(options)
 	--- Settles retained debt in order; done(settled) exactly once.
 	local function settle(done)
 		if debt == nil then return done(true) end
+		if debt.release_queue then
+			while debt.release_index <= #debt.release_queue do
+				local current = debt.release_queue[debt.release_index]
+				local called, released, detail = pcall(current.participant.release)
+				if not called or (released ~= nil and released ~= true) then
+					return done(false, current.id, called and tostring(detail or "inverse release refused") or tostring(released))
+				end
+				debt.release_index = debt.release_index + 1
+			end
+			debt = nil
+			logger.info(LOG, "Scope %s inverse releases settled.", options.scope)
+			return done(true)
+		end
 		local function continue()
 			if debt.failed and debt.failed.participant.pending() == true then
 				local failed = debt.failed
@@ -172,7 +188,7 @@ function M.new(options)
 		return false
 	end
 
-	--- Retries retained rollback debt; done(settled) exactly once.
+	--- Retries retained rollback or finalization debt; done(settled) exactly once.
 	--- @param done function|nil Continuation.
 	--- @return boolean accepted
 	function owner.retry_restore(done)
@@ -254,8 +270,18 @@ function M.new(options)
 			index = index + 1
 			local current = steps[index]
 			if current == nil then
-				for _, entry in ipairs(committed) do entry.participant.release() end
-				return finish(true)
+				-- Every preference candidate is committed. An acknowledged inverse
+				-- release is irreversible, so later refusals retain finalization,
+				-- never pretend the already released cohorts can roll back.
+				debt = { release_queue = committed, release_index = 1 }
+				return settle(once(logger, LOG, "finalize " .. options.scope, function(settled, failed, detail)
+					if settled ~= true then
+						report.failed, report.detail = failed, detail
+						report.phase, report.committed, report.finalization_pending = "finalization", true, true
+						return finish(false)
+					end
+					return finish(true)
+				end))
 			end
 			local function apply(continuation) return current.participant.apply(mode, continuation) end
 			return invoke(logger, LOG, "apply " .. current.id, apply, function(ok, detail)

@@ -60,6 +60,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { scriptTokens } = require('../lib/script-source.cjs');
 const {
 	delegatedMenuSources,
 	combineMenuVisibility
@@ -85,22 +86,202 @@ const SEPARATOR = '---';
 // be a rule with four exceptions — and a missing entry here would silently make
 // a whole submenu unreachable, which is one of the things being checked.
 const OPENS_SUBMENU = {
+	// The empty native Input Sources provider composes its actual shared command.
+	active_layouts: {
+		menu: 'layout_active_source_empty_commands',
+		platforms: ['hs'],
+		kind: 'compose',
+		native_sources: { hs: 'macos/ui/menu/menu_keyboard_layout.lua' }
+	},
+	apps_installed: {
+		menu: 'apps_empty_rows',
+		platforms: ['hs'],
+		kind: 'compose',
+		native_sources: { hs: 'macos/ui/menu/menu_apps.lua' }
+	},
+	system_gesture_status: {
+		menu: 'gesture_system_status_controls',
+		platforms: ['ahk', 'hs'],
+		kind: 'compose',
+		native_sources: {
+			ahk: 'windows/ui/gesture_conflicts.ahk',
+			hs: 'macos/ui/menu/menu_gestures.lua'
+		}
+	},
 	selection_operations: [
 		'selection_caps_word_control',
+		{
+			menu: 'selection_case_boundary',
+			platforms: ['linux'],
+			kind: 'compose',
+			native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+		},
 		'selection_case_commands',
+		{
+			menu: 'selection_helper_boundary',
+			platforms: ['linux'],
+			kind: 'compose',
+			native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+		},
 		'selection_helper_commands'
 	],
 	// Every native live-mode provider renders the shared fixed Off choice.
-	llm_live_mode: 'llm_live_controls',
-	agent_system1: 'agent_system_controls',
-	agent_system2: 'agent_system_controls',
+	llm_live_mode: [
+		'llm_live_controls',
+		{
+			menu: 'llm_live_off_boundary',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_llm/live_mode_panel.lua' }
+		}
+	],
+	agent_system1: [
+		'agent_system_controls',
+		{
+			menu: 'agent_server_empty_status',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_llm/agent_panel.lua' }
+		},
+		'agent_system_model_controls',
+		{
+			menu: 'agent_system_model_installed_controls',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_llm/agent_panel.lua' }
+		},
+		{
+			menu: 'agent_system_model_missing_controls',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_llm/agent_panel.lua' }
+		}
+	],
+	agent_system2: [
+		'agent_system_controls',
+		{
+			menu: 'agent_server_empty_status',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_llm/agent_panel.lua' }
+		},
+		'agent_system_model_controls',
+		{
+			menu: 'agent_system_model_installed_controls',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_llm/agent_panel.lua' }
+		},
+		{
+			menu: 'agent_system_model_missing_controls',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_llm/agent_panel.lua' }
+		}
+	],
 	configuration: 'configuration_menu',
 	debug: 'debug_menu',
-	shortcuts: 'shortcuts_menu',
-	metrics: 'metrics_menu',
+	shortcuts: [
+		'shortcuts_menu',
+		{
+			menu: 'linux_shortcuts_absent_rows',
+			platforms: ['linux'],
+			kind: 'compose',
+			native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+		}
+	],
+	personal_shortcuts: {
+		menu: 'personal_shortcuts_frame',
+		platforms: ['ahk'],
+		kind: 'compose',
+		native_sources: { ahk: 'windows/ui/menu/menu_init.ahk' }
+	},
+	extensions_shortcuts: {
+		menu: 'shortcut_extension_boundary',
+		platforms: ['ahk', 'hs'],
+		kind: 'compose',
+		native_sources: {
+			ahk: 'windows/ui/menu/menu_shortcuts.ahk',
+			hs: 'macos/ui/menu/menu_shortcuts.lua'
+		}
+	},
+	// Native wrap providers compose these fixed fragments into their existing picker.
+	wrap_symbols_menu: [
+		{
+			menu: 'wrap_symbols_global_controls',
+			platforms: ['ahk', 'hs'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_shortcuts.ahk',
+				hs: 'macos/ui/menu/menu_shortcuts.lua'
+			}
+		},
+		{
+			menu: 'wrap_symbols_group_controls',
+			platforms: ['ahk', 'hs'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_shortcuts.ahk',
+				hs: 'macos/ui/menu/menu_shortcuts.lua'
+			}
+		},
+		{
+			menu: 'wrap_symbols_custom_separator',
+			platforms: ['ahk', 'hs'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_shortcuts.ahk',
+				hs: 'macos/ui/menu/menu_shortcuts.lua'
+			}
+		},
+		{
+			menu: 'wrap_symbols_custom_controls',
+			platforms: ['ahk', 'hs'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_shortcuts.ahk',
+				hs: 'macos/ui/menu/menu_shortcuts.lua'
+			}
+		},
+		{
+			menu: 'wrap_symbols_add_controls',
+			platforms: ['ahk', 'hs'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_shortcuts.ahk',
+				hs: 'macos/ui/menu/menu_shortcuts.lua'
+			}
+		}
+	],
+	metrics: [
+		'metrics_menu',
+		{
+			menu: 'linux_metrics_absent_rows',
+			platforms: ['linux'],
+			kind: 'compose',
+			native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+		}
+	],
+	// Its native state branches compose readouts into the existing Metrics menu.
+	metrics_migration: ['metrics_migration_unavailable_rows', 'metrics_migration_idle_rows'].map(
+		(menu) => ({
+			menu,
+			platforms: ['linux'],
+			kind: 'compose',
+			native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+		})
+	),
 	keyboard_layout: 'layout_menu',
 	number_row_policy: 'number_row_policy_rows',
-	hotstrings: 'hotstrings_menu',
+	hotstrings: [
+		'hotstrings_menu',
+		{
+			menu: 'linux_hotstrings_absent_rows',
+			platforms: ['linux'],
+			kind: 'compose',
+			native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+		}
+	],
 	// The personal provider renders the shared editor command head on every driver.
 	hotstring_personal: [
 		'personal_hotstring_commands',
@@ -116,11 +297,143 @@ const OPENS_SUBMENU = {
 	programmable_hotstrings: { menu: 'programmable_hotstrings', platforms: ['hs', 'linux'] },
 	// Each standard category provider opens the shared explicit command head.
 	hotstring_categories_standard: 'hotstring_category_menu',
-	gestures: 'gestures_menu',
-	tap_holds: 'tap_holds_menu',
+	gestures: [
+		'gestures_menu',
+		{
+			menu: 'linux_gestures_absent_rows',
+			platforms: ['linux'],
+			kind: 'compose',
+			native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+		}
+	],
+	gesture_slots_2: [
+		{
+			menu: 'gesture_swipe_slot_menu',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+		},
+		{ menu: 'gesture_slot_mode_commands', platforms: ['hs'] },
+		{
+			menu: 'gesture_sensitivity_head',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+		},
+		{
+			menu: 'gesture_change_action',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+		}
+	],
+	gesture_slots_3: [
+		{
+			menu: 'gesture_swipe_slot_menu',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+		},
+		{ menu: 'gesture_slot_mode_commands', platforms: ['hs'] },
+		{
+			menu: 'gesture_sensitivity_head',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+		},
+		{
+			menu: 'gesture_change_action',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+		}
+	],
+	gesture_slots_4: [
+		{
+			menu: 'gesture_swipe_slot_menu',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+		},
+		{ menu: 'gesture_slot_mode_commands', platforms: ['hs'] },
+		{
+			menu: 'gesture_sensitivity_head',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+		},
+		{
+			menu: 'gesture_change_action',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+		}
+	],
+	gesture_slots_5: [
+		{
+			menu: 'gesture_swipe_slot_menu',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+		},
+		{ menu: 'gesture_slot_mode_commands', platforms: ['hs'] },
+		{
+			menu: 'gesture_sensitivity_head',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+		},
+		{
+			menu: 'gesture_change_action',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+		}
+	],
+	gesture_mode_options: { menu: 'gesture_slot_mode_commands', platforms: ['hs'] },
+	gesture_sensitivity_options: {
+		menu: 'gesture_sensitivity_head',
+		platforms: ['hs'],
+		kind: 'compose',
+		native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+	},
+	tap_holds: [
+		'tap_holds_menu',
+		{
+			menu: 'tap_hold_karabiner_off_rows',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
+		},
+		{
+			menu: 'tap_hold_guardian_approval_rows',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
+		},
+		{
+			menu: 'tap_hold_guardian_unavailable_rows',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
+		},
+		{
+			menu: 'tap_hold_login_items_open_rows',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
+		},
+		{
+			menu: 'tap_hold_legacy_rules_rows',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
+		}
+	],
 	// Both hand providers render this declared fixed command under every native key.
-	tap_hold_keys_left: 'tap_hold_key_head',
-	tap_hold_keys_right: 'tap_hold_key_head',
+	tap_hold_keys_left: 'tap_hold_key_rows',
+	tap_hold_keys_right: 'tap_hold_key_rows',
+	tap_hold_key_delay: 'tap_hold_key_delay_rows',
 	key_combinations: 'key_combinations_group',
 	// Both drivers render each pair's declaration: Windows opens it at the
 	// pointer, while macOS hangs it under the cached pair row.
@@ -142,21 +455,225 @@ const OPENS_SUBMENU = {
 	// Custom entries expose this head nested on Windows/macOS and inline on Linux.
 	word_expander_entries: 'word_expander_custom_menu',
 	// The model provider publishes its fixed browser command on every driver.
-	llm_models: 'llm_model_commands',
+	llm_models: [
+		'llm_model_commands',
+		{
+			menu: 'llm_api_empty_status',
+			platforms: ['linux'],
+			kind: 'compose',
+			native_sources: { linux: 'linux/ui/menu/llm_backend_rows.lua' }
+		},
+		{
+			menu: 'llm_api_add_provider_group',
+			platforms: ['linux'],
+			kind: 'compose',
+			native_sources: { linux: 'linux/ui/menu/llm_backend_rows.lua' }
+		},
+		{
+			menu: 'llm_api_add_separator',
+			platforms: ['linux'],
+			kind: 'compose',
+			native_sources: { linux: 'linux/ui/menu/llm_backend_rows.lua' }
+		},
+		{
+			menu: 'llm_backend_choice_boundary',
+			platforms: ['linux'],
+			kind: 'compose',
+			native_sources: { linux: 'linux/ui/menu/llm_backend_rows.lua' }
+		}
+	],
 	// The backend/model providers render the active API-entry command head.
-	llm_backend: 'llm_api_active_commands',
-	llm_model: 'llm_api_active_commands',
+	llm_backend: [
+		'llm_api_active_commands',
+		{
+			menu: 'llm_api_add_provider_group',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_llm/api_panel.lua' }
+		},
+		{
+			menu: 'llm_api_add_separator',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_llm/api_panel.lua' }
+		},
+		{
+			menu: 'llm_backend_choice_boundary',
+			platforms: ['ahk'],
+			kind: 'compose',
+			native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_models.ahk' }
+		}
+	],
+	llm_model: [
+		{
+			menu: 'llm_model_header_boundary',
+			platforms: ['ahk', 'hs'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_llm/menu_models.ahk',
+				hs: 'macos/ui/menu/menu_llm/models_selector.lua'
+			}
+		},
+		{
+			menu: 'llm_api_empty_status',
+			platforms: ['ahk'],
+			kind: 'compose',
+			native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_api_entries.ahk' }
+		},
+		{
+			menu: 'llm_model_hardware_boundary',
+			platforms: ['ahk', 'hs'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_llm/menu_models.ahk',
+				hs: 'macos/ui/menu/menu_llm/models_selector.lua'
+			}
+		},
+		{
+			menu: 'llm_model_family_boundary',
+			platforms: ['ahk', 'hs'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_llm/menu_models.ahk',
+				hs: 'macos/ui/menu/menu_llm/models_selector.lua'
+			}
+		},
+		{
+			menu: 'llm_model_origin_boundary',
+			platforms: ['ahk', 'hs'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_llm/menu_models.ahk',
+				hs: 'macos/ui/menu/menu_llm/models_selector.lua'
+			}
+		},
+		'llm_api_active_commands',
+		{
+			menu: 'llm_api_add_command',
+			platforms: ['ahk'],
+			kind: 'compose',
+			native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_api_entries.ahk' }
+		},
+		{
+			menu: 'llm_api_add_separator',
+			platforms: ['ahk'],
+			kind: 'compose',
+			native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_api_entries.ahk' }
+		},
+		{
+			menu: 'llm_user_model_controls',
+			platforms: ['hs'],
+			kind: 'submenu',
+			native_sources: { hs: 'macos/ui/menu/menu_llm/models_selector.lua' }
+		},
+		{
+			menu: 'llm_model_specs_frame',
+			platforms: ['ahk', 'hs'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_llm/menu_models.ahk',
+				hs: 'macos/ui/menu/menu_llm/models_selector.lua'
+			}
+		},
+		{
+			menu: 'llm_model_caps_frame',
+			platforms: ['ahk', 'hs'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_llm/menu_models.ahk',
+				hs: 'macos/ui/menu/menu_llm/models_selector.lua'
+			}
+		}
+	],
 	// All three profile providers render the shared Create/Clone command head.
-	llm_profile: 'llm_profile_commands',
+	llm_profile: [
+		'llm_profile_commands',
+		{ menu: 'llm_custom_profile_controls', platforms: ['hs', 'linux'] },
+		{
+			menu: 'llm_profile_windows_frame',
+			platforms: ['ahk'],
+			kind: 'compose',
+			native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_profiles.ahk' }
+		},
+		{
+			menu: 'llm_profile_lua_frame',
+			platforms: ['hs', 'linux'],
+			kind: 'compose',
+			native_sources: {
+				hs: 'macos/ui/menu/menu_llm/profiles_manager.lua',
+				linux: 'linux/ui/menu/menu_builder.lua'
+			}
+		}
+	],
 	// Optional category-file providers return this declared opening command.
 	hotstring_category_file: 'hotstring_file_commands',
-	llm_display: 'llm_display_menu',
+	llm_display: [
+		'llm_display_menu',
+		{
+			menu: 'llm_display_provider_boundary',
+			platforms: ['ahk'],
+			kind: 'compose',
+			native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_settings.ahk' }
+		}
+	],
 	// Native prediction modifier providers consume the shared child records.
 	llm_navigation: 'llm_navigation_rows',
-	llm_trigger: 'llm_trigger_menu',
-	llm_generation_settings: 'llm_generation_menu',
+	llm_trigger: [
+		{
+			menu: 'llm_trigger_provider_boundary',
+			platforms: ['ahk', 'linux'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_llm/menu_settings.ahk',
+				linux: 'linux/ui/menu/menu_builder.lua'
+			}
+		},
+		'llm_trigger_menu',
+		{
+			menu: 'llm_numeric_custom_rows',
+			platforms: ['linux'],
+			kind: 'compose',
+			native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+		}
+	],
+	llm_generation_settings: [
+		'llm_generation_menu',
+		{
+			menu: 'llm_generation_count_boundary',
+			platforms: ['ahk', 'hs'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_llm/menu_settings.ahk',
+				hs: 'macos/ui/menu/menu_llm/init.lua'
+			}
+		},
+		{
+			menu: 'llm_generation_context_boundary',
+			platforms: ['ahk'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_llm/menu_settings.ahk'
+			}
+		},
+		{
+			menu: 'llm_generation_words_boundary',
+			platforms: ['ahk'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_llm/menu_settings.ahk'
+			}
+		}
+	],
 	// Linux uses the same generation child inline, through its dynamic handler.
-	llm_generation: 'llm_generation_menu',
+	llm_generation: [
+		'llm_generation_menu',
+		{
+			menu: 'llm_numeric_custom_rows',
+			platforms: ['linux'],
+			kind: 'compose',
+			native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+		}
+	],
 	// The language selector. Its rows inherit `top_level/language`'s visibility,
 	// which is every driver — the DECLARATION is narrower than that, and says why
 	// in its own reason_key rather than through this map.
@@ -169,12 +686,34 @@ const OPENS_SUBMENU = {
 	// rows: Linux folded its top-level Updates submenu into it in 2026-09.
 	about: 'about_menu',
 	// The About updater provider renders the registry-backed channel choice.
-	about_updates: ['about_update_channel_menu', 'about_update_frequency_menu', 'about_source_menu'],
+	about_updates: [
+		'about_update_channel_menu',
+		'about_update_frequency_menu',
+		'about_source_menu',
+		{
+			menu: 'about_version_separator',
+			platforms: ['ahk', 'hs', 'linux'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_init.ahk',
+				hs: 'macos/ui/menu/menu_about.lua',
+				linux: 'linux/ui/menu/menu_builder.lua'
+			}
+		}
+	],
 	// The LLM submenu, which had no manifest tree at all until 2026-08-06: the
 	// top-level row has existed on all three drivers since the feature shipped
 	// and each built the submenu beneath it by hand, so the section and its six
 	// subsections described capabilities with no rows behind them.
-	llm: 'llm_menu',
+	llm: [
+		'llm_menu',
+		{
+			menu: 'linux_llm_absent_rows',
+			platforms: ['linux'],
+			kind: 'compose',
+			native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+		}
+	],
 	// The AI agent submenu (_shared/modules/llm/agent.json), on every driver.
 	agent: 'agent_menu'
 };
@@ -300,8 +839,50 @@ function identityOf(row) {
  * @param {string} platform "ahk", "hs" or "linux".
  * @returns {object[]}
  */
-function project(menuKey, platform) {
-	return (manifest[menuKey] || []).filter((row) => visibleOn(row, platform));
+function project(menuKey, platform, visiting = new Set(), rowId) {
+	if (visiting.has(menuKey)) throw new Error(`cyclic menu include: ${menuKey}`);
+	if (!Array.isArray(manifest[menuKey])) throw new Error(`missing menu include: ${menuKey}`);
+	let declaration = manifest[menuKey];
+	if (rowId !== undefined) {
+		const selected = declaration.filter((row) => row.id === rowId);
+		if (typeof rowId !== 'string' || rowId === '' || selected.length !== 1)
+			throw new Error(`invalid direct menu row selector: ${menuKey}.${rowId}`);
+		declaration = selected;
+	}
+	visiting.add(menuKey);
+	const rows = [];
+	for (const row of declaration) {
+		if (!visibleOn(row, platform)) continue;
+		if (row.type === 'include') rows.push(...project(row.section, platform, visiting, row.row_id));
+		else rows.push(row);
+	}
+	visiting.delete(menuKey);
+	return rows;
+}
+
+// Includes are transparent: hidden tails add no clickable row, while a
+// duplicated included command still has the same actionable identity.
+{
+	const assert = require('node:assert/strict');
+	const root = manifest.tap_hold_key_rows;
+	assert.equal(project('tap_hold_key_rows', 'ahk').length, 5);
+	assert.equal(project('tap_hold_key_rows', 'hs').length, 6);
+	assert.equal(project('tap_hold_key_rows', 'linux').length, 5);
+	const original = root.slice();
+	try {
+		root.push({ type: 'include', section: 'tap_hold_key_head' });
+		const identities = actionable('tap_hold_key_rows', 'ahk').map(identityOf);
+		assert(
+			identities.length > new Set(identities).size,
+			'nested duplicate commands remain detectable'
+		);
+		root.splice(0, root.length, { type: 'include', section: 'tap_hold_key_rows' });
+		assert.throws(() => project('tap_hold_key_rows', 'ahk'), /cyclic menu include/);
+		root.splice(0, root.length, { type: 'include', section: 'absent_child_template' });
+		assert.throws(() => project('tap_hold_key_rows', 'ahk'), /missing menu include/);
+	} finally {
+		root.splice(0, root.length, ...original);
+	}
 }
 
 /**
@@ -311,7 +892,9 @@ function project(menuKey, platform) {
  * @returns {object[]}
  */
 function actionable(menuKey, platform) {
-	return project(menuKey, platform).filter((row) => !isSeparator(row));
+	return project(menuKey, platform).filter(
+		(row) => !isSeparator(row) && !['label', 'section_header'].includes(row.type)
+	);
 }
 
 // ==================================================
@@ -326,6 +909,90 @@ function actionable(menuKey, platform) {
 // opening it says so, and its children inherit that without repeating it.
 const reachableOn = { top_level: PLATFORMS.slice() };
 const openedBy = {};
+const reachedByKinds = {};
+
+/** Distinguishes actual composed readouts from a clicked, empty submenu. */
+function isComposedFragment(rows, kinds) {
+	if (kinds.size !== 1 || !kinds.has('compose') || rows.length === 0) return false;
+	return rows.every((row) => {
+		if (row.type === SEPARATOR)
+			return Object.keys(row).every((key) => ['type', 'platforms', 'unavailable'].includes(key));
+		return (
+			['label', 'section_header'].includes(row.type) &&
+			typeof row.id === 'string' &&
+			row.id !== '' &&
+			typeof row.i18n === 'string' &&
+			row.i18n !== '' &&
+			Object.keys(row).every((key) =>
+				['type', 'id', 'i18n', 'platforms', 'unavailable'].includes(key)
+			)
+		);
+	});
+}
+
+const { publishesMenuTemplate: publishesTemplate } = require('../lib/menu-shared-delegation.cjs');
+
+// An inert readout is admissible only through composition. A clicked parent,
+// including one sharing the same target, still owes a usable child on that OS.
+const readout = { type: 'label', id: 'readout', i18n: 'menu.metrics.status' };
+const separator = { type: SEPARATOR };
+const header = { type: 'section_header', id: 'readout_header', i18n: 'menu.metrics.status' };
+for (const rows of [
+	[readout],
+	[separator],
+	[readout, separator],
+	[header],
+	[header, readout, separator]
+]) {
+	if (!isComposedFragment(rows, new Set(['compose'])))
+		throw new Error('Rejected a declared composed readout.');
+	for (const kinds of [new Set(), new Set(['submenu']), new Set(['compose', 'submenu'])]) {
+		if (isComposedFragment(rows, kinds)) throw new Error('Accepted an empty clicked submenu.');
+	}
+}
+for (const rows of [
+	[],
+	[{ ...readout, callback: 'invoke' }],
+	[{ ...readout, id: '' }],
+	[{ ...readout, i18n: '' }],
+	[{ type: 'check', id: 'readout', i18n: 'menu.metrics.status' }],
+	[{ ...separator, id: 'command' }],
+	[{ ...header, children: [] }],
+	[{ ...header, callback: 'invoke' }],
+	[{ ...header, caption_getter: 'read' }],
+	[{ ...header, id: '' }],
+	[readout, { type: 'section_header', i18n: 'menu.metrics.status' }]
+]) {
+	if (isComposedFragment(rows, new Set(['compose'])))
+		throw new Error('Accepted an undeclared composed readout shape.');
+}
+const platformKinds = { linux: new Set(['compose']), ahk: new Set(['submenu']) };
+if (
+	!isComposedFragment([readout], platformKinds.linux) ||
+	isComposedFragment([readout], platformKinds.ahk)
+)
+	throw new Error('Composition leaked across platform projections.');
+for (const [extension, method, comment] of [
+	['.lua', 'ManifestMenu.template_rows', '-- '],
+	['.ahk', 'MenuRenderer_TemplateRows', '; ']
+]) {
+	const call = `${method}("declared_readout", options)`;
+	if (!publishesTemplate(call, extension, 'declared_readout'))
+		throw new Error(`Missed executable ${extension} template publication.`);
+	for (const source of [
+		comment + call,
+		JSON.stringify(call),
+		call.replace('declared_readout', 'another_readout'),
+		call.replace(method, 'Unowned.template_rows'),
+		'Foreign.' + call,
+		'Foreign:' + call,
+		call.replace('"declared_readout"', '"declared_readout" .. suffix'),
+		`function ${call}`
+	]) {
+		if (publishesTemplate(source, extension, 'declared_readout'))
+			throw new Error(`Credited non-publication ${extension} template evidence.`);
+	}
+}
 
 // Iterated to a fixed point rather than walked once: the graph is shallow today
 // but a group nested inside a group would make a single pass depth-dependent,
@@ -344,9 +1011,35 @@ for (let pass = 0; pass < MENU_KEYS.length + 1; pass += 1) {
 			for (const opened of Array.isArray(published) ? published : [published]) {
 				const target = typeof opened === 'string' ? opened : opened.menu;
 				const only = typeof opened === 'string' ? PLATFORMS : opened.platforms;
+				const kind = row.type === 'include' || opened.kind === 'compose' ? 'compose' : 'submenu';
 				const effective = PLATFORMS.filter(
-					(p) => visibleOn(row, p) && parentVisibility.includes(p) && only.includes(p)
+					(p) =>
+						visibleOn(row, p) &&
+						parentVisibility.includes(p) &&
+						only.includes(p) &&
+						(row.type !== 'include' || project(target, p).length > 0)
 				);
+				for (const platform of effective) {
+					if (!reachedByKinds[target]) reachedByKinds[target] = {};
+					if (!reachedByKinds[target][platform]) reachedByKinds[target][platform] = new Set();
+					reachedByKinds[target][platform].add(kind);
+					if (row.type === 'include') continue;
+					const file = opened.native_sources?.[platform];
+					if (kind !== 'compose' && file === undefined) continue;
+					const driver = { ahk: 'windows', hs: 'macos', linux: 'linux' }[platform];
+					if (
+						typeof file !== 'string' ||
+						!file.startsWith(driver + '/') ||
+						!publishesTemplate(
+							fs.readFileSync(path.join(SP, file), 'utf8'),
+							path.extname(file),
+							target
+						)
+					)
+						errors.push(
+							`${menuKey}/${row.id}: ${kind} ${target} has no native template publication on ${platform}`
+						);
+				}
 				const before = (reachableOn[target] || []).join(',');
 				const combined = combineMenuVisibility(PLATFORMS, reachableOn[target], effective);
 				if (before !== combined.join(',')) {
@@ -377,6 +1070,13 @@ for (const menuKey of MENU_KEYS) {
 	if (!visibility || menuKey === 'top_level') continue;
 	for (const platform of visibility) {
 		if (actionable(menuKey, platform).length > 0) continue;
+		if (
+			isComposedFragment(
+				project(menuKey, platform),
+				reachedByKinds[menuKey]?.[platform] || new Set()
+			)
+		)
+			continue;
 		errors.push(
 			`${DRIVER_OF[platform]}: "${openedBy[menuKey]}" is visible, and the "${menuKey}" it opens ` +
 				`projects no actionable row for ${DRIVER_OF[platform]} — the user clicks an entry and gets an ` +
@@ -400,6 +1100,9 @@ for (const menuKey of MENU_KEYS) {
 	const visibility = reachableOn[menuKey] || PLATFORMS;
 	for (const platform of visibility) {
 		const rows = project(menuKey, platform);
+		// Native providers compose these validated inert fragments into their actual lists.
+		// A standalone heading in such a fragment is not an empty clicked submenu.
+		if (isComposedFragment(rows, reachedByKinds[menuKey]?.[platform] || new Set())) continue;
 		rows.forEach((row, index) => {
 			if ((row.type || 'ref') !== 'section_header') return;
 			let under = 0;
@@ -932,3 +1635,38 @@ console.log(
 		`${unreasoned.length} hidden row(s) still unreasoned (baseline ${UNREASONED_BASELINE}); shared ` +
 		`renderer covers macOS ${renderedCounts.hs}, Linux ${renderedCounts.linux} menu(s).\x1b[0m`
 );
+
+// Static projection selects the same direct declaration as the actual template include.
+{
+	const assert = require('node:assert/strict');
+	const names = ['__selected_frame_probe', '__selected_commands_probe'];
+	for (const key of names) assert(!Object.hasOwn(manifest, key));
+	manifest[names[0]] = [{ type: 'include', section: names[1], row_id: 'clone' }];
+	manifest[names[1]] = [
+		{ type: 'command', id: 'create', i18n: 'menu.profiles.create_profile' },
+		{ type: 'command', id: 'clone', i18n: 'menu.profiles.clone_builtin', platforms: ['hs'] }
+	];
+	try {
+		assert.deepEqual(
+			project(names[0], 'hs').map((row) => row.id),
+			['clone']
+		);
+		assert.deepEqual(project(names[0], 'ahk'), []);
+		assert.deepEqual(project(names[0], 'linux'), []);
+		for (const selector of ['', false, 'missing', 'Clone']) {
+			manifest[names[0]][0].row_id = selector;
+			assert.throws(() => project(names[0], 'hs'), /invalid direct menu row selector/);
+		}
+		manifest[names[0]][0].row_id = 'clone';
+		manifest[names[1]][0].id = 'clone';
+		assert.throws(() => project(names[0], 'hs'), /invalid direct menu row selector/);
+		manifest[names[1]][0].id = 'create';
+		delete manifest[names[0]][0].row_id;
+		assert.deepEqual(
+			project(names[0], 'hs').map((row) => row.id),
+			['create', 'clone']
+		);
+	} finally {
+		for (const key of names) delete manifest[key];
+	}
+}

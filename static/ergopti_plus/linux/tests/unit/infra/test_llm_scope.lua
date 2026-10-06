@@ -324,3 +324,267 @@ helpers.describe("Linux terminal LLM scope revert", function()
 		end)
 	end)
 end)
+
+
+helpers.describe("LLM private native claims", function()
+	helpers.it("releases actual preference and quiescent engine primitives while public pending remains true", function()
+		with_scope(function(_, engine, controls, path, backup)
+			local Preferences = require("infra.llm_preferences")
+			local public, claim, primary = {}, {}, nil
+			claim.pending = function() return primary.pending() end
+			primary = require("config_scope_transaction").new({ path = path, backup_path = backup,
+				files = { read_with_status = function(target) return Writer.read_classified(target) end,
+					write = function() error("unconditional publication") end,
+					write_if_unchanged = function(target, content, expected)
+						return Writer.publish_if_unchanged(target, content, nil, expected)
+					end }, manifest = require("infra.manifest_reader"),
+				capture = function()
+					helpers.assert_eq(engine.quiesce_configuration(claim), true)
+					return engine.configuration_snapshot(claim)
+				end,
+				apply = function() return engine.apply_configuration(claim, { enabled = false }) end,
+				restore = function(snapshot) return engine.apply_configuration(claim, snapshot) end })
+			local releases = {}
+			local function native_release(name, port)
+				return function(token)
+					helpers.assert_eq(token, claim)
+					helpers.assert_eq(public.pending(), true)
+					helpers.assert_eq(claim.pending(), false)
+					releases[#releases + 1] = name
+					return port(token)
+				end
+			end
+			local owner = require("config_scope_fenced_transaction").new({ owner = public, native_token = claim,
+				transaction = primary, scope = "llm", available = function() return true end,
+				fences = { { acquire = Preferences.acquire, release = native_release("preferences", Preferences.release) },
+					{ acquire = engine.acquire_configuration, release = native_release("engine", engine.release_configuration) } } })
+			helpers.assert_eq(owner.apply("clear"), true)
+			helpers.assert_eq(engine.is_enabled(), false)
+			helpers.assert_eq(Preferences.admit(), true)
+			helpers.assert_eq(owner.revert(), true)
+			helpers.assert_eq(Sandbox.read_bytes(path), SOURCE)
+			helpers.assert_eq(engine.is_enabled(), true)
+			helpers.assert_eq(releases, { "engine", "preferences", "engine", "preferences" })
+			helpers.assert_eq(controls.requests, 0)
+			helpers.assert_eq(owner.pending(), false)
+		end)
+	end)
+end)
+
+helpers.describe("LLM retained native release and stop debt", function()
+	local expected = { llm = { enabled = true, unknown = "keep", generation = { temperature = 0.9 },
+		trigger = { secure_filter_enabled = false, url_bar_filter_enabled = false, debounce_ms = 600 },
+		models = { ollama = "private-model" }, profiles = { num_predictions = 1 }, display = { streaming = true } },
+		api_credentials = { token = "untouched" }, foreign = { value = 42 } }
+	local receipts = {
+		{ name = "nil", reply = function() return nil end },
+		{ name = "false", reply = function() return false end },
+		{ name = "truthy string", reply = function() return "true" end },
+		{ name = "wrong object", reply = function() return {} end },
+		{ name = "exception", reply = function() error("native AI release refused") end },
+	}
+	local function controlled_scope(engine, controls, path, selected, refusal)
+		local Preferences = require("infra.llm_preferences")
+		local blocked, live, acknowledged, faults, scope = true, {}, {}, {}, nil
+		for _, entry in ipairs({ { "preferences", Preferences, "acquire", "release" },
+			{ "engine", engine, "acquire_configuration", "release_configuration" } }) do
+			local name, native = entry[1], entry[2]
+			local acquire, release = native[entry[3]], native[entry[4]]
+			native[entry[3]] = function(token)
+				if faults.acquire == name or (faults.reacquire == name and acknowledged[name]) then return false end
+				local accepted = acquire(token)
+				if accepted == true then helpers.assert_nil(live[name], "a live claim is not reacquired"); live[name] = token end
+				return accepted
+			end
+			native[entry[4]] = function(token)
+				helpers.assert_eq(live[name], token, "only the exact live native claim can release")
+				if selected == name and blocked then return refusal() end
+				helpers.assert_eq(scope.pending(), true, "public ownership remains pending until native acknowledgement")
+				helpers.assert_eq(token.pending(), false, "native token retains only primary and stop debt")
+				local accepted = release(token)
+				if accepted == true then live[name] = nil; acknowledged[name] = (acknowledged[name] or 0) + 1 end
+				return accepted
+			end
+		end
+		local files = { read_with_status = function(target) return Writer.read_classified(target) end,
+			write = function() error("unconditional AI scope publication") end,
+			write_if_unchanged = function(target, content, source)
+				if faults.on_publish then faults.on_publish(target) end
+				return Writer.publish_if_unchanged(target, content, nil, source)
+			end }
+		faults.files = files
+		scope = require("infra.llm_scope").new({ path = path, backup_path = path .. ".scope-backup", files = files, engine = engine })
+		return scope, function(value) blocked = value == true end, live, faults
+	end
+	local function restored(engine, controls, path, live)
+		helpers.assert_eq(Codec.decode(Sandbox.read_bytes(path)), expected, "complete independent source model")
+		helpers.assert_eq(engine.is_enabled(), true)
+		helpers.assert_eq(require("modules.llm.settings").get("temperature"), 0.9)
+		helpers.assert_eq(require("modules.llm.profiles").get_current_model(), "private-model")
+		helpers.assert_eq(next(live), nil)
+	end
+	for _, mode in ipairs({ "clear", "recommended" }) do
+		for _, selected in ipairs({ "preferences", "engine" }) do
+			for _, receipt in ipairs(receipts) do
+				helpers.it("compensates " .. mode .. " on " .. selected .. " " .. receipt.name .. " release", function()
+					with_scope(function(_, engine, controls, path)
+						helpers.assert_true(engine.trigger_now())
+						local scope, unblock, live = controlled_scope(engine, controls, path, selected, receipt.reply)
+						local called, committed = pcall(scope.apply, mode)
+						helpers.assert_eq(called, true)
+						helpers.assert_eq(committed, false)
+						helpers.assert_eq(scope.pending(), true)
+						helpers.assert_eq(scope.release(), false)
+						helpers.assert_eq(scope.apply("clear"), false)
+						helpers.assert_eq(engine.trigger_now(), false)
+						helpers.assert_eq(require("modules.llm.settings").set("temperature", 0.6), false)
+						unblock()
+						helpers.assert_eq(scope.retry_restore(), true)
+						helpers.assert_eq(scope.pending(), false)
+						helpers.assert_eq(controls.requests, 1, "compensation cannot resend the paid prompt")
+						helpers.assert_eq(controls.active, false)
+						restored(engine, controls, path, live)
+					end)
+				end)
+			end
+		end
+	end
+	helpers.it("retains an acquired preference claim when engine acquisition and cleanup refuse", function()
+		with_scope(function(_, engine, controls, path, backup)
+			local scope, unblock, live, faults = controlled_scope(engine, controls, path, "preferences", function() return false end)
+			faults.acquire = "engine"
+			helpers.assert_eq(scope.apply("clear"), false)
+			helpers.assert_eq(scope.pending(), true)
+			helpers.assert_eq(Sandbox.read_bytes(path), SOURCE)
+			local _, status = Writer.read_classified(backup)
+			helpers.assert_eq(status, "absent", "no primary snapshot before both native claims")
+			unblock()
+			helpers.assert_eq(scope.retry_restore(), true)
+			helpers.assert_eq(controls.requests, 0)
+			restored(engine, controls, path, live)
+		end)
+	end)
+	helpers.it("retains native stop debt through a later refused release without publishing preferences", function()
+		with_scope(function(_, engine, controls, path, backup)
+			helpers.assert_true(engine.trigger_now())
+			local scope, unblock, live = controlled_scope(engine, controls, path, "engine", function() return false end)
+			controls.stop_refused = true
+			helpers.assert_eq(scope.apply("clear"), false)
+			helpers.assert_eq(scope.pending(), true)
+			helpers.assert_eq(scope.retry_restore(), false)
+			helpers.assert_eq(controls.active, true)
+			helpers.assert_eq(Sandbox.read_bytes(path), SOURCE)
+			local _, status = Writer.read_classified(backup)
+			helpers.assert_eq(status, "absent")
+			controls.stop_refused = false
+			helpers.assert_eq(scope.retry_restore(), false)
+			helpers.assert_eq(controls.active, false)
+			helpers.assert_eq(scope.pending(), true, "stop acknowledgement does not drop release debt")
+			unblock()
+			helpers.assert_eq(scope.retry_restore(), true)
+			helpers.assert_eq(controls.requests, 1)
+			restored(engine, controls, path, live)
+		end)
+	end)
+	helpers.it("retains the committed inverse through a native stop refusal on explicit revert", function()
+		with_scope(function(_, engine, controls, path)
+			local scope, block, live = controlled_scope(engine, controls, path, "engine", function() return false end)
+			block(false)
+			helpers.assert_eq(scope.apply("recommended"), true)
+			local candidate = Sandbox.read_bytes(path)
+			helpers.assert_true(engine.trigger_now())
+			controls.stop_refused = true
+			helpers.assert_eq(scope.revert(), false)
+			helpers.assert_eq(scope.retry_restore(), false)
+			helpers.assert_eq(Sandbox.read_bytes(path), candidate)
+			controls.stop_refused = false
+			helpers.assert_eq(scope.retry_restore(), true)
+			helpers.assert_eq(controls.requests, 1)
+			restored(engine, controls, path, live)
+		end)
+	end)
+	helpers.it("holds the candidate until a released engine claim can be reacquired for its inverse", function()
+		with_scope(function(_, engine, controls, path)
+			local scope, unblock, live, faults = controlled_scope(engine, controls, path, "preferences", function() return false end)
+			faults.reacquire = "engine"
+			helpers.assert_eq(scope.apply("clear"), false)
+			local candidate = Sandbox.read_bytes(path)
+			helpers.assert_true(candidate ~= SOURCE)
+			unblock()
+			helpers.assert_eq(scope.retry_restore(), false)
+			helpers.assert_eq(Sandbox.read_bytes(path), candidate)
+			faults.reacquire = nil
+			helpers.assert_eq(scope.retry_restore(), true)
+			helpers.assert_eq(controls.requests, 0)
+			restored(engine, controls, path, live)
+		end)
+	end)
+	helpers.it("preserves an external source while native compensation remains exactly owned", function()
+		with_scope(function(_, engine, controls, path)
+			local scope, unblock, live, faults = controlled_scope(engine, controls, path, "engine", function() return false end)
+			local publish, writes, candidate = faults.files.write_if_unchanged, 0, nil
+			local foreign = '[external]\nowner = "later"\n'
+			faults.files.write_if_unchanged = function(target, content, source)
+				if target == path then writes = writes + 1; if writes == 2 then Sandbox.write_bytes(path, foreign) end end
+				local ok, detail = publish(target, content, source)
+				if target == path and writes == 1 and ok == true then candidate = Sandbox.read_bytes(path) end
+				return ok, detail
+			end
+			helpers.assert_eq(scope.apply("clear"), false)
+			helpers.assert_eq(Sandbox.read_bytes(path), foreign)
+			unblock()
+			helpers.assert_eq(scope.retry_restore(), false)
+			helpers.assert_eq(Sandbox.read_bytes(path), foreign)
+			helpers.assert_eq(engine.trigger_now(), false)
+			Sandbox.write_bytes(path, candidate) -- Explicit fixture repair of this journal's candidate generation.
+			helpers.assert_eq(scope.retry_restore(), true)
+			helpers.assert_eq(controls.requests, 0)
+			restored(engine, controls, path, live)
+		end)
+	end)
+	helpers.it("settles release-only debt after explicit inverse without repeating reader restore", function()
+		with_scope(function(_, engine, controls, path)
+			local scope, block, live = controlled_scope(engine, controls, path, "preferences", function() return false end)
+			block(false)
+			helpers.assert_eq(scope.apply("recommended"), true)
+			block(true)
+			helpers.assert_eq(scope.revert(), false)
+			local settings = require("modules.llm.settings")
+			local restore, replay = settings.restore_configuration, 0
+			settings.restore_configuration = function(...) replay = replay + 1; return restore(...) end
+			block(false)
+			helpers.assert_eq(scope.retry_restore(), true)
+			helpers.assert_eq(replay, 0)
+			restored(engine, controls, path, live)
+		end)
+	end)
+	helpers.it("halts actual global progression before Metrics while AI release debt is retained", function()
+		with_scope(function(_, engine, controls, path)
+			local scope, unblock, live = controlled_scope(engine, controls, path, "engine", function() return false end)
+			local trace = {}
+			local before = { apply = function(_, done) trace[#trace + 1] = "before.apply"; done(true) end,
+				revert = function(done) trace[#trace + 1] = "before.revert"; done(true) end,
+				release = function() end, pending = function() return false end, retry_restore = function(done) done(true) end }
+			local after = { apply = function(_, done) trace[#trace + 1] = "after.apply"; done(true) end,
+				revert = function(done) done(true) end, release = function() end,
+				pending = function() return false end, retry_restore = function(done) done(true) end }
+			local actual = require("config_scope_participant").synchronous({ apply = scope.apply, owner = function() return scope end })
+			local logger = {}; for _, name in ipairs({ "start", "success", "warn", "info", "error" }) do logger[name] = function() end end
+			local global = require("config_scope_composition").new({ manifest = require("infra.manifest_reader"), scope = "global",
+				logger = logger, participants = function() return { hotstrings = before, llm = actual, metrics = after } end })
+			local verdict, report
+			global.apply("recommended", function(ok, detail) verdict, report = ok, detail end)
+			helpers.assert_eq(verdict, false)
+			helpers.assert_eq(report.failed, "llm")
+			helpers.assert_eq(global.pending(), true)
+			helpers.assert_eq(trace, { "before.apply" })
+			unblock()
+			local settled
+			global.retry_restore(function(ok) settled = ok end)
+			helpers.assert_eq(settled, true)
+			helpers.assert_eq(trace, { "before.apply", "before.revert" })
+			helpers.assert_eq(global.pending(), false)
+			restored(engine, controls, path, live)
+		end)
+	end)
+end)

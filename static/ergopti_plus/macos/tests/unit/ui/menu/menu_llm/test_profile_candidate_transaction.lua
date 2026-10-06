@@ -168,6 +168,7 @@ local function with_fixture(options, body)
 		package.loaded["infra.manifest_menu"] = {
 			render_rows = function(rows) return rows end,
 			command_row = renderer.command_row,
+			template_rows = renderer.template_rows,
 		}
 		package.loaded["infra.notifications"] = {
 			notify = function()

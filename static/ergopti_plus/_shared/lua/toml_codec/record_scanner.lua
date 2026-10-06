@@ -112,6 +112,32 @@ local function trim(value)
 	return (value:match("^%s*(.-)%s*$")) or ""
 end
 
+--- Splits an assignment at the first equals sign outside quoted key segments.
+--- The strict codec still owns key and value validation; this shared lexical
+--- boundary only gives the decoder and physical editor the same source span.
+--- @param line string One physical assignment line.
+--- @return string|nil key Trimmed key spelling.
+--- @return string|nil value Trimmed value spelling.
+--- @return string|nil original_rhs Untrimmed bytes after the separator.
+function M.split_assignment(line)
+	local in_dbl, in_sgl, escape = false, false, false
+	for i = 1, #line do
+		local c = line:sub(i, i)
+		if escape then
+			escape = false
+		elseif c == "\\" and in_dbl then
+			escape = true
+		elseif c == '"' and not in_sgl then
+			in_dbl = not in_dbl
+		elseif c == "'" and not in_dbl then
+			in_sgl = not in_sgl
+		elseif not in_dbl and not in_sgl and c == "=" then
+			return trim(line:sub(1, i - 1)), trim(line:sub(i + 1)), line:sub(i + 1)
+		end
+	end
+	return nil, nil
+end
+
 --- Splits a dotted bare-key path. Returns nil for anything that is not a plain
 --- run of bare segments (quotes, empty segments), which is never offered.
 --- @param text string Key or header body.
@@ -190,7 +216,7 @@ function M.scan_records(source, options)
 				headers[#headers + 1] = current
 				open = nil
 			else
-				local key_text, value_text = trimmed:match("^([^=]-)%s*=%s*(.*)$")
+				local key_text, value_text = M.split_assignment(trimmed)
 				open = {
 					first = index,
 					last = index,

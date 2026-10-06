@@ -64,7 +64,7 @@ end
 --- @param path string Absolute path to config.toml.
 --- @return table scan `{ status, keys }`.
 function M.find(path)
-	return Engine.find({ path = path, collect = M.collect })
+	return Engine.find({ path = path, collect = M.collect, whole_unread_roots = true })
 end
 
 
@@ -85,6 +85,7 @@ function M.run_from_menu(deps)
 	return (deps.host or require("ui.config_cleanup.bridge")).open({
 		path = deps.path or require("infra.config_paths").config("config.toml"),
 		collect = M.collect,
+		whole_unread_roots = true,
 		file_adapter = deps.file_adapter,
 	})
 end

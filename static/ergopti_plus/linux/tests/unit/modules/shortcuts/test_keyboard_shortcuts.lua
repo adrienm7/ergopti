@@ -740,3 +740,5 @@ helpers.describe("keyboard shortcuts: ordinary physical magic editor slot", func
 		end, true)
 	end)
 end)
+
+require("test.keyboard_native_publication_contract").register(helpers, "linux")

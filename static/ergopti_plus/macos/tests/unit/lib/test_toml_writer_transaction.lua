@@ -146,16 +146,18 @@ helpers.describe("toml_writer: exact transactional acknowledgement", function()
 		end
 	end)
 
-	helpers.it("batch_write never reports an unaddressable deletion as committed", function()
-		local writes = 0
+	helpers.it("batch_write commits an authentic root-inline deletion only with exact surviving bytes", function()
+		local writes, inline_published = 0, nil
 		local wrote = writer.batch_write("/controlled/inline-delete.toml", {
 			{ section = "shortcuts", key = "enabled", delete = true },
 		}, {
 			read_with_status = function() return 'shortcuts = { enabled = true }\n', "ok" end,
-			write = function() writes = writes + 1; return true end,
+			write = function(_, content) writes = writes + 1; inline_published = content; return true end,
 		})
-		helpers.assert_eq(wrote, false)
-		helpers.assert_eq(writes, 0)
+		helpers.assert_eq(wrote, true)
+		helpers.assert_eq(writes, 1)
+		helpers.assert_eq(inline_published, 'shortcuts = {}\n', "complete independent inline deletion image")
+		helpers.assert_nil(require("toml_codec.codec").decode(inline_published).shortcuts.enabled)
 		-- A quoted spelling of the same key is addressable, and its deletion
 		-- commits only with the key gone (toml-batch-existing-key).
 		local published = nil

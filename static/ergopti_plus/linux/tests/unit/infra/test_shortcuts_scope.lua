@@ -214,18 +214,35 @@ helpers.describe("Linux terminal shortcut scope", function()
 	end)
 
 	for _, mode in ipairs({ "clear", "recommended" }) do
-		helpers.it("resets over a plain keyboard or tap_keys value instead of refusing: " .. mode
-			.. " (config-outdated-shortcut-shape)", function()
-			-- The candidate readers asserted a table, so a value an older build
-			-- left as `keyboard = "…"` refused Restore recommended and Clear.
-			-- Initialize every real owner from this old-shape source. Replacing
-			-- a different live parameter frame would test source incoherence.
+		helpers.it("retains obsolete keyboard and tap parents and refuses " .. mode
+			.. " collisions (config-outdated-shortcut-shape)", function()
+			-- Ordinary scope reset cannot replace an obsolete parent. Clear's
+			-- explicit magic-editor None also differs from neutral absence.
 			local stale = '[shortcuts]\nenabled = true\nkeyboard = "x"\ntap_keys = "y"\n'
-			with_scope(function(scope, owners, _, path)
-				local ok, committed = pcall(owners.keyboard.configuration_candidate, Codec.decode(stale))
-				helpers.assert_true(ok, tostring(committed))
-				helpers.assert_eq(scope.apply(mode), true)
+			with_scope(function(scope, owners, controls, path)
+				local assignments, parameters = owners.keyboard.get_assignments(), owners.gestures.get_all_action_parameters()
+				local actions = {}
+				for _, slot in ipairs(owners.chords.slots()) do actions[slot.id] = owners.chords.get_action(slot.id) end
+				local enabled, wrap = owners.manager.is_enabled(), owners.manager.is_wrap_on_type_enabled()
+				local chords, url = owners.chords.chords_enabled(), owners.url.get_url()
+				local ok, candidate = pcall(owners.keyboard.configuration_candidate, Codec.decode(stale))
+				helpers.assert_true(ok, tostring(candidate), "obsolete source remains readable")
+				helpers.assert_eq(scope.apply(mode), false)
+				helpers.assert_eq(Sandbox.read_bytes(path), stale, "the entire source stays intact until explicit cleanup")
+				helpers.assert_eq(#controls.backups, 0)
+				helpers.assert_eq(controls.device_calls, 0)
+				helpers.assert_eq(controls.runtime_calls, 0)
+				helpers.assert_eq(owners.keyboard.get_assignments(), assignments)
+				helpers.assert_eq(owners.gestures.get_all_action_parameters(), parameters)
+				helpers.assert_eq(owners.manager.is_enabled(), enabled)
+				helpers.assert_eq(owners.manager.is_wrap_on_type_enabled(), wrap)
+				helpers.assert_eq(owners.chords.chords_enabled(), chords)
+				helpers.assert_eq(owners.url.get_url(), url)
+				for id, action in pairs(actions) do helpers.assert_eq(owners.chords.get_action(id), action) end
+				helpers.assert_eq(owners.keyboard.get_action("magic_editor"), "open_hotstrings_editor")
+				helpers.assert_eq(owners.taps.get_action("number_row_left"), "none")
 				helpers.assert_true(owners.manager.configuration_admitted())
+				helpers.assert_eq(scope.pending(), false)
 			end, stale)
 		end)
 	end
@@ -654,6 +671,263 @@ helpers.describe("Linux script chords in the Shortcuts scope", function()
 	end)
 end)
 
+
+helpers.describe("shortcut retained native release debt", function()
+	local expected = {
+		shortcuts = { enabled = true, wrap_text_if_selected = true, chatgpt_url = "https://old.example", unknown = "keep",
+			keyboard = { ctrl_j = "open_url", ctrl_k = "enter", ctrl_p = "script_reload", foreign_slot = "keep" },
+			tap_keys = { number_row_left = "send_text", unknown = "keep" } },
+		gesture_parameters = { keyboard__ctrl_j__open_url = "https://old.example", tap_key__number_row_left__send_text = "typed",
+			tap_3__open_url = "https://gesture.example", tap_hold__caps_lock__open_url = "https://hold.example", unknown = "keep" },
+		linux = { action_parameters = { keyboard__ctrl_k__open_url = "https://legacy.example", unknown = "keep" } },
+		gestures = { enabled = false, tap_3 = "enter" }, metrics = { enabled = true }, llm = { enabled = true }, other = { value = 42 },
+	}
+	local receipts = {
+		{ name = "nil", reply = function() return nil end },
+		{ name = "false", reply = function() return false end },
+		{ name = "truthy string", reply = function() return "true" end },
+		{ name = "wrong object", reply = function() return {} end },
+		{ name = "exception", reply = function() error("native release refused") end },
+	}
+	--- Wraps real lease owners; an injected refusal never releases their token.
+	local function controlled_scope(owners, controls, path, selected, refusal)
+		local blocked, live, acknowledgements = true, {}, {}
+		local faults = {}
+		for _, entry in ipairs({ { "manager", "acquire_configuration", "release_configuration" },
+			{ "gestures", "acquire_parameter_configuration", "release_parameter_configuration" },
+			{ "url", "acquire_configuration", "release_configuration" },
+			{ "keyboard", "acquire_configuration", "release_configuration" },
+			{ "taps", "acquire_configuration", "release_configuration" },
+			{ "chords", "acquire_configuration", "release_configuration" } }) do
+			local name, native = entry[1], owners[entry[1]]
+			local acquire, release = native[entry[2]], native[entry[3]]
+			native[entry[2]] = function(token)
+				if faults.reacquire == name and acknowledgements[name] then return false end
+				local accepted = acquire(token)
+				if accepted == true then
+					helpers.assert_eq(live[name], nil, "a live acknowledged lease is never reacquired")
+					live[name] = token
+				end
+				return accepted
+			end
+			native[entry[3]] = function(token)
+				helpers.assert_eq(live[name], token, "a released lease is never released without a fresh acquisition")
+				if name == selected and blocked then return refusal() end
+				local accepted = release(token)
+				if accepted == true then
+					live[name] = nil
+					acknowledgements[name] = (acknowledgements[name] or 0) + 1
+				end
+				return accepted
+			end
+		end
+		local scope = require("infra.shortcuts_scope").new({ path = path, backup_path = path .. ".release-debt-backup",
+			files = controls.files, is_paused = function() return controls.paused end })
+		return scope, function(value) blocked = value == true end, live, acknowledgements, faults
+	end
+
+	for _, mode in ipairs({ "clear", "recommended" }) do
+		for _, receipt in ipairs(receipts) do
+			helpers.it("retains " .. mode .. " runtime/file compensation on " .. receipt.name .. " native release", function()
+				with_scope(function(_, owners, controls, path)
+					local scope, unblock, live = controlled_scope(owners, controls, path, "manager", receipt.reply)
+					local called, committed = pcall(scope.apply, mode)
+					helpers.assert_eq(called, true, "native refusal settles rather than escaping")
+					helpers.assert_eq(committed, false)
+					helpers.assert_eq(scope.pending(), true)
+					helpers.assert_eq(scope.release(), false)
+					helpers.assert_eq(scope.apply("clear"), false, "another request cannot replace release debt")
+					unblock()
+					helpers.assert_eq(scope.retry_restore(), true)
+					helpers.assert_eq(scope.pending(), false)
+					helpers.assert_eq(Codec.decode(Sandbox.read_bytes(path)), expected)
+					helpers.assert_eq(owners.manager.is_enabled(), true)
+					helpers.assert_eq(owners.keyboard.get_action("ctrl_j"), "open_url")
+					helpers.assert_eq(owners.taps.get_action("number_row_left"), "send_text")
+					helpers.assert_eq(owners.gestures.get_action_parameter("keyboard__ctrl_j", "open_url"), "https://old.example")
+					helpers.assert_eq(next(live), nil)
+				end)
+			end)
+		end
+	end
+
+	helpers.it("stops global progression and retries the exact shortcut inverse before earlier categories", function()
+		with_scope(function(_, owners, controls, path)
+			local scope, unblock = controlled_scope(owners, controls, path, "keyboard", function() return false end)
+			local trace = {}
+			local before = { apply = function(_, done) trace[#trace + 1] = "before.apply"; done(true) end,
+				revert = function(done) trace[#trace + 1] = "before.revert"; done(true) end,
+				release = function() trace[#trace + 1] = "before.release" end,
+				pending = function() return false end, retry_restore = function(done) done(true) end }
+			local after = { apply = function(_, done) trace[#trace + 1] = "after.apply"; done(true) end,
+				revert = function(done) done(true) end, release = function() end,
+				pending = function() return false end, retry_restore = function(done) done(true) end }
+			local actual = require("config_scope_participant").synchronous({ apply = scope.apply, owner = function() return scope end })
+			local logger = {}; for _, level in ipairs({ "start", "success", "warn", "info", "error" }) do logger[level] = function() end end
+			local global = require("config_scope_composition").new({ manifest = Manifest, scope = "global", logger = logger,
+				participants = function() return { tap_holds = before, shortcuts = actual, llm = after } end })
+			local verdict, report
+			global.apply("recommended", function(ok, detail) verdict, report = ok, detail end)
+			helpers.assert_eq(verdict, false)
+			helpers.assert_eq(report.failed, "shortcuts")
+			helpers.assert_eq(report.reverted, false)
+			helpers.assert_eq(global.pending(), true)
+			helpers.assert_eq(trace, { "before.apply" }, "later scopes and earlier inverses wait for exact owned debt")
+			unblock()
+			local restored
+			global.retry_restore(function(ok) restored = ok end)
+			helpers.assert_eq(restored, true)
+			helpers.assert_eq(trace, { "before.apply", "before.revert" })
+			helpers.assert_eq(Codec.decode(Sandbox.read_bytes(path)), expected)
+			helpers.assert_eq(global.pending(), false)
+		end)
+	end)
+
+	helpers.it("preserves a source successor while the exact inverse and all native claims remain pending", function()
+		with_scope(function(_, owners, controls, path)
+			local scope, unblock, live = controlled_scope(owners, controls, path, "keyboard", function() return false end)
+			local publish, writes, candidate = controls.files.write_if_unchanged, 0, nil
+			local foreign = '[foreign]\nowner = "external"\nvalue = 999\n'
+			controls.files.write_if_unchanged = function(target, content, expected_source)
+				if target == path then
+					writes = writes + 1
+					if writes == 2 then Sandbox.write_bytes(path, foreign) end
+				end
+				local ok, detail = publish(target, content, expected_source)
+				if target == path and writes == 1 and ok == true then candidate = Sandbox.read_bytes(path) end
+				return ok, detail
+			end
+			helpers.assert_eq(scope.apply("clear"), false)
+			helpers.assert_eq(Sandbox.read_bytes(path), foreign)
+			helpers.assert_eq(scope.pending(), true)
+			helpers.assert_eq(owners.keyboard.set_action("ctrl_j", "none"), false)
+			unblock()
+			helpers.assert_eq(scope.retry_restore(), false)
+			helpers.assert_eq(Sandbox.read_bytes(path), foreign)
+			helpers.assert_true(next(live) ~= nil)
+			local restored_runtime = controls.runtime_calls
+			Sandbox.write_bytes(path, candidate) -- Explicit fixture repair under the retained source fence.
+			helpers.assert_eq(scope.retry_restore(), true)
+			helpers.assert_eq(controls.runtime_calls, restored_runtime, "the acknowledged runtime inverse is not repeated")
+			helpers.assert_eq(Codec.decode(Sandbox.read_bytes(path)), expected)
+			helpers.assert_eq(next(live), nil)
+		end)
+	end)
+
+	helpers.it("retains a committed candidate until released dispatch claims can be reacquired for its inverse", function()
+		with_scope(function(_, owners, controls, path)
+			local scope, unblock, live, _, faults = controlled_scope(owners, controls, path, "keyboard", function() return false end)
+			faults.reacquire = "taps"
+			helpers.assert_eq(scope.apply("clear"), false)
+			local candidate = Sandbox.read_bytes(path)
+			helpers.assert_true(candidate ~= SOURCE)
+			helpers.assert_eq(scope.pending(), true)
+			unblock()
+			helpers.assert_eq(scope.retry_restore(), false)
+			helpers.assert_eq(Sandbox.read_bytes(path), candidate)
+			helpers.assert_true(next(live) ~= nil)
+			faults.reacquire = nil
+			helpers.assert_eq(scope.retry_restore(), true)
+			helpers.assert_eq(Codec.decode(Sandbox.read_bytes(path)), expected)
+			helpers.assert_eq(owners.keyboard.get_action("ctrl_j"), "open_url")
+			helpers.assert_eq(next(live), nil)
+		end)
+	end)
+
+	helpers.it("settles release-only debt after an acknowledged explicit inverse without replaying it", function()
+		with_scope(function(_, _, controls, path)
+			local owners = { manager = require("modules.shortcuts.manager"), keyboard = require("modules.shortcuts.keyboard_shortcuts"),
+				taps = require("modules.shortcuts.tap_keys"), chords = require("modules.shortcuts.script_chords"),
+				url = require("modules.shortcuts.chatgpt"), gestures = require("modules.gestures.manager") }
+			local scope, block, live = controlled_scope(owners, controls, path, "keyboard", function() return false end)
+			block(false)
+			helpers.assert_eq(scope.apply("recommended"), true)
+			block(true)
+			helpers.assert_eq(scope.revert(), false)
+			helpers.assert_eq(scope.pending(), true)
+			helpers.assert_eq(Codec.decode(Sandbox.read_bytes(path)), expected)
+			local runtime_calls = controls.runtime_calls
+			block(false)
+			helpers.assert_eq(scope.retry_restore(), true)
+			helpers.assert_eq(controls.runtime_calls, runtime_calls)
+			helpers.assert_eq(next(live), nil)
+		end)
+	end)
+end)
+
+helpers.describe("Linux ordinary obsolete shortcut parent policy", function()
+	for _, literal in ipairs({ '"legacy"', '["legacy"]', "[]" }) do
+		helpers.it("clears neutral tap intent while retaining exact obsolete source " .. literal, function()
+			local source = '[shortcuts]\nenabled = true\ntap_keys = ' .. literal .. ' # taps retained\n'
+				.. '[shortcuts.keyboard]\nfuture = "keep" # keyboard retained\n[future]\nkeep = 7\n'
+			local expected = '[shortcuts]\ntap_keys = ' .. literal .. ' # taps retained\n[shortcuts.keyboard]\n'
+				.. 'magic_editor = "none"\nfuture = "keep" # keyboard retained\n[future]\nkeep = 7\n\n[shortcuts.script_control]\n'
+				.. 'script_altgr_backspace = "none"\nscript_altgr_delete = "none"\nscript_altgr_enter = "none"\nscript_altgr_escape = "none"\n'
+			with_scope(function(scope, owners, controls, path, backup)
+				local committed, detail = scope.apply("clear")
+				helpers.assert_eq(committed, true, detail)
+				helpers.assert_eq(Sandbox.read_bytes(path), expected, "hand-authored full image preserves obsolete token and comments")
+				helpers.assert_eq(Sandbox.read_bytes(backup), source)
+				helpers.assert_eq(#controls.backups, 1)
+				helpers.assert_eq(controls.runtime_calls, 1)
+				helpers.assert_eq(controls.device_calls, 0)
+				helpers.assert_eq(owners.manager.is_enabled(), false)
+				helpers.assert_eq(owners.keyboard.get_action("magic_editor"), "none")
+				for _, id in ipairs({ "number_row_left", "number_row_right_1", "number_row_right_2" }) do
+					helpers.assert_eq(owners.taps.get_action(id), "none")
+				end
+				owners.keyboard._reset()
+				owners.taps._reset()
+				helpers.assert_eq(owners.keyboard.get_action("magic_editor"), "none", "fresh actual keyboard reader agrees with ACK")
+				helpers.assert_eq(owners.taps.get_action("number_row_left"), "none", "fresh actual tap reader agrees with ACK")
+				helpers.assert_eq(scope.pending(), false)
+			end, source)
+		end)
+	end
+
+	helpers.it("compensates refused neutral source publication without erasing obsolete tap intent", function()
+		local source = '[shortcuts]\nenabled = true\ntap_keys = ["legacy"]\n[shortcuts.keyboard]\nfuture = "keep"\n[future]\nkeep = 7\n'
+		with_scope(function(scope, owners, controls, path)
+			local actions = owners.keyboard.get_assignments()
+			controls.refuse = path
+			helpers.assert_eq(scope.apply("clear"), false)
+			helpers.assert_eq(Sandbox.read_bytes(path), source)
+			helpers.assert_eq(#controls.backups, 1)
+			helpers.assert_eq(controls.runtime_calls, 2, "actual candidate and compensation both pass the native owner")
+			helpers.assert_eq(controls.device_calls, 0)
+			helpers.assert_eq(owners.manager.is_enabled(), true)
+			helpers.assert_eq(owners.keyboard.get_assignments(), actions)
+			helpers.assert_eq(owners.taps.get_action("number_row_left"), "none")
+			helpers.assert_eq(scope.pending(), false)
+			helpers.assert_eq(scope.retry_restore(), true, "the actual compensation journal is settled")
+			helpers.assert_eq(Sandbox.read_bytes(path), source)
+			owners.keyboard._reset()
+			owners.taps._reset()
+			helpers.assert_eq(owners.keyboard.get_assignments(), actions)
+			helpers.assert_eq(owners.taps.get_action("number_row_left"), "none")
+		end, source)
+	end)
+
+	for _, owner in ipairs({ "keyboard", "tap" }) do
+		helpers.it("keeps existing ordinary " .. owner .. " collision refusal source and native state", function()
+			local source = '[shortcuts]\nenabled = true\nkeyboard = "legacy"\ntap_keys = ["legacy"]\n[future]\nkeep = 7\n'
+			with_scope(function(_, owners, controls, path)
+				local accepted
+				if owner == "keyboard" then accepted = owners.keyboard.set_action("ctrl_j", "send_text")
+				else accepted = owners.taps.set_action("number_row_left", "send_text") end
+				helpers.assert_eq(accepted, false)
+				helpers.assert_eq(Sandbox.read_bytes(path), source)
+				helpers.assert_eq(#controls.backups, 0)
+				helpers.assert_eq(controls.runtime_calls, 0)
+				helpers.assert_eq(controls.device_calls, 0)
+				helpers.assert_eq(owners.keyboard.get_action("ctrl_j"), "none")
+				helpers.assert_eq(owners.taps.get_action("number_row_left"), "none")
+			end, source)
+		end)
+	end
+end)
+
+require("test.config_obsolete_parents_contract").register(helpers)
 helpers.describe("Linux shortcut scope pair initialization", function()
 	helpers.it("refuses an uninitialized actual pair owner before backup or other runtime mutation", function()
 		with_scope(function(scope, owners, controls, path)
@@ -745,6 +1019,44 @@ helpers.describe("Linux shortcut scope canonical parameter admission", function(
 			helpers.assert_eq(#controls.backups, 0)
 			helpers.assert_eq(controls.runtime_calls, 0)
 			helpers.assert_eq(owners.gestures.get_action_parameter("keyboard__ctrl_j", "open_url"), "https://old.example")
+		end)
+	end)
+end)
+
+helpers.describe("Linux merged shortcut acquisition custody", function()
+	helpers.it("reclaims only previously held ports after a partial acquisition and refused release", function()
+		with_scope(function(_, owners, controls, path)
+			local attempts, blocked = { keyboard = 0, taps = 0, chords = 0 }, true
+			owners.keyboard.acquire_configuration = function()
+				attempts.keyboard = attempts.keyboard + 1
+				return false
+			end
+			for _, name in ipairs({ "taps", "chords" }) do
+				local native, acquire = owners[name], owners[name].acquire_configuration
+				native.acquire_configuration = function(token)
+					attempts[name] = attempts[name] + 1
+					return acquire(token)
+				end
+			end
+			local release = owners.manager.release_configuration
+			owners.manager.release_configuration = function(token)
+				if blocked then return false end
+				return release(token)
+			end
+			local scope = require("infra.shortcuts_scope").new({ path = path, backup_path = path .. ".acquisition-backup",
+				files = controls.files, is_paused = function() return controls.paused end })
+			local original = Sandbox.read_bytes(path)
+			helpers.assert_eq(scope.apply("clear"), false)
+			helpers.assert_eq(scope.pending(), true)
+			helpers.assert_eq(attempts, { keyboard = 1, taps = 0, chords = 0 }, "a release debt never acquires a never-held sibling")
+			helpers.assert_eq(Sandbox.read_bytes(path), original)
+			helpers.assert_eq(#controls.backups, 0)
+			helpers.assert_eq(controls.runtime_calls, 0)
+			blocked = false
+			helpers.assert_eq(scope.retry_restore(), true)
+			helpers.assert_eq(scope.pending(), false)
+			helpers.assert_eq(attempts, { keyboard = 1, taps = 0, chords = 0 })
+			helpers.assert_eq(Sandbox.read_bytes(path), original)
 		end)
 	end)
 end)
