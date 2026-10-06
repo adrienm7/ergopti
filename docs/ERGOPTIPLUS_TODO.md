@@ -4749,6 +4749,14 @@ is unexecuted. Hosted E2E, packaging, installation and final integrated-source
 qualification remain required. The twelve Windows continuation steps and
 transversal items16/38 remain open; item62 is partial.
 
+The original installed-updater fixture now initializes the real pause owner and
+waits for the actual asynchronous installation callback. Release identity and
+all original replacement, restart, stamp and rollback assertions remain fenced.
+Its source/model controls pass; the complete local Linux suite above includes
+the unchanged candidate. Actual installation in this non-root container refuses
+at its native privilege prerequisite (exit127, no sudo/pkexec); hosted native
+installation is still required and is not reported as passed.
+
 Validation curl now prepares a private Debian archive keyring from the exact
 signed-distribution package and checks its complete aggregate hash. The original
 full InRelease verifier, successful gpgv command and required signer are unchanged.
