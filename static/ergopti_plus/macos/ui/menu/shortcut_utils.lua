@@ -174,7 +174,32 @@ local function apply_prompt_update(callback, ...)
 		Logger.error(LOG, "Shortcut prompt update raised: %s.", tostring(result))
 		return false
 	end
-	return result == true
+	if result ~= true then
+		Logger.error(LOG, "Shortcut prompt update did not commit: %s.", tostring(result))
+		return false
+	end
+	return true
+end
+
+--- Delegates a program edit to the session's existing writer-fenced owner.
+--- @param gestures table Gestures facade.
+--- @param binding string Canonical binding identifier.
+--- @param action string Action identifier.
+--- @param value string Validated parameter scalar.
+--- @param mutation table Assignment read, apply and restore ports.
+--- @param transaction function Session program transaction entry point.
+--- @return boolean committed
+function M.commit_action_parameter(gestures, binding, action, value, mutation, transaction)
+	if type(transaction) ~= "function" then
+		Logger.error(LOG, "Private program edit refused because its transaction owner is unavailable.")
+		return false
+	end
+	local called, committed = pcall(transaction, binding, action, value, mutation)
+	if not called or committed ~= true then
+		Logger.error(LOG, "Private program edit was not acknowledged.")
+		return false
+	end
+	return true
 end
 
 --- Opens a standard shortcut prompt and returns parsed output via callback.
@@ -268,8 +293,10 @@ end
 --- @param picked string|nil A value the action picker's own editor collected: it
 ---   is stored without a prompt when it validates, and prefills the prompt when
 ---   it does not.
---- @return boolean True when a valid value was stored, false when cancelled.
-function M.prompt_action_parameter(gestures, binding, action, spec, picked)
+--- @param mutation table|nil Program assignment ports for the session transaction.
+--- @param transaction function|nil Session program transaction entry point.
+--- @return boolean True when a valid value was stored and the optional transaction committed.
+local function prompt_action_parameter(gestures, binding, action, spec, picked, mutation, transaction)
 	if type(gestures) ~= "table" or type(spec) ~= "string" then return false end
 
 	local label  = (type(gestures.get_action_label) == "function" and gestures.get_action_label(action)) or action
@@ -289,6 +316,9 @@ function M.prompt_action_parameter(gestures, binding, action, spec, picked)
 		end
 		if type(gestures.validate_action_parameter) == "function"
 			and gestures.validate_action_parameter(action, value) then
+			if spec == "program" then
+				return M.commit_action_parameter(gestures, binding, action, value, mutation, transaction)
+			end
 			return apply_prompt_update(gestures.set_action_parameter,
 				binding, action, value)
 		end
@@ -297,6 +327,25 @@ function M.prompt_action_parameter(gestures, binding, action, spec, picked)
 		prior = value or prior
 		value = nil
 	end
+end
+
+--- Prompts and contains private program provider failures without logging values.
+--- @param gestures table Gestures facade.
+--- @param binding string Canonical binding identifier.
+--- @param action string Action identifier.
+--- @param spec string Parameter kind.
+--- @param picked string|nil Picker editor value.
+--- @param mutation table|nil Program assignment ports.
+--- @param transaction function|nil Session program transaction entry point.
+--- @return boolean committed
+function M.prompt_action_parameter(gestures, binding, action, spec, picked, mutation, transaction)
+	if spec ~= "program" then return prompt_action_parameter(gestures, binding, action, spec, picked, mutation, transaction) end
+	local called, committed = pcall(prompt_action_parameter, gestures, binding, action, spec, picked, mutation, transaction)
+	if not called then
+		Logger.error(LOG, "Private program parameter prompt was refused by its provider.")
+		return false
+	end
+	return committed == true
 end
 
 -- What picker_parameter_fields reads from the gestures facade.
@@ -332,9 +381,22 @@ function M.picker_parameter_fields(gestures, items, binding)
 	for _, item in ipairs(items) do
 		local kind = item.type == "action" and gestures.get_action_parameter_spec(item.id) or nil
 		if kind then
+			if kind == "program" then
+				local ready_ok, ready = pcall(function()
+					return require("modules.gestures.actions_aux_owner").program_available() == true
+						and type(gestures.program_admission_available) == "function"
+						and gestures.program_admission_available() == true
+						and type(gestures.program_binding_supported) == "function"
+						and gestures.program_binding_supported(binding) == true
+				end)
+				if not ready_ok or ready ~= true then
+					item.disabled = true
+					item.hint = i18n.get("platform_reason.program_runner_unavailable")
+				end
+			end
 			item.parameter = kind
 			item.parameterValue = binding and gestures.get_action_parameter(binding, item.id) or ""
-			if SendInput.KINDS[kind] or kind == "llm_prompt" or kind == "llm_vision" or kind == "llm_language" then
+			if SendInput.KINDS[kind] or kind == "llm_prompt" or kind == "llm_vision" or kind == "llm_language" or kind == "program" then
 				prompts[kind] = gestures.parameter_prompt(item.id)
 				errors[kind] = gestures.parameter_error(item.id)
 			end
@@ -362,6 +424,10 @@ function M.picker_parameter_fields(gestures, items, binding)
 			visionModelDefault = i18n.get("dialog.action_picker.vision_model_default"),
 			visionModelRequired = i18n.get("dialog.action_picker.vision_model_required"),
 			languageLabel = i18n.get("dialog.action_picker.language_label"),
+			programExecutableLabel = i18n.get("dialog.action_picker.program_executable"),
+			programArgumentsLabel = i18n.get("dialog.action_picker.program_arguments"),
+			programAddLabel = i18n.get("dialog.action_picker.program_add_argument"),
+			programRemoveLabel = i18n.get("dialog.action_picker.program_remove_argument"),
 			prompts = prompts,
 			errors = errors,
 		},

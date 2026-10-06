@@ -1,0 +1,557 @@
+--- tests/unit/modules/test_key_combinations.lua
+
+--- Controlled production composition; no device, process or IO port is claimed native.
+local helpers = require("tests.helpers")
+local assert_false = function(value, message) helpers.assert_eq(value, false, message) end
+local Owner = require("modules.shortcuts.key_combinations")
+local Engine = require("platform.remap.tap_hold_engine")
+local Native = require("platform.remap.key_combination_engine")
+local catalog = {}; for _, id in ipairs({ "caps_lock", "tab", "left_shift", "left_alt", "space" }) do catalog[#catalog + 1] = { id = id, key = id } end
+local path, binding = "/controlled/config.toml", "combination__caps_lock_then_tab"
+local base_text = '[shortcuts.key_combination_taps]\ncaps_lock_then_tab = "run_program"\n[shortcuts.key_combination_holds]\ncaps_lock_then_tab = "shift"\n[gesture_parameters]\ncombination__caps_lock_then_tab__run_program = "executableargvv1:controlled"\n'
+local function make(text, keys, changed)
+	local state = { bytes = text or base_text, paused = false, route = path }
+	state.owner = Owner.new({ keys = catalog, hold_picker = { modifiers = { "ctrl", "shift", "alt" }, layers = { "nav" } },
+		files = { read_with_status = function() if state.on_read then state.on_read() end; return state.bytes, "ok" end }, route = function() return state.route end,
+		is_paused = function() return state.paused end, changed = changed or function() return true end,
+		actions = { is_assignable = function(action) return action == "run_program" or action == "copy" end } })
+	local base = Engine.new({ keys = keys or { caps_lock = { tap_action = "enter", hold_modifier = "ctrl", time_activation_seconds = .3 } },
+		tap_min_ms = 0, one_shot_timeout_ms = 1000 })
+	local thresholds = {}; for _, row in ipairs(catalog) do thresholds[row.id] = 300 end
+	state.base, state.native = base, Native.new(base, state.owner.engine_options(thresholds))
+	return state
+end
+local function origin(generation, source, physical)
+	return { ready = true, generation = generation or 7, source = source or "owned-keyboard", physical = physical ~= false }
+end
+local function rows(events)
+	local text = {}; for _, row in ipairs(events or {}) do text[#text + 1] = row.code .. ":" .. row.value end; return table.concat(text, " ")
+end
+local function process(state, code, value, at_ms, receipt)
+	return state.native:process(code, value, at_ms, receipt or origin())
+end
+local function take(state)
+	process(state, 58, 1, 0)
+	local out, action, slot, frame = process(state, 15, 1, 10)
+	helpers.assert_eq(rows(out), "42:1")
+	helpers.assert_eq(action, nil)
+	helpers.assert_true(frame.ack(true))
+	return frame
+end
+helpers.describe("configured Linux ordered pair ownership", function()
+	helpers.it("reads canonical shared pair slots and exact action source parameters", function()
+		local state = make(); helpers.assert_true(state.owner.has_bindings())
+		helpers.assert_eq(state.owner.get_action("caps_lock_then_tab"), "run_program")
+		helpers.assert_eq(state.owner.configuration_domain(binding), "combination")
+		local guard = state.owner.capture_action(binding,"run_program"); helpers.assert_true(guard())
+		state.bytes = state.bytes:gsub("executableargvv1:controlled", "executableargvv1:changed")
+		assert_false(guard(), "parameter bytes are part of canonical source authority")
+	end)
+	helpers.it("refuses rerouted source and foreign binding identities", function()
+		local state = make(); local guard = state.owner.capture_action(binding,"run_program")
+		state.route = "/other/config.toml"; assert_false(guard())
+		helpers.assert_eq(state.owner.configuration_domain("combination__unknown_then_tab"),nil)
+	end)
+	helpers.it("retains a refused configuration lease and retries the exact token", function()
+		local accepted = false; local state = make(nil,nil,function() return accepted end); local exact, foreign = {}, {}
+		assert_false(state.owner.acquire_configuration(exact)); helpers.assert_true(state.owner.configuration_pending())
+		helpers.assert_eq(state.owner.capture_action(binding,"run_program"),nil)
+		assert_false(state.owner.acquire_configuration(foreign)); assert_false(state.owner.release_configuration(foreign))
+		accepted = true; helpers.assert_true(state.owner.acquire_configuration(exact)); helpers.assert_true(state.owner.release_configuration(exact))
+		assert_false(state.owner.configuration_pending())
+	end)
+	helpers.it("fences reentrant configuration acquisition before the native callback", function()
+		local state, entered; state = make(nil,nil,function()
+			entered = state.owner.capture_runtime() == nil and state.owner.acquire_configuration({}) == false
+			return true
+		end)
+		local token = {}; helpers.assert_true(state.owner.acquire_configuration(token)); helpers.assert_true(entered)
+		helpers.assert_true(state.owner.release_configuration(token))
+	end)
+	helpers.it("lifts only the first owned hold before action and restores afterward", function()
+		local state = make(); take(state)
+		local out, action, slot, frame = process(state,15,0,100)
+		helpers.assert_eq(rows(out),"42:0 29:0"); helpers.assert_eq(action,"run_program"); helpers.assert_eq(slot,binding)
+		helpers.assert_true(frame.ack(true)); local called = false
+		helpers.assert_true(frame.run(function(a,b) called = a == action and b == binding; helpers.assert_eq(state.base.key_refs[29],nil) end,origin()))
+		helpers.assert_true(called)
+		local restored, ack = frame.restore(origin()); helpers.assert_eq(rows(restored),"29:1"); helpers.assert_true(ack.ack(true))
+		helpers.assert_eq(rows(process(state,58,0,150)),"29:0", "first tap remains cancelled")
+	end)
+	helpers.it("does not lift another owner's reference to the same modifier", function()
+		local state = make(nil,{ caps_lock = { tap_action="enter",hold_modifier="ctrl",time_activation_seconds=.3 },
+			left_shift = { tap_action="copy",hold_modifier="ctrl",time_activation_seconds=.3 } })
+		process(state,42,1,0); take(state)
+		local out,_,_,frame = process(state,15,0,100); helpers.assert_eq(rows(out),"42:0")
+		helpers.assert_eq(state.base.key_refs[29],1); helpers.assert_true(frame.ack(true))
+		frame.run(function() helpers.assert_eq(state.base.key_refs[29],1) end,origin())
+		local restored = frame.restore(origin()); helpers.assert_eq(rows(restored),"")
+	end)
+	helpers.it("does not restore a first press that was physically released", function()
+		local state = make(); take(state); process(state,58,0,40)
+		local out,_,_,frame = process(state,15,0,100); helpers.assert_eq(rows(out),"42:0")
+		helpers.assert_true(frame.ack(true)); frame.run(function() end,origin())
+		local restored = frame.restore(origin()); helpers.assert_eq(rows(restored),"")
+	end)
+	helpers.it("lifts and restores the first owned navigation layer", function()
+		local text = base_text:gsub("caps_lock_then_tab", "left_alt_then_tab")
+		local state = make(text,{ left_alt = {tap_action="backspace",hold_layer="nav",time_activation_seconds=.3} })
+		process(state,56,1,0); helpers.assert_eq(state.base.layer_depth,1)
+		local out,_,_,frame = process(state,15,1,10); helpers.assert_true(frame.ack(true))
+		out,_,_,frame = process(state,15,0,100); helpers.assert_eq(state.base.layer_depth,0); helpers.assert_true(frame.ack(true))
+		frame.run(function() helpers.assert_eq(state.base.layer_depth,0) end,origin()); frame.restore(origin())
+		helpers.assert_eq(state.base.layer_depth,1)
+	end)
+	helpers.it("cancels a held pair tap on an unrelated physical key", function()
+		local state = make(); take(state); process(state,30,1,20)
+		local out,action,_,frame = process(state,15,0,100); helpers.assert_eq(rows(out),"42:0"); helpers.assert_eq(action,nil); helpers.assert_true(frame.ack(true))
+	end)
+	helpers.it("fires a tap-only pair at down and repeat with the canonical binding", function()
+		local state = make(base_text:gsub('caps_lock_then_tab = "shift"','caps_lock_then_tab = "none"'))
+		process(state,58,1,0)
+		for _, sample in ipairs({ {1,10}, {2,50} }) do
+			local out,action,slot,frame = process(state,15,sample[1],sample[2]); helpers.assert_eq(action,"run_program"); helpers.assert_eq(slot,binding)
+			helpers.assert_true(frame.ack(true)); frame.run(function() end,origin()); local restored, ack = frame.restore(origin()); if ack then helpers.assert_true(ack.ack(true)) end
+		end
+		local _,action,_,frame = process(state,15,0,100); helpers.assert_eq(action,nil); helpers.assert_true(frame.ack(true))
+	end)
+	helpers.it("refuses a cross-keyboard pair and a duplicate-code source collision", function()
+		local state = make(); process(state,58,1,0)
+		local _,action,_,frame = process(state,15,1,10,origin(7,"other-keyboard")); helpers.assert_eq(action,nil); helpers.assert_eq(frame,nil)
+		helpers.assert_eq(rows(process(state,58,1,20,origin(7,"other-keyboard"))),"")
+		helpers.assert_eq(rows(process(state,58,0,30,origin(7,"other-keyboard"))),"")
+		helpers.assert_true(state.base.held[58] ~= nil)
+	end)
+	helpers.it("does not admit combinations from a virtual source", function()
+		local state = make(); process(state,58,1,0,origin(7,nil,false))
+		local _,action,_,frame = process(state,15,1,10,origin(7,nil,false)); helpers.assert_eq(action,nil); helpers.assert_eq(frame,nil)
+	end)
+	helpers.it("retires instead of acknowledging late focus after canonical mutation", function()
+		local state = make(); take(state); state.bytes = state.bytes .. "\n# source changed\n"
+		local out,action,_,frame = process(state,15,0,100); helpers.assert_eq(action,nil)
+		helpers.assert_true(rows(out):find("29:0",1,true) ~= nil); helpers.assert_true(rows(out):find("42:0",1,true) ~= nil)
+		helpers.assert_true(frame.ack(true))
+	end)
+	helpers.it("retires on physical generation revocation without action", function()
+		local state = make(); take(state); local out,action,_,frame = process(state,15,0,100,origin(8))
+		helpers.assert_eq(action,nil); helpers.assert_true(#out == 2); helpers.assert_true(frame.ack(true))
+	end)
+	helpers.it("retains a refused native lift and exact retirement rows", function()
+		local state = make(); take(state); local _,_,_,frame = process(state,15,0,100)
+		assert_false(frame.ack(false)); assert_false(state.native:activate())
+		local exact = state.native:release_all(); helpers.assert_true(#exact == 2); helpers.assert_eq(state.native:release_all(),exact)
+		assert_false(state.native:ack_retirement(nil)); assert_false(state.native:activate())
+		helpers.assert_true(state.native:ack_retirement(true)); helpers.assert_true(state.native:activate())
+	end)
+	helpers.it("blocks a reentrant successor until the action frame has returned", function()
+		local state = make(); take(state); local _,_,_,frame = process(state,15,0,100); helpers.assert_true(frame.ack(true))
+		frame.run(function() state.native:release_all(); assert_false(state.native:ack_retirement(true)); assert_false(state.native:activate()) end,origin())
+		local restored = frame.restore(origin()); helpers.assert_eq(rows(restored),""); helpers.assert_true(state.native:ack_retirement(true))
+	end)
+	helpers.it("rejects an undecided roll as first key without advancing its timeline", function()
+		local state = make(base_text:gsub("caps_lock_then_tab","space_then_tab"),{ space={tap_action="",hold_modifier="ctrl",time_activation_seconds=.3} })
+		-- Roll policy is set only by the native loader; this independent base
+		-- makes that actual pending state rather than inventing a policy event.
+		state.base.by_code[57].roll = true
+		process(state,57,1,0); helpers.assert_true(state.base.held[57].undecided)
+		local _,action,_,frame = process(state,15,1,10); helpers.assert_eq(action,nil); helpers.assert_eq(frame,nil)
+	end)
+	helpers.it("preserves the original three-value binding on native roll replay", function()
+		local base = Engine.new({ keys={space={tap_action="",hold_modifier="ctrl",time_activation_seconds=.3},win={tap_action="run_program",time_activation_seconds=.3}},roll_keys={"space"},tap_min_ms=0,one_shot_timeout_ms=1000 })
+		base:process(57,1,0); base:process(125,1,10)
+		local due = base:tick(301); local found = false
+		for _, row in ipairs(due) do if row.tap == "run_program" then found = row.binding == "tap_hold__win" end end
+		helpers.assert_true(found)
+	end)
+end)
+
+local function protected_modules(replacements, callback)
+	local previous = {}; for name, module in pairs(replacements) do previous[name] = { package.loaded[name] }; package.loaded[name] = module end
+	local ok, err = pcall(callback)
+	for name, old in pairs(previous) do package.loaded[name] = old[1] end
+	if not ok then error(err,0) end
+end
+helpers.describe("ordered pairs through actual native consumers", function()
+	helpers.it("dispatches the action between acknowledged lift and restore in the actual hook", function()
+		local state = make(); local emitted, observed = {}, false
+		protected_modules({ ["adapters.keyboard_hook"] = false, ["modules.hotstrings.device_finder"] = { physical_sources = function(devices)
+			local out = {}; for _, device in ipairs(devices) do out[#out + 1] = { path=device,sysfs="/controlled/physical",name="controlled",physical=true } end; return out
+		end } }, function()
+			local hook = helpers.load_module("adapters.keyboard_hook")
+			helpers.assert_true(hook.set_remapper(state.native,function(action,slot)
+				observed = action == "run_program" and slot == binding and not hook.held_modifiers().ctrl
+				emitted[#emitted + 1] = "action"
+			end))
+			hook._test_drive({ {type=1,code=58,value=1,at_ms=0},{type=1,code=15,value=1,at_ms=10},
+				{type=1,code=15,value=0,at_ms=100},{type=1,code=58,value=0,at_ms=150} },
+				{onEmitRaw=function(code,value) emitted[#emitted + 1] = code .. ":" .. value; return true end},true)
+			helpers.assert_true(observed)
+			helpers.assert_eq(table.concat(emitted," "),"29:1 42:1 42:0 29:0 action 29:1 29:0")
+		end)
+	end)
+	helpers.it("builds pairs from actual loader state without disabling them with tap-holds", function()
+		local Loader = require("platform.remap.tap_hold_loader")
+		local defaults = require("infra.paths").shared("tap_hold/defaults.toml")
+		local loaded = Loader.load_document(defaults,{ tap_hold={enabled=false,inherit_defaults=true} },nil,"/controlled/tap_hold.toml")
+		local hook = {}; hook.set_remapper = function(engine,callback) hook.engine,hook.on_tap = engine,callback; return true end
+		for _, name in ipairs({"key_text","held_modifiers","held_text_modifier_codes","held_shortcut_modifier_codes"}) do hook[name] = function() return {} end end
+		protected_modules({ ["modules.shortcuts.key_combinations"] = false, ["platform.remap.tap_hold_manager"] = false, ["platform.remap.tap_hold_loader"]={ FALLBACK_THRESHOLD_SECONDS=Loader.FALLBACK_THRESHOLD_SECONDS, load=function() return loaded end },
+			["platform.remap.nav_layer"]={load=function() return {} end},
+			["adapters.file_system"]={read_with_status=function() return base_text,"ok" end},
+			["infra.config_paths"]={config=function() return path end} },function()
+			-- The owner must capture these actual declared ports before the manager
+			-- requires it; previous cache identity is restored by the outer guard.
+			local manager = require("platform.remap.tap_hold_manager")
+			manager.init({keyboard_hook=hook,execute_action=function() end,action_names=function() return {"run_program"} end,
+				on_text_injected=function() end,defaults_path=defaults,user_path="/controlled/tap_hold.toml"})
+			helpers.assert_true(manager.is_active()); helpers.assert_true(hook.engine.has_combinations ~= nil)
+			helpers.assert_eq(next(hook.engine.by_code),nil,"tap-hold configuration switch stays independent")
+			local out = hook.engine:process(58,1,0,origin()); helpers.assert_eq(out,nil)
+			local _,action,_,frame = hook.engine:process(15,1,10,origin()); helpers.assert_eq(action,nil); helpers.assert_true(frame.ack(true))
+			local _,tap,slot = hook.engine:process(15,0,100,origin()); helpers.assert_eq(tap,"run_program"); helpers.assert_eq(slot,binding)
+		end)
+	end)
+end)
+helpers.describe("combination binding canonical program dispatch",function()
+	helpers.it("uses the actual manager parameter source guard and blocks source changes",function()
+		local scalar = '{"version":1,"executable":"/controlled/program","arguments":["literal argument"]}'
+		local text = '[shortcuts.key_combination_taps]\ncaps_lock_then_tab="run_program"\n[shortcuts.key_combination_holds]\ncaps_lock_then_tab="shift"\n[gesture_parameters]\n' .. binding .. '__run_program=\'' .. scalar .. '\'\n'
+		local state = make(text); local captured, admission
+		local prior_open = io.open
+		io.open = function(name,mode)
+			if name == path and mode == "r" then return {read=function() return state.bytes end,close=function() return true end} end
+			return prior_open(name,mode)
+		end
+		local ok,err = pcall(function()
+			protected_modules({ ["modules.gestures.manager"]=false,
+				["adapters.file_system"]={read_with_status=function() return state.bytes,"ok" end},
+				["modules.shortcuts.key_combinations"]={ get_action=state.owner.get_action,capture_action=state.owner.capture_action },
+				["modules.gestures.program_owner"]={new=function(capture) return {
+					stop=function() return true end,run=function(slot) captured,admission = capture(slot); return captured ~= nil and admission() == true end,
+				} end},
+				["adapters.window_switch"]={new=function() return {stop=function() return true end} end},
+				["ui.gesture_conflicts"]={notify_boot=function() end},
+			},function()
+				local manager = require("modules.gestures.manager")
+				manager.init({persist=true,enabled=false,config_path=path,is_paused=function() return state.paused end})
+				helpers.assert_eq(manager.get_action_parameter(binding,"run_program"),scalar)
+				helpers.assert_true(manager.run_program(binding)); helpers.assert_eq(captured,scalar)
+				state.bytes = state.bytes .. "\n# edited after capture\n"
+				assert_false(admission(),"actual manager cannot keep a stale pair source alive")
+			end)
+		end)
+		io.open = prior_open
+		if not ok then error(err,0) end
+	end)
+end)
+helpers.describe("pair native receipt refusal boundaries",function()
+	helpers.it("never invokes action or modal after a refused real hook output port",function()
+		local state = make(); local actions, modal = 0,0
+		protected_modules({ ["adapters.keyboard_hook"]=false,["modules.hotstrings.device_finder"]={physical_sources=function(devices)
+			local out={};for _, device in ipairs(devices) do out[#out+1]={path=device,sysfs="/controlled/physical",name="controlled",physical=true} end;return out
+		end} },function()
+			local hook = require("adapters.keyboard_hook")
+			helpers.assert_true(hook.set_remapper(state.native,function() actions=actions+1 end))
+			hook._test_drive({{type=1,code=58,value=1,at_ms=0},{type=1,code=15,value=1,at_ms=10},{type=1,code=15,value=0,at_ms=100}},
+				{onEmitRaw=function(code,value) return not (code==42 and value==1) end},true)
+			helpers.assert_eq(actions,0)
+			local exact = state.native:release_all(); helpers.assert_eq(state.native:release_all(),exact)
+			helpers.assert_true(#exact > 0)
+			assert_false(hook.set_remapper(nil),"refused retirement blocks replacement")
+			hook.while_released(function() modal=modal+1 end)
+			helpers.assert_eq(modal,0,"modal acquisition cannot discard native debt")
+		end)
+	end)
+	helpers.it("suppresses reentrant physical release restoration after the action retires ownership",function()
+		local state=make();take(state)
+		local _,_,_,frame=process(state,15,0,100);helpers.assert_true(frame.ack(true))
+		frame.run(function() process(state,58,0,110) end,origin())
+		local restored=frame.restore(origin());helpers.assert_eq(rows(restored),"")
+		helpers.assert_true(state.native:ack_retirement(true))
+	end)
+	helpers.it("retires held pair output on pause during the periodic native tick",function()
+		local state=make();take(state);state.paused=true
+		local due=state.native:tick(100);helpers.assert_eq(#due,1);helpers.assert_true(#due[1].owned_rows==2)
+		helpers.assert_true(due[1].frame.ack(true));helpers.assert_eq(state.owner.capture_runtime(),nil,"pending desired pause still refuses action admission")
+	end)
+end)
+helpers.describe("configured pair publication lifecycle",function()
+	helpers.it("refreshes copied native slots only after exact retirement before owned publication release",function()
+		local Loader=require("platform.remap.tap_hold_loader")
+		local defaults=require("infra.paths").shared("tap_hold/defaults.toml")
+		local loaded=Loader.load_document(defaults,{tap_hold={enabled=true,inherit_defaults=true}},nil,"/controlled/tap_hold.toml")
+		local bytes=base_text
+		local hook={};hook.set_remapper=function(engine,callback)
+			if hook.engine and hook.engine.has_combinations then
+				hook.engine:release_all(); if hook.engine:ack_retirement(true)~=true then return false end
+			elseif hook.engine then hook.engine:release_all() end
+			if engine and engine.activate and engine:activate()~=true then return false end
+			hook.engine,hook.on_tap=engine,callback;return true
+		end
+		for _,name in ipairs({"key_text","held_modifiers","held_text_modifier_codes","held_shortcut_modifier_codes"}) do hook[name]=function() return {} end end
+		protected_modules({["modules.shortcuts.key_combinations"]=false,["platform.remap.tap_hold_manager"]=false,
+			["platform.remap.tap_hold_loader"]={FALLBACK_THRESHOLD_SECONDS=Loader.FALLBACK_THRESHOLD_SECONDS,load=function() return loaded end},
+			["platform.remap.nav_layer"]={load=function() return {} end},["adapters.file_system"]={read_with_status=function() return bytes,"ok" end},
+			["infra.config_paths"]={config=function() return path end}},function()
+			local manager=require("platform.remap.tap_hold_manager")
+			helpers.assert_true(manager.init({keyboard_hook=hook,execute_action=function() end,action_names=function() return {"run_program","copy"} end,
+				on_text_injected=function() end,defaults_path=defaults,user_path="/controlled/tap_hold.toml"}))
+			local pairs=require("modules.shortcuts.key_combinations");local token={}
+			helpers.assert_true(pairs.acquire_configuration(token));helpers.assert_eq(hook.engine,nil)
+			local next_text=bytes:gsub('caps_lock_then_tab = "run_program"','caps_lock_then_tab = "copy"'):gsub('caps_lock_then_tab = "shift"','caps_lock_then_tab = "alt"')
+			local selected=pairs.configuration_candidate(require("toml_codec").decode(next_text),true)
+			helpers.assert_true(pairs.apply_configuration(token,selected));helpers.assert_eq(hook.engine,nil,"unpublished candidate cannot receive physical input")
+			bytes=next_text
+			helpers.assert_true(pairs.release_configuration(token));helpers.assert_true(hook.engine~=nil)
+			hook.engine:process(58,1,0,origin())
+			local out,action,_,frame=hook.engine:process(15,1,10,origin())
+			helpers.assert_eq(rows(out),"56:1","new Alt hold must replace the old Shift snapshot")
+			helpers.assert_eq(action,nil);helpers.assert_true(frame.ack(true))
+			local _,tap,slot,release=hook.engine:process(15,0,100,origin())
+			helpers.assert_eq(tap,"copy");helpers.assert_eq(slot,binding);helpers.assert_true(release.ack(true))
+			for _,unsupported in ipairs({"one_shot_shift","caps_word"}) do
+				local accepted=pcall(pairs.configuration_candidate,require("toml_codec").decode(next_text:gsub('"copy"','"'..unsupported..'"')),true)
+				assert_false(accepted,"native-only tap state must not be claimed as a dispatched pair action")
+			end
+		end)
+	end)
+end)
+helpers.describe("pair source and restoration refusals",function()
+	helpers.it("refuses malformed source after installation and forwards unrelated grabbed input",function()
+		local state=make();state.bytes='[shortcuts.key_combination_taps\n'
+		protected_modules({["adapters.keyboard_hook"]=false,["modules.hotstrings.device_finder"]={physical_sources=function(devices)
+			local out={};for _,device in ipairs(devices) do out[#out+1]={path=device,sysfs="/controlled/physical",name="controlled",physical=true} end;return out
+		end}},function()
+			local hook=require("adapters.keyboard_hook");local emitted,actions={},0
+			helpers.assert_true(hook.set_remapper(state.native,function() actions=actions+1 end))
+			hook._test_drive({{type=1,code=30,value=1,at_ms=0},{type=1,code=30,value=0,at_ms=10}},
+				{onEmitRaw=function(code,value) emitted[#emitted+1]=code..":"..value;return true end},true)
+			helpers.assert_eq(table.concat(emitted," "),"30:1 30:0");helpers.assert_eq(actions,0)
+		end)
+	end)
+	helpers.it("keeps canonical unreadable startup neutral and baseline construction valid",function()
+		local owner=Owner.new({keys=catalog,hold_picker={modifiers={"ctrl"},layers={"nav"}},
+			files={read_with_status=function() error("PRIVATE SOURCE ERROR") end},route=function() return path end,
+			is_paused=function() return false end,changed=function() return true end,actions={is_assignable=function() return true end}})
+		assert_false(owner.has_bindings());helpers.assert_eq(owner.capture_runtime(),nil)
+	end)
+	helpers.it("retains a refused restore without acknowledging a successor",function()
+		local state=make();take(state);local _,_,_,frame=process(state,15,0,100);helpers.assert_true(frame.ack(true))
+		frame.run(function() end,origin());local out,restore=frame.restore(origin());helpers.assert_eq(rows(out),"29:1")
+		assert_false(restore.ack(false));assert_false(state.native:activate())
+		local retirement=state.native:release_all();helpers.assert_eq(rows(retirement),"29:0")
+		assert_false(state.native:ack_retirement(false));helpers.assert_eq(state.native:release_all(),retirement)
+		helpers.assert_true(state.native:ack_retirement(true))
+	end)
+	helpers.it("contains a throwing action while restoring only the same live first press",function()
+		local state=make();take(state);local _,_,_,frame=process(state,15,0,100);helpers.assert_true(frame.ack(true))
+		assert_false(frame.run(function() error("CONTROLLED CALLBACK REFUSAL") end,origin()))
+		local restored,ack=frame.restore(origin());helpers.assert_eq(rows(restored),"29:1");helpers.assert_true(ack.ack(true))
+	end)
+	helpers.it("refuses a post-read route change under the exact returned source guard",function()
+		local route,change=path,false
+		local owner=Owner.new({keys=catalog,hold_picker={modifiers={"ctrl","shift"},layers={"nav"}},
+			files={read_with_status=function() if change then route="/foreign/config.toml" end;return base_text,"ok" end},route=function() return route end,
+			is_paused=function() return false end,changed=function() return true end,actions={is_assignable=function() return true end}})
+		local guard=owner.capture_runtime();helpers.assert_true(guard());change=true
+		assert_false(guard(),"post-read route must still be the exact captured source")
+	end)
+end)
+helpers.describe("independent pair enablement across empty configuration",function()
+	helpers.it("installs the first pair and re-installs after last deletion with tap-holds disabled",function()
+		local Loader=require("platform.remap.tap_hold_loader")
+		local defaults=require("infra.paths").shared("tap_hold/defaults.toml")
+		local loaded=Loader.load_document(defaults,{tap_hold={enabled=false,inherit_defaults=true}},nil,"/controlled/tap_hold.toml")
+		local bytes='[shortcuts.key_combination_taps]\n[shortcuts.key_combination_holds]\n'
+		local hook={};hook.set_remapper=function(engine,callback)
+			if hook.engine and hook.engine.has_combinations then hook.engine:release_all();if hook.engine:ack_retirement(true)~=true then return false end
+			elseif hook.engine then hook.engine:release_all() end
+			if engine and engine.activate and engine:activate()~=true then return false end
+			hook.engine,hook.on_tap=engine,callback;return true
+		end
+		for _,name in ipairs({"key_text","held_modifiers","held_text_modifier_codes","held_shortcut_modifier_codes"}) do hook[name]=function() return {} end end
+		protected_modules({["modules.shortcuts.key_combinations"]=false,["platform.remap.tap_hold_manager"]=false,
+			["platform.remap.tap_hold_loader"]={FALLBACK_THRESHOLD_SECONDS=Loader.FALLBACK_THRESHOLD_SECONDS,load=function() return loaded end},
+			["platform.remap.nav_layer"]={load=function() return {} end},["adapters.file_system"]={read_with_status=function() return bytes,"ok" end},
+			["infra.config_paths"]={config=function() return path end}},function()
+			local manager=require("platform.remap.tap_hold_manager")
+			helpers.assert_true(manager.init({keyboard_hook=hook,execute_action=function() end,action_names=function() return {"run_program"} end,
+				on_text_injected=function() end,defaults_path=defaults,user_path="/controlled/tap_hold.toml"}))
+			helpers.assert_eq(hook.engine,nil)
+			local pairs=require("modules.shortcuts.key_combinations")
+			local function publish(text)
+				local token={};helpers.assert_true(pairs.acquire_configuration(token))
+				helpers.assert_true(pairs.apply_configuration(token,pairs.configuration_candidate(require("toml_codec").decode(text),true)))
+				bytes=text;helpers.assert_true(pairs.release_configuration(token))
+			end
+			for cycle=1,2 do
+				publish(base_text);helpers.assert_true(manager.is_active());helpers.assert_true(hook.engine.has_combinations~=nil)
+				helpers.assert_eq(next(hook.engine.by_code),nil)
+				hook.engine:process(58,1,0,origin());local _,_,_,frame=hook.engine:process(15,1,10,origin());helpers.assert_true(frame.ack(true))
+				local _,action,slot,release=hook.engine:process(15,0,100,origin());helpers.assert_eq(action,"run_program");helpers.assert_eq(slot,binding);helpers.assert_true(release.ack(true))
+				publish('[shortcuts.key_combination_taps]\n[shortcuts.key_combination_holds]\n');helpers.assert_eq(hook.engine,nil);assert_false(manager.is_active())
+			end
+		end)
+	end)
+end)
+helpers.describe("pair external-boundary ownership",function()
+	helpers.it("rechecks the exact frame after a guard retires and replaces its owner",function()
+		local state=make();take(state);local _,_,_,frame=process(state,15,0,100);helpers.assert_true(frame.ack(true))
+		state.on_read=function()
+			state.on_read=nil;state.native:release_all();helpers.assert_true(state.native:ack_retirement(true));helpers.assert_true(state.native:activate())
+			process(state,58,1,120)
+		end
+		local actions=0;assert_false(frame.run(function() actions=actions+1 end,origin()));helpers.assert_eq(actions,0)
+		local restored=frame.restore(origin());helpers.assert_eq(rows(restored),"");helpers.assert_eq(state.base.key_refs[29],1)
+	end)
+	helpers.it("rechecks exact restoration ownership after native read reentrancy",function()
+		local state=make();take(state);local _,_,_,frame=process(state,15,0,100);helpers.assert_true(frame.ack(true))
+		helpers.assert_true(frame.run(function() end,origin()))
+		state.on_read=function() state.on_read=nil;state.native:release_all();helpers.assert_true(state.native:ack_retirement(true));helpers.assert_true(state.native:activate());process(state,58,1,120) end
+		local restored=frame.restore(origin());helpers.assert_eq(rows(restored),"");helpers.assert_eq(state.base.key_refs[29],1)
+	end)
+	helpers.it("resumes baseline letters after exact source-revocation retirement through the actual hook",function()
+		local state=make();local emitted,actions={},0
+		protected_modules({["adapters.keyboard_hook"]=false,["modules.hotstrings.device_finder"]={physical_sources=function(devices)
+			local out={};for _,device in ipairs(devices) do out[#out+1]={path=device,sysfs="/controlled/physical",name="controlled",physical=true} end;return out
+		end}},function()
+			local hook=require("adapters.keyboard_hook");helpers.assert_true(hook.set_remapper(state.native,function() actions=actions+1 end))
+			hook._test_drive({{type=1,code=58,value=1,at_ms=0},{type=1,code=15,value=1,at_ms=10},
+				{type=1,code=30,value=1,at_ms=20},{type=1,code=30,value=0,at_ms=30}},
+				{onEmitRaw=function(code,value) emitted[#emitted+1]=code..":"..value;if code==42 and value==1 then state.bytes='[malformed\n' end;return true end},true)
+			helpers.assert_eq(actions,0);helpers.assert_true(table.concat(emitted," "):find("30:1 30:0",1,true)~=nil)
+			helpers.assert_eq(state.base.key_refs[29],nil);helpers.assert_eq(state.base.key_refs[42],nil)
+		end)
+	end)
+	helpers.it("keeps baseline output acquisition owned during reentrant native retirement",function()
+		local state=make();local accepted,entered
+		protected_modules({["adapters.keyboard_hook"]=false,["modules.hotstrings.device_finder"]={physical_sources=function(devices)
+			local out={};for _,device in ipairs(devices) do out[#out+1]={path=device,sysfs="/controlled/physical",name="controlled",physical=true} end;return out
+		end}},function()
+			local hook=require("adapters.keyboard_hook");helpers.assert_true(hook.set_remapper(state.native,function() error("stale action must not run") end))
+			hook._test_drive({{type=1,code=58,value=1,at_ms=0}}, {onEmitRaw=function(code,value)
+				if code==29 and value==1 and not entered then entered=true;accepted=hook.set_remapper(nil) end
+				return true
+			end},true)
+			helpers.assert_true(entered);assert_false(accepted,"output syscall has not returned, so retirement cannot ACK")
+			local exact=state.native:release_all();helpers.assert_eq(rows(exact),"29:0");helpers.assert_eq(state.native:release_all(),exact)
+			assert_false(state.native:activate())
+		end)
+	end)
+end)
+
+-- Reentrant native getters must not acknowledge a newly fenced owner.
+local function terminal_owner(port)
+	local state = { armed = false, calls = 0, token = {}, acquired = false }
+	local function boundary(name)
+		if state.armed and name == port then
+			state.calls = state.calls + 1
+			if state.calls == 2 then
+				state.acquired = state.owner.acquire_configuration(state.token)
+			end
+		end
+	end
+	state.owner = Owner.new({ keys = catalog, hold_picker = { modifiers = { "ctrl", "shift", "alt" }, layers = { "nav" } },
+		files = { read_with_status = function() return base_text, "ok" end },
+		route = function() boundary("route"); return path end,
+		is_paused = function() boundary("pause"); return false end,
+		changed = function() return true end,
+		actions = { is_assignable = function(action) return action == "run_program" end } })
+	state.base = Engine.new({ keys = { caps_lock = { tap_action = "enter", hold_modifier = "ctrl", time_activation_seconds = .3 } },
+		tap_min_ms = 0, one_shot_timeout_ms = 1000 })
+	local thresholds = {}; for _, row in ipairs(catalog) do thresholds[row.id] = 300 end
+	state.native = Native.new(state.base, state.owner.engine_options(thresholds))
+	return state
+end
+helpers.describe("pair terminal native getter currency", function()
+	for _, port in ipairs({ "route", "pause" }) do
+		for _, kind in ipairs({ "runtime", "action" }) do
+			helpers.it("refuses " .. kind .. " admission when the final " .. port .. " callback acquires a lease", function()
+				local state = terminal_owner(port)
+				local guard = kind == "runtime" and state.owner.capture_runtime() or state.owner.capture_action(binding, "run_program")
+				helpers.assert_true(type(guard) == "function"); state.armed = true
+				local accepted = guard()
+				helpers.assert_eq(state.calls, 2); helpers.assert_true(state.acquired)
+				helpers.assert_true(state.owner.configuration_snapshot(state.token) ~= nil)
+				assert_false(accepted, "native callback completed after the captured private currency")
+				helpers.assert_true(state.owner.release_configuration(state.token))
+			end)
+		end
+		helpers.it("vetoes actual native pair dispatch after final " .. port .. " reentry", function()
+			local state = terminal_owner(port); take(state)
+			local lifted, action, slot, frame = process(state, 15, 0, 100)
+			helpers.assert_eq(rows(lifted), "42:0 29:0"); helpers.assert_eq(action, "run_program"); helpers.assert_eq(slot, binding)
+			helpers.assert_true(frame.ack(true)); state.armed = true
+			local calls = 0; local accepted = frame.run(function() calls = calls + 1 end, origin())
+			helpers.assert_true(state.acquired); assert_false(accepted); helpers.assert_eq(calls, 0)
+			helpers.assert_eq(state.base.key_refs[29], nil)
+			helpers.assert_true(state.owner.configuration_snapshot(state.token) ~= nil)
+		end)
+		helpers.it("vetoes actual native hold restoration after final " .. port .. " reentry", function()
+			local state = terminal_owner(port); take(state)
+			local _, _, _, frame = process(state, 15, 0, 100); helpers.assert_true(frame.ack(true))
+			helpers.assert_true(frame.run(function() end, origin())); state.armed = true
+			local restored, receipt = frame.restore(origin())
+			helpers.assert_true(state.acquired); helpers.assert_eq(rows(restored), ""); helpers.assert_eq(receipt, nil)
+			helpers.assert_eq(state.base.key_refs[29], nil)
+			helpers.assert_true(state.owner.configuration_snapshot(state.token) ~= nil)
+		end)
+	end
+end)
+
+helpers.describe("exact staged pair delivery fence",function()
+	helpers.it("requires the exact configuration owner and rejects foreign editor and release tokens",function()
+		local state=make();local exact,foreign={},{}
+		assert_false(state.owner.acquire_delivery_fence(exact))
+		helpers.assert_true(state.owner.acquire_configuration(exact))
+		helpers.assert_true(state.owner.acquire_delivery_fence(exact))
+		assert_false(state.owner.acquire_delivery_fence(foreign));assert_false(state.owner.release_delivery_fence(exact))
+		helpers.assert_true(state.owner.release_configuration(exact))
+		helpers.assert_eq(state.owner.capture_runtime(),nil);helpers.assert_eq(state.owner.capture_action(binding,"run_program"),nil)
+		helpers.assert_eq(state.owner.capture_edit_source(),nil);helpers.assert_eq(state.owner.capture_edit_source(foreign),nil)
+		local receipt=state.owner.capture_edit_source(exact);helpers.assert_true(receipt.guard())
+		assert_false(state.owner.acquire_configuration(foreign));assert_false(state.owner.release_delivery_fence(foreign))
+		helpers.assert_true(state.owner.release_delivery_fence(exact));assert_false(state.owner.owns_delivery_fence(exact))
+		helpers.assert_true(state.owner.capture_runtime()() == true)
+	end)
+	helpers.it("opens delivery with a private-only ACK after staged installation",function()
+		local calls=0;local state=make(nil,nil,function() calls=calls+1;return true end);local exact={}
+		helpers.assert_true(state.owner.acquire_configuration(exact));helpers.assert_true(state.owner.acquire_delivery_fence(exact))
+		helpers.assert_true(state.owner.release_configuration(exact));helpers.assert_eq(calls,2)
+		helpers.assert_true(state.owner.release_delivery_fence(exact));helpers.assert_eq(calls,2,"opening delivery must not invoke native callbacks")
+		take(state)
+	end)
+	helpers.it("retains both exact capabilities when staged installation refuses",function()
+		local accepted=true;local state=make(nil,nil,function() return accepted end);local exact={}
+		helpers.assert_true(state.owner.acquire_configuration(exact));helpers.assert_true(state.owner.acquire_delivery_fence(exact))
+		accepted=false;assert_false(state.owner.release_configuration(exact))
+		helpers.assert_true(state.owner.owns_configuration(exact));helpers.assert_true(state.owner.owns_delivery_fence(exact))
+		assert_false(state.owner.release_delivery_fence(exact));helpers.assert_eq(state.owner.capture_runtime(),nil)
+		accepted=true;helpers.assert_true(state.owner.release_configuration(exact));helpers.assert_true(state.owner.release_delivery_fence(exact))
+		take(state)
+	end)
+end)
+
+helpers.describe("pair source receipt after final native pause callback",function()
+	for _,phase in ipairs({"editor","configuration","matches"}) do
+		helpers.it("refuses a same-byte canonical route handoff in final "..phase.." pause getter",function()
+			local route, armed, calls=path,false,0;local token={}
+			local owner=Owner.new({keys=catalog,hold_picker={modifiers={"shift","alt"},layers={"nav"}},
+				files={read_with_status=function() return base_text,"ok" end},route=function() return route end,
+				is_paused=function()
+					if armed then calls=calls+1;if calls==(phase=="editor" and 3 or 2) then route="/controlled/foreign.toml" end end
+					return false
+				end,changed=function() return true end,actions={is_assignable=function(action) return action=="run_program" end}})
+			helpers.assert_true(owner.acquire_configuration(token));helpers.assert_true(owner.acquire_delivery_fence(token))
+			if phase=="editor" then helpers.assert_true(owner.release_configuration(token)) end
+			armed=true
+			local receipt
+			if phase=="editor" then receipt=owner.capture_edit_source(token)
+			elseif phase=="configuration" then receipt=owner.configuration_source(token)
+			else receipt=owner.configuration_source_matches(token,{path=path,status="ok",content=base_text}) end
+			helpers.assert_eq(route,"/controlled/foreign.toml","The final native pause getter must cause the handoff")
+			if phase=="matches" then assert_false(receipt) else helpers.assert_eq(receipt,nil) end
+			helpers.assert_true(owner.owns_delivery_fence(token));helpers.assert_eq(owner.capture_runtime(),nil)
+		end)
+	end
+end)

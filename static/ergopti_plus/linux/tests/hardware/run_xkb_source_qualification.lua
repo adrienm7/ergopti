@@ -28,6 +28,9 @@ ffi.cdef([[
 local X11 = ffi.load(require("_generated.native_runtime").x11)
 local _checks, _failures = 0, 0
 local _server_pid, _control = nil, nil
+local _second_server_pid, _second_control = nil, nil
+-- Xlib retains extension callbacks until the owned display is closed.
+local _xtest = nil
 local _files = {}
 local _saved_env = { DISPLAY = os.getenv("DISPLAY"), WAYLAND_DISPLAY = os.getenv("WAYLAND_DISPLAY"),
 	XDG_SESSION_TYPE = os.getenv("XDG_SESSION_TYPE") }
@@ -64,6 +67,8 @@ local function file(suffix)
 	return path
 end
 local function cleanup()
+	if _second_control ~= nil then X11.XCloseDisplay(_second_control) _second_control = nil end
+	if _second_server_pid then ffi.C.kill(_second_server_pid, 15) _second_server_pid = nil end
 	Capture.clear()
 	Probe.close()
 	if _control ~= nil then X11.XCloseDisplay(_control) _control = nil end
@@ -132,6 +137,107 @@ end
 -- =========================================
 -- =========================================
 
+--- Reads the actual full server map through the same native parser as capture.
+local function native_identity(text)
+ local lib = ffi.load(require("_generated.native_runtime").xkbcommon)
+ local context = lib.xkb_context_new(0); assert(context ~= nil)
+ local keymap = lib.xkb_keymap_new_from_string(context, text, 1, 0); assert(keymap ~= nil)
+ local pointer = lib.xkb_keymap_get_as_string(keymap, 1); assert(pointer ~= nil)
+ local identity = ffi.string(pointer)
+ ffi.C.free(pointer); lib.xkb_keymap_unref(keymap); lib.xkb_context_unref(context)
+ return identity
+end
+
+--- Independent actual XKB input state changes; production never clears latches.
+local function input_state_qualification(identity, groups)
+ local requests={{code=36,mods={}}}
+ ffi.cdef([[int XkbLatchModifiers(struct _XDisplay *, unsigned int, unsigned int, unsigned int);
+  int XTestFakeKeyEvent(struct _XDisplay *, unsigned int, int, unsigned long);]])
+ _xtest = ffi.load('libXtst.so.6')
+ local state=assert(Probe.read_input_state(identity,groups))
+ check(state.mods==0 and state.base_mods==0 and state.latched_mods==0 and state.locked_mods==0 and state.observed_current()==true,'actual initial native input masks acknowledged')
+ local initial_generation, initial_locked=state.generation,state.locked_generation
+ state.latched_mods=99
+ check(state.observed_current()==true,'detached receipt mutation cannot alter private observation seal')
+ assert(X11.XkbLatchModifiers(_control,0x100,1,1)~=0);X11.XSync(_control,0)
+ local latch=assert(Probe.read_input_state(identity,groups))
+ local unsupported,latch_reason=Capture.chord_sources(requests)
+ check(unsupported==nil and latch_reason=='physical-input-modifiers-unsupported','actual native sticky Shift refuses physical chord admission with a closed reason')
+ check(latch.mods==1 and latch.base_mods==0 and latch.latched_mods==1 and latch.locked_mods==0 and latch.input_generation>state.input_generation and state.observed_current()==false,'actual sticky Shift observed independently of held and Caps state')
+ check(latch.generation==initial_generation and latch.locked_generation==initial_locked,'latches preserve original source and locked-only epochs')
+ assert(X11.XkbLatchModifiers(_control,0x100,1,0)~=0);X11.XSync(_control,0)
+ assert(X11.XkbLatchModifiers(_control,0x100,1,1)~=0);X11.XSync(_control,0)
+ local returned=assert(Probe.read_input_state(identity,groups))
+ check(returned.latched_mods==1 and returned.input_generation>latch.input_generation and latch.observed_current()==false,'native latch away-and-back revokes equal-final-mask receipt')
+ assert(X11.XkbLatchModifiers(_control,0x100,1,0)~=0);X11.XSync(_control,0)
+ assert(Probe.read_locked(identity,groups))
+ check(returned.observed_current()==false,'existing native locked read also records latch observations without changing its public contract')
+ local released=assert(Probe.read_input_state(identity,groups))
+ assert(_xtest.XTestFakeKeyEvent(_control,50,1,0)~=0);X11.XSync(_control,0)
+ local held=assert(Probe.read_input_state(identity,groups))
+ local unsupported_held,held_reason=Capture.chord_sources(requests)
+ check(unsupported_held==nil and held_reason=='physical-input-modifiers-unsupported','actual native depressed Shift cannot be guessed into physical source admission')
+ check(held.base_mods==1 and held.latched_mods==0 and held.mods==1 and held.locked_mods==0 and released.observed_current()==false,'real native depressed Shift is distinct from a latch')
+ assert(_xtest.XTestFakeKeyEvent(_control,50,0,0)~=0);X11.XSync(_control,0)
+ assert(_xtest.XTestFakeKeyEvent(_control,50,1,0)~=0);X11.XSync(_control,0)
+ local held_again=assert(Probe.read_input_state(identity,groups))
+ check(held_again.base_mods==1 and held_again.input_generation>held.input_generation and held.observed_current()==false,'native held Shift away-and-back revokes input seal despite equal final depressed mask')
+ assert(_xtest.XTestFakeKeyEvent(_control,50,0,0)~=0);X11.XSync(_control,0)
+ local neutral=assert(Probe.read_input_state(identity,groups))
+ local recovered=assert(Capture.chord_sources(requests))
+ check(Capture.chord_source_current(recovered)==true and Capture.chord_source_view(recovered)~=nil,'fresh physical source admission recovers only after actual native neutral state acknowledgement')
+ check(neutral.mods==0 and neutral.base_mods==0 and neutral.latched_mods==0 and neutral.locked_mods==0 and held_again.observed_current()==false,'native input restoration is acknowledged without clearing a latch in production')
+ local original_read=Probe.read_input_state
+ local injected=false
+ Probe.read_input_state=function(...)
+  local receipt,why=original_read(...)
+  if receipt and not injected then
+   injected=true;assert(X11.XkbLatchModifiers(_control,0x100,1,1)~=0);X11.XSync(_control,0)
+  end
+  return receipt,why
+ end
+ local changed,changed_reason=Capture.chord_sources(requests)
+ Probe.read_input_state=original_read
+ assert(X11.XkbLatchModifiers(_control,0x100,1,0)~=0);X11.XSync(_control,0)
+ check(injected and changed==nil and changed_reason=='physical-source-changed','actual native latch inserted during read callback cannot escape final physical source currency')
+ Probe.close()
+ check(neutral.observed_current()==false,'native connection retirement revokes input-state seal')
+ local reopened=assert(Probe.read_input_state(identity,groups))
+ check(reopened.input_generation>neutral.input_generation and reopened.observed_current()==true,'new native connection establishes a new input-state observation epoch')
+end
+
+--- Two independently owned displays with identical complete map/RMLVO.
+--- These eight controls retain the independent connection-lifetime oracle.
+local function connection_lifetime_qualification(first_display, keymap)
+ assert(Capture.load(keymap, "C.UTF-8"))
+ local codes={2,3,4,5,6,7,8,9,10,11}
+ local levels=assert(Capture.number_row_levels(codes))
+ local view=assert(Capture.number_row_view(levels,codes))
+ local namespace=assert(Probe.capture_number_row_namespace("de",view.keymap,view.groups))
+ check(Probe.number_row_namespace_view(namespace)~=nil,"first native namespace is owned")
+ local first_pid,first_control=_server_pid,_control
+ -- A failed second acquisition must never duplicate the borrowed first owner.
+ _server_pid,_control=nil,nil
+ local started,second_display=pcall(start)
+ _second_server_pid,_second_control=_server_pid,_control
+ _server_pid,_control=first_pid,first_control
+ assert(started,second_display)
+ assert(second_display~=first_display,"owned displays must differ")
+ layout(second_display,"de")
+ -- No stale saved Display may be dereferenced after this M.read reconnect.
+ check(Probe.number_row_namespace_view(namespace)==nil,"saved native display refuses an identical-map reconnect before property read")
+ check(Probe.read(view.keymap,view.groups)~=nil,"second identical native source is independently acknowledged")
+ local other=assert(Probe.capture_number_row_namespace("de",view.keymap,view.groups))
+ check(Probe.number_row_namespace_view(other)~=nil,"second native namespace is owned")
+ ffi.C.setenv("DISPLAY",first_display,1)
+ check(Probe.number_row_namespace_view(other)==nil,"second saved display refuses a native reconnect back")
+ check(Probe.number_row_namespace_view(namespace)==nil,"returning to equal bytes cannot revive the first native issuer")
+ local fresh=assert(Probe.capture_number_row_namespace("de",view.keymap,view.groups))
+ check(Probe.number_row_namespace_view(fresh)~=nil,"fresh native issuer works after acknowledged reconnect")
+ Probe.close()
+ check(Probe.number_row_namespace_view(fresh)==nil,"native close revokes the fresh namespace issuer")
+end
+
 print("=== native X11 source qualification on an owned Xvfb server ===")
 local ok, err = xpcall(function()
 	local display = start()
@@ -156,6 +262,7 @@ local ok, err = xpcall(function()
 	check(locked and locked.text == "ù", "locked modifiers cannot alter plain source qualification")
 	X11.XkbLockModifiers(_control, 0x100, 2, 0)
 	X11.XSync(_control, 0)
+	input_state_qualification(native_identity(server_map(display)), 2)
 
 	group(0)
 	local pending, why = Capture.source_generation()
@@ -202,6 +309,12 @@ local ok, err = xpcall(function()
 	check(Capture.load(german_map, "C.UTF-8"), "the original server map restores the acknowledged capture owner")
 	local restored_generation, restored_rows = Capture.source_generation(), Capture.direct_sources({ 39 })
 	check(restored_generation and plain(restored_rows, 39) and plain(restored_rows, 39).text == "ö", "source delivery recovers only after the complete server map matches")
+
+	local dead_results = dofile("tests/hardware/run_xkb_dead_symbols.lua")
+	check(dead_results.passed == 8 and dead_results.failed == 0, "all eight independent actual native chord/dead symbol cases pass")
+	check(Capture.load(german_map, "C.UTF-8"), "the real server capture owner is restored after independent detached library cases")
+
+	connection_lifetime_qualification(display, german_map)
 
 	DisplayServer._set_for_test(DisplayServer.WAYLAND)
 	local unsupported, wayland = Capture.source_generation()

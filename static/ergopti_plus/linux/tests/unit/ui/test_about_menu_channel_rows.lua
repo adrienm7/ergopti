@@ -68,11 +68,19 @@ local function bind_action_owners(items, source_run)
 				local Installation = require("infra.installation")
 				local original_owner = Installation.is_source_run
 				local original_progress = package.loaded["ui.download_window.bridge"]
+				local original_webview = package.loaded["ui.webview_manager"]
+				local arguments = packed(...)
 				Installation.is_source_run = function() return source_run == true end
 				package.loaded["ui.download_window.bridge"] = { show = function() return nil end }
-				local result = packed(pcall(action, ...))
+				local result = packed(pcall(function()
+					-- Keep the real consent/window path, with this click's native SDK
+					-- explicitly unavailable instead of inheriting an earlier GTK owner.
+					helpers.load_module_with_dependency("ui.webview_manager", "lgi", false)
+					return action(unpack_results(arguments, 1, arguments.n))
+				end))
 				Installation.is_source_run = original_owner
 				package.loaded["ui.download_window.bridge"] = original_progress
+				package.loaded["ui.webview_manager"] = original_webview
 				if not result[1] then error(result[2], 0) end
 				return unpack_results(result, 2, result.n)
 			end
@@ -104,6 +112,30 @@ local function build(up, changed, source_run)
 end
 
 helpers.describe("tray (linux): the About submenu owns the updater rows", function()
+
+	helpers.it("restores exact click owners after the controlled action raises", function()
+		local Installation = require("infra.installation")
+		local original_owner = Installation.is_source_run
+		local original_progress = package.loaded["ui.download_window.bridge"]
+		local original_webview = package.loaded["ui.webview_manager"]
+		local original_lgi = package.loaded["lgi"]
+		local original_preload = package.preload["lgi"]
+		local rows = bind_action_owners({ { fn = function()
+			local Webview = require("ui.webview_manager")
+			helpers.assert_true(Webview ~= original_webview, "the click must own a fresh actual page manager")
+			helpers.assert_eq(Webview._create_gtk_window("update_check", "unused", nil), false,
+				"the click must refuse the exact unavailable native acquisition")
+			error("Controlled tray action refusal", 0)
+		end } }, false)
+		local ok, err = pcall(rows[1].fn)
+		helpers.assert_eq(ok, false, "the action refusal must reach its caller")
+		helpers.assert_eq(err, "Controlled tray action refusal", "preserve the action failure")
+		helpers.assert_eq(Installation.is_source_run, original_owner, "restore the exact installation owner")
+		helpers.assert_eq(package.loaded["ui.download_window.bridge"], original_progress, "restore the exact progress owner")
+		helpers.assert_eq(package.loaded["ui.webview_manager"], original_webview, "restore the exact page owner")
+		helpers.assert_eq(package.loaded["lgi"], original_lgi, "restore the exact native SDK cache")
+		helpers.assert_eq(package.preload["lgi"], original_preload, "restore the exact native SDK loader")
+	end)
 	helpers.it("has no separate top-level Updates submenu", function()
 		local up = fake_updater("dev")
 		for _, item in ipairs(build(up)) do

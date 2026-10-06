@@ -48,6 +48,11 @@ ReloadSuccessorPort() {
 
 ReloadSuccessorAlive(Successor) {
 	global PLC_WAIT_OBJECT_0, PLC_WAIT_TIMEOUT
+	if Successor.Get("close_attempted", false) {
+		if Successor.Get("close_acknowledged", false)
+			return false
+		throw Error("The reload successor handle close remains unacknowledged.")
+	}
 	Wait := PLC_WaitHandle(Successor["handle"], 0)
 	if (Wait == PLC_WAIT_TIMEOUT)
 		return true
@@ -58,13 +63,23 @@ ReloadSuccessorAlive(Successor) {
 }
 
 ReloadSuccessorTerminate(Successor) {
+	if Successor.Get("close_attempted", false)
+		throw Error("A reload successor handle cannot be used after native close was attempted.")
 	return PLC_TerminateProcessHandle(Successor["handle"])
 }
 
 ReloadSuccessorClose(Successor) {
+	if Successor.Get("close_attempted", false)
+		return Successor.Get("close_acknowledged", false)
 	Handle := Successor["handle"]
+	Successor["close_attempted"] := true
+	Successor["close_acknowledged"] := false
+	Closed := PLC_CloseNativeHandle(Handle)
+	if !((Closed is Integer) && Closed == 1)
+		return false
 	Successor["handle"] := 0
-	return PLC_CloseNativeHandle(Handle)
+	Successor["close_acknowledged"] := true
+	return true
 }
 
 _ReloadSuccessorNow() {

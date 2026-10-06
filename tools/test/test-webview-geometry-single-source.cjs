@@ -49,6 +49,7 @@
 const fs = require('fs');
 const path = require('path');
 const assert = require('node:assert/strict');
+const { parse: parseToml } = require('smol-toml');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = 'static/ergopti_plus';
@@ -130,6 +131,7 @@ const MACOS_MODULES = {
 	hotstring_editor: 'ui/hotstring_editor/init.lua',
 	personal_info_editor: 'ui/personal_info_editor/init.lua',
 	layer_editor: 'ui/layer_editor/init.lua',
+	physical_shortcuts: 'ui/physical_shortcuts/init.lua',
 	onboarding: 'ui/onboarding/init.lua',
 	paths_editor: 'ui/menu/menu_paths.lua',
 	layout_manager: 'ui/layout_manager/init.lua',
@@ -263,6 +265,9 @@ const WINDOWS_APPS = {
 
 // Same contract as MACOS_EXCLUSIONS: a reason, or a check.
 const WINDOWS_EXCLUSIONS = {
+	physical_shortcuts:
+		'no Windows editor host yet — the shared menu keeps this row grey with ' +
+		'physical_shortcuts.windows_unavailable; the explicit unsupported contract below guards this exclusion',
 	permission_dialog:
 		'no Windows host — it walks through a macOS privacy grant (System Settings > ' +
 		'Privacy & Security), which Windows does not have',
@@ -276,6 +281,99 @@ const WINDOWS_EXCLUSIONS = {
 		'no Windows host — InputBox asks for a number natively, same reason as ' +
 		'token_prompt above. Linux has no equivalent and needs a webview to ask at all'
 };
+
+// This new app has no Windows geometry owner. Its exclusion is conditional on
+// the actual shared menu refusing Windows and explaining why, rather than an
+// exemption for every future app without a native host. A Windows port must add
+// its geometry owner above and retire this exact exclusion.
+function unsupportedPhysicalEditor(row) {
+	return (
+		row?.type === 'command' &&
+		row.id === 'physical_shortcuts_editor' &&
+		row.i18n === 'physical_shortcuts.window_title' &&
+		JSON.stringify(row.platforms) === JSON.stringify(['hs', 'linux']) &&
+		row.unavailable === 'grey' &&
+		row.reason_key === 'physical_shortcuts.windows_unavailable' &&
+		JSON.stringify(row.disabled_when) === JSON.stringify(['physical_shortcuts_editor_ready']) &&
+		row.disabled_reason_key === 'physical_shortcuts.window_unavailable'
+	);
+}
+
+const unsupportedFixture = {
+	type: 'command',
+	id: 'physical_shortcuts_editor',
+	i18n: 'physical_shortcuts.window_title',
+	platforms: ['hs', 'linux'],
+	unavailable: 'grey',
+	reason_key: 'physical_shortcuts.windows_unavailable',
+	disabled_when: ['physical_shortcuts_editor_ready'],
+	disabled_reason_key: 'physical_shortcuts.window_unavailable'
+};
+assert.equal(unsupportedPhysicalEditor(unsupportedFixture), true);
+for (const [field, value] of [
+	['type', 'dynamic'],
+	['id', 'another_editor'],
+	['i18n', 'another.title'],
+	['platforms', ['ahk', 'hs', 'linux']],
+	['platforms', undefined],
+	['unavailable', 'hide'],
+	['reason_key', 'another.reason'],
+	['disabled_when', []],
+	['disabled_reason_key', undefined]
+]) {
+	assert.equal(
+		unsupportedPhysicalEditor({ ...unsupportedFixture, [field]: value }),
+		false,
+		`unsupported physical editor fixture: ${field}`
+	);
+}
+assert.equal(unsupportedPhysicalEditor(undefined), false);
+
+const featureSource = fs.readFileSync(
+	path.join(ROOT, SP, '_shared/modules/features/manifest.toml'),
+	'utf8'
+);
+const canonicalMenu = parseToml(
+	featureSource.replace(
+		/^\[\[features\.([^\]]+)\]\]\r?$/gm,
+		(_match, prefix) => `[[entries]]\npath_prefix = "${prefix}"`
+	)
+).menu;
+const generatedMenu = JSON.parse(
+	fs.readFileSync(path.join(ROOT, SP, '_shared/modules/menu/menu_manifest.json'), 'utf8')
+);
+for (const [name, menu] of [
+	['canonical', canonicalMenu],
+	['generated', generatedMenu]
+]) {
+	const rows = menu.shortcuts_menu.filter((row) => row.id === 'physical_shortcuts_editor');
+	assert.equal(rows.length, 1, `${name}: exactly one physical shortcut editor row`);
+	assert.equal(
+		unsupportedPhysicalEditor(rows[0]),
+		true,
+		`${name}: Windows physical editor geometry exclusion requires its grey unsupported contract`
+	);
+}
+const localeDirectory = path.join(ROOT, SP, '_shared/data/locales');
+const localeFiles = fs.readdirSync(localeDirectory).filter((name) => name.endsWith('.json'));
+assert.equal(
+	localeFiles.length,
+	21,
+	'unsupported physical editor reasons must cover all 21 locales'
+);
+for (const name of localeFiles) {
+	const locale = JSON.parse(fs.readFileSync(path.join(localeDirectory, name), 'utf8'));
+	for (const key of [
+		unsupportedFixture.i18n,
+		unsupportedFixture.reason_key,
+		unsupportedFixture.disabled_reason_key
+	]) {
+		assert.ok(
+			typeof locale[key] === 'string' && locale[key].trim().length > 0,
+			`${name}: unsupported physical editor needs a translated ${key}`
+		);
+	}
+}
 
 // ── Linux: the manager must resolve geometry generically, for every app ───────
 // Linux is the one driver that already reads the manifest for all 14 ids, so the
