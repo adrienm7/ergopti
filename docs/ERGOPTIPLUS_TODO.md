@@ -6790,6 +6790,18 @@ macOS acceptance/diagnostic corrections are preserved; macOS also requires
 qualification on these new sources. The atomic PID publication correction
 remains active. No TODO item is completed by this diagnostic preparation.
 
+Bootstrap diagnostic follow-up (2026-10-06): the provider, notification and
+global-switcher probes now report closed release_metadata/archive_download
+phases, closed transport families and a finite numeric HTTP status when
+observed. They rethrow the identical ordinary failure; diagnostic write faults
+do not turn failure into success, and genuine interruption remains visible.
+No URL, headers, response body or arbitrary exception text enters these facts.
+Portable controls pass29/0,15/0,29/0 with every original20/13/27 control intact;
+the original metadata HTTP403 black-box control fails without these facts and
+passes with them. Both callers retain the formatted inventory source pin.
+Fresh native macOS qualification is pending; the prior HTTPError stage/status
+remains unknown. This is diagnostic evidence, not provider invocation.
+
 - [~] **107.** Make the number-row policy explicit: native behavior, digits
   directly or symbols directly, with an acknowledged migration of the old
   Windows Boolean and preserved unrelated settings. The earlier Boolean slice
@@ -7227,6 +7239,13 @@ unexecuted unit, E2E, package, installation and launch gates.
 retains historical commands and packet ownership; the earlier PC-only software
 deferral is superseded. This item and items16/38 remain open.
 
+The constructor probe shares the closed bootstrap phase/status diagnostic
+without changing the existing lowercase native reason policy, source/digest/
+signature admission, nine-case contract, cleanup or failure status. Portable
+15/0 controls retain all13 original cases. Native requalification remains
+pending; first-checkpoint constructor successes do not replace the second
+checkpoint refusal, and no notification delivery/callback is claimed.
+
 - [~] **111.** Provide two distinct, explicitly labelled shared window-switching
   actions on Windows, macOS and Linux: the operating system's normal Alt+Tab switcher
   (the native equivalent on macOS), and switching only among windows on the display
@@ -7367,6 +7386,41 @@ fresh minimal distributions. Five-distribution hosted qualification remains
 pending. All original assertions, native windows and
 deadlines remain unchanged; macOS broker integration and real displays remain
 unfinished. The overall integrated run failed; Release was skipped.
+
+The global-switcher bootstrap reports the same closed transport diagnostic
+while retaining all source pins, native owners and retirement guards. Portable
+29/0 controls retain the original27; native broker qualification remains open.
+Subsequent Linux-only run37479728162 on CIa1e30e88 (exact Dev7bfd15ea tree)
+passes units9126/0, native supervision5+external1 and all34 window cases. GTK
+passes3/4: case0 misses its unchanged receipt poll, while real GTK exits0 after
+about2.3775seconds with the exact authored identity present. No argv refusal,
+specific cold-service cause or production regression is established. Package
+and all distribution lanes are skipped; the new native distro bootstrap has
+not executed on hosted distributions. Release is skipped. Preserve this failure
+and the earlier4/4 success separately; no assertion or deadline is weakened.
+
+- [ ] **112.** Accept an AI prediction immediately with its configured
+      modifier-plus-digit shortcut, with matching shortcut hints on all three OSes.
+
+  Maintainer report on Windows AHK (2026-10-06): the shortcut currently only
+  highlights the corresponding prediction. Pressing the configured shortcut
+  must immediately insert that prediction through the normal acceptance owner,
+  including any correction of previously typed text.
+
+  Each prediction tooltip row must show its effective shortcut in a separate
+  right-aligned, muted gray column. Derive the displayed modifiers and digit
+  from the same current menu configuration that owns the binding. Use one
+  shared visual design on Windows, macOS and Linux, with the existing native
+  modifier labels, and refresh both bindings and hints after configuration
+  changes.
+
+  Regression coverage must distinguish insertion from highlighting, verify
+  every supported prediction index and modifier choice, preserve the existing
+  behavior when no prediction is mapped, and check hint/binding agreement.
+  Native acceptance must cover replacement/correction in Windows Notepad and
+  the supported macOS/Linux editors, plus tooltip alignment and appearance on
+  all three OSes. This is an unimplemented follow-up; it does not complete the
+  existing prediction-input or tooltip validation items.
 
 ## Time estimate
 
