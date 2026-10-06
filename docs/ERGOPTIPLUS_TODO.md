@@ -3897,6 +3897,45 @@ missing-predicate error and pass the corrected real Writer/SQLite/Reader pipelin
 still fail at the intended boundary. Hosted Linux validation and physical input
 remain distinct; no production driver or shared dashboard behavior changed.
 
+The inactive owned-runtime compilation candidate now consumes one fixed source
+factory and its 32 closed dependencies. It keeps the genuine 4,505-entry pristine
+Git inventory separate from a detached 4,530-entry stage, applies 57 generated
+source outputs, executes the actual version generator and retains its 12 outputs
+by physical descriptor. Existing 25 diagnostic dependencies are unchanged.
+Source, generated-input, native project, product, plist and lipo currentness are
+rechecked through the final compilation receipt. The new full-tree reads use the
+factory's existing 8 MiB bound; the original small-input path and all native and
+Guardian deadlines are unchanged. The real initial 2 MiB staging refusal is
+retained as before-code evidence, not converted into a successful compilation.
+
+Normal and inherited-optimization software qualification covers genuine full
+source preparation/version execution, seven physical source/refusal controls,
+41 portable build controls with all 31 original methods unchanged, the existing
+95 diagnostic cases, 21 callback-retirement controls and the separate unchanged
+26/22 policy corpora at C++ O0/O2. The current common Swift helper keeps every old
+body and adds one fixed owned-build invoker. A discovered XCTest requires an
+actual fresh baseline to finish and retire before a second fresh four-target
+compilation, using the existing individual 300/305/10 bounds. The callback and
+policy companions have explicit direct commands and require separate native
+source-control registration; the 41 build cases do not replace them.
+
+This tranche is inactive source generation and unsigned compilation preparation.
+Darwin compilation of the four new targets, broader AUTH review, native signing,
+installation, physical capture and activation remain unqualified. It neither
+changes production startup nor completes WP4-WP10 or TODO31.
+
+Manual macOS run37449616401 at e320ea199 qualifies the actual eight public pkgutil
+streams: four frames reconstruct the 9,558-byte envelope, all four command
+statuses are zero, and source/tool-image/fixed package pins match. Help is 2,130
+stderr bytes with empty stdout and does not advertise --expand-full; executable
+option support is untested. Trust remains UNKNOWN and authority/reference
+qualification false. The whole run fails with 339 Swift cases passed, three
+failed and 15 skipped; all 357 completion markers survive. The stock instrumented
+build fails at XcodeGen HTTPS acquisition, so it gives no fresh compilation
+credit. Brew/Sparkle failures persist, and packaging/install are skipped. Full
+artifact bytes and package-signature parsing remain unverified or unimplemented;
+these transcript bytes do not authorize provisioning or complete TODO31.
+
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
   listed; see `docs/memory/text-input-and-config.md`. Still open everywhere:

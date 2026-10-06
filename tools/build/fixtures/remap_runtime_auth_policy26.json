@@ -1,0 +1,283 @@
+{
+	"status": "LITERAL_INDEPENDENT_CORPUS_FROZEN_BEFORE_AUTH_IMPLEMENTATION",
+	"qualification": "NOT_EXECUTED; native fields are fixture inputs until a real same-FD sampler obtains them",
+	"cases": [
+		{
+			"id": "cli-console-impersonation",
+			"route": "daemon_server",
+			"local_role": "core",
+			"local_euid": 0,
+			"peer_role": "cli",
+			"peer_euid": 501,
+			"receiver_uid": 501,
+			"operation": "start_device_grabber",
+			"expected": "DENY"
+		},
+		{
+			"id": "same-uid-core-console-impersonation",
+			"route": "daemon_server",
+			"local_role": "core",
+			"local_euid": 0,
+			"peer_role": "core",
+			"peer_euid": 501,
+			"receiver_uid": 501,
+			"operation": "start_device_grabber",
+			"expected": "DENY"
+		},
+		{
+			"id": "actual-console-grabber",
+			"route": "daemon_server",
+			"local_role": "core",
+			"local_euid": 0,
+			"peer_role": "console",
+			"peer_euid": 501,
+			"receiver_uid": 501,
+			"operation": "start_device_grabber",
+			"expected": "ALLOW_ONLY_WITH_CURRENT_NATIVE_OWNER_AND_FRAME_PROOF"
+		},
+		{
+			"id": "cli-core-impersonation",
+			"route": "daemon_server",
+			"local_role": "core",
+			"local_euid": 0,
+			"peer_role": "cli",
+			"peer_euid": 501,
+			"receiver_uid": 501,
+			"operation": "core_service_bundle_permission_check_result",
+			"expected": "DENY"
+		},
+		{
+			"id": "same-uid-console-core-impersonation",
+			"route": "daemon_server",
+			"local_role": "core",
+			"local_euid": 0,
+			"peer_role": "console",
+			"peer_euid": 501,
+			"receiver_uid": 501,
+			"operation": "core_service_bundle_permission_check_result",
+			"expected": "DENY"
+		},
+		{
+			"id": "actual-core-agent",
+			"route": "daemon_server",
+			"local_role": "core",
+			"local_euid": 0,
+			"peer_role": "core",
+			"peer_euid": 501,
+			"receiver_uid": 501,
+			"operation": "core_service_bundle_permission_check_result",
+			"expected": "ALLOW_ONLY_WITH_CURRENT_NATIVE_FRAME_PROOF"
+		},
+		{
+			"id": "user-core-fake-root-daemon",
+			"route": "daemon_server",
+			"local_role": "core",
+			"local_euid": 501,
+			"peer_role": "cli",
+			"peer_euid": 501,
+			"receiver_uid": 501,
+			"operation": "set_variables",
+			"expected": "DENY"
+		},
+		{
+			"id": "cli-user-variables",
+			"route": "daemon_server",
+			"local_role": "core",
+			"local_euid": 0,
+			"peer_role": "cli",
+			"peer_euid": 501,
+			"receiver_uid": 501,
+			"operation": "set_variables",
+			"expected": "ALLOW_ONLY_WITH_CURRENT_NATIVE_FRAME_PROOF"
+		},
+		{
+			"id": "other-user-cli-variables",
+			"route": "daemon_server",
+			"local_role": "core",
+			"local_euid": 0,
+			"peer_role": "cli",
+			"peer_euid": 502,
+			"receiver_uid": 501,
+			"operation": "set_variables",
+			"expected": "DENY"
+		},
+		{
+			"id": "missing-console-user",
+			"route": "daemon_server",
+			"local_role": "core",
+			"local_euid": 0,
+			"peer_role": "cli",
+			"peer_euid": 501,
+			"receiver_uid": null,
+			"operation": "set_variables",
+			"expected": "DENY"
+		},
+		{
+			"id": "root-cli-ordinary-variables",
+			"route": "daemon_server",
+			"local_role": "core",
+			"local_euid": 0,
+			"peer_role": "cli",
+			"peer_euid": 0,
+			"receiver_uid": 501,
+			"operation": "set_variables",
+			"expected": "DENY"
+		},
+		{
+			"id": "cli-console-system-preferences",
+			"route": "daemon_server",
+			"local_role": "core",
+			"local_euid": 0,
+			"peer_role": "cli",
+			"peer_euid": 501,
+			"receiver_uid": 501,
+			"operation": "system_preferences_updated",
+			"expected": "DENY"
+		},
+		{
+			"id": "cli-core-frontmost-window",
+			"route": "daemon_server",
+			"local_role": "core",
+			"local_euid": 0,
+			"peer_role": "cli",
+			"peer_euid": 501,
+			"receiver_uid": 501,
+			"operation": "focused_ui_element_changed",
+			"expected": "DENY"
+		},
+		{
+			"id": "cli-multitouch-impersonation",
+			"route": "daemon_server",
+			"local_role": "core",
+			"local_euid": 0,
+			"peer_role": "cli",
+			"peer_euid": 501,
+			"receiver_uid": 501,
+			"operation": "connect_multitouch_extension",
+			"expected": "DENY"
+		},
+		{
+			"id": "unknown-operation",
+			"route": "daemon_server",
+			"local_role": "core",
+			"local_euid": 0,
+			"peer_role": "cli",
+			"peer_euid": 501,
+			"receiver_uid": 501,
+			"operation": "unknown",
+			"expected": "DENY"
+		},
+		{
+			"id": "same-user-core-console-receiver",
+			"route": "console_server",
+			"local_role": "console",
+			"local_euid": 501,
+			"peer_role": "core",
+			"peer_euid": 501,
+			"operation": "ordinary_supported_request",
+			"expected": "ALLOW_ONLY_WITH_CURRENT_NATIVE_OWNER_AND_FRAME_PROOF"
+		},
+		{
+			"id": "other-user-core-console-receiver",
+			"route": "console_server",
+			"local_role": "console",
+			"local_euid": 501,
+			"peer_role": "core",
+			"peer_euid": 502,
+			"operation": "ordinary_supported_request",
+			"expected": "DENY"
+		},
+		{
+			"id": "same-user-cli-console-receiver",
+			"route": "console_server",
+			"local_role": "console",
+			"local_euid": 501,
+			"peer_role": "cli",
+			"peer_euid": 501,
+			"operation": "ordinary_supported_request",
+			"expected": "DENY"
+		},
+		{
+			"id": "same-user-console-console-receiver",
+			"route": "console_server",
+			"local_role": "console",
+			"local_euid": 501,
+			"peer_role": "console",
+			"peer_euid": 501,
+			"operation": "ordinary_supported_request",
+			"expected": "DENY"
+		},
+		{
+			"id": "console-same-role-health",
+			"route": "console_server_health",
+			"local_role": "console",
+			"local_euid": 501,
+			"peer_role": "console",
+			"peer_euid": 501,
+			"operation": "health_check",
+			"expected": "HEALTH_ONLY_NEVER_ORDINARY_AUTHORITY"
+		},
+		{
+			"id": "console-other-user-health",
+			"route": "console_server_health",
+			"local_role": "console",
+			"local_euid": 501,
+			"peer_role": "console",
+			"peer_euid": 502,
+			"operation": "health_check",
+			"expected": "DENY"
+		},
+		{
+			"id": "core-root-same-role-health",
+			"route": "daemon_server_health",
+			"local_role": "core",
+			"local_euid": 0,
+			"peer_role": "core",
+			"peer_euid": 0,
+			"operation": "health_check",
+			"expected": "HEALTH_ONLY_NEVER_ORDINARY_AUTHORITY"
+		},
+		{
+			"id": "health-role-ordinary-upgrade",
+			"route": "console_server_health",
+			"local_role": "console",
+			"local_euid": 501,
+			"peer_role": "console",
+			"peer_euid": 501,
+			"operation": "ordinary_supported_request",
+			"expected": "DENY"
+		},
+		{
+			"id": "session-native-user-attribution",
+			"route": "session_server",
+			"local_role": "core",
+			"local_euid": 0,
+			"peer_role": "console",
+			"peer_euid": 501,
+			"cached_uid": 502,
+			"payload_uid": 503,
+			"operation": "console_user_id_changed",
+			"expected": "ATTRIBUTE_501_ONLY_WITH_CURRENT_NATIVE_FRAME_PROOF"
+		},
+		{
+			"id": "session-root-console",
+			"route": "session_server",
+			"local_role": "core",
+			"local_euid": 0,
+			"peer_role": "console",
+			"peer_euid": 0,
+			"operation": "console_user_id_changed",
+			"expected": "DENY"
+		},
+		{
+			"id": "session-same-uid-cli-confusion",
+			"route": "session_server",
+			"local_role": "core",
+			"local_euid": 0,
+			"peer_role": "cli",
+			"peer_euid": 501,
+			"operation": "console_user_id_changed",
+			"expected": "DENY"
+		}
+	]
+}

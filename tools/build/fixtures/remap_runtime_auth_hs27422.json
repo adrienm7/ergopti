@@ -1,0 +1,248 @@
+{
+	"qualification": "INDEPENDENT_LITERAL_POLICY_EXTENSION_BEFORE_IMPLEMENTATION_NOT_NATIVE_PROOF",
+	"operation": "hs274_capture",
+	"cases": [
+		{
+			"id": "hs274-request-cli-current-user",
+			"route": "daemon_server",
+			"local_role": "core",
+			"peer_role": "cli",
+			"local_euid": 0,
+			"peer_euid": 501,
+			"receiver_uid": 501,
+			"operation": "hs274_capture",
+			"expected": "ALLOW_ONLY_WITH_CURRENT_NATIVE_FRAME"
+		},
+		{
+			"id": "hs274-response-to-cli-root-peer",
+			"route": "daemon_client",
+			"local_role": "cli",
+			"peer_role": "core",
+			"local_euid": 501,
+			"peer_euid": 0,
+			"receiver_uid": null,
+			"operation": "hs274_capture",
+			"expected": "ALLOW_ONLY_WITH_CURRENT_NATIVE_FRAME"
+		},
+		{
+			"id": "hs274-request-missing-receiver",
+			"route": "daemon_server",
+			"local_role": "core",
+			"peer_role": "cli",
+			"local_euid": 0,
+			"peer_euid": 501,
+			"receiver_uid": null,
+			"operation": "hs274_capture",
+			"expected": "DENY"
+		},
+		{
+			"id": "hs274-request-wrong-receiver",
+			"route": "daemon_server",
+			"local_role": "core",
+			"peer_role": "cli",
+			"local_euid": 0,
+			"peer_euid": 501,
+			"receiver_uid": 502,
+			"operation": "hs274_capture",
+			"expected": "DENY"
+		},
+		{
+			"id": "hs274-request-root-cli",
+			"route": "daemon_server",
+			"local_role": "core",
+			"peer_role": "cli",
+			"local_euid": 0,
+			"peer_euid": 0,
+			"receiver_uid": 0,
+			"operation": "hs274_capture",
+			"expected": "DENY"
+		},
+		{
+			"id": "hs274-request-user-core-listener",
+			"route": "daemon_server",
+			"local_role": "core",
+			"peer_role": "cli",
+			"local_euid": 501,
+			"peer_euid": 501,
+			"receiver_uid": 501,
+			"operation": "hs274_capture",
+			"expected": "DENY"
+		},
+		{
+			"id": "hs274-request-console-role",
+			"route": "daemon_server",
+			"local_role": "core",
+			"peer_role": "console",
+			"local_euid": 0,
+			"peer_euid": 501,
+			"receiver_uid": 501,
+			"operation": "hs274_capture",
+			"expected": "DENY"
+		},
+		{
+			"id": "hs274-request-agent-role",
+			"route": "daemon_server",
+			"local_role": "core",
+			"peer_role": "core",
+			"local_euid": 0,
+			"peer_euid": 501,
+			"receiver_uid": 501,
+			"operation": "hs274_capture",
+			"expected": "DENY"
+		},
+		{
+			"id": "hs274-request-unavailable-role",
+			"route": "daemon_server",
+			"local_role": "core",
+			"peer_role": "unavailable",
+			"local_euid": 0,
+			"peer_euid": 501,
+			"receiver_uid": 501,
+			"operation": "hs274_capture",
+			"expected": "DENY"
+		},
+		{
+			"id": "hs274-response-root-cli",
+			"route": "daemon_client",
+			"local_role": "cli",
+			"peer_role": "core",
+			"local_euid": 0,
+			"peer_euid": 0,
+			"receiver_uid": null,
+			"operation": "hs274_capture",
+			"expected": "DENY"
+		},
+		{
+			"id": "hs274-response-console-client",
+			"route": "daemon_client",
+			"local_role": "console",
+			"peer_role": "core",
+			"local_euid": 501,
+			"peer_euid": 0,
+			"receiver_uid": null,
+			"operation": "hs274_capture",
+			"expected": "DENY"
+		},
+		{
+			"id": "hs274-response-agent-client",
+			"route": "daemon_client",
+			"local_role": "core",
+			"peer_role": "core",
+			"local_euid": 501,
+			"peer_euid": 0,
+			"receiver_uid": null,
+			"operation": "hs274_capture",
+			"expected": "DENY"
+		},
+		{
+			"id": "hs274-response-user-core-peer",
+			"route": "daemon_client",
+			"local_role": "cli",
+			"peer_role": "core",
+			"local_euid": 501,
+			"peer_euid": 501,
+			"receiver_uid": null,
+			"operation": "hs274_capture",
+			"expected": "DENY"
+		},
+		{
+			"id": "hs274-response-wrong-peer-role",
+			"route": "daemon_client",
+			"local_role": "cli",
+			"peer_role": "console",
+			"local_euid": 501,
+			"peer_euid": 0,
+			"receiver_uid": null,
+			"operation": "hs274_capture",
+			"expected": "DENY"
+		},
+		{
+			"id": "hs274-response-unavailable-peer",
+			"route": "daemon_client",
+			"local_role": "cli",
+			"peer_role": "unavailable",
+			"local_euid": 501,
+			"peer_euid": 0,
+			"receiver_uid": null,
+			"operation": "hs274_capture",
+			"expected": "DENY"
+		},
+		{
+			"id": "hs274-daemon-health-no-upgrade",
+			"route": "daemon_server_health",
+			"local_role": "core",
+			"peer_role": "core",
+			"local_euid": 0,
+			"peer_euid": 0,
+			"receiver_uid": null,
+			"operation": "hs274_capture",
+			"expected": "DENY"
+		},
+		{
+			"id": "hs274-session-health-no-upgrade",
+			"route": "session_server_health",
+			"local_role": "core",
+			"peer_role": "core",
+			"local_euid": 0,
+			"peer_euid": 0,
+			"receiver_uid": null,
+			"operation": "hs274_capture",
+			"expected": "DENY"
+		},
+		{
+			"id": "hs274-console-health-no-upgrade",
+			"route": "console_server_health",
+			"local_role": "console",
+			"peer_role": "console",
+			"local_euid": 501,
+			"peer_euid": 501,
+			"receiver_uid": null,
+			"operation": "hs274_capture",
+			"expected": "DENY"
+		},
+		{
+			"id": "hs274-session-client-denied",
+			"route": "session_client",
+			"local_role": "console",
+			"peer_role": "core",
+			"local_euid": 501,
+			"peer_euid": 0,
+			"receiver_uid": null,
+			"operation": "hs274_capture",
+			"expected": "DENY"
+		},
+		{
+			"id": "hs274-session-server-denied",
+			"route": "session_server",
+			"local_role": "core",
+			"peer_role": "console",
+			"local_euid": 0,
+			"peer_euid": 501,
+			"receiver_uid": null,
+			"operation": "hs274_capture",
+			"expected": "DENY"
+		},
+		{
+			"id": "hs274-console-client-denied",
+			"route": "console_client",
+			"local_role": "core",
+			"peer_role": "console",
+			"local_euid": 501,
+			"peer_euid": 501,
+			"receiver_uid": null,
+			"operation": "hs274_capture",
+			"expected": "DENY"
+		},
+		{
+			"id": "hs274-console-server-denied",
+			"route": "console_server",
+			"local_role": "console",
+			"peer_role": "core",
+			"local_euid": 501,
+			"peer_euid": 501,
+			"receiver_uid": null,
+			"operation": "hs274_capture",
+			"expected": "DENY"
+		}
+	]
+}

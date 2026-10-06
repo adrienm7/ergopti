@@ -274,6 +274,19 @@ final class HS274NativePolicyQualificationTests: XCTestCase {
 		return try child.finish()
 	}
 
+	/// Only the fixed owned consumer uses this second independent calibration.
+	/// It retains its own native Guardian; ordinary SDK budgets stay intact.
+	func runOwnedRuntimeCompilation(_ arguments: [String], root: URL) throws -> Receipt {
+		let script = source("hs274_native_build.py").deletingLastPathComponent()
+			.deletingLastPathComponent().appendingPathComponent("build/remap_runtime_build.py")
+		let child = try GuardianChild(executable: URL(fileURLWithPath: "/usr/bin/env"),
+			arguments: ["python3", script.path] + arguments,
+			repository: Self.repository, root: root, budget: .sourceCalibration)
+		children.append(child)
+		try child.start()
+		return try child.finish()
+	}
+
 	/// CI already archives this parent. Admit its canonical ordinary owner before
 	/// creating a unique private child, so failures retain useful phase evidence.
 	func compilationEvidenceParent() throws -> URL {
