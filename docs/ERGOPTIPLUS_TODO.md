@@ -2399,14 +2399,22 @@ These are software implementations; final hardware verification remains below.
   foreign source or reserved implementation change.
 
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
-  Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
-  composition. Keep unknown fields, verified backups, exact runtime
+  Qualify the implemented macOS/Linux Hotstrings and TapHold owners and the
+  global composition, including its Script participant. Keep unknown fields,
+  verified backups, exact runtime
   acknowledgement, external-write conflict detection and retryable rollback.
   Recommended delay values must match effective runtime inheritance for the
   currently published feature catalogue. The retired `autocorrection.caps`
   namespace is obsolete source data, preserved until explicit cleanup; it is
   not a current recommendation target. Do not assume deletion implements the
-  recommendation. Hotstrings: Linux
+  recommendation.
+  At published `409b8ee0`, manual all-OS run 37476981548 is still in progress:
+  Windows lifecycle capture fails with ENOBUFS before the full native suite;
+  its engine E2E/package/install are skipped. macOS packaging has actual Sparkle
+  server-retirement, Homebrew owned AppleEvent receiver and global-switcher
+  failures. They require source/runner follow-up, not invented device-only
+  closure; physical acceptance is unexecuted. Keep exact dated CI receipts.
+  Hotstrings: Linux
   categories, sections and scalar settings are canonical config.toml leaves,
   with a one-shot import of legacy storage.json choices; both Lua drivers have a
   two-file recommended/clear owner whose planner writes explicit delays where
@@ -2595,7 +2603,11 @@ Windows scopes classify a freshly captured strict source through the existing ca
 
 - [~] **7.** Complete W2: seven-page first-run opt-in wizard, per-category
   recommended choices, consistent WebView behavior and genuine translations in
-  21 locales. The tap-holds page lists each engine's recommended keys from the
+  21 locales. Current source implements the seven-page declaration, native
+  chosen-folder writers and rerun preservation. Remaining acceptance includes
+  the installed fresh/existing/moved-folder wizard and actual trigger/runtime
+  restart on each OS; portable or historical CI alone does not complete it.
+  The tap-holds page lists each engine's recommended keys from the
   shared tap-hold catalogue and imports only the checked ones through each
   driver's tap-hold writer: Windows renders them into the tap_hold.toml beside
   config.toml in the wizard's own transition, macOS goes through the remap
@@ -3153,9 +3165,11 @@ WP3 prerequisite: the actual macOS physical accounting owner now requires exact 
   remap bindings are warned, read as neutral and preserved during unrelated
   saves; requested replacement still requires explicit source repair. Linux
   layers.toml boot isolation and obsolete installed-layout entry partitioning
-  are implemented. Remaining software includes complete parameter-binding
-  catalogues for the other owners and publication authority for remaining
-  dynamic model, provider and order identities. The historical review sites
+  are implemented. Remaining software includes complete Windows keyboard
+  parameter-binding publication from its actual input owner (coordinate groups
+  3/7), macOS aggregate Hotstrings category/section/order authority (group 2),
+  Linux dynamic model publication (group 4), and other unfinished binding owners.
+  API-provider publication is implemented. The historical review sites
   14/93, 19, 24, 26, 28 and Windows 32, 34, 36, 37-60 still require exact current
   owner audits before their closure can be claimed. Native Windows execution,
   Linux layers.toml startup, Hammerspoon and installed three-OS qualification
@@ -3861,6 +3875,15 @@ The packaged macOS launch matrix now contains a Karabiner configuration scenario
 The signed native checkpoint 37116923472 reached the actual independent JSON codec and production build/merge owners, then refused its first variant because the canonical French action registry gives distinct Cmd+Tab and Option+F17 outputs the same localized label. Legacy reconstruction now keeps validated action-label candidates: unused descriptive ambiguity cannot block foreign profiles, while a complete historical block referencing distinct candidates remains unowned and refuses publication. The eight real-catalogue default/recommended switch vectors prove merge, exact-source publication and unchanged confirmation locally. Signed native qualification of all eight variants remains pending; the original AppleEvent controls and deadlines remain mandatory.
 
 - [~] **42.** config.toml batch writer follow-ups (`toml-batch-existing-key`):
+  Current source implements the Windows typed dotted/inline document reader,
+  targeted saves and full-state publication. The nineteen FullSnapshot cases
+  passed natively in diagnostic run 37466163822 (feature `682d373e` plus one
+  test); that historical tree does not qualify the published `409b8ee0` source.
+  Final composed native/E2E/package/install/restart qualification remains open.
+  Preserve obsolete scalars until explicit cleanup and strict invalid-schema
+  and requested colliding-subtree refusals. Earlier reader/full-state status
+  below is historical, superseded by current source implementation.
+
   an old build's scalar where a table is now expected (`magickey = true` under
   `[hotstrings.modules]`, `groups = "x"`) still makes a menu save fail with «
   the batch cannot address the destination without ambiguous TOML keys » —
@@ -3869,7 +3892,7 @@ The signed native checkpoint 37116923472 reached the actual independent JSON cod
   The shared macOS/Linux decoder now resolves hand-written dotted assignments
   (`a.b = 1`) as semantic nested keys while quoted dots remain literal keys.
   Windows now reads typed document dotted keys and supports targeted semantic
-  configuration saves; full-state publication remains a separate follow-up.
+  configuration saves; full-state publication was then a separate follow-up.
   Its inline-table reader also replays the common corpus.
   Linux now delegates whole custom-delimiter lists to the shared TOML writer,
   including `[[hotstrings.terminators]]` and quoted table-array headers. The
@@ -3882,8 +3905,8 @@ The signed native checkpoint 37116923472 reached the actual independent JSON cod
   the fix. Local gates passed (349 JS, 4607 Linux unit and 143 Linux E2E
   checks). Full three-OS checkpoint 37033032620 at `6275cac35` passed unit,
   E2E, packaging and installation gates with release skipped. The scalar
-  preservation policy is settled; Windows document dotted-key reader remains
-  open.
+  preservation policy is settled; at that historical checkpoint the Windows
+  document dotted-key reader was still open.
 
 The Windows configuration gateway and detached scope builder now use the
 configuration-only semantic document transformation through the existing atomic
@@ -4279,13 +4302,18 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 70, macOS 102, Linux 73, each
+  drivers still build (current baseline: Windows 66, macOS 98, Linux 73, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
   existing rows during the migration (proposal in the menu-first-group
   report: most hide; greyed: Linux edit_shortcuts, Linux key
   combinations, Linux metrics shortcut rows, Windows preview_bubbles).
+  Published `409b8ee0` includes the shared model-readout migration and its two
+  owner-generated artifacts; the remaining sites are software migration work.
+  Native allocators and computed user-data captions alone do not prove missing
+  shared policy. Final native binding/order/caption and installed acceptance
+  remain required; source review and the local portable gates are insufficient.
 
 Linux Metrics unavailable/idle migration readouts now consume shared inert label
 templates. Running progress and cancellation retain their native owners. The
@@ -5033,7 +5061,7 @@ deferral is superseded. This item and items16/38 remain open.
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 70, macOS 102 and Linux 73 rows are still built by the
+  Windows 66, macOS 98 and Linux 73 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). Read on
   2026-10-01, the sites are of four kinds, and three of them need the
   manifest to say more than it can today:
@@ -5051,6 +5079,10 @@ deferral is superseded. This item and items16/38 remain open.
   sites): they follow (b), as part of the template;
   (d) the tray root bootstrap (Windows `tray_bootstrap.ahk`,
   `menu_init.ahk`).
+  Current shared child-template, native-list/lazy-group, presence and inert
+  presentation-refusal APIs are implemented. The historical classification
+  above does not mean these APIs are absent; remaining provider families still
+  need genuine shared data/order/policy consumption on the applicable drivers.
 
   The Windows qualification successor for the shared Tap-Hold head retains its
   real four-row Win32 and refusal assertions; item 54 records the precise
