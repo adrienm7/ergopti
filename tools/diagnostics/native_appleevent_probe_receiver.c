@@ -3,6 +3,7 @@
 
 #include <Carbon/Carbon.h>
 #include <ApplicationServices/ApplicationServices.h>
+#import <AppKit/AppKit.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -69,7 +70,25 @@ static OSErr receive_probe(const AppleEvent *event, AppleEvent *reply, SRefCon c
     return AEPutParamPtr(reply, nonce_parameter, typeUTF8Text, expected_nonce, 36);
 }
 
-int main(int argc, char **argv) {
+enum AppKitAdmission {
+    AppKitAdmitted = 0,
+    AppKitApplicationMissing,
+    AppKitPolicyRefused,
+    AppKitPolicyUnconfirmed
+};
+
+static enum AppKitAdmission admit_appkit(NSApplication *application) {
+    if (application == nil) return AppKitApplicationMissing;
+    if (![application setActivationPolicy:NSApplicationActivationPolicyAccessory]) {
+        return AppKitPolicyRefused;
+    }
+    if ([application activationPolicy] != NSApplicationActivationPolicyAccessory) {
+        return AppKitPolicyUnconfirmed;
+    }
+    return AppKitAdmitted;
+}
+
+static int receiver_main(int argc, char **argv) {
     if (argc != 4 || !valid_nonce(argv[3])) return 64;
     delivery_path = argv[2];
     expected_nonce = argv[3];
@@ -79,11 +98,11 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Owned AppleEvent recipient registration failed: phase=get-current-process, osstatus=%d\n", (int)status);
         return 65;
     }
-    // The documented UIElement/background to foreground transition does not
-    // bring this private receiver to the front or request a window.
-    status = TransformProcessType(&serial, kProcessTransformToForegroundApplication);
-    if (status != noErr) {
-        fprintf(stderr, "Owned AppleEvent recipient registration failed: phase=transform-process-type, osstatus=%d\n", (int)status);
+    const enum AppKitAdmission admission = admit_appkit([NSApplication sharedApplication]);
+    if (admission != AppKitAdmitted) {
+        // This reason is not an OSStatus. Existing bounded terminal diagnostics
+        // retain it as unclassified instead of inventing a Carbon status.
+        fprintf(stderr, "Owned AppleEvent recipient AppKit admission refused (reason %d).\n", (int)admission);
         return 65;
     }
     const AEEventHandlerUPP handler = NewAEEventHandlerUPP(receive_probe);
@@ -126,4 +145,10 @@ int main(int argc, char **argv) {
     AERemoveEventHandler(probe_class, probe_event, handler, false);
     DisposeAEEventHandlerUPP(handler);
     return 68;
+}
+
+int main(int argc, char **argv) {
+    @autoreleasepool {
+        return receiver_main(argc, argv);
+    }
 }

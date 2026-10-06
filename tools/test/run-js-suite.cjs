@@ -37,6 +37,12 @@ const CHECKS = [
 		repro: 'node tools/test/test-linux-nix-native.cjs'
 	},
 	{
+		name: 'Ubuntu CI dependencies retain signed archive scope and native failure status',
+		cmd: process.execPath,
+		args: ['tools/test/test-ubuntu-ci-acquisition.cjs'],
+		repro: 'npm run test:ubuntu-ci-acquisition'
+	},
+	{
 		name: 'native typing consumer retains actual selection and KPI dependencies',
 		cmd: process.execPath,
 		args: ['tools/test/test-linux-typing-consumer-closure.cjs'],

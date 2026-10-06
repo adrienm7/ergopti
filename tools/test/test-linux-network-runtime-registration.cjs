@@ -167,7 +167,7 @@ function validateRuntimeCI(workflow, coverage) {
 	assert.equal(Pipeline.stepField(native, 'timeout-minutes'), '3');
 	assert.deepEqual(Pipeline.runOf(native), [
 		'set -euo pipefail',
-		'sudo apt-get install -y --no-install-recommends luajit lua-luv glib-networking gsettings-desktop-schemas',
+		'sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends luajit lua-luv glib-networking gsettings-desktop-schemas',
 		'npm run test:linux:network-runtime | tee "$RUNNER_TEMP/linux-network-runtime.log"'
 	]);
 	const record = Pipeline.runOf(Pipeline.step(e2e[0].body, 'Record mandatory E2E evidence'));
@@ -234,10 +234,10 @@ for (const [before, after] of [
 	[
 		'- name: ' +
 			NATIVE_STEP +
-			'\n        if: ${{ !cancelled() }}\n        run: |\n          set -euo pipefail\n          sudo apt-get install -y --no-install-recommends luajit',
+			'\n        if: ${{ !cancelled() }}\n        run: |\n          set -euo pipefail\n          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends luajit',
 		'- name: ' +
 			NATIVE_STEP +
-			'\n        if: ${{ !cancelled() }}\n        run: |\n          set -eu\n          sudo apt-get install -y --no-install-recommends luajit'
+			'\n        if: ${{ !cancelled() }}\n        run: |\n          set -eu\n          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends luajit'
 	],
 	[COUNT_LINE, 'network_runtime_assertions=4'],
 	[COUNT_LINE, COUNT_LINE + '\n          ' + COUNT_LINE],

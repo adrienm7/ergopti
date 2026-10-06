@@ -228,7 +228,10 @@ check('Ruby parses both casks', () => {
 		return;
 	}
 	for (const cask of [dev, stable]) {
-		const run = spawnSync('ruby', ['-c'], { input: cask.text, encoding: 'utf8' });
+		const run = spawnSync('ruby', ['-c'], {
+			input: cask.text,
+			encoding: 'utf8'
+		});
 		assert.strictEqual(run.status, 0, `${cask.token}: ${run.stderr}`);
 	}
 });
@@ -309,7 +312,35 @@ check(
 		);
 		assert.match(
 			registration,
-			/TransformProcessType\(&serial, kProcessTransformToForegroundApplication\);\s*if \(status != noErr\) \{\s*fprintf\(stderr, "Owned AppleEvent recipient registration failed: phase=transform-process-type, osstatus=%d\\n", \(int\)status\);\s*return 65;/
+			/const enum AppKitAdmission admission = admit_appkit\(\[NSApplication sharedApplication\]\);\s*if \(admission != AppKitAdmitted\) \{[\s\S]*?return 65;/
+		);
+		assert.doesNotMatch(receiver, /\bTransformProcessType\s*\(/);
+		const appkitStart = receiver.indexOf('static enum AppKitAdmission admit_appkit(');
+		const appkitEnd = receiver.indexOf('static int receiver_main(', appkitStart);
+		assert.ok(
+			appkitStart >= 0 && appkitEnd > appkitStart,
+			'the actual AppKit admission body must be nonempty'
+		);
+		const appkit = receiver.slice(appkitStart, appkitEnd);
+		assert.match(appkit, /if \(application == nil\) return AppKitApplicationMissing;/);
+		assert.match(
+			appkit,
+			/if \(!\[application setActivationPolicy:NSApplicationActivationPolicyAccessory\]\) \{\s*return AppKitPolicyRefused;/
+		);
+		assert.match(
+			appkit,
+			/if \(\[application activationPolicy\] != NSApplicationActivationPolicyAccessory\) \{\s*return AppKitPolicyUnconfirmed;/
+		);
+		assert.ok(
+			appkit.indexOf('return AppKitPolicyUnconfirmed;') < appkit.indexOf('return AppKitAdmitted;')
+		);
+		assert.ok(
+			receiver.indexOf('if (admission != AppKitAdmitted)') <
+				receiver.indexOf('AEInstallEventHandler(')
+		);
+		assert.ok(
+			receiver.indexOf('if (admission != AppKitAdmitted)') <
+				receiver.indexOf('write_exclusive(argv[1]')
 		);
 		assert.match(helper, /xcode-select", "--print-path"\], confined=True/);
 		assert.match(helper, /-isysroot/);
@@ -320,6 +351,15 @@ check(
 			helper.indexOf('def ', helper.indexOf('def _admit_appleevent_boundary') + 5)
 		);
 		assert.doesNotMatch(boundary, /xcrun/);
+		assert.match(
+			boundary,
+			/if role == "receiver":\s*command \+= \[\s*"-x",\s*"objective-c",\s*"-fobjc-arc",\s*"-framework",\s*"Carbon",\s*"-framework",\s*"AppKit",?\s*\]/
+		);
+		assert.match(
+			boundary,
+			/registration_controls\.stdout == "native_appkit_registration_controls=4\\n"/
+		);
+		assert.doesNotMatch(boundary, /NSWorkspace|\/usr\/bin\/open/);
 	}
 );
 
@@ -373,43 +413,42 @@ check('owned registration diagnosis projects only a closed bounded native failur
 	assert.ok(projection.includes('not -(2**31) <= status < 2**31'));
 	assert.doesNotMatch(projection, /observe_exit|\.(?:poll|wait|settle)\(/);
 	assert.match(helper, /observation\.si_code == os\.CLD_EXITED and observation\.si_status == 65/);
-	for (const phase of ['get-current-process', 'transform-process-type']) {
+	for (const phase of ['get-current-process']) {
 		assert.ok(receiver.includes(`phase=${phase}, osstatus=%d`));
 	}
+	assert.match(receiver, /Owned AppleEvent recipient AppKit admission refused \(reason %d\)\./);
 	const registration = receiver.slice(
 		receiver.indexOf('OSStatus status = GetCurrentProcess'),
 		receiver.indexOf('const AEEventHandlerUPP')
 	);
-	assert.equal((registration.match(/if \(status != noErr\)/g) || []).length, 2);
+	assert.equal((registration.match(/if \(status != noErr\)/g) || []).length, 1);
+	assert.equal((registration.match(/if \(admission != AppKitAdmitted\)/g) || []).length, 1);
 	assert.equal((registration.match(/return 65;/g) || []).length, 2);
 });
 
-check(
-	'owned receiver uses the documented self foreground transition without front activation',
-	() => {
-		const receiver = fs.readFileSync(
-			path.join(ROOT, 'tools/diagnostics/native_appleevent_probe_receiver.c'),
-			'utf8'
-		);
-		assert.match(
-			receiver,
-			/TransformProcessType\(&serial, kProcessTransformToForegroundApplication\)/
-		);
-		assert.doesNotMatch(receiver, /kProcessTransformToUIElementApplication/);
-		assert.doesNotMatch(
-			receiver,
-			/SetFrontProcess\s*\(|ShowHideProcess\s*\(|NSApplicationLoad\s*\(/
-		);
-		const registration = receiver.slice(
-			receiver.indexOf('OSStatus status = GetCurrentProcess'),
-			receiver.indexOf('const AEEventHandlerUPP')
-		);
-		assert.equal((registration.match(/if \(status != noErr\)/g) || []).length, 2);
-		assert.equal((registration.match(/return 65;/g) || []).length, 2);
-		assert.match(registration, /phase=get-current-process, osstatus=%d/);
-		assert.match(registration, /phase=transform-process-type, osstatus=%d/);
-	}
-);
+check('owned receiver uses guarded AppKit accessory admission without front activation', () => {
+	const receiver = fs.readFileSync(
+		path.join(ROOT, 'tools/diagnostics/native_appleevent_probe_receiver.c'),
+		'utf8'
+	);
+	assert.match(receiver, /admit_appkit\(\[NSApplication sharedApplication\]\)/);
+	assert.doesNotMatch(receiver, /kProcessTransformToUIElementApplication/);
+	assert.doesNotMatch(receiver, /SetFrontProcess\s*\(|ShowHideProcess\s*\(|NSApplicationLoad\s*\(/);
+	const registration = receiver.slice(
+		receiver.indexOf('OSStatus status = GetCurrentProcess'),
+		receiver.indexOf('const AEEventHandlerUPP')
+	);
+	assert.equal((registration.match(/if \(status != noErr\)/g) || []).length, 1);
+	assert.equal((registration.match(/if \(admission != AppKitAdmitted\)/g) || []).length, 1);
+	assert.equal((registration.match(/return 65;/g) || []).length, 2);
+	assert.match(registration, /phase=get-current-process, osstatus=%d/);
+	assert.match(registration, /if \(admission != AppKitAdmitted\) \{[\s\S]*?return 65;/);
+	assert.match(registration, /AppKit admission refused \(reason %d\)\./);
+	assert.doesNotMatch(
+		receiver,
+		/activateIgnoringOtherApps|activateWithOptions|makeKeyAndOrderFront/
+	);
+});
 
 check(
 	'owned sender reports closed reply facts without weakening nonce or refusal admission',
