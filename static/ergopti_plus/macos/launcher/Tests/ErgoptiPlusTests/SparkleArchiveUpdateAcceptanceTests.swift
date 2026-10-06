@@ -785,7 +785,7 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		let helper = repository.appendingPathComponent("tools/diagnostics/macos_sparkle_archive_fixture.py")
 		let www = root.appendingPathComponent("www")
 		try privateDirectory(www)
-		server = try OwnedProcess("/usr/bin/env", ["python3", helper.path, "serve", www.path, nonce], root: root)
+		server = try OwnedProcess("/usr/bin/env", ["python3", helper.path, "serve", try ownedCensusPath(www), nonce], root: root)
 		commands.append(try XCTUnwrap(server))
 		try server?.start()
 		let listening = try waitFor("server-start", root: www, seconds: 10)

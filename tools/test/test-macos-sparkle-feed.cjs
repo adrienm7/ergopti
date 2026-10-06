@@ -927,14 +927,14 @@ try {
 	assert.ifError(result.error);
 	assert.equal(result.signal, null, result.stderr);
 	assert.equal(result.status, 0, result.stderr);
-	assert.match(result.stderr, /Ran 25 tests in /);
-	const skipped = process.platform === 'win32' ? 5 : process.platform === 'darwin' ? 1 : 0;
+	assert.match(result.stderr, /Ran 26 tests in /);
+	const skipped = process.platform === 'win32' ? 6 : process.platform === 'darwin' ? 1 : 0;
 	assert.match(
 		result.stderr,
 		skipped ? new RegExp(`\\nOK \\(skipped=${skipped}\\)\\s*$`) : /\nOK\s*$/
 	);
 	console.log(
-		`Sparkle transport controls: ${20 - skipped} passed, ${skipped} platform cases skipped.`
+		`Sparkle transport controls: ${26 - skipped} passed, ${skipped} platform cases skipped.`
 	);
 	const fixture = fs.readFileSync(
 		path.join(
@@ -1216,6 +1216,43 @@ try {
 	);
 } catch (error) {
 	errors.push(`Native Sparkle server-exit diagnostic guard failed: ${error.message}`);
+}
+
+// An admitted Foundation parent alias must cross the helper API physically.
+try {
+	const assert = require('node:assert/strict');
+	const fixture = fs.readFileSync(
+		path.join(
+			root,
+			'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/SparkleArchiveUpdateAcceptanceTests.swift'
+		),
+		'utf8'
+	);
+	const helper = fs.readFileSync(
+		path.join(root, 'tools/diagnostics/macos_sparkle_archive_fixture.py'),
+		'utf8'
+	);
+	function assertPhysicalHelperInputs(source) {
+		assert.match(source, /\["python3", helper\.path, "serve", try ownedCensusPath\(www\), nonce\]/);
+		assert.doesNotMatch(source, /"serve", www\.path/);
+		assert.match(source, /let paths = try roots\.map \{ try ownedCensusPath\(\$0\) \}/);
+		assert.match(source, /\["python3", helper\.path, "census"\] \+ paths/);
+		assert.match(source, /helper\.path, physical\], root: root/);
+	}
+	assertPhysicalHelperInputs(fixture);
+	assert.match(helper, /observed\("canonical", lambda: path\.resolve\(\) != path\)/);
+	assert.throws(
+		() =>
+			assertPhysicalHelperInputs(
+				fixture.replace('"serve", try ownedCensusPath(www)', '"serve", www.path')
+			),
+		'original lexical alias handoff fails the exact source composition guard'
+	);
+	console.log(
+		'Sparkle native serve and census use retained physical directory identity; canonical helper admission stays strict.'
+	);
+} catch (error) {
+	errors.push(`Native Sparkle physical helper input guard failed: ${error.message}`);
 }
 
 if (errors.length > 0) {

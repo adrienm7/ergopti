@@ -227,6 +227,76 @@ class PrivateSparkleTransportTests(unittest.TestCase):
             json.loads((self.root / "server-retired.json").read_bytes())["requests"], 0
         )
 
+    @unittest.skipUnless(hasattr(os, "geteuid"), "Physical parent aliases need a POSIX host")
+    def testActualParentAliasRefusesButRetainedPhysicalDirectoryServesAndRetires(self):
+        physical = self.root / "physical-parent"
+        physical.mkdir(mode=0o700)
+        www = physical / "www"
+        www.mkdir(mode=0o700)
+        alias = self.root / "parent-alias"
+        alias.symlink_to(physical, target_is_directory=True)
+        logical = alias / "www"
+        observed = www.stat()
+        refused = subprocess.run(
+            [sys.executable, str(HELPER), "serve", str(logical), NONCE],
+            capture_output=True,
+            timeout=5,
+        )
+        self.assertEqual(
+            (refused.returncode, refused.stdout, refused.stderr),
+            (1, b"", b"Private Sparkle fixture refused.\n"),
+        )
+        self.assertFalse((www / "server-start.json").exists())
+        self.assertFalse((www / "server-retired.json").exists())
+        # The producer must hand over its already-retained physical identity;
+        # the helper keeps rejecting the independent lexical parent alias.
+        retained = www.resolve(strict=True)
+        self.assertEqual(retained.stat().st_dev, observed.st_dev)
+        self.assertEqual(retained.stat().st_ino, observed.st_ino)
+        self.assertNotEqual(str(logical), str(retained))
+        payload = b"independent physical alias feed\n"
+        (retained / "feed.xml").write_bytes(payload)
+        self.child = subprocess.Popen(
+            [sys.executable, str(HELPER), "serve", str(retained), NONCE],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        target = retained / "server-start.json"
+        deadline = time.monotonic() + 5
+        while not target.exists() and self.child.poll() is None and time.monotonic() < deadline:
+            time.sleep(0.02)
+        self.assertTrue(target.exists(), "Only the retained physical input may publish readiness")
+        started = json.loads(target.read_bytes())
+        self.assertEqual((started["nonce"], started["pid"]), (NONCE, self.child.pid))
+        connection = http.client.HTTPConnection("127.0.0.1", started["port"], timeout=5)
+        try:
+            connection.request("GET", "/feed.xml")
+            response = connection.getresponse()
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.read(), payload)
+        finally:
+            connection.close()
+        request = json.loads((retained / "request-000001.json").read_bytes())
+        self.assertEqual(
+            request,
+            {
+                "nonce": NONCE,
+                "path": "/feed.xml",
+                "bytes": len(payload),
+                "sha256": hashlib.sha256(payload).hexdigest(),
+            },
+        )
+        self.child.terminate()
+        stdout, stderr = self.child.communicate(timeout=5)
+        self.assertEqual((self.child.returncode, stdout, stderr), (0, b"", b""))
+        self.assertEqual(
+            json.loads((retained / "server-retired.json").read_bytes()),
+            {"nonce": NONCE, "pid": self.child.pid, "requests": 1},
+        )
+        self.assertEqual(
+            (retained.stat().st_dev, retained.stat().st_ino), (observed.st_dev, observed.st_ino)
+        )
+
 
 class NativeCensusDiagnosticControls(unittest.TestCase):
     """Model diagnostic projection only; these do not qualify Darwin census."""
