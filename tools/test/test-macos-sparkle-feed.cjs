@@ -1571,9 +1571,21 @@ try {
 		assert.match(source, /XCTAssertTrue\(officialForeignValid,/);
 		assert.match(source, /XCTAssertFalse\(officialInstalledValid,/);
 		assert.match(source, /XCTAssertTrue\(foreignPayloadEqual,/);
+		assert.match(source, /XCTAssertEqual\(signatureBytes.count, 64,/);
 		assert.match(
 			source,
-			/XCTAssertTrue\(Data\(base64Encoded: foreignSignature\) == wrongSignature, "The official signer must agree with the independent foreign Ed25519 key"\)/
+			/XCTAssertFalse\(foreignKey\.publicKey\.isValidSignature\(signatureBytes, for: payload\),/
+		);
+		assert.match(
+			source,
+			/guard !copiedForeignPayload\.isEmpty else \{ throw Failure\.evidence\("signature-payload-empty"\) \}/
+		);
+		assert.match(source, /var alteredPayload = copiedForeignPayload/);
+		assert.match(source, /alteredPayload\[alteredPayload\.startIndex\] \^= 0x01/);
+		assert.match(source, /XCTAssertEqual\(alteredPayload.count, payload.count,/);
+		assert.match(
+			source,
+			/XCTAssertTrue\(!foreignKey\.publicKey\.isValidSignature\(officialForeignSignature, for: alteredPayload\)\s*&& !key\.publicKey\.isValidSignature\(signatureBytes, for: alteredPayload\),\s*"Both official signatures must refuse a one-byte change to the independently authenticated archive"\)/
 		);
 		assert.match(source, /func testSignatureAndApplicationFactsContainOnlyClosedObservations\(\)/);
 	}
@@ -1595,9 +1607,29 @@ try {
 			'let foreignPayloadEqual = true'
 		],
 		[
-			'original signer equality removed',
-			'XCTAssertTrue(Data(base64Encoded: foreignSignature) == wrongSignature, "The official signer must agree with the independent foreign Ed25519 key")',
-			'XCTAssertTrue(officialForeignValid)'
+			'counterfactual foreign signature refusal replaced',
+			'XCTAssertTrue(!foreignKey.publicKey.isValidSignature(officialForeignSignature, for: alteredPayload)',
+			'XCTAssertTrue(true'
+		],
+		[
+			'counterfactual installed signature refusal replaced',
+			'&& !key.publicKey.isValidSignature(signatureBytes, for: alteredPayload)',
+			'&& true'
+		],
+		[
+			'counterfactual byte mutation removed',
+			'alteredPayload[alteredPayload.startIndex] ^= 0x01',
+			'alteredPayload[alteredPayload.startIndex] ^= 0x00'
+		],
+		[
+			'installed signature opposite-key refusal replaced',
+			'XCTAssertFalse(foreignKey.publicKey.isValidSignature(signatureBytes, for: payload),',
+			'XCTAssertFalse(false,'
+		],
+		[
+			'counterfactual length admission replaced',
+			'XCTAssertEqual(alteredPayload.count, payload.count,',
+			'XCTAssertEqual(payload.count, payload.count,'
 		]
 	]) {
 		assert.equal(fixture.split(before).length - 1, 1, 'One exact independent mutation');

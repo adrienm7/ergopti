@@ -3434,6 +3434,15 @@ the complete three-OS checkpoint remain pending.
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 
+Exact macOS run 37511777225 on fd107685ae2ff2cedbe8edb559a54b4886d0954b
+observes matching-key cryptographic validity and identical copied payloads,
+but independently generated signature bytes differ. The corrected oracle
+requires actual matching-key validity, opposite-key refusal and rejection of
+a one-bit payload change by both authentic signatures. Every remaining native
+archive and installation assertion is preserved. The Sparkle source gate
+passes; actual corrected macOS compilation/acceptance remains required.
+Item 36 and transversal validation 16/38 remain open.
+
 Exact macOS run 37494074376 on a96b224a676b8267e072069ed57c556a99623327
 compiles the corrected imported Sparkle delegate. Core JavaScript/properties,
 portable Hammerspoon unit/E2E and tooltip checks pass, but native packaging
