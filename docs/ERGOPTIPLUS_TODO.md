@@ -3733,6 +3733,11 @@ LuaJIT/libuv/OpenSSL controls, including two independent NIST vectors over
 unlinked files. This receipt does not prove archive publication, tar install,
 rollback or installed package delivery; their original requirements remain.
 
+Reviewed pending group6 sources, exact preimages and scoped qualifications are
+preserved in the [restored-container checkpoint](handovers/2026-10-06-group6-recovery/README.md).
+The installed native archive/update chain remains required; saved patches do
+not close this item.
+
 - [~] **37.** Always show the shipped Ergopti hotstring pack, including when
   its keyboard layout is not installed. Move French `suffixes_a` and magic-key
   `replace` into that extension without a beta compatibility layer. The runtime
@@ -4892,6 +4897,11 @@ and relay retries cannot renew a phase. The descriptor-sealing and digest
 prerequisite has the bounded qualification recorded in item 36. Mandatory
 native runner, planner and CI evidence registrations are added; final-source
 validation and the full updater composition remain required.
+
+Reviewed pending group6 sources, exact preimages and scoped qualifications are
+preserved in the [restored-container checkpoint](handovers/2026-10-06-group6-recovery/README.md).
+The installed native archive/update chain remains required; saved patches do
+not close this item.
 
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard
