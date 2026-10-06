@@ -4850,6 +4850,12 @@ This deferral does not complete this item or the cross-cutting items16/38.
   normal edit and delivery admission still refuse. Native Luv fixture cache
   custody and current canonical Ctrl+G fixture owners preserve every previous
   assertion. Final integrated CI and physical input acceptance remain open.
+  A baseline CI prerequisite also required a fixture-only raw SQL token
+  transport repair: the independent aggregation oracle now returns the
+  reader's byte-preserving token_json field while retaining all 21 assertions.
+  Actual SQLite on the declared LuaJIT target passes; independent embedded-NUL
+  and Unicode byte controls pass on both ABIs. The extra full Lua 5.4 run still
+  fails its existing extreme-number comparison and is not claimed green.
 
 Windows continuation for item93 (explicitly deferred to the maintainer's PC):
 
