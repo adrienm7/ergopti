@@ -42,6 +42,20 @@ No manual workflow was canceled and no final integration lock was held.
 | Linux/macOS downstream delivery   | E2E, package/install and native Mac canvas are SKIPPED; no qualification is inferred.                                                                                                                                          |
 | Release                           | SKIPPED.                                                                                                                                                                                                                       |
 
+The retained earlier native macOS inventory run
+[37494746572](https://github.com/adrienm7/ergopti/actions/runs/37494746572)
+tested CI `ad22d30899058661e62e3a7ee2fe37f836c2a6e1`, exactly dev
+`4dfbb9a50563ea8680a4e59136e7df1062fef430` tree
+`47a77762d002422c17212bea65849522bb8ed1e8`. All 16 inventory and five shim
+cases passed, including `real_interpreter_symlink`. A fresh source comparison
+verifies all 64 retained observer pins and the unchanged current native adapter,
+directory owner, both fixtures and controller. Hammerspoon 1.1.1's pinned
+implementation actually calls `realpath`; no new interpreter defect is
+demonstrated. Current shared policy/data add Windows support while retaining
+the same macOS projection. This preserves earlier component qualification;
+it does not replace a current complete-source native replay or qualify the
+whole macOS lane, Apple Shortcuts, packaging or installation.
+
 The terminal log ZIP SHA-256 is
 `9c9acc202446fe6d7e6679637acc329b036ea8686c01a4927a52e68be67f9c51`.
 Individual artifact downloads used a newly blocked Azure host; terminal
