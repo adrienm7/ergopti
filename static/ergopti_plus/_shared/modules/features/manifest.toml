@@ -1310,6 +1310,7 @@ input_altering = false
 type = "array"
 description_key = "menu.llm.title"
 platforms = ["hs"]
+reason_key = "platform_reason.llm_saved_user_models_are_macos"
 
 [[features.llm.models]]
 id = "selected"
@@ -6782,5 +6783,110 @@ type = "---"
 type = "command"
 id = "layout_open_preferences"
 i18n = "menu.layout.open_prefs"
+platforms = ["hs"]
+unavailable = "hide"
+
+# A custom profile's child menu is shared; native ports own the exact transactions.
+# Windows retains its existing profile row click/dialog instead of a nested menu.
+[[menu.llm_custom_profile_controls]]
+type = "check"
+id = "llm_profile_use"
+i18n = "menu.profiles.use_profile"
+checked_when = ["llm_custom_profile_active"]
+disabled_when = ["llm_custom_profile_ready"]
+platforms = ["hs", "linux"]
+unavailable = "hide"
+
+# Only the macOS native profile child exposes its existing shortcut prompt here.
+[[menu.llm_custom_profile_controls]]
+type = "command"
+id = "llm_profile_shortcut"
+i18n = "menu.profiles.shortcut_prefix"
+disabled_when = ["llm_custom_profile_ready"]
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.llm_custom_profile_controls]]
+type = "---"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.llm_custom_profile_controls]]
+type = "command"
+id = "llm_profile_edit"
+i18n = "menu.profiles.edit_profile"
+disabled_when = ["llm_custom_profile_ready"]
+platforms = ["hs", "linux"]
+unavailable = "hide"
+
+[[menu.llm_custom_profile_controls]]
+type = "command"
+id = "llm_profile_delete"
+i18n = "menu.profiles.delete_profile"
+disabled_when = ["llm_custom_profile_ready"]
+platforms = ["hs", "linux"]
+unavailable = "hide"
+
+# Per-user-added-model child controls; outer dynamic model rows remain native.
+[[menu.llm_user_model_controls]]
+type = "check"
+id = "llm_user_model_select"
+i18n = "menu.llm.select_model"
+platforms = ["hs"]
+unavailable = "hide"
+checked_when = ["llm_user_model_selected"]
+disabled_when = ["llm_user_model_selection_ready", "llm_user_model_live"]
+
+[[menu.llm_user_model_controls]]
+type = "command"
+id = "llm_user_model_remove"
+i18n = "menu.llm.remove_user_model"
+platforms = ["hs"]
+unavailable = "hide"
+disabled_when = ["llm_user_model_live"]
+
+# Linux adds a free numeric prompt after preset choices. Other native menus
+# already open their numeric dialogs directly rather than this preset tail.
+[[menu.llm_numeric_custom_rows]]
+type = "---"
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.llm_numeric_custom_rows]]
+type = "command"
+id = "llm_numeric_custom_value"
+i18n = "menu.llm.generation.custom_value"
+platforms = ["linux"]
+unavailable = "hide"
+
+# Fixed native profile headings retain each platform's existing decoration.
+[[menu.llm_profile_builtin_heading]]
+type = "label"
+id = "llm_profile_builtin_plain_heading"
+i18n = "menu.profiles.header_default_profiles"
+platforms = ["ahk", "linux"]
+unavailable = "hide"
+
+[[menu.llm_profile_builtin_heading]]
+type = "section_header"
+id = "llm_profile_builtin_decorated_heading"
+i18n = "menu.profiles.header_default_profiles"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.llm_profile_custom_heading]]
+type = "---"
+
+[[menu.llm_profile_custom_heading]]
+type = "label"
+id = "llm_profile_custom_plain_heading"
+i18n = "menu.profiles.header_custom_profiles"
+platforms = ["ahk", "linux"]
+unavailable = "hide"
+
+[[menu.llm_profile_custom_heading]]
+type = "section_header"
+id = "llm_profile_custom_decorated_heading"
+i18n = "menu.profiles.header_custom_profiles"
 platforms = ["hs"]
 unavailable = "hide"

@@ -1,0 +1,36 @@
+{
+	"provenance": "Handwritten from original native Select/Remove order and user-authorized shared child ownership; not generated from implementation",
+	"section": "llm_user_model_controls",
+	"rows": [
+		{
+			"id": "llm_user_model_select",
+			"type": "check",
+			"i18n": "menu.llm.select_model"
+		},
+		{
+			"id": "llm_user_model_remove",
+			"type": "command",
+			"i18n": "menu.llm.remove_user_model"
+		}
+	],
+	"cases": [
+		{
+			"active": "",
+			"paused": false,
+			"checked": false,
+			"disabled": false
+		},
+		{
+			"active": "owner/model",
+			"paused": false,
+			"checked": true,
+			"disabled": false
+		},
+		{
+			"active": "owner/model",
+			"paused": true,
+			"checked": true,
+			"disabled": true
+		}
+	]
+}

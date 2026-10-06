@@ -349,18 +349,55 @@ const OPENS_SUBMENU = {
 	llm_models: 'llm_model_commands',
 	// The backend/model providers render the active API-entry command head.
 	llm_backend: 'llm_api_active_commands',
-	llm_model: 'llm_api_active_commands',
+	llm_model: [
+		'llm_api_active_commands',
+		{
+			menu: 'llm_user_model_controls',
+			platforms: ['hs'],
+			kind: 'submenu',
+			native_sources: { hs: 'macos/ui/menu/menu_llm/models_selector.lua' }
+		}
+	],
 	// All three profile providers render the shared Create/Clone command head.
-	llm_profile: 'llm_profile_commands',
+	llm_profile: [
+		'llm_profile_commands',
+		{ menu: 'llm_custom_profile_controls', platforms: ['hs', 'linux'] },
+		...['llm_profile_builtin_heading', 'llm_profile_custom_heading'].map((menu) => ({
+			menu,
+			platforms: ['ahk', 'hs', 'linux'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_llm/menu_profiles.ahk',
+				hs: 'macos/ui/menu/menu_llm/profiles_manager.lua',
+				linux: 'linux/ui/menu/menu_builder.lua'
+			}
+		}))
+	],
 	// Optional category-file providers return this declared opening command.
 	hotstring_category_file: 'hotstring_file_commands',
 	llm_display: 'llm_display_menu',
 	// Native prediction modifier providers consume the shared child records.
 	llm_navigation: 'llm_navigation_rows',
-	llm_trigger: 'llm_trigger_menu',
+	llm_trigger: [
+		'llm_trigger_menu',
+		{
+			menu: 'llm_numeric_custom_rows',
+			platforms: ['linux'],
+			kind: 'compose',
+			native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+		}
+	],
 	llm_generation_settings: 'llm_generation_menu',
 	// Linux uses the same generation child inline, through its dynamic handler.
-	llm_generation: 'llm_generation_menu',
+	llm_generation: [
+		'llm_generation_menu',
+		{
+			menu: 'llm_numeric_custom_rows',
+			platforms: ['linux'],
+			kind: 'compose',
+			native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+		}
+	],
 	// The language selector. Its rows inherit `top_level/language`'s visibility,
 	// which is every driver — the DECLARATION is narrower than that, and says why
 	// in its own reason_key rather than through this map.
@@ -695,8 +732,9 @@ for (let pass = 0; pass < MENU_KEYS.length + 1; pass += 1) {
 					if (!reachedByKinds[target]) reachedByKinds[target] = {};
 					if (!reachedByKinds[target][platform]) reachedByKinds[target][platform] = new Set();
 					reachedByKinds[target][platform].add(kind);
-					if (kind !== 'compose' || row.type === 'include') continue;
+					if (row.type === 'include') continue;
 					const file = opened.native_sources?.[platform];
+					if (kind !== 'compose' && file === undefined) continue;
 					const driver = { ahk: 'windows', hs: 'macos', linux: 'linux' }[platform];
 					if (
 						typeof file !== 'string' ||
@@ -708,7 +746,7 @@ for (let pass = 0; pass < MENU_KEYS.length + 1; pass += 1) {
 						)
 					)
 						errors.push(
-							`${menuKey}/${row.id}: composed ${target} has no native template publication on ${platform}`
+							`${menuKey}/${row.id}: ${kind} ${target} has no native template publication on ${platform}`
 						);
 				}
 				const before = (reachableOn[target] || []).join(',');
@@ -771,6 +809,9 @@ for (const menuKey of MENU_KEYS) {
 	const visibility = reachableOn[menuKey] || PLATFORMS;
 	for (const platform of visibility) {
 		const rows = project(menuKey, platform);
+		// Native providers compose these validated inert fragments into their actual lists.
+		// A standalone heading in such a fragment is not an empty clicked submenu.
+		if (isComposedFragment(rows, reachedByKinds[menuKey]?.[platform] || new Set())) continue;
 		rows.forEach((row, index) => {
 			if ((row.type || 'ref') !== 'section_header') return;
 			let under = 0;

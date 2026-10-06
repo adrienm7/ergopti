@@ -260,7 +260,7 @@ global FEATURES_MANIFEST := Map(
         Map("path", "hotstrings.preview_autocorrect_enabled", "section", "hotstrings", "reason_key", "", "platforms", ["hs", "linux"]),
         Map("path", "hotstrings.preview_colored_tooltips", "section", "hotstrings", "reason_key", "", "platforms", ["hs", "linux"]),
         Map("path", "hotstrings.preview_star_enabled", "section", "hotstrings", "reason_key", "", "platforms", ["hs", "linux"]),
-        Map("path", "llm.models.user_models", "section", "llm.models", "reason_key", "", "platforms", ["hs"]),
+        Map("path", "llm.models.user_models", "section", "llm.models", "reason_key", "platform_reason.llm_saved_user_models_are_macos", "platforms", ["hs"]),
         Map("path", "llm.models.mlx", "section", "llm.models", "reason_key", "platform_reason.llm_mlx_is_apple_silicon", "platforms", ["hs"]),
         Map("path", "llm.profiles.user_profiles", "section", "llm.profiles", "reason_key", "", "platforms", ["hs"]),
         Map("path", "llm.trigger.disabled_apps", "section", "llm.trigger", "reason_key", "", "platforms", ["hs"]),

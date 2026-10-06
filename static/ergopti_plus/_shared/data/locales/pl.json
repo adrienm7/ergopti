@@ -3218,5 +3218,6 @@
 	"sg_actions.run_program": "▶️ Uruchom program [konfigurowalne]",
 	"menu.hotstrings.personal_metadata_unavailable": "Tutaj niedostępne: edytuj to pole bezpośrednio w pliku źródłowym.",
 	"menu.gestures.mode_current": "Tryb: %s",
-	"menu.gestures.sensitivity_current": "Czułość: %s"
+	"menu.gestures.sensitivity_current": "Czułość: %s",
+	"platform_reason.llm_saved_user_models_are_macos": "Te opcje zarządzają zapisaną listą „Moje modele” w macOS. Windows i Linux korzystają z własnych list modeli."
 }

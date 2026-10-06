@@ -3218,5 +3218,6 @@
 	"sg_actions.run_program": "▶️ Spustit program [nastavitelné]",
 	"menu.hotstrings.personal_metadata_unavailable": "Zde není k dispozici: upravte toto pole přímo ve zdrojovém souboru.",
 	"menu.gestures.mode_current": "Režim: %s",
-	"menu.gestures.sensitivity_current": "Citlivost: %s"
+	"menu.gestures.sensitivity_current": "Citlivost: %s",
+	"platform_reason.llm_saved_user_models_are_macos": "Tyto ovládací prvky spravují uložený seznam „Moje modely“ v macOS. Windows a Linux používají vlastní seznamy modelů."
 }

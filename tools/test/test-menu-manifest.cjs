@@ -268,6 +268,7 @@ function checkChoiceProjection() {
 		for (const relativePath of [
 			'tools/build/build-menu-manifest.js',
 			'tools/lib/paths.cjs',
+			'tools/lib/menu-row-availability.cjs',
 			'static/ergopti_plus/_shared/modules/updater/channels.json',
 			'static/ergopti_plus/_shared/ui/update_channels.js',
 			'static/ergopti_plus/_shared/modules/updater/defaults.json',
@@ -3629,4 +3630,423 @@ checkPrivacyTriggerControls();
 		mutate(wrong);
 		assert.throws(() => aboutEdges(wrong));
 	}
+}
+
+// Custom-profile child callbacks stay native; their fixed presentation is shared.
+{
+	const assert = require('node:assert/strict');
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const expected = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/custom_profile_children.json'), 'utf8')
+	);
+	const declared = parseToml(readFileSync(MANIFEST_PATH, 'utf8')).menu;
+	const generated = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	assert.deepEqual(declared[expected.section], expected.declaration);
+	assert.deepEqual(generated[expected.section], expected.declaration);
+	const languages = JSON.parse(
+		readFileSync(resolve(SHARED, 'data/locale_order.json'), 'utf8')
+	).order;
+	assert.equal(languages.length, 21);
+	assert.deepEqual(Object.keys(expected.caption_snapshots).sort(), [...languages].sort());
+	for (const code of languages) {
+		const values = JSON.parse(readFileSync(resolve(LOCALES_DIR, code + '.json'), 'utf8'));
+		for (const [key, value] of Object.entries(expected.caption_snapshots[code]))
+			assert.equal(values[key], value, code + ': original native caption ' + key);
+	}
+	function wiring(source, platform) {
+		const tokens = scriptTokens(source, '.lua').map((token) => token.value);
+		function has(sequence) {
+			return tokens.some((_, i) => sequence.every((value, n) => tokens[i + n] === value));
+		}
+		assert(
+			has(['ManifestMenu', '.', 'template_rows', '(', expected.section, ',']),
+			'actual canonical renderer consumer'
+		);
+		for (const id of expected.platform_rows[platform]) {
+			if (id === '---') continue;
+			assert(has(['[', id, ']', '=', 'function']), 'actual native callback binding: ' + id);
+		}
+		assert(has(['[', 'llm_custom_profile_active', ']', '=', 'function']), 'native active getter');
+		assert(
+			has(['[', 'llm_custom_profile_ready', ']', '=', 'child_ready']),
+			'native current-owner admission'
+		);
+		assert(has(['local', 'function', 'child_ready', '(', ')']), 'actual readiness function');
+		assert(
+			platform === 'hs'
+				? has(['item', '.', 'items', '=', 'ManifestMenu', '.', 'template_rows'])
+				: has(['items', '=', 'ManifestMenu', '.', 'template_rows']),
+			'actual child payload materializes template'
+		);
+	}
+	for (const [platform, file] of [
+		['hs', 'macos/ui/menu/menu_llm/profiles_manager.lua'],
+		['linux', 'linux/ui/menu/menu_builder.lua']
+	]) {
+		const source = readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus', file), 'utf8');
+		wiring(source, platform);
+		for (const name of [
+			expected.section,
+			...expected.platform_rows[platform].filter((id) => id !== '---'),
+			'llm_custom_profile_active',
+			'llm_custom_profile_ready'
+		])
+			assert.throws(() => wiring(source.replaceAll('"' + name + '"', '"wrong_owner"'), platform));
+		const wrong = source.replace(
+			'ManifestMenu.template_rows("' + expected.section + '"',
+			'Foreign.template_rows("' + expected.section + '"'
+		);
+		assert.throws(() =>
+			wiring(wrong + '\n-- ManifestMenu.template_rows("' + expected.section + '")', platform)
+		);
+		assert.throws(() =>
+			wiring(
+				wrong + '\nlocal decorative = [[ManifestMenu.template_rows("' + expected.section + '")]]',
+				platform
+			)
+		);
+	}
+	const graphText = readFileSync(resolve(__dirname, 'test-menu-parity.cjs'), 'utf8');
+	const start = graphText.indexOf('const OPENS_SUBMENU = {');
+	const end = graphText.indexOf('\n};', start);
+	const graph = require('node:vm').runInNewContext(
+		graphText.slice(start, end + 3) + '; OPENS_SUBMENU'
+	);
+	function childEdges(candidate) {
+		assert(Array.isArray(candidate.llm_profile));
+		assert(
+			candidate.llm_profile.includes('llm_profile_commands'),
+			'original Create/Clone child retained'
+		);
+		const edge = candidate.llm_profile.find((row) => row?.menu === expected.section);
+		assert(edge);
+		assert.equal(edge.kind, undefined, 'ordinary clicked child retains actionable-row floor');
+		assert.deepEqual([...edge.platforms], ['hs', 'linux']);
+	}
+	childEdges(graph);
+	for (const mutate of [
+		(g) => {
+			g.llm_profile.find((e) => e?.menu === expected.section).menu = 'llm_menu';
+		},
+		(g) => {
+			g.llm_profile.find((e) => e?.menu === expected.section).kind = 'compose';
+		},
+		(g) => {
+			g.llm_profile.find((e) => e?.menu === expected.section).platforms = ['ahk'];
+		},
+		(g) => {
+			g.llm_profile = g.llm_profile.filter((e) => e !== 'llm_profile_commands');
+		}
+	]) {
+		const wrong = structuredClone(graph);
+		mutate(wrong);
+		assert.throws(() => childEdges(wrong));
+	}
+	console.log(
+		'Custom profile children: independent declared order, 21 existing captions, actual native bindings and clicked graph ownership.'
+	);
+}
+
+// Linux's five numeric preset pickers share the complete free-entry tail.
+{
+	const assert = require('node:assert/strict');
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const expected = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/linux_numeric_custom_tail.json'), 'utf8')
+	);
+	const section = 'llm_numeric_custom_rows';
+	const declared = parseToml(readFileSync(MANIFEST_PATH, 'utf8')).menu;
+	const generated = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	function declaration(candidate) {
+		assert.deepEqual(candidate[section], expected.declaration);
+	}
+	declaration(declared);
+	declaration(generated);
+	for (const mutate of [
+		(m) => (m[section][1].i18n = 'button.cancel'),
+		(m) => m[section].reverse(),
+		(m) => (m[section][1].platforms = ['hs']),
+		(m) => (m[section][1].id = 'foreign_owner')
+	]) {
+		const wrong = structuredClone(generated);
+		mutate(wrong);
+		assert.throws(() => declaration(wrong));
+	}
+	const languages = JSON.parse(
+		readFileSync(resolve(SHARED, 'data/locale_order.json'), 'utf8')
+	).order;
+	assert.equal(languages.length, 21);
+	assert.deepEqual(Object.keys(expected.captions).sort(), [...languages].sort());
+	for (const code of languages) {
+		const strings = JSON.parse(readFileSync(resolve(LOCALES_DIR, code + '.json'), 'utf8'));
+		assert.equal(strings['menu.llm.generation.custom_value'], expected.captions[code]);
+	}
+	function wiring(source) {
+		for (const [owner, receiver] of [
+			['llm_trigger', 'delay_choices'],
+			['llm_generation', 'choices']
+		]) {
+			const begin = source.indexOf('dynamic_handlers["' + owner + '"] = function(target)');
+			assert(begin >= 0, 'actual numeric provider ' + owner);
+			const rest = source.slice(begin + 1);
+			const end = rest.indexOf('dynamic_handlers[');
+			const body = source.slice(begin, end < 0 ? source.length : begin + 1 + end);
+			const tokens = scriptTokens(body, '.lua').map((t) => t.value);
+			function has(seq) {
+				return tokens.some((_, i) => seq.every((v, n) => tokens[i + n] === v));
+			}
+			assert(
+				has([
+					'local',
+					'custom_rows',
+					'=',
+					'ManifestMenu',
+					'.',
+					'template_rows',
+					'(',
+					section,
+					',',
+					'{',
+					'[',
+					'llm_numeric_custom_value',
+					']',
+					'=',
+					'function',
+					'(',
+					')'
+				]),
+				'actual native command binding in ' + owner
+			);
+			assert(
+				has([
+					'for',
+					'_',
+					',',
+					'row',
+					'in',
+					'ipairs',
+					'(',
+					'custom_rows',
+					'or',
+					'{',
+					'}',
+					')',
+					'do',
+					receiver,
+					'[',
+					'#',
+					receiver,
+					'+',
+					'1',
+					']',
+					'=',
+					'row',
+					'end'
+				]),
+				'actual numeric tail appended to preset owner ' + owner
+			);
+		}
+	}
+	const native = readFileSync(
+		resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/menu_builder.lua'),
+		'utf8'
+	);
+	wiring(native);
+	for (const mutate of [
+		(s) =>
+			s.replace(
+				'ManifestMenu.template_rows("' + section + '"',
+				'Foreign.template_rows("' + section + '"'
+			),
+		(s) => s.replace('["llm_numeric_custom_value"] = function()', '["foreign_owner"] = function()'),
+		(s) => s.replace('do choices[#choices + 1] = row end', 'do unused[#unused + 1] = row end'),
+		(s) => s.replace('dynamic_handlers["llm_trigger"]', 'dynamic_handlers["unreachable"]')
+	])
+		assert.throws(() => wiring(mutate(native)));
+	const graphText = readFileSync(resolve(__dirname, 'test-menu-parity.cjs'), 'utf8');
+	const start = graphText.indexOf('const OPENS_SUBMENU = {');
+	const end = graphText.indexOf('\n};', start);
+	const graph = require('node:vm').runInNewContext(
+		graphText.slice(start, end + 3) + '; OPENS_SUBMENU'
+	);
+	function edges(g) {
+		for (const [provider, oldChild] of [
+			['llm_trigger', 'llm_trigger_menu'],
+			['llm_generation', 'llm_generation_menu']
+		]) {
+			assert(Array.isArray(g[provider]));
+			assert(g[provider].includes(oldChild), 'original clicked child retained');
+			const edge = g[provider].find((e) => e?.menu === section);
+			assert(edge);
+			assert.equal(edge.kind, 'compose');
+			assert.deepEqual([...edge.platforms], ['linux']);
+			assert.equal(edge.native_sources.linux, 'linux/ui/menu/menu_builder.lua');
+		}
+	}
+	edges(graph);
+	for (const mutate of [
+		(g) => (g.llm_trigger.find((e) => e?.menu === section).menu = 'llm_trigger_menu'),
+		(g) => (g.llm_generation.find((e) => e?.menu === section).kind = 'clicked'),
+		(g) => (g.llm_trigger.find((e) => e?.menu === section).platforms = ['hs']),
+		(g) =>
+			(g.llm_generation.find((e) => e?.menu === section).native_sources.linux =
+				'linux/ui/menu/agent_rows.lua'),
+		(g) => (g.llm_trigger = g.llm_trigger.filter((e) => e !== 'llm_trigger_menu'))
+	]) {
+		const wrong = structuredClone(graph);
+		mutate(wrong);
+		assert.throws(() => edges(wrong));
+	}
+	console.log(
+		'Linux numeric tails: independent shared declaration, 21 existing captions, real preset receivers and preserved clicked children.'
+	);
+}
+
+// Profile section headings are real inert fragments, never clicked children.
+{
+	const assert = require('node:assert/strict');
+	const fs = require('node:fs');
+	const path = require('node:path');
+	const vm = require('node:vm');
+	const shared = path.resolve(__dirname, '../../static/ergopti_plus/_shared');
+	const declared = JSON.parse(
+		fs.readFileSync(path.join(shared, 'modules/menu/menu_manifest.json'), 'utf8')
+	);
+	const expected = JSON.parse(
+		fs.readFileSync(path.join(shared, 'tests/corpus/menus/profile_section_headings.json'), 'utf8')
+	);
+	const sections = ['llm_profile_builtin_heading', 'llm_profile_custom_heading'];
+	function declaration(document) {
+		for (const section of sections) assert.deepEqual(document[section], expected.sections[section]);
+	}
+	declaration(declared);
+	for (const mutate of [
+		(d) => delete d.llm_profile_builtin_heading,
+		(d) => d.llm_profile_custom_heading.reverse(),
+		(d) => (d.llm_profile_builtin_heading[0].i18n = 'button.cancel'),
+		(d) => (d.llm_profile_custom_heading[1].platforms = ['hs']),
+		(d) => (d.llm_profile_builtin_heading[1].type = 'label'),
+		(d) => (d.llm_profile_custom_heading[0].type = 'label')
+	]) {
+		const wrong = structuredClone(declared);
+		mutate(wrong);
+		assert.throws(() => declaration(wrong));
+	}
+	assert.equal(Object.keys(expected.captions).length, 21);
+	for (const [language, captions] of Object.entries(expected.captions)) {
+		const values = JSON.parse(
+			fs.readFileSync(path.join(shared, 'data/locales', language + '.json'), 'utf8')
+		);
+		assert.deepEqual(
+			expected.keys.map((key) => values[key]),
+			captions
+		);
+	}
+	const owners = {
+		ahk: 'windows/ui/menu/menu_llm/menu_profiles.ahk',
+		hs: 'macos/ui/menu/menu_llm/profiles_manager.lua',
+		linux: 'linux/ui/menu/menu_builder.lua'
+	};
+	function wiring(source, platform) {
+		if (platform === 'ahk') {
+			for (const [section, variable] of [
+				['llm_profile_builtin_heading', 'BuiltinHeadingRows'],
+				['llm_profile_custom_heading', 'CustomHeadingRows']
+			]) {
+				assert(
+					source.includes(
+						variable + ' := MenuRenderer_TemplateRows("' + section + '", Map(), Map(), Map())'
+					)
+				);
+				assert(
+					source.includes(
+						'if ' +
+							variable +
+							' is Array\n\t' +
+							(section.includes('custom') ? '\t' : '') +
+							'\tRows.Push(' +
+							variable +
+							'*)'
+					)
+				);
+			}
+			assert(source.includes('if (user_profiles.Length > 0) {'));
+		} else {
+			const receiver = platform === 'hs' ? 'table.insert(rows, row)' : 'rows[#rows + 1] = row';
+			for (const section of sections) {
+				const expression = new RegExp(
+					'for _, row in ipairs\\(ManifestMenu\\.template_rows\\("' +
+						section +
+						'", \\{\\}, \\{\\}, \\{\\}\\) or \\{\\}\\) do\\s+' +
+						receiver.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') +
+						'\\s+end'
+				);
+				assert(expression.test(source));
+			}
+			assert(
+				source.includes(
+					platform === 'hs'
+						? 'if type(user_profiles) == "table" and #user_profiles > 0 then'
+						: 'if #user_profiles > 0 then'
+				)
+			);
+		}
+		assert(
+			!/(?:t|i18n_safe|i18n\.section)\("menu\.profiles\.header_(?:default|custom)_profiles"\)/.test(
+				source
+			)
+		);
+	}
+	for (const [platform, owner] of Object.entries(owners)) {
+		const source = fs.readFileSync(path.resolve(shared, '..', owner), 'utf8');
+		wiring(source, platform);
+		for (const mutate of [
+			(s) => s.replace(/llm_profile_builtin_heading/g, 'unreachable_heading'),
+			(s) => s.replace(/llm_profile_custom_heading/g, 'llm_profile_commands'),
+			(s) =>
+				platform === 'ahk'
+					? s.replace('Rows.Push(CustomHeadingRows*)', 'Discarded.Push(CustomHeadingRows*)')
+					: s.replace(
+							platform === 'hs' ? 'table.insert(rows, row)' : 'rows[#rows + 1] = row',
+							'discarded[#discarded + 1] = row'
+						)
+		])
+			assert.throws(() => wiring(mutate(source), platform));
+	}
+	const graphSource = fs.readFileSync(path.resolve(__dirname, 'test-menu-parity.cjs'), 'utf8');
+	const start = graphSource.indexOf('const OPENS_SUBMENU = {');
+	const end = graphSource.indexOf('\n};', start);
+	const graph = vm.runInNewContext(graphSource.slice(start, end + 3) + '; OPENS_SUBMENU');
+	function edges(value) {
+		assert(Array.isArray(value.llm_profile));
+		assert(
+			value.llm_profile.includes('llm_profile_commands'),
+			'the original clicked command child survives'
+		);
+		const original = value.llm_profile.find((edge) => edge?.menu === 'llm_custom_profile_controls');
+		assert(original);
+		assert.deepEqual([...original.platforms], ['hs', 'linux']);
+		for (const section of sections) {
+			const edge = value.llm_profile.find((item) => item?.menu === section);
+			assert(edge);
+			assert.equal(edge.kind, 'compose');
+			assert.deepEqual([...edge.platforms], ['ahk', 'hs', 'linux']);
+			assert.deepEqual({ ...edge.native_sources }, owners);
+		}
+	}
+	edges(graph);
+	for (const mutate of [
+		(g) => (g.llm_profile.find((e) => e?.menu === sections[0]).menu = 'llm_profile_commands'),
+		(g) => (g.llm_profile.find((e) => e?.menu === sections[1]).kind = 'submenu'),
+		(g) => (g.llm_profile.find((e) => e?.menu === sections[0]).platforms = ['hs']),
+		(g) => (g.llm_profile.find((e) => e?.menu === sections[1]).native_sources.linux = owners.hs),
+		(g) => (g.llm_profile = g.llm_profile.filter((e) => e !== 'llm_profile_commands'))
+	]) {
+		const wrong = structuredClone(graph);
+		mutate(wrong);
+		assert.throws(() => edges(wrong));
+	}
+	console.log(
+		'Profile headings: independent declaration, original 21 captions, real three-driver fragment publication and clicked-child preservation.'
+	);
 }

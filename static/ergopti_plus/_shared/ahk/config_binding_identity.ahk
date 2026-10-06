@@ -48,3 +48,38 @@ ConfigBindingIdentityGestureStatus(BindingId, Catalogue?) {
 	}
 	return "retired"
 }
+
+; Judges only a complete acknowledged script-domain publication.
+; Omitted publication remains unjudged, without reading or initializing an owner.
+ConfigBindingIdentityScriptStatus(BindingId, Catalogue?) {
+	if !IsSet(Catalogue)
+		return "unjudged"
+	if !(Catalogue is Map) || !Catalogue.Has("prefix") || Catalogue["prefix"] !== "script__"
+		|| !Catalogue.Has("slots") || !(Catalogue["slots"] is Map) || Catalogue["slots"].Count == 0
+		throw ValueError("config_binding_identity: invalid published script catalogue")
+	return ConfigBindingIdentityGestureStatus(BindingId, Catalogue)
+}
+
+; Exact reason shared by native readers and cleanup; other domains are unchanged.
+ConfigBindingIdentityScriptRetiredReason() {
+	return "no script chord slot of this build has this name"
+}
+
+; Builds only the complete native script-slot declaration publication.
+; This compiled source owner performs no file IO and does not use assignments.
+ConfigBindingIdentityScriptPublication(Ids) {
+	if !(Ids is Array) || Ids.Length == 0
+		throw ValueError("script chords: invalid published slot catalogue")
+	Slots := Map()
+	Slots.CaseSense := "On"
+	Count := 0
+	for Index, Slot in Ids {
+		if Type(Slot) != "String" || Slot == "" || InStr(Slot, "__", true) || Slots.Has(Slot)
+			throw ValueError("script chords: invalid published slot catalogue")
+		Slots[Slot] := true
+		Count += 1
+	}
+	if Count != Ids.Length
+		throw ValueError("script chords: invalid published slot catalogue")
+	return { Source: Ids, Catalogue: Map("prefix", "script__", "slots", Slots) }
+}

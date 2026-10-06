@@ -33,6 +33,7 @@ local SECTION = "shortcuts.script_control"
 
 -- The validated catalogue; nil until the first read.
 local _catalogue = nil
+local _binding_catalogue = nil
 
 
 
@@ -51,14 +52,31 @@ function M.get()
 	local path = Paths.shared(CATALOGUE_REL_PATH)
 	local handle = path and io.open(path, "rb")
 	if not handle then error("script chords: cannot read " .. tostring(path)) end
-	local raw = handle:read("*a")
-	handle:close()
+	local read_ok, raw = pcall(handle.read, handle, "*a")
+	local close_ok, closed = pcall(handle.close, handle)
+	if not read_ok or type(raw) ~= "string" or not close_ok or closed ~= true then
+		error("script chords: cannot complete read of " .. tostring(path))
+	end
 	local ok, decoded = pcall(Json.decode, raw)
 	if not ok or type(decoded) ~= "table" then
 		error("script chords: " .. tostring(path) .. " is malformed")
 	end
-	_catalogue = ScriptChords.catalogue(decoded)
+	local catalogue = ScriptChords.catalogue(decoded)
+	local binding = { prefix = "script__", slots = {} }
+	for _, slot in ipairs(catalogue.slots) do binding.slots[slot.id] = true end
+	require("config_binding_identity").script_binding_fits("script__", binding)
+	_catalogue, _binding_catalogue = catalogue, binding
 	return _catalogue
+end
+
+--- Returns only a detached, already acknowledged complete binding publication.
+--- This accessor performs no IO or runtime initialization.
+--- @return table|nil catalogue
+function M.published_binding_catalogue()
+	if _binding_catalogue == nil then return nil end
+	local publication = { prefix = _binding_catalogue.prefix, slots = {} }
+	for id in pairs(_binding_catalogue.slots) do publication.slots[id] = true end
+	return publication
 end
 
 --- The manifest path of a slot or of the switch.
@@ -95,6 +113,7 @@ end
 --- Test seam: forgets the catalogue read.
 function M._reset()
 	_catalogue = nil
+	_binding_catalogue = nil
 end
 
 return M
