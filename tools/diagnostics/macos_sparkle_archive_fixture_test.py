@@ -1064,5 +1064,177 @@ class PrivateStartupPrimaryTests(unittest.TestCase):
             self.exercise_retirement("retirement-begin")
 
 
+@unittest.skipUnless(hasattr(os, "geteuid"), "Physical private sockets need a POSIX host")
+class PrivateNumericLoopbackBindTests(unittest.TestCase):
+    retained_owners = []  # Keep uncertain native socket owners beyond a failed frame.
+
+    def exercise(self, fault=None):
+        # Only failure ports and signal registration are controlled. The actual
+        # PrivateServer constructor, TCP bind/listen and close remain native.
+        spec = importlib.util.spec_from_file_location("private_numeric_bind", HELPER)
+        helper = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(helper)
+        original_init = helper.http.server.HTTPServer.__init__
+        original_bind = helper.http.server.socketserver.TCPServer.server_bind
+        original_activate = helper.http.server.socketserver.TCPServer.server_activate
+        acquired = []
+        native_failures = []
+        observation = {}
+        blocker = None
+        directory = Path(tempfile.mkdtemp(prefix="sparkle-numeric-bind-")).resolve()
+        directory.chmod(0o700)
+        primary = None
+        cleanup_failure = None
+        signal_failure = KeyboardInterrupt("independent signal registration refusal")
+        ownership = {"servers": acquired, "blocker": None, "directory": directory}
+        self.retained_owners.append(ownership)
+
+        def initialize(server, *args, **kwargs):
+            acquired.append(server)  # Retain even partial native acquisition.
+            original_init(server, *args, **kwargs)
+            observation["address"] = server.socket.getsockname()
+            observation["listening"] = server.socket.getsockopt(
+                socket.SOL_SOCKET, socket.SO_ACCEPTCONN
+            )
+            observation["name"] = server.server_name
+            observation["port"] = server.server_port
+
+        def bind(server):
+            if fault == "occupied-bind":
+                server.server_address = blocker.getsockname()
+            try:
+                return original_bind(server)
+            except OSError as error:
+                native_failures.append(error)
+                raise
+
+        def activate(server):
+            if fault == "closed-listen":
+                observation["bound_before_listen"] = server.socket.getsockname()
+                server.socket.close()
+            try:
+                return original_activate(server)
+            except OSError as error:
+                native_failures.append(error)
+                raise
+
+        def register(number, callback):
+            if fault == "signal-refusal":
+                raise signal_failure
+            callback(number, None)  # Call the producer's actual graceful owner.
+
+        try:
+            if fault == "occupied-bind":
+                blocker = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                ownership["blocker"] = blocker
+                blocker.bind(("127.0.0.1", 0))
+                blocker.listen(1)
+            observed_error = None
+            with (
+                mock.patch.object(helper.http.server.HTTPServer, "__init__", initialize),
+                mock.patch.object(helper.http.server.socketserver.TCPServer, "server_bind", bind),
+                mock.patch.object(
+                    helper.http.server.socketserver.TCPServer, "server_activate", activate
+                ),
+                mock.patch.object(helper.signal, "signal", side_effect=register),
+                mock.patch.object(
+                    helper.http.server.socket,
+                    "getfqdn",
+                    side_effect=RuntimeError("independent reverse DNS refusal"),
+                ) as dns,
+            ):
+                try:
+                    helper.serve(str(directory), NONCE)
+                except BaseException as error:
+                    observed_error = error
+                dns.assert_not_called()
+            self.assertEqual(len(acquired), 1)
+            self.assertEqual(
+                acquired[0].socket.fileno(), -1, "The real constructor/body must close its socket"
+            )
+            if fault in ("occupied-bind", "closed-listen"):
+                self.assertIsInstance(observed_error, OSError)
+                self.assertEqual(
+                    observed_error.errno,
+                    errno.EADDRINUSE if fault == "occupied-bind" else errno.EBADF,
+                )
+                self.assertEqual(len(native_failures), 1)
+                self.assertIs(
+                    observed_error,
+                    native_failures[0],
+                    "The actual native primary cannot be replaced",
+                )
+                self.assertFalse((directory / "server-start.json").exists())
+                self.assertFalse((directory / "server-retired.json").exists())
+                if fault == "closed-listen":
+                    self.assertEqual(observation["bound_before_listen"][0], "127.0.0.1")
+                    self.assertGreater(observation["bound_before_listen"][1], 0)
+            else:
+                self.assertEqual(observation["address"][0], "127.0.0.1")
+                self.assertGreater(observation["address"][1], 0)
+                self.assertEqual(observation["name"], "127.0.0.1")
+                self.assertEqual(observation["port"], observation["address"][1])
+                self.assertEqual(observation["listening"], 1)
+                self.assertEqual(
+                    json.loads((directory / "server-retired.json").read_bytes()),
+                    {"nonce": NONCE, "pid": os.getpid(), "requests": 0},
+                )
+                if fault == "signal-refusal":
+                    self.assertIs(observed_error, signal_failure)
+                    self.assertFalse((directory / "server-start.json").exists())
+                else:
+                    self.assertIsNone(observed_error)
+                    started = json.loads((directory / "server-start.json").read_bytes())
+                    self.assertEqual(
+                        started, {"nonce": NONCE, "pid": os.getpid(), "port": observation["port"]}
+                    )
+        except BaseException as error:
+            primary = error
+        finally:
+            # Every real acquired socket is attempted independently, including
+            # native constructor failure. Never close a guessed descriptor.
+            for server in acquired:
+                try:
+                    if hasattr(server, "socket") and server.socket.fileno() >= 0:
+                        server.server_close()
+                    if hasattr(server, "socket"):
+                        self.assertEqual(server.socket.fileno(), -1)
+                except BaseException as error:
+                    if cleanup_failure is None:
+                        cleanup_failure = error
+            if blocker is not None:
+                try:
+                    blocker.close()
+                    self.assertEqual(blocker.fileno(), -1)
+                except BaseException as error:
+                    if cleanup_failure is None:
+                        cleanup_failure = error
+            if cleanup_failure is None:
+                self.retained_owners[:] = [
+                    item for item in self.retained_owners if item is not ownership
+                ]
+            if primary is None and cleanup_failure is None:
+                shutil.rmtree(directory)
+        if primary is not None:
+            raise primary
+        if cleanup_failure is not None:
+            raise cleanup_failure
+
+    def testActualNumericLoopbackBindListenAndKernelPortReadback(self):
+        self.exercise()
+
+    def testRefusedReverseDNSCannotPreventActualBindListenAndRetirement(self):
+        self.exercise("dns-refusal")
+
+    def testActualOccupiedPortRefusesAndPhysicallyClosesPartialConstructor(self):
+        self.exercise("occupied-bind")
+
+    def testActualClosedSocketListenRefusesAndPreservesNativePrimary(self):
+        self.exercise("closed-listen")
+
+    def testSignalRegistrationRefusalPreservesPrimaryAndRealBoundSocketRetirement(self):
+        self.exercise("signal-refusal")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -273,6 +273,14 @@ def serve(root, nonce):
     # Sparkle 2.9.2 explicitly supports local-network testing. Only the private
     # fixture has NSAllowsLocalNetworking; archive EdDSA admission remains on.
     class PrivateServer(http.server.HTTPServer):
+        def server_bind(self):
+            # This private authority is numeric loopback, not a resolver name.
+            # Keep the genuine socket bind/getsockname; HTTPServer's display-only
+            # getfqdn would otherwise add an unbounded external lookup before
+            # our graceful handlers and retirement owner are installed.
+            http.server.socketserver.TCPServer.server_bind(self)
+            self.server_name, self.server_port = self.server_address[:2]
+
         def process_request(self, request, client_address):
             # BaseServer's error callback may raise before its own shutdown.
             # The native accepted socket has one unconditional physical owner.

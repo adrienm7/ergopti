@@ -1005,14 +1005,14 @@ try {
 	assert.ifError(result.error);
 	assert.equal(result.signal, null, result.stderr);
 	assert.equal(result.status, 0, result.stderr);
-	assert.match(result.stderr, /Ran 34 tests in /);
-	const skipped = process.platform === 'win32' ? 10 : process.platform === 'darwin' ? 1 : 0;
+	assert.match(result.stderr, /Ran 39 tests in /);
+	const skipped = process.platform === 'win32' ? 15 : process.platform === 'darwin' ? 1 : 0;
 	assert.match(
 		result.stderr,
 		skipped ? new RegExp(`\\nOK \\(skipped=${skipped}\\)\\s*$`) : /\nOK\s*$/
 	);
 	console.log(
-		`Sparkle transport controls: ${34 - skipped} passed, ${skipped} platform cases skipped.`
+		`Sparkle transport controls: ${39 - skipped} passed, ${skipped} platform cases skipped.`
 	);
 	const fixture = fs.readFileSync(
 		path.join(
@@ -1458,6 +1458,60 @@ try {
 	errors.push(`Native Sparkle startup diagnostic guard failed: ${error.message}`);
 }
 // SPARKLE_STARTUP_DIAGNOSTIC_CONTROLS_END
+
+// SPARKLE_NUMERIC_BIND_CONTROLS_BEGIN
+// Numeric loopback authority must not introduce an unrelated reverse-DNS wait.
+try {
+	const assert = require('node:assert/strict');
+	const helper = fs.readFileSync(
+		path.join(root, 'tools/diagnostics/macos_sparkle_archive_fixture.py'),
+		'utf8'
+	);
+	function assertNumericLoopbackBinding(python) {
+		const start = python.indexOf('    class PrivateServer(http.server.HTTPServer):');
+		assert.ok(start >= 0);
+		const end = python.indexOf('        def process_request(', start);
+		assert.ok(end > start);
+		const binding = python.slice(start, end);
+		assert.match(binding, /def server_bind\(self\):/);
+		assert.match(binding, /http\.server\.socketserver\.TCPServer\.server_bind\(self\)/);
+		assert.match(binding, /self\.server_name, self\.server_port = self\.server_address\[:2\]/);
+		assert.doesNotMatch(binding, /getfqdn\s*\(/);
+		assert.ok(
+			binding.indexOf('TCPServer.server_bind(self)') <
+				binding.indexOf('self.server_name, self.server_port')
+		);
+		assert.match(python, /server = PrivateServer\(\("127\.0\.0\.1", 0\), Handler\)/);
+		assert.match(python, /timeout = 5/);
+		assert.match(python, /server\.timeout = 0\.2/);
+		assert.match(python, /server\.handle_request\(\)/);
+		assert.match(python, /finally:\n            server\.server_close\(\)/);
+	}
+	assertNumericLoopbackBinding(helper);
+	for (const [name, needle, replacement] of [
+		[
+			'original reverse DNS dependency',
+			'http.server.socketserver.TCPServer.server_bind(self)',
+			'http.server.HTTPServer.server_bind(self)'
+		],
+		['manufactured bind success', 'http.server.socketserver.TCPServer.server_bind(self)', 'pass'],
+		[
+			'manufactured port',
+			'self.server_name, self.server_port = self.server_address[:2]',
+			'self.server_name, self.server_port = "127.0.0.1", 1'
+		]
+	]) {
+		assert.equal(helper.split(needle).length - 1, 1, 'One exact numeric binding mutation');
+		const candidate = helper.replace(needle, replacement);
+		assert.throws(() => assertNumericLoopbackBinding(candidate), name);
+	}
+	console.log(
+		'Sparkle private loopback binds its real socket and port without reverse-DNS authority; native retirement remains mandatory.'
+	);
+} catch (error) {
+	errors.push(`Native Sparkle numeric loopback binding guard failed: ${error.message}`);
+}
+// SPARKLE_NUMERIC_BIND_CONTROLS_END
 
 if (errors.length > 0) {
 	for (const error of errors) console.error(`[FAIL] ${error}`);
