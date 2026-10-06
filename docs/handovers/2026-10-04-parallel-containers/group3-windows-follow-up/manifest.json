@@ -11,8 +11,8 @@
 	"files": [
 		{
 			"path": "README.md",
-			"sha256": "d48b6ae3fb9e81e29a917e986b95888e0854b718bef0442e9e26b3af9ed6d78d",
-			"bytes": 46241
+			"sha256": "a7d922c4e416bbf8e30746b9424f0cf77c89b62a8457853308f1487720805283",
+			"bytes": 49132
 		},
 		{
 			"path": "inactive/windows106-ctor-handoff/DESIGN.md.txt",

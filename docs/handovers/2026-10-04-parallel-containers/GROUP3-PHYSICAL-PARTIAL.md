@@ -72,10 +72,11 @@ infer a physical J from a logical character or regenerate independent corpora.
 
 ## Terminal checkpoint and remaining software
 
-All thirteen Group3 TODO items remain partial; no items are removed. Feature
-HEAD089008a19f1aff8b63e8beb832fbae037f5311c5 is the current source checkpoint. The earlier
-EOF candidate 9fcef640b8e55e96d645f6ab756f0e21e8f0448b passed selected JS362/362, formatting239/239
-and AHK encoding1855/1855; those results do not qualify later native sources.
+All thirteen Group3 TODO items remain partial; no items are removed.
+This preparation uses source epoch ad32ff97e917401aeceaba63c15b4353bacf86f8.
+EOF9fcef640 and BOM089008a1 are historical selected-source checkpoints,
+not claims about the current feature HEAD. Their JS362/362, formatting239/239
+and AHK encoding1855/1855 results remain separate from native qualification.
 
 Previous run37451229133 is terminal FAILURE. Windows units record9,693 passes
 and9 failures, all remaining failures in program methods; brightness retirement
@@ -119,15 +120,41 @@ the local fixture correction, not the remote cause or hosted successor success.
 The foreign ETag gate remains under its existing owner. Keep software defects
 and whole-suite failures distinct from actual device acceptance.
 
-The current BOM fixture commit is089008a19f1aff8b63e8beb832fbae037f5311c5,
-with local JS362/362, formatting239/239 and AHK encoding1855/1855 passed.
-The GTK fixture correction also passes local Linux9126/0 and actual GTK4/4.
-Fresh Windows/Linux native qualification is PENDING. Private Windows candidate
-9fa92730dba206e1e9bd97b7a5f61d8a9b0defd2, tree
-81405a1af10e61234f94c24ff7086438e01ee9c0, uses the reviewed32498e18 receipt:
-whole BOM-corrected15-method/178-assertion prefix plus the unchanged12 appendix.
-Its native qualification is PENDING and constructor source remains outside
-Root. Neither old12 success nor local source gates qualify the new27 prefix.
+Current minimal run37458316115, CI54b02cdb5bab61ec746fdf49bb87a63358314a80,
+is terminal FAILURE. Windows units pass9,700 with two brightness timeouts;
+there are zero program-method failures and the basic15 component passes.
+Brightness timeout cause remains UNKNOWN. Compiler/startup and Windows E2E
+were SKIPPED after unit failure. Linux unit/hold/window gates pass; Linux E2E
+fails GTK receipt and the foreign ETag gate. Both OS package/install jobs,
+unselected macOS and Release are SKIPPED. No whole-minimal-run pass is claimed.
+
+Current private run37458344080, CI78781632bf098fb7c19ceaec35d29e12b61219b4,
+uses candidate9fa92730dba206e1e9bd97b7a5f61d8a9b0defd2 and tree
+81405a1af10e61234f94c24ff7086438e01ee9c0. Windows unit job112251650133
+is SUCCESS:9,714 passed/0failed, all AHK/manifest/compiler/full-driver/fresh-warm
+startup gates passed. The exact basic15 and twelve additional constructor
+fault methods qualify together in this complete private unit suite. Receipt
+32498e18 is source/custody CLEAR with producer3617/test2f7 and all16 scoped
+dependencies unchanged. This slice admits reviewed producer3617cb6e and
+twenty-seven-method fixture2f7e12b1 after SUCCESS on private CI
+78781632bf098fb7c19ceaec35d29e12b61219b4. Final integrated three-OS
+validation remains unqualified.
+The whole private run finished SUCCESS at12:01:58UTC on2026-10-06:
+Windows E2E, compiled package, installation/launch and Windows/selected verdict
+jobs all pass. Release is SKIPPED; Linux/macOS are unselected/SKIPPED.
+Full qualification receipt18a44437b047edc2e86abc40e4b72376db55f19663d067d65786109eecfc309f records this exact snapshot.
+Raw per-method artifact rows and the E2E case count are unobserved; successful
+complete manifest/completion guards, unchanged source census and the12-method
+count difference establish the recorded components without invented rows.
+Final integrated three-OS E2E/package/install remain unexecuted, and physical
+acceptance is unqualified. Retain every assertion and diagnose brightness
+variability rather than treating a later pass as its explanation.
+
+The receipt-state GTK diagnostic is locally qualified4/4 with12reaped and
+pending0/rescue0, but the precise hosted failure cause remains UNKNOWN and
+a hosted successor must still pass. The historical v3 constructor archive
+remains inactive/notinstalled/native-unexecuted; all10 payload pins and
+historical policies are unchanged despite the current forward-port result.
 
 Metrics merge3844cd550bfb3a3471960c262a7497a0870a2ae4 preserves devb6fa,
 incoming Python01325a22 and joint Luabaccd503. Actual LuaJIT passes1,026 grouped/

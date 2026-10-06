@@ -5624,8 +5624,8 @@ child/namespace allocation; mandatory hosted native qualification remains open.
 
 Remaining work for item106 (CI-feasible software first):
 
-- [ ] Software implementation/repair: Requalify the EOF-first Windows descriptor and UTF-8-RAW BOM fixture repairs with retained shutdown/HANDLE/Job ownership; fix only demonstrated failures. The private constructor candidate is not admitted and requires separate native qualification before consumption. Complete Windows discovery, installed automation/application providers and bounded Apple Shortcuts chosen-ID/invocation ownership; preserve literal argv, privacy and consumer concurrency.
-- [ ] Hosted native qualification: Run the actual basic 15 program cases, genuine script/Python/executable and lifecycle controls on affected hosted OS lanes; the inactive constructor's 12 native HANDLE/Job fault cases require separate reviewed admission/qualification. Requalify signed Hammerspoon provider/shim cases after scalar-arity fixture repair, native locking/symlinks and 14 owned-program XCTest cases; complete E2E/package/install/launch. Saved, unintegrated or lost preparations require preimage review/reconstruction, not a completion claim.
+- [ ] Software implementation/repair: Requalify the EOF-first Windows descriptor and UTF-8-RAW BOM fixture repairs with retained shutdown/HANDLE/Job ownership; fix only demonstrated failures. The reviewed constructor failure carrier has native basic/constructor qualification; preserve its lifecycle guards and requalify final integrated sources. Complete Windows discovery, installed automation/application providers and bounded Apple Shortcuts chosen-ID/invocation ownership; preserve literal argv, privacy and consumer concurrency.
+- [ ] Hosted native qualification: Run the actual basic 15 program cases, genuine script/Python/executable and lifecycle controls on affected hosted OS lanes; retain the admitted constructor's 12 native HANDLE/Job fault cases and their private Windows qualification; final integrated-source acceptance remains required. Requalify signed Hammerspoon provider/shim cases after scalar-arity fixture repair, native locking/symlinks and 14 owned-program XCTest cases; complete E2E/package/install/launch. Saved, unintegrated or lost preparations require preimage review/reconstruction, not a completion claim.
 - [ ] Separate device/evidence boundary: Only hardware/peripheral-dependent automation or actual user workflows require a device; basic execution, discovery, cancellation and packaging remain software work.
 
 Fetch current `origin/dev`, establish the native baseline and coordinate affected
@@ -5718,6 +5718,20 @@ assertions and native/cleanup deadlines remain unchanged. Independent
 portable controls preserve earlier-stage annotations and reject payload
 values. Actual local GTK still passes4/4 with12 reaped descendants and no
 pending/rescue debt; the diagnostic successor requires hosted execution.
+
+This slice admits the reviewed call-scoped native constructor failure carrier
+and all12 unchanged HANDLE/Job fault cases after private Windows run37458344080
+completed SUCCESS:9,714 unit passes, zero failures, E2E, compiled packaging,
+installation and startup successful; Release skipped. The complete15-method
+BOM-corrected prefix remains byte-exact, with all178 assertion lines retained.
+Native partial acquisitions are taken and zeroed before publication, adopted
+through the same exact retirement claim, and cancelled starts retain their
+pre-bind disposition. Legacy anonymous cleanup and completion policies remain
+unchanged. The old archived constructor preparation remains inactive and
+native-unexecuted; it is separate historical evidence. No raw per-method
+artifact-row or E2E case count is claimed. Final integrated three-OS
+qualification, discovery/automation completion and device acceptance remain
+open; this does not complete item106 or the other partial items.
 
 - [~] **107.** Make the number-row policy explicit: native behavior, digits
   directly or symbols directly, with an acknowledged migration of the old
