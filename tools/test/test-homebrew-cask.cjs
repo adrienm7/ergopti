@@ -278,7 +278,7 @@ check('portable Brew ownership controls remain registered and mandatory', () => 
 	assert.ifError(result.error);
 	assert.strictEqual(result.signal, null, result.stderr);
 	assert.strictEqual(result.status, 0, result.stderr);
-	assert.match(result.stderr, /Ran 59 tests in /);
+	assert.match(result.stderr, /Ran 63 tests in /);
 	assert.match(result.stderr, /\nOK\s*$/);
 	assert.doesNotMatch(result.stderr, /skipped=/);
 });
@@ -733,6 +733,31 @@ check('sender-owned marker snapshots never change nonce admission or parent life
 	assert.match(helper, /result\.returncode == 66/);
 });
 // SENDER_INTERNAL_MARKER_DIAGNOSTIC_END
+
+check('owned AppKit readiness diagnosis preserves native enum and refusal authority', () => {
+	const helper = fs.readFileSync(
+		path.join(ROOT, 'tools/diagnostics/macos_brew_archive_acceptance.py'),
+		'utf8'
+	);
+	const receiver = fs.readFileSync(
+		path.join(ROOT, 'tools/diagnostics/native_appleevent_probe_receiver.c'),
+		'utf8'
+	);
+	assert.match(
+		receiver,
+		/enum AppKitAdmission \{\s*AppKitAdmitted = 0,\s*AppKitApplicationMissing,\s*AppKitPolicyRefused,\s*AppKitPolicyUnconfirmed\s*\}/
+	);
+	assert.match(receiver, /Owned AppleEvent recipient AppKit admission refused \(reason %d\)\.\\n/);
+	assert.match(helper, /re\.fullmatch\(\s*rb"Owned AppleEvent recipient AppKit admission refused/);
+	assert.match(
+		helper,
+		/b"1": "application-missing",\s*b"2": "policy-refused",\s*b"3": "policy-unconfirmed"/
+	);
+	assert.match(helper, /return \{"phase": "appkit-admission", "appkit_reason": reason\}/);
+	assert.match(helper, /registration\.get\("phase"\) == "appkit-admission"/);
+	assert.match(helper, /registration_appkit_reason=\{registration\['appkit_reason'\]\}/);
+	assert.match(helper, /observation\.si_code == os\.CLD_EXITED and observation\.si_status == 65/);
+});
 
 if (failures > 0) {
 	console.error(`\n${failures} Homebrew cask check(s) failed.`);

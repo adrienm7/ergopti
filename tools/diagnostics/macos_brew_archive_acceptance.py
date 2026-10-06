@@ -1100,6 +1100,19 @@ def appleevent_registration_fact(children, receiver):
         value = os.read(descriptor, 129)
         if len(value) != info.st_size or len(value) > 128:
             return {}
+        # This native enum is not a Carbon OSStatus. Project only the exact
+        # producer's three refusal values, never an admitted/unknown reason.
+        appkit = re.fullmatch(
+            rb"Owned AppleEvent recipient AppKit admission refused \(reason ([123])\)\.\n",
+            value,
+        )
+        if appkit is not None:
+            reason = {
+                b"1": "application-missing",
+                b"2": "policy-refused",
+                b"3": "policy-unconfirmed",
+            }[appkit[1]]
+            return {"phase": "appkit-admission", "appkit_reason": reason}
         for phase in ("get-current-process", "transform-process-type"):
             prefix = (
                 "Owned AppleEvent recipient registration failed: phase=" + phase + ", osstatus="
@@ -1371,12 +1384,18 @@ def _admit_appleevent_boundary(children, repository):
             registration = {}
             if observation.si_code == os.CLD_EXITED and observation.si_status == 65:
                 registration = appleevent_registration_fact(children, receiver)
-            detail = (
-                f", registration_phase={registration['phase']}, "
-                f"registration_osstatus={registration['osstatus']}"
-                if registration
-                else ""
-            )
+            if registration.get("phase") == "appkit-admission":
+                detail = (
+                    ", registration_phase=appkit-admission, "
+                    f"registration_appkit_reason={registration['appkit_reason']}"
+                )
+            else:
+                detail = (
+                    f", registration_phase={registration['phase']}, "
+                    f"registration_osstatus={registration['osstatus']}"
+                    if registration
+                    else ""
+                )
             # Preserve the upstream terminal receipt from this same reserved
             # observation when the actual fixture owns an evidence writer.
             evidence = getattr(children, "evidence", None)
