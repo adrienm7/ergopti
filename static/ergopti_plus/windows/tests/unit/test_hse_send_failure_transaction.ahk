@@ -293,22 +293,22 @@ _AHK04_NormalDispatchImpl() {
 	HSE_Buffer := "ab"
 	_PrefixBuffer := "ab"
 	_AHK04_SetSendVerdict(false)
-	AssertEqual(false, HSE_DispatchMatch(Spec, ""),
-		"Notepad clipboard failure must decline instead of publishing a fire")
+	AssertEqual(false, HSE_DispatchMatch(Spec, "", , false, _HNP_InlineSend.Bind(false)),
+		"Notepad native refusal must decline instead of publishing a fire")
 	AssertEqual("ab", HSE_Buffer,
-		"Notepad clipboard failure must not rewrite the engine buffer")
+		"Notepad native refusal must not rewrite the engine buffer")
 	AssertEqual("ab", _PrefixBuffer,
-		"Notepad clipboard failure must not consume the preview")
+		"Notepad native refusal must not consume the preview")
 	AssertEqual("seed", GetLastSentCharacterAt(-1),
-		"Notepad clipboard failure must not advance the ring")
-	AssertEqual("SendInstant", _AHK04_SendCalls[1].Name,
-		"Notepad must use the status-bearing clipboard sender")
-	AssertEqual("{BackSpace 2}", _AHK04_SendCalls[1].Args[2],
-		"Notepad must prepare the payload before injecting its atomic erase prefix")
+		"Notepad native refusal must not advance the ring")
+	AssertEqual("NativeTextSend", _AHK04_SendCalls[1].Name,
+		"Notepad must use the native completion-bearing sender")
+	AssertEqual("ab", _AHK04_SendCalls[1].Args[2]["deleted_text"],
+		"Notepad must submit the actual erased suffix")
 }
 
 _AHK04_NormalDispatchCommitsOnlyAfterSend() {
-	_AHK04_RunIsolated(_AHK04_NormalDispatchImpl)
+	_HNP_Run(_AHK04_NormalDispatchImpl)
 }
 
 _AHK04_NotepadSendModeImpl() {
@@ -348,7 +348,7 @@ _AHK04_NotepadPreservesSendMode() {
 ; ===== 1.3) AHK-002 functional host ownership ========
 ; ======================================================
 
-_AHK002_MetricsOffNotepadUsesClipboardImpl() {
+_AHK002_MetricsOffNotepadUsesNativeImpl() {
 	global HSE_Buffer, HSE_StartIsWordBoundary, _PrefixBuffer
 	global _AHK04_SendCalls, _OHR_IdentityReads
 	MetricsShortcuts.enabled := false
@@ -359,25 +359,25 @@ _AHK002_MetricsOffNotepadUsesClipboardImpl() {
 	_PrefixBuffer := "ab"
 	_AHK04_SetSendVerdict(true)
 
-	AssertTrue(HSE_DispatchMatch(_AHK04_NormalSpec(), ""),
+	AssertTrue(HSE_DispatchMatch(_AHK04_NormalSpec(), "", , false, _HNP_InlineSend.Bind(true)) is Map,
 		"metrics-off Notepad must still publish a real expansion")
 	AssertEqual(1, _AHK04_SendCalls.Length)
-	AssertEqual("SendInstant", _AHK04_SendCalls[1].Name,
-		"the exact output-host receipt must select the Notepad clipboard route")
+	AssertEqual("NativeTextSend", _AHK04_SendCalls[1].Name,
+		"the exact output-host receipt must select the Notepad native route")
 	AssertEqual(2, _OHR_IdentityReads,
 		"sender selection must acquire one initial/final foreground receipt")
 }
 
-_AHK002_MetricsOffNotepadUsesClipboard() {
+_AHK002_MetricsOffNotepadUsesNative() {
 	SavedEnabled := MetricsShortcuts.enabled
-	try _AHK04_RunIsolated(_AHK002_MetricsOffNotepadUsesClipboardImpl)
+	try _HNP_Run(_AHK002_MetricsOffNotepadUsesNativeImpl)
 	finally {
 		MetricsShortcuts.enabled := SavedEnabled
 		_Stub_SetOutputHost("test.exe", "Test App")
 	}
 }
-Test("output host: metrics-off Notepad uses clipboard (ahk-002)",
-	_AHK002_MetricsOffNotepadUsesClipboard)
+Test("output host: metrics-off Notepad uses native completion (ahk-002)",
+	_AHK002_MetricsOffNotepadUsesNative)
 
 _AHK002_StableCodeWindowBecomesTerminalImpl() {
 	global HSE_Buffer, HSE_StartIsWordBoundary, _PrefixBuffer
@@ -790,6 +790,9 @@ _UnicodeLedgerAssert(Character) {
 	AssertFalse(IsTimeActivationExpired(Character, 1), "a just-emitted scalar admits a prompt timed completion")
 }
 _UnicodeLedgerOutput(Mode) {
+	if Mode == "paste" || Mode == "paste-endchar"
+		return _UnicodeLedgerNativeOutput(Mode == "paste-endchar")
+
 	_AHK04_RunIsolated(Body)
 	Body() {
 		global HSE_Buffer, HSE_SUPPRESS_RELEASE_DELAY_MS
@@ -800,8 +803,6 @@ _UnicodeLedgerOutput(Mode) {
 		if Mode == "primitive" {
 			AssertTrue(SendNewResult(Emoji))
 		} else {
-			if Mode == "paste" || Mode == "paste-endchar"
-				SimulateNotepadActive()
 			Spec := _AHK04_NormalSpec()
 			WithEndChar := Mode == "atomic-endchar" || Mode == "paste-endchar"
 			Spec.Replacement := WithEndChar ? "R" : Emoji
@@ -861,3 +862,686 @@ Test("synthetic unicode-ledger: atomic dispatch preserves a supplementary end ch
 	_UnicodeLedgerOutput.Bind("atomic-endchar"))
 Test("synthetic unicode-ledger: clipboard dispatch preserves a supplementary end character",
 	_UnicodeLedgerOutput.Bind("paste-endchar"))
+
+; ================================================
+; ======= Native Notepad completion ownership ====
+; ================================================
+
+_HNP_Run(Body) {
+	global _HSE_TerminalOwner, _LLM_Bridge_Buffer, _PrefixPrivateResidue
+	global _LLM_Bridge_Active, _LLM_Bridge_ContentGeneration, _LLM_Bridge_PrefixObserver, _LLM_Live
+	global _PrefixContentGeneration, _PrefixInputContextGeneration
+	global _PrefixDeferredGeneration, _PrefixFocusedControlToken, _HSE_TerminalOwnerSerial
+	global _PrefixRenderTimer, _PrefixRenderScheduledGeneration, _PrefixRenderQueuedWallMs
+	global _OUTPUT_HOST_CACHE, _OUTPUT_HOST_IDENTITY_PROBE, _OUTPUT_HOST_METADATA_PROBE
+	global _OUTPUT_HOST_TITLE_PROBE, _OUTPUT_HOST_RESOLVE_SERIAL
+	AssertFalse(HSE_TerminalTransactionPending(), "the passive fixture cannot adopt an active output")
+	AssertEqual(0, _LLM_Bridge_PrefixObserver, "the passive fixture cannot replace a live prefix observer")
+	AssertFalse((_PrefixRenderTimer is Map) && !_PrefixRenderTimer.Get("Fired", false),
+		"the passive fixture cannot replace a live render timer")
+	Saved := { Owner: _HSE_TerminalOwner, Llm: _LLM_Bridge_Buffer,
+		LlmActive: _LLM_Bridge_Active, LlmGeneration: _LLM_Bridge_ContentGeneration, Live: _LLM_Live,
+		Private: _PrefixPrivateResidue, Content: _PrefixContentGeneration,
+		Deferred: _PrefixDeferredGeneration, FocusToken: _PrefixFocusedControlToken,
+		OwnerSerial: _HSE_TerminalOwnerSerial, RenderTimer: _PrefixRenderTimer,
+		RenderGeneration: _PrefixRenderScheduledGeneration, RenderWall: _PrefixRenderQueuedWallMs,
+		Context: _PrefixInputContextGeneration, Cache: _OUTPUT_HOST_CACHE,
+		Identity: _OUTPUT_HOST_IDENTITY_PROBE, Metadata: _OUTPUT_HOST_METADATA_PROBE,
+		Title: _OUTPUT_HOST_TITLE_PROBE, Serial: _OUTPUT_HOST_RESOLVE_SERIAL }
+	try {
+		_LLM_Bridge_Active := true
+		_LLM_Live := _LLM_Live.Clone()
+		_LLM_Live["active"] := false
+		_PrefixRenderTimer := 0
+		_PrefixRenderScheduledGeneration := -1
+		_AHK04_RunIsolated(_HNP_InvokeAndSettle.Bind(Body))
+	}
+	finally {
+		try TimerCancel(_PrefixRenderTimer)
+		finally {
+			_PrefixRenderTimer := Saved.RenderTimer
+			_PrefixRenderScheduledGeneration := Saved.RenderGeneration
+			_PrefixRenderQueuedWallMs := Saved.RenderWall
+			_PrefixDeferredGeneration := Saved.Deferred
+			_PrefixFocusedControlToken := Saved.FocusToken
+			_HSE_TerminalOwnerSerial := Saved.OwnerSerial
+			_HSE_TerminalOwner := Saved.Owner
+			_LLM_Bridge_Buffer := Saved.Llm
+			_LLM_Bridge_Active := Saved.LlmActive
+			_LLM_Bridge_ContentGeneration := Saved.LlmGeneration
+			_LLM_Live := Saved.Live
+			_PrefixPrivateResidue := Saved.Private
+			_PrefixContentGeneration := Saved.Content
+			_PrefixInputContextGeneration := Saved.Context
+			_OUTPUT_HOST_CACHE := Saved.Cache
+			_OUTPUT_HOST_IDENTITY_PROBE := Saved.Identity
+			_OUTPUT_HOST_METADATA_PROBE := Saved.Metadata
+			_OUTPUT_HOST_TITLE_PROBE := Saved.Title
+			_OUTPUT_HOST_RESOLVE_SERIAL := Saved.Serial
+		}
+	}
+}
+
+_HNP_InvokeAndSettle(Body) {
+	global _HSE_TerminalOwner
+	try Body.Call()
+	finally {
+		if (_HSE_TerminalOwner is Map) && _HSE_TerminalOwner["Pending"]
+			_HSE_CompleteNotepadOwner(_HSE_TerminalOwner, false, "fixture cleanup")
+	}
+}
+
+_HNP_Record(State, Text, Opts, Callback) {
+	State["Requests"].Push({Text: Text, Opts: Opts, Callback: Callback})
+}
+
+/** Records the native caller contract while delivering an inline terminal verdict. */
+_HNP_InlineSend(Ok, Text, Opts, Callback) {
+	global _AHK04_SendCalls
+	_AHK04_SendCalls.Push({Name: "NativeTextSend", Args: [Text, Opts]})
+	Finalizer := 0
+	if Ok {
+		PreviousCritical := Critical("On")
+		try Finalizer := Opts["atomic_commit"].Call()
+		finally Critical(PreviousCritical)
+		if HasMethod(Finalizer, "Call")
+			Finalizer.Call()
+	}
+	Callback.Call(Ok, Ok ? "" : "recorded native refusal")
+}
+
+_HNP_Dispatch(State, Buffer := "xxab", EndChar := "") {
+	global HSE_Buffer, _PrefixBuffer, _LLM_Bridge_Buffer
+	HSE_Buffer := Buffer
+	_PrefixBuffer := Buffer
+	_LLM_Bridge_Buffer := Buffer
+	OutputHostResolverPrimeForTest("notepad.exe")
+	Spec := _AHK04_NormalSpec()
+	Effect := 0
+	return HSE_DispatchMatch(Spec, EndChar, &Effect, false, _HNP_Record.Bind(State))
+}
+
+/** Executes the real commit hook at the future backend's terminal boundary. */
+_HNP_Settle(State, Ok := true) {
+	Request := State["Requests"][1]
+	Finalizer := 0
+	if Ok {
+		PreviousCritical := Critical("On")
+		try Finalizer := Request.Opts["atomic_commit"].Call()
+		finally Critical(PreviousCritical)
+		if HasMethod(Finalizer, "Call")
+			Finalizer.Call()
+	}
+	Request.Callback.Call(Ok, Ok ? "" : "recorded native refusal")
+}
+
+_HNP_PendingThenCommitted() {
+	_HNP_Run(_Body)
+	_Body() {
+		global HSE_Buffer, _LLM_Bridge_Buffer, _PrefixWatcherSuppressed, _HSE_FireLogQueue
+		State := Map("Requests", [])
+		Owner := _HNP_Dispatch(State)
+		AssertTrue(Owner is Map, "native dispatch must return its pending owner")
+		AssertTrue(Owner["Pending"], "Begin is not an output verdict")
+		AssertEqual(1, State["Requests"].Length, "one immutable request is submitted")
+		Request := State["Requests"][1]
+		AssertEqual("native", Request.Opts["mode"], "Notepad cannot fall back to keyboard paste")
+		AssertEqual("ab", Request.Opts["deleted_text"], "the actual typed suffix is submitted")
+		AssertEqual("xxab", HSE_Buffer, "pending output cannot rewrite HSE")
+		AssertEqual("xxab", _LLM_Bridge_Buffer, "pending output cannot rewrite LLM")
+		AssertEqual(0, _HSE_FireLogQueue.Length, "pending output is not a fire")
+		AssertEqual(1, _PrefixWatcherSuppressed, "the pending owner retains suppression")
+		_HNP_Settle(State)
+		AssertEqual("xxZ", HSE_Buffer, "the actual completion hook commits once")
+		AssertEqual("xxZ", _LLM_Bridge_Buffer, "the same effect reaches LLM")
+		AssertEqual(1, _HSE_FireLogQueue.Length, "verified completion records one fire")
+		AssertEqual(0, _PrefixWatcherSuppressed, "completion releases suppression")
+		AssertEqual(0, Keylogger.synth_active, "completion releases its synthetic marker")
+		Request.Callback.Call(true, "")
+		AssertEqual("xxZ", HSE_Buffer, "duplicate completion cannot commit again")
+		AssertEqual(1, _HSE_FireLogQueue.Length, "duplicate completion cannot record another fire")
+		AssertEqual(0, _PrefixWatcherSuppressed, "duplicate completion cannot underflow suppression")
+	}
+}
+Test("Notepad pending owner: commit and cleanup occur once after completion (notepad-pending)",
+	_HNP_PendingThenCommitted)
+
+_HNP_RefusalDoesNotCommit() {
+	_HNP_Run(_Body)
+	_Body() {
+		global HSE_Buffer, _HSE_FireLogQueue, _PrefixWatcherSuppressed
+		State := Map("Requests", [])
+		Owner := _HNP_Dispatch(State)
+		_HNP_Settle(State, false)
+		AssertEqual("xxab", HSE_Buffer, "a pre-effect refusal leaves the typed buffer intact")
+		AssertEqual(0, _HSE_FireLogQueue.Length, "a refused request is not a fire")
+		AssertFalse(Owner["FinalSucceeded"], "refusal cannot become completed output")
+		AssertEqual(0, _PrefixWatcherSuppressed, "refusal releases suppression once")
+		AssertEqual(0, Keylogger.synth_active, "refusal releases its synthetic marker")
+	}
+}
+Test("Notepad pending owner: native refusal leaves canonical state unchanged (notepad-pending)",
+	_HNP_RefusalDoesNotCommit)
+
+_HNP_SuccessRequiresCommit() {
+	_HNP_Run(_Body)
+	_Body() {
+		global HSE_Buffer, _HSE_FireLogQueue
+		State := Map("Requests", [])
+		Owner := _HNP_Dispatch(State)
+		State["Requests"][1].Callback.Call(true, "")
+		AssertFalse(Owner["FinalSucceeded"], "a success scalar cannot replace the commit hook")
+		AssertEqual("xxab", HSE_Buffer, "an unauthenticated completion cannot edit a mirror")
+		AssertEqual(0, _HSE_FireLogQueue.Length, "an unauthenticated completion cannot report a fire")
+	}
+}
+Test("Notepad pending owner: callback success alone cannot publish a fire (notepad-pending)",
+	_HNP_SuccessRequiresCommit)
+
+_HNP_StaleAfterEffectRecovers() {
+	_HNP_Run(_Body)
+	_Body() {
+		global HSE_Buffer, _LLM_Bridge_Buffer, _HSE_FireLogQueue, _PrefixContentGeneration
+		State := Map("Requests", [])
+		Owner := _HNP_Dispatch(State)
+		Request := State["Requests"][1]
+		_PrefixContentGeneration += 1
+		AssertFalse(Request.Opts["admission"].Call(), "a later input event revokes the original authority")
+		Failure := 0
+		Finalizer := 0
+		PreviousCritical := Critical("On")
+		try {
+			try Request.Opts["atomic_commit"].Call()
+			catch as CommitFailure {
+				Failure := CommitFailure
+				Finalizer := Request.Opts["commit_failure"].Call(CommitFailure.Message)
+			}
+		} finally Critical(PreviousCritical)
+		AssertEqual("Error", Type(Failure), "a stale post-effect commit must refuse with the named owner error")
+		AssertEqual("The Notepad canonical commit lost its original input context.", Failure.Message,
+			"the refusal must come from the actual immutable-authority guard")
+		if HasMethod(Finalizer, "Call")
+			Finalizer.Call()
+		Request.Callback.Call(false, "effect unverified")
+		AssertEqual("", HSE_Buffer, "uncertain output invalidates HSE knowledge")
+		AssertEqual("", _LLM_Bridge_Buffer, "uncertain output invalidates LLM knowledge")
+		AssertEqual(0, _HSE_FireLogQueue.Length, "uncertain output never publishes a fire")
+		AssertFalse(Owner["FinalSucceeded"], "recovery is not receiving success")
+	}
+}
+Test("Notepad pending owner: stale post-effect state resets mirrors without a fire (notepad-pending)",
+	_HNP_StaleAfterEffectRecovers)
+
+_HNP_ExactSuffixAndDelimiter() {
+	_HNP_Run(_Body)
+	_Body() {
+		global HSE_Buffer, HSE_CONSUMED_DELIMITERS
+		SavedConsumedDelimiters := HSE_CONSUMED_DELIMITERS
+		try {
+			HSE_CONSUMED_DELIMITERS := " "
+			State := Map("Requests", [])
+			Owner := _HNP_Dispatch(State, "xxAB ", " ")
+			AssertTrue(Owner is Map, "the end-character route must own completion")
+			Request := State["Requests"][1]
+			AssertEqual("AB ", Request.Opts["deleted_text"], "typed case and delimiter survive independently of Spec.Trigger")
+			AssertEqual(3, Request.Opts["erase_before"], "the complete typed suffix is erased")
+			AssertEqual("Z", Request.Text, "the configured consumed delimiter is not reinserted")
+			_HNP_Settle(State)
+			AssertEqual("xxZ", HSE_Buffer, "the canonical effect deletes the exact suffix")
+		} finally HSE_CONSUMED_DELIMITERS := SavedConsumedDelimiters
+	}
+}
+Test("Notepad pending owner: exact typed case and consumed delimiter are preserved (notepad-pending)",
+	_HNP_ExactSuffixAndDelimiter)
+
+_HNP_ThrowingSenderCleansOnce() {
+	_HNP_Run(_Body)
+	_Body() {
+		global HSE_Buffer, _PrefixBuffer, _PrefixWatcherSuppressed
+		HSE_Buffer := "xxab"
+		_PrefixBuffer := HSE_Buffer
+		OutputHostResolverPrimeForTest("notepad.exe")
+		Failure := Error("recorded native Begin refusal")
+		Thrown := 0
+		try HSE_DispatchMatch(_AHK04_NormalSpec(), "", , false, _Throw.Bind(Failure))
+		catch as SenderFailure
+			Thrown := SenderFailure
+		AssertTrue(Thrown == Failure, "the original sender exception is preserved")
+		AssertEqual("xxab", HSE_Buffer, "Begin refusal does not commit an effect")
+		AssertEqual(0, _PrefixWatcherSuppressed, "throwing Begin releases suppression once")
+		AssertEqual(0, Keylogger.synth_active, "throwing Begin releases its synthetic marker once")
+	}
+	_Throw(Failure, Text, Opts, Callback) {
+		throw Failure
+	}
+}
+Test("Notepad pending owner: throwing Begin preserves its error and balances ownership (notepad-pending)",
+	_HNP_ThrowingSenderCleansOnce)
+
+_HNP_InitiatingPrefixDoesNotRevoke() {
+	_HNP_Run(_Body)
+	_Body() {
+		global _PrefixBuffer, _PrefixContentGeneration, HSE_Buffer
+		State := Map("Requests", [])
+		Owner := _HNP_Dispatch(State)
+		_PrefixBuffer := "xxa"
+		BeforeGeneration := _PrefixContentGeneration
+		AssertTrue(_HSE_RetainNotepadPrefixChar(Owner, "b"),
+			"the actual pending-owner helper retains the initiating callback")
+		AssertEqual(BeforeGeneration, _PrefixContentGeneration,
+			"retaining the already-fed trigger cannot change its original authority")
+		AssertEqual("xxa", _PrefixBuffer, "presentation waits for its terminal verdict")
+		AssertFalse(_HSE_RetainNotepadPrefixChar(Map("Pending", true), "b"),
+			"ordinary terminal owners keep their original prefix path")
+		_HNP_Settle(State, false)
+		AssertEqual("xxab", HSE_Buffer, "pre-effect refusal keeps the typed engine state")
+		AssertEqual("xxab", _PrefixBuffer, "pre-effect refusal restores the complete typed preview")
+		AssertEqual(BeforeGeneration + 1, _PrefixContentGeneration,
+			"refusal publishes exactly one owned preview mutation")
+	}
+}
+Test("Notepad pending owner: initiating prefix bookkeeping preserves immutable admission (notepad-pending)",
+	_HNP_InitiatingPrefixDoesNotRevoke)
+
+; ==================================================
+; ======= Native raw-callback preparation ==========
+; ==================================================
+
+_HNR_Dispatch(State, Callback, Buffer, Trigger, SupportsPreparation := true) {
+	global HSE_Buffer, _PrefixBuffer, _LLM_Bridge_Buffer
+	HSE_Buffer := Buffer
+	_PrefixBuffer := Buffer
+	_LLM_Bridge_Buffer := Buffer
+	OutputHostResolverPrimeForTest("notepad.exe")
+	_AHK04_SetSendVerdict(true)
+	Spec := {Trigger: Trigger, RawCallback: true, Callback: Callback,
+		SupportsPreparation: SupportsPreparation, IsPrivate: false}
+	Effect := 0
+	return HSE_DispatchMatch(Spec, "", &Effect, false, _HNP_Record.Bind(State))
+}
+
+_HNR_EllipsisPreparesAndCommits() {
+	_HNP_Run(_Body)
+	_Body() {
+		global HSE_Buffer, _LLM_Bridge_Buffer, _AHK04_SendCalls, _HSE_FireLogQueue
+		State := Map("Requests", [])
+		_LSCResetFrom(["a", ".", ".", "."])
+		_AHK04_SetSendVerdict(true)
+		Owner := _HNR_Dispatch(State, _EllipsisRawCallback, "a...", "...")
+		AssertTrue(Owner is Map, "the actual ellipsis callback must prepare a pending owner")
+		AssertEqual(0, _AHK04_SendCalls.Length, "prepare-only must emit no keyboard burst")
+		AssertEqual("a...", HSE_Buffer, "preparation cannot mutate the canonical buffer")
+		AssertEqual("...", State["Requests"][1].Opts["deleted_text"], "the three literal dots own deletion")
+		AssertEqual("…", State["Requests"][1].Text, "the native request carries the actual prepared insertion")
+		_HNP_Settle(State)
+		AssertEqual("a…", HSE_Buffer, "the terminal commit applies the prepared raw edit once")
+		AssertEqual("a…", _LLM_Bridge_Buffer, "the same exact raw edit reaches the LLM mirror")
+		AssertEqual(1, _HSE_FireLogQueue.Length, "verified raw completion records one fire")
+		AssertEqual("…", GetLastSentCharacterAt(-1), "completion updates the actual last-character ring")
+	}
+}
+Test("Notepad raw: actual ellipsis prepares without keyboard output and commits once (notepad-raw)",
+	_HNR_EllipsisPreparesAndCommits)
+
+_HNR_DeadkeyPreparesAndCommits() {
+	_HNP_Run(_Body)
+	_Body() {
+		global HSE_Buffer, _AHK04_SendCalls
+		State := Map("Requests", [])
+		_LSCResetFrom([" ", "ê", "x"])
+		_AHK04_SetSendVerdict(true)
+		Owner := _HNR_Dispatch(State, _Prepare, " êx", "êx")
+		AssertTrue(Owner is Map, "the actual deadkey helper must prepare the owned replacement")
+		AssertEqual(0, _AHK04_SendCalls.Length, "deadkey preparation cannot send backspaces")
+		AssertEqual("êx", State["Requests"][1].Opts["deleted_text"], "the exact deadkey suffix is copied")
+		AssertEqual("★", State["Requests"][1].Text, "the mapped symbol remains literal")
+		_HNP_Settle(State)
+		AssertEqual(" ★", HSE_Buffer, "completion preserves the prefix before the two-scalar raw edit")
+	}
+	_Prepare(EndChar, PrepareOnly) {
+		return ShouldActivateDeadkey("êx", "★", 0, PrepareOnly)
+	}
+}
+Test("Notepad raw: actual deadkey helper prepares its exact suffix without sending (notepad-raw)",
+	_HNR_DeadkeyPreparesAndCommits)
+
+_HNR_DeclinedPreparationDoesNotSchedule() {
+	_HNP_Run(_Body)
+	_Body() {
+		global HSE_Buffer, _AHK04_SendCalls, _PrefixWatcherSuppressed
+		State := Map("Requests", [])
+		_LSCResetFrom(["[", ".", ".", "."])
+		AssertFalse(_HNR_Dispatch(State, _EllipsisRawCallback, "[...", "..."),
+			"the actual non-letter ellipsis condition must decline")
+		AssertEqual(0, State["Requests"].Length, "a declined preparation cannot acquire native work")
+		AssertEqual(0, _AHK04_SendCalls.Length, "a declined preparation cannot fall back to keyboard output")
+		AssertEqual("[...", HSE_Buffer, "the existing typed text remains authoritative")
+		AssertEqual(0, _PrefixWatcherSuppressed, "decline acquires no output suppression")
+	}
+}
+Test("Notepad raw: declined actual ellipsis preparation schedules no output (notepad-raw)",
+	_HNR_DeclinedPreparationDoesNotSchedule)
+
+_HNR_UndeclaredCallbackIsNeverInvoked() {
+	_HNP_Run(_Body)
+	_Body() {
+		global _AHK04_SendCalls
+		State := Map("Requests", [], "Calls", 0)
+		AssertFalse(_HNR_Dispatch(State, _Unsafe.Bind(State), "ab", "ab", false),
+			"a callback without a prepare-only contract must refuse")
+		AssertEqual(0, State["Calls"], "an undeclared callback is refused before invocation")
+		AssertEqual(0, State["Requests"].Length, "refusal cannot publish native work")
+		AssertEqual(0, _AHK04_SendCalls.Length, "the callback's own sender must remain unreachable")
+	}
+	_Unsafe(State, Args*) {
+		State["Calls"] += 1
+		SendNewResult("{BackSpace 2}{Text}bad", false)
+		return {Prepared: true, Ok: true, Bs: 2, Ins: "bad"}
+	}
+}
+Test("Notepad raw: undeclared callbacks are refused before their emitter executes (notepad-raw)",
+	_HNR_UndeclaredCallbackIsNeverInvoked)
+
+_HNR_MalformedPreparedPlansRefuse() {
+	_HNP_Run(_Body)
+	_Body() {
+		global HSE_Buffer, _AHK04_SendCalls, _PrefixWatcherSuppressed
+		for Plan in [
+			{Prepared: true, Ok: "1", Bs: 1, Ins: "Z"},
+			{Prepared: "1", Ok: true, Bs: 1, Ins: "Z"},
+			{Prepared: true, Ok: true, Bs: 3, Ins: "Z"},
+			{Prepared: true, Ok: true, Bs: -1, Ins: "Z"},
+			{Prepared: true, Ok: true, Bs: 1, Ins: 0}
+		] {
+			State := Map("Requests", [])
+			AssertFalse(_HNR_Dispatch(State, _Return.Bind(Plan), "ab", "ab"),
+				"malformed or out-of-range preparation must refuse before effects")
+			AssertEqual(0, State["Requests"].Length, "malformed plans cannot acquire native output")
+			AssertEqual("ab", HSE_Buffer, "malformed plans cannot edit canonical text")
+			AssertEqual(0, _AHK04_SendCalls.Length, "malformed plans have no keyboard fallback")
+			AssertEqual(0, _PrefixWatcherSuppressed, "malformed plans acquire no suppression")
+		}
+	}
+	_Return(Plan, EndChar, PrepareOnly) {
+		return Plan
+	}
+}
+Test("Notepad raw: exact Boolean and range validation rejects malformed plans (notepad-raw)",
+	_HNR_MalformedPreparedPlansRefuse)
+
+
+; ==================================================
+; ======= Raw preparation registration contract ====
+; ==================================================
+
+_HNR_ActualRegistrationTransportsPreparation() {
+	global _HotstringRegistrar, HSE_RegistryByGroup, HSE_DisabledGroups
+	global HSE_SeqCounter, HSE_RegistryGeneration, HSE_RegistryTransitionDepth
+	PreviousCritical := Critical("On")
+	SavedRegistrar := _HotstringRegistrar
+	SavedGroups := HSE_RegistryByGroup
+	SavedDisabled := HSE_DisabledGroups
+	SavedSequence := HSE_SeqCounter
+	SavedGeneration := HSE_RegistryGeneration
+	SavedTransition := HSE_RegistryTransitionDepth
+	try {
+		_HotstringRegistrar := 0
+		; A disabled private group exercises actual metadata transport without
+		; inserting a trigger into the host's live matcher or refreshing pixels.
+		Group := "notepad-raw-registration-fixture"
+		HSE_RegistryByGroup := Map()
+		HSE_DisabledGroups := Map(Group, true)
+		HSE_RegistryTransitionDepth := SavedTransition + 1
+		Callback := _NeverInvoke
+		CreateRawCallbackHotstring("*?C", "raw-prepared", Callback,
+			Map("Group", Group, "SupportsPreparation", true))
+		CreateRawCallbackHotstring("*?C", "raw-default", Callback, Map("Group", Group))
+		CreateRawCallbackHotstring("*?C", "raw-disabled", Callback,
+			Map("Group", Group, "SupportsPreparation", false))
+		Specs := HSE_RegistryByGroup[Group]
+		AssertEqual(3, Specs.Length, "the actual registration owner publishes three specs")
+		AssertTrue(Specs[1].RawCallback, "registration preserves raw dispatch identity")
+		AssertTrue(Specs[1].SupportsPreparation is Integer,
+			"the transported capability must retain its Boolean representation")
+		AssertEqual(true, Specs[1].SupportsPreparation, "the actual spec carries the explicit capability")
+		AssertTrue(Specs[1].Callback == Callback, "the capability belongs to the registered callback")
+		AssertFalse(Specs[2].HasOwnProp("SupportsPreparation"), "omitted options preserve the old metadata shape")
+		AssertFalse(Specs[3].HasOwnProp("SupportsPreparation"), "explicit false grants no prepare capability")
+		BeforeSequence := HSE_SeqCounter
+		BeforeGeneration := HSE_RegistryGeneration
+		Refused := false
+		try CreateRawCallbackHotstring("*?C", "raw-invalid", Callback,
+			Map("Group", Group, "SupportsPreparation", "1"))
+		catch as RegistrationError {
+			if Type(RegistrationError) != "TypeError"
+					|| RegistrationError.Message != "Raw callback preparation support must be Boolean."
+				throw RegistrationError
+			Refused := true
+		}
+		AssertTrue(Refused, "a string Boolean must fail before registry acquisition")
+		AssertEqual(3, Specs.Length, "refusal cannot publish a fourth spec")
+		AssertEqual(BeforeSequence, HSE_SeqCounter, "refusal cannot consume insertion identity")
+		AssertEqual(BeforeGeneration, HSE_RegistryGeneration, "refusal cannot invalidate existing decisions")
+	} finally {
+		_HotstringRegistrar := SavedRegistrar
+		HSE_RegistryByGroup := SavedGroups
+		HSE_DisabledGroups := SavedDisabled
+		HSE_SeqCounter := SavedSequence
+		HSE_RegistryGeneration := SavedGeneration
+		HSE_RegistryTransitionDepth := SavedTransition
+		Critical(PreviousCritical)
+	}
+	_NeverInvoke(Args*) {
+		throw Error("Registration must not invoke its raw callback.")
+	}
+}
+Test("Notepad raw registration: actual builder transports only explicit Boolean preparation (notepad-raw-registration)",
+	_HNR_ActualRegistrationTransportsPreparation)
+
+/** Keeps the Unicode ledger on the real asynchronous TextSender commit path. */
+_UnicodeLedgerNativeOutput(WithEndChar) {
+	_HNP_Run(_ULN_Body.Bind(WithEndChar))
+}
+
+_ULN_Body(WithEndChar) {
+	global HSE_Buffer, _PrefixBuffer, _LLM_Bridge_Buffer, _TEXT_NATIVE_OWNER
+	global _TEXT_NATIVE_SERIAL, _LSC_LEN, _HSE_FireLogQueue, _TEXT_CLIPBOARD_QUEUE
+	AssertFalse(_TEXT_NATIVE_OWNER, "the ledger fixture cannot adopt another native request")
+	SavedSerial := _TEXT_NATIVE_SERIAL
+	QueueLength := _TEXT_CLIPBOARD_QUEUE.Length
+	Emoji := Chr(0x1F600)
+	EndChar := WithEndChar ? Emoji : ""
+	Seed := "xxab" . EndChar
+	State := { Phase: 1, Scheduled: 0, Requests: [], Callbacks: 0,
+		Begins: 0, Decisions: 0, Closes: 0, Owner: 0 }
+	State.Port := Map(
+		"focus", () => Map("hwnd", 100, "control", 1001, "pid", 77),
+		"begin", (Owner) => (State.Owner := Owner, State.Begins += 1, 0),
+		"poll", (Token) => Map("phase", State.Phase, "os_error", 0),
+		"decide", (Token, Commit) => (State.Decisions += 1, State.Admitted := Commit, 0),
+		"close", (Token) => (State.Closes += 1, 0),
+		"schedule", (Callback) => (State.Scheduled := Callback))
+	try {
+		SimulateNotepadActive()
+		_LSCResetFrom([])
+		Spec := _AHK04_NormalSpec()
+		Spec.Replacement := WithEndChar ? "R" : Emoji
+		HSE_Buffer := Seed
+		_PrefixBuffer := Seed
+		_LLM_Bridge_Buffer := Seed
+		Pending := HSE_DispatchMatch(Spec, EndChar, , false, _ULN_Send.Bind(State))
+		AssertTrue(Pending is Map, "native output returns its pending canonical owner")
+		AssertTrue(Pending["Pending"], "queueing does not complete a synthetic output")
+		AssertEqual(1, State.Requests.Length, "one literal request owns the output")
+		Request := State.Requests[1]
+		AssertEqual(WithEndChar ? 3 : 2, Request.Opts["erase_before"],
+			"the erasure counts the complete supplementary completion as one scalar")
+		AssertEqual("ab" . EndChar, Request.Opts["deleted_text"], "the actual typed UTF-16 suffix is retained")
+		AssertEqual(WithEndChar ? 4 : 2, StrLen(Request.Opts["deleted_text"]),
+			"the native deletion span includes both surrogate units")
+		AssertEqual(WithEndChar ? "R" . Emoji : Emoji, Request.Text,
+			"the native literal retains the complete result and unconsumed completion")
+		AssertEqual(Seed, HSE_Buffer, "pending output cannot publish the HSE mirror")
+		AssertEqual(Seed, _LLM_Bridge_Buffer, "pending output cannot publish the LLM mirror")
+		AssertEqual(0, _LSC_LEN, "pending output cannot publish a ring entry")
+		AssertEqual(0, _HSE_FireLogQueue.Length, "pending output cannot publish a fire")
+		State.Scheduled.Call()
+		AssertEqual(1, State.Begins, "the actual TextSender owner begins once")
+		State.Phase := 2
+		State.Scheduled.Call()
+		AssertEqual(1, State.Admitted, "ready admission permits the recorded native effect")
+		AssertEqual(Seed, HSE_Buffer, "ready admission is not receiving completion")
+		AssertEqual(0, _LSC_LEN, "ready admission cannot publish the timing scalar")
+		State.Phase := 4
+		State.Scheduled.Call()
+		AssertTrue(Pending["FinalSucceeded"], "the actual commit and callback complete the owner")
+		AssertEqual("xx" . (WithEndChar ? "R" : "") . Emoji, HSE_Buffer,
+			"actual asynchronous settlement commits the emitted supplementary result")
+		AssertEqual(HSE_Buffer, _LLM_Bridge_Buffer, "both complete mirrors describe the same effect")
+		_UnicodeLedgerAssert(Emoji)
+		AssertEqual(1, State.Callbacks, "the real TextSender invokes completion once")
+		AssertEqual(1, State.Closes, "the recording native job closes once")
+		State.Scheduled.Call()
+		AssertEqual(1, State.Callbacks, "duplicate polling cannot republish completion")
+		AssertEqual(1, State.Decisions, "duplicate polling cannot authorize another effect")
+		AssertEqual(QueueLength, _TEXT_CLIPBOARD_QUEUE.Length, "native output queues no clipboard sender")
+	} finally {
+		try {
+			if State.Owner && _TEXT_NATIVE_OWNER == State.Owner
+				_TextSenderFinishNative(State.Owner, 5, 0, "Unicode ledger fixture cleanup")
+		} finally _TEXT_NATIVE_SERIAL := SavedSerial
+	}
+}
+
+_ULN_Send(State, Text, Opts, Callback) {
+	global _TEXT_NATIVE_OWNER
+	State.Requests.Push({ Text: Text, Opts: Opts })
+	Options := Opts.Clone()
+	Options["native_port"] := State.Port
+	TextSend(Text, Options, _ULN_Complete.Bind(State, Callback))
+	State.Owner := _TEXT_NATIVE_OWNER
+}
+
+_ULN_Complete(State, Callback, Ok, ErrorMessage := "") {
+	State.Callbacks += 1
+	Callback.Call(Ok, ErrorMessage)
+}
+
+/** Exercises upstream publication authority through the actual deferred native owner. */
+_HNPG_PublicationReceipt(Gate) {
+	global _PrefixContentGeneration
+	Gate["Reads"] += 1
+	if Gate.Get("Throws", false)
+		throw Error("recorded publication refusal")
+	if Gate.Get("MutatesContext", false)
+		_PrefixContentGeneration += 1
+	return Gate["Verdict"]
+}
+
+_HNPG_Dispatch(State, Gate) {
+	global HSE_Buffer, _PrefixBuffer, _LLM_Bridge_Buffer
+	HSE_Buffer := "xxab"
+	_PrefixBuffer := "xxab"
+	_LLM_Bridge_Buffer := "xxab"
+	OutputHostResolverPrimeForTest("notepad.exe")
+	Spec := _AHK04_NormalSpec()
+	Spec.PublicationCurrent := _HNPG_PublicationReceipt.Bind(Gate)
+	Spec.UserCodeGeneration := 123
+	Effect := 0
+	Owner := HSE_DispatchMatch(Spec, "", &Effect, false, _HNP_Record.Bind(State))
+	AssertTrue(Owner is Map, "native dispatch must retain its actual pending owner")
+	AssertTrue(Owner.Has("PublicationCurrent"), "the native owner must retain upstream publication authority")
+	AssertTrue(Owner["PublicationCurrent"] == Spec.PublicationCurrent,
+		"the native owner must retain the exact supplied publication callback")
+	AssertTrue(Owner["UserCodeOwned"], "the native owner must retain user-code ownership")
+	AssertEqual(1, State["Requests"].Length, "one native request must reach the actual recording sender")
+	return Owner
+}
+
+_HNPG_CurrentPublicationCommits() {
+	_HNP_Run(_Body)
+	_Body() {
+		global HSE_Buffer, _LLM_Bridge_Buffer, _HSE_FireLogQueue, _PrefixWatcherSuppressed
+		Gate := Map("Verdict", 1, "Reads", 0)
+		State := Map("Requests", [])
+		Owner := _HNPG_Dispatch(State, Gate)
+		AssertTrue(State["Requests"][1].Opts["admission"].Call(),
+			"strict current publication must admit the original native request")
+		ReadsBefore := Gate["Reads"]
+		_HNP_Settle(State)
+		AssertTrue(Gate["Reads"] > ReadsBefore, "the commit must consult publication again")
+		AssertEqual("xxZ", HSE_Buffer, "authorized completion must commit the actual HSE effect")
+		AssertEqual("xxZ", _LLM_Bridge_Buffer, "authorized completion must commit the paired mirror")
+		AssertTrue(Owner["FinalSucceeded"], "authorized completion must finish successfully")
+		AssertEqual(1, _HSE_FireLogQueue.Length, "authorized completion must publish exactly one fire")
+		AssertEqual(0, _PrefixWatcherSuppressed, "authorized completion must release suppression")
+	}
+}
+Test("Notepad publication: current upstream receipt commits once (notepad-publication)",
+	_HNPG_CurrentPublicationCommits)
+
+_HNPG_RefusedPublicationBody(Mode) {
+	global HSE_Buffer, _LLM_Bridge_Buffer, _HSE_FireLogQueue, _PrefixWatcherSuppressed
+	Gate := Map("Verdict", 1, "Reads", 0)
+	State := Map("Requests", [])
+	Owner := _HNPG_Dispatch(State, Gate)
+	Request := State["Requests"][1]
+	AssertTrue(Request.Opts["admission"].Call(), "the request starts with genuine current publication")
+	if Mode == "revoked"
+		Gate["Verdict"] := 0
+	else if Mode == "malformed"
+		Gate["Verdict"] := "1"
+	else if Mode == "throwing"
+		Gate["Throws"] := true
+	else if Mode == "context"
+		Gate["MutatesContext"] := true
+	else
+		throw ValueError("The publication fixture mode is unknown.")
+	AssertFalse(Request.Opts["admission"].Call(), "changed publication authority must refuse admission")
+	Failure := 0
+	PreviousCritical := Critical("On")
+	try {
+		try Request.Opts["atomic_commit"].Call()
+		catch as CommitFailure
+			Failure := CommitFailure
+	} finally Critical(PreviousCritical)
+	AssertEqual("Error", Type(Failure), "the actual canonical commit must refuse the stale receipt")
+	ExpectedMessage := Mode == "context"
+		? "The Notepad canonical commit lost its original input context."
+		: "The Notepad canonical commit lost its publication authority."
+	AssertEqual(ExpectedMessage, Failure.Message, "the exact authority guard must cause the refusal")
+	AssertEqual("xxab", HSE_Buffer, "refused publication must not edit HSE")
+	AssertEqual("xxab", _LLM_Bridge_Buffer, "refused publication must not edit the paired mirror")
+	AssertFalse(Owner["Committed"], "refused publication must not claim a canonical commit")
+	AssertEqual(0, _HSE_FireLogQueue.Length, "refused publication must not publish a fire")
+	Request.Callback.Call(false, "recorded publication refusal")
+	AssertFalse(Owner["FinalSucceeded"], "authority refusal cannot report successful output")
+	AssertEqual(0, _PrefixWatcherSuppressed, "refusal completion must release owned suppression")
+	AssertEqual(0, Keylogger.synth_active, "refusal completion must release its synthetic marker")
+	Request.Callback.Call(false, "duplicate recorded refusal")
+	AssertEqual(0, _PrefixWatcherSuppressed, "duplicate completion cannot release ownership twice")
+}
+
+_HNPG_RevokedPublicationRefuses() {
+	_HNP_Run(_HNPG_RefusedPublicationBody.Bind("revoked"))
+}
+Test("Notepad publication: revoked receipt refuses admission and commit (notepad-publication)",
+	_HNPG_RevokedPublicationRefuses)
+
+_HNPG_MalformedPublicationRefuses() {
+	_HNP_Run(_HNPG_RefusedPublicationBody.Bind("malformed"))
+}
+Test("Notepad publication: String receipt cannot impersonate Integer1 (notepad-publication)",
+	_HNPG_MalformedPublicationRefuses)
+
+_HNPG_ThrowingPublicationRefuses() {
+	_HNP_Run(_HNPG_RefusedPublicationBody.Bind("throwing"))
+}
+Test("Notepad publication: callback refusal cannot reach canonical mutation (notepad-publication)",
+	_HNPG_ThrowingPublicationRefuses)
+
+_HNPG_ContextMutationRefuses() {
+	_HNP_Run(_HNPG_RefusedPublicationBody.Bind("context"))
+}
+Test("Notepad publication: callback context mutation is checked afterward (notepad-publication)",
+	_HNPG_ContextMutationRefuses)

@@ -1,5 +1,7 @@
 ﻿; adapters/file_system.ahk
 
+#Include %A_LineFile%\..\..\infra\file_read_activity.ahk
+
 ; ==============================================================================
 ; MODULE: FileSystem Adapter (AutoHotkey)
 ; DESCRIPTION:
@@ -348,6 +350,38 @@ FSListDirectoryStrict(Path, Directories := false) {
 	return Entries
 }
 
+/**
+ * Resolves an existing directory to an absolute long path without recasing it.
+ * @param {String} Path - Existing directory without wildcard characters.
+ * @returns {String} Absolute long path; volume roots keep their final separator.
+ * @throws {Error|OSError} Missing directories or incomplete native resolution.
+ */
+FSResolveDirectoryPath(Path) {
+	if Path == "" || InStr(Path, "*") || InStr(Path, "?")
+		throw Error("Startup working directory cannot be resolved")
+	if !DirExist(Path)
+		throw Error("Startup working directory does not exist")
+	Size := DllCall("kernel32\GetFullPathNameW", "Str", Path, "UInt", 0, "Ptr", 0, "Ptr", 0, "UInt")
+	if !Size
+		throw OSError(A_LastError, A_ThisFunc)
+	Full := Buffer(Size * 2)
+	Written := DllCall("kernel32\GetFullPathNameW", "Str", Path, "UInt", Size,
+		"Ptr", Full, "Ptr", 0, "UInt")
+	if !Written || Written >= Size
+		throw Error("Startup working directory resolution did not complete")
+	Size := DllCall("kernel32\GetLongPathNameW", "Ptr", Full, "Ptr", 0, "UInt", 0, "UInt")
+	if !Size
+		throw OSError(A_LastError, A_ThisFunc)
+	Long := Buffer(Size * 2)
+	Written := DllCall("kernel32\GetLongPathNameW", "Ptr", Full, "Ptr", Long, "UInt", Size, "UInt")
+	if !Written || Written >= Size
+		throw Error("Startup working directory long-name resolution did not complete")
+	Resolved := StrGet(Long)
+	if RegExMatch(Resolved, "i)^[a-z]:\\$")
+		return Resolved
+	return RTrim(Resolved, "\")
+}
+
 ; Creates one directory exclusively, without adopting existing paths or parents.
 ; @param Path {String} Non-empty directory path with an existing parent.
 ; @return {Boolean} True only after native exclusive creation succeeds.
@@ -564,6 +598,10 @@ _FSReadUtf8ExactImpl(Path, MaxBytes, Bounded) {
 	static OPEN_EXISTING := 3
 	static FILE_ATTRIBUTE_NORMAL := 0x00000080
 	Handle := -1
+	OpeningReturned := false
+	Closed := false
+	Content := false
+	ReadActivity := FileReadActivityEnter(Path)
 	try {
 		Handle := DllCall("kernel32\CreateFileW",
 			"Str", Path,
@@ -574,52 +612,69 @@ _FSReadUtf8ExactImpl(Path, MaxBytes, Bounded) {
 			"UInt", FILE_ATTRIBUTE_NORMAL,
 			"Ptr", 0,
 			"Ptr")
-		if Handle == -1
-			return false
-		ByteCount := 0
-		if !DllCall("kernel32\GetFileSizeEx", "Ptr", Handle,
-				"Int64*", &ByteCount, "Int")
-			return false
-		if ByteCount < 0 || ByteCount > 0x7FFFFFFF
-			return false
-		if Bounded && ByteCount > MaxBytes
-			return false
-		Raw := Buffer(ByteCount > 0 ? ByteCount : 1, 0)
-		Offset := 0
-		while Offset < ByteCount {
-			Chunk := Min(ByteCount - Offset, 0x7FFFF000)
-			ReadCount := 0
-			if !DllCall("kernel32\ReadFile",
-					"Ptr", Handle,
-					"Ptr", Raw.Ptr + Offset,
-					"UInt", Chunk,
-					"UInt*", &ReadCount,
-					"Ptr", 0,
-					"Int") || ReadCount <= 0
-				return false
-			Offset += ReadCount
+		OpeningReturned := true
+		if Handle != -1 {
+			FileReadActivityBind(ReadActivity, Handle)
+			Content := _FSReadUtf8ExactHandle(Handle, MaxBytes, Bounded)
 		}
-		FinalSize := 0
-		if !DllCall("kernel32\GetFileSizeEx", "Ptr", Handle,
-				"Int64*", &FinalSize, "Int") || FinalSize != ByteCount
-			return false
-		if ByteCount == 0
-			return ""
-		Content := StrGet(Raw.Ptr, ByteCount, "UTF-8")
-		CanonicalCount := StrPut(Content, "UTF-8") - 1
-		if CanonicalCount != ByteCount
-			return false
-		Canonical := Buffer(CanonicalCount + 1, 0)
-		StrPut(Content, Canonical, CanonicalCount + 1, "UTF-8")
-		MatchingBytes := DllCall("ntdll\RtlCompareMemory",
-			"Ptr", Raw, "Ptr", Canonical, "UPtr", ByteCount, "UPtr")
-		return MatchingBytes == ByteCount ? Content : false
 	} catch {
-		return false
+		Content := false
 	} finally {
-		if Handle != -1
-			try DllCall("kernel32\CloseHandle", "Ptr", Handle, "Int")
+		if Handle == -1 {
+			; A returned failed opening owns no handle; a thrown acquisition stays debt.
+			Closed := OpeningReturned
+		} else {
+			try Closed := DllCall("kernel32\CloseHandle", "Ptr", Handle, "Int") != 0
+			catch {
+				Closed := false
+			}
+		}
+		if Closed
+			FileReadActivityLeave(ReadActivity)
 	}
+	return Closed ? Content : false
+}
+
+/** Reads and validates the original UTF-8 bytes through one retained handle. */
+_FSReadUtf8ExactHandle(Handle, MaxBytes, Bounded) {
+	ByteCount := 0
+	if !DllCall("kernel32\GetFileSizeEx", "Ptr", Handle,
+			"Int64*", &ByteCount, "Int")
+		return false
+	if ByteCount < 0 || ByteCount > 0x7FFFFFFF
+		return false
+	if Bounded && ByteCount > MaxBytes
+		return false
+	Raw := Buffer(ByteCount > 0 ? ByteCount : 1, 0)
+	Offset := 0
+	while Offset < ByteCount {
+		Chunk := Min(ByteCount - Offset, 0x7FFFF000)
+		ReadCount := 0
+		if !DllCall("kernel32\ReadFile",
+				"Ptr", Handle,
+				"Ptr", Raw.Ptr + Offset,
+				"UInt", Chunk,
+				"UInt*", &ReadCount,
+				"Ptr", 0,
+				"Int") || ReadCount <= 0
+			return false
+		Offset += ReadCount
+	}
+	FinalSize := 0
+	if !DllCall("kernel32\GetFileSizeEx", "Ptr", Handle,
+			"Int64*", &FinalSize, "Int") || FinalSize != ByteCount
+		return false
+	if ByteCount == 0
+		return ""
+	Content := StrGet(Raw.Ptr, ByteCount, "UTF-8")
+	CanonicalCount := StrPut(Content, "UTF-8") - 1
+	if CanonicalCount != ByteCount
+		return false
+	Canonical := Buffer(CanonicalCount + 1, 0)
+	StrPut(Content, Canonical, CanonicalCount + 1, "UTF-8")
+	MatchingBytes := DllCall("ntdll\RtlCompareMemory",
+		"Ptr", Raw, "Ptr", Canonical, "UPtr", ByteCount, "UPtr")
+	return MatchingBytes == ByteCount ? Content : false
 }
 
 ; Admit only the target's HWND-sequence scratch format after its owner exits.
@@ -639,17 +694,26 @@ FSAtomicTempOwnerIsGone(FileName, TargetName) {
 
 ; Publishes a complete same-directory stage with one write-through Win32 rename.
 ; Failure retains Source and leaves Destination untouched.
-FSAtomicMoveReplace(Source, Destination) {
+; NativeError reports the immediate Win32 error; zero also denotes unavailable
+; native information on invalid arguments or a DllCall exception.
+FSAtomicMoveReplace(Source, Destination, &NativeError := 0) {
+	NativeError := 0
 	if !(Source is String) or Source = ""
 		or !(Destination is String) or Destination = ""
 		return false
 	static MOVEFILE_REPLACE_EXISTING := 0x00000001
 	static MOVEFILE_WRITE_THROUGH := 0x00000008
-	try return DllCall("MoveFileExW", "Str", Source, "Str", Destination,
-		"UInt", MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
-		"Int") != 0
-	catch
+	try {
+		DllCall("kernel32\SetLastError", "UInt", 0)
+		Moved := DllCall("MoveFileExW", "Str", Source, "Str", Destination,
+			"UInt", MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH, "Int")
+		NativeError := A_LastError
+		return Moved != 0
+	} catch Error {
+		; No completed native receipt is available for a DllCall exception.
+		NativeError := 0
 		return false
+	}
 }
 
 ; Publishes Source only when Destination is still absent. Omitting
@@ -677,6 +741,11 @@ FSMove(Source, Destination, Overwrite := false) {
         } catch {
                 return false
         }
+}
+
+/** Open a BOM-aware UTF-8 reader; native refusal reaches the identity owner. */
+FSOpenReadStrict(Path) {
+	return FileOpen(Path, "r", "UTF-8")
 }
 
 ; Opens a file for STREAMED reading and hands the handle back.

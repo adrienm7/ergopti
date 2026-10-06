@@ -934,9 +934,16 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 				}
 		}
 
+		; Foreign table-array generations are not flat rendering destinations.
+		; Admission below independently verifies their complete typed subtrees.
+		try RenderingSections := _TOML_ForeignArrayRenderingSections(SourceBytes, Sections)
+		catch as Err {
+				try LoggerError("TomlWrite", "Refusing TOML {1}: source rendering admission failed. No file was changed.", Mode)
+				return false
+		}
 		; Sort sections alphabetically for stable, readable output
 		SortedSections := []
-		for sec in order
+		for sec in RenderingSections
 				SortedSections.Push(sec)
 		SortedSections := SortArray(SortedSections)
 		FirstSection := true
@@ -948,11 +955,11 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 				body .= "[" . sec . "]`n"
 				; Sort keys alphabetically within each section
 				SortedKeys := []
-				for k, v in Sections[sec]
+				for k, v in RenderingSections[sec]
 						SortedKeys.Push(k)
 				SortedKeys := SortArray(SortedKeys)
 				for _, k in SortedKeys
-						body .= TOML_RenderKey(k) . " = " . TOML_RenderValue(Sections[sec][k]) . "`n"
+						body .= TOML_RenderKey(k) . " = " . TOML_RenderValue(RenderingSections[sec][k]) . "`n"
 		}
 		try Admitted := TOML_AdmitWriterCandidate(SourceBytes, Parsed, Sections, Chr(0xFEFF) . body,
 			Updates, ExactSectionPrefixes)
@@ -1074,12 +1081,12 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 	; Publish only through the same-volume write-through adapter. The WAL may
 	; promote immediately after this return, so a merely visible rename is not a
 	; sufficient durability boundary.
-	Moved := FSAtomicMoveReplace(tmp, Path)
+	Moved := FSAtomicMoveReplace(tmp, Path, &MoveError)
 	if !((Moved is Integer) && Moved == 1) {
 		global _ParseTomlCache
 		if _ParseTomlCache.Has(Path)
 			_ParseTomlCache.Delete(Path)
-		try LoggerError("TomlWrite", "Write-through atomic replace of '{1}' was refused. The previous contents are intact, so the change is NOT persisted.", Path)
+		try LoggerError("TomlWrite", "Write-through atomic replace of '{1}' was refused. The previous contents are intact, so the change is NOT persisted (native error {2}).", Path, MoveError)
 		_TOML_RemoveOwnedStage(tmp)
 		return false
 	}

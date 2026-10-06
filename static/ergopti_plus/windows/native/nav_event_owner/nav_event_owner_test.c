@@ -20,6 +20,7 @@
 #include <string.h>
 
 #include "nav_event_owner.h"
+#include "editor_replace.h"
 
 
 
@@ -3738,7 +3739,8 @@ int main(int argc, char **argv)
 			TestNavigationPrecedesProfileSelection},
 		{"plan validation is atomic", TestPlanValidationIsAtomic},
 		{"nav-stale-physical-modifier",
-			TestStalePhysicalModifierCannotArmRoutes}
+			TestStalePhysicalModifierCannotArmRoutes},
+		{"native editor receiver matrix", ErgoptiEditor_TestReplacements}
 	};
 	uint32_t test_count = (uint32_t)(sizeof(tests) / sizeof(tests[0]));
 	uint32_t selected_count = test_count;

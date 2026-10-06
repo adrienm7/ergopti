@@ -1882,6 +1882,522 @@ These are software implementations; final hardware verification remains below.
   No collection policy, cache/flush, persistence, reserved surface or physical
   keyboard validation change.
 
+- [~] **L125.** Linux fractional WPM persistence: serialize the admitted rate
+  as a double instead of an integer. A real two-character collector flush with
+  1300 ms elapsed stored 18 instead of 240/13 WPM under LuaJIT; Lua 5.4 threw
+  before writing the raw batch. Keep the shared formula, caller data, ID cursor,
+  dates, other SQL columns and all prior category/metadata/histogram fixes intact.
+  Thirteen real collector/Writer/SQLite checks reproduce nine LuaJIT failures
+  and the Lua 5.4 production exception, then pass under current LuaJIT, signed
+  Ubuntu 22.04 luv/libuv dependencies and Lua 5.4. SQLite/kernel/libc stay current
+  in the mixed profile. Seven independently specified native scalar controls
+  cover fractions, numeric text, integers, zero and existing invalid-text fallback;
+  the first collector check also retains the shared computation assertion.
+  Nonfinite serialization now receives a genuine SQLite refusal instead of an
+  acknowledged coerced integer; unchanged accepted rows and healthy retry are
+  checked, without claiming ID rollback or whole-flush atomicity. Six registered
+  unit cases reproduce three failures and pass on both runtimes. Every original
+  assertion remains intact; existing histogram/category/metadata native fixtures
+  also pass under all three configurations. Register future Linux CI without
+  launching it. macOS and Windows retain their existing one-decimal WPM policy
+  and numeric SQL serialization by source inspection; their native checks remain
+  with the principal agent. Software collector calls are synthetic input and do
+  not validate physical keyboards. No formula, schema, collection, persistence,
+  reserved policy or foreign driver change.
+
+- [~] **L126.** Linux remote terminal callback diagnostics: describe caught
+  errors with the existing shared ErrorDescription policy. Calling tostring on
+  an error object invoked caller formatting again and could throw during failure
+  reporting. Reuse the shared helper through one import and one formatter call;
+  keep owner clearing before the caller, callback arguments/count/order, retries,
+  successors, decoders and HTTP transport identical. Per native configuration,
+  sixty-three public Chat/Models/Test and ordinary-string Vision scenarios issue
+  145 genuine verified-TLS requests: thirty-two formatter-policy failures before,
+  none after under current LuaJIT, signed Ubuntu 22.04 curl/luv/libuv dependencies
+  and Lua 5.4. The mixed profile retains host kernel/Lua/libc and recorded OpenSSL;
+  current and stock Lua use curl 8.14/libuv 1.50, the mixed profile 7.81/1.43.
+  All native primary/successor/retry tuples, arity, model IDs and captured ownership
+  are asserted outside protected callbacks after settlement, alongside exact wire
+  inventory, one terminal callback and zero retained handles. Preserve every
+  original assertion: five deliberate software tuple mutations demonstrate that
+  the former protected assertions could falsely pass and that outside oracles
+  refuse them. Forty-seven independent software sensitivity controls cover the
+  new oracles on both Lua runtimes; these are not native or physical validation.
+  Seventy-eight registered unit cases reproduce fifty-three failures and pass
+  after. Preserve the four original pcall-status assertions and additionally
+  assert the genuinely returned caller-delivery records outside protection;
+  four software mutation pairs on both runtimes prove these unit oracles can
+  fail. The unchanged complete-tree JS false-green ratchet stays at zero.
+  Existing API admission/UTF8/IPv6 regressions remain byte-identical.
+  Register future Linux CI without launching it. macOS callback traceback/object
+  formatting remains a source-only analogue; Windows uses native protected
+  callbacks whose error getters need separate native evidence. Leave their gates
+  to the principal agent. Vision object diagnostics and outer HTTP diagnostics
+  remain separate, unmeasured scopes. No menu, magic, transport, persistence,
+  physical hardware or foreign driver change.
+
+- [~] **L127.** Linux raw event calendar days: use the local day for hotstring
+  and shortcut collection and the four raw Writer defaults, matching existing
+  typing and daily aggregates. Keep UTC timestamps and caller-supplied dates
+  unchanged. Genuine public software events, Writer, Reader and dashboard APIs
+  with real SQLite reproduce six mismatches in thirteen checks before and pass
+  after on current LuaJIT, Lua 5.4 and the signed Jammy luv/libuv mixed profile.
+  The genuine-clock fixture starts only its process with POSIX TZ=OWN-24, an
+  artificial UTC+24 offset that guarantees distinct real local/UTC days. It
+  replaces no clock or adapter, verifies clock identity and UTC bounds, rejects
+  calendar crossing during setup, and checks repeat flushes and durable IDs.
+  This does not represent a geographic timezone or physical keyboard input.
+  Nineteen additional checks with explicitly simulated Lua clock inputs and real
+  libc/SQLite cover east/west/UTC and midnight boundaries: nine failures before,
+  none after under current and mixed-profile LuaJIT. Their FFI requirement leaves
+  this fixture unexecuted under Lua 5.4. Ten registered unit cases reproduce six
+  failures and pass after on all three profiles. Native fixtures assert their
+  exact check floors; preserve every original test and assertion. Windows
+  KL_Today and macOS aggregator.today already use local calendar days in source;
+  foreign native validation remains with the principal agent. Register future
+  Linux CI without launching it. No migration of historical events, formula,
+  schema, shared policy, physical-input, menu or reserved configuration change.
+
+- [~] **L128.** Linux n-gram text projection: preserve embedded NUL and distinct
+  admitted UTF-8 tokens through the SQLite CLI. Raw TEXT in its JSON mode truncates
+  at NUL, losing tokens or merging them with a prefix. Project json_quote(token)
+  and decode its string with the existing shared JSON codec at the native adapter
+  boundary; retain grouping, counts, delays, error/source totals and malformed
+  numeric fallback. Twenty-nine native checks across all nine character/word
+  families reproduce nineteen failures and pass after on current LuaJIT, Lua 5.4
+  and the signed Jammy luv/libuv mixed profile, all with actual SQLite 3.46.
+  Public synthetic output, flush, range and historical/today split APIs retain
+  exact NUL, quotes, whitespace and accented text. Independent durable hex(token)
+  and seven distinct token identities verify the original bytes and counters.
+  Empty-range and ordinary-text controls remain healthy. Use a fixed historical
+  fixture day with a distinct-day precondition rather than subtracting 24 hours,
+  which can still be today on a 25-hour calendar day. Preserve all original native
+  assertions and add an exact twenty-nine-check floor. The registered regression
+  fails before and passes after on all three profiles; forty-four Reader owner
+  checks, including canonical modifier-hold data, pass after. Their CLI adapters
+  are explicitly simulated; the native fixture runs real software/database paths
+  and does not validate physical input. macOS uses native binding rows in source;
+  Windows has a separate source analogue in SQLite_Utf8ToStr, which calls StrGet
+  without a byte length. Its direct text queries need native evidence and a
+  length-aware or JSON-framed read strategy from the principal agent. No foreign
+  driver changes or native gates here. Register future Linux CI without launching
+  it. No NULL policy, completion cache, schema, Writer, menu or reserved change.
+
+- [~] **L129.** Linux SQLite NULL boundary: use the existing shared lossless JSON
+  decoder for native result rows and remove only top-level tagged NULL scalars.
+  Legacy empty-table sentinels defeated numeric zero defaults and published absent
+  optional extrema or first/last minutes as objects. Keep arrays, ordinary objects,
+  nested tagged NULL and embedded JSON text unchanged; do not change the shared
+  decoder contract or SQL queries. Eight genuine public Writer/Reader checks with
+  native SQLite reproduce three failures and pass after under current LuaJIT,
+  Lua 5.4 and the signed Jammy luv/libuv mixed profile. Optional manifest fields
+  reach the runtime projection; read_system_days is a public API with no current
+  Linux runtime caller. Native tests assert their exact eight-check floor and all
+  original assertions remain unchanged. Three registered CLI-response unit cases
+  reproduce three failures and pass after on all three profiles. Forty-seven
+  complete Reader owner checks, including n-gram byte identity and canonical
+  modifier-hold fields, pass after; replay all twenty-nine native n-gram checks
+  on each profile. Windows already uses COALESCE for system totals and removes
+  absent battery extrema represented by empty strings in source; macOS uses
+  binding-native nullable values. Foreign binding and driver execution remains
+  untested here and belongs to the principal agent. Register future Linux CI
+  without launching it. Preserve both PulseAudio language packs and principal
+  notification/HTTP fixtures from dev. No global codec, query, numeric policy,
+  schema, cache, configuration, menu, physical-input or foreign driver change.
+
+- [~] **L130.** Linux raw-event batches: wrap each typing, hotstring, shortcut
+  and app-switch script in a checked SQLite transaction. An INSERT trigger using
+  RAISE(FAIL) previously left earlier rows or trigger effects committed while the
+  public caller retained the entire refused batch; its retry then duplicated
+  events and diverged from derived totals. Roll back the refused script when the
+  checked CLI exits before COMMIT. Keep separately acknowledged event-ID
+  reservations and their gaps; this does not promise whole-flush atomicity,
+  ID rollback, COMMIT-refusal handling or exactly-once delivery after a lost
+  post-COMMIT acknowledgement. Twelve genuine native checks reproduce ten
+  failures and pass after on current LuaJIT, Lua 5.4 and the signed Jammy luv/libuv
+  mixed profile. A separate actual-clock public Keylogger producer and independent
+  Python SQLite oracle reproduce five failures among twelve checks and pass after
+  on each profile. Producer exit zero before and after only means its snapshots
+  were collected: the oracle supplies the failing or passing verdict. Refused,
+  accepted and repeated-flush snapshots independently verify IDs, pending events,
+  raw/derived conservation, exact fractional WPM, local days and UTC timestamps.
+  Both native fixtures enforce their exact twelve-check floors. Eight registered
+  CLI-script unit assertions fail before and pass after on all three profiles.
+  Preserve every existing assertion and the unchanged Keylogger implementation.
+  macOS already checks its ingest transaction and rolls back failures in
+  log_manager; Windows journals transaction-delimited ingest scripts for its
+  detached replay worker. Those different native paths need their own runtime
+  validation and remain with the principal agent. No shared policy change is
+  required: transaction ownership belongs to each native SQLite adapter. Register
+  future Linux CI without launching it. These are real Linux software/database
+  executions with software-supplied input, not physical keyboard validation.
+  Preserve both PulseAudio language packs and principal notification/HTTP fixtures.
+  No schema, Reader, menu, configuration, foreign driver or reserved change.
+
+- [~] **L131.** Linux native manifest completion: retain the useful partial first
+  result after a refused SQLite query, but cache a revision only when every
+  projection query completed. Otherwise a temporary failure in the base, error
+  or session query remained cached after native recovery at the same revision.
+  Preserve successful empty reads, accepted cache reuse and explicit cache clear;
+  malformed native JSON and invalid paths refuse completion. Ten actual public
+  collector/SQLite/Reader checks reproduce seven failures and pass after on
+  current LuaJIT, Lua 5.4 and the signed Jammy luv/libuv mixed profile. A separate
+  three-check public cache regression independently reproduces three failures
+  and passes after on each profile: literal native SQL proves accepted chars3,
+  errors7 and sessions2 while the recovered public payload previously retained
+  an omitted field. This supplemental oracle does not depend on the new completion
+  flag; preserve its entire original body and exact three-check floor. The primary
+  fixture enforces ten checks. Eight registered CLI-response unit cases reproduce
+  eight failures and pass after on all three profiles; all fifty-five checks in
+  the three existing Reader owners remain green, with every old assertion and
+  complete unit prefix preserved. Select only the first return in the existing
+  NULL and two filesystem fixture calls to next, preserving their assertions and
+  eight/thirty-five floors. The two additional calls failed with invalid keys
+  after the API change; all thirty-five native path checks pass after the caller
+  adaptation on each profile. macOS source likewise has no manifest completion
+  result, but this alone does not reproduce a macOS revision-cache defect.
+  Windows has separate candidate/last-good refresh guards; neither foreign
+  runtime is executed or modified here. Completion acceptance belongs to the
+  native Reader/cache adapter, with no shared SQL or numeric policy change.
+  Register future Linux CI without launching it. Software events and schema
+  obstructions exercise real native software/database paths, not physical input.
+  Preserve both language packs and principal notification/HTTP fixtures. No
+  Writer, schema, menus, configuration, foreign driver or reserved change.
+
+- [~] **L132.** Linux layout-count projection: publish persisted counts as the
+  canonical layouts_seen map consumed by the shared Apps/Typing dashboard.
+  Linux previously emitted layouts, leaving healthy native metadata invisible
+  to that consumer. Change only the two field statements; preserve SQL grouping,
+  filters, optional absence, numeric zero, revision-cache completion and stored
+  event/aggregate bytes. Ten genuine public collector/SQLite/Reader/dashboard
+  checks reproduce seven failures and pass after on current LuaJIT, Lua 5.4 and
+  the signed Jammy luv/libuv mixed profile. The actual keyboard module supplies
+  its default qwerty label without hook initialization; two software key calls
+  produce a durable count2 independently observed in native SQL. Explicit metadata
+  covers multiple devices, quoted UTF-8 labels, date/app filters and recovery.
+  This proves software metadata persistence/projection, not physical input,
+  desktop-layout discovery or an initialized XKB/Wayland keyboard hook. Preserve
+  all fifty-one original native assertion lines and enforce the exact ten-check
+  floor. Four registered CLI-response unit cases reproduce one failure and pass
+  after on all three profiles. All fifty-nine checks from the existing Reader
+  owners remain green; retain the entire old unit prefix and every assertion.
+  Replay native NULL8, completion10 and independent public-cache3 on each profile.
+  macOS and Windows already publish layouts_seen in source, and shared consumers
+  already read it; no shared policy or UI change is required. Their native gates
+  remain with the principal agent. Register future Linux CI without launching
+  it. Preserve both language packs and principal notification/HTTP fixtures.
+  No Writer, Keylogger, SQL, schema, UI labels, menu, configuration, physical-input,
+  foreign driver or reserved change.
+
+- [~] **L133.** Linux directed application transitions: project persisted
+  agg_app_day_switches_to rows into the canonical switches_to map. Sum device
+  contributions by date, source and destination; reuse inclusive date and source
+  application filters while retaining destinations outside that selection.
+  Preserve optional absence, typed zero, quoted UTF-8 names, aggregate/raw bytes
+  and native completion-cache refusal/recovery. Thirteen real public software
+  collector/SQLite/Reader/dashboard controls reproduce nine failures and pass
+  after on current LuaJIT, Lua 5.4 and the signed Jammy luv/libuv mixed profile.
+  Five independent native SQL controls reproduce three failures and pass after
+  on each profile, including literal directed 6|2, reverse 1|1 and zero integer
+  0|1|integer oracles. Both fixtures enforce their exact thirteen/five floors.
+  Four registered CLI-response unit cases reproduce three failures and pass
+  after; all sixty-three existing Reader owner cases and every old assertion
+  remain. Replay native NULL8, completion10, public-cache3 and layouts10 on all
+  three profiles. Shared consumers already use switches_to; no shared policy
+  change is needed. macOS/Windows source also produces transitions but their
+  Reader manifests omit this field; this is a source diagnosis, with native
+  foreign validation and corresponding fixes left to the principal agent.
+  Register future Linux CI without launching it. Explicit software focus calls
+  exercise native databases, not physical input or foreground-window discovery.
+  Preserve both language packs and principal notification/HTTP assertions.
+  No Writer, Keylogger, schema, UI, configuration or reserved change.
+
+- [~] **L134.** Linux hourly manual corrections: credit the existing software
+  [BS] protocol to local hourly/min5 error counters and cumulative delay bins,
+  while preserving typed-character totals and synthetic exclusion. Persist
+  numeric histogram deltas through the existing native SQLite merge policy;
+  extract the existing burst expression without changing its behavior.
+  Twelve genuine public collector/SQLite/Reader/dashboard checks reproduce
+  eight failures and pass after on current LuaJIT, Lua 5.4 and the signed Jammy
+  luv/libuv mixed profile. Enforce the exact twelve-check floor and preserve
+  every original assertion. Literal SQL controls cover raw bytes, daily errors,
+  cumulative thresholds, multiple flushes/devices, repeated direct deltas,
+  caller preservation, filters and RAISE(ABORT) statement refusal/recovery.
+  This proves that tested statement rollback, not general transaction recovery
+  or automatic retry durability. Four registered Walker cases reproduce three
+  failures and pass after; all forty-five Walker owner cases remain green with
+  the entire old unit prefix preserved. Replay native burst18, WPM13, raw-batch12
+  and completion10 on each profile. macOS/Windows already count manual corrections
+  in hour/min5 bins and persist their histograms in source; native foreign gates
+  remain with the principal agent. Reuse shared bucket thresholds/helpers and
+  the canonical schema, with no new policy or shared-data change. Register future
+  Linux CI without launching it. Real clocks/native processes/databases with
+  explicit software event timestamps do not validate physical Backspace capture,
+  which currently does not supply this marker. Preserve both language packs and
+  principal notification/HTTP assertions. No input hook, Reader, Keylogger, schema,
+  configuration, menu, foreign driver or reserved change.
+
+- [~] **L135.** Linux canonical manual-character count: exclude the exact
+  software correction marker [BS] from the per-app character accumulator.
+  Preserve its raw event/bytes, correction counters, elapsed-time admission,
+  global/live/raw-event WPM, ngrams and exact-marker distinction. The software
+  a/[BS]/b stream previously exposed live/durable chars3 while class/hour totals
+  correctly remained2; correction-only input incorrectly contributed a character.
+  Nine real public collector/SQLite/Reader/dashboard controls reproduce five
+  failures and pass after on current LuaJIT, Lua 5.4 and the signed Jammy luv/libuv
+  mixed profile. Keep the existing exact nine-check floor. Literal SQL independently
+  requires daily2, classes2, hourly2, raw hex615B42535D62 with three input events,
+  and backspaces1. A second c/[BS] flush adds one character for cumulative3;
+  an empty flush preserves all raw ID/text/event bytes and the ASCII control2.
+  Four registered unit cases reproduce three failures and pass after, including
+  Unicode/whitespace, marker-only and [BS]x controls. All forty-five old/new owner
+  cases pass; preserve the entire 28658-byte old unit prefix and all ninety-eight
+  assertion lines. The frozen author README undercounts those lines as97; keep
+  that receipt unchanged and use the measured count here. Shared Apps/Typing,
+  macOS/Windows source already separate manual chars from corrections; no new
+  policy or foreign-native claim. Native foreign gates remain principal-owned.
+  Register future Linux CI without launching it. This software protocol does not
+  validate physical Backspace collection, which currently does not feed this
+  marker. Preserve both language packs and principal notification/HTTP assertions.
+  No physical hook, timing policy, Writer, Reader, Walker, schema, configuration,
+  window-title logic, menu, foreign driver or reserved change.
+
+- [~] **L136.** Linux fallback wait completion: accept the interpreter-native
+  os.execute success receipts true/0 and propagate refusal instead of reporting
+  a completed wait after an ignored command failure. Preserve duration conversion,
+  native nanosleep/EINTR behavior, luv pump/clock/reentry and existing shared timing
+  helpers. Eight actual native controls reproduce four failures and pass after
+  on current LuaJIT, Lua 5.4 and the signed Jammy luv/libuv mixed profile, with
+  the original exact eight-check floor. A private executable returns exit7;
+  genuine sleep recovery completes at least25ms with exact0.020/0.025 arguments.
+  Stock Lua naturally lacks FFI; LuaJIT FFI absence and cdef refusal are explicitly
+  simulated selection seams around real commands. Thirteen registered controls
+  reproduce nine failures and pass after on all three profiles while loading
+  all382 modules without errors. Twelve model CLI/FFI receipts; the thirteenth
+  executes the real native child fixture. Preserve the entire old unit by the
+  remove-only inverse of the unchanged2567-byte internal insertion before the
+  unique backend-isolation block; this is not an appended-prefix claim. macOS
+  uses hs.timer.usleep with a void adapter contract, Windows native timer methods
+  use SetTimer; neither supplies this Linux boolean external-command wait path.
+  The macOS exception suppression is a separate source observation, not foreign
+  native validation or proof of an equivalent completion defect. Shared policies
+  remain unchanged; foreign native gates stay principal-owned. Register future
+  Linux CI without launching it. Real software waits/processes do not validate
+  physical input or new signal/lifecycle behavior. Preserve both language packs
+  and principal notification/HTTP assertions. No shared helper, foreign driver,
+  input hook, configuration, menu or reserved change.
+
+- [~] **L137.** Linux Unicode character classes: replace the private multibyte
+  shortcut with the existing shared coarse classifier, preserving codepoint
+  lengths, source counters and manual/synthetic separation. Actual public
+  software ingestion and native SQLite reproduce three failures among fourteen
+  independent Python-oracle controls before and pass after on current LuaJIT,
+  Lua 5.4 and the signed Jammy luv/libuv mixed profile. Han and emoji belong to
+  other; NBSP and NNBSP belong to space. ASCII, accented letters, combining
+  codepoints and synthetic output retain their literal counts. This existing
+  coarse policy does not implement Unicode general categories or graphemes.
+  Nine registered unit controls reproduce four failures and pass after on all
+  three profiles; the supplemental CR/VT/FF control checks other while tab/LF
+  stay space. That supplemental control is a Walker unit, not native hardware
+  coverage; the fourteen native controls remain unchanged. Preserve the entire
+  original eight-case unit prefix and all forty-five previous Walker controls.
+  macOS already delegates to the same shared classifier. Windows agrees on the
+  concrete Han, emoji, NBSP/NNBSP and accent cases; broader letter ranges and
+  combining behavior differ, so this is not full foreign taxonomy parity.
+  Foreign native validation remains principal-owned. Register future Linux CI
+  without launching it. Preserve both language packs and principal notification
+  and HTTP assertions. No input hook, shared policy, schema, source counters,
+  normalization, menu, configuration or reserved change.
+
+- [~] **L138.** Linux stored ngram source projection: retain all admitted string
+  source labels except hotstring, llm and none in the canonical other bucket.
+  A shared Utils predicate owns that membership; Linux retains native JSON
+  projection and its existing tonumber scalar admission/fallback. Actual SQLite
+  Writer/Reader controls reproduce one failure among six, scalar/shape controls
+  one among seven, and public software collector/flush/SQLite/Reader/dashboard
+  five among nine before, then pass after on current LuaJIT, Lua 5.4 and the
+  signed Jammy luv/libuv mixed profile. Independent read-only Python SQLite
+  verifies literal c11/hs1/llm2/o6; producer exit0 means collection, not success
+  of the independent oracle. The word-family check is an explicit Writer seam,
+  separate from the collector's synthetic-word exclusion. Ten original unit
+  controls reproduce three source failures; an additional pure membership case
+  covers twelve literal labels/types and adds a separate pre-fix API absence.
+  All eleven pass after, along with all seventy-four current Reader controls.
+  Preserve the complete old34969-byte unit and its110 assertions, the entire
+  frozen ten-case prefix, native6/7/9 floors and all older ngram/NULL/completion/
+  cache/layout/switch/Unicode regressions. macOS/Windows already project extra
+  string labels into other; source inspection establishes that supported
+  taxonomy, not full scalar/fallback parity or foreign native execution.
+  This slice covers stored reads. The live unflushed projection and Writer
+  conflict merge have separately reproduced omissions and remain queued; do
+  not claim complete source accounting. Register future Linux CI without
+  launching it. Preserve both language packs and principal notification/HTTP
+  assertions. No Writer, live delta, input hook, shared admission change, schema,
+  configuration, menu, normalization, foreign driver or reserved change.
+
+- [~] **L139.** Shared typing metrics NONE selection: use one selection policy
+  for historical dictionaries, live known/Unknown applications and per-app KPIs.
+  Explicit NONE excludes all input while retaining existing ALL, uninitialized,
+  explicit selection, Unknown inclusion, discovery and cache ownership outside
+  NONE. Twelve registered JS controls cover all ngram families and actual raw/
+  hotstring SFB computations; all pass after the fix. Fifteen existing request
+  ownership controls remain green. Real Linux WebKit 2.54 under virtual X11 and
+  private D-Bus reproduces two failures among nine before, then nine pass after:
+  a mandatory visible owned h/count7 row is cleared, leaving zero data rows and
+  the genuine translated colspan8 no-data placeholder. The production manager,
+  keylogger, native SQLite and actual picker open/select/close transaction run;
+  literal SQL historical and flushed software counts remain healthy. Preserve
+  all eight original GUI checks, the ninth rendered-row assertion and subject
+  floor. Register the exact future CI command without launching GitHub CI.
+  The UI policy is shared by Windows/macOS/Linux; backend empty-array semantics
+  differ and are unchanged. Foreign native WebViews, Ubuntu 22.04 WebKit and
+  physical input are unexecuted. Preserve both PulseAudio language packs and
+  principal notification/HTTP assertions. No bridge, backend, input hook, menu,
+  configuration, source-admission, translation or reserved implementation change.
+
+- [~] **L140.** Linux ngram source conflicts: reuse the existing numeric-map
+  SQL accumulator so successive flushes retain every admitted literal source key.
+  Preserve existing string/positive-number admission, floors, scalar counters,
+  schema and generic helper. Actual public software output and native SQLite
+  reproduce four failures among twelve before, then pass after, on current
+  LuaJIT, Lua 5.4 and the signed Jammy luv/libuv mixed profile. An independent
+  read-only Python connection verifies the same twelve outcomes from native
+  snapshots. Eight healthy controls retain known-source addition, manual absence,
+  raw tagged events, exact c/td/cd/e, device/date isolation and numeric admission.
+  Quoted Unicode/dotted keys and persisted numeric-string counts accumulate.
+  Four additive registered units pass; all104 Writer controls remain green.
+  Strengthen only three old source-shape assertions into captured public Writer
+  SQL, decoded known/extra input maps, cumulative literal-key inputs and scalar
+  bindings; preserve every other old byte and assertion. All six focused faulty
+  mutations are caught by the original strengthened subject and native fixture.
+  Register future native/Python CI pairs without launching workflows. Windows
+  already enumerates literal source keys; macOS uses generic JSON-path merging,
+  supporting conventional labels by source inspection, without establishing
+  dotted/quoted/empty literal-key parity. Foreign native runtimes and physical
+  input are unexecuted. This conflict slice does not fix control-character key
+  encoding, pending live-source projection or cross-flush session accounting.
+  Preserve both language packs and principal notification/HTTP assertions. No
+  collector, Reader, shared helper, raw event, timing, schema, configuration,
+  menu, reserved implementation or foreign driver change.
+
+- [~] **L141.** Linux live ngram source projection: use the delivered shared
+  source-membership predicate and subtract each source's own flushed snapshot
+  before summing its positive pending contribution into the other bucket.
+  Preserve logical, hotstring and LLM deltas, raw events, flush receipts, timing,
+  producer admission and persistence. Public software output, real private
+  SQLite and range/dashboard requests reproduce seven failures among fifteen
+  before, then all pass after on LuaJIT, Lua 5.4 and the signed Jammy luv/libuv
+  mixed profile. Known-source/manual controls remain healthy; repeated reads
+  retain exact pending counts without flushing the durable database. Twelve
+  additive registered units reproduce seven failures before and pass after;
+  preserve the complete old31208-byte owner and all45 old subjects. The root
+  complete owner explicitly requires57 subjects and passes on all three
+  profiles. Caller-supplied API timestamps are software inputs; no mocked clock
+  or physical clipboard/input validation is claimed. The shared predicate owns
+  label membership; native source maps/deltas remain the Linux implementation.
+  Foreign source inspection establishes supported string taxonomy only, without
+  native Windows/macOS validation. The separate delivered Writer conflict fix
+  retains persisted labels; this slice covers pending projection. Register the
+  future CI commands without launching workflows. Preserve both language packs
+  and principal notification/HTTP assertions. No Writer, Reader, input hook,
+  schema, source-count admission, session cursor, configuration, menu, foreign
+  driver or reserved implementation change.
+
+- [~] **L142.** Linux literal ngram source keys: use the existing shared JSON
+  encoder for each admitted source label instead of escaping quotation marks
+  alone. Preserve count admission, flooring, SQL escaping, the delivered numeric
+  map conflict accumulator and every scalar. Actual public synthetic output and
+  native SQLite reproduce five failures among fifteen independent readonly
+  Python checks before, then all pass after on LuaJIT, Lua 5.4 and the signed
+  Jammy luv/libuv mixed profile. Each profile runs one actual native producer
+  successfully and one fifteen-subject oracle; these are not two test suites.
+  Backslash, newline, tab and carriage-return labels remain literal; quoted
+  Unicode, ordinary labels, raw tagged events, manual attribution and character
+  totals provide healthy controls. Production SQLite3.46.1 writes the database;
+  Python SQLite3.53.1 validates it independently. Eight additive registered units
+  reproduce five failures before and pass after; preserve the complete old
+  41826-byte Writer owner and its104 subjects. The complete112-subject owner
+  passes on all three profiles. Unit SQL receipts are modeled, while the public
+  producer uses real native libraries and storage; no physical input validation
+  is claimed. Windows/macOS source inspection finds existing full JSON encoders
+  on insertion, without native validation or a claim about macOS conflict-key
+  parity. Register both future Linux CI commands without launching workflows.
+  Preserve both language packs and principal notification/HTTP assertions. No
+  collector, Reader, count policy, schema, raw timing, session cursor, menu,
+  configuration, foreign driver or reserved implementation change.
+
+- [~] **L143.** Linux canonical backspace unigrams: retain each correction
+  marker through the existing Walker accumulator, with its actual delay and
+  manual, hotstring or LLM source. The common metrics UI and both foreign
+  drivers already retain this token; this slice covers unigrams only. Preserve
+  correction errors, cascades, recovery, sequence breaks, raw events and scalar
+  character totals. Actual public software events, native clocks and SQLite
+  reproduce five failures among fourteen checks before, then all pass after on
+  LuaJIT, Lua 5.4 and the signed Jammy luv/libuv mixed profile. Independent
+  readonly Python checks reproduce two failures among eight, then all pass.
+  Four additive registered units reproduce three failures before and pass
+  after; preserve the complete old Walker owner and its45 subjects. All49 owner
+  subjects pass on every profile. Controls cover source attribution, an actual
+  forty-millisecond manual delay, literal four-codepoint "[BS]" text, dashboard
+  and filtered Reader projection, unchanged scalar counts and idempotent flush.
+  Unit events are modeled; production collector, clocks and storage are native.
+  No physical keyboard or foreign native runtime validation is claimed. Broader
+  backspace bigrams/trigrams and existing corpus differences remain outside this
+  slice. Register future Linux CI commands without launching workflows. Preserve
+  both language packs and principal notification/HTTP assertions. No input hook,
+  schema, source-count policy, configuration, menu or reserved implementation
+  change.
+
+- [~] **L144.** Linux system-day restart retention: hydrate the sampler's
+  cumulative row for its exact database, device and calendar day before the
+  first sample. Preserve replacement/idempotence semantics and reset previous
+  process clocks and sensor transitions. A checked Writer read distinguishes
+  accepted absence from refusal; failed reads publish no writable zero day and
+  remain retryable. Rebinding the same database preserves the live day, while
+  changed database/device/day identities load their own row. Actual public
+  collector and SQLite in two separate native processes reproduce three
+  history-loss failures; a genuine thirty-second monotonic interval is retained
+  after restart on LuaJIT, Lua 5.4 and the signed Jammy mixed profile. Each profile
+  preserves two first-process controls and changes twelve restart checks from
+  ten failures to zero; seven baseline failures cover the newly introduced
+  checked-loader API, not seven further old data-loss bugs. Complete sampler25
+  and Writer122 owners change ten failures each to zero, retaining all old
+  assertions. The truthful in-memory Writer model and its23-case protocol owner
+  remain explicit software tests, with detached rows and owned identity checks.
+  Supplied sensor history, reset seams and the next-date adapter are modeled;
+  clocks, native processes, library calls and SQLite refusal/recovery are real.
+  No physical sensor, keyboard, systemd or foreign runtime claim. Foreign source
+  inspection finds additive system deltas on macOS and additive/SQL-rebuilt
+  system fields on Windows, rather than this Linux cumulative zero overwrite.
+  Register future native Linux CI commands without launching workflows. Preserve
+  both language packs and principal notification/HTTP assertions. No schema,
+  raw-event, menu, title, configuration or reserved implementation change.
+
+- [~] **L145.** Linux ngram group refusal atomicity: reuse the existing checked
+  batch transaction for the single multirow upsert. Actual SQLite RAISE(FAIL)
+  previously retained earlier additive token updates and trigger effects despite
+  a false receipt; a later retry duplicated those earlier contributions. Preserve
+  the native bail/connection settlement and helper body, literal source encoder,
+  source-map merging, count admission and scalar fields. Each LuaJIT, Lua 5.4 and
+  signed Jammy mixed profile runs one successful native Writer producer and one
+  independent readonly Python oracle: eight checks with four failures before,
+  then eight passes after. These are not two eight-subject suites. Refusal at the
+  first token preserves counts but leaves a trigger effect; refusal at the last
+  token additionally retains an earlier update. Both become unchanged rows and
+  zero effects, followed by exactly-once healthy retry. ABORT and untriggered
+  controls retain all scalar and known/arbitrary source values. Two registered
+  units reproduce one failure before and pass after; the entire old122-subject
+  Writer prefix and assertions remain intact, and all124 subjects pass on every
+  profile. Unit CLI receipts are simulated; native processes, triggers, files and
+  SQLite reads/writes are real. No physical input or foreign native validation.
+  Foreign source inspection finds outer aggregate transactions/rollback paths,
+  without claiming every foreign caller's FAIL behavior. This slice does not
+  implement a collector derived retry queue, raw replay, session cursor changes,
+  whole-flush atomicity or post-COMMIT lost-receipt recovery. Register future
+  Linux CI commands without launching workflows. Preserve both language packs
+  and principal notification/HTTP assertions. No schema, configuration, menu,
+  foreign source or reserved implementation change.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
@@ -3186,6 +3702,13 @@ transport suite. This corrects a proved composition gap without claiming
 it caused the hosted exit. Native macOS compilation and complete archive
 acceptance on this functional correction remain required.
 
+Manual run 37430974838 tests exact candidate 54493dc2a on macOS and Linux.
+Both closed native archive outcomes remain FAIL: Sparkle reaches server
+retirement with deadline/terminal debt and acknowledged signal 15; Brew still
+refuses the deny-removal positive control with target error -10004. These
+facts do not prove their causes. Native archive packaging and installation
+are skipped, and Release / Publish is skipped. Item 36 remains partial.
+
 - [~] **37.** Always show the shipped Ergopti hotstring pack, including when
   its keyboard layout is not installed. Move French `suffixes_a` and magic-key
   `replace` into that extension without a beta compatibility layer. The runtime
@@ -4290,6 +4813,21 @@ The first selected run retains its missing-Pillow failure; the exact failed
 checks and macOS Swift are explicitly deferred to their real hosts. Final
 hosted/package qualification, per-hop GET, retained archive output and
 installed-format closure remain required; item62 stays partial.
+
+Joining current dev 71ec4563f exposed forty-six callback tuple regressions:
+appending absent private evidence added a nil argument to existing callers.
+The transport now preserves the original two/three-value tuples whenever
+there is no actual failure receipt, and retains optional native evidence
+when present. All original callback/sibling assertions remain unchanged.
+Exact upstream and corrected composition each pass the 78 focused controls;
+the original joined failure is retained. The complete corrected Linux suite
+passes 8,969 tests in 433 modules. Actual verified-TLS replay also passes
+33 provider scenarios with 75 requests and 30 sibling scenarios with 70
+requests, preserving callback counts, ownership and healthy retries. The
+first provider attempt retains its missing shared Lua-path failure; the
+unchanged fixture passes after activating its documented search path.
+Hosted/package qualification and the HTTP fixture corrections remain
+required. Item 62 stays partial.
 
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard

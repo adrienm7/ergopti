@@ -49,6 +49,7 @@ local M = {}
 
 local Helpers = require("keylogger.aggregator_helpers")
 local Timings = require("infra.timings")
+local Utils = require("keylogger.utils")
 
 -- Beyond this gap two keystrokes are not a sequence. Shared with the other two
 -- drivers through the timing canon rather than restated here.
@@ -161,22 +162,13 @@ local function synthetic_of(event)
 	return is_synthetic, (is_synthetic and type(meta.st) == "string") and meta.st or "none"
 end
 
---- Which class a character belongs to in the composition breakdown.
----
---- Byte patterns, not a Unicode table: accented letters arrive as multi-byte
---- sequences that `%a` does not match, so anything outside ASCII is classified
---- as a letter rather than as "other". A French corpus is mostly accented text,
---- and filing it under "other" would make the breakdown say nothing at all.
+--- Uses the shared coarse character policy for the composition breakdown.
+--- Keeping Unicode spaces and non-letter codepoints in their canonical buckets
+--- makes Linux agree with the shared metrics classifier used by macOS.
 --- @param char string
 --- @return string One of "letter", "digit", "punct", "space", "other".
 local function class_of(char)
-	if char == "" then return "other" end
-	if #char > 1 then return "letter" end
-	if char:match("^%s$") then return "space" end
-	if char:match("^%d$") then return "digit" end
-	if char:match("^%a$") then return "letter" end
-	if char:match("^%p$") then return "punct" end
-	return "other"
+	return Utils.char_class(char)
 end
 
 --- Replays one application's buffered stream into the derived batch.
@@ -341,7 +333,8 @@ function M.walk(events, date_str, app, batch, clock)
 
 	--- Credits one keystroke to its hour and its five-minute slot.
 	--- @param index number Position in the stream, to look the timestamp up.
-	local function bump_time_of_day(index)
+	--- @param error_delay number|nil Manual correction delay; excludes typed-character totals.
+	local function bump_time_of_day(index, error_delay)
 		if type(clock) ~= "table" or type(clock.times) ~= "table" then return end
 		local monotonic = tonumber(clock.times[index])
 		if not monotonic then return end
@@ -357,21 +350,28 @@ function M.walk(events, date_str, app, batch, clock)
 		-- because they answer the same question: what the day looked like, rather
 		-- than how much of it there was.
 		local minute_label = string.format("%s:%02d", hour, minute)
-		if not classes.first_typed_min or minute_label < classes.first_typed_min then
+		if error_delay == nil and (not classes.first_typed_min or minute_label < classes.first_typed_min) then
 			classes.first_typed_min = minute_label
 		end
-		if not classes.last_typed_min or minute_label > classes.last_typed_min then
+		if error_delay == nil and (not classes.last_typed_min or minute_label > classes.last_typed_min) then
 			classes.last_typed_min = minute_label
 		end
 
 		local hourly = Helpers.gc(batch.hourly, app_day_key .. SEPARATOR .. hour, {
-			date = date_str, app = app, hour = hour, c = 0, e = 0, em = 0, es = 0,
+			date = date_str, app = app, hour = hour, c = 0, e = 0, em = 0, es = 0, e_buckets = {},
 		})
-		hourly.c = hourly.c + 1
 		local min5 = Helpers.gc(batch.hourly_min5, app_day_key .. SEPARATOR .. slot, {
-			date = date_str, app = app, slot = slot, c = 0, e = 0, es = 0,
+			date = date_str, app = app, slot = slot, c = 0, e = 0, es = 0, e_buckets = {},
 		})
-		min5.c = min5.c + 1
+		if error_delay ~= nil then
+			hourly.e, hourly.em = hourly.e + 1, hourly.em + 1
+			min5.e = min5.e + 1
+			Helpers.bucket_add(hourly.e_buckets, error_delay, 1)
+			Helpers.bucket_add(min5.e_buckets, error_delay, 1)
+		else
+			hourly.c = hourly.c + 1
+			min5.c = min5.c + 1
+		end
 	end
 
 	--- Ends the current word, if there is one.
@@ -392,6 +392,7 @@ function M.walk(events, date_str, app, batch, clock)
 		local is_synthetic, source = synthetic_of(event)
 
 		if char == BACKSPACE_MARKER then
+			Helpers.push_ngram(batch, "ngram_chars", date_str, app, char, delay, false, source)
 			-- A correction. The run is broken because what follows continues from
 			-- a different character than it appears to, and the partial word is
 			-- abandoned rather than recorded — the user was not writing it.
@@ -408,6 +409,7 @@ function M.walk(events, date_str, app, batch, clock)
 			if not is_synthetic then
 				errors.bs_total = errors.bs_total + 1
 				backspace_run = backspace_run + 1
+				bump_time_of_day(index, delay)
 			end
 		elseif is_synthetic then
 			-- Counted so the source histogram stays honest about how much of the

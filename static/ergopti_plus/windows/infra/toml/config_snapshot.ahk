@@ -164,7 +164,7 @@ ConfigTomlReadSnapshot(Path) {
 		Snapshot.Present := false
 		return Snapshot
 	}
-	try Source := FileRead(Path, "UTF-8")
+	try Source := FSReadStrict(Path)
 	catch as Err {
 		_TomlReadFailures[Path] := true
 		if FileExist(Path)
@@ -214,6 +214,9 @@ TomlConfigStaticForeignOwnershipRegistry() {
 			"magic_key", "FeatureState",
 			"rolls", "FeatureState",
 			"sfbs_reduction", "FeatureState"),
+		"hotstrings", Map(
+			"terminators", "TerminatorRecords",
+			"terminator_states", "TerminatorRecords"),
 		"gestures", Map(
 			"auto_configure_on_next_start", "Gestures"),
 		"personal_editor", Map(

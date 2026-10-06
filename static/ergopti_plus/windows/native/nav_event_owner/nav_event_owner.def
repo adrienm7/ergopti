@@ -5,6 +5,10 @@
 LIBRARY "ergopti_nav_owner"
 
 EXPORTS
+	ErgoptiEditor_Begin
+	ErgoptiEditor_Poll
+	ErgoptiEditor_Decide
+	ErgoptiEditor_Close
 	ErgoptiNav_Start
 	ErgoptiNav_Stop
 	ErgoptiNav_PreparePlan
