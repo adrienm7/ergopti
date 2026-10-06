@@ -55,6 +55,42 @@ function validate(data) {
 			if (typeof pkg !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9+_.-]*$/.test(pkg))
 				throw new TypeError('Invalid native network provider package.');
 	}
+	const portable = network.portable;
+	if (
+		!portable ||
+		!Array.isArray(portable.gio_modules) ||
+		portable.gio_modules.join(',') !== 'libgiognomeproxy.so,libgiolibproxy.so,libdconfsettings.so'
+	)
+		throw new TypeError('Missing explicit portable GIO modules.');
+	if (
+		!Array.isArray(portable.system_ca_files) ||
+		!portable.system_ca_files.length ||
+		new Set(portable.system_ca_files).size !== portable.system_ca_files.length ||
+		portable.system_ca_files.some(
+			(file) =>
+				typeof file !== 'string' || !/^\/[A-Za-z0-9_./-]+$/.test(file) || file.includes('..')
+		)
+	)
+		throw new TypeError('Invalid recipient system trust candidates.');
+	const sources = portable.flatpak_sources;
+	if (
+		!sources ||
+		Object.keys(sources).join(',') !== 'luv,schemas,curl,duktape,libproxy,glib_networking'
+	)
+		throw new TypeError('Incomplete portable native source inventory.');
+	for (const [name, source] of Object.entries(sources)) {
+		if (
+			!/^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_./-]+$/.test(source.url) ||
+			source.url.includes('..')
+		)
+			throw new TypeError('Invalid portable native source identity.');
+		if (
+			name === 'duktape'
+				? !/^[a-f0-9]{64}$/.test(source.sha256)
+				: !/^[a-f0-9]{40}$/.test(source.commit)
+		)
+			throw new TypeError('Unpinned portable native source.');
+	}
 	return data;
 }
 
@@ -67,6 +103,96 @@ function requirements(data, format) {
 		: KEYS.map((key) => data.libraries[key].nix_package);
 	const network = manager ? data.network_runtime.providers[manager] || [] : [];
 	return [...new Set([...data.package_requirements[format], ...native, ...network])];
+}
+
+/** Native Flatpak recipes use pinned canonical sources, never the build host ABI. */
+function flatpakModules(data) {
+	validate(data);
+	const sources = data.network_runtime.portable.flatpak_sources;
+	const modules = [
+		{
+			name: 'network-luv',
+			buildsystem: 'cmake-ninja',
+			'config-opts': [
+				'-DLUA_BUILD_TYPE=System',
+				'-DWITH_LUA_ENGINE=LuaJIT',
+				'-DBUILD_MODULE=ON',
+				'-DBUILD_SHARED_LIBS=OFF',
+				'-DBUILD_STATIC_LIBS=OFF',
+				'-DWITH_SHARED_LIBUV=OFF'
+			],
+			'post-install': ['test -f /app/lib/lua/5.1/luv.so'],
+			source: 'luv'
+		},
+		{
+			name: 'network-schemas',
+			buildsystem: 'meson',
+			'config-opts': ['-Dintrospection=false'],
+			'post-install': ['glib-compile-schemas /app/share/glib-2.0/schemas'],
+			source: 'schemas'
+		},
+		{
+			name: 'network-curl',
+			buildsystem: 'cmake-ninja',
+			'config-opts': [
+				'-DBUILD_CURL_EXE=ON',
+				'-DBUILD_SHARED_LIBS=ON',
+				'-DBUILD_TESTING=OFF',
+				'-DCURL_USE_OPENSSL=ON',
+				'-DCURL_USE_GSSAPI=ON'
+			],
+			'post-install': ['test -x /app/bin/curl'],
+			source: 'curl'
+		},
+		{
+			name: 'network-duktape',
+			buildsystem: 'simple',
+			'build-commands': [
+				'make -f Makefile.sharedlibrary INSTALL_PREFIX=/app',
+				'make -f Makefile.sharedlibrary INSTALL_PREFIX=/app install'
+			],
+			source: 'duktape'
+		},
+		{
+			name: 'network-libproxy',
+			buildsystem: 'meson',
+			'config-opts': [
+				'-Ddocs=false',
+				'-Dtests=false',
+				'-Dvapi=false',
+				'-Dintrospection=false',
+				'-Dconfig-xdp=true',
+				'-Dpacrunner-duktape=true',
+				'-Dcurl=true'
+			],
+			source: 'libproxy'
+		},
+		// The Flatpak proxy selection goes through libproxy, whose native XDP
+		// implementation is built above. A private GNOME dconf view is not
+		// promoted to host settings; portal delivery still needs native proof.
+		{
+			name: 'network-gio-proxy',
+			buildsystem: 'meson',
+			'config-opts': [
+				'-Dlibproxy=enabled',
+				'-Dgnome_proxy=disabled',
+				'-Dgnutls=enabled',
+				'-Denvironment_proxy=disabled',
+				'-Dtests=false'
+			],
+			source: 'glib_networking'
+		}
+	];
+	return modules
+		.map(({ source, ...recipe }) => {
+			const input = sources[source];
+			const pinned =
+				source === 'duktape'
+					? { type: 'archive', url: input.url, sha256: input.sha256 }
+					: { type: 'git', url: input.url, commit: input.commit };
+			return '  - ' + JSON.stringify({ ...recipe, sources: [pinned] }) + '\n';
+		})
+		.join('');
 }
 
 /** Replace exactly one owned region without altering the surrounding installer or recipe. */
@@ -84,6 +210,14 @@ function projectRegion(source, label, body) {
 function render(data, read) {
 	validate(data);
 	const result = {};
+	const template = 'tools/build/templates/linux-portable-runtime-env.sh';
+	result[template] = projectRegion(
+		read(template),
+		'LINUX PORTABLE TRUST',
+		'ERGOPTI_SYSTEM_CA_FILES=(' +
+			data.network_runtime.portable.system_ca_files.map((file) => `"${file}"`).join(' ') +
+			')'
+	);
 	const rows = MANAGERS.flatMap((manager) =>
 		KEYS.map((key) => {
 			const lib = data.libraries[key];
@@ -160,6 +294,7 @@ module.exports = {
 	KEYS,
 	NETWORK_KEYS,
 	validate,
+	flatpakModules,
 	requirements,
 	projectRegion,
 	render

@@ -1021,6 +1021,18 @@ const CHECKS = [
 		repro: 'node tools/test/test-linux-tracked-copy.cjs'
 	},
 	{
+		name: 'Linux portable network packages retain native ABI and command ownership',
+		cmd: 'node',
+		args: ['tools/test/test-linux-portable-network-runtime.cjs'],
+		repro: 'npm run test:linux-portable-network-runtime'
+	},
+	{
+		name: 'Linux portable native admission rejects incomplete and skipped receipts',
+		cmd: 'node',
+		args: ['tools/test/test-linux-portable-network-registration.cjs'],
+		repro: 'npm run test:linux-portable-network-registration'
+	},
+	{
 		name: 'Linux CI requires successful mandatory jobs and assertion evidence',
 		cmd: 'node',
 		args: ['tools/test/test-linux-ci-evidence.cjs'],

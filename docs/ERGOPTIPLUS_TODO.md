@@ -3709,6 +3709,22 @@ refuses the deny-removal positive control with target error -10004. These
 facts do not prove their causes. Native archive packaging and installation
 are skipped, and Release / Publish is skipped. Item 36 remains partial.
 
+Portable Linux package sources now stage the genuine LuaJIT/luv, curl, GIO
+proxy backends, compiled schemas and recursive ELF dependency closure.
+Recipient certificate trust remains external. Flatpak builds six native
+dependencies from independently pinned official sources inside its existing
+SDK, without expanding its permissions. The qualified private source cohort
+passes 70 portable controls, two actual kernel ownership controls and all
+seven original staged AppDir native groups, including component refusal and
+escaped-descendant timeout retirement. All seven projections are regenerated
+with their canonical owner and match the qualified output hashes. The original
+missing-kernel-children failure is retained; complete namespace-fenced PPID
+census fixes that proved setup boundary without weakening retirement guards.
+Normal JS and a mandatory separate native planner/CI gate are registered;
+missing or duplicated native receipts cannot qualify a zero-exit producer.
+Actual full-format AppImage/Flatpak builds, installation and PAC/session/TLS
+delivery remain required. Staged AppDir acceptance does not complete item 36.
+
 - [~] **37.** Always show the shipped Ergopti hotstring pack, including when
   its keyboard layout is not installed. Move French `suffixes_a` and magic-key
   `replace` into that extension without a beta compatibility layer. The runtime
@@ -4854,6 +4870,13 @@ logs additionally expose public owned-request predecessor replacement,
 preflight cleanup and fixture retirement failures. Their source corrections
 and causal native replays remain required Linux work, rather than Windows or
 macOS device-only follow-up. Item 62 and transversal items 16/38 remain open.
+
+The portable Linux network closure described in item 36 is also a managed
+network prerequisite. Its installed ABI/schema/backend refusal and recovery
+controls pass on genuine host components; they do not prove an enterprise
+session, authentication or certificate deployment. Package CI now declares
+the native development/runtime prerequisites for the stage owner. Installed
+AppImage/Flatpak network replay and archive delivery remain required.
 
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard

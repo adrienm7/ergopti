@@ -126,6 +126,43 @@
 			"apk": ["glib-networking", "gsettings-desktop-schemas", "lua5.1-luv"]
 		},
 		"description": "A provider list is admitted only from recorded distribution metadata; null means no verified repair provider. Actual LuaJIT ABI, supported GIO resolver and required GNOME schema are always re-probed. Libproxy selection does not prove every desktop setting or PAC evaluation.",
-		"curl_package": "curl"
+		"curl_package": "curl",
+		"portable": {
+			"gio_modules": ["libgiognomeproxy.so", "libgiolibproxy.so", "libdconfsettings.so"],
+			"system_ca_files": [
+				"/etc/ssl/certs/ca-certificates.crt",
+				"/etc/pki/tls/certs/ca-bundle.crt",
+				"/usr/share/ssl/certs/ca-bundle.crt",
+				"/usr/local/share/certs/ca-root-nss.crt",
+				"/etc/ssl/cert.pem"
+			],
+			"flatpak_sources": {
+				"luv": {
+					"url": "https://github.com/luvit/luv.git",
+					"commit": "26e62e49b0230891ece45a78cc1f63c074e60020"
+				},
+				"schemas": {
+					"url": "https://github.com/GNOME/gsettings-desktop-schemas.git",
+					"commit": "cf1946e8886bb29d9c4b793d0ee4253e38ae6fa8"
+				},
+				"curl": {
+					"url": "https://github.com/curl/curl.git",
+					"commit": "01346829096c61b372692f6dc43ffa778c6caccd"
+				},
+				"duktape": {
+					"url": "https://github.com/svaarala/duktape/releases/download/v2.7.0/duktape-2.7.0.tar.xz",
+					"sha256": "90f8d2fa8b5567c6899830ddef2c03f3c27960b11aca222fa17aa7ac613c2890"
+				},
+				"libproxy": {
+					"url": "https://github.com/libproxy/libproxy.git",
+					"commit": "99da01926b1b1e303a4d2331bbd74bed424863e7"
+				},
+				"glib_networking": {
+					"url": "https://github.com/GNOME/glib-networking.git",
+					"commit": "1417a8dd98c46c208853c5ed95de61c384acea21"
+				}
+			},
+			"description": "AppImage copies the actual build-host ELF closure and retains the recipient glibc and certificate trust. Flatpak builds its native modules under /app. Runtime admission proves ABI/schema/backend availability, not desktop/PAC settings or transport delivery."
+		}
 	}
 }
