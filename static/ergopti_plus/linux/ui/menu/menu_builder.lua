@@ -1909,9 +1909,9 @@ local function _build_hotstrings(ctx)
 	local config = ctx.config
 
 	if type(config) ~= "table" then
-		return { label = i18n_safe("menu.hotstrings.title"), items = {
-			{ label = i18n_safe("menu.hotstrings.unavailable"), disabled = true },
-		}}
+		local status_rows = ManifestMenu and ManifestMenu.template_rows("linux_hotstrings_absent_rows", {}, {}, {})
+		if not status_rows then return {} end
+		return { label = i18n_safe("menu.hotstrings.title"), items = status_rows }
 	end
 
 	local items = _manifest_hotstring_rows(ctx, config)
@@ -1951,10 +1951,9 @@ end
 local function _build_llm(ctx)
 	local llm = ctx.llm
 	if not llm then
-		return { label = i18n_safe("menu.llm.title"), items = {
-			{ label = i18n_safe("menu.llm.unavailable"), disabled = true },
-			{ label = i18n_safe("menu.llm.ollama_start_hint"), disabled = true },
-		}}
+		local status_rows = ManifestMenu and ManifestMenu.template_rows("linux_llm_absent_rows", {}, {}, {})
+		if not status_rows then return {} end
+		return { label = i18n_safe("menu.llm.title"), items = status_rows }
 	end
 
 	local items = {}
@@ -3051,9 +3050,9 @@ end
 local function _build_metrics(ctx)
 	local k = ctx.keylogger
 	if type(k) ~= "table" then
-		return { label = i18n_safe("menu.metrics.title"), items = {
-			{ label = i18n_safe("menu.metrics.unavailable"), disabled = true },
-		}}
+		local status_rows = ManifestMenu and ManifestMenu.template_rows("linux_metrics_absent_rows", {}, {}, {})
+		if not status_rows then return {} end
+		return { label = i18n_safe("menu.metrics.title"), items = status_rows }
 	end
 
 	local items = _manifest_metrics_rows(ctx, k)
@@ -3206,9 +3205,9 @@ end
 local function _build_shortcuts(ctx)
 	local sc = ctx.shortcuts
 	if not sc then
-		return { label = i18n_safe("menu.shortcuts.title"), items = {
-			{ label = i18n_safe("menu.shortcuts.unavailable"), disabled = true },
-		}}
+		local status_rows = ManifestMenu and ManifestMenu.template_rows("linux_shortcuts_absent_rows", {}, {}, {})
+		if not status_rows then return {} end
+		return { label = i18n_safe("menu.shortcuts.title"), items = status_rows }
 	end
 
 	local enabled = sc.is_enabled()
@@ -3864,9 +3863,9 @@ end
 local function _build_gestures(ctx)
 	local ge = ctx.gestures
 	if not ge then
-		return { label = i18n_safe("menu.gestures.title"), items = {
-			{ label = i18n_safe("menu.gestures.unavailable"), disabled = true },
-		}}
+		local status_rows = ManifestMenu and ManifestMenu.template_rows("linux_gestures_absent_rows", {}, {}, {})
+		if not status_rows then return {} end
+		return { label = i18n_safe("menu.gestures.title"), items = status_rows }
 	end
 
 	local enabled = ge.is_enabled()

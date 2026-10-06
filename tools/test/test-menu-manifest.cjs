@@ -4908,3 +4908,36 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		}
 	}
 }
+
+// Independent absent-module messages are disabled presentation, with native ownership untouched.
+{
+	const assert = require('node:assert/strict');
+	const menu = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const expected = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/linux_absent_modules.json'), 'utf8')
+	);
+	const source = readFileSync(
+		resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/menu_builder.lua'),
+		'utf8'
+	);
+	assert.equal(expected.owners.length, 5);
+	assert.equal(
+		expected.owners.reduce((count, owner) => count + owner.rows.length, 0),
+		6
+	);
+	for (const owner of expected.owners) {
+		assert.deepEqual(menu[owner.section], owner.rows);
+		assert.ok(source.includes('ManifestMenu.template_rows("' + owner.section + '"'));
+		assert.ok(
+			source.includes('if (' + owner.predicate + ')') ||
+				source.includes('if ' + owner.predicate + ' then')
+		);
+		for (const file of readdirSync(LOCALES_DIR).filter((name) => name.endsWith('.json'))) {
+			const locale = JSON.parse(readFileSync(resolve(LOCALES_DIR, file), 'utf8'));
+			for (const row of owner.rows) {
+				assert.equal(typeof locale[row.i18n], 'string');
+				assert.ok(locale[row.i18n].trim().length > 0 && locale[row.i18n] !== row.i18n);
+			}
+		}
+	}
+}

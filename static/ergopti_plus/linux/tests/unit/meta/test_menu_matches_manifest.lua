@@ -515,3 +515,181 @@ helpers.describe("menu certification: private API source lifecycle", function()
 	end)
 
 end)
+
+
+-- Actual inert absent-module projections, preserving the original whole-tray prefix.
+local function absent_module_corpus()
+	local path = require("infra.paths").shared("tests/corpus/menus/linux_absent_modules.json")
+	local file = assert(io.open(path, "rb"))
+	local bytes = assert(file:read("*a")); assert(file:close())
+	return assert(require("json").decode(bytes))
+end
+
+local function with_absent_current(scenario)
+	local names = { "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu" }
+	local prior = {}; for _, name in ipairs(names) do prior[name] = rawget(package.loaded, name) end
+	local native = require("infra.i18n")
+	helpers.assert_true(rawequal(native, i18n), "the original caption reader is the genuine current cohort")
+	helpers.assert_true(rawequal(require("infra.manifest_menu"), ManifestMenu))
+	local before = native.get_locale()
+	local owner = { pending = function() return false end }
+	assert(native.scope_acquire(owner))
+	local receipt = assert(native.scope_capture(owner))
+	local ok, result = xpcall(function()
+		assert(native.scope_apply(owner, receipt, "en"))
+		return scenario()
+	end, debug.traceback)
+	assert(native.scope_restore(owner, receipt))
+	assert(native.scope_release(owner)); assert(native.scope_forget(owner, receipt))
+	helpers.assert_eq(native.get_locale(), before, "the genuine predecessor locale is restored")
+	for _, name in ipairs(names) do helpers.assert_true(rawequal(rawget(package.loaded, name), prior[name]), name) end
+	if not ok then error(result, 0) end
+	return result
+end
+
+
+-- Earlier suite cases can replace the backend under a cached caption reader.
+-- Own a fresh, initialized native cohort for these new projections, then restore
+-- the exact predecessor modules and file-local readers even if construction raises.
+local function with_absent_english(scenario)
+	local names = { "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu" }
+	local prior = {}; for _, name in ipairs(names) do prior[name] = rawget(package.loaded, name) end
+	local prior_i18n, prior_manifest = i18n, ManifestMenu
+	local ok, result = xpcall(function()
+		for _, name in ipairs(names) do rawset(package.loaded, name, nil) end
+		local native = require("infra.i18n")
+		native.init()
+		i18n = native
+		ManifestMenu = require("infra.manifest_menu")
+		return with_absent_current(scenario)
+	end, debug.traceback)
+	i18n, ManifestMenu = prior_i18n, prior_manifest
+	for _, name in ipairs(names) do rawset(package.loaded, name, prior[name]) end
+	helpers.assert_true(rawequal(i18n, prior_i18n), "the original caption reader is restored")
+	helpers.assert_true(rawequal(ManifestMenu, prior_manifest), "the original renderer is restored")
+	for _, name in ipairs(names) do helpers.assert_true(rawequal(rawget(package.loaded, name), prior[name]), name) end
+	if not ok then error(result, 0) end
+	return result
+end
+
+local function absent_context()
+	-- No data owner is constructed to manufacture absence. Native ctx fields are absent.
+	return { _version = "9.9.9", on_menu_changed = function() error("inert status must not mutate") end }
+end
+
+helpers.describe("linux-absent-module templates: actual native branches", function()
+	for _, vector in ipairs(absent_module_corpus().owners) do
+		local contract = vector
+		helpers.it(contract.owner .. " consumes its exact disabled declaration and refuses withdrawn status", function()
+			with_absent_english(function()
+				local root = ManifestMenu.get_root()
+				local original = root[contract.section]
+				helpers.assert_type(original, "table")
+				local function inspect()
+					return with_api_source(function(builder, entries, path)
+						local function physical_source()
+							local file = assert(io.open(path, "rb"))
+							local bytes = assert(file:read("*a")); assert(file:close())
+							return bytes
+						end
+						local before, changes = physical_source(), 0
+						local context = absent_context()
+						context.on_menu_changed = function() changes = changes + 1 end
+						local menu = builder.build(context)
+						helpers.assert_eq(changes, 0, "inert status construction cannot publish a native change")
+						helpers.assert_eq(physical_source(), before, "the genuine private source is byte-exact")
+						helpers.assert_nil(io.open(path .. ".corrupt", "rb"))
+						helpers.assert_eq(entries.path(), path)
+						return find_item(menu, i18n.get(contract.parent_key))
+					end)
+				end
+				local row = assert(inspect())
+				helpers.assert_eq(#row.menu, #contract.english)
+				for index, caption in ipairs(contract.english) do
+					helpers.assert_eq(row.menu[index].title, caption)
+					helpers.assert_eq(row.menu[index].disabled, true)
+					helpers.assert_nil(row.menu[index].fn)
+				end
+				local marker = { type = "label", id = "hand_absent_marker", i18n = "button.cancel", platforms = { "linux" }, unavailable = "hide" }
+				local ok, detail = xpcall(function()
+					root[contract.section] = { marker }
+					local changed = assert(inspect())
+					helpers.assert_eq(#changed.menu, 1)
+					helpers.assert_eq(changed.menu[1].title, "Cancel")
+					helpers.assert_eq(changed.menu[1].disabled, true)
+					helpers.assert_nil(changed.menu[1].fn)
+					root[contract.section] = nil
+					helpers.assert_nil(inspect(), "withdrawn status must not be silently rebuilt in native source")
+					root[contract.section] = { { type = "command", id = "hand_unbound_status", i18n = "button.cancel" } }
+					helpers.assert_nil(inspect(), "unbound command cannot replace inert unavailable status")
+				end, debug.traceback)
+				root[contract.section] = original
+				if not ok then error(detail, 0) end
+				local repaired = assert(inspect())
+				helpers.assert_eq(#repaired.menu, #contract.english)
+				for index, caption in ipairs(contract.english) do
+					helpers.assert_eq(repaired.menu[index].title, caption)
+					helpers.assert_eq(repaired.menu[index].disabled, true)
+					helpers.assert_nil(repaired.menu[index].fn)
+				end
+			end)
+		end)
+	end
+
+	helpers.it("projects exactly the true Linux-only status role through the genuine shared renderer", function()
+		with_absent_english(function()
+			for _, platform in ipairs({ "ahk", "hs", "linux" }) do
+				local renderer = assert(require("menu.renderer").new({
+					platform = platform,
+					manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
+					json_decode = require("json").decode,
+					i18n = i18n,
+					logger = require("logger.shim"),
+				}))
+				for _, contract in ipairs(absent_module_corpus().owners) do
+					local rows = assert(renderer.template_rows(contract.section, {}, {}, {}))
+					helpers.assert_eq(#rows, platform == "linux" and #contract.english or 0)
+					for index, row in ipairs(rows) do
+						helpers.assert_eq(row.label, contract.english[index])
+						helpers.assert_eq(row.disabled, true)
+						helpers.assert_nil(row.action)
+					end
+				end
+			end
+		end)
+	end)
+
+	helpers.it("restores its genuine French/English caption cohort after an exception", function()
+		local before = i18n.get_locale()
+		local ok, detail = pcall(function()
+			with_absent_english(function() error("absent locale sentinel") end)
+		end)
+		helpers.assert_eq(ok, false)
+		helpers.assert_contains(detail, "absent locale sentinel")
+		helpers.assert_eq(i18n.get_locale(), before)
+	end)
+
+	helpers.it("retains the empty whole-tray contract when the actual shared renderer cannot load", function()
+		with_api_source(function(_, entries, path)
+			-- The already constructed genuine backend retains its private source owner.
+			-- Only the new builder's optional renderer admission is withdrawn.
+			helpers.assert_eq(entries.path(), path)
+			local name, builder_name = "infra.manifest_menu", "ui.menu.menu_builder"
+			local prior, preload = rawget(package.loaded, name), rawget(package.preload, name)
+			local old_builder = rawget(package.loaded, builder_name)
+			local ok, detail = xpcall(function()
+				rawset(package.loaded, name, nil)
+				rawset(package.preload, name, function() error("genuine renderer unavailable sentinel") end)
+				rawset(package.loaded, builder_name, nil)
+				local actual_builder = require(builder_name)
+				helpers.assert_eq(#actual_builder.build(absent_context()), 0)
+			end, debug.traceback)
+			rawset(package.preload, name, preload); rawset(package.loaded, name, prior)
+			rawset(package.loaded, builder_name, old_builder)
+			helpers.assert_true(rawequal(rawget(package.loaded, name), prior))
+			helpers.assert_true(rawequal(rawget(package.preload, name), preload))
+			helpers.assert_true(rawequal(rawget(package.loaded, builder_name), old_builder))
+			if not ok then error(detail, 0) end
+		end)
+	end)
+end)
