@@ -604,11 +604,13 @@ end)
 helpers.describe("scope fixture native loop custody", function()
 	helpers.it("test_physical_shortcut_scope preserves its issuer and a real timer close receipt", function()
 		local native = NativeLoop
+		local detached = {}; for key, value in pairs(native) do detached[key] = value end
+		helpers.assert_true(not rawequal(detached, native), "a detached lookalike is not the native issuer")
 		with_scope(function()
-			helpers.assert_eq(package.loaded.luv, native, "fixture uses the actual process-wide issuer")
+			helpers.assert_true(rawequal(package.loaded.luv, native), "fixture uses the actual process-wide issuer")
 			collectgarbage("collect")
 		end)
-		helpers.assert_eq(package.loaded.luv, native, "whole-cache restoration retains native issuer custody")
+		helpers.assert_true(rawequal(package.loaded.luv, native), "whole-cache restoration retains native issuer custody")
 		collectgarbage("collect")
 		local timer = assert(native.new_timer())
 		local fired, settled = false, false

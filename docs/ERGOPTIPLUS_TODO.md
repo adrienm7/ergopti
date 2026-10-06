@@ -2414,6 +2414,23 @@ These are software implementations; final hardware verification remains below.
   server-retirement, Homebrew owned AppleEvent receiver and global-switcher
   failures. They require source/runner follow-up, not invented device-only
   closure; physical acceptance is unexecuted. Keep exact dated CI receipts.
+
+  The three Linux scope fixtures now require raw object identity for the native
+  luv issuer: five custody assertions use `rawequal` and each fixture rejects
+  the actual native table's detached clone. All registered cases, timer/GC/close
+  assertions and restoration remain unchanged; focused native tests pass 108/0
+  on both LuaJIT and Lua 5.4. The current four distribution artifacts stopped
+  at the same first-module custody assertion (22/1); actual Alpine constants
+  include NaN, so the old recursive comparison can reject even the same table.
+  This is not evidence of the earlier baseline's missing-luv cause. Corrected
+  hosted distro suites are still unexecuted; local passes do not qualify them.
+  The earlier `409b8ee0` observation above was recorded before run 37476981548
+  completed: its terminal result is failure, with Release / Publish skipped.
+  Main Linux unit/E2E gates passed, while Arch/Fedora/openSUSE/Alpine stopped at
+  that custody assertion; macOS native packaging failures remain recorded.
+  The published Windows capture successor `109736e5` has a separate manual
+  run 37482352928 in progress; no new native qualification is inferred.
+
   Hotstrings: Linux
   categories, sections and scalar settings are canonical config.toml leaves,
   with a one-shot import of legacy storage.json choices; both Lua drivers have a
@@ -4302,7 +4319,7 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 66, macOS 98, Linux 73, each
+  drivers still build (current baseline: Windows 63, macOS 97, Linux 73, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
@@ -4314,6 +4331,19 @@ integrated, then publish one grouped release.
   Native allocators and computed user-data captions alone do not prove missing
   shared policy. Final native binding/order/caption and installed acceptance
   remain required; source review and the local portable gates are insufficient.
+
+  Generation numeric boundaries now consume three shared inert fragments,
+  retiring the three actual Windows separators and one macOS separator. Later
+  macOS numeric boundaries and all Linux generation boundaries retain genuine
+  absence
+  through explicit `unavailable = "hide"`; no native callback, numeric/reset
+  selection, prompt, state or existing acknowledgement policy changes. The
+  canonical generators establish 66/98/73 to 63/97/73, with all 463 predecessor
+  corpora and 21 locale files byte-identical. Actual macOS owning tests pass
+  10/0 and French warm-owner controls 3/0 on both runtimes; genuine old native
+  source alone gives 8/2 and 1/2 respectively. Unchanged Linux whole-tray tests
+  pass 9/0 in English and French on both runtimes. Three new Windows Win32
+  cases, final composed native CI and installed-device acceptance remain open.
 
 Linux Metrics unavailable/idle migration readouts now consume shared inert label
 templates. Running progress and cancellation retain their native owners. The
@@ -5061,7 +5091,7 @@ deferral is superseded. This item and items16/38 remain open.
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 66, macOS 98 and Linux 73 rows are still built by the
+  Windows 63, macOS 97 and Linux 73 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). Read on
   2026-10-01, the sites are of four kinds, and three of them need the
   manifest to say more than it can today:
@@ -5083,6 +5113,13 @@ deferral is superseded. This item and items16/38 remain open.
   presentation-refusal APIs are implemented. The historical classification
   above does not mean these APIs are absent; remaining provider families still
   need genuine shared data/order/policy consumption on the applicable drivers.
+
+  The generation numeric-boundary family consumes actual shared fragments at
+  its four former native constructor sites, preserving cross-driver order and
+  genuine hidden absence. Counts above are the owner-generated result, not a
+  raised ratchet or a claim that remaining provider families are complete.
+  Original corpus, locale, native callbacks and prior assertions stay intact;
+  final native three-OS qualification remains required.
 
   The Windows qualification successor for the shared Tap-Hold head retains its
   real four-row Win32 and refusal assertions; item 54 records the precise
@@ -6113,6 +6150,18 @@ macOS acceptance/diagnostic corrections are preserved; macOS also requires
 qualification on these new sources. The atomic PID publication correction
 remains active. No TODO item is completed by this diagnostic preparation.
 
+Bootstrap diagnostic follow-up (2026-10-06): the provider, notification and
+global-switcher probes now report closed release_metadata/archive_download
+phases, closed transport families and a finite numeric HTTP status when
+observed. They rethrow the identical ordinary failure; diagnostic write faults
+do not turn failure into success, and genuine interruption remains visible.
+No URL, headers, response body or arbitrary exception text enters these facts.
+Portable controls pass29/0,15/0,29/0 with every original20/13/27 control intact;
+the original metadata HTTP403 black-box control fails without these facts and
+passes with them. Both callers retain the formatted inventory source pin.
+Fresh native macOS qualification is pending; the prior HTTPError stage/status
+remains unknown. This is diagnostic evidence, not provider invocation.
+
 - [~] **107.** Make the number-row policy explicit: native behavior, digits
   directly or symbols directly, with an acknowledged migration of the old
   Windows Boolean and preserved unrelated settings. The earlier Boolean slice
@@ -6550,6 +6599,13 @@ unexecuted unit, E2E, package, installation and launch gates.
 retains historical commands and packet ownership; the earlier PC-only software
 deferral is superseded. This item and items16/38 remain open.
 
+The constructor probe shares the closed bootstrap phase/status diagnostic
+without changing the existing lowercase native reason policy, source/digest/
+signature admission, nine-case contract, cleanup or failure status. Portable
+15/0 controls retain all13 original cases. Native requalification remains
+pending; first-checkpoint constructor successes do not replace the second
+checkpoint refusal, and no notification delivery/callback is claimed.
+
 - [~] **111.** Provide two distinct, explicitly labelled shared window-switching
   actions on Windows, macOS and Linux: the operating system's normal Alt+Tab switcher
   (the native equivalent on macOS), and switching only among windows on the display
@@ -6672,6 +6728,36 @@ not the exact earlier hosted schedule or complete native family recovery.
 The container still refuses the full /proc child-census prerequisite; the
 unchanged five supervision cases, external recovery and all34 window cases
 require hosted qualification. This does not complete item111 or items16/38.
+
+Follow-up integrated run37470985920 at CIaea032f8 (exact Dev90076001 tree)
+passes all five native family controls, external recovery and all34 original
+cursor-window cases, with physical settlement acknowledged. GTK4/4, units9126/0,
+E2E and packaging pass; nine first-install scenarios and three package-format
+launches pass. Five distribution unit lanes each report8803 passes/78 failures:
+their setup installs only LuaJIT, lacks native luv/lfs and Python3, and runs
+permission-refusal fixtures as root. This slice supplies those test prerequisites
+after the unchanged ordinary-user --no-deps installation proof. It compiles the
+existing vendor versions from verified official Git commits and the pinned
+compatibility submodule against each distribution's own LuaJIT headers. The
+unchanged suite requires real native C entry points and a non-root UID before
+execution. Local native compilation/admission and the unchanged9126/0 unit suite pass
+with these pinned modules. Explicit CA bundles preserve HTTPS verification in
+fresh minimal distributions. Five-distribution hosted qualification remains
+pending. All original assertions, native windows and
+deadlines remain unchanged; macOS broker integration and real displays remain
+unfinished. The overall integrated run failed; Release was skipped.
+
+The global-switcher bootstrap reports the same closed transport diagnostic
+while retaining all source pins, native owners and retirement guards. Portable
+29/0 controls retain the original27; native broker qualification remains open.
+Subsequent Linux-only run37479728162 on CIa1e30e88 (exact Dev7bfd15ea tree)
+passes units9126/0, native supervision5+external1 and all34 window cases. GTK
+passes3/4: case0 misses its unchanged receipt poll, while real GTK exits0 after
+about2.3775seconds with the exact authored identity present. No argv refusal,
+specific cold-service cause or production regression is established. Package
+and all distribution lanes are skipped; the new native distro bootstrap has
+not executed on hosted distributions. Release is skipped. Preserve this failure
+and the earlier4/4 success separately; no assertion or deadline is weakened.
 
 ## Time estimate
 

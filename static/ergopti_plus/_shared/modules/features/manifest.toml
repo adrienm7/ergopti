@@ -6615,6 +6615,22 @@ id = "hotstring_file_open"
 i18n = "menu.hotstrings.open_file"
 disabled_when = ["hotstring_file_ready"]
 
+# Native generation groups retain their existing per-driver presentation boundaries.
+[[menu.llm_generation_count_boundary]]
+type = "---"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.llm_generation_context_boundary]]
+type = "---"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.llm_generation_words_boundary]]
+type = "---"
+platforms = ["ahk"]
+unavailable = "hide"
+
 # Per-model detail sheets exist on Windows/macOS; Linux has no corresponding frames.
 [[menu.llm_model_specs_frame]]
 type = "---"
