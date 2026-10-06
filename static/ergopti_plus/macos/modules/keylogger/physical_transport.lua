@@ -59,14 +59,18 @@ function M.new(dependencies)
 	local function fail(reason)
 		if failure or reporting then return end
 		reporting = true
-		local reported, report_error = pcall(function()
-			failure = tostring(reason)
-			transport.stop()
-			-- Keep the original failure available without changing the diagnostic port.
-			dependencies.on_error(failure, reason)
-		end)
+		failure = "Physical callback diagnostic unavailable"
+		-- Revoke delivery before arbitrary diagnostic code can fail or reenter.
+		-- Native refusal remains real debt; it cannot suppress the owner verdict.
+		local stop_ok, stop_error = pcall(transport.stop)
+		local formatted, diagnostic = pcall(tostring, reason)
+		if formatted then failure = diagnostic end
+		-- The raw callback object remains distinct from its safe diagnostic string.
+		local reported, report_error = pcall(dependencies.on_error, failure, reason)
 		reporting = false
 		local published, publish_error = pcall(publish_settlement)
+		if not formatted then error(diagnostic, 0) end
+		if not stop_ok then error(stop_error, 0) end
 		if not reported then error(report_error, 0) end
 		if not published then error(publish_error, 0) end
 	end

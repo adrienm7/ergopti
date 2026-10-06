@@ -800,6 +800,17 @@ formatting229 files, all361 JS checks and15,307 Lua assertions across1,528
 modules pass after the reader correction. Other selected sources and successful
 production/E2E/Linux gates are unchanged; native acceptance remains required.
 
+The physical transport now retires its exact native task before formatting a
+foreign error object. A failed formatter remains an observable exception, while
+source/writer debt, callback frames and genuine retirement stay authoritative.
+The reviewed eight normally discovered controls fail five assertions on the
+prior source and pass on the correction; the original205-case transport/recovery
+cohort and independent failure/stop controls remain intact. Diagnostic string
+fallback supplies no successful acknowledgement or retirement credit. All3,233
+sealed subjects and current preimages are verified; actual patch adoption is
+zero-fuzz/offset. The change remains dormant with the current runtime; genuine
+macOS process/clock/capture acceptance and TODO31 stay open.
+
 ## Coordination and setup
 
 Coordination is recorded in GitHub issue86. Group3 owns only its new native
