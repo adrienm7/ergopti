@@ -9,6 +9,7 @@
 
 local M = {}
 local BindingIdentity = require("config_binding_identity")
+local KeyboardPublication = require("config_keyboard_publication")
 local BindingPublication = require("config_binding_publication")
 
 local hs            = hs
@@ -2186,6 +2187,10 @@ end
 --- @param binding any Native binding id.
 --- @return boolean|nil fits
 function M.action_parameter_binding_fits(binding)
+	if type(binding) == "string" and binding:sub(1, 10) == "keyboard__" then
+		local catalogue = KeyboardPublication.current(rawget(package.loaded, "modules.shortcuts.keyboard_shortcuts"))
+		return BindingIdentity.keyboard_binding_fits(binding, catalogue), BindingIdentity.RETIRED_KEYBOARD
+	end
 	if type(binding) == "string" and binding:sub(1, 9) == "tap_key__" then
 		local taps = rawget(package.loaded, "modules.shortcuts.tap_keys")
 		local catalogue = BindingPublication.current("tap", "modules.shortcuts.tap_keys", taps)
@@ -2422,13 +2427,14 @@ function M.llm_language_choices()
 end
 
 function M.get_action_parameter(binding, action)
-	if type(binding) == "string" and binding:sub(1, 9) == "tap_key__"
-		and M.action_parameter_binding_fits(binding) == false then
-		if _state and type(_state.action_params) == "table" and _state.action_params[parameter_key(binding, action)] ~= nil then
-			require("config_outdated").report({ "gestures", "action_parameters", parameter_key(binding, action) },
-				BindingIdentity.RETIRED_TAP, Logger)
+	if type(binding) == "string" and (binding:sub(1, 9) == "tap_key__" or binding:sub(1, 10) == "keyboard__") then
+		local fits, reason = M.action_parameter_binding_fits(binding)
+		if fits == false then
+			if _state and type(_state.action_params) == "table" and _state.action_params[parameter_key(binding, action)] ~= nil then
+				require("config_outdated").report({ "gestures", "action_parameters", parameter_key(binding, action) }, reason, Logger)
+			end
+			return ""
 		end
-		return ""
 	end
 	if not _state or type(_state.action_params) ~= "table" then return "" end
 	return _state.action_params[parameter_key(binding, action)] or ""

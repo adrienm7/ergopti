@@ -3,11 +3,11 @@
 --- ==============================================================================
 --- MODULE: Configuration Binding Identity (shared rule)
 --- DESCRIPTION:
---- Judges only gesture bindings against a complete catalogue published by their
---- native owner. An unavailable catalogue or another binding domain remains
---- unjudged; a missing gesture in a published catalogue is retired. Readers
---- warn and preserve that source until explicit cleanup, while ordinary setters
---- refuse to activate it.
+--- Judges supported binding families against complete catalogues published by
+--- their native owners. Unavailable catalogues and other domains remain
+--- unjudged; absent native identities in published catalogues are retired.
+--- Readers warn and preserve that source until explicit cleanup, while ordinary
+--- setters refuse to activate it. Publication admission belongs to native owners.
 --- ==============================================================================
 
 local M = {}
@@ -16,6 +16,7 @@ local M = {}
 M.RETIRED_GESTURE = "no gesture slot of this build has this name"
 M.RETIRED_SCRIPT = "no script chord slot of this build has this name"
 M.RETIRED_TAP = "no number-row tap key of this build has this name"
+M.RETIRED_KEYBOARD = "no keyboard shortcut slot of this build has this name"
 
 --- Judges a binding only when its native gesture catalogue is published.
 --- The owner supplies its actual complete slot ids, never an inferred empty
@@ -89,6 +90,38 @@ function M.tap_binding_fits(binding, catalogue)
 	assert(type(catalogue) == "table" and catalogue.prefix == "tap_key__"
 		and type(catalogue.slots) == "table" and next(catalogue.slots) ~= nil,
 		"config_binding_identity: invalid published tap-key catalogue")
+	return M.gesture_binding_fits(binding, catalogue)
+end
+
+--- Builds a detached identity projection from the complete native shortcut inventory.
+--- Native owners admit the actual group/key source and its read/close receipts first.
+--- @param ids table Nonempty dense array of native slot ids, never active assignments.
+--- @return table catalogue Detached qualified identity projection.
+function M.keyboard_binding_catalogue(ids)
+	assert(type(ids) == "table" and getmetatable(ids) == nil and next(ids) ~= nil,
+		"config_binding_identity: invalid native keyboard catalogue")
+	local slots, count = {}, 0
+	for index, id in next, ids do
+		assert(type(index) == "number" and index >= 1 and index % 1 == 0
+			and type(id) == "string" and id ~= "" and not id:find("__", 1, true) and slots[id] == nil,
+			"config_binding_identity: invalid native keyboard catalogue")
+		slots[id], count = true, count + 1
+	end
+	for index = 1, count do
+		assert(rawget(ids, index) ~= nil, "config_binding_identity: invalid native keyboard catalogue")
+	end
+	return { prefix = "keyboard__", slots = slots }
+end
+
+--- Judges only keyboard bindings after an acknowledged complete native publication.
+--- @param binding any Native binding identity.
+--- @param catalogue table|nil Published catalogue, never menu rows or active assignments.
+--- @return boolean|nil fits Missing or withdrawn publication remains unjudged.
+function M.keyboard_binding_fits(binding, catalogue)
+	if catalogue == nil then return nil end
+	assert(type(catalogue) == "table" and catalogue.prefix == "keyboard__"
+		and type(catalogue.slots) == "table" and next(catalogue.slots) ~= nil,
+		"config_binding_identity: invalid published keyboard catalogue")
 	return M.gesture_binding_fits(binding, catalogue)
 end
 

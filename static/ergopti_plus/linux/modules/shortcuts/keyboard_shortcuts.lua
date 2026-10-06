@@ -45,6 +45,7 @@ local Manifest = require("infra.manifest_reader")
 local Codec = require("toml_codec")
 local Writer = require("toml_codec.writer")
 local MagicEditor = require("shortcuts.magic_editor")
+local KeyboardPublication = require("config_keyboard_publication")
 
 local LOG = "modules.shortcuts.keyboard_shortcuts"
 
@@ -113,6 +114,7 @@ local CATALOGUE_REL_PATH = "modules/actions/modifier_chords.json"
 -- Decoded once. `false` after a failed read, so a missing catalogue is reported
 -- once rather than on every menu rebuild.
 local _catalogue = nil
+local _binding_publication = nil
 
 -- slot_id → action_id, for the slots the user has assigned.
 local _assignments = {}
@@ -170,8 +172,13 @@ local function catalogue_keys()
 		Logger.error(LOG, "Cannot read '%s' — no slots are offered.", path)
 		return nil
 	end
-	local body = handle:read("*a")
-	handle:close()
+	local read_ok, body = pcall(handle.read, handle, "*a")
+	local close_ok, closed = pcall(handle.close, handle)
+	if not read_ok or type(body) ~= "string" or not close_ok or closed ~= true then
+		_catalogue = false
+		Logger.error(LOG, "The key catalogue at '%s' was not completely read and closed — no slots are offered.", path)
+		return nil
+	end
 
 	local ok_json, Json = pcall(require, "json")
 	if not ok_json then
@@ -186,6 +193,12 @@ local function catalogue_keys()
 		return nil
 	end
 	_catalogue = parsed.keys
+	local admitted, publication = pcall(KeyboardPublication.publish, _catalogue, SLOT_MODS, MagicEditor.SLOT_ID)
+	if admitted then
+		_binding_publication = publication
+	else
+		Logger.error(LOG, "The complete keyboard source cannot publish its binding catalogue.")
+	end
 	Logger.debug(LOG, "Key catalogue loaded (%d key(s)).", #_catalogue)
 	return _catalogue
 end
@@ -677,6 +690,7 @@ function M._reset()
 	_explicit_assignments = {}
 	_loaded = false
 	_catalogue = nil
+	_binding_publication = nil
 end
 
 
@@ -759,5 +773,16 @@ function M.apply_configuration(owner, state)
 	_dispatch_generation = _dispatch_generation + 1
 	return true
 end
+
+
+--- Returns a detached complete native publication without reading or dispatching input.
+--- @return table|nil catalogue Unavailable or withdrawn sources remain unjudged.
+function M.published_binding_catalogue()
+	if not KeyboardPublication.owner_is_current(M)
+		or _binding_publication == nil then return nil end
+	return _binding_publication(_catalogue, SLOT_MODS, MagicEditor.SLOT_ID)
+end
+
+KeyboardPublication.register(M, M.published_binding_catalogue)
 
 return M

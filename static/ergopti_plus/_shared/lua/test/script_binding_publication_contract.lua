@@ -172,7 +172,7 @@ function M.register(helpers, driver)
 			local source = "# Independent complete file.\n[_meta]\nschema_version = 11\n[" .. section .. "]\n"
 				.. 'script__removed_script_slot__open_url = "https://obsolete.example" # explicit cleanup owns this\n'
 				.. 'script__script_altgr_enter__open_url = "https://current.example"\n'
-				.. 'keyboard__future_unjudged__open_url = "https://unjudged.example"\n'
+				.. 'tap_hold__future_unjudged__open_url = "https://unjudged.example"\n'
 				.. '[future]\nnumber = 0.12345678901234566\nlarge = 9223372036854775807\n'
 				.. 'when = 1979-05-27T07:32:00-08:00\n"literal.dot" = [[1], [2, 3]]\n'
 			local path = os.tmpname()
@@ -221,9 +221,9 @@ function M.register(helpers, driver)
 		helpers.it("retains current and other-owner entries without inventing judgments", function()
 			with_file(true, function(f)
 				helpers.assert_eq(stored(f).script__script_altgr_enter__open_url, "https://current.example")
-				helpers.assert_eq(stored(f).keyboard__future_unjudged__open_url, "https://unjudged.example")
+				helpers.assert_eq(stored(f).tap_hold__future_unjudged__open_url, "https://unjudged.example")
 				helpers.assert_eq(f.marks[f.section .. ".script__script_altgr_enter__open_url"], true)
-				helpers.assert_eq(f.marks[f.section .. ".keyboard__future_unjudged__open_url"], true)
+				helpers.assert_eq(f.marks[f.section .. ".tap_hold__future_unjudged__open_url"], true)
 			end)
 		end)
 		helpers.it("keeps unpublished script choices active, consumed and unmodified", function()
@@ -292,7 +292,7 @@ function M.register(helpers, driver)
 				helpers.assert_eq(parameters, {
 					script__removed_script_slot__open_url = "https://obsolete.example",
 					script__script_altgr_enter__open_url = "https://changed.example",
-					keyboard__future_unjudged__open_url = "https://unjudged.example",
+					tap_hold__future_unjudged__open_url = "https://unjudged.example",
 				}, "complete handwritten preserved parameter model")
 			end)
 		end)
