@@ -1,5 +1,38 @@
 ﻿; tests/unit/test_run_program_actions.ahk
 
+_RPA_DescriptorPrimitiveStages() {
+	Text := "{x", Position := 1
+	Delimiter := SubStr(Text, Position++, 1)
+	Assert(Delimiter == "{" && Position == 2, "program outer primitive postfix delimiter and cursor")
+	Assert(RegExMatch("1,", "^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?", &Token),
+		"program outer primitive version token is present")
+	Assert(Token[0] == "1", "program outer primitive version token has exact span")
+	try Version := JsonParse(Token[0])
+	catch Any {
+		Assert(false, "program outer primitive version decoder raised")
+	}
+	Assert((Version is Integer) && Version == 1, "program outer primitive version is native integer one")
+	Data := Map()
+	Data.CaseSense := "On"
+	Data["version"] := Version
+	Data["executable"] := "C:\missing program\script.exe"
+	Data["arguments"] := []
+	Assert(Data.Count == 3 && Data.Has("version") && Data.Has("arguments"),
+		"program outer primitive three-field case-sensitive map")
+	Assert(RegExMatch(Data["executable"], "^[A-Za-z]:[/\\]"),
+		"program outer primitive fictional drive path is admitted")
+	AssertFalse(RegExMatch(Data["executable"], "^\\\\[?.]\\"),
+		"program outer primitive fictional drive is not a device path")
+	Text := '"",0', Position := 1
+	try Empty := _ProgramParameterString(Text, &Position)
+	catch Any {
+		Assert(false, "program outer primitive empty argument decoder raised")
+	}
+	Assert((Empty is String) && Empty == "" && SubStr(Text, Position) == ",0",
+		"program outer primitive empty argument remains a string at its exact cursor")
+}
+Test("user program: closed outer decoder native primitives", _RPA_DescriptorPrimitiveStages)
+
 _RPA_StringStages() {
 	; Independently authored fixture strings; no user paths/argv enter diagnostics.
 	for Vector in [
@@ -27,6 +60,8 @@ _RPA_StringStages() {
 	Position := 1
 	AssertFalse(_ProgramParameterString('"\u0000",0', &Position), "program stage unescaped NUL refusal")
 	Scalar := '{"version":1,"executable":"C:\\missing program\\script.exe","arguments":["","trail\\","\"quote\"","\\u0000","日本語"]}'
+	Actual := _ProgramParameterParseWithStage(Scalar, &Stage)
+	Assert(Actual is Map, "program stage actual descriptor decoder: " . Stage)
 	Actual := ProgramParameterParse(Scalar)
 	Assert(Actual is Map, "program stage descriptor pure fictional path")
 	Assert(Actual["executable"] == "C:\missing program\script.exe", "program stage descriptor executable bytes")
@@ -230,7 +265,10 @@ _RPA_ExactNativeShutdownEnvelope() {
 		Source .= "#Warn VarUnset, Off`n"
 		for Name in ["Ergopti_OnShutdown", "_LifecycleRefuseShutdown",
 				"LifecycleShutdownVetoHonored", "_LifecycleForceReleaseHeldInput",
-				"_ReloadPreservingSuspendNonCritical", "ProgramActions_Stop", "_ProgramActions_Retire"] {
+				"_ReloadPreservingSuspendNonCritical", "ProgramActions_Stop", "_ProgramActions_Retire",
+				"_ProgramActions_EnsurePoll", "_ProgramActions_StopPoll", "ProgramActions_Poll",
+				"_ProgramActions_Admitted", "_ProgramActions_BindingAction",
+				"TimerSetCallback", "_TimerAdapterSetNative"] {
 			Body := _DriverFuncBody(Name)
 			Assert(Body != "", "the exact production owner is extracted: " . Name)
 			Source .= Body . "`n"
@@ -245,6 +283,16 @@ _RPA_ExactNativeShutdownEnvelope() {
 		Source .= 'global _UserProgramGeneration := 0' . "`n"
 		Source .= 'global _UserProgramPaused := false' . "`n"
 		Source .= 'global _UserProgramAcquiring := 0' . "`n"
+		Source .= 'global _UserProgramPollOwner := 0' . "`n"
+		Source .= 'global ConfigurationFile := ""' . "`n"
+		Source .= 'global GestureAssignments := Map()' . "`n"
+		Source .= 'global KeyboardShortcutAssignments := Map()' . "`n"
+		Source .= 'global ScriptShortcutAssignments := Map()' . "`n"
+		Source .= 'global TapKeyAssignments := Map()' . "`n"
+		Source .= "global TIMER_ADAPTER_MAX_INTERVAL_MS := " . TIMER_ADAPTER_MAX_INTERVAL_MS . "`n"
+		Source .= 'global _RPA_EnvelopeTimings := Map("aux_shell_cleanup_retry_ms", '
+			. TimingsGet("gestures", "aux_shell_cleanup_retry_ms") . ', "aux_shell_timeout_ms", '
+			. TimingsGet("gestures", "aux_shell_timeout_ms") . ")`n"
 		Source .= 'global _RPA_EnvelopeState := Map()' . "`n"
 		Source .= '#Include ' . A_ScriptDir . "\support\run_program_shutdown_envelope.ahk`n"
 		Harness := Root . "\shutdown.ahk"
