@@ -623,6 +623,34 @@
 			"disabled_reason_key": "menu.about.source_run_reason"
 		}
 	],
+	"llm_trigger_provider_boundary": [
+		{
+			"type": "---",
+			"platforms": [
+				"ahk",
+				"linux"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"llm_display_provider_boundary": [
+		{
+			"type": "---",
+			"platforms": [
+				"ahk"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"llm_live_off_boundary": [
+		{
+			"type": "---",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
 	"llm_trigger_menu": [
 		{
 			"type": "list",

@@ -186,7 +186,11 @@ _LLM_Menu_TriggerRows(Position := "all") {
 		(*) => _LLM_AssignAndRebuild("debounce_ms",
 			_LLM_DefaultFor("llm_debounce_ms", 500)))
 
-	Rows.Push(Map("separator", true))
+	BoundaryRows := MenuRenderer_TemplateRows("llm_trigger_provider_boundary", Map(), Map(), Map())
+	if !(BoundaryRows is Array)
+		return []
+	for Row in BoundaryRows
+		Rows.Push(Row)
 
 	LeadingRows := Rows
 	Rows := []
@@ -594,7 +598,11 @@ _LLM_Menu_DisplayRows(Position := "all") {
 		"checked", _LLM_Menu["inline_autotype"],
 		"action",  (*) => LLM_Menu_ToggleBool("inline_autotype")))
 
-	Rows.Push(Map("separator", true))
+	BoundaryRows := MenuRenderer_TemplateRows("llm_display_provider_boundary", Map(), Map(), Map())
+	if !(BoundaryRows is Array)
+		return []
+	for Row in BoundaryRows
+		Rows.Push(Row)
 
 	LeadingRows := Rows
 	Rows := []

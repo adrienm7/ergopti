@@ -4154,6 +4154,22 @@ disabled_reason_key = "menu.about.source_run_reason"
 # The two automatic prediction triggers share row identity, labels and admission.
 # Numeric debounce and application exclusions retain native row owners.
 # Privacy checks use shared identity and native source-fenced transactions.
+# Native leading settings and live choices retain their existing construction boundaries.
+[[menu.llm_trigger_provider_boundary]]
+type = "---"
+platforms = ["ahk", "linux"]
+unavailable = "hide"
+
+[[menu.llm_display_provider_boundary]]
+type = "---"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.llm_live_off_boundary]]
+type = "---"
+platforms = ["hs"]
+unavailable = "hide"
+
 [[menu.llm_trigger_menu]]
 type = "list"
 id = "llm_trigger_leading"
