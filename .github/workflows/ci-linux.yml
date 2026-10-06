@@ -171,7 +171,8 @@ jobs:
         working-directory: static/ergopti_plus/linux
         run: |
           sudo apt-get install -y --no-install-recommends libgtk-3-bin dbus-x11 xvfb
-          python3 tests/hardware/run_application_operand_receipts.py
+          python3 tests/hardware/test_application_operand_diagnostics.py
+          python3 tests/hardware/run_application_operand_receipts.py --evidence-dir "$RUNNER_TEMP/linux-application-operands"
         timeout-minutes: 1
 
       - name: Terminate real descendants after their process leader exits

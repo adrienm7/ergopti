@@ -434,6 +434,64 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		return bytes
 	}
 
+	/// Foundation can strip /private from an existing path. The native Python
+	/// receiver and proc_pidpath require POSIX realpath spelling for the same root.
+	private static func physicalDirectoryURL(_ directory: URL) throws -> URL {
+		guard directory.isFileURL else { throw Failure.evidence("physical-fixture-directory") }
+		let resolved: UnsafeMutablePointer<CChar>? = directory.withUnsafeFileSystemRepresentation { value in
+			guard let value else { return nil }
+			return Darwin.realpath(value, nil)
+		}
+		guard let resolved else { throw Failure.evidence("physical-fixture-directory") }
+		defer { free(resolved) }
+		var metadata = stat()
+		guard lstat(resolved, &metadata) == 0,
+			metadata.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR) else {
+			throw Failure.evidence("physical-fixture-directory")
+		}
+		guard let nativePath = String(validatingUTF8: resolved), nativePath.hasPrefix("/") else {
+			throw Failure.evidence("physical-fixture-directory-encoding")
+		}
+		let result = URL(fileURLWithPath: nativePath, isDirectory: true)
+		guard result.path == nativePath else { throw Failure.evidence("physical-fixture-directory-projection") }
+		return result
+	}
+
+	func testPhysicalFixtureDirectoryUsesNativeRealpathThroughOwnedAlias() throws {
+		let parent = try Self.physicalDirectoryURL(manager.temporaryDirectory)
+		let root = parent.appendingPathComponent("ErgoptiSparkleRealpath-" + UUID().uuidString)
+		try privateDirectory(root)
+		defer {
+			do { try manager.removeItem(at: root) }
+			catch { XCTFail("Owned realpath fixture could not retire: \(error)") }
+		}
+		let target = root.appendingPathComponent("physical-directory")
+		try privateDirectory(target)
+		let alias = root.appendingPathComponent("owned-alias")
+		try manager.createSymbolicLink(at: alias, withDestinationURL: target)
+		let observed = try Self.physicalDirectoryURL(alias)
+		// Independent native resolution admits the exact existing fixture, not
+		// a hand-written /private prefix rule or the same helper's own receipt.
+		let pointer: UnsafeMutablePointer<CChar>? = alias.withUnsafeFileSystemRepresentation { value in
+			guard let value else { return nil }
+			return Darwin.realpath(value, nil)
+		}
+		let expected = try XCTUnwrap(pointer)
+		defer { free(expected) }
+		XCTAssertEqual(observed.path, try XCTUnwrap(String(validatingUTF8: expected)))
+		var nativeInfo = stat(), observedInfo = stat()
+		XCTAssertEqual(lstat(expected, &nativeInfo), 0)
+		XCTAssertEqual(lstat(observed.path, &observedInfo), 0)
+		XCTAssertEqual(observedInfo.st_dev, nativeInfo.st_dev)
+		XCTAssertEqual(observedInfo.st_ino, nativeInfo.st_ino)
+		XCTAssertEqual(observedInfo.st_mode & mode_t(S_IFMT), mode_t(S_IFDIR))
+		let ordinary = root.appendingPathComponent("ordinary-file")
+		try Data("independent ordinary-file control".utf8).write(to: ordinary, options: .withoutOverwriting)
+		XCTAssertThrowsError(try Self.physicalDirectoryURL(ordinary), "A real regular file cannot become a directory authority")
+		XCTAssertThrowsError(try Self.physicalDirectoryURL(root.appendingPathComponent("missing")))
+		XCTAssertThrowsError(try Self.physicalDirectoryURL(URL(string: "https://example.invalid/")!))
+	}
+
 	private func census(_ roots: [URL], root: URL) throws -> [[String: Any]] {
 		let helper = repository.appendingPathComponent("tools/diagnostics/macos_sparkle_archive_fixture.py")
 		let response = try run("/usr/bin/env", ["python3", helper.path, "census"] + roots.map(\.path), root: root, phase: .nativeProcessCensus)
@@ -503,11 +561,12 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		let identity = try releaseRepository()
 		let nonce = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
 		let bundleID = "org.ergoptiplus.archive-acceptance." + nonce
-		let root = manager.temporaryDirectory.resolvingSymlinksInPath()
+		let root = try Self.physicalDirectoryURL(manager.temporaryDirectory)
 			.appendingPathComponent("ErgoptiSparkleArchive-" + nonce)
 		try privateDirectory(root)
-		let cache = try manager.url(for: .cachesDirectory, in: .userDomainMask,
-			appropriateFor: nil, create: false).resolvingSymlinksInPath().appendingPathComponent(bundleID)
+		let cacheParent = try manager.url(for: .cachesDirectory, in: .userDomainMask,
+			appropriateFor: nil, create: false)
+		let cache = try Self.physicalDirectoryURL(cacheParent).appendingPathComponent(bundleID)
 		let job = "gui/" + String(getuid()) + "/" + bundleID + "-sparkle-updater"
 		var cacheOwned = false
 		var jobOwned = false
