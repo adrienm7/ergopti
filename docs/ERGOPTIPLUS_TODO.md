@@ -4739,6 +4739,11 @@ shared root, native C ABI, supported GIO/schema and independent NIST digest.
 Its thirty-five source/configuration/receipt controls and the complete
 376-check JavaScript suite pass; none credits a native Nix execution.
 Run the new mandatory Linux gate at the committed SHA before crediting Nix.
+The original native body-limit84 and literal-target55 fixtures now wait for
+actual close acknowledgements and pass without changed assertions or budgets.
+The CLI50 cohort still reports34 passes and16 orphan-retirement failures;
+its stronger intermediate closure observation does not credit those cases.
+That separate native refusal is under investigation; item62 remains open.
 
 Windows remote API readiness and generation now reserve their actual request
 owner before asynchronous system-proxy admission. Native WinHTTP resolves the

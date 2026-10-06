@@ -28,7 +28,8 @@ end
 local function retired()
 	local retained = false
 	uv.walk(function(handle)
-		if not server_handles[handle] and not uv.is_closing(handle) then retained = true end
+		-- The next request must wait for transport close callbacks, including timers.
+		if not server_handles[handle] then retained = true end
 	end)
 	return not retained
 end
