@@ -4864,3 +4864,47 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		assert.ok(locale[contract.caption_key] !== contract.caption_key);
 	}
 }
+
+// Independently pinned catalogue boundaries retain the real native family/sheet order.
+{
+	const assert = require('node:assert/strict');
+	const manifest = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/model_catalogue_boundaries.json'), 'utf8')
+	);
+	for (const key of ['family', 'origin']) {
+		const expected = corpus.boundaries[key];
+		assert.deepEqual(manifest[expected.section], expected.rows);
+		assert.deepEqual(expected.projections.linux, []);
+		for (const [driver, relative, call] of [
+			['windows', 'ui/menu/menu_llm/menu_models.ahk', 'MenuRenderer_TemplateRows'],
+			['macos', 'ui/menu/menu_llm/models_selector.lua', 'ManifestMenu.template_rows']
+		]) {
+			const source = readFileSync(
+				resolve(REPO_ROOT, 'static/ergopti_plus', driver, relative),
+				'utf8'
+			);
+			assert.ok(
+				source.includes(call + '("' + expected.section + '"'),
+				driver + ': actual catalogue boundary owner'
+			);
+		}
+	}
+	const providers = JSON.parse(readFileSync(resolve(SHARED, 'modules/llm/models.json'), 'utf8'));
+	const provider = providers.filter((item) => item.label === corpus.provider_caption);
+	assert.equal(provider.length, 1);
+	for (const [index, name] of [corpus.first_family_model, corpus.second_family_model].entries()) {
+		const admitted = provider[0].families[index].models.filter(
+			(model) => typeof model.urls.ollama === 'string' && model.urls.ollama.length > 0
+		);
+		assert.equal(admitted.length, 1);
+		assert.equal(admitted[0].name, name);
+	}
+	for (const file of readdirSync(LOCALES_DIR).filter((name) => name.endsWith('.json'))) {
+		const locale = JSON.parse(readFileSync(resolve(LOCALES_DIR, file), 'utf8'));
+		for (const key of corpus.caption_keys) {
+			assert.equal(typeof locale[key], 'string');
+			assert.ok(locale[key].trim().length > 0 && locale[key] !== key);
+		}
+	}
+}

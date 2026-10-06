@@ -330,3 +330,107 @@ helpers.describe("Readout native constructor failure inverse (model-readout-fram
 		helpers.assert_eq(rawequal(os.getenv, previous_getenv), true)
 	end)
 end)
+
+
+--- Reads handwritten expectations for the actual catalogue's first two families.
+--- @return table expected
+local function catalogue_boundary_corpus()
+	local file = assert(io.open(helpers.shared("tests/corpus/menus/model_catalogue_boundaries.json"), "rb"))
+	local raw = file:read("*a"); assert(file:close())
+	return assert(require("adapters.json_codec").decode(raw))
+end
+
+--- Finds an existing provider's real published model list.
+--- @param rows table Native selector rows.
+--- @param caption string Actual shipped provider caption.
+--- @return table family_rows
+local function catalogue_provider_rows(rows, caption)
+	for _, row in ipairs(rows) do if row.label == caption then return row.items end end
+	error("actual curated provider is missing: " .. caption)
+end
+
+helpers.describe("Model catalogue presentation boundaries", function()
+	helpers.it("the actual per-model origin consumes its boundary and retains selection/source callbacks (model-catalogue-boundaries)", function()
+		with_model_readout_owner(function(selector, ctx, menu, native, calls)
+			local expected = catalogue_boundary_corpus()
+			local declaration = menu.get_array(expected.boundaries.origin.section)
+			local original = declaration[1]
+			local ok, detail = xpcall(function()
+				local sheet = model_readout_sheet(selector.build(ctx), expected.first_family_model)
+				local position = expected.uninstalled_origin_position.hs
+				helpers.assert_eq(sheet[position], { separator = true })
+				helpers.assert_eq(sheet[1].label, native.get("menu.llm.select_model"))
+				helpers.assert_type(sheet[1].action, "function")
+				helpers.assert_type(sheet[position + 2].action, "function", "the actual model source callback stays native")
+				helpers.assert_eq(#calls, 0)
+				declaration[1] = { type = "label", id = "model_origin_marker", i18n = expected.published_marker_key,
+					platforms = { "ahk", "hs" }, unavailable = "hide" }
+				sheet = model_readout_sheet(selector.build(ctx), expected.first_family_model)
+				helpers.assert_eq(sheet[position].label, expected.marker_english,
+					"the unchanged real selector consumes the live shared origin boundary")
+				helpers.assert_eq(sheet[position].disabled, true)
+				helpers.assert_nil(sheet[position].action)
+				sheet[1].action()
+				helpers.assert_eq(calls, { expected.first_family_model })
+				declaration[1] = { type = "command", id = "unowned_model_origin", i18n = expected.published_marker_key }
+				helpers.assert_eq(selector.build(ctx), {}, "an unbound origin frame cannot fall back to native presentation")
+				helpers.assert_eq(calls, { expected.first_family_model })
+			end, debug.traceback)
+			declaration[1] = original
+			if not ok then error(detail, 0) end
+			local sheet = model_readout_sheet(selector.build(ctx), expected.first_family_model)
+			helpers.assert_eq(sheet[expected.uninstalled_origin_position.hs], { separator = true })
+			helpers.assert_eq(#calls, 1)
+		end)
+	end)
+
+	helpers.it("the actual second populated family consumes its boundary and retains model order (model-catalogue-boundaries)", function()
+		with_model_readout_owner(function(selector, ctx, menu, _, calls)
+			local expected = catalogue_boundary_corpus()
+			local root, declaration = menu.get_root(), menu.get_array(expected.boundaries.family.section)
+			local original = declaration[1]
+			local ok, detail = xpcall(function()
+				local rows = catalogue_provider_rows(selector.build(ctx), expected.provider_caption)
+				helpers.assert_true(rows[1].label:find(expected.first_family_model, 1, true) ~= nil)
+				helpers.assert_eq(rows[2], { separator = true })
+				helpers.assert_true(rows[3].label:find(expected.second_family_model, 1, true) ~= nil)
+				declaration[1] = { type = "label", id = "model_family_marker", i18n = expected.published_marker_key,
+					platforms = { "ahk", "hs" }, unavailable = "hide" }
+				rows = catalogue_provider_rows(selector.build(ctx), expected.provider_caption)
+				helpers.assert_eq(rows[2].label, expected.marker_english,
+					"the actual family grouping consumes its current shared boundary")
+				helpers.assert_eq(rows[2].disabled, true)
+				helpers.assert_nil(rows[2].action)
+				helpers.assert_true(rows[1].label:find(expected.first_family_model, 1, true) ~= nil)
+				helpers.assert_true(rows[3].label:find(expected.second_family_model, 1, true) ~= nil)
+				rows[3].items[1].action()
+				helpers.assert_eq(calls, { expected.second_family_model })
+				root[expected.boundaries.family.section] = nil
+				helpers.assert_eq(selector.build(ctx), {}, "a missing family boundary cannot become an undeclared separator")
+				helpers.assert_eq(calls, { expected.second_family_model })
+			end, debug.traceback)
+			root[expected.boundaries.family.section] = declaration
+			declaration[1] = original
+			if not ok then error(detail, 0) end
+			local rows = catalogue_provider_rows(selector.build(ctx), expected.provider_caption)
+			helpers.assert_eq(rows[2], { separator = true })
+			helpers.assert_eq(#calls, 1)
+		end)
+	end)
+
+	helpers.it("the real renderer projects both inert boundaries and the actual Linux absence (model-catalogue-boundaries)", function()
+		with_model_readout_owner(function(_, _, _, native)
+			local expected = catalogue_boundary_corpus()
+			local Renderer, Json = require("menu.renderer"), require("adapters.json_codec")
+			for _, platform in ipairs({ "ahk", "hs", "linux" }) do
+				local renderer = assert(Renderer.new({ platform = platform,
+					manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
+					json_decode = Json.decode, i18n = native, logger = require("infra.logger") }))
+				for _, key in ipairs({ "family", "origin" }) do
+					local boundary = expected.boundaries[key]
+					helpers.assert_eq(renderer.template_rows(boundary.section, {}, {}, {}), boundary.projections[platform])
+				end
+			end
+		end)
+	end)
+end)

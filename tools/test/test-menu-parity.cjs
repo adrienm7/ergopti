@@ -429,6 +429,24 @@ const OPENS_SUBMENU = {
 		}
 	],
 	llm_model: [
+		{
+			menu: 'llm_model_family_boundary',
+			platforms: ['ahk', 'hs'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_llm/menu_models.ahk',
+				hs: 'macos/ui/menu/menu_llm/models_selector.lua'
+			}
+		},
+		{
+			menu: 'llm_model_origin_boundary',
+			platforms: ['ahk', 'hs'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_llm/menu_models.ahk',
+				hs: 'macos/ui/menu/menu_llm/models_selector.lua'
+			}
+		},
 		'llm_api_active_commands',
 		{
 			menu: 'llm_api_add_command',
