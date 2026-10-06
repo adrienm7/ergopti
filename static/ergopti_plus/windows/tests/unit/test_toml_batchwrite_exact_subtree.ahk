@@ -162,9 +162,15 @@ _TBES_NamespaceAdmissionRetainsPhysicalSource() {
 			for Updates in [[{ Section: "settings", Key: Vector.Key, Value: 2 }],
 				[{ Section: "settings", Key: Vector.Key, Delete: 1 }],
 				[{ Section: "settings", Key: "other", Value: "unrelated" }]] {
-				AssertFalse(TOML_BatchWrite(Path, Updates), "refuse source identity loss: " . Vector.Id)
-				AssertTrue(FSUtf8ExactMatches(Path, Source))
-				AssertEqual(BeforeTime, FileGetTime(Path, "M"), "refusal precedes all publication")
+				if Vector.HasOwnProp("Preservable") {
+					AssertTrue(TOML_BatchWrite(Path, Updates), "a retained foreign array admits the exact sibling change")
+					_TAOT_AssertFuture(FSReadUtf8Exact(Path))
+					_TAOT_AssertRequested(FSReadUtf8Exact(Path), Updates[1])
+				} else {
+					AssertFalse(TOML_BatchWrite(Path, Updates), "refuse source identity loss: " . Vector.Id)
+					AssertTrue(FSUtf8ExactMatches(Path, Source))
+					AssertEqual(BeforeTime, FileGetTime(Path, "M"), "refusal precedes all publication")
+				}
 			}
 			Stages := 0
 			Loop Files, Path . ".*.tmp"

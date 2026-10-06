@@ -3461,6 +3461,8 @@ The existing real Storage GC fixture now returns its allocation frame before the
 
 Archive-distro unit validation now provisions only measured LuaJIT/Python/curl requirements and verifies real luv/lfs ABI5.1 loading with candidates obtained from the canonical installer function. The unchanged full unit command runs as the ordinary CI user in an owned writable checkout copy. Actual Debian13 Docker execution passes9184/0 with the reviewed GC fixture; Fedora, Arch, Alpine and openSUSE remain unexecuted until manual CI. Existing --no-deps installation, release conditions and all other workflow fields remain unchanged. The earlier Arch first-install exit2 is still unclassified.
 
+The current Windows native read/write-exclusion and foreign TOML record-parent fixes are composed with the configuration document owner. Canonical source-span arguments keep their original positions; the native container-stop argument is appended, with a registered fourteen-assert combined lexer regression. Native-reader child fixtures discover and copy complete genuine modules through canonical source ownership; all original sixty-nine assertions and child effects remain. Local selected encoding and361 JS checks pass; native Windows execution remains required.
+
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
   The shared AHK override policy now writes an explicit recommended delay only
