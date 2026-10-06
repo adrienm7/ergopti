@@ -81,7 +81,7 @@ end
 --- Handles objects, arrays, strings, numbers, booleans, and null.
 --- @param raw string JSON string.
 --- @return any|nil Decoded Lua value, or nil on parse failure.
-local function decode(raw, lossless)
+local function decode(raw, lossless, source_members)
 	if type(raw) ~= "string" or raw == "" then return nil end
 	local pos = 1
 
@@ -154,28 +154,49 @@ local function decode(raw, lossless)
 		return nil
 	end
 
-	parse_value = function()
+	parse_value = function(is_root)
 		local c = skip_ws()
 		if not c then return nil end
 
 		if c == "{" then
+			local recording = source_members and is_root
+			if recording then source_members.open = pos end
 			pos = pos + 1
 			local obj = {}
-			if skip_ws() == "}" then pos = pos + 1; return obj end
+			local member_first = pos
+			if skip_ws() == "}" then
+				if recording then source_members.close = pos end
+				pos = pos + 1
+				return obj
+			end
 			while true do
 				if skip_ws() ~= '"' then return nil end
 				local key = parse_string()
 				if type(key) ~= "string" then return nil end
 				if skip_ws() ~= ":" then return nil end
 				pos = pos + 1
+				if recording then skip_ws() end
+				local value_first = recording and pos
 				local val = parse_value()
+				local value_last = recording and pos - 1
 				if val == nil then return nil end
 				if lossless and obj[key] ~= nil then return nil end
 				obj[key] = (val == NULL) and nil or val
 				local sep = skip_ws()
-				if sep == "}" then pos = pos + 1; return obj end
+				if recording then
+					source_members[#source_members + 1] = {
+						key = key, first = member_first, last = pos - 1,
+						value_first = value_first, value_last = value_last,
+					}
+				end
+				if sep == "}" then
+					if recording then source_members.close = pos end
+					pos = pos + 1
+					return obj
+				end
 				if sep ~= "," then return nil end
 				pos = pos + 1
+				member_first = pos
 			end
 		end
 
@@ -220,7 +241,7 @@ local function decode(raw, lossless)
 		return nil
 	end
 
-	local ok, result = pcall(parse_value)
+	local ok, result = pcall(parse_value, true)
 	if not ok then return nil end
 	if result == nil or skip_ws() ~= nil then return nil end
 	return result == NULL and nil or result
@@ -292,6 +313,168 @@ function M.encode(val)
 		return "{" .. table.concat(parts, ",") .. "}"
 	end
 	return nil
+end
+
+-- ============================================================================
+-- 3. Source-bound root object edits
+-- ============================================================================
+
+-- Source authority stays private to this codec instance. Returned decoded values
+-- never alias these spans; modifying a model cannot authorize a different source.
+local ROOT_SOURCES = setmetatable({}, { __mode = "k" })
+local SOURCE_RECEIPT_META = {
+	__newindex = function() error("JSON source receipts are immutable", 2) end,
+	__metatable = false,
+}
+
+--- Decodes a strict root object and retains its exact member spans privately.
+--- Uses the same lossless parser, including decoded-key duplicate rejection.
+--- The opaque receipt proves this source parsed; it is NOT a file-liveness,
+--- ownership, generation, backup, or publication receipt. Callers must admit the
+--- actual current file and native owner independently before publishing edits.
+--- @param raw string Exact JSON source.
+--- @return table|nil model Lossless decoded object; numbers keep legacy Lua types.
+--- @return table|string receipt Opaque source receipt, or a bounded diagnostic.
+local function decode_root_object_source(raw)
+	local members = {}
+	local model = decode(raw, true, members)
+	if model == nil or not members.open or not members.close then
+		return nil, "JSON source requires a strict root object"
+	end
+	local receipt = setmetatable({}, SOURCE_RECEIPT_META)
+	ROOT_SOURCES[receipt] = { raw = raw, members = members }
+	return model, receipt
+end
+
+function M.decode_root_object_source(raw) return decode_root_object_source(raw) end
+
+-- Strict edit values use existing JSON identities without changing the legacy
+-- encoder's permissive behavior. Reject values it otherwise drops/normalizes.
+local function edit_kind(value)
+	if rawequal(value, LOSSLESS_NULL) then return "null" end
+	local kind = type(value)
+	if kind ~= "table" then return kind end
+	if getmetatable(value) ~= nil then return nil end
+	local count = array_length(value)
+	if ARRAY_VALUES[value] then return count and "array" or nil end
+	if count and count > 0 then return "array" end
+	for key in pairs(value) do if type(key) ~= "string" then return nil end end
+	return "object"
+end
+
+local function valid_edit_value(value, visiting)
+	local kind = edit_kind(value)
+	if kind == "null" or kind == "string" or kind == "boolean" then return true end
+	if kind == "number" then return value == value and value ~= math.huge and value ~= -math.huge end
+	if kind ~= "array" and kind ~= "object" then return false end
+	if visiting[value] then return false end
+	visiting[value] = true
+	for _, child in pairs(value) do
+		if not valid_edit_value(child, visiting) then visiting[value] = nil; return false end
+	end
+	visiting[value] = nil
+	return true
+end
+
+local function same_edit_value(left, right)
+	local kind = edit_kind(left)
+	if kind ~= edit_kind(right) then return false end
+	if kind ~= "array" and kind ~= "object" then
+		if kind == "number" and left == 0 and right == 0 then return 1 / left == 1 / right end
+		return left == right
+	end
+	for key, value in pairs(left) do
+		local other = rawget(right, key)
+		if other == nil or not same_edit_value(value, other) then return false end
+	end
+	for key in pairs(right) do if rawget(left, key) == nil then return false end end
+	return true
+end
+
+local function prepare_edit_cells(updates)
+	if type(updates) ~= "table" or getmetatable(updates) ~= nil or ARRAY_VALUES[updates] then return nil end
+	local prepared = {}
+	for key, cell in pairs(updates) do
+		if type(key) ~= "string" or type(cell) ~= "table" or getmetatable(cell) ~= nil
+			or ARRAY_VALUES[cell] or type(rawget(cell, "present")) ~= "boolean" then return nil end
+		for field in pairs(cell) do if field ~= "present" and field ~= "value" then return nil end end
+		local value = rawget(cell, "value")
+		if not cell.present then
+			if value ~= nil then return nil end
+			prepared[key] = { present = false }
+		else
+			if not valid_edit_value(value, {}) then return nil end
+			local ok, encoded = pcall(M.encode, value)
+			if not ok or type(encoded) ~= "string" then return nil end
+			local reparsed = decode(encoded, true)
+			if reparsed == nil or not same_edit_value(value, reparsed) then return nil end
+			-- Keep the independent reparsed copy, never caller-owned mutable values.
+			prepared[key] = { present = true, value = reparsed, encoded = encoded }
+		end
+	end
+	return prepared
+end
+
+--- Splices explicitly owned root members while retaining every unowned byte.
+--- Updates are a string-keyed map of {present=true,value=...} or {present=false}.
+--- Use the lossless null token for JSON null; nil is never an implicit deletion.
+--- Existing member keys/trivia/order survive replacement; new keys append in
+--- decoded-key order. Deletion removes that member's trivia and one delimiter.
+--- The candidate is strictly reparsed and checked against all requested cells.
+--- Receipts are codec-instance-local and reusable; no native IO occurs here.
+--- @param receipt table Authentic receipt from decode_root_object_source.
+--- @param updates table Explicit owned root-member edits.
+--- @return string|nil source Candidate JSON source, or nil on refusal.
+--- @return table|string model Reparsed model, or a bounded diagnostic.
+--- @return table|nil receipt Fresh candidate source receipt on success.
+function M.splice_root_object_source(receipt, updates)
+	local source = type(receipt) == "table" and ROOT_SOURCES[receipt]
+	if not source or next(receipt) ~= nil then return nil, "Invalid JSON source receipt" end
+	local admitted, edits = pcall(prepare_edit_cells, updates)
+	if not admitted or not edits then return nil, "Invalid JSON source update cells" end
+	local raw, members = source.raw, source.members
+	local parts, seen = {}, {}
+	for _, member in ipairs(members) do
+		local cell = edits[member.key]
+		seen[member.key] = true
+		if cell == nil then
+			parts[#parts + 1] = raw:sub(member.first, member.last)
+		elseif cell.present then
+			parts[#parts + 1] = raw:sub(member.first, member.value_first - 1)
+				.. cell.encoded .. raw:sub(member.value_last + 1, member.last)
+		end
+	end
+	local appended = {}
+	for key, cell in pairs(edits) do if not seen[key] and cell.present then appended[#appended + 1] = key end end
+	table.sort(appended)
+	for _, key in ipairs(appended) do
+		local quoted, key_source = pcall(M.quote, key)
+		if not quoted or type(key_source) ~= "string" then return nil, "JSON source key encoding failed" end
+		parts[#parts + 1] = key_source .. ":" .. edits[key].encoded
+	end
+	local inner = table.concat(parts, ",")
+	if #members == 0 then inner = raw:sub(members.open + 1, members.close - 1) .. inner end
+	local candidate = raw:sub(1, members.open) .. inner .. raw:sub(members.close)
+	local model, candidate_receipt = decode_root_object_source(candidate)
+	if not model then return nil, "JSON source candidate failed strict reparse" end
+	local original = decode(raw, true)
+	for key, value in pairs(original) do
+		local cell = edits[key]
+		if cell == nil and not same_edit_value(value, rawget(model, key)) then
+			return nil, "JSON source candidate changed an unowned member"
+		end
+	end
+	for key, cell in pairs(edits) do
+		local value = rawget(model, key)
+		if (cell.present and (value == nil or not same_edit_value(cell.value, value)))
+			or (not cell.present and value ~= nil) then return nil, "JSON source candidate disagrees with update cells" end
+	end
+	for key in pairs(model) do
+		if rawget(original, key) == nil and not (edits[key] and edits[key].present) then
+			return nil, "JSON source candidate introduced an unowned member"
+		end
+	end
+	return candidate, model, candidate_receipt
 end
 
 return M

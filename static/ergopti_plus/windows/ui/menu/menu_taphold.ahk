@@ -85,13 +85,20 @@ _TH_KeyRows(Hand) {
 		; resolve the wrong function body (see HIGH-07 regression guard).
 		_HoldRowsBuilder := _TH_HoldPickerRows
 
-		KeyRows := MenuRenderer_TemplateRows("tap_hold_key_head",
+		DelayRows := MenuRenderer_TemplateRows("tap_hold_key_delay_rows",
+			Map("tap_hold_key_delay_set", _TH_MakeDelayPickerFn(KeyId)), Map(), Map())
+		if !(DelayRows is Array)
+			continue
+		DelayCaption := Round(TapHoldDuration(MasterGateDesiredTapHold(TapHold), KeyId) * 1000) . " ms"
+		KeyRows := MenuRenderer_TemplateRows("tap_hold_key_rows",
 			Map("tap_hold_key_native", _TH_MakeDisableFn(KeyId),
 				"tap_hold_key_tap", _TH_MakeTapPickerFn(KeyId, KeyLabel, TapLbl)),
 			Map("tap_hold_key_configured", ((Value) => Value).Bind(IsConfigured),
 				"tap_hold_key_tap_caption", ((Value) => Value).Bind(TapLbl),
-				"tap_hold_key_hold_caption", ((Value) => Value).Bind(HoldLbl)),
-			Map("tap_hold_key_hold", _HoldRowsBuilder(KeyId)))
+				"tap_hold_key_hold_caption", ((Value) => Value).Bind(HoldLbl),
+				"tap_hold_key_delay_caption", ((Value) => Value).Bind(DelayCaption)),
+			Map("tap_hold_key_hold", _HoldRowsBuilder(KeyId),
+				"tap_hold_key_delay", DelayRows))
 		if !(KeyRows is Array)
 			continue
 		Rows.Push(Map(
@@ -295,6 +302,16 @@ class _TH_TapPickerFnObj {
 	}
 }
 
+class _TH_DelayPickerFnObj {
+	KeyId := ""
+	PromptFn := 0
+	SetterFn := 0
+	ReloadFn := 0
+	Call(*) {
+		return _TH_PromptKeyDelay(this.KeyId, this.PromptFn, this.SetterFn, this.ReloadFn)
+	}
+}
+
 class _TH_HoldFnObj {
 	KeyId   := ""
 	HoldOpt := ""
@@ -334,6 +351,99 @@ _TH_MakeTapPickerFn(KeyId, KeyLabel, TapLbl) {
 	obj.KeyId    := KeyId
 	obj.KeyLabel := KeyLabel
 	return ObjBindMethod(obj, "Call")
+}
+
+/**
+ * Captures the physical key while discarding native menu callback arguments.
+ * @param {String} KeyId Shared physical-key identifier.
+ * @returns {BoundFunc} Per-key prompt command.
+ */
+_TH_MakeDelayPickerFn(KeyId, PromptFn := 0, SetterFn := 0, ReloadFn := 0) {
+	obj := _TH_DelayPickerFnObj()
+	obj.KeyId := KeyId
+	obj.PromptFn := PromptFn
+	obj.SetterFn := SetterFn
+	obj.ReloadFn := ReloadFn
+	return ObjBindMethod(obj, "Call")
+}
+
+/**
+ * Prompts for milliseconds, publishes through the native owner, then reloads once.
+ * @param {String} KeyId Shared physical-key identifier.
+ * @returns {Integer|Boolean} Strict1 after publication and reload, otherwise false.
+ */
+_TH_PromptKeyDelay(KeyId, PromptFn := 0, SetterFn := 0, ReloadFn := 0) {
+	global TapHold
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return _TH_PromptKeyDelay(KeyId, PromptFn, SetterFn, ReloadFn)
+		finally Critical(InheritedCritical)
+	}
+	for Adapter in [PromptFn, SetterFn, ReloadFn] {
+		if !((Adapter is Integer) && Adapter == 0) && !HasMethod(Adapter, "Call")
+			return false
+	}
+	if !(KeyId is String) || !(TapHold is Map)
+		return false
+	if !_TH_DurationKeyKnown(KeyId)
+		return false
+	StartState := TapHold
+	StartPath := _TH_TapHoldConfigPath()
+	if !(StartPath is String) || StartPath == ""
+		return false
+	SourceWitness := _TH_CaptureDurationContext(Map("path", StartPath), KeyId)
+	PhysicalSource := _TH_CaptureDurationSource(StartPath)
+	if !(SourceWitness is Map) || !(PhysicalSource is Map)
+		return false
+	SourceWitness["source_present"] := PhysicalSource["source_present"]
+	SourceWitness["source_content"] := PhysicalSource["source_content"]
+	if !_TH_DurationSourceMatches(SourceWitness, StartPath)
+		return false
+	CurrentMs := Round(TapHoldDuration(MasterGateDesiredTapHold(StartState), KeyId) * 1000)
+	Prompt := StrReplace(t("menu.tapholds.key_tap_delay_dialog_prompt_current"), "%d", CurrentMs)
+	Title := t("menu.tapholds.key_tap_delay_dialog_title")
+	try {
+		Answer := HasMethod(PromptFn, "Call") ? PromptFn.Call(Prompt, Title, "w340 h160", CurrentMs)
+			: Ui_InputBox(Prompt, Title, "w340 h160", CurrentMs)
+		if !(Answer is Object) || Answer.Result != "OK" || !(Answer.Value is String)
+			return false
+		Raw := Trim(Answer.Value, " `t")
+		if !IsNumber(Raw)
+			return false
+		Ms := Raw + 0
+		if !_TH_DurationValueValid(Ms / 1000)
+			return false
+		Ms := Round(Ms)
+		if Ms <= 0
+			return false
+	} catch as Err {
+		try LoggerError("TapHoldMenu", "The per-key delay prompt was refused: {1}.", Err.Message)
+		return false
+	}
+	if !_TH_DurationSourceMatches(SourceWitness, _TH_TapHoldConfigPath()) {
+		try LoggerWarn("TapHoldMenu", "The per-key delay source changed while its prompt was open.")
+		return false
+	}
+	try Published := HasMethod(SetterFn, "Call") ? SetterFn.Call(KeyId, Ms / 1000, SourceWitness)
+		: WriteTapHoldDuration(KeyId, Ms / 1000, 0, 0, 0, 0, SourceWitness)
+	catch as Err {
+		try LoggerError("TapHoldMenu", "The per-key delay could not be saved: {1}.", Err.Message)
+		return false
+	}
+	if !(Published is Integer) || Published != 1
+		return false
+	; A persistence callback cannot acknowledge a different key or parent and
+	; then send Reload to that successor configuration.
+	if !_TH_DurationReceiptMatches(SourceWitness, _TH_TapHoldConfigPath(), KeyId, Ms / 1000)
+		return false
+	try Reloaded := HasMethod(ReloadFn, "Call") ? ReloadFn.Call("delay_set", KeyId)
+		: _TH_ReloadTapHoldMenu("delay_set", KeyId)
+	catch as Err {
+		try LoggerError("TapHoldMenu", "Reload after the per-key delay failed: {1}.", Err.Message)
+		return false
+	}
+	return (Reloaded is Integer) && Reloaded == 1 ? 1 : false
 }
 
 ; Apply a tap action chosen from the modal picker.

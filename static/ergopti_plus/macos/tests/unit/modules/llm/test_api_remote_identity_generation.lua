@@ -139,3 +139,183 @@ helpers.describe("api_remote entry identity generation", function()
 		if not ok then error(err) end
 	end)
 end)
+
+
+-- Real native readers consume these independent complete physical sources.
+local PUBLICATION_CLOUD = [[{"provider_order":["openai"],"providers":{"openai":{"label":"Independent cloud","base_url":"https://api.openai.com/v1","default_model":"independent-model","format":"openai"}},"model_prices":{},"test_request":{"system_prompt":"Independent","user_text":"Independent","temperature":0,"max_tokens":1},"decisions_test":{"state":{"independent":true},"questions":{"one":{"type":"text","instructions":"Independent"}}}}]]
+local PUBLICATION_LOCAL = [[{"server_order":["independent_local"],"servers":{"independent_local":{"label":"Independent local","base_url":"http://localhost:4321/v1","auth":"optional"}}}]]
+
+--- Runs the actual catalogue loaders over private files; only native ports vary.
+--- @param cloud string|false Cloud source, or an absent path.
+--- @param local_source string|false Local source, or an absent path.
+--- @param callback function Actual native owner and recorded diagnostics.
+--- @param close_refused boolean|nil Inject a refused cloud close receipt.
+local function with_publication_sources(cloud, local_source, callback, close_refused)
+	helpers.with_stub_scope({ "modules.llm.api_remote", "modules.llm.local_servers", "infra.paths",
+		"infra.logger", "llm.provider_config_policy" }, function()
+		-- Establish the native ports once. A second load_with_stubs would replace
+		-- the path owner and hide the source under examination.
+		helpers.load_with_stubs("modules.llm.api_remote")
+		local paths = require("infra.paths")
+		local original_path = paths.shared_llm_path
+		local logger = require("infra.logger")
+		local original_warn, original_error = logger.warn, logger.error
+		local original_open = io.open
+		local cloud_path, local_path = os.tmpname(), os.tmpname()
+		local warnings, errors = {}, {}
+		local function write(path, source)
+			if source == false then os.remove(path); return end
+			local file = assert(original_open(path, "wb"))
+			assert(file:write(source)); assert(file:close())
+		end
+		write(cloud_path, cloud); write(local_path, local_source)
+		paths.shared_llm_path = function(name)
+			if name == "api_providers.json" then return cloud_path end
+			if name == "local_servers.json" then return local_path end
+			return original_path(name)
+		end
+		logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
+		logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
+		if close_refused then
+			io.open = function(path, mode)
+				local file, err, code = original_open(path, mode)
+				if path ~= cloud_path or not file or mode ~= "r" then return file, err, code end
+				return {
+					read = function(_, ...) return file:read(...) end,
+					close = function() assert(file:close()); return nil, "controlled close refusal" end,
+				}
+			end
+		end
+		local outcome = table.pack(xpcall(function()
+			package.loaded["modules.llm.api_remote"], package.loaded["modules.llm.local_servers"] = nil, nil
+			local owner = require("modules.llm.api_remote")
+			callback(owner, {
+				warnings = warnings, errors = errors, cloud_path = cloud_path, local_path = local_path,
+				read = function(path)
+					local file = assert(original_open(path, "rb"))
+					local source = assert(file:read("*a")); assert(file:close()); return source
+				end,
+			})
+		end, debug.traceback))
+		io.open = original_open
+		paths.shared_llm_path = original_path
+		logger.warn, logger.error = original_warn, original_error
+		os.remove(cloud_path); os.remove(local_path)
+		if not outcome[1] then error(outcome[2], 0) end
+	end)
+end
+
+--- Exercises all three unchanged absent-provider paths without an HTTP dispatch.
+--- @param owner table Actual remote owner.
+--- @param observed table Native diagnostics and source ports.
+--- @param expected integer Exact retirement warning count.
+local function assert_missing_provider_routes(owner, observed, expected)
+	local entry = { id = "independent-missing", provider = "removed_provider", token = "controlled-token",
+		model = "noncatalogue-custom-model", future = { independent = false } }
+	owner.set_entries({ entry })
+	owner.set_active_entry_id(entry.id)
+	local requests, acquired, missing, failed, delivered, cancelled = 0, {}, {}, 0, 0, 0
+	for _, pair in ipairs({ { owner.warmup, "_warmup_client" }, { owner.check_availability, "_check_client" },
+		{ owner.cancel_streaming, "_infer_client" } }) do
+		local client = assert(get_upvalue(pair[1], pair[2]))
+		client.get = function() requests = requests + 1 end
+		client.post = function() requests = requests + 1 end
+	end
+	helpers.assert_eq(owner.warmup(nil, nil, function(value) acquired[#acquired + 1] = value end), false)
+	helpers.assert_eq(owner.check_availability(nil,
+		function() delivered = delivered + 1 end,
+		function(value) missing[#missing + 1] = value end,
+		function() cancelled = cancelled + 1 end), false)
+	owner.request_raw(entry.model, "Independent", "Independent", "", 0, 1,
+		function() delivered = delivered + 1 end,
+		function() failed = failed + 1 end)
+	owner.warmup()
+	helpers.assert_eq(requests, 0)
+	helpers.assert_eq(acquired, { false }, "warmup refusal keeps its exact acquisition acknowledgement")
+	helpers.assert_eq(missing, { true }, "availability still terminalizes missing exactly once")
+	helpers.assert_eq(failed, 1, "inference still refuses once")
+	helpers.assert_eq(delivered, 0)
+	helpers.assert_eq(cancelled, 0)
+	helpers.assert_true(rawequal(owner.get_entries()[1], entry), "unavailable/retired classification never rewrites stored row identity")
+	helpers.assert_eq(entry.future, { independent = false })
+	helpers.assert_eq(entry.model, "noncatalogue-custom-model")
+	local retired = {}
+	for _, message in ipairs(observed.warnings) do
+		if message:find("which this build no longer has", 1, true) then retired[#retired + 1] = message end
+	end
+	helpers.assert_eq(#retired, expected, table.concat(observed.warnings, " | "))
+	for _, message in ipairs(observed.warnings) do
+		helpers.assert_true(message:find(entry.token, 1, true) == nil, "private tokens stay outside diagnostics")
+	end
+end
+
+helpers.describe("Actual provider catalogue publication", function()
+	for _, vector in ipairs({
+		{ name = "valid complete pair", cloud = PUBLICATION_CLOUD, local_source = PUBLICATION_LOCAL, expected = 1 },
+		{ name = "valid empty local list", cloud = PUBLICATION_CLOUD, local_source = '{"server_order":[],"servers":{}}', expected = 1 },
+		{ name = "malformed cloud", cloud = "{ malformed", local_source = PUBLICATION_LOCAL, expected = 0 },
+		{ name = "absent cloud", cloud = false, local_source = PUBLICATION_LOCAL, expected = 0 },
+		{ name = "wrong-shaped cloud order", cloud = PUBLICATION_CLOUD:gsub('%["openai"%]', '{"one":"openai"}'), local_source = PUBLICATION_LOCAL, expected = 0 },
+		{ name = "duplicate cloud order", cloud = PUBLICATION_CLOUD:gsub('%["openai"%]', '["openai","openai"]'), local_source = PUBLICATION_LOCAL, expected = 0 },
+		{ name = "missing declared cloud descriptor", cloud = PUBLICATION_CLOUD:gsub('%["openai"%]', '["openai","missing_descriptor"]'), local_source = PUBLICATION_LOCAL, expected = 0 },
+		{ name = "empty refused cloud list", cloud = PUBLICATION_CLOUD:gsub('%["openai"%]', '[]'), local_source = PUBLICATION_LOCAL, expected = 0 },
+		{ name = "native-erased cloud null slot", cloud = PUBLICATION_CLOUD:gsub('%["openai"%]', '["openai",null]'), local_source = PUBLICATION_LOCAL, expected = 0 },
+		{ name = "native-erased local null slot", cloud = PUBLICATION_CLOUD, local_source = '{"server_order":[null],"servers":{}}', expected = 0 },
+		{ name = "unacknowledged cloud close", cloud = PUBLICATION_CLOUD, local_source = PUBLICATION_LOCAL, close_refused = true, expected = 0 },
+		{ name = "malformed local", cloud = PUBLICATION_CLOUD, local_source = "{ malformed", expected = 0 },
+		{ name = "absent local", cloud = PUBLICATION_CLOUD, local_source = false, expected = 0 },
+		{ name = "empty object instead of local order", cloud = PUBLICATION_CLOUD, local_source = '{"server_order":{},"servers":{}}', expected = 0 },
+		{ name = "empty array instead of local descriptors", cloud = PUBLICATION_CLOUD, local_source = '{"server_order":[],"servers":[]}', expected = 0 },
+		{ name = "duplicate local order", cloud = PUBLICATION_CLOUD, local_source = PUBLICATION_LOCAL:gsub('%["independent_local"%]', '["independent_local","independent_local"]'), expected = 0 },
+		{ name = "cloud local collision", cloud = PUBLICATION_CLOUD, local_source = PUBLICATION_LOCAL:gsub("independent_local", "openai"), expected = 0 },
+	}) do
+		helpers.it("(provider-publication-route) " .. vector.name .. " cannot invent retirement authority", function()
+			with_publication_sources(vector.cloud, vector.local_source, function(owner, observed)
+				assert_missing_provider_routes(owner, observed, vector.expected)
+				if vector.cloud ~= false then helpers.assert_eq(observed.read(observed.cloud_path), vector.cloud) end
+				if vector.local_source ~= false then helpers.assert_eq(observed.read(observed.local_path), vector.local_source) end
+			end, vector.close_refused)
+		end)
+	end
+
+	helpers.it("(provider-publication-receipt) actual snapshots are detached from runtime map mutations", function()
+		with_publication_sources(PUBLICATION_CLOUD, PUBLICATION_LOCAL, function(owner)
+			local policy = require("llm.provider_config_policy")
+			local first = owner.provider_config_receipt()
+			helpers.assert_eq(first.published, true)
+			helpers.assert_eq(policy.classify("openai", first), "known")
+			helpers.assert_eq(policy.classify("independent_local", first), "known")
+			helpers.assert_eq(policy.classify("removed_provider", first), "retired")
+			first.ids.removed_provider = true
+			owner.PROVIDERS.runtime_only = {}
+			local second = owner.provider_config_receipt()
+			helpers.assert_eq(policy.classify("removed_provider", second), "retired")
+			helpers.assert_eq(policy.classify("runtime_only", second), "retired")
+			helpers.assert_true(first ~= second and first.ids ~= second.ids)
+		end)
+	end)
+
+	helpers.it("(provider-publication-route) actual known provider permits noncatalogue custom model identifiers", function()
+		for _, sources in ipairs({
+			{ cloud = PUBLICATION_CLOUD, local_source = PUBLICATION_LOCAL },
+			{ cloud = PUBLICATION_CLOUD, local_source = "{ malformed" },
+			{ cloud = PUBLICATION_CLOUD:gsub('%["openai"%]', '["openai","missing_descriptor"]'), local_source = PUBLICATION_LOCAL },
+		}) do
+			with_publication_sources(sources.cloud, sources.local_source, function(owner, observed)
+				local entry = { id = "independent-known", provider = "openai", token = "controlled-token", model = "outside-the-shipped-model-list" }
+				owner.set_entries({ entry }); owner.set_active_entry_id(entry.id)
+				local client = assert(get_upvalue(owner.cancel_streaming, "_infer_client"))
+				local body
+				client.post = function(_, _, raw) body = raw end
+				owner.request_raw(entry.model, "Independent", "Independent", "", 0, 1, function() end, function() end)
+				helpers.assert_type(body, "string")
+				local decoded = assert(require("adapters.json_codec").decode(body))
+				helpers.assert_eq(decoded.model, entry.model)
+				helpers.assert_true(rawequal(owner.get_entries()[1], entry))
+				for _, message in ipairs(observed.warnings) do
+					helpers.assert_true(message:find("which this build no longer has", 1, true) == nil)
+				end
+			end)
+		end
+	end)
+end)

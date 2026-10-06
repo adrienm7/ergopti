@@ -1,0 +1,114 @@
+{
+	"marker_key": "button.cancel",
+	"marker_english": "Cancel",
+	"specs": {
+		"section": "llm_model_specs_frame",
+		"key": "menu.llm.specs_header",
+		"english": "SPECIFICATIONS",
+		"rows": [
+			{
+				"type": "---",
+				"platforms": ["ahk", "hs"],
+				"unavailable": "hide"
+			},
+			{
+				"type": "label",
+				"id": "llm_model_specs_readout",
+				"i18n": "menu.llm.specs_header",
+				"platforms": ["ahk"],
+				"unavailable": "hide"
+			},
+			{
+				"type": "section_header",
+				"id": "llm_model_specs_heading",
+				"i18n": "menu.llm.specs_header",
+				"platforms": ["hs"],
+				"unavailable": "hide"
+			}
+		],
+		"platform_rows": {
+			"ahk": [
+				{
+					"separator": true
+				},
+				{
+					"label": "SPECIFICATIONS",
+					"disabled": true
+				}
+			],
+			"hs": [
+				{
+					"separator": true
+				},
+				{
+					"label": "— SPECIFICATIONS —",
+					"disabled": true
+				}
+			],
+			"linux": []
+		}
+	},
+	"caps": {
+		"section": "llm_model_caps_frame",
+		"key": "menu.llm.caps_header",
+		"english": "CAPABILITIES",
+		"rows": [
+			{
+				"type": "---",
+				"platforms": ["ahk", "hs"],
+				"unavailable": "hide"
+			},
+			{
+				"type": "label",
+				"id": "llm_model_caps_readout",
+				"i18n": "menu.llm.caps_header",
+				"platforms": ["ahk"],
+				"unavailable": "hide"
+			},
+			{
+				"type": "section_header",
+				"id": "llm_model_caps_heading",
+				"i18n": "menu.llm.caps_header",
+				"platforms": ["hs"],
+				"unavailable": "hide"
+			}
+		],
+		"platform_rows": {
+			"ahk": [
+				{
+					"separator": true
+				},
+				{
+					"label": "CAPABILITIES",
+					"disabled": true
+				}
+			],
+			"hs": [
+				{
+					"separator": true
+				},
+				{
+					"label": "— CAPABILITIES —",
+					"disabled": true
+				}
+			],
+			"linux": []
+		}
+	},
+	"platforms": {
+		"ahk": {
+			"decoration": "",
+			"present": true
+		},
+		"hs": {
+			"decoration": ["— ", " —"],
+			"present": true
+		},
+		"linux": {
+			"present": false
+		}
+	},
+	"native_model": "Qwen3-Coder-30B-A3B-Instruct",
+	"selection_key": "menu.llm.select_model",
+	"selection_english": "👉 Select this model"
+}

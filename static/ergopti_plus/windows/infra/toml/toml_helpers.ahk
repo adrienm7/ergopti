@@ -792,6 +792,22 @@ TOML_BatchWrite(Path, Updates, ExactSectionPrefixes := []) {
 		return _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, "write")
 }
 
+/** Builds a complete configuration-only semantic candidate without publication. */
+TOML_BuildConfigUpdatedContent(Path, Updates, ExactSectionPrefixes := []) {
+	SourcePresent := FileExist(Path) ? 1 : 0
+	SourceBytes := SourcePresent ? FSReadUtf8Exact(Path) : ""
+	if SourcePresent && !(SourceBytes is String)
+		return Map("status", "error", "kind", "source_unreadable", "content", "")
+	Result := _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, "build",
+		SourceBytes, SourcePresent, true)
+	return _TOML_FinalizeBuildResult(Result, SourcePresent, SourceBytes)
+}
+
+/** Publishes semantic configuration effects through the existing guarded stage. */
+TOML_ConfigBatchWrite(Path, Updates, ExactSectionPrefixes := []) {
+	return _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, "write", , , true)
+}
+
 ; Fresh source authority is checked independently of candidate equality. A
 ; concurrent writer cannot turn a stale candidate into an acknowledged no-op.
 _TOML_WriteSourceMatches(Path, SourcePresent, SourceBytes) {
@@ -799,7 +815,7 @@ _TOML_WriteSourceMatches(Path, SourcePresent, SourceBytes) {
 }
 
 _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
-		ProvidedContent := unset, ProvidedPresence := unset) {
+		ProvidedContent := unset, ProvidedPresence := unset, DocumentMode := false) {
 		if !(Mode is String) || (Mode != "write" && Mode != "build")
 				throw ValueError("TOML_BatchWrite mode must be 'write' or 'build'")
 		BuildOnly := Mode == "build"
@@ -815,7 +831,7 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 				if !(Prefix is String) or Prefix = ""
 						throw ValueError("ExactSectionPrefixes must contain non-empty strings")
 		}
-		if (!BuildOnly && Updates.Length = 0 and ExactSectionPrefixes.Length = 0)
+		if (!DocumentMode && !BuildOnly && Updates.Length = 0 and ExactSectionPrefixes.Length = 0)
 				return true
 
 		; A config save is a full read-modify-write plus a canonicalisation pass, and
@@ -838,134 +854,142 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 				try LoggerError("TomlWrite", "Refusing TOML {1} for '{2}': its exact source image could not be read. No file was changed.", Mode, Path)
 				return false
 		}
-		Parsed := _ParseTomlFileImpl(Path, false, false, SourceBytes, true, &DiscardedArrays)
-		; Refuse to rebuild a file we could not read. Everything below serializes
-		; ONLY what this parse returned and then moves the result over the original,
-		; so proceeding on a failed read would replace the user's whole config with
-		; the handful of keys in Updates. "I could not read it" must never be
-		; allowed to mean "it was empty".
-		if TOML_ReadFailed(Path) {
-				try LoggerError("TomlWrite", "Refusing to write '{1}': the current contents could not be read, and rewriting from an unread file would discard every setting it holds.", Path)
+		if DocumentMode {
+			try Admitted := TOML_BuildConfigDocumentCandidate(SourceBytes, Updates, ExactSectionPrefixes)
+			catch as Err {
+				try LoggerError("TomlWrite", "Refusing semantic configuration {1} for '{2}': {3}. No file was changed.", Mode, Path, Err.Message)
 				return false
-		}
-		if DiscardedArrays {
-				try LoggerError("TomlWrite", "Refusing TOML {1} for '{2}': parsing discarded {3} unterminated array(s). Repair the source before saving; no file was changed.", Mode, Path, DiscardedArrays)
-				return false
-		}
-		; Deep-copy the parsed Map before mutating so candidate rendering and
-		; publication share the same side-effect-free transformation.
-		Sections := Parsed.Clone()
-		for sec in Sections
-				Sections[sec] := Sections[sec].Clone()
-		; Track section order so the on-disk layout stays stable across writes.
-		; ``ParseTomlFile`` already iterates the file in declaration order, so
-		; ``for`` over the resulting Map preserves it; we rebuild the order
-		; explicitly to make new sections deterministic.
-		order := []
-		for sec in Sections
-				order.Push(sec)
+			}
+		} else {
+			Parsed := _ParseTomlFileImpl(Path, false, false, SourceBytes, true, &DiscardedArrays)
+			; Refuse to rebuild a file we could not read. Everything below serializes
+			; ONLY what this parse returned and then moves the result over the original,
+			; so proceeding on a failed read would replace the user's whole config with
+			; the handful of keys in Updates. "I could not read it" must never be
+			; allowed to mean "it was empty".
+			if TOML_ReadFailed(Path) {
+					try LoggerError("TomlWrite", "Refusing to write '{1}': the current contents could not be read, and rewriting from an unread file would discard every setting it holds.", Path)
+					return false
+			}
+			if DiscardedArrays {
+					try LoggerError("TomlWrite", "Refusing TOML {1} for '{2}': parsing discarded {3} unterminated array(s). Repair the source before saving; no file was changed.", Mode, Path, DiscardedArrays)
+					return false
+			}
+			; Deep-copy the parsed Map before mutating so candidate rendering and
+			; publication share the same side-effect-free transformation.
+			Sections := Parsed.Clone()
+			for sec in Sections
+					Sections[sec] := Sections[sec].Clone()
+			; Track section order so the on-disk layout stays stable across writes.
+			; ``ParseTomlFile`` already iterates the file in declaration order, so
+			; ``for`` over the resulting Map preserves it; we rebuild the order
+			; explicitly to make new sections deterministic.
+			order := []
+			for sec in Sections
+					order.Push(sec)
 
-		; Dynamic record namespaces need replace semantics: a merge-only write
-		; retains records omitted by the caller and resurrects deleted profiles on
-		; the next boot. Match only the exact section or a dot-delimited child so a
-		; sibling such as ``user_profiles_backup`` remains untouched.
-		if (ExactSectionPrefixes.Length > 0) {
-				KeptOrder := []
-				for _, SecName in order {
-						DropSection := false
-						for _, Prefix in ExactSectionPrefixes {
-								if (SecName = Prefix or InStr(SecName, Prefix . ".") = 1) {
-										DropSection := true
-										break
-								}
-						}
-						if DropSection
-								Sections.Delete(SecName)
-						else
-								KeptOrder.Push(SecName)
-				}
-				order := KeptOrder
-		}
+			; Dynamic record namespaces need replace semantics: a merge-only write
+			; retains records omitted by the caller and resurrects deleted profiles on
+			; the next boot. Match only the exact section or a dot-delimited child so a
+			; sibling such as ``user_profiles_backup`` remains untouched.
+			if (ExactSectionPrefixes.Length > 0) {
+					KeptOrder := []
+					for _, SecName in order {
+							DropSection := false
+							for _, Prefix in ExactSectionPrefixes {
+									if (SecName = Prefix or InStr(SecName, Prefix . ".") = 1) {
+											DropSection := true
+											break
+									}
+							}
+							if DropSection
+									Sections.Delete(SecName)
+							else
+									KeptOrder.Push(SecName)
+					}
+					order := KeptOrder
+			}
 
-		for _, U in Updates {
-				Sec := U.Section
-				K := U.Key
-				DeleteRequested := U.HasOwnProp("Delete")
-					&& (U.Delete is Integer) && U.Delete == 1
-				if U.HasOwnProp("Delete")
-						&& (!(U.Delete is Integer)
-							|| (U.Delete != 0 && U.Delete != 1))
-						throw TypeError("Delete must be the Integer 0 or 1")
-				; A neutral-value deletion must not create the missing section it
-				; was meant to leave absent, especially in the boot full-save batch.
-				if DeleteRequested && !Sections.Has(Sec)
-						continue
-				if !Sections.Has(Sec) {
-						Sections[Sec] := Map()
-						order.Push(Sec)
-				}
-				if DeleteRequested {
-						if Sections[Sec].Has(K)
-								Sections[Sec].Delete(K)
-				} else {
-						Sections[Sec][K] := U.Value
-				}
-		}
+			for _, U in Updates {
+					Sec := U.Section
+					K := U.Key
+					DeleteRequested := U.HasOwnProp("Delete")
+						&& (U.Delete is Integer) && U.Delete == 1
+					if U.HasOwnProp("Delete")
+							&& (!(U.Delete is Integer)
+								|| (U.Delete != 0 && U.Delete != 1))
+							throw TypeError("Delete must be the Integer 0 or 1")
+					; A neutral-value deletion must not create the missing section it
+					; was meant to leave absent, especially in the boot full-save batch.
+					if DeleteRequested && !Sections.Has(Sec)
+							continue
+					if !Sections.Has(Sec) {
+							Sections[Sec] := Map()
+							order.Push(Sec)
+					}
+					if DeleteRequested {
+							if Sections[Sec].Has(K)
+									Sections[Sec].Delete(K)
+					} else {
+							Sections[Sec][K] := U.Value
+					}
+			}
 
-		body := ""
+			body := ""
 
-		EnsureTrailingBlankLines(count) {
-				newline_run := 0
-				i := StrLen(body)
-				while (i > 0 && SubStr(body, i, 1) = "`n") {
-						newline_run += 1
-						i -= 1
-				}
-				current := newline_run > 0 ? (newline_run - 1) : 0
-				while (current < count) {
-						body .= "`n"
-						newline_run += 1
-						current += 1
-				}
-				while (current > count) {
-						body := SubStr(body, 1, StrLen(body) - 1)
-						newline_run -= 1
-						current -= 1
-				}
-		}
+			EnsureTrailingBlankLines(count) {
+					newline_run := 0
+					i := StrLen(body)
+					while (i > 0 && SubStr(body, i, 1) = "`n") {
+							newline_run += 1
+							i -= 1
+					}
+					current := newline_run > 0 ? (newline_run - 1) : 0
+					while (current < count) {
+							body .= "`n"
+							newline_run += 1
+							current += 1
+					}
+					while (current > count) {
+							body := SubStr(body, 1, StrLen(body) - 1)
+							newline_run -= 1
+							current -= 1
+					}
+			}
 
-		; Foreign table-array generations are not flat rendering destinations.
-		; Admission below independently verifies their complete typed subtrees.
-		try RenderingSections := _TOML_ForeignArrayRenderingSections(SourceBytes, Sections)
-		catch as Err {
-				try LoggerError("TomlWrite", "Refusing TOML {1}: source rendering admission failed. No file was changed.", Mode)
-				return false
-		}
-		; Sort sections alphabetically for stable, readable output
-		SortedSections := []
-		for sec in RenderingSections
-				SortedSections.Push(sec)
-		SortedSections := SortArray(SortedSections)
-		FirstSection := true
-		for _, sec in SortedSections {
-				if !FirstSection {
-						EnsureTrailingBlankLines(5)
-				}
-				FirstSection := false
-				body .= "[" . sec . "]`n"
-				; Sort keys alphabetically within each section
-				SortedKeys := []
-				for k, v in RenderingSections[sec]
-						SortedKeys.Push(k)
-				SortedKeys := SortArray(SortedKeys)
-				for _, k in SortedKeys
-						body .= TOML_RenderKey(k) . " = " . TOML_RenderValue(RenderingSections[sec][k]) . "`n"
-		}
-		try Admitted := TOML_AdmitWriterCandidate(SourceBytes, Parsed, Sections, Chr(0xFEFF) . body,
-			Updates, ExactSectionPrefixes)
-		catch as Err {
-				try LoggerError("TomlWrite", "Refusing TOML {1} for '{2}': {3}. No file was changed.", Mode, Path, Err.Message)
-				return false
+			; Foreign table-array generations are not flat rendering destinations.
+			; Admission below independently verifies their complete typed subtrees.
+			try RenderingSections := _TOML_ForeignArrayRenderingSections(SourceBytes, Sections)
+			catch as Err {
+					try LoggerError("TomlWrite", "Refusing TOML {1}: source rendering admission failed. No file was changed.", Mode)
+					return false
+			}
+			; Sort sections alphabetically for stable, readable output
+			SortedSections := []
+			for sec in RenderingSections
+					SortedSections.Push(sec)
+			SortedSections := SortArray(SortedSections)
+			FirstSection := true
+			for _, sec in SortedSections {
+					if !FirstSection {
+							EnsureTrailingBlankLines(5)
+					}
+					FirstSection := false
+					body .= "[" . sec . "]`n"
+					; Sort keys alphabetically within each section
+					SortedKeys := []
+					for k, v in RenderingSections[sec]
+							SortedKeys.Push(k)
+					SortedKeys := SortArray(SortedKeys)
+					for _, k in SortedKeys
+							body .= TOML_RenderKey(k) . " = " . TOML_RenderValue(RenderingSections[sec][k]) . "`n"
+			}
+			try Admitted := TOML_AdmitWriterCandidate(SourceBytes, Parsed, Sections, Chr(0xFEFF) . body,
+				Updates, ExactSectionPrefixes)
+			catch as Err {
+					try LoggerError("TomlWrite", "Refusing TOML {1} for '{2}': {3}. No file was changed.", Mode, Path, Err.Message)
+					return false
+			}
 		}
 		if !_TOML_WriteSourceMatches(Path, SourcePresent, SourceBytes) {
 				; Detached builds never own the live reader cache. An ordinary

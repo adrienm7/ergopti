@@ -534,3 +534,102 @@ _TOAN_UnreadableConfigurationIsNeverShownNeutral() {
 }
 Test("onboarding answers: a damaged configuration is refused, not shown neutral (onboarding-answers-windows)",
 	_TOAN_UnreadableConfigurationIsNeverShownNeutral)
+
+
+; The actual wizard transaction publishes before its unit-owned reload hand-off.
+; The hand-off is a runner stub; this does not claim an installed-driver reload.
+_TOAN_FullSemanticCommit() {
+	global _ConfigDir, _DefaultConfigDir, _DefaultLogsDir, _AhkSubDir
+	global _PathsFile, ConfigurationFile, _Stub_SentText
+	global _ConfigBootRejectedOverrides, _ConfigBootOutdatedEntries
+	global _ParseTomlCache, _TomlFileCache, _ConfigTomlSnapshots
+	Runtime := _CFGFS_CaptureRuntime(), Coordinator := _ConfigFullSaveCoordinator()
+	Previous := Map("dir_set", IsSet(_ConfigDir), "dir", IsSet(_ConfigDir) ? _ConfigDir : "",
+		"default_set", IsSet(_DefaultConfigDir), "default", IsSet(_DefaultConfigDir) ? _DefaultConfigDir : "",
+		"logs_set", IsSet(_DefaultLogsDir), "logs", IsSet(_DefaultLogsDir) ? _DefaultLogsDir : "",
+		"subdir_set", IsSet(_AhkSubDir), "subdir", IsSet(_AhkSubDir) ? _AhkSubDir : "",
+		"paths_set", IsSet(_PathsFile), "paths", IsSet(_PathsFile) ? _PathsFile : "",
+		"sent", _Stub_SentText, "rejected", _ConfigBootRejectedOverrides,
+		"outdated", _ConfigBootOutdatedEntries)
+	Folder := SubStr(_TOAN_NewPath(), 1, -5), Path := Folder . "\config.toml"
+	AssertTrue(DllCall("CreateDirectoryW", "Str", Folder, "Ptr", 0, "Int"),
+		"the wizard transaction fixture must exclusively own its directory")
+	Source := 'script = {locale = "en", future = "retain"}`n[future]`nold = "retain" # user data`n'
+	Expected := Chr(0xFEFF) . 'script = {locale = "fr", future = "retain"}`n[future]`nold = "retain" # user data`n'
+	Seen := Map("calls", 0)
+	Observe() {
+		Seen["calls"] += 1
+		Seen["content"] := FSReadUtf8Exact(ConfigurationFile)
+		Seen["path"] := ConfigurationFile
+		Seen["terminal"] := _ConfigWriteTerminalIsActive()
+		Bundle := _ConfigWriteLeaseState().terminal
+		Token := _ConfigWriteLeaseSelectOwner(Bundle, ConfigurationFile)
+		Seen["bundle"] := Bundle
+		Seen["token"] := Token
+		Seen["current"] := _ConfigWriteLeaseCurrent(ConfigurationFile)
+		Seen["lease"] := _ConfigWriteLeaseOwns(Token, ConfigurationFile)
+		Seen["ordinary_busy"] := ConfigWriteLeaseBusy()
+		Seen["unrelated"] := _ConfigWriteLeaseSelectOwner(Bundle, ConfigurationFile . ".unrelated")
+		Seen["wrong_path"] := _ConfigWriteLeaseOwns(Token, ConfigurationFile . ".unrelated")
+		Seen["wal"] := FSStrictExists(ConfigTransitionWalPath(_PathsFile))
+		Seen["journal"] := ConfigTransitionInspect(_PathsFile, ConfigTransitionProductionPort())
+	}
+	try {
+		_ConfigDir := Folder . "\"
+		_DefaultConfigDir := _ConfigDir
+		_DefaultLogsDir := Folder . "\logs"
+		_AhkSubDir := ""
+		_PathsFile := Folder . "\paths.toml"
+		_Stub_SentText := []
+		_CFGFS_Prepare(Path)
+		_ConfigBootRejectedOverrides := 0
+		_ConfigBootOutdatedEntries := Map()
+		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		Plan := _OnbWeb_FinishPlan(_TOAN_Answers([], "fr", Folder))
+		AssertTrue(Plan is Map)
+		Result := _Onboarding_Commit(Plan["locale"], Plan["config_dir"],
+			Plan["rows"], Plan["tap_hold_keys"], Observe)
+		AssertTrue((Result is Integer) && Result == 1, "the actual wizard can update an inline-owned locale")
+		AssertEqual(1, Seen["calls"], "only an accepted hand-off observes the committed image")
+		AssertEqual(Expected, Seen["content"])
+		AssertEqual(Path, Seen["path"])
+		AssertTrue(Seen["terminal"], "the actual transaction retains terminal authority through hand-off")
+		AssertTrue(Seen["lease"], "the actual transaction retains source ownership through hand-off")
+		AssertTrue(Seen["bundle"] is Object, "the hand-off retains the actual terminal bundle")
+		AssertEqual("terminal_bundle", Seen["bundle"].kind)
+		AssertTrue(Seen["token"] is Object, "the candidate path has an actual native lease token")
+		AssertTrue(Seen["token"] == Seen["current"], "the selected token is the exact live candidate-path owner")
+		AssertFalse(Seen["ordinary_busy"], "terminal ownership is not the deferrable ordinary-writer busy state")
+		AssertFalse(Seen["unrelated"], "the bundle cannot borrow an undeclared sibling path")
+		AssertFalse(Seen["wrong_path"], "the actual candidate token refuses an unrelated path")
+		AssertEqual(1, Seen["wal"], "the accepted hand-off retains its journal for refused-reload rollback")
+		AssertTrue(ConfigTransitionResultIs(Seen["journal"], "ready"))
+		AssertEqual("committed_new", Seen["journal"]["record"]["phase"])
+		AssertEqual(Expected, FSReadUtf8Exact(Path))
+		AssertEqual(1, _Stub_SentText.Length)
+		AssertEqual("reload_preserving_suspend", _Stub_SentText[1].kind)
+		AssertFalse(_ConfigWriteTerminalIsActive())
+		AssertFalse(ConfigWriteLeaseBusy())
+		Cache := ParseConfigTomlFile(Path)
+		AssertEqual("fr", IniCacheGet(Cache, "script", "locale"))
+		AssertEqual("retain", IniCacheGet(Cache, "script", "future"))
+	} finally {
+		_ConfigFullSaveCoordinator(Coordinator)
+		_CFGFS_RestoreRuntime(Runtime)
+		_ConfigDir := Previous["dir_set"] ? Previous["dir"] : unset
+		_DefaultConfigDir := Previous["default_set"] ? Previous["default"] : unset
+		_DefaultLogsDir := Previous["logs_set"] ? Previous["logs"] : unset
+		_AhkSubDir := Previous["subdir_set"] ? Previous["subdir"] : unset
+		_PathsFile := Previous["paths_set"] ? Previous["paths"] : unset
+		_Stub_SentText := Previous["sent"]
+		_ConfigBootRejectedOverrides := Previous["rejected"]
+		_ConfigBootOutdatedEntries := Previous["outdated"]
+		for Store in [_ParseTomlCache, _TomlFileCache, _ConfigTomlSnapshots] {
+			if Store.Has(Path)
+				Store.Delete(Path)
+		}
+		_TOAN_DeleteFolder(Folder)
+	}
+}
+Test("onboarding answers: actual WAL commit changes inline settings before owned reload hand-off (config-full-semantic-successor)",
+	_TOAN_FullSemanticCommit)

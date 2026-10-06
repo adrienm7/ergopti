@@ -43,10 +43,15 @@ local it          = helpers.it
 local assert_eq   = helpers.assert_eq
 local assert_true = helpers.assert_true
 
-local Logger = require("logger")
 local json   = require("json")
 
 local Paths = require("infra.paths")
+
+-- Format vectors own a private instance of the actual shared core. A live
+-- singleton can carry a pending dedup summary from earlier native-owner tests;
+-- capturing that summary would mix their lifecycle with this formatting corpus.
+-- Loading the source directly leaves the registered logger and its debt intact.
+local Logger = assert(loadfile(assert(Paths.shared("lua/logger/init.lua"))))()
 
 -- Every variant the corpus can name, mapped to the function that emits it.
 -- A vector naming a variant absent from this table fails loudly rather than

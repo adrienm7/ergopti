@@ -41,9 +41,9 @@ local ConfigOutdated = require("config_outdated")
 --- each one consumes.
 --- @param decoded table Decoded config.toml.
 --- @param mark function mark(...segments).
-function M.collect(decoded, mark)
+function M.collect(decoded, mark, shapes)
 	require("infra.config_overrides").mark_config_reads(decoded, mark)
-	require("infra.preferences").mark_config_reads(decoded, mark)
+	require("infra.preferences").mark_config_reads(decoded, mark, shapes)
 	require("modules.shortcuts.tap_keys").mark_config_reads(decoded, mark)
 	require("modules.shortcuts.keyboard_shortcuts").mark_config_reads(decoded, mark)
 	require("ui.onboarding").config_values(decoded, mark)
@@ -57,6 +57,7 @@ function M.find(path, file_adapter)
 	return Engine.find({
 		path = path,
 		collect = M.collect,
+		whole_unread_roots = true,
 		file_adapter = file_adapter or require("adapters.file_system"),
 	})
 end
@@ -103,6 +104,7 @@ function M.run_from_menu(deps)
 	local host = deps.host or require("ui.config_cleanup")
 	return host.open({
 		path = path, collect = M.collect,
+		whole_unread_roots = true,
 		file_adapter = deps.file_adapter or require("adapters.file_system"),
 		on_removed = function(result)
 			return preferences.adopt_cleanup(path, result.previous, result.content)

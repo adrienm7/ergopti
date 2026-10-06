@@ -1,0 +1,35 @@
+{
+	"label_key": "menu.llm.api_add_entry",
+	"label": "+ Add an API",
+	"mutated_key": "button.cancel",
+	"mutated_label": "Cancel",
+	"command_section": "llm_api_add_command",
+	"group_section": "llm_api_add_provider_group",
+	"separator_section": "llm_api_add_separator",
+	"identity": "api_add_entry",
+	"mac_decoration": "➕ ",
+	"group_ready": "llm_api_add_group_ready",
+	"command": {
+		"type": "command",
+		"id": "api_add_entry",
+		"i18n": "menu.llm.api_add_entry",
+		"platforms": ["ahk"],
+		"unavailable": "hide"
+	},
+	"group": {
+		"type": "group",
+		"id": "api_add_entry",
+		"i18n": "menu.llm.api_add_entry",
+		"disabled_when": ["llm_api_add_group_ready"],
+		"platforms": ["hs", "linux"],
+		"unavailable": "hide"
+	},
+	"separator": {
+		"type": "---"
+	},
+	"native_positions": {
+		"ahk": "after Add only with entries",
+		"hs": "after Add only with entries",
+		"linux": "before Add"
+	}
+}

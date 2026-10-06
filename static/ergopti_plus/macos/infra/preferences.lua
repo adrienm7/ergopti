@@ -38,9 +38,13 @@ local FileSystem = require("adapters.file_system")
 local Manifest = require("infra.manifest_reader")
 local HotstringLanguages = require("hotstrings.languages")
 local ConfigOutdated = require("config_outdated")
+local BindingIdentity = require("config_binding_identity")
 local PersonalFiles = require("hotstrings.personal_files")
 local PersonalAdoption = require("infra.personal_file_adoption")
 local Agent     = require("llm.agent")
+local WrapPreferences = require("menu.wrap_preferences")
+local UserModels = require("config_user_models")
+local RecordList = require("toml_codec.record_list")
 local LOG       = "preferences"
 local OperationReporter = require("diagnostics.operation_reporter")
 
@@ -188,6 +192,8 @@ local NESTED_KEY_MAP = {
 	-- Shortcuts nested tables
 	shortcut_keys            = { sec = "shortcuts",  key = "keys"                       },
 	script_control_shortcuts = { sec = "shortcuts",  key = "script_control"             },
+	wrap_symbol_states       = WrapPreferences.locations.wrap_symbol_states,
+	custom_wrap_symbols      = WrapPreferences.locations.custom_wrap_symbols,
 }
 
 --- Nested tables whose every child is a manifest-declared setting. A child the
@@ -223,9 +229,9 @@ end
 --- an action that still takes a parameter, and its value must still fit that
 --- parameter (a removed wrap pair, a retired language). The gesture catalogue
 --- judges it once loaded, as for retired actions; without it, or when its own
---- validator cannot judge, every entry is kept. Whether the binding before the
---- action still exists is not judged: no single catalogue lists every binding
---- (gesture slots, keyboard__, tap_key__, script__…).
+--- validator cannot judge, every entry is kept. Bare gesture bindings are
+--- judged only after their actual owner publishes its slot catalogue; other
+--- binding domains remain with their own owners.
 --- @param key string Persisted parameter key.
 --- @param value any Persisted value.
 --- @return boolean known
@@ -234,8 +240,12 @@ local function action_parameter_fits(key, value)
 	local catalogue = package.loaded["modules.gestures.actions"]
 	if type(catalogue) ~= "table" or type(catalogue.split_action_parameter_key) ~= "function"
 		or type(catalogue.validate_action_parameter) ~= "function" then return true end
-	local _, action = catalogue.split_action_parameter_key(key)
+	local binding, action = catalogue.split_action_parameter_key(key)
 	if not action then return false, "no action parameter of this build has this name" end
+	if type(catalogue.action_parameter_binding_fits) == "function" then
+		local fits, detail = catalogue.action_parameter_binding_fits(binding)
+		if fits == false then return false, detail or BindingIdentity.RETIRED_GESTURE end
+	end
 	local judged, valid = pcall(catalogue.validate_action_parameter, action, value)
 	if judged and not valid then return false, "the value no longer fits its action's parameter" end
 	return true
@@ -368,6 +378,43 @@ local function partition_section_choices(prefix, modules, mark)
 		end
 	end
 	return kept
+end
+
+--- Distinguishes the settings namespace from arrays using actual source evidence.
+--- @param value any Section-order namespace.
+--- @param shapes table|nil Canonical document receipt.
+--- @return boolean
+local function section_orders_are_map(value, shapes)
+	if type(value) ~= "table" then return false end
+	local origin = require("toml_codec.leaf_rows").source_origin(value)
+	if origin then return not origin.array end
+	if shapes then return shapes.arrays[value] ~= true end
+	return #value == 0
+end
+
+--- Checks intrinsic section-order shape without judging unpublished group ids.
+--- @param value any Persisted per-category section order.
+--- @param shapes table|nil Canonical receipt of the original document.
+--- @return boolean fits
+--- @return string|nil detail
+local function section_order_fits(value, shapes)
+	if type(value) ~= "table" then return false, "section order is not a list" end
+	local origin = require("toml_codec.leaf_rows").source_origin(value)
+	if (origin and not origin.array) or (shapes and shapes.arrays[value] ~= true) then
+		return false, "section order is not an array"
+	end
+	local count = 0
+	for index, entry in pairs(value) do
+		if type(index) ~= "number" or index < 1 or index ~= math.floor(index) then
+			return false, "section order is not a dense list"
+		end
+		if type(entry) ~= "string" then return false, "section order entries are not text" end
+		count = count + 1
+	end
+	for index = 1, count do
+		if value[index] == nil then return false, "section order is not a dense list" end
+	end
+	return true
 end
 
 --- Set of known top-level section names for fast lookup.
@@ -518,7 +565,9 @@ local function group_for_disk(flat)
 	for k, v in pairs(flat) do
 		local nested = NESTED_KEY_MAP[k]
 		local scalar  = KEY_MAP[k]
-		if nested then
+		if k == "wrap_symbol_states" or k == "custom_wrap_symbols" then
+			-- The typed Wrap policy plans these source-preserving rows separately.
+		elseif nested then
 			if nested.merge_into_sec then
 				-- Gesture slots: each entry becomes a scalar in the parent section
 				if type(v) == "table" then
@@ -616,9 +665,12 @@ end
 --- @param mark function|nil mark(...segments), called for every disk path the
 ---   flat state takes; the unused-key cleanup offers only the paths never marked.
 --- @return table A flat state dictionary.
-local function flatten_from_disk(grouped, mark)
+local function flatten_from_disk(grouped, mark, shapes)
 	if type(grouped) ~= "table" then return {} end
 	local flat = {}
+	if shapes then
+		flat = WrapPreferences.project(grouped, shapes, mark, ConfigOutdated.report)
+	end
 	local function take(...)
 		if mark then mark(...) end
 	end
@@ -635,6 +687,10 @@ local function flatten_from_disk(grouped, mark)
 		return profile_ids, legacy_profile_ids
 	end
 	local function take_value(flat_key, value, ...)
+		if flat_key == "llm_user_models" then
+			flat[flat_key] = UserModels.partition(value, shapes, mark)
+			return
+		end
 		local fits, detail = persisted_units_fit(KEY_MAP[flat_key], value)
 		local spec = KEY_MAP[flat_key]
 		if fits and spec and spec.enum then
@@ -728,6 +784,14 @@ local function flatten_from_disk(grouped, mark)
 								boolean_choice, mark)
 						elseif nested_fk == "section_states" then
 							flat[nested_fk] = partition_section_choices({ sec_name, disk_key }, owned, mark)
+						elseif nested_fk == "sections_order_overrides" then
+							if not section_orders_are_map(disk_val, shapes) then
+								ConfigOutdated.report({ sec_name, disk_key }, "section orders are not a table of settings")
+								flat[nested_fk] = {}
+							else
+								flat[nested_fk] = ConfigOutdated.partition({ sec_name, disk_key }, owned,
+									function(_, value) return section_order_fits(value, shapes) end, mark)
+							end
 						elseif nested_fk == "delays" then
 							-- A retired delay was ignored by set_delay and saved back
 							-- at every save, never offered.
@@ -755,7 +819,7 @@ local function flatten_from_disk(grouped, mark)
 								if #inner_val > 0 then
 									local lookup = sec_name .. ":" .. disk_key .. "." .. inner_key
 									local fk     = _reverse_scalar[lookup] or _reverse_nested[lookup]
-									if fk then
+									if fk and fk ~= "custom_wrap_symbols" and fk ~= "wrap_symbol_states" then
 										take_value(fk, inner_val, sec_name, disk_key, inner_key)
 									end
 								else
@@ -763,11 +827,11 @@ local function flatten_from_disk(grouped, mark)
 									-- or depth-3 nested maps (hotstrings.editor.*).
 									local lookup = sec_name .. ":" .. disk_key .. "." .. inner_key
 									local fk     = _reverse_scalar[lookup]
-									if fk then
+									if fk and fk ~= "custom_wrap_symbols" and fk ~= "wrap_symbol_states" then
 										take_value(fk, inner_val, sec_name, disk_key, inner_key)
 									else
 										local nfk = _reverse_nested[lookup]
-										if nfk then
+										if nfk and nfk ~= "custom_wrap_symbols" and nfk ~= "wrap_symbol_states" then
 											take_value(nfk, inner_val, sec_name, disk_key, inner_key)
 										else
 											take_scalar_descendants(sec_name, disk_key .. "." .. inner_key,
@@ -780,6 +844,10 @@ local function flatten_from_disk(grouped, mark)
 								local fk     = _reverse_scalar[lookup]
 								if fk then
 									take_value(fk, inner_val, sec_name, disk_key, inner_key)
+								elseif _reverse_nested[lookup] == "llm_user_models" then
+									-- A neutral runtime list cannot authorize deleting an
+									-- obsolete scalar through the ordinary sparse save.
+									ConfigOutdated.report({ sec_name, disk_key, inner_key }, "a list of user model records is expected here")
 								end
 							end
 						end
@@ -1004,7 +1072,7 @@ function M.load(prefs_file)
 		return {}, "corrupt"
 	end
 
-	local dec_ok, tbl = pcall(TomlCodec.decode, content)
+	local dec_ok, tbl, shapes = pcall(require("toml_codec.leaf_rows").decode_source, content)
 	if not dec_ok or type(tbl) ~= "table" then
 		_source_snapshots[prefs_file] = nil
 		-- Loud, and never silently overwritten. The user's settings are still on
@@ -1019,7 +1087,7 @@ function M.load(prefs_file)
 
 	local values
 	local flattened, outdated = pcall(ConfigOutdated.collect_reports, function()
-		values = flatten_from_disk(tbl)
+		values = flatten_from_disk(tbl, nil, shapes)
 	end)
 	if not flattened then
 		_source_snapshots[prefs_file] = nil
@@ -1042,7 +1110,7 @@ function M.current_view(prefs_file)
 		local current = classify_source(prefs_file)
 		if not current then return nil end
 		if current.status == "absent" then return {}, current end
-		local decoded = TomlCodec.decode(current.content)
+		local decoded, shapes = require("toml_codec.leaf_rows").decode_source(current.content)
 		if type(decoded) ~= "table" then return nil end
 		for _, spec in pairs(KEY_MAP) do
 			local node = decoded[spec.sec]
@@ -1053,7 +1121,7 @@ function M.current_view(prefs_file)
 			end
 		end
 		local flat
-		local outdated = ConfigOutdated.collect_reports(function() flat = flatten_from_disk(decoded) end)
+		local outdated = ConfigOutdated.collect_reports(function() flat = flatten_from_disk(decoded, nil, shapes) end)
 		if next(outdated) ~= nil then return nil end
 		for key, value in pairs(flat) do
 			local spec = KEY_MAP[key]
@@ -1096,9 +1164,9 @@ end
 --- very walk load() uses.
 --- @param decoded table Decoded config.toml.
 --- @param mark function mark(...segments) from config_unused_keys.
-function M.mark_config_reads(decoded, mark)
+function M.mark_config_reads(decoded, mark, shapes)
 	if type(mark) ~= "function" then error("Preferences.mark_config_reads needs a mark function", 2) end
-	flatten_from_disk(decoded, mark)
+	flatten_from_disk(decoded, mark, shapes)
 end
 
 --- Flattens a decoded config.toml into menu-state keys through the walk load()
@@ -1106,9 +1174,9 @@ end
 --- alias the decoded document, which the caller must not reuse.
 --- @param decoded table Decoded config.toml.
 --- @return table flat Flat preferences.
-function M.flatten_document(decoded)
+function M.flatten_document(decoded, shapes)
 	if type(decoded) ~= "table" then error("Preferences.flatten_document needs a decoded document", 2) end
-	return flatten_from_disk(decoded)
+	return flatten_from_disk(decoded, nil, shapes)
 end
 
 --- Moves the save baseline past an unused-key cleanup. The cleanup removes
@@ -1173,10 +1241,7 @@ end
 --- @param value any Value to clone.
 --- @return any clone
 local function clone_value(value)
-	if type(value) ~= "table" then return value end
-	local clone = {}
-	for key, child in pairs(value) do clone[clone_value(key)] = clone_value(child) end
-	return clone
+	return require("toml_codec.leaf_rows").clone_value(value)
 end
 
 --- Reconciles leaf operations with existing inline gesture tables without
@@ -1217,6 +1282,17 @@ function M.prepare_gesture_updates(source, updates)
 	return rows
 end
 
+--- Detects only the obsolete scalar at the declared optional model-list leaf.
+--- Legacy table spellings and record-level policy remain with their owners.
+--- @param document table|nil Exact decoded source model.
+--- @return boolean obsolete
+local function user_models_scalar_is_obsolete(document)
+	local llm = type(document) == "table" and document.llm or nil
+	local models = type(llm) == "table" and llm.models or nil
+	if type(models) ~= "table" then return false end
+	return models.user_models ~= nil and type(models.user_models) ~= "table"
+end
+
 --- Rewrites only declared LLM leaves inside existing inline preference tables.
 --- The scanner owns TOML syntax; this owner clones parsed values and preserves
 --- neighboring fields before handing one complete inline value to the writer.
@@ -1226,7 +1302,21 @@ end
 local function prepare_inline_updates(source, updates, root)
 	local scanned, detail = require("toml_codec.record_scanner").scan_records(source.content or "", { quoted_headers = true })
 	assert(scanned, detail)
-	local decoded = TomlCodec.decode(source.content or "")
+	local LeafRows = require("toml_codec.leaf_rows")
+	local decoded = LeafRows.decode_source(source.content or "")
+	if root == "llm" and user_models_scalar_is_obsolete(decoded) then
+		local preserved = {}
+		for _, row in ipairs(updates) do
+			local path = require("toml_codec.key_path").parse(row.section, true)
+			if path then path[#path + 1] = row.key end
+			if path and #path == 3 and path[1] == "llm" and path[2] == "models" and path[3] == "user_models" then
+				-- A scope's neutral list is not an explicit obsolete-entry cleanup.
+				assert(row.delete or type(row.value) == "table" and next(row.value) == nil,
+					"Obsolete user model list 'llm.models.user_models' requires manual source cleanup before replacement")
+			else preserved[#preserved + 1] = row end
+		end
+		updates = preserved
+	end
 	local inline, candidates, rows = {}, {}, {}
 	local function parts(path)
 		if root == "hotstrings" then
@@ -1253,6 +1343,15 @@ local function prepare_inline_updates(source, updates, root)
 			end
 		end
 	end
+	-- Only this owner's actual inline groups need the shared forwarding proof.
+	-- The publisher repeats ownership, span, value and native source checks.
+	local direct_parents = {}
+	if next(inline) ~= nil then
+		local direct_detail
+		direct_parents, direct_detail = TomlWriter.source_inline_scalar_parents(source.content or "", updates)
+		assert(direct_parents, direct_detail)
+	end
+
 	for _, row in ipairs(updates) do
 		local path = leaf_path(row.section, row.key)
 		local parent = row.section
@@ -1265,7 +1364,7 @@ local function prepare_inline_updates(source, updates, root)
 		end
 		if path == "llm.profiles.shortcuts" and type(row.value) == "table" and next(row.value) == nil then
 			-- An empty runtime dictionary owns no unknown profile leaves on disk.
-		elseif inline[parent] then
+		elseif inline[parent] and not direct_parents[parent] then
 			local candidate = candidates[parent] or clone_value(inline[parent].value)
 			candidates[parent] = candidate
 			local keys, target = parts(path:sub(#parent + 2)), candidate
@@ -1289,8 +1388,15 @@ local function prepare_inline_updates(source, updates, root)
 	end
 	for path, candidate in pairs(candidates) do
 		local record = inline[path].record
-		rows[#rows + 1] = next(candidate) == nil and { section = record.section, key = record.key, delete = true }
-			or { section = record.section, key = record.key, value = candidate }
+		local path_segments = assert(require("toml_codec.key_path").parse(record.section, true))
+		path_segments[#path_segments + 1] = record.key
+		local operation = next(candidate) == nil and { path = path_segments, delete = true }
+			or { path = path_segments, value = candidate }
+		-- Reissue a real same-source row after this native owner transforms the
+		-- value; forwarding a stale receipt or a plain model loses future kinds.
+		for _, prepared in ipairs(LeafRows.prepare(source.content or "", { operation })) do
+			rows[#rows + 1] = prepared
+		end
 	end
 	return rows
 end
@@ -1303,31 +1409,89 @@ function M.prepare_llm_updates(source, updates)
 	return prepare_inline_updates(source, updates, "llm")
 end
 
---- The assignment containers of [shortcuts] a write may replace when they
---- hold an older build's plain value: the Shortcuts scope owns both.
-M.SHORTCUT_CONTAINERS = { "keyboard", "tap_keys" }
+--- The existing native shortcut assignment-container owners.
+M.SHORTCUT_CONTAINERS = require("config_obsolete_parents").SHORTCUT_CONTAINERS
 
 --- Prepares declared shortcut leaves while preserving inline neighbors.
+--- Obsolete assignment parents stay on disk until explicit cleanup; only
+--- neutral descendant deletions can proceed without replacing their source.
 --- @param source table Classified source.
 --- @param updates table Owned leaf operations.
---- @param containers table|nil Assignment containers this write fills
----   (`keyboard`, `tap_keys`). A plain value an older build left there (`keyboard
----   = "…"`) would make every row below it unwritable, so the write replaces
----   it. Any other container, and every ordinary save (nil), leaves such a
----   value on disk for the config cleanup, which offers it.
+--- @param containers table|nil Existing native assignment-container owners;
+---   nil retains the unchanged ordinary preference-save route.
 --- @return table Prepared writer operations.
 function M.prepare_shortcut_updates(source, updates, containers)
-	local rows = {}
-	local decoded = TomlCodec.decode(source.content or "")
-	local section = type(decoded) == "table" and decoded.shortcuts or nil
-	for _, key in ipairs(type(section) == "table" and containers or {}) do
-		local value = section[key]
-		if value ~= nil and (type(value) ~= "table" or #value > 0) then
-			rows[#rows + 1] = { section = "shortcuts", key = key, delete = true }
+	if containers ~= nil then
+		local Parents = require("config_obsolete_parents")
+		updates = Parents.preserve(source.content or "", updates, Parents.shortcut_namespaces(containers))
+	end
+	return prepare_inline_updates(source, updates, "shortcuts")
+end
+
+--- Preserves obsolete order rows while admitting only owned order mutations.
+--- No catalogue is inferred from a namespace or a currently missing group.
+--- @param source table Exact classified source snapshot.
+--- @param updates table Proposed leaf operations.
+--- @return table updates Source-preserving operations.
+local function prepare_order_updates(source, updates)
+	local KeyPath = require("toml_codec.key_path")
+	local relevant = false
+	for _, row in ipairs(updates) do
+		local path = KeyPath.parse(row.section, true)
+		if path then path[#path + 1] = row.key end
+		if path and path[1] == "hotstrings" and path[2] == "order_overrides" then relevant = true end
+	end
+	if not relevant then return updates end
+	local document, shapes = require("toml_codec.leaf_rows").decode_source(source.content or "")
+	local hotstrings = type(document.hotstrings) == "table" and document.hotstrings or {}
+	local orders = hotstrings.order_overrides
+	local malformed_parent = orders ~= nil and not section_orders_are_map(orders, shapes)
+	local bad = {}
+	if not malformed_parent then
+		for id, value in pairs(orders or {}) do
+			if type(id) ~= "string" or id == "" or not section_order_fits(value, shapes) then bad[id] = true end
 		end
 	end
-	for _, row in ipairs(prepare_inline_updates(source, updates, "shortcuts")) do rows[#rows + 1] = row end
-	return rows
+	local function refuse(path)
+		error("Obsolete section order '" .. KeyPath.render(path) .. "' requires manual source cleanup before replacement", 0)
+	end
+	local prepared = {}
+	for _, row in ipairs(updates) do
+		local path = KeyPath.parse(row.section, true)
+		if path then path[#path + 1] = row.key end
+		if path and path[1] == "hotstrings" and path[2] == "order_overrides" and #path == 2 and not row.delete then
+			assert(section_orders_are_map(row.value), "section orders candidate is not a table of settings")
+		end
+		if not path or path[1] ~= "hotstrings" or path[2] ~= "order_overrides" then
+			prepared[#prepared + 1] = row
+		elseif #path == 2 and (row.delete or type(row.value) == "table" and next(row.value) == nil) then
+			if not malformed_parent and next(bad) == nil then
+				prepared[#prepared + 1] = row
+			elseif not malformed_parent then
+				for id in pairs(orders) do
+					if not bad[id] then prepared[#prepared + 1] = { section = "hotstrings.order_overrides", key = id, delete = true } end
+				end
+			end
+		elseif malformed_parent or #path == 2 and next(bad) ~= nil or bad[path[3]] then
+			if not row.delete then refuse(malformed_parent and { "hotstrings", "order_overrides" } or path) end
+		else
+			assert(#path <= 3, "section order mutations must address a whole text list")
+			if not row.delete then
+				if #path == 2 then
+					assert(section_orders_are_map(row.value), "section orders candidate is not a table of settings")
+					for id, value in pairs(row.value) do
+						assert(type(id) == "string" and id ~= "", "section order identity is not a nonempty text key")
+						assert(section_order_fits(value), "section order candidate is not a text list")
+					end
+				else
+					assert(type(path[3]) == "string" and path[3] ~= "", "section order identity is not a nonempty text key")
+					assert(section_order_fits(row.value), "section order candidate is not a text list")
+				end
+			end
+			prepared[#prepared + 1] = row
+		end
+	end
+	return prepared
 end
 
 --- Preserves unowned hotstring neighbors while changing declared inline leaves.
@@ -1335,6 +1499,7 @@ end
 --- @param updates table Owned leaf operations.
 --- @return table Prepared writer operations.
 function M.prepare_hotstring_updates(source, updates)
+	updates = prepare_order_updates(source, updates)
 	local personal = {}
 	for _, row in ipairs(updates) do
 		local path = require("toml_codec.key_path").parse(row.section, true)
@@ -1638,20 +1803,65 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view, on_error,
 	-- its default, whose sparse delete must not erase it (see _load_outdated).
 	local outdated = _load_outdated[prefs_file] or {}
 	local replaced = {}
+	local model_operation
 	local ok, updates = pcall(function()
-		local document = expected_source.status == "ok" and TomlCodec.decode(expected_source.content) or nil
+		local document, shapes
+		if expected_source.status == "ok" then
+			document, shapes = require("toml_codec.leaf_rows").decode_source(expected_source.content)
+		end
+		if user_models_scalar_is_obsolete(document) and existing.llm_user_models ~= nil then
+			-- Reject a changed carried snapshot before sparse encoding can omit it
+			-- or overwrite the obsolete source without an explicit cleanup.
+			assert(type(existing.llm_user_models) == "table" and next(existing.llm_user_models) == nil,
+				"Obsolete user model list 'llm.models.user_models' requires manual source cleanup before replacement")
+		end
+		local hotstrings = document and type(document.hotstrings) == "table" and document.hotstrings or {}
+		local orders, desired = hotstrings.order_overrides, existing.sections_order_overrides
+		local cleared_orders = {}
+		assert(desired == nil or section_orders_are_map(desired), "section orders candidate is not a table of settings")
+		if type(desired) == "table" then
+			for id, value in pairs(desired) do
+				assert(type(id) == "string" and id ~= "", "section order identity is not a nonempty text key")
+				local old
+				if type(orders) == "table" then old = orders[id] end
+				assert(orders == nil or section_orders_are_map(orders, shapes),
+					"Obsolete section orders in '" .. prefs_file .. "' require manual source cleanup")
+				assert(old == nil or section_order_fits(old, shapes),
+					"Obsolete section order '" .. require("toml_codec.key_path").render({ "hotstrings", "order_overrides", id })
+						.. "' in '" .. prefs_file .. "' requires manual source cleanup before replacement")
+				assert(section_order_fits(value), "section order candidate is not a text list")
+				-- Sparse array encoding omits an empty list. A user who clears an
+				-- existing order must remove it, while a carried source [] keeps its
+				-- exact kind and is not silently replaced by an empty map.
+				if old ~= nil and next(old) ~= nil and next(value) == nil then
+					cleared_orders[#cleared_orders + 1] = { section = "hotstrings.order_overrides", key = id, delete = true }
+				end
+			end
+		end
+		if existing.llm_user_models ~= nil then
+			model_operation = RecordList.prepare(expected_source.content or "", existing.llm_user_models, prefs_file)
+		end
 		local leaves = {}
-		for _, row in ipairs(sparse_updates(existing)) do
+		local proposed = sparse_updates(existing)
+		for _, row in ipairs(cleared_orders) do proposed[#proposed + 1] = row end
+		for _, row in ipairs(WrapPreferences.prepare(expected_source.content or "", existing)) do
+			proposed[#proposed + 1] = row
+		end
+		for _, row in ipairs(proposed) do
 			local path = row.section .. "." .. row.key
 			local reset = reset_keeping_outdated(row, outdated, document)
-			if reset then
+			if model_operation and path == "llm.models.user_models" then
+				-- The row owner is appended after ordinary parent projections.
+			elseif reset then
 				for _, child in ipairs(reset) do leaves[#leaves + 1] = child end
 			elseif not (row.delete and outdated[path]) then
 				leaves[#leaves + 1] = row
 				if outdated[path] then replaced[#replaced + 1] = path end
 			end
 		end
-		return M.prepare_hotstring_updates(expected_source, M.prepare_shortcut_updates(expected_source, M.prepare_llm_updates(expected_source, M.prepare_gesture_updates(expected_source, leaves))))
+		local prepared = M.prepare_hotstring_updates(expected_source, M.prepare_shortcut_updates(expected_source, M.prepare_llm_updates(expected_source, M.prepare_gesture_updates(expected_source, leaves))))
+		if model_operation then prepared[#prepared + 1] = model_operation end
+		return prepared
 	end)
 	if not ok then
 		-- A silent return here looks exactly like a successful save until the next
@@ -1679,6 +1889,7 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view, on_error,
 		end
 		return false
 	end
+	if model_operation then RecordList.acknowledge(model_operation, encoded) end
 	_source_snapshots[prefs_file] = { status = "ok", content = encoded }
 	if type(encoded) == "string" then
 		local prior = _save_receipts[prefs_file]

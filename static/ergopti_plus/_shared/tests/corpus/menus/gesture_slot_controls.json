@@ -1,0 +1,187 @@
+{
+	"_comment": "Independent existing Mac sensitivity-head and action-choice contract, recorded before next implementation. Ordered metadata and numeric choices handwritten; literal caption snapshots come only from unchanged old locale dictionaries with source hashes in old-caption-snapshots.json. No new implementation/generator-derived expectations.",
+	"sections": {
+		"gesture_sensitivity_head": [
+			{
+				"type": "section_header",
+				"id": "gesture_sensitivity_heading",
+				"i18n": "menu.gestures.sensitivity_label",
+				"platforms": ["hs"],
+				"unavailable": "hide"
+			},
+			{
+				"type": "label",
+				"id": "gesture_sensitivity_hint",
+				"i18n": "menu.gestures.sensitivity_hint",
+				"platforms": ["hs"],
+				"unavailable": "hide"
+			},
+			{
+				"type": "---",
+				"platforms": ["hs"],
+				"unavailable": "hide"
+			}
+		],
+		"gesture_change_action": [
+			{
+				"type": "command",
+				"id": "gesture_slot_change_action",
+				"i18n": "menu.gestures.change_action",
+				"disabled_when": ["gesture_slot_choice_ready"],
+				"platforms": ["hs"],
+				"unavailable": "hide"
+			}
+		]
+	},
+	"sensitivity_values": [
+		1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0, 7.0, 8.0, 10.0, 12.0, 15.0, 20.0, 25.0, 30.0
+	],
+	"default_sensitivity": 3.5,
+	"heading_decoration": ["— ", " —"],
+	"deferred_picker": {
+		"delay_seconds": 0.05,
+		"tag": "menu_gestures.action_chooser"
+	},
+	"platform_rows": {
+		"ahk": {
+			"sensitivity_head": 0,
+			"change_action": 0
+		},
+		"hs": {
+			"sensitivity_head": 3,
+			"change_action": 1
+		},
+		"linux": {
+			"sensitivity_head": 0,
+			"change_action": 0
+		}
+	},
+	"caption_snapshots": {
+		"ar": {
+			"menu.gestures.sensitivity_label": "المسافة لكل إجراء (الحساسية):",
+			"menu.gestures.sensitivity_hint": "(أصغر = أكثر حساسية/استجابة)",
+			"menu.gestures.change_action": "تغيير الإجراء",
+			"menu.gestures.default_sensitivity": "(الافتراضي العام)"
+		},
+		"cs": {
+			"menu.gestures.sensitivity_label": "Vzdálenost na akci (Citlivost):",
+			"menu.gestures.sensitivity_hint": "(Menší = citlivější/reaktivnější)",
+			"menu.gestures.change_action": "Změnit akci",
+			"menu.gestures.default_sensitivity": "(Obecné výchozí)"
+		},
+		"da": {
+			"menu.gestures.sensitivity_label": "Afstand pr. handling (Følsomhed):",
+			"menu.gestures.sensitivity_hint": "(Mindre = mere sensitiv/responsiv)",
+			"menu.gestures.change_action": "Skift handling",
+			"menu.gestures.default_sensitivity": "(Generel standard)"
+		},
+		"de": {
+			"menu.gestures.sensitivity_label": "Distanz pro Aktion (Empfindlichkeit):",
+			"menu.gestures.sensitivity_hint": "(Kleiner = empfindlicher/reaktiver)",
+			"menu.gestures.change_action": "Aktion ändern",
+			"menu.gestures.default_sensitivity": "(Allgemeiner Standard)"
+		},
+		"en": {
+			"menu.gestures.sensitivity_label": "Distance per action (Sensitivity):",
+			"menu.gestures.sensitivity_hint": "(Smaller = more sensitive/reactive)",
+			"menu.gestures.change_action": "Change action",
+			"menu.gestures.default_sensitivity": "(General default)"
+		},
+		"es": {
+			"menu.gestures.sensitivity_label": "Distancia por acción (Sensibilidad):",
+			"menu.gestures.sensitivity_hint": "(Más pequeño = más sensible/reactivo)",
+			"menu.gestures.change_action": "Cambiar acción",
+			"menu.gestures.default_sensitivity": "(Valor general por defecto)"
+		},
+		"fr": {
+			"menu.gestures.sensitivity_label": "Distance par action (Sensibilité) :",
+			"menu.gestures.sensitivity_hint": "(Plus petit = Plus sensible/réactif)",
+			"menu.gestures.change_action": "Changer l'action",
+			"menu.gestures.default_sensitivity": "(Défaut général)"
+		},
+		"he": {
+			"menu.gestures.sensitivity_label": "מרחק לכל פעולה (רגישות):",
+			"menu.gestures.sensitivity_hint": "(קטן יותר = רגיש/תגובתי יותר)",
+			"menu.gestures.change_action": "שנה פעולה",
+			"menu.gestures.default_sensitivity": "(ברירת מחדל כללית)"
+		},
+		"hi": {
+			"menu.gestures.sensitivity_label": "प्रति क्रिया दूरी (संवेदनशीलता):",
+			"menu.gestures.sensitivity_hint": "(छोटा = अधिक संवेदनशील/प्रतिक्रियाशील)",
+			"menu.gestures.change_action": "क्रिया बदलें",
+			"menu.gestures.default_sensitivity": "(सामान्य डिफ़ॉल्ट)"
+		},
+		"it": {
+			"menu.gestures.sensitivity_label": "Distanza per azione (Sensibilità):",
+			"menu.gestures.sensitivity_hint": "(Minore = più sensibile/reattivo)",
+			"menu.gestures.change_action": "Cambia azione",
+			"menu.gestures.default_sensitivity": "(Predefinito generale)"
+		},
+		"ja": {
+			"menu.gestures.sensitivity_label": "アクションあたりの距離（感度）:",
+			"menu.gestures.sensitivity_hint": "（小さいほど感度が高い）",
+			"menu.gestures.change_action": "アクションを変更",
+			"menu.gestures.default_sensitivity": "（一般デフォルト）"
+		},
+		"ko": {
+			"menu.gestures.sensitivity_label": "동작당 거리 (감도):",
+			"menu.gestures.sensitivity_hint": "(작을수록 = 더 민감/반응적)",
+			"menu.gestures.change_action": "동작 변경",
+			"menu.gestures.default_sensitivity": "(일반 기본값)"
+		},
+		"nl": {
+			"menu.gestures.sensitivity_label": "Afstand per actie (Gevoeligheid):",
+			"menu.gestures.sensitivity_hint": "(Kleiner = gevoeliger/reagerend)",
+			"menu.gestures.change_action": "Actie wijzigen",
+			"menu.gestures.default_sensitivity": "(Algemene standaard)"
+		},
+		"no": {
+			"menu.gestures.sensitivity_label": "Avstand per handling (Følsomhet):",
+			"menu.gestures.sensitivity_hint": "(Mindre = mer følsom/responsiv)",
+			"menu.gestures.change_action": "Endre handling",
+			"menu.gestures.default_sensitivity": "(Generelt standard)"
+		},
+		"pl": {
+			"menu.gestures.sensitivity_label": "Odległość na akcję (Czułość):",
+			"menu.gestures.sensitivity_hint": "(Mniejsza = bardziej czuła/reaktywna)",
+			"menu.gestures.change_action": "Zmień akcję",
+			"menu.gestures.default_sensitivity": "(Ogólna domyślna)"
+		},
+		"pt": {
+			"menu.gestures.sensitivity_label": "Distância por ação (Sensibilidade):",
+			"menu.gestures.sensitivity_hint": "(Menor = mais sensível/reativo)",
+			"menu.gestures.change_action": "Alterar ação",
+			"menu.gestures.default_sensitivity": "(Padrão geral)"
+		},
+		"ru": {
+			"menu.gestures.sensitivity_label": "Расстояние на действие (Чувствительность):",
+			"menu.gestures.sensitivity_hint": "(Меньше = чувствительнее/отзывчивее)",
+			"menu.gestures.change_action": "Изменить действие",
+			"menu.gestures.default_sensitivity": "(Общее значение по умолчанию)"
+		},
+		"sv": {
+			"menu.gestures.sensitivity_label": "Distans per åtgärd (Känslighet):",
+			"menu.gestures.sensitivity_hint": "(Mindre = mer känslig/responsiv)",
+			"menu.gestures.change_action": "Ändra åtgärd",
+			"menu.gestures.default_sensitivity": "(Allmänt standardvärde)"
+		},
+		"tr": {
+			"menu.gestures.sensitivity_label": "Eylem başına mesafe (Hassasiyet):",
+			"menu.gestures.sensitivity_hint": "(Küçük = daha hassas/duyarlı)",
+			"menu.gestures.change_action": "Eylemi değiştir",
+			"menu.gestures.default_sensitivity": "(Genel varsayılan)"
+		},
+		"uk": {
+			"menu.gestures.sensitivity_label": "Відстань на дію (Чутливість):",
+			"menu.gestures.sensitivity_hint": "(Менше = чутливіше/реактивніше)",
+			"menu.gestures.change_action": "Змінити дію",
+			"menu.gestures.default_sensitivity": "(Загальне значення за замовчуванням)"
+		},
+		"zh": {
+			"menu.gestures.sensitivity_label": "每次动作距离（灵敏度）：",
+			"menu.gestures.sensitivity_hint": "（值越小 = 越灵敏）",
+			"menu.gestures.change_action": "更改操作",
+			"menu.gestures.default_sensitivity": "（通用默认值）"
+		}
+	}
+}

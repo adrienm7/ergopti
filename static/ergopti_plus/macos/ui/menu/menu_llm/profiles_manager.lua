@@ -988,63 +988,67 @@ local function build_profile_menu(
 	deps, models_mgr, delete_profile, activate_candidate, replace_profile)
 	local state  = deps.state
 	local paused = deps.script_control and type(deps.script_control.is_paused) == "function" and deps.script_control.is_paused() or false
-	local rows   = {}
-
-	-- Auto-detect recommendation logic
-	table.insert(rows, {
-		label    = i18n.get("menu.profiles.auto_detect"),
-		disabled = paused or nil,
-		action       = not paused and function()
-			if not settle_profile_mutation_recovery(deps) then return false end
-			if type(deps.apply_recommended_prompt_profile) == "function" then
-				return deps.apply_recommended_prompt_profile({
-					dialog_title = i18n.get("menu.profiles.recommended_profile"),
-					force_dialog = true,
-				})
-			end
-
-			Logger.callback(LOG, "Recommended-profile unavailable notification",
-				notifications.notify,
-				i18n.get("menu.profiles.recommended_unavailable_title"),
-				i18n.get("menu.profiles.recommended_unavailable_body"),
-				"warning")
-			return false
-		end or nil,
-	})
-	table.insert(rows, { separator = true })
-
-	-- Native profiles section
-	table.insert(rows, { label = i18n.section("menu.profiles.header_default_profiles"), disabled = true })
-	for _, profile in ipairs(llm_mod.BUILTIN_PROFILES or {}) do
-		local pid = profile.id
-		
-		local info = models_mgr and models_mgr.get_model_info(state.llm_model) or {}
-		local is_thinking = info.emojis and info.emojis:find("🧠💭")
-		
-		local extra = ""
-		if (pid == "basic" or pid == "advanced") and is_thinking then
-			extra = i18n.get("menu.profiles.not_recommended")
+	local function recommend_profile()
+		if not settle_profile_mutation_recovery(deps) then return false end
+		if type(deps.apply_recommended_prompt_profile) == "function" then
+			return deps.apply_recommended_prompt_profile({
+				dialog_title = i18n.get("menu.profiles.recommended_profile"),
+				force_dialog = true,
+			})
 		end
 
-		local display_label = ProfileLabel.format(profile.label, state.llm_num_predictions)
-
-		-- A single click selects the profile directly — no nested "use this
-		-- profile" sub-item. Mirrors the AHK tray where clicking a built-in row
-		-- activates it (ui/menu/menu_llm/menu_profiles.ahk). Customising a built-in is
-		-- still reachable via the "Clone active profile…" entry further down.
-		table.insert(rows, {
-			label    = display_label .. (profile.description and ("  —  " .. profile.description) or "") .. extra,
-			checked  = (state.llm_active_profile == pid) or nil,
-			disabled = paused or nil,
-			action       = not paused and function() return select_profile(deps, state, pid) end or nil,
-		})
+		Logger.callback(LOG, "Recommended-profile unavailable notification",
+			notifications.notify,
+			i18n.get("menu.profiles.recommended_unavailable_title"),
+			i18n.get("menu.profiles.recommended_unavailable_body"),
+			"warning")
+		return false
 	end
 
-	-- Custom profiles section
-	local user_profiles = state.llm_user_profiles or {}
-	if type(user_profiles) == "table" and #user_profiles > 0 then
-		table.insert(rows, { separator = true })
-		table.insert(rows, { label = i18n.section("menu.profiles.header_custom_profiles"), disabled = true })
+	local function create_ready()
+		if type(deps.script_control) ~= "table"
+			or type(deps.script_control.is_paused) ~= "function" then return false end
+		local ok, current = pcall(deps.script_control.is_paused)
+		return ok and current == false
+	end
+
+
+	local function builtin_rows()
+		local rows = {}
+		for _, profile in ipairs(llm_mod.BUILTIN_PROFILES or {}) do
+			local pid = profile.id
+
+			local info = models_mgr and models_mgr.get_model_info(state.llm_model) or {}
+			local is_thinking = info.emojis and info.emojis:find("🧠💭")
+
+			local extra = ""
+			if (pid == "basic" or pid == "advanced") and is_thinking then
+				extra = i18n.get("menu.profiles.not_recommended")
+			end
+
+			local display_label = ProfileLabel.format(profile.label, state.llm_num_predictions)
+
+			-- A single click selects the profile directly — no nested "use this
+			-- profile" sub-item. Mirrors the AHK tray where clicking a built-in row
+			-- activates it (ui/menu/menu_llm/menu_profiles.ahk). Customising a built-in is
+			-- still reachable via the "Clone active profile…" entry further down.
+			table.insert(rows, {
+				label    = display_label .. (profile.description and ("  —  " .. profile.description) or "") .. extra,
+				checked  = (state.llm_active_profile == pid) or nil,
+				disabled = paused or nil,
+				action       = not paused and function() return select_profile(deps, state, pid) end or nil,
+			})
+		end
+		return rows
+	end
+
+	local user_profiles
+	local function custom_present()
+		user_profiles = state.llm_user_profiles or {}
+		return type(user_profiles) == "table" and #user_profiles > 0
+	end
+	local function custom_rows()
+		local rows = {}
 		for i, profile in ipairs(user_profiles) do
 			local pid = profile.id
 			local display_label = ProfileLabel.format(profile.label or (i18n.get("menu.profiles.custom_profile_label") .. " " .. i), state.llm_num_predictions)
@@ -1056,17 +1060,9 @@ local function build_profile_menu(
 			}
 			
 			-- User profiles get a sub-menu for Editing/Deleting
-			item.items = {
-				{
-					label    = i18n.get("menu.profiles.use_profile"),
-					checked  = (state.llm_active_profile == pid) or nil,
-					disabled = paused or nil,
-					action       = not paused and function() return select_profile(deps, state, pid) end or nil,
-				},
-				{
-					label    = i18n.get("menu.profiles.shortcut_prefix"),
-					disabled = paused or nil,
-					action       = not paused and function()
+			local child_commands = {
+				["llm_profile_use"] = function() return select_profile(deps, state, pid) end,
+				["llm_profile_shortcut"] = function()
 						if not settle_profile_mutation_recovery(deps) then return false end
 						return shortcut_ui.prompt_shortcut({
 							title = i18n.get("menu.profiles.shortcut_title"),
@@ -1081,13 +1077,8 @@ local function build_profile_menu(
 								return false
 							end,
 						})
-					end or nil,
-				},
-				{ separator = true },
-				{
-					label    = i18n.get("menu.profiles.edit_profile"),
-					disabled = paused or nil,
-					action       = not paused and function()
+					end,
+				["llm_profile_edit"] = function()
 						if not settle_profile_mutation_recovery(deps) then return false end
 						if not prompt_editor or type(prompt_editor.open) ~= "function" then return false end
 						local timer_fired = false
@@ -1120,12 +1111,8 @@ local function build_profile_menu(
 						end
 						local _, timer_committed = schedule_editor(open_profile_editor)
 						return timer_committed == true
-					end or nil,
-				},
-				{
-					label    = i18n.get("menu.profiles.delete_profile"),
-					disabled = paused or nil,
-					action       = not paused and function()
+					end,
+				["llm_profile_delete"] = function()
 						if not settle_profile_mutation_recovery(deps) then return false end
 						local ok_c, choice = pcall(dialog.block_alert,
 							string.format(i18n.get("menu.profiles.delete_confirm_title"), display_label),
@@ -1136,45 +1123,44 @@ local function build_profile_menu(
 							return delete_profile(pid)
 						end
 						return false
-					end or nil,
-				},
+					end,
 			}
+			local function child_ready()
+				if paused or type(deps.script_control) ~= "table"
+					or type(deps.script_control.is_paused) ~= "function" then return false end
+				local ok, current = pcall(deps.script_control.is_paused)
+				if not ok or current ~= false then return false end
+				local count = 0
+				for _, current_profile in ipairs(state.llm_user_profiles or {}) do
+					if rawequal(current_profile, profile) then count = count + 1 end
+				end
+				return count == 1
+			end
+			item.items = ManifestMenu.template_rows("llm_custom_profile_controls", child_commands, {
+				["llm_custom_profile_active"] = function() return state.llm_active_profile == pid end,
+				["llm_custom_profile_ready"] = child_ready,
+			}, {}) or {}
+			-- Preserve the native paused-construction contract: disabled leaves have no action.
+			if paused then
+				for _, row in ipairs(item.items) do row.action = nil end
+			end
 			table.insert(rows, item)
 		end
+		return rows
 	end
 
-	local function create_ready()
-		if type(deps.script_control) ~= "table"
-			or type(deps.script_control.is_paused) ~= "function" then return false end
-		local ok, current = pcall(deps.script_control.is_paused)
-		return ok and current == false
-	end
-
-	-- "Clone active profile…" — built-ins ship with the driver and are read-only,
-	-- so cloning the active one into an editable user profile is the supported way
-	-- to customise its prompt. Only shown when the active profile is a built-in
-	-- (user profiles already expose Edit in their own submenu). Replaces the former
-	-- per-row "Clone & edit" sub-item that the single-click selection removed, and
-	-- mirrors the AHK tray's single clone entry (LLM_Menu_CloneActiveBuiltinProfile).
-	local active_builtin = nil
-	for _, p in ipairs(llm_mod.BUILTIN_PROFILES or {}) do
-		if type(p) == "table" and p.id == state.llm_active_profile then
-			active_builtin = p
-			break
+	local active_builtin
+	local function clone_present()
+		active_builtin = nil
+		for _, p in ipairs(llm_mod.BUILTIN_PROFILES or {}) do
+			if type(p) == "table" and p.id == state.llm_active_profile then
+				active_builtin = p
+				break
+			end
 		end
-	end
-	if active_builtin and not paused then
-		table.insert(rows, { separator = true })
-		local clone_row = ManifestMenu.command_row("llm_profile_commands", "llm_profile_clone", {
-			llm_profile_clone = function()
-				return clone_builtin_profile(
-					deps, state, active_builtin, activate_candidate, replace_profile, create_ready)
-			end,
-		}, { llm_profile_clone_ready = create_ready })
-		if clone_row then table.insert(rows, clone_row) end
+		return active_builtin ~= nil and not paused
 	end
 
-	table.insert(rows, { separator = true })
 	local function create_profile()
 		if not create_ready() or not settle_profile_mutation_recovery(deps)
 			or not create_ready() then return false end
@@ -1214,10 +1200,26 @@ local function build_profile_menu(
 		if timer_committed ~= true then return false end
 		return true
 	end
-	local create_row = ManifestMenu.command_row("llm_profile_commands", "llm_profile_create",
-		{ llm_profile_create = create_profile }, { llm_profile_create_ready = create_ready })
-	if create_row then table.insert(rows, create_row) end
-	
+
+	local rows = ManifestMenu.template_rows("llm_profile_lua_frame", {
+		["llm_profile_recommend"] = recommend_profile,
+		["llm_profile_clone"] = function()
+			return clone_builtin_profile(
+				deps, state, active_builtin, activate_candidate, replace_profile, create_ready)
+		end,
+		["llm_profile_create"] = create_profile,
+	}, {
+		["llm_profile_recommendation_present"] = function() return not paused end,
+		["llm_profile_recommendation_paused"] = function() return not not paused end,
+		["llm_profile_custom_present"] = custom_present,
+		["llm_profile_clone_present"] = clone_present,
+		["llm_profile_create_ready"] = create_ready,
+		["llm_profile_clone_ready"] = create_ready,
+	}, {
+		["llm_profile_builtin_rows"] = builtin_rows,
+		["llm_profile_custom_rows"] = custom_rows,
+	})
+	if not rows then return {} end
 	return ManifestMenu.render_rows(rows, "llm_profile")
 end
 

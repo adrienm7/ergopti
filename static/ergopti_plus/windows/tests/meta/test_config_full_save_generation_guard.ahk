@@ -10,6 +10,12 @@
 
 #Requires AutoHotkey v2.0
 
+_CFGFM_CapturedPublisherPosition(Body) {
+	Position := RegExMatch(Body, 'm)^[ \t]*Written := _TOML_BatchWriteImpl\(BoundPath, Updates, \[\], "write",[ \t]*\n[ \t]*SourceImage\["source_content"\], SourceImage\["source_present"\], true\)[ \t]*$', &Matched)
+	Code := _DriverMaskNonCode(&Body)
+	return Position && SubStr(Code, Position + InStr(Matched[0], "Written", true) - 1, 7) == "Written" ? Position : 0
+}
+
 _CFGFM_OwnerSpansCollectionAndAcknowledgement() {
 	Body := _DriverFuncBody("SaveFullConfig")
 	Assert(Body != "", "SaveFullConfig must exist")
@@ -17,18 +23,21 @@ _CFGFM_OwnerSpansCollectionAndAcknowledgement() {
 	MatchPos := InStr(Body, "_ConfigFullSavePathMatches(ConfigurationFile)")
 	OwnerPos := InStr(Body, "_ConfigWriteLeaseTryAcquire")
 	CapturePos := InStr(Body, "TargetGeneration := _ConfigFullSaveCapture()")
+	SourcePos := InStr(Body, "SourceImage := TOML_BuildConfigUpdatedContent(BoundPath, [])")
+	ClassifyPos := InStr(Body, 'ObsoleteSource := ConfigFullSnapshotCaptureObsoleteSource(SourceImage["source_content"])')
 	CollectPos := InStr(Body, "_ConfigCollectFullSaveUpdates()")
-	WritePos := InStr(Body, "TOML_BatchWrite(BoundPath, Updates,")
+	WritePos := _CFGFM_CapturedPublisherPosition(Body)
 	AckPos := InStr(Body, "_ConfigFullSaveAcknowledge(TargetGeneration)")
 	ReleasePos := InStr(Body, "_ConfigWriteLeaseRelease(OwnerToken)")
 	Assert(BoundPos > 0 and MatchPos > BoundPos and OwnerPos > MatchPos
-		and CapturePos > OwnerPos and CollectPos > CapturePos
+		and CapturePos > OwnerPos and SourcePos > CapturePos
+		and ClassifyPos > SourcePos and CollectPos > ClassifyPos
 		and WritePos > CollectPos and AckPos > WritePos and ReleasePos > AckPos,
 		"one path-bound config owner must span capture, collection, write and exact acknowledgement")
 	Assert(InStr(Body, "WriterFn.Call(BoundPath, Updates)") > 0,
 		"both injected and production writers must receive the accepted generation path")
-	Assert(InStr(Body, "CONFIG_OBSOLETE_SECTION_PREFIXES", true, WritePos) > 0,
-		"the production full writer must retire obsolete driver namespaces")
+	Assert(InStr(Body, "CONFIG_OBSOLETE_SECTION_PREFIXES", true) = 0,
+		"ordinary full saves must not own automatic obsolete-namespace deletion")
 	Assert(InStr(Body, "Written is Integer") > 0,
 		"durability acknowledgement must reject truthy non-boolean statuses")
 }

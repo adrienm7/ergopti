@@ -68,3 +68,58 @@ _LLMPC_CountHeadsGenerationRows() {
 }
 Test("llm menu: the suggestion count heads the generation submenu (llm-count-row)",
 	_LLMPC_CountHeadsGenerationRows)
+
+
+/** Exercises one true boundary through the actual native numeric allocator and Win32 menu. */
+_LLMPC_GenerationBoundary(Key) {
+	global _LLM_Menu, _SharedDir, LLM_MENU_N_OPTIONS
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\generation_boundaries.json", "UTF-8"))
+	Expected := Corpus["boundaries"][Key]
+	Saved := _LLM_Menu
+	Frame := _MR_GetMenuDef(Expected["section"])
+	Original := Frame[1]
+	Native := 0
+	try {
+		_LLM_Menu := Saved.Clone()
+		_LLM_Menu["n_predictions"] := _LLM_DefaultFor("llm_num_predictions")
+		_LLM_Menu["ctx_chars"] := _LLM_DefaultFor("llm_context_length", 500)
+		_LLM_Menu["min_words"] := _LLM_DefaultFor("llm_min_words", 3)
+		_LLM_Menu["max_words"] := _LLM_DefaultFor("llm_max_words", 15)
+		_LLM_Menu["temperature"] := Format("{:.2f}", Float(_LLM_DefaultFor("llm_temperature", "0.10")) + 0)
+		Rows := _LLM_Menu_GenerationRows()
+		AssertEqual(9, Rows.Length, "the independent default numeric order has no optional reset")
+		Position := Key == "count" ? 2 : Key == "context" ? 5 : 8
+		AssertTrue(Rows[Position]["separator"])
+		AssertEqual(LLM_MENU_N_OPTIONS.Length, Rows[1]["items"].Length)
+		AssertTrue(HasMethod(Rows[3]["action"], "Call"))
+		AssertTrue(HasMethod(Rows[4]["action"], "Call"))
+		AssertTrue(HasMethod(Rows[6]["action"], "Call"))
+		AssertTrue(HasMethod(Rows[7]["action"], "Call"))
+		AssertTrue(HasMethod(Rows[9]["action"], "Call"))
+		Native := Menu()
+		MenuRenderer_AppendRows(Native, "llm_generation_menu", "llm_generation_values", Rows)
+		AssertEqual(Rows.Length, DllCall("GetMenuItemCount", "ptr", Native.Handle, "int"))
+		Flags := DllCall("GetMenuState", "ptr", Native.Handle, "uint", Position - 1, "uint", 0x400, "uint")
+		Assert(Flags != 0xFFFFFFFF && (Flags & 0x800) != 0, "the actual native boundary remains a separator")
+		Frame[1] := Map("type", "label", "id", "generation_boundary_marker", "i18n", Corpus["published_marker_key"],
+			"platforms", Original["platforms"], "unavailable", "hide")
+		Rows := _LLM_Menu_GenerationRows()
+		AssertEqual(9, Rows.Length)
+		AssertEqual(t(Corpus["published_marker_key"]), Rows[Position].Get("label", ""), "the true native allocator consumes its shared declaration")
+		AssertTrue(Rows[Position]["disabled"])
+		AssertFalse(Rows[Position].Has("action"))
+		AssertTrue(HasMethod(Rows[9]["action"], "Call"))
+		Frame[1] := Map("type", "command", "id", "unowned_generation_boundary", "i18n", Corpus["published_marker_key"],
+			"platforms", Original["platforms"], "unavailable", "hide")
+		AssertEqual(0, _LLM_Menu_GenerationRows().Length, "a refused boundary cannot fall back to native presentation")
+		AssertEqual(_LLM_DefaultFor("llm_num_predictions"), _LLM_Menu["n_predictions"])
+		AssertEqual(_LLM_DefaultFor("llm_context_length", 500), _LLM_Menu["ctx_chars"])
+	} finally {
+		Frame[1] := Original
+		_LLM_Menu := Saved
+		if Native is Menu
+			_CTC_ReleaseMenu(Native)
+	}
+}
+for Key in ["count", "context", "words"]
+	Test("generation boundaries: authentic numeric owner " . Key, _LLMPC_GenerationBoundary.Bind(Key))
