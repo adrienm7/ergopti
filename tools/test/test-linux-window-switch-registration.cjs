@@ -110,7 +110,11 @@ function validate(root) {
 	assert.equal(Pipeline.stepField(step, 'timeout-minutes'), '4', 'native step is bounded');
 	const command = Pipeline.stepField(step, 'run');
 	assert.match(command, /set -euo pipefail/);
-	const packages = command.match(/apt-get install[^\n]+/)?.[0] ?? '';
+	const acquisitions = Pipeline.runOf(step).filter((line) =>
+		/^sudo python3 "\$GITHUB_WORKSPACE\/tools\/ci\/ubuntu_apt\.py" /.test(line)
+	);
+	assert.equal(acquisitions.length, 1, 'the native prerequisites use one signed archive owner');
+	const packages = acquisitions[0];
 	for (const prerequisite of [
 		'luajit',
 		'lua-luv',

@@ -339,6 +339,7 @@
 		"test:ci-pipeline": "node ./tools/test/test-ci-pipeline.cjs",
 		"test:ci-kana-install": "node ./tools/test/test-ci-kana-install.cjs",
 		"test:ci-pipeline-wiring": "node ./tools/test/test-ci-pipeline-wiring.cjs",
+		"test:ubuntu-ci-acquisition": "node ./tools/test/test-ubuntu-ci-acquisition.cjs",
 		"test:ci-release-reruns": "node ./tools/test/test-ci-release-reruns.cjs",
 		"test:linux-launcher-deps": "node ./tools/test/test-linux-launcher-deps.cjs",
 		"test:extensions-path-resolves": "node ./tools/test/test-extensions-path-resolves.cjs",

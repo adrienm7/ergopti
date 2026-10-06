@@ -64,8 +64,7 @@ jobs:
 
       - name: Install Lua 5.4 + luarocks
         run: |
-          sudo apt-get update
-          sudo apt-get install -y lua5.4 liblua5.4-dev luarocks
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y lua5.4 liblua5.4-dev luarocks
 
       - name: Install luacheck + luafilesystem
         # lfs is required by tests/run.lua for recursive test discovery;
@@ -100,8 +99,7 @@ jobs:
 
       - name: Install the E2E interpreter
         run: |
-          sudo apt-get update
-          sudo apt-get install -y lua5.4 lua-filesystem
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y lua5.4 lua-filesystem
 
       # Hammerspoon virtual-keyboard harness (stubbed, NOT real macOS/HS).
       # This step runs on ubuntu-latest against the same in-memory

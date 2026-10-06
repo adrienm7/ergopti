@@ -228,7 +228,10 @@ check('Ruby parses both casks', () => {
 		return;
 	}
 	for (const cask of [dev, stable]) {
-		const run = spawnSync('ruby', ['-c'], { input: cask.text, encoding: 'utf8' });
+		const run = spawnSync('ruby', ['-c'], {
+			input: cask.text,
+			encoding: 'utf8'
+		});
 		assert.strictEqual(run.status, 0, `${cask.token}: ${run.stderr}`);
 	}
 });
@@ -309,7 +312,35 @@ check(
 		);
 		assert.match(
 			registration,
-			/TransformProcessType\(&serial, kProcessTransformToUIElementApplication\);\s*if \(status != noErr\) \{\s*fprintf\(stderr, "Owned AppleEvent recipient transform registration failed: %d\\n", \(int\)status\);\s*return 65;/
+			/const enum AppKitAdmission admission = admit_appkit\(\[NSApplication sharedApplication\]\);\s*if \(admission != AppKitAdmitted\) \{[\s\S]*?return 65;/
+		);
+		assert.doesNotMatch(receiver, /\bTransformProcessType\s*\(/);
+		const appkitStart = receiver.indexOf('static enum AppKitAdmission admit_appkit(');
+		const appkitEnd = receiver.indexOf('static int receiver_main(', appkitStart);
+		assert.ok(
+			appkitStart >= 0 && appkitEnd > appkitStart,
+			'the actual AppKit admission body must be nonempty'
+		);
+		const appkit = receiver.slice(appkitStart, appkitEnd);
+		assert.match(appkit, /if \(application == nil\) return AppKitApplicationMissing;/);
+		assert.match(
+			appkit,
+			/if \(!\[application setActivationPolicy:NSApplicationActivationPolicyAccessory\]\) \{\s*return AppKitPolicyRefused;/
+		);
+		assert.match(
+			appkit,
+			/if \(\[application activationPolicy\] != NSApplicationActivationPolicyAccessory\) \{\s*return AppKitPolicyUnconfirmed;/
+		);
+		assert.ok(
+			appkit.indexOf('return AppKitPolicyUnconfirmed;') < appkit.indexOf('return AppKitAdmitted;')
+		);
+		assert.ok(
+			receiver.indexOf('if (admission != AppKitAdmitted)') <
+				receiver.indexOf('AEInstallEventHandler(')
+		);
+		assert.ok(
+			receiver.indexOf('if (admission != AppKitAdmitted)') <
+				receiver.indexOf('write_exclusive(argv[1]')
 		);
 		assert.match(helper, /xcode-select", "--print-path"\], confined=True/);
 		assert.match(helper, /-isysroot/);
@@ -320,6 +351,15 @@ check(
 			helper.indexOf('def ', helper.indexOf('def _admit_appleevent_boundary') + 5)
 		);
 		assert.doesNotMatch(boundary, /xcrun/);
+		assert.match(
+			boundary,
+			/if role == "receiver":\s*command \+= \[\s*"-x",\s*"objective-c",\s*"-fobjc-arc",\s*"-framework",\s*"Carbon",\s*"-framework",\s*"AppKit",?\s*\]/
+		);
+		assert.match(
+			boundary,
+			/registration_controls\.stdout == "native_appkit_registration_controls=4\\n"/
+		);
+		assert.doesNotMatch(boundary, /NSWorkspace|\/usr\/bin\/open/);
 	}
 );
 
