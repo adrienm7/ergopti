@@ -1416,3 +1416,15 @@ and malformed same-ID duplicates are explicitly refused without unbounded row
 patterns. The fixture owns the new module during teardown. Actual native CLI
 format, owned dependency enforcement, confirmed updates and installation remain
 unqualified or unfinished. Item31 remains partial.
+
+## Current Ubuntu native qualification prerequisite
+
+Current dev de4f is composed without losing the pinned Ubuntu key authority
+or Windows Ollama receipt correction. The explicitly published Group3
+4e6b2c0b two-path fixture delta narrows constructed root ownership to retained
+namespace/file identities and exclusive creation; production Ubuntu helper and
+trust policy are unchanged. Thirty original controls and143 assertion calls
+stay whole, plus one foreign/replacement boundary control. Hosted APT and
+macOS native jobs remain unexecuted on this composition until fresh CI. The
+previous37535674201 run remains failed before tests, without native credit.
+No group item is closed and no final integration lock is held.

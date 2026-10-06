@@ -4112,6 +4112,15 @@ patterns. The fixture owns the new module during teardown. Actual native CLI
 format, owned dependency enforcement, confirmed updates and installation remain
 unqualified or unfinished. Item31 remains partial.
 
+The macOS native qualification prerequisite now composes current dev de4f
+with the reviewed Group3 Ubuntu fixture authority correction from4e6b2c0b.
+Production signed archive/root policy stays unchanged; the constructed root
+projection now retains exact namespace/file identity and exclusive creation.
+All original30 controls and143 in-method assertions remain, with one additional
+foreign/replacement refusal control. Actual hosted APT and the previously
+skipped native macOS jobs require a fresh final-source run; no native credit
+or TODO closure follows from this fixture correction.
+
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
   listed; see `docs/memory/text-input-and-config.md`. Still open everywhere:
