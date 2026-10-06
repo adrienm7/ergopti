@@ -3434,6 +3434,18 @@ the complete three-OS checkpoint remain pending.
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 
+The exact macOS run 37487966582 on 8827c9d326dc501cdbe96f838b2f27cfaac9da10
+reached a genuine Swift compiler refusal: the imported Sparkle delegate uses
+`updater(_:willDownloadUpdate:with:)`, whereas the private archive child used
+the obsolete `withRequest` label. The fixture and its existing source guard
+now use the canonical imported label; routing, signatures and lifecycle
+assertions are retained. The upstream socket-stop controls are combined with
+the numeric-bind controls: 46 actual portable Sparkle cases and 53 Brew
+portable cases pass on Linux. Native Swift/Sparkle requalification is still
+required. Brew still refuses deny-removal-positive with -10004 and no second
+delivery marker; no successful native acceptance is inferred. Item 36 stays
+open.
+
 The private Sparkle fixture now binds its real numeric loopback socket without
 the HTTP server's unrelated reverse-DNS lookup. Actual bind, assigned port,
 listen refusal, cancellation and physical socket retirement remain required.

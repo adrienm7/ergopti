@@ -1149,10 +1149,7 @@ try {
 	assert.match(fixture, /fetchedFeeds\.count, 2/);
 	assert.match(fixture, /hash\(refusedFeed\), hash\(acceptedFeed\)/);
 	assert.doesNotMatch(fixture, /<rss|private func feed\(/);
-	assert.match(
-		child,
-		/willDownloadUpdate item: SUAppcastItem, withRequest request: NSMutableURLRequest/
-	);
+	assert.match(child, /willDownloadUpdate item: SUAppcastItem, with request: NSMutableURLRequest/);
 	assert.match(child, /item\.fileURL == origin, request\.url == origin/);
 	assert.match(child, /transport\.scheme == "http", transport\.host == "localhost"/);
 	assert.match(
