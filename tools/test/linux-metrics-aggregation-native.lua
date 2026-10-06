@@ -1,6 +1,9 @@
 -- tools/test/linux-metrics-aggregation-native.lua
 -- Execute production projection against real SQLite, then against raw-row SQL.
 local root, database = assert(arg[1]), assert(arg[2])
+local control = arg[3]
+assert(control == nil or control == 'legacy-global-column' or control == 'legacy-app-column',
+	'unknown raw projection contract control')
 package.path = root .. '/static/ergopti_plus/linux/?.lua;'
 	.. root .. '/static/ergopti_plus/_shared/lua/?.lua;' .. package.path
 package.loaded['logger.shim'] = {
@@ -96,6 +99,21 @@ local function workload()
 end
 local candidate = workload()
 local grouped_rows = row_count
+-- Equality alone can compare two truncated projections. Pin complete literal
+-- keys and independently seeded metrics before switching to raw-row SQL.
+local transport_tokens = { 'quote"token', 'back\\slash', 'literal\\u0000',
+	'nul\0tailA', 'nul\0tailB', 'line\n\tend' }
+local codes = { 'c', 'bg', 'tg', 'qg', 'pg', 'hx', 'hp', 'w', 'w_bg' }
+for _, code in ipairs(codes) do
+	for _, token in ipairs(transport_tokens) do
+		local total = assert(candidate[1][code][token], 'complete global token key missing')
+		assert(total.c == 8 and total.t == 16 and total.e == 4, 'independent global token metrics changed')
+		for _, app in ipairs({ 'app-a', 'app-b' }) do
+			local today = assert(candidate[2].today[app][code][token], 'complete application token key missing')
+			assert(today.c == 2 and today.t == 4 and today.e == 1, 'independent application token metrics changed')
+		end
+	end
+end
 -- Mutate an actual successful native output as well as the independent literals.
 assert(type(first_native_output) == 'string', 'real native output control required')
 local missing_receipt, removed = first_native_output:gsub('\n[^\n]+\n$', '')
@@ -107,8 +125,15 @@ refuses_rows(refused_receipt, 'native SQLite exit receipt failed:')
 -- Freeze the previous two SQL projections, not a second copy of Lua merge logic.
 command.build = function(db, sql, options)
 	if sql:find('FROM ngram_', 1, true) and not sql:find('FROM ngram_scancodes', 1, true) then
-		local columns = sql:find('SELECT app,', 1, true) and 'app, json_quote(token) AS token_json, c, td, e, esrc_json'
-			or 'json_quote(token) AS token_json, c, td, e, esrc_json'
+		local by_app = sql:find('SELECT app,', 1, true) ~= nil
+		-- Raw rows must retain the reader's complete-token transport contract;
+		-- only aggregation changes between the two projections.
+		local token_column = 'json_quote(token) AS token_json'
+		if (by_app and control == 'legacy-app-column')
+			or (not by_app and control == 'legacy-global-column') then
+			token_column = 'token'
+		end
+		local columns = (by_app and 'app, ' or '') .. token_column .. ', c, td, e, esrc_json'
 		-- Remove only the new typed partition; retain the actual date/app filters.
 		sql = sql:gsub(" AND %(typeof%(c%).*$", ';')
 		sql = sql:gsub(" WHERE %(typeof%(c%).*$", ';')
