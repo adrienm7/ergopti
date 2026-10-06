@@ -5607,6 +5607,30 @@ complete/trailing-whitespace, empty-argv and invalid-tail controls preserve all
 156 earlier assertions and15 methods. These corrected sources require fresh
 Windows CI; the previous brightness failure cause remains unknown.
 
+Native run37454415583 passes the Linux units and hold/window native gates,
+but the GTK operand fixture fails at receipt/case0 and the foreign ETag gate
+also fails. A controlled real shell/file barrier reproduces the fixture's
+publication race: all four original consumers see an empty public file. The
+producer now writes a private pending file and renames it only after writing
+the full receipt; all four unchanged identity assertions then pass. Independent
+review preserves all native commands, cleanup and time budgets. Actual local
+GTK passes4/4 with12 descendants reaped, none pending or rescued. The precise
+historical hosted receipt failure remains unknown; fresh hosted qualification
+is required. Package and installation were skipped in that failed run.
+
+Native run37454415583 now records9,700 Windows passes and only two program
+fixture failures; the private constructor run37454501003 records9,709 passes
+and five failures, including three native PowerShell5s timeouts of unknown
+cause. All12 appended constructor controls pass, but that private suite fails
+and its constructor remains outside the product. Exact source reads retain
+the physical UTF-8 BOM: the fixture added one to a BOM-less foreign image and
+duplicated it when restoring an already-BOM-bearing captured source. Only
+those two fixture writers now use UTF-8-RAW. All165 earlier assertions and
+15 methods remain;13 additive actual FileAppend/RAW-byte controls require
+fresh Windows execution. Production source admission and the independent
+corpus are unchanged. The native brightness budget and assertions remain
+unchanged; downstream E2E/package/install were skipped in both failed runs.
+
 - [~] **107.** Make the number-row policy explicit: native behavior, digits
   directly or symbols directly, with an acknowledged migration of the old
   Windows Boolean and preserved unrelated settings. The earlier Boolean slice
