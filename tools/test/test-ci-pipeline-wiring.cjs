@@ -172,6 +172,7 @@ const STEP_CONDITIONS = [
 		MANUAL_RUNTIME_EVIDENCE_IF
 	],
 	[LINUX_BOX, 'e2e-linux', 'Qualify native runtime prerequisites', NOT_CANCELLED],
+	[LINUX_BOX, 'e2e-linux', 'Qualify native retained FD SHA-256', NOT_CANCELLED],
 	[ENTRY, 'core', 'Install shared UI browsers', "matrix.suite == 'js'"],
 	[ENTRY, 'core', 'Test shared layer editor rendering', "matrix.suite == 'js'"],
 	[ENTRY, 'core', 'Test shared Versions installation rendering', "matrix.suite == 'js'"],

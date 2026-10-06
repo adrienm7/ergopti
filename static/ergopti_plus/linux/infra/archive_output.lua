@@ -31,6 +31,7 @@ function M.new(ports)
 		local retired, acquiring, probing, beginning = false, true, false, false
 		local attempt, sequence, timer = nil, 0, nil
 		local listeners, closing, revoking = {}, false, false
+		local sealed, sealing, digest_work = false, false, nil
 		leases[lease] = true
 
 		local function notify()
@@ -76,6 +77,13 @@ function M.new(ports)
 				and item.producer == producer and (item.eof or (allow_closed and input_closed(item)))
 		end
 
+		local function cancel_digest()
+			local work = digest_work
+			if not work or not work.operation or type(work.cancel) ~= "function" or work.cancel_requested then return end
+			work.cancel_requested = true -- Reserve this exact signal before reentry.
+			pcall(work.cancel, work.operation)
+		end
+
 		local function abort_attempt()
 			local item = attempt
 			if not item or not item.input or not item.producer or item.abort_attempted then return end
@@ -92,13 +100,20 @@ function M.new(ports)
 
 		local function close_if_ready()
 			if not retired or acquiring or closing or descriptor ~= "open" then notify(); return end
-			if attempt then
-				if attempt.starting or attempt.pending then return end
-				closing = true -- Native settlement probes can reenter cancellation.
-				local physically_ready = not attempt.producer or producer_settled(attempt, true)
-				closing = false
-				if not physically_ready then return end
+			if sealing then return end
+			local item, hash_work = attempt, digest_work
+			closing = true -- Covers every foreign physical probe, including hash.
+			if digest_work then
+				local called, ack = pcall(digest_work.is_settled, digest_work.operation)
+				if not called or ack ~= true then closing = false; return end
 			end
+			if attempt then
+				if attempt.starting or attempt.pending then closing = false; return end
+				local physically_ready = not attempt.producer or producer_settled(attempt, true)
+				if not physically_ready then closing = false; return end
+			end
+			if not retired or acquiring or sealing or descriptor ~= "open"
+				or attempt ~= item or digest_work ~= hash_work then closing = false; return end
 			-- Reserve destructive authority before a native call that may reenter.
 			closing, descriptor = true, "closing"
 			local called, ack = pcall(ports.close, fd)
@@ -112,6 +127,7 @@ function M.new(ports)
 			if revoking then return end
 			revoking = true
 			abort_attempt()
+			cancel_digest()
 			if timer then pcall(timer.cancel, timer) end
 			close_if_ready()
 			revoking = false
@@ -147,9 +163,9 @@ function M.new(ports)
 		-- Initial and relay attempts share one original deadline. A caller must
 		-- separately admit policy; reset never grants retry after delivered bytes.
 		function lease:begin(previous)
-			if acquiring or beginning then return nil end
+			if acquiring or beginning or sealed then return nil end
 			beginning = true
-			if (attempt and (previous ~= attempt.public or attempt.bytes ~= 0
+			if (attempt and (not rawequal(previous, attempt.public) or attempt.bytes ~= 0
 				or attempt.failed or not producer_settled(attempt)))
 				or (not attempt and previous ~= nil) or not admitted() then
 				beginning = false
@@ -186,7 +202,7 @@ function M.new(ports)
 
 		local function bind(ticket, producer, input)
 			local item = attempt
-			if not item or item.public ~= ticket or item.producer or item.starting
+			if sealed or not item or not rawequal(item.public, ticket) or item.producer or item.starting
 				or beginning or type(producer) ~= "table" or type(producer.is_settled) ~= "function"
 				or type(producer.on_settled) ~= "function" then return false end
 			local is_settled, on_settled = producer.is_settled, producer.on_settled
@@ -225,7 +241,7 @@ function M.new(ports)
 		-- Return false while a write is pending; the curl sink must stop reading.
 		function lease:write(ticket, chunk, callback)
 			local item = attempt
-			if beginning or not item or item.public ~= ticket or not item.producer or item.pending or item.eof
+			if sealed or beginning or not item or not rawequal(item.public, ticket) or not item.producer or item.pending or item.eof
 				or type(chunk) ~= "string" or #chunk == 0 or #chunk > MAX_CHUNK
 				or item.bytes > MAX_SIZE - #chunk or type(callback) ~= "function" or not admitted() then
 				return false
@@ -289,19 +305,19 @@ function M.new(ports)
 
 		function lease:eof(ticket)
 			local item = attempt
-			if not item or item.public ~= ticket or not item.producer then return false end
+			if not item or not rawequal(item.public, ticket) or not item.producer then return false end
 			item.eof = true -- Actual native pipe EOF; not a logical cancellation.
 			close_if_ready()
 			return true
 		end
 		function lease:attempt_settled(ticket)
-			return attempt and attempt.public == ticket and producer_settled(attempt) or false
+			return attempt and rawequal(attempt.public, ticket) and producer_settled(attempt) or false
 		end
 		--- Fresh native backpressure admission after the sink's external live probe.
 		--- The original private owner/deadline and input state are never cached.
 		function lease:resume_admit(ticket, final_native_admit)
 			local item = attempt
-			if not item or item.public ~= ticket or not item.producer or item.pending then return false end
+			if not item or not rawequal(item.public, ticket) or not item.producer or item.pending then return false end
 			local producer = item.producer
 			if not admitted() or not writable(item, nil, producer) then return false end
 			if final_native_admit ~= nil then
@@ -319,16 +335,100 @@ function M.new(ports)
 		--- Read-only exact-ticket ledger for the sole native stdout sink.
 		--- False means no write is retained; nil means no ticket authority.
 		function lease:write_pending(ticket)
-			if not attempt or attempt.public ~= ticket then return nil end
+			if not attempt or not rawequal(attempt.public, ticket) then return nil end
 			return attempt.pending ~= nil
 		end
 		function lease:bytes(ticket)
-			return attempt and attempt.public == ticket and attempt.bytes or nil
+			return attempt and rawequal(attempt.public, ticket) and attempt.bytes or nil
 		end
 		function lease:failure(ticket)
 			local item = attempt
-			if not item or item.public ~= ticket or not item.failure then return nil end
+			if not item or not rawequal(item.public, ticket) or not item.failure then return nil end
 			return receipt(item.failure.stage, { errno = item.failure.native_errno })
+		end
+
+		--- Irreversibly seals the final ticket before any parent-only hash read.
+		--- Hash cancellation retains the FD until exact read/context/timer ACKs.
+		--- @param ticket table Final output ticket.
+		--- @param expected_digest string Captured canonical release SHA-256.
+		--- @param hash_deadline number Captured original hash phase deadline.
+		--- @param callback function Private (digest, receipt, verified_token) result.
+		--- @return table|nil operation Native hash physical debt owner.
+		function lease:seal_sha256(ticket, expected_digest, hash_deadline, callback)
+			local item = attempt
+			if sealed or beginning or acquiring or not item or not rawequal(item.public, ticket) or item.failed
+				or item.pending or not item.eof or not item.producer or item.bytes <= 0
+				or type(expected_digest) ~= "string" or #expected_digest ~= 64 or expected_digest:find("[^0-9a-f]")
+				or not finite(hash_deadline) or hash_deadline > deadline
+				or type(callback) ~= "function" or type(ports.hash) ~= "function" then return nil end
+			sealed, sealing = true, true -- No subsequent write, reset or producer bind.
+			local producer = item.producer
+			local function hash_current()
+				if attempt ~= item or item.producer ~= producer or retired or descriptor ~= "open" then return false end
+				if not producer_settled(item) or not admitted() then return false end
+				local observed, now = pcall(ports.now_ms)
+				return observed and finite(now) and now < hash_deadline and attempt == item
+					and item.producer == producer and not retired and descriptor == "open"
+					and not item.pending and item.eof and not item.failed
+			end
+			if not hash_current() then sealing = false; revoke(); return nil end
+			local work = { delivered = false, received = false, token = {}, deadline = hash_deadline }
+			digest_work = work
+			local function publish()
+				if sealing or digest_work ~= work or not work.operation or not work.received or work.delivered then return end
+				local called, ack = pcall(work.is_settled, work.operation)
+				if not called or ack ~= true then return end
+				local digest = not work.had_error and work.digest or nil
+				if digest and digest ~= expected_digest then digest = nil; work.reason = "checksum_mismatch" end
+				if digest and not hash_current() then digest = nil; revoke() end
+				if digest_work ~= work or work.delivered then return end
+				work.delivered, work.verified = true, digest ~= nil
+				pcall(callback, digest, work.receipt, digest and work.token or nil, work.reason)
+				close_if_ready()
+			end
+			local called, operation = pcall(ports.hash, fd, item.bytes, hash_current, hash_deadline, function(digest, err)
+				if digest_work ~= work or work.received then return end
+				work.received, work.had_error = true, err ~= nil
+				work.digest = type(digest) == "string" and #digest == 64 and not digest:find("[^0-9a-f]") and digest or nil
+				work.receipt = type(err) == "table" and receipt("file_read", { errno = err.native_errno }) or nil
+				publish()
+			end)
+			local is_settled = type(operation) == "table" and rawget(operation, "is_settled") or nil
+			local cancel = type(operation) == "table" and rawget(operation, "cancel") or nil
+			local on_settled = type(operation) == "table" and rawget(operation, "on_settled") or nil
+			if called and type(is_settled) == "function" and type(cancel) == "function" and type(on_settled) == "function" then
+				work.operation, work.is_settled, work.cancel, work.on_settled = operation, is_settled, cancel, on_settled
+				local subscribed, ack = pcall(work.on_settled, operation, function() publish(); close_if_ready() end)
+				if not subscribed or ack ~= true then revoke() end
+			else
+				-- An unknown hash allocation may own a read on this exact FD. Its
+				-- integer value is never guessed closed or reused after refusal.
+				work.is_settled, work.cancel = function() return false end, function() return false end
+				work.operation = { is_settled = work.is_settled, cancel = work.cancel }
+				revoke()
+			end
+			-- Hash construction/registration may reenter retirement before the
+			-- exact child is attached. Signal that captured late owner before
+			-- releasing the reservation; accepted cancellation is never an ACK.
+			if not retired and not hash_current() then revoke() end
+			if retired then cancel_digest() end
+			sealing = false
+			publish()
+			close_if_ready()
+			return work.operation
+		end
+
+		--- Admits only the private verification of the current sealed FD.
+		--- @param token table Exact verification token returned by seal_sha256.
+		--- @return boolean
+		function lease:verified(token)
+			local work, item = digest_work, attempt
+			if not work or not work.verified or not rawequal(token, work.token) or not item or not sealed then return false end
+			if not admitted() then return false end
+			local observed, now = pcall(ports.now_ms)
+			return observed and finite(now) and now < work.deadline and digest_work == work
+				and attempt == item and not retired and descriptor == "open"
+				and work.verified and rawequal(token, work.token)
 		end
 
 		-- Native open returns the sole authority; there is no named fallback.
@@ -415,6 +515,9 @@ function M.native()
 				end
 				callback(failure, count)
 			end)
+		end,
+		hash = function(fd, length, current, hash_deadline, callback)
+			return require("infra.fd_sha256").native().start(fd, length, current, hash_deadline, callback)
 		end,
 		close = function(fd)
 			if ffi.C.close(fd) ~= 0 then return false, errno() end

@@ -1033,6 +1033,12 @@ const CHECKS = [
 		repro: 'npm run test:linux-portable-network-registration'
 	},
 	{
+		name: 'Linux native FD digest admission requires completed physical receipts',
+		cmd: 'node',
+		args: ['tools/test/test-linux-fd-sha256-native-gate.cjs'],
+		repro: 'npm run test:linux-fd-sha256-native-gate'
+	},
+	{
 		name: 'Linux CI requires successful mandatory jobs and assertion evidence',
 		cmd: 'node',
 		args: ['tools/test/test-linux-ci-evidence.cjs'],

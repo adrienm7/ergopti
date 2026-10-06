@@ -3725,6 +3725,14 @@ missing or duplicated native receipts cannot qualify a zero-exit producer.
 Actual full-format AppImage/Flatpak builds, installation and PAC/session/TLS
 delivery remain required. Staged AppDir acceptance does not complete item 36.
 
+Retained archive descriptors now have a reviewed sealing and native SHA-256
+prerequisite, with the original producer identity preserved through read,
+context and timer retirement. An independent immutable source cohort passes
+125 literal model controls on each Lua ABI and twelve actual Linux
+LuaJIT/libuv/OpenSSL controls, including two independent NIST vectors over
+unlinked files. This receipt does not prove archive publication, tar install,
+rollback or installed package delivery; their original requirements remain.
+
 - [~] **37.** Always show the shipped Ergopti hotstring pack, including when
   its keyboard layout is not installed. Move French `suffixes_a` and magic-key
   `replace` into that extension without a beta compatibility layer. The runtime
@@ -4877,6 +4885,13 @@ controls pass on genuine host components; they do not prove an enterprise
 session, authentication or certificate deployment. Package CI now declares
 the native development/runtime prerequisites for the stage owner. Installed
 AppImage/Flatpak network replay and archive delivery remain required.
+
+Shared archive transfer budgets capture the canonical checksum, archive and
+hash caps once, deriving the original total deadline from those caps. Redirects
+and relay retries cannot renew a phase. The descriptor-sealing and digest
+prerequisite has the bounded qualification recorded in item 36. Mandatory
+native runner, planner and CI evidence registrations are added; final-source
+validation and the full updater composition remain required.
 
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard

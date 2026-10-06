@@ -563,6 +563,24 @@ const RULES = [
 			].includes(f)
 	},
 	{
+		gate: 'linux-fd-sha256-native',
+		why: 'retained archive hashing requires actual LuaJIT, libuv, OpenSSL and descriptor retirement',
+		match: (f) =>
+			[
+				'tools/test/run-linux-fd-sha256-native.cjs',
+				'tools/test/test-linux-fd-sha256-native-gate.cjs',
+				'static/ergopti_plus/linux/tests/hardware/run_fd_sha256_native.lua',
+				'static/ergopti_plus/linux/infra/fd_sha256.lua',
+				'static/ergopti_plus/linux/infra/archive_output.lua',
+				'static/ergopti_plus/linux/infra/managed_http_deadline.lua',
+				'static/ergopti_plus/linux/infra/native_timer.lua',
+				'static/ergopti_plus/linux/infra/monotonic.lua',
+				'static/ergopti_plus/linux/tests/hardware/run_native_subreaper.py',
+				'.github/workflows/ci-linux.yml',
+				'.github/linux-ci-coverage.json'
+			].includes(f)
+	},
+	{
 		gate: 'linux-portable-network-native',
 		why: 'portable network packages require actual installed ELF, GIO, schema and owned timeout retirement',
 		match: (f) =>
@@ -682,6 +700,7 @@ const GATE_COMMANDS = {
 	'linux-network-runtime': { npm: 'test:linux:network-runtime' },
 	'linux-runtime-native': { npm: 'test:linux:runtime-native' },
 	'linux-portable-network-native': { npm: 'test:linux:portable-network-native' },
+	'linux-fd-sha256-native': { npm: 'test:linux:fd-sha256-native' },
 	'ahk-parse': { npm: 'test:ahk-parse' },
 	'ahk-suite': { ahk: 'run_all.ahk' },
 	'ahk-e2e': { ahk: 'e2e/run_e2e.ahk' }

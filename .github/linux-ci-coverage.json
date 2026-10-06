@@ -29,7 +29,8 @@
 				"webview-editor": 1,
 				"webview-roundtrip": 1,
 				"page-load-errors": 1,
-				"hotstring-e2e": 100
+				"hotstring-e2e": 100,
+				"retained-fd-sha256": 12
 			}
 		},
 		"package-linux": {
