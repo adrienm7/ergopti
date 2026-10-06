@@ -26,6 +26,7 @@
 --- ==============================================================================
 
 local M = {}
+local BindingPublication = require("config_binding_publication")
 
 local Logger = require("logger.shim")
 local ConfigOutdated = require("config_outdated")
@@ -128,7 +129,7 @@ end
 --- A changed source withdraws publication; this accessor performs no IO.
 --- @return table|nil catalogue
 function M.published_binding_catalogue()
-	if not rawequal(package.loaded["modules.shortcuts.tap_keys"], M) then return nil end
+	if not BindingPublication.owner_is_current("tap", "modules.shortcuts.tap_keys", M) then return nil end
 	if _binding_catalogue == nil or not rawequal(_keys, _binding_source) then return nil end
 	local current = require("config_binding_identity").tap_binding_catalogue(_keys)
 	for id in pairs(current.slots) do
@@ -441,5 +442,7 @@ function M.apply_configuration(owner, state)
 	_dispatch_generation = _dispatch_generation + 1
 	return true
 end
+
+BindingPublication.register("tap", "modules.shortcuts.tap_keys", M, M.published_binding_catalogue)
 
 return M
