@@ -1029,8 +1029,12 @@ _SR_CompletionDispatch(Claim) {
 		Critical(previous_critical)
 	}
 	try callback.Call(result*)
-	catch as Err
-		_SR_TreeLogError(Claim, "Task {1} on_done callback threw: {2}", Claim["TaskId"], Err.Message)
+	catch as Err {
+		if (Claim is Map) && Claim.Get("PrivateDiagnostics", false) == true
+			_SR_TreeLogError(Claim, "Task {1} on_done callback threw: {2}", Claim["TaskId"], Err.Message)
+		else
+			_SR_LogError("Task {1} on_done callback threw: {2}", Claim["TaskId"], Err.Message)
+	}
 	return true
 }
 
@@ -2127,12 +2131,12 @@ _SR_TreeRecordQuiesced(State, Claim) {
 _SR_TreeFinishClaim(Claim, ReadFn := 0, DeleteFn := 0) {
 	if !IsObject(Claim)
 		return false
-	_SR_TreeLogNativeDebt(Claim)
 	if !Claim.Get("TreeQuiesced", false)
 		return false
 	if !_SR_CompletionBegin(Claim)
 		return false
 	try {
+		_SR_TreeLogNativeDebt(Claim)
 		local stdout := ""
 		local tmp_file := Claim["TmpFile"]
 		try {
@@ -2149,8 +2153,12 @@ _SR_TreeFinishClaim(Claim, ReadFn := 0, DeleteFn := 0) {
 				}
 			}
 		} catch as Err {
-			_SR_TreeLogError(Claim, "tree-owned task {1} output cleanup failed: {2}",
-				Claim["TaskId"], Err.Message)
+			if (Claim is Map) && Claim.Get("PrivateDiagnostics", false) == true
+				_SR_TreeLogError(Claim, "tree-owned task {1} output cleanup failed: {2}",
+					Claim["TaskId"], Err.Message)
+			else
+				_SR_LogError("tree-owned task {1} output cleanup failed: {2}",
+					Claim["TaskId"], Err.Message)
 		} finally {
 			_SR_TreeCleanupCapture(Claim, DeleteFn)
 		}
