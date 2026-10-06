@@ -4374,6 +4374,23 @@ integrated, then publish one grouped release.
   shared policy. Final native binding/order/caption and installed acceptance
   remain required; source review and the local portable gates are insufficient.
 
+  The Windows hardware-boundary fixture now uses the existing typed recursive
+  \_LVS_DeepEqual comparator through AssertEqual with an empty mismatch result,
+  replacing two calls to the undefined AssertDeepEqual helper. Both independent
+  expected hardware Maps and both actual operands remain exact; all other
+  assertions, the strict comparator and its registered negative controls are
+  preserved. The canonical runner includes the owning fixture and comparator
+  before registered callbacks execute. Reversing those two calls recovers the
+  complete published fixture, and the repair commutes exactly with the appended
+  model-header tests. Production, framework, corpus, locales, menu declarations
+  and the 55/86/61 census remain unchanged. Early native CI 37519571990 on
+  source47dec reports Windows 10038 passed/1 failed at the first undefined call;
+  the second defective call was not reached. That run is terminal failed and
+  Release is skipped. Detached source checks pass; local AHK/Win32 execution
+  and the actual Windows retry remain pending. This fixture repair is not a
+  current union/native or installed qualification result. All six group items
+  stay partial.
+
   The model-picker header boundary now consumes one canonical inert separator
   on Windows and macOS; Linux retains its genuine flat model-list presentation
   and hides this fragment, not the model feature. The unchanged owner scanner

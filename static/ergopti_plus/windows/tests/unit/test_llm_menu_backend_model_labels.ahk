@@ -471,7 +471,7 @@ _LBMD_HardwareBoundary() {
 	Model := _LBMD_ReadoutCatalogueModel(Expected["native_model"])
 	Name := Model["name"], Url := Model["urls"]["ollama"]
 	Hardware := Model["hardware_requirements"]
-	AssertDeepEqual(Expected["hardware_ollama"], Hardware["ollama"])
+	AssertEqual("", _LVS_DeepEqual(Expected["hardware_ollama"], Hardware["ollama"]))
 	Frame := _MR_GetMenuDef(Expected["section"]), Original := Frame[1]
 	Root := _MM_GetManifestRoot(), Native := 0
 	try {
@@ -525,7 +525,7 @@ _LBMD_HardwareBoundary() {
 	}
 	Rows := _LLM_Menu_PerModelRows(Name, Model, Url, Name, false)
 	AssertTrue(Rows[Position - 1]["separator"], "actual repaired declaration and original data remain usable")
-	AssertDeepEqual(Expected["hardware_ollama"], Model["hardware_requirements"]["ollama"])
+	AssertEqual("", _LVS_DeepEqual(Expected["hardware_ollama"], Model["hardware_requirements"]["ollama"]))
 }
 Test("per-model hardware: authentic shared boundary and original Map predicate (model-hardware-boundary)",
 	_LBMD_HardwareBoundary)
