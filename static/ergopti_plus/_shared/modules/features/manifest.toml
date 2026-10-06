@@ -6757,6 +6757,17 @@ id = "api_remove_active"
 i18n = "menu.llm.api_remove_entry"
 disabled_when = ["llm_api_active_ready"]
 
+# The Linux selection provider retains its two fixed boundaries around the case trio.
+[[menu.selection_case_boundary]]
+type = "---"
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.selection_helper_boundary]]
+type = "---"
+platforms = ["linux"]
+unavailable = "hide"
+
 # Selection case commands use each driver's existing action bindings. The Linux
 # selection provider offers these direct tray actions without duplicate native
 # keyboard slots on Windows or macOS.

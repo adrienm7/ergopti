@@ -3243,7 +3243,9 @@ local function _build_shortcuts(ctx)
 		["selection_caps_word_ready"] = caps_word_ready,
 	})
 	if caps_row then selection_rows[#selection_rows + 1] = caps_row end
-	selection_rows[#selection_rows + 1] = { separator = true }
+	local case_boundary = ManifestMenu.template_rows("selection_case_boundary", {}, {}, {})
+	if not case_boundary then return {} end
+	for _, row in ipairs(case_boundary) do selection_rows[#selection_rows + 1] = row end
 	local case_methods = {
 		uppercase_selection = "transform_uppercase",
 		selection_lowercase = "transform_lowercase",
@@ -3269,7 +3271,9 @@ local function _build_shortcuts(ctx)
 		}, case_getters)
 		if row then selection_rows[#selection_rows + 1] = row end
 	end
-	selection_rows[#selection_rows + 1] = { separator = true }
+	local helper_boundary = ManifestMenu.template_rows("selection_helper_boundary", {}, {}, {})
+	if not helper_boundary then return {} end
+	for _, row in ipairs(helper_boundary) do selection_rows[#selection_rows + 1] = row end
 	local helper_methods = {
 		["selection_select_word"] = "select_word",
 		["selection_select_line"] = "select_line",

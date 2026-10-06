@@ -110,7 +110,19 @@ const OPENS_SUBMENU = {
 	},
 	selection_operations: [
 		'selection_caps_word_control',
+		{
+			menu: 'selection_case_boundary',
+			platforms: ['linux'],
+			kind: 'compose',
+			native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+		},
 		'selection_case_commands',
+		{
+			menu: 'selection_helper_boundary',
+			platforms: ['linux'],
+			kind: 'compose',
+			native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+		},
 		'selection_helper_commands'
 	],
 	// Every native live-mode provider renders the shared fixed Off choice.

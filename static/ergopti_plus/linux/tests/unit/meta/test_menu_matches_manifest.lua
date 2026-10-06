@@ -801,3 +801,61 @@ helpers.describe("llm-control-boundaries: actual Linux trigger provider", functi
 		helpers.assert_nil(io.open(path, "rb"))
 	end)
 end)
+
+
+helpers.describe("selection boundary fragments in the complete native tray", function()
+	local path = require("infra.paths").shared("tests/corpus/menus/linux_selection_boundaries.json")
+	local file = assert(io.open(path, "rb"))
+	local bytes = assert(file:read("*a")); assert(file:close())
+	local corpus = assert(require("json").decode(bytes))
+
+	helpers.it("keeps the independently declared nine-row selection order without invoking an action", function()
+		with_absent_english(function()
+			local context, changes = full_context(), 0
+			context.on_menu_changed = function() changes = changes + 1 end
+			local parent = assert(find_item(build_full_menu(context), i18n.get(corpus.parent_key)))
+			local first
+			for index, row in ipairs(parent.menu) do
+				if row.title == corpus.selection_child_order[1].english then first = index; break end
+			end
+			helpers.assert_type(first, "number")
+			for offset, expected in ipairs(corpus.selection_child_order) do
+				local row = parent.menu[first + offset - 1]
+				helpers.assert_type(row, "table")
+				helpers.assert_eq(row.title, expected.separator and "-" or expected.english)
+				if expected.separator then helpers.assert_nil(row.fn) end
+			end
+			helpers.assert_eq(changes, 0)
+		end)
+	end)
+
+	helpers.it("follows both actual fragment captions at their exact whole-tray positions", function()
+		with_absent_english(function()
+			local root = ManifestMenu.get_root()
+			local originals = { root.selection_case_boundary, root.selection_helper_boundary }
+			local sections = { "selection_case_boundary", "selection_helper_boundary" }
+			local ok, detail = xpcall(function()
+				for _, section in ipairs(sections) do
+					root[section] = { { type = "label", id = "selection_tray_marker",
+						i18n = corpus.marker_key, platforms = { "linux" }, unavailable = "hide" } }
+				end
+				local parent = assert(find_item(build_full_menu(full_context()), i18n.get(corpus.parent_key)))
+				local first
+				for index, row in ipairs(parent.menu) do
+					if row.title == corpus.selection_child_order[1].english then first = index; break end
+				end
+				helpers.assert_type(first, "number")
+				for offset, expected in ipairs(corpus.selection_child_order) do
+					local row = parent.menu[first + offset - 1]
+					helpers.assert_eq(row.title, expected.separator and corpus.marker_english or expected.english)
+					if expected.separator then
+						helpers.assert_eq(row.disabled, true)
+						helpers.assert_nil(row.fn)
+					end
+				end
+			end, debug.traceback)
+			for index, section in ipairs(sections) do root[section] = originals[index] end
+			if not ok then error(detail, 0) end
+		end)
+	end)
+end)

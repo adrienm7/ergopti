@@ -2998,6 +2998,24 @@
 			]
 		}
 	],
+	"selection_case_boundary": [
+		{
+			"type": "---",
+			"platforms": [
+				"linux"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"selection_helper_boundary": [
+		{
+			"type": "---",
+			"platforms": [
+				"linux"
+			],
+			"unavailable": "hide"
+		}
+	],
 	"selection_case_commands": [
 		{
 			"type": "command",

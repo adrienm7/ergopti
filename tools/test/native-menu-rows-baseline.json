@@ -159,7 +159,7 @@
 		]
 	},
 	"linux": {
-		"count": 66,
+		"count": 64,
 		"sites": [
 			"linux/ui/menu/agent_rows.lua:199 separator",
 			"linux/ui/menu/menu_builder.lua:264 static",
@@ -207,26 +207,24 @@
 			"linux/ui/menu/menu_builder.lua:3067 static",
 			"linux/ui/menu/menu_builder.lua:3100 separator",
 			"linux/ui/menu/menu_builder.lua:3212 static",
-			"linux/ui/menu/menu_builder.lua:3246 separator",
-			"linux/ui/menu/menu_builder.lua:3272 separator",
-			"linux/ui/menu/menu_builder.lua:3515 static",
-			"linux/ui/menu/menu_builder.lua:3620 static",
-			"linux/ui/menu/menu_builder.lua:3642 static",
-			"linux/ui/menu/menu_builder.lua:3696 static",
-			"linux/ui/menu/menu_builder.lua:3727 static",
-			"linux/ui/menu/menu_builder.lua:3728 static",
-			"linux/ui/menu/menu_builder.lua:3861 static",
-			"linux/ui/menu/menu_builder.lua:3870 static",
-			"linux/ui/menu/menu_builder.lua:4020 static",
-			"linux/ui/menu/menu_builder.lua:4033 static",
-			"linux/ui/menu/menu_builder.lua:4105 static",
-			"linux/ui/menu/menu_builder.lua:4151 static",
-			"linux/ui/menu/menu_builder.lua:4325 static",
-			"linux/ui/menu/menu_builder.lua:4397 static",
-			"linux/ui/menu/menu_builder.lua:4455 static",
-			"linux/ui/menu/menu_builder.lua:4493 static",
-			"linux/ui/menu/menu_builder.lua:4614 separator",
-			"linux/ui/menu/menu_builder.lua:4638 separator"
+			"linux/ui/menu/menu_builder.lua:3519 static",
+			"linux/ui/menu/menu_builder.lua:3624 static",
+			"linux/ui/menu/menu_builder.lua:3646 static",
+			"linux/ui/menu/menu_builder.lua:3700 static",
+			"linux/ui/menu/menu_builder.lua:3731 static",
+			"linux/ui/menu/menu_builder.lua:3732 static",
+			"linux/ui/menu/menu_builder.lua:3865 static",
+			"linux/ui/menu/menu_builder.lua:3874 static",
+			"linux/ui/menu/menu_builder.lua:4024 static",
+			"linux/ui/menu/menu_builder.lua:4037 static",
+			"linux/ui/menu/menu_builder.lua:4109 static",
+			"linux/ui/menu/menu_builder.lua:4155 static",
+			"linux/ui/menu/menu_builder.lua:4329 static",
+			"linux/ui/menu/menu_builder.lua:4401 static",
+			"linux/ui/menu/menu_builder.lua:4459 static",
+			"linux/ui/menu/menu_builder.lua:4497 static",
+			"linux/ui/menu/menu_builder.lua:4618 separator",
+			"linux/ui/menu/menu_builder.lua:4642 separator"
 		]
 	}
 }
