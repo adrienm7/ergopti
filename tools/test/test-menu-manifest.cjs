@@ -4669,3 +4669,92 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		'Backend boundary: independent two-driver rows, genuine macOS absence and21 existing captions.'
 	);
 }
+
+// Independent per-model frame declarations retain bare Windows and decorated Mac headings.
+{
+	const assert = require('node:assert/strict');
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/model_readout_frames.json'), 'utf8')
+	);
+	const manifest = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	for (const key of ['specs', 'caps']) {
+		const expected = corpus[key];
+		assert.deepEqual(manifest[expected.section], expected.rows);
+		assert.deepEqual(expected.platform_rows, {
+			ahk: [{ separator: true }, { label: expected.english, disabled: true }],
+			hs: [{ separator: true }, { label: '— ' + expected.english + ' —', disabled: true }],
+			linux: []
+		});
+		for (const code of [
+			'ar',
+			'cs',
+			'da',
+			'de',
+			'en',
+			'es',
+			'fr',
+			'he',
+			'hi',
+			'it',
+			'ja',
+			'ko',
+			'no',
+			'nl',
+			'pl',
+			'pt',
+			'ru',
+			'sv',
+			'tr',
+			'uk',
+			'zh'
+		]) {
+			const strings = JSON.parse(
+				readFileSync(resolve(SHARED, 'data/locales/' + code + '.json'), 'utf8')
+			);
+			for (const caption of [expected.key, corpus.selection_key, corpus.marker_key]) {
+				assert.equal(typeof strings[caption], 'string', code + ': existing caption ' + caption);
+				assert(strings[caption].trim().length > 0);
+			}
+			if (code === 'en') {
+				assert.equal(strings[expected.key], expected.english);
+				assert.equal(strings[corpus.selection_key], corpus.selection_english);
+				assert.equal(strings[corpus.marker_key], corpus.marker_english);
+			}
+		}
+		for (const [driver, relative, call] of [
+			['windows', 'ui/menu/menu_llm/menu_models.ahk', 'MenuRenderer_TemplateRows'],
+			['macos', 'ui/menu/menu_llm/models_selector.lua', 'ManifestMenu.template_rows']
+		]) {
+			const source = readFileSync(
+				resolve(REPO_ROOT, 'static/ergopti_plus', driver, relative),
+				'utf8'
+			);
+			assert(
+				source.includes(call + '("' + expected.section + '"'),
+				driver + ': genuine per-model frame owner'
+			);
+		}
+		const linux = readFileSync(
+			resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/menu_builder.lua'),
+			'utf8'
+		);
+		assert(
+			!linux.includes('"' + expected.section + '"'),
+			'Linux has no per-model detail sheet to populate'
+		);
+	}
+	const providers = JSON.parse(readFileSync(resolve(SHARED, 'modules/llm/models.json'), 'utf8'));
+	const actual = providers
+		.flatMap((p) => p.families.flatMap((f) => f.models))
+		.filter((m) => m.name === corpus.native_model);
+	assert.equal(
+		actual.length,
+		1,
+		'the hand-pinned native model must exist exactly once in the shipped catalogue'
+	);
+	assert.equal(typeof actual[0].urls.ollama, 'string');
+	assert.equal(typeof actual[0].capabilities, 'object');
+	console.log(
+		'Model readouts: authentic two-driver frames, genuine Linux absence and21 unchanged captions.'
+	);
+}
