@@ -1,0 +1,45 @@
+# Windows constructor-failure ownership proposal
+
+Status: scratch only, pending root review and Group 7 ownership clearance. No repository producer/test files are changed by this proposal. The native AHK regressions have not been executed on Linux.
+
+## Concrete defect
+
+The current native creator catches a failed creation after it has acquired HANDLEs, moves those HANDLEs to a partial Map, calls native quiescence and rethrows. A refused close retains this exact Map in `_SR_TreeNativeDebts` without an `OwnerState`. The tree start catch then claims its still-empty State and records that unrelated empty claim as physically retired. `_ProgramActions_Retire` can accept this empty-State acknowledgement and delete its program entry. No global native-debt admission guard currently prevents a later program acquisition.
+
+The existing generic `_SRTCR_UnpublishedCloseRecovery` already defines a real protected-process-HANDLE fixture for that creator rollback. Its existing assertions must remain unchanged: legacy creator callers still have no callback owner, and native HANDLE debt remains retained until a real retry succeeds.
+
+## Per-call capability
+
+Before native allocation, tree start prepares a carrier holding its exact State and one complete zero-HANDLE terminal claim. The common metadata factory prepares the same TaskId, private-diagnostic policy, capture policy and completion-token shape used by ordinary terminal claims. There are no pending-callback or active-task registry changes at preparation.
+
+The creator accepts the carrier as a trailing optional argument. On failure, it selects this already allocated claim and atomically moves ProcessHandle, ThreadHandle, JobHandle, Pid and the actual Assigned Boolean into it, zeroes its native local owners, and marks the carrier published before restoring Critical. Legacy callers omit the carrier and retain their anonymous partial-claim behavior.
+
+The carrier therefore holds the one actual claim even if an adopter throws after native transfer. The adopter never receives authority to manufacture another native receipt. The producer unconditionally attempts the trusted, idempotent State binder after a refusing, throwing or malformed adopter. Binding consumes the current pending STARTING callback disposition and connects `State.TerminalClaim` to the exact capsule before native quiescence can yield.
+
+The start catch reuses the published capsule. It cannot create a second empty-State claim for that failure. Native retry, forced cancellation and the exact program entry therefore refer to the same HANDLE owner. Assigned comes from the producer's actual assignment result, not from the mere presence of a Job HANDLE: input-stream-close failure occurs before assignment and must terminate the suspended root directly.
+
+A carrier remains reachable from State when binding cannot be established. A local termination guard returns false for a published capsule that is not State's terminal claim; neither physical cleanup nor an unrelated empty claim may turn that mismatch into a successful user-program retirement. This is a per-call containment check, not a global debt fence. The trusted binder does not call the injected port; normal refusal/throw cases complete binding and need no recovery exception.
+
+## Regression fixture
+
+`test_run_program_constructor_failure.ahk` defines twelve candidate cases: ten protected-root modes (normal handoff, refusal/Error throw/String throw before and after binding, malformed returned private receipt, actual launch-stream String fault and an independent request-before-binding mode), plus start-port and CreateFn non-Error no-root refusals. Each delegates creation to real `PLC_CreateProcessWithInheritedHandles`, sets real `HANDLE_FLAG_PROTECT_FROM_CLOSE` on the suspended native root and refuses the real launch-stream close boundary. Native quiescence and ProgramActions retirement remain production functions.
+
+The protected-root cases inject constructor start reentry; hard-cancellation modes also invoke actual ProgramActions_Stop while State is STARTING; the root's retained observer positively proves a live suspended process. It also injects cancellation during adoption, verifies the exact protected HANDLE is the published capsule, verifies pre-assignment Assigned=false, and duplicates the actual Job HANDLE independently. Start must fail while actual HANDLE debt, State terminal claim and program entry remain connected. A subsequent acquisition after clearing the explicit acquisition fixture remains refused while that exact entry owes native cleanup. Removing protection and running the actual native poll must retire the exact capabilities before the same entry may be deleted.
+
+The surrounding State/handle/acquisition are explicit fixtures. This exercises actual internal start/creator/terminate and ProgramActions retirement/admission boundaries; it does not claim to execute the entire unmodified public ProgramActions_Run acquisition stack through an injected constructor. The internal optional creator seam on `_SR_TreeHandleStart` exists solely to define this bounded native fault, and does not expand public SpawnTree API or change concurrency policy.
+
+No code moves into the repository until review. No generic native assertions, suite manifests, run_all includes, public Spawn API, concurrency policy or global native admission logic are changed. Native Windows execution, baseline protected-HANDLE causal execution and full unit/E2E/packaging qualification remain pending hosted CI.
+
+## Review corrections in version 2
+
+Version 1 remains frozen outside this directory. Explicit catch Any now contains adopter, creator-port and start-port faults, including a String thrown after physical allocation. Non-Error fault text is replaced by a fixed category rather than reading Err.Message. Before/after String faults and a launch-stream String after actual protected-root creation are separately defined. The CreateFn and start-port no-root tests assert that Starting ends and only actual empty/native Job capabilities are acknowledged.
+
+The local capsule mismatch guard now runs only in the non-STARTING branch. A requestTerminate(true) while a published capsule awaits State binding must first latch TerminationRequested and the callable pending completion callback. The independent request mode does not perform an earlier Stop(false), uses a real callback that delegates to actual _ProgramActions_Done, keeps it pending through real protected-HANDLE debt, and requires exactly one callback observing root signalled, Job zero and the genuine claim quiesced after protection is removed. Later polling cannot duplicate it. Hard cancellation modes also start with this actual callback and require its suppression.
+
+Fixture preservation is enabled before native allocation. Failed protection/control setup owns its actual process/thread capsule before rethrowing, and unconditional outer finally blocks attempt both exact observer closes even if unprotect or native recovery asserts. Preservation is cleared only after primary assertions and strict physical, program-owner and independent-observer close receipts all succeed. No existing generic assertions were removed or weakened.
+
+These remain source-defined, unexecuted Windows tests. The source checks do not prove AHK runtime compilation, physical cancellation, callback timing or private logs on Windows. Do not import or claim native qualification until root review and ownership coordination complete.
+
+## Version 3 fixture correction
+
+The reviewed version 2 production source is byte-for-byte unchanged. The surrounding native fixture now passes one additional independently authored literal argument, must-not-run106, to the actual fixture script. That script writes A_Args[1] for each Index>1; script+output alone had no possible output side effect. The additional argv makes the unchanged native no-output assertion capable of detecting actual payload execution. Source-defined native Windows execution remains pending.

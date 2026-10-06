@@ -1,0 +1,86 @@
+from pathlib import Path
+import re
+root=Path('/tmp/ergopti106-windows-constructor-handoff/v3')
+base=(root/'base-shell_runner.ahk').read_text(encoding='utf-8-sig')
+candidate=(root/'candidate-shell_runner.ahk').read_text(encoding='utf-8-sig')
+
+def bodies(text):
+    result={}
+    for m in re.finditer(r'^([A-Za-z_]\w*)\(',text,re.M):
+        # A function header can span lines; its first non-string block brace
+        # follows the matching parameter list.
+        pos=m.end()-1; par=0; quote=None; escaped=False; brace=None
+        while pos<len(text):
+            c=text[pos]
+            if quote:
+                if escaped: escaped=False
+                elif c=='`': escaped=True
+                elif c==quote: quote=None
+            elif c in "\"'": quote=c
+            elif c=='(': par+=1
+            elif c==')':
+                par-=1
+                if par==0:
+                    p=pos+1
+                    while p<len(text) and text[p].isspace(): p+=1
+                    if p<len(text) and text[p]=='{': brace=p
+                    break
+            pos+=1
+        if brace is None: continue
+        pos=brace; depth=0; quote=None; escaped=False
+        while pos<len(text):
+            c=text[pos]
+            if quote:
+                if escaped: escaped=False
+                elif c=='`': escaped=True
+                elif c==quote: quote=None
+            elif c in "\"'": quote=c
+            elif c==';':
+                p=text.find('\n',pos)
+                if p<0: break
+                pos=p
+            elif c=='{': depth+=1
+            elif c=='}':
+                depth-=1
+                if depth==0:
+                    result[m.group(1)]=text[m.start():pos+1]
+                    break
+            pos+=1
+    return result
+old,new=bodies(base),bodies(candidate)
+changed={name for name in old if old[name]!=new.get(name)}
+assert changed=={'_SR_TreeHandleStart','_SR_TreeHandleTerminate','_SR_TreeCreateSuspended','_SR_TreeClaimTaskLocked'},changed
+assert len(new)==len(old)+5,(len(old),len(new),set(new)-set(old))
+creator=new['_SR_TreeCreateSuspended']
+for key,local in [('ProcessHandle','process_handle'),('ThreadHandle','thread_handle'),('JobHandle','job_handle'),('Pid','pid')]:
+    take=creator.rindex(f'partial["{key}"] := {local}')
+    zero=creator.index(f'{local} := 0',take)
+    published=creator.index('FailureCarrier["Published"] := true',zero)
+    adopt=creator.index('FailureCarrier["AdoptFn"].Call',published)
+    quiesce=creator.index('_SR_TreeQuiesceNative(partial, true)',adopt)
+    assert take<zero<published<adopt<quiesce
+assert 'partial["Assigned"] := assigned' in creator
+assert 'finally {\n\t\t\t\t; A refusing or throwing port' in creator
+assert '_SR_TreeAttachCreationFailure(FailureCarrier)' in creator
+assert 'FailureCarrier["AdoptionFailed"] := !(receipt is Integer) || receipt != 1' in creator
+start=new['_SR_TreeHandleStart']
+assert start.index('if IsObject(failure_carrier) && failure_carrier["Published"]')<start.index('failed_claim := failure_carrier["Claim"]')<start.index('} else {',start.index('local failed_claim := 0'))
+terminate=new['_SR_TreeHandleTerminate']
+assert terminate.count('_SR_TreeClaimTaskLocked(')==1
+assert '&& State["TerminalClaim"] != carrier["Claim"]\n\t\t\t\treturn false' in terminate
+assert terminate.index('starting_pending := true') < terminate.index('&& State["TerminalClaim"] != carrier["Claim"]')
+assert '} catch Any as Err {\n\t\tlocal failed_claim := 0' in start
+assert '} catch Any as Err {\n\t\tlocal partial :=' in creator
+assert '} catch Any {\n\t\t\t\t; Arbitrary receipt/exception contents' in creator
+assert 'Err is Error ? Err.Message : "Native creation raised a non-Error value."' in start
+legacy=(Path('/workspace/ergopti/static/ergopti_plus/windows/adapters/shell_runner.ahk').read_bytes())
+assert legacy==(root/'base-shell_runner.ahk').read_bytes(),'parent/Group7 producer has moved since scratch preimage'
+for name in ('candidate-shell_runner.ahk','test_run_program_constructor_failure.ahk'):
+    b=(root/name).read_bytes();assert b.startswith(b'\xef\xbb\xbf') and b'\r' not in b
+    assert all(line.rstrip()==line for line in b.decode('utf-8-sig').splitlines())
+print(f'Source-only checks passed: {len(old)} existing functions, 4 scoped changes, 5 new helpers; tuple take/zero/order, strict receipt, same-claim catch, local mismatch refusal, unchanged repository preimage, BOM/LF/whitespace.')
+
+fixture=(root/'test_run_program_constructor_failure.ahk').read_text(encoding='utf-8-sig')
+assert '[Context["script"], Context["output"], "must-not-run106"]' in fixture
+assert (root/'candidate-shell_runner.ahk').read_bytes()==(root.parent/'v2/candidate-shell_runner.ahk').read_bytes()
+print('V3 marker argv strengthens actual payload possibility; reviewed V2 producer bytes unchanged.')

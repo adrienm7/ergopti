@@ -87,7 +87,7 @@ local DEFAULT_EFFECTS = {
 	open = xdg_open,
 	open_url = xdg_open,
 	notify = function(title, body, level)
-		require("adapters.notifier").send(body ~= "" and body or title, { title = title, level = level })
+		require("adapters.application_notifier").send(body ~= "" and body or title, { title = title, level = level })
 		return true
 	end,
 	identity = function()

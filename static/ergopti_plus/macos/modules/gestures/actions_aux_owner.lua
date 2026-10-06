@@ -62,6 +62,10 @@ local function entry_is_current(entry)
 end
 
 local function authorized(entry)
+	if entry.admit ~= nil then
+		local ok, receipt = pcall(entry.admit)
+		if not ok or receipt ~= true then return false end
+	end
 	local scope = entry.scope
 	return entry_is_current(entry)
 		and type(scope) == "table" and scope.paused ~= true
@@ -77,8 +81,19 @@ local function cleanup_debt(parent)
 			and (entry.discard == true or entry.committed ~= true) then return true end
 	end
 	for _, entry in pairs(_shells) do
-		if entry.scope == scope
-			and (entry.discard == true or entry.committed ~= true) then return true end
+		if entry.scope == scope then
+			if entry.discard == true or entry.committed ~= true then return true end
+			if entry.strict == true then
+				if entry.checking_cleanup == true then return true end
+				entry.checking_cleanup = true
+				local ok, pending = pcall(function()
+					if type(entry.handle.hasCleanupDebt) ~= "function" then return nil end
+					return entry.handle.hasCleanupDebt()
+				end)
+				entry.checking_cleanup = false
+				if not ok or pending ~= false or entry.discard == true or entry.committed ~= true then return true end
+			end
+		end
 	end
 	return false
 end
@@ -276,6 +291,14 @@ local function shell_task_is_settled(entry)
 	return ok == true and settled == true
 end
 
+local function shell_error(entry, message, ...)
+	if entry.strict == true then
+		Logger.error(LOG, "Private user program cleanup or admission remains unacknowledged.")
+	else
+		Logger.error(LOG, message, ...)
+	end
+end
+
 local function observe_shell_timer(entry, field, handle, continuation)
 	local observer_field = field .. "_observer"
 	if entry[observer_field] == handle then return true end
@@ -289,7 +312,7 @@ local function observe_shell_timer(entry, field, handle, continuation)
 		end)
 	if not ok or observed ~= true then
 		if entry[observer_field] == handle then entry[observer_field] = nil end
-		Logger.error(LOG, "%s %s timer observer refused: %s.",
+		shell_error(entry, "%s %s timer observer refused: %s.",
 			tostring(entry.label), field, tostring(observed))
 		return false
 	end
@@ -304,7 +327,7 @@ local function cancel_shell_timer(entry, field)
 	end)
 	local ok, cancelled = xpcall(TimerScheduler.cancel, debug.traceback, handle)
 	if not ok or cancelled ~= true then
-		Logger.error(LOG, "%s %s timer cleanup remains pending: %s.",
+		shell_error(entry, "%s %s timer cleanup remains pending: %s.",
 			tostring(entry.label), field, tostring(cancelled))
 	end
 	return observed and ok and cancelled == true and entry[field] == nil
@@ -327,7 +350,7 @@ local function arm_shell_timer(entry, field, delay, continuation)
 			end)
 			TimerScheduler.cancel(handle)
 		end
-		Logger.error(LOG, "%s %s timer acquisition failed: %s.",
+		shell_error(entry, "%s %s timer acquisition failed: %s.",
 			tostring(entry.label), field, tostring(committed))
 		return false
 	end
@@ -361,19 +384,20 @@ local function observe_shell(entry)
 	end)
 	if not ok or observed ~= true then
 		entry.observing = false
-		Logger.error(LOG, "%s process observer refused: %s.",
+		shell_error(entry, "%s process observer refused: %s.",
 			tostring(entry.label), tostring(observed))
 	end
 end
 
 local function degrade_shell(entry, reason)
+	if entry.strict == true then return false end
 	if _shells[entry.id] ~= entry then return false end
 	_shells[entry.id] = nil
 	_degraded_shells[entry.id] = entry
 	entry.degraded = true
 	entry.discard = true
 	entry.committed = false
-	Logger.error(LOG,
+	shell_error(entry,
 		"%s process remained live after bounded termination; action owner released in degraded mode: %s.",
 		tostring(entry.label), tostring(reason))
 	return true
@@ -399,7 +423,7 @@ request_shell_termination = function(entry, context)
 			request_shell_termination(entry, "cleanup retry exhausted")
 		end)
 	if not armed then return degrade_shell(entry, "cleanup retry timer refused") end
-	Logger.error(LOG, "%s process cleanup remains pending: %s (%s).",
+	shell_error(entry, "%s process cleanup remains pending: %s (%s).",
 		tostring(entry.label), tostring(terminate_ok and accepted or accepted), tostring(state))
 	return false
 end
@@ -415,18 +439,20 @@ local function publish_shell_timeout(entry)
 	entry.callback_active = true
 	invoke(entry.scope, entry.label, entry.callback, false, nil)
 	entry.callback_active = false
-	Logger.error(LOG, "%s process exceeded its %.1f-second settlement deadline.",
+	shell_error(entry, "%s process exceeded its %.1f-second settlement deadline.",
 		tostring(entry.label), SHELL_DEADLINE_SEC)
 	request_shell_termination(entry, "settlement deadline exhausted")
 	return true
 end
 
-local function start_shell(method, payload, label, callback, parent)
+local function start_shell(method, payload, label, callback, parent, strict, admit)
 	local admitted, scope = admission_open(parent)
 	if not admitted then return false end
 	local entry = {
 		id = next_id(),
 		kind = "shell",
+		strict = strict == true,
+		admit = admit,
 		parent = scope.id,
 		scope = scope,
 		label = label,
@@ -444,6 +470,7 @@ local function start_shell(method, payload, label, callback, parent)
 		retry_handle = nil,
 	}
 	_shells[entry.id] = entry
+	if not authorized(entry) then release_shell(entry); return false end
 	scope.acquisitions = scope.acquisitions + 1
 	local function terminal(...)
 		if entry.terminal_received == true then return end
@@ -521,6 +548,44 @@ function M.run(executable, args, label, callback, parent)
 	return start_shell(function(payload, terminal)
 		return ShellRunner.run(payload.executable, payload.args, terminal)
 	end, { executable = executable, args = args }, label or "process", callback, parent)
+end
+
+--- Runs an explicitly owned user program without legacy degraded-debt release.
+function M.run_program(executable, arguments, admitted, parent, source)
+	if type(admitted) ~= "function" then return false end
+	local function completed(ok, status)
+		if ok == true then return end
+		local admission_ok, receipt = pcall(admitted)
+		if not admission_ok or receipt ~= true then return end
+		if type(status) == "number" and status % 1 == 0 and status ~= 0
+			and status >= -2147483648 and status <= 2147483647 then
+			Logger.error(LOG, "Private user program failed (native status %d).", status)
+		else
+			Logger.error(LOG, "Private user program completion status is unavailable.")
+		end
+	end
+	return start_shell(function(payload, terminal)
+		local handle = ShellRunner.spawn_private(payload.executable, payload.arguments, terminal, admitted, payload.source)
+		local ok, receipt = pcall(handle.start)
+		return ok and receipt == true, handle
+	end, { executable = executable, arguments = arguments, source = source }, "user program", completed, parent, true, admitted)
+end
+
+function M.stop_programs(parent)
+	local scope = action_scope(parent)
+	local selected = {}
+	for _, entry in pairs(_shells) do
+		if entry.scope == scope and entry.strict == true then selected[#selected + 1] = entry end
+	end
+	local settled = true
+	for _, entry in ipairs(selected) do if terminate_shell(entry) ~= true then settled = false end end
+	return settled
+end
+
+function M.program_available()
+	if type(ShellRunner.private_program_available) ~= "function" then return false end
+	local ok, available = pcall(ShellRunner.private_program_available)
+	return ok and available == true and type(ShellRunner.spawn_private) == "function"
 end
 
 local function settle_all(parent)

@@ -293,8 +293,8 @@ local function open_window()
 		-- Without a window (no WebKitGTK, no display) the error is announced and
 		-- stays in the errors file
 		local I18n = require("infra.i18n")
-		require("adapters.notifier").send(record.message,
-			{ title = I18n.get("error_dialog.heading"), level = "error" })
+		require("adapters.application_notifier").send(record.message,
+			{ title = I18n.get("common.error_title"), level = "error" })
 		Logger.warn(LOG, "The error window could not open; the error was announced by a notification.")
 		return false
 	end

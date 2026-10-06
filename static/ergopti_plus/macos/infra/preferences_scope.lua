@@ -53,17 +53,27 @@ function M.new(options)
 		if type(spec) ~= "string" or spec == "" then return nil end
 		if slots[binding] then return "gesture" end
 		local domain, name = binding:match("^([a-z_]+)__(.+)$")
-		if domain and domain ~= "gesture" and domains[domain] and identifier(name) then return domain end
+		if domain and domain ~= "gesture" and domains[domain] then
+			local owned
+			if type(options.parameter_name_owned) == "function" then owned = options.parameter_name_owned(domain, name) end
+			if owned == true or owned == nil and identifier(name) then return domain end
+		end
 		return nil
 	end
 	local owners = { action_parameter_domain = parameter_domain }
 	local source_snapshot, disk_parameters, disk_gestures, scope_id
+	local editing = false
 	local transaction
 	local function inventory()
 		local content, status, detail = Writer.read_classified(options.path, options.files)
 		assert(status == "ok" or status == "absent", "scope source is unreadable: " .. tostring(detail))
 		local decoded = Codec.decode(content or "")
 		assert(type(decoded) == "table", "scope source is not valid TOML")
+		if options.expected_source then
+			local expected = options.expected_source
+			assert(expected.path == options.path and expected.status == status and expected.content == content,
+				"scope editor source changed")
+		end
 		source_snapshot = { status = status, content = content }
 		disk_gestures = decoded.gestures or {}
 		disk_parameters = disk_gestures.action_parameters
@@ -93,6 +103,16 @@ function M.new(options)
 		path = options.path, backup_path = options.backup_path, files = options.files,
 		manifest = Manifest, owners = owners, owned_paths = inventory, prepare_batch = prepare,
 		select = options.select,
+		validate_update = type(options.validate_edit_row) == "function" and options.validate_edit_row or nil,
+		before_restore = type(options.before_restore) == "function" and function(snapshot)
+			return options.before_restore(snapshot.native) == true
+		end or nil,
+		after_publish = type(options.after_publish) == "function" and function(snapshot)
+			return options.after_publish(snapshot.native) == true
+		end or nil,
+		after_restore = type(options.after_restore) == "function" and function(snapshot)
+			return options.after_restore(snapshot.native) == true
+		end or nil,
 		capture = function(source, candidate, updates)
 			local native = options.capture(source, candidate, updates)
 			assert(type(native) == "table", "scope native capture was not acknowledged")
@@ -104,8 +124,12 @@ function M.new(options)
 			local parameters = gestures.get_all_action_parameters()
 			for _, row in ipairs(updates) do
 				if parameter_domain(row.section .. "." .. row.key) then
-					assert(row.delete == true, "scope parameter restoration requires absence")
-					parameters[row.key] = nil
+					if row.delete then parameters[row.key] = nil
+					else
+						assert(editing and type(options.validate_edit_row) == "function" and options.validate_edit_row(scope_id, row) == true,
+							"scope parameter restoration requires absence")
+						parameters[row.key] = row.value
+					end
 				end
 			end
 			if gestures.replace_action_parameters(parameters) ~= true then return false end
@@ -121,12 +145,17 @@ function M.new(options)
 		retry_restore = transaction.retry_restore,
 		revert = transaction.revert,
 		release = transaction.release,
+		apply_updates = function(scope, rows)
+			if transaction.pending() then return false, "a configuration transaction is still pending" end
+			scope_id, editing = scope, true
+			return transaction.apply_updates(scope, rows)
+		end,
 		apply = function(scope, mode)
 			if transaction.pending() then return false, "a configuration transaction is still pending" end
 			local planned, plan = pcall(Manifest.scope_plan, scope, mode)
 			if not planned then return false, tostring(plan) end
 			if #plan.presets > 0 then return false, "scope requires separate preset ownership" end
-			scope_id = scope
+			scope_id, editing = scope, false
 			return transaction.apply(scope, mode)
 		end,
 	}

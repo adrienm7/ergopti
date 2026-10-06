@@ -295,7 +295,7 @@ check(
 		/swift_pipeline_status=\([^\n]+\)\s*\n\s*node tools\/diagnostics\/swift_xctest_evidence\.cjs/.test(
 			testStep
 		) &&
-		/xctest_evidence_status=\$\?\s*\n\s*node tools\/diagnostics\/tis_evidence_transport\.cjs[^\n]+\n\s*tis_evidence_status=\$\?\s*\n\s*set -e/.test(
+		/xctest_evidence_status=\$\?\s*\n\s*node tools\/diagnostics\/owned_program_xctest_notice\.cjs "\$RUNNER_TEMP\/swift-launcher-evidence\/verdict\.json" "\$xctest_log" "\$\(git rev-parse HEAD\)"\s*\n\s*owned_program_evidence_status=\$\?\s*\n\s*node tools\/diagnostics\/tis_evidence_transport\.cjs[^\n]+\n\s*tis_evidence_status=\$\?\s*\n\s*set -e/.test(
 			testStep
 		) &&
 		testStep.includes(
@@ -304,9 +304,33 @@ check(
 		testStep.includes(
 			'if [ "$tis_evidence_status" -ne 0 ]; then exit "$tis_evidence_status"; fi'
 		) &&
+		testStep.includes(
+			'if [ "$owned_program_evidence_status" -ne 0 ]; then exit "$owned_program_evidence_status"; fi'
+		) &&
+		testStep.indexOf('if [ "$xctest_evidence_status" -ne 0 ]') <
+			testStep.indexOf('if [ "$tis_evidence_status" -ne 0 ]') &&
+		testStep.indexOf('if [ "$tis_evidence_status" -ne 0 ]') <
+			testStep.indexOf('if [ "$owned_program_evidence_status" -ne 0 ]') &&
+		testStep.indexOf('if [ "$owned_program_evidence_status" -ne 0 ]') <
+			testStep.indexOf('if ! grep -Fq') &&
 		testStep.includes('"${swift_pipeline_status[0]}" "${swift_pipeline_status[1]}"') &&
 		!/trap[^\n]*rm[^\n]*xctest_log/.test(testStep),
 	'the XCTest evidence owner receives both real pipeline statuses before errexit, and retains the transcript on failure'
+);
+const ownedPolicyStep = pipeline.step(
+	swiftJob,
+	'Run owned program XCTest notice constructed-policy controls'
+);
+check(
+	pipeline.stepField(ownedPolicyStep, 'run') ===
+		'node tools/test/test-owned-program-xctest-notice.cjs' &&
+		pipeline.stepField(ownedPolicyStep, 'if') === null &&
+		pipeline.stepField(ownedPolicyStep, 'continue-on-error') === null &&
+		packageStepNames.indexOf('Run owned program XCTest notice constructed-policy controls') >
+			packageStepNames.indexOf('Prepare Node for native policy fixtures and XCTest evidence') &&
+		packageStepNames.indexOf('Run owned program XCTest notice constructed-policy controls') <
+			packageStepNames.indexOf('Run Swift launcher tests'),
+	'the independently authored owned-program policy corpus runs unconditionally before native XCTest'
 );
 const transcriptUpload = pipeline.step(swiftJob, 'Upload Swift launcher failure transcript');
 check(

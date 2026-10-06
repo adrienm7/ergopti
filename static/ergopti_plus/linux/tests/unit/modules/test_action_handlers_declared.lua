@@ -51,6 +51,20 @@ local function with_recorded_shell(body)
 	if not ok then error(err, 0) end
 end
 
+--- Runs a callback with a fresh real page owner whose native SDK is unavailable.
+--- Restores the exact previous page owner even when acquisition or the callback raises.
+--- @param body function Receives the actual webview manager.
+local function with_unavailable_webview(body)
+	local name = "ui.webview_manager"
+	local previous_webview = package.loaded[name]
+	local ok, err = pcall(function()
+		local Webview = helpers.load_module_with_dependency(name, "lgi", false)
+		body(Webview)
+	end)
+	package.loaded[name] = previous_webview
+	if not ok then error(err, 0) end
+end
+
 --- Every recorded command joined, for a substring hunt across all of them.
 local function joined(commands)
 	return table.concat(commands, "\n")
@@ -231,11 +245,41 @@ helpers.describe("linux actions: the driver's own surfaces", function()
 	end)
 
 	helpers.it("a window action shells out to nothing — it asks the webview", function()
-		with_recorded_shell(function(commands)
-			Gestures.execute_action("open_metrics_typing", "test__slot")
-			helpers.assert_true(not joined(commands):find("xdg-open", 1, true),
-				"the metrics window is a webview this driver owns, not a file for the desktop to open. Routing it through xdg-open would open the HTML in a browser instead of the driver's own window")
+		with_unavailable_webview(function(Webview)
+			-- Exercise the real logical owner through an explicitly unavailable SDK,
+			-- independently of any genuine GTK dependency captured by earlier cases.
+			local create = Webview._create_gtk_window
+			local attempts = {}
+			Webview._create_gtk_window = function(app_name, html, handler)
+				attempts[#attempts + 1] = app_name
+				return create(app_name, html, handler)
+			end
+			with_recorded_shell(function(commands)
+				Gestures.execute_action("open_metrics_typing", "test__slot")
+				helpers.assert_true(not joined(commands):find("xdg-open", 1, true),
+					"the metrics window is a webview this driver owns, not a file for the desktop to open. Routing it through xdg-open would open the HTML in a browser instead of the driver's own window")
+				helpers.assert_eq(attempts, { "metrics_typing" },
+					"the action must reach the actual owner's native acquisition boundary")
+				helpers.assert_eq(Webview.is_visible("metrics_typing"), false,
+					"an unavailable native owner must retain no fictional visible page")
+			end)
 		end)
+	end)
+
+	helpers.it("restores exact native owners after the controlled window fixture raises", function()
+		local previous_webview = package.loaded["ui.webview_manager"]
+		local previous_lgi = package.loaded["lgi"]
+		local previous_preload = package.preload["lgi"]
+		local ok, err = pcall(with_unavailable_webview, function(Webview)
+			helpers.assert_eq(package.loaded["ui.webview_manager"], Webview,
+				"the callback must receive the exact acquired page owner")
+			error("Controlled window fixture callback refusal", 0)
+		end)
+		helpers.assert_eq(ok, false, "the callback refusal must reach its caller")
+		helpers.assert_eq(err, "Controlled window fixture callback refusal", "preserve the callback failure")
+		helpers.assert_eq(package.loaded["ui.webview_manager"], previous_webview, "restore the exact page owner")
+		helpers.assert_eq(package.loaded["lgi"], previous_lgi, "restore the exact native SDK cache")
+		helpers.assert_eq(package.preload["lgi"], previous_preload, "restore the exact native SDK loader")
 	end)
 
 	helpers.it("the paths action opens the dedicated paths editor", function()

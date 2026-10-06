@@ -138,8 +138,37 @@ end
 --- Builds the real tray with a scoped entries source, retaining native callbacks.
 --- @param context table
 --- @return table
+--- Builds with the actual ordered-pair owner over an owned neutral source.
+--- Native editing is not exercised by this menu-shape fixture.
+local function build_fixture_menu(context)
+	local names = {"modules.shortcuts.key_combinations", "infra.key_combinations_scope", "ui.menu.key_combinations"}
+	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+	local ok, rows = pcall(function()
+		local Paths = require("infra.paths")
+		local file = assert(io.open(Paths.shared("tap_hold/defaults.toml"), "rb"))
+		local defaults = assert(require("toml_codec").decode(file:read("*a"))); assert(file:close())
+		local Pair = helpers.load_module("modules.shortcuts.key_combinations")
+		context.is_paused = function() return false end
+		context.gestures.is_assignable = function() return false end
+		context.gestures.capture_parameter_source_guard = function() return function() return true end end
+		local owner = Pair.new({keys = context.tap_holds.key_catalog(), hold_picker = defaults.tap_hold.hold_picker,
+			route = function() return "/controlled/menu-certification.toml" end,
+			files = {read_with_status = function() return nil, "absent" end},
+			actions = context.gestures, is_paused = context.is_paused, changed = function() return true end})
+		helpers.assert_true(Pair.set_instance(owner))
+		package.loaded["infra.key_combinations_scope"] = {retry_restore = function() return true end,
+			edit = function() error("menu-shape fixture cannot publish") end}
+		package.loaded["ui.menu.key_combinations"] = nil
+		return with_api_source(function(builder) return builder.build(context) end)
+	end)
+	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+	if not ok then error(rows, 0) end
+	return rows
+end
+
+--- Composes both genuine native source owners for the whole-tray fixture.
 local function build_full_menu(context)
-	return with_api_source(function(builder) return builder.build(context) end)
+	return build_fixture_menu(context)
 end
 
 --- A menu context complete enough for every submenu to build.

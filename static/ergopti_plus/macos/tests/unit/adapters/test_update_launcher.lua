@@ -25,7 +25,7 @@ local function load_subject(open_url, alert)
 	package.loaded["infra.dialog_util"] = {
 		block_alert = alert or function(...) dialogs[#dialogs + 1] = { ... } end,
 	}
-	package.loaded["adapters.notifier"] = {
+	package.loaded["adapters.application_notifier"] = {
 		send = function(...) notifications[#notifications + 1] = { ... } end,
 	}
 	local subject = helpers.load_with_stubs("adapters.update_launcher", {

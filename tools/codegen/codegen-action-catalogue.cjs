@@ -70,7 +70,8 @@ const PARAMETER_KINDS = new Set([
 	'llm_prompt',
 	'llm_vision',
 	'llm_language',
-	'app'
+	'app',
+	'program'
 ]);
 
 const SG_FIELDS = new Set([

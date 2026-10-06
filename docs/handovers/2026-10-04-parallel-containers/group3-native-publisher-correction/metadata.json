@@ -1,0 +1,9 @@
+{
+	"status": "reviewed portable source correction; native macOS qualification pending",
+	"product_path": "static/ergopti_plus/macos/adapters/file_system.lua",
+	"preimage_sha256": "7f5c07d153c0f2ea48e651451244328893ca7f3141cff6f1e94aa18bb8a36df2",
+	"postimage_sha256": "88af46890a9a0205e7c483e959b32a0030aee4aaff543053d14c09984a96a353",
+	"patch_sha256": "bc7758b997fe1381c46eba7182ce88478cbaae31d20ea6483280f9df56a67134",
+	"original_packet_commit": "50165bb976321adabe3e90c53e36dbb8460bfdde",
+	"reviewed_five_path_patch_sha256": "23edb44588b37c314cc82c3490daeb3cea578a8070b810a2b9f7183ffbeae58f"
+}

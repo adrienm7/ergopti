@@ -34,7 +34,7 @@ local function drain()
 end
 
 local function with_runtime(body)
-	local owned = { "modules.dynamic_hotstrings.user_code", "infra.config_paths", "adapters.notifier" }
+	local owned = { "modules.dynamic_hotstrings.user_code", "infra.config_paths", "adapters.application_notifier" }
 	for _, name in ipairs(DISCOVERY_OWNERS) do owned[#owned + 1] = name end
 	local previous = {}
 	for _, path in ipairs(owned) do previous[path] = package.loaded[path]; package.loaded[path] = nil end
@@ -46,7 +46,7 @@ local function with_runtime(body)
 	_G.__LINUX_USER_HOTSTRING_FIXTURE = f
 	package.loaded["infra.config_paths"] = setmetatable({ get_config_dir = function() return "/owned" end },
 		{ __index = NativeConfigPaths })
-	package.loaded["adapters.notifier"] = { send = function() f.notified = true; return true end }
+	package.loaded["adapters.application_notifier"] = { send = function() f.notified = true; return true end }
 	f.content = [[return function(api)
 		local f=__LINUX_USER_HOTSTRING_FIXTURE
 		f.factories=f.factories+1

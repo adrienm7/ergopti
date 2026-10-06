@@ -1,0 +1,260 @@
+{
+	"_comment": "Independent physical-slot vectors authored from the user-owned entry contract and canonical native registry facts. Expectations are literal; never regenerate them from the slot implementation. Native identities are metadata checks, not physical hook qualification.",
+	"version": 1,
+	"valid": [
+		{
+			"slot": "physical_none_KeyJ",
+			"code": "KeyJ",
+			"mods": {}
+		},
+		{
+			"slot": "physical_ctrl_KeyJ",
+			"code": "KeyJ",
+			"mods": {
+				"ctrl": true
+			}
+		},
+		{
+			"slot": "physical_alt_KeyJ",
+			"code": "KeyJ",
+			"mods": {
+				"alt": true
+			}
+		},
+		{
+			"slot": "physical_shift_KeyJ",
+			"code": "KeyJ",
+			"mods": {
+				"shift": true
+			}
+		},
+		{
+			"slot": "physical_super_KeyJ",
+			"code": "KeyJ",
+			"mods": {
+				"super": true
+			}
+		},
+		{
+			"slot": "physical_ctrl_alt_KeyJ",
+			"code": "KeyJ",
+			"mods": {
+				"ctrl": true,
+				"alt": true
+			}
+		},
+		{
+			"slot": "physical_ctrl_shift_KeyJ",
+			"code": "KeyJ",
+			"mods": {
+				"ctrl": true,
+				"shift": true
+			}
+		},
+		{
+			"slot": "physical_ctrl_super_KeyJ",
+			"code": "KeyJ",
+			"mods": {
+				"ctrl": true,
+				"super": true
+			}
+		},
+		{
+			"slot": "physical_alt_shift_KeyJ",
+			"code": "KeyJ",
+			"mods": {
+				"alt": true,
+				"shift": true
+			}
+		},
+		{
+			"slot": "physical_alt_super_KeyJ",
+			"code": "KeyJ",
+			"mods": {
+				"alt": true,
+				"super": true
+			}
+		},
+		{
+			"slot": "physical_shift_super_KeyJ",
+			"code": "KeyJ",
+			"mods": {
+				"shift": true,
+				"super": true
+			}
+		},
+		{
+			"slot": "physical_ctrl_alt_shift_KeyJ",
+			"code": "KeyJ",
+			"mods": {
+				"ctrl": true,
+				"alt": true,
+				"shift": true
+			}
+		},
+		{
+			"slot": "physical_ctrl_alt_super_KeyJ",
+			"code": "KeyJ",
+			"mods": {
+				"ctrl": true,
+				"alt": true,
+				"super": true
+			}
+		},
+		{
+			"slot": "physical_ctrl_shift_super_KeyJ",
+			"code": "KeyJ",
+			"mods": {
+				"ctrl": true,
+				"shift": true,
+				"super": true
+			}
+		},
+		{
+			"slot": "physical_alt_shift_super_KeyJ",
+			"code": "KeyJ",
+			"mods": {
+				"alt": true,
+				"shift": true,
+				"super": true
+			}
+		},
+		{
+			"slot": "physical_ctrl_alt_shift_super_KeyJ",
+			"code": "KeyJ",
+			"mods": {
+				"ctrl": true,
+				"alt": true,
+				"shift": true,
+				"super": true
+			}
+		}
+	],
+	"invalid_slots": [
+		"physical_KeyJ",
+		"physical__KeyJ",
+		"physical_none_keyj",
+		"physical_none_j",
+		"physical_none_SC024",
+		"physical_none_36",
+		"physical_none_MouseLeft",
+		"physical_none_WheelUp",
+		"physical_none_ControlLeft",
+		"physical_none_ControlRight",
+		"physical_none_ShiftLeft",
+		"physical_none_ShiftRight",
+		"physical_none_AltLeft",
+		"physical_none_AltRight",
+		"physical_none_MetaLeft",
+		"physical_none_MetaRight",
+		"physical_none_CapsLock",
+		"physical_none_KeyMissing",
+		"physical_ctrl_ctrl_KeyJ",
+		"physical_shift_ctrl_KeyJ",
+		"physical_super_ctrl_KeyJ",
+		"physical_ctrl_none_KeyJ",
+		"physical_altgr_KeyJ",
+		"physical_cmd_KeyJ",
+		"physical_meta_KeyJ",
+		"physical_win_KeyJ",
+		"physical_fn_KeyJ",
+		"physical_CTRL_KeyJ",
+		"physical_ctrl__KeyJ",
+		"physical__ctrl_KeyJ",
+		"physical_none__KeyJ",
+		"physical_ctrl_KeyJ_extra",
+		"physical_ctrl_KeyJ\n",
+		"physical_none_KeyJ.foo",
+		"physical_none_KeyJ__send_text",
+		" physical_none_KeyJ",
+		"PHYSICAL_none_KeyJ",
+		"cmd_j"
+	],
+	"arbitrary_codes": [
+		"KeyE",
+		"Comma",
+		"Period",
+		"Semicolon",
+		"Quote",
+		"Space",
+		"Enter",
+		"Escape",
+		"F1",
+		"Numpad0",
+		"AudioVolumeUp"
+	],
+	"native": [
+		{
+			"slot": "physical_none_KeyJ",
+			"field": "hs",
+			"form": "ansi",
+			"identity": 38
+		},
+		{
+			"slot": "physical_ctrl_KeyJ",
+			"field": "evdev",
+			"form": "ansi",
+			"identity": 36
+		},
+		{
+			"slot": "physical_alt_KeyJ",
+			"field": "ahk",
+			"form": "ansi",
+			"identity": "SC024"
+		},
+		{
+			"slot": "physical_none_Backquote",
+			"field": "hs",
+			"form": "ansi",
+			"identity": 50
+		},
+		{
+			"slot": "physical_none_Backquote",
+			"field": "hs",
+			"form": "iso",
+			"identity": 10
+		},
+		{
+			"slot": "physical_none_IntlBackslash",
+			"field": "hs",
+			"form": "iso",
+			"identity": 50
+		},
+		{
+			"slot": "physical_none_IntlBackslash",
+			"field": "hs",
+			"form": "ansi",
+			"reason": "key_absent_on_form"
+		},
+		{
+			"slot": "physical_none_Backquote",
+			"field": "evdev",
+			"form": "iso",
+			"identity": 41
+		},
+		{
+			"slot": "physical_none_IntlBackslash",
+			"field": "evdev",
+			"form": "iso",
+			"identity": 86
+		},
+		{
+			"slot": "physical_none_IntlBackslash",
+			"field": "ahk",
+			"form": "iso",
+			"identity": "SC056"
+		},
+		{
+			"slot": "physical_none_KeyJ",
+			"field": "text",
+			"form": "ansi",
+			"reason": "invalid_native_field"
+		},
+		{
+			"slot": "physical_none_KeyJ",
+			"field": "hs",
+			"form": "azerty",
+			"reason": "invalid_keyboard_form"
+		}
+	]
+}
