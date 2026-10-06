@@ -4374,6 +4374,19 @@ integrated, then publish one grouped release.
   shared policy. Final native binding/order/caption and installed acceptance
   remain required; source review and the local portable gates are insufficient.
 
+  Current qualification checkpoint: own all-OS CI37541202298 tested exact
+  published cee55e1a/treea17350f2: native AHK10089/0, macOS canvas12 and the
+  entire Linux chain with17 install/launch variants pass, but Windows fresh-clone
+  startup fails with downstream phases skipped, and macOS package fails.
+  Corrected Windows CI37543830928 on exact20352/tree6641 is terminal successful:
+  native10089/0, full/fresh-clone startup, E2E, package, installed compiled
+  admission, programmable qualification, mandatory evidence and verdicts pass;
+  Release is skipped. Both new personal-shortcut cases belong to the actual
+  native runner; only aggregate proof is available (earlier individual manifest
+  download403, current individual/artifact fields not downloaded). All six items
+  remain partial:53/86/61 retains200 software construction sites plus separate
+  final integrated-source and installed/device qualification requirements.
+
   The current Windows fixture cohort checks the genuine shared-renderer
   toggle route, captures and restores absent or present dependency state, and
   loads the real English translation owner while restoring all eleven prior
@@ -5375,6 +5388,16 @@ Current Group 3 source checkpoint (item 73, 2026-10-06): [Group 3 current checkp
   presentation-refusal APIs are implemented. The historical classification
   above does not mean these APIs are absent; remaining provider families still
   need genuine shared data/order/policy consumption on the applicable drivers.
+
+  Current qualification checkpoint: exact cee55e1a/treea17350f2 CI37541202298
+  has native AHK10089/0, macOS canvas12 and the entire Linux chain with17
+  install/launch variants passing; Windows fresh-clone and macOS package still
+  fail on that source. Corrected Windows CI37543830928 on exact20352/tree6641
+  is terminal successful across native10089/0, startup/fresh clone, E2E,
+  package, installed compiled/programmable admission and mandatory verdicts;
+  Release is skipped. The two personal-shortcut cases belong to that native
+  runner: aggregate proof only, no individual manifest or artifact fields
+  inferred.53/86/61 retains200 software sites; all six items remain partial.
 
   The generation numeric-boundary family consumes actual shared fragments at
   its four former native constructor sites, preserving cross-driver order and
