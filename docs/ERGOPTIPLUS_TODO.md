@@ -3718,6 +3718,15 @@ Darwin compilation, protected fixtures, native ACLs and both signature slices
 remain UNEXECUTED until the exact-source macOS validation. This does not grant
 reference, broker, client, capture or history authority or complete TODO31.
 
+The registered Linux physical-hold dashboard harness now loads its actual
+shared selection enum and predicates before the unchanged Typing KPI consumer.
+The original assertion and independent hold/app/text expectations are preserved.
+Before-code and independent replays on both LuaJIT and Lua 5.4 reproduce the old
+missing-predicate error and pass the corrected real Writer/SQLite/Reader pipeline
+(12 checks) and dashboard consumers (5 checks). Native dependency-removal controls
+still fail at the intended boundary. Hosted Linux validation and physical input
+remain distinct; no production driver or shared dashboard behavior changed.
+
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
   listed; see `docs/memory/text-input-and-config.md`. Still open everywhere:
