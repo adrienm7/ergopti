@@ -43,6 +43,24 @@ local failure_pipe = assert(original_popen(failure_command, 'r'))
 local failure_output = assert(failure_pipe:read('*a'))
 failure_pipe:close()
 refuses_rows(failure_output, 'native SQLite exit receipt failed:')
+-- Author-written byte vectors qualify the transport independently of the reader.
+-- JSON-quote in SQLite before CLI rendering; raw TEXT output can truncate NUL.
+for _, fixture in ipairs({
+	{ sql = "X'410042'", token = "A\0B" },
+	{ sql = "X'00225c0a0dc3a92065cc8100'", token = '\0"\\\n\r\195\169 e\204\129\0' },
+}) do
+	local probe = assert(original_build(database,
+		'SELECT json_quote(CAST(' .. fixture.sql .. ' AS TEXT)) AS token_json;', {
+			flags = { '-readonly', '-json' }, capture_exit = true,
+		}))
+	local pipe = assert(original_popen(probe, 'r'))
+	local output = assert(pipe:read('*a'))
+	local closed, kind, status = pipe:close()
+	assert(closed == true or closed == 0, 'native token probe exit failed: ' .. tostring(kind) .. ':' .. tostring(status))
+	local rows = native_rows(output)
+	assert(#rows == 1 and type(rows[1].token_json) == 'string', 'native token probe must return its JSON string')
+	assert(json.decode(rows[1].token_json) == fixture.token, 'native JSON token transport must preserve every authored byte')
+end
 io.popen = function(...)
 	local pipe = assert(original_popen(...))
 	return {

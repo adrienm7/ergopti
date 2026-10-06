@@ -214,6 +214,9 @@ jobs:
       - name: Run reporter lifecycle self-tests
         run: node tools/test/test-report.cjs
 
+      - name: Run owned program XCTest notice constructed-policy controls
+        run: node tools/test/test-owned-program-xctest-notice.cjs
+
       # CPython intentionally omitted Darwin os.waitid until Python 3.13.
       - name: Prepare Python for native nonreaping waits
         uses: actions/setup-python@v5
@@ -352,11 +355,14 @@ jobs:
           swift_pipeline_status=("${PIPESTATUS[@]}")
           node tools/diagnostics/swift_xctest_evidence.cjs "$xctest_log" "${swift_pipeline_status[0]}" "${swift_pipeline_status[1]}" "$RUNNER_TEMP/swift-launcher-evidence/verdict.json"
           xctest_evidence_status=$?
+          node tools/diagnostics/owned_program_xctest_notice.cjs "$RUNNER_TEMP/swift-launcher-evidence/verdict.json" "$xctest_log" "$(git rev-parse HEAD)"
+          owned_program_evidence_status=$?
           node tools/diagnostics/tis_evidence_transport.cjs "$ERGOPTI_TIS_EVIDENCE_DIR" "$ERGOPTI_TIS_EVIDENCE_SESSION"
           tis_evidence_status=$?
           set -e
           if [ "$xctest_evidence_status" -ne 0 ]; then exit "$xctest_evidence_status"; fi
           if [ "$tis_evidence_status" -ne 0 ]; then exit "$tis_evidence_status"; fi
+          if [ "$owned_program_evidence_status" -ne 0 ]; then exit "$owned_program_evidence_status"; fi
           if ! grep -Fq "Test Suite 'All tests' passed" "$xctest_log"; then
               echo "::error::the XCTest process ended without its successful suite summary"
               exit 1
@@ -410,6 +416,103 @@ jobs:
             ${{ steps.swift-launcher-tests.outputs.tis_session_dir }}/manifest.json
             ${{ steps.swift-launcher-tests.outputs.tis_session_dir }}/record-*.dat
             ${{ steps.swift-launcher-tests.outputs.tis_session_dir }}/refusal.json
+          if-no-files-found: error
+
+      # Native inventory remains observable even when the separate XCTest suite fails.
+      - name: Run signed Hammerspoon program provider inventory
+        if: ${{ always() }}
+        run: |
+          python3 -m unittest discover -s tools/diagnostics/native_hs_program_providers -p test_receipt.py -v
+          python3 tools/diagnostics/native_hs_program_providers/run_native.py \
+            --source-root "$GITHUB_WORKSPACE" \
+            --source-sha "$GITHUB_SHA" \
+            --output "$RUNNER_TEMP/native-hs-program-providers" \
+            --download
+        timeout-minutes: 5
+
+      - name: Retain native Hammerspoon provider inventory
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-hs-program-providers-${{ github.run_id }}-${{ github.run_attempt }}
+          # Retain closed evidence only; fixture paths intentionally include newlines.
+          path: |
+            ${{ runner.temp }}/native-hs-program-providers/summary.json
+            ${{ runner.temp }}/native-hs-program-providers/*/receipt.json
+            ${{ runner.temp }}/native-hs-program-providers/*/physical-group.json
+            ${{ runner.temp }}/native-hs-program-providers/*/diagnostic-facts.json
+          if-no-files-found: error
+
+      # Observe genuine constructor userdata without delivering notifications.
+      - name: Observe native notification constructors
+        if: ${{ always() }}
+        run: |
+          python3 -m unittest discover -s tools/diagnostics/native_notification_constructors -p test_receipt.py -v
+          python3 tools/diagnostics/native_notification_constructors/run_native.py \
+            --source-root "$GITHUB_WORKSPACE" \
+            --source-sha "$GITHUB_SHA" \
+            --output "$RUNNER_TEMP/native-notification-constructors" \
+            --download
+        timeout-minutes: 5
+
+      - name: Retain native notification constructor observations
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-notification-constructors-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/native-notification-constructors/receipt.json
+            ${{ runner.temp }}/native-notification-constructors/physical-group.json
+            ${{ runner.temp }}/native-notification-constructors/summary.json
+            ${{ runner.temp }}/native-notification-constructors/failure.json
+            ${{ runner.temp }}/native-notification-constructors/pending-retirement.json
+          if-no-files-found: error
+
+      # Qualify the isolated OS switcher; prerequisite refusal remains a failure.
+      - name: Observe native global application switcher
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tools/diagnostics/native_global_switcher -p 'test_*.py' -v
+          brew install lua@5.4
+          global_switcher_lua54="$(brew --prefix lua@5.4)/bin/lua"
+          test -x "$global_switcher_lua54"
+          python3 tools/diagnostics/native_global_switcher/run_owner_controls.py --lua "$global_switcher_lua54"
+          python3 tools/diagnostics/native_global_switcher/run_ci_probe.py \
+            --source-root "$GITHUB_WORKSPACE" \
+            --output "$RUNNER_TEMP/native-global-switcher" \
+            2>&1 | tee "$RUNNER_TEMP/native-global-switcher-ci.log"
+        timeout-minutes: 5
+
+      - name: Retain native global application switcher observations
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-global-switcher-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/native-global-switcher/report.json
+            ${{ runner.temp }}/native-global-switcher/native-result.json
+            ${{ runner.temp }}/native-global-switcher-ci.log
+          if-no-files-found: error
+
+      # Observe the native structured API without invoking or importing automations.
+      - name: Observe native Apple Shortcuts discovery
+        if: ${{ always() }}
+        run: |
+          python3 -m unittest discover -s tools/diagnostics/apple_shortcuts_probe -p test_probe.py -v
+          python3 tools/diagnostics/apple_shortcuts_probe/run_probe.py \
+            --source-root "$GITHUB_WORKSPACE" \
+            --source-sha "$GITHUB_SHA" \
+            --output "$RUNNER_TEMP/group3-apple-shortcuts-probe"
+        timeout-minutes: 2
+
+      - name: Retain native Apple Shortcuts observation
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-apple-shortcuts-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/group3-apple-shortcuts-probe
           if-no-files-found: error
 
       # LauncherLogTests append to the real launcher log,

@@ -1,0 +1,46 @@
+{
+	"base_ref": "origin/dev",
+	"base_commit": "689d30293704093feab2e3caa077604e88560eb6",
+	"remote_dev_verified": "689d30293704093feab2e3caa077604e88560eb6",
+	"scope": "Inactive native publisher only: macOS FileSystem, shared TOML Writer, optional diagnostic reporter dependency. No Preferences/controller/program106 product files.",
+	"patch_sha256": "e0fb4e31fd11a12ca46724bc1e10b5d9f6a29b447f5b3fab28ce0fa1ec6ba5a4",
+	"patch_bytes": 37549,
+	"files": [
+		{
+			"path": "static/ergopti_plus/_shared/lua/diagnostics/operation_reporter.lua",
+			"preimage_exists": false,
+			"preimage_git_blob": "0000000000000000000000000000000000000000",
+			"postimage_git_blob": "637f041846cd9bf94efab754f5295d917de8a73f",
+			"preimage_sha256": null,
+			"postimage_sha256": "39a23c3201512b17b1ca6f8fb47b5a15f5e824df3149c7b7b9b9c26d0f0b0204",
+			"preimage_bytes": null,
+			"postimage_bytes": 1202,
+			"mode": "100644"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/toml_codec/writer.lua",
+			"preimage_exists": true,
+			"preimage_git_blob": "bd7bd0a08e6926b019332bbb40d972e331c169b9",
+			"postimage_git_blob": "9b3f871686c9d7b8be6f85bedda2691dc91f47a6",
+			"preimage_sha256": "ed98d6ee201637c642d58c0f4b1390e076b676820263610614c40dbb0ab137d5",
+			"postimage_sha256": "d97569637eddf1ab94659a2f9c75979256019fbd13d735a74396bc58a89788fa",
+			"preimage_bytes": 39806,
+			"postimage_bytes": 42101,
+			"mode": "100644"
+		},
+		{
+			"path": "static/ergopti_plus/macos/adapters/file_system.lua",
+			"preimage_exists": true,
+			"preimage_git_blob": "32a1baedcb8877d5865178306be784424196d711",
+			"postimage_git_blob": "38b5098cbb7ac54cc31c77123a483722c27f6f07",
+			"preimage_sha256": "41cb3c8a8a0f5c0225614fbe1e84a8a4be7df1440b92221d66ce63a2623966de",
+			"postimage_sha256": "7f5c07d153c0f2ea48e651451244328893ca7f3141cff6f1e94aa18bb8a36df2",
+			"preimage_bytes": 80005,
+			"postimage_bytes": 90019,
+			"mode": "100644"
+		}
+	],
+	"source_mutated": false,
+	"git_mutated": false,
+	"tests_run_for_packet": false
+}

@@ -1001,7 +1001,7 @@ _SR_CompletionQueue(Claim, ExitCode, Stdout, Stderr) {
 	}
 	try _SR_EnsurePoller()
 	catch as Err
-		_SR_LogError("Task {1} completion retry timer failed: {2}", Claim["TaskId"], Err.Message)
+		_SR_TreeLogError(Claim, "Task {1} completion retry timer failed: {2}", Claim["TaskId"], Err.Message)
 }
 
 ; Admission is atomic, but arbitrary client callbacks never run under our lock
@@ -1029,8 +1029,12 @@ _SR_CompletionDispatch(Claim) {
 		Critical(previous_critical)
 	}
 	try callback.Call(result*)
-	catch as Err
-		_SR_LogError("Task {1} on_done callback threw: {2}", Claim["TaskId"], Err.Message)
+	catch as Err {
+		if (Claim is Map) && Claim.Get("PrivateDiagnostics", false) == true
+			_SR_TreeLogError(Claim, "Task {1} on_done callback threw: {2}", Claim["TaskId"], Err.Message)
+		else
+			_SR_LogError("Task {1} on_done callback threw: {2}", Claim["TaskId"], Err.Message)
+	}
 	return true
 }
 
@@ -1226,7 +1230,7 @@ ShellRunner_ValidateSpawnArgs(Executable, Args) {
  * unbounded staging file.
  */
 ShellRunner_SpawnTreeOwned(Executable, Args, OnDone?, OnChunk?,
-		BeforeNativeAdoptFn?, MaxOutputBytes := 0, CaptureOutput := true) {
+		BeforeNativeAdoptFn?, MaxOutputBytes := 0, CaptureOutput := true, PrivateDiagnostics := false) {
 	global _SR_TaskCounter
 	local previous_critical := Critical("On")
 	local task_id := 0
@@ -1235,7 +1239,7 @@ ShellRunner_SpawnTreeOwned(Executable, Args, OnDone?, OnChunk?,
 
 	local capture_output := !!CaptureOutput
 	local validation := ShellRunner_ValidateSpawnArgs(Executable, Args)
-	local bad_arg_index := validation["bad_arg_index"]
+	local bad_arg_index := PrivateDiagnostics == true ? 0 : validation["bad_arg_index"]
 	local validation_error := validation["error"]
 
 	; This API receives an executable and argv, never shell syntax. Launch it
@@ -1249,6 +1253,7 @@ ShellRunner_SpawnTreeOwned(Executable, Args, OnDone?, OnChunk?,
 		"TmpFile", "",
 		"CaptureDir", "",
 		"CaptureOutput", capture_output,
+		"PrivateDiagnostics", PrivateDiagnostics == true,
 		"MaxOutputBytes", Max(0, Integer(MaxOutputBytes)),
 		"BadArgIndex", bad_arg_index,
 		"ValidationError", validation_error,
@@ -1303,7 +1308,14 @@ ShellRunner_SpawnTreeOwned(Executable, Args, OnDone?, OnChunk?,
 	return handle
 }
 
-_SR_TreeHandleStart(State) {
+_SR_TreeLogError(Owner, Message, Arguments*) {
+	if (Owner is Map) && Owner.Get("PrivateDiagnostics", false) == true
+		_SR_LogError("Private user program native operation remains unacknowledged.")
+	else
+		_SR_LogError(Message, Arguments*)
+}
+
+_SR_TreeHandleStart(State, CreateSuspendedFn := _SR_TreeCreateSuspendedForState) {
 	local validation_error := State["ValidationError"]
 	local bad_arg_index := State["BadArgIndex"]
 	if validation_error != "" {
@@ -1311,7 +1323,7 @@ _SR_TreeHandleStart(State) {
 		_SR_TreeQuiesceNative(invalid_claim, true)
 		_SR_TreeRecordQuiesced(State, invalid_claim)
 		_SR_TreeFinishClaim(invalid_claim)
-		_SR_LogError("tree-owned spawn() refused for '{1}': {2}",
+		_SR_TreeLogError(State, "tree-owned spawn() refused for '{1}': {2}",
 			State["Executable"], validation_error)
 		return false
 	}
@@ -1320,7 +1332,7 @@ _SR_TreeHandleStart(State) {
 		_SR_TreeQuiesceNative(newline_claim, true)
 		_SR_TreeRecordQuiesced(State, newline_claim)
 		_SR_TreeFinishClaim(newline_claim)
-		_SR_LogError("tree-owned spawn() refused for '{1}': argument {2} contains a newline. The cmd.exe /c transport truncates at the first newline; stage a multi-line payload to a file and pass its path instead.",
+		_SR_TreeLogError(State, "tree-owned spawn() refused for '{1}': argument {2} contains a newline. The cmd.exe /c transport truncates at the first newline; stage a multi-line payload to a file and pass its path instead.",
 			State["Executable"], bad_arg_index)
 		return false
 	}
@@ -1346,26 +1358,45 @@ _SR_TreeHandleStart(State) {
 			previous_critical := Critical("On")
 			try State["Starting"] := false
 			finally Critical(previous_critical)
-			_SR_LogError("tree-owned capture allocation failed for '{1}': {2}",
+			_SR_TreeLogError(State, "tree-owned capture allocation failed for '{1}': {2}",
 				State["Executable"], Err.Message)
 			return false
 		}
 	}
 
 	local native := 0
-	try native := _SR_TreeCreateSuspended(State["Executable"], State["Command"],
-		State["TmpFile"])
-	catch as Err {
-		previous_critical := Critical("On")
-		try State["Starting"] := false
-		finally Critical(previous_critical)
-		local failed_claim := _SR_TreeClaimTask(State, false)
+	local failure_carrier := 0
+	try {
+		failure_carrier := _SR_TreeCreationFailureCarrier(State)
+		native := CreateSuspendedFn.Call(State["Executable"], State["Command"],
+			State["TmpFile"], failure_carrier)
+	} catch Any as Err {
+		local failed_claim := 0
+		if IsObject(failure_carrier) && failure_carrier["Published"] {
+			; The producer has already transferred its exact native tuple. A failed
+			; adopter cannot replace this capsule with an unowned empty-State claim.
+			failed_claim := failure_carrier["Claim"]
+			try _SR_TreeAttachCreationFailure(failure_carrier)
+			catch Any
+				failure_carrier["AdoptionFailed"] := true
+		} else {
+			previous_critical := Critical("On")
+			try State["Starting"] := false
+			finally Critical(previous_critical)
+			failed_claim := _SR_TreeClaimTask(State, false)
+		}
 		_SR_TreeQuiesceNative(failed_claim, true)
-		_SR_TreeRecordQuiesced(State, failed_claim)
-		_SR_TreeFinishClaim(failed_claim)
-		_SR_LogError("tree-owned spawn.start() failed for '{1}': {2}",
-			State["Executable"], Err.Message)
+		if State["TerminalClaim"] == failed_claim {
+			_SR_TreeRecordQuiesced(State, failed_claim)
+			_SR_TreeFinishClaim(failed_claim)
+		}
+		_SR_TreeLogError(State, "tree-owned spawn.start() failed for '{1}': {2}",
+			State["Executable"], Err is Error ? Err.Message : "Native creation raised a non-Error value.")
 		return false
+	} finally {
+		if State.Has("CreationFailureCarrier") && (!failure_carrier["Published"]
+				|| State["TerminalClaim"] == failure_carrier["Claim"])
+			State.Delete("CreationFailureCarrier")
 	}
 	local before_adopt_failed := false
 	local before_adopt_error := ""
@@ -1468,10 +1499,10 @@ _SR_TreeHandleStart(State) {
 		; this owner now kills and closes the unpublished handles exactly once.
 		_SR_TreeQuiesceNative(native, true)
 		for NativeError in native["NativeErrors"]
-			_SR_LogError("tree-owned canceled-start cleanup warning for '{1}': {2}",
+			_SR_TreeLogError(State, "tree-owned canceled-start cleanup warning for '{1}': {2}",
 				State["Executable"], NativeError)
 		if before_adopt_failed
-			_SR_LogError("tree-owned before-adopt hook failed for '{1}': {2}",
+			_SR_TreeLogError(State, "tree-owned before-adopt hook failed for '{1}': {2}",
 				State["Executable"], before_adopt_error)
 		return false
 	}
@@ -1480,7 +1511,7 @@ _SR_TreeHandleStart(State) {
 		_SR_TreeRecordQuiesced(State, canceled_claim)
 		_SR_TreeFinishClaim(canceled_claim)
 		if before_adopt_failed
-			_SR_LogError("tree-owned before-adopt hook failed for '{1}': {2}",
+			_SR_TreeLogError(State, "tree-owned before-adopt hook failed for '{1}': {2}",
 				State["Executable"], before_adopt_error)
 		return false
 	}
@@ -1488,12 +1519,12 @@ _SR_TreeHandleStart(State) {
 		_SR_TreeQuiesceNative(resume_claim, true)
 		_SR_TreeRecordQuiesced(State, resume_claim)
 		_SR_TreeFinishClaim(resume_claim)
-		_SR_LogError("tree-owned spawn.start() failed for '{1}': {2}",
+		_SR_TreeLogError(State, "tree-owned spawn.start() failed for '{1}': {2}",
 			State["Executable"], resume_error)
 		return false
 	}
 	if thread_close_error != ""
-		_SR_LogError("tree-owned spawn.start() cleanup warning for '{1}': {2}",
+		_SR_TreeLogError(State, "tree-owned spawn.start() cleanup warning for '{1}': {2}",
 			State["Executable"], thread_close_error)
 	_SR_TreeEnsurePoller()
 	return true
@@ -1508,6 +1539,7 @@ _SR_TreeHandleTerminate(State, FireDone) {
 	try {
 		if !FireDone
 			_SR_TreeHandleDetach(State)
+		local carrier := State.Get("CreationFailureCarrier", 0)
 		if State["Starting"] && !State["TerminalClaimed"] {
 			if !State["TerminationRequested"] {
 				State["TerminationRequested"] := true
@@ -1521,6 +1553,11 @@ _SR_TreeHandleTerminate(State, FireDone) {
 				State["PendingTerminationCallback"] := 0
 			starting_pending := true
 		} else {
+			; A STARTING request above must retain its callback disposition even
+			; while the published capsule still awaits State binding.
+			if IsObject(carrier) && carrier["Published"]
+					&& State["TerminalClaim"] != carrier["Claim"]
+				return false
 			State["TerminationRequested"] := true
 			claim := _SR_TreeClaimTaskLocked(State, FireDone, false)
 			if !IsObject(claim) && State["FinalizationPending"]
@@ -1545,7 +1582,7 @@ _SR_TreeHandleTerminate(State, FireDone) {
 		return claim["TreeQuiesced"]
 	}
 	if finalization_pending
-		_SR_LogError("tree-owned task {1} termination is already being finalized; returning false instead of claiming an unverified empty tree.",
+		_SR_TreeLogError(State, "tree-owned task {1} termination is already being finalized; returning false instead of claiming an unverified empty tree.",
 			State["TaskId"])
 	return already_quiesced
 }
@@ -1594,7 +1631,9 @@ _SR_TreeHandleProcessId(State) {
 ; child its own two streams and nothing else.
 _SR_TreeCreateSuspended(Executable, CommandLine, CapturePath, OwnTree := true,
 		CreateFn := PLC_CreateProcessWithInheritedHandles,
-		CloseStreamFn := _SR_TreeCloseLaunchStream) {
+		CloseStreamFn := _SR_TreeCloseLaunchStream, FailureCarrier := 0) {
+	if !(FailureCarrier is Integer) || FailureCarrier != 0
+		_SR_TreeValidateCreationFailureCarrier(FailureCarrier)
 	if !HasMethod(CreateFn, "Call") || !HasMethod(CloseStreamFn, "Call")
 		throw TypeError("Native launch ports must be callable")
 	local job_handle := 0
@@ -1699,16 +1738,39 @@ _SR_TreeCreateSuspended(Executable, CommandLine, CapturePath, OwnTree := true,
 		thread_handle := 0
 		job_handle := 0
 		return owned
-	} catch as Err {
-		local partial := Map(
-			"ProcessHandle", process_handle,
-			"ThreadHandle", thread_handle,
-			"JobHandle", job_handle,
-			"Pid", pid,
-			"Assigned", assigned)
-		process_handle := 0
-		thread_handle := 0
-		job_handle := 0
+	} catch Any as Err {
+		local partial := IsObject(FailureCarrier) ? FailureCarrier["Claim"] : Map()
+		local previous_critical := Critical("On")
+		try {
+			; The call-scoped capsule was allocated before CreateProcessW. Publish
+			; its exact tuple and take-and-zero before any adopter or native poll yields.
+			partial["ProcessHandle"] := process_handle
+			partial["ThreadHandle"] := thread_handle
+			partial["JobHandle"] := job_handle
+			partial["Pid"] := pid
+			partial["Assigned"] := assigned
+			process_handle := 0
+			thread_handle := 0
+			job_handle := 0
+			pid := 0
+			if IsObject(FailureCarrier)
+				FailureCarrier["Published"] := true
+		} finally Critical(previous_critical)
+		if IsObject(FailureCarrier) {
+			try {
+				local receipt := FailureCarrier["AdoptFn"].Call(FailureCarrier)
+				FailureCarrier["AdoptionFailed"] := !(receipt is Integer) || receipt != 1
+			} catch Any {
+				; Arbitrary receipt/exception contents are never diagnostic data.
+				FailureCarrier["AdoptionFailed"] := true
+			} finally {
+				; A refusing or throwing port cannot orphan an already transferred
+				; capsule. The internal binder is idempotent and has no callback port.
+				try _SR_TreeAttachCreationFailure(FailureCarrier)
+				catch Any
+					FailureCarrier["AdoptionFailed"] := true
+			}
+		}
 		_SR_TreeQuiesceNative(partial, true)
 		throw Err
 	}
@@ -1776,23 +1838,7 @@ _SR_TreeClaimTaskLocked(State, FireDone, AccountingConfirmedZero) {
 			? State["OnDone"] : 0)
 	State["PendingTerminationCallback"] := 0
 	State["OnDone"] := 0
-	local claim := Map(
-		"OwnerState", State,
-		"NativeExitObserved", State["RootReaped"],
-		"TaskId", task_id,
-		"Executable", State["Executable"],
-		"TmpFile", State["TmpFile"],
-		"CaptureDir", State.Get("CaptureDir", ""),
-		"MaxOutputBytes", State.Get("MaxOutputBytes", 0),
-		"AccountingConfirmedZero", AccountingConfirmedZero,
-		"ProcessHandle", State["ProcessHandle"],
-		"ThreadHandle", State["ThreadHandle"],
-		"JobHandle", State["JobHandle"],
-		"Assigned", State["JobHandle"] != 0,
-		"ExitCode", State["ExitCode"],
-		"TreeQuiesced", false,
-		"NativeErrors", Array())
-	_SR_CompletionInitClaim(claim, _SR_CompletionNewToken(callback))
+	local claim := _SR_TreeNewTerminalClaim(State, callback, AccountingConfirmedZero)
 	State["TerminalClaim"] := claim
 	State["ProcessHandle"] := 0
 	State["ThreadHandle"] := 0
@@ -2080,7 +2126,7 @@ _SR_TreeLogNativeDebt(Claim) {
 		return
 	Claim["NativeDiagnostic"] := diagnostic
 	if diagnostic != ""
-		_SR_LogError("tree-owned task {1} native teardown diagnostic: {2}",
+		_SR_TreeLogError(Claim, "tree-owned task {1} native teardown diagnostic: {2}",
 			Claim.Get("TaskId", "unpublished"), RTrim(diagnostic))
 }
 
@@ -2096,6 +2142,87 @@ _SR_TreeCloseNativeHandle(Kind, NativeHandle, Errors) {
 		Errors.Push("CloseHandle(" . Kind . ") threw: " . Err.Message)
 	}
 	return false
+}
+
+; Central metadata preparation does not take native ownership or mutate State.
+_SR_TreeNewTerminalClaim(State, Callback, AccountingConfirmedZero) {
+	local task_id := State["TaskId"]
+	local claim := Map(
+		"OwnerState", State,
+		"PrivateDiagnostics", State.Get("PrivateDiagnostics", false),
+		"NativeExitObserved", State["RootReaped"],
+		"TaskId", task_id,
+		"Executable", State["Executable"],
+		"TmpFile", State["TmpFile"],
+		"CaptureDir", State.Get("CaptureDir", ""),
+		"MaxOutputBytes", State.Get("MaxOutputBytes", 0),
+		"AccountingConfirmedZero", AccountingConfirmedZero,
+		"ProcessHandle", State["ProcessHandle"],
+		"ThreadHandle", State["ThreadHandle"],
+		"JobHandle", State["JobHandle"],
+		"Assigned", State["JobHandle"] != 0,
+		"ExitCode", State["ExitCode"],
+		"TreeQuiesced", false,
+		"NativeErrors", Array())
+	_SR_CompletionInitClaim(claim, _SR_CompletionNewToken(Callback))
+	return claim
+}
+
+; This private seam receives the per-call capsule, never a global debt fence.
+_SR_TreeCreateSuspendedForState(Executable, CommandLine, CapturePath, Carrier) {
+	return _SR_TreeCreateSuspended(Executable, CommandLine, CapturePath, true,
+		PLC_CreateProcessWithInheritedHandles, _SR_TreeCloseLaunchStream, Carrier)
+}
+
+_SR_TreeCreationFailureCarrier(State, AdoptFn := _SR_TreeAttachCreationFailure) {
+	if !HasMethod(AdoptFn, "Call")
+		throw TypeError("Creation failure adopter must be callable")
+	local claim := _SR_TreeNewTerminalClaim(State, 0, false)
+	claim["Pid"] := 0
+	local carrier := Map("State", State, "Claim", claim, "Published", false,
+		"AdoptFn", AdoptFn, "AdoptionFailed", false)
+	_SR_TreeValidateCreationFailureCarrier(carrier)
+	State["CreationFailureCarrier"] := carrier
+	return carrier
+}
+
+_SR_TreeValidateCreationFailureCarrier(Carrier) {
+	if !(Carrier is Map) || !(Carrier.Get("State", 0) is Map)
+			|| !(Carrier.Get("Claim", 0) is Map) || Carrier.Get("Published", true)
+			|| !HasMethod(Carrier.Get("AdoptFn", 0), "Call")
+		throw TypeError("Invalid creation failure capsule")
+	local state := Carrier["State"], claim := Carrier["Claim"]
+	if !state["Starting"] || state["Started"] || state["TerminalClaimed"]
+			|| claim["OwnerState"] != state || claim["ClaimIdentity"] != ObjPtr(claim)
+			|| claim["ProcessHandle"] || claim["ThreadHandle"] || claim["JobHandle"]
+			|| state["ProcessHandle"] || state["ThreadHandle"] || state["JobHandle"]
+		throw Error("Creation failure capsule cannot borrow native ownership")
+}
+
+_SR_TreeAttachCreationFailure(Carrier) {
+	local previous_critical := Critical("On")
+	try {
+		local state := Carrier["State"], claim := Carrier["Claim"]
+		if !Carrier["Published"]
+			throw Error("Creation failure capsule has no native receipt")
+		if state["TerminalClaimed"] {
+			if state["TerminalClaim"] != claim
+				throw Error("Creation failure capsule has a competing owner")
+			return true
+		}
+		if !state["Starting"] || state["Started"]
+				|| state["ProcessHandle"] || state["ThreadHandle"] || state["JobHandle"]
+			throw Error("Creation failure State cannot borrow native ownership")
+		local pending_callback := state["PendingTerminationCallback"]
+		claim["CallbackToken"]["Callback"] := IsObject(pending_callback) ? pending_callback : 0
+		state["PendingTerminationCallback"] := 0
+		state["OnDone"] := 0
+		state["TerminalClaim"] := claim
+		state["TerminalClaimed"] := true
+		state["FinalizationPending"] := true
+		state["Starting"] := false
+		return true
+	} finally Critical(previous_critical)
 }
 
 _SR_TreeRecordQuiesced(State, Claim) {
@@ -2118,12 +2245,12 @@ _SR_TreeRecordQuiesced(State, Claim) {
 _SR_TreeFinishClaim(Claim, ReadFn := 0, DeleteFn := 0) {
 	if !IsObject(Claim)
 		return false
-	_SR_TreeLogNativeDebt(Claim)
 	if !Claim.Get("TreeQuiesced", false)
 		return false
 	if !_SR_CompletionBegin(Claim)
 		return false
 	try {
+		_SR_TreeLogNativeDebt(Claim)
 		local stdout := ""
 		local tmp_file := Claim["TmpFile"]
 		try {
@@ -2132,7 +2259,7 @@ _SR_TreeFinishClaim(Claim, ReadFn := 0, DeleteFn := 0) {
 				local output_bytes := FileGetSize(tmp_file)
 				if max_output_bytes > 0 && output_bytes > max_output_bytes {
 					Claim["ExitCode"] := 63
-					_SR_LogError("tree-owned task {1} output exceeded its {2}-byte ceiling; body was not read.",
+					_SR_TreeLogError(Claim, "tree-owned task {1} output exceeded its {2}-byte ceiling; body was not read.",
 						Claim["TaskId"], max_output_bytes)
 				} else {
 					local output := IsObject(ReadFn) ? ReadFn.Call(tmp_file) : FileRead(tmp_file)
@@ -2140,8 +2267,12 @@ _SR_TreeFinishClaim(Claim, ReadFn := 0, DeleteFn := 0) {
 				}
 			}
 		} catch as Err {
-			_SR_LogError("tree-owned task {1} output cleanup failed: {2}",
-				Claim["TaskId"], Err.Message)
+			if (Claim is Map) && Claim.Get("PrivateDiagnostics", false) == true
+				_SR_TreeLogError(Claim, "tree-owned task {1} output cleanup failed: {2}",
+					Claim["TaskId"], Err.Message)
+			else
+				_SR_LogError("tree-owned task {1} output cleanup failed: {2}",
+					Claim["TaskId"], Err.Message)
 		} finally {
 			_SR_TreeCleanupCapture(Claim, DeleteFn)
 		}
@@ -2162,7 +2293,7 @@ _SR_TreeCleanupCapture(Claim, DeleteFn := 0) {
 	try refusal := _SR_CaptureRemove(Claim, DeleteFn)
 	catch as Err {
 		_SR_TreeSetCaptureDebt(Claim, false)
-		_SR_LogError("tree-owned task {1} output deletion failed: {2}",
+		_SR_TreeLogError(Claim, "tree-owned task {1} output deletion failed: {2}",
 			Claim["TaskId"], Err.Message)
 		return true
 	}
@@ -2189,7 +2320,7 @@ _SR_TreeSetCaptureDebt(Claim, Pending) {
 	; Completion never depends on the retry timer; any later poll still drains it
 	try _SR_TreeEnsurePoller()
 	catch as Err
-		_SR_LogError("tree-owned task {1} capture retry timer failed: {2}",
+		_SR_TreeLogError(Claim, "tree-owned task {1} capture retry timer failed: {2}",
 			Claim["TaskId"], Err.Message)
 }
 
@@ -2350,7 +2481,7 @@ _SR_TreePoll(ApplyTimer := 0) {
 			Critical(previous_critical)
 		}
 		if poll_diagnostic != ""
-			_SR_LogError("tree-owned task {1} poll diagnostic: {2}",
+			_SR_TreeLogError(state, "tree-owned task {1} poll diagnostic: {2}",
 				task_id, poll_diagnostic)
 		if IsObject(claim) {
 			_SR_TreeQuiesceNative(claim, force_terminate)

@@ -514,10 +514,13 @@ function cataloguePaths(driver) {
 		assert.ok(asked >= 5, `${driver}: most pages ask their question`);
 		const done = page.messages.find((m) => m.action === 'finish');
 		assert.ok(done, `${driver}: the last page finishes`);
-		// A sub-switch stays unwritten: a first No turns nothing in force off.
-		const masters = CATALOGUE.platforms[driver].pages
-			.filter((p) => p.master)
-			.map((p) => p.master.path);
+		// Existing unsupported/Windows sub-switch behavior remains unchanged.
+		// Linux's independent pair master follows its explicit No-first answer.
+		const masters = CATALOGUE.platforms[driver].pages.flatMap((described) => {
+			const paths = described.master ? [described.master.path] : [];
+			if (driver === 'linux' && described.sub_switch) paths.push(described.sub_switch.path);
+			return paths;
+		});
 		assert.deepEqual(
 			done.answers.operations,
 			masters.map((master) => ({ path: master, value: false })),
@@ -634,7 +637,7 @@ function cataloguePaths(driver) {
 			items.filter((item) => item.path.startsWith(family + '.')).map((item) => item.path)
 		)
 	});
-	for (const driver of ['macos', 'linux']) {
+	for (const driver of ['macos']) {
 		assert.ok(
 			CATALOGUE.platforms[driver].pages.every((page) => page.sub_switch === undefined),
 			`${driver}: no page lists a key combination`
@@ -722,6 +725,86 @@ function cataloguePaths(driver) {
 	assert.ok(
 		items.every((item) => !operations.some((op) => op.path === item.path)),
 		'and imports no family item'
+	);
+})();
+
+(function linuxOrderedPairsFollowTheirOwnNoFirstAnswer() {
+	const described = CATALOGUE.platforms.linux.pages.find((page) => page.id === 'shortcuts');
+	const families = manifestToml.onboarding.pages.shortcuts.sub_switch.linux.sections;
+	assert.deepEqual(families, ['shortcuts.key_combination_taps']);
+	const items = described.groups[0].items.filter((item) =>
+		families.some((family) => item.path.startsWith(family + '.'))
+	);
+	assert.deepEqual(
+		items.map((item) => [item.path, item.value]),
+		[
+			['shortcuts.key_combination_taps.alt_gr_then_left_alt', 'ctrl_backspace'],
+			['shortcuts.key_combination_taps.alt_gr_then_caps_lock', 'ctrl_delete']
+		]
+	);
+	assert.deepEqual(
+		described.sub_switch.items,
+		items.map((item) => item.path)
+	);
+	assert.equal(
+		items.some((item) => item.value === 'caps_word'),
+		false
+	);
+	const open = (current = {}) => {
+		const page = openWizard({ platform: 'linux', current });
+		page.platform = 'linux';
+		goToPage(page, 'shortcuts');
+		return page;
+	};
+	const combinations = (page) =>
+		finish(page).answers.operations.filter((op) => op.path === 'category_enabled.key_combinations');
+	const firstNo = open();
+	assert.equal(firstNo.el('page-no').checked, true);
+	assert.deepEqual(
+		combinations(firstNo),
+		[{ path: 'category_enabled.key_combinations', value: false }],
+		'No-first explicitly disables the independent ordered-pair owner'
+	);
+	const accepted = open();
+	answer(accepted, true);
+	assert.deepEqual(combinations(accepted), [
+		{ path: 'category_enabled.key_combinations', value: true }
+	]);
+	const alreadyOn = Object.fromEntries(items.map((item) => [item.path, item.value]));
+	const activeDespiteMasterOff = open({
+		...alreadyOn,
+		'shortcuts.enabled': false,
+		'category_enabled.key_combinations': true
+	});
+	assert.deepEqual(
+		combinations(activeDespiteMasterOff),
+		[{ path: 'category_enabled.key_combinations', value: false }],
+		'No disables current pairs even when the ordinary shortcuts master is off'
+	);
+	const keptTray = open({
+		...alreadyOn,
+		'shortcuts.enabled': true,
+		'category_enabled.key_combinations': false
+	});
+	assert.deepEqual(
+		combinations(keptTray),
+		[],
+		'unchanged Yes imports no pair and preserves the disabled tray switch'
+	);
+	const withoutPairs = open({ 'category_enabled.key_combinations': false });
+	answer(withoutPairs, true);
+	const names = new Set(
+		items.map((item) =>
+			item.label.map((segment) => (segment.key ? locale('en')[segment.key] : segment.text)).join('')
+		)
+	);
+	const rows = checkRows(withoutPairs).filter((row) => names.has(row.name));
+	assert.equal(rows.length, 2);
+	rows.forEach(toggle);
+	assert.deepEqual(
+		combinations(withoutPairs),
+		[],
+		'Yes without pair selections does not enable the pair owner'
 	);
 })();
 
