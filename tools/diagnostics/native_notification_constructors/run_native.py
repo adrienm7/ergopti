@@ -16,14 +16,13 @@ import subprocess
 import sys
 import time
 from types import SimpleNamespace
-from urllib.request import urlopen
 import zipfile
 
 from receipt import validate
 
 DEPENDENCIES = {
     "ownership": "d3bc862c737e444f22d84fc32368bb8669360bc33ba6008c208f7bf62001314b",
-    "inventory": "21b51cdc242e6c2b1d2b5270d6ef0ddafd65b7e4658d955addd9a9c36697696d",
+    "inventory": "fbe160f9565f3bba3cb67bc98bd463601f3d0deba300f364c9ffd32f39810057",
 }
 PINS = (
     "static/ergopti_plus/macos/adapters/application_notifier.lua",
@@ -153,7 +152,9 @@ def main(arguments=None):
             require(app is None and archive is None, "bootstrap_arguments_refused")
             archive = output / inventory.ASSET
             with (
-                urlopen(asset["browser_download_url"], timeout=30) as incoming,
+                inventory.bootstrap_response(
+                    "archive_download", asset["browser_download_url"], timeout=30
+                ) as incoming,
                 archive.open("xb") as destination,
             ):
                 payload = incoming.read(asset["size"] + 1)
