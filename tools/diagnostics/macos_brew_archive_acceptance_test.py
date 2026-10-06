@@ -231,6 +231,7 @@ class ArchiveAcceptanceControls(unittest.TestCase):
                 "tools/diagnostics/macos_owned_process.py",
                 "tools/diagnostics/native_appleevent_probe_receiver.c",
                 "tools/diagnostics/native_appleevent_probe_sender.c",
+                "tools/diagnostics/native_appleevent_registration_test.m",
             ):
                 file = repository / name
                 file.parent.mkdir(parents=True, exist_ok=True)
@@ -278,6 +279,7 @@ class ArchiveAcceptanceControls(unittest.TestCase):
                 "tools/diagnostics/macos_owned_process.py",
                 "tools/diagnostics/native_appleevent_probe_receiver.c",
                 "tools/diagnostics/native_appleevent_probe_sender.c",
+                "tools/diagnostics/native_appleevent_registration_test.m",
             ):
                 file = repository / name
                 file.parent.mkdir(parents=True, exist_ok=True)
@@ -612,6 +614,11 @@ class AppleEventBoundaryControls(unittest.TestCase):
                 return child
 
             def run(self, arguments, **options):
+                if arguments == [str(root / "native-appleevent-registration-test")]:
+                    judge.assertTrue(options["confined"])
+                    return subprocess.CompletedProcess(
+                        arguments, 0, "native_appkit_registration_controls=4\n", ""
+                    )
                 if arguments[-1] not in ("success", "denied"):
                     return subprocess.CompletedProcess(arguments, 0, "", "")
                 self.sender_calls.append((arguments, options))
