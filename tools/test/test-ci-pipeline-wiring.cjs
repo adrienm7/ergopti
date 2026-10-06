@@ -1432,7 +1432,7 @@ const NATIVE_ACTION_PROBES = [
 			'python3 tools/diagnostics/native_global_switcher/run_ci_probe.py',
 			'--source-root "$GITHUB_WORKSPACE"',
 			'--output "$RUNNER_TEMP/native-global-switcher"',
-			'2>&1 | tee "$RUNNER_TEMP/native-global-switcher-ci.log"'
+			'2>&1 | env -u ERGOPTI_NATIVE_HS_METADATA_TOKEN tee "$RUNNER_TEMP/native-global-switcher-ci.log"'
 		],
 		files: ['report.json', 'native-result.json'],
 		extraPaths: ['${{ runner.temp }}/native-global-switcher-ci.log']
@@ -1531,6 +1531,14 @@ for (const spec of NATIVE_ACTION_PROBES) {
 		nativeActionProbeProblems
 	);
 }
+
+mustCatch(
+	'global switcher log receiver must exclude the metadata credential',
+	MACOS_BOX,
+	'2>&1 | env -u ERGOPTI_NATIVE_HS_METADATA_TOKEN tee "$RUNNER_TEMP/native-global-switcher-ci.log"',
+	'2>&1 | tee "$RUNNER_TEMP/native-global-switcher-ci.log"',
+	nativeActionProbeProblems
+);
 
 for (const condition of ['', 'false', 'success()']) {
 	const head =
