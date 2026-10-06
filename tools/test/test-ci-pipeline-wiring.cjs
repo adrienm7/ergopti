@@ -2610,6 +2610,118 @@ for (const changed of [undefined, 'node ./tools/test/browser/layer-editor.playwr
 	);
 }
 
+// Package downloads have a separate clock from the unchanged native audio gate.
+const LINUX_AUDIO_SETUP = 'Install native virtual audio locale prerequisites';
+const LINUX_AUDIO_NATIVE = 'Parse native virtual audio state independently of user locale';
+const LINUX_AUDIO_INSTALL =
+	'sudo apt-get install -y --no-install-recommends pulseaudio pulseaudio-utils locales language-pack-fr language-pack-de';
+const LINUX_AUDIO_LOCALES = 'sudo locale-gen fr_FR.UTF-8 de_DE.UTF-8';
+const LINUX_AUDIO_COMMANDS = [
+	'python3 tests/hardware/run_system_audio_locale_receipts.py',
+	'ERGOPTI_SYSTEM_TEST_LUA=lua5.4 python3 tests/hardware/run_system_audio_locale_receipts.py'
+];
+
+/** Keeps exact locale prerequisites outside the unchanged two-minute native budget. */
+function linuxAudioPrerequisiteProblems(files) {
+	const steps = files
+		.filter((entry) => entry.rel === LINUX_BOX)
+		.flatMap((entry) => pipeline.jobsOfText(entry.text, entry.rel))
+		.filter((job) => job.id === 'e2e-linux')
+		.flatMap((job) => pipeline.steps(job.body));
+	const setup = steps.filter((step) => step.name === LINUX_AUDIO_SETUP);
+	const native = steps.filter((step) => step.name === LINUX_AUDIO_NATIVE);
+	const setupAt = steps.findIndex((step) => step.name === LINUX_AUDIO_SETUP);
+	const nativeAt = steps.findIndex((step) => step.name === LINUX_AUDIO_NATIVE);
+	if (setup.length !== 1 || native.length !== 1 || setupAt + 1 !== nativeAt) {
+		return ['native audio needs one prerequisite step immediately before its native gate'];
+	}
+	const problems = [];
+	for (const step of [setup[0], native[0]]) {
+		if (
+			pipeline.stepField(step.body, 'if') !== NOT_CANCELLED ||
+			pipeline.stepField(step.body, 'working-directory') !== 'static/ergopti_plus/linux' ||
+			pipeline.stepField(step.body, 'continue-on-error') !== null
+		) {
+			problems.push(`${step.name} must remain an unforgiven Linux harness under !cancelled()`);
+		}
+	}
+	if (
+		pipeline.stepField(setup[0].body, 'timeout-minutes') !== '10' ||
+		JSON.stringify(logicalLines(setup[0].body)) !==
+			JSON.stringify([LINUX_AUDIO_INSTALL, LINUX_AUDIO_LOCALES])
+	) {
+		problems.push(
+			'native audio setup must install the exact packages/locales with its separate budget'
+		);
+	}
+	if (
+		pipeline.stepField(native[0].body, 'timeout-minutes') !== '2' ||
+		JSON.stringify(logicalLines(native[0].body)) !== JSON.stringify(LINUX_AUDIO_COMMANDS)
+	) {
+		problems.push(
+			'native audio must retain both exact interpreter invocations and its two-minute budget'
+		);
+	}
+	return problems;
+}
+
+errors.push(...linuxAudioPrerequisiteProblems(pipeline.files()));
+const linuxAudioSetupBody = pipeline.step(pipeline.job('e2e-linux'), LINUX_AUDIO_SETUP);
+const linuxAudioNativeBody = pipeline.step(pipeline.job('e2e-linux'), LINUX_AUDIO_NATIVE);
+for (const [what, from, to] of [
+	['missing audio prerequisites', linuxAudioSetupBody, ''],
+	...['pulseaudio', 'pulseaudio-utils', 'locales', 'language-pack-fr', 'language-pack-de'].map(
+		(name) => [
+			`missing native audio package ${name}`,
+			LINUX_AUDIO_INSTALL,
+			LINUX_AUDIO_INSTALL.split(' ')
+				.filter((word) => word !== name)
+				.join(' ')
+		]
+	),
+	['missing native audio locale generation', LINUX_AUDIO_LOCALES, 'true'],
+	...LINUX_AUDIO_COMMANDS.map((command) => [
+		`missing native audio interpreter ${command}`,
+		linuxAudioNativeBody,
+		linuxAudioNativeBody.replace(`          ${command}\n`, '')
+	]),
+	[
+		'changed native audio budget',
+		linuxAudioNativeBody,
+		linuxAudioNativeBody.replace('timeout-minutes: 2', 'timeout-minutes: 10')
+	],
+	[
+		'shared audio setup/native clock',
+		linuxAudioSetupBody,
+		linuxAudioSetupBody.replace('timeout-minutes: 10', 'timeout-minutes: 2')
+	],
+	[
+		'APT returned to native audio clock',
+		linuxAudioNativeBody,
+		linuxAudioNativeBody.replace(
+			'        run: |\n',
+			`        run: |\n          ${LINUX_AUDIO_INSTALL}\n`
+		)
+	],
+	[
+		'disabled audio setup',
+		linuxAudioSetupBody,
+		linuxAudioSetupBody.replace(NOT_CANCELLED, 'false')
+	],
+	[
+		'forgiven audio setup',
+		linuxAudioSetupBody,
+		linuxAudioSetupBody + '\n        continue-on-error: true'
+	],
+	[
+		'audio prerequisites after native execution',
+		linuxAudioSetupBody + '\n\n' + linuxAudioNativeBody,
+		linuxAudioNativeBody + '\n\n' + linuxAudioSetupBody
+	]
+]) {
+	mustCatch(what, LINUX_BOX, from, to, linuxAudioPrerequisiteProblems);
+}
+
 if (errors.length > 0) {
 	console.error(
 		'[FAIL] the CI pipeline wiring can skip a gate, publish a wrong or partial release, or draw a tangled graph:'

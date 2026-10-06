@@ -5803,6 +5803,18 @@ The controlled old403/new authenticated asset result proves the request
 boundary, not the cause of the earlier hosted403. Actual hosted acquisition
 and native qualification remain pending; item106 stays partial.
 
+Linux qualification prerequisite follow-up (2026-10-06): exact integrated
+run37494746572 passed all four genuine GTK cases but timed out while APT
+was still downloading the audio prerequisites, before either native audio
+runner. The same surviving apt-get process held the dpkg frontend lock,
+so later physical-source/window commands and package/install matrices did
+not execute. The exact existing PulseAudio packages, both translated language
+packs and locale generation now have a separate bounded prerequisite step.
+The original native audio name, both interpreter commands and two-minute
+budget are unchanged; fifteen additive wiring controls refuse missing
+prerequisites, changed budgets and shared setup/native clocks. Fresh hosted
+qualification remains required; no native assertion or item is waived.
+
 - [~] **107.** Make the number-row policy explicit: native behavior, digits
   directly or symbols directly, with an acknowledged migration of the old
   Windows Boolean and preserved unrelated settings. The earlier Boolean slice
