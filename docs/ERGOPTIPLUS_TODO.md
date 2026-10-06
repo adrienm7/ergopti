@@ -5499,6 +5499,21 @@ integration evidence. Independent regressions exposed refused macOS parameter
 transactions, overly broad source admission, Windows shutdown cancellation
 ordering and Linux descendants surviving their original process leader. Their
 bounded fixes retain source/privacy and strict ownership requirements.
+The Windows provider tranche now uses the canonical shared command metadata
+and one native inventory adapter. Discovery performs bounded regular-file and
+PATH metadata checks without launching programs or reading user scripts;
+interpreter prefixes and literal arguments use the existing owned execution
+path. Refused native cleanup remains reserved before assignment or confirmation
+callbacks. The shared reader preserves POSIX prefixes and rejects mismatched
+Windows provider metadata. Independent source review covers the native consumer,
+assignment/confirmation paths and retained-handle cleanup; all 27 previous
+program cases remain intact, with 34 composed registered cases. Those Windows
+cases, native discovery/invocation, compiled behavior, packaging and installation
+remain unexecuted for this tranche until exact-source Windows CI. macOS and
+Linux qualification is also required for the shared metadata. Real interpreter
+eligibility does not by itself qualify invocation or Apple Shortcuts, and this
+tranche does not complete item 106.
+
 Complete selected gates, hosted native execution, packaging and installation
 remain required. Automation-provider discovery and Apple Shortcuts are still
 outside this executable slice; item106 remains partial.
