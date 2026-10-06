@@ -9,10 +9,17 @@
 --- ==============================================================================
 
 return {
+	"tests.unit.infra.test_http_headers",
+	"tests.unit.meta.test_native_prepared_headers",
+	"tests.unit.adapters.test_managed_prepared_queue",
+	"tests.unit.infra.test_managed_construction_terminal",
+	"tests.unit.meta.test_native_descriptor_cancel",
+	"tests.unit.infra.test_managed_descriptor_cancel",
 	"tests.unit.infra.test_curl_identity_exact",
 	"tests.unit.adapters.test_system_proxy_exact_identity",
 	"tests.unit.adapters.test_managed_http_exact_forwarding",
 	"tests.unit.meta.test_managed_http_fixture_import_isolation",
+	"tests.unit.meta.test_prepared_native_port_import_isolation",
 	"tests.unit.adapters.test_curl_identity_helper",
 	"tests.unit.adapters.test_managed_http_public",
 	"tests.unit.adapters.test_managed_get_redirect_boundaries",

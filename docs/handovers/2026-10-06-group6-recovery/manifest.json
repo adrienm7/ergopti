@@ -36,6 +36,18 @@
 			"sha256": "ac7f1ad4f2cc7292907ea02461a58c1e92f29b4543616b5df7e4dbdff090de83",
 			"bytes": 466731,
 			"kind": "byte-exact executed controlled-model receipts; no native composite credit"
+		},
+		{
+			"file": "network-qualified-application.tar.gz",
+			"sha256": "da0ca2f0f26d026a183c222930a3a249550ddb262d90ba0b420b98192a4492ac",
+			"bytes": 191896,
+			"kind": "reviewed ordinary application and immutable scoped native receipts; pending compositions inactive"
+		},
+		{
+			"file": "prepared-fixture-isolation.tar.gz",
+			"sha256": "b160bbd48a5f1a22795283ea1a83db30a1edee51d150a66f400fe3c319643f3d",
+			"bytes": 17836,
+			"kind": "reviewed fixture cache isolation; unchanged seven receiving controls fail before and pass after on both Lua ABIs"
 		}
 	]
 }

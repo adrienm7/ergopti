@@ -3733,10 +3733,16 @@ LuaJIT/libuv/OpenSSL controls, including two independent NIST vectors over
 unlinked files. This receipt does not prove archive publication, tar install,
 rollback or installed package delivery; their original requirements remain.
 
-Reviewed pending group6 sources, exact preimages and scoped qualifications are
-preserved in the [restored-container checkpoint](handovers/2026-10-06-group6-recovery/README.md).
-The installed native archive/update chain remains required; saved patches do
-not close this item.
+Reviewed group6 sources, exact preimages and scoped qualifications are preserved
+in the [restored-container checkpoint](handovers/2026-10-06-group6-recovery/README.md).
+The ordinary Linux HTTP correction captures header metadata once before native
+replacement, retains live boolean predecessors until physical retirement, and
+preserves typed descriptor cancellation debt without altering failed-signal
+behavior. Six new normal modules retain 48 independent controls; GET198 and all
+existing fixture assertions remain intact. Final current-source verification
+and hosted HTTP replays are required. Pending output-hop, fixture335 and four
+body-pipe failures remain implementation work. The installed native archive/
+update chain remains required; saved patches do not close this item.
 
 - [~] **37.** Always show the shipped Ergopti hotstring pack, including when
   its keyboard layout is not installed. Move French `suffixes_a` and magic-key
@@ -4897,6 +4903,22 @@ and relay retries cannot renew a phase. The descriptor-sealing and digest
 prerequisite has the bounded qualification recorded in item 36. Mandatory
 native runner, planner and CI evidence registrations are added; final-source
 validation and the full updater composition remain required.
+
+The ordinary Linux HTTP owner now snapshots prepared headers once, queues a
+replacement only behind its exact physically retained live predecessor, and
+retains typed descriptor-cancellation debt. Seven additive normal modules cover
+55 independent controls; GET198 and existing forwarding assertions remain
+unchanged. Selected local gates pass format220, JS368, stub Hammerspoon101/14731,
+Linux189/9296, actual HTTP streaming262/API48 and native runtime82 on both ABIs.
+The Hammerspoon E2E profile skips one driver-specific vector. Native preflight25
+and body-cleanup14 pass with actual child reaping and no pending/rescue debt.
+A cold fake-backend fixture leak caused two first-run Linux failures; all seven
+new receiving controls fail before and pass after on both ABIs, and both
+original native assertions pass in the final full normal suite. Exact finite
+results are in the restored-container checkpoint. Native GET30/output18,
+cancelled-BOOLEAN successor/body-pipe, fixture335, archive-output/updater,
+hosted final-source and installed-format qualification remain required.
+Item62 stays partial; no Windows/macOS or enterprise-session acceptance is inferred.
 
 Reviewed pending group6 sources, exact preimages and scoped qualifications are
 preserved in the [restored-container checkpoint](handovers/2026-10-06-group6-recovery/README.md).

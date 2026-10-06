@@ -47,6 +47,7 @@ local function with_client(config, exercise)
 		state.timers[#state.timers + 1] = token
 		return token
 	end
+	local prepared = setmetatable({}, { __mode = "k" })
 	local native = { HAS_ASYNC = true, default_timeout_ms = function() return 30000 end }
 	function native.preflight(_, headers)
 		state.metadata = state.metadata + 1
@@ -58,7 +59,16 @@ local function with_client(config, exercise)
 			for _ in iterator, values, key do end
 		else for _ in pairs(headers) do end end
 		if config.metadata then config.metadata(client, state) end
-		return true
+		-- The explicit metadata port now returns a private preparation receipt;
+		-- raw next avoids evaluating its original __pairs callback twice.
+		local view, token = {}, {}
+		for name, value in next, headers do view[tostring(name)] = tostring(value) end
+		prepared[token] = true
+		return true, nil, token, view
+	end
+	function native.rebind_prepared_headers(token)
+		if not prepared[token] then return nil end
+		local rebound = {}; prepared[rebound] = true; return rebound
 	end
 	function native.dispatch_owned(url, headers, body, options, chunk, complete)
 		if options.authorized and options.authorized() ~= true then
