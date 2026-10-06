@@ -3,8 +3,8 @@
 ; ==============================================================================
 ; MODULE: Configuration Binding Identity (shared rule)
 ; DESCRIPTION:
-; Judges only gesture bindings against a complete catalogue published by their
-; native owner. Replays the same config_binding_identity JSON corpus as Lua:
+; Judges supported bindings against complete catalogues published by their
+; native owners. Replays the same config_binding_identity JSON corpus as Lua:
 ; unavailable or another domain is unjudged; a missing published slot is retired.
 ; The owner reports retirement and preserves source until explicit cleanup.
 ; ==============================================================================
@@ -127,4 +127,50 @@ ConfigBindingIdentityTapPublication(Ids, Scans) {
 ; Shared warning detail for the published tap-key parameter owner.
 ConfigBindingIdentityTapRetiredReason() {
 	return "no number-row tap key of this build has this name"
+}
+
+
+; Builds a detached identity projection from a complete admitted native owner.
+; This pure rule performs no source IO, boot publication or input registration.
+; @param {Array} Ids Actual nonempty dense native slot identities.
+; @return {Map} Detached keyboard domain; admission belongs to its native owner.
+ConfigBindingIdentityKeyboardCatalogue(Ids) {
+	if !(Ids is Array) || ObjGetBase(Ids) != Array.Prototype
+		throw ValueError("config_binding_identity: invalid native keyboard catalogue")
+	; The intrinsic enumerates names only: named getters and methods cannot run.
+	; Numeric Array cells are not named properties and remain checked below.
+	for PropertyName in ObjOwnProps(Ids)
+		throw ValueError("config_binding_identity: invalid native keyboard catalogue")
+	if Ids.Length == 0
+		throw ValueError("config_binding_identity: invalid native keyboard catalogue")
+	Slots := Map()
+	Slots.CaseSense := "On"
+	loop Ids.Length {
+		if !Ids.Has(A_Index)
+			throw ValueError("config_binding_identity: invalid native keyboard catalogue")
+		Slot := Ids[A_Index]
+		if Type(Slot) != "String" || Slot == "" || InStr(Slot, "__", true) || Slots.Has(Slot)
+			throw ValueError("config_binding_identity: invalid native keyboard catalogue")
+		Slots[Slot] := true
+	}
+	return Map("prefix", "keyboard__", "slots", Slots)
+}
+
+; Judges only an acknowledged complete keyboard domain through the shared rule.
+; Omitted authority remains unjudged; malformed explicit metadata refuses.
+; @param {Any} BindingId Native binding identity.
+; @param {Map} Catalogue Native publication, omitted when unavailable.
+; @return {String} "current", "retired", or "unjudged".
+ConfigBindingIdentityKeyboardStatus(BindingId, Catalogue?) {
+	if !IsSet(Catalogue)
+		return "unjudged"
+	if !(Catalogue is Map) || !Catalogue.Has("prefix") || Catalogue["prefix"] !== "keyboard__"
+		|| !Catalogue.Has("slots") || !(Catalogue["slots"] is Map) || Catalogue["slots"].Count == 0
+		throw ValueError("config_binding_identity: invalid published keyboard catalogue")
+	return ConfigBindingIdentityGestureStatus(BindingId, Catalogue)
+}
+
+; Exact shared warning reason; declaring it does not publish a native inventory.
+ConfigBindingIdentityKeyboardRetiredReason() {
+	return "no keyboard shortcut slot of this build has this name"
 }

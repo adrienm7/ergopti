@@ -3491,6 +3491,8 @@ Successful native Script-storage finalization now detaches the owner from the re
 
 Windows diagnostic run37456524038 resolves the five publisher source guards, global-clear expectation and native profile frame, with9982 passed and9 remaining full-snapshot failures. The genuine logger locates those failures inside the real collector with an unassigned global. The runner omits FeatureState initialization; the fixture now constructs the mandatory keyboard defaults from the exact native manifest projection and restores its prior value or unset state. All574 existing textual assertions and19 registrations are preserved, with one new real-default prerequisite assertion. Source review is clear; exact native replay remains pending and no production persistence guard is relaxed.
 
+The shared AutoHotkey keyboard identity rule now matches the existing Lua policy and replays17 additive independent handwritten vectors. Native source admission rejects sparse arrays, named metadata and derived prototypes before accessors run; five registered Windows cases cover retirement, omission and callback-free refusal. Independent pure Lua replay passes83/0 on each runtime. This is preparatory policy only: no complete Windows catalogue, loader publication or late parameter getter is changed or claimed implemented. Actual native AHK qualification and coordinated action-owner integration remain required.
+
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
   The shared AHK override policy now writes an explicit recommended delay only
