@@ -778,6 +778,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_gesture_recommended_actions.ahk
 #Include unit/test_config_persistence_transactions.ahk
 #Include unit/test_reload_terminal_pending.ahk
+#Include unit/test_reload_successor_quiescence.ahk
 #Include unit/test_reload_worker_identity.ahk
 #Include unit/test_reload_deferral.ahk
 #Include unit/test_tray_menu_separator_popup.ahk

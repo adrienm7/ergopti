@@ -847,13 +847,20 @@ LifecycleShutdownVetoHonored() {
 ; LifecycleShutdownVetoHonored, the one rule the layout poll also consults.
 ; @param Gate {String} Short name of the refusing gate, for the exhaustion line.
 ; @returns {Integer} 1 to veto the exit, 0 to let it proceed regardless.
-_LifecycleRefuseShutdown(Gate) {
+_LifecycleRefuseShutdown(Gate, RequireNativeRetirement := false) {
 	global _LifecycleShutdownVetoAttempts, _LifecycleShutdownReason
 	global _LifecycleAiShutdownAttempt
 	try UninstallCancel()
 	catch as Err
 		try LoggerError("Lifecycle", "Removal cancellation failed during shutdown refusal: {1}.", Err.Message)
 	Honored := LifecycleShutdownVetoHonored()
+	; Only an exact unsettled reload owner can extend the general veto ceiling.
+	NativeStopPending := !Honored && IsSet(ReloadTerminalHandoffNativeStopPending)
+		&& ReloadTerminalHandoffNativeStopPending.Call()
+	if RequireNativeRetirement || NativeStopPending {
+		Honored := true
+		try KL_CancelShutdown()
+	}
 	_LifecycleShutdownVetoAttempts += 1
 	if Honored {
 		; The successor that asked is now waiting on this window. Stop it and hand
@@ -880,6 +887,19 @@ _LifecycleRefuseShutdown(Gate) {
 		_LifecycleShutdownVetoAttempts, Gate,
 		Released == 1 ? "proven" : "INCOMPLETE")
 	return 0
+}
+
+; This admission protects only the exact unsettled successor retirement.
+_LifecycleRefuseNativeRetirement(Gate) {
+	return _LifecycleRefuseShutdown(Gate, true)
+}
+
+; Resumes only the same explicitly requested ordinary exit after native stop.
+_LifecycleRetrySupersededExit(Code, Record, *) {
+	if ReloadTerminalHandoffPending() != Record || Record["state"] != "abandon_ready"
+			|| !Record["stop_acknowledged"]
+		return false
+	ExitApp(Code)
 }
 
 Ergopti_OnShutdown(reason, code) {
@@ -1116,6 +1136,18 @@ Ergopti_OnShutdown(reason, code) {
 		if FileReadActivityBusy() {
 			try KL_CancelShutdown()
 			return _LifecycleRefuseShutdown("an exact file read still owns native cleanup")
+		}
+		if (SupersededReload is Map) {
+			ResumeExit := StrCompare(reason, "Exit", true) == 0
+				? _LifecycleRetrySupersededExit.Bind(code) : 0
+			StopReady := false
+			try StopReady := ReloadTerminalHandoffPrepareAbandon(SupersededReload, reason, ResumeExit)
+			catch as Err
+				try LoggerError("Lifecycle", "Superseded reload retirement failed: {1}.", Err.Message)
+			if !StopReady {
+				try KL_CancelShutdown()
+				return _LifecycleRefuseNativeRetirement("a reload successor still owns native retirement")
+			}
 		}
 		FinalExitAuthorized := false
 		try FinalExitAuthorized := _Updater_SignalFinalExitForIntent()

@@ -65,6 +65,31 @@ const parsed = toml.parse(fs.readFileSync(SOURCE, 'utf8'));
 const folderName = requireString(parsed.app, 'folder_name', 'app');
 if (/[\\/]/.test(folderName)) fail('app.folder_name must be one path component.');
 
+/** Returns the isolated Windows runtime directory component. */
+function requireWindowsRuntimeFolder(value, appFolder) {
+	if (
+		typeof value !== 'string' ||
+		value === '' ||
+		value === '.' ||
+		value === '..' ||
+		/[<>:"/\\|?*\p{Cc}]/u.test(value) ||
+		/[. ]$/.test(value) ||
+		/^(?:con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³]|conin\$|conout\$)(?:\.|$)/i.test(value)
+	) {
+		fail(
+			'runtime.windows.managed_ollama_folder_name must be a valid single Windows directory component.'
+		);
+	}
+	if (value.toLowerCase() === appFolder.toLowerCase())
+		fail('runtime.windows.managed_ollama_folder_name must differ from app.folder_name.');
+	return value;
+}
+
+const managedOllamaFolder = requireWindowsRuntimeFolder(
+	parsed.runtime?.windows?.managed_ollama_folder_name,
+	folderName
+);
+
 const logs = parsed.logs || fail('[logs] is missing.');
 const files = logs.files || fail('[logs.files] is missing.');
 const data = {
@@ -192,6 +217,12 @@ function emitAhk() {
 		'; ==============================================================================\n' +
 		'\n' +
 		fn('AppDirsFolderName', data.folderName, 'Folder named after the application, on every OS.') +
+		'\n' +
+		fn(
+			'AppDirsWindowsManagedOllamaFolderName',
+			managedOllamaFolder,
+			'Separate direct LocalApplicationData child for the managed Windows runtime.'
+		) +
 		'\n' +
 		fn(
 			'AppDirsLogsOverrideKey',

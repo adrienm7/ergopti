@@ -257,10 +257,10 @@ _StripFullLineComments(Src) {
 ; that had nothing to do with the order they protect. One name, one edit
 ; (lifecycle-shutdown-veto-unbounded).
 global _SHUTDOWN_REFUSAL_MARKER := "return _LifecycleRefuseShutdown("
-; Same marker as a multiline pattern, for the guards that COUNT refusals or
-; assert that a region contains none. Kept beside the substring form so the two
-; can never describe different things.
-global _SHUTDOWN_REFUSAL_PATTERN := "m)^\s*return\s+_LifecycleRefuseShutdown\("
+; Count both legitimate refusal wrappers: ordinary budget admission and the
+; stricter native-retirement delegate. The substring marker still identifies
+; ordinary refusal branches; the count excludes unrelated or lookalike names.
+global _SHUTDOWN_REFUSAL_PATTERN := "m)^\s*return\s+_LifecycleRefuse(?:Shutdown|NativeRetirement)\("
 
 ; Returns the whole driver source (see _DriverSourceConcat) with every
 ; full-line comment stripped. Use for source-scan invariants that count or

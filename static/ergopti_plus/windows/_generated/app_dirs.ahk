@@ -19,6 +19,11 @@ AppDirsFolderName() {
 	return "ergopti_plus"
 }
 
+; Separate direct LocalApplicationData child for the managed Windows runtime.
+AppDirsWindowsManagedOllamaFolderName() {
+	return "ergopti_plus_ollama"
+}
+
 ; paths.toml key of the optional logs-folder override.
 AppDirsLogsOverrideKey() {
 	return "LogsDirPath"
