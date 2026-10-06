@@ -191,7 +191,7 @@ local _approval_presenter       = nil   -- Login Items steps the boot registered
 local _script_chords_source     = nil   -- The script chords' plan the boot registered, or nil
 local _legacy_cleanup_presenter = nil   -- Legacy-rule cleanup dialog the boot registered, or nil
 local _legacy_conflicts         = nil   -- Untagged legacy rules the last deploy refused, while pending
-local _legacy_cleanup_offered   = {}    -- Conflict sets whose cleanup was offered in this launch
+local _legacy_cleanup_offered   = { confirmations = setmetatable({}, { __mode = "k" }), confirmation_generation = 0 } -- Offers and UI receipts
 local _legacy_offer_token       = nil   -- The one deferred cleanup offer { epoch }, inert once replaced
 local _guardian_regeneration_wait = nil -- Bundled rebuilds retained behind exact native readiness
 local _lease_less_resume_waiters = {} -- Resume terminals released by a non-ready guardian status
@@ -3224,22 +3224,64 @@ function M.set_legacy_cleanup_presenter(present)
 end
 
 --- The untagged legacy rules the last deploy refused, while they block it.
---- @return table|nil conflicts { count, descriptions }, nil when none is pending.
-function M.legacy_rule_conflicts()
+--- @param with_confirmation boolean|nil True only when capturing the actual dialog source.
+--- @return table|nil conflicts { count, descriptions, confirmation? }, nil when unavailable.
+function M.legacy_rule_conflicts(with_confirmation)
 	local record = _legacy_conflicts
 	if record == nil or not is_current_lifecycle(record.epoch) then return nil end
+	if with_confirmation ~= true then
+		local descriptions = {}
+		for index, description in ipairs(record.descriptions) do descriptions[index] = description end
+		return { count = record.count, descriptions = descriptions }
+	end
+
+	-- The dialog and its approval derive from ONE actual read. Menu renders do
+	-- not mint approvals; their existing no-argument summary stays inexpensive.
+	local path, context, epoch = KARABINER_OUT, record.legacy_context, record.epoch
+	local generation = _legacy_cleanup_offered.confirmation_generation
+	local function current()
+		return rawequal(_legacy_conflicts, record) and is_current_lifecycle(epoch)
+			and KARABINER_OUT == path and rawequal(record.legacy_context, context)
+			and _legacy_cleanup_offered.confirmation_generation == generation
+	end
+	local ok, raw, conflicts = xpcall(function()
+		local bytes, status = require("adapters.file_system").read_with_status(path)
+		if not current() or status ~= "ok" or type(bytes) ~= "string" then
+			error("legacy-confirmation-source-unavailable", 0)
+		end
+		local tree, decode_error = require("adapters.json_codec").decode(bytes)
+		if not current() or decode_error ~= nil or type(tree) ~= "table" then
+			error("legacy-confirmation-source-invalid", 0)
+		end
+		local found, classify_error = Generator.find_legacy_signature_conflicts(tree, context)
+		if not current() or type(found) ~= "table" then
+			error(classify_error or "legacy-confirmation-expired", 0)
+		end
+		return bytes, found
+	end, debug.traceback)
+	if not ok or not current() then
+		Logger.error(LOG, "The legacy-rule confirmation could not capture its current source: %s.", tostring(raw))
+		return nil
+	end
+	if #conflicts == 0 then return nil end
 	local descriptions = {}
-	for index, description in ipairs(record.descriptions) do descriptions[index] = description end
-	return { count = record.count, descriptions = descriptions }
+	for index, conflict in ipairs(conflicts) do descriptions[index] = tostring(conflict.description) end
+	local token = {}
+	_legacy_cleanup_offered.confirmations[token] = {
+		path = path, context = context, record = record, epoch = epoch,
+		source = { status = "ok", content = raw }, current = current,
+	}
+	return { count = #conflicts, descriptions = descriptions, confirmation = token }
 end
 
 --- Removes the untagged rules the last deploy refused (with a verified backup
 --- of karabiner.json), then requests a normal regeneration.
 --- @param on_done function|nil fn(ok, result) where result is { stage =
 ---   "removal"|"regeneration", reason, removed_count, backup_path }.
+--- @param confirmation table Opaque one-use token returned with the displayed summary.
 --- @return boolean accepted True when the rules were removed and the
 ---   regeneration requested; its outcome reaches on_done.
-function M.remove_legacy_rules(on_done)
+function M.remove_legacy_rules(on_done, confirmation)
 	Logger.info(LOG, "Removal of the legacy Karabiner rules requested.")
 	local function settle(ok, result)
 		invoke_public_callback("remove legacy rules", on_done, ok, result)
@@ -3254,8 +3296,17 @@ function M.remove_legacy_rules(on_done)
 		settle(false, { stage = "removal", reason = "no-legacy-rules-pending", removed_count = 0 })
 		return false
 	end
+	local approved = type(confirmation) == "table" and _legacy_cleanup_offered.confirmations[confirmation] or nil
+	if approved ~= nil then _legacy_cleanup_offered.confirmations[confirmation] = nil end
+	if approved == nil or not rawequal(approved.record, record)
+		or approved.epoch ~= _lifecycle_epoch or approved.path ~= KARABINER_OUT
+		or not rawequal(approved.context, record.legacy_context) or approved.current() ~= true then
+		settle(false, { stage = "removal", reason = "legacy-confirmation-expired", removed_count = 0 })
+		return false
+	end
 	local call_ok, removed, detail, removed_count, backup_path = xpcall(function()
-		return ManagedRuleRemoval.remove_legacy_rules(KARABINER_OUT, record.legacy_context)
+		return ManagedRuleRemoval.remove_legacy_rules(approved.path, approved.context,
+			approved.source, approved.current)
 	end, debug.traceback)
 	if not call_ok then
 		Logger.error(LOG, "Legacy-rule removal raised: %s.", tostring(removed))
@@ -3267,8 +3318,13 @@ function M.remove_legacy_rules(on_done)
 		settle(false, { stage = "removal", reason = tostring(detail), removed_count = 0 })
 		return false
 	end
-	if _legacy_conflicts == record then _legacy_conflicts = nil end
 	local count = removed_count or 0
+	if approved.current() ~= true then
+		settle(false, { stage = "regeneration", reason = "legacy-confirmation-expired",
+			removed_count = count, backup_path = backup_path })
+		return false
+	end
+	if rawequal(_legacy_conflicts, record) then _legacy_conflicts = nil end
 	M.regenerate(function(ok, reason)
 		settle(ok == true, {
 			stage = "regeneration",
@@ -5563,6 +5619,7 @@ function M.regenerate(
 	regeneration_context,
 	guardian_ready_capability
 )
+	_legacy_cleanup_offered.confirmation_generation = _legacy_cleanup_offered.confirmation_generation + 1
 	if regeneration_context == nil then
 		local retained = _deferred_layout_regeneration
 		if retained and retained.capability == recovery_capability
@@ -6041,6 +6098,7 @@ end
 --- @param on_done function|nil Callback fn(ok, reason) after the exact fence.
 --- @return boolean True when the stop transaction was accepted or completed.
 function M.stop_lease(on_done)
+	_legacy_cleanup_offered.confirmation_generation = _legacy_cleanup_offered.confirmation_generation + 1
 	if not require_state("stop_lease") then
 		invoke_public_callback("stop lease", on_done, false, "not-initialized")
 		return false
@@ -6091,6 +6149,7 @@ end
 --- @param on_done function|nil Callback fn(ok, reason) after PAUSED or failure.
 --- @param onboarding_gate table|nil Private exact-settlement continuation token.
 function M.pause(on_done, onboarding_gate)
+	_legacy_cleanup_offered.confirmation_generation = _legacy_cleanup_offered.confirmation_generation + 1
 	if not _state or not _state.enabled then
 		invoke_public_callback("pause", on_done, false, "integration-disabled")
 		return false
@@ -6202,6 +6261,7 @@ end
 --- acknowledgement names the same ACTIVE token.
 --- @param on_done function|nil Callback fn(ok, reason) after the full transaction.
 function M.resume(on_done)
+	_legacy_cleanup_offered.confirmation_generation = _legacy_cleanup_offered.confirmation_generation + 1
 	if not _state or not _state.enabled then
 		invoke_public_callback("resume", on_done, false, "integration-disabled")
 		return false
@@ -6845,6 +6905,7 @@ end
 --- controller proves STOPPED or its exact fallback transports complete.
 --- @return boolean True when the stop transaction was accepted.
 function M.stop()
+	_legacy_cleanup_offered.confirmation_generation = _legacy_cleanup_offered.confirmation_generation + 1
 	return M.shutdown("hammerspoon_stop")
 end
 

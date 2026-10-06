@@ -109,7 +109,7 @@ end
 --- @return boolean shown True when the dialog reached the user.
 local function present(remap, trigger)
 	validate(remap)
-	local read_ok, conflicts = pcall(remap.legacy_rule_conflicts)
+	local read_ok, conflicts = pcall(remap.legacy_rule_conflicts, true)
 	if not read_ok then
 		Logger.error(LOG, "The pending legacy Karabiner rules could not be read: %s.", tostring(conflicts))
 		return false
@@ -133,7 +133,7 @@ local function present(remap, trigger)
 
 	Logger.start(LOG, "Removing %d legacy Karabiner rule(s) on the user's request (%s)…", count, trigger)
 	local call_ok, err = xpcall(function()
-		return remap.remove_legacy_rules(report)
+		return remap.remove_legacy_rules(report, conflicts.confirmation)
 	end, debug.traceback)
 	if not call_ok then
 		Logger.error(LOG, "The legacy-rule removal raised: %s.", tostring(err))

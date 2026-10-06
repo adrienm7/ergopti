@@ -4887,6 +4887,21 @@ upload succeeds, but actual sibling bytes are not independently downloadable.
 The exact historical25-rule backup, confirmation UI and physical acceptance
 remain unavailable or unqualified; this native correction does not complete43.
 
+The cleanup dialog now captures its displayed count and descriptions from one
+actual source read and retains an opaque, one-use confirmation for those exact
+bytes, path, context, conflict record and lifecycle. The original source could
+remove three rules after displaying two when an external edit intervened; the
+same frozen four controls give one pass and three failures before this correction
+and four passes afterwards. Missing, forged, reused or expired approvals refuse
+before backup/publication. Regeneration, pause/resume and stop requests revoke
+older approvals; the original verified backup and conditional publication remain
+unchanged. Selected software discovery passes61 focused cases with explicit modal,
+filesystem/JSON and lease models; three causal mutations fail. All existing native
+six-case cleanup sources, the independent corpus and three Foundation controls
+remain byte-identical. Actual confirmation UI, native execution of these new
+guards, packaging and installation remain unqualified. The historical25-rule
+backup is unavailable, and item43 remains partial.
+
 - [~] **44.** CapsWord is no longer cancelled by the pointer when Karabiner
   activated it (AltGr + CapsLock): the watcher probed the variable with
   `karabiner_cli --get-variable`, an option karabiner_cli has never had (exit

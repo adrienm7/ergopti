@@ -1340,3 +1340,18 @@ parser is introduced. The current native compilation cause stays unknown.
 OwnedRuntime and the frozen CF7 corpus stay whole. CF7/25/24 pass normally and
 with inherited optimization. Actual Swift metadata controls, CF12, signed-peer
 scenarios, owned products and full-suite native completion remain unqualified.
+
+## Retained cleanup confirmation source
+
+The reviewed TODO43 correction binds the actual dialog summary and one-use
+approval to the same read of karabiner.json, exact source bytes/path, context,
+record and lifecycle. External added, replaced or altered rules now refuse before
+backup and publication instead of removing a different set than the user saw.
+Pause/resume, regeneration and stop requests invalidate retained approvals.
+The original verified backup, conditional writer and native six-case/three
+Foundation sources remain byte-identical. Frozen preimage controls give1PASS/
+3FAIL and the corrected source4PASS; focused modeled discovery passes61 cases,
+and three causal mutations are rejected. This does not recover the missing
+historical25-rule backup or qualify native modal confirmation, the new guards,
+packaging or installation. No TODO item is removed by this slice. Root composed
+verification and subsequent exact-source macOS qualification remain required.

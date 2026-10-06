@@ -506,7 +506,7 @@ end
 --- @return string detail `absent`, `unchanged`, `removed`, or the refusal.
 --- @return integer removed_count Number of rules removed.
 --- @return string|nil backup_path The verified backup, when one was written.
-function M.remove_legacy_rules(karabiner_out, legacy_context)
+function M.remove_legacy_rules(karabiner_out, legacy_context, confirmed_source, confirmation_current)
 	Logger.start(LOG, "Removing legacy ErgoptiPlus rules from karabiner.json…")
 	local function refuse(detail, backup_path)
 		Logger.error(LOG, "Legacy-rule removal refused — %s. karabiner.json was left untouched.", detail)
@@ -518,8 +518,21 @@ function M.remove_legacy_rules(karabiner_out, legacy_context)
 	if type(legacy_context) ~= "table" then
 		return refuse("the legacy migration context is missing")
 	end
+	local function current()
+		if confirmation_current == nil then return true end
+		if type(confirmation_current) ~= "function" then return false end
+		local ok, admitted = pcall(confirmation_current)
+		return ok and admitted == true
+	end
+	if not current() then return refuse("legacy-confirmation-expired") end
 	local FileSystem = require("adapters.file_system")
 	local raw, status, read_detail = FileSystem.read_with_status(karabiner_out)
+	if confirmed_source ~= nil and (type(confirmed_source) ~= "table"
+		or confirmed_source.status ~= "ok" or type(confirmed_source.content) ~= "string"
+		or status ~= "ok" or raw ~= confirmed_source.content) then
+		return refuse("legacy-confirmation-source-changed")
+	end
+	if not current() then return refuse("legacy-confirmation-expired") end
 	if status == "absent" then
 		Logger.success(LOG, "No karabiner.json at '%s' — no legacy ErgoptiPlus rule to remove.", karabiner_out)
 		return true, "absent", 0
@@ -565,8 +578,10 @@ function M.remove_legacy_rules(karabiner_out, legacy_context)
 			removed_or_error, #conflicts))
 	end
 
+	if not current() then return refuse("legacy-confirmation-expired") end
 	local backup_path, backup_err = write_legacy_backup(FileSystem, karabiner_out, raw)
 	if not backup_path then return refuse(backup_err) end
+	if not current() then return refuse("legacy-confirmation-expired", backup_path) end
 
 	local write_ok, written, write_detail = pcall(FileSystem.write_if_unchanged, karabiner_out, stripped,
 		{ status = "ok", content = raw })

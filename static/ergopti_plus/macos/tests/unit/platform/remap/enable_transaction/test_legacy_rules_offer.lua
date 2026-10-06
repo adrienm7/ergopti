@@ -51,6 +51,18 @@ end
 local function load_with_presenter(fixture)
 	local remap, calls = fixture.load_enabled_remap()
 	calls.lease_phase = "prepared"
+	-- Explicit source/preparation ports for this bridge-only fixture.
+	package.loaded["adapters.file_system"] = {
+		read_with_status = function() return '{"profiles":[]}', "ok" end,
+	}
+	package.loaded["platform.remap.generator"].find_legacy_signature_conflicts = function()
+		local pending = remap.legacy_rule_conflicts()
+		local found = {}
+		for index, description in ipairs(pending and pending.descriptions or {}) do
+			found[index] = { description = description }
+		end
+		return found
+	end
 	local offers = { count = 0, during_regeneration = 0, regenerating = false }
 	helpers.assert_true(remap.set_legacy_cleanup_presenter(function()
 		offers.count = offers.count + 1
@@ -144,10 +156,11 @@ helpers.describe("a deploy refused by legacy Karabiner rules (karabiner-legacy-c
 				calls.deploy_override = nil
 				local deploys = calls.deploy
 
+				local confirmation = assert(remap.legacy_rule_conflicts(true)).confirmation
 				local done_ok, done_result = nil, nil
 				helpers.assert_true(remap.remove_legacy_rules(function(ok, result)
 					done_ok, done_result = ok, result
-				end))
+				end, confirmation))
 				helpers.assert_eq(#calls.legacy_removals, 1)
 				helpers.assert_true(rawequal(calls.legacy_removals[1].legacy_context, calls.legacy_context),
 					"the removal classifies with the context the refused merge used")
@@ -171,10 +184,11 @@ helpers.describe("a deploy refused by legacy Karabiner rules (karabiner-legacy-c
 			offers.regenerate()
 			calls.legacy_removal_result = { false, "karabiner.json publication refused: source changed", 0, nil }
 			local deploys = calls.deploy
+			local confirmation = assert(remap.legacy_rule_conflicts(true)).confirmation
 			local done_ok, done_result = nil, nil
 			helpers.assert_eq(remap.remove_legacy_rules(function(ok, result)
 				done_ok, done_result = ok, result
-			end), false)
+			end, confirmation), false)
 			helpers.assert_eq(done_ok, false)
 			helpers.assert_eq(done_result.stage, "removal")
 			helpers.assert_eq(done_result.reason, "karabiner.json publication refused: source changed")
@@ -203,6 +217,56 @@ helpers.describe("a deploy refused by legacy Karabiner rules (karabiner-legacy-c
 			helpers.assert_eq(remap.set_legacy_cleanup_presenter(function() return true end), false,
 				"the first presenter is kept")
 			helpers.assert_true(not pcall(remap.set_legacy_cleanup_presenter, "dialog"))
+		end)
+	end)
+end)
+
+helpers.describe("legacy confirmation receipt ownership", function()
+	helpers.it("consumes an exact confirmation even when the removal owner refuses", function()
+		with_fixture(function(fixture)
+			local remap, calls, offers = load_with_presenter(fixture)
+			calls.deploy_override = refused_by(LEGACY)
+			offers.regenerate()
+			local confirmation = assert(remap.legacy_rule_conflicts(true)).confirmation
+			helpers.assert_type(confirmation, "table")
+			calls.legacy_removal_result = { false, "independent refusal", 0, nil }
+			helpers.assert_eq(remap.remove_legacy_rules(nil, confirmation), false)
+			helpers.assert_eq(#calls.legacy_removals, 1)
+			calls.legacy_removal_result = nil
+			local deploys = calls.deploy
+			helpers.assert_eq(remap.remove_legacy_rules(nil, confirmation), false)
+			helpers.assert_eq(#calls.legacy_removals, 1, "reused approval never reaches removal")
+			helpers.assert_eq(calls.deploy, deploys)
+		end)
+	end)
+	helpers.it("refuses a capture whose record changed during its actual source-read port", function()
+		with_fixture(function(fixture)
+			local remap, calls, offers = load_with_presenter(fixture)
+			calls.deploy_override = refused_by(LEGACY)
+			offers.regenerate()
+			local files = package.loaded["adapters.file_system"]
+			local read = files.read_with_status
+			files.read_with_status = function(...)
+				local raw, status = read(...)
+				offers.regenerate()
+				return raw, status
+			end
+			helpers.assert_eq(remap.legacy_rule_conflicts(true), nil)
+			helpers.assert_eq(#calls.legacy_removals, 0)
+		end)
+	end)
+	helpers.it("revokes a retained confirmation across pause and resume requests", function()
+		with_fixture(function(fixture)
+			local remap, calls, offers = load_with_presenter(fixture)
+			calls.deploy_override = refused_by(LEGACY)
+			offers.regenerate()
+			local confirmation = assert(remap.legacy_rule_conflicts(true)).confirmation
+			remap.pause()
+			remap.resume()
+			local deploys = calls.deploy
+			helpers.assert_eq(remap.remove_legacy_rules(nil, confirmation), false)
+			helpers.assert_eq(#calls.legacy_removals, 0)
+			helpers.assert_eq(calls.deploy, deploys)
 		end)
 	end)
 end)
