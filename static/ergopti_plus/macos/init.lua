@@ -551,6 +551,128 @@ local quit_layout_step = require("ui.menu.quit_layout").create({
 	logger = Logger,
 })
 
+-- Retain the actual scheduler ports before any controlled-stop owner callback.
+local physical_teardown_schedule = rawget(TimerScheduler, "after")
+local physical_teardown_cancel = rawget(TimerScheduler, "cancel")
+
+--- Awaits only an already loaded physical history owner before local teardown.
+--- The completion callback is framed; a committed continuation proves retirement
+--- after unwind without loading or activating a dormant session.
+--- @param on_teardown_ready function|nil Retained controlled-termination callback.
+--- @return boolean accepted
+--- @return string|nil state Pending while an exact owner is retained.
+local function settle_loaded_physical_owner(on_teardown_ready)
+	-- A loaded physical owner must retire while its source/accounting dependencies
+	-- are still live. This port never loads or initializes the dormant module.
+	local physical = _local_teardown_state.physical
+	if physical == nil then
+		local owner = rawget(package.loaded, "modules.keylogger.physical_history_session")
+		if owner == nil then
+			physical = { settled = true }
+		else
+			if type(owner) ~= "table" then return false end
+			local stop = rawget(owner, "stop")
+			local retired = rawget(owner, "retired")
+			if type(stop) ~= "function" or type(retired) ~= "function" then
+				Logger.error(LOG, "Physical teardown refused: loaded owner ports are unavailable.")
+				return false
+			end
+			local schedule = physical_teardown_schedule
+			local cancel = physical_teardown_cancel
+			if type(schedule) ~= "function" or type(cancel) ~= "function" then return false end
+			physical = { owner = owner, stop = stop, retired = retired, schedule = schedule, cancel = cancel }
+		end
+		_local_teardown_state.physical = physical
+	end
+	local function current()
+		local owner = rawget(package.loaded, "modules.keylogger.physical_history_session")
+		if physical.owner == nil then return owner == nil end
+		return rawequal(owner, physical.owner)
+			and rawequal(rawget(physical.owner, "stop"), physical.stop)
+			and rawequal(rawget(physical.owner, "retired"), physical.retired)
+			and rawequal(rawget(TimerScheduler, "after"), physical.schedule)
+			and rawequal(rawget(TimerScheduler, "cancel"), physical.cancel)
+	end
+	if physical.failed or not current() then physical.failed = true; return false end
+	if not physical.settled then
+		if physical.pending or physical.probing then return true, "pending" end
+		physical.probing = true
+		local retired_ok, retired = pcall(physical.retired)
+		physical.probing = false
+		if not current() or not retired_ok or type(retired) ~= "boolean" then
+			physical.failed = true
+			return false
+		end
+		if retired == true then
+			physical.settled = true
+		else
+			if type(on_teardown_ready) ~= "function" then return false end
+			physical.pending = true
+			local callback_claimed = false
+			local notification_claimed = false
+			local function finish(settled)
+				if notification_claimed then return false end
+				notification_claimed = true
+				local permitted = settled == true and current()
+				physical.pending = false
+				physical.settled = permitted
+				physical.failed = not permitted
+				local notified, result = pcall(on_teardown_ready, permitted)
+				if not current() or not notified or result == false then
+					physical.failed = true
+					physical.settled = false
+					return false
+				end
+				return permitted
+			end
+			local function on_physical_stopped(settled)
+				if callback_claimed then return false end
+				callback_claimed = true
+				if settled ~= true or not current() then return finish(false) end
+				-- The owner's completion callback is itself a held frame. One
+				-- committed continuation checks retirement only after that unwind.
+				local continuation
+				local schedule_ok, handle, committed = pcall(physical.schedule, 0, function()
+					if notification_claimed then return end
+					if not current() or continuation == nil then finish(false); return end
+					local cancel_ok, cancelled = pcall(physical.cancel, continuation)
+					if not current() or not cancel_ok or cancelled ~= true then finish(false); return end
+					local query_ok, complete = pcall(physical.retired)
+					if not current() or not query_ok or complete ~= true then finish(false); return end
+					finish(true)
+				end)
+				continuation = handle
+				physical.continuation = handle
+				if not current() or not schedule_ok or committed ~= true or type(handle) ~= "table" then
+					if schedule_ok and type(handle) == "table" then
+						pcall(physical.cancel, handle)
+					end
+					return finish(false)
+				end
+				return true
+			end
+			local stop_ok, accepted = pcall(physical.stop, on_physical_stopped)
+			if not current() then
+				if physical.continuation ~= nil then pcall(physical.cancel, physical.continuation) end
+				finish(false)
+				return false
+			end
+			-- A retained exact synchronous callback outranks a later stop error;
+			-- it still needs its after-unwind retirement proof before proceeding.
+			if callback_claimed then return true, "pending" end
+			if not stop_ok or accepted ~= true then
+				physical.pending = false
+				physical.failed = true
+				Logger.error(LOG, "Physical teardown stop was refused.")
+				return false
+			end
+			return true, "pending"
+		end
+	end
+
+	return true
+end
+
 --- Releases every Lua-owned resource. This function never owns Karabiner's
 --- shared processes; controlled callers invoke it only after the exact token
 --- fence. The native shutdown callback intentionally does not call it because
@@ -618,6 +740,11 @@ local function teardown_all_resources(termination_kind, on_teardown_ready)
 			Logger.debug(LOG, "MLX teardown is awaiting exact task completion.")
 			return true, "pending"
 		end
+	end
+
+	local physical_accepted, physical_state = settle_loaded_physical_owner(on_teardown_ready)
+	if physical_accepted ~= true or physical_state == "pending" then
+		return physical_accepted, physical_state
 	end
 
 	local steps = {

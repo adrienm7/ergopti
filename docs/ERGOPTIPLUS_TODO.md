@@ -3618,6 +3618,43 @@ owned runtime, compatibility, installation and physical acceptance are separate
 unfinished requirements. This promotion does not activate capture or complete
 TODO31 and WP4-WP10.
 
+The reviewed managed physical-history owner and controlled termination hook are
+now composed in the checkout. Explicit managed=true remains opt-in; default
+capture stays dormant. Each retry or600-second baseline rotation waits for the
+exact predecessor's native/source/writer/clock/frame debts and genuine scheduler
+settlement. Final shutdown joins the selected Accounting owner before reporting
+completion; callback return values alone grant no retirement.
+
+Controlled teardown consults only an already loaded physical-history module,
+after MLX settlement and before generic cleanup. It neither imports nor starts
+the dormant source. Captured original scheduler methods and one committed
+zero-delay continuation preserve the final callback's unwind before checking
+actual module retirement. Native unawaitable shutdown, layout, startup, logger
+and other generic cleanup remain unchanged.
+
+Source review verifies18,948 sealed subjects and all five current preimages;
+actual patch adoption is zero-fuzz/offset. The reviewed78 session controls,
+29 termination controls and four actual software manager/termination composition
+cases pass; required pure controls run on both Lua ABIs. Native task/timer and
+calendar boundaries remain modeled. The four composition cases run on Lua54;
+the LuaJIT native-fixture setup has four table.pack errors and is not qualified.
+Root selected gates and genuine macOS process/runtime/capture acceptance remain
+required. This completes a dormant WP3 software tranche, not TODO31 or WP4-WP10.
+
+The first Root selected run passes15,307 Lua assertions across1,528 modules,
+macOS E2E, Linux E2E and all8,562 Linux unit assertions; one JS source-read
+ratchet fails on the new termination fixture. Its reviewed test-only correction
+uses the canonical unique-unit reader to execute the same production bodies.
+The actual ratchet falls from77 to74 reads with its75 threshold unchanged;
+all29 case/assertion bodies and four independent controls remain exact. Real
+private source moves now retain those cases. Lua54 controls pass normally;
+bare LuaJIT lacks the existing reader's table.pack prerequisite and is
+unqualified. A separately disclosed external standard-library fixture passes
+those same supplementary JIT controls without repository changes. Root final
+formatting229 files, all361 JS checks and15,307 Lua assertions across1,528
+modules pass after the reader correction. Other selected sources and successful
+production/E2E/Linux gates are unchanged; native acceptance remains required.
+
 ## Remaining work after the 2026-09-30 releases
 
 - [~] **33.** Config policy for the files other than config.toml (the former

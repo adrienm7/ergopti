@@ -21,6 +21,7 @@ local function methods(scope, names)
 		captured[name] = rawget(scope, name)
 		assert(type(captured[name]) == "function", "Missing history subscription port: " .. name)
 	end
+	captured.on_retired = rawget(scope, "on_retired")
 	return captured
 end
 local function copy(value, budget, depth)
@@ -66,7 +67,7 @@ function M.new(owner, capacity, dependencies)
 	local own_current, own_retired = capability.current, capability.retired
 	life.bind_detach(function() life.detach(); return true end)
 	local active, building, busy, finished = true, true, false, false
-	local retirement_reentered = false
+	local retirement_reentered, hint_registered = false, false
 	local bindings, queue, failure = {}, {}, nil
 	local binding_name, history, conjunction, projection, projection_scope
 	local capture_token, clock_token, capture_observer, lifecycle_observer = nil, nil, {}, {}
@@ -364,6 +365,29 @@ function M.new(owner, capacity, dependencies)
 		if not ok or acknowledged ~= true or retirement_reentered then return false end
 		finished, queue = true, {}
 		return true
+	end
+	--- Registers exact original completion hints once; callback values grant no ACK.
+	--- Legacy callers make no registration or additional source query.
+	---@param callback function Framed source-completion hint, never native permission.
+	---@return boolean registered Whether every retained original source accepted it.
+	function coordinator.on_retirement_hint(callback)
+		assert(type(callback) == "function", "Missing history retirement hint")
+		if hint_registered or finished or building then return false end
+		hint_registered = true
+		local function register(scope, token)
+			local operation = scope and scope.on_retired
+			if type(operation) ~= "function" then return false end
+			local ok, accepted = pcall(operation, owner, token, callback)
+			return ok and accepted == true
+		end
+		local all = register({ on_retired = capability.on_retired }, life_token)
+		for _, name in ipairs(SOURCES) do
+			local source = bindings[name]
+			if source then all = register(source, source.token) and all end
+		end
+		all = register(clock, clock_token) and all
+		if projection_scope then all = register(projection_scope, projection_scope.token) and all end
+		return all
 	end
 	--- Returns detached operational status without retained application/private data.
 	function coordinator.status()
