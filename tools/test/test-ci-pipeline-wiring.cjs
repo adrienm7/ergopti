@@ -271,6 +271,12 @@ const STEP_CONDITIONS = [
 		"The unit suite on this distribution's LuaJIT",
 		"matrix.kind == 'install'"
 	],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'Upload the native distro unit log',
+		"${{ !cancelled() && matrix.kind == 'install' }}"
+	],
 	[LINUX_BOX, 'install-linux', 'Record mandatory distro evidence', "matrix.kind == 'install'"],
 	[LINUX_BOX, 'install-linux', 'Upload mandatory distro evidence', "matrix.kind == 'install'"],
 	[
@@ -1292,6 +1298,32 @@ function stepProblems(files) {
 		problems.push(`STEP_CONDITIONS lists ${key}, which the pipeline no longer has`);
 	return problems;
 }
+
+// Raw failure logs are diagnostics, separate from success-only distro evidence.
+for (const condition of [
+	'',
+	'false',
+	'success()',
+	"matrix.kind == 'install'",
+	'always()',
+	"always() && matrix.kind == 'install'"
+]) {
+	const head = '      - name: Upload the native distro unit log\n';
+	mustCatch(
+		'distro native unit raw log condition ' + condition,
+		LINUX_BOX,
+		head + "        if: ${{ !cancelled() && matrix.kind == 'install' }}\n",
+		head + (condition ? '        if: ' + condition + '\n' : ''),
+		stepProblems
+	);
+}
+mustCatch(
+	'missing native distro unit raw log upload',
+	LINUX_BOX,
+	'      - name: Upload the native distro unit log\n',
+	'      - name: Omitted native distro unit raw log upload\n',
+	stepProblems
+);
 
 for (const condition of ['', 'false', 'success()']) {
 	const head =
