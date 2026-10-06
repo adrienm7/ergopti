@@ -4728,6 +4728,12 @@ These are implementation tasks; separate installed tray/input acceptance.
       uncommitted in the local worktree of `fix/downloads-on-managed-networks`
       when the session stopped; redo it if that worktree is gone.
 
+The latest hosted Nix refusal reaches pinned-source metadata. Four fixed
+checkpoints distinguish command, decoding, routing and exact pin agreement;
+all original 35 controls and seven native requirements remain. Local admission
+refuses at the local-store checkpoint; the seven native checks are unexecuted
+in this container. Item 62 remains partial.
+
 The latest origin/dev authenticated Ubuntu acquisition owner now installs every
 original group-6 runtime, validation-tool, portable and Nix dependency. The
 workflow guard requires all 34 acquisition scopes and retains failure mutations.
