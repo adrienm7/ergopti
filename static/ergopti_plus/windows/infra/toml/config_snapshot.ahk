@@ -214,6 +214,9 @@ TomlConfigStaticForeignOwnershipRegistry() {
 			"magic_key", "FeatureState",
 			"rolls", "FeatureState",
 			"sfbs_reduction", "FeatureState"),
+		"hotstrings", Map(
+			"terminators", "TerminatorRecords",
+			"terminator_states", "TerminatorRecords"),
 		"gestures", Map(
 			"auto_configure_on_next_start", "Gestures"),
 		"personal_editor", Map(

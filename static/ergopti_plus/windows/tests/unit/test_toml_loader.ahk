@@ -1041,3 +1041,22 @@ for _TestTL_PrioritySourceCase in [
 		_TestTL_PrioritySourceType.Bind(_TestTL_PrioritySourceCase.Raw,
 			_TestTL_PrioritySourceCase.Fallback, _TestTL_PrioritySourceCase.Expected))
 }
+
+
+
+
+
+; ========================================================
+; ========================================================
+; ======= 4/ Custom Terminator Namespace Ownership =======
+; ========================================================
+; ========================================================
+
+_TAOT_LoaderRecordNamespaces() {
+	for Header in ["hotstrings.terminators", '"hotstrings"."terminators"',
+			"hotstrings.terminators.metadata", "hotstrings.terminator_states"]
+		AssertEqual("foreign", TomlConfigSectionSkipKind(Header), "record metadata stays with its declared owner")
+	for Header in ['"hotstrings.terminators"', "hotstrings.terminators_backup", "hotstrings"]
+		AssertEqual("", TomlConfigSectionSkipKind(Header), "literal dots and unrelated namespaces must not inherit the exemption")
+}
+Test("toml-aot-sibling: exact record namespaces retain metadata without excusing unrelated configuration", _TAOT_LoaderRecordNamespaces)
