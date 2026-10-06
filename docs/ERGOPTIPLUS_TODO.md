@@ -2591,6 +2591,8 @@ The Windows fresh-bootstrap control now reads the real autocorrection names reco
 
 Shared shortcut scope planning now filters only proved neutral deletions beneath an obsolete scalar/array parent. Requested nondelete, ancestor and whole-parent replacements refuse before native IO or runtime changes. Ordinary saves keep obsolete source values until explicit cleanup. Portable current-owner controls preserve all original ordinary-save assertions; physical device and native runner acceptance remain pending.
 
+Windows scopes classify a freshly captured strict source through the existing canonical decoder and obsolete-key owner, then admit only neutral deletion intents beneath proved obsolete scalar/array parents. Nonneutral or ancestor collisions refuse before backup/runtime publication. The candidate is built from the same captured source through existing build-only admission, drift and late session fences. Eighteen registered native controls retain the original full test prefix; native execution is pending.
+
 - [~] **7.** Complete W2: seven-page first-run opt-in wizard, per-category
   recommended choices, consistent WebView behavior and genuine translations in
   21 locales. The tap-holds page lists each engine's recommended keys from the
@@ -3965,6 +3967,8 @@ The shared writer now resolves root and section-relative dotted/inline scalar de
 Shortcut scopes preserve source-proven obsolete scalar/array parents rather than deleting them to create a current subtree. Explicit unsafe descendant replacement raises a retained-parent collision with no native IO. This does not complete the separate Windows full-state obsolete-parent refusal or case-sensitive boot-map work.
 
 The real Windows recursive full-state collector now renders each semantic key segment with the canonical TOML key owner. Its configuration-only sparse adapter consumes the resulting exact semantic parts, preserving literal dots, empty/non-BMP keys and supplied case-sensitive map entries. Generic sparse API semantics remain unchanged. New registered actual-collector/full-save cases are appended; native execution is pending. Simultaneous case-twin boot maps and obsolete-parent full-state safe refusal remain separate software work.
+
+Windows scope recommendation/clear preserves source-classified obsolete values until explicit cleanup, including new external-source and late schema-session refusals. This covers the detached scope owner, not the still-open whole-state obsolete-parent refusal or unclassified table-array boundaries.
 
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
