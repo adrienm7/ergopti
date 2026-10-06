@@ -1,0 +1,145 @@
+{
+  "evidence": {
+    "integrity.json": {
+      "bytes": 442,
+      "sha256": "a151d387b05edf8aaa6b5fa8c2099e4507ec95adff86c0638b1867f7865deb65"
+    },
+    "prepare.py": {
+      "bytes": 3312,
+      "sha256": "da57dba4b512a8261337935f553ba94b6cafdc8ea45eaacf7bf9b101abaf8dbc"
+    },
+    "replay.stdout": {
+      "bytes": 3209,
+      "sha256": "002895461c05549127b09bdf8bc969c5ce9ff282a2196d3a4445453f8f1230da"
+    },
+    "replay/lua5.4-current.log": {
+      "bytes": 3712,
+      "sha256": "b783c7de65250b52cde2aff56e46f87dccebd751b04a9d25f6566e1ccc36814f"
+    },
+    "replay/lua5.4-forbid-retirement.log": {
+      "bytes": 2839,
+      "sha256": "f4a7ce56f545abe29d9df1a55617d5742e9fc056cb3ea2703a454f9fb7f1ee73"
+    },
+    "replay/lua5.4-legacy-retirement.log": {
+      "bytes": 2676,
+      "sha256": "08a6e0f2147532ff7d0ca8b0446e0cc05d03d9cfbb0097fbe8750b53865cf538"
+    },
+    "replay/lua5.4-skip-only-up.log": {
+      "bytes": 3420,
+      "sha256": "caf71ebf1b953e736cbeb983ea202ef61487307220863d7c85d683472a8b2dd0"
+    },
+    "replay/lua5.4-weaken-baseline.log": {
+      "bytes": 3806,
+      "sha256": "e2e749295733a29ffac1a77da8c44d27e13cef09c2df52a474abf820c6baa67e"
+    },
+    "replay/luajit-current.log": {
+      "bytes": 3712,
+      "sha256": "b783c7de65250b52cde2aff56e46f87dccebd751b04a9d25f6566e1ccc36814f"
+    },
+    "replay/luajit-forbid-retirement.log": {
+      "bytes": 2839,
+      "sha256": "f4a7ce56f545abe29d9df1a55617d5742e9fc056cb3ea2703a454f9fb7f1ee73"
+    },
+    "replay/luajit-legacy-retirement.log": {
+      "bytes": 2676,
+      "sha256": "08a6e0f2147532ff7d0ca8b0446e0cc05d03d9cfbb0097fbe8750b53865cf538"
+    },
+    "replay/luajit-skip-only-up.log": {
+      "bytes": 3420,
+      "sha256": "caf71ebf1b953e736cbeb983ea202ef61487307220863d7c85d683472a8b2dd0"
+    },
+    "replay/luajit-weaken-baseline.log": {
+      "bytes": 3806,
+      "sha256": "e2e749295733a29ffac1a77da8c44d27e13cef09c2df52a474abf820c6baa67e"
+    },
+    "replay/results.json": {
+      "bytes": 2995,
+      "sha256": "bd3223ac7f4582f00347b381078db6f981f71d371baaec1c88bdfa892b88401f"
+    },
+    "replay/run.lua": {
+      "bytes": 1610,
+      "sha256": "672586a8f0f860299ebc4f5ca06fd0c6f1381711a7c9475802c73257c4564467"
+    },
+    "reviewer-setup-note.txt": {
+      "bytes": 582,
+      "sha256": "df1268e271ca25cca690a5b8146c031268fd3f16e9d47a89517610a3c64219a9"
+    }
+  },
+  "findings": [],
+  "independent_replay": {
+    "abi": [
+      "LuaJIT",
+      "Lua5.4"
+    ],
+    "all_logs_byte_equal_producer": true,
+    "current": {
+      "exit": 1,
+      "failed": 8,
+      "passed": 17
+    },
+    "executions": 10,
+    "forbid_reentrant_retirement": {
+      "exit": 1,
+      "failed": 1,
+      "passed": 25
+    },
+    "harness_expected_outcomes_exit": 0,
+    "legacy_retirement": {
+      "exit": 0,
+      "failed": 0,
+      "passed": 26
+    },
+    "skip_only_up": {
+      "exit": 1,
+      "failed": 6,
+      "passed": 19
+    },
+    "weaken_baseline": {
+      "exit": 1,
+      "failed": 9,
+      "passed": 16
+    }
+  },
+  "integrity": {
+    "all_original_tap_hold_integration_case_count": 26,
+    "explicit_archived_overlay_receipt_overlap_inputs": 9,
+    "member_pins": 8,
+    "new_cases": 10,
+    "old_overlap_cases": 1,
+    "original_watchdog_and_overlap_whole_prefix_byte_exact": true,
+    "portable_members_including_receipt": 9,
+    "reviewed_overlays": 2,
+    "snapshot_sources": 1904,
+    "watchdog_original_case_count": 14
+  },
+  "native_kernel_execution": "NOT_RUN",
+  "packet_receipt_sha256": "e22aafd8169ed11844417daf610cdadfc1b2f7de2fdc19e4b020a500031217a9",
+  "physical_delivery_available": false,
+  "producer_snapshots_or_prior_receipts_mutated": false,
+  "production_bugs_retained": 8,
+  "production_source_fix": false,
+  "resource_review": [
+    "The harness injects explicit controlled Reader/Writer syscalls, XKB, libuv clock and sleep/window providers; real Hook/TapHold/Injector/ComboEmitter implementation methods still execute.",
+    "New assertions run after session.close attempts hook retirement and controlled Reader/backend/Writer cleanup and removes its ordinary fake-node files. Native handles/syscalls/display ownership are not exercised.",
+    "Original fourteen watchdog and twenty-six TapHold assertions remain unchanged. Cleanup callback success is controlled here, so this diagnostic does not qualify native retirement/close refusal."
+  ],
+  "reviewed_contracts": [
+    "The exact old overlap regression remains failed; duplicate downs, final source ownership, live-layout Menu/Ctrl, stale lost-source roster and emitter reentry assertions specify distinct regressions, rather than relaxing the original expected roster.",
+    "Actual TapHold Caps-synthetic Shift plus same-source physical Shift retains output through set_remapper(nil), but orphan handling swallows the subsequent physical UP and strands Writer down42. The failing control reproduces that exact production path.",
+    "Actual Injector Alt spending is deliberate and does not imply physical ownership ended; restoring text modifiers currently duplicates shared Shift transitions. Future handoffs must distinguish spent and restored ownership.",
+    "Actual ComboEmitter advances the exact same Writer capability epoch legitimately. A Hook-only opaque epoch without a joint reservation/handoff would misclassify valid interleaving.",
+    "Writer temporary release remains exact-baseline/restoration guarded. The weakened baseline counterfactual creates an additional failure; persistent forwarding must use a distinct fully acknowledged private commit instead of loosening this predicate.",
+    "The blanket busy-refusal counterfactual breaks an existing legitimate same-owner reentrant remapper retirement assertion. A future broker needs staged exact retirement, not indiscriminate refusal.",
+    "Future zero-wire duplicate/additional-holder/intermediate-UP dispositions must identify zero native writes rather than claim an ACK; native final source/output/current held/XKB currency remains a separate ownership and qualification boundary."
+  ],
+  "root_git_ci_mutations": false,
+  "scope": "Nine-file inactive actual-consumer diagnostic selection only, no proposed source patch or native admission",
+  "scope_limits": [
+    "CLEAR means archival diagnostic/design fidelity only; current production composition is RED and is not safe for capability admission.",
+    "The controlled XKB port models an aggregate desktop key bit and checks required routing; no claim is made about actual native XKB key/refcount behavior.",
+    "No kernel/uinput/input-device/display/native-command/libuv-handle allocations were performed by this review.",
+    "No full suite, hardware, deployment, E2E, package or install run; coordinated broker/native source ownership and native qualifications remain necessary.",
+    "The two reviewer setup failures came from reconstruction path/dependency omissions; preserved incomplete owned directories and setup note are distinct from product diagnostic failures."
+  ],
+  "verdict": "BOUNDED_REGRESSION_INVENTORY_AND_DESIGN_CLEAR_PRODUCTION_UNREPAIRED"
+}

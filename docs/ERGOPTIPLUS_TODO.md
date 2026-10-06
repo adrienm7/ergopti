@@ -5058,6 +5058,20 @@ deferral is superseded. This item and items16/38 remain open.
 
 Current Group 3 source checkpoint (item 97, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Complete native capture, all-owner collisions, joint source/modifier/output custody, Unicode/dead-key delivery and accent migration; qualify actual GUI/bridge and retain legacy menus. Separate device/evidence boundary: Real physical positions/modifiers and output across layouts/devices.
 
+The frozen [modifier-consumer inventory](handovers/2026-10-04-parallel-containers/group3-2026-10-06-modifier-consumer-inventory/README.md)
+preserves the original fourteen watchdog cases and overlap assertion. Actual
+controlled consumers record 17 PASS / 8 FAIL on each Lua ABI. In addition to
+the two-source Shift overlap, withdrawing a Caps remapper can swallow the
+remaining physical Shift release as an orphan and leave the Writer held roster
+set. A skip-only-UP change remains red (19/6), weakened temporary restoration
+regresses further (16/9), and blanket reentry refusal breaks an original
+TapHold retirement assertion (25/1 versus unchanged 26/0). Independent review
+is CLEAR for the inventory only. Implement a coherent single-channel owner
+broker across Hook, Reader, Writer, TapHold, Injector, ComboEmitter,
+OutputTransaction and daemon; coordinate source ownership before admission.
+No production repair, native capability, kernel output or physical qualification
+is claimed. This remains software work, not a device-only check.
+
 - [~] **98.** Replace the fixed "make J the star key" setting with a physical
   key and output chosen by the user: any keyboard position and arbitrary
   character, including choosing no star at all. Integrate with item 97's
@@ -5874,6 +5888,22 @@ prerequisites, changed budgets and shared setup/native clocks. Fresh hosted
 qualification remains required; no native assertion or item is waived.
 
 Current Group 3 source checkpoint (item 106, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Preserve the qualified 21-case inventory and owned-program provider; diagnose the current GTK delayed-identity observation with its original poll unchanged; record Windows discovery/invocation for the maintainer workstation, then complete Linux/macOS providers and real Shortcuts discovery/invocation. Separate device/evidence boundary: Only device-dependent automation workflows require external device acceptance.
+
+The Ubuntu prerequisite is now separately published and integrated upstream:
+`b70f98236` restores actual native acquisition; dev `a576915cf` CI
+37533343559 passes the complete Windows and Linux lanes. Its non-root fixture
+failure has a published thirty-case successor (`509795692`, dev `de4f253c1`).
+The Group 3 test-only successor keeps all thirty methods/assertions and
+constrains modeled private UID facts to captured directory/file identity,
+original UID and exclusive creation. Thirty-one controls pass under UID 1000;
+the same boundary corpus has eleven failing subtests against the published
+pathname-only model. Production root/signature policy is unchanged. Selected
+formatting and all 364 JS checks pass; final integrated CI remains required.
+The earlier dev macOS package
+still fails owned Brew receiver lifetime and Sparkle server retirement; its
+complete native/package/install scope is unqualified. These are automated
+software/ownership prerequisites, not device-only checks. Item 106 remains
+partial, and items 16 and 38 retain their validation requirements.
 
 - [~] **107.** Make the number-row policy explicit: native behavior, digits
   directly or symbols directly, with an acknowledged migration of the old
