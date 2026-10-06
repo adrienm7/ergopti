@@ -1,0 +1,236 @@
+{
+  "independent_replay": [
+    {
+      "abi": "luajit",
+      "exit": 1,
+      "failed": null,
+      "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-tick-independent-review/independent-old-luajit.log",
+      "passed": null,
+      "role": "independent-old",
+      "sha256": "3cc5f4bb83e299717fcc0e91f63d66544334bb961f4caa364af9b58773cf269e",
+      "stale_raw_down": "true"
+    },
+    {
+      "abi": "luajit",
+      "exit": 0,
+      "failed": null,
+      "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-tick-independent-review/independent-new-luajit.log",
+      "passed": null,
+      "role": "independent-new",
+      "sha256": "c062dd01f9968798abdc6e25502c155199cc62444f342408ab6a2673c10b7254",
+      "stale_raw_down": "false"
+    },
+    {
+      "abi": "luajit",
+      "exit": 0,
+      "failed": 0,
+      "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-tick-independent-review/controlled-new-luajit.log",
+      "passed": 171,
+      "role": "controlled-new",
+      "sha256": "d698a6a3cd7f83d5cf5c78f99ede1f91e79d98007033f74cc7057b5753e48b77",
+      "stale_raw_down": null
+    },
+    {
+      "abi": "luajit",
+      "exit": 0,
+      "failed": 0,
+      "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-tick-independent-review/legacy-new-luajit.log",
+      "passed": 59,
+      "role": "legacy-new",
+      "sha256": "81b2faa0e9a264483792108a97dd768a79772456ec5fb649d8b1c5256ac3da00",
+      "stale_raw_down": null
+    },
+    {
+      "abi": "luajit",
+      "exit": 1,
+      "failed": 7,
+      "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-tick-independent-review/original-frozen-tick-luajit.log",
+      "passed": 28,
+      "role": "original-frozen-tick",
+      "sha256": "aec23fabacb52ba2b9202384f3f1243a0a21d4d4f3f5a24414835798fe174b8d",
+      "stale_raw_down": null
+    },
+    {
+      "abi": "luajit",
+      "exit": 1,
+      "failed": 2,
+      "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-tick-independent-review/omit-post-source-guard-luajit.log",
+      "passed": 33,
+      "role": "omit-post-source-guard",
+      "sha256": "48bcc1e256faa99dc8eea72ddc34aecb6c9fcc3d15e4d4c5f5b9e6c65366d4ea",
+      "stale_raw_down": null
+    },
+    {
+      "abi": "luajit",
+      "exit": 1,
+      "failed": 3,
+      "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-tick-independent-review/omit-post-casing-guard-luajit.log",
+      "passed": 32,
+      "role": "omit-post-casing-guard",
+      "sha256": "fbf40775d4af301805d203145435bd471827935689a6313565a88d6e340f20a9",
+      "stale_raw_down": null
+    },
+    {
+      "abi": "luajit",
+      "exit": 1,
+      "failed": 1,
+      "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-tick-independent-review/omit-post-private-currency-luajit.log",
+      "passed": 34,
+      "role": "omit-post-private-currency",
+      "sha256": "6ccea40f49131ed175a96338efb9c7c198dfe10d69f5ec61390ba4b98dc717d4",
+      "stale_raw_down": null
+    },
+    {
+      "abi": "luajit",
+      "exit": 1,
+      "failed": 1,
+      "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-tick-independent-review/omit-final-casing-order-luajit.log",
+      "passed": 34,
+      "role": "omit-final-casing-order",
+      "sha256": "2442a49afd34fdfc6f02ebc7ec21e33f4d90fcf987e0330e3797d33140dfde87",
+      "stale_raw_down": null
+    },
+    {
+      "abi": "lua5.4",
+      "exit": 1,
+      "failed": null,
+      "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-tick-independent-review/independent-old-lua5.4.log",
+      "passed": null,
+      "role": "independent-old",
+      "sha256": "3573168a2a15fd671b6637ee7e05c1e45e5f8d2d085b462dec03326e7f212350",
+      "stale_raw_down": "true"
+    },
+    {
+      "abi": "lua5.4",
+      "exit": 0,
+      "failed": null,
+      "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-tick-independent-review/independent-new-lua5.4.log",
+      "passed": null,
+      "role": "independent-new",
+      "sha256": "c062dd01f9968798abdc6e25502c155199cc62444f342408ab6a2673c10b7254",
+      "stale_raw_down": "false"
+    },
+    {
+      "abi": "lua5.4",
+      "exit": 0,
+      "failed": 0,
+      "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-tick-independent-review/controlled-new-lua5.4.log",
+      "passed": 171,
+      "role": "controlled-new",
+      "sha256": "d698a6a3cd7f83d5cf5c78f99ede1f91e79d98007033f74cc7057b5753e48b77",
+      "stale_raw_down": null
+    },
+    {
+      "abi": "lua5.4",
+      "exit": 0,
+      "failed": 0,
+      "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-tick-independent-review/legacy-new-lua5.4.log",
+      "passed": 59,
+      "role": "legacy-new",
+      "sha256": "81b2faa0e9a264483792108a97dd768a79772456ec5fb649d8b1c5256ac3da00",
+      "stale_raw_down": null
+    },
+    {
+      "abi": "lua5.4",
+      "exit": 1,
+      "failed": 7,
+      "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-tick-independent-review/original-frozen-tick-lua5.4.log",
+      "passed": 28,
+      "role": "original-frozen-tick",
+      "sha256": "aec23fabacb52ba2b9202384f3f1243a0a21d4d4f3f5a24414835798fe174b8d",
+      "stale_raw_down": null
+    },
+    {
+      "abi": "lua5.4",
+      "exit": 1,
+      "failed": 2,
+      "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-tick-independent-review/omit-post-source-guard-lua5.4.log",
+      "passed": 33,
+      "role": "omit-post-source-guard",
+      "sha256": "48bcc1e256faa99dc8eea72ddc34aecb6c9fcc3d15e4d4c5f5b9e6c65366d4ea",
+      "stale_raw_down": null
+    },
+    {
+      "abi": "lua5.4",
+      "exit": 1,
+      "failed": 3,
+      "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-tick-independent-review/omit-post-casing-guard-lua5.4.log",
+      "passed": 32,
+      "role": "omit-post-casing-guard",
+      "sha256": "fbf40775d4af301805d203145435bd471827935689a6313565a88d6e340f20a9",
+      "stale_raw_down": null
+    },
+    {
+      "abi": "lua5.4",
+      "exit": 1,
+      "failed": 1,
+      "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-tick-independent-review/omit-post-private-currency-lua5.4.log",
+      "passed": 34,
+      "role": "omit-post-private-currency",
+      "sha256": "6ccea40f49131ed175a96338efb9c7c198dfe10d69f5ec61390ba4b98dc717d4",
+      "stale_raw_down": null
+    },
+    {
+      "abi": "lua5.4",
+      "exit": 1,
+      "failed": 1,
+      "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-tick-independent-review/omit-final-casing-order-lua5.4.log",
+      "passed": 34,
+      "role": "omit-final-casing-order",
+      "sha256": "2442a49afd34fdfc6f02ebc7ec21e33f4d90fcf987e0330e3797d33140dfde87",
+      "stale_raw_down": null
+    }
+  ],
+  "independent_reproducer": {
+    "cleanup": "release_all/exact controlled ACK plus inactive/keyrefs-empty assertions unchanged before final stale-output assertion.",
+    "path": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-tick-independent-review/tick-reentry.lua",
+    "sha256": "15616a5c5185fe7ea7938445987cf97a191a19307840ef0aaba13df71639f8d0",
+    "verbatim_original": true
+  },
+  "limits": {
+    "CI_package_install": "UNEXECUTED",
+    "Root_index_Git_workflow_edits": "NONE",
+    "availability": "NO_ADMISSION; prototype remains inactive",
+    "joint_XKB_native_source_output_custody": "UNQUALIFIED",
+    "physical_evdev_uinput": "UNEXECUTED",
+    "physical_shortcut_pointer_modifier_timing": "UNEXECUTED",
+    "startup_global_scope_composition": "UNEXECUTED"
+  },
+  "pinned_files_verified": 72,
+  "reviewed_receipt": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-tick-successor/freeze/receipt.json",
+  "reviewed_receipt_sha256": "6974793b4dfddd4f899d4fffde9da56fad9796045954d43ed3913f2085b57a26",
+  "six_other_original_source_posts_preserved": {
+    "static/ergopti_plus/_shared/lua/tap_hold/caps_word.lua": true,
+    "static/ergopti_plus/linux/ergopti_hotstrings.lua": true,
+    "static/ergopti_plus/linux/modules/shortcuts/manager.lua": true,
+    "static/ergopti_plus/linux/platform/remap/tap_hold_engine.lua": true,
+    "static/ergopti_plus/linux/platform/remap/tap_hold_manager.lua": true,
+    "static/ergopti_plus/linux/tests/unit/modules/test_caps_word_policy.lua": true
+  },
+  "source_paths": [
+    {
+      "path": "static/ergopti_plus/linux/platform/remap/key_combination_engine.lua",
+      "post_matches_replayed_snapshot": true,
+      "post_sha256": "d227a656ee52b35b153d896099ad43e4d5e61863caf606f03ef0e47883877345",
+      "pre_matches_reviewed_predecessor": true,
+      "pre_sha256": "a851868c2c0cb380f35bab04c8254150a89831e2f47505dd166b1a69740b4a3e",
+      "unchanged_test_prefix": null
+    },
+    {
+      "path": "static/ergopti_plus/linux/tests/unit/modules/test_key_combination_caps_word.lua",
+      "post_matches_replayed_snapshot": true,
+      "post_sha256": "ff3947b4c80dba4f091981cae0e83773e43ea51970105209501c166cc24cd0e9",
+      "pre_matches_reviewed_predecessor": true,
+      "pre_sha256": "0ee5cfcbe6c05c550e474c46c5be8dd34f0178642011fec2fe8490d9dbaed339",
+      "unchanged_test_prefix": true
+    }
+  ],
+  "source_review": {
+    "assertions": "Whole predecessor new-test file is an exact prefix; original163 controls retained, eight appended. No expectations regenerated from output.",
+    "findings": "No remaining concrete blocker in this bounded correction.",
+    "foreign_newer_title_intent": "Native retirement uses exact old claim, preserving the replacement title owner; post-source-callback casing replacement control proves guard ordering.",
+    "retirement": "Refused/throwing/unknown delayed outputs use exact owned retirement rows; false/nil ACK keeps the same terminal debt; active delivery blocks ACK until exact end_delivery. Casing termination reactivates only configured pair policy after exact retirement ACK.",
+    "tick_postcallback_order": "Re-evaluate captured source guard, then actual pure casing owner, then exact private epoch/serial/policy/guard and pending/acting/delivery/retirement currency."
+  },
+  "status": "SOURCE_CLEAR_INACTIVE_SOFTWARE_ONLY"
+}

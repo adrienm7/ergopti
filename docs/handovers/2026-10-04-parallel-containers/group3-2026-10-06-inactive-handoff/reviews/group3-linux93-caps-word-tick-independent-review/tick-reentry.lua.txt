@@ -1,0 +1,30 @@
+local root=assert(arg[1])
+package.path=root.."/static/ergopti_plus/linux/?.lua;"..root.."/static/ergopti_plus/linux/?/init.lua;"..root.."/static/ergopti_plus/_shared/lua/?.lua;"..root.."/static/ergopti_plus/_shared/lua/?/init.lua;"..package.path
+require("compat.utf8").install()
+require("luv")
+os.execute=function()error("No subprocesses permitted")end;io.popen=os.execute
+local Engine=require("platform.remap.tap_hold_engine")
+local Native=require("platform.remap.key_combination_engine")
+local Casing=require("tap_hold.caps_word")
+local Bindings=require("modules.shortcuts.key_combinations")
+local raw='[shortcuts.key_combination_taps]\ncaps_lock_then_tab="caps_word"\n[shortcuts.key_combination_holds]\ncaps_lock_then_tab="shift"\n'
+local bindings=Bindings.new({keys={{id="caps_lock",key="caps_lock"},{id="tab",key="tab"}},hold_picker={modifiers={"ctrl","shift"},layers={}},files={read_with_status=function()return raw,"ok"end},route=function()return "/controlled/config.toml"end,is_paused=function()return false end,changed=function()return true end,actions={is_assignable=function(a)return a=="caps_word"end}})
+local casing=Casing.new()
+local callbacks=0
+local base=Engine.new({casing_owner=casing,keys={caps_lock={tap_action="enter",hold_modifier="ctrl",time_activation_seconds=.3},space={tap_action="",hold_modifier="shift",time_activation_seconds=.3}},roll_keys={"space"},tap_min_ms=0,one_shot_timeout_ms=1000,key_text=function(c)return c==30 and "a" or c==48 and "b" or c==57 and " "end,one_shot_result=function()end,plan_text=function(t)if t=="A"then callbacks=callbacks+1;raw=raw.."\n# source revoked during tick\n"end;return {{keycode=t=="A" and 30 or 48,mods={"shift"}}}end})
+local native=Native.new(base,bindings.engine_options({caps_lock=300,tab=300}))
+local function origin()return {ready=true,physical=true,source="controlled",generation=7}end
+local function process(c,v,t)local rows,a,b,frame=native:process(c,v,t,origin());if frame then assert(frame.ack(true))end;return rows,a,b,frame end
+process(58,1,0);process(15,1,10)
+local _,action,_,frame=process(15,0,100);assert(action=="caps_word");assert(frame.run(function()error("No generic action")end,origin()))
+local restored,receipt=frame.restore(origin());if receipt then assert(receipt.ack(true))end
+process(58,0,110)
+assert(casing.current_native(base.caps_word_claim))
+process(57,1,120);process(30,1,130)
+assert(callbacks==0,"The queued character must not consult layout before the tick")
+local due=native:tick(500)
+assert(callbacks==1,"The real base tick must invoke the reentrant layout observation")
+local leaked=false;for _,r in ipairs(due)do if not r.owned_rows and r.code==30 and r.value==1 then leaked=true end end
+print("TICK_CALLBACKS",callbacks,"STALE_RAW_DOWN",leaked)
+local terminal=native:release_all();assert(native:ack_retirement(true,terminal));assert(not casing.active());assert(next(base.key_refs)==nil)
+assert(not leaked,"A source revoked inside delayed native replay must not escape as raw DOWN rows")

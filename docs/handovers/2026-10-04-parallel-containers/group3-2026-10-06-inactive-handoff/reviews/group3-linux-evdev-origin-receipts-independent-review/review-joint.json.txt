@@ -1,0 +1,449 @@
+{
+  "verdict": "BOUNDED_JOINT_SOURCE_CLEAR",
+  "predecessor_receipt_sha256": "f69b51fd4c5e9075a1a48ab5c0a658c1518416593149455ced72e95d63a34840",
+  "successor_receipt_sha256": "4cca79c2a13de04ee912b62dcd39d7a52e8a8263f556a1bee27f8ec17787d90e",
+  "successor_patch_sha256": "7adca8a25011e6effe0fda85c984f65f5fbd47a178a8c4d587d462fc6633ac2b",
+  "retained_prior_reviews": [
+    {
+      "path": "review-blocked.json",
+      "sha256": "fa78219d4a12fc4def3b037668e85c73a3606b90a43f39bd7427e68b676ecdc0"
+    },
+    {
+      "path": "review-opaque-identity-addendum.json",
+      "sha256": "3cfc54b8547795a0b3b584ab962c259588d21474bdd55a33fe8398c81413f17b"
+    }
+  ],
+  "custody": "all41predecessor+18successorpins verified; predecessor actual2Rootad937 preimages matched; successor exact2predecessorposts; wholeold27and47testprefixes exact; production one-lineinverse exact",
+  "fixed_defect": "Only new opaque-slot equality path now uses rawequal. Foreign slot aliases and single-sided Lua54 __eq cannot mint or reenter native cleanup. Other token/backend/state/provider comparisons are rawidentity; nativefacts/fd/generation/epochs private scalars.",
+  "control_preservation": "Original independent6c6a639e three-control artifact exact; installed3case syntax differs only whitespace/documentation; allassertions/logic unchanged. Fourthpositive test preserves legitimate opaque slotcurrency, throw-on-equality safe.",
+  "independent_final_replay": [
+    {
+      "abi": "luajit",
+      "source": "slot-candidate",
+      "exit": 0,
+      "summary": "READER_ORIGIN 51 0",
+      "log": "luajit-slot-candidate.log",
+      "sha256": "a61021d80d496a905c0d260e86987d8d18fc49b1cc2fba5a038f1d26ffc93cc5"
+    },
+    {
+      "abi": "luajit",
+      "source": "slot-preimages",
+      "exit": 1,
+      "summary": "READER_ORIGIN 49 2",
+      "log": "luajit-slot-preimages.log",
+      "sha256": "f7dae6a4bfa4ba5b4fe7594c6a623ea3e5ca1010f9e0221409c3fed9613807f5"
+    },
+    {
+      "abi": "lua5.4",
+      "source": "slot-candidate",
+      "exit": 0,
+      "summary": "READER_ORIGIN 51 0",
+      "log": "lua5.4-slot-candidate.log",
+      "sha256": "a61021d80d496a905c0d260e86987d8d18fc49b1cc2fba5a038f1d26ffc93cc5"
+    },
+    {
+      "abi": "lua5.4",
+      "source": "slot-preimages",
+      "exit": 1,
+      "summary": "READER_ORIGIN 48 3",
+      "log": "lua5.4-slot-preimages.log",
+      "sha256": "b1224a6b21afa9eb0a32818e49758c4be49ba250736c00a5e974c91120363890"
+    },
+    {
+      "abi": "luajit",
+      "source": "verbatim3-slot-candidate",
+      "exit": 0,
+      "summary": "READER_ORIGIN 50 0",
+      "log": "luajit-verbatim3-slot-candidate.log",
+      "sha256": "dbe3161c8f209f2e8740e5079efc277eea4326dca7a2578c3210d07295ef4277"
+    },
+    {
+      "abi": "luajit",
+      "source": "verbatim3-slot-preimages",
+      "exit": 1,
+      "summary": "READER_ORIGIN 48 2",
+      "log": "luajit-verbatim3-slot-preimages.log",
+      "sha256": "50fb038f6c6a81d2a2fe6c74f2b829df8a14a258843186149557e2c075831b72"
+    },
+    {
+      "abi": "lua5.4",
+      "source": "verbatim3-slot-candidate",
+      "exit": 0,
+      "summary": "READER_ORIGIN 50 0",
+      "log": "lua5.4-verbatim3-slot-candidate.log",
+      "sha256": "dbe3161c8f209f2e8740e5079efc277eea4326dca7a2578c3210d07295ef4277"
+    },
+    {
+      "abi": "lua5.4",
+      "source": "verbatim3-slot-preimages",
+      "exit": 1,
+      "summary": "READER_ORIGIN 47 3",
+      "log": "lua5.4-verbatim3-slot-preimages.log",
+      "sha256": "6cd9677e35bf9a504f08f6a380091ed33844784a69c98133b042f14f9492bcd5"
+    }
+  ],
+  "original_and_six_causal_controls": [
+    {
+      "abi": "luajit",
+      "source": "candidate",
+      "exit_code": 0,
+      "summary": "READER_ORIGIN 47 0",
+      "log": "luajit-candidate.log",
+      "sha256": "11b605b938cff72df8c2bbc03657f078dc6a66db354d77d5938b59360cada324"
+    },
+    {
+      "abi": "luajit",
+      "source": "preimages",
+      "exit_code": 1,
+      "summary": "READER_ORIGIN 27 20",
+      "log": "luajit-preimages.log",
+      "sha256": "3903bcc42635e1d3a04df5d0d12d6a0b62f589cb63ee76a58c9dfdd13a83b0bf"
+    },
+    {
+      "abi": "luajit",
+      "source": "omit_native_provider",
+      "exit_code": 1,
+      "summary": "READER_ORIGIN 46 1",
+      "log": "luajit-omit_native_provider.log",
+      "sha256": "18cd0d2274ee4359ee2d189797662e4fd30b07f089b749a6aec4a7c65696d2e4"
+    },
+    {
+      "abi": "luajit",
+      "source": "omit_original_row",
+      "exit_code": 1,
+      "summary": "READER_ORIGIN 45 2",
+      "log": "luajit-omit_original_row.log",
+      "sha256": "3f97a7576bcb43239e23cd79cd7aeefe7ef5604292fd8f0216df66b46329b88a"
+    },
+    {
+      "abi": "luajit",
+      "source": "omit_session_generation",
+      "exit_code": 1,
+      "summary": "READER_ORIGIN 45 2",
+      "log": "luajit-omit_session_generation.log",
+      "sha256": "92e71126d0db6f9268a5cae7b4803495515c4c3477e22ef7558422a6548abd8a"
+    },
+    {
+      "abi": "luajit",
+      "source": "omit_queue_loss_fence",
+      "exit_code": 1,
+      "summary": "READER_ORIGIN 46 1",
+      "log": "luajit-omit_queue_loss_fence.log",
+      "sha256": "7229d25ef38450a397cc1ba377e353b6d443fabc5002b3ca41595b34e786f201"
+    },
+    {
+      "abi": "luajit",
+      "source": "omit_native_close_debt",
+      "exit_code": 1,
+      "summary": "READER_ORIGIN 45 2",
+      "log": "luajit-omit_native_close_debt.log",
+      "sha256": "574555734dbf756b6f0a62a8a7e6a3943b69e18558c50171bd3eeb657482f543"
+    },
+    {
+      "abi": "luajit",
+      "source": "omit_lazy_binding_reservation",
+      "exit_code": 1,
+      "summary": "READER_ORIGIN 46 1",
+      "log": "luajit-omit_lazy_binding_reservation.log",
+      "sha256": "dc6810c4ef1fab627d602d9e1f23aa2bb0e40fd44546672ead7a3736379ae8c8"
+    },
+    {
+      "abi": "lua5.4",
+      "source": "candidate",
+      "exit_code": 0,
+      "summary": "READER_ORIGIN 47 0",
+      "log": "lua5.4-candidate.log",
+      "sha256": "11b605b938cff72df8c2bbc03657f078dc6a66db354d77d5938b59360cada324"
+    },
+    {
+      "abi": "lua5.4",
+      "source": "preimages",
+      "exit_code": 1,
+      "summary": "READER_ORIGIN 27 20",
+      "log": "lua5.4-preimages.log",
+      "sha256": "286e214e0425bfbfbc536227cec14a967108377e44173979ae13961a902e0642"
+    },
+    {
+      "abi": "lua5.4",
+      "source": "omit_native_provider",
+      "exit_code": 1,
+      "summary": "READER_ORIGIN 46 1",
+      "log": "lua5.4-omit_native_provider.log",
+      "sha256": "18cd0d2274ee4359ee2d189797662e4fd30b07f089b749a6aec4a7c65696d2e4"
+    },
+    {
+      "abi": "lua5.4",
+      "source": "omit_original_row",
+      "exit_code": 1,
+      "summary": "READER_ORIGIN 45 2",
+      "log": "lua5.4-omit_original_row.log",
+      "sha256": "3f97a7576bcb43239e23cd79cd7aeefe7ef5604292fd8f0216df66b46329b88a"
+    },
+    {
+      "abi": "lua5.4",
+      "source": "omit_session_generation",
+      "exit_code": 1,
+      "summary": "READER_ORIGIN 45 2",
+      "log": "lua5.4-omit_session_generation.log",
+      "sha256": "92e71126d0db6f9268a5cae7b4803495515c4c3477e22ef7558422a6548abd8a"
+    },
+    {
+      "abi": "lua5.4",
+      "source": "omit_queue_loss_fence",
+      "exit_code": 1,
+      "summary": "READER_ORIGIN 46 1",
+      "log": "lua5.4-omit_queue_loss_fence.log",
+      "sha256": "7229d25ef38450a397cc1ba377e353b6d443fabc5002b3ca41595b34e786f201"
+    },
+    {
+      "abi": "lua5.4",
+      "source": "omit_native_close_debt",
+      "exit_code": 1,
+      "summary": "READER_ORIGIN 45 2",
+      "log": "lua5.4-omit_native_close_debt.log",
+      "sha256": "574555734dbf756b6f0a62a8a7e6a3943b69e18558c50171bd3eeb657482f543"
+    },
+    {
+      "abi": "lua5.4",
+      "source": "omit_lazy_binding_reservation",
+      "exit_code": 1,
+      "summary": "READER_ORIGIN 46 1",
+      "log": "lua5.4-omit_lazy_binding_reservation.log",
+      "sha256": "dc6810c4ef1fab627d602d9e1f23aa2bb0e40fd44546672ead7a3736379ae8c8"
+    }
+  ],
+  "source_review": [
+    "Pinned FFI symbols/binding/read reservation; custombackend or copied/remapped nativebytes cannot acquire provenance.",
+    "Private source/slot/generation and originatingread epoch; originaldecodedrow enforced against independently pinned native byteprimitives, publicexport replacement cannot spoof currentreceiptviews.",
+    "SYN_DROPPED revokes untilclose/reopen; no unobserved resyncmint.",
+    "Nativeclose debt retained/no recycledfd retry; knownpeer ordinary read/ungrab/close preserved afterforeignslotdebt without minting authority.",
+    "GC capability retention/abandonedrecord collection verified; source_current is sessionprovenance only and remains true afteroriginalkeyup, explicitly not a held-keyoracle."
+  ],
+  "native_kernel_display_physical": "UNEXECUTED; no reviewer kernel/evdev/uinput/display/input allocation.",
+  "full_hosted_packaging_installation": "UNEXECUTED by reviewer",
+  "physical_delivery_available": false,
+  "admission_constraints": [
+    "Parent publicfix/linux sourcelease pending; no ownership or Rootadmission by reviewer.",
+    "Join exact Hookheld-edge ledger/currentnativeheld proof/output transaction/config/source/modifier policies before any physical delivery availability.",
+    "Use predecessorplusidentitysuccessor; recheck actualcurrentoriginDev sourcepreimages at admission."
+  ],
+  "Root_index_Git_CI_mutation": false,
+  "evidence": [
+    {
+      "path": "candidate/static/ergopti_plus/linux/adapters/evdev_reader.lua",
+      "sha256": "cd84840b1c6e3e990afaeec3ee6d44b8d75e55f9f8d39ebcc13bf543d839d9e7"
+    },
+    {
+      "path": "candidate/static/ergopti_plus/linux/tests/unit/adapters/test_evdev_reader.lua",
+      "sha256": "7148b559a03d772ea79a18722be521c2966e714b11bccc1c3f87820597c4dc5d"
+    },
+    {
+      "path": "lua5.4-candidate.log",
+      "sha256": "11b605b938cff72df8c2bbc03657f078dc6a66db354d77d5938b59360cada324"
+    },
+    {
+      "path": "lua5.4-omit_lazy_binding_reservation.log",
+      "sha256": "dc6810c4ef1fab627d602d9e1f23aa2bb0e40fd44546672ead7a3736379ae8c8"
+    },
+    {
+      "path": "lua5.4-omit_native_close_debt.log",
+      "sha256": "574555734dbf756b6f0a62a8a7e6a3943b69e18558c50171bd3eeb657482f543"
+    },
+    {
+      "path": "lua5.4-omit_native_provider.log",
+      "sha256": "18cd0d2274ee4359ee2d189797662e4fd30b07f089b749a6aec4a7c65696d2e4"
+    },
+    {
+      "path": "lua5.4-omit_original_row.log",
+      "sha256": "3f97a7576bcb43239e23cd79cd7aeefe7ef5604292fd8f0216df66b46329b88a"
+    },
+    {
+      "path": "lua5.4-omit_queue_loss_fence.log",
+      "sha256": "7229d25ef38450a397cc1ba377e353b6d443fabc5002b3ca41595b34e786f201"
+    },
+    {
+      "path": "lua5.4-omit_session_generation.log",
+      "sha256": "92e71126d0db6f9268a5cae7b4803495515c4c3477e22ef7558422a6548abd8a"
+    },
+    {
+      "path": "lua5.4-preimages.log",
+      "sha256": "286e214e0425bfbfbc536227cec14a967108377e44173979ae13961a902e0642"
+    },
+    {
+      "path": "lua5.4-slot-alias.log",
+      "sha256": "0fdb0b63f6b127638e37bd754a63d6112ed36c1cb123db5823477e3b02c45cfa"
+    },
+    {
+      "path": "lua5.4-slot-candidate.log",
+      "sha256": "a61021d80d496a905c0d260e86987d8d18fc49b1cc2fba5a038f1d26ffc93cc5"
+    },
+    {
+      "path": "lua5.4-slot-combined.log",
+      "sha256": "6cd9677e35bf9a504f08f6a380091ed33844784a69c98133b042f14f9492bcd5"
+    },
+    {
+      "path": "lua5.4-slot-preimages.log",
+      "sha256": "b1224a6b21afa9eb0a32818e49758c4be49ba250736c00a5e974c91120363890"
+    },
+    {
+      "path": "lua5.4-verbatim3-slot-candidate.log",
+      "sha256": "dbe3161c8f209f2e8740e5079efc277eea4326dca7a2578c3210d07295ef4277"
+    },
+    {
+      "path": "lua5.4-verbatim3-slot-preimages.log",
+      "sha256": "6cd9677e35bf9a504f08f6a380091ed33844784a69c98133b042f14f9492bcd5"
+    },
+    {
+      "path": "luajit-candidate.log",
+      "sha256": "11b605b938cff72df8c2bbc03657f078dc6a66db354d77d5938b59360cada324"
+    },
+    {
+      "path": "luajit-omit_lazy_binding_reservation.log",
+      "sha256": "dc6810c4ef1fab627d602d9e1f23aa2bb0e40fd44546672ead7a3736379ae8c8"
+    },
+    {
+      "path": "luajit-omit_native_close_debt.log",
+      "sha256": "574555734dbf756b6f0a62a8a7e6a3943b69e18558c50171bd3eeb657482f543"
+    },
+    {
+      "path": "luajit-omit_native_provider.log",
+      "sha256": "18cd0d2274ee4359ee2d189797662e4fd30b07f089b749a6aec4a7c65696d2e4"
+    },
+    {
+      "path": "luajit-omit_original_row.log",
+      "sha256": "3f97a7576bcb43239e23cd79cd7aeefe7ef5604292fd8f0216df66b46329b88a"
+    },
+    {
+      "path": "luajit-omit_queue_loss_fence.log",
+      "sha256": "7229d25ef38450a397cc1ba377e353b6d443fabc5002b3ca41595b34e786f201"
+    },
+    {
+      "path": "luajit-omit_session_generation.log",
+      "sha256": "92e71126d0db6f9268a5cae7b4803495515c4c3477e22ef7558422a6548abd8a"
+    },
+    {
+      "path": "luajit-preimages.log",
+      "sha256": "3903bcc42635e1d3a04df5d0d12d6a0b62f589cb63ee76a58c9dfdd13a83b0bf"
+    },
+    {
+      "path": "luajit-slot-alias.log",
+      "sha256": "0fdb0b63f6b127638e37bd754a63d6112ed36c1cb123db5823477e3b02c45cfa"
+    },
+    {
+      "path": "luajit-slot-candidate.log",
+      "sha256": "a61021d80d496a905c0d260e86987d8d18fc49b1cc2fba5a038f1d26ffc93cc5"
+    },
+    {
+      "path": "luajit-slot-combined.log",
+      "sha256": "50fb038f6c6a81d2a2fe6c74f2b829df8a14a258843186149557e2c075831b72"
+    },
+    {
+      "path": "luajit-slot-preimages.log",
+      "sha256": "f7dae6a4bfa4ba5b4fe7594c6a623ea3e5ca1010f9e0221409c3fed9613807f5"
+    },
+    {
+      "path": "luajit-verbatim3-slot-candidate.log",
+      "sha256": "dbe3161c8f209f2e8740e5079efc277eea4326dca7a2578c3210d07295ef4277"
+    },
+    {
+      "path": "luajit-verbatim3-slot-preimages.log",
+      "sha256": "50fb038f6c6a81d2a2fe6c74f2b829df8a14a258843186149557e2c075831b72"
+    },
+    {
+      "path": "omit_lazy_binding_reservation/static/ergopti_plus/linux/adapters/evdev_reader.lua",
+      "sha256": "77e732722c42c238ec91d97b1bbba6ef9491d51e18bb503426d212577d2a21f3"
+    },
+    {
+      "path": "omit_native_close_debt/static/ergopti_plus/linux/adapters/evdev_reader.lua",
+      "sha256": "07d9e905ce42d26b883cd77a2884efce08507c7a9374384ec8ed73da843b12bb"
+    },
+    {
+      "path": "omit_native_provider/static/ergopti_plus/linux/adapters/evdev_reader.lua",
+      "sha256": "8ffd459700ab365ca4e6b8d4fc354b452af8d2c2dd61de66771d2fe24904eb77"
+    },
+    {
+      "path": "omit_original_row/static/ergopti_plus/linux/adapters/evdev_reader.lua",
+      "sha256": "0352aa0baa416f907c9ad634dbc821a020676bc263f45f6278726daab22c645b"
+    },
+    {
+      "path": "omit_queue_loss_fence/static/ergopti_plus/linux/adapters/evdev_reader.lua",
+      "sha256": "3370db8bec43227c932beb0a4b394c9b24c862d1ecb385c5916306bd87fa0dd9"
+    },
+    {
+      "path": "omit_session_generation/static/ergopti_plus/linux/adapters/evdev_reader.lua",
+      "sha256": "218fa36f6ae8fd270898ae5ded0dc56630cfbeda5dbb04bf7c4c4817f29eebee"
+    },
+    {
+      "path": "preimages/static/ergopti_plus/linux/adapters/evdev_reader.lua",
+      "sha256": "3cf0d9c728d0d53743f5798cbdeb806504acb5da36061d43ef016298948c0ea7"
+    },
+    {
+      "path": "preimages/static/ergopti_plus/linux/tests/unit/adapters/test_evdev_reader.lua",
+      "sha256": "961b7ae813677b2547d7b5e86947fbbe58bec7bb78f002cf32fe15faef5f787e"
+    },
+    {
+      "path": "replay.json",
+      "sha256": "47fcdd88dcdbc9d79aa6f9c5a16daedd7450397748dca59fd29335d93d1a8a57"
+    },
+    {
+      "path": "run-slot.lua",
+      "sha256": "f3e2570e6f40b3ceb531444e01a5264c98b9e50f799c9afb378931b7b1f74d09"
+    },
+    {
+      "path": "run.lua",
+      "sha256": "f8af9ac40f0e0c0b620525746e0cd95289b0a0a1303bcdd984cd5dc1cbbb7c35"
+    },
+    {
+      "path": "slot-alias-extra.lua",
+      "sha256": "8a497fc289ad2c186a049b8b52f7ec1b2210697856314f4ca7093eb4305c5c1b"
+    },
+    {
+      "path": "slot-alias-results.json",
+      "sha256": "8ceedf2007ff79df8e29bdbf423301576e1f4691c3ff3bc081e965fc4e3efa10"
+    },
+    {
+      "path": "slot-candidate/static/ergopti_plus/linux/adapters/evdev_reader.lua",
+      "sha256": "bcfd7821ef61176afde6eb5de91282b6d7803d02280670ef9ff11249401d0f98"
+    },
+    {
+      "path": "slot-candidate/static/ergopti_plus/linux/tests/unit/adapters/test_evdev_reader.lua",
+      "sha256": "44f9355f1f563ea828779a7318d3c7209ff3fe02f82b96473d87a4a0ae76ca35"
+    },
+    {
+      "path": "slot-combined-extra.lua",
+      "sha256": "6c6a639e655ed429c19dfff531e81931dc46f7e873377583d935a8caa26aba64"
+    },
+    {
+      "path": "slot-combined-results.json",
+      "sha256": "98a893e12f97060d0b240ad3ad139d530502926fc73e852f14cbfddbdf4f3b57"
+    },
+    {
+      "path": "slot-final-replay.json",
+      "sha256": "101e4116de4cef369d78aa87f3d53407654d5e0e70683d57790136230365de17"
+    },
+    {
+      "path": "slot-preimages/static/ergopti_plus/linux/adapters/evdev_reader.lua",
+      "sha256": "cd84840b1c6e3e990afaeec3ee6d44b8d75e55f9f8d39ebcc13bf543d839d9e7"
+    },
+    {
+      "path": "slot-preimages/static/ergopti_plus/linux/tests/unit/adapters/test_evdev_reader.lua",
+      "sha256": "7148b559a03d772ea79a18722be521c2966e714b11bccc1c3f87820597c4dc5d"
+    },
+    {
+      "path": "snapshot/static/ergopti_plus/_shared/lua/test/assertions.lua",
+      "sha256": "d0a137008bed77c7129c94d0221801bea4851011a6626ce078a2f66cb4a2a1de"
+    },
+    {
+      "path": "snapshot/static/ergopti_plus/_shared/lua/test/format.lua",
+      "sha256": "5f435e974d232f59e3150967b0bfc93ad7174e665b4b0cbe0ac0b3a6cfa0d91a"
+    },
+    {
+      "path": "snapshot/static/ergopti_plus/linux/infra/input_event.lua",
+      "sha256": "4dacdce142135428bba5ef1a9d27a9840c2da0f536e63e6d3d550e74a607b626"
+    },
+    {
+      "path": "snapshot/static/ergopti_plus/linux/tests/helpers.lua",
+      "sha256": "c40df4005280f8c3a5671bad44b4b4d4811103c5332831c5b30fefc2eafb4765"
+    }
+  ]
+}

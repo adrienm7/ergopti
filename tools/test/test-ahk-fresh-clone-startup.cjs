@@ -87,9 +87,26 @@ try {
 	]);
 	run(
 		'git',
-		['clone', '--quiet', '--no-local', '--no-hardlinks', '--depth=1', root, clone],
+		[
+			'clone',
+			'--quiet',
+			'--no-local',
+			'--no-hardlinks',
+			'--depth=1',
+			// Archived evidence can exceed Win32 MAX_PATH beneath the private root.
+			// Configure this clone before checkout without changing developer Git.
+			'--config',
+			'core.longpaths=true',
+			root,
+			clone
+		],
 		root,
 		180000
+	);
+	assert.equal(
+		run('git', ['config', '--local', '--get', 'core.longpaths'], clone).trim(),
+		'true',
+		'the private clone must enable long paths before its complete checkout'
 	);
 	assert.equal(
 		run('git', ['rev-parse', 'HEAD'], clone).trim(),

@@ -1,0 +1,507 @@
+﻿; adapters/key_state.ahk
+
+; ==============================================================================
+; MODULE: KeyState Adapter (AutoHotkey)
+; DESCRIPTION:
+; AHK v2 implementation of the KeyState port contract. Wraps the AHK v2
+; built-in GetKeyState() behind two stable functions so tap-hold logic and
+; modifier-detection routines can query physical key state without coupling
+; to AHK-specific function syntax.
+;
+; NAMING CONVENTION:
+; Port method  → AHK name mapping:
+;   KS_IsDown(keyName) → KS_IsDown(KeyName)
+;   KS_IsUp(keyName)   → KS_IsUp(KeyName)
+;
+; PHYSICAL MODE:
+; Both functions use the "P" (physical) mode of GetKeyState exclusively.
+; Logical/toggle state (CapsLock LED, NumLock) is out of scope for this adapter.
+;
+; FAIL-SAFE:
+; GetKeyState is wrapped in try/catch. An unknown key name or any AHK error
+; returns 0 (false) from KS_IsDown and 1 (true) from KS_IsUp — an absent key
+; is treated as "not pressed".
+; ==============================================================================
+
+
+
+; ===========================================
+; ===========================================
+; ======= 1/ Adapter Functions ==============
+; ===========================================
+; ===========================================
+
+; Returns 1 when the key is physically held down, 0 otherwise.
+; An unknown key name or any GetKeyState error yields 0 (not pressed).
+; @param KeyName {String} Platform key identifier (e.g. "SC038", "LShift").
+; @return {Integer} 1 if the key is currently down, 0 otherwise.
+KS_IsDown(KeyName) {
+	try {
+		return GetKeyState(KeyName, "P") ? 1 : 0
+	} catch {
+		return 0
+	}
+}
+
+; Returns 1 when the key is not physically held down, 0 otherwise.
+; Equivalent to !KS_IsDown(KeyName) — exists so call sites read naturally.
+; @param KeyName {String} Platform key identifier (e.g. "SC038", "LShift").
+; @return {Integer} 1 if the key is currently up, 0 if it is down.
+KS_IsUp(KeyName) {
+	try {
+		return GetKeyState(KeyName, "P") ? 0 : 1
+	} catch {
+		return 1
+	}
+}
+
+; Returns the wrap-safe tick epoch of the most recent physical keyboard or
+; mouse input. A_TimeIdlePhysical ignores AutoHotkey-generated input while the
+; hooks are installed, so a deferred output can distinguish the physical event
+; which authorized it from any later user action without observing SendInput.
+; This is Windows-local state, not part of the cross-platform KeyState port.
+; @return {Integer} Unsigned 32-bit A_TickCount epoch.
+KS_GetPhysicalInputEpoch() {
+	return (A_TickCount - A_TimeIdlePhysical) & 0xFFFFFFFF
+}
+
+; Monotonic user-intent generation advanced by HookDispatcher before it fans out
+; a physical key-down, mouse-down or wheel action. Unlike A_TimeIdlePhysical it
+; deliberately ignores the matching key/button release: a deferred action
+; authorized by Tab must not cancel itself merely because Tab comes back up.
+; SendInput is invisible to the dispatcher's InputHook, so the generation also
+; stays stable across the atomic output which consumes an admission ticket.
+global _KS_PhysicalInputGeneration := 0
+global _KS_LastPhysicalKeyVk := -1
+global _KS_LastPhysicalKeySc := -1
+global _KS_LastPhysicalKeyEpoch := -1
+global _KS_LastPhysicalKeySources := Map()
+
+; Record one key-down seen by either of the driver's two InputHooks. The prefix
+; watcher is started after HookDispatcher and therefore normally receives the
+; same physical event first. The physical idle epoch identifies that key-down;
+; a source-set then collapses its two callbacks into one generation. A later
+; same-key event has a new epoch even if one hook missed the preceding event, so
+; stale peer state cannot consume it. This remains correct if hook order flips.
+KS_RecordPhysicalKeyDown(VK, SC, Source, EventEpoch := unset) {
+	global _KS_PhysicalInputGeneration
+	global _KS_LastPhysicalKeyVk, _KS_LastPhysicalKeySc
+	global _KS_LastPhysicalKeyEpoch, _KS_LastPhysicalKeySources
+	if !(VK is Integer) or !(SC is Integer)
+		throw TypeError("Physical key identity must be integer VK/SC values.")
+	if !(Source is String) or (Source != "prefix" and Source != "dispatcher")
+		throw ValueError("Physical key source must be 'prefix' or 'dispatcher'.")
+	if !IsSet(EventEpoch)
+		EventEpoch := KS_GetPhysicalInputEpoch()
+	if !(EventEpoch is Integer)
+		throw TypeError("Physical key event epoch must be an integer.")
+	PreviousCritical := Critical("On")
+	try {
+		IsPeerCallback := (_KS_LastPhysicalKeyVk == VK
+			and _KS_LastPhysicalKeySc == SC
+			and _KS_LastPhysicalKeyEpoch == EventEpoch
+			and !_KS_LastPhysicalKeySources.Has(Source))
+		if IsPeerCallback {
+			_KS_LastPhysicalKeySources[Source] := true
+			return _KS_PhysicalInputGeneration
+		}
+		_KS_PhysicalInputGeneration += 1
+		_KS_LastPhysicalKeyVk := VK
+		_KS_LastPhysicalKeySc := SC
+		_KS_LastPhysicalKeyEpoch := EventEpoch
+		_KS_LastPhysicalKeySources := Map(Source, true)
+		return _KS_PhysicalInputGeneration
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+; Pointer intent has only the dispatcher owner, so every call is a distinct
+; action. Clear the pending key pair as well: if a yielded key callback really
+; lets pointer input land before its peer hook, the peer must not reuse the old
+; admission ticket after that intervening action.
+KS_RecordPhysicalInput() {
+	global _KS_PhysicalInputGeneration
+	global _KS_LastPhysicalKeyVk, _KS_LastPhysicalKeySc
+	global _KS_LastPhysicalKeyEpoch, _KS_LastPhysicalKeySources
+	PreviousCritical := Critical("On")
+	try {
+		_KS_PhysicalInputGeneration += 1
+		_KS_LastPhysicalKeyVk := -1
+		_KS_LastPhysicalKeySc := -1
+		_KS_LastPhysicalKeyEpoch := -1
+		_KS_LastPhysicalKeySources := Map()
+		return _KS_PhysicalInputGeneration
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+KS_GetPhysicalInputGeneration() {
+	global _KS_PhysicalInputGeneration
+	return _KS_PhysicalInputGeneration
+}
+
+
+
+
+
+; =========================================
+; =========================================
+; ======= 2/ Keyboard Layout Probes =======
+; =========================================
+; =========================================
+
+; Win32 keyboard-layout probes used at boot to detect the active layout and the
+; physical scancodes behind logical keys. These wrap MapVirtualKeyExW / ToUnicodeEx
+; / SystemParametersInfo so every layout-detection DllCall lives in this adapter
+; instead of being inlined in the boot sequence. They are Windows-specific and so
+; are NOT part of the cross-platform KeyState port contract (isDown/isUp).
+
+; Resolves the active HKL via a 3-step cascade: the foreground window's layout,
+; then the AHK thread's own layout, then the system default input language. At
+; tray-only startup there may be no foreground window, hence the fallbacks.
+; @return {Integer} The resolved HKL, or 0 when none could be obtained.
+KS_ResolveKeyboardLayout() {
+	; Same fail-safe contract as KS_IsDown/KS_IsUp above: an unguarded DllCall
+	; failure at boot must degrade to the documented "could not resolve" return
+	; (0), not propagate uncaught and abort the boot sequence.
+	try {
+		local hkl := GetForegroundKeyboardLayout()
+		if hkl = 0
+			hkl := DllCall("GetKeyboardLayout", "UInt", DllCall("GetCurrentThreadId", "UInt"), "Ptr")
+		if hkl = 0 {
+			; SPI_GETDEFAULTINPUTLANG = 0x0059; pvParam receives an HKL.
+			local buf := Buffer(A_PtrSize, 0)
+			DllCall("SystemParametersInfo", "UInt", 0x0059, "UInt", 0, "Ptr", buf, "UInt", 0)
+			hkl := NumGet(buf, 0, "Ptr")
+		}
+		return hkl
+	} catch as e {
+		try LoggerError("KeyState", "KS_ResolveKeyboardLayout failed: {1}.", e.Message)
+		return 0
+	}
+}
+
+; Win32 names for the AltGr probe (MapVirtualKeyExW), defined once.
+global KS_VK_RMENU := 0xA5
+global KS_MAPVK_VK_TO_VSC_EX := 4
+global KS_MAPVK_VSC_TO_VK_EX := 3
+; Extended scan code of the physical AltGr key (right Alt position).
+global KS_SC_ALTGR_EXTENDED := 0xE038
+
+; Probes layout Hkl for the AltGr family, once, and returns what decided it.
+; VK_RMENU reverse-probes to a scan code (typically 0xE038) on a standard AltGr
+; layout (bépo, AZERTY, US-International) and on QWERTY; on a Kana-style
+; KbdEdit/MSKLC remap the AltGr key sits on another virtual key (VK_OEM_8,
+; VK_KANA, ...) and VK_RMENU has no scan code at all. The forward lookup of the
+; AltGr scan code gives the virtual key the layout puts that key on, which a
+; Send must name on a Kana layout (KS_AltGrSendKey). The reverse direction
+; proved more reliable than the forward one for the family itself: the forward
+; lookup behaved inconsistently across bépo HKLs.
+; Never probes HKL 0, which MapVirtualKeyExW reads as HKL_PREV (another loaded
+; layout), and a layout that maps neither direction (an invalid HKL answers 0
+; to both) is reported as unknown ("valid" false), never as a Kana layout: a
+; lone 0 from the reverse probe used to be enough to pick the Kana family.
+; "altgr_level" tells an AltGr layout (AZERTY, bépo: Ctrl+Alt types characters,
+; and right Alt comes with a fake LCtrl) from one without (QWERTY: right Alt is
+; a plain Alt), which the family flag cannot: both keep VK_RMENU.
+; @param Hkl {Integer} Keyboard layout handle; 0 is refused.
+; @param MapFn {Func} Test seam taking (Code, MapType, Hkl), MapVirtualKeyExW
+;        by default.
+; @param AltGrLevelFn {Func} Test seam taking Hkl, KS_LayoutHasAltGrLevel by
+;        default.
+; @return {Map} "hkl", "rmenu_sc" (0 = VK_RMENU unmapped), "altgr_vk", "valid"
+;         (the layout knows the AltGr key one way or the other), "kana"
+;         (VK_RMENU unmapped while the AltGr key has a virtual key) and
+;         "altgr_level".
+KS_ProbeAltGrLayout(Hkl, MapFn := 0, AltGrLevelFn := 0) {
+	global KS_VK_RMENU, KS_MAPVK_VK_TO_VSC_EX, KS_MAPVK_VSC_TO_VK_EX, KS_SC_ALTGR_EXTENDED
+	if (Hkl == 0)
+		throw ValueError("The AltGr layout probe needs a keyboard layout; HKL 0 is another loaded layout (HKL_PREV).", -1)
+	if !IsObject(MapFn)
+		MapFn := (Code, MapType, Layout) => DllCall("MapVirtualKeyExW", "UInt", Code, "UInt", MapType, "Ptr", Layout, "UInt")
+	RMenuSc := MapFn.Call(KS_VK_RMENU, KS_MAPVK_VK_TO_VSC_EX, Hkl)
+	AltGrVk := MapFn.Call(KS_SC_ALTGR_EXTENDED, KS_MAPVK_VSC_TO_VK_EX, Hkl)
+	if !IsObject(AltGrLevelFn)
+		AltGrLevelFn := KS_LayoutHasAltGrLevel
+	return Map("hkl", Hkl, "rmenu_sc", RMenuSc, "altgr_vk", AltGrVk,
+		"valid", RMenuSc != 0 or AltGrVk != 0,
+		"kana", RMenuSc == 0 and AltGrVk != 0,
+		"altgr_level", AltGrLevelFn.Call(Hkl))
+}
+
+; Whether Ctrl+Alt types something on layout Hkl: a character or a dead key on
+; one of the character keys (digits, letters, OEM punctuation), which is the
+; AltGr level of an AltGr layout. QWERTY has none (measured on this machine:
+; AZERTY 13 keys, bépo 45, the Ergopti Kana layout 0). ToUnicodeEx runs with
+; flag 0x4 so no dead-key state is left behind.
+; @param Hkl {Integer} Keyboard layout handle.
+; @return {Boolean}
+KS_LayoutHasAltGrLevel(Hkl) {
+	static CtrlAltVks := [0x11, 0x12, 0xA2, 0xA5] ; VK_CONTROL, VK_MENU, VK_LCONTROL, VK_RMENU
+	static KeyRanges := [[0x30, 0x39], [0x41, 0x5A], [0xBA, 0xC0], [0xDB, 0xDF], [0xE2, 0xE2]]
+	State := Buffer(256, 0)
+	for _, Vk in CtrlAltVks
+		NumPut("UChar", 0x80, State, Vk)
+	Chars := Buffer(32, 0)
+	for _, Range in KeyRanges {
+		Vk := Range[1]
+		while (Vk <= Range[2]) {
+			Sc := DllCall("MapVirtualKeyExW", "UInt", Vk, "UInt", 0, "Ptr", Hkl, "UInt")
+			if (Sc and DllCall("ToUnicodeEx", "UInt", Vk, "UInt", Sc, "Ptr", State,
+					"Ptr", Chars, "Int", 8, "UInt", 0x4, "Ptr", Hkl, "Int") != 0)
+				return true
+			Vk += 1
+		}
+	}
+	return false
+}
+
+; The probe record that decides the AltGr family now (infra/altgr_family.ahk):
+; the KS_ProbeAltGrLayout result of the current layout plus "source" ("probe",
+; "override" when the TOML flag decided, "unresolved" when no layout could be
+; read). Seeded here as unresolved; HotstringEngineInit replaces it before the
+; first hotstring fires, and it then follows the foreground window's layout
+; (AltGrFamilyFollow). Every reader below reads it on each call, never a copy.
+global _ALTGR_LAYOUT_PROBE := Map("hkl", 0, "rmenu_sc", 0, "altgr_vk", 0,
+	"valid", false, "kana", false, "altgr_level", false, "source", "unresolved")
+
+; Whether every AltGr press reaches the hook as the layout's fake LCtrl (scan
+; code 0x21D, read as SC01D and recorded as physical) then RAlt: a standard
+; AltGr layout, where the layout probe found an AltGr level (AZERTY, bépo). On
+; QWERTY right Alt is a plain Alt and adds no LCtrl; a Kana-style AltGr is
+; SC138 on another virtual key and adds none either. Read by parse-time #HotIf
+; criteria, which are live before this file's globals are assigned.
+; @return {Boolean}
+KS_AltGrAddsFakeLCtrl() {
+	global _ALTGR_KANA_FIXUP, _ALTGR_LAYOUT_PROBE
+	return !_ALTGR_KANA_FIXUP and IsSet(_ALTGR_LAYOUT_PROBE) and _ALTGR_LAYOUT_PROBE["altgr_level"]
+}
+
+; Whether the layout's AltGr key is an AltGr: a Kana-style AltGr, or right Alt
+; on a layout where the layout probe found an AltGr level. On QWERTY right Alt is
+; a plain Alt. Read by #HotIf criteria, live before this file's globals are
+; assigned.
+; @return {Boolean}
+KS_LayoutHasAltGr() {
+	global _ALTGR_KANA_FIXUP, _ALTGR_LAYOUT_PROBE
+	return _ALTGR_KANA_FIXUP or (IsSet(_ALTGR_LAYOUT_PROBE) and _ALTGR_LAYOUT_PROBE["altgr_level"])
+}
+
+; AHK key name that presses the active layout's AltGr. Standard AltGr layouts
+; put AltGr on VK_RMENU, so "RAlt" is AltGr there. Kana-style remaps
+; (_ALTGR_KANA_FIXUP, following the foreground layout) move AltGr to another virtual key and
+; leave VK_RMENU without a scan code: a synthetic RAlt is then a plain Alt that
+; opens a window's menu bar on release and types nothing on a chord, while the
+; physical scan code SC138 still is the layout's AltGr.
+; @return {String} "SC138" on a Kana-style layout, otherwise "RAlt".
+KS_AltGrKeyName() {
+	global _ALTGR_KANA_FIXUP
+	return _ALTGR_KANA_FIXUP ? "SC138" : "RAlt"
+}
+
+; AHK key name a Send must use to press or release the layout's AltGr key.
+; KS_AltGrKeyName stays the key's identity for GetKeyState, KeyWait, the
+; hotkeys and the synthetic ledger, but on a Kana-style layout its "SC138" is
+; unfit for a Send: AutoHotkey reads a bare SC138 as the right Alt modifier
+; (KeyToModifiersLR, case SC_RALT) while it injects the layout's own virtual
+; key for that scan code (VK_OEM_8 on the Ergopti layout), which is no
+; modifier. At the end of a SendInput it then pressed the right Alt it believed
+; missing, a plain Alt on that layout, and left it down: Alt chords instead of
+; AltGr characters, and a stuck Alt after the hold. The virtual key the layout
+; probe read for the AltGr scan code ("vkDF") injects the same key without that
+; bookkeeping. On a layout where right Alt is AltGr, "RAlt" is correct as is.
+; @return {String} "vkXX" on a Kana-style layout, "" when the layout probe found
+;         no virtual key for it (a Send must then refuse), otherwise "RAlt".
+KS_AltGrSendKey() {
+	global _ALTGR_KANA_FIXUP, _ALTGR_LAYOUT_PROBE
+	if !_ALTGR_KANA_FIXUP
+		return "RAlt"
+	Vk := _ALTGR_LAYOUT_PROBE["altgr_vk"]
+	return Vk ? Format("vk{:X}", Vk) : ""
+}
+
+; Whether releasing key Name with nothing typed under it opens a menu: an Alt
+; key puts the focused window's menu bar in menu mode, a Win key opens Start.
+; RAlt counts: it is a plain Alt wherever right Alt is not AltGr. Such a
+; release is masked first (TextSendMenuMask).
+; @param Name {String} AHK key name.
+; @return {Boolean}
+KS_IsMenuModifier(Name) {
+	static MenuModifiers := Map("LAlt", true, "RAlt", true, "LWin", true, "RWin", true)
+	return MenuModifiers.Has(Name)
+}
+
+; Scan code of the key KS_AltGrKeyName presses. A key event is the AltGr key
+; when its scan code matches, whatever virtual key the layout gives it: VK_RMENU
+; on standard layouts, another one (VK_OEM_8, VK_KANA...) on Kana-style ones.
+; @return {Integer} The scan code, extended keys carrying 0x100.
+KS_AltGrScanCode() {
+	return GetKeySC(KS_AltGrKeyName())
+}
+
+; Enumerates base scancodes 0x01-0x7F under Hkl and returns the first whose
+; no-modifier output equals TargetChar. ToUnicodeEx is called with wFlags=0x4
+; (UNICODE_NOCHAR) so the probe never corrupts pending Win32 dead-key state.
+; @param Hkl {Integer} The keyboard layout handle to probe.
+; @param TargetChar {String} The character to locate (e.g. the magic-key source).
+; @return {Map} Map("scan", SC, "vk", VK); scan = 0 when no scancode matches.
+KS_ScanScancodeForChar(Hkl, TargetChar) {
+	local keyState := Buffer(256, 0)  ; all modifier keys unpressed
+	local foundScan := 0, foundVK := 0
+	try {
+		; Probe every base scancode. 0x01-0x58 covers all standard keys;
+		; extend to 0x7F as a safety margin for exotic layouts.
+		Loop 127 {
+			local sc := A_Index
+			; MAPVK_VSC_TO_VK_EX = 3: extended-key-aware SC -> VK.
+			local vk := DllCall("MapVirtualKeyExW", "UInt", sc, "UInt", 3, "Ptr", Hkl, "UInt")
+			if vk = 0
+				continue
+			; Reset buffer before each call - dead-key state can persist across calls.
+			local charBuf := Buffer(10, 0)
+			local len := DllCall("ToUnicodeEx",
+				"UInt", vk, "UInt", sc, "Ptr", keyState,
+				"Ptr", charBuf, "Int", 4, "UInt", 0x4, "Ptr", Hkl, "Int")
+			if len <= 0
+				continue
+			local ch := StrGet(charBuf, len, "UTF-16")
+			if ch = TargetChar {
+				foundScan := sc
+				foundVK := vk
+				break
+			}
+		}
+	} catch as e {
+		try LoggerError("KeyState", "KS_ScanScancodeForChar failed: {1}.", e.Message)
+	}
+	return Map("scan", foundScan, "vk", foundVK)
+}
+
+; Returns the scancode of the key that types Char with no Shift, Ctrl or Alt in
+; Hkl (VkKeyScanExW high byte 0), or 0 when the character needs a modifier or is
+; absent from the layout.
+; @param Hkl {Integer} The keyboard layout handle to probe.
+; @param Char {String} One character.
+; @return {Integer} The scancode, or 0.
+KS_DirectScanCodeForChar(Hkl, Char) {
+	try {
+		local result := DllCall("VkKeyScanExW", "UShort", Ord(Char), "Ptr", Hkl, "Short")
+		if result == -1 || ((result >> 8) & 0xFF) != 0
+			return 0
+		; MAPVK_VK_TO_VSC = 0.
+		return DllCall("MapVirtualKeyExW", "UInt", result & 0xFF, "UInt", 0, "Ptr", Hkl, "UInt")
+	} catch as e {
+		try LoggerError("KeyState", "KS_DirectScanCodeForChar failed: {1}.", e.Message)
+		return 0
+	}
+}
+
+; The digit-row keys, 1 to 0: virtual key (VK_1..VK_9, VK_0) and scan code.
+global KS_DIGIT_ROW_KEYS := [[0x31, 0x02], [0x32, 0x03], [0x33, 0x04], [0x34, 0x05],
+	[0x35, 0x06], [0x36, 0x07], [0x37, 0x08], [0x38, 0x09], [0x39, 0x0A], [0x30, 0x0B]]
+; MapVirtualKeyExW map type: virtual key to its unshifted character.
+global KS_MAPVK_VK_TO_CHAR := 2
+
+; Whether layout Hkl types the digit 1 only with Shift (AZERTY, bépo), so its
+; digit row types symbols unshifted. VkKeyScanExW takes the character itself:
+; passed as a string, it read the low bits of the string's address, found no
+; such character (-1) on every layout, and the -1's high byte read as Shift, so
+; QWERTY and the Ergopti Kana layout counted as shifted too.
+; @param Hkl {Integer} Keyboard layout handle; 0 (none read) is not shifted.
+; @return {Boolean}
+KS_LayoutDigitsAreShifted(Hkl) {
+	if (Hkl == 0)
+		return false
+	Result := DllCall("VkKeyScanExW", "UShort", Ord("1"), "Ptr", Hkl, "Short")
+	return Result != -1 and ((Result >> 8) & 0x01) != 0
+}
+
+; The character each digit-row key types unshifted on layout Hkl: "&" to "à"
+; on AZERTY, the digits themselves on QWERTY. MapVirtualKeyExW (MAPVK_VK_TO_CHAR)
+; is what AutoHotkey's GetKeyName reads for these keys, but on the script's own
+; thread layout, which need not be the layout the digit row was probed on; this
+; reads the probed one. ToUnicodeEx is not used: it answered the digit on
+; KbdEdit layouts.
+; @param Hkl {Integer} Keyboard layout handle; 0 gives an empty map.
+; @return {Map} Scan code -> one-character string; a key with no character is
+;         left out.
+KS_LayoutDigitRowSymbols(Hkl) {
+	global KS_DIGIT_ROW_KEYS, KS_MAPVK_VK_TO_CHAR
+	Symbols := Map()
+	if (Hkl == 0)
+		return Symbols
+	for _, Key in KS_DIGIT_ROW_KEYS {
+		Char := DllCall("MapVirtualKeyExW", "UInt", Key[1], "UInt", KS_MAPVK_VK_TO_CHAR, "Ptr", Hkl, "UInt") & 0xFFFF
+		if (Char >= 0x20)
+			Symbols[Key[2]] := Chr(Char)
+	}
+	return Symbols
+}
+
+; Translates a scancode into its virtual key under Hkl, distinguishing left and
+; right keys (MAPVK_VSC_TO_VK_EX = 3).
+; @param Scancode {Integer} The physical scancode.
+; @param Hkl {Integer} The keyboard layout handle to probe.
+; @return {Integer} The virtual key, or 0 when the scancode is unmapped.
+KS_ScancodeToVk(Scancode, Hkl) {
+	try {
+		return DllCall("MapVirtualKeyExW", "UInt", Scancode, "UInt", 3, "Ptr", Hkl, "UInt")
+	} catch as e {
+		try LoggerError("KeyState", "KS_ScancodeToVk failed: {1}.", e.Message)
+		return 0
+	}
+}
+
+; What one key types under Hkl, optionally with Shift/Caps. ToUnicodeEx uses
+; wFlags=0x4 so reading a dead key cannot arm it for the user's next keystroke.
+; @param Vk {Integer} The virtual key.
+; @param Scancode {Integer} The physical scancode.
+; @param Hkl {Integer} The keyboard layout handle to probe.
+; @return {Object} { Count, Text }: ToUnicodeEx's result (-1 for a dead key,
+;   0 when the key types nothing or the call failed) and the characters written.
+; @param Shift {boolean} Whether to resolve the shifted native character.
+; @param Caps {boolean} Whether CapsLock is toggled in the probed state.
+KS_KeyTextNoStateChange(Vk, Scancode, Hkl, Shift := false, Caps := false) {
+	try {
+		local keyState := Buffer(256, 0)
+		if Shift
+			NumPut("UChar", 0x80, keyState, 0x10)
+		if Caps
+			NumPut("UChar", 1, keyState, 0x14)
+		local charBuf := Buffer(32, 0)
+		local count := DllCall("ToUnicodeEx", "UInt", Vk, "UInt", Scancode, "Ptr", keyState,
+			"Ptr", charBuf, "Int", 16, "UInt", 0x4, "Ptr", Hkl, "Int")
+		return { Count: count, Text: (count = 0) ? "" : StrGet(charBuf, Abs(count), "UTF-16") }
+	} catch as e {
+		try LoggerError("KeyState", "KS_KeyTextNoStateChange failed: {1}.", e.Message)
+		return { Count: 0, Text: "" }
+	}
+}
+
+; Lists the keyboard layouts installed for the user (GetKeyboardLayoutList).
+; @return {Array} HKL handles; empty when the list cannot be read.
+KS_InstalledKeyboardLayouts() {
+	local layouts := []
+	try {
+		local count := DllCall("GetKeyboardLayoutList", "Int", 0, "Ptr", 0, "Int")
+		if count <= 0
+			return layouts
+		local buf := Buffer(count * A_PtrSize, 0)
+		count := DllCall("GetKeyboardLayoutList", "Int", count, "Ptr", buf, "Int")
+		Loop count
+			layouts.Push(NumGet(buf, (A_Index - 1) * A_PtrSize, "Ptr"))
+	} catch as e {
+		try LoggerError("KeyState", "KS_InstalledKeyboardLayouts failed: {1}.", e.Message)
+	}
+	return layouts
+}
+
+; Machine-readable contract map - consumed by the generic adapter compliance test
+; (tests/test_adapter_compliance_new.ahk) to verify every required method exists
+; and is callable without manually listing functions per-adapter.
+global ADAPTER_KEY_STATE := Map(
+    "isDown", KS_IsDown,
+    "isUp",   KS_IsUp,
+)

@@ -1,0 +1,82 @@
+[
+  {
+    "abi": "luajit",
+    "source": "candidate",
+    "exit_code": 0,
+    "summary": "OUTPUT_OWNER 60 0",
+    "log": "luajit-candidate.log",
+    "sha256": "dd11741f14afe932777c2f460e6a12c3de5ff0bc06ab3bf37826a62d8877f8a7"
+  },
+  {
+    "abi": "luajit",
+    "source": "preimages",
+    "exit_code": 1,
+    "summary": "OUTPUT_OWNER 47 13",
+    "log": "luajit-preimages.log",
+    "sha256": "4a027fc10d174576cf85e012f78712bfaeff61f4546c9f3d52fb94bd251ab704"
+  },
+  {
+    "abi": "luajit",
+    "source": "omit_restoration",
+    "exit_code": 1,
+    "summary": "OUTPUT_OWNER 59 1",
+    "log": "luajit-omit_restoration.log",
+    "sha256": "12f0ec59c59fcd40d083226de6ff2cd82259ea31fd3840bb7b1d8d7e660c9a7e"
+  },
+  {
+    "abi": "luajit",
+    "source": "omit_channel_reservation",
+    "exit_code": 1,
+    "summary": "OUTPUT_OWNER 58 2",
+    "log": "luajit-omit_channel_reservation.log",
+    "sha256": "fbf80ad5253afb492ca03240a1a5b5698b072ca01f1a427e6db026e7ad440396"
+  },
+  {
+    "abi": "luajit",
+    "source": "omit_known_repeat",
+    "exit_code": 1,
+    "summary": "OUTPUT_OWNER 59 1",
+    "log": "luajit-omit_known_repeat.log",
+    "sha256": "cca4d0a0ef5bbee0d78d00d6ec55d9e95ad89186062c5ab3b3f63cb571570765"
+  },
+  {
+    "abi": "lua5.4",
+    "source": "candidate",
+    "exit_code": 0,
+    "summary": "OUTPUT_OWNER 60 0",
+    "log": "lua5.4-candidate.log",
+    "sha256": "dd11741f14afe932777c2f460e6a12c3de5ff0bc06ab3bf37826a62d8877f8a7"
+  },
+  {
+    "abi": "lua5.4",
+    "source": "preimages",
+    "exit_code": 1,
+    "summary": "OUTPUT_OWNER 47 13",
+    "log": "lua5.4-preimages.log",
+    "sha256": "788759d7d7912f7e828b75e9c96b48ca2c98a544c7265136d27c8a4bc456e451"
+  },
+  {
+    "abi": "lua5.4",
+    "source": "omit_restoration",
+    "exit_code": 1,
+    "summary": "OUTPUT_OWNER 59 1",
+    "log": "lua5.4-omit_restoration.log",
+    "sha256": "12f0ec59c59fcd40d083226de6ff2cd82259ea31fd3840bb7b1d8d7e660c9a7e"
+  },
+  {
+    "abi": "lua5.4",
+    "source": "omit_channel_reservation",
+    "exit_code": 1,
+    "summary": "OUTPUT_OWNER 58 2",
+    "log": "lua5.4-omit_channel_reservation.log",
+    "sha256": "fbf80ad5253afb492ca03240a1a5b5698b072ca01f1a427e6db026e7ad440396"
+  },
+  {
+    "abi": "lua5.4",
+    "source": "omit_known_repeat",
+    "exit_code": 1,
+    "summary": "OUTPUT_OWNER 59 1",
+    "log": "lua5.4-omit_known_repeat.log",
+    "sha256": "cca4d0a0ef5bbee0d78d00d6ec55d9e95ad89186062c5ab3b3f63cb571570765"
+  }
+]

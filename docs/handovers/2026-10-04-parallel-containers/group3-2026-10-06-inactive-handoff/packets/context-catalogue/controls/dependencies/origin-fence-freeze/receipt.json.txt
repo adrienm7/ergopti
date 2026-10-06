@@ -1,0 +1,35 @@
+{
+  "all_original_new_assertions_prefix_byte_exact": true,
+  "dependency_receipt": "/workspace/.ergopti-cloud/preparations/group3-linux93-native-actions/one-shot-freeze/receipt.json",
+  "dependency_receipt_sha256": "4efd7f0a523526140cafa438ac17b067607c028bd22999b512001f1bc4bffb99",
+  "files": {
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-native-actions/evidence/final-origin-combined-lua54.log": "a7290355c06f96d16c0c6b17302437a6cfa4a5d03b44ebf933d796aa2254982a",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-native-actions/evidence/final-origin-combined-luajit.log": "a7290355c06f96d16c0c6b17302437a6cfa4a5d03b44ebf933d796aa2254982a",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-native-actions/evidence/lint-origin-owned.log": "8a91761d72c3b198542b81c2f52f3500d6f2b5fd4436fe9f78566194b0919afb",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-native-actions/evidence/pre-origin-fence-lua54.log": "14614db9e5ff5bcd6972f78b7d20141a26694239e268a449f671a36b2d1991a3",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-native-actions/evidence/pre-origin-fence-luajit.log": "14614db9e5ff5bcd6972f78b7d20141a26694239e268a449f671a36b2d1991a3",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-native-actions/origin-fence-freeze/README.md": "b805175476e7aa0d04073f6419fd1a1101c8fb9afad10a2a0fd32cf0064fe951",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-native-actions/origin-fence-freeze/origin-fence.patch": "e3d77c1a83def12bd9ee80c0b1af69b67989c43eb72b42e39d250f22b87e0e65",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-native-actions/origin-fence-freeze/source-pair.tar": "4007fd92366788032d79eb726edbeda765427af6262fddce8137644fb9d8c374"
+  },
+  "patch_sha256": "e3d77c1a83def12bd9ee80c0b1af69b67989c43eb72b42e39d250f22b87e0e65",
+  "source_paths": [
+    {
+      "path": "static/ergopti_plus/linux/platform/remap/key_combination_engine.lua",
+      "post_sha256": "20eff976dcd6fc682bce1bcc2313d9b8935522e4b79a61fe8fdebea225830c89",
+      "pre_sha256": "488a8ca05decb632adb4bd75f2f30014a577ddf0d1cf6295260f2b52f9e011ff"
+    },
+    {
+      "path": "static/ergopti_plus/linux/tests/unit/modules/test_key_combination_native_actions.lua",
+      "post_sha256": "d4c50d2f05e46652f89919770b47e696cb3f467bc19baa7faf8716eb8fda7d19",
+      "pre_sha256": "0e94b7138ef4c0d9a59ede62f76c53e1e7ae5dbf00e730d86a45cad3c7979bae"
+    }
+  ],
+  "status": "FROZEN_INACTIVE_ORIGIN_REFIT_SUCCESSOR",
+  "tests": {
+    "combined_each_abi": "136 passed / 0 failed",
+    "first_tranche_each_abi": "12 passed / 2 failed",
+    "native_physical": "unexecuted",
+    "successor_each_abi": "14 passed / 0 failed"
+  }
+}

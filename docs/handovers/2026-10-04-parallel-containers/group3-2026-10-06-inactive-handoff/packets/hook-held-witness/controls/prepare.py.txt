@@ -1,0 +1,15 @@
+from pathlib import Path
+import hashlib,json,shutil
+root=Path('/workspace/.ergopti-cloud/preparations/group3-linux-hook-held-proof');repo=Path('/workspace/ergopti')
+chain={
+ 'static/ergopti_plus/linux/adapters/uinput_writer.lua':Path('/workspace/.ergopti-cloud/preparations/group3-linux-output-transaction/candidate/static/ergopti_plus/linux/adapters/uinput_writer.lua'),
+ 'static/ergopti_plus/linux/adapters/evdev_reader.lua':Path('/workspace/.ergopti-cloud/preparations/group3-linux-evdev-origin-slot-identity/candidate/static/ergopti_plus/linux/adapters/evdev_reader.lua'),
+}
+paths=['static/ergopti_plus/linux/adapters/keyboard_hook.lua','static/ergopti_plus/linux/tests/unit/adapters/test_keyboard_hook_device_watchdog.lua']
+pins=[]
+for rel,source in chain.items():
+ p=root/'dependencies'/rel;p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(source.read_bytes());pins.append({'path':rel,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()})
+for rel in paths:
+ for folder in ['preimages','candidate']:
+  p=root/folder/rel;p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes((repo/rel).read_bytes())
+(root/'dependencies.json').write_text(json.dumps(pins,indent=2)+'\n')
