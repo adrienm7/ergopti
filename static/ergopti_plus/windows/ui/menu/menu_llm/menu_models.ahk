@@ -381,7 +381,11 @@ _LLM_Menu_CatalogueRows(presets, active, deps_ready := true) {
 				; nested sub-sub-menus. Insert it only once per family, and
 				; only if a previous family already contributed rows.
 				if (family_added_any == false and !first_family_with_entries) {
-					ProviderRows.Push(Map("separator", true))
+					FamilyRows := MenuRenderer_TemplateRows("llm_model_family_boundary", Map(), Map(), Map())
+					if !(FamilyRows is Array)
+						return []
+					for Row in FamilyRows
+						ProviderRows.Push(Row)
 				}
 
 				ProviderRows.Push(Map(
@@ -464,7 +468,11 @@ _LLM_Menu_PerModelRows(name, model, ollama_url, active, deps_ready := true) {
 			"action", _LLM_Menu_MakeDownloadModelHandler(name)))
 	}
 
-	Rows.Push(Map("separator", true))
+	OriginRows := MenuRenderer_TemplateRows("llm_model_origin_boundary", Map(), Map(), Map())
+	if !(OriginRows is Array)
+		return []
+	for Row in OriginRows
+		Rows.Push(Row)
 	; A row with no action is drawn disabled by the renderer, which is what every
 	; spec line below is: information, not a click target.
 	Rows.Push(Map("label", StrReplace(t("menu.llm.model_backend"), "%s",

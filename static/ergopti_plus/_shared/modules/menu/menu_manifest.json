@@ -2777,6 +2777,26 @@
 			]
 		}
 	],
+	"llm_model_family_boundary": [
+		{
+			"type": "---",
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"llm_model_origin_boundary": [
+		{
+			"type": "---",
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
 	"shortcut_extension_boundary": [
 		{
 			"type": "---",

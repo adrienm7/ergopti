@@ -6615,6 +6615,17 @@ id = "hotstring_file_open"
 i18n = "menu.hotstrings.open_file"
 disabled_when = ["hotstring_file_ready"]
 
+# Curated catalogue families and per-model origins retain their existing native boundaries.
+[[menu.llm_model_family_boundary]]
+type = "---"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.llm_model_origin_boundary]]
+type = "---"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
 # Nonempty shortcut-extension menus retain the Windows/macOS presentation boundary.
 [[menu.shortcut_extension_boundary]]
 type = "---"

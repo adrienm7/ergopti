@@ -4361,7 +4361,7 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 62, macOS 95, Linux 73, each
+  drivers still build (current baseline: Windows 60, macOS 93, Linux 73, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
@@ -4373,6 +4373,20 @@ integrated, then publish one grouped release.
   Native allocators and computed user-data captions alone do not prove missing
   shared policy. Final native binding/order/caption and installed acceptance
   remain required; source review and the local portable gates are insufficient.
+
+  The curated model family and per-model origin boundaries now consume two
+  shared inert fragments on Windows and macOS; Linux's installed-model list
+  has no corresponding boundaries and explicitly hides them. Native populated
+  family predicates, catalogue order, selection, download, deletion, readout
+  and hardware callbacks remain unchanged. The unchanged owner scanner retires
+  exactly four sites, establishing 62/95/73 to 60/93/73. All 465 predecessor
+  corpora and 21 locale files remain exact. Independently reviewed portable
+  macOS owning and genuine French-warm controls pass 11/0 and 3/0 on both Lua
+  runtimes; original native producers give 9/2 and 1/2. Unchanged Linux
+  whole-tray controls pass 9/0 in English and French on both runtimes. Two new
+  Windows Win32 cases remain locally unexecuted; final composed native CI,
+  actual Hammerspoon/SDK and installed acceptance remain pending. This bounded
+  source migration does not close either menu item or any group item.
 
   Generation numeric boundaries now consume three shared inert fragments,
   retiring the three actual Windows separators and one macOS separator. Later
@@ -5150,7 +5164,7 @@ deferral is superseded. This item and items16/38 remain open.
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 62, macOS 95 and Linux 73 rows are still built by the
+  Windows 60, macOS 93 and Linux 73 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). Read on
   2026-10-01, the sites are of four kinds, and three of them need the
   manifest to say more than it can today:

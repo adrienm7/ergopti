@@ -392,3 +392,73 @@ _LBMD_PerModelReadoutFrame(Key) {
 for Key in ["specs", "caps"]
 	Test("per-model readout: authentic native sheet and shared frame " . Key,
 		_LBMD_PerModelReadoutFrame.Bind(Key))
+
+
+/** Exercises the actual catalogue allocator and current shared separator owners. */
+_LBMD_CatalogueBoundary(Key) {
+	global _SharedDir
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\model_catalogue_boundaries.json", "UTF-8"))
+	Catalogue := JsonParse(FileRead(_SharedDir . "\modules\llm\models.json", "UTF-8"))
+	Model := _LBMD_ReadoutCatalogueModel(Corpus["first_family_model"])
+	Frame := _MR_GetMenuDef(Corpus["boundaries"][Key]["section"])
+	Original := Frame[1]
+	Root := _MM_GetManifestRoot()
+	Native := 0
+	OwnedRows() {
+		if Key == "origin"
+			return _LLM_Menu_PerModelRows(Model["name"], Model, Model["urls"]["ollama"], Model["name"], false)
+		for Provider in _LLM_Menu_CatalogueRows(Catalogue, Model["name"], false) {
+			if Provider["label"] == Corpus["provider_caption"]
+				return Provider["items"]
+		}
+		return []
+	}
+	try {
+		Rows := OwnedRows()
+		Position := Key == "origin" ? Corpus["uninstalled_origin_position"]["ahk"] : 2
+		Assert(Rows.Length > Position)
+		AssertTrue(Rows[Position]["separator"])
+		if Key == "origin" {
+			AssertEqual(t("menu.llm.select_model"), Rows[1]["label"])
+			AssertTrue(HasMethod(Rows[1]["action"], "Call"))
+			AssertTrue(HasMethod(Rows[2]["action"], "Call"))
+			AssertTrue(HasMethod(Rows[5]["action"], "Call"), "the existing source callback remains native")
+		} else {
+			Assert(InStr(Rows[1]["label"], Corpus["first_family_model"]))
+			Assert(InStr(Rows[3]["label"], Corpus["second_family_model"]))
+			AssertTrue(HasMethod(Rows[1]["items"][1]["action"], "Call"))
+			AssertTrue(HasMethod(Rows[3]["items"][1]["action"], "Call"))
+		}
+		Native := Menu()
+		MenuRenderer_AppendRows(Native, "llm_menu", "llm_model", Rows)
+		AssertEqual(Rows.Length, DllCall("GetMenuItemCount", "ptr", Native.Handle, "int"))
+		Flags := DllCall("GetMenuState", "ptr", Native.Handle, "uint", Position - 1, "uint", 0x400, "uint")
+		Assert(Flags != 0xFFFFFFFF && (Flags & 0x800) != 0, "the native presentation boundary stays a separator")
+		Frame[1] := Map("type", "label", "id", "catalogue_boundary_marker", "i18n", Corpus["published_marker_key"],
+			"platforms", Original["platforms"], "unavailable", "hide")
+		Rows := OwnedRows()
+		AssertEqual(t(Corpus["published_marker_key"]), Rows[Position]["label"],
+			"the real native allocator consumes the live shared boundary")
+		AssertTrue(Rows[Position]["disabled"])
+		AssertFalse(Rows[Position].Has("action"))
+		if Key == "family" {
+			Assert(InStr(Rows[1]["label"], Corpus["first_family_model"]))
+			Assert(InStr(Rows[3]["label"], Corpus["second_family_model"]))
+		}
+		Root.Delete(Corpus["boundaries"][Key]["section"])
+		AssertEqual(0, OwnedRows().Length, "a withdrawn boundary cannot publish a native fallback")
+		Root[Corpus["boundaries"][Key]["section"]] := [Map("type", "command", "id", "unowned_catalogue_boundary", "i18n", Corpus["published_marker_key"])]
+		AssertEqual(0, OwnedRows().Length, "an unbound command cannot become a separator")
+		Root[Corpus["boundaries"][Key]["section"]] := Frame
+		Frame[1] := Original
+		AssertTrue(OwnedRows()[Position]["separator"], "repair retains the same actual allocator")
+		AssertEqual(0, _LLM_Menu_CatalogueRows([], "", false).Length, "a genuinely absent catalogue creates no family boundary")
+	} finally {
+		Root[Corpus["boundaries"][Key]["section"]] := Frame
+		Frame[1] := Original
+		if Native is Menu
+			_CTC_ReleaseMenu(Native)
+	}
+}
+for Key in ["family", "origin"]
+	Test("model catalogue boundaries: actual native owner " . Key, _LBMD_CatalogueBoundary.Bind(Key))
