@@ -3,6 +3,8 @@
 
 #include <ApplicationServices/ApplicationServices.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,6 +26,59 @@ static int valid_nonce(const char *value) {
         }
     }
     return 1;
+}
+
+static const char *owned_second_marker_snapshot(const char *expected_nonce) {
+    // Information only: the sender already has the exact owned private cwd.
+    // Any ambiguous process-local descriptor retires with this failed sender.
+    // No marker observation changes the original send/reply admission result.
+    const char *snapshot = "unavailable";
+    int directory = -1;
+    int descriptor = -1;
+    struct stat before_directory;
+    struct stat after_directory;
+    struct stat before;
+    struct stat after;
+    int directory_admitted = 0;
+    directory = open(".", O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW);
+    if (directory < 0) return snapshot;
+    if (fstat(directory, &before_directory) != 0 ||
+        !S_ISDIR(before_directory.st_mode) || before_directory.st_uid != getuid() ||
+        (before_directory.st_mode & 0777) != 0700) goto finished;
+    directory_admitted = 1;
+    descriptor = openat(directory, "appleevent-delivered.2",
+        O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
+    if (descriptor < 0) {
+        snapshot = errno == ENOENT ? "absent" : errno == ELOOP ? "invalid" : "unavailable";
+        goto finished;
+    }
+    if (fstat(descriptor, &before) != 0) goto finished;
+    if (!S_ISREG(before.st_mode) || before.st_uid != getuid() ||
+        (before.st_mode & 0777) != 0600 || before.st_nlink != 1 || before.st_size != 36) {
+        snapshot = "invalid";
+        goto finished;
+    }
+    char bytes[37];
+    const ssize_t count = read(descriptor, bytes, sizeof(bytes));
+    if (count < 0 || fstat(descriptor, &after) != 0) goto finished;
+    if (count != 36 || before.st_dev != after.st_dev || before.st_ino != after.st_ino ||
+        after.st_uid != getuid() || (after.st_mode & 0777) != 0600 ||
+        !S_ISREG(after.st_mode) || after.st_nlink != 1 || after.st_size != 36) {
+        snapshot = "invalid";
+        goto finished;
+    }
+    snapshot = memcmp(bytes, expected_nonce, 36) == 0 ? "conforming" : "invalid";
+finished:
+    if (directory_admitted && (fstat(directory, &after_directory) != 0 ||
+        before_directory.st_dev != after_directory.st_dev ||
+        before_directory.st_ino != after_directory.st_ino ||
+        !S_ISDIR(after_directory.st_mode) || after_directory.st_uid != getuid() ||
+        (after_directory.st_mode & 0777) != 0700)) snapshot = "unavailable";
+    // Never retry a close or publish marker facts after a refused close.
+    // The existing exact sender's physical exit ACK remains mandatory.
+    if (descriptor >= 0 && close(descriptor) != 0) snapshot = "unavailable";
+    if (close(directory) != 0) snapshot = "unavailable";
+    return snapshot;
 }
 
 int main(int argc, char **argv) {
@@ -125,9 +180,15 @@ int main(int argc, char **argv) {
                 }
             }
         }
-        fprintf(stderr, "Owned AppleEvent outcome admission failed: phase=%s, send=%d, read=%s, length=%s, match=%s, error_read=%s, error_length=%s, error_value=%s\n",
+        // Snapshot only a failed positive reply; a full-policy denial never
+        // acquires this diagnostic. No native policy/permission query is added.
+        const int marker_attempted = strcmp(argv[3], "success") == 0 && status == noErr;
+        const char *marker_snapshot = marker_attempted ? owned_second_marker_snapshot(argv[2]) : NULL;
+        fprintf(stderr, "Owned AppleEvent outcome admission failed: phase=%s, send=%d, read=%s, length=%s, match=%s, error_read=%s, error_length=%s, error_value=%s",
             phase, (int)status, read_detail, length_detail, match_detail,
             error_read_detail, error_length_detail, error_value_detail);
+        if (marker_attempted) fprintf(stderr, ", marker2=%s", marker_snapshot);
+        fprintf(stderr, "\n");
     } else {
         printf("native_appleevent_status=%d\n", (int)status);
     }

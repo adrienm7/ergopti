@@ -1626,5 +1626,69 @@ class NativeCompilerSelectionControls(unittest.TestCase):
             )
 
 
+class SenderOwnedMarkerSnapshotControls(unittest.TestCase):
+    FAILURE = (
+        "Owned AppleEvent outcome admission failed: phase=reply-read, send=0, read=-1701, "
+        "length=unobserved, match=unobserved, error_read=0, error_length=4, error_value=-10004"
+    )
+
+    def test_existing_closed_sender_facts_remain_byte_equivalent_without_marker(self):
+        value = self.FAILURE + "\n"
+        self.assertEqual(
+            probe.appleevent_sender_marker_fact(value), probe.appleevent_sender_fact(value)
+        )
+
+    def test_four_snapshot_enums_preserve_all_independent_original_native_facts(self):
+        expected = {
+            "phase": "reply-read",
+            "send_osstatus": 0,
+            "reply_read_osstatus": -1701,
+            "reply_length": None,
+            "reply_match": None,
+            "error_read_osstatus": 0,
+            "error_length": 4,
+            "error_number": -10004,
+        }
+        for snapshot in ("absent", "conforming", "invalid", "unavailable"):
+            with self.subTest(snapshot=snapshot):
+                self.assertEqual(
+                    probe.appleevent_sender_marker_fact(
+                        self.FAILURE + ", marker2=" + snapshot + "\n"
+                    ),
+                    {**expected, "marker2_snapshot": snapshot},
+                )
+
+    def test_snapshot_noise_or_incompatible_causal_phase_never_exports_private_bytes(self):
+        for value in [
+            self.FAILURE + ", marker2=private-path-nonce\n",
+            self.FAILURE + ", marker2=absent, marker2=conforming\n",
+            self.FAILURE + ", marker2=absent\nnoise",
+            self.FAILURE + ", marker2=absent\0\n",
+            self.FAILURE + ", marker2=absent\n" + "x" * 256,
+            "Owned AppleEvent outcome admission failed: phase=send, send=-1743, read=unobserved, "
+            "length=unobserved, match=unobserved, error_read=unobserved, error_length=unobserved, "
+            "error_value=unobserved, marker2=conforming\n",
+        ]:
+            with self.subTest(value=value):
+                self.assertEqual(probe.appleevent_sender_marker_fact(value), {})
+
+    def test_conforming_snapshot_cannot_change_existing_sender_failure_or_acceptance(self):
+        owner = Mock()
+        owner.run.return_value = subprocess.CompletedProcess(
+            [], 66, "", self.FAILURE + ", marker2=conforming\n"
+        )
+        with self.assertRaises(probe.AdmissionError) as failure:
+            probe.run_appleevent_sender(owner, ["owned-sender"], "deny-removal-positive")
+        owner.run.assert_called_once_with(["owned-sender"], check=False, confined=False)
+        self.assertIn("exit=66", str(failure.exception))
+        self.assertIn('"error_number": -10004', str(failure.exception))
+        self.assertIn('"marker2_snapshot": "conforming"', str(failure.exception))
+        owner.run.return_value = subprocess.CompletedProcess(
+            [], 0, "native_appleevent_status=0\n", self.FAILURE + ", marker2=conforming\n"
+        )
+        with self.assertRaises(probe.AdmissionError):
+            probe.run_appleevent_sender(owner, ["owned-sender"], "deny-removal-positive")
+
+
 if __name__ == "__main__":
     unittest.main()

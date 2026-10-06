@@ -275,7 +275,7 @@ check('portable Brew ownership controls remain registered and mandatory', () => 
 	assert.ifError(result.error);
 	assert.strictEqual(result.signal, null, result.stderr);
 	assert.strictEqual(result.status, 0, result.stderr);
-	assert.match(result.stderr, /Ran 48 tests in /);
+	assert.match(result.stderr, /Ran 52 tests in /);
 	assert.match(result.stderr, /\nOK\s*$/);
 	assert.doesNotMatch(result.stderr, /skipped=/);
 });
@@ -604,6 +604,48 @@ check('shared native process ownership controls remain registered and mandatory'
 	assert.match(result.stderr, /\nOK\s*$/);
 	assert.doesNotMatch(result.stderr, /skipped=/);
 });
+
+// SENDER_INTERNAL_MARKER_DIAGNOSTIC_BEGIN
+check('sender-owned marker snapshots never change nonce admission or parent lifetime', () => {
+	const sender = fs.readFileSync(
+		path.join(ROOT, 'tools/diagnostics/native_appleevent_probe_sender.c'),
+		'utf8'
+	);
+	const helper = fs.readFileSync(
+		path.join(ROOT, 'tools/diagnostics/macos_brew_archive_acceptance.py'),
+		'utf8'
+	);
+	const marker = sender.slice(
+		sender.indexOf('static const char *owned_second_marker_snapshot('),
+		sender.indexOf('int main(')
+	);
+	assert.match(marker, /open\("\.", O_RDONLY \| O_DIRECTORY \| O_CLOEXEC \| O_NOFOLLOW\)/);
+	assert.match(
+		marker,
+		/openat\(directory, "appleevent-delivered\.2",[\s\S]*O_NOFOLLOW \| O_NONBLOCK/
+	);
+	assert.match(marker, /before\.st_nlink != 1 \|\| before\.st_size != 36/);
+	assert.match(marker, /char bytes\[37\]/);
+	assert.match(marker, /read\(descriptor, bytes, sizeof\(bytes\)\)/);
+	assert.match(marker, /close\(descriptor\) != 0\) snapshot = "unavailable"/);
+	assert.match(marker, /close\(directory\) != 0\) snapshot = "unavailable"/);
+	assert.doesNotMatch(marker, /wait|kill|sleep|Permission|Entitlement|fprintf|printf/);
+	assert.match(sender, /strcmp\(argv\[3\], "success"\) == 0 && status == noErr/);
+	assert.match(
+		sender,
+		/if \(read == noErr && actual_length == 36 && memcmp\(echoed, argv\[2\], 36\) == 0\)/
+	);
+	assert.match(
+		sender,
+		/if \(marker_attempted\) fprintf\(stderr, ", marker2=%s", marker_snapshot\)/
+	);
+	assert.match(
+		helper,
+		/facts\.get\("phase"\) not in \("reply-read", "reply-length", "reply-match"\)/
+	);
+	assert.match(helper, /result\.returncode == 66/);
+});
+// SENDER_INTERNAL_MARKER_DIAGNOSTIC_END
 
 if (failures > 0) {
 	console.error(`\n${failures} Homebrew cask check(s) failed.`);
