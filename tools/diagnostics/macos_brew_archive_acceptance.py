@@ -1283,6 +1283,31 @@ def _admit_appleevent_boundary(children, repository):
     nonce = str(uuid.uuid4())
     executables = {}
     compiler = native_compiler(children)
+    registration_test = root / "native-appleevent-registration-test"
+    children.run(
+        [
+            *compiler,
+            "-std=c11",
+            "-O2",
+            "-fobjc-arc",
+            "-framework",
+            "ApplicationServices",
+            "-framework",
+            "Carbon",
+            "-framework",
+            "AppKit",
+            str(repository / "tools/diagnostics/native_appleevent_registration_test.m"),
+            "-o",
+            str(registration_test),
+        ],
+        confined=True,
+    )
+    registration_controls = children.run([str(registration_test)], confined=True)
+    require(
+        registration_controls.stdout == "native_appkit_registration_controls=4\n"
+        and not registration_controls.stderr,
+        "Controlled AppKit registration refusals were not independently admitted",
+    )
     for role in ("receiver", "sender"):
         app = root / ("OwnedAppleEvent-" + role + ".app")
         executable = app / "Contents/MacOS" / role
@@ -1307,7 +1332,15 @@ def _admit_appleevent_boundary(children, repository):
             "ApplicationServices",
         ]
         if role == "receiver":
-            command += ["-framework", "Carbon"]
+            command += [
+                "-x",
+                "objective-c",
+                "-fobjc-arc",
+                "-framework",
+                "Carbon",
+                "-framework",
+                "AppKit",
+            ]
         command += [
             str(repository / ("tools/diagnostics/native_appleevent_probe_" + role + ".c")),
             "-o",
@@ -1740,6 +1773,7 @@ def _observe(repository, output, *, fixture_parent=None, evidence):
                 "tools/diagnostics/macos_owned_process.py",
                 "tools/diagnostics/native_appleevent_probe_receiver.c",
                 "tools/diagnostics/native_appleevent_probe_sender.c",
+                "tools/diagnostics/native_appleevent_registration_test.m",
             )
         },
         "cases": {},

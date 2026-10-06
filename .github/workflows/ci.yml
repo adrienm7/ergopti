@@ -325,8 +325,7 @@ jobs:
         # The Sparkle appcast fixture is parsed
         # with xmllint so malformed release metadata cannot pass by string shape.
         run: |
-          sudo apt-get update
-          sudo apt-get install -y lua5.4 lua-luv libxml2-utils
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y lua5.4 lua-luv libxml2-utils
 
       # One style per language: Prettier (JavaScript, Svelte, CSS, HTML, JSON,
       # Markdown, YAML) and Ruff (Python), at the version format.cjs pins.
@@ -342,7 +341,7 @@ jobs:
       # are recorded; Chromium and WebKit cover both renderer families.
       - name: Install shared UI browsers
         if: matrix.suite == 'js'
-        run: npx playwright install --with-deps chromium webkit
+        run: node tools/ci/install-playwright.cjs chromium webkit
 
       - name: Test shared layer editor rendering
         if: matrix.suite == 'js'

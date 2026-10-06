@@ -3434,6 +3434,10 @@ the complete three-OS checkpoint remain pending.
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 
+The latest origin/dev AppKit receiver registration is merged with the retained
+post-failure WNOWAIT observation and original typed GetCurrentProcess refusal.
+Source controls preserve both histories; native acceptance remains pending.
+
 The portable replacement-script fixture now retains its real shell parent
 while that parent waits for its own unchanged sleeper. This avoids abandoning
 a zombie beneath the actual validation subreaper. The exact producer is closed
@@ -4717,6 +4721,11 @@ These are implementation tasks; separate installed tray/input acceptance.
       the `network.failure.*` keys). The Windows and Linux work stayed
       uncommitted in the local worktree of `fix/downloads-on-managed-networks`
       when the session stopped; redo it if that worktree is gone.
+
+The latest origin/dev authenticated Ubuntu acquisition owner now installs every
+original group-6 runtime, validation-tool, portable and Nix dependency. The
+workflow guard requires all 34 acquisition scopes and retains failure mutations.
+Neither this merge nor portable tests close native or device acceptance.
 
 Fresh authenticated validation-curl preparation succeeds locally after actual
 signed gpgv installation. Hosted Linux run 37516058879 on
