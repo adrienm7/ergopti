@@ -4086,6 +4086,20 @@ signing, installation and activation remain unqualified. The separate XcodeGen
 metadata HTTP403 and native UI geometry refusal are not resolved by this fix.
 Item31 remains partial.
 
+The fixed opt-in unsigned runtime preparation now consumes the original live
+owned compilation and captures complete bounded Core/Console app inventories
+plus CLI bytes before later compiler phases. The default compilation path has
+no extra shipping capture. Exclusive private outputs copy retained ordinary
+bytes only; source, owner, member, mode, inventory and deadline changes refuse.
+A later preparation refusal remains separate from the completed compilation
+receipt. Forty frozen artifact/builder controls and the unchanged41 builder,
+7 Team,25 observer and29 transport controls pass in independent software
+validation; optimized modes preserve the40-control result. Four before-failure
+boundaries were corrected without replacing their expectations. Actual native
+owned shipping capture, Swift execution, signing, distribution, installation
+and activation remain unqualified. This is unsigned preparation only; item31
+and all its unfinished work packages remain open.
+
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
   listed; see `docs/memory/text-input-and-config.md`. Still open everywhere:

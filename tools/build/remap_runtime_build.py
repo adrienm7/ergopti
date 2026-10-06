@@ -453,7 +453,134 @@ def _current_build_inputs(source_snapshot, deadline, staged_image):
         _factory_operation(factory, factory.current_staged_source, staged_image, deadline)
 
 
-def _compile_product_images(source_snapshot, owner, tools, deadline, *, staged_image=None):
+# Artifact custody is opt-in and outside the original complete factory closure.
+ARTIFACT_RELATIVE = "tools/build/remap_runtime_artifact.py"
+ARTIFACT_SHA256 = "86e8458f29a2cf31864d33a5ef4d58e9934c7241bb2efd8e3c74f73041797482"
+
+
+@dataclass(frozen=True, slots=True)
+class PreparationFailure:
+    """A separate later refusal never downgrades completed compilation evidence."""
+
+    code: str
+    status: str = "refused"
+
+
+@dataclass(frozen=True, slots=True)
+class CompilationPreparation:
+    """Keep the original compilation dictionary separate from unsigned preparation."""
+
+    compilation: dict
+    preparation: object
+
+
+def _load_artifact(snapshot, deadline):
+    """Execute only the fixed module's originally captured and pinned bytes."""
+    current_inputs(snapshot, deadline)
+    _REQUIRE(
+        len(snapshot.files) == 1 and snapshot.files[0].path == ARTIFACT_RELATIVE,
+        "source_identity",
+        "The fixed artifact consumer inventory changed",
+    )
+    path = snapshot.root / ARTIFACT_RELATIVE
+    specification = importlib.util.spec_from_loader("four_target_unsigned_artifact", loader=None)
+    module = importlib.util.module_from_spec(specification)
+    module.__file__ = str(path)
+    sys.modules[specification.name] = module
+    exec(compile(snapshot.files[0].data, str(path), "exec"), module.__dict__)
+    current_inputs(snapshot, deadline)
+    return module
+
+
+class _PreparationSink:
+    """One fixed lexical shipping sink inside the original finite compile owner."""
+
+    def __init__(self, repository, owner, deadline, owner_identity):
+        self.source = snapshot_inputs(
+            Path(repository), {ARTIFACT_RELATIVE: ARTIFACT_SHA256}, deadline
+        )
+        self.module = _load_artifact(self.source, deadline)
+        self.owner = self.operation(self.module.capture_owner, owner, deadline)
+        _REQUIRE(
+            self.owner.identity == owner_identity,
+            "owner_identity",
+            "The original compile owner changed before artifact admission",
+        )
+        self.snapshots = []
+        self.members = self.module.MAX_MEMBERS
+        self.bytes = self.module.MAX_TOTAL_BYTES
+        self.guard = self.module._OneUse()
+        self.current(deadline)
+
+    def operation(self, method, *arguments, **keywords):
+        try:
+            return method(*arguments, **keywords)
+        except self.module.ArtifactRefusal as error:
+            raise BASE.NativeBuildError(
+                error.code, "Unsigned snapshot preparation refused; compilation is incomplete"
+            ) from error
+
+    def current(self, deadline):
+        current_inputs(self.source, deadline)
+        self.operation(self.module._current_owner, self.owner, deadline)
+        for snapshot in self.snapshots:
+            self.operation(self.module.current_shipping, snapshot, deadline)
+        current_inputs(self.source, deadline)
+
+    def capture(self, label, stage, deadline):
+        if label == "duktape":
+            return
+        self.current(deadline)
+        snapshot = self.operation(
+            self.module.capture_shipping,
+            label,
+            stage,
+            deadline,
+            remaining_members=self.members,
+            remaining_bytes=self.bytes,
+        )
+        self.snapshots.append(snapshot)
+        self.members -= len(snapshot.directories) + len(snapshot.files)
+        self.bytes -= sum(len(row.data) for row in snapshot.files)
+        self.current(deadline)
+
+    def prepare(self, record, inputs, image, retained_products, deadline):
+        def current():
+            try:
+                _current_build_inputs(inputs, deadline, image)
+                for previous, root in retained_products:
+                    current_product(previous, root)
+                    check_deadline(deadline)
+                self.current(deadline)
+                check_deadline(deadline)
+            except OSError as error:
+                raise BASE.NativeBuildError(
+                    "source_identity",
+                    "Original retained source became unavailable after compilation",
+                ) from error
+
+        try:
+            current()
+            outcome = self.module.prepare_unsigned(
+                self.owner, tuple(self.snapshots), deadline, self.guard
+            )
+            current()
+        except (BASE.NativeBuildError, self.module.ArtifactRefusal) as error:
+            outcome = PreparationFailure(error.code)
+        return CompilationPreparation(record, outcome)
+
+
+def _preparation_current(sink, retained, deadline):
+    if sink is not None:
+        for previous, root in retained:
+            current_product(previous, root)
+            check_deadline(deadline)
+        sink.current(deadline)
+
+
+def _compile_product_images(
+    source_snapshot, owner, tools, deadline, *, staged_image=None, shipping_sink=None
+):
     """Compile the fixed four native images from a retained complete owned stage.
 
     The fixed entrypoint first obtains the released parent/auth projection.
@@ -494,7 +621,9 @@ def _compile_product_images(source_snapshot, owner, tools, deadline, *, staged_i
             ("build", build_command(tools["xcodebuild"], project)),
         ):
             _current_build_inputs(source_snapshot, deadline, staged_image)
+            _preparation_current(shipping_sink, retained, deadline)
             phases.append(_RUN_PHASE(label + "_" + suffix, command, project, owner, deadline))
+            _preparation_current(shipping_sink, retained, deadline)
             check_deadline(deadline)
             _current_build_inputs(source_snapshot, deadline, staged_image)
             if staged_image is not None and suffix == "generate":
@@ -518,9 +647,12 @@ def _compile_product_images(source_snapshot, owner, tools, deadline, *, staged_i
                 retained.append((native_recipe, source_snapshot.root))
             for previous, root in retained:
                 current_product(previous, root)
+            if shipping_sink is not None and suffix == "build":
+                shipping_sink.capture(label, source_snapshot.root, deadline)
         image = product_snapshot(output, source_snapshot.root)
         retained.append((image, source_snapshot.root))
         _current_build_inputs(source_snapshot, deadline, staged_image)
+        _preparation_current(shipping_sink, retained, deadline)
         phases.append(
             _RUN_PHASE(
                 label + "_architectures",
@@ -530,6 +662,7 @@ def _compile_product_images(source_snapshot, owner, tools, deadline, *, staged_i
                 deadline,
             )
         )
+        _preparation_current(shipping_sink, retained, deadline)
         check_deadline(deadline)
         current_product(image, source_snapshot.root)
         lipo_output = _ordinary(owner / (label + "_architectures.stdout"), owner, 1024)
@@ -1033,7 +1166,7 @@ def dependency_ready(repository, owner, seconds):
     return factory
 
 
-def _acquire_pristine(owner, tools, deadline, phases):
+def _acquire_pristine(owner, tools, deadline, phases, *, shipping_sink=None):
     """Use the existing phase owner for a genuinely fresh fixed pinned checkout."""
     checkout = owner / "pristine"
     _REQUIRE(
@@ -1063,7 +1196,11 @@ def _acquire_pristine(owner, tools, deadline, phases):
         ),
     )
     for name, command in commands:
+        if shipping_sink is not None:
+            shipping_sink.current(deadline)
         phases.append(_RUN_PHASE(name, command, owner, owner, deadline))
+        if shipping_sink is not None:
+            shipping_sink.current(deadline)
         check_deadline(deadline)
     observed = {}
     for name, relative in (
@@ -1072,6 +1209,8 @@ def _acquire_pristine(owner, tools, deadline, phases):
         ("vhd", "vendor/Karabiner-DriverKit-VirtualHIDDevice"),
     ):
         phase = "identity_" + name
+        if shipping_sink is not None:
+            shipping_sink.current(deadline)
         phases.append(
             _RUN_PHASE(
                 phase,
@@ -1081,11 +1220,15 @@ def _acquire_pristine(owner, tools, deadline, phases):
                 deadline,
             )
         )
+        if shipping_sink is not None:
+            shipping_sink.current(deadline)
         observed[name] = (
             _ordinary(owner / (phase + ".stdout"), owner, 1024).data.decode("ascii").strip()
         )
         check_deadline(deadline)
     BASE.verify_pins(observed)
+    if shipping_sink is not None:
+        shipping_sink.current(deadline)
     phases.append(
         _RUN_PHASE(
             "source_clean",
@@ -1095,6 +1238,8 @@ def _acquire_pristine(owner, tools, deadline, phases):
             deadline,
         )
     )
+    if shipping_sink is not None:
+        shipping_sink.current(deadline)
     return checkout
 
 
@@ -1121,11 +1266,22 @@ def capture_generated_inputs(image, deadline):
 
 
 def compile_owned(repository, owner, seconds, upstream=None):
+    """Retain the original default compilation path without any shipping capture."""
+    return _compile_owned(repository, owner, seconds, upstream)
+
+
+def compile_owned_and_prepare(repository, owner, seconds, upstream=None):
+    """Opt in to a fixed unsigned snapshot; signing and installation stay unqualified."""
+    return _compile_owned(repository, owner, seconds, upstream, prepare=True)
+
+
+def _compile_owned(repository, owner, seconds, upstream=None, *, prepare=False):
     """Compile the complete canonical owned tree using the genuine Darwin SDK.
 
     A separate pristine acquisition is retained through all phase boundaries.
     The factory's complete tracked image is published before actual version
-    generation. No signing, installation, authentication or capture executes.
+    generation. The default skips shipping capture; the opt-in copies retained
+    unsigned snapshots. Neither path signs, installs or authenticates.
     """
     _REQUIRE(
         type(seconds) is int and seconds == 300,
@@ -1133,12 +1289,18 @@ def compile_owned(repository, owner, seconds, upstream=None):
         "Owned calibration requires 300 seconds",
     )
     owner = _OWNER(owner)
+    owner_identity = _directory_identity(owner.lstat()) if prepare else None
     _REQUIRE(
         not any(owner.iterdir()), "unsafe_path", "Actual owned build requires a fresh empty owner"
     )
     deadline = time.monotonic() + seconds
+    shipping_sink = (
+        _PreparationSink(repository, owner, deadline, owner_identity) if prepare else None
+    )
     factory = _source_factory()
     _factory_operation(factory, factory.capture_dependencies, Path(repository), deadline)
+    if shipping_sink is not None:
+        shipping_sink.current(deadline)
     _REQUIRE(
         sys.platform == "darwin",
         "tool_unavailable",
@@ -1149,28 +1311,48 @@ def compile_owned(repository, owner, seconds, upstream=None):
         path = shutil.which(name)
         _REQUIRE(path is not None, "tool_unavailable", "An actual fixed native tool is unavailable")
         tools[name] = str(Path(path).resolve(strict=True))
+    if shipping_sink is not None:
+        shipping_sink.current(deadline)
     phases = [
         _RUN_PHASE("xcode_version", [tools["xcodebuild"], "-version"], owner, owner, deadline)
     ]
+    if shipping_sink is not None:
+        shipping_sink.current(deadline)
     binary, acquisition = BASE.acquire_xcodegen(owner, deadline)
+    if shipping_sink is not None:
+        shipping_sink.current(deadline)
     phases.append(acquisition)
     tools["xcodegen"] = str(binary.resolve(strict=True))
+    if shipping_sink is not None:
+        shipping_sink.current(deadline)
     phases.append(
         _RUN_PHASE("xcodegen_version", [tools["xcodegen"], "--version"], owner, owner, deadline)
     )
+    if shipping_sink is not None:
+        shipping_sink.current(deadline)
     phases.append(
         _RUN_PHASE("sdk_path", [tools["xcrun"], "--show-sdk-path"], owner, owner, deadline)
     )
+    if shipping_sink is not None:
+        shipping_sink.current(deadline)
     pristine = (
         Path(upstream)
         if upstream is not None
-        else _acquire_pristine(owner, tools, deadline, phases)
+        else (
+            _acquire_pristine(owner, tools, deadline, phases, shipping_sink=shipping_sink)
+            if shipping_sink is not None
+            else _acquire_pristine(owner, tools, deadline, phases)
+        )
     )
+    if shipping_sink is not None:
+        shipping_sink.current(deadline)
     projection = _factory_operation(
         factory, factory.prepare_owned_source, Path(repository), pristine, deadline
     )
     image = materialize_owned_source(projection, owner, deadline)
     _factory_operation(factory, factory.current_staged_source, image, deadline)
+    if shipping_sink is not None:
+        shipping_sink.current(deadline)
     phases.append(
         _RUN_PHASE(
             "version",
@@ -1180,13 +1362,18 @@ def compile_owned(repository, owner, seconds, upstream=None):
             deadline,
         )
     )
+    if shipping_sink is not None:
+        shipping_sink.current(deadline)
     inputs = capture_generated_inputs(image, deadline)
+    compilation_keywords = {"staged_image": image}
+    if shipping_sink is not None:
+        compilation_keywords["shipping_sink"] = shipping_sink
     products, native_phases, retained_products = _compile_product_images(
         inputs,
         owner,
         {name: tools[name] for name in ("xcodegen", "xcodebuild", "xcrun")},
         deadline,
-        staged_image=image,
+        **compilation_keywords,
     )
     phases.extend(native_phases)
     _current_build_inputs(inputs, deadline, image)
@@ -1225,6 +1412,8 @@ def compile_owned(repository, owner, seconds, upstream=None):
         current_product(previous, root)
     _current_build_inputs(inputs, deadline, image)
     check_deadline(deadline)
+    if shipping_sink is not None:
+        return shipping_sink.prepare(record, inputs, image, retained_products, deadline)
     return record
 
 
@@ -1612,6 +1801,7 @@ def main(arguments=None):
     parser.add_argument("--preflight", action="store_true")
     parser.add_argument("--ready", action="store_true")
     parser.add_argument("--compile-owned", action="store_true")
+    parser.add_argument("--prepare-owned", action="store_true")
     parser.add_argument("--source-controls", action="store_true")
     parser.add_argument("--upstream", type=Path)
     parser.add_argument("--observe-products", type=Path)
@@ -1621,11 +1811,13 @@ def main(arguments=None):
             int(options.preflight)
             + int(options.ready)
             + int(options.compile_owned)
+            + int(options.prepare_owned)
             + int(options.source_controls)
             + int(options.observe_products is not None)
         )
         _REQUIRE(
-            selected <= 1 and (options.upstream is None or options.compile_owned),
+            selected <= 1
+            and (options.upstream is None or options.compile_owned or options.prepare_owned),
             "invalid_budget",
             "Conflicting owned preparation modes",
         )
@@ -1636,6 +1828,23 @@ def main(arguments=None):
         if options.ready:
             dependency_ready(options.repository, options.owner, options.budget)
             print("PASS fixed owned build dependencies; source and compilation unexecuted")
+            return 0
+        if options.prepare_owned:
+            result = compile_owned_and_prepare(
+                options.repository, options.owner, options.budget, options.upstream
+            )
+            print(
+                "PASS unsigned actual owned four-target compilation; signing and activation unqualified"
+            )
+            if type(result.preparation) is PreparationFailure:
+                print(
+                    "Unsigned runtime preparation refused: " + result.preparation.code,
+                    file=sys.stderr,
+                )
+                return 2
+            print(
+                "PASS retained unsigned runtime snapshot; native shipping and installation unqualified"
+            )
             return 0
         if options.compile_owned:
             compile_owned(options.repository, options.owner, options.budget, options.upstream)
@@ -1669,7 +1878,14 @@ def main(arguments=None):
             )
         except (BASE.NativeBuildError, OSError):
             pass  # Refusal never replaces an earlier receipt or clears retained debt.
-        print("Owned runtime compilation refused: " + error.code, file=sys.stderr)
+        if options.prepare_owned:
+            print(
+                "Owned runtime compilation incomplete; unsigned preparation not completed: "
+                + error.code,
+                file=sys.stderr,
+            )
+        else:
+            print("Owned runtime compilation refused: " + error.code, file=sys.stderr)
         return 1
 
 
