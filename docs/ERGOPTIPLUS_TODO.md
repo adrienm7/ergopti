@@ -3447,6 +3447,8 @@ The script-chord parameter domain now consumes each native owner's complete publ
 
 The failed native modifier-hold dashboard qualifier now loads canonical actual selection state and helper functions, preserving its editor subset and all original Writer/SQLite/Reader and displayed mean/maximum assertions. The unchanged old harness fails with a missing real helper after12 native and4 Apps checks; the corrected fixture passes all17 on LuaJIT and Lua5.4 against real private SQLite files. No dashboard/runtime/SQLite policy or original expected values change. This is software consumer qualification; physical typing, GUI and final CI remain separate.
 
+macOS provider identities now require a complete same-read native publication and checked close/JSON shape. Malformed, unavailable, partial or changed sources stay unjudged; valid empty local publications remain distinct from unavailable providers. Existing cloud refusal and custom names retain their contracts. The final AI branch is already integrated; complete model-row/order ownership and installed Hammerspoon acceptance remain open.
+
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
   The shared AHK override policy now writes an explicit recommended delay only
