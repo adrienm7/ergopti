@@ -57,7 +57,12 @@ def main():
         applications = root / "data" / "applications"
         applications.mkdir(parents=True)
         launcher = root / "record-application"
-        launcher.write_text('#!/bin/sh\nprintf %s "$1" > "$ERGOPTI_NATIVE_APPLICATION_RECEIPT"\n')
+        launcher.write_text(
+            "#!/bin/sh\nset -eu\n"
+            'pending="${ERGOPTI_NATIVE_APPLICATION_RECEIPT}.pending"\n'
+            'printf %s "$1" > "$pending"\n'
+            'mv -- "$pending" "$ERGOPTI_NATIVE_APPLICATION_RECEIPT"\n'
+        )
         launcher.chmod(0o700)
         read_fd, write_fd = os.pipe()
         with (root / "display.log").open("w") as log:
