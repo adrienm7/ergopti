@@ -9,6 +9,14 @@
 --- (toml-batch-existing-key).
 --- @param helpers table Driver test helpers.
 return function(helpers)
+	-- Source literals can lose their zero sign on some LuaJIT builds.
+	-- Establish the intended IEEE sign before calling any producer under test.
+	local function negative_zero()
+		local value = tonumber("-0.0")
+		helpers.assert_eq(type(value), "number", "negative-zero request must be numeric")
+		helpers.assert_eq(1 / value, -math.huge, "negative-zero request must retain its actual sign")
+		return value
+	end
 	local Writer = require("toml_codec.writer")
 	local Codec = require("toml_codec.codec")
 	local function prepare(source, rows)
@@ -149,7 +157,7 @@ return function(helpers)
 			{ name = "existing boolean", rows = rows, expected = '[a] # header\nchild = { first=true, middle="001", last=0.25, future=9007199254740993, empty=[], map={} } # trailer\n' },
 			{ name = "existing string", rows = { { section = "a.child", key = "middle", value = "002" } }, expected = '[a] # header\nchild = { first=false, middle="002", last=0.25, future=9007199254740993, empty=[], map={} } # trailer\n' },
 			{ name = "precise number", rows = { { section = "a.child", key = "last", value = 0.12345678901234567 } }, expected = '[a] # header\nchild = { first=false, middle="001", last=0.12345678901234566, future=9007199254740993, empty=[], map={} } # trailer\n' },
-			{ name = "negative zero", rows = { { section = "a.child", key = "last", value = -0.0 } }, expected = '[a] # header\nchild = { first=false, middle="001", last=-0.0, future=9007199254740993, empty=[], map={} } # trailer\n' },
+			{ name = "negative zero", rows = { { section = "a.child", key = "last", value = negative_zero() } }, expected = '[a] # header\nchild = { first=false, middle="001", last=-0.0, future=9007199254740993, empty=[], map={} } # trailer\n' },
 			{ name = "first deletion", rows = { { section = "a.child", key = "first", delete = true } }, expected = '[a] # header\nchild = { middle="001", last=0.25, future=9007199254740993, empty=[], map={} } # trailer\n' },
 			{ name = "middle deletion", rows = { { section = "a.child", key = "middle", delete = true } }, expected = '[a] # header\nchild = { first=false, last=0.25, future=9007199254740993, empty=[], map={} } # trailer\n' },
 			{ name = "existing no-op", rows = { { section = "a.child", key = "first", value = false } }, expected = source },
@@ -308,7 +316,7 @@ return function(helpers)
 			{ token="-9007199254740994", value=-9007199254740994, expected="-9007199254740994" },
 			{ token="1.0000000000000001e16", value=10000000000000000, expected="1.0000000000000001e16" },
 			{ token="0.1", value=0.1, expected="0.1" },
-			{ token="-0.0", value=-0.0, expected="-0.0" },
+			{ token="-0.0", value=negative_zero(), expected="-0.0" },
 		}
 		for _, vector in ipairs(literals) do
 			helpers.it("retains exact numeric intent for canonical token " .. vector.token, function()

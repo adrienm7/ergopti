@@ -75,11 +75,13 @@ int main(int argc, char **argv) {
     expected_nonce = argv[3];
     ProcessSerialNumber serial;
     OSStatus status = GetCurrentProcess(&serial);
-    if (status == noErr) {
-        status = TransformProcessType(&serial, kProcessTransformToUIElementApplication);
-    }
     if (status != noErr) {
-        fprintf(stderr, "Owned AppleEvent recipient registration failed: %d\n", (int)status);
+        fprintf(stderr, "Owned AppleEvent recipient current-process registration failed: %d\n", (int)status);
+        return 65;
+    }
+    status = TransformProcessType(&serial, kProcessTransformToUIElementApplication);
+    if (status != noErr) {
+        fprintf(stderr, "Owned AppleEvent recipient transform registration failed: %d\n", (int)status);
         return 65;
     }
     const AEEventHandlerUPP handler = NewAEEventHandlerUPP(receive_probe);

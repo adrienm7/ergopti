@@ -593,7 +593,9 @@ function M.build(ctx)
 					})
 				end
 
-				table.insert(model_submenu, { separator = true })
+				local origin_rows = ManifestMenu.template_rows("llm_model_origin_boundary", {}, {}, {})
+				if not origin_rows then return {} end
+				for _, row in ipairs(origin_rows) do model_submenu[#model_submenu + 1] = row end
 				table.insert(model_submenu, {
 					label = string.format(i18n.get("menu.llm.model_backend"), display_backend),
 					action    = function() end
@@ -663,7 +665,9 @@ function M.build(ctx)
 				end
 
 				if hw_active.download_gb or hw_active.disk_gb or hw_active.ram_gb then
-					table.insert(model_submenu, { separator = true })
+					local hardware_rows = ManifestMenu.template_rows("llm_model_hardware_boundary", {}, {}, {})
+					if not hardware_rows then return {} end
+					for _, row in ipairs(hardware_rows) do model_submenu[#model_submenu + 1] = row end
 					table.insert(model_submenu, {
 						label    = i18n.decorate_section(string.format(i18n.get("menu.llm.hw_header"), display_backend)),
 						disabled = true
@@ -700,7 +704,11 @@ function M.build(ctx)
 			end
 
 			if #family_sub > 0 then
-				if #sub > 0 then table.insert(sub, { separator = true }) end
+				if #sub > 0 then
+					local family_rows = ManifestMenu.template_rows("llm_model_family_boundary", {}, {}, {})
+					if not family_rows then return {} end
+					for _, row in ipairs(family_rows) do sub[#sub + 1] = row end
+				end
 				for _, model_entry in ipairs(family_sub) do
 					table.insert(sub, model_entry)
 				end

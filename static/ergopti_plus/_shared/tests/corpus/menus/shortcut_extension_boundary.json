@@ -1,0 +1,47 @@
+{
+	"section": "shortcut_extension_boundary",
+	"heading_id": "shortcut_extension_heading",
+	"caption_key": "menu.extensions.header",
+	"published_marker_key": "button.cancel",
+	"rows": [
+		{
+			"type": "---",
+			"platforms": ["ahk", "hs"],
+			"unavailable": "hide"
+		},
+		{
+			"type": "section_header",
+			"id": "shortcut_extension_heading",
+			"i18n": "menu.extensions.header",
+			"platforms": ["ahk", "hs"],
+			"unavailable": "hide"
+		}
+	],
+	"projections": {
+		"ahk": [
+			{
+				"separator": true
+			},
+			{
+				"label": "— Extensions —",
+				"disabled": true
+			}
+		],
+		"hs": [
+			{
+				"separator": true
+			},
+			{
+				"label": "— Extensions —",
+				"disabled": true
+			}
+		],
+		"linux": []
+	},
+	"en_marker": "— Cancel —",
+	"fr_marker": "— Annuler —",
+	"nonempty_order": ["separator", "heading", "extension_group"],
+	"empty_rows": [],
+	"native_counts_before": [63, 97, 73],
+	"native_counts_after": [62, 95, 73]
+}

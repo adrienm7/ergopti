@@ -4826,3 +4826,154 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		'Generation boundaries: four actual constructors, authentic cross-platform absence and21 unchanged caption sets.'
 	);
 }
+
+// The extension-list boundary has two actual native owners, independent of its children.
+{
+	const assert = require('assert');
+	const manifest = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const contract = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/shortcut_extension_boundary.json'), 'utf8')
+	);
+	assert.deepStrictEqual(manifest[contract.section], contract.rows);
+	assert.deepStrictEqual(contract.projections.linux, []);
+	assert.deepStrictEqual(contract.nonempty_order, ['separator', 'heading', 'extension_group']);
+	for (const [driver, call] of [
+		['windows', 'MenuRenderer_TemplateRows'],
+		['macos', 'ManifestMenu.template_rows']
+	]) {
+		const source = readFileSync(
+			resolve(
+				REPO_ROOT,
+				'static/ergopti_plus',
+				driver,
+				'ui/menu/menu_shortcuts.' + (driver === 'windows' ? 'ahk' : 'lua')
+			),
+			'utf8'
+		);
+		assert.ok(
+			source.includes(call + '("' + contract.section + '"'),
+			driver + ': actual extension boundary owner'
+		);
+	}
+	for (const file of readdirSync(resolve(SHARED, 'data/locales')).filter((name) =>
+		name.endsWith('.json')
+	)) {
+		const locale = JSON.parse(readFileSync(resolve(SHARED, 'data/locales', file), 'utf8'));
+		assert.strictEqual(typeof locale[contract.caption_key], 'string');
+		assert.ok(locale[contract.caption_key].trim().length > 0);
+		assert.ok(locale[contract.caption_key] !== contract.caption_key);
+	}
+}
+
+// Independently pinned catalogue boundaries retain the real native family/sheet order.
+{
+	const assert = require('node:assert/strict');
+	const manifest = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/model_catalogue_boundaries.json'), 'utf8')
+	);
+	for (const key of ['family', 'origin']) {
+		const expected = corpus.boundaries[key];
+		assert.deepEqual(manifest[expected.section], expected.rows);
+		assert.deepEqual(expected.projections.linux, []);
+		for (const [driver, relative, call] of [
+			['windows', 'ui/menu/menu_llm/menu_models.ahk', 'MenuRenderer_TemplateRows'],
+			['macos', 'ui/menu/menu_llm/models_selector.lua', 'ManifestMenu.template_rows']
+		]) {
+			const source = readFileSync(
+				resolve(REPO_ROOT, 'static/ergopti_plus', driver, relative),
+				'utf8'
+			);
+			assert.ok(
+				source.includes(call + '("' + expected.section + '"'),
+				driver + ': actual catalogue boundary owner'
+			);
+		}
+	}
+	const providers = JSON.parse(readFileSync(resolve(SHARED, 'modules/llm/models.json'), 'utf8'));
+	const provider = providers.filter((item) => item.label === corpus.provider_caption);
+	assert.equal(provider.length, 1);
+	for (const [index, name] of [corpus.first_family_model, corpus.second_family_model].entries()) {
+		const admitted = provider[0].families[index].models.filter(
+			(model) => typeof model.urls.ollama === 'string' && model.urls.ollama.length > 0
+		);
+		assert.equal(admitted.length, 1);
+		assert.equal(admitted[0].name, name);
+	}
+	for (const file of readdirSync(LOCALES_DIR).filter((name) => name.endsWith('.json'))) {
+		const locale = JSON.parse(readFileSync(resolve(LOCALES_DIR, file), 'utf8'));
+		for (const key of corpus.caption_keys) {
+			assert.equal(typeof locale[key], 'string');
+			assert.ok(locale[key].trim().length > 0 && locale[key] !== key);
+		}
+	}
+}
+
+// Independent absent-module messages are disabled presentation, with native ownership untouched.
+{
+	const assert = require('node:assert/strict');
+	const menu = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const expected = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/linux_absent_modules.json'), 'utf8')
+	);
+	const source = readFileSync(
+		resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/menu_builder.lua'),
+		'utf8'
+	);
+	assert.equal(expected.owners.length, 5);
+	assert.equal(
+		expected.owners.reduce((count, owner) => count + owner.rows.length, 0),
+		6
+	);
+	for (const owner of expected.owners) {
+		assert.deepEqual(menu[owner.section], owner.rows);
+		assert.ok(source.includes('ManifestMenu.template_rows("' + owner.section + '"'));
+		assert.ok(
+			source.includes('if (' + owner.predicate + ')') ||
+				source.includes('if ' + owner.predicate + ' then')
+		);
+		for (const file of readdirSync(LOCALES_DIR).filter((name) => name.endsWith('.json'))) {
+			const locale = JSON.parse(readFileSync(resolve(LOCALES_DIR, file), 'utf8'));
+			for (const row of owner.rows) {
+				assert.equal(typeof locale[row.i18n], 'string');
+				assert.ok(locale[row.i18n].trim().length > 0 && locale[row.i18n] !== row.i18n);
+			}
+		}
+	}
+}
+
+// Actual hardware data and distinct native availability remain outside the inert boundary policy.
+{
+	const assert = require('node:assert/strict');
+	const expected = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/model_hardware_boundary.json'), 'utf8')
+	);
+	const menu = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	assert.deepEqual(menu[expected.section], expected.rows);
+	assert.deepEqual(expected.projections.linux, []);
+	const catalogue = JSON.parse(readFileSync(resolve(SHARED, 'modules/llm/models.json'), 'utf8'));
+	const actual = catalogue
+		.flatMap((provider) => provider.families.flatMap((family) => family.models))
+		.filter((model) => model.name === expected.native_model);
+	assert.equal(actual.length, 1);
+	assert.deepEqual(actual[0].hardware_requirements.ollama, expected.hardware_ollama);
+	assert.equal(typeof actual[0].urls.ollama, 'string');
+	assert.ok(actual[0].urls.ollama.length > 0);
+	for (const [driver, relative, call] of [
+		['windows', 'ui/menu/menu_llm/menu_models.ahk', 'MenuRenderer_TemplateRows'],
+		['macos', 'ui/menu/menu_llm/models_selector.lua', 'ManifestMenu.template_rows']
+	]) {
+		const source = readFileSync(
+			resolve(REPO_ROOT, 'static/ergopti_plus', driver, relative),
+			'utf8'
+		);
+		assert.ok(source.includes(call + '("' + expected.section + '"'));
+	}
+	for (const file of readdirSync(LOCALES_DIR).filter((name) => name.endsWith('.json'))) {
+		const locale = JSON.parse(readFileSync(resolve(LOCALES_DIR, file), 'utf8'));
+		for (const key of expected.caption_keys) {
+			assert.equal(typeof locale[key], 'string');
+			assert.ok(locale[key].trim().length > 0 && locale[key] !== key);
+		}
+	}
+}

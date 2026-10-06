@@ -4,6 +4,14 @@
 --- from the production decoder. Writes retain their byte and refusal owners.
 --- @param helpers table Driver test helpers.
 return function(helpers)
+	-- Source literals can lose their zero sign on some LuaJIT builds.
+	-- Establish the intended IEEE sign before calling any producer under test.
+	local function negative_zero()
+		local value = tonumber("-0.0")
+		helpers.assert_eq(type(value), "number", "negative-zero request must be numeric")
+		helpers.assert_eq(1 / value, -math.huge, "negative-zero request must retain its actual sign")
+		return value
+	end
 	local Codec = require("toml_codec.codec")
 	local Writer = require("toml_codec.writer")
 	local Paths = require("infra.paths")
@@ -207,7 +215,7 @@ return function(helpers)
 			local vectors = {
 				{ value = 0.12345678901234567, literal = "0.12345678901234566" },
 				{ value = 9007199254740992, literal = "9007199254740992" },
-				{ value = -0.0, literal = "-0.0" },
+				{ value = negative_zero(), literal = "-0.0" },
 			}
 			for _, vector in ipairs(vectors) do
 				local okay, detail, content = root_prepare('a.setting=0.25\nfuture.precise=0.1\nfuture.integer=9007199254740993\n',
@@ -225,7 +233,7 @@ return function(helpers)
 			local called, detail = pcall(function()
 				for _, replacement in ipairs({ "0.12345678901235", '"wrong kind"', "0.0" }) do
 					LeafRows.value_literal = function() return replacement end
-					local value = replacement == "0.0" and -0.0 or 0.12345678901234567
+					local value = replacement == "0.0" and negative_zero() or 0.12345678901234567
 					local okay, reason, content = root_prepare('a.setting=0.25\nfuture.keep=0.1\n', { section = "a", key = "setting", value = value })
 					helpers.assert_eq(okay, false, "valid syntax alone cannot acknowledge a wrong scalar")
 					helpers.assert_contains(reason, "differs from the requested value")
@@ -250,7 +258,7 @@ return function(helpers)
 		local vectors = {
 			{ name = "precise decimal", value = 0.12345678901234567, literal = "0.12345678901234566" },
 			{ name = "representable large integer", value = 9007199254740992, literal = "9007199254740992" },
-			{ name = "negative zero", value = -0.0, literal = "-0.0" },
+			{ name = "negative zero", value = negative_zero(), literal = "-0.0" },
 		}
 		for _, vector in ipairs(vectors) do
 			helpers.it("publishes exact " .. vector.name .. " under an existing header", function()
@@ -323,7 +331,7 @@ return function(helpers)
 			{ name = "all removals", source = 'a={one=false, two=true, three="keep"}\n', rows = { { section = "a", key = "one", delete = true }, { section = "a", key = "two", delete = true }, { section = "a", key = "three", delete = true } }, expected = 'a={}\n' },
 			{ name = "nested empty parent retained", source = 'a={child={only=false}, foreign=[]}\n', rows = { { section = "a.child", key = "only", delete = true } }, expected = 'a={child={}, foreign=[]}\n' },
 			{ name = "nested dotted inline member", source = 'a={child.setting=false, child.future=0.1, "literal.dot"={v=[]}}\n', rows = { { section = "a.child", key = "setting", value = true } }, expected = 'a={child.setting=true, child.future=0.1, "literal.dot"={v=[]}}\n' },
-			{ name = "disjoint edits", source = 'a={one=false, child={setting=0.25, future=0.1}, last="keep"}\n', rows = { { section = "a", key = "one", delete = true }, { section = "a.child", key = "setting", value = -0.0 }, { section = "a", key = "last", value = "changed" } }, expected = 'a={ child={setting=-0.0, future=0.1}, last="changed"}\n' },
+			{ name = "disjoint edits", source = 'a={one=false, child={setting=0.25, future=0.1}, last="keep"}\n', rows = { { section = "a", key = "one", delete = true }, { section = "a.child", key = "setting", value = negative_zero() }, { section = "a", key = "last", value = "changed" } }, expected = 'a={ child={setting=-0.0, future=0.1}, last="changed"}\n' },
 			{ name = "opaque escaped delimiters", source = 'a = { setting=false, "literal=key"="comma, hash# braces{}", text="escaped\\\"comma,", arrays=[{v=0.1}, []], map={n=9223372036854775807} } # keep\n', rows = { { section = "a", key = "setting", value = true } }, expected = 'a = { setting=true, "literal=key"="comma, hash# braces{}", text="escaped\\\"comma,", arrays=[{v=0.1}, []], map={n=9223372036854775807} } # keep\n' },
 			{ name = "quoted root owner", source = '"team=name" = { setting=false, future=1_234.500e-2 }', rows = { { section = '"team=name"', key = "setting", value = true } }, expected = '"team=name" = { setting=true, future=1_234.500e-2 }' },
 		}
@@ -336,7 +344,7 @@ return function(helpers)
 		end
 		helpers.it("retains every byte and signed zero of an exact root-inline no-op", function()
 			local source = 'a  =  { setting = -0.0 , future=9007199254740993 } # comment\n'
-			local okay, detail, content = inline_prepare(source, { { section = "a", key = "setting", value = -0.0 } })
+			local okay, detail, content = inline_prepare(source, { { section = "a", key = "setting", value = negative_zero() } })
 			helpers.assert_eq(okay, true, detail)
 			helpers.assert_eq(content, source)
 			local changed, reason, updated = inline_prepare(source, { { section = "a", key = "setting", value = 0 } })
@@ -449,7 +457,7 @@ return function(helpers)
 			{ name = "quoted header", source = '["a"."parent"] # header\nchild.setting=false\nfuture="unchanged"\n', rows = { { section = "a.parent.child", key = "setting", value = true } }, expected = '["a"."parent"] # header\nchild.setting = true\nfuture="unchanged"\n' },
 			{ name = "quoted literal header segment", source = '["literal.dot"]\nchild.setting=false\nfuture=0.1\n', rows = { { section = '"literal.dot".child', key = "setting", value = true } }, expected = '["literal.dot"]\nchild.setting = true\nfuture=0.1\n' },
 			{ name = "precise finite number", source = '[a]\nchild.setting=0.25\nchild.future=9007199254740993\n', rows = { { section = "a.child", key = "setting", value = 0.12345678901234567 } }, expected = '[a]\nchild.setting = 0.12345678901234566\nchild.future=9007199254740993\n' },
-			{ name = "negative zero", source = '[a]\nchild.setting=0.25\nchild.future=1.0\n', rows = { { section = "a.child", key = "setting", value = -0.0 } }, expected = '[a]\nchild.setting = -0.0\nchild.future=1.0\n' },
+			{ name = "negative zero", source = '[a]\nchild.setting=0.25\nchild.future=1.0\n', rows = { { section = "a.child", key = "setting", value = negative_zero() } }, expected = '[a]\nchild.setting = -0.0\nchild.future=1.0\n' },
 			{ name = "explicit leaf deletion", source = '[a]\nchild.setting=false\nchild.future=0.1 # foreign\n', rows = { { section = "a.child", key = "setting", delete = true } }, expected = '[a]\nchild.future=0.1 # foreign\n' },
 			{ name = "multiline scalar record", source = '[a]\nchild.setting="""line one\nline two"""\nchild.future=[]\n', rows = { { section = "a.child", key = "setting", value = "replacement" } }, expected = '[a]\nchild.setting = "replacement"\nchild.future=[]\n' },
 			{ name = "two separate scalar owners", source = '[a]\nchild.first=false\nchild.second="001"\nchild.future={}\n', rows = { { section = "a.child", key = "first", value = true }, { section = "a.child", key = "second", delete = true } }, expected = '[a]\nchild.first = true\nchild.future={}\n' },
@@ -464,7 +472,7 @@ return function(helpers)
 		end
 		helpers.it("retains the complete original section scalar no-op image", function()
 			local source = '["a"] # exact header\n child.setting = -0.0 # exact scalar\nchild.future=9007199254740993\n'
-			local okay, detail, content = section_prepare(source, { { section = "a.child", key = "setting", value = -0.0 } })
+			local okay, detail, content = section_prepare(source, { { section = "a.child", key = "setting", value = negative_zero() } })
 			helpers.assert_eq(okay, true, detail)
 			helpers.assert_eq(content, source)
 			helpers.assert_eq(1 / Codec.decode(content).a.child.setting, -math.huge)

@@ -6615,6 +6615,36 @@ id = "hotstring_file_open"
 i18n = "menu.hotstrings.open_file"
 disabled_when = ["hotstring_file_ready"]
 
+# The actual per-model hardware owners retain their distinct availability predicates.
+[[menu.llm_model_hardware_boundary]]
+type = "---"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+# Curated catalogue families and per-model origins retain their existing native boundaries.
+[[menu.llm_model_family_boundary]]
+type = "---"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.llm_model_origin_boundary]]
+type = "---"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+# Nonempty shortcut-extension menus retain the Windows/macOS presentation boundary.
+[[menu.shortcut_extension_boundary]]
+type = "---"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.shortcut_extension_boundary]]
+type = "section_header"
+id = "shortcut_extension_heading"
+i18n = "menu.extensions.header"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
 # Native generation groups retain their existing per-driver presentation boundaries.
 [[menu.llm_generation_count_boundary]]
 type = "---"
@@ -6821,6 +6851,49 @@ id = "tap_hold_key_hold_picker"
 i18n = "menu.tapholds.hold_arrow"
 caption_getter = "tap_hold_key_hold_caption"
 platforms = ["hs"]
+unavailable = "hide"
+
+# Native absent-module branches retain disabled status without acquiring an action.
+[[menu.linux_hotstrings_absent_rows]]
+type = "label"
+id = "linux_hotstrings_unavailable"
+i18n = "menu.hotstrings.unavailable"
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.linux_llm_absent_rows]]
+type = "label"
+id = "linux_llm_unavailable"
+i18n = "menu.llm.unavailable"
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.linux_llm_absent_rows]]
+type = "label"
+id = "linux_llm_start_hint"
+i18n = "menu.llm.ollama_start_hint"
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.linux_metrics_absent_rows]]
+type = "label"
+id = "linux_metrics_unavailable"
+i18n = "menu.metrics.unavailable"
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.linux_shortcuts_absent_rows]]
+type = "label"
+id = "linux_shortcuts_unavailable"
+i18n = "menu.shortcuts.unavailable"
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.linux_gestures_absent_rows]]
+type = "label"
+id = "linux_gestures_unavailable"
+i18n = "menu.gestures.unavailable"
+platforms = ["linux"]
 unavailable = "hide"
 
 # Linux's idle/unavailable migration readouts are inert, not dummy commands.
