@@ -4374,6 +4374,15 @@ integrated, then publish one grouped release.
   shared policy. Final native binding/order/caption and installed acceptance
   remain required; source review and the local portable gates are insufficient.
 
+  The current Windows fixture cohort checks the genuine shared-renderer
+  toggle route, captures and restores absent or present dependency state, and
+  loads the real English translation owner while restoring all eleven prior
+  locale references and flags. All 156 existing model/label assertions remain
+  intact; production menus, corpus expectations and locale sources are not
+  regenerated or changed. The component fixes are independently source-reviewed;
+  actual AHK/Win32 execution remains unrun locally and requires fresh Windows
+  CI. These fixture corrections leave all six group items partial.
+
   The Windows hardware-boundary fixture now uses the existing typed recursive
   \_LVS_DeepEqual comparator through AssertEqual with an empty mismatch result,
   replacing two calls to the undefined AssertDeepEqual helper. Both independent
