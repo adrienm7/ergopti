@@ -24,6 +24,7 @@ function M.new(dependencies)
 		or type(dependencies.deadline) ~= "function"
 		or type(dependencies.report) ~= "function" then return nil, "managed-http-initialization-invalid" end
 	if dependencies.redirect ~= nil and type(dependencies.redirect) ~= "function" then return nil, "managed-http-initialization-invalid" end
+	if dependencies.prepare_headers ~= nil and type(dependencies.prepare_headers) ~= "function" then return nil, "managed-http-initialization-invalid" end
 	local owned = {}
 	local coordinator = {}
 	local start_curl
@@ -32,18 +33,25 @@ function M.new(dependencies)
 	local expire
 	local request_cancel
 
+	--- Includes a tentative queued reservation without replacing its native owner.
+	local function reservation_current(record)
+		local incumbent = owned[record.owner]
+		return incumbent == record or (incumbent ~= nil and record.predecessor == incumbent
+			and incumbent.successor == record and not incumbent.options.owned_api)
+	end
+
 	--- Rechecks only the captured source under its original public reservation.
 	--- Caller reentry cannot authorize a retired/replaced/cancelled operation.
 	local function source_current(record)
-		if record.operation._cancelled or record.operation._settled or owned[record.owner] ~= record then return false end
+		if record.operation._cancelled or record.operation._settled or not reservation_current(record) then return false end
 		if not record.authorized then return true end
 		if record.authorization_revoked or record.authorizing or record.operation._cancelled
-			or record.operation._settled or owned[record.owner] ~= record then return false end
+			or record.operation._settled or not reservation_current(record) then return false end
 		record.authorizing = true
 		local called, accepted = pcall(record.authorized)
 		record.authorizing = false
 		local current = called and accepted == true and not record.operation._cancelled
-			and not record.operation._settled and owned[record.owner] == record
+			and not record.operation._settled and reservation_current(record)
 		if not current then record.authorization_revoked = true end
 		return current
 	end
@@ -107,7 +115,7 @@ function M.new(dependencies)
 	--- @param result table
 	local function finish(record, result)
 		if record.operation._settled or record.uncertain then return end
-		if record.admitted and not record.operation._cancelled and remaining(record) <= 0 then
+		if record.admitted and not record.prestart_refused and not record.operation._cancelled and remaining(record) <= 0 then
 			record.expired, record.visible_active = true, false
 			result = refusal("timeout")
 		end
@@ -128,15 +136,19 @@ function M.new(dependencies)
 			record.finalizing = false
 			if not ok or settled ~= true then return end
 		end
+		-- Accepted owned replacements retain the old physical debt too; invalid
+		-- preflight refusals were never admitted and leave the incumbent valid.
+		if record.predecessor and record.admitted and record.options.owned_api
+			and not record.predecessor.operation._settled then return end
 		-- A delayed timer close ACK cannot admit success past the original budget.
-		if record.admitted and not record.operation._cancelled and remaining(record) <= 0 then
+		if record.admitted and not record.prestart_refused and not record.operation._cancelled and remaining(record) <= 0 then
 			record.expired, record.visible_active = true, false
 			record.pending_result = refusal("timeout")
 		end
 		if record.authorized and not record.operation._cancelled then
 			record.admitting = true
 			if not source_current(record) then record.operation._cancelled = true end
-			if record.admitted and not record.operation._cancelled and remaining(record) <= 0 then
+			if record.admitted and not record.prestart_refused and not record.operation._cancelled and remaining(record) <= 0 then
 				record.expired, record.visible_active = true, false
 				record.pending_result = refusal("timeout")
 			end
@@ -177,16 +189,16 @@ function M.new(dependencies)
 	--- @return boolean
 	local function stop_child(record)
 		if not record.child then return true end
-		local ok, accepted
+		local ok, accepted, native_refusal
 		if record.stage == "proxy" then ok, accepted = pcall(record.child.cancel)
-		else ok, accepted = pcall(record.child.request_cancel, record.child) end
-		return ok and accepted == true
+		else ok, accepted, native_refusal = pcall(record.child.request_cancel, record.child) end
+		return ok and accepted == true, ok and native_refusal or nil
 	end
 
 	--- Expires one accepted operation while retaining every physical debt.
 	--- @param record table
 	expire = function(record)
-		if record.operation._settled or record.expired or record.operation._cancelled then return end
+		if record.operation._settled or record.expired or record.operation._cancelled or record.prestart_refused then return end
 		record.expired, record.visible_active = true, false
 		local result = refusal("timeout")
 		record.pending_result = result
@@ -246,8 +258,12 @@ function M.new(dependencies)
 			finish(record, refusal("cancelled"))
 			return record.operation._settled or record.deadline_close_accepted ~= false
 		end
-		local accepted = stop_child(record)
-		if not accepted and not record.options.owned_api and not previously_cancelled then
+		local accepted, native_refusal = stop_child(record)
+		local descriptor_refusal = record.stage == "curl" and record.prestart_refused
+			and record.child.started == false and native_refusal == "body-descriptor-retirement-pending"
+		-- Descriptor retirement can refuse after accepting logical revocation;
+		-- a failed process signal keeps the original boolean delivery law.
+		if not accepted and not descriptor_refusal and not record.options.owned_api and not previously_cancelled then
 			record.operation._cancelled = false
 		end
 		if accepted then record.visible_active = false end
@@ -333,11 +349,23 @@ function M.new(dependencies)
 		local choice = record.choices[record.choice]
 		if not choice then finish(record, refusal("proxy-selection-invalid")); return end
 		record.stage, record.child, record.result, record.done_received = "curl", nil, nil, false
+		record.construction_terminal = nil
 		record.generation = record.generation + 1
 		local generation = record.generation
 		local options = {}
 		for key, value in pairs(record.options) do options[key] = value end
 		options.owner, options.timeout_ms, options.proxy_selection = record.owner, budget, choice
+		if options.prepared_headers ~= nil then
+			if not dependencies.prepare_headers then finish(record, refusal("HTTP prepared headers unavailable")); return end
+			local called, token = pcall(dependencies.prepare_headers, options.prepared_headers, record.headers)
+			if owned[record.owner] ~= record or record.generation ~= generation or record.operation._cancelled or record.operation._settled then return end
+			if not called or type(token) ~= "table" then finish(record, refusal("HTTP prepared headers refused")); return end
+			options.prepared_headers = token
+			local adjusted = remaining(record)
+			if owned[record.owner] ~= record or record.generation ~= generation or record.operation._cancelled or record.operation._settled then return end
+			if adjusted <= 0 then expire(record); return end
+			options.timeout_ms = adjusted
+		end
 		options.single_hop_redirect, options.single_hop_receipt_bytes, options.single_hop_url_bytes = nil, nil, nil
 		if record.redirect_policy then
 			options.single_hop_redirect, options.follow_redirects = true, false
@@ -374,6 +402,10 @@ function M.new(dependencies)
 		end
 		options.on_native_terminal = function(result)
 			if owned[record.owner] ~= record or record.generation ~= generation then return end
+			-- A pre-start refusal can still own pipes, timers or descriptors.
+			-- Its original failure publishes through physical completion, while
+			-- an admitted native child keeps ordinary early logical terminals.
+			if record.constructing then record.construction_terminal = result; return end
 			logical_complete(record, result)
 		end
 		local function complete(result)
@@ -407,6 +439,18 @@ function M.new(dependencies)
 		end
 		record.child = child
 		record.operation.started = record.operation.started or child.started == true
+		local construction_terminal = record.construction_terminal
+		record.construction_terminal = nil
+		if construction_terminal and child.started == true then logical_complete(record, construction_terminal)
+		elseif type(construction_terminal) == "table" and construction_terminal.ok == false then
+			-- The actual child refused to start. Its failure already became
+			-- terminal before the deadline; cleanup is not a new timeout phase.
+			record.prestart_refused, record.pending_result = true, construction_terminal
+			local accepted, closed = pcall(record.deadline_child.cancel, record.deadline_child)
+			if not accepted or closed ~= true then
+				dependencies.report("Managed HTTP deadline cleanup refused; ownership retained.")
+			end
+		end
 		observe(record, generation)
 	end
 
@@ -416,7 +460,7 @@ function M.new(dependencies)
 		if not child_settled(record) then return end
 		if record.operation._cancelled then finish(record, refusal("cancelled")); return end
 		if not source_admitted(record) then return end
-		if record.expired or remaining(record) <= 0 then
+		if not record.prestart_refused and (record.expired or remaining(record) <= 0) then
 			expire(record)
 			finish(record, refusal("timeout"))
 			return
@@ -582,12 +626,21 @@ function M.new(dependencies)
 		if admission then
 			-- Reserve before caller source/preflight metadata. Unlike boolean
 			-- successors, this owner never cancels or probes a predecessor source.
-			if owned[record.owner] then
+			local incumbent = owned[record.owner]
+			-- Only a genuinely live regular request is replaceable. A logical
+			-- terminal, constructor refusal or cancelled/expired retirement debt
+			-- keeps its original pre-metadata cleanup-pending fence.
+			if incumbent and (incumbent.options.owned_api or incumbent.successor
+				or incumbent.admitted ~= true or incumbent.visible_active ~= true
+				or incumbent.logical_done or incumbent.operation._cancelled
+				or incumbent.expired or incumbent.prestart_refused) then
 				if admission.authorized then operation._settled = true
 				else finish(record, refusal("previous request cleanup pending")) end
 				return operation
 			end
-			owned[record.owner] = record
+			if incumbent then
+				incumbent.successor, record.predecessor = record, incumbent
+			else owned[record.owner] = record end
 			record.admitting, record.authorized = true, admission.authorized
 			local clocked, started = pcall(dependencies.clock)
 			if not clocked or type(started) ~= "number" or started ~= started or math.abs(started) == math.huge then
@@ -599,7 +652,7 @@ function M.new(dependencies)
 				record.admitting = false
 				finish(record, refusal("cancelled")); return operation
 			end
-			local prepared, native_options, preparation_error = pcall(admission.prepare)
+			local prepared, native_options, preparation_error, prepared_headers = pcall(admission.prepare)
 			if not source_admitted(record) then
 				record.admitting = false
 				finish(record, refusal("cancelled")); return operation
@@ -607,6 +660,16 @@ function M.new(dependencies)
 			if not prepared or type(native_options) ~= "table" then
 				record.admitting = false
 				finish(record, refusal(prepared and preparation_error or "owned request admission failed")); return operation
+			end
+			if prepared_headers ~= nil then
+				if type(prepared_headers) ~= "table" then
+					record.admitting = false
+					finish(record, refusal("HTTP prepared headers unavailable")); return operation
+				end
+				record.headers, headers = prepared_headers, prepared_headers
+			elseif native_options.prepared_headers ~= nil then
+				record.admitting = false
+				finish(record, refusal("HTTP prepared headers unavailable")); return operation
 			end
 			record.options = native_options
 		end
@@ -630,7 +693,7 @@ function M.new(dependencies)
 			local budget = remaining(record)
 			-- Boolean starts have not reserved an owner yet; owned admission has.
 			if record.operation._cancelled or record.operation._settled or record.generation ~= generation
-				or (admission and owned[record.owner] ~= record) then
+				or (admission and not reservation_current(record)) then
 				record.admitting = false
 				finish(record, refusal("cancelled")); return false
 			end
@@ -675,16 +738,44 @@ function M.new(dependencies)
 				record.admitting = false
 				finish(record, refusal("cancelled")); return operation
 			end
-			record.admitting = false
-			if record.operation._cancelled then finish(record, refusal("cancelled")); return operation end
-			if remaining(record) <= 0 then expire(record); return operation end
-			if owned[record.owner] ~= record or operation._cancelled or operation._settled then
-				finish(record, refusal("cancelled")); return operation
+			if record.operation._cancelled then
+				record.admitting = false; finish(record, refusal("cancelled")); return operation
 			end
-			if not route then finish(record, refusal(err or "proxy-environment-unavailable")); return operation end
+			local budget = remaining(record)
+			if not reservation_current(record) or operation._cancelled or operation._settled then
+				record.admitting = false; finish(record, refusal("cancelled")); return operation
+			end
+			if budget <= 0 then record.admitting = false; expire(record); return operation end
+			if not route then
+				record.admitting = false; finish(record, refusal(err or "proxy-environment-unavailable")); return operation
+			end
 			record.route, record.admitted, record.visible_active = route, true, true
-			if not arm_deadline(record) then return operation end
-			dispatch_route(record, route)
+			-- Keep the tentative successor fenced while timer ports may reenter
+			-- predecessor settlement. Its absolute wait budget is already running.
+			if not arm_deadline(record) then
+				record.admitting = false
+				-- Failed arming never accepts a replacement or cancels its valid
+				-- predecessor; the exact allocated timer debt remains linked.
+				if record.deadline_failed then record.admitted = false end
+				if record.pending_result then finish(record, record.pending_result) end
+				return operation
+			end
+			if record.operation._cancelled or record.expired then
+				record.admitting = false; finish(record, record.pending_result or refusal("cancelled")); return operation
+			end
+			local incumbent = record.predecessor
+			if incumbent then
+				operation.started = true
+				if not request_cancel(incumbent) then
+					operation.started, record.admitted, record.visible_active, record.admitting = false, false, false, false
+					finish(record, refusal("previous request cancellation failed")); return operation
+				end
+			end
+			record.admitting = false
+			if record.operation._cancelled or record.operation._settled or record.expired then
+				finish(record, record.pending_result or refusal("cancelled")); return operation
+			end
+			if not record.predecessor then dispatch_route(record, route) end
 			return operation
 		end
 		if not route then finish(record, refusal(err or "proxy-environment-unavailable")); return operation end

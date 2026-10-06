@@ -41,6 +41,7 @@ local function initialize()
 	coordinator, initialization_error = Managed.new({
 		policy = policy, proxy = Proxy, curl = Curl.dispatch_owned, redirect = RedirectBinding.load,
 		clock = Monotonic.now_ms, deadline = Deadline.start, environment = PolicyBinding.environment,
+		prepare_headers = Curl.rebind_prepared_headers,
 		report = function(message) Logger.error(LOG, "%s", message) end,
 	})
 	return coordinator, initialization_error
@@ -89,12 +90,15 @@ local function dispatch(url, headers, body, options, method, buffered, owned_api
 	local request = {}
 	for key, value in pairs(type(options) == "table" and options or {}) do request[key] = value end
 	request.single_hop_redirect, request.single_hop_receipt_bytes, request.single_hop_url_bytes = nil, nil, nil
+	request.prepared_headers = nil
 	request.owner = owner_name(request.owner)
 	request.timeout_ms = tonumber(request.timeout_ms) or Curl.default_timeout_ms()
 	if request.timeout_ms <= 0 or request.timeout_ms % 1 ~= 0 then return rejected("HTTP timeout is invalid", callback) end
 	request.method, request.buffered, request.owned_api = method, buffered, owned_api
-	local allowed, err = Curl.preflight(url, headers, body, request)
+	local allowed, err, token, prepared = Curl.preflight(url, headers, body, request)
 	if not allowed then return rejected(err, callback) end
+	if type(token) ~= "table" or type(prepared) ~= "table" then return rejected("HTTP prepared headers unavailable", callback) end
+	request.prepared_headers, headers = token, prepared
 	local active, initialization_refusal = initialize()
 	if not active then return rejected(initialization_refusal, callback) end
 	return active.start(url, headers, body, request, on_chunk, callback)
@@ -124,12 +128,15 @@ local function dispatch_owned(url, headers, body, options, method, buffered, on_
 			for key, value in next, options do captured[key] = value end
 		end
 		captured.single_hop_redirect, captured.single_hop_receipt_bytes, captured.single_hop_url_bytes = nil, nil, nil
+		captured.prepared_headers = nil
 		captured.owner, captured.timeout_ms = owner, timeout
 		captured.method, captured.buffered, captured.owned_api = method, buffered, true
 		captured.authorized = authorized
-		local allowed, err = Curl.preflight(url, headers, body, captured)
+		local allowed, err, token, prepared = Curl.preflight(url, headers, body, captured)
 		if not allowed then return nil, err end
-		return captured
+		if type(token) ~= "table" or type(prepared) ~= "table" then return nil, "HTTP prepared headers unavailable" end
+		captured.prepared_headers = token
+		return captured, nil, prepared
 	end
 	return active.start(url, headers, body, request, on_chunk, callback,
 		{ authorized = authorized, prepare = prepare })

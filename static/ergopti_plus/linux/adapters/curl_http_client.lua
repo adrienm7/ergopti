@@ -23,6 +23,7 @@ local Timings = require("infra.timings")
 local ProcessGroup = require("infra.libuv_process_group")
 local RedirectPolicy = require("infra.http_redirect_policy")
 local HeaderPolicy = require("infra.http_header_policy")
+local HeaderSnapshot = require("network.http_headers")
 local TransportPolicy = require("infra.http_transport_policy")
 local LOG = "adapters.http_client"
 
@@ -44,6 +45,8 @@ local STATUS_MARKER = "ERGOPTI_HTTP_STATUS:"
 local PROXY_MARKER = "ERGOPTI_PROXY_STATUS:"
 local NATIVE_TRAILER_BYTES = #STATUS_MARKER + #PROXY_MARKER + 32
 local MAX_SAFE_INTEGER = 9007199254740991
+-- Only genuine preflight capabilities can reuse admitted private header bytes.
+local prepared_headers = setmetatable({}, { __mode = "k" })
 
 --- Exposes the existing native default to the private managed wrapper.
 --- @return number
@@ -500,18 +503,27 @@ local function curl_args(url, headers, body, options)
 			lines[#lines + 1] = 'noproxy = "*"'
 		end
 	end
-	local names = {}
-	for name in pairs(headers) do names[#names + 1] = name end
-	table.sort(names)
-	for _, name in ipairs(names) do
-		local header_name, header_value = tostring(name), tostring(headers[name])
-		local allowed, err = HeaderPolicy.validate(header_name, header_value)
-		if not allowed then error(err) end
-		-- Curl's empty colon form removes a field; semicolon sends an empty
-		-- value, preserving the caller's distinction between present and absent.
-		local wire_header = header_value:match("^[ \t]*$") and header_name .. ";"
-			or header_name .. ": " .. header_value
-		lines[#lines + 1] = "header = " .. config_quote(wire_header)
+	local prepared = options.prepared_headers and prepared_headers[options.prepared_headers]
+	if options.prepared_headers then
+		if not prepared or not HeaderSnapshot.matches(headers, prepared.view) then error("HTTP prepared headers refused") end
+		for _, row in ipairs(prepared.rows) do
+			local wire_header = row.value:match("^[ \t]*$") and row.name .. ";" or row.name .. ": " .. row.value
+			lines[#lines + 1] = "header = " .. config_quote(wire_header)
+		end
+	else
+		local names = {}
+		for name in pairs(headers) do names[#names + 1] = name end
+		table.sort(names)
+		for _, name in ipairs(names) do
+			local header_name, header_value = tostring(name), tostring(headers[name])
+			local allowed, err = HeaderPolicy.validate(header_name, header_value)
+			if not allowed then error(err) end
+			-- Curl's empty colon form removes a field; semicolon sends an empty
+			-- value, preserving the caller's distinction between present and absent.
+			local wire_header = header_value:match("^[ \t]*$") and header_name .. ";"
+				or header_name .. ": " .. header_value
+			lines[#lines + 1] = "header = " .. config_quote(wire_header)
+		end
 	end
 	-- Curl config lines are limited to 10 MB. A separate inherited pipe carries
 	-- admitted caller text without putting it in a config line, argv or a file.
@@ -810,7 +822,14 @@ local function admit_metadata(url, headers, body, options)
 		end
 	end
 	local timeout_ms = tonumber(options.timeout_ms) or DEFAULT_TIMEOUT_MS
+	if options.prepared_headers ~= nil then
+		local prepared = prepared_headers[options.prepared_headers]
+		if not prepared or not HeaderSnapshot.matches(headers, prepared.view) then
+			return nil, "HTTP prepared headers refused"
+		end
+	end
 	local request_options = {
+		prepared_headers = options.prepared_headers,
 		protocols = protocols,
 		buffered = options.buffered == true,
 		method = options.method or "POST",
@@ -877,11 +896,30 @@ end
 function M.preflight(url, headers, body, options)
 	local normalized, err = admit_metadata(url, headers, body, options)
 	if not normalized then return false, err end
-	local composed, argv = pcall(curl_args, url, headers, body, normalized)
+	local captured, rows, view = pcall(HeaderSnapshot.capture, headers, HeaderPolicy.validate)
+	if not captured then return false, "curl configuration refused" end
+	local token = {}
+	prepared_headers[token] = { rows = rows, view = view }
+	normalized.prepared_headers = token
+	local composed, argv = pcall(curl_args, url, view, body, normalized)
 	if not composed then return false, "curl configuration refused" end
 	local refused = ShellRunner.validate_spawn_args(normalized.curl_executable, argv)
 	if refused ~= "" then return false, "curl argument vector refused: " .. refused end
-	return true
+	return true, nil, token, HeaderSnapshot.copy(view)
+end
+
+--- Rebinds an admitted snapshot after canonical redirect field removal.
+--- @param token table Genuine private header capability.
+--- @param headers table Detached string subset.
+--- @return table|nil New private capability; no caller values are evaluated.
+function M.rebind_prepared_headers(token, headers)
+	local prepared = prepared_headers[token]
+	if not prepared then return nil end
+	local rows, view = HeaderSnapshot.subset(prepared.rows, prepared.view, headers)
+	if not rows then return nil end
+	local rebound = {}
+	prepared_headers[rebound] = { rows = rows, view = view }
+	return rebound
 end
 
 --- Starts one asynchronous curl process.
@@ -1362,6 +1400,13 @@ local function owned_request(url, headers, body, options, on_chunk, on_done, met
 		if not request.terminal then
 			finish(request, { ok = false, status = 0, body = "", error = "cancelled" }, true)
 		else retry_owned_cleanup(request) end
+		-- A refused construction owns its exact anonymous-pipe descriptors even
+		-- when cancellation intent is accepted. Return the native retirement
+		-- refusal, never claim descriptor closure from logical revocation.
+		if request.terminal and not request.spawned
+			and (request.body_readfd ~= nil or request.body_writefd ~= nil) then
+			return false, "body-descriptor-retirement-pending"
+		end
 		return true
 	end
 	function operation:cancel()

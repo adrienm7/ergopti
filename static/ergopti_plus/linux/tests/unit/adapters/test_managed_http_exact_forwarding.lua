@@ -20,8 +20,16 @@ end
 
 local function start(capabilities, options)
 	local wire = { starts = 0, results = {} }
-	local Curl = { HAS_ASYNC = true, default_timeout_ms = function() return 1000 end,
-		preflight = function() return true end }
+	local prepared = setmetatable({}, { __mode = "k" })
+	local Curl = { HAS_ASYNC = true, default_timeout_ms = function() return 1000 end }
+	function Curl.preflight()
+		local token = {}; prepared[token] = true
+		return true, nil, token, {}
+	end
+	function Curl.rebind_prepared_headers(token)
+		if not prepared[token] then return nil end
+		local rebound = {}; prepared[rebound] = true; return rebound
+	end
 	function Curl.dispatch_owned(_, _, _, admitted, _, done)
 		wire.starts, wire.options = wire.starts + 1, admitted
 		local child, listeners = { started = true }, {}
