@@ -630,7 +630,7 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 			"CFBundleName": "ErgoptiPlus", "CFBundleExecutable": "PrivateSparkleChild",
 			"CFBundlePackageType": "APPL", "CFBundleVersion": version,
 			"CFBundleShortVersionString": version + ".0",
-			"FixtureRoot": root.path, "FixtureNonce": nonce,
+			"FixtureRoot": try ownedCensusPath(root), "FixtureNonce": nonce,
 			"FixtureGitHubOwner": identity.owner, "FixtureGitHubRepo": identity.name,
 			"FixtureArchiveOrigin": identity.archiveOrigin,
 			"FixtureArchiveTransport": "http://localhost:" + String(port) + "/archive.tar.xz",

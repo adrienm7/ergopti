@@ -217,17 +217,27 @@ guard let rootPath = Bundle.main.object(forInfoDictionaryKey: "FixtureRoot") as?
 	fputs("Private Sparkle child configuration refused.\n", stderr)
 	exit(78)
 }
-let root = URL(fileURLWithPath: rootPath).resolvingSymlinksInPath()
-guard root.path == rootPath else {
+// Keep native path spelling as a String. Foundation can project a /private
+// path back to its alias even after resolving a URL; that is not a new root.
+private func nativeDirectoryPath(_ path: String) -> String? {
+	guard let resolved = Darwin.realpath(path, nil) else { return nil }
+	defer { free(resolved) }
+	var metadata = stat()
+	guard Darwin.lstat(resolved, &metadata) == 0,
+		metadata.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR) else { return nil }
+	return String(validatingUTF8: resolved)
+}
+guard let nativeRoot = nativeDirectoryPath(rootPath), nativeRoot == rootPath else {
 	fputs("SPARKLE_CHILD_REFUSAL/1 target-root\n", stderr)
 	fputs("Private Sparkle child target refused.\n", stderr)
 	exit(78)
 }
-guard Bundle.main.bundleURL.resolvingSymlinksInPath() == root.appendingPathComponent("installed/ErgoptiPlus.app") else {
+guard nativeDirectoryPath(Bundle.main.bundleURL.path) == nativeRoot + "/installed/ErgoptiPlus.app" else {
 	fputs("SPARKLE_CHILD_REFUSAL/1 target-bundle\n", stderr)
 	fputs("Private Sparkle child target refused.\n", stderr)
 	exit(78)
 }
+let root = URL(fileURLWithPath: nativeRoot)
 let application = NSApplication.shared
 application.setActivationPolicy(.accessory)
 let delegate = PrivateArchiveChild(root: root, nonce: nonce, version: version)

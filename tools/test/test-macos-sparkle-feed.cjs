@@ -1728,10 +1728,13 @@ try {
 			'One literal failed-branch category emission'
 		);
 	}
-	assert.match(child, /guard root\.path == rootPath else/);
 	assert.match(
 		child,
-		/guard Bundle\.main\.bundleURL\.resolvingSymlinksInPath\(\) == root\.appendingPathComponent\("installed\/ErgoptiPlus.app"\) else/
+		/guard let nativeRoot = nativeDirectoryPath\(rootPath\), nativeRoot == rootPath else/
+	);
+	assert.match(
+		child,
+		/guard nativeDirectoryPath\(Bundle\.main\.bundleURL\.path\) == nativeRoot \+ "\/installed\/ErgoptiPlus.app" else/
 	);
 	assert.match(child, /try stream\.close\(\)[\s\S]*guard link\(stage\.path, target\.path\) == 0/);
 	const fixed = 'Native Sparkle child refusal: category=target-root';
@@ -1774,6 +1777,65 @@ try {
 	errors.push(`Native Sparkle child refusal visibility guard failed: ${error.message}`);
 }
 // SPARKLE_CHILD_REFUSAL_VISIBILITY_END
+
+// SPARKLE_CHILD_POSIX_ADMISSION_BEGIN
+// The signed root is the captured native directory, not a Foundation alias.
+try {
+	const assert = require('node:assert/strict');
+	const fixture = fs.readFileSync(
+		path.join(
+			root,
+			'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/SparkleArchiveUpdateAcceptanceTests.swift'
+		),
+		'utf8'
+	);
+	const child = fs.readFileSync(
+		path.join(root, 'tools/diagnostics/macos_sparkle_archive_child.swift'),
+		'utf8'
+	);
+	function assertNativeChildPaths(signed, receiver) {
+		assert.match(signed, /"FixtureRoot": try ownedCensusPath\(root\), "FixtureNonce": nonce/);
+		const start = receiver.indexOf('private func nativeDirectoryPath(_ path: String) -> String? {');
+		const end = receiver.indexOf('\nlet application = NSApplication.shared', start);
+		assert.ok(start >= 0 && end > start, 'The native admission precedes application startup');
+		const admission = receiver.slice(start, end);
+		assert.match(admission, /Darwin\.realpath\(path, nil\)/);
+		assert.match(admission, /defer \{ free\(resolved\) \}/);
+		assert.match(admission, /Darwin\.lstat\(resolved, &metadata\) == 0/);
+		assert.match(admission, /metadata\.st_mode & mode_t\(S_IFMT\) == mode_t\(S_IFDIR\)/);
+		assert.match(admission, /return String\(validatingUTF8: resolved\)/);
+		assert.match(
+			admission,
+			/guard let nativeRoot = nativeDirectoryPath\(rootPath\), nativeRoot == rootPath else/
+		);
+		assert.match(
+			admission,
+			/guard nativeDirectoryPath\(Bundle\.main\.bundleURL\.path\) == nativeRoot \+ "\/installed\/ErgoptiPlus.app" else/
+		);
+		assert.doesNotMatch(admission, /resolvingSymlinksInPath|standardized|root\.path == rootPath/);
+	}
+	assertNativeChildPaths(fixture, child);
+	for (const [before, after] of [
+		['"FixtureRoot": try ownedCensusPath(root)', '"FixtureRoot": root.path']
+	]) {
+		assert.equal(fixture.split(before).length - 1, 1);
+		assert.throws(() => assertNativeChildPaths(fixture.replace(before, after), child));
+	}
+	for (const [before, after] of [
+		['nativeRoot == rootPath else', 'nativeRoot != rootPath else'],
+		['nativeRoot + "/installed/ErgoptiPlus.app"', 'nativeRoot + "/source/ErgoptiPlus.app"'],
+		[
+			'return String(validatingUTF8: resolved)',
+			'return URL(fileURLWithPath: path).resolvingSymlinksInPath().path'
+		]
+	]) {
+		assert.equal(child.split(before).length - 1, 1);
+		assert.throws(() => assertNativeChildPaths(fixture, child.replace(before, after)));
+	}
+} catch (error) {
+	errors.push(`Native Sparkle POSIX child admission guard failed: ${error.message}`);
+}
+// SPARKLE_CHILD_POSIX_ADMISSION_END
 
 if (errors.length > 0) {
 	for (const error of errors) console.error(`[FAIL] ${error}`);
