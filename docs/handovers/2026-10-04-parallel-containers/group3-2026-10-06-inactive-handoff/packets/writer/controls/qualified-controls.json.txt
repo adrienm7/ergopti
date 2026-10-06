@@ -1,0 +1,42 @@
+[
+  {
+    "name": "luajit-preimages-qualified",
+    "exit": 1,
+    "summary": "OUTPUT_OWNER 20 27"
+  },
+  {
+    "name": "luajit-candidate-qualified",
+    "exit": 0,
+    "summary": "OUTPUT_OWNER 47 0"
+  },
+  {
+    "name": "luajit-omit-literal-write-ack",
+    "exit": 1,
+    "summary": "OUTPUT_OWNER 45 2"
+  },
+  {
+    "name": "luajit-omit-constructor-reservation",
+    "exit": 1,
+    "summary": "OUTPUT_OWNER 45 2"
+  },
+  {
+    "name": "lua5.4-preimages-qualified",
+    "exit": 1,
+    "summary": "OUTPUT_OWNER 20 27"
+  },
+  {
+    "name": "lua5.4-candidate-qualified",
+    "exit": 0,
+    "summary": "OUTPUT_OWNER 47 0"
+  },
+  {
+    "name": "lua5.4-omit-literal-write-ack",
+    "exit": 1,
+    "summary": "OUTPUT_OWNER 45 2"
+  },
+  {
+    "name": "lua5.4-omit-constructor-reservation",
+    "exit": 1,
+    "summary": "OUTPUT_OWNER 45 2"
+  }
+]

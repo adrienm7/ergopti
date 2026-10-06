@@ -126,3 +126,97 @@ _SMB_ExtensionBoundary() {
 	}
 }
 Test("shortcut extension boundary: authentic allocator and native submenu (extension-boundary)", _SMB_ExtensionBoundary)
+
+
+/** Exercises the real personal registry and native submenu through its shared frame. */
+_SMB_PersonalShortcutFrame() {
+	global _PersonalShortcutsRegistry, Features, CategoryEnabled, _SharedDir
+	global _MenuPopulationBuilding, _MenuPopulationPublished, _MenuDispatchCallbacks
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\personal_shortcuts_frame.json", "UTF-8"))
+	SavedRegistry := IsSet(_PersonalShortcutsRegistry) ? _PersonalShortcutsRegistry : unset
+	SavedFeatures := Features, SavedCategories := CategoryEnabled
+	State := MasterGateState(), SavedState := State.Clone()
+	SavedBuilding := _MenuPopulationBuilding, SavedPublished := _MenuPopulationPublished
+	Definition := _MM_GetManifestRoot(), Frame := _MR_GetMenuDef(Corpus["section"])
+	Heading := Frame[2]
+	Native := Menu()
+	try {
+		_MenuPopulationBuilding := false, _MenuPopulationPublished := false
+		State["initialized"] := false
+		Features := Map("shortcuts", Map("personal", Map()))
+		CategoryEnabled := Map("Shortcuts", true)
+		_PersonalShortcutsRegistry := Map()
+		_AppendPersonalShortcutsSubmenuIfAny(Native)
+		AssertEqual(Corpus["absent_registry_count"], _MenuItemCount(Native))
+		_PersonalShortcutsRegistry := Map("__Order", [])
+		_AppendPersonalShortcutsSubmenuIfAny(Native)
+		AssertEqual(Corpus["empty_registry_count"], _MenuItemCount(Native))
+		RegisterPersonalFeature(Corpus["registered_names"][1], true, Corpus["registered_labels"][1])
+		RegisterPersonalFeature(Corpus["registered_names"][2], true)
+		AssertEqual(false, Features["shortcuts"]["personal"][Corpus["registered_names"][1]])
+		AssertEqual(false, Features["shortcuts"]["personal"][Corpus["registered_names"][2]])
+		_AppendPersonalShortcutsSubmenuIfAny(Native)
+		AssertEqual(Corpus["populated_frame_count"], _MenuItemCount(Native))
+		AssertTrue(TrayMenuIsSeparatorAt(Native, 0))
+		AssertEqual(t(Heading["i18n"]), _MP_ReadLabel(Native, 1))
+		ChildHandle := DllCall("GetSubMenu", "ptr", Native.Handle, "int", 1, "ptr")
+		Assert(ChildHandle != 0, "the registered rows remain an actual submenu")
+		AssertEqual(2, DllCall("GetMenuItemCount", "ptr", ChildHandle, "int"))
+		for Index, ExpectedLabel in Corpus["registered_labels"] {
+			Text := Buffer(512, 0)
+			DllCall("GetMenuStringW", "ptr", ChildHandle, "uint", Index - 1, "ptr", Text,
+				"int", 256, "uint", 0x400)
+			AssertEqual(ExpectedLabel, StrGet(Text, "UTF-16"))
+			CommandId := DllCall("GetMenuItemID", "ptr", ChildHandle, "int", Index - 1, "uint")
+			Assert(_MenuDispatchCallbacks.Has(CommandId), "every real switch retains a dispatch callback")
+		}
+		_CTC_ReleaseMenu(Native)
+		Native := Menu()
+		Frame[2] := Map("type", "group", "id", Heading["id"], "i18n", Corpus["marker_key"],
+			"platforms", Heading["platforms"], "unavailable", "hide")
+		_AppendPersonalShortcutsSubmenuIfAny(Native)
+		AssertEqual(t(Corpus["marker_key"]), _MP_ReadLabel(Native, 1),
+			"the actual provider consumes the current shared caption")
+		_CTC_ReleaseMenu(Native)
+		Native := Menu()
+		Definition.Delete(Corpus["section"])
+		_AppendPersonalShortcutsSubmenuIfAny(Native)
+		AssertEqual(0, _MenuItemCount(Native), "a missing frame cannot synthesize native fixed rows")
+		Definition[Corpus["section"]] := [Map("type", "command", "id", Heading["id"], "i18n", Heading["i18n"])]
+		_AppendPersonalShortcutsSubmenuIfAny(Native)
+		AssertEqual(0, _MenuItemCount(Native), "an unbound command cannot become a child group")
+		Definition[Corpus["section"]] := Frame
+		Frame[2] := Heading
+		_AppendPersonalShortcutsSubmenuIfAny(Native)
+		AssertEqual(Corpus["populated_frame_count"], _MenuItemCount(Native), "repair keeps the real registry")
+		AssertEqual(t(Heading["i18n"]), _MP_ReadLabel(Native, 1))
+		AssertEqual(2, _PersonalShortcutsRegistry["__Order"].Length)
+	} finally {
+		Definition[Corpus["section"]] := Frame
+		Frame[2] := Heading
+		_CTC_ReleaseMenu(Native)
+		_PersonalShortcutsRegistry := IsSet(SavedRegistry) ? SavedRegistry : unset
+		Features := SavedFeatures, CategoryEnabled := SavedCategories
+		State.Clear()
+		for Key, Value in SavedState
+			State[Key] := Value
+		_MenuPopulationBuilding := SavedBuilding, _MenuPopulationPublished := SavedPublished
+	}
+}
+Test("personal shortcut frame: real registration, shared caption and refusal repair", _SMB_PersonalShortcutFrame)
+
+/** Keeps actual child callbacks and a valid empty group when projecting the fixed frame. */
+_SMB_PersonalShortcutFrameChildren() {
+	Children := [], Callback := (*) => true
+	Rows := MenuRenderer_TemplateRows("personal_shortcuts_frame", Map(), Map(),
+		Map("personal_shortcuts_registered", Children))
+	AssertEqual(2, Rows.Length)
+	Assert(ObjPtr(Children) == ObjPtr(Rows[2]["items"]), "empty data is the existing actual child array")
+	Children.Push(Map("label", "Child callback", "action", Callback, "checked", true))
+	Rows := MenuRenderer_TemplateRows("personal_shortcuts_frame", Map(), Map(),
+		Map("personal_shortcuts_registered", Children))
+	Assert(ObjPtr(Callback) == ObjPtr(Rows[2]["items"][1]["action"]))
+	AssertTrue(Rows[2]["items"][1]["checked"])
+	AssertFalse(MenuRenderer_TemplateRows("personal_shortcuts_frame", Map(), Map(), Map()))
+}
+Test("personal shortcut frame: original child identity, callbacks and empty array", _SMB_PersonalShortcutFrameChildren)
