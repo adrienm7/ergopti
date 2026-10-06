@@ -6042,6 +6042,41 @@ artifact-row or E2E case count is claimed. Final integrated three-OS
 qualification, discovery/automation completion and device acceptance remain
 open; this does not complete item106 or the other partial items.
 
+Integrated run37462985994 (CI036bbff29, exact Dev2dc6f9d6b tree) passed all
+9,715 Windows unit checks, E2E, packaging, compiled startup and crash smoke.
+The separate23-case compiled programmable-hotstring acceptance had22 passes
+and one failure before disable; its owner has the exact evidence. macOS passed
+all14 native owned-program cases and21 signed Hammerspoon inventory cases;
+this inventory does not prove program invocation, atomic leases or effective
+ACL behavior. Native Shortcuts discovery remained refused and invocation
+unqualified. Linux units passed9,126/0, while the original GTK identity cases
+passed3/4: the first ordinary-app receipt was not observed, with no precise
+launcher failure cause proved. Package and installation acceptance remains
+incomplete across the integrated OS lanes; Release was skipped.
+
+This slice adds a transparent observer around the actual PATH-selected GTK
+command, forwarding the exact original arguments and native status. Capped,
+closed command-entry, operand-boundary, terminal-status and launcher-entry
+facts diagnose failure without publishing paths or receipt payloads. Failed
+diagnostic writes preserve the genuine native outcome. The whole original
+worker, all assertions, four identities,100 reads,20ms sleeps and10s/5s native
+budgets remain unchanged. Local actual GTK passes4/4; four real marker-write
+refusals and two genuine CLI diagnostic-publication refusals preserve original
+receipts/status/stdout. All12 adopted descendants are physically reaped with
+zero pending/rescue debt;15 closed-parser controls pass. Hosted execution of
+this observer is still required, and its output cannot complete item106.
+
+After this prepared slice was pushed, upstream2afdf3039 introduced structured
+GTK command, native stderr and polling diagnostics. Its entire fixture and
+new diagnostic owner are preserved during the current Dev merge; the earlier
+58690cd9 observer is superseded rather than layered onto another wrapper.
+The old four-case/refusal controls qualify only that historical observer.
+Current GTK sources require fresh hosted qualification, with the original
+identity oracle and poll window retained. Upstream ETag, typing-consumer and
+macOS acceptance/diagnostic corrections are preserved; macOS also requires
+qualification on these new sources. The atomic PID publication correction
+remains active. No TODO item is completed by this diagnostic preparation.
+
 - [~] **107.** Make the number-row policy explicit: native behavior, digits
   directly or symbols directly, with an acknowledged migration of the old
   Windows Boolean and preserved unrelated settings. The earlier Boolean slice
@@ -6585,6 +6620,22 @@ Four original controls and ten independent delayed/synchronous refusal controls
 pass on Lua5.4 and LuaJIT; seven of the new controls fail on the prior source.
 These injected callback cases do not qualify physical timer APIs or complete
 item111; finite default deadlines and the native display requirements remain.
+
+Integrated run37462985994 at CI036bbff29 (exact Dev2dc6f9d6b tree) passed the
+first five native supervision cases, then failed the external helper-loss
+case before all34 cursor-window cases could execute. The failure was the
+original five-unique-PID assertion, not a measured window operation failure.
+Generated child and parent PID receipts could be observed before their writers
+completed. This slice stages both receipts privately, closes the original
+writer and atomically publishes the completed bytes. All46 original assertion
+ASTs, cases, readers, native calls, cleanup and budgets remain unchanged.
+Two real direct-child fork barriers expose the old incomplete publications
+(expected red) and pass after the correction, with exact reaping, descriptor
+and namespace acknowledgement and zero debt. This proves the publication race,
+not the exact earlier hosted schedule or complete native family recovery.
+The container still refuses the full /proc child-census prerequisite; the
+unchanged five supervision cases, external recovery and all34 window cases
+require hosted qualification. This does not complete item111 or items16/38.
 
 ## Time estimate
 
