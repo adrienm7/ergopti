@@ -1664,6 +1664,105 @@ checkPrivacyTriggerControls();
 	);
 }
 
+// Limit structural proofs to the genuine native provider and its private data helpers.
+function profileFrameOwnerSource(source, platform) {
+	const tokens = require('../lib/script-source.cjs').scriptTokens(
+		source,
+		platform === 'ahk' ? '.ahk' : '.lua'
+	);
+	const [start, end] =
+		platform === 'ahk'
+			? [
+					['_LLM_Menu_ProfileRows', '(', ')', '{'],
+					['_LLM_Menu_PerAppProfileRows', '(', ')', '{']
+				]
+			: platform === 'hs'
+				? [
+						['local', 'function', 'build_profile_menu', '('],
+						['function', 'M', '.', 'new', '(']
+					]
+				: [
+						['dynamic_handlers', '[', 'llm_profile', ']', '=', 'function'],
+						['dynamic_handlers', '[', 'llm_display', ']', '=', 'function']
+					];
+	function matches(at, values) {
+		if (tokens[at - 1]?.kind === 'symbol' && ['.', ':'].includes(tokens[at - 1].value))
+			return false;
+		return values.every((value, offset) => {
+			const token = tokens[at + offset];
+			if (platform === 'ahk' && offset === 0 && token) {
+				const before = source.charCodeAt(token.start - 1);
+				if (before > 0x7f || /[A-Za-z0-9_]/.test(source[token.start - 1] || '')) return false;
+			}
+			const string = platform === 'linux' && offset === 2;
+			const kind = string ? 'string' : /^[A-Za-z_]\w*$/.test(value) ? 'identifier' : 'symbol';
+			return token?.kind === kind && token.value === value;
+		});
+	}
+	const starts = tokens.map((_, at) => at).filter((at) => matches(at, start));
+	if (starts.length !== 1) return '';
+	const at = starts[0];
+	const until = tokens.findIndex((_, index) => index > at && matches(index, end));
+	return until > at ? source.slice(tokens[at].start, tokens[until].start) : '';
+}
+
+// Actual provider -> ordered frame -> exact shared command import; never a vestigial direct call.
+function consumesProfileFrameCommand(source, file, menu, section, id) {
+	source = profileFrameOwnerSource(
+		source,
+		file.startsWith('windows/') ? 'ahk' : file.startsWith('macos/') ? 'hs' : 'linux'
+	);
+	const tokens = require('../lib/script-source.cjs').scriptTokens(
+		source,
+		file.endsWith('.ahk') ? '.ahk' : '.lua'
+	);
+	const has = (values) =>
+		tokens.some((_, index) =>
+			values.every((value, offset) => tokens[index + offset]?.value === value)
+		);
+	const windows = file.startsWith('windows/');
+	const frame = windows ? 'llm_profile_windows_frame' : 'llm_profile_lua_frame';
+	if (
+		!has(
+			windows
+				? ['return', 'MenuRenderer_TemplateRows', '(', frame, ',']
+				: ['local', 'rows', '=', 'ManifestMenu', '.', 'template_rows', '(', frame, ',']
+		)
+	)
+		return false;
+	const native = windows
+		? id === 'llm_profile_create'
+			? 'LLM_Menu_PromptCreateProfile'
+			: 'LLM_Menu_CloneActiveBuiltinProfile'
+		: id === 'llm_profile_create'
+			? file.startsWith('macos/')
+				? 'create_profile'
+				: 'function'
+			: 'function';
+	if (!has(windows ? [id, ',', native] : ['[', id, ']', '=', native])) return false;
+	const ready =
+		id === 'llm_profile_create' ? 'llm_profile_create_ready' : 'llm_profile_clone_ready';
+	if (
+		!has(
+			windows
+				? [ready, ',', '_LLM_Menu_CreateProfileReady', '.', 'Bind', '(']
+				: ['[', ready, ']', '=', 'create_ready']
+		)
+	)
+		return false;
+	function imported(key, visiting = new Set()) {
+		if (visiting.has(key) || !Array.isArray(menu[key])) return false;
+		visiting.add(key);
+		for (const row of menu[key]) {
+			if (row.type !== 'include') continue;
+			if (row.section === section && row.row_id === id) return true;
+			if (row.row_id === undefined && imported(row.section, new Set(visiting))) return true;
+		}
+		return false;
+	}
+	return imported(frame);
+}
+
 // Profile creation is one ordinary command; native providers keep the editor owners.
 {
 	const assert = require('node:assert/strict');
@@ -1682,7 +1781,7 @@ checkPrivacyTriggerControls();
 	]) {
 		const source = readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus', file), 'utf8');
 		assert(
-			source.includes(`("${corpus.section}", "${corpus.id}"`),
+			consumesProfileFrameCommand(source, file, menu, corpus.section, corpus.id),
 			`${file}: the actual provider must consume the declared Create command`
 		);
 		assert(
@@ -1690,6 +1789,28 @@ checkPrivacyTriggerControls();
 				source
 			),
 			`${file}: a native provider cannot redeclare the fixed command label`
+		);
+		const frame = file.startsWith('windows/')
+			? 'llm_profile_windows_frame'
+			: 'llm_profile_lua_frame';
+		for (const changed of [
+			source.replaceAll('"' + frame + '"', '"wrong_frame"'),
+			source.replaceAll('"' + corpus.id + '"', '"wrong_callback"'),
+			source.replaceAll('"' + corpus.ready + '"', '"wrong_readiness"')
+		])
+			assert.equal(
+				consumesProfileFrameCommand(changed, file, menu, corpus.section, corpus.id),
+				false
+			);
+		const wrong = structuredClone(menu);
+		for (const rows of Object.values(wrong))
+			if (Array.isArray(rows))
+				for (const row of rows)
+					if (row.type === 'include' && row.section === corpus.section && row.row_id === corpus.id)
+						row.row_id = 'missing';
+		assert.equal(
+			consumesProfileFrameCommand(source, file, wrong, corpus.section, corpus.id),
+			false
 		);
 	}
 	console.log('Create Profile: one common declaration and three existing native editor owners.');
@@ -1718,7 +1839,7 @@ checkPrivacyTriggerControls();
 	]) {
 		const source = readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus', file), 'utf8');
 		assert(
-			source.includes(`("${corpus.section}", "${corpus.id}"`),
+			consumesProfileFrameCommand(source, file, menu, corpus.section, corpus.id),
 			`${file}: the actual Clone provider must consume the shared declaration`
 		);
 		assert(
@@ -1726,6 +1847,28 @@ checkPrivacyTriggerControls();
 				source
 			),
 			`${file}: native providers cannot redeclare the fixed Clone command label`
+		);
+		const frame = file.startsWith('windows/')
+			? 'llm_profile_windows_frame'
+			: 'llm_profile_lua_frame';
+		for (const changed of [
+			source.replaceAll('"' + frame + '"', '"wrong_frame"'),
+			source.replaceAll('"' + corpus.id + '"', '"wrong_callback"'),
+			source.replaceAll('"' + corpus.ready + '"', '"wrong_readiness"')
+		])
+			assert.equal(
+				consumesProfileFrameCommand(changed, file, menu, corpus.section, corpus.id),
+				false
+			);
+		const wrong = structuredClone(menu);
+		for (const rows of Object.values(wrong))
+			if (Array.isArray(rows))
+				for (const row of rows)
+					if (row.type === 'include' && row.section === corpus.section && row.row_id === corpus.id)
+						row.row_id = 'missing';
+		assert.equal(
+			consumesProfileFrameCommand(source, file, wrong, corpus.section, corpus.id),
+			false
 		);
 	}
 	console.log(
@@ -3947,47 +4090,101 @@ checkPrivacyTriggerControls();
 		hs: 'macos/ui/menu/menu_llm/profiles_manager.lua',
 		linux: 'linux/ui/menu/menu_builder.lua'
 	};
-	function wiring(source, platform) {
-		if (platform === 'ahk') {
-			for (const [section, variable] of [
-				['llm_profile_builtin_heading', 'BuiltinHeadingRows'],
-				['llm_profile_custom_heading', 'CustomHeadingRows']
-			]) {
-				assert(
-					source.includes(
-						variable + ' := MenuRenderer_TemplateRows("' + section + '", Map(), Map(), Map())'
-					)
-				);
-				assert(
-					source.includes(
-						'if ' +
-							variable +
-							' is Array\n\t' +
-							(section.includes('custom') ? '\t' : '') +
-							'\tRows.Push(' +
-							variable +
-							'*)'
-					)
-				);
-			}
-			assert(source.includes('if (user_profiles.Length > 0) {'));
-		} else {
-			const receiver = platform === 'hs' ? 'table.insert(rows, row)' : 'rows[#rows + 1] = row';
-			for (const section of sections) {
-				const expression = new RegExp(
-					'for _, row in ipairs\\(ManifestMenu\\.template_rows\\("' +
-						section +
-						'", \\{\\}, \\{\\}, \\{\\}\\) or \\{\\}\\) do\\s+' +
-						receiver.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') +
-						'\\s+end'
-				);
-				assert(expression.test(source));
-			}
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	function sequence(tokens, values) {
+		return tokens.some((_, index) =>
+			values.every((value, offset) => tokens[index + offset]?.value === value)
+		);
+	}
+	function wiring(source, platform, document = declared) {
+		source = profileFrameOwnerSource(source, platform);
+		const frame = platform === 'ahk' ? 'llm_profile_windows_frame' : 'llm_profile_lua_frame';
+		const tokens = scriptTokens(source, platform === 'ahk' ? '.ahk' : '.lua');
+		const call =
+			platform === 'ahk'
+				? ['return', 'MenuRenderer_TemplateRows', '(', frame, ',']
+				: ['local', 'rows', '=', 'ManifestMenu', '.', 'template_rows', '(', frame, ','];
+		assert(sequence(tokens, call), 'actual provider consumes the complete declared frame');
+		const native =
+			platform === 'ahk'
+				? ['llm_profile_builtin_rows', 'llm_profile_custom_rows']
+				: ['llm_profile_builtin_rows', 'llm_profile_custom_rows'];
+		for (const id of native) {
+			const payload = id.includes('builtin')
+				? platform === 'ahk'
+					? '_LLM_Menu_ProfileBuiltinRows'
+					: 'builtin_rows'
+				: platform === 'ahk'
+					? '_LLM_Menu_ProfileCustomRows'
+					: 'custom_rows';
 			assert(
-				source.includes(
+				sequence(
+					tokens,
+					platform === 'ahk' ? [id, ',', payload, '.', 'Bind', '('] : ['[', id, ']', '=', payload]
+				),
+				'actual lazy native data binding: ' + id
+			);
+		}
+		const builtin = document[frame].filter(
+			(row) => row.type === 'include' && row.section === sections[0]
+		);
+		assert.equal(builtin.length, 1, 'exact frame import of original builtin presentation');
+		assert.equal(builtin[0].on_refusal, 'omit_presentation');
+		const custom = document[frame].filter(
+			(row) => row.type === 'include' && row.section === 'llm_profile_custom_section'
+		);
+		assert.equal(custom.length, 1);
+		assert.equal(
+			custom[0].present_when,
+			'llm_profile_custom_present',
+			'original registry predicate controls heading and data together'
+		);
+		assert.deepEqual(document.llm_profile_custom_section, [
+			{ type: 'include', section: sections[1], on_refusal: 'omit_presentation' },
+			{ type: 'list', id: 'llm_profile_custom_rows' }
+		]);
+		if (platform === 'ahk') {
+			assert(
+				sequence(tokens, [
+					'llm_profile_custom_present',
+					',',
+					'_LLM_Menu_ProfileCustomPresent',
+					'.',
+					'Bind',
+					'('
+				])
+			);
+			assert(sequence(tokens, ['return', 'user_profiles', '.', 'Length', '>', '0']));
+		} else {
+			assert(sequence(tokens, ['[', 'llm_profile_custom_present', ']', '=', 'custom_present']));
+			assert(
+				sequence(
+					tokens,
 					platform === 'hs'
-						? 'if type(user_profiles) == "table" and #user_profiles > 0 then'
-						: 'if #user_profiles > 0 then'
+						? [
+								'return',
+								'type',
+								'(',
+								'user_profiles',
+								')',
+								'=',
+								'=',
+								'table',
+								'and',
+								'#',
+								'user_profiles',
+								'>',
+								'0'
+							]
+						: ['return', '#', 'user_profiles', '>', '0']
+				)
+			);
+			assert(
+				sequence(
+					tokens,
+					platform === 'hs'
+						? ['return', 'ManifestMenu', '.', 'render_rows', '(', 'rows', ',']
+						: ['items', '=', 'rows']
 				)
 			);
 		}
@@ -4000,18 +4197,99 @@ checkPrivacyTriggerControls();
 	for (const [platform, owner] of Object.entries(owners)) {
 		const source = fs.readFileSync(path.resolve(shared, '..', owner), 'utf8');
 		wiring(source, platform);
-		for (const mutate of [
-			(s) => s.replace(/llm_profile_builtin_heading/g, 'unreachable_heading'),
-			(s) => s.replace(/llm_profile_custom_heading/g, 'llm_profile_commands'),
-			(s) =>
-				platform === 'ahk'
-					? s.replace('Rows.Push(CustomHeadingRows*)', 'Discarded.Push(CustomHeadingRows*)')
-					: s.replace(
-							platform === 'hs' ? 'table.insert(rows, row)' : 'rows[#rows + 1] = row',
-							'discarded[#discarded + 1] = row'
-						)
+		for (const id of [
+			platform === 'ahk' ? 'llm_profile_windows_frame' : 'llm_profile_lua_frame',
+			'llm_profile_builtin_rows',
+			'llm_profile_custom_rows',
+			'llm_profile_custom_present'
 		])
-			assert.throws(() => wiring(mutate(source), platform));
+			assert.throws(() => wiring(source.replaceAll('"' + id + '"', '"unowned_frame"'), platform));
+		for (const section of sections) {
+			const wrong = structuredClone(declared);
+			for (const rows of Object.values(wrong)) {
+				if (!Array.isArray(rows)) continue;
+				for (const row of rows)
+					if (row.type === 'include' && row.section === section)
+						row.section = 'llm_profile_commands';
+			}
+			assert.throws(() => wiring(source, platform, wrong));
+		}
+		const erased = source.replaceAll(
+			'"' + (platform === 'ahk' ? 'llm_profile_windows_frame' : 'llm_profile_lua_frame') + '"',
+			'"unowned_frame"'
+		);
+		const fake =
+			platform === 'ahk'
+				? 'return MenuRenderer_TemplateRows("llm_profile_windows_frame", Map(), Map(), Map())'
+				: 'local rows = ManifestMenu.template_rows("llm_profile_lua_frame", {}, {}, {})';
+		assert.throws(() => wiring(erased + (platform === 'ahk' ? '\n; ' : '\n-- ') + fake, platform));
+		assert.throws(() => wiring(erased + '\n' + JSON.stringify(fake), platform));
+		const ownerMarker =
+			platform === 'ahk'
+				? '_LLM_Menu_ProfileRows() {'
+				: platform === 'hs'
+					? 'local function build_profile_menu('
+					: 'dynamic_handlers["llm_profile"] = function';
+		const unrelatedOwner =
+			platform === 'ahk'
+				? '_LLM_Menu_UnrelatedRows() {'
+				: platform === 'hs'
+					? 'local function unrelated_build_profile_menu('
+					: 'dynamic_handlers["unrelated_profile"] = function';
+		const fakeOwner = source.replace(
+			ownerMarker,
+			(platform === 'ahk' ? '; ' : '-- ') + ownerMarker + '\n' + unrelatedOwner
+		);
+		assert.notEqual(fakeOwner, source, 'actual provider definition was renamed');
+		assert.throws(
+			() => wiring(fakeOwner, platform),
+			'a commented owner marker cannot authenticate a renamed native builder'
+		);
+		for (const id of ['llm_profile_create', 'llm_profile_clone'])
+			assert.equal(
+				consumesProfileFrameCommand(fakeOwner, owner, declared, 'llm_profile_commands', id),
+				false
+			);
+		if (platform === 'linux') {
+			const foreignHandler = source.replace(
+				ownerMarker,
+				'local decoy = {dynamic_handlers={}}; decoy.' + ownerMarker
+			);
+			assert.notEqual(foreignHandler, source);
+			assert.throws(
+				() => wiring(foreignHandler, platform),
+				'a foreign table receiver cannot authenticate the real dynamic provider'
+			);
+			for (const id of ['llm_profile_create', 'llm_profile_clone'])
+				assert.equal(
+					consumesProfileFrameCommand(foreignHandler, owner, declared, 'llm_profile_commands', id),
+					false
+				);
+		}
+		if (platform === 'ahk') {
+			const unicodeOwner = source.replace(ownerMarker, 'É' + ownerMarker);
+			assert.notEqual(unicodeOwner, source);
+			assert.throws(
+				() => wiring(unicodeOwner, platform),
+				'an ASCII suffix of a different Unicode AHK identifier is not the actual owner'
+			);
+			for (const id of ['llm_profile_create', 'llm_profile_clone'])
+				assert.equal(
+					consumesProfileFrameCommand(unicodeOwner, owner, declared, 'llm_profile_commands', id),
+					false
+				);
+		}
+		// An executable decoy outside the actual provider cannot repair withdrawn ownership.
+		assert.throws(() => wiring(erased + '\n' + fake, platform));
+		if (platform !== 'ahk') {
+			const discarded = profileFrameOwnerSource(source, platform).replace(
+				platform === 'hs'
+					? 'return ManifestMenu.render_rows(rows, "llm_profile")'
+					: 'items = rows,',
+				platform === 'hs' ? 'return {}' : 'items = discarded_rows,'
+			);
+			assert.throws(() => wiring(discarded, platform));
+		}
 	}
 	const graphSource = fs.readFileSync(path.resolve(__dirname, 'test-menu-parity.cjs'), 'utf8');
 	const start = graphSource.indexOf('const OPENS_SUBMENU = {');
@@ -4026,20 +4304,35 @@ checkPrivacyTriggerControls();
 		const original = value.llm_profile.find((edge) => edge?.menu === 'llm_custom_profile_controls');
 		assert(original);
 		assert.deepEqual([...original.platforms], ['hs', 'linux']);
-		for (const section of sections) {
-			const edge = value.llm_profile.find((item) => item?.menu === section);
+		for (const [frame, platforms] of [
+			['llm_profile_windows_frame', ['ahk']],
+			['llm_profile_lua_frame', ['hs', 'linux']]
+		]) {
+			const edge = value.llm_profile.find((item) => item?.menu === frame);
 			assert(edge);
 			assert.equal(edge.kind, 'compose');
-			assert.deepEqual([...edge.platforms], ['ahk', 'hs', 'linux']);
-			assert.deepEqual({ ...edge.native_sources }, owners);
+			assert.deepEqual([...edge.platforms], platforms);
+			for (const platform of platforms)
+				assert.equal(edge.native_sources[platform], owners[platform]);
+		}
+		// Include graph preserves both original inert descendants through the actual frame.
+		for (const section of sections) {
+			const target = section.includes('custom')
+				? declared.llm_profile_custom_section
+				: declared.llm_profile_windows_frame;
+			assert(target.some((row) => row.type === 'include' && row.section === section));
 		}
 	}
 	edges(graph);
 	for (const mutate of [
-		(g) => (g.llm_profile.find((e) => e?.menu === sections[0]).menu = 'llm_profile_commands'),
-		(g) => (g.llm_profile.find((e) => e?.menu === sections[1]).kind = 'submenu'),
-		(g) => (g.llm_profile.find((e) => e?.menu === sections[0]).platforms = ['hs']),
-		(g) => (g.llm_profile.find((e) => e?.menu === sections[1]).native_sources.linux = owners.hs),
+		(g) =>
+			(g.llm_profile.find((e) => e?.menu === 'llm_profile_windows_frame').menu =
+				'llm_profile_commands'),
+		(g) => (g.llm_profile.find((e) => e?.menu === 'llm_profile_lua_frame').kind = 'submenu'),
+		(g) => (g.llm_profile.find((e) => e?.menu === 'llm_profile_windows_frame').platforms = ['hs']),
+		(g) =>
+			(g.llm_profile.find((e) => e?.menu === 'llm_profile_lua_frame').native_sources.linux =
+				owners.hs),
 		(g) => (g.llm_profile = g.llm_profile.filter((e) => e !== 'llm_profile_commands'))
 	]) {
 		const wrong = structuredClone(graph);

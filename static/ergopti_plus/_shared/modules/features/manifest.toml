@@ -6890,3 +6890,133 @@ id = "llm_profile_custom_decorated_heading"
 i18n = "menu.profiles.header_custom_profiles"
 platforms = ["hs"]
 unavailable = "hide"
+
+# Ordered frames consume native profile data without owning its callbacks.
+
+[[menu.llm_profile_lua_frame]]
+type = "include"
+section = "llm_profile_recommendation"
+present_when = "llm_profile_recommendation_present"
+
+[[menu.llm_profile_lua_frame]]
+type = "include"
+section = "llm_profile_paused_recommendation"
+present_when = "llm_profile_recommendation_paused"
+
+[[menu.llm_profile_lua_frame]]
+type = "include"
+section = "llm_profile_auto_detect_control"
+
+[[menu.llm_profile_lua_frame]]
+type = "---"
+
+[[menu.llm_profile_lua_frame]]
+type = "include"
+section = "llm_profile_builtin_heading"
+on_refusal = "omit_presentation"
+
+[[menu.llm_profile_lua_frame]]
+type = "list"
+id = "llm_profile_builtin_rows"
+
+[[menu.llm_profile_lua_frame]]
+type = "include"
+section = "llm_profile_custom_section"
+present_when = "llm_profile_custom_present"
+
+[[menu.llm_profile_lua_frame]]
+type = "include"
+section = "llm_profile_clone_section"
+present_when = "llm_profile_clone_present"
+
+[[menu.llm_profile_lua_frame]]
+type = "---"
+
+[[menu.llm_profile_lua_frame]]
+type = "include"
+section = "llm_profile_commands"
+row_id = "llm_profile_create"
+
+[[menu.llm_profile_windows_frame]]
+type = "include"
+section = "llm_profile_builtin_heading"
+on_refusal = "omit_presentation"
+
+[[menu.llm_profile_windows_frame]]
+type = "list"
+id = "llm_profile_builtin_rows"
+
+[[menu.llm_profile_windows_frame]]
+type = "include"
+section = "llm_profile_custom_section"
+present_when = "llm_profile_custom_present"
+
+[[menu.llm_profile_windows_frame]]
+type = "---"
+
+[[menu.llm_profile_windows_frame]]
+type = "include"
+section = "llm_profile_commands"
+row_id = "llm_profile_create"
+
+[[menu.llm_profile_windows_frame]]
+type = "include"
+section = "llm_profile_commands"
+row_id = "llm_profile_clone"
+present_when = "llm_profile_clone_present"
+
+[[menu.llm_profile_windows_frame]]
+type = "---"
+
+[[menu.llm_profile_windows_frame]]
+type = "include"
+section = "llm_profile_auto_detect_control"
+
+[[menu.llm_profile_windows_frame]]
+type = "---"
+
+[[menu.llm_profile_windows_frame]]
+type = "group"
+id = "llm_profile_app_overrides"
+i18n = "menu.profiles.per_app_overrides"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.llm_profile_custom_section]]
+type = "include"
+section = "llm_profile_custom_heading"
+on_refusal = "omit_presentation"
+
+[[menu.llm_profile_custom_section]]
+type = "list"
+id = "llm_profile_custom_rows"
+
+[[menu.llm_profile_clone_section]]
+type = "---"
+
+[[menu.llm_profile_clone_section]]
+type = "include"
+section = "llm_profile_commands"
+row_id = "llm_profile_clone"
+
+[[menu.llm_profile_recommendation]]
+type = "command"
+id = "llm_profile_recommend"
+i18n = "menu.profiles.auto_detect"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.llm_profile_paused_recommendation]]
+type = "label"
+id = "llm_profile_recommend_paused"
+i18n = "menu.profiles.auto_detect"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.llm_profile_auto_detect_control]]
+type = "check"
+id = "llm_profile_auto_detect"
+i18n = "menu.profiles.auto_detect"
+checked_when = ["llm_profile_auto_detect_checked"]
+platforms = ["ahk", "linux"]
+unavailable = "hide"
