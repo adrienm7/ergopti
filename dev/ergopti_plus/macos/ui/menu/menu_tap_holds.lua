@@ -462,81 +462,76 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 		and NONE_DISPLAY
 		or  (tap_slbl .. "  /  " .. hold_slbl)
 
-	local key_submenu = {
-		{
-			label    = i18n.get("menu.tapholds.nothing_tap_hold"),
-			disabled = (current_tap == "none" and current_hold == "none"),
-			action       = function()
-				return run_bulk_menu_command(
-					karabiner,
-					"clear_tap_hold_binding",
-					"Clearing one tap/hold binding…",
-					"Tap/hold binding cleared.",
-					false,
-					update_menu,
-					kid
-				)
-			end,
-		},
-		{ separator = true },
-		{
-			label = string.format(i18n.get("menu.tapholds.tap_arrow"), tap_slbl),
-			items  = build_action_picker(
+	local key_submenu = ManifestMenu.template_rows("tap_hold_key_head", {
+		["tap_hold_key_no_action"] = function()
+			return run_bulk_menu_command(
 				karabiner,
-				function(action_id) return karabiner.set_tap_action(kid, action_id) end,
-				current_tap,
+				"clear_tap_hold_binding",
+				"Clearing one tap/hold binding…",
+				"Tap/hold binding cleared.",
+				false,
 				update_menu,
-				"tap"
-			),
-		},
-		{
-			label = string.format(i18n.get("menu.tapholds.hold_arrow"), hold_slbl),
-			items  = build_action_picker(
-				karabiner,
-				function(action_id) return karabiner.set_hold_action(kid, action_id) end,
-				current_hold,
-				update_menu,
-				"hold"
-			),
-		},
-		{ separator = true },
-		-- Per-key tap/hold delay: open a free-text dialog to set a custom value, or
-		-- revert to the single global delay. The title shows the effective value.
-		{
-			label = string.format(i18n.get("menu.tapholds.key_tap_delay"), fmt_delay(effective_ms)),
-			items  = {
-				{
-					label = i18n.get("menu.tapholds.key_tap_delay_set"),
-					action    = function()
-						hs.focus()
-						local prompt = string.format(
-							i18n.get("menu.tapholds.key_tap_delay_dialog_prompt"), global_ms)
-						local title_d    = i18n.get("menu.tapholds.key_tap_delay_dialog_title")
-						local btn_ok     = i18n.get("button.ok")
-						local btn_cancel = i18n.get("button.cancel")
-						local script = delay_dialog_script(prompt, effective_ms, title_d, btn_cancel, btn_ok)
-						local ok, result = hs.osascript.applescript(script)
-						if not ok or type(result) ~= "table" then return end
-						local ms = tonumber(result["text returned"])
-						if not ms or ms <= 0 then
-							Logger.warn(LOG, "Invalid per-key delay '%s' — ignored.", tostring(result["text returned"]))
-							return
-						end
-						commit_menu_setting(karabiner, "Per-key tap/hold timeout", function()
-							return karabiner.set_tap_timeout(kid, math.floor(ms))
-						end, update_menu)
-					end,
-				},
-				{
-					label   = string.format(i18n.get("menu.tapholds.key_tap_delay_use_global"), fmt_delay(global_ms)),
-					checked = (per_key_ms == nil),
-					disabled = (per_key_ms == nil),
-					action      = function()
-						commit_menu_setting(karabiner, "Per-key timeout reset", function()
-							return karabiner.set_tap_timeout(kid, nil)
-						end, update_menu)
-					end,
-				},
+				kid
+			)
+		end,
+	}, {
+		["tap_hold_key_configured"] = function() return is_active end,
+		["tap_hold_key_tap_caption"] = function() return tap_slbl end,
+		["tap_hold_key_hold_caption"] = function() return hold_slbl end,
+	}, {
+		["tap_hold_key_tap_picker"] = build_action_picker(
+			karabiner,
+			function(action_id) return karabiner.set_tap_action(kid, action_id) end,
+			current_tap,
+			update_menu,
+			"tap"
+		),
+		["tap_hold_key_hold_picker"] = build_action_picker(
+			karabiner,
+			function(action_id) return karabiner.set_hold_action(kid, action_id) end,
+			current_hold,
+			update_menu,
+			"hold"
+		),
+	})
+	if not key_submenu then return nil end
+	key_submenu[#key_submenu + 1] = { separator = true }
+	-- Per-key tap/hold delay: open a free-text dialog to set a custom value, or
+	-- revert to the single global delay. The title shows the effective value.
+	key_submenu[#key_submenu + 1] = {
+		label = string.format(i18n.get("menu.tapholds.key_tap_delay"), fmt_delay(effective_ms)),
+		items  = {
+			{
+				label = i18n.get("menu.tapholds.key_tap_delay_set"),
+				action    = function()
+					hs.focus()
+					local prompt = string.format(
+						i18n.get("menu.tapholds.key_tap_delay_dialog_prompt"), global_ms)
+					local title_d    = i18n.get("menu.tapholds.key_tap_delay_dialog_title")
+					local btn_ok     = i18n.get("button.ok")
+					local btn_cancel = i18n.get("button.cancel")
+					local script = delay_dialog_script(prompt, effective_ms, title_d, btn_cancel, btn_ok)
+					local ok, result = hs.osascript.applescript(script)
+					if not ok or type(result) ~= "table" then return end
+					local ms = tonumber(result["text returned"])
+					if not ms or ms <= 0 then
+						Logger.warn(LOG, "Invalid per-key delay '%s' — ignored.", tostring(result["text returned"]))
+						return
+					end
+					commit_menu_setting(karabiner, "Per-key tap/hold timeout", function()
+						return karabiner.set_tap_timeout(kid, math.floor(ms))
+					end, update_menu)
+				end,
+			},
+			{
+				label   = string.format(i18n.get("menu.tapholds.key_tap_delay_use_global"), fmt_delay(global_ms)),
+				checked = (per_key_ms == nil),
+				disabled = (per_key_ms == nil),
+				action      = function()
+					commit_menu_setting(karabiner, "Per-key timeout reset", function()
+						return karabiner.set_tap_timeout(kid, nil)
+					end, update_menu)
+				end,
 			},
 		},
 	}

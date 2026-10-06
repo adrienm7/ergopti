@@ -104,11 +104,11 @@ function M.on_message(payload, state, context)
 			Logger.error(LOG, "Personal information was not committed; editor remains open.")
 			return { saved = false, reloaded = false, closed = false }
 		end
-		local ok_reload, reload_result = false, nil
+		local ok_reload, _mapping_count, reload_committed = false, nil, false
 		if state.config and type(state.config.reload) == "function" then
-			ok_reload, reload_result = pcall(state.config.reload)
+			ok_reload, _mapping_count, reload_committed = pcall(state.config.reload)
 		end
-		local reloaded = ok_reload and reload_result ~= false
+		local reloaded = ok_reload and reload_committed == true
 		if not reloaded then
 			Logger.error(LOG, "Personal information was saved but the hotstring catalogue did not reload.")
 			return { saved = true, reloaded = false, closed = false }

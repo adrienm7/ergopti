@@ -379,6 +379,87 @@ helpers.describe("keyboard_layout: planning a string", function()
 				.. "wrong characters")
 	end)
 
+	helpers.it("(layout-plan-utf8) refuses malformed bytes instead of skipping them", function()
+		local layout = loaded()
+		for _, text in ipairs({
+			string.char(0x80) .. "az",
+			string.char(0xFF) .. "az",
+			"a" .. string.char(0xC0, 0xAF) .. "z",
+			"az" .. string.char(0xF5, 0x80, 0x80, 0x80),
+		}) do
+			local plan, blocker = layout.plan(text)
+			helpers.assert_nil(plan, "every input byte must belong to a validated character")
+			helpers.assert_nil(blocker, "malformed input has no valid blocking character to report")
+		end
+	end)
+
+	helpers.it("(layout-plan-utf8) refuses incomplete and invalid scalar sequences", function()
+		local layout = loaded()
+		for _, text in ipairs({
+			"a" .. string.char(0xC2),
+			string.char(0xC2) .. "az",
+			string.char(0xE0, 0x80, 0xAF) .. "az",
+			string.char(0xED, 0xA0, 0x80) .. "az",
+			string.char(0xF4, 0x90, 0x80, 0x80) .. "az",
+		}) do
+			helpers.assert_nil((layout.plan(text)), "malformed UTF-8 has no complete keystroke plan")
+		end
+	end)
+
+	helpers.it("(layout-plan-utf8) keeps healthy and unavailable-input contracts", function()
+		local layout = loaded()
+		local empty, empty_blocker = layout.plan("")
+		helpers.assert_eq(#empty, 0, "an available layout still permits an empty plan")
+		helpers.assert_nil(empty_blocker)
+		local supported, supported_blocker = layout.plan("aé")
+		helpers.assert_eq(#supported, 2)
+		helpers.assert_nil(supported_blocker)
+		local unsupported, unsupported_blocker = layout.plan("a😀z")
+		helpers.assert_nil(unsupported)
+		helpers.assert_eq(unsupported_blocker, "😀", "a valid unsupported scalar retains the old blocker")
+		local invalid_type, invalid_type_blocker = layout.plan(false)
+		helpers.assert_nil(invalid_type)
+		helpers.assert_nil(invalid_type_blocker)
+		layout._set_table_for_test(nil)
+		local absent, absent_blocker = layout.plan("é")
+		helpers.assert_nil(absent)
+		helpers.assert_eq(absent_blocker, ("é"):sub(1, 1))
+		local absent_empty, absent_empty_blocker = layout.plan("")
+		helpers.assert_nil(absent_empty)
+		helpers.assert_eq(absent_empty_blocker, "")
+	end)
+
+	helpers.it("(layout-plan-utf8-missing) refuses malformed blockers before a map is available", function()
+		local layout = helpers.load_module("adapters.keyboard_layout")
+		layout._set_table_for_test(nil)
+		for _, text in ipairs({ string.char(0x80) .. "az", string.char(0xFF) .. "az",
+			"a" .. string.char(0xC0, 0xAF) .. "z", "az" .. string.char(0xF5, 0x80, 0x80, 0x80),
+			"a" .. string.char(0xC2), string.char(0xC2) .. "az", string.char(0xE0, 0x80, 0xAF) .. "az",
+			string.char(0xED, 0xA0, 0x80) .. "az", string.char(0xF4, 0x90, 0x80, 0x80) .. "az" }) do
+			local plan, blocker = layout.plan(text)
+			helpers.assert_nil(plan)
+			helpers.assert_nil(blocker, "the malformed-input receipt cannot depend on layout availability")
+		end
+	end)
+
+	helpers.it("(layout-plan-utf8-missing) preserves valid unavailable and nonstring receipts", function()
+		local layout = helpers.load_module("adapters.keyboard_layout")
+		layout._set_table_for_test(nil)
+		for _, text in ipairs({ "", "a", "é", "\0", "😀" }) do
+			local plan, blocker = layout.plan(text)
+			helpers.assert_nil(plan)
+			helpers.assert_eq(blocker, text:sub(1, 1), "valid input retains its existing unavailable-layout blocker")
+		end
+		for _, text in ipairs({ false, 17, {} }) do
+			local plan, blocker = layout.plan(text)
+			helpers.assert_nil(plan)
+			helpers.assert_nil(blocker)
+		end
+		local nil_plan, nil_blocker = layout.plan(nil)
+		helpers.assert_nil(nil_plan)
+		helpers.assert_nil(nil_blocker)
+	end)
+
 	helpers.it("builds a plausible number of characters from a real dump", function()
 		local layout = helpers.load_module("adapters.keyboard_layout")
 		local _, count = layout.build(AZERTY_DUMP)
@@ -389,4 +470,142 @@ helpers.describe("keyboard_layout: planning a string", function()
 			"the fixture carries eleven keys across four levels; got " .. count)
 	end)
 
+end)
+
+
+
+
+
+-- ===============================================================
+-- ===============================================================
+-- ======= 5/ Quoted block metadata ==============================
+-- ===============================================================
+-- ===============================================================
+
+helpers.describe("xkb_keymap: quoted block metadata", function()
+	local plain = "\n\tkey <AC01> { [ a, A ] };\n"
+	local function dump(body, header, prefix)
+		return (prefix or "") .. 'xkb_symbols "' .. (header or "healthy") .. '" {' .. body .. '};\nxkb_types "next" { type "T" { modifiers=Shift; }; };'
+	end
+	local escaped_quote = [[name="Readback \" } metadata"; key <AC01> { [ a, A ] };]]
+	local even_backslashes = [[name="Readback \\"; key <AC01> { [ a, A ] };]]
+	local odd_backslashes = [[name="Readback \\\" } metadata"; key <AC01> { [ a, A ] };]]
+	local cases = {
+		{ name = "preserves the exact nested body", text = dump(plain), body = plain },
+		{ name = "ignores a closing brace in metadata", body = [[name="Readback } metadata";]] .. plain },
+		{ name = "ignores an opening brace in metadata", body = [[name="Readback { metadata";]] .. plain },
+		{ name = "ignores balanced braces in metadata", body = [[name="Readback {balanced} metadata";]] .. plain },
+		{ name = "ignores inverted braces in metadata", body = [[name="Readback }{ metadata";]] .. plain },
+		{ name = "ignores a quoted keyword before the actual block", text = dump(plain, nil, 'xkb_types "t" { type "xkb_symbols" { modifiers=Shift; }; };'), body = plain },
+		{ name = "ignores repeated quoted keywords", text = dump(plain, nil, 'xkb_types "xkb_symbols" { name="xkb_symbols"; };'), body = plain },
+		{ name = "ignores an escaped quote before the actual block", text = dump(plain, nil, [[name="before \" xkb_symbols } metadata";]]), body = plain },
+		{ name = "finds the opener after a quoted opening brace", text = dump(plain, "Readback { header"), body = plain },
+		{ name = "finds the opener after a quoted closing brace", text = dump(plain, "Readback } header"), body = plain },
+		{ name = "ignores escaped quotes inside the body", body = escaped_quote },
+		{ name = "closes a string after an even backslash run", body = even_backslashes },
+		{ name = "retains a string after an odd backslash run", body = odd_backslashes },
+		{ name = "preserves Unicode metadata bytes", body = [[name="é }{ 😀";]] .. plain },
+		{ name = "preserves an empty body", text = dump(""), body = "" },
+		{ name = "refuses a missing block", text = 'xkb_types "t" { type "T" { modifiers=Shift; }; };' },
+		{ name = "refuses a keyword found only inside a string", text = 'name="xkb_symbols"; unrelated { raw };' },
+		{ name = "refuses a missing structural opener", text = 'xkb_symbols "Readback { header";' },
+		{ name = "refuses an unclosed header string", text = 'xkb_symbols "Readback { header;' },
+		{ name = "refuses an unclosed body string", text = [[xkb_symbols "h" { name="unfinished } ; };]] },
+		{ name = "refuses an escaped terminal quote", text = [[xkb_symbols "h" { name="unfinished \" } ; };]] },
+		{ name = "refuses a terminal string backslash", text = [[xkb_symbols "h" { name="unfinished \]] },
+		{ name = "refuses an unfinished structural block", text = 'xkb_symbols "h" { key <AC01> { [ a, A ] };' },
+		{ name = "refuses empty input", text = "" },
+		{ name = "refuses nonstring input", text = false },
+	}
+	for _, spec in ipairs(cases) do
+		if spec.text == nil then spec.text = dump(spec.body) end
+		helpers.it("(xkb-block-strings) " .. spec.name, function()
+			local parser = helpers.load_module("infra.xkb_keymap")
+			helpers.assert_eq(parser.block(spec.text, "xkb_symbols"), spec.body,
+				"quoted bytes do not choose a structural block or change its exact body")
+		end)
+	end
+end)
+
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 6/ Quoted key definition metadata =======================
+-- =================================================================
+-- =================================================================
+
+helpers.describe("xkb_keymap: quoted key definition metadata", function()
+	local alphabetic = { AC01 = { "a", "A" } }
+	local cases = {
+		{ name = "balances a closing brace in a quoted type", body = [[key <AC01> { type="Readback } type", symbols[Group1]=[ a, A ] };]], expected = alphabetic },
+		{ name = "balances an opening brace in a quoted type", body = [[key <AC01> { type="Readback { type", symbols[Group1]=[ a, A ] };]], expected = alphabetic },
+		{ name = "retains balanced quoted braces", body = [[key <AC01> { type="Readback {balanced} type", symbols[Group1]=[ a, A ] };]], expected = alphabetic },
+		{ name = "retains inverted quoted braces", body = [[key <AC01> { type="Readback }{ type", symbols[Group1]=[ a, A ] };]], expected = alphabetic },
+		{ name = "retains an escaped quote before a quoted brace", body = [[key <AC01> { type="Readback \" } type", symbols[Group1]=[ a, A ] };]], expected = alphabetic },
+		{ name = "closes a quoted type after even backslashes", body = [[key <AC01> { type="Readback \\" , symbols[Group1]=[ a, A ] };]], expected = alphabetic },
+		{ name = "retains a quoted type after odd backslashes", body = [[key <AC01> { type="Readback \\\" } type", symbols[Group1]=[ a, A ] };]], expected = alphabetic },
+		{ name = "ignores a quoted declaration before a real key", body = [[name="key <AC01> { [ z, Z ] }"; key <AC01> { [ a, A ] };]], expected = alphabetic },
+		{ name = "ignores a quoted declaration after a real key", body = [[key <AC01> { [ a, A ] }; name="key <AC01> { [ z, Z ] }";]], expected = alphabetic },
+		{ name = "ignores a quoted phantom key declaration", body = [[name="key <DECOY> { [ z, Z ] }"; key <AC01> { [ a, A ] };]], expected = alphabetic },
+		{ name = "refuses a declaration inside another identifier", body = [[monkey <AC01> { [ z, Z ] };]], expected = {} },
+		{ name = "keeps adjacent real declarations distinct", body = [[key <AC01> {[ a, A ]};key <AC02> {[ s, S ]};]], expected = { AC01 = { "a", "A" }, AC02 = { "s", "S" } } },
+		{ name = "preserves the existing key-name grammar", body = [[key <A_B+1-2> {[ a, A ]};]], expected = { ["A_B+1-2"] = { "a", "A" } } },
+		{ name = "preserves long and short symbols forms", body = [[key <AC01> { type="Readback [ z, Z ] type", symbols[Group1]=[ a, A ] };key <AC02> {[ s, S ]};]], expected = { AC01 = { "a", "A" }, AC02 = { "s", "S" } } },
+		{ name = "refuses a declaration without its structural opener", body = [[key <AC01> [ a, A ];]], expected = {} },
+		{ name = "retains the empty symbols contract", body = "", expected = {} },
+	}
+	for _, spec in ipairs(cases) do
+		helpers.it("(xkb-key-definition-strings) " .. spec.name, function()
+			local parser = helpers.load_module("infra.xkb_keymap")
+			local text = 'xkb_symbols "healthy" {' .. spec.body .. '};'
+			helpers.assert_eq(parser.parse_symbols(text), spec.expected,
+				"real key declarations own complete definitions outside quoted metadata")
+		end)
+	end
+end)
+
+
+
+
+
+-- ===============================================================
+-- ===============================================================
+-- ======= 7/ Quoted symbol-list metadata =========================
+-- ===============================================================
+-- ===============================================================
+
+helpers.describe("xkb_keymap: quoted symbol-list metadata", function()
+	local alphabetic = { AC01 = { "a", "A" } }
+	local cases = {
+		{ name = "ignores a quoted explicit fake list", body = [[key <AC01> { type="Readback symbols[Group1]= [ z, Z ] type", symbols[Group1]=[ a, A ] };]], expected = alphabetic },
+		{ name = "ignores a spaced quoted explicit fake list", body = [[key <AC01> { type="Readback symbols [ Group1 ] = [ z, Z ] type", symbols[Group1]=[ a, A ] };]], expected = alphabetic },
+		{ name = "ignores a nested quoted explicit fake list", body = [=[key <AC01> { type="Readback [[ symbols[Group1]= [ z, Z ] ]] type", symbols[Group1]=[ a, A ] };]=], expected = alphabetic },
+		{ name = "ignores repeated quoted explicit fake lists", body = [[key <AC01> { type="symbols[Group1]=[z,Z] symbols[Group1]=[s,S]", symbols[Group1]=[ a, A ] };]], expected = alphabetic },
+		{ name = "ignores a quoted fallback fake list", body = [[key <AC01> { type="Readback [ z, Z ] type", [ a, A ] };]], expected = alphabetic },
+		{ name = "retains an earlier real fallback list", body = [[key <AC01> { [ a, A ], type="Readback [ z, Z ] type" };]], expected = alphabetic },
+		{ name = "retains an earlier real explicit list", body = [[key <AC01> { symbols[Group1]=[ a, A ], type="symbols[Group1]=[z,Z]" };]], expected = alphabetic },
+		{ name = "preserves explicit priority over an earlier fallback", body = [[key <AC01> { [ z, Z ], symbols[Group1]=[ a, A ] };]], expected = alphabetic },
+		{ name = "preserves explicit Group1 priority over Group2", body = [[key <AC01> { symbols[Group2]=[ z, Z ], symbols[Group1]=[ a, A ] };]], expected = alphabetic },
+		{ name = "preserves the existing fallback index behavior", body = [[key <AC01> { type[Group1]="Readback [ z, Z ] type", [ a, A ] };]], expected = { AC01 = { "Group1" } } },
+		{ name = "preserves the existing Group2-only fallback behavior", body = [[key <AC01> { symbols[Group2]=[ z, Z ] };]], expected = { AC01 = { "Group2" } } },
+		{ name = "preserves an empty explicit capture", body = [[key <AC01> { [ z, Z ], symbols[Group1]=[] };]], expected = { AC01 = { false } } },
+		{ name = "preserves raw keysym spelling and NoSymbol", body = [[key <AC01> { symbols[Group1]=[ U00E9, NoSymbol, A ] };]], expected = { AC01 = { "U00E9", false, "A" } } },
+		{ name = "ignores a fake list after an escaped quote", body = [[key <AC01> { type="Readback \" symbols[Group1]=[z,Z] type", symbols[Group1]=[ a, A ] };]], expected = alphabetic },
+		{ name = "closes metadata after even backslashes", body = [[key <AC01> { type="Readback \\" , symbols[Group1]=[ a, A ] };]], expected = alphabetic },
+		{ name = "retains metadata after odd backslashes", body = [[key <AC01> { type="Readback \\\" symbols[Group1]=[z,Z] type", symbols[Group1]=[ a, A ] };]], expected = alphabetic },
+		{ name = "ignores braces and fake lists in the same type", body = [[key <AC01> { type="Readback } symbols[Group1]=[z,Z] { type", symbols[Group1]=[ a, A ] };]], expected = alphabetic },
+		{ name = "ignores fake lists in multiple metadata strings", body = [[key <AC01> { type="symbols[Group1]=[z,Z]", name="symbols[Group1]=[s,S]", symbols[Group1]=[ a, A ] };]], expected = alphabetic },
+		{ name = "preserves first outside-string match precedence", body = [[key <AC01> { mysymbols[Group1]=[ z, Z ], symbols[Group1]=[ a, A ] };]], expected = { AC01 = { "z", "Z" } } },
+		{ name = "retains the no-list contract", body = [[key <AC01> { type="Readback [ z, Z ] type" };]], expected = {} },
+	}
+	for _, spec in ipairs(cases) do
+		helpers.it("(xkb-symbol-list-strings) " .. spec.name, function()
+			local parser = helpers.load_module("infra.xkb_keymap")
+			helpers.assert_eq(parser.parse_symbols('xkb_symbols "healthy" {' .. spec.body .. '};'), spec.expected,
+				"quoted metadata does not own a list; existing unquoted priority and raw captures remain")
+		end)
+	end
 end)

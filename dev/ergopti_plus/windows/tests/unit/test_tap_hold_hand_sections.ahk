@@ -116,3 +116,182 @@ _THHS_MenuSeparatesTheHands() {
 }
 Test("tap-holds: the submenu separates the left-hand keys from the right-hand keys (tap-hold-hand-sections)",
 	_THHS_MenuSeparatesTheHands)
+
+; Actual provider rows must read their caption from the shared declaration.
+_THHS_WithNativeFixture(TestFn) {
+	Owner := MasterGateState()
+	PreviousInitialized := Owner["initialized"]
+	Owner["initialized"] := false
+	try return _THGT_WithFixture(TestFn)
+	finally Owner["initialized"] := PreviousInitialized
+}
+
+_THHS_NativeCommandRow(KeyId) {
+	for Row in _TH_KeyRows("left") {
+		if InStr(Row["label"], t("tap_hold.group." . KeyId) . "  :") == 1
+			return Row["items"][1]
+	}
+	throw Error("Missing actual key provider: " . KeyId)
+}
+
+_THHS_NativeCommandStates(TargetPath) {
+	global TapHold
+	TapHold := Map("keys", Map("caps_lock", Map("tap_action", "copy", "hold_modifier", "ctrl")),
+		"inherit_defaults", false)
+	Active := _THHS_NativeCommandRow("caps_lock")
+	AssertEqual(t("tap_hold.action.disable"), Active["label"], "established Windows caption")
+	Assert(!_MR_Get(Active, "disabled", false), "configured key can be made native")
+	TapHold := Map("keys", Map(), "inherit_defaults", false)
+	Native := _THHS_NativeCommandRow("caps_lock")
+	Assert(Native["disabled"], "native key remains disabled")
+	AssertEqual(false, Native["action"].Call(), "disabled retained callback cannot write")
+	AssertEqual(0, TapHold["keys"].Count, "disabled command does not mutate the owner")
+}
+Test("tap-holds: the actual native command retains both availability states (tap-hold-key-native)",
+	() => _THHS_WithNativeFixture(_THHS_NativeCommandStates))
+
+_THHS_NativeCommandCaption(TargetPath) {
+	Definition := _MR_GetMenuDef("tap_hold_key_native_commands")[1]
+	Previous := Definition["i18n"]
+	try {
+		Definition["i18n"] := "menu.shortcuts.title"
+		Row := _THHS_NativeCommandRow("caps_lock")
+		AssertEqual(t("menu.shortcuts.title"), Row["label"], "actual provider consumes shared caption")
+		Assert(!_MR_Get(Row, "disabled", false), "caption mutation retains configured availability")
+	} finally Definition["i18n"] := Previous
+}
+Test("tap-holds: the actual native command consumes its shared caption (tap-hold-key-native)",
+	() => _THHS_WithNativeFixture(_THHS_NativeCommandCaption))
+
+_THHS_NativeCommandLeaseRefusal(TargetPath) {
+	global TapHold
+	Row := _THHS_NativeCommandRow("caps_lock")
+	BeforeTap := TapHold["keys"]["caps_lock"]["tap_action"]
+	BeforeHold := TapHold["keys"]["caps_lock"]["hold_modifier"]
+	Lease := _ConfigWriteLeaseTryAcquire(TargetPath, "tap-hold-key-native-test")
+	Assert(Lease is Object, "fixture owns the actual native writer lease")
+	try {
+		AssertEqual(false, Row["action"].Call(), "actual native writer refuses a competing lease")
+		AssertEqual(BeforeTap, TapHold["keys"]["caps_lock"]["tap_action"], "refusal preserves tap")
+		AssertEqual(BeforeHold, TapHold["keys"]["caps_lock"]["hold_modifier"], "refusal preserves hold")
+		Assert(!FileExist(TargetPath), "refusal cannot publish an absent private file")
+	} finally _ConfigWriteLeaseRelease(Lease)
+}
+Test("tap-holds: the actual native command preserves writer lease refusal (tap-hold-key-native)",
+	() => _THHS_WithNativeFixture(_THHS_NativeCommandLeaseRefusal))
+
+; The complete child template owns row order, captions and platform projection.
+_THHS_KeyChildren(KeyId) {
+	for Row in _TH_KeyRows("left") {
+		if InStr(Row["label"], t("tap_hold.group." . KeyId) . "  :") == 1
+			return Row["items"]
+	}
+	throw Error("Missing actual key template: " . KeyId)
+}
+
+_THHS_KeyHeadOrder(TargetPath) {
+	Rows := _THHS_KeyChildren("caps_lock")
+	AssertEqual(4, Rows.Length, "exact shared head, without a new delay tail")
+	AssertEqual(t("tap_hold.action.disable"), Rows[1]["label"], "original clearing command remains first")
+	Assert(Rows[2]["separator"], "declared separator is second")
+	AssertEqual(StrReplace(t("tap_hold.picker.tap"), "%s", TapHoldCurrentTapLabel("caps_lock")),
+		Rows[3]["label"], "shared tap caption uses the selected native label")
+	AssertEqual(StrReplace(t("tap_hold.picker.hold"), "%s", TapHoldCurrentHoldLabel("caps_lock")),
+		Rows[4]["label"], "shared hold caption uses the selected native label")
+	Assert(Rows[3].Has("action") && !Rows[3].Has("items"), "tap remains the native picker command")
+	Assert(Rows[4]["items"] is Array && !Rows[4].Has("action"), "hold remains native child data")
+	Rendered := Menu()
+	try {
+		; The renderer receipt counts labelled rows; separators still occupy native positions.
+		AssertEqual(3, _MR_RenderRows(Rendered, Rows, "tap_hold_key_head_test", 1), "renderer reports all three labelled head rows")
+		AssertEqual(4, DllCall("GetMenuItemCount", "ptr", Rendered.Handle, "int"),
+			"real native renderer draws the complete four-row declared head")
+		AssertEqual(Rows[1]["label"], _THHS_LabelAt(Rendered, 0), "native first caption")
+		Assert(TrayMenuIsSeparatorAt(Rendered, 1), "real native separator follows the included command")
+		AssertEqual(Rows[3]["label"], _THHS_LabelAt(Rendered, 2), "native tap caption")
+		AssertEqual(Rows[4]["label"], _THHS_LabelAt(Rendered, 3), "native hold caption")
+	} finally {
+		Rendered.Delete()
+		MenuDispatcher_PruneMenu(Rendered)
+	}
+}
+Test("tap-holds: actual key provider follows complete declared head (tap-hold-key-head)",
+	() => _THHS_WithNativeFixture(_THHS_KeyHeadOrder))
+
+_THHS_KeyHeadMutation(TargetPath) {
+	Definition := _MR_GetMenuDef("tap_hold_key_head")
+	Tap := Definition[3]
+	Hold := Definition[5]
+	PreviousCaption := Tap["i18n"]
+	PreviousGetter := Tap["caption_getter"]
+	try {
+		Tap["i18n"] := "tap_hold.picker.hold"
+		Tap["caption_getter"] := "tap_hold_key_hold_caption"
+		Rows := _THHS_KeyChildren("caps_lock")
+		AssertEqual(StrReplace(t("tap_hold.picker.hold"), "%s", TapHoldCurrentHoldLabel("caps_lock")),
+			Rows[3]["label"], "actual provider reads both shared caption and getter metadata")
+		Assert(Rows[3].Has("action") && !Rows[3].Has("items"), "caption changes retain the picker owner")
+		Definition[3] := Hold
+		Definition[5] := Tap
+		Rows := _THHS_KeyChildren("caps_lock")
+		Assert(Rows[3].Has("items") && Rows[4].Has("action"), "declaration determines hold-before-tap order")
+	} finally {
+		Tap["i18n"] := PreviousCaption
+		Tap["caption_getter"] := PreviousGetter
+		Definition[3] := Tap
+		Definition[5] := Hold
+	}
+}
+Test("tap-holds: actual key provider reads shared order and caption getter mutations (tap-hold-key-head)",
+	() => _THHS_WithNativeFixture(_THHS_KeyHeadMutation))
+
+_THHS_KeyHeadPlatform(TargetPath) {
+	Tap := _MR_GetMenuDef("tap_hold_key_head")[3]
+	Previous := Tap["platforms"]
+	try {
+		Tap["platforms"] := ["linux"]
+		Rows := _THHS_KeyChildren("caps_lock")
+		AssertEqual(3, Rows.Length, "only the unavailable tap row is hidden")
+		Assert(Rows[2]["separator"], "the shared separator retains its declared position")
+		Assert(Rows[3]["items"] is Array, "hold payload remains present")
+	} finally Tap["platforms"] := Previous
+}
+Test("tap-holds: actual key provider honors declared platform hiding (tap-hold-key-head)",
+	() => _THHS_WithNativeFixture(_THHS_KeyHeadPlatform))
+
+_THHS_KeyHeadRefusesBrokenData() {
+	Definition := _MR_GetMenuDef("tap_hold_key_head")
+	PreviousInclude := Definition[1]["section"]
+	PreviousGetter := Definition[3]["caption_getter"]
+	Commands := Map("tap_hold_key_native", () => true, "tap_hold_key_tap", () => true)
+	Getters := Map("tap_hold_key_configured", () => true,
+		"tap_hold_key_tap_caption", () => "copy 100%", "tap_hold_key_hold_caption", () => "Ctrl / {}")
+	Children := Map("tap_hold_key_hold", [])
+	try {
+		Definition[1]["section"] := "missing_child_template"
+		AssertEqual(false, MenuRenderer_TemplateRows("tap_hold_key_head", Commands, Getters, Children),
+			"missing include cannot return a partial key head")
+		Definition[1]["section"] := "tap_hold_key_head"
+		AssertEqual(false, MenuRenderer_TemplateRows("tap_hold_key_head", Commands, Getters, Children),
+			"cyclic include cannot recurse forever")
+		Definition[1]["section"] := PreviousInclude
+		Definition[3]["caption_getter"] := "missing_getter"
+		AssertEqual(false, MenuRenderer_TemplateRows("tap_hold_key_head", Commands, Getters, Children),
+			"missing caption getter cannot return a partial key head")
+		Definition[3]["caption_getter"] := PreviousGetter
+		Getters["tap_hold_key_tap_caption"] := 42
+		AssertEqual(false, MenuRenderer_TemplateRows("tap_hold_key_head", Commands, Getters, Children),
+			"non-callable caption getter cannot return a partial key head")
+		Getters["tap_hold_key_tap_caption"] := () => 42
+		AssertEqual(false, MenuRenderer_TemplateRows("tap_hold_key_head", Commands, Getters, Children),
+			"non-string caption cannot return a partial key head")
+		Getters["tap_hold_key_tap_caption"] := () => "copy 100%"
+		AssertEqual(false, MenuRenderer_TemplateRows("tap_hold_key_head", Commands, Getters, Map()),
+			"missing picker children cannot return a partial key head")
+	} finally {
+		Definition[1]["section"] := PreviousInclude
+		Definition[3]["caption_getter"] := PreviousGetter
+	}
+}
+Test("tap-holds: declared key head refuses missing or cyclic data (tap-hold-key-head)",
+	_THHS_KeyHeadRefusesBrokenData)

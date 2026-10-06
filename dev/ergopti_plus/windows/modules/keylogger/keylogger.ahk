@@ -470,7 +470,7 @@ KL_EnsureGitignore() {
 ; ========================================
 
 KL_AppendLog(entry, &RejectedBySuspend := false, PublishGuard := unset,
-	PublishCommit := unset) {
+	PublishCommit := unset, FrozenClose := unset) {
 	RejectedBySuspend := false
     ; Hot path. Optimisations applied (see Section 2 latency caches):
     ;  - persistent FileObject handle: avoids open/close ≈ 0.5-2 ms each
@@ -498,6 +498,11 @@ KL_AppendLog(entry, &RejectedBySuspend := false, PublishGuard := unset,
 		RejectedBySuspend := true
 		return false
 	}
+	; A stopped focus invalidator cannot classify new telemetry. Only an exact,
+	; content-free closing row can carry its previously accepted interval instead.
+	FrozenClosing := IsSet(FrozenClose)
+	if FrozenClosing && !_KL_IsFrozenSessionClose(entry, FrozenClose, PublishCommit?)
+		return false
     ; Privacy filters — drop anything captured while the focused window is
     ; on the user's exclusion list, in private browsing, or in a system-
     ; auth dialog. The check is cached for ~250 ms so the per-keystroke
@@ -505,7 +510,8 @@ KL_AppendLog(entry, &RejectedBySuspend := false, PublishGuard := unset,
     ; gracefully (filters stay off rather than crashing the hot path).
     filtered := false
     try {
-        filtered := MF_ShouldFilter()
+        if !FrozenClosing
+            filtered := MF_ShouldFilter()
     } catch {
         ; Module not loaded or error — fail closed (treat as filtered) so sensitive
         ; data is never logged when the privacy module is unavailable.
@@ -577,7 +583,13 @@ KL_AppendLog(entry, &RejectedBySuspend := false, PublishGuard := unset,
 		; mutation; the optional commit is memory-only and shares that transaction.
 		if IsSet(PublishGuard) && !PublishGuard.Call()
 			return false
+		; A supplied guard may synchronously reenter, replace an owner, or alter
+		; the row. Check its immutable preimage after that call, before allocating.
+		if FrozenClosing && !_KL_IsFrozenSessionClose(entry, FrozenClose, PublishCommit?)
+			return false
 		KL_AssignStableEventId(entry)
+		if FrozenClosing && !_KL_IsFrozenSessionClose(entry, FrozenClose, PublishCommit?, true)
+			return false
 		Keylogger._pending_entries.Push(entry)
 		Keylogger.health_events_session += 1
 		if IsSet(PublishCommit)
@@ -791,15 +803,6 @@ KL_LogWindowSwitch(app_name, prev_title, next_title, duration_ms := 0) {
     ))
 }
 
-KL_LogShortcut(shortcut_key, app_name := "Unknown") {
-    if (shortcut_key = "")
-        return
-    KL_AppendLog(Map(
-        "type", "shortcut",
-        "key",  shortcut_key,
-        "app",  app_name
-    ))
-}
 
 KL_LogSystemEvent(action, metadata := unset) {
     e := Map("type", "system_event", "action", action)

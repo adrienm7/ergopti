@@ -136,6 +136,23 @@ HSE_TerminalTransactionPending() {
 		|| (_HSE_TerminalReplayPending is Map)
 }
 
+; Optional authority comes only from an explicitly adopted native producer.
+; Ordinary and built-in Specs retain their existing sender behavior.
+_HSE_PublicationGuardCurrent(Spec) {
+	if !Spec.HasOwnProp("PublicationCurrent")
+		return true
+	try {
+		Receipt := Spec.PublicationCurrent.Call()
+		return (Receipt is Integer) && Receipt == 1
+	}
+	catch
+		return false
+}
+
+_HSE_PublishGuarded(Spec, SendFn) {
+	return _HSE_PublicationGuardCurrent(Spec) ? SendFn.Call() : false
+}
+
 _HSE_TerminalOwnerIsCurrent(Owner) {
 	global _HSE_TerminalOwner, HSE_RegistryGeneration, HSE_RuntimeDecisionGeneration
 	global _PrefixInputContextGeneration, _PrefixDeferredGeneration, HSE_Buffer
@@ -143,6 +160,14 @@ _HSE_TerminalOwnerIsCurrent(Owner) {
 		return false
 	if A_IsSuspended
 		return false
+	if Owner.Has("PublicationCurrent") {
+		try {
+			Receipt := Owner["PublicationCurrent"].Call()
+			if !(Receipt is Integer) || Receipt != 1
+				return false
+		} catch
+			return false
+	}
 	if (HSE_RegistryGeneration != Owner["RegistryGeneration"]
 			|| HSE_RuntimeDecisionGeneration != Owner["DecisionGeneration"]
 			|| _PrefixInputContextGeneration != Owner["InputGeneration"]
@@ -359,6 +384,7 @@ _HSE_ReleaseTerminalCapture(Owner, Committed) {
 	Replay := Map("Token", Owner["Id"], "Committed", Committed,
 		"Port", Owner.Get("Port", 0),
 		"TrailingText", Committed ? Owner.Get("TrailingText", "") : "",
+		"UserCodeOwned", Owner.Get("UserCodeOwned", false),
 		"TrailingChars", Committed ? Owner.Get("TrailingChars", []) : [],
 		"ObservedChars", [],
 		"ReplayVisibleFn", Owner.Get("ReplayVisibleFn", 0))
@@ -472,6 +498,18 @@ _HSE_FinishTerminalOwner(Owner, OutputSucceeded, TrailingText := "") {
 	return Committed
 }
 
+_HSE_EmitOwnedTerminalBurst(Owner, Payload) {
+	PreviousCritical := Critical("On")
+	try {
+		if !_HSE_TerminalOwnerIsCurrent(Owner)
+			return false
+		if HasMethod(Owner["EmitFn"], "Call")
+			return _SendVerdictSucceeded(Owner["EmitFn"].Call(Payload))
+		SendEvent(Payload)
+		return true
+	} finally Critical(PreviousCritical)
+}
+
 _HSE_RunOwnedTerminalTransaction(Owner) {
 	global HSE_Buffer
 	RunnerCritical := Critical("On")
@@ -496,7 +534,8 @@ _HSE_RunOwnedTerminalTransaction(Owner) {
 			OutputSucceeded := _HSE_SendTerminalPaced(
 				Owner["Backspaces"] + _TextCodepointLength(TrailingText),
 				Tail, Owner["DelayMs"],
-				Owner["EmitFn"], Owner["DelayFn"])
+				Owner.Has("PublicationCurrent") ? _HSE_EmitOwnedTerminalBurst.Bind(Owner) : Owner["EmitFn"],
+				Owner["DelayFn"])
 			if !OutputSucceeded
 				try LoggerError("HSE", "Terminal expansion sender refused an event.")
 		}
@@ -549,6 +588,232 @@ _HSE_BeginOwnedTerminalTransaction(Owner, SchedulerFn := 0) {
 		return false
 	}
 	return Owner
+}
+
+/** Captures local dispatch authority before preflight or host-resolution callouts. */
+_HSE_CaptureNotepadDispatchState() {
+	global HSE_Buffer, HSE_RegistryGeneration, HSE_RuntimeDecisionGeneration
+	global _PrefixInputContextGeneration, _PrefixDeferredGeneration, _PrefixContentGeneration
+	PreviousCritical := Critical("On")
+	try {
+		if !IsSet(HSE_Buffer) || !IsSet(HSE_RegistryGeneration)
+				|| !IsSet(HSE_RuntimeDecisionGeneration) || !IsSet(_PrefixInputContextGeneration)
+				|| !IsSet(_PrefixDeferredGeneration) || !IsSet(_PrefixContentGeneration)
+			return 0
+		return Map("Buffer", HSE_Buffer, "RegistryGeneration", HSE_RegistryGeneration,
+			"DecisionGeneration", HSE_RuntimeDecisionGeneration,
+			"InputGeneration", _PrefixInputContextGeneration,
+			"LifecycleGeneration", _PrefixDeferredGeneration,
+			"ContentGeneration", _PrefixContentGeneration)
+	} finally Critical(PreviousCritical)
+}
+
+/** Freezes the literal Notepad edit while dispatch still owns its typed suffix. */
+_HSE_NewNotepadOwner(Spec, Replacement, EndCharPart, EraseUnits, Backspaces,
+		OutputHost, SyntheticOwner, DispatchState) {
+	global _HSE_TerminalOwnerSerial
+	if !(DispatchState is Map)
+		throw Error("The Notepad request requires initialized prefix ownership.")
+	Snapshot := DispatchState["Buffer"]
+	if !(EraseUnits is Integer) || EraseUnits < 0 || EraseUnits > StrLen(Snapshot)
+		throw ValueError("The Notepad erasure must fit the captured hotstring buffer.")
+	Owner := Map(
+		"Id", ++_HSE_TerminalOwnerSerial, "Pending", true, "NativeLiteral", true,
+		"FinalSucceeded", false, "Committed", false, "CompletionClaimed", false,
+		"OutputOwnershipReleased", false, "EraseUnits", EraseUnits,
+		"Backspaces", Backspaces, "BufferSnapshot", Snapshot,
+		"DeletedText", EraseUnits ? SubStr(Snapshot, StrLen(Snapshot) - EraseUnits + 1) : "",
+		"PlainInsertedText", Replacement . EndCharPart, "EndCharPart", EndCharPart,
+		"FinalizerClaimed", false,
+		"OnlyText", true, "TrailingText", "", "TrailingChars", [],
+		"Hwnd", OutputHost["Hwnd"], "Pid", OutputHost["Pid"],
+		"RegistryGeneration", DispatchState["RegistryGeneration"],
+		"DecisionGeneration", DispatchState["DecisionGeneration"],
+		"InputGeneration", DispatchState["InputGeneration"],
+		"ContentGeneration", DispatchState["ContentGeneration"],
+		"LifecycleGeneration", DispatchState["LifecycleGeneration"],
+		"Trigger", Spec.Trigger, "ReplacementForLog", Replacement,
+		"HType", IsSet(_ResolveFireHType) ? _ResolveFireHType(Spec) : "star",
+		"Category", Spec.HasOwnProp("Category") ? Spec.Category : "",
+		"Section", Spec.HasOwnProp("Section") ? Spec.Section : "",
+		"IsPrivate", Spec.HasOwnProp("IsPrivate") && Spec.IsPrivate,
+		"SyntheticOwner", SyntheticOwner)
+	if Spec.HasOwnProp("PublicationCurrent")
+		Owner["PublicationCurrent"] := Spec.PublicationCurrent
+	if Spec.HasOwnProp("UserCodeGeneration")
+		Owner["UserCodeOwned"] := true
+	return Owner
+}
+
+/** Admission preserves the original suffix; a later visible character revokes it. */
+_HSE_NotepadOwnerIsCurrent(Owner) {
+	global HSE_Buffer, _PrefixContentGeneration
+	return _HSE_TerminalOwnerIsCurrent(Owner)
+		&& HSE_Buffer == Owner["BufferSnapshot"]
+		&& _PrefixContentGeneration == Owner["ContentGeneration"]
+}
+
+/** The initiating callback already fed HSE and LLM; preview waits for completion. */
+_HSE_RetainNotepadPrefixChar(Owner, Char) {
+	if !(Owner is Map) || !Owner.Get("NativeLiteral", false)
+		return false
+	if Owner["Pending"]
+		Owner["PendingPrefixChar"] := Char
+	return true
+}
+
+/** TextSender calls this after its native output verdict, before completion. */
+_HSE_CommitNotepadOwner(Owner) {
+	global _HSE_TerminalOwner, HSE_Buffer, HSE_StartIsWordBoundary
+	global HSE_RegistryGeneration, HSE_RuntimeDecisionGeneration
+	global _PrefixInputContextGeneration, _PrefixDeferredGeneration, _PrefixPrivateResidue
+	global _PrefixContentGeneration
+	if !A_IsCritical
+		throw Error("The Notepad canonical commit requires a Critical transaction.")
+	if Owner.Has("PublicationCurrent") {
+		try PublicationReceipt := Owner["PublicationCurrent"].Call()
+		catch
+			throw Error("The Notepad canonical commit lost its publication authority.")
+		if !(PublicationReceipt is Integer) || PublicationReceipt != 1
+			throw Error("The Notepad canonical commit lost its publication authority.")
+	}
+	if _HSE_TerminalOwner != Owner || !Owner["Pending"] || Owner["CompletionClaimed"]
+		throw Error("The Notepad canonical commit has no current owner.")
+	if Owner["Committed"]
+		return 0
+	if A_IsSuspended || HSE_Buffer != Owner["BufferSnapshot"]
+			|| HSE_RegistryGeneration != Owner["RegistryGeneration"]
+			|| HSE_RuntimeDecisionGeneration != Owner["DecisionGeneration"]
+			|| _PrefixInputContextGeneration != Owner["InputGeneration"]
+			|| _PrefixContentGeneration != Owner["ContentGeneration"]
+			|| _PrefixDeferredGeneration != Owner["LifecycleGeneration"]
+		throw Error("The Notepad canonical commit lost its original input context.")
+	InsertedText := Owner["PlainInsertedText"]
+	Effect := { ClearAll: false, DeleteFromEnd: Owner["EraseUnits"],
+		InsertedText: InsertedText, EndCharEmitted: Owner["EndCharPart"] != "",
+		KnownBoundaryAfter: InsertedText != ""
+			&& InStr(_HSE_WordBoundarySet(), SubStr(InsertedText, -_TextTailCodeUnits(InsertedText, 1))) > 0 }
+	PreviousBuffer := HSE_Buffer
+	PreviousBoundary := HSE_StartIsWordBoundary
+	try {
+		HSE_Buffer := SubStr(HSE_Buffer, 1, StrLen(HSE_Buffer) - Owner["EraseUnits"]) . InsertedText
+		_HSE_TrimBufferToCapacity()
+		_HSE_MirrorCanonicalEffectToLlm(Effect)
+		UpdateLastSentCharacter(SubStr(InsertedText, -_TextTailCodeUnits(InsertedText, 1)))
+	} catch {
+		HSE_Buffer := PreviousBuffer
+		HSE_StartIsWordBoundary := PreviousBoundary
+		throw
+	}
+	if Owner["IsPrivate"]
+		_PrefixPrivateResidue := true
+	Owner["Effect"] := Effect
+	Owner["CommitBuffer"] := HSE_Buffer
+	Owner["CommitContextGeneration"] := _PrefixInputContextGeneration
+	Owner["CommitContentGeneration"] := _PrefixContentGeneration
+	Owner["Committed"] := true
+	return _HSE_FinishNotepadCommit.Bind(Owner)
+}
+
+/** Presentation and metrics run after the RAM transaction, once per output. */
+_HSE_FinishNotepadCommit(Owner) {
+	global HSE_Buffer, _PrefixInputContextGeneration, _PrefixContentGeneration
+	if Owner["FinalizerClaimed"]
+		return
+	Owner["FinalizerClaimed"] := true
+	if HSE_Buffer == Owner["CommitBuffer"]
+			&& _PrefixInputContextGeneration == Owner["CommitContextGeneration"]
+			&& _PrefixContentGeneration == Owner["CommitContentGeneration"]
+		_PrefixCommitPostFireEffect(Owner["Effect"])
+	_HSE_QueueFireLog(Owner["Trigger"], Owner["ReplacementForLog"],
+		Owner["HType"], Owner["Category"], Owner["Section"], Owner["IsPrivate"])
+}
+
+/** An unverified edit invalidates mirrors; it never retries or reports a fire. */
+_HSE_RecoverNotepadOwner(Owner, CommitError := "") {
+	if !A_IsCritical
+		throw Error("The Notepad mirror recovery requires a Critical transaction.")
+	Owner["Committed"] := false
+	Owner["Recovered"] := true
+	_LLM_Bridge_ApplyBufferEdit()
+	Commit := _PrefixCommitInputContext(0, false)
+	_LSCResetFrom([])
+	return _PrefixFinishInputContext.Bind(Commit)
+}
+
+/** Claims completion once; native worker memory remains backend-owned. */
+_HSE_CompleteNotepadOwner(Owner, Ok := true, ErrorMessage := "") {
+	global _HSE_TerminalOwner, HSE_Buffer, _PrefixContentGeneration
+	global HSE_RegistryGeneration, HSE_RuntimeDecisionGeneration
+	global _PrefixInputContextGeneration, _PrefixDeferredGeneration
+	AppendTrigger := false
+	PreviousCritical := Critical("On")
+	try {
+		if Owner["CompletionClaimed"]
+			return Owner["FinalSucceeded"]
+		Owner["CompletionClaimed"] := true
+		Owner["Pending"] := false
+		Owner["FinalSucceeded"] := (Ok is Integer) && Ok == true && Owner["Committed"]
+		AppendTrigger := !Owner["Committed"] && !Owner.Get("Recovered", false)
+			&& Owner.Has("PendingPrefixChar") && HSE_Buffer == Owner["BufferSnapshot"]
+			&& _PrefixContentGeneration == Owner["ContentGeneration"]
+			&& HSE_RegistryGeneration == Owner["RegistryGeneration"]
+			&& HSE_RuntimeDecisionGeneration == Owner["DecisionGeneration"]
+			&& _PrefixInputContextGeneration == Owner["InputGeneration"]
+			&& _PrefixDeferredGeneration == Owner["LifecycleGeneration"]
+		if AppendTrigger
+			Owner["RefusalContentGeneration"] := _PrefixSetBuffer(_PrefixWordTail(HSE_Buffer))
+		if _HSE_TerminalOwner == Owner
+			_HSE_TerminalOwner := 0
+	} finally Critical(PreviousCritical)
+	try {
+		if AppendTrigger && _PrefixContentGeneration == Owner["RefusalContentGeneration"]
+			_PrefixScheduleRender()
+		if !Owner["FinalSucceeded"]
+			LoggerError("HSE", "Notepad expansion did not complete its canonical commit: {1}.", ErrorMessage)
+		else if ErrorMessage != ""
+			LoggerWarn("HSE", "Notepad expansion completed with a non-retryable warning: {1}.", ErrorMessage)
+	} finally {
+		if !Owner["OutputOwnershipReleased"] {
+			Owner["OutputOwnershipReleased"] := true
+			_HSE_ClearTerminalOutputOwnership(Owner)
+		}
+	}
+	return Owner["FinalSucceeded"]
+}
+
+/** Publishes before calling the sender so inline completion sees the same owner. */
+_HSE_BeginOwnedNotepadTransaction(Owner, SendFn := unset) {
+	global _HSE_TerminalOwner
+	if !IsSet(SendFn)
+		SendFn := TextSend
+	if !HasMethod(SendFn, "Call") {
+		_HSE_CompleteNotepadOwner(Owner, false, "the native text sender is not callable")
+		throw TypeError("The native text sender must be callable.")
+	}
+	PreviousCritical := Critical("On")
+	try {
+		Occupied := HSE_TerminalTransactionPending()
+		if !Occupied
+			_HSE_TerminalOwner := Owner
+	} finally Critical(PreviousCritical)
+	if Occupied {
+		_HSE_CompleteNotepadOwner(Owner, false, "another hotstring output owns completion")
+		return false
+	}
+	Opts := Map("mode", "native", "erase_before", Owner["Backspaces"],
+		"deleted_text", Owner["DeletedText"],
+		"admission", _HSE_NotepadOwnerIsCurrent.Bind(Owner),
+		"atomic_commit", _HSE_CommitNotepadOwner.Bind(Owner),
+		"commit_failure", _HSE_RecoverNotepadOwner.Bind(Owner))
+	try SendFn.Call(Owner["PlainInsertedText"], Opts,
+		_HSE_CompleteNotepadOwner.Bind(Owner))
+	catch as Err {
+		if Owner["Pending"]
+			_HSE_CompleteNotepadOwner(Owner, false, Err.Message)
+		throw Err
+	}
+	return Owner["Pending"] || Owner["FinalSucceeded"] ? Owner : false
 }
 
 _HSE_RejectTerminalOwner(Owner) {
@@ -611,6 +876,55 @@ _HSE_MirrorCanonicalEffectToLlm(Effect) {
 				LLM_Bridge_MirrorAgentEdit(Effect.DeleteFromEnd, Effect.InsertedText,
 						Effect.HasOwnProp("ClearAll") and Effect.ClearAll)
 		}
+}
+
+/** Resolves a declared prepare-only raw callback before scheduling native output. */
+_HSE_DispatchNotepadRawCallback(Spec, EndChar, OutputHost, DispatchState,
+		SendFn := unset) {
+	if !Spec.HasOwnProp("SupportsPreparation")
+			|| !(Spec.SupportsPreparation is Integer) || Spec.SupportsPreparation != true
+		return false
+	if !(DispatchState is Map) || !Spec.HasOwnProp("Callback")
+			|| !HasMethod(Spec.Callback, "Call")
+		return false
+	try Prepared := (Spec.Callback)(EndChar, true)
+	catch {
+		LoggerError("HSE", "Notepad raw preparation failed; exception detail withheld.")
+		return false
+	}
+	if !IsObject(Prepared) || !Prepared.HasOwnProp("Prepared")
+			|| !(Prepared.Prepared is Integer) || Prepared.Prepared != true
+			|| !Prepared.HasOwnProp("Ok") || !(Prepared.Ok is Integer) || Prepared.Ok != true
+			|| !Prepared.HasOwnProp("Bs") || !(Prepared.Bs is Integer) || Prepared.Bs < 0
+			|| !Prepared.HasOwnProp("Ins") || !(Prepared.Ins is String)
+		return false
+	if Prepared.Bs > _TextCodepointLength(DispatchState["Buffer"])
+			|| (Prepared.Bs == 0 && Prepared.Ins == "")
+		return false
+	EraseUnits := _TextTailCodeUnits(DispatchState["Buffer"], Prepared.Bs)
+	if IsSet(PrefixWatcherSuppress)
+		PrefixWatcherSuppress(true)
+	else
+		HSE_Suppress(true)
+	SyntheticOwner := 0
+	Transferred := false
+	try {
+		SyntheticOwner := KL_MarkSynthetic("hotstring",
+			Spec.HasOwnProp("IsPrivate") && Spec.IsPrivate)
+		Owner := _HSE_NewNotepadOwner(Spec, Prepared.Ins, "", EraseUnits,
+			Prepared.Bs, OutputHost, SyntheticOwner, DispatchState)
+		Transferred := true
+		return _HSE_BeginOwnedNotepadTransaction(Owner, SendFn?)
+	} finally {
+		if !Transferred {
+			try {
+				if IsSet(PrefixWatcherSuppress)
+					PrefixWatcherSuppress(false)
+				else
+					HSE_Suppress(false)
+			} finally KL_ClearSynthetic(SyntheticOwner)
+		}
+	}
 }
 
 ; Dispatch a "raw callback" hotstring (the natives migrated into the HSE: the
@@ -828,7 +1142,7 @@ _HSE_PrepareDispatchDecision(Spec, BufferAfterCompletion, EndChar,
 ; a fire — or stripping the preview buffer — for a decline reports an expansion the
 ; user never saw.
 HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
-		ForceConsumeEndChar := false) {
+		ForceConsumeEndChar := false, NativeSendFn := unset) {
 		global HSE_SUPPRESS_RELEASE_DELAY_MS, _SendHook, HSE_TypoNbspStripped, HSE_Buffer
 		global _HSE_TerminalOwnerSerial, HSE_RegistryGeneration, HSE_RuntimeDecisionGeneration
 		global _PrefixInputContextGeneration, _PrefixDeferredGeneration
@@ -841,11 +1155,15 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 		; route them to _HSE_DispatchRawCallback so the engine never auto-strips a
 		; trigger the callback may have left in place.
 		if (Spec.HasOwnProp("RawCallback") and Spec.RawCallback) {
+				RawDispatchState := _HSE_CaptureNotepadDispatchState()
 				RawHostStarted := HotPath_Now()
 				RawHost := OutputHostResolve(_HSE_OutputHostNeedsTitle)
 				HotPath_LogIfSlow("HSE.OutputHost", RawHostStarted, "raw=true")
 				if !RawHost["Valid"]
 					return false
+				if OutputHostTakesTextByPaste(RawHost)
+					return _HSE_DispatchNotepadRawCallback(Spec, EndChar, RawHost,
+						RawDispatchState, NativeSendFn?)
 				if _HSE_IsTerminalInputHost(RawHost["Exe"], RawHost["Title"])
 					return _HSE_DispatchTerminalRawCallback(Spec, EndChar, RawHost)
 				; Propagate the callback's own verdict: it alone knows whether it expanded.
@@ -861,6 +1179,7 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 		; If the currently visible row owns a resolved dynamic value, claim it only
 		; when its registry identity and exact input context still match. Preflight
 		; then rechecks the live time/case gates while reusing that shown value.
+		DispatchState := _HSE_CaptureNotepadDispatchState()
 		VisibleDecision := 0
 		PreflightStarted := HotPath_Now()
 		if IsSet(HotstringPrefixWatcherClaimVisibleDecision)
@@ -952,31 +1271,11 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 					Burst := BackSpaceSeq . ReplacementPart . EndCharPart
 
 				if IsNotepadApp {
-						; Windows-11 Notepad mis-handles SendInput-injected hotstrings, so the
-						; replacement is routed through the clipboard. SendInstant accepts the
-						; erase sequence as a prefix and injects it with Ctrl+V in one SendInput
-						; burst, so no physical key can land between erase and paste.
-						; Mirror the atomic branch's consumed-delimiter guard so a space
-						; (or any other consumed end-char) is not re-injected after the
-						; clipboard paste — same contract as the SendInput path.
-						EndCharEmitted := (EndChar != "" and !ForceConsumeEndChar
-								and !InStr(HSE_CONSUMED_DELIMITERS, EndChar)) ? EndChar : ""
-						_NpCrit := Critical("On")
-						PasteStarted := HotPath_Now()
-						try {
-								; BackSpaceSeq is a control sequence, not emitted text. The actual
-								; last character is recorded explicitly below after the atomic paste.
-								Fired := _HSE_SendWithAltGrUp(
-										() => SendInstant(Replacement . EndCharEmitted, BackSpaceSeq))
-						} finally {
-								Critical(_NpCrit)
-						}
-						HotPath_LogIfSlow("HSE.NativeSend", PasteStarted, "branch=paste")
-						if !Fired
-								return false
-						UpdateLastSentCharacter(SubStr(EndCharEmitted != "" ? EndCharEmitted : Replacement,
-							-_TextTailCodeUnits(EndCharEmitted != "" ? EndCharEmitted : Replacement, 1)))
-						SentBurst := BackSpaceSeq . "[clip]" . Replacement . EndCharEmitted
+					; Literal native output owns completion; scheduling is never a fire.
+					DeferredOwner := _HSE_NewNotepadOwner(Spec, Replacement,
+						EndCharPart, EraseUnits, BSCount, OutputHost, SyntheticOwner, DispatchState)
+					TerminalOwnershipTransferred := true
+					return _HSE_BeginOwnedNotepadTransaction(DeferredOwner, NativeSendFn?)
 				} else if IsTerminalApp {
 						; OpenTUI/React-style prompts commit deletion state once per render
 						; turn. SendInput's zero-delay Backspace array makes every handler see
@@ -1022,6 +1321,10 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 									"SyntheticOwner", SyntheticOwner,
 									"Port", 0
 								)
+								if Spec.HasOwnProp("PublicationCurrent")
+									DeferredOwner["PublicationCurrent"] := Spec.PublicationCurrent
+								if Spec.HasOwnProp("UserCodeGeneration")
+									DeferredOwner["UserCodeOwned"] := true
 								TerminalOwnershipTransferred := true
 								BeginResult := _HSE_BeginOwnedTerminalTransaction(DeferredOwner)
 								if BeginResult is Map {
@@ -1067,6 +1370,8 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 								; Nested so the burst runs inside _HSE_SendWithAltGrUp; it reads the
 								; burst and the hook from this call.
 								SendAtomicBurst() {
+										if !_HSE_PublicationGuardCurrent(Spec)
+												return false
 										if _SendHook {
 												Hook := _SendHook
 												return _SendVerdictSucceeded(Hook("SendFinalResult", Burst, false))

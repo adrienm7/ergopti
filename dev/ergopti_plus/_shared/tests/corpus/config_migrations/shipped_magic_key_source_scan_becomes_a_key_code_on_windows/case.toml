@@ -5,4 +5,4 @@ description = "The shipped v4 to v5 step turns the Windows magic-key scan code i
 drivers = ["ahk"]
 outcome = "migrated"
 from_version = 4
-to_version = 9
+to_version = 11

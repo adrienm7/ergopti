@@ -42,6 +42,7 @@ local function with_scope(body)
 					return true
 				end,
 			}
+			require("tests.support.owned_http_fixture").attach(package.loaded["adapters.http_client"])
 			local overlay = require("ui.tooltip.llm")
 			overlay.init({ style = {}, renderer = {
 				show = function() controls.visible = true; return true end,

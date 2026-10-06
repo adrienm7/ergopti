@@ -262,6 +262,56 @@ _DigitRowProfile(Hkl) {
 	return _DigitRowProfiles[Hkl]
 }
 
+/** Returns typed effective intent; category masking never treats a string as a switch. */
+NumberRowEffectiveMode() {
+	global Features, CategoryEnabled
+	; Parse-time criteria can run during Bundle_Init, before category publication.
+	; Only the actual admitted Layout switch may enable a non-native policy.
+	if !IsSet(Features) || !(Features is Map) || !Features.Has("layout") || !(Features["layout"] is Map)
+			|| !IsSet(CategoryEnabled) || !(CategoryEnabled is Map) || !CategoryEnabled.Has("Layout")
+			|| !(CategoryEnabled["Layout"] is Integer) || CategoryEnabled["Layout"] != true
+		return "native"
+	Mode := NumberRowPolicyMode(Features["layout"].Get("direct_access_digits", ""))
+	; Capability dependencies are also unpublished during the first pump. A
+	; contained admission leaves native input authoritative on an unset source.
+	if Mode == "symbols" {
+		Supported := false
+		try NumberRowSymbolsAdmission(GetKeyState("CapsLock", "T"), &Supported)
+		if !Supported
+			return "native"
+	}
+	return Mode
+}
+
+/** Publishes capability only after the existing source owner returns exact true. */
+NumberRowSymbolsAdmission(Caps, &Supported) {
+	Supported := false
+	Observed := NumberRowSymbolsCapable(Caps)
+	Supported := (Observed is Integer) && Observed == true
+}
+
+/** Resolves the symbols-first level from the currently selected registry source. */
+NumberRowSymbolsLevel(Sc, Caps) {
+	global KLE_Id, Features
+	Refused := Map("supported", false, "shift", false)
+	if !IsSet(Features) || !(Features is Map) || !IsSet(KLE_Id) || !(KLE_Id is String)
+			|| !((Caps is Integer) && (Caps == true || Caps == false)) || !KeylayoutEmulation_LayerIsActive("ergopti_base")
+			|| Sc < 0x02 || Sc > 0x0B
+			|| StrCompare(KLE_Id, KeylayoutEmulation_SelectedId(MasterGateDesiredFeatures(Features)), true) != 0
+		return Refused
+	Levels := KeylayoutEmulation_NumberRowLevels(Sc, Caps)
+	return Levels is Map ? NumberRowPolicySymbolsShift(Mod(Sc - 1, 10) . "", Levels["plain"], Levels["shift"]) : Refused
+}
+
+/** Every physical position must have a genuine source pair before offering symbols. */
+NumberRowSymbolsCapable(Caps) {
+	Loop 10 {
+		if !NumberRowSymbolsLevel(A_Index + 1, Caps)["supported"]
+			return false
+	}
+	return true
+}
+
 ; Resolve one effective digit-row key before the override chooses its level.
 ; The native profile retains its measured MapVirtualKeyEx/VkKeyScan behavior.
 ; A registry source instead owns its actual neutral-state descriptors, including
@@ -272,7 +322,7 @@ _DigitRowProfile(Hkl) {
 ; @return {Map} Swap, Source and Descriptor; inspection never changes KLE_State.
 _DigitRowSwapResolution(Sc, Hkl, Caps := unset) {
 	global Features
-	if !Features["layout"].Get("direct_access_digits", false) || Sc < 0x02 || Sc > 0x0B
+	if NumberRowEffectiveMode() != "digits" || Sc < 0x02 || Sc > 0x0B
 		return Map("swap", false, "source", "native", "descriptor", 0)
 	if !IsSet(Caps)
 		Caps := GetKeyState("CapsLock", "T")

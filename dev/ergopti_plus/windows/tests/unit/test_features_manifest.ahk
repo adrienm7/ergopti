@@ -515,7 +515,7 @@ TestFMv2_LegacyZeroOneBooleansMigrate() {
 			. "context_length = 0`r`n"
 			. "[script]`r`n"
 			. "locale = " . '"' . "es" . '"' . "`r`n"
-			. "[hotstrings.autocorrection.caps]`r`n"
+			. "[hotstrings.autocorrection.names]`r`n"
 			. "time_activation_seconds = true`r`n")
 		Applied := ApplyConfigToml(Features, Path, &Rejected, , &Outdated)
 		AssertEqual(6, Applied,
@@ -1164,3 +1164,727 @@ TestFMv2_PersonalEditorHasNoDedicatedMagicBinding() {
 }
 Test("layout: editor shortcuts belong only to ordinary user-owned assignments (hotstrings-editor-ordinary-slot)",
 	TestFMv2_PersonalEditorHasNoDedicatedMagicBinding)
+
+
+; =======================================================
+; =======================================================
+; ======= 8/ Semantic configuration snapshot ============
+; =======================================================
+; =======================================================
+
+; Each native case owns real source bytes and an isolated cache identity.
+_FMS_WithSource(Tag, Source, Body) {
+	global _ParseTomlCache, _TomlFileCache, _ConfigTomlSnapshots
+	global _ConfigBootReadFailed, _ConfigBootRejectedOverrides, _ConfigBootOutdatedEntries
+	Path := _FM_WriteFixture("semantic_" . Tag . "_" . ProcessExist(), Source)
+	OldRead := _ConfigBootReadFailed, OldRejected := _ConfigBootRejectedOverrides
+	OldOutdated := _ConfigBootOutdatedEntries
+	PriorRefusal := TOML_WriteRefusal(Path)
+	try return Body.Call(Path)
+	finally {
+		_ConfigBootReadFailed := OldRead
+		_ConfigBootRejectedOverrides := OldRejected
+		_ConfigBootOutdatedEntries := OldOutdated
+		if PriorRefusal == "" && _TOML_WriteRefusals().Has(_TOML_WriteRefusalKey(Path))
+			_TOML_WriteRefusals().Delete(_TOML_WriteRefusalKey(Path))
+		for Store in [_ParseTomlCache, _TomlFileCache, _ConfigTomlSnapshots] {
+			if Store.Has(Path)
+				Store.Delete(Path)
+		}
+		try FileDelete(Path)
+	}
+}
+
+_FMS_RootAndSectionRows(Path) {
+	Cache := ParseConfigTomlFile(Path)
+	AssertEqual("@", IniCacheGet(Cache, "hotstrings", "trigger_char"))
+	AssertEqual(true, IniCacheGet(Cache, "category_enabled", "hotstrings"))
+	AssertEqual("none", IniCacheGet(Cache, "shortcuts.keyboard", "win_space"))
+	Target := ManifestBuildFeaturesMap()
+	Target["hotstrings"]["autocorrection"]["names"]["enabled"] := false
+	Assert(ApplyConfigToml(Target, Path) >= 1, "at least the actual known dotted feature must apply")
+	AssertTrue(Target["hotstrings"]["autocorrection"]["names"]["enabled"])
+	AssertEqual(false, TOML_UnreadableFile(Path))
+}
+_FMS_RootSettingsAndDottedFeatureApply() {
+	Source := 'hotstrings.trigger_char = "@"`ncategory_enabled.hotstrings = true`nshortcuts.keyboard.win_space = "none"`nhotstrings.autocorrection.names.enabled = true`n'
+	_FMS_WithSource("root", Source, _FMS_RootAndSectionRows)
+	Source := '[hotstrings]`ntrigger_char = "@"`nautocorrection.names.enabled = true`n[category_enabled]`nhotstrings = true`n[shortcuts]`nkeyboard.win_space = "none"`n'
+	_FMS_WithSource("section", Source, _FMS_RootAndSectionRows)
+}
+Test("configuration snapshot: root and dotted settings reach cache and features (config-semantic-snapshot)",
+	_FMS_RootSettingsAndDottedFeatureApply)
+
+_FMS_LiteralAndNested(Path) {
+	Cache := ParseConfigTomlFile(Path)
+	AssertEqual(false, IniCacheGet(Cache, "hotstrings", "autocorrection.names.enabled"))
+	AssertEqual(true, IniCacheGet(Cache, "hotstrings.autocorrection.names", "enabled"))
+	AssertEqual("literal", IniCacheGet(Cache, '"hotstrings.autocorrection.names"', "note"))
+	AssertEqual("_", IniCacheGet(Cache, "hotstrings.autocorrection.names", "note"))
+	Target := ManifestBuildFeaturesMap()
+	Target["hotstrings"]["autocorrection"]["names"]["enabled"] := false
+	ApplyConfigToml(Target, Path)
+	AssertTrue(Target["hotstrings"]["autocorrection"]["names"]["enabled"],
+		"the quoted literal false leaf must never alias the actual nested true preference")
+	AssertEqual(false, IniCacheGet(Cache, "hotstrings", "autocorrection.names.enabled"))
+}
+_FMS_LiteralDotsStayDistinct() {
+	Source := '[hotstrings]`n"autocorrection.names.enabled" = false`nautocorrection.names.enabled = true`n["hotstrings.autocorrection.names"]`nnote = "literal"`n'
+	_FMS_WithSource("literal", Source, _FMS_LiteralAndNested)
+}
+Test("configuration snapshot: literal dots never alias nested settings (config-semantic-snapshot)",
+	_FMS_LiteralDotsStayDistinct)
+
+_FMS_TypedModelsAndIsolation() {
+	Snapshot := ConfigTomlDecodeSnapshot('[future]`ntruth = true`nzero = 0`ntext = "0"`nitems = [false, 1, "true"]`nvalue = { nested = { enabled = true } }`n')
+	Cache := Snapshot.Cache["future"]
+	AssertEqual("Integer", Type(Cache["truth"]))
+	AssertTrue(Cache["truth"])
+	AssertEqual("Integer", Type(Cache["zero"]))
+	AssertEqual(0, Cache["zero"])
+	AssertEqual("String", Type(Cache["text"]))
+	AssertEqual("0", Cache["text"])
+	AssertEqual(3, Cache["items"].Length)
+	AssertEqual(false, Cache["items"][1])
+	AssertEqual(1, Cache["items"][2])
+	AssertEqual("true", Cache["items"][3])
+	Cache["value"]["nested"]["enabled"] := false
+	AssertTrue(Snapshot.Rows[5].Value["nested"]["enabled"], "feature values do not alias the cache")
+	Assert(Snapshot.Document["future"]["value"]["nested"]["enabled"] is TOML_Bool,
+		"the original typed source proof retains Boolean intent")
+	AssertTrue(Snapshot.Document["future"]["value"]["nested"]["enabled"].Value)
+	Assert(Snapshot.Rows[5].Typed["nested"]["enabled"] is TOML_Bool)
+	Snapshot.Document["future"]["value"]["nested"]["enabled"].Value := false
+	AssertTrue(Snapshot.Rows[5].Typed["nested"]["enabled"].Value, "typed row evidence is detached from the document")
+	AssertEqual("true", Snapshot.Rows[5].ChildRaw["nested"]["enabled"], "the exact child raw token remains retained")
+}
+Test("configuration snapshot: nested native values are typed and detached (config-semantic-snapshot)",
+	_FMS_TypedModelsAndIsolation)
+
+_FMS_LegacyBooleans(Path) {
+	Target := ManifestBuildFeaturesMap()
+	AssertEqual(2, ApplyConfigToml(Target, Path, &Rejected, &Migrated, &Outdated))
+	AssertEqual(0, Rejected)
+	AssertEqual(2, Migrated, "bare zero/one preserve the installed legacy Boolean contract")
+	AssertEqual(2, Outdated.Count, "quoted and out-of-range values remain obsolete")
+	AssertTrue(Target["shortcuts"]["screen"])
+	AssertFalse(Target["layout"]["ergopti_base"])
+}
+_FMS_LegacyBooleanCompatibility() {
+	_FMS_WithSource("legacy", 'shortcuts.screen = 1`nlayout.ergopti_base = 0`nshortcuts.microsoft_bold = "true"`nshortcuts.title_case = 2`n',
+		_FMS_LegacyBooleans)
+}
+Test("configuration snapshot: legacy Boolean intent and outdated values stay governed (config-semantic-snapshot)",
+	_FMS_LegacyBooleanCompatibility)
+
+_FMS_RefusesWholeNamespace(Path) {
+	global _ConfigBootReadFailed, _ConfigBootRejectedOverrides
+	Target := ManifestBuildFeaturesMap()
+	Target["layout"]["ergopti_base"] := true
+	_ConfigBootReadFailed := false
+	_ConfigBootRejectedOverrides := 0
+	Cache := ParseConfigTomlFile(Path)
+	AssertEqual(0, Cache.Count, "no incomplete cache may be published")
+	AssertTrue(_ConfigBootReadFailed, "semantic boot refusal must remain session-blocking")
+	AssertEqual(-1, ApplyBootConfigToml(Target, Path))
+	AssertTrue(_ConfigBootRejectedOverrides > 0)
+	AssertTrue(Target["layout"]["ergopti_base"], "the early valid leaf must not publish before duplicate admission")
+	AssertFalse(ConfigFullStateCanPersist())
+	Original := FSRead(Path)
+	AssertFalse(TOML_BatchWrite(Path, [{ Section: "layout", Key: "ergopti_base", Value: TOML_Bool(false) }]))
+	AssertEqual(Original, FSRead(Path))
+	Repaired := '[layout]`nergopti_base = false`n'
+	AssertTrue(FSWriteDurable(Path, Repaired))
+	AssertFalse(IniCacheGet(ParseConfigTomlFile(Path), "layout", "ergopti_base"))
+	AssertTrue(_ConfigBootReadFailed, "manual repair does not complete the prior boot generation")
+	AssertFalse(TOML_BatchWrite(Path, [{ Section: "layout", Key: "ergopti_base", Value: TOML_Bool(true) }]))
+	AssertEqual(Repaired, FSRead(Path), "only a restart can reconsider the semantic boot write refusal")
+}
+_FMS_DuplicatesPublishNothing() {
+	_FMS_WithSource("duplicate", 'layout.ergopti_base = false`n[layout]`nergopti_base = true`n',
+		_FMS_RefusesWholeNamespace)
+}
+Test("configuration snapshot: duplicate namespaces refuse before cache or feature publication (config-semantic-snapshot)",
+	_FMS_DuplicatesPublishNothing)
+
+_FMS_TableArrayGenerationIsolation() {
+	Snapshot := ConfigTomlDecodeSnapshot('[[future]]`nname = "one"`nvalue.enabled = true`n[[future]]`nname = "two"`nvalue.enabled = false`n[layout]`nergopti_base = false`n')
+	AssertEqual(4, Snapshot.SkippedRecords)
+	AssertFalse(Snapshot.Cache.Has("future"))
+	AssertFalse(Snapshot.Cache.Has("future.value"))
+	AssertEqual(1, Snapshot.Rows.Length)
+	AssertEqual("one", Snapshot.Document["future"][1]["name"])
+	AssertEqual("two", Snapshot.Document["future"][2]["name"])
+	AssertTrue(Snapshot.Document["future"][1]["value"]["enabled"].Value)
+	AssertFalse(Snapshot.Document["future"][2]["value"]["enabled"].Value)
+}
+Test("configuration snapshot: table-array generations cannot become last-wins settings (config-semantic-snapshot)",
+	_FMS_TableArrayGenerationIsolation)
+
+_FMS_SnapshotOwnsOneGeneration(Path) {
+	global _ParseTomlCache
+	Cache := ParseConfigTomlFile(Path)
+	Source := FSReadUtf8Exact(Path)
+	AssertTrue(Cache["layout"]["ergopti_base"])
+	External := '[layout]`nergopti_base = false`n'
+	FileDelete(Path)
+	FileAppend(External, Path, "UTF-8")
+	Target := ManifestBuildFeaturesMap()
+	ApplyConfigToml(Target, Path)
+	AssertTrue(Target["layout"]["ergopti_base"], "feature application consumes the same admitted boot generation")
+	_ParseTomlCache.Delete(Path)
+	NewCache := ParseConfigTomlFile(Path)
+	AssertFalse(NewCache["layout"]["ergopti_base"])
+	AssertTrue(Cache["layout"]["ergopti_base"], "retirement must not mutate a prior cache object")
+	Assert(NewCache != Cache, "new source generation owns a new cache")
+	ApplyConfigToml(Target, Path)
+	AssertFalse(Target["layout"]["ergopti_base"])
+	AssertFalse(_TOML_BatchWriteImpl(Path,
+		[{ Section: "layout", Key: "ergopti_base", Value: TOML_Bool(true) }],
+		[], "write", Source, 1),
+		"an old source image cannot acknowledge publication over the new generation")
+	AssertEqual(External, FSRead(Path))
+}
+_FMS_OneAdmittedSourceGeneration() {
+	_FMS_WithSource("generation", '[layout]`nergopti_base = true`n', _FMS_SnapshotOwnsOneGeneration)
+}
+Test("configuration snapshot: boot readers share one generation and invalidation retires identity (config-semantic-snapshot)",
+	_FMS_OneAdmittedSourceGeneration)
+
+_FMS_UnknownScalarsAndWriterPolicy(Path) {
+	Original := FSRead(Path)
+	Cache := ParseConfigTomlFile(Path)
+	AssertEqual("retain", Cache["future"]["old"])
+	ApplyConfigToml(ManifestBuildFeaturesMap(), Path)
+	AssertTrue(TOML_BatchWrite(Path, [{ Section: "hotstrings", Key: "trigger_char", Value: "@" }]))
+	AssertEqual(Original, FSRead(Path), "loading/no-op publication does not clean unowned scalar records")
+	AssertFalse(TOML_BatchWrite(Path, [{ Section: "hotstrings", Key: "trigger_char", Value: "!" }]))
+	AssertEqual(Original, FSRead(Path), "semantic loading does not relax changed dotted-source writer refusal")
+}
+_FMS_UnknownScalarsStayUntilCleanup() {
+	_FMS_WithSource("unknown", 'hotstrings.trigger_char = "@"`n[future]`nold = "retain" # user data`n',
+		_FMS_UnknownScalarsAndWriterPolicy)
+}
+Test("configuration snapshot: unknown scalars survive and writer admission stays strict (config-semantic-snapshot)",
+	_FMS_UnknownScalarsStayUntilCleanup)
+
+_FMS_RepeatedFeatureValuesAreDetached(Path) {
+	ParseConfigTomlFile(Path)
+	Target := ManifestBuildFeaturesMap()
+	AssertEqual(1, ApplyConfigToml(Target, Path))
+	Target["shortcuts"]["take_note"]["enabled"] := false
+	Target["shortcuts"]["take_note"]["destination_folder"] := "changed by the first consumer"
+	Second := ManifestBuildFeaturesMap()
+	AssertEqual(1, ApplyConfigToml(Second, Path))
+	AssertTrue(Second["shortcuts"]["take_note"]["enabled"])
+	AssertEqual("owned", Second["shortcuts"]["take_note"]["destination_folder"],
+		"a feature consumer cannot rewrite the retained admitted source row")
+}
+_FMS_RepeatedFeatureReadUsesOriginalSource() {
+	_FMS_WithSource("detached", '[shortcuts]`ntake_note = { enabled = true, dated_notes = false, destination_folder = "owned" }`n',
+		_FMS_RepeatedFeatureValuesAreDetached)
+}
+Test("configuration snapshot: repeated feature reads detach their retained source values (config-semantic-snapshot)",
+	_FMS_RepeatedFeatureReadUsesOriginalSource)
+
+_FMS_NativeReadRefusalAndRecovery(Path) {
+	global _ConfigBootReadFailed
+	_ConfigBootReadFailed := false
+	Lock := FileOpen(Path, "r-rwd")
+	Assert(IsObject(Lock), "the native read-refusal fixture must acquire its actual exclusive lock")
+	try Cache := ParseConfigTomlFile(Path)
+	finally Lock.Close()
+	AssertEqual(0, Cache.Count)
+	AssertTrue(TOML_UnreadableFile(Path))
+	AssertTrue(_ConfigBootReadFailed)
+	Recovered := ParseConfigTomlFile(Path)
+	AssertEqual("@", IniCacheGet(Recovered, "hotstrings", "trigger_char"))
+	AssertFalse(TOML_UnreadableFile(Path), "a successful native read clears only the per-path read diagnostic")
+	AssertTrue(_ConfigBootReadFailed, "a later successful read cannot rewrite the incomplete boot generation")
+	AssertFalse(ConfigFullStateCanPersist())
+}
+_FMS_ReadFailureRemainsSessionDebt() {
+	_FMS_WithSource("locked", 'hotstrings.trigger_char = "@"`n', _FMS_NativeReadRefusalAndRecovery)
+}
+Test("configuration snapshot: real native read refusal retains boot write protection after recovery (config-semantic-snapshot)",
+	_FMS_ReadFailureRemainsSessionDebt)
+
+_FMS_CaseAndEscapedNames() {
+	Snapshot := ConfigTomlDecodeSnapshot('[hotstrings]`n"trigger\u005fchar" = "@"`n[Hotstrings]`ntrigger_char = "!"`n')
+	AssertEqual("@", IniCacheGet(Snapshot.Cache, "hotstrings", "trigger_char"))
+	AssertEqual("!", IniCacheGet(Snapshot.Cache, "Hotstrings", "trigger_char"))
+	AssertThrows(_FMS_EscapedAlias,
+		"semantic quoted/bare aliases must refuse before either projection is returned")
+}
+_FMS_EscapedAlias() {
+	return ConfigTomlDecodeSnapshot('[hotstrings]`ntrigger_char = "@"`n"trigger\u005fchar" = "!"`n')
+}
+Test("configuration snapshot: escaped aliases refuse and case-distinct namespaces stay distinct (config-semantic-snapshot)",
+	_FMS_CaseAndEscapedNames)
+
+_FMS_GenericParserRemainsFlat(Path) {
+	Cache := ParseTomlFile(Path)
+	AssertFalse(Cache.Has("root"), "generic data-file parsing retains its historical root contract")
+	AssertEqual(7, IniCacheGet(Cache, "settings", "nested.value"))
+	AssertEqual("_", IniCacheGet(Cache, "settings.nested", "value"))
+	Semantic := ConfigTomlDecodeSnapshot(FSRead(Path))
+	AssertEqual(1, IniCacheGet(Semantic.Cache, "root", "value"))
+	AssertEqual(7, IniCacheGet(Semantic.Cache, "settings.nested", "value"))
+}
+_FMS_GenericDataParserCompatibility() {
+	_FMS_WithSource("generic", 'root.value = 1`n[settings]`nnested.value = 7`n', _FMS_GenericParserRemainsFlat)
+}
+Test("configuration snapshot: generic data-file parsing keeps its legacy contract (config-semantic-snapshot)",
+	_FMS_GenericDataParserCompatibility)
+
+; These complete native-cache goldens are handwritten from the independent
+; semantic corpus, never emitted by the new projection implementation.
+_FMS_IndependentDottedCorpus() {
+	global _SharedDir
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\toml\dotted_keys.json", "UTF-8"))
+	AssertEqual(23, Corpus["documents"].Length, "every independent semantic vector remains registered")
+	Caches := Map(
+		"root bare dotted assignment", Map("a", Map("b", 1)),
+		"siblings share one semantic owner", Map("a", Map("b", 1, "c", false)),
+		"root literal and nested dots coexist", Map("", Map("a.b", 1), "a", Map("b", 2)),
+		"section relative dotted assignment", Map("settings.ai", Map("enabled", true, "model", "001")),
+		"array of table owner generations", Map(),
+		"multiline dotted array", Map("a", Map("b", [1, 2])),
+		"multiline dotted string", Map("a", Map("b", "first`nsecond")),
+		"quoted Unicode assignment", Map('"é"', Map("ключ", true)),
+		"root quoted escaped path", Map('a."b.c"', Map("d", 2)),
+		"inline dotted values inside array", Map("", Map("items", [Map("a", Map("b", 1, "c", false))])),
+		"dotted namespace child header", Map("a", Map("b", 1), "a.c", Map("v", 2)),
+		"implicit header parent admits new dotted child", Map("a.b.c", Map("x", 1), "a.b", Map("d", 2)))
+	Valid := 0
+	for Row in Corpus["documents"] {
+		if !Row["valid"] {
+			AssertThrows(ConfigTomlDecodeSnapshot.Bind(Row["source"]), Row["name"])
+			continue
+		}
+		Valid += 1
+		AssertTrue(Caches.Has(Row["name"]), "each valid source owns an independent native-cache golden")
+		Snapshot := ConfigTomlDecodeSnapshot(Row["source"])
+		_TIT_DottedAssert(Row["expected"], Snapshot.Document)
+		_TIT_DottedAssert(Caches[Row["name"]], Snapshot.Cache)
+	}
+	AssertEqual(12, Valid)
+}
+Test("configuration snapshot: independent dotted corpus pins complete native projection (config-semantic-snapshot)",
+	_FMS_IndependentDottedCorpus)
+
+_FMS_MissingSourceIsNotFailure(Path) {
+	global _ConfigBootReadFailed
+	FileDelete(Path)
+	_ConfigBootReadFailed := false
+	AssertEqual(0, ParseConfigTomlFile(Path).Count)
+	AssertFalse(_ConfigBootReadFailed, "first use has a genuinely absent source, not incomplete boot data")
+	AssertFalse(TOML_UnreadableFile(Path))
+	AssertEqual("", TOML_WriteRefusal(Path))
+	AssertTrue(TOML_BatchWrite(Path, [{ Section: "script", Key: "locale", Value: "en" }]))
+	AssertEqual("en", IniCacheGet(ParseConfigTomlFile(Path), "script", "locale"))
+}
+_FMS_MissingSourceAllowsFirstUse() {
+	_FMS_WithSource("missing", "", _FMS_MissingSourceIsNotFailure)
+}
+Test("configuration snapshot: an absent source still permits first-use settings (config-semantic-snapshot)",
+	_FMS_MissingSourceAllowsFirstUse)
+
+_FMS_FullSavePreservesOutdatedAndUnknown(Path) {
+	global _ConfigBootRejectedOverrides, _ConfigBootOutdatedEntries
+	Runtime := _CFGFS_CaptureRuntime(), Coordinator := _ConfigFullSaveCoordinator()
+	Original := FSRead(Path)
+	Target := ManifestBuildFeaturesMap()
+	try {
+		_CFGFS_Prepare(Path)
+		_ConfigBootRejectedOverrides := 0
+		_ConfigBootOutdatedEntries := Map()
+		Cache := ParseConfigTomlFile(Path)
+		ApplyBootConfigToml(Target, Path)
+		AssertEqual("@", IniCacheGet(Cache, "hotstrings", "trigger_char"))
+		AssertTrue(_ConfigBootOutdatedEntries.Has("shortcuts`nscreen"))
+		AssertEqual(0, _ConfigBootRejectedOverrides)
+		Collect := () => [
+			{ Section: "hotstrings", Key: "trigger_char", Value: IniCacheGet(Cache, "hotstrings", "trigger_char") },
+			{ Section: "shortcuts", Key: "screen", Value: Target["shortcuts"]["screen"] }]
+		AssertEqual(CONFIG_SAVE_OK, SaveFullConfig(0, (*) => true, true, 0, Collect),
+			"the actual full-save owner and writer must acknowledge the semantic no-op")
+		AssertEqual(Original, FSRead(Path), "full save must preserve obsolete scalar and unowned source bytes")
+		AssertEqual(_ConfigFullSaveCoordinator().requested_generation,
+			_ConfigFullSaveCoordinator().committed_generation,
+			"successful publication, not a deferred timer, owns this generation")
+	} finally {
+		_ConfigFullSaveCoordinator(Coordinator)
+		_CFGFS_RestoreRuntime(Runtime)
+	}
+}
+_FMS_FullSaveUsesSemanticReadWithoutCleanup() {
+	_FMS_WithSource("fullsave", 'hotstrings.trigger_char = "@"`n[shortcuts]`nscreen = 2 # outdated, retained`n[future]`nold = "retain" # user data`n',
+		_FMS_FullSavePreservesOutdatedAndUnknown)
+}
+Test("configuration snapshot: actual full save retains outdated and unknown scalar records (config-semantic-snapshot)",
+	_FMS_FullSaveUsesSemanticReadWithoutCleanup)
+
+; Complete hand-authored models distinguish native values from typed sentinels.
+_FMS_AssertExactTree(Expected, Actual) {
+	if Expected is TOML_Bool {
+		Assert(Actual is TOML_Bool, "typed Boolean source intent remains distinct")
+		AssertEqual(Expected.Value, Actual.Value)
+	} else if Expected is Map {
+		Assert(Actual is Map)
+		AssertEqual(Expected.Count, Actual.Count, "the complete independent model retains every member")
+		for Key, Child in Expected {
+			Assert(Actual.Has(Key), "the exact independent semantic identity exists: " . Key)
+			_FMS_AssertExactTree(Child, Actual[Key])
+		}
+	} else if Expected is Array {
+		Assert(Actual is Array)
+		AssertEqual(Expected.Length, Actual.Length)
+		for Index, Child in Expected
+			_FMS_AssertExactTree(Child, Actual[Index])
+	} else {
+		AssertEqual(Type(Expected), Type(Actual), "native scalar kinds cannot alias one another")
+		AssertEqual(Expected, Actual)
+	}
+}
+
+_FMS_InlineOwnedNamespaces(Path) {
+	Snapshot := ConfigTomlReadSnapshot(Path)
+	Cache := ParseConfigTomlFile(Path)
+	_FMS_AssertExactTree(Map("hotstrings", Map("trigger_char", "@", "autocorrection", Map("names", Map("enabled", TOML_Bool(true)))),
+		"category_enabled", Map("hotstrings", TOML_Bool(true))), Snapshot.Document)
+	_FMS_AssertExactTree(Map("hotstrings", Map("trigger_char", "@"), "hotstrings.autocorrection", Map("names", Map("enabled", true)),
+		"category_enabled", Map("hotstrings", true)), Cache)
+	AssertEqual("@", IniCacheGet(Cache, "hotstrings", "trigger_char"))
+	AssertTrue(IniCacheGet(Cache, "category_enabled", "hotstrings"))
+	Assert(Cache["hotstrings.autocorrection"]["names"] is Map,
+		"inline feature records retain a native owned-record identity")
+	Target := ManifestBuildFeaturesMap()
+	AssertEqual(3, ApplyConfigToml(Target, Path, &Rejected, , &Outdated),
+		"two owned primitive leaves and one successfully merged feature record apply")
+	AssertEqual(0, Rejected)
+	AssertEqual(0, Outdated.Count)
+	AssertTrue(Target["hotstrings"]["autocorrection"]["names"]["enabled"])
+	AssertEqual(0.5, Target["hotstrings"]["autocorrection"]["names"]["time_activation_seconds"],
+		"an omitted feature child retains its independent shipped default")
+	Assert(Target["hotstrings"].Has("french_autocorrection"),
+		"an inline namespace cannot replace unrelated seeded siblings")
+	AssertFalse(Target["hotstrings"]["autocorrection"].Has("accents"),
+		"the actual current manifest has no accents owner in this namespace")
+	AssertTrue(Snapshot.Document["hotstrings"]["autocorrection"]["names"]["enabled"].Value)
+}
+_FMS_InlineNamespaceSpellingsKeepDefaults() {
+	_FMS_WithSource("inline_root", 'hotstrings = { trigger_char = "@", autocorrection = { names = { enabled = true } } }`ncategory_enabled = { hotstrings = true }`n',
+		_FMS_InlineOwnedNamespaces)
+	_FMS_WithSource("inline_section", '[hotstrings]`ntrigger_char = "@"`nautocorrection = { names = { enabled = true } }`n[category_enabled]`nhotstrings = true`n',
+		_FMS_InlineOwnedNamespaces)
+}
+Test("configuration snapshot: inline owned namespaces retain record identity and defaults (config-semantic-snapshot)",
+	_FMS_InlineNamespaceSpellingsKeepDefaults)
+
+_FMS_InlineRecordAndPhysicalChildren() {
+	Inline := ConfigTomlDecodeSnapshot('shortcuts = { take_note = { enabled = true } }`n')
+	Assert(Inline.Cache["shortcuts"]["take_note"] is Map)
+	AssertEqual(1, Inline.Rows.Length, "the record must not be flattened into an alternative cache layout")
+	AssertEqual("shortcuts", Inline.Rows[1].Section)
+	AssertEqual("take_note", Inline.Rows[1].Key)
+	AssertTrue(Inline.Cache["shortcuts"]["take_note"]["enabled"])
+	Source := '[shortcuts]`ntake_note = { enabled = true }`n'
+	_FMS_WithSource("inline_record", Source, _FMS_AssertRecordDefaults)
+	Source := '[shortcuts.take_note]`nenabled = true`n'
+	_FMS_WithSource("physical_record", Source, _FMS_AssertRecordDefaults)
+}
+_FMS_AssertRecordDefaults(Path) {
+	Target := ManifestBuildFeaturesMap()
+	AssertEqual(1, ApplyConfigToml(Target, Path))
+	AssertTrue(Target["shortcuts"]["take_note"]["enabled"])
+	AssertFalse(Target["shortcuts"]["take_note"]["dated_notes"])
+	AssertEqual("D:\Bureau", Target["shortcuts"]["take_note"]["destination_folder"])
+}
+Test("configuration snapshot: owned inline records match physical child settings without dropping defaults (config-semantic-snapshot)",
+	_FMS_InlineRecordAndPhysicalChildren)
+
+_FMS_ChildPoliciesAndFullSave(Path, ExpectedSave) {
+	global _ConfigBootRejectedOverrides, _ConfigBootOutdatedEntries
+	Runtime := _CFGFS_CaptureRuntime(), Coordinator := _ConfigFullSaveCoordinator()
+	Original := FSRead(Path)
+	Target := ManifestBuildFeaturesMap()
+	try {
+		_CFGFS_Prepare(Path)
+		_ConfigBootRejectedOverrides := 0
+		_ConfigBootOutdatedEntries := Map()
+		ParseConfigTomlFile(Path)
+		AssertEqual(1, ApplyBootConfigToml(Target, Path), "only the valid timing child applies")
+		Caps := Target["hotstrings"]["autocorrection"]["names"]
+		AssertFalse(Caps["enabled"], "an invalid known Boolean child cannot become truthy")
+		AssertEqual(0.25, Caps["time_activation_seconds"])
+		AssertFalse(Caps.Has("future"), "unowned fields are ignored in runtime, retained on disk")
+		AssertTrue(_ConfigBootOutdatedEntries.Has("hotstrings.autocorrection.names`nenabled"),
+			"the exact child identity, not the parent record, owns neutral-save preservation")
+		Collect() {
+			Updates := []
+			_CollectFeatureUpdates(Updates, "hotstrings.autocorrection.names", Caps)
+			return Updates
+		}
+		AssertEqual(ExpectedSave, SaveFullConfig(0, (*) => true, true, 0, Collect),
+			"the actual full-save owner distinguishes preserved physical no-op from unaddressable inline refusal")
+		AssertEqual(Original, FSRead(Path), "neither outcome may erase the invalid or unowned source child")
+		if ExpectedSave == CONFIG_SAVE_OK
+			AssertEqual(_ConfigFullSaveCoordinator().requested_generation, _ConfigFullSaveCoordinator().committed_generation)
+		else
+			Assert(_ConfigFullSaveCoordinator().committed_generation < _ConfigFullSaveCoordinator().requested_generation,
+				"an inline writer refusal must not acknowledge the requested generation")
+	} finally {
+		_ConfigFullSaveCoordinator(Coordinator)
+		_CFGFS_RestoreRuntime(Runtime)
+	}
+}
+_FMS_InlineChildRefusalAndPhysicalPreservation() {
+	_FMS_WithSource("inline_child", '[hotstrings]`nautocorrection = { names = { enabled = "true", time_activation_seconds = 0.25, future = "retain" } } # preserve`n',
+		_FMS_ChildPoliciesAndFullSave.Bind(, CONFIG_SAVE_FAILED))
+	_FMS_WithSource("physical_child", '[hotstrings.autocorrection.names]`nenabled = "true" # outdated`ntime_activation_seconds = 0.25`nfuture = "retain" # unknown`n',
+		_FMS_ChildPoliciesAndFullSave.Bind(, CONFIG_SAVE_OK))
+}
+Test("configuration snapshot: inline child policy and actual full-save fences retain obsolete data (config-semantic-snapshot)",
+	_FMS_InlineChildRefusalAndPhysicalPreservation)
+
+_FMS_EmptyNamespaceCannotBorrowRoot(Path) {
+	Cache := ParseConfigTomlFile(Path)
+	_FMS_AssertExactTree(Map('"".layout', Map("ergopti_base", false), 'layout.""', Map("ergopti_base", false),
+		'"layout.extra"', Map("ergopti_base", false)), Cache)
+	_FMS_AssertExactTree(Map("", Map("layout", Map("ergopti_base", TOML_Bool(false))),
+		"layout", Map("", Map("ergopti_base", TOML_Bool(false))), "layout.extra", Map("ergopti_base", TOML_Bool(false))),
+		ConfigTomlReadSnapshot(Path).Document)
+	AssertFalse(IniCacheGet(Cache, '"".layout', "ergopti_base"))
+	AssertFalse(IniCacheGet(Cache, 'layout.""', "ergopti_base"))
+	AssertFalse(IniCacheGet(Cache, '"layout.extra"', "ergopti_base"))
+	AssertEqual("_", IniCacheGet(Cache, "layout", "ergopti_base"))
+	Target := ManifestBuildFeaturesMap()
+	Target["layout"]["ergopti_base"] := true
+	AssertEqual(0, ApplyConfigToml(Target, Path))
+	AssertTrue(Target["layout"]["ergopti_base"], "empty and literal dotted names must never borrow a root owner")
+	AssertEqual("section", TomlConfigUnknownKind(Target, '"".layout', "ergopti_base"))
+	AssertEqual("", TomlConfigManifestPath('"".layout'))
+	AssertEqual("", TomlConfigManifestPath('"layout.extra"'))
+	AssertEqual(0, Target["layout"].Has(""))
+}
+_FMS_EmptyAndLiteralNamespacesStayForeign() {
+	_FMS_WithSource("empty_namespace", '["".layout]`nergopti_base = false`n[layout.""]`nergopti_base = false`n["layout.extra"]`nergopti_base = false`n',
+		_FMS_EmptyNamespaceCannotBorrowRoot)
+}
+Test("configuration snapshot: quoted empty and literal namespaces cannot alias root settings (config-semantic-snapshot)",
+	_FMS_EmptyAndLiteralNamespacesStayForeign)
+
+_FMS_DeletedSourceKeepsAdmittedBootGeneration(Path) {
+	global _ParseTomlCache
+	Cache := ParseConfigTomlFile(Path)
+	AssertTrue(IniCacheGet(Cache, "layout", "ergopti_base"))
+	Snapshot := ConfigTomlReadSnapshot(Path)
+	AssertTrue(Snapshot.Present, "presence belongs to the successful admitted read")
+	FileDelete(Path)
+	Target := ManifestBuildFeaturesMap()
+	AssertEqual(1, ApplyConfigToml(Target, Path), "external deletion cannot bypass the retained boot generation")
+	AssertTrue(Target["layout"]["ergopti_base"])
+	Assert(ParseConfigTomlFile(Path) == Cache, "publication must use admitted presence, not a later FileExist shortcut")
+	_ParseTomlCache.Delete(Path)
+	Fresh := ConfigTomlReadSnapshot(Path)
+	AssertFalse(Fresh.Present, "retirement permits a new genuinely absent generation")
+	AssertEqual(0, Fresh.Rows.Length)
+	AssertEqual(0, ApplyConfigToml(ManifestBuildFeaturesMap(), Path))
+}
+_FMS_DeletionBetweenConsumersKeepsOneGeneration() {
+	_FMS_WithSource("deleted_generation", '[layout]`nergopti_base = true`n', _FMS_DeletedSourceKeepsAdmittedBootGeneration)
+}
+Test("configuration snapshot: external deletion cannot split bootstrap consumer generations (config-semantic-snapshot)",
+	_FMS_DeletionBetweenConsumersKeepsOneGeneration)
+
+_FMS_ForeignInlineNamespacesRemainOwned(Path) {
+	Cache := ParseConfigTomlFile(Path)
+	_FMS_AssertExactTree(Map("personal_editor", Map("close_on_add", false, "future", "retained"),
+		"llm", Map("api_entry_id", "42")), Cache)
+	_FMS_AssertExactTree(Map("personal_editor", Map("close_on_add", TOML_Bool(false), "future", "retained"),
+		"llm", Map("api_entry_id", "42")), ConfigTomlReadSnapshot(Path).Document)
+	AssertFalse(IniCacheGet(Cache, "personal_editor", "close_on_add"))
+	AssertEqual("retained", IniCacheGet(Cache, "personal_editor", "future"))
+	AssertEqual("42", IniCacheGet(Cache, "llm", "api_entry_id"))
+	Target := ManifestBuildFeaturesMap()
+	AssertEqual(0, ApplyConfigToml(Target, Path), "foreign and unknown children cannot enter the feature tree")
+	AssertFalse(Target.Has("personal_editor"))
+}
+_FMS_RegisteredForeignNamespaceProjection() {
+	_FMS_WithSource("foreign_inline", 'personal_editor = { close_on_add = false, future = "retained" }`nllm = { api_entry_id = "42" }`n',
+		_FMS_ForeignInlineNamespacesRemainOwned)
+}
+Test("configuration snapshot: inline foreign bootstrap namespaces reuse their exact registry owner (config-semantic-snapshot)",
+	_FMS_RegisteredForeignNamespaceProjection)
+
+_FMS_DynamicLiteralNamesKeepChildDomains(Path) {
+	Cache := ParseConfigTomlFile(Path)
+	_FMS_AssertExactTree(Map("hotstrings", Map("personal", Map("work.notes", Map("enabled", "false", "time_activation_seconds", -1),
+		"", Map("enabled", 2, "time_activation_seconds", TOML_Bool(true)),
+		"literal.ok", Map("enabled", TOML_Bool(true), "time_activation_seconds", 0.125)))), ConfigTomlReadSnapshot(Path).Document)
+	_FMS_AssertExactTree(Map('hotstrings.personal."work.notes"', Map("enabled", "false", "time_activation_seconds", -1),
+		'hotstrings.personal.""', Map("enabled", 2, "time_activation_seconds", true),
+		'hotstrings.personal."literal.ok"', Map("enabled", true, "time_activation_seconds", 0.125)), Cache)
+	AssertEqual("false", IniCacheGet(Cache, 'hotstrings.personal."work.notes"', "enabled"))
+	AssertEqual(-1, IniCacheGet(Cache, 'hotstrings.personal."work.notes"', "time_activation_seconds"))
+	AssertEqual(2, IniCacheGet(Cache, 'hotstrings.personal.""', "enabled"))
+	Target := ManifestBuildFeaturesMap()
+	AssertEqual(2, ApplyConfigToml(Target, Path, &Rejected, , &Outdated))
+	AssertEqual(0, Rejected)
+	AssertEqual(4, Outdated.Count, "quoted dots and empty names retain Boolean and timing domains")
+	AssertTrue(Outdated.Has('hotstrings.personal."work.notes"' . "`nenabled"))
+	AssertTrue(Outdated.Has('hotstrings.personal.""' . "`ntime_activation_seconds"))
+	AssertFalse(Target["hotstrings"]["personal"].Has("work.notes"))
+	AssertFalse(Target["hotstrings"]["personal"].Has(""))
+	AssertTrue(Target["hotstrings"]["personal"]["literal.ok"]["enabled"])
+	AssertEqual(0.125, Target["hotstrings"]["personal"]["literal.ok"]["time_activation_seconds"])
+	AssertFalse(Target["hotstrings"]["personal"].Has("literal"), "a literal user name never creates nested category ownership")
+}
+_FMS_DynamicEmptyNameIsDistinct(Path) {
+	Target := ManifestBuildFeaturesMap()
+	AssertEqual(2, ApplyConfigToml(Target, Path))
+	AssertFalse(Target["hotstrings"]["personal"][""]["enabled"])
+	AssertEqual(0, Target["hotstrings"]["personal"][""]["time_activation_seconds"])
+	AssertFalse(Target["layout"]["ergopti_base"], "the empty personal name remains inside its declared dynamic owner")
+}
+_FMS_DynamicQuotedNamesDoNotBorrowStaticPaths() {
+	_FMS_WithSource("dynamic_literals", '[hotstrings.personal."work.notes"]`nenabled = "false"`ntime_activation_seconds = -1`n[hotstrings.personal.""]`nenabled = 2`ntime_activation_seconds = true`n[hotstrings.personal."literal.ok"]`nenabled = true`ntime_activation_seconds = 0.125`n',
+		_FMS_DynamicLiteralNamesKeepChildDomains)
+	_FMS_WithSource("dynamic_empty_valid", '[hotstrings.personal.""]`nenabled = false`ntime_activation_seconds = 0`n',
+		_FMS_DynamicEmptyNameIsDistinct)
+}
+Test("configuration snapshot: dynamic quoted names retain typed domains and exact identities (config-semantic-snapshot)",
+	_FMS_DynamicQuotedNamesDoNotBorrowStaticPaths)
+
+_FMS_DynamicInlineMapsUseChildDomains(Path) {
+	Cache := ParseConfigTomlFile(Path)
+	_FMS_AssertExactTree(Map("hotstrings", Map("personal", Map("work.notes", Map("enabled", "false", "time_activation_seconds", -1),
+		"literal.ok", Map("enabled", TOML_Bool(true), "time_activation_seconds", 0.125)))), ConfigTomlReadSnapshot(Path).Document)
+	_FMS_AssertExactTree(Map('hotstrings.personal."work.notes"', Map("enabled", "false", "time_activation_seconds", -1),
+		'hotstrings.personal."literal.ok"', Map("enabled", true, "time_activation_seconds", 0.125)), Cache)
+	AssertEqual("false", IniCacheGet(Cache, 'hotstrings.personal."work.notes"', "enabled"))
+	AssertEqual(-1, IniCacheGet(Cache, 'hotstrings.personal."work.notes"', "time_activation_seconds"))
+	Target := ManifestBuildFeaturesMap()
+	AssertEqual(2, ApplyConfigToml(Target, Path, &Rejected, , &Outdated))
+	AssertEqual(0, Rejected)
+	AssertEqual(2, Outdated.Count)
+	AssertFalse(Target["hotstrings"]["personal"].Has("work.notes"))
+	AssertTrue(Target["hotstrings"]["personal"]["literal.ok"]["enabled"])
+	AssertEqual(0.125, Target["hotstrings"]["personal"]["literal.ok"]["time_activation_seconds"])
+}
+_FMS_InlineDynamicNamespacesMatchPhysicalPolicy() {
+	_FMS_WithSource("inline_dynamic_root", 'hotstrings = { personal = { "work.notes" = { enabled = "false", time_activation_seconds = -1 }, "literal.ok" = { enabled = true, time_activation_seconds = 0.125 } } }`n',
+		_FMS_DynamicInlineMapsUseChildDomains)
+	_FMS_WithSource("inline_dynamic_section", '[hotstrings.personal]`n"work.notes" = { enabled = "false", time_activation_seconds = -1 }`n"literal.ok" = { enabled = true, time_activation_seconds = 0.125 }`n',
+		_FMS_DynamicInlineMapsUseChildDomains)
+}
+Test("configuration snapshot: inline dynamic namespaces retain physical child typing (config-semantic-snapshot)",
+	_FMS_InlineDynamicNamespacesMatchPhysicalPolicy)
+
+_FMS_AbsentGenerationCannotConsumeExternalCreation(Path) {
+	global _ParseTomlCache
+	FileDelete(Path)
+	Cache := ParseConfigTomlFile(Path)
+	AssertEqual(0, Cache.Count)
+	AssertFalse(ConfigTomlReadSnapshot(Path).Present)
+	FileAppend('[layout]`nergopti_base = true`n', Path, "UTF-8")
+	Target := ManifestBuildFeaturesMap()
+	AssertEqual(0, ApplyConfigToml(Target, Path), "external creation cannot replace admitted absence between boot consumers")
+	AssertFalse(Target["layout"]["ergopti_base"])
+	Assert(ParseConfigTomlFile(Path) == Cache)
+	_ParseTomlCache.Delete(Path)
+	Fresh := ParseConfigTomlFile(Path)
+	AssertTrue(IniCacheGet(Fresh, "layout", "ergopti_base"))
+	AssertTrue(ConfigTomlReadSnapshot(Path).Present)
+	AssertEqual(1, ApplyConfigToml(Target, Path))
+	AssertTrue(Target["layout"]["ergopti_base"])
+}
+_FMS_ExternalCreationCannotSplitAbsentBoot() {
+	_FMS_WithSource("absent_created", "", _FMS_AbsentGenerationCannotConsumeExternalCreation)
+}
+Test("configuration snapshot: admitted absence survives external creation until owner retirement (config-semantic-snapshot)",
+	_FMS_ExternalCreationCannotSplitAbsentBoot)
+
+_FMS_BootPublicationUsesAdmittedPresence() {
+	Body := _DriverFuncBody("ParseConfigTomlFile")
+	Assert(Body != "", "the actual configuration cache owner must be readable")
+	Assert(!InStr(Body, "FileExist("), "a post-read existence check cannot decide which admitted generation to publish")
+	Assert(InStr(Body, "_ParseTomlCache[Path] := Snapshot.Cache") > 0,
+		"both admitted presence and admitted absence must retain the actual cache identity")
+	Assert(InStr(Body, "_ConfigTomlSnapshots[Path] := Snapshot") > 0,
+		"both states must retain the exact source rows for the next boot consumer")
+}
+Test("configuration snapshot: source guard retains observed generation without post-read shortcuts (config-semantic-snapshot)",
+	_FMS_BootPublicationUsesAdmittedPresence)
+
+_FMS_InlineLiteralSpellingsKeepBooleanIntent(Path) {
+	Snapshot := ConfigTomlReadSnapshot(Path)
+	_FMS_AssertExactTree(Map("shortcuts", Map("screen", 0, "microsoft_bold", 0, "title_case", 1),
+		"hotstrings", Map("autocorrection", Map("names", Map("enabled", 0, "time_activation_seconds", 0.125)),
+		"french_autocorrection", Map("accents", Map("enabled", 1)))), Snapshot.Document)
+	_FMS_AssertExactTree(Map("shortcuts", Map("screen", 0, "microsoft_bold", 0, "title_case", 1),
+		"hotstrings.autocorrection", Map("names", Map("enabled", 0, "time_activation_seconds", 0.125)),
+		"hotstrings.french_autocorrection", Map("accents", Map("enabled", 1))), Snapshot.Cache)
+	Rows := Map()
+	for Row in Snapshot.Rows
+		Rows[Row.Section . "`n" . Row.Key] := Row
+	AssertEqual(5, Rows.Count)
+	AssertEqual("-0", Rows["shortcuts`nscreen"].Raw)
+	AssertEqual("-0", Rows["shortcuts`nmicrosoft_bold"].Raw)
+	AssertEqual("1", Rows["shortcuts`ntitle_case"].Raw)
+	AssertEqual("-0", Rows["hotstrings.autocorrection`nnames"].ChildRaw["enabled"])
+	AssertEqual("1", Rows["hotstrings.french_autocorrection`naccents"].ChildRaw["enabled"])
+	Target := ManifestBuildFeaturesMap()
+	AssertEqual(3, ApplyConfigToml(Target, Path, &Rejected, &Migrated, &Outdated))
+	AssertEqual(0, Rejected)
+	AssertEqual(2, Migrated, "only actual bare one leaves carry legacy Boolean intent")
+	AssertEqual(3, Outdated.Count, "signed-zero integers cannot invent legacy Boolean intent")
+	AssertFalse(Target["shortcuts"]["screen"])
+	AssertFalse(Target["shortcuts"]["microsoft_bold"])
+	AssertTrue(Target["shortcuts"]["title_case"])
+	AssertFalse(Target["hotstrings"]["autocorrection"]["names"]["enabled"])
+	AssertEqual(0.125, Target["hotstrings"]["autocorrection"]["names"]["time_activation_seconds"])
+	AssertTrue(Target["hotstrings"]["french_autocorrection"]["accents"]["enabled"])
+}
+_FMS_InlineRawTokensNeverInventMigrationIntent() {
+	_FMS_WithSource("inline_spelling", 'shortcuts = { screen = -0, microsoft_bold = -0, title_case = 1 }`nhotstrings = { autocorrection = { names = { enabled = -0, time_activation_seconds = 0.125 } }, french_autocorrection = { accents = { enabled = 1 } } }`n',
+		_FMS_InlineLiteralSpellingsKeepBooleanIntent)
+}
+Test("configuration snapshot: exact inline child spellings retain legacy Boolean admission (config-semantic-snapshot)",
+	_FMS_InlineRawTokensNeverInventMigrationIntent)
+
+_FMS_RepeatedArrayOwnerCannotRewriteRows(Path) {
+	ParseConfigTomlFile(Path)
+	First := ManifestBuildFeaturesMap()
+	AssertEqual(1, ApplyConfigToml(First, Path))
+	First["llm"]["navigation"]["val_modifiers"].Push("ctrl")
+	Second := ManifestBuildFeaturesMap()
+	AssertEqual(1, ApplyConfigToml(Second, Path))
+	AssertEqual(1, Second["llm"]["navigation"]["val_modifiers"].Length)
+	AssertEqual("alt", Second["llm"]["navigation"]["val_modifiers"][1])
+}
+_FMS_RepeatedArrayReadUsesRetainedSource() {
+	_FMS_WithSource("detached_array", '[llm.navigation]`nval_modifiers = ["alt"]`n', _FMS_RepeatedArrayOwnerCannotRewriteRows)
+}
+Test("configuration snapshot: repeated array consumers cannot mutate retained source rows (config-semantic-snapshot)",
+	_FMS_RepeatedArrayReadUsesRetainedSource)
+
+; Retired family source remains readable without becoming a current feature.
+_FMS_RetiredCorrectionFamily(Path) {
+	Original := FSRead(Path)
+	Target := ManifestBuildFeaturesMap()
+	Assert(ManifestFindEntryByPath("hotstrings.autocorrection.names") is Map,
+		"the replacement fixture must exercise a current canonical feature")
+	AssertFalse(ManifestFindEntryByPath("hotstrings.autocorrection.caps"))
+	AssertEqual(true, IniCacheGet(ParseConfigTomlFile(Path), "hotstrings.autocorrection.caps", "enabled"))
+	AssertEqual(0, ApplyConfigToml(Target, Path), "a retired family cannot apply as a current feature")
+	AssertFalse(Target["hotstrings"]["autocorrection"].Has("caps"))
+	AssertEqual(Original, FSRead(Path), "loading must preserve the retired user source bytes")
+}
+_FMS_RetiredCorrectionFamilyRemainsSourceOnly() {
+	_FMS_WithSource("retired_correction", "[hotstrings.autocorrection.caps]`nenabled = true`n",
+		_FMS_RetiredCorrectionFamily)
+}
+Test("configuration snapshot: retired correction family stays source-only (config-semantic-snapshot)",
+	_FMS_RetiredCorrectionFamilyRemainsSourceOnly)

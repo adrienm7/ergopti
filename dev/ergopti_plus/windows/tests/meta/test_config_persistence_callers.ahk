@@ -213,7 +213,7 @@ _CPC_InternalTomlPublishersConsumeResult() {
 	; adds one exact-source publication beneath its existing borrowed lease.
 	; Privacy adds one more publisher, audited above against actual native source
 	; and independently exercised by the retained-source race regression.
-	AssertEqual(4, Calls, "audit every internal publisher before changing its complete inventory")
+	AssertEqual(5, Calls, "audit every internal publisher before changing its complete inventory")
 	Writer := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_InfoBarWrite"))
 	Action := _StripFullLineComments(_DriverFuncBody("LLM_Menu_SetInfoBar"))
 	Command := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_InfoBarCommand"))
@@ -437,3 +437,31 @@ _CPC_LifecycleRoutesThroughAtomicHandoff() {
 }
 Test("AHK-15-persistence: lifecycle uses the atomic tested hand-off",
 	_CPC_LifecycleRoutesThroughAtomicHandoff)
+
+
+_CPC_NumberRowRetainsSourceAndStrictAck() {
+	Writer := _StripFullLineComments(_DriverFuncBody("_LAY_NumberRowWrite"))
+	Commit := _StripFullLineComments(_DriverFuncBody("_LAY_NumberRowCommit"))
+	Assert(Writer != "" && Commit != "", "number-row production owners must resolve")
+	Lines := StrSplit(Writer, "`n", "`r")
+	Calls := 0
+	for Index, Line in Lines {
+		if !InStr(Line, "_TOML_BatchWriteImpl(")
+			continue
+		Calls += 1
+		Assert(_CPC_LineConsumesResult(Lines, Index), "the actual publisher must return its strict result")
+		AssertContains(Line, 'Expected["content"], Expected["presence"]', "exact retained bytes and absence reach the canonical owner")
+		Discarded := Lines.Clone()
+		Discarded[Index] := StrReplace(Line, "return ", "")
+		AssertFalse(_CPC_LineConsumesResult(Discarded, Index), "discarding native publication must fail")
+		Assigned := Lines.Clone()
+		Assigned[Index] := StrReplace(Line, "return ", "Ignored := ")
+		AssertFalse(_CPC_LineConsumesResult(Assigned, Index), "an untested native ACK must fail")
+	}
+	AssertEqual(1, Calls)
+	AssertContains(Writer, '_LAY_NumberRowSnapshot()', "physical source is revalidated inside the borrowed feature transaction")
+	AssertContains(Writer, 'Updates.Length != 1', "only the declared leaf may be published")
+	AssertContains(Commit, '_LAY_NumberRowWrite.Bind(Expected, Value, WriterFn)')
+	AssertContains(Commit, 'if !(Written is Integer) || Written != true')
+}
+Test("AHK-15-persistence: number-row choice consumes its exact-source leased publisher", _CPC_NumberRowRetainsSourceAndStrictAck)

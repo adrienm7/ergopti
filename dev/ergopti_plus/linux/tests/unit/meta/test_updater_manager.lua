@@ -482,6 +482,106 @@ helpers.describe("modules/updater/manager.lua", function()
 		helpers.assert_eq(M.get_state(), "idle")
 	end)
 
+	for _, mode in ipairs({ "transport", "conditional-transport", "conditional-false", "conditional-number", "conditional-table", "http-error", "invalid-json", "wrong-root", "oversized-page", "entries-mismatch", "dispatch-refusal", "cancel" }) do
+		helpers.it("linux-updater-etag: " .. mode .. " forces a fresh page after an unknown native validator", function()
+			local previous_fs, previous_manager = package.loaded["adapters.file_system"], package.loaded["modules.updater.manager"]
+			local real_fs = require("adapters.file_system")
+			package.loaded["adapters.file_system"] = setmetatable({ exists = function() return true end }, { __index = real_fs })
+			package.loaded["modules.updater.manager"] = nil
+			local loaded, fresh = pcall(require, "modules.updater.manager")
+			package.loaded["adapters.file_system"], package.loaded["modules.updater.manager"] = previous_fs, previous_manager
+			helpers.assert_true(loaded and type(fresh) == "table", tostring(fresh))
+			local old = '[{"tag_name":"v1.0.0"}]'
+			local new = '[{"tag_name":"v2.0.0"}]'
+			local too_many = {}
+			for _ = 1, 21 do too_many[#too_many + 1] = '{"tag_name":"v2.0.0"}' end
+			local failure = {
+				transport = { ok = false, status = 200, body = "", error = "truncated native transfer" },
+				["conditional-transport"] = { ok = false, status = 304, body = "", error = "HTTP 304" },
+				["conditional-false"] = { ok = false, status = 304, body = "", error = "HTTP 304", error_body = false },
+				["conditional-number"] = { ok = false, status = 304, body = "", error = "HTTP 304", error_body = 0 },
+				["conditional-table"] = { ok = false, status = 304, body = "", error = "HTTP 304", error_body = {} },
+				["http-error"] = { ok = false, status = 503, body = "", error = "HTTP 503" },
+				["invalid-json"] = { ok = true, status = 200, body = "{malformed" },
+				["wrong-root"] = { ok = true, status = 200, body = '{"tag_name":"v2.0.0"}' },
+				["oversized-page"] = { ok = true, status = 200, body = "[" .. table.concat(too_many, ",") .. "]" },
+				["entries-mismatch"] = { ok = true, status = 200, body = '["not a release object"]' },
+			}
+			local requests, completions = {}, {}
+			fresh._http_client = {
+				get = function(_, _, options, callback)
+					requests[#requests + 1] = options
+					if #requests == 1 then callback({ ok = true, status = 200, body = old })
+					elseif #requests == 2 then
+						if mode == "dispatch-refusal" then return false end
+						if mode == "cancel" then return true end
+						callback(failure[mode])
+					else callback({ ok = true, status = 200, body = new }) end
+					return true
+				end,
+				cancel = function() return true end,
+			}
+			fresh._file_digest = { cancel = function() return true end }
+			for index = 1, 3 do
+				local count = 0
+				fresh._fetch_releases("main", function(body, status, err, reason)
+					completions[index] = { body = body, status = status, error = err, reason = reason }; count = count + 1
+				end)
+				if mode == "cancel" and index == 2 then helpers.assert_true(fresh.cancel_update()) end
+				helpers.assert_eq(count, 1)
+			end
+			helpers.assert_nil(requests[1].etag_compare)
+			helpers.assert_true(requests[2].etag_compare ~= nil, "accepted page retains its conditional association")
+			helpers.assert_nil(requests[3].etag_compare, "failed page cannot associate a changed validator with its old body")
+			helpers.assert_eq(completions[1].body, old)
+			helpers.assert_nil(completions[2].body)
+			helpers.assert_true(type(completions[2].error) == "string")
+			if mode:match("^conditional%-") then
+				helpers.assert_eq(completions[2].status, 304)
+				helpers.assert_eq(completions[2].reason, "no_connection")
+			end
+			helpers.assert_eq(completions[3].body, new)
+			helpers.assert_eq(completions[3].status, 200)
+		end)
+	end
+
+	helpers.it("linux-updater-etag: a failed second page keeps the accepted first-page association", function()
+		local previous_fs, previous_manager = package.loaded["adapters.file_system"], package.loaded["modules.updater.manager"]
+		local real_fs = require("adapters.file_system")
+		package.loaded["adapters.file_system"] = setmetatable({ exists = function() return true end }, { __index = real_fs })
+		package.loaded["modules.updater.manager"] = nil
+		local loaded, fresh = pcall(require, "modules.updater.manager")
+		package.loaded["adapters.file_system"], package.loaded["modules.updater.manager"] = previous_fs, previous_manager
+		helpers.assert_true(loaded and type(fresh) == "table", tostring(fresh))
+		local entries = {}
+		for index = 1, 20 do entries[index] = '{"tag_name":"v1.0.' .. index .. '"}' end
+		local first_page = "[" .. table.concat(entries, ",") .. "]"
+		local final_page = '[{"tag_name":"v2.0.0"}]'
+		local responses = {
+			{ ok = true, status = 200, body = first_page }, { ok = true, status = 200, body = '[{"tag_name":"v1.0.21"}]' },
+			{ ok = false, status = 304, body = "", error = "HTTP 304", error_body = "" }, { ok = false, status = 200, body = "", error = "truncated page" },
+			{ ok = false, status = 304, body = "", error = "HTTP 304", error_body = "" }, { ok = true, status = 200, body = final_page },
+		}
+		local requests, results = {}, {}
+		fresh._http_client = { get = function(_, _, options, callback)
+			requests[#requests + 1] = options; callback(assert(table.remove(responses, 1))); return true
+		end }
+		for index = 1, 3 do
+			local callbacks = 0
+			helpers.assert_true(fresh._fetch_releases("main", function(body, status, err)
+				results[index] = { body = body, status = status, error = err }; callbacks = callbacks + 1
+			end))
+			helpers.assert_eq(callbacks, 1)
+		end
+		helpers.assert_eq(#requests, 6)
+		helpers.assert_nil(results[2].body)
+		helpers.assert_true(type(results[2].error) == "string")
+		helpers.assert_true(requests[5].etag_compare ~= nil, "an accepted earlier page keeps its own validator")
+		helpers.assert_nil(requests[6].etag_compare, "the failed page alone must refetch fully")
+		helpers.assert_true(results[3].body:find("v1.0.20", 1, true) ~= nil and results[3].body:find("v2.0.0", 1, true) ~= nil)
+		helpers.assert_eq(results[3].status, 200)
+	end)
+
 	-- GitHub answers 304 Not Modified, with no body, when the list is unchanged
 	-- since the ETag curl saved. check_for_updates cleared the cached release
 	-- before fetching and a 304 then read as "nothing available": an update
@@ -503,7 +603,7 @@ helpers.describe("modules/updater/manager.lua", function()
 		local list = "[" .. release("v0.0.0-dev.140", true) .. "," .. release("v1.2.0", false) .. "]"
 		local responses = {
 			{ ok = true, status = 200, body = list },
-			{ ok = false, status = 304, body = "", error = "HTTP 304" },
+			{ ok = false, status = 304, body = "", error = "HTTP 304", error_body = "" },
 		}
 		local requests = {}
 		fresh._http_client = {
@@ -598,7 +698,80 @@ helpers.describe("modules/updater/manager.lua", function()
 			"refusal must happen before the installer can mutate the archive")
 	end)
 
-	helpers.it("downloads, hashes and publishes only a verified archive", function()
+	for _, suffix in ipairs({ ".tar.gz", ".tar.gz.part" }) do
+		for _, alias in ipairs({ "regular", "dangling" }) do
+			helpers.it("linux-updater-temp-ownership: preserves unrelated " .. alias .. " " .. suffix, function()
+				M.cancel_update()
+				local base = os.tmpname()
+				local candidate, target = base .. suffix, base .. ".missing"
+				local history = "Retained unrelated temporary bytes"
+				if alias == "regular" then write_file(candidate, history)
+				else helpers.assert_true(command_ok("ln -s -- " .. shell_quote(target) .. " " .. shell_quote(candidate))) end
+				local real_tmpname, real_http = os.tmpname, M._http_client
+				local callbacks, completion_error = 0, nil
+				os.tmpname = function() return base end
+				M._http_client = {
+					get = function(_, _, _, callback)
+						callback({ ok = false, status = 503, error = "synthetic checksum failure" })
+						return true
+					end,
+					download = function() error("failed checksum must not download an archive") end,
+					cancel = function() return true end,
+				}
+				local ok, err = xpcall(function()
+					helpers.assert_true(M.download_release({ tag = "v4.0.0", download_url = "https://example.invalid/archive",
+						checksum_url = "https://example.invalid/checksum" }, function(path, failure)
+						callbacks = callbacks + 1; completion_error = failure; helpers.assert_nil(path)
+					end))
+					helpers.assert_eq(callbacks, 1)
+					helpers.assert_eq(completion_error, "synthetic checksum failure")
+					if alias == "regular" then helpers.assert_eq(read_file(candidate), history)
+					else
+						helpers.assert_true(command_ok("test -L " .. shell_quote(candidate)))
+						helpers.assert_nil(io.open(target, "r"))
+					end
+					helpers.assert_eq(M.get_state(), "idle")
+					helpers.assert_eq(Fs.exists(base), false)
+				end, debug.traceback)
+				os.tmpname, M._http_client = real_tmpname, real_http
+				M.cancel_update()
+				os.remove(base); os.remove(candidate); os.remove(target)
+				helpers.assert_true(ok, tostring(err))
+			end)
+		end
+	end
+
+	for _, api in ipairs({ "update", "release" }) do
+		for _, wants_callback in ipairs({ true, false }) do
+			helpers.it("linux-updater-temp-allocation: " .. api .. " acknowledges allocator refusal with callback " .. tostring(wants_callback), function()
+				M.cancel_update()
+				local release = { tag = "v4.0.0", download_url = "https://example.invalid/archive",
+					checksum_url = "https://example.invalid/checksum" }
+				M._test_set_cached_release(release)
+				local real_tmpname, real_http = os.tmpname, M._http_client
+				os.tmpname = function() error("synthetic native allocator refusal") end
+				M._http_client = { get = function() error("allocation refusal must precede HTTP") end, cancel = function() return true end }
+				local callbacks, received_error = 0, nil
+				local callback
+				if wants_callback then callback = function(path, err) callbacks = callbacks + 1; received_error = err; helpers.assert_nil(path) end end
+				local ok, err = xpcall(function()
+					local dispatched
+					if api == "update" then dispatched = M.download_update(nil, callback)
+					else dispatched = M.download_release(release, callback) end
+					helpers.assert_eq(dispatched, false)
+					helpers.assert_eq(callbacks, wants_callback and 1 or 0)
+					if wants_callback then helpers.assert_eq(received_error, "temporary path unavailable") end
+					helpers.assert_eq(M.get_state(), "available")
+					helpers.assert_eq(M.get_cached_release().tag, release.tag)
+				end, debug.traceback)
+				os.tmpname, M._http_client = real_tmpname, real_http
+				M.cancel_update()
+				helpers.assert_true(ok, tostring(err))
+			end)
+		end
+	end
+
+	helpers.it("linux-digest-owner: downloads and hashes a verified archive under the updater owner", function()
 		local real_http = M._http_client
 		local real_digest = M._file_digest
 		local expected = string.rep("cd", 32)
@@ -620,8 +793,9 @@ helpers.describe("modules/updater/manager.lua", function()
 		end
 		function http.cancel() return true end
 		local digest = {
-			sha256 = function(path, _, callback)
+			sha256 = function(path, options, callback)
 				helpers.assert_eq(path, downloaded_part)
+				helpers.assert_eq(options.owner, "updater", "the archive digest must have the same owner as cancellation")
 				callback(expected, nil)
 				return true
 			end,
@@ -649,7 +823,7 @@ helpers.describe("modules/updater/manager.lua", function()
 		helpers.assert_eq(completion_error, nil)
 		helpers.assert_true(type(verified_path) == "string" and Fs.exists(verified_path))
 		helpers.assert_true(not Fs.exists(downloaded_part),
-			"the .part path must be atomically renamed after verification")
+			"the owned partial path must be renamed after verification")
 		helpers.assert_eq(M.get_state(), "available")
 		Fs.delete(verified_path)
 		M.clear_cached_release()
@@ -702,8 +876,8 @@ helpers.describe("modules/updater/manager.lua", function()
 		helpers.assert_nil(verified_path)
 		helpers.assert_contains(completion_error, "checksum mismatch")
 		helpers.assert_true(not Fs.exists(downloaded_part),
-			"a mismatched .part archive must be removed")
-		helpers.assert_true(not Fs.exists(downloaded_part:gsub("%.part$", "")),
+			"a mismatched partial archive must be removed")
+		helpers.assert_true(not Fs.exists(downloaded_part .. ".tar.gz"),
 			"a mismatched archive must never be published")
 		helpers.assert_eq(M.get_state(), "idle")
 		M.clear_cached_release()
@@ -764,6 +938,35 @@ helpers.describe("modules/updater/manager.lua", function()
 		helpers.assert_eq(package_install.kind, "package",
 			".deb, RPM, Flatpak, AppImage and Nix layouts must keep their update owner")
 	end)
+
+	helpers.it("linux-native-cwd: updater shares the actual cwd owner for a relative source", function()
+		local Paths = require("infra.paths")
+		local installer = helpers.load_module("modules.updater.installer")
+		local real_cwd, real_getenv = Paths.current_directory, os.getenv
+		Paths.current_directory = function() return "/synthetic/prefix/lib/ergopti" end
+		os.getenv = function(key) if key == "PWD" then return "/synthetic/stale" end; return real_getenv(key) end
+		local ok, context = pcall(installer.resolve, "linux/modules/updater/manager.lua", function() return true end)
+		Paths.current_directory, os.getenv = real_cwd, real_getenv
+		helpers.assert_true(ok, tostring(context))
+		helpers.assert_eq(context.kind, "standalone")
+		helpers.assert_eq(context.install_root, "/synthetic/prefix/lib/ergopti")
+		helpers.assert_eq(context.wrapper, "/synthetic/prefix/bin/ergopti-hotstrings")
+	end)
+
+	for _, component in ipairs({ "literal\\backslash", "double\\\\backslash", "\\leading" }) do
+		helpers.it("linux-native-path-literal: updater keeps POSIX component " .. component, function()
+			local real_config = package.config
+			package.config = "/" .. real_config:sub(2)
+			local prefix = "/synthetic/" .. component
+			local ok, context = pcall(Installer.resolve, prefix .. "/lib/ergopti/linux/modules/updater/manager.lua",
+				function() return true end)
+			package.config = real_config
+			helpers.assert_true(ok, tostring(context))
+			helpers.assert_eq(context.kind, "standalone")
+			helpers.assert_eq(context.install_root, prefix .. "/lib/ergopti")
+			helpers.assert_eq(context.wrapper, prefix .. "/bin/ergopti-hotstrings")
+		end)
+	end
 
 	helpers.it("upgrades the complete standalone root and keeps a verified backup", function()
 		local base = os.tmpname():gsub("\\", "/")
@@ -1038,7 +1241,7 @@ helpers.describe("updater bounded pagination", function()
 			helpers.assert_true(index ~= nil, "requests carry an explicit page")
 			helpers.assert_contains(url, "per_page=20")
 			helpers.assert_eq(options.max_body_bytes, 2 * 1024 * 1024)
-			local response = cached and { status = 304 } or { ok = true, status = 200, body = page((index - 1) * 20 + 1, 20) }
+			local response = cached and { ok = false, status = 304, body = "", error = "HTTP 304", error_body = "" } or { ok = true, status = 200, body = page((index - 1) * 20 + 1, 20) }
 			cb(response)
 			cb(response)
 			return true

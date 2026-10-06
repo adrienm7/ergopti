@@ -12,6 +12,9 @@ local M = {}
 
 local Logger = require("logger.shim")
 local ShellRunner = require("adapters.shell_runner")
+local LibuvExit = require("infra.libuv_exit")
+local NativeTimer = require("infra.native_timer")
+local ProcessGroup = require("infra.libuv_process_group")
 local LOG = "adapters.file_digest"
 
 local ok_luv, luv = pcall(require, "luv")
@@ -25,11 +28,19 @@ if not ok_luv then luv = nil end
 -- =========================================
 
 local DEFAULT_TIMEOUT_MS = 30000
+local DEFAULT_OWNER = "default"
 local MAX_OUTPUT_BYTES = 1024
 
-local _active = nil
+local _active = {}
 
 M.HAS_ASYNC = luv ~= nil
+
+--- Resolves a stable owner while preserving the historical default request.
+--- @param owner any
+--- @return string
+local function request_owner(owner)
+	return type(owner) == "string" and owner ~= "" and owner or DEFAULT_OWNER
+end
 
 
 -- =========================================
@@ -78,24 +89,11 @@ local function close_timer(request)
 	request.timer = nil
 end
 
---- Sends a signal to the detached sha256sum process group.
---- @param request table
---- @param signal string
---- @return boolean
-local function signal_group(request, signal)
-	if not luv or not request.pid or type(luv.kill) ~= "function" then return false end
-	local ok, accepted = pcall(luv.kill, -request.pid, signal)
-	return ok and accepted ~= nil and accepted ~= false
-end
-
 --- Terminates the entire owned process group.
 --- @param request table
 --- @return boolean
 local function terminate_group(request)
-	if request.exited then return true end
-	local terminated = signal_group(request, "sigterm")
-	if terminated then signal_group(request, "sigkill") end
-	return terminated
+	return ProcessGroup.terminate(luv, request.pid)
 end
 
 --- Publishes one terminal result and makes every late callback inert.
@@ -106,7 +104,7 @@ end
 local function finish(request, digest, err, suppress_callback)
 	if request.terminal then return end
 	request.terminal = true
-	if _active == request then _active = nil end
+	if _active[request.owner] == request then _active[request.owner] = nil end
 	close_timer(request)
 	close_stream(request, "stdout")
 	close_stream(request, "stderr")
@@ -157,7 +155,8 @@ end
 
 --- Computes one file's SHA-256 asynchronously.
 --- @param path string Absolute file path.
---- @param options table|nil { timeout_ms? }
+--- A new digest replaces only the previous request for the same owner.
+--- @param options table|nil { timeout_ms?, owner? }
 --- @param callback function Receives digest, error exactly once.
 --- @return boolean Whether hashing was dispatched.
 function M.sha256(path, options, callback)
@@ -166,13 +165,27 @@ function M.sha256(path, options, callback)
 		return false
 	end
 	if type(path) ~= "string" or path:sub(1, 1) ~= "/" then return reject("invalid digest path") end
-	if _active and not M.cancel() then return reject("previous digest cancellation failed") end
+	-- Refuse the complete argument vector before replacing a valid incumbent.
+	-- A NUL-bearing absolute path has the right shape but cannot reach execve.
+	local argv = { "--binary", "--zero", "--", path }
+	local argv_refusal = ShellRunner.validate_spawn_args("sha256sum", argv)
+	if argv_refusal ~= "" then
+		-- Keep ordinary terminal reporting without acquiring native ownership.
+		finish({ callback = callback }, nil, "sha256sum argument vector refused: " .. argv_refusal)
+		return false
+	end
+	local request_options = type(options) == "table" and options or {}
+	local owner = request_owner(request_options.owner)
+	if _active[owner] and not M.cancel(owner) then return reject("previous digest cancellation failed") end
 	if not luv or type(luv.spawn) ~= "function" then return reject("asynchronous digest unavailable") end
 
-	local request_options = type(options) == "table" and options or {}
 	local timeout_ms = tonumber(request_options.timeout_ms) or DEFAULT_TIMEOUT_MS
 	local request = {
+		owner = owner,
 		callback = callback,
+		-- GNU sha256sum echoes the literal filename in its NUL-ended receipt.
+		-- Reserve that known payload separately from the bounded output budget.
+		stdout_limit = MAX_OUTPUT_BYTES + #path,
 		stdout_text = "",
 		stderr_text = "",
 		stdout_eof = false,
@@ -180,15 +193,21 @@ function M.sha256(path, options, callback)
 		exited = false,
 		terminal = false,
 	}
-	local handles_ok, stdout, stderr, timer = pcall(function()
-		return luv.new_pipe(false), luv.new_pipe(false), luv.new_timer()
+	local handles_ok = pcall(function()
+		-- Capture each allocation immediately so a later constructor exception
+		-- cannot hide already owned handles from finish().
+		request.stdout = luv.new_pipe(false)
+		if not request.stdout then error("stdout allocation refused", 0) end
+		request.stderr = luv.new_pipe(false)
+		if not request.stderr then error("stderr allocation refused", 0) end
+		request.timer = luv.new_timer()
+		if not request.timer then error("timer allocation refused", 0) end
 	end)
-	request.stdout, request.stderr, request.timer = stdout, stderr, timer
 	if not handles_ok or not request.stdout or not request.stderr or not request.timer then
 		finish(request, nil, "libuv handle allocation failed")
 		return false
 	end
-	local timer_ok, timer_result = pcall(luv.timer_start, request.timer, timeout_ms, 0, function()
+	local timer_ok, timer_result = pcall(NativeTimer.start, luv, request.timer, timeout_ms, 0, function()
 		if request.terminal then return end
 		terminate_group(request)
 		finish(request, nil, "timeout")
@@ -198,22 +217,13 @@ function M.sha256(path, options, callback)
 		return false
 	end
 
-	-- `path` arrives from a caller, so its type is not this module's to assume:
-	-- refuse an ill-typed argv by index before libuv turns it into a nameless
-	-- spawn failure (keylogger-worker-timings-must-be-strings).
-	local argv = { "--binary", "--zero", "--", path }
-	local argv_refusal = ShellRunner.validate_spawn_args("sha256sum", argv)
-	if argv_refusal ~= "" then
-		finish(request, nil, "sha256sum argument vector refused: " .. argv_refusal)
-		return false
-	end
 	local spawn_ok, process, pid, spawn_error = pcall(luv.spawn, "sha256sum", {
 		args = argv,
 		stdio = { nil, request.stdout, request.stderr },
 		detached = true,
-	}, function(code)
+	}, function(code, signal)
 		request.exited = true
-		request.exit_code = tonumber(code) or -1
+		request.exit_code = LibuvExit.status(code, signal)
 		maybe_complete(request)
 		close_process(request)
 	end)
@@ -232,7 +242,8 @@ function M.sha256(path, options, callback)
 		elseif chunk == nil then
 			request[eof_field] = true
 			maybe_complete(request)
-		elseif #request[field] + #chunk > MAX_OUTPUT_BYTES then
+		elseif #request[field] + #chunk > (field == "stdout_text"
+			and request.stdout_limit or MAX_OUTPUT_BYTES) then
 			terminate_group(request)
 			finish(request, nil, "sha256sum output exceeds limit")
 		else
@@ -252,16 +263,18 @@ function M.sha256(path, options, callback)
 		return false
 	end
 
-	_active = request
+	_active[owner] = request
 	Logger.debug(LOG, "SHA-256 file digest dispatched asynchronously (pid=%d).", pid)
 	return true
 end
 
---- Cancels the active digest without publishing its callback.
+--- Cancels one owner's active digest without publishing its callback.
+--- @param owner string|nil Defaults to the historical unnamed owner.
 --- @return boolean
-function M.cancel()
-	if not _active then return true end
-	local request = _active
+function M.cancel(owner)
+	local key = request_owner(owner)
+	if not _active[key] then return true end
+	local request = _active[key]
 	if not terminate_group(request) then
 		Logger.error(LOG, "Digest cancellation failed for pid=%s; ownership retained.",
 			tostring(request.pid))
@@ -271,10 +284,11 @@ function M.cancel()
 	return true
 end
 
---- Returns true while one file owns a live digest process.
+--- Returns true while this owner has a live digest process.
+--- @param owner string|nil Defaults to the historical unnamed owner.
 --- @return boolean
-function M.isActive()
-	return _active ~= nil
+function M.isActive(owner)
+	return _active[request_owner(owner)] ~= nil
 end
 
 return M

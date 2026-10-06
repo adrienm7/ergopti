@@ -12,6 +12,7 @@ local M = {}
 
 local Logger = require("infra.logger")
 local LOG = "menu"
+local OperationReporter = require("diagnostics.operation_reporter")
 
 local function clone_value(value)
 	if type(value) ~= "table" then return value end
@@ -115,7 +116,8 @@ function M.bind(preferences, opts)
 		return true
 	end
 
-	local function save()
+	local function save(on_error, publication_observer)
+		local report = OperationReporter.new(on_error, Logger, LOG)
 		if rolling_back then return false end
 		local read_only = nil
 		if opts.read_only_reason then read_only = opts.read_only_reason() end
@@ -123,12 +125,12 @@ function M.bind(preferences, opts)
 			if type(read_only) ~= "string" then
 				error("read_only_reason must return nil or a reason string", 2)
 			end
-			Logger.error(LOG, "Preferences are read-only for this session (%s); config.toml was "
+			report("admission", "error", "Preferences are read-only for this session (%s); config.toml was "
 				.. "not written and the change was rolled back. Reload once the cause is fixed.",
 				tostring(read_only))
 			local rollback_ok, rollback_result = xpcall(rollback, debug.traceback)
 			if not rollback_ok or rollback_result ~= true then
-				Logger.error(LOG, "Preference rollback did not commit: %s.", tostring(rollback_result))
+				report("rollback", "error", "Preference rollback did not commit: %s.", tostring(rollback_result))
 			end
 			return false
 		end
@@ -154,7 +156,9 @@ function M.bind(preferences, opts)
 				if type(opts.on_commit) == "function" then opts.on_commit(saved_snapshot, runtime_snapshot) end
 			end,
 			rollback,
-			opts.snapshot_view
+			opts.snapshot_view,
+			on_error,
+			publication_observer
 		)
 		return committed, snapshot
 	end
@@ -172,6 +176,8 @@ end
 --- @param on_commit function|nil Callback receiving the committed preference snapshot.
 --- @param on_rollback function|nil Callback restoring the last committed state.
 --- @param snapshot_view function|nil Transforms the complete snapshot for disk.
+--- @param on_error function|nil Receives only fixed failure categories.
+--- @param publication_observer function|nil Accepts a verified call-scoped native handoff.
 --- @return boolean committed
 --- @return table|nil snapshot Complete preference snapshot acknowledged by save().
 function M.commit(
@@ -184,8 +190,11 @@ function M.commit(
 	hot_counter,
 	on_commit,
 	on_rollback,
-	snapshot_view
+	snapshot_view,
+	on_error,
+	publication_observer
 )
+	local report = OperationReporter.new(on_error, Logger, LOG)
 	if type(preferences) ~= "table" or type(preferences.save) ~= "function" then return false end
 	local call_ok, committed, snapshot, runtime_snapshot = pcall(
 		preferences.save,
@@ -193,14 +202,16 @@ function M.commit(
 		state,
 		hotfiles,
 		core_modules,
-		snapshot_view
+		snapshot_view,
+		on_error,
+		publication_observer
 	)
 	if not call_ok or committed ~= true then
-		Logger.error(LOG, "Preference save did not commit; success-only cache updates were skipped.")
+		report("publication", "error", "Preference save did not commit; success-only cache updates were skipped.")
 		if type(on_rollback) == "function" then
 			local rollback_ok, rollback_result = xpcall(on_rollback, debug.traceback)
 			if not rollback_ok or rollback_result ~= true then
-				Logger.error(LOG, "Preference rollback did not commit: %s.", tostring(rollback_result))
+				report("rollback", "error", "Preference rollback did not commit: %s.", tostring(rollback_result))
 			end
 		end
 		return false

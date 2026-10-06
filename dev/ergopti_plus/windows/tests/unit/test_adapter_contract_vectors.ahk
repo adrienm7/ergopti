@@ -444,8 +444,8 @@ _RunTextSenderContractVectors() {
 	}
 	Test("TextSender: pressKey('Return', []) does not throw", _Result_press_key)
 
-	_Result_send_short() {
-		if InCI {
+	_Result_send_short(ForceBehavior := false) {
+		if InCI && !ForceBehavior {
 			; Same reasoning as pressKey above: the injection cannot run here, but the
 			; surface can still be held to its contract.
 			Assert(IsSet(TextSend), "TextSend must exist even where it cannot be exercised")
@@ -456,7 +456,7 @@ _RunTextSenderContractVectors() {
 		}
 		Err := ""
 		try {
-			TextSend("hello", Map(), 0)
+			TextSend("hello", Map("mode", "direct"), 0)
 		} catch as E {
 			Err := E.Message
 		}
@@ -1143,3 +1143,90 @@ _RunKeyboardHookContractVectors() {
 		_Result_kh_normalized_names)
 }
 _RunKeyboardHookContractVectors()
+
+
+; A short-text smoke fixture must not acquire an asynchronous clipboard owner
+; merely because the user's foreground application is Notepad. The queue port
+; refuses before scheduling, so this regression never touches the clipboard.
+class _ACV_RefuseClipboardQueue extends Array {
+	Attempts := 0
+	Push(Values*) {
+		this.Attempts += 1
+		throw Error("short-text fixture unexpectedly queued clipboard output.")
+	}
+}
+
+_ACV_ShortTextFixtureUsesDirectMode() {
+	global TEST_REGISTRY, _TEXT_CLIPBOARD_QUEUE, _TEXT_CLIPBOARD_BUSY
+	global _TEXT_CLIPBOARD_OWNER_TOKEN, _TEXT_CLIPBOARD_GENERATION
+	global _AHK_SendText, _ACV_SendCalls
+	global _OUTPUT_HOST_CACHE, _OUTPUT_HOST_IDENTITY_PROBE
+	global _OUTPUT_HOST_METADATA_PROBE, _OUTPUT_HOST_TITLE_PROBE
+	global _OUTPUT_HOST_RESOLVE_SERIAL
+	AssertEqual(0, _TEXT_CLIPBOARD_QUEUE.Length, "the fixture requires an idle sender queue")
+	AssertFalse(_TEXT_CLIPBOARD_BUSY, "the fixture must not adopt a busy sender")
+	AssertEqual(0, CBClipboardOwner.active.Count, "the fixture requires no active clipboard owner")
+	AssertEqual(0, CBClipboardOwner.paste_transaction, "the fixture requires an idle paste slot")
+	AssertEqual(0, CBClipboardOwner.restore_debt, "the fixture must not adopt restore debt")
+	Matches := []
+	for Entry in TEST_REGISTRY
+		if Entry.name == "TextSender: send short text does not throw"
+			Matches.Push(Entry.callback)
+	AssertEqual(1, Matches.Length, "the actual short-text fixture must be uniquely registered")
+	OldQueue := _TEXT_CLIPBOARD_QUEUE
+	OldSend := _AHK_SendText
+	OldCalls := _ACV_SendCalls
+	OldCache := _OUTPUT_HOST_CACHE
+	OldIdentity := _OUTPUT_HOST_IDENTITY_PROBE
+	OldMetadata := _OUTPUT_HOST_METADATA_PROBE
+	OldTitle := _OUTPUT_HOST_TITLE_PROBE
+	OldSerial := _OUTPUT_HOST_RESOLVE_SERIAL
+	OldOwner := _TEXT_CLIPBOARD_OWNER_TOKEN
+	OldGeneration := _TEXT_CLIPBOARD_GENERATION
+	OldCbGeneration := CBClipboardOwner.generation
+	OldMutation := CBClipboardOwner.mutation_id
+	OldActive := CBClipboardOwner.active
+	OldPending := CBClipboardOwner.pending
+	OldPendingLength := OldPending.Length
+	OldSendLevel := A_SendLevel
+	Queue := _ACV_RefuseClipboardQueue()
+	try {
+		_TEXT_CLIPBOARD_QUEUE := Queue
+		_ACV_SendCalls := []
+		_AHK_SendText := _ACV_RecordSend
+		OutputHostResolverConfigure(
+			(*) => Map("Hwnd", 4242, "Pid", 4243),
+			(*) => Map("Exe", "Notepad.exe", "Class", "RichEditD2DPT"),
+			(*) => Map("Ok", true, "Title", "owned fixture", "TimedOut", false))
+		AssertTrue(OutputHostTakesTextByPaste(OutputHostResolve()),
+			"the actual host resolver must select Notepad's paste policy")
+		; Force only this fixture's existing behavior branch under headless CI.
+		Matches[1].Call(true)
+		AssertEqual(0, Queue.Attempts, "the short-text fixture must never queue clipboard output")
+		AssertEqual(1, _ACV_SendCalls.Length, "the direct fixture must emit exactly once")
+		AssertEqual("hello", _ACV_SendCalls[1], "the recording primitive must receive the original text")
+		AssertFalse(_TEXT_CLIPBOARD_BUSY, "direct output must leave the sender idle")
+		AssertEqual(OldOwner, _TEXT_CLIPBOARD_OWNER_TOKEN, "direct output must not claim a sender owner")
+		AssertEqual(OldGeneration, _TEXT_CLIPBOARD_GENERATION, "direct output must not change sender generation")
+		AssertEqual(OldCbGeneration, CBClipboardOwner.generation, "direct output must not claim clipboard ownership")
+		AssertEqual(OldMutation, CBClipboardOwner.mutation_id, "direct output must not publish a clipboard mutation")
+		AssertTrue(CBClipboardOwner.active == OldActive, "the clipboard owner map must retain its identity")
+		AssertEqual(0, OldActive.Count, "direct output must leave the owner map empty")
+		AssertTrue(CBClipboardOwner.pending == OldPending, "the clipboard notification queue must retain its identity")
+		AssertEqual(OldPendingLength, OldPending.Length, "direct output must not publish a notification")
+		AssertEqual(0, CBClipboardOwner.paste_transaction, "direct output must leave the paste slot idle")
+		AssertEqual(0, CBClipboardOwner.restore_debt, "direct output must leave restoration debt absent")
+		AssertEqual(OldSendLevel, A_SendLevel, "the actual sender must restore its caller's send level")
+	} finally {
+		_TEXT_CLIPBOARD_QUEUE := OldQueue
+		_AHK_SendText := OldSend
+		_ACV_SendCalls := OldCalls
+		_OUTPUT_HOST_CACHE := OldCache
+		_OUTPUT_HOST_IDENTITY_PROBE := OldIdentity
+		_OUTPUT_HOST_METADATA_PROBE := OldMetadata
+		_OUTPUT_HOST_TITLE_PROBE := OldTitle
+		_OUTPUT_HOST_RESOLVE_SERIAL := OldSerial
+	}
+}
+Test("TextSender: short-text fixture stays direct under Notepad (short-text-fixture-direct)",
+	_ACV_ShortTextFixtureUsesDirectMode)

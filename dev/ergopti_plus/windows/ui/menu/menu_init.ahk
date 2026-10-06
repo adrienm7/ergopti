@@ -191,6 +191,7 @@ _MI_StageTopLevel(TopLevel, Builders, IncludeFn := 0, StatusLabel := "") {
 ; ``active_layouts`` is macOS-only and skipped by the AHK platform filter.
 _MI_StageLayout() {
 	LayoutListProviders := Map(
+		"number_row_policy",      (*) => _LAY_NumberRowRows(),
 		"custom_layouts",         (*) => _LAY_CustomLayoutRows(),
 		"layout_features_base",   (*) => _LAY_LayoutFeatureBaseRows(),
 		"layout_features_altgr",  (*) => _LAY_LayoutFeatureAltGrRows(),

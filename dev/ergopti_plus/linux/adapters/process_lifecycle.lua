@@ -32,6 +32,7 @@ local Logger = require("logger.shim")
 -- keystroke path — so teaching WindowInfo about Wayland would have changed
 -- nothing a user experiences.
 local WindowInfo = require("adapters.window_info")
+local Shell = require("adapters.shell_runner")
 
 local LOG = "adapters.process_lifecycle"
 
@@ -111,22 +112,21 @@ end
 --- read as an empty machine: diffing one would fire a quit event for every
 --- known process, then a launch event for every one of them when ps recovers.
 local function _snapshot_processes()
-	local fh = io.popen("ps -eo comm 2>/dev/null", "r")
-	if not fh then return nil end
+	-- LuaJIT's pclose can report true for a child that exited nonzero.
+	-- The checked runner retains native status independently of partial stdout.
+	-- Request no header: COMMAND is also a legal native process name.
+	local accepted, output = Shell.exec_checked("ps -eo comm= 2>/dev/null")
+	if not accepted then return nil end
 	local snapshot = {}
-	local read_ok = pcall(function()
-		for line in fh:lines() do
-			local name = line:match("^%s*(.-)%s*$")
-			if name and name ~= "" and name ~= "COMMAND" then
-				snapshot[name] = true
-			end
+	for line in (output .. "\n"):gmatch("([^\n]*)\n") do
+		-- The final headerless comm column is unpadded. Spaces are native name
+		-- bytes; trimming merges distinct processes and loses whitespace names.
+		local name = line
+		if name and name ~= "" then
+			snapshot[name] = true
 		end
-	end)
-	-- os.execute and pipe:close() return a NUMBER on LuaJIT (5.1) and true
-	-- on 5.2+: accept both spellings of success, like every other call site.
-	local close_status = fh:close()
-	local close_ok = close_status == true or close_status == 0
-	if not read_ok or not close_ok or next(snapshot) == nil then return nil end
+	end
+	if next(snapshot) == nil then return nil end
 	return snapshot
 end
 

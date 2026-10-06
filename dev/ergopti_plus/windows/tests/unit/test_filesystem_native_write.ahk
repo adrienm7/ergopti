@@ -101,3 +101,61 @@ _FSNW_Empty(Mode) {
 
 for Mode in ["write", "durable", "append"]
 	Test("filesystem: empty native " . Mode . " (filesystem-native-write)", _FSNW_Empty.Bind(Mode))
+
+; Native rename failures report their immediate Win32 receipt without retrying.
+_FSNW_AtomicMoveReceipt(Mode) {
+	RootPath := _FSWL_Path() . ".dir"
+	FSCreateDirectoryExclusiveStrict(RootPath)
+	SourcePath := RootPath . "\source.tmp"
+	TargetPath := RootPath . "\target.toml"
+	try {
+		FileAppend("old destination", TargetPath, "UTF-8-RAW")
+		if Mode != "missing-source"
+			FileAppend("é😀 new bytes", SourcePath, "UTF-8-RAW")
+		NativeError := 1234
+		DllCall("kernel32\SetLastError", "UInt", 1234)
+		switch Mode {
+			case "missing-parent":
+				Accepted := FSAtomicMoveReplace(SourcePath, RootPath . "\absent\target.toml", &NativeError)
+				AssertFalse(Accepted)
+				AssertEqual(3, NativeError, "missing destination parent reports ERROR_PATH_NOT_FOUND")
+			case "missing-source":
+				Accepted := FSAtomicMoveReplace(SourcePath, TargetPath, &NativeError)
+				AssertFalse(Accepted)
+				AssertEqual(2, NativeError, "missing source reports ERROR_FILE_NOT_FOUND")
+			case "success":
+				Accepted := FSAtomicMoveReplace(SourcePath, TargetPath, &NativeError)
+				AssertTrue(Accepted)
+				AssertEqual(0, NativeError, "a successful rename resets an unrelated prior error")
+				AssertFalse(FileExist(SourcePath), "the successfully published stage is consumed")
+				AssertEqual("é😀 new bytes", FileRead(TargetPath, "UTF-8-RAW"))
+				AssertEqual(StrPut("é😀 new bytes", "UTF-8") - 1, FileGetSize(TargetPath))
+				FileAppend("two-argument control", SourcePath, "UTF-8-RAW")
+				AssertTrue(FSAtomicMoveReplace(SourcePath, TargetPath), "existing two-argument callers remain valid")
+				AssertEqual("two-argument control", FileRead(TargetPath, "UTF-8-RAW"))
+			case "invalid":
+				for InvalidPath in ["", 0, Map()] {
+					NativeError := 1234
+					AssertFalse(FSAtomicMoveReplace(InvalidPath, TargetPath, &NativeError))
+					AssertEqual(0, NativeError, "invalid source has no native error receipt")
+					NativeError := 1234
+					AssertFalse(FSAtomicMoveReplace(SourcePath, InvalidPath, &NativeError))
+					AssertEqual(0, NativeError, "invalid destination has no native error receipt")
+				}
+		}
+		if Mode != "success" {
+			AssertEqual("old destination", FileRead(TargetPath, "UTF-8-RAW"), "refusal preserves the independent destination")
+			if Mode != "missing-source"
+				AssertEqual("é😀 new bytes", FileRead(SourcePath, "UTF-8-RAW"), "refusal preserves the source stage")
+		}
+	} finally {
+		if FileExist(SourcePath)
+			FileDelete(SourcePath)
+		if FileExist(TargetPath)
+			FileDelete(TargetPath)
+		DirDelete(RootPath)
+	}
+}
+
+for Mode in ["missing-parent", "missing-source", "success", "invalid"]
+	Test("filesystem: atomic move receipt " . Mode . " (filesystem-native-write)", _FSNW_AtomicMoveReceipt.Bind(Mode))

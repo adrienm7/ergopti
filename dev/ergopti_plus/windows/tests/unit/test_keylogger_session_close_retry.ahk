@@ -17,6 +17,7 @@ _KLSCR_RetryPartialClose(Mode) {
 	global _Stub_AppendLogRows, _Stub_AppendLogAccept, _Stub_AppendLogRejectSuspend, _Stub_AppendLogHook
 	Saved := Map()
 	for Name in ["is_idle", "idle_started_at", "is_session_active", "session_started_at",
+		"session_generation", "idle_generation",
 		"last_authorized_tick", "privacy_interrupted", "privacy_started_at", "system_events",
 		"system_failure_reported", "wts_registered", "wts_failure_reported", "wts_retry_timer",
 		"session_close", "session_close_draining", "idle_close"] {
@@ -102,6 +103,7 @@ _KLSCR_ClosePort(State, Kind, Duration, Commit) {
 _KLSCR_FrozenClose(Mode) {
 	Saved := Map()
 	for Name in ["is_idle", "idle_started_at", "is_session_active", "session_started_at",
+		"session_generation", "idle_generation",
 		"session_close", "session_close_draining", "idle_close"]
 		Saved[Name] := KLWatch.%Name%
 	try {
@@ -143,6 +145,7 @@ _KLSCR_ShortIdleRetry(Mode) {
 	global _Stub_AppendLogRows, _Stub_AppendLogAccept, _Stub_AppendLogRejectSuspend, _Stub_AppendLogHook
 	Saved := Map()
 	for Name in ["is_idle", "idle_started_at", "is_session_active", "session_started_at",
+		"session_generation", "idle_generation",
 		"last_authorized_tick", "privacy_interrupted", "privacy_started_at", "system_events",
 		"system_failure_reported", "wts_registered", "wts_failure_reported", "wts_retry_timer",
 		"session_close", "session_close_draining", "idle_close"] {
@@ -238,6 +241,7 @@ _KLSCR_Native64Scope(Run) {
 	global _Stub_AppendLogRows, _Stub_AppendLogAccept, _Stub_AppendLogRejectSuspend, _Stub_AppendLogHook
 	Saved := Map()
 	for Name in ["is_idle", "idle_started_at", "is_session_active", "session_started_at",
+		"session_generation", "idle_generation",
 		"last_authorized_tick", "privacy_interrupted", "privacy_started_at", "system_events",
 		"session_close", "session_close_draining", "idle_close"]
 		Saved[Name] := KLWatch.%Name%
@@ -792,3 +796,382 @@ _KLA64_NativeDefaults() {
 	} finally KLHook.last_tick := SavedTick
 }
 Test("keylogger activity native64: omitted observation retains the actual native clock", _KLA64_NativeDefaults)
+
+
+; The main runner uses a recording append stub. A tree-owned child instead loads
+; the actual production append and teardown bodies, preserving their include
+; isolation while exercising the privacy refusal that the recording stub hides.
+_KLSCR_ShutdownCloseNativeChain() {
+	_KLRDC_Reset()
+	Script := _KLRDC_Root() . "shutdown_close_chain.ahk"
+	Handle := 0
+	Receipt := 0
+	try {
+		Source := Chr(0xFEFF) . "#Requires AutoHotkey v2.0`n#Warn All, StdOut`n"
+		for Spec in [["keylogger_password.ahk", "KLPasswordCache"],
+			["keylogger_watchers.ahk", "KLWatchConst"], ["keylogger_watchers.ahk", "KLWatch"]] {
+			ClassSource := FileRead(A_ScriptDir . "\..\modules\keylogger\" . Spec[1], "UTF-8")
+			AssertTrue(RegExMatch(ClassSource, "ms)^class " . Spec[2] . " \{.*?^\}", &NativeClass) > 0,
+				"each native-chain class must come from actual production source")
+			Source .= NativeClass[0] . "`n"
+		}
+		for Name in ["KL_AppendLog", "KL_BeginShutdown", "KL_CancelShutdown", "KL_Hook_Stop", "KL_Hook_InvalidateCapture",
+			"KL_CommitPwCache", "KL_TryGetPwCachedVerdict", "KL_PasswordFocusSnapshot",
+			"KL_PasswordFocusTrackingStop", "KL_FreePasswordFocusCallback", "KL_IsFocusedFieldPassword",
+			"MF_ShouldFilter", "MF_ShouldFilterFor", "KL_AssignStableEventId", "KL_AllocEventId",
+			"KL_RecordPrivacyHit", "TickElapsed64", "_KL_Watchers_CommitSessionStart",
+			"_KL_Watchers_CommitSessionEnd", "_KL_Watchers_CommitIdleStart", "_KL_Watchers_CommitIdleEnd",
+			"_KL_Watchers_CommitIdleClose", "_KL_Watchers_EndIdle", "_KL_Watchers_Log",
+			"_KL_Watchers_CommitClose", "_KL_Watchers_CloseSession", "KL_Watchers_OnKeystroke",
+			"KL_Watchers_OnPrivateKeystroke"] {
+			Body := _DriverFuncBody(Name)
+			AssertTrue(Body != "", "each actual native-chain function must be present")
+			Source .= Body . "`n"
+		}
+		Source .= '#Include ' . A_ScriptDir . '\..\modules\keylogger\keylogger_session_events.ahk' . "`n"
+		Source .= '#Include ' . A_ScriptDir . '\fixtures\keylogger_shutdown_close_fixture.ahk' . "`n"
+		AssertTrue(FSWriteCreateDurable(Script, Source) != 0)
+		Done(Code, Out, Err) {
+			Receipt := [Code, Out, Err]
+		}
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath, ["/ErrorStdOut", Script], Done)
+		AssertTrue(Handle.start())
+		Started := A_TickCount
+		while !IsObject(Receipt) && TickElapsed(Started) < 5000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AssertTrue(IsObject(Receipt), "the native close fixture must complete within its owned deadline")
+		AssertEqual(0, Receipt[1], Receipt[2] . Receipt[3])
+		; The real ShellRunner callback removes terminal CR/LF from its capture.
+		AssertEqual("frozen-close-chain: passed", Receipt[2], "the complete native receipt must match")
+		AssertEqual("", Receipt[3], "the native close fixture must emit no errors or warnings")
+	} finally {
+		if IsObject(Handle)
+			AssertTrue(Handle.terminate())
+		_KLRDC_Cleanup()
+	}
+}
+Test("keylogger session: actual focus teardown retains only certified closes (keylogger-shutdown-close-chain)",
+	_KLRDC_CheckTeardown.Bind(_KLSCR_ShutdownCloseNativeChain))
+
+; Arrival receipts are classified on the original callback thread, then committed
+; in FIFO order. Every fixture owns all state and uses only recording ports.
+_KLF_WithState(Body) {
+	global _Stub_AppendLogRows, _Stub_AppendLogAccept, _Stub_AppendLogRejectSuspend
+	global _Stub_AppendLogHook, _Stub_WpmPushCalls
+	Owners := [Keylogger, KLHook, KLWatch, KLPasswordCache, MetricsFocusCache, MetricsFilters]
+	Fields := [["initialized", "_shutting_down", "lifecycle_generation", "buffer_events", "buffer_text",
+		"synth_active", "synth_type", "synth_private", "health_privacy_hits"],
+		["last_tick", "last_vk", "last_sc", "capture_queue", "capture_owner", "capture_generation", "capture_stopping"],
+		["is_session_active", "session_started_at", "session_generation", "last_authorized_tick", "is_idle", "idle_started_at", "idle_generation",
+		"privacy_interrupted", "privacy_started_at", "session_close", "session_close_draining", "idle_close", "system_events", "system_failure_reported"],
+		["generation", "focus_generation"], ["generation", "state"],
+		["disabled_apps", "private_browsing", "secure_field", "system_auth"]]
+	Saved := []
+	for Index, Owner in Owners {
+		Values := Map()
+		for Field in Fields[Index]
+			Values[Field] := Owner.HasOwnProp(Field) ? {present: true, value: Owner.%Field%} : {present: false}
+		Saved.Push(Values)
+	}
+	SavedRows := _Stub_AppendLogRows
+	SavedAccept := _Stub_AppendLogAccept
+	SavedReject := _Stub_AppendLogRejectSuspend
+	SavedHook := _Stub_AppendLogHook
+	SavedWpm := _Stub_WpmPushCalls
+	try {
+		Keylogger.initialized := true
+		Keylogger._shutting_down := false
+		Keylogger.lifecycle_generation := 100
+		Keylogger.buffer_events := []
+		Keylogger.buffer_text := ""
+		Keylogger.synth_active := 0
+		Keylogger.synth_type := "none"
+		Keylogger.synth_private := false
+		Keylogger.health_privacy_hits := 0
+		KLHook.last_tick := 100
+		KLHook.last_vk := 0x41
+		KLHook.last_sc := 0x1E
+		if KLHook.HasOwnProp("capture_queue") {
+			KLHook.capture_queue := []
+			KLHook.capture_owner := false
+			KLHook.capture_generation := 100
+			KLHook.capture_stopping := false
+		}
+		KLWatch.is_session_active := true
+		KLWatch.session_started_at := 100
+		KLWatch.last_authorized_tick := 100
+		KLWatch.is_idle := false
+		KLWatch.idle_started_at := 0
+		KLWatch.privacy_interrupted := false
+		KLWatch.privacy_started_at := 0
+		KLWatch.session_close := false
+		KLWatch.session_close_draining := false
+		KLWatch.idle_close := false
+		KLWatch.system_events := false
+		KLWatch.system_failure_reported := false
+		KLPasswordCache.generation := 100
+		KLPasswordCache.focus_generation := 100
+		MetricsFocusCache.generation := 100
+		MetricsFocusCache.state := {valid: true, process_name: "owned-fifo.exe", title: "Owned FIFO",
+			class: "OwnedFifo", hwnd: 1, last_at: 100, failure_reason: "", timed_out: false}
+		MetricsFilters.disabled_apps := Map()
+		MetricsFilters.private_browsing := false
+		MetricsFilters.secure_field := false
+		MetricsFilters.system_auth := false
+		_Stub_AppendLogRows := []
+		_Stub_AppendLogAccept := true
+		_Stub_AppendLogRejectSuspend := false
+		_Stub_AppendLogHook := 0
+		_Stub_WpmPushCalls := []
+		Body.Call()
+	} finally {
+		for Index, Owner in Owners {
+			for Field, Prior in Saved[Index] {
+				if Prior.present
+					Owner.%Field% := Prior.value
+				else if Owner.HasOwnProp(Field)
+					Owner.DeleteProp(Field)
+			}
+		}
+		_Stub_AppendLogRows := SavedRows
+		_Stub_AppendLogAccept := SavedAccept
+		_Stub_AppendLogRejectSuspend := SavedReject
+		_Stub_AppendLogHook := SavedHook
+		_Stub_WpmPushCalls := SavedWpm
+	}
+}
+
+_KLF_Allow() {
+	return false
+}
+
+_KLF_NoShortcut(*) {
+	return ""
+}
+
+_KLF_Shortcut(Label, *) {
+	return Label
+}
+
+_KLF_Reenter() {
+	KL_Hook_OnChar(0, "b", _KLF_Allow, 1100)
+	AssertEqual(0, Keylogger.buffer_events.Length,
+		"a nested ready receipt must not publish ahead of the outer unready receipt")
+	AssertEqual(100, KLHook.last_tick, "classification cannot publish timing out of order")
+	return false
+}
+
+_KLF_Ordered(Kind) {
+	global _Stub_AppendLogRows
+	switch Kind {
+		case "char": KL_Hook_OnChar(0, "a", _KLF_Reenter, 1000)
+		case "special": KL_Hook_OnKeyDown(0, 0x0D, 0x1C, _KLF_Reenter, 1000, _KLF_NoShortcut)
+		case "shortcut": KL_Hook_OnKeyDown(0, 0x41, 0x1E, _KLF_Reenter, 1000, _KLF_Shortcut.Bind("Ctrl+A"))
+		case "special_shortcut": KL_Hook_OnKeyDown(0, 0x0D, 0x1C, _KLF_Reenter, 1000, _KLF_Shortcut.Bind("Ctrl+Enter"))
+	}
+	AssertEqual(1100, KLHook.last_tick, "both original arrival timestamps survive ordered processing")
+	AssertEqual(1100, KLWatch.last_authorized_tick, "the actual watcher consumes both timestamps in order")
+	Rows := Keylogger.buffer_events
+	if Kind = "shortcut" {
+		AssertEqual(1, Rows.Length)
+		AssertEqual("b", Rows[1][1])
+		AssertEqual(100, Rows[1][2], "shortcut activity owns the prior tick exactly once")
+	} else {
+		AssertEqual(2, Rows.Length, "both observed tokens must survive without clamp or drop")
+		AssertEqual(Kind = "char" ? "a" : "[ENTER]", Rows[1][1])
+		AssertEqual(900, Rows[1][2])
+		AssertEqual("b", Rows[2][1])
+		AssertEqual(100, Rows[2][2])
+	}
+	if InStr(Kind, "shortcut") {
+		AssertEqual(1, _Stub_AppendLogRows.Length, "the actual shortcut publication owner must run")
+		AssertEqual("shortcut", _Stub_AppendLogRows[1]["type"])
+		AssertEqual(Kind = "shortcut" ? "Ctrl+A" : "Ctrl+Enter", _Stub_AppendLogRows[1]["key"])
+	}
+}
+for _KLF_Kind in ["char", "special", "shortcut", "special_shortcut"]
+	Test("keylogger arrival FIFO: interrupted " . _KLF_Kind,
+		_KLF_WithState.Bind(_KLF_Ordered.Bind(_KLF_Kind)))
+
+_KLF_NewMetadata() {
+	KL_Hook_OnKeyDown(0, 0x42, 0x30, _KLF_Allow, 1050, _KLF_NoShortcut)
+	KL_Hook_OnChar(0, "b", _KLF_Allow, 1100)
+	return false
+}
+
+_KLF_Metadata() {
+	KL_Hook_OnChar(0, "a", _KLF_NewMetadata, 1000)
+	Rows := Keylogger.buffer_events
+	AssertEqual(2, Rows.Length)
+	AssertEqual(0x41, Rows[1][3]["kc"], "outer receipt retains its entry keycode")
+	AssertEqual(0x1E, Rows[1][3]["sk"])
+	AssertEqual(0x42, Rows[2][3]["kc"], "nested Char pairs with the nested arrived keydown")
+	AssertEqual(0x30, Rows[2][3]["sk"])
+	AssertEqual(0x42, KLHook.last_vk, "public metadata remains the latest arrived keydown")
+	AssertEqual(0x30, KLHook.last_sc)
+}
+Test("keylogger arrival FIFO: metadata belongs to its arrival", _KLF_WithState.Bind(_KLF_Metadata))
+
+_KLF_ChangeSynthetic() {
+	Keylogger.synth_active := 1
+	Keylogger.synth_type := "owned-expansion"
+	Keylogger.synth_private := true
+	KL_Hook_OnChar(0, "z", _KLF_Allow, 1100)
+	Keylogger.synth_active := 0
+	Keylogger.synth_type := "none"
+	Keylogger.synth_private := false
+	return false
+}
+
+_KLF_Synthetic() {
+	global PI_MASK_FALLBACK_CHAR
+	KL_Hook_OnChar(0, "a", _KLF_ChangeSynthetic, 1000)
+	Rows := Keylogger.buffer_events
+	AssertEqual(2, Rows.Length)
+	AssertEqual("a", Rows[1][1])
+	AssertFalse(Rows[1][3].Has("s"), "outer manual receipt stays manual")
+	AssertEqual(PI_MASK_FALLBACK_CHAR, Rows[2][1])
+	AssertEqual(1, Rows[2][3]["s"])
+	AssertEqual("owned-expansion", Rows[2][3]["st"])
+	AssertEqual(1000, KLWatch.last_authorized_tick, "queued synthetic activity cannot mutate accepted timing")
+	AssertEqual(0, KLHook.last_tick, "the final synthetic receipt preserves the original physical-clock reset")
+	KL_Hook_OnChar(0, "c", _KLF_Allow, 1200)
+	AssertEqual("c", Keylogger.buffer_events[3][1])
+	AssertEqual(0, Keylogger.buffer_events[3][2], "next physical row restarts timing after ordered synthesis")
+	AssertEqual(1200, KLHook.last_tick)
+}
+Test("keylogger arrival FIFO: synthesis belongs to its arrival", _KLF_WithState.Bind(_KLF_Synthetic))
+
+_KLF_ChangeFocus() {
+	MetricsFocusCache.generation += 1
+	return false
+}
+
+_KLF_PrivacyDowngrade() {
+	KL_Hook_OnChar(0, "a", _KLF_ChangeFocus, 1000)
+	AssertEqual(0, Keylogger.buffer_events.Length, "a changed identity cannot borrow an ordinary verdict")
+	AssertEqual(1000, KLHook.last_tick, "unknown privacy still accounts for physical activity")
+	AssertEqual(100, KLWatch.last_authorized_tick, "unknown privacy cannot acquire authorized time")
+	AssertTrue(KLWatch.privacy_interrupted)
+	AssertEqual(1000, KLWatch.privacy_started_at)
+}
+Test("keylogger arrival FIFO: changed classification identity remains private physical activity",
+	_KLF_WithState.Bind(_KLF_PrivacyDowngrade))
+
+_KLF_ChangeLifecycle() {
+	Keylogger.lifecycle_generation += 1
+	KL_Hook_OnChar(0, "b", _KLF_Allow, 1100)
+	return false
+}
+
+_KLF_Lifecycle() {
+	KL_Hook_OnChar(0, "a", _KLF_ChangeLifecycle, 1000)
+	AssertEqual(1, Keylogger.buffer_events.Length, "revoked old lifecycle cannot publish into the successor")
+	AssertEqual("b", Keylogger.buffer_events[1][1])
+	AssertEqual(1100, KLHook.last_tick)
+	AssertEqual(1100, KLWatch.last_authorized_tick)
+	AssertFalse(KL_Hook_HasPendingInput(), "revocation cannot strand a drain owner")
+}
+Test("keylogger arrival FIFO: lifecycle revocation leaves successor work intact", _KLF_WithState.Bind(_KLF_Lifecycle))
+
+
+_KLF_Ordinary(Kind) {
+	global _Stub_AppendLogRows
+	switch Kind {
+		case "char": KL_Hook_OnChar(0, "a", _KLF_Allow, 1000)
+		case "special": KL_Hook_OnKeyDown(0, 0x0D, 0x1C, _KLF_Allow, 1000, _KLF_NoShortcut)
+		case "shortcut": KL_Hook_OnKeyDown(0, 0x41, 0x1E, _KLF_Allow, 1000, _KLF_Shortcut.Bind("Ctrl+A"))
+		case "special_shortcut": KL_Hook_OnKeyDown(0, 0x0D, 0x1C, _KLF_Allow, 1000, _KLF_Shortcut.Bind("Ctrl+Enter"))
+	}
+	AssertEqual(1000, KLHook.last_tick)
+	AssertEqual(1000, KLWatch.last_authorized_tick)
+	AssertEqual(Kind = "shortcut" ? 0 : 1, Keylogger.buffer_events.Length)
+	if Kind != "shortcut"
+		AssertEqual(900, Keylogger.buffer_events[1][2])
+	AssertEqual(InStr(Kind, "shortcut") ? 1 : 0, _Stub_AppendLogRows.Length)
+	AssertFalse(KL_Hook_HasPendingInput(), "every completed ordinary receipt releases its lease")
+}
+for _KLF_Kind in ["char", "special", "shortcut", "special_shortcut"]
+	Test("keylogger arrival FIFO: ordinary " . _KLF_Kind,
+		_KLF_WithState.Bind(_KLF_Ordinary.Bind(_KLF_Kind)))
+
+_KLF_IdleDuringClassification() {
+	global _Stub_AppendLogRows
+	KL_Watchers_IdleTick(35101)
+	AssertFalse(KLWatch.is_idle, "a timer cannot classify inactivity while the just-arrived head is unready")
+	AssertEqual(0, _Stub_AppendLogRows.Length, "pending classification cannot publish a premature idle_start")
+	return false
+}
+
+_KLF_PendingIdle() {
+	global _Stub_AppendLogRows
+	KL_Hook_OnChar(0, "a", _KLF_IdleDuringClassification, 35100)
+	AssertEqual(1, Keylogger.buffer_events.Length)
+	AssertEqual(35000, Keylogger.buffer_events[1][2])
+	AssertFalse(KL_Hook_HasPendingInput(), "completion makes later timer checks eligible")
+	KL_Watchers_IdleTick(35102)
+	AssertFalse(KLWatch.is_idle)
+	AssertEqual(0, _Stub_AppendLogRows.Length)
+}
+Test("keylogger arrival FIFO: idle timer defers the pending classification",
+	_KLF_WithState.Bind(_KLF_PendingIdle))
+
+
+_KLF_RecordErgo(Rows, Arguments*) {
+	Rows.Push(Arguments)
+}
+
+_KLF_BackspaceContract() {
+	Rows := []
+	Record := _KLF_RecordErgo.Bind(Rows)
+	Keylogger.buffer_text := "ab"
+	KL_Hook_OnChar(0, "c", _KLF_Allow, 1000, Record)
+	KL_Hook_OnKeyDown(0, 0x08, 0, _KLF_Allow, 1050, _KLF_NoShortcut, Record)
+	AssertEqual(2, Rows.Length, "both actual callback branches must notify ergonomics")
+	AssertEqual(3, Rows[1].Length, "Char retains its original three-argument contract")
+	AssertEqual(4, Rows[2].Length, "KeyDown retains its explicit Backspace argument")
+	AssertEqual(50, Rows[2][1])
+	AssertEqual(0x08, Rows[2][2])
+	AssertEqual(0, Rows[2][3])
+	AssertTrue(Rows[2][4], "the actual Backspace branch must retain deletion accounting")
+	AssertEqual("ab", Keylogger.buffer_text)
+	Meta := Keylogger.buffer_events[2][3]
+	AssertTrue(Meta.Has("kc") && Meta.Has("sk"), "special-key metadata retains both original keys")
+	AssertEqual(0x08, Meta["kc"])
+	AssertEqual(0, Meta["sk"], "a zero scancode remains explicitly recorded for KeyDown")
+}
+Test("keylogger arrival FIFO: Backspace ergonomics and zero scancode retain their contracts",
+	_KLF_WithState.Bind(_KLF_BackspaceContract))
+
+_KLF_RejectReady(This, Value) {
+	throw Error("Owned completion setter refusal.")
+}
+
+_KLF_BreakCompletion() {
+	Intent := KLHook.capture_queue[1]
+	KL_Hook_OnChar(0, "b", _KLF_Allow, 1100)
+	Intent.DeleteProp("ready")
+	Intent.DefineProp("ready", {Get: (*) => false, Set: _KLF_RejectReady})
+	return false
+}
+
+_KLF_CompletionRefusal(Kind) {
+	if Kind = "char"
+		KL_Hook_OnChar(0, "a", _KLF_BreakCompletion, 1000)
+	else
+		KL_Hook_OnKeyDown(0, 0x0D, 0x1C, _KLF_BreakCompletion, 1000, _KLF_NoShortcut)
+	AssertEqual(1, Keylogger.buffer_events.Length, "only the failed owned receipt is retired")
+	AssertEqual("b", Keylogger.buffer_events[1][1], "the ready successor remains drainable")
+	AssertEqual(1000, Keylogger.buffer_events[1][2])
+	AssertEqual(1100, KLHook.last_tick)
+	AssertEqual(1100, KLWatch.last_authorized_tick)
+	AssertFalse(KL_Hook_HasPendingInput(), "a completion refusal must not wedge the lease")
+	KL_Hook_OnChar(0, "c", _KLF_Allow, 1200)
+	AssertEqual("c", Keylogger.buffer_events[2][1], "subsequent callbacks stay alive after the logged refusal")
+	AssertEqual(100, Keylogger.buffer_events[2][2])
+}
+for _KLF_Kind in ["char", "key"]
+	Test("keylogger arrival FIFO: completion refusal stays contained for " . _KLF_Kind,
+		_KLF_WithState.Bind(_KLF_CompletionRefusal.Bind(_KLF_Kind)))

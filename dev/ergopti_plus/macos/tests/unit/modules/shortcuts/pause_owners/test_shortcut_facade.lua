@@ -231,7 +231,14 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 		package.loaded["infra.personal_shortcuts"] = { load = noop }
 		package.loaded["ui.menu.init"] = nil
 		local Menu = require("ui.menu.init")
-		local menu = Menu.start("/virtual/", {}, {}, {}, {}, {}, nil, {})
+		local program_admission
+		local gestures = { configure_program_admission = function(callback)
+			helpers.assert_type(callback, "function")
+			program_admission = callback
+			return true
+		end }
+		local menu = Menu.start("/virtual/", {}, gestures, {}, {}, {}, nil, {})
+		helpers.assert_type(program_admission, "function", "menu facade startup registers the required program owner")
 		helpers.assert_not_nil(menu,
 			"the real root menu must reach its LLM dependency-injection boundary")
 		helpers.assert_true(injected_control == shortcuts,

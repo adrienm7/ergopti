@@ -65,13 +65,9 @@ end
 
 local function normalise_path(path)
 	if type(path) ~= "string" or path == "" then return nil end
-	path = path:gsub("\\", "/"):gsub("/+", "/")
+	path = Paths.normalize_native_separators(path):gsub("/+", "/")
 	if path:sub(1, 1) ~= "/" then
-		local cwd = os.getenv("PWD")
-		if type(cwd) ~= "string" or cwd == "" then
-			cwd = capture_command("pwd 2>/dev/null")
-			if cwd then cwd = cwd:gsub("%s+$", "") end
-		end
+		local cwd = Paths.current_directory()
 		if type(cwd) ~= "string" or cwd == "" then return nil end
 		path = cwd:gsub("/+$", "") .. "/" .. path
 	end

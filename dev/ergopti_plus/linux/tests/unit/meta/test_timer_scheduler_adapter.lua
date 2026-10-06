@@ -11,6 +11,94 @@
 local helpers = require("tests.helpers")
 local ts      = helpers.load_module("adapters.timer_scheduler")
 
+-- Native API double: the backend retains callbacks, not returned Lua tokens.
+local function timer_fixture()
+	local state = { timers = {} }
+	local backend = {}
+	function backend.update_time() end -- native void-style clock refresh
+	function backend.new_timer()
+		local timer = { closed = false, stopped = false }
+		state.timers[#state.timers + 1] = timer
+		return timer
+	end
+	function backend.timer_start(timer, timeout, interval, callback)
+		timer.timeout, timer.interval, timer.callback = timeout, interval, callback
+		return 0
+	end
+	function backend.timer_stop(timer) timer.stopped = true; return 0 end
+	function backend.close(timer) timer.closed = true; timer.callback = nil end
+	function state.fire(index)
+		local timer = state.timers[index]
+		if not timer.closed and not timer.stopped then timer.callback() end
+	end
+	local previous_backend, previous_scheduler = package.loaded.luv, package.loaded["adapters.timer_scheduler"]
+	package.loaded.luv, package.loaded["adapters.timer_scheduler"] = backend, nil
+	local scheduler = require("adapters.timer_scheduler")
+	package.loaded.luv, package.loaded["adapters.timer_scheduler"] = previous_backend, previous_scheduler
+	return scheduler, state
+end
+
+helpers.describe("linux-timer-gc-ownership", function()
+	for _, count in ipairs({ 1, 3, 12 }) do
+		helpers.it("linux-timer-gc-ownership: cancelAll owns " .. count .. " unretained repeaters", function()
+			local scheduler, state = timer_fixture()
+			local callbacks = 0
+			for _ = 1, count do scheduler.every(1, function() callbacks = callbacks + 1 end) end
+			collectgarbage("collect")
+			collectgarbage("collect")
+			helpers.assert_eq(scheduler.activeCount(), count, "GC cannot erase native timer ownership")
+			helpers.assert_eq(scheduler.cancelAll(), true)
+			for index, timer in ipairs(state.timers) do
+				helpers.assert_true(timer.stopped and timer.closed, "every issued timer must be retired")
+				state.fire(index)
+			end
+			helpers.assert_eq(callbacks, 0, "retired backend timers publish no callbacks")
+			helpers.assert_eq(scheduler.activeCount(), 0)
+			helpers.assert_eq(scheduler.cancelAll(), true, "bulk cancellation remains idempotent")
+		end)
+	end
+
+	helpers.it("linux-timer-gc-ownership: cancellation preserves mixed unretained ownership", function()
+		local scheduler, state = timer_fixture()
+		scheduler.after(1, function() end)
+		scheduler.every(1, function() end)
+		scheduler.after(1, function() end)
+		scheduler.every(1, function() end)
+		collectgarbage("collect")
+		helpers.assert_eq(scheduler.activeCount(), 4)
+		helpers.assert_eq(scheduler.cancelAll(), true)
+		for _, timer in ipairs(state.timers) do helpers.assert_true(timer.closed and timer.stopped) end
+		helpers.assert_eq(scheduler.activeCount(), 0)
+	end)
+
+	helpers.it("linux-timer-gc-ownership: one-shot firing releases its token", function()
+		local scheduler, state = timer_fixture()
+		local tokens = setmetatable({}, { __mode = "v" })
+		local callbacks = 0
+		tokens[1] = scheduler.after(1, function() callbacks = callbacks + 1 end)
+		collectgarbage("collect")
+		helpers.assert_eq(scheduler.activeCount(), 1)
+		state.fire(1)
+		state.fire(1)
+		collectgarbage("collect")
+		helpers.assert_eq(callbacks, 1, "one-shot completion occurs once")
+		helpers.assert_eq(scheduler.activeCount(), 0)
+		helpers.assert_eq(tokens[1], nil, "settled one-shots do not accumulate in the registry")
+	end)
+
+	helpers.it("linux-timer-gc-ownership: individual cancellation releases a repeating token", function()
+		local scheduler, state = timer_fixture()
+		local tokens = setmetatable({}, { __mode = "v" })
+		tokens[1] = scheduler.every(1, function() end)
+		helpers.assert_eq(scheduler.cancel(tokens[1]), true)
+		helpers.assert_eq(scheduler.cancel(tokens[1]), true)
+		collectgarbage("collect")
+		helpers.assert_eq(tokens[1], nil)
+		helpers.assert_true(state.timers[1].closed and state.timers[1].stopped)
+		helpers.assert_eq(scheduler.activeCount(), 0)
+	end)
+end)
+
 helpers.describe("timer_scheduler adapter", function()
 
   -- ==========================================================================
@@ -265,9 +353,28 @@ local function with_luv(fake_luv, body)
 end
 
 helpers.describe("timer_scheduler armed ownership", function()
+  helpers.it("linux-relative-clock: simulated refresh exception closes unarmed timers", function()
+    local closed, starts = 0, 0
+    with_luv({
+      update_time = function() error("simulated clock refresh failure") end,
+      new_timer = function() return {} end,
+      timer_start = function() starts = starts + 1; return 0 end,
+      close = function() closed = closed + 1 end,
+    }, function(scheduler)
+      for _, method in ipairs({ "after", "every" }) do
+        local handle = scheduler[method](1, function() end)
+        helpers.assert_true(handle.fired and not handle.armed)
+      end
+      helpers.assert_eq(starts, 0, "refresh failure must refuse native arming")
+      helpers.assert_eq(closed, 2, "allocated native timers must be released")
+      helpers.assert_eq(scheduler.activeCount(), 0)
+    end)
+  end)
+
   helpers.it("counts and releases a successfully armed timer", function()
     local callback = nil
     with_luv({
+      update_time = function() end,
       new_timer = function() return {} end,
       timer_start = function(_, _, _, fn) callback = fn; return true end,
       timer_stop = function() return true end,
@@ -286,6 +393,7 @@ helpers.describe("timer_scheduler armed ownership", function()
   helpers.it("closes and rejects a timer the backend did not start", function()
     local closed = 0
     with_luv({
+      update_time = function() end,
       new_timer = function() return {} end,
       timer_start = function() return false end,
       timer_stop = function() return true end,
@@ -304,6 +412,7 @@ helpers.describe("timer_scheduler armed ownership", function()
   helpers.it("retains ownership when cancellation is uncertain", function()
     local close_fails = true
     with_luv({
+      update_time = function() end,
       new_timer = function() return {} end,
       timer_start = function() return true end,
       timer_stop = function() return true end,
@@ -328,6 +437,7 @@ helpers.describe("timer_scheduler armed ownership", function()
     local close_fails = true
     local fired = 0
     with_luv({
+      update_time = function() end,
       new_timer = function() return {} end,
       timer_start = function(_, _, _, fn) callback = fn; return true end,
       timer_stop = function() return true end,
@@ -345,4 +455,57 @@ helpers.describe("timer_scheduler armed ownership", function()
       helpers.assert_true(scheduler.cancel(handle), "retained resource ownership must be retryable")
     end)
   end)
+end)
+
+helpers.describe("linux-timer-finite-admission", function()
+	local invalid = {
+		{ name = "NaN", value = 0 / 0 },
+		{ name = "positive infinity", value = math.huge },
+		{ name = "negative infinity", value = -math.huge },
+		{ name = "positive conversion overflow", value = 1e308 },
+		{ name = "negative conversion overflow", value = -1e308 },
+		{ name = "numeric string", value = "0.1" },
+		{ name = "boolean", value = false },
+		{ name = "nil" },
+		{ name = "table", value = {} },
+	}
+	for _, method in ipairs({ "after", "every" }) do
+		for _, case in ipairs(invalid) do
+			helpers.it("linux-timer-finite-admission: " .. method .. " rejects " .. case.name .. " before allocation", function()
+				local scheduler, state = timer_fixture()
+				local calls = 0
+				local handle = scheduler[method](case.value, function() calls = calls + 1 end)
+				helpers.assert_eq(handle.armed, false)
+				helpers.assert_eq(handle.fired, true)
+				helpers.assert_eq(handle.timer, nil)
+				helpers.assert_eq(#state.timers, 0, "invalid arithmetic must not acquire native resources")
+				helpers.assert_eq(scheduler.activeCount(), 0)
+				helpers.assert_eq(calls, 0)
+			end)
+		end
+	end
+end)
+
+helpers.describe("linux-timer-finite-admission", function()
+	helpers.it("linux-timer-finite-admission: shared policy preserves finite magnitude and signed values", function()
+		local policy = require("number_policy")
+		for _, value in ipairs({ 0, -1, 0.125, 1e308 }) do
+			helpers.assert_eq(policy.is_finite(value), true)
+		end
+		for _, case in ipairs({ { value = 0 / 0 }, { value = math.huge }, { value = -math.huge },
+			{ value = "1" }, { value = false }, {}, { value = {} } }) do
+			helpers.assert_eq(policy.is_finite(case.value), false)
+		end
+	end)
+
+	local native_ok = pcall(require, "luv")
+	if native_ok and package.config:sub(1, 1) == "/" then
+		helpers.it("linux-timer-finite-admission: native admission and delivery preserve healthy successors", function()
+			local executable = assert(arg and arg[-1], "running Lua interpreter must be identifiable")
+			local fixture = helpers.driver_root() .. "/tests/fixtures/native_timer_finite_admission.lua"
+			local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
+			local result = os.execute(quote(executable) .. " " .. quote(fixture))
+			helpers.assert_true(result == true or result == 0, "native numeric admission fixture must succeed")
+		end)
+	end
 end)

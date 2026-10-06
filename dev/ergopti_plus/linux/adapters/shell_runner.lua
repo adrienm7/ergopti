@@ -42,6 +42,8 @@ local Logger = require("logger.shim")
 local Heredoc = require("shell.heredoc")
 local Monotonic = require("infra.monotonic")
 local RuntimeLog = require("diagnostics.runtime_log")
+local LibuvExit = require("infra.libuv_exit")
+local NativeTimer = require("infra.native_timer")
 
 local LOG = "adapters.shell_runner"
 
@@ -53,6 +55,9 @@ local QUOTE_ESCAPE = "'\\''"
 -- os.execute() reports success as the exit code 0 under Lua 5.1/LuaJIT and as
 -- the boolean true from Lua 5.2 onwards. Both spellings must be accepted.
 local EXIT_SUCCESS = 0
+
+-- Written only after the stdout transmitter succeeds, beyond caller bytes.
+local CHECKED_CAPTURE_TRAILER = "\nERGOPTI_CAPTURE_COMPLETE\n"
 
 -- Default opening token of a stdin heredoc for this driver. The framing itself
 -- lives in _shared/lua/shell/heredoc.lua.
@@ -111,6 +116,9 @@ function M.validate_spawn_args(executable, args)
 	if type(executable) ~= "string" or executable == "" then
 		return "executable must be a non-empty string"
 	end
+	-- execve receives C strings: libuv silently truncates embedded NUL rather
+	-- than refusing a different executable or argv value. Reject before spawn.
+	if executable:find("\0", 1, true) then return "executable cannot contain NUL" end
 	if args == nil then return "" end
 	if type(args) ~= "table" then
 		return "args must be a table, got " .. type(args)
@@ -125,8 +133,29 @@ function M.validate_spawn_args(executable, args)
 			return string.format("argument %d must be a string, got %s",
 				index, type(args[index]))
 		end
+		if args[index]:find("\0", 1, true) then
+			return string.format("argument %d cannot contain NUL", index)
+		end
 	end
 	return ""
+end
+
+--- Applies the same execve byte boundary to libc's implicit sh -c argv.
+--- popen/system silently shorten an embedded NUL before the shell sees it.
+--- @param command any Composed shell command.
+--- @param operation string Constant operation name for diagnostics.
+--- @return boolean admitted, string|nil refusal
+local function valid_shell_command(command, operation)
+	if type(command) ~= "string" or command == "" then
+		Logger.warn(LOG, "%s(): empty command — ignored.", operation)
+		return false, "empty command"
+	end
+	local refusal = M.validate_spawn_args("sh", { "-c", command })
+	if refusal ~= "" then
+		Logger.error(LOG, "%s(): %s.", operation, refusal)
+		return false, refusal
+	end
+	return true
 end
 
 
@@ -143,10 +172,7 @@ end
 --- @param cmd string Fully composed shell command (quote every interpolation).
 --- @return boolean True when the command exited 0, false on any failure.
 function M.run(cmd)
-	if type(cmd) ~= "string" or cmd == "" then
-		Logger.warn(LOG, "run(): empty command — ignored.")
-		return false
-	end
+	if not valid_shell_command(cmd, "run") then return false end
 	if _test_runner then
 		-- A runner that returns a boolean is simulating the exit status, so a
 		-- test can drive the failure branch too; anything else means the runner
@@ -173,10 +199,7 @@ end
 --- @param cmd string Fully composed shell command (quote every interpolation).
 --- @return string Captured stdout, or "" on any failure.
 function M.exec(cmd)
-	if type(cmd) ~= "string" or cmd == "" then
-		Logger.warn(LOG, "exec(): empty command — ignored.")
-		return ""
-	end
+	if not valid_shell_command(cmd, "exec") then return "" end
 	if _test_runner then
 		local captured = _test_runner(cmd)
 		return type(captured) == "string" and captured or ""
@@ -204,13 +227,17 @@ end
 --- Use this wherever an empty successful result has a different meaning from a
 --- failed command, such as snapshotting an empty clipboard before replacement.
 --- @param cmd string Fully composed shell command (quote every interpolation).
+--- @param options table|nil { output_dir? } Native receipt staging directory.
 --- @return boolean ok
 --- @return string output Captured stdout, including the empty string.
 --- @return string|nil error_message
-function M.exec_checked(cmd)
-	if type(cmd) ~= "string" or cmd == "" then
-		Logger.warn(LOG, "exec_checked(): empty command — ignored.")
-		return false, "", "empty command"
+function M.exec_checked(cmd, options)
+	local admitted, refusal = valid_shell_command(cmd, "exec_checked")
+	if not admitted then return false, "", refusal end
+	if options ~= nil and type(options) ~= "table" then return false, "", "invalid checked command options" end
+	local output_dir = options and options.output_dir
+	if output_dir ~= nil and (type(output_dir) ~= "string" or output_dir == "" or output_dir:find("\0", 1, true)) then
+		return false, "", "invalid checked output directory"
 	end
 	if _test_runner then
 		local result = _test_runner(cmd)
@@ -228,32 +255,56 @@ function M.exec_checked(cmd)
 		-- LuaJIT's io.popen handle does not preserve a child's non-zero status on
 		-- every libc/runtime combination. Run the caller's command in a nested
 		-- shell, buffer stdout in an atomically-created file, and frame the result
-		-- with an unambiguous status/byte-count header. The length check makes a
-		-- failed or truncated cat an explicit failure too.
+		-- with an unambiguous status/byte-count header and completion trailer.
+		-- A cat can emit every byte and still fail; only its successful completion
+		-- admits the trailer, even when LuaJIT drops the outer shell's exit code.
+		-- An owner with a selected runtime directory can stage its receipt there,
+		-- independently of a different TMPDIR that may be unavailable.
 		local wrapper = table.concat({
-			"output=$(mktemp) || exit 125",
+			output_dir and 'output=$(mktemp -p "$2") || exit 125' or "output=$(mktemp) || exit 125",
 			"trap 'rm -f -- \"$output\"' EXIT HUP INT TERM",
 			"sh -c \"$1\" >\"$output\"",
 			"status=$?",
 			"byte_count=$(wc -c <\"$output\") || exit 125",
 			"printf '%s %s\\n' \"$status\" \"$byte_count\"",
-			"cat -- \"$output\"",
+			"cat -- \"$output\" || exit 125",
+			"printf '%s' " .. M.quote(CHECKED_CAPTURE_TRAILER),
 		}, "\n")
 		local framed_command = "sh -c " .. M.quote(wrapper)
 			.. " ergopti-exec-checked " .. M.quote(cmd)
-		local pipe, open_error = io.popen(framed_command, "r")
-		if not pipe then return false, "", tostring(open_error or "pipe open failed") end
-		local framed = pipe:read("*a")
-		pipe:close()
-		local status, byte_count, content
+		if output_dir then framed_command = framed_command .. " " .. M.quote(output_dir) end
+		-- libc/Lua may prefix a popen error with the entire composed command,
+		-- including caller text. Keep the native errno, never that raw message.
+		local pipe, _, open_errno = io.popen(framed_command, "r")
+		if not pipe then
+			local code = type(open_errno) == "number" and tostring(open_errno) or "unavailable"
+			return false, "", "pipe open failed (errno " .. code .. ")"
+		end
+		-- Close even when reading raises: pclose also reaps the native child.
+		-- Native error text may contain the command, so retain only fixed reasons.
+		local read_ok, framed, read_error = pcall(pipe.read, pipe, "*a")
+		local close_ok, closed = pcall(pipe.close, pipe)
+		if not read_ok or read_error ~= nil or type(framed) ~= "string" then
+			return false, "", "native pipe read failed"
+		end
+		local status, byte_count, payload
 		if type(framed) == "string" then
-			status, byte_count, content = framed:match("^(%d+) (%d+)\n(.*)$")
+			status, byte_count, payload = framed:match("^(%d+) (%d+)\n(.*)$")
 		end
 		if not status then
 			return false, "", "checked command did not return a status frame"
 		end
-		if #content ~= tonumber(byte_count) then
+		local count = tonumber(byte_count)
+		local content = payload:sub(1, count)
+		if #content ~= count then
 			return false, content, "checked command output was truncated"
+		end
+		if not close_ok then return false, "", "native pipe close failed" end
+		if closed ~= true and closed ~= EXIT_SUCCESS then
+			return false, content, "native pipe close failed"
+		end
+		if payload:sub(count + 1) ~= CHECKED_CAPTURE_TRAILER then
+			return false, content, "checked command capture did not complete"
 		end
 		if tonumber(status) ~= EXIT_SUCCESS then
 			return false, content, "command exited with status " .. status
@@ -261,9 +312,9 @@ function M.exec_checked(cmd)
 		return true, content, nil
 	end)
 	if not call_ok then
-		Logger.error(LOG, "exec_checked(): io.popen failed for '%s' — %s",
-			RuntimeLog.program_name(cmd), tostring(command_ok))
-		return false, "", tostring(command_ok)
+		-- Exceptions from open/read/close can carry the same private arguments.
+		Logger.error(LOG, "exec_checked(): native capture raised for '%s'.", RuntimeLog.program_name(cmd))
+		return false, "", "native command capture raised"
 	end
 	_record_exit(RuntimeLog.program_name(cmd), command_ok and 0 or tostring(error_message),
 		Monotonic.now_ms() - started_ms)
@@ -387,9 +438,17 @@ end
 --- Stops a child's whole process group.
 --- @param request table
 local function stop_group(request)
-	if request.exited or not request.pid then return end
-	local ok = pcall(luv.kill, -request.pid, "sigterm")
-	if not ok then Logger.error(LOG, "run_async(): could not stop pid %s.", tostring(request.pid)) end
+	-- A descendant can retain the pipes after libuv reaps the group leader.
+	-- The deadline and cancellation still own that group until terminal cleanup.
+	if not request.pid then return end
+	pcall(luv.kill, -request.pid, "sigterm")
+	-- A deadline must also retire children that ignore SIGTERM, or libuv keeps
+	-- their process handles alive indefinitely. The other argv runner does this too.
+	local ok, status, detail, code = pcall(luv.kill, -request.pid, "sigkill")
+	if not ok or (status == nil and code ~= "ESRCH") then
+		Logger.error(LOG, "run_async(): could not stop pid %s — %s.",
+			tostring(request.pid), tostring(detail or status))
+	end
 end
 
 --- Publishes one terminal result and releases every handle.
@@ -431,8 +490,8 @@ end
 --- @param args table Array of string arguments.
 --- @param options table|nil { timeout_ms }
 --- @param callback function Receives { ok, code, stdout, stderr, error } once.
---- @return table|nil handle { cancel = function() } — nil when nothing started.
---- @return string|nil error Why nothing started.
+--- @return table|nil handle { cancel = function() } — nil when admission failed.
+--- @return string|nil error Why admission failed; the completion callback stays silent.
 function M.run_async(executable, args, options, callback)
 	if not luv then return nil, "asynchronous execution needs libuv" end
 	local refusal = M.validate_spawn_args(executable, args)
@@ -445,27 +504,50 @@ function M.run_async(executable, args, options, callback)
 		stdout_text = "", stderr_text = "", stdout_eof = false, stderr_eof = false,
 		exited = false, terminal = false, silent = false,
 	}
-	request.stdout, request.stderr, request.timer = luv.new_pipe(false), luv.new_pipe(false), luv.new_timer()
-	luv.timer_start(request.timer, timeout_ms, 0, function()
+	local function refuse(reason)
+		-- The caller reports synchronous admission failures from nil/error.
+		-- A reader can fail after spawn; retire that group without also delivering
+		-- a callback, while the late exit still closes its owned process handle.
+		request.silent = true
+		stop_group(request)
+		finish_async(request, { ok = false, error = reason })
+		return nil, reason
+	end
+	local allocated, allocation_error = pcall(function()
+		-- Capture ownership before the next constructor can refuse or raise.
+		request.stdout = luv.new_pipe(false)
+		if not request.stdout then error("stdout allocation refused", 0) end
+		request.stderr = luv.new_pipe(false)
+		if not request.stderr then error("stderr allocation refused", 0) end
+		request.timer = luv.new_timer()
+		if not request.timer then error("timer allocation refused", 0) end
+	end)
+	if not allocated then return refuse("handle allocation failed: " .. tostring(allocation_error)) end
+	local timer_ok, timer_started, timer_error = pcall(NativeTimer.start, luv, request.timer, timeout_ms, 0, function()
 		stop_group(request)
 		finish_async(request, { ok = false, error = "timeout" })
 	end)
+	if not timer_ok or timer_started == nil or timer_started == false then
+		return refuse("timeout activation failed: " .. tostring(timer_ok and timer_error or timer_started))
+	end
 	local spawned, process, pid = pcall(luv.spawn, executable, {
 		args = args, stdio = { nil, request.stdout, request.stderr }, detached = true,
-	}, function(code)
+	}, function(code, signal)
 		request.exited = true
-		request.code = tonumber(code) or -1
+		request.code = LibuvExit.status(code, signal)
 		maybe_finish(request)
 		if request.terminal then close_handle(request.process) end
 	end)
 	if not spawned or not process then
-		finish_async(request, { ok = false, error = "spawn failed: " .. tostring(pid or process) })
-		return nil, "spawn failed"
+		-- No child was dispatched. Callers handle this synchronous refusal from
+		-- the return value; invoking their completion callback would report twice.
+		local reason = "spawn failed: " .. tostring(pid or process)
+		return refuse(reason)
 	end
 	request.process, request.pid = process, pid
 	for _, stream in ipairs({ { "stdout", "stdout_text", "stdout_eof" }, { "stderr", "stderr_text", "stderr_eof" } }) do
 		local field, text, eof = stream[1], stream[2], stream[3]
-		luv.read_start(request[field], function(err, chunk)
+		local read_ok, read_started, read_error = pcall(luv.read_start, request[field], function(err, chunk)
 			if request.terminal then return end
 			if err then
 				stop_group(request)
@@ -480,6 +562,9 @@ function M.run_async(executable, args, options, callback)
 				request[text] = request[text] .. chunk
 			end
 		end)
+		if not read_ok or read_started == nil or read_started == false then
+			return refuse(field .. " activation failed: " .. tostring(read_ok and read_error or read_started))
+		end
 	end
 	return {
 		cancel = function()

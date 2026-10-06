@@ -360,14 +360,16 @@ function M.build_management(ctx)
 
 				local new_sec = val / 1000
 				if is_base then
-					state.expansion_delay = new_sec
-					if ctx.keymap and type(ctx.keymap.set_base_delay) == "function" then pcall(ctx.keymap.set_base_delay, new_sec) end
+					if type(ctx.commit_base_delay) ~= "function" or ctx.commit_base_delay(new_sec) ~= true then
+						return false
+					end
 				else
 					state.delays[key] = new_sec
 					if ctx.keymap and type(ctx.keymap.set_delay) == "function" then pcall(ctx.keymap.set_delay, key, new_sec) end
 				end
-				if ctx.save_prefs() ~= true then return false end
+				if not is_base and ctx.save_prefs() ~= true then return false end
 				ctx.updateMenu()
+				if is_base then return true end
 			end or nil,
 		}
 	end

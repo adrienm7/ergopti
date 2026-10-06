@@ -150,3 +150,333 @@ _MCD_DispatcherDefersBothPaths() {
 }
 Test("menu command deferral: both dispatch paths defer behind a write (menu-click-during-config-write)",
 	_MCD_DispatcherDefersBothPaths)
+
+
+
+
+
+; =================================================
+; =================================================
+; ======= 2/ Deferred Registration Identity =======
+; =================================================
+; =================================================
+
+/** Records arguments without retaining a native Menu in its own callback. */
+_MCDR_Command(ActionState, ItemName, ItemPosition, NativeMenu) {
+	ActionState.Runs.Push({Name: ItemName, Position: ItemPosition,
+		Third: NativeMenu is Menu ? NativeMenu.Handle : NativeMenu})
+	return "done"
+}
+
+/** Captures the real retry callback; no message-loop timer is created. */
+_MCDR_Arm(ScheduleState, Callback, DelayMs) {
+	ScheduleState.Armed.Push({Fn: Callback, Delay: DelayMs})
+	return true
+}
+
+_MCDR_Drain(ScheduleState) {
+	PendingRetry := ScheduleState.Armed
+	ScheduleState.Armed := []
+	for ScheduledRetry in PendingRetry
+		ScheduledRetry.Fn.Call()
+}
+
+/** Uses real native item allocation, actual token publication and a real lease. */
+_MCDR_Run(Body) {
+	global _MenuDispatchCallbacks, _MenuDispatchLastFire, _MenuDispatchTokens
+	global _MenuDispatchClickSequences, _MenuDispatchOwnerHandles, _MenuStartupCommands
+	AssertTrue((_MenuStartupCommands is Integer) && _MenuStartupCommands == 0,
+		"the isolated native registration fixture cannot adopt live startup selections")
+	AssertFalse(_ConfigWriteTerminalIsActive(), "the fixture cannot adopt a terminal transition")
+	AssertEqual(0, _ConfigWriteLeaseOwners().Count, "the fixture begins with no owned writer")
+	SavedDispatch := {Callbacks: _MenuDispatchCallbacks, LastFire: _MenuDispatchLastFire,
+		Tokens: _MenuDispatchTokens, Clicks: _MenuDispatchClickSequences,
+		Handles: _MenuDispatchOwnerHandles}
+	ActionState := {Runs: []}
+	ScheduleState := {Armed: []}
+	NativeMenu := 0, ForeignMenu := 0, WriteOwner := 0
+	try {
+		; Keep inherited map identities untouched, including detached registrations.
+		_MenuDispatchCallbacks := _MenuDispatchCallbacks.Clone()
+		_MenuDispatchLastFire := _MenuDispatchLastFire.Clone()
+		_MenuDispatchTokens := _MenuDispatchTokens.Clone()
+		_MenuDispatchClickSequences := _MenuDispatchClickSequences.Clone()
+		_MenuDispatchOwnerHandles := _MenuDispatchOwnerHandles.Clone()
+		NativeMenu := Menu(), ForeignMenu := Menu()
+		OwnedCommand := _MCDR_Command.Bind(ActionState)
+		AssertEqual(1, RegisterMenuItem(NativeMenu, "owned", OwnedCommand),
+			"the actual dispatcher must allocate a tracked native item")
+		AssertEqual(1, RegisterMenuItem(ForeignMenu, "foreign", NoAction),
+			"an independent detached native registration must stay live")
+		NativeId := _MenuItemIdAtPosition(NativeMenu, 0)
+		ForeignId := _MenuItemIdAtPosition(ForeignMenu, 0)
+		AssertTrue(NativeId > 0 && ForeignId > 0 && NativeId != ForeignId)
+		Identity := {ItemId: NativeId, Token: _MenuDispatchTokens[NativeId]}
+		ForeignToken := _MenuDispatchTokens[ForeignId]
+		ForeignCallback := _MenuDispatchCallbacks[ForeignId]
+		LeasePath := A_Temp . "\ergopti-menu-registration-" . A_ScriptHwnd . ".toml"
+		WriteOwner := _ConfigWriteLeaseTryAcquire(LeasePath, "menu-registration-test")
+		AssertTrue(WriteOwner is Object, "the actual config writer must own the busy admission")
+		Fixture := {NativeMenu: NativeMenu, Identity: Identity, Command: OwnedCommand,
+			Action: ActionState, Schedule: ScheduleState, Lease: WriteOwner}
+		Body.Call(Fixture)
+		AssertTrue(_MenuDispatchTokens.Has(ForeignId))
+		AssertEqual(ForeignToken, _MenuDispatchTokens[ForeignId], "retirement must preserve the foreign token")
+		AssertTrue(_MenuDispatchCallbacks[ForeignId] == ForeignCallback,
+			"retirement must preserve the foreign command identity")
+	} finally {
+		; Release retained retry Args before native rows, while exact menus stay owned.
+		ScheduleState.Armed := []
+		try {
+			if WriteOwner is Object
+				_ConfigWriteLeaseRelease(WriteOwner)
+			if NativeMenu is Menu {
+				NativeMenu.Delete()
+				MenuDispatcher_PruneMenu(NativeMenu)
+			}
+			if ForeignMenu is Menu {
+				ForeignMenu.Delete()
+				MenuDispatcher_PruneMenu(ForeignMenu)
+			}
+		} finally {
+			_MenuDispatchCallbacks := SavedDispatch.Callbacks
+			_MenuDispatchLastFire := SavedDispatch.LastFire
+			_MenuDispatchTokens := SavedDispatch.Tokens
+			_MenuDispatchClickSequences := SavedDispatch.Clicks
+			_MenuDispatchOwnerHandles := SavedDispatch.Handles
+		}
+	}
+}
+
+_MCDR_Queue(Fixture, Args) {
+	AssertEqual("", MenuCommandRun(Fixture.Command, Args, 0, 0,
+		_MCDR_Arm.Bind(Fixture.Schedule), Fixture.Identity), "a real busy lease defers the actual command")
+	AssertEqual(0, Fixture.Action.Runs.Length, "admission has no command effects")
+	AssertEqual(1, Fixture.Schedule.Armed.Length, "one real retry callback is retained")
+}
+
+_MCDR_Retire(Fixture) {
+	global _MenuDispatchTokens
+	Fixture.NativeMenu.Delete()
+	MenuDispatcher_PruneMenu(Fixture.NativeMenu)
+	AssertFalse(_MenuDispatchTokens.Has(Fixture.Identity.ItemId),
+		"the actual prune owner must retire the deleted native item")
+}
+
+_MCDR_RetiredBody(Fixture) {
+	_MCDR_Queue(Fixture, ["owned", 1, Fixture.NativeMenu])
+	_MCDR_Retire(Fixture)
+	AssertTrue(_ConfigWriteLeaseRelease(Fixture.Lease))
+	_MCDR_Drain(Fixture.Schedule)
+	AssertEqual(0, Fixture.Action.Runs.Length, "a busy then retired native registration cannot execute after the writer ends")
+	AssertEqual(0, Fixture.Schedule.Armed.Length)
+}
+_MCDR_Retired() {
+	_MCDR_Run(_MCDR_RetiredBody)
+}
+Test("menu registration deferral: actual busy then retired native item refuses the drain", _MCDR_Retired)
+
+_MCDR_LiveBody(Fixture) {
+	_MCDR_Queue(Fixture, ["owned", 1, Fixture.NativeMenu])
+	AssertTrue(_ConfigWriteLeaseRelease(Fixture.Lease))
+	_MCDR_Drain(Fixture.Schedule)
+	AssertEqual(1, Fixture.Action.Runs.Length, "a live native registration still executes exactly once")
+	AssertEqual("owned", Fixture.Action.Runs[1].Name)
+	AssertEqual(1, Fixture.Action.Runs[1].Position)
+	AssertEqual(Fixture.NativeMenu.Handle, Fixture.Action.Runs[1].Third)
+	AssertEqual(0, Fixture.Schedule.Armed.Length)
+}
+_MCDR_Live() {
+	_MCDR_Run(_MCDR_LiveBody)
+}
+Test("menu registration deferral: actual live item preserves native arguments after a real write", _MCDR_Live)
+
+_MCDR_BypassBody(Fixture) {
+	_MCDR_Queue(Fixture, ["", 0, 0])
+	AssertTrue(_ConfigWriteLeaseRelease(Fixture.Lease))
+	_MCDR_Drain(Fixture.Schedule)
+	AssertEqual(1, Fixture.Action.Runs.Length, "a healthy fallback registration is not lost")
+	AssertEqual("", Fixture.Action.Runs[1].Name)
+	AssertEqual(0, Fixture.Action.Runs[1].Position)
+	AssertEqual(0, Fixture.Action.Runs[1].Third, "bypass third argument remains the exact Integer zero")
+}
+_MCDR_Bypass() {
+	_MCDR_Run(_MCDR_BypassBody)
+}
+Test("menu registration deferral: live bypass preserves its zero menu argument", _MCDR_Bypass)
+
+_MCDR_MutableBody(Fixture) {
+	global _MenuDispatchTokens
+	_MCDR_Queue(Fixture, ["owned", 1, 0])
+	_MCDR_Retire(Fixture)
+	AssertEqual(1, RegisterMenuItem(Fixture.NativeMenu, "replacement", NoAction))
+	ReplacementId := _MenuItemIdAtPosition(Fixture.NativeMenu, 0)
+	AssertTrue(_MenuDispatchTokens[ReplacementId] != Fixture.Identity.Token,
+		"a replacement allocates a distinct canonical token even if its native ID is recycled")
+	Fixture.Identity.ItemId := ReplacementId
+	Fixture.Identity.Token := _MenuDispatchTokens[ReplacementId]
+	AssertTrue(_ConfigWriteLeaseRelease(Fixture.Lease))
+	_MCDR_Drain(Fixture.Schedule)
+	AssertEqual(0, Fixture.Action.Runs.Length, "mutating the supplied receipt cannot absolve the retired original request")
+}
+_MCDR_Mutable() {
+	_MCDR_Run(_MCDR_MutableBody)
+}
+Test("menu registration deferral: a later live receipt cannot replace the accepted identity", _MCDR_Mutable)
+
+_MCDR_RearmedBody(Fixture) {
+	_MCDR_Queue(Fixture, ["owned", 1, 0])
+	_MCDR_Drain(Fixture.Schedule)
+	AssertEqual(0, Fixture.Action.Runs.Length, "the genuinely held writer still prevents action")
+	AssertEqual(1, Fixture.Schedule.Armed.Length, "the real retry owner rearms exactly once")
+	_MCDR_Retire(Fixture)
+	AssertTrue(_ConfigWriteLeaseRelease(Fixture.Lease))
+	_MCDR_Drain(Fixture.Schedule)
+	AssertEqual(0, Fixture.Action.Runs.Length, "every successive retry carries the original registration")
+}
+_MCDR_Rearmed() {
+	_MCDR_Run(_MCDR_RearmedBody)
+}
+Test("menu registration deferral: registration survives repeated busy checks before retirement", _MCDR_Rearmed)
+
+_MCDR_RevokeDuringRead(Fixture) {
+	_MCDR_Retire(Fixture)
+	return ConfigWriteLeaseBusy()
+}
+_MCDR_CalloutBody(Fixture) {
+	AssertTrue(_ConfigWriteLeaseRelease(Fixture.Lease))
+	AssertEqual(false, MenuCommandRun(Fixture.Command, ["owned", 1, 0], 0,
+		_MCDR_RevokeDuringRead.Bind(Fixture), _MCDR_Arm.Bind(Fixture.Schedule), Fixture.Identity))
+	AssertEqual(0, Fixture.Action.Runs.Length, "a yielding readiness port cannot retire the item and then publish its action")
+	AssertEqual(0, Fixture.Schedule.Armed.Length)
+}
+_MCDR_Callout() {
+	_MCDR_Run(_MCDR_CalloutBody)
+}
+Test("menu registration deferral: final admission rechecks actual retirement during readiness", _MCDR_Callout)
+
+
+
+
+
+; ====================================================
+; ====================================================
+; ======= 3/ Startup Native Registration Retry =======
+; ====================================================
+; ====================================================
+
+/** Records scheduling while delegating to the real native timer. */
+_MCDS_ArmStartup(StartupTrace, StartupCallback, StartupDelay) {
+	StartupTrace.Timers.Push(StartupCallback)
+	SetTimer(StartupCallback, StartupDelay)
+}
+
+/** Observes the actual base drain without replacing its dispatch. */
+class _MCDS_ObservedStartup extends MenuStartupCommands {
+	__New(StartupTrace) {
+		this.Trace := StartupTrace
+		super.__New(() => StartupTrace.Ready, _MCDS_ArmStartup.Bind(StartupTrace))
+	}
+
+	Drain(Entries, Generation, *) {
+		this.Trace.DrainCalls += 1
+		try return super.Drain(Entries, Generation)
+		finally this.Trace.DrainReturns += 1
+	}
+}
+
+_MCDS_Wait(StartupCondition, StartupDiagnostic) {
+	StartupDeadline := A_TickCount + 3000
+	while !StartupCondition.Call() {
+		if A_TickCount >= StartupDeadline
+			throw Error(StartupDiagnostic)
+		Sleep(1)
+	}
+}
+
+_MCDS_ObserveWindow(StartupTrace, *) {
+	StartupTrace.WindowObserved := true
+}
+
+_MCDS_WriterRetryBody(RetireItem, Fixture) {
+	global _MenuStartupCommands, _TrayStartupCommands, _SuspendPending
+	global _MenuDispatchTokens, MENU_COMMAND_DEFERRAL_RETRY_MS
+	SavedStartup := _MenuStartupCommands
+	HadTrayStartup := IsSet(_TrayStartupCommands)
+	SavedTrayStartup := HadTrayStartup ? _TrayStartupCommands : false
+	HadSuspendPending := IsSet(_SuspendPending)
+	SavedSuspendPending := HadSuspendPending ? _SuspendPending : false
+	StartupCritical := Critical("On")
+	StartupTrace := {Ready: false, DrainCalls: 0, DrainReturns: 0, Timers: [], WindowObserved: false}
+	StartupOwner := _MCDS_ObservedStartup(StartupTrace)
+	WindowCallback := _MCDS_ObserveWindow.Bind(StartupTrace)
+	try {
+		_MenuStartupCommands := StartupOwner
+		_TrayStartupCommands := false
+		_SuspendPending := false
+		AssertTrue(StartupOwner.Retain(Fixture.Command, ["owned", 1, Fixture.NativeMenu], Fixture.Identity))
+		AssertEqual(1, StartupOwner.Pending.Length)
+		AssertEqual(Fixture.Identity.ItemId, StartupOwner.Pending[1].Identity.ItemId)
+		AssertEqual(Fixture.Identity.Token, StartupOwner.Pending[1].Identity.Token)
+		AssertEqual(0, Fixture.Action.Runs.Length)
+		StartupTrace.Ready := true
+		AssertTrue(StartupOwner.NotifyReady())
+		AssertFalse(StartupOwner.NotifyReady(), "readiness must not schedule the accepted selection twice")
+		AssertEqual(1, StartupTrace.Timers.Length, "one actual startup SetTimer is owned")
+		Critical("Off")
+		_MCDS_Wait(() => StartupTrace.DrainReturns == 1, "the native startup timer must execute the actual drain")
+		AssertEqual(1, StartupTrace.DrainCalls)
+		AssertTrue(ConfigWriteLeaseBusy(), "the genuine writer still owns retry admission after startup drains")
+		AssertEqual(0, Fixture.Action.Runs.Length, "startup must reach a real busy writer without calling the command")
+		if RetireItem
+			_MCDR_Retire(Fixture)
+		AssertTrue(_ConfigWriteLeaseRelease(Fixture.Lease))
+		; Observe a real message-loop window after the already armed native retry.
+		; The live sibling must actually fire, preventing a dropped-timer false green.
+		SetTimer(WindowCallback, -2 * MENU_COMMAND_DEFERRAL_RETRY_MS)
+		_MCDS_Wait(() => StartupTrace.WindowObserved, "the native retry observation timer must actually fire")
+		if RetireItem {
+			AssertEqual(0, Fixture.Action.Runs.Length,
+				"startup identity must survive the writer retry and refuse the actually retired native item")
+			AssertFalse(_MenuDispatchTokens.Has(Fixture.Identity.ItemId))
+		} else {
+			AssertEqual(1, Fixture.Action.Runs.Length, "a live startup selection must execute exactly once through the actual writer retry")
+			AssertEqual("owned", Fixture.Action.Runs[1].Name)
+			AssertEqual(1, Fixture.Action.Runs[1].Position)
+			AssertEqual(Fixture.NativeMenu.Handle, Fixture.Action.Runs[1].Third)
+			AssertEqual(Fixture.Identity.Token, _MenuDispatchTokens[Fixture.Identity.ItemId])
+		}
+		AssertEqual(1, StartupTrace.DrainReturns)
+		AssertEqual(0, StartupOwner.Pending.Length)
+	} finally {
+		Critical("On")
+		StartupOwner.Cancel()
+		for StartupCallback in StartupTrace.Timers
+			SetTimer(StartupCallback, 0)
+		SetTimer(WindowCallback, 0)
+		; Retire the exact item before releasing the real writer, including failures.
+		if _MenuDispatchTokens.Has(Fixture.Identity.ItemId)
+			_MCDR_Retire(Fixture)
+		_ConfigWriteLeaseRelease(Fixture.Lease)
+		StartupTrace.WindowObserved := false
+		SetTimer(WindowCallback, -2 * MENU_COMMAND_DEFERRAL_RETRY_MS)
+		Critical("Off")
+		try _MCDS_Wait(() => StartupTrace.WindowObserved, "owned timer cleanup must pump before native fixture maps are restored")
+		finally {
+			Critical("On")
+			SetTimer(WindowCallback, 0)
+			_MenuStartupCommands := SavedStartup
+			_TrayStartupCommands := HadTrayStartup ? SavedTrayStartup : unset
+			_SuspendPending := HadSuspendPending ? SavedSuspendPending : unset
+			Critical(StartupCritical)
+		}
+	}
+}
+
+_MCDS_WriterRetry(RetireItem) {
+	_MCDR_Run(_MCDS_WriterRetryBody.Bind(RetireItem))
+}
+Test("menu startup registration: real startup and writer timers refuse an item retired during the write",
+	_MCDS_WriterRetry.Bind(true))
+Test("menu startup registration: real startup and writer timers execute the live native selection exactly once",
+	_MCDS_WriterRetry.Bind(false))

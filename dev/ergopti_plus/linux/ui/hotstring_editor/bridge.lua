@@ -87,6 +87,7 @@ local _pending_mode = "menu"
 -- Lazily-loaded codecs. Required at call time rather than at load so a driver
 -- missing the codec still boots and reports the failure when the window opens.
 local _writer, _reader = nil, nil
+local _opening = nil
 
 --- @return table|nil
 local function get_writer()
@@ -199,6 +200,53 @@ end
 -- =========================================
 -- =========================================
 
+--- Whether the retained display belongs to the manager's current page and route.
+--- @param opening table|nil Retained source and trusted window epoch.
+--- @param state table Daemon state.
+--- @param context table|nil Trusted manager routing context.
+--- @return boolean current
+local function opening_current(opening, state, context)
+	if type(opening) ~= "table" or personal_path(state) ~= opening.path
+		or type(context) ~= "table" or context.app_name ~= APP_NAME
+		or context.epoch ~= opening.epoch then return false end
+	local ok, Manager = pcall(require, "ui.webview_manager")
+	if not ok or type(Manager.current_epoch) ~= "function" then return false end
+	local read_ok, epoch = pcall(Manager.current_epoch, APP_NAME)
+	return read_ok and type(epoch) == "number" and epoch > 0 and epoch % 1 == 0
+		and epoch == opening.epoch
+end
+
+--- Captures the exact source whose model will be displayed, including proven absence.
+--- @param state table Daemon state.
+--- @param context table|nil Trusted manager routing context.
+--- @return table|nil opening
+local function capture_opening(state, context)
+	local path, writer, reader = personal_path(state), get_writer(), get_reader()
+	if not path or type(writer) ~= "table" or type(writer.read_classified) ~= "function"
+		or type(reader) ~= "table" or type(reader.parse_text) ~= "function" then return nil end
+	local candidate = { path = path, epoch = type(context) == "table" and context.epoch or nil }
+	if not opening_current(candidate, state, context) then return nil end
+	local ok, content, status = pcall(writer.read_classified, path)
+	if not ok or (status ~= "ok" and status ~= "absent")
+		or (status == "ok" and type(content) ~= "string")
+		or (status == "absent" and content ~= nil) then return nil end
+	local parsed = { meta = {}, sections_order = {}, sections = {} }
+	if status == "ok" then
+		local codec_ok, codec = pcall(require, "toml_codec")
+		if not codec_ok or type(codec.decode) ~= "function" then return nil end
+		local valid, document = pcall(codec.decode, content)
+		if not valid or type(document) ~= "table" then return nil end
+		local parse_ok, projection, committed = pcall(reader.parse_text, content)
+		if not parse_ok or committed ~= true or type(projection) ~= "table"
+			or type(projection.meta) ~= "table" or type(projection.sections_order) ~= "table"
+			or type(projection.sections) ~= "table" then return nil end
+		parsed = projection
+	end
+	if not opening_current(candidate, state, context) then return nil end
+	candidate.source, candidate.parsed = { status = status, content = content }, parsed
+	return candidate
+end
+
 --- Builds the payload `window.initData` reads.
 ---
 --- Every key here is one the shared script destructures. That is the whole
@@ -207,43 +255,39 @@ end
 --- like it worked.
 --- @param state table Daemon state.
 --- @param open_mode string|nil "menu" or "shortcut".
+--- @param parsed table Projection of the exact displayed source.
 --- @return table
-local function build_payload(state, open_mode)
+local function build_payload(state, open_mode, parsed)
 	local sections = {}
 
-	local path = personal_path(state)
-	local reader = get_reader()
-	if path and reader then
-		local ok, parsed = pcall(reader.parse, path)
-		if ok and type(parsed) == "table" and type(parsed.sections_order) == "table" then
-			for _, name in ipairs(parsed.sections_order) do
-				-- "-" is the menu's separator marker in a sections_order list. It is
-				-- not a section, and rendering it would put an unnamed empty group in
-				-- the editor.
-				local sec = name ~= "-" and type(parsed.sections) == "table" and parsed.sections[name] or nil
-				if type(sec) == "table" then
-					local entries = {}
-					for _, e in ipairs(type(sec.entries) == "table" and sec.entries or {}) do
-						entries[#entries + 1] = {
-							trigger           = type(e.trigger) == "string" and e.trigger or "",
-							output            = type(e.output) == "string" and e.output or "",
-							is_word           = e.is_word == true,
-							auto_expand       = e.auto_expand == true,
-							is_case_sensitive = e.is_case_sensitive == true,
-							final_result      = e.final_result == true,
-							is_case_sensitive_strict = e.is_case_sensitive_strict == true,
-							-- Omitted rather than defaulted when absent: nil means "inherit
-							-- the source default", and writing a number here would silently
-							-- pin every entry to whatever that default happened to be.
-							priority          = type(e.priority) == "number" and e.priority or nil,
-						}
-					end
-					sections[#sections + 1] = {
-						name        = name,
-						description = type(sec.description) == "string" and sec.description or name,
-						entries     = entries,
+	if type(parsed) == "table" and type(parsed.sections_order) == "table" then
+		for _, name in ipairs(parsed.sections_order) do
+			-- "-" is the menu's separator marker in a sections_order list. It is
+			-- not a section, and rendering it would put an unnamed empty group in
+			-- the editor.
+			local sec = name ~= "-" and type(parsed.sections) == "table" and parsed.sections[name] or nil
+			if type(sec) == "table" then
+				local entries = {}
+				for _, e in ipairs(type(sec.entries) == "table" and sec.entries or {}) do
+					entries[#entries + 1] = {
+						trigger           = type(e.trigger) == "string" and e.trigger or "",
+						output            = type(e.output) == "string" and e.output or "",
+						is_word           = e.is_word == true,
+						auto_expand       = e.auto_expand == true,
+						is_case_sensitive = e.is_case_sensitive == true,
+						final_result      = e.final_result == true,
+						is_case_sensitive_strict = e.is_case_sensitive_strict == true,
+						-- Omitted rather than defaulted when absent: nil means "inherit
+						-- the source default", and writing a number here would silently
+						-- pin every entry to whatever that default happened to be.
+						priority          = type(e.priority) == "number" and e.priority or nil,
 					}
 				end
+				sections[#sections + 1] = {
+					name        = name,
+					description = type(sec.description) == "string" and sec.description or name,
+					entries     = entries,
+				}
 			end
 		end
 	end
@@ -293,11 +337,13 @@ end
 --- the next restart.
 --- @param state table Daemon state.
 --- @param data table { sections_order, sections }.
+--- @param context table Trusted manager routing context.
 --- @return boolean
-local function save_all(state, data)
+local function save_all(state, data, context)
+	local opening = _opening
 	local path = personal_path(state)
 	local writer = get_writer()
-	if not path or not writer then return false end
+	if not path or not writer or not (_opening == opening and opening_current(opening, state, context)) then return false end
 	if type(data) ~= "table" or type(data.sections) ~= "table" then
 		Logger.error(LOG, "Save rejected: the payload carries no sections.")
 		return false
@@ -324,13 +370,14 @@ local function save_all(state, data)
 		Logger.error(LOG, "Personal save requires classified source and snapshot parser owners.")
 		return false
 	end
-	local read_ok, content, status = pcall(writer.read_classified, path)
-	if not read_ok or (status ~= "ok" and status ~= "absent")
-		or (status == "ok" and type(content) ~= "string") then
-		Logger.error(LOG, "Personal source read refused — nothing saved.")
+	local source = opening.source
+	local content, status = source.content, source.status
+	local read_ok, current, current_status = pcall(writer.read_classified, path)
+	if not read_ok or current_status ~= status or current ~= content
+		or not (_opening == opening and opening_current(opening, state, context)) then
+		Logger.error(LOG, "Personal source differs from the displayed model — nothing saved.")
 		return false
 	end
-	local source = { status = status, content = content }
 	if status == "ok" then
 		-- The hotstring reader projects an already validated TOML snapshot.
 		-- Validate its syntax with the canonical codec before that projection.
@@ -390,11 +437,21 @@ local function save_all(state, data)
 		end
 	end
 
-	local ok, err = writer.write(path, toml, nil, nil, source)
+	if not (_opening == opening and opening_current(opening, state, context)) then return false end
+	local called, ok, err, committed = pcall(writer.write, path, toml, nil, nil, source)
+	if not called then ok = false end
 	if ok ~= true then
 		Logger.error(LOG, "Could not write '%s': %s.", path, tostring(err))
 		return false
 	end
+
+	-- Only our writer's exact payload can advance consent; a fresh disk view cannot.
+	if type(committed) ~= "string" or not (_opening == opening and opening_current(opening, state, context)) then
+		if _opening == opening then _opening = nil end
+		Logger.error(LOG, "Personal write lacks an owned committed payload — reopen the editor.")
+		return false
+	end
+	opening.source = { status = "ok", content = committed }
 
 	local count = 0
 	for _, sec in pairs(toml.sections) do count = count + #sec.entries end
@@ -475,8 +532,12 @@ end
 --- The page reveals `#app` from inside window.initData and nowhere else, so this
 --- is not one way of delivering the data — it is the only one.
 --- @param state table Daemon state.
+--- @param context table Trusted manager routing context.
 --- @return boolean True when the push reached a live webview.
-function M.push_init(state)
+function M.push_init(state, context)
+	_opening = nil
+	local opening = capture_opening(state, context)
+	if not opening then return false end
 	local ok_json, json_mod = pcall(require, "json")
 	if not ok_json or type(json_mod.encode) ~= "function" then
 		Logger.error(LOG, "Cannot push initData(): the shared json module is unavailable — the editor stays on its loading screen.")
@@ -484,7 +545,7 @@ function M.push_init(state)
 	end
 
 	local ok_payload, encoded = pcall(function()
-		return json_mod.encode(build_payload(state, _pending_mode))
+		return json_mod.encode(build_payload(state, _pending_mode, opening.parsed))
 	end)
 	if not ok_payload or type(encoded) ~= "string" then
 		Logger.error(LOG, "Cannot push initData(): payload encoding failed (%s).", tostring(encoded))
@@ -500,8 +561,10 @@ function M.push_init(state)
 	-- Guarded on the page side too, exactly as macOS guards it: a push that
 	-- arrives before the function is defined would throw inside the webview,
 	-- where nothing on this side would ever see it.
-	local pushed = Manager.eval_js(APP_NAME, "if(window.initData) window.initData(" .. encoded .. ")")
-	if pushed then
+	local pushed_ok, pushed = pcall(Manager.eval_js, APP_NAME, "if(window.initData) window.initData(" .. encoded .. ")")
+	if not pushed_ok then return false end
+	if pushed == true and opening_current(opening, state, context) then
+		_opening = opening
 		Logger.success(LOG, "Hotstring editor initialised (%d byte(s), mode '%s').", #encoded, _pending_mode)
 	else
 		Logger.warn(LOG, "The editor reported ready but its window is gone — initData() not pushed.")
@@ -510,7 +573,7 @@ function M.push_init(state)
 	-- One shortcut opening must not make every later menu opening behave like a
 	-- shortcut one.
 	_pending_mode = "menu"
-	return pushed
+	return _opening == opening
 end
 
 
@@ -551,12 +614,12 @@ function M.on_message(payload, state, context)
 		-- The mode is the host's to decide, not the page's: script.js sends
 		-- `ready` with an empty data object, so `data.open_mode` was always nil and
 		-- "shortcut" could never be reached. Whoever opens the window sets it.
-		M.push_init(state)
+		M.push_init(state, context)
 		return nil
 	end
 
 	if action == "save" then
-		local saved = save_all(state, data)
+		local saved = save_all(state, data, context)
 		if not saved then
 			-- The page flashes its "saved" toast whatever this returns — it does not
 			-- read bridge responses — so a failed write was visible only as a log

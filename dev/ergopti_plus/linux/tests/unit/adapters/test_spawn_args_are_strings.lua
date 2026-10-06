@@ -40,6 +40,25 @@ end
 -- ================================================================
 
 helpers.describe("ShellRunner: argv typing", function()
+	for index, bytes in ipairs({ "prefix\0suffix", "\0suffix", "prefix\0", "\0" }) do
+		helpers.it("refuses native argument NUL at every byte position " .. index .. " (linux-spawn-nul-receipts)", function()
+			local Shell = helpers.load_module("adapters.shell_runner")
+			local refusal = Shell.validate_spawn_args("native", { "literal", bytes })
+			helpers.assert_contains(refusal, "argument 2", "diagnostics must identify the unrepresentable slot before execve")
+			helpers.assert_true(refusal:find("suffix", 1, true) == nil, "a refusal must not expose caller argument bytes")
+		end)
+		helpers.it("refuses native executable NUL at every byte position " .. index .. " (linux-spawn-nul-receipts)", function()
+			local Shell = helpers.load_module("adapters.shell_runner")
+			local refusal = Shell.validate_spawn_args(bytes, nil)
+			helpers.assert_contains(refusal, "executable", "a shorter C-string name must not silently select another program")
+			helpers.assert_true(refusal:find("suffix", 1, true) == nil)
+		end)
+	end
+	helpers.it("retains empty and literal NUL-free native argv values (linux-spawn-nul-receipts)", function()
+		local Shell = helpers.load_module("adapters.shell_runner")
+		helpers.assert_eq(Shell.validate_spawn_args("native", { "", "é漢\n'$(false)'" }), "",
+			"empty words and native literal bytes are representable and must not be over-rejected")
+	end)
 
 	helpers.it("refuses a non-string argument by its index", function()
 		local Shell = helpers.load_module("adapters.shell_runner")

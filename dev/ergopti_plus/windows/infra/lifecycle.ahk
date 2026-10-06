@@ -71,6 +71,8 @@ global _LifecycleShutdownVetoAttempts := 0
 ; Reason of the OnExit call in progress. A veto of a "Reload" close request
 ; refuses the pending reload whose successor sent it.
 global _LifecycleShutdownReason := ""
+; Exact private AI attempt owned by this noninterruptible OnExit call.
+global _LifecycleAiShutdownAttempt := 0
 
 ; Drains every registered custom-combination prefix key (see
 ; SUSPEND_CUSTOM_COMBO_PREFIX_KEYS) BEFORE a suspend flips. AHK prefix flags
@@ -170,6 +172,14 @@ ReloadPreservingSuspend(SuccessFn := 0, ExistingBundle := 0, RefusedFn := 0,
 _ReloadPreservingSuspendNonCritical(SuccessFn, ExistingBundle, RefusedFn,
 		StageFailureFn) {
 	global ConfigurationFile
+	if IsSet(ProgramActions_Stop) {
+		ProgramStopped := false
+		try ProgramStopped := ProgramActions_Stop(A_IsSuspended)
+		catch as Err
+			try LoggerError("Lifecycle", "User-program reload preflight failed: {1}.", Err.Message)
+		if !((ProgramStopped is Integer) && ProgramStopped == 1)
+			return false
+	}
 	if (ExistingBundle is Object) && !HasMethod(RefusedFn, "Call")
 		throw TypeError("A reload that borrows a configuration bundle needs a refusal callback to take it back.")
 	ReportStage := HasMethod(StageFailureFn, "Call") ? StageFailureFn : _SuspendHandoffFailure
@@ -458,6 +468,10 @@ Ergopti_OnSuspendEnter() {
 	global _SpaceHoldInputHook
 	global _MagicKeyEditorInputHook
 	Transition := LifecycleTransitionBegin("suspend")
+	if IsSet(ProgramActions_Stop)
+		_LifecycleRunRequiredStep(Transition, "user-programs", () => ProgramActions_Stop(true), true)
+	if IsSet(UserHotstringsInvalidate)
+		_LifecycleRunRequiredStep(Transition, "user-hotstrings", UserHotstringsInvalidate.Bind("suspend"), true)
 	if !_LifecycleRunRequiredStep(Transition, "navigation-event",
 			() => _LifecycleSetNavEventOwnerSuspended(true), true) {
 		LifecycleTransitionFinish(Transition)
@@ -467,6 +481,9 @@ Ergopti_OnSuspendEnter() {
 	if IsSet(LLM_AuxInvalidate)
 		_LifecycleRunRequiredStep(Transition, "llm-aux-context",
 			LLM_AuxInvalidate.Bind("suspend"))
+	if IsSet(LLM_Menu_LocalServersOnSuspend)
+		_LifecycleRunRequiredStep(Transition, "llm-local-servers",
+			LLM_Menu_LocalServersOnSuspend, true)
 	if IsSet(KL_Watchers_OnSuspend)
 		_LifecycleRunRequiredStep(Transition, "keylogger-system-intervals",
 			KL_Watchers_OnSuspend)
@@ -623,6 +640,8 @@ Ergopti_OnSuspendEnter() {
 }
 Ergopti_OnSuspendResume() {
 		Transition := LifecycleTransitionBegin("resume")
+		if IsSet(ProgramActions_Stop)
+			_LifecycleRunRequiredStep(Transition, "user-programs", () => ProgramActions_Stop(false), true)
 		LoggerStart("Lifecycle", "Resuming from suspend…")
 		LifecycleTransitionMarkStarted(Transition)
 		_LifecycleRunRequiredStep(Transition, "navigation-event",
@@ -703,6 +722,11 @@ Ergopti_OnSuspendResume() {
 		if !LifecycleTransitionFinish(Transition) {
 				_LifecycleLogTransitionDebt(Transition)
 				return false
+		}
+		if IsSet(LLM_Menu_LocalServersResumeFinished) {
+			try LLM_Menu_LocalServersResumeFinished(Transition)
+			catch as Err
+				try LoggerError("Lifecycle", "Local AI server post-transition repair remains owned.")
 		}
 		LoggerSuccess("Lifecycle", "Resumed — suspend-bypassing subsystems restarted.")
 		return true
@@ -835,12 +859,20 @@ LifecycleShutdownVetoHonored() {
 ; LifecycleShutdownVetoHonored, the one rule the layout poll also consults.
 ; @param Gate {String} Short name of the refusing gate, for the exhaustion line.
 ; @returns {Integer} 1 to veto the exit, 0 to let it proceed regardless.
-_LifecycleRefuseShutdown(Gate) {
+_LifecycleRefuseShutdown(Gate, RequireNativeRetirement := false) {
 	global _LifecycleShutdownVetoAttempts, _LifecycleShutdownReason
+	global _LifecycleAiShutdownAttempt
 	try UninstallCancel()
 	catch as Err
 		try LoggerError("Lifecycle", "Removal cancellation failed during shutdown refusal: {1}.", Err.Message)
 	Honored := LifecycleShutdownVetoHonored()
+	; Only an exact unsettled reload owner can extend the general veto ceiling.
+	NativeStopPending := !Honored && IsSet(ReloadTerminalHandoffNativeStopPending)
+		&& ReloadTerminalHandoffNativeStopPending.Call()
+	if RequireNativeRetirement || NativeStopPending {
+		Honored := true
+		try KL_CancelShutdown()
+	}
 	_LifecycleShutdownVetoAttempts += 1
 	if Honored {
 		; The successor that asked is now waiting on this window. Stop it and hand
@@ -849,6 +881,15 @@ _LifecycleRefuseShutdown(Gate) {
 		catch as Err
 			try LoggerError("Lifecycle",
 				"Refused reload could not be handed back: {1}.", Err.Message)
+		; Cancellation retires only this exact AI attempt. Existing terminal,
+		; reload and cleanup barriers keep their independent authority.
+		if IsSet(LLM_Menu_ApiPrivateRefuseShutdown)
+			LLM_Menu_ApiPrivateRefuseShutdown(_LifecycleAiShutdownAttempt)
+		if IsSet(LLM_Menu_LocalServersShutdownRefused) {
+			try LLM_Menu_LocalServersShutdownRefused(_LifecycleAiShutdownAttempt)
+			catch as Err
+				try LoggerError("Lifecycle", "Local AI server repair remains owned after shutdown refusal.")
+		}
 		return 1
 	}
 	Released := _LifecycleForceReleaseHeldInput()
@@ -860,8 +901,23 @@ _LifecycleRefuseShutdown(Gate) {
 	return 0
 }
 
+; This admission protects only the exact unsettled successor retirement.
+_LifecycleRefuseNativeRetirement(Gate) {
+	return _LifecycleRefuseShutdown(Gate, true)
+}
+
+; Resumes only the same explicitly requested ordinary exit after native stop.
+_LifecycleRetrySupersededExit(Code, Record, *) {
+	if ReloadTerminalHandoffPending() != Record || Record["state"] != "abandon_ready"
+			|| !Record["stop_acknowledged"]
+		return false
+	ExitApp(Code)
+}
+
 Ergopti_OnShutdown(reason, code) {
-		global _LifecycleShutdownReason
+		global _LifecycleShutdownReason, _LifecycleAiShutdownAttempt
+		if IsSet(LLM_Menu_ApiPrivateBeginShutdown)
+			_LifecycleAiShutdownAttempt := LLM_Menu_ApiPrivateBeginShutdown()
 		_LifecycleShutdownReason := reason
 		; Button holds are OS state, so release them before any gate may keep this
 		; process alive. Do not free the WinEvent hook yet: a refused OnExit must
@@ -883,6 +939,8 @@ Ergopti_OnShutdown(reason, code) {
 			try _Updater_DeferRecoveryHandoffRetry()
 			return _LifecycleRefuseShutdown("a synthetic mouse button release remains pending")
 		}
+		if IsSet(UserHotstringsInvalidate) && !UserHotstringsInvalidate("shutdown-preflight")
+			return _LifecycleRefuseShutdown("a programmable hotstring process or stage remains owned")
 		NavOwnerReady := false
 		try NavOwnerReady := LLM_NavEventOwner_PrepareShutdown()
 		catch as Err
@@ -932,6 +990,22 @@ Ergopti_OnShutdown(reason, code) {
 			try _Updater_DeferExitIntentRetry()
 			try _Updater_DeferRecoveryHandoffRetry()
 			return _LifecycleRefuseShutdown("a synthetic modifier release is still pending")
+		}
+		; Retire user programs only after OS-held input is released. A refused
+		; exit keeps the real pause posture, and the enclosing finally blocks
+		; return the configuration bundle and native admission to the live driver.
+		ProgramStopped := !IsSet(ProgramActions_Stop)
+		try {
+			if IsSet(ProgramActions_Stop)
+				ProgramStopped := ProgramActions_Stop(A_IsSuspended)
+		} catch as Err {
+			try LoggerError("Lifecycle", "User-program shutdown preflight failed: {1}.", Err.Message)
+		}
+		if !((ProgramStopped is Integer) && ProgramStopped == 1) {
+			try LoggerError("Lifecycle", "Shutdown refused because a user program tree is still alive.")
+			try _Updater_DeferExitIntentRetry()
+			try _Updater_DeferRecoveryHandoffRetry()
+			return _LifecycleRefuseShutdown("a user program tree is still alive")
 		}
 		FullSaveSettled := false
 		try FullSaveSettled := _ConfigFullSaveSettleTerminal(ShutdownOwners)
@@ -1007,6 +1081,19 @@ Ergopti_OnShutdown(reason, code) {
 			try _Updater_DeferRecoveryHandoffRetry()
 			return _LifecycleRefuseShutdown("deferred hotstring records are still pending")
 		}
+		LocalServersSettled := true
+		if IsSet(LLM_Menu_LocalServersPrepareShutdown) {
+			LocalServersSettled := false
+			try LocalServersSettled := LLM_Menu_LocalServersPrepareShutdown()
+			catch as Err
+				try LoggerError("Lifecycle", "Local AI server retirement failed before shutdown: {1}.", Err.Message)
+		}
+		if !LocalServersSettled {
+			try KL_CancelShutdown()
+			try _Updater_DeferExitIntentRetry()
+			try _Updater_DeferRecoveryHandoffRetry()
+			return _LifecycleRefuseShutdown("local AI server requests remain owned")
+		}
 		InstallerStopped := false
 		try InstallerStopped := LLM_Deps_PrepareShutdown()
 		catch as Err
@@ -1074,6 +1161,22 @@ Ergopti_OnShutdown(reason, code) {
 		; FinalExit and ownership transfer remain refusal gates, but all live
 		; producers are still installed. A refusal rolls back the terminal handoff
 		; through _LifecycleRefuseShutdown and withdraws the keylogger lease below.
+		if FileReadActivityBusy() {
+			try KL_CancelShutdown()
+			return _LifecycleRefuseShutdown("an exact file read still owns native cleanup")
+		}
+		if (SupersededReload is Map) {
+			ResumeExit := StrCompare(reason, "Exit", true) == 0
+				? _LifecycleRetrySupersededExit.Bind(code) : 0
+			StopReady := false
+			try StopReady := ReloadTerminalHandoffPrepareAbandon(SupersededReload, reason, ResumeExit)
+			catch as Err
+				try LoggerError("Lifecycle", "Superseded reload retirement failed: {1}.", Err.Message)
+			if !StopReady {
+				try KL_CancelShutdown()
+				return _LifecycleRefuseNativeRetirement("a reload successor still owns native retirement")
+			}
+		}
 		FinalExitAuthorized := false
 		try FinalExitAuthorized := _Updater_SignalFinalExitForIntent()
 		catch as Err

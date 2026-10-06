@@ -121,6 +121,13 @@ CreateRawCallbackHotstring(Flags, Abbreviation, Callback, options := unset) {
 		; to it), so it is always passed; only the recorder string is gated on Rec.
 		Rec := _HotstringRegistrar
 		Meta := { RawCallback: true, TimeActivationSeconds: TimeActivationSeconds, PrevCharKey: _TextPenultimateCodepoint(Abbreviation), Category: Category, Section: Section, Priority: Priority }
+		if IsSet(options) && options.Has("SupportsPreparation") {
+			SupportsPreparation := options["SupportsPreparation"]
+			if !(SupportsPreparation is Integer) || (SupportsPreparation != false && SupportsPreparation != true)
+				throw TypeError("Raw callback preparation support must be Boolean.")
+			if SupportsPreparation
+				Meta.SupportsPreparation := true
+		}
 		if (IsSet(options) and options.Has("Group"))
 				Meta.group := options["Group"]
 		if (IsSet(options) and options.Has("PersonalSource"))

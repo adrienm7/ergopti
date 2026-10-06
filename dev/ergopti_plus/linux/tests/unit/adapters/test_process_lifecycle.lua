@@ -17,7 +17,8 @@ local helpers = require("tests.helpers")
 
 --- Runs body with io.popen stubbed to replay canned `ps` outputs.
 --- Each entry of outputs is either a string (ps stdout, exit 0) or false (fork
---- failure: io.popen returns nil). Restores io.popen even on failure.
+--- failure: io.popen returns nil). A table carries { output, status } for a
+--- real checked-runner status frame. Restores io.popen even on failure.
 --- @param outputs table Array of string|false.
 --- @param body function Receives nothing; reads popen calls in order.
 local function with_ps(outputs, body)
@@ -28,12 +29,18 @@ local function with_ps(outputs, body)
 		local out = outputs[at]
 		if out == nil then out = outputs[#outputs] end
 		if out == false then return nil end
+		local receipt = type(out) == "table" and out or { output = tostring(out), status = 0 }
+		local content = receipt.output
+		-- Fixture strings include the conventional header. A headerless request
+		-- removes only that first protocol row; subsequent COMMAND rows are data.
+		if cmd:find("ps -eo comm=", 1, true) then content = content:gsub("^COMMAND\n", "", 1) end
 		local lines = {}
-		for line in (tostring(out) .. "\n"):gmatch("([^\n]*)\n") do
+		for line in (content .. "\n"):gmatch("([^\n]*)\n") do
 			lines[#lines + 1] = line
 		end
 		local pos = 0
 		return {
+			read = function() return string.format("%d %d\n%s\nERGOPTI_CAPTURE_COMPLETE\n", receipt.status, #content, content) end,
 			lines = function()
 				return function()
 					pos = pos + 1
@@ -64,6 +71,87 @@ local PS_AC = "COMMAND\na\nc\n"
 
 -- process_every = floor(2.0 / 0.25) = 8: the process poll runs on these ticks.
 local PROCESS_TICK = 8
+
+helpers.describe("linux-process-snapshot-receipts", function()
+	for _, status in ipairs({ 1, 7, 127, 143 }) do
+		helpers.it("linux-process-snapshot-receipts: failed status " .. status .. " cannot replace a successful baseline", function()
+			with_ps({ PS_ABC }, function()
+				local M, launched, quit = fresh_lifecycle()
+				M.start()
+				with_ps({ { output = PS_AB, status = status } }, function() M.tick(PROCESS_TICK) end)
+				helpers.assert_eq(quit, {}, "nonempty partial stdout cannot prove any process quit")
+				helpers.assert_eq(launched, {})
+				with_ps({ PS_AC }, function() M.tick(PROCESS_TICK * 2) end)
+				M.stop()
+				helpers.assert_eq(quit, { "b" }, "recovery diffs only the last successful baseline")
+				helpers.assert_eq(launched, {}, "partial failure cannot synthesize a recovery launch")
+			end)
+		end)
+		helpers.it("linux-process-snapshot-receipts: failed status " .. status .. " cannot seed startup ownership", function()
+			with_ps({ { output = PS_AB, status = status } }, function()
+				local M, launched, quit = fresh_lifecycle()
+				M.start()
+				with_ps({ PS_ABC }, function() M.tick(PROCESS_TICK) end)
+				M.stop()
+				helpers.assert_eq(launched, {}, "the first trustworthy snapshot silently adopts existing processes")
+				helpers.assert_eq(quit, {})
+			end)
+		end)
+	end
+end)
+
+helpers.describe("linux-process-header-receipts", function()
+	helpers.it("linux-process-header-receipts: COMMAND launches and quits as an ordinary process", function()
+		with_ps({ PS_AB }, function()
+			local M, launched, quit = fresh_lifecycle()
+			M.start()
+			with_ps({ PS_AB .. "COMMAND\n" }, function() M.tick(PROCESS_TICK) end)
+			helpers.assert_eq(launched, { "COMMAND" }, "protocol headers cannot reserve a legitimate application name")
+			with_ps({ PS_AB }, function() M.tick(PROCESS_TICK * 2) end)
+			M.stop()
+			helpers.assert_eq(quit, { "COMMAND" })
+		end)
+	end)
+	helpers.it("linux-process-header-receipts: COMMAND present at startup remains in the baseline", function()
+		with_ps({ PS_AB .. "COMMAND\n" }, function()
+			local M, launched, quit = fresh_lifecycle()
+			M.start()
+			with_ps({ PS_AB }, function() M.tick(PROCESS_TICK) end)
+			M.stop()
+			helpers.assert_eq(launched, {})
+			helpers.assert_eq(quit, { "COMMAND" }, "startup must retain every real row")
+		end)
+	end)
+end)
+
+helpers.describe("linux-process-name-byte-receipts", function()
+	for index, name in ipairs({ " ep lead", "ep trail ", " ep both ", "   " }) do
+		helpers.it("linux-process-name-byte-receipts: native whitespace case " .. index .. " launches and quits exactly", function()
+			with_ps({ PS_AB }, function()
+				local M, launched, quit = fresh_lifecycle()
+				M.start()
+				with_ps({ PS_AB .. name .. "\n" }, function() M.tick(PROCESS_TICK) end)
+				helpers.assert_eq(launched, { name }, "native name bytes cannot be treated as column padding")
+				with_ps({ PS_AB }, function() M.tick(PROCESS_TICK * 2) end)
+				M.stop()
+				helpers.assert_eq(quit, { name })
+			end)
+		end)
+	end
+	helpers.it("linux-process-name-byte-receipts: a live neighbor cannot hide a distinct whitespace identity", function()
+		with_ps({ PS_AB .. "ep pair\n" }, function()
+			local M, launched, quit = fresh_lifecycle()
+			M.start()
+			with_ps({ PS_AB .. "ep pair\n ep pair \n" }, function() M.tick(PROCESS_TICK) end)
+			helpers.assert_eq(launched, { " ep pair " })
+			with_ps({ PS_AB .. "ep pair\n" }, function() M.tick(PROCESS_TICK * 2) end)
+			helpers.assert_eq(quit, { " ep pair " }, "trimmed alias cannot hide the neighbor's real retirement")
+			with_ps({ PS_AB }, function() M.tick(PROCESS_TICK * 3) end)
+			M.stop()
+			helpers.assert_eq(quit, { " ep pair ", "ep pair" })
+		end)
+	end)
+end)
 
 helpers.describe("process_lifecycle: a failed snapshot fires nothing (ps-storm)", function()
 

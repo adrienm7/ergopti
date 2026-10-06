@@ -537,6 +537,103 @@ MenuRenderer_CommandRow(ManifestKey, CommandId, Commands, StateGetters := unset)
 		IsSet(StateGetters) ? StateGetters : Map(), "command")
 }
 
+/**
+ * Supplies an ordered declared child template as provider data.
+ * @param {String} ManifestKey Shared child declaration.
+ * @param {Map} Commands Native callback owners.
+ * @param {Map} StateGetters Native state and current caption readers.
+ * @param {Map} Children Native child data indexed by declared group identity.
+ * @returns {Array|false} Canonical provider rows or a refused template.
+ */
+MenuRenderer_TemplateRows(ManifestKey, Commands, StateGetters, Children) {
+	return _MR_TemplateRows(ManifestKey, Commands, StateGetters, Children, Map())
+}
+
+/**
+ * Supplies inert status declared on an existing live provider row.
+ * @param {String} ManifestKey Owning menu declaration.
+ * @param {String} RowId Existing provider identity.
+ * @param {String} Status Named native status to project.
+ * @returns {Array|false} Translated inactive data or a refused declaration.
+ */
+MenuRenderer_StatusRows(ManifestKey, RowId, Status) {
+	Owner := _MR_FindItemById(ManifestKey, RowId)
+	Statuses := Owner is Map ? Owner.Get("status_rows", false) : false
+	Def := Statuses is Map ? Statuses.Get(Status, false) : false
+	if !(Def is Array) || Def.Length == 0 {
+		try LoggerError("MenuRenderer", "Missing provider status '{1}.{2}.{3}' — rows refused.", ManifestKey, RowId, Status)
+		return false
+	}
+	for Item in Def {
+		if !(Item is Map)
+			return false
+		ItemType := Item.Get("type", "")
+		Label := ItemType == "label" && Item.Get("i18n", false) is String && Item["i18n"] != ""
+		if ItemType != "---" && !Label
+			return false
+		for Field in Item
+			if Field != "type" && !(Label && Field == "i18n")
+				return false
+	}
+	return _MR_TemplateRows(ManifestKey, Map(), Map(), Map(), Map(), Def)
+}
+
+; Includes retain their declaration's original command readiness policy.
+_MR_TemplateRows(ManifestKey, Commands, StateGetters, Children, Visiting, StatusDefinition := unset) {
+	Def := IsSet(StatusDefinition) ? StatusDefinition : _MR_GetMenuDef(ManifestKey)
+	if Visiting.Has(ManifestKey) || Def.Length == 0 {
+		try LoggerError("MenuRenderer", "Missing or cyclic child template '{1}' — provider rows refused.", ManifestKey)
+		return false
+	}
+	Visiting[ManifestKey] := true
+	Rows := []
+	for Item in Def {
+		if !_MR_IsForAhk(Item)
+			continue
+		ItemType := _MR_Get(Item, "type")
+		Id := _MR_Get(Item, "id")
+		if ItemType == "include" {
+			Included := _MR_TemplateRows(_MR_Get(Item, "section"), Commands, StateGetters, Children, Visiting)
+			if !(Included is Array)
+				return false
+			for Child in Included
+				Rows.Push(Child)
+			continue
+		}
+		if ItemType == "---"
+			Row := Map("separator", true)
+		else if IsSet(StatusDefinition) && ItemType == "label"
+			Row := Map("label", t(Item["i18n"]), "disabled", true)
+		else if ItemType == "command" {
+			Row := MenuRenderer_CommandRow(ManifestKey, Id, Commands, StateGetters)
+			if !(Row is Map)
+				return false
+		} else if ItemType == "group" && Children.Has(Id) && Children[Id] is Array
+			Row := Map("label", t(_MR_Get(Item, "i18n")), "items", Children[Id])
+		else {
+			try LoggerError("MenuRenderer", "Missing child data or unsupported row in template '{1}' — provider rows refused.", ManifestKey)
+			return false
+		}
+		CaptionGetter := _MR_Get(Item, "caption_getter")
+		if CaptionGetter != "" {
+			if !StateGetters.Has(CaptionGetter) || !HasMethod(StateGetters[CaptionGetter], "Call") {
+				try LoggerError("MenuRenderer", "Missing or invalid caption getter in template '{1}' — provider rows refused.", ManifestKey)
+				return false
+			}
+			Value := StateGetters[CaptionGetter].Call()
+			Title := t(_MR_Get(Item, "i18n"))
+			if Type(Value) != "String" {
+				try LoggerError("MenuRenderer", "Invalid caption getter in template '{1}' — provider rows refused.", ManifestKey)
+				return false
+			}
+			Row["label"] := StrReplace(Title, "%s", Value)
+		}
+		Rows.Push(Row)
+	}
+	Visiting.Delete(ManifestKey)
+	return Rows
+}
+
 MenuRenderer_CheckRow(ManifestKey, CheckId, Commands, StateGetters := unset) {
 	return _MR_DeclaredProviderRow(ManifestKey, CheckId, Commands,
 		IsSet(StateGetters) ? StateGetters : Map(), "check")

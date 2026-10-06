@@ -185,7 +185,7 @@ LayerEditor_CurrentEmulation() {
 	Layout := (IsSet(Features) && Features is Map && Features.Has("layout")) ? Features["layout"] : Map()
 	Registry := KeylayoutEmulation_LayerIsActive("ergopti_base")
 	Ergopti := !Registry && Layout.Get("ergopti_base", false) == true
-	Digits := Layout.Get("direct_access_digits", false) == true
+	Digits := NumberRowPolicyMode(Layout.Get("direct_access_digits", "")) == "digits"
 	return Map("active", Registry || Ergopti,
 		"character", _LayerEditor_EmulatedCharacter.Bind(Registry, Ergopti, Digits))
 }
@@ -206,8 +206,16 @@ _LayerEditor_EmulatedCharacter(Registry, Ergopti, Digits, Sc) {
 		if Edges.Has(Code)
 			return Edges[Code]
 	}
-	if Registry
-		return KLE_KeyCodes.Has(Sc) ? Keylayout_Resolve(KLE_Model, KLE_LevelIndex[""], KLE_KeyCodes[Sc])["Text"] : ""
+	if Registry {
+		Shift := false
+		if NumberRowEffectiveMode() == "symbols" && NumberRowSymbolsCapable(false) {
+			Level := NumberRowSymbolsLevel(Code, false)
+			if Level["supported"]
+				Shift := Level["shift"]
+		}
+		return KLE_KeyCodes.Has(Sc) ? Keylayout_Resolve(KLE_Model,
+			KLE_LevelIndex[_KLE_ComboKey(Shift, false, false)], KLE_KeyCodes[Sc])["Text"] : ""
+	}
 	if !Ergopti
 		return ""
 	Spec := ErgoptiLayout_Spec()

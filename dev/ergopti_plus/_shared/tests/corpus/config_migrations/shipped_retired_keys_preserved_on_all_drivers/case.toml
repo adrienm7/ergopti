@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/shipped_retired_keys_preserved_on_all_drivers/case.toml
+
+[case]
+description = "All shipped drivers preserve retired scalar and false settings for explicit cleanup while advancing the schema stamp."
+drivers = ["ahk", "hs", "linux"]
+outcome = "migrated"
+from_version = 2
+to_version = 11

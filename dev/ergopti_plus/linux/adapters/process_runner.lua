@@ -21,6 +21,8 @@ local M = {}
 
 local Logger = require("logger.shim")
 local ShellRunner = require("adapters.shell_runner")
+local LibuvExit = require("infra.libuv_exit")
+local NativeTimer = require("infra.native_timer")
 local LOG = "adapters.process_runner"
 
 local ok_luv, luv = pcall(require, "luv")
@@ -66,7 +68,8 @@ end
 --- Terminates the run's whole process group.
 --- @param run table
 local function terminate_group(run)
-	if run.exited or not run.pid or type(luv.kill) ~= "function" then return end
+	-- Reaping the leader does not release descendants or their inherited pipes.
+	if not run.pid or type(luv.kill) ~= "function" then return end
 	pcall(luv.kill, -run.pid, "sigterm")
 	pcall(luv.kill, -run.pid, "sigkill")
 end
@@ -152,10 +155,16 @@ function M.run(program, args, options, callback)
 		exited = false,
 		terminal = false,
 	}
-	local handles_ok, stdout, stderr, timer = pcall(function()
-		return luv.new_pipe(false), luv.new_pipe(false), luv.new_timer()
+	local handles_ok = pcall(function()
+		-- Capture ownership immediately: later constructor exceptions must not
+		-- hide earlier handles from the terminal cleanup path.
+		run.stdout = luv.new_pipe(false)
+		if not run.stdout then error("stdout allocation refused", 0) end
+		run.stderr = luv.new_pipe(false)
+		if not run.stderr then error("stderr allocation refused", 0) end
+		run.timer = luv.new_timer()
+		if not run.timer then error("timer allocation refused", 0) end
 	end)
-	run.stdout, run.stderr, run.timer = stdout, stderr, timer
 	if not handles_ok or not run.stdout or not run.stderr or not run.timer then
 		finish(run, { exit_code = -1, stdout = "", stderr = "", error = "libuv handle allocation failed" })
 		return false
@@ -164,9 +173,9 @@ function M.run(program, args, options, callback)
 		args = args,
 		stdio = { nil, run.stdout, run.stderr },
 		detached = true,
-	}, function(code)
+	}, function(code, signal)
 		run.exited = true
-		run.exit_code = tonumber(code) or -1
+		run.exit_code = LibuvExit.status(code, signal)
 		maybe_complete(run)
 		-- A run already finished by its deadline still owns this handle.
 		if run.terminal and run.process then
@@ -187,7 +196,7 @@ function M.run(program, args, options, callback)
 	run.process = process
 	run.pid = pid
 
-	local timer_ok = pcall(luv.timer_start, run.timer, timeout_ms, 0, function()
+	local timer_ok, timer_started = pcall(NativeTimer.start, luv, run.timer, timeout_ms, 0, function()
 		if run.terminal then return end
 		terminate_group(run)
 		finish(run, { exit_code = -1, stdout = run.stdout_text, stderr = run.stderr_text,
@@ -208,13 +217,16 @@ function M.run(program, args, options, callback)
 			run[field] = run[field] .. chunk
 		end
 	end
-	local out_ok = pcall(luv.read_start, run.stdout, function(err, chunk)
+	local out_ok, stdout_started = pcall(luv.read_start, run.stdout, function(err, chunk)
 		consume("stdout_text", "stdout_eof", err, chunk)
 	end)
-	local err_ok = pcall(luv.read_start, run.stderr, function(err, chunk)
+	local err_ok, stderr_started = pcall(luv.read_start, run.stderr, function(err, chunk)
 		consume("stderr_text", "stderr_eof", err, chunk)
 	end)
-	if not timer_ok or not out_ok or not err_ok then
+	-- Libuv returns nil/error on native refusal without raising. Its successful
+	-- zero receipt is truthy in Lua; pcall status alone admits unsupervised runs.
+	if not timer_ok or not timer_started or not out_ok or not stdout_started
+		or not err_ok or not stderr_started then
 		terminate_group(run)
 		finish(run, { exit_code = -1, stdout = "", stderr = "", error = "process supervision could not start" })
 		return false

@@ -41,6 +41,7 @@ local BasicString = require("toml_codec.basic_string")
 local Engine = require("platform.remap.tap_hold_engine")
 local Manifest = require("infra.manifest_reader")
 local LayerPreset = require("keymap.layer_preset")
+local Shapes = require("platform.remap.tap_hold_shapes")
 
 local LOG = "platform.remap.tap_hold_writer"
 
@@ -84,13 +85,14 @@ local _backup_sequence = 0    -- Keeps the wizard import's backups unique.
 --- Reads a tap_hold.toml; an absent file is an empty document.
 --- @param path string
 --- @return table|nil document, string|nil err, string|nil text The file's bytes.
+--- @return table|nil shapes Canonical array identities for this document.
 local function read_document(path)
 	local text, status, detail = TomlWriter.read_classified(path)
-	if status == "absent" then return {} end
+	if status == "absent" then return {}, nil, nil, { arrays = {} } end
 	if status ~= "ok" then return nil, detail end
-	local parsed = TomlCodec.decode(text)
+	local parsed, shapes = TomlCodec.decode_with_shapes(text)
 	if type(parsed) ~= "table" then return nil, "malformed" end
-	return parsed, nil, text
+	return parsed, nil, text, shapes
 end
 
 --- Copies a file's bytes to a new backup beside it, then reads them back.
@@ -118,25 +120,25 @@ end
 --- The TOML spelling of one scalar or array.
 --- @param value any
 --- @return string
-local function encode_value(value)
+local function encode_value(value, shapes, owner, key)
 	local kind = type(value)
 	if kind == "string" then return '"' .. BasicString.escape_body(value) .. '"' end
 	if kind == "boolean" then return tostring(value) end
 	if kind == "number" then
+		if shapes then return TomlCodec.encode_value_with_shapes(value, shapes, owner, key) end
 		if value == math.floor(value) and math.abs(value) < 2 ^ 53 then return string.format("%d", value) end
 		return string.format("%.10g", value)
 	end
 	if kind == "table" then
-		local parts = {}
-		for index, item in ipairs(value) do parts[index] = encode_value(item) end
-		return "[" .. table.concat(parts, ", ") .. "]"
+		if shapes then return TomlCodec.encode_value_with_shapes(value, shapes, owner, key) end
+		return TomlCodec.encode_value(value)
 	end
 	error("tap_hold.toml cannot hold a " .. kind, 0)
 end
 
 --- Whether a table is an array (its values are written inline).
-local function is_array(value)
-	return type(value) == "table" and (next(value) == nil and false or value[1] ~= nil)
+local function is_array(value, shapes)
+	return type(value) == "table" and not Shapes.is_table(value, shapes)
 end
 
 --- A bare TOML key, or a quoted one when it is not bare.
@@ -146,10 +148,10 @@ local function encode_key(key)
 end
 
 --- Appends one table and its sub-tables, sorted, under `path`.
-local function encode_table(out, tbl, path)
+local function encode_table(out, tbl, path, shapes)
 	local scalars, tables = {}, {}
 	for key, value in pairs(tbl) do
-		if type(value) == "table" and not is_array(value) then
+		if type(value) == "table" and not is_array(value, shapes) then
 			tables[#tables + 1] = key
 		else
 			scalars[#scalars + 1] = key
@@ -162,20 +164,20 @@ local function encode_table(out, tbl, path)
 		out[#out + 1] = "[" .. path .. "]"
 	end
 	for _, key in ipairs(scalars) do
-		out[#out + 1] = encode_key(key) .. " = " .. encode_value(tbl[key])
+		out[#out + 1] = encode_key(key) .. " = " .. encode_value(tbl[key], shapes, tbl, key)
 	end
 	for _, key in ipairs(tables) do
-		encode_table(out, tbl[key], path == "" and encode_key(key) or (path .. "." .. encode_key(key)))
+		encode_table(out, tbl[key], path == "" and encode_key(key) or (path .. "." .. encode_key(key)), shapes)
 	end
 end
 
 --- The file's complete text for `document`, as every tray change writes it.
 --- @param document table
 --- @return string
-local function render_document(document)
+local function render_document(document, shapes)
 	local out = {}
 	for _, line in ipairs(HEADER) do out[#out + 1] = line end
-	encode_table(out, document, "")
+	encode_table(out, document, "", shapes)
 	return table.concat(out, "\n") .. "\n"
 end
 
@@ -183,8 +185,12 @@ end
 --- @param path string
 --- @param document table
 --- @return boolean
-local function write_document(path, document)
-	local text = render_document(document)
+local function write_document(path, document, shapes, expected_source)
+	local text = render_document(document, shapes)
+	if type(TomlCodec.decode(text)) ~= "table" then
+		Logger.error(LOG, "'%s' rendered an invalid tap-hold candidate — nothing written.", path)
+		return false
+	end
 	local tmp = path .. ".tmp"
 	local fh, err = io.open(tmp, "w")
 	if not fh then
@@ -205,6 +211,14 @@ local function write_document(path, document)
 		Logger.error(LOG, "Cannot complete staging file '%s' (%s) — the change was not saved.", tmp, tostring(detail))
 		return false
 	end
+	local current, status = TomlWriter.read_classified(path)
+	if expected_source and (status ~= expected_source.status
+		or (status == "ok" and current ~= expected_source.content)) then
+		local removed, remove_err = os.remove(tmp)
+		if not removed then Logger.error(LOG, "Cannot remove refused staging file '%s' (%s).", tmp, tostring(remove_err)) end
+		Logger.error(LOG, "'%s' changed before tap-hold publication — the source is preserved.", path)
+		return false
+	end
 	local ok, rename_err = os.rename(tmp, path)
 	if not ok then
 		os.remove(tmp)
@@ -216,23 +230,29 @@ end
 
 --- Reads, changes, writes and reloads: one tray change.
 --- @param what string For the logs.
---- @param mutate function(document) Changes the decoded document in place.
+--- @param mutate function(document, shapes) Changes the decoded document in place.
 --- @return boolean True when the change is saved and in force.
 --- @return boolean saved True once the file holds the change, reloaded or not.
-local function save_and_reload(what, mutate)
+local function save_and_reload(what, mutate, prepare)
 	if not _path then
 		Logger.error(LOG, "Tap-hold writer used before init() — '%s' not saved.", what)
 		return false, false
 	end
-	local document, err = read_document(_path)
+	local document, err, text, shapes = read_document(_path)
 	if not document then
 		Logger.error(LOG, "'%s' is %s — '%s' refused rather than overwrite it.", _path, tostring(err), what)
 		return false, false
 	end
-	mutate(document)
-	if not write_document(_path, document) then return false, false end
+	local changed, detail = pcall(mutate, document, shapes)
+	if not changed then
+		Logger.error(LOG, "Tap-hold change '%s' refused: %s.", what, tostring(detail))
+		return false, false
+	end
+	if prepare and prepare() ~= true then return false, false end
+	if not write_document(_path, document, shapes, { status = text and "ok" or "absent", content = text }) then return false, false end
 	Logger.info(LOG, "Tap-hold change saved: %s.", what)
-	if not _reload() then
+	local called, reloaded = pcall(_reload)
+	if not called or reloaded ~= true then
 		Logger.error(LOG, "Tap-hold change '%s' saved but the engine did not reload.", what)
 		return false, true
 	end
@@ -241,7 +261,7 @@ end
 
 --- One tray change, as the public setters report it.
 --- @param what string For the logs.
---- @param mutate function(document) Changes the decoded document in place.
+--- @param mutate function(document, shapes) Changes the decoded document in place.
 --- @return boolean True when the change is saved and in force.
 local function commit(what, mutate)
 	local in_force = save_and_reload(what, mutate)
@@ -285,16 +305,19 @@ local function undo_layer(import)
 end
 
 --- The [tap_hold] table of a document, created when absent.
-local function section(document)
-	if type(document.tap_hold) ~= "table" then document.tap_hold = {} end
+local function section(document, shapes)
+	Shapes.require_table(document.tap_hold, shapes, "tap_hold")
+	if document.tap_hold == nil then document.tap_hold = {} end
 	return document.tap_hold
 end
 
 --- The [tap_hold.keys.<id>] table of a document, created when absent.
-local function key_entry(document, key_id)
-	local tap_hold = section(document)
-	if type(tap_hold.keys) ~= "table" then tap_hold.keys = {} end
-	if type(tap_hold.keys[key_id]) ~= "table" then tap_hold.keys[key_id] = {} end
+local function key_entry(document, key_id, shapes)
+	local tap_hold = section(document, shapes)
+	Shapes.require_table(tap_hold.keys, shapes, "tap_hold.keys")
+	if tap_hold.keys == nil then tap_hold.keys = {} end
+	Shapes.require_table(tap_hold.keys[key_id], shapes, "tap_hold.keys." .. key_id)
+	if tap_hold.keys[key_id] == nil then tap_hold.keys[key_id] = {} end
 	return tap_hold.keys[key_id]
 end
 
@@ -302,15 +325,15 @@ end
 --- key this engine knows and every key of the shipped preset.
 --- @param tap_hold table
 --- @param preset table key id -> fields of the shipped preset.
-local function clear_owned_keys(tap_hold, preset)
+local function clear_owned_keys(tap_hold, preset, shapes)
 	if tap_hold.keys == nil then return end
-	if type(tap_hold.keys) ~= "table" then error("[tap_hold] keys is not a table", 0) end
+	Shapes.require_table(tap_hold.keys, shapes, "tap_hold.keys")
 	local owned = {}
 	for key_id in pairs(Engine.KEY_CODES) do owned[key_id] = true end
 	for key_id in pairs(preset) do owned[key_id] = true end
 	for key_id in pairs(owned) do
 		local entry = tap_hold.keys[key_id]
-		if type(entry) == "table" then
+		if Shapes.is_table(entry, shapes) then
 			for _, field in ipairs(OWNED_KEY_FIELDS) do entry[field] = nil end
 			if next(entry) == nil then tap_hold.keys[key_id] = nil end
 		end
@@ -371,8 +394,8 @@ function M.set_tap(key_id, action)
 		Logger.error(LOG, "set_tap: '%s' is not a tap action here — nothing written.", tostring(action))
 		return false
 	end
-	return commit(key_id .. " tap = " .. (action == "" and "<native>" or action), function(document)
-		local entry = key_entry(document, key_id)
+	return commit(key_id .. " tap = " .. (action == "" and "<native>" or action), function(document, shapes)
+		local entry = key_entry(document, key_id, shapes)
 		entry.tap_action = action
 		entry.enabled = nil
 	end)
@@ -393,14 +416,9 @@ function M.set_hold(key_id, kind, id)
 			tostring(kind), tostring(id), tostring(err))
 		return false
 	end
-	local layer, layer_err = import_layer(kind, canonical)
-	if not layer then
-		Logger.error(LOG, "set_hold: the recommended navigation layer cannot be imported (%s) — nothing written.",
-			tostring(layer_err))
-		return false
-	end
-	local in_force, saved = save_and_reload(key_id .. " hold = " .. kind .. ":" .. canonical, function(document)
-		local entry = key_entry(document, key_id)
+	local layer = nil
+	local in_force, saved = save_and_reload(key_id .. " hold = " .. kind .. ":" .. canonical, function(document, shapes)
+		local entry = key_entry(document, key_id, shapes)
 		entry.hold_modifier, entry.hold_layer, entry.enabled = nil, nil, nil
 		if kind == "layer" then
 			entry.hold_layer = canonical
@@ -410,9 +428,18 @@ function M.set_hold(key_id, kind, id)
 			-- Empty, not absent: absent would inherit the default's hold.
 			entry.hold_modifier = ""
 		end
+	end, function()
+		local layer_err
+		layer, layer_err = import_layer(kind, canonical)
+		if not layer then
+			Logger.error(LOG, "set_hold: the recommended navigation layer cannot be imported (%s) — nothing written.",
+				tostring(layer_err))
+			return false
+		end
+		return true
 	end)
 	-- A saved key keeps the layer it enters, even when the reload failed.
-	if not saved then undo_layer(layer) end
+	if not saved and layer then undo_layer(layer) end
 	return in_force
 end
 
@@ -421,8 +448,8 @@ end
 --- @return boolean
 function M.set_native(key_id)
 	if not valid_key(key_id, "set_native") then return false end
-	return commit(key_id .. " native", function(document)
-		local entry = key_entry(document, key_id)
+	return commit(key_id .. " native", function(document, shapes)
+		local entry = key_entry(document, key_id, shapes)
 		entry.tap_action, entry.hold_modifier, entry.hold_layer, entry.enabled = "", "", nil, nil
 	end)
 end
@@ -438,8 +465,8 @@ function M.set_threshold(key_id, seconds)
 			tostring(seconds), MAX_THRESHOLD_SECONDS)
 		return false
 	end
-	return commit(key_id .. " threshold = " .. tostring(seconds or "<default>"), function(document)
-		key_entry(document, key_id).time_activation_seconds = seconds
+	return commit(key_id .. " threshold = " .. tostring(seconds or "<default>"), function(document, shapes)
+		key_entry(document, key_id, shapes).time_activation_seconds = seconds
 	end)
 end
 
@@ -451,8 +478,8 @@ function M.set_enabled(enabled)
 		Logger.error(LOG, "set_enabled: a boolean is required — nothing written.")
 		return false
 	end
-	return commit("feature " .. (enabled and "on" or "off"), function(document)
-		section(document).enabled = enabled
+	return commit("feature " .. (enabled and "on" or "off"), function(document, shapes)
+		section(document, shapes).enabled = enabled
 	end)
 end
 
@@ -464,16 +491,22 @@ end
 --- @param document table Decoded user document, consumed by this call.
 --- @param rows table Manifest rows under tap_holds, routed by the transaction.
 --- @param preset table key id -> fields of the shipped preset.
+--- @param shapes table|nil Canonical receipt for the exact source document.
 --- @return string candidate Complete file text.
-function M.render_scope(mode, document, rows, preset)
+function M.render_scope(mode, document, rows, preset, shapes)
 	if mode ~= "recommended" and mode ~= "clear" then error("unknown tap-hold scope mode: " .. tostring(mode), 0) end
 	if type(document) ~= "table" or type(rows) ~= "table" or type(preset) ~= "table" then
 		error("tap-hold scope rendering requires a document, rows and the preset", 0)
 	end
-	if document.tap_hold ~= nil and type(document.tap_hold) ~= "table" then error("[tap_hold] is not a table", 0) end
-	local tap_hold = section(document)
+	local tap_hold = section(document, shapes)
+	Shapes.require_table(tap_hold.keys, shapes, "tap_hold.keys")
+	if mode == "recommended" then
+		for key_id in pairs(preset) do
+			Shapes.require_table(tap_hold.keys and tap_hold.keys[key_id], shapes, "tap_hold.keys." .. key_id)
+		end
+	end
 	tap_hold.inherit_defaults = nil
-	clear_owned_keys(tap_hold, preset)
+	clear_owned_keys(tap_hold, preset, shapes)
 	for _, row in ipairs(rows) do
 		if row.section ~= "tap_holds" or row.key ~= "enabled" then
 			error("tap-hold scope row has no tap_hold.toml owner: " .. tostring(row.section) .. "." .. tostring(row.key), 0)
@@ -482,12 +515,12 @@ function M.render_scope(mode, document, rows, preset)
 	end
 	if mode == "recommended" then
 		for key_id, fields in pairs(preset) do
-			local entry = key_entry(document, key_id)
+			local entry = key_entry(document, key_id, shapes)
 			for field, value in pairs(fields) do entry[field] = value end
 		end
 	end
 	if next(tap_hold) == nil then document.tap_hold = nil end
-	return render_document(document)
+	return render_document(document, shapes)
 end
 
 --- Whether a key's entry holds a setting of the user's: any owned field, unless
@@ -542,17 +575,23 @@ function M.import_recommended(path, key_ids, preset)
 		seen[key_id] = true
 	end
 	Logger.start(LOG, "Importing %d recommended tap-hold key(s) into '%s'…", #key_ids, path)
-	local document, err, text = read_document(path)
+	local document, err, text, shapes = read_document(path)
 	if not document then
 		Logger.error(LOG, "'%s' is %s — the import is refused rather than overwrite it.", path, tostring(err))
 		return false, "'" .. path .. "' is " .. tostring(err)
 	end
-	-- A scalar where a table belongs is the user's text, not ours to replace.
 	local tap_hold = document.tap_hold
-	if (tap_hold ~= nil and type(tap_hold) ~= "table")
-		or (type(tap_hold) == "table" and tap_hold.keys ~= nil and type(tap_hold.keys) ~= "table") then
-		Logger.error(LOG, "[tap_hold] of '%s' is not a table of keys — the import is refused.", path)
-		return false, "[tap_hold] of '" .. path .. "' is not a table of keys"
+	local admitted, admission_error = pcall(function()
+		Shapes.require_table(tap_hold, shapes, "tap_hold")
+		Shapes.require_table(tap_hold and tap_hold.keys, shapes, "tap_hold.keys")
+		for _, key_id in ipairs(key_ids) do
+			Shapes.require_table(tap_hold and tap_hold.keys and tap_hold.keys[key_id], shapes,
+				"tap_hold.keys." .. key_id)
+		end
+	end)
+	if not admitted then
+		Logger.error(LOG, "Tap-hold import into '%s' refused: %s.", path, tostring(admission_error))
+		return false, tostring(admission_error)
 	end
 	local keys = type(tap_hold) == "table" and tap_hold.keys or {}
 	for _, key_id in ipairs(key_ids) do
@@ -570,13 +609,13 @@ function M.import_recommended(path, key_ids, preset)
 			return false, "'" .. path .. "' could not be backed up"
 		end
 	end
-	section(document).enabled = true
+	section(document, shapes).enabled = true
 	for _, key_id in ipairs(key_ids) do
-		local entry = key_entry(document, key_id)
+		local entry = key_entry(document, key_id, shapes)
 		for _, field in ipairs(OWNED_KEY_FIELDS) do entry[field] = nil end
 		for field, value in pairs(preset[key_id]) do entry[field] = value end
 	end
-	if not write_document(path, document) then
+	if not write_document(path, document, shapes, { status = text and "ok" or "absent", content = text }) then
 		return false, "'" .. path .. "' could not be written"
 	end
 	Logger.success(LOG, "Imported %d recommended tap-hold key(s) into '%s' (backup: %s).",
@@ -589,9 +628,9 @@ end
 --- @return boolean
 function M.is_overridden(key_id)
 	if not _path then return false end
-	local document = read_document(_path)
-	return type(document) == "table" and type(document.tap_hold) == "table"
-		and type(document.tap_hold.keys) == "table" and type(document.tap_hold.keys[key_id]) == "table"
+	local document, _, _, shapes = read_document(_path)
+	return type(document) == "table" and Shapes.is_table(document.tap_hold, shapes)
+		and Shapes.is_table(document.tap_hold.keys, shapes) and Shapes.is_table(document.tap_hold.keys[key_id], shapes)
 end
 
 --- Test seam: forgets the initialisation.

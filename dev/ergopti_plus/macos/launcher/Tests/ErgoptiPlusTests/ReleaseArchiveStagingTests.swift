@@ -5,6 +5,7 @@
 // copy of the independently built fixture; no installed app is changed or run.
 
 import Foundation
+import Security
 import XCTest
 
 final class ReleaseArchiveStagingTests: XCTestCase {
@@ -309,4 +310,228 @@ final class ReleaseArchiveStagingTests: XCTestCase {
 		XCTAssertNotEqual(refused.status, 0, "A display failure cannot authorize staged verification")
 	}
 
+
+	func testCIInstallSelectsDeclaredArchiveAndPreservesIndependentSignedSource() throws {
+		let root = try scratch()
+		defer { retire(root) }
+		let app = try signedBundle(root: root)
+		let owner = Self.repositoryURL.appendingPathComponent("tools/build/macos-release-archives.cjs")
+		for format in ["tar.xz", "zip"] {
+			let payload = try archive(format, app: app, root: root)
+			let input = payload.deletingLastPathComponent()
+			if format == "zip" {
+				try manager.removeItem(at: input.appendingPathComponent("ErgoptiPlus.app.tar.xz"))
+			}
+			let source = try successful("/usr/bin/env", ["node", owner.path, "--ci-receipt", app.path, input.path], root: root)
+			XCTAssertTrue(source.stdout.isEmpty)
+			XCTAssertTrue(source.stderr.isEmpty)
+			let sourcePacket = try XCTUnwrap(try JSONSerialization.jsonObject(with:
+				Data(contentsOf: input.appendingPathComponent("ErgoptiPlus.app.ci-receipt.json"))) as? [String: Any])
+			let requirement = try XCTUnwrap(sourcePacket["requirement"] as? String)
+			XCTAssertFalse(requirement.isEmpty)
+			let output = root.appendingPathComponent("ci-install-" + UUID().uuidString)
+			try manager.createDirectory(at: output, withIntermediateDirectories: false)
+			let result = try successful("/usr/bin/env", ["node", owner.path, "--ci-install", input.path, output.path], root: root)
+			XCTAssertTrue(result.stderr.isEmpty)
+			let packet = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(result.stdout.utf8)) as? [String: Any])
+			XCTAssertEqual(packet["format"] as? String, format)
+			let retained = URL(fileURLWithPath: try XCTUnwrap(packet["archive"] as? String))
+			XCTAssertEqual(try Data(contentsOf: retained), try Data(contentsOf: payload))
+			XCTAssertEqual(packet["sha256"] as? String, try digest(retained, root: root))
+			let installed = output.appendingPathComponent(bundleName)
+			let verification = try successful("/usr/bin/codesign", ["--verify", "--deep", "--strict", "-R", "=" + requirement, installed.path], root: root)
+			XCTAssertTrue(verification.stdout.isEmpty)
+			XCTAssertTrue(verification.stderr.isEmpty)
+			XCTAssertEqual(try Data(contentsOf: installed.appendingPathComponent("Contents/Resources/données.txt")),
+				Data("Independent Unicode bytes: café 😀\n".utf8))
+			let attributes = try manager.attributesOfItem(atPath: installed.appendingPathComponent("Contents/MacOS/OwnedFixture").path)
+			XCTAssertEqual((attributes[.posixPermissions] as? NSNumber)?.intValue, 0o751)
+			XCTAssertEqual(try manager.destinationOfSymbolicLink(atPath: installed.appendingPathComponent("Contents/Resources/owned-link").path), "données.txt")
+			let metadata = try successful("/usr/bin/xattr", ["-p", "com.ergopti.owned-fixture", installed.appendingPathComponent("Contents/Resources/données.txt").path], root: root)
+			XCTAssertEqual(metadata.stdout, "owned-metadata\n")
+			XCTAssertEqual(try Data(contentsOf: app.appendingPathComponent("Contents/Resources/données.txt")),
+				Data("Independent Unicode bytes: café 😀\n".utf8))
+		}
+	}
+
+	func testCIPreferredArchiveNeverFallsBackAfterDigestExtractionOrSignatureRefusal() throws {
+		let root = try scratch()
+		defer { retire(root) }
+		let app = try signedBundle(root: root)
+		let owner = Self.repositoryURL.appendingPathComponent("tools/build/macos-release-archives.cjs")
+		for refusal in ["digest", "extract", "signature"] {
+			let payload = try archive("tar.xz", app: app, root: root)
+			let input = payload.deletingLastPathComponent()
+			if refusal == "extract" { try Data("Not a native XZ archive\n".utf8).write(to: payload) }
+			_ = try successful("/usr/bin/env", ["node", owner.path, "--ci-receipt", app.path, input.path], root: root)
+			if refusal == "digest" { try Data("Different archive bytes\n".utf8).write(to: payload) }
+			if refusal == "signature" {
+				let receipt = input.appendingPathComponent("ErgoptiPlus.app.ci-receipt.json")
+				var packet = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(contentsOf: receipt)) as? [String: Any])
+				packet["requirement"] = "identifier \"com.ergopti.foreign-staging-fixture\""
+				try JSONSerialization.data(withJSONObject: packet).write(to: receipt)
+			}
+			let output = root.appendingPathComponent("ci-refusal-" + UUID().uuidString)
+			try manager.createDirectory(at: output, withIntermediateDirectories: false)
+			let result = try child("/usr/bin/env", ["node", owner.path, "--ci-install", input.path, output.path], root: root)
+			XCTAssertNotEqual(result.status, 0)
+			XCTAssertTrue(result.stdout.isEmpty)
+			XCTAssertFalse(manager.fileExists(atPath: output.appendingPathComponent(bundleName).path))
+			XCTAssertTrue(manager.fileExists(atPath: input.appendingPathComponent("ErgoptiPlus.app.zip").path),
+				"A usable compatibility ZIP cannot turn a refused preferred archive into success")
+			XCTAssertFalse(try manager.contentsOfDirectory(atPath: input.path).contains { $0.hasPrefix(".ci-install-") })
+		}
+	}
+
+	/// Key commands never include their captured text in thrown failures. The
+	/// existing exact-child deadline/retirement owner retains inputs on debt.
+	private func privateSparkleChild(_ executable: String, _ arguments: [String], root: URL) throws -> Receipt {
+		guard let failuresBefore = testRun?.failureCount else {
+			throw FixtureError.toolFailure("owned-native-child-observation-unavailable", -1, "")
+		}
+		do {
+			let receipt = try child(executable, arguments, root: root)
+			// The shared child owner records a non-exit or still-running receipt
+			// through XCTest. Retain private inputs on that exact owner refusal;
+			// its assertions must never be converted into a signing receipt.
+			guard testRun?.failureCount == failuresBefore else {
+				fixtureCanRetire = false
+				throw FixtureError.toolFailure("owned-native-child-retirement-refused", -1, "")
+			}
+			return receipt
+		} catch { throw FixtureError.toolFailure("owned-native-signer-child", -1, "") }
+	}
+
+	private func privateSparkleRetire(_ root: URL) {
+		guard fixtureCanRetire else {
+			XCTFail("The private signer fixture retains its inputs until its child retires")
+			return
+		}
+		do {
+			try manager.removeItem(at: root)
+			XCTAssertFalse(manager.fileExists(atPath: root.path))
+		} catch { XCTFail("The private signer fixture could not retire") }
+	}
+
+	/// This uses the pinned Sparkle decoder's 32-byte seed ABI, not generate_keys
+	/// or the login Keychain. No key bytes are arguments, output or evidence.
+	func testActualSparkleFileKeyBindsBothArchivesAndRefusesCrossedSameLengthSignatures() throws {
+		let root = try scratch()
+		defer { privateSparkleRetire(root) }
+		try manager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: root.path)
+		guard let signer = ProcessInfo.processInfo.environment["SIGN_UPDATE"],
+			!signer.isEmpty, manager.isExecutableFile(atPath: signer) else {
+			throw FixtureError.toolFailure("owned-native-signer-unavailable", -1, "")
+		}
+		let app = try signedBundle(root: root)
+		let preferred = try archive("tar.xz", app: app, root: root)
+		let directory = preferred.deletingLastPathComponent()
+		let payloads = [preferred, directory.appendingPathComponent("ErgoptiPlus.app.zip")]
+		let before = try payloads.map { try Data(contentsOf: $0) }
+		var seed = [UInt8](repeating: 0, count: 32)
+		let randomStatus = seed.withUnsafeMutableBytes { bytes in
+			SecRandomCopyBytes(kSecRandomDefault, bytes.count, bytes.baseAddress!)
+		}
+		guard randomStatus == errSecSuccess else {
+			throw FixtureError.toolFailure("owned-native-seed-refused", -1, "")
+		}
+		let key = root.appendingPathComponent("owned-file-key")
+		guard manager.createFile(atPath: key.path,
+			contents: Data(Data(seed).base64EncodedString().utf8),
+			attributes: [.posixPermissions: 0o600]) else {
+			throw FixtureError.toolFailure("owned-native-key-create-refused", -1, "")
+		}
+		let keyAttributes = try manager.attributesOfItem(atPath: key.path)
+		XCTAssertEqual((keyAttributes[.posixPermissions] as? NSNumber)?.intValue, 0o600)
+		let owner = Self.repositoryURL.appendingPathComponent("tools/build/macos-release-publication.cjs")
+		let published = try privateSparkleChild("/usr/bin/env",
+			["node", owner.path, "sign", directory.path, signer, key.path], root: root)
+		XCTAssertEqual(published.status, 0, "The actual publication owner must use the native file-key signer")
+		XCTAssertTrue(published.stderr.isEmpty, "The native file-key signer must complete without errors")
+		guard published.status == 0 else {
+			throw FixtureError.toolFailure("owned-native-publication-refused", published.status, "")
+		}
+		let receiptURL = directory.appendingPathComponent("macos-publication.json")
+		let receipt = try XCTUnwrap(try JSONSerialization.jsonObject(with:
+			Data(contentsOf: receiptURL)) as? [String: Any])
+		let records = try XCTUnwrap(receipt["archives"] as? [[String: Any]])
+		XCTAssertEqual(records.count, 2)
+		guard records.count == 2 else {
+			throw FixtureError.toolFailure("owned-native-records-incomplete", -1, "")
+		}
+		XCTAssertEqual(records.compactMap { $0["format"] as? String }, ["tar.xz", "zip"])
+		let expression = try NSRegularExpression(pattern: #"^sparkle:edSignature="([A-Za-z0-9+/]{86}==)" length="([1-9][0-9]*)"\n$"#)
+		var signatures: [String] = []
+		for (index, payload) in payloads.enumerated() {
+			let fragment = try String(contentsOf: directory.appendingPathComponent("_" + payload.lastPathComponent + ".sig"), encoding: .utf8)
+			let match = try XCTUnwrap(expression.firstMatch(in: fragment,
+				range: NSRange(fragment.startIndex..., in: fragment)))
+			let signature = String(fragment[try XCTUnwrap(Range(match.range(at: 1), in: fragment))])
+			let length = String(fragment[try XCTUnwrap(Range(match.range(at: 2), in: fragment))])
+			let decoded = try XCTUnwrap(Data(base64Encoded: signature))
+			XCTAssertEqual(decoded.count, 64)
+			XCTAssertEqual(signature.count, 88)
+			XCTAssertTrue(decoded.base64EncodedString() == signature)
+			XCTAssertEqual(Int(length), before[index].count)
+			XCTAssertEqual((records[index]["size"] as? NSNumber)?.intValue, before[index].count)
+			XCTAssertEqual(records[index]["sha256"] as? String, try digest(payload, root: root))
+			XCTAssertEqual(records[index]["fragment_sha256"] as? String,
+				try digest(directory.appendingPathComponent("_" + payload.lastPathComponent + ".sig"), root: root))
+			let verified = try privateSparkleChild(signer,
+				["--verify", "-f", key.path, payload.path, signature], root: root)
+			XCTAssertEqual(verified.status, 0, "The real Sparkle verifier must accept its own payload")
+			XCTAssertTrue(verified.stderr.isEmpty, "Native verification must produce no errors")
+			signatures.append(signature)
+		}
+		guard signatures.count == 2 else {
+			throw FixtureError.toolFailure("owned-native-signatures-incomplete", -1, "")
+		}
+		XCTAssertFalse(signatures[0] == signatures[1], "Distinct archive bytes must have distinct signatures")
+		XCTAssertEqual(signatures[0].count, signatures[1].count)
+		for (index, payload) in payloads.enumerated() {
+			let crossed = try privateSparkleChild(signer,
+				["--verify", "-f", key.path, payload.path, signatures[1 - index]], root: root)
+			XCTAssertEqual(crossed.status, 1, "A valid equal-length signature for the other archive must refuse")
+			XCTAssertTrue(crossed.stdout.contains("Error: failed to pass signing verification."),
+				"The native verifier must reach its actual cryptographic refusal")
+			var changed = before[index]
+			changed[changed.startIndex] ^= 1
+			XCTAssertEqual(changed.count, before[index].count)
+			let modified = root.appendingPathComponent("same-length-payload-\(index)")
+			try changed.write(to: modified)
+			let refused = try privateSparkleChild(signer,
+				["--verify", "-f", key.path, modified.path, signatures[index]], root: root)
+			XCTAssertEqual(refused.status, 1, "The native verifier must refuse changed same-length bytes")
+			XCTAssertTrue(refused.stdout.contains("Error: failed to pass signing verification."),
+				"Same-length byte mutations must reach the native cryptographic refusal")
+			XCTAssertEqual(try Data(contentsOf: payload), before[index])
+			let stillOwned = try privateSparkleChild(signer,
+				["--verify", "-f", key.path, payload.path, signatures[index]], root: root)
+			XCTAssertEqual(stillOwned.status, 0, "Negative controls must leave the original signature valid")
+		}
+		let malformed = root.appendingPathComponent("invalid-file-key")
+		guard manager.createFile(atPath: malformed.path,
+			contents: Data(Data(seed.prefix(31)).base64EncodedString().utf8),
+			attributes: [.posixPermissions: 0o600]) else {
+			throw FixtureError.toolFailure("owned-invalid-key-create-refused", -1, "")
+		}
+		for invalid in [malformed, root.appendingPathComponent("absent-file-key")] {
+			let refused = try privateSparkleChild(signer, ["-f", invalid.path, preferred.path], root: root)
+			XCTAssertNotEqual(refused.status, 0, "Missing or malformed owned file keys cannot sign")
+			XCTAssertFalse(refused.stdout.hasPrefix("sparkle:edSignature="))
+			let rejectedDirectory = root.appendingPathComponent("refused-publication-" + UUID().uuidString)
+			try manager.createDirectory(at: rejectedDirectory, withIntermediateDirectories: false)
+			for (index, payload) in payloads.enumerated() {
+				try before[index].write(to: rejectedDirectory.appendingPathComponent(payload.lastPathComponent))
+			}
+			let unpublished = try privateSparkleChild("/usr/bin/env",
+				["node", owner.path, "sign", rejectedDirectory.path, signer, invalid.path], root: root)
+			XCTAssertNotEqual(unpublished.status, 0, "The actual publication owner must reject the invalid native key")
+			XCTAssertFalse(manager.fileExists(atPath: rejectedDirectory.appendingPathComponent("macos-publication.json").path))
+			for payload in payloads {
+				XCTAssertFalse(manager.fileExists(atPath: rejectedDirectory.appendingPathComponent("_" + payload.lastPathComponent + ".sig").path))
+			}
+		}
+		XCTAssertEqual(try Data(contentsOf: preferred), before[0])
+	}
 }

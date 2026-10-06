@@ -240,7 +240,7 @@ helpers.describe("sqlite_command — arguments", function()
 
 	helpers.it("places flags before the database path", function()
 		local cmd = Cmd.build("/db", "SELECT 1;", { flags = { "-json" } })
-		helpers.assert_contains(cmd, "sqlite3 '-json' '/db'", "flags precede the positional argument")
+		helpers.assert_contains(cmd, "sqlite3 '-init' '/dev/null' '-bail' '-json' '/db'", "owned flags precede the positional argument after isolated fail-fast init")
 	end)
 
 	helpers.it("discards diagnostics by default and captures them on request", function()
@@ -256,6 +256,91 @@ helpers.describe("sqlite_command — arguments", function()
 		helpers.assert_type(reason, "string", "the refusal must say why")
 		helpers.assert_nil((Cmd.build("/db", "")), "an empty script must not compose")
 		helpers.assert_nil((Cmd.build(nil, "SELECT 1;")), "a nil db_path must not compose")
+	end)
+end)
+
+
+helpers.describe("sqlite_command — stop-on-error ownership", function()
+	for _, mode in ipairs({ "write", "json", "scalar" }) do
+		helpers.it("linux-sqlite-bail: " .. mode .. " stops the native CLI at its first failed statement", function()
+			local flags = mode == "json" and { "-readonly", "-json" } or mode == "scalar" and { "-noheader" } or {}
+			local command = assert(Cmd.build("/db/metrics.sqlite", "BEGIN;\nSELECT 42;\nCOMMIT;", { flags = flags, capture_exit = true }))
+			helpers.assert_contains(command, "'-bail'", "receipt refusal alone cannot undo a later COMMIT")
+			helpers.assert_true(command:find("sqlite3 '-init' '/dev/null'", 1, true) == 1)
+			for _, flag in ipairs(flags) do helpers.assert_contains(command, "'" .. flag .. "'") end
+			helpers.assert_contains(command, "BEGIN;\nSELECT 42;\nCOMMIT;")
+			helpers.assert_contains(command, "ERGOPTI_SQL_EXIT_STATUS=")
+		end)
+	end
+end)
+
+
+helpers.describe("sqlite_command — native initialization isolation", function()
+	for _, mode in ipairs({ "write", "json", "scalar" }) do
+		helpers.it("linux-sqlite-init: " .. mode .. " uses an explicit empty native init before its owned flags", function()
+			local flags = mode == "json" and { "-readonly", "-json" } or mode == "scalar" and { "-noheader" } or {}
+			local command = assert(Cmd.build("/db/metrics.sqlite", "SELECT 42;", { flags = flags, capture_exit = true }))
+			helpers.assert_true(command:find("sqlite3 '-init' '/dev/null'", 1, true) == 1,
+				"native application CLI must not inherit a personal .sqliterc program")
+			for _, flag in ipairs(flags) do helpers.assert_contains(command, "'" .. flag .. "'") end
+			helpers.assert_contains(command, "'/db/metrics.sqlite'")
+			helpers.assert_contains(command, "SELECT 42;")
+			helpers.assert_contains(command, "ERGOPTI_SQL_EXIT_STATUS=")
+		end)
+	end
+end)
+
+
+helpers.describe("sqlite_command — native literal serialization", function()
+	for _, case in ipairs({
+		{ "plain", "été\t\n $() `literal` " .. string.char(92), "été\t\n $() `literal` " .. string.char(92) },
+		{ "empty", "", "" },
+		{ "quote", "'", "''" },
+		{ "CRLF", "a\r\nb", "a'||char(13)||'\nb" },
+		{ "leading CR", "\ra", "'||char(13)||'a" },
+		{ "trailing CR", "a\r", "a'||char(13)||'" },
+		{ "NUL", "a\0b", "a'||char(0)||'b" },
+		{ "leading NUL", "\0a", "'||char(0)||'a" },
+		{ "trailing NUL", "a\0", "a'||char(0)||'" },
+		{ "mixed", "'\0\r\n'", "''" .. "'||char(0)||'" .. "'||char(13)||'\n''" },
+	}) do
+		helpers.it("linux-sqlite-literal: " .. case[1] .. " keeps exact quoted value semantics", function()
+			local escaped = Cmd.escape_literal(case[2])
+			helpers.assert_eq(escaped, case[3])
+			assert_absent(escaped, "\0", "serialized native SQL must remain representable")
+			assert_absent(escaped, "\r", "CLI line framing must never normalize a literal CR")
+			local command = assert(Cmd.build("/db", "SELECT '" .. escaped .. "';", { capture_exit = true }))
+			helpers.assert_contains(command, "SELECT '" .. escaped .. "';")
+		end)
+	end
+end)
+
+
+helpers.describe("sqlite_command — native command admission", function()
+	for _, field in ipairs({ "database", "script", "flag" }) do
+		for _, position in ipairs({ "first", "middle", "last" }) do
+			helpers.it("linux-sqlite-nul: refuses " .. field .. " NUL at " .. position .. " before returning a command", function()
+				local secret = "private_sql_payload"
+				local value = position == "first" and ("\0" .. secret)
+					or position == "middle" and (secret .. "\0" .. "suffix") or (secret .. "\0")
+				local database, script, options = "/db/metrics.sqlite", "SELECT 1;", { flags = { "-json" }, capture_exit = true }
+				if field == "database" then database = value
+				elseif field == "script" then script = value
+				else options.flags = { value } end
+				local command, reason = Cmd.build(database, script, options)
+				helpers.assert_nil(command, "libc cannot receive this complete command; no SQL prefix may execute")
+				helpers.assert_type(reason, "string")
+				helpers.assert_contains(reason, "NUL")
+				assert_absent(reason, secret, "refusal must not copy the SQL or database payload")
+			end)
+		end
+	end
+
+	helpers.it("linux-sqlite-nul: retains legal literal bytes and encoded NUL SQL", function()
+		local script = "SELECT 'été\t\r\nquote'' and \"double\"'; SELECT CAST(X'610062' AS TEXT);"
+		local command = assert(Cmd.build([=[/db/été ' \metrics.sqlite]=], script, { flags = { "-json" }, capture_exit = true }))
+		helpers.assert_contains(command, script, "admission must preserve representable input rather than sanitizing SQL")
+		helpers.assert_contains(command, "ERGOPTI_SQL_EXIT_STATUS=")
 	end)
 end)
 
@@ -276,6 +361,52 @@ helpers.describe("sqlite_command — diagnostics carry no typed text", function(
 	helpers.it("tolerates nil and empty input", function()
 		helpers.assert_eq(Cmd.sanitise_error(nil), "", "nil must not raise")
 		helpers.assert_eq(Cmd.sanitise_error(""), "", "empty must not raise")
+	end)
+end)
+
+helpers.describe("linux-sqlite-exit-receipts", function()
+	for _, status in ipairs({ 1, 7, 23, 127, 137, 255 }) do
+		helpers.it("linux-sqlite-exit-receipts: refuses terminal status " .. status, function()
+			local accepted, diagnostics, reason = Cmd.read_exit_receipt("\nERGOPTI_SQL_EXIT_STATUS=" .. status .. "\n")
+			helpers.assert_eq(accepted, false)
+			helpers.assert_eq(diagnostics, "")
+			helpers.assert_contains(reason, tostring(status))
+		end)
+	end
+
+	for label, output in pairs({ missing = "", truncated = "\nERGOPTI_SQL_EXIT_STATUS=0",
+		malformed = "\nERGOPTI_SQL_EXIT_STATUS=ok\n", overflow = "\nERGOPTI_SQL_EXIT_STATUS=256\n",
+		trailing = "\nERGOPTI_SQL_EXIT_STATUS=0\ntrailing" }) do
+		helpers.it("linux-sqlite-exit-receipts: refuses a " .. label .. " receipt", function()
+			local accepted, _, reason = Cmd.read_exit_receipt(output)
+			helpers.assert_eq(accepted, false)
+			helpers.assert_eq(type(reason), "string")
+		end)
+	end
+
+	helpers.it("linux-sqlite-exit-receipts: preserves diagnostics separately from successful status", function()
+		local accepted, diagnostics, reason = Cmd.read_exit_receipt("native diagnostic\n\nERGOPTI_SQL_EXIT_STATUS=0\n")
+		helpers.assert_true(accepted)
+		helpers.assert_eq(diagnostics, "native diagnostic\n")
+		helpers.assert_nil(reason)
+	end)
+
+	helpers.it("linux-sqlite-exit-receipts: the last terminal status owns prior marker-looking output", function()
+		local prior = "\nERGOPTI_SQL_EXIT_STATUS=0\n"
+		local accepted, diagnostics, reason = Cmd.read_exit_receipt(prior .. "\nERGOPTI_SQL_EXIT_STATUS=7\n")
+		helpers.assert_eq(accepted, false)
+		helpers.assert_eq(diagnostics, prior)
+		helpers.assert_contains(reason, "7")
+	end)
+
+	helpers.it("linux-sqlite-exit-receipts: keeps quote-heavy SQL inside the original heredoc", function()
+		local sql = "INSERT INTO t VALUES ('" .. string.rep("a''", 35000) .. "');"
+		local ordinary = assert(Cmd.build("/db/metrics.sqlite", sql))
+		local checked = assert(Cmd.build("/db/metrics.sqlite", sql, { capture_exit = true }))
+		helpers.assert_eq(checked:sub(1, #ordinary), ordinary, "receipt transport cannot re-quote user SQL")
+		helpers.assert_contains(checked:sub(#ordinary + 1), "ERGOPTI_SQL_EXIT_STATUS=", "real shell status must be appended")
+		helpers.assert_true(#checked - #ordinary < 100, "framing overhead must be constant")
+		assert_absent(checked, "mktemp", "this write path needs no temporary receipt file")
 	end)
 end)
 
@@ -321,6 +452,32 @@ helpers.describe("keylogger SQLite paths stage nothing on disk", function()
 		for _, rel in ipairs(CALLERS) do
 			helpers.assert_contains(code_of(rel), "SqliteCommand.build",
 				rel .. " must compose its sqlite3 invocation through the audited builder")
+		end
+	end)
+end)
+
+
+helpers.describe("sqlite_command — native filesystem database paths", function()
+	for _, mode in ipairs({ "write", "json", "scalar" }) do
+		helpers.it("linux-sqlite-filesystem-path: " .. mode .. " keeps every relative spelling literal", function()
+			local flags = mode == "json" and { "-readonly", "-json" } or mode == "scalar" and { "-noheader" } or {}
+			for _, path in ipairs({ "metrics.sqlite", "./metrics.sqlite", "../metrics.sqlite",
+				"file:owned.sqlite", "file:encoded%20name.sqlite", "file:query.sqlite?mode=ro",
+				"file:fragment.sqlite#tail", ":memory:", "-metrics.sqlite", "-", "été ' .sqlite" }) do
+				local command = assert(Cmd.build(path, "SELECT 42;", { flags = flags, capture_exit = true }))
+				local quoted = require("adapters.shell_runner").quote("./" .. path)
+				helpers.assert_contains(command, quoted, "the CLI must open the filesystem path, not its URI or option interpretation")
+				helpers.assert_contains(command, "SELECT 42;")
+				helpers.assert_contains(command, "ERGOPTI_SQL_EXIT_STATUS=")
+			end
+		end)
+	end
+
+	helpers.it("linux-sqlite-filesystem-path: leaves absolute database bytes unchanged", function()
+		for _, path in ipairs({ "/db/metrics.sqlite", "/db/file:owned.sqlite", "/db/:memory:", "/db/été ' .sqlite" }) do
+			local command = assert(Cmd.build(path, "SELECT 42;"))
+			helpers.assert_contains(command, require("adapters.shell_runner").quote(path))
+			assert_absent(command, "./" .. path, "absolute filesystem identities must not change")
 		end
 	end)
 end)

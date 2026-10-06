@@ -611,20 +611,20 @@ local function fire_instant(self, out, config, now_ms)
 	end
 	local typed = M.KEY_TAPS[config.tap]
 	if typed then return out, type_key_tap(self, out, config, typed, now_ms) end
-	return out, config.tap
+	return out, config.tap, "tap_hold__" .. config.id
 end
 
 --- Runs one event through the engine and appends what comes out, the event
 --- itself when the engine passes it unchanged.
 --- @return string|table|nil tap As M:process returns it.
 local function replay(self, out, code, value, now_ms)
-	local events, tap = self:process(code, value, now_ms)
+	local events, tap, binding = self:process(code, value, now_ms)
 	if events == nil then
 		out[#out + 1] = { code = code, value = value }
 	else
 		for _, event in ipairs(events) do out[#out + 1] = event end
 	end
-	return tap
+	return tap, binding
 end
 
 --- Decides an undecided roll key and replays the keys struck meanwhile, in
@@ -635,7 +635,7 @@ end
 --- @return table out, string|table|nil tap As M:process returns them.
 local function resolve_roll(self, code, decision, now_ms, released)
 	local config, state = self.by_code[code], self.held[code]
-	local out, tap = {}, nil
+	local out, tap, binding = {}, nil, nil
 	local queue = state.queue
 	state.undecided, state.queue = nil, nil
 	self.undecided = nil
@@ -659,10 +659,10 @@ local function resolve_roll(self, code, decision, now_ms, released)
 		end
 	end
 	for _, queued_code in ipairs(queue) do
-		local queued_tap = replay(self, out, queued_code, DOWN, now_ms)
-		tap = tap or queued_tap
+		local queued_tap, queued_binding = replay(self, out, queued_code, DOWN, now_ms)
+		if tap == nil then tap, binding = queued_tap, queued_binding end
 	end
-	return out, tap
+	return out, tap, binding
 end
 
 --- Another key's event while a roll key is undecided.
@@ -682,9 +682,10 @@ local function roll_other_key(self, pending, code, value, now_ms)
 	if not waiting then return false end
 	if value == REPEAT then return true, {} end
 	-- Struck and let go while the roll key is still down: its hold.
-	local out, tap = resolve_roll(self, pending, "hold", now_ms)
-	local released_tap = replay(self, out, code, UP, now_ms)
-	return true, out, tap or released_tap
+	local out, tap, binding = resolve_roll(self, pending, "hold", now_ms)
+	local released_tap, released_binding = replay(self, out, code, UP, now_ms)
+	if tap == nil then tap, binding = released_tap, released_binding end
+	return true, out, tap, binding
 end
 
 --- Presses a layer chord for `code` and remembers it until the key comes up.
@@ -714,6 +715,7 @@ end
 --- @return table|nil events to dispatch instead (nil = pass the event through unchanged)
 --- @return string|table|nil tap What to run after them: a catalogue action, or
 ---   { type_text } for text the layout cannot type
+--- @return string|nil binding Exact tap_hold__ source of a catalogue action.
 function M:process(code, value, now_ms)
 	local config = self.by_code[code]
 	local out = {}
@@ -725,8 +727,8 @@ function M:process(code, value, now_ms)
 
 	-- A roll key not yet decided: the keys struck meanwhile wait for it.
 	if self.undecided and code ~= self.undecided then
-		local handled, events, tap = roll_other_key(self, self.undecided, code, value, now_ms)
-		if handled then return events, tap end
+		local handled, events, tap, binding = roll_other_key(self, self.undecided, code, value, now_ms)
+		if handled then return events, tap, binding end
 	end
 
 	-- A release is activity too, as on Windows (hook_dispatcher's _OnKeyUp): a
@@ -858,7 +860,7 @@ function M:process(code, value, now_ms)
 		if typed then
 			return out, type_key_tap(self, out, config, typed, now_ms)
 		end
-		return out, config.tap
+		return out, config.tap, "tap_hold__" .. config.id
 	end
 
 	-- A key the one-shot Shift replaced by its result: its repeats and its
@@ -915,17 +917,17 @@ end
 --- struck under it is replayed.
 --- @return table events What to dispatch, each with `owner`, the code of the
 ---   key whose hold it is: key events, and { tap = … } for an action a
----   replayed key runs.
+---   replayed key runs, with its own canonical `binding`.
 function M:tick(now_ms)
 	local out = {}
 	local pending = self.undecided
 	if pending and now_ms - self.held[pending].down_at > self.by_code[pending].threshold_ms then
-		local events, tap = resolve_roll(self, pending, "hold", now_ms)
+		local events, tap, binding = resolve_roll(self, pending, "hold", now_ms)
 		for _, event in ipairs(events) do
 			event.owner = pending
 			out[#out + 1] = event
 		end
-		if tap ~= nil then out[#out + 1] = { tap = tap, owner = pending } end
+		if tap ~= nil then out[#out + 1] = { tap = tap, binding = binding, owner = pending } end
 	end
 	for code, state in pairs(self.held) do
 		local config = self.by_code[code]
@@ -962,4 +964,38 @@ function M:release_all()
 	return out
 end
 
+--- Narrow composition ports for configured ordered pairs. These retain the
+--- existing reference counts: lifting one owner's Ctrl cannot lift another's.
+function M:combination_hold(spec)
+	local out, state = {}, { emitted = {}, layer = false }
+	for _, code in ipairs(spec.mods or {}) do press(self, out, code); state.emitted[#state.emitted + 1] = code end
+	if spec.layer then self.layer_depth = self.layer_depth + 1; state.layer = true end
+	return out, state
+end
+function M:combination_release(state)
+	local out = {}
+	for index = #state.emitted, 1, -1 do release(self, out, state.emitted[index]) end
+	if state.layer then self.layer_depth = self.layer_depth - 1 end
+	state.emitted, state.layer = {}, false
+	return out
+end
+function M:combination_lift(code)
+	local first = self.held[code]
+	if not first or first.undecided then return {}, nil end
+	first.cancelled = true
+	local frame = { first = first, code = code, emitted = first.emitted, layer = first.layer }
+	first.emitted, first.layer = {}, false
+	local out = {}
+	for index = #frame.emitted, 1, -1 do release(self, out, frame.emitted[index]) end
+	if frame.layer then self.layer_depth = self.layer_depth - 1 end
+	return out, frame
+end
+function M:combination_restore(frame)
+	local out = {}
+	if not frame or self.held[frame.code] ~= frame.first then return out end
+	for _, code in ipairs(frame.emitted) do press(self, out, code) end
+	if frame.layer then self.layer_depth = self.layer_depth + 1 end
+	frame.first.emitted, frame.first.layer = frame.emitted, frame.layer
+	return out
+end
 return M

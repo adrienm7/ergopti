@@ -36,9 +36,13 @@ local TomlWriter = require("toml_codec.writer")
 local Logger    = require("infra.logger")
 local FileSystem = require("adapters.file_system")
 local Manifest = require("infra.manifest_reader")
+local HotstringLanguages = require("hotstrings.languages")
 local ConfigOutdated = require("config_outdated")
+local PersonalFiles = require("hotstrings.personal_files")
+local PersonalAdoption = require("infra.personal_file_adoption")
 local Agent     = require("llm.agent")
 local LOG       = "preferences"
+local OperationReporter = require("diagnostics.operation_reporter")
 
 
 --- Top-level TOML section names in the order they appear on disk.
@@ -70,6 +74,10 @@ local KEY_MAP = {
 	magic_key_source                     = { sec = "hotstrings", enum = true                           },
 	-- Dynamic hotstrings sub-section
 	dynamichotstrings_enabled            = { sec = "hotstrings", path = "dynamic", key = "enabled"      },
+	dynamichotstrings_user_code_enabled  = { sec = "hotstrings", path = "dynamic.user_code", key = "enabled" },
+	dynamichotstrings_user_code_time_activation_seconds = {
+		sec = "hotstrings", path = "dynamic.user_code", key = "time_activation_seconds",
+	},
 	dynamichotstrings_date               = { sec = "hotstrings", path = "dynamic", key = "date"         },
 	dynamichotstrings_datefr             = { sec = "hotstrings", path = "dynamic", key = "datefr"       },
 	dynamichotstrings_datelongfr         = { sec = "hotstrings", path = "dynamic", key = "datelongfr"   },
@@ -123,6 +131,7 @@ local KEY_MAP = {
 	llm_agent_mode                       = { sec = "llm", key = "agent_mode"                        },
 
 	-- ── Layout ─────────────────────────────────────────────────────────────
+	layout_number_row_mode               = { sec = "layout", key = "direct_access_digits", enum = true },
 	layout_pause_switch_enabled          = { sec = "layout", key = "pause_switch_enabled"    },
 	layout_on_pause                      = { sec = "layout", key = "on_pause"                },
 	layout_on_resume                     = { sec = "layout", key = "on_resume"               },
@@ -421,6 +430,14 @@ end
 --- Owners' rules for scalars whose value set is closed beyond the manifest's
 --- Lua type. The agent's modes are shared with every driver (llm.agent).
 local SCALAR_VALUE_RULES = {
+	dynamichotstrings_user_code_enabled = function(value)
+		if type(value) == "boolean" then return true end
+		return false, "the programmable hotstring gate is not a boolean"
+	end,
+	dynamichotstrings_user_code_time_activation_seconds = function(value)
+		if type(value) == "number" and value == value and value >= 0 and value < math.huge then return true end
+		return false, "the activation interval is not a finite non-negative number"
+	end,
 	llm_agent_mode = function(value)
 		if Agent.MODES[value] then return true end
 		return false, "'" .. tostring(value) .. "' is no longer an agent mode"
@@ -558,10 +575,27 @@ local function sparse_updates(flat)
 	local function visit(node, path)
 		for key, value in pairs(node) do
 			local leaf = path == "" and key or path .. "." .. key
+			local segments = require("toml_codec.key_path").parse(path, true)
+			if segments and #segments == 3 and segments[1] == "hotstrings" and segments[2] == "modules"
+				and PersonalFiles.components(segments[3]) then
+				segments[#segments + 1] = key
+				leaf = require("toml_codec.key_path").render(segments)
+			end
 			if type(value) == "table" and #value == 0 and next(value) ~= nil then
 				visit(value, leaf)
 			elseif type(value) ~= "table" or next(value) ~= nil or table_paths[leaf] then
-				if Manifest.has_default(leaf) then
+				local canonical = PersonalFiles.preference_default(leaf) ~= nil
+				local path_parts = canonical and require("toml_codec.key_path").parse(leaf, true)
+				local id = path_parts and path_parts[3]
+				local personal = canonical and require("infra.personal_hotstrings").adoption(id)
+				if canonical and (not personal or not personal.admitted) then
+					-- Unavailable sources own no disk preference leaves in this snapshot.
+				elseif personal and personal.admitted and personal.legacy_name and value == true then
+					assert(require("infra.personal_hotstrings").adoption_current(personal) == true,
+						"personal legacy source changed before preferences publication")
+					updates[#updates + 1] = require("hotstrings.personal_adoption").preference_row(personal,
+						path_parts[2] == "modules" and path_parts[4] or nil, value)
+				elseif Manifest.has_default(leaf) then
 					updates[#updates + 1] = Manifest.sparse_operation(leaf, value)
 				else
 					updates[#updates + 1] = { section = path, key = key, value = value }
@@ -634,6 +668,23 @@ local function flatten_from_disk(grouped, mark)
 		end
 		flat[flat_key] = value
 		take(...)
+	end
+
+	-- Only declared scalar paths gain ownership when a feature nests below a
+	-- family table. Unknown neighbors and arrays remain with their own readers.
+	local function take_scalar_descendants(section, path, node, parts)
+		for key, value in pairs(node) do
+			local child_path = path .. "." .. key
+			local child_parts = {}
+			for index, part in ipairs(parts) do child_parts[index] = part end
+			child_parts[#child_parts + 1] = key
+			local flat_key = _reverse_scalar[section .. ":" .. child_path]
+			if flat_key then
+				take_value(flat_key, value, table.unpack(child_parts))
+			elseif type(value) == "table" and #value == 0 then
+				take_scalar_descendants(section, child_path, value, child_parts)
+			end
+		end
 	end
 
 	for sec_name, sec_val in pairs(grouped) do
@@ -718,6 +769,9 @@ local function flatten_from_disk(grouped, mark)
 										local nfk = _reverse_nested[lookup]
 										if nfk then
 											take_value(nfk, inner_val, sec_name, disk_key, inner_key)
+										else
+											take_scalar_descendants(sec_name, disk_key .. "." .. inner_key,
+												inner_val, { sec_name, disk_key, inner_key })
 										end
 									end
 								end
@@ -841,8 +895,8 @@ local _load_outdated = {}
 --- Classifies one preference source without interpreting its contents.
 --- @param prefs_file string Destination path.
 --- @return table|nil snapshot Exact `ok`/`absent` source classification.
-local function classify_source(prefs_file)
-	local content, read_status = FileSystem.read_with_status(prefs_file)
+local function classify_source(prefs_file, on_error)
+	local content, read_status = FileSystem.read_with_status(prefs_file, on_error)
 	if read_status == "ok" and type(content) == "string" then
 		return { status = "ok", content = content }
 	end
@@ -902,8 +956,8 @@ end
 --- @param prefs_file string Destination path.
 --- @param expected_source table Snapshot used by the rejected publication.
 --- @return boolean adopted Whether the exact external source became the baseline.
-local function adopt_changed_source(prefs_file, expected_source)
-	local current_source = classify_source(prefs_file)
+local function adopt_changed_source(prefs_file, expected_source, on_error)
+	local current_source = classify_source(prefs_file, on_error)
 	if type(current_source) ~= "table" or same_source(expected_source, current_source) then
 		return false
 	end
@@ -1080,6 +1134,16 @@ end
 --- Captures the exact source acknowledged by load or the last publication.
 --- @param path string Configuration path.
 --- @return table|nil snapshot Classified source snapshot.
+--- Captures exact private source ownership across native read callbacks.
+function M.capture_source_delivery_guard(path)
+	local source = _source_snapshots[path]
+	local status, content = source and source.status, source and source.content
+	return function()
+		return _source_snapshots[path] == source and source ~= nil
+			and source.status == status and source.content == content
+	end
+end
+
 function M.source_snapshot(path)
 	local source = _source_snapshots[path]
 	return source and { status = source.status, content = source.content } or nil
@@ -1165,13 +1229,22 @@ local function prepare_inline_updates(source, updates, root)
 	local decoded = TomlCodec.decode(source.content or "")
 	local inline, candidates, rows = {}, {}, {}
 	local function parts(path)
+		if root == "hotstrings" then
+			return assert(require("toml_codec.key_path").parse(path, true), "invalid semantic hotstring preference path")
+		end
 		local result = {}
 		for key in path:gmatch("[^.]+") do result[#result + 1] = key end
 		return result
 	end
+	local function leaf_path(section, key)
+		if root ~= "hotstrings" then return section == "" and key or section .. "." .. key end
+		local segments = section == "" and {} or parts(section)
+		segments[#segments + 1] = key
+		return require("toml_codec.key_path").render(segments)
+	end
 	for _, record in ipairs(scanned.records) do
 		if record.addressable then
-			local path = record.section == "" and record.key or record.section .. "." .. record.key
+			local path = leaf_path(record.section, record.key)
 			if path == root or path:sub(1, #root + 1) == root .. "." then
 				local value = decoded
 				for _, key in ipairs(parts(path)) do value = type(value) == "table" and value[key] or nil end
@@ -1181,9 +1254,15 @@ local function prepare_inline_updates(source, updates, root)
 		end
 	end
 	for _, row in ipairs(updates) do
-		local path = row.section .. "." .. row.key
+		local path = leaf_path(row.section, row.key)
 		local parent = row.section
-		while parent ~= "" and not inline[parent] do parent = parent:match("^(.*)%.[^.]+$") or "" end
+		while parent ~= "" and not inline[parent] do
+			if root == "hotstrings" then
+				local segments = parts(parent)
+				table.remove(segments)
+				parent = #segments > 0 and require("toml_codec.key_path").render(segments) or ""
+			else parent = parent:match("^(.*)%.[^.]+$") or "" end
+		end
 		if path == "llm.profiles.shortcuts" and type(row.value) == "table" and next(row.value) == nil then
 			-- An empty runtime dictionary owns no unknown profile leaves on disk.
 		elseif inline[parent] then
@@ -1256,23 +1335,91 @@ end
 --- @param updates table Owned leaf operations.
 --- @return table Prepared writer operations.
 function M.prepare_hotstring_updates(source, updates)
+	local personal = {}
+	for _, row in ipairs(updates) do
+		local path = require("toml_codec.key_path").parse(row.section, true)
+		if path then path[#path + 1] = row.key end
+		if path and PersonalFiles.preference_default(require("toml_codec.key_path").render(path)) ~= nil then
+			personal[#personal + 1] = row
+		end
+	end
+	assert(require("hotstrings.personal_metadata").exact_rows_available(source.content or "", personal),
+		"canonical personal preferences have an ambiguous case alias")
 	return prepare_inline_updates(source, updates, "hotstrings")
+end
+
+--- Hands one verified call-scoped native publication to its private transaction.
+--- Partial physical publication updates only its owned source view; it does not
+--- acknowledge a save or advance the ordinary full-save/checkpoint receipt.
+local function handoff_native_publication(path, expected, candidate, native, on_error, observer, acknowledged)
+	if type(observer) ~= "function" or type(FileSystem.publication_receipt_view) ~= "function"
+		or type(candidate) ~= "string" then return false end
+	local verified = FileSystem.publication_receipt_view(native, path, expected, candidate, on_error)
+	if type(verified) ~= "table" or type(verified.source) ~= "table" then return false end
+	local source = { status = verified.source.status, content = verified.source.content }
+	local function adopt()
+		if FileSystem.publication_receipt_view(native, path, expected, candidate, on_error) == nil
+			or native.matches_source() ~= true then return false end
+		local baseline = _source_snapshots[path]
+		if baseline and not same_source(baseline, expected) and not same_source(baseline, source) then return false end
+		_source_snapshots[path] = { status = source.status, content = source.content }
+		return true
+	end
+	-- Deliver the capability even when a foreign source currently prevents its
+	-- adoption, so exact later reinstatement can resume without inventing ownership.
+	adopt()
+	local received, result = pcall(observer, { native = native, path = path,
+		expected = { status = expected.status, content = expected.content }, source = source,
+		published = verified.published, acknowledged = acknowledged == true, adopt = adopt })
+	if not received or result ~= true then
+		OperationReporter.new(on_error, Logger, LOG)("publication_receipt", "error", "Private publication receipt handoff was refused.")
+	end
+	return true
+end
+
+--- Preflights canonical personal choices through this preferences source owner.
+--- Native callers separately hold the actual source and registry bindings.
+--- @param changes table Declared canonical group/section Boolean choices.
+--- @return boolean available
+function M.personal_choices_available(changes)
+	local path = require("infra.config_paths").get("ConfigTomlPath")
+	if type(path) ~= "string" or type(changes) ~= "table" then return false end
+	local baseline, current = _source_snapshots[path], classify_source(path)
+	if not current or baseline and not same_source(baseline, current) then return false end
+	local rows = {}
+	for _, choice in ipairs(changes) do
+		if PersonalFiles.components(choice.group) then
+			if type(choice.enabled) ~= "boolean" or choice.section ~= nil
+				and (type(choice.section) ~= "string" or choice.section == "") then return false end
+			local record = require("infra.personal_hotstrings").adoption(choice.group)
+			if not record or record.admitted ~= true
+				or require("infra.personal_hotstrings").adoption_current(record) ~= true then return false end
+			rows[#rows + 1] = { section = require("toml_codec.key_path").render(choice.section
+				and { "hotstrings", "modules", choice.group } or { "hotstrings", "groups" }),
+				key = choice.section or choice.group }
+		end
+	end
+	return require("hotstrings.personal_metadata").exact_rows_available(current.content or "", rows)
 end
 
 --- Publishes a domain owner's exact batch and advances the ordinary save baseline.
 --- @param path string Canonical configuration path.
 --- @param updates table Already validated owned operations.
 --- @param source table Exact classified source used by the domain owner.
+--- @param on_error function|nil Receives only fixed failure categories.
+--- @param publication_observer function|nil Accepts a verified call-scoped native handoff.
 --- @return boolean committed
-function M.publish_owned(path, updates, source)
+function M.publish_owned(path, updates, source, on_error, publication_observer)
+	local report = OperationReporter.new(on_error, Logger, LOG)
 	if _owned_publications[path] then return false end
 	local baseline = _source_snapshots[path]
 	if baseline and not same_source(baseline, source) then return false end
 	_owned_publications[path] = true
-	local called, committed, detail, encoded = pcall(TomlWriter.batch_write, path, updates, FileSystem, source)
+	local called, committed, detail, encoded, native, candidate = pcall(TomlWriter.batch_write, path, updates, FileSystem, source, on_error)
 	_owned_publications[path] = nil
+	if called then handoff_native_publication(path, source, candidate, native, on_error, publication_observer, committed) end
 	if not called or committed ~= true then
-		Logger.error(LOG, "Owned preferences were not published: %s.", tostring(called and detail or committed))
+		report("publication", "error", "Owned preferences were not published: %s.", tostring(called and detail or committed))
 		return false
 	end
 	_source_snapshots[path] = { status = "ok", content = encoded }
@@ -1294,19 +1441,34 @@ function M.project_hotstring_preferences(saved, groups, get_sections)
 	for name in pairs(groups) do
 		assert(type(name) == "string" and name ~= "", "hotstring group identity is invalid")
 		local enabled = saved.hotstrings and saved.hotstrings[name]
+		local personal_record, personal_sections
+		if PersonalFiles.components(name) then
+			personal_record = require("infra.personal_hotstrings").adoption(name)
+			if personal_record then
+				enabled, personal_sections = PersonalAdoption.preferences(personal_record, saved)
+			else
+				-- Valid provenance alone cannot admit a native mutation or live gate.
+				enabled, personal_sections = false, {}
+			end
+		end
 		if enabled == nil then enabled = Manifest.default_for("hotstrings.groups." .. name) end
 		assert(type(enabled) == "boolean", "hotstring group preference must be boolean")
 		desired.hotstrings[name] = enabled
 		local supplied = saved.section_states and saved.section_states[name]
+		if personal_sections ~= nil then supplied = personal_sections end
 		assert(supplied == nil or type(supplied) == "table", "hotstring section preferences must be a table")
 		local sections = get_sections(name)
 		assert(sections == nil or type(sections) == "table", "hotstring section inventory is malformed")
 		local projected = {}
 		for _, section in ipairs(sections or {}) do
 			assert(type(section) == "table" and type(section.name) == "string", "hotstring section descriptor is invalid")
-			if section.name ~= "-" and not section.is_module_placeholder then
+			if HotstringLanguages.section_actionable(Manifest.features(), name, section) then
 				local selected = supplied and supplied[section.name]
-				if selected == nil then selected = Manifest.default_for("hotstrings.modules." .. name .. "." .. section.name) end
+				if PersonalFiles.components(name) and (not personal_record or personal_record.admitted ~= true) then
+					selected = false
+				end
+				if selected == nil then selected = Manifest.default_for(require("toml_codec.key_path").render(
+					{ "hotstrings", "modules", name, section.name })) end
 				assert(type(selected) == "boolean", "hotstring section preference must be boolean")
 				projected[section.name] = selected
 			end
@@ -1340,7 +1502,7 @@ function M.snapshot(state, hotfiles, core_mods)
 		if type(secs) == "table" then
 			section_states[name] = {}
 			for _, sec in ipairs(secs) do
-				if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder then
+				if HotstringLanguages.section_actionable(Manifest.features(), name, sec) then
 					local is_en = keymap and type(keymap.is_section_enabled) == "function"
 						and keymap.is_section_enabled(name, sec.name) or false
 					section_states[name][sec.name] = is_en
@@ -1432,23 +1594,26 @@ end
 --- @param hotfiles table List of hotstring files.
 --- @param core_mods table Loaded core modules.
 --- @param snapshot_view function|nil Transforms the complete runtime snapshot for disk.
+--- @param on_error function|nil Receives only fixed failure categories.
+--- @param publication_observer function|nil Accepts a verified call-scoped native handoff.
 --- @return boolean committed
 --- @return table|nil persisted Snapshot written to disk.
 --- @return table|nil runtime Snapshot before session-only preservation.
-function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view)
+function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view, on_error, publication_observer)
+	local report = OperationReporter.new(on_error, Logger, LOG)
 	if _owned_publications[prefs_file] then return false end
 	if snapshot_view ~= nil and type(snapshot_view) ~= "function" then
 		error("snapshot_view must be a function", 2)
 	end
 	if type(prefs_file) ~= "string" or prefs_file == "" then
-		Logger.error(LOG, "Cannot save preferences without a destination path.")
+		report("validation", "error", "Cannot save preferences without a destination path.")
 		return false
 	end
 	-- The boot migration could not version this file (a newer schema, a failed
 	-- migration): this session never writes it.
 	local refusal = TomlWriter.write_refusal(prefs_file)
 	if refusal then
-		Logger.error(LOG, "Preferences NOT saved: writes to '%s' are refused for this session (%s).",
+		report("admission", "error", "Preferences NOT saved: writes to '%s' are refused for this session (%s).",
 			prefs_file, refusal)
 		return false
 	end
@@ -1460,9 +1625,9 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view)
 	end
 	local expected_source = _source_snapshots[prefs_file]
 	if type(expected_source) ~= "table" then
-		expected_source = classify_source(prefs_file)
+		expected_source = classify_source(prefs_file, on_error)
 		if type(expected_source) ~= "table" then
-			Logger.error(LOG, "Cannot classify '%s' before saving preferences.",
+			report("read", "error", "Cannot classify '%s' before saving preferences.",
 				tostring(prefs_file))
 			return false
 		end
@@ -1491,23 +1656,25 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view)
 	if not ok then
 		-- A silent return here looks exactly like a successful save until the next
 		-- reload restores the previous file and the user's change is simply gone.
-		Logger.error(LOG, "Cannot prepare preferences — settings NOT saved: %s.", tostring(updates))
+		report("preparation", "error", "Cannot prepare preferences — settings NOT saved: %s.", tostring(updates))
 		return false
 	end
 
-	local write_ok, written, detail, encoded = pcall(
+	local write_ok, written, detail, encoded, native, candidate = pcall(
 		TomlWriter.batch_write,
 		prefs_file,
 		updates,
 		FileSystem,
-		expected_source
+		expected_source,
+		on_error
 	)
+	local owned_native = write_ok and handoff_native_publication(prefs_file, expected_source, candidate, native, on_error, publication_observer, written)
 	if not write_ok or written ~= true then
-		if adopt_changed_source(prefs_file, expected_source) then
-			Logger.warn(LOG, "Preferences changed externally; the stale save was refused. "
+		if not owned_native and adopt_changed_source(prefs_file, expected_source, on_error) then
+			report("source_changed", "warn", "Preferences changed externally; the stale save was refused. "
 				.. "Review the external edit, then repeat the setting change to save it.")
 		else
-			Logger.error(LOG, "Cannot atomically replace '%s' — settings NOT saved: %s.",
+			report("publication", "error", "Cannot atomically replace '%s' — settings NOT saved: %s.",
 				tostring(prefs_file), tostring(write_ok and detail or written))
 		end
 		return false

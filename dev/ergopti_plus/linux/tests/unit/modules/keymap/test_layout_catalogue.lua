@@ -80,3 +80,9 @@ helpers.describe("layout catalogue (Linux): which index a refresh shows", functi
 		end
 	end)
 end)
+
+require("test.layout_installed_record_contract")(helpers, Catalogue, Json)
+
+require("test.layout_installed_update_contract")(helpers, Catalogue, Json)
+
+require("test.layout_installed_extension_contract")(helpers, Catalogue, Json)

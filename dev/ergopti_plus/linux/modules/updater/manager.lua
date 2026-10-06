@@ -47,6 +47,7 @@ local M = {}
 
 local Logger    = require("logger.shim")
 local Paths     = require("infra.paths")
+local NoReplaceMove = require("infra.no_replace_move")
 local Version   = require("updater.version")
 local Parser    = require("updater.release_parser")
 local CheckResult = require("updater.check_result")
@@ -162,7 +163,7 @@ local CONFIG_INTERVAL_KEY = "check_interval_seconds"
 
 -- User-Agent header required by GitHub API.
 local USER_AGENT = "ErgoptiPlus-Updater-Linux/1.0"
-local HTTP_OWNER = "updater"
+local REQUEST_OWNER = "updater"
 local RELEASE_TIMEOUT_MS = 15000
 local MAX_RELEASE_BODY_BYTES = 2 * 1024 * 1024
 -- Transport pages fit the existing 2 MiB ceiling; the canonical URL still
@@ -468,7 +469,7 @@ local function _build_fetch_request(channel, page)
 	local etag_file = etag_cache_path(cache_key)
 	local parent = etag_file:match("^(.*)/[^/]+$")
 	local options = {
-		owner = HTTP_OWNER,
+		owner = REQUEST_OWNER,
 		timeout_ms = RELEASE_TIMEOUT_MS,
 		max_body_bytes = MAX_RELEASE_BODY_BYTES,
 		follow_redirects = true,
@@ -505,11 +506,16 @@ local function _fetch_releases(channel, callback)
 		return false
 	end
 	local chunks, terminal, all_unchanged = {}, false, true
+	local active_key
 	local cancel
 	-- reason: the updater.check_result reason a failure is shown with
 	local function finish(body, status, err, reason)
 		if terminal then return end
 		terminal = true
+		-- Native etag_save can advance its file before transport/JSON acceptance.
+		-- A failed page must fetch fully next time, never pair that file with its
+		-- older cached body. Successfully accepted pages retain their association.
+		if body == nil and active_key then _list_cache[active_key] = nil end
 		if _release_fetch_cancel == cancel then _release_fetch_cancel = nil end
 		callback(body, status, err, reason)
 	end
@@ -519,6 +525,7 @@ local function _fetch_releases(channel, callback)
 	fetch_page = function(page)
 		local url, headers, options = M._build_fetch_request(channel, page)
 		local key = channel .. "-page-" .. page .. "-size-" .. RELEASE_PAGE_SIZE
+		active_key = key
 		local answered = false
 		local sent = M._http_client.get(url, headers, options, function(result)
 			if terminal or answered then return end
@@ -526,6 +533,12 @@ local function _fetch_releases(channel, callback)
 			local status = tonumber(result and result.status) or 0
 			local body = result and result.body
 			if status == 304 then
+				-- Curl retains 304 on a failed transfer; only a completed response
+				-- carries error_body and can validate the cached page's ETag.
+				if type(result.error_body) ~= "string" then
+					finish(nil, status, "incomplete conditional response", "no_connection")
+					return
+				end
 				body = _list_cache[key]
 				if not body then
 					Logger.warn(LOG, "GitHub answered 304 for channel %s page %d without a cached release page.", channel, page)
@@ -540,7 +553,7 @@ local function _fetch_releases(channel, callback)
 			else
 				all_unchanged = false
 			end
-			local valid, decoded = pcall(Json.decode, body)
+			local valid, decoded = pcall(Json.decode_lossless, body)
 			if not valid or type(body) ~= "string" or not body:match("^%s*%[")
 				or type(decoded) ~= "table" then
 				finish(nil, status, "invalid release page JSON", "parse_failed")
@@ -1037,7 +1050,8 @@ end
 --- @param stage string|nil "download" or "verify": where a failure happened.
 --- @param release table|nil The release the archive belongs to.
 --- @param failure_state string The updater state a failure returns to.
-local function publish_download(callback, path, err, stage, release, failure_state)
+--- @param failure_receipt table|nil Structured native evidence, never inferred from err.
+local function publish_download(callback, path, err, stage, release, failure_state, failure_receipt)
 	_state = path and "available" or failure_state
 	_verified_archive = path
 	_verified_release = path and release or nil
@@ -1045,52 +1059,52 @@ local function publish_download(callback, path, err, stage, release, failure_sta
 	_download_dest = nil
 	if err then Logger.error(LOG, "Update download failed (%s): %s.", tostring(stage), tostring(err)) end
 	if type(callback) ~= "function" then return end
-	local ok, callback_error = pcall(callback, path, err, path and nil or stage)
+	local ok, callback_error = pcall(callback, path, err, path and nil or stage, failure_receipt)
 	if not ok then Logger.error(LOG, "Update download callback raised: %s.", tostring(callback_error)) end
 end
 
---- Removes both sides of a partially published download.
+--- Removes the reserved partial file; the destination is not owned until publish.
 local function remove_partial_download()
 	if _download_part then Fs.delete(_download_part) end
-	if _download_dest then Fs.delete(_download_dest) end
 end
 
 --- Downloads one release's archive and its published checksum, and keeps the
 --- archive only when its SHA-256 matches.
 --- @param release table { tag, download_url, checksum_url }
 --- @param download_url string
---- @param callback function|nil Receives verified path, error, failing stage.
+--- @param callback function|nil Receives verified path, error, failing stage, native failure receipt.
 --- @param failure_state string The updater state a failure returns to.
 --- @return boolean Whether the checksum request was dispatched.
 local function start_download(release, download_url, callback, failure_state)
-	local temp_path = os.tmpname()
-	if type(temp_path) ~= "string" or temp_path:sub(1, 1) ~= "/" then
+	local allocated, temp_path = pcall(os.tmpname)
+	if not allocated or type(temp_path) ~= "string" or temp_path:sub(1, 1) ~= "/" then
 		if type(callback) == "function" then callback(nil, "temporary path unavailable", "download") end
 		return false
 	end
-	Fs.delete(temp_path)
 	if _verified_archive then Fs.delete(_verified_archive); _verified_archive = nil end
 	_verified_release = nil
 	_download_dest = temp_path .. ".tar.gz"
-	_download_part = _download_dest .. ".part"
-	remove_partial_download()
+	-- os.tmpname reserves a native 0600 inode. Keep it as the download target;
+	-- derived names were never reserved and may belong to another process.
+	_download_part = temp_path
 	_state = "downloading"
 
-	local function fail(message, stage)
+	local function fail(message, stage, failure_receipt)
 		remove_partial_download()
-		publish_download(callback, nil, message, stage or "download", release, failure_state)
+		publish_download(callback, nil, message, stage or "download", release, failure_state, failure_receipt)
 	end
 	local checksum_dispatched = M._http_client.get(release.checksum_url, {
 		["User-Agent"] = USER_AGENT,
 	}, {
-		owner = HTTP_OWNER,
+		owner = REQUEST_OWNER,
 		timeout_ms = RELEASE_TIMEOUT_MS,
 		max_body_bytes = MAX_CHECKSUM_BODY_BYTES,
 		follow_redirects = true,
 		https_only = true,
 	}, function(checksum_result)
 		if not checksum_result or checksum_result.ok ~= true then
-			fail(checksum_result and checksum_result.error or "checksum request failed")
+			fail(checksum_result and checksum_result.error or "checksum request failed", "download",
+				type(checksum_result) == "table" and checksum_result.failure_receipt or nil)
 			return
 		end
 		local expected, checksum_error = parse_checksum(checksum_result.body)
@@ -1098,13 +1112,14 @@ local function start_download(release, download_url, callback, failure_state)
 
 		Logger.info(LOG, "Downloading authenticated update to %s.", _download_part)
 		M._http_client.download(download_url, { ["User-Agent"] = USER_AGENT }, _download_part, {
-			owner = HTTP_OWNER,
+			owner = REQUEST_OWNER,
 			timeout_ms = DOWNLOAD_TIMEOUT_MS,
 			max_download_bytes = MAX_DOWNLOAD_BYTES,
 			https_only = true,
 		}, function(download_result)
 			if not download_result or download_result.ok ~= true then
-				fail(download_result and download_result.error or "archive request failed")
+				fail(download_result and download_result.error or "archive request failed", "download",
+					type(download_result) == "table" and download_result.failure_receipt or nil)
 				return
 			end
 			local size = file_size(_download_part)
@@ -1112,11 +1127,11 @@ local function start_download(release, download_url, callback, failure_state)
 				fail("downloaded archive has an invalid size", "verify")
 				return
 			end
-			M._file_digest.sha256(_download_part, { timeout_ms = RELEASE_TIMEOUT_MS },
+			M._file_digest.sha256(_download_part, { timeout_ms = RELEASE_TIMEOUT_MS, owner = REQUEST_OWNER },
 				function(actual, digest_error)
 					if not actual then fail(digest_error or "archive digest failed", "verify"); return end
 					if actual ~= expected then fail("SHA-256 checksum mismatch", "verify"); return end
-					local renamed, rename_error = os.rename(_download_part, _download_dest)
+					local renamed, rename_error = NoReplaceMove.move(_download_part, _download_dest)
 					if not renamed then
 						fail("verified archive publication failed: " .. tostring(rename_error))
 						return
@@ -1135,7 +1150,7 @@ end
 
 --- Downloads and verifies the canonical update archive asynchronously.
 --- @param url string|nil Must match the cached release URL when provided.
---- @param callback function|nil Receives verified path, error, failing stage.
+--- @param callback function|nil Receives verified path, error, failing stage, native failure receipt.
 --- @return boolean Whether the checksum request was dispatched.
 function M.download_update(url, callback)
 	local release = _cached_release
@@ -1187,9 +1202,9 @@ end
 --- must not pull either out from under it.
 --- @return boolean
 function M.cancel_update()
-	local http_cancelled = M._http_client.cancel(HTTP_OWNER)
+	local http_cancelled = M._http_client.cancel(REQUEST_OWNER)
 	if http_cancelled and _release_fetch_cancel then _release_fetch_cancel() end
-	local digest_cancelled = M._file_digest.cancel()
+	local digest_cancelled = M._file_digest.cancel(REQUEST_OWNER)
 	if not http_cancelled or not digest_cancelled then return false end
 	if _state == "installing" then return true end
 	remove_partial_download()

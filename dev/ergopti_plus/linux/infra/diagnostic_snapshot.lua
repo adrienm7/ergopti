@@ -26,6 +26,7 @@ local ConfigPaths   = require("infra.config_paths")
 local LoggerSink    = require("infra.logger_sink")
 local Paths         = require("infra.paths")
 local DisplayServer = require("infra.display_server")
+local FileSystem    = require("adapters.file_system")
 
 M.DRIVER = "linux"
 
@@ -42,28 +43,13 @@ local COMMIT_LOG = "BuildCommit"
 -- =================================
 -- =================================
 
---- Reads a whole file quietly: a missing file is an expected answer here, not
---- an event worth a debug line per probe.
---- @param path string
---- @return string|nil
-local function read_file(path)
-	local fh = io.open(path, "r")
-	if not fh then return nil end
-	local content = fh:read("*a")
-	fh:close()
-	return content
-end
-
 --- Default probe environment.
+--- Native reads refuse special endpoints; metadata probes never open a stream.
 --- @return table
 local function default_env()
 	return {
-		read = read_file,
-		exists = function(path)
-			local fh = io.open(path, "r")
-			if fh then fh:close() return true end
-			return false
-		end,
+		read = FileSystem.read,
+		exists = FileSystem.exists,
 	}
 end
 

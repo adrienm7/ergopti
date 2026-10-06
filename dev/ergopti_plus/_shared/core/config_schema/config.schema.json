@@ -118,6 +118,7 @@
 						"iban_prefixes": { "$ref": "#/$defs/feature_toggle" },
 						"phone_prefixes": { "$ref": "#/$defs/feature_toggle" },
 						"ssn_prefixes": { "$ref": "#/$defs/feature_toggle" },
+						"user_code": { "$ref": "#/$defs/feature_toggle" },
 						"text_expansion_personal_information": {
 							"description": "feature_toggle plus an optional pattern_max_length. Spelled out (not allOf with feature_toggle) because that strict toggle sets additionalProperties:false, which would otherwise reject pattern_max_length.",
 							"type": "object",
@@ -302,7 +303,7 @@
 				"on_pause": { "type": ["boolean", "string"] },
 				"on_resume": { "type": ["boolean", "string"] },
 				"ergopti_base": { "type": "boolean" },
-				"direct_access_digits": { "type": "boolean" },
+				"direct_access_digits": { "type": "string", "enum": ["native", "digits", "symbols"] },
 				"ergopti_alt_gr": { "type": "boolean" },
 				"ergopti_plus": { "type": "boolean" },
 				"ctrl_magic_save": { "type": "boolean" },

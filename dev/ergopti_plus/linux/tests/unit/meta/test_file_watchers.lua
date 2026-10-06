@@ -95,6 +95,7 @@ helpers.describe("file watchers native backend", function()
 			new_fs_event = function() return {} end,
 			fs_event_start = function(handle, watched, _, callback)
 				armed[#armed + 1] = { handle = handle, path = watched, callback = callback }
+				return 0
 			end,
 			fs_event_stop = function() stopped = stopped + 1 end,
 			close = function() closed = closed + 1 end,
@@ -152,6 +153,91 @@ helpers.describe("file watchers native backend", function()
 		end)
 	else
 		print("  [native inotify integration unavailable; callback fixtures still run]")
+	end
+end)
+
+
+--- Isolates the real libuv return-value interface, not a physical watch.
+local function activation_fixture(receipt)
+	local state = { handles = {}, starts = 0, stops = 0, closes = 0, warnings = {}, summaries = {} }
+	local backend = { constants = {} }
+	function backend.new_fs_event()
+		local handle = {}
+		state.handles[#state.handles + 1] = handle
+		return handle
+	end
+	function backend.fs_event_start(handle, path, flags, callback)
+		state.starts = state.starts + 1
+		handle.callback = callback
+		if receipt.throws then error(receipt.reason) end
+		return receipt.value, receipt.reason, receipt.code
+	end
+	function backend.fs_event_stop() state.stops = state.stops + 1; return 0 end
+	function backend.close(handle)
+		state.closes = state.closes + 1
+		handle.closed = true
+	end
+	local logger = {}
+	for _, level in ipairs({ "debug", "trace", "done", "info", "start", "error" }) do
+		logger[level] = function() end
+	end
+	function logger.warn(_, format, ...)
+		state.warnings[#state.warnings + 1] = string.format(format, ...)
+	end
+	function logger.success(_, format, ...)
+		state.summaries[#state.summaries + 1] = string.format(format, ...)
+	end
+	local replacements = {
+		{ "luv", backend }, { "posix", { stat = function() return { type = "directory" } end } },
+		{ "logger.shim", logger }, { "infra.file_watchers", nil },
+	}
+	local saved = {}
+	for _, entry in ipairs(replacements) do
+		saved[#saved + 1] = { entry[1], package.loaded[entry[1]] }
+		package.loaded[entry[1]] = entry[2]
+	end
+	local ok, watcher = pcall(require, "infra.file_watchers")
+	for _, entry in ipairs(saved) do package.loaded[entry[1]] = entry[2] end
+	if not ok then error(watcher, 0) end
+	return watcher, state
+end
+
+helpers.describe("linux-watch-activation-receipts", function()
+	for _, receipt in ipairs({
+		{ name = "EACCES", reason = "EACCES: permission denied", code = "EACCES" },
+		{ name = "ENOSPC", reason = "ENOSPC: watch limit reached", code = "ENOSPC" },
+		{ name = "ENOENT", reason = "ENOENT: path disappeared", code = "ENOENT" },
+		{ name = "false", value = false, reason = "native refusal", code = "EIO" },
+		{ name = "throw", throws = true, reason = "native activation threw" },
+	}) do
+		helpers.it("linux-watch-activation-receipts: retires " .. receipt.name .. " before reporting ownership", function()
+			local watcher, state = activation_fixture(receipt)
+			watcher.start({ base_dir = "/source", on_reload = function() error("unarmed watcher reloaded") end })
+			helpers.assert_eq(state.starts, 1, "the production activation site must be exercised")
+			helpers.assert_eq(state.closes, 1, "refusal must immediately retire the candidate")
+			helpers.assert_true(state.handles[1].closed)
+			helpers.assert_eq(#state.warnings, 1)
+			helpers.assert_contains(state.warnings[1], receipt.reason)
+			helpers.assert_contains(state.summaries[1], "0 handle(s)")
+			watcher.stop()
+			helpers.assert_eq(state.closes, 1, "refused handle cannot remain in the committed registry")
+			helpers.assert_eq(state.stops, 0)
+		end)
+	end
+	for _, value in ipairs({ 0, true }) do
+		helpers.it("linux-watch-activation-receipts: owns native success " .. tostring(value), function()
+			local watcher, state = activation_fixture({ value = value })
+			watcher.start({ base_dir = "/source" })
+			helpers.assert_eq(state.starts, 1)
+			helpers.assert_eq(state.closes, 0)
+			helpers.assert_eq(#state.warnings, 0)
+			helpers.assert_contains(state.summaries[1], "1 handle(s)")
+			watcher.stop()
+			helpers.assert_eq(state.stops, 1)
+			helpers.assert_eq(state.closes, 1)
+			watcher.stop()
+			helpers.assert_eq(state.closes, 1, "successful ownership is released once")
+		end)
 	end
 end)
 

@@ -22,6 +22,62 @@ local ShellRunner = require("adapters.shell_runner")
 
 local EDGE = 1568
 
+--- Captures staging receipts at the actual ShellRunner adapter interface.
+local function with_staging_receipt(receipt, body)
+	local saved_checked, saved_line, saved_async = ShellRunner.exec_checked, ShellRunner.exec_line, ShellRunner.run_async
+	local state = { spawns = 0 }
+	ShellRunner.exec_checked = function() return receipt.ok, receipt.output, "native mktemp refusal" end
+	ShellRunner.exec_line = function()
+		local line = receipt.output:match("^([^\r\n]*)")
+		return line ~= "" and line or nil
+	end
+	ShellRunner.run_async = function(executable, args, options, callback)
+		state.spawns = state.spawns + 1
+		state.executable, state.args, state.callback = executable, args, callback
+		return { cancel = function() return true end }
+	end
+	local ok, err = xpcall(function() body(state) end, debug.traceback)
+	ShellRunner.exec_checked, ShellRunner.exec_line, ShellRunner.run_async = saved_checked, saved_line, saved_async
+	if not ok then error(err, 0) end
+end
+
+helpers.describe("linux-screen-path-receipts", function()
+	for index, path in ipairs({
+		"/owned/plain/ergopti-screen.ABCDEFGH", "/owned/line\npart/ergopti-screen.ABCDEFGH",
+		"/owned/carriage\rpart/ergopti-screen.ABCDEFGH", "/owned/quote-é'漢\npart/ergopti-screen.ABCDEFGH",
+		"/owned/tail\n/ergopti-screen.ABCDEFGH", "/owned/crlf\r\npart/ergopti-screen.ABCDEFGH",
+	}) do
+		helpers.it("linux-screen-path-receipts: preserves literal staging bytes " .. index, function()
+			with_staging_receipt({ ok = true, output = path .. "\n" }, function(state)
+				local handle, reason = ScreenCapture.capture("full", EDGE, function() end)
+				helpers.assert_true(handle ~= nil, tostring(reason))
+				helpers.assert_eq(handle.dir, path, "only mktemp's final protocol newline may be removed")
+				helpers.assert_eq(handle.path, path .. "/screen.png")
+				helpers.assert_eq(state.spawns, 1)
+				helpers.assert_eq(state.executable, "sh")
+				helpers.assert_eq(state.args[4], handle.path, "native argv and cleanup must name the same image")
+			end)
+		end)
+	end
+	for _, receipt in ipairs({
+		{ name = "failed empty", ok = false, output = "" },
+		{ name = "failed partial", ok = false, output = "/owned/partial\n" },
+		{ name = "missing path", ok = true, output = "" },
+		{ name = "empty line", ok = true, output = "\n" },
+	}) do
+		helpers.it("linux-screen-path-receipts: refuses " .. receipt.name .. " without dispatch", function()
+			with_staging_receipt(receipt, function(state)
+				local callbacks = 0
+				local handle, reason = ScreenCapture.capture("full", EDGE, function() callbacks = callbacks + 1 end)
+				helpers.assert_eq(handle, nil)
+				helpers.assert_true(type(reason) == "string" and reason ~= "")
+				helpers.assert_eq(state.spawns, 0, "failed staging cannot launch a capture outside its private directory")
+				helpers.assert_eq(callbacks, 0)
+			end)
+		end)
+	end
+end)
+
 -- The fake tools. Each logs its name and arguments; the behaviour is chosen
 -- per scenario.
 local BEHAVIOURS = {

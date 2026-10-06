@@ -11,6 +11,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local Utils = require("keylogger.utils")
 local SqliteCommand = require("modules.keylogger.sqlite_command")
 local ok_json, Json = pcall(require, "json")
 local LOG = "modules.keylogger.sqlite_reader"
@@ -38,7 +39,7 @@ local NGRAM_TYPE_TABLE = {
 local NGRAM_CODES = { "c", "bg", "tg", "qg", "pg", "hx", "hp", "w", "w_bg" }
 
 local function sql_quote(value)
-	return "'" .. tostring(value or ""):gsub("'", "''") .. "'"
+	return "'" .. SqliteCommand.escape_literal(tostring(value or "")) .. "'"
 end
 
 local function valid_date(value)
@@ -47,22 +48,38 @@ end
 
 --- Executes a read-only JSON query through sqlite3.
 local function read_rows(sqlite_path, sql)
-	if not ok_json or type(sqlite_path) ~= "string" or sqlite_path == "" then return {} end
+	if not ok_json or type(sqlite_path) ~= "string" or sqlite_path == "" then return {}, false end
 	-- Same rule as the writer: the script goes on stdin, never through a file in
 	-- a world-writable directory.
-	local cmd = SqliteCommand.build(sqlite_path, sql, { flags = { "-json" } })
-	if not cmd then return {} end
+	-- Readonly is an open-time property: SELECT alone still creates a missing
+	-- database (or a dangling alias target) under SQLite's default create mode.
+	local cmd = SqliteCommand.build(sqlite_path, sql, { flags = { "-readonly", "-json" }, capture_exit = true })
+	if not cmd then return {}, false end
 	local pipe = io.popen(cmd, "r")
-	if not pipe then return {} end
-	local body = pipe:read("*a") or ""
+	if not pipe then return {}, false end
+	local output = pipe:read("*a")
 	pipe:close()
-	if body == "" then return {} end
-	local ok, rows = pcall(Json.decode, body)
+	local accepted, body, reason = SqliteCommand.read_exit_receipt(output)
+	if not accepted then
+		Logger.warn(LOG, "SQLite read refused: %s.", reason)
+		return {}, false
+	end
+	if body == "" then return {}, true end
+	local ok, rows = pcall(Json.decode_lossless, body)
 	if not ok or type(rows) ~= "table" then
 		Logger.warn(LOG, "SQLite read returned invalid JSON; dashboard projection skipped.")
-		return {}
+		return {}, false
 	end
-	return rows
+	-- SQLite emits scalar object fields, with null for absent SQL values. The
+	-- legacy decoder represents null as an ordinary empty table, which defeats
+	-- numeric defaults and publishes optional extrema as {}. Only the explicit
+	-- lossless token is absent here; inner JSON text and array identities survive.
+	for _, row in ipairs(rows) do
+		for column, value in pairs(row) do
+			if Json.is_null(value) then row[column] = nil end
+		end
+	end
+	return rows, true
 end
 
 local function filters(start_date, end_date, apps)
@@ -108,9 +125,19 @@ local function merge_error_buckets(target, row)
 end
 
 --- Builds the shared date/app manifest from persisted aggregates.
+--- @return table manifest Partial or complete dashboard projection.
+--- @return boolean complete Whether every native query was accepted.
 function M.read_manifest(sqlite_path, start_date, end_date, apps)
 	local manifest = {}
-	local rows = read_rows(sqlite_path, string.format([[
+	local complete = true
+	-- A partial projection remains a useful first return, but must never become
+	-- a successful revision cache entry. Track every CLI pass independently.
+	local function query(sql)
+		local rows, accepted = read_rows(sqlite_path, sql)
+		if not accepted then complete = false end
+		return rows
+	end
+	local rows = query(string.format([[
 SELECT date, app, SUM(chars) AS chars, SUM(pauses) AS pauses,
        SUM(time_ms) AS time_ms, SUM(think_time_ms) AS think_time_ms,
        SUM(hs_chars) AS hs_chars, SUM(llm_chars) AS llm_chars,
@@ -142,7 +169,7 @@ FROM agg_app_day%s GROUP BY date, app;
 	-- because the dashboard that reads them is the same one.
 	local where = filters(start_date, end_date, apps)
 
-	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+	for _, row in ipairs(query(string.format([[
 SELECT date, app, SUM(letter) AS letter, SUM(digit) AS digit, SUM(punct) AS punct,
        SUM(space) AS space, SUM(other) AS other,
        MIN(first_typed_min) AS first_min, MAX(last_typed_min) AS last_min
@@ -161,7 +188,7 @@ FROM agg_app_day_chars_class%s GROUP BY date, app;
 		entry.last_typed_min = row.last_min
 	end
 
-	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+	for _, row in ipairs(query(string.format([[
 SELECT date, app, SUM(bs_total) AS bs_total, SUM(cascade_count) AS cascade_count,
        MAX(cascade_max_len) AS cascade_max_len,
        SUM(recovery_sum_ms) AS recovery_sum, SUM(recovery_count) AS recovery_count
@@ -175,7 +202,7 @@ FROM agg_app_day_errors%s GROUP BY date, app;
 		entry.recovery_time_count = row.recovery_count or 0
 	end
 
-	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+	for _, row in ipairs(query(string.format([[
 SELECT date, app, MAX(same_finger_streak_max) AS f_max,
        MAX(same_hand_streak_max) AS h_max, SUM(auto_repeat_count) AS ar_count,
        SUM(focus_to_first_key_sum_ms) AS focus_sum,
@@ -192,7 +219,7 @@ FROM agg_app_day_ergo%s GROUP BY date, app;
 		entry.focus_to_first_key_count = row.focus_count or 0
 	end
 
-	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+	for _, row in ipairs(query(string.format([[
 SELECT date, app, keycode, SUM(sum_ms) AS sum_ms, SUM(count) AS count,
        MAX(max_ms) AS max_ms, SUM(tap_count) AS tap_count,
        SUM(hold_count) AS hold_count
@@ -201,23 +228,23 @@ FROM agg_app_day_kc_hold%s GROUP BY date, app, keycode;
 		local entry = get_entry(manifest, row.date, row.app)
 		entry.kc_hold = entry.kc_hold or {}
 		entry.kc_hold[tostring(row.keycode)] = {
-			sum_ms = row.sum_ms or 0, count = row.count or 0,
+			s = row.sum_ms or 0, n = row.count or 0,
 			-- MAX, not SUM: the longest hold of the day is a record across devices.
-			max_ms = row.max_ms or 0,
-			tap_count = row.tap_count or 0, hold_count = row.hold_count or 0,
+			m = row.max_ms or 0,
+			tap = row.tap_count or 0, hold = row.hold_count or 0,
 		}
 	end
 
-	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+	for _, row in ipairs(query(string.format([[
 SELECT date, app, layout, SUM(count) AS count
 FROM agg_app_day_layouts%s GROUP BY date, app, layout;
 ]], where))) do
 		local entry = get_entry(manifest, row.date, row.app)
-		entry.layouts = entry.layouts or {}
-		entry.layouts[row.layout] = (entry.layouts[row.layout] or 0) + (row.count or 0)
+		entry.layouts_seen = entry.layouts_seen or {}
+		entry.layouts_seen[row.layout] = (entry.layouts_seen[row.layout] or 0) + (row.count or 0)
 	end
 
-	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+	for _, row in ipairs(query(string.format([[
 SELECT date, app, title, SUM(c) AS c, SUM(ms) AS ms
 FROM agg_app_day_titles%s GROUP BY date, app, title;
 ]], where))) do
@@ -226,7 +253,7 @@ FROM agg_app_day_titles%s GROUP BY date, app, title;
 		entry.titles[row.title] = { c = row.c or 0, ms = row.ms or 0 }
 	end
 
-	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+	for _, row in ipairs(query(string.format([[
 SELECT date, app, hour, SUM(c) AS c, SUM(e) AS e, SUM(em) AS em, SUM(es) AS es,
        e_buckets_json, COUNT(*) AS source_rows
 FROM agg_app_day_hourly%s GROUP BY date, app, hour, e_buckets_json;
@@ -240,7 +267,7 @@ FROM agg_app_day_hourly%s GROUP BY date, app, hour, e_buckets_json;
 		merge_error_buckets(bucket.e_buckets, row)
 	end
 
-	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+	for _, row in ipairs(query(string.format([[
 SELECT date, app, slot, SUM(c) AS c, SUM(e) AS e, SUM(es) AS es,
        e_buckets_json, COUNT(*) AS source_rows
 FROM agg_app_day_hourly_min5%s GROUP BY date, app, slot, e_buckets_json;
@@ -254,7 +281,7 @@ FROM agg_app_day_hourly_min5%s GROUP BY date, app, slot, e_buckets_json;
 		merge_error_buckets(bucket.e_buckets, row)
 	end
 
-	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+	for _, row in ipairs(query(string.format([[
 SELECT date, app, bucket_ms, SUM(time_sum) AS time_sum, SUM(credited) AS credited,
        SUM(hs_input_time_sum) AS hs_in_t, SUM(hs_input_credited) AS hs_in_c,
        SUM(llm_input_time_sum) AS llm_in_t, SUM(llm_input_credited) AS llm_in_c
@@ -273,7 +300,7 @@ FROM agg_app_day_buckets%s GROUP BY date, app, bucket_ms;
 	-- Grouped by the histogram blob as well as by app-day, so two devices'
 	-- distinct blobs each come back as their own row and are merged below.
 	-- Count identical blobs too: grouping must not deduplicate their buckets.
-	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+	for _, row in ipairs(query(string.format([[
 SELECT date, app, SUM(count_total) AS count_total, MAX(max_cpm) AS max_cpm,
        MAX(max_chars) AS max_chars, SUM(inter_delay_count) AS inter_count,
        SUM(inter_delay_sum) AS inter_sum, SUM(inter_delay_sumsq) AS inter_sumsq,
@@ -299,7 +326,7 @@ FROM agg_app_day_burst%s GROUP BY date, app, length_buckets_json;
 		end
 	end
 
-	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+	for _, row in ipairs(query(string.format([[
 SELECT date, app, count_total, longest_ms, longest_chars, total_active_ms, durations_json
 FROM agg_app_day_session%s;
 ]], where))) do
@@ -325,7 +352,21 @@ FROM agg_app_day_session%s;
 		end
 	end
 
-	return manifest
+	-- Application filters select the source app; its destinations remain the
+	-- workflow the shared metrics pages display. Alias the source at the SQL
+	-- boundary so the same date/app filter policy covers this differently keyed
+	-- aggregate, including synchronized contributions from several devices.
+	for _, row in ipairs(query(string.format([[
+SELECT date, app, app_to, SUM(count) AS count
+FROM (SELECT date, app_from AS app, app_to, count FROM agg_app_day_switches_to)%s
+GROUP BY date, app, app_to;
+]], where))) do
+		local entry = get_entry(manifest, row.date, row.app)
+		entry.switches_to = entry.switches_to or {}
+		entry.switches_to[row.app_to] = row.count or 0
+	end
+
+	return manifest, complete
 end
 
 --- Reads the machine's own state for a range.
@@ -383,10 +424,31 @@ local function source_count(esrc_json, source)
 	if type(esrc_json) ~= "string" or esrc_json == "" then return 0 end
 	if ok_json then
 		local ok, decoded = pcall(Json.decode, esrc_json)
-		if ok and type(decoded) == "table" then return tonumber(decoded[source]) or 0 end
+		if ok and type(decoded) == "table" then
+			if source ~= "other" then return tonumber(decoded[source]) or 0 end
+			-- All additional synthetic labels belong to the shared other bucket.
+			-- Numeric array keys are not source labels; scalar admission is unchanged.
+			local count = 0
+			for label, value in pairs(decoded) do
+				if Utils.is_other_synthetic_source(label) then
+					count = count + (tonumber(value) or 0)
+				end
+			end
+			return count
+		end
 	end
 	local raw = esrc_json:match('"' .. source .. '"%s*:%s*(%d+)')
 	return tonumber(raw) or 0
+end
+
+--- Decodes SQL's JSON string before native token bytes become projection keys.
+--- The CLI's JSON mode truncates raw TEXT at NUL. json_quote uses SQLite's
+--- complete byte length and escapes NUL before the CLI can shorten it.
+local function decode_token(row)
+	local ok, token = pcall(Json.decode, row.token_json)
+	if ok and type(token) == "string" then return token end
+	Logger.warn(LOG, "SQLite n-gram token returned invalid JSON; token projection skipped.")
+	return nil
 end
 
 local function merge_ngram(target, token, count, esrc_json, total_delay, error_count, source_rows)
@@ -413,13 +475,14 @@ end
 --- TOTAL uses floating accumulation like LuaJIT, avoiding SUM's integer overflow.
 local function grouped_ngram_sql(table_name, where, by_app)
 	local keys = by_app and "app, token" or "token"
+	local projection = by_app and "app, json_quote(token) AS token_json" or "json_quote(token) AS token_json"
 	local numeric = "typeof(c) IN ('integer','real') AND typeof(td) IN ('integer','real') AND typeof(e) IN ('integer','real')"
 	local conjunction = where == "" and " WHERE " or " AND "
 	-- SQLite's numeric affinity permits malformed text. Keep those rare rows raw:
 	-- TOTAL('12oops') is 12 whereas the established Lua tonumber fallback is zero.
-	return "SELECT " .. keys .. ", TOTAL(c) AS c, TOTAL(td) AS td, TOTAL(e) AS e, esrc_json, COUNT(*) AS source_rows FROM "
+	return "SELECT " .. projection .. ", TOTAL(c) AS c, TOTAL(td) AS td, TOTAL(e) AS e, esrc_json, COUNT(*) AS source_rows FROM "
 		.. table_name .. where .. conjunction .. "(" .. numeric .. ") GROUP BY " .. keys .. ", esrc_json"
-		.. " UNION ALL SELECT " .. keys .. ", c, td, e, esrc_json, 1 AS source_rows FROM "
+		.. " UNION ALL SELECT " .. projection .. ", c, td, e, esrc_json, 1 AS source_rows FROM "
 		.. table_name .. where .. conjunction .. "NOT (" .. numeric .. ");"
 end
 
@@ -429,7 +492,7 @@ function M.read_ngrams(sqlite_path, start_date, end_date, apps)
 	for _, code in ipairs(NGRAM_CODES) do
 		local rows = read_rows(sqlite_path, grouped_ngram_sql(NGRAM_TYPE_TABLE[code], where, false))
 		for _, row in ipairs(rows) do
-			merge_ngram(out[code], row.token, row.c, row.esrc_json, row.td, row.e, row.source_rows)
+			merge_ngram(out[code], decode_token(row), row.c, row.esrc_json, row.td, row.e, row.source_rows)
 		end
 	end
 	local sc_rows = read_rows(sqlite_path, string.format(
@@ -442,7 +505,13 @@ end
 --- Returns historical n-grams before today plus per-app n-grams for today.
 function M.read_range_split_today(sqlite_path, start_date, end_date, apps)
 	local today = os.date("%Y-%m-%d")
-	local yesterday = os.date("%Y-%m-%d", os.time() - 86400)
+	-- Calendar days can contain 23 or 25 hours. Derive the preceding day from
+	-- the captured date at noon, so DST and a clock crossing midnight cannot
+	-- duplicate today's rows or omit yesterday from the historical projection.
+	local year, month, day = today:match("^(%d%d%d%d)%-(%d%d)%-(%d%d)$")
+	local yesterday = os.date("%Y-%m-%d", os.time({
+		year = tonumber(year), month = tonumber(month), day = tonumber(day) - 1, hour = 12,
+	}))
 	local historical_end = valid_date(end_date) and end_date < today and end_date or yesterday
 	local historical = M.read_ngrams(sqlite_path, start_date, historical_end, apps)
 	local today_by_app = {}
@@ -451,7 +520,7 @@ function M.read_range_split_today(sqlite_path, start_date, end_date, apps)
 		local rows = read_rows(sqlite_path, grouped_ngram_sql(NGRAM_TYPE_TABLE[code], today_where, true))
 		for _, row in ipairs(rows) do
 			today_by_app[row.app] = today_by_app[row.app] or empty_ngrams()
-			merge_ngram(today_by_app[row.app][code], row.token, row.c, row.esrc_json, row.td, row.e, row.source_rows)
+			merge_ngram(today_by_app[row.app][code], decode_token(row), row.c, row.esrc_json, row.td, row.e, row.source_rows)
 		end
 	end
 	local sc_rows = read_rows(sqlite_path, string.format(

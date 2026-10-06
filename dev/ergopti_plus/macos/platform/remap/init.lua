@@ -297,12 +297,17 @@ end
 
 --- Persists an enabled flag without mutating the live state before commit.
 --- @param enabled boolean Target persisted flag.
+--- @param transaction table|nil Private current enabled transition.
 --- @return boolean True only when the config writer explicitly succeeds.
-local function persist_enabled_flag(enabled)
+local function persist_enabled_flag(enabled, transaction)
+	transaction = transaction or _enabled_transition
 	local persisted = {}
 	for key, item in pairs(_state) do persisted[key] = item end
 	persisted.enabled = enabled == true
-	local ok, saved_or_err = pcall(Config.save_user_config, persisted, resolve_user_config())
+	local ok, saved_or_err, _, receipt = pcall(Config.save_user_config, persisted, resolve_user_config())
+	if ok and type(receipt) == "table" and transaction ~= nil then
+		transaction.file = receipt
+	end
 	if not ok or saved_or_err ~= true then
 		Logger.error(LOG, "Karabiner enabled preference could not be persisted: %s.",
 			tostring(ok and saved_or_err or saved_or_err))
@@ -322,7 +327,7 @@ local function commit_enable_transition(transaction)
 	if transaction.committed == true and _state.enabled == true then
 		return true, "already-enabled"
 	end
-	if not persist_enabled_flag(true) then return false, "persistence-failed" end
+	if not persist_enabled_flag(true, transaction) then return false, "persistence-failed" end
 	_state.enabled = true
 	transaction.committed = true
 	return true, "enabled"
@@ -3552,7 +3557,7 @@ function M.set_enabled(value, on_done, onboarding_gate)
 	local target_enabled = value == true
 	if _bulk_settings_transaction then
 		local phase = _bulk_settings_transaction.phase
-		if phase == "rollback-persistence" or phase == "rollback-regeneration" then
+		if phase == "rollback-persistence" or phase == "rollback-regeneration" or phase == "rollback-sibling" then
 			retry_bulk_settings_recovery()
 		end
 		if _bulk_settings_transaction then
@@ -3585,6 +3590,9 @@ function M.set_enabled(value, on_done, onboarding_gate)
 			end
 			Logger.debug(LOG, "Joined the in-flight Karabiner %s transaction.",
 				transition_targets_enabled and "enable" or "disable")
+			if _enabled_transition.file ~= nil and type(_enabled_transition.retry) == "function" then
+				_enabled_transition.retry()
+			end
 			return true
 		end
 		Logger.warn(LOG, "Karabiner state request rejected while the opposite transition is in flight.")
@@ -3629,8 +3637,53 @@ function M.set_enabled(value, on_done, onboarding_gate)
 		return true
 	end
 
+	-- The file journal is an optional private capability. Ordinary two-return
+	-- Config ports retain their existing enabled-state and lifecycle behavior.
+	--- Attaches exact file settlement to the private enabled transition.
+	--- @param transaction table Current enabled-state owner.
+	local function retain_enabled_file(transaction)
+		function transaction.cancel_regeneration()
+			for context in pairs(_regeneration_contexts) do
+				if context.enabled_transaction == transaction and not context.settled then
+					context:settle(false, "lease-revocation-requested")
+				end
+			end
+		end
+		function transaction.restore_file()
+			if transaction.file_restored == true then return true end
+			local file = transaction.file
+			if file == nil then return true end
+			local restored = false
+			if transaction.compensation_target == true then
+				-- A legacy forward save can first expose a receipt on its OFF
+				-- compensation. Its source is ON; that receipt must never be inverted.
+				if file.publication_cleanup ~= nil then
+					local settled, _, published = TomlWriter.retry_publication_cleanup(file)
+					if settled ~= true then return false end
+					transaction.compensation_published = published
+				end
+				if transaction.compensation_published ~= true then
+					local published, _, cleanup = TomlWriter.publish_if_unchanged(
+						file.path, file.candidate, FileSystem, file.source)
+					if type(cleanup) == "function" then file.publication_cleanup = cleanup end
+					if published ~= true then return false end
+					transaction.compensation_published = true
+				end
+				local bytes, status = TomlWriter.read_classified(file.path, FileSystem)
+				restored = status == "ok" and bytes == file.candidate
+			else
+				local called, result = pcall(require("config_file_inverse").restore, file, FileSystem)
+				restored = called and result == true
+			end
+			if restored ~= true then return false end
+			transaction.file_restored = true
+			return true
+		end
+	end
+
 	if target_enabled then
 		local transaction = { kind = "enabling", callbacks = {} }
+		retain_enabled_file(transaction)
 		if type(on_done) == "function" then transaction.callbacks[1] = on_done end
 		_enabled_transition = transaction
 		Logger.info(LOG, "Karabiner integration enable requested; awaiting READY before commit.")
@@ -3639,7 +3692,14 @@ function M.set_enabled(value, on_done, onboarding_gate)
 			if _enabled_transition ~= transaction then return end
 			transaction.kind = "enable-aborting"
 			if transaction.committed then
-				local rollback_saved = persist_enabled_flag(false)
+				local rollback_saved = true
+				if transaction.file == nil then
+					rollback_saved = persist_enabled_flag(false, transaction)
+					if transaction.file ~= nil then
+						transaction.compensation_target = true
+						transaction.compensation_published = rollback_saved == true
+					end
+				end
 				_state.enabled = false
 				transaction.committed = false
 				if not rollback_saved then
@@ -3647,6 +3707,7 @@ function M.set_enabled(value, on_done, onboarding_gate)
 						"Failed enable rolled back in memory but enabled=false could not be persisted.")
 				end
 			end
+			transaction.failure_reason = transaction.failure_reason or enable_reason or "enable-failed"
 			-- The preference commit happens before RESUME, so a later failure can
 			-- observe rules that are ACTIVE or whose acknowledgement is in flight.
 			-- Never dismantle F17 consumers/classification here; they stay mounted
@@ -3661,9 +3722,12 @@ function M.set_enabled(value, on_done, onboarding_gate)
 
 			local stop_callback_fired = false
 			local function finish_after_stop(stopped, stop_reason)
+				if stop_callback_fired then return end
 				stop_callback_fired = true
 				if _enabled_transition ~= transaction then return end
+				transaction.stop_inflight = false
 				if stopped == true then
+					transaction.stop_settled = true
 					clear_managed_output_set()
 					stop_lease_bound_inputs()
 				else
@@ -3671,22 +3735,59 @@ function M.set_enabled(value, on_done, onboarding_gate)
 						"Failed enable retained lease-bound consumers because STOPPED was not proven: %s.",
 						tostring(stop_reason))
 				end
+				if transaction.file ~= nil then
+					if stopped == true then transaction.retry() end
+					return
+				end
 				_enabled_transition = nil
 				replay_pending_layout_refresh()
 				Logger.warn(LOG, "Karabiner enable transaction remained disabled after teardown (%s).",
 					tostring(stop_reason))
 				settle_enabled_callbacks(transaction, false, enable_reason or "enable-failed")
 			end
-			local ok_stop, stop_requested = pcall(
-				LeaseController.stop,
-				"integration_enable_failed",
-				finish_after_stop
-			)
-			if not ok_stop then
-				finish_after_stop(false, "stop-raised")
-			elseif not stop_requested and not stop_callback_fired then
-				finish_after_stop(false, "stop-request-rejected")
+			local function request_stop()
+				if transaction.stop_inflight == true then return end
+				stop_callback_fired = false
+				transaction.stop_inflight = true
+				transaction.stop_attempt = (transaction.stop_attempt or 0) + 1
+				local stop_attempt = transaction.stop_attempt
+				local ok_stop, stop_requested = pcall(
+					LeaseController.stop, "integration_enable_failed", function(stopped, reason)
+						if transaction.stop_attempt ~= stop_attempt then return end
+						finish_after_stop(stopped, reason)
+					end)
+				if not ok_stop then
+					finish_after_stop(false, "stop-raised")
+				elseif not stop_requested and not stop_callback_fired then
+					finish_after_stop(false, "stop-request-rejected")
+				end
 			end
+			if transaction.file ~= nil then
+				transaction.retry = function()
+					if _enabled_transition ~= transaction then return false end
+					if transaction.stop_settled ~= true then
+						request_stop()
+						return _enabled_transition ~= transaction
+					end
+					if transaction.restore_file() ~= true then return false end
+					_enabled_transition = nil
+					replay_pending_layout_refresh()
+					settle_enabled_callbacks(transaction, false, transaction.failure_reason)
+					return true
+				end
+			end
+			request_stop()
+		end
+		transaction.retry = function() return false end
+		transaction.before_lifecycle = function()
+			if _enabled_transition ~= transaction then return false end
+			transaction.cancel_regeneration()
+			if _enabled_transition ~= transaction then return true end
+			if transaction.kind == "enabling" then
+				finish_enable_failure("lease-revocation-requested")
+			end
+			if _enabled_transition == transaction then return transaction.retry() end
+			return true
 		end
 
 		local regenerate_callback_fired = false
@@ -3725,11 +3826,19 @@ function M.set_enabled(value, on_done, onboarding_gate)
 		previous_token = type(disable_snapshot) == "table" and disable_snapshot.token or nil,
 	}
 	if type(on_done) == "function" then transaction.callbacks[1] = on_done end
+	retain_enabled_file(transaction)
 	_enabled_transition = transaction
 	Logger.info(LOG, "Karabiner integration disable requested; awaiting STOPPED.")
 
 	local function finish_recovery(recovered, recovery_reason, disable_reason)
 		if _enabled_transition ~= transaction then return end
+		transaction.recovery_inflight = false
+		if transaction.file ~= nil and (recovered ~= true or transaction.file_restored ~= true) then
+			transaction.recovery_needs_fence = true
+			Logger.error(LOG, "Enabled preference recovery remains owned before READY: %s.",
+				tostring(recovery_reason))
+			return
+		end
 		_enabled_transition = nil
 		replay_pending_layout_refresh()
 		if recovered then
@@ -3768,9 +3877,26 @@ function M.set_enabled(value, on_done, onboarding_gate)
 			return
 		end
 		transaction.kind = "recovering"
+		if transaction.file ~= nil then
+			transaction.failure_reason = transaction.failure_reason or disable_reason or "disable-failed"
+			if transaction.file_restored ~= true then
+				transaction.retry()
+				return
+			end
+			if transaction.recovery_inflight == true then return end
+			transaction.recovery_inflight = true
+			transaction.recovery_attempt = (transaction.recovery_attempt or 0) + 1
+		end
+		local recovery_attempt = transaction.recovery_attempt
+		local recovery_callback_fired = false
 		Logger.error(LOG, "Karabiner disable did not receive STOPPED: %s; restoring a fresh lease.",
 			tostring(disable_reason))
 		local ok_recovery, recovery_requested = pcall(M.regenerate, function(ok, reason)
+			if transaction.file ~= nil then
+				if recovery_callback_fired or transaction.lifecycle_requested == true
+					or transaction.recovery_attempt ~= recovery_attempt then return end
+				recovery_callback_fired = true
+			end
 			finish_recovery(ok == true, reason, disable_reason)
 		end, PAUSED_DISABLE_RECOVERY)
 		if not ok_recovery then
@@ -3779,6 +3905,65 @@ function M.set_enabled(value, on_done, onboarding_gate)
 		elseif not recovery_requested and _enabled_transition == transaction then
 			finish_recovery(false, "rollback-request-rejected", disable_reason)
 		end
+	end
+
+	transaction.retry = function()
+		if _enabled_transition ~= transaction then return false end
+		if transaction.file == nil or transaction.kind ~= "recovering" then return false end
+		if transaction.lifecycle_requested == true and transaction.lifecycle_stopped ~= true then return false end
+		if transaction.restore_file() ~= true then return false end
+		if transaction.lifecycle_requested == true then
+			_enabled_transition = nil
+			settle_enabled_callbacks(transaction, false, transaction.failure_reason or "disable-failed")
+			return true
+		end
+		if transaction.recovery_needs_fence == true then
+			if transaction.recovery_fence_inflight == true then return false end
+			transaction.recovery_fence_inflight = true
+			transaction.recovery_fence_attempt = (transaction.recovery_fence_attempt or 0) + 1
+			local fence_attempt = transaction.recovery_fence_attempt
+			local callback_seen = false
+			local called, accepted = pcall(LeaseController.stop, "enabled_publication_recovery_failed", function(stopped)
+				if callback_seen or transaction.recovery_fence_attempt ~= fence_attempt then return end
+				callback_seen = true
+				if _enabled_transition ~= transaction then return end
+				transaction.recovery_fence_inflight = false
+				if stopped ~= true then return end
+				transaction.recovery_needs_fence = false
+				transaction.retry()
+			end)
+			if not called or (accepted ~= true and not callback_seen) then
+				transaction.recovery_fence_inflight = false
+			end
+			return _enabled_transition ~= transaction
+		end
+		rollback_enabled_state(transaction.failure_reason)
+		return _enabled_transition ~= transaction
+	end
+	transaction.before_lifecycle = function()
+		if _enabled_transition ~= transaction then return false end
+		transaction.lifecycle_requested = true
+		transaction.cancel_regeneration()
+		if transaction.lifecycle_stopped ~= true and transaction.lifecycle_stop_inflight ~= true then
+			transaction.lifecycle_stop_inflight = true
+			transaction.lifecycle_stop_attempt = (transaction.lifecycle_stop_attempt or 0) + 1
+			local stop_attempt = transaction.lifecycle_stop_attempt
+			local callback_seen = false
+			local called, accepted = pcall(LeaseController.stop, "enabled_publication_lifecycle", function(stopped)
+				if transaction.lifecycle_stop_attempt ~= stop_attempt or callback_seen then return end
+				callback_seen = true
+				if _enabled_transition ~= transaction then return end
+				transaction.lifecycle_stop_inflight = false
+				if stopped ~= true then return end
+				transaction.lifecycle_stopped = true
+				transaction.retry()
+			end)
+			if not called or (accepted ~= true and not callback_seen) then
+				transaction.lifecycle_stop_inflight = false
+			end
+		end
+		if _enabled_transition == transaction then return transaction.retry() end
+		return true
 	end
 
 	local callback_fired = false
@@ -3896,11 +4081,12 @@ end
 --- @param label string Stable operation label for diagnostics.
 --- @param expected_source table|nil Exact bytes a scope backed up before this save.
 --- @return boolean committed
+--- @return table|nil receipt Exact native publication ownership.
 local function persist_and_publish_settings(candidate, overwrite_corrupt, label, expected_source)
 	local payload = clone_settings_state(candidate)
 	-- Settings compensation must never roll back a separately owned preference
 	payload.enabled = _state.enabled == true
-	local call_ok, saved = pcall(
+	local call_ok, saved, _, receipt = pcall(
 		Config.save_user_config,
 		payload,
 		resolve_user_config(),
@@ -3910,10 +4096,10 @@ local function persist_and_publish_settings(candidate, overwrite_corrupt, label,
 	if not call_ok or saved ~= true then
 		Logger.error(LOG, "%s did not persist; live Karabiner settings were preserved: %s.",
 			tostring(label), tostring(saved))
-		return false
+		return false, call_ok and receipt or nil
 	end
 	publish_settings_state(payload)
-	return true
+	return true, receipt
 end
 
 -- Refusals M.regenerate() reports synchronously before it builds or deploys
@@ -3934,13 +4120,18 @@ local REGENERATION_REFUSED_BEFORE_DEPLOY = {
 local function finish_bulk_settings_callback(transaction, ok, reason)
 	if transaction.callback_settled then return end
 	transaction.callback_settled = true
-	invoke_public_callback(
-		transaction.label,
-		transaction.on_done,
-		ok == true,
-		reason,
-		transaction.change_count
-	)
+	local receipt = nil
+	if transaction.sibling then
+		transaction.sibling.settled(ok == true)
+		if ok == true then receipt = transaction.sibling.receipt() end
+	end
+	if receipt ~= nil then
+		invoke_public_callback(transaction.label, transaction.on_done, ok == true,
+			reason, transaction.change_count, receipt)
+		return
+	end
+	invoke_public_callback(transaction.label, transaction.on_done, ok == true,
+		reason, transaction.change_count)
 end
 
 --- Settles a bulk transaction whose settings are persisted while their deploy
@@ -4108,17 +4299,42 @@ end
 retry_bulk_settings_recovery = function()
 	local transaction = _bulk_settings_transaction
 	if not transaction then return true end
+	-- Backup data is retained. Its only inverse is exact native cleanup, which
+	-- must settle before a no-write or sibling shortcut can retire this owner.
+	if transaction.backup_cleanup ~= nil
+		and TomlWriter.retry_publication_cleanup(transaction.backup_cleanup) ~= true then return false end
+	if transaction.file ~= nil and require("config_file_inverse").settle_publication(transaction.file) ~= true then return false end
 	if transaction.phase == "rollback-persistence" then
 		Logger.warn(LOG, "Retrying retained %s inverse persistence.", transaction.label)
-		if not persist_and_publish_settings(
+		if transaction.file ~= nil then
+			if require("config_file_inverse").restore(transaction.file, FileSystem) ~= true then return false end
+			if transaction.detached ~= true then publish_settings_state(transaction.snapshot) end
+		elseif not persist_and_publish_settings(
 			transaction.snapshot,
 			transaction.overwrite_corrupt,
 			transaction.label .. " inverse"
 		) then
 			return false
 		end
-		-- The refused candidate stayed published until this save, so any
-		-- build since (Resume, a layout change, lease recovery) deployed it.
+		transaction.phase = "rollback-sibling"
+	end
+	if transaction.phase == "rollback-sibling" then
+		if transaction.detached == true then
+			-- This path has no runtime candidate, sibling or deployment to undo.
+			_bulk_settings_transaction = nil
+			return true
+		end
+		if transaction.sibling then
+			local called, restored, detail = pcall(transaction.sibling.restore)
+			if not called or restored ~= true then
+				Logger.error(LOG, "%s navigation-layer inverse remains pending: %s.",
+					transaction.label, tostring(called and detail or restored))
+				return false
+			end
+		end
+		-- The refused candidate stayed published until its settings inverse,
+		-- so any intervening build may have deployed it. Its sibling must be
+		-- restored before compiling that inverse or acknowledging no deploy.
 		if transaction.inverse_redeploy_required == false
 			and transaction.refused_deploy_serial == _deploy_serial then
 			settle_bulk_inverse_without_redeploy(transaction)
@@ -4149,7 +4365,7 @@ local function settle_bulk_settings_before_lifecycle(boundary, cancel_reason)
 	save_bulk_edits_retained_by_guardian_wait(cancel_reason)
 	if _bulk_settings_transaction == nil then return true end
 	local phase = transaction.phase
-	if phase == "rollback-persistence" or phase == "rollback-regeneration" then
+	if phase == "rollback-persistence" or phase == "rollback-regeneration" or phase == "rollback-sibling" then
 		retry_bulk_settings_recovery()
 	end
 	if _bulk_settings_transaction == nil then return true end
@@ -4172,6 +4388,13 @@ local function reject_bulk_settings_candidate(transaction, reason, refused_befor
 	transaction.phase = "rollback-persistence"
 	Logger.error(LOG, "%s failed after settings commit; restoring the exact prior configuration.",
 		transaction.label)
+	if transaction.file ~= nil then
+		retry_bulk_settings_recovery()
+		if _bulk_settings_transaction == transaction then
+			finish_bulk_settings_callback(transaction, false, transaction.failure_reason)
+		end
+		return
+	end
 	if not persist_and_publish_settings(
 		transaction.snapshot,
 		transaction.overwrite_corrupt,
@@ -4181,27 +4404,42 @@ local function reject_bulk_settings_candidate(transaction, reason, refused_befor
 		finish_bulk_settings_callback(transaction, false, transaction.failure_reason)
 		return
 	end
-	if not transaction.inverse_redeploy_required then
-		settle_bulk_inverse_without_redeploy(transaction)
-		return
+	transaction.phase = "rollback-sibling"
+	retry_bulk_settings_recovery()
+	if _bulk_settings_transaction == transaction and transaction.phase == "rollback-sibling" then
+		finish_bulk_settings_callback(transaction, false, transaction.failure_reason)
 	end
-	transaction.phase = "rollback-regeneration"
-	request_bulk_inverse_regeneration(transaction)
 end
 
 --- Reads the remap file and writes one verified backup of its exact bytes, so a
 --- scope's candidate can only replace the bytes that backup holds.
 --- @param backup_path string Unique backup destination that must not exist.
 --- @param source_path string|nil The settings file, the running one by default.
+--- @param admitted_source table|nil Optional exact Config read-generation receipt.
 --- @return table|nil source `{ status, content }` precondition for the save.
 --- @return string|nil detail Refusal reason.
-local function back_up_settings_source(backup_path, source_path)
+--- @return table|nil cleanup Private release-only backup receipt.
+local function back_up_settings_source(backup_path, source_path, admitted_source)
 	local path = source_path or resolve_user_config()
 	local content, status = FileSystem.read_with_status(path)
+	if admitted_source ~= nil then
+		-- Recommendation admission used this exact native read, not the later
+		-- backup generation. A personalized successor must never be adopted as
+		-- authority for a candidate validated against older neutral bindings.
+		if type(admitted_source) ~= "table" or admitted_source.path ~= path
+			or (admitted_source.status ~= "ok" and admitted_source.status ~= "absent")
+			or status ~= admitted_source.status
+			or (status == "ok" and content ~= admitted_source.content) then
+			return nil, "remap source changed after recommendation admission"
+		end
+	end
 	if status == "absent" then return { status = "absent" } end
 	if status ~= "ok" or type(content) ~= "string" then return nil, "remap source is unreadable" end
-	local backed, detail = TomlWriter.publish_if_unchanged(backup_path, content, FileSystem, { status = "absent" })
-	if backed ~= true then return nil, "backup refused: " .. tostring(detail) end
+	local backed, detail, retry_cleanup = TomlWriter.publish_if_unchanged(backup_path, content, FileSystem, { status = "absent" })
+	if backed ~= true then
+		local cleanup = type(retry_cleanup) == "function" and { publication_cleanup = retry_cleanup } or nil
+		return nil, "backup refused: " .. tostring(detail), cleanup
+	end
 	local observed, observed_status = FileSystem.read_with_status(backup_path)
 	if observed_status ~= "ok" or observed ~= content then return nil, "backup verification failed" end
 	return { status = "ok", content = content }
@@ -4216,9 +4454,10 @@ end
 --- @param overwrite_corrupt boolean|nil Explicit reset-only overwrite intent.
 --- @param backup_path string|nil A scope's unique backup: the candidate then
 ---        replaces only the exact bytes that verified backup holds.
+--- @param sibling table|nil Navigation-layer participant retained with this bulk owner.
 --- @return boolean accepted True when candidate regeneration was accepted, or
 ---   when the candidate persisted while « Ergopti uses Karabiner » is off.
-local function apply_bulk_settings_transaction(label, mutate, on_done, overwrite_corrupt, backup_path)
+local function apply_bulk_settings_transaction(label, mutate, on_done, overwrite_corrupt, backup_path, sibling)
 	if not require_state(label) then
 		invoke_public_callback(label, on_done, false, "not-initialized", 0)
 		return false
@@ -4242,7 +4481,7 @@ local function apply_bulk_settings_transaction(label, mutate, on_done, overwrite
 	end
 	if _bulk_settings_transaction then
 		local phase = _bulk_settings_transaction.phase
-		if phase == "rollback-persistence" or phase == "rollback-regeneration" then
+		if phase == "rollback-persistence" or phase == "rollback-regeneration" or phase == "rollback-sibling" then
 			retry_bulk_settings_recovery()
 		end
 		-- The retry can settle the retained recovery synchronously; refusing
@@ -4282,22 +4521,49 @@ local function apply_bulk_settings_transaction(label, mutate, on_done, overwrite
 		overwrite_corrupt = overwrite_corrupt,
 		phase = "candidate-persistence",
 		callback_settled = false,
+		sibling = sibling,
 	}
 	_bulk_settings_transaction = transaction
 	local expected_source
 	if backup_path ~= nil then
 		local backup_detail
-		expected_source, backup_detail = back_up_settings_source(backup_path)
+		expected_source, backup_detail, transaction.backup_cleanup = back_up_settings_source(backup_path)
 		if not expected_source then
-			Logger.error(LOG, "%s refused before any write: %s.", label, tostring(backup_detail))
-			_bulk_settings_transaction = nil
+			Logger.error(LOG, "%s refused before any settings write: %s.", label, tostring(backup_detail))
+			if transaction.backup_cleanup ~= nil then
+				transaction.failure_reason = "backup-refused"
+				transaction.inverse_redeploy_required = false
+				transaction.refused_deploy_serial = _deploy_serial
+				transaction.phase = "rollback-sibling"
+				retry_bulk_settings_recovery()
+			else
+				_bulk_settings_transaction = nil
+			end
 			finish_bulk_settings_callback(transaction, false, "backup-refused")
 			return false
 		end
 	end
-	if not persist_and_publish_settings(candidate, overwrite_corrupt, label, expected_source) then
-		_bulk_settings_transaction = nil
-		finish_bulk_settings_callback(transaction, false, "candidate-persistence-failed")
+	if sibling then
+		local prepared, ready, detail = pcall(sibling.prepare)
+		if not prepared or ready ~= true then
+			transaction.failure_reason = type(detail) == "string" and detail or "nav-layer-import-failed"
+			transaction.inverse_redeploy_required = false
+			transaction.refused_deploy_serial = _deploy_serial
+			transaction.phase = "rollback-sibling"
+			retry_bulk_settings_recovery()
+			finish_bulk_settings_callback(transaction, false, transaction.failure_reason)
+			return false
+		end
+	end
+	local saved, file = persist_and_publish_settings(candidate, overwrite_corrupt, label, expected_source)
+	transaction.file = file
+	if saved ~= true then
+		transaction.failure_reason = "candidate-persistence-failed"
+		transaction.inverse_redeploy_required = false
+		transaction.refused_deploy_serial = _deploy_serial
+		transaction.phase = file ~= nil and "rollback-persistence" or "rollback-sibling"
+		retry_bulk_settings_recovery()
+		finish_bulk_settings_callback(transaction, false, transaction.failure_reason)
 		return false
 	end
 
@@ -4349,7 +4615,7 @@ local function commit_state_mutation(mutate, overwrite_corrupt)
 	end
 	if _bulk_settings_transaction then
 		local phase = _bulk_settings_transaction.phase
-		if phase == "rollback-persistence" or phase == "rollback-regeneration" then
+		if phase == "rollback-persistence" or phase == "rollback-regeneration" or phase == "rollback-sibling" then
 			retry_bulk_settings_recovery()
 		end
 		if _bulk_settings_transaction then
@@ -4361,14 +4627,26 @@ local function commit_state_mutation(mutate, overwrite_corrupt)
 			"Karabiner setting mutation continues: the retained '%s' recovery settled on retry.",
 			tostring(phase))
 	end
-	local candidate = clone_settings_state(_state)
+	local snapshot = clone_settings_state(_state)
+	local candidate = clone_settings_state(snapshot)
 	local mutate_ok, mutate_err = xpcall(function() mutate(candidate) end, debug.traceback)
 	if not mutate_ok then
 		Logger.error(LOG, "Karabiner setting candidate construction failed: %s.",
 			tostring(mutate_err))
 		return false
 	end
-	return persist_and_publish_settings(candidate, overwrite_corrupt, "Karabiner setting mutation")
+	local saved, file = persist_and_publish_settings(candidate, overwrite_corrupt, "Karabiner setting mutation")
+	if saved ~= true and file ~= nil then
+		-- The public mutation stayed refused, but its native publication may
+		-- have changed the file and still owns exact cleanup or inverse debt.
+		_bulk_settings_transaction = {
+			label = "Karabiner setting mutation", snapshot = snapshot, file = file,
+			phase = "rollback-persistence", failure_reason = "candidate-persistence-failed",
+			inverse_redeploy_required = false, refused_deploy_serial = _deploy_serial,
+		}
+		retry_bulk_settings_recovery()
+	end
+	return saved == true
 end
 
 --- Returns the current tap action id for a key.
@@ -4865,6 +5143,9 @@ function M.save_recommended_keys(request)
 		or request.backup_path == "" then
 		return false, "no settings file or backup to save with"
 	end
+	if _bulk_settings_transaction and _bulk_settings_transaction.detached == true then
+		retry_bulk_settings_recovery()
+	end
 	if M.has_pending_settings_save() then
 		Logger.error(LOG, "%s refused: the running bridge still owes a settings save that would overwrite '%s'.",
 			label, path)
@@ -4874,7 +5155,7 @@ function M.save_recommended_keys(request)
 	local mod_combos = Config.load_mod_combos(MOD_COMBOS_FILE)
 	if not key_defs or not mod_combos then return false, "the remap data files are unreadable" end
 	Logger.start(LOG, "%s: %d key(s) into '%s'…", label, type(request.keys) == "table" and #request.keys or 0, path)
-	local state, status = Config.load_user_config(key_defs, mod_combos, path)
+	local state, status, admitted_source = Config.load_user_config(key_defs, mod_combos, path)
 	if type(state) ~= "table" or status == "error" then
 		Logger.error(LOG, "%s refused: '%s' is unsafe.", label, path)
 		return false, "'" .. path .. "' is unsafe"
@@ -4884,15 +5165,26 @@ function M.save_recommended_keys(request)
 		Logger.error(LOG, "%s refused: %s.", label, tostring(refusal))
 		return false, refusal
 	end
-	local expected, backup_detail = back_up_settings_source(request.backup_path, path)
+	local expected, backup_detail, backup_cleanup = back_up_settings_source(request.backup_path, path, admitted_source)
 	if not expected then
+		if backup_cleanup ~= nil then
+			_bulk_settings_transaction = { label = label, detached = true,
+				backup_cleanup = backup_cleanup, phase = "rollback-sibling" }
+			retry_bulk_settings_recovery()
+		end
 		Logger.error(LOG, "%s refused before any write: %s.", label, tostring(backup_detail))
 		return false, backup_detail
 	end
 	apply_recommended_bindings(state, bindings)
 	-- A settings-only save carries no integration decision.
 	state.enabled = nil
-	if Config.save_user_config(state, path, nil, expected) ~= true then
+	local saved, _, file = Config.save_user_config(state, path, nil, expected)
+	if saved ~= true then
+		if file ~= nil then
+			_bulk_settings_transaction = { label = label, detached = true,
+				file = file, phase = "rollback-persistence" }
+			retry_bulk_settings_recovery()
+		end
 		Logger.error(LOG, "%s: '%s' was not written.", label, path)
 		return false, "'" .. path .. "' was not written"
 	end
@@ -4946,11 +5238,13 @@ end
 
 --- Restores one captured settings snapshot through the same exact bulk owner.
 --- The enabled flag belongs to the lease transition and must still match; this
---- inverse owns only the remaining persisted settings and their regeneration.
+--- inverse owns the remaining persisted settings and their regeneration, plus
+--- the acknowledged scope import when its exact receipt accompanies the snapshot.
 --- @param snapshot table Detached result of `snapshot_settings()`.
 --- @param on_done function|nil Callback fn(ok, reason).
+--- @param layer_receipt table|nil Exact import receipt delivered by apply_scope.
 --- @return boolean accepted True only when exact regeneration was accepted.
-function M.restore_settings(snapshot, on_done)
+function M.restore_settings(snapshot, on_done, layer_receipt)
 	local desired = clone_persisted_settings(snapshot)
 	if not desired then
 		invoke_public_callback(
@@ -4972,6 +5266,15 @@ function M.restore_settings(snapshot, on_done)
 		)
 		return false
 	end
+	local sibling = nil
+	if layer_receipt ~= nil then
+		local detail
+		sibling, detail = require("platform.remap.scope_layer").inverse(layer_receipt)
+		if not sibling then
+			invoke_public_callback("Restore captured settings", on_done, false, detail, 0)
+			return false
+		end
+	end
 	return apply_bulk_settings_transaction("Restore captured settings", function(candidate)
 		local restored = clone_persisted_settings(desired)
 		candidate.tap_holds_enabled = restored.tap_holds_enabled
@@ -4983,7 +5286,7 @@ function M.restore_settings(snapshot, on_done)
 		candidate.simultaneous_threshold_ms = restored.simultaneous_threshold_ms
 		candidate.combo_symmetric = restored.combo_symmetric
 		return 0
-	end, on_done)
+	end, on_done, nil, nil, sibling)
 end
 
 --- Clears both slots for one tap/hold key as one exact transaction.
@@ -5090,9 +5393,13 @@ function M.settings_pending()
 	return _bulk_settings_transaction ~= nil
 end
 
---- Retries a retained bulk inverse once; its regeneration may settle later.
---- @return boolean settled True only when no bulk owner or debt remains.
+--- Retries retained enabled publication or bulk inverse recovery once.
+--- Required native fencing or regeneration may settle later.
+--- @return boolean settled True only when the selected owner and its debt settle.
 function M.retry_settings_recovery()
+	if _enabled_transition ~= nil and _enabled_transition.file ~= nil then
+		if _enabled_transition.retry() ~= true then return false end
+	end
 	return retry_bulk_settings_recovery() == true
 end
 
@@ -5108,10 +5415,11 @@ local REMAP_SCOPE_SECTIONS = { tap_holds = "tap_holds", shortcuts = "mod_combos"
 --- manifest rows; every other table of the file is left untouched. The
 --- tap_holds « recommended » first creates layers.toml from Ergopti's
 --- recommended layer when the folder has none, so the regeneration deploys the
---- layer the preset's key enters; a refused transaction removes that file.
+--- layer the preset's key enters. Its exact import receipt joins the settings
+--- inverse; a refused cleanup retains debt until absence is acknowledged.
 --- @param request table `{ scope = "tap_holds"|"shortcuts"|"key_combinations",
 ---   mode = "recommended"|"clear", backup_path = string }`.
---- @param on_done function|nil Callback fn(ok, reason, change_count).
+--- @param on_done function|nil Callback fn(ok, reason, change_count, layer_receipt).
 --- @return boolean accepted True only when exact regeneration was accepted.
 function M.apply_scope(request, on_done)
 	local label = "Remap scope"
@@ -5130,23 +5438,8 @@ function M.apply_scope(request, on_done)
 		return false
 	end
 	Logger.debug(LOG, "Remap scope %s '%s' transaction requested.", request.scope, request.mode)
-	local layer = nil
-	if request.scope == "tap_holds" and request.mode == "recommended" then
-		local import, layer_err = NavLayer.import_recommended()
-		if not import then
-			Logger.error(LOG, "%s refused: the recommended navigation layer cannot be imported (%s).",
-				label, tostring(layer_err))
-			invoke_public_callback(label, on_done, false, "nav-layer-import-failed", 0)
-			return false
-		end
-		layer = import
-	end
-	local function settle(ok, reason, change_count)
-		if ok ~= true then NavLayer.undo_import(layer) end
-		-- The imported layer binds the wheel: its owner reads the new file.
-		if ok == true and layer then NavLayer.reconcile_wheel(label) end
-		if on_done then return on_done(ok, reason, change_count) end
-	end
+	local sibling = request.scope == "tap_holds" and request.mode == "recommended"
+		and require("platform.remap.scope_layer").import() or nil
 	return apply_bulk_settings_transaction(label, function(candidate)
 		local target = request.mode == "recommended"
 			and Config.build_recommended_state(M.TAP_HOLD_KEYS, M.MOD_COMBOS)
@@ -5175,7 +5468,7 @@ function M.apply_scope(request, on_done)
 		candidate.tap_hold_timeout_ms = target.tap_hold_timeout_ms
 		candidate.sticky_timeout_ms = target.sticky_timeout_ms
 		return #M.TAP_HOLD_KEYS
-	end, settle, nil, request.backup_path)
+	end, on_done, nil, request.backup_path, sibling)
 end
 
 --- Restores the settings to defaults as one exact transaction: every setting,
@@ -5994,8 +6287,8 @@ function M.init(file_system)
 		return false
 	end
 
-	if _state then
-		Logger.warn(LOG, "M.init() called more than once — ignoring duplicate call.")
+	if _state or settle_bulk_settings_before_lifecycle("Karabiner initialization", "local-teardown") ~= true then
+		Logger.warn(LOG, "M.init() refused an existing runtime or an unsettled settings owner.")
 		return false
 	end
 
@@ -6041,22 +6334,62 @@ function M.init(file_system)
 	end
 	local first_launch = user_config_status == "absent"
 
-	-- Establish no lease generation until the persisted enable/disable decision
-	-- is safely readable. An unreadable config may contain `enabled = false`.
-	if not LeaseController.init(on_lease_phase) then
-		Logger.error(LOG, "Exact Karabiner lease controller initialization failed — remapping stays fail-closed.")
-		return false
+	--- Retains failed boot publication before any remap runtime or native lease.
+	--- Failed native publication retains cleanup only: these saved defaults or
+	--- migrations are not a runtime candidate to compensate by resetting bytes.
+	--- @param saved boolean Literal publication result.
+	--- @param file table|nil Private native publication receipt.
+	--- @param label string Private publication owner label.
+	--- @return boolean acknowledged
+	local function retain_startup_publication(saved, file, label)
+		if saved ~= true and type(file) == "table" then
+			_bulk_settings_transaction = { label = label, detached = true,
+				file = file, phase = "rollback-sibling" }
+		end
+		return saved == true
 	end
 	local tab_cfg      = user_cfg.tap_hold_config and user_cfg.tap_hold_config.tab
 	if type(tab_cfg) == "table" and tab_cfg.tap == "cmd_tab" then
 		tab_cfg.tap = "alt_tab_windows"
 		-- The save is refused when the file on disk is unparseable, so announcing
 		-- the migration unconditionally would claim a persistence that never happened.
-		if Config.save_user_config(user_cfg, resolve_user_config()) then
+		local saved, _, file = Config.save_user_config(user_cfg, resolve_user_config())
+		if retain_startup_publication(saved, file, "Startup tab action migration") then
 			Logger.info(LOG, "Migrated tab.tap: 'cmd_tab' → 'alt_tab_windows'.")
+		elseif _bulk_settings_transaction ~= nil then
+			Logger.warn(LOG, "tab.tap migration publication remains unacknowledged.")
 		else
 			Logger.warn(LOG, "tab.tap migrated in memory only — the user config was not written.")
 		end
+	end
+
+	-- A first-launch save has no live runtime to publish. Make the same persisted
+	-- payload before native initialization so failed release cannot leave a
+	-- partially started bridge reporting successful boot.
+	if first_launch then
+		local startup = clone_settings_state(user_cfg)
+		startup.tap_holds_enabled = user_cfg.tap_holds_enabled ~= false
+		local saved, _, file = Config.save_user_config(startup, resolve_user_config())
+		if retain_startup_publication(saved, file, "Startup default configuration") then
+			Logger.info(LOG, "Default config written to '%s'.", resolve_user_config())
+		elseif _bulk_settings_transaction ~= nil then
+			Logger.error(LOG, "Default config publication remains unacknowledged in '%s'.", resolve_user_config())
+		else
+			Logger.error(LOG, "Default config could NOT be written to '%s' — settings will not survive a restart.",
+				resolve_user_config())
+		end
+	end
+
+	-- Establish no native lease or runtime until the saved decision is readable
+	-- and every private startup writer receipt has settled. This reuses init's
+	-- existing refusal boundary; retries only release the exact original writer.
+	if _bulk_settings_transaction ~= nil or not LeaseController.init(on_lease_phase) then
+		if _bulk_settings_transaction ~= nil then
+			Logger.error(LOG, "Karabiner initialization refused before startup publication cleanup settled.")
+		else
+			Logger.error(LOG, "Exact Karabiner lease controller initialization failed — remapping stays fail-closed.")
+		end
+		return false
 	end
 
 	_state = {
@@ -6149,16 +6482,6 @@ function M.init(file_system)
 		-- module initialization do not fire reliably. The main init.lua calls
 		-- M.regenerate() explicitly at the very end of its boot sequence, once
 		-- the event loop is guaranteed to be running.
-	end
-
-	-- Persist immediately on first launch so the file exists for future runs
-	if first_launch then
-		if Config.save_user_config(_state, resolve_user_config()) then
-			Logger.info(LOG, "Default config written to '%s'.", resolve_user_config())
-		else
-			Logger.error(LOG, "Default config could NOT be written to '%s' — settings will not survive a restart.",
-				resolve_user_config())
-		end
 	end
 
 	-- Gesture probes and F17 sentinels are lease-owned resources. Starting them
@@ -6341,6 +6664,13 @@ end
 --- disabled hotkey with an unfenced Karabiner generation.
 --- @return boolean stopped True only when every local resource was released.
 function M.teardown_local()
+	if _enabled_transition ~= nil and _enabled_transition.file ~= nil then
+		local transaction = _enabled_transition
+		if transaction.before_lifecycle() ~= true then
+			Logger.error(LOG, "Karabiner local teardown refused while enabled publication recovery is pending.")
+			return false
+		end
+	end
 	if settle_bulk_settings_before_lifecycle("Karabiner local teardown", "local-teardown") ~= true then
 		return false
 	end
@@ -6371,6 +6701,13 @@ end
 --- @param on_done function|nil Callback fn(fenced, reason).
 --- @return boolean True when exact revocation was accepted.
 function M.revoke(reason, on_done)
+	if _enabled_transition ~= nil and _enabled_transition.file ~= nil then
+		local transaction = _enabled_transition
+		if transaction.before_lifecycle() ~= true then
+			invoke_public_callback("revoke", on_done, false, "enabled-publication-recovery-pending")
+			return false
+		end
+	end
 	if settle_bulk_settings_before_lifecycle("Karabiner lease revocation",
 		"lease-revocation-requested") ~= true then
 		invoke_public_callback(

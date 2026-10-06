@@ -192,3 +192,99 @@ helpers.describe("i18n persistence", function()
   end)
 
 end)
+
+helpers.describe("i18n explicit wizard persistence", function()
+	local function with_owned_store(options, body)
+		local names = { "infra.i18n", "infra.locale", "adapters.storage", "infra.config_paths" }
+		local saved = {}
+		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+		local root = os.tmpname()
+		os.remove(root)
+		local made = os.execute("mkdir -p " .. string.format("%q", root .. "/ergopti_plus"))
+		helpers.assert_true(made == true or made == 0)
+		local path = root .. "/ergopti_plus/storage.json"
+		local seed = '{"locale":"zz_UNSUPPORTED","future":{"retained":true}}\n'
+		local fh = assert(io.open(path, "wb"))
+		assert(fh:write(seed)); assert(fh:close())
+		local original_rename = os.rename
+		local attempts = 0
+		local observations = nil
+		local ok, err = xpcall(function()
+			package.loaded["infra.config_paths"] = { config_home = function() return root end }
+			package.loaded["infra.locale"] = nil
+			package.loaded["adapters.storage"] = nil
+			package.loaded["infra.i18n"] = nil
+			local i18n = require("infra.i18n")
+			i18n.init()
+			os.rename = function(from, to)
+				if from == path .. ".tmp" and to == path then
+					attempts = attempts + 1
+					if options.rename == "throw" then error("owned rename refused") end
+					if options.rename == "false" then return nil, "owned rename refused", 13 end
+				end
+				return original_rename(from, to)
+			end
+			observations = body(i18n, path, seed)
+		end, debug.traceback)
+		os.rename = original_rename
+		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+		os.remove(path .. ".tmp"); os.remove(path)
+		os.execute("rmdir " .. string.format("%q", root .. "/ergopti_plus"))
+		os.execute("rmdir " .. string.format("%q", root))
+		if not ok then error(err, 0) end
+		return observations, attempts
+	end
+
+	local function read(path)
+		local fh = assert(io.open(path, "rb"))
+		local raw = assert(fh:read("*a")); assert(fh:close())
+		return raw
+	end
+
+	for _, code in ipairs({ "fr", "en" }) do
+		for _, mode in ipairs({ "false", "throw" }) do
+			helpers.it("(wizard-locale-ack) refuses " .. code .. " after an actual " .. mode .. " rename", function()
+				local observed, attempts = with_owned_store({ rename = mode }, function(i18n, path, seed)
+					local before = i18n.get_locale()
+					local accepted = i18n.persist_locale(code)
+					return { before = before, after = i18n.get_locale(), accepted = accepted,
+						unchanged = read(path) == seed }
+				end)
+				helpers.assert_eq(observed, { before = "fr", after = "fr", accepted = false, unchanged = true })
+				helpers.assert_eq(attempts, 1, "explicit selection reaches the actual private storage owner")
+			end)
+		end
+	end
+
+	for _, code in ipairs({ "fr", "en" }) do
+		helpers.it("(wizard-locale-ack) reads back the acknowledged " .. code .. " selection", function()
+			local observed, attempts = with_owned_store({}, function(i18n, path)
+				local accepted = i18n.persist_locale(code)
+				return { accepted = accepted, locale = i18n.get_locale(),
+					stored = require("json").decode(read(path)) }
+			end)
+			helpers.assert_true(observed.accepted)
+			helpers.assert_eq(observed.locale, code)
+			helpers.assert_eq(observed.stored, { locale = code, future = { retained = true } })
+			helpers.assert_eq(attempts, 1)
+		end)
+	end
+
+	helpers.it("(wizard-locale-ack) rejects invalid input before publication", function()
+		local observed, attempts = with_owned_store({}, function(i18n, path, seed)
+			local rejected = { i18n.persist_locale(nil), i18n.persist_locale(""),
+				i18n.persist_locale("xx_NOT_SUPPORTED"), i18n.persist_locale(false) }
+			return { rejected = rejected, locale = i18n.get_locale(), unchanged = read(path) == seed }
+		end)
+		helpers.assert_eq(observed, { rejected = { false, false, false, false }, locale = "fr", unchanged = true })
+		helpers.assert_eq(attempts, 0)
+	end)
+
+	helpers.it("(wizard-locale-ack) leaves the ordinary same-locale menu setter unchanged", function()
+		local observed, attempts = with_owned_store({ rename = "false" }, function(i18n, path, seed)
+			return { accepted = i18n.set_locale("fr"), unchanged = read(path) == seed }
+		end)
+		helpers.assert_eq(observed, { accepted = true, unchanged = true })
+		helpers.assert_eq(attempts, 0)
+	end)
+end)

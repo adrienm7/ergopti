@@ -90,7 +90,7 @@ local DEFAULT_EFFECTS = {
 	open = function(target) return open_with({ target }) end,
 	open_url = function(url) return require("ui.ui_builder").open_http_url(url) end,
 	notify = function(title, body, kind)
-		return require("adapters.notifier").send(title, { body = body, kind = kind })
+		return require("adapters.application_notifier").send(title, { body = body, kind = kind })
 	end,
 	identity = function() return { home = os.getenv("HOME"), user = os.getenv("USER") } end,
 }

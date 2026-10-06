@@ -1,0 +1,48 @@
+{
+	"schema_version": 1,
+	"description": "Independent optional backend capability expectations. Never generate expected actions from policy or implementation.",
+	"vectors": [
+		{
+			"id": "missing_alternate_capability",
+			"cause": "host_blocked",
+			"capabilities": { "owner_alive": true },
+			"actions": []
+		},
+		{
+			"id": "unavailable_actual_alternate",
+			"cause": "host_blocked",
+			"capabilities": { "owner_alive": true, "alternative_backend_available": false },
+			"actions": []
+		},
+		{
+			"id": "string_is_not_bound_alternate",
+			"cause": "host_blocked",
+			"capabilities": { "owner_alive": true, "alternative_backend_available": "true" },
+			"actions": []
+		},
+		{
+			"id": "backend_name_is_not_bound_alternate",
+			"cause": "certificate",
+			"capabilities": { "owner_alive": true, "alternative_backend_available": "ollama" },
+			"actions": []
+		},
+		{
+			"id": "retired_owner_cannot_select_alternate",
+			"cause": "host_blocked",
+			"capabilities": { "owner_alive": false, "alternative_backend_available": true },
+			"actions": []
+		},
+		{
+			"id": "actual_bound_alternate_for_verified_block",
+			"cause": "host_blocked",
+			"capabilities": { "owner_alive": true, "alternative_backend_available": true },
+			"actions": ["alternative_backend"]
+		},
+		{
+			"id": "unknown_cause_does_not_offer_alternate",
+			"cause": "unknown",
+			"capabilities": { "owner_alive": true, "alternative_backend_available": true },
+			"actions": []
+		}
+	]
+}

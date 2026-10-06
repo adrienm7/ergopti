@@ -1,7 +1,7 @@
 # _shared/tests/corpus/config_migrations/shipped_script_chords_renamed_on_macos/expected.toml
 
 [_meta]
-schema_version = 9
+schema_version = 11
 
 [shortcuts]
 enabled = true

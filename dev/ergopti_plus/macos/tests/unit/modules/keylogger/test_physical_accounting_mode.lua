@@ -109,3 +109,72 @@ helpers.describe("physical accounting mode (hs274)", function()
 		end)
 	end)
 end)
+
+helpers.describe("physical source settlement (wp3)", function()
+	local operations = {
+		select = function(mode) return mode.select_stream(OWNER) end,
+		admit = function(mode) return mode.admit(OWNER, CAPTURE, mode.COMPLETE_COVERAGE) end,
+		interrupt = function(mode) return mode.interrupt(OWNER, CAPTURE) end,
+		release = function(mode) return mode.release(OWNER) end,
+	}
+	local function prepare(mode, operation)
+		if operation ~= "select" then mode.select_stream(OWNER) end
+		if operation == "interrupt" or operation == "release" then
+			mode.admit(OWNER, CAPTURE, mode.COMPLETE_COVERAGE)
+		end
+	end
+	for _, operation in ipairs({ "select", "admit", "interrupt", "release" }) do
+		for _, receipt in ipairs({ "false", "nil", "number", "throw" }) do
+			helpers.it("(wp3-settlement) refuses " .. operation .. " after " .. receipt .. " settlement", function()
+				with_mode(function(mode)
+					local refuse, calls = false, 0
+					helpers.assert_eq(mode.bind_settlement({}, function()
+						calls = calls + 1
+						if not refuse then return true end
+						if receipt == "throw" then error("owned settlement refusal") end
+						if receipt == "nil" then return nil end
+						if receipt == "number" then return 1 end
+						return false
+					end), true)
+					prepare(mode, operation)
+					local source, capture, before = mode.credit_source(), mode.admitted_capture(), calls
+					refuse = true
+					local accepted, reason = operations[operation](mode)
+					helpers.assert_eq(accepted, false)
+					helpers.assert_eq(reason, "settlement_refused")
+					helpers.assert_eq(mode.credit_source(), source)
+					helpers.assert_eq(mode.admitted_capture(), capture)
+					helpers.assert_eq(calls, before + 1)
+				end)
+			end)
+		end
+	end
+	helpers.it("(wp3-settlement) binds one owner before selection and rejects replacement", function()
+		with_mode(function(mode)
+			local owner = {}
+			helpers.assert_eq(mode.bind_settlement(false, function() return true end), false)
+			helpers.assert_eq(mode.bind_settlement(owner, false), false)
+			helpers.assert_eq(mode.bind_settlement(owner, function() return true end), true)
+			helpers.assert_eq(mode.bind_settlement(owner, function() return true end), false)
+			helpers.assert_eq(mode.bind_settlement({}, function() return true end), false)
+			helpers.assert_eq(mode.select_stream(OWNER), true)
+			helpers.assert_eq(mode.bind_settlement({}, function() return true end), false)
+		end)
+	end)
+	helpers.it("(wp3-settlement) rejects reentry before any competing source publication", function()
+		with_mode(function(mode)
+			local observations = {}
+			helpers.assert_eq(mode.bind_settlement({}, function()
+				observations.source = mode.credit_source()
+				observations.reentry = pcall(mode.select_stream, "intruder")
+				observations.rebind = pcall(mode.bind_settlement, {}, function() return true end)
+				return true
+			end), true)
+			helpers.assert_eq(mode.select_stream(OWNER), true)
+			helpers.assert_eq(observations, { source = mode.SOURCE_LEGACY, reentry = false, rebind = false })
+			helpers.assert_eq(mode.credit_source(), mode.SOURCE_GAP)
+			raises(function() mode.release("intruder") end, "owns the stream")
+			helpers.assert_eq(mode.credit_source(), mode.SOURCE_GAP)
+		end)
+	end)
+end)

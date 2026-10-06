@@ -23,6 +23,7 @@ local M = {}
 
 local Logger = require("logger.shim")
 local Shell  = require("adapters.shell_runner")
+local NoReplaceMove = require("infra.no_replace_move")
 
 -- Shared pure-Lua JSON codec (single source of truth for all Lua drivers). The
 -- bespoke encoder/decoder this replaces silently flattened nested tables and
@@ -30,6 +31,7 @@ local Shell  = require("adapters.shell_runner")
 local json = require("json")
 
 local LOG = "adapters.storage"
+local ENOENT = 2 -- Native Linux errno: only a proven missing store may start empty.
 
 
 -- ========================================
@@ -78,14 +80,25 @@ local function _close(fh)
 end
 
 --- Finds a recovery path without overwriting an older corrupt-store backup.
---- @return string
+--- @return string|nil Unoccupied path, or nil when absence cannot be proven.
 local function _next_recovery_path()
 	local candidate = _CORRUPT_PATH
 	local suffix = 0
 	while true do
-		local fh = io.open(candidate, "r")
-		if not fh then return candidate end
-		_close(fh)
+		-- Opening is not an existence probe: FIFO endpoints block and dangling
+		-- links look absent. Skip known occupied special paths without following
+		-- them; keep ordinary-file read refusals conservative as before.
+		local path = Shell.quote(candidate)
+		local query = "if test -L " .. path .. " || { test -e " .. path .. " && test ! -f " .. path
+			.. "; }; then printf special; else printf ordinary; fi"
+		local queried, inspected, kind = pcall(Shell.exec_checked, query)
+		if not queried or inspected ~= true or (kind ~= "special" and kind ~= "ordinary") then return nil end
+		if kind == "ordinary" then
+			local ok, fh, _, errno = pcall(io.open, candidate, "r")
+			if not ok then return nil end
+			if not fh then return errno == ENOENT and candidate or nil end
+			_close(fh)
+		end
 		suffix = suffix + 1
 		candidate = _CORRUPT_PATH .. "." .. suffix
 	end
@@ -95,7 +108,15 @@ end
 --- @param reason string Stable recovery reason.
 local function _preserve_corrupt_store(reason)
 	local recovery_path = _next_recovery_path()
-	local ok, renamed = pcall(os.rename, _STORE_PATH, recovery_path)
+	local ok, renamed = false, false
+	while recovery_path do
+		local failure
+		ok, renamed, failure = pcall(NoReplaceMove.move, _STORE_PATH, recovery_path)
+		if not ok or renamed == true or failure ~= "EEXIST" then break end
+		-- Inspection is advisory: another writer can claim this name before the
+		-- native move. Reinspect without replacing any concurrently created inode.
+		recovery_path = _next_recovery_path()
+	end
 	if ok and renamed == true then
 		_recovery = { reason = reason, path = recovery_path, preserved = true }
 		Logger.error(LOG, "Corrupt storage preserved at '%s'; starting with an empty store.", recovery_path)
@@ -108,14 +129,15 @@ end
 
 --- Loads the store from disk into _cache.
 local function _load()
-	local ok_open, fh = pcall(io.open, _STORE_PATH, "r")
-	if not ok_open then
+	local ok_open, fh, _, open_errno = pcall(require("infra.regular_file_reader").open, _STORE_PATH)
+	if not ok_open or not fh then
 		_cache = {}
+		if ok_open and open_errno == ENOENT then return end
 		_load_blocked = true
-		Logger.error(LOG, "Storage read could not start; mutations are blocked.")
+		_recovery = { reason = "read_failed", path = _STORE_PATH, preserved = true }
+		Logger.error(LOG, "Storage read could not start; original path retained and mutations blocked.")
 		return
 	end
-	if not fh then _cache = {} ; return end
 	local read_ok, content = pcall(fh.read, fh, "*a")
 	local close_ok = _close(fh)
 	if not read_ok or type(content) ~= "string" or not close_ok then
@@ -126,7 +148,9 @@ local function _load()
 		return
 	end
 	local decode_ok, decoded = pcall(json.decode, content)
-	if decode_ok and type(decoded) == "table" then
+	-- Lua represents both JSON objects and arrays as tables. A root array is
+	-- not this key-value store: the next object write would discard its entries.
+	if decode_ok and type(decoded) == "table" and content:match("^%s*{") then
 		_cache = decoded
 		return
 	end
@@ -134,9 +158,38 @@ local function _load()
 	_preserve_corrupt_store("invalid_json")
 end
 
+--- Creates the staging inode exclusively and retains its original descriptor.
+--- LuaJIT forwards C11 wx to libc; stock Lua rejects that stdio mode, so its
+--- native libuv descriptor supplies the same no-clobber boundary.
+--- @return file*|table|nil handle
+local function _open_owned_temp()
+	if _VERSION == "Lua 5.1" then return io.open(_TMP_PATH, "wx") end
+	local ok, uv = pcall(require, "luv")
+	if not ok or type(uv.fs_open) ~= "function" or type(uv.fs_write) ~= "function" or type(uv.fs_close) ~= "function" then
+		return nil, "exclusive storage staging is unavailable"
+	end
+	local fd, err = uv.fs_open(_TMP_PATH, "wx", 384) -- Native 0600 permission bits.
+	if not fd then return nil, err end
+	return {
+		write = function(_, bytes)
+			local offset = 0
+			while offset < #bytes do
+				local written, failure = uv.fs_write(fd, bytes:sub(offset + 1), offset)
+				if type(written) ~= "number" or written <= 0 or written > #bytes - offset then
+					return nil, failure or "storage write did not commit"
+				end
+				offset = offset + written
+			end
+			return true
+		end,
+		close = function() return uv.fs_close(fd) end,
+	}
+end
+
 --- Persists a staged cache to disk atomically.
 --- @param staged table Candidate store that is not yet published in memory.
 --- @return boolean
+--- @return table|nil snapshot Owned representation of the persisted JSON.
 local function _flush(staged)
 	if type(staged) ~= "table" or _load_blocked then return false end
 	local encode_ok, payload = pcall(json.encode, staged)
@@ -144,7 +197,14 @@ local function _flush(staged)
 		Logger.error(LOG, "_flush(): store could not be encoded.")
 		return false
 	end
-	local open_ok, fh = pcall(io.open, _TMP_PATH, "w")
+	-- Own the same representation a subsequent process will read, rather than
+	-- publishing caller tables whose later mutations bypass durable writes.
+	local decode_ok, snapshot = pcall(json.decode, payload)
+	if not decode_ok or type(snapshot) ~= "table" then
+		Logger.error(LOG, "_flush(): store could not round-trip through JSON.")
+		return false
+	end
+	local open_ok, fh = pcall(_open_owned_temp)
 	if not open_ok or not fh then
 		-- Create the directory only after a direct open proved it is needed. This
 		-- keeps an already-existing directory independent of shell flavour while
@@ -154,7 +214,7 @@ local function _flush(staged)
 			Logger.error(LOG, "_flush(): configuration directory could not be created.")
 			return false
 		end
-		open_ok, fh = pcall(io.open, _TMP_PATH, "w")
+		open_ok, fh = pcall(_open_owned_temp)
 	end
 	if not open_ok or not fh then
 		Logger.error(LOG, "_flush(): temporary file could not be opened.")
@@ -178,7 +238,7 @@ local function _flush(staged)
 		Logger.error(LOG, "_flush(): atomic rename failed.")
 		return false
 	end
-	return true
+	return true, snapshot
 end
 
 --- Ensures the in-memory cache is populated.
@@ -206,8 +266,9 @@ local function _commit(mutate)
 		Logger.error(LOG, "Storage mutation staging failed — %s", tostring(err))
 		return false
 	end
-	if not _flush(staged) then return false end
-	_cache = staged
+	local flushed, snapshot = _flush(staged)
+	if not flushed then return false end
+	_cache = snapshot
 	return true
 end
 
@@ -245,7 +306,10 @@ end
 function M.get(key, default_value)
 	_ensure_loaded()
 	local ok, result = pcall(function()
-		return _cache[tostring(key)]
+		local value = _cache[tostring(key)]
+		-- Native settings backends return values, not mutable cache ownership.
+		if type(value) == "table" then return json.decode(json.encode(value)) end
+		return value
 	end)
 	if not ok then
 		Logger.error(LOG, "get(): failed to read key '%s' — %s", tostring(key), tostring(result))

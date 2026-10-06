@@ -30,6 +30,10 @@ enabled = false
 [hotstrings.dynamic.ssn_prefixes]
 enabled = false
 
+[hotstrings.dynamic.user_code]
+enabled = false
+time_activation_seconds = 0.5
+
 [hotstrings.dynamic.text_expansion_personal_information]
 enabled = false
 pattern_max_length = 1
@@ -43,7 +47,15 @@ preview_autocorrect_enabled = false
 preview_colored_tooltips = false
 preview_star_enabled = false
 
-[hotstrings.autocorrection.caps]
+[hotstrings.autocorrection.names]
+enabled = false
+time_activation_seconds = 0.5
+
+[hotstrings.autocorrection.abbreviations]
+enabled = false
+time_activation_seconds = 0.5
+
+[hotstrings.autocorrection.technical_terms]
 enabled = false
 time_activation_seconds = 0.5
 
@@ -321,6 +333,11 @@ enabled = false
 chatgpt_url = "https://chat.openai.com"
 wrap_text_if_selected = false
 
+[shortcuts.key_combination_taps]
+alt_gr_then_left_alt = "none"
+alt_gr_then_caps_lock = "none"
+left_alt_then_caps_lock = "none"
+
 [shortcuts.script_control]
 chords_enabled = true
 script_altgr_backspace = "script_reload"
@@ -377,6 +394,12 @@ swipe_5_right_up = "none"
 swipe_5_horiz = "none"
 tap_2 = "none"
 tap_5 = "none"
+
+[layout]
+direct_access_digits = "native"
+
+[category_enabled]
+key_combinations = true
 
 [tap_holds]
 enabled = false

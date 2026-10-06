@@ -29,16 +29,19 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local ErrorDescription = require("error_description")
 local Json = require("json")
 local Paths = require("infra.paths")
 local Timings = require("infra.timings")
 local HttpClient = require("adapters.http_client")
 local PromptBuilder = require("llm.prompt_builder")
+local TextUtils = require("text_utils")
 local LlmBridge = require("infra.llm_bridge")
 local Monotonic = require("infra.monotonic")
 local Formats = require("llm.remote_formats")
 local AuthPolicy = require("llm.local_server_auth")
 local LocalCatalogue = require("modules.llm.local_server_catalogue")
+local ProviderConfig = require("llm.provider_config_policy")
 
 local LOG = "modules.llm.api_remote"
 
@@ -76,6 +79,7 @@ local MAX_SERVER_MESSAGE = 200
 -- =========================================
 
 local _catalogue = nil
+local _config_catalogue_failed = false
 
 --- Whether one provider descriptor is usable.
 --- @param id string
@@ -142,12 +146,13 @@ end
 --- Parses a catalogue document. Exposed for tests over the shared corpus.
 --- @param text string|nil
 --- @return table { providers, order, test_request, decisions_test }
+--- @return boolean admitted Nonempty projected catalogue, before native read acknowledgement.
 function M.parse_catalogue(text)
 	local catalogue = { providers = {}, order = {}, test_request = nil, decisions_test = nil }
 	local root = type(text) == "string" and Json.decode(text) or nil
 	if type(root) ~= "table" or type(root.providers) ~= "table" or type(root.provider_order) ~= "table" then
 		Logger.error(LOG, "api_providers.json is missing or malformed — no remote provider is available.")
-		return catalogue
+		return catalogue, false
 	end
 	for _, id in ipairs(root.provider_order) do
 		local desc = type(id) == "string" and root.providers[id] or nil
@@ -169,7 +174,7 @@ function M.parse_catalogue(text)
 	end
 	catalogue.test_request = parse_test_request(root.test_request)
 	catalogue.decisions_test = parse_decisions_test(root.decisions_test)
-	return catalogue
+	return catalogue, #catalogue.order > 0
 end
 
 --- The catalogue, loaded once from the shared tree.
@@ -179,9 +184,12 @@ local function catalogue()
 	local path = Paths.shared("modules/llm/api_providers.json")
 	local fh = path and io.open(path, "r")
 	local text = fh and fh:read("*a") or nil
-	if fh then fh:close() end
-	_catalogue = M.parse_catalogue(text)
-	local order, servers = LocalCatalogue.load(_catalogue.providers)
+	local closed = fh and fh:close()
+	local cloud_published
+	_catalogue, cloud_published = M.parse_catalogue(text)
+	local order, servers, local_published = LocalCatalogue.load(_catalogue.providers)
+	_catalogue.config_cloud_published = cloud_published == true and type(text) == "string" and closed == true
+	_catalogue.config_local_published = local_published == true
 	_catalogue.local_servers = servers
 	for _, id in ipairs(order) do
 		local desc = servers[id]
@@ -205,6 +213,23 @@ end
 --- @return table|nil
 function M.provider(id)
 	return catalogue().providers[id]
+end
+
+--- Exposes only identities whose native catalogue owner actually published.
+--- Empty, unavailable and unacknowledged reads cannot prove retirement.
+--- @return table receipt Detached cloud/local configuration publication status.
+function M.provider_config_receipt()
+	if _config_catalogue_failed then return ProviderConfig.snapshot(false, false, {}) end
+	local ok, current = pcall(catalogue)
+	if not ok then
+		-- A failed native publication cannot acquire configuration authority from
+		-- its partial cache. Its existing transport behavior remains its owner's.
+		_config_catalogue_failed = true
+		Logger.error(LOG, "Provider catalogues could not publish configuration identities: %s.", tostring(current))
+		return ProviderConfig.snapshot(false, false, {})
+	end
+	return ProviderConfig.snapshot(current.config_cloud_published,
+		current.config_local_published, current.providers)
 end
 
 --- Whether an explicit token satisfies the actual provider's capability.
@@ -280,7 +305,8 @@ function M.normalize_base_url(raw)
 	if scheme ~= "http" and scheme ~= "https" then return nil, "base URL scheme must be http or https" end
 	if authority:find("@", 1, true) then return nil, "base URL must not contain userinfo" end
 	if suffix:find("[?#]") then return nil, "base URL must not contain a query or fragment" end
-	local host, port = authority:match("^([^:]+):(%d+)$")
+	local host, port = authority:match("^(%[[%x:%.]+%]):(%d+)$")
+	if not host then host, port = authority:match("^([^:]+):(%d+)$") end
 	host = host or authority
 	if not host:match("^[%w%._%-]+$") and not host:match("^%[[%x:%.]+%]$") then
 		return nil, "base URL host is invalid"
@@ -431,8 +457,8 @@ end
 --- @param body string
 --- @return string|nil
 function M.extract_text(format, body)
-	local root = type(body) == "string" and Json.decode(body) or nil
-	if type(root) ~= "table" then return nil end
+	local root = type(body) == "string" and Json.decode_lossless(body) or nil
+	if type(root) ~= "table" or Formats.response_has_error(root) then return nil end
 	if format == "anthropic" then
 		for _, block in ipairs(type(root.content) == "table" and root.content or {}) do
 			if type(block) == "table" and block.type == "text" and type(block.text) == "string" then return block.text end
@@ -461,7 +487,7 @@ function M.server_message(body)
 	local message = type(root.error) == "table" and root.error.message or root.message
 	if type(message) ~= "string" and type(root.error) == "string" then message = root.error end
 	if type(message) ~= "string" or message == "" then return nil end
-	return message:sub(1, MAX_SERVER_MESSAGE)
+	return TextUtils.utf8_byte_prefix(message, MAX_SERVER_MESSAGE)
 end
 
 
@@ -496,7 +522,7 @@ local function open_exchange(on_done)
 		_active = nil
 		if type(on_done) == "function" then
 			local ok, callback_err = pcall(on_done, ...)
-			if not ok then Logger.error(LOG, "Terminal callback raised — %s", tostring(callback_err)) end
+			if not ok then Logger.error(LOG, "Terminal callback raised — %s", ErrorDescription.describe(callback_err)) end
 		end
 	end
 	return epoch, done
@@ -816,6 +842,7 @@ end
 --- Forgets the loaded catalogue and the Backboard assistants (tests).
 function M._reset_for_test()
 	_catalogue = nil
+	_config_catalogue_failed = false
 	_epoch = _epoch + 1
 	_active = nil
 	_assistants = {}

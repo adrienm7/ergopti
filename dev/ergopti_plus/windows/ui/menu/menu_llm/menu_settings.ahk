@@ -637,14 +637,19 @@ _LLM_Menu_NavRows() {
 	val_display   := (_LLM_Menu["val_modifiers"] != "") ? _LLM_Menu["val_modifiers"] : t("menu.llm.digits_only")
 	val_key_range := (n == 10) ? "1-0" : "1-" . n
 
-	return [
-		Map("label",    t("menu.llm.nav_label") . " — " . nav_display,
-			"disabled", (n < 2),
-			"action",   (*) => LLM_Menu_PromptNavModifiers()),
-		Map("label",    StrReplace(t("menu.llm.val_label"), "%s", val_key_range) . " — " . val_display,
-			"disabled", (n < 2),
-			"action",   (*) => LLM_Menu_PromptValModifiers())
-	]
+	Rows := []
+	for Definition in _MR_GetMenuDef("llm_navigation_rows") {
+		if !(Definition is Map) || Definition.Get("type", "") != "list"
+				|| !(Definition.Get("i18n", 0) is String) || Definition["i18n"] == ""
+			continue
+		if Definition.Get("id", "") == "llm_nav_modifiers"
+			Rows.Push(Map("label", t(Definition["i18n"]) . " — " . nav_display,
+				"disabled", (n < 2), "action", (*) => LLM_Menu_PromptNavModifiers()))
+		else if Definition.Get("id", "") == "llm_val_modifiers"
+			Rows.Push(Map("label", StrReplace(t(Definition["i18n"]), "%s", val_key_range) . " — " . val_display,
+				"disabled", (n < 2), "action", (*) => LLM_Menu_PromptValModifiers()))
+	}
+	return Rows
 }
 
 

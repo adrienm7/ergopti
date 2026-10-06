@@ -33,9 +33,11 @@ local MagicKeySourceMenu = require("ui.menu.magic_key_source_menu")
 local LayoutManagerWindow = require("ui.layout_manager")
 local install       = require("modules.keymap.layout_install")
 local input_sources = require("modules.keymap.input_sources")
+local NumberRowPolicy = require("layout.number_row_policy")
 local LOG           = "menu.keyboard_layout"
 
 M.DEFAULT_STATE = {
+	layout_number_row_mode       = Manifest.default_for("layout.direct_access_digits"),
 	layout_pause_switch_enabled = Manifest.default_for("layout.pause_switch_enabled"),
 	layout_on_pause             = Manifest.default_for("layout.on_pause"),
 	layout_on_resume            = Manifest.default_for("layout.on_resume"),
@@ -628,64 +630,6 @@ function M.build(ctx)
 		}
 	end
 
-	-- J→★ remapping lives here because it configures the physical key, not hotstring behaviour.
-	-- repeat_key_toggle remains in Hotstrings > Paramètres as it governs hotstring timing.
-	local hs_paused = ctx and ctx.paused
-	local replace_enabled = ctx and ctx.keymap
-		and type(ctx.keymap.is_section_enabled) == "function"
-		and ctx.keymap.is_section_enabled("magic_key", "replace")
-	local replace_group_on = ctx and ctx.keymap
-		and type(ctx.keymap.is_group_enabled) == "function"
-		and ctx.keymap.is_group_enabled("magic_key")
-	-- Resolve the section label from the TOML _meta.sections description (locale-aware)
-	local replace_label = nil
-	if ctx and ctx.keymap and type(ctx.keymap.get_sections) == "function" then
-		local mk_secs = ctx.keymap.get_sections("magic_key")
-		if type(mk_secs) == "table" then
-			for _, sec in ipairs(mk_secs) do
-				if type(sec) == "table" and sec.name == "replace" and sec.description then
-					local desc = sec.description
-					if type(desc) == "table" then
-						local code = i18n.get_locale and i18n.get_locale() or "fr"
-						replace_label = desc[code] or desc["fr"]
-					elseif type(desc) == "string" then
-						replace_label = desc
-					end
-					break
-				end
-			end
-		end
-	end
-	-- The manifest declares this row as the `hotstrings.magic_key.replace`
-	-- feature right after `layout_switching`, and the renderer draws no `feature`
-	-- row itself. Appending it to that list keeps the declared order and lets the
-	-- renderer materialise it like every other row of this menu.
-	if replace_label then
-		switching_rows[#switching_rows + 1] = { separator = true }
-		switching_rows[#switching_rows + 1] = {
-			label    = replace_label,
-			checked  = replace_enabled or nil,
-			disabled = not replace_group_on or hs_paused or nil,
-			action       = (replace_group_on and not hs_paused) and function()
-				if ctx and ctx.keymap then
-					if replace_enabled then
-						if type(ctx.keymap.disable_section) == "function" then
-							pcall(ctx.keymap.disable_section, "magic_key", "replace")
-						end
-					else
-						if not KeymapLifecycle.ensure_started(ctx, "enable magic-key replacement") then
-							return
-						end
-						if type(ctx.keymap.enable_section) == "function" then
-							pcall(ctx.keymap.enable_section, "magic_key", "replace")
-						end
-					end
-				end
-				ctx.do_reload("menu")
-			end or nil,
-		}
-	end
-
 	-- Rendered LAST, once every provider list is filled. The providers are read
 	-- when the renderer reaches their row, so a build issued before the
 	-- pause/resume pickers were collected drew an empty `layout_switching`.
@@ -727,8 +671,11 @@ function M.build(ctx)
 			return ctx.apply_preference_scope("keyboard_layout", mode)
 		end
 	end
+	-- Native-only status never acquires a preference or forced-input writer.
+	render_ctx.commands["number_row_mode"] = function() return false end
 	local custom_rows = custom_layout_rows(update_menu)
 	local submenu = ManifestMenu.build("layout_menu", "Layout", nil, nil, render_ctx, {
+		["number_row_policy"] = function() return NumberRowPolicy.native_rows(ManifestMenu, render_ctx.commands) end,
 		["custom_layouts"]   = function() return custom_rows end,
 		["active_layouts"]   = active_layout_rows,
 		["layout_bundle"]    = function() return bundle_rows end,
@@ -843,8 +790,24 @@ function M.scope_pending() return next(pending_switches) ~= nil end
 --- Captures the exact future automatic-switching policy.
 --- @param state table Live menu state.
 --- @return table|nil snapshot Detached policy, absent while native work is pending.
-function M.capture_scope(state)
+function M.capture_scope(state, source)
 	if M.scope_pending() then return nil end
+	-- The new read-only number-row status does not acquire a future or malformed
+	-- personal leaf during a whole scope restoration. Observe only this leaf
+	-- from the transaction's exact admitted source, before backup/publication.
+	if source ~= nil then
+		if type(source) ~= "table" or (source.status ~= "ok" and source.status ~= "absent") then return nil end
+		if source.status == "ok" then
+			if type(source.content) ~= "string" then return nil end
+			local decoded, document = pcall(require("infra.toml.codec").decode, source.content)
+			if not decoded or type(document) ~= "table" then return nil end
+			local layout = document.layout
+			if layout ~= nil and type(layout) ~= "table" then return nil end
+			local value
+			if type(layout) == "table" then value = layout.direct_access_digits end
+			if value ~= nil and NumberRowPolicy.mode(value) == nil then return nil end
+		end
+	end
 	local result = {}
 	local Preferences = require("infra.preferences")
 	for _, row in ipairs(Manifest.scope_operations("keyboard_layout", "clear")) do

@@ -933,6 +933,9 @@ local ui_restore         = require("infra.ui_restore")
 do
 	local init_ok, initialized_or_err = xpcall(function()
 		return TerminationCoordinator.init({
+			capture_publication_admission = function()
+				return require("modules.hotstrings.hotstrings_config").capture_terminal_admission()
+			end,
 			request_lease = request_exact_lease_revoke,
 			drain_input = function(callback)
 				return SyntheticInput.when_idle(callback)
@@ -1474,6 +1477,9 @@ do
 	override_path = override_path .. "hotstrings_config.toml"
 	local hotstring_config_ready = hotstrings_config.init({
 		override_path = override_path,
+		current_override_path = function()
+			return config_paths.get_config_dir():gsub("[/\\]+$", "") .. "/hotstrings_config.toml"
+		end,
 		delay_transaction = keymap.with_hotstring_delays,
 		toml_resolver = function(category)
 			-- A namespaced extension pack names its own discovered file, and a
@@ -1490,6 +1496,11 @@ do
 			end
 			if category == "personal" then
 				return config_paths.get("PersonalTomlPath")
+			end
+			local personal_components = require("hotstrings.personal_files").components(category)
+			if personal_components then
+				return (config_paths.get("PersonalHotstringsDir"):gsub("/+$", "")
+					.. "/" .. table.concat(personal_components, "/"))
 			end
 			-- Extension personal TOML groups: personal_ext_<stem> → hotstrings/<stem>.toml
 			local ext_stem = category:match("^personal_ext_(.+)$")
@@ -1676,7 +1687,10 @@ Boot.stage("Hotstring groups registered (personal + dynamic + common)")
 -- The personal group + recursive extension scan live in infra/personal_hotstrings;
 -- it registers each group with keymap and returns them in load order so they keep
 -- the lowest group_order (= highest priority). Extracted from init.lua Section 5.1.
-personal_files = require("infra.personal_hotstrings").load({ bundled_hotstrings_dir = bundled_hotstrings_dir })
+personal_files = require("infra.personal_hotstrings").load({
+	bundled_hotstrings_dir = bundled_hotstrings_dir,
+	saved_preferences = boot_saved_prefs,
+})
 for _, g in ipairs(personal_files) do
 	table.insert(hotfiles, g.name)
 	hotfile_paths[g.name] = g.path
@@ -1698,6 +1712,17 @@ local dynamic_hotstrings_started = dynamic_hotstrings.start(base_dir, keymap, pe
 if dynamic_hotstrings_started ~= true then
 	error("dynamic_hotstrings.start did not commit")
 end
+local boot_user_code_time = boot_saved_prefs.dynamichotstrings_user_code_time_activation_seconds
+if boot_user_code_time == nil then boot_user_code_time = dynamic_hotstrings.DEFAULT_STATE.dynamichotstrings_user_code_time_activation_seconds end
+local boot_user_code_enabled = boot_saved_prefs.dynamichotstrings_user_code_enabled
+if boot_user_code_enabled == nil then boot_user_code_enabled = dynamic_hotstrings.DEFAULT_STATE.dynamichotstrings_user_code_enabled end
+if dynamic_hotstrings.set_user_code_time_activation(boot_user_code_time) ~= true then
+	error("canonical programmable-hotstring interval did not commit before eventtap startup")
+end
+-- A malformed executable source disables only this optional user feature.
+if dynamic_hotstrings.set_user_code_enabled(boot_user_code_enabled) ~= true then
+	Logger.error(LOG, "Programmable hotstrings remain closed after source admission refusal.")
+end
 local boot_personal_info = boot_saved_prefs.personal_info
 if boot_personal_info == nil then boot_personal_info = dynamic_hotstrings.DEFAULT_STATE.personal_info end
 if dynamic_hotstrings.set_enabled(boot_personal_info) ~= true
@@ -1711,15 +1736,16 @@ table.insert(hotfiles, "dynamichotstrings")
 -- file: the bound rules keep the category and its common tier.
 Logger.debug(LOG, "Loading common TOML hotstring files…")
 local _toml_load_t0 = hs.timer.secondsSinceEpoch()
+local CommonHotstringsBoot = require("infra.common_hotstrings_boot")
+local common_file_count = 0
 local carried_categories = {}
 for _, fname in ipairs(toml_fnames) do
 	local name = fname:match("^(.-)%.toml$")
 	local own = hotstrings_dir .. fname
 	local path, section_sources = ExtensionPacks.route(name, own, is_user_hotstrings_copy(own))
 	Logger.debug(LOG, string.format("Loading TOML file: %s…", name))
-	keymap.load_toml(name, path, section_sources)
-	table.insert(hotfiles, name)
-	hotfile_paths[name] = path
+	local receipt = CommonHotstringsBoot.load(keymap, name, path, section_sources, hotfiles, hotfile_paths)
+	if receipt.committed then common_file_count = common_file_count + 1 end
 	carried_categories[name] = true
 end
 -- Language packs after the neutral files. A declared pack whose file is missing
@@ -1733,11 +1759,9 @@ for _, pack in ipairs(language_packs) do
 		local path, section_sources = ExtensionPacks.route(name, own, is_user_hotstrings_copy(own))
 		if path then
 			Logger.debug(LOG, string.format("Loading language TOML file: %s…", name))
-			keymap.load_toml(name, path, section_sources)
-			table.insert(hotfiles, name)
-			hotfile_paths[name] = path
+			local receipt = CommonHotstringsBoot.load(keymap, name, path, section_sources, hotfiles, hotfile_paths)
 			carried_categories[name] = true
-			language_file_count = language_file_count + 1
+			if receipt.committed then language_file_count = language_file_count + 1 end
 		else
 			Logger.error(LOG, string.format("Language pack file %s/%s.toml is missing.", pack.id, stem))
 		end
@@ -1748,16 +1772,14 @@ end
 -- no metadata to join, so they are reported instead of guessed.
 for _, route in ipairs(ExtensionPacks.unbundled_routes(carried_categories)) do
 	if route.path then
-		keymap.load_toml(route.category, route.path, route.section_sources)
-		table.insert(hotfiles, route.category)
-		hotfile_paths[route.category] = route.path
+		CommonHotstringsBoot.load(keymap, route.category, route.path, route.section_sources, hotfiles, hotfile_paths)
 	else
 		Logger.error(LOG, "An extension binds sections of '%s', a category this driver does not carry.",
 			route.category)
 	end
 end
 Logger.info(LOG, string.format("Loaded %d TOML hotstring file(s) and %d language file(s) in %.1fms.",
-	#toml_fnames, language_file_count, (hs.timer.secondsSinceEpoch() - _toml_load_t0) * 1000))
+	common_file_count, language_file_count, (hs.timer.secondsSinceEpoch() - _toml_load_t0) * 1000))
 -- Surface the snapshot-cache hit rate at INFO so the boot log shows whether the
 -- hotstring load took the fast (cached) path. A miss-heavy boot (e.g. right after
 -- an edit, or a stale cache dir) explains a slower "Hotstring groups registered".

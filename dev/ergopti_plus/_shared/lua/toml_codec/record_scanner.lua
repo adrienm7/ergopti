@@ -230,11 +230,12 @@ function M.scan_records(source, options)
 		-- One quoted key, such as an extension pack's `"ext:pack:stem"` or a hand
 		-- edit's `"enabled"`, is exposed apart from `addressable` so only the batch
 		-- writer, which renders it back in its canonical spelling, can edit its
-		-- line; cleanup and path readers stay unchanged. A quoted dot would collide
-		-- with a dotted key's identity, so none is offered.
+		-- line; cleanup and path readers stay unchanged. The batch writer alone
+		-- can address a quoted literal dot through semantic key path segments.
 		if table_owned and not addressable and record.key_text then
 			local key = KeyPath.parse(record.key_text)
-			if key and #key == 1 and key[1] ~= "" and not key[1]:find(".", 1, true) then
+			if key and #key == 1 and key[1] ~= ""
+				and (not key[1]:find(".", 1, true) or (options and options.quoted_headers)) then
 				record.quoted = { section = header.section, key = key[1] }
 			end
 		end

@@ -138,7 +138,8 @@ function M.parse_localectl(text)
 	if not layout then return nil end
 	local variant = text:match("X11 Variant:%s*([^\n]+)")
 	local options = text:match("X11 Options:%s*([^\n]+)")
-	return descriptor(split_commas(layout)[1], variant and split_commas(variant)[1] or nil,
+	-- Variants are index-aligned with layouts; an empty first slot is the default.
+	return descriptor(split_commas(layout)[1], variant and variant:match("^([^,]*)") or nil,
 		options, "localectl")
 end
 

@@ -375,6 +375,7 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include adapters/notifier.ahk
 #Include adapters/tray_menu.ahk
 #Include adapters/text_sender.ahk
+#Include ../_shared/modules/network/failure.ahk
 #Include adapters/http_client.ahk
 #Include adapters/secure_field_detector.ahk
 #Include adapters/storage.ahk
@@ -479,6 +480,8 @@ BootProfile_Stamp("Hotstring and TOML state initialised")
 #Include ui/update_check/init.ahk
 #Include modules/diagnostics/crash_reporter.ahk
 #Include infra/json.ahk
+#Include infra/program_parameter.ahk
+#Include infra/program_actions.ahk
 ; i18n layer — must come after toml_loader.ahk (TOML_BatchWrite), logger.ahk, and json.ahk.
 ; locale.ahk (string loading + t()) precedes i18n.ahk (locale management), which calls into it.
 #Include infra/locale.ahk
@@ -508,6 +511,7 @@ BootProfile_Stamp("Manifest, updater and locale state initialised")
 #Include ui/personal_toml_editor.ahk
 #Include ui/personal_toml_editor_webview.ahk
 #Include modules/keymap/layout/layout_altgr.ahk
+#Include ../_shared/modules/features/number_row_policy.ahk
 #Include modules/keymap/layout/layout_shift_caps.ahk
 ; .keylayout reading (registry layout emulation and the Ergopti tables):
 ; definitions only. The hotkeys are registered by KeylayoutEmulation_Boot below
@@ -577,6 +581,10 @@ KLPF_InitializeCleanup()
 #Include modules/llm/parser.ahk
 #Include modules/llm/remote_formats.ahk
 #Include ..\_shared\modules\llm\local_server_auth.ahk
+#Include ..\_shared\modules\llm\local_server_discovery.ahk
+#Include ..\_shared\modules\llm\local_server_menu.ahk
+#Include modules/llm/local_server_models.ahk
+#Include modules/llm/local_servers.ahk
 #Include modules/llm/api_remote.ahk
 #Include modules/llm/models.ahk
 ; LLM_GetSharedPath is now available — load the cross-platform defaults before
@@ -686,7 +694,7 @@ BootProfile_Stamp("Tray reset + onboarding")
 ConfigMigrateBoot(ConfigurationFile)
 BootProfile_Stamp("Configuration migration checked")
 
-global _IniCache := ParseTomlFile(ConfigurationFile)
+global _IniCache := ParseConfigTomlFile(ConfigurationFile)
 BootProfile_Stamp("Configuration TOML snapshot parsed")
 ; Latch the session sentinel SaveFullConfig honours when that parse could not
 ; READ an existing config.toml. This snapshot is taken once and never refreshed,
@@ -1372,9 +1380,16 @@ _ReleasePhantomModifiers()
 ; Deferring these ~3000 registrations after ready made a first emoji/symbol trigger
 ; literal for seconds and allowed the timer to stall the first typing burst.
 BootProfile_StageBegin("hotstrings")
-RegisterAllHotstrings(false)
+_BootHotstringsReceipt := RegisterAllHotstrings(false, true)
+if !(_BootHotstringsReceipt is Map) || !_BootHotstringsReceipt.Get("committed", false)
+	throw Error("Cold hotstring registration did not return a committed receipt.")
 BootProfile_StageEnd("hotstrings")
-BootProfile_Mark("Hotstrings registered (HSE complete)")
+if _BootHotstringsReceipt["complete"]
+	BootProfile_Mark("Hotstrings registered (HSE complete)")
+else {
+	LoggerWarn("Hotstrings", "Common autocorrection is unavailable after override admission refusal; unrelated hotstrings were registered.")
+	BootProfile_Mark("Hotstrings registered (common autocorrection unavailable)")
+}
 BootProfile_StageBegin("prefix watcher")
 HotstringPrefixWatcherInit()
 ; Install the shared low-level keyboard arbiter after the prefix InputHook. Its

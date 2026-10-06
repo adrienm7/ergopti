@@ -102,7 +102,7 @@ global DriverPid := DllCall("GetCurrentProcessId", "UInt")
 global Features := Map(
     "layout", Map(
         "ergopti_base",         true,
-        "direct_access_digits", true,
+        "direct_access_digits", "digits",
         "ergopti_alt_gr",       true,
         "ergopti_plus",         false,
         "emulated_layout",      "",
@@ -873,7 +873,7 @@ global _Stub_AppendLogHook := 0
 global _Stub_FlushBufferMutates := false
 global _Stub_FlushBufferDeferred := false
 
-KL_AppendLog(entry, &RejectedBySuspend := false, PublishGuard := unset, PublishCommit := unset) {
+KL_AppendLog(entry, &RejectedBySuspend := false, PublishGuard := unset, PublishCommit := unset, FrozenClose := unset) {
 	global _Stub_AppendLogRows, _Stub_AppendLogAccept
 	global _Stub_AppendLogRejectSuspend, _Stub_AppendLogHook
 	RejectedBySuspend := _Stub_AppendLogRejectSuspend
@@ -1026,4 +1026,12 @@ KL_ClearSynthetic(Owner, *) {
 KL_WriteAtomic(path, content) {
     try FileDelete(path)
     FileAppend(content, path, "UTF-8")
+}
+
+; Launch and cleanup fixtures still cross the real proxy continuation. Record
+; explicit direct admission so they never borrow the host's asynchronous PAC.
+_Stub_CurlResolveProxyDirect(State, Url, Callback) {
+	State["proxy_resolutions"] := State.Get("proxy_resolutions", 0) + 1
+	Callback.Call(Map("ok", true, "inherit", false, "proxy", ""))
+	return true
 }

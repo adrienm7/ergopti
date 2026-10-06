@@ -32,6 +32,7 @@ function M.new(options)
 	assert(type(Config) == "table" and type(Preferences) == "table" and type(Dynamic) == "table",
 		"dynamic bulk selection owners are incomplete")
 	local owner, held = {}, false
+	local active_snapshot
 	local files = options.files or require("adapters.file_system")
 	local manifest_port = {}
 	function manifest_port.scope_plan(scope, mode)
@@ -78,13 +79,17 @@ function M.new(options)
 		capture = function()
 			local config, preferences = Config.configuration_snapshot(), Preferences.snapshot()
 			if type(config) ~= "table" or type(preferences) ~= "table" then return nil end
-			return { config = config, preferences = preferences, dynamic_enabled = Dynamic.is_enabled() }
+			active_snapshot = { config = config, preferences = preferences, dynamic_enabled = Dynamic.is_enabled(),
+				programmable = Dynamic.user_code_scope_snapshot and Dynamic.user_code_scope_snapshot() }
+			if Dynamic.user_code_time_activation and Dynamic.user_code_time_activation() ~= nil
+				and type(active_snapshot.programmable) ~= "table" then return nil end
+			return active_snapshot
 		end,
 		apply = function(document, updates)
 			local touched = {}
 			for _, row in ipairs(updates) do touched[row.section .. "." .. row.key] = true end
 			if Preferences.adopt(owner, document, touched) ~= true then return false end
-			if Dynamic.refresh() ~= true then return false end
+			if Dynamic.refresh(active_snapshot.programmable) ~= true then return false end
 			-- Prefix families live in the ordinary matcher, unlike date guards.
 			local _, committed = Config.reload()
 			if committed ~= true then return false end
@@ -92,8 +97,12 @@ function M.new(options)
 			return Shell.run("mkdir -p " .. Shell.quote(directory) .. " 2>/dev/null") == true
 		end,
 		restore = function(snapshot)
+			if snapshot.programmable and Dynamic.user_code_scope_current(snapshot.programmable) ~= true then return false end
 			if Preferences.restore(owner, snapshot.preferences) ~= true then return false end
-			Dynamic.refresh()
+			local acknowledged, reason = Dynamic.refresh(snapshot.programmable, true)
+			if acknowledged ~= true and not (reason == "builtin-unavailable" and Dynamic.get_rules_count() == 0) then
+				return false
+			end
 			-- A previous true preference can legitimately have no loaded rules.
 			-- Restore its effective posture, including that disabled runtime.
 			if Dynamic.is_enabled() ~= snapshot.dynamic_enabled then return false end

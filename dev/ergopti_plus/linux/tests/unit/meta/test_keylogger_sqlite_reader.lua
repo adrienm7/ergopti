@@ -30,8 +30,8 @@ helpers.describe("keylogger sqlite_reader", function()
     -- must still go through the audited builder to get it.
     helpers.assert_true(src:find("SqliteCommand.build", 1, true) ~= nil,
       "reader must compose its sqlite3 invocation through the audited builder")
-    helpers.assert_true(src:find('flags = { "-json" }', 1, true) ~= nil,
-      "reader must request JSON output from sqlite3")
+    helpers.assert_true(src:find('flags = { "-readonly", "-json" }', 1, true) ~= nil,
+      "reader must open readonly while retaining JSON output from sqlite3")
     helpers.assert_true(src:find("FROM agg_app_day", 1, true) ~= nil)
     -- The single-character table used to be the only one named here, in the
     -- source and in the reader alike. It is now reached through the code→table

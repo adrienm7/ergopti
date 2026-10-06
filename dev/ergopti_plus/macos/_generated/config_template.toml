@@ -41,11 +41,23 @@ enabled = false
 [hotstrings.dynamic.ssn_prefixes]
 enabled = false
 
+[hotstrings.dynamic.user_code]
+enabled = false
+time_activation_seconds = 0.5
+
 [hotstrings.dynamic.text_expansion_personal_information]
 enabled = false
 pattern_max_length = 1
 
-[hotstrings.autocorrection.caps]
+[hotstrings.autocorrection.names]
+enabled = false
+time_activation_seconds = 0.5
+
+[hotstrings.autocorrection.abbreviations]
+enabled = false
+time_activation_seconds = 0.5
+
+[hotstrings.autocorrection.technical_terms]
 enabled = false
 time_activation_seconds = 0.5
 
@@ -461,6 +473,12 @@ swipe_3_horiz = 3.5
 swipe_4_horiz = 3.5
 swipe_5_horiz = 3.5
 
+[layout]
+direct_access_digits = "native"
+pause_switch_enabled = false
+on_pause = false
+on_resume = false
+
 [ui]
 menubar_icon = "v1"
 
@@ -489,8 +507,3 @@ ctrl_period = false
 ctrl_quote = false
 cmd_shift_v = false
 cmd_star = false
-
-[layout]
-pause_switch_enabled = false
-on_pause = false
-on_resume = false
