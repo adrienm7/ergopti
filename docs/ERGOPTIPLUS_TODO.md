@@ -4682,6 +4682,8 @@ Whole profile frames now consume shared child templates on all three drivers, pr
 
 The existing model-picker providers now obtain their inert tail separator from the shared provider status declaration. Native callback/browser phases and platform-specific conditional presence remain unchanged. Actual canonical generators retire exactly one more allocator per driver, giving the current baseline Windows74/macOS105/Linux76. Existing labels retain all21 translations; remaining native families and device qualification are still open.
 
+The Windows profile uniqueness audit now follows both actual frame providers and their shared native counter. Existing duplicate-label and disambiguator assertions remain; executable-source data decoys and four genuinely colliding Win32 rows add causal controls. Static/source review passes, while the actual native menu cases require Windows CI.
+
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote
