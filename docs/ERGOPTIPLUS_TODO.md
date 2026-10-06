@@ -5502,6 +5502,15 @@ Detailed commands, test owners and the inactive prepared packet are in
 [group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md).
 This deferral does not complete this item or the cross-cutting items16/38.
 
+Native provider CI fixture correction on 2026-10-06: the real Hammerspoon
+JSON decoder accepts exactly one argument, while the shared resolver returns
+value and reason. Capture its scalar before decoding instead of forwarding
+both through assert. The regression fails before and passes after on Lua 5.4
+and LuaJIT; the complete Lua 5.4 provider module passes 21/0. All 57 original
+native checks, 16 full-provider and 5 shim cases remain unchanged. This corrects
+the case raised in macOS run 37329111337; actual hosted revalidation remains
+required, and no production interpreter/provider behavior was changed.
+
 - [~] **107.** Make the number-row policy explicit: native behavior, digits
   directly or symbols directly, with an acknowledged migration of the old
   Windows Boolean and preserved unrelated settings. The earlier Boolean slice

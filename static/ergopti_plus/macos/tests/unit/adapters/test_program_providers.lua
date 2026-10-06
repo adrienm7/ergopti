@@ -330,3 +330,66 @@ helpers.describe("native provider inventory through shared policy", function()
 		end)
 	end)
 end)
+
+helpers.describe("native provider fixture scalar boundary", function()
+	helpers.it("forwards one scalar from actual shared resolution to the strict SDK arity mirror", function()
+		-- This executes the native case body, not the native JSON implementation.
+		local fixture = helpers.driver_root() .. "../../../tools/diagnostics/native_hs_program_providers/fixture.lua"
+		local handle = assert(io.open(fixture, "rb"))
+		local source = assert(handle:read("*a")); helpers.assert_true(handle:close() == true)
+		local body = assert(source:match('case%("real_interpreter_symlink", function%(%)\n(.-)\nend%)\ncase%("interpreter_link_retarget_is_stale"'))
+		local observer = assert(source:match("local function observe_scalar%(%.%.%.%)\n.-\nend"))
+		with_native(function()
+			local shared, json = require("program_providers"), require("json")
+			local input = { config = "/fixture", expected_python = "/fixture/python3" }
+			local owner = assert(shared.new("hs", RAW, {
+				route = function() return "/fixture/scripts" end,
+				list = function() return { names = { "literal.py" }, truncated = false } end,
+				identity = function(path)
+					if path == "/fixture/scripts" then return { kind = "directory", token = "owned-directory" } end
+					if path == "/fixture/scripts/literal.py" or path == "/fixture/python3" then
+						return { kind = "file", token = path, readable = true, executable = true }
+					end
+					return nil, "missing"
+				end,
+				interpreter = function(commands)
+					if commands[1] == "python3" then return { executable = "/fixture/python3", token = "/fixture/python3" } end
+					return nil, "unavailable"
+				end,
+			}))
+			local initial = assert(owner.discover())
+			helpers.assert_eq(#initial.choices, 1)
+			helpers.assert_eq(initial.choices[1].label, "literal.py")
+			helpers.assert_eq(select("#", owner.resolve(initial.choices[1].key, {})), 2,
+				"the actual shared owner returns a scalar and an explicit nil reason")
+			local checks, decoded, resolved = 0, 0, 0
+			local resolve = owner.resolve
+			owner.resolve = function(...) resolved = resolved + 1; return resolve(...) end
+			local facts = {}
+			local environment = setmetatable({
+				owner = owner, initial = initial, input = input, interpreter_facts = facts,
+				check = function(value) checks = checks + 1; helpers.assert_true(value) end,
+				choices_by_name = function(result)
+					local values = {}; for _, choice in ipairs(result.choices) do values[choice.label] = choice end; return values
+				end,
+				hs = { json = { decode = function(...)
+					decoded = decoded + 1
+					-- Independent mirror of official LS_TSTRING, LS_TBREAK: exactly one string.
+					helpers.assert_eq(select("#", ...), 1, "strict SDK decoder argument count")
+					helpers.assert_eq(type((...)), "string")
+					return json.decode((...))
+				end } },
+			}, { __index = _G })
+			local chunk = observer .. "\nreturn function()\n" .. body .. "\nend"
+			local loader
+			if loadstring then loader = assert(loadstring(chunk, "@native-provider-scalar-control")); setfenv(loader, environment)
+			else loader = assert(load(chunk, "@native-provider-scalar-control", "t", environment)) end
+			loader()()
+			helpers.assert_eq(checks, 2, "both original native predicates execute")
+			helpers.assert_eq(decoded, 1)
+			helpers.assert_eq(resolved, 1)
+			helpers.assert_eq(facts, { resolved_scalar_observed = true, interpreter_equal = true,
+				argv_count_equal = true, script_argument_equal = true })
+		end)
+	end)
+end)
