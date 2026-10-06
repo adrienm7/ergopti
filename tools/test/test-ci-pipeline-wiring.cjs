@@ -2450,10 +2450,10 @@ function distroUnitProblems(files, helper = DISTRO_UNIT_HELPER) {
 		.join('\n');
 	if (
 		(code.match(/^sudo -H -u ergopti-ci env -u SUDO_UID -u SUDO_GID -u SUDO_USER \\$/gm) || [])
-			.length !== 3
+			.length !== 4
 	) {
 		problems.push(
-			'both native preflights and the unchanged suite must use the ordinary installation user'
+			'the two original native preflights, added write preflight and unchanged suite must use the ordinary installation user'
 		);
 	}
 	if (!code.includes(DISTRO_UNIT_SUITE)) {
@@ -2472,6 +2472,66 @@ function distroUnitProblems(files, helper = DISTRO_UNIT_HELPER) {
 	}
 	if (!code.includes("/usr/bin/python3 -c 'import os; assert(os.geteuid() != 0)'")) {
 		problems.push('the actual Python filesystem fixture requires an ordinary-user preflight');
+	}
+	for (const distro of ['debian', 'fedora', 'arch', 'alpine', 'opensuse']) {
+		const packages = code.match(new RegExp('^\\t' + distro + '\\) ([^\\n]+)$', 'm'))?.[1] || '';
+		if (!packages.split(/\s+/).includes('curl')) {
+			problems.push(distro + ' must install the actual curl executable for native timer fixtures');
+		}
+		if (distro === 'debian' && !packages.split(/\s+/).includes('libc6-dev')) {
+			problems.push(
+				'Debian native builds require libc startup objects without recommended packages'
+			);
+		}
+	}
+	const ownership = 'chown ergopti-ci "$unit_driver" "$unit_driver/tests"';
+	const chowns = code.match(/^chown .+$/gm) || [];
+	if (
+		!code.includes('unit_driver="$(pwd -P)"') ||
+		!code.includes('test -f "$unit_driver/tests/run.lua"') ||
+		JSON.stringify(chowns) !== JSON.stringify(['chown ergopti-ci "$unit_tmp"', ownership]) ||
+		code.indexOf(ownership) >= code.indexOf('sudo -H -u ergopti-ci env')
+	) {
+		problems.push(
+			'only the actual driver and tests directories must become writable before admission'
+		);
+	}
+	const python =
+		code.match(
+			/^sudo -H -u ergopti-ci env -u SUDO_UID -u SUDO_GID -u SUDO_USER \\\n\t\/usr\/bin\/python3 -c '\n([\s\S]*?)\n'/m
+		)?.[1] || '';
+	const expectedPython = [
+		'import os',
+		'from pathlib import Path',
+		'import tempfile',
+		'assert(os.geteuid() != 0)',
+		'working = Path.cwd()',
+		'for directory in (working, working / "tests"):',
+		'    assert(directory.stat().st_uid == os.geteuid())',
+		'    with tempfile.TemporaryFile(dir=directory) as receipt:',
+		'        assert(receipt.write(b"ordinary fixture write") == 22)',
+		'        receipt.seek(0)',
+		'        assert(receipt.read() == b"ordinary fixture write")',
+		'assert(Path.cwd() == working)',
+		'print("Native ordinary-user fixture writes: 2 directories admitted")'
+	].join('\n');
+	if (python !== expectedPython) {
+		problems.push('the added native directory write preflight must execute its exact closed body');
+	}
+	const pythonLines = python.split('\n').map((line) => line.trim());
+	for (const statement of [
+		'assert(os.geteuid() != 0)',
+		'working = Path.cwd()',
+		'for directory in (working, working / "tests"):',
+		'assert(directory.stat().st_uid == os.geteuid())',
+		'with tempfile.TemporaryFile(dir=directory) as receipt:',
+		'assert(receipt.write(b"ordinary fixture write") == 22)',
+		'receipt.seek(0)',
+		'assert(receipt.read() == b"ordinary fixture write")',
+		'assert(Path.cwd() == working)'
+	]) {
+		if (!pythonLines.includes(statement))
+			problems.push('native Python fixture admission omits ' + statement);
 	}
 	if (!/^set -euo pipefail$/m.test(code) || /^\s*set \+e\b/m.test(code) || SWALLOWED.test(code)) {
 		problems.push('native distro preparation and suite failures may not be swallowed');
@@ -2522,6 +2582,79 @@ for (const [what, from, to] of [
 	assert.notEqual(changed, DISTRO_UNIT_HELPER, what + ' must actually mutate the native wrapper');
 	assert.ok(distroUnitProblems(pipeline.files(), changed).length > 0, what + ' must refuse');
 }
+
+for (const [what, from, to] of [
+	[
+		'missing added filesystem preflight',
+		"/usr/bin/python3 -c '\n",
+		"/usr/bin/python3 -c 'omitted\n"
+	],
+	['missing added ordinary UID acknowledgement', '\nassert(os.geteuid() != 0)\n', '\n'],
+	['missing driver fixture admission', 'test -f "$unit_driver/tests/run.lua"', ''],
+	['missing Debian C startup objects', 'gcc libc6-dev make', 'gcc make'],
+	['missing actual driver path', 'unit_driver="$(pwd -P)"', 'unit_driver="/tmp"'],
+	[
+		'missing driver write ownership',
+		'chown ergopti-ci "$unit_driver" "$unit_driver/tests"',
+		'chown ergopti-ci "$unit_driver/tests"'
+	],
+	[
+		'missing tests write ownership',
+		'chown ergopti-ci "$unit_driver" "$unit_driver/tests"',
+		'chown ergopti-ci "$unit_driver"'
+	],
+	[
+		'recursive source ownership',
+		'chown ergopti-ci "$unit_driver" "$unit_driver/tests"',
+		'chown -R ergopti-ci "$unit_driver" "$unit_driver/tests"'
+	],
+	[
+		'missing native ownership acknowledgement',
+		'assert(directory.stat().st_uid == os.geteuid())',
+		''
+	],
+	[
+		'missing actual native directory writes',
+		'assert(receipt.write(b"ordinary fixture write") == 22)',
+		''
+	],
+	['missing actual native readback', 'assert(receipt.read() == b"ordinary fixture write")', ''],
+	['missing unchanged CWD acknowledgement', 'assert(Path.cwd() == working)', '']
+]) {
+	const changed = DISTRO_UNIT_HELPER.replace(from, to);
+	assert.notEqual(changed, DISTRO_UNIT_HELPER, what + ' must actually mutate the native wrapper');
+	assert.ok(distroUnitProblems(pipeline.files(), changed).length > 0, what + ' must refuse');
+}
+for (const distro of ['debian', 'fedora', 'arch', 'alpine', 'opensuse']) {
+	const changed = DISTRO_UNIT_HELPER.replace(
+		new RegExp('^(\\t' + distro + '\\) [^\\n]*?) curl( ;;)$', 'm'),
+		'$1$2'
+	);
+	assert.notEqual(changed, DISTRO_UNIT_HELPER, distro + ' must actually lose its curl executable');
+	assert.ok(
+		distroUnitProblems(pipeline.files(), changed).length > 0,
+		distro + ' without curl must refuse'
+	);
+}
+
+const activeWriteLoop =
+	'for directory in (working, working / "tests"):\n    assert(directory.stat().st_uid == os.geteuid())\n    with tempfile.TemporaryFile(dir=directory) as receipt:\n        assert(receipt.write(b"ordinary fixture write") == 22)\n        receipt.seek(0)\n        assert(receipt.read() == b"ordinary fixture write")';
+const skippedWriteLoop =
+	'if False:\n' +
+	activeWriteLoop
+		.split('\n')
+		.map((line) => '    ' + line)
+		.join('\n');
+const skippedWriteHelper = DISTRO_UNIT_HELPER.replace(activeWriteLoop, skippedWriteLoop);
+assert.notEqual(
+	skippedWriteHelper,
+	DISTRO_UNIT_HELPER,
+	'the skipped-write control must actually change the native wrapper'
+);
+assert.ok(
+	distroUnitProblems(pipeline.files(), skippedWriteHelper).length > 0,
+	'disabled native directory writes must refuse'
+);
 
 const PHYSICAL_BROWSER_STEP = 'Test shared physical shortcut rendering';
 const PHYSICAL_BROWSER_ALIAS = 'test:browser:physical-shortcuts';
