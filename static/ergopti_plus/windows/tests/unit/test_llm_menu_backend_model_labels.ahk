@@ -464,8 +464,58 @@ for Key in ["family", "origin"]
 	Test("model catalogue boundaries: actual native owner " . Key, _LBMD_CatalogueBoundary.Bind(Key))
 
 
-/** The real Windows Map-presence contract remains distinct from the macOS value predicate. */
+/** Captures each genuine translation owner without cloning its cache identity. */
+_LBMD_HardwareLocaleState() {
+	global _I18nLocale, _I18nCache, _I18nCacheLoaded, _I18nActiveCacheIdentity, _I18nMissWarned
+	global _I18nCacheEn, _I18nCacheEnLoaded, _I18nCacheFr, _I18nCacheFrLoaded
+	global _I18nFallbacksWarmed, _I18nFlagExistsCache
+	return [_I18nLocale, _I18nCache, _I18nCacheLoaded, _I18nActiveCacheIdentity, _I18nMissWarned,
+		_I18nCacheEn, _I18nCacheEnLoaded, _I18nCacheFr, _I18nCacheFrLoaded,
+		_I18nFallbacksWarmed, _I18nFlagExistsCache]
+}
+
+/** Restores the exact translation objects and flags retained before the fixture. */
+_LBMD_RestoreHardwareLocale(State) {
+	global _I18nLocale, _I18nCache, _I18nCacheLoaded, _I18nActiveCacheIdentity, _I18nMissWarned
+	global _I18nCacheEn, _I18nCacheEnLoaded, _I18nCacheFr, _I18nCacheFrLoaded
+	global _I18nFallbacksWarmed, _I18nFlagExistsCache
+	_I18nLocale := State[1]
+	_I18nCache := State[2], _I18nCacheLoaded := State[3], _I18nActiveCacheIdentity := State[4]
+	_I18nMissWarned := State[5]
+	_I18nCacheEn := State[6], _I18nCacheEnLoaded := State[7]
+	_I18nCacheFr := State[8], _I18nCacheFrLoaded := State[9]
+	_I18nFallbacksWarmed := State[10], _I18nFlagExistsCache := State[11]
+}
+
+/** Loads the real locale while detached caches protect the preceding test cohort. */
+_LBMD_WithHardwareLocale(Code, Body) {
+	global _I18nCache, _I18nCacheLoaded, _I18nActiveCacheIdentity, _I18nMissWarned
+	global _I18nCacheEn, _I18nCacheEnLoaded, _I18nCacheFr, _I18nCacheFrLoaded
+	global _I18nFallbacksWarmed, _I18nFlagExistsCache
+	Saved := _LBMD_HardwareLocaleState()
+	try {
+		_I18nCache := Map(), _I18nCacheLoaded := false, _I18nActiveCacheIdentity := false
+		_I18nMissWarned := Map()
+		_I18nCacheEn := Map(), _I18nCacheEnLoaded := false
+		_I18nCacheFr := Map(), _I18nCacheFrLoaded := false
+		_I18nFallbacksWarmed := false, _I18nFlagExistsCache := Map()
+		I18nInit(Map("script", Map("locale", Code)))
+		I18nPreload()
+		AssertEqual(Code, I18nGetLocale(), "the real locale owner acknowledges this fixture")
+		AssertTrue(_I18nCacheLoaded, "the actual locale file must load before menu construction")
+		return Body.Call()
+	} finally {
+		_LBMD_RestoreHardwareLocale(Saved)
+	}
+}
+
+/** Pins the independent English corpus without persisting a locale or scheduling reload. */
 _LBMD_HardwareBoundary() {
+	return _LBMD_WithHardwareLocale("en", _LBMD_HardwareBoundaryCurrent)
+}
+
+/** The real Windows Map-presence contract remains distinct from the macOS value predicate. */
+_LBMD_HardwareBoundaryCurrent() {
 	global _SharedDir
 	Expected := JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\model_hardware_boundary.json", "UTF-8"))
 	Model := _LBMD_ReadoutCatalogueModel(Expected["native_model"])
@@ -535,7 +585,10 @@ Test("per-model hardware: authentic shared boundary and original Map predicate (
 _LBMD_ModelHeaderBoundary(Populated) {
 	global _SharedDir, _LLM_Menu, LLM_Defaults, _LLM_Deps_State
 	Expected := JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\model_header_boundary.json", "UTF-8"))
-	SavedMenu := _LLM_Menu, SavedDeps := _LLM_Deps_State
+	SavedMenu := _LLM_Menu
+	HadDeps := IsSet(_LLM_Deps_State)
+	if HadDeps
+		SavedDeps := _LLM_Deps_State
 	HadDefaults := IsSet(LLM_Defaults)
 	if HadDefaults
 		SavedDefaults := LLM_Defaults
@@ -589,7 +642,11 @@ _LBMD_ModelHeaderBoundary(Populated) {
 		AssertEqual("pending", _LLM_Deps_State)
 	} finally {
 		Root[Expected["section"]] := Frame, Frame[1] := Original
-		_LLM_Menu := SavedMenu, _LLM_Deps_State := SavedDeps
+		_LLM_Menu := SavedMenu
+		if HadDeps
+			_LLM_Deps_State := SavedDeps
+		else
+			_LLM_Deps_State := unset
 		if HadDefaults
 			LLM_Defaults := SavedDefaults
 		else
@@ -600,3 +657,109 @@ _LBMD_ModelHeaderBoundary(Populated) {
 }
 for Populated in [false, true]
 	Test("model header boundary: genuine picker default " . Populated, _LBMD_ModelHeaderBoundary.Bind(Populated))
+
+
+/** A callback failure must not retain the fixture's initialized English owner. */
+_LBMD_HardwareLocaleThrow() {
+	global _SharedDir
+	Expected := JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\model_hardware_boundary.json", "UTF-8"))
+	AssertEqual("en", I18nGetLocale())
+	AssertEqual(Expected["header"]["ahk"], StrReplace(t("menu.llm.hw_header"), "%s", "Ollama"))
+	throw Error("hardware locale restoration sentinel")
+}
+
+/** Exercises successful native construction and throwing callbacks from a real French cohort. */
+_LBMD_HardwareLocaleRestorationCurrent(Throws) {
+	Saved := _LBMD_HardwareLocaleState()
+	AssertEqual("fr", I18nGetLocale())
+	if Throws {
+		Thrown := false
+		try {
+			_LBMD_WithHardwareLocale("en", _LBMD_HardwareLocaleThrow)
+		} catch as Err {
+			AssertEqual("hardware locale restoration sentinel", Err.Message)
+			Thrown := true
+		}
+		AssertTrue(Thrown, "the real callback must throw before restoration is checked")
+	} else {
+		_LBMD_HardwareBoundary()
+	}
+	Current := _LBMD_HardwareLocaleState()
+	for Index, Value in Saved
+		AssertEqual(Value, Current[Index], "successful and throwing fixtures restore locale state " . Index)
+}
+
+/** Keeps an independently initialized French owner outside the scoped hardware fixture. */
+_LBMD_HardwareLocaleRestoration(Throws) {
+	Saved := _LBMD_HardwareLocaleState()
+	_LBMD_WithHardwareLocale("fr", _LBMD_HardwareLocaleRestorationCurrent.Bind(Throws))
+	Current := _LBMD_HardwareLocaleState()
+	for Index, Value in Saved
+		AssertEqual(Value, Current[Index], "the outer genuine cohort restores locale state " . Index)
+}
+
+/** The original corpus comparison fails under a genuine non-English owner. */
+_LBMD_HardwareLocaleOriginalPremiseCurrent() {
+	global _SharedDir
+	AssertEqual("fr", I18nGetLocale())
+	Expected := JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\model_hardware_boundary.json", "UTF-8"))
+	Model := _LBMD_ReadoutCatalogueModel(Expected["native_model"])
+	FrenchHeader := "CONFIGURATION REQUISE (Ollama)"
+	AssertEqual(FrenchHeader, StrReplace(t("menu.llm.hw_header"), "%s", "Ollama"))
+	Rows := _LLM_Menu_PerModelRows(Model["name"], Model, Model["urls"]["ollama"], Model["name"], false)
+	Position := 0
+	for Index, Row in Rows
+		if Row.Get("label", "") == FrenchHeader
+			Position := Index
+	Assert(Position > 1, "the genuine French native heading exists before the original English comparison")
+	AssertTrue(Rows[Position - 1]["separator"])
+	Failure := ""
+	try {
+		_LBMD_HardwareBoundaryCurrent()
+	} catch as Err {
+		Failure := Err.Message
+	}
+	AssertEqual("actual hardware heading must be reached", Failure,
+		"the unchanged original body must expose the unbound English premise")
+	_LBMD_HardwareBoundary()
+	AssertEqual("fr", I18nGetLocale(), "repair restores the genuine French owner after native construction")
+}
+
+/** Proves the old premise and repaired native allocator through the same original body. */
+_LBMD_HardwareLocaleOriginalPremise() {
+	_LBMD_WithHardwareLocale("fr", _LBMD_HardwareLocaleOriginalPremiseCurrent)
+}
+for Throws in [false, true]
+	Test("model hardware locale: genuine owner restoration after throw " . Throws,
+		_LBMD_HardwareLocaleRestoration.Bind(Throws))
+Test("model hardware locale: unchanged English premise fails in a genuine French cohort",
+	_LBMD_HardwareLocaleOriginalPremise)
+
+
+_LBMD_ModelHeaderDependencyPresence(Present) {
+	global _LLM_Deps_State
+	HadOriginal := IsSet(_LLM_Deps_State)
+	if HadOriginal
+		Original := _LLM_Deps_State
+	try {
+		if Present
+			_LLM_Deps_State := "fixture-prior-state"
+		else
+			_LLM_Deps_State := unset
+		_LBMD_ModelHeaderBoundary(false)
+		AssertEqual(Present, IsSet(_LLM_Deps_State), "empty default picker restores prior dependency presence")
+		if Present
+			AssertEqual("fixture-prior-state", _LLM_Deps_State)
+		_LBMD_ModelHeaderBoundary(true)
+		AssertEqual(Present, IsSet(_LLM_Deps_State), "populated default picker restores prior dependency presence")
+		if Present
+			AssertEqual("fixture-prior-state", _LLM_Deps_State)
+	} finally {
+		if HadOriginal
+			_LLM_Deps_State := Original
+		else
+			_LLM_Deps_State := unset
+	}
+}
+for Present in [false, true]
+	Test("model header boundary: dependency prior presence " . Present, _LBMD_ModelHeaderDependencyPresence.Bind(Present))
