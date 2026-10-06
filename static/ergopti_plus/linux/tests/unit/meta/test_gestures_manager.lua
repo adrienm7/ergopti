@@ -741,3 +741,5 @@ helpers.describe("gesture parameter binding publication with the real script own
 end)
 
 require("test.tap_binding_publication_contract").register(require("tests.helpers"), "linux")
+
+require("test.binding_publication_authority_contract").register(require("tests.helpers"), "linux")

@@ -40,6 +40,7 @@ local M = {}
 local Logger = require("logger.shim")
 local ConfigOutdated = require("config_outdated")
 local BindingIdentity = require("config_binding_identity")
+local BindingPublication = require("config_binding_publication")
 local Paths = require("infra.paths")
 local Timings = require("infra.timings")
 local Monotonic = require("infra.monotonic")
@@ -1331,19 +1332,13 @@ end
 --- @return string detail
 function M.action_parameter_binding_fits(binding)
 	if type(binding) == "string" and binding:sub(1, 9) == "tap_key__" then
-		local taps = package.loaded["modules.shortcuts.tap_keys"]
-		local catalogue
-		if type(taps) == "table" and type(taps.published_binding_catalogue) == "function" then
-			catalogue = taps.published_binding_catalogue()
-		end
+		local taps = rawget(package.loaded, "modules.shortcuts.tap_keys")
+		local catalogue = BindingPublication.current("tap", "modules.shortcuts.tap_keys", taps)
 		return BindingIdentity.tap_binding_fits(binding, catalogue), BindingIdentity.RETIRED_TAP
 	end
 	if type(binding) == "string" and binding:sub(1, 8) == "script__" then
-		local chords = package.loaded["modules.shortcuts.script_chords"]
-		local catalogue
-		if type(chords) == "table" and type(chords.published_binding_catalogue) == "function" then
-			catalogue = chords.published_binding_catalogue()
-		end
+		local chords = rawget(package.loaded, "modules.shortcuts.script_chords")
+		local catalogue = BindingPublication.current("script", "modules.shortcuts.script_chords", chords)
 		return BindingIdentity.script_binding_fits(binding, catalogue), BindingIdentity.RETIRED_SCRIPT
 	end
 	return BindingIdentity.gesture_binding_fits(binding, parameter_binding_catalogue), BindingIdentity.RETIRED_GESTURE

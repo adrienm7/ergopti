@@ -27,6 +27,7 @@
 --- ==============================================================================
 
 local M = {}
+local BindingPublication = require("config_binding_publication")
 
 local Logger = require("logger.shim")
 local ConfigOutdated = require("config_outdated")
@@ -132,6 +133,7 @@ end
 --- Returns a detached complete publication without reading or initializing an owner.
 --- @return table|nil catalogue
 function M.published_binding_catalogue()
+	if not BindingPublication.owner_is_current("script", "modules.shortcuts.script_chords", M) then return nil end
 	if _binding_catalogue == nil then return nil end
 	local publication = { prefix = _binding_catalogue.prefix, slots = {} }
 	for id in pairs(_binding_catalogue.slots) do publication.slots[id] = true end
@@ -486,5 +488,7 @@ function M.apply_configuration(owner, state)
 	_dispatch_generation = _dispatch_generation + 1
 	return true
 end
+
+BindingPublication.register("script", "modules.shortcuts.script_chords", M, M.published_binding_catalogue)
 
 return M

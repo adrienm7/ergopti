@@ -9,6 +9,7 @@
 
 local M = {}
 local BindingIdentity = require("config_binding_identity")
+local BindingPublication = require("config_binding_publication")
 
 local hs            = hs
 local notifications = require("infra.notifications")
@@ -2186,19 +2187,12 @@ end
 --- @return boolean|nil fits
 function M.action_parameter_binding_fits(binding)
 	if type(binding) == "string" and binding:sub(1, 9) == "tap_key__" then
-		local taps = package.loaded["modules.shortcuts.tap_keys"]
-		local catalogue
-		if type(taps) == "table" and type(taps.published_binding_catalogue) == "function" then
-			catalogue = taps.published_binding_catalogue()
-		end
+		local taps = rawget(package.loaded, "modules.shortcuts.tap_keys")
+		local catalogue = BindingPublication.current("tap", "modules.shortcuts.tap_keys", taps)
 		return BindingIdentity.tap_binding_fits(binding, catalogue), BindingIdentity.RETIRED_TAP
 	end
 	if type(binding) == "string" and binding:sub(1, 8) == "script__" then
-		local catalogue
-		if rawequal(package.loaded["infra.script_chord_catalogue"], ChordCatalogue)
-			and type(ChordCatalogue.published_binding_catalogue) == "function" then
-			catalogue = ChordCatalogue.published_binding_catalogue()
-		end
+		local catalogue = BindingPublication.current("script", "infra.script_chord_catalogue", ChordCatalogue)
 		return BindingIdentity.script_binding_fits(binding, catalogue), BindingIdentity.RETIRED_SCRIPT
 	end
 	local gestures = package.loaded["modules.gestures"]
