@@ -1,5 +1,41 @@
 ﻿; tests/unit/test_run_program_actions.ahk
 
+_RPA_StringStages() {
+	; Independently authored fixture strings; no user paths/argv enter diagnostics.
+	for Vector in [
+		Map("source", '"C:\\Program Files\\été\\program.exe",0', "value", "C:\Program Files\été\program.exe"),
+		Map("source", '"trail\\",0', "value", "trail\"),
+		Map("source", '"\"quote\"",0', "value", '"quote"'),
+		Map("source", '"\\u0000",0', "value", "\u0000"),
+		Map("source", '"日本語",0', "value", "日本語")
+	] {
+		Text := Vector["source"], Position := 1
+		try Canonical := _JsonParseString(&Text, &Position)
+		catch Any {
+			Assert(false, "program stage canonical-string raised")
+		}
+		Assert(Canonical == Vector["value"], "program stage canonical-string bytes")
+		Assert(SubStr(Text, Position) == ",0", "program stage canonical-string cursor")
+		Position := 1
+		try Actual := _ProgramParameterString(Text, &Position)
+		catch Any {
+			Assert(false, "program stage parameter-string raised")
+		}
+		Assert((Actual is String) && Actual == Vector["value"], "program stage parameter-string bytes")
+		Assert(SubStr(Text, Position) == ",0", "program stage parameter-string cursor")
+	}
+	Position := 1
+	AssertFalse(_ProgramParameterString('"\u0000",0', &Position), "program stage unescaped NUL refusal")
+	Scalar := '{"version":1,"executable":"C:\\missing program\\script.exe","arguments":["","trail\\","\"quote\"","\\u0000","日本語"]}'
+	Actual := ProgramParameterParse(Scalar)
+	Assert(Actual is Map, "program stage descriptor pure fictional path")
+	Assert(Actual["executable"] == "C:\missing program\script.exe", "program stage descriptor executable bytes")
+	Assert(Actual["arguments"].Length == 5, "program stage descriptor argument count")
+	Assert(Actual["arguments"][1] == "", "program stage descriptor empty argument")
+	Assert(Actual["arguments"][4] == "\u0000", "program stage descriptor escaped NUL literal")
+}
+Test("user program: closed canonical string and parameter cursor stages", _RPA_StringStages)
+
 _RPA_ProgramCorpus() {
 	global _SharedDir, JSON_NULL
 	Corpus := JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\action_parameters\program_vectors.json"))
@@ -35,7 +71,7 @@ _RPA_WithFixture(Body) {
 	AssertFalse(IsObject(_UserProgramAcquiring), "native fixture cannot borrow an acquisition")
 	SavedFile := ConfigurationFile
 	SavedGestures := GestureAssignments
-	SavedKeyboard := KeyboardShortcutAssignments
+	SavedKeyboard := IsSet(KeyboardShortcutAssignments) ? KeyboardShortcutAssignments : unset
 	SavedParameters := GestureActionParameters
 	SavedPaused := _UserProgramPaused
 	Directory := A_Temp . "\program106_" . A_TickCount . "_" . Random(1000, 9999)
@@ -68,7 +104,7 @@ _RPA_WithFixture(Body) {
 		SetTimer(ProgramActions_Poll, 0)
 		ConfigurationFile := SavedFile
 		GestureAssignments := SavedGestures
-		KeyboardShortcutAssignments := SavedKeyboard
+		KeyboardShortcutAssignments := IsSet(SavedKeyboard) ? SavedKeyboard : unset
 		GestureActionParameters := SavedParameters
 		_UserProgramPaused := SavedPaused
 		if !Context.Get("preserve_directory", false)
@@ -515,3 +551,129 @@ _RPA_MalformedCompletion(Context) {
 }
 Test("user program: malformed completion never formats untrusted private status",
 	_RPA_WithFixture.Bind(_RPA_WithCapturedProgramLogs.Bind(_RPA_MalformedCompletion)))
+
+_RPA_UnsetKeyboardBody(Context) {
+	global KeyboardShortcutAssignments
+	Assert(KeyboardShortcutAssignments is Map, "fixture initializes the actual keyboard assignment owner")
+	AssertEqual("run_program", KeyboardShortcutAssignments.Get("ctrl_p", ""), "fixture initializes the keyboard binding")
+	AssertEqual(Context["scalar"], GestureGetActionParameter("gesture__tap_3", "run_program"),
+		"fixture uses the actual acknowledged action parameter owner")
+}
+
+_RPA_UnsetKeyboardRestored() {
+	global KeyboardShortcutAssignments
+	Saved := IsSet(KeyboardShortcutAssignments) ? KeyboardShortcutAssignments : unset
+	try {
+		KeyboardShortcutAssignments := unset
+		_RPA_WithFixture(_RPA_UnsetKeyboardBody)
+		AssertFalse(IsSet(KeyboardShortcutAssignments), "fixture restores an originally unset owner")
+	} finally KeyboardShortcutAssignments := IsSet(Saved) ? Saved : unset
+}
+Test("user program: native fixture owns and restores an unset keyboard map", _RPA_UnsetKeyboardRestored)
+
+_RPA_PollPort(State, Callback, Period) {
+	Assert(HasMethod(Callback, "Call"), "poll retains one callable native identity")
+	State["calls"].Push(Map("callback", Callback, "period", Period))
+	if Period == 0 {
+		if State["cancel"] == "throw"
+			throw Error("controlled poll cancellation refusal")
+		return State["cancel"]
+	}
+	Assert(Period < 0, "poll schedules one-shot cleanup instead of a repeating typing-thread stall")
+	if State["schedule"] == "throw"
+		throw Error("controlled poll schedule refusal")
+	if State["schedule"] == "early" {
+		State["early_receipt"] := Callback.Call()
+		return true
+	}
+	if State["schedule"] == "stop" {
+		State["stop_receipt"] := ProgramActions_Stop(true)
+		return true
+	}
+	return State["schedule"]
+}
+
+class _RPA_ControlledPollHandle {
+	__New(State) {
+		this.State := State
+	}
+	terminate() {
+		this.State["terminations"] += 1
+		return this.State["retire"]
+	}
+}
+
+_RPA_PollCustody() {
+	global _UserProgramPollOwner, _UserProgramEntries, _UserProgramPaused
+	AssertEqual(0, _UserProgramEntries.Count, "controlled timer test borrows no native program")
+	AssertFalse(IsObject(_UserProgramPollOwner), "controlled timer test borrows no timer")
+	SavedPaused := _UserProgramPaused
+	State := Map("calls", [], "schedule", true, "cancel", true, "retire", false, "terminations", 0)
+	Port := _RPA_PollPort.Bind(State)
+	try {
+		AssertTrue(_ProgramActions_EnsurePoll(Port), "literal timer admission owns its bound callback")
+		Owner := _UserProgramPollOwner
+		Callback := Owner["callback"]
+		for Refusal in [false, "", "throw"] {
+			State["cancel"] := Refusal
+			AssertFalse(_ProgramActions_StopPoll(), "false unknown and throwing cancellation retains debt")
+			Assert(_UserProgramPollOwner == Owner, "exact refused timer capability remains retained")
+			AssertFalse(ProgramActions_Run("gesture__tap_3"), "timer debt blocks successor acquisition")
+		}
+		State["cancel"] := true
+		Owner["active"] := true
+		AssertFalse(_ProgramActions_StopPoll(), "an active callback prevents terminal acknowledgement")
+		Assert(_UserProgramPollOwner == Owner, "active native callback retains the same owner")
+		Owner["active"] := false
+		AssertTrue(_ProgramActions_StopPoll(), "fresh exact cancellation settles the inactive owner")
+		AssertFalse(IsObject(_UserProgramPollOwner), "acknowledged timer capability retires")
+		for Call in State["calls"]
+			Assert(Call["callback"] == Callback, "every inverse uses the original exact native callback")
+		for Refusal in [false, "", "throw"] {
+			State["schedule"] := Refusal, State["cancel"] := false
+			AssertFalse(_ProgramActions_EnsurePoll(Port), "refused timer acquisition cannot become success")
+			Assert(IsObject(_UserProgramPollOwner), "ambiguous schedule retains its exact cancellation capability")
+			State["cancel"] := true
+			AssertTrue(_ProgramActions_StopPoll(), "strict compensation retires a refused schedule")
+		}
+		State["schedule"] := "early"
+		AssertFalse(_ProgramActions_EnsurePoll(Port), "callback before same-call timer admission cannot become success")
+		AssertEqual(false, State["early_receipt"], "early native callback cannot run cleanup before admission")
+		AssertFalse(IsObject(_UserProgramPollOwner), "exact compensation retires an early consumed callback")
+		State["schedule"] := "stop"
+		AssertFalse(_ProgramActions_EnsurePoll(Port), "cancellation during timer acquisition refuses activation")
+		AssertEqual(false, State["stop_receipt"], "acquiring timer cannot acknowledge early shutdown")
+		AssertFalse(IsObject(_UserProgramPollOwner), "acquisition compensation retires the exact timer")
+		State["schedule"] := true
+		AssertTrue(_ProgramActions_EnsurePoll(Port), "a fresh timer can start after physical compensation")
+		Current := _UserProgramPollOwner
+		AssertFalse(Callback.Call(), "old retired callback cannot act on the new owner")
+		Assert(_UserProgramPollOwner == Current, "old callback preserves the fresh exact owner")
+		AssertTrue(_ProgramActions_StopPoll(), "the final owned timer retires")
+		AssertTrue(_ProgramActions_EnsurePoll(Port), "physical retirement debt owns a cleanup callback")
+		DebtOwner := _UserProgramPollOwner
+		DebtCallback := DebtOwner["callback"]
+		Entry := Map("binding", "gesture__controlled-poll", "cancelled", false,
+			"handle", _RPA_ControlledPollHandle(State), "snapshot", 0, "started", A_TickCount)
+		_UserProgramEntries[Entry["binding"]] := Entry
+		AssertFalse(ProgramActions_Stop(true), "refused physical retirement cannot acknowledge stop")
+		Assert(_UserProgramEntries.Get(Entry["binding"], 0) == Entry, "the exact refused handle remains owned")
+		Assert(_UserProgramPollOwner == DebtOwner && DebtOwner["scheduled"],
+			"refused physical retirement preserves an actually scheduled cleanup callback")
+		AssertFalse(DebtOwner["cancelled"], "physical debt must not cancel its only retry callback")
+		Assert(State["calls"][-1]["callback"] == DebtCallback && State["calls"][-1]["period"] < 0,
+			"stop rearms the same exact one-shot callback while physical debt remains")
+		State["retire"] := true
+		AssertTrue(DebtCallback.Call(), "the retained exact callback retries physical retirement")
+		AssertEqual(2, State["terminations"], "physical termination is retried after the refused attempt")
+		AssertFalse(_UserProgramEntries.Has(Entry["binding"]), "strict physical receipt retires the exact entry")
+		AssertFalse(IsObject(_UserProgramPollOwner), "physical retirement also settles its exact callback")
+	} finally {
+		State["cancel"] := true
+		State["retire"] := true
+		AssertTrue(ProgramActions_Stop(SavedPaused), "controlled program cleanup must actually acknowledge")
+		AssertTrue(_ProgramActions_StopPoll(), "controlled timer cleanup must actually acknowledge")
+		_UserProgramPaused := SavedPaused
+	}
+}
+Test("user program: exact one-shot poll retains refused acquisition and callback debt", _RPA_PollCustody)
