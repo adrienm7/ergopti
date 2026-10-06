@@ -1311,22 +1311,36 @@ SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
 		TargetGeneration := _ConfigFullSaveCapture()
 		Result := CONFIG_SAVE_FAILED
 		try {
-				Phase := "collector"
+				Phase := "source"
 				try {
-						Updates := HasMethod(CollectFn, "Call")
-								? CollectFn.Call()
-								: _ConfigCollectFullSaveUpdates()
-						if !(Updates is Array)
-								throw TypeError("The full configuration collector must return an Array")
-						Updates := _ConfigPrepareTypedUpdates(_ConfigKeepOutdatedEntries(Updates))
-						; Do NOT FileDelete before writing — TOML_BatchWrite already performs an
-						; atomic write (temp file + rename). A FileDelete here creates a data-loss
-						; window: if a Reload() or thread interrupt fires between the delete and the
-						; write, the user's config is permanently gone with no replacement.
-						if FileReadActivityBusy(BoundPath)
-							return _ConfigArmFullSaveRetry(CONFIG_FULL_SAVE_RETRY_DELAY_MS, TimerFn)
-								? CONFIG_SAVE_DEFERRED : CONFIG_SAVE_FAILED
-						Phase := "writer"
+				SourceImage := 0
+				if !HasMethod(WriterFn, "Call") {
+					; Bind full-snapshot preservation to one admitted generation
+					; before collection can run callbacks or change live state.
+					SourceImage := TOML_BuildConfigUpdatedContent(BoundPath, [])
+					if !(SourceImage is Map) || SourceImage.Get("status", "") != "ok"
+							|| SourceImage.Get("kind", "") != "rendered"
+						throw Error("The full configuration source could not be admitted.")
+					ObsoleteSource := ConfigFullSnapshotCaptureObsoleteSource(SourceImage["source_content"])
+				}
+				Phase := "collector"
+				Updates := HasMethod(CollectFn, "Call")
+						? CollectFn.Call()
+						: _ConfigCollectFullSaveUpdates()
+				if !(Updates is Array)
+						throw TypeError("The full configuration collector must return an Array")
+				Updates := _ConfigKeepOutdatedEntries(Updates)
+				if SourceImage is Map
+					Updates := ConfigFullSnapshotPreserveObsoleteSource(ObsoleteSource, Updates)
+				Updates := _ConfigPrepareTypedUpdates(Updates)
+				; Do NOT FileDelete before writing — TOML_BatchWrite already performs an
+				; atomic write (temp file + rename). A FileDelete here creates a data-loss
+				; window: if a Reload() or thread interrupt fires between the delete and the
+				; write, the user's config is permanently gone with no replacement.
+				if FileReadActivityBusy(BoundPath)
+					return _ConfigArmFullSaveRetry(CONFIG_FULL_SAVE_RETRY_DELAY_MS, TimerFn)
+						? CONFIG_SAVE_DEFERRED : CONFIG_SAVE_FAILED
+				Phase := "writer"
 				; RETURNED, not discarded. TOML_BatchWrite fails without throwing when
 				; the staging file cannot be opened or the atomic replace is refused, and
 				; every caller that dropped this boolean turned that into a silent no-op:
@@ -1338,7 +1352,8 @@ SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
 				else
 					; Ordinary saves own only collected settings; retired namespaces stay
 					; on disk until the user explicitly removes them.
-					Written := TOML_ConfigBatchWrite(BoundPath, Updates)
+					Written := _TOML_BatchWriteImpl(BoundPath, Updates, [], "write",
+						SourceImage["source_content"], SourceImage["source_present"], true)
 				} catch as Err {
 						Written := false
 						try LoggerError("ConfigIO", "The full configuration {1} raised an error: {2}.",
