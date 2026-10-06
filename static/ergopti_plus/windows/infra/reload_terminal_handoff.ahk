@@ -37,39 +37,38 @@ global RELOAD_SUCCESSOR_STALL_MS := 15000
 
 global _ReloadTerminalHandoff := false
 global _ReloadTerminalHandoffNextId := 0
+global _ReloadTerminalRetirements := Map()
 
 ReloadTerminalHandoffPrepare(Bundle, SuccessFn := 0, CommitFn := 0,
 		AbortFn := 0, RefusedFn := 0, ReleaseFn := 0, RetractFn := 0) {
-	global _ReloadTerminalHandoff, _ReloadTerminalHandoffNextId
+	global _ReloadTerminalHandoff, _ReloadTerminalHandoffNextId, _ReloadTerminalRetirements
 	if !(Bundle is Object)
 		return false
 	for Callback in [SuccessFn, CommitFn, AbortFn, RefusedFn, ReleaseFn, RetractFn] {
-		if !((Callback is Integer) && Callback == 0)
-				&& !HasMethod(Callback, "Call")
+		if !((Callback is Integer) && Callback == 0) && !HasMethod(Callback, "Call")
 			return false
 	}
 	if !_ConfigWriteTerminalAuthorize(Bundle)
 		return false
 	PreviousCritical := Critical("On")
 	try {
-		if (_ReloadTerminalHandoff is Map)
+		if (_ReloadTerminalHandoff is Map) || _ReloadTerminalRetirements.Count
 			return false
 		_ReloadTerminalHandoffNextId += 1
-		Record := Map(
-			"id", _ReloadTerminalHandoffNextId,
-			"bundle", Bundle,
-			"success", SuccessFn,
-			"commit", CommitFn,
-			"abort", AbortFn,
-			"refused", RefusedFn,
-			"release", ReleaseFn,
-			"retract", RetractFn,
-			"port", 0,
-			"successor", 0,
-			"launch_tick", 0,
-			"stall_reported", false,
-			"probe_failure_reported", false,
-			"state", "authorized")
+		Record := Map("id", _ReloadTerminalHandoffNextId, "bundle", Bundle,
+			"success", SuccessFn, "commit", CommitFn, "abort", AbortFn,
+			"refused", RefusedFn, "release", ReleaseFn, "retract", RetractFn,
+			"port", 0, "successor", 0, "launch_tick", 0,
+			"stall_reported", false, "probe_failure_reported", false,
+			"state", "authorized", "stop_mode", "", "stop_origin", "",
+			"stop_reason", "", "stop_requested", false, "stop_request_ok", false,
+			"stop_acknowledged", false, "stop_busy", false,
+			"stop_deferred", false,
+			"stop_watch_armed", false, "stop_error_reported", false,
+			"stop_probe_reported", false, "compensation_done", false,
+			"compensation_ok", false, "resume_exit", 0, "resume_armed", false,
+			"delivery_armed", false, "delivery_done", false,
+			"close_attempted", false, "close_acknowledged", false)
 		_ReloadTerminalHandoff := Record
 		return Record
 	} finally Critical(PreviousCritical)
@@ -218,37 +217,26 @@ _ReloadTerminalHandoffCancelNonCritical(Record) {
 	global _ReloadTerminalHandoff
 	PreviousCritical := Critical("On")
 	try {
-		if !(_ReloadTerminalHandoff is Map)
-				|| (_ReloadTerminalHandoff != Record)
+		if !(_ReloadTerminalHandoff is Map) || (_ReloadTerminalHandoff != Record)
+				|| Record["state"] != "authorized"
+				|| _ReloadTerminalSuccessorValid(Record["successor"])
 			return false
 		Record["state"] := "canceling"
 	} finally Critical(PreviousCritical)
 	AbortOk := _ReloadTerminalHandoffRunAbort(Record)
-	; Keep the record globally exclusive until its abort callback is finished.
-	; Rearming first would let a second Prepare/Claim interleave with cleanup of
-	; the previous pause marker. Both handoff and lease state become reusable in
-	; this one non-yielding section.
-	ResetFailed := false
-	CancelResult := false
 	PreviousCritical := Critical("On")
 	try {
-		if !(_ReloadTerminalHandoff is Map)
-				|| (_ReloadTerminalHandoff != Record)
+		if !(_ReloadTerminalHandoff is Map) || (_ReloadTerminalHandoff != Record)
 				|| Record["state"] != "canceling"
 			return false
 		if !_ConfigWriteTerminalCancelShutdown(Record["bundle"]) {
 			Record["state"] := "cancel_failed"
-			ResetFailed := true
-		} else {
-			Record["state"] := AbortOk ? "canceled" : "cancel_failed"
-			_ReloadTerminalHandoff := false
-			CancelResult := AbortOk
+			return false
 		}
+		Record["state"] := AbortOk ? "canceled" : "cancel_failed"
+		_ReloadTerminalHandoff := false
+		return AbortOk
 	} finally Critical(PreviousCritical)
-	if ResetFailed
-		try LoggerError("Lifecycle",
-			"Reload terminal claim could not be rearmed after refusal.")
-	return CancelResult
 }
 
 _ReloadTerminalHandoffRunAbort(Record) {
@@ -296,7 +284,7 @@ ReloadTerminalInvoke(Bundle, SuccessFn, LaunchFn, Port, CommitFn := 0,
 
 _ReloadTerminalInvokeNonCritical(Bundle, SuccessFn, LaunchFn, Port, CommitFn,
 		AbortFn, RefusedFn, ReleaseFn, RetractFn) {
-	global _ReloadTerminalHandoff
+	global _ReloadTerminalHandoff, _ReloadTerminalRetirements
 	if !HasMethod(LaunchFn, "Call")
 		throw TypeError("Reload terminal hand-off requires a successor launcher.")
 	_ReloadTerminalRequirePort(Port)
@@ -304,42 +292,54 @@ _ReloadTerminalInvokeNonCritical(Bundle, SuccessFn, LaunchFn, Port, CommitFn,
 		RefusedFn, ReleaseFn, RetractFn)
 	if !(Record is Map)
 		return false
-	Record["port"] := Port
+	PreviousCritical := Critical("On")
+	try {
+		Record["port"] := Port
+		; Cancel cannot give the bundle back while native creation may be yielding.
+		Record["state"] := "launching"
+	} finally Critical(PreviousCritical)
 	try {
 		Successor := LaunchFn.Call()
 		if !_ReloadTerminalSuccessorValid(Successor)
 			throw ValueError("the launcher returned no successor process")
 	} catch as Err {
+		PreviousCritical := Critical("On")
+		try {
+			if (_ReloadTerminalHandoff is Map) && (_ReloadTerminalHandoff == Record)
+					&& Record["state"] == "launching"
+				Record["state"] := "authorized"
+		} finally Critical(PreviousCritical)
 		ReloadTerminalHandoffCancel(Record)
-		try LoggerError("Lifecycle", "Reload successor launch failed: {1}.",
-			Err.Message)
+		try LoggerError("Lifecycle", "Reload successor launch failed: {1}.", Err.Message)
 		return false
 	}
+	; From here the caller must not roll back or release its bundle on false.
+	; Even failed publication owns a real process until the same port proves exit.
 	Published := false
 	PreviousCritical := Critical("On")
 	try {
+		Record["successor"] := Successor
 		if (_ReloadTerminalHandoff is Map) && (_ReloadTerminalHandoff == Record)
-				&& Record["state"] == "authorized" {
-			Record["successor"] := Successor
-			Record["launch_tick"] := Port["now"].Call()
+				&& Record["state"] == "launching" {
 			Record["state"] := "pending"
 			Published := true
+		} else {
+			_ReloadTerminalRetirements[Record["id"]] := Record
+			Record["state"] := "pending"
 		}
 	} finally Critical(PreviousCritical)
 	if !Published {
-		; Nothing can own a successor whose record vanished while it launched, so
-		; stop it rather than let it replace this instance unaccounted for.
-		Record["successor"] := Successor
-		_ReloadTerminalHandoffStopSuccessor(Record)
-		_ReloadTerminalHandoffCloseSuccessor(Record)
-		try LoggerError("Lifecycle",
-			"Reload record changed while successor pid {1} launched; it was stopped.",
-			Successor["pid"])
-		return false
+		ReloadTerminalHandoffRefuse(Record,
+			"the reload record changed while its successor launched")
+		return true
 	}
-	try LoggerInfo("Lifecycle",
-		"Reload successor pid {1} launched; this instance closes when it asks.",
-		Successor["pid"])
+	try Record["launch_tick"] := Port["now"].Call()
+	catch as Err {
+		ReloadTerminalHandoffRefuse(Record,
+			"the successor launch clock failed: " . Err.Message)
+		return true
+	}
+	try LoggerInfo("Lifecycle", "Reload successor pid {1} launched; this instance closes when it asks.", Successor["pid"])
 	_ReloadTerminalHandoffArmWatch(Record)
 	return true
 }
@@ -348,10 +348,14 @@ _ReloadTerminalInvokeNonCritical(Bundle, SuccessFn, LaunchFn, Port, CommitFn,
 ReloadTerminalHandoffPending() {
 	global _ReloadTerminalHandoff
 	PreviousCritical := Critical("On")
-	try return ((_ReloadTerminalHandoff is Map)
-			&& _ReloadTerminalHandoff["state"] == "pending")
-		? _ReloadTerminalHandoff : false
-	finally Critical(PreviousCritical)
+	try {
+		if !(_ReloadTerminalHandoff is Map)
+			return false
+		Record := _ReloadTerminalHandoff
+		return (Record["state"] == "pending"
+			|| (Record["state"] == "stopping" && Record["stop_mode"] == "abandon")
+			|| Record["state"] == "abandon_ready") ? Record : false
+	} finally Critical(PreviousCritical)
 }
 
 ; Whether a reload hand-off exists, from its authorization to its terminal. A
@@ -360,10 +364,10 @@ ReloadTerminalHandoffPending() {
 ; A record whose claim could not be rearmed stays published for good and has
 ; no successor, so it does not count.
 ReloadTerminalHandoffActive() {
-	global _ReloadTerminalHandoff
+	global _ReloadTerminalHandoff, _ReloadTerminalRetirements
 	PreviousCritical := Critical("On")
-	try return (_ReloadTerminalHandoff is Map)
-		&& _ReloadTerminalHandoff["state"] != "cancel_failed"
+	try return _ReloadTerminalRetirements.Count > 0
+		|| ((_ReloadTerminalHandoff is Map) && _ReloadTerminalHandoff["state"] != "cancel_failed")
 	finally Critical(PreviousCritical)
 }
 
@@ -431,42 +435,23 @@ ReloadTerminalHandoffRefuse(Record, Reason) {
 }
 
 _ReloadTerminalHandoffRefuseNonCritical(Record, Reason) {
-	global _ReloadTerminalHandoff
 	PreviousCritical := Critical("On")
 	try {
-		if !(_ReloadTerminalHandoff is Map)
-				|| (_ReloadTerminalHandoff != Record)
+		if !_ReloadTerminalHandoffOwns(Record)
 			return false
 		State := Record["state"]
-		if !(State == "pending" || State == "claimed"
-				|| State == "committed" || State == "commit_failed")
+		if State == "stopping" && Record["stop_mode"] == "refuse"
+			return Record["stop_request_ok"]
+		if !(State == "pending" || State == "claimed" || State == "committed" || State == "commit_failed")
 			return false
-		Record["state"] := "refusing"
+		Record["stop_origin"] := State
+		Record["stop_mode"] := "refuse"
+		Record["stop_reason"] := Reason
+		Record["state"] := "stopping"
 	} finally Critical(PreviousCritical)
-	StopOk := _ReloadTerminalHandoffStopSuccessor(Record)
-	AbortOk := _ReloadTerminalHandoffRunAbort(Record)
-	RetractOk := (State == "committed" || State == "commit_failed")
-		? _ReloadTerminalHandoffRunRetract(Record) : true
-	RearmOk := false
-	PreviousCritical := Critical("On")
-	try {
-		RearmOk := _ConfigWriteTerminalCancelShutdown(Record["bundle"])
-		_ReloadTerminalHandoff := false
-		Record["state"] := "refused"
-	} finally Critical(PreviousCritical)
-	try LoggerError("Lifecycle", "Reload refused after launch: {1}.", Reason)
-	if !RearmOk
-		try LoggerError("Lifecycle",
-			"Reload terminal claim could not be rearmed after refusal.")
-	Deliver := _ReloadTerminalHandoffDeliverRefusal.Bind(Record, Reason)
-	try Record["port"]["arm"].Call(Deliver, 1)
-	catch as Err {
-		try LoggerError("Lifecycle",
-			"Reload refusal delivery could not be deferred: {1}. Delivering it now.",
-			Err.Message)
-		Deliver.Call()
-	}
-	return StopOk && AbortOk && RetractOk && RearmOk
+	_ReloadTerminalHandoffStopSuccessor(Record)
+	; True acknowledges the withdrawal request, never physical termination.
+	return Record["stop_acknowledged"] || Record["stop_request_ok"]
 }
 
 ; Runs RetractFn after a refusal that followed the terminal commit.
@@ -488,21 +473,34 @@ _ReloadTerminalHandoffRunRetract(Record) {
 }
 
 _ReloadTerminalHandoffDeliverRefusal(Record, Reason, *) {
+	PreviousCritical := Critical("On")
+	try {
+		if !_ReloadTerminalHandoffOwns(Record) || Record["state"] != "refusal_ready"
+				|| !Record["stop_acknowledged"] || Record["delivery_done"]
+			return false
+		if !_ConfigWriteTerminalCancelShutdown(Record["bundle"]) {
+			Record["state"] := "rearm_failed"
+			return false
+		}
+		Record["delivery_done"] := true
+		Record["state"] := "refused"
+		_ReloadTerminalHandoffReleaseOwner(Record)
+	} finally Critical(PreviousCritical)
 	RefusedFn := Record["refused"]
 	if HasMethod(RefusedFn, "Call") {
 		try RefusedFn.Call(Reason)
 		catch as Err
-			try LoggerError("Lifecycle",
-				"Reload refusal callback failed: {1}.", Err.Message)
+			try LoggerError("Lifecycle", "Reload refusal callback failed: {1}.", Err.Message)
 	}
 	ReleaseFn := Record["release"]
 	if HasMethod(ReleaseFn, "Call") {
 		try ReleaseFn.Call()
 		catch as Err
-			try LoggerError("Lifecycle",
-				"Reload refusal bundle release failed: {1}.", Err.Message)
+			try LoggerError("Lifecycle", "Reload refusal bundle release failed: {1}.", Err.Message)
 	}
-	_ReloadTerminalHandoffCloseSuccessor(Record)
+	if !_ReloadTerminalHandoffCloseSuccessor(Record)
+		_ReloadTerminalHandoffRetainCloseDebt(Record)
+	return true
 }
 
 ; An ordinary exit accepted while the successor is still loading supersedes the
@@ -511,26 +509,24 @@ _ReloadTerminalHandoffDeliverRefusal(Record, Reason, *) {
 ; when this process is certainly exiting. Nothing is rolled back: the committed
 ; configuration stays on disk for the next start.
 ReloadTerminalHandoffAbandon(Record, ExitReason) {
-	global _ReloadTerminalHandoff
-	PreviousCritical := Critical("On")
+	PreviousCritical := Critical("Off")
 	try {
-		if !(_ReloadTerminalHandoff is Map)
-				|| (_ReloadTerminalHandoff != Record)
-				|| Record["state"] != "pending"
+		if !ReloadTerminalHandoffPrepareAbandon(Record, ExitReason)
 			return false
-		Record["state"] := "abandoning"
+		PreviousOwnershipCritical := Critical("On")
+		try {
+			if !_ReloadTerminalHandoffOwns(Record) || Record["state"] != "abandon_ready"
+					|| !Record["stop_acknowledged"]
+				return false
+			Record["state"] := "abandoned"
+			_ReloadTerminalHandoffReleaseOwner(Record)
+		} finally Critical(PreviousOwnershipCritical)
+		Closed := _ReloadTerminalHandoffCloseSuccessor(Record)
+		if !Closed
+			_ReloadTerminalHandoffRetainCloseDebt(Record)
+		try LoggerInfo("Lifecycle", "Exit reason '{1}' superseded the pending reload.", ExitReason)
+		return Closed
 	} finally Critical(PreviousCritical)
-	StopOk := _ReloadTerminalHandoffStopSuccessor(Record)
-	AbortOk := _ReloadTerminalHandoffRunAbort(Record)
-	PreviousCritical := Critical("On")
-	try {
-		_ReloadTerminalHandoff := false
-		Record["state"] := "abandoned"
-	} finally Critical(PreviousCritical)
-	_ReloadTerminalHandoffCloseSuccessor(Record)
-	try LoggerInfo("Lifecycle",
-		"Exit reason '{1}' superseded the pending reload.", ExitReason)
-	return StopOk && AbortOk
 }
 
 ; OnExit vetoed a close request. When it came from the successor of a pending
@@ -551,44 +547,69 @@ ReloadTerminalHandoffRefuseForShutdown(ExitReason, Gate) {
 }
 
 _ReloadTerminalHandoffStopSuccessor(Record) {
-	Successor := Record["successor"]
-	if !_ReloadTerminalSuccessorValid(Successor)
+	PreviousCritical := Critical("On")
+	try {
+		if !_ReloadTerminalHandoffOwns(Record) || Record["state"] != "stopping" || Record["stop_busy"]
+			return false
+		Record["stop_busy"] := true
+	} finally Critical(PreviousCritical)
+	try {
+		Successor := Record["successor"]
+		if !_ReloadTerminalSuccessorValid(Successor)
+			throw Error("A stopping reload must retain its exact successor descriptor.")
+		Port := Record["port"]
+		Alive := _ReloadTerminalHandoffProbeStop(Record)
+		if Alive && !Record["stop_requested"] {
+			Record["stop_requested"] := true
+			try {
+				Result := Port["terminate"].Call(Successor)
+				Record["stop_request_ok"] := (Result is Integer) && Result == 1
+			} catch as Err {
+				Record["stop_request_ok"] := false
+				_ReloadTerminalHandoffStopError(Record, "termination raised: " . Err.Message)
+			}
+			if !Record["stop_request_ok"]
+				_ReloadTerminalHandoffStopError(Record, "termination was not acknowledged")
+			Alive := _ReloadTerminalHandoffProbeStop(Record)
+		}
+		if Alive {
+			Record["stop_deferred"] := true
+			_ReloadTerminalHandoffArmStopWatch(Record)
+			return false
+		}
+		Record["stop_acknowledged"] := true
+		try LoggerInfo("Lifecycle", "Stopped reload successor pid {1}.", Successor["pid"])
+		_ReloadTerminalHandoffCompleteStop(Record)
 		return true
-	Port := Record["port"]
-	Alive := true
-	try Alive := Port["alive"].Call(Successor)
-	catch as Err
-		try LoggerError("Lifecycle",
-			"Reload successor pid {1} could not be probed before stopping it: {2}.",
-			Successor["pid"], Err.Message)
-	if !Alive
-		return true
-	Stopped := false
-	try Stopped := Port["terminate"].Call(Successor)
-	catch as Err
-		try LoggerError("Lifecycle",
-			"Reload successor pid {1} termination raised: {2}.",
-			Successor["pid"], Err.Message)
-	if !Stopped {
-		try LoggerError("Lifecycle",
-			"Reload successor pid {1} could not be stopped; it keeps waiting for this instance to close.",
-			Successor["pid"])
+	} catch as Err {
+		Record["stop_deferred"] := true
+		if !Record["stop_probe_reported"] {
+			Record["stop_probe_reported"] := true
+			try LoggerError("Lifecycle", "Reload successor native retirement remains owned: {1}.", Err.Message)
+		}
+		_ReloadTerminalHandoffArmStopWatch(Record)
 		return false
+	} finally {
+		PreviousCritical := Critical("On")
+		try Record["stop_busy"] := false
+		finally Critical(PreviousCritical)
 	}
-	try LoggerInfo("Lifecycle", "Stopped reload successor pid {1}.",
-		Successor["pid"])
-	return true
 }
 
 _ReloadTerminalHandoffCloseSuccessor(Record) {
-	Successor := Record["successor"]
-	if !_ReloadTerminalSuccessorValid(Successor)
-		return
-	try Record["port"]["close"].Call(Successor)
-	catch as Err
-		try LoggerError("Lifecycle",
-			"Reload successor pid {1} handle could not be closed: {2}.",
-			Successor["pid"], Err.Message)
+	if !Record["stop_acknowledged"] || Record["close_attempted"]
+		return Record["close_acknowledged"]
+	Record["close_attempted"] := true
+	try {
+		Closed := Record["port"]["close"].Call(Record["successor"])
+		Record["close_acknowledged"] := (Closed is Integer) && Closed == 1
+	} catch as Err {
+		Record["close_acknowledged"] := false
+		try LoggerError("Lifecycle", "Reload successor handle close raised: {1}.", Err.Message)
+	}
+	if !Record["close_acknowledged"]
+		try LoggerError("Lifecycle", "Reload successor handle close remains unacknowledged; its owning record is retained.")
+	return Record["close_acknowledged"]
 }
 
 _ReloadTerminalRequirePort(Port) {
@@ -635,4 +656,169 @@ ReloadRefusalDeliver(CallerRefusedFn, Reason, NotifyFn := 0) {
 ReloadRefusedNotify(*) {
 	try NotifierSend(t("init.reload_refused_body"),
 		Map("title", t("init.reload_refused_title"), "level", "error"))
+}
+
+ReloadTerminalHandoffPrepareAbandon(Record, ExitReason, ResumeFn := 0) {
+	PreviousCritical := Critical("Off")
+	try return _ReloadTerminalHandoffPrepareAbandonNonCritical(Record, ExitReason, ResumeFn)
+	finally Critical(PreviousCritical)
+}
+
+_ReloadTerminalHandoffPrepareAbandonNonCritical(Record, ExitReason, ResumeFn) {
+	if !((ResumeFn is Integer) && ResumeFn == 0) && !HasMethod(ResumeFn, "Call")
+		return false
+	PreviousCritical := Critical("On")
+	try {
+		if !_ReloadTerminalHandoffOwns(Record)
+			return false
+		if Record["state"] == "abandon_ready"
+			return true
+		if Record["state"] == "pending" {
+			Record["stop_origin"] := "pending"
+			Record["stop_mode"] := "abandon"
+			Record["stop_reason"] := ExitReason
+			Record["resume_exit"] := ResumeFn
+			Record["state"] := "stopping"
+		} else if Record["state"] != "stopping" || Record["stop_mode"] != "abandon"
+			return false
+	} finally Critical(PreviousCritical)
+	_ReloadTerminalHandoffStopSuccessor(Record)
+	return Record["state"] == "abandon_ready"
+}
+
+_ReloadTerminalHandoffProbeStop(Record) {
+	Alive := Record["port"]["alive"].Call(Record["successor"])
+	if !(Alive is Integer) || !(Alive == 0 || Alive == 1)
+		throw TypeError("The reload successor liveness port did not return a Boolean.")
+	return Alive
+}
+
+_ReloadTerminalHandoffStopError(Record, Diagnostic) {
+	if Record["stop_error_reported"]
+		return
+	Record["stop_error_reported"] := true
+	try LoggerError("Lifecycle", "Reload successor pid {1} stop request failed: {2}; native ownership remains retained.",
+		Record["successor"]["pid"], Diagnostic)
+}
+
+_ReloadTerminalHandoffArmStopWatch(Record) {
+	global RELOAD_SUCCESSOR_POLL_MS
+	if Record["stop_watch_armed"]
+		return
+	Record["stop_watch_armed"] := true
+	try Record["port"]["arm"].Call(_ReloadTerminalHandoffStopWatch.Bind(Record), RELOAD_SUCCESSOR_POLL_MS)
+	catch as Err {
+		Record["stop_watch_armed"] := false
+		try LoggerError("Lifecycle", "Reload retirement probe could not be armed: {1}; native ownership remains retained.", Err.Message)
+	}
+}
+
+_ReloadTerminalHandoffStopWatch(Record, *) {
+	Record["stop_watch_armed"] := false
+	if !_ReloadTerminalHandoffOwns(Record)
+		return false
+	if Record["state"] == "stopping"
+		return _ReloadTerminalHandoffStopSuccessor(Record)
+	if Record["state"] == "refusal_ready"
+		return _ReloadTerminalHandoffArmRefusal(Record)
+	return false
+}
+
+_ReloadTerminalHandoffCompleteStop(Record) {
+	if !Record["stop_acknowledged"] || Record["compensation_done"]
+		return false
+	Record["compensation_done"] := true
+	AbortOk := _ReloadTerminalHandoffRunAbort(Record)
+	RetractOk := Record["stop_mode"] == "refuse"
+		&& (Record["stop_origin"] == "committed" || Record["stop_origin"] == "commit_failed")
+		? _ReloadTerminalHandoffRunRetract(Record) : true
+	Record["compensation_ok"] := AbortOk && RetractOk
+	if !Record["compensation_ok"] {
+		Record["state"] := "compensation_failed"
+		return false
+	}
+	if Record["stop_mode"] == "abandon" {
+		Record["state"] := "abandon_ready"
+		ResumeFn := Record["resume_exit"]
+		if HasMethod(ResumeFn, "Call") && Record["stop_deferred"] && !Record["resume_armed"] {
+			Record["resume_armed"] := true
+			try Record["port"]["arm"].Call(ResumeFn.Bind(Record), 1)
+			catch as Err
+				try LoggerError("Lifecycle", "The owned exit retry could not be armed: {1}.", Err.Message)
+		}
+		return true
+	}
+	Record["state"] := "refusal_ready"
+	try LoggerError("Lifecycle", "Reload refused after launch: {1}.", Record["stop_reason"])
+	return _ReloadTerminalHandoffArmRefusal(Record)
+}
+
+_ReloadTerminalHandoffArmRefusal(Record) {
+	if Record["delivery_armed"]
+		return true
+	Record["delivery_armed"] := true
+	try {
+		Record["port"]["arm"].Call(_ReloadTerminalHandoffDeliverRefusal.Bind(Record, Record["stop_reason"]), 1)
+		return true
+	} catch as Err {
+		Record["delivery_armed"] := false
+		try LoggerError("Lifecycle", "Reload refusal delivery could not be deferred: {1}; its bundle remains owned.", Err.Message)
+		_ReloadTerminalHandoffArmStopWatch(Record)
+		return false
+	}
+}
+
+_ReloadTerminalHandoffOwns(Record) {
+	global _ReloadTerminalHandoff, _ReloadTerminalRetirements
+	if !(Record is Map) || !Record.Has("id")
+		return false
+	PreviousCritical := Critical("On")
+	try return ((_ReloadTerminalHandoff is Map) && _ReloadTerminalHandoff == Record)
+		|| (_ReloadTerminalRetirements.Has(Record["id"]) && _ReloadTerminalRetirements[Record["id"]] == Record)
+	finally Critical(PreviousCritical)
+}
+
+_ReloadTerminalHandoffReleaseOwner(Record) {
+	global _ReloadTerminalHandoff, _ReloadTerminalRetirements
+	if (_ReloadTerminalHandoff is Map) && _ReloadTerminalHandoff == Record
+		_ReloadTerminalHandoff := false
+	if _ReloadTerminalRetirements.Has(Record["id"]) && _ReloadTerminalRetirements[Record["id"]] == Record
+		_ReloadTerminalRetirements.Delete(Record["id"])
+}
+
+_ReloadTerminalHandoffRetainCloseDebt(Record) {
+	global _ReloadTerminalRetirements
+	PreviousCritical := Critical("On")
+	try {
+		Record["state"] := "close_failed"
+		_ReloadTerminalRetirements[Record["id"]] := Record
+	} finally Critical(PreviousCritical)
+}
+
+ReloadTerminalHandoffNativeStopPending() {
+	global _ReloadTerminalHandoff, _ReloadTerminalRetirements
+	PreviousCritical := Critical("On")
+	try {
+		if (_ReloadTerminalHandoff is Map) && _ReloadTerminalHandoffNativeStopDebt(_ReloadTerminalHandoff)
+			return true
+		for Id, Record in _ReloadTerminalRetirements {
+			if (Record is Map) && Record.Has("id") && Record["id"] == Id
+					&& _ReloadTerminalHandoffNativeStopDebt(Record)
+				return true
+		}
+		return false
+	} finally Critical(PreviousCritical)
+}
+
+_ReloadTerminalHandoffNativeStopDebt(Record) {
+	if Record["stop_acknowledged"]
+		return false
+	; The exact launching reservation covers the interval before its descriptor
+	; returns, while acquisition may already own a process inside the launcher.
+	if Record["state"] == "launching"
+		return true
+	return _ReloadTerminalSuccessorValid(Record["successor"])
+		&& (Record["state"] == "pending" || Record["state"] == "claimed"
+			|| Record["state"] == "committed" || Record["state"] == "commit_failed"
+			|| Record["state"] == "stopping")
 }
