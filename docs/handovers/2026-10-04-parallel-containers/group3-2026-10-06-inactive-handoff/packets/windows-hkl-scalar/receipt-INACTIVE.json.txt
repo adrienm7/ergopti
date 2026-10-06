@@ -1,0 +1,171 @@
+{
+  "status": "PRIVATE_INACTIVE_SCALAR_CAPTURE_SUCCESSOR",
+  "predecessor_receipt_sha256": "23813ae615451aa25d8d2d0ddfc2a9e13aae4e8781590205b664d564d772248b",
+  "source_paths": [
+    {
+      "path": "static/ergopti_plus/windows/adapters/key_state.ahk",
+      "pre_sha256": "fec814344a74abae5c88d51566583e0d6a5614e2393a68292f9820c2e78ba00a",
+      "post_sha256": "09b0beca31afc3f675fe331fdf8dbdd007102c22390814fdb74fd5a65f7753e0",
+      "actual_root_pre_sha256": "969f960c2aebdc29a1078b655f017122ce1e46d00245cd488c485575be312dd3"
+    },
+    {
+      "path": "static/ergopti_plus/windows/tests/unit/test_layout_digit_row_probe.ahk",
+      "pre_sha256": "1fda4818436bba15c87dc96ca8c7cc2a4812ed03a9eb7d04919374ead1fc252f",
+      "post_sha256": "47fa2b54a78c04457fdf5d0598e4a2fa976fecc68541acaef822470615803a3b",
+      "actual_root_pre_sha256": "e5059ddd532af8377d5e6e4fec5f454a3203456ef6d1cdcef6324d84baadf88a"
+    }
+  ],
+  "pins": [
+    {
+      "path": ".ruff_cache/.gitignore",
+      "sha256": "9e3a60f1e6ec4ae60215c11d54b171392745ec25e9dded433d5bd921363af316",
+      "bytes": 35
+    },
+    {
+      "path": ".ruff_cache/0.15.8/6025920296935229878",
+      "sha256": "fb02ab3ce62173df19dab9b273ccd8c43a340b22d7df1af503c641a32508d48e",
+      "bytes": 137
+    },
+    {
+      "path": ".ruff_cache/CACHEDIR.TAG",
+      "sha256": "5953156d7e0c564a427251316eaf26f8870e6483ae2197f916b630e4f93e31ae",
+      "bytes": 43
+    },
+    {
+      "path": "README.md",
+      "sha256": "8d359d3003b2afe5b7dbda6381d3ba241b7f16445101d8007455592e2cc353a3",
+      "bytes": 1996
+    },
+    {
+      "path": "candidate/.ruff_cache/.gitignore",
+      "sha256": "9e3a60f1e6ec4ae60215c11d54b171392745ec25e9dded433d5bd921363af316",
+      "bytes": 35
+    },
+    {
+      "path": "candidate/.ruff_cache/CACHEDIR.TAG",
+      "sha256": "5953156d7e0c564a427251316eaf26f8870e6483ae2197f916b630e4f93e31ae",
+      "bytes": 43
+    },
+    {
+      "path": "candidate/static/ergopti_plus/windows/adapters/key_state.ahk",
+      "sha256": "09b0beca31afc3f675fe331fdf8dbdd007102c22390814fdb74fd5a65f7753e0",
+      "bytes": 26317
+    },
+    {
+      "path": "candidate/static/ergopti_plus/windows/tests/run_all.ahk",
+      "sha256": "df00800c67e84c01ce57272c8d85388d584c393c968fdbf6a3606da3521c6bf3",
+      "bytes": 107245
+    },
+    {
+      "path": "candidate/static/ergopti_plus/windows/tests/unit/test_layout_digit_row_probe.ahk",
+      "sha256": "47fa2b54a78c04457fdf5d0598e4a2fa976fecc68541acaef822470615803a3b",
+      "bytes": 48470
+    },
+    {
+      "path": "candidate/tools/test/test-ahk-v2-syntax-antipatterns.cjs",
+      "sha256": "71ccb10d9341a1c008884e7005a8da409f93bd3b3b1f392d920a652a1a67ba07",
+      "bytes": 16067
+    },
+    {
+      "path": "check_scalar_contract.py",
+      "sha256": "9fc1646eaabb4bc984c90836028766bf5d7df111c4495d08d237f7e7e1f888e7",
+      "bytes": 2953
+    },
+    {
+      "path": "dependencies/static/ergopti_plus/_shared/modules/features/number_row_policy.ahk",
+      "sha256": "a7db4ff9d9cda10e1490b4bebdef88bf53335e98f29137798a623b83e468f092",
+      "bytes": 3803
+    },
+    {
+      "path": "dependencies/static/ergopti_plus/windows/modules/keymap/layout/layout_shift_caps.ahk",
+      "sha256": "f77610e293ce62677f40d5ee71e753ec816335efbcbed4ae3bf0bc169eaa6c6e",
+      "bytes": 16401
+    },
+    {
+      "path": "dependencies/static/ergopti_plus/windows/modules/keymap/layout.ahk",
+      "sha256": "cfdbfc389e740e90cca7ea4269154b2a2dbc127d60f3ca5cf3d08cbdcf433186",
+      "bytes": 44218
+    },
+    {
+      "path": "dependencies/static/ergopti_plus/windows/tests/test_framework.ahk",
+      "sha256": "82d83e258dea19fbb9973fd4e477021348ace5d4a0eb29d2b74785e772f9d182",
+      "bytes": 31861
+    },
+    {
+      "path": "dependencies/static/ergopti_plus/windows/tests/test_stubs.ahk",
+      "sha256": "9cddbc1cdca4f9b4c66b7c58b72e00b38a443eee345e298ded2c35710e33bb2d",
+      "bytes": 42685
+    },
+    {
+      "path": "dependencies/static/ergopti_plus/windows/ui/menu/menu_layout.ahk",
+      "sha256": "10a72de230b0a7650571dc0ba2590b9448be7fb5a7df8b2b68ab56e23573208c",
+      "bytes": 9910
+    },
+    {
+      "path": "joint-apply.log",
+      "sha256": "19eaf43821a7660ec323a87c8457bf74823beb296c39f5e01aa8a683aa50f061",
+      "bytes": 7
+    },
+    {
+      "path": "joint.patch",
+      "sha256": "a63ccfe8c9918d6001a3b7326a4e84a946ef3765baf1a2a7d23157bb4ec2f3da",
+      "bytes": 13205
+    },
+    {
+      "path": "predecessor-receipt.json",
+      "sha256": "23813ae615451aa25d8d2d0ddfc2a9e13aae4e8781590205b664d564d772248b",
+      "bytes": 7023
+    },
+    {
+      "path": "preimages/static/ergopti_plus/windows/adapters/key_state.ahk",
+      "sha256": "fec814344a74abae5c88d51566583e0d6a5614e2393a68292f9820c2e78ba00a",
+      "bytes": 26206
+    },
+    {
+      "path": "preimages/static/ergopti_plus/windows/tests/unit/test_layout_digit_row_probe.ahk",
+      "sha256": "1fda4818436bba15c87dc96ca8c7cc2a4812ed03a9eb7d04919374ead1fc252f",
+      "bytes": 47177
+    },
+    {
+      "path": "ruff.log",
+      "sha256": "0d5ae52662163149b74821a07fbdb57f34079135e72743eb08a732e31059edc5",
+      "bytes": 44
+    },
+    {
+      "path": "source-controls.json",
+      "sha256": "8b1e10272eba5d580e21b9ba46e23b13210fb163ebdde58a15977fea5dc2e4e2",
+      "bytes": 231
+    },
+    {
+      "path": "source-controls.log",
+      "sha256": "6c9aa75e0662dff04d8b0251daf3adf36de9fea2b61b245cd14da11e54493fbf",
+      "bytes": 299
+    },
+    {
+      "path": "source-pairs.json",
+      "sha256": "30fca5aae9f9e10c6b1806745d12169c24e2ca7751ace76c70d32335063a84b4",
+      "bytes": 713
+    },
+    {
+      "path": "successor-apply.log",
+      "sha256": "19eaf43821a7660ec323a87c8457bf74823beb296c39f5e01aa8a683aa50f061",
+      "bytes": 7
+    },
+    {
+      "path": "successor.patch",
+      "sha256": "b816fa8cca6e06f0f18db31451ed8344726edcf211eafe4fc53cec04c4d34e16",
+      "bytes": 3042
+    },
+    {
+      "path": "syntax.log",
+      "sha256": "f310b137f60cce4858f843a54e9d57ffdfa2e3167421bf344b11b69dba7fdc72",
+      "bytes": 70
+    }
+  ],
+  "successor_patch_sha256": "b816fa8cca6e06f0f18db31451ed8344726edcf211eafe4fc53cec04c4d34e16",
+  "joint_patch_sha256": "a63ccfe8c9918d6001a3b7326a4e84a946ef3765baf1a2a7d23157bb4ec2f3da",
+  "archive_sha256": "3964dce742550fb1772a184dfa6eb98dd4869f6aa7410149ca2a48701324f373",
+  "portable": "source old-contract RED, new PASS and 2 unchecked-publication mutations RED; partial syntax3files+BOMLF+Ruff+both applychecks PASS",
+  "native": "all6 registered cases UNEXECUTED, including actual own/stateful/throwing getter behavior and actual HKLs; no output availability authority",
+  "preservation": "whole old5e source/test prefix except newly prepared descriptor block, previous5case exact byte prefix, frozen corpus/runner/no-state reader0x4 exact; predecessor immutable"
+}

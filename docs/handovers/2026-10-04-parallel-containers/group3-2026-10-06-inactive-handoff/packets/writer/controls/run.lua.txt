@@ -1,0 +1,15 @@
+-- Private focused replay of the actual existing unit module; no kernel output.
+local directory = assert(arg[1])
+local selected = assert(arg[2])
+local root = assert(arg[3])
+package.path = root .. "/static/ergopti_plus/linux/?.lua;"
+	.. root .. "/static/ergopti_plus/_shared/lua/?.lua;" .. package.path
+local helpers = require("tests.helpers")
+package.loaded["logger.shim"] = helpers.make_logger_stub()
+package.preload["adapters.uinput_writer"] = function()
+	return assert(loadfile(directory .. "/" .. selected .. "/static/ergopti_plus/linux/adapters/uinput_writer.lua"))()
+end
+assert(loadfile(directory .. "/candidate/static/ergopti_plus/linux/tests/unit/adapters/test_uinput_writer.lua"))()
+local results = helpers.get_results()
+print(string.format("OUTPUT_OWNER %d %d", results.passed, results.failed))
+os.exit(results.failed == 0 and 0 or 1)

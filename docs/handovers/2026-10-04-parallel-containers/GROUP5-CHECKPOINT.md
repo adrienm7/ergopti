@@ -1442,3 +1442,18 @@ messages, frame calls, timer/deadline and failure prefix remain conserved.
 Independent review clears the successor; publication corrects only its new
 test path comment. Actual native cause/geometry acceptance remains unknown.
 Item24 remains partial; no runtime, permission or signing authority is added.
+
+## Verified runtime source execution
+
+Current dev7a75 is composed, preserving Group3 providers and inactive handoff
+without adopting its incomplete preparations. The actual builder now executes
+retained SHA-verified BASE/provider bytes directly, preserving module metadata
+and default commands/records/products/deadlines. Existing bytecode cannot
+replace those bytes. Two consumer pins follow the reviewed builder338352.
+Seven private CLI/file regressions and113 unchanged controls pass; original
+source fails five cache cases. Root independently rehashed478 subjects, reviewed
+the exact five-path delta and ran all120 controls. New SDK XCTest registers
+these portable controls; no native build/auth/sign/install credit is inferred.
+The independently reviewed Session suspend/resume tranche remains private for
+separate adoption. The new native shipping observer needs its own reviewed
+three-argument loader composition. Item31 and its unfinished packages stay open.

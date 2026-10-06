@@ -1,0 +1,235 @@
+{
+  "status": "PRIVATE_UNINTEGRATED_NATIVE_UNQUALIFIED_TERMINAL_SUCCESSOR",
+  "root_head": "9e237dc0bc84721d08054ddcf45de4d476d3e1e6",
+  "dependency_receipt_sha256": "b88a1f2eb20d20c3d74b0f5459a5c3f8c4a3ab89a827f247c98b72cee66c67ad",
+  "paths": [
+    {
+      "path": "static/ergopti_plus/_shared/lua/native_app_switcher_owner.lua",
+      "root_preimage": null,
+      "b88_preimage": "d8643e455524da3d2b64db1300a9e691245d63d2f0e3bde18cae8426bf93ae98",
+      "postimage": "6020b0b2687fc7eaa98b82ec16e8f70388d497c5824286e60be6eb1983f17357",
+      "changed_from_b88": true
+    },
+    {
+      "path": "static/ergopti_plus/macos/modules/gestures/native_app_switcher.lua",
+      "root_preimage": null,
+      "b88_preimage": "d61ab5137a01f313ce3aa94db07f1dfece32cf1ea06b444da89daf06f3bcca91",
+      "postimage": "d61ab5137a01f313ce3aa94db07f1dfece32cf1ea06b444da89daf06f3bcca91",
+      "changed_from_b88": false
+    },
+    {
+      "path": "static/ergopti_plus/macos/tests/unit/modules/gestures/test_native_app_switcher.lua",
+      "root_preimage": null,
+      "b88_preimage": "84ef2517e805fae946f6a313076ddd644c5ebf2ba6294c7813036b4d31032b31",
+      "postimage": "84ef2517e805fae946f6a313076ddd644c5ebf2ba6294c7813036b4d31032b31",
+      "changed_from_b88": false
+    },
+    {
+      "path": "static/ergopti_plus/macos/tests/unit/modules/gestures/test_native_app_switcher_owner.lua",
+      "root_preimage": null,
+      "b88_preimage": "0fe9169faa202cf861326c60c906ae5a8933e0fdf50aaec0711df0aae8cf4f0d",
+      "postimage": "3f0295f932f08ec063ab6dbe2f1cbed7ff9e93e63d0839df451dfaf6b0926211",
+      "changed_from_b88": true
+    }
+  ],
+  "artifacts": {
+    "README.md": {
+      "sha256": "6ff6df887f8bbf4c4b8599980e3435be7ec34c23eeaa0a9e6bff4e72f7dbf99e",
+      "bytes": 2666
+    },
+    "actual-frozen-b88-before-lua54-control.lua": {
+      "sha256": "d8643e455524da3d2b64db1300a9e691245d63d2f0e3bde18cae8426bf93ae98",
+      "bytes": 10315
+    },
+    "actual-frozen-b88-before-lua54.log": {
+      "sha256": "8da8fba6bcffb97c3cd7884a72608b44b821d3729374f17ff123bfee39735401",
+      "bytes": 3660
+    },
+    "actual-frozen-b88-before-luajit-control.lua": {
+      "sha256": "d8643e455524da3d2b64db1300a9e691245d63d2f0e3bde18cae8426bf93ae98",
+      "bytes": 10315
+    },
+    "actual-frozen-b88-before-luajit.log": {
+      "sha256": "c07cf686b94d796195d514a0beb9c539c31defb219b62a947727357b7d2e338d",
+      "bytes": 2800
+    },
+    "before-b88/static/ergopti_plus/_shared/lua/native_app_switcher_owner.lua": {
+      "sha256": "d8643e455524da3d2b64db1300a9e691245d63d2f0e3bde18cae8426bf93ae98",
+      "bytes": 10315
+    },
+    "before-b88/static/ergopti_plus/macos/tests/unit/modules/gestures/test_native_app_switcher_owner.lua": {
+      "sha256": "0fe9169faa202cf861326c60c906ae5a8933e0fdf50aaec0711df0aae8cf4f0d",
+      "bytes": 11533
+    },
+    "candidate/static/ergopti_plus/_shared/lua/native_app_switcher_owner.lua": {
+      "sha256": "6020b0b2687fc7eaa98b82ec16e8f70388d497c5824286e60be6eb1983f17357",
+      "bytes": 10777
+    },
+    "candidate/static/ergopti_plus/macos/modules/gestures/native_app_switcher.lua": {
+      "sha256": "d61ab5137a01f313ce3aa94db07f1dfece32cf1ea06b444da89daf06f3bcca91",
+      "bytes": 5045
+    },
+    "candidate/static/ergopti_plus/macos/tests/unit/modules/gestures/test_native_app_switcher.lua": {
+      "sha256": "84ef2517e805fae946f6a313076ddd644c5ebf2ba6294c7813036b4d31032b31",
+      "bytes": 8730
+    },
+    "candidate/static/ergopti_plus/macos/tests/unit/modules/gestures/test_native_app_switcher_owner.lua": {
+      "sha256": "3f0295f932f08ec063ab6dbe2f1cbed7ff9e93e63d0839df451dfaf6b0926211",
+      "bytes": 14210
+    },
+    "controlled-lua54.log": {
+      "sha256": "0c8d9104242c5567e4f5cccc2046d36de48fd4132465f1dbc295b00ba745e1f3",
+      "bytes": 4745
+    },
+    "dependencies/b88-receipt.json": {
+      "sha256": "b88a1f2eb20d20c3d74b0f5459a5c3f8c4a3ab89a827f247c98b72cee66c67ad",
+      "bytes": 6544
+    },
+    "dependencies/terminal_seal_control.lua": {
+      "sha256": "9ae6a69091193936ce5a240cbf8fa7d7d1b047dbfd2352a11e62efc9fbc790f1",
+      "bytes": 1887
+    },
+    "final-core-luajit.log": {
+      "sha256": "60e1315661d9d3de2629ba2663634a9178cd9dae891514ba6f7e40ca7476f37d",
+      "bytes": 2198
+    },
+    "final-lua54.log": {
+      "sha256": "720efa8c0bb45825da70a8f14e7fea206e5cfb137165c4f305c00962c564a233",
+      "bytes": 3058
+    },
+    "omit-input-retirement-ack-control.lua": {
+      "sha256": "6706c1a5f3f83329072f8d4383ee0e2ac47cc0c396f770a669a8b6c32ca5e9aa",
+      "bytes": 10734
+    },
+    "omit-input-retirement-ack.log": {
+      "sha256": "2a03fd5f701f28e35e8272faa213eeaedfbde3a5b452ef336923136e586346d7",
+      "bytes": 4893
+    },
+    "omit-tagged-arrival-admission-control.lua": {
+      "sha256": "36f9a7b4e28da10ace428b994150f2629d99c1538b51e4ca409555c78445555c",
+      "bytes": 10764
+    },
+    "omit-tagged-arrival-admission.log": {
+      "sha256": "2827d1262333276abdc71dd27da670cd146ad4210a4bfdaaf3dfc78a8a761f80",
+      "bytes": 3141
+    },
+    "omit-terminal-source-seal-control.lua": {
+      "sha256": "8c872a5e5e7f59b72161188ccde43c7239f9be2a9323dd6bbf3c1eae68de5a3d",
+      "bytes": 10744
+    },
+    "omit-terminal-source-seal.log": {
+      "sha256": "db27f1774a31bf90039dcd5bab17bd09b4c9070d543406f0b93b7f5d07721c35",
+      "bytes": 3247
+    },
+    "preimages/.agents/skills/hammerspoon-driver/SKILL.md": {
+      "sha256": "0a051706c88da6301e2aa7a562e79e0a614d05ef3fc90b30f5ce275f9a753c90",
+      "bytes": 10728
+    },
+    "preimages/.agents/skills/verify-change/SKILL.md": {
+      "sha256": "47b6fa014f939d5162e398529c8af91791808615cd221d4ecc8f260e38d5d9cf",
+      "bytes": 6554
+    },
+    "preimages/AGENTS.md": {
+      "sha256": "78b76196e3ab06d6cea4567769d834394132242b0a5f73e7f2f3932fc3701958",
+      "bytes": 3249
+    },
+    "preimages/docs/memory/macos-hammerspoon.md": {
+      "sha256": "1657a54105f02b576cba9298a5393871be6d035c11aea15a38dc19cd9b0400e3",
+      "bytes": 72658
+    },
+    "preimages/static/ergopti_plus/_shared/lua/native_worker_owner.lua": {
+      "sha256": "c6d8169f6f6fe0a2d3977a56708d2bf0104ed9d1369129a66a905a6415e6050f",
+      "bytes": 7754
+    },
+    "preimages/static/ergopti_plus/_shared/modules/timings/constants.toml": {
+      "sha256": "94f0a04ded780757ed8b08045150ddef079c4421d6ec864e9a425b2fe6e86997",
+      "bytes": 30221
+    },
+    "preimages/static/ergopti_plus/macos/adapters/synthetic_input.lua": {
+      "sha256": "44fb9852845d6099af93530771391632ed4a2ac470c562325e5a0cd2997ef8e3",
+      "bytes": 157155
+    },
+    "preimages/static/ergopti_plus/macos/adapters/timer_scheduler.lua": {
+      "sha256": "b2c47bb57a2a42af872135a468b49ea7320a7b822dc5807458673bee7e2a2d19",
+      "bytes": 17290
+    },
+    "preimages/static/ergopti_plus/macos/adapters/window_manager.lua": {
+      "sha256": "a6c18a07e99eaf9f270a39e3d956ee462c260d9360a218092ae17d2aa9f4da89",
+      "bytes": 10659
+    },
+    "preimages/static/ergopti_plus/macos/modules/gestures/actions.lua": {
+      "sha256": "22e20d24aa3a015618b9baa710cb7f44ae2c2fbbd3d97bd5f6ea17ea86e2c891",
+      "bytes": 123889
+    },
+    "preimages/static/ergopti_plus/macos/modules/gestures/actions_aux_owner.lua": {
+      "sha256": "eead2be145f34a4d3e20de9332e9e4bafdbf9073ff89b8d0173fc3e5d36b3175",
+      "bytes": 22117
+    },
+    "preimages/static/ergopti_plus/macos/tests/helpers/init.lua": {
+      "sha256": "c8255bc747f596ff7353e631baf7e57bd549148b93b960dd39763997648c5e89",
+      "bytes": 34300
+    },
+    "preservation.json": {
+      "sha256": "30d8bc86f514bd83594602422a71b799684d07f650dad3fd32750693d6e2d181",
+      "bytes": 108
+    },
+    "root-independent-lua5.4.log": {
+      "sha256": "42cdee2a10d4dbd9371fb468ef4c914ccfdf17b1a4b069371dd1d5055829876a",
+      "bytes": 137
+    },
+    "root-independent-luajit.log": {
+      "sha256": "42cdee2a10d4dbd9371fb468ef4c914ccfdf17b1a4b069371dd1d5055829876a",
+      "bytes": 137
+    },
+    "root-source.patch": {
+      "sha256": "a3582b211dab5add88c2df52fa2f74a0b2187f5d8c17bebdf10d293bd81df923",
+      "bytes": 40918
+    },
+    "run_focused.py": {
+      "sha256": "142684e9be5bcb8689e854ed94880d5fed6251f78a0f18721930b9fb1f3b6cde",
+      "bytes": 3328
+    },
+    "source-pair.tar": {
+      "sha256": "095034667dba05acd2e9ca2f5b6a1016b8a3a676ef74d3233086afbe96eca7fd",
+      "bytes": 92160
+    },
+    "successor-only.patch": {
+      "sha256": "0d2a23eb71d8d7070b7acd6bceb7183c74f5ff61b50ecc72946e0486b42ed9f5",
+      "bytes": 4603
+    }
+  },
+  "final": {
+    "lua54": {
+      "passed": 37,
+      "failed": 0
+    },
+    "shared_luajit": {
+      "passed": 27,
+      "failed": 0
+    }
+  },
+  "actual_b88_before": {
+    "lua54": {
+      "passed": 31,
+      "failed": 6
+    },
+    "shared_luajit": {
+      "passed": 21,
+      "failed": 6
+    }
+  },
+  "root_independent_control": {
+    "lua54": {
+      "passed": 2,
+      "failed": 0
+    },
+    "luajit": {
+      "passed": 2,
+      "failed": 0
+    }
+  },
+  "native_allocations": 0,
+  "root_mutations": 0,
+  "original_assertions_removed": 0,
+  "availability": "false until G5 and timing admission"
+}

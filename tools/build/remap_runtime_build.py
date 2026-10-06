@@ -22,18 +22,20 @@ BASE_SHA256 = "aa54be49feca564a455bc0f1804939a8bf3658ddeb5f56a691a914114c69aee2"
 PROVIDER_SHA256 = "6655ddeae27826d7dd9e7e54e907eba82f5477cb0212fb443eb0bafa367f8352"
 
 
-def _load(name, path):
+def _load(name, path, data):
+    """Execute retained verified bytes without allowing a cache to replace them."""
     specification = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(specification)
     sys.modules[name] = module
-    specification.loader.exec_module(module)
+    exec(compile(data, str(path), "exec"), module.__dict__)
     return module
 
 
 # The reviewed process, TLS, evidence and phase owners remain the sole backend.
-if hashlib.sha256(BASE_PATH.read_bytes()).hexdigest() != BASE_SHA256:
+BASE_SOURCE = BASE_PATH.read_bytes()
+if hashlib.sha256(BASE_SOURCE).hexdigest() != BASE_SHA256:
     raise RuntimeError("Reviewed native phase controller changed")
-BASE = _load("four_target_native_phase_owner", BASE_PATH)
+BASE = _load("four_target_native_phase_owner", BASE_PATH, BASE_SOURCE)
 _REQUIRE = BASE.require
 _RUN_PHASE = BASE.run_phase
 _READ_REGULAR = BASE.read_regular
@@ -410,7 +412,7 @@ def _identifiers(repository=None, deadline=None):
         "source_identity",
         "Reviewed single identity provider changed",
     )
-    provider = _load("four_target_single_identity_provider", path)
+    provider = _load("four_target_single_identity_provider", path, source)
     _REQUIRE(
         _READ_REGULAR(path) == source,
         "source_identity",

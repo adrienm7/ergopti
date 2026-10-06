@@ -1,0 +1,6 @@
+{
+  "original_pair_test_inverse_byte_exact": true,
+  "caps_word_unavailable_assertion_preserved": true,
+  "original_base_suite_byte_exact": true,
+  "original_native_assertions_modified": 0
+}

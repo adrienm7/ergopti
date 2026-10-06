@@ -1,0 +1,9 @@
+{
+  "portable_replay_status": "EXPECTED_DIAGNOSTIC_OUTCOMES_REPRODUCED",
+  "portable_replay_stdout_sha256": "663b18a2d17b4cedc4912e23f6430f648510ffc9e3d4e1917500785992e817ca",
+  "portable_replay_results_sha256": "e848c5d4ac9e3e467b438f5b71cbc5414dbede0999f8906457df6ced55e7c1d8",
+  "source_fix": "NOT_IMPLEMENTED",
+  "physical_delivery_available": false,
+  "native_kernel_execution": "NOT_RUN",
+  "peer_review": "REQUESTED_AFTER_FREEZE"
+}

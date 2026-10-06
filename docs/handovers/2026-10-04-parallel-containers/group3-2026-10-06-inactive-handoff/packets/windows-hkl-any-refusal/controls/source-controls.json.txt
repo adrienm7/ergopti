@@ -1,0 +1,8 @@
+{
+  "source": "passed",
+  "predecessor": "expected failure",
+  "omitted_Any_boundaries": 2,
+  "old_test_lines": "all retained in order",
+  "registered_cases": 6,
+  "native_behavior": "unexecuted"
+}

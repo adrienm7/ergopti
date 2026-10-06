@@ -1,0 +1,44 @@
+from pathlib import Path
+import difflib,hashlib,json,tarfile,shutil,subprocess
+root=Path(__file__).parent;old=Path('/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word');dep=old/'prototype-freeze/receipt.json';freeze=root/'freeze';freeze.mkdir(exist_ok=True)
+def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
+assert sha(dep)=='5aeb20f1c6b4d254ed08b9fdabfdb995b7710c7994e123bee597a2139a012881'
+paths=['static/ergopti_plus/linux/platform/remap/key_combination_engine.lua','static/ergopti_plus/linux/tests/unit/modules/test_key_combination_caps_word.lua'];patch=[];sources=[]
+for rel in paths:
+ pre=freeze/'preimages'/rel;post=freeze/'candidate'/rel;pre.parent.mkdir(parents=True,exist_ok=True);post.parent.mkdir(parents=True,exist_ok=True)
+ pre.write_bytes((old/'prototype-freeze/candidate'/rel).read_bytes());post.write_bytes((root/'snapshot'/rel).read_bytes())
+ patch.append('diff --git a/'+rel+' b/'+rel+'\n');patch.extend(difflib.unified_diff(pre.read_text().splitlines(True),post.read_text().splitlines(True),fromfile='a/'+rel,tofile='b/'+rel))
+ sources.append({'path':rel,'pre_sha256':sha(pre),'post_sha256':sha(post)})
+assert (freeze/'candidate'/paths[1]).read_bytes().startswith((freeze/'preimages'/paths[1]).read_bytes())
+pp=freeze/'tick-successor.patch';pp.write_text(''.join(patch));check=freeze/'apply-check';check.mkdir(exist_ok=True);shutil.copytree(freeze/'preimages',check,dirs_exist_ok=True)
+with(freeze/'apply-check.log').open('wb')as out:r=subprocess.run(['git','apply','--check',str(pp)],cwd=check,stdout=out,stderr=subprocess.STDOUT)
+assert r.returncode==0;subprocess.run(['git','apply',str(pp)],cwd=check,check=True)
+assert all(sha(check/x['path'])==x['post_sha256']for x in sources)
+readme=freeze/'README.md';readme.write_text('''# Inactive Caps Word delayed replay successor
+
+Two sources apply after immutable prototype5aeb20f1. No Root, Git, metadata, registration, availability, daemon wiring or corpus changes. Caps Word remains an inactive prototype; physical native custody remains unqualified.
+
+Independent actual Pair/Base reproducer proves a delayed Space-roll layout callback can change canonical source then leak raw A DOWN. This successor snapshots tick epoch/serial/policy/guard, rechecks source and pure shared casing after base:tick callbacks, then checks private ownership last. Throwing/unknown native tick results, source revocation and transport handoff return exact owned retirement, suppressing every delayed raw row/tap. Casing-only retirement preserves newer title-word intent and the existing ACK-gated private policy resumption. Valid legacy tick shape is unchanged.
+
+Old test file is an exact byte prefix. Eight appended controlled regressions cover source mutation, actual configuration acquisition, newer title owner, pointer cancellation, valid roll, throwing plan, acquired native delivery custody and last source callback casing replacement. Both ABIs: original163 + eight =171/0; unchanged title words59/0. Original tick with all35 casing controls28/7. Three post-callback guard omissions and an ordering omission are red in both. Independent15616a5 script is unchanged: old stale raw DOWN true/red, new false/green after exact cleanup. Scoped original lint definitions2/0.
+
+Remaining physical modifiers/source/output, evdev/uinput, contextual registration and complete startup/global-scope qualification are unchanged. Pure current_native casing observation has no native IO or source callback in the actual shared owner and Linux facade.
+''')
+archive=freeze/'source-pair.tar'
+with tarfile.open(archive,'w')as tar:
+ for kind in ['preimages','candidate']:
+  for p in sorted((freeze/kind).rglob('*')):
+   if p.is_file():tar.add(p,arcname=str(p.relative_to(freeze)),recursive=False)
+files={}
+for folder in ['evidence','mutations','lint-scope']:
+ for p in(root/folder).rglob('*'):
+  if p.is_file():files[str(p)]=sha(p)
+for p in [Path(__file__),root/'qualify-owner.lua',root/'qualify-all-controlled.lua',root/'qualify-legacy-title-unblocked.lua',root/'qualify-mutated-tick.lua',root/'independent-tick-reentry.lua',root/'final-results.json',pp,readme,archive,freeze/'apply-check.log']:
+ files[str(p)]=sha(p)
+for row in sources:
+ for kind in ['preimages','candidate']:
+  p=freeze/kind/row['path'];files[str(p)]=sha(p)
+deps=json.loads(dep.read_text())['source_dependencies'];deps={str(root/'snapshot'/Path(k).relative_to(old/'snapshot')):v for k,v in deps.items()}
+for p,h in deps.items():assert sha(Path(p))==h
+receipt={'status':'FROZEN_INACTIVE_CAPS_WORD_TICK_SUCCESSOR','dependency_receipt':str(dep),'dependency_receipt_sha256':sha(dep),'source_paths':sources,'files':files,'source_dependencies':deps,'original_test_file_byte_exact_prefix':True,'independent_reproducer_sha256':sha(root/'independent-tick-reentry.lua'),'qualifications':{'combined_luajit':{'passed':171,'failed':0},'combined_lua54':{'passed':171,'failed':0},'unchanged_title_words_each_abi':{'passed':59,'failed':0},'original_tick_with_appended_tests_each_abi':{'passed':28,'failed':7},'guard_omissions_each_abi':4,'independent_reproducer_old':'RED_STALE_RAW_DOWN_TRUE','independent_reproducer_new':'PASS_STALE_RAW_DOWN_FALSE','lint':{'sources':2,'violations':0},'physical_native_input_output':'UNEXECUTED_UNQUALIFIED','availability':'UNCHANGED_UNAVAILABLE'},'apply_check_exit':r.returncode,'patch_sha256':sha(pp),'archive_sha256':sha(archive)}
+p=freeze/'receipt.json';p.write_text(json.dumps(receipt,indent=2,sort_keys=True)+'\n');print('RECEIPT',p,sha(p));print('PATCH',sha(pp))

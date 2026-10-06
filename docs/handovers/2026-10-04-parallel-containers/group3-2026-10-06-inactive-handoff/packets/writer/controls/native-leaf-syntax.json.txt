@@ -1,0 +1,12 @@
+[
+  {
+    "abi": "luajit",
+    "native_leaf_syntax_exit": 0,
+    "stderr": ""
+  },
+  {
+    "abi": "lua5.4",
+    "native_leaf_syntax_exit": 0,
+    "stderr": ""
+  }
+]

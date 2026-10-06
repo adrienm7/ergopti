@@ -1,0 +1,39 @@
+from pathlib import Path
+import hashlib,json,difflib,re
+root=Path('/workspace/.ergopti-cloud/preparations/group3-linux-evdev-origin-slot-identity');base=Path('/workspace/.ergopti-cloud/preparations/group3-linux-evdev-origin-receipts');repo=Path('/workspace/ergopti')
+sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
+paths=['static/ergopti_plus/linux/adapters/evdev_reader.lua','static/ergopti_plus/linux/tests/unit/adapters/test_evdev_reader.lua'];patch=[];sources=[]
+for rel in paths:
+ pre=root/'preimages'/rel;post=root/'candidate'/rel
+ assert pre.read_bytes()==(base/'candidate'/rel).read_bytes()
+ if '/tests/' in rel:assert post.read_bytes().startswith(pre.read_bytes())
+ else:assert post.read_text().replace('not rawequal(record.slot, slot or M.KEYBOARD)','record.slot ~= (slot or M.KEYBOARD)',1)==pre.read_text()
+ patch.extend(difflib.unified_diff(pre.read_text().splitlines(True),post.read_text().splitlines(True),fromfile='a/'+rel,tofile='b/'+rel))
+ sources.append({'path':rel,'preimage':sha(pre),'postimage':sha(post)})
+(root/'candidate.patch').write_text(''.join(patch))
+results=[]
+for abi in ['luajit','lua5.4']:
+ for selected in ['preimages','candidate']:
+  p=root/(abi+'-'+selected+'.log');m=re.fullmatch(r'READER_ORIGIN (\d+) (\d+)',p.read_text().strip().splitlines()[-1]);assert m
+  results.append({'abi':abi,'source':selected,'passed':int(m[1]),'failed':int(m[2]),'log':p.name,'sha256':sha(p)})
+(root/'results.json').write_text(json.dumps(results,indent=2)+'\n')
+(root/'README.md').write_text('''# Exact evdev origin slot identity successor
+
+Immutable predecessor f69b51fd remains unchanged. This successor changes exactly one production comparison: `capture_event` now uses `rawequal(record.slot, supplied_slot)` instead of metamethod-capable equality. Existing opaque/table slots remain supported; no old native/ordinary API is narrowed.
+
+The whole preceding registered unit module is an exact byte prefix (27 original plus 20 producer cases). The three independent reviewer controls are appended with their exact assertions/logic retained (only indentation normalized and helper documentation added). They prove foreign equal-shaped/equal-metamethod slot refusal, no two-sided equality callback/native-close reentry, and no single-sided Lua54 callback/native-close reentry. A fourth positive case proves actual controlled native open/grab/read/capture/view/current/close still accepts the legitimate same opaque slot with a throwing equality handler, without executing it.
+
+On the predecessor, the complete strengthened module reports LuaJIT 49 PASS / 2 FAIL and Lua5.4 48 PASS / 3 FAIL. The difference is genuine Lua54 single-sided __eq behavior; that case already passes on LuaJIT while the two shared controls fail. Candidate reports 51 PASS / 0 FAIL on both. Reverting the sole production line exactly recovers the predecessor bytes and the red behavior. Finite authoritative convention checks on the two owned paths pass.
+
+All other new opaque identity comparisons were audited: receipt/backend/provider/state identities already use rawequal; table registries use raw key identity; native descriptors/session/read epochs and independent expected wire fields are private scalar values. The only metamethod-capable slot comparison in the added receipt API is corrected here. The predecessor's lifecycle/provider/debt/GC/source boundaries are unchanged.
+
+These are explicitly controlled FFI-provider cases, never native kernel calls. No Root/index/workflow/manifest/registry/generated changes or native allocation occurred. Kernel acceptance, full driver gates, Hook/output handoff and public ownership acknowledgement remain unqualified/pending. Physical delivery stays unavailable. Only candidate/ postimages plus candidate.patch are proposed; the predecessor is not final without this successor.
+''')
+# Pin exact independent original fixture and current preimages, not only its reindented copy.
+assert sha(root/'independent-combined-extra.lua')=='6c6a639e655ed429c19dfff531e81931dc46f7e873377583d935a8caa26aba64'
+deps=[{'path':item['path'],'sha256':sha(repo/item['path'])} for item in json.loads((base/'receipt.json').read_text())['dependencies']]
+artifacts=[{'path':str(p.relative_to(root)),'sha256':sha(p),'bytes':p.stat().st_size} for p in sorted(root.rglob('*')) if p.is_file() and p.name!='receipt.json']
+r={'status':'PRIVATE_PENDING_OWNERSHIP_AND_REVIEW','predecessor_receipt':sha(base/'receipt.json'),'owned_paths':sources,'dependencies':deps,'results':results,'artifacts':artifacts,'native_execution':'NOT_RUN','physical_delivery_available':False}
+(root/'receipt.json').write_text(json.dumps(r,indent=2)+'\n');print('receipt',sha(root/'receipt.json'));print(json.dumps(sources,indent=2))
+for p in root.rglob('*'):
+ if p.is_file():p.chmod(0o444)

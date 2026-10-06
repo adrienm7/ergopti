@@ -1,0 +1,84 @@
+{
+  "verdict": "BOUNDED_SOURCE_CLEAR",
+  "receipt_sha256": "4735d40af11aa1245b7cca0ef615d1c7e18369902c96de3832ae64fa69a86f63",
+  "patch_sha256": "277577bb26fbb2f116aac856254eade950efda374d49b9a1cea3f3622d53cdf2",
+  "verified_artifacts": 1869,
+  "verified_source_paths": [
+    {
+      "path": "static/ergopti_plus/_shared/lua/action_context.lua",
+      "pre_sha256": null,
+      "post_sha256": "1ed882dc4554a0382ad13d843bc5ac4c43876b646dee10e6a45900462b29082f",
+      "bytes": 1232
+    },
+    {
+      "path": "static/ergopti_plus/_shared/modules/actions/actions.toml",
+      "pre_sha256": "b0c7c57781cade4188a26ddc2e5e3d2f56dc1e9acc5db863bb5d7698aedc4549",
+      "post_sha256": "4aa0cda8bbde6fc416f9533f51e1d0802d9f9cacd6b6a28b0ab7da92c1a1a1f1",
+      "bytes": 51998
+    },
+    {
+      "path": "static/ergopti_plus/linux/_generated/action_catalogue.lua",
+      "pre_sha256": "bd8ec58ada85c59731ebccd5de7afc4f0483797c211c71b8f86ca5a3bfabde32",
+      "post_sha256": "5fdc7449b8cebeea930d08a21d428497cd440a6386a28672887bd8b07f39398b",
+      "bytes": 24540
+    },
+    {
+      "path": "static/ergopti_plus/linux/modules/gestures/manager.lua",
+      "pre_sha256": "5d307526dc1be67f51a93b80e411e2908a26db31a607d2da143cf37291ddbd50",
+      "post_sha256": "7d414063431b10d76271119ffa94bf351c5eb0a16e6677c0cbed5879ad2e5a46",
+      "bytes": 99826
+    },
+    {
+      "path": "static/ergopti_plus/linux/tests/unit/infra/test_key_combinations_scope.lua",
+      "pre_sha256": "b00a3d584cbe0de14386c84f62507025ddbd0162adc7bda89d2f01accae597dc",
+      "post_sha256": "5e4aa4984a89ade764e6b14c631301aab0f36a0c895e60618fce9dd3cfa57556",
+      "bytes": 47661
+    },
+    {
+      "path": "static/ergopti_plus/linux/tests/unit/modules/test_action_catalogue_parity.lua",
+      "pre_sha256": "954824d529845310015f5304311c737f824cda528383f8bcd997b3b3be3f03c1",
+      "post_sha256": "c3c5eccc8a78a5f65226197f49df2c53f1bf7c20b9ac5d4c68e3262b110ea762",
+      "bytes": 23522
+    },
+    {
+      "path": "static/ergopti_plus/linux/tests/unit/ui/test_key_combinations_menu.lua",
+      "pre_sha256": "7416b572510c2f8960633b9e8c28d91df9f56fa0bb7a96cbf6cbb994bfdbe05e",
+      "post_sha256": "5817a442539f7147b41e266bc6644ad8038c872b9307e0df505d7fc82e73a79b",
+      "bytes": 5615
+    },
+    {
+      "path": "static/ergopti_plus/linux/ui/menu/key_combinations.lua",
+      "pre_sha256": "cbda9c98cab03c07408da477dfc23eac35a93bd81f2fe2781b1f920a581f2695",
+      "post_sha256": "34b732e1acb8d77d06901b0a8c8795ea8614c9dc7e9461a7191d559bbc6432a3",
+      "bytes": 7189
+    },
+    {
+      "path": "tools/codegen/codegen-action-catalogue.cjs",
+      "pre_sha256": "1535d7bc668115c7bfc8a778207093e63b783d956c99bae3315ccb81508dbdb8",
+      "post_sha256": "5f725be707c6eccc6cdc9566ff2595c6500119685306406c2680c32ae65be028",
+      "bytes": 19011
+    },
+    {
+      "path": "tools/test/test-action-catalogue-codegen.cjs",
+      "pre_sha256": "b445c17afabb77d23318e3edf4ead06ad96cb84e7be284d3202d67d33c917aa4",
+      "post_sha256": "2c77b0443ab72474286bbfcc25a91ee960652a491e13ea67ec640ca4913df41f",
+      "bytes": 12705
+    }
+  ],
+  "review": [
+    "All1869 captured pins and 10source posts verified; all nongenerated actualRoot preimages match.",
+    "Canonical one-shot claim onlyLinux exacttap_hold/key_combinations; CapsWord unclaimed; serializer retains contexts, generator rejects malformed/unknown/foreign contexts.",
+    "Generic enumeration builds immutable ASSIGNABLE without restricted row; runnable/direct execute/handler injection separately refuse declared contextual row. Ordinary unknown/custom modifier semantics unchanged.",
+    "Actual ordered pair picker requests exactcontext and native validate_slot independently; enumeration grants no physical execution authority.",
+    "Original190scope+49catalogue+7menu assertionlines ordered exact; catalogue wholeprefix unchanged; modified fixtures transport actual native owner without replacing old cases.",
+    "Actualtap-hold native manager retains its already-existing independent one-shot owner; no generic handler invented.",
+    "Producer logs final92/0 eachABI and meaningful actualbefore84/8 and91/1 inspected, not independently rerun; generator6782 and old39AST retention receipts inspected."
+  ],
+  "qualification_limits": [
+    "No native input/kernel/physical delivery or hosted/full/packaging qualification claimed.",
+    "Separate producer4efd+ced dependencies must be admitted and its new test registered byRoot.",
+    "Parent must regenerate artifacts through owning generator after integration; no Root edits or generator runs performed by reviewer."
+  ],
+  "Root_mutation": false,
+  "reviewer_test_execution": "none"
+}
