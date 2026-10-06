@@ -220,7 +220,7 @@ _CBRF_GuardPrecedesTheWrite() {
 	Assert(GuardBody != "", "the shared full-state admission guard must exist")
 	Assert(InStr(GuardBody, "_ConfigBootReadFailed") > 0,
 		"shared admission must retain unreadable-boot protection")
-	WritePos := RegExMatch(Body, "m)^[ `t]*Written := TOML_ConfigBatchWrite\(BoundPath, Updates\)[ `t]*$")
+	WritePos := _CBRF_CapturedPublisherPosition(Body)
 	Assert(GuardPos > 0,
 		"SaveFullConfig must consult _ConfigBootReadFailed — without it a boot that could not read config.toml persists manifest defaults over the user's settings")
 	Assert(WritePos > 0, "SaveFullConfig must still reach its actual semantic publisher on the nominal path")
@@ -231,6 +231,21 @@ _CBRF_GuardPrecedesTheWrite() {
 	Publisher := _StripFullLineComments(_DriverFuncBody("TOML_ConfigBatchWrite"))
 	Assert(InStr(Publisher, 'return _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, "write", , , true)') > 0,
 		"the current gateway returns the semantic native writer result unchanged")
+	NativePublisher := _StripFullLineComments(_DriverFuncBody("_TOML_BatchWriteImpl"))
+	SourceBuilder := _StripFullLineComments(_DriverFuncBody("TOML_BuildConfigUpdatedContent"))
+	SourceReceipt := _StripFullLineComments(_DriverFuncBody("_TOML_FinalizeBuildResult"))
+	Assert(NativePublisher != "" && SourceBuilder != "" && SourceReceipt != "",
+		"the private semantic publisher and its exact-source receipt owners must exist")
+	Assert(InStr(NativePublisher, "TOML_BuildConfigDocumentCandidate(") > 0,
+		"the current private publisher still builds the actual complete typed configuration")
+	Assert(InStr(SourceBuilder, 'SourcePresent := FileExist(Path) ? 1 : 0') > 0
+		&& InStr(SourceBuilder, 'SourceBytes := SourcePresent ? FSReadUtf8Exact(Path) : ""') > 0
+		&& InStr(SourceBuilder, 'return _TOML_FinalizeBuildResult(Result, SourcePresent, SourceBytes)') > 0
+		&& InStr(SourceReceipt, 'Result["source_present"] := SourcePresent') > 0
+		&& InStr(SourceReceipt, 'Result["source_content"] := SourceBytes') > 0,
+		"captured presence and physical bytes must come from the real source receipt before classification or collection")
+	Assert(_CBRF_SourceReceiptOwnersAreExecutable(SourceBuilder, SourceReceipt, NativePublisher),
+		"quoted receipt text cannot lend absent source capture, fields or native semantic publication")
 }
 
 
@@ -246,28 +261,123 @@ Test("meta config-boot-read-failed: the persist guard precedes the write",
 	_CBRF_GuardPrecedesTheWrite)
 
 ; These mutations consume the same actual body as the positional guard.
+_CBRF_CapturedPublisherPosition(Body) {
+	Position := RegExMatch(Body, 'm)^[ \t]*Written := _TOML_BatchWriteImpl\(BoundPath, Updates, \[\], "write",[ \t]*\n[ \t]*SourceImage\["source_content"\], SourceImage\["source_present"\], true\)[ \t]*$', &Matched)
+	Code := _DriverMaskNonCode(&Body)
+	return Position && SubStr(Code, Position + InStr(Matched[0], "Written", true) - 1, 7) == "Written" ? Position : 0
+}
+
 _CBRF_SemanticGuardAndStrictAck(Body) {
 	GuardPos := RegExMatch(Body, "m)^[ `t]*if !ConfigFullStateCanPersist\(\) \{[ `t]*$")
-	WritePos := RegExMatch(Body, "m)^[ `t]*Written := TOML_ConfigBatchWrite\(BoundPath, Updates\)[ `t]*$")
-	if !GuardPos || !WritePos
+	CapturePos := RegExMatch(Body, 'm)^[ \t]*SourceImage := TOML_BuildConfigUpdatedContent\(BoundPath, \[\]\)')
+	ClassifyPos := RegExMatch(Body, 'm)^[ \t]*ObsoleteSource := ConfigFullSnapshotCaptureObsoleteSource\(SourceImage\["source_content"\]\)')
+	CollectPos := RegExMatch(Body, 'm)^[ \t]*Updates := HasMethod\(CollectFn, "Call"\)')
+	WritePos := _CBRF_CapturedPublisherPosition(Body)
+	if !GuardPos || !CapturePos || !ClassifyPos || !CollectPos || !WritePos
 		return false
+	Code := _DriverMaskNonCode(&Body)
+	for Binding in [{ position: GuardPos, token: "if" }, { position: CapturePos, token: "SourceImage" },
+			{ position: ClassifyPos, token: "ObsoleteSource" }, { position: CollectPos, token: "Updates" }] {
+		Offset := InStr(SubStr(Body, Binding.position), Binding.token, true)
+		if SubStr(Code, Binding.position + Offset - 1, StrLen(Binding.token)) != Binding.token
+			return false
+	}
 	AckPos := RegExMatch(Body, "m)^[ `t]*if \(\(Written is Integer\) && Written == 1\)[ `t]*$",, WritePos)
-	return WritePos > GuardPos && AckPos > WritePos
+	AckOffset := AckPos ? InStr(SubStr(Body, AckPos), "if", true) : 0
+	return GuardPos < CapturePos && CapturePos < ClassifyPos && ClassifyPos < CollectPos
+		&& CollectPos < WritePos && AckPos > WritePos
+		&& AckOffset && SubStr(Code, AckPos + AckOffset - 1, 2) == "if"
 }
 
 _CBRF_CurrentPublisherGuardMutations() {
 	Body := _StripFullLineComments(_DriverFuncBody("SaveFullConfig"))
+	Call := 'Written := _TOML_BatchWriteImpl(BoundPath, Updates, [], "write",`n'
+		. '`t`t`t`t`t`tSourceImage["source_content"], SourceImage["source_present"], true)'
+	Assert(InStr(Body, Call, true) > 0, "mutations must own the actual captured-source publisher")
 	AssertTrue(_CBRF_SemanticGuardAndStrictAck(Body), "the actual nominal path remains admitted")
 	AssertFalse(_CBRF_SemanticGuardAndStrictAck(StrReplace(Body,
-		"Written := TOML_ConfigBatchWrite(BoundPath, Updates)",
-		"UnrelatedWritten := TOML_ConfigBatchWrite(BoundPath, Updates)")),
+		Call, StrReplace(Call, "Written :=", "UnrelatedWritten :=", true))),
 		"a suffix-sharing assignment cannot lend an unresolved Written result binding")
 	AssertFalse(_CBRF_SemanticGuardAndStrictAck(StrReplace(Body,
 		"if !ConfigFullStateCanPersist()", "if true")), "removing boot admission cannot pass")
-	AssertFalse(_CBRF_SemanticGuardAndStrictAck("Written := TOML_ConfigBatchWrite(BoundPath, Updates)`n" . Body),
+	AssertFalse(_CBRF_SemanticGuardAndStrictAck(Call . "`n" . Body),
 		"publishing before boot admission cannot pass")
 	AssertFalse(_CBRF_SemanticGuardAndStrictAck(StrReplace(Body,
 		"if ((Written is Integer) && Written == 1)", "if Written")), "truthy malformed receipts cannot pass")
+	AssertFalse(_CBRF_SemanticGuardAndStrictAck(StrReplace(Body,
+		'SourceImage["source_content"], SourceImage["source_present"], true)',
+		'SourceImage["content"], SourceImage["source_present"], true)')), "candidate bytes cannot replace captured source authority")
+	AssertFalse(_CBRF_SemanticGuardAndStrictAck(StrReplace(Body,
+		'SourceImage["source_content"], SourceImage["source_present"], true)',
+		'SourceImage["source_content"], true, true)')), "presence must remain bound to the exact admitted source")
+	AssertFalse(_CBRF_SemanticGuardAndStrictAck(StrReplace(Body,
+		"SourceImage := TOML_BuildConfigUpdatedContent(", "UnrelatedSourceImage := TOML_BuildConfigUpdatedContent(")), "unrelated captures cannot lend their source authority")
+	AssertFalse(_CBRF_SemanticGuardAndStrictAck(StrReplace(Body,
+		"ConfigFullSnapshotCaptureObsoleteSource(", "UnrelatedSourceClassifier(")), "collection must follow fresh source classification")
+	Quoted := "AuditText := " . Chr(39) . "`n(`n" . Call . "`n)" . Chr(39)
+	AssertFalse(_CBRF_SemanticGuardAndStrictAck(StrReplace(Body, Call, Quoted, true)), "quoted writer data cannot authorize publication")
+	AssertFalse(_CBRF_SemanticGuardAndStrictAck(StrReplace(Body, Call, "/*`n" . Call . "`n*/", true)), "commented writer data cannot authorize publication")
+	Ack := "if ((Written is Integer) && Written == 1)"
+	AssertFalse(_CBRF_SemanticGuardAndStrictAck(StrReplace(Body, Ack, "/*`n" . Ack . "`n*/", true)),
+		"commented strict-ACK text cannot authorize a generation")
+	AssertFalse(_CBRF_SemanticGuardAndStrictAck(StrReplace(Body, Ack,
+		"AuditText := " . Chr(39) . "`n(`n" . Ack . "`n)" . Chr(39), true)),
+		"quoted strict-ACK text cannot authorize a generation")
 }
 Test("meta config-boot-read-failed: actual semantic publisher retains causal guard and strict-ACK controls",
 	_CBRF_CurrentPublisherGuardMutations)
+
+; These statements remain owned by the actual reader, finalizer and semantic
+; publisher. A copied source fragment is data, not proof of executable receipt.
+_CBRF_SourceStatementPosition(Body, Pattern, Token) {
+	Position := RegExMatch(Body, Pattern, &Matched)
+	if !Position
+		return 0
+	Offset := InStr(Matched[0], Token, true)
+	Code := _DriverMaskNonCode(&Body)
+	return Offset && SubStr(Code, Position + Offset - 1, StrLen(Token)) == Token ? Position : 0
+}
+
+_CBRF_SourceReceiptOwnersAreExecutable(Builder, Receipt, Publisher) {
+	Presence := _CBRF_SourceStatementPosition(Builder, 'm)^[ \t]*SourcePresent := FileExist\(Path\) \? 1 : 0[ \t]*$', "SourcePresent")
+	Content := _CBRF_SourceStatementPosition(Builder, 'm)^[ \t]*SourceBytes := SourcePresent \? FSReadUtf8Exact\(Path\) : ""[ \t]*$', "SourceBytes")
+	Finalize := _CBRF_SourceStatementPosition(Builder, 'm)^[ \t]*return _TOML_FinalizeBuildResult\(Result, SourcePresent, SourceBytes\)[ \t]*$', "return")
+	PresenceField := _CBRF_SourceStatementPosition(Receipt, 'm)^[ \t]*Result\["source_present"\] := SourcePresent[ \t]*$', "Result")
+	ContentField := _CBRF_SourceStatementPosition(Receipt, 'm)^[ \t]*Result\["source_content"\] := SourceBytes[ \t]*$', "Result")
+	Typed := _CBRF_SourceStatementPosition(Publisher, 'm)^[ \t]*try Admitted := TOML_BuildConfigDocumentCandidate\(SourceBytes, Updates, ExactSectionPrefixes\)[ \t]*$', "try")
+	return Presence > 0 && Content > Presence && Finalize > Content
+		&& PresenceField > 0 && ContentField > PresenceField && Typed > 0
+}
+
+_CBRF_SourceReceiptMutation(Builder, Receipt, Publisher, Owner, Statement) {
+	Body := Owner == "builder" ? Builder : Owner == "receipt" ? Receipt : Publisher
+	Assert(InStr(Body, Statement, true) > 0, "each receipt mutation must replace the actual executable native statement")
+	for Replacement in ["AuditText := " . Chr(39) . "`n(`n" . Statement . "`n)" . Chr(39),
+			"/*`n" . Statement . "`n*/"] {
+		Changed := StrReplace(Body, Statement, Replacement, true)
+		AssertFalse(Changed == Body, "receipt quote/comment controls must change the real owner body")
+		AssertFalse(_CBRF_SourceReceiptOwnersAreExecutable(
+			Owner == "builder" ? Changed : Builder,
+			Owner == "receipt" ? Changed : Receipt,
+			Owner == "publisher" ? Changed : Publisher), "quoted or commented statements cannot lend captured-source receipt authority")
+	}
+}
+
+_CBRF_CurrentSourceReceiptGuardMutations() {
+	Builder := _StripFullLineComments(_DriverFuncBody("TOML_BuildConfigUpdatedContent"))
+	Receipt := _StripFullLineComments(_DriverFuncBody("_TOML_FinalizeBuildResult"))
+	Publisher := _StripFullLineComments(_DriverFuncBody("_TOML_BatchWriteImpl"))
+	Assert(Builder != "" && Receipt != "" && Publisher != "", "the native source receipt owners must exist before mutation")
+	AssertTrue(_CBRF_SourceReceiptOwnersAreExecutable(Builder, Receipt, Publisher), "the real source receipt remains admitted")
+	for Spec in [
+		{ owner: "builder", statement: 'SourcePresent := FileExist(Path) ? 1 : 0' },
+		{ owner: "builder", statement: 'SourceBytes := SourcePresent ? FSReadUtf8Exact(Path) : ""' },
+		{ owner: "builder", statement: 'return _TOML_FinalizeBuildResult(Result, SourcePresent, SourceBytes)' },
+		{ owner: "receipt", statement: 'Result["source_present"] := SourcePresent' },
+		{ owner: "receipt", statement: 'Result["source_content"] := SourceBytes' },
+		{ owner: "publisher", statement: 'try Admitted := TOML_BuildConfigDocumentCandidate(SourceBytes, Updates, ExactSectionPrefixes)' }
+	]
+		_CBRF_SourceReceiptMutation(Builder, Receipt, Publisher, Spec.owner, Spec.statement)
+}
+Test("meta config-boot-read-failed: actual captured-source receipt rejects nonexecutable authority",
+	_CBRF_CurrentSourceReceiptGuardMutations)
