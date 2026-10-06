@@ -138,8 +138,11 @@ _SC_ExtensionRows() {
 	if !HasExtShortcuts {
 		return Rows
 	}
-	Rows.Push(Map("separator", true))
-	Rows.Push(Map("label", MenuSectionTitle(t("menu.extensions.header")), "disabled", true))
+	BoundaryRows := MenuRenderer_TemplateRows("shortcut_extension_boundary", Map(), Map(), Map())
+	if !(BoundaryRows is Array)
+		return []
+	for Row in BoundaryRows
+		Rows.Push(Row)
 	Loop Files ExtShortcutsBaseDir . "*", "D" {
 		ExtId       := A_LoopFileName
 		ExtDir      := A_LoopFileFullPath
@@ -227,32 +230,28 @@ _SC_WrapSymbolRows() {
 ; are `items`, and the driver supplies labels, ticks and callbacks.
 _WS_BuildSymbolRows() {
 	global _WS_BUILTIN_GROUPS, _WS_Custom
-	Rows := []
-
-	; ── Global bulk actions ──────────────────────────────────────────────────
-	Rows.Push(Map("label", t("menu.shortcuts.wrap_symbols_check_all"),
-		"action", (*) => _WS_MenuSetAll(true)))
-	Rows.Push(Map("label", t("menu.shortcuts.wrap_symbols_uncheck_all"),
-		"action", (*) => _WS_MenuSetAll(false)))
-	Rows.Push(Map("label", t("common.restore_recommended"),
-		"action", (*) => _WS_MenuReset()))
-	Rows.Push(Map("separator", true))
+	Getters := Map("wrap_symbols_ready", (*) => true)
+	Rows := MenuRenderer_TemplateRows("wrap_symbols_global_controls", Map(
+		"wrap_symbols_enable_all", (*) => _WS_MenuSetAll(true),
+		"wrap_symbols_disable_all", (*) => _WS_MenuSetAll(false),
+		"wrap_symbols_restore", (*) => _WS_MenuReset()), Getters, Map())
+	if !(Rows is Array)
+		return []
 
 	; ── Built-in symbols, one named nested group per family ──────────────────
 	; Order and grouping come from _shared/modules/wrap_symbols/wrap_symbols.json.
 	; Each group carries its own « check all / uncheck all » so a whole family can
 	; be flipped at once, and the parent row ticks when every symbol in it is on.
 	for _, Group in _WS_BUILTIN_GROUPS {
-		GroupRows := []
 		GroupLefts := []
 		for _, Pair in Group["pairs"] {
 			GroupLefts.Push(Pair["left"])
 		}
-		GroupRows.Push(Map("label", t("menu.shortcuts.wrap_symbols_check_all"),
-			"action", ((Chars) => (*) => _WS_MenuSetGroup(Chars, true))(GroupLefts)))
-		GroupRows.Push(Map("label", t("menu.shortcuts.wrap_symbols_uncheck_all"),
-			"action", ((Chars) => (*) => _WS_MenuSetGroup(Chars, false))(GroupLefts)))
-		GroupRows.Push(Map("separator", true))
+		GroupRows := MenuRenderer_TemplateRows("wrap_symbols_group_controls", Map(
+			"wrap_symbols_enable_group", _WS_ControlSetGroup.Bind(GroupLefts, true),
+			"wrap_symbols_disable_group", _WS_ControlSetGroup.Bind(GroupLefts, false)), Getters, Map())
+		if !(GroupRows is Array)
+			return []
 
 		GroupAllOn := true
 		for _, Pair in Group["pairs"] {
@@ -274,23 +273,41 @@ _WS_BuildSymbolRows() {
 
 	; ── Custom symbols ───────────────────────────────────────────────────────
 	if (_WS_Custom.Length > 0) {
-		Rows.Push(Map("separator", true))
+		CustomSeparator := MenuRenderer_TemplateRows("wrap_symbols_custom_separator", Map(), Getters, Map())
+		if !(CustomSeparator is Array)
+			return []
+		for _, Row in CustomSeparator
+			Rows.Push(Row)
 		for Idx, Pair in _WS_Custom {
 			L := Pair["left"]
 			R := Pair["right"]
 			Lbl := ((L != R) ? (L . " … " . R) : L) . " — " . t("menu.shortcuts.wrap_symbols_custom_label")
-			Rows.Push(Map("label", Lbl, "checked", true, "items", [
-				Map("label", t("button.delete"), "action", ((I) => (*) => _WS_MenuRemoveCustom(I))(Idx))
-			]))
+			CustomControls := MenuRenderer_TemplateRows("wrap_symbols_custom_controls", Map(
+				"wrap_symbols_delete_custom", _WS_ControlRemoveCustom.Bind(Idx)), Getters, Map())
+			if !(CustomControls is Array)
+				return []
+			Rows.Push(Map("label", Lbl, "checked", true, "items", CustomControls))
 		}
 	}
 
 	; ── Add custom ───────────────────────────────────────────────────────────
-	Rows.Push(Map("separator", true))
-	Rows.Push(Map("label", t("menu.shortcuts.wrap_symbols_add_custom"),
-		"action", (*) => _WS_MenuAddCustom()))
+	AddControls := MenuRenderer_TemplateRows("wrap_symbols_add_controls", Map(
+		"wrap_symbols_add_custom", (*) => _WS_MenuAddCustom()), Getters, Map())
+	if !(AddControls is Array)
+		return []
+	for _, Row in AddControls
+		Rows.Push(Row)
 
 	return Rows
+}
+
+; Native callbacks capture payloads with Bind and discard menu-event arguments.
+_WS_ControlSetGroup(OpenChars, Enable, *) {
+	return _WS_MenuSetGroup(OpenChars, Enable)
+}
+
+_WS_ControlRemoveCustom(Idx, *) {
+	return _WS_MenuRemoveCustom(Idx)
 }
 
 ; Rebuild only after a strictly acknowledged durable wrap-symbol commit. A

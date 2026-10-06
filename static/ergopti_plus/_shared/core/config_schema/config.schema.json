@@ -99,6 +99,14 @@
 				"preview_autocorrect_enabled": { "type": "boolean" },
 				"preview_colored_tooltips": { "type": "boolean" },
 				"preview_star_enabled": { "type": "boolean" },
+				"order_overrides": {
+					"type": "object",
+					"propertyNames": { "minLength": 1 },
+					"additionalProperties": {
+						"type": "array",
+						"items": { "type": "string" }
+					}
+				},
 
 				"autocorrection": { "$ref": "#/$defs/feature_group" },
 				"distances_reduction": { "$ref": "#/$defs/feature_group" },
@@ -271,6 +279,41 @@
 				"enabled": { "type": "boolean" },
 				"chatgpt_url": { "type": "string", "format": "uri" },
 				"keys": { "type": "object" },
+				"wrap_symbols": {
+					"type": "object",
+					"additionalProperties": true,
+					"properties": {
+						"states": {
+							"type": "object",
+							"propertyNames": {
+								"minLength": 1
+							},
+							"additionalProperties": {
+								"type": "boolean"
+							}
+						},
+						"custom": {
+							"type": "array",
+							"items": {
+								"type": "object",
+								"required": ["left", "right"],
+								"properties": {
+									"left": {
+										"type": "string",
+										"minLength": 1,
+										"maxLength": 1
+									},
+									"right": {
+										"type": "string",
+										"minLength": 1,
+										"maxLength": 1
+									}
+								},
+								"additionalProperties": true
+							}
+						}
+					}
+				},
 				"script_control": {
 					"type": "object",
 					"additionalProperties": true,

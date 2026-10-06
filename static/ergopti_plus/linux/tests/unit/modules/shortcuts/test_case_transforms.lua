@@ -683,3 +683,126 @@ helpers.describe("shared selection helper command ownership", function()
 		if not isolated_ok then error(isolated_err, 0) end
 	end)
 end)
+
+
+--- Reads the independent physical selection order before testing native providers.
+--- @return table Hand-authored boundary, caption and platform expectations.
+local function selection_boundary_corpus()
+	local path = require("infra.paths").shared("tests/corpus/menus/linux_selection_boundaries.json")
+	local file = assert(io.open(path, "rb"))
+	local bytes = assert(file:read("*a")); assert(file:close())
+	return assert(require("json").decode(bytes))
+end
+
+--- Finds the existing CapsWord-led selection block inside the actual finished tray.
+--- @param rows table Native rendered menu entries.
+--- @param title string Genuine first selection caption.
+--- @return table|nil, integer|nil Containing native entries and first position.
+local function selection_boundary_block(rows, title)
+	for index, row in ipairs(rows or {}) do
+		if row.title == title then return rows, index end
+		local nested, position = selection_boundary_block(row.menu, title)
+		if nested then return nested, position end
+	end
+end
+
+helpers.describe("shared selection presentation boundaries", function()
+	local corpus = selection_boundary_corpus()
+	local fragments = { "selection_case_boundary", "selection_helper_boundary" }
+
+	helpers.it("keeps the complete physical order under an actual configured native owner", function()
+		with_helper_menu(function(_, _, effects, rows)
+			local native = require("infra.i18n")
+			local entries, first = selection_boundary_block(rows(), native.get(corpus.selection_child_order[1].key))
+			helpers.assert_type(entries, "table")
+			helpers.assert_eq(#corpus.selection_child_order, 9)
+			for offset, expected in ipairs(corpus.selection_child_order) do
+				local row = entries[first + offset - 1]
+				helpers.assert_type(row, "table")
+				helpers.assert_eq(row.title, expected.separator and "-" or native.get(expected.key))
+				if expected.separator then helpers.assert_nil(row.fn)
+				else helpers.assert_type(row.fn, "function") end
+			end
+			helpers.assert_eq(#effects.chords + effects.reads + #effects.injections, 0,
+				"boundary construction does not invoke a selection operation")
+		end)
+	end)
+
+	helpers.it("keeps both boundaries and the retained action refusal under a real reservation", function()
+		with_helper_menu(function(manager, item, effects, rows)
+			local held = item("menu.shortcuts.select_word").fn
+			local owner = {}
+			helpers.assert_eq(manager.acquire_configuration(owner), true)
+			local native = require("infra.i18n")
+			local entries, first = selection_boundary_block(rows(), native.get(corpus.selection_child_order[1].key))
+			helpers.assert_type(entries, "table")
+			for offset, expected in ipairs(corpus.selection_child_order) do
+				local row = entries[first + offset - 1]
+				helpers.assert_eq(row.title, expected.separator and "-" or native.get(expected.key))
+				if expected.separator then helpers.assert_nil(row.fn)
+				else helpers.assert_eq(row.disabled, true) end
+			end
+			local refused = held()
+			helpers.assert_eq(refused, false)
+			helpers.assert_eq(#effects.chords + effects.reads + #effects.injections, 0)
+			helpers.assert_eq(manager.release_configuration(owner), true)
+			helpers.assert_eq(held(), true)
+			helpers.assert_eq(effects.chords, { "ctrl+Right", "ctrl+shift+Left" })
+		end)
+	end)
+
+	for _, fragment in ipairs(fragments) do
+		local section = fragment
+		helpers.it("consumes the genuine " .. section .. " and refuses missing or unbound replacements", function()
+			with_helper_menu(function(_, _, effects, rows)
+				local manifest = require("infra.manifest_menu")
+				local root = manifest.get_root()
+				local original = root[section]
+				helpers.assert_type(original, "table")
+				local native = require("infra.i18n")
+				local offset = section == fragments[1] and 2 or 6
+				local function block()
+					return selection_boundary_block(rows(), native.get(corpus.selection_child_order[1].key))
+				end
+				local ok, detail = xpcall(function()
+					root[section] = { { type = "label", id = "selection_boundary_marker",
+						i18n = corpus.marker_key, platforms = { "linux" }, unavailable = "hide" } }
+					local entries, first = block()
+					helpers.assert_type(entries, "table")
+					helpers.assert_eq(entries[first + offset - 1].title, native.get(corpus.marker_key))
+					helpers.assert_eq(entries[first + offset - 1].disabled, true)
+					helpers.assert_nil(entries[first + offset - 1].fn)
+					root[section] = nil
+					helpers.assert_nil(block(), "a withdrawn boundary refuses its actual selection provider")
+					root[section] = { { type = "command", id = "selection_boundary_unbound", i18n = corpus.marker_key } }
+					helpers.assert_nil(block(), "an unbound action cannot replace inert presentation")
+				end, debug.traceback)
+				root[section] = original
+				helpers.assert_true(rawequal(root[section], original))
+				if not ok then error(detail, 0) end
+				local entries, first = block()
+				helpers.assert_type(entries, "table")
+				helpers.assert_eq(entries[first + offset - 1].title, "-", "repair restores the original boundary")
+				helpers.assert_eq(#effects.chords + effects.reads + #effects.injections, 0)
+			end)
+		end)
+	end
+
+	for platform, expected_count in pairs(corpus.platform_rows) do
+		local native_platform, count = platform, expected_count
+		helpers.it("keeps the truthful " .. native_platform .. " boundary projection without an action", function()
+			local renderer = assert(require("menu.renderer").new({ platform = native_platform,
+				manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
+				json_decode = require("json").decode, i18n = require("infra.i18n"), logger = require("logger.shim"),
+			}))
+			for _, section in ipairs(fragments) do
+				local rows = assert(renderer.template_rows(section, {}, {}, {}))
+				helpers.assert_eq(#rows, count)
+				for _, row in ipairs(rows) do
+					helpers.assert_eq(row.separator, true)
+					helpers.assert_nil(row.action)
+				end
+			end
+		end)
+	end
+end)

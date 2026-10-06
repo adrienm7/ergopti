@@ -310,3 +310,167 @@ helpers.describe("Linux metrics scope revert", function()
 		end)
 	end)
 end)
+
+
+helpers.describe("metrics private native claim", function()
+	helpers.it("releases the actual preference primitive without hiding public pending", function()
+		with_scope(function(_, _, _, _, controls, path, backup)
+			local Preferences = require("infra.metrics_preferences")
+			local public, claim, primary = {}, {}, nil
+			local runtime = "original"
+			claim.pending = function() return primary.pending() end
+			primary = require("config_scope_transaction").new({ path = path, backup_path = backup,
+				files = controls.files, manifest = require("infra.manifest_reader"),
+				capture = function() return { marker = runtime } end,
+				apply = function() runtime = "candidate"; return true end,
+				restore = function(snapshot) runtime = snapshot.marker; return true end })
+			local releases = 0
+			local owner = require("config_scope_fenced_transaction").new({ owner = public, native_token = claim,
+				transaction = primary, scope = "metrics", available = function() return true end,
+				fences = { { acquire = Preferences.acquire, release = function(token)
+					helpers.assert_eq(token, claim)
+					helpers.assert_eq(public.pending(), true)
+					helpers.assert_eq(token.pending(), false)
+					releases = releases + 1
+					return Preferences.release(token)
+				end } } })
+			helpers.assert_eq(owner.apply("clear"), true)
+			helpers.assert_eq(Preferences.admit(), true)
+			helpers.assert_eq(owner.pending(), false)
+			helpers.assert_eq(owner.revert(), true)
+			helpers.assert_eq(Sandbox.read_bytes(path), SOURCE)
+			helpers.assert_eq(runtime, "original")
+			helpers.assert_eq(releases, 2)
+			helpers.assert_eq(Preferences.admit(), true)
+		end)
+	end)
+end)
+
+helpers.describe("metrics retained native release debt", function()
+	local expected = { metrics = { enabled = true, private_filter_enabled = false,
+		wpm_widget_visible = true, wpm_menubar_visible = true, unknown = "keep" }, other = { value = 42 } }
+	local receipts = {
+		{ name = "nil", reply = function() return nil end },
+		{ name = "false", reply = function() return false end },
+		{ name = "truthy string", reply = function() return "true" end },
+		{ name = "wrong object", reply = function() return {} end },
+		{ name = "exception", reply = function() error("native metrics release refused") end },
+	}
+	local function controlled_scope(collector, widget, readout, controls, path, refusal)
+		local Preferences = require("infra.metrics_preferences")
+		local acquire, release = Preferences.acquire, Preferences.release
+		local blocked, live, scope = true, nil, nil
+		Preferences.acquire = function(token)
+			local accepted = acquire(token)
+			if accepted == true then helpers.assert_nil(live, "an acknowledged claim is acquired once"); live = token end
+			return accepted
+		end
+		Preferences.release = function(token)
+			helpers.assert_eq(live, token, "only the exact native claim can release")
+			if blocked then return refusal() end
+			helpers.assert_eq(scope.pending(), true, "public ownership remains pending during release")
+			helpers.assert_eq(token.pending(), false, "native release sees only settled primary compensation")
+			local accepted = release(token)
+			if accepted == true then live = nil end
+			return accepted
+		end
+		scope = require("infra.metrics_scope").new({ path = path, backup_path = path .. ".scope-backup",
+			collector = collector, widget = widget, readout = readout, files = controls.files })
+		return scope, function(value) blocked = value == true end, function() return live end
+	end
+	local function restored(collector, widget, readout, controls, path, claim)
+		helpers.assert_eq(Codec.decode(Sandbox.read_bytes(path)), expected, "complete handwritten source model")
+		helpers.assert_eq(collector.is_enabled(), true)
+		helpers.assert_eq(collector.configuration_snapshot().private_filter_enabled, false)
+		helpers.assert_eq(widget.is_running(), true)
+		helpers.assert_eq(readout.is_running(), true)
+		helpers.assert_eq(controls.migrations, 0, "preference compensation cannot start history conversion")
+		helpers.assert_nil(claim())
+		helpers.assert_eq(require("infra.metrics_preferences").admit(), true)
+	end
+	for _, mode in ipairs({ "clear", "recommended" }) do
+		for _, receipt in ipairs(receipts) do
+			helpers.it("compensates " .. mode .. " native runtime and source on " .. receipt.name .. " release", function()
+				with_scope(function(_, collector, widget, readout, controls, path)
+					local scope, unblock, claim = controlled_scope(collector, widget, readout, controls, path, receipt.reply)
+					helpers.assert_eq(scope.apply(mode), false)
+					helpers.assert_eq(scope.pending(), true)
+					helpers.assert_eq(scope.release(), false)
+					helpers.assert_eq(scope.apply("clear"), false)
+					helpers.assert_eq(collector.set_enabled(false), false, "ordinary writes cannot replace retained debt")
+					unblock()
+					helpers.assert_eq(scope.retry_restore(), true)
+					helpers.assert_eq(scope.pending(), false)
+					restored(collector, widget, readout, controls, path, claim)
+				end)
+			end)
+		end
+	end
+	helpers.it("preserves an external successor under the exact retained native inverse", function()
+		with_scope(function(_, collector, widget, readout, controls, path)
+			local scope, unblock, claim = controlled_scope(collector, widget, readout, controls, path, function() return false end)
+			local publish, writes, candidate = controls.files.write_if_unchanged, 0, nil
+			local foreign = '[external]\nowner = "later"\n'
+			controls.files.write_if_unchanged = function(target, content, expected_source)
+				if target == path then writes = writes + 1; if writes == 2 then Sandbox.write_bytes(path, foreign) end end
+				local ok, detail = publish(target, content, expected_source)
+				if target == path and writes == 1 and ok == true then candidate = Sandbox.read_bytes(path) end
+				return ok, detail
+			end
+			helpers.assert_eq(scope.apply("clear"), false)
+			helpers.assert_eq(Sandbox.read_bytes(path), foreign)
+			unblock()
+			helpers.assert_eq(scope.retry_restore(), false)
+			helpers.assert_eq(Sandbox.read_bytes(path), foreign)
+			helpers.assert_eq(require("infra.metrics_preferences").admit(), false)
+			Sandbox.write_bytes(path, candidate) -- Explicit fixture repair of the retained candidate generation.
+			helpers.assert_eq(scope.retry_restore(), true)
+			restored(collector, widget, readout, controls, path, claim)
+		end)
+	end)
+	helpers.it("settles release-only debt after an acknowledged explicit inverse", function()
+		with_scope(function(_, collector, widget, readout, controls, path)
+			local scope, block, claim = controlled_scope(collector, widget, readout, controls, path, function() return false end)
+			block(false)
+			helpers.assert_eq(scope.apply("recommended"), true)
+			block(true)
+			helpers.assert_eq(scope.revert(), false)
+			helpers.assert_eq(scope.pending(), true)
+			local apply, replay = collector.apply_configuration, 0
+			collector.apply_configuration = function(...) replay = replay + 1; return apply(...) end
+			block(false)
+			helpers.assert_eq(scope.retry_restore(), true)
+			helpers.assert_eq(replay, 0, "an acknowledged native inverse is not replayed")
+			restored(collector, widget, readout, controls, path, claim)
+		end)
+	end)
+	helpers.it("halts the actual global composition before a later participant on native debt", function()
+		with_scope(function(_, collector, widget, readout, controls, path)
+			local scope, unblock, claim = controlled_scope(collector, widget, readout, controls, path, function() return false end)
+			local trace = {}
+			local before = { apply = function(_, done) trace[#trace + 1] = "before.apply"; done(true) end,
+				revert = function(done) trace[#trace + 1] = "before.revert"; done(true) end,
+				release = function() end, pending = function() return false end, retry_restore = function(done) done(true) end }
+			local after = { apply = function(_, done) trace[#trace + 1] = "after.apply"; done(true) end,
+				revert = function(done) done(true) end, release = function() end,
+				pending = function() return false end, retry_restore = function(done) done(true) end }
+			local actual = require("config_scope_participant").synchronous({ apply = scope.apply, owner = function() return scope end })
+			local logger = {}; for _, name in ipairs({ "start", "success", "warn", "info", "error" }) do logger[name] = function() end end
+			local global = require("config_scope_composition").new({ manifest = require("infra.manifest_reader"), scope = "global",
+				logger = logger, participants = function() return { tap_holds = before, metrics = { actual, after } } end })
+			local verdict, report
+			global.apply("recommended", function(ok, detail) verdict, report = ok, detail end)
+			helpers.assert_eq(verdict, false)
+			helpers.assert_eq(report.failed, "metrics")
+			helpers.assert_eq(global.pending(), true)
+			helpers.assert_eq(trace, { "before.apply" })
+			unblock()
+			local settled
+			global.retry_restore(function(ok) settled = ok end)
+			helpers.assert_eq(settled, true)
+			helpers.assert_eq(trace, { "before.apply", "before.revert" })
+			helpers.assert_eq(global.pending(), false)
+			restored(collector, widget, readout, controls, path, claim)
+		end)
+	end)
+end)

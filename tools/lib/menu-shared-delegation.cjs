@@ -152,4 +152,29 @@ function combineMenuVisibility(platforms, previous, incoming) {
 	);
 }
 
-module.exports = { delegatedMenuSources, combineMenuVisibility };
+/** Credits executable native template calls, never comments, strings or declarations. */
+function publishesMenuTemplate(source, extension, section) {
+	const tokens = scriptTokens(source, extension);
+	return tokens.some((token, i) => {
+		if (token.kind !== 'identifier' || tokens[i - 1]?.value === 'function') return false;
+		const lua =
+			extension === '.lua' &&
+			token.value === 'template_rows' &&
+			tokens[i - 1]?.value === '.' &&
+			tokens[i - 2]?.value === 'ManifestMenu' &&
+			!['function', '.', ':'].includes(tokens[i - 3]?.value);
+		const ahk =
+			extension === '.ahk' &&
+			token.value === 'MenuRenderer_TemplateRows' &&
+			!['.', ':'].includes(tokens[i - 1]?.value);
+		return (
+			(lua || ahk) &&
+			tokens[i + 1]?.value === '(' &&
+			tokens[i + 2]?.kind === 'string' &&
+			tokens[i + 2]?.value === section &&
+			[',', ')'].includes(tokens[i + 3]?.value)
+		);
+	});
+}
+
+module.exports = { delegatedMenuSources, combineMenuVisibility, publishesMenuTemplate };

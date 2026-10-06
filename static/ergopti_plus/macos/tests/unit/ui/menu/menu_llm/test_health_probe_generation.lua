@@ -224,7 +224,9 @@ local function with_fixture(callback, options)
 		}
 		package.loaded["infra.manifest_menu"] = {
 			command_row = native_renderer.command_row,
+			template_rows = native_renderer.template_rows,
 		check_row = native_renderer.check_row,
+			native_child_rows = native_renderer.native_child_rows,
 			get_array = native_renderer.get_array,
 			render_rows = function(rows) return rows end,
 			build = function(key, _, handlers, _, render_ctx, providers)

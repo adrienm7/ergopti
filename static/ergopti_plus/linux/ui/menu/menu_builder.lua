@@ -472,7 +472,9 @@ local function _build_layouts(ctx)
 				}
 			end
 			if #rows == 0 then
-				rows[1] = { label = i18n_safe("menu.layout.none_installed"), disabled = true }
+				if type(ManifestMenu) ~= "table" or type(ManifestMenu.status_rows) ~= "function" then return {} end
+				local status = ManifestMenu.status_rows("layout_menu", "custom_layouts", "none_installed")
+				return type(status) == "table" and status or {}
 			end
 			return rows
 		end,
@@ -1907,9 +1909,9 @@ local function _build_hotstrings(ctx)
 	local config = ctx.config
 
 	if type(config) ~= "table" then
-		return { label = i18n_safe("menu.hotstrings.title"), items = {
-			{ label = i18n_safe("menu.hotstrings.unavailable"), disabled = true },
-		}}
+		local status_rows = ManifestMenu and ManifestMenu.template_rows("linux_hotstrings_absent_rows", {}, {}, {})
+		if not status_rows then return {} end
+		return { label = i18n_safe("menu.hotstrings.title"), items = status_rows }
 	end
 
 	local items = _manifest_hotstring_rows(ctx, config)
@@ -1949,10 +1951,9 @@ end
 local function _build_llm(ctx)
 	local llm = ctx.llm
 	if not llm then
-		return { label = i18n_safe("menu.llm.title"), items = {
-			{ label = i18n_safe("menu.llm.unavailable"), disabled = true },
-			{ label = i18n_safe("menu.llm.ollama_start_hint"), disabled = true },
-		}}
+		local status_rows = ManifestMenu and ManifestMenu.template_rows("linux_llm_absent_rows", {}, {}, {})
+		if not status_rows then return {} end
+		return { label = i18n_safe("menu.llm.title"), items = status_rows }
 	end
 
 	local items = {}
@@ -1966,6 +1967,7 @@ local function _build_llm(ctx)
 
 	local providers = {}
 	local dynamic_handlers = {}
+	local group_builders = {}
 
 	--- Appends computed row data after the shared renderer materialises it.
 	---
@@ -1984,8 +1986,8 @@ local function _build_llm(ctx)
 
 	-- Inactivity and privacy controls. Unlike the model and generation lists,
 	-- this is one labelled submenu, so the manifest keeps its cross-driver
-	-- `dynamic` row and this driver supplies only the runtime contents.
-	dynamic_handlers["llm_trigger"] = function(target)
+	-- declared group and this driver supplies only the runtime child contents.
+	group_builders["llm_trigger"] = function()
 		local ok_settings, TriggerSettings = pcall(require, "modules.llm.trigger_settings")
 		if not ok_settings then
 			Logger.error(LOG, "LLM trigger settings unavailable; trigger menu omitted.")
@@ -2005,10 +2007,8 @@ local function _build_llm(ctx)
 			}
 		end
 		local bounds = TriggerSettings.bounds("debounce_ms")
-		delay_choices[#delay_choices + 1] = { separator = true }
-		delay_choices[#delay_choices + 1] = {
-			label = i18n_safe("menu.llm.generation.custom_value"),
-			action = function()
+		local custom_rows = ManifestMenu.template_rows("llm_numeric_custom_rows", {
+			["llm_numeric_custom_value"] = function()
 				local ok_prompt, Prompt = pcall(require, "ui.numeric_prompt.bridge")
 				if not ok_prompt then
 					Logger.error(LOG, "No numeric prompt; debounce can only take a preset.")
@@ -2027,12 +2027,15 @@ local function _build_llm(ctx)
 					end,
 				}, ctx.webview)
 			end,
-		}
+		})
+		for _, row in ipairs(custom_rows or {}) do delay_choices[#delay_choices + 1] = row end
 		rows[#rows + 1] = {
 			label = string.format(i18n_safe("menu.llm.debounce_label"), tostring(current_delay) .. " ms"),
 			items = delay_choices,
 		}
-		rows[#rows + 1] = { separator = true }
+		local boundary_rows = ManifestMenu.template_rows("llm_trigger_provider_boundary", {}, {}, {})
+		if not boundary_rows then return end
+		for _, row in ipairs(boundary_rows) do rows[#rows + 1] = row end
 		local leading_rows = rows
 		rows = {}
 		local Preferences = require("infra.llm_preferences")
@@ -2106,11 +2109,9 @@ local function _build_llm(ctx)
 			["llm_trigger_leading"] = function() return leading_rows end,
 			["llm_trigger_remaining"] = function() return rows end,
 		})
-		append_rendered_row(target, {
-			label = i18n_safe("menu.llm.trigger_menu_title"),
-			submenu = rows,
-			disabled = not enabled or nil,
-		}, "llm_trigger")
+		local child_rows = ManifestMenu.native_child_rows(rows)
+		if child_rows == nil then return nil end
+		return { items = child_rows, disabled = not enabled or nil }
 	end
 
 	-- Live mode: Off, then every rewrite-format prompt (the built-ins in menu
@@ -2205,113 +2206,118 @@ local function _build_llm(ctx)
 			end, opts)
 		end
 		local effective_label = effective
-		local rows = {
-			{
-				label = i18n_safe("menu.profiles.auto_detect"),
-				checked = ProfileSettings.get("auto_profile_for_model") == true,
-				action = function()
-					if not create_ready() then return false end
-					local current = ProfileSettings.get("auto_profile_for_model")
-					if type(current) ~= "boolean" or not create_ready() then return false end
-					local saved = ProfileSettings.set("auto_profile_for_model", not current, current_model)
-					if saved ~= true then return false end
-					refresh()
-					return true
-				end,
-			},
-			{ separator = true },
-			{
-				label = i18n_safe("menu.profiles.header_default_profiles"),
-				disabled = true,
-			},
-		}
-		local active_builtin = nil
-		for _, profile in ipairs(ProfileSettings.list_built_in()) do
-			local profile_id = profile.id
-			-- The same label the action picker lists the profile under. _fill
-			-- appended the count to every label without {n}: "Basic — … 3 s".
-			local label = ProfileSettings.menu_label(profile, count)
-			if effective == profile_id then
-				effective_label = label
-				active_builtin = profile
+		local active_builtin, user_profiles, seed
+		local function auto_profile()
+			if not create_ready() then return false end
+			local current = ProfileSettings.get("auto_profile_for_model")
+			if type(current) ~= "boolean" or not create_ready() then return false end
+			local saved = ProfileSettings.set("auto_profile_for_model", not current, current_model)
+			if saved ~= true then return false end
+			refresh()
+			return true
+		end
+		local function builtin_rows()
+			local rows = {}
+			for _, profile in ipairs(ProfileSettings.list_built_in()) do
+				local profile_id = profile.id
+				-- The same label the action picker lists the profile under. _fill
+				-- appended the count to every label without {n}: "Basic — … 3 s".
+				local label = ProfileSettings.menu_label(profile, count)
+				if effective == profile_id then
+					effective_label = label
+					active_builtin = profile
+				end
+				rows[#rows + 1] = {
+					label = label,
+					checked = effective == profile_id,
+					action = function()
+						select_profile(profile_id)
+					end,
+				}
 			end
-			rows[#rows + 1] = {
-				label = label,
-				checked = effective == profile_id,
-				action = function()
-					select_profile(profile_id)
-				end,
-			}
+			return rows
 		end
-
-		local user_profiles = ProfileSettings.list_user()
-		if #user_profiles > 0 then
-			rows[#rows + 1] = { separator = true }
-			rows[#rows + 1] = {
-				label = i18n_safe("menu.profiles.header_custom_profiles"),
-				disabled = true,
-			}
+		local function custom_present()
+			user_profiles = ProfileSettings.list_user()
+			return #user_profiles > 0
 		end
-		for _, profile in ipairs(user_profiles) do
-			local owned_profile = profile
-			local profile_id = profile.id
-			local label = profile.label
-			if effective == profile_id then effective_label = label end
-			rows[#rows + 1] = {
-				label = label,
-				items = {
-					{
-						label = i18n_safe("menu.profiles.use_profile"),
-						checked = effective == profile_id,
-						action = function() return select_profile(profile_id) end,
-					},
-					{
-						label = i18n_safe("menu.profiles.edit_profile"),
-						action = function() return open_editor(owned_profile, false) end,
-					},
-					{
-						label = i18n_safe("menu.profiles.delete_profile"),
-						action = function()
-							local title = string.format(
-								i18n_safe("menu.profiles.delete_confirm_title"), label)
-							local confirmed
-							if type(ctx.confirm_profile_delete) == "function" then
-								confirmed = ctx.confirm_profile_delete(profile_id, label)
-							else
-								confirmed = ask_yes_no(
-									title,
-									i18n_safe("menu.profiles.delete_confirm_body"),
-									i18n_safe("button.delete"),
-									i18n_safe("button.cancel"))
-							end
-							if confirmed ~= true then return false end
-							local deleted = ProfileSettings.delete_user_profile(profile_id)
-							if deleted then refresh() end
-							return deleted
+		local function custom_rows()
+			local rows = {}
+			for _, profile in ipairs(user_profiles) do
+				local owned_profile = profile
+				local profile_id = profile.id
+				local label = profile.label
+				if effective == profile_id then effective_label = label end
+				local function child_ready()
+					if type(ProfileSettings.list_user) ~= "function" then return false end
+					local ok, current = pcall(ProfileSettings.list_user)
+					if not ok or type(current) ~= "table" then return false end
+					local matches = 0
+					for _, entry in ipairs(current) do
+						if entry.id == profile_id then matches = matches + 1 end
+					end
+					return matches == 1
+				end
+				rows[#rows + 1] = {
+					label = label,
+					items = ManifestMenu.template_rows("llm_custom_profile_controls", {
+						["llm_profile_use"] = function() return select_profile(profile_id) end,
+						["llm_profile_edit"] = function() return open_editor(owned_profile, false) end,
+						["llm_profile_delete"] = function()
+								local title = string.format(
+									i18n_safe("menu.profiles.delete_confirm_title"), label)
+								local confirmed
+								if type(ctx.confirm_profile_delete) == "function" then
+									confirmed = ctx.confirm_profile_delete(profile_id, label)
+								else
+									confirmed = ask_yes_no(
+										title,
+										i18n_safe("menu.profiles.delete_confirm_body"),
+										i18n_safe("button.delete"),
+										i18n_safe("button.cancel"))
+								end
+								if confirmed ~= true then return false end
+								local deleted = ProfileSettings.delete_user_profile(profile_id)
+								if deleted then refresh() end
+								return deleted
+							end,
+					}, {
+						["llm_custom_profile_active"] = function()
+							return ProfileSettings.effective_profile(current_model) == profile_id
 						end,
-					},
-				},
-			}
+						["llm_custom_profile_ready"] = child_ready,
+					}, {}) or {},
+				}
+			end
+			return rows
 		end
-
-		if active_builtin then
-			local seed = {
+		local function clone_present()
+			if not active_builtin then return false end
+			seed = {
 				label = effective_label .. " " .. i18n_safe("menu.profiles.copy_suffix"),
 				system_single = active_builtin.system_single,
 				system_multi_template = active_builtin.system_multi_template,
 				batch = active_builtin.batch == true,
 			}
-			rows[#rows + 1] = { separator = true }
-			local clone_row = ManifestMenu.command_row("llm_profile_commands", "llm_profile_clone",
-				{ llm_profile_clone = function() return open_editor(seed, true, { as_new = true }, true) end },
-				{ llm_profile_clone_ready = create_ready })
-			if clone_row then rows[#rows + 1] = clone_row end
+			return true
 		end
-		rows[#rows + 1] = { separator = true }
-		local create_row = ManifestMenu.command_row("llm_profile_commands", "llm_profile_create",
-			{ llm_profile_create = function() return open_editor(nil, true, nil, true) end },
-			{ llm_profile_create_ready = create_ready })
-		if create_row then rows[#rows + 1] = create_row end
+		local rows = ManifestMenu.template_rows("llm_profile_lua_frame", {
+			["llm_profile_auto_detect"] = auto_profile,
+			["llm_profile_clone"] = function() return open_editor(seed, true, { as_new = true }, true) end,
+			["llm_profile_create"] = function() return open_editor(nil, true, nil, true) end,
+		}, {
+			["llm_profile_recommendation_present"] = function() return false end,
+			["llm_profile_recommendation_paused"] = function() return false end,
+			["llm_profile_auto_detect_checked"] = function() return ProfileSettings.get("auto_profile_for_model") == true end,
+			["llm_profile_custom_present"] = custom_present,
+			["llm_profile_clone_present"] = clone_present,
+			["llm_profile_create_ready"] = create_ready,
+			["llm_profile_clone_ready"] = create_ready,
+		}, {
+			["llm_profile_builtin_rows"] = builtin_rows,
+			["llm_profile_custom_rows"] = custom_rows,
+		})
+		if not rows then return end
 		append_rendered_row(target, {
 			label = string.format(i18n_safe("menu.profiles.profile_label_prefix"), effective_label),
 			items = rows,
@@ -2319,7 +2325,7 @@ local function _build_llm(ctx)
 		}, "llm_profile")
 	end
 
-	dynamic_handlers["llm_display"] = function(target)
+	group_builders["llm_display"] = function()
 		local ok_display, DisplaySettings = pcall(require, "modules.llm.display_settings")
 		if not ok_display then return end
 		local DisplayPolicy = require("llm.display_policy")
@@ -2436,14 +2442,12 @@ local function _build_llm(ctx)
 			["llm_display_remaining"] = function() return {} end,
 			["llm_display_trailing"] = function() return rows end,
 		})
-		append_rendered_row(target, {
-			label = i18n_safe("menu.llm.display_menu_title"),
-			submenu = display_rows,
-			disabled = not enabled or nil,
-		}, "llm_display")
+		local child_rows = ManifestMenu.native_child_rows(display_rows)
+		if child_rows == nil then return nil end
+		return { items = child_rows, disabled = not enabled or nil }
 	end
 
-	dynamic_handlers["llm_navigation"] = function(target)
+	group_builders["llm_navigation"] = function()
 		local ok_navigation, NavigationSettings = pcall(require, "modules.llm.navigation_settings")
 		if not ok_navigation then return end
 		-- One choice list per chord: the navigation modifiers held with Up and
@@ -2504,11 +2508,9 @@ local function _build_llm(ctx)
 			end,
 		}
 		local rows = ManifestMenu.build("llm_navigation_rows", "LLM navigation", nil, nil, ctx, navigation_providers)
-		append_rendered_row(target, {
-			label = i18n_safe("menu.llm.nav_menu_title"),
-			submenu = rows,
-			disabled = not enabled or nil,
-		}, "llm_navigation")
+		local child_rows = ManifestMenu.native_child_rows(rows)
+		if child_rows == nil then return nil end
+		return { items = child_rows, disabled = not enabled or nil }
 	end
 
 	-- The models this machine actually has. A `list`, because the rows are
@@ -2532,7 +2534,11 @@ local function _build_llm(ctx)
 				end,
 			}
 		end
-		if #rows > 0 then rows[#rows + 1] = { separator = true } end
+		if #rows > 0 then
+			for _, row in ipairs(ManifestMenu.status_rows("llm_menu", "llm_models", "model_picker_tail") or {}) do
+				rows[#rows + 1] = row
+			end
+		end
 		local browser_row = ManifestMenu.command_row("llm_model_commands", "llm_browse_models", {
 			["llm_browse_models"] = function()
 				return ctx.webview.show("model_browser") == true
@@ -2632,10 +2638,8 @@ local function _build_llm(ctx)
 			-- capability, which is convergence downwards.
 			local bounds = Settings.bounds(setting.name)
 			if bounds then
-				choices[#choices + 1] = { separator = true }
-				choices[#choices + 1] = {
-					label = i18n_safe("menu.llm.generation.custom_value"),
-					action = function()
+				local custom_rows = ManifestMenu.template_rows("llm_numeric_custom_rows", {
+					["llm_numeric_custom_value"] = function()
 						local ok_prompt, Prompt = pcall(require, "ui.numeric_prompt.bridge")
 						if not ok_prompt then
 							Logger.error(LOG, "No numeric prompt — '%s' can only take a preset.", setting.name)
@@ -2654,7 +2658,8 @@ local function _build_llm(ctx)
 							end,
 						}, ctx.webview)
 					end,
-				}
+				})
+				for _, row in ipairs(custom_rows or {}) do choices[#choices + 1] = row end
 			end
 
 			rows[#rows + 1] = {
@@ -2715,7 +2720,7 @@ local function _build_llm(ctx)
 	llm_ctx.state_getters["llm_toggle_ready"] = function() return ctx.paused ~= true end
 
 	local rendered = ManifestMenu
-		and ManifestMenu.build("llm_menu", "LLM", dynamic_handlers, nil, llm_ctx, providers)
+		and ManifestMenu.build("llm_menu", "LLM", dynamic_handlers, group_builders, llm_ctx, providers)
 		or {}
 	for _, row in ipairs(rendered) do items[#items + 1] = row end
 
@@ -2752,11 +2757,13 @@ end
 --- @return table One provider row.
 local function _migration_row(k)
 	if type(k.get_migration_progress) ~= "function" then
-		return { label = i18n_safe("menu.metrics.migration_unavailable"), disabled = true }
+		local rows = ManifestMenu.template_rows("metrics_migration_unavailable_rows")
+		return rows and rows[1] or nil
 	end
 	local progress = k.get_migration_progress()
 	if not progress.running then
-		return { label = i18n_safe("menu.metrics.migration_idle"), disabled = true }
+		local rows = ManifestMenu.template_rows("metrics_migration_idle_rows")
+		return rows and rows[1] or nil
 	end
 	return {
 		label = string.format(i18n_safe("menu.metrics.migration_progress"),
@@ -3040,9 +3047,9 @@ end
 local function _build_metrics(ctx)
 	local k = ctx.keylogger
 	if type(k) ~= "table" then
-		return { label = i18n_safe("menu.metrics.title"), items = {
-			{ label = i18n_safe("menu.metrics.unavailable"), disabled = true },
-		}}
+		local status_rows = ManifestMenu and ManifestMenu.template_rows("linux_metrics_absent_rows", {}, {}, {})
+		if not status_rows then return {} end
+		return { label = i18n_safe("menu.metrics.title"), items = status_rows }
 	end
 
 	local items = _manifest_metrics_rows(ctx, k)
@@ -3195,9 +3202,9 @@ end
 local function _build_shortcuts(ctx)
 	local sc = ctx.shortcuts
 	if not sc then
-		return { label = i18n_safe("menu.shortcuts.title"), items = {
-			{ label = i18n_safe("menu.shortcuts.unavailable"), disabled = true },
-		}}
+		local status_rows = ManifestMenu and ManifestMenu.template_rows("linux_shortcuts_absent_rows", {}, {}, {})
+		if not status_rows then return {} end
+		return { label = i18n_safe("menu.shortcuts.title"), items = status_rows }
 	end
 
 	local enabled = sc.is_enabled()
@@ -3231,7 +3238,9 @@ local function _build_shortcuts(ctx)
 		["selection_caps_word_ready"] = caps_word_ready,
 	})
 	if caps_row then selection_rows[#selection_rows + 1] = caps_row end
-	selection_rows[#selection_rows + 1] = { separator = true }
+	local case_boundary = ManifestMenu.template_rows("selection_case_boundary", {}, {}, {})
+	if not case_boundary then return {} end
+	for _, row in ipairs(case_boundary) do selection_rows[#selection_rows + 1] = row end
 	local case_methods = {
 		uppercase_selection = "transform_uppercase",
 		selection_lowercase = "transform_lowercase",
@@ -3257,7 +3266,9 @@ local function _build_shortcuts(ctx)
 		}, case_getters)
 		if row then selection_rows[#selection_rows + 1] = row end
 	end
-	selection_rows[#selection_rows + 1] = { separator = true }
+	local helper_boundary = ManifestMenu.template_rows("selection_helper_boundary", {}, {}, {})
+	if not helper_boundary then return {} end
+	for _, row in ipairs(helper_boundary) do selection_rows[#selection_rows + 1] = row end
 	local helper_methods = {
 		["selection_select_word"] = "select_word",
 		["selection_select_line"] = "select_line",
@@ -3730,14 +3741,20 @@ local function _build_tap_holds(ctx)
 		local value = prompt_text(i18n_safe("menu.tapholds.key_tap_delay_dialog_title"),
 			string.format(i18n_safe("menu.tapholds.key_tap_delay_dialog_prompt"), current_ms),
 			tostring(current_ms))
-		if value == nil then return end
+		if value == nil then return false end
 		local ms = tonumber(value)
-		if not ms or ms <= 0 then
+		if not ms or ms ~= ms or ms == math.huge or ms <= 0 or math.floor(ms + 0.5) <= 0 then
 			Logger.warn(LOG, "Invalid tap-hold delay '%s' — ignored.", tostring(value))
 			show_error(tostring(value), i18n_safe("dialog.gestures.param_error_title"))
-			return
+			return false
 		end
-		changed(Writer.set_threshold(key_id, math.floor(ms + 0.5) / 1000))
+		local call_ok, persisted = pcall(Writer.set_threshold, key_id, math.floor(ms + 0.5) / 1000)
+		if not call_ok or persisted ~= true then
+			changed(false)
+			return false
+		end
+		changed(true)
+		return true
 	end
 
 	--- The rows of one hand: its keys in the shared catalogue's order, each
@@ -3767,24 +3784,22 @@ local function _build_tap_holds(ctx)
 				}
 			end
 
-			local key_rows = ManifestMenu.template_rows("tap_hold_key_head", {
+			local delay_rows = ManifestMenu.template_rows("tap_hold_key_delay_rows", {
+				["tap_hold_key_delay_set"] = function() return ask_delay(key_id, ms) end,
+			})
+			if not delay_rows then return nil end
+
+			local key_rows = ManifestMenu.template_rows("tap_hold_key_rows", {
 				["tap_hold_key_native"] = function() changed(Writer.set_native(key_id)) end,
 				["tap_hold_key_tap"] = function() pick_tap(catalog_entry, tap) end,
 			}, {
 				["tap_hold_key_configured"] = function() return configured end,
 				["tap_hold_key_tap_caption"] = function() return tap_label end,
 				["tap_hold_key_hold_caption"] = function() return hold_label end,
-			}, { ["tap_hold_key_hold"] = hold_rows })
+				["tap_hold_key_delay_caption"] = function() return ms .. " ms" end,
+			}, { ["tap_hold_key_hold"] = hold_rows, ["tap_hold_key_delay"] = delay_rows })
 			if key_rows then
-				key_rows[#key_rows + 1] = {
-					label = string.format(i18n_safe("menu.tapholds.key_tap_delay"), ms .. " ms"),
-					items = {
-						{
-							label = i18n_safe("menu.tapholds.key_tap_delay_set"),
-							action = function() ask_delay(key_id, ms) end,
-						},
-					},
-				}
+
 				rows[#rows + 1] = {
 					label = _tap_hold_key_label(catalog_entry) .. "  :  "
 						.. (configured and (tap_label .. "  /  " .. hold_label) or "—"),
@@ -3849,9 +3864,9 @@ end
 local function _build_gestures(ctx)
 	local ge = ctx.gestures
 	if not ge then
-		return { label = i18n_safe("menu.gestures.title"), items = {
-			{ label = i18n_safe("menu.gestures.unavailable"), disabled = true },
-		}}
+		local status_rows = ManifestMenu and ManifestMenu.template_rows("linux_gestures_absent_rows", {}, {}, {})
+		if not status_rows then return {} end
+		return { label = i18n_safe("menu.gestures.title"), items = status_rows }
 	end
 
 	local enabled = ge.is_enabled()
@@ -4198,8 +4213,10 @@ local function _about_update_rows(ctx)
 			label = VersionLabel.format(identity.kind, identity.version, identity.commit, i18n_safe),
 			disabled = true,
 		},
-		{ separator = true },
 	}
+	local separator_rows = ManifestMenu.template_rows("about_version_separator")
+	if not separator_rows then return {} end
+	for _, row in ipairs(separator_rows) do out[#out + 1] = row end
 	if not up then
 		Logger.error(LOG, "No updater module — the About menu shows no channel or check row.")
 		return out

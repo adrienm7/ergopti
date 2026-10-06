@@ -88,6 +88,7 @@ helpers.describe("API panel durable persistence gate", function()
 		}))
 		package.loaded["infra.manifest_menu"] = {
 			command_row = command_renderer.command_row,
+			template_rows = command_renderer.template_rows,
 			get_array = command_renderer.get_array, render_rows = function(rows) return rows end }
 		package.loaded["ui.menu.menu_llm.api_panel"] = nil
 

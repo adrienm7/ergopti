@@ -474,3 +474,52 @@ _AMCR_SourceCheckSharedCommand() {
 	} finally Root["about_source_menu"] := Original
 }
 Test("About source check: canonical disabled label reason and zero native effects", _AMCR_SourceCheckSharedCommand)
+
+
+_AMCR_VersionFragmentOrder() {
+	global _SharedDir
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\about_version_separator.json", "UTF-8"))
+	Definition := _MR_GetMenuDef(Corpus["section"])
+	AssertEqual(1, Definition.Length, "the independent fixed fragment contains one separator")
+	AssertEqual(Corpus["rows"][1]["type"], Definition[1]["type"])
+	Rows := _MI_AboutUpdateRows(true, _AMCR_RecordChannel.Bind({ Calls: [] }))
+	Assert(Rows[Corpus["version_index"]].Has("label"))
+	Assert(Rows[Corpus["separator_index"]]["separator"])
+	Assert(Rows[Corpus["channel_index"]]["items"] is Array)
+	Rendered := Menu()
+	try {
+		_MR_RenderRows(Rendered, Rows, "about_version_fragment_test", 1)
+		Assert(TrayMenuIsSeparatorAt(Rendered, Corpus["separator_index"] - 1),
+			"the actual native menu draws the declared separator after the version")
+		AssertEqual(Rows[1]["label"], _CTC_LabelAt(Rendered, 0))
+	} finally _CTC_ReleaseMenu(Rendered)
+}
+Test("About version fragment: actual declared and native rendered position", _AMCR_VersionFragmentOrder)
+
+_AMCR_VersionFragmentPresentation() {
+	Root := _MR_GetManifestRoot()
+	Previous := Root["about_version_separator"]
+	try {
+		Root["about_version_separator"] := [Map("type", "label", "id", "version_fragment_probe", "i18n", "menu.about.title")]
+		Rows := _MI_AboutUpdateRows(true, _AMCR_RecordChannel.Bind({ Calls: [] }))
+		AssertEqual(t("menu.about.title"), Rows[2]["label"])
+		Assert(Rows[2]["disabled"] && !Rows[2].Has("action"), "alternate shared presentation is inert")
+		Root["about_version_separator"] := [Map("type", "---", "platforms", ["hs"], "unavailable", "hide")]
+		Rows := _MI_AboutUpdateRows(true, _AMCR_RecordChannel.Bind({ Calls: [] }))
+		Assert(Rows[2]["items"] is Array, "only the unavailable separator is hidden")
+	} finally Root["about_version_separator"] := Previous
+}
+Test("About version fragment: actual provider consumes presentation and platform policy", _AMCR_VersionFragmentPresentation)
+
+_AMCR_VersionFragmentRefusal() {
+	Root := _MR_GetManifestRoot()
+	Previous := Root["about_version_separator"]
+	State := { Calls: [] }
+	try {
+		Root.Delete("about_version_separator")
+		Rows := _MI_AboutUpdateRows(true, _AMCR_RecordChannel.Bind(State))
+		AssertEqual(0, Rows.Length, "missing shared fragment refuses the actual updater block")
+		AssertEqual(0, State.Calls.Length, "fragment refusal cannot subscribe to an update channel")
+	} finally Root["about_version_separator"] := Previous
+}
+Test("About version fragment: actual provider refuses a missing declaration", _AMCR_VersionFragmentRefusal)

@@ -114,32 +114,14 @@ LLM_Menu_BuildSubmenu() {
 	; feature back on.
 	_disabled := !_LLM_Menu["enabled"]
 
-	; The category switch is the manifest's `llm_toggle` row, drawn by the shared
-	; renderer code like every other category's: one label, ticked from intent.
-	MenuRenderer_AppendToggle(_LLM_Menu_Handle, "llm_menu", "llm_toggle",
-		Map("llm_toggle", LLM_Menu_OnToggle),
-		Map("llm_enabled", () => _LLM_Menu["enabled"],
-			"llm_toggle_ready", () => !A_IsSuspended))
-	MenuRenderer_AppendCommand(_LLM_Menu_Handle, "llm_menu", "scope_restore", _LLM_ScopeCommands())
-	_LLM_Menu_Handle.Add()  ; separator after the switch, as the manifest declares
-
-	; Warning row — surfaces when the feature is ON but the active backend
-	; can't actually answer (Ollama not installed yet, install crashed
-	; mid-way, daemon got uninstalled). Clicking the row re-launches the
-	; install with the WebView visible — same path as the toggle ON click
-	; but without losing the user's enabled=true state. Without this row
-	; a missing install was completely silent: the toggle showed ON, no
-	; tooltip ever appeared, and the user had no obvious next step.
+	Commands := _LLM_ScopeCommands()
+	Commands["llm_toggle"] := LLM_Menu_OnToggle
+	StateGetters := Map("llm_enabled", () => _LLM_Menu["enabled"],
+		"llm_toggle_ready", () => !A_IsSuspended)
+	WarningRows := []
 	if (_LLM_Menu["enabled"] and _LLM_Menu["backend"] == "ollama" and !_deps_ready) {
 		LoggerInfo("LLM", "Tray: showing 'Ollama not installed' warning row.")
-		; Pass the function reference DIRECTLY (no fat-arrow wrapper). AHK
-		; v2 menu callbacks call ``fn(ItemName, ItemPos, MenuObj)``, which
-		; works because _LLM_Menu_OnWarningInstallClick is variadic. The
-		; previous ``(*) => …`` lambda may have been swallowing exceptions
-		; silently — when the user clicked nothing ever fired and no log
-		; line was emitted.
-		MenuRenderer_AppendRows(_LLM_Menu_Handle, "llm_menu", "install_warning",
-			[Map("label", t("menu.llm.warning_install_ollama"), "action", _LLM_Menu_OnWarningInstallClick)])
+		WarningRows := [Map("label", t("menu.llm.warning_install_ollama"), "action", _LLM_Menu_OnWarningInstallClick)]
 	}
 
 	; ── Settings rows ────────────────────────────────────────────────────────
@@ -159,8 +141,18 @@ LLM_Menu_BuildSubmenu() {
 	; happen only after every row has been successfully constructed.
 	try LoggerInfo("LLM", "LLM_Menu_Build: pre-emit staging took {1} ms.", TickElapsed(_tStaged))
 	try LoggerInfo("LLM", "LLM_Menu_Build: emitting {1} settings row(s) from shared spec…", _rows.Length)
-	for _i, _row in _rows
-		_LLM_Menu_EmitRow(_row["id"], (_row["disabled_when_off"] ? _disabled : false), _llm_is_operational, _MR_Get(_row, "health_dot", false))
+	DynamicHandlers := Map(), GroupDisabled := Map()
+	for _i, _row in _rows {
+		RowDisabled := _row["disabled_when_off"] ? _disabled : false
+		if _MR_Get(_row, "type") == "group" {
+			GroupDisabled[_row["id"]] := RowDisabled
+		} else {
+			DynamicHandlers[_row["id"]] := _LLM_Menu_EmitCapturedRow.Bind(
+				_row["id"], RowDisabled, _llm_is_operational, _MR_Get(_row, "health_dot", false), WarningRows)
+		}
+	}
+	MenuRenderer_Build("llm_menu", "LLM", DynamicHandlers, _LLM_Menu_GroupBuilders(),
+		"", Commands, StateGetters, StagedHandle, GroupDisabled)
 	try LoggerInfo("LLM", "LLM_Menu_Build: settings rows emitted ({1} item(s) so far).", DllCall("GetMenuItemCount", "ptr", _LLM_Menu_Handle.Handle, "int"))
 	} catch as e {
 		if IsObject(SavedHandle)
@@ -171,6 +163,23 @@ LLM_Menu_BuildSubmenu() {
 	if IsObject(SavedHandle)
 		_LLM_Menu_Handle := SavedHandle
 	return StagedHandle
+}
+
+; Binding captures each row before the native renderer invokes it, avoiding loop closures.
+_LLM_Menu_EmitCapturedRow(Id, Disabled, Operational, HealthDot, WarningRows, TargetMenu, CategoryName) {
+	global _LLM_Menu_Handle
+	if !(TargetMenu is Menu) || TargetMenu != _LLM_Menu_Handle
+		throw Error("An LLM row cannot leave its detached native menu owner.")
+	if Id == "llm_backend" && WarningRows.Length > 0
+		MenuRenderer_AppendRows(TargetMenu, "llm_menu", "install_warning", WarningRows)
+	_LLM_Menu_EmitRow(Id, Disabled, Operational, HealthDot)
+}
+
+; Child builders retain genuine native Menu identities; the manifest owns the parents.
+_LLM_Menu_GroupBuilders() {
+	return Map("llm_trigger", LLM_Menu_BuildTriggerMenu,
+		"llm_display", LLM_Menu_BuildDisplayMenu,
+		"llm_navigation", LLM_Menu_BuildNavMenu)
 }
 
 /**
@@ -285,8 +294,8 @@ _LLM_MenuLayout_Rows() {
 		for _, Entry in Declared {
 			; Separators and Linux's inline lists are not settings rows: this
 			; dispatch emits a native submenu per id, and only the declared
-			; ``dynamic`` rows have one.
-			if (Entry is Map && _MR_IsForAhk(Entry) && _MR_Get(Entry, "type", "") == "dynamic")
+			; ``dynamic`` and declared ``group`` rows have one.
+			if (Entry is Map && _MR_IsForAhk(Entry) && (_MR_Get(Entry, "type", "") == "dynamic" || _MR_Get(Entry, "type", "") == "group"))
 				Filtered.Push(Entry)
 		}
 		if (Filtered.Length > 0)
@@ -378,15 +387,21 @@ _LLM_Menu_EmitRow(id, disabled, llm_is_operational, has_health_dot := false) {
 		; between them is the first row of the generation submenu.
 		_LLM_Menu_Handle.Add()
 	case "llm_trigger":
-		_LLM_Menu_AddRow(t("menu.llm.trigger_menu_title"), LLM_Menu_BuildTriggerMenu(), disabled)
+		if !MenuRenderer_AppendGroup(_LLM_Menu_Handle, "llm_menu", "llm_trigger",
+			Map("llm_trigger", LLM_Menu_BuildTriggerMenu), disabled)
+			throw Error("Declared LLM group 'llm_trigger' was refused.")
 	case "llm_live_mode":
 		_LLM_Menu_AddRow(t("menu.llm.live_mode_title"), LLM_Menu_BuildLiveModeMenu(), disabled)
 	case "llm_generation_settings":
 		_LLM_Menu_AddRow(t("menu.llm.generation_menu_title"), LLM_Menu_BuildGenerationMenu(), disabled)
 	case "llm_display":
-		_LLM_Menu_AddRow(t("menu.llm.display_menu_title"), LLM_Menu_BuildDisplayMenu(), disabled)
+		if !MenuRenderer_AppendGroup(_LLM_Menu_Handle, "llm_menu", "llm_display",
+			Map("llm_display", LLM_Menu_BuildDisplayMenu), disabled)
+			throw Error("Declared LLM group 'llm_display' was refused.")
 	case "llm_navigation":
-		_LLM_Menu_AddRow(t("menu.llm.nav_menu_title"), LLM_Menu_BuildNavMenu(), disabled)
+		if !MenuRenderer_AppendGroup(_LLM_Menu_Handle, "llm_menu", "llm_navigation",
+			Map("llm_navigation", LLM_Menu_BuildNavMenu), disabled)
+			throw Error("Declared LLM group 'llm_navigation' was refused.")
 	default:
 		try LoggerWarn("LLM", "_LLM_Menu_EmitRow: unknown row id '{1}' in the shared menu manifest — skipped.", id)
 	}

@@ -221,9 +221,9 @@ return function(helpers)
 				end
 			end
 		end)
-		helpers.it("refuses the inline macOS parameter table before backup or runtime publication", function()
+		helpers.it("refuses a malformed inline macOS parameter table before backup or runtime publication", function()
 			local options, files, writes, runtime = fixture()
-			local original = '[gestures]\naction_parameters = { tap_4__open_url = "https://apple.com", unknown = "preserve" }\n'
+			local original = '[gestures]\naction_parameters = { tap_4__open_url = "https://apple.com", tap_4__open_url = "https://example.com", unknown = "preserve" }\n'
 			files.config = original
 			options.owned_paths = function() return { "gestures.action_parameters.tap_4__open_url" } end
 			options.owners = { action_parameter_domain = function(path)
@@ -236,6 +236,52 @@ return function(helpers)
 			helpers.assert_eq(#writes, 0)
 			helpers.assert_eq(runtime.marker, "original")
 		end)
+		helpers.it("clears the original inline macOS parameter with exact bytes, backup and typed reload", function()
+			local original_inline = '[gestures]\naction_parameters = { tap_4__open_url = "https://apple.com", unknown = "preserve" }\n'
+			local expected_inline = '[gestures]\naction_parameters = { unknown = "preserve" }\n'
+			for _, suffix in ipairs({ "", 'future_empty = []\nfuture_map = {}\nfuture_flag = false\nfuture_integer = 17\nfuture_float = 17.0\n[llm]\nenabled = true\n' }) do
+				local options, files, writes, runtime = fixture()
+				local original, expected = original_inline .. suffix, expected_inline .. suffix
+				files.config = original
+				options.owned_paths = function() return { "gestures.action_parameters.tap_4__open_url" } end
+				options.owners = { action_parameter_domain = function(path)
+					if path == "gestures.action_parameters.tap_4__open_url" then return "gesture" end
+				end }
+				local captures, applications, applied = 0, 0, nil
+				local capture, apply = options.capture, options.apply
+				options.capture = function(...) captures = captures + 1; return capture(...) end
+				options.apply = function(decoded, ...)
+					applications, applied = applications + 1, decoded
+					return apply(decoded, ...)
+				end
+				local owner = require("config_scope_transaction").new(options)
+				local ok, detail, candidate = owner.apply("gestures", "clear")
+				helpers.assert_eq(ok, true, detail)
+				helpers.assert_eq(files.config, expected)
+				helpers.assert_eq(candidate, expected)
+				helpers.assert_eq(files.backup, original)
+				helpers.assert_eq(writes, { "backup", "config" })
+				helpers.assert_eq(captures, 1)
+				helpers.assert_eq(applications, 1)
+				helpers.assert_eq(runtime.marker, nil)
+				helpers.assert_eq(owner.pending(), false)
+				local reload, shapes = Codec.decode_with_shapes(files.config)
+				helpers.assert_eq(reload, applied)
+				helpers.assert_eq(reload.gestures.action_parameters.tap_4__open_url, nil)
+				helpers.assert_eq(reload.gestures.action_parameters.unknown, "preserve")
+				if suffix ~= "" then
+					helpers.assert_eq(shapes.arrays[reload.gestures.future_empty], true)
+					helpers.assert_eq(shapes.arrays[reload.gestures.future_map], nil)
+					helpers.assert_eq(reload.gestures.future_flag, false)
+					helpers.assert_eq(reload.gestures.future_integer, 17)
+					helpers.assert_eq(reload.gestures.future_float, 17.0)
+					helpers.assert_eq(shapes.numbers[reload.gestures].future_integer.token, "17")
+					helpers.assert_eq(shapes.numbers[reload.gestures].future_float.token, "17.0")
+					helpers.assert_eq(reload.llm.enabled, true)
+				end
+			end
+		end)
+
 		helpers.it("refuses preset scopes before reading, backing up or touching runtime", function()
 			for _, scope in ipairs({ "global", "tap_holds" }) do
 				for _, mode in ipairs({ "recommended", "clear" }) do

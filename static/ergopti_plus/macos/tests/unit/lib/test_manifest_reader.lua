@@ -148,3 +148,28 @@ helpers.describe("manifest_reader: extended module wiring parity", function()
 		end
 	end)
 end)
+
+
+helpers.describe("Pure manifest declaration metadata", function()
+	helpers.it("reads a backend declaration before hardware defaults resolve (declared-metadata)", function()
+		helpers.with_stub_scope({ "infra.manifest_reader", "modules.llm.backend_detector" }, function()
+			local calls = 0
+			package.loaded["modules.llm.backend_detector"] = { auto_default = function()
+				calls = calls + 1
+				return "ollama"
+			end }
+			local reader = require("infra.manifest_reader")
+			local entry = reader.find_declared_entry_by_path("llm.models.selected")
+			helpers.assert_true(type(entry) == "table", "exact backend declaration must exist")
+			helpers.assert_eq(entry.type, "string")
+			helpers.assert_eq(entry.platforms, { "ahk", "hs", "linux" })
+			helpers.assert_eq(calls, 0, "declaration lookup must not resolve any native default")
+			helpers.assert_nil(reader.find_declared_entry_by_path("does.not.exist"))
+			helpers.assert_eq(calls, 0)
+			helpers.assert_eq(reader.find_entry_by_path("llm.models.selected").default, "ollama", "old value lookup still resolves the owner")
+			helpers.assert_eq(calls, 1)
+			helpers.assert_eq(reader.default_for("llm.models.selected"), "ollama")
+			helpers.assert_eq(calls, 1, "existing one-time default resolution remains intact")
+		end)
+	end)
+end)

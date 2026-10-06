@@ -51,7 +51,9 @@ else
 	local _, _, options = Manager._build_fetch_request("main", 1)
 	local file = assert(io.open(options.etag_save, "rb"))
 	local etag = assert(file:read("*a")); assert(file:close())
-	if mode == "http-error" then assert(etag:find("E1", 1, true), "HTTP-error control changed its prior native validator")
+	if mode == "http-error" or mode == "http-error-new-validator" then
+		assert(etag == assert(os.getenv("ERGOPTI_NATIVE_UPDATER_FAILED_ETAG")),
+			"HTTP-error validator differs from the independent native curl receipt")
 	else assert(etag:find("E2", 1, true), "failed native response did not actually change the file validator") end
 	local third = fetch()
 	if mode == "truncated" then
@@ -105,8 +107,9 @@ def main():
                 pass
 
             def do_GET(self):
-                mode = urllib.parse.urlparse(self.path).path.strip("/")
-                receipts = records.setdefault(mode, [])
+                route = urllib.parse.urlparse(self.path).path.strip("/")
+                mode = route.removeprefix("oracle/")
+                receipts = records.setdefault(route, [])
                 receipts.append(self.headers.get("If-None-Match"))
                 phase = len(receipts)
                 tag = (
@@ -164,6 +167,64 @@ def main():
         server.socket = context.wrap_socket(server.socket, server_side=True)
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
+
+        def failed_validator_oracle(mode, case_root, env):
+            # Curl versions disagree on saving a response ETag when
+            # --fail-with-body reports 503. Measure the real binary directly,
+            # independently of the updater/cache code, with the same TLS and
+            # conditional-file options. Its two requests use a separate route.
+            etag_path = case_root / "oracle-etag.txt"
+            for phase, expected_status in ((1, 200), (2, 503)):
+                arguments = [
+                    "curl",
+                    "--disable",
+                    "--globoff",
+                    "--silent",
+                    "--show-error",
+                    "--no-buffer",
+                    "--fail-with-body",
+                    "--max-time",
+                    "10",
+                    "--proto",
+                    "=https",
+                    "--request",
+                    "GET",
+                    "--location",
+                    "--proto-redir",
+                    "=https",
+                    "--tlsv1.2",
+                    "--etag-save",
+                    str(etag_path),
+                    "--write-out",
+                    "\nERGOPTI_ORACLE_STATUS=%{http_code}\n",
+                    "--config",
+                    "-",
+                ]
+                if phase == 2:
+                    arguments.extend(["--etag-compare", str(etag_path)])
+                target = f"https://127.0.0.1:{server.server_port}/oracle/{mode}?per_page=20&page=1"
+                oracle = subprocess.run(
+                    arguments,
+                    input=f'url = "{target}"\n',
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                )
+                body, marker, status = oracle.stdout.rpartition("\nERGOPTI_ORACLE_STATUS=")
+                assert marker and status == f"{expected_status}\n", oracle.stdout
+                assert oracle.returncode == (0 if phase == 1 else 22), oracle.stderr
+                if phase == 1:
+                    assert json.loads(body) == [{"tag_name": "v1.0.0"}]
+                    assert etag_path.read_bytes() == b'"E1"\n'
+                else:
+                    assert body == "Synthetic unavailable response"
+            assert records["oracle/" + mode] == [None, '"E1"']
+            actual = etag_path.read_bytes()
+            assert actual in (b'"E1"\n', b'"E2"\n'), actual
+            print(f"ORACLE native curl {mode} rejected503 validator={actual!r}", flush=True)
+            return actual.decode("ascii")
+
         try:
             for mode in (
                 "truncated",
@@ -190,6 +251,10 @@ def main():
                     }
                 )
                 try:
+                    if mode in ("http-error", "http-error-new-validator"):
+                        env["ERGOPTI_NATIVE_UPDATER_FAILED_ETAG"] = failed_validator_oracle(
+                            mode, case_root, env
+                        )
                     child = subprocess.run(
                         [interpreter, "-e", WORKER],
                         env=env,
