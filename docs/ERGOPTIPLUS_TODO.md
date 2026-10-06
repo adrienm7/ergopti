@@ -4933,6 +4933,8 @@ This deferral does not complete this item or the cross-cutting items16/38.
   and must be reconstructed and reviewed against current sources. No fixed accent menu/default is retired.
   Real physical capture, Unicode/dead-key delivery, collision refusal, native
   GUI lifecycle, installation and Windows PC acceptance remain open.
+  The editor row retains an all-platform separator before the legacy modifier
+  shortcut groups, preserving the existing native Windows menu assertion.
 
 Windows continuation for item97 (explicitly deferred to the maintainer's PC):
 
