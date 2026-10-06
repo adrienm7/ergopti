@@ -2221,7 +2221,7 @@ _FMS_FullSnapshotParent(Path, Literal, Scenario := "complete") {
 	global ScriptShortcutAssignments, KeyboardShortcutAssignments, GestureAssignments
 	global CategoryEnabled, UPDATER_CHECK_INTERVAL, UPDATER_CHANNEL, _IniCache
 	global _ConfigBootRejectedOverrides, _ConfigBootOutdatedEntries, Features
-	global _ParseTomlCache, _TomlFileCache, _ConfigTomlSnapshots
+	global _ParseTomlCache, _TomlFileCache, _ConfigTomlSnapshots, _LOGGER_TEST_SINK
 	Runtime := _CFGFS_CaptureRuntime(), Coordinator := _ConfigFullSaveCoordinator()
 	State := MasterGateState(), PriorState := State.Clone()
 	SavedI18nLocale := IsSet(_I18nLocale) ? _I18nLocale : unset
@@ -2322,11 +2322,26 @@ _FMS_FullSnapshotParent(Path, Literal, Scenario := "complete") {
 			Assert(Borrowed is Object)
 		}
 		Requested := 0
-		Result := SaveFullConfig(0, (*) => true, true, Borrowed, Collect, &Requested)
+		NativeLog := [], PriorLogSink := _LOGGER_TEST_SINK
+		try {
+			LoggerSetTestSink((Line) => NativeLog.Push(Line))
+			Result := SaveFullConfig(0, (*) => true, true, Borrowed, Collect, &Requested)
+		} finally {
+			_LOGGER_TEST_SINK := PriorLogSink
+		}
+		Trace := ""
+		for Line in NativeLog
+			Trace .= (Trace != "" ? "`n" : "") . Line
+		Diagnostic := " | scenario=" . Scenario . " collected=" . Collected
+			. " native_log=" . JsonStringLiteral(Trace)
 		if StampRefused || Scenario == "nonneutral" || Scenario == "late-neutral" || Scenario == "source" || Scenario == "absent" || Scenario == "schema" {
-			AssertEqual(CONFIG_SAVE_FAILED, Result, "a nonneutral collision or withdrawn source never receives a successful full-save ACK")
-			AssertEqual(Scenario == "source" || Scenario == "absent" ? Foreign : Original, FSReadUtf8Exact(Path),
-				"the complete retained or external source survives refusal")
+			AssertEqual(CONFIG_SAVE_FAILED, Result, "a nonneutral collision or withdrawn source never receives a successful full-save ACK" . Diagnostic)
+			ActualSource := FSReadUtf8Exact(Path)
+			ExpectedSource := Scenario == "source" || Scenario == "absent" ? Foreign : Original
+			AssertEqual(ExpectedSource, ActualSource,
+				"the complete retained or external source survives refusal" . Diagnostic
+					. " expected=" . JsonStringLiteral(String(ExpectedSource))
+					. " actual=" . JsonStringLiteral(String(ActualSource)))
 			AssertEqual(0, _ConfigFullSaveCoordinator().committed_generation)
 			if Scenario == "schema" {
 				AssertEqual(0, Collected, "the strict session fence precedes the real collector")
@@ -2342,7 +2357,7 @@ _FMS_FullSnapshotParent(Path, Literal, Scenario := "complete") {
 				Assert(_ConfigFullSaveHasPending(), "failure retains the exact outstanding request")
 			}
 		} else {
-			AssertEqual(CONFIG_SAVE_OK, Result, "unrelated real snapshot changes can commit while obsolete parents remain")
+			AssertEqual(CONFIG_SAVE_OK, Result, "unrelated real snapshot changes can commit while obsolete parents remain" . Diagnostic)
 			AssertEqual(1, Collected)
 			AssertEqual(Expected, FSReadUtf8Exact(Path), "the complete handwritten physical image changes only admitted owned fields")
 			AssertEqual(Requested, _ConfigFullSaveCoordinator().committed_generation)

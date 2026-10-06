@@ -3483,6 +3483,8 @@ The personal-editor source guard now reads the complete actual keymap module thr
 
 The actual Windows global-clear image from manual run37451318736 contains the five explicit off assignments required by shared policy, while retaining every obsolete/private source byte. Its handwritten full-image expectation now includes those assignments. All188 existing assertions, exact backup and inverse checks remain unchanged. Manual diagnostic run37456524038 passes this corrected native transaction and its retained subsequent assertions; final-source native qualification remains pending.
 
+Manual run37451318736 reports9974 successful and16 failed Windows cases, including nine actual full-snapshot cases whose ordinary saves refuse. A fixture-only diagnostic now retains the genuine ConfigIO/TomlWrite logger, collector count and complete expected/actual physical images in the first annotation line. All574 measured textual assertions and expected outcomes remain unchanged; the exact prior logger sink is restored even on exceptions. Manual diagnostic run37456524038 locates all9 remaining errors inside the actual collector at an unassigned global. The subsequent genuine keyboard-default fixture prerequisite is recorded separately and must receive its own native qualification. No production guard or schema refusal is weakened.
+
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
   The shared AHK override policy now writes an explicit recommended delay only
