@@ -3679,6 +3679,18 @@ No production caller, native observer, installer, update or capture authority
 exists in this slice. Actual dependency/reference/native qualification and the
 remaining WP6 work stay open; this policy alone cannot complete TODO31.
 
+The promoted-source CLI fixture now resolves its own temporary directory before
+passing that owned repository path to the unchanged canonical source checker.
+The actual original13 controls pass on canonical temporary storage but fail the
+healthy CLI case under a genuine symbolic-link TMPDIR; the one-line correction
+passes all13 on both. Independent normal/explicit-optimized/inherited-optimized
+runs preserve every assertion, fixed corpus, source25 expectation and generated
+seal. No production path admission changes. Manual macOS CI37396409648 reports
+one failing witness control and an xcodegen HTTPS acquisition refusal; its exact
+Python failed-case identity remains unknown without the blocked artifact trace.
+This fixture reproduction is not attribution or native compilation qualification;
+the native source build, packaging/install and TODO31 remain open.
+
 ## Remaining work after the 2026-09-30 releases
 
 - [~] **33.** Config policy for the files other than config.toml (the former

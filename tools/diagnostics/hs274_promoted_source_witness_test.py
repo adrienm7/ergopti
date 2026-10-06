@@ -470,7 +470,7 @@ class WitnessCLIControls(unittest.TestCase):
 
     def run_case(self, case):
         with tempfile.TemporaryDirectory(prefix="cli-" + case + "-") as tmp:
-            owner = Path(tmp)
+            owner = Path(tmp).resolve()
             repo = owner / "repo"
             shutil.copytree(
                 ROOT / "packet/candidate",
