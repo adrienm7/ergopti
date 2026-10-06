@@ -1,0 +1,46 @@
+{
+	"_comment": "Handwritten expectations for Linux's two existing inert migration captions. Running progress and native cancellation stay outside this fixed-label slice.",
+	"statuses": [
+		{
+			"state": "unavailable",
+			"section": "metrics_migration_unavailable_rows",
+			"row": {
+				"type": "label",
+				"id": "metrics_migration_unavailable",
+				"i18n": "menu.metrics.migration_unavailable",
+				"platforms": ["linux"],
+				"unavailable": "hide"
+			},
+			"disabled": true,
+			"locales": {
+				"en": "Encryption migration (unavailable)",
+				"fr": "Migration du chiffrement (indisponible)"
+			}
+		},
+		{
+			"state": "idle",
+			"section": "metrics_migration_idle_rows",
+			"row": {
+				"type": "label",
+				"id": "metrics_migration_idle",
+				"i18n": "menu.metrics.migration_idle",
+				"platforms": ["linux"],
+				"unavailable": "hide"
+			},
+			"disabled": true,
+			"locales": {
+				"en": "Encryption migration: idle",
+				"fr": "Migration du chiffrement : inactive"
+			}
+		}
+	],
+	"running": {
+		"scanned": 7,
+		"total": 29,
+		"disabled": false,
+		"locales": {
+			"en": "Migration: 7/29 row(s) — click to stop",
+			"fr": "Migration : 7/29 ligne(s) — cliquer pour arrêter"
+		}
+	}
+}

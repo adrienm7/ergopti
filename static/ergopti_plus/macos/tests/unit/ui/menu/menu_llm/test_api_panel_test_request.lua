@@ -95,6 +95,7 @@ local function install_doubles(args)
 	}))
 	package.loaded["infra.manifest_menu"] = {
 		command_row = command_renderer.command_row,
+		template_rows = command_renderer.template_rows,
 		get_array = command_renderer.get_array,
 		render_rows = function(rows) return rows end,
 	}
@@ -747,5 +748,146 @@ helpers.describe("API Add: retained native admission", function()
 			helpers.assert_eq(remote.get_entries()[2].token, "inert-new-secret")
 			helpers.assert_eq(ctx.state.llm_model, "new-model")
 		end)
+	end)
+end)
+
+
+--- Loads the hand-authored API Add contract from physical shared data.
+local function api_add_corpus()
+	local file = assert(io.open(helpers.driver_root() .. "../_shared/tests/corpus/menus/api_add_controls.json", "rb"))
+	local raw = file:read("*a"); assert(file:close())
+	return assert(require("adapters.json_codec").decode(raw))
+end
+
+--- Holds the genuine translator/backend/renderer cohort without persisting a locale.
+local function with_api_add_locale(scenario)
+	local names = { "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu" }
+	local previous = {}
+	for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
+	local native, owner, receipt, acquired
+	local ok, err = pcall(function()
+		native = require("infra.i18n")
+		local backend = require("infra.locale")
+		native.set_locale_injector(function(code) backend.set_locale(code) end)
+		native.init()
+		owner = { pending = function() return false end }
+		acquired = native.scope_acquire(owner)
+		helpers.assert_eq(acquired, true)
+		receipt = native.scope_capture(owner)
+		helpers.assert_not_nil(receipt)
+		helpers.assert_eq(native.scope_apply(owner, receipt, "en"), true)
+		helpers.assert_eq(native.get_locale(), "en")
+		helpers.assert_eq(require("infra.locale").current_locale(), "en")
+		scenario(native)
+	end)
+	local restored, released, forgotten = true, true, true
+	if receipt then restored = native.scope_restore(owner, receipt) == true end
+	if acquired then released = native.scope_release(owner) == true end
+	if receipt then forgotten = native.scope_forget(owner, receipt) == true end
+	for _, name in ipairs(names) do package.loaded[name] = previous[name] end
+	for _, name in ipairs(names) do helpers.assert_eq(rawequal(package.loaded[name], previous[name]), true, name) end
+	helpers.assert_eq(restored, true, "the genuine runtime inverse restores its previous locale")
+	helpers.assert_eq(released, true, "the temporary locale owner is released on every exit")
+	helpers.assert_eq(forgotten, true, "the temporary locale receipt is forgotten on every exit")
+	if not ok then error(err, 0) end
+end
+
+--- Retains the native collaborators while injecting the genuine English translator.
+local function install_api_add_doubles(args, native)
+	install_doubles(args)
+	package.loaded["infra.i18n"] = native
+	local renderer = assert(require("menu.renderer").new({
+		platform = "hs",
+		manifest_path = function() return helpers.driver_root() .. "../_shared/modules/menu/menu_manifest.json" end,
+		json_decode = require("adapters.json_codec").decode,
+		i18n = native,
+		logger = helpers.make_logger_stub(),
+	}))
+	package.loaded["infra.manifest_menu"] = {
+		command_row = renderer.command_row, template_rows = renderer.template_rows,
+		get_array = renderer.get_array, render_rows = function(rows) return rows end,
+	}
+end
+
+helpers.describe("Shared API Add frame (api-add-controls)", function()
+	local owned = { "modules.llm", "infra.i18n", "infra.logger", "infra.dialog_util",
+		"infra.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel" }
+	helpers.it("uses the shared Add label and retains the genuine provider action (api-add-controls)", function()
+		helpers.with_fresh_modules(owned, function()
+			with_api_add_locale(function(native)
+			local corpus = api_add_corpus()
+			install_api_add_doubles({ entries = {}, active_id = "" }, native)
+			local menu = package.loaded["infra.manifest_menu"]
+			local declaration = menu.get_array(corpus.group_section)[1]
+			local original = declaration.i18n
+			local panel = require("ui.menu.menu_llm.api_panel")
+			local observations
+			local ok, err = pcall(function()
+				local _, rows = panel.build(fixture_context())
+				helpers.assert_eq(rows[1].label, corpus.mac_decoration .. corpus.label)
+				helpers.assert_type(rows[1].items[1].action, "function")
+				declaration.i18n = corpus.mutated_key
+				_, rows = panel.build(fixture_context())
+				observations = rows[1]
+			end)
+			declaration.i18n = original
+			helpers.assert_eq(ok, true, tostring(err))
+			helpers.assert_eq(observations.label, corpus.mac_decoration .. corpus.mutated_label)
+			helpers.assert_eq(observations.disabled, nil)
+			helpers.assert_type(observations.items[1].action, "function")
+			end)
+		end)
+	end)
+	helpers.it("uses the conditional separator declaration and preserves native pause (api-add-controls)", function()
+		helpers.with_fresh_modules(owned, function()
+			with_api_add_locale(function(native)
+			local corpus = api_add_corpus()
+			local entry = { id = "prod", provider = "openai", token = "inert", model = "probe" }
+			install_api_add_doubles({ entries = { entry }, active_id = "prod" }, native)
+			local menu = package.loaded["infra.manifest_menu"]
+			local declaration = menu.get_array(corpus.separator_section)
+			local original = declaration[1]
+			local panel = require("ui.menu.menu_llm.api_panel")
+			local observations
+			local ok, err = pcall(function()
+				declaration[1] = { type = "label", id = "api_add_marker", i18n = corpus.mutated_key }
+				local _, rows = panel.build(fixture_context())
+				local position
+				for index, row in ipairs(rows) do if row.label == corpus.mac_decoration .. corpus.label then position = index end end
+				helpers.assert_type(position, "number")
+				observations = rows[position + 1]
+				local context = fixture_context(); context.paused = true
+				_, rows = panel.build(context)
+				helpers.assert_eq(rows[position].disabled, true)
+				helpers.assert_nil(rows[position].items[1].action, "native paused provider has no action")
+			end)
+			declaration[1] = original
+			helpers.assert_eq(ok, true, tostring(err))
+			helpers.assert_eq(observations.label, corpus.mutated_label)
+			helpers.assert_eq(observations.disabled, true)
+			helpers.assert_nil(observations.action)
+			package.loaded["modules.llm"].api_remote.set_entries({})
+			local _, rows = panel.build(fixture_context())
+			for _, row in ipairs(rows) do helpers.assert_nil(row.separator, "empty entries keep no dangling Add separator") end
+			end)
+		end)
+	end)
+end)
+
+helpers.describe("API Add locale scope failure inverse (api-add-controls)", function()
+	helpers.it("restores the actual prior locale cohort after a raised case (api-add-controls)", function()
+		local names = { "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu" }
+		local previous = {}
+		for _, name in ipairs(names) do previous[name] = package.loaded[name] end
+		local raised = {}
+		local ok, err = pcall(function()
+			with_api_add_locale(function(native)
+				helpers.assert_eq(native.get("menu.llm.api_add_entry"), "+ Add an API")
+				error(raised, 0)
+			end)
+		end)
+		helpers.assert_eq(ok, false)
+		helpers.assert_eq(rawequal(err, raised), true)
+		for _, name in ipairs(names) do helpers.assert_eq(rawequal(package.loaded[name], previous[name]), true, name) end
 	end)
 end)

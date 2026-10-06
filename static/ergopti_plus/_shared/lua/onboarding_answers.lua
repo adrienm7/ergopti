@@ -30,6 +30,7 @@
 local M = {}
 
 local Json = require("json")
+local Utf8 = require("compat.utf8")
 
 -- The catalogue format this module reads; the generator emits the same number.
 M.SCHEMA_VERSION = 1
@@ -138,19 +139,8 @@ end
 --- @param text string
 --- @return number|nil
 local function utf8_length(text)
-	local count, position = 0, 1
-	while position <= #text do
-		local byte = text:byte(position)
-		local width = byte < 0x80 and 1 or byte >= 0xF0 and byte < 0xF5 and 4
-			or byte >= 0xE0 and byte < 0xF0 and 3 or byte >= 0xC2 and byte < 0xE0 and 2 or nil
-		if not width or position + width - 1 > #text then return nil end
-		for index = position + 1, position + width - 1 do
-			local continuation = text:byte(index)
-			if continuation < 0x80 or continuation > 0xBF then return nil end
-		end
-		count, position = count + 1, position + width
-	end
-	return count
+	local called, count = pcall(Utf8.len, text)
+	return called and type(count) == "number" and count or nil
 end
 
 --- Why a value cannot be written to an entry, or nil when it can.

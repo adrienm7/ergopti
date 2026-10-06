@@ -65,13 +65,40 @@ _CUK_Ids(Keys) {
 }
 
 _CUK_SortedIds(Keys) {
+	return _CUK_CanonicalIds(_CUK_Ids(Keys))
+}
+
+; Cleanup promises identities, not the native parser Map's enumeration order.
+; Compare hand-written identities case-exactly without discarding duplicates.
+_CUK_CanonicalIds(Items) {
 	Sorted := Map()
-	for Id in _CUK_Ids(Keys)
+	Sorted.CaseSense := "On"
+	for Id in Items {
+		AssertFalse(Sorted.Has(Id), "cleanup preview identities must not repeat")
 		Sorted[Id] := true
+	}
 	Ids := []
 	for Id in Sorted
 		Ids.Push(Id)
 	return Ids
+}
+
+_CUK_AssertIds(Expected, Keys) {
+	ExpectedIds := StrSplit(Expected, "|")
+	ActualIds := _CUK_Ids(Keys)
+	AssertEqual(ExpectedIds.Length, ActualIds.Length, "every hand-written cleanup identity occurs exactly once")
+	AssertEqual(_CUK_Join(_CUK_CanonicalIds(ExpectedIds)), _CUK_Join(_CUK_CanonicalIds(ActualIds)),
+		"the complete cleanup identities match case-exactly")
+}
+
+_CUK_RequireId(Keys, Id) {
+	Matches := []
+	for Entry in Keys {
+		if (Entry["section"] . "." . Entry["key"] . "=" . Entry["kind"]) == Id
+			Matches.Push(Entry)
+	}
+	AssertEqual(1, Matches.Length, "the independently named cleanup identity occurs exactly once")
+	return Matches[1]
 }
 
 _CUK_Join(Items) {
@@ -96,12 +123,13 @@ _CUK_DetectsExactlyTheUnknownKeys() {
 	try {
 		Scan := ConfigUnusedKeysFind(_CUK_WriteFixture(Dir))
 		AssertEqual("ok", Scan["status"])
-		AssertEqual("metrics.metrics_encrypt=leaf|stale.section.label=section",
+		AssertEqual("ahk.layout.ergopti_base=section|metrics.metrics_encrypt=leaf|stale.section.label=section",
 			_CUK_Join(_CUK_Ids(Scan["keys"])),
-			"only the unknown leaf and the unknown section path are unused; metadata, "
-			. "updater, obsolete, dynamic personal and foreign-owned keys are not")
-		AssertEqual("0", Scan["keys"][1]["value"])
-		AssertEqual('"old"', Scan["keys"][2]["value"])
+			"the retired section, unknown leaf and unknown section path are offered; metadata, "
+			. "updater, dynamic personal and foreign-owned keys are not")
+		AssertEqual("true", Scan["keys"][1]["value"])
+		AssertEqual("0", Scan["keys"][2]["value"])
+		AssertEqual('"old"', Scan["keys"][3]["value"])
 	} finally DirDelete(Dir, true)
 }
 Test("config unused keys: detection reports exactly the keys boot rejects as unknown "
@@ -266,7 +294,7 @@ _CUK_RemovesExactlyThemAfterBackup() {
 		Keys := ConfigUnusedKeysFind(Path)["keys"]
 		Result := ConfigUnusedKeysRemove(Path, Keys, "20990101-000000")
 		AssertEqual("removed", Result["status"])
-		AssertEqual(2, Result["removed"])
+		AssertEqual(3, Result["removed"])
 		AssertEqual(Dir . "\config.backup-20990101-000000.toml", Result["backup"])
 		AssertEqual(Original, FSReadUtf8Exact(Result["backup"]),
 			"the backup must hold the exact pre-cleanup bytes")
@@ -314,8 +342,8 @@ _CUK_CaseVariantSectionKeepsKnownTwin() {
 		Path := _CUK_WriteFixture(Dir)
 		AssertTrue(TOML_BatchWrite(Path, [{ Section: "Layout", Key: "stale", Value: 1 }]))
 		Keys := ConfigUnusedKeysFind(Path)["keys"]
-		AssertEqual("Layout.stale=section|metrics.metrics_encrypt=leaf|stale.section.label=section",
-			_CUK_Join(_CUK_Ids(Keys)))
+		_CUK_AssertIds("ahk.layout.ergopti_base=section|Layout.stale=section|metrics.metrics_encrypt=leaf|stale.section.label=section",
+			Keys)
 		AssertEqual("removed", ConfigUnusedKeysRemove(Path, Keys, "20990101-000004")["status"])
 		After := TOML_ParseFreshFile(Path)
 		AssertEqual(false, After["layout"]["ergopti_base"],
@@ -429,7 +457,7 @@ _CUK_WebPreviewLifecycle() {
 		Session := ConfigCleanupSession(Path)
 		State := Session.Handle("ready")
 		AssertEqual("ready", State["status"])
-		AssertEqual(2, State["keys"].Length)
+		AssertEqual(3, State["keys"].Length)
 		Before := FSReadUtf8Exact(Path)
 		AssertEqual(0, Session.Handle(Map("action", "clean", "session", "stale")))
 		AssertEqual(Before, FSReadUtf8Exact(Path))
@@ -635,3 +663,1041 @@ _CUK_WebWindowReuseRefusal() {
 }
 Test("config cleanup webview: reuse consumes the native activation refusal (config-cleanup-reuse)",
 	_CUK_WebWindowReuseRefusal)
+
+
+; The physical fixture is exclusively owned, including its verified backups.
+_CUK_RetiredNewDir() {
+	static Sequence := 0
+	Sequence += 1
+	Folder := A_Temp . "\ergopti_retired_cleanup_" . A_ScriptHwnd
+		. "_" . A_TickCount . "_" . Sequence
+	AssertTrue(DllCall("CreateDirectoryW", "Str", Folder, "Ptr", 0, "Int"),
+		"the fixture must exclusively own its native directory")
+	return Folder
+}
+
+_CUK_RetiredRows(Scan) {
+	AssertEqual("ok", Scan["status"])
+	Rows := []
+	for Entry in Scan["keys"] {
+		if _ConfigUnusedKeysRetiredSection(Entry["section"])
+			Rows.Push(Entry)
+	}
+	return Rows
+}
+
+_CUK_RetiredPrefixActualCleanup() {
+	Folder := _CUK_RetiredNewDir()
+	Path := Folder . "\config.toml"
+	Retired := "# Retired namespace preview.`n[ahk]`n`n"
+		. "[ahk.layout]`nflag = true`n`n"
+		. "[ahk.layout.deep]`n" . 'label = "retain until cleanup"' . "`n`n"
+		. "[ahk.empty]`n`n"
+	Kept := "[_meta]`nschema_version = 11`n`n"
+		. "[updater]`n" . 'channel = "stable"' . "`n`n"
+		. "[hotstrings.personal.mine]`nenabled = true`n`n"
+		. '["ahk.foo"]' . "`n" . 'keep = "literal"' . "`n`n"
+		. "[AHK.layout]`n" . 'keep = "case"' . "`n`n"
+		. "[future_extension]`nkeep = 42 # preserve exact comment`n"
+	Source := Retired . Kept
+	Expected := Chr(0xFEFF) . "# Retired namespace preview.`n`n`n`n`n" . Kept
+	try {
+		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		Rows := _CUK_RetiredRows(ConfigUnusedKeysFind(Path))
+		_CUK_AssertIds("ahk.=section|ahk.layout.flag=section|ahk.layout.deep.label=section|ahk.empty.=section",
+			Rows)
+		RootRow := _CUK_RequireId(Rows, "ahk.=section")
+		EmptyRow := _CUK_RequireId(Rows, "ahk.empty.=section")
+		AssertTrue(RootRow["section_only"] is Integer)
+		AssertEqual(1, RootRow["section_only"])
+		AssertTrue(EmptyRow["section_only"] is Integer)
+		AssertEqual(1, EmptyRow["section_only"])
+		AssertEqual(Source, FSReadUtf8Exact(Path), "scanning never accepts cleanup")
+		Result := ConfigUnusedKeysRemove(Path, Rows, "20990101-000201", 0, 0, Source)
+		AssertEqual("removed", Result["status"])
+		AssertEqual(4, Result["removed"])
+		AssertEqual(Source, FSReadUtf8Exact(Result["backup"]),
+			"the actual native backup contains the exact preview generation")
+		AssertEqual(Expected, FSReadUtf8Exact(Path),
+			"actual semantic cleanup drops only explicitly offered retired identities")
+		Document := TOML_ParseDocument(FSReadUtf8Exact(Path))
+		AssertFalse(Document.Has("ahk"))
+		AssertEqual("literal", Document["ahk.foo"]["keep"])
+		AssertEqual("case", Document["AHK"]["layout"]["keep"])
+		AssertEqual("stable", Document["updater"]["channel"])
+		AssertEqual(11, Document["_meta"]["schema_version"])
+		AssertTrue(Document["hotstrings"]["personal"]["mine"]["enabled"] is TOML_Bool)
+		AssertEqual(true, Document["hotstrings"]["personal"]["mine"]["enabled"].Value)
+		AssertEqual(42, Document["future_extension"]["keep"])
+		AssertEqual(0, _CUK_RetiredRows(ConfigUnusedKeysFind(Path)).Length)
+	} finally DirDelete(Folder, true)
+}
+Test("config cleanup: actual retired prefix removal preserves reserved literal and case twins "
+	. "(config-retired-explicit-cleanup)", _CUK_RetiredPrefixActualCleanup)
+
+_CUK_RetiredEmptyTablesActualCleanup() {
+	Folder := _CUK_RetiredNewDir()
+	Path := Folder . "\config.toml"
+	Source := "[ahk]`n`n[ahk.empty]`n`n[updater]`n" . 'channel = "stable"' . "`n"
+	Expected := Chr(0xFEFF) . "`n`n[updater]`n" . 'channel = "stable"' . "`n"
+	try {
+		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		Rows := _CUK_RetiredRows(ConfigUnusedKeysFind(Path))
+		AssertEqual("ahk.=section|ahk.empty.=section", _CUK_Join(_CUK_Ids(Rows)))
+		AssertEqual("{}", Rows[1]["value"])
+		AssertTrue(_ConfigUnusedKeysSectionOnly(Rows[1]))
+		AssertTrue(_ConfigUnusedKeysSectionOnly(Rows[2]))
+		Session := ConfigCleanupSession(Path)
+		try {
+			AssertEqual("ready", Session.Handle("ready")["status"])
+			Page := JsonParse(Session.Json())
+			AssertEqual(2, Page["keys"].Length)
+			AssertEqual("", Page["keys"][1]["key"])
+			AssertEqual("{}", Page["keys"][1]["value"])
+			AssertFalse(Page["keys"][1].Has("section_only"),
+				"the private whole-section authorization never enters the page contract")
+			Result := Session.Handle(Map("action", "clean", "session", Session.Token))
+			AssertEqual("removed", Result["status"])
+			AssertEqual(2, Result["removed"])
+			AssertEqual(Source, FSReadUtf8Exact(Result["backup"]))
+			AssertEqual(Expected, FSReadUtf8Exact(Path))
+		} finally Session.Close()
+		AssertEqual(0, ConfigUnusedKeysFind(Path)["keys"].Length)
+	} finally DirDelete(Folder, true)
+}
+Test("config cleanup: empty retired tables use real preview backup and semantic deletion "
+	. "(config-retired-explicit-cleanup)", _CUK_RetiredEmptyTablesActualCleanup)
+
+_CUK_RetiredEmptyTableCannotOwnLateChild(ChildSource) {
+	Folder := _CUK_RetiredNewDir()
+	Path := Folder . "\config.toml"
+	Source := "[ahk]`n`n[updater]`n" . 'channel = "stable"' . "`n"
+	Concurrent := Source . ChildSource
+	try {
+		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		Rows := _CUK_RetiredRows(ConfigUnusedKeysFind(Path))
+		AssertEqual(1, Rows.Length)
+		AssertTrue(_ConfigUnusedKeysSectionOnly(Rows[1]))
+		AssertEqual(1, FSWriteDurable(Path, Concurrent))
+		Result := ConfigUnusedKeysRemove(Path, Rows, "20990101-000202")
+		AssertEqual("changed", Result["status"],
+			"a direct old empty-table scan cannot own an unlisted semantic child")
+		AssertEqual(0, Result["removed"])
+		AssertEqual(Concurrent, FSReadUtf8Exact(Path))
+		AssertFalse(FileExist(Result["backup"]), "refusal precedes backup and publication")
+		Result := ConfigUnusedKeysRemove(Path, Rows, "20990101-000203", 0, 0, Source)
+		AssertEqual("changed", Result["status"])
+		AssertEqual(Concurrent, FSReadUtf8Exact(Path))
+		AssertFalse(FileExist(Result["backup"]), "stale preview bytes cannot authorize any transaction")
+	} finally DirDelete(Folder, true)
+}
+Test("config cleanup: retired empty-table preview cannot own late descendants or stale bytes "
+	. "(config-retired-explicit-cleanup)",
+	_CUK_RetiredEmptyTableCannotOwnLateChild.Bind("`n[ahk.late]`nflag = true`n"))
+Test("config cleanup: retired empty-table preview cannot own an unlisted empty child header "
+	. "(config-retired-explicit-cleanup)",
+	_CUK_RetiredEmptyTableCannotOwnLateChild.Bind("`n[ahk.late]`n"))
+
+_CUK_RetiredBackupRaceUsesExactSource() {
+	Folder := _CUK_RetiredNewDir()
+	Path := Folder . "\config.toml"
+	Source := "[ahk.layout]`nflag = true`n`n[future_extension]`nkeep = 42`n"
+	Concurrent := "[ahk.layout]`nflag = true`n`n[future_extension]`nkeep = 43`n"
+	Seen := Map("backup_calls", 0, "lease_blocked", false)
+	Backup(Target, Content) {
+		Seen["backup_calls"] += 1
+		Owner := _ConfigWriteLeaseTryAcquire(Path, "foreign-backup-probe")
+		Seen["lease_blocked"] := !(Owner is Object)
+		if Owner is Object
+			_ConfigWriteLeaseRelease(Owner)
+		Written := FSWriteCreateDurable(Target, Content)
+		if !(Written is Integer) || Written != 1
+			return Written
+		Changed := FSWriteDurable(Path, Concurrent)
+		if !(Changed is Integer) || Changed != 1
+			throw Error("the actual native fixture could not publish its foreign source generation")
+		return Written
+	}
+	try {
+		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		Rows := _CUK_RetiredRows(ConfigUnusedKeysFind(Path))
+		AssertEqual(1, Rows.Length)
+		Result := ConfigUnusedKeysRemove(Path, Rows, "20990101-000204", Backup, 0, Source)
+		AssertEqual("write_failed", Result["status"],
+			"the actual default writer must refuse a source changed during verified backup")
+		AssertEqual(0, Result["removed"])
+		AssertEqual(1, Seen["backup_calls"])
+		AssertTrue(Seen["lease_blocked"], "one source lease spans native backup and publication refusal")
+		AssertEqual(Source, FSReadUtf8Exact(Result["backup"]))
+		AssertEqual(Concurrent, FSReadUtf8Exact(Path),
+			"a foreign generation remains byte-exact, including its retired entries")
+		Owner := _ConfigWriteLeaseTryAcquire(Path, "post-cleanup-probe")
+		try AssertTrue(Owner is Object, "refusal must release its original source lease")
+		finally {
+			if Owner is Object
+				_ConfigWriteLeaseRelease(Owner)
+		}
+	} finally DirDelete(Folder, true)
+}
+Test("config cleanup: actual default writer binds the exact verified backup generation "
+	. "(config-retired-backup-source-race)", _CUK_RetiredBackupRaceUsesExactSource)
+
+_CUK_RetiredUnsupportedProjection(Source, Mode) {
+	Folder := _CUK_RetiredNewDir()
+	Path := Folder . "\config.toml"
+	try {
+		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		; These requests have no privately captured whole-root capability. Actual
+		; typed producers are qualified separately; metadata cannot substitute.
+		switch Mode {
+			case "unproven": Rows := [Map("section", "ahk", "key", "layout.flag", "kind", "section", "value", "true")]
+			case "forged": Rows := [Map("section", "ahk", "key", "", "kind", "section", "value", "{}", "retired_root_receipt", Map())]
+			case "partial": Rows := [Map("section", "ahk.items", "key", "flag", "kind", "section", "value", "true")]
+			default: throw ValueError("Unknown unsupported root fixture")
+		}
+		Result := ConfigUnusedKeysRemove(Path, Rows, "20990101-000300", 0, 0, Source)
+		AssertEqual("write_failed", Result["status"])
+		AssertEqual(0, Result["removed"],
+			"an unproved flat retired projection cannot manufacture whole-section authorization")
+		AssertEqual(Source, FSReadUtf8Exact(Path))
+		AssertFalse(FileExist(Result["backup"]), "refusal precedes backup and publication")
+		AssertFalse(ConfigUnusedKeysOffer(Path, (*) => Map("status", "unsupported", "keys", []), (*) => false))
+		AssertEqual(Source, FSReadUtf8Exact(Path))
+	} finally DirDelete(Folder, true)
+}
+Test("config cleanup: retired dotted assignments refuse unproved flat ownership (config-retired-unsupported)",
+	_CUK_RetiredUnsupportedProjection.Bind("[ahk]`nlayout.flag = true`n", "unproven"))
+Test("config cleanup: retired inline root refuses forged whole-root authority (config-retired-unsupported)",
+	_CUK_RetiredUnsupportedProjection.Bind("ahk = {layout = {flag = true}}`n", "forged"))
+Test("config cleanup: retired table-array generations refuse partial flat ownership (config-retired-unsupported)",
+	_CUK_RetiredUnsupportedProjection.Bind("[[ahk.items]]`nflag = true`n", "partial"))
+
+_CUK_RetiredWarningAndRuntimeNeutrality() {
+	Folder := _CUK_RetiredNewDir()
+	Path := Folder . "\config.toml"
+	Source := "[ahk.layout]`nergopti_base = true`n"
+	Lines := []
+	LoggerSetTestSink((Line) => Lines.Push(Line))
+	try {
+		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		Target := ManifestBuildFeaturesMap()
+		AssertEqual(0, ApplyConfigToml(Target, Path, &Rejected))
+		AssertEqual(0, Rejected)
+		AssertEqual(false, Target["layout"]["ergopti_base"])
+		Errors := 0, Named := 0
+		for Line in Lines {
+			if InStr(Line, "[ERROR]")
+				Errors += 1
+			if InStr(Line, "[WARNING]") && InStr(Line, "obsolete [ahk.*]")
+					&& InStr(Line, "remain until explicit cleanup")
+				Named += 1
+			AssertFalse(InStr(Line, "next canonical save removes") > 0)
+		}
+		AssertEqual(0, Errors)
+		AssertEqual(1, Named)
+		AssertEqual(Source, FSReadUtf8Exact(Path), "the warning never performs cleanup")
+		AssertEqual(1, _CUK_RetiredRows(ConfigUnusedKeysFind(Path)).Length)
+	} finally {
+		LoggerClearTestSink()
+		DirDelete(Folder, true)
+	}
+}
+Test("config cleanup: retired entries warn truthfully remain runtime neutral and await explicit cleanup "
+	. "(config-retired-explicit-cleanup)", _CUK_RetiredWarningAndRuntimeNeutrality)
+
+
+_CUK_RetiredCaseTwinScanIsIndependent() {
+	Folder := _CUK_RetiredNewDir()
+	Path := Folder . "\config.toml"
+	Source := "[AHK.layout]`nflag = true`n"
+	try {
+		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		Scan := ConfigUnusedKeysFind(Path)
+		AssertEqual("ok", Scan["status"],
+			"a differently cased source segment cannot enter retired-prefix admission")
+		AssertEqual(0, Scan["keys"].Length,
+			"the existing skipped case twin must not be manufactured into retired cleanup ownership")
+		AssertEqual(Source, FSReadUtf8Exact(Path))
+		Document := TOML_ParseDocument(FSReadUtf8Exact(Path))
+		AssertFalse(Document.Has("ahk"))
+		AssertTrue(Document.Has("AHK"))
+	} finally DirDelete(Folder, true)
+}
+Test("config cleanup: differently cased source segment never enters retired admission "
+	. "(config-retired-case-identity)", _CUK_RetiredCaseTwinScanIsIndependent)
+
+; Independent whole source images; the production renderer never creates these expectations.
+_CUK_RetiredRootVector(Kind) {
+	switch Kind {
+		case "dotted":
+			Source := "# retired dotted root`n" . 'ahk.layout.flag = true' . "`n"
+				. 'ahk.layout.label = "retired"' . "`n`n"
+		case "inline":
+			Source := "# retired inline root`n" . 'ahk = {layout = {flag = true}, items = [{id = "a"}, {id = "b"}]}' . "`n`n"
+		case "array":
+			Source := "# retired array root`n[[ahk.items]]`nflag = true`n"
+				. 'id = "first"' . "`n[[ahk.items]]`nflag = 0`n" . 'id = "second"' . "`n`n"
+		default: throw ValueError("Unknown retired root fixture")
+	}
+	Root := "# exact root neighbors`n" . '"ahk.literal" = {keep = "literal", empty = []} # root comment' . "`n"
+		. 'AHK = {keep = "case", flag = false}' . "`n`n"
+	Tables := "[_meta]`nschema_version = 11`n`n[updater]`n" . 'channel = "stable" # updater comment' . "`n`n"
+		. "[hotstrings.personal.mine]`nenabled = true`ntime_activation_seconds = 0.75`n`n"
+		. "[_future]`nflag = false`nzero = 0`nvalues = [1, 2]`nempty = []`n"
+		. "stamp = 2026-10-05T10:20:30Z`n" . '"literal.dot" = "keep" # exact future comment' . "`n"
+	return Map("source", Root . Source . Tables,
+		"expected", Chr(0xFEFF) . Root . "# retired " . Kind . " root`n`n" . Tables)
+}
+
+_CUK_RetiredRootTypedNeighbors(Document) {
+	AssertFalse(Document.Has("ahk"), "only the exact retired root is gone")
+	AssertEqual("literal", Document["ahk.literal"]["keep"])
+	AssertTrue(Document["ahk.literal"]["empty"] is Array)
+	AssertEqual(0, Document["ahk.literal"]["empty"].Length)
+	AssertEqual("case", Document["AHK"]["keep"])
+	AssertTrue(Document["AHK"]["flag"] is TOML_Bool)
+	AssertEqual(false, Document["AHK"]["flag"].Value)
+	AssertEqual(11, Document["_meta"]["schema_version"])
+	AssertEqual("stable", Document["updater"]["channel"])
+	AssertTrue(Document["hotstrings"]["personal"]["mine"]["enabled"] is TOML_Bool)
+	AssertEqual(true, Document["hotstrings"]["personal"]["mine"]["enabled"].Value)
+	AssertEqual(0.75, Document["hotstrings"]["personal"]["mine"]["time_activation_seconds"])
+	AssertTrue(Document["_future"]["flag"] is TOML_Bool)
+	AssertEqual(false, Document["_future"]["flag"].Value)
+	AssertTrue(Document["_future"]["zero"] is Integer)
+	AssertFalse(Document["_future"]["zero"] is TOML_Bool)
+	AssertEqual(0, Document["_future"]["zero"])
+	Values := Document["_future"]["values"]
+	AssertTrue(Values is Array, "the unrelated future array keeps its native shape")
+	AssertEqual(2, Values.Length, "both unrelated numeric elements survive cleanup")
+	AssertTrue(Values[1] is Integer)
+	AssertTrue(Values[2] is Integer)
+	AssertEqual(1, Values[1], "the first independently supplied element is retained")
+	AssertEqual(2, Values[2], "the second independently supplied element is retained")
+	AssertEqual("1|2", _CUK_Join(Values), "the existing diagnostic joiner uses a pipe separator")
+	AssertTrue(Document["_future"]["empty"] is Array)
+	AssertEqual(0, Document["_future"]["empty"].Length)
+	AssertEqual("2026-10-05T10:20:30Z", Document["_future"]["stamp"])
+	AssertEqual("keep", Document["_future"]["literal.dot"])
+}
+
+_CUK_RetiredRootActualCleanup(Kind) {
+	Folder := _CUK_RetiredNewDir(), Path := Folder . "\config.toml"
+	Vector := _CUK_RetiredRootVector(Kind), Source := Vector["source"]
+	try {
+		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		Rows := _CUK_RetiredRows(ConfigUnusedKeysFind(Path))
+		AssertEqual(1, Rows.Length, "the complete retired namespace is one explicit native preview")
+		if Rows.Length != 1
+			return
+		Entry := Rows[1]
+		AssertEqual("ahk", Entry["section"])
+		AssertEqual("", Entry["key"])
+		AssertEqual("section", Entry["kind"])
+		AssertEqual("_ConfigUnusedKeysRetiredRootReceipt", Type(Entry["retired_root_receipt"]))
+		AssertFalse(_ConfigUnusedKeysSectionOnly(Entry), "a whole root is not an empty-table marker")
+		AssertEqual(Source, FSReadUtf8Exact(Path), "collection never accepts cleanup")
+		Result := ConfigUnusedKeysRemove(Path, Rows, "20990101-000301", 0, 0, Source)
+		AssertEqual("removed", Result["status"])
+		AssertEqual(1, Result["removed"])
+		AssertEqual(Source, FSReadUtf8Exact(Result["backup"]))
+		AssertEqual(Vector["expected"], FSReadUtf8Exact(Path), "independent complete physical image")
+		_CUK_RetiredRootTypedNeighbors(TOML_ParseDocument(FSReadUtf8Exact(Path)))
+		AssertEqual(0, _CUK_RetiredRows(ConfigUnusedKeysFind(Path)).Length)
+	} finally DirDelete(Folder, true)
+}
+Test("config cleanup: privately captured root dotted namespace uses actual verified publication (config-retired-root)",
+	_CUK_RetiredRootActualCleanup.Bind("dotted"))
+Test("config cleanup: privately captured inline namespace uses actual verified publication (config-retired-root)",
+	_CUK_RetiredRootActualCleanup.Bind("inline"))
+Test("config cleanup: privately captured table-array root removes all exact generations (config-retired-root)",
+	_CUK_RetiredRootActualCleanup.Bind("array"))
+
+_CUK_RetiredRootPrivatePage() {
+	Folder := _CUK_RetiredNewDir(), Path := Folder . "\config.toml"
+	Vector := _CUK_RetiredRootVector("array")
+	try {
+		AssertEqual(1, FSWriteCreateDurable(Path, Vector["source"]))
+		Session := ConfigCleanupSession(Path)
+		try {
+			Status := Session.Handle("ready")["status"]
+			AssertEqual("ready", Status)
+			if Status != "ready"
+				return
+			Page := JsonParse(Session.Json())
+			AssertEqual(1, Page["keys"].Length)
+			if Page["keys"].Length != 1
+				return
+			AssertEqual(3, Page["keys"][1].Count, "only descriptive source fields reach the page")
+			AssertFalse(Page["keys"][1].Has("retired_root_receipt"))
+			AssertFalse(Page["keys"][1].Has("Source"))
+			AssertFalse(Session.Handle(Map("action", "clean", "session", "foreign")))
+			AssertEqual(Vector["source"], FSReadUtf8Exact(Path))
+			Result := Session.Handle(Map("action", "clean", "session", Session.Token,
+				"keys", [Map("section", "updater", "key", "channel")]))
+			AssertEqual("removed", Result["status"], "page metadata cannot choose another removal")
+			AssertEqual(Vector["source"], FSReadUtf8Exact(Result["backup"]))
+			AssertEqual(Vector["expected"], FSReadUtf8Exact(Path))
+			AssertFalse(Session.Handle(Map("action", "clean", "session", Session.Token)))
+		} finally Session.Close()
+	} finally DirDelete(Folder, true)
+}
+Test("config cleanup: actual host keeps the complete retired source receipt private and action-only (config-retired-root)",
+	_CUK_RetiredRootPrivatePage)
+
+_CUK_RetiredRootRefusesMutation(Field, Replacement) {
+	Folder := _CUK_RetiredNewDir(), Path := Folder . "\config.toml"
+	Vector := _CUK_RetiredRootVector("inline"), Source := Vector["source"]
+	try {
+		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		Rows := _CUK_RetiredRows(ConfigUnusedKeysFind(Path))
+		AssertEqual(1, Rows.Length)
+		if Rows.Length != 1
+			return
+		if Field == "extra"
+			Rows[1]["forged"] := Replacement
+		else if Field == "case_sense" {
+			Fields := Rows[1].Clone()
+			Rows[1].Clear()
+			Rows[1].CaseSense := Replacement
+			for Name, Value in Fields
+				Rows[1][Name] := Value
+		}
+		else if Field == "field_case" {
+			Rows[1].Delete("section")
+			Rows[1]["Section"] := Replacement
+		} else
+			Rows[1][Field] := Replacement
+		Result := ConfigUnusedKeysRemove(Path, Rows, "20990101-000302", 0, 0, Source)
+		AssertEqual("write_failed", Result["status"])
+		AssertEqual(0, Result["removed"])
+		AssertEqual(Source, FSReadUtf8Exact(Path))
+		AssertFalse(FileExist(Result["backup"]), "same-object metadata mutation refuses before backup")
+	} finally DirDelete(Folder, true)
+}
+Test("config cleanup: a same-map section mutation cannot borrow root proof (config-retired-root)",
+	_CUK_RetiredRootRefusesMutation.Bind("section", "AHK"))
+Test("config cleanup: a same-map key mutation cannot borrow root proof (config-retired-root)",
+	_CUK_RetiredRootRefusesMutation.Bind("key", "layout"))
+Test("config cleanup: a same-map kind mutation cannot borrow root proof (config-retired-root)",
+	_CUK_RetiredRootRefusesMutation.Bind("kind", "leaf"))
+Test("config cleanup: a same-map display-value mutation cannot borrow root proof (config-retired-root)",
+	_CUK_RetiredRootRefusesMutation.Bind("value", "{}"))
+Test("config cleanup: a same-map value type mutation cannot borrow root proof (config-retired-root)",
+	_CUK_RetiredRootRefusesMutation.Bind("value", 1))
+Test("config cleanup: extra same-map metadata cannot borrow root proof (config-retired-root)",
+	_CUK_RetiredRootRefusesMutation.Bind("extra", true))
+Test("config cleanup: native map case-policy mutation cannot borrow root proof (config-retired-root)",
+	_CUK_RetiredRootRefusesMutation.Bind("case_sense", "Off"))
+Test("config cleanup: renamed native metadata fields cannot borrow root proof (config-retired-root)",
+	_CUK_RetiredRootRefusesMutation.Bind("field_case", "ahk"))
+
+_CUK_RetiredRootRefusesBorrowedRecord(Mode) {
+	Folder := _CUK_RetiredNewDir(), Path := Folder . "\config.toml", Foreign := Folder . "\other.toml"
+	Vector := _CUK_RetiredRootVector("array"), Source := Vector["source"]
+	try {
+		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		Rows := _CUK_RetiredRows(ConfigUnusedKeysFind(Path))
+		AssertEqual(1, Rows.Length)
+		if Rows.Length != 1
+			return
+		if Mode == "clone"
+			Rows := [Rows[1].Clone()]
+		else if Mode == "duplicate"
+			Rows.Push(Rows[1])
+		else {
+			AssertEqual(1, FSWriteCreateDurable(Foreign, Source))
+			Rows := _CUK_RetiredRows(ConfigUnusedKeysFind(Foreign))
+		}
+		Result := ConfigUnusedKeysRemove(Path, Rows, "20990101-000303", 0, 0, Source)
+		AssertEqual("write_failed", Result["status"])
+		AssertEqual(Source, FSReadUtf8Exact(Path))
+		AssertEqual(0, Result["removed"])
+		AssertFalse(FileExist(Result["backup"]), "a borrowed object or file receipt refuses before backup")
+	} finally DirDelete(Folder, true)
+}
+Test("config cleanup: a cloned native row cannot borrow an original root receipt (config-retired-root)",
+	_CUK_RetiredRootRefusesBorrowedRecord.Bind("clone"))
+Test("config cleanup: equal bytes at another file cannot borrow root authority (config-retired-root)",
+	_CUK_RetiredRootRefusesBorrowedRecord.Bind("foreign"))
+
+_CUK_RetiredRootRefusesStaleSource() {
+	Folder := _CUK_RetiredNewDir(), Path := Folder . "\config.toml"
+	Vector := _CUK_RetiredRootVector("dotted"), Source := Vector["source"]
+	Concurrent := StrReplace(Source, '"literal.dot" = "keep"', '"literal.dot" = "later"')
+	try {
+		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		Rows := _CUK_RetiredRows(ConfigUnusedKeysFind(Path))
+		AssertEqual(1, Rows.Length)
+		if Rows.Length != 1
+			return
+		AssertEqual(1, FSWriteDurable(Path, Concurrent))
+		Result := ConfigUnusedKeysRemove(Path, Rows, "20990101-000304")
+		AssertEqual("write_failed", Result["status"])
+		AssertEqual(0, Result["removed"])
+		AssertEqual(Concurrent, FSReadUtf8Exact(Path))
+		AssertFalse(FileExist(Result["backup"]), "an unchanged retired root cannot borrow changed foreign source")
+		Fresh := _CUK_RetiredRows(ConfigUnusedKeysFind(Path))
+		Result := ConfigUnusedKeysRemove(Path, Fresh, "20990101-000305", 0, 0, Concurrent)
+		AssertEqual("removed", Result["status"])
+		AssertEqual(Concurrent, FSReadUtf8Exact(Result["backup"]))
+		AssertEqual(StrReplace(Vector["expected"], '"literal.dot" = "keep"', '"literal.dot" = "later"'), FSReadUtf8Exact(Path))
+	} finally DirDelete(Folder, true)
+}
+Test("config cleanup: stale whole-file source refuses before backup and fresh retry owns later neighbors (config-retired-root)",
+	_CUK_RetiredRootRefusesStaleSource)
+
+_CUK_RetiredRootRefusesReuse() {
+	Folder := _CUK_RetiredNewDir(), Path := Folder . "\config.toml"
+	Vector := _CUK_RetiredRootVector("inline"), Source := Vector["source"]
+	try {
+		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		Rows := _CUK_RetiredRows(ConfigUnusedKeysFind(Path))
+		AssertEqual(1, Rows.Length)
+		if Rows.Length != 1
+			return
+		AssertEqual("removed", ConfigUnusedKeysRemove(Path, Rows, "20990101-000306", 0, 0, Source)["status"])
+		AssertEqual(1, FSWriteDurable(Path, Source), "even byte-identical restoration cannot revive consumed authority")
+		Result := ConfigUnusedKeysRemove(Path, Rows, "20990101-000307", 0, 0, Source)
+		AssertEqual("write_failed", Result["status"])
+		AssertEqual(Source, FSReadUtf8Exact(Path))
+		AssertFalse(FileExist(Result["backup"]))
+		Fresh := _CUK_RetiredRows(ConfigUnusedKeysFind(Path))
+		AssertEqual("removed", ConfigUnusedKeysRemove(Path, Fresh, "20990101-000308", 0, 0, Source)["status"])
+		AssertEqual(Vector["expected"], FSReadUtf8Exact(Path))
+	} finally DirDelete(Folder, true)
+}
+Test("config cleanup: consumed root authority cannot be replayed after byte-identical external restoration (config-retired-root)",
+	_CUK_RetiredRootRefusesReuse)
+
+_CUK_RetiredRootMutationDuringBackup(Mode) {
+	Folder := _CUK_RetiredNewDir(), Path := Folder . "\config.toml"
+	Vector := _CUK_RetiredRootVector("array"), Source := Vector["source"]
+	Rows := [], Seen := Map("calls", 0)
+	Backup(Target, Content) {
+		Seen["calls"] += 1
+		Written := FSWriteCreateDurable(Target, Content)
+		switch Mode {
+			case "collection": Rows.RemoveAt(1)
+			case "receipt": Rows[1].Delete("retired_root_receipt")
+			case "field": Rows[1]["key"] := "items"
+			default: throw ValueError("Unknown backup mutation fixture")
+		}
+		return Written
+	}
+	try {
+		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		Rows := _CUK_RetiredRows(ConfigUnusedKeysFind(Path))
+		AssertEqual(1, Rows.Length)
+		if Rows.Length != 1
+			return
+		Result := ConfigUnusedKeysRemove(Path, Rows, "20990101-000309", Backup, 0, Source)
+		AssertEqual("write_failed", Result["status"])
+		AssertEqual(0, Result["removed"])
+		AssertEqual(1, Seen["calls"])
+		AssertEqual(Source, FSReadUtf8Exact(Path))
+		AssertEqual(Source, FSReadUtf8Exact(Result["backup"]), "an existing verified backup cannot grant later metadata authority")
+	} finally DirDelete(Folder, true)
+}
+Test("config cleanup: backup-time same-map mutation refuses before source publication (config-retired-root)",
+	_CUK_RetiredRootMutationDuringBackup.Bind("field"))
+Test("config cleanup: backup-time preview collection mutation refuses before source publication (config-retired-root)",
+	_CUK_RetiredRootMutationDuringBackup.Bind("collection"))
+
+Test("config cleanup: backup-time removal of private receipt refuses before source publication (config-retired-root)",
+	_CUK_RetiredRootMutationDuringBackup.Bind("receipt"))
+
+_CUK_RetiredRootBackupSourceRace() {
+	Folder := _CUK_RetiredNewDir(), Path := Folder . "\config.toml"
+	Vector := _CUK_RetiredRootVector("array"), Source := Vector["source"]
+	Concurrent := StrReplace(Source, '"literal.dot" = "keep"', '"literal.dot" = "later"')
+	Seen := Map("calls", 0, "lease_blocked", false)
+	Backup(Target, Content) {
+		Seen["calls"] += 1
+		Owner := _ConfigWriteLeaseTryAcquire(Path, "foreign-root-backup-probe")
+		Seen["lease_blocked"] := !(Owner is Object)
+		if Owner is Object
+			_ConfigWriteLeaseRelease(Owner)
+		Written := FSWriteCreateDurable(Target, Content)
+		if !(Written is Integer) || Written != 1
+			return Written
+		Changed := FSWriteDurable(Path, Concurrent)
+		if !(Changed is Integer) || Changed != 1
+			throw Error("The native root fixture could not publish its foreign source generation")
+		return Written
+	}
+	try {
+		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		Rows := _CUK_RetiredRows(ConfigUnusedKeysFind(Path))
+		AssertEqual(1, Rows.Length)
+		if Rows.Length != 1
+			return
+		Result := ConfigUnusedKeysRemove(Path, Rows, "20990101-000310", Backup, 0, Source)
+		AssertEqual("write_failed", Result["status"])
+		AssertEqual(0, Result["removed"])
+		AssertEqual(1, Seen["calls"])
+		AssertTrue(Seen["lease_blocked"])
+		AssertEqual(Source, FSReadUtf8Exact(Result["backup"]))
+		AssertEqual(Concurrent, FSReadUtf8Exact(Path), "the native default writer preserves the later full source")
+		AssertFalse(Rows[1]["retired_root_receipt"].Consumed, "refused publication does not consume source authority")
+		Owner := _ConfigWriteLeaseTryAcquire(Path, "post-root-cleanup-probe")
+		try AssertTrue(Owner is Object)
+		finally {
+			if Owner is Object
+				_ConfigWriteLeaseRelease(Owner)
+		}
+	} finally DirDelete(Folder, true)
+}
+Test("config cleanup: root capability retains the native exact-source and lease fence through backup (config-retired-root)",
+	_CUK_RetiredRootBackupSourceRace)
+
+Test("config cleanup: selecting the same whole-root receipt twice refuses before backup (config-retired-root)",
+	_CUK_RetiredRootRefusesBorrowedRecord.Bind("duplicate"))
+
+
+_CUK_RetiredGestureBindingOwnership() {
+	Target := ManifestBuildFeaturesMap()
+	Owner := ""
+	AssertEqual("section", TomlConfigUnknownKind(Target, "action_parameters", "gesture__removed_gesture_slot__open_url", &Owner))
+	AssertEqual("", Owner, "retirement never gets a foreign ownership exemption")
+	AssertEqual("retired", TomlConfigActionParameterBindingStatus("gesture__removed_gesture_slot__open_url"))
+	for Slot in GestureSlotIds() {
+		Key := GestureBindingId("gesture", Slot) . "__open_url"
+		AssertEqual("", TomlConfigUnknownKind(Target, "action_parameters", Key, &Owner), Slot)
+		AssertEqual("Gestures", Owner, Slot)
+	}
+	AssertEqual("retired", TomlConfigActionParameterBindingStatus("gesture__TAP_3__open_url"))
+	AssertEqual("unjudged", TomlConfigActionParameterBindingStatus("Gesture__tap_3__open_url"))
+}
+Test("config: retired native gesture parameters share boot and cleanup ownership (gesture-binding-identity-ownership)",
+	_CUK_RetiredGestureBindingOwnership)
+
+_CUK_RetiredGestureWarningOwnership() {
+	Dir := _CUK_NewDir()
+	try {
+		Path := Dir . "\config.toml"
+		Key := "gesture__removed_gesture_slot__open_url"
+		AssertTrue(TomlConfigReportRetiredGestureParameter(Path, Key), "first report uses the config.toml owner")
+		AssertFalse(TomlConfigReportRetiredGestureParameter(Path, Key), "duplicate boot/reload report is suppressed")
+		AssertTrue(TomlConfigReportRetiredGestureParameter(Path, "gesture__another_removed_slot__open_url"), "another retired row is independently named")
+	} finally DirDelete(Dir, true)
+}
+Test("config: retired gesture warnings deduplicate in the config.toml owner (gesture-binding-identity-warning)",
+	_CUK_RetiredGestureWarningOwnership)
+
+_CUK_RetiredGestureBindingsPreserveWholeSource() {
+	global ConfigurationFile, GestureActionParameters, GestureAssignments, _IniCache, _ConfigBootRejectedOverrides
+	Runtime := _CFGFS_CaptureRuntime()
+	Coordinator := _ConfigFullSaveCoordinator()
+	PreviousParameters := GestureActionParameters
+	PreviousAssignments := GestureAssignments.Clone()
+	PreviousCache := _IniCache
+	PreviousRejected := _ConfigBootRejectedOverrides
+	Dir := _CUK_NewDir()
+	Known := "gesture__tap_3__open_url"
+	Twin := "Gesture__tap_3__open_url"
+	Retired := "gesture__removed_gesture_slot__open_url"
+	ParameterSource := "[action_parameters]`n"
+		. Retired . ' = "https://obsolete.example" # explicit cleanup owns this row' . "`n"
+		. Known . ' = "https://known.example"' . "`n"
+		. Twin . ' = "https://unjudged.example"' . "`n"
+		. 'keyboard__ctrl_k__open_url = "https://keyboard.example"' . "`n"
+	Source := "# independent user comment`n" . ParameterSource
+		. "`n[future]`nkeep = " . Chr(34) . "independent" . Chr(34) . "`n"
+		. "`n[layout]`nergopti_base = true`n"
+	try {
+		Path := Dir . "\config.toml"
+		_CFGFS_Prepare(Path)
+		_ConfigBootRejectedOverrides := 0
+		AssertTrue(FSWriteDurable(Path, Source))
+		Target := ManifestBuildFeaturesMap()
+		ApplyConfigToml(Target, Path, &Rejected)
+		AssertEqual(0, Rejected, "known retirement is never a schema/native rejection")
+		_IniCache := ParseConfigTomlFile(Path)
+		GesturesReadConfig()
+		AssertEqual("On", GestureActionParameters.CaseSense)
+		AssertFalse(GestureActionParameters.Has(Retired))
+		AssertEqual("https://known.example", GestureGetActionParameter("gesture__tap_3", "open_url"))
+		AssertEqual("https://unjudged.example", GestureActionParameters[Twin])
+		AssertEqual(3, GestureActionParameters.Count, "both case twins and the other owner remain independent")
+		AssertFalse(TomlConfigReportRetiredGestureParameter(Path, Retired), "actual boot and direct reload share one report identity")
+		AssertEqual(Source, FSReadUtf8Exact(Path), "admission does not rewrite the source")
+		Scan := ConfigUnusedKeysFind(Path)
+		RetiredRows := []
+		for Entry in Scan["keys"] {
+			if Entry["section"] == "action_parameters" && Entry["key"] == Retired
+				RetiredRows.Push(Entry)
+		}
+		AssertEqual(1, RetiredRows.Length, "the ignored known-retired row is offered exactly once")
+
+		; The preserved unjudged prefix cannot activate a canonical gesture.
+		OtherPath := Dir . "\unjudged-only.toml"
+		UpperOnlySource := StrReplace(Source, Known . ' = "https://known.example"' . "`n", "", true)
+		AssertTrue(FSWriteDurable(OtherPath, UpperOnlySource))
+		ConfigurationFile := OtherPath
+		_IniCache := ParseConfigTomlFile(OtherPath)
+		GesturesReadConfig()
+		AssertEqual("", GestureGetActionParameter("gesture__tap_3", "open_url"))
+		AssertEqual("https://unjudged.example", GestureActionParameters[Twin])
+		AssertEqual("On", GestureActionParameters.Clone().CaseSense)
+		AssertEqual(UpperOnlySource, FSReadUtf8Exact(OtherPath))
+		ConfigurationFile := Path
+		_IniCache := ParseConfigTomlFile(Path)
+		GesturesReadConfig()
+		AssertTrue(GestureSetActionParameter("gesture__tap_3", "open_url", "https://changed.example"))
+		AssertEqual("On", GestureActionParameters.CaseSense)
+		AssertEqual("https://changed.example", GestureActionParameters[Known])
+		AssertEqual("https://unjudged.example", GestureActionParameters[Twin])
+		BeforeRefusal := FSReadUtf8Exact(Path)
+		AssertFalse(GestureSetActionParameter("gesture__removed_gesture_slot", "open_url", "https://must-not-publish.example"))
+		AssertEqual(BeforeRefusal, FSReadUtf8Exact(Path), "ordinary refusal preserves exact persisted bytes")
+		AssertEqual(CONFIG_SAVE_OK, SaveFullConfig(0, (*) => true, true, 0,
+			() => [{ Section: "layout", Key: "ergopti_base", Value: false }]))
+		Saved := FSReadUtf8Exact(Path)
+		AssertContains(Saved, Retired . ' = "https://obsolete.example" # explicit cleanup owns this row')
+		AssertContains(Saved, "# independent user comment")
+		Parsed := ConfigTomlDecodeSnapshot(Saved).Document
+		AssertEqual(4, Parsed["action_parameters"].Count, "complete handwritten preserved parameter model")
+		AssertEqual("https://obsolete.example", Parsed["action_parameters"][Retired])
+		AssertEqual("https://changed.example", Parsed["action_parameters"][Known])
+		AssertEqual("https://unjudged.example", Parsed["action_parameters"][Twin])
+		AssertEqual("https://keyboard.example", Parsed["action_parameters"]["keyboard__ctrl_k__open_url"])
+		AssertEqual("independent", Parsed["future"]["keep"])
+
+		FreshRows := []
+		for Entry in ConfigUnusedKeysFind(Path)["keys"] {
+			if Entry["section"] == "action_parameters" && Entry["key"] == Retired
+				FreshRows.Push(Entry)
+		}
+		AssertEqual("removed", ConfigUnusedKeysRemove(Path, FreshRows, "20990101-000176")["status"])
+		AfterCleanup := ConfigTomlDecodeSnapshot(FSReadUtf8Exact(Path)).Document
+		AssertFalse(AfterCleanup["action_parameters"].Has(Retired), "only explicit cleanup removes retirement")
+		AssertEqual("https://changed.example", AfterCleanup["action_parameters"][Known])
+		AssertEqual("https://unjudged.example", AfterCleanup["action_parameters"][Twin])
+	} finally {
+		_ConfigBootRejectedOverrides := PreviousRejected
+		_ConfigFullSaveCoordinator(Coordinator)
+		_CFGFS_RestoreRuntime(Runtime)
+		GestureActionParameters := PreviousParameters
+		GestureAssignments := PreviousAssignments
+		_IniCache := PreviousCache
+		DirDelete(Dir, true)
+	}
+}
+Test("config: retired gesture source survives native reload, ordinary edit and full save until explicit cleanup (gesture-binding-identity-preservation)",
+	_CUK_RetiredGestureBindingsPreserveWholeSource)
+
+; Case twins survive canonicalization; count and uniqueness remain assertions.
+_CUK_CanonicalIdentityControls() {
+	Upper := Map("section", "Layout", "key", "stale", "kind", "section")
+	Lower := Map("section", "layout", "key", "stale", "kind", "section")
+	_CUK_AssertIds("layout.stale=section|Layout.stale=section", [Upper, Lower])
+	_CUK_AssertIds("layout.stale=section|Layout.stale=section", [Lower, Upper])
+	AssertEqual(2, _CUK_CanonicalIds(["Layout.stale=section", "layout.stale=section"]).Length,
+		"a case twin is a distinct source identity")
+	AssertThrows(_CUK_CanonicalIds.Bind(["layout.stale=section", "layout.stale=section"]),
+		"canonicalization must refuse duplicates instead of hiding them")
+	AssertThrows(_CUK_AssertIds.Bind("layout.stale=section", []),
+		"an empty actual preview cannot satisfy a nonempty independent expectation")
+	AssertThrows(_CUK_AssertIds.Bind("layout.stale=section", [Upper]),
+		"a case near-miss cannot satisfy the expectation")
+	AssertThrows(_CUK_AssertIds.Bind("layout.stale=section|Layout.stale=section", [Lower, Lower]),
+		"the right row count cannot conceal a duplicate and missing case twin")
+	AssertEqual(ObjPtr(Upper), ObjPtr(_CUK_RequireId([Lower, Upper], "Layout.stale=section")),
+		"marker checks select the unique semantic source identity")
+	AssertThrows(_CUK_RequireId.Bind([], "Layout.stale=section"),
+		"a marker lookup must refuse an absent identity")
+	AssertThrows(_CUK_RequireId.Bind([Upper, Upper], "Layout.stale=section"),
+		"a marker lookup must refuse ambiguous duplicates")
+}
+Test("config cleanup fixture: canonical identities keep case twins and reject missing or duplicate rows "
+	. "(config-unused-keys-identity-controls)", _CUK_CanonicalIdentityControls)
+
+
+_CUK_RetiredScriptBindingsPreserveWholeSource() {
+	_GSBP_WithPublication(_CUK_RetiredScriptBindingsPreserveWholeSourceBody)
+}
+_CUK_RetiredScriptBindingsPreserveWholeSourceBody() {
+	global ConfigurationFile, GestureActionParameters, GestureAssignments, _IniCache, _ConfigBootRejectedOverrides
+	Runtime := _CFGFS_CaptureRuntime()
+	Coordinator := _ConfigFullSaveCoordinator()
+	PreviousParameters := GestureActionParameters
+	PreviousAssignments := GestureAssignments.Clone()
+	PreviousCache := _IniCache
+	PreviousRejected := _ConfigBootRejectedOverrides
+	Dir := _CUK_NewDir()
+	Known := "script__script_altgr_enter__open_url"
+	Twin := "Script__script_altgr_enter__open_url"
+	Retired := "script__removed_script_slot__open_url"
+	ParameterSource := "[action_parameters]`n"
+		. Retired . ' = "https://obsolete.example" # explicit cleanup owns this row' . "`n"
+		. Known . ' = "https://known.example"' . "`n"
+		. Twin . ' = "https://unjudged.example"' . "`n"
+		. 'keyboard__ctrl_k__open_url = "https://keyboard.example"' . "`n"
+	Source := "# independent user comment`n" . ParameterSource
+		. "`n[future]`nkeep = " . Chr(34) . "independent" . Chr(34) . "`n"
+		. "`n[layout]`nergopti_base = true`n"
+	try {
+		Path := Dir . "\config.toml"
+		_CFGFS_Prepare(Path)
+		_ConfigBootRejectedOverrides := 0
+		AssertTrue(FSWriteDurable(Path, Source))
+		Target := ManifestBuildFeaturesMap()
+		ApplyConfigToml(Target, Path, &Rejected)
+		AssertEqual(0, Rejected, "known retirement is never a schema/native rejection")
+		_IniCache := ParseConfigTomlFile(Path)
+		GesturesReadConfig()
+		AssertEqual("On", GestureActionParameters.CaseSense)
+		AssertFalse(GestureActionParameters.Has(Retired))
+		AssertEqual("https://known.example", GestureGetActionParameter("script__script_altgr_enter", "open_url"))
+		AssertEqual("https://unjudged.example", GestureActionParameters[Twin])
+		AssertEqual(3, GestureActionParameters.Count, "both case twins and the other owner remain independent")
+		AssertFalse(TomlConfigReportRetiredGestureParameter(Path, Retired), "actual boot and direct reload share one report identity")
+		AssertEqual(Source, FSReadUtf8Exact(Path), "admission does not rewrite the source")
+		AssertTrue(TomlConfigReportRetiredGestureParameter(Path, "script__another_retired_slot__open_url"), "each retired script key has a separate warning identity")
+		Scan := ConfigUnusedKeysFind(Path)
+		RetiredRows := []
+		for Entry in Scan["keys"] {
+			if Entry["section"] == "action_parameters" && Entry["key"] == Retired
+				RetiredRows.Push(Entry)
+		}
+		AssertEqual(1, RetiredRows.Length, "the ignored known-retired row is offered exactly once")
+
+		; The preserved unjudged prefix cannot activate a canonical gesture.
+		OtherPath := Dir . "\unjudged-only.toml"
+		UpperOnlySource := StrReplace(Source, Known . ' = "https://known.example"' . "`n", "", true)
+		AssertTrue(FSWriteDurable(OtherPath, UpperOnlySource))
+		ConfigurationFile := OtherPath
+		_IniCache := ParseConfigTomlFile(OtherPath)
+		GesturesReadConfig()
+		AssertEqual("", GestureGetActionParameter("script__script_altgr_enter", "open_url"))
+		AssertEqual("https://unjudged.example", GestureActionParameters[Twin])
+		AssertEqual("On", GestureActionParameters.Clone().CaseSense)
+		AssertEqual(UpperOnlySource, FSReadUtf8Exact(OtherPath))
+		ConfigurationFile := Path
+		_IniCache := ParseConfigTomlFile(Path)
+		GesturesReadConfig()
+		AssertTrue(GestureSetActionParameter("script__script_altgr_enter", "open_url", "https://changed.example"))
+		AssertEqual("On", GestureActionParameters.CaseSense)
+		AssertEqual("https://changed.example", GestureActionParameters[Known])
+		AssertEqual("https://unjudged.example", GestureActionParameters[Twin])
+		BeforeRefusal := FSReadUtf8Exact(Path)
+		AssertFalse(GestureSetActionParameter("script__removed_script_slot", "open_url", "https://must-not-publish.example"))
+		AssertEqual(BeforeRefusal, FSReadUtf8Exact(Path), "ordinary refusal preserves exact persisted bytes")
+		AssertEqual(CONFIG_SAVE_OK, SaveFullConfig(0, (*) => true, true, 0,
+			() => [{ Section: "layout", Key: "ergopti_base", Value: false }]))
+		Saved := FSReadUtf8Exact(Path)
+		AssertContains(Saved, Retired . ' = "https://obsolete.example" # explicit cleanup owns this row')
+		AssertContains(Saved, "# independent user comment")
+		Parsed := ConfigTomlDecodeSnapshot(Saved).Document
+		AssertEqual(4, Parsed["action_parameters"].Count, "complete handwritten preserved parameter model")
+		AssertEqual("https://obsolete.example", Parsed["action_parameters"][Retired])
+		AssertEqual("https://changed.example", Parsed["action_parameters"][Known])
+		AssertEqual("https://unjudged.example", Parsed["action_parameters"][Twin])
+		AssertEqual("https://keyboard.example", Parsed["action_parameters"]["keyboard__ctrl_k__open_url"])
+		AssertEqual("independent", Parsed["future"]["keep"])
+
+		FreshRows := []
+		for Entry in ConfigUnusedKeysFind(Path)["keys"] {
+			if Entry["section"] == "action_parameters" && Entry["key"] == Retired
+				FreshRows.Push(Entry)
+		}
+		AssertEqual("removed", ConfigUnusedKeysRemove(Path, FreshRows, "20990101-000276")["status"])
+		AfterCleanup := ConfigTomlDecodeSnapshot(FSReadUtf8Exact(Path)).Document
+		AssertFalse(AfterCleanup["action_parameters"].Has(Retired), "only explicit cleanup removes retirement")
+		AssertEqual("https://changed.example", AfterCleanup["action_parameters"][Known])
+		AssertEqual("https://unjudged.example", AfterCleanup["action_parameters"][Twin])
+	} finally {
+		_ConfigBootRejectedOverrides := PreviousRejected
+		_ConfigFullSaveCoordinator(Coordinator)
+		_CFGFS_RestoreRuntime(Runtime)
+		GestureActionParameters := PreviousParameters
+		GestureAssignments := PreviousAssignments
+		_IniCache := PreviousCache
+		DirDelete(Dir, true)
+	}
+}
+Test("config: retired script parameters survive actual reload, edit and full save until cleanup (script-binding-identity)",
+	_CUK_RetiredScriptBindingsPreserveWholeSource)
+
+_CUK_RetiredScriptBindingOwnership() {
+	_GSBP_WithPublication(_CUK_RetiredScriptBindingOwnershipBody)
+}
+_CUK_RetiredScriptBindingOwnershipBody() {
+	Target := ManifestBuildFeaturesMap()
+	Owner := ""
+	AssertEqual("section", TomlConfigUnknownKind(Target, "action_parameters", "script__removed_script_slot__open_url", &Owner))
+	AssertEqual("", Owner, "obsolete script parameters stay unread")
+	AssertEqual("retired", TomlConfigActionParameterBindingStatus("script__removed_script_slot__open_url"))
+	for Slot in ["script_altgr_enter", "script_altgr_backspace", "script_altgr_delete", "script_altgr_escape"] {
+		Key := GestureBindingId("script", Slot) . "__open_url"
+		AssertEqual("current", TomlConfigActionParameterBindingStatus(Key), Slot)
+		AssertEqual("", TomlConfigUnknownKind(Target, "action_parameters", Key, &Owner), Slot)
+		AssertEqual("Gestures", Owner, Slot)
+	}
+	AssertEqual("unjudged", TomlConfigActionParameterBindingStatus("Script__script_altgr_enter__open_url"))
+	AssertEqual("unjudged", TomlConfigActionParameterBindingStatus("keyboard__removed_slot__open_url"))
+}
+Test("config: script boot and cleanup consume the same complete published domain (script-binding-identity)",
+	_CUK_RetiredScriptBindingOwnership)
+
+_CUK_RetiredTapBindingsPreserveWholeSource() {
+	_GTKP_WithPublication(_CUK_RetiredTapBindingsPreserveWholeSourceBody)
+}
+_CUK_RetiredTapBindingsPreserveWholeSourceBody() {
+	global ConfigurationFile, GestureActionParameters, GestureAssignments, _IniCache, _ConfigBootRejectedOverrides
+	Runtime := _CFGFS_CaptureRuntime()
+	Coordinator := _ConfigFullSaveCoordinator()
+	PreviousParameters := GestureActionParameters
+	PreviousAssignments := GestureAssignments.Clone()
+	PreviousCache := _IniCache
+	PreviousRejected := _ConfigBootRejectedOverrides
+	Dir := _CUK_NewDir()
+	Known := "tap_key__number_row_left__open_url"
+	Twin := "Tap_key__number_row_left__open_url"
+	Retired := "tap_key__removed_tap_key__open_url"
+	ParameterSource := "[action_parameters]`n"
+		. Retired . ' = "https://obsolete.example" # explicit cleanup owns this row' . "`n"
+		. Known . ' = "https://known.example"' . "`n"
+		. Twin . ' = "https://unjudged.example"' . "`n"
+		. 'keyboard__ctrl_k__open_url = "https://keyboard.example"' . "`n"
+	Source := "# independent user comment`n" . ParameterSource
+		. "`n[future]`nkeep = " . Chr(34) . "independent" . Chr(34) . "`n"
+		. "`n[layout]`nergopti_base = true`n"
+	try {
+		Path := Dir . "\config.toml"
+		_CFGFS_Prepare(Path)
+		_ConfigBootRejectedOverrides := 0
+		AssertTrue(FSWriteDurable(Path, Source))
+		Target := ManifestBuildFeaturesMap()
+		ApplyConfigToml(Target, Path, &Rejected)
+		AssertEqual(0, Rejected, "known retirement is never a schema/native rejection")
+		_IniCache := ParseConfigTomlFile(Path)
+		GesturesReadConfig()
+		AssertEqual("On", GestureActionParameters.CaseSense)
+		AssertFalse(GestureActionParameters.Has(Retired))
+		AssertEqual("https://known.example", GestureGetActionParameter("tap_key__number_row_left", "open_url"))
+		AssertEqual("https://unjudged.example", GestureActionParameters[Twin])
+		AssertEqual(3, GestureActionParameters.Count, "both case twins and the other owner remain independent")
+		AssertFalse(TomlConfigReportRetiredGestureParameter(Path, Retired), "actual boot and direct reload share one report identity")
+		AssertEqual(Source, FSReadUtf8Exact(Path), "admission does not rewrite the source")
+		AssertTrue(TomlConfigReportRetiredGestureParameter(Path, "tap_key__another_retired_slot__open_url"), "each retired tap key has a separate warning identity")
+		Scan := ConfigUnusedKeysFind(Path)
+		RetiredRows := []
+		for Entry in Scan["keys"] {
+			if Entry["section"] == "action_parameters" && Entry["key"] == Retired
+				RetiredRows.Push(Entry)
+		}
+		AssertEqual(1, RetiredRows.Length, "the ignored known-retired row is offered exactly once")
+
+		; The preserved unjudged prefix cannot activate a canonical gesture.
+		OtherPath := Dir . "\unjudged-only.toml"
+		UpperOnlySource := StrReplace(Source, Known . ' = "https://known.example"' . "`n", "", true)
+		AssertTrue(FSWriteDurable(OtherPath, UpperOnlySource))
+		ConfigurationFile := OtherPath
+		_IniCache := ParseConfigTomlFile(OtherPath)
+		GesturesReadConfig()
+		AssertEqual("", GestureGetActionParameter("tap_key__number_row_left", "open_url"))
+		AssertEqual("https://unjudged.example", GestureActionParameters[Twin])
+		AssertEqual("On", GestureActionParameters.Clone().CaseSense)
+		AssertEqual(UpperOnlySource, FSReadUtf8Exact(OtherPath))
+		ConfigurationFile := Path
+		_IniCache := ParseConfigTomlFile(Path)
+		GesturesReadConfig()
+		AssertTrue(GestureSetActionParameter("tap_key__number_row_left", "open_url", "https://changed.example"))
+		AssertEqual("On", GestureActionParameters.CaseSense)
+		AssertEqual("https://changed.example", GestureActionParameters[Known])
+		AssertEqual("https://unjudged.example", GestureActionParameters[Twin])
+		BeforeRefusal := FSReadUtf8Exact(Path)
+		AssertFalse(GestureSetActionParameter("tap_key__removed_tap_key", "open_url", "https://must-not-publish.example"))
+		AssertEqual(BeforeRefusal, FSReadUtf8Exact(Path), "ordinary refusal preserves exact persisted bytes")
+		AssertEqual(CONFIG_SAVE_OK, SaveFullConfig(0, (*) => true, true, 0,
+			() => [{ Section: "layout", Key: "ergopti_base", Value: false }]))
+		Saved := FSReadUtf8Exact(Path)
+		AssertContains(Saved, Retired . ' = "https://obsolete.example" # explicit cleanup owns this row')
+		AssertContains(Saved, "# independent user comment")
+		Parsed := ConfigTomlDecodeSnapshot(Saved).Document
+		AssertEqual(4, Parsed["action_parameters"].Count, "complete handwritten preserved parameter model")
+		AssertEqual("https://obsolete.example", Parsed["action_parameters"][Retired])
+		AssertEqual("https://changed.example", Parsed["action_parameters"][Known])
+		AssertEqual("https://unjudged.example", Parsed["action_parameters"][Twin])
+		AssertEqual("https://keyboard.example", Parsed["action_parameters"]["keyboard__ctrl_k__open_url"])
+		AssertEqual("independent", Parsed["future"]["keep"])
+
+		FreshRows := []
+		for Entry in ConfigUnusedKeysFind(Path)["keys"] {
+			if Entry["section"] == "action_parameters" && Entry["key"] == Retired
+				FreshRows.Push(Entry)
+		}
+		AssertEqual("removed", ConfigUnusedKeysRemove(Path, FreshRows, "20990101-000276")["status"])
+		AfterCleanup := ConfigTomlDecodeSnapshot(FSReadUtf8Exact(Path)).Document
+		AssertFalse(AfterCleanup["action_parameters"].Has(Retired), "only explicit cleanup removes retirement")
+		AssertEqual("https://changed.example", AfterCleanup["action_parameters"][Known])
+		AssertEqual("https://unjudged.example", AfterCleanup["action_parameters"][Twin])
+	} finally {
+		_ConfigBootRejectedOverrides := PreviousRejected
+		_ConfigFullSaveCoordinator(Coordinator)
+		_CFGFS_RestoreRuntime(Runtime)
+		GestureActionParameters := PreviousParameters
+		GestureAssignments := PreviousAssignments
+		_IniCache := PreviousCache
+		DirDelete(Dir, true)
+	}
+}
+Test("config: retired tap parameters survive actual reload, edit and full save until cleanup (tap-binding-identity)",
+	_CUK_RetiredTapBindingsPreserveWholeSource)
+
+_CUK_RetiredTapBindingOwnership() {
+	_GTKP_WithPublication(_CUK_RetiredTapBindingOwnershipBody)
+}
+_CUK_RetiredTapBindingOwnershipBody() {
+	Target := ManifestBuildFeaturesMap()
+	Owner := ""
+	AssertEqual("section", TomlConfigUnknownKind(Target, "action_parameters", "tap_key__removed_tap_key__open_url", &Owner))
+	AssertEqual("", Owner, "obsolete script parameters stay unread")
+	AssertEqual("retired", TomlConfigActionParameterBindingStatus("tap_key__removed_tap_key__open_url"))
+	global TAP_KEY_ORDER
+	for Slot in TAP_KEY_ORDER {
+		Key := GestureBindingId("tap_key", Slot) . "__open_url"
+		AssertEqual("current", TomlConfigActionParameterBindingStatus(Key), Slot)
+		AssertEqual("", TomlConfigUnknownKind(Target, "action_parameters", Key, &Owner), Slot)
+		AssertEqual("Gestures", Owner, Slot)
+	}
+	AssertEqual("unjudged", TomlConfigActionParameterBindingStatus("Tap_key__number_row_left__open_url"))
+	AssertEqual("unjudged", TomlConfigActionParameterBindingStatus("keyboard__removed_slot__open_url"))
+}
+Test("config: tap boot and cleanup consume the same complete published domain (tap-binding-identity)",
+	_CUK_RetiredTapBindingOwnership)
+
+_CUK_RetiredTapWarningReason() {
+	Dir := _CUK_NewDir()
+	Lines := []
+	LoggerSetTestSink((Line) => Lines.Push(Line))
+	try {
+		Path := Dir . "\config.toml"
+		Key := "tap_key__removed_tap_key__open_url"
+		Source := '[action_parameters]`n' . Key . ' = "https://obsolete.example"`n'
+		AssertTrue(FSWriteDurable(Path, Source))
+		AssertTrue(TomlConfigReportRetiredGestureParameter(Path, Key))
+		AssertFalse(TomlConfigReportRetiredGestureParameter(Path, Key), "boot and reload share the same tap warning identity")
+		Warnings := 0, Errors := 0
+		for Line in Lines {
+			if InStr(Line, "[ERROR]")
+				Errors += 1
+			if InStr(Line, "[WARNING]") && InStr(Line, "[TomlConfigLoader]") && InStr(Line, Key) {
+				Warnings += 1
+				AssertTrue(InStr(Line, ConfigBindingIdentityTapRetiredReason()) > 0, "the actual native logger names the tap-key domain")
+				AssertFalse(InStr(Line, "no gesture slot of this build has this name") > 0)
+				AssertTrue(InStr(Line, "explicit cleanup") > 0)
+			}
+		}
+		AssertEqual(1, Warnings, "the actual warning route must execute exactly once")
+		AssertEqual(0, Errors)
+		AssertEqual(Source, FSReadUtf8Exact(Path), "warning policy never edits the retired source")
+	} finally {
+		LoggerClearTestSink()
+		DirDelete(Dir, true)
+	}
+}
+Test("config: retired tap warnings name the actual number-row domain (tap-binding-identity-warning)",
+	_CUK_RetiredTapWarningReason)

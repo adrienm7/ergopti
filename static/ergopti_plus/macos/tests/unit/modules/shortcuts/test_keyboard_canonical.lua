@@ -213,3 +213,5 @@ helpers.describe("keyboard scope candidate admission", function()
 		end)
 	end)
 end)
+
+require("test.keyboard_native_publication_contract").register(helpers, "macos")

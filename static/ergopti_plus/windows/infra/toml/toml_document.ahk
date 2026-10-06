@@ -20,12 +20,21 @@ _TOML_DocumentTable() {
 
 ; One lexical owner serves physical records and nested value containers. Only
 ; an unquoted top-level separator ends a token; comments never acquire ownership.
-_TOML_DocumentToken(Text, &Position, Separator, &Separated := 0, StopAfterContainer := false) {
+_TOML_DocumentToken(Text, &Position, Separator, &Separated := 0, &SpanStart := 0, &SpanEnd := 0, StopAfterContainer := false) {
 	Separated := false
+	SpanStart := 0, SpanEnd := 0
 	Result := "", Quote := "", Closers := [], Length := StrLen(Text)
 	while Position <= Length {
 		Char := SubStr(Text, Position, 1)
 		Triple := SubStr(Text, Position, 3)
+		; Report original token offsets without changing the decoded token. Quote
+		; contents own whitespace; comments and outside trivia never own its span.
+		if Quote != "" || (Char != "#" && !InStr(" `t`r`n", Char)
+				&& (Char != Separator || Closers.Length)) {
+			if !SpanStart
+				SpanStart := Position
+			SpanEnd := Position
+		}
 		if Quote != "" {
 			if StrLen(Quote) == 3 && Triple == Quote {
 				Run := 3
@@ -33,12 +42,14 @@ _TOML_DocumentToken(Text, &Position, Separator, &Separated := 0, StopAfterContai
 					Run += 1
 				if Run > 5
 					throw ValueError("Invalid TOML multiline string closure")
+				SpanEnd := Position + Run - 1
 				Result .= SubStr(Text, Position, Run)
 				Position += Run
 				Quote := ""
 				continue
 			}
 			if SubStr(Quote, 1, 1) == Chr(34) && Char == "\" {
+				SpanEnd := Position + 1
 				Result .= SubStr(Text, Position, 2)
 				Position += 2
 				continue
@@ -54,6 +65,7 @@ _TOML_DocumentToken(Text, &Position, Separator, &Separated := 0, StopAfterContai
 		} else if (Triple == Chr(34) . Chr(34) . Chr(34))
 				|| (Triple == Chr(39) . Chr(39) . Chr(39)) {
 			Quote := Triple
+			SpanEnd := Position + 2
 			Result .= Triple
 			Position += 3
 			continue
@@ -115,6 +127,24 @@ _TOML_DocumentMultilineBody(Raw) {
 	return TOML_UnescapeBasicStringContents(Result)
 }
 
+; Only the semantic inline-table reader uses this canonical strict delegation.
+; Keep the generic inline-table splitter unchanged for all existing callers.
+_TOML_DocumentSplit(Body, Separator := ",", Strict := true) {
+	Parts := [], Position := 1
+	while Position <= StrLen(Body) {
+		Token := _TOML_DocumentToken(Body, &Position, Separator, &Separated)
+		if Token == "" {
+			if Separated || Parts.Length
+				throw ValueError("Empty TOML inline table member")
+			break
+		}
+		Parts.Push(Token)
+		if Separated && Trim(SubStr(Body, Position), " " . Chr(9) . Chr(13) . Chr(10)) == ""
+			throw ValueError("Empty TOML inline table member")
+	}
+	return Parts
+}
+
 ; Native Boolean intent stays typed; bare legacy strings keep the old scalar
 ; contract rather than turning an unknown setting into a whole-file refusal.
 _TOML_DocumentValue(Raw) {
@@ -123,7 +153,7 @@ _TOML_DocumentValue(Raw) {
 			|| SubStr(Raw, 1, 3) == Chr(39) . Chr(39) . Chr(39)
 		return _TOML_DocumentMultilineBody(Raw)
 	if SubStr(Raw, 1, 1) == "{"
-		return TOML_ParseInlineTable(Raw, _TOML_DocumentValue)
+		return TOML_ParseInlineTable(Raw, _TOML_DocumentValue, _TOML_DocumentSplit)
 	if SubStr(Raw, 1, 1) == "[" {
 		if SubStr(Raw, -1) != "]"
 			throw ValueError("Unterminated TOML array")
@@ -516,6 +546,408 @@ _TOML_RetainForeignRecords(Source, Candidate, Updates, Prefixes) {
 	return Chr(0xFEFF) . Content
 }
 
+
+; Configuration saves have semantic destinations; generic data-file callers keep
+; their existing flat writer. Only explicit updates and replacement prefixes own
+; source values, so future namespaces and table-array generations stay physical.
+_TOML_ConfigPath(Section, Key := unset) {
+	Parts := Section == "" ? [] : TOML_ParseKeyPath(Section, true)
+	if IsSet(Key) {
+		if !(Key is String)
+			throw TypeError("Configuration update keys must be strings")
+		Parts.Push(Key)
+	}
+	return Parts
+}
+
+_TOML_ConfigPathName(Parts) {
+	Name := ""
+	for Index, Part in Parts
+		Name .= (Index == 1 ? "" : ".") . TOML_RenderKey(Part)
+	return Name
+}
+
+_TOML_ConfigPathUnder(Parts, Prefix) {
+	if Parts.Length < Prefix.Length
+		return false
+	for Index, Part in Prefix {
+		if StrCompare(Parts[Index], Part, true) != 0
+			return false
+	}
+	return true
+}
+
+_TOML_ConfigPathDropped(Parts, Prefixes) {
+	for Prefix in Prefixes {
+		if _TOML_ConfigPathUnder(Parts, Prefix)
+			return true
+	}
+	return false
+}
+
+; Ordinary writes cannot turn a retired scalar or array into a new namespace.
+; Deletion is explicit ownership; absent deletion never manufactures a table.
+_TOML_ConfigSet(Document, Parts, Update) {
+	Deleting := Update.HasOwnProp("Delete") && Update.Delete == 1
+	if Update.HasOwnProp("Delete") && (!(Update.Delete is Integer)
+			|| (Update.Delete != 0 && Update.Delete != 1))
+		throw TypeError("Delete must be the Integer 0 or 1")
+	Node := Document
+	loop Parts.Length - 1 {
+		Key := Parts[A_Index]
+		if !Node.Has(Key) {
+			if Deleting
+				return
+			Node[Key] := _TOML_DocumentTable()
+		}
+		if !(Node[Key] is Map)
+			throw ValueError("Configuration update collides with a retained scalar or array")
+		Node := Node[Key]
+	}
+	Key := Parts[Parts.Length]
+	if Deleting {
+		if Node.Has(Key)
+			Node.Delete(Key)
+		return
+	}
+	Value := _TOML_DocumentValue(TOML_RenderValue(Update.Value))
+	if Node.Has(Key) && ((Node[Key] is Map) != (Value is Map)
+			|| (Node[Key] is Array) != (Value is Array))
+		throw ValueError("Configuration update cannot replace a retained value container")
+	Node[Key] := Value
+}
+
+; A changed descendant does not own a containing inline assignment. Its source
+; spans come from the existing strict lexical owner, not a second key grammar.
+_TOML_ConfigInlineNewRows(Value, Parts, Covered, Rows) {
+	Descendants := false
+	for Prefix in Covered {
+		if _TOML_ConfigPathUnder(Parts, Prefix)
+			return
+		if _TOML_ConfigPathUnder(Prefix, Parts)
+			Descendants := true
+	}
+	if Value is Map && (!Parts.Length || Descendants) {
+		; Deleting the last dotted member still retains its sealed inline parent.
+		if Parts.Length && !Value.Count {
+			Rows.Push(_TOML_ConfigPathName(Parts) . " = " . TOML_RenderValue(Value))
+			return
+		}
+		for Key, Child in Value {
+			ChildParts := Parts.Clone()
+			ChildParts.Push(Key)
+			_TOML_ConfigInlineNewRows(Child, ChildParts, Covered, Rows)
+		}
+	} else
+		Rows.Push(_TOML_ConfigPathName(Parts) . " = " . TOML_RenderValue(Value))
+}
+
+_TOML_ConfigInlineValue(Raw, Before, After, Path, Owned) {
+	if TOML_SameValue(Before, After)
+		return Raw
+	Position := 1
+	Token := _TOML_DocumentToken(Raw, &Position, "", , &SpanStart, &SpanEnd)
+	if !SpanStart || !TOML_SameValue(_TOML_DocumentValue(Token), Before)
+		throw ValueError("An inline source span is not its exact typed member")
+	if !(Before is Map && After is Map) || Owned.Has(_TOML_ConfigPathName(Path))
+		return SubStr(Raw, 1, SpanStart - 1) . TOML_RenderValue(After) . SubStr(Raw, SpanEnd + 1)
+	if SubStr(Raw, SpanStart, 1) != "{" || SubStr(Raw, SpanEnd, 1) != "}"
+		throw ValueError("An inline container lost its physical braces")
+	Body := SubStr(Raw, SpanStart + 1, SpanEnd - SpanStart - 1)
+	Rows := [], Covered := [], Carry := "", ClosingTrivia := "", Position := 1
+	while Position <= StrLen(Body) {
+		Start := Position
+		Member := _TOML_DocumentToken(Body, &Position, ",", &Separated, , &MemberEnd)
+		Text := SubStr(Body, Start, Position - Start - (Separated ? 1 : 0))
+		if Member == "" {
+			if Separated
+				throw ValueError("An inline source has an empty member")
+			ClosingTrivia := Text
+			break
+		}
+		if !Separated {
+			ClosingTrivia := SubStr(Text, MemberEnd - Start + 2)
+			Text := SubStr(Text, 1, MemberEnd - Start + 1)
+		}
+		ValuePosition := 1
+		KeyText := _TOML_DocumentToken(Text, &ValuePosition, "=", &Assigned, &KeyStart)
+		if !Assigned
+			throw ValueError("An inline member has no exact assignment delimiter")
+		Parts := TOML_ParseKeyPath(KeyText, true)
+		Original := _TOML_DocumentLookup(Before, Parts)
+		Desired := _TOML_DocumentLookup(After, Parts)
+		if !Original["found"] || Original["blocked"] || Desired["blocked"]
+			throw ValueError("An inline member has no unique semantic destination")
+		Covered.Push(Parts)
+		ValueRaw := SubStr(Text, ValuePosition)
+		if !Desired["found"] {
+			TailPosition := 1
+			_TOML_DocumentToken(ValueRaw, &TailPosition, "", , , &ValueEnd)
+			Carry .= SubStr(Text, 1, KeyStart - 1) . SubStr(ValueRaw, ValueEnd + 1)
+			continue
+		}
+		ChildPath := Path.Clone()
+		for Part in Parts
+			ChildPath.Push(Part)
+		Rows.Push(Carry . SubStr(Text, 1, ValuePosition - 1)
+			. _TOML_ConfigInlineValue(ValueRaw, Original["value"], Desired["value"], ChildPath, Owned))
+		Carry := ""
+	}
+	NewRows := []
+	_TOML_ConfigInlineNewRows(After, [], Covered, NewRows)
+	Content := ""
+	for Index, Row in Rows
+		Content .= (Index == 1 ? "" : ",") . Row
+	for Row in NewRows {
+		Content .= (Content == "" ? "" : ", ") . Carry . Row
+		Carry := ""
+	}
+	Content .= Carry . ClosingTrivia
+	return SubStr(Raw, 1, SpanStart) . Content . SubStr(Raw, SpanEnd)
+}
+
+_TOML_ConfigInlineAssignment(Text, Record, Desired, Owned) {
+	Position := 1
+	_TOML_DocumentToken(Text, &Position, "=", &Assigned)
+	if !Assigned
+		throw ValueError("A configuration inline assignment lost its source delimiter")
+	return SubStr(Text, 1, Position - 1)
+		. _TOML_ConfigInlineValue(SubStr(Text, Position), Record.Value, Desired, Record.Path, Owned)
+}
+
+; Inline assignments own their complete existing container shape, including
+; empty members. Header ancestry alone does not confer that explicit ownership.
+_TOML_ConfigRetainedContainers(Value, Parts, Owners, Dropped) {
+	if !(Value is Map) || _TOML_ConfigPathDropped(Parts, Dropped)
+		return
+	Owners[_TOML_ConfigPathName(Parts)] := true
+	for Key, Child in Value {
+		ChildParts := Parts.Clone()
+		ChildParts.Push(Key)
+		_TOML_ConfigRetainedContainers(Child, ChildParts, Owners, Dropped)
+	}
+}
+
+; A removed leaf cannot leave an implicit table that has no physical declaration.
+; Preserve surviving source headers and inline containers instead of pruning
+; every empty map or changing the generic semantic setter's contract.
+_TOML_ConfigPruneDeletedAncestors(Expected, Deleted, Records, Physical, Dropped, Owned) {
+	if !Deleted.Length
+		return
+	Owners := Map()
+	Owners.CaseSense := "On"
+	for PhysicalRecord in Physical {
+		if PhysicalRecord.Kind != "header" || SubStr(Trim(PhysicalRecord.Text), 1, 2) == "[["
+			continue
+		Parts := _TOML_ConfigPath(PhysicalRecord.Section)
+		if !_TOML_ConfigPathDropped(Parts, Dropped)
+			Owners[_TOML_ConfigPathName(Parts)] := true
+	}
+	for Record in Records
+		_TOML_ConfigRetainedContainers(Record.Value, Record.Path, Owners, Dropped)
+	for Name, Parts in Owned {
+		Desired := _TOML_DocumentLookup(Expected, Parts)
+		if Desired["found"]
+			_TOML_ConfigRetainedContainers(Desired["value"], Parts, Owners, [])
+	}
+	for DeletedParts in Deleted {
+		Parts := DeletedParts.Clone()
+		Parts.Pop()
+		while Parts.Length {
+			Existing := _TOML_DocumentLookup(Expected, Parts)
+			if Existing["blocked"]
+				break
+			if Existing["found"] {
+				if !(Existing["value"] is Map) || Existing["value"].Count
+						|| Owners.Has(_TOML_ConfigPathName(Parts))
+					break
+				_TOML_ConfigSet(Expected, Parts, { Delete: 1 })
+			}
+			Parts.Pop()
+		}
+	}
+}
+
+/**
+ * Renders explicit configuration effects against the complete semantic source.
+ * @param {String} Source Exact source image captured by the existing I/O owner.
+ * @param {Array} Updates Section paths and literal leaf keys, never flat aliases.
+ * @param {Array} Prefixes Explicitly replaced semantic namespaces.
+ * @returns {Map} Qualified complete content and unchanged-source acknowledgement.
+ */
+TOML_BuildConfigDocumentCandidate(Source, Updates, Prefixes) {
+	Document := TOML_ParseDocument(Source, &Records, &Physical)
+	Expected := TOML_ParseDocument(Source)
+	for PhysicalRecord in Physical {
+		if PhysicalRecord.Kind == "opaque"
+			throw ValueError("Cannot retain an unclassified configuration source record")
+	}
+	Dropped := [], Deleted := []
+	for Prefix in Prefixes {
+		Parts := _TOML_ConfigPath(Prefix)
+		if !Parts.Length
+			throw ValueError("A configuration namespace replacement cannot own the root")
+		Dropped.Push(Parts)
+		Deleted.Push(Parts)
+		_TOML_ConfigSet(Expected, Parts, { Delete: 1 })
+	}
+	Owned := Map()
+	Owned.CaseSense := "On"
+	for Update in Updates {
+		Parts := _TOML_ConfigPath(Update.Section, Update.Key)
+		_TOML_ConfigSet(Expected, Parts, Update)
+		if Update.HasOwnProp("Delete") && Update.Delete == 1
+			Deleted.Push(Parts)
+		Owned[_TOML_ConfigPathName(Parts)] := Parts
+	}
+	_TOML_ConfigPruneDeletedAncestors(Expected, Deleted, Records, Physical, Dropped, Owned)
+	if TOML_SameValue(Document, Expected)
+		return Map("content", Source, "preserve_source", true)
+
+	; Find the deepest surviving explicit table for each newly introduced leaf.
+	; Appending a root dotted row after a header would silently change its owner.
+	Headers := [], RecordIndex := 0, HeaderSource := ""
+	for PhysicalRecord in Physical {
+		if PhysicalRecord.Kind == "opaque"
+			throw ValueError("Cannot retain an unclassified configuration source record")
+		if PhysicalRecord.Kind == "header" {
+			Parts := _TOML_ConfigPath(PhysicalRecord.Section)
+			if _TOML_ConfigPathDropped(Parts, Dropped)
+				continue
+			if SubStr(Trim(PhysicalRecord.Text), 1, 2) != "[["
+					&& !_ConfigTomlArrayMember(Document, Parts)
+				Headers.Push(Parts)
+		} else if PhysicalRecord.Kind == "assignment" {
+			RecordIndex += 1
+			if _TOML_ConfigPathDropped(Records[RecordIndex].Path, Dropped)
+				continue
+		}
+		if HeaderSource != "" && !RegExMatch(HeaderSource, "[\r\n]$")
+			HeaderSource .= "`n"
+		HeaderSource .= PhysicalRecord.Text
+	}
+	Pending := Map()
+	Pending.CaseSense := "On"
+	NewTables := Map()
+	NewTables.CaseSense := "On"
+	HeaderAdmission := Map()
+	HeaderAdmission.CaseSense := "On"
+	for Name, Parts in Owned {
+		Desired := _TOML_DocumentLookup(Expected, Parts)
+		if !Desired["found"]
+			continue
+		Covered := false
+		for Record in Records {
+			if !_TOML_ConfigPathDropped(Record.Path, Dropped)
+					&& _TOML_ConfigPathUnder(Parts, Record.Path) {
+				Covered := true
+				break
+			}
+		}
+		if Covered
+			continue
+		SectionParts := []
+		loop Parts.Length - 1
+			SectionParts.Push(Parts[A_Index])
+		Identity := _TOML_ConfigPathName(SectionParts)
+		; New sections need explicit headers for the still-live native flat reader.
+		; The semantic parser decides whether that declaration is legal: existing
+		; dotted or inline namespaces may already have closed the requested table.
+		; Explicit replacements first release only their classified physical owners.
+		if SectionParts.Length && !HeaderAdmission.Has(Identity) {
+			HeaderAdmission[Identity] := false
+			try {
+				TOML_ParseDocument(HeaderSource . "`n[" . Identity . "]`n")
+				HeaderAdmission[Identity] := true
+			} catch ValueError {
+				; Existing physical ownership remains the only legal insertion route.
+			}
+		}
+		if SectionParts.Length && HeaderAdmission[Identity] {
+			if !NewTables.Has(Identity)
+				NewTables[Identity] := []
+			NewTables[Identity].Push(TOML_RenderKey(Parts[Parts.Length]) . " = "
+				. TOML_RenderValue(Desired["value"]) . "`n")
+			continue
+		}
+		Owner := []
+		for Header in Headers {
+			if Header.Length < Parts.Length && Header.Length > Owner.Length
+					&& _TOML_ConfigPathUnder(Parts, Header)
+				Owner := Header
+		}
+		Identity := _TOML_ConfigPathName(Owner)
+		if !Pending.Has(Identity)
+			Pending[Identity] := []
+		Relative := []
+		loop Parts.Length - Owner.Length
+			Relative.Push(Parts[Owner.Length + A_Index])
+		Pending[Identity].Push(_TOML_ConfigPathName(Relative) . " = "
+			. TOML_RenderValue(Desired["value"]) . "`n")
+	}
+	Content := "", Current := "", RecordIndex := 0
+	Append(Text) {
+		if Content != "" && !RegExMatch(Content, "[\r\n]$")
+			Content .= "`n"
+		Content .= Text
+	}
+	Flush(Identity) {
+		if !Pending.Has(Identity)
+			return
+		for Text in Pending[Identity]
+			Append(Text)
+		Pending.Delete(Identity)
+	}
+	for PhysicalRecord in Physical {
+		switch PhysicalRecord.Kind {
+			case "header":
+				Flush(Current)
+				Parts := _TOML_ConfigPath(PhysicalRecord.Section)
+				Current := _TOML_ConfigPathName(Parts)
+				if !_TOML_ConfigPathDropped(Parts, Dropped)
+					Append(PhysicalRecord.Text)
+			case "assignment":
+				RecordIndex += 1
+				Record := Records[RecordIndex]
+				if _TOML_ConfigPathDropped(Record.Path, Dropped)
+					continue
+				Desired := _TOML_DocumentLookup(Expected, Record.Path)
+				; Table-array members have no unique update destination. Their
+				; complete original generations are retained, never flattened.
+				if Desired["blocked"] {
+					Append(PhysicalRecord.Text)
+					continue
+				}
+				if !Desired["found"]
+					continue
+				if TOML_SameValue(Record.Value, Desired["value"])
+					Append(PhysicalRecord.Text)
+				else if Record.Value is Map && Desired["value"] is Map
+						&& !Owned.Has(_TOML_ConfigPathName(Record.Path))
+					Append(_TOML_ConfigInlineAssignment(PhysicalRecord.Text, Record, Desired["value"], Owned))
+				else {
+					Position := 1
+					KeyText := _TOML_DocumentToken(PhysicalRecord.Text, &Position, "=")
+					Append(KeyText . " = " . TOML_RenderValue(Desired["value"]) . "`n")
+				}
+			default:
+				Append(PhysicalRecord.Text)
+		}
+	}
+	Flush(Current)
+	for Identity, Entries in NewTables {
+		Append("[" . Identity . "]`n")
+		for Text in Entries
+			Append(Text)
+	}
+	if Pending.Count
+		throw ValueError("A configuration update lost its physical table owner")
+	Candidate := Chr(0xFEFF) . Content
+	if !TOML_SameValue(TOML_ParseDocument(Candidate), Expected)
+		throw ValueError("The physical configuration candidate differs from its requested semantic model")
+	return Map("content", Candidate, "preserve_source", false)
+}
+
 ; Foreign table arrays cannot lend their collapsed flat row to the writer.
 ; Only independently representable siblings may change; every array subtree
 ; and its lexical spans stay with the typed source owner.
@@ -686,7 +1118,7 @@ _TOML_InlineTableRewriteRecord(RecordText, Changes) {
 	InlineStart := InlinePosition
 	if SubStr(RecordText, InlineStart, 1) != "{"
 		throw ValueError("An inline edit requires a table container")
-	_TOML_DocumentToken(RecordText, &InlinePosition, Chr(0), , true)
+	_TOML_DocumentToken(RecordText, &InlinePosition, Chr(0), , , , true)
 	InlineFinish := InlinePosition - 1
 	InlineBody := SubStr(RecordText, InlineStart + 1, InlineFinish - InlineStart - 1)
 	MemberPosition := 1, Fragments := [], SeenMembers := Map()

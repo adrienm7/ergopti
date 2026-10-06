@@ -139,6 +139,98 @@ return function(helpers)
 				end
 			end)
 		end
+		-- Direct scope owners participate once alongside included native owners.
+		helpers.it("plans global's declared rows without acquiring included presets or settings", function()
+			local declarations = Manifest.scopes().global
+			local expected = {}
+			for _, entry in ipairs(Manifest.features()) do
+				for _, prefix in ipairs(declarations.prefixes or {}) do
+					if entry.path == prefix or entry.path:sub(1, #prefix + 1) == prefix .. "." then
+						expected[entry.path] = true
+					end
+				end
+			end
+			for _, mode in ipairs({ "recommended", "clear" }) do
+				local plan = Manifest.direct_scope_plan("global", mode, {})
+				helpers.assert_eq(plan.scope, "global")
+				helpers.assert_eq(plan.mode, mode)
+				helpers.assert_eq(plan.presets, {})
+				helpers.assert_eq(plan.operations, Manifest.direct_scope_operations("global", mode, {}))
+				local actual = {}
+				for _, operation in ipairs(plan.operations) do
+					local path = operation.section .. "." .. operation.key
+					helpers.assert_eq(expected[path], true, "included row escaped direct scope: " .. path)
+					actual[path] = true
+				end
+				helpers.assert_eq(actual, expected)
+				helpers.assert_eq(#Manifest.scope_plan("global", mode, {}).presets, 1)
+			end
+		end)
+		if type(Manifest.find_declared_entry_by_path) == "function" then
+			helpers.it("does not resolve an included native backend for direct planning", function()
+				local name = "modules.llm.backend_detector"
+				local previous, calls = package.loaded[name], 0
+				package.loaded[name] = { auto_default = function() calls = calls + 1; return "llama_cpp" end }
+				local ok, err = pcall(function()
+					local reader = assert(loadfile(helpers.driver_root() .. "infra/manifest_reader.lua"))()
+					reader.direct_scope_plan("global", "clear")
+					reader.direct_scope_operations("global", "recommended")
+					helpers.assert_eq(calls, 0, "direct script planning invoked the included AI owner")
+					reader.scope_plan("global", "clear")
+					helpers.assert_eq(calls, 1, "recursive planning must still resolve the included backend")
+				end)
+				package.loaded[name] = previous
+				if not ok then error(err) end
+			end)
+		end
+		helpers.it("retains only direct preset, exclusion, dynamic and parameter declarations", function()
+			local contract = require("config_defaults").new({
+				features = {
+					{ path = "own.keep", default = false, recommended = true },
+					{ path = "own.clear_keep", default = false, recommended = true },
+					{ path = "own.switch", default = true, recommended = true, cleared = false },
+					{ path = "child.value", default = false, recommended = true },
+				},
+				scopes = {
+					root = { prefixes = { "own" }, includes = { "child" }, preset = "own_file",
+						restore_exclude = { "own.keep" }, clear_exclude = { "own.clear_keep" },
+						dynamic_defaults = { { prefix = "own.dynamic", depth = 1, default = false, recommended = true } },
+						action_parameters = { restore = "remove", domains = { "script" } } },
+					child = { prefixes = { "child" }, preset = "child_file",
+						dynamic_defaults = { { prefix = "child.dynamic", depth = 1, default = false, recommended = true } },
+						action_parameters = { restore = "remove", domains = { "gesture" } } },
+				},
+			})
+			local paths = { "own.dynamic.actual", "child.dynamic.other", "action_parameters.script__reload__open_url",
+				"action_parameters.gesture__tap_4__open_url" }
+			for _, mode in ipairs({ "recommended", "clear" }) do
+				local plan = contract.direct_scope_plan("root", mode, paths, owners)
+				helpers.assert_eq(plan.presets, { { scope = "root", preset = "own_file", mode = mode } })
+				local rows = {}
+				for _, operation in ipairs(plan.operations) do rows[operation.section .. "." .. operation.key] = operation end
+				helpers.assert_eq(rows["child.value"], nil)
+				helpers.assert_eq(rows["child.dynamic.other"], nil)
+				helpers.assert_eq(rows["action_parameters.gesture__tap_4__open_url"], nil)
+				helpers.assert_eq(rows["action_parameters.script__reload__open_url"].delete, true)
+				helpers.assert_eq(rows["own.dynamic.actual"].delete, mode == "clear" and true or nil)
+				helpers.assert_eq(rows[mode == "recommended" and "own.keep" or "own.clear_keep"], nil)
+				if mode == "clear" then helpers.assert_eq(rows["own.switch"].value, false)
+				else helpers.assert_eq(rows["own.switch"].delete, true) end
+				plan.presets[1].preset = "foreign"
+				helpers.assert_eq(contract.direct_scope_plan("root", mode, paths, owners).presets[1].preset, "own_file")
+				helpers.assert_eq(#contract.scope_plan("root", mode, paths, owners).presets, 2)
+			end
+			helpers.assert_eq(pcall(contract.direct_scope_plan, "missing", "clear"), false)
+			helpers.assert_eq(pcall(contract.direct_scope_plan, "root", "foreign"), false)
+			helpers.assert_eq(pcall(contract.direct_scope_plan, "root", "clear", { "own.unknown" }, owners), false)
+		end)
+		helpers.it("does not traverse foreign cyclic or missing included declarations", function()
+			local contract = require("config_defaults").new({ features = {
+				{ path = "own.value", default = false, recommended = true },
+			}, scopes = { root = { prefixes = { "own" }, includes = { "root", "missing" } } } })
+			helpers.assert_eq(#contract.direct_scope_plan("root", "recommended").operations, 1)
+			helpers.assert_eq(pcall(contract.scope_plan, "root", "recommended"), false)
+		end)
 		helpers.it("routes separate-file presets for restore and clear without inventing config rows", function()
 			for _, mode in ipairs({ "recommended", "clear" }) do
 				local plan = Manifest.scope_plan("global", mode, {})

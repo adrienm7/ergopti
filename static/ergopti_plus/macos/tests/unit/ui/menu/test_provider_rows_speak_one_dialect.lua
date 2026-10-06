@@ -19,6 +19,83 @@
 
 local helpers = require("tests.helpers")
 
+
+--- Builds the actual packaged About provider over controlled native effect ports.
+--- Shared declarations, decoding, row rendering and update consent remain real.
+local function with_declared_about_provider(offer, body)
+	helpers.with_stub_scope({"infra.manifest_menu", "infra.i18n", "infra.paths", "infra.logger",
+		"ui.menu.menu_about", "modules.updater", "adapters.update_launcher", "ui.update_check",
+		"ui.menu.start_at_login", "ui.changelog"}, function()
+		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		local manifest = helpers.load_with_stubs("infra.manifest_menu")
+		local session = { offer = offer, opens = {}, requests = {} }
+		package.loaded["modules.updater"] = {
+			is_local_source = function() return false end,
+			installed_channel = function() return "dev" end,
+			build_identity = function() return {kind = "release", version = "0.0.0-dev.100", commit = "known"} end,
+			releases_page_url = function() return "https://example.invalid/releases" end,
+		}
+		package.loaded["adapters.update_launcher"] = {
+			request_check = function(channel) session.requests[#session.requests + 1] = channel; return true end,
+		}
+		package.loaded["ui.update_check"] = {open = function(opts) session.opens[#session.opens + 1] = opts; return true end}
+		package.loaded["ui.menu.start_at_login"] = {enabled = function() return false end}
+		package.loaded["ui.changelog"] = {open = function() error("A provider build must not open its changelog") end}
+		session.channel = "dev"
+		session.owner = {get = function() return session.channel end, set = function() return false end}
+		session.checks = {latest = function() return session.offer end, interval = function() return 86400 end,
+			set_interval = function() return false end}
+		session.refresh = function() end
+		session.manifest = manifest
+		session.translate = require("infra.i18n").get
+		local About = require("ui.menu.menu_about")
+		session.build = function()
+			return About.build({channel_owner = session.owner, update_checks = session.checks,
+				updateMenu = session.refresh}, {}).submenu
+		end
+		body(session)
+	end)
+end
+
+local function about_row_named(rows, title)
+	for _, row in ipairs(rows) do if row.title == title then return row end end
+end
+
+--- Retains the old visibility contract through actual shared caption materialization.
+local function declared_about_check_is_visible()
+	local visible = false
+	with_declared_about_provider(nil, function(session)
+		local declaration = session.manifest.get_root().about_source_menu
+		helpers.assert_eq(#declaration, 1)
+		helpers.assert_eq(declaration[1].type, "command")
+		helpers.assert_eq(declaration[1].id, "about_source_check")
+		helpers.assert_eq(declaration[1].i18n, "menu.about.check_for_updates")
+		local row = about_row_named(session.build(), session.translate(declaration[1].i18n))
+		visible = row ~= nil and type(row.fn) == "function" and row.disabled ~= true
+		if not visible then return end
+		row.fn()
+		helpers.assert_eq(#session.opens, 1)
+		helpers.assert_eq(#session.requests, 0)
+		helpers.assert_true(session.opens[1].checks == session.checks)
+		helpers.assert_true(session.opens[1].channel_owner == session.owner)
+		helpers.assert_true(session.opens[1].on_change == session.refresh)
+		session.offer = {tag = "v0.0.0-dev.150", channel = "dev"}
+		local offered
+		for _, candidate in ipairs(session.build()) do
+			if type(candidate.title) == "string" and candidate.title:find(session.offer.tag, 1, true)
+				and type(candidate.fn) == "function" then offered = candidate end
+		end
+		helpers.assert_not_nil(offered, "the actual offered-release row remains visible")
+		helpers.assert_eq(offered.fn(), true)
+		helpers.assert_eq(session.requests, {"dev"})
+		helpers.assert_eq(#session.opens, 1)
+		session.offer = nil
+		helpers.assert_eq(offered.fn(), false, "the same visible row retains the native stale-offer refusal")
+		helpers.assert_eq(session.requests, {"dev"})
+	end)
+	return visible
+end
+
 helpers.describe("provider rows speak the provider dialect (a driver-dialect row is dropped)", function()
 	-- Each entry: a declaration unique to the module, and the name of the array
 	-- its list provider returns. Selected by declaration rather than by path so
@@ -208,7 +285,7 @@ helpers.describe("provider rows speak the provider dialect (a driver-dialect row
 		helpers.assert_true(src:find("label = ver_display", 1, true) ~= nil,
 			"the version header must be a provider row (`label = ver_display`) — as `title` it is "
 			.. "dropped by the renderer and the submenu shows no version at all")
-		helpers.assert_true(src:find('label = i18n.get("menu.about.check_for_updates")', 1, true) ~= nil,
+		helpers.assert_true(declared_about_check_is_visible(),
 			"the Sparkle command must remain a visible provider row")
 		helpers.assert_true(src:find('require("ui.update_check").open(', 1, true) ~= nil,
 			"the visible check row must open the update-check window")
@@ -272,4 +349,44 @@ helpers.describe("provider rows speak the provider dialect (a driver-dialect row
 			end
 		end)
 	end)
+end)
+
+
+helpers.describe("About provider consumes its existing canonical caption declaration", function()
+	helpers.it("materializes an independently changed declared caption through the actual native renderer", function()
+		with_declared_about_provider(nil, function(session)
+			local root = session.manifest.get_root()
+			local previous = root.about_source_menu[1].i18n
+			root.about_source_menu[1].i18n = "common.restore_recommended"
+			local ok, detail = xpcall(function()
+				local row = about_row_named(session.build(), session.translate("common.restore_recommended"))
+				helpers.assert_not_nil(row)
+				row.fn()
+				helpers.assert_eq(#session.opens, 1)
+				helpers.assert_eq(#session.requests, 0)
+			end, debug.traceback)
+			root.about_source_menu[1].i18n = previous
+			if not ok then error(detail, 0) end
+		end)
+	end)
+	for _, offered in ipairs({false, true}) do
+		helpers.it("refuses a missing actual declaration instead of inventing a native check row (offer=" .. tostring(offered) .. ")", function()
+			with_declared_about_provider(offered and {tag = "v0.0.0-dev.150", channel = "dev"} or nil, function(session)
+				local root = session.manifest.get_root()
+				local previous = root.about_source_menu
+				root.about_source_menu = nil
+				local ok, detail = xpcall(function()
+					local rows = session.build()
+					helpers.assert_nil(about_row_named(rows, session.translate("menu.about.check_for_updates")))
+					for _, row in ipairs(rows) do
+						helpers.assert_true(type(row.title) ~= "string" or not row.title:find("v0.0.0-dev.150", 1, true))
+					end
+					helpers.assert_eq(#session.opens, 0)
+					helpers.assert_eq(#session.requests, 0)
+				end, debug.traceback)
+				root.about_source_menu = previous
+				if not ok then error(detail, 0) end
+			end)
+		end)
+	end
 end)

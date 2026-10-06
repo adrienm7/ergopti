@@ -1,0 +1,79 @@
+{
+	"frame": [
+		{
+			"type": "label",
+			"id": "heading",
+			"i18n": "menu.profiles.header_default_profiles"
+		},
+		{
+			"type": "list",
+			"id": "builtins"
+		},
+		{
+			"type": "include",
+			"section": "conditional",
+			"present_when": "custom_present"
+		},
+		{
+			"type": "include",
+			"section": "commands",
+			"row_id": "clone"
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "include",
+			"section": "commands",
+			"row_id": "create"
+		}
+	],
+	"conditional": [
+		{
+			"type": "---"
+		},
+		{
+			"type": "label",
+			"id": "custom",
+			"i18n": "menu.profiles.header_custom_profiles"
+		},
+		{
+			"type": "list",
+			"id": "customs"
+		}
+	],
+	"commands": [
+		{
+			"type": "command",
+			"id": "create",
+			"i18n": "menu.profiles.create_profile",
+			"disabled_when": ["ready"]
+		},
+		{
+			"type": "command",
+			"id": "clone",
+			"i18n": "menu.profiles.clone_builtin",
+			"disabled_when": ["ready"]
+		}
+	],
+	"_expected": {
+		"present": [
+			"menu.profiles.header_default_profiles",
+			"Builtin native",
+			"---",
+			"menu.profiles.header_custom_profiles",
+			"Custom native",
+			"menu.profiles.clone_builtin",
+			"---",
+			"menu.profiles.create_profile"
+		],
+		"absent": [
+			"menu.profiles.header_default_profiles",
+			"Builtin native",
+			"menu.profiles.clone_builtin",
+			"---",
+			"menu.profiles.create_profile"
+		],
+		"phases": ["builtins", "custom_present", "customs"]
+	}
+}

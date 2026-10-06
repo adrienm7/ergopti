@@ -1,0 +1,36 @@
+{
+	"systems": ["system1", "system2"],
+	"section": "agent_system_model_controls",
+	"row_id": "agent_system_model",
+	"label_key": "menu.agent.model",
+	"mutated_label_key": "menu.agent.model_missing",
+	"spec": "cerebras|hand/50%",
+	"model": "hand/50%",
+	"caption": "Model… (hand/50%)",
+	"mutated_caption": "Model… (hand/50%, not installed)",
+	"rows": [
+		{
+			"type": "---"
+		},
+		{
+			"type": "command",
+			"id": "agent_system_model",
+			"i18n": "menu.agent.model",
+			"disabled_when": ["agent_system_model_ready"]
+		}
+	],
+	"variants": [
+		{
+			"section": "agent_system_model_installed_controls",
+			"label_key": "menu.agent.model_installed",
+			"caption": "Model… (qwen2.5:7b, installed)",
+			"installed": true
+		},
+		{
+			"section": "agent_system_model_missing_controls",
+			"label_key": "menu.agent.model_missing",
+			"caption": "Model… (qwen2.5:7b, not installed)",
+			"installed": false
+		}
+	]
+}

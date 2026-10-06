@@ -90,9 +90,9 @@ function M.new(options)
 		config.expected_source = edit_source
 		config.gestures = gestures
 		config.owned_paths = keyboard.get_owned_config_paths
-		-- The scope's reset owns both assignment containers, an older build's
-		-- plain value included; the script chords' submenu (a `select`) owns
-		-- neither, but writes its inline leaves the same way.
+		-- Ordinary resets preserve obsolete assignment parents until explicit
+		-- cleanup. Physical edits retain their source-bound leaf validation;
+		-- the script chords' submenu writes only its own leaves.
 		local containers = config.select == nil and not config.editing and Preferences.SHORTCUT_CONTAINERS or nil
 		config.parameter_name_owned = function(domain, name)
 			if domain == "keyboard" and require("shortcuts.physical_slots").is_namespace(name) then

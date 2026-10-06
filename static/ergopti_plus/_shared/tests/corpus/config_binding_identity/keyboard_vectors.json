@@ -1,0 +1,101 @@
+{
+	"description": "Independent handwritten pure keyboard identity vectors. These illustrative identities are not a complete native Windows inventory or publication.",
+	"ids": [
+		"ctrl_k",
+		"super_shift_k",
+		"alt_shift_k",
+		"future_literal",
+		"magic_editor",
+		"win_sc029",
+		"alt_sc029",
+		"ctrl_sc029",
+		"ctrl_shift_sc029"
+	],
+	"vectors": [
+		{
+			"name": "current standard keyboard slot",
+			"binding": "keyboard__ctrl_k",
+			"expected": "current"
+		},
+		{
+			"name": "current native super modifier family",
+			"binding": "keyboard__super_shift_k",
+			"expected": "current"
+		},
+		{
+			"name": "current native alt shift modifier family",
+			"binding": "keyboard__alt_shift_k",
+			"expected": "current"
+		},
+		{
+			"name": "current source owner literal identity",
+			"binding": "keyboard__future_literal",
+			"expected": "current"
+		},
+		{
+			"name": "current contextual owner",
+			"binding": "keyboard__magic_editor",
+			"expected": "current"
+		},
+		{
+			"name": "current accepted win sc029 identity",
+			"binding": "keyboard__win_sc029",
+			"expected": "current"
+		},
+		{
+			"name": "current accepted alt sc029 identity",
+			"binding": "keyboard__alt_sc029",
+			"expected": "current"
+		},
+		{
+			"name": "current accepted ctrl sc029 identity",
+			"binding": "keyboard__ctrl_sc029",
+			"expected": "current"
+		},
+		{
+			"name": "current accepted ctrl shift sc029 identity",
+			"binding": "keyboard__ctrl_shift_sc029",
+			"expected": "current"
+		},
+		{
+			"name": "missing qualified identity",
+			"binding": "keyboard__removed",
+			"expected": "retired"
+		},
+		{
+			"name": "case exact slot identity",
+			"binding": "keyboard__Ctrl_k",
+			"expected": "retired"
+		},
+		{
+			"name": "empty qualified suffix",
+			"binding": "keyboard__",
+			"expected": "retired"
+		},
+		{
+			"name": "another binding domain",
+			"binding": "tap_key__removed",
+			"expected": "unjudged"
+		},
+		{
+			"name": "case exact domain prefix",
+			"binding": "Keyboard__ctrl_k",
+			"expected": "unjudged"
+		},
+		{
+			"name": "bare unsupported domain",
+			"binding": "ctrl_k",
+			"expected": "unjudged"
+		},
+		{
+			"name": "typed false binding",
+			"binding": false,
+			"expected": "unjudged"
+		},
+		{
+			"name": "typed integer binding",
+			"binding": 17,
+			"expected": "unjudged"
+		}
+	]
+}
