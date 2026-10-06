@@ -54,7 +54,11 @@ _LLM_Menu_ApiEntriesRows() {
 	Rows := []
 	entries := _LLM_Menu["api_entries"]
 	if (Type(entries) != "Array" or entries.Length == 0) {
-		Rows.Push(Map("label", t("menu.llm.api_no_entry")))
+		EmptyRows := MenuRenderer_TemplateRows("llm_api_empty_status", Map(), Map(), Map())
+		if !(EmptyRows is Array)
+			return []
+		for Row in EmptyRows
+			Rows.Push(Row)
 	} else {
 		active_id := _LLM_Menu.Has("api_entry_id") ? _LLM_Menu["api_entry_id"] : ""
 		Names := _LLM_Menu_ApiEntryNameList(entries)

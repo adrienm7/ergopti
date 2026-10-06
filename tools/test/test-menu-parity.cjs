@@ -110,13 +110,39 @@ const OPENS_SUBMENU = {
 	},
 	selection_operations: [
 		'selection_caps_word_control',
+		{
+			menu: 'selection_case_boundary',
+			platforms: ['linux'],
+			kind: 'compose',
+			native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+		},
 		'selection_case_commands',
+		{
+			menu: 'selection_helper_boundary',
+			platforms: ['linux'],
+			kind: 'compose',
+			native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+		},
 		'selection_helper_commands'
 	],
 	// Every native live-mode provider renders the shared fixed Off choice.
-	llm_live_mode: 'llm_live_controls',
+	llm_live_mode: [
+		'llm_live_controls',
+		{
+			menu: 'llm_live_off_boundary',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_llm/live_mode_panel.lua' }
+		}
+	],
 	agent_system1: [
 		'agent_system_controls',
+		{
+			menu: 'agent_server_empty_status',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_llm/agent_panel.lua' }
+		},
 		'agent_system_model_controls',
 		{
 			menu: 'agent_system_model_installed_controls',
@@ -133,6 +159,12 @@ const OPENS_SUBMENU = {
 	],
 	agent_system2: [
 		'agent_system_controls',
+		{
+			menu: 'agent_server_empty_status',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_llm/agent_panel.lua' }
+		},
 		'agent_system_model_controls',
 		{
 			menu: 'agent_system_model_installed_controls',
@@ -420,6 +452,12 @@ const OPENS_SUBMENU = {
 	llm_models: [
 		'llm_model_commands',
 		{
+			menu: 'llm_api_empty_status',
+			platforms: ['linux'],
+			kind: 'compose',
+			native_sources: { linux: 'linux/ui/menu/llm_backend_rows.lua' }
+		},
+		{
 			menu: 'llm_api_add_provider_group',
 			platforms: ['linux'],
 			kind: 'compose',
@@ -461,6 +499,21 @@ const OPENS_SUBMENU = {
 		}
 	],
 	llm_model: [
+		{
+			menu: 'llm_model_header_boundary',
+			platforms: ['ahk', 'hs'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_llm/menu_models.ahk',
+				hs: 'macos/ui/menu/menu_llm/models_selector.lua'
+			}
+		},
+		{
+			menu: 'llm_api_empty_status',
+			platforms: ['ahk'],
+			kind: 'compose',
+			native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_api_entries.ahk' }
+		},
 		{
 			menu: 'llm_model_hardware_boundary',
 			platforms: ['ahk', 'hs'],
@@ -548,10 +601,27 @@ const OPENS_SUBMENU = {
 	],
 	// Optional category-file providers return this declared opening command.
 	hotstring_category_file: 'hotstring_file_commands',
-	llm_display: 'llm_display_menu',
+	llm_display: [
+		'llm_display_menu',
+		{
+			menu: 'llm_display_provider_boundary',
+			platforms: ['ahk'],
+			kind: 'compose',
+			native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_settings.ahk' }
+		}
+	],
 	// Native prediction modifier providers consume the shared child records.
 	llm_navigation: 'llm_navigation_rows',
 	llm_trigger: [
+		{
+			menu: 'llm_trigger_provider_boundary',
+			platforms: ['ahk', 'linux'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_llm/menu_settings.ahk',
+				linux: 'linux/ui/menu/menu_builder.lua'
+			}
+		},
 		'llm_trigger_menu',
 		{
 			menu: 'llm_numeric_custom_rows',

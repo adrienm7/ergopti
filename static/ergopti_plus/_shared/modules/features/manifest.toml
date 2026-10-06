@@ -4015,7 +4015,7 @@ platforms = ["ahk", "hs", "linux"]
 # `llm_generation_settings` submenu, or Linux's inline `llm_generation` handler),
 # not a row of this top level.
 [[menu.llm_menu]]
-type = "dynamic"
+type = "group"
 id = "llm_trigger"
 i18n = "menu.llm.trigger_menu_title"
 disabled_when_off = true
@@ -4054,7 +4054,7 @@ platforms = ["linux"]
 reason_key = "platform_reason.llm_lists_are_inline_on_linux"
 
 [[menu.llm_menu]]
-type = "dynamic"
+type = "group"
 id = "llm_display"
 i18n = "menu.llm.display_menu_title"
 disabled_when_off = true
@@ -4062,7 +4062,7 @@ health_dot = false
 platforms = ["ahk", "hs", "linux"]
 
 [[menu.llm_menu]]
-type = "dynamic"
+type = "group"
 id = "llm_navigation"
 i18n = "menu.llm.nav_menu_title"
 disabled_when_off = true
@@ -4154,6 +4154,22 @@ disabled_reason_key = "menu.about.source_run_reason"
 # The two automatic prediction triggers share row identity, labels and admission.
 # Numeric debounce and application exclusions retain native row owners.
 # Privacy checks use shared identity and native source-fenced transactions.
+# Native leading settings and live choices retain their existing construction boundaries.
+[[menu.llm_trigger_provider_boundary]]
+type = "---"
+platforms = ["ahk", "linux"]
+unavailable = "hide"
+
+[[menu.llm_display_provider_boundary]]
+type = "---"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.llm_live_off_boundary]]
+type = "---"
+platforms = ["hs"]
+unavailable = "hide"
+
 [[menu.llm_trigger_menu]]
 type = "list"
 id = "llm_trigger_leading"
@@ -6741,6 +6757,17 @@ id = "api_remove_active"
 i18n = "menu.llm.api_remove_entry"
 disabled_when = ["llm_api_active_ready"]
 
+# The Linux selection provider retains its two fixed boundaries around the case trio.
+[[menu.selection_case_boundary]]
+type = "---"
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.selection_helper_boundary]]
+type = "---"
+platforms = ["linux"]
+unavailable = "hide"
+
 # Selection case commands use each driver's existing action bindings. The Linux
 # selection provider offers these direct tray actions without duplicate native
 # keyboard slots on Windows or macOS.
@@ -7028,6 +7055,22 @@ disabled_when = ["llm_custom_profile_ready"]
 platforms = ["hs", "linux"]
 unavailable = "hide"
 
+# Empty remote entries are inert status rows; macOS uses a selectable model command.
+[[menu.llm_api_empty_status]]
+type = "label"
+id = "llm_api_empty_hint"
+i18n = "menu.llm.api_no_entry"
+platforms = ["ahk", "linux"]
+unavailable = "hide"
+
+# macOS alone nests a local server's discovered model list under each System.
+[[menu.agent_server_empty_status]]
+type = "label"
+id = "agent_server_empty_hint"
+i18n = "menu.llm.local_servers.no_models"
+platforms = ["hs"]
+unavailable = "hide"
+
 # Per-user-added-model child controls; outer dynamic model rows remain native.
 [[menu.llm_user_model_controls]]
 type = "check"
@@ -7220,4 +7263,10 @@ id = "llm_profile_auto_detect"
 i18n = "menu.profiles.auto_detect"
 checked_when = ["llm_profile_auto_detect_checked"]
 platforms = ["ahk", "linux"]
+unavailable = "hide"
+
+# The picker header is native to Windows and macOS; Linux starts with model rows.
+[[menu.llm_model_header_boundary]]
+type = "---"
+platforms = ["ahk", "hs"]
 unavailable = "hide"

@@ -16,6 +16,15 @@ public static class SourceBootChild
         var root = Environment.GetEnvironmentVariable("ERGOPTI_STARTUP_SMOKE_DIR");
         var scenario = Environment.GetEnvironmentVariable("ERGOPTI_SOURCE_CHILD_SCENARIO");
         if (scenario == "early-exit") return 7;
+        if (scenario == "cooperative-exit") {
+            File.WriteAllText(Path.Combine(root, "child-ready.txt"), "ready");
+            var started = Stopwatch.StartNew();
+            while (!File.Exists(Path.Combine(root, "release.txt"))) {
+                if (started.ElapsedMilliseconds > 15000) return 92;
+                Thread.Sleep(10);
+            }
+            return 7;
+        }
         if (scenario == "reload-missing-receipt") {
             var start = new ProcessStartInfo(Process.GetCurrentProcess().MainModule.FileName,
                 "/restart /script \"" + arguments[arguments.Length - 1] + "\"");

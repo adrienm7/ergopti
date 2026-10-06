@@ -237,7 +237,11 @@ function M.rows(llm, dialogs, on_changed, ollama_rows, context)
 	local active = entries.active()
 	local list = entries.list()
 	local names = entry_names(remote, list)
-	if #list == 0 then rows[#rows + 1] = { label = tr("menu.llm.api_no_entry"), disabled = true } end
+	if #list == 0 then
+		local empty_rows = ManifestMenu.template_rows("llm_api_empty_status", {}, {}, {})
+		if not empty_rows then return {} end
+		for _, row in ipairs(empty_rows) do rows[#rows + 1] = row end
+	end
 	for _, entry in ipairs(list) do
 		local label = names[entry.id]
 		if remote.serves(entry.provider, "chat") then

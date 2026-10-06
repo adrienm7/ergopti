@@ -471,7 +471,7 @@ _LBMD_HardwareBoundary() {
 	Model := _LBMD_ReadoutCatalogueModel(Expected["native_model"])
 	Name := Model["name"], Url := Model["urls"]["ollama"]
 	Hardware := Model["hardware_requirements"]
-	AssertDeepEqual(Expected["hardware_ollama"], Hardware["ollama"])
+	AssertEqual("", _LVS_DeepEqual(Expected["hardware_ollama"], Hardware["ollama"]))
 	Frame := _MR_GetMenuDef(Expected["section"]), Original := Frame[1]
 	Root := _MM_GetManifestRoot(), Native := 0
 	try {
@@ -525,7 +525,78 @@ _LBMD_HardwareBoundary() {
 	}
 	Rows := _LLM_Menu_PerModelRows(Name, Model, Url, Name, false)
 	AssertTrue(Rows[Position - 1]["separator"], "actual repaired declaration and original data remain usable")
-	AssertDeepEqual(Expected["hardware_ollama"], Model["hardware_requirements"]["ollama"])
+	AssertEqual("", _LVS_DeepEqual(Expected["hardware_ollama"], Model["hardware_requirements"]["ollama"]))
 }
 Test("per-model hardware: authentic shared boundary and original Map predicate (model-hardware-boundary)",
 	_LBMD_HardwareBoundary)
+
+
+/** Exercises the real picker with genuine catalogue loading and native menu handles. */
+_LBMD_ModelHeaderBoundary(Populated) {
+	global _SharedDir, _LLM_Menu, LLM_Defaults, _LLM_Deps_State
+	Expected := JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\model_header_boundary.json", "UTF-8"))
+	SavedMenu := _LLM_Menu, SavedDeps := _LLM_Deps_State
+	HadDefaults := IsSet(LLM_Defaults)
+	if HadDefaults
+		SavedDefaults := LLM_Defaults
+	Frame := _MR_GetMenuDef(Expected["section"]), Original := Frame[1]
+	Root := _MM_GetManifestRoot(), Native := 0
+	try {
+		_LLM_Menu := Map("backend", "ollama", "model", Populated ? Expected["default_name"] : "")
+		LLM_Defaults := Map("llm_model", Populated ? Expected["default_name"] : "")
+		_LLM_Deps_State := "pending"
+		Assert(LLM_GetModelPresets().Length > 0, "this test loads the actual nonempty shared catalogue")
+		Position := Populated ? 3 : 2
+		Native := LLM_Menu_BuildModelMenu()
+		Label := Buffer(2048, 0)
+		DllCall("GetMenuStringW", "ptr", Native.Handle, "uint", 0, "ptr", Label, "int", 1024, "uint", 0x400)
+		AssertEqual(t("menu.llm.no_model"), StrGet(Label, "UTF-16"))
+		Assert(DllCall("GetMenuItemCount", "ptr", Native.Handle, "int") > Position)
+		Flags := DllCall("GetMenuState", "ptr", Native.Handle, "uint", Position - 1, "uint", 0x400, "uint")
+		Assert(Flags != 0xFFFFFFFF && (Flags & 0x800) != 0, "the actual header boundary remains a native separator")
+		NoModel := DllCall("GetMenuState", "ptr", Native.Handle, "uint", 0, "uint", 0x400, "uint")
+		Assert(NoModel != 0xFFFFFFFF && (NoModel & 0x3) == 0, "NoModel remains selectable")
+		AssertEqual(!Populated, (NoModel & 0x8) != 0)
+		if Populated {
+			DllCall("GetMenuStringW", "ptr", Native.Handle, "uint", 1, "ptr", Label, "int", 1024, "uint", 0x400)
+			AssertEqual(StrReplace(t("menu.llm.backend_default_model"), "%s", Expected["default_name"]), StrGet(Label, "UTF-16"))
+			Default := DllCall("GetMenuState", "ptr", Native.Handle, "uint", 1, "uint", 0x400, "uint")
+			Assert(Default != 0xFFFFFFFF && (Default & 0x3) == 0 && (Default & 0x8) != 0)
+		}
+		_CTC_ReleaseMenu(Native), Native := 0
+		Frame[1] := Map("type", "label", "id", "hand_header_marker", "i18n", Expected["marker_key"],
+			"platforms", ["ahk", "hs"], "unavailable", "hide")
+		Native := LLM_Menu_BuildModelMenu()
+		Flags := DllCall("GetMenuState", "ptr", Native.Handle, "uint", Position - 1, "uint", 0x400, "uint")
+		DllCall("GetMenuStringW", "ptr", Native.Handle, "uint", Position - 1, "ptr", Label, "int", 1024, "uint", 0x400)
+		AssertEqual(t(Expected["marker_key"]), StrGet(Label, "UTF-16"))
+		Assert(Flags != 0xFFFFFFFF && (Flags & 0x800) == 0 && (Flags & 0x3) != 0,
+			"the actual picker consumes the live inert shared marker")
+		_CTC_ReleaseMenu(Native), Native := 0
+		Frame[1] := Map("type", "command", "id", "unbound_header_marker", "i18n", Expected["marker_key"])
+		Native := LLM_Menu_BuildModelMenu()
+		AssertEqual(0, DllCall("GetMenuItemCount", "ptr", Native.Handle, "int"), "unbound header presentation refuses the picker")
+		_CTC_ReleaseMenu(Native), Native := 0
+		Root.Delete(Expected["section"])
+		Native := LLM_Menu_BuildModelMenu()
+		AssertEqual(0, DllCall("GetMenuItemCount", "ptr", Native.Handle, "int"), "withdrawn header has no native fallback")
+		_CTC_ReleaseMenu(Native), Native := 0
+		Root[Expected["section"]] := Frame, Frame[1] := Original
+		Native := LLM_Menu_BuildModelMenu()
+		Flags := DllCall("GetMenuState", "ptr", Native.Handle, "uint", Position - 1, "uint", 0x400, "uint")
+		Assert(Flags != 0xFFFFFFFF && (Flags & 0x800) != 0, "repair retains the original native model picker")
+		AssertEqual(Populated ? Expected["default_name"] : "", _LLM_Menu["model"], "construction/refusal never changes model state")
+		AssertEqual("pending", _LLM_Deps_State)
+	} finally {
+		Root[Expected["section"]] := Frame, Frame[1] := Original
+		_LLM_Menu := SavedMenu, _LLM_Deps_State := SavedDeps
+		if HadDefaults
+			LLM_Defaults := SavedDefaults
+		else
+			LLM_Defaults := unset
+		if Native is Menu
+			_CTC_ReleaseMenu(Native)
+	}
+}
+for Populated in [false, true]
+	Test("model header boundary: genuine picker default " . Populated, _LBMD_ModelHeaderBoundary.Bind(Populated))

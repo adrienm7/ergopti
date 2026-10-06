@@ -558,3 +558,184 @@ helpers.describe("Agent model observed-state frames (agent-system-model)", funct
 		end)
 	end
 end)
+
+
+--- Reads the two independent inert status frames.
+local function empty_status_corpus()
+	local file = assert(io.open(helpers.shared("tests/corpus/menus/llm_empty_status.json"), "rb"))
+	local raw = file:read("*a"); assert(file:close())
+	return assert(require("adapters.json_codec").decode(raw))
+end
+
+--- Holds the real native data, renderer and locale owners over private bootstrap paths.
+local function with_empty_server_owner(scenario)
+	local previous, previous_hs, previous_getenv = {}, rawget(_G, "hs"), os.getenv
+	for name, value in pairs(package.loaded) do previous[name] = value end
+	local native, owner, receipt, acquired, scratch, fresh_bridge
+	local ok, err = pcall(function()
+		local driver = helpers.driver_root():gsub("/+$", "")
+		local shared = assert(driver:match("^(.*)/[^/]+$")) .. "/_shared/lua"
+		require("tests.support.module_isolation").purge(driver, shared)
+		helpers.load_with_stubs("infra.logger")
+		scratch = assert(os.tmpname())
+		assert(os.remove(scratch))
+		assert(hs.fs.mkdir(scratch))
+		assert(hs.fs.mkdir(scratch .. "/metrics"))
+		local ledger = assert(io.open(scratch .. "/metrics/karabiner_kc.log", "wb")); assert(ledger:close())
+		local bootstrap = assert(io.open(scratch .. "/paths.toml", "wb"))
+		assert(bootstrap:write('ConfigDirPath = "' .. scratch .. '/"\n'))
+		assert(bootstrap:close())
+		os.getenv = function(name)
+			if name == "ERGOPTI_PATHS_FILE" then return scratch .. "/paths.toml" end
+			return previous_getenv(name)
+		end
+		local paths = require("infra.config_paths")
+		helpers.assert_eq(paths.init(scratch .. "/"), true)
+		helpers.assert_eq(paths.get_config_dir(), scratch .. "/")
+		package.loaded["infra.i18n"] = nil
+		native = require("infra.i18n")
+		local backend = require("infra.locale")
+		native.set_locale_injector(function(code) backend.set_locale(code) end)
+		native.init()
+		owner = { pending = function() return false end }
+		acquired = native.scope_acquire(owner)
+		helpers.assert_eq(acquired, true)
+		receipt = native.scope_capture(owner)
+		helpers.assert_not_nil(receipt)
+		helpers.assert_eq(native.scope_apply(owner, receipt, "en"), true)
+		local corpus = empty_status_corpus()
+		local servers = require("modules.llm.local_servers")
+		servers.sweep({ { id = corpus.server_id, base_url = "http://localhost:1234/v1" } }, function(_, settle)
+			settle({ ok = true, status = 200, body = corpus.empty_server_body }); return true
+		end)
+		helpers.assert_eq(servers.result(corpus.server_id).status, servers.STATUS_UP)
+		helpers.assert_eq(servers.result(corpus.server_id).models, {})
+		local applied, observations = {}, { refreshes = 0 }
+		local state = { llm_agent_system1 = corpus.server_id, llm_agent_system2 = corpus.server_id,
+			llm_agent_mode = "action", llm_agent_disabled_apps = {} }
+		local ctx = { state = state, settings_mgr = { apply_setting_transaction = function(options)
+			applied[#applied + 1] = options; state[options.key] = options.value; return true
+		end }, update_menu = function() observations.refreshes = observations.refreshes + 1 end, observations = observations }
+		local panel = require("ui.menu.menu_llm.agent_panel")
+		fresh_bridge = package.loaded["modules.keylogger.kc_bridge"]
+		scenario(function() return panel.build(ctx) end, ctx, require("infra.manifest_menu"), native, applied, corpus, servers)
+	end)
+	local restored, released, forgotten = true, true, true
+	if receipt then restored = native.scope_restore(owner, receipt) == true end
+	if acquired then released = native.scope_release(owner) == true end
+	if receipt then forgotten = native.scope_forget(owner, receipt) == true end
+	local cleanup_ok, cleanup_error = pcall(function()
+		fresh_bridge = fresh_bridge or package.loaded["modules.keylogger.kc_bridge"]
+		if fresh_bridge and not rawequal(fresh_bridge, previous["modules.keylogger.kc_bridge"]) then fresh_bridge.stop() end
+		local scheduler = package.loaded["adapters.timer_scheduler"]
+		if scheduler and not rawequal(scheduler, previous["adapters.timer_scheduler"]) then
+			helpers.assert_eq(scheduler.cancelAll(), true)
+			helpers.assert_eq(scheduler.activeCount(), 0)
+		end
+		if scratch then
+			os.remove(scratch .. "/metrics/karabiner_kc.log")
+			os.remove(scratch .. "/paths.toml")
+			if hs.fs.attributes(scratch .. "/hammerspoon") then assert(hs.fs.rmdir(scratch .. "/hammerspoon")) end
+			if hs.fs.attributes(scratch .. "/metrics") then assert(hs.fs.rmdir(scratch .. "/metrics")) end
+			assert(hs.fs.rmdir(scratch))
+		end
+	end)
+	for name in pairs(package.loaded) do if previous[name] == nil then package.loaded[name] = nil end end
+	for name, value in pairs(previous) do package.loaded[name] = value end
+	_G.hs = previous_hs
+	os.getenv = previous_getenv
+	helpers.assert_eq(rawequal(os.getenv, previous_getenv), true)
+	for name, value in pairs(previous) do helpers.assert_eq(rawequal(package.loaded[name], value), true, name) end
+	helpers.assert_eq(cleanup_ok, true, tostring(cleanup_error))
+	helpers.assert_eq(restored, true, "actual translator inverse restores before releasing ownership")
+	helpers.assert_eq(released, true)
+	helpers.assert_eq(forgotten, true)
+	if not ok then error(err, 0) end
+end
+
+--- Finds the genuine retained or discovered LM Studio submenu under System 1.
+local function empty_server_rows(build)
+	local system = assert(row_starting(build().submenu, "⚡"))
+	local server = assert(row_starting(system.menu, "LM Studio"))
+	return server.menu or {}, server
+end
+
+helpers.describe("Shared inert empty server status (llm-empty-status)", function()
+	helpers.it("uses the genuine empty discovery receipt and shared inert caption (llm-empty-status)", function()
+		with_empty_server_owner(function(build, ctx, menu, native, applied, corpus, servers)
+			local definition = menu.get_array(corpus.agent.section)
+			local original = definition[1]
+			local ok, err = pcall(function()
+				local rows = empty_server_rows(build)
+				helpers.assert_eq(#rows, 1)
+				helpers.assert_eq(rows[1].title, corpus.agent.english)
+				helpers.assert_eq(rows[1].disabled, true)
+				helpers.assert_nil(rows[1].fn)
+				definition[1] = { type = "label", id = corpus.agent.rows[1].id, i18n = corpus.marker_key,
+					platforms = { "hs" }, unavailable = "hide" }
+				rows = empty_server_rows(build)
+				helpers.assert_eq(rows[1].title, corpus.marker_english)
+				helpers.assert_eq(rows[1].disabled, true)
+				helpers.assert_nil(rows[1].fn)
+				ctx.state.llm_agent_system1 = corpus.server_id .. "|" .. corpus.selected_model
+				rows = empty_server_rows(build)
+				helpers.assert_eq(#rows, 1)
+				helpers.assert_eq(rows[1].title, corpus.selected_model)
+				helpers.assert_eq(rows[1].checked, true)
+				helpers.assert_type(rows[1].fn, "function")
+				helpers.assert_eq(#applied, 0)
+				helpers.assert_eq(ctx.observations.refreshes, 0)
+				servers.sweep({ { id = corpus.server_id, base_url = "http://localhost:1234/v1" } }, function(_, settle)
+					settle({ ok = true, status = 200, body = corpus.served_server_body }); return true
+				end)
+				ctx.state.llm_agent_system1 = corpus.server_id
+				rows = empty_server_rows(build)
+				helpers.assert_eq(rows[1].title, corpus.served_model)
+				helpers.assert_type(rows[1].fn, "function")
+				helpers.assert_eq(rows[1].fn(), true)
+				helpers.assert_eq(ctx.state.llm_agent_system1, corpus.server_id .. "|" .. corpus.served_model)
+				helpers.assert_eq(ctx.state.llm_agent_system2, corpus.server_id)
+				helpers.assert_eq(#applied, 1)
+				helpers.assert_eq(ctx.observations.refreshes, 0, "the native setting route delegates publication without a second direct refresh")
+				helpers.assert_eq(applied[1].publish_setting, false)
+				helpers.assert_eq(applied[1].runtime_fn, "set_llm_agent_system1")
+			end)
+			definition[1] = original
+			helpers.assert_eq(ok, true, tostring(err))
+			helpers.assert_eq(native.get(corpus.agent.key), corpus.agent.english)
+		end)
+	end)
+	helpers.it("refuses a missing or unbound leaf then repairs the original presentation (llm-empty-status)", function()
+		with_empty_server_owner(function(build, ctx, menu, _, applied, corpus)
+			local definition = menu.get_array(corpus.agent.section)
+			local original = definition[1]
+			local ok, err = pcall(function()
+				definition[1] = nil
+				local rows = empty_server_rows(build)
+				helpers.assert_eq(rows, {})
+				definition[1] = { type = "command", id = "unowned_server_empty", i18n = corpus.agent.key,
+					platforms = { "hs" }, unavailable = "hide" }
+				rows = empty_server_rows(build)
+				helpers.assert_eq(rows, {})
+				helpers.assert_eq(ctx.state.llm_agent_system1, corpus.server_id)
+				helpers.assert_eq(ctx.state.llm_agent_system2, corpus.server_id)
+				helpers.assert_eq(#applied, 0)
+				helpers.assert_eq(ctx.observations.refreshes, 0)
+			end)
+			definition[1] = original
+			helpers.assert_eq(ok, true, tostring(err))
+			local repaired = empty_server_rows(build)
+			helpers.assert_eq(repaired[1].title, corpus.agent.english)
+			helpers.assert_eq(repaired[1].disabled, true)
+			helpers.assert_nil(repaired[1].fn)
+		end)
+	end)
+	helpers.it("restores exact native owners and private paths after a raised scenario (llm-empty-status)", function()
+		local raised = {}
+		local ok, err = pcall(function()
+			with_empty_server_owner(function() error(raised, 0) end)
+		end)
+		helpers.assert_eq(ok, false)
+		helpers.assert_eq(rawequal(err, raised), true)
+	end)
+end)

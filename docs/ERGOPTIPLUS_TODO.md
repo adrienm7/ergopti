@@ -4361,7 +4361,7 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 59, macOS 92, Linux 67, each
+  drivers still build (current baseline: Windows 55, macOS 86, Linux 61, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
@@ -4373,6 +4373,126 @@ integrated, then publish one grouped release.
   Native allocators and computed user-data captions alone do not prove missing
   shared policy. Final native binding/order/caption and installed acceptance
   remain required; source review and the local portable gates are insufficient.
+
+  The Windows hardware-boundary fixture now uses the existing typed recursive
+  \_LVS_DeepEqual comparator through AssertEqual with an empty mismatch result,
+  replacing two calls to the undefined AssertDeepEqual helper. Both independent
+  expected hardware Maps and both actual operands remain exact; all other
+  assertions, the strict comparator and its registered negative controls are
+  preserved. The canonical runner includes the owning fixture and comparator
+  before registered callbacks execute. Reversing those two calls recovers the
+  complete published fixture, and the repair commutes exactly with the appended
+  model-header tests. Production, framework, corpus, locales, menu declarations
+  and the 55/86/61 census remain unchanged. Early native CI 37519571990 on
+  source47dec reports Windows 10038 passed/1 failed at the first undefined call;
+  the second defective call was not reached. That run is terminal failed and
+  Release is skipped. Detached source checks pass; local AHK/Win32 execution
+  and the actual Windows retry remain pending. This fixture repair is not a
+  current union/native or installed qualification result. All six group items
+  stay partial.
+
+  The model-picker header boundary now consumes one canonical inert separator
+  on Windows and macOS; Linux retains its genuine flat model-list presentation
+  and hides this fragment, not the model feature. The unchanged owner scanner
+  retires two genuine native constructors, establishing 56/87/61 to 55/86/61.
+  Selectable NoModel/default controls, model/API/catalogue data, pause policies,
+  native callbacks and preceding HF-token reads remain exact. Declaration
+  refusal retains the native empty-Menu/completed-row refusal behavior; it does
+  not prevent those earlier catalogue/token reads. All 472 predecessor corpora
+  and 21 locale files remain exact. Actual supported portable macOS owner tests
+  pass 16/0 and French-warm controls pass 3/0 on both Lua runtimes; genuine old
+  native-only controls give 14/2 and 1/2 with the same tests. Unchanged Linux
+  whole-menu controls pass 41/0 in English and French on both runtimes. Actual
+  source withdrawal/receiver/comment controls and repeated owner generation
+  protect binding and presence. Two new Windows full-picker/native Win32 cases
+  remain locally unexecuted; SDK, GTK, device, installed and final current-Root
+  hosted-native qualification remain pending. All six group items stay partial.
+
+  The first full portable macOS gate of the staged LLM presentation union
+  records 16530 passed and 79 failed, not a qualified union. Two existing
+  fixture renderer seams omit the genuine native_child_rows contract; 77 cases
+  fail on that omission and two activation_scope cases reflect the same
+  boundary consequences. The repair is limited to forwarding the genuine
+  helper through those same two fixture owners; prior assertions and production
+  behavior stay intact. The complete corrected portable rerun and
+  current hosted-native/installed qualification remain pending. The 55/86/61
+  source census is unchanged; all six group items stay partial.
+
+  The LLM Trigger, Display and Navigation parents now consume three canonical
+  group declarations on all three drivers. Existing caption keys, platform
+  projection, disabled/health-dot policy and native child settings, readiness,
+  callbacks and choices remain authoritative. The pure native_child_rows
+  adapter detaches valid completed Lua trees without IO or callback delivery;
+  actual admitted/refused-input controls verify no external hooks. Proper
+  empty Navigation remains valid, while malformed child trees refuse parent
+  attachment. Windows uses the real shared renderer with its original staged
+  Menu, child handles, cleanup/lifetimes and conditional backend warning anchor.
+  The unchanged owner scanner establishes 56/90/64 to 56/87/61, retiring three
+  macOS and three Linux sites with no Windows retirement. All 471 predecessor
+  corpora and 21 locale files remain exact; original behavioral assertions stay
+  retained and one Windows source-route premise is strengthened for genuine
+  canonical renderer binding and dispatch. Thirteen actual source negatives,
+  21 lexical controls and 12 helper-shape controls protect real parent binding.
+  Supported macOS Lua5.4 owning, pure-renderer and layout controls record
+  175/0, 106/0 and 8/0, inherited through exact native/API/test-byte equality.
+  Final Linux owning and adapter/menu controls pass 90/0 and 41/0 freshly on
+  both Lua runtimes. Genuine original native routes with their original dynamic
+  declarations and current APIs give 166/9 on macOS and 84/6 on Linux. The
+  repaired Linux fixture prefix and its unchanged topology registration are
+  exact; separate cumulative fixture-chain qualification remains required.
+  Five actual registered Windows native cases remain locally unexecuted; SDK,
+  GTK, hardware, final Root/full hosted-native and installed qualification
+  remain pending. All six group items stay partial.
+
+  The existing Windows/Linux empty-API status and macOS empty server-model
+  status now consume two shared inert label fragments. Three genuine native
+  leaves migrate, but only the Windows and macOS leaves were counted: the
+  unchanged owner scanner establishes 57/91/64 to 56/90/64. Linux's actual API
+  status remains available; only genuinely absent presentation roles hide.
+  Native empty predicates, retained selected models, selectable NoModel
+  commands, provider actions and runtime owners remain unchanged, with all
+  470 predecessor corpora, 21 translated locale files and prior assertions
+  preserved. Supported macOS Lua5.4 owning and French-warm controls pass 22/0
+  and 3/0; genuine old native source gives 20/2 and 1/2. Linux LuaJIT owning
+  controls pass 50/0, and four new controls pass 4/0 in English and French on
+  Lua5.4 and LuaJIT versus old-native 2/2. The Linux full Lua5.4 fixture remains
+  48/2 versus original 44/2 from its inherited private-write/FFI limits; raw
+  macOS LuaJIT warm controls remain 1/2 on current and old native source from
+  the inherited table.pack formatting limit. No shim or unsupported green
+  result is claimed. Windows native cases and Win32 acceptance, actual
+  Hammerspoon/SDK, GTK, physical devices and final Root/hosted-native
+  qualification remain unexecuted or pending; all six group items stay partial.
+
+  Linux's two existing selection boundaries now consume shared inert
+  fragments between CapsWord, the case-transform trio and the selection-helper
+  trio. Existing native actions, callbacks, readiness and order stay unchanged;
+  Windows and macOS have no corresponding provider boundaries and explicitly
+  hide them. The unchanged owner scanner establishes 57/91/66 to 57/91/64,
+  preserving all 469 predecessor corpora, 21 locale files and prior assertions.
+  Actual Linux case-transform and whole-tray controls pass 72/0 and 22/0 in
+  English and French on Lua5.4 and LuaJIT; the genuine old native producer
+  gives 70/2 and 21/1 with the same tests. Neighbour controls pass 311/0, and
+  eighteen negative source/declaration controls remain red. These portable
+  source receipts do not qualify native GTK, SDK, physical devices, the final
+  Root source or hosted CI. Final composed native and installed acceptance
+  remain pending; all six group items stay partial.
+
+  The existing trigger, display and live-mode control boundaries now consume
+  three shared inert fragments at their genuine Windows, macOS and Linux
+  provider sites. Each original platform-specific presence and placement
+  remains exact; native settings, prompts, pause/source checks, callbacks,
+  catalogues and acknowledgement policies are unchanged. The unchanged owner
+  scanner retires four sites, establishing 59/92/67 to 57/91/66, with all 468
+  predecessor corpora and 21 locale files exact. Supported portable macOS
+  Lua5.4 owning and French-warm controls pass 14/0 and 3/0; the genuine old
+  native producer gives 13/1 and 2/1. Linux whole-tray controls pass 20/0 in
+  English and French on Lua5.4 and LuaJIT, while original native source gives
+  19/1. macOS LuaJIT preparation fails on the inherited raw bitwise operator
+  in key_state.lua before behavioral assertions; original native source and
+  original fixtures reproduce that preparation failure, so no LuaJIT behavior
+  is qualified and no shim is used. Two new Windows Win32 cases, actual
+  Hammerspoon/SDK, final composed hosted-native and installed acceptance remain
+  unexecuted or pending. All six group items stay partial.
 
   The Windows/macOS separator before per-model hardware details now consumes
   one shared inert fragment; Linux has no corresponding hardware block and
@@ -5107,6 +5227,8 @@ unexecuted unit, E2E, package, installation and launch gates.
 retains historical commands and packet ownership; the earlier PC-only software
 deferral is superseded. This item and items16/38 remain open.
 
+Current Group 3 source checkpoint (item 63, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Preserve the qualified brightness owner and finish required native package/install acceptance; investigate only demonstrated timeout regressions. Separate device/evidence boundary: Actual display luminance and retained evidence for historical timeouts.
+
 ## Maintainer requests on 2026-10-01
 
 Every request the maintainer makes is written here first and removed once it
@@ -5147,6 +5269,8 @@ unexecuted unit, E2E, package, installation and launch gates.
 [group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md)
 retains historical commands and packet ownership; the earlier PC-only software
 deferral is superseded. This item and items16/38 remain open.
+
+Current Group 3 source checkpoint (item 71, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Preserve completed Metrics retirement and unknown values/comments; finish full-save, upgrade and complete three-OS package/install/startup acceptance. Separate device/evidence boundary: No new device-only task is established for this retirement.
 
 - [ ] **73.** Partial: Windows combination families and pairs already use
       the canonical translated tap-hold key labels; macOS now resolves both
@@ -5192,9 +5316,11 @@ unexecuted unit, E2E, package, installation and launch gates.
 retains historical commands and packet ownership; the earlier PC-only software
 deferral is superseded. This item and items16/38 remain open.
 
+Current Group 3 source checkpoint (item 73, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Preserve translated labels and the 182-entry matrix; qualify actual providers without guessing a configuration writer regression. Separate device/evidence boundary: Historical writer attribution requires retained evidence; one disabled gate and three boot sections do not prove three disabled categories.
+
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 59, macOS 92 and Linux 67 rows are still built by the
+  Windows 55, macOS 86 and Linux 61 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). Read on
   2026-10-01, the sites are of four kinds, and three of them need the
   manifest to say more than it can today:
@@ -5378,6 +5504,8 @@ unexecuted unit, E2E, package, installation and launch gates.
 retains historical commands and packet ownership; the earlier PC-only software
 deferral is superseded. This item and items16/38 remain open.
 
+Current Group 3 source checkpoint (item 91, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Complete Windows simultaneous chords, delay/copy, hold arbitration and fake-AltGr-LCtrl hook ownership, then native hook/compiled acceptance on the maintainer Windows workstation. Separate device/evidence boundary: Real key ordering and actual AltGr generation.
+
 - [~] **93.** Linux: the key combinations of item 91. The shared ordered-pair
   model now runs through the actual tap-hold engine, keyboard hook and
   native configuration owner, using the same pair IDs, slots and sections.
@@ -5446,6 +5574,8 @@ replays pass12/0 SQLite and5/0 consumers, with four omission controls rejected.
 Production readers, writers, schemas and consumers are unchanged. Hosted
 revalidation remains pending; these checks do not qualify physical input.
 
+Current Group 3 source checkpoint (item 93, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Preserve ordered Linux pairs and historical fifth GTK 4/4; diagnose the current delayed-identity poll miss, then complete simultaneous chords, cross-device ownership, remaining native actions and physical-host/input/distribution acceptance. Separate device/evidence boundary: Genuine evdev/device/seat delivery and multi-keyboard acceptance.
+
 - [ ] **96.** Remove the separate Ergopti+ AltGr-adjustments option from the
       Layout menu. Selecting the Ergopti+ keylayout in the emulation picker must
       suffice. Verify that the layout supplies every intended change, retire
@@ -5479,6 +5609,8 @@ unexecuted unit, E2E, package, installation and launch gates.
 [group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md)
 retains historical commands and packet ownership; the earlier PC-only software
 deferral is superseded. This item and items16/38 remain open.
+
+Current Group 3 source checkpoint (item 96, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Prove picker handoff and layout equivalence, resolve wrap/spacing/shift differences and acknowledge migration before retiring the separate switch. Separate device/evidence boundary: Real precedence, recent-chevron timing and layout/dead-key delivery.
 
 - [~] **97.** Replace the fixed accent/direct-symbol shortcut submenu with
   user-owned entries, empty by default and offering "+ Add". Let a user on
@@ -5527,6 +5659,8 @@ unexecuted unit, E2E, package, installation and launch gates.
 retains historical commands and packet ownership; the earlier PC-only software
 deferral is superseded. This item and items16/38 remain open.
 
+Current Group 3 source checkpoint (item 97, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Complete native capture, all-owner collisions, joint source/modifier/output custody, Unicode/dead-key delivery and accent migration; qualify actual GUI/bridge and retain legacy menus. Separate device/evidence boundary: Real physical positions/modifiers and output across layouts/devices.
+
 - [~] **98.** Replace the fixed "make J the star key" setting with a physical
   key and output chosen by the user: any keyboard position and arbitrary
   character, including choosing no star at all. Integrate with item 97's
@@ -5554,6 +5688,8 @@ unexecuted unit, E2E, package, installation and launch gates.
 [group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md)
 retains historical commands and packet ownership; the earlier PC-only software
 deferral is superseded. This item and items16/38 remain open.
+
+Current Group 3 source checkpoint (item 98, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Complete the same arbitrary physical key/output or None owner and star migration, preserving occupied/unknown records without inferring physical J from a logical character. Separate device/evidence boundary: Chosen output across actual layout changes, modifiers and repeats.
 
 - [~] **101.** Investigate the supplied Windows diagnostic's retained keylogger
   shutdown debt (watchers=0). Keep privacy filtering fail-closed;
@@ -6296,6 +6432,20 @@ The controlled old403/new authenticated asset result proves the request
 boundary, not the cause of the earlier hosted403. Actual hosted acquisition
 and native qualification remain pending; item106 stays partial.
 
+Linux qualification prerequisite follow-up (2026-10-06): exact integrated
+run37494746572 passed all four genuine GTK cases but timed out while APT
+was still downloading the audio prerequisites, before either native audio
+runner. The same surviving apt-get process held the dpkg frontend lock,
+so later physical-source/window commands and package/install matrices did
+not execute. The exact existing PulseAudio packages, both translated language
+packs and locale generation now have a separate bounded prerequisite step.
+The original native audio name, both interpreter commands and two-minute
+budget are unchanged; fifteen additive wiring controls refuse missing
+prerequisites, changed budgets and shared setup/native clocks. Fresh hosted
+qualification remains required; no native assertion or item is waived.
+
+Current Group 3 source checkpoint (item 106, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Preserve the qualified 21-case inventory and owned-program provider; diagnose the current GTK delayed-identity observation with its original poll unchanged; record Windows discovery/invocation for the maintainer workstation, then complete Linux/macOS providers and real Shortcuts discovery/invocation. Separate device/evidence boundary: Only device-dependent automation workflows require external device acceptance.
+
 - [~] **107.** Make the number-row policy explicit: native behavior, digits
   directly or symbols directly, with an acknowledged migration of the old
   Windows Boolean and preserved unrelated settings. The earlier Boolean slice
@@ -6343,6 +6493,8 @@ unexecuted unit, E2E, package, installation and launch gates.
 [group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md)
 retains historical commands and packet ownership; the earlier PC-only software
 deferral is superseded. This item and items16/38 remain open.
+
+Current Group 3 source checkpoint (item 107, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Implement native-HKL and Linux/macOS forced symbol/digit owners with joint provenance, preserving admitted policy/migration and independent descriptor/dead-state expectations. Separate device/evidence boundary: Actual number-row/repeat/Nav/AltGr/Caps and dead-key output.
 
 - [~] **108.** Make the default hotstring-editor shortcut follow the effective
   physical key that directly types the selected magic character: Ctrl on
@@ -6413,6 +6565,8 @@ unexecuted unit, E2E, package, installation and launch gates.
 [group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md)
 retains historical commands and packet ownership; the earlier PC-only software
 deferral is superseded. This item and items16/38 remain open.
+
+Current Group 3 source checkpoint (item 108, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Complete effective-source retargeting, all-owner collisions and modifier/output transactions while preserving None, personal overrides and compensation. Separate device/evidence boundary: Actual layout changes and editor-key delivery on supported keyboards/seats.
 
 - [~] **109.** Give every application window the same "ErgoptiPlus — Title"
   format. GUI/WebView titles now use one prefix/separator policy in
@@ -6746,6 +6900,8 @@ controls pass, including the15 prior controls; archive verification, the nine
 native constructor cases, cancellation and physical retirement are unchanged.
 Fresh hosted qualification and delivery/clicks remain separate; item109 is partial.
 
+Current Group 3 source checkpoint (item 109, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Preserve genuine constructor captions/returns; establish supported fresh invisible Variables/KeyHistory capture before separate owned GUI/title qualification, retaining runtime HWND identity. Separate device/evidence boundary: Physical key history and notification/focus behavior outside observable hosted cases.
+
 - [~] **111.** Provide two distinct, explicitly labelled shared window-switching
   actions on Windows, macOS and Linux: the operating system's normal Alt+Tab switcher
   (the native equivalent on macOS), and switching only among windows on the display
@@ -6906,6 +7062,23 @@ exclude the key; archive/native ownership and refusal contracts remain intact.
 Fresh native acquisition, broker integration and actual switcher consumption
 remain unqualified. Linux window assertions and deadlines are unchanged.
 Item111 and cross-cutting requirements16/38 remain open.
+
+Distribution prerequisite follow-up (2026-10-06): independent native run
+37491630360 tested byte-identical helper sources and exposed three real
+ordinary-user fixture writes denied by the root-owned checkout directories.
+Alpine additionally lacked the actual curl executable; Debian could not
+link its native modules without C startup objects. The preparation now
+provisions curl and Debian libc6-dev, changes only the driver/tests directory
+owners and adds actual ordinary-user write receipts before the unchanged
+suite. The three prior preflights/suite calls, native module pins and all
+assertions remain intact. Genuine UID1000 private mode-only refusal/recovery
+reproduces all three failures and recoveries; the original full suite passes
+9,126/0 on 433 modules with a short owned TMPDIR. Its earlier long-TMPDIR
+Unix-socket harness failure is retained separately. Actual foreign-owner
+chown, all five corrected distributions and integrated package/install
+acceptance still require hosted qualification; item111 stays partial.
+
+Current Group 3 source checkpoint (item 111, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Complete Mac broker/wiring and exact retirement qualification; preserve final Linux supervision five, external recovery one and window 34 successes without rebuilding the switcher. Separate device/evidence boundary: Genuine dual screens, independent cursor/focus and moved/closed windows.
 
 - [ ] **112.** Accept an AI prediction immediately with its configured
       modifier-plus-digit shortcut, with matching shortcut hints on all three OSes.

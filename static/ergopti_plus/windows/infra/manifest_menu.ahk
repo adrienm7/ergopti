@@ -176,8 +176,10 @@ _MR_Get(Obj, Key, Default := "") {
 ;
 ; An optional empty target keeps caller-owned references used by native repaint
 ; callbacks while the shared declaration still owns command and separator order.
+; Optional GroupDisabled maps declared ids to resolved native Boolean greying.
+; Such groups must return a genuine Menu before any parent is attached.
 ; Returns the populated Menu object.
-MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := "", ListProviders := "", Commands := "", StateGetters := "", TargetMenu := unset) {
+MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := "", ListProviders := "", Commands := "", StateGetters := "", TargetMenu := unset, GroupDisabled := unset) {
 	if IsSet(TargetMenu) && (!(TargetMenu is Menu)
 			|| TrayMenuItemCount(TargetMenu) != 0)
 		throw Error("A manifest menu target must be an empty native menu.")
@@ -198,6 +200,15 @@ MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := 
 		StateGetters := Map()
 	}
 
+	if IsSet(GroupDisabled) {
+		if !(GroupDisabled is Map)
+			throw Error("Native group greying must be a Map.")
+		for Id, Disabled in GroupDisabled {
+			if Type(Id) != "String" || Id == "" || Type(Disabled) != "Integer"
+				|| (Disabled != 0 && Disabled != 1)
+				throw Error("Native group greying requires an explicit Boolean fact.")
+		}
+	}
 	MenuDef    := _MR_GetMenuDef(ManifestKey)
 	if IsSet(TargetMenu)
 		Result := TargetMenu
@@ -270,7 +281,13 @@ MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := 
 			ItemCount++
 
 		} else if ItemType == "group" {
-			_MR_RenderGroup(Result, Item, CategoryName, GroupBuilders, ManifestKey, StateGetters)
+			Id := _MR_Get(Item, "id")
+			if IsSet(GroupDisabled) && GroupDisabled.Has(Id) {
+				if !_MR_RenderGroup(Result, Item, CategoryName, GroupBuilders, ManifestKey, StateGetters, GroupDisabled[Id])
+					throw Error("Declared native group '" . Id . "' was refused.")
+			} else {
+				_MR_RenderGroup(Result, Item, CategoryName, GroupBuilders, ManifestKey, StateGetters)
+			}
 			ItemCount++
 
 		} else if ItemType == "letter_picker" {
@@ -1135,10 +1152,37 @@ _MR_RenderSectionHeader(ResultMenu, Item) {
 	ResultMenu.Disable(Label)
 }
 
+/**
+ * Appends one current declared group while retaining its genuine native Menu.
+ * @param {Menu} TargetMenu Detached native destination.
+ * @param {String} ManifestKey Current declaration owner.
+ * @param {String} GroupId Declared group identity.
+ * @param {Map} GroupBuilders Genuine native child builders.
+ * @param {Integer} Disabled Explicit resolved greying fact, zero or one.
+ * @returns {Boolean} Whether the complete parent was attached.
+ */
+MenuRenderer_AppendGroup(TargetMenu, ManifestKey, GroupId, GroupBuilders, Disabled := false) {
+	if !(TargetMenu is Menu) || !(GroupBuilders is Map)
+		|| Type(Disabled) != "Integer" || (Disabled != 0 && Disabled != 1)
+		return false
+	Selected := false, Matches := 0
+	for Item in _MR_GetMenuDef(ManifestKey) {
+		if Item is Map && _MR_IsForAhk(Item) && _MR_Get(Item, "id") == GroupId {
+			Selected := Item
+			Matches += 1
+		}
+	}
+	if Matches != 1 || _MR_Get(Selected, "type") != "group"
+		|| Type(_MR_Get(Selected, "i18n")) != "String" || _MR_Get(Selected, "i18n") == ""
+		|| !GroupBuilders.Has(GroupId) || !HasMethod(GroupBuilders[GroupId], "Call")
+		return false
+	return _MR_RenderGroup(TargetMenu, Selected, "LLM", GroupBuilders, ManifestKey, "", Disabled)
+}
+
 ; Render a named group submenu. A group declaring ``checked_when`` ticks its
 ; title from those getters, as a category's parent row shows its switch: the
 ; key-combinations group is checked while its own first-row switch is on.
-_MR_RenderGroup(ResultMenu, Item, CategoryName, GroupBuilders, ManifestKey := "", StateGetters := "") {
+_MR_RenderGroup(ResultMenu, Item, CategoryName, GroupBuilders, ManifestKey := "", StateGetters := "", Disabled := unset) {
 	Id    := _MR_Get(Item, "id")
 	I18nKey := _MR_Get(Item, "i18n")
 	if (Id == "" or I18nKey == "") {
@@ -1154,14 +1198,17 @@ _MR_RenderGroup(ResultMenu, Item, CategoryName, GroupBuilders, ManifestKey := ""
 		Sub := _MR_BuildBuiltinGroup(Id, CategoryName)
 	}
 	if !(Sub is Menu) {
-		return
+		return false
 	}
 	ResultMenu.Add(Label, Sub)
+	if IsSet(Disabled) && Disabled
+		ResultMenu.Disable(Label)
 	if (_MR_Get(Item, "checked_when", 0) is Array) {
 		if MenuRenderer_ResolveCheckedWhen(ManifestKey, Id, StateGetters) {
 			try ResultMenu.Check(Label)
 		}
 	}
+	return true
 }
 
 ; Render a letter-picker submenu entry. The manifest ``id`` is the v2 alpha id

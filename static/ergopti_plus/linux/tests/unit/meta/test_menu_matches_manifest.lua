@@ -693,3 +693,172 @@ helpers.describe("linux-absent-module templates: actual native branches", functi
 		end)
 	end)
 end)
+
+
+local function control_boundary_corpus()
+	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/llm_control_boundaries.json"), "rb"))
+	local bytes = assert(file:read("*a")); assert(file:close())
+	return assert(require("json").decode(bytes))
+end
+
+--- Reuses the existing physical-source sandbox with genuine native preference/settings owners.
+local function with_control_trigger_source(scenario)
+	local Sandbox = require("test.config_unused_keys_contract").sandbox
+	Sandbox.with_config('# hand trigger source\n[llm]\nenabled = true\n[llm.models]\nselected = "api"\n'
+		.. '[llm.trigger]\ndebounce_ms = 500\nfuture = "keep exact" # retained\n', function(path)
+		local names = { "infra.llm_preferences", "modules.llm.trigger_settings" }
+		local prior = {}; for _, name in ipairs(names) do prior[name] = rawget(package.loaded, name); rawset(package.loaded, name, nil) end
+		local Paths = require("infra.config_paths")
+		local original = Paths.config
+		Paths.config = function(relative) helpers.assert_eq(relative, "config.toml"); return path end
+		local ok, detail = xpcall(function()
+			local settings = require("modules.llm.trigger_settings")
+			scenario(settings, path, Sandbox)
+		end, debug.traceback)
+		Paths.config = original
+		for _, name in ipairs(names) do rawset(package.loaded, name, prior[name]) end
+		helpers.assert_true(rawequal(Paths.config, original))
+		for _, name in ipairs(names) do helpers.assert_true(rawequal(rawget(package.loaded, name), prior[name]), name) end
+		if not ok then error(detail, 0) end
+	end)
+end
+
+helpers.describe("llm-control-boundaries: actual Linux trigger provider", function()
+	helpers.it("retains the native debounce writer and shared privacy order around the boundary (llm-control-boundaries)", function()
+		with_absent_english(function()
+			with_control_trigger_source(function(settings, path, Sandbox)
+				local expected = control_boundary_corpus()
+				local boundary = expected.boundaries.trigger
+				local root, original = ManifestMenu.get_root(), ManifestMenu.get_array(boundary.section)
+				local context, changes = full_context(), 0
+				context.on_menu_changed = function() changes = changes + 1 end
+				local function build()
+					return with_api_source(function(builder, entries, api_path)
+						local source = Sandbox.read_bytes(api_path)
+						local rows = builder.build(context)
+						helpers.assert_eq(Sandbox.read_bytes(api_path), source)
+						helpers.assert_nil(io.open(api_path .. ".corrupt", "rb"))
+						helpers.assert_eq(entries.path(), api_path)
+						return find_item(rows, i18n.get("menu.llm.trigger_menu_title"))
+					end)
+				end
+				local row = assert(build())
+				helpers.assert_eq(row.menu[1].title, expected.trigger_debounce_english)
+				helpers.assert_eq(row.menu[2].title, "-")
+				helpers.assert_not_nil(find_item(row.menu, i18n.get("menu.llm.disable_url_bars")))
+				helpers.assert_not_nil(find_item(row.menu, i18n.get("menu.llm.disable_password_fields")))
+				local before = Sandbox.read_bytes(path)
+				local ok, detail = xpcall(function()
+					root[boundary.section] = { { type = "label", id = "hand_trigger_boundary", i18n = expected.marker_key,
+						platforms = { "ahk", "linux" }, unavailable = "hide" } }
+					row = assert(build()); helpers.assert_eq(row.menu[2].title, expected.marker_english)
+					helpers.assert_eq(row.menu[2].disabled, true); helpers.assert_nil(row.menu[2].fn)
+					helpers.assert_eq(changes, 0); helpers.assert_eq(Sandbox.read_bytes(path), before)
+					local preset = assert(find_item(row.menu[1].menu, "50 ms"))
+					helpers.assert_type(preset.fn, "function"); helpers.assert_nil(preset.fn())
+					helpers.assert_eq(settings.get("debounce_ms"), 50); helpers.assert_eq(changes, 1)
+					helpers.assert_eq(Sandbox.read_bytes(path), before:gsub("debounce_ms = 500", "debounce_ms = 50"))
+					root[boundary.section] = nil
+					helpers.assert_nil(build(), "withdrawn boundary refuses the genuine native trigger child")
+					root[boundary.section] = { { type = "command", id = "hand_unbound_trigger_boundary", i18n = expected.marker_key } }
+					helpers.assert_nil(build())
+					helpers.assert_eq(changes, 1)
+					helpers.assert_eq(Sandbox.read_bytes(path), before:gsub("debounce_ms = 500", "debounce_ms = 50"))
+				end, debug.traceback)
+				root[boundary.section] = original
+				if not ok then error(detail, 0) end
+				row = assert(build()); helpers.assert_eq(row.menu[2].title, "-")
+				helpers.assert_eq(changes, 1)
+			end)
+		end)
+	end)
+
+	helpers.it("projects independent platform boundaries using the actual initialized renderer (llm-control-boundaries)", function()
+		with_absent_english(function()
+			local expected = control_boundary_corpus()
+			for _, platform in ipairs({ "ahk", "hs", "linux" }) do
+				local renderer = assert(require("menu.renderer").new({ platform = platform,
+					manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
+					json_decode = require("json").decode, i18n = i18n, logger = require("logger.shim") }))
+				for _, boundary in pairs(expected.boundaries) do
+					helpers.assert_eq(renderer.template_rows(boundary.section, {}, {}, {}), boundary.projections[platform])
+				end
+			end
+		end)
+	end)
+
+	helpers.it("restores original source-routing and module identities after raised native construction (llm-control-boundaries)", function()
+		local names = { "infra.llm_preferences", "modules.llm.trigger_settings" }
+		local prior = {}; for _, name in ipairs(names) do prior[name] = rawget(package.loaded, name) end
+		local Paths = require("infra.config_paths"); local original = Paths.config
+		local path
+		local ok, detail = pcall(function()
+			with_control_trigger_source(function(_, owned) path = owned; error("trigger boundary inverse sentinel") end)
+		end)
+		helpers.assert_eq(ok, false); helpers.assert_contains(detail, "trigger boundary inverse sentinel")
+		helpers.assert_true(rawequal(Paths.config, original))
+		for _, name in ipairs(names) do helpers.assert_true(rawequal(rawget(package.loaded, name), prior[name]), name) end
+		helpers.assert_nil(io.open(path, "rb"))
+	end)
+end)
+
+
+helpers.describe("selection boundary fragments in the complete native tray", function()
+	local path = require("infra.paths").shared("tests/corpus/menus/linux_selection_boundaries.json")
+	local file = assert(io.open(path, "rb"))
+	local bytes = assert(file:read("*a")); assert(file:close())
+	local corpus = assert(require("json").decode(bytes))
+
+	helpers.it("keeps the independently declared nine-row selection order without invoking an action", function()
+		with_absent_english(function()
+			local context, changes = full_context(), 0
+			context.on_menu_changed = function() changes = changes + 1 end
+			local parent = assert(find_item(build_full_menu(context), i18n.get(corpus.parent_key)))
+			local first
+			for index, row in ipairs(parent.menu) do
+				if row.title == corpus.selection_child_order[1].english then first = index; break end
+			end
+			helpers.assert_type(first, "number")
+			for offset, expected in ipairs(corpus.selection_child_order) do
+				local row = parent.menu[first + offset - 1]
+				helpers.assert_type(row, "table")
+				helpers.assert_eq(row.title, expected.separator and "-" or expected.english)
+				if expected.separator then helpers.assert_nil(row.fn) end
+			end
+			helpers.assert_eq(changes, 0)
+		end)
+	end)
+
+	helpers.it("follows both actual fragment captions at their exact whole-tray positions", function()
+		with_absent_english(function()
+			local root = ManifestMenu.get_root()
+			local originals = { root.selection_case_boundary, root.selection_helper_boundary }
+			local sections = { "selection_case_boundary", "selection_helper_boundary" }
+			local ok, detail = xpcall(function()
+				for _, section in ipairs(sections) do
+					root[section] = { { type = "label", id = "selection_tray_marker",
+						i18n = corpus.marker_key, platforms = { "linux" }, unavailable = "hide" } }
+				end
+				local parent = assert(find_item(build_full_menu(full_context()), i18n.get(corpus.parent_key)))
+				local first
+				for index, row in ipairs(parent.menu) do
+					if row.title == corpus.selection_child_order[1].english then first = index; break end
+				end
+				helpers.assert_type(first, "number")
+				for offset, expected in ipairs(corpus.selection_child_order) do
+					local row = parent.menu[first + offset - 1]
+					helpers.assert_eq(row.title, expected.separator and corpus.marker_english or expected.english)
+					if expected.separator then
+						helpers.assert_eq(row.disabled, true)
+						helpers.assert_nil(row.fn)
+					end
+				end
+			end, debug.traceback)
+			for index, section in ipairs(sections) do root[section] = originals[index] end
+			if not ok then error(detail, 0) end
+		end)
+	end)
+end)
+
+
+require("test.menu_native_child_rows").run(helpers, require("infra.manifest_menu"))
