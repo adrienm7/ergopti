@@ -120,13 +120,18 @@ _LMT_Notify(Message, Options) {
 }
 
 _LMT_InstallFixture() {
-	global Features, _LLM_Menu, ConfigurationFile
+	global Features, _LLM_Menu, ConfigurationFile, LLM_PROFILE_HOTKEY_LIMIT
 	global _LMT_WriterResult, _LMT_WriterCalls, _LMT_ApplyCalls
 	global _LMT_WriterCritical, _LMT_ApplyCritical, _LMT_LiveAtWrite
 	global _LMT_ConfigPath, _LMT_PrepareResult, _LMT_PrepareCalls
 	global _LMT_PublishCalls, _LMT_Events
 	Previous := Map("features", Features, "menu", _LLM_Menu,
-		"path", ConfigurationFile, "test_state", _LMT_CaptureFixtureState())
+		"path", ConfigurationFile, "test_state", _LMT_CaptureFixtureState(),
+		"had_profile_limit", IsSet(LLM_PROFILE_HOTKEY_LIMIT))
+	if IsSet(LLM_PROFILE_HOTKEY_LIMIT)
+		Previous["profile_limit"] := LLM_PROFILE_HOTKEY_LIMIT
+	; The actual profile provider needs the number-row protocol even in a cold fixture.
+	LLM_PROFILE_HOTKEY_LIMIT := 9
 	_LMT_ConfigPath := A_Temp . "\ergopti_llm_menu_transaction.toml"
 	ConfigurationFile := _LMT_ConfigPath
 	Features := _LMT_Features()
@@ -145,10 +150,11 @@ _LMT_InstallFixture() {
 }
 
 _LMT_RestoreFixture(Previous) {
-	global Features, _LLM_Menu, ConfigurationFile
+	global Features, _LLM_Menu, ConfigurationFile, LLM_PROFILE_HOTKEY_LIMIT
 	Features := Previous["features"]
 	_LLM_Menu := Previous["menu"]
 	ConfigurationFile := Previous["path"]
+	LLM_PROFILE_HOTKEY_LIMIT := Previous["had_profile_limit"] ? Previous["profile_limit"] : unset
 	_LMT_RestoreFixtureState(Previous["test_state"])
 }
 
