@@ -3465,6 +3465,8 @@ The current Windows native read/write-exclusion and foreign TOML record-parent f
 
 The actual macOS saved-model reader admits only intrinsically valid nonempty string backend/name records. Ordinary edits, removal, clear and immediate inverse preserve invalid physical members and surviving unknown fields. Explicit cleanup uses source/file/ordinal-bound native receipts with raw token identity; custom names and backend identifiers remain valid. Independent owning84/0 and shared55/0 on both Lua engines pass, including genuine original producer failures and two physical forged-token refusals. Full final-source native qualification and the remaining configuration inventories remain separate.
 
+The native callback error regression fixture now arms its same 5 ms continuation only after the first actual bad callback, preserving the original 30 ms watchdog and all nine assertions. A real 10 ms startup delay reproduces the original failure on Lua 5.4 and LuaJIT and passes the candidate. The full local Linux suite passes 9537/0; hosted packaging and installation still require the next exact-source manual CI.
+
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
   The shared AHK override policy now writes an explicit recommended delay only
