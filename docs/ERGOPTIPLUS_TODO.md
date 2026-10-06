@@ -6673,6 +6673,24 @@ The container still refuses the full /proc child-census prerequisite; the
 unchanged five supervision cases, external recovery and all34 window cases
 require hosted qualification. This does not complete item111 or items16/38.
 
+Follow-up integrated run37470985920 at CIaea032f8 (exact Dev90076001 tree)
+passes all five native family controls, external recovery and all34 original
+cursor-window cases, with physical settlement acknowledged. GTK4/4, units9126/0,
+E2E and packaging pass; nine first-install scenarios and three package-format
+launches pass. Five distribution unit lanes each report8803 passes/78 failures:
+their setup installs only LuaJIT, lacks native luv/lfs and Python3, and runs
+permission-refusal fixtures as root. This slice supplies those test prerequisites
+after the unchanged ordinary-user --no-deps installation proof. It compiles the
+existing vendor versions from verified official Git commits and the pinned
+compatibility submodule against each distribution's own LuaJIT headers. The
+unchanged suite requires real native C entry points and a non-root UID before
+execution. Local native compilation/admission and the unchanged9126/0 unit suite pass
+with these pinned modules. Explicit CA bundles preserve HTTPS verification in
+fresh minimal distributions. Five-distribution hosted qualification remains
+pending. All original assertions, native windows and
+deadlines remain unchanged; macOS broker integration and real displays remain
+unfinished. The overall integrated run failed; Release was skipped.
+
 ## Time estimate
 
 Order-of-magnitude estimate: 40–70 agent-days for the current remaining
