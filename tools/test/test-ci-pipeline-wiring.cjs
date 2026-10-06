@@ -2450,10 +2450,10 @@ function distroUnitProblems(files, helper = DISTRO_UNIT_HELPER) {
 		.join('\n');
 	if (
 		(code.match(/^sudo -H -u ergopti-ci env -u SUDO_UID -u SUDO_GID -u SUDO_USER \\$/gm) || [])
-			.length !== 3
+			.length !== 4
 	) {
 		problems.push(
-			'both native preflights and the unchanged suite must use the ordinary installation user'
+			'the two original native preflights, added write preflight and unchanged suite must use the ordinary installation user'
 		);
 	}
 	if (!code.includes(DISTRO_UNIT_SUITE)) {
@@ -2472,6 +2472,66 @@ function distroUnitProblems(files, helper = DISTRO_UNIT_HELPER) {
 	}
 	if (!code.includes("/usr/bin/python3 -c 'import os; assert(os.geteuid() != 0)'")) {
 		problems.push('the actual Python filesystem fixture requires an ordinary-user preflight');
+	}
+	for (const distro of ['debian', 'fedora', 'arch', 'alpine', 'opensuse']) {
+		const packages = code.match(new RegExp('^\\t' + distro + '\\) ([^\\n]+)$', 'm'))?.[1] || '';
+		if (!packages.split(/\s+/).includes('curl')) {
+			problems.push(distro + ' must install the actual curl executable for native timer fixtures');
+		}
+		if (distro === 'debian' && !packages.split(/\s+/).includes('libc6-dev')) {
+			problems.push(
+				'Debian native builds require libc startup objects without recommended packages'
+			);
+		}
+	}
+	const ownership = 'chown ergopti-ci "$unit_driver" "$unit_driver/tests"';
+	const chowns = code.match(/^chown .+$/gm) || [];
+	if (
+		!code.includes('unit_driver="$(pwd -P)"') ||
+		!code.includes('test -f "$unit_driver/tests/run.lua"') ||
+		JSON.stringify(chowns) !== JSON.stringify(['chown ergopti-ci "$unit_tmp"', ownership]) ||
+		code.indexOf(ownership) >= code.indexOf('sudo -H -u ergopti-ci env')
+	) {
+		problems.push(
+			'only the actual driver and tests directories must become writable before admission'
+		);
+	}
+	const python =
+		code.match(
+			/^sudo -H -u ergopti-ci env -u SUDO_UID -u SUDO_GID -u SUDO_USER \\\n\t\/usr\/bin\/python3 -c '\n([\s\S]*?)\n'/m
+		)?.[1] || '';
+	const expectedPython = [
+		'import os',
+		'from pathlib import Path',
+		'import tempfile',
+		'assert(os.geteuid() != 0)',
+		'working = Path.cwd()',
+		'for directory in (working, working / "tests"):',
+		'    assert(directory.stat().st_uid == os.geteuid())',
+		'    with tempfile.TemporaryFile(dir=directory) as receipt:',
+		'        assert(receipt.write(b"ordinary fixture write") == 22)',
+		'        receipt.seek(0)',
+		'        assert(receipt.read() == b"ordinary fixture write")',
+		'assert(Path.cwd() == working)',
+		'print("Native ordinary-user fixture writes: 2 directories admitted")'
+	].join('\n');
+	if (python !== expectedPython) {
+		problems.push('the added native directory write preflight must execute its exact closed body');
+	}
+	const pythonLines = python.split('\n').map((line) => line.trim());
+	for (const statement of [
+		'assert(os.geteuid() != 0)',
+		'working = Path.cwd()',
+		'for directory in (working, working / "tests"):',
+		'assert(directory.stat().st_uid == os.geteuid())',
+		'with tempfile.TemporaryFile(dir=directory) as receipt:',
+		'assert(receipt.write(b"ordinary fixture write") == 22)',
+		'receipt.seek(0)',
+		'assert(receipt.read() == b"ordinary fixture write")',
+		'assert(Path.cwd() == working)'
+	]) {
+		if (!pythonLines.includes(statement))
+			problems.push('native Python fixture admission omits ' + statement);
 	}
 	if (!/^set -euo pipefail$/m.test(code) || /^\s*set \+e\b/m.test(code) || SWALLOWED.test(code)) {
 		problems.push('native distro preparation and suite failures may not be swallowed');
@@ -2522,6 +2582,79 @@ for (const [what, from, to] of [
 	assert.notEqual(changed, DISTRO_UNIT_HELPER, what + ' must actually mutate the native wrapper');
 	assert.ok(distroUnitProblems(pipeline.files(), changed).length > 0, what + ' must refuse');
 }
+
+for (const [what, from, to] of [
+	[
+		'missing added filesystem preflight',
+		"/usr/bin/python3 -c '\n",
+		"/usr/bin/python3 -c 'omitted\n"
+	],
+	['missing added ordinary UID acknowledgement', '\nassert(os.geteuid() != 0)\n', '\n'],
+	['missing driver fixture admission', 'test -f "$unit_driver/tests/run.lua"', ''],
+	['missing Debian C startup objects', 'gcc libc6-dev make', 'gcc make'],
+	['missing actual driver path', 'unit_driver="$(pwd -P)"', 'unit_driver="/tmp"'],
+	[
+		'missing driver write ownership',
+		'chown ergopti-ci "$unit_driver" "$unit_driver/tests"',
+		'chown ergopti-ci "$unit_driver/tests"'
+	],
+	[
+		'missing tests write ownership',
+		'chown ergopti-ci "$unit_driver" "$unit_driver/tests"',
+		'chown ergopti-ci "$unit_driver"'
+	],
+	[
+		'recursive source ownership',
+		'chown ergopti-ci "$unit_driver" "$unit_driver/tests"',
+		'chown -R ergopti-ci "$unit_driver" "$unit_driver/tests"'
+	],
+	[
+		'missing native ownership acknowledgement',
+		'assert(directory.stat().st_uid == os.geteuid())',
+		''
+	],
+	[
+		'missing actual native directory writes',
+		'assert(receipt.write(b"ordinary fixture write") == 22)',
+		''
+	],
+	['missing actual native readback', 'assert(receipt.read() == b"ordinary fixture write")', ''],
+	['missing unchanged CWD acknowledgement', 'assert(Path.cwd() == working)', '']
+]) {
+	const changed = DISTRO_UNIT_HELPER.replace(from, to);
+	assert.notEqual(changed, DISTRO_UNIT_HELPER, what + ' must actually mutate the native wrapper');
+	assert.ok(distroUnitProblems(pipeline.files(), changed).length > 0, what + ' must refuse');
+}
+for (const distro of ['debian', 'fedora', 'arch', 'alpine', 'opensuse']) {
+	const changed = DISTRO_UNIT_HELPER.replace(
+		new RegExp('^(\\t' + distro + '\\) [^\\n]*?) curl( ;;)$', 'm'),
+		'$1$2'
+	);
+	assert.notEqual(changed, DISTRO_UNIT_HELPER, distro + ' must actually lose its curl executable');
+	assert.ok(
+		distroUnitProblems(pipeline.files(), changed).length > 0,
+		distro + ' without curl must refuse'
+	);
+}
+
+const activeWriteLoop =
+	'for directory in (working, working / "tests"):\n    assert(directory.stat().st_uid == os.geteuid())\n    with tempfile.TemporaryFile(dir=directory) as receipt:\n        assert(receipt.write(b"ordinary fixture write") == 22)\n        receipt.seek(0)\n        assert(receipt.read() == b"ordinary fixture write")';
+const skippedWriteLoop =
+	'if False:\n' +
+	activeWriteLoop
+		.split('\n')
+		.map((line) => '    ' + line)
+		.join('\n');
+const skippedWriteHelper = DISTRO_UNIT_HELPER.replace(activeWriteLoop, skippedWriteLoop);
+assert.notEqual(
+	skippedWriteHelper,
+	DISTRO_UNIT_HELPER,
+	'the skipped-write control must actually change the native wrapper'
+);
+assert.ok(
+	distroUnitProblems(pipeline.files(), skippedWriteHelper).length > 0,
+	'disabled native directory writes must refuse'
+);
 
 const PHYSICAL_BROWSER_STEP = 'Test shared physical shortcut rendering';
 const PHYSICAL_BROWSER_ALIAS = 'test:browser:physical-shortcuts';
@@ -2608,6 +2741,118 @@ for (const changed of [undefined, 'node ./tools/test/browser/layer-editor.playwr
 		physicalBrowserProblems(pipeline.files(), scripts).length > 0,
 		'missing or redirected physical browser alias must refuse'
 	);
+}
+
+// Package downloads have a separate clock from the unchanged native audio gate.
+const LINUX_AUDIO_SETUP = 'Install native virtual audio locale prerequisites';
+const LINUX_AUDIO_NATIVE = 'Parse native virtual audio state independently of user locale';
+const LINUX_AUDIO_INSTALL =
+	'sudo apt-get install -y --no-install-recommends pulseaudio pulseaudio-utils locales language-pack-fr language-pack-de';
+const LINUX_AUDIO_LOCALES = 'sudo locale-gen fr_FR.UTF-8 de_DE.UTF-8';
+const LINUX_AUDIO_COMMANDS = [
+	'python3 tests/hardware/run_system_audio_locale_receipts.py',
+	'ERGOPTI_SYSTEM_TEST_LUA=lua5.4 python3 tests/hardware/run_system_audio_locale_receipts.py'
+];
+
+/** Keeps exact locale prerequisites outside the unchanged two-minute native budget. */
+function linuxAudioPrerequisiteProblems(files) {
+	const steps = files
+		.filter((entry) => entry.rel === LINUX_BOX)
+		.flatMap((entry) => pipeline.jobsOfText(entry.text, entry.rel))
+		.filter((job) => job.id === 'e2e-linux')
+		.flatMap((job) => pipeline.steps(job.body));
+	const setup = steps.filter((step) => step.name === LINUX_AUDIO_SETUP);
+	const native = steps.filter((step) => step.name === LINUX_AUDIO_NATIVE);
+	const setupAt = steps.findIndex((step) => step.name === LINUX_AUDIO_SETUP);
+	const nativeAt = steps.findIndex((step) => step.name === LINUX_AUDIO_NATIVE);
+	if (setup.length !== 1 || native.length !== 1 || setupAt + 1 !== nativeAt) {
+		return ['native audio needs one prerequisite step immediately before its native gate'];
+	}
+	const problems = [];
+	for (const step of [setup[0], native[0]]) {
+		if (
+			pipeline.stepField(step.body, 'if') !== NOT_CANCELLED ||
+			pipeline.stepField(step.body, 'working-directory') !== 'static/ergopti_plus/linux' ||
+			pipeline.stepField(step.body, 'continue-on-error') !== null
+		) {
+			problems.push(`${step.name} must remain an unforgiven Linux harness under !cancelled()`);
+		}
+	}
+	if (
+		pipeline.stepField(setup[0].body, 'timeout-minutes') !== '10' ||
+		JSON.stringify(logicalLines(setup[0].body)) !==
+			JSON.stringify([LINUX_AUDIO_INSTALL, LINUX_AUDIO_LOCALES])
+	) {
+		problems.push(
+			'native audio setup must install the exact packages/locales with its separate budget'
+		);
+	}
+	if (
+		pipeline.stepField(native[0].body, 'timeout-minutes') !== '2' ||
+		JSON.stringify(logicalLines(native[0].body)) !== JSON.stringify(LINUX_AUDIO_COMMANDS)
+	) {
+		problems.push(
+			'native audio must retain both exact interpreter invocations and its two-minute budget'
+		);
+	}
+	return problems;
+}
+
+errors.push(...linuxAudioPrerequisiteProblems(pipeline.files()));
+const linuxAudioSetupBody = pipeline.step(pipeline.job('e2e-linux'), LINUX_AUDIO_SETUP);
+const linuxAudioNativeBody = pipeline.step(pipeline.job('e2e-linux'), LINUX_AUDIO_NATIVE);
+for (const [what, from, to] of [
+	['missing audio prerequisites', linuxAudioSetupBody, ''],
+	...['pulseaudio', 'pulseaudio-utils', 'locales', 'language-pack-fr', 'language-pack-de'].map(
+		(name) => [
+			`missing native audio package ${name}`,
+			LINUX_AUDIO_INSTALL,
+			LINUX_AUDIO_INSTALL.split(' ')
+				.filter((word) => word !== name)
+				.join(' ')
+		]
+	),
+	['missing native audio locale generation', LINUX_AUDIO_LOCALES, 'true'],
+	...LINUX_AUDIO_COMMANDS.map((command) => [
+		`missing native audio interpreter ${command}`,
+		linuxAudioNativeBody,
+		linuxAudioNativeBody.replace(`          ${command}\n`, '')
+	]),
+	[
+		'changed native audio budget',
+		linuxAudioNativeBody,
+		linuxAudioNativeBody.replace('timeout-minutes: 2', 'timeout-minutes: 10')
+	],
+	[
+		'shared audio setup/native clock',
+		linuxAudioSetupBody,
+		linuxAudioSetupBody.replace('timeout-minutes: 10', 'timeout-minutes: 2')
+	],
+	[
+		'APT returned to native audio clock',
+		linuxAudioNativeBody,
+		linuxAudioNativeBody.replace(
+			'        run: |\n',
+			`        run: |\n          ${LINUX_AUDIO_INSTALL}\n`
+		)
+	],
+	[
+		'disabled audio setup',
+		linuxAudioSetupBody,
+		linuxAudioSetupBody.replace(NOT_CANCELLED, 'false')
+	],
+	[
+		'forgiven audio setup',
+		linuxAudioSetupBody,
+		linuxAudioSetupBody + '\n        continue-on-error: true'
+	],
+	[
+		'audio prerequisites after native execution',
+		linuxAudioSetupBody + '\n\n' + linuxAudioNativeBody,
+		linuxAudioNativeBody + '\n\n' + linuxAudioSetupBody
+	]
+]) {
+	mustCatch(what, LINUX_BOX, from, to, linuxAudioPrerequisiteProblems);
 }
 
 if (errors.length > 0) {

@@ -5803,6 +5803,18 @@ The controlled old403/new authenticated asset result proves the request
 boundary, not the cause of the earlier hosted403. Actual hosted acquisition
 and native qualification remain pending; item106 stays partial.
 
+Linux qualification prerequisite follow-up (2026-10-06): exact integrated
+run37494746572 passed all four genuine GTK cases but timed out while APT
+was still downloading the audio prerequisites, before either native audio
+runner. The same surviving apt-get process held the dpkg frontend lock,
+so later physical-source/window commands and package/install matrices did
+not execute. The exact existing PulseAudio packages, both translated language
+packs and locale generation now have a separate bounded prerequisite step.
+The original native audio name, both interpreter commands and two-minute
+budget are unchanged; fifteen additive wiring controls refuse missing
+prerequisites, changed budgets and shared setup/native clocks. Fresh hosted
+qualification remains required; no native assertion or item is waived.
+
 - [~] **107.** Make the number-row policy explicit: native behavior, digits
   directly or symbols directly, with an acknowledged migration of the old
   Windows Boolean and preserved unrelated settings. The earlier Boolean slice
@@ -6413,6 +6425,21 @@ exclude the key; archive/native ownership and refusal contracts remain intact.
 Fresh native acquisition, broker integration and actual switcher consumption
 remain unqualified. Linux window assertions and deadlines are unchanged.
 Item111 and cross-cutting requirements16/38 remain open.
+
+Distribution prerequisite follow-up (2026-10-06): independent native run
+37491630360 tested byte-identical helper sources and exposed three real
+ordinary-user fixture writes denied by the root-owned checkout directories.
+Alpine additionally lacked the actual curl executable; Debian could not
+link its native modules without C startup objects. The preparation now
+provisions curl and Debian libc6-dev, changes only the driver/tests directory
+owners and adds actual ordinary-user write receipts before the unchanged
+suite. The three prior preflights/suite calls, native module pins and all
+assertions remain intact. Genuine UID1000 private mode-only refusal/recovery
+reproduces all three failures and recoveries; the original full suite passes
+9,126/0 on 433 modules with a short owned TMPDIR. Its earlier long-TMPDIR
+Unix-socket harness failure is retained separately. Actual foreign-owner
+chown, all five corrected distributions and integrated package/install
+acceptance still require hosted qualification; item111 stays partial.
 
 - [ ] **112.** Accept an AI prediction immediately with its configured
       modifier-plus-digit shortcut, with matching shortcut hints on all three OSes.
