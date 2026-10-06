@@ -379,3 +379,48 @@ helpers.describe("macOS About channel post-publication refusal", function()
 		if not ok then error(detail, 0) end
 	end)
 end)
+
+
+local function with_version_fragment(rows, body)
+	local root = require("infra.manifest_menu").get_root()
+	local previous = root.about_version_separator
+	root.about_version_separator = rows
+	local ok, detail = xpcall(body, debug.traceback)
+	root.about_version_separator = previous
+	if not ok then error(detail, 0) end
+end
+
+helpers.describe("About version separator shared fragment (macOS)", function()
+	helpers.it("retains actual rendered version-separator-channel order", function()
+		local handle = assert(io.open(helpers.shared("tests/corpus/menus/about_version_separator.json"), "rb"))
+		local expected = assert(require("adapters.json_codec").decode(handle:read("*a"))); assert(handle:close())
+		helpers.assert_eq(require("infra.manifest_menu").get_root()[expected.section], expected.rows)
+		local rows, labels = build((fake_owner("dev")))
+		helpers.assert_not_nil(rows[expected.version_index])
+		helpers.assert_eq(rows[expected.separator_index].title, "-")
+		local _, position = picker(rows, labels)
+		helpers.assert_eq(position, expected.channel_index)
+	end)
+	helpers.it("consumes alternate presentation and platform hiding in the actual provider", function()
+		with_version_fragment({{type = "label", id = "version_fragment_probe", i18n = "menu.about.title"}}, function()
+			local rows, labels = build((fake_owner("dev")))
+			helpers.assert_eq(rows[2].title, labels["menu.about.title"])
+			helpers.assert_eq(rows[2].disabled, true)
+			helpers.assert_eq(rows[2].fn, nil)
+		end)
+		with_version_fragment({{type = "---", platforms = {"linux"}, unavailable = "hide"}}, function()
+			local rows, labels = build((fake_owner("dev")))
+			local _, position = picker(rows, labels)
+			helpers.assert_eq(position, 2, "only the unavailable fragment is hidden")
+		end)
+	end)
+	helpers.it("refuses the actual About provider when its required fragment is missing", function()
+		with_version_fragment(nil, function()
+			package.loaded["ui.menu.menu_about"] = nil
+			local About = helpers.load_with_stubs("ui.menu.menu_about")
+			local owner, calls = fake_owner("dev")
+			helpers.assert_eq(About.build({channel_owner = owner}, {}), nil)
+			helpers.assert_eq(#calls, 0, "fragment refusal cannot subscribe to an update channel")
+		end)
+	end)
+end)

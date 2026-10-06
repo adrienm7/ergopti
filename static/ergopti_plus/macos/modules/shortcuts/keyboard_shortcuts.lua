@@ -36,8 +36,12 @@ local ConfigPaths = require("infra.config_paths")
 local Manifest    = require("infra.manifest_reader")
 local ConfigOutdated = require("config_outdated")
 local MagicPolicy = require("shortcuts.magic_editor")
+local KeyboardPublication = require("config_keyboard_publication")
+local KeyboardComposition = KeyboardPublication.compose
+local KeyboardOwnerCurrent = KeyboardPublication.owner_is_current
 local Assignment = require("shortcuts.assignment")
 local PhysicalSlots = require("shortcuts.physical_slots")
+local PhysicalSlotConstructor = PhysicalSlots.new
 local PhysicalAvailability = require("shortcuts.physical_availability")
 local i18n = require("infra.i18n")
 
@@ -55,6 +59,7 @@ end
 local BINDING_PREFIX = "keyboard__"
 
 local _physical_model, _physical_owner, _physical_publication = nil, nil, nil
+local _physical_binding_publication = nil
 local _physical_publication_epoch = 0
 local _hotkeys   = {}  -- slot_id → registrar handle
 local _actions   = {}  -- slot_id → action_id
@@ -151,6 +156,7 @@ end
 -- The catalogue, decoded once. Nil until the first read; false once a read has
 -- failed, so a missing file is reported once rather than on every menu rebuild.
 local _catalogue = nil
+local _binding_publication = nil
 
 --- Reads the shared key catalogue.
 --- @return table|nil keys The ordered key entries, or nil when unavailable.
@@ -185,6 +191,12 @@ local function catalogue_keys()
 		for _, key in ipairs(decoded.keys) do keys[key.id] = key.chord_key or key.id end
 		SLOT_MODS, SPECIAL_KEYS = groups, keys
 		_catalogue = decoded
+		local admitted, publication = pcall(KeyboardPublication.publish, decoded.keys, SLOT_MODS, MagicPolicy.SLOT_ID)
+		if admitted then
+			_binding_publication = publication
+		else
+			Logger.error(LOG, "The complete keyboard source cannot publish its binding catalogue.")
+		end
 	end
 	return _catalogue.keys
 end
@@ -219,10 +231,13 @@ end
 --- Loads the immutable shared physical registry without a host key fallback.
 local function physical_model()
 	if _physical_model == nil then
+		assert(rawequal(rawget(package.loaded, "shortcuts.physical_slots"), PhysicalSlots)
+			and getmetatable(PhysicalSlots) == nil and rawequal(rawget(PhysicalSlots, "new"), PhysicalSlotConstructor),
+			"physical-key constructor ownership changed")
 		local raw = assert(FileSystem.read(Paths.shared("data/keycodes/physical_keys.json")), "physical registry unavailable")
 		local decoded, detail = JsonCodec.decode(raw)
 		assert(decoded and not detail, "physical registry malformed")
-		_physical_model = PhysicalSlots.new(decoded)
+		_physical_model, _physical_binding_publication = PhysicalSlotConstructor(decoded)
 	end
 	return _physical_model
 end
@@ -1125,5 +1140,23 @@ function M.release_pause_admission()
 	invalidate_lifecycle()
 	return true
 end
+
+
+--- Returns a detached complete native publication without reading or binding input.
+--- @return table|nil catalogue Unavailable or withdrawn sources remain unjudged.
+function M.published_binding_catalogue()
+	if not rawequal(rawget(package.loaded, "config_keyboard_publication"), KeyboardPublication)
+		or getmetatable(KeyboardPublication) ~= nil or type(KeyboardComposition) ~= "function"
+		or type(KeyboardOwnerCurrent) ~= "function"
+		or not rawequal(rawget(KeyboardPublication, "compose"), KeyboardComposition)
+		or not rawequal(rawget(KeyboardPublication, "owner_is_current"), KeyboardOwnerCurrent)
+		or not KeyboardOwnerCurrent(M)
+		or _binding_publication == nil or _physical_binding_publication == nil
+		or type(_catalogue) ~= "table" then return nil end
+	return KeyboardComposition(_binding_publication(rawget(_catalogue, "keys"), SLOT_MODS, MagicPolicy.SLOT_ID),
+		_physical_binding_publication(_physical_model))
+end
+
+KeyboardPublication.register(M, M.published_binding_catalogue)
 
 return M

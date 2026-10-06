@@ -1,0 +1,11 @@
+{
+	"section": "about_version_separator",
+	"rows": [
+		{
+			"type": "---"
+		}
+	],
+	"version_index": 1,
+	"separator_index": 2,
+	"channel_index": 3
+}

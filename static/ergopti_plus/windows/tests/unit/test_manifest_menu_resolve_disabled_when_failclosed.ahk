@@ -107,3 +107,88 @@ _MMRDW_UngatedPair() {
 	}
 	throw Error("no manifest item lacks disabled_when — this test's premise is stale, fix the test")
 }
+
+
+; A template group consumes the established predicate owner and leaves native
+; children intact. GetMenuState/GetMenuString observe the actual Win32 row.
+_MMRDW_TemplateGroupPolicy() {
+	Root := _MR_GetManifestRoot()
+	Section := "__group_policy_probe"
+	Assert(!Root.Has(Section), "independent temporary group section owns its identity")
+	Item := Map("type", "group", "id", "owned_group", "i18n", "tap_hold.picker.hold")
+	Root[Section] := [Item]
+	Children := [Map("label", "Existing native child", "action", (*) => false)]
+	Payload := Map("owned_group", Children)
+	Native := Menu()
+	try {
+		Rows := MenuRenderer_TemplateRows(Section, Map(), Map(), Payload)
+		Assert(Rows is Array && Rows.Length == 1, "one actual group row")
+		AssertEqual(2, Rows[1].Count, "absent policy retains exact legacy two-field group shape")
+		Assert(Rows[1]["items"] == Children, "native child array identity is retained")
+		AssertEqual(false, Rows[1]["items"][1]["action"].Call(), "native child refusal is preserved")
+		Item["disabled_when"] := ["ready"]
+		Item["caption_getter"] := "caption"
+		Item["disabled_reason_key"] := "menu.gestures.sensitivity_hint"
+		Getters := Map("ready", () => true, "caption", () => "35% $ literal")
+		Rows := MenuRenderer_TemplateRows(Section, Map(), Getters, Payload)
+		Expected := StrReplace(t("tap_hold.picker.hold"), "%s", "35% $ literal")
+		AssertEqual(Expected, Rows[1]["label"], "literal caption passes through existing interpolation owner")
+		AssertEqual(2, Rows[1].Count, "enabled group does not invent disabled or reason fields")
+		AssertEqual(1, _MR_RenderRows(Native, Rows, Section, 1), "actual renderer consumes enabled native group")
+		Flags := DllCall("GetMenuState", "ptr", Native.Handle, "uint", 0, "uint", 0x400, "uint")
+		Assert(Flags != 0xFFFFFFFF && !(Flags & 0x3), "actual native group is enabled")
+		Native.Delete()
+		MenuDispatcher_PruneMenu(Native)
+		Getters["ready"] := () => false
+		Rows := MenuRenderer_TemplateRows(Section, Map(), Getters, Payload)
+		Assert(Rows[1]["disabled"], "false native group getter disables provider data")
+		AssertEqual("menu.gestures.sensitivity_hint", Rows[1]["disabled_reason_key"], "declared exact reason receipt reaches existing native owner")
+		Assert(Rows[1]["items"] == Children, "disabled group retains actual native child identity")
+		Assert(!Rows[1].Has("action"), "no dummy callback is added to a group")
+		AssertEqual(1, _MR_RenderRows(Native, Rows, Section, 1), "actual renderer consumes disabled native group")
+		Flags := DllCall("GetMenuState", "ptr", Native.Handle, "uint", 0, "uint", 0x400, "uint")
+		Assert(Flags != 0xFFFFFFFF && (Flags & 0x3), "actual Win32 group is disabled")
+		Text := Buffer(4096, 0)
+		Length := DllCall("GetMenuStringW", "ptr", Native.Handle, "uint", 0,
+			"ptr", Text, "int", 2048, "uint", 0x400, "int")
+		Assert(Length > 0, "actual native group text is observable")
+		AssertEqual(StrReplace(Expected . " — " . _MR_ReasonHead(t("menu.gestures.sensitivity_hint")), "&", "&&"),
+			StrGet(Text, Length, "UTF-16"), "native reason decoration is applied exactly once")
+	} finally {
+		Native.Delete()
+		MenuDispatcher_PruneMenu(Native)
+		Root.Delete(Section)
+	}
+}
+Test("manifest_menu: real template group preserves native readiness reason and child ownership", _MMRDW_TemplateGroupPolicy)
+
+_MMRDW_TemplateGroupRefusals() {
+	Root := _MR_GetManifestRoot()
+	Section := "__group_refusal_probe"
+	Assert(!Root.Has(Section), "independent refusal section owns its identity")
+	Item := Map("type", "group", "id", "owned_group", "i18n", "menu.gestures.mode_single", "disabled_when", ["ready"])
+	Root[Section] := [Item]
+	Payload := Map("owned_group", [Map("label", "Existing native child")])
+	try {
+		Missing := MenuRenderer_TemplateRows(Section, Map(), Map(), Payload)
+		Assert(Missing[1]["disabled"], "missing declared native group getter fails closed")
+		Assert(!Missing[1].Has("disabled_reason_key"), "an undeclared reason is not invented")
+		Threw := false
+		try MenuRenderer_TemplateRows(Section, Map(), Map("ready", _MMRDW_TemplateGroupThrow), Payload)
+		catch as Err {
+			Threw := InStr(Err.Message, "group-native-read-refused") > 0
+		}
+		Assert(Threw, "actual native getter error propagates rather than manufacturing an enabled group")
+		Item["platforms"] := ["hs"]
+		Item["unavailable"] := "hide"
+		Hidden := MenuRenderer_TemplateRows(Section, Map(), Map("ready", _MMRDW_TemplateGroupThrow), Payload)
+		Assert(Hidden is Array && Hidden.Length == 0, "hidden group cannot invoke its native getter")
+		Item["platforms"] := ["ahk"]
+		AssertEqual(false, MenuRenderer_TemplateRows(Section, Map(), Map("ready", () => true), Map()),
+			"missing actual group child payload refuses the whole template")
+	} finally Root.Delete(Section)
+}
+_MMRDW_TemplateGroupThrow(*) {
+	throw Error("group-native-read-refused")
+}
+Test("manifest_menu: template group retains getter refusal platform hide and child admission", _MMRDW_TemplateGroupRefusals)

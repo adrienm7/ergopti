@@ -83,7 +83,11 @@ TOML_DecodeKey(Token, Strict := false) {
 }
 
 /** Parses inline members using the caller's scalar and array decoder. */
-TOML_ParseInlineTable(Raw, Coerce) {
+TOML_ParseInlineTable(Raw, Coerce, Splitter := 0) {
+	; Generic callers keep their original splitter and scalar contract. The
+	; semantic document owner may supply its canonical multiline-aware lexer.
+	if !IsObject(Splitter)
+		Splitter := TOML_SplitArrayElements
 	Raw := Trim(Raw)
 	if SubStr(Raw, 1, 1) != "{" || SubStr(Raw, -1) != "}"
 		throw ValueError("Unterminated TOML inline table")
@@ -92,7 +96,7 @@ TOML_ParseInlineTable(Raw, Coerce) {
 	; Only implicitly created dotted parents can be extended by another member.
 	; An explicit inline table is closed even when the supplied value is empty.
 	DottedParents := Map()
-	for Member in TOML_SplitArrayElements(SubStr(Raw, 2, StrLen(Raw) - 2), ",", true) {
+	for Member in Splitter.Call(SubStr(Raw, 2, StrLen(Raw) - 2), ",", true) {
 		; The strict outer scan has checked quotes and nesting. Ordinary registry
 		; members need neither a second delimiter scan nor a dotted-key scan.
 		if RegExMatch(Member, '^([A-Za-z0-9_-]+)[ \t]*=[ \t]*("(?:[^"\\]|\\.)*"|[A-Za-z0-9_-]+)\z', &SimpleMember) {
@@ -101,7 +105,7 @@ TOML_ParseInlineTable(Raw, Coerce) {
 			Result[SimpleMember[1]] := Coerce.Call(SimpleMember[2])
 			continue
 		}
-		Pair := TOML_SplitArrayElements(Member, "=", true)
+		Pair := Splitter.Call(Member, "=", true)
 		if Pair.Length != 2 || Pair[1] == "" || Pair[2] == ""
 			throw ValueError("TOML inline table members require a key and value")
 		Keys := TOML_ParseKeyPath(Pair[1])

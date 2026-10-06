@@ -199,6 +199,98 @@ def owned_observation(executable, config, output, operation, native):
     return receipt
 
 
+def qualify_script_scope(copied_app, source_root, scratch, output, version, canvas, unchanged):
+    """Run the existing native SDK/participant owner after exact canvas retirement.
+
+    This diagnostic overlay contains actual frozen production sources and a copy
+    of the authentic signed runtime. It cannot qualify an installed release app.
+    """
+    from hs_native_bootstrap_probe import (
+        SupplementaryNativeBootstrap,
+        CONTRACT,
+        QUALIFICATION,
+    )
+    from hs_script_scope_probe import require_summary
+    from macos_launch_gate import processes
+
+    require(
+        canvas.get("status") == "ok" and canvas.get("cleanup_errors") == [],
+        "Canvas failure blocks native Script qualification",
+    )
+    retired = canvas.get("native_owner")
+    require(
+        type(retired) is dict
+        and retired.get("closed") is True
+        and retired.get("reservation_lost") is False
+        and retired.get("live_group_members") == []
+        and type(retired.get("worker_pid")) is int
+        and retired["worker_pid"] > 0
+        and type(retired.get("group_id")) is int
+        and retired["group_id"] == retired["worker_pid"],
+        "Canvas native reservation has not settled",
+    )
+    unchanged()
+    overlay = scratch / "script-native-overlay.app"
+    overlay.mkdir(mode=0o700)
+    embedded = overlay / "Contents/Frameworks/Hammerspoon.app"
+    embedded.parent.mkdir(parents=True)
+    # A symlink would permit executable identity to canonicalize to another
+    # owner. Preserve the selected signed app bytes with the existing ditto copy.
+    subprocess.run(["/usr/bin/ditto", str(copied_app), str(embedded)], check=True, timeout=60)
+    native = admit_runtime(embedded, version, output, "script-overlay")
+    require(
+        native["executable_sha256"] == digest(copied_app / "Contents/MacOS/Hammerspoon"),
+        "Native Script overlay executable differs",
+    )
+    with (embedded / "Contents/Info.plist").open("rb") as stream:
+        info = plistlib.load(stream)
+    domain = info.get("CFBundleIdentifier")
+    require(
+        type(domain) is str and domain != "",
+        "Native Script runtime has no actual preference domain",
+    )
+    destination = overlay / "Contents/Resources/static/ergopti_plus"
+    destination.parent.mkdir(parents=True)
+    shutil.copytree(source_root / "static/ergopti_plus", destination)
+    copied = {
+        str(path.relative_to(source_root / "static/ergopti_plus")): digest(path)
+        for path in (source_root / "static/ergopti_plus").rglob("*")
+        if path.is_file()
+    }
+    for relative, expected in copied.items():
+        require(
+            digest(destination / relative) == expected,
+            "Native Script source copy differs: " + relative,
+        )
+    unchanged()
+    script_output = output / "script-scope"
+    script_output.mkdir(mode=0o700)
+    executable = embedded / "Contents/MacOS/Hammerspoon"
+    summary = SupplementaryNativeBootstrap(overlay, script_output, domain, processes).observe(
+        "script_scope"
+    )
+    summary = require_summary(summary, executable, domain, CONTRACT, QUALIFICATION)
+    require(processes(executable) == [], "Native Script overlay process remains live")
+    unchanged()
+    for relative, expected in copied.items():
+        require(
+            digest(destination / relative) == expected,
+            "Native Script source drifted: " + relative,
+        )
+    require(
+        digest(executable) == native["executable_sha256"],
+        "Native Script overlay executable drifted",
+    )
+    return {
+        "status": "ok",
+        "native_execution": "executed",
+        "source_layout": "private diagnostic overlay",
+        "installed_package": "unmeasured",
+        "runtime": native,
+        "measurement": summary,
+    }
+
+
 def run(repo, app, output):
     """Snapshot real sources and execute only the unique copied signed app executable."""
     require(sys.platform == "darwin", "Requires native macOS, a GUI login and actual Hammerspoon")
@@ -236,6 +328,15 @@ def run(repo, app, output):
             "macos_tooltip_canvas.lua",
             "macos_tooltip_canvas.py",
             "macos_tooltip_canvas_observer.py",
+            "hs_native_bootstrap_probe.py",
+            "hs_native_bootstrap.lua",
+            "hs_script_scope_native.lua",
+            "hs_script_scope_probe.py",
+            "hs_delayed_timer_probe.py",
+            "hs_karabiner_config_probe.py",
+            "macos_launch_gate.py",
+            "hs_delayed_timer_contract.json",
+            "hs_karabiner_config_contract.json",
         )
         probe_hashes = {name: digest(here / name) for name in names}
         version = selected_version(repo)
@@ -300,6 +401,9 @@ def run(repo, app, output):
                 lambda group: supervise(group, output, version, unchanged),
                 owner.NativeProcessGroups(),
             )
+        )
+        report["native_script_scope"] = qualify_script_scope(
+            copied_app, source_root, scratch, output, version, report, unchanged
         )
     except BaseException as error:
         report.update(status="error", error=str(error) or type(error).__name__)

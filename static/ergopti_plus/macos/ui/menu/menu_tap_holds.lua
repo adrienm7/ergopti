@@ -462,7 +462,41 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 		and NONE_DISPLAY
 		or  (tap_slbl .. "  /  " .. hold_slbl)
 
-	local key_submenu = ManifestMenu.template_rows("tap_hold_key_head", {
+	-- Native delay dialogs and persistence retain their existing mutation owners.
+	local delay_rows = ManifestMenu.template_rows("tap_hold_key_delay_rows", {
+		["tap_hold_key_delay_set"] = function()
+			hs.focus()
+			local prompt = string.format(
+				i18n.get("menu.tapholds.key_tap_delay_dialog_prompt"), global_ms)
+			local title_d    = i18n.get("menu.tapholds.key_tap_delay_dialog_title")
+			local btn_ok     = i18n.get("button.ok")
+			local btn_cancel = i18n.get("button.cancel")
+			local script = delay_dialog_script(prompt, effective_ms, title_d, btn_cancel, btn_ok)
+			local call_ok, ok, result = pcall(hs.osascript.applescript, script)
+			if not call_ok or ok ~= true or type(result) ~= "table"
+				or type(result["text returned"]) ~= "string" then return false end
+			local ms = tonumber(result["text returned"])
+			if not ms or ms ~= ms or ms == math.huge or ms <= 0 or math.floor(ms) <= 0 then
+				Logger.warn(LOG, "Invalid per-key delay '%s' — ignored.", tostring(result["text returned"]))
+				return false
+			end
+			return commit_menu_setting(karabiner, "Per-key tap/hold timeout", function()
+				return karabiner.set_tap_timeout(kid, math.floor(ms))
+			end, update_menu)
+		end,
+		["tap_hold_key_delay_use_global"] = function()
+			return commit_menu_setting(karabiner, "Per-key timeout reset", function()
+				return karabiner.set_tap_timeout(kid, nil)
+			end, update_menu)
+		end,
+	}, {
+		["tap_hold_key_global_delay_caption"] = function() return fmt_delay(global_ms) end,
+		["tap_hold_key_delay_is_global"] = function() return per_key_ms == nil end,
+		["tap_hold_key_delay_has_override"] = function() return per_key_ms ~= nil end,
+	})
+	if not delay_rows then return nil end
+
+	local key_submenu = ManifestMenu.template_rows("tap_hold_key_rows", {
 		["tap_hold_key_no_action"] = function()
 			return run_bulk_menu_command(
 				karabiner,
@@ -478,7 +512,9 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 		["tap_hold_key_configured"] = function() return is_active end,
 		["tap_hold_key_tap_caption"] = function() return tap_slbl end,
 		["tap_hold_key_hold_caption"] = function() return hold_slbl end,
+		["tap_hold_key_delay_caption"] = function() return fmt_delay(effective_ms) end,
 	}, {
+		["tap_hold_key_delay"] = delay_rows,
 		["tap_hold_key_tap_picker"] = build_action_picker(
 			karabiner,
 			function(action_id) return karabiner.set_tap_action(kid, action_id) end,
@@ -495,46 +531,6 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 		),
 	})
 	if not key_submenu then return nil end
-	key_submenu[#key_submenu + 1] = { separator = true }
-	-- Per-key tap/hold delay: open a free-text dialog to set a custom value, or
-	-- revert to the single global delay. The title shows the effective value.
-	key_submenu[#key_submenu + 1] = {
-		label = string.format(i18n.get("menu.tapholds.key_tap_delay"), fmt_delay(effective_ms)),
-		items  = {
-			{
-				label = i18n.get("menu.tapholds.key_tap_delay_set"),
-				action    = function()
-					hs.focus()
-					local prompt = string.format(
-						i18n.get("menu.tapholds.key_tap_delay_dialog_prompt"), global_ms)
-					local title_d    = i18n.get("menu.tapholds.key_tap_delay_dialog_title")
-					local btn_ok     = i18n.get("button.ok")
-					local btn_cancel = i18n.get("button.cancel")
-					local script = delay_dialog_script(prompt, effective_ms, title_d, btn_cancel, btn_ok)
-					local ok, result = hs.osascript.applescript(script)
-					if not ok or type(result) ~= "table" then return end
-					local ms = tonumber(result["text returned"])
-					if not ms or ms <= 0 then
-						Logger.warn(LOG, "Invalid per-key delay '%s' — ignored.", tostring(result["text returned"]))
-						return
-					end
-					commit_menu_setting(karabiner, "Per-key tap/hold timeout", function()
-						return karabiner.set_tap_timeout(kid, math.floor(ms))
-					end, update_menu)
-				end,
-			},
-			{
-				label   = string.format(i18n.get("menu.tapholds.key_tap_delay_use_global"), fmt_delay(global_ms)),
-				checked = (per_key_ms == nil),
-				disabled = (per_key_ms == nil),
-				action      = function()
-					commit_menu_setting(karabiner, "Per-key timeout reset", function()
-						return karabiner.set_tap_timeout(kid, nil)
-					end, update_menu)
-				end,
-			},
-		},
-	}
 
 	return {
 		label    = string.format("%s  :  %s", key_label, combo_label),
@@ -955,42 +951,47 @@ end
 --- @return table rows The cached rows when on, or a fresh list led by the hint.
 local function with_karabiner_off_hint(rows, enabled)
 	if enabled then return rows end
-	local hinted = { { label = i18n.get("menu.tapholds.karabiner_off_hint"), disabled = true } }
+	local hinted = ManifestMenu.template_rows("tap_hold_karabiner_off_rows", {})
+	if not hinted then return nil end
 	for _, row in ipairs(rows) do hinted[#hinted + 1] = row end
 	return hinted
 end
 
--- The guardian states that leave every tap-hold inert, each with the reason
--- row it shows and the facade opener its Login Items row calls: the approval
--- opener rechecks that approval is still what is missing, while an
--- unregistered helper is fixed from the same pane without that precondition.
--- An approval also offers its numbered steps again: the dialog shows them by
--- itself once per launch, and this row is where they stay afterwards.
-local GUARDIAN_STATUS_ROWS = {
-	requires_approval = { key = "menu.tapholds.guardian_requires_approval", opener = "open_guardian_settings",
-		steps = true },
-	unavailable       = { key = "menu.tapholds.guardian_unavailable",       opener = "open_login_items" },
-}
-
---- The row that shows the Login Items steps again, on the user's request.
+--- Supplies the existing callback that reopens the Login Items steps.
 --- @param karabiner table Remap facade.
---- @return table row
-local function login_items_steps_row(karabiner)
-	return {
-		label = i18n.get("menu.tapholds.show_login_items_steps"),
-		action = function()
-			Logger.info(LOG, "Showing the Login Items steps again from the Tap-Holds menu.")
-			local ok, shown = xpcall(function()
-				return require("ui.permission_dialog.login_items_guide").reopen(karabiner)
-			end, debug.traceback)
-			if not ok then
-				Logger.error(LOG, "The Login Items steps could not be shown: %s.", tostring(shown))
-				return false
-			end
-			return shown == true
-		end,
-	}
+--- @return function command
+local function login_items_steps_command(karabiner)
+	return function()
+		Logger.info(LOG, "Showing the Login Items steps again from the Tap-Holds menu.")
+		local ok, shown = xpcall(function()
+			return require("ui.permission_dialog.login_items_guide").reopen(karabiner)
+		end, debug.traceback)
+		if not ok then
+			Logger.error(LOG, "The Login Items steps could not be shown: %s.", tostring(shown))
+			return false
+		end
+		return shown == true
+	end
 end
+
+-- Native guardian states retain their original opener selection. Each provider
+-- reads the corresponding shared presentation; the native owner admits actions.
+local GUARDIAN_STATUS_ROWS = {
+	requires_approval = {
+		rows = function(karabiner)
+			return ManifestMenu.template_rows("tap_hold_guardian_approval_rows", {
+				["tap_hold_login_items_steps"] = login_items_steps_command(karabiner),
+			})
+		end,
+		opener = "open_guardian_settings",
+	},
+	unavailable = {
+		rows = function()
+			return ManifestMenu.template_rows("tap_hold_guardian_unavailable_rows", {})
+		end,
+		opener = "open_login_items",
+	},
+}
 
 --- The rows that say why switched-on tap-holds do nothing: the remap guardian
 --- is not ready, so no rule deploys, and before these rows only the log said so.
@@ -1004,16 +1005,17 @@ local function guardian_status_rows(karabiner, tap_holds_on)
 	local spec = ok and GUARDIAN_STATUS_ROWS[state] or nil
 	if not spec then return {} end
 	local opener = karabiner[spec.opener]
-	local rows = { { label = i18n.get(spec.key), disabled = true } }
-	if spec.steps then rows[#rows + 1] = login_items_steps_row(karabiner) end
+	local rows = spec.rows(karabiner)
+	if not rows then return {} end
 	if type(opener) == "function" then
-		rows[#rows + 1] = {
-			label = i18n.get("menu.tapholds.open_login_items"),
-			action = function()
+		local open_rows = ManifestMenu.template_rows("tap_hold_login_items_open_rows", {
+			["tap_hold_login_items_open"] = function()
 				Logger.info(LOG, "Opening Login Items for the remap guardian (%s).", state)
 				return opener(report_login_items_opened) == true
 			end,
-		}
+		})
+		if not open_rows then return rows end
+		for _, row in ipairs(open_rows) do rows[#rows + 1] = row end
 	end
 	return rows
 end
@@ -1031,9 +1033,8 @@ local function legacy_rules_rows(karabiner)
 		return {}
 	end
 	if type(conflicts) ~= "table" then return {} end
-	return { {
-		label = i18n.get("menu.tapholds.legacy_rules_pending"),
-		action = function()
+	return ManifestMenu.template_rows("tap_hold_legacy_rules_rows", {
+		["tap_hold_legacy_rules_cleanup"] = function()
 			Logger.info(LOG, "Showing the legacy Karabiner rules cleanup from the Tap-Holds menu.")
 			local shown_ok, shown = xpcall(function()
 				return require("ui.legacy_rules_cleanup").open(karabiner)
@@ -1044,7 +1045,7 @@ local function legacy_rules_rows(karabiner)
 			end
 			return shown == true
 		end,
-	} }
+	})
 end
 
 --- Builds the Tap-holds row and its submenu.

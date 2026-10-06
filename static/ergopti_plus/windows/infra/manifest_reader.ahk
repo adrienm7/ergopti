@@ -202,7 +202,7 @@ ManifestValueFor(V2Path, Field) {
 }
 
 ; Dynamic user-authored sections have a declared neutral leaf shape.
-ManifestDynamicEntry(V2Path) {
+ManifestDynamicEntry(V2Path, SemanticParts := unset) {
 	global FEATURES_MANIFEST
 	Prefix := V2Path
 	Loop {
@@ -215,13 +215,32 @@ ManifestDynamicEntry(V2Path) {
 	}
 	for _, Scope in FEATURES_MANIFEST["scopes"] {
 		for Definition in Scope.Get("dynamic_defaults", []) {
-			Prefix := Definition["prefix"] . "."
-			if SubStr(V2Path, 1, StrLen(Prefix)) != Prefix
-				continue
-			Tail := SubStr(V2Path, StrLen(Prefix) + 1)
-			Parts := StrSplit(Tail, ".")
-			if Parts.Length != Definition["depth"] || InStr(Tail, "..")
-					|| SubStr(Tail, 1, 1) == "." || SubStr(Tail, -1) == "."
+			if IsSet(SemanticParts) {
+				PrefixParts := StrSplit(Definition["prefix"], ".")
+				if SemanticParts.Length != PrefixParts.Length + Definition["depth"]
+					continue
+				Matches := true
+				for Index, Part in PrefixParts {
+					if StrCompare(SemanticParts[Index], Part, true) != 0 {
+						Matches := false
+						break
+					}
+				}
+				if !Matches
+					continue
+				Parts := []
+				loop Definition["depth"]
+					Parts.Push(SemanticParts[PrefixParts.Length + A_Index])
+			} else {
+				Prefix := Definition["prefix"] . "."
+				if SubStr(V2Path, 1, StrLen(Prefix)) != Prefix
+					continue
+				Tail := SubStr(V2Path, StrLen(Prefix) + 1)
+				Parts := StrSplit(Tail, ".")
+				if InStr(Tail, "..") || SubStr(Tail, 1, 1) == "." || SubStr(Tail, -1) == "."
+					continue
+			}
+			if Parts.Length != Definition["depth"]
 				continue
 			if Definition.Has("suffix") && Parts[-1] != Definition["suffix"]
 				continue
@@ -290,6 +309,31 @@ ManifestConfigRow(V2Path, Value := unset, Delete := false) {
 ; Persist only desired differences from the neutral baseline.
 ManifestSparseOperation(V2Path, Value) {
 	return ManifestConfigRow(V2Path, Value, ManifestValuesEqual(Value, ManifestDefaultFor(V2Path)))
+}
+
+/**
+ * Prepares one configuration row without flattening its semantic section names.
+ * @param {String} Section Existing TOML section spelling, including quoted names.
+ * @param {String} Key Literal leaf identity, separate from section path grammar.
+ * @param {Any} Value Native desired value before Boolean serialization.
+ * @returns {Object} Native row with explicit neutral deletion or detached value.
+ */
+ManifestConfigSparseOperation(Section, Key, Value) {
+	if !(Section is String) || !(Key is String)
+		throw TypeError("Configuration rows require String section and key identities.")
+	Parts := Section == "" ? [] : TOML_ParseKeyPath(Section, true)
+	Parts.Push(Key)
+	Path := ""
+	for Part in Parts
+		Path .= (Path == "" ? "" : ".") . TOML_RenderKey(Part)
+	Dynamic := ManifestDynamicEntry(Path, Parts)
+	Default := Dynamic is Map ? ManifestCloneValue(Dynamic["default"]) : ManifestDefaultFor(Path)
+	Row := { Section: Section, Key: Key }
+	if ManifestValuesEqual(Value, Default)
+		Row.Delete := 1
+	else
+		Row.Value := ManifestCloneValue(Value)
+	return Row
 }
 
 ; Match complete path segments, never adjacent names with a common prefix.
