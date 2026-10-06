@@ -49,11 +49,21 @@
             buildInputs = [ runtimeLuaJIT pkgs.at-spi2-core pkgs.gtk3 pkgs.glib-networking pkgs.gsettings-desktop-schemas pkgs.dconf ];
             dontWrapGApps = true;
 
+            # stdenv supplies the compiler for this derivation's target. A
+            # stdenvNoCC or host-built private fixture cannot provide this ELF.
+            buildPhase = ''
+              runHook preBuild
+              bash tools/build/build-linux-native-output.sh
+              runHook postBuild
+            '';
+
             installPhase = ''
               runHook preInstall
 
               mkdir -p $out/lib/ergopti
               cp -r static/ergopti_plus/linux/. $out/lib/ergopti/
+              install -Dm755 build/linux/linux/bin/libergopti_archive_publication.so \
+                $out/lib/ergopti/bin/libergopti_archive_publication.so
               mkdir -p $out/lib/ergopti/_shared
               cp -r static/ergopti_plus/_shared/. $out/lib/ergopti/_shared/
               # The layout registry below the driver root, where the packages
@@ -75,7 +85,7 @@
                 ])} \
                 --prefix LD_LIBRARY_PATH : ${nixpkgs.lib.makeLibraryPath (with pkgs; [
                   # BEGIN GENERATED LINUX NATIVE REQUIREMENTS
-                  libayatana-appindicator gtk3 glib libxkbcommon at-spi2-core glib-networking libproxy dconf xorg.libX11
+                  libayatana-appindicator gtk3 glib libxkbcommon at-spi2-core glib-networking libproxy dconf openssl xorg.libX11
                   # END GENERATED LINUX NATIVE REQUIREMENTS
                 ])}
 

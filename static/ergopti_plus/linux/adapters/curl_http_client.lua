@@ -246,6 +246,7 @@ local function finalize_owned(request)
 		and type(request.on_done) == "function" and not owned_authorized(request) then
 		request.suppress_callback = true
 	end
+	request.output_physically_retired = request.output_sink ~= nil
 	operation._settled = true
 	if _owned[request.owner] == operation then _owned[request.owner] = nil end
 	local result = request.result
@@ -349,7 +350,16 @@ local function finish(request, result, suppress_callback)
 	request.result = result
 	request.suppress_callback = suppress_callback == true
 	request.observing_terminal = true -- Reserve before output cancellation can reenter native cleanup.
-	if request.output_sink then request.output_sink:stop(result.ok ~= true) end
+	if request.output_sink then
+		-- A completed transport receipt may continue at another admitted proxy
+		-- or URL. Retain the FD only after actual EOF/exit and no filesystem
+		-- failure; cancellation/early refusal still revokes it immediately.
+		local keep = request.output_transport_completion == true and request.exited == true and request.stdout_eof == true and request.stderr_eof == true
+			and not request.cleanup_intent and not request.authorization_revoked
+			and request.operation and not request.operation._cancelled
+			and request.output_failure == nil and request.output_sink:failure() == nil
+		request.output_sink:stop(not keep)
+	end
 	if _active[request.owner] == request then _active[request.owner] = nil end
 	-- Logical observation precedes even an immediately acknowledged close.
 	-- Its copy cannot mutate the pending physical completion receipt.
@@ -400,6 +410,9 @@ end
 --- @param request table
 --- @return boolean
 local function terminate_group(request)
+	-- Private intent is recorded before native signal/group probes can reenter.
+	-- Refused termination is still cleanup intent, never transport completion.
+	request.cleanup_intent = true
 	local operation = request.operation
 	if operation and not operation._body_cleanup then
 		if operation._settled or _owned[request.owner] ~= operation then return false end
@@ -654,13 +667,17 @@ local function maybe_complete(request)
 		finish(request, { ok = false, status = 0, body = "", error = "archive output write failed",
 			failure_receipt = request.output_failure })
 	elseif request.buffered then
+		request.output_transport_completion = true
 		if request.single_hop_redirect then
 			finish(request, RedirectReceipt.attach(request, native_receipt(request, buffered_result(request))))
 		else
 			finish(request, native_receipt(request, buffered_result(request)))
 		end
 	else
-		finish(request, native_receipt(request, streaming_result(request)))
+		request.output_transport_completion = true
+		local result = native_receipt(request, streaming_result(request))
+		if request.single_hop_redirect then result = RedirectReceipt.attach(request, result) end
+		finish(request, result)
 	end
 	close_process(request)
 end
@@ -738,7 +755,7 @@ local function bind_output_target(request, target)
 		return called and ack ~= nil and ack ~= false and err == nil and exact()
 	end
 	function input:abort(ticket, producer)
-		if producer ~= operation or not OutputTarget.owns(target, ticket, producer) or not exact() then return false end
+		if not rawequal(producer, operation) or not OutputTarget.owns(target, ticket, producer) or not exact() then return false end
 		local failure = OutputTarget.failure(target)
 		terminate_group(request)
 		if not request.terminal then
@@ -752,11 +769,21 @@ local function bind_output_target(request, target)
 			and input.reader == reader and input.receipt == receipt and receipt.state == "closed"
 	end
 	function input:on_reader_closed(ticket, producer, callback)
-		if producer ~= operation or not OutputTarget.owns(target, ticket, producer)
+		if not rawequal(producer, operation) or not OutputTarget.owns(target, ticket, producer)
 			or type(callback) ~= "function" then return false end
 		if receipt.state == "closed" then pcall(callback)
 		else input.listeners[#input.listeners + 1] = callback end
 		return true
+	end
+	function input:continuation_receipt(ticket, producer, result)
+		if not rawequal(producer, operation) or not OutputTarget.owns(target, ticket, producer)
+			or not rawequal(request.operation, operation) or not rawequal(request.result, result)
+			or request.output_physically_retired ~= true or request.stdout_eof ~= true
+			or not rawequal(input.reader, reader) or not rawequal(input.receipt, receipt)
+			or receipt.state ~= "closed" then return nil end
+		return { result = result, reader_eof = true, physical_settled = true,
+			cancelled = request.cleanup_intent == true or request.authorization_revoked == true or operation._cancelled == true,
+			received_bytes = request.output_bytes }
 	end
 	function input:write_ack(failure)
 		if not exact() then return end
@@ -871,7 +898,8 @@ local function admit_metadata(url, headers, body, options)
 	if options.single_hop_redirect == true then
 		local json_bytes, url_bytes = options.single_hop_receipt_bytes, options.single_hop_url_bytes
 		local authority = url:match("^[^:]+://([^/?#]*)")
-		if request_options.method ~= "GET" or not request_options.buffered or body ~= nil
+		local streamed_archive = output_target ~= nil and request_options.buffered == false
+		if request_options.method ~= "GET" or (not request_options.buffered and not streamed_archive) or body ~= nil
 			or request_options.output_path ~= nil or options.etag_compare ~= nil or options.etag_save ~= nil
 			or request_options.proxy_selection == nil or not authority or authority:find("@", 1, true)
 			or type(json_bytes) ~= "number" or json_bytes < 1 or json_bytes > MAX_DIAGNOSTIC_BYTES or json_bytes % 1 ~= 0
@@ -1091,7 +1119,7 @@ local function start_request(url, headers, body, options, on_chunk, on_done, ope
 		end
 	end
 
-	local timer_ok, timer_result = pcall(NativeTimer.start, luv, request.timer, timeout_ms, 0, function()
+	local timer_ok, timer_result = pcall(NativeTimer.start, luv, request.timer, math.ceil(timeout_ms), 0, function()
 		if request.terminal then return end
 		terminate_group(request)
 		finish(request, { ok = false, status = 0, body = "", error = "timeout" })
@@ -1393,13 +1421,17 @@ local function owned_request(url, headers, body, options, on_chunk, on_done, met
 		if self._settled then return true end
 		local request = self._request
 		if not request then return false end
+		request.cleanup_intent = true
 		-- A reaped leader can leave group descendants holding captured pipes.
 		if request.spawned and (not request.terminal or not request.exited)
 			and not terminate_group(request) then return false end
 		self._cancelled = true
 		if not request.terminal then
 			finish(request, { ok = false, status = 0, body = "", error = "cancelled" }, true)
-		else retry_owned_cleanup(request) end
+		else
+			if request.output_sink then request.output_sink:stop(true) end
+			retry_owned_cleanup(request)
+		end
 		-- A refused construction owns its exact anonymous-pipe descriptors even
 		-- when cancellation intent is accepted. Return the native retirement
 		-- refusal, never claim descriptor closure from logical revocation.

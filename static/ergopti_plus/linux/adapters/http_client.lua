@@ -11,6 +11,7 @@
 
 local M = {}
 local Curl = require("adapters.curl_http_client")
+local OutputTarget = require("infra.http_output_target")
 local Proxy = require("adapters.system_proxy")
 local PolicyBinding = require("infra.proxy_policy")
 local RedirectBinding = require("infra.managed_redirect_policy")
@@ -39,7 +40,7 @@ local function initialize()
 	local policy, err = PolicyBinding.load()
 	if not policy then initialization_error = err; return nil, err end
 	coordinator, initialization_error = Managed.new({
-		policy = policy, proxy = Proxy, curl = Curl.dispatch_owned, redirect = RedirectBinding.load,
+		policy = policy, proxy = Proxy, curl = Curl.dispatch_owned, redirect = RedirectBinding.load, output = OutputTarget,
 		clock = Monotonic.now_ms, deadline = Deadline.start, environment = PolicyBinding.environment,
 		prepare_headers = Curl.rebind_prepared_headers,
 		report = function(message) Logger.error(LOG, "%s", message) end,
@@ -107,7 +108,7 @@ end
 
 --- Reserves the captured public owner before caller metadata or source callbacks.
 --- The lazy preparation port runs only under the coordinator's exact reservation.
-local function dispatch_owned(url, headers, body, options, method, buffered, on_chunk, callback)
+local function dispatch_owned(url, headers, body, options, method, buffered, on_chunk, callback, native_override)
 	local authorized
 	if type(options) == "table" then authorized = rawget(options, "authorized") end
 	if authorized ~= nil and type(authorized) ~= "function" then
@@ -116,22 +117,31 @@ local function dispatch_owned(url, headers, body, options, method, buffered, on_
 	local owner = owner_name(type(options) == "table" and rawget(options, "owner") or nil)
 	local timeout = tonumber(type(options) == "table" and rawget(options, "timeout_ms") or nil) or Curl.default_timeout_ms()
 	local timeout_valid = timeout > 0 and timeout % 1 == 0 and timeout ~= math.huge
+	local absolute_deadline = type(options) == "table" and rawget(options, "absolute_deadline_ms") or nil
+	local deadline_valid = absolute_deadline == nil or type(absolute_deadline) == "number"
+		and absolute_deadline == absolute_deadline and absolute_deadline >= 0 and absolute_deadline < math.huge
 	if method == "POST" and authorized == nil then authorized = function() return true end end
 	local active, initialization_refusal = initialize()
 	-- Without a coordinator reservation no caller source can authorize delivery.
 	if not active then return rejected(initialization_refusal, nil) end
-	local request = { owner = owner, timeout_ms = timeout_valid and timeout or 0, method = method, buffered = buffered, owned_api = true }
+	local request = { owner = owner, timeout_ms = timeout_valid and timeout or 0, method = method, buffered = buffered, owned_api = true,
+		absolute_deadline_ms = deadline_valid and absolute_deadline or nil }
 	local function prepare()
 		if not timeout_valid then return nil, "HTTP timeout is invalid" end
+		if not deadline_valid then return nil, "HTTP absolute deadline is invalid" end
 		local captured = {}
 		if type(options) == "table" then
 			for key, value in next, options do captured[key] = value end
 		end
 		captured.single_hop_redirect, captured.single_hop_receipt_bytes, captured.single_hop_url_bytes = nil, nil, nil
 		captured.prepared_headers = nil
-		captured.owner, captured.timeout_ms = owner, timeout
+		captured.owner, captured.timeout_ms, captured.absolute_deadline_ms = owner, timeout, absolute_deadline
 		captured.method, captured.buffered, captured.owned_api = method, buffered, true
 		captured.authorized = authorized
+		if native_override then
+			local override_refusal = native_override(captured)
+			if override_refusal then return nil, override_refusal end
+		end
 		local allowed, err, token, prepared = Curl.preflight(url, headers, body, captured)
 		if not allowed then return nil, err end
 		if type(token) ~= "table" or type(prepared) ~= "table" then return nil, "HTTP prepared headers unavailable" end
@@ -192,6 +202,26 @@ end
 function M.post_stream_owned(url, headers, body, options, on_chunk, on_done)
 	return dispatch_owned(url, type(headers) == "table" and headers or {}, type(body) == "string" and body or "",
 		options, "POST", false, on_chunk, on_done)
+end
+
+--- Receives an archive into one caller-owned private parent output target.
+--- The exact source is mandatory; lookup/preflight occurs under its reservation.
+--- This port cannot authorize path/body/ETag/native-follow or manual per-hop use.
+--- @return table Retained physical operation; no writable descriptor is exposed.
+function M.download_output_owned(url, headers, target, options, callback)
+	local authorized = type(options) == "table" and rawget(options, "authorized") or nil
+	if type(authorized) ~= "function" then
+		return rejected("owned archive authorization unavailable", nil)
+	end
+	return dispatch_owned(url, type(headers) == "table" and headers or {}, nil,
+		options, "GET", false, nil, callback, function(captured)
+			if captured.output_target ~= nil and not rawequal(captured.output_target, target) then
+				return "archive output target mismatch"
+			end
+			if captured.follow_redirects ~= nil and type(captured.follow_redirects) ~= "boolean" then return "archive redirect option is invalid" end
+			captured.archive_redirects = captured.follow_redirects == true
+			captured.output_target, captured.follow_redirects = target, false
+		end)
 end
 
 --- Downloads to a caller-owned native temporary destination.

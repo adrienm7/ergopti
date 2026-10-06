@@ -1153,6 +1153,36 @@ const CHECKS = [
 		repro: 'npm run test:linux-network-runtime-registration'
 	},
 	{
+		name: 'Managed native HTTP phase owners preserve original modeled closure protocol',
+		cmd: 'node',
+		args: ['tools/test/test-linux-managed-http-phase-protocol.cjs'],
+		repro: 'npm run test:linux-managed-http-phase-protocol'
+	},
+	{
+		name: 'Managed native HTTP CI admits authenticated tools and complete source-bound receipts',
+		cmd: 'node',
+		args: ['tools/test/test-linux-managed-http-ci-registration.cjs'],
+		repro: 'npm run test:linux-managed-http-ci-registration'
+	},
+	{
+		name: 'test:linux-updater-archive-receipt',
+		cmd: 'node',
+		args: ['tools/test/test-linux-updater-archive-receipt.cjs'],
+		repro: 'npm run test:linux-updater-archive-receipt'
+	},
+	{
+		name: 'test:linux-updater-archive-registration',
+		cmd: 'node',
+		args: ['tools/test/test-linux-updater-archive-registration.cjs'],
+		repro: 'npm run test:linux-updater-archive-registration'
+	},
+	{
+		name: 'Linux native digest runtime preserves exact OpenSSL 3 projection and build owners',
+		cmd: 'node',
+		args: ['tools/test/test-linux-crypto-runtime.cjs'],
+		repro: 'npm run test:linux-crypto-runtime'
+	},
+	{
 		name: 'extension-pack paths resolve (every read site lands on a real pack; pre-reorg prefix ratcheted out)',
 		cmd: 'node',
 		args: ['tools/test/test-extensions-path-resolves.cjs'],

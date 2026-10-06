@@ -49,14 +49,16 @@ for _, key in pairs(M.REASON) do KNOWN_REASON[key] = true end
 ---   blocked() -> reason_key|nil (a source run, a system package),
 ---   find_release(tag, channel) -> release|nil, reason_key,
 ---   backup(release) -> record|nil, error (record.path is shown to the user),
----   resolve_asset(release) -> asset|nil,
----   download(asset, release, done(path|nil, reason_key, detail, failure_receipt?)) -> dispatched,
+---   resolve_asset(release, native_owner?) -> asset|nil,
+---   download(asset, release, done(path|nil, reason_key, detail, failure_receipt?), native_owner?) -> dispatched,
 ---   install(path, release, asset) -> true | false, reason_key, detail,
+---   install_async?(path, release, asset, done(completed, reason, detail, receipt?), native_owner?) -> admitted,
 ---   restart(release) -> true | false,
 ---   report(message, native_owner?) -- safe public message plus optional PRIVATE native owner,
 ---   failure_contract?() -> canonical network.failure interpreter,
 ---   acceptance_owner?(tag, channel) -> private pre-acceptance snapshot,
 ---   acceptance_current?(owner) -> original owner still admits native work,
+---   accept_execution?(native_owner, release) -> literal true at initial native transaction acceptance,
 ---   failure_owner?(release) -> private native snapshot,
 ---   failure_current?(owner) -> true only for that exact live native owner,
 ---   failure_capabilities?(owner) -> actual available native actions,
@@ -69,6 +71,10 @@ function M.new(ports)
 		"restart", "report" }) do
 		assert(type(ports[name]) == "function", "release_install needs the " .. name .. " port")
 	end
+	local install_async = rawget(ports, "install_async")
+	assert(install_async == nil or type(install_async) == "function", "release_install async install port is invalid")
+	local accept_execution = rawget(ports, "accept_execution")
+	assert(accept_execution == nil or type(accept_execution) == "function", "release_install execution admission port is invalid")
 	local Logger, LOG = ports.logger, ports.log or "release_install"
 	assert(type(Logger) == "table", "release_install needs a logger")
 
@@ -234,6 +240,15 @@ function M.new(ports)
 				return false
 			end
 		end
+		if accept_execution then
+			-- Capture native transaction lineage at the original fresh admission.
+			-- Presentation retirement afterward does not revoke this transaction.
+			local accepted, native_current = pcall(accept_execution, current.native_owner, release)
+			if not accepted or native_current ~= true or retirement_revision ~= admission_revision then
+				if running == current then running = nil end
+				return false
+			end
+		end
 		if running ~= current or last_operation ~= current or retired then
 			if running == current then running = nil end
 			return false
@@ -250,7 +265,7 @@ function M.new(ports)
 			fail(tag, M.REASON.backup, nil, nil, current)
 			return false
 		end
-		local asset = ports.resolve_asset(release)
+		local asset = ports.resolve_asset(release, current.native_owner)
 		if not execution_current() then return false end
 		if not asset then
 			Logger.error(LOG, "Install of %s refused: the release has no asset for this system.", tag)
@@ -271,27 +286,57 @@ function M.new(ports)
 			end
 			report({ tag = tag, phase = "installing", backup_path = backup.path }, current)
 			if not execution_current() then return end
-			local ok_install, installed, install_reason, install_detail = pcall(ports.install, path, release, asset)
-			if not execution_current() then return end
-			if not ok_install or installed ~= true then
-				Logger.error(LOG, "Install of %s failed: %s.", tag,
-					tostring(ok_install and (install_detail or install_reason) or installed))
-				fail(tag, ok_install and install_reason or M.REASON.install, backup, nil, current)
-				return
+			local install_completed = false
+			local function installed_done(ok_install, installed, install_reason, install_detail, failure_receipt)
+				if install_completed or not execution_current() then return end
+				install_completed = true
+				if not execution_current() then return end
+				if not ok_install or installed ~= true then
+					Logger.error(LOG, "Install of %s failed: %s.", tag,
+						tostring(ok_install and (install_detail or install_reason) or installed))
+					fail(tag, ok_install and install_reason or M.REASON.install, backup, failure_receipt, current)
+					return
+				end
+				Logger.success(LOG, "Release %s installed; restarting on it.", tag)
+				if not execution_current() then return end
+				report({ tag = tag, phase = "restarting", backup_path = backup.path }, current)
+				if not execution_current() then return end
+				local ok_restart, restarted = pcall(ports.restart, release, current.native_owner)
+				if not execution_current() then return end
+				if not ok_restart or restarted ~= true then
+					Logger.error(LOG, "Release %s is installed but the restart failed: %s.", tag,
+						tostring(ok_restart and "refused" or restarted))
+					fail(tag, M.REASON.install, backup, nil, current)
+				end
 			end
-			Logger.success(LOG, "Release %s installed; restarting on it.", tag)
-			if not execution_current() then return end
-			report({ tag = tag, phase = "restarting", backup_path = backup.path }, current)
-			if not execution_current() then return end
-			local ok_restart, restarted = pcall(ports.restart, release)
-			if not execution_current() then return end
-			if not ok_restart or restarted ~= true then
-				Logger.error(LOG, "Release %s is installed but the restart failed: %s.", tag,
-					tostring(ok_restart and "refused" or restarted))
-				fail(tag, M.REASON.install, backup, nil, current)
+			if install_async then
+				-- Admission is separate from completion. Only the native callback
+				-- may report a completed literal-true installation and restart it.
+				local constructing, admitted, seen, early = true, false, false, nil
+				local function completed(installed, reason, detail, receipt)
+					if seen then return end
+					seen = true
+					if constructing then
+						early = { installed, reason, detail, receipt }
+					elseif admitted then
+						installed_done(true, installed, reason, detail, receipt)
+					end
+				end
+				local called, dispatched = pcall(install_async, path, release, asset, completed, current.native_owner)
+				admitted = called and dispatched == true
+				constructing = false
+				if not execution_current() then return end
+				if not admitted then
+					installed_done(called, false, M.REASON.install, called and "refused" or dispatched)
+				elseif early then
+					installed_done(true, early[1], early[2], early[3], early[4])
+				end
+			else
+				local ok_install, installed, install_reason, install_detail = pcall(ports.install, path, release, asset)
+				installed_done(ok_install, installed, install_reason, install_detail)
 			end
 		end
-		local ok_dispatch, dispatched = pcall(ports.download, asset, release, done)
+		local ok_dispatch, dispatched = pcall(ports.download, asset, release, done, current.native_owner)
 		if not ok_dispatch or dispatched ~= true then
 			if not settled then
 				Logger.error(LOG, "Install of %s stopped: the download could not start (%s).", tag,

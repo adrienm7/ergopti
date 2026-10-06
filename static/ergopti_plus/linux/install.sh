@@ -210,6 +210,50 @@ fi
 # ===========================================
 # ===========================================
 
+# APT alternatives are selected from actual local metadata in declared order.
+# A failed/malformed observation never grants repair or falls through to an
+# arbitrary package. Installing a provider still requires the native re-probe.
+_available_apt_runtime_package() {
+	local package_name metadata label value rest candidate count
+	for package_name in "$@"; do
+		if ! metadata="$(LC_ALL=C apt-cache policy -- "$package_name")"; then return 1; fi
+		candidate=""
+		count=0
+		while read -r label value rest; do
+			if [ "$label" = "Candidate:" ]; then
+				count=$((count + 1))
+				[ -z "$rest" ] || return 1
+				candidate="$value"
+			fi
+		done <<< "$metadata"
+		if [ "$count" = 0 ] && [ -z "$metadata" ]; then continue; fi
+		[ "$count" = 1 ] || return 1
+		[ "$candidate" = "(none)" ] && continue
+		[[ "$candidate" =~ ^[0-9][A-Za-z0-9.+:~_-]*$ ]] || return 1
+		printf '%s\n' "$package_name"
+		return 0
+	done
+	return 1
+}
+
+_archive_digest_runtime_available() {
+	luajit "${SRC_DRIVER}/platform/network/digest_probe.lua" "$SRC_DRIVER" >/dev/null 2>&1
+}
+
+_ensure_archive_digest_runtime() {
+	if _archive_digest_runtime_available; then return 0; fi
+	[ -n "${ARCHIVE_DIGEST_SONAME:-}" ] || return 1
+	local manager package_name
+	manager="$(_detect_pkg_manager)"
+	# The generated Lua projection supplies this SONAME to the native probe;
+	# package selection remains in the generator's owned repair table.
+	if ! package_name="$(_required_dependency_package "$manager" "$ARCHIVE_DIGEST_SONAME")"; then
+		return 1
+	fi
+	if ! _install_required_package "$manager" "$package_name"; then return 1; fi
+	_archive_digest_runtime_available
+}
+
 _required_dependency_package() {
 	local pkg_mgr="$1"
 	local capability="$2"
@@ -245,6 +289,7 @@ _required_dependency_package() {
 		pacman:curl) echo "curl" ;;
 		xbps:curl) echo "curl" ;;
 		apk:curl) echo "curl" ;;
+		apt:libcrypto.so.3) _available_apt_runtime_package libssl3t64 libssl3 ;;
 		# END GENERATED LINUX NATIVE PACKAGES
 		apt:luajit) echo "luajit" ;;
 		dnf:luajit) echo "luajit" ;;
@@ -381,6 +426,10 @@ _check_or_install_library() {
 	fi
 	echo "  ✔  ${soname} — capacité vérifiée"
 }
+
+# BEGIN GENERATED LINUX ARCHIVE DIGEST
+ARCHIVE_DIGEST_SONAME="libcrypto.so.3"
+# END GENERATED LINUX ARCHIVE DIGEST
 
 # BEGIN GENERATED LINUX NETWORK PROVIDERS
 _network_runtime_packages() {
@@ -612,6 +661,9 @@ _install_lua_module() {
 
 # Networking owns luv as a required native ABI, after any repair attempt.
 _ensure_network_runtime
+if ! _ensure_archive_digest_runtime; then
+	echo "archive-digest-unavailable: retained-FD updates require an actual OpenSSL3 runtime; capability remains unavailable." >&2
+fi
 _install_lua_module lfs   "système de fichiers"
 _install_lua_module posix "signaux SIGTERM/SIGHUP"
 _install_lua_module lgi   "fenêtres WebKit, compteur de vitesse"
@@ -643,6 +695,54 @@ echo "=== Installation des fichiers ==="
 source "${SRC_DRIVER}/install/layout_registry.sh"
 SRC_REGISTRY="$(layout_registry_source "${SRC_DRIVER}" "${DRIVERS_ROOT}")"
 
+# Source installations compile before replacing the current installation.
+# Release bundles carry their target-built helper; absent binaries are refused,
+# never rebuilt from an unrelated checkout or borrowed from a system location.
+# Native helper admission never follows a foreign bin directory. The existing
+# selected source/installation namespace remains the ownership premise; these
+# checks do not claim hostile same-UID race isolation or atomic directory leases.
+_native_output_ordinary_directory() {
+	local directory="$1"
+	if [ -L "$directory" ] || { [ -e "$directory" ] && [ ! -d "$directory" ]; }; then
+		echo "Native archive bin parent unavailable" >&2
+		return 1
+	fi
+}
+
+_native_output_bin_parents() {
+	_native_output_ordinary_directory "${SRC_DRIVER}/bin" \
+		&& _native_output_ordinary_directory "${LIB_DIR}/linux" \
+		&& _native_output_ordinary_directory "${LIB_DIR}/linux/bin"
+}
+
+# Refuse before compiling, migrating configuration, copying files or replacing
+# the existing generated-helper ownership manifest.
+_native_output_bin_parents || exit 1
+command -v tar >/dev/null || { echo "Native payload copy requires tar" >&2; exit 1; }
+NATIVE_OUTPUT_STAGE=""
+NATIVE_OUTPUT_SOURCE="${SRC_DRIVER}/bin/libergopti_archive_publication.so"
+NATIVE_OUTPUT_REPO="$(cd "${SRC_DRIVER}/../../.." && pwd -P)"
+if [ "$SRC_DRIVER" = "${NATIVE_OUTPUT_REPO}/static/ergopti_plus/linux" ]; then
+	NATIVE_OUTPUT_BUILD="${NATIVE_OUTPUT_REPO}/tools/build/build-linux-native-output.sh"
+	[ -f "$NATIVE_OUTPUT_BUILD" ] && [ ! -L "$NATIVE_OUTPUT_BUILD" ] || {
+		echo "Canonical native archive build helper unavailable" >&2
+		exit 1
+	}
+	NATIVE_OUTPUT_STAGE="$(mktemp -d)"
+	# A failed/uncertain compiler leaves its private stage for explicit cleanup;
+	# no recursive trap can erase an unobserved compiler descendant's resources.
+	if ! bash "$NATIVE_OUTPUT_BUILD" --source-directory "${SRC_DRIVER}/native/archive_output" \
+		--output-directory "$NATIVE_OUTPUT_STAGE"; then
+		echo "Native archive build refused; stage retained: $NATIVE_OUTPUT_STAGE" >&2
+		exit 1
+	fi
+	NATIVE_OUTPUT_SOURCE="${NATIVE_OUTPUT_STAGE}/libergopti_archive_publication.so"
+fi
+[ -f "$NATIVE_OUTPUT_SOURCE" ] && [ ! -L "$NATIVE_OUTPUT_SOURCE" ] || {
+	echo "Target native archive backend unavailable" >&2
+	exit 1
+}
+
 # Create destination directories.
 install -d "${LIB_DIR}/linux"
 install -d "${DEST_SHARED}"
@@ -663,7 +763,18 @@ migrate_canonical_packs \
 # Copy driver Lua sources. SRC_DRIVER, not SCRIPT_DIR: from the release tarball
 # this script sits BESIDE the driver rather than inside it, so SCRIPT_DIR would
 # nest linux/, _shared/ and bin/ inside LIB_DIR/linux/.
-cp -r "${SRC_DRIVER}/." "${LIB_DIR}/linux/"
+# Exclude the canonical generated backend from the source copy. Checkout-local
+# fixture .so bytes can never be staged even briefly; only the freshly compiled
+# output (or release-bundle artifact) below supplies this exact destination.
+tar -C "$SRC_DRIVER" --exclude='./bin/libergopti_archive_publication.so' -cf - . \
+	| tar -C "${LIB_DIR}/linux" -xf -
+# Re-read after the payload/native directory operations; a payload bin alias
+# must not become write authority for the target helper.
+_native_output_bin_parents || exit 1
+install -d "${LIB_DIR}/linux/bin"
+_native_output_bin_parents || exit 1
+[ -d "${LIB_DIR}/linux/bin" ] || exit 1
+install -m 755 "$NATIVE_OUTPUT_SOURCE" "${LIB_DIR}/linux/bin/libergopti_archive_publication.so"
 cp -r "${SRC_SHARED}/." "${DEST_SHARED}/"
 install_layout_registry "${SRC_REGISTRY}" "${LIB_DIR}/linux"
 install -d "${LIB_DIR}/bin"
@@ -675,6 +786,22 @@ if [ -n "${SRC_REGISTRY}" ]; then
 		"${SRC_REGISTRY}" "linux/${LAYOUT_REGISTRY_FOLDER}"
 else
 	bash "${SRC_DRIVER}/install/ownership.sh" "${SRC_DRIVER}" "${SRC_SHARED}" "${LIB_DIR}"
+fi
+
+if [ -n "$NATIVE_OUTPUT_STAGE" ]; then
+	# This generated checkout artifact is outside the input source tree, so its
+	# actual installed bytes need their own canonical ownership entry.
+	NATIVE_OUTPUT_DIGEST="$(sha256sum -- "${LIB_DIR}/linux/bin/libergopti_archive_publication.so")"
+	NATIVE_OUTPUT_MANIFEST="$(mktemp "${LIB_DIR}/.ergopti-owned-native.XXXXXX")"
+	while IFS=$'\t' read -r native_digest native_relative; do
+		[ "$native_relative" = "linux/bin/libergopti_archive_publication.so" ] && continue
+		printf '%s\t%s\n' "$native_digest" "$native_relative" >> "$NATIVE_OUTPUT_MANIFEST"
+	done < "${LIB_DIR}/.ergopti-owned-files"
+	printf '%s\tlinux/bin/libergopti_archive_publication.so\n' "${NATIVE_OUTPUT_DIGEST%% *}" \
+		>> "$NATIVE_OUTPUT_MANIFEST"
+	mv -- "$NATIVE_OUTPUT_MANIFEST" "${LIB_DIR}/.ergopti-owned-files"
+	rm -f -- "${NATIVE_OUTPUT_STAGE}/libergopti_archive_publication.so"
+	rmdir -- "$NATIVE_OUTPUT_STAGE"
 fi
 
 # Create the wrapper script in ~/.local/bin/ that points to the installed libs.

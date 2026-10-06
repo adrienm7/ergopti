@@ -15,4 +15,8 @@ return {
 		},
 		proxy_schema = "org.gnome.system.proxy",
 	},
+	archive_digest_runtime = {
+		schema_version = 1,
+		soname = "libcrypto.so.3",
+	},
 }

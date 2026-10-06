@@ -3434,17 +3434,16 @@ the complete three-OS checkpoint remain pending.
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 
-The exact macOS run 37487966582 on 8827c9d326dc501cdbe96f838b2f27cfaac9da10
-reached a genuine Swift compiler refusal: the imported Sparkle delegate uses
-`updater(_:willDownloadUpdate:with:)`, whereas the private archive child used
-the obsolete `withRequest` label. The fixture and its existing source guard
-now use the canonical imported label; routing, signatures and lifecycle
-assertions are retained. The upstream socket-stop controls are combined with
-the numeric-bind controls: 46 actual portable Sparkle cases and 53 Brew
-portable cases pass on Linux. Native Swift/Sparkle requalification is still
-required. Brew still refuses deny-removal-positive with -10004 and no second
-delivery marker; no successful native acceptance is inferred. Item 36 stays
-open.
+Exact macOS run 37494074376 on a96b224a676b8267e072069ed57c556a99623327
+compiles the corrected imported Sparkle delegate. Core JavaScript/properties,
+portable Hammerspoon unit/E2E and tooltip checks pass, but native packaging
+fails: the official foreign-signature equality and application lifecycle
+controls refuse, and Brew's unconfined positive sender reports -600/exit66.
+Installation is skipped; publication is skipped. Added fixed signature and
+cached application-exit facts preserve all original assertions and deadlines;
+these diagnostics still require actual macOS execution. The latest complete
+Linux-host JavaScript gate passes 375 checks. Physical Sparkle/Brew acceptance
+and transversal requirements 16/38 remain open; item 36 stays partial.
 
 The private Sparkle fixture now binds its real numeric loopback socket without
 the HTTP server's unrelated reverse-DNS lookup. Actual bind, assigned port,
@@ -4691,18 +4690,47 @@ These are implementation tasks; separate installed tray/input acceptance.
       uncommitted in the local worktree of `fix/downloads-on-managed-networks`
       when the session stopped; redo it if that worktree is gone.
 
-The current-dev alignment retains the other group's distribution-specific unit
-toolchain preparation and closed native bootstrap diagnostics. The isolated
-492-module updater composition passed all 42 focused component commands, but
-its complete Linux suite reported 10,051 passed and 11 failed. The failing
-legacy scenarios exposed a backup-order regression and missing owned fixture
-ports; their reviewed corrections still need runtime qualification.
-The original native body-pipe replay stopped at eight passed, one failed and
-eleven unexecuted, both without and with the separate passive observer. Exact
-native and guardian retirement reported no remaining owned debt. The observer
-recorded a positive residual rounded to zero before POST admission; its timing
-does not replace the uninstrumented result. These remain feasible Linux work,
-while the twelve Windows PC steps and transversal items 16/38 stay open.
+The current Linux working-source qualification passes 375 JavaScript checks,
+all 10,106 normal Linux tests in 495 modules, 124 focused updater controls
+under each Lua ABI, and the original uninstrumented 20 real body-pipe cases
+with unchanged 1 ms caller budgets. Earlier failures remain recorded. Strict
+native output18/public30 now pass with physical closure; the successful
+CONNECT fixture retires its HTTP connection after tunnelling. Source controls
+pass separately: metadata8, filesystem4, actual private Git snapshots5 and
+modeled CONNECT5; registration89 and receipt19 also pass. Protocol models do
+not qualify enterprise authentication or native transport.
+
+A real AppImage was built (17,230,328 bytes, SHA-256
+024429d3e90c3316dfd44ddf3139915e3bbd28f897ad8b0da86f8d4fcaa16c0f),
+extracted without FUSE, and its real launcher and installed network-runtime
+probe pass with host Lua/library overrides removed. This is the recorded
+working-source test build, not final committed/package-matrix acceptance or
+a physical graphical session. The original AppDir7 and actual PPID2 controls
+also pass. Flatpak/Nix and final-source package qualification remain required.
+
+The genuine updater now builds from an actual HEAD clone plus its exact
+index-listed working snapshot. Private staging preserves tracked files inside
+ignored parents and all original index/status/HEAD bytes. Canonical Bash,
+actual generated stamp and identical complete UTF-8 inventory ordering admit
+the native chain. A separately captured shared 8388608-byte listing bound
+admits the real names117004/verbose229756-byte outputs while extraction and
+the generic 65536-byte process bound remain unchanged. Three genuine native
+cases now pass fifteen checks with zero skips and complete physical closure:
+verified installation, wrong-digest refusal, and an actually executed exit42
+replacement launcher followed by restoration of the complete prior inode,
+path, mode and content tree. Original assertions remain intact. Fifteen new
+listing-policy models pass under each actual Lua ABI, alongside their
+thirty-three original controls. Archive receiving controls pass their original
+19/89 floors plus four/eight rollback refusals. Final source qualification and
+the package matrix remain required. The twelve Windows PC steps and
+transversal requirements 16/38 remain open; item 62 stays partial.
+
+The final scoped replay also passes 15,154 portable Hammerspoon tests. Its
+stamping-mutation failure is corrected against the actual packaging owner;
+the complete 375-check JavaScript gate then passes. Swift is deferred to native
+macOS. The cloud window-switch supervisor prerequisite remains blocked before
+child allocation. A real Nix user/mount namespace works, but the official cache
+HTTPS prerequisite returns 403; genuine Nix package qualification is pending.
 
 Windows remote API readiness and generation now reserve their actual request
 owner before asynchronous system-proxy admission. Native WinHTTP resolves the

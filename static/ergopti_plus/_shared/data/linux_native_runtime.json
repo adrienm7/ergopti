@@ -99,7 +99,8 @@
 			"at-spi2-core",
 			"glib-networking",
 			"libproxy",
-			"dconf"
+			"dconf",
+			"openssl"
 		]
 	},
 	"package_sources": {
@@ -163,6 +164,26 @@
 				}
 			},
 			"description": "AppImage copies the actual build-host ELF closure and retains the recipient glibc and certificate trust. Flatpak builds its native modules under /app. Runtime admission proves ABI/schema/backend availability, not desktop/PAC settings or transport delivery."
+		}
+	},
+	"archive_digest_runtime": {
+		"soname": "libcrypto.so.3",
+		"nix_package": "openssl",
+		"deb_dependency_alternatives": ["libssl3t64", "libssl3"],
+		"package_alternatives": {
+			"apt": ["libssl3t64", "libssl3"],
+			"dnf": null,
+			"zypper": null,
+			"pacman": null,
+			"xbps": null,
+			"apk": null
+		},
+		"portable_dlopen_roots": ["libcrypto.so.3"],
+		"description": "Exact OpenSSL3 runtime for retained-FD EVP digest. Alternatives mean one currently available provider, never a command-line list installing both. Debian and pre-t64 Ubuntu use libssl3; t64 Ubuntu uses libssl3t64. Null means no reviewed repair package mapping, not proof the loaded native capability is absent. Every target must re-probe actual SONAME and EVP APIs; OpenSSL1.1 is not a fallback.",
+		"package_sources": {
+			"apt_debian": "https://packages.debian.org/bookworm/libssl3",
+			"apt_ubuntu_22_04": "https://packages.ubuntu.com/jammy/libssl3",
+			"apt_ubuntu_24_04": "https://packages.ubuntu.com/noble/libssl3t64"
 		}
 	}
 }

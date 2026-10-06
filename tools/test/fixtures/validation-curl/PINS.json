@@ -1,0 +1,67 @@
+{
+	"schema_version": 1,
+	"command_owner_sha256": "ac48a4e9755fb2b9e9cbe35c81b097942bf7be76d14466e03b891b4c78f302f5",
+	"modern": {
+		"authority": "official_upstream_github_release_asset_digest",
+		"api_url": "https://api.github.com/repos/curl/curl/releases/tags/curl-8_14_1",
+		"release_id": 222954438,
+		"asset_id": 260804610,
+		"version": "8.14.1",
+		"url": "https://github.com/curl/curl/releases/download/curl-8_14_1/curl-8.14.1.tar.xz",
+		"size": 2817248,
+		"sha256": "f4619a1e2474c4bbfedc88a7c2191209c8334b48fa1f4e53fd584cc12e9120dd"
+	},
+	"legacy": {
+		"authority": "official_debian_signed_distribution_packages",
+		"version": "7.88.1",
+		"inrelease_url": "https://deb.debian.org/debian/dists/bookworm/InRelease",
+		"inrelease_sha256": "77737fa4b34f2693e982cc9ee35736816c35a7778fc2d326cc1bbf5b301fe1aa",
+		"required_signer": "4D64FEC119C2029067D6E791F8D2585B8783D481",
+		"metadata": {
+			"path": "main/binary-amd64/Packages.xz",
+			"size": 8790396,
+			"sha256": "9e0b5aabb2465b3d2e7a7fe27f9913846277833f7a2826e7767acccff5b588c5"
+		},
+		"packages": [
+			{
+				"package": "curl",
+				"version": "7.88.1-10+deb12u15",
+				"url": "https://deb.debian.org/debian/pool/main/c/curl/curl_7.88.1-10+deb12u15_amd64.deb",
+				"sha256": "0dd9b6bf7a0bd11af2d68a52ec44c2a223fa7c11f9104c36ce1047e1137d4a8f",
+				"size": 315764
+			},
+			{
+				"package": "libcurl4",
+				"version": "7.88.1-10+deb12u15",
+				"url": "https://deb.debian.org/debian/pool/main/c/curl/libcurl4_7.88.1-10+deb12u15_amd64.deb",
+				"sha256": "3042904de01f9c4fbdcf1452b8f81abedcf2b015f9b9deba109063322b5bd68b",
+				"size": 392184
+			},
+			{
+				"package": "libldap-2.5-0",
+				"version": "2.5.13+dfsg-5",
+				"url": "https://deb.debian.org/debian/pool/main/o/openldap/libldap-2.5-0_2.5.13+dfsg-5_amd64.deb",
+				"sha256": "4b6c30f6554149c594628d945edc6003f0eea8d0cc1341638c0e71375db147ed",
+				"size": 183248
+			}
+		],
+		"curl_file_sha256": "27125f0331490b7fbf4da11f2bd913ce1b94e071367b2fa8e535ce8c5526e29c",
+		"libraries": [
+			{
+				"soname": "libcurl.so.4",
+				"file_sha256": "02fbea31e63cd827ee61644851f1d336de6850a7df0f7af30ba74da97c4b99ab",
+				"source_basename": "libcurl.so.4.8.0"
+			},
+			{
+				"soname": "libldap-2.5.so.0",
+				"file_sha256": "062bb940f27b45cdcac5d3d66a727f441755b17f59842641ceaebaf990e1634d",
+				"source_basename": "libldap-2.5.so.0.1.8"
+			},
+			{
+				"soname": "liblber-2.5.so.0",
+				"file_sha256": "64f183c14330855843841747ff1975ed87e767de2e2f1b1cc4d7abd2302cb7a9",
+				"source_basename": "liblber-2.5.so.0.1.8"
+			}
+		]
+	}
+}

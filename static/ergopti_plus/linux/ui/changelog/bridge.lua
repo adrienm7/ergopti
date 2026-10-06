@@ -481,12 +481,49 @@ end
 
 local function install_session()
 	if _install_session then return _install_session end
+	local accepted_owners = {} -- Private native transaction lineage, not page consent.
+	local function accepted_current(owner, release)
+		local accepted = accepted_owners[owner]
+		if not accepted or not rawequal(accepted.release, release) then return false end
+		local manager = updater()
+		return rawequal(manager, accepted.manager) and accepted_owners[owner] == accepted
+			and rawget(manager, "release_record") == accepted.resolve
+			and rawequal(_daemon_state, accepted.state) and rawget(accepted.state, "restart_after_update") == accepted.restart
+	end
+	local function selected_current(accepted, record, owner, release)
+		local function identity()
+			if not accepted or type(accepted.selected) ~= "table" or type(record) ~= "table" then return false end
+			for _, key in ipairs({ "tag", "download_url", "checksum_url" }) do
+				if rawget(record, key) ~= accepted.selected[key] then return false end
+			end
+			return accepted_owners[owner] == accepted
+		end
+		return identity() and accepted_current(owner, release) and identity()
+	end
 	_install_session = ReleaseInstall.new({
 		logger = Logger,
 		log = LOG,
 		failure_contract = failure_contract,
 		acceptance_owner = failure_owner,
 		acceptance_current = failure_current,
+		accept_execution = function(owner, release)
+			if not failure_current(owner) or accepted_owners[owner] ~= nil then return false end
+			local tag = Parser.parse_tag(release)
+			local manager, state = updater(), owner.state
+			local restart = rawget(state, "restart_after_update")
+			local resolve = manager and rawget(manager, "release_record")
+			if tag == "" or type(resolve) ~= "function" or type(restart) ~= "function" then return false end
+			-- Capture execution lineage now; resolve its asset only after the
+			-- shared caller has completed the required configuration backup.
+			if updater() ~= manager or rawget(manager, "release_record") ~= resolve or not failure_current(owner) then return false end
+			accepted_owners[owner] = { release = release, tag = tag, resolve = resolve,
+				manager = manager, state = state, restart = restart }
+			if not accepted_current(owner, release) or not failure_current(owner) then
+				accepted_owners[owner] = nil
+				return false
+			end
+			return true
+		end,
 		failure_owner = failure_owner,
 		failure_current = failure_current,
 		blocked = function() return install_blocked(updater()) end,
@@ -496,16 +533,36 @@ local function install_session()
 			if not owner then return nil, err end
 			return owner.create("pre_install", { tag = Parser.parse_tag(chunk), from_version = Version.VERSION })
 		end,
-		resolve_asset = function(chunk)
-			local manager = updater()
-			return manager and manager.release_record(chunk) or nil
+		resolve_asset = function(chunk, retained_owner)
+			local accepted = accepted_owners[retained_owner]
+			if not accepted or accepted.asset_resolved or not accepted_current(retained_owner, chunk) then return nil end
+			accepted.asset_resolved = true -- Reserve the single post-backup resolver call.
+			local resolved, record = pcall(accepted.resolve, chunk)
+			if not resolved or not accepted_current(retained_owner, chunk) or type(record) ~= "table"
+				or rawget(record, "tag") ~= accepted.tag or type(rawget(record, "download_url")) ~= "string"
+				or type(rawget(record, "checksum_url")) ~= "string" then return nil end
+			local selected = {}
+			for _, key in ipairs({ "tag", "download_url", "checksum_url", "notes", "published_at", "prerelease" }) do
+				selected[key] = rawget(record, key)
+			end
+			if not accepted_current(retained_owner, chunk) then return nil end
+			accepted.selected = selected
+			local copy = {}
+			for key, value in next, selected do copy[key] = value end
+			return copy
 		end,
-		download = function(record, _, done)
-			local manager = updater()
-			if not manager then return false end
-			return manager.download_release(record, function(path, err, stage, failure_receipt)
+		download = function(record, release, done, retained_owner)
+			local accepted = accepted_owners[retained_owner]
+			if not selected_current(accepted, record, retained_owner, release) then return false end
+			local manager = accepted.manager
+			local download = rawget(manager, "download_release")
+			if type(download) ~= "function" or not selected_current(accepted, record, retained_owner, release) then return false end
+			return download(record, function(path, err, stage, failure_receipt)
 				done(path, stage == "verify" and ReleaseInstall.REASON.verify or ReleaseInstall.REASON.download, err,
 					failure_receipt)
+			end, function()
+				return rawget(manager, "download_release") == download
+					and selected_current(accepted, record, retained_owner, release)
 			end) == true
 		end,
 		install = function(path, _, record)
@@ -513,13 +570,33 @@ local function install_session()
 			if manager and manager.install_release_archive(path, record.tag) == true then return true end
 			return false, ReleaseInstall.REASON.install, "the installer refused the archive"
 		end,
-		restart = function(chunk)
-			local restart = type(_daemon_state) == "table" and _daemon_state.restart_after_update or nil
+		install_async = function(path, release, record, done, retained_owner)
+			local accepted = accepted_owners[retained_owner]
+			local function current() return selected_current(accepted, record, retained_owner, release) end
+			if not current() then return false end
+			local manager = accepted.manager
+			local install = rawget(manager, "install_release_archive_async")
+			if type(install) ~= "function" or not current() then return false end
+			-- Original accepted script intent survives later page/pause retirement.
+			return install(path, accepted.tag, function(installed, detail, receipt)
+				done(installed == true, ReleaseInstall.REASON.install, detail, receipt)
+			end, function()
+				return rawget(manager, "install_release_archive_async") == install
+					and current()
+			end) == true
+		end,
+		restart = function(chunk, retained_owner)
+			local accepted = accepted_owners[retained_owner]
+			local restart
+			if retained_owner ~= nil then
+				if not accepted or not accepted_current(retained_owner, chunk) then return false end
+				restart = accepted.restart
+			else restart = type(_daemon_state) == "table" and _daemon_state.restart_after_update or nil end
 			if type(restart) ~= "function" then
 				Logger.error(LOG, "No daemon restart hook: the installed release starts at the next launch.")
 				return false
 			end
-			return restart(Parser.parse_tag(chunk)) == true
+			return restart(accepted and accepted.tag or Parser.parse_tag(chunk)) == true
 		end,
 		report = function(message, retained_owner)
 			local payload = { action = "install_progress" }

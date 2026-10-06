@@ -78,7 +78,7 @@ function M.start(deadline, callback)
 	local allocated, value = pcall(luv.new_timer)
 	if not allocated or not value then return operation end
 	timer, state = value, "open"
-	local budget = math.max(0, math.floor(deadline - Monotonic.now_ms()))
+	local budget = math.max(0, math.ceil(deadline - Monotonic.now_ms()))
 	local armed, ack, native_error = pcall(NativeTimer.start, luv, timer, budget, 0, function()
 		if terminal then return end
 		terminal = true

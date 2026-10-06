@@ -63,6 +63,11 @@ const NOT_SUITE_ENTRIES = new Set([
 	'tools/test/run-linux-http-stream-receipts.cjs',
 	// Actual GIO/runtime admission has its own planner gate and mandatory Linux lane.
 	'tools/test/run-linux-network-runtime.cjs',
+	// Native output/public fixtures retain their own mandatory Linux ownership gate.
+	'tools/test/run-linux-managed-http-native.cjs',
+	// Actual archive and source controls have mandatory separate Linux planner/CI gates.
+	'tools/test/run-linux-updater-archive-native.cjs',
+	'tools/test/run-linux-archive-source-controls.cjs',
 	// Actual owned X11/RandR focus and cleanup run under the native gate.
 	'tools/test/run-linux-window-switch-receipts.cjs',
 	// Real process/file probes run under verify-change and mandatory Linux CI.

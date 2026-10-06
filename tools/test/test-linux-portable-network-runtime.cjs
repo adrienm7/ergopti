@@ -448,23 +448,33 @@ spec=importlib.util.spec_from_file_location('owned_stager',sys.argv[1]);m=import
 class BoundaryReached(Exception):pass
 with tempfile.TemporaryDirectory(prefix='ergopti-gio-metadata-') as temporary:
  root=pathlib.Path(temporary);sources=root/'sources';sources.mkdir()
- for name in ['luajit','curl','luv.so','libgiognomeproxy.so','libgiolibproxy.so','libdconfsettings.so']:(sources/name).write_bytes(b'independent query control only')
+ for name in ['luajit','curl','luv.so','libgiognomeproxy.so','libgiolibproxy.so','libdconfsettings.so','libcrypto.so.3']:(sources/name).write_bytes(b'independent query control only')
  schema=root/'runtime schemas';schema.mkdir();(schema/'gschemas.compiled').write_bytes(b'independent schema acquisition control only')
- catalogue=root/'catalogue.json';catalogue.write_text(json.dumps({'network_runtime':{'portable':{'gio_modules':['libgiognomeproxy.so','libgiolibproxy.so','libdconfsettings.so']}}}))
+ catalogue=root/'catalogue.json';catalogue.write_text(json.dumps({'network_runtime':{'portable':{'gio_modules':['libgiognomeproxy.so','libgiolibproxy.so','libdconfsettings.so']}},'archive_digest_runtime':{'soname':'libcrypto.so.3','portable_dlopen_roots':['libcrypto.so.3']}}))
  real_uname=m.os.uname;m.os.uname=lambda:types.SimpleNamespace(machine='x86_64')
  m.shutil.which=lambda name:str(sources/name)
  try:
   for index,value in enumerate([str(schema),'','relative/untrusted-schemas']):
    appdir=root/('package'+str(index));driver=appdir/'usr/lib/ergopti';(driver/'platform/network').mkdir(parents=True);(driver/'platform/network/runtime_probe.lua').write_bytes(b'no execution in query witness')
-   queries=[];copies=[];closure=[]
+   queries=[];copies=[];closure=[];crypto_queries=[]
    def controlled_run(arguments,**options):
     if arguments[0]==str(sources/'luajit'):return str(sources/'luv.so')
+    # Separate explicit crypto command-contract model; dummy bytes/SONAME output
+    # never qualify native OpenSSL ABI, ELF inspection, staging or digest behavior.
+    if arguments==['pkg-config','--variable=libdir','libcrypto']:
+     crypto_queries.append(arguments);return str(sources)
+    if arguments==['readelf','--dynamic','--',str(sources/'libcrypto.so.3')]:
+     assert options['env']['LC_ALL']=='C','Explicit SONAME observation must use fixed locale'
+     crypto_queries.append(arguments)
+     return ' 0x000000000000000e (SONAME) Library soname: [libcrypto.so.3]\\n'
     assert arguments[0]=='pkg-config' and len(arguments)==3,'Unexpected native command or schema factory'
     queries.append(arguments)
     if arguments==['pkg-config','--variable=giomoduledir','gio-2.0']:return str(sources)
     assert arguments==['pkg-config','--variable=schemasdir','gio-2.0'],'Desktop development metadata must not be required'
     return value
-   def boundary(*arguments):closure.append(True);raise BoundaryReached()
+   def boundary(*arguments):
+    assert [pathlib.Path(item) for item in arguments[0]]==[sources/name for name in ['luajit','curl','luv.so','libgiognomeproxy.so','libgiolibproxy.so','libdconfsettings.so','libcrypto.so.3']],'Explicit crypto source must join the unchanged closure seeds'
+    closure.append(True);raise BoundaryReached()
    m.run=controlled_run;m.copy_unique=lambda source,destination,owners:copies.append((pathlib.Path(source),pathlib.Path(destination)));m.copy_elf_closure=boundary
    try:m.stage(str(appdir),str(catalogue),'unused owned template')
    except BoundaryReached:assert index==0
@@ -474,6 +484,10 @@ with tempfile.TemporaryDirectory(prefix='ergopti-gio-metadata-') as temporary:
    assert queries==[['pkg-config','--variable=giomoduledir','gio-2.0'],['pkg-config','--variable=schemasdir','gio-2.0']]
    schema_copies=[source for source,destination in copies if destination.name=='gschemas.compiled']
    assert schema_copies==([schema/'gschemas.compiled'] if index==0 else [])
+   # Invalid schema values refuse before the newly explicit crypto boundary.
+   assert crypto_queries==([['pkg-config','--variable=libdir','libcrypto'],['readelf','--dynamic','--',str(sources/'libcrypto.so.3')]] if index==0 else [])
+   crypto_copies=[source for source,destination in copies if destination.name=='libcrypto.so.3']
+   assert crypto_copies==([sources/'libcrypto.so.3'] if index==0 else [])
    assert closure==([True] if index==0 else []) and m._DESTINATION_ROOT is None
  finally:m.os.uname=real_uname
 with tempfile.TemporaryDirectory(prefix='ergopti-gio-cache-tool-') as temporary:
