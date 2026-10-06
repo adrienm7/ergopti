@@ -71,6 +71,8 @@ while (_riArgIndex <= A_Args.Length) {
 ; Test framework first — Assert / Test / RunTests must exist before any
 ; subsequent file registers its cases or invokes assertions inside lambdas.
 #Include test_framework.ahk
+; Acquire the selected receipt before any bootstrap observation or test include.
+_TestResultsBeginRun()
 
 ; AppState — must come before test_stubs.ahk because the stubs reference
 ; AppState fields directly, and before any infra/ file that reads AppState.
@@ -95,7 +97,9 @@ _FatalErrorHandler(e, mode) {
     msg := "not ok 0 - FATAL STARTUP ERROR: " . e.Message
     try 	msg .= "`r`nSTACK TRACE:`r`n" . e.Stack
 	msg .= "`r`nLikely cause: top-level code or missing stub in a newly added module."
-	try FileAppend(msg . "`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
+	global TEST_RESULTS_FILE
+	try _TestResultsWrite(TEST_RESULTS_FILE, msg . "`r`n")
+	try FileAppend(msg . "`r`n", "**")
 	try FileAppend(msg . "`r`n", "*")
     ExitApp(1)
     return 1
@@ -558,14 +562,20 @@ _LogBootProgress("loading LLM modules")
 #Include ../modules/llm/remote_formats.ahk
 #Include ..\..\_shared\modules\llm\local_server_auth.ahk
 #Include ..\..\_shared\modules\llm\local_server_discovery.ahk
+#Include ../../_shared/modules/llm/local_server_menu.ahk
 #Include ../modules/llm/api_remote.ahk
 #Include ../modules/llm/local_server_models.ahk
+#Include ../modules/llm/local_servers.ahk
 #Include unit/test_llm_api_ollama.ahk
 #Include unit/test_llm_engine_read_guarded_in_timer.ahk
 #Include unit/test_llm_api_remote.ahk
 #Include unit/test_local_server_auth.ahk
 #Include unit/test_local_server_discovery_policy.ahk
 #Include unit/test_local_server_models.ahk
+#Include unit/test_local_server_models_timer.ahk
+#Include unit/test_local_server_menu.ahk
+#Include unit/test_local_servers.ahk
+#Include unit/test_local_server_queue_timer.ahk
 #Include unit/test_llm_crash_orphan_cleanup.ahk
 #Include unit/test_llm_temp_artifact_terminal_ownership.ahk
 #Include unit/test_filesystem_native_write.ahk
@@ -682,6 +692,7 @@ _LogBootProgress("loading menu_llm/persist")
 #Include ../ui/menu/menu_llm/backend_lifecycle.ahk
 #Include ../ui/menu/menu_llm/aux_ownership.ahk
 #Include ../ui/menu/menu_llm/menu_api_entries.ahk
+#Include ../ui/menu/menu_llm/local_server_panel.ahk
 #Include ../ui/menu/menu_llm/menu_main.ahk
 #Include ../ui/menu/menu_llm/enable_admission.ahk
 #Include ../ui/menu/menu_llm/actions.ahk
@@ -697,6 +708,10 @@ _LogBootProgress("loading menu_llm/persist")
 #Include unit/test_llm_sync_target.ahk
 #Include unit/test_llm_menu_transactions_20260813.ahk
 #Include unit/test_local_server_private_publication.ahk
+#Include unit/test_local_server_write_admission.ahk
+#Include unit/test_local_server_join.ahk
+#Include unit/test_local_server_scope_cohort.ahk
+#Include unit/test_local_server_panel.ahk
 #Include unit/test_llm_enable_admission.ahk
 #Include unit/test_llm_menu_fixture_isolation.ahk
 #Include unit/test_llm_fixture_setup.ahk
@@ -1595,6 +1610,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_plain_paste_clipboard_sequence_ownership.ahk
 #Include meta/test_onboarding_gesture_registration_async.ahk
 #Include unit/test_text_sender_completion_status.ahk
+#Include unit/test_native_editor_completion.ahk
 #Include unit/test_text_sender_sendinput_failure.ahk
 #Include meta/test_deadkey_unmapped_base_char.ahk
 #Include meta/test_savefullconfig_no_delete.ahk
@@ -2032,6 +2048,8 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_suite_watchdog_manifest.ahk
 #Include meta/test_suite_unique_includes.ahk
 
+#Include unit/test_file_read_activity.ahk
+
 ; Watchdog: kill the process if RunTests() never returns (e.g. a corpus
 ; consumer blocks on a synchronous HTTP call, an InputHook with no timeout,
 ; or a blocking dialog in a headless CI context). The current corpus normally
@@ -2060,4 +2078,5 @@ SetTimer(_WatchdogFire, -_SUITE_TIMEOUT_MS)
 
 ; Drive everything. RunTests prints a TAP-style report to stdout and exits
 ; with the appropriate code — control never returns from this call.
+
 RunTests()

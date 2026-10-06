@@ -803,15 +803,6 @@ KL_LogWindowSwitch(app_name, prev_title, next_title, duration_ms := 0) {
     ))
 }
 
-KL_LogShortcut(shortcut_key, app_name := "Unknown") {
-    if (shortcut_key = "")
-        return
-    KL_AppendLog(Map(
-        "type", "shortcut",
-        "key",  shortcut_key,
-        "app",  app_name
-    ))
-}
 
 KL_LogSystemEvent(action, metadata := unset) {
     e := Map("type", "system_event", "action", action)

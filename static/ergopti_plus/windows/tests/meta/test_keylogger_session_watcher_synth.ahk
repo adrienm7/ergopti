@@ -56,11 +56,13 @@ _KSW_WatcherGatedBySynth() {
 		"KL_Hook_NoteActivity must still drive KL_Watchers_OnKeystroke for real keystrokes")
 	; Anchor on the guard CODE literal (not comment wording): the call must be
 	; the statement guarded by `if !Keylogger.synth_active`.
-	GuardIdx := InStr(Body, "if !Keylogger.synth_active")
+	Assert(InStr(Body, "IsSynthetic := IsSet(Synthetic) ? Synthetic : Keylogger.synth_active") > 0,
+		"ordinary callers retain the native synthetic default and receipts pass their entry state")
+	GuardIdx := InStr(Body, "if !IsSynthetic")
 	Assert(GuardIdx > 0,
-		"KL_Hook_NoteActivity must guard the KL_Watchers_OnKeystroke call with `if !Keylogger.synth_active` — synthetic auto-typed keystrokes (hotstring / LLM) must not fabricate session/idle activity (session-watcher-fed-synthetic)")
-	AfterGuard := SubStr(Body, GuardIdx, 120)
+		"KL_Hook_NoteActivity must guard the KL_Watchers_OnKeystroke call with the captured synthetic verdict — synthetic auto-typed keystrokes (hotstring / LLM) must not fabricate session/idle activity (session-watcher-fed-synthetic)")
+	AfterGuard := SubStr(Body, GuardIdx, 240)
 	Assert(InStr(AfterGuard, "KL_Watchers_OnKeystroke") > 0,
-		"the statement immediately guarded by `if !Keylogger.synth_active` must be the KL_Watchers_OnKeystroke call so synthetic keystrokes never reach the session/idle machine")
+		"the statement guarded by the captured synthetic verdict must be the KL_Watchers_OnKeystroke call so synthetic keystrokes never reach the session/idle machine")
 }
 Test("keylogger: session/idle watcher is gated by !synth_active so auto-typed output cannot fabricate activity (session-watcher-fed-synthetic)", _KSW_WatcherGatedBySynth)

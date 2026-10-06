@@ -178,6 +178,14 @@
 			"min_width": 400,
 			"min_height": 260,
 			"vhost": "ergopti.updatecheck"
+		},
+		"physical_shortcuts": {
+			"title_key": "physical_shortcuts.window_title",
+			"width": 780,
+			"height": 660,
+			"min_width": 560,
+			"min_height": 420,
+			"vhost": "ergopti.physicalshortcuts"
 		}
 	}
 }

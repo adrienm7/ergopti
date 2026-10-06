@@ -515,7 +515,7 @@ TestFMv2_LegacyZeroOneBooleansMigrate() {
 			. "context_length = 0`r`n"
 			. "[script]`r`n"
 			. "locale = " . '"' . "es" . '"' . "`r`n"
-			. "[hotstrings.autocorrection.caps]`r`n"
+			. "[hotstrings.autocorrection.names]`r`n"
 			. "time_activation_seconds = true`r`n")
 		Applied := ApplyConfigToml(Features, Path, &Rejected, , &Outdated)
 		AssertEqual(6, Applied,
@@ -1201,15 +1201,15 @@ _FMS_RootAndSectionRows(Path) {
 	AssertEqual(true, IniCacheGet(Cache, "category_enabled", "hotstrings"))
 	AssertEqual("none", IniCacheGet(Cache, "shortcuts.keyboard", "win_space"))
 	Target := ManifestBuildFeaturesMap()
-	Target["hotstrings"]["autocorrection"]["caps"]["enabled"] := false
+	Target["hotstrings"]["autocorrection"]["names"]["enabled"] := false
 	Assert(ApplyConfigToml(Target, Path) >= 1, "at least the actual known dotted feature must apply")
-	AssertTrue(Target["hotstrings"]["autocorrection"]["caps"]["enabled"])
+	AssertTrue(Target["hotstrings"]["autocorrection"]["names"]["enabled"])
 	AssertEqual(false, TOML_UnreadableFile(Path))
 }
 _FMS_RootSettingsAndDottedFeatureApply() {
-	Source := 'hotstrings.trigger_char = "@"`ncategory_enabled.hotstrings = true`nshortcuts.keyboard.win_space = "none"`nhotstrings.autocorrection.caps.enabled = true`n'
+	Source := 'hotstrings.trigger_char = "@"`ncategory_enabled.hotstrings = true`nshortcuts.keyboard.win_space = "none"`nhotstrings.autocorrection.names.enabled = true`n'
 	_FMS_WithSource("root", Source, _FMS_RootAndSectionRows)
-	Source := '[hotstrings]`ntrigger_char = "@"`nautocorrection.caps.enabled = true`n[category_enabled]`nhotstrings = true`n[shortcuts]`nkeyboard.win_space = "none"`n'
+	Source := '[hotstrings]`ntrigger_char = "@"`nautocorrection.names.enabled = true`n[category_enabled]`nhotstrings = true`n[shortcuts]`nkeyboard.win_space = "none"`n'
 	_FMS_WithSource("section", Source, _FMS_RootAndSectionRows)
 }
 Test("configuration snapshot: root and dotted settings reach cache and features (config-semantic-snapshot)",
@@ -1217,19 +1217,19 @@ Test("configuration snapshot: root and dotted settings reach cache and features 
 
 _FMS_LiteralAndNested(Path) {
 	Cache := ParseConfigTomlFile(Path)
-	AssertEqual(false, IniCacheGet(Cache, "hotstrings", "autocorrection.caps.enabled"))
-	AssertEqual(true, IniCacheGet(Cache, "hotstrings.autocorrection.caps", "enabled"))
-	AssertEqual("literal", IniCacheGet(Cache, '"hotstrings.autocorrection.caps"', "note"))
-	AssertEqual("_", IniCacheGet(Cache, "hotstrings.autocorrection.caps", "note"))
+	AssertEqual(false, IniCacheGet(Cache, "hotstrings", "autocorrection.names.enabled"))
+	AssertEqual(true, IniCacheGet(Cache, "hotstrings.autocorrection.names", "enabled"))
+	AssertEqual("literal", IniCacheGet(Cache, '"hotstrings.autocorrection.names"', "note"))
+	AssertEqual("_", IniCacheGet(Cache, "hotstrings.autocorrection.names", "note"))
 	Target := ManifestBuildFeaturesMap()
-	Target["hotstrings"]["autocorrection"]["caps"]["enabled"] := false
+	Target["hotstrings"]["autocorrection"]["names"]["enabled"] := false
 	ApplyConfigToml(Target, Path)
-	AssertTrue(Target["hotstrings"]["autocorrection"]["caps"]["enabled"],
+	AssertTrue(Target["hotstrings"]["autocorrection"]["names"]["enabled"],
 		"the quoted literal false leaf must never alias the actual nested true preference")
-	AssertEqual(false, IniCacheGet(Cache, "hotstrings", "autocorrection.caps.enabled"))
+	AssertEqual(false, IniCacheGet(Cache, "hotstrings", "autocorrection.names.enabled"))
 }
 _FMS_LiteralDotsStayDistinct() {
-	Source := '[hotstrings]`n"autocorrection.caps.enabled" = false`nautocorrection.caps.enabled = true`n["hotstrings.autocorrection.caps"]`nnote = "literal"`n'
+	Source := '[hotstrings]`n"autocorrection.names.enabled" = false`nautocorrection.names.enabled = true`n["hotstrings.autocorrection.names"]`nnote = "literal"`n'
 	_FMS_WithSource("literal", Source, _FMS_LiteralAndNested)
 }
 Test("configuration snapshot: literal dots never alias nested settings (config-semantic-snapshot)",
@@ -1551,32 +1551,32 @@ _FMS_AssertExactTree(Expected, Actual) {
 _FMS_InlineOwnedNamespaces(Path) {
 	Snapshot := ConfigTomlReadSnapshot(Path)
 	Cache := ParseConfigTomlFile(Path)
-	_FMS_AssertExactTree(Map("hotstrings", Map("trigger_char", "@", "autocorrection", Map("caps", Map("enabled", TOML_Bool(true)))),
+	_FMS_AssertExactTree(Map("hotstrings", Map("trigger_char", "@", "autocorrection", Map("names", Map("enabled", TOML_Bool(true)))),
 		"category_enabled", Map("hotstrings", TOML_Bool(true))), Snapshot.Document)
-	_FMS_AssertExactTree(Map("hotstrings", Map("trigger_char", "@"), "hotstrings.autocorrection", Map("caps", Map("enabled", true)),
+	_FMS_AssertExactTree(Map("hotstrings", Map("trigger_char", "@"), "hotstrings.autocorrection", Map("names", Map("enabled", true)),
 		"category_enabled", Map("hotstrings", true)), Cache)
 	AssertEqual("@", IniCacheGet(Cache, "hotstrings", "trigger_char"))
 	AssertTrue(IniCacheGet(Cache, "category_enabled", "hotstrings"))
-	Assert(Cache["hotstrings.autocorrection"]["caps"] is Map,
+	Assert(Cache["hotstrings.autocorrection"]["names"] is Map,
 		"inline feature records retain a native owned-record identity")
 	Target := ManifestBuildFeaturesMap()
 	AssertEqual(3, ApplyConfigToml(Target, Path, &Rejected, , &Outdated),
 		"two owned primitive leaves and one successfully merged feature record apply")
 	AssertEqual(0, Rejected)
 	AssertEqual(0, Outdated.Count)
-	AssertTrue(Target["hotstrings"]["autocorrection"]["caps"]["enabled"])
-	AssertEqual(0.5, Target["hotstrings"]["autocorrection"]["caps"]["time_activation_seconds"],
+	AssertTrue(Target["hotstrings"]["autocorrection"]["names"]["enabled"])
+	AssertEqual(0.5, Target["hotstrings"]["autocorrection"]["names"]["time_activation_seconds"],
 		"an omitted feature child retains its independent shipped default")
 	Assert(Target["hotstrings"].Has("french_autocorrection"),
 		"an inline namespace cannot replace unrelated seeded siblings")
 	AssertFalse(Target["hotstrings"]["autocorrection"].Has("accents"),
 		"the actual current manifest has no accents owner in this namespace")
-	AssertTrue(Snapshot.Document["hotstrings"]["autocorrection"]["caps"]["enabled"].Value)
+	AssertTrue(Snapshot.Document["hotstrings"]["autocorrection"]["names"]["enabled"].Value)
 }
 _FMS_InlineNamespaceSpellingsKeepDefaults() {
-	_FMS_WithSource("inline_root", 'hotstrings = { trigger_char = "@", autocorrection = { caps = { enabled = true } } }`ncategory_enabled = { hotstrings = true }`n',
+	_FMS_WithSource("inline_root", 'hotstrings = { trigger_char = "@", autocorrection = { names = { enabled = true } } }`ncategory_enabled = { hotstrings = true }`n',
 		_FMS_InlineOwnedNamespaces)
-	_FMS_WithSource("inline_section", '[hotstrings]`ntrigger_char = "@"`nautocorrection = { caps = { enabled = true } }`n[category_enabled]`nhotstrings = true`n',
+	_FMS_WithSource("inline_section", '[hotstrings]`ntrigger_char = "@"`nautocorrection = { names = { enabled = true } }`n[category_enabled]`nhotstrings = true`n',
 		_FMS_InlineOwnedNamespaces)
 }
 Test("configuration snapshot: inline owned namespaces retain record identity and defaults (config-semantic-snapshot)",
@@ -1615,15 +1615,15 @@ _FMS_ChildPoliciesAndFullSave(Path, ExpectedSave) {
 		_ConfigBootOutdatedEntries := Map()
 		ParseConfigTomlFile(Path)
 		AssertEqual(1, ApplyBootConfigToml(Target, Path), "only the valid timing child applies")
-		Caps := Target["hotstrings"]["autocorrection"]["caps"]
+		Caps := Target["hotstrings"]["autocorrection"]["names"]
 		AssertFalse(Caps["enabled"], "an invalid known Boolean child cannot become truthy")
 		AssertEqual(0.25, Caps["time_activation_seconds"])
 		AssertFalse(Caps.Has("future"), "unowned fields are ignored in runtime, retained on disk")
-		AssertTrue(_ConfigBootOutdatedEntries.Has("hotstrings.autocorrection.caps`nenabled"),
+		AssertTrue(_ConfigBootOutdatedEntries.Has("hotstrings.autocorrection.names`nenabled"),
 			"the exact child identity, not the parent record, owns neutral-save preservation")
 		Collect() {
 			Updates := []
-			_CollectFeatureUpdates(Updates, "hotstrings.autocorrection.caps", Caps)
+			_CollectFeatureUpdates(Updates, "hotstrings.autocorrection.names", Caps)
 			return Updates
 		}
 		AssertEqual(ExpectedSave, SaveFullConfig(0, (*) => true, true, 0, Collect),
@@ -1640,9 +1640,9 @@ _FMS_ChildPoliciesAndFullSave(Path, ExpectedSave) {
 	}
 }
 _FMS_InlineChildRefusalAndPhysicalPreservation() {
-	_FMS_WithSource("inline_child", '[hotstrings]`nautocorrection = { caps = { enabled = "true", time_activation_seconds = 0.25, future = "retain" } } # preserve`n',
+	_FMS_WithSource("inline_child", '[hotstrings]`nautocorrection = { names = { enabled = "true", time_activation_seconds = 0.25, future = "retain" } } # preserve`n',
 		_FMS_ChildPoliciesAndFullSave.Bind(, CONFIG_SAVE_FAILED))
-	_FMS_WithSource("physical_child", '[hotstrings.autocorrection.caps]`nenabled = "true" # outdated`ntime_activation_seconds = 0.25`nfuture = "retain" # unknown`n',
+	_FMS_WithSource("physical_child", '[hotstrings.autocorrection.names]`nenabled = "true" # outdated`ntime_activation_seconds = 0.25`nfuture = "retain" # unknown`n',
 		_FMS_ChildPoliciesAndFullSave.Bind(, CONFIG_SAVE_OK))
 }
 Test("configuration snapshot: inline child policy and actual full-save fences retain obsolete data (config-semantic-snapshot)",
@@ -1821,10 +1821,10 @@ Test("configuration snapshot: source guard retains observed generation without p
 _FMS_InlineLiteralSpellingsKeepBooleanIntent(Path) {
 	Snapshot := ConfigTomlReadSnapshot(Path)
 	_FMS_AssertExactTree(Map("shortcuts", Map("screen", 0, "microsoft_bold", 0, "title_case", 1),
-		"hotstrings", Map("autocorrection", Map("caps", Map("enabled", 0, "time_activation_seconds", 0.125)),
+		"hotstrings", Map("autocorrection", Map("names", Map("enabled", 0, "time_activation_seconds", 0.125)),
 		"french_autocorrection", Map("accents", Map("enabled", 1)))), Snapshot.Document)
 	_FMS_AssertExactTree(Map("shortcuts", Map("screen", 0, "microsoft_bold", 0, "title_case", 1),
-		"hotstrings.autocorrection", Map("caps", Map("enabled", 0, "time_activation_seconds", 0.125)),
+		"hotstrings.autocorrection", Map("names", Map("enabled", 0, "time_activation_seconds", 0.125)),
 		"hotstrings.french_autocorrection", Map("accents", Map("enabled", 1))), Snapshot.Cache)
 	Rows := Map()
 	for Row in Snapshot.Rows
@@ -1833,7 +1833,7 @@ _FMS_InlineLiteralSpellingsKeepBooleanIntent(Path) {
 	AssertEqual("-0", Rows["shortcuts`nscreen"].Raw)
 	AssertEqual("-0", Rows["shortcuts`nmicrosoft_bold"].Raw)
 	AssertEqual("1", Rows["shortcuts`ntitle_case"].Raw)
-	AssertEqual("-0", Rows["hotstrings.autocorrection`ncaps"].ChildRaw["enabled"])
+	AssertEqual("-0", Rows["hotstrings.autocorrection`nnames"].ChildRaw["enabled"])
 	AssertEqual("1", Rows["hotstrings.french_autocorrection`naccents"].ChildRaw["enabled"])
 	Target := ManifestBuildFeaturesMap()
 	AssertEqual(3, ApplyConfigToml(Target, Path, &Rejected, &Migrated, &Outdated))
@@ -1843,12 +1843,12 @@ _FMS_InlineLiteralSpellingsKeepBooleanIntent(Path) {
 	AssertFalse(Target["shortcuts"]["screen"])
 	AssertFalse(Target["shortcuts"]["microsoft_bold"])
 	AssertTrue(Target["shortcuts"]["title_case"])
-	AssertFalse(Target["hotstrings"]["autocorrection"]["caps"]["enabled"])
-	AssertEqual(0.125, Target["hotstrings"]["autocorrection"]["caps"]["time_activation_seconds"])
+	AssertFalse(Target["hotstrings"]["autocorrection"]["names"]["enabled"])
+	AssertEqual(0.125, Target["hotstrings"]["autocorrection"]["names"]["time_activation_seconds"])
 	AssertTrue(Target["hotstrings"]["french_autocorrection"]["accents"]["enabled"])
 }
 _FMS_InlineRawTokensNeverInventMigrationIntent() {
-	_FMS_WithSource("inline_spelling", 'shortcuts = { screen = -0, microsoft_bold = -0, title_case = 1 }`nhotstrings = { autocorrection = { caps = { enabled = -0, time_activation_seconds = 0.125 } }, french_autocorrection = { accents = { enabled = 1 } } }`n',
+	_FMS_WithSource("inline_spelling", 'shortcuts = { screen = -0, microsoft_bold = -0, title_case = 1 }`nhotstrings = { autocorrection = { names = { enabled = -0, time_activation_seconds = 0.125 } }, french_autocorrection = { accents = { enabled = 1 } } }`n',
 		_FMS_InlineLiteralSpellingsKeepBooleanIntent)
 }
 Test("configuration snapshot: exact inline child spellings retain legacy Boolean admission (config-semantic-snapshot)",
@@ -1869,3 +1869,22 @@ _FMS_RepeatedArrayReadUsesRetainedSource() {
 }
 Test("configuration snapshot: repeated array consumers cannot mutate retained source rows (config-semantic-snapshot)",
 	_FMS_RepeatedArrayReadUsesRetainedSource)
+
+; Retired family source remains readable without becoming a current feature.
+_FMS_RetiredCorrectionFamily(Path) {
+	Original := FSRead(Path)
+	Target := ManifestBuildFeaturesMap()
+	Assert(ManifestFindEntryByPath("hotstrings.autocorrection.names") is Map,
+		"the replacement fixture must exercise a current canonical feature")
+	AssertFalse(ManifestFindEntryByPath("hotstrings.autocorrection.caps"))
+	AssertEqual(true, IniCacheGet(ParseConfigTomlFile(Path), "hotstrings.autocorrection.caps", "enabled"))
+	AssertEqual(0, ApplyConfigToml(Target, Path), "a retired family cannot apply as a current feature")
+	AssertFalse(Target["hotstrings"]["autocorrection"].Has("caps"))
+	AssertEqual(Original, FSRead(Path), "loading must preserve the retired user source bytes")
+}
+_FMS_RetiredCorrectionFamilyRemainsSourceOnly() {
+	_FMS_WithSource("retired_correction", "[hotstrings.autocorrection.caps]`nenabled = true`n",
+		_FMS_RetiredCorrectionFamily)
+}
+Test("configuration snapshot: retired correction family stays source-only (config-semantic-snapshot)",
+	_FMS_RetiredCorrectionFamilyRemainsSourceOnly)

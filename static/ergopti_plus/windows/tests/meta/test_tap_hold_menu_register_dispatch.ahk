@@ -75,22 +75,13 @@ Test("meta fix-tapholds-menu-raw-add: the two buttons are declared commands",
 ; ================================================
 
 _THRD_KeyRowsReturnData() {
-	Body := _DriverFuncBody("_TH_KeyRows")
-	Assert(Body != "", "_TH_KeyRows must be present in the driver source")
-
-	Assert(!RegExMatch(Body, "\bMenu\(\)"),
-		"_TH_KeyRows must return row data, never build a Menu — a Menu it filled itself would carry "
-		. "callbacks outside the WM_COMMAND retry path (HIGH-07)")
-	Assert(!InStr(Body, "RegisterMenuItem("),
-		"_TH_KeyRows must not register menu items itself (HIGH-07)")
-	; The provider binds each native owner to its shared command identity. The
-	; template materializes action data through the same renderer as every list.
-	Assert(InStr(Body, 'MenuRenderer_TemplateRows("tap_hold_key_head"') > 0,
-		"_TH_KeyRows must delegate the complete child head to the shared template")
-	for Id, Fn in Map("tap_hold_key_native", "_TH_MakeDisableFn",
-		"tap_hold_key_tap", "_TH_MakeTapPickerFn") {
-		Assert(RegExMatch(Body, Chr(34) . Id . Chr(34) . "\s*,\s*" . Fn),
-			"_TH_KeyRows must bind " . Fn . " to its declared command " . Id . " (HIGH-07)")
+	Owners := Map()
+	for Name in ["_TH_KeyRows", "MenuRenderer_TemplateRows", "_MR_TemplateRows",
+			"MenuRenderer_CommandRow", "_MR_DeclaredProviderRow",
+			"_MR_CommandRowData", "_MR_RenderRows"] {
+		Body := _DriverFuncBody(Name)
+		Assert(Body != "", Name . " must have an actual source body")
+		Owners[Name] := Body
 	}
 	Head := _MR_GetMenuDef("tap_hold_key_head")
 	Assert(Head.Length > 0 && Head[1]["type"] == "include"
@@ -102,18 +93,86 @@ _THRD_KeyRowsReturnData() {
 		Assert(Item is Map && Item["type"] == "command" && _MR_IsForAhk(Item),
 			"the bound callback must remain a reachable Windows command: " . Id)
 	}
-	Assert(InStr(_DriverFuncBody("_MR_TemplateRows"), "MenuRenderer_CommandRow(") > 0,
-		"the template must materialize each declared command through the native provider")
-	Assert(InStr(_DriverFuncBody("MenuRenderer_CommandRow"), "_MR_DeclaredProviderRow(") > 0,
-		"the command provider must use the actual declaration owner")
-	Assert(InStr(_DriverFuncBody("_MR_DeclaredProviderRow"), "_MR_CommandRowData(") > 0,
-		"the declaration owner must materialize canonical command row data")
-	Assert(RegExMatch(_DriverFuncBody("_MR_CommandRowData"),
-		Chr(34) . "action" . Chr(34) . "\s*,\s*Commands\[CmdId\]"),
-		"canonical command data must retain its callback as an action field (HIGH-07)")
-	Assert(InStr(_DriverFuncBody("_MR_RenderRows"), 'RegisterMenuItem(TargetMenu, Label, Row["action"])') > 0,
-		"the actual native renderer must register action data through the WM_COMMAND retry owner")
+	_THRD_KeyRowsPolicy(Owners)
+	Mutant := Owners.Clone()
+	Mutant["_TH_KeyRows"] := StrReplace(Owners["_TH_KeyRows"],
+		"_TH_MakeDisableFn(KeyId)", "_TH_MakeTapPickerFn(KeyId)", true, &Changed)
+	AssertEqual(1, Changed, "the wrong native callback mutation must change its actual binding")
+	_THRD_KeyRowsRefuses(Mutant, "native and tap callbacks plus configured state must reach the child template")
+	Mutant := Owners.Clone()
+	Mutant["_TH_KeyRows"] := StrReplace(Owners["_TH_KeyRows"],
+		".Bind(IsConfigured)", ".Bind(false)", true, &Changed)
+	AssertEqual(1, Changed, "the wrong state argument mutation must change its actual getter binding")
+	_THRD_KeyRowsRefuses(Mutant, "native and tap callbacks plus configured state must reach the child template")
+	Mutant := Owners.Clone()
+	Mutant["_MR_CommandRowData"] := StrReplace(Owners["_MR_CommandRowData"],
+		'"action", Commands[CmdId]', '"action", Commands[Id]', true, &Changed)
+	AssertEqual(1, Changed, "the wrong renderer action mutation must change the actual row constructor")
+	_THRD_KeyRowsRefuses(Mutant, "the declared command must construct the renderer action")
 }
+
+/** Pins shared child-template callbacks and state to reliable native dispatch. */
+_THRD_KeyRowsPolicy(Owners) {
+	Body := Owners["_TH_KeyRows"]
+	Code := _DriverMaskNonCode(&Body)
+	Assert(!RegExMatch(Code, "i)\bMenu\s*\("), "per-key providers cannot build a native Menu")
+	Assert(!RegExMatch(Code, "i)\bRegisterMenuItem\s*\("), "per-key providers cannot register their own callbacks")
+	NativePattern := 'i)MenuRenderer_TemplateRows\(\s*"tap_hold_key_head"\s*,\s*'
+		. 'Map\(\s*"tap_hold_key_native"\s*,\s*_TH_MakeDisableFn\(\s*KeyId\s*\)\s*,\s*'
+		. '"tap_hold_key_tap"\s*,\s*_TH_MakeTapPickerFn\(\s*KeyId\s*,\s*KeyLabel\s*,\s*TapLbl\s*\)\s*\)\s*,\s*'
+		. 'Map\(\s*"tap_hold_key_configured"\s*,\s*\(\(Value\)\s*=>\s*Value\)\.Bind\(\s*IsConfigured\s*\)\s*,'
+	Assert(_THRD_ExecutablePattern(Body, NativePattern, "MenuRenderer_TemplateRows"),
+		"native and tap callbacks plus configured state must reach the child template")
+	Template := Owners["MenuRenderer_TemplateRows"]
+	Code := _DriverMaskNonCode(&Template)
+	Assert(RegExMatch(Code, "i)\breturn\s+_MR_TemplateRows\(\s*ManifestKey\s*,\s*Commands\s*,\s*StateGetters\s*,\s*Children\s*,"),
+		"the public template must forward its exact callbacks and state")
+	TemplateRows := Owners["_MR_TemplateRows"]
+	Code := _DriverMaskNonCode(&TemplateRows)
+	Assert(RegExMatch(Code, "i)\bRow\s*:=\s*MenuRenderer_CommandRow\(\s*ManifestKey\s*,\s*Id\s*,\s*Commands\s*,\s*StateGetters\s*\)"),
+		"the child template must materialize callbacks through the command owner")
+	Command := Owners["MenuRenderer_CommandRow"]
+	Code := _DriverMaskNonCode(&Command)
+	Assert(RegExMatch(Code, "i)\breturn\s+_MR_DeclaredProviderRow\(\s*ManifestKey\s*,\s*CommandId\s*,\s*Commands\s*,"),
+		"the command factory must forward the actual owner callback map")
+	Declared := Owners["_MR_DeclaredProviderRow"]
+	Code := _DriverMaskNonCode(&Declared)
+	Assert(RegExMatch(Code, "i)Row\s*:=\s*_MR_CommandRowData\(\s*Item\s*,\s*ManifestKey\s*,\s*Commands\s*,\s*Getters\s*\)"),
+		"the provider must consume the command map through the declared row owner")
+	Data := Owners["_MR_CommandRowData"]
+	Assert(_THRD_ExecutablePattern(Data,
+		'i)Map\(\s*"label"\s*,\s*t\(I18nKey\)\s*,\s*"action"\s*,\s*Commands\[CmdId\]\s*\)', "Map"),
+		"the declared command must construct the renderer action")
+	Renderer := Owners["_MR_RenderRows"]
+	Assert(_THRD_ExecutablePattern(Renderer,
+		'i)RegisterMenuItem\(\s*TargetMenu\s*,\s*Label\s*,\s*Row\["action"\]\s*\)', "RegisterMenuItem"),
+		"the shared renderer must register the row action with reliable dispatch")
+}
+
+/** Requires literal argument bindings to start at an executable source token. */
+_THRD_ExecutablePattern(Source, Pattern, Token) {
+	Code := _DriverMaskNonCode(&Source)
+	Search := 1
+	while RegExMatch(Source, Pattern, &Match, Search) {
+		if StrLower(SubStr(Code, Match.Pos(0), StrLen(Token))) == StrLower(Token)
+			return true
+		Search := Match.Pos(0) + Match.Len(0)
+	}
+	return false
+}
+
+/** Unexpected errors are propagated; only the named policy refusal is accepted. */
+_THRD_KeyRowsRefuses(Owners, ExpectedMessage) {
+	Refused := false
+	try _THRD_KeyRowsPolicy(Owners)
+	catch as PolicyFailure {
+		if Type(PolicyFailure) != "Error" || PolicyFailure.Message != ExpectedMessage
+			throw PolicyFailure
+		Refused := true
+	}
+	AssertTrue(Refused, "the actual per-key policy must reject its targeted mutation")
+}
+
 Test("meta fix-tapholds-menu-raw-add: the per-key provider returns data, not a menu",
 	_THRD_KeyRowsReturnData)
 

@@ -229,3 +229,156 @@ console.log(
 	`[OK] log file names are spelled only by the generated app_dirs data ` +
 		`(${scannedFiles} files, ${scannedLiterals} literals scanned).`
 );
+
+/** Exercises the actual generator with a closed in-memory output owner. */
+function assertManagedWindowsRuntimeContract() {
+	const assert = require('node:assert/strict');
+	const vm = require('node:vm');
+	const source = fs.readFileSync(path.join(SP, '_shared/modules/paths/app_dirs.toml'), 'utf8');
+	const generator = fs.readFileSync(path.join(ROOT, 'tools/codegen/codegen-app-dirs.cjs'), 'utf8');
+	const declared = toml.parse(source);
+	const nativeFunction = 'AppDirsWindowsManagedOllamaFolderName';
+	const targets = GENERATED_OWNERS.map((p) => path.join(SP, p));
+	function generate(input) {
+		const writes = new Map();
+		const messages = [];
+		let refusal = false;
+		const sourcePath = path.join(SP, '_shared/modules/paths/app_dirs.toml');
+		const filesystem = {
+			readFileSync(filename, encoding) {
+				assert.equal(filename, sourcePath);
+				assert.equal(encoding, 'utf8');
+				return input;
+			},
+			mkdirSync(filename) {
+				assert(targets.some((target) => path.dirname(target) === filename));
+			},
+			writeFileSync(filename, content, encoding) {
+				assert(targets.includes(filename), 'Unknown generated output is not owned.');
+				assert.equal(encoding, 'utf8');
+				assert(!writes.has(filename), 'Each generated output is written once.');
+				writes.set(filename, content);
+			}
+		};
+		const exit = {};
+		try {
+			vm.runInNewContext(
+				generator,
+				{
+					__dirname: path.join(ROOT, 'tools/codegen'),
+					require(name) {
+						if (name === 'fs') return filesystem;
+						if (name === 'path') return path;
+						if (name === 'smol-toml') return toml;
+						throw new Error(`Unowned generator dependency ${name}.`);
+					},
+					console: {
+						log() {},
+						error(message) {
+							messages.push(message);
+						}
+					},
+					process: {
+						exit(code) {
+							assert.equal(code, 1);
+							throw exit;
+						}
+					}
+				},
+				{ timeout: 2000, filename: 'actual-app-dirs-generator.cjs' }
+			);
+		} catch (error) {
+			if (error !== exit) throw error;
+			refusal = true;
+		}
+		return { writes, messages, refusal };
+	}
+	const healthy = generate(source);
+	assert(!healthy.refusal);
+	assert.equal(healthy.writes.size, 3);
+	const ahk = healthy.writes.get(path.join(SP, 'windows/_generated/app_dirs.ahk'));
+	assert(ahk.startsWith('\uFEFF'));
+	assert(!ahk.includes('\r'));
+	assert(
+		ahk.includes(`${nativeFunction}() {\n\treturn "ergopti_plus_ollama"\n}`),
+		'The actual generator must emit AppDirsWindowsManagedOllamaFolderName from the shared declaration.'
+	);
+	assert.equal(declared.runtime.windows.managed_ollama_folder_name, 'ergopti_plus_ollama');
+	assert.equal(ahk, fs.readFileSync(path.join(SP, 'windows/_generated/app_dirs.ahk'), 'utf8'));
+	for (const file of GENERATED_OWNERS.filter((p) => !p.endsWith('.ahk'))) {
+		assert.equal(
+			healthy.writes.get(path.join(SP, file)),
+			fs.readFileSync(path.join(SP, file), 'utf8'),
+			'Existing macOS/Linux paths remain unchanged.'
+		);
+	}
+	const invalid = [
+		undefined,
+		null,
+		false,
+		7,
+		[],
+		'',
+		'.',
+		'..',
+		'a/b',
+		'a\\b',
+		'a:b',
+		'a<b',
+		'a>b',
+		'a"b',
+		'a|b',
+		'a?b',
+		'a*b',
+		'a\0b',
+		'a\nb',
+		'a\u0085b',
+		'tail.',
+		'tail ',
+		'CON',
+		'con.txt',
+		'PrN.any',
+		'AUX',
+		'nul',
+		'COM1',
+		'com9.ext',
+		'LPT1',
+		'lpt9.ext',
+		'COM¹',
+		'LPT².txt',
+		'CONIN$',
+		'conout$.txt',
+		declared.app.folder_name,
+		declared.app.folder_name.toUpperCase()
+	];
+	for (const value of invalid) {
+		const candidate = toml.parse(source);
+		if (value === undefined) delete candidate.runtime.windows.managed_ollama_folder_name;
+		else if (value === null) delete candidate.runtime.windows;
+		else candidate.runtime.windows.managed_ollama_folder_name = value;
+		const result = generate(toml.stringify(candidate));
+		assert(result.refusal, `Invalid managed root was accepted: ${JSON.stringify(value)}.`);
+		assert.equal(result.writes.size, 0, 'Refusal precedes every generated output.');
+		assert(
+			result.messages.some((message) =>
+				message.includes('runtime.windows.managed_ollama_folder_name')
+			)
+		);
+	}
+	for (const value of ['runtime-safe', 'résident_ollama', 'CONSOLE', 'com10', 'LPT10.data']) {
+		const candidate = toml.parse(source);
+		candidate.runtime.windows.managed_ollama_folder_name = value;
+		const result = generate(toml.stringify(candidate));
+		assert(!result.refusal, `Valid managed root was refused: ${value}.`);
+		assert(
+			result.writes
+				.get(path.join(SP, 'windows/_generated/app_dirs.ahk'))
+				.includes(`return "${value}"`)
+		);
+	}
+	console.log(
+		`[OK] managed Windows runtime root: exact generated owner, ${invalid.length} refusals and five valid controls.`
+	);
+}
+
+assertManagedWindowsRuntimeContract();

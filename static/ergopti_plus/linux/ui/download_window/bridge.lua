@@ -195,6 +195,7 @@ function M.show(opts)
 		Logger.error(LOG, "Download progress native window could not be opened.")
 		return nil
 	end
+	session.page_epoch = type(host.current_epoch) == "function" and host.current_epoch(APP_NAME) or nil
 	return session.id
 end
 
@@ -259,10 +260,25 @@ function M.focus(session_id)
 	if not host or type(host.show) ~= "function" then return false end
 	if type(host.is_visible) == "function" and host.is_visible(APP_NAME) == true then
 		if type(host.bring_to_front) == "function" then host.bring_to_front(APP_NAME) end
+		session.page_epoch = type(host.current_epoch) == "function" and host.current_epoch(APP_NAME) or nil
 		return true
 	end
 	session.ready = false
-	return host.show(APP_NAME) == true
+	if host.show(APP_NAME) ~= true then return false end
+	session.page_epoch = type(host.current_epoch) == "function" and host.current_epoch(APP_NAME) or nil
+	return true
+end
+
+--- Releases readiness only for the native page that actually closed.
+--- Background download ownership and explicit cancellation remain independent.
+--- @param page_epoch number The epoch captured by the native close callback.
+--- @return boolean True when this session owned the closed page.
+function M.on_window_closed(page_epoch)
+	local session = _session
+	if not session or page_epoch == nil or session.page_epoch ~= page_epoch then return false end
+	session.ready = false
+	session.page_epoch = nil
+	return true
 end
 
 --- Retires a native operation's retained actions without signalling another owner.

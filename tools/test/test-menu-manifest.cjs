@@ -215,6 +215,15 @@ function main() {
 				}
 			}
 
+			for (const declaration of Object.values(item.status_rows || {})) {
+				for (const row of declaration) {
+					if (row.type !== 'label') continue;
+					for (const [locale, keys] of Object.entries(localeKeys))
+						if (!keys.has(row.i18n))
+							violations.push(`${where}: status label missing from ${locale}.json`);
+				}
+			}
+
 			if (item.platforms !== undefined) {
 				if (!Array.isArray(item.platforms)) {
 					violations.push(`${where}: "platforms" must be an array`);
@@ -297,6 +306,58 @@ function checkChoiceProjection() {
 		assert.equal(result.status, 0, result.stderr);
 		let menu = JSON.parse(fs.readFileSync(output, 'utf8'));
 		const acknowledgedTemplates = fs.readFileSync(output);
+		const backendStatus = menu.llm_menu.find((row) => row.id === 'llm_backend').status_rows;
+		assert.deepEqual(
+			backendStatus.unavailable,
+			[
+				{ type: '---' },
+				{ type: 'label', i18n: 'menu.llm.local_servers.header' },
+				{ type: 'label', i18n: 'menu.llm.unavailable' }
+			],
+			'existing provider owns exact independent status data'
+		);
+		assert.equal(
+			Object.hasOwn(menu, 'llm_local_servers_unavailable'),
+			false,
+			'status is not another menu'
+		);
+		for (const [name, source, reason] of [
+			[
+				'status effect',
+				original.replace(
+					'type = "label", i18n = "menu.llm.unavailable"',
+					'type = "label", i18n = "menu.llm.unavailable", action = "foreign"'
+				),
+				/only inert/
+			],
+			[
+				'status empty caption',
+				original.replace(
+					'type = "label", i18n = "menu.llm.unavailable"',
+					'type = "label", i18n = ""'
+				),
+				/only inert/
+			],
+			[
+				'status submenu',
+				original.replace(
+					'type = "label", i18n = "menu.llm.unavailable"',
+					'type = "group", i18n = "menu.llm.unavailable"'
+				),
+				/only inert/
+			]
+		]) {
+			assert.notEqual(source, original, name + ': mutation reaches actual metadata');
+			result = execute(source);
+			assert.notEqual(result.status, 0, name + ': actual generator refuses');
+			assert.match(result.stderr, reason, name + ': classified refusal');
+			assert.deepEqual(
+				fs.readFileSync(output),
+				acknowledgedTemplates,
+				name + ': published data retained'
+			);
+		}
+
 		for (const [name, source, reason] of [
 			[
 				'missing include',

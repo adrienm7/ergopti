@@ -353,6 +353,21 @@
 		{
 			"type": "dynamic",
 			"id": "llm_backend",
+			"status_rows": {
+				"unavailable": [
+					{
+						"type": "---"
+					},
+					{
+						"type": "label",
+						"i18n": "menu.llm.local_servers.header"
+					},
+					{
+						"type": "label",
+						"i18n": "menu.llm.unavailable"
+					}
+				]
+			},
 			"disabled_when_off": false,
 			"health_dot": false,
 			"platforms": [
@@ -1141,6 +1156,21 @@
 		},
 		{
 			"type": "---"
+		},
+		{
+			"type": "command",
+			"id": "physical_shortcuts_editor",
+			"i18n": "physical_shortcuts.window_title",
+			"platforms": [
+				"hs",
+				"linux"
+			],
+			"unavailable": "grey",
+			"reason_key": "physical_shortcuts.windows_unavailable",
+			"disabled_when": [
+				"physical_shortcuts_editor_ready"
+			],
+			"disabled_reason_key": "physical_shortcuts.window_unavailable"
 		},
 		{
 			"type": "list",

@@ -847,3 +847,120 @@ helpers.describe("aggregate walker: the streaks the layout exists to reduce", fu
 	end)
 
 end)
+
+helpers.describe("linux-hourly-manual-errors", function()
+	local function walk(events, times)
+		return Walker.daily_rows(Walker.walk(events, "2000-01-01", "owned", nil,
+			{ times = times, wall_offset_ms = 0 }))
+	end
+	it("linux-hourly-manual-errors: manual correction bins are cumulative without changing typed counts", function()
+		local at = os.time({ year = 2000, month = 1, day = 1, hour = 10, min = 0, sec = 0 }) * 1000
+		local rows = walk({ key("a"), key("[BS]", 1000), key("b", 100), key("[BS]", 1500) },
+			{ at, at + 1000, at + 1100, at + 2600 })
+		local hour, slot = rows.hourly[1], rows.hourly_min5[1]
+		helpers.assert_eq(hour.c, 2)
+		helpers.assert_eq(hour.e, 2)
+		helpers.assert_eq(hour.em, 2)
+		helpers.assert_eq(hour.es, 0)
+		helpers.assert_eq(hour.e_buckets["1000"], 1)
+		helpers.assert_eq(hour.e_buckets["2000"], 2)
+		helpers.assert_eq(slot.e, 2)
+		helpers.assert_eq(slot.c, 2)
+		helpers.assert_eq(slot.e_buckets["1000"], 1)
+		helpers.assert_eq(rows.errors[1].bs_total, 2)
+	end)
+	it("linux-hourly-manual-errors: synthetic erasure preserves the existing manual-error exclusion", function()
+		local at = os.time({ year = 2000, month = 1, day = 1, hour = 10, min = 0, sec = 0 }) * 1000
+		local rows = walk({ key("a"), key("[BS]", 100, "hotstring"), key("b", 100) }, { at, at + 100, at + 200 })
+		helpers.assert_eq(rows.errors[1].bs_total, 0)
+		helpers.assert_eq(rows.hourly[1].c, 2)
+		helpers.assert_eq(rows.hourly[1].e, 0)
+		helpers.assert_eq(rows.hourly[1].em, 0)
+		helpers.assert_nil(next(rows.hourly[1].e_buckets))
+	end)
+	it("linux-hourly-manual-errors: correction-only hours do not change first or last typed minute", function()
+		local at = os.time({ year = 2000, month = 1, day = 1, hour = 10, min = 0, sec = 0 }) * 1000
+		local rows = walk({ key("[BS]", 100), key("a"), key("[BS]", 100) }, { at - 3600000, at, at + 3600000 })
+		helpers.assert_eq(rows.chars_class[1].first_typed_min, "10:00")
+		helpers.assert_eq(rows.chars_class[1].last_typed_min, "10:00")
+		local errors, chars = 0, 0
+		for _, row in ipairs(rows.hourly) do errors, chars = errors + row.e, chars + row.c end
+		helpers.assert_eq(errors, 2)
+		helpers.assert_eq(chars, 1)
+	end)
+	it("linux-hourly-manual-errors: absent clock metadata retains daily correction totals without inventing bins", function()
+		local rows = walk({ key("a"), key("[BS]", 100) }, nil)
+		helpers.assert_eq(rows.errors[1].bs_total, 1)
+		helpers.assert_eq(#rows.hourly, 0)
+		helpers.assert_eq(#rows.hourly_min5, 0)
+	end)
+end)
+
+-- ============================================================================
+-- Canonical backspace unigrams without extending correction sequences
+-- ============================================================================
+
+helpers.describe("aggregate walker: backspace unigram retention", function()
+	it("linux-backspace-unigrams: manual correction keeps its count and native delay", function()
+		local batch = Walker.walk({ key("a", 100), key("[BS]", 110), key("b", 120) },
+			"2026-08-06", "app")
+		local item = batch.ngram.ngram_chars["2026-08-06\1app\1[BS]"]
+		helpers.assert_true(item ~= nil, "the supported Backspace row survives persistence")
+		helpers.assert_eq(item.c, 1)
+		helpers.assert_eq(item.td, 110)
+		helpers.assert_eq(item.cd, 1)
+		helpers.assert_eq(item.e, 0)
+		helpers.assert_nil(next(item.esrc))
+		helpers.assert_eq(batch.errors["2026-08-06\1app"].bs_total, 1)
+		helpers.assert_eq(batch.chars_class["2026-08-06\1app"].letter, 2)
+		helpers.assert_eq(count_of(batch, "ngram_bigrams", "ab"), 0)
+		helpers.assert_eq(count_of(batch, "ngram_words", "a"), 0)
+		helpers.assert_eq(count_of(batch, "ngram_words", "b"), 1)
+	end)
+	it("linux-backspace-unigrams: synthetic deletions keep HS and LLM source counts", function()
+		local batch = Walker.walk({ key("a", 100), key("[BS]", 0, "hotstring"),
+			key("[BS]", 0, "hotstring"), key("[BS]", 0, "llm"), key("b", 100) },
+			"2026-08-06", "app")
+		local item = batch.ngram.ngram_chars["2026-08-06\1app\1[BS]"]
+		helpers.assert_true(item ~= nil)
+		helpers.assert_eq(item.c, 3)
+		helpers.assert_eq(item.td, 0)
+		helpers.assert_eq(item.cd, 0)
+		helpers.assert_eq(item.e, 0)
+		helpers.assert_eq(item.esrc.hotstring, 2)
+		helpers.assert_eq(item.esrc.llm, 1)
+		helpers.assert_eq(batch.errors["2026-08-06\1app"].bs_total, 0)
+		helpers.assert_eq(batch.errors["2026-08-06\1app"].cascade_count, 0)
+		helpers.assert_eq(batch.chars_class["2026-08-06\1app"].letter, 2)
+		helpers.assert_eq(count_of(batch, "ngram_bigrams", "ab"), 0)
+	end)
+	it("linux-backspace-unigrams: cascade and recovery contexts stay independent", function()
+		local batch = Walker.walk({ key("a", 100), key("[BS]", 100), key("[BS]", 100),
+			key("[BS]", 100), key("b", 140) }, "2026-08-06", "app")
+		local item = batch.ngram.ngram_chars["2026-08-06\1app\1[BS]"]
+		helpers.assert_true(item ~= nil)
+		helpers.assert_eq(item.c, 3)
+		helpers.assert_eq(item.td, 300)
+		helpers.assert_eq(item.cd, 3)
+		local errors = batch.errors["2026-08-06\1app"]
+		helpers.assert_eq(errors.bs_total, 3)
+		helpers.assert_eq(errors.cascade_count, 1)
+		helpers.assert_eq(errors.cascade_max_len, 3)
+		helpers.assert_eq(errors.recovery_sum_ms, 140)
+		helpers.assert_eq(errors.recovery_count, 1)
+		helpers.assert_eq(count_of(batch, "ngram_bigrams", "a[BS]"), 0)
+		helpers.assert_eq(count_of(batch, "ngram_bigrams", "[BS]b"), 0)
+		helpers.assert_eq(count_of(batch, "ngram_trigrams", "a[BS]b"), 0)
+	end)
+	it("linux-backspace-unigrams: literal software spelling stays four codepoints", function()
+		local batch = Walker.walk({ key("[", 0, "other"), key("B", 0, "other"),
+			key("S", 0, "other"), key("]", 0, "other") }, "2026-08-06", "app")
+		helpers.assert_eq(count_of(batch, "ngram_chars", "[BS]"), 0)
+		for _, char in ipairs({ "[", "B", "S", "]" }) do
+			local item = batch.ngram.ngram_chars["2026-08-06\1app\1" .. char]
+			helpers.assert_eq(item.c, 1)
+			helpers.assert_eq(item.esrc.other, 1)
+		end
+		helpers.assert_eq(batch.errors["2026-08-06\1app"].bs_total, 0)
+	end)
+end)

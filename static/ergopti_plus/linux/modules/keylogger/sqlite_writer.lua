@@ -135,6 +135,16 @@ local function _exec(sql)
 	return true
 end
 
+--- Commits one raw or derived batch without exposing partially refused rows.
+--- SQLite FAIL can retain earlier rows and trigger effects in autocommit mode.
+--- A failed script exits before COMMIT and its connection rolls the batch back;
+--- the existing receipt acknowledges COMMIT, not merely the INSERT statement.
+--- @param sql string One composed raw or derived INSERT statement.
+--- @return boolean
+local function _exec_raw_batch(sql)
+	return _exec("BEGIN IMMEDIATE;\n" .. sql .. "\nCOMMIT;")
+end
+
 --- Runs a read query and rejects any rows from a failed native CLI.
 --- @param sql string Complete SELECT statement.
 --- @return string|nil Complete output, or nil when the query fails.
@@ -415,16 +425,17 @@ function M.insert_typing_events(device_id, events)
 		end
 
 		local ts      = _sql_escape(ev.ts      or os.date("!%Y-%m-%d %H:%M:%S"))
-		local date    = _sql_escape(ev.date    or os.date("!%Y-%m-%d"))
+		local date    = _sql_escape(ev.date    or os.date("%Y-%m-%d"))
 		local app     = _sql_escape(ev.app     or "unknown")
 		local text    = _sql_escape(enc_text)
 		local title   = _sql_escape(ev.title   or "")
+		-- WPM is a fractional rate in a REAL column, not an integer counter.
 		local wpm     = tonumber(ev.wpm) or 0
 		local layout  = _sql_escape(ev.layout  or "")
 		local events_json = _sql_escape(enc_json)
 
 		parts[#parts + 1] = string.format(
-			"('%s',%d,'%s','%s','%s','%s','','','%s','',0,0,0,0,0,0,0,0.0,%d,'%s','','%s')",
+			"('%s',%d,'%s','%s','%s','%s','','','%s','',0,0,0,0,0,0,0,0.0,%.17g,'%s','','%s')",
 			_sql_escape(device_id), event_id, ts, date, app, title,
 			layout, wpm, text, events_json
 		)
@@ -438,7 +449,7 @@ function M.insert_typing_events(device_id, events)
 		.. "VALUES %s;",
 		table.concat(parts, ",")
 	)
-	return _exec(sql)
+	return _exec_raw_batch(sql)
 end
 
 --- Inserts canonical hotstring events matching the macOS/Windows table shape.
@@ -454,7 +465,7 @@ function M.insert_hotstring_events(device_id, events)
 			"('%s',%d,'%s','%s','%s','%s','%s','%s','%s',%d)",
 			_sql_escape(device_id), first_id + i - 1,
 			_sql_escape(ev.ts or os.date("!%Y-%m-%d %H:%M:%S")),
-			_sql_escape(ev.date or os.date("!%Y-%m-%d")),
+			_sql_escape(ev.date or os.date("%Y-%m-%d")),
 			_sql_escape(ev.app or "unknown"),
 			_sql_escape(ev.kind or "fired"),
 			_sql_escape(ev.trigger or ""),
@@ -463,7 +474,7 @@ function M.insert_hotstring_events(device_id, events)
 			tonumber(ev.net_saved_chars) or 0
 		)
 	end
-	return _exec("INSERT OR IGNORE INTO events_hotstring "
+	return _exec_raw_batch("INSERT OR IGNORE INTO events_hotstring "
 		.. "(device_id,id,ts,date,app,kind,trigger,replacement,h_type,net_saved_chars) VALUES "
 		.. table.concat(parts, ",") .. ";")
 end
@@ -491,12 +502,12 @@ function M.insert_shortcut_events(device_id, events)
 			"('%s',%d,'%s','%s','%s','%s')",
 			_sql_escape(device_id), first_id + i - 1,
 			_sql_escape(ev.ts or os.date("!%Y-%m-%d %H:%M:%S")),
-			_sql_escape(ev.date or os.date("!%Y-%m-%d")),
+			_sql_escape(ev.date or os.date("%Y-%m-%d")),
 			_sql_escape(ev.app or "unknown"),
 			_sql_escape(ev.key or "")
 		)
 	end
-	return _exec("INSERT OR IGNORE INTO events_shortcut "
+	return _exec_raw_batch("INSERT OR IGNORE INTO events_shortcut "
 		.. "(device_id,id,ts,date,app,key) VALUES "
 		.. table.concat(parts, ",") .. ";")
 end
@@ -514,13 +525,13 @@ function M.insert_app_switch_events(device_id, events)
 			"('%s',%d,'%s','%s','%s','%s',%d)",
 			_sql_escape(device_id), first_id + i - 1,
 			_sql_escape(ev.ts or os.date("!%Y-%m-%d %H:%M:%S")),
-			_sql_escape(ev.date or os.date("!%Y-%m-%d")),
+			_sql_escape(ev.date or os.date("%Y-%m-%d")),
 			_sql_escape(ev.prev_app or ""),
 			_sql_escape(ev.next_app or ""),
 			tonumber(ev.duration_ms) or 0
 		)
 	end
-	return _exec("INSERT OR IGNORE INTO events_app_switch "
+	return _exec_raw_batch("INSERT OR IGNORE INTO events_app_switch "
 		.. "(device_id,id,ts,date,prev_app,next_app,duration_ms) VALUES "
 		.. table.concat(parts, ",") .. ";")
 end
@@ -637,35 +648,49 @@ function M.upsert_errors(device_id, row)
 	return _exec(sql)
 end
 
+--- Merges cumulative numeric histogram deltas using the existing burst SQL policy.
+--- @param column string Owned histogram column.
+--- @return string
+local function number_map_merge_sql(column)
+	return column .. " = (SELECT json_group_object(k, v) FROM ("
+		.. "SELECT key AS k, SUM(value) AS v FROM ("
+		.. "SELECT key, value FROM json_each(" .. column .. ") "
+		.. "UNION ALL SELECT key, value FROM json_each(excluded." .. column .. ")"
+		.. ") GROUP BY key))"
+end
+
 --- Upserts one hour of the activity histogram.
---- @param row table { date, app, hour, c, e, em, es }
+--- @param row table { date, app, hour, c, e, em, es, e_buckets? }
 function M.upsert_hourly(device_id, row)
 	if not M.is_available() or type(row) ~= "table" then return end
 	local sql = string.format(
-		"INSERT INTO agg_app_day_hourly (device_id, date, app, hour, c, e, em, es) "
-		.. "VALUES ('%s','%s','%s','%s',%d,%d,%d,%d) "
+		"INSERT INTO agg_app_day_hourly (device_id, date, app, hour, c, e, em, es, e_buckets_json) "
+		.. "VALUES ('%s','%s','%s','%s',%d,%d,%d,%d,'%s') "
 		.. "ON CONFLICT(device_id, date, app, hour) DO UPDATE SET "
-		.. "c = c + excluded.c, e = e + excluded.e, em = em + excluded.em, es = es + excluded.es;",
+		.. "c = c + excluded.c, e = e + excluded.e, em = em + excluded.em, es = es + excluded.es, "
+		.. number_map_merge_sql("e_buckets_json") .. ";",
 		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
 		_sql_escape(tostring(row.hour or "")),
 		math.floor(tonumber(row.c) or 0), math.floor(tonumber(row.e) or 0),
-		math.floor(tonumber(row.em) or 0), math.floor(tonumber(row.es) or 0))
+		math.floor(tonumber(row.em) or 0), math.floor(tonumber(row.es) or 0),
+		_sql_escape(Json.encode(row.e_buckets or {})))
 	return _exec(sql)
 end
 
 --- Upserts one five-minute slot of the fine-grained activity histogram.
---- @param row table { date, app, slot, c, e, es }
+--- @param row table { date, app, slot, c, e, es, e_buckets? }
 function M.upsert_hourly_min5(device_id, row)
 	if not M.is_available() or type(row) ~= "table" then return end
 	local sql = string.format(
-		"INSERT INTO agg_app_day_hourly_min5 (device_id, date, app, slot, c, e, es) "
-		.. "VALUES ('%s','%s','%s','%s',%d,%d,%d) "
+		"INSERT INTO agg_app_day_hourly_min5 (device_id, date, app, slot, c, e, es, e_buckets_json) "
+		.. "VALUES ('%s','%s','%s','%s',%d,%d,%d,'%s') "
 		.. "ON CONFLICT(device_id, date, app, slot) DO UPDATE SET "
-		.. "c = c + excluded.c, e = e + excluded.e, es = es + excluded.es;",
+		.. "c = c + excluded.c, e = e + excluded.e, es = es + excluded.es, "
+		.. number_map_merge_sql("e_buckets_json") .. ";",
 		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
 		_sql_escape(tostring(row.slot or "")),
 		math.floor(tonumber(row.c) or 0), math.floor(tonumber(row.e) or 0),
-		math.floor(tonumber(row.es) or 0))
+		math.floor(tonumber(row.es) or 0), _sql_escape(Json.encode(row.e_buckets or {})))
 	return _exec(sql)
 end
 
@@ -717,11 +742,7 @@ function M.upsert_burst(device_id, row)
 		-- Merged key by key rather than replaced: each flush sees only its own
 		-- bursts, so overwriting would leave the histogram describing the last
 		-- few seconds of the day.
-		.. "length_buckets_json = (SELECT json_group_object(k, v) FROM ("
-		.. "SELECT key AS k, SUM(value) AS v FROM ("
-		.. "SELECT key, value FROM json_each(length_buckets_json) "
-		.. "UNION ALL SELECT key, value FROM json_each(excluded.length_buckets_json)"
-		.. ") GROUP BY key)), "
+		.. number_map_merge_sql("length_buckets_json") .. ", "
 		.. "inter_delay_count = inter_delay_count + excluded.inter_delay_count, "
 		.. "inter_delay_sum = inter_delay_sum + excluded.inter_delay_sum, "
 		.. "inter_delay_sumsq = inter_delay_sumsq + excluded.inter_delay_sumsq;",
@@ -794,6 +815,44 @@ function M.upsert_title(device_id, row)
 		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
 		math.floor(TITLE_CAP_PER_APP_DAY))
 	return _exec(sql)
+end
+
+--- Reads the exact collector device/day baseline without aggregating devices.
+--- @param device_id string Collector identity.
+--- @param date string Calendar day.
+--- @return table|nil row Persisted cumulative row, or nil when absent.
+--- @return boolean accepted False when the native read or row is refused.
+function M.read_system_day(device_id, date)
+	if not M.is_available() or type(device_id) ~= "string" or device_id == ""
+		or type(date) ~= "string" or date == "" then return nil, false end
+	local fields = {
+		"wifi_changes", "space_switches", "battery_sum", "battery_count", "battery_min",
+		"battery_max", "audio_muted_ms", "locked_ms", "sleep_ms", "awake_ms",
+		"passive_count", "night_wake_count",
+	}
+	local pairs = { "'date',date" }
+	for _, field in ipairs(fields) do pairs[#pairs + 1] = "'" .. field .. "'," .. field end
+	local body = _query_output("SELECT json_object(" .. table.concat(pairs, ",")
+		.. ") FROM agg_system_day WHERE device_id='" .. _sql_escape(device_id)
+		.. "' AND date='" .. _sql_escape(date) .. "';")
+	if body == nil then return nil, false end
+	if body == "" then return nil, true end
+	local ok, row = pcall(Json.decode_lossless, body)
+	if not ok or type(row) ~= "table" or Json.is_array(row) or Json.is_null(row)
+		or row.date ~= date then return nil, false end
+	for _, field in ipairs(fields) do
+		local value = row[field]
+		if Json.is_null(value) then value = nil end
+		if value == nil and (field == "battery_sum" or field == "battery_count") then value = 0 end
+		if value == nil and (field == "battery_min" or field == "battery_max") then
+			row[field] = nil
+		elseif type(value) == "number" then
+			row[field] = value
+		else
+			return nil, false
+		end
+	end
+	return row, true
 end
 
 --- Upserts the machine's own state for a day.
@@ -1015,8 +1074,8 @@ function M.upsert_ngrams(device_id, date, app, ngrams, table_name)
 			local source_parts = {}
 			for source, source_count in pairs(sources or {}) do
 				if type(source) == "string" and type(source_count) == "number" and source_count > 0 then
-					source_parts[#source_parts + 1] = string.format('"%s":%d',
-						source:gsub('"', '\\"'), math.floor(source_count))
+					source_parts[#source_parts + 1] = string.format('%s:%d',
+					Json.encode(source), math.floor(source_count))
 				end
 			end
 			local source_json = "{" .. table.concat(source_parts, ",") .. "}"
@@ -1047,13 +1106,10 @@ function M.upsert_ngrams(device_id, date, app, ngrams, table_name)
 		.. "td = td + excluded.td, "
 		.. "cd = cd + excluded.cd, "
 		.. "e = e + excluded.e, "
-		.. "esrc_json = json_object("
-		.. "'hotstring', COALESCE(json_extract(esrc_json, '$.hotstring'), 0) + COALESCE(json_extract(excluded.esrc_json, '$.hotstring'), 0), "
-		.. "'llm', COALESCE(json_extract(esrc_json, '$.llm'), 0) + COALESCE(json_extract(excluded.esrc_json, '$.llm'), 0), "
-		.. "'other', COALESCE(json_extract(esrc_json, '$.other'), 0) + COALESCE(json_extract(excluded.esrc_json, '$.other'), 0));",
+		.. number_map_merge_sql("esrc_json") .. ";",
 		table.concat(parts, ",")
 	)
-	return _exec(sql)
+	return _exec_raw_batch(sql)
 end
 
 --- Upserts physical Linux evdev scancodes. This is intentionally distinct

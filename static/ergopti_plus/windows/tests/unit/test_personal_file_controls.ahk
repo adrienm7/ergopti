@@ -7,14 +7,25 @@
 ; launch alone is injected. Generic provenance-only loader assertions stay intact.
 ; ==============================================================================
 
-_PFC_Fixture() {
+_PFC_Fixture(FixtureRootSpelling := "temp") {
 	global ScriptInformation, ConfigurationFile, _HotstringRegistrar, CategoryEnabled
+	if FixtureRootSpelling != "temp" && FixtureRootSpelling != "long" && FixtureRootSpelling != "dot"
+		throw ValueError("Unknown fixture native root spelling")
 	Fixture := _ScopeOwnerFixture()
 	Fixture.savedInfo := ScriptInformation, Fixture.savedConfig := ConfigurationFile
 	Fixture.savedOwners := PersonalFileControls.owners, Fixture.savedInventory := PersonalFileControls.inventory
 	Fixture.savedRegistrar := _HotstringRegistrar, Fixture.savedGate := CategoryEnabled["Hotstrings"]
 	Fixture.root := Fixture.directory . "\hotstrings"
 	DirCreate(Fixture.root)
+	try {
+		if FixtureRootSpelling == "long"
+			Fixture.root := FSResolveDirectoryPath(Fixture.root)
+		else if FixtureRootSpelling == "dot"
+			Fixture.root := Fixture.directory . "\.\hotstrings"
+	} catch as RootResolutionError {
+		_ScopeOwnerCleanup(Fixture)
+		throw RootResolutionError
+	}
 	Fixture.file := Fixture.root . "\a__b.toml"
 	Fixture.descriptor := PersonalFileDescribe(["a__b.toml"])
 	Fixture.content := '[[live]]`n"abcd" = "first"`n[[quiet]]`n"qwer" = "second"`n'
@@ -195,11 +206,11 @@ _PFC_CollidingLegacyNamesAndPhysicalAliases() {
 Test("personal-file-controls: flattened names retain distinct package owners and real primary aliases refuse", _PFC_CollidingLegacyNamesAndPhysicalAliases)
 
 _PFC_NeutralProjectionIsNotAdmission() {
-	Group := "hotstrings.groups.personal-file:632e746f6d6c"
+	Group := 'hotstrings.groups."personal-file:632e746f6d6c"'
 	Section := 'hotstrings.modules."personal-file:632e746f6d6c"."é.foo"'
 	AssertEqual(true, ManifestDefaultFor(Group))
 	AssertEqual(true, ManifestDefaultFor(Section))
-	AssertEqual("", PersonalFilePreferenceDefault("hotstrings.groups.personal-file:632e746F6d6c"))
+	AssertEqual("", PersonalFilePreferenceDefault('hotstrings.groups."personal-file:632e746F6d6c"'))
 	AssertEqual("", PersonalFilePreferenceDefault("hotstrings.modules.personal-file:632e746f6d6c.é.foo"))
 	AssertEqual("", PersonalFilePreferenceDefault('hotstrings.modules."personal-file:632e746f6d6c".""'))
 	AssertEqual(false, ManifestDefaultFor("hotstrings.groups.foreign"), "unrelated dynamic groups keep their neutral baseline")
@@ -297,9 +308,12 @@ Test("personal-file-controls: opaque or malformed physical records remain read-o
 
 _PFC_DirectoryCycleAndDepthRefuse() {
 	global _HS_PreScanPersonalCacheLoaded, _PersonalExtTree, _ExtTotalPersonalCounterGlobal
+	global _ParseExtTomlSectionsCache
 	Fixture := _PFC_Fixture(), Cycle := Fixture.root . "\cycle"
 	SavedLoaded := _HS_PreScanPersonalCacheLoaded, SavedTree := _PersonalExtTree
 	SavedCount := _ExtTotalPersonalCounterGlobal.value
+	HadSectionsCache := IsSet(_ParseExtTomlSectionsCache)
+	SavedSectionsCache := HadSectionsCache ? _ParseExtTomlSectionsCache : 0
 	try {
 		AssertEqual(16, PersonalFileScanMaxDepth())
 		Assert(HS_PersonalDirectoryAdmitted(Fixture.root, 1))
@@ -311,6 +325,8 @@ _PFC_DirectoryCycleAndDepthRefuse() {
 		AssertEqual(1, Packs.Length, "the native registration/recheck walk terminates without cycle aliases")
 		PersonalFileControls.Refresh()
 		Assert(PersonalFileControls.ForPath(Fixture.file) is PersonalFileAdoptedOwner)
+		; The tray owns this cache at boot; the headless fixture owns its snapshot.
+		_ParseExtTomlSectionsCache := Map()
 		_HS_PreScanPersonalCacheLoaded := false
 		_HS_PreScanPersonal()
 		Assert(_PersonalExtTree["cycle"]["unavailable"], "the real menu retains a read-only reason for a skipped directory")
@@ -319,6 +335,10 @@ _PFC_DirectoryCycleAndDepthRefuse() {
 			DirDelete(Cycle)
 		_HS_PreScanPersonalCacheLoaded := SavedLoaded, _PersonalExtTree := SavedTree
 		_ExtTotalPersonalCounterGlobal.value := SavedCount
+		if HadSectionsCache
+			_ParseExtTomlSectionsCache := SavedSectionsCache
+		else
+			_ParseExtTomlSectionsCache := unset
 		_PFC_Cleanup(Fixture)
 	}
 }
@@ -429,3 +449,55 @@ _PFC_BomFirstMetadataEditAndRollback() {
 	}
 }
 Test("personal-file-controls: first BOM metadata header remains owned through real edit and exact rollback", _PFC_BomFirstMetadataEditAndRollback)
+
+/** The strict adapter preserves BOM-aware text and the real handle identity. */
+_PFC_StrictReadAdapter() {
+	Fixture := _PFC_Fixture()
+	File := 0
+	try {
+		File := FSOpenReadStrict(Fixture.file)
+		AssertTrue(IsObject(File), "the existing source acquires a real read handle")
+		Snapshot := FSHandleSnapshot(File.Handle)
+		AssertTrue(Snapshot.Get("ok", false), "the adapter exposes the original physical identity handle")
+		AssertEqual(FSReadStrict(Fixture.file), File.Read(), "streamed UTF-8 keeps the same BOM-aware content")
+	} finally {
+		if IsObject(File)
+			File.Close()
+		_PFC_Cleanup(Fixture)
+	}
+}
+Test("personal-file-controls: strict reader preserves source bytes and physical handle identity", _PFC_StrictReadAdapter)
+
+
+
+
+
+; =============================================
+; =============================================
+; ======= 1/ Supplied native root route =======
+; =============================================
+; =============================================
+
+_PFC_SuppliedRootRoute(RouteMode) {
+	RouteFixture := _PFC_Fixture(RouteMode)
+	try {
+		RouteOwner := RouteFixture.owner
+		AssertEqual(RouteFixture.file, RouteOwner.path,
+			"native discovery must retain the caller-owned route spelling")
+		AssertTrue(RouteOwner.Authorize(RouteFixture.file, RouteFixture.descriptor),
+			"a discovered actual source must remain reachable through its original route")
+		AssertEqual(RouteOwner, PersonalFileControls.ForPath(RouteFixture.file))
+		RouteCanonicalFile := FSResolveDirectoryPath(RouteFixture.root) . "\a__b.toml"
+		AssertEqual(PersonalFileControls.Physical(RouteCanonicalFile), RouteOwner.physical,
+			"independent native long-path resolution must identify the same retained source")
+		AssertEqual(1, LoadExtTomlFile(RouteFixture.file, "a__b", "", RouteFixture.descriptor, RouteOwner))
+		AssertEqual(1, RouteOwner.ActiveCount())
+		if RouteMode == "dot"
+			AssertFalse(RouteCanonicalFile == RouteFixture.file,
+				"the physical dot-route control must differ from the native canonical spelling")
+	} finally _PFC_Cleanup(RouteFixture)
+}
+Test("personal-file-route: native long-root source retains exact loader and activation ownership",
+	_PFC_SuppliedRootRoute.Bind("long"))
+Test("personal-file-route: physically identical dot-root source retains its supplied logical route",
+	_PFC_SuppliedRootRoute.Bind("dot"))

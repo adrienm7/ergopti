@@ -518,3 +518,90 @@ _LSM_NativeProcessCloseRefusal() {
 	}
 }
 Test("local models owner: real protected process capability blocks successor admission", _LSM_NativeProcessCloseRefusal)
+
+
+
+
+
+; ===============================================
+; ===============================================
+; ======= 4/ Native One-Shot Timer Policy =======
+; ===============================================
+; ===============================================
+
+_LSM_NativeTimerOwner() {
+	return LocalServerModelsOwner(Map("servers", Map(), "timeout_ms", 1000, "poll_ms", 20))
+}
+
+_LSM_NativeTimerInvalid(Period, ExpectedType) {
+	Owner := _LSM_NativeTimerOwner()
+	Observed := Map("calls", 0)
+	Callback := _LSM_NativeTimerCount.Bind(Observed)
+	Rejected := false
+	PreviousCritical := Critical("Off")
+	try {
+		try Owner._NativeTimer(Callback, Period)
+		catch as TimerFailure {
+			if Type(TimerFailure) != ExpectedType
+				throw TimerFailure
+			Rejected := true
+		}
+		Sleep(60)
+		Assert(Rejected, "invalid native timer period must be rejected before arming")
+		AssertEqual(0, Observed["calls"], "refused period must not publish a callback")
+	} finally {
+		try Owner._NativeTimer(Callback, 0)
+		finally Critical(PreviousCritical)
+	}
+}
+Test("local models native timer: positive period refuses repetition",
+	_LSM_NativeTimerInvalid.Bind(20, "TypeError"))
+Test("local models native timer: string period is not an integer",
+	_LSM_NativeTimerInvalid.Bind("20", "TypeError"))
+Test("local models native timer: fractional period is not an integer",
+	_LSM_NativeTimerInvalid.Bind(20.5, "TypeError"))
+
+_LSM_NativeTimerCount(Observed) {
+	Observed["calls"] += 1
+}
+
+_LSM_NativeTimerOneShot() {
+	Owner := _LSM_NativeTimerOwner()
+	Observed := Map("calls", 0)
+	Callback := _LSM_NativeTimerCount.Bind(Observed)
+	PreviousCritical := Critical("Off")
+	try {
+		AssertEqual(true, Owner._NativeTimer(Callback, -20), "native one-shot acknowledges arm")
+		WaitingSince := A_TickCount
+		while Observed["calls"] == 0 && ((A_TickCount - WaitingSince) & 0xFFFFFFFF) < 1000
+			Sleep(10)
+		AssertEqual(1, Observed["calls"], "actual native callback must execute")
+		Sleep(80)
+		AssertEqual(1, Observed["calls"], "one-shot must not repeat after it fires")
+		AssertEqual(true, Owner._NativeTimer(Callback, 0), "retired callback accepts stop")
+	} finally {
+		try Owner._NativeTimer(Callback, 0)
+		finally Critical(PreviousCritical)
+	}
+}
+Test("local models native timer: negative period fires once and retires", _LSM_NativeTimerOneShot)
+
+_LSM_NativeTimerStop() {
+	Owner := _LSM_NativeTimerOwner()
+	Observed := Map("calls", 0)
+	Callback := _LSM_NativeTimerCount.Bind(Observed)
+	PreviousCritical := Critical("Off")
+	try {
+		PreviousTransaction := Critical("On")
+		try {
+			AssertEqual(true, Owner._NativeTimer(Callback, -20), "actual callback is armed")
+			AssertEqual(true, Owner._NativeTimer(Callback, 0), "same callback is stopped before dispatch")
+		} finally Critical(PreviousTransaction)
+		Sleep(80)
+		AssertEqual(0, Observed["calls"], "stopped callback must never dispatch")
+	} finally {
+		try Owner._NativeTimer(Callback, 0)
+		finally Critical(PreviousCritical)
+	}
+}
+Test("local models native timer: zero stops the exact pending callback", _LSM_NativeTimerStop)

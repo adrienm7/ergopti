@@ -26,6 +26,7 @@ async function observe(source, root, scenario) {
 	let warmCalls = 0;
 	let initialReceipt;
 	let initialNonce;
+	let initialFullSave;
 	let launchPid = 21000;
 	const ending = 'main().then(';
 	assert.equal(source.split(ending).length, 2, 'the actual startup main must have one invocation');
@@ -134,6 +135,42 @@ async function observe(source, root, scenario) {
 										: JSON.stringify(warm && scenario === 'stale' ? initialReceipt : receipt),
 									{ flag: 'wx' }
 								);
+							const wrapperSource = fs.readFileSync(args[1], 'utf8');
+							const integrated =
+								/_StartupSmokeReceipts\(\*\)\s*\{\s*_StartupSmokeFullSaveReceipt\(\)/.test(
+									wrapperSource
+								);
+							const fullSave = {
+								schema_version: 1,
+								nonce: options.env.ERGOPTI_STARTUP_SMOKE_NONCE,
+								pid,
+								requested: 1,
+								committed: 1,
+								settled: 1,
+								pending: false
+							};
+							if (!warm && fixture === 'fresh-config') initialFullSave = { ...fullSave };
+							if (warm && scenario === 'save-pid') fullSave.pid = initialFullSave.pid;
+							if (warm && scenario === 'save-nonce') fullSave.nonce = 'f'.repeat(32);
+							if (warm && ['save-uncommitted', 'save-abandoned'].includes(scenario))
+								fullSave.committed = 0;
+							if (warm && scenario === 'save-pending') fullSave.pending = true;
+							if (warm && scenario === 'save-string') fullSave.requested = '1';
+							if (warm && scenario === 'save-zero') fullSave.requested = 0;
+							if (
+								integrated &&
+								!(warm && scenario === 'save-missing') &&
+								!(!warm && scenario === 'first-save-missing')
+							)
+								fs.writeFileSync(
+									path.join(probe, 'full-save.json'),
+									warm && scenario === 'save-malformed'
+										? '{'
+										: JSON.stringify(
+												warm && scenario === 'save-stale' ? initialFullSave : fullSave
+											),
+									{ flag: 'wx' }
+								);
 							return result;
 						}
 					};
@@ -166,6 +203,17 @@ async function check(source, root = ROOT) {
 		'logged-error',
 		'nonzero-exit',
 		'first-early-exit',
+		'save-missing',
+		'save-stale',
+		'save-pid',
+		'save-nonce',
+		'save-uncommitted',
+		'save-abandoned',
+		'save-pending',
+		'save-string',
+		'save-zero',
+		'save-malformed',
+		'first-save-missing',
 		'ready'
 	]) {
 		const result = await observe(source, root, scenario);
@@ -177,9 +225,13 @@ async function check(source, root = ROOT) {
 		);
 		assert.equal(
 			result.warmCalls,
-			scenario === 'first-early-exit' ? 0 : 1,
+			['first-early-exit', 'first-save-missing'].includes(scenario) ? 0 : 1,
 			scenario + ': the intended real runner branch must execute'
 		);
+		if (scenario.startsWith('save-'))
+			assert.match(result.diagnostics.join('\n'), /reloaded-config:.*full-save receipt/);
+		if (scenario === 'first-save-missing')
+			assert.match(result.diagnostics.join('\n'), /fresh-config:.*no fresh full-save receipt/);
 		if (scenario === 'early-exit')
 			assert.match(result.diagnostics.join('\n'), /reloaded-config:.*no fresh readiness/);
 		if (scenario === 'logged-error')
@@ -192,7 +244,7 @@ if (require.main === module)
 	check(fs.readFileSync(path.join(ROOT, OWNER), 'utf8')).then(
 		() =>
 			console.log(
-				'[OK] Ten inert actual startup admission cases reject stale or incomplete warm readiness.'
+				'[OK] Twenty-one inert actual startup admission cases reject stale readiness and uncommitted full saves.'
 			),
 		(error) => {
 			console.error(error);

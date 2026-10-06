@@ -895,6 +895,24 @@ function M.build(ctx)
 	sc_ctx.commands["edit_shortcuts"] = cmd_edit_shortcuts
 	sc_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do sc_ctx.state_getters[key] = value end
+	local physical_editor = require("shortcuts.physical_editor_menu").new({
+		paused = function()
+			if paused then return nil end
+			if type(ctx.physical_shortcuts_paused) ~= "function" then return nil end
+			return ctx.physical_shortcuts_paused()
+		end,
+		scope = function()
+			if type(ctx.physical_shortcuts_scope) == "function" then return ctx.physical_shortcuts_scope() end
+		end,
+		gestures = ctx.gestures,
+		host = function() return require("ui.physical_shortcuts") end,
+		refused = function()
+			dialog.block_alert(i18n.get("physical_shortcuts.window_title"),
+				i18n.get("physical_shortcuts.window_unavailable"), i18n.get("button.ok"))
+		end,
+	})
+	sc_ctx.commands["physical_shortcuts_editor"] = physical_editor.open
+	sc_ctx.state_getters["physical_shortcuts_editor_ready"] = physical_editor.ready
 	sc_ctx.state_getters["shortcuts_enabled"] = function() return state.shortcuts and true or false end
 	-- Ticks « Raccourcis de gestion du script » while its switch is on.
 	sc_ctx.state_getters["script_control_enabled"] = function() return state.script_control_enabled == true end
