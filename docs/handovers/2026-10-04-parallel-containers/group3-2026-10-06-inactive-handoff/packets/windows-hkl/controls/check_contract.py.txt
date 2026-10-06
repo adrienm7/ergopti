@@ -1,0 +1,147 @@
+"""Bounded source/preservation controls, not an AutoHotkey runtime substitute."""
+
+from pathlib import Path
+import hashlib
+import json
+import re
+
+BASE = Path(__file__).resolve().parent
+REL = "static/ergopti_plus/windows/adapters/key_state.ahk"
+TEST = "static/ergopti_plus/windows/tests/unit/test_layout_digit_row_probe.ahk"
+
+
+def validate(src):
+    first = src.index(
+        "KS_NativeKeyLevel(Vk, Scancode, Hkl, Shift, Caps, ReadFn := 0) {"
+    )
+    second = src.index("KS_NativeNumberRowLevels(Hkl, Caps, ReadFn := 0, MapFn := 0) {")
+    level, row = src[first:second], src[second:]
+    for required in [
+        "KS_KeyTextNoStateChange(Vk, Scancode, Hkl, Shift, Caps)",
+        'Observed.Count < 0 ? "dead"',
+        'Map("Kind", Kind, "Text", Observed.Text, "Count", Observed.Count)',
+        "StrLen(Observed.Text) != Abs(Observed.Count)",
+    ]:
+        assert required in level, required
+    for required in [
+        "!(Hkl is Integer) || Hkl == 0",
+        "!(Caps is Integer) || (Caps != true && Caps != false)",
+        "for _, Key in KS_DIGIT_ROW_KEYS",
+        "Scancode := Key[2]",
+        "KS_ScancodeToVk(Scancode, Hkl)",
+        "KS_NativeKeyLevel(Vk, Scancode, Hkl, false, Caps, ReadFn)",
+        "KS_NativeKeyLevel(Vk, Scancode, Hkl, true, Caps, ReadFn)",
+        "if !(Plain is Map) || !(Shifted is Map)\n\t\t\t\treturn 0",
+        'Map("hkl", Hkl, "caps", Caps, "rows", Rows)',
+    ]:
+        assert required in row, required
+    addition = src[first:]
+    assert not re.search(
+        r"\b(?:DllCall|SendEvent|SendInput|Hotkey|HotIf|Critical|LoggerError|LoggerWarn)\s*\(",
+        addition,
+    )
+    assert not re.search(r"\bKLE_State\s*:=", addition)
+    assert '"owner"' not in addition and '"supported"' not in addition
+
+
+def main():
+    pre = (BASE / "preimages" / REL).read_bytes()
+    post = (BASE / "candidate" / REL).read_bytes()
+    before_tests = (BASE / "preimages" / TEST).read_bytes()
+    after_tests = (BASE / "candidate" / TEST).read_bytes()
+    assert post.startswith(pre) and after_tests.startswith(before_tests)
+    assert all(
+        blob.startswith(b"\xef\xbb\xbf") and b"\r" not in blob
+        for blob in [post, after_tests]
+    )
+    src = post.decode("utf-8-sig")
+    validate(src)
+    assert '"Int", 16, "UInt", 0x4, "Ptr", Hkl, "Int")' in pre.decode("utf-8-sig")
+    assert (
+        len(
+            re.findall(
+                r'^Test\("native HKL number row:',
+                after_tests[len(before_tests) :].decode(),
+                re.M,
+            )
+        )
+        == 5
+    )
+    runner = (
+        BASE / "preimages/static/ergopti_plus/windows/tests/run_all.ahk"
+    ).read_text(encoding="utf-8-sig")
+    assert "#Include ../adapters/key_state.ahk" in runner
+    assert "#Include unit/test_layout_digit_row_probe.ahk" in runner
+    corpus = (
+        BASE
+        / "preimages/static/ergopti_plus/_shared/tests/corpus/layouts/number_row_levels.json"
+    )
+    oracle = json.loads(corpus.read_text())
+    assert len(oracle["digits"]) == len(oracle["scancodes"]) == 10
+    try:
+        validate(pre.decode("utf-8-sig"))
+    except (AssertionError, ValueError):
+        print("EXPECTED RED: predecessor has no native typed observation contract")
+    else:
+        raise AssertionError("predecessor unexpectedly supplies new API")
+    addition = src[
+        src.index("KS_NativeKeyLevel(Vk, Scancode, Hkl, Shift, Caps, ReadFn := 0) {") :
+    ]
+    mutations = {
+        "negative-dead-status": (
+            'Observed.Count < 0 ? "dead"',
+            'Observed.Count < 0 ? "text"',
+        ),
+        "source-hkl": (
+            "KS_ScancodeToVk(Scancode, Hkl)",
+            "KS_ScancodeToVk(Scancode, 0)",
+        ),
+        "shift-level": (
+            "KS_NativeKeyLevel(Vk, Scancode, Hkl, true, Caps, ReadFn)",
+            "KS_NativeKeyLevel(Vk, Scancode, Hkl, false, Caps, ReadFn)",
+        ),
+        "caps-transport": (
+            "KS_NativeKeyLevel(Vk, Scancode, Hkl, false, Caps, ReadFn)",
+            "KS_NativeKeyLevel(Vk, Scancode, Hkl, false, false, ReadFn)",
+        ),
+        "partial-row": (
+            "if !(Plain is Map) || !(Shifted is Map)\n\t\t\t\treturn 0",
+            "if false\n\t\t\t\treturn 0",
+        ),
+        "descriptor-validation": (
+            "StrLen(Observed.Text) != Abs(Observed.Count)",
+            "false",
+        ),
+    }
+    for name, (old, new) in mutations.items():
+        assert addition.count(old) == 1, name
+        try:
+            validate(addition.replace(old, new))
+        except (AssertionError, ValueError):
+            print("EXPECTED RED: " + name)
+        else:
+            raise AssertionError("mutation survived: " + name)
+    print(
+        "PASS: two append-only sources; five actual registered cases; six source mutations refused"
+    )
+    print(
+        "UNEXECUTED: registered AHK behavior, actual HKL/dead-state runtime, native packaging and installation"
+    )
+    (BASE / "contract-results.json").write_text(
+        json.dumps(
+            {
+                "source_contract": "passed",
+                "predecessor": "expected_failure",
+                "mutations": len(mutations),
+                "native_ahk": "unexecuted",
+                "registered_cases": 5,
+                "corpus_sha256": hashlib.sha256(corpus.read_bytes()).hexdigest(),
+            },
+            indent=2,
+        )
+        + "\n"
+    )
+
+
+if __name__ == "__main__":
+    main()

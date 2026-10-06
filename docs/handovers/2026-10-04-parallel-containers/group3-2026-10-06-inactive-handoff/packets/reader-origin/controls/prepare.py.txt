@@ -1,0 +1,305 @@
+from pathlib import Path
+import subprocess
+root=Path('/workspace/.ergopti-cloud/preparations/group3-linux-evdev-origin-receipts');repo=Path('/workspace/ergopti')
+paths=['static/ergopti_plus/linux/adapters/evdev_reader.lua','static/ergopti_plus/linux/tests/unit/adapters/test_evdev_reader.lua']
+for rel in paths:
+ data=subprocess.check_output(['git','-C',str(repo),'show','origin/dev:'+rel]);assert data==(repo/rel).read_bytes()
+ for folder in ['preimages','candidate']:
+  p=root/folder/rel;p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(data)
+p=root/'candidate'/paths[0];s=p.read_text()
+s=s.replace('local _backend = nil','''local _backend = nil
+local _native_backend, _native_ports = nil, nil
+local _busy, _native_debt = false, false
+local _generation = 0
+local _events = setmetatable({}, { __mode = "k" })
+local _receipts = setmetatable({}, { __mode = "k" })
+local _codec = {}
+for _, name in ipairs({ "decode", "native_size", "unpack_u16_le", "unpack_i32_le", "unpack_uint_le" }) do
+	_codec[name] = rawget(InputEvent, name)
+end
+local EVENT_FIELDS = { "type", "code", "value", "seconds", "microseconds", "timestamp_us" }
+local EVENT_FIELD_SET = {}
+for _, field in ipairs(EVENT_FIELDS) do EVENT_FIELD_SET[field] = true end
+local SYN_DROPPED = 3''',1)
+s=s.replace('entry = { fd = nil, grabbed = false, path = nil }','entry = { fd = nil, grabbed = false, path = nil, generation = 0, read_epoch = 0, synchronized = false }',1)
+a=s.index('function M._set_backend(backend)');b=s.index('--- Builds the LuaJIT FFI backend',a)
+s=s[:a]+'''function M._set_backend(backend)
+	if _busy or _native_debt then return false end
+	if _native_backend ~= nil then
+		for _, entry in pairs(_slots) do if entry.fd ~= nil then return false end end
+	end
+	_backend = backend
+	_native_backend, _native_ports = nil, nil
+	_slots = {}
+	Logger.debug(LOG, "Backend replaced: %s.", backend and "custom" or "none")
+end
+
+--- Drops the backend after acknowledged native retirement. Test seam.
+function M._reset_backend()
+	if _busy or _native_debt then return false end
+	if _native_backend ~= nil then
+		for slot in pairs(_slots) do if M.close(slot) ~= true then return false end end
+	else
+		_busy = true
+		for _, entry in pairs(_slots) do
+			if entry.fd and _backend and _backend.close then pcall(_backend.close, entry.fd) end
+		end
+		_busy = false
+	end
+	_backend = nil
+	_native_backend, _native_ports = nil, nil
+	_slots = {}
+	Logger.debug(LOG, "Backend reset.")
+end
+
+'''+s[b:]
+# Native closures pin actual symbol providers while binding is reserved.
+s=s.replace('local size = InputEvent.native_size()','local size = _codec.native_size()',1)
+s=s.replace('\tlocal pfd  = ffi.new("struct pollfd[1]")','''	local pfd  = ffi.new("struct pollfd[1]")
+	local native_open, native_close, native_ioctl = ffi.C.open, ffi.C.close, ffi.C.ioctl
+	local native_read, native_poll = ffi.C.read, ffi.C.poll
+	local native_cast, native_new, native_string, native_errno = ffi.cast, ffi.new, ffi.string, ffi.errno''',1)
+start=s.index('local native_open, native_close');end=s.index('--- Binds the production',start)
+chunk=s[start:end]
+for old,new in [('ffi.C.open(', 'native_open('),('ffi.C.close(', 'native_close('),('ffi.C.ioctl(', 'native_ioctl('),('ffi.C.read(', 'native_read('),('ffi.C.poll(', 'native_poll('),('ffi.cast(', 'native_cast('),('ffi.new(', 'native_new('),('ffi.string(', 'native_string('),('ffi.errno()', 'native_errno()')]:chunk=chunk.replace(old,new)
+s=s[:start]+chunk+s[end:]
+a=s.index('function M.use_ffi_backend()');b=s.index('\n\n\n\n',a)
+s=s[:a]+'''function M.use_ffi_backend()
+	if _busy or _native_debt then return false end
+	for _, entry in pairs(_slots) do if entry.fd ~= nil then return false end end
+	_busy = true
+	local called, backend, err = pcall(build_ffi_backend)
+	if not called or type(backend) ~= "table" then
+		pcall(Logger.debug, LOG, "FFI backend unavailable.")
+		_busy = false
+		return false
+	end
+	_backend, _native_backend = backend, backend
+	_native_ports = {}
+	for _, name in ipairs({ "open", "read", "ioctl", "read_bits", "poll", "close" }) do
+		_native_ports[name] = rawget(backend, name)
+	end
+	pcall(Logger.debug, LOG, "FFI backend bound.")
+	_busy = false
+	return true
+end'''+s[b:]
+a=s.index('function M.open(path, slot)');b=s.index('\n--- Takes EVIOCGRAB',a)
+s=s[:a]+'''function M.open(path, slot)
+	if _busy or _native_debt then return false end
+	local st = state(slot)
+	if st.close_error then return false, st.close_error end
+	if st.fd ~= nil then return true end
+	if type(path) ~= "string" or path == "" then return false end
+	if not _backend and not M.use_ffi_backend() then return false end
+	local backend, open_port = _backend, rawget(_backend, "open")
+	if type(open_port) ~= "function" then return false end
+	_busy = true
+	local called, fd, err = pcall(open_port, path, O_NONBLOCK + O_CLOEXEC)
+	if not called or fd == nil or fd == false then
+		pcall(Logger.error, LOG, "open(): native acquisition was refused.")
+		_busy = false
+		return false, called and err or nil
+	end
+	_generation = _generation + 1
+	st.fd, st.path, st.grabbed = fd, path, false
+	st.generation, st.read_epoch, st.synchronized = _generation, 0, true
+	st.native = rawequal(backend, _native_backend) and type(fd) == "number"
+		and fd >= 0 and fd <= 2147483647 and fd % 1 == 0
+	st.native_grab = false
+	pcall(Logger.success, LOG, "Reading %s (non-blocking).", path)
+	_busy = false
+	return true
+end
+'''+s[b:]
+a=s.index('function M.grab(slot)');b=s.index('\n--- Releases EVIOCGRAB',a)
+s=s[:a]+'''function M.grab(slot)
+	if _busy or _native_debt then return false end
+	local st = state(slot)
+	if st.fd == nil then return false end
+	if st.grabbed then return true end
+	local port = rawget(_backend, "ioctl")
+	_busy = true
+	local called, acknowledged = pcall(port, st.fd, EVIOCGRAB, GRAB_ON)
+	if not called or not acknowledged then
+		_busy = false
+		return false
+	end
+	st.grabbed = true
+	st.native_grab = st.native and acknowledged == true
+	pcall(Logger.success, LOG, "Grabbed %s — the desktop no longer sees this device.", tostring(st.path))
+	_busy = false
+	return true
+end
+'''+s[b:]
+a=s.index('function M.ungrab(slot)');b=s.index('\n--- Closes the device',a)
+s=s[:a]+'''function M.ungrab(slot)
+	if _busy or _native_debt then return false end
+	local st = state(slot)
+	if st.fd == nil or not st.grabbed then return true end
+	st.native_grab = false
+	_generation = _generation + 1
+	st.generation = _generation
+	_busy = true
+	local called, acknowledged = pcall(rawget(_backend, "ioctl"), st.fd, EVIOCGRAB, GRAB_OFF)
+	if not called or not acknowledged then
+		_busy = false
+		return false
+	end
+	st.grabbed = false
+	pcall(Logger.done, LOG, "Released %s.", tostring(st.path))
+	_busy = false
+	return true
+end
+'''+s[b:]
+a=s.index('function M.close(slot)');b=s.index('\n--- @return boolean True when a device is open.',a)
+s=s[:a]+'''function M.close(slot)
+	if _busy then return false end
+	local st = state(slot)
+	if st.close_error then return false, st.close_error end
+	if st.fd == nil then return true end
+	_busy = true
+	local fd, path, backend = st.fd, st.path, _backend
+	local native = st.native == true
+	-- Revoke every receipt before callbacks, and retire this numeric fd once.
+	st.fd, st.path, st.native_grab, st.synchronized = nil, nil, false, false
+	_generation = _generation + 1
+	st.generation = _generation
+	if st.grabbed then pcall(rawget(backend, "ioctl"), fd, EVIOCGRAB, GRAB_OFF) end
+	st.grabbed = false
+	local called, acknowledged, detail = pcall(rawget(backend, "close"), fd)
+	if not called or (native and acknowledged ~= true)
+		or (not native and acknowledged ~= nil and acknowledged ~= true) then
+		st.close_error = "native retirement was not acknowledged"
+		if native then _native_debt = true end
+		pcall(Logger.error, LOG, "Close of %s is not acknowledged; restart is required.", tostring(path))
+		_busy = false
+		return false, st.close_error
+	end
+	pcall(Logger.info, LOG, "Closed %s.", tostring(path))
+	_busy = false
+	return true
+end
+'''+s[b:]
+# Protect polling and snapshot callbacks from session mutation.
+s=s.replace('local function bit_snapshot(slot, number, max_code)\n','local function bit_snapshot(slot, number, max_code)\n\tif _busy or _native_debt then return nil, "native operation is unavailable" end\n',1)
+s=s.replace('local ok, bytes, err = pcall(_backend.read_bits, st.fd,','_busy = true\n\tlocal ok, bytes, err = pcall(_backend.read_bits, st.fd,',1)
+s=s.replace('ioctl_read_request(number, count), count)\n','ioctl_read_request(number, count), count)\n\t_busy = false\n',1)
+s=s.replace('function M.wait_readable(timeout_ms, slot)\n','function M.wait_readable(timeout_ms, slot)\n\tif _busy or _native_debt then return false end\n',1)
+s=s.replace('local ok, readable = pcall(_backend.poll, st.fd, timeout_ms or 0)','_busy = true\n\tlocal ok, readable = pcall(_backend.poll, st.fd, timeout_ms or 0)\n\t_busy = false',1)
+# Private helpers are declared before read_event and never call public current exports.
+a=s.index('--- Reads one event and classifies the absence of one.')
+helpers='''--- Checks private provider/session identity, not an unobserved kernel state lease.
+--- @param record table Private original event record.
+--- @return boolean current
+local function native_session_current(record)
+	local st = record.state
+	if _busy or _native_debt or not rawequal(_slots[record.slot], st)
+		or not rawequal(_backend, record.backend) or not rawequal(_backend, _native_backend)
+		or st.fd ~= record.fd or st.generation ~= record.generation
+		or st.native ~= true or st.native_grab ~= true or st.grabbed ~= true
+		or st.synchronized ~= true or st.close_error ~= nil then return false end
+	for name, port in pairs(_native_ports or {}) do
+		if not rawequal(rawget(record.backend, name), port) then return false end
+	end
+	for name, port in pairs(_codec) do
+		if not rawequal(rawget(InputEvent, name), port) then return false end
+	end
+	return true
+end
+
+--- Rejects replaced, remapped or mutated decoded objects without metatable callbacks.
+--- @param record table Private original event record.
+--- @return boolean original
+local function original_row(record)
+	local event = record.event
+	if getmetatable(event) ~= nil then return false end
+	for field in pairs(event) do if EVENT_FIELD_SET[field] ~= true then return false end end
+	for _, field in ipairs(EVENT_FIELDS) do
+		if rawget(event, field) ~= record.row[field] then return false end
+	end
+	return true
+end
+
+'''
+s=s[:a]+helpers+s[a:]
+s=s.replace('function M.read_event(slot)\n','function M.read_event(slot)\n\tif _busy or _native_debt then return nil, "closed", "native operation is unavailable" end\n',1)
+s=s.replace('local size = InputEvent.native_size()\n\tlocal ok, data, status, reason = pcall(_backend.read, st.fd, size)','''local size = _codec.native_size()
+	local backend, fd = _backend, st.fd
+	st.read_epoch = st.read_epoch + 1
+	_busy = true
+	local ok, data, status, reason = pcall(rawget(backend, "read"), fd, size)
+	_busy = false''',1)
+s=s.replace('local event = InputEvent.decode(data, size)','local event = _codec.decode(data, size)',1)
+s=s.replace('\treturn event, "event", nil\nend','''	if event.type == InputEvent.EV_SYN and event.code == SYN_DROPPED then
+		st.synchronized = false
+		_generation = _generation + 1
+		st.generation = _generation
+	end
+	if event.type == InputEvent.EV_KEY and event.code >= 1 and event.code <= 0x2ff
+		and (event.value == 0 or event.value == 1 or event.value == 2) then
+		local record = { event = event, row = {}, state = st, slot = slot or M.KEYBOARD,
+			backend = backend, fd = fd, generation = st.generation, read_epoch = st.read_epoch, path = st.path }
+		for _, field in ipairs(EVENT_FIELDS) do record.row[field] = rawget(event, field) end
+		if native_session_current(record) and original_row(record) then _events[event] = record end
+	end
+	return event, "event", nil
+end''',1)
+anchor='-- Exposed for the tests that pin the ioctl request and the open flags.'
+extra='''--- Captures only the exact current object issued by this native grabbed reader.
+--- Custom backends and caller-created decoded tables cannot acquire authority.
+--- @param event table Actual decoded event returned by read_event.
+--- @param slot string|nil Exact reader slot.
+--- @return table|nil capability Opaque native-origin receipt, not a hardware-class claim.
+function M.capture_event(event, slot)
+	local record = _events[event]
+	if not record or record.slot ~= (slot or M.KEYBOARD) or record.read_epoch ~= record.state.read_epoch
+		or not native_session_current(record) or not original_row(record) then return nil end
+	if record.capability == nil then
+		record.capability = {}
+		_receipts[record.capability] = record
+	end
+	return record.capability
+end
+
+--- Observes this exact event before the next read, without native callbacks.
+--- @param capability table Opaque native-origin receipt.
+--- @return boolean current
+function M.event_current(capability)
+	local record = _receipts[capability]
+	return record ~= nil and rawequal(capability, record.capability)
+		and record.read_epoch == record.state.read_epoch
+		and native_session_current(record) and original_row(record)
+end
+
+--- Returns detached original facts while the exact event/session is current.
+--- @param capability table Opaque native-origin receipt.
+--- @return table|nil view Never exposes the descriptor or backend.
+function M.event_view(capability)
+	local record = _receipts[capability]
+	if not record or not rawequal(capability, record.capability)
+		or record.read_epoch ~= record.state.read_epoch
+		or not native_session_current(record) or not original_row(record) then return nil end
+	local view = { source = record.path, slot = record.slot, generation = record.generation,
+		read_epoch = record.read_epoch, origin = "native-evdev" }
+	for _, field in ipairs(EVENT_FIELDS) do view[field] = record.row[field] end
+	return view
+end
+
+--- Preserves an original held-event provenance across later reads in the same session.
+--- Revoked by queue loss, ungrab/close, rebind, codec/provider change or native debt.
+--- @param capability table Opaque native-origin receipt.
+--- @return boolean current
+function M.source_current(capability)
+	local record = _receipts[capability]
+	return record ~= nil and rawequal(capability, record.capability)
+		and native_session_current(record) and original_row(record)
+end
+
+--- Reports unknown native retirement without exposing a reusable numeric descriptor.
+--- @return boolean pending
+function M.has_native_origin_debt()
+	return _native_debt == true
+end
+
+'''
+assert anchor in s;s=s.replace(anchor,extra+anchor,1);p.write_text(s)

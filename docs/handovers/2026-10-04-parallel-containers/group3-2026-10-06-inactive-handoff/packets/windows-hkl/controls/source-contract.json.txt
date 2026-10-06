@@ -1,0 +1,22 @@
+{
+  "anchor": "5e622935b7618bb9f8e3e1508141773046ed2134",
+  "paths": [
+    {
+      "path": "static/ergopti_plus/windows/adapters/key_state.ahk",
+      "preimage": "969f960c2aebdc29a1078b655f017122ce1e46d00245cd488c485575be312dd3",
+      "postimage": "fec814344a74abae5c88d51566583e0d6a5614e2393a68292f9820c2e78ba00a",
+      "preservation": "whole predecessor byte prefix retained",
+      "added_bytes": 3563
+    },
+    {
+      "path": "static/ergopti_plus/windows/tests/unit/test_layout_digit_row_probe.ahk",
+      "preimage": "e5059ddd532af8377d5e6e4fec5f454a3203456ef6d1cdcef6324d84baadf88a",
+      "postimage": "1fda4818436bba15c87dc96ca8c7cc2a4812ed03a9eb7d04919374ead1fc252f",
+      "preservation": "whole predecessor byte prefix retained",
+      "added_bytes": 7472
+    }
+  ],
+  "scope": "observation adapter only; no native input/output or mode availability authority",
+  "cases": 5,
+  "native_execution": "unexecuted"
+}

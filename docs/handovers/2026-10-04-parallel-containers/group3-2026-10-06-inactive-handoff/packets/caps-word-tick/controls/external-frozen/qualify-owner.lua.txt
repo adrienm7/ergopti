@@ -1,0 +1,11 @@
+local root = assert(arg[1])
+package.path = root .. "/static/ergopti_plus/linux/?.lua;" .. root .. "/static/ergopti_plus/linux/?/init.lua;" .. root .. "/static/ergopti_plus/_shared/lua/?.lua;" .. root .. "/static/ergopti_plus/_shared/lua/?/init.lua;" .. package.path
+require("compat.utf8").install()
+require("luv") -- Retain the process-native issuer before any fixture cache snapshots.
+os.execute=function() error("Subprocesses prohibited in controlled native-action proof") end
+io.popen=os.execute
+require("tests.unit.modules.test_caps_word_policy")
+require("tests.unit.modules.test_key_combination_caps_word")
+local results=require("tests.helpers").get_results()
+print("NATIVE_ACTIONS_CONTROLLED",results.passed,results.failed)
+os.exit(results.failed == 0 and 0 or 1)

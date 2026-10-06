@@ -1,0 +1,157 @@
+from pathlib import Path
+import shutil
+base=Path('/workspace/.ergopti-cloud/preparations/group3-linux-physical-output-native-owner')
+root=Path('/workspace/.ergopti-cloud/preparations/group3-linux-output-transaction')
+paths=['static/ergopti_plus/linux/adapters/uinput_writer.lua','static/ergopti_plus/linux/tests/unit/adapters/test_uinput_writer.lua']
+for rel in paths:
+    for folder in ['preimages','candidate']:
+        p=root/folder/rel
+        p.parent.mkdir(parents=True,exist_ok=True)
+        p.write_bytes((base/'candidate'/rel).read_bytes())
+shutil.copyfile(base/'run.lua',root/'run.lua')
+p=root/'candidate'/paths[0]
+s=p.read_text()
+s=s.replace('local _output = nil\n','local _output = nil\nlocal _transaction = nil\n',1)
+s=s.replace('return not _busy and not _debt and output_identity(_output)','return not _busy and not _debt and _transaction == nil and output_identity(_output)',1)
+s=s.replace('local function emit_owned(capability, code, value)','local function emit_owned(capability, code, value, transaction)',1)
+s=s.replace('if _busy or _debt or not output_identity(output)\n\t\tor not rawequal(capability, output.capability) then return false end','if _busy or _debt or not output_identity(output)\n\t\tor not rawequal(capability, output.capability)\n\t\tor (_transaction ~= nil and not rawequal(transaction, _transaction)) then return false end',1)
+s=s.replace('\t_busy = false\n\treturn called and acknowledged == true\nend','''\tif called and acknowledged == true then
+		if value == 1 then output.down[code] = true
+		elseif value == 0 then output.down[code] = nil
+		elseif output.down[code] ~= true then output.roster_known = false end
+		if transaction ~= nil then transaction.write_epoch = output.write_epoch end
+	end
+	_busy = false
+	return called and acknowledged == true
+end''',1)
+s=s.replace('local function close_owned(capability)','local function close_owned(capability, transaction)',1)
+s=s.replace('if _busy or not output_identity(output) or output.close_attempted\n\t\tor not rawequal(capability, output.capability) then return false end','if _busy or not output_identity(output) or output.close_attempted\n\t\tor not rawequal(capability, output.capability)\n\t\tor (_transaction ~= nil and not rawequal(transaction, _transaction)) then return false end',1)
+s=s.replace('\t\t_output = nil\n\t\t_debt = false','\t\t_output = nil\n\t\tif _transaction ~= nil then _transaction.retired = true end\n\t\t_transaction = nil\n\t\t_debt = false',1)
+s=s.replace('if _busy or _debt then return false end\n\tif _output ~= nil then return emit_owned','if _busy or _debt or _transaction ~= nil then return false end\n\tif _output ~= nil then return emit_owned',1)
+s=s.replace('if _busy or _debt or _fd == nil or not _strict_constructor or _legacy_wire then return nil end','if _busy or _debt or _transaction ~= nil or _fd == nil or not _strict_constructor or _legacy_wire then return nil end',1)
+s=s.replace('generation = _generation, write_epoch = 0 }','generation = _generation, write_epoch = 0, down = {}, roster_known = true }',1)
+s=s.replace('return { generation = _output.generation, write_epoch = _output.write_epoch }','''local down = {}
+	for code in pairs(_output.down) do down[#down + 1] = code end
+	table.sort(down)
+	return { generation = _output.generation, write_epoch = _output.write_epoch,
+		down = down, roster_known = _output.roster_known }''',1)
+anchor='-- Exposed for the tests that pin the wire format and the ioctl order.'
+extra='''--- Checks private transport reservation; does not assert physical/native input state.
+--- @param token table Opaque transaction capability.
+--- @return boolean current
+local function transaction_current(token)
+	local transaction = _transaction
+	return not _busy and not _debt and transaction ~= nil and not transaction.retired
+		and rawequal(token, transaction.capability) and output_identity(transaction.output)
+		and transaction.output.roster_known == true
+		and transaction.write_epoch == transaction.output.write_epoch
+end
+
+--- Checks exact acknowledged roster equality without external callbacks.
+--- @param transaction table Private transaction record.
+--- @return boolean restored
+local function transaction_restored(transaction)
+	for code in pairs(transaction.baseline) do
+		if transaction.output.down[code] ~= true then return false end
+	end
+	for code in pairs(transaction.output.down) do
+		if transaction.baseline[code] ~= true then return false end
+	end
+	return true
+end
+
+--- Reserves the exact acknowledged output roster against other channel callers.
+--- No physical origin or global desktop modifier state is inferred from this roster.
+--- @param capability table Issued output capability.
+--- @return table|nil token Opaque transaction capability.
+function M.acquire_transaction(capability)
+	if not output_current(capability) or _output.roster_known ~= true then return nil end
+	local baseline = {}
+	for code in pairs(_output.down) do baseline[code] = true end
+	local token = {}
+	_transaction = { capability = token, output = _output, baseline = baseline,
+		write_epoch = _output.write_epoch, retired = false }
+	return token
+end
+
+--- Pure observation of the exact transport reservation.
+--- @param token table Opaque transaction capability.
+--- @return boolean current
+function M.transaction_current(token)
+	return transaction_current(token)
+end
+
+--- Returns detached acknowledged rows, never native descriptors or authority.
+--- @param token table Opaque transaction capability.
+--- @return table|nil view
+function M.transaction_view(token)
+	if not transaction_current(token) then return nil end
+	local down, baseline = {}, {}
+	for code in pairs(_transaction.output.down) do down[#down + 1] = code end
+	for code in pairs(_transaction.baseline) do baseline[#baseline + 1] = code end
+	table.sort(down)
+	table.sort(baseline)
+	return { generation = _transaction.output.generation, write_epoch = _transaction.write_epoch,
+		down = down, baseline = baseline, restored = transaction_restored(_transaction) }
+end
+
+--- Emits only a transition consistent with the acknowledged transaction roster.
+--- Duplicate downs, unmatched ups and unmatched repeats are refused before native IO.
+--- @param token table Opaque transaction capability.
+--- @param code integer Native evdev keycode.
+--- @param value integer Native up/down/repeat value.
+--- @return boolean acknowledged
+function M.transaction_emit(token, code, value)
+	if not transaction_current(token) then return false end
+	local down = _transaction.output.down[code] == true
+	if (value == 1 and down) or ((value == 0 or value == 2) and not down) then return false end
+	return emit_owned(_transaction.output.capability, code, value, _transaction)
+end
+
+--- Compensates only changes in this reservation's acknowledged roster.
+--- Failed native acknowledgement retains the reservation/debt; no borrowed list is read.
+--- @param token table Opaque transaction capability.
+--- @return boolean restored
+function M.restore_transaction(token)
+	if not transaction_current(token) then return false end
+	local transaction, release, restore = _transaction, {}, {}
+	for code in pairs(transaction.output.down) do
+		if transaction.baseline[code] ~= true then release[#release + 1] = code end
+	end
+	for code in pairs(transaction.baseline) do
+		if transaction.output.down[code] ~= true then restore[#restore + 1] = code end
+	end
+	table.sort(release)
+	table.sort(restore)
+	for _, code in ipairs(release) do
+		if not emit_owned(transaction.output.capability, code, 0, transaction) then return false end
+	end
+	for _, code in ipairs(restore) do
+		if not emit_owned(transaction.output.capability, code, 1, transaction) then return false end
+	end
+	return transaction_current(token) and transaction_restored(transaction)
+end
+
+--- Opens delivery only after exact private roster restoration, without callbacks.
+--- @param token table Opaque transaction capability.
+--- @return boolean released
+function M.release_transaction(token)
+	if not transaction_current(token) or not transaction_restored(_transaction) then return false end
+	_transaction.retired = true
+	_transaction = nil
+	return true
+end
+
+--- Retires this reservation's exact native channel after unresolved wire debt.
+--- Ambiguous native close remains non-retryable; no successor descriptor is touched.
+--- @param token table Opaque transaction capability.
+--- @return boolean retired
+function M.retire_transaction(token)
+	local transaction = _transaction
+	if transaction == nil or not rawequal(token, transaction.capability) or transaction.retired then return false end
+	return close_owned(transaction.output.capability, transaction)
+end
+
+'''
+assert anchor in s
+p.write_text(s.replace(anchor,extra+anchor,1))

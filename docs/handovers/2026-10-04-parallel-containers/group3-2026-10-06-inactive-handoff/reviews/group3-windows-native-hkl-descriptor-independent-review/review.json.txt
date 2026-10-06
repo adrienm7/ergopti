@@ -1,0 +1,28 @@
+{
+  "verdict": "SOURCE CLEAR joint fourth successor; native execution UNEXECUTED",
+  "receipt_sha256": "1a5864cddc1f9c0fb77b60e2df007b67c02e81280e3bceface4e0cb14308fd14",
+  "predecessor_sha256": "214e1a5e5ca517a28bb5c2c43aa7376d5369628482e5ee6c7bbb28679030efda",
+  "predecessor_pins_verified": 28,
+  "final_pins_verified": 17,
+  "Root_preimages_exact": true,
+  "Root_source_and_test_entire_prefixes_exact": true,
+  "production": [
+    "single reads of external Count/Text before validation and detached publication",
+    "catch Any at both new preview boundaries; private arbitrary throw values do not escape",
+    "negative native status preserved; original ToUnicodeEx reader and 0x4 flag byte-exact",
+    "explicit HKL/Caps/Shift type checks; no physical/source/output capability invented"
+  ],
+  "fixture": [
+    "exact bound Result fixes both iterator-capture flaws; reverse recreates whole prior fixture",
+    "non-Error read/map/getter controls use closed failure sentinel",
+    "six native method count unchanged; new observation assertions never advertise runtime availability"
+  ],
+  "actual_portable_review": {
+    "old_loop_scan_exit": 1,
+    "old_findings": 2,
+    "final_loop_scan_exit": 0,
+    "final_self_tests": 14
+  },
+  "native": "six new actual AHK cases UNEXECUTED; hostedWindows unit/compile/E2E required",
+  "Root_writes": 0
+}

@@ -1,0 +1,89 @@
+{
+  "apply_check_exit": 0,
+  "archive_sha256": "b3a706a2ca2b9051a7f3e8a11a0cd1999084825dc71eff14f23ea003bb1140a8",
+  "files": {
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-native-actions/evidence/after-lua54.log": "020000161e077a426e239a5d5cc4bb1012c6d705f39b7286da811dd83bae54aa",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-native-actions/evidence/after-luajit.log": "020000161e077a426e239a5d5cc4bb1012c6d705f39b7286da811dd83bae54aa",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-native-actions/evidence/before-luajit.log": "37e1e9b3ed12bc2897ed6dda5eab06e84fd79a1d9e224952ace91f01629e1b47",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-native-actions/evidence/final-before-lua54.log": "bdf68bdc1add98c7743656d50c8187a3c0579301f38cff691df922afec378801",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-native-actions/evidence/final-before-luajit.log": "91096f096afdac9b02fa007c85857b82dd31c60992adc371d9fb1f08a6565bfb",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-native-actions/evidence/final-combined-lua54.log": "4c4c94eeb5d8e1a83ab9b4deef0a41864cad970ced44871f34055fc85af416e1",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-native-actions/evidence/final-combined-luajit.log": "4c4c94eeb5d8e1a83ab9b4deef0a41864cad970ced44871f34055fc85af416e1",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-native-actions/evidence/lint-owned.log": "8a91761d72c3b198542b81c2f52f3500d6f2b5fd4436fe9f78566194b0919afb",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-native-actions/evidence/pre-output-guard-luajit.log": "4ad5a99172ec79e9816271fef1e66eb96804c37d911ec6b4433c5cad9ccac554",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-native-actions/evidence/preserved-lua54.log": "bce6ea38e1f0925ab7a00b60dfdc777402718fcc1eaf63275b1fd0138713b94f",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-native-actions/evidence/preserved-luajit.log": "bce6ea38e1f0925ab7a00b60dfdc777402718fcc1eaf63275b1fd0138713b94f",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-native-actions/one-shot-freeze/README.md": "3a4ba27fa8440a17c683249ae88a792a96a1e31fe05b050acd105be005f57002",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-native-actions/one-shot-freeze/apply-check.json": "732883d74fff105b6916110dd67928d04765fdfa4fce96791f3d3be410b4440f",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-native-actions/one-shot-freeze/one-shot.patch": "60838d423ca63c8c5166657472e721d6d47569c6434b6ec4eeabd8c441dbcdb1",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-native-actions/one-shot-freeze/preservation.json": "247542986f805d8810190eae45fa825bcc67161a1549eaffab5efc4f806fd9b6",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-native-actions/one-shot-freeze/source-pair.tar": "b3a706a2ca2b9051a7f3e8a11a0cd1999084825dc71eff14f23ea003bb1140a8",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-native-actions/qualify-combined.lua": "0ff1e8da2b851226bf67148ab2742f88f37d0d30a327fc047de8ff981f70dccb",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-native-actions/qualify-preservation.lua": "31005f14bde2f8fd3a4898d315a2203670b6ca493e8d432b3f91389f03cdbbca",
+    "/workspace/.ergopti-cloud/preparations/group3-linux93-native-actions/qualify.lua": "ca0cb5c694b6ebb42ebd5e3f53982196da10befde8be04612f1ed4538533fc0c"
+  },
+  "patch_sha256": "60838d423ca63c8c5166657472e721d6d47569c6434b6ec4eeabd8c441dbcdb1",
+  "qualifications": {
+    "combined_preservation_each_abi": {
+      "failed": 0,
+      "passed": 134
+    },
+    "final_original_each_abi": {
+      "failed": 8,
+      "passed": 4
+    },
+    "hosted_ci": "unexecuted",
+    "native_evdev_uinput": "unexecuted",
+    "new_controlled_each_abi": {
+      "failed": 0,
+      "passed": 12
+    },
+    "shared_metadata_generators": "unexecuted"
+  },
+  "root_source_head": "5e622935b7618bb9f8e3e1508141773046ed2134",
+  "source_dependencies": {
+    "static/ergopti_plus/_shared/lua/tap_hold/key_combinations.lua": "ecf457cc2e8a94ce74748663b1161571e27500e1c00785e97ed7206b748dc312",
+    "static/ergopti_plus/_shared/lua/tap_hold/one_shot_shift.lua": "9ff4f097e014ada2c6755d774c5570b91239f611b4699bdbb317c5af84071b13",
+    "static/ergopti_plus/_shared/lua/unicode_case/data.lua": "70a93d4956f5490c24bf35a1c73cccbb1f131260702cdb155f43ae6b95bc5026",
+    "static/ergopti_plus/_shared/lua/unicode_case/init.lua": "4bcde1859108a31bc5f1a61f102d8c57af2244b9475277b1420560275707fe9f",
+    "static/ergopti_plus/_shared/tap_hold/one_shot_shift.json": "6c605b612374f4e21a3ad5edfea6c0c676c37c23cff32db78d867aef4e28d182",
+    "static/ergopti_plus/linux/adapters/keyboard_hook.lua": "bf7d81db85aec313ccbff2113ca55e45aff58be110955ec8947dd322e00d1eb2",
+    "static/ergopti_plus/linux/modules/shortcuts/key_combinations.lua": "634261734d05247b997695d008ca664d3d594f031353692e92cba08ec7d01baf",
+    "static/ergopti_plus/linux/tests/helpers.lua": "c40df4005280f8c3a5671bad44b4b4d4811103c5332831c5b30fefc2eafb4765",
+    "tools/lib/paths.cjs": "a172a610e402b7dd4535439e748cc8ed2fecb6c81097859aae79a8c022fd664a",
+    "tools/lint/lint-conventions.js": "7739c690b024e745b981b0b4071ccb254b0daace2bb2f8356a56295b907ccc90"
+  },
+  "source_paths": [
+    {
+      "current_root_preimage_matches": true,
+      "path": "static/ergopti_plus/linux/platform/remap/tap_hold_engine.lua",
+      "post_sha256": "39ffc279e68ad50360b9af13c12913345e5d319134feb6e78d428d7d1a6db9be",
+      "pre_sha256": "20d9e79c74d1e9457df7c03073190602d3fe418b650928add009b9699662454e"
+    },
+    {
+      "current_root_preimage_matches": true,
+      "path": "static/ergopti_plus/linux/platform/remap/key_combination_engine.lua",
+      "post_sha256": "488a8ca05decb632adb4bd75f2f30014a577ddf0d1cf6295260f2b52f9e011ff",
+      "pre_sha256": "4f4d7c4d796f8529ad9e8e89826969ecba2777375bbeadc4d6cbb572d4a5b96d"
+    },
+    {
+      "current_root_preimage_matches": true,
+      "path": "static/ergopti_plus/linux/platform/remap/tap_hold_manager.lua",
+      "post_sha256": "d60dacf410e31e77eaaa1d7cc0a2c1074c35fe7dbd8cb6a84577d0644004c3aa",
+      "pre_sha256": "1b5f4ba8c13d80376d166e719620f5a3defda76b33f7358be3cae7565e360de2"
+    },
+    {
+      "current_root_preimage_matches": true,
+      "path": "static/ergopti_plus/linux/tests/unit/modules/test_key_combinations.lua",
+      "post_sha256": "3c63b4aee5e539c5b39962bbb13b8e8108e4c60425ac66daa976b7b618b9b52a",
+      "pre_sha256": "b2e8983f1e58879e5bde2f89b74bed4798fa426840185b5063f53dd87d18757c"
+    },
+    {
+      "current_root_preimage_matches": true,
+      "path": "static/ergopti_plus/linux/tests/unit/modules/test_key_combination_native_actions.lua",
+      "post_sha256": "0e94b7138ef4c0d9a59ede62f76c53e1e7ae5dbf00e730d86a45cad3c7979bae",
+      "pre_sha256": null
+    }
+  ],
+  "status": "FROZEN_INACTIVE_ONE_SHOT_SHIFT"
+}

@@ -1,0 +1,864 @@
+diff --git a/static/ergopti_plus/_shared/lua/tap_hold/caps_word.lua b/static/ergopti_plus/_shared/lua/tap_hold/caps_word.lua
+new file mode 100644
+--- /dev/null
++++ b/static/ergopti_plus/_shared/lua/tap_hold/caps_word.lua
+@@ -0,0 +1,87 @@
++--- _shared/lua/tap_hold/caps_word.lua
++
++--- ==============================================================================
++--- MODULE: Versioned Caps Word Casing Owner (shared)
++--- DESCRIPTION:
++--- One pure owner chooses title_words (legacy menu semantics) or upper_word
++--- (native pair context). Opaque probes never commit across mode/callback changes.
++--- ==============================================================================
++
++local UnicodeCase = require("unicode_case")
++local M = {}
++local STOP_CONTROL = {enter=true,tab=true,escape=true}
++
++--- Creates a pure casing owner. Native delivery remains the adapter's custody.
++--- @return table owner
++function M.new()
++	local owner, active, triggered, mode, revision, native = {}, false, false, "title_words", 0, nil
++	local probes = setmetatable({}, {__mode="k"})
++	local function changed()
++		revision=revision+1
++	end
++	function owner.active() return active end
++	function owner.mode() return mode end
++	function owner.triggered() return triggered end
++	function owner.current_native(claim)
++		return claim~=nil and rawequal(claim,native) and active and mode=="upper_word"
++	end
++	function owner.toggle_title()
++		active,triggered,mode,native=not active,false,"title_words",nil
++		changed();return true
++	end
++	function owner.toggle_native()
++		active,triggered,mode=not active,false,"upper_word"
++		native=active and {} or nil
++		changed();return true,native
++	end
++	function owner.retire_native(claim)
++		if claim~=nil and rawequal(claim,native) then active,triggered,native=false,false,nil;changed() end
++		return true
++	end
++	function owner.pointer_activity(claim)
++		return owner.retire_native(claim)
++	end
++	function owner.clear()
++		active,triggered,mode,native=false,false,"title_words",nil;changed();return true
++	end
++	function owner.restore_title(saved_active,saved_triggered)
++		if type(saved_active)~="boolean" or type(saved_triggered)~="boolean" then return false end
++		active,triggered,mode,native=saved_active,saved_triggered,"title_words",nil;changed();return true
++	end
++	function owner.title_snapshot()
++		if active and mode=="upper_word" then return nil end
++		return {active=active,triggered=triggered}
++	end
++	function owner.process_title(text)
++		if not active or mode~="title_words" or not UnicodeCase.is_single_character(text) then return nil end
++		if UnicodeCase.is_word_boundary(text) then triggered=false;changed();return nil end
++		if triggered then return nil end
++		triggered=true;changed()
++		local capital=UnicodeCase.upper(text)
++		return capital~=text and capital or nil
++	end
++	function owner.probe_native(claim,text,control)
++		if not owner.current_native(claim) then return nil end
++		local boundary=STOP_CONTROL[control]==true
++		if type(text)=="string" and text~="" then
++			boundary=boundary or not UnicodeCase.is_single_character(text) or UnicodeCase.is_word_boundary(text)
++		end
++		local capital
++		if not boundary and type(text)=="string" and text~="" then
++			local upper=UnicodeCase.upper(text)
++			if upper~=text or UnicodeCase.lower(text)~=text then capital=upper end
++		end
++		local receipt={};probes[receipt]={claim=claim,revision=revision,boundary=boundary,capital=capital}
++		return receipt,capital
++	end
++	function owner.commit_native(claim,receipt)
++		local probe=probes[receipt]
++		if not probe or not rawequal(probe.claim,claim) or probe.revision~=revision or not owner.current_native(claim) then return false end
++		probes[receipt]=nil
++		if probe.boundary then active,triggered,native=false,false,nil end
++		changed();return true
++	end
++	return owner
++end
++
++return M
+diff --git a/static/ergopti_plus/linux/modules/shortcuts/manager.lua b/static/ergopti_plus/linux/modules/shortcuts/manager.lua
+--- a/static/ergopti_plus/linux/modules/shortcuts/manager.lua
++++ b/static/ergopti_plus/linux/modules/shortcuts/manager.lua
+@@ -31,6 +31,7 @@
+ local Paths  = require("infra.paths")
+ local Manifest = require("infra.manifest_reader")
+ local TextCase = require("unicode_case")
++local Casing = require("tap_hold.caps_word")
+ local WrapPair = require("wrap_pair")
+ local SendInput = require("send_input")
+ local TomlCodec = require("toml_codec")
+@@ -320,13 +321,13 @@
+ -- =========================================
+ -- =========================================
+ 
+-local _caps_word_active = false
+-local _caps_word_triggered = false  -- true after first letter capitalized, waiting for word end
++local _casing = Casing.new()
++local _native_casing
+ 
+ --- Returns whether CapsWord is currently active.
+ --- @return boolean
+ function M.is_caps_word_active()
+-	return _caps_word_active
++	return _casing.active()
+ end
+ 
+ --- Toggles CapsWord on/off via the menu.
+@@ -336,9 +337,8 @@
+ 	record("caps_word")
+ 	-- Metric delivery is protected external code and can reserve configuration.
+ 	if _configuration_owner ~= nil then return false end
+-	_caps_word_active = not _caps_word_active
+-	_caps_word_triggered = false
+-	Logger.info(LOG, "CapsWord: %s", _caps_word_active and "ON" or "OFF")
++	_casing.toggle_title()
++	Logger.info(LOG, "CapsWord: %s", _casing.active() and "ON" or "OFF")
+ 	return true
+ end
+ 
+@@ -350,30 +350,31 @@
+ --- @return string|nil Modified character (upper-cased), or nil to pass through.
+ function M.process_caps_word(ch)
+ 	if _configuration_owner ~= nil then return nil end
+-	if not _caps_word_active then return nil end
+-	if not TextCase.is_single_character(ch) then return nil end
+-
+-	-- Word boundaries: Unicode whitespace and punctuation.
+-	local is_boundary = TextCase.is_word_boundary(ch)
+-
+-	if is_boundary then
+-		-- Word boundary reached — prepare for next word.
+-		_caps_word_triggered = false
+-		return nil
+-	end
+-
+-	if not _caps_word_triggered then
+-		-- First letter of new word — capitalize and disengage for this word.
+-		_caps_word_triggered = true
+-		local upper = TextCase.upper(ch)
+-		if upper == ch then
+-			return nil  -- already uppercase, no change needed
+-		end
+-		Logger.debug(LOG, "CapsWord: '%s' → '%s'.", ch, upper)
+-		return upper
+-	end
+-
+-	return nil
++	return _casing.process_title(ch)
++end
++
++--- Returns the single casing owner's native context, closed during publication.
++--- @return table owner Pure native policy port; never a physical-delivery ACK.
++function M.native_casing_owner()
++	if not _native_casing then
++		_native_casing = {
++			current_native = function(claim) return _configuration_owner == nil and _casing.current_native(claim) end,
++			toggle_native = function()
++				if _configuration_owner ~= nil then return false end
++				return _casing.toggle_native()
++			end,
++			probe_native = function(...)
++				if _configuration_owner ~= nil then return nil end
++				return _casing.probe_native(...)
++			end,
++			commit_native = function(...)
++				if _configuration_owner ~= nil then return false end
++				return _casing.commit_native(...)
++			end,
++			retire_native = _casing.retire_native,
++		}
++	end
++	return _native_casing
+ end
+ 
+ -- =========================================
+@@ -554,8 +555,7 @@
+ 
+ 	_enabled = enabled
+ 	if not enabled then
+-		_caps_word_active = false
+-		_caps_word_triggered = false
++		_casing.clear()
+ 	end
+ 	Logger.info(LOG, "Shortcuts %s.", enabled and "enabled" or "disabled")
+ 	return true
+@@ -654,8 +654,7 @@
+ 		error("shortcuts enabled override must be a boolean")
+ 	end
+ 	-- Reset CapsWord state so init() gives a clean slate for tests.
+-	_caps_word_active = false
+-	_caps_word_triggered = false
++	_casing.clear()
+ 	_config_path = opts.config_path or require("infra.config_paths").config("config.toml")
+ 	_persist = opts.persist == true
+ 
+@@ -740,8 +739,10 @@
+ --- @return table|nil state
+ function M.configuration_snapshot(owner)
+ 	if _configuration_owner ~= owner then return nil end
++	local casing = _casing.title_snapshot()
++	if not casing then return nil end
+ 	return { enabled = _enabled, wrap = _wrap_on_type,
+-		caps_word_active = _caps_word_active, caps_word_triggered = _caps_word_triggered }
++		caps_word_active = casing.active, caps_word_triggered = casing.triggered }
+ end
+ 
+ --- Applies a validated runtime state without invoking independent setters.
+@@ -749,12 +750,12 @@
+ --- @param state table Candidate or saved state.
+ --- @return boolean acknowledged
+ function M.apply_configuration(owner, state)
+-	if _configuration_owner ~= owner or type(state) ~= "table" then return false end
++	if _configuration_owner ~= owner or type(state) ~= "table" or _casing.title_snapshot() == nil then return false end
+ 	for _, key in ipairs({ "enabled", "wrap", "caps_word_active", "caps_word_triggered" }) do
+ 		if type(state[key]) ~= "boolean" then return false end
+ 	end
+ 	_enabled, _wrap_on_type = state.enabled, state.wrap
+-	_caps_word_active, _caps_word_triggered = state.caps_word_active, state.caps_word_triggered
++	_casing.restore_title(state.caps_word_active, state.caps_word_triggered)
+ 	return true
+ end
+ 
+diff --git a/static/ergopti_plus/linux/ergopti_hotstrings.lua b/static/ergopti_plus/linux/ergopti_hotstrings.lua
+--- a/static/ergopti_plus/linux/ergopti_hotstrings.lua
++++ b/static/ergopti_plus/linux/ergopti_hotstrings.lua
+@@ -780,6 +780,7 @@
+ 	-- take the tap actions with it.
+ 	local action_catalogue = gestures
+ 	TapHold.init({
++		casing_owner = shortcuts and shortcuts.native_casing_owner(),
+ 		keyboard_hook = keyboard_hook,
+ 		execute_action = function(action, binding)
+ 			if not action_catalogue then error("the action catalogue (gestures module) is not loaded") end
+diff --git a/static/ergopti_plus/linux/platform/remap/tap_hold_engine.lua b/static/ergopti_plus/linux/platform/remap/tap_hold_engine.lua
+--- a/static/ergopti_plus/linux/platform/remap/tap_hold_engine.lua
++++ b/static/ergopti_plus/linux/platform/remap/tap_hold_engine.lua
+@@ -186,6 +186,9 @@
+ 		layer_depth = 0,     -- how many layer keys are down
+ 		layer_keys = {},     -- code -> chord emitted for a key pressed on the layer
+ 		one_shot_until = nil,
++		casing_owner = options.casing_owner,
++		caps_word_claim = nil,
++		caps_word_retire = false,
+ 		one_shot_keys = {},  -- keys a one-shot Shift is wrapping (several can overlap)
+ 		one_shot_swallowed = {}, -- keys a one-shot Shift replaced by its result, until released
+ 		native_keys = {},    -- configured keys pressed under a modifier: themselves until released
+@@ -421,6 +424,41 @@
+ 	end)
+ end
+ 
++--- Selects an owned casing output using shared Unicode policy and native levels.
++--- @param code integer Original input key.
++--- @param now_ms number Input event timestamp.
++--- @return string|nil kind
++--- @return string|nil text
++local function take_case(self, code, now_ms)
++	local kind, result
++	local casing, claim = self.casing_owner, self.caps_word_claim
++	if casing and casing.current_native(claim) then
++		local receipt, capital = casing.probe_native(claim, self.key_text(code), EvdevCodes.CONTROL_NAME_OF[code])
++		if receipt then
++			if capital then
++				local steps = self.plan_text(capital)
++				local step = type(steps) == "table" and #steps == 1 and type(steps[1]) == "table" and steps[1]
++				if step and step.keycode == code and type(step.mods) == "table" and #step.mods == 1 and step.mods[1] == "shift" then
++					kind = "shift"
++				else
++					-- This prototype owns original-key Shift output only. A Unicode
++					-- capital requiring another chord or text injector has no admitted
++					-- output custody; retire rather than invent native parity.
++					casing.retire_native(claim)
++					self.caps_word_retire = true
++				end
++			end
++			if not self.caps_word_retire and casing.commit_native(claim, receipt) == true then
++				result = capital
++				if not casing.current_native(claim) then self.caps_word_retire = true end
++			else kind = nil; self.caps_word_retire = true end
++		end
++	end
++	local one_shot_kind, one_shot_result = take_one_shot(self, code, now_ms)
++	if one_shot_kind then return one_shot_kind, one_shot_result end
++	return kind, result
++end
++
+ -- The level keys the engine counts as held when no live layout names them.
+ local USUAL_LEVEL_KEYS = { EvdevCodes.KEY_LEFTSHIFT, EvdevCodes.KEY_RIGHTSHIFT, EvdevCodes.KEY_RIGHTALT }
+ 
+@@ -477,7 +515,7 @@
+ --- unshifted and left the Shift for the next letter.
+ --- @return table|nil tap Text for the injector, as type_text returns it.
+ local function type_tap(self, out, code, now_ms)
+-	local verdict, text = take_one_shot(self, code, now_ms)
++	local verdict, text = take_case(self, code, now_ms)
+ 	if verdict == "text" then return type_text(self, out, text) end
+ 	if verdict == "shift" then press(self, out, KEY_LEFTSHIFT) end
+ 	tap_key(self, out, code)
+@@ -886,7 +924,7 @@
+ 		return out
+ 	end
+ 	if value == DOWN and not self.one_shot_keys[code] then
+-		local verdict, text = take_one_shot(self, code, now_ms)
++		local verdict, text = take_case(self, code, now_ms)
+ 		if verdict == "shift" then
+ 			self.one_shot_keys[code] = true
+ 			press(self, out, KEY_LEFTSHIFT)
+@@ -903,6 +941,9 @@
+ --- A click, its release or a wheel turn: it makes every held tap-hold key a
+ --- chord.
+ function M:activity()
++	if self.caps_word_claim then self.caps_word_retire = true end
++	if self.casing_owner then self.casing_owner.retire_native(self.caps_word_claim) end
++	self.caps_word_claim = nil
+ 	cancel_taps(self, nil, true)
+ end
+ 
+@@ -956,6 +997,8 @@
+ 	self.held, self.layer_keys, self.layer_depth = {}, {}, 0
+ 	self.undecided = nil
+ 	self.one_shot_until, self.one_shot_keys, self.key_refs = nil, {}, {}
++	if self.casing_owner then self.casing_owner.retire_native(self.caps_word_claim) end
++	self.caps_word_claim, self.caps_word_retire = nil, false
+ 	self.one_shot_swallowed, self.instant_down = {}, {}
+ 	self.native_keys, self.modifiers_down, self.passed_down = {}, {}, {}
+ 	-- The hook swallows the rest of every key it took from this engine, so
+@@ -970,11 +1013,18 @@
+ --- @param at_ms number Timestamp of the admitted physical pair event.
+ --- @return boolean accepted
+ function M:combination_native_action(action, at_ms)
+-	if action ~= "one_shot_shift" or type(at_ms) ~= "number" or at_ms ~= at_ms
++	if action ~= "one_shot_shift" and action ~= "caps_word" or type(at_ms) ~= "number" or at_ms ~= at_ms
+ 		or at_ms == math.huge or at_ms == -math.huge
+ 		or type(self.key_text) ~= "function" or type(self.plan_text) ~= "function"
+ 		or type(self.one_shot_result) ~= "function" then return false end
+-	self.one_shot_until = at_ms + self.one_shot_timeout_ms
++	if action == "caps_word" then
++		if not self.casing_owner then return false end
++		local previous = self.caps_word_claim
++		local accepted, claim = self.casing_owner.toggle_native()
++		if accepted ~= true then return false end
++		if previous and previous ~= claim then self.caps_word_retire = true end
++		self.caps_word_claim = claim
++	else self.one_shot_until = at_ms + self.one_shot_timeout_ms end
+ 	return true
+ end
+ 
+diff --git a/static/ergopti_plus/linux/platform/remap/tap_hold_manager.lua b/static/ergopti_plus/linux/platform/remap/tap_hold_manager.lua
+--- a/static/ergopti_plus/linux/platform/remap/tap_hold_manager.lua
++++ b/static/ergopti_plus/linux/platform/remap/tap_hold_manager.lua
+@@ -53,6 +53,7 @@
+ local _user_path = nil
+ local _loaded = nil          -- Config.load() result.
+ local _engine = nil          -- Built from _loaded; nil when there is nothing to run.
++local _casing_owner = nil
+ local _one_shot = nil        -- The shared one-shot Shift results, read with _loaded.
+ local _enabled = true        -- The runtime feature switch (« Disable all »).
+ local _paused = false        -- The daemon's pause.
+@@ -164,6 +165,7 @@
+ --- @return table id -> true
+ local function _tap_action_set()
+ 	local set = { one_shot_shift = true }
++	if _casing_owner then set.caps_word = true end
+ 	for id in pairs(Engine.KEY_TAPS) do set[id] = true end
+ 	for id in pairs(EmitActions) do set[id] = true end
+ 	for _, id in ipairs(_action_names()) do
+@@ -231,6 +233,7 @@
+ 		if key.enabled ~= false then count = count + 1 end
+ 	end
+ 	local engine = Engine.new({
++		casing_owner = _casing_owner,
+ 		keys = loaded.keys,
+ 		roll_keys = loaded.roll_keys,
+ 		nav_layer = nav_layer,
+@@ -245,7 +248,7 @@
+ 	})
+ 	local combinations = Combinations.new({ keys = loaded.catalog, hold_picker = loaded.hold_picker,
+ 		is_paused = function() return _paused end, changed = _apply,
+-		actions = { is_assignable = function(action) return action ~= "caps_word" and _tap_action_set()[action] == true end } })
++		actions = { is_assignable = function(action) return _tap_action_set()[action] == true end } })
+ 	if combinations.has_bindings() then
+ 		engine = CombinationEngine.new(engine, combinations.engine_options(_pair_thresholds(loaded)))
+ 	end
+@@ -294,6 +297,12 @@
+ 		end
+ 	end
+ 	Logger.start(LOG, "Initialising tap-holds…")
++	_casing_owner = opts.casing_owner
++	if _casing_owner ~= nil then
++		for _, method in ipairs({ "current_native", "toggle_native", "probe_native", "commit_native", "retire_native" }) do
++			if type(_casing_owner[method]) ~= "function" then error("invalid native casing owner", 2) end
++		end
++	end
+ 	_hook = opts.keyboard_hook
+ 	_execute_action = opts.execute_action
+ 	_action_names = opts.action_names
+diff --git a/static/ergopti_plus/linux/platform/remap/key_combination_engine.lua b/static/ergopti_plus/linux/platform/remap/key_combination_engine.lua
+--- a/static/ergopti_plus/linux/platform/remap/key_combination_engine.lua
++++ b/static/ergopti_plus/linux/platform/remap/key_combination_engine.lua
+@@ -53,7 +53,7 @@
+ 		end
+ 		function result.run(callback, current)
+ 			if not action or not result.admit(current) then return false end
+-			if action == "one_shot_shift" then
++			if action == "one_shot_shift" or action == "caps_word" then
+ 				if exact.native_ran then return false end
+ 				acting = true
+ 				local ok, accepted = pcall(base.combination_native_action, base, action, at_ms)
+@@ -74,9 +74,16 @@
+ 		end
+ 		return result
+ 	end
+-	local function retired_frame(replay)
++	local function retired_frame(replay, resume)
+ 		local exact = retirement
+-		return { owned = true, replay = replay == true, ack = function(accepted) return owner:ack_retirement(accepted, exact.rows) end,
++		return { owned = true, replay = replay == true, ack = function(accepted)
++			if owner:ack_retirement(accepted, exact.rows) ~= true then return false end
++			-- Word termination settles the whole old output cohort before an
++			-- unrelated key replays. Re-arm only the configured policy, privately;
++			-- its next physical event must capture a fresh canonical source guard.
++			if resume then return owner:activate() end
++			return true
++		end,
+ 			restore = function() return {}, nil end }
+ 	end
+ local function revoke_event(code, source)
+@@ -110,15 +117,22 @@
+ 		return retirement == previous.retirement and epoch == previous.epoch
+ 	end
+ 	function owner.handles(_, code) return base:handles(code) or ids[code] ~= nil end
++	local function casing_ended()
++		return base.caps_word_retire == true or base.caps_word_claim ~= nil
++			and base.casing_owner.current_native(base.caps_word_claim) ~= true
++	end
+ 	local function process_base(code, value, at_ms, receipt)
+ 		if not native_state then return base:process(code, value, at_ms) end
+ 		local exact_epoch, exact_serial = epoch, serial
++		if casing_ended() then return owner:release_all(), nil, nil, retired_frame(true, true) end
+ 		local rows, action, binding = base:process(code, value, at_ms)
++		local casing_stopped = casing_ended()
+ 		local admitted = runtime_guard and runtime_guard() == true
+ 		if not admitted or retirement or disabled or acting or delivery or pending
+ 			or epoch ~= exact_epoch or serial ~= exact_serial then
+ 			return owner:release_all(), nil, nil, retired_frame()
+ 		end
++		if casing_stopped then return owner:release_all(), nil, nil, retired_frame(true, true) end
+ 		if rows then return rows, action, binding, frame(rows, action, binding, nil, runtime_guard, receipt, at_ms) end
+ 		return rows, action, binding
+ 	end
+@@ -194,6 +208,9 @@
+ 			local guard = runtime_guard
+ 			if not guard or guard() ~= true then return { { owned_rows = owner:release_all(), frame = retired_frame() } } end
+ 		end
++		if native_state and casing_ended() then
++			return { { owned_rows = owner:release_all(), frame = retired_frame(false, true) } }
++		end
+ 		return base:tick(at_ms)
+ 	end
+ 	function owner.activity() if policy then policy.activity() end; base:activity() end
+diff --git a/static/ergopti_plus/linux/tests/unit/modules/test_caps_word_policy.lua b/static/ergopti_plus/linux/tests/unit/modules/test_caps_word_policy.lua
+new file mode 100644
+--- /dev/null
++++ b/static/ergopti_plus/linux/tests/unit/modules/test_caps_word_policy.lua
+@@ -0,0 +1,119 @@
++--- tests/unit/modules/test_caps_word_policy.lua
++
++--- ==============================================================================
++--- MODULE: Shared Caps Word Casing Ownership
++--- DESCRIPTION:
++--- Independent legacy title-word vectors, sealed native probes and actual Linux
++--- shortcut-manager composition. No physical native input is claimed.
++--- ==============================================================================
++
++local NativeLoop=require("luv")
++local helpers=require("tests.helpers")
++local Casing=require("tap_hold.caps_word")
++helpers.describe("one versioned Caps Word state owner",function()
++	helpers.it("preserves title-case first-letter and repeated-word semantics",function()
++		local owner=Casing.new();helpers.assert_eq(owner.toggle_title(),true)
++		helpers.assert_eq(owner.process_title("é"),"É");helpers.assert_eq(owner.process_title("b"),nil)
++		helpers.assert_eq(owner.process_title(" "),nil);helpers.assert_eq(owner.process_title("a"),"A")
++		helpers.assert_eq(owner.process_title("."),nil);helpers.assert_eq(owner.process_title("n"),"N")
++		helpers.assert_eq(owner.active(),true)
++	end)
++	helpers.it("does not treat invalid or empty text as an invented word boundary",function()
++		local owner=Casing.new();owner.toggle_title()
++		helpers.assert_eq(owner.process_title(""),nil);helpers.assert_eq(owner.process_title("\255"),nil)
++		helpers.assert_eq(owner.triggered(),false);helpers.assert_eq(owner.process_title("a"),"A")
++	end)
++	helpers.it("keeps the original already-uppercase and digit title-word consumption",function()
++		local owner=Casing.new();owner.toggle_title()
++		helpers.assert_eq(owner.process_title("A"),nil);helpers.assert_eq(owner.process_title("b"),nil)
++		owner.process_title(" ");helpers.assert_eq(owner.process_title("1"),nil)
++		helpers.assert_eq(owner.process_title("b"),nil)
++	end)
++	helpers.it("prevents the legacy on-char observer from duplicating native uppercase output",function()
++		local owner=Casing.new();local accepted,claim=owner.toggle_native();helpers.assert_eq(accepted,true)
++		helpers.assert_eq(owner.process_title("a"),nil)
++		local receipt,text=owner.probe_native(claim,"a");helpers.assert_eq(text,"A")
++		helpers.assert_eq(owner.commit_native(claim,receipt),true);helpers.assert_eq(owner.current_native(claim),true)
++	end)
++	helpers.it("does not commit a probe after pointer cancellation",function()
++		local owner=Casing.new();local _,claim=owner.toggle_native()
++		local receipt,text=owner.probe_native(claim,"a");helpers.assert_eq(text,"A")
++		owner.pointer_activity(claim);helpers.assert_eq(owner.commit_native(claim,receipt),false)
++		helpers.assert_eq(owner.active(),false)
++	end)
++	helpers.it("never lets an old native claim clear newer title-word intent",function()
++		local owner=Casing.new();local _,claim=owner.toggle_native()
++		owner.toggle_title();owner.toggle_title()
++		helpers.assert_eq(owner.mode(),"title_words");helpers.assert_eq(owner.active(),true)
++		helpers.assert_eq(owner.retire_native(claim),true);helpers.assert_eq(owner.active(),true)
++		helpers.assert_eq(owner.process_title("a"),"A")
++	end)
++	helpers.it("rejects foreign or cloned probes without publishing guessed state",function()
++		local owner=Casing.new();local _,claim=owner.toggle_native()
++		local receipt=owner.probe_native(claim," ")
++		helpers.assert_eq(owner.commit_native({},receipt),false)
++		helpers.assert_eq(owner.commit_native(claim,{}),false)
++		helpers.assert_eq(owner.current_native(claim),true)
++		helpers.assert_eq(owner.commit_native(claim,receipt),true)
++		helpers.assert_eq(owner.commit_native(claim,receipt),false);helpers.assert_eq(owner.active(),false)
++	end)
++	helpers.it("does not forge a title snapshot while native upper-word ownership is active",function()
++		local owner=Casing.new();local _,claim=owner.toggle_native()
++		helpers.assert_eq(owner.title_snapshot(),nil)
++		owner.retire_native(claim);local snapshot=owner.title_snapshot()
++		helpers.assert_eq(snapshot.active,false);helpers.assert_eq(snapshot.triggered,false)
++		helpers.assert_eq(owner.restore_title(true,true),true)
++		helpers.assert_eq(owner.process_title("a"),nil)
++		helpers.assert_eq(owner.restore_title(true,false),true);helpers.assert_eq(owner.process_title("a"),"A")
++	end)
++	helpers.it("rejects stale probes even if a different mode returns to native uppercase",function()
++		local owner=Casing.new();local _,claim=owner.toggle_native();local receipt=owner.probe_native(claim,"a")
++		owner.toggle_title();local _,successor=owner.toggle_native()
++		helpers.assert_eq(owner.current_native(successor),true)
++		helpers.assert_eq(owner.commit_native(claim,receipt),false)
++	end)
++end)
++helpers.describe("actual Linux title-word manager and native casing port",function()
++	helpers.it("shares one owner while preserving menu toggles and detached title snapshots",function()
++		local manager=require("modules.shortcuts.manager")
++		manager.init({persist=true,config_path="/controlled/config.toml",enabled=true})
++		local native=manager.native_casing_owner();helpers.assert_eq(native,manager.native_casing_owner())
++		helpers.assert_eq(manager.toggle_caps_word(),true);helpers.assert_eq(manager.process_caps_word("a"),"A")
++		helpers.assert_eq(manager.process_caps_word("b"),nil)
++		local token={};helpers.assert_eq(manager.acquire_configuration(token),true)
++		local snapshot=manager.configuration_snapshot(token);helpers.assert_eq(snapshot.caps_word_active,true)
++		helpers.assert_eq(snapshot.caps_word_triggered,true);helpers.assert_eq(native.toggle_native(),false)
++		helpers.assert_eq(manager.release_configuration(token),true)
++		manager.toggle_caps_word();local accepted,claim=native.toggle_native();helpers.assert_eq(accepted,true)
++		helpers.assert_eq(native.current_native(claim),true);helpers.assert_eq(manager.process_caps_word("a"),nil)
++		helpers.assert_eq(manager.acquire_configuration(token),true)
++		helpers.assert_eq(manager.configuration_snapshot(token),nil,"native output ownership is not a guessed legacy boolean snapshot")
++		helpers.assert_eq(native.current_native(claim),false)
++		helpers.assert_eq(manager.release_configuration(token),true)
++		native.retire_native(claim);manager.toggle_caps_word()
++		helpers.assert_eq(native.retire_native(claim),true);helpers.assert_eq(manager.process_caps_word("a"),"A")
++	end)
++end)
++
++helpers.describe("native casing publication ownership",function()
++	helpers.it("cannot apply guessed title booleans over an unretired native upper-word claim",function()
++		local manager=require("modules.shortcuts.manager");manager.init({persist=true,config_path="/controlled/config.toml",enabled=true})
++		local native=manager.native_casing_owner();local accepted,claim=native.toggle_native();helpers.assert_eq(accepted,true)
++		local token={};helpers.assert_eq(manager.acquire_configuration(token),true)
++		helpers.assert_eq(manager.apply_configuration(token,{enabled=false,wrap=false,caps_word_active=false,caps_word_triggered=false}),false)
++		helpers.assert_eq(manager.release_configuration(token),true);helpers.assert_eq(native.current_native(claim),true)
++		native.retire_native(claim);helpers.assert_eq(manager.acquire_configuration(token),true)
++		helpers.assert_eq(manager.apply_configuration(token,{enabled=true,wrap=true,caps_word_active=true,caps_word_triggered=false}),true)
++		helpers.assert_eq(manager.release_configuration(token),true);helpers.assert_eq(manager.process_caps_word("n"),"N")
++	end)
++end)
++
++helpers.describe("native casing probe revision",function()
++	helpers.it("cannot commit an outer plan after a nested probe commits the same native claim",function()
++		local owner=Casing.new();local _,claim=owner.toggle_native()
++		local outer=owner.probe_native(claim,"a");local nested=owner.probe_native(claim,"b")
++		helpers.assert_eq(owner.commit_native(claim,nested),true)
++		helpers.assert_eq(owner.commit_native(claim,outer),false)
++		helpers.assert_eq(owner.current_native(claim),true)
++	end)
++end)
+diff --git a/static/ergopti_plus/linux/tests/unit/modules/test_key_combination_caps_word.lua b/static/ergopti_plus/linux/tests/unit/modules/test_key_combination_caps_word.lua
+new file mode 100644
+--- /dev/null
++++ b/static/ergopti_plus/linux/tests/unit/modules/test_key_combination_caps_word.lua
+@@ -0,0 +1,263 @@
++--- tests/unit/modules/test_key_combination_caps_word.lua
++
++--- ==============================================================================
++--- MODULE: Ordered Pair Caps Word Native Ownership
++--- DESCRIPTION:
++--- Actual owners and engines with controlled layout/output ports. These are
++--- software proofs, not physical evdev/uinput or live-layout qualification.
++--- ==============================================================================
++
++local NativeLoop = require("luv")
++local helpers = require("tests.helpers")
++local Owner = require("modules.shortcuts.key_combinations")
++local Engine = require("platform.remap.tap_hold_engine")
++local Native = require("platform.remap.key_combination_engine")
++local Casing = require("tap_hold.caps_word")
++local function origin()return {ready=true,physical=true,source="owned-keyboard",generation=7}end
++local function rows(events)
++	local result={};for _,row in ipairs(events or {})do result[#result+1]=row.code..":"..row.value end
++	return table.concat(result," ")
++end
++local function make()
++	local state={bytes='[shortcuts.key_combination_taps]\ncaps_lock_then_tab="caps_word"\n[shortcuts.key_combination_holds]\ncaps_lock_then_tab="shift"\n',paused=false}
++	state.owner=Owner.new({keys={{id="caps_lock",key="caps_lock"},{id="tab",key="tab"}},hold_picker={modifiers={"ctrl","shift"},layers={}},
++		files={read_with_status=function()return state.bytes,"ok"end},route=function()return "/controlled/config.toml"end,
++		is_paused=function()return state.paused end,changed=function()return true end,actions={is_assignable=function(action)return action=="caps_word"end}})
++	state.casing=Casing.new()
++	state.base=Engine.new({casing_owner=state.casing,keys={caps_lock={tap_action="enter",hold_modifier="ctrl",time_activation_seconds=.3}},tap_min_ms=0,one_shot_timeout_ms=1000,
++		key_text=function(code)return ({[30]="a",[48]="b",[2]="1",[57]=" ",[51]=",",[18]="é"})[code]end,
++		one_shot_result=function()return nil end,plan_text=function(text)
++			return ({A={{keycode=30,mods={"shift"}}},B={{keycode=48,mods={"shift"}}},["É"]={{keycode=18,mods={"shift"}}}})[text]
++		end})
++	state.native=Native.new(state.base,state.owner.engine_options({caps_lock=300,tab=300}));return state
++end
++local function process(state,code,value,at)
++	local out,action,binding,frame=state.native:process(code,value,at,origin())
++	if frame then helpers.assert_eq(frame.ack(true),true)end
++	return out,action,binding,frame
++end
++local function arm(state,at)
++	at=at or 0;process(state,58,1,at);process(state,15,1,at+10)
++	local out,action,binding,frame=process(state,15,0,at+100)
++	helpers.assert_eq(rows(out),"42:0 29:0");helpers.assert_eq(action,"caps_word")
++	helpers.assert_eq(binding,"combination__caps_lock_then_tab")
++	local callbacks=0;helpers.assert_eq(frame.run(function()callbacks=callbacks+1 end,origin()),true)
++	helpers.assert_eq(callbacks,0,"Caps Word owns native state rather than a gesture action")
++	local restored,receipt=frame.restore(origin());helpers.assert_eq(rows(restored),"29:1");helpers.assert_eq(receipt.ack(true),true)
++	process(state,58,0,at+110)
++end
++helpers.describe("ordered pair Caps Word native state",function()
++	helpers.it("uppercases successive native letters while preserving digits and genuine CapsLock",function()
++		local state=make();arm(state);helpers.assert_eq(state.casing.current_native(state.base.caps_word_claim),true)
++		helpers.assert_eq(rows(process(state,30,1,120)),"42:1 30:1")
++		helpers.assert_eq(rows(process(state,30,0,130)),"30:0 42:0")
++		helpers.assert_eq(rows(process(state,2,1,140)),"");helpers.assert_eq(rows(process(state,2,0,150)),"")
++		helpers.assert_eq(rows(process(state,18,1,160)),"42:1 18:1")
++		helpers.assert_eq(rows(process(state,18,0,170)),"18:0 42:0")
++		helpers.assert_eq(state.casing.current_native(state.base.caps_word_claim),true)
++	end)
++	helpers.it("stops on shared Unicode word boundaries without replacing punctuation",function()
++		for _,code in ipairs({57,51,28,15,1})do
++			local state=make();arm(state)
++			process(state,code,1,120);process(state,code,0,130)
++			helpers.assert_eq(state.casing.current_native(state.base.caps_word_claim),false)
++			helpers.assert_eq(rows(process(state,30,1,140)),"")
++		end
++	end)
++	helpers.it("toggles the exact state off on a second pair without leaving modifier references",function()
++		local state=make();arm(state);helpers.assert_eq(state.casing.current_native(state.base.caps_word_claim),true)
++		arm(state,200);helpers.assert_eq(state.casing.current_native(state.base.caps_word_claim),false)
++		helpers.assert_eq(next(state.base.key_refs),nil)
++		helpers.assert_eq(rows(process(state,30,1,320)),"")
++	end)
++	helpers.it("cancels on pointer activity and exact owner retirement",function()
++		local state=make();arm(state);state.native:activity();helpers.assert_eq(state.casing.current_native(state.base.caps_word_claim),false)
++		local second=make();arm(second);process(second,30,1,120)
++		local release=second.native:release_all();local seen={}
++		for _,row in ipairs(release)do seen[row.code..":"..row.value]=true end
++		helpers.assert_eq(seen["42:0"],true);helpers.assert_eq(seen["30:0"],true)
++		helpers.assert_eq(second.casing.current_native(second.base.caps_word_claim),false);helpers.assert_eq(second.native:ack_retirement(false),false)
++		helpers.assert_eq(second.native:release_all(),release);helpers.assert_eq(second.native:ack_retirement(true),true)
++	end)
++	helpers.it("rejects stale native layout callback before any Caps Word Shift down",function()
++		local state=make();arm(state)
++		state.base.key_text=function()state.bytes=state.bytes.."\n# revoked\n";return "a"end
++		local out,_,_,frame=state.native:process(30,1,120,origin())
++		helpers.assert_true(rows(out):find("42:1",1,true)==nil);helpers.assert_eq(state.casing.current_native(state.base.caps_word_claim),false)
++		helpers.assert_eq(frame.ack(true),true)
++	end)
++end)
++
++helpers.describe("Caps Word modifier overlap and policy callback currency",function()
++	helpers.it("keeps each native letter's Shift ownership until its own physical release",function()
++		local state=make();arm(state)
++		helpers.assert_eq(rows(process(state,30,1,120)),"42:1 30:1")
++		state.base.key_text=function(code)return code==48 and "B" or code==30 and "A" or nil end
++		helpers.assert_eq(rows(process(state,48,1,125)),"48:1")
++		helpers.assert_eq(state.base.key_refs[42],2)
++		helpers.assert_eq(rows(process(state,30,0,130)),"30:0")
++		helpers.assert_eq(state.base.key_refs[42],1)
++		helpers.assert_eq(rows(process(state,48,0,135)),"48:0 42:0")
++		helpers.assert_eq(state.base.key_refs[42],nil)
++	end)
++	helpers.it("revokes the exact native physical generation before another letter emits",function()
++		local state=make();arm(state);process(state,30,1,120)
++		local changed={ready=true,physical=true,source="owned-keyboard",generation=8}
++		local out,_,_,frame=state.native:process(48,1,125,changed)
++		helpers.assert_true(rows(out):find("42:1",1,true)==nil)
++		helpers.assert_eq(state.casing.current_native(state.base.caps_word_claim),false)
++		helpers.assert_eq(frame.ack(false),false);helpers.assert_eq(state.native:release_all(),out)
++		helpers.assert_eq(frame.ack(true),true)
++	end)
++	helpers.it("cannot resurrect Caps Word when the layout callback cancels it via pointer activity",function()
++		local state=make();arm(state)
++		state.base.plan_text=function()state.native:activity();return {{keycode=30,mods={"shift"}}}end
++		local out=process(state,30,1,120)
++		helpers.assert_true(rows(out):find("42:1",1,true)==nil)
++		helpers.assert_eq(state.casing.current_native(state.base.caps_word_claim),false)
++	end)
++end)
++
++helpers.describe("Caps Word real-layout output admission and terminal debt",function()
++	helpers.it("refuses AZERTY capitals whose native plan is not the original key under Shift",function()
++		local state=make();arm(state)
++		state.base.plan_text=function(text) helpers.assert_eq(text,"É");return {{keycode=3,mods={"altgr"}}} end
++		local out,action,_,frame=state.native:process(18,1,120,origin())
++		helpers.assert_eq(action,nil,"unsupported native casing must not fall back to the unqualified text injector")
++		helpers.assert_true(rows(out):find("42:1",1,true)==nil)
++		helpers.assert_eq(state.casing.current_native(state.base.caps_word_claim),false)
++		helpers.assert_eq(frame.replay,true);helpers.assert_eq(frame.ack(false),false)
++		helpers.assert_eq(state.native:release_all(),out);helpers.assert_eq(frame.ack(true),true)
++	end)
++	helpers.it("refuses multi-scalar German casing and absent native plans without fabricated output",function()
++		for _,plan in ipairs({false,true})do
++			local state=make();arm(state);state.base.key_text=function()return "ß"end
++			state.base.plan_text=function()if plan then return {{keycode=31,mods={"shift"}},{keycode=31,mods={"shift"}}}end end
++			local out,action,_,frame=state.native:process(31,1,120,origin())
++			helpers.assert_eq(action,nil);helpers.assert_true(rows(out):find("42:1",1,true)==nil)
++			helpers.assert_eq(frame.replay,true);helpers.assert_eq(frame.ack(true),true)
++		end
++	end)
++	helpers.it("keeps exact Shift UP debt before pointer-cancelled casing can replay a neighbour",function()
++		local state=make();arm(state);process(state,30,1,120);state.native:activity()
++		local out,_,_,frame=state.native:process(48,1,125,origin())
++		helpers.assert_true(rows(out):find("42:0",1,true)~=nil)
++		helpers.assert_eq(frame.replay,true);helpers.assert_eq(frame.ack(nil),false)
++		helpers.assert_eq(state.native:release_all(),out);helpers.assert_eq(frame.ack(true),true)
++		helpers.assert_eq(state.native:process(48,1,126,origin()),nil,"the neighbour replays under a fresh source capture")
++		process(state,48,0,130);arm(state,200)
++		helpers.assert_eq(state.casing.current_native(state.base.caps_word_claim),true,"word retirement must not permanently disable configured pairs")
++	end)
++	helpers.it("retires owned Shift before punctuation and preserves a later title-word menu owner",function()
++		local state=make();arm(state);process(state,30,1,120)
++		state.casing.toggle_title();state.casing.toggle_title()
++		local out,_,_,frame=state.native:process(51,1,125,origin())
++		helpers.assert_true(rows(out):find("42:0",1,true)~=nil);helpers.assert_eq(frame.replay,true)
++		helpers.assert_eq(frame.ack(true),true);helpers.assert_eq(state.casing.active(),true)
++		helpers.assert_eq(state.casing.process_title("n"),"N")
++	end)
++end)
++
++local function with_hook(callback)
++	local names = { "adapters.keyboard_hook", "modules.hotstrings.device_finder" }
++	local old = {}
++	for _, name in ipairs(names) do old[name] = package.loaded[name]; package.loaded[name] = nil end
++	package.loaded["modules.hotstrings.device_finder"] = { physical_sources = function(devices)
++		local result = {}
++		for _, device in ipairs(devices) do
++			result[#result + 1] = {path=device,sysfs="/controlled/physical",name="controlled",physical=true}
++		end
++		return result
++	end }
++	local ok, err = pcall(callback, require("adapters.keyboard_hook"))
++	for _, name in ipairs(names) do package.loaded[name] = old[name] end
++	assert(package.loaded.luv == NativeLoop, "The exact process-native loop remains owned")
++	if not ok then error(err, 0) end
++end
++
++helpers.describe("actual hook Caps Word output and release wave",function()
++	helpers.it("releases the cancelled letter cohort before forwarding its neighbour",function()
++		local state=make();with_hook(function(hook)
++			local emitted,callbacks={},0
++			helpers.assert_eq(hook.set_remapper(state.native,function()callbacks=callbacks+1 end),true)
++			hook._test_drive({{type=1,code=58,value=1,at_ms=0},{type=1,code=15,value=1,at_ms=10},
++				{type=1,code=15,value=0,at_ms=100},{type=1,code=58,value=0,at_ms=110},
++				{type=1,code=30,value=1,at_ms=120},{type=1,code=48,value=1,at_ms=130},{type=1,code=48,value=0,at_ms=140}},
++				{onEmitRaw=function(code,value)
++					emitted[#emitted+1]=code..":"..value
++					if code==30 and value==1 then state.native:activity() end
++					return true
++				end},true)
++			helpers.assert_eq(callbacks,0)
++			local trace=table.concat(emitted," ")
++			helpers.assert_true(trace:find("30:0",1,true)~=nil)
++			local last_shift=0;for i,row in ipairs(emitted)do if row=="42:0"then last_shift=i end end
++			local neighbour;for i,row in ipairs(emitted)do if row=="48:1"then neighbour=i end end
++			helpers.assert_true(neighbour and neighbour>last_shift,"actual Shift UP must precede baseline neighbour DOWN")
++			helpers.assert_eq(hook.set_remapper(nil),true);helpers.assert_eq(next(state.base.key_refs),nil)
++		end)
++	end)
++	helpers.it("never forwards the neighbour when exact Caps Word Shift UP is refused",function()
++		local state=make();with_hook(function(hook)
++			local letter,refuse,neighbour=false,true,0
++			helpers.assert_eq(hook.set_remapper(state.native,function()error("No generic native casing dispatch")end),true)
++			hook._test_drive({{type=1,code=58,value=1,at_ms=0},{type=1,code=15,value=1,at_ms=10},
++				{type=1,code=15,value=0,at_ms=100},{type=1,code=58,value=0,at_ms=110},
++				{type=1,code=30,value=1,at_ms=120},{type=1,code=48,value=1,at_ms=130}},
++				{onEmitRaw=function(code,value)
++					if code==30 and value==1 then letter=true;state.native:activity() end
++					if code==48 and value==1 then neighbour=neighbour+1 end
++					return not(letter and code==42 and value==0 and refuse)
++				end},true)
++			helpers.assert_eq(neighbour,0);helpers.assert_eq(hook.set_remapper(nil),false)
++			local debt=state.native:release_all();helpers.assert_eq(state.native:ack_retirement(false),false)
++			helpers.assert_eq(state.native:release_all(),debt)
++			refuse=false
++			local retried=0
++			-- Recovery is attempted while the actual controlled capture session is
++			-- alive; a stopped session cannot truthfully ACK native key delivery.
++			hook._test_drive({{type=0,code=3,value=0,at_ms=150},{type=0,code=0,value=0,at_ms=151}},
++				{onDesync=function()end,onEmitRaw=function(code,value)
++					if code==42 and value==0 then retried=retried+1 end
++					return true
++				end},true)
++			helpers.assert_true(retried>0);helpers.assert_eq(hook.set_remapper(nil),true)
++		end)
++	end)
++end)
++
++helpers.describe("actual configured manager and single casing owner",function()
++	helpers.it("builds native Caps Word only from the explicit shared-owner injection",function()
++		local state=make();local Loader=require("platform.remap.tap_hold_loader")
++		local defaults=require("infra.paths").shared("tap_hold/defaults.toml")
++		local loaded=Loader.load_document(defaults,{tap_hold={enabled=false,inherit_defaults=true}},nil,"/controlled/tap_hold.toml")
++		local modules={
++			["modules.shortcuts.key_combinations"]=false,["platform.remap.tap_hold_manager"]=false,
++			["platform.remap.tap_hold_loader"]={FALLBACK_THRESHOLD_SECONDS=Loader.FALLBACK_THRESHOLD_SECONDS,load=function()return loaded end},
++			["platform.remap.nav_layer"]={load=function()return {}end},
++			["adapters.file_system"]={read_with_status=function()return state.bytes,"ok"end},
++			["infra.config_paths"]={config=function()return "/controlled/config.toml"end},
++		}
++		local previous={};for name,value in pairs(modules)do previous[name]=package.loaded[name];package.loaded[name]=value or nil end
++		local ok,err=pcall(function()
++			local shortcuts=require("modules.shortcuts.manager");shortcuts.init({persist=true,config_path="/controlled/config.toml",enabled=true})
++			local manager=require("platform.remap.tap_hold_manager")
++			local hook={set_remapper=function(engine,callback)state.installed,state.callback=engine,callback;return true end,
++				key_text=state.base.key_text,held_modifiers=function()return {}end,held_text_modifier_codes=function()return {}end,
++				held_shortcut_modifier_codes=function()return {}end}
++			manager.init({casing_owner=shortcuts.native_casing_owner(),keyboard_hook=hook,execute_action=function()error("No generic Caps Word execution")end,
++				action_names=function()return {}end,on_text_injected=function()error("No unqualified text injection")end,defaults_path=defaults,user_path="/controlled/tap_hold.toml"})
++			helpers.assert_eq(manager.is_active(),true);helpers.assert_eq(next(state.installed.by_code),nil)
++			state.installed:process(58,1,0,origin());local _,_,_,taken=state.installed:process(15,1,10,origin())
++			helpers.assert_eq(taken.ack(true),true)
++			local _,action,_,frame=state.installed:process(15,0,100,origin())
++			helpers.assert_eq(action,"caps_word");helpers.assert_eq(frame.ack(true),true)
++			helpers.assert_eq(frame.run(state.callback,origin()),true);helpers.assert_eq(shortcuts.is_caps_word_active(),true)
++			helpers.assert_eq(shortcuts.process_caps_word("a"),nil,"the daemon title-word observer cannot duplicate this native owner")
++			state.installed:release_all();helpers.assert_eq(state.installed:ack_retirement(true),true)
++			helpers.assert_eq(shortcuts.is_caps_word_active(),false)
++		end)
++		for name in pairs(modules)do package.loaded[name]=previous[name]end
++		helpers.assert_eq(package.loaded.luv,NativeLoop);if not ok then error(err,0)end
++	end)
++end)

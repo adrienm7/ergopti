@@ -1,0 +1,98 @@
+[
+  {
+    "abi": "luajit",
+    "source": "candidate",
+    "exit": 0,
+    "summary": "READER_ORIGIN 65 0",
+    "log": "luajit-candidate.log",
+    "sha256": "438d9c63f5900a6da801dc849cedb924e4d1010cafc54025c96fdb8323b9009a"
+  },
+  {
+    "abi": "luajit",
+    "source": "preimages",
+    "exit": 1,
+    "summary": "READER_ORIGIN 51 14",
+    "log": "luajit-preimages.log",
+    "sha256": "7b4f2251934ea138b099ee5b1a3fd50241e5be41ee3e427ede4926a7b514d16d"
+  },
+  {
+    "abi": "luajit",
+    "source": "omit-copy-ack",
+    "exit": 1,
+    "summary": "READER_ORIGIN 63 2",
+    "log": "luajit-omit-copy-ack.log",
+    "sha256": "d9d04ead72079f12757a4b8d812c6367396d209b2845323a121503f77b889bf8"
+  },
+  {
+    "abi": "luajit",
+    "source": "omit-query-currency",
+    "exit": 1,
+    "summary": "READER_ORIGIN 63 2",
+    "log": "luajit-omit-query-currency.log",
+    "sha256": "960ed673c3bec4738f998072c56a748651aa8ba8740d420e72b694906e88d47b"
+  },
+  {
+    "abi": "luajit",
+    "source": "omit-read-currency",
+    "exit": 1,
+    "summary": "READER_ORIGIN 63 2",
+    "log": "luajit-omit-read-currency.log",
+    "sha256": "545ebe0106e1d5e47e68b1e81b9548b11b92dc36d5c7dc9d2e805eaf1703795c"
+  },
+  {
+    "abi": "luajit",
+    "source": "omit-terminal-provider",
+    "exit": 1,
+    "summary": "READER_ORIGIN 64 1",
+    "log": "luajit-omit-terminal-provider.log",
+    "sha256": "82356e1192881c8e7f580224cf77a0b377289f9f181750395aae17c4496bae0b"
+  },
+  {
+    "abi": "lua5.4",
+    "source": "candidate",
+    "exit": 0,
+    "summary": "READER_ORIGIN 65 0",
+    "log": "lua5.4-candidate.log",
+    "sha256": "438d9c63f5900a6da801dc849cedb924e4d1010cafc54025c96fdb8323b9009a"
+  },
+  {
+    "abi": "lua5.4",
+    "source": "preimages",
+    "exit": 1,
+    "summary": "READER_ORIGIN 51 14",
+    "log": "lua5.4-preimages.log",
+    "sha256": "389a4b8157d065d1150da1085a5909233f5682854b37999607563b2ccdf6fa75"
+  },
+  {
+    "abi": "lua5.4",
+    "source": "omit-copy-ack",
+    "exit": 1,
+    "summary": "READER_ORIGIN 63 2",
+    "log": "lua5.4-omit-copy-ack.log",
+    "sha256": "d9d04ead72079f12757a4b8d812c6367396d209b2845323a121503f77b889bf8"
+  },
+  {
+    "abi": "lua5.4",
+    "source": "omit-query-currency",
+    "exit": 1,
+    "summary": "READER_ORIGIN 63 2",
+    "log": "lua5.4-omit-query-currency.log",
+    "sha256": "960ed673c3bec4738f998072c56a748651aa8ba8740d420e72b694906e88d47b"
+  },
+  {
+    "abi": "lua5.4",
+    "source": "omit-read-currency",
+    "exit": 1,
+    "summary": "READER_ORIGIN 63 2",
+    "log": "lua5.4-omit-read-currency.log",
+    "sha256": "545ebe0106e1d5e47e68b1e81b9548b11b92dc36d5c7dc9d2e805eaf1703795c"
+  },
+  {
+    "abi": "lua5.4",
+    "source": "omit-terminal-provider",
+    "exit": 1,
+    "summary": "READER_ORIGIN 64 1",
+    "log": "lua5.4-omit-terminal-provider.log",
+    "sha256": "82356e1192881c8e7f580224cf77a0b377289f9f181750395aae17c4496bae0b"
+  }
+]

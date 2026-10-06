@@ -1,0 +1,301 @@
+{
+  "status": "PRIVATE_PENDING_OWNERSHIP_AND_INDEPENDENT_REVIEW",
+  "owned_paths": [
+    {
+      "path": "static/ergopti_plus/linux/adapters/evdev_reader.lua",
+      "preimage": "bcfd7821ef61176afde6eb5de91282b6d7803d02280670ef9ff11249401d0f98",
+      "postimage": "6844b07b2f89f9d3729ed610592165419f1769bb758d1745f6bb81693d8da1e1",
+      "current_root_preimage": "3cf0d9c728d0d53743f5798cbdeb806504acb5da36061d43ef016298948c0ea7"
+    },
+    {
+      "path": "static/ergopti_plus/linux/tests/unit/adapters/test_evdev_reader.lua",
+      "preimage": "44f9355f1f563ea828779a7318d3c7209ff3fe02f82b96473d87a4a0ae76ca35",
+      "postimage": "95ce06b6ab80f5287ee354d994b299daf02edefae57cf50a508f2c210398c551",
+      "current_root_preimage": "961b7ae813677b2547d7b5e86947fbbe58bec7bb78f002cf32fe15faef5f787e"
+    }
+  ],
+  "prerequisite_pins": [
+    {
+      "path": "/workspace/.ergopti-cloud/preparations/group3-linux-evdev-origin-receipts/receipt.json",
+      "sha256": "f69b51fd4c5e9075a1a48ab5c0a658c1518416593149455ced72e95d63a34840"
+    },
+    {
+      "path": "/workspace/.ergopti-cloud/preparations/group3-linux-evdev-origin-slot-identity/receipt.json",
+      "sha256": "4cca79c2a13de04ee912b62dcd39d7a52e8a8263f556a1bee27f8ec17787d90e"
+    },
+    {
+      "path": "/workspace/.ergopti-cloud/preparations/group3-linux-evdev-origin-receipts-independent-review/review-joint.json",
+      "sha256": "b202c069b2c0da111f8321c7ab60fc9f3381dd5a28a8187553979c7b3291176b"
+    }
+  ],
+  "dependencies": [
+    {
+      "path": "static/ergopti_plus/linux/infra/input_event.lua",
+      "sha256": "4dacdce142135428bba5ef1a9d27a9840c2da0f536e63e6d3d550e74a607b626"
+    },
+    {
+      "path": "static/ergopti_plus/linux/tests/helpers.lua",
+      "sha256": "c40df4005280f8c3a5671bad44b4b4d4811103c5332831c5b30fefc2eafb4765"
+    },
+    {
+      "path": "static/ergopti_plus/_shared/lua/logger/shim.lua",
+      "sha256": "f4370f549ba3bfadfebe5927b60ae6b1863d21925dfbbb95646d4cc0c99a9c20"
+    },
+    {
+      "path": "tools/lint/lint-conventions.js",
+      "sha256": "7739c690b024e745b981b0b4071ccb254b0daace2bb2f8356a56295b907ccc90"
+    }
+  ],
+  "results": [
+    {
+      "abi": "luajit",
+      "source": "preimages",
+      "passed": 51,
+      "failed": 14,
+      "log": "luajit-preimages.log",
+      "sha256": "7b4f2251934ea138b099ee5b1a3fd50241e5be41ee3e427ede4926a7b514d16d"
+    },
+    {
+      "abi": "luajit",
+      "source": "candidate",
+      "passed": 65,
+      "failed": 0,
+      "log": "luajit-candidate.log",
+      "sha256": "438d9c63f5900a6da801dc849cedb924e4d1010cafc54025c96fdb8323b9009a"
+    },
+    {
+      "abi": "luajit",
+      "source": "omit-copy-ack",
+      "passed": 63,
+      "failed": 2,
+      "log": "luajit-omit-copy-ack.log",
+      "sha256": "d9d04ead72079f12757a4b8d812c6367396d209b2845323a121503f77b889bf8"
+    },
+    {
+      "abi": "luajit",
+      "source": "omit-query-currency",
+      "passed": 63,
+      "failed": 2,
+      "log": "luajit-omit-query-currency.log",
+      "sha256": "960ed673c3bec4738f998072c56a748651aa8ba8740d420e72b694906e88d47b"
+    },
+    {
+      "abi": "luajit",
+      "source": "omit-read-currency",
+      "passed": 63,
+      "failed": 2,
+      "log": "luajit-omit-read-currency.log",
+      "sha256": "545ebe0106e1d5e47e68b1e81b9548b11b92dc36d5c7dc9d2e805eaf1703795c"
+    },
+    {
+      "abi": "luajit",
+      "source": "omit-terminal-provider",
+      "passed": 64,
+      "failed": 1,
+      "log": "luajit-omit-terminal-provider.log",
+      "sha256": "82356e1192881c8e7f580224cf77a0b377289f9f181750395aae17c4496bae0b"
+    },
+    {
+      "abi": "lua5.4",
+      "source": "preimages",
+      "passed": 51,
+      "failed": 14,
+      "log": "lua5.4-preimages.log",
+      "sha256": "389a4b8157d065d1150da1085a5909233f5682854b37999607563b2ccdf6fa75"
+    },
+    {
+      "abi": "lua5.4",
+      "source": "candidate",
+      "passed": 65,
+      "failed": 0,
+      "log": "lua5.4-candidate.log",
+      "sha256": "438d9c63f5900a6da801dc849cedb924e4d1010cafc54025c96fdb8323b9009a"
+    },
+    {
+      "abi": "lua5.4",
+      "source": "omit-copy-ack",
+      "passed": 63,
+      "failed": 2,
+      "log": "lua5.4-omit-copy-ack.log",
+      "sha256": "d9d04ead72079f12757a4b8d812c6367396d209b2845323a121503f77b889bf8"
+    },
+    {
+      "abi": "lua5.4",
+      "source": "omit-query-currency",
+      "passed": 63,
+      "failed": 2,
+      "log": "lua5.4-omit-query-currency.log",
+      "sha256": "960ed673c3bec4738f998072c56a748651aa8ba8740d420e72b694906e88d47b"
+    },
+    {
+      "abi": "lua5.4",
+      "source": "omit-read-currency",
+      "passed": 63,
+      "failed": 2,
+      "log": "lua5.4-omit-read-currency.log",
+      "sha256": "545ebe0106e1d5e47e68b1e81b9548b11b92dc36d5c7dc9d2e805eaf1703795c"
+    },
+    {
+      "abi": "lua5.4",
+      "source": "omit-terminal-provider",
+      "passed": 64,
+      "failed": 1,
+      "log": "lua5.4-omit-terminal-provider.log",
+      "sha256": "82356e1192881c8e7f580224cf77a0b377289f9f181750395aae17c4496bae0b"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "README.md",
+      "sha256": "3528e3fb9d8d7db851b049e0640c814ae7e29cd424bb329ec6acd41b37787337",
+      "bytes": 3763
+    },
+    {
+      "path": "candidate/static/ergopti_plus/linux/adapters/evdev_reader.lua",
+      "sha256": "6844b07b2f89f9d3729ed610592165419f1769bb758d1745f6bb81693d8da1e1",
+      "bytes": 32843
+    },
+    {
+      "path": "candidate/static/ergopti_plus/linux/tests/unit/adapters/test_evdev_reader.lua",
+      "sha256": "95ce06b6ab80f5287ee354d994b299daf02edefae57cf50a508f2c210398c551",
+      "bytes": 54478
+    },
+    {
+      "path": "candidate.patch",
+      "sha256": "1fb3ff9495b0716f74a5d27a3ccfa4b84fdd6689394f04092d7955e6780ebe9c",
+      "bytes": 17423
+    },
+    {
+      "path": "check_owned_conventions.cjs",
+      "sha256": "f84ed32145cc6f02697c2c36ab0a24517916f54837e541487b711487e505c08b",
+      "bytes": 1684
+    },
+    {
+      "path": "conventions.log",
+      "sha256": "2cee28fb8c7662a8abe3ed8798f33bbed48d06a5b7fd780534840135f8b3c2b4",
+      "bytes": 34
+    },
+    {
+      "path": "freeze.py",
+      "sha256": "5c622860caa0f3bbf2a90c40034f442bb6f438f2476ae905dec2309d752855d7",
+      "bytes": 6507
+    },
+    {
+      "path": "held-tests.lua",
+      "sha256": "b3f187670d2210e3372b2ca206d932f8b0418563eb33683e61e4dd5095a88c22",
+      "bytes": 11898
+    },
+    {
+      "path": "lua5.4-candidate.log",
+      "sha256": "438d9c63f5900a6da801dc849cedb924e4d1010cafc54025c96fdb8323b9009a",
+      "bytes": 5249
+    },
+    {
+      "path": "lua5.4-omit-copy-ack.log",
+      "sha256": "d9d04ead72079f12757a4b8d812c6367396d209b2845323a121503f77b889bf8",
+      "bytes": 5397
+    },
+    {
+      "path": "lua5.4-omit-query-currency.log",
+      "sha256": "960ed673c3bec4738f998072c56a748651aa8ba8740d420e72b694906e88d47b",
+      "bytes": 5405
+    },
+    {
+      "path": "lua5.4-omit-read-currency.log",
+      "sha256": "545ebe0106e1d5e47e68b1e81b9548b11b92dc36d5c7dc9d2e805eaf1703795c",
+      "bytes": 5405
+    },
+    {
+      "path": "lua5.4-omit-terminal-provider.log",
+      "sha256": "82356e1192881c8e7f580224cf77a0b377289f9f181750395aae17c4496bae0b",
+      "bytes": 5323
+    },
+    {
+      "path": "lua5.4-preimages.log",
+      "sha256": "389a4b8157d065d1150da1085a5909233f5682854b37999607563b2ccdf6fa75",
+      "bytes": 7056
+    },
+    {
+      "path": "lua54-candidate.log",
+      "sha256": "438d9c63f5900a6da801dc849cedb924e4d1010cafc54025c96fdb8323b9009a",
+      "bytes": 5249
+    },
+    {
+      "path": "luajit-candidate.log",
+      "sha256": "438d9c63f5900a6da801dc849cedb924e4d1010cafc54025c96fdb8323b9009a",
+      "bytes": 5249
+    },
+    {
+      "path": "luajit-omit-copy-ack.log",
+      "sha256": "d9d04ead72079f12757a4b8d812c6367396d209b2845323a121503f77b889bf8",
+      "bytes": 5397
+    },
+    {
+      "path": "luajit-omit-query-currency.log",
+      "sha256": "960ed673c3bec4738f998072c56a748651aa8ba8740d420e72b694906e88d47b",
+      "bytes": 5405
+    },
+    {
+      "path": "luajit-omit-read-currency.log",
+      "sha256": "545ebe0106e1d5e47e68b1e81b9548b11b92dc36d5c7dc9d2e805eaf1703795c",
+      "bytes": 5405
+    },
+    {
+      "path": "luajit-omit-terminal-provider.log",
+      "sha256": "82356e1192881c8e7f580224cf77a0b377289f9f181750395aae17c4496bae0b",
+      "bytes": 5323
+    },
+    {
+      "path": "luajit-preimages.log",
+      "sha256": "7b4f2251934ea138b099ee5b1a3fd50241e5be41ee3e427ede4926a7b514d16d",
+      "bytes": 7056
+    },
+    {
+      "path": "make_omissions.py",
+      "sha256": "a72b35c22ac1753d4c3fa654eb876264a978980aab83f2d0f1784e0b4cf110b3",
+      "bytes": 1211
+    },
+    {
+      "path": "omit-copy-ack/static/ergopti_plus/linux/adapters/evdev_reader.lua",
+      "sha256": "40b654871cd438f8dcdeea0539ceff4aee76bcfd831bd5fa27ab09f68ecb47a9",
+      "bytes": 32841
+    },
+    {
+      "path": "omit-query-currency/static/ergopti_plus/linux/adapters/evdev_reader.lua",
+      "sha256": "a5c642fe347ae649986144d61c49a42c1bcb592ea9ef055afcc440872cfe9e86",
+      "bytes": 32788
+    },
+    {
+      "path": "omit-read-currency/static/ergopti_plus/linux/adapters/evdev_reader.lua",
+      "sha256": "95744ee568926437da1def5553b55da53f31796e78810cb08fb5a75ac35e0f8e",
+      "bytes": 32794
+    },
+    {
+      "path": "omit-terminal-provider/static/ergopti_plus/linux/adapters/evdev_reader.lua",
+      "sha256": "f2da2861f1c99fc872b440aa2b33d63817ab7c41e5c9729c4aa921631806b42b",
+      "bytes": 32803
+    },
+    {
+      "path": "preimages/static/ergopti_plus/linux/adapters/evdev_reader.lua",
+      "sha256": "bcfd7821ef61176afde6eb5de91282b6d7803d02280670ef9ff11249401d0f98",
+      "bytes": 29365
+    },
+    {
+      "path": "preimages/static/ergopti_plus/linux/tests/unit/adapters/test_evdev_reader.lua",
+      "sha256": "44f9355f1f563ea828779a7318d3c7209ff3fe02f82b96473d87a4a0ae76ca35",
+      "bytes": 42580
+    },
+    {
+      "path": "results.json",
+      "sha256": "9128f3c302a29cf266d93e2e0ce411d3e4976a2ba07460daf8ad450a310b6ce6",
+      "bytes": 2645
+    },
+    {
+      "path": "run.lua",
+      "sha256": "f8af9ac40f0e0c0b620525746e0cd95289b0a0a1303bcdd984cd5dc1cbbb7c35",
+      "bytes": 840
+    }
+  ],
+  "native_kernel_execution": "NOT_RUN",
+  "physical_delivery_available": false
+}

@@ -1,0 +1,238 @@
+--- platform/remap/key_combination_engine.lua
+
+--- Native effect ownership for the shared ordered-pair policy. The underlying
+--- tap-hold engine retains modifier reference counts and live layer ownership.
+local Policy = require("tap_hold.key_combinations")
+local Engine = require("platform.remap.tap_hold_engine")
+local M = {}
+local function append(out, rows) for _, row in ipairs(rows) do out[#out + 1] = row end end
+function M.new(base, options)
+	assert(type(base) == "table" and type(options.capture) == "function" and type(options.capture_action) == "function")
+	local owner, policy, generation, pending, retirement, acting = {}, nil, nil, nil, nil, false
+	local presses, blocked, holds, serial = {}, {}, {}, 0
+	local original_by_code, acknowledged, runtime_guard = base.by_code, false, nil
+	local epoch, disabled, delivery = 0, false, nil
+	local native_state = false
+	local ids = {}; for id, code in pairs(Engine.KEY_CODES) do ids[code] = id end
+	local function token(effect) return effect.source .. "\0" .. effect.pair_id end
+	local function spec(id)
+		local result = { mods = {} }
+		if id == "nav" then result.layer = true; return result end
+		for modifier in id:gmatch("[^+]+") do result.mods[#result.mods + 1] = assert(Engine.MODIFIER_CODES[modifier]) end
+		return result
+	end
+	local function capture(callback, ...)
+		local ok, guard = pcall(callback, ...)
+		if not ok or type(guard) ~= "function" then return nil end
+		return function()
+			local admitted, current = pcall(guard)
+			return admitted and current == true
+		end
+	end
+	local function physical(receipt)
+		return type(receipt) == "table" and receipt.ready == true and receipt.physical == true
+			and type(receipt.source) == "string" and receipt.source ~= "" and type(receipt.generation) == "number"
+	end
+	local function frame(rows, action, binding, lifted, guard, receipt, at_ms)
+		serial = serial + 1
+		local exact = { rows = rows, serial = serial, action = action, lifted = lifted, epoch = epoch, native_ran = false }
+		pending = exact
+		local result = { owned = true }
+		function result.ack(accepted)
+			if pending ~= exact or accepted ~= true or retirement or delivery then return false end
+			pending = nil; return true
+		end
+		local function current_frame(current)
+			return not retirement and not disabled and not pending and not acting and not delivery
+				and epoch == exact.epoch and serial == exact.serial and generation == receipt.generation
+				and physical(current) and current.source == receipt.source and current.generation == receipt.generation
+		end
+		function result.admit(current)
+			if not current_frame(current) or not guard or guard() ~= true then return false end
+			return current_frame(current)
+		end
+		function result.run(callback, current)
+			if not action or not result.admit(current) then return false end
+			if action == "one_shot_shift" or action == "caps_word" then
+				if exact.native_ran then return false end
+				acting = true
+				local ok, accepted = pcall(base.combination_native_action, base, action, at_ms)
+				acting = false
+				if ok and accepted == true then exact.native_ran = true; native_state = true; return true end
+				return false
+			end
+			acting = true
+			local ok = pcall(callback, action, binding)
+			acting = false
+			return ok
+		end
+		function result.restore(current)
+			if not result.admit(current) then return {}, nil end
+			local restored = base:combination_restore(lifted)
+			if #restored == 0 then return restored, nil end
+			return restored, frame(restored, nil, nil, nil, guard, receipt)
+		end
+		return result
+	end
+	local function retired_frame(replay, resume)
+		local exact = retirement
+		return { owned = true, replay = replay == true, ack = function(accepted)
+			if owner:ack_retirement(accepted, exact.rows) ~= true then return false end
+			-- Word termination settles the whole old output cohort before an
+			-- unrelated key replays. Re-arm only the configured policy, privately;
+			-- its next physical event must capture a fresh canonical source guard.
+			if resume then return owner:activate() end
+			return true
+		end,
+			restore = function() return {}, nil end }
+	end
+local function revoke_event(code, source)
+		local consumed = base.held[code] or base.layer_keys[code] or base.instant_down[code]
+			or base.native_keys[code] or base.one_shot_swallowed[code]
+			or policy and policy.owns(ids[code] or tostring(code), source)
+		return owner:release_all(), nil, nil, retired_frame(not consumed)
+	end
+	function owner.has_combinations() return true end
+	function owner.activate()
+		if native_state or retirement or acting or pending or delivery or next(base.key_refs) or next(base.held) then return false end
+		policy, generation, retirement, acknowledged, runtime_guard, disabled, epoch = nil, nil, nil, false, nil, false, epoch + 1
+		return true
+	end
+	function owner.configure(_, selected)
+		if native_state or retirement or acting or pending or delivery or next(base.key_refs) or next(base.held) then return false end
+		if type(selected) ~= "table" or type(selected.capture) ~= "function" or type(selected.capture_action) ~= "function" then return false end
+		options = selected; epoch = epoch + 1; return true
+	end
+	function owner.set_tap_holds_enabled(_, enabled)
+		if native_state or next(base.held) or next(base.key_refs) or acting or pending then return false end
+		base.by_code = enabled and original_by_code or {}; return true
+	end
+	function owner.begin_delivery(_, rows)
+		if delivery or acting or retirement and retirement.rows ~= rows then return nil end
+		local token = {}; delivery = { token = token, retirement = retirement, epoch = epoch }; return token
+	end
+	function owner.end_delivery(_, token)
+		if not delivery or token ~= delivery.token or token == nil then return false end
+		local previous = delivery; delivery = nil
+		return retirement == previous.retirement and epoch == previous.epoch
+	end
+	function owner.handles(_, code) return base:handles(code) or ids[code] ~= nil end
+	local function casing_ended() return false end
+	local function process_base(code, value, at_ms, receipt)
+		if not native_state then return base:process(code, value, at_ms) end
+		local exact_epoch, exact_serial = epoch, serial
+		if casing_ended() then return owner:release_all(), nil, nil, retired_frame(true, true) end
+		local rows, action, binding = base:process(code, value, at_ms)
+		local casing_stopped = casing_ended()
+		local admitted = runtime_guard and runtime_guard() == true
+		if not admitted or retirement or disabled or acting or delivery or pending
+			or epoch ~= exact_epoch or serial ~= exact_serial then
+			return owner:release_all(), nil, nil, retired_frame()
+		end
+		if casing_stopped then return owner:release_all(), nil, nil, retired_frame(true, true) end
+		if rows then return rows, action, binding, frame(rows, action, binding, nil, runtime_guard, receipt, at_ms) end
+		return rows, action, binding
+	end
+	function owner.process(_, code, value, at_ms, receipt)
+		if acting or delivery or pending then return owner:release_all(), nil, nil, retired_frame() end
+		if retirement then return {} end
+		if disabled then return base:process(code, value, at_ms) end
+		if not physical(receipt) then
+			if native_state then return owner:release_all(), nil, nil, retired_frame(true) end
+			return base:process(code, value, at_ms)
+		end
+		if generation ~= nil and generation ~= receipt.generation then return revoke_event(code, receipt.source) end
+		local source = receipt.source
+		if value == 1 then
+			if presses[code] and presses[code] ~= source then
+				blocked[source .. "\0" .. code] = true
+				if policy then policy.activity() end
+				return {}
+			end
+			presses[code] = source
+		elseif blocked[source .. "\0" .. code] then
+			if value == 0 then blocked[source .. "\0" .. code] = nil end
+			if policy then policy.activity() end
+			return {}
+		end
+		local guard = policy and runtime_guard or capture(options.capture)
+		if not guard or guard() ~= true then
+			if policy then return revoke_event(code, receipt.source) end
+			if value == 0 then presses[code] = nil end
+			return base:process(code, value, at_ms)
+		end
+		if not policy then
+			generation, runtime_guard = receipt.generation, guard
+			local configured = {}; for key, setting in pairs(options) do configured[key] = setting end
+			configured.generation = generation
+			policy = Policy.new(configured)
+		end
+		local unavailable = {}
+		for id, first_code in pairs(Engine.KEY_CODES) do
+			local state = base.held[first_code]
+			unavailable[id] = presses[first_code] ~= source or state and state.undecided == true
+		end
+		local result = policy.process({ key = ids[code] or tostring(code), value = value, at_ms = at_ms,
+			physical = true, source = source, generation = generation, revision = options.revision, blocked_first = unavailable })
+		if value == 0 then presses[code] = nil end
+		if not result.consumed then return process_base(code, value, at_ms, receipt) end
+		local rows, action, binding, lifted, action_guard = {}, nil, nil, nil, guard
+		for _, effect in ipairs(result.effects) do
+			local exact = token(effect)
+			if effect.kind == "take_first" then
+				local first = base.held[Engine.KEY_CODES[effect.first]]
+				if first then first.cancelled = true end
+			elseif effect.kind == "take_hold" then
+				local generated, hold = base:combination_hold(spec(effect.hold))
+				holds[exact] = hold; append(rows, generated)
+			elseif effect.kind == "release_hold" then
+				local hold = holds[exact]
+				if hold then append(rows, base:combination_release(hold)); holds[exact] = nil end
+			elseif effect.kind == "tap" then
+				action, binding = effect.tap, effect.binding
+				action_guard = capture(options.capture_action, binding, action)
+				if action_guard and action_guard() == true then
+					local released; released, lifted = base:combination_lift(Engine.KEY_CODES[effect.first]); append(rows, released)
+				else action, binding = nil, nil end
+			end
+		end
+		return rows, action, binding, frame(rows, action, binding, lifted, action_guard, receipt, at_ms)
+	end
+	function owner.tick(_, at_ms)
+		if retirement or pending or acting or delivery then return {} end
+		if disabled then return base:tick(at_ms) end
+		if policy then
+			local guard = runtime_guard
+			if not guard or guard() ~= true then return { { owned_rows = owner:release_all(), frame = retired_frame() } } end
+		end
+		if native_state and casing_ended() then
+			return { { owned_rows = owner:release_all(), frame = retired_frame(false, true) } }
+		end
+		return base:tick(at_ms)
+	end
+	function owner.activity() if policy then policy.activity() end; base:activity() end
+	function owner.release_all()
+		if retirement then return retirement.rows end
+		native_state = false
+		local seen, rows = {}, base:release_all()
+		for _, row in ipairs(rows) do seen[row.code] = true end
+		-- A failed lift/release still owns its physical UP obligation even after
+		-- logical reference counts changed. Preserve these exact rows for retry.
+		if pending then for _, row in ipairs(pending.rows) do
+			if not seen[row.code] then rows[#rows + 1] = { code = row.code, value = 0 }; seen[row.code] = true end
+		end end
+		local policy_token
+		if policy then local ignored; ignored, policy_token = policy.retire() end
+		retirement = { rows = rows, token = {}, policy_token = policy_token }
+		return rows
+	end
+	function owner.ack_retirement(_, accepted, exact_rows)
+		if not retirement or accepted ~= true or acting or delivery or exact_rows and exact_rows ~= retirement.rows then return false end
+		if policy and not policy.ack_retirement(retirement.policy_token, true) then return false end
+		pending, holds, presses, blocked, acknowledged = nil, {}, {}, {}, true
+		policy, generation, runtime_guard, retirement, disabled, epoch = nil, nil, nil, nil, true, epoch + 1
+		return true
+	end
+	return setmetatable(owner, { __index = function(_, key) return base[key] end })
+end
+return M

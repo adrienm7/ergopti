@@ -1,0 +1,34 @@
+[
+  {
+    "abi": "luajit",
+    "source": "before",
+    "passed": 27,
+    "failed": 20,
+    "log": "luajit-before.log",
+    "sha256": "3903bcc42635e1d3a04df5d0d12d6a0b62f589cb63ee76a58c9dfdd13a83b0bf"
+  },
+  {
+    "abi": "luajit",
+    "source": "after",
+    "passed": 47,
+    "failed": 0,
+    "log": "luajit-after.log",
+    "sha256": "11b605b938cff72df8c2bbc03657f078dc6a66db354d77d5938b59360cada324"
+  },
+  {
+    "abi": "lua54",
+    "source": "before",
+    "passed": 27,
+    "failed": 20,
+    "log": "lua54-before.log",
+    "sha256": "286e214e0425bfbfbc536227cec14a967108377e44173979ae13961a902e0642"
+  },
+  {
+    "abi": "lua54",
+    "source": "after",
+    "passed": 47,
+    "failed": 0,
+    "log": "lua54-after.log",
+    "sha256": "11b605b938cff72df8c2bbc03657f078dc6a66db354d77d5938b59360cada324"
+  }
+]
