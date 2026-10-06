@@ -1221,6 +1221,128 @@ for (const [from, to] of [
 			'native reader refusal must not project private streams'
 		);
 	}
+
+	// Independent closed receipts distinguish native refusal without projecting private data.
+	const refusalPrefix = 'the actual native log catalogue reader refused';
+	const closedRefusals = [
+		[
+			'timeout',
+			{ error: { code: 'ETIMEDOUT' }, status: null, signal: 'SIGTERM' },
+			'present; status=null; error=ETIMEDOUT; signal=SIGTERM'
+		],
+		[
+			'missing-program',
+			{ error: { code: 'ENOENT' }, status: null, signal: null },
+			'present; status=null; error=ENOENT; signal=NONE'
+		],
+		[
+			'access-refused',
+			{ error: { code: 'EACCES' }, status: null },
+			'present; status=null; error=EACCES; signal=NONE'
+		],
+		[
+			'buffer-refused',
+			{ error: { code: 'ENOBUFS' }, status: null },
+			'present; status=null; error=ENOBUFS; signal=NONE'
+		],
+		['nonzero', { status: 7, signal: null }, 'present; status=7; error=NONE; signal=NONE'],
+		['null-status', { status: null }, 'present; status=null; error=NONE; signal=NONE'],
+		['absent-result', undefined, 'absent; status=null; error=NONE; signal=NONE'],
+		['null-result', null, 'absent; status=null; error=NONE; signal=NONE'],
+		[
+			'private-code',
+			{
+				error: { code: 'PRIVATE_CATALOG_ERROR', message: 'PRIVATE_CATALOG_ERROR' },
+				status: -2,
+				signal: 'PRIVATE_CATALOG_ERROR'
+			},
+			'present; status=-2; error=OTHER; signal=OTHER'
+		],
+		[
+			'string-error',
+			{ error: 'PRIVATE_CATALOG_ERROR', status: null },
+			'present; status=null; error=OTHER; signal=NONE'
+		],
+		[
+			'integer-error',
+			{ error: 17, status: null },
+			'present; status=null; error=OTHER; signal=NONE'
+		],
+		[
+			'invalid-status',
+			{ error: true, status: 'PRIVATE_CATALOG_ERROR', signal: 17 },
+			'present; status=null; error=OTHER; signal=OTHER'
+		],
+		[
+			'private-code-getter',
+			{
+				error: {
+					get code() {
+						throw 'PRIVATE_CATALOG_ERROR';
+					}
+				},
+				status: null
+			},
+			'present; status=null; error=OTHER; signal=NONE'
+		],
+		[
+			'private-signal-getter',
+			{
+				error: true,
+				status: null,
+				get signal() {
+					throw 'PRIVATE_CATALOG_ERROR';
+				}
+			},
+			'present; status=null; error=OTHER; signal=OTHER'
+		]
+	];
+	for (const [name, response, fields] of closedRefusals) {
+		let observed;
+		assert.throws(
+			() => readCatalog(recipe, pipeline.ROOT, () => response),
+			(error) => {
+				observed = error;
+				return error instanceof assert.AssertionError;
+			},
+			`${name}: the original native result predicate must still refuse`
+		);
+		assert.equal(
+			observed.message,
+			`${refusalPrefix} [result=${fields}]`,
+			`${name}: the exact closed refusal receipt must remain observable`
+		);
+		assert.doesNotMatch(
+			observed.message,
+			/PRIVATE_CATALOG_ERROR/,
+			`${name}: no private result field may escape`
+		);
+	}
+	// The existing execute boundary propagates thrown values by exact identity.
+	for (const thrown of ['PRIVATE_CATALOG_ERROR', 17, null, new Error('PRIVATE_CATALOG_ERROR')]) {
+		let caught = false;
+		try {
+			readCatalog(recipe, pipeline.ROOT, () => {
+				throw thrown;
+			});
+		} catch (error) {
+			caught = true;
+			assert.equal(error, thrown, 'execute exceptions retain their original identity');
+		}
+		assert.equal(caught, true, 'the original execute exception must propagate');
+	}
+	assert.deepEqual(
+		readCatalog(recipe, pipeline.ROOT, (program, arguments_, options) => {
+			assert.equal(program, 'python', 'the original workflow command remains the executable');
+			assert.equal(arguments_[0], '-c', 'the original catalogue script invocation is unchanged');
+			assert.equal(options.timeout, 5000, 'diagnostics never relax the native read deadline');
+			assert.equal(options.maxBuffer, 65536, 'diagnostics never relax the native stream bound');
+			return valid;
+		}),
+		actual,
+		'the original valid native result is still admitted unchanged'
+	);
+
 	assert.throws(() => readCatalog([]), /one actual owner/);
 	const command = recipe.find((line) => line.includes('$catalogJson = & python -c '));
 	assert.throws(() => readCatalog([command, command]), /one actual owner/);

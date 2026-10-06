@@ -4701,9 +4701,25 @@ the newly archived evidence's long paths, before application startup. The
 fixture now configures `core.longpaths=true` only in its new private clone,
 before checkout, and verifies the local setting. The complete clone, exact
 HEAD, tracked driver projection and all native boot/retirement assertions
-remain mandatory. Native Windows requalification is pending. Separate
+remain mandatory. Separate
 macOS TIS, Brew receiver, switcher and Shortcuts failures remain explicit;
 downstream Windows/macOS delivery was skipped and Release/Publish skipped.
+
+The integrated clone correction `5d1d06854` was replayed by Windows-only
+manual run `37542732140`, exact CI SHA `6c9d575ce`. All 9,734 AHK records,
+70 E2E cases, complete source boot, fresh clone/reload/warm startup and
+packaging passed. Installation admission then refused the actual Python
+catalogue reader before compiled boot; the original assertion retained no
+child error/status, so its cause is unknown. The downstream 23 programmable
+cases were unexecuted, not failed test cases. Release/Publish was skipped.
+Both manual runs are terminal and the owned integration lock is released;
+the feature branch is retained for isolated preparation and qualification.
+The reviewed diagnostic successor keeps the exact original execution,
+predicate, 5-second deadline, buffer and all earlier assertions, exposing
+only closed result/status/error/signal facts without streams or private
+values. Independent controls retain 55 assertions: fourteen observability
+failures on the old helper, none on the successor. Native replay remains
+pending; this does not prove the original cause or successful installation.
 
 - [ ] Software implementation/repair: Keep the completed dedicated Metrics-shortcut retirement and ordinary Metrics actions; repair only demonstrated regressions in unknown retired values/comments, consent or compensation.
 - [ ] Hosted native qualification: Requalify native full-save, installed upgrade/startup and complete three-OS unit/E2E/package/install/launch gates on final sources.

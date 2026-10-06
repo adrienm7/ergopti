@@ -50,15 +50,44 @@ These foreign failures were sent to their owners; none becomes device-only.
 
 Windows passed all 9,734 AHK records and ten native source-observer ownership
 scenarios, then failed before boot: Git could not check out long archived
-evidence paths beneath the temporary clone. The clone invocation now sets
-repository-local `core.longpaths=true` before checkout and verifies it;
+evidence paths beneath the temporary clone. Correction `f098e95688d822c6ee036c6d392eb4d4ebcd1964`
+sets repository-local `core.longpaths=true` before checkout and verifies it;
 developer/global configuration, the complete checkout, exact tested HEAD
-and all startup/retirement assertions remain unchanged. Native Windows
-requalification is pending; its previous downstream E2E/package/install
-were skipped. Group 3 retains its owned `323873fd` lock for this repair.
+and all startup/retirement assertions remain unchanged. It is integrated
+without squash as dev `5d1d06854b412e91c9350e05f03b20f83b297db8`.
 
 The terminal log archive contains 548 members; SHA-256:
 `713896102044d474f04f86b24a01233d6a82fbb98b6f4579b99e0c08958a2be1`.
+
+[Windows-only manual run 37542732140](https://github.com/adrienm7/ergopti/actions/runs/37542732140)
+tested CI `6c9d575ced36354c2ea87e96bd367575a79d2640`, exact integrated
+tree `870ecde04d46c62e3fa5d4082bce529155e40806`. All 9,734 AHK records,
+70 E2E cases, native source boot, fresh clone/reload/warm startup and package
+passed. Installation admission refused the actual Python catalogue reader
+before compiled boot. The later programmable acceptance refused admission
+because startup evidence was absent; its 23 cases were unexecuted. This is
+distinct from the Windows owner's separately reproduced PID-receipt race.
+Overall FAILURE; Release/Publish SKIPPED; Linux/macOS intentionally unselected.
+Terminal ZIP SHA-256:
+`5cdc7efda55d88a5c2b3dffee0ed1c379d177d1b66402a33542e89c1a10ddc1f`.
+
+The catalogue refusal's cause remains unknown: its original assertion did
+not retain the child status/error. The launch job used unpinned Node 22.23.3
+and no explicit Python setup, while the exact image advertises Python 3.12.10.
+Neither a timeout nor missing TOML support is proved. The reviewed successor
+adds closed refusal facts, retaining the exact original execution, predicate,
+5-second deadline, buffer, schema and every prior assertion. Its independent
+55-control corpus has fourteen observability failures on the original helper
+and none on the successor; arbitrary execution throws still propagate by
+identity. No stream, error message, private value or getter is projected.
+Actual Windows replay remains pending. The separate runtime-initialization
+workflow preparation is inactive pending source ownership coordination.
+
+Both final manual runs are terminal. Group 3 deleted only its owned
+`323873fd` integration lock and preserved CI-validation `6c9d575`; other
+groups can reserve their final phase. `feat/actions` remains for isolated
+preparation and qualification through `codex/ci-actions`. No feature deletion,
+whole-group completion or successful installed Windows acceptance is claimed.
 
 ## Actual provider qualification
 
