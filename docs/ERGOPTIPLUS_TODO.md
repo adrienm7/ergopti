@@ -3775,6 +3775,13 @@ receives target error -10004 through its acknowledged AppleEvent sender.
 Packaging and installation are skipped after the test failure. These facts
 do not establish the server exception or the AppleEvent policy cause.
 
+The final reviewed diagnostic cohort passes all 379 JavaScript controls,
+15,154 Hammerspoon stub units in 1,529 modules and 10,142 Linux units in
+496 modules. Original59/current63 portable AppKit reader controls pass;
+the new enum test against the original reader fails all three expected
+subcases. These are receiving/source qualifications. Swift compilation, real
+AppKit readiness and complete Sparkle/Brew native acceptance remain pending.
+
 The existing Homebrew receiver readiness refusal now projects only the exact
 AppKit producer enum1/2/3 from its bounded owned capture, separately from
 Carbon OSStatus. Native run37540551778 at a5a07 observes CLD_EXITED/code1,
@@ -5125,6 +5132,15 @@ logs additionally expose public owned-request predecessor replacement,
 preflight cleanup and fixture retirement failures. Their source corrections
 and causal native replays remain required Linux work, rather than Windows or
 macOS device-only follow-up. Item 62 and transversal items 16/38 remain open.
+
+Final reviewed local sources retain the unchanged nine actual relative-clock
+cases:9/0, with first/second loopback HTTP56.24/52.00ms and acknowledged
+physical closure. The change-scoped gates pass format, JS379/0, stub macOS
+15154/0 and Linux10142/0. The earlier complete a5a07 range additionally passes
+all63 mandatory genuine temporary-native controls and installed archive3/15;
+its window-supervisor and Nix local-store prerequisites refuse, so that full
+range remains FAIL and the seven native Nix cases remain unexecuted. Final
+hosted E2E, package/install and enterprise-session qualification remain required.
 
 Native Linux CI run37540551778 at a5a07 retains one first-request timeout
 (208.57ms/status0) and a successful second request (55.91ms/status200);
