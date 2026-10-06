@@ -2115,9 +2115,9 @@ jobs:
       # that belongs to the interpreter or the C library is invisible to it —
       # and those are the differences that actually bite here. Alpine is musl
       # rather than glibc; Arch ships whatever LuaJIT released last; several
-      # distributions patch it. The driver is 1600 assertions of pure Lua plus a
-      # thin FFI layer, so running them where the interpreter differs is cheap
-      # certification of exactly the part that varies.
+      # distributions patch it. The suite also measures actual native filesystem,
+      # timers and supervised Python/curl children; install their test prerequisites
+      # without changing the earlier no-dependencies installation contract.
       #
       # LuaJIT is the production interpreter. A distribution lane without it is
       # not evidence about the driver and therefore cannot satisfy this gate.
@@ -2126,23 +2126,82 @@ jobs:
         working-directory: static/ergopti_plus/linux
         shell: bash
         run: |
-          set +e
+          set -euo pipefail
           case "${{ matrix.distro }}" in
-            debian)   apt-get install -y --no-install-recommends luajit ;;
-            fedora)   dnf install -y luajit ;;
-            arch)     pacman -Sy --noconfirm luajit ;;
-            alpine)   apk add --no-cache luajit ;;
-            opensuse) zypper --non-interactive install luajit ;;
+            debian)   package_manager=apt; apt-get install -y --no-install-recommends luajit python3 curl ;;
+            fedora)   package_manager=dnf; dnf install -y luajit python3 curl ;;
+            arch)     package_manager=pacman; pacman -Sy --noconfirm luajit python curl ;;
+            alpine)   package_manager=apk; apk add --no-cache luajit python3 curl ;;
+            opensuse) package_manager=zypper; zypper --non-interactive install luajit python3 curl ;;
+            *) echo "::error::unknown archive unit distribution"; exit 1 ;;
           esac
-          if ! command -v luajit >/dev/null 2>&1; then
-            echo "::error::${{ matrix.distro }} has no LuaJIT package — mandatory distro coverage did not run."
-            exit 1
-          fi
-          luajit -v
-          luajit tests/run.lua
-          STATUS=$?
-          set -e
-          exit $STATUS
+          luajit_executable="$(command -v luajit)"
+          "$luajit_executable" -v
+          command -v python3
+          command -v curl
+
+          # Import only the installer's existing pure LuaJIT package mapping.
+          # Exact top-level boundaries and a unique complete declaration keep
+          # this narrow source coupling from executing the installer itself.
+          module_mapping=''
+          mapping_declarations=0
+          mapping_complete=0
+          mapping_active=0
+          while IFS= read -r line || [[ -n "$line" ]]; do
+            if [[ "$line" == '_lua_module_candidates() {' ]]; then
+              mapping_declarations=$((mapping_declarations + 1))
+              mapping_active=1
+            fi
+            if [[ "$mapping_active" == 1 ]]; then
+              module_mapping+="$line"$'\n'
+              if [[ "$line" == '}' ]]; then
+                mapping_active=0
+                mapping_complete=$((mapping_complete + 1))
+              fi
+            fi
+          done < install.sh
+          test "$mapping_declarations" -eq 1
+          test "$mapping_complete" -eq 1
+          test "$mapping_active" -eq 0
+          test -n "$module_mapping"
+          source /dev/stdin <<< "$module_mapping"
+          declare -F _lua_module_candidates >/dev/null
+
+          install_test_package() {
+            case "$package_manager" in
+              apt) apt-get install -y --no-install-recommends "$1" ;;
+              dnf) dnf install -y "$1" ;;
+              pacman) pacman -Sy --noconfirm "$1" ;;
+              apk) apk add --no-cache "$1" ;;
+              zypper) zypper --non-interactive install "$1" ;;
+            esac
+          }
+          for module in luv lfs; do
+            if ! "$luajit_executable" -e "assert(require('$module'))"; then
+              candidates="$(_lua_module_candidates "$package_manager" "$module")"
+              test -n "$candidates"
+              for package in $candidates; do
+                if install_test_package "$package" && "$luajit_executable" -e "assert(require('$module'))"; then
+                  break
+                fi
+              done
+            fi
+            # Package names or a different Lua ABI are not native evidence.
+            "$luajit_executable" -e "assert(require('$module'))"
+          done
+
+          # Root bypasses the suite's real unreadable-file permission premise.
+          # Keep the checkout untouched and give the installation user a private
+          # writable source tree, including every original test and shared file.
+          test "$(id -u ergopti-ci)" -ge 1000
+          unit_root="$(mktemp -d)"
+          readonly unit_root
+          trap 'rm -rf -- "$unit_root"' EXIT
+          cp -a "$GITHUB_WORKSPACE/." "$unit_root/"
+          chown -R ergopti-ci:ergopti-ci "$unit_root"
+          sudo -H -u ergopti-ci env -u SUDO_UID -u SUDO_GID -u SUDO_USER \
+            bash -c 'cd "$1/static/ergopti_plus/linux" && exec "$2" tests/run.lua' \
+            bash "$unit_root" "$luajit_executable"
         timeout-minutes: 10
 
       - name: Record mandatory distro evidence
