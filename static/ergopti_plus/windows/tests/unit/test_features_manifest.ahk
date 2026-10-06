@@ -2032,3 +2032,144 @@ _FMS_RetiredCorrectionFamilyRemainsSourceOnly() {
 }
 Test("configuration snapshot: retired correction family stays source-only (config-semantic-snapshot)",
 	_FMS_RetiredCorrectionFamilyRemainsSourceOnly)
+
+; A genuine loader owns exact user names; full-state traversal must not flatten them.
+_FMS_ConfigExactNameFixtures() {
+	return [
+		{ name: "literal.ok", header: '[hotstrings.personal."literal.ok"]' },
+		{ name: "", header: '[hotstrings.personal.""]' },
+		{ name: Chr(0x1F680), header: '[hotstrings.personal."' . Chr(0x1F680) . '"]' },
+		{ name: "Twin", header: '[hotstrings.personal."Twin"]' },
+		{ name: "twin", header: '[hotstrings.personal."twin"]' }]
+}
+
+_FMS_ConfigExactNameSource(Fixture) {
+	return "# private exact-name source`n" . Fixture.header . "`n"
+		. "enabled = true # current choice`ntime_activation_seconds = 0.125`n"
+		. '# keep source trivia`n[future]`n"literal.dot" = { rows = [[1, "x"]], count = 9223372036854775807 }`n'
+}
+
+_FMS_ConfigExactWholeCollector(Path, Fixture) {
+	global _LLM_Menu
+	Target := ManifestBuildFeaturesMap()
+	AssertEqual(2, ApplyConfigToml(Target, Path), "the real reader admits both dynamic typed fields")
+	AssertTrue(Target["hotstrings"]["personal"].Has(Fixture.name))
+	Menu := _HSDeepCloneMap(_LLM_Menu)
+	Menu["onboarding_seen"] := false
+	Menu["app_profile_overrides"] := Map()
+	Menu["user_profiles"] := []
+	State := MasterGateState(), PriorState := State.Clone()
+	try {
+		State["initialized"] := false
+		Updates := _ConfigCollectFullSaveUpdates(Target, Menu)
+		Found := 0
+		for Update in Updates {
+			Parts := TOML_ParseKeyPath(Update.Section, true)
+			if Parts.Length != 3 || Parts[1] != "hotstrings" || Parts[2] != "personal"
+				continue
+			AssertEqual(Fixture.name, Parts[3], "the real full-state collector retains the exact admitted name")
+			AssertTrue(Update.Key == "enabled" || Update.Key == "time_activation_seconds")
+			AssertFalse(Update.HasOwnProp("Delete"), "both explicit choices differ from their published defaults")
+			AssertEqual(Update.Key == "enabled" ? true : 0.125, Update.Value)
+			Found += 1
+		}
+		AssertEqual(2, Found, "the genuine whole collector must include both exact dynamic rows")
+	} finally {
+		State.Clear()
+		for Key, Value in PriorState
+			State[Key] := Value
+	}
+}
+_FMS_ConfigWholeCollectorsKeepExactNames() {
+	for Index, Fixture in _FMS_ConfigExactNameFixtures()
+		_FMS_WithSource("fullcollector_name_" . Index, _FMS_ConfigExactNameSource(Fixture),
+			_FMS_ConfigExactWholeCollector.Bind(, Fixture))
+}
+Test("configuration snapshot: actual whole full-state collector retains exact semantic names (config-full-state-exact-path)",
+	_FMS_ConfigWholeCollectorsKeepExactNames)
+
+; The same recursive collector and sparse adapter feed the real durable full-save owner.
+_FMS_ConfigExactCollectedSubtree(Target) {
+	Updates := []
+	_CollectFeatureUpdates(Updates, "hotstrings.personal", Target["hotstrings"]["personal"])
+	return _ConfigSparseUpdates(Updates)
+}
+
+_FMS_ConfigExactNameFullSave(Path, Fixture) {
+	global _ConfigBootRejectedOverrides, _ConfigBootOutdatedEntries
+	Runtime := _CFGFS_CaptureRuntime(), Coordinator := _ConfigFullSaveCoordinator()
+	Original := _FMS_ConfigExactNameSource(Fixture)
+	Target := ManifestBuildFeaturesMap()
+	try {
+		_CFGFS_Prepare(Path)
+		_ConfigBootRejectedOverrides := 0
+		_ConfigBootOutdatedEntries := Map()
+		AssertEqual(2, ApplyBootConfigToml(Target, Path))
+		AssertEqual(Original, FSRead(Path))
+		Collector := _FMS_ConfigExactCollectedSubtree.Bind(Target)
+		AssertEqual(CONFIG_SAVE_OK, SaveFullConfig(0, (*) => true, true, 0, Collector))
+		AssertEqual(Original, FSRead(Path), "a collected semantic no-op retains the complete handwritten source")
+		Target["hotstrings"]["personal"][Fixture.name]["enabled"] := false
+		AssertEqual(CONFIG_SAVE_OK, SaveFullConfig(0, (*) => true, true, 0, Collector))
+		ExpectedSource := "# private exact-name source`n" . Fixture.header . "`n"
+			. "time_activation_seconds = 0.125`n"
+			. '# keep source trivia`n[future]`n"literal.dot" = { rows = [[1, "x"]], count = 9223372036854775807 }`n'
+		AssertEqual(ExpectedSource, FSRead(Path), "only the explicitly cleared leaf is removed")
+		Personal := Map()
+		Personal.CaseSense := "On"
+		Personal[Fixture.name] := Map("time_activation_seconds", 0.125)
+		_FMS_AssertExactTree(Map("hotstrings", Map("personal", Personal),
+			"future", Map("literal.dot", Map("rows", [[1, "x"]], "count", 9223372036854775807))),
+			TOML_ParseDocument(FSRead(Path)))
+		Reloaded := ManifestBuildFeaturesMap()
+		AssertEqual(1, ApplyConfigToml(Reloaded, Path), "the genuine reload reader keeps the exact remaining owner")
+		AssertTrue(Reloaded["hotstrings"]["personal"].Has(Fixture.name))
+		AssertEqual(0.125, Reloaded["hotstrings"]["personal"][Fixture.name]["time_activation_seconds"])
+		AssertEqual(_ConfigFullSaveCoordinator().requested_generation,
+			_ConfigFullSaveCoordinator().committed_generation)
+		AssertFalse(_ConfigFullSaveHasPending())
+	} finally {
+		_ConfigFullSaveCoordinator(Coordinator)
+		_CFGFS_RestoreRuntime(Runtime)
+	}
+}
+_FMS_ConfigFullSaveKeepsExactNames() {
+	for Index, Fixture in _FMS_ConfigExactNameFixtures()
+		_FMS_WithSource("fullsave_name_" . Index, _FMS_ConfigExactNameSource(Fixture),
+			_FMS_ConfigExactNameFullSave.Bind(, Fixture))
+}
+Test("configuration snapshot: real full-save publication and reload preserve exact semantic names (config-full-state-exact-path)",
+	_FMS_ConfigFullSaveKeepsExactNames)
+
+_FMS_ConfigExactCaseTwins() {
+	Personal := Map()
+	Personal.CaseSense := "On"
+	Personal["Twin"] := Map("enabled", true)
+	Personal["twin"] := Map("enabled", true)
+	Rows := _FMS_ConfigExactCollectedSubtree(Map("hotstrings", Map("personal", Personal)))
+	AssertEqual(2, Rows.Length)
+	Seen := Map()
+	Seen.CaseSense := "On"
+	for Row in Rows {
+		Parts := TOML_ParseKeyPath(Row.Section, true)
+		AssertEqual(3, Parts.Length)
+		Seen[Parts[3]] := Row.Value
+	}
+	AssertEqual(2, Seen.Count, "a supplied exact native Map must not collapse case twins during collection")
+	AssertTrue(Seen.Has("Twin"))
+	AssertTrue(Seen.Has("twin"))
+	Exact := ManifestConfigSparseOperation('hotstrings.personal."literal.ok"', "enabled", true)
+	AssertEqual('hotstrings.personal."literal.ok"', Exact.Section)
+	AssertEqual("enabled", Exact.Key)
+	AssertEqual(true, Exact.Value)
+	AssertFalse(Exact.HasOwnProp("Delete"))
+	AssertTrue(ManifestDynamicEntry("hotstrings.personal.user.enabled") is Map)
+	AssertFalse(ManifestDynamicEntry('hotstrings.personal."literal.ok".enabled'),
+		"the generic path API retains its original lexical segment contract")
+	AssertThrows(ManifestConfigSparseOperation.Bind('hotstrings.personal."literal.ok"', "typo", true),
+		"an exact user name cannot invent a dynamic field")
+	AssertThrows(ManifestConfigSparseOperation.Bind('hotstrings.personall."literal.ok"', "enabled", true),
+		"an adjacent prefix cannot acquire dynamic ownership")
+}
+Test("configuration snapshot: config-row adapter preserves twins and unchanged generic domains (config-full-state-exact-path)",
+	_FMS_ConfigExactCaseTwins)

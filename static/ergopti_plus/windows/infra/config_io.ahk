@@ -1147,7 +1147,7 @@ _ConfigCollectFullSaveUpdates(FeaturesSource := unset, MenuSource := unset) {
 ; to the final typed writer boundary, after neutral-value deletion is decided.
 _ConfigSparseOperation(Section, Key, Value) {
 	NativeValue := Value is TOML_Bool ? Value.Value : Value
-	return ManifestSparseOperation(Section . "." . Key, NativeValue)
+	return ManifestConfigSparseOperation(Section, Key, NativeValue)
 }
 
 ; Neutral values delete their previous override in the same atomic batch.
@@ -1413,7 +1413,7 @@ _CollectFeatureUpdates(Updates, SectionPath, Node) {
 		for Key, Value in Node {
 				if (SectionPath == "" and Type(Value) != "Map")
 						continue
-				Sub := (SectionPath == "") ? Key : SectionPath "." Key
+				Sub := (SectionPath == "") ? TOML_RenderKey(Key) : SectionPath "." TOML_RenderKey(Key)
 				if (Type(Value) == "Map")
 						_CollectFeatureUpdates(Updates, Sub, Value)
 				else
