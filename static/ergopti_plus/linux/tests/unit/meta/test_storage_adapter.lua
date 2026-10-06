@@ -924,7 +924,9 @@ end)
 
 helpers.describe("script storage receipt finalization", function()
 	helpers.it("script-storage-cohort explicit forget finalizes without IO and breaks native owner cycles", function()
+		local retained_storage, retained_receipt, weak
 		storage_cohort_fixture('{"a":1}', function(storage, files, path, backup, _, read)
+			retained_storage = storage
 			local owner, receipt = {}, nil
 			owner.pending = function() local retained = receipt; return retained == nil end
 			helpers.assert_true(storage.acquire_owned(owner, { "a" })); receipt = assert(storage.capture_owned(owner))
@@ -935,11 +937,17 @@ helpers.describe("script storage receipt finalization", function()
 			owner.pending = pending; helpers.assert_true(storage.forget_owned(owner, receipt)); helpers.assert_true(storage.forget_owned(owner, receipt))
 			helpers.assert_eq(storage.forget_owned({}, receipt), false); helpers.assert_eq(read(path), source); helpers.assert_eq(read(backup), snapshot)
 			helpers.assert_true(storage.acquire_owned(owner, { "a" })); helpers.assert_eq(storage.restore_owned(owner, receipt), false); helpers.assert_true(storage.release_owned(owner))
-			local weak = setmetatable({ owner, receipt }, { __mode = "v" })
+			weak = setmetatable({ owner, receipt }, { __mode = "v" })
+			retained_receipt = receipt
 			owner, receipt, pending = nil, nil, nil
-			collectgarbage("collect"); collectgarbage("collect")
-			helpers.assert_nil(weak[1]); helpers.assert_nil(weak[2])
 		end)
+		collectgarbage("collect")
+		helpers.assert_nil(weak[1], "a finalized journal must not retain its native owner while its receipt stays reachable")
+		helpers.assert_eq(weak[2], retained_receipt, "the first collection still observes the actual rooted receipt")
+		retained_receipt = nil
+		collectgarbage("collect")
+		helpers.assert_nil(weak[1]); helpers.assert_nil(weak[2])
+		helpers.assert_eq(type(retained_storage.forget_owned), "function", "the native producer remains reachable during the collection proof")
 	end)
 	helpers.it("script-storage-cohort foreign ordinary writes remain admitted during a distinct backup publication", function()
 		storage_cohort_fixture('{"a":1,"foreign":2}', function(storage, files, path, backup, _, read)
