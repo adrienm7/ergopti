@@ -2045,6 +2045,8 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_suite_watchdog_manifest.ahk
 #Include meta/test_suite_unique_includes.ahk
 
+#Include unit/test_file_read_activity.ahk
+
 ; Watchdog: kill the process if RunTests() never returns (e.g. a corpus
 ; consumer blocks on a synchronous HTTP call, an InputHook with no timeout,
 ; or a blocking dialog in a headless CI context). The current corpus normally
@@ -2073,4 +2075,5 @@ SetTimer(_WatchdogFire, -_SUITE_TIMEOUT_MS)
 
 ; Drive everything. RunTests prints a TAP-style report to stdout and exits
 ; with the appropriate code — control never returns from this call.
+
 RunTests()
