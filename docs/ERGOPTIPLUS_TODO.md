@@ -4850,6 +4850,12 @@ This deferral does not complete this item or the cross-cutting items16/38.
   normal edit and delivery admission still refuse. Native Luv fixture cache
   custody and current canonical Ctrl+G fixture owners preserve every previous
   assertion. Final integrated CI and physical input acceptance remain open.
+  A baseline CI prerequisite also required a fixture-only raw SQL token
+  transport repair: the independent aggregation oracle now returns the
+  reader's byte-preserving token_json field while retaining all 21 assertions.
+  Actual SQLite on the declared LuaJIT target passes; independent embedded-NUL
+  and Unicode byte controls pass on both ABIs. The extra full Lua 5.4 run still
+  fails its existing extreme-number comparison and is not claimed green.
 
 Windows continuation for item93 (explicitly deferred to the maintainer's PC):
 
@@ -4927,6 +4933,8 @@ This deferral does not complete this item or the cross-cutting items16/38.
   and must be reconstructed and reviewed against current sources. No fixed accent menu/default is retired.
   Real physical capture, Unicode/dead-key delivery, collision refusal, native
   GUI lifecycle, installation and Windows PC acceptance remain open.
+  The editor row retains an all-platform separator before the legacy modifier
+  shortcut groups, preserving the existing native Windows menu assertion.
 
 Windows continuation for item97 (explicitly deferred to the maintainer's PC):
 
@@ -5549,6 +5557,23 @@ and LuaJIT; the complete Lua 5.4 provider module passes 21/0. All 57 original
 native checks, 16 full-provider and 5 shim cases remain unchanged. This corrects
 the case raised in macOS run 37329111337; actual hosted revalidation remains
 required, and no production interpreter/provider behavior was changed.
+
+The Windows tree completion owner now claims finalization before diagnostic
+logging or capture I/O can yield. Ordinary callbacks use the adapter logger;
+private program claims retain the unchanged central redactor. Both existing
+native guards remain byte-exact. Ten independent causal source controls and
+the complete 362-check JS gate pass; actual native AHK revalidation is pending.
+This repair does not admit the inactive Job-constructor packet or finish106.
+
+The Windows basic program owner now uses an exact, acknowledged one-shot
+callback and keeps cleanup polling while physical program debt remains. Its
+suspend/resume owner is registered, and the fixture preserves an initially
+unset keyboard map. The canonical JSON string lexer replaces the duplicated
+lexical path, with an independent native stage/cursor control before the
+unchanged corpus. All11 original tests and91 assertions remain, with three
+new controls. Source review is clear and the unchanged601 native-call budget
+is met; native parser success, all14 tests and packaging remain unexecuted
+until the next hosted CI. The lexer change is an unproven diagnosis hypothesis.
 
 - [~] **107.** Make the number-row policy explicit: native behavior, digits
   directly or symbols directly, with an acknowledged migration of the old

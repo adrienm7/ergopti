@@ -1173,6 +1173,9 @@
 			"disabled_reason_key": "physical_shortcuts.window_unavailable"
 		},
 		{
+			"type": "---"
+		},
+		{
 			"type": "list",
 			"id": "keyboard_slots",
 			"platforms": [
