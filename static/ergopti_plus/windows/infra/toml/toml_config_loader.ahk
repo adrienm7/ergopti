@@ -327,6 +327,12 @@ TomlConfigForeignOwner(SectionPath, Key) {
 ; the dissolved ``[ahk.*]`` silo is "obsolete" and remains on disk until
 ; explicit cleanup. Returns "" for a section the manifest tree must account for.
 TomlConfigSectionSkipKind(Header) {
+	Parts := TomlConfigSectionParts(Header)
+	; The record consumer owns its exact namespaces, including unknown row
+	; metadata. Neither the Features loader nor cleanup may acquire those rows.
+	if Parts is Array && Parts.Length >= 2 && Parts[1] == "hotstrings"
+			&& (Parts[2] == "terminators" || Parts[2] == "terminator_states")
+		return "foreign"
 	if (Header == "ahk" or InStr(Header, "ahk.") == 1)
 		return "obsolete"
 	if (SubStr(Header, 1, 1) == "_" or Header == "updater")

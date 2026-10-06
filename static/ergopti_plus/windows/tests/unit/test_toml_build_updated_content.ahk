@@ -333,7 +333,7 @@ _TBUI_NamespaceLossVectors() {
 		{ Id: "root", Source: 'future.version = "001" # unknown root`n[settings]`nowned = 1`n',
 			Key: "owned", Value: 1 },
 		{ Id: "table-arrays", Source: '[[future]]`nname="first"`n[[future]]`nname="second"`n[settings]`nowned=1`n',
-			Key: "owned", Value: 1 }
+			Key: "owned", Value: 1, Preservable: true }
 	]
 }
 
@@ -367,8 +367,14 @@ _TBUI_ChangedLossSensitiveBuildRefuses() {
 				{ Section: "settings", Key: Vector.Key, Delete: 1 },
 				{ Section: "settings", Key: "unrelated", Value: TOML_Bool(false) }] {
 				Candidate := TOML_BuildUpdatedContent(Path, [Update])
-				AssertEqual("error", Candidate["status"], "no unowned namespace may disappear: " . Vector.Id)
-				AssertFalse(Candidate.Has("source_content"), "no refused candidate gains publication authority")
+				if Vector.HasOwnProp("Preservable") {
+					AssertEqual("ok", Candidate["status"], "foreign arrays survive an independently owned sibling change")
+					_TAOT_AssertFuture(Candidate["content"])
+					_TAOT_AssertRequested(Candidate["content"], Update)
+				} else {
+					AssertEqual("error", Candidate["status"], "no unowned namespace may disappear: " . Vector.Id)
+					AssertFalse(Candidate.Has("source_content"), "no refused candidate gains publication authority")
+				}
 				AssertTrue(FSUtf8ExactMatches(Path, Source))
 				AssertTrue(Cached == ParseTomlFile(Path), "refusal leaves the live cache object intact")
 			}
@@ -958,3 +964,159 @@ _TBUI_ConfigInlineCanonicalReader() {
 }
 Test("toml config inline source spans: semantic reader reuses the actual canonical multiline lexer",
 	_TBUI_ConfigInlineCanonicalReader)
+
+
+
+
+
+; =======================================================
+; =======================================================
+; ======= 3/ Foreign Table-Array Writer Admission =======
+; =======================================================
+; =======================================================
+
+_TAOT_Source() {
+	return '[layout]`nenabled = true # independently owned`n'
+		. '[["hotstrings"."terminators"]] # first record`nkey = "currency"`nchar = "¤"`nlabel = "Currency"`nconsume = true`nmetadata = { opaque = "keep", count = 7 }`n'
+		. '[[hotstrings.terminators]] # second record`nkey = "smile"`nchar = "😀"`nlabel = "Smile"`nconsume = false`n'
+		. '[private]`nvalue = "leave exactly" # untouched`n'
+}
+
+_TAOT_AssertFuture(Content) {
+	Document := TOML_ParseDocument(Content)
+	AssertEqual(2, Document["future"].Length, "both independent table-array records must survive")
+	AssertEqual("first", Document["future"][1]["name"])
+	AssertEqual("second", Document["future"][2]["name"])
+	AssertContains(Content, '[[future]]`nname="first"`n[[future]]`nname="second"`n',
+		"the original foreign lexical spans must remain byte-for-byte present")
+}
+
+_TAOT_AssertRequested(Content, Update) {
+	Document := TOML_ParseDocument(Content), Entries := Document["settings"]
+	if Update.HasOwnProp("Delete") && Update.Delete == 1
+		AssertFalse(Entries.Has(Update.Key), "the independently requested deletion must take effect")
+	else
+		AssertTrue(TOML_SameValue(Update.Value, Entries[Update.Key]), "the requested sibling value must take effect")
+}
+
+_TAOT_DetachedAndNative() {
+	Path := _TBUI_NewPath(), FixtureSource := Chr(0xFEFF) . _TAOT_Source()
+	try {
+		AssertTrue(FSWriteCreateDurable(Path, FixtureSource) == 1)
+		Cached := ParseTomlFile(Path)
+		Updates := [{ Section: "layout", Key: "enabled", Value: TOML_Bool(false) }]
+		Candidate := TOML_BuildUpdatedContent(Path, Updates)
+		AssertEqual("ok", Candidate["status"], "a representable sibling must not borrow the collapsed array row")
+		AssertEqual(FixtureSource, Candidate["source_content"], "the complete old source still binds later publication")
+		AssertTrue(FSUtf8ExactMatches(Path, FixtureSource), "detached preparation has no disk effects")
+		AssertTrue(Cached == ParseTomlFile(Path), "detached preparation retains the live cached receipt")
+		Document := TOML_ParseDocument(Candidate["content"])
+		AssertTrue(Document["layout"]["enabled"] is TOML_Bool)
+		AssertEqual(false, Document["layout"]["enabled"].Value)
+		AssertEqual(2, Document["hotstrings"]["terminators"].Length)
+		AssertEqual("currency", Document["hotstrings"]["terminators"][1]["key"])
+		AssertEqual("¤", Document["hotstrings"]["terminators"][1]["char"])
+		AssertEqual(7, Document["hotstrings"]["terminators"][1]["metadata"]["count"])
+		AssertEqual("keep", Document["hotstrings"]["terminators"][1]["metadata"]["opaque"])
+		AssertEqual("😀", Document["hotstrings"]["terminators"][2]["char"])
+		AssertContains(Candidate["content"], SubStr(_TAOT_Source(), InStr(_TAOT_Source(), '[["hotstrings"')),
+			"foreign record and private-tail spans must remain exact")
+		AssertTrue(TOML_BatchWrite(Path, Updates))
+		AssertTrue(FSUtf8ExactMatches(Path, Candidate["content"]), "ordinary publication equals the qualified detached image")
+	} finally FSDelete(Path)
+}
+Test("toml-aot-sibling: actual detached and native sibling update preserves custom record generations and unknown spans", _TAOT_DetachedAndNative)
+
+_TAOT_NestedArray() {
+	Path := _TBUI_NewPath()
+	FixtureSource := '[[future]] # outer first`nname="first"`n[[future.children]] # child one`nvalue="one"`n[[future.children]]`nvalue="two"`n[[future]]`nname="second"`n[settings]`nowned=1`n'
+	try {
+		AssertTrue(FSWriteDurable(Path, FixtureSource))
+		Candidate := TOML_BuildUpdatedContent(Path, [{ Section: "settings", Key: "owned", Value: 2 }])
+		AssertEqual("ok", Candidate["status"], "nested arrays stay with their exact outer row")
+		Document := TOML_ParseDocument(Candidate["content"])
+		AssertEqual(2, Document["future"].Length)
+		AssertEqual("first", Document["future"][1]["name"])
+		AssertEqual(2, Document["future"][1]["children"].Length)
+		AssertEqual("one", Document["future"][1]["children"][1]["value"])
+		AssertEqual("two", Document["future"][1]["children"][2]["value"])
+		AssertEqual("second", Document["future"][2]["name"])
+		AssertEqual(2, Document["settings"]["owned"])
+		AssertContains(Candidate["content"], SubStr(FixtureSource, 1, InStr(FixtureSource, "[settings]") - 1))
+	} finally FSDelete(Path)
+}
+Test("toml-aot-sibling: nested table arrays retain outer record identity and exact lexical spans", _TAOT_NestedArray)
+
+_TAOT_RefusedNamespace(Updates, Prefixes := []) {
+	Path := _TBUI_NewPath(), FixtureSource := Chr(0xFEFF) . _TAOT_Source()
+	try {
+		AssertTrue(FSWriteCreateDurable(Path, FixtureSource) == 1)
+		Candidate := TOML_BuildUpdatedContent(Path, Updates, Prefixes)
+		AssertEqual("error", Candidate["status"], "a foreign table array cannot lend flat write authority")
+		AssertFalse(Candidate.Has("source_content"))
+		AssertFalse(TOML_BatchWrite(Path, Updates, Prefixes))
+		AssertTrue(FSUtf8ExactMatches(Path, FixtureSource), "refusal must precede any physical replacement")
+	} finally FSDelete(Path)
+}
+Test("toml-aot-sibling: direct collapsed-record mutation refuses without effects", _TAOT_RefusedNamespace.Bind([{ Section: "hotstrings.terminators", Key: "char", Value: "x" }]))
+Test("toml-aot-sibling: native case alias cannot acquire a foreign record", _TAOT_RefusedNamespace.Bind([{ Section: "HOTSTRINGS.TERMINATORS", Key: "char", Value: "x" }]))
+Test("toml-aot-sibling: replacing the array ancestor refuses without effects", _TAOT_RefusedNamespace.Bind([], ["hotstrings"]))
+Test("toml-aot-sibling: replacing an array child refuses without effects", _TAOT_RefusedNamespace.Bind([], ["hotstrings.terminators.metadata"]))
+
+_TAOT_IgnoredRootStillRefuses() {
+	Path := _TBUI_NewPath(), FixtureSource := 'root.future = "keep"`n' . _TAOT_Source()
+	try {
+		AssertTrue(FSWriteDurable(Path, FixtureSource))
+		Candidate := TOML_BuildUpdatedContent(Path, [{ Section: "layout", Key: "enabled", Value: TOML_Bool(false) }])
+		AssertEqual("error", Candidate["status"], "the AOT partition cannot excuse a second unrepresented namespace")
+		AssertFalse(TOML_BatchWrite(Path, [{ Section: "layout", Key: "enabled", Value: TOML_Bool(false) }]))
+		AssertTrue(FSUtf8ExactMatches(Path, FixtureSource))
+	} finally FSDelete(Path)
+}
+Test("toml-aot-sibling: an unrelated ignored root still refuses despite preserved array records", _TAOT_IgnoredRootStillRefuses)
+
+_TAOT_SourceRace() {
+	Path := _TBUI_NewPath(), FixtureSource := Chr(0xFEFF) . _TAOT_Source()
+	Foreign := FixtureSource . '# exact independent concurrent writer`n'
+	try {
+		AssertTrue(FSWriteCreateDurable(Path, FixtureSource) == 1)
+		ConcurrentValue := _TBUI_SourceMutatingBoolean(Path, Foreign)
+		Candidate := TOML_BuildUpdatedContent(Path, [{ Section: "layout", Key: "enabled", Value: ConcurrentValue }])
+		AssertTrue(ConcurrentValue.Calls > 0)
+		AssertTrue(ConcurrentValue.WriteAccepted)
+		AssertEqual("error", Candidate["status"], "foreign-record retention cannot bypass the old-source fence")
+		AssertTrue(FSUtf8ExactMatches(Path, Foreign))
+	} finally FSDelete(Path)
+}
+Test("toml-aot-sibling: actual concurrent source mutation still wins before publication", _TAOT_SourceRace)
+
+; One registered native case owns both merged canonical lexer contracts.
+_TBUI_CanonicalSpansAndContainerBoundary() {
+	Expected := '{ owned = false, future = "a,}#=b" }'
+	Remainder := ' # trailing future marker`nnext = "retain"`n'
+	Source := "  " . Expected . Remainder
+	Position := 1
+	Token := _TOML_DocumentToken(Source, &Position, Chr(0), &Separated,
+		&SpanStart, &SpanEnd, true)
+	AssertEqual(Expected, Token, "container stopping retains the complete handwritten token")
+	AssertFalse(Separated, "balanced container completion does not invent a separator")
+	AssertEqual(3, SpanStart, "outside leading trivia does not own the token span")
+	AssertEqual(2 + StrLen(Expected), SpanEnd, "the closing container owns the final span byte")
+	AssertEqual(SpanEnd + 1, Position, "the retained cursor stops immediately after the matching closure")
+	AssertEqual(Remainder, SubStr(Source, Position), "following source comments and records remain unconsumed")
+	Document := TOML_ParseDocument("private = " . Token . "`n")
+	AssertTrue(Document["private"]["owned"] is TOML_Bool)
+	AssertEqual(false, Document["private"]["owned"].Value)
+	AssertEqual("a,}#=b", Document["private"]["future"], "quoted structural characters cannot close the container")
+
+	Scalar := '  "a,}#=b" # retained trailing comment'
+	Position := 1
+	Token := _TOML_DocumentToken(Scalar, &Position, Chr(0), &Separated, &SpanStart, &SpanEnd)
+	AssertEqual('"a,}#=b"', Token, "the unchanged default lexer still consumes the complete scalar record")
+	AssertFalse(Separated)
+	AssertEqual(3, SpanStart)
+	AssertEqual(10, SpanEnd, "quoted punctuation belongs to the complete original scalar span")
+	AssertEqual(StrLen(Scalar) + 1, Position, "omitted container stopping preserves complete-record consumption")
+}
+Test("toml canonical lexer: merged spans and balanced-container stopping preserve the same source owner",
+	_TBUI_CanonicalSpansAndContainerBoundary)

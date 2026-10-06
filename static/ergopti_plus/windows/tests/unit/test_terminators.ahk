@@ -413,3 +413,64 @@ TestTerminators_StarTriggerWinsOverEndCharOnMagicKey() {
     HSE_CONSUMED_DELIMITERS := SavedCD
 }
 Test("Terminators: star trigger wins over the end-char match on the magic key", TestTerminators_StarTriggerWinsOverEndCharOnMagicKey)
+
+
+
+
+
+; =======================================================
+; =======================================================
+; ======= 4/ Foreign Inline Writer Prerequisite ========
+; =======================================================
+; =======================================================
+
+_HTRI_Source() {
+	return 'hotstrings = { terminators = [{ key = "currency", char = "¤", label = "Currency", consume = false, metadata = { tag = "retain" } }], terminator_states.currency = true, unknown = { nested = ["a,b", "{keep}", { child = "x=y" }], exact = "a # b" } } # parent comment`n[layout]`nenabled=true`n'
+}
+
+_HTRI_AssertForeign(InlineContent) {
+	AssertContains(InlineContent, ' unknown = { nested = ["a,b", "{keep}", { child = "x=y" }], exact = "a # b" } ',
+		"the complete unrelated inline member must remain lexically exact")
+	AssertContains(InlineContent, '} # parent comment`n', "the outer closure and comment remain exact")
+	AssertEqual("a,b", TOML_ParseDocument(InlineContent)["hotstrings"]["unknown"]["nested"][1])
+}
+
+
+_HTRI_CanonicalSibling(InlineLeaf) {
+	InlinePath := _TBUI_NewPath(), InlineFixtureSource := _HTRI_Source()
+	try {
+		AssertTrue(FSWriteCreateDurable(InlinePath, InlineFixtureSource) == 1)
+		InlineUpdates := InlineLeaf ? [{ Section: "hotstrings", Key: "custom_pref", Value: "new" }]
+			: [{ Section: "layout", Key: "enabled", Value: TOML_Bool(false) }]
+		Prepared := TOML_BuildUpdatedContent(InlinePath, InlineUpdates)
+		AssertEqual("ok", Prepared["status"], "a qualified inline partition must admit the requested sibling")
+		AssertEqual(InlineFixtureSource, Prepared["source_content"], "the exact old source binds admission")
+		AssertTrue(FSUtf8ExactMatches(InlinePath, InlineFixtureSource), "detached preparation has no publication effects")
+		_HTRI_AssertForeign(Prepared["content"])
+		PreparedDocument := TOML_ParseDocument(Prepared["content"])
+		AssertEqual("retain", PreparedDocument["hotstrings"]["terminators"][1]["metadata"]["tag"])
+		AssertContains(Prepared["content"], ' terminators = [{ key = "currency", char = "¤", label = "Currency", consume = false, metadata = { tag = "retain" } }]')
+		if InlineLeaf
+			AssertEqual("new", PreparedDocument["hotstrings"]["custom_pref"])
+		else
+			AssertEqual(false, PreparedDocument["layout"]["enabled"].Value)
+		AssertTrue(TOML_BatchWrite(InlinePath, InlineUpdates))
+		AssertTrue(FSUtf8ExactMatches(InlinePath, Prepared["content"]), "actual native publication equals the independently qualified detached image")
+	} finally FSDelete(InlinePath)
+}
+Test("terminator-inline: actual canonical and native sibling save retains a handwritten inline record parent", _HTRI_CanonicalSibling.Bind(false))
+Test("terminator-inline: actual native scalar sibling edit does not borrow record or foreign member authority", _HTRI_CanonicalSibling.Bind(true))
+
+_HTRI_ProtectedRefusal(InlineUpdates, InlinePrefixes := []) {
+	InlinePath := _TBUI_NewPath(), InlineFixtureSource := _HTRI_Source()
+	try {
+		AssertTrue(FSWriteCreateDurable(InlinePath, InlineFixtureSource) == 1)
+		AssertEqual("error", TOML_BuildUpdatedContent(InlinePath, InlineUpdates, InlinePrefixes)["status"],
+			"a protected record parent must refuse ordinary replacement authority")
+		AssertFalse(TOML_BatchWrite(InlinePath, InlineUpdates, InlinePrefixes))
+		AssertTrue(FSUtf8ExactMatches(InlinePath, InlineFixtureSource), "refusal retains the complete actual source")
+	} finally FSDelete(InlinePath)
+}
+Test("terminator-inline: the canonical writer cannot replace records with a collapsed flat leaf", _HTRI_ProtectedRefusal.Bind([{ Section: "hotstrings", Key: "terminators", Value: [] }]))
+Test("terminator-inline: a native case alias cannot acquire the closed parent", _HTRI_ProtectedRefusal.Bind([{ Section: "HOTSTRINGS", Key: "custom_pref", Value: "new" }]))
+Test("terminator-inline: namespace replacement cannot delete unknown parent members", _HTRI_ProtectedRefusal.Bind([], ["hotstrings"]))

@@ -547,6 +547,10 @@ _ConfigCommitOwned(OwnerToken, Path, Updates, Context, WriterFn, NotifyFn,
 
 _ConfigInvokeCommitWriter(Path, Updates, WriterFn, Stage, &FailureDetail) {
 	global ConfigurationFile
+	if FileReadActivityBusy(Path) {
+		FailureDetail .= (FailureDetail != "" ? "; " : "") . "an exact configuration read is still in progress"
+		return false
+	}
 	try {
 		IsConfiguration := IsSet(ConfigurationFile) && ConfigurationFile != ""
 			&& _ConfigWriteLeaseKey(Path) == _ConfigWriteLeaseKey(ConfigurationFile)
@@ -1292,6 +1296,9 @@ SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
 				try LoggerError("ConfigIO", "Refusing a full save through a stale configuration owner.")
 				return CONFIG_SAVE_FAILED
 			}
+			if FileReadActivityBusy(BoundPath)
+				return _ConfigArmFullSaveRetry(CONFIG_FULL_SAVE_RETRY_DELAY_MS, TimerFn)
+					? CONFIG_SAVE_DEFERRED : CONFIG_SAVE_FAILED
 			OwnerToken := ExistingOwner
 		} else {
 			OwnerToken := _ConfigWriteLeaseTryAcquire(BoundPath, "full")
@@ -1316,6 +1323,9 @@ SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
 						; atomic write (temp file + rename). A FileDelete here creates a data-loss
 						; window: if a Reload() or thread interrupt fires between the delete and the
 						; write, the user's config is permanently gone with no replacement.
+						if FileReadActivityBusy(BoundPath)
+							return _ConfigArmFullSaveRetry(CONFIG_FULL_SAVE_RETRY_DELAY_MS, TimerFn)
+								? CONFIG_SAVE_DEFERRED : CONFIG_SAVE_FAILED
 						Phase := "writer"
 				; RETURNED, not discarded. TOML_BatchWrite fails without throwing when
 				; the staging file cannot be opened or the atomic replace is refused, and
@@ -1367,6 +1377,8 @@ _ConfigDrainFullSave(WriterFn := 0, TimerFn := 0, ExistingOwner := 0,
 ; obligation must reach the exact owned config path or refuse shutdown.
 _ConfigFullSaveSettleTerminal(OwnerBundle, WriterFn := 0, TimerFn := 0,
 		CollectFn := 0) {
+	if FileReadActivityBusy()
+		return false
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
