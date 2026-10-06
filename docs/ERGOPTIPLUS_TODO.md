@@ -3007,6 +3007,15 @@ Windows PC acceptance, delegated to the maintainer:
   controls17 and native-error interpretation controls9 pass; actual macOS UI
   execution is pending. The Hammerspoon1.1.1 nil-NSError sentinel uses the
   unchanged canonical WebView adapter. Item24 remains incomplete.
+
+A closed failure observation now preserves the original permission UI refusal
+while exposing only a frozen check code and a strictly completed case-prefix
+position after actual owned-child retirement. Unknown or foreign metadata stays
+unsupported; no private error, URL, payload or native-stage claim is published.
+The original17 portable cases and16 new diagnostic controls pass normally and
+with inherited optimization. Nine Swift summary controls and actual WebKit/UI
+acceptance require native CI. This diagnostic does not complete item24.
+
 - [~] **30.** Physical magic-key setting on all three OSes: one
   `hotstrings.magic_key_source` (a KeyboardEvent.code, `auto` by default),
   config schema v5 migrating every spelling of the Windows

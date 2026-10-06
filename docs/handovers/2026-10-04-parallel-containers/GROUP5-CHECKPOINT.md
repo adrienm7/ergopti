@@ -1313,3 +1313,11 @@ are corrected; original preparation and blocked review receipts remain intact.
 Portable41/22/25/7 controls pass on the coherent private composition. Actual CF12,
 Swift registration, signed-peer8, owned compilation/admission and native AUTH
 remain unexecuted here. No producer, installation or activation is enabled.
+
+A closed failure observation now preserves the original permission UI refusal
+while exposing only a frozen check code and a strictly completed case-prefix
+position after actual owned-child retirement. Unknown or foreign metadata stays
+unsupported; no private error, URL, payload or native-stage claim is published.
+The original17 portable cases and16 new diagnostic controls pass normally and
+with inherited optimization. Nine Swift summary controls and actual WebKit/UI
+acceptance require native CI. This diagnostic does not complete item24.
