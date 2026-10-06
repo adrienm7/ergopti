@@ -403,6 +403,7 @@ local function build_fixture(backend, save_results, options)
 	}
 	package.loaded["infra.manifest_menu"] = {
 		check_row = native_renderer.check_row,
+		native_child_rows = native_renderer.native_child_rows,
 		template_rows = native_renderer.template_rows,
 		get_array = native_renderer.get_array,
 		render_rows = function(rows) return rows end,

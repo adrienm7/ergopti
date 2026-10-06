@@ -4361,7 +4361,7 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 57, macOS 91, Linux 64, each
+  drivers still build (current baseline: Windows 55, macOS 86, Linux 61, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
@@ -4373,6 +4373,78 @@ integrated, then publish one grouped release.
   Native allocators and computed user-data captions alone do not prove missing
   shared policy. Final native binding/order/caption and installed acceptance
   remain required; source review and the local portable gates are insufficient.
+
+  The model-picker header boundary now consumes one canonical inert separator
+  on Windows and macOS; Linux retains its genuine flat model-list presentation
+  and hides this fragment, not the model feature. The unchanged owner scanner
+  retires two genuine native constructors, establishing 56/87/61 to 55/86/61.
+  Selectable NoModel/default controls, model/API/catalogue data, pause policies,
+  native callbacks and preceding HF-token reads remain exact. Declaration
+  refusal retains the native empty-Menu/completed-row refusal behavior; it does
+  not prevent those earlier catalogue/token reads. All 472 predecessor corpora
+  and 21 locale files remain exact. Actual supported portable macOS owner tests
+  pass 16/0 and French-warm controls pass 3/0 on both Lua runtimes; genuine old
+  native-only controls give 14/2 and 1/2 with the same tests. Unchanged Linux
+  whole-menu controls pass 41/0 in English and French on both runtimes. Actual
+  source withdrawal/receiver/comment controls and repeated owner generation
+  protect binding and presence. Two new Windows full-picker/native Win32 cases
+  remain locally unexecuted; SDK, GTK, device, installed and final current-Root
+  hosted-native qualification remain pending. All six group items stay partial.
+
+  The first full portable macOS gate of the staged LLM presentation union
+  records 16530 passed and 79 failed, not a qualified union. Two existing
+  fixture renderer seams omit the genuine native_child_rows contract; 77 cases
+  fail on that omission and two activation_scope cases reflect the same
+  boundary consequences. The repair is limited to forwarding the genuine
+  helper through those same two fixture owners; prior assertions and production
+  behavior stay intact. The complete corrected portable rerun and
+  current hosted-native/installed qualification remain pending. The 55/86/61
+  source census is unchanged; all six group items stay partial.
+
+  The LLM Trigger, Display and Navigation parents now consume three canonical
+  group declarations on all three drivers. Existing caption keys, platform
+  projection, disabled/health-dot policy and native child settings, readiness,
+  callbacks and choices remain authoritative. The pure native_child_rows
+  adapter detaches valid completed Lua trees without IO or callback delivery;
+  actual admitted/refused-input controls verify no external hooks. Proper
+  empty Navigation remains valid, while malformed child trees refuse parent
+  attachment. Windows uses the real shared renderer with its original staged
+  Menu, child handles, cleanup/lifetimes and conditional backend warning anchor.
+  The unchanged owner scanner establishes 56/90/64 to 56/87/61, retiring three
+  macOS and three Linux sites with no Windows retirement. All 471 predecessor
+  corpora and 21 locale files remain exact; original behavioral assertions stay
+  retained and one Windows source-route premise is strengthened for genuine
+  canonical renderer binding and dispatch. Thirteen actual source negatives,
+  21 lexical controls and 12 helper-shape controls protect real parent binding.
+  Supported macOS Lua5.4 owning, pure-renderer and layout controls record
+  175/0, 106/0 and 8/0, inherited through exact native/API/test-byte equality.
+  Final Linux owning and adapter/menu controls pass 90/0 and 41/0 freshly on
+  both Lua runtimes. Genuine original native routes with their original dynamic
+  declarations and current APIs give 166/9 on macOS and 84/6 on Linux. The
+  repaired Linux fixture prefix and its unchanged topology registration are
+  exact; separate cumulative fixture-chain qualification remains required.
+  Five actual registered Windows native cases remain locally unexecuted; SDK,
+  GTK, hardware, final Root/full hosted-native and installed qualification
+  remain pending. All six group items stay partial.
+
+  The existing Windows/Linux empty-API status and macOS empty server-model
+  status now consume two shared inert label fragments. Three genuine native
+  leaves migrate, but only the Windows and macOS leaves were counted: the
+  unchanged owner scanner establishes 57/91/64 to 56/90/64. Linux's actual API
+  status remains available; only genuinely absent presentation roles hide.
+  Native empty predicates, retained selected models, selectable NoModel
+  commands, provider actions and runtime owners remain unchanged, with all
+  470 predecessor corpora, 21 translated locale files and prior assertions
+  preserved. Supported macOS Lua5.4 owning and French-warm controls pass 22/0
+  and 3/0; genuine old native source gives 20/2 and 1/2. Linux LuaJIT owning
+  controls pass 50/0, and four new controls pass 4/0 in English and French on
+  Lua5.4 and LuaJIT versus old-native 2/2. The Linux full Lua5.4 fixture remains
+  48/2 versus original 44/2 from its inherited private-write/FFI limits; raw
+  macOS LuaJIT warm controls remain 1/2 on current and old native source from
+  the inherited table.pack formatting limit. No shim or unsupported green
+  result is claimed. Windows native cases and Win32 acceptance, actual
+  Hammerspoon/SDK, GTK, physical devices and final Root/hosted-native
+  qualification remain unexecuted or pending; all six group items stay partial.
 
   Linux's two existing selection boundaries now consume shared inert
   fragments between CapsWord, the case-transform trio and the selection-helper
@@ -5225,7 +5297,7 @@ deferral is superseded. This item and items16/38 remain open.
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 57, macOS 91 and Linux 64 rows are still built by the
+  Windows 55, macOS 86 and Linux 61 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). Read on
   2026-10-01, the sites are of four kinds, and three of them need the
   manifest to say more than it can today:

@@ -453,7 +453,9 @@ function M.build(ctx)
 		})
 	end
 
-	table.insert(menu, { separator = true })
+	local header_rows = ManifestMenu.template_rows("llm_model_header_boundary", {}, {}, {})
+	if not header_rows then return {} end
+	for _, row in ipairs(header_rows) do table.insert(menu, row) end
 
 
 	-- =====================================================

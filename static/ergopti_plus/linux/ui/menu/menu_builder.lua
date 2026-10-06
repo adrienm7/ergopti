@@ -1967,6 +1967,7 @@ local function _build_llm(ctx)
 
 	local providers = {}
 	local dynamic_handlers = {}
+	local group_builders = {}
 
 	--- Appends computed row data after the shared renderer materialises it.
 	---
@@ -1985,8 +1986,8 @@ local function _build_llm(ctx)
 
 	-- Inactivity and privacy controls. Unlike the model and generation lists,
 	-- this is one labelled submenu, so the manifest keeps its cross-driver
-	-- `dynamic` row and this driver supplies only the runtime contents.
-	dynamic_handlers["llm_trigger"] = function(target)
+	-- declared group and this driver supplies only the runtime child contents.
+	group_builders["llm_trigger"] = function()
 		local ok_settings, TriggerSettings = pcall(require, "modules.llm.trigger_settings")
 		if not ok_settings then
 			Logger.error(LOG, "LLM trigger settings unavailable; trigger menu omitted.")
@@ -2108,11 +2109,9 @@ local function _build_llm(ctx)
 			["llm_trigger_leading"] = function() return leading_rows end,
 			["llm_trigger_remaining"] = function() return rows end,
 		})
-		append_rendered_row(target, {
-			label = i18n_safe("menu.llm.trigger_menu_title"),
-			submenu = rows,
-			disabled = not enabled or nil,
-		}, "llm_trigger")
+		local child_rows = ManifestMenu.native_child_rows(rows)
+		if child_rows == nil then return nil end
+		return { items = child_rows, disabled = not enabled or nil }
 	end
 
 	-- Live mode: Off, then every rewrite-format prompt (the built-ins in menu
@@ -2326,7 +2325,7 @@ local function _build_llm(ctx)
 		}, "llm_profile")
 	end
 
-	dynamic_handlers["llm_display"] = function(target)
+	group_builders["llm_display"] = function()
 		local ok_display, DisplaySettings = pcall(require, "modules.llm.display_settings")
 		if not ok_display then return end
 		local DisplayPolicy = require("llm.display_policy")
@@ -2443,14 +2442,12 @@ local function _build_llm(ctx)
 			["llm_display_remaining"] = function() return {} end,
 			["llm_display_trailing"] = function() return rows end,
 		})
-		append_rendered_row(target, {
-			label = i18n_safe("menu.llm.display_menu_title"),
-			submenu = display_rows,
-			disabled = not enabled or nil,
-		}, "llm_display")
+		local child_rows = ManifestMenu.native_child_rows(display_rows)
+		if child_rows == nil then return nil end
+		return { items = child_rows, disabled = not enabled or nil }
 	end
 
-	dynamic_handlers["llm_navigation"] = function(target)
+	group_builders["llm_navigation"] = function()
 		local ok_navigation, NavigationSettings = pcall(require, "modules.llm.navigation_settings")
 		if not ok_navigation then return end
 		-- One choice list per chord: the navigation modifiers held with Up and
@@ -2511,11 +2508,9 @@ local function _build_llm(ctx)
 			end,
 		}
 		local rows = ManifestMenu.build("llm_navigation_rows", "LLM navigation", nil, nil, ctx, navigation_providers)
-		append_rendered_row(target, {
-			label = i18n_safe("menu.llm.nav_menu_title"),
-			submenu = rows,
-			disabled = not enabled or nil,
-		}, "llm_navigation")
+		local child_rows = ManifestMenu.native_child_rows(rows)
+		if child_rows == nil then return nil end
+		return { items = child_rows, disabled = not enabled or nil }
 	end
 
 	-- The models this machine actually has. A `list`, because the rows are
@@ -2725,7 +2720,7 @@ local function _build_llm(ctx)
 	llm_ctx.state_getters["llm_toggle_ready"] = function() return ctx.paused ~= true end
 
 	local rendered = ManifestMenu
-		and ManifestMenu.build("llm_menu", "LLM", dynamic_handlers, nil, llm_ctx, providers)
+		and ManifestMenu.build("llm_menu", "LLM", dynamic_handlers, group_builders, llm_ctx, providers)
 		or {}
 	for _, row in ipairs(rendered) do items[#items + 1] = row end
 

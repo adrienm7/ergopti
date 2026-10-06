@@ -648,3 +648,121 @@ helpers.describe("Shared backend-choice boundary (backend-choice-boundary)", fun
 		end)
 	end)
 end)
+
+
+--- Builds the native API rows over a genuine private empty entries source.
+local function with_empty_api_owner(scenario)
+	local previous = {}
+	for name, value in pairs(package.loaded) do previous[name] = value end
+	local path = assert(os.tmpname())
+	local image = '{"version":1,"active_id":"","entries":[]}\n'
+	local file = assert(io.open(path, "wb")); assert(file:write(image)); assert(file:close())
+	local ok, err = pcall(function()
+		for _, name in ipairs({ "modules.llm.api_remote", "modules.llm.api_entries", "ui.menu.llm_backend_rows" }) do
+			package.loaded[name] = nil
+		end
+		with_api_add_locale(function(native)
+			local entries = require("modules.llm.api_entries")
+			entries._set_path_for_test(path)
+			helpers.assert_eq(entries.list(), {})
+			helpers.assert_nil(entries.active())
+			local observations = { prompts = 0, changes = 0, sets = 0 }
+			local llm = { get_backend = function() return "api" end, get_current_model = function() return nil end,
+				set_backend = function() observations.sets = observations.sets + 1; return true end }
+			local dialogs = { prompt = function() observations.prompts = observations.prompts + 1; return nil end,
+				error = function() error("empty status must not open an error") end,
+				info = function() error("empty status must not open a notice") end }
+			local rows = require("ui.menu.llm_backend_rows")
+			local function build()
+				return rows.rows(llm, dialogs, function() observations.changes = observations.changes + 1 end,
+					function() error("the API status must not query Ollama rows") end)
+			end
+			scenario(build, require("infra.manifest_menu"), native, observations)
+		end)
+	end)
+	local check = assert(io.open(path, "rb")); local retained = check:read("*a"); assert(check:close())
+	local quarantined = io.open(path .. ".corrupt", "rb")
+	if quarantined then quarantined:close() end
+	assert(os.remove(path))
+	for name in pairs(package.loaded) do if previous[name] == nil then package.loaded[name] = nil end end
+	for name, value in pairs(previous) do package.loaded[name] = value end
+	for name, value in pairs(previous) do helpers.assert_eq(rawequal(package.loaded[name], value), true, name) end
+	helpers.assert_eq(retained, image, "the genuine empty source stays byte-exact")
+	helpers.assert_nil(quarantined, "the valid private source is never quarantined")
+	if not ok then error(err, 0) end
+end
+
+--- The two empty states are independent inert labels, not selectable NoModel controls.
+local function empty_status_corpus()
+	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/llm_empty_status.json"), "rb"))
+	local raw = file:read("*a"); assert(file:close())
+	return assert(require("json").decode(raw))
+end
+
+helpers.describe("Shared inert empty API status (llm-empty-status)", function()
+	helpers.it("uses the actual private empty source and canonical inert label (llm-empty-status)", function()
+		with_empty_api_owner(function(build, menu, native, observations)
+			local corpus = empty_status_corpus()
+			local definition = menu.get_array(corpus.api.section)
+			local original = definition[1]
+			local ok, err = pcall(function()
+				local rows = build()
+				helpers.assert_eq(rows[5], corpus.api.platform_rows.linux[1])
+				helpers.assert_eq(rows[6].separator, true)
+				helpers.assert_eq(rows[7].label, corpus.add_english)
+				helpers.assert_type(rows[7].items[1].action, "function")
+				definition[1] = { type = "label", id = corpus.api.rows[1].id, i18n = corpus.marker_key,
+					platforms = { "ahk", "linux" }, unavailable = "hide" }
+				local marker = build()[5]
+				helpers.assert_eq(marker.label, corpus.marker_english)
+				helpers.assert_eq(marker.disabled, true)
+				helpers.assert_nil(marker.action)
+				helpers.assert_nil(marker.items)
+				rows[7].items[1].action()
+				helpers.assert_eq(observations, { prompts = 1, changes = 0, sets = 0 })
+			end)
+			definition[1] = original
+			helpers.assert_eq(ok, true, tostring(err))
+			helpers.assert_eq(native.get(corpus.api.key), corpus.api.english)
+		end)
+	end)
+	helpers.it("refuses missing or unbound status admission and repairs the original owner (llm-empty-status)", function()
+		with_empty_api_owner(function(build, menu, _, observations)
+			local corpus = empty_status_corpus()
+			local definition = menu.get_array(corpus.api.section)
+			local original = definition[1]
+			local ok, err = pcall(function()
+				definition[1] = nil
+				helpers.assert_eq(build(), {})
+				definition[1] = { type = "command", id = "unowned_api_empty", i18n = corpus.api.key,
+					platforms = { "ahk", "linux" }, unavailable = "hide" }
+				helpers.assert_eq(build(), {})
+				helpers.assert_eq(observations, { prompts = 0, changes = 0, sets = 0 })
+			end)
+			definition[1] = original
+			helpers.assert_eq(ok, true, tostring(err))
+			helpers.assert_eq(build()[5], corpus.api.platform_rows.linux[1])
+		end)
+	end)
+	helpers.it("replays both hand fragments with the genuine three-platform renderer (llm-empty-status)", function()
+		with_api_add_locale(function(native)
+			local corpus = empty_status_corpus()
+			for _, platform in ipairs({ "ahk", "hs", "linux" }) do
+				local renderer = assert(require("menu.renderer").new({ platform = platform,
+					manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
+					json_decode = require("json").decode, i18n = native, logger = require("logger.shim") }))
+				for _, status in ipairs({ corpus.api, corpus.agent }) do
+					helpers.assert_eq(renderer.template_rows(status.section, {}, {}, {}), status.platform_rows[platform])
+				end
+			end
+		end)
+	end)
+	helpers.it("restores actual source and module owners after a raised scenario (llm-empty-status)", function()
+		local raised = {}
+		local ok, err = pcall(function()
+			with_empty_api_owner(function() error(raised, 0) end)
+		end)
+		helpers.assert_eq(ok, false)
+		helpers.assert_eq(rawequal(err, raised), true)
+	end)
+end)

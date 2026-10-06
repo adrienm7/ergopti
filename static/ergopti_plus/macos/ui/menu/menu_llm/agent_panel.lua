@@ -237,7 +237,7 @@ local function server_model_rows(ctx, system, id, parsed)
 			action = function() return apply(ctx, system.key, id .. "|" .. model, system.setter) end,
 		}
 	end
-	if #rows == 0 then rows[1] = { label = i18n.get("menu.llm.local_servers.no_models"), disabled = true } end
+	if #rows == 0 then return ManifestMenu.template_rows("agent_server_empty_status", {}, {}, {}) or {} end
 	return rows
 end
 

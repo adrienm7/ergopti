@@ -244,7 +244,11 @@ LLM_Menu_BuildModelMenu() {
 			"checked", (active == default_name),
 			"action",  _LLM_Menu_MakeSetModelHandler(default_name)))
 	}
-	HeadRows.Push(Map("separator", true))
+	HeaderRows := MenuRenderer_TemplateRows("llm_model_header_boundary", Map(), Map(), Map())
+	if !(HeaderRows is Array)
+		return m
+	for Row in HeaderRows
+		HeadRows.Push(Row)
 	MenuRenderer_AppendRows(m, "llm_menu", "llm_model", HeadRows)
 
 	; Curated catalogue — provider → family → model. Family boundaries are

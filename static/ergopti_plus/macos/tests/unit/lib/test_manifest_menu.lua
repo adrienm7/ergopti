@@ -597,3 +597,6 @@ helpers.describe("invalid inert selector refuses before identity comparison", fu
 		helpers.assert_nil(errors[1]:find("presentation omitted", 1, true))
 	end)
 end)
+
+
+require("test.menu_native_child_rows").run(helpers, require("infra.manifest_menu"))
