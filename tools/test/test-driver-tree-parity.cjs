@@ -235,7 +235,13 @@ const BASELINE_SHARED = 36;
 //   58 → 59 on 2026-10-06 — preserve both platform/network and
 //   ui/physical_shortcuts at integration. Each adds exactly one symmetric path;
 //   the combined shared floor is 36 and the canonical source floor stays 17.
-const BASELINE_UNION = 59;
+//   59 -> 60 on 2026-10-06 - Linux native/archive_output contains the real
+//   retained-directory/O_TMPFILE/linkat implementation in archive_publication.c
+//   and its C ABI header. This is an explicit Linux-only native allowance:
+//   Windows and macOS use their own native file APIs and gain no wrapper folders.
+//   Shared-count36 and canonical-source17 remain unchanged. No generated bin,
+//   private fixture directory or implementation-independent feature is counted.
+const BASELINE_UNION = 60;
 
 // ── The canonical features, the third measurement this gate never had ───────
 //

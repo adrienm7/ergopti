@@ -693,6 +693,33 @@ def copy_elf_closure(seeds, library_directory, owners):
             pending.append(dependency)
 
 
+def explicit_digest_sources(catalogue):
+    """Resolve direct dlopen roots from actual OpenSSL build metadata/ELF."""
+    descriptor = catalogue.get("archive_digest_runtime")
+    if (
+        not isinstance(descriptor, dict)
+        or descriptor.get("soname") != "libcrypto.so.3"
+        or descriptor.get("portable_dlopen_roots") != ["libcrypto.so.3"]
+    ):
+        raise RuntimeRefused("Explicit OpenSSL3 staging descriptor unavailable.")
+    # libcrypto.pc is OpenSSL's actual component metadata. No architecture-
+    # specific /usr/lib directory or curl's optional dependency is inferred.
+    directory = Path(run(["pkg-config", "--variable=libdir", "libcrypto"]).strip())
+    if not directory.is_absolute():
+        raise RuntimeRefused("Actual OpenSSL build library directory unavailable.")
+    sources = []
+    for soname in descriptor["portable_dlopen_roots"]:
+        source = regular_source(directory / soname)
+        observed = run(
+            ["readelf", "--dynamic", "--", str(source)], env={**os.environ, "LC_ALL": "C"}
+        )
+        identities = re.findall(r"\(SONAME\)[^\n]*Library soname: \[([^\]\n]+)\]", observed)
+        if identities != [soname]:
+            raise RuntimeRefused("Actual OpenSSL ELF SONAME refused.")
+        sources.append(source)
+    return sources
+
+
 def stage(appdir, catalogue, template):
     global _STAGE_DEADLINE
     _STAGE_DEADLINE = time.monotonic() + 180
@@ -703,7 +730,8 @@ def stage(appdir, catalogue, template):
         driver = prefix / "lib/ergopti"
         if not (driver / "platform/network/runtime_probe.lua").is_file():
             raise RuntimeRefused("Installed runtime probe absent.")
-        policy = json.loads(Path(catalogue).read_text())["network_runtime"]["portable"]
+        catalogue_data = json.loads(Path(catalogue).read_text())
+        policy = catalogue_data["network_runtime"]["portable"]
         owners = {}
         binaries = []
         for name in ["luajit", "curl"]:
@@ -740,7 +768,12 @@ def stage(appdir, catalogue, template):
             prefix / "share/glib-2.0/schemas/gschemas.compiled",
             owners,
         )
-        copy_elf_closure([*binaries, luv_source, *modules], prefix / "lib", owners)
+        digest_sources = explicit_digest_sources(catalogue_data)
+        for source in digest_sources:
+            copy_unique(
+                source, prefix / "lib" / catalogue_data["archive_digest_runtime"]["soname"], owners
+            )
+        copy_elf_closure([*binaries, luv_source, *modules, *digest_sources], prefix / "lib", owners)
         # 0.5's backend is linked and therefore relocatable through package lib.
         # 0.4's separate runtime plugin search needs another qualification owner.
         if not any(destination.name == "libpxbackend-1.0.so" for destination in owners):

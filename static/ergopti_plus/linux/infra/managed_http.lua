@@ -25,6 +25,9 @@ function M.new(dependencies)
 		or type(dependencies.report) ~= "function" then return nil, "managed-http-initialization-invalid" end
 	if dependencies.redirect ~= nil and type(dependencies.redirect) ~= "function" then return nil, "managed-http-initialization-invalid" end
 	if dependencies.prepare_headers ~= nil and type(dependencies.prepare_headers) ~= "function" then return nil, "managed-http-initialization-invalid" end
+	local next_output = type(dependencies.output) == "table" and rawget(dependencies.output, "next") or nil
+	local complete_output = type(dependencies.output) == "table" and rawget(dependencies.output, "complete") or nil
+	if dependencies.output ~= nil and type(next_output) ~= "function" then return nil, "managed-http-initialization-invalid" end
 	local owned = {}
 	local coordinator = {}
 	local start_curl
@@ -85,7 +88,7 @@ function M.new(dependencies)
 	--- @param record table
 	--- @return number
 	local function remaining(record)
-		return math.floor(record.deadline - dependencies.clock())
+		return record.deadline - dependencies.clock()
 	end
 
 	--- Removes only private hop metadata; ordinary result identity is unchanged.
@@ -166,14 +169,18 @@ function M.new(dependencies)
 		if successor and not successor.operation._settled then
 			successor.predecessor = nil
 			owned[record.owner] = successor
-			if successor.operation._cancelled or successor.expired or successor.deadline_failed then
+			if successor.operation._cancelled or successor.expired or successor.deadline_failed
+				or successor.replacement_refused then
 				finish(successor, successor.pending_result or refusal("cancelled"))
 			elseif not successor.admitting and not successor.uncertain then
 				dispatch_route(successor, successor.route)
 			end
 		end
 		if not record.operation._cancelled and not record.logical_done and type(record.done) == "function" then
-			local ok = pcall(record.done, result)
+			local ok
+			if record.options.output_target ~= nil then
+				ok = pcall(record.done, result, result.ok == true and record.output_completion or nil)
+			else ok = pcall(record.done, result) end
 			if not ok then dependencies.report("Managed HTTP completion callback raised.") end
 		end
 		local listeners = record.operation._listeners
@@ -193,6 +200,34 @@ function M.new(dependencies)
 		if record.stage == "proxy" then ok, accepted = pcall(record.child.cancel)
 		else ok, accepted, native_refusal = pcall(record.child.request_cancel, record.child) end
 		return ok and accepted == true, ok and native_refusal or nil
+	end
+
+	--- Admits only the unchanged private positive cancellation lineage.
+	--- A native cancellation ACK permits a queued reservation, never a new child.
+	local function cancelled_boolean_current(record, receipt)
+		return type(receipt) == "table" and record.cancelled_boolean_receipt == receipt
+			and owned[record.owner] == record and record.operation == receipt.operation
+			and record.child == receipt.child and record.generation == receipt.generation
+			and record.options == receipt.options and record.options.owned_api == false
+			and record.cancellation_attempt == receipt.attempt and record.deadline == receipt.deadline
+			and record.stage == "curl" and rawget(receipt.child, "started") == true
+			and record.admitted == true and record.operation.started == true
+			and record.operation._cancelled == true and not record.operation._settled
+			and record.visible_active == false and not record.logical_done
+			and not record.expired and not record.prestart_refused and not record.uncertain
+			and not record.authorization_revoked and record.authorized == nil
+			and rawget(record.options, "authorized") == nil
+	end
+
+	--- Refences the old original budget after protected clock reentry.
+	--- The initial successor check uses its existing clock observation after reservation.
+	local function cancelled_boolean_budget_current(record, receipt, observed)
+		if not cancelled_boolean_current(record, receipt) then return false end
+		local called = true
+		if observed == nil then called, observed = pcall(dependencies.clock) end
+		return called and type(observed) == "number" and observed == observed
+			and math.abs(observed) ~= math.huge and observed < receipt.deadline
+			and cancelled_boolean_current(record, receipt)
 	end
 
 	--- Expires one accepted operation while retaining every physical debt.
@@ -249,6 +284,10 @@ function M.new(dependencies)
 	--- @return boolean Native signal/cleanup acceptance, not settlement.
 	request_cancel = function(record)
 		local previously_cancelled = record.operation._cancelled
+		-- An opaque attempt fences newer reentrant cancellation receipts without
+		-- guessing native generations or using a numeric sequence as authority.
+		local attempt = {}
+		record.cancellation_attempt, record.cancelled_boolean_receipt = attempt, nil
 		record.operation._cancelled = true
 		if record.operation._settled then return true end
 		if record.uncertain then return false end
@@ -258,16 +297,48 @@ function M.new(dependencies)
 			finish(record, refusal("cancelled"))
 			return record.operation._settled or record.deadline_close_accepted ~= false
 		end
+		-- Capture before the native cancellation call, then recheck its exact
+		-- lineage after any synchronous settlement or callback reentry.
+		local lineage
+		if owned[record.owner] == record
+			and record.options.owned_api == false and record.admitted == true
+			and record.stage == "curl"
+			and type(record.child) == "table" and rawget(record.child, "started") == true
+			and record.operation.started == true and not record.logical_done
+			and not record.expired and not record.prestart_refused and not record.uncertain
+			and not record.authorization_revoked and record.authorized == nil
+			and rawget(record.options, "authorized") == nil then
+			lineage = { operation = record.operation, child = record.child,
+				generation = record.generation, options = record.options, attempt = attempt, deadline = record.deadline }
+			local called, observed = pcall(dependencies.clock)
+			if not called or type(observed) ~= "number" or observed ~= observed
+				or math.abs(observed) == math.huge or observed >= lineage.deadline
+				or record.cancellation_attempt ~= attempt or owned[record.owner] ~= record
+				or record.child ~= lineage.child or record.generation ~= lineage.generation
+				or record.options ~= lineage.options or record.deadline ~= lineage.deadline
+				or record.operation._settled then lineage = nil end
+		end
 		local accepted, native_refusal = stop_child(record)
 		local descriptor_refusal = record.stage == "curl" and record.prestart_refused
 			and record.child.started == false and native_refusal == "body-descriptor-retirement-pending"
 		-- Descriptor retirement can refuse after accepting logical revocation;
 		-- a failed process signal keeps the original boolean delivery law.
-		if not accepted and not descriptor_refusal and not record.options.owned_api and not previously_cancelled then
+		if record.cancellation_attempt == attempt and not accepted and not descriptor_refusal
+			and not record.options.owned_api and not previously_cancelled then
 			record.operation._cancelled = false
 		end
-		if accepted then record.visible_active = false end
-		if child_settled(record) then finish(record, refusal("cancelled")) end
+		if accepted and record.cancellation_attempt == attempt then record.visible_active = false end
+		if accepted and lineage and record.cancellation_attempt == attempt then
+			local called, observed = pcall(dependencies.clock)
+			if called and type(observed) == "number" and observed == observed
+				and math.abs(observed) ~= math.huge and observed < lineage.deadline
+				and record.cancellation_attempt == attempt then
+				record.cancelled_boolean_receipt = lineage
+				if not cancelled_boolean_current(record, lineage) then record.cancelled_boolean_receipt = nil end
+			end
+		elseif not accepted and record.cancellation_attempt == attempt then record.cancelled_boolean_receipt = nil end
+		if record.cancellation_attempt == attempt and child_settled(record)
+			and record.cancellation_attempt == attempt then finish(record, refusal("cancelled")) end
 		return accepted
 	end
 
@@ -313,6 +384,26 @@ function M.new(dependencies)
 			return { action = "refuse", error = "HTTP redirect receipt refused" }
 		end
 		return decision
+	end
+
+	--- Produces an exact new output capability after actual retired hop receipt.
+	--- Every native/lease probe retains the original parent generation/deadline.
+	local function output_successor(record, result, disposition)
+		local target, producer, generation = record.options.output_target, record.child, record.generation
+		if target == nil or type(next_output) ~= "function" then return false end
+		local function current()
+			if not source_admitted(record) then return false end
+			local budget = remaining(record)
+			return budget > 0 and not record.expired and owned[record.owner] == record
+				and record.generation == generation and rawequal(record.child, producer)
+				and rawequal(record.options.output_target, target)
+				and not record.operation._cancelled and not record.operation._settled
+		end
+		if not current() then return false end
+		local called, successor = pcall(next_output, target, producer, result, disposition, current)
+		if not called or type(successor) ~= "table" or not current() then return false end
+		record.options.output_target = successor
+		return true
 	end
 
 	--- Publishes the historical boolean-port terminal event without retiring debt.
@@ -498,6 +589,9 @@ function M.new(dependencies)
 				or type(decision.hops) ~= "number" or decision.hops ~= record.hops + 1 then
 				finish(record, refusal("HTTP redirect receipt refused")); return
 			end
+			if record.options.output_target ~= nil and not output_successor(record, result, "redirect") then
+				finish(record, refusal("archive redirect continuation refused")); return
+			end
 			-- The preceding child's is_settled ACK is observed above. Keep the
 			-- same parent/deadline while replacing only the retired hop's state.
 			record.url, record.headers, record.hops = decision.url, decision.headers, decision.hops
@@ -522,8 +616,9 @@ function M.new(dependencies)
 		end
 		local choice = record.choices[record.choice]
 		-- Retained FD retry needs an exact previous-attempt ticket, not the old
-		-- zero-argument pathname admission callback. No target relay is enabled.
-		local safe_file = not record.options.output_path and record.options.output_target == nil
+		-- zero-argument pathname admission callback. Target relay additionally
+		-- consumes the captured physical producer and zero-byte receipt below.
+		local safe_file = not record.options.output_path and (record.options.output_target == nil or type(next_output) == "function")
 		if not safe_file and record.options.output_target == nil and type(record.options.proxy_retry_admit) == "function" then
 			local admitted, acknowledged = pcall(record.options.proxy_retry_admit)
 			safe_file = admitted and acknowledged == true
@@ -533,7 +628,29 @@ function M.new(dependencies)
 				selection_mode = choice.mode, delivered_bytes = record.delivered_bytes,
 				proxy_used = result.proxy_used == true,
 			}) == true
-		if can_retry then record.choice = record.choice + 1; start_curl(record); return end
+		if can_retry then
+			if record.options.output_target ~= nil and not output_successor(record, result, "relay") then
+				result.proxy_selection_receipt = record.selection_metadata
+				finish(record, result); return
+			end
+			record.choice = record.choice + 1; start_curl(record); return
+		end
+		if record.options.output_target ~= nil and result.ok == true then
+			local completed, token = false, nil
+			if type(complete_output) == "function" then
+				completed, token = pcall(complete_output, record.options.output_target, record.child, result)
+			end
+			if not completed or type(token) ~= "table" then
+				finish(record, refusal("archive output completion refused")); return
+			end
+			-- Completing probes the captured lease/native owner. Re-admit the
+			-- same parent after that boundary before publishing its token.
+			if not source_admitted(record) then return end
+			local budget = remaining(record)
+			if owned[record.owner] ~= record or record.operation._cancelled or record.operation._settled then return end
+			if record.expired or budget <= 0 then expire(record); return end
+			record.output_completion = token
+		end
 		result.proxy_selection_receipt = record.selection_metadata
 		finish(record, result)
 	end
@@ -564,7 +681,7 @@ function M.new(dependencies)
 			finish(record, refusal("cancelled")); return operation
 		end
 		local called, child, lookup_error = pcall(dependencies.proxy.lookup_owned, record.url, {
-			owner = record.owner, timeout_ms = budget, probe_curl = true,
+			owner = record.owner, timeout_ms = math.ceil(budget), probe_curl = true,
 			logical_cancel = record.options.owned_api == false,
 			on_native_terminal = function(result)
 				if owned[record.owner] ~= record or record.generation ~= generation then return end
@@ -610,7 +727,7 @@ function M.new(dependencies)
 		local record = {
 			url = url, headers = headers, body = body, options = options, owner = options.owner,
 			chunk = on_chunk, done = on_done, operation = operation, generation = 0, delivered_bytes = 0, visible_active = false,
-			deadline = admission and 0 or dependencies.clock() + options.timeout_ms,
+			deadline = admission and 0 or math.min(dependencies.clock() + options.timeout_ms, rawget(options, "absolute_deadline_ms") or math.huge),
 		}
 		function operation:is_settled() return self._settled end
 		function operation:on_settled(listener)
@@ -627,19 +744,21 @@ function M.new(dependencies)
 			-- Reserve before caller source/preflight metadata. Unlike boolean
 			-- successors, this owner never cancels or probes a predecessor source.
 			local incumbent = owned[record.owner]
-			-- Only a genuinely live regular request is replaceable. A logical
-			-- terminal, constructor refusal or cancelled/expired retirement debt
-			-- keeps its original pre-metadata cleanup-pending fence.
+			-- A positively cancelled, actually started BOOLEAN curl child may
+			-- accept one reservation while retaining every physical retirement debt.
+			local cancelled_receipt = incumbent and incumbent.cancelled_boolean_receipt
+			local cancelled_incumbent = incumbent and cancelled_boolean_current(incumbent, cancelled_receipt)
 			if incumbent and (incumbent.options.owned_api or incumbent.successor
-				or incumbent.admitted ~= true or incumbent.visible_active ~= true
-				or incumbent.logical_done or incumbent.operation._cancelled
-				or incumbent.expired or incumbent.prestart_refused) then
+				or incumbent.admitted ~= true or incumbent.uncertain
+				or ((incumbent.visible_active ~= true or incumbent.operation._cancelled) and not cancelled_incumbent)
+				or incumbent.logical_done or incumbent.expired or incumbent.prestart_refused) then
 				if admission.authorized then operation._settled = true
 				else finish(record, refusal("previous request cleanup pending")) end
 				return operation
 			end
 			if incumbent then
 				incumbent.successor, record.predecessor = record, incumbent
+				if cancelled_incumbent then record.cancelled_predecessor_receipt = cancelled_receipt end
 			else owned[record.owner] = record end
 			record.admitting, record.authorized = true, admission.authorized
 			local clocked, started = pcall(dependencies.clock)
@@ -647,7 +766,15 @@ function M.new(dependencies)
 				record.admitting = false
 				finish(record, refusal("managed-http-clock-unavailable")); return operation
 			end
-			record.deadline = started + options.timeout_ms
+			record.deadline = math.min(started + options.timeout_ms, rawget(options, "absolute_deadline_ms") or math.huge)
+			if record.predecessor and record.cancelled_predecessor_receipt
+				and not cancelled_boolean_budget_current(record.predecessor, record.cancelled_predecessor_receipt, started) then
+				-- Match pre-metadata cleanup refusal: source-bound callers receive
+				-- no guessed authorization callback on an expired incumbent.
+				if admission.authorized then operation._cancelled = true end
+				record.admitting = false
+				finish(record, refusal("previous request cleanup pending")); return operation
+			end
 			if not source_admitted(record) then
 				record.admitting = false
 				finish(record, refusal("cancelled")); return operation
@@ -677,8 +804,12 @@ function M.new(dependencies)
 		-- reservation/source/absolute deadline established above remain unchanged.
 		local redirect_options = record.options
 		local authority = type(url) == "string" and url:match("^[^:]+://([^/?#]*)") or nil
-		local hop_eligible = dependencies.redirect ~= nil and redirect_options.method == "GET" and redirect_options.buffered == true
-			and redirect_options.follow_redirects and body == nil and redirect_options.output_path == nil and redirect_options.output_target == nil
+		local archive_hops = redirect_options.output_target ~= nil and redirect_options.buffered == false
+			and redirect_options.archive_redirects == true and type(next_output) == "function"
+		local buffered_hops = redirect_options.buffered == true and redirect_options.follow_redirects
+			and redirect_options.output_target == nil
+		local hop_eligible = dependencies.redirect ~= nil and redirect_options.method == "GET" and (buffered_hops or archive_hops)
+			and body == nil and redirect_options.output_path == nil
 			and redirect_options.etag_compare == nil and redirect_options.etag_save == nil and authority and not authority:find("@", 1, true)
 		local function redirect_still_current()
 			local generation = record.generation
@@ -766,9 +897,25 @@ function M.new(dependencies)
 			local incumbent = record.predecessor
 			if incumbent then
 				operation.started = true
-				if not request_cancel(incumbent) then
+				local cancellation_accepted
+				if record.cancelled_predecessor_receipt then
+					-- Revalidate after metadata/environment/timer reentry. The old
+					-- positive ACK is not permission to signal an already cancelled child again.
+					cancellation_accepted = cancelled_boolean_budget_current(incumbent, record.cancelled_predecessor_receipt)
+					-- A clock callback may complete the old exact physical owner;
+					-- its settled adoption is the ordinary standalone admission path.
+					if record.predecessor == nil and incumbent.operation._settled
+						and reservation_current(record) and not operation._cancelled and not operation._settled then
+						cancellation_accepted = true
+					end
+				else cancellation_accepted = request_cancel(incumbent) end
+				if not cancellation_accepted then
+					-- Refused admission remains terminal while its own timer closes;
+					-- predecessor retirement must never dispatch this reservation.
+					record.replacement_refused = true
 					operation.started, record.admitted, record.visible_active, record.admitting = false, false, false, false
-					finish(record, refusal("previous request cancellation failed")); return operation
+					finish(record, refusal(record.cancelled_predecessor_receipt and "previous request cleanup pending"
+						or "previous request cancellation failed")); return operation
 				end
 			end
 			record.admitting = false

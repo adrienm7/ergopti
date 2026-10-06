@@ -1492,6 +1492,8 @@ assert.ok(
 );
 assert.strictEqual(MANIFEST.jobs['e2e-linux'].subjects['managed-network-runtime'], 4);
 assert.strictEqual(MANIFEST.jobs['e2e-linux'].subjects['retained-fd-sha256'], 12);
+assert.strictEqual(MANIFEST.jobs['e2e-linux'].subjects['managed-http-output'], 18);
+assert.strictEqual(MANIFEST.jobs['e2e-linux'].subjects['managed-http-public'], 30);
 const recorded = [...recordScript.join('\n').matchAll(/--subject "?([a-z0-9-]+)=([^\s"]+)"?/g)];
 assert.deepStrictEqual(
 	recorded.map((match) => match[1]).sort(),
@@ -1510,6 +1512,13 @@ for (const [, subject, value] of recorded) {
 			'http-stream-receipts': '$http_stream_assertions',
 			'managed-network-runtime': '$network_runtime_assertions',
 			'retained-fd-sha256': '$fd_sha256_assertions',
+			'managed-http-output': '$managed_http_output_assertions',
+			'managed-http-public': '$managed_http_public_assertions',
+			'updater-archive-pipeline': '$updater_archive_assertions',
+			'archive-source-crypto': '$archive_crypto_assertions',
+			'archive-source-bin-parent': '$archive_bin_parent_assertions',
+			'archive-private-snapshot': '$archive_snapshot_assertions',
+			'connect-terminal-protocol-model': '$connect_protocol_assertions',
 			'window-switch-receipts': '$window_switch_assertions',
 			'native-fixture-family': '$native_family_assertions'
 		}[subject] ?? '1';

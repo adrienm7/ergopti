@@ -337,6 +337,54 @@ if (result.tarballs < MIN_TARBALL_STEPS) {
 	);
 }
 
+/** Removes one env field belonging to an actual parsed stamping build. */
+function stampingOwnerMutation(text, rel, key) {
+	const parsed = parseJobs(text);
+	const jobs = pipeline.jobsOfText(text, rel);
+	for (const job of parsed) {
+		for (const step of job.steps) {
+			const stamps = Object.entries(STAMPING_BUILDS).some(
+				([script, invocation]) =>
+					invocation.test(step.run) &&
+					(key === 'ERGOPTI_BUILD_COMMIT' ||
+						(key === 'ERGOPTI_BUILD_VERSION' && script.endsWith('build-linux-driver.sh')) ||
+						(key === 'ERGOPTI_VERSION' && script.endsWith('build_macos_app.sh')))
+			);
+			if (!stamps) continue;
+			const field = new RegExp(`^${key}:`);
+			const stepFields = step.env.filter((entry) => field.test(entry));
+			const jobFields = job.env.filter((entry) => field.test(entry));
+			if (stepFields.length + jobFields.length === 0) continue;
+			if (stepFields.length + jobFields.length !== 1)
+				throw new Error(`${rel}: stamping owner ${key} must have one env field`);
+			const matchingJobs = jobs.filter((candidate) => candidate.id === job.name);
+			if (matchingJobs.length !== 1) throw new Error(`${rel}: stamping owner job must be unique`);
+			const jobBody = matchingJobs[0].body;
+			const body = stepFields.length ? pipeline.step(jobBody, step.name) : jobBody;
+			const envIndent = stepFields.length ? 8 : 4;
+			const lines = body.split('\n');
+			const envAt = lines.flatMap((line, index) =>
+				line === ' '.repeat(envIndent) + 'env:' ? [index] : []
+			);
+			if (envAt.length !== 1) throw new Error(`${rel}: stamping owner env mapping must be unique`);
+			const entries = [];
+			for (let at = envAt[0] + 1; at < lines.length; at++) {
+				const ind = indentOf(lines[at]);
+				if (ind === -1) continue;
+				if (ind <= envIndent) break;
+				if (ind === envIndent + 2 && field.test(lines[at].trim())) entries.push(at);
+			}
+			if (entries.length !== 1 || text.split(body).length !== 2)
+				throw new Error(`${rel}: stamping owner field boundary must be unique`);
+			lines.splice(entries[0], 1);
+			const mutated = text.replace(body, () => lines.join('\n'));
+			if (mutated === text) throw new Error(`${rel}: stamping owner mutation must change text`);
+			return mutated;
+		}
+	}
+	throw new Error(`${rel}: no parsed stamping owner supplies ${key}`);
+}
+
 // The guard must be able to fail: dropping one stamp or one version, in every
 // workflow that carries one, has to be reported.
 for (const [key, owners] of [
@@ -352,7 +400,8 @@ for (const [key, owners] of [
 		);
 	}
 	for (const { rel, text } of carriers) {
-		if (checkWorkflow(text.replace(entry, ''), rel).errors.length === 0) {
+		const mutated = stampingOwnerMutation(text, rel, key);
+		if (checkWorkflow(mutated, rel).errors.length === 0) {
 			errors.push(
 				`self-check: removing the first ${key} entry of ${rel} went unnoticed — this guard cannot fail`
 			);

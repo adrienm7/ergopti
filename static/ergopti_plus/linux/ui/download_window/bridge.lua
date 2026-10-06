@@ -463,6 +463,17 @@ function M.on_message(payload, state, context)
 	return nil
 end
 
+--- Fresh native admission for the same app-update operation document.
+--- No document owner/descriptor is exported; a missing initialization ACK refuses.
+function M.install_admission_current(session_id)
+	local session = _session
+	if not session or session.id ~= session_id or session.kind ~= "app_update"
+		or session.terminal or session.retired or session.cancelled then return false end
+	local observed, admitted = pcall(owner_current, session)
+	return observed and admitted == true and _session == session and session.id == session_id
+		and not session.terminal and not session.retired and not session.cancelled
+end
+
 function M.session_id()
 	return _session and _session.id or nil
 end

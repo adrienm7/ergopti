@@ -214,7 +214,11 @@ cat >> "$MANIFEST_FILE" << 'MANIFEST_EOF'
       - install -d /app/lib/ergopti
       # The shared tree is staged as a CHILD of the driver root (/app/lib/ergopti/_shared),
       # matching what build-linux-deb.sh installs under /usr/lib/ergopti.
+      # The compiler and libc are the declared SDK's target, not the build host.
+      - mkdir -p native-output
+      - bash tools/build/build-linux-native-output.sh --source-directory "$PWD/lib/ergopti/native/archive_output" --output-directory "$PWD/native-output"
       - cp -r lib/ergopti/. /app/lib/ergopti/
+      - install -Dm755 native-output/libergopti_archive_publication.so /app/lib/ergopti/bin/libergopti_archive_publication.so
       - install -Dm755 bin/ergopti /app/bin/ergopti
       - install -Dm644 lib/ergopti/network-runtime-env.sh /app/lib/ergopti/network-runtime-env.sh
       - install -Dm644 share/applications/org.ergopti.Ergopti.desktop /app/share/applications/org.ergopti.Ergopti.desktop
@@ -250,6 +254,11 @@ echo "  Manifest: $MANIFEST_FILE ($APP_ID)"
 # failure is how a packager ships an empty package and still exits 0.
 echo "Staging driver payload..."
 cp -r "$BUILD_DIR/linux/." "$PAYLOAD_DIR/lib/ergopti/"
+# This SDK module receives sources and the canonical compiler owner only.
+# A host-built ELF must not enter /app before the SDK-built artifact replaces it.
+rm -f -- "$PAYLOAD_DIR/lib/ergopti/bin/libergopti_archive_publication.so"
+mkdir -p "$PAYLOAD_DIR/tools/build"
+install -m 755 "$SCRIPT_DIR/build-linux-native-output.sh" "$PAYLOAD_DIR/tools/build/build-linux-native-output.sh"
 
 # The whole shared tree, not just _shared/lua: the keycode tables, hotstring
 # packs, locales and the defaults the resolver fails fast on live in

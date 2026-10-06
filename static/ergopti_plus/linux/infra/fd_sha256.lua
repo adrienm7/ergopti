@@ -212,6 +212,12 @@ end
 --- Builds the actual libuv/opaque OpenSSL EVP backend from native APIs.
 --- @return table factory
 function M.native()
+	local projected = require("_generated.native_runtime")
+	local runtime = type(projected) == "table" and rawget(projected, "archive_digest_runtime")
+	local soname = type(runtime) == "table" and rawget(runtime, "soname")
+	assert(type(runtime) == "table" and rawget(runtime, "schema_version") == 1
+		and soname == "libcrypto.so.3",
+		"Generated FD digest runtime descriptor unavailable")
 	local ffi, uv = require("ffi"), require("luv")
 	assert(ffi.os == "Linux", "FD digest requires Linux")
 	-- Exact opaque typedefs/prototypes from installed OpenSSL types.h/evp.h.
@@ -227,7 +233,7 @@ function M.native()
 		int EVP_DigestUpdate(EVP_MD_CTX *ctx, const void *data, size_t count);
 		int EVP_DigestFinal_ex(EVP_MD_CTX *ctx, unsigned char *md, unsigned int *s);
 	]])
-	local crypto = ffi.load("libcrypto.so.3")
+	local crypto = ffi.load(soname)
 	local Clock, Deadline = require("infra.monotonic"), require("infra.managed_http_deadline")
 	return M.new({
 		now_ms = Clock.now_ms, deadline = Deadline.start,

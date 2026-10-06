@@ -1325,6 +1325,53 @@ jobs:
           npm run --silent test:linux:fd-sha256-native | tee "$RUNNER_TEMP/linux-fd-sha256-native.log"
         timeout-minutes: 3
 
+      # Tool admissions are private and scoped; product curl remains unchanged.
+      - name: Prepare authenticated managed HTTP validation tools
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y --no-install-recommends build-essential pkg-config libssl-dev zlib1g-dev gpgv debian-archive-keyring luajit lua-luv libglib2.0-dev libglib2.0-bin glib-networking gsettings-desktop-schemas dconf-gsettings-backend dbus openssl libnghttp2-14 libidn2-0 librtmp1 libssh2-1t64 libpsl5t64 libgssapi-krb5-2 libsasl2-2 libzstd1 libbrotli1
+          umask 077
+          validation_parent="$RUNNER_TEMP/managed-http-validation"
+          mkdir -m 700 "$validation_parent"
+          if python3 -B tools/test/fixtures/validation-curl/setup_validation_curl.py --repo "$GITHUB_WORKSPACE" --destination "$validation_parent/tools" --openssl-prefix /usr --keyring /usr/share/keyrings/debian-archive-keyring.gpg --jobs 2 > "$validation_parent/setup.stdout.private" 2> "$validation_parent/setup.stderr.private"; then
+            node tools/test/linux-managed-http-evidence.cjs --tools-env "$validation_parent/tools/TOOLS-ADMISSION.json" "$validation_parent/tools" tools/test/fixtures/validation-curl/PINS.json >> "$GITHUB_ENV"
+          else
+            echo "::error::Authenticated managed HTTP validation tool setup refused; private inputs retained."
+            exit 1
+          fi
+        timeout-minutes: 35
+
+      - name: Qualify native managed HTTP public and retained output
+        if: ${{ !cancelled() }}
+        env:
+          ERGOPTI_MANAGED_NATIVE_EXPECTED_HEAD: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          unset PKG_CONFIG_SYSROOT_DIR ERGOPTI_MANAGED_NATIVE_GIO_SYSROOT
+          npm run --silent test:linux:managed-http-native | tee "$RUNNER_TEMP/linux-managed-http-native.log"
+        timeout-minutes: 35
+
+      # Actual owner-built installed-prefix archive chain; no mocked production I/O.
+      - name: Qualify native updater archive pipeline
+        if: ${{ !cancelled() }}
+        env:
+          # Empty on manual/nonrelease runs: private runner admits package metadata.
+          ERGOPTI_BUILD_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          export ERGOPTI_MANAGED_NATIVE_EXPECTED_HEAD="$GITHUB_SHA"
+          env -u PKG_CONFIG_SYSROOT_DIR -u ERGOPTI_MANAGED_NATIVE_GIO_SYSROOT npm run --silent test:linux:updater-archive-native | tee "$RUNNER_TEMP/linux-updater-archive-native.log"
+        timeout-minutes: 35
+
+      # Controlled metadata and real filesystem guards are separate from native provider proof.
+      - name: Qualify archive crypto and bin parent source controls
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          npm run --silent test:linux:archive-source-controls | tee "$RUNNER_TEMP/linux-archive-source-controls.log"
+        timeout-minutes: 3
+
       # This prerequisite proof is independent of official runtime/model downloads.
       - name: Qualify native runtime prerequisites
         if: ${{ !cancelled() }}
@@ -1612,6 +1659,13 @@ jobs:
           http_stream_assertions=$(sed -n 's/^PASS native HTTP streaming receipts: \([0-9][0-9]*\) checks$/\1/p' "$RUNNER_TEMP/linux-http-stream.log" | tail -1)
           network_runtime_assertions=$(node tools/test/linux-network-runtime-evidence.cjs "$RUNNER_TEMP/linux-network-runtime.log")
           fd_sha256_assertions=$(node tools/test/run-linux-fd-sha256-native.cjs --evidence "$RUNNER_TEMP/linux-fd-sha256-native.log")
+          managed_http_output_assertions=$(node tools/test/linux-managed-http-evidence.cjs --count output "$RUNNER_TEMP/linux-managed-http-native.log" "$GITHUB_SHA")
+          managed_http_public_assertions=$(node tools/test/linux-managed-http-evidence.cjs --count public "$RUNNER_TEMP/linux-managed-http-native.log" "$GITHUB_SHA")
+          updater_archive_assertions=$(node tools/test/linux-updater-archive-evidence.cjs archive "$RUNNER_TEMP/linux-updater-archive-native.log")
+          archive_crypto_assertions=$(node tools/test/linux-updater-archive-evidence.cjs crypto "$RUNNER_TEMP/linux-archive-source-controls.log")
+          archive_bin_parent_assertions=$(node tools/test/linux-updater-archive-evidence.cjs parents "$RUNNER_TEMP/linux-archive-source-controls.log")
+          archive_snapshot_assertions=$(node tools/test/linux-updater-archive-evidence.cjs snapshot "$RUNNER_TEMP/linux-archive-source-controls.log")
+          connect_protocol_assertions=$(node tools/test/linux-updater-archive-evidence.cjs connect "$RUNNER_TEMP/linux-archive-source-controls.log")
           node tools/test/linux-ci-evidence.cjs record \
               --job e2e-linux \
               --output "$RUNNER_TEMP/linux-ci-evidence/e2e-linux.json" \
@@ -1629,6 +1683,13 @@ jobs:
               --subject "http-stream-receipts=$http_stream_assertions" \
               --subject "managed-network-runtime=$network_runtime_assertions" \
               --subject "retained-fd-sha256=$fd_sha256_assertions" \
+              --subject "managed-http-output=$managed_http_output_assertions" \
+              --subject "managed-http-public=$managed_http_public_assertions" \
+              --subject "updater-archive-pipeline=$updater_archive_assertions" \
+              --subject "archive-source-crypto=$archive_crypto_assertions" \
+              --subject "archive-source-bin-parent=$archive_bin_parent_assertions" \
+              --subject "archive-private-snapshot=$archive_snapshot_assertions" \
+              --subject "connect-terminal-protocol-model=$connect_protocol_assertions" \
               --subject x11-display=1 \
               --subject wayland-display=1 \
               --subject tray-symbols=1 \
