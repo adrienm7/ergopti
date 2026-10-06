@@ -485,7 +485,7 @@ MenuCommandRun(Callback, Args, Attempt := 0, BusyFn := 0, ArmFn := 0, Registrati
 		}
 		if MenuStartupCommands_Defer(Callback, Args, Registration)
 			return ""
-		Busy := HasMethod(BusyFn, "Call") ? BusyFn.Call() : ConfigWriteLeaseBusy()
+		Busy := HasMethod(BusyFn, "Call") ? BusyFn.Call() : ConfigMutationBusy()
 		if (Busy and Attempt < MENU_COMMAND_DEFERRAL_MAX_ATTEMPTS) {
 				if (Attempt == 0)
 						try LoggerInfo("MenuDispatcher", "Menu command deferred: a configuration write is in progress; it runs when that write ends.")
