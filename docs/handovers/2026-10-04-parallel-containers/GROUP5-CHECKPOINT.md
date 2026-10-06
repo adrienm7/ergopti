@@ -1044,6 +1044,19 @@ previous guard byte/assertion by inverse. Actual macOS copied-Mach-O execution,
 nonreaping ownership, ACL sampling, Swift and package/install acceptance still
 require the next exact-SHA manual run. TODO31 stays partial.
 
+A bounded read-only macOS collector now retains the actual pkgutil help and
+signature transcripts for three fixed official VirtualHID package pins. Every
+native child uses the existing nonreaping process owner and its unchanged
+retirement budgets; held source, policy, runtime and package identities are
+revalidated before an exclusive readback receipt. It never expands or installs
+packages and leaves trust UNKNOWN, authority false and reference qualification
+false. All30 controls pass360 matrix executions, and independent current-policy
+composition passes33 controls in both modes. The additive CI observer and full
+raw-evidence upload preserve every original workflow/guard byte by inverse;
+60 healthy guard controls pass and23 frozen causal mutations are refused.
+Actual macOS package grammar and upload remain unexecuted until the next
+exact-SHA manual run; protected provisioning and WP4-WP10 remain unfinished.
+
 Managed physical sessions now request one fresh correlated app/window/secure
 sample after capture readiness and before baseline acknowledgement or first-batch
 delivery. The existing framed context owner validates the exact subscription,

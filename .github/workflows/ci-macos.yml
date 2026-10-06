@@ -298,6 +298,26 @@ jobs:
           python3 -B tools/diagnostics/installed_vhd_acl_ci.py "$evidence_parent"
         timeout-minutes: 2
 
+      - name: Observe native read-only VHD package metadata
+        id: installed-vhd-raw
+        run: |
+          set -euo pipefail
+          evidence_parent="$(mktemp -d "$RUNNER_TEMP/installed-vhd-raw-evidence.XXXXXX")"
+          echo "evidence_parent=$evidence_parent" >> "$GITHUB_OUTPUT"
+          git rev-parse HEAD > "$evidence_parent/tested-sha.txt"
+          python3 -B -m unittest discover -s tools/diagnostics -p installed_vhd_static_fixture_test.py
+          python3 -O -B -m unittest discover -s tools/diagnostics -p installed_vhd_static_fixture_test.py
+          python3 -B tools/diagnostics/installed_vhd_static_fixture.py "$evidence_parent"
+        timeout-minutes: 2
+
+      - name: Retain read-only VHD raw package evidence
+        if: always() && (steps.installed-vhd-raw.outcome == 'success' || steps.installed-vhd-raw.outcome == 'failure') && steps.installed-vhd-raw.outputs.evidence_parent != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: installed-vhd-raw-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ steps.installed-vhd-raw.outputs.evidence_parent }}
+          if-no-files-found: error
+
       - name: Run Swift launcher tests
         id: swift-launcher-tests
         env:

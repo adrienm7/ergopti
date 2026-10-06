@@ -182,6 +182,38 @@ const LEGACY_RECEIPT_STEP_TEXT = [
 	'          if-no-files-found: ignore'
 ].join('\n');
 
+// Read-only acquisition exposes raw observations; it never admits driver trust.
+const RAW_VHD_STEP_ORDER = [
+	'Observe native installed-VHD ancestry prerequisites',
+	'Observe native read-only VHD package metadata',
+	'Retain read-only VHD raw package evidence',
+	'Run Swift launcher tests'
+];
+const RAW_VHD_CONDITION =
+	"always() && (steps.installed-vhd-raw.outcome == 'success' || steps.installed-vhd-raw.outcome == 'failure') && steps.installed-vhd-raw.outputs.evidence_parent != ''";
+const RAW_VHD_OBSERVER_TEXT = [
+	'      - name: Observe native read-only VHD package metadata',
+	'        id: installed-vhd-raw',
+	'        run: |',
+	'          set -euo pipefail',
+	'          evidence_parent="$(mktemp -d "$RUNNER_TEMP/installed-vhd-raw-evidence.XXXXXX")"',
+	'          echo "evidence_parent=$evidence_parent" >> "$GITHUB_OUTPUT"',
+	'          git rev-parse HEAD > "$evidence_parent/tested-sha.txt"',
+	'          python3 -B -m unittest discover -s tools/diagnostics -p installed_vhd_static_fixture_test.py',
+	'          python3 -O -B -m unittest discover -s tools/diagnostics -p installed_vhd_static_fixture_test.py',
+	'          python3 -B tools/diagnostics/installed_vhd_static_fixture.py "$evidence_parent"',
+	'        timeout-minutes: 2'
+].join('\n');
+const RAW_VHD_UPLOAD_TEXT = [
+	'      - name: Retain read-only VHD raw package evidence',
+	"        if: always() && (steps.installed-vhd-raw.outcome == 'success' || steps.installed-vhd-raw.outcome == 'failure') && steps.installed-vhd-raw.outputs.evidence_parent != ''",
+	'        uses: actions/upload-artifact@v4',
+	'        with:',
+	'          name: installed-vhd-raw-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}',
+	'          path: ${{ steps.installed-vhd-raw.outputs.evidence_parent }}',
+	'          if-no-files-found: error'
+].join('\n');
+
 const STEP_CONDITIONS = [
 	[LINUX_BOX, 'test-linux', 'Run manual official runtime and model acceptance', MANUAL_RUNTIME_IF],
 	[
@@ -219,6 +251,7 @@ const STEP_CONDITIONS = [
 		'Retain packaged application startup evidence',
 		'always() && inputs.release'
 	],
+	[MACOS_BOX, 'package-macos', RAW_VHD_STEP_ORDER[2], RAW_VHD_CONDITION],
 	[MACOS_BOX, 'package-macos', LEGACY_RECEIPT_STEP_ORDER[1], LEGACY_RECEIPT_CONDITION],
 	[
 		MACOS_BOX,
@@ -1369,6 +1402,204 @@ for (const [name, expected] of [
 	);
 }
 errors.push(...stepProblems(pipeline.files()));
+
+/** Keep read-only raw acquisition separate from installed ancestry and Swift. */
+function rawVhdProblems(files) {
+	const problems = [];
+	const mac = files.find((entry) => entry.rel === MACOS_BOX);
+	const job =
+		mac && pipeline.jobsOfText(mac.text, MACOS_BOX).find((entry) => entry.id === 'package-macos');
+	const steps = job ? pipeline.steps(job.body) : [];
+	const indices = RAW_VHD_STEP_ORDER.map((name) => steps.findIndex((step) => step.name === name));
+	if (
+		RAW_VHD_STEP_ORDER.some((name) => steps.filter((step) => step.name === name).length !== 1) ||
+		indices.some((at, index) => at < 0 || (index > 0 && at !== indices[index - 1] + 1))
+	) {
+		problems.push(
+			'read-only VHD raw acquisition and retention must occur exactly once between the ACL observer and Swift'
+		);
+	}
+	for (const [name, text] of [
+		[RAW_VHD_STEP_ORDER[1], RAW_VHD_OBSERVER_TEXT],
+		[RAW_VHD_STEP_ORDER[2], RAW_VHD_UPLOAD_TEXT]
+	]) {
+		const selected = steps.filter((step) => step.name === name);
+		if (selected.length === 1 && codeOf(selected[0].body) !== text) {
+			problems.push(
+				'read-only VHD raw evidence must keep exact ordinary collector controls, separate tested-SHA parent and success/failure whole-parent upload'
+			);
+		}
+	}
+	return problems;
+}
+errors.push(...rawVhdProblems(pipeline.files()));
+for (const [what, from, to] of [
+	['missing observer', RAW_VHD_OBSERVER_TEXT + '\n', ''],
+	['missing retained raw evidence', RAW_VHD_UPLOAD_TEXT + '\n', ''],
+	[
+		'skipped observer',
+		RAW_VHD_OBSERVER_TEXT,
+		RAW_VHD_OBSERVER_TEXT.replace(
+			'        id: installed-vhd-raw\n',
+			'        id: installed-vhd-raw\n        if: false\n'
+		)
+	],
+	[
+		'forgiven observer',
+		RAW_VHD_OBSERVER_TEXT,
+		RAW_VHD_OBSERVER_TEXT.replace(
+			'        id: installed-vhd-raw\n',
+			'        id: installed-vhd-raw\n        continue-on-error: true\n'
+		)
+	],
+	[
+		'missing normal controls',
+		RAW_VHD_OBSERVER_TEXT,
+		RAW_VHD_OBSERVER_TEXT.replace(
+			'          python3 -B -m unittest discover -s tools/diagnostics -p installed_vhd_static_fixture_test.py\n',
+			''
+		)
+	],
+	[
+		'missing optimized controls',
+		RAW_VHD_OBSERVER_TEXT,
+		RAW_VHD_OBSERVER_TEXT.replace(
+			'          python3 -O -B -m unittest discover -s tools/diagnostics -p installed_vhd_static_fixture_test.py\n',
+			''
+		)
+	],
+	[
+		'wrong native collector',
+		RAW_VHD_OBSERVER_TEXT,
+		RAW_VHD_OBSERVER_TEXT.replace(
+			'installed_vhd_static_fixture.py "$evidence_parent"',
+			'installed_vhd_acl_ci.py "$evidence_parent"'
+		)
+	],
+	[
+		'missing tested source SHA',
+		RAW_VHD_OBSERVER_TEXT,
+		RAW_VHD_OBSERVER_TEXT.replace(
+			'          git rev-parse HEAD > "$evidence_parent/tested-sha.txt"\n',
+			''
+		)
+	],
+	[
+		'shared parent',
+		RAW_VHD_OBSERVER_TEXT,
+		RAW_VHD_OBSERVER_TEXT.replace(
+			'installed-vhd-raw-evidence.XXXXXX',
+			'installed-vhd-acl-evidence.XXXXXX'
+		)
+	],
+	[
+		'external package arguments',
+		RAW_VHD_OBSERVER_TEXT,
+		RAW_VHD_OBSERVER_TEXT.replace(
+			'installed_vhd_static_fixture.py "$evidence_parent"',
+			'installed_vhd_static_fixture.py "$evidence_parent" --packages /tmp/packages'
+		)
+	],
+	[
+		'expanded collector timeout',
+		RAW_VHD_OBSERVER_TEXT,
+		RAW_VHD_OBSERVER_TEXT.replace('timeout-minutes: 2', 'timeout-minutes: 20')
+	],
+	[
+		'changed artifact action',
+		RAW_VHD_UPLOAD_TEXT,
+		RAW_VHD_UPLOAD_TEXT.replace('actions/upload-artifact@v4', 'actions/upload-artifact@v3')
+	],
+	[
+		'missing artifact SHA',
+		RAW_VHD_UPLOAD_TEXT,
+		RAW_VHD_UPLOAD_TEXT.replace('installed-vhd-raw-${{ github.sha }}-', 'installed-vhd-raw-')
+	],
+	[
+		'missing artifact run',
+		RAW_VHD_UPLOAD_TEXT,
+		RAW_VHD_UPLOAD_TEXT.replace('-${{ github.run_id }}-', '-')
+	],
+	[
+		'missing artifact attempt',
+		RAW_VHD_UPLOAD_TEXT,
+		RAW_VHD_UPLOAD_TEXT.replace('-${{ github.run_attempt }}', '')
+	],
+	[
+		'foreign parent export',
+		RAW_VHD_UPLOAD_TEXT,
+		RAW_VHD_UPLOAD_TEXT.replace(
+			'${{ steps.installed-vhd-raw.outputs.evidence_parent }}',
+			'${{ steps.installed-vhd-acl.outputs.evidence_parent }}'
+		)
+	],
+	[
+		'partial parent export',
+		RAW_VHD_UPLOAD_TEXT,
+		RAW_VHD_UPLOAD_TEXT.replace(
+			'${{ steps.installed-vhd-raw.outputs.evidence_parent }}',
+			'${{ steps.installed-vhd-raw.outputs.evidence_parent }}/*.json'
+		)
+	],
+	[
+		'ignored missing evidence',
+		RAW_VHD_UPLOAD_TEXT,
+		RAW_VHD_UPLOAD_TEXT.replace('if-no-files-found: error', 'if-no-files-found: ignore')
+	]
+]) {
+	mustCatch('read-only VHD raw evidence ' + what, MACOS_BOX, from, to, rawVhdProblems);
+}
+for (const condition of [
+	'success()',
+	"always() && steps.installed-vhd-raw.outcome == 'failure'",
+	'inputs.release',
+	"always() && (steps.installed-vhd-raw.outcome == 'success' || steps.installed-vhd-raw.outcome == 'failure')"
+]) {
+	const from = RAW_VHD_UPLOAD_TEXT;
+	const to = from.replace(RAW_VHD_CONDITION, condition);
+	mustCatch(
+		'read-only VHD raw retained condition ' + condition,
+		MACOS_BOX,
+		from,
+		to,
+		rawVhdProblems
+	);
+	mustCatch('read-only VHD raw generic registry ' + condition, MACOS_BOX, from, to, stepProblems);
+}
+const rawVhdWorkflow = pipeline.file(MACOS_BOX);
+for (const [what, moved] of [
+	[
+		'observer before ACL',
+		rawVhdWorkflow
+			.replace(RAW_VHD_OBSERVER_TEXT + '\n\n', '')
+			.replace(
+				'      - name: Observe native installed-VHD ancestry prerequisites\n',
+				RAW_VHD_OBSERVER_TEXT +
+					'\n\n      - name: Observe native installed-VHD ancestry prerequisites\n'
+			)
+	],
+	[
+		'upload after Swift',
+		rawVhdWorkflow
+			.replace(RAW_VHD_UPLOAD_TEXT + '\n\n', '')
+			.replace(
+				'      - name: Retain native legacy-cleanup receipt\n',
+				RAW_VHD_UPLOAD_TEXT + '\n\n      - name: Retain native legacy-cleanup receipt\n'
+			)
+	]
+]) {
+	assert.notEqual(
+		moved,
+		rawVhdWorkflow,
+		'the raw VHD order control must change the actual workflow: ' + what
+	);
+	assert.ok(
+		rawVhdProblems(
+			pipeline.files().map((entry) => (entry.rel === MACOS_BOX ? { ...entry, text: moved } : entry))
+		).length > 0,
+		'raw VHD ownership order must refuse: ' + what
+	);
+}
 
 const PRIVATE_CPYTHON_STEP_ORDER = [
 	'Prepare Python for native nonreaping waits',
