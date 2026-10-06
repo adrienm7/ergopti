@@ -155,22 +155,29 @@ element('date_start').value = '2026-10-03';
 element('date_end').value = '2026-10-03';
 const typingContext = vm.createContext({
 	window: { metrics_manifest: manifest },
-	app_state: {
-		manifest_dates_sorted: ['2026-10-03'],
-		selected_apps: new Set(['editor']),
-		today_live_data: null
-	},
 	document: { getElementById: element },
 	get_local_date_string: () => new Date().toISOString().slice(0, 10),
 	format_number: String,
 	escape_html: String,
-	render_apps_table: () => {},
-	INFO_SVG: '',
-	_t: (key) => key,
-	KEYCODE_NAMES: { 29: 'Left Ctrl' }
+	render_apps_table: () => {}
 });
+for (const source of ['_generated/keycode_data.js', 'state.js'])
+	vm.runInContext(read('static/ergopti_plus/_shared/ui/metrics_typing/' + source), typingContext, {
+		filename: 'metrics_typing/' + source
+	});
+vm.runInContext(
+	"app_state.manifest_dates_sorted=['2026-10-03'];app_state.selected_apps=new Set(['editor']);app_state.app_selection_mode=APP_SELECTION_MODE.SUBSET;",
+	typingContext
+);
+// The canonical state carries macOS keycodes; retain this Linux display adapter.
+vm.runInContext("KEYCODE_NAMES[29]='Left Ctrl';", typingContext);
 const typingSource = read('static/ergopti_plus/_shared/ui/metrics_typing/data.js');
-for (const name of ['_foreach_filtered_app', 'render_apps_kpi'])
+for (const name of [
+	'has_typing_app_selection',
+	'matches_typing_app_selection',
+	'_foreach_filtered_app',
+	'render_apps_kpi'
+])
 	vm.runInContext(extractFunction(typingSource, name), typingContext, { filename: name + '.js' });
 typingContext.render_apps_kpi();
 checks++;
