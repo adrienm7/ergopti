@@ -2422,14 +2422,32 @@ These are software implementations; final hardware verification remains below.
   on both LuaJIT and Lua 5.4. The current four distribution artifacts stopped
   at the same first-module custody assertion (22/1); actual Alpine constants
   include NaN, so the old recursive comparison can reject even the same table.
-  This is not evidence of the earlier baseline's missing-luv cause. Corrected
-  hosted distro suites are still unexecuted; local passes do not qualify them.
+  This is not evidence of the earlier baseline's missing-luv cause. The
+  local checkpoint for published source `30500346` passes selected
+  verification with exit0: Linux 10,133/0 and JavaScript 363/0, using the
+  admitted private writable temporary directory. The later terminal S1
+  manual run 37491143093 tests `6bf86bfc` from source `aa70bebf`, same tree
+  `135f3667`. Arch, Fedora and openSUSE each execute 433 modules with
+  10,133/0; Alpine executes 433 modules with 10,120/13. Actual Alpine native
+  diagnosis reproduces all 13 signed-zero fixture failures: the numeric
+  request literal normalizes to positive zero before the writer. Genuine
+  runtime negative-zero requests retain their sign through the unchanged
+  parser/writer (13/0 independent native controls); this evidence does not
+  justify a production correction. Debian executes no native suite: compiler
+  linking fails on missing `Scrt1.o`/`crti.o` from the libc6 development
+  prerequisite. S1 Windows units give 10,033/2, with two unsettled native
+  screen-brightness worker cases. S1 excludes the later Extension/db31 tree;
+  it does not qualify those changes, all distributions or complete TODO5.
   The earlier `409b8ee0` observation above was recorded before run 37476981548
   completed: its terminal result is failure, with Release / Publish skipped.
   Main Linux unit/E2E gates passed, while Arch/Fedora/openSUSE/Alpine stopped at
   that custody assertion; macOS native packaging failures remain recorded.
-  The published Windows capture successor `109736e5` has a separate manual
-  run 37482352928 in progress; no new native qualification is inferred.
+  The published Windows capture successor `109736e5` is now qualified by
+  terminal successful manual run 37482352928, tested `458e9cb1` on the same
+  source tree `61bf069d`: Windows units 10,032/0, engine E2E, package and
+  install/launch pass. Release / Publish is skipped; physical acceptance is
+  unexecuted. This dated Windows receipt does not qualify other OS lanes or
+  complete TODO5.
 
   Hotstrings: Linux
   categories, sections and scalar settings are canonical config.toml leaves,
@@ -2583,12 +2601,17 @@ planner, live logger/locale/error owners and acknowledged native settings
 receipts. Initial same-threshold successor defects refuse through raw parent
 identity fences. Final composed, installed and device acceptance remain open.
 
-The native Script settings cohort refuses valid JSON source whose current
-codec cannot preserve exact decimal semantics, including large integers and
-some fractional spellings. It preserves the original source on refusal. This
-conservative boundary remains source work for complete future-data support;
-portable settings models do not prove actual Hammerspoon storage or atomic
-cross-process publication.
+The current macOS/Linux Script settings cohort owns only declared string and
+Boolean aliases. Linux source-span publication preserves unowned future JSON
+numeric tokens through apply, clear, ordinary foreign updates, exact backup
+and inverse; it does not require whole-document re-encoding. Private actual
+Linux owner replay passes seven selected cases on each of Lua 5.4 and LuaJIT,
+with four independent complete Decimal/TOML image checks. This is bounded
+source evidence, not a full unit/native-suite completion claim. Unsafe numeric
+values captured into the generic owned settings inverse still refuse strictly;
+future numeric-owned aliases need an explicit snapshot contract. Portable
+replay does not prove actual Hammerspoon SDK/storage or atomic cross-process
+publication. TODO5 remains partial.
 
 The Linux formatting corpus now owns a private instance of the actual shared logger. The existing native shutdown owner retains its live suppression debt; every corpus assertion remains strict. Current and incoming-dev causal cohorts reproduce the old fixture failure, and isolated replay preserves the live singleton and its pending lines. This is validation isolation, not a global-reset behavior change.
 
