@@ -2,6 +2,8 @@
 # static/ergopti_plus/linux/tests/hardware/test_application_operand_diagnostics.py
 """Constructed ownership controls; these never substitute native GTK evidence."""
 
+import copy
+import hashlib
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -10,6 +12,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import application_operand_diagnostics as diagnostic
+import run_application_operand_receipts as receiver
 
 
 class DiagnosticControls(unittest.TestCase):
@@ -153,6 +156,250 @@ class DiagnosticControls(unittest.TestCase):
         self.assertTrue(result.observer_timed_out)
         self.assertEqual(result.stdout, "later native stdout")
         self.assertEqual(result.stderr, "")
+
+
+class X11ReadinessControls(unittest.TestCase):
+    def client(self, outcomes, *, kill_failure=None):
+        events = []
+        outcomes = iter(outcomes)
+
+        class Child:
+            returncode = None
+
+            def wait(self, **options):
+                events.append(("wait", options))
+                result = next(outcomes)
+                if isinstance(result, BaseException):
+                    raise result
+                self.returncode = result
+                return result
+
+            def kill(self):
+                events.append(("kill", self.returncode))
+                if kill_failure is not None:
+                    raise kill_failure
+
+        return Child(), events
+
+    def server(self):
+        return SimpleNamespace(poll=lambda: None)
+
+    def test_real_client_path_exact_owned_display_and_one_bounded_wait(self):
+        child, events = self.client([0])
+        with patch.object(diagnostic.subprocess, "Popen", return_value=child) as spawn:
+            self.assertTrue(diagnostic.require_x11_ready(":87", self.server(), spawn=spawn))
+        spawn.assert_called_once_with(
+            ["/usr/bin/xdpyinfo", "-display", ":87"],
+            stdin=diagnostic.subprocess.DEVNULL,
+            stdout=diagnostic.subprocess.DEVNULL,
+            stderr=diagnostic.subprocess.DEVNULL,
+        )
+        self.assertEqual(events, [("wait", {"timeout": 5})])
+        self.assertEqual(child.returncode, 0)
+
+    def test_native_nonzero_is_refused_after_actual_terminal_wait(self):
+        child, events = self.client([3])
+        with self.assertRaisesRegex(RuntimeError, "refused"):
+            diagnostic.require_x11_ready(":87", self.server(), spawn=lambda *_a, **_p: child)
+        self.assertEqual(events, [("wait", {"timeout": 5})])
+        self.assertEqual(child.returncode, 3)
+
+    def test_timeout_kills_and_waits_exact_acquired_client_before_refusal(self):
+        child, events = self.client(
+            [diagnostic.subprocess.TimeoutExpired(["/usr/bin/xdpyinfo"], 5), -9]
+        )
+        with self.assertRaises(diagnostic.subprocess.TimeoutExpired):
+            diagnostic.require_x11_ready(":87", self.server(), spawn=lambda *_a, **_p: child)
+        self.assertEqual(events, [("wait", {"timeout": 5}), ("kill", None), ("wait", {})])
+        self.assertEqual(child.returncode, -9)
+
+    def test_interruption_cannot_drop_client_or_become_success(self):
+        child, events = self.client([KeyboardInterrupt("controlled interruption"), -9])
+        with self.assertRaises(KeyboardInterrupt):
+            diagnostic.require_x11_ready(":87", self.server(), spawn=lambda *_a, **_p: child)
+        self.assertEqual(events, [("wait", {"timeout": 5}), ("kill", None), ("wait", {})])
+        self.assertEqual(child.returncode, -9)
+
+    def test_interrupted_retirement_still_waits_the_same_client(self):
+        child, events = self.client(
+            [
+                diagnostic.subprocess.TimeoutExpired(["/usr/bin/xdpyinfo"], 5),
+                KeyboardInterrupt(),
+                -9,
+            ]
+        )
+        with self.assertRaises(diagnostic.subprocess.TimeoutExpired):
+            diagnostic.require_x11_ready(":87", self.server(), spawn=lambda *_a, **_p: child)
+        self.assertEqual(
+            events,
+            [("wait", {"timeout": 5}), ("kill", None), ("wait", {}), ("wait", {})],
+        )
+        self.assertEqual(child.returncode, -9)
+
+    def test_signal_exit_race_still_requires_actual_wait(self):
+        child, events = self.client(
+            [diagnostic.subprocess.TimeoutExpired(["/usr/bin/xdpyinfo"], 5), -9],
+            kill_failure=ProcessLookupError("controlled completed client"),
+        )
+        with self.assertRaises(diagnostic.subprocess.TimeoutExpired):
+            diagnostic.require_x11_ready(":87", self.server(), spawn=lambda *_a, **_p: child)
+        self.assertEqual(events[-1], ("wait", {}))
+        self.assertEqual(child.returncode, -9)
+
+    def test_interrupted_kill_retries_signal_before_waiting_on_blocked_client(self):
+        events = []
+
+        class Child:
+            returncode = None
+            kill_count = 0
+
+            def wait(self, **options):
+                events.append(("wait", options))
+                if options:
+                    raise diagnostic.subprocess.TimeoutExpired(["/usr/bin/xdpyinfo"], 5)
+                self.returncode = -9
+                return -9
+
+            def kill(self):
+                self.kill_count += 1
+                events.append(("kill", self.kill_count))
+                if self.kill_count == 1:
+                    raise KeyboardInterrupt("controlled interruption before native signal")
+
+        child = Child()
+        with self.assertRaises(diagnostic.subprocess.TimeoutExpired):
+            diagnostic.require_x11_ready(":87", self.server(), spawn=lambda *_a, **_p: child)
+        self.assertEqual(
+            events,
+            [("wait", {"timeout": 5}), ("kill", 1), ("kill", 2), ("wait", {})],
+        )
+        self.assertEqual(child.returncode, -9)
+
+    def test_owned_server_exit_after_handshake_still_refuses(self):
+        child, events = self.client([0])
+        states = iter([None, 0])
+        server = SimpleNamespace(poll=lambda: next(states))
+        with self.assertRaisesRegex(RuntimeError, "refused"):
+            diagnostic.require_x11_ready(":87", server, spawn=lambda *_a, **_p: child)
+        self.assertEqual(events, [("wait", {"timeout": 5})])
+        self.assertEqual(child.returncode, 0)
+
+    def test_missing_client_has_no_native_owner_to_invent_or_warm(self):
+        with patch.object(
+            diagnostic.subprocess, "Popen", side_effect=FileNotFoundError("controlled absence")
+        ) as spawn:
+            with self.assertRaises(FileNotFoundError):
+                diagnostic.require_x11_ready(":87", self.server(), spawn=spawn)
+        self.assertEqual(spawn.call_count, 1)
+
+    def test_invalid_or_retired_owned_display_never_spawns_client(self):
+        with patch.object(diagnostic.subprocess, "Popen") as spawn:
+            for name in ("", "87", ":", ":8.0", ":８", "--display", None):
+                with self.subTest(name=name), self.assertRaises(RuntimeError):
+                    diagnostic.require_x11_ready(name, self.server(), spawn=spawn)
+            with self.assertRaises(RuntimeError):
+                diagnostic.require_x11_ready(":87", SimpleNamespace(poll=lambda: 0), spawn=spawn)
+        spawn.assert_not_called()
+
+    def test_unknown_native_success_status_cannot_admit_readiness(self):
+        child, events = self.client([False])
+        with self.assertRaisesRegex(RuntimeError, "refused"):
+            diagnostic.require_x11_ready(":87", self.server(), spawn=lambda *_a, **_p: child)
+        self.assertEqual(events, [("wait", {"timeout": 5})])
+
+
+class AdmissionControls(unittest.TestCase):
+    def facts(self):
+        identity = "ordinary-app"
+        data = identity.encode("utf-8")
+        return {
+            "nonce": "owned-case",
+            "identity": identity,
+            "worker_exit": 0,
+            "observer_timed_out": False,
+            "gtk": {
+                "nonce": "owned-case",
+                "identity": identity,
+                "native_terminal_observed": True,
+                "native_exit": 0,
+                "observer_failure": "",
+            },
+            "receipt_after_worker": {
+                "present": True,
+                "truncated": False,
+                "text": identity,
+                "bytes_total": len(data),
+                "captured_bytes": len(data),
+                "prefix_sha256": hashlib.sha256(data).hexdigest(),
+            },
+        }
+
+    def accepted(self, facts):
+        return diagnostic.application_receive_complete(facts, "owned-case", "ordinary-app")
+
+    def test_exact_settled_receipt_does_not_depend_on_an_earlier_poll(self):
+        facts = self.facts()
+        facts["poll"] = {"phase": "missing", "after_receipt": {"present": False}}
+        self.assertTrue(self.accepted(facts))
+        facts["worker_exit"] = 1
+        self.assertFalse(self.accepted(facts), "A real worker error cannot be waived")
+
+    def test_worker_keeps_actual_admission_but_does_not_impose_delivery_polling(self):
+        for statement in (
+            'local id = assert(Chooser.desktop_id(os.getenv("ERGOPTI_NATIVE_APPLICATION_ENTRY")))',
+            'assert(Actions.set_action_parameter("tap_3", "open_app", id))',
+            'assert(Actions.execute_action("open_app", "tap_3"))',
+        ):
+            self.assertIn(statement, receiver.WORKER)
+        self.assertTrue(receiver.WORKER.rstrip().endswith("return"))
+        self.assertNotIn('os.execute("sleep 0.02")', receiver.WORKER)
+        self.assertNotIn("the selected desktop entry did not launch", receiver.WORKER)
+
+    def test_native_and_case_failures_cannot_admit_an_exact_receipt(self):
+        cases = (
+            ("gtk", None),
+            ("worker_exit", 1),
+            ("worker_exit", False),
+            ("observer_timed_out", True),
+            ("observer_timed_out", None),
+            ("nonce", "other-case"),
+            ("identity", "other-app"),
+        )
+        for key, value in cases:
+            with self.subTest(key=key, value=value):
+                facts = self.facts()
+                facts[key] = value
+                self.assertFalse(self.accepted(facts))
+        for key, value in (
+            ("native_exit", 3),
+            ("native_exit", False),
+            ("native_terminal_observed", False),
+            ("observer_failure", "Interrupted"),
+            ("nonce", "other-case"),
+            ("identity", "other-app"),
+        ):
+            with self.subTest(native_key=key, value=value):
+                facts = self.facts()
+                facts["gtk"][key] = value
+                self.assertFalse(self.accepted(facts))
+
+    def test_missing_wrong_extra_truncated_and_wrong_digest_receipts_refuse(self):
+        facts = self.facts()
+        facts["receipt_after_worker"] = None
+        self.assertFalse(self.accepted(facts))
+        for key, value in (
+            ("present", False),
+            ("text", "other-app"),
+            ("text", "ordinary-app-extra"),
+            ("truncated", True),
+            ("bytes_total", 13),
+            ("captured_bytes", 11),
+            ("prefix_sha256", "0" * 64),
+        ):
+            with self.subTest(key=key, value=value):
+                facts = copy.deepcopy(self.facts())
+                facts["receipt_after_worker"][key] = value
+                self.assertFalse(self.accepted(facts))
 
 
 if __name__ == "__main__":
