@@ -4679,6 +4679,19 @@ These are implementation tasks; separate installed tray/input acceptance.
       uncommitted in the local worktree of `fix/downloads-on-managed-networks`
       when the session stopped; redo it if that worktree is gone.
 
+The current-dev alignment retains the other group's distribution-specific unit
+toolchain preparation and closed native bootstrap diagnostics. The isolated
+492-module updater composition passed all 42 focused component commands, but
+its complete Linux suite reported 10,051 passed and 11 failed. The failing
+legacy scenarios exposed a backup-order regression and missing owned fixture
+ports; their reviewed corrections still need runtime qualification.
+The original native body-pipe replay stopped at eight passed, one failed and
+eleven unexecuted, both without and with the separate passive observer. Exact
+native and guardian retirement reported no remaining owned debt. The observer
+recorded a positive residual rounded to zero before POST admission; its timing
+does not replace the uninstrumented result. These remain feasible Linux work,
+while the twelve Windows PC steps and transversal items 16/38 stay open.
+
 Windows remote API readiness and generation now reserve their actual request
 owner before asynchronous system-proxy admission. Native WinHTTP resolves the
 complete destination through configured PAC or WPAD, distinguishes acknowledged
@@ -6188,6 +6201,18 @@ macOS acceptance/diagnostic corrections are preserved; macOS also requires
 qualification on these new sources. The atomic PID publication correction
 remains active. No TODO item is completed by this diagnostic preparation.
 
+Bootstrap diagnostic follow-up (2026-10-06): the provider, notification and
+global-switcher probes now report closed release_metadata/archive_download
+phases, closed transport families and a finite numeric HTTP status when
+observed. They rethrow the identical ordinary failure; diagnostic write faults
+do not turn failure into success, and genuine interruption remains visible.
+No URL, headers, response body or arbitrary exception text enters these facts.
+Portable controls pass29/0,15/0,29/0 with every original20/13/27 control intact;
+the original metadata HTTP403 black-box control fails without these facts and
+passes with them. Both callers retain the formatted inventory source pin.
+Fresh native macOS qualification is pending; the prior HTTPError stage/status
+remains unknown. This is diagnostic evidence, not provider invocation.
+
 - [~] **107.** Make the number-row policy explicit: native behavior, digits
   directly or symbols directly, with an acknowledged migration of the old
   Windows Boolean and preserved unrelated settings. The earlier Boolean slice
@@ -6625,6 +6650,13 @@ unexecuted unit, E2E, package, installation and launch gates.
 retains historical commands and packet ownership; the earlier PC-only software
 deferral is superseded. This item and items16/38 remain open.
 
+The constructor probe shares the closed bootstrap phase/status diagnostic
+without changing the existing lowercase native reason policy, source/digest/
+signature admission, nine-case contract, cleanup or failure status. Portable
+15/0 controls retain all13 original cases. Native requalification remains
+pending; first-checkpoint constructor successes do not replace the second
+checkpoint refusal, and no notification delivery/callback is claimed.
+
 - [~] **111.** Provide two distinct, explicitly labelled shared window-switching
   actions on Windows, macOS and Linux: the operating system's normal Alt+Tab switcher
   (the native equivalent on macOS), and switching only among windows on the display
@@ -6747,6 +6779,36 @@ not the exact earlier hosted schedule or complete native family recovery.
 The container still refuses the full /proc child-census prerequisite; the
 unchanged five supervision cases, external recovery and all34 window cases
 require hosted qualification. This does not complete item111 or items16/38.
+
+Follow-up integrated run37470985920 at CIaea032f8 (exact Dev90076001 tree)
+passes all five native family controls, external recovery and all34 original
+cursor-window cases, with physical settlement acknowledged. GTK4/4, units9126/0,
+E2E and packaging pass; nine first-install scenarios and three package-format
+launches pass. Five distribution unit lanes each report8803 passes/78 failures:
+their setup installs only LuaJIT, lacks native luv/lfs and Python3, and runs
+permission-refusal fixtures as root. This slice supplies those test prerequisites
+after the unchanged ordinary-user --no-deps installation proof. It compiles the
+existing vendor versions from verified official Git commits and the pinned
+compatibility submodule against each distribution's own LuaJIT headers. The
+unchanged suite requires real native C entry points and a non-root UID before
+execution. Local native compilation/admission and the unchanged9126/0 unit suite pass
+with these pinned modules. Explicit CA bundles preserve HTTPS verification in
+fresh minimal distributions. Five-distribution hosted qualification remains
+pending. All original assertions, native windows and
+deadlines remain unchanged; macOS broker integration and real displays remain
+unfinished. The overall integrated run failed; Release was skipped.
+
+The global-switcher bootstrap reports the same closed transport diagnostic
+while retaining all source pins, native owners and retirement guards. Portable
+29/0 controls retain the original27; native broker qualification remains open.
+Subsequent Linux-only run37479728162 on CIa1e30e88 (exact Dev7bfd15ea tree)
+passes units9126/0, native supervision5+external1 and all34 window cases. GTK
+passes3/4: case0 misses its unchanged receipt poll, while real GTK exits0 after
+about2.3775seconds with the exact authored identity present. No argv refusal,
+specific cold-service cause or production regression is established. Package
+and all distribution lanes are skipped; the new native distro bootstrap has
+not executed on hosted distributions. Release is skipped. Preserve this failure
+and the earlier4/4 success separately; no assertion or deadline is weakened.
 
 ## Time estimate
 
