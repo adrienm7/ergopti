@@ -501,3 +501,149 @@ try {
 }
 
 console.log('AHK suite execution manifest: completeness and per-case timing guards passed.');
+
+// Exercise the actual file-backed transport with real portable child processes.
+// These validate transport and manifests, never Windows menus or AutoHotkey.
+const {
+	runFileBackedNative,
+	describeNativeCapture
+} = require('./support/file-backed-native-runner.cjs');
+const transportRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-native-capture-contract-'));
+const transportCase = (name) => {
+	const directory = path.join(transportRoot, name);
+	fs.mkdirSync(directory);
+	return directory;
+};
+const nativeNames = [
+	'hotstring-personal-menu-owner: releases owned descendants and preserves foreign detached menus',
+	'hotstring-personal-menu-owner: command 1 preserves state after refusal 1',
+	'hotstring-personal-menu-owner: command 1 preserves state after refusal 0',
+	'hotstring-personal-menu-owner: command 0 preserves state after refusal 1',
+	'hotstring-personal-menu-owner: command 0 preserves state after refusal 0'
+];
+const fiveCaseManifest = [
+	'1..5',
+	...nativeNames.flatMap((name, index) => [
+		`RUNNING ${index + 1}/5 - ${name}`,
+		`ok ${index + 1} - ${name}`,
+		`# duration_ms ${index + 1} 0.125`
+	]),
+	'# 5 passed, 0 failed.'
+].join('\n');
+const streamSize = 2 * 1024 * 1024;
+const streamProgram = [
+	"const fs = require('node:fs');",
+	`fs.writeSync(1, Buffer.alloc(${streamSize}, 65));`,
+	`fs.writeSync(2, Buffer.alloc(${streamSize}, 66));`,
+	'if (process.env.ERGOPTI_AHK_RESULTS_FILE) fs.writeFileSync(process.env.ERGOPTI_AHK_RESULTS_FILE, process.env.MODELED_TAP);',
+	'process.exit(Number(process.env.MODELED_EXIT || 0));'
+].join('\n');
+try {
+	// Causal predecessor: the actual default pipe transport refuses this output.
+	const buffered = spawnSync(process.execPath, ['-e', streamProgram], { timeout: 10000 });
+	assert.equal(buffered.error && buffered.error.code, 'ENOBUFS');
+
+	const directory = transportCase('large-complete');
+	const results = path.join(directory, 'results.txt');
+	const captured = runFileBackedNative(process.execPath, ['-e', streamProgram], directory, {
+		encoding: 'utf8',
+		timeout: 10000,
+		env: {
+			...process.env,
+			ERGOPTI_AHK_RESULTS_FILE: results,
+			MODELED_TAP: fiveCaseManifest,
+			MODELED_EXIT: '0'
+		}
+	});
+	assert.ifError(captured.result.error);
+	assert.equal(captured.result.status, 0);
+	assert.equal(captured.result.signal, null);
+	assert.equal(captured.result.stdout, null, 'the child has no buffered stdout capture');
+	assert.equal(captured.result.stderr, null, 'the child has no buffered stderr capture');
+	assert.deepEqual(fs.readFileSync(captured.captures.stdout), Buffer.alloc(streamSize, 65));
+	assert.deepEqual(fs.readFileSync(captured.captures.stderr), Buffer.alloc(streamSize, 66));
+	const complete = validateAhkSuiteManifest(fs.readFileSync(results, 'utf8'));
+	assert.equal(complete.complete, true, complete.errors.join('\n'));
+	assert.equal(complete.failed, 0);
+	assert.equal(complete.passed, 5);
+	assert.equal(complete.timed_count, 5);
+	assert.deepEqual(
+		complete.executed.map((row) => row.name),
+		nativeNames
+	);
+	const tail = describeNativeCapture(captured.captures.stderr);
+	assert.equal(tail.bytes, streamSize);
+	assert.equal(tail.tail_limit_bytes, 4096);
+	assert.equal(tail.tail_bytes, 4096);
+	assert.equal(tail.tail_utf8, 'B'.repeat(4096));
+	assert.notEqual(tail.tail_bytes, tail.bytes, 'a bounded tail cannot be credited as full output');
+
+	const failedDirectory = transportCase('failed-exit');
+	const failedResults = path.join(failedDirectory, 'results.txt');
+	const failed = runFileBackedNative(process.execPath, ['-e', streamProgram], failedDirectory, {
+		encoding: 'utf8',
+		timeout: 10000,
+		env: {
+			...process.env,
+			ERGOPTI_AHK_RESULTS_FILE: failedResults,
+			MODELED_TAP: fiveCaseManifest,
+			MODELED_EXIT: '7'
+		}
+	});
+	assert.ifError(failed.result.error);
+	assert.equal(failed.result.status, 7, 'a complete green manifest cannot replace native exit');
+	assert.equal(validateAhkSuiteManifest(fs.readFileSync(failedResults, 'utf8')).complete, true);
+	assert.equal(fs.statSync(failed.captures.stdout).size, streamSize);
+	assert.equal(fs.statSync(failed.captures.stderr).size, streamSize);
+
+	const timeoutDirectory = transportCase('native-timeout');
+	const timed = runFileBackedNative(
+		process.execPath,
+		['-e', 'setInterval(() => {}, 1000)'],
+		timeoutDirectory,
+		{ timeout: 1000 }
+	);
+	assert.equal(timed.result.error && timed.result.error.code, 'ETIMEDOUT');
+	assert.equal(timed.result.status, null, 'timeout cannot invent a successful native exit');
+	assert.ok(fs.existsSync(timed.captures.stdout));
+	assert.ok(fs.existsSync(timed.captures.stderr));
+
+	const thrownDirectory = transportCase('spawn-throw');
+	const opened = [];
+	const actualOpen = fs.openSync;
+	try {
+		fs.openSync = function (file, ...args) {
+			const descriptor = actualOpen.call(this, file, ...args);
+			if (path.dirname(String(file)) === thrownDirectory) opened.push(descriptor);
+			return descriptor;
+		};
+		assert.throws(() => runFileBackedNative(undefined, [], thrownDirectory, {}), {
+			code: 'ERR_INVALID_ARG_TYPE'
+		});
+	} finally {
+		fs.openSync = actualOpen;
+	}
+	assert.equal(
+		opened.length,
+		2,
+		'both actual capture descriptors were acquired before spawn threw'
+	);
+	for (const descriptor of opened) assert.throws(() => fs.fstatSync(descriptor), { code: 'EBADF' });
+	assert.equal(fs.statSync(path.join(thrownDirectory, 'native.stdout.log')).size, 0);
+	assert.equal(fs.statSync(path.join(thrownDirectory, 'native.stderr.log')).size, 0);
+
+	const exclusiveDirectory = transportCase('foreign-capture');
+	const foreign = path.join(exclusiveDirectory, 'native.stderr.log');
+	fs.writeFileSync(foreign, 'independent existing capture');
+	assert.throws(
+		() => runFileBackedNative(process.execPath, ['-e', 'process.exit(0)'], exclusiveDirectory, {}),
+		{ code: 'EEXIST' }
+	);
+	assert.equal(fs.readFileSync(foreign, 'utf8'), 'independent existing capture');
+	assert.equal(fs.statSync(path.join(exclusiveDirectory, 'native.stdout.log')).size, 0);
+	console.log(
+		'File-backed native output: 5 portable real-child/refusal controls passed; original pipe overflow reproduced.'
+	);
+} finally {
+	fs.rmSync(transportRoot, { recursive: true, force: true });
+}
