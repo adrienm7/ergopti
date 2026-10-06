@@ -202,7 +202,10 @@ function validate(root) {
 	assert.equal(Pipeline.stepField(body, 'timeout-minutes'), '5');
 	const command = Pipeline.stepField(body, 'run');
 	assert.match(command, /set -euo pipefail/);
-	assert.match(command, /sudo apt-get install -y --no-install-recommends zstd/);
+	assert.match(
+		command,
+		/sudo python3 "\$GITHUB_WORKSPACE\/tools\/ci\/ubuntu_apt\.py" -y --no-install-recommends zstd/
+	);
 	assert.match(
 		command,
 		/npm run test:linux:runtime-native \| tee "\$RUNNER_TEMP\/linux-runtime-native\.log"/
@@ -214,7 +217,10 @@ function validate(root) {
 		'native dependencies precede this proof'
 	);
 	const early = Pipeline.step(job, 'Terminate real descendants after their process leader exits');
-	assert.match(Pipeline.stepField(early, 'run'), /apt-get install[^\n]*lua-luv lua5\.4 curl/);
+	assert.match(
+		Pipeline.stepField(early, 'run'),
+		/sudo python3 "\$GITHUB_WORKSPACE\/tools\/ci\/ubuntu_apt\.py" -y --no-install-recommends lua-luv lua5\.4 curl/
+	);
 	validateManual(root);
 }
 
