@@ -275,7 +275,7 @@ check('portable Brew ownership controls remain registered and mandatory', () => 
 	assert.ifError(result.error);
 	assert.strictEqual(result.signal, null, result.stderr);
 	assert.strictEqual(result.status, 0, result.stderr);
-	assert.match(result.stderr, /Ran 53 tests in /);
+	assert.match(result.stderr, /Ran 59 tests in /);
 	assert.match(result.stderr, /\nOK\s*$/);
 	assert.doesNotMatch(result.stderr, /skipped=/);
 });
@@ -449,6 +449,41 @@ check(
 		}
 	}
 );
+
+// BREW_POST_FAILED_SENDER_TARGET_OBSERVATION_BEGIN
+check(
+	'failed AppleEvent send observes only its exact retained target and preserves primary refusal',
+	() => {
+		const helper = fs.readFileSync(
+			path.join(ROOT, 'tools/diagnostics/macos_brew_archive_acceptance.py'),
+			'utf8'
+		);
+		const begin = helper.indexOf('def run_appleevent_sender_observed(');
+		const end = helper.indexOf('def native_compiler(', begin);
+		assert.ok(begin >= 0 && end > begin);
+		const observation = helper.slice(begin, end);
+		assert.equal((observation.match(/group\.observe_exit\(\)/g) || []).length, 1);
+		assert.match(observation, /children\.groups\.get\(receiver\) is group/);
+		assert.match(observation, /group\.process is receiver/);
+		assert.match(observation, /receiver\.returncode is None/);
+		assert.match(
+			observation,
+			/terminal = _appleevent_terminal_packet\(children, receiver, group, observation\)/
+		);
+		assert.match(observation, /fact\["state"\] = "no-terminal-observation"/);
+		assert.match(observation, /except AdmissionError:/);
+		assert.match(observation, /except BaseException:/);
+		assert.match(observation, /\n        raise\n/);
+		assert.doesNotMatch(
+			observation,
+			/\.(?:poll|wait|settle|sleep)\(|killpg|signal\(|reservation_lost\s*=/
+		);
+		assert.doesNotMatch(observation, /repr\(|str\(error|\.path|nonce|stdout|stderr\[/);
+		assert.equal((helper.match(/positive = run_appleevent_sender_observed\(/g) || []).length, 2);
+		assert.equal((helper.match(/refused = run_appleevent_sender_observed\(/g) || []).length, 1);
+	}
+);
+// BREW_POST_FAILED_SENDER_TARGET_OBSERVATION_END
 
 check('native XCTest invokes actual Brew acceptance and requires its complete receipt', () => {
 	const fixture = fs.readFileSync(

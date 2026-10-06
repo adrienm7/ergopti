@@ -3434,6 +3434,15 @@ the complete three-OS checkpoint remain pending.
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 
+Brew sender refusal -600 remains unexplained; it identifies failed native
+AppleEvent port discovery and does not establish target death or a permission
+cause. One exact owned WNOWAIT observation after the failed sender is reused
+without reaping, signalling or changing its original exception. Its fixed
+notice reports only an observation state. All 53 original portable controls
+remain and six new controls pass (59 total); the Homebrew source gate passes.
+Actual positive delivery, sandbox denial, upgrade/install and native closure
+still require successful macOS observations; item 36 stays partial.
+
 Exact macOS run 37511777225 on fd107685ae2ff2cedbe8edb559a54b4886d0954b
 observes matching-key cryptographic validity and identical copied payloads,
 but independently generated signature bytes differ. The corrected oracle

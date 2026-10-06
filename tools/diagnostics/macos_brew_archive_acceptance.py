@@ -958,6 +958,60 @@ def admit_appleevent_boundary(children, repository):
         ) from error
 
 
+def run_appleevent_sender_observed(
+    children, arguments, control, *, receiver, group, confined=False
+):
+    """Observe only a failed send's retained target; never replace its primary refusal."""
+    try:
+        return run_appleevent_sender(children, arguments, control, confined=confined)
+    except AdmissionError:
+        fact = {"schema": 1, "control": "unadmitted", "state": "unavailable"}
+        try:
+            require(
+                type(control) is str
+                and control
+                in ("unconfined-positive", "deny-removal-positive", "full-policy-denial"),
+                "Unadmitted post-failure control",
+            )
+            fact["control"] = control
+            require(
+                children.groups.get(receiver) is group
+                and group.process is receiver
+                and not group.reaped
+                and receiver.returncode is None,
+                "Post-failure receiver reservation differs",
+            )
+            observation = group.observe_exit()
+            if observation is None:
+                # This is one instant without a terminal receipt, not proof of
+                # process liveness for the preceding send or AE port discovery.
+                fact["state"] = "no-terminal-observation"
+            else:
+                terminal = _appleevent_terminal_packet(children, receiver, group, observation)
+                fact.update(
+                    {
+                        "state": "terminal",
+                        "si_code": terminal["si_code"],
+                        "si_status": terminal["si_status"],
+                        "stderr_phase": terminal["stderr_phase"],
+                        "stderr_osstatus": terminal["stderr_osstatus"],
+                    }
+                )
+        except BaseException:
+            # Actual reservation loss/debt stays in its existing owner; an
+            # optional observation or interruption cannot replace this sender error.
+            fact = {"schema": 1, "control": fact["control"], "state": "unavailable"}
+        try:
+            print(
+                "Owned AppleEvent receiver after failed sender: "
+                + json.dumps(fact, sort_keys=True),
+                file=sys.stderr,
+            )
+        except BaseException:
+            pass  # Retain the identical primary even if optional evidence cannot publish.
+        raise
+
+
 def native_compiler(children):
     """Resolve the selected native tools without xcrun's host temporary cache."""
     selection = children.run(["/usr/bin/xcode-select", "--print-path"], confined=True)
@@ -1331,7 +1385,9 @@ def _admit_appleevent_boundary(children, repository):
         time.sleep(0.02)
     same_live_receiver("before-unconfined-positive")
     sender = [str(executables["sender"]), str(receiver.pid), nonce]
-    positive = run_appleevent_sender(children, [*sender, "success"], "unconfined-positive")
+    positive = run_appleevent_sender_observed(
+        children, [*sender, "success"], "unconfined-positive", receiver=receiver, group=group
+    )
     require(
         positive.stdout == "native_appleevent_status=0\n" and not positive.stderr,
         "Owned unconfined AppleEvent route was not independently admitted",
@@ -1359,10 +1415,12 @@ def _admit_appleevent_boundary(children, repository):
     )
     removed = root / "sandbox-appleevent-positive.sb"
     removed.write_text(policy.replace(deny, ""), encoding="utf-8", newline="\n")
-    positive = run_appleevent_sender(
+    positive = run_appleevent_sender_observed(
         children,
         ["/usr/bin/sandbox-exec", "-f", str(removed), *sender, "success"],
         "deny-removal-positive",
+        receiver=receiver,
+        group=group,
     )
     require(
         positive.stdout == "native_appleevent_status=0\n" and not positive.stderr,
@@ -1371,8 +1429,13 @@ def _admit_appleevent_boundary(children, repository):
     second = marker_bytes(2)
     require(marker_bytes(1) == first, "Deny-removal delivery altered the first positive marker")
     same_live_receiver("before-full-policy-denial")
-    refused = run_appleevent_sender(
-        children, [*sender, "denied"], "full-policy-denial", confined=True
+    refused = run_appleevent_sender_observed(
+        children,
+        [*sender, "denied"],
+        "full-policy-denial",
+        receiver=receiver,
+        group=group,
+        confined=True,
     )
     require(
         refused.stdout in ("native_appleevent_status=-1742\n", "native_appleevent_status=-1743\n")
