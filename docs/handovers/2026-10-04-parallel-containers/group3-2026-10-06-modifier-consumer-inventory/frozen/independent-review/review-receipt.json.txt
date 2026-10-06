@@ -1,0 +1,74 @@
+{
+  "checkout_mutations": false,
+  "evidence": {
+    "integrity.json": {
+      "bytes": 442,
+      "sha256": "a151d387b05edf8aaa6b5fa8c2099e4507ec95adff86c0638b1867f7865deb65"
+    },
+    "prepare.py": {
+      "bytes": 3312,
+      "sha256": "da57dba4b512a8261337935f553ba94b6cafdc8ea45eaacf7bf9b101abaf8dbc"
+    },
+    "replay.stdout": {
+      "bytes": 3209,
+      "sha256": "002895461c05549127b09bdf8bc969c5ce9ff282a2196d3a4445453f8f1230da"
+    },
+    "replay/lua5.4-current.log": {
+      "bytes": 3712,
+      "sha256": "b783c7de65250b52cde2aff56e46f87dccebd751b04a9d25f6566e1ccc36814f"
+    },
+    "replay/lua5.4-forbid-retirement.log": {
+      "bytes": 2839,
+      "sha256": "f4a7ce56f545abe29d9df1a55617d5742e9fc056cb3ea2703a454f9fb7f1ee73"
+    },
+    "replay/lua5.4-legacy-retirement.log": {
+      "bytes": 2676,
+      "sha256": "08a6e0f2147532ff7d0ca8b0446e0cc05d03d9cfbb0097fbe8750b53865cf538"
+    },
+    "replay/lua5.4-skip-only-up.log": {
+      "bytes": 3420,
+      "sha256": "caf71ebf1b953e736cbeb983ea202ef61487307220863d7c85d683472a8b2dd0"
+    },
+    "replay/lua5.4-weaken-baseline.log": {
+      "bytes": 3806,
+      "sha256": "e2e749295733a29ffac1a77da8c44d27e13cef09c2df52a474abf820c6baa67e"
+    },
+    "replay/luajit-current.log": {
+      "bytes": 3712,
+      "sha256": "b783c7de65250b52cde2aff56e46f87dccebd751b04a9d25f6566e1ccc36814f"
+    },
+    "replay/luajit-forbid-retirement.log": {
+      "bytes": 2839,
+      "sha256": "f4a7ce56f545abe29d9df1a55617d5742e9fc056cb3ea2703a454f9fb7f1ee73"
+    },
+    "replay/luajit-legacy-retirement.log": {
+      "bytes": 2676,
+      "sha256": "08a6e0f2147532ff7d0ca8b0446e0cc05d03d9cfbb0097fbe8750b53865cf538"
+    },
+    "replay/luajit-skip-only-up.log": {
+      "bytes": 3420,
+      "sha256": "caf71ebf1b953e736cbeb983ea202ef61487307220863d7c85d683472a8b2dd0"
+    },
+    "replay/luajit-weaken-baseline.log": {
+      "bytes": 3806,
+      "sha256": "e2e749295733a29ffac1a77da8c44d27e13cef09c2df52a474abf820c6baa67e"
+    },
+    "replay/results.json": {
+      "bytes": 2995,
+      "sha256": "bd3223ac7f4582f00347b381078db6f981f71d371baaec1c88bdfa892b88401f"
+    },
+    "replay/run.lua": {
+      "bytes": 1610,
+      "sha256": "672586a8f0f860299ebc4f5ca06fd0c6f1381711a7c9475802c73257c4564467"
+    },
+    "reviewer-setup-note.txt": {
+      "bytes": 582,
+      "sha256": "df1268e271ca25cca690a5b8146c031268fd3f16e9d47a89517610a3c64219a9"
+    }
+  },
+  "native_allocations": false,
+  "packet_receipt_sha256": "e22aafd8169ed11844417daf610cdadfc1b2f7de2fdc19e4b020a500031217a9",
+  "review_bytes": 7071,
+  "review_sha256": "be41b5280ab31c5c7820a253b3d905c795d40b7a9a61017d9722bdff7c48abf6",
+  "verdict": "BOUNDED_REGRESSION_INVENTORY_AND_DESIGN_CLEAR_PRODUCTION_UNREPAIRED"
+}

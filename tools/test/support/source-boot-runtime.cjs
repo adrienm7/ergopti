@@ -35,6 +35,22 @@ module.exports = function checkSourceBootRuntime(root, temporary) {
 	);
 	assert.equal(compile.status, 0, compile.stdout + compile.stderr);
 	const observer = path.join(root, 'tools/test/fixtures/observe_ahk_source_boot.ps1');
+	invokeCensusControls();
+	function invokeCensusControls() {
+		const controls = invoke('pwsh.exe', [
+			'-File',
+			path.join(root, 'tools/test/fixtures/test_source_boot_terminal_census.ps1'),
+			'-Observer',
+			observer,
+			'-Executable',
+			executable,
+			'-Root',
+			temporary
+		]);
+		assert.equal(controls.status, 0, controls.stdout + controls.stderr);
+		assert.match(controls.stdout, /Ten actual census branch controls/);
+		assert.match(controls.stdout, /Two exact native child exits/);
+	}
 	for (const [scenario, refusal] of [
 		['ready', null],
 		['missing-receipt', /no complete readiness/],

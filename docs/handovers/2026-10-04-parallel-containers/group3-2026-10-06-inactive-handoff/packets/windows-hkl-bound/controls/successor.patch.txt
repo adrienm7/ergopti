@@ -1,0 +1,29 @@
+diff --git a/static/ergopti_plus/windows/tests/unit/test_layout_digit_row_probe.ahk b/static/ergopti_plus/windows/tests/unit/test_layout_digit_row_probe.ahk
+--- a/static/ergopti_plus/windows/tests/unit/test_layout_digit_row_probe.ahk
++++ b/static/ergopti_plus/windows/tests/unit/test_layout_digit_row_probe.ahk
+@@ -989,7 +989,7 @@
+ 	AssertEqual(0, KS_NativeNumberRowLevels(1, false, _NHKL_RecordRead.Bind(Reads), _NHKL_ThrowRead))
+ 	for Result in [{Count: "1", Text: "1"}, {Count: 1.0, Text: "1"}, {Count: 1, Text: ""},
+ 		{Count: 0, Text: "private"}, {Count: 17, Text: "1"}, {Count: 2, Text: "1"}, Map(), 0] {
+-		AssertEqual(0, KS_NativeNumberRowLevels(1, false, (*) => Result, (*) => 0x31),
++		AssertEqual(0, KS_NativeNumberRowLevels(1, false, _NHKL_ObservedResult.Bind(Result), (*) => 0x31),
+ 			"an incomplete or malformed level cannot publish a partial source observation")
+ 	}
+ }
+@@ -998,7 +998,7 @@
+ _NHKL_DescriptorStatusAndDetachment() {
+ 	for Result in [{Count: -1, Text: "^"}, {Count: 0, Text: ""}, {Count: 2, Text: "ab"}] {
+ 		ExpectedText := Result.Text
+-		Observed := KS_NativeKeyLevel(0x31, 0x02, 1, false, false, (*) => Result)
++		Observed := KS_NativeKeyLevel(0x31, 0x02, 1, false, false, _NHKL_ObservedResult.Bind(Result))
+ 		AssertTrue(Observed is Map)
+ 		AssertEqual(Result.Count, Observed["Count"])
+ 		AssertEqual(Result.Count < 0 ? "dead" : (Result.Count > 0 ? "text" : "none"), Observed["Kind"])
+@@ -1066,3 +1066,7 @@
+ 		return "escaped native observation boundary"
+ 	}
+ }
++
++_NHKL_ObservedResult(Result, *) {
++	return Result
++}

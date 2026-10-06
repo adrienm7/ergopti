@@ -1,0 +1,130 @@
+[
+  {
+    "abi": "luajit",
+    "source": "candidate",
+    "exit_code": 0,
+    "summary": "READER_ORIGIN 47 0",
+    "log": "luajit-candidate.log",
+    "sha256": "11b605b938cff72df8c2bbc03657f078dc6a66db354d77d5938b59360cada324"
+  },
+  {
+    "abi": "luajit",
+    "source": "preimages",
+    "exit_code": 1,
+    "summary": "READER_ORIGIN 27 20",
+    "log": "luajit-preimages.log",
+    "sha256": "3903bcc42635e1d3a04df5d0d12d6a0b62f589cb63ee76a58c9dfdd13a83b0bf"
+  },
+  {
+    "abi": "luajit",
+    "source": "omit_native_provider",
+    "exit_code": 1,
+    "summary": "READER_ORIGIN 46 1",
+    "log": "luajit-omit_native_provider.log",
+    "sha256": "18cd0d2274ee4359ee2d189797662e4fd30b07f089b749a6aec4a7c65696d2e4"
+  },
+  {
+    "abi": "luajit",
+    "source": "omit_original_row",
+    "exit_code": 1,
+    "summary": "READER_ORIGIN 45 2",
+    "log": "luajit-omit_original_row.log",
+    "sha256": "3f97a7576bcb43239e23cd79cd7aeefe7ef5604292fd8f0216df66b46329b88a"
+  },
+  {
+    "abi": "luajit",
+    "source": "omit_session_generation",
+    "exit_code": 1,
+    "summary": "READER_ORIGIN 45 2",
+    "log": "luajit-omit_session_generation.log",
+    "sha256": "92e71126d0db6f9268a5cae7b4803495515c4c3477e22ef7558422a6548abd8a"
+  },
+  {
+    "abi": "luajit",
+    "source": "omit_queue_loss_fence",
+    "exit_code": 1,
+    "summary": "READER_ORIGIN 46 1",
+    "log": "luajit-omit_queue_loss_fence.log",
+    "sha256": "7229d25ef38450a397cc1ba377e353b6d443fabc5002b3ca41595b34e786f201"
+  },
+  {
+    "abi": "luajit",
+    "source": "omit_native_close_debt",
+    "exit_code": 1,
+    "summary": "READER_ORIGIN 45 2",
+    "log": "luajit-omit_native_close_debt.log",
+    "sha256": "574555734dbf756b6f0a62a8a7e6a3943b69e18558c50171bd3eeb657482f543"
+  },
+  {
+    "abi": "luajit",
+    "source": "omit_lazy_binding_reservation",
+    "exit_code": 1,
+    "summary": "READER_ORIGIN 46 1",
+    "log": "luajit-omit_lazy_binding_reservation.log",
+    "sha256": "dc6810c4ef1fab627d602d9e1f23aa2bb0e40fd44546672ead7a3736379ae8c8"
+  },
+  {
+    "abi": "lua5.4",
+    "source": "candidate",
+    "exit_code": 0,
+    "summary": "READER_ORIGIN 47 0",
+    "log": "lua5.4-candidate.log",
+    "sha256": "11b605b938cff72df8c2bbc03657f078dc6a66db354d77d5938b59360cada324"
+  },
+  {
+    "abi": "lua5.4",
+    "source": "preimages",
+    "exit_code": 1,
+    "summary": "READER_ORIGIN 27 20",
+    "log": "lua5.4-preimages.log",
+    "sha256": "286e214e0425bfbfbc536227cec14a967108377e44173979ae13961a902e0642"
+  },
+  {
+    "abi": "lua5.4",
+    "source": "omit_native_provider",
+    "exit_code": 1,
+    "summary": "READER_ORIGIN 46 1",
+    "log": "lua5.4-omit_native_provider.log",
+    "sha256": "18cd0d2274ee4359ee2d189797662e4fd30b07f089b749a6aec4a7c65696d2e4"
+  },
+  {
+    "abi": "lua5.4",
+    "source": "omit_original_row",
+    "exit_code": 1,
+    "summary": "READER_ORIGIN 45 2",
+    "log": "lua5.4-omit_original_row.log",
+    "sha256": "3f97a7576bcb43239e23cd79cd7aeefe7ef5604292fd8f0216df66b46329b88a"
+  },
+  {
+    "abi": "lua5.4",
+    "source": "omit_session_generation",
+    "exit_code": 1,
+    "summary": "READER_ORIGIN 45 2",
+    "log": "lua5.4-omit_session_generation.log",
+    "sha256": "92e71126d0db6f9268a5cae7b4803495515c4c3477e22ef7558422a6548abd8a"
+  },
+  {
+    "abi": "lua5.4",
+    "source": "omit_queue_loss_fence",
+    "exit_code": 1,
+    "summary": "READER_ORIGIN 46 1",
+    "log": "lua5.4-omit_queue_loss_fence.log",
+    "sha256": "7229d25ef38450a397cc1ba377e353b6d443fabc5002b3ca41595b34e786f201"
+  },
+  {
+    "abi": "lua5.4",
+    "source": "omit_native_close_debt",
+    "exit_code": 1,
+    "summary": "READER_ORIGIN 45 2",
+    "log": "lua5.4-omit_native_close_debt.log",
+    "sha256": "574555734dbf756b6f0a62a8a7e6a3943b69e18558c50171bd3eeb657482f543"
+  },
+  {
+    "abi": "lua5.4",
+    "source": "omit_lazy_binding_reservation",
+    "exit_code": 1,
+    "summary": "READER_ORIGIN 46 1",
+    "log": "lua5.4-omit_lazy_binding_reservation.log",
+    "sha256": "dc6810c4ef1fab627d602d9e1f23aa2bb0e40fd44546672ead7a3736379ae8c8"
+  }
+]

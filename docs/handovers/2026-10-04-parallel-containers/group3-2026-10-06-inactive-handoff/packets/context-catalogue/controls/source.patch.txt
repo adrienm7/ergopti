@@ -1,0 +1,474 @@
+diff --git a/static/ergopti_plus/_shared/lua/action_context.lua b/static/ergopti_plus/_shared/lua/action_context.lua
+new file mode 100644
+--- /dev/null
++++ b/static/ergopti_plus/_shared/lua/action_context.lua
+@@ -0,0 +1,29 @@
++--- _shared/lua/action_context.lua
++
++--- Pure eligibility for generated context-restricted action metadata.
++--- Availability of the native slot owner is a separate admission contract.
++local M = {}
++
++--- Tests the declared contexts without widening generic dispatch permission.
++--- @param metadata table Generated per-driver action metadata.
++--- @param context string|nil Exact native consumer context; nil is generic.
++--- @return boolean eligible
++function M.eligible(metadata, context)
++	if type(metadata) ~= "table" or getmetatable(metadata) ~= nil then return false end
++	local contexts = rawget(metadata, "contexts")
++	if contexts == nil then return true end
++	if type(contexts) ~= "table" or getmetatable(contexts) ~= nil
++		or type(context) ~= "string" then return false end
++	local count, matches, seen = 0, false, {}
++	for key, value in pairs(contexts) do
++		if type(key) ~= "number" or key % 1 ~= 0 or key < 1 or type(value) ~= "string"
++			or value == "" or seen[value] then return false end
++		seen[value], count = true, count + 1
++		if value == context then matches = true end
++	end
++	if count == 0 then return false end
++	for index = 1, count do if rawget(contexts, index) == nil then return false end end
++	return matches
++end
++
++return M
+diff --git a/static/ergopti_plus/_shared/modules/actions/actions.toml b/static/ergopti_plus/_shared/modules/actions/actions.toml
+--- a/static/ergopti_plus/_shared/modules/actions/actions.toml
++++ b/static/ergopti_plus/_shared/modules/actions/actions.toml
+@@ -1244,7 +1244,8 @@
+ # --- Tap-Hold (actions disponibles uniquement comme valeur au tap d'une touche remappée) ---
+ 
+ [sg_actions.one_shot_shift]
+-platform = "ahk"
++platform = "ahk,linux"
++contexts_linux = ["tap_hold", "key_combinations"]
+ 
+ [sg_actions.caps_word]
+ platform = "ahk"
+diff --git a/static/ergopti_plus/linux/_generated/action_catalogue.lua b/static/ergopti_plus/linux/_generated/action_catalogue.lua
+--- a/static/ergopti_plus/linux/_generated/action_catalogue.lua
++++ b/static/ergopti_plus/linux/_generated/action_catalogue.lua
+@@ -169,6 +169,7 @@
+ 		{ kind = "action", id = "search_web" },
+ 		{ kind = "action", id = "toggle_capslock" },
+ 		{ kind = "heading", level = 2, key = "sg_actions.sg_order.header.tapholds" },
++		{ kind = "action", id = "one_shot_shift" },
+ 		{ kind = "action", id = "ctrl_backspace" },
+ 		{ kind = "action", id = "ctrl_delete" },
+ 		{ kind = "action", id = "space" },
+@@ -266,6 +267,7 @@
+ 		["mute"] = { family = "sg", label_key = "sg_actions.mute" },
+ 		["none"] = { family = "sg", label_key = "sg_actions.none" },
+ 		["notification_center"] = { family = "sg", label_key = "sg_actions.notification_center" },
++		["one_shot_shift"] = { family = "sg", label_key = "sg_actions.one_shot_shift", contexts = { "tap_hold", "key_combinations" } },
+ 		["open_app"] = { family = "sg", label_key = "sg_actions.open_app", parameter = "app", requires = { "tool:gtk-launch" } },
+ 		["open_chatgpt"] = { family = "sg", label_key = "sg_actions.open_chatgpt", requires = { "tool:xdg-open" } },
+ 		["open_config"] = { family = "sg", label_key = "sg_actions.open_config" },
+diff --git a/static/ergopti_plus/linux/modules/gestures/manager.lua b/static/ergopti_plus/linux/modules/gestures/manager.lua
+--- a/static/ergopti_plus/linux/modules/gestures/manager.lua
++++ b/static/ergopti_plus/linux/modules/gestures/manager.lua
+@@ -44,6 +44,7 @@
+ local Monotonic = require("infra.monotonic")
+ local Manifest = require("infra.manifest_reader")
+ local ParameterLabel = require("action_parameter_label")
++local ActionContext = require("action_context")
+ local ProgramParameter = require("program_parameter")
+ local ProgramOwner = require("modules.gestures.program_owner")
+ local WindowSwitch = require("adapters.window_switch")
+@@ -735,12 +736,16 @@
+ 
+ --- Returns the action ids the picker lists, in catalogue order, the
+ --- modifier-chord block expanded. "none" is included: it is a valid binding.
++--- Context-restricted rows require the exact native consumer context.
++--- @param context string|nil Native picker context; nil is generic.
+ --- @return table
+-function M.get_action_names()
++function M.get_action_names(context)
+ 	local names = {}
+ 	for _, item in ipairs(Catalogue.sg_items) do
+ 		if item.kind == "action" then
+-			names[#names + 1] = item.id
++			if ActionContext.eligible(Catalogue.actions[item.id], context) then
++				names[#names + 1] = item.id
++			end
+ 		elseif item.kind == "modifier_chords" then
+ 			for _, group in ipairs(MODIFIER_ACTION_GROUPS) do
+ 				for _, action_id in ipairs(group.actions) do names[#names + 1] = action_id end
+@@ -770,6 +775,8 @@
+ --- @param action_name string
+ --- @return boolean
+ function M.is_runnable(action_name)
++	local meta = Catalogue.actions[action_name]
++	if meta and not ActionContext.eligible(meta, nil) then return false end
+ 	if action_name == "none" then return true end
+ 	return MODIFIER_ACTION_COMMANDS[action_name] ~= nil
+ 		or _EMIT_ROWS[action_name] ~= nil
+@@ -863,9 +870,11 @@
+ --- catalogue declares is proven absent — `disabled` plus the reason as `hint`.
+ --- Greyed rather than hidden: a row that vanishes reads as a bug, and the user
+ --- cannot tell "this session cannot" from "this driver forgot". "none" is left
+---- out because the page adds its own translated row for it.
++--- out because the page adds its own translated row for it. Context-restricted
++--- rows require the exact native context; slot-owner admission remains separate.
++--- @param context string|nil Native picker context; nil is generic.
+ --- @return table
+-function M.get_picker_items()
++function M.get_picker_items(context)
+ 	local items, probed = {}, {}
+ 	--- Resolves one action's availability, probing each token once per build.
+ 	local function availability(action_name)
+@@ -906,7 +915,7 @@
+ 				type = "heading", level = item.level, text = (i18n.get(item.key):gsub("^#+", "")),
+ 			}
+ 		elseif item.kind == "action" then
+-			if item.id ~= "none" then push_action(item.id) end
++			if item.id ~= "none" and ActionContext.eligible(Catalogue.actions[item.id], context) then push_action(item.id) end
+ 		elseif item.kind == "modifier_chords" then
+ 			local template = i18n.get(item.group_key)
+ 			for _, group in ipairs(MODIFIER_ACTION_GROUPS) do
+@@ -1727,11 +1736,13 @@
+ --- "select the word", drifting from this one the first time either is touched.
+ --- @param action_name string From M.get_action_names().
+ --- @param binding string|nil What asked for it, for the logs and the parameters.
+---- @return boolean True when a name was given at all.
++--- @return boolean Named generic action; context-restricted rows are refused.
+ function M.execute_action(action_name, binding)
+ 	if type(action_name) ~= "string" or action_name == "" or action_name == "none" then
+ 		return false
+ 	end
++	local meta = Catalogue.actions[action_name]
++	if meta and not ActionContext.eligible(meta, nil) then return false end
+ 	_execute_action(action_name, nil, binding)
+ 	return true
+ end
+@@ -2117,6 +2128,10 @@
+ 		if type(action_name) ~= "string" or type(handler) ~= "function" then
+ 			error("every gestures action handler must map a string id to a function")
+ 		end
++		local meta = Catalogue.actions[action_name]
++		if meta and not ActionContext.eligible(meta, nil) then
++			error("a context-restricted action cannot register a generic gesture handler")
++		end
+ 		_action_handlers[action_name] = handler
+ 	end
+ 
+diff --git a/static/ergopti_plus/linux/tests/unit/infra/test_key_combinations_scope.lua b/static/ergopti_plus/linux/tests/unit/infra/test_key_combinations_scope.lua
+--- a/static/ergopti_plus/linux/tests/unit/infra/test_key_combinations_scope.lua
++++ b/static/ergopti_plus/linux/tests/unit/infra/test_key_combinations_scope.lua
+@@ -376,7 +376,7 @@
+ 	end)
+ end)
+ 
+-local function with_menu(body)
++local function with_menu(body, native)
+ 	with_owner(function(s)
+ 		package.loaded["adapters.file_system"]=s.files
+ 		package.loaded["infra.config_paths"]={config=function() return path end}
+@@ -388,9 +388,11 @@
+ 		local keys={{id="caps_lock",key="caps_lock",hand="left"},{id="tab",key="tab",hand="left"}}
+ 		local holds=Holds.build({modifiers={"shift","alt"},layers={"nav"}})
+ 		local PairOwner=require("modules.shortcuts.key_combinations")
++		if not native then
+ 		s.pairs=PairOwner.new({keys=keys,hold_picker={modifiers={"shift","alt"},layers={"nav"}},files=s.files,
+ 			route=function() return path end,is_paused=function() return s.paused end,actions=s.gestures,changed=function() return true end})
+ 		helpers.assert_true(PairOwner.set_instance(s.pairs))
++		end
+ 		local ctx={gestures=s.gestures,tap_holds={key_catalog=function() return keys end,hold_options=function() return holds end},
+ 			is_paused=function() return s.paused end,on_menu_changed=function() s.refreshes=(s.refreshes or 0)+1 end}
+ 		local ui={manifest=renderer,get=i18n.get,key_label=function(key) return key.id end,
+@@ -403,7 +405,7 @@
+ 		s.build=function() return require("ui.menu.key_combinations").build(ctx,ui) end
+ 		s.translate=i18n.get;s.context=ctx
+ 		body(s)
+-	end)
++	end, native)
+ end
+ local function find_menu(rows,title,exact)
+ 	for _,row in ipairs(rows) do
+@@ -765,3 +767,26 @@
+ 		helpers.assert_true(settled, "the exact acquired timer must physically close")
+ 	end)
+ end)
++
++helpers.describe("actual native context pair picker", function()
++	helpers.it("offers one-shot only through the actual installed native manager slot owner", function()
++		with_menu(function(s)
++			helpers.assert_eq(s.pairs.validate_slot("tap", pair, "one_shot_shift"), true)
++			helpers.assert_eq(s.gestures.is_assignable("one_shot_shift"), false)
++			helpers.assert_eq(s.gestures.is_runnable("one_shot_shift"), false)
++			local row = find_menu(s.build(), "caps_lock → tab")
++			local tap = find_menu(row.menu, s.translate("menu.shortcuts.key_combinations_hold_tap"):gsub("%%s", "open_url"))
++			helpers.assert_true(tap.fn())
++			local one_shot = 0
++			for _, item in ipairs(s.picker.items) do
++				helpers.assert_true(item.id ~= "caps_word")
++				if item.id == "one_shot_shift" then one_shot = one_shot + 1 end
++			end
++			helpers.assert_eq(one_shot, 1)
++			helpers.assert_true(s.picker.confirm("one_shot_shift"))
++			helpers.assert_eq(Codec.decode(s.bytes[path]).shortcuts.key_combination_taps[pair], "one_shot_shift")
++			helpers.assert_eq(s.pairs.get_action(pair), "one_shot_shift")
++			helpers.assert_eq(s.gestures.is_assignable("one_shot_shift"), false)
++		end, true)
++	end)
++end)
+diff --git a/static/ergopti_plus/linux/tests/unit/modules/test_action_catalogue_parity.lua b/static/ergopti_plus/linux/tests/unit/modules/test_action_catalogue_parity.lua
+--- a/static/ergopti_plus/linux/tests/unit/modules/test_action_catalogue_parity.lua
++++ b/static/ergopti_plus/linux/tests/unit/modules/test_action_catalogue_parity.lua
+@@ -440,3 +440,80 @@
+ 		end)
+ 	end
+ end)
++
++helpers.describe("contextual native action catalogue admission", function()
++	helpers.it("one-shot Shift stays absent from generic names, picker, assignment and dispatch", function()
++		local M = recording_manager()
++		M.init({ enabled = false, persist = false })
++		local function absent(items)
++			for _, value in ipairs(items) do
++				local id = type(value) == "table" and value.id or value
++				helpers.assert_true(id ~= "one_shot_shift" and id ~= "caps_word")
++			end
++		end
++		absent(M.get_action_names())
++		without_tools(function() absent(M.get_picker_items()) end)
++		helpers.assert_eq(M.is_assignable("one_shot_shift"), false)
++		helpers.assert_eq(M.is_runnable("one_shot_shift"), false)
++		helpers.assert_eq(M.set_action("tap_3", "one_shot_shift"), false)
++		helpers.assert_eq(M.get_action("tap_3"), "none")
++	end)
++
++	helpers.it("only the two declared native contexts include the one-shot row", function()
++		local M = recording_manager()
++		for _, context in ipairs({ "tap_hold", "key_combinations", "gestures", "physical_shortcuts", "" }) do
++			local expected = context == "tap_hold" or context == "key_combinations"
++			local names, rows = 0, 0
++			for _, id in ipairs(M.get_action_names(context)) do
++				if id == "one_shot_shift" then names = names + 1 end
++				helpers.assert_true(id ~= "caps_word")
++			end
++			without_tools(function()
++				for _, row in ipairs(M.get_picker_items(context)) do
++					if row.id == "one_shot_shift" then
++						rows = rows + 1; helpers.assert_true(row.disabled ~= true)
++					end
++				end
++			end)
++			helpers.assert_eq(names, expected and 1 or 0)
++			helpers.assert_eq(rows, expected and 1 or 0)
++		end
++		-- Merely asking for contextual names never changes generic permission.
++		helpers.assert_eq(M.is_assignable("one_shot_shift"), false)
++		helpers.assert_eq(M.is_runnable("one_shot_shift"), false)
++	end)
++
++	helpers.it("shared pure eligibility refuses malformed contexts without callbacks", function()
++		local Policy = require("action_context")
++		helpers.assert_eq(Policy.eligible({}, nil), true)
++		local restricted = { contexts = { "tap_hold", "key_combinations" } }
++		helpers.assert_eq(Policy.eligible(restricted, nil), false)
++		helpers.assert_eq(Policy.eligible(restricted, "tap_hold"), true)
++		helpers.assert_eq(Policy.eligible(restricted, "key_combinations"), true)
++		for _, contexts in ipairs({ {}, { "tap_hold", "tap_hold" }, { [2] = "tap_hold" }, { true }, { bad = "tap_hold" } }) do
++			helpers.assert_eq(Policy.eligible({ contexts = contexts }, "tap_hold"), false)
++		end
++		local callbacks = 0
++		local foreign = setmetatable({}, { __index = function() callbacks = callbacks + 1; return { "tap_hold" } end })
++		helpers.assert_eq(Policy.eligible(foreign, "tap_hold"), false)
++		helpers.assert_eq(callbacks, 0)
++	end)
++end)
++
++helpers.describe("contextual generic execution refusal", function()
++	helpers.it("refuses direct generic execution and a phantom native-state handler", function()
++		local M = recording_manager()
++		helpers.assert_eq(M.execute_action("one_shot_shift", "tap_3"), false)
++	end)
++	helpers.it("refuses native-state injection into the generic runnable registry", function()
++		local M = recording_manager()
++		local invoked = 0
++		local registered = pcall(M.init, { enabled = false, persist = false,
++			action_handlers = { one_shot_shift = function() invoked = invoked + 1 end } })
++		helpers.assert_eq(registered, false)
++		helpers.assert_eq(M.is_assignable("one_shot_shift"), false)
++		helpers.assert_eq(M.is_runnable("one_shot_shift"), false)
++		helpers.assert_eq(M.execute_action("one_shot_shift", "combination__caps_lock_then_tab"), false)
++		helpers.assert_eq(invoked, 0)
++	end)
++end)
+diff --git a/static/ergopti_plus/linux/tests/unit/ui/test_key_combinations_menu.lua b/static/ergopti_plus/linux/tests/unit/ui/test_key_combinations_menu.lua
+--- a/static/ergopti_plus/linux/tests/unit/ui/test_key_combinations_menu.lua
++++ b/static/ergopti_plus/linux/tests/unit/ui/test_key_combinations_menu.lua
+@@ -20,6 +20,11 @@
+ 		local keys,holds=KeyCatalog.for_platform(defaults,"linux"),HoldOptions.build(defaults.tap_hold.hold_picker)
+ 		package.loaded["modules.gestures.manager"]=nil
+ 		local gestures=require("modules.gestures.manager")
++		local original_picker = gestures.get_picker_items
++		gestures.get_picker_items = function(context)
++			helpers.assert_eq(context, "key_combinations", "ordered-pair picker requires its exact native context")
++			return original_picker(context)
++		end
+ 		package.loaded["modules.shortcuts.key_combinations"]=nil
+ 		local Pair=require("modules.shortcuts.key_combinations")
+ 		local owner=Pair.new({keys=keys,hold_picker=defaults.tap_hold.hold_picker,route=function() return "/controlled/config.toml" end,
+diff --git a/static/ergopti_plus/linux/ui/menu/key_combinations.lua b/static/ergopti_plus/linux/ui/menu/key_combinations.lua
+--- a/static/ergopti_plus/linux/ui/menu/key_combinations.lua
++++ b/static/ergopti_plus/linux/ui/menu/key_combinations.lua
+@@ -62,7 +62,7 @@
+ 		local source=snapshot();if not source then return feedback(false) end
+ 		local binding=Shared.BINDING_SCOPE.."__"..pair
+ 		local items={}
+-		for _,row in ipairs(actions.get_picker_items()) do
++		for _,row in ipairs(actions.get_picker_items("key_combinations")) do
+ 			if row.type~="action" or pairs.validate_slot("tap",pair,row.id)==true then items[#items+1]=row end
+ 		end
+ 		return ui.open_picker(label,current,binding,function(action,picked)
+diff --git a/tools/codegen/codegen-action-catalogue.cjs b/tools/codegen/codegen-action-catalogue.cjs
+--- a/tools/codegen/codegen-action-catalogue.cjs
++++ b/tools/codegen/codegen-action-catalogue.cjs
+@@ -87,7 +87,8 @@
+ 	'is_header',
+ 	'requires_ahk',
+ 	'requires_hs',
+-	'requires_linux'
++	'requires_linux',
++	'contexts_linux'
+ ]);
+ const AX_FIELDS = new Set(['platform', 'scalable']);
+ 
+@@ -179,6 +180,23 @@
+ 		}
+ 		if (row.is_header !== undefined && row.is_header !== true) {
+ 			throw new Error(`${where}: is_header may only be true`);
++		}
++		const contexts = row.contexts_linux;
++		if (contexts !== undefined) {
++			if (!claimed.includes('linux')) {
++				throw new Error(`${where}: contexts_linux on an action that does not claim linux`);
++			}
++			if (!Array.isArray(contexts) || contexts.length === 0) {
++				throw new Error(`${where}: contexts_linux must be a non-empty array`);
++			}
++			const seenContexts = new Set();
++			for (const context of contexts) {
++				if (typeof context !== 'string' || !['tap_hold', 'key_combinations'].includes(context)) {
++					throw new Error(`${where}: unknown Linux action context`);
++				}
++				if (seenContexts.has(context)) throw new Error(`${where}: duplicate Linux action context`);
++				seenContexts.add(context);
++			}
+ 		}
+ 		for (const driver of PLATFORMS) {
+ 			const tokens = row[`requires_${driver}`];
+@@ -252,6 +270,7 @@
+ 			if (row.confirm === true) entry.confirm = true;
+ 			const req = row[`requires_${platform}`];
+ 			if (req) entry.requires = [...req];
++			if (platform === 'linux' && row.contexts_linux) entry.contexts = [...row.contexts_linux];
+ 			actions[id] = entry;
+ 		}
+ 	}
+@@ -266,12 +285,20 @@
+ 		const heading = item.match(/^(#{1,2})([a-z_][a-z0-9_]*)$/);
+ 		if (heading) {
+ 			parentLevel = heading[1].length;
+-			raw.push({ kind: 'heading', level: parentLevel, key: HEADER_KEY_PREFIX + heading[2] });
++			raw.push({
++				kind: 'heading',
++				level: parentLevel,
++				key: HEADER_KEY_PREFIX + heading[2]
++			});
+ 			continue;
+ 		}
+ 		if (item === CHORD_PLACEHOLDER) {
+ 			if (!claims(data.sg_actions[item], `sg_actions.${item}`)) continue;
+-			raw.push({ kind: 'modifier_chords', level: parentLevel + 1, groupKey: CHORD_GROUP_KEY });
++			raw.push({
++				kind: 'modifier_chords',
++				level: parentLevel + 1,
++				groupKey: CHORD_GROUP_KEY
++			});
+ 			continue;
+ 		}
+ 		if (actions[item]) raw.push({ kind: 'action', id: item });
+@@ -298,7 +325,10 @@
+ 	const model = { platform, sgItems, axItems, actions };
+ 	if (platform === 'hs') model.karabinerAliases = { ...(data.karabiner_aliases || {}) };
+ 	if (platform === 'linux')
+-		model.slots = { single: [...data.slots.single], axis: [...data.slots.axis] };
++		model.slots = {
++			single: [...data.slots.single],
++			axis: [...data.slots.axis]
++		};
+ 	return model;
+ }
+ 
+@@ -357,6 +387,7 @@
+ 		if (a.parameter) parts.push(`parameter = ${luaQ(a.parameter)}`);
+ 		if (a.confirm) parts.push('confirm = true');
+ 		if (a.requires) parts.push(`requires = { ${a.requires.map(luaQ).join(', ')} }`);
++		if (a.contexts) parts.push(`contexts = { ${a.contexts.map(luaQ).join(', ')} }`);
+ 		out.push(`\t\t[${luaQ(id)}] = { ${parts.join(', ')} },`);
+ 	}
+ 	out.push('\t},');
+diff --git a/tools/test/test-action-catalogue-codegen.cjs b/tools/test/test-action-catalogue-codegen.cjs
+--- a/tools/test/test-action-catalogue-codegen.cjs
++++ b/tools/test/test-action-catalogue-codegen.cjs
+@@ -147,6 +147,35 @@
+ 	/confirm must be a boolean/
+ );
+ 
++// Native context metadata cannot silently widen generic action execution.
++const contextualRow =
++	'[sg_actions.one_shot_shift]\nplatform = "ahk,linux"\ncontexts_linux = ["tap_hold", "key_combinations"]';
++for (const [label, value, refusal] of [
++	['empty contexts', '[]', /non-empty array/],
++	['scalar contexts', '"tap_hold"', /non-empty array/],
++	['unknown context', '["gestures"]', /unknown Linux action context/],
++	['non-string context', '[1]', /unknown Linux action context/],
++	['duplicate context', '["tap_hold", "tap_hold"]', /duplicate Linux action context/]
++]) {
++	rejects(
++		label,
++		mutate(contextualRow, contextualRow.replace('["tap_hold", "key_combinations"]', value)),
++		refusal
++	);
++}
++rejects(
++	'context on unclaimed platform',
++	mutate(contextualRow, contextualRow.replace('platform = "ahk,linux"', 'platform = "ahk"')),
++	/does not claim linux/
++);
++for (const driver of ['ahk', 'hs']) {
++	rejects(
++		'unsupported context consumer ' + driver,
++		mutate(contextualRow, contextualRow.replace('contexts_linux', 'contexts_' + driver)),
++		/unknown field/
++	);
++}
++
+ // 2. The committed files are exactly what the generator produces.
+ const generated = generate(SOURCE);
+ for (const [platform, out] of Object.entries(generated)) {
+@@ -229,6 +258,21 @@
+ 	'Linux carries the gesture slot-space'
+ );
+ 
++check(
++	JSON.stringify(models.linux.actions.one_shot_shift.contexts) ===
++		JSON.stringify(['tap_hold', 'key_combinations']),
++	'Linux one-shot Shift keeps its two actual native contexts'
++);
++check(
++	!models.ahk.actions.one_shot_shift.contexts && !models.hs.actions.one_shot_shift,
++	'Context admission does not alter Windows or invent a macOS owner'
++);
++check(!models.linux.actions.caps_word, 'Caps Word remains unclaimed on Linux');
++check(
++	generated.linux.text.includes('contexts = { "tap_hold", "key_combinations" }'),
++	'Linux serialized metadata must retain native context restrictions'
++);
++
+ // 4. Every heading and label key resolves in every locale, and none is French
+ //    outside fr.json.
+ const localeFiles = fs.readdirSync(LOCALES).filter((f) => f.endsWith('.json'));

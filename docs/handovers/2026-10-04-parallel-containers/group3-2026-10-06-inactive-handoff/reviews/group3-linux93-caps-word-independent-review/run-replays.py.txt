@@ -1,0 +1,19 @@
+import json, subprocess
+from pathlib import Path
+p=Path(__file__).parent
+source=Path("/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word")
+result=[]
+for abi in ["luajit","lua5.4"]:
+ for name,harness in [("controlled","qualify-all-controlled.lua"),("legacy","qualify-legacy-title-unblocked.lua")]:
+  log=p/(name+"-"+abi+".log")
+  with log.open("wb") as out:
+   r=subprocess.run(["python","/workspace/.ergopti-cloud/reap_validation.py",abi,str(p/harness),str(p/"snapshot")],stdout=out,stderr=subprocess.STDOUT,timeout=45)
+  result.append({"abi":abi,"name":name,"exit":r.returncode,"log":str(log)})
+ for mutation in ["omit-probe-revision","omit-native-publication-refusal","omit-casing-retirement-wave","omit-private-resumption","omit-native-output-refusal"]:
+  module="tap_hold.caps_word" if mutation=="omit-probe-revision" else "modules.shortcuts.manager" if mutation=="omit-native-publication-refusal" else "platform.remap.key_combination_engine" if mutation in ["omit-casing-retirement-wave","omit-private-resumption"] else "platform.remap.tap_hold_engine"
+  log=p/(mutation+"-"+abi+".log")
+  with log.open("wb") as out:
+   r=subprocess.run(["python","/workspace/.ergopti-cloud/reap_validation.py",abi,str(p/"qualify-mutation.lua"),str(p/"snapshot"),str(source/"mutations"/(mutation+".lua")),module],stdout=out,stderr=subprocess.STDOUT,timeout=45)
+  result.append({"abi":abi,"name":mutation,"exit":r.returncode,"log":str(log)})
+(p/"replay-results.json").write_text(json.dumps(result,indent=2)+"\n")
+for row in result:print(row["abi"],row["name"],row["exit"])
