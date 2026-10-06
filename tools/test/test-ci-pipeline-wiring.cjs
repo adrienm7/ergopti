@@ -76,6 +76,8 @@
 const pipeline = require('./ci-pipeline.cjs');
 const assert = require('node:assert/strict');
 const { spawnSync } = require('node:child_process');
+const fs = require('node:fs');
+const path = require('node:path');
 const manual = require('../ci/manual-ci-lanes.cjs');
 
 const ENTRY = pipeline.ENTRY_REL;
@@ -391,6 +393,7 @@ const GATE_COMMAND = new RegExp(
 		/_test\.py\b|\bmacos_launch_gate\.py\b|\bmacos-release-launch\.py\b|\bmacos_tooltip_canvas\.py\b/,
 		/\blinux-ci-evidence\.cjs (?:verify|record)\b|\bvalidate-ahk-suite-manifest\.cjs\b/,
 		/\btools\/test\/test-[\w-]+\.(?:py|cjs)\b/,
+		/\bprepare-linux-distro-unit\.sh\b/,
 		/\bnpm run (?:test|build)\b/,
 		/\bformat_toml\.py\b/,
 		/\binstall\.sh\b|\binstalled_layout_check\.lua\b/,
@@ -2406,6 +2409,112 @@ assert.ok(
 );
 
 // This qualifies the shared renderer and recorded bridge, not physical input.
+const DISTRO_UNIT_COMMAND =
+	'bash "$GITHUB_WORKSPACE/tools/test/prepare-linux-distro-unit.sh" "${{ matrix.distro }}"';
+const DISTRO_UNIT_HELPER = fs.readFileSync(
+	path.join(__dirname, 'prepare-linux-distro-unit.sh'),
+	'utf8'
+);
+const DISTRO_UNIT_SUITE =
+	'sudo -H -u ergopti-ci env -u SUDO_UID -u SUDO_GID -u SUDO_USER \\\n\tLUA_CPATH="$native_root/modules/?.so;;" TMPDIR="$unit_tmp" "$interpreter" tests/run.lua\n';
+
+/** Rejects native distro suites whose wrapper omits their real prerequisites. */
+function distroUnitProblems(files, helper = DISTRO_UNIT_HELPER) {
+	const linux = files.find((entry) => entry.rel === LINUX_BOX);
+	const job =
+		linux && pipeline.jobsOfText(linux.text, LINUX_BOX).find((row) => row.id === 'install-linux');
+	const steps = job ? pipeline.steps(job.body) : [];
+	const units = steps.filter(
+		(step) => step.name === "The unit suite on this distribution's LuaJIT"
+	);
+	const problems = [];
+	if (
+		units.length !== 1 ||
+		pipeline.stepField(units[0].body, 'shell') !== 'bash' ||
+		JSON.stringify(logicalLines(units[0].body).filter((line) => line !== '')) !==
+			JSON.stringify([DISTRO_UNIT_COMMAND])
+	) {
+		problems.push('the distro unit step must execute its fail-closed native prerequisite wrapper');
+	}
+	const code = helper
+		.split('\n')
+		.filter((line) => !/^\s*(?:#|--)/.test(line))
+		.join('\n');
+	if (
+		(code.match(/^sudo -H -u ergopti-ci env -u SUDO_UID -u SUDO_GID -u SUDO_USER \\$/gm) || [])
+			.length !== 3
+	) {
+		problems.push(
+			'both native preflights and the unchanged suite must use the ordinary installation user'
+		);
+	}
+	if (!code.includes(DISTRO_UNIT_SUITE)) {
+		problems.push('the unchanged distro suite must inherit the exact admitted native modules');
+	}
+	const lua = code.match(/"\$interpreter" -e '\n([\s\S]*?)\n'/)?.[1] || '';
+	for (const statement of [
+		'assert(ffi.C.getuid() ~= 0)',
+		'assert(jit.os == "Linux" and _VERSION == "Lua 5.1")',
+		'local uv, lfs = require("luv"), require("lfs")',
+		'assert(debug.getinfo(uv.fs_stat, "S").what == "C")',
+		'assert(debug.getinfo(lfs.attributes, "S").what == "C")'
+	]) {
+		if (!lua.split('\n').includes(statement))
+			problems.push('native distro admission omits ' + statement);
+	}
+	if (!code.includes("/usr/bin/python3 -c 'import os; assert(os.geteuid() != 0)'")) {
+		problems.push('the actual Python filesystem fixture requires an ordinary-user preflight');
+	}
+	if (!/^set -euo pipefail$/m.test(code) || /^\s*set \+e\b/m.test(code) || SWALLOWED.test(code)) {
+		problems.push('native distro preparation and suite failures may not be swallowed');
+	}
+	return problems;
+}
+errors.push(...distroUnitProblems(pipeline.files()));
+const distroUnitBody = pipeline.step(
+	pipeline.job('install-linux'),
+	"The unit suite on this distribution's LuaJIT"
+);
+for (const [what, changed] of [
+	['missing native distro wrapper', ''],
+	[
+		'interpreter-only native distro setup',
+		distroUnitBody.replace(DISTRO_UNIT_COMMAND, 'luajit tests/run.lua')
+	]
+]) {
+	mustCatch(what, LINUX_BOX, distroUnitBody, changed, distroUnitProblems);
+}
+mustCatch(
+	'swallowed native distro wrapper',
+	LINUX_BOX,
+	distroUnitBody,
+	distroUnitBody.replace(DISTRO_UNIT_COMMAND, DISTRO_UNIT_COMMAND + ' || true'),
+	stepProblems
+);
+for (const [what, from, to] of [
+	[
+		'root suite execution',
+		DISTRO_UNIT_SUITE,
+		DISTRO_UNIT_SUITE.replace('sudo -H -u ergopti-ci ', '')
+	],
+	['root Lua admission', 'sudo -H -u ergopti-ci env', 'env'],
+	['missing ordinary UID admission', 'assert(ffi.C.getuid() ~= 0)', ''],
+	['missing Linux LuaJIT admission', 'assert(jit.os == "Linux" and _VERSION == "Lua 5.1")', ''],
+	['missing native modules', 'local uv, lfs = require("luv"), require("lfs")', ''],
+	['missing luv C entry point', 'assert(debug.getinfo(uv.fs_stat, "S").what == "C")', ''],
+	['missing lfs C entry point', 'assert(debug.getinfo(lfs.attributes, "S").what == "C")', ''],
+	['missing Python preflight', "/usr/bin/python3 -c 'import os; assert(os.geteuid() != 0)'", ''],
+	[
+		'swallowed unchanged unit suite',
+		'"$interpreter" tests/run.lua',
+		'"$interpreter" tests/run.lua || true'
+	]
+]) {
+	const changed = DISTRO_UNIT_HELPER.replace(from, to);
+	assert.notEqual(changed, DISTRO_UNIT_HELPER, what + ' must actually mutate the native wrapper');
+	assert.ok(distroUnitProblems(pipeline.files(), changed).length > 0, what + ' must refuse');
+}
+
 const PHYSICAL_BROWSER_STEP = 'Test shared physical shortcut rendering';
 const PHYSICAL_BROWSER_ALIAS = 'test:browser:physical-shortcuts';
 const PHYSICAL_BROWSER_COMMAND = 'node ./tools/test/browser/physical-shortcuts.playwright.cjs';
