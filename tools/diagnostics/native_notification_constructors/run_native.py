@@ -16,14 +16,13 @@ import subprocess
 import sys
 import time
 from types import SimpleNamespace
-from urllib.request import urlopen
 import zipfile
 
 from receipt import validate
 
 DEPENDENCIES = {
     "ownership": "d3bc862c737e444f22d84fc32368bb8669360bc33ba6008c208f7bf62001314b",
-    "inventory": "21b51cdc242e6c2b1d2b5270d6ef0ddafd65b7e4658d955addd9a9c36697696d",
+    "inventory": "ec22906ec34b4b7efdf304dab81ab62cee0ad03148e6006bcbdf4276c8976afe",
 }
 PINS = (
     "static/ergopti_plus/macos/adapters/application_notifier.lua",
@@ -114,6 +113,8 @@ def notify_source_member(app, archive):
 
 
 def main(arguments=None):
+    # Remove before platform checks, Git/source checks, or any child allocation.
+    metadata_token = os.environ.pop("ERGOPTI_NATIVE_HS_METADATA_TOKEN", None)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-root", type=Path, required=True)
     parser.add_argument("--source-sha", required=True)
@@ -131,6 +132,7 @@ def main(arguments=None):
     output.mkdir(mode=0o700, parents=True, exist_ok=False)
     ownership = pinned_module(root / PINS[4], "ownership")
     inventory = pinned_module(root / PINS[5], "inventory")
+    metadata_token = inventory.validate_metadata_token(metadata_token)
     native = ownership.NativeProcessGroups()
     owners = []
     borrowed = retained_acquirer(ownership, native, owners)
@@ -147,13 +149,16 @@ def main(arguments=None):
         old_handlers[signum] = signal.signal(signum, interrupted)
     try:
         hashes = inventory.source_hashes(root, args.source_sha, PINS)
-        asset = inventory.trusted_asset(output)
+        asset = inventory.trusted_asset(output, metadata_token=metadata_token)
+        metadata_token = None
         app, archive = args.app, args.archive
         if args.download:
             require(app is None and archive is None, "bootstrap_arguments_refused")
             archive = output / inventory.ASSET
             with (
-                urlopen(asset["browser_download_url"], timeout=30) as incoming,
+                inventory.bootstrap_response(
+                    "archive_download", asset["browser_download_url"], timeout=30
+                ) as incoming,
                 archive.open("xb") as destination,
             ):
                 payload = incoming.read(asset["size"] + 1)

@@ -248,6 +248,51 @@ _SBT_DiagnosticSize(Path) {
 	return FileGetSize(Path)
 }
 
+; The optional marker is a separately allocated test file, never stdout or a
+; worker handle. Only complete closed phase tokens may enter public diagnostics.
+_SBT_DiagnosticMarkerCreate() {
+	Path := Buffer(260 * 2, 0)
+	if !DllCall("Kernel32\GetTempFileNameW", "Str", A_Temp, "Str", "sbt",
+			"UInt", 0, "Ptr", Path.Ptr, "UInt")
+		throw Error("Brightness phase marker acquisition refused.")
+	return StrGet(Path, "UTF-16")
+}
+
+_SBT_DiagnosticMarkerDelete(Path) {
+	try FileDelete(Path)
+	catch Any
+		throw Error("Brightness phase marker retirement refused.")
+}
+
+_SBT_DiagnosticMarkerRead(Path) {
+	File := FileOpen(Path, "r", "UTF-8")
+	if !IsObject(File)
+		return "unavailable"
+	try {
+		if File.Length > 64
+			return "unavailable"
+		return File.Read(64)
+	} finally File.Close()
+}
+
+_SBT_DiagnosticMarkerFact(Path, ReadFn := 0) {
+	if Path == ""
+		return ";phase_observed=disabled"
+	if !IsObject(ReadFn)
+		ReadFn := _SBT_DiagnosticMarkerRead
+	Phase := "unavailable"
+	try {
+		Observed := ReadFn.Call(Path)
+		Known := Map()
+		Known.CaseSense := "On"
+		for PhaseName in ["fixture_enter", "before_worker", "enumerate_monitors", "enumerate_methods", "write", "readback", "worker_return", "emit"]
+			Known[PhaseName] := true
+		if (Observed is String) && Known.Has(Observed)
+			Phase := Observed
+	}
+	return ";phase_observed=" . Phase
+}
+
 ; Closed observations precede finally's mandatory callback detachment. Queries
 ; never close handles, retire a task, drain a claim, read output, or wait for work.
 _SBT_NativeDiagnostic(Control, Elapsed, Polls, WaitFn := 0, JobFn := 0, SizeFn := 0) {
@@ -364,12 +409,22 @@ _SBT_NativeProvider(Mode, ExpectedStatus, ExpectedExit, ExpectedCalls := 1,
 		ExpectedStage := "readback", ExpectedPolicyType := "object") {
 	global _DriverDir, _SharedDir, _VendorDir
 	Observed := [], Control := Map(), Polls := 0
-	Handle := ShellRunner_SpawnTreeOwned("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+	Args := ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
 		"-File", _DriverDir . "\tests\fixtures\screen_brightness_provider.ps1",
 		"-Worker", _VendorDir . "\ergopti_brightness_worker.ps1",
 		"-FixturePolicyPath", _SharedDir . "\modules\actions\brightness.json",
-		"-Action", "brightness_up", "-Mode", Mode],
+		"-Action", "brightness_up", "-Mode", Mode]
+	MarkerPath := _SBT_DiagnosticMarkerCreate()
+	if MarkerPath != ""
+		Args.Push("-FixtureDiagnosticPath", MarkerPath)
+	try Handle := ShellRunner_SpawnTreeOwned("powershell.exe", Args,
 		(Code, Out, Err) => Observed.Push(Map("exit", Code, "stdout", Out, "stderr", Err)), , _SBT_ObserveNative.Bind(Control), 8192)
+	catch Any as Err {
+		; The factory is lazy: before a returned handle there is no child writer.
+		if MarkerPath != ""
+			_SBT_DiagnosticMarkerDelete(MarkerPath)
+		throw Err
+	}
 	try {
 		AssertTrue(Handle.start(), "the native owned child must really start")
 		Started := A_TickCount
@@ -379,6 +434,7 @@ _SBT_NativeProvider(Mode, ExpectedStatus, ExpectedExit, ExpectedCalls := 1,
 			Sleep(10)
 		}
 		Diagnostic := _SBT_NativeDiagnostic(Control, TickElapsed(Started), Polls)
+			. _SBT_DiagnosticMarkerFact(MarkerPath)
 		AssertEqual(1, Observed.Length, "the actual native provider worker settles once; " . Diagnostic)
 		AssertEqual("", Observed[1]["stderr"], "the real provider fixture exposes no hidden native failure")
 		Receipt := JsonParse(Observed[1]["stdout"])
@@ -392,6 +448,10 @@ _SBT_NativeProvider(Mode, ExpectedStatus, ExpectedExit, ExpectedCalls := 1,
 			"the real worker and shared readback policy agree")
 	} finally {
 		AssertTrue(Handle.terminate(), "the exact native child tree must physically settle")
+		; Failed native retirement retains the marker instead of deleting a file
+		; a still-owned child may continue writing. No termination retry is added.
+		if MarkerPath != ""
+			_SBT_DiagnosticMarkerDelete(MarkerPath)
 	}
 }
 Test("screen brightness: native PowerShell provider uses the actual WMI ABI", () => _SBT_NativeProvider("applied", "applied", 0))
@@ -512,3 +572,32 @@ _SBT_Reentry(NativeStart, ThrowAfter := false) {
 Test("screen brightness: synchronous canceled start preserves its terminal successor", () => _SBT_Reentry(false))
 Test("screen brightness: a start throw after terminal delivery preserves its successor", () => _SBT_Reentry(false, true))
 Test("screen brightness: actual ShellRunner STARTING retirement preserves a reentrant successor", () => _SBT_Reentry(true))
+
+
+; Bind captures a concrete value; an AHK for variable has a different cell
+; from any closure even when the caller invokes it synchronously.
+_SBT_DiagnosticMarkerValue(Value, *) {
+	return Value
+}
+
+_SBT_DiagnosticMarkerControls() {
+	Secret := "PRIVATE_MARKER_BODY"
+	AssertEqual(";phase_observed=disabled", _SBT_DiagnosticMarkerFact(""))
+	for Phase in ["fixture_enter", "before_worker", "enumerate_monitors", "enumerate_methods", "write", "readback", "worker_return", "emit"]
+		AssertEqual(";phase_observed=" . Phase, _SBT_DiagnosticMarkerFact(Secret, _SBT_DiagnosticMarkerValue.Bind(Phase)))
+	for Value in [Secret, "emit`n", "EMIT", 1, Map()]
+		AssertEqual(";phase_observed=unavailable", _SBT_DiagnosticMarkerFact(Secret, _SBT_DiagnosticMarkerValue.Bind(Value)))
+	ThrowMarker(*) {
+		throw Error(Secret)
+	}
+	AssertEqual(";phase_observed=unavailable", _SBT_DiagnosticMarkerFact(Secret, ThrowMarker))
+	Path := _SBT_DiagnosticMarkerCreate()
+	try {
+		AssertEqual(";phase_observed=unavailable", _SBT_DiagnosticMarkerFact(Path))
+		FileAppend("before_worker", Path, "UTF-8-RAW")
+		AssertEqual(";phase_observed=before_worker", _SBT_DiagnosticMarkerFact(Path))
+		FileAppend("abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz", Path, "UTF-8-RAW")
+		AssertEqual(";phase_observed=unavailable", _SBT_DiagnosticMarkerFact(Path), "oversized private marker is never public phase data")
+	} finally _SBT_DiagnosticMarkerDelete(Path)
+}
+Test("screen brightness: optional phase marker reads closed bounded facts without exposing paths", _SBT_DiagnosticMarkerControls)

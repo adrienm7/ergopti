@@ -3,6 +3,7 @@
 """Qualify actual pinned Hammerspoon provider inventory, never user-program execution."""
 
 import argparse
+from contextlib import contextmanager
 import ctypes
 import errno
 import hashlib
@@ -15,12 +16,14 @@ import re
 import secrets
 import shutil
 import signal
+import ssl
 import stat
 import subprocess
 import sys
 import tempfile
 import time
-from urllib.request import Request, urlopen
+from urllib.error import HTTPError, URLError
+from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
 import zipfile
 
 VERSION = "1.1.1"
@@ -318,15 +321,99 @@ def source_hashes(root, sha, paths=PINS):
     return result
 
 
-def trusted_asset(output):
+METADATA_TOKEN_ENV = "ERGOPTI_NATIVE_HS_METADATA_TOKEN"
+
+
+def validate_metadata_token(token):
+    # Optional local anonymous mode; supplied credentials never fall back.
+    require(
+        token is None
+        or (
+            type(token) is str
+            and 0 < len(token) <= 4096
+            and re.fullmatch(r"[A-Za-z0-9._~+/-]+=*", token) is not None
+        ),
+        "metadata_token_refused",
+    )
+    return token
+
+
+class MetadataNoRedirect(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        # Never forward the API credential, including same-origin redirects.
+        return None
+
+
+@contextmanager
+def bootstrap_response(phase, request, *, timeout, metadata_opener=None):
+    """Report closed network facts, then preserve the original failure and cleanup."""
+    require(
+        type(phase) is str and phase in ("release_metadata", "archive_download"),
+        "bootstrap_phase_refused",
+    )
+    require(metadata_opener is None or phase == "release_metadata", "bootstrap_phase_refused")
+    opening = urlopen if metadata_opener is None else metadata_opener
+    try:
+        with opening(request, timeout=timeout) as response:
+            yield response
+    except (HTTPError, URLError, TimeoutError, ssl.SSLError) as error:
+        # No URL, request/response headers, body, or arbitrary exception text.
+        # A failed diagnostic write cannot replace the original network error;
+        # process interruption remains visible rather than being swallowed.
+        try:
+            status = None
+            if isinstance(error, HTTPError):
+                family = "http_error"
+                code = error.code
+                if type(code) is int and 100 <= code <= 599:
+                    status = code
+            elif isinstance(error, ssl.SSLError) or (
+                isinstance(error, URLError) and isinstance(error.reason, ssl.SSLError)
+            ):
+                family = "tls_error"
+            elif isinstance(error, TimeoutError):
+                family = "read_timeout"
+            else:
+                family = "transport_error"
+            print(
+                json.dumps(
+                    {
+                        "schema": 1,
+                        "contract": "macos-native-bootstrap-failure",
+                        "phase": phase,
+                        "family": family,
+                        "http_status": status,
+                        "native_pass": False,
+                    }
+                ),
+                flush=True,
+            )
+        except Exception:
+            pass
+        raise
+
+
+def trusted_asset(output, *, metadata_token=None):
+    metadata_token = validate_metadata_token(metadata_token)
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "ErgoptiPlus-native-qualification",
+    }
+    opening = None
+    if metadata_token is not None:
+        require(
+            API == "https://api.github.com/repos/Hammerspoon/hammerspoon/releases/tags/1.1.1",
+            "metadata_route_refused",
+        )
+        headers["Authorization"] = "Bearer " + metadata_token
+        opening = build_opener(MetadataNoRedirect()).open
     request = Request(
         API,
-        headers={
-            "Accept": "application/vnd.github+json",
-            "User-Agent": "ErgoptiPlus-native-qualification",
-        },
+        headers=headers,
     )
-    with urlopen(request, timeout=20) as reply:
+    with bootstrap_response(
+        "release_metadata", request, timeout=20, metadata_opener=opening
+    ) as reply:
         raw = reply.read(1048577)
     require(len(raw) <= 1048576, "release_metadata_size_refused")
     release = json.loads(raw)
@@ -642,6 +729,8 @@ def run_case(
 
 
 def main():
+    # Consume before argument handling, source_hashes Git, or native allocation.
+    metadata_token = validate_metadata_token(os.environ.pop(METADATA_TOKEN_ENV, None))
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-root", type=Path, required=True)
     parser.add_argument("--source-sha", required=True)
@@ -672,13 +761,16 @@ def main():
     args.output.mkdir(mode=0o700, parents=True, exist_ok=False)
     hashes = source_hashes(root, args.source_sha)
     diagnostic_hashes = source_hashes(root, args.source_sha, DIAGNOSTIC_PINS)
-    asset = trusted_asset(args.output)
+    asset = trusted_asset(args.output, metadata_token=metadata_token)
+    metadata_token = None
     archive, app = args.archive, args.app
     if args.download:
         require(archive is None and app is None, "bootstrap_arguments_refused")
         archive = args.output / ASSET
         with (
-            urlopen(asset["browser_download_url"], timeout=30) as incoming,
+            bootstrap_response(
+                "archive_download", asset["browser_download_url"], timeout=30
+            ) as incoming,
             archive.open("xb") as target,
         ):
             raw = incoming.read(asset["size"] + 1)

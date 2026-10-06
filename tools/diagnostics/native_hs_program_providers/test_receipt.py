@@ -568,5 +568,489 @@ class ClosedDiagnosticLogControls(unittest.TestCase):
                 retained.wait_for_exit.assert_not_called()
 
 
+class BootstrapBoundaryControls(unittest.TestCase):
+    """Actual network scopes; controlled HTTP objects, never native macOS PASS."""
+
+    def facts(self, text, phase, family, status):
+        self.assertEqual(
+            json.loads(text),
+            {
+                "schema": 1,
+                "contract": "macos-native-bootstrap-failure",
+                "phase": phase,
+                "family": family,
+                "http_status": status,
+                "native_pass": False,
+            },
+        )
+        for private in ("PRIVATE_URL", "PRIVATE_MESSAGE", "PRIVATE_HEADER", "PRIVATE_BODY"):
+            self.assertNotIn(private, text)
+
+    def test_actual_metadata_http_failure_preserves_original_and_has_no_native_tool(self):
+        import contextlib
+        import io
+        from urllib.error import HTTPError
+
+        error = HTTPError(
+            "https://PRIVATE_URL/PRIVATE_BODY",
+            403,
+            "PRIVATE_MESSAGE",
+            {"PRIVATE_HEADER": "PRIVATE_BODY"},
+            None,
+        )
+        logged = io.StringIO()
+        with (
+            mock.patch.object(subject, "urlopen", side_effect=error) as opening,
+            mock.patch.object(subject, "owned_tool") as native,
+            contextlib.redirect_stdout(logged),
+        ):
+            with self.assertRaises(HTTPError) as caught:
+                subject.trusted_asset(Path("unused"))
+        self.assertIs(caught.exception, error)
+        self.facts(logged.getvalue(), "release_metadata", "http_error", 403)
+        native.assert_not_called()
+        request = opening.call_args.args[0]
+        self.assertEqual(
+            request.full_url,
+            "https://api.github.com/repos/Hammerspoon/hammerspoon/releases/tags/1.1.1",
+        )
+        self.assertEqual(opening.call_args.kwargs, {"timeout": 20})
+
+    def test_archive_open_and_read_http_errors_keep_exact_exception(self):
+        import contextlib
+        import io
+        from urllib.error import HTTPError
+
+        for boundary in ("open", "read"):
+            with self.subTest(boundary=boundary):
+                error = HTTPError(
+                    "PRIVATE_URL", 503, "PRIVATE_MESSAGE", {"PRIVATE_HEADER": "PRIVATE_BODY"}, None
+                )
+                response = mock.MagicMock()
+                response.__enter__.return_value = response
+                response.read.side_effect = error
+                logged = io.StringIO()
+                with (
+                    mock.patch.object(
+                        subject,
+                        "urlopen",
+                        side_effect=error if boundary == "open" else None,
+                        return_value=response,
+                    ),
+                    contextlib.redirect_stdout(logged),
+                ):
+                    with self.assertRaises(HTTPError) as caught:
+                        with subject.bootstrap_response(
+                            "archive_download", "PRIVATE_URL", timeout=30
+                        ) as incoming:
+                            incoming.read(1025)
+                self.assertIs(caught.exception, error)
+                self.facts(logged.getvalue(), "archive_download", "http_error", 503)
+                if boundary == "read":
+                    response.read.assert_called_once_with(1025)
+                    self.assertIs(response.__exit__.call_args.args[1], error)
+
+    def test_transport_tls_and_read_timeout_families_do_not_invent_status(self):
+        import contextlib
+        import io
+        import ssl
+        from urllib.error import URLError
+
+        cases = [
+            (URLError("PRIVATE_MESSAGE"), "transport_error"),
+            (ssl.SSLCertVerificationError("PRIVATE_MESSAGE"), "tls_error"),
+            (URLError(ssl.SSLCertVerificationError("PRIVATE_MESSAGE")), "tls_error"),
+            (TimeoutError("PRIVATE_MESSAGE"), "read_timeout"),
+        ]
+        for error, family in cases:
+            for phase in ("release_metadata", "archive_download"):
+                with self.subTest(error=type(error).__name__, phase=phase):
+                    logged = io.StringIO()
+                    response = mock.MagicMock()
+                    response.__enter__.return_value = response
+                    response.read.side_effect = error
+                    with (
+                        mock.patch.object(subject, "urlopen", return_value=response),
+                        contextlib.redirect_stdout(logged),
+                    ):
+                        with self.assertRaises(type(error)) as caught:
+                            with subject.bootstrap_response(
+                                phase, "PRIVATE_URL", timeout=20
+                            ) as incoming:
+                                incoming.read(17)
+                    self.assertIs(caught.exception, error)
+                    self.facts(logged.getvalue(), phase, family, None)
+
+    def test_malformed_http_status_is_unknown_without_serializing_input(self):
+        import contextlib
+        import io
+        from urllib.error import HTTPError
+
+        for code in (True, False, 99, 600, -1, 403.0, "PRIVATE_BODY", None):
+            with self.subTest(code_type=type(code).__name__):
+                error = HTTPError("PRIVATE_URL", code, "PRIVATE_MESSAGE", None, None)
+                logged = io.StringIO()
+                with (
+                    mock.patch.object(subject, "urlopen", side_effect=error),
+                    contextlib.redirect_stdout(logged),
+                ):
+                    with self.assertRaises(HTTPError) as caught:
+                        with subject.bootstrap_response(
+                            "release_metadata", "PRIVATE_URL", timeout=20
+                        ):
+                            self.fail("refused request yielded")
+                self.assertIs(caught.exception, error)
+                self.facts(logged.getvalue(), "release_metadata", "http_error", None)
+
+    def test_http_code_is_captured_once_and_getter_refusal_preserves_original(self):
+        import contextlib
+        import io
+        from urllib.error import HTTPError
+
+        class ChangingCode(HTTPError):
+            reads = 0
+
+            def __getattribute__(self, name):
+                if name == "code":
+                    count = object.__getattribute__(self, "reads") + 1
+                    object.__setattr__(self, "reads", count)
+                    return 403 if count == 1 else "PRIVATE_BODY"
+                return super().__getattribute__(name)
+
+        class RefusedCode(HTTPError):
+            def __getattribute__(self, name):
+                if name == "code":
+                    raise OSError("PRIVATE_BODY")
+                return super().__getattribute__(name)
+
+        for error in (
+            ChangingCode("PRIVATE_URL", 403, "PRIVATE_MESSAGE", None, None),
+            RefusedCode("PRIVATE_URL", 403, "PRIVATE_MESSAGE", None, None),
+        ):
+            logged = io.StringIO()
+            with (
+                mock.patch.object(subject, "urlopen", side_effect=error),
+                contextlib.redirect_stdout(logged),
+            ):
+                with self.assertRaises(type(error)) as caught:
+                    with subject.bootstrap_response("release_metadata", "PRIVATE_URL", timeout=20):
+                        self.fail("refused request yielded")
+            self.assertIs(caught.exception, error)
+            if isinstance(error, ChangingCode):
+                self.assertEqual(error.reads, 1)
+                self.facts(logged.getvalue(), "release_metadata", "http_error", 403)
+            else:
+                self.assertEqual(logged.getvalue(), "")
+
+    def test_diagnostic_write_refusal_never_replaces_original_network_error(self):
+        from urllib.error import HTTPError
+
+        for refusal in (OSError("PRIVATE_MESSAGE"), RuntimeError("PRIVATE_BODY"), False, None):
+            with self.subTest(refusal=type(refusal).__name__):
+                error = HTTPError("PRIVATE_URL", 429, "PRIVATE_MESSAGE", None, None)
+                options = (
+                    {"side_effect": refusal}
+                    if isinstance(refusal, Exception)
+                    else {"return_value": refusal}
+                )
+                with (
+                    mock.patch.object(subject, "urlopen", side_effect=error),
+                    mock.patch("builtins.print", **options),
+                ):
+                    with self.assertRaises(HTTPError) as caught:
+                        with subject.bootstrap_response(
+                            "archive_download", "PRIVATE_URL", timeout=30
+                        ):
+                            self.fail("refused request yielded")
+                self.assertIs(caught.exception, error)
+
+    def test_diagnostic_cancellation_is_not_swallowed(self):
+        from urllib.error import HTTPError
+
+        for cancellation in (KeyboardInterrupt(), SystemExit(73)):
+            with self.subTest(cancellation=type(cancellation).__name__):
+                error = HTTPError("PRIVATE_URL", 403, "PRIVATE_MESSAGE", None, None)
+                with (
+                    mock.patch.object(subject, "urlopen", side_effect=error),
+                    mock.patch("builtins.print", side_effect=cancellation),
+                ):
+                    with self.assertRaises(type(cancellation)) as caught:
+                        with subject.bootstrap_response(
+                            "release_metadata", "PRIVATE_URL", timeout=20
+                        ):
+                            self.fail("refused request yielded")
+                self.assertIs(caught.exception, cancellation)
+
+    def test_successful_metadata_preserves_exact_bound_and_archive_validation_inputs(self):
+        import contextlib
+        import io
+
+        asset = {
+            "name": "Hammerspoon-1.1.1.zip",
+            "digest": "sha256:" + "f" * 64,
+            "size": 1024,
+            "browser_download_url": "https://github.com/Hammerspoon/hammerspoon/releases/download/1.1.1/Hammerspoon-1.1.1.zip",
+        }
+        response = mock.MagicMock()
+        response.__enter__.return_value = response
+        response.read.return_value = json.dumps({"tag_name": "1.1.1", "assets": [asset]}).encode()
+        logged = io.StringIO()
+        with (
+            mock.patch.object(subject, "urlopen", return_value=response) as opening,
+            contextlib.redirect_stdout(logged),
+        ):
+            self.assertEqual(subject.trusted_asset(Path("unused")), asset)
+        self.assertEqual(logged.getvalue(), "")
+        response.read.assert_called_once_with(1048577)
+        response.__exit__.assert_called_once_with(None, None, None)
+        self.assertEqual(opening.call_args.kwargs, {"timeout": 20})
+
+    def test_unknown_phase_refuses_before_request_or_diagnostic(self):
+        for phase in (None, True, "PRIVATE_BODY", "metadata", ""):
+            with (
+                mock.patch.object(subject, "urlopen") as opening,
+                mock.patch("builtins.print") as log,
+            ):
+                with self.assertRaises(ValueError):
+                    with subject.bootstrap_response(phase, "PRIVATE_URL", timeout=20):
+                        self.fail("foreign phase yielded")
+                opening.assert_not_called()
+                log.assert_not_called()
+
+
+class MetadataAuthenticationControls(unittest.TestCase):
+    TOKEN = "ghs_INDEPENDENT_PRIVATE_CREDENTIAL"
+
+    def asset(self):
+        return {
+            "name": "Hammerspoon-1.1.1.zip",
+            "digest": "sha256:" + "f" * 64,
+            "size": 1024,
+            "browser_download_url": "https://github.com/Hammerspoon/hammerspoon/releases/download/1.1.1/Hammerspoon-1.1.1.zip",
+        }
+
+    def reply(self):
+        response = mock.MagicMock()
+        response.__enter__.return_value = response
+        response.read.return_value = json.dumps(
+            {"tag_name": "1.1.1", "assets": [self.asset()]}
+        ).encode()
+        return response
+
+    def test_actual_metadata_authentication_changes_controlled_403_to_valid_asset(self):
+        from urllib.error import HTTPError
+        from types import SimpleNamespace
+
+        seen = []
+
+        def api(request, *, timeout):
+            seen.append(request)
+            self.assertEqual(
+                request.full_url,
+                "https://api.github.com/repos/Hammerspoon/hammerspoon/releases/tags/1.1.1",
+            )
+            self.assertEqual(timeout, 20)
+            if request.get_header("Authorization") != "Bearer " + self.TOKEN:
+                raise HTTPError(request.full_url, 403, "PRIVATE_BODY", None, None)
+            return self.reply()
+
+        with (
+            mock.patch.object(subject, "build_opener", return_value=SimpleNamespace(open=api)),
+            mock.patch.object(subject, "urlopen", side_effect=AssertionError("anonymous fallback")),
+        ):
+            self.assertEqual(
+                subject.trusted_asset(Path("unused"), metadata_token=self.TOKEN), self.asset()
+            )
+        self.assertEqual(len(seen), 1)
+        self.assertIsNone(seen[0].data)
+
+    def test_authenticated_401_and_403_preserve_exception_without_fallback_or_secret(self):
+        import contextlib
+        import io
+        from types import SimpleNamespace
+        from urllib.error import HTTPError
+
+        for status in (401, 403):
+            error = HTTPError(
+                "PRIVATE_URL", status, self.TOKEN, {"Authorization": self.TOKEN}, None
+            )
+            log = io.StringIO()
+            opening = mock.Mock(side_effect=error)
+            with (
+                mock.patch.object(
+                    subject, "build_opener", return_value=SimpleNamespace(open=opening)
+                ),
+                mock.patch.object(subject, "urlopen") as anonymous,
+                contextlib.redirect_stdout(log),
+            ):
+                with self.assertRaises(HTTPError) as caught:
+                    subject.trusted_asset(Path("unused"), metadata_token=self.TOKEN)
+            self.assertIs(caught.exception, error)
+            anonymous.assert_not_called()
+            opening.assert_called_once()
+            self.assertEqual(json.loads(log.getvalue())["http_status"], status)
+            for private in (self.TOKEN, "Authorization", "PRIVATE_URL"):
+                self.assertNotIn(private, log.getvalue())
+
+    def test_redirects_are_refused_without_forwarding_any_credential(self):
+        from urllib.error import HTTPError
+        from urllib.request import Request, build_opener
+        from email.message import Message
+
+        handler = subject.MetadataNoRedirect()
+        opener = build_opener(handler)
+        request = Request(
+            "https://api.github.com/repos/Hammerspoon/hammerspoon/releases/tags/1.1.1",
+            headers={"Authorization": "Bearer " + self.TOKEN},
+        )
+        for target in ("https://api.github.com/other", "https://foreign.invalid/secret"):
+            for code in (301, 302, 303, 307, 308):
+                headers = Message()
+                headers["Location"] = target
+                with self.assertRaises(HTTPError) as caught:
+                    opener.error("http", request, mock.Mock(), code, "redirect", headers)
+                self.assertEqual(caught.exception.code, code)
+        self.assertIsNone(
+            handler.redirect_request(request, None, 302, "redirect", {}, "https://foreign.invalid")
+        )
+
+    def test_authenticated_opener_preserves_default_tls_and_installs_only_redirect_refusal(self):
+        from types import SimpleNamespace
+
+        with mock.patch.object(
+            subject, "build_opener", return_value=SimpleNamespace(open=lambda *a, **k: self.reply())
+        ) as building:
+            subject.trusted_asset(Path("unused"), metadata_token=self.TOKEN)
+        self.assertEqual(len(building.call_args.args), 1)
+        self.assertIsInstance(building.call_args.args[0], subject.MetadataNoRedirect)
+        self.assertEqual(building.call_args.kwargs, {})
+
+    def test_foreign_metadata_route_refuses_before_authenticated_request(self):
+        with (
+            mock.patch.object(subject, "API", "https://foreign.invalid"),
+            mock.patch.object(subject, "build_opener") as building,
+            mock.patch.object(subject, "urlopen") as opening,
+        ):
+            with self.assertRaisesRegex(ValueError, "^metadata_route_refused$"):
+                subject.trusted_asset(Path("unused"), metadata_token=self.TOKEN)
+        building.assert_not_called()
+        opening.assert_not_called()
+
+    def test_malformed_supplied_tokens_refuse_closed_without_request(self):
+        for token in ("", "a b", "a\nPRIVATE", "é", "x" * 4097, True, 3, [], "a=b"):
+            with (
+                mock.patch.object(subject, "build_opener") as building,
+                mock.patch.object(subject, "urlopen") as opening,
+            ):
+                with self.assertRaisesRegex(ValueError, "^metadata_token_refused$"):
+                    subject.trusted_asset(Path("unused"), metadata_token=token)
+            building.assert_not_called()
+            opening.assert_not_called()
+        self.assertIsNone(subject.validate_metadata_token(None))
+        self.assertEqual(subject.validate_metadata_token(self.TOKEN), self.TOKEN)
+
+    def test_archive_after_authenticated_metadata_has_no_authorization(self):
+        from types import SimpleNamespace
+
+        with (
+            mock.patch.object(
+                subject,
+                "build_opener",
+                return_value=SimpleNamespace(open=lambda *a, **k: self.reply()),
+            ),
+            mock.patch.object(subject, "urlopen", return_value=self.reply()) as archive,
+        ):
+            asset = subject.trusted_asset(Path("unused"), metadata_token=self.TOKEN)
+            with subject.bootstrap_response(
+                "archive_download", asset["browser_download_url"], timeout=30
+            ):
+                pass
+        self.assertEqual(
+            archive.call_args.args,
+            (
+                "https://github.com/Hammerspoon/hammerspoon/releases/download/1.1.1/Hammerspoon-1.1.1.zip",
+            ),
+        )
+        self.assertEqual(archive.call_args.kwargs, {"timeout": 30})
+
+    def test_inventory_entry_scrubs_token_before_platform_refusal(self):
+        import os
+
+        with (
+            mock.patch.dict(os.environ, {"ERGOPTI_NATIVE_HS_METADATA_TOKEN": self.TOKEN}),
+            mock.patch.object(
+                subject.sys,
+                "argv",
+                ["probe", "--source-root", ".", "--source-sha", "a" * 40, "--output", "."],
+            ),
+            mock.patch.object(subject.sys, "platform", "linux"),
+            mock.patch.object(subject, "source_hashes") as git,
+            mock.patch.object(subject.importlib.util, "spec_from_file_location") as allocation,
+        ):
+            with self.assertRaisesRegex(ValueError, "native_python_prerequisite_refused"):
+                subject.main()
+            self.assertNotIn("ERGOPTI_NATIVE_HS_METADATA_TOKEN", os.environ)
+        git.assert_not_called()
+        allocation.assert_not_called()
+
+    def test_inventory_malformed_entry_consumes_token_before_any_allocation(self):
+        import os
+
+        with (
+            mock.patch.dict(os.environ, {"ERGOPTI_NATIVE_HS_METADATA_TOKEN": "PRIVATE\nTOKEN"}),
+            mock.patch.object(subject, "source_hashes") as git,
+            mock.patch.object(subject.importlib.util, "spec_from_file_location") as allocation,
+        ):
+            with self.assertRaisesRegex(ValueError, "^metadata_token_refused$"):
+                subject.main()
+            self.assertNotIn("ERGOPTI_NATIVE_HS_METADATA_TOKEN", os.environ)
+        git.assert_not_called()
+        allocation.assert_not_called()
+
+    def test_anonymous_local_metadata_retains_original_urlopen_seam(self):
+        with (
+            mock.patch.object(subject, "urlopen", return_value=self.reply()) as opening,
+            mock.patch.object(subject, "build_opener") as auth,
+        ):
+            self.assertEqual(subject.trusted_asset(Path("unused")), self.asset())
+        auth.assert_not_called()
+        request = opening.call_args.args[0]
+        self.assertIsNone(request.get_header("Authorization"))
+        self.assertEqual(opening.call_args.kwargs, {"timeout": 20})
+
+
+class NativeEntryTokenBoundary(unittest.TestCase):
+    def test_consumption_precedes_native_constructor_and_git_source_checks(self):
+        import os
+        from types import SimpleNamespace
+
+        error = RuntimeError("CONTROLLED_CONSTRUCTOR_BOUNDARY")
+
+        def construct():
+            self.assertNotIn("ERGOPTI_NATIVE_HS_METADATA_TOKEN", os.environ)
+            raise error
+
+        owner = SimpleNamespace(NativeProcessGroups=construct, OwnedProcessInterrupted=RuntimeError)
+        spec = SimpleNamespace(loader=SimpleNamespace(exec_module=lambda module: None))
+        with (
+            mock.patch.dict(os.environ, {"ERGOPTI_NATIVE_HS_METADATA_TOKEN": "ghs_PRIVATE"}),
+            mock.patch.object(
+                subject.sys,
+                "argv",
+                ["probe", "--source-root", ".", "--source-sha", "a" * 40, "--output", "."],
+            ),
+            mock.patch.object(subject.sys, "platform", "darwin"),
+            mock.patch.object(subject.sys, "version_info", (3, 13)),
+            mock.patch.object(subject.importlib.util, "spec_from_file_location", return_value=spec),
+            mock.patch.object(subject.importlib.util, "module_from_spec", return_value=owner),
+            mock.patch.object(subject.signal, "signal"),
+            mock.patch.object(subject, "source_hashes") as git,
+        ):
+            with self.assertRaises(RuntimeError) as caught:
+                subject.main()
+            self.assertIs(caught.exception, error)
+        git.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()

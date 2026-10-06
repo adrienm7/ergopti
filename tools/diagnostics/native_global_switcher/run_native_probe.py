@@ -5,6 +5,7 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
 import plistlib
 import signal
@@ -12,14 +13,13 @@ import sys
 import time
 from types import SimpleNamespace
 import uuid
-from urllib.request import urlopen
 
 from native_controller_owner import ProbeControllerOwner
 from probe_receipts import qualify
 
 DEPENDENCIES = {
     "ownership": "d3bc862c737e444f22d84fc32368bb8669360bc33ba6008c208f7bf62001314b",
-    "inventory": "21b51cdc242e6c2b1d2b5270d6ef0ddafd65b7e4658d955addd9a9c36697696d",
+    "inventory": "ec22906ec34b4b7efdf304dab81ab62cee0ad03148e6006bcbdf4276c8976afe",
 }
 
 
@@ -81,6 +81,8 @@ def read_receipt(path):
 
 
 def main(arguments=None):
+    # Remove before platform checks, Git/source checks, or any child allocation.
+    metadata_token = os.environ.pop("ERGOPTI_NATIVE_HS_METADATA_TOKEN", None)
     parser = argparse.ArgumentParser()
     parser.add_argument("--hammerspoon-app")
     parser.add_argument("--hammerspoon-archive")
@@ -115,6 +117,7 @@ def main(arguments=None):
         raise RuntimeError("The dedicated native fixture directory must be empty")
     ownership = pinned_module(args.owner_library, "ownership")
     inventory = pinned_module(args.inventory_library, "inventory")
+    metadata_token = inventory.validate_metadata_token(metadata_token)
     # CPython3.13+ is required on Darwin; failure is before any native child allocation.
     try:
         native = ownership.NativeProcessGroups()
@@ -168,11 +171,14 @@ def main(arguments=None):
             initial_pins.append(file_pin(here / name))
         initial_pins.extend([file_pin(args.owner_library), file_pin(args.inventory_library)])
         report["source_pins_before"] = initial_pins
-        asset = inventory.trusted_asset(scratch)
+        asset = inventory.trusted_asset(scratch, metadata_token=metadata_token)
+        metadata_token = None
         if args.download:
             archive = scratch / inventory.ASSET
             with (
-                urlopen(asset["browser_download_url"], timeout=30) as incoming,
+                inventory.bootstrap_response(
+                    "archive_download", asset["browser_download_url"], timeout=30
+                ) as incoming,
                 archive.open("xb") as destination,
             ):
                 payload = incoming.read(asset["size"] + 1)
