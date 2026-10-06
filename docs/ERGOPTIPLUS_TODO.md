@@ -4870,6 +4870,15 @@ Detailed commands, test owners and the inactive prepared packet are in
 [group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md).
 This deferral does not complete this item or the cross-cutting items16/38.
 
+The native modifier-hold consumer fixture now loads its actual shared Typing
+selection helpers and production selection constants. The missing dependency
+reproduces on both current sources and dev13 after12 successful SQLite checks
+and four Apps checks. The reviewed fixture-only repair retains every original
+assertion, SQL query and independent expected number; actual LuaJIT and Lua5.4
+replays pass12/0 SQLite and5/0 consumers, with four omission controls rejected.
+Production readers, writers, schemas and consumers are unchanged. Hosted
+revalidation remains pending; these checks do not qualify physical input.
+
 - [ ] **96.** Remove the separate Ergopti+ AltGr-adjustments option from the
       Layout menu. Selecting the Ergopti+ keylayout in the emulation picker must
       suffice. Verify that the layout supplies every intended change, retire
@@ -5574,6 +5583,20 @@ unchanged corpus. All11 original tests and91 assertions remain, with three
 new controls. Source review is clear and the unchanged601 native-call budget
 is met; native parser success, all14 tests and packaging remain unexecuted
 until the next hosted CI. The lexer change is an unproven diagnosis hypothesis.
+
+Native run37446596183 records9,690 Windows passes and11 failures. The original
+menu, logger, lifecycle and timer guards now pass, but valid program descriptors
+remain refused after successful string/cursor decoding. Fixed private parser
+stages and independent delimiter, numeric and empty-string controls now localize
+that refusal without changing its guards or logging input/exception messages.
+The isolated shutdown fixture loads the actual polling dependency graph and
+captured timing values, with strict per-mode callback and handle cleanup. All
+145 existing assertions remain; the candidate15 methods require native CI.
+The Linux GTK operand fixture adds only closed stage/case/exit annotations on
+its original failure branch. Actual unchanged current/dev13 and the candidate
+each pass4/4 locally, with12 descendants reaped and no pending debt. Its remote
+failure remains unexplained. Existing invocation/assertion/cleanup budgets are
+unchanged; this diagnostic slice does not qualify either refused boundary.
 
 - [~] **107.** Make the number-row policy explicit: native behavior, digits
   directly or symbols directly, with an acknowledged migration of the old
