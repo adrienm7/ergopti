@@ -400,8 +400,9 @@ end
 --- structural delimiters inside their content.
 --- @param body string Container body without its outer brackets/braces.
 --- @return table|nil fragments
-local function split_top_level_commas(body)
-	local fragments = {}
+local function split_top_level_commas(body, with_spans)
+	local fragments, spans = {}, with_spans and {} or nil
+	local first = 1
 	local current = {}
 	local quote = nil
 	local depth = 0
@@ -456,6 +457,8 @@ local function split_top_level_commas(body)
 			index = index + 1
 		elseif char == "," and depth == 0 then
 			fragments[#fragments + 1] = table.concat(current)
+			if spans then spans[#spans + 1] = { first = first, last = index - 1 } end
+			first = index + 1
 			current = {}
 			index = index + 1
 		else
@@ -464,8 +467,11 @@ local function split_top_level_commas(body)
 		end
 	end
 	if quote ~= nil or depth ~= 0 then return nil end
-	if #current > 0 then fragments[#fragments + 1] = table.concat(current) end
-	return fragments
+	if #current > 0 then
+		fragments[#fragments + 1] = table.concat(current)
+		if spans then spans[#spans + 1] = { first = first, last = #body } end
+	end
+	return fragments, spans
 end
 
 --- Extracts a multiline body only when its first lexical closure ends the token.
@@ -936,6 +942,47 @@ local function decode_document(content, shapes)
 	return root
 end
 
+
+
+--- Describes scalar-edit boundaries of one canonically valid inline value.
+--- Offsets refer to the supplied exact bytes, including outer trivia/comments.
+--- This evidence is descriptive only; callers still own source liveness and
+--- publication admission. The established decoder owns all key/value grammar.
+--- @param raw string One physical inline-table value.
+--- @return table|nil spans Container/member byte boundaries and decoded identities.
+function M.inline_member_spans(raw)
+	if type(raw) ~= "string" or raw:find("[\r\n]") then return nil end
+	local clean = trim(strip_comments(raw))
+	if clean:sub(1, 1) ~= "{" or clean:sub(-1) ~= "}" then return nil end
+	local decoded = coerce_value(clean)
+	if decoded == PARSE_ERROR or type(decoded) ~= "table" then return nil end
+	local first = raw:find("%S")
+	local last = first + #clean - 1
+	if raw:sub(first, last) ~= clean then return nil end
+	local result = { first = first, last = last, members = {} }
+	local body = clean:sub(2, -2)
+	if trim(body) == "" then return result end
+	local fragments, spans = split_top_level_commas(body, true)
+	if not fragments then return nil end
+	for index, fragment in ipairs(fragments) do
+		local key, value, rhs = split_kv(fragment)
+		local segments = key and parse_key(key)
+		if not segments or not rhs or not value or value == "" then return nil end
+		local span = spans[index]
+		local value_first = first + span.first + #fragment - #rhs + #rhs:match("^%s*")
+		local value_last = value_first + #value - 1
+		if raw:sub(value_first, value_last) ~= value then return nil end
+		result.members[#result.members + 1] = {
+			segments = segments,
+			first = first + span.first,
+			last = first + span.last,
+			value_first = value_first,
+			value_last = value_last,
+			value_source = value,
+		}
+	end
+	return result
+end
 
 --- Decodes a document with the established untagged Lua value model.
 --- @param content string TOML source.
