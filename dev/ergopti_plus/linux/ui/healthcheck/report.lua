@@ -67,11 +67,11 @@ local DEFAULT_EFFECTS = {
 		local Shell = require("adapters.shell_runner")
 		if not Shell.run("mkdir -p " .. Shell.quote(dir)) then return nil, "cannot create " .. dir end
 		local path = dir .. "/" .. name
-		local fh, err = io.open(path, "wb")
-		if not fh then return nil, tostring(err) end
-		local ok, write_err = fh:write(text)
-		fh:close()
-		if not ok then return nil, tostring(write_err) end
+		-- The filesystem adapter owns buffered write and close receipts: only a
+		-- completed file may be reported as saved and revealed to the user.
+		if require("adapters.file_system").write(path, text) ~= true then
+			return nil, "cannot complete writing " .. path
+		end
 		return path
 	end,
 	exists = function(path)
@@ -87,7 +87,7 @@ local DEFAULT_EFFECTS = {
 	open = xdg_open,
 	open_url = xdg_open,
 	notify = function(title, body, level)
-		require("adapters.notifier").send(body ~= "" and body or title, { title = title, level = level })
+		require("adapters.application_notifier").send(body ~= "" and body or title, { title = title, level = level })
 		return true
 	end,
 	identity = function()

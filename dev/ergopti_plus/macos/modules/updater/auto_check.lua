@@ -580,7 +580,7 @@ function M.announce(release)
 	else
 		body = body .. " " .. release.tag
 	end
-	local notified, err = notifications.notify(i18n.get("updater.tray_new_version_title"), body, "info",
+	local notified, err = notifications.notify(i18n.get("updater.tray_new_version_label"), body, "info",
 		function() UpdateLauncher.request_check(release.channel) end)
 	if notified ~= true then
 		Logger.error(LOG, "The new-release notification was refused: %s.", tostring(err))

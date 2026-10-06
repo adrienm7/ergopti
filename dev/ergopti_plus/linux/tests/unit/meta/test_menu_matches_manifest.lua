@@ -181,6 +181,34 @@ end
 
 
 
+--- Builds with the actual ordered-pair owner over an owned neutral source.
+--- Native editing is not exercised by this menu-shape fixture.
+local function build_fixture_menu(context)
+	local names = {"modules.shortcuts.key_combinations", "infra.key_combinations_scope", "ui.menu.key_combinations"}
+	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+	local ok, rows = pcall(function()
+		local Paths = require("infra.paths")
+		local file = assert(io.open(Paths.shared("tap_hold/defaults.toml"), "rb"))
+		local defaults = assert(require("toml_codec").decode(file:read("*a"))); assert(file:close())
+		local Pair = helpers.load_module("modules.shortcuts.key_combinations")
+		context.is_paused = function() return false end
+		context.gestures.is_assignable = function() return false end
+		context.gestures.capture_parameter_source_guard = function() return function() return true end end
+		local owner = Pair.new({keys = context.tap_holds.key_catalog(), hold_picker = defaults.tap_hold.hold_picker,
+			route = function() return "/controlled/menu-certification.toml" end,
+			files = {read_with_status = function() return nil, "absent" end},
+			actions = context.gestures, is_paused = context.is_paused, changed = function() return true end})
+		helpers.assert_true(Pair.set_instance(owner))
+		package.loaded["infra.key_combinations_scope"] = {retry_restore = function() return true end,
+			edit = function() error("menu-shape fixture cannot publish") end}
+		package.loaded["ui.menu.key_combinations"] = nil
+		return helpers.load_module("ui.menu.menu_builder").build(context)
+	end)
+	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+	if not ok then error(rows, 0) end
+	return rows
+end
+
 -- =================================================================
 -- =================================================================
 -- ======= 1/ Every declared row is on screen ======================
@@ -195,7 +223,7 @@ helpers.describe("menu certification: the manifest's rows are rendered", functio
 	helpers.before_each(function()
 		if built then return end
 		local mb = helpers.load_module("ui.menu.menu_builder")
-		built = mb.build(full_context())
+		built = build_fixture_menu(full_context())
 		titles = {}
 		for _, title in ipairs(all_titles(built)) do titles[title] = true end
 	end)
@@ -211,6 +239,12 @@ helpers.describe("menu certification: the manifest's rows are rendered", functio
 		local root = ManifestMenu and ManifestMenu.get_root() or nil
 		helpers.assert_not_nil(root, "the manifest must load, or this test checks nothing")
 
+		-- The complete fixture has no configured key, so these independent captions
+		-- name the native tap and absent hold. Provider templates format their rows.
+		local fixture_captions = {
+			tap_hold_key_tap_caption = i18n.get("tap_hold.tap.none"),
+			tap_hold_key_hold_caption = i18n.get("tap_hold.hold.none"),
+		}
 		local checked, missing = 0, {}
 		for menu_key in pairs(root) do
 			local rows = ManifestMenu.get_array(menu_key)
@@ -227,6 +261,11 @@ helpers.describe("menu certification: the manifest's rows are rendered", functio
 						local label = (kind == "section_header")
 							and i18n.section(row.i18n)
 							or i18n.get(row.i18n)
+						if row.caption_getter ~= nil then
+							local caption = fixture_captions[row.caption_getter]
+							helpers.assert_type(caption, "string", "every declared caption needs independent fixture state")
+							label = string.format(label, caption)
+						end
 						if not titles[label] then
 							missing[#missing + 1] = menu_key .. "/" .. (row.id or row.i18n)
 						end
@@ -265,7 +304,7 @@ helpers.describe("menu certification: the manifest's rows are rendered", functio
 			end,
 		}
 		local mb = helpers.load_module("ui.menu.menu_builder")
-		local row = find_item(mb.build(context), i18n.get("menu.shortcuts.edit_personal_info"))
+		local row = find_item(build_fixture_menu(context), i18n.get("menu.shortcuts.edit_personal_info"))
 		helpers.assert_not_nil(row, "the shared editor must have a production caller")
 		helpers.assert_true(type(row.fn) == "function")
 		row.fn()
@@ -298,7 +337,7 @@ helpers.describe("menu certification: no empty submenu", function()
 				end
 			end
 		end
-		walk(mb.build(full_context()), "")
+		walk(build_fixture_menu(full_context()), "")
 
 		helpers.assert_eq(#empty, 0,
 			"a submenu that opens onto nothing is worse than a missing one: the user "

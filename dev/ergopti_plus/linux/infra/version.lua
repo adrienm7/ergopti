@@ -30,6 +30,7 @@ local M = {}
 local Logger   = require("logger.shim")
 local Snapshot = require("diagnostics.snapshot")
 local Paths    = require("infra.paths")
+local FileSystem = require("adapters.file_system")
 local VersionLabel = require("updater.version_label")
 
 local LOG = "Version"
@@ -45,17 +46,6 @@ M.SOURCE_BUILD = "build"
 M.SOURCE_LOCAL = "local"
 M.SOURCE_UNKNOWN = "unknown"
 
---- Reads a whole file, nil when it cannot be opened.
---- @param path string
---- @return string|nil
-local function read_file(path)
-	local fh = io.open(path, "r")
-	if not fh then return nil end
-	local content = fh:read("*a")
-	fh:close()
-	return content
-end
-
 --- Resolves the driver version from the shared tree's build stamp.
 --- @param opts table|nil { fs = { read = fn(path) }, shared_root = string } overrides for tests.
 --- @return string version Release version, M.LOCAL or M.UNKNOWN.
@@ -64,7 +54,9 @@ function M.resolve(opts)
 	opts = opts or {}
 	local shared_root = opts.shared_root
 	if shared_root == nil then shared_root = Paths.shared_root() end
-	local version, reason, stamped = Snapshot.build_version(opts.fs or { read = read_file }, shared_root)
+	-- Release metadata uses the same native regular-file admission and terminal
+	-- receipts as other reads; a FIFO stamp must never block daemon startup.
+	local version, reason, stamped = Snapshot.build_version(opts.fs or FileSystem, shared_root)
 	if version then return version, M.SOURCE_BUILD end
 	if not stamped and reason == nil then return M.LOCAL, M.SOURCE_LOCAL end
 	Logger.warn(LOG, "Driver version unknown: %s.", tostring(reason))

@@ -1,0 +1,100 @@
+{
+	"description": "Independent complete source/expected update models; expectations are handwritten, not generated from the implementation.",
+	"cases": [
+		{
+			"id": "update-keeps-omitted-future-models",
+			"source": "{\"schema_version\":1,\"layouts\":{\"sample\":{\"id\":\"sample\",\"sha256\":\"old\",\"version\":\"1\",\"name\":\"Old\",\"homepage\":\"old\",\"languages\":[\"fr\"],\"platforms\":[\"macos\"],\"xkb\":{\"base_level_only\":[\"A\"]},\"future\":{\"nothing\":null,\"empty\":[],\"flag\":false},\"Version\":9},\"retired\":false},\"future_root\":{\"keep\":[]}}",
+			"operations": [
+				{
+					"kind": "install",
+					"entry": {
+						"id": "sample",
+						"sha256": "verified",
+						"version": "2"
+					}
+				}
+			],
+			"expected": "{\"schema_version\":1,\"layouts\":{\"sample\":{\"id\":\"sample\",\"sha256\":\"verified\",\"version\":\"2\",\"future\":{\"nothing\":null,\"empty\":[],\"flag\":false},\"Version\":9},\"retired\":false},\"future_root\":{\"keep\":[]}}"
+		},
+		{
+			"id": "supplied-values-win-with-detached-future-neighbors",
+			"source": "{\"schema_version\":1,\"layouts\":{\"sample\":{\"id\":\"sample\",\"sha256\":\"old\",\"version\":\"1\",\"future\":{\"nothing\":null,\"empty\":[],\"flag\":false},\"opaque\":[null,[],false]}},\"future_root\":false}",
+			"operations": [
+				{
+					"kind": "install",
+					"entry": {
+						"id": "sample",
+						"sha256": "verified",
+						"version": "2",
+						"future": false
+					}
+				}
+			],
+			"expected": "{\"schema_version\":1,\"layouts\":{\"sample\":{\"id\":\"sample\",\"sha256\":\"verified\",\"version\":\"2\",\"future\":false,\"opaque\":[null,[],false]}},\"future_root\":false}"
+		},
+		{
+			"id": "owned-extension-to-base-removes-only-owned-container",
+			"source": "{\"schema_version\":1,\"layouts\":{\"sample\":{\"id\":\"sample\",\"sha256\":\"old\",\"version\":\"1\",\"extension\":{\"id\":\"sample\",\"name\":\"Sample\",\"sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"files\":[{\"path\":\"manifest.toml\",\"file\":\"sample/manifest.toml\",\"size\":1,\"sha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"},{\"path\":\"sample.keylayout\",\"file\":\"sample/sample.keylayout\",\"size\":1,\"sha256\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\"}]},\"extension_future\":{\"keep\":[null,[],false]}}}}",
+			"operations": [
+				{
+					"kind": "install",
+					"entry": {
+						"id": "sample",
+						"sha256": "verified",
+						"version": "2"
+					}
+				}
+			],
+			"expected": "{\"schema_version\":1,\"layouts\":{\"sample\":{\"id\":\"sample\",\"sha256\":\"verified\",\"version\":\"2\",\"extension_future\":{\"keep\":[null,[],false]}}}}"
+		},
+		{
+			"id": "known-optional-index-fields-do-not-resurrect",
+			"source": "{\"schema_version\":1,\"layouts\":{\"sample\":{\"id\":\"sample\",\"sha256\":\"old\",\"version\":\"1\",\"name\":\"Old\",\"family\":\"sample\",\"keyboard_name\":\"Old\",\"file\":\"sample/old.keylayout\",\"size\":12,\"licence\":\"MIT\",\"author\":\"Old\",\"homepage\":\"old\",\"languages\":[\"fr\"],\"variants\":[\"sample_iso\"],\"platforms\":[\"macos\"],\"keycode_convention\":\"iso\",\"source_url\":\"old\",\"source_sha256\":\"old\",\"licence_file\":\"LICENSE\",\"xkb\":{\"base_level_only\":[\"A\"]},\"foreign\":false}}}",
+			"operations": [
+				{
+					"kind": "install",
+					"entry": {
+						"id": "sample",
+						"sha256": "verified",
+						"version": "2"
+					}
+				}
+			],
+			"expected": "{\"schema_version\":1,\"layouts\":{\"sample\":{\"id\":\"sample\",\"sha256\":\"verified\",\"version\":\"2\",\"foreign\":false}}}"
+		},
+		{
+			"id": "chained-update-remove-preserves-neighbors-not-owned-id",
+			"source": "{\"schema_version\":1,\"layouts\":{\"sample\":{\"id\":\"sample\",\"sha256\":\"old\",\"version\":\"1\",\"future\":[null,[],false]},\"neighbor\":{\"id\":\"neighbor\",\"sha256\":\"kept\",\"version\":\"1\",\"future\":[]}},\"future_root\":null}",
+			"operations": [
+				{
+					"kind": "install",
+					"entry": {
+						"id": "sample",
+						"sha256": "verified",
+						"version": "2"
+					}
+				},
+				{
+					"kind": "remove",
+					"id": "sample"
+				}
+			],
+			"expected": "{\"schema_version\":1,\"layouts\":{\"neighbor\":{\"id\":\"neighbor\",\"sha256\":\"kept\",\"version\":\"1\",\"future\":[]}},\"future_root\":null}"
+		},
+		{
+			"id": "verified-obsolete-row-replacement-still-has-no-inheritance",
+			"source": "{\"schema_version\":1,\"layouts\":{\"sample\":{\"id\":\"sample\",\"version\":\"legacy\",\"future\":{\"unverified\":true}},\"retired\":null}}",
+			"operations": [
+				{
+					"kind": "install",
+					"entry": {
+						"id": "sample",
+						"sha256": "verified",
+						"version": "2"
+					}
+				}
+			],
+			"expected": "{\"schema_version\":1,\"layouts\":{\"sample\":{\"id\":\"sample\",\"sha256\":\"verified\",\"version\":\"2\"},\"retired\":null}}"
+		}
+	]
+}

@@ -67,6 +67,9 @@ local _lgi = nil
 
 -- Native GTK window references: { [app_name] = { window, webview } }
 local _gtk_windows = {}
+local _native_ready = false
+local _native_query_generation = 0
+local _shutting_down = false
 
 -- Monotonic identity for each newly-created page context. A late blur or crash
 -- callback from an older WebView must not release ownership acquired by its
@@ -80,13 +83,14 @@ local function _probe_gtk()
 		Logger.debug(LOG, "lgi not available — webview rendering disabled (pure-Lua bridge mode).")
 		return false
 	end
-	if not pcall(function() return lgi.WebKit2 end) then
+	local read, native = pcall(function() return lgi.WebKit2 end)
+	if not read then
 		Logger.debug(LOG, "lgi.WebKit2 not available — webview rendering disabled.")
 		return false
 	end
 	_lgi = lgi
 	Logger.success(LOG, "GTK/WebKit2GTK available via lgi — webview rendering enabled.")
-	return true
+	return true, type(native) == "table" or type(native) == "userdata"
 end
 
 
@@ -136,6 +140,7 @@ end
 local BRIDGE_MODULES = {
 	config_cleanup        = "ui.config_cleanup.bridge",
 	action_picker         = "ui.action_picker.bridge",
+	physical_shortcuts     = "ui.physical_shortcuts.bridge",
 	changelog             = "ui.changelog.bridge",
 	download_window       = "ui.download_window.bridge",
 	error_dialog          = "ui.error_dialog.bridge",
@@ -192,8 +197,7 @@ local function _release_app_ownership(app_name, epoch)
 	if type(gate) ~= "table" or type(gate.release) ~= "function" then return true end
 	local ok, accepted = pcall(gate.release, app_name, epoch)
 	if not ok then
-		Logger.error(LOG, "Could not release input ownership for '%s': %s",
-			tostring(app_name), tostring(accepted))
+		Logger.error(LOG, "Input ownership release for '%s' refused.", tostring(app_name))
 		return false
 	end
 	if accepted ~= true then
@@ -209,6 +213,18 @@ end
 --- @return number|nil
 function M.current_epoch(app_name)
 	return _windows[app_name] and _windows[app_name].epoch or nil
+end
+
+--- Returns whether the exact native page has completed acquisition without debt.
+--- @param app_name string Stable page owner.
+--- @param epoch number Exact page identity.
+--- @return boolean current
+function M.page_current(app_name, epoch)
+	local owned, native = _windows[app_name], _gtk_windows[app_name]
+	return owned ~= nil and native ~= nil and native.epoch == epoch and not native.settled
+		and not native.view_settled and native.registration == true and native.signal_id ~= nil
+		and owned.epoch == epoch and not owned.acquiring
+		and not owned.closing and not owned.debt and not owned.failed
 end
 
 -- Exported for the pure-Lua lifecycle regression harness.
@@ -246,6 +262,7 @@ end
 --- @param active_locale string|nil Locale code (default: the interface's).
 --- @return boolean true if the window was opened or brought to front.
 function M.show(app_name, active_locale)
+	if _shutting_down then return false end
 	if type(app_name) ~= "string" or app_name == "" then
 		Logger.error(LOG, "show(): app_name is required.")
 		return false
@@ -262,9 +279,15 @@ function M.show(app_name, active_locale)
 
 	-- If window already exists, bring to front.
 	if _windows[app_name] then
-		Logger.debug(LOG, "Window '%s' already open — bringing to front.", app_name)
-		M.bring_to_front(app_name)
-		return true
+		local previous = _windows[app_name]
+		if previous.acquiring or previous.closing then return false end
+		if previous.failed or previous.debt then
+			if M.hide(app_name, previous.epoch) ~= true then return false end
+		else
+			Logger.debug(LOG, "Window '%s' already open — bringing to front.", app_name)
+			M.bring_to_front(app_name)
+			return true
+		end
 	end
 
 	local html = M.build_page_html(app_name, active_locale)
@@ -288,8 +311,18 @@ function M.show(app_name, active_locale)
 		handler = handler,
 		visible = false,
 		epoch   = _next_window_epoch,
-		opened_ms = Monotonic.now_ms(),
+		opened_ms = Monotonic.now_ms(), acquiring = true,
 	}
+
+	local owned = _windows[app_name]
+	if type(handler.on_window_acquiring) == "function" then
+		local called, accepted = pcall(handler.on_window_acquiring, owned.epoch)
+		if not called or accepted ~= true then
+			owned.acquiring, owned.failed = false, true
+			M.hide(app_name, owned.epoch)
+			return false
+		end
+	end
 
 	-- A logical page context is only provisional until the native owner exists.
 	-- Returning success in headless/pure-Lua mode made tray actions look healthy
@@ -299,10 +332,11 @@ function M.show(app_name, active_locale)
 	local create_ok, created, create_err = xpcall(function()
 		return M._create_gtk_window(app_name, html, handler)
 	end, debug.traceback)
-	if not create_ok or created ~= true then
-		_windows[app_name] = nil
-		Logger.error(LOG, "show(): native window creation failed for '%s': %s",
-			app_name, tostring(create_ok and (create_err or "native creator refused") or created))
+	owned.acquiring = false
+	if not create_ok or created ~= true or owned.cancelled or _windows[app_name] ~= owned then
+		owned.failed = true
+		if _windows[app_name] == owned then M.hide(app_name, owned.epoch) end
+		Logger.error(LOG, "show(): native window acquisition refused for '%s'.", app_name)
 		return false
 	end
 
@@ -319,17 +353,32 @@ end
 function M.hide(app_name, expected_epoch)
 	local owned = _windows[app_name]
 	if not owned or (expected_epoch ~= nil and owned.epoch ~= expected_epoch) then return false end
-	_release_app_ownership(app_name, owned.epoch)
-	_windows[app_name] = nil
-	if _gtk_available then
-		M._destroy_gtk_window(app_name, owned.epoch)
+	if owned.acquiring then
+		owned.cancelled = true
+		local native = _gtk_windows[app_name]
+		if native and native.epoch == owned.epoch then native.cancelled = true end
+		return false
 	end
-	-- A bridge that holds state for its window (the error window's policy) is
-	-- told when the window goes, whoever closed it
+	if owned.closing then return false end
+	owned.closing = true
+	local native = _gtk_windows[app_name]
+	if native then
+		local called, retired = pcall(M._destroy_gtk_window, app_name, owned.epoch)
+		if not called or retired ~= true then
+			owned.closing, owned.debt = false, true
+			return false
+		end
+	end
+	if _release_app_ownership(app_name, owned.epoch) ~= true or _windows[app_name] ~= owned then
+		owned.closing, owned.debt = false, true
+		return false
+	end
+	owned.closing = false
+	_windows[app_name] = nil
 	local handler = owned.handler
 	if type(handler) == "table" and type(handler.on_window_closed) == "function" then
 		local ok, err = pcall(handler.on_window_closed, owned.epoch)
-		if not ok then Logger.error(LOG, "The '%s' bridge failed on close: %s", app_name, tostring(err)) end
+		if not ok then Logger.error(LOG, "The '%s' bridge refused its close notification.", app_name) end
 	end
 	Logger.info(LOG, "Webview '%s' closed after %.1f s open.", app_name,
 		(Monotonic.now_ms() - (owned.opened_ms or Monotonic.now_ms())) / 1000)
@@ -488,7 +537,9 @@ function M.route_message(app_name, bridge_name, payload, source_epoch)
 		return nil
 	end
 	local current_epoch = M.current_epoch(app_name)
-	if source_epoch ~= nil and current_epoch ~= nil and source_epoch ~= current_epoch then
+	-- Native callbacks keep their captured epoch after public hide. No live
+	-- epoch means their page has retired, rather than permission to reload it.
+	if source_epoch ~= nil and source_epoch ~= current_epoch then
 		Logger.debug(LOG, "Ignoring stale message for '%s' from epoch %s (current %s).",
 			app_name, tostring(source_epoch), tostring(current_epoch))
 		return nil
@@ -625,6 +676,27 @@ M._app_title = _app_title
 -- =========================================
 -- =========================================
 
+--- Installs the exact child's terminal signal before any destruction attempt.
+--- Refused installation retains the live child for an owned retry.
+--- @return boolean observed
+local function observe_child(attempt, app_name, window_epoch)
+	if attempt.view_observed then return true end
+	local called = pcall(function()
+		attempt.webview.on_destroy = function()
+			attempt.view_settled = true
+			if attempt.retiring then return end
+			attempt.cancelled = true
+			local owned = _windows[app_name]
+			if owned and owned.epoch == window_epoch then
+				owned.cancelled = true
+				if not owned.acquiring and not owned.closing then M.hide(app_name, window_epoch) end
+			elseif not attempt.acquiring then M._destroy_gtk_window(app_name, window_epoch) end
+		end
+	end)
+	if called then attempt.view_observed = true end
+	return called
+end
+
 --- Creates a GTK WebKit2 window (Linux only, requires lgi).
 ---
 --- Lifecycle: GTK window is created on demand via show(), tracked in _gtk_windows
@@ -639,172 +711,188 @@ M._app_title = _app_title
 --- @return string|nil error_message Exact refusal reason.
 function M._create_gtk_window(app_name, html, handler)
 	if not _gtk_available or not _lgi then return false, "GTK/WebKit unavailable" end
+	if _gtk_windows[app_name] then return false, "native acquisition already owned" end
 	local window_epoch = M.current_epoch(app_name) or 0
+	local attempt = { epoch = window_epoch, acquiring = true }
+	_gtk_windows[app_name] = attempt
+	local called, created, detail = pcall(function()
 
-	local Gtk     = _lgi.Gtk
-	local WebKit2 = _lgi.WebKit2
-	local GLib    = _lgi.GLib
+		local Gtk     = _lgi.Gtk
+		local WebKit2 = _lgi.WebKit2
+		local GLib    = _lgi.GLib
 
-	-- Read geometry from the single-source manifest.
-	local geometry = _read_app_geometry(app_name)
+		-- Read geometry from the single-source manifest.
+		local geometry = _read_app_geometry(app_name)
 
-	-- ── Create the GTK window ──
-	local window = Gtk.Window({
-		title            = M.window_title(_app_title(app_name)),
-		default_width    = geometry.width,
-		default_height   = geometry.height,
-		window_position  = Gtk.WindowPosition.CENTER,
-		type             = Gtk.WindowType.TOPLEVEL,
-		-- A window that can appear while the user types must not take the keyboard
-		focus_on_map     = not UNFOCUSED_APPS[app_name],
-	})
+		-- ── Create the GTK window ──
+		local window = Gtk.Window({
+			title            = M.window_title(_app_title(app_name)),
+			default_width    = geometry.width,
+			default_height   = geometry.height,
+			window_position  = Gtk.WindowPosition.CENTER,
+			type             = Gtk.WindowType.TOPLEVEL,
+			-- A window that can appear while the user types must not take the keyboard
+			focus_on_map     = not UNFOCUSED_APPS[app_name],
+		})
 
-	-- Set minimum size if supported.
-	local ok_size, size_err = pcall(function()
-		window:set_size_request(geometry.min_width, geometry.min_height)
-	end)
-	if not ok_size then
-		Logger.warn(LOG, "Minimum size not applied to '%s': %s.", app_name, tostring(size_err))
-	end
+		attempt.window = window
+		if window == nil or window == false or attempt.cancelled then return false, "native acquisition revoked" end
 
-	-- Register only the capability owned by this page. A UserContentManager is
-	-- page-local, so there is no reason to expose any foreign handler name.
-	local ucm = WebKit2.UserContentManager()
-	local bridge_name = webkit_host.bridge_for_app(app_name)
-	if not bridge_name or not handler or handler.bridge_name ~= bridge_name then
-		Logger.error(LOG, "Cannot create '%s': owned bridge is unavailable.", app_name)
-		return false, "owned bridge unavailable"
-	end
-	local registered = pcall(function()
-		ucm:register_script_message_handler(bridge_name)
-	end)
-	if not registered then
-		Logger.error(LOG, "Cannot create '%s': bridge registration failed.", app_name)
-		return false, "bridge registration failed"
-	end
-
-	-- ── Connect the script-message-received signal for this bridge ──
-	-- lgi connects a DETAILED signal by indexing the signal with its detail:
-	-- `ucm.on_script_message_received[detail] = callback`. This assigned a table
-	-- of callbacks to the signal instead, which lgi took for the callback itself:
-	-- every message a page posted raised "attempt to call upvalue 'target' (a
-	-- table value)" inside lgi and never reached its bridge. Only a real WebKit
-	-- page posting its own request shows it (tests/hardware/run_webview_roundtrip).
-	local function handle_script_message(js_result)
-		local js_value = js_result:get_js_value()
-		local payload = _js_value_to_lua(js_value)
-		local response = M.route_message(app_name, bridge_name, payload, window_epoch)
-		if response ~= nil and _gtk_windows[app_name] and _gtk_windows[app_name].webview then
-			_send_response_to_js(_gtk_windows[app_name].webview, bridge_name, response)
+		-- Set minimum size if supported.
+		local ok_size, size_err = pcall(function()
+			window:set_size_request(geometry.min_width, geometry.min_height)
+		end)
+		if not ok_size then
+			Logger.warn(LOG, "Minimum size not applied to '%s': %s.", app_name, tostring(size_err))
 		end
-	end
 
-	local ok_sig, sig_err = pcall(function()
-		ucm.on_script_message_received[bridge_name] = function(_manager, js_result)
-			local ok_handle, handle_err = pcall(handle_script_message, js_result)
-			if not ok_handle then
-				Logger.error(LOG, "Message from '%s' could not be handled: %s.", app_name, tostring(handle_err))
+		-- Register only the capability owned by this page. A UserContentManager is
+		-- page-local, so there is no reason to expose any foreign handler name.
+		local ucm = WebKit2.UserContentManager()
+		attempt.ucm = ucm
+		local bridge_name = webkit_host.bridge_for_app(app_name)
+		if not bridge_name or not handler or handler.bridge_name ~= bridge_name then
+			Logger.error(LOG, "Cannot create '%s': owned bridge is unavailable.", app_name)
+			return false, "owned bridge unavailable"
+		end
+		local registered, accepted = pcall(function()
+			return ucm:register_script_message_handler(bridge_name)
+		end)
+		if not registered or accepted ~= true then
+			Logger.error(LOG, "Cannot create '%s': bridge registration failed.", app_name)
+			return false, "bridge registration failed"
+		end
+
+		attempt.registration, attempt.bridge_name = true, bridge_name
+		-- Detailed connect retains the exact native handler ID for its inverse.
+		-- Assignment connects the same signal but drops this physical capability.
+		local function handle_script_message(js_result)
+			local js_value = js_result:get_js_value()
+			local payload = _js_value_to_lua(js_value)
+			local response = M.route_message(app_name, bridge_name, payload, window_epoch)
+			if response ~= nil and _gtk_windows[app_name] and _gtk_windows[app_name].webview then
+				_send_response_to_js(_gtk_windows[app_name].webview, bridge_name, response)
 			end
 		end
-	end)
-	if not ok_sig then
-		Logger.error(LOG, "Cannot create '%s': its page messages cannot be received (%s).",
-			app_name, tostring(sig_err))
-		return false, "bridge signal connection failed"
-	end
 
-	-- ── Create the WebView ──
-	local webview = WebKit2.WebView({
-		user_content_manager = ucm,
-		visible              = true,
-	})
-
-	-- Load the inline HTML with an explicit base URI.
-	--
-	-- It was nil, and the comment called that "no file:// origin" as though the
-	-- absence were the point. A nil base makes WebKit treat the document as
-	-- about:blank with a unique opaque origin, and that is the only difference
-	-- between this path and the one in tests/hardware/run_page_errors.lua — which
-	-- builds the SAME html, loads it with "file:///", and finds window.setData
-	-- defined and no exception raised. Through this path it was undefined, so the
-	-- host's `if(window.setData)` guard discarded every push and the settings
-	-- window drew nothing.
-	--
-	-- Everything is inlined by build_injected_html, so nothing is ever fetched
-	-- relative to this URI. It exists to give the document an ordinary origin
-	-- rather than an opaque one.
-	-- The page load is the slow half of opening a window and the half a blank
-	-- window points at, so its completion is logged with its duration.
-	local load_started_ms = Monotonic.now_ms()
-	local ok_load_signal, load_signal_err = pcall(function()
-		webview.on_load_changed = function(_view, event)
-			if event == "FINISHED" or event == WebKit2.LoadEvent.FINISHED then
-				Logger.info(LOG, "Webview '%s' page loaded in %.0f ms.", app_name,
-					Monotonic.now_ms() - load_started_ms)
-			end
-		end
-	end)
-	if not ok_load_signal then
-		Logger.warn(LOG, "Load-completion signal unavailable for '%s': %s.", app_name,
-			tostring(load_signal_err))
-	end
-	webview:load_html(html, "file:///")
-
-	-- ── Window lifecycle: close → destroy the page context ──
-	window.on_destroy = function()
-		Logger.debug(LOG, "GTK window '%s' destroyed.", app_name)
-		_release_app_ownership(app_name, window_epoch)
-		if _gtk_windows[app_name] and _gtk_windows[app_name].epoch == window_epoch then
-			_gtk_windows[app_name] = nil
-		end
-		if M.current_epoch(app_name) == window_epoch then _windows[app_name] = nil end
-	end
-
-	window.on_delete_event = function()
-		Logger.debug(LOG, "GTK window '%s' delete-event — closing page context.", app_name)
-		return M._handle_delete_event(app_name, window_epoch)
-	end
-
-	-- A renderer crash can bypass blur/delete-event while leaving the native
-	-- window object alive. Release only the epoch owned by this WebView.
-	pcall(function()
-		webview.on_web_process_terminated = function()
-			Logger.error(LOG, "WebKit process for '%s' terminated.", app_name)
-			_release_app_ownership(app_name, window_epoch)
-		end
-	end)
-
-	-- ── Assemble and show ──
-	window:add(webview)
-	M._present_gtk_window(window, not UNFOCUSED_APPS[app_name])
-
-	-- ── Track native references ──
-	_gtk_windows[app_name] = {
-		window  = window,
-		webview = webview,
-		epoch   = window_epoch,
-	}
-
-	Logger.success(LOG, "GTK window '%s' created (%dx%d).", app_name, geometry.width, geometry.height)
-
-	-- Pump GTK events: if the daemon has a luv event loop, integrate.
-	local ok_pump, pump_err = pcall(function()
-		local event_loop = require("adapters.event_loop")
-		if event_loop and event_loop.add_idle_handler then
-			event_loop.add_idle_handler(function()
-				if _gtk_windows[app_name] then
-					local ctx = GLib.MainContext.default()
-					if ctx then ctx:iteration(false) end
+		local ok_sig, signal_id = pcall(function()
+			return ucm.on_script_message_received:connect(function(_manager, js_result)
+				local ok_handle, handle_err = pcall(handle_script_message, js_result)
+				if not ok_handle then
+					Logger.error(LOG, "Message from '%s' could not be handled: %s.", app_name, tostring(handle_err))
 				end
-			end)
+			end, bridge_name)
+		end)
+		if not ok_sig or type(signal_id) ~= "number" or signal_id <= 0 then
+			Logger.error(LOG, "Cannot create '%s': its page message receiver refused.", app_name)
+			return false, "bridge signal connection failed"
 		end
+
+		attempt.signal_id = signal_id
+		-- ── Create the WebView ──
+		local webview = WebKit2.WebView({
+			user_content_manager = ucm,
+			visible              = true,
+		})
+
+		attempt.webview = webview
+		if webview == nil or webview == false then return false, "native acquisition revoked" end
+		if observe_child(attempt, app_name, window_epoch) ~= true then return false, "native child observer refused" end
+		if attempt.cancelled then return false, "native acquisition revoked" end
+
+
+		-- Load the inline HTML with an explicit base URI.
+		--
+		-- It was nil, and the comment called that "no file:// origin" as though the
+		-- absence were the point. A nil base makes WebKit treat the document as
+		-- about:blank with a unique opaque origin, and that is the only difference
+		-- between this path and the one in tests/hardware/run_page_errors.lua — which
+		-- builds the SAME html, loads it with "file:///", and finds window.setData
+		-- defined and no exception raised. Through this path it was undefined, so the
+		-- host's `if(window.setData)` guard discarded every push and the settings
+		-- window drew nothing.
+		--
+		-- Everything is inlined by build_injected_html, so nothing is ever fetched
+		-- relative to this URI. It exists to give the document an ordinary origin
+		-- rather than an opaque one.
+		-- The page load is the slow half of opening a window and the half a blank
+		-- window points at, so its completion is logged with its duration.
+		local load_started_ms = Monotonic.now_ms()
+		local ok_load_signal, load_signal_err = pcall(function()
+			webview.on_load_changed = function(_view, event)
+				if event == "FINISHED" or event == WebKit2.LoadEvent.FINISHED then
+					Logger.info(LOG, "Webview '%s' page loaded in %.0f ms.", app_name,
+						Monotonic.now_ms() - load_started_ms)
+				end
+			end
+		end)
+		if not ok_load_signal then
+			Logger.warn(LOG, "Load-completion signal unavailable for '%s': %s.", app_name,
+				tostring(load_signal_err))
+		end
+		webview:load_html(html, "file:///")
+
+		-- ── Window lifecycle: close → destroy the page context ──
+		window.on_destroy = function()
+			attempt.settled = true
+			local owned = _windows[app_name]
+			if owned and owned.epoch == window_epoch then
+				if owned.acquiring then owned.cancelled, attempt.cancelled = true, true
+				elseif not owned.closing then M.hide(app_name, window_epoch) end
+			elseif _gtk_windows[app_name] == attempt and not attempt.retiring then
+				if attempt.acquiring then attempt.cancelled = true
+				elseif M._destroy_gtk_window(app_name, window_epoch) == true then _release_app_ownership(app_name, window_epoch) end
+			end
+		end
+
+		window.on_delete_event = function()
+			Logger.debug(LOG, "GTK window '%s' delete-event — closing page context.", app_name)
+			return M._handle_delete_event(app_name, window_epoch)
+		end
+
+		-- A renderer crash can bypass blur/delete-event while leaving the native
+		-- window object alive. Release only the epoch owned by this WebView.
+		pcall(function()
+			webview.on_web_process_terminated = function()
+				Logger.error(LOG, "WebKit process for '%s' terminated.", app_name)
+				_release_app_ownership(app_name, window_epoch)
+			end
+		end)
+
+		-- ── Assemble and show ──
+		window:add(webview)
+		M._present_gtk_window(window, not UNFOCUSED_APPS[app_name])
+
+		-- ── Track native references ──
+		if attempt.cancelled or attempt.settled or _gtk_windows[app_name] ~= attempt then
+			return false, "native acquisition revoked"
+		end
+
+		Logger.success(LOG, "GTK window '%s' created (%dx%d).", app_name, geometry.width, geometry.height)
+
+		-- Pump GTK events: if the daemon has a luv event loop, integrate.
+		local ok_pump, pump_err = pcall(function()
+			local event_loop = require("adapters.event_loop")
+			if event_loop and event_loop.add_idle_handler then
+				event_loop.add_idle_handler(function()
+					if _gtk_windows[app_name] then
+						local ctx = GLib.MainContext.default()
+						if ctx then ctx:iteration(false) end
+					end
+				end)
+			end
+		end)
+		if not ok_pump then
+			-- Without this integration the window paints once and then freezes.
+			Logger.error(LOG, "GTK event pump could not be attached for '%s': %s.", app_name,
+				tostring(pump_err))
+		end
+		return true
 	end)
-	if not ok_pump then
-		-- Without this integration the window paints once and then freezes.
-		Logger.error(LOG, "GTK event pump could not be attached for '%s': %s.", app_name,
-			tostring(pump_err))
-	end
-	return true
+	attempt.acquiring = false
+	if not attempt.window and _gtk_windows[app_name] == attempt then _gtk_windows[app_name] = nil end
+	if not called then return false, "native construction refused" end
+	return created == true, detail
 end
 
 --- Destroys a GTK window (Linux only).
@@ -812,17 +900,43 @@ end
 --- @param expected_epoch number|nil Refuse to destroy a replacement window when set.
 --- @return boolean true when a native window was destroyed.
 function M._destroy_gtk_window(app_name, expected_epoch)
-	_release_app_ownership(app_name, expected_epoch or M.current_epoch(app_name))
-	if not _gtk_available or not _lgi then return false end
 	local wref = _gtk_windows[app_name]
-	if not wref or not wref.window then return false end
-	if expected_epoch ~= nil and wref.epoch ~= expected_epoch then return false end
-	local ok, err = pcall(function() wref.window:destroy() end)
-	if not ok then
-		Logger.error(LOG, "Could not destroy GTK window '%s': %s", app_name, tostring(err))
+	if not wref or (expected_epoch ~= nil and wref.epoch ~= expected_epoch) then return false end
+	if wref.acquiring then wref.cancelled = true; return false end
+	if wref.retiring then return false end
+	wref.retiring = true
+	local called, retired = pcall(function()
+		if wref.webview and not wref.view_settled then
+			if observe_child(wref, app_name, wref.epoch) ~= true then return false end
+			local removed, accepted = pcall(function() return wref.webview:destroy() end)
+			if not removed or accepted == false or not wref.view_settled then return false end
+		end
+		if wref.signal_id then
+			local GObject = _lgi.GObject
+			local detached, accepted = pcall(GObject.signal_handler_disconnect, wref.ucm, wref.signal_id)
+			if not detached or accepted == false then return false end
+			local checked, connected = pcall(GObject.signal_handler_is_connected, wref.ucm, wref.signal_id)
+			if not checked or connected ~= false then return false end
+			wref.signal_id = nil
+		end
+		if wref.registration then
+			local removed, accepted = pcall(function() return wref.ucm:unregister_script_message_handler(wref.bridge_name) end)
+			if not removed or accepted == false then return false end
+			wref.registration = false
+		end
+		if not wref.settled and wref.window then
+			local removed, accepted = pcall(function() return wref.window:destroy() end)
+			if not removed or accepted == false then return false end
+			wref.settled = true
+		end
+		return true
+	end)
+	wref.retiring = false
+	if not called or retired ~= true or _gtk_windows[app_name] ~= wref then
+		Logger.error(LOG, "Native GTK page retirement refused for '%s'; exact capabilities retained.", app_name)
 		return false
 	end
-	if _gtk_windows[app_name] == wref then _gtk_windows[app_name] = nil end
+	_gtk_windows[app_name] = nil
 	Logger.debug(LOG, "GTK window '%s' destroyed.", app_name)
 	return true
 end
@@ -863,26 +977,61 @@ end
 -- =========================================
 -- =========================================
 
+--- Returns only the acknowledged native window readiness cached by initialization.
+--- Physical key capture is a separate capability and is never inferred here.
+--- @return boolean available
+function M.native_available() return _native_ready and _gtk_available == true end
+
 --- Initialises the webview manager. Probes for GTK availability.
 function M.init()
-	_gtk_available = _probe_gtk()
+	_native_query_generation = _native_query_generation + 1
+	local query_generation = _native_query_generation
+	_native_ready = false
+	local native_probe_ready
+	_gtk_available, native_probe_ready = _probe_gtk()
 	Logger.info(LOG, "WebView manager initialised (GTK available: %s).", tostring(_gtk_available))
+	if _native_query_generation == query_generation then _native_ready = _gtk_available == true and native_probe_ready == true end
 end
 
---- Destroys every owned page and clears UI-held input inhibition.
+--- Retires owned pages without discarding a refused exact native cleanup.
+--- @return boolean retired All owned page and native capabilities acknowledged release.
 function M.shutdown()
+	if _shutting_down then return false end
+	_shutting_down = true
+	_native_query_generation = _native_query_generation + 1
+	_native_ready = false
+	local retired = true
 	local app_names = {}
 	for app_name in pairs(_windows) do app_names[#app_names + 1] = app_name end
 	for _, app_name in ipairs(app_names) do
-		M.hide(app_name)
-		_windows[app_name] = nil
+		if M.hide(app_name) ~= true then retired = false end
 	end
-	local gate = _daemon_state.input_capture_gate
-	if type(gate) == "table" and type(gate.release_all) == "function" then
-		local ok, err = pcall(gate.release_all)
-		if not ok then Logger.error(LOG, "Input ownership shutdown failed: %s", tostring(err)) end
+	-- Direct native harness callers can own a window without a logical page.
+	local native_names = {}
+	for app_name in pairs(_gtk_windows) do
+		if _windows[app_name] == nil then native_names[#native_names + 1] = app_name end
 	end
-	Logger.info(LOG, "WebView manager shut down.")
+	for _, app_name in ipairs(native_names) do
+		local native = _gtk_windows[app_name]
+		if native then
+			local called, accepted = pcall(M._destroy_gtk_window, app_name, native.epoch)
+			if not called or accepted ~= true then retired = false end
+		end
+	end
+	if next(_windows) ~= nil or next(_gtk_windows) ~= nil then retired = false end
+	if retired then
+		local gate = _daemon_state.input_capture_gate
+		if type(gate) == "table" and type(gate.release_all) == "function" then
+			local called, accepted = pcall(gate.release_all)
+			if not called or accepted == false then
+				retired = false
+				Logger.error(LOG, "Input ownership shutdown refused.")
+			end
+		end
+	end
+	_shutting_down = false
+	if retired then Logger.info(LOG, "WebView manager shut down.") end
+	return retired
 end
 
 -- Auto-init on module load so the GTK probe runs once.

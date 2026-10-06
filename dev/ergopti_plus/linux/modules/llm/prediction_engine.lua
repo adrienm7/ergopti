@@ -74,6 +74,10 @@ local _max_tokens = nil
 local _scope_owner = nil
 local _enable_admission = nil
 local _enable_generation = 0
+local _runtime_app_epoch = 0
+local _runtime_closed = false
+local _runtime_owner, _runtime_request = nil, nil
+local retire_runtime_request, stop_runtime_app
 local _request_epoch = 0
 
 -- Injected by init(): whether the daemon is paused, and how a manual request
@@ -134,6 +138,7 @@ local _agent_timer = nil
 local _agent_generation = 0
 local _model_consent_owner = nil
 local _modal_resync_owner = nil
+local _enable_modal_resync_owner = nil
 local _agent_triage = nil
 local _agent_triaged = {}
 -- The application the user last typed in, for the menu's exclusion row
@@ -410,7 +415,7 @@ local function schedule(context, output_context, delay_ms, reason, live)
 		automatic = not live and not (type(output_context) == "table" and output_context.explicit == true),
 	}
 	local handle = _scheduler.after(math.max(0, tonumber(delay_ms) or 0) / 1000, function()
-		if _scope_owner then return end
+		if _runtime_closed or _scope_owner then return end
 		_pending_trigger = nil
 		if not live then
 			M.predict(context, captured)
@@ -450,8 +455,12 @@ end
 --- Initialises the engine and its explicit side-effect seams.
 --- @param opts table|nil
 function M.init(opts)
-	if _scope_owner then return false end
+	if _runtime_closed or _scope_owner then return false end
+	if stop_runtime_app and not stop_runtime_app() then return false end
+	if _runtime_closed or _scope_owner then return false end
+	_runtime_owner = nil
 	if _enable_admission and _enable_admission.cancel() ~= true then return false end
+	if _runtime_closed or _scope_owner then return false end
 	_enable_generation = _enable_generation + 1
 	local options = type(opts) == "table" and opts or {}
 	_engine = options.engine
@@ -497,7 +506,12 @@ function M.init(opts)
 	local profiles = get_profiles()
 	if profiles then
 		profiles.init({ port = HttpBridge.OLLAMA_DEFAULT_PORT })
-		if type(profiles.is_enabled) == "function" then _enabled = profiles.is_enabled() end
+		if _runtime_closed or _scope_owner then return false end
+		if type(profiles.is_enabled) == "function" then
+			local enabled = profiles.is_enabled()
+			if _runtime_closed or _scope_owner then return false end
+			_enabled = enabled
+		end
 	end
 	Logger.success(LOG, "Prediction engine initialised (triggers=%d, max_context=%d).",
 		#_triggers, max_context_chars())
@@ -505,7 +519,7 @@ end
 
 --- Processes one physical character after the hotstring buffer recorded it.
 function M.on_char(ch, buffer, output_context)
-	if _scope_owner then return false end
+	if _runtime_closed or _scope_owner then return false end
 	if type(ch) ~= "string" or type(buffer) ~= "string" then return end
 	-- A keystroke withdraws the agent's triage in flight and restarts its pause.
 	-- The agent does not depend on the AI menu's switch: it runs with it off.
@@ -556,7 +570,7 @@ end
 --- @param output_context table|nil
 --- @return boolean
 function M.on_hotstring_expired(context, output_context)
-	if _scope_owner then return false end
+	if _runtime_closed or _scope_owner then return false end
 	-- The automatic agent held its pause back while the preview was shown
 	-- (on_char), with the AI menu's switch on or off.
 	arm_agent(context, output_context)
@@ -632,7 +646,7 @@ end
 --- @return string|nil refusal A MANUAL_REFUSAL_KEYS reason the user should be
 ---   told, when the request was refused for one.
 function M.predict(context, output_context, override)
-	if _scope_owner then return false end
+	if _runtime_closed or _scope_owner then return false end
 	if _predicting or type(context) ~= "string" or context == "" then return end
 	if _is_secure_context() then
 		Logger.debug(LOG, "Prediction suppressed: secure field or excluded context.")
@@ -726,13 +740,13 @@ function M.predict(context, output_context, override)
 
 	local dispatch
 	dispatch = function()
-		if _scope_owner or epoch ~= _request_epoch then return end
+		if _runtime_closed or _scope_owner or epoch ~= _request_epoch then return end
 		local kind = M.get_backend()
 		local now = _clock_ms()
 		local wait_ms = (_last_request_ms[kind] or -math.huge) + Inference.min_interval_ms(kind) - now
 		if wait_ms > 0 then
 			_rate_timer = _scheduler.after(wait_ms / 1000, function()
-				if _scope_owner then return end
+				if _runtime_closed or _scope_owner then return end
 				_rate_timer = nil
 				dispatch()
 			end)
@@ -775,14 +789,14 @@ function M.predict(context, output_context, override)
 			-- user's copy of "basic" never got the single-line stops.
 			line_mode = not is_batch and not system_prompt:find("TAIL_CORRECTED", 1, true),
 		}, function(delta)
-			if _scope_owner or epoch ~= _request_epoch then return end
+			if _runtime_closed or _scope_owner or epoch ~= _request_epoch then return end
 			streamed = streamed .. think_filter:feed(delta)
 			if DisplaySettings.get("streaming") ~= true then return end
 			if requested > 1 and DisplaySettings.get("streaming_multi") ~= true then return end
 			local partials = parse_response(streamed, is_batch, trigger_chars)
 			publish(partials[#partials])
 		end, function(full_text, err)
-			if _scope_owner or epoch ~= _request_epoch then return end
+			if _runtime_closed or _scope_owner or epoch ~= _request_epoch then return end
 			if err then
 				_predicting = false
 				meta.loading = false
@@ -842,7 +856,7 @@ end
 --- @param prompt table|nil prompt_action.parse() output, nil for the menu's prompt.
 --- @return boolean requested True when predict() was started.
 local function run_manual(output_context, prompt)
-	if _scope_owner then return false end
+	if _runtime_closed or _scope_owner then return false end
 	local reason, context = manual_refusal()
 	if reason then
 		Logger.info(LOG, "Manual prediction refused (%s).", reason)
@@ -890,7 +904,7 @@ end
 --- @param output_context table|nil { app_id } for the metrics.
 --- @return boolean requested True when predict() was started.
 function M.trigger_prompt(value, output_context)
-	if _scope_owner then return false end
+	if _runtime_closed or _scope_owner then return false end
 	local prompt, err = PromptAction.parse(value)
 	if not prompt then
 		Logger.warn(LOG, "Prompt prediction refused: invalid parameter '%s' (%s).", tostring(value), err)
@@ -948,7 +962,7 @@ end
 --- @param source string What the log names the origin.
 --- @return boolean started
 local function start_live(prompt, source)
-	if _scope_owner then return false end
+	if _runtime_closed or _scope_owner then return false end
 	-- Live mode needs no text yet: it waits for typing.
 	local reason = manual_refusal()
 	if reason == "empty_context" then reason = nil end
@@ -984,7 +998,7 @@ end
 --- @param value string The binding's parameter, "<profile_id>" or "<profile_id>|<count>".
 --- @return boolean changed True when live mode was turned on or off.
 function M.toggle_live(value)
-	if _scope_owner then return false end
+	if _runtime_closed or _scope_owner then return false end
 	if _live then return M.stop_live("toggled off", true) end
 	local prompt, err = PromptAction.parse(value)
 	if not prompt then
@@ -999,7 +1013,7 @@ end
 --- @param profile_id string|nil
 --- @return boolean applied
 function M.set_live(profile_id)
-	if _scope_owner then return false end
+	if _runtime_closed or _scope_owner then return false end
 	if profile_id == nil then
 		if not _live then return true end
 		return M.stop_live("menu", true)
@@ -1011,9 +1025,11 @@ end
 --- Told by the daemon after every pause transition: a pause turns live mode off.
 --- @param paused boolean
 function M.on_pause_change(paused)
+	local retired = not paused or stop_runtime_app()
 	_enable_generation = _enable_generation + 1
 	if _enable_admission then _enable_admission.cancel() end
 	if paused then M.stop_live("Ergopti+ paused", false) end
+	return retired
 end
 
 --- The catalogue actions this engine answers, for the gesture executor's
@@ -1076,7 +1092,7 @@ end
 --- @param full_text string|nil The model's answer.
 --- @param err string|nil The backend's error.
 local function finish_tone(generation, plan, focus, full_text, err)
-	if _scope_owner then return end
+	if _runtime_closed or _scope_owner then return end
 	if generation ~= _tone_generation then
 		Logger.debug(LOG, "Tone answer ignored: a newer step or an edit superseded it.")
 		return
@@ -1128,7 +1144,7 @@ end
 --- @param cycle boolean Wrap around at the ends of the ladder.
 --- @return boolean requested True when the rewrite request was started.
 function M.shift_tone(direction, cycle)
-	if _scope_owner then return false end
+	if _runtime_closed or _scope_owner then return false end
 	local step = nil
 	for _, candidate in ipairs(TONE_DIRECTIONS) do
 		if candidate.direction == direction then step = candidate end
@@ -1210,7 +1226,7 @@ function M.shift_tone(direction, cycle)
 
 	local send
 	send = function()
-		if _scope_owner or generation ~= _tone_generation then return end
+		if _runtime_closed or _scope_owner or generation ~= _tone_generation then return end
 		local kind = M.get_backend()
 		local now = _clock_ms()
 		local wait_ms = (_last_request_ms[kind] or -math.huge) + Inference.min_interval_ms(kind) - now
@@ -1320,13 +1336,13 @@ end
 --- @param kind string|nil The backend kind ("ollama" or "api") the request goes
 ---   to; nil for the AI menu's.
 local function send_paced(epoch, what, send, on_unpaced, kind)
-	if _scope_owner or epoch ~= _request_epoch then return end
+	if _runtime_closed or _scope_owner or epoch ~= _request_epoch then return end
 	kind = kind or M.get_backend()
 	local now = _clock_ms()
 	local wait_ms = (_last_request_ms[kind] or -math.huge) + Inference.min_interval_ms(kind) - now
 	if wait_ms > 0 then
 		_rate_timer = _scheduler.after(wait_ms / 1000, function()
-			if _scope_owner then return end
+			if _runtime_closed or _scope_owner then return end
 			_rate_timer = nil
 			send_paced(epoch, what, send, on_unpaced, kind)
 		end)
@@ -1364,11 +1380,12 @@ local function offer_missing_model(failure, require_enabled)
 	}
 	_model_consent_owner = owner
 	local function current()
-		return _model_consent_owner == owner and _scope_owner == nil and not _is_paused()
+		local paused, origin = _is_paused(), M.get_base_url()
+		return _model_consent_owner == owner and _scope_owner == nil and not _runtime_closed and not paused
 			and (not require_enabled or _enabled)
 			and owner.epoch == _request_epoch and owner.vision_generation == _vision_generation
 			and owner.agent_generation == _agent_generation and owner.tone_generation == _tone_generation
-			and owner.base_url == M.get_base_url()
+			and owner.base_url == origin
 	end
 	local function observer(stage, receipt)
 		if stage == "before" then
@@ -1445,7 +1462,7 @@ local function request_screen_answers(spec, screen)
 		}
 		_inflight_backend = backend
 		backend.chat(target, model, messages, offer_request_opts(config.answer_max_tokens, true), nil, function(full_text, err)
-			if _scope_owner then return end
+			if _runtime_closed or _scope_owner then return end
 			if epoch ~= _request_epoch then
 				Logger.info(LOG, "Screen answer '%s' ignored: a newer action or an edit superseded it.", answer.id)
 				return
@@ -1486,7 +1503,7 @@ end
 --- @param text string|nil The vision model's answer.
 --- @param err string|nil The transport's or the provider's error.
 local function finish_screen_read(flow, spec, text, err)
-	if _scope_owner then return end
+	if _runtime_closed or _scope_owner then return end
 	if not vision_current(flow) then
 		Logger.info(LOG, "Screen transcription ignored: a newer action or an edit superseded it.")
 		return
@@ -1523,7 +1540,7 @@ end
 --- @param outcome table screen_capture outcome { status, scaled, reason }.
 local function finish_capture(flow, spec, outcome)
 	local capture = flow.capture
-	if _scope_owner or not vision_current(flow) then
+	if _runtime_closed or _scope_owner or not vision_current(flow) then
 		discard_capture(capture)
 		Logger.info(LOG, "Screen capture ignored: a newer action or an edit superseded it.")
 		return
@@ -1591,7 +1608,7 @@ end
 --- @param value string The binding's parameter, "<backend>" or "<backend>|<model>".
 --- @return boolean started True when the capture was started.
 function M.read_screen(action, value)
-	if _scope_owner then return false end
+	if _runtime_closed or _scope_owner then return false end
 	local screen_action = VISION_ACTIONS[action]
 	if not screen_action then error("read_screen: unknown screen action '" .. tostring(action) .. "'") end
 	local mode = screen_action.mode
@@ -1670,7 +1687,7 @@ end
 --- @param full_text string|nil The model's answer.
 --- @param err string|nil The backend's error.
 local function finish_translation(epoch, meta, config, full_text, err)
-	if _scope_owner then return end
+	if _runtime_closed or _scope_owner then return end
 	if epoch ~= _request_epoch then
 		Logger.info(LOG, "Translation ignored: a newer action or an edit superseded it.")
 		return
@@ -1709,7 +1726,7 @@ end
 --- @param value string The binding's parameter, "ui" or a locale code.
 --- @return boolean requested True when the translation request was started.
 function M.translate_selection(value)
-	if _scope_owner then return false end
+	if _runtime_closed or _scope_owner then return false end
 	if not _read_selection or not _replace_selection then
 		Logger.error(LOG, "Translation refused: no selection surface was injected.")
 		return false
@@ -1980,7 +1997,7 @@ end
 --- @param full_text string|nil The model's answer.
 --- @param err string|nil The backend's error.
 local function finish_agent(epoch, meta, config, tools, full_text, err)
-	if _scope_owner then return end
+	if _runtime_closed or _scope_owner then return end
 	if epoch ~= _request_epoch then
 		Logger.info(LOG, "Agent answer ignored: a newer action or an edit superseded it.")
 		return
@@ -2073,7 +2090,7 @@ end
 --- the selection and its actions are offered in the tooltip.
 --- @return boolean requested True when the request was started.
 function M.agent_selection()
-	if _scope_owner then return false end
+	if _runtime_closed or _scope_owner then return false end
 	if not _read_selection then
 		Logger.error(LOG, "Agent selection refused: no selection surface was injected.")
 		return false
@@ -2104,7 +2121,7 @@ end
 --- dialog. Cancelling it, or confirming nothing, does nothing.
 --- @return boolean requested True when the request was started.
 function M.agent_command()
-	if _scope_owner then return false end
+	if _runtime_closed or _scope_owner then return false end
 	if not _ask_text then
 		Logger.error(LOG, "Agent command refused: no text dialog was injected.")
 		return false
@@ -2137,7 +2154,7 @@ end
 --- @param mode string "off", "action" or "auto"
 --- @return boolean applied
 function M.set_agent_mode(mode)
-	if _scope_owner then return false end
+	if _runtime_closed or _scope_owner then return false end
 	if mode == "auto" then
 		local system1, reason1 = AgentSettings.chat_target("system1")
 		if not system1 then
@@ -2168,7 +2185,7 @@ end
 --- "action"; from "off" it turns the automatic mode on).
 --- @return boolean changed
 function M.toggle_agent_auto()
-	if _scope_owner then return false end
+	if _runtime_closed or _scope_owner then return false end
 	return M.set_agent_mode(AgentSettings.get_mode() == "auto" and "action" or "auto")
 end
 
@@ -2234,7 +2251,7 @@ end
 --- @param what string What the log names the request.
 --- @param send function Called when the request may go.
 local function send_when_free(generation, chat, what, send)
-	if _scope_owner or generation ~= _agent_generation then return end
+	if _runtime_closed or _scope_owner or generation ~= _agent_generation then return end
 	local interval = Inference.min_interval_ms(chat.kind)
 	local wait_ms = (_last_request_ms[chat.kind] or -math.huge) + interval - _clock_ms()
 	local busy = type(chat.module.is_active) == "function" and chat.module.is_active() == true
@@ -2277,7 +2294,7 @@ local function auto_system2(generation, sentence, opts)
 		Logger.info(LOG, "Sending agent request (source=typing, backend=%s, model=%s, %d byte(s), %d tool(s)).",
 			chat.backend, chat.model, #sentence, #tools)
 		send_system2(chat, payload, function(full_text, err)
-			if _scope_owner then return end
+			if _runtime_closed or _scope_owner then return end
 			if _agent_triage ~= state or generation ~= _agent_generation then
 				Logger.info(LOG, "Agent answer ignored: typing superseded it.")
 				return
@@ -2319,7 +2336,7 @@ end
 --- @param buffer string The typing buffer.
 --- @param app string|nil The application typed in.
 local function agent_pause_elapsed(generation, buffer, app)
-	if _scope_owner or generation ~= _agent_generation or agent_blocked() then return end
+	if _runtime_closed or _scope_owner or generation ~= _agent_generation or agent_blocked() then return end
 	if AgentSettings.is_app_disabled(app) then
 		Logger.debug(LOG, "Agent triage skipped: the application is excluded.")
 		return
@@ -2353,7 +2370,7 @@ local function agent_pause_elapsed(generation, buffer, app)
 		Logger.info(LOG, "Agent triage sent (backend=%s, model=%s, %s, %d char(s)).", system1.backend,
 			system1.model, system1.decision and "Jev decision" or "chat", code_points(sentence))
 		system1_transport(system1, config, sentence, { app = window.app, tools = tools }, function(triage, err)
-			if _scope_owner then return end
+			if _runtime_closed or _scope_owner then return end
 			if _agent_triage ~= triage_state or generation ~= _agent_generation then
 				Logger.info(LOG, "Agent triage ignored: typing superseded it.")
 				return
@@ -2427,6 +2444,10 @@ end
 --- Cancels pending/in-flight work and discards the current engine buffer.
 function M.cancel()
 	if _scope_owner then return false end
+	-- Only the one reset bracketed by this enable dialog's native restoration
+	-- may continue its unchanged receipt. Every other cancellation still revokes it.
+	if _enable_modal_resync_owner then _enable_modal_resync_owner.claim() end
+	if retire_runtime_request and not retire_runtime_request() then return false end
 	_enable_generation = _enable_generation + 1
 	if _enable_admission and _enable_admission.cancel() ~= true then return false end
 	M.withdraw(_modal_resync_owner)
@@ -2455,7 +2476,7 @@ end
 --- @param index integer
 --- @return boolean
 function M.accept(index)
-	if _scope_owner then return false end
+	if _runtime_closed or _scope_owner then return false end
 	local candidate = _suggestions[tonumber(index)]
 	if not candidate then return false end
 	local ok, committed
@@ -2499,7 +2520,7 @@ function M.accept(index)
 end
 
 function M.select(index)
-	if _scope_owner then return false end
+	if _runtime_closed or _scope_owner then return false end
 	if not _suggestions[tonumber(index)] then return false end
 	if _overlay and type(_overlay.select) == "function" then return _overlay.select(tonumber(index)) == true end
 	return true
@@ -2557,7 +2578,7 @@ end
 --- @param detail table { key, code, mods }
 --- @return boolean True when the key was the chord and must not reach the app.
 function M.handle_shortcut(detail)
-	if _scope_owner then return false end
+	if _runtime_closed or _scope_owner then return false end
 	if type(detail) ~= "table" or not offer_visible() then return false end
 	local navigation = ARROW_NAVIGATION_DELTA[detail.code]
 	if navigation then
@@ -2622,31 +2643,146 @@ function M.is_enabled() return _enabled end
 --- @return integer revision Monotonic native admission revision.
 function M.streaming_revision() return _enable_generation end
 
+
+-- ========================================
+-- ======= 6/ Owned Runtime Repair =========
+-- ========================================
+
+--- Retires the exact disabled enable ticket while preserving a promoted app lease.
+--- @return boolean acknowledged Physical request cleanup has settled.
+retire_runtime_request = function()
+	local request = _runtime_request
+	if not request then return true end
+	if request:cancel() ~= true then return false end
+	if _runtime_request == request then _runtime_request = nil end
+	return _runtime_request == nil
+end
+--- Revokes the app epoch and retains exact request/service cleanup debt.
+--- @return boolean acknowledged Every owned native runtime resource has retired.
+stop_runtime_app = function()
+	_runtime_app_epoch = _runtime_app_epoch + 1
+	local owner = _runtime_owner
+	local retired = retire_runtime_request()
+	local stopped = not owner or owner.controller:stop_app() == true
+	return retired and stopped and _runtime_owner == owner
+		and (not owner or not owner.controller:has_debt())
+end
+--- Stops only this app's Ollama service for pause, scope or app shutdown.
+--- @return boolean acknowledged Actual process/group/timer/HTTP retirement.
+function M.stop_runtime() return stop_runtime_app() end
+--- Permanently revokes this daemon's AI runtime authority before native teardown.
+--- @return boolean acknowledged Physical runtime cleanup has settled.
+function M.shutdown_runtime()
+	_runtime_closed = true
+	_enable_generation = _enable_generation + 1
+	-- Revoke ordinary probe/download authority before a native stop can reenter.
+	local probe_closed = not _enable_admission or _enable_admission.cancel() == true
+	local download_closed = M.cancel_model_download() == true
+	local runtime_closed = stop_runtime_app()
+	return probe_closed and download_closed and runtime_closed
+end
+--- Reports retained runtime repair or app-service cleanup ownership.
+--- @return boolean pending
+function M.runtime_pending()
+	return (_runtime_request ~= nil and not _runtime_request:is_settled())
+		or (_runtime_owner ~= nil and _runtime_owner.controller:has_debt())
+end
+--- Builds native composition lazily and classifies construction refusal.
+--- @return table|nil owner
+--- @return string|nil reason
+local function runtime_owner()
+	if _runtime_owner then return _runtime_owner end
+	local engine = { backend_key = BACKEND_KEY }
+	--- Captures native lexical revisions after potentially reentrant readers.
+	--- @return table state Current engine admission and app lifetime.
+	function engine.state()
+		local backend, model, origin = M.get_backend(), M.get_current_model(), M.get_base_url()
+		local paused = _is_paused()
+		return { backend=backend, model=model, origin=origin, revision=_enable_generation,
+			app_epoch=_runtime_app_epoch, enabled=_enabled, paused=paused, blocked=_runtime_closed or _scope_owner ~= nil }
+	end
+	--- Admits a conditional preference publication with final lexical guards.
+	--- @param revision integer Originating enable admission revision.
+	--- @param app_epoch integer Originating application lifetime.
+	--- @param enabled boolean Expected current native enable state.
+	--- @param observe_source function Captured source reader ending in cheap owner checks.
+	--- @return boolean admitted
+	function engine.admit_write(revision, app_epoch, enabled, observe_source)
+		local paused = _is_paused()
+		if paused or type(observe_source) ~= "function" then return false end
+		local observed = observe_source()
+		return observed == true and not _runtime_closed and _scope_owner == nil and _enabled == enabled
+			and revision == _enable_generation and app_epoch == _runtime_app_epoch
+	end
+	--- Publishes native enable only after the existing profile writer ACK.
+	--- @param revision integer Exact originating engine admission revision.
+	--- @param app_epoch integer Exact originating application lifetime.
+	--- @return boolean acknowledged
+	function engine.publish_enabled(revision, app_epoch)
+		local paused = _is_paused()
+		if paused or _runtime_closed or _scope_owner or _enabled or revision ~= _enable_generation
+			or app_epoch ~= _runtime_app_epoch then return false end
+		_enabled = true
+		return true
+	end
+	--- Restores only the originating native gate after conditional profile compensation.
+	--- @param revision integer Exact originating native admission revision.
+	--- @param app_epoch integer Exact originating application lifetime.
+	--- @return boolean acknowledged
+	function engine.restore_disabled(revision, app_epoch)
+		local paused = _is_paused()
+		if paused or _runtime_closed or _scope_owner or revision ~= _enable_generation
+			or app_epoch ~= _runtime_app_epoch then return false end
+		_enabled = false
+		return true
+	end
+	local ok, owner, reason = pcall(function()
+		return require("modules.llm.runtime_factory").new(engine, get_profiles())
+	end)
+	if ok and owner then
+		if _runtime_closed or _scope_owner then return nil, "runtime_cancelled" end
+		_runtime_owner = owner
+		return owner
+	end
+	Logger.error(LOG, "Local Ollama runtime construction refused: %s.", tostring(ok and reason or owner))
+	return nil, "runtime_composition_unavailable"
+end
+
 --- Requests a fresh local receipt before the existing consent owner publishes.
 --- API activation does not depend on a local Ollama installation or server.
 --- @param on_changed function|nil Menu refresh after acknowledged publication.
 --- @return boolean dispatched
 function M.enable(on_changed)
-	if _scope_owner then return false end
+	if _runtime_closed or _scope_owner then return false end
 	if _enabled then return true end
+	if M.runtime_pending() then return false end
 	if _enable_admission and _enable_admission.pending() then return false end
 	local Preferences = require("infra.llm_preferences")
+	local modal_generation_offset = 0
 	local function snapshot()
 		local values, source = Preferences.get_many({ BACKEND_KEY, "llm.models.ollama", "llm.enabled" })
 		local backend = M.get_backend()
 		return {
 			backend = backend, model = values["llm.models.ollama"], origin = M.get_base_url(),
-			generation = Preferences.generation() + _enable_generation, source = source,
+			generation = Preferences.generation() + _enable_generation
+				- modal_generation_offset, source = source,
 			enabled = values["llm.enabled"], paused = _is_paused(),
 			blocked = _scope_owner ~= nil or not Preferences.admit() or _enabled ~= values["llm.enabled"]
-				or (backend == "ollama" and M.get_current_model() ~= values["llm.models.ollama"]),
+				or (backend == "ollama" and M.get_current_model() ~= values["llm.models.ollama"])
+				or _runtime_closed,
 		}
 	end
 	_enable_admission = require("modules.llm.enable_admission").new({
 		snapshot = snapshot,
 		commit = function(source)
+			local revision, app_epoch = _enable_generation, _runtime_app_epoch
+			local function admit()
+				return not _runtime_closed and _scope_owner == nil and not _enabled
+					and revision == _enable_generation and app_epoch == _runtime_app_epoch
+			end
 			local profiles = get_profiles()
-			if not profiles or type(profiles.enable) ~= "function" or profiles.enable(source) ~= true then
+			if not admit() or not profiles or type(profiles.enable) ~= "function"
+				or profiles.enable(source, admit) ~= true or not admit() then
 				Logger.error(LOG, "Prediction engine enable was not persisted - keeping the current state.")
 				return false
 			end
@@ -2654,17 +2790,166 @@ function M.enable(on_changed)
 			Logger.info(LOG, "Prediction engine enabled after current admission.")
 			return true
 		end,
-		reject = function(origin)
-			local _, retry = require("ui.llm_enable_refusal").show(origin)
+		reject = function(origin, _, _, captured, current, cleanup_only)
+			local Servers = require("modules.llm.local_servers")
+			local Entries = require("modules.llm.api_entries")
+			local Discovery = require("llm.local_server_discovery")
+			local I18n = require("infra.i18n")
+			local replacements = {}
+			local function current_cached()
+				return not cleanup_only and current() and not Servers.is_stale() and not Servers.is_sweeping()
+			end
+			-- The Models menu owns discovery. A refused enable consumes only its
+			-- current cached verdicts, never treating logical publication as proof
+			-- that the HTTP owner's process and native handles have retired.
+			if current_cached() then
+				for _, id in ipairs(Servers.detected()) do
+					local verdict = Servers.result(id)
+					local server = Servers.servers()[id]
+					local model = verdict and verdict.models and verdict.models[1]
+					local receipt = verdict and Servers.capture(id)
+					if server and verdict and verdict.status == Discovery.STATUS_UP and model
+						and receipt and Servers.is_current(receipt, model) then
+						local values = { server.label, model,
+							require("llm.local_server_menu").host_of(verdict.base_url) }
+						replacements[#replacements + 1] = {
+							label = (I18n.get("llm.unreachable.use_server"):gsub("{(%d+)}",
+								function(index) return tostring(values[tonumber(index)] or "") end)),
+							value = { id = id, model = model, receipt = receipt },
+						}
+					end
+				end
+			end
+			local runtime_choices, runtime_note = {}, nil
+			if not cleanup_only and current() and require('llm.runtime_repair').loopback_origin(origin) then
+				local runtime = runtime_owner()
+				if not runtime then runtime_note = I18n.get("ollama.runtime_repair_failed") end
+				local ok, resolved = pcall(function() return runtime and runtime.resolve() end)
+				if current() and ok and type(resolved)=='table'
+					and (resolved.status=='installed' or resolved.status=='missing') then
+					local token={}
+					local action=resolved.status=='installed' and 'start' or 'download'
+					runtime_choices[token]=action
+					replacements[#replacements+1]={value=token,label=I18n.get(action=='download'
+						and 'ollama.offer_download' or 'ollama.runtime_start')}
+					if action=='download' then runtime_note=I18n.get('ollama.offer_body') end
+				end
+			end
+			local continuation = { claimed = false }
+			function continuation.claim()
+				if continuation.claimed or not current() then return false end
+				continuation.claimed = true
+				modal_generation_offset = modal_generation_offset + 1
+				return true
+			end
+			local function modal_observer(stage, receipt)
+				if stage == "before" then
+					if type(receipt) ~= "table" or receipt.ok ~= true or not current() then return false end
+					_enable_modal_resync_owner = continuation
+				elseif stage == "after" or stage == "refused" then
+					_enable_modal_resync_owner = nil
+					if stage == "refused" or type(receipt) ~= "table" or receipt.ok ~= true then return false end
+					return current()
+				end
+				return true
+			end
+			local shown, _, retry, replacement = pcall(require("ui.llm_enable_refusal").show,
+				origin, replacements, modal_observer, runtime_note)
+			_enable_modal_resync_owner = nil
+			if not shown then
+				Logger.error(LOG, "The local AI refusal dialog failed: %s.", tostring(_))
+				return nil
+			end
+			local runtime_action = replacement and runtime_choices[replacement]
+			if runtime_action and not cleanup_only and current() then
+				if _enable_admission.cancel() ~= true or not current() then return nil end
+				local handle=_runtime_owner.source.capture()
+				if not handle or not current() then return nil end
+				local owner = _runtime_owner
+				-- Reserve teardown admission before any constructor can reenter.
+				-- This frame never acknowledges an unknown/unfinished acquisition.
+				local frame = { acquiring = true, cancelled = false, epoch = _runtime_app_epoch }
+				function frame:is_settled()
+					if self.acquiring or not self.operation or not self.settled then return false end
+					local called, settled = pcall(self.settled, self.operation)
+					return called and settled == true
+				end
+				function frame:cancel()
+					self.cancelled = true
+					if self.acquiring or not self.operation or not self.retire then return false end
+					local called, retired = pcall(self.retire, self.operation)
+					return called and retired == true and self:is_settled()
+				end
+				_runtime_request = frame
+				local called, request = pcall(owner.controller.start, owner.controller, handle, runtime_action, true, function(result)
+					if type(result) == "table" and result.ok == true and not frame.cancelled
+						and _runtime_request == frame and _runtime_owner == owner
+						and frame.epoch == _runtime_app_epoch and type(on_changed) == "function" then on_changed() end
+				end)
+				frame.acquiring = false
+				if not called or type(request) ~= "table" or type(request.cancel) ~= "function"
+					or type(request.is_settled) ~= "function" or type(request.on_result) ~= "function" then
+					Logger.error(LOG, "Local Ollama repair construction is unknown; its exact acquisition frame remains retained.")
+					return nil
+				end
+				frame.operation, frame.retire, frame.settled = request, request.cancel, request.is_settled
+				if frame.cancelled or frame.epoch ~= _runtime_app_epoch or _runtime_owner ~= owner then frame:cancel() end
+				request:on_result(function(result)
+					if type(result) ~= "table" or result.ok ~= false or result.error == "runtime_cancelled" then return end
+					Logger.error(LOG, "Local Ollama repair refused; its native cleanup owner remains retained until acknowledgment: %s.", tostring(result.error))
+					if owner.source.diagnostic_current(handle) then
+						local delivered = require("adapters.notifier").send(I18n.get("ollama.runtime_repair_failed"), {
+							title = I18n.get("ollama.fail_title"), level = "error",
+						})
+						if delivered ~= true then Logger.warn(LOG, "The local Ollama failure notice was not delivered.") end
+					end
+				end)
+				return nil
+			end
+			if replacement and current_cached() then
+				local selection_revision = _enable_generation
+				local preference_revision = Preferences.generation()
+				local result = Servers.apply(replacement.receipt, { model = replacement.model }, current_cached)
+				if not result or not result.saved or not result.entry then return nil end
+				local source = Entries.capture_source()
+				local function selection_current(phase)
+					local values, live_source = Preferences.get_many({ BACKEND_KEY, "llm.models.ollama", "llm.enabled" })
+					local active = Entries.active()
+					-- Only the backend owner's second admission observes its one revision
+					-- advance. A reset or preference rewrite during dismissal cannot borrow
+					-- that advance, even when the resulting source bytes happen to match.
+					local expected_revision = selection_revision + (phase == "after" and 1 or 0)
+					return not _is_paused() and M.can_configure_local_servers() and not _enabled
+						and _enable_generation == expected_revision and Preferences.generation() == preference_revision
+						and values["llm.enabled"] == false and values[BACKEND_KEY] == captured.backend
+						and values["llm.models.ollama"] == captured.model
+						and live_source.status == captured.source.status and live_source.content == captured.source.content
+						and source ~= nil and Entries.source_is_current(source)
+						and active ~= nil and active.id == result.entry.id and active.model == replacement.model
+				end
+				if selection_current() and M.set_backend("api", selection_current) == true then
+					if M.enable() ~= true then
+						Logger.warn(LOG, "The replacement backend was selected; AI enable was refused.")
+					end
+				else
+					Logger.warn(LOG, "The replacement server was saved; its backend selection was refused.")
+				end
+				if type(on_changed) == "function" then on_changed() end
+			end
 			return retry == true and "retry" or nil
 		end,
 		changed = on_changed,
 	})
-	return _enable_admission.enable()
+	local dispatched = _enable_admission.enable()
+	-- A refused synchronous probe can open the repair dialog before returning.
+	-- Its explicit replacement may already have acknowledged API enable through
+	-- the same preference owner; report that actual enabled state to the caller.
+	return dispatched == true or _enabled == true
 end
 
 function M.disable()
-	if _scope_owner then return false end
+	if _runtime_closed or _scope_owner then return false end
+	if not retire_runtime_request() then return false end
 	_enable_generation = _enable_generation + 1
 	if _enable_admission and _enable_admission.cancel() ~= true then return false end
 	local profiles = get_profiles()
@@ -2690,7 +2975,7 @@ function M.set_trigger_setting(name, value) return TriggerSettings.set(name, val
 function M.get_triggers() return _triggers end
 
 function M.set_triggers(triggers)
-	if _scope_owner then return false end
+	if _runtime_closed or _scope_owner then return false end
 	if type(triggers) ~= "table" then return false end
 	local accepted = {}
 	for _, trigger in ipairs(triggers) do
@@ -2729,26 +3014,40 @@ end
 --- The existing preference transaction owns the backend mutation separately.
 --- @return boolean
 function M.can_configure_local_servers()
-	return _scope_owner == nil and not _is_paused()
+	local paused = _is_paused()
+	return not paused and _scope_owner == nil and not _runtime_closed
 end
 
 --- Selects the backend.
 --- @param kind string "ollama" or "api"
+--- @param admit function|nil Receives "before" or "after" the owner's revision advance.
 --- @return boolean
 function M.set_backend(kind, admit)
-	local function admitted()
+	local function admitted(phase)
 		if admit == nil then return true end
 		if type(admit) ~= "function" then return false end
-		local ok, value = pcall(admit)
+		local ok, value = pcall(admit, phase)
 		return ok and value == true
 	end
-	if _scope_owner or not admitted() then return false end
+	local initial_revision, initial_epoch = _enable_generation, _runtime_app_epoch
+	if _runtime_closed or _scope_owner or not admitted("before") then return false end
+	if _runtime_closed or _scope_owner or initial_revision ~= _enable_generation
+		or initial_epoch ~= _runtime_app_epoch then return false end
 	if not BACKENDS[kind] then return false end
+	if not retire_runtime_request() then return false end
+	if kind ~= M.get_backend() and not stop_runtime_app() then return false end
 	_enable_generation = _enable_generation + 1
+	local revision, app_epoch = _enable_generation, _runtime_app_epoch
 	if _enable_admission and _enable_admission.cancel() ~= true then return false end
 	M.dismiss()
-	if _scope_owner or not admitted() then return false end
-	if require("infra.llm_preferences").set(BACKEND_KEY, kind) ~= true then return false end
+	if _runtime_closed or _scope_owner or not admitted("after") then return false end
+	local function current()
+		return not _runtime_closed and _scope_owner == nil
+			and revision == _enable_generation and app_epoch == _runtime_app_epoch
+	end
+	if not current() then return false end
+	if require("infra.llm_preferences").set_many({ [BACKEND_KEY] = kind }, nil, current) ~= true
+		or not current() then return false end
 	Logger.info(LOG, "Prediction backend set to '%s'.", kind)
 	return true
 end
@@ -2809,13 +3108,23 @@ function M.get_current_model()
 end
 
 function M.set_model(model_name)
+	if _runtime_closed or _scope_owner then return false end
+	if not retire_runtime_request() then return false end
 	_enable_generation = _enable_generation + 1
 	if _enable_admission and _enable_admission.cancel() ~= true then return false end
+	local revision, app_epoch = _enable_generation, _runtime_app_epoch
+	local function current()
+		return not _runtime_closed and _scope_owner == nil
+			and revision == _enable_generation and app_epoch == _runtime_app_epoch
+	end
+	local _, source = require("infra.llm_preferences").get_many({ "llm.models.ollama" })
 	local profiles = get_profiles()
-	return profiles and type(profiles.set_model) == "function" and profiles.set_model(model_name) == true or false
+	return current() and profiles and type(profiles.set_model) == "function"
+		and profiles.set_model(model_name, source, current) == true and current() or false
 end
 
 function M.refresh_models()
+	if _runtime_closed or _scope_owner then return false end
 	local profiles = get_profiles()
 	if profiles and type(profiles.refresh_models) == "function" then return profiles.refresh_models() end
 	return nil
@@ -2832,16 +3141,24 @@ end
 --- @param on_done function|nil
 --- @return boolean
 function M.download_model(model_tag, label, on_done)
+	if _runtime_closed or _scope_owner then return false end
+	local revision, app_epoch = _enable_generation, _runtime_app_epoch
+	local function current()
+		return not _runtime_closed and _scope_owner == nil
+			and revision == _enable_generation and app_epoch == _runtime_app_epoch
+	end
 	local base_url = M.get_base_url()
 	local ok_download, Download = pcall(require, "modules.llm.model_download")
-	if not base_url or not ok_download or type(Download.start) ~= "function" then return false end
+	if not current() or not base_url or not ok_download or type(Download.start) ~= "function" then return false end
 	return Download.start(base_url, model_tag, label, function(succeeded, tag)
+		if not current() then return end
 		if succeeded then
 			M.refresh_models()
 			if not M.set_model(tag) then succeeded = false end
 		end
+		if _runtime_closed or _scope_owner then return end
 		if type(on_done) == "function" then on_done(succeeded, tag) end
-	end)
+	end, current)
 end
 
 --- Cancels a model pull owned by this engine.
@@ -2880,8 +3197,9 @@ function M.is_auto_inject() return false end
 --- @param owner table Transaction identity.
 --- @return boolean acquired
 function M.acquire_configuration(owner)
-	if _scope_owner or type(owner) ~= "table" then return false end
+	if _runtime_closed or _scope_owner or type(owner) ~= "table" then return false end
 	_scope_owner = owner
+	_runtime_app_epoch = _runtime_app_epoch + 1
 	_enable_generation = _enable_generation + 1
 	return true
 end
@@ -2902,6 +3220,7 @@ end
 --- @return boolean quiescent
 function M.quiesce_configuration(owner)
 	if _scope_owner ~= owner then return false end
+	if not stop_runtime_app() then return false end
 	if _enable_admission and _enable_admission.cancel() ~= true then return false end
 	if _pending_trigger then
 		if _scheduler.cancel(_pending_trigger) ~= true then return false end
@@ -2937,7 +3256,7 @@ end
 function M.configuration_snapshot(owner)
 	if _scope_owner ~= owner or _predicting or _pending_trigger or _rate_timer or _tone_timer
 		or _inflight_backend or _vision_flow or _agent_timer or _agent_triage
-		or (_enable_admission and _enable_admission.pending()) then return nil end
+		or (_enable_admission and _enable_admission.pending()) or M.runtime_pending() then return nil end
 	return { enabled = _enabled }
 end
 
@@ -2946,7 +3265,7 @@ end
 --- @param snapshot table Desired enabled state.
 --- @return boolean applied
 function M.apply_configuration(owner, snapshot)
-	if _scope_owner ~= owner or type(snapshot.enabled) ~= "boolean" then return false end
+	if _runtime_closed or _scope_owner ~= owner or type(snapshot.enabled) ~= "boolean" then return false end
 	if not M.quiesce_configuration(owner) then return false end
 	_enabled = snapshot.enabled
 	if not _enabled then M.stop_live("AI switched off", false) end

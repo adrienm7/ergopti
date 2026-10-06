@@ -130,6 +130,34 @@ helpers.describe("AT-SPI focus query", function()
 		helpers.assert_eq(conclusive, false, "partial traversal must remain inconclusive")
 	end)
 
+	local interpreter_cases = {
+		{ arguments = { [-1] = "/synthetic/lua interpreter" }, executable = "/synthetic/lua interpreter" },
+		{ arguments = { [-2] = "/synthetic/luajit", [-1] = "-joff" }, executable = "/synthetic/luajit" },
+		{ arguments = { [-3] = "/synthetic/luajit", [-2] = "-joff", [-1] = "-O0" }, executable = "/synthetic/luajit" },
+		{ arguments = { [-3] = "/synthetic/luajit", [-2] = "-e", [-1] = "jit.off()" }, executable = "/synthetic/luajit" },
+		{ arguments = {}, executable = "luajit" },
+		{ executable = "luajit" },
+	}
+	for number, case in ipairs(interpreter_cases) do
+		helpers.it("linux-atspi-interpreter: launch metadata case " .. number, function()
+			AtspiFocus._set_backend_for_test(nil)
+			local original_arg, captured = arg, nil
+			arg = case.arguments
+			AtspiFocus._set_command_runner_for_test(function(command)
+				captured = command
+				return true, 'FOCUS:{"attributes":{},"name":"Password","role":40}'
+			end)
+			local ok, snapshot, conclusive = pcall(AtspiFocus.get_snapshot)
+			arg = original_arg
+			AtspiFocus._set_command_runner_for_test(nil)
+			helpers.assert_true(ok, tostring(snapshot))
+			helpers.assert_true(conclusive)
+			helpers.assert_eq(snapshot.role, 40)
+			helpers.assert_contains(captured, " " .. ShellRunner.quote(case.executable) .. " -e ",
+				"the helper must execute the interpreter, not a preceding interpreter option")
+		end)
+	end
+
 	helpers.it("bounds the native query and accepts only an explicit role record", function()
 		AtspiFocus._set_backend_for_test(nil)
 		local original_package_path = package.path

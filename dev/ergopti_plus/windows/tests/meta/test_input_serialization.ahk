@@ -15,9 +15,9 @@
 ;   into an in-flight expansion burst -> "trigger"+"bc" -> "outpubct". The fix is
 ;   to make the per-key remap (_RemapEmit), the watcher fire region (_OnPrefixChar
 ;   before HSE_FeedChar) and the dispatch's atomic send (HSE_DispatchMatch)
-;   uninterruptible via Critical. The Notepad clipboard path now uses one
-;   Prefix . "^v" SendInput burst, so it too stays under Critical; only genuine
-;   message-pumping waits (such as UIA selection) must release it. If a future edit drops any of those Critical calls, the
+;   uninterruptible via Critical. Native Notepad output instead publishes an
+;   owner in a short RAM transaction, revalidates admission, then commits only
+;   after verified receiving and worker retirement. If a future edit drops those Critical calls, the
 ;   fast-typing reorder / expansion interleave silently returns: this test makes
 ;   that loud.
 ;
@@ -96,24 +96,15 @@ _MetaCheckInputSerialization() {
 	Assert(GuardPos > 0 and LookupPos > 0 and GuardPos < LookupPos,
 		"_PrefixRenderFlush must early-return while suppressed, before _LookupAndRender")
 
-    ; --- Dispatch: every erase/output burst, including Notepad, is Critical ---
-	; Scope each assertion to HSE_DispatchMatch itself. Searching the concatenated
-	; directory after an exact signature was both refactor-fragile and could pass
-	; on an unrelated Critical in a later function.
+	; Native ownership uses a short RAM transaction, then an asynchronous receiver.
+	_NHAB_AssertNativeRoute()
 	DispatchBody := _StripFullLineComments(_DriverFuncBody("HSE_DispatchMatch"))
 	Assert(DispatchBody != "", "engine must define HSE_DispatchMatch")
-	NotepadStart := InStr(DispatchBody, "if IsNotepadApp")
-	AtomicStart := NotepadStart > 0
-		? InStr(DispatchBody, "} else {", true, NotepadStart)
-		: 0
-	Assert(NotepadStart > 0 and AtomicStart > NotepadStart,
-		"HSE_DispatchMatch must retain distinct Notepad and atomic output branches")
-
-	NotepadBlock := SubStr(DispatchBody, NotepadStart, AtomicStart - NotepadStart)
-	NotepadCritical := InStr(NotepadBlock, 'Critical("On")')
-	NotepadSend := InStr(NotepadBlock, "SendInstant(")
-	Assert(NotepadCritical > 0 and NotepadSend > NotepadCritical,
-		"the Notepad erase+paste transaction must enter Critical before SendInstant")
+	NativeStart := InStr(DispatchBody, "if IsNotepadApp {")
+	TerminalStart := InStr(DispatchBody, "} else if IsTerminalApp {", , NativeStart)
+	AtomicStart := InStr(DispatchBody, "} else {", , TerminalStart)
+	Assert(NativeStart > 0 && TerminalStart > NativeStart && AtomicStart > TerminalStart,
+		"native, terminal and atomic dispatch branches must remain distinct")
 
 	AtomicBlock := SubStr(DispatchBody, AtomicStart)
 	AtomicCritical := InStr(AtomicBlock, 'Critical("On")')
@@ -320,53 +311,31 @@ Test("meta input: DeadKey releases Critical before the blocking ih.Wait() and re
 ; =====================================
 ; =====================================
 
-; Guards that the clipboard/SendInstant compatibility branch is still selected only
-; for notepad.exe AND has the same atomicity as the regular path. The historical
-; branch released Critical, erased with SendEvent, then pasted separately; a
-; physical key could land in that gap. This test pins the Prefix . "^v" transaction
-; so a future compatibility edit cannot reintroduce the interleave.
+; Native completion must retain the shared host gate and retire before commit.
 _MIS_CheckNotepadClipboardBranchIsAtomic() {
+	_NHAB_AssertNativeRoute()
 	Body := _DriverFuncBody("HSE_DispatchMatch")
-	Assert(Body != "", "HSE_DispatchMatch(Spec, EndChar) must exist")
-
-	; The IsNotepadApp gate must exist.
-	IsNotepadPos := InStr(Body, "IsNotepadApp")
-	Assert(IsNotepadPos > 0,
-        "HSE_DispatchMatch must gate the Notepad clipboard branch on IsNotepadApp")
-
-	; The gate must be the host rule every sender shares, and that rule must be
-	; keyed on notepad.exe alone.
-	Assert(InStr(Body, "IsNotepadApp := OutputHostTakesTextByPaste(OutputHost)") > 0,
-		"the IsNotepadApp check must read the shared host rule from the dispatch's own receipt")
-	RuleBody := _DriverFuncBody("OutputHostTakesTextByPaste")
-	Assert(RuleBody != "", "OutputHostTakesTextByPaste(Host) must exist")
-	Assert(InStr(RuleBody, '"notepad.exe"') > 0,
-		"the host rule must be keyed on 'notepad.exe' — no other app must take the compatibility path")
-
-	; The else branch (atomic path) must contain SendInput with Critical On.
-	ElsePos := InStr(Body, "} else {", , InStr(Body, "if IsNotepadApp"))
-	Assert(ElsePos > 0,
-		"HSE_DispatchMatch must have an else branch (atomic path) after the Notepad check")
-	ElseBlockStart := ElsePos
-	NextSectionEnd := InStr(Body, "HSE_ApplyExpansion", , ElseBlockStart)
-	ElseBlock := SubStr(Body, ElseBlockStart, (NextSectionEnd > 0 ? NextSectionEnd : StrLen(Body)) - ElseBlockStart)
-	Assert(InStr(ElseBlock, "SendInput") > 0,
-		"the atomic else branch must use SendInput (not SendEvent/SendInstant)")
-	Assert(InStr(ElseBlock, 'Critical("On")') > 0,
-		"the atomic else branch must enter Critical On before the SendInput burst")
-
-    ; The Notepad branch must retain Critical and emit erase+paste through one
-    ; SendInstant transaction. No separate SendNewResult erase is permitted.
-	IfBlockStart := InStr(Body, "if IsNotepadApp")
-	IfBlockEnd := InStr(Body, "} else {", , IfBlockStart)
-	IfBlock := SubStr(Body, IfBlockStart, IfBlockEnd - IfBlockStart)
-    Assert(InStr(IfBlock, 'Critical("On")') > 0,
-        "the Notepad branch must retain Critical through its non-blocking clipboard injection")
-    Assert(InStr(IfBlock, "SendInstant(Replacement . EndCharEmitted, BackSpaceSeq)") > 0,
-        "the Notepad branch must send erase and clipboard paste as one SendInstant transaction")
-    Assert(InStr(IfBlock, "SendNewResult(BackSpaceSeq") = 0,
-        "the Notepad branch must not issue a separate SendEvent erase before the paste")
+	Rule := _DriverFuncBody("OutputHostTakesTextByPaste")
+	Poll := _DriverFuncBody("_TextSenderPollNative")
+	Finish := _DriverFuncBody("_TextSenderFinishNative")
+	Assert(Body != "" && Rule != "" && Poll != "" && Finish != "",
+		"native Notepad admission and completion owners must exist")
+	AssertContains(Body, "IsNotepadApp := OutputHostTakesTextByPaste(OutputHost)",
+		"native Notepad dispatch must use its captured shared host receipt")
+	AssertContains(Rule, '"notepad.exe"', "the native literal host rule must retain Notepad")
+	Code := _DriverMaskNonCode(&Poll)
+	Close := InStr(Code, 'Closed := Owner.Port[')
+	Assert(Close > 0 && RegExMatch(SubStr(Poll, Close), '^Closed := Owner\.Port\["close"\]\.Call\(Owner.Token\)'),
+		"native completion must call the actual close port")
+	Busy := InStr(Code, "if Closed == 5")
+	Refusal := InStr(Code, "if Closed != 0")
+	Done := InStr(Code, "_TextSenderFinishNative(Owner, Phase,")
+	Assert(Busy > Close && Refusal > Busy && Done > Refusal,
+		"native completion must wait for retirement and reject close refusal before canonical commit")
+	FinishCode := _DriverMaskNonCode(&Finish)
+	Assert(RegExMatch(FinishCode, "i)if\s+Phase\s*==\s*4\s*\{[\s\S]*_TextSenderRunAtomicOutput\("),
+		"only independently verified native success may enter the canonical output commit")
 }
 
-Test("meta input: Notepad clipboard branch remains atomic (clipboard/SendInstant gate)",
+Test("meta input: Notepad native owner retires before canonical output commit",
     _MIS_CheckNotepadClipboardBranchIsAtomic)

@@ -9,7 +9,7 @@
 ; consulted the synthetic ledger: with AltGr held by a tap-hold (CapsLock or
 ; Space held as AltGr), an expansion released it for good and the rest of the
 ; hold typed plain characters, while the owner still counted it down
-; (kana-altgr-lift-owner-2026-09-25). Every expansion output now goes through
+; (kana-altgr-lift-owner-2026-09-25). Keyboard expansion output now goes through
 ; _HSE_SendWithAltGrUp, which on a Kana layout has the owner lift the key
 ; around the output and press it again only while a tap-hold still holds it,
 ; and the chord cleanup leaves an owned key to its owner. The cases below drive
@@ -262,12 +262,13 @@ _KALO_RecordExpansionSend(Name, Args*) {
 	return true
 }
 
-; Every production expansion path, with a tap-hold or the user holding AltGr:
-; both are given their AltGr back after the output. Runs inside
+; Keyboard expansion paths lift and restore owned AltGr; literal native output
+; sends no keyboard edges and must leave both ownership ledgers untouched. Runs inside
 ; the send-failure suite's isolation (_AHK04_RunIsolated), which snapshots and
 ; restores the engine, preview, ring and hook state these paths commit.
 _KALO_EveryExpansionPathImpl() {
-	global _SendHook, HSE_Buffer, HSE_StartIsWordBoundary, _PrefixBuffer, _KALO_Sent
+	global _SendHook, HSE_Buffer, HSE_StartIsWordBoundary, _PrefixBuffer, _KALO_Sent, _LLM_Bridge_Buffer
+	global _TH_SyntheticHeldKeys, _TH_SyntheticUserHeldKeys, _TH_SyntheticReleasePendingKeys
 	for _, Scenario in [[true, "tap-hold"], [false, "tap-hold"], [true, "user"], [false, "user"]] {
 		Kana := Scenario[1]
 		Layout := _KALO_LayoutName(Kana) . ", " . Scenario[2] . " hold"
@@ -301,9 +302,27 @@ _KALO_EveryExpansionPathImpl() {
 			_KALO_Sent := []
 			HSE_Buffer := "ab"
 			_PrefixBuffer := "ab"
-			AssertTrue(HSE_DispatchMatch(_AHK04_NormalSpec(), ""), Layout . ": the Notepad expansion must fire")
-			AssertEqual(_KALO_AroundOwnedHold(Kana, "SendInstant", Scenario[2]), _KALO_Joined(),
-				Layout . ": the Notepad clipboard expansion must go out through the AltGr owner")
+			_LLM_Bridge_Buffer := "ab"
+			Native := Map("Requests", [])
+			HeldBefore := _TH_SyntheticHeldKeys.Count
+			UserHeldBefore := _TH_SyntheticUserHeldKeys.Count
+			PendingBefore := _TH_SyntheticReleasePendingKeys.Count
+			Owner := HSE_DispatchMatch(_AHK04_NormalSpec(), "", , false, _HNP_Record.Bind(Native))
+			AssertTrue(Owner is Map, Layout . ": native output must retain its real pending owner")
+			AssertTrue(Owner["Pending"], Layout . ": native scheduling cannot report a fire")
+			AssertEqual("ab", HSE_Buffer, Layout . ": pending receiving cannot commit the engine")
+			AssertEqual("", _KALO_Joined(), Layout . ": native scheduling must not emit keyboard or modifier edges")
+			AssertEqual(HeldBefore, _TH_SyntheticHeldKeys.Count, Layout . ": pending output retains synthetic holds")
+			AssertEqual(UserHeldBefore, _TH_SyntheticUserHeldKeys.Count, Layout . ": pending output retains user holds")
+			AssertEqual(PendingBefore, _TH_SyntheticReleasePendingKeys.Count, Layout . ": pending output creates no release debt")
+			_HNP_Settle(Native)
+			AssertTrue(Owner["FinalSucceeded"], Layout . ": actual canonical completion acknowledges native output")
+			AssertEqual("Z", HSE_Buffer, Layout . ": completion commits the exact visible effect")
+			AssertEqual("Z", _LLM_Bridge_Buffer, Layout . ": canonical completion commits the same LLM mirror")
+			AssertEqual("", _KALO_Joined(), Layout . ": native completion also leaves modifiers untouched")
+			AssertEqual(HeldBefore, _TH_SyntheticHeldKeys.Count, Layout . ": completion preserves synthetic hold ownership")
+			AssertEqual(UserHeldBefore, _TH_SyntheticUserHeldKeys.Count, Layout . ": completion preserves user hold ownership")
+			AssertEqual(PendingBefore, _TH_SyntheticReleasePendingKeys.Count, Layout . ": completion creates no release debt")
 
 			_KALO_Sent := []
 			AssertTrue(_HotstringDispatch("Z", " ", "{BackSpace 2}", "a", true, false, 0),
@@ -315,9 +334,9 @@ _KALO_EveryExpansionPathImpl() {
 }
 
 _KALO_EveryExpansionPathKeepsTheHold() {
-	_AHK04_RunIsolated(_KALO_EveryExpansionPathImpl)
+	_HNP_Run(_KALO_EveryExpansionPathImpl)
 }
-Test("kana altgr lift: every expansion path lifts AltGr through the owner (kana-altgr-lift-owner-2026-09-25)",
+Test("kana altgr lift: keyboard paths lift AltGr and native output preserves its owner (kana-altgr-lift-owner-2026-09-25)",
 	_KALO_EveryExpansionPathKeepsTheHold)
 
 _KALO_RecordRelease(Name) {
@@ -419,7 +438,7 @@ _KALO_NoRawAltGrReleaseOutsideTheOwner() {
 		"the scan must reach the boot-time phantom AltGr release it allows, or its pattern matches nothing")
 	AssertEqual("", Offenders,
 		"a raw {SC138 Up} bypasses the synthetic ledger and ends a tap-hold's AltGr; use TapHoldSendWithKeyUp or TapHoldReleaseUnlessOwned")
-	for Name, Outputs in Map("HSE_DispatchMatch", 2, "_HotstringDispatch", 1, "_HSE_SendTerminalPaced", 1) {
+	for Name, Outputs in Map("HSE_DispatchMatch", 1, "_HotstringDispatch", 1, "_HSE_SendTerminalPaced", 1) {
 		Body := _StripFullLineComments(_DriverFuncBody(Name))
 		Assert(Body != "", Name . " must exist")
 		AssertEqual(Outputs, _KALO_Count(Body, "_HSE_SendWithAltGrUp("),

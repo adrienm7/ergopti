@@ -496,7 +496,7 @@ helpers.describe("category section callbacks: exact publication acknowledgement"
 		assert(os.remove(directory))
 		directory = directory .. "-ergopti-section-ack"
 		local quote = require("adapters.shell_runner").quote
-		assert(os.execute("mkdir -p " .. quote(directory)) == 0)
+		assert(require("adapters.shell_runner").run("mkdir -p " .. quote(directory)) == true)
 		local path = directory .. "/config.toml"
 		local original = '# independently written future preferences\n[hotstrings]\ngroups = { rolls = true, foreign = true }\n'
 			.. '[hotstrings.modules.rolls]\nhc = true\nsx = false\n[future]\nlabel = "kept"\n'
@@ -538,9 +538,9 @@ helpers.describe("category section callbacks: exact publication acknowledgement"
 		local restored = Terminators.restore_configuration(catalogue)
 		for name in pairs(package.loaded) do if loaded[name] == nil then package.loaded[name] = nil end end
 		for name, value in pairs(loaded) do package.loaded[name] = value end
-		local removed = os.execute("rm -rf " .. quote(directory))
+		local removed = require("adapters.shell_runner").run("rm -rf " .. quote(directory))
 		assert(restored, "the exact delimiter catalogue is restored")
-		assert(removed == 0, "the owned private fixture is retired")
+		assert(removed == true, "the owned private fixture is retired")
 		if not ok then error(err, 0) end
 	end
 	local function read(path)
@@ -668,7 +668,7 @@ helpers.describe("extension-bound section callbacks: exact publication acknowled
 		assert(os.remove(directory))
 		directory = directory .. "-ergopti-section-ack"
 		local quote = require("adapters.shell_runner").quote
-		assert(os.execute("mkdir -p " .. quote(directory)) == 0)
+		assert(require("adapters.shell_runner").run("mkdir -p " .. quote(directory)) == true)
 		local path = directory .. "/config.toml"
 		local original = '# independently written future preferences\n[hotstrings]\ngroups = { rolls = true, foreign = true }\n'
 			.. '[hotstrings.modules.rolls]\nhc = true\nsx = false\n[future]\nlabel = "kept"\n'
@@ -710,9 +710,9 @@ helpers.describe("extension-bound section callbacks: exact publication acknowled
 		local restored = Terminators.restore_configuration(catalogue)
 		for name in pairs(package.loaded) do if loaded[name] == nil then package.loaded[name] = nil end end
 		for name, value in pairs(loaded) do package.loaded[name] = value end
-		local removed = os.execute("rm -rf " .. quote(directory))
+		local removed = require("adapters.shell_runner").run("rm -rf " .. quote(directory))
 		assert(restored, "the exact delimiter catalogue is restored")
-		assert(removed == 0, "the owned private fixture is retired")
+		assert(removed == true, "the owned private fixture is retired")
 		if not ok then error(err, 0) end
 	end
 	local function read(path)
@@ -806,7 +806,7 @@ helpers.describe("extension category gates: one acknowledged batch", function()
 		assert(os.remove(directory))
 		directory = directory .. "-ergopti-gate-batch"
 		local quote = require("adapters.shell_runner").quote
-		assert(os.execute("mkdir -p " .. quote(directory)) == 0)
+		assert(require("adapters.shell_runner").run("mkdir -p " .. quote(directory)) == true)
 		local path = directory .. "/config.toml"
 		local state = initial and "true" or "false"
 		local sections = '[hotstrings.modules.rolls]\nhc = true\nsx = false\n[hotstrings.modules.sfbsreduction]\ncomma = true\n[hotstrings.modules.foreign]\nfx = true\n'
@@ -861,9 +861,9 @@ helpers.describe("extension category gates: one acknowledged batch", function()
 		local restored = Terminators.restore_configuration(catalogue)
 		for name in pairs(package.loaded) do if loaded[name] == nil then package.loaded[name] = nil end end
 		for name, value in pairs(loaded) do package.loaded[name] = value end
-		local removed = os.execute("rm -rf " .. quote(directory))
+		local removed = require("adapters.shell_runner").run("rm -rf " .. quote(directory))
 		assert(restored, "the exact delimiter catalogue is restored")
-		assert(removed == 0, "the owned private fixture is retired")
+		assert(removed == true, "the owned private fixture is retired")
 		if not ok then error(err, 0) end
 	end
 	local function read(path)
@@ -879,7 +879,8 @@ helpers.describe("extension category gates: one acknowledged batch", function()
 			local config = fake_config({})
 			local asked, toggles, redraws = {}, 0, 0
 			config.toggle_group = function() toggles = toggles + 1; return true end
-			if outcome ~= "missing" then config.set_category_gates_enabled = function(ids, enabled)
+			if outcome ~= "missing" then config.set_extension_sections_enabled = function(ids, bound, enabled)
+				helpers.assert_eq(bound, {}, "the gate-only fixture has no bound sections")
 				asked[#asked + 1] = { ids = ids, enabled = enabled }
 				if outcome == "throw" then error("inert batch owner refusal") end
 				if outcome == "nil" then return nil end
@@ -1109,7 +1110,7 @@ helpers.describe("hotstring delay rows: durable owner acknowledgement", function
 	local function with_native_owner(body)
 		local directory = os.tmpname();assert(os.remove(directory));directory = directory .. "-ergopti-delay-ack"
 		local quote = require("adapters.shell_runner").quote
-		assert(os.execute("mkdir -p " .. quote(directory)) == 0)
+		assert(require("adapters.shell_runner").run("mkdir -p " .. quote(directory)) == true)
 		local path, config_path = directory .. "/hotstrings_overrides.toml", directory .. "/config.toml"
 		local foreign = '[future]\nlabel = "independent" # unrelated future comment\nnested = { values = [2, 7], on = true }\n'
 		local original = '# hand-written delay preferences\n[_global]\ndelay = 0.4\n[magickey]\ndelay = 0.3\n' .. foreign
@@ -1126,8 +1127,8 @@ helpers.describe("hotstring delay rows: durable owner acknowledgement", function
 		end)
 		for name in pairs(package.loaded) do if loaded[name] == nil then package.loaded[name] = nil end end
 		for name, value in pairs(loaded) do package.loaded[name] = value end
-		local removed = os.execute("rm -rf " .. quote(directory))
-		assert(removed == 0, "only the owned private directory is retired")
+		local removed = require("adapters.shell_runner").run("rm -rf " .. quote(directory))
+		assert(removed == true, "only the owned private directory is retired")
 		if not called then error(err, 0) end
 	end
 	for _, kind in ipairs({ "global", "category" }) do
@@ -1181,6 +1182,72 @@ helpers.describe("hotstring delay rows: durable owner acknowledgement", function
 				helpers.assert_eq(c.config.get_global_delay(), 0.4);helpers.assert_eq(c.config.resolve("magickey", nil).delay, 0.3)
 				helpers.assert_eq(#notices, 1)
 			end)
+		end)
+	end
+end)
+
+
+helpers.describe("category fixture process status: actual normalized owner", function()
+	for _, abi in ipairs({ "numeric", "compat52" }) do
+		helpers.it("keeps real directory/write/cleanup acknowledgement under " .. abi, function()
+			local previous = package.loaded["adapters.shell_runner"]
+			local shell = helpers.load_module("adapters.shell_runner")
+			local execute = os.execute
+			local directory = os.tmpname();assert(os.remove(directory));directory = directory .. "-section-abi"
+			local seen = { calls = 0 }
+			os.execute = function(command)
+				seen.calls = seen.calls + 1
+				local code, kind, status = execute(command)
+				if code == 0 or (code == true and kind == "exit" and status == 0) then
+					if abi == "numeric" then return 0 end
+					return true, "exit", 0
+				end
+				return code, kind, status
+			end
+			local called, issue = pcall(function()
+				seen.mkdir = shell.run("mkdir -p " .. shell.quote(directory))
+				local file = assert(io.open(directory .. "/physical", "wb"))
+				assert(file:write("independent physical bytes"));assert(file:close())
+				file = assert(io.open(directory .. "/physical", "rb"))
+				seen.bytes = file:read("*a");assert(file:close())
+				seen.failed_process = shell.run("sh -c 'exit 1'")
+				seen.cleanup = shell.run("rm -rf " .. shell.quote(directory))
+				seen.absent = io.open(directory .. "/physical", "rb") == nil
+			end)
+			os.execute = execute
+			package.loaded["adapters.shell_runner"] = previous
+			-- Cleanup is physical even if an earlier candidate acknowledgement refused.
+			if not seen.absent then shell.run("rm -rf " .. shell.quote(directory)) end
+			helpers.assert_true(called, issue)
+			helpers.assert_eq(seen.calls, 3, "the real process boundary, not a retained _test_runner, owns every command")
+			helpers.assert_eq(seen.mkdir, true)
+			helpers.assert_eq(seen.bytes, "independent physical bytes")
+			helpers.assert_eq(seen.failed_process, false)
+			helpers.assert_eq(seen.cleanup, true)
+			helpers.assert_eq(seen.absent, true)
+		end)
+	end
+	for _, outcome in ipairs({ "false", "nil", "number", "text", "throw" }) do
+		helpers.it("does not acknowledge the real failed process with receipt " .. outcome, function()
+			local previous = package.loaded["adapters.shell_runner"]
+			local shell = helpers.load_module("adapters.shell_runner")
+			local execute, seen = os.execute, {}
+			os.execute = function(command)
+				seen.calls = (seen.calls or 0) + 1
+				seen.native = { execute(command) }
+				if outcome == "nil" then return nil, "exit", 1 end
+				if outcome == "number" then return 2 end
+				if outcome == "text" then return "true" end
+				if outcome == "throw" then error("inert process receipt refusal") end
+				return false, "exit", 1
+			end
+			local called, result = pcall(shell.run, "sh -c 'exit 1'")
+			os.execute = execute
+			package.loaded["adapters.shell_runner"] = previous
+			helpers.assert_true(called)
+			helpers.assert_eq(seen.calls, 1, "the refusal still executed the actual independent failed child")
+			helpers.assert_true(seen.native[1] ~= 0 and seen.native[1] ~= true)
+			helpers.assert_eq(result, false)
 		end)
 	end
 end)

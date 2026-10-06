@@ -20,7 +20,7 @@
 ; ==============================================================================
 
 
-
+#Include common_autocorrection_migration.ahk
 
 ; ============================================================
 ; ============================================================
@@ -101,6 +101,11 @@ _HSDefaultsRequireHex(c, Section, Key, Path) {
 HotstringsConfigInit(OverridePath) {
 		global _HotstringsOverridesPath, _HotstringsOverrides
 		global _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
+		if !HotstringsCommonOverrideMigrate(OverridePath) {
+				_HotstringsOverridesPath := OverridePath
+				try LoggerError("HotstringsConfig", "Common autocorrection override migration was refused; prior proven overrides and delimiters remain in memory, and common families and writes are blocked.")
+				return false
+		}
 		_HotstringsOverridesPath    := OverridePath
 		_HotstringsOverrides        := _ParseOverrides(OverridePath)
 		_HotstringsWordDelimiters   := _ParseGlobalKey(OverridePath, "word_delimiters")
@@ -118,7 +123,7 @@ _ParseGlobalKey(Path, KeyName) {
 		InGlobal := false
 		Pattern  := "^" . KeyName . "\s*=\s*" . '"' . "((?:[^" . '"' . "\\]|\\.)*)" . '"' . "\s*$"
 		loop read, Path {
-				Line := Trim(A_LoopReadLine, " `t")
+				Line := TOML_StripInlineComment(Trim(A_LoopReadLine, " `t"))
 				if (Line == "[__global__]") {
 						InGlobal := true
 						continue
@@ -367,7 +372,7 @@ _ParseOverrides(Path) {
 		SeenSections := Map()
 
 		loop parse, Content, "`n", "`r" {
-				Line := Trim(A_LoopField, " `t")
+				Line := Trim(TOML_StripInlineComment(A_LoopField), " `t")
 				if (Line == "" or SubStr(Line, 1, 1) == "#") {
 						continue
 				}

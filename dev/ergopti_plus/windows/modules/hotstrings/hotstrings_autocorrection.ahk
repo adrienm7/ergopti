@@ -5,9 +5,9 @@
 ; DESCRIPTION:
 ; Registers the autocorrection hotstring categories: typographic apostrophe,
 ; spelling errors, "ou" → "où" fix, multiple punctuation marks (including the
-; "…" ellipsis raw-callback), suffixes_a_chaining, minus, caps, names, and
-; accents. Extracted from modules/hotstrings.ahk to keep each category readable
-; in isolation.
+; "…" ellipsis raw-callback), suffixes_a_chaining, minus, common families,
+; French names and accents. Extracted from modules/hotstrings.ahk to keep each
+; category readable in isolation.
 ; ==============================================================================
 
 
@@ -78,7 +78,8 @@ _HS_RegisterAutocorrection() {
 		; expands "..." → "…" only after a letter (otherwise it breaks code like the JS
 		; spread « [...a, ...b] ») and returns a { Bs, Ins } effect for buffer resync.
 		CreateRawCallbackHotstring("*?", "...", _EllipsisRawCallback,
-			Map("Category", "french_autocorrection", "Section", "multiple_punctuation_marks"))
+			Map("Category", "french_autocorrection", "Section", "multiple_punctuation_marks",
+				"SupportsPreparation", true))
 	}
 
 	if Features["hotstrings"]["french_autocorrection"]["suffixes_a_chaining"]["enabled"] {
@@ -103,12 +104,20 @@ _HS_RegisterAutocorrection() {
 
 
 
-	; ====================================
-	; ===== 3.4) Caps autocorrection =====
-	; ====================================
+	; ==========================================================
+	; ===== 3.4) Selectable common autocorrection families =====
+	; ==========================================================
 
-	if Features["hotstrings"]["autocorrection"]["caps"]["enabled"] {
-		LoadHotstringsCategory("autocorrection", Map("caps", Features["hotstrings"]["autocorrection"]["caps"]))
+	CommonSections := Map()
+	for Section in ["names", "abbreviations", "technical_terms"]
+		CommonSections[Section] := Features["hotstrings"]["autocorrection"][Section]
+	CommonRefusal := HotstringsCommonAdmissionRefusal(Features)
+	if CommonRefusal == ""
+		LoadHotstringsCategory("autocorrection", CommonSections)
+	else
+		try LoggerError("Hotstrings", CommonRefusal)
+
+	if CommonRefusal == "" && Features["hotstrings"]["autocorrection"]["names"]["enabled"] {
 
 		; For these apps, we only capitalize them when used in context of apps, and not as English words
 		apps := ["excel", "teams", "word", "office"]

@@ -43,6 +43,7 @@
 local M = {}
 
 local Shell = require("adapters.shell_runner")
+local SqliteLiteral = require("sqlite.literal")
 
 
 
@@ -71,6 +72,10 @@ local REDACTED_SQL_TOKEN = '"[redacted]"'
 -- Upper bound on a logged diagnostic. Long enough to identify the failure,
 -- short enough that a runaway message cannot flood the log.
 local ERROR_LOG_MAX_CHARS = 200
+
+-- stdout is otherwise empty on the write path. The shell emits this terminal
+-- receipt after sqlite3; LuaJIT's pclose result can conceal a nonzero exit.
+local EXIT_STATUS_PREFIX = "ERGOPTI_SQL_EXIT_STATUS="
 
 
 
@@ -103,9 +108,9 @@ end
 -- ======================================
 
 --- Composes the `sqlite3` invocation that reads `sql` from standard input.
---- @param db_path string Absolute path to the database file.
+--- @param db_path string Filesystem path to the database file.
 --- @param sql     string Complete SQL script; may contain arbitrary user text.
---- @param opts    table|nil { flags = string[]?, capture_stderr = boolean? }.
+--- @param opts    table|nil { flags = string[]?, capture_stderr?, capture_exit? }.
 --- @return string|nil The command, or nil when the arguments are unusable.
 --- @return string|nil The reason, when the command could not be composed.
 function M.build(db_path, sql, opts)
@@ -117,16 +122,63 @@ function M.build(db_path, sql, opts)
 	end
 	opts = opts or {}
 
-	local words = { "sqlite3" }
+	-- A personal .sqliterc is executable CLI setup: it can replace JSON mode,
+	-- prepend output or run .shell before the owned script/receipt even starts.
+	-- Select an empty init explicitly without changing the user's login home.
+	-- A failed statement must stop before a later line can COMMIT. The CLI's
+	-- default differs from native sqlite3_exec: it resumes at the next line,
+	-- persisting partial migration batches despite a refused terminal receipt.
+	local words = { "sqlite3", Shell.quote("-init"), Shell.quote("/dev/null"), Shell.quote("-bail") }
 	-- Flags are literals chosen inside this repository, never caller data, but
 	-- they go through the same quoter so no call site can smuggle one in later.
 	for _, flag in ipairs(opts.flags or {}) do
 		words[#words + 1] = Shell.quote(flag)
 	end
-	words[#words + 1] = Shell.quote(db_path)
+	-- sqlite3 interprets bare relative file: names as URIs, :memory: as a
+	-- special database, and leading dashes as options. This API accepts file
+	-- paths: an explicit relative prefix preserves their filesystem identity.
+	local filename = db_path:sub(1, 1) == "/" and db_path or ("./" .. db_path)
+	words[#words + 1] = Shell.quote(filename)
 	words[#words + 1] = opts.capture_stderr and STDERR_TO_STDOUT or STDERR_DISCARDED
 
-	return Shell.with_stdin(table.concat(words, " "), sql, HEREDOC_BASE_TOKEN)
+	local command = Shell.with_stdin(table.concat(words, " "), sql, HEREDOC_BASE_TOKEN)
+	if opts.capture_exit then
+		-- Append to the existing command, without quoting the SQL a second time.
+		-- Reusing exec_checked here amplified quote-heavy SQL beyond ARG_MAX and
+		-- required a temporary output file on a path that stages no typed text.
+		command = command .. "printf '\\n" .. EXIT_STATUS_PREFIX .. "%s\\n' \"$?\"\n"
+	end
+	-- Direct popen callers bypass Shell.exec's admission. libc shortens a NUL
+	-- script before the shell sees it and can execute a durable SQL prefix even
+	-- though the terminal receipt is lost. Reuse the native argv boundary before
+	-- returning any executable command, without staging or re-quoting typed SQL.
+	local refusal = Shell.validate_spawn_args("sh", { "-c", command })
+	if refusal ~= "" then return nil, refusal end
+	return command
+end
+
+--- Encodes content embedded inside a single-quoted SQLite value.
+--- The CLI strips CRLF while reading script lines and libc cannot receive raw
+--- NUL. SQL expressions preserve these bytes without a temporary data file or
+--- changing the caller's value; ordinary quotes retain SQLite's doubled form.
+--- @param value string Content between the caller's literal quotes.
+--- @return string Escaped content with native control bytes expressed in SQL.
+function M.escape_literal(value)
+	return SqliteLiteral.escape(value)
+end
+
+--- Decodes the terminal receipt of a capture_exit invocation.
+--- @param output string|nil Complete captured stdout.
+--- @return boolean accepted Whether sqlite3 exited successfully.
+--- @return string diagnostics Output preceding the shell's terminal receipt.
+--- @return string|nil error_message Missing or refused terminal status.
+function M.read_exit_receipt(output)
+	if type(output) ~= "string" then return false, "", "missing SQLite exit receipt" end
+	local diagnostics, status = output:match("^(.*)\n" .. EXIT_STATUS_PREFIX .. "(%d+)\n$")
+	status = tonumber(status)
+	if not status or status > 255 then return false, "", "invalid SQLite exit receipt" end
+	if status ~= 0 then return false, diagnostics, "SQLite CLI exited with status " .. status end
+	return true, diagnostics, nil
 end
 
 

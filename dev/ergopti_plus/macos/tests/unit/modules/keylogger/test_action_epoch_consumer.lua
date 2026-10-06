@@ -12,6 +12,7 @@
 local helpers = require("tests.helpers")
 
 local RESET_MODULES = {
+	"modules.keylogger.physical_accounting_mode",
 	"modules.keylogger", "modules.keylogger.init", "modules.keylogger.log_manager",
 	"modules.keylogger.rotation", "modules.keylogger.sqlite_writer",
 	"modules.keylogger.aggregator", "modules.keylogger.export",

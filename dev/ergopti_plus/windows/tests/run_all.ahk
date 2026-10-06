@@ -71,6 +71,8 @@ while (_riArgIndex <= A_Args.Length) {
 ; Test framework first — Assert / Test / RunTests must exist before any
 ; subsequent file registers its cases or invokes assertions inside lambdas.
 #Include test_framework.ahk
+; Acquire the selected receipt before any bootstrap observation or test include.
+_TestResultsBeginRun()
 
 ; AppState — must come before test_stubs.ahk because the stubs reference
 ; AppState fields directly, and before any infra/ file that reads AppState.
@@ -95,7 +97,9 @@ _FatalErrorHandler(e, mode) {
     msg := "not ok 0 - FATAL STARTUP ERROR: " . e.Message
     try 	msg .= "`r`nSTACK TRACE:`r`n" . e.Stack
 	msg .= "`r`nLikely cause: top-level code or missing stub in a newly added module."
-	try FileAppend(msg . "`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
+	global TEST_RESULTS_FILE
+	try _TestResultsWrite(TEST_RESULTS_FILE, msg . "`r`n")
+	try FileAppend(msg . "`r`n", "**")
 	try FileAppend(msg . "`r`n", "*")
     ExitApp(1)
     return 1
@@ -199,6 +203,7 @@ global _DefaultLogsDir := _LogsDir
 ; date formatters). Definitions only — _DynHS_RegisterAll() is not called here,
 ; so no registration happens at harness load.
 #Include ../modules/dynamic_hotstrings/dynamic_hotstrings.ahk
+#Include ../modules/dynamic_hotstrings/user_code.ahk
 #Include ../infra/feature_io.ahk
 ; EnsurePersonalHotstringFeature is exercised directly by the F4 regression
 ; test (test_feature_io_locator.ahk) — RegisterPersonalFeature in the same file
@@ -241,6 +246,7 @@ global _DefaultLogsDir := _LogsDir
 #Include ../modules/keymap/layout/layout_altgr.ahk
 #Include ../modules/keymap/layout/layout_ergopti.ahk
 #Include ../modules/keymap/layout/accented_shortcuts.ahk
+#Include ../../_shared/modules/features/number_row_policy.ahk
 #Include ../modules/keymap/layout/layout_shift_caps.ahk
 ; Registry layout emulation: definitions only (the hotkeys are registered by
 ; KeylayoutEmulation_Register, which the tests call with injected registrars).
@@ -261,6 +267,9 @@ global _DefaultLogsDir := _LogsDir
 ; json.ahk must precede locale.ahk — _I18nLoadLocaleMap delegates to JsonParse.
 #Include ../infra/registry.ahk
 #Include ../infra/json.ahk
+#Include ../infra/program_parameter.ahk
+#Include ../infra/program_actions.ahk
+#Include ../../_shared/modules/network/failure.ahk
 ; locale.ahk (string loading + t()) is included here because gestures.ahk calls
 ; t() at the top level when building GESTURE_SLOT_LABELS; without it the process
 ; blocks on an AHK runtime-error MsgBox and the CI job times out. i18n.ahk (locale
@@ -425,6 +434,7 @@ InstallSendNoOps()
 #Include unit/test_hotstring_language_packs.ahk
 #Include unit/test_menu_languages_and_global_separator.ahk
 #Include unit/test_dynamic_hotstrings_module.ahk
+#Include unit/test_user_hotstrings.ahk
 #Include unit/test_hotstrings_config.ahk
 #Include unit/test_hotstring_delimiter_global_transaction_20260813.ahk
 #Include unit/test_hotstring_override_global_transaction_20260813.ahk
@@ -457,6 +467,7 @@ InstallSendNoOps()
 #Include unit/test_script_control_submenu.ahk
 #Include unit/test_personal_shortcut_neutral_seed.ahk
 #Include unit/test_hotstrings_scope.ahk
+#Include unit/test_personal_file_controls.ahk
 #Include unit/test_hotstring_delimiter_scope_preservation.ahk
 #Include unit/test_hotstring_category_scope.ahk
 #Include unit/test_global_config_scope.ahk
@@ -550,11 +561,21 @@ _LogBootProgress("loading LLM modules")
 #Include ../modules/llm/api_ollama.ahk
 #Include ../modules/llm/remote_formats.ahk
 #Include ..\..\_shared\modules\llm\local_server_auth.ahk
+#Include ..\..\_shared\modules\llm\local_server_discovery.ahk
+#Include ../../_shared/modules/llm/local_server_menu.ahk
 #Include ../modules/llm/api_remote.ahk
+#Include ../modules/llm/local_server_models.ahk
+#Include ../modules/llm/local_servers.ahk
 #Include unit/test_llm_api_ollama.ahk
 #Include unit/test_llm_engine_read_guarded_in_timer.ahk
 #Include unit/test_llm_api_remote.ahk
 #Include unit/test_local_server_auth.ahk
+#Include unit/test_local_server_discovery_policy.ahk
+#Include unit/test_local_server_models.ahk
+#Include unit/test_local_server_models_timer.ahk
+#Include unit/test_local_server_menu.ahk
+#Include unit/test_local_servers.ahk
+#Include unit/test_local_server_queue_timer.ahk
 #Include unit/test_llm_crash_orphan_cleanup.ahk
 #Include unit/test_llm_temp_artifact_terminal_ownership.ahk
 #Include unit/test_filesystem_native_write.ahk
@@ -671,6 +692,7 @@ _LogBootProgress("loading menu_llm/persist")
 #Include ../ui/menu/menu_llm/backend_lifecycle.ahk
 #Include ../ui/menu/menu_llm/aux_ownership.ahk
 #Include ../ui/menu/menu_llm/menu_api_entries.ahk
+#Include ../ui/menu/menu_llm/local_server_panel.ahk
 #Include ../ui/menu/menu_llm/menu_main.ahk
 #Include ../ui/menu/menu_llm/enable_admission.ahk
 #Include ../ui/menu/menu_llm/actions.ahk
@@ -685,6 +707,11 @@ _LogBootProgress("loading menu_llm/persist")
 #Include unit/test_llm_numeric_option_ranges.ahk
 #Include unit/test_llm_sync_target.ahk
 #Include unit/test_llm_menu_transactions_20260813.ahk
+#Include unit/test_local_server_private_publication.ahk
+#Include unit/test_local_server_write_admission.ahk
+#Include unit/test_local_server_join.ahk
+#Include unit/test_local_server_scope_cohort.ahk
+#Include unit/test_local_server_panel.ahk
 #Include unit/test_llm_enable_admission.ahk
 #Include unit/test_llm_menu_fixture_isolation.ahk
 #Include unit/test_llm_fixture_setup.ahk
@@ -753,6 +780,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_gesture_recommended_actions.ahk
 #Include unit/test_config_persistence_transactions.ahk
 #Include unit/test_reload_terminal_pending.ahk
+#Include unit/test_reload_successor_quiescence.ahk
 #Include unit/test_reload_worker_identity.ahk
 #Include unit/test_reload_deferral.ahk
 #Include unit/test_tray_menu_separator_popup.ahk
@@ -1044,6 +1072,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_logger_pairing.ahk
 #Include meta/test_remote_generate_curl_dispatch.ahk
 #Include unit/test_network_dispatch_nonblocking.ahk
+#Include unit/test_managed_network_failure.ahk
 #Include meta/test_remote_connect_timeout_bounded.ahk
 #Include meta/test_keylogger_json_64bit_decode.ahk
 #Include meta/test_crash_build_offthread.ahk
@@ -1582,6 +1611,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_plain_paste_clipboard_sequence_ownership.ahk
 #Include meta/test_onboarding_gesture_registration_async.ahk
 #Include unit/test_text_sender_completion_status.ahk
+#Include unit/test_native_editor_completion.ahk
 #Include unit/test_text_sender_sendinput_failure.ahk
 #Include meta/test_deadkey_unmapped_base_char.ahk
 #Include meta/test_savefullconfig_no_delete.ahk
@@ -1961,6 +1991,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_shell_runner_legacy_state_machine.ahk
 #Include unit/test_shell_runner_multiline_arg.ahk
 #Include unit/test_shell_runner_tree_owned.ahk
+#Include unit/test_run_program_actions.ahk
 #Include unit/test_shell_runner_launch_cleanup.ahk
 #Include unit/test_shell_runner_native_argv.ahk
 #Include unit/test_shell_runner_native_exit_code.ahk
@@ -2018,6 +2049,8 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_suite_watchdog_manifest.ahk
 #Include meta/test_suite_unique_includes.ahk
 
+#Include unit/test_file_read_activity.ahk
+
 ; Watchdog: kill the process if RunTests() never returns (e.g. a corpus
 ; consumer blocks on a synchronous HTTP call, an InputHook with no timeout,
 ; or a blocking dialog in a headless CI context). The current corpus normally
@@ -2046,4 +2079,5 @@ SetTimer(_WatchdogFire, -_SUITE_TIMEOUT_MS)
 
 ; Drive everything. RunTests prints a TAP-style report to stdout and exits
 ; with the appropriate code — control never returns from this call.
+
 RunTests()

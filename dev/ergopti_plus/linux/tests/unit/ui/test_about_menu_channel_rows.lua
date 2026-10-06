@@ -55,6 +55,41 @@ local CHANNEL_AT = 3
 -- names is: the checkout itself is a source run, whose Update row is greyed.
 local IDENTITY = { kind = "release", version = "0.0.0-dev.140", commit = "c3005e0b9" }
 
+--- Keeps an installed-build fixture's native owner live through the later click.
+--- The real consent bridge is exercised with an explicitly unavailable progress
+--- window; these tray fixtures do not claim a native GUI or real download.
+local function bind_action_owners(items, source_run)
+	local unpack_results = table.unpack or unpack
+	local function packed(...) return { n = select("#", ...), ... } end
+	for _, item in ipairs(items) do
+		if type(item.fn) == "function" then
+			local action = item.fn
+			item.fn = function(...)
+				local Installation = require("infra.installation")
+				local original_owner = Installation.is_source_run
+				local original_progress = package.loaded["ui.download_window.bridge"]
+				local original_webview = package.loaded["ui.webview_manager"]
+				local arguments = packed(...)
+				Installation.is_source_run = function() return source_run == true end
+				package.loaded["ui.download_window.bridge"] = { show = function() return nil end }
+				local result = packed(pcall(function()
+					-- Keep the real consent/window path, with this click's native SDK
+					-- explicitly unavailable instead of inheriting an earlier GTK owner.
+					helpers.load_module_with_dependency("ui.webview_manager", "lgi", false)
+					return action(unpack_results(arguments, 1, arguments.n))
+				end))
+				Installation.is_source_run = original_owner
+				package.loaded["ui.download_window.bridge"] = original_progress
+				package.loaded["ui.webview_manager"] = original_webview
+				if not result[1] then error(result[2], 0) end
+				return unpack_results(result, 2, result.n)
+			end
+		end
+		if type(item.menu) == "table" then bind_action_owners(item.menu, source_run) end
+	end
+	return items
+end
+
 --- @param source_run boolean|nil True to build the tray of a local version.
 local function build(up, changed, source_run)
 	local Version = require("infra.version")
@@ -73,10 +108,34 @@ local function build(up, changed, source_run)
 	Version.identity = real_identity
 	Installation.is_source_run = real_is_source_run
 	if not ok then error(items, 0) end
-	return items
+	return bind_action_owners(items, source_run)
 end
 
 helpers.describe("tray (linux): the About submenu owns the updater rows", function()
+
+	helpers.it("restores exact click owners after the controlled action raises", function()
+		local Installation = require("infra.installation")
+		local original_owner = Installation.is_source_run
+		local original_progress = package.loaded["ui.download_window.bridge"]
+		local original_webview = package.loaded["ui.webview_manager"]
+		local original_lgi = package.loaded["lgi"]
+		local original_preload = package.preload["lgi"]
+		local rows = bind_action_owners({ { fn = function()
+			local Webview = require("ui.webview_manager")
+			helpers.assert_true(Webview ~= original_webview, "the click must own a fresh actual page manager")
+			helpers.assert_eq(Webview._create_gtk_window("update_check", "unused", nil), false,
+				"the click must refuse the exact unavailable native acquisition")
+			error("Controlled tray action refusal", 0)
+		end } }, false)
+		local ok, err = pcall(rows[1].fn)
+		helpers.assert_eq(ok, false, "the action refusal must reach its caller")
+		helpers.assert_eq(err, "Controlled tray action refusal", "preserve the action failure")
+		helpers.assert_eq(Installation.is_source_run, original_owner, "restore the exact installation owner")
+		helpers.assert_eq(package.loaded["ui.download_window.bridge"], original_progress, "restore the exact progress owner")
+		helpers.assert_eq(package.loaded["ui.webview_manager"], original_webview, "restore the exact page owner")
+		helpers.assert_eq(package.loaded["lgi"], original_lgi, "restore the exact native SDK cache")
+		helpers.assert_eq(package.preload["lgi"], original_preload, "restore the exact native SDK loader")
+	end)
 	helpers.it("has no separate top-level Updates submenu", function()
 		local up = fake_updater("dev")
 		for _, item in ipairs(build(up)) do
@@ -339,8 +398,8 @@ helpers.describe("tray (linux): published About channel choices", function()
 				local changed = { count = 0 }
 				local row = submenu_of(build(up, changed), "menu.about.title")[CHANNEL_AT]
 				local accepted, result = pcall(row.menu[2].fn)
-				helpers.assert_eq(accepted, refusal ~= "throw")
-				if accepted then helpers.assert_eq(result, nil) end
+				helpers.assert_eq(accepted, true, "the native owner exception is a refused callback")
+				helpers.assert_eq(result, false, "the native receipt must be exact true")
 				helpers.assert_eq(requests.set, { "dev" })
 				helpers.assert_eq(up.get_channel(), "main")
 				helpers.assert_eq(changed.count, 0)
@@ -587,4 +646,76 @@ helpers.describe("About source check shared command", function()
 			helpers.assert_eq(seen.effects, 0)
 		end)
 	end)
+end)
+
+
+helpers.describe("Linux About channel durable receipts", function()
+	for _, outcome in ipairs({"false", "nil", "number", "throw", "true"}) do
+		helpers.it("publishes menu and Versions effects only after exact native ACK (channel-ack " .. outcome .. ")", function()
+			local previous_bridge = package.loaded["ui.changelog.bridge"]
+			local pushes, calls = 0, 0
+			package.loaded["ui.changelog.bridge"] = {push_subscribed_channel = function() pushes = pushes + 1 end}
+			local ok, detail = xpcall(function()
+				local up = fake_updater("main")
+				up.set_channel = function()
+					calls = calls + 1
+					if outcome == "throw" then error("The native owner refused.") end
+					if outcome == "number" then return 2 end
+					if outcome == "nil" then return nil end
+					return outcome == "true"
+				end
+				local changed = {count = 0}
+				local held = submenu_of(build(up, changed), "menu.about.title")[CHANNEL_AT].menu[2].fn
+				local protected, accepted = pcall(held)
+				helpers.assert_eq(protected, true)
+				helpers.assert_eq(accepted, outcome == "true")
+				helpers.assert_eq(calls, 1)
+				helpers.assert_eq(changed.count, outcome == "true" and 1 or 0)
+				helpers.assert_eq(pushes, outcome == "true" and 1 or 0)
+			end, debug.traceback)
+			package.loaded["ui.changelog.bridge"] = previous_bridge
+			if not ok then error(detail, 0) end
+		end)
+	end
+
+	for _, outcome in ipairs({"false", "nil", "number", "throw"}) do
+		helpers.it("retries actual updater persistence after refusal without changing canonical bytes (channel-ack durable " .. outcome .. ")", function()
+			with_frequency_owner(nil, function(up, obs, path, original)
+				local writer = require("toml_codec.writer")
+				local previous_write = writer.batch_write
+				local refusing, writes = true, 0
+				writer.batch_write = function(...)
+					writes = writes + 1
+					if refusing then
+						if outcome == "throw" then error("The canonical writer refused.") end
+						if outcome == "number" then return 2 end
+						if outcome == "false" then return false end
+						return nil
+					end
+					return previous_write(...)
+				end
+				local initial = up.get_channel()
+				local row = submenu_of(build(up, obs.redraws), "menu.about.title")[CHANNEL_AT]
+				local target = initial == "main" and "dev" or "main"
+				local held = row.menu[target == "main" and 1 or 2].fn
+				local accepted = held()
+				local file = assert(io.open(path, "rb")); local bytes = file:read("*a"); assert(file:close())
+				helpers.assert_eq(accepted, false)
+				helpers.assert_eq(bytes, original)
+				helpers.assert_eq(up.get_channel(), initial)
+				helpers.assert_eq(obs.redraws.count, 0)
+				helpers.assert_eq(writes, 1)
+				refusing = false
+				helpers.assert_eq(held(), true)
+				local saved = assert(io.open(path, "rb")); local committed = saved:read("*a"); assert(saved:close())
+				helpers.assert_true(committed:find('channel = "' .. target .. '"', 1, true) ~= nil)
+				helpers.assert_true(committed:find("future_interval_option = 42", 1, true) ~= nil)
+				helpers.assert_eq(up.get_channel(), target)
+				helpers.assert_eq(obs.redraws.count, 1)
+				helpers.assert_eq(writes, 2)
+				helpers.assert_eq(held(), true)
+				helpers.assert_eq(writes, 2)
+			end)
+		end)
+	end
 end)

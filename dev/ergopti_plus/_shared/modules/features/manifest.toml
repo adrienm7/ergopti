@@ -135,7 +135,7 @@ platforms = ["ahk", "hs", "linux"]
 description_key = "menu.hotstrings.magic_key"
 platforms = ["ahk", "hs", "linux"]
 
-# French language pack: _shared/modules/hotstrings/french/distancesreduction.toml.
+# Ergopti extension: static/layouts/registry/ergopti/hotstrings/suffixes_a.toml.
 [sections.hotstrings.french_distancesreduction]
 description_key = "menu.hotstrings.distances_reduction"
 platforms = ["ahk", "hs", "linux"]
@@ -234,7 +234,7 @@ platforms = ["hs"]
 
 [sections.shortcuts.key_combination_taps]
 description_key = "menu.shortcuts.key_combinations"
-platforms = ["ahk"]
+platforms = ["ahk", "linux"]
 
 [sections.shortcuts.keyboard]
 description_key = "menu.shortcuts.keyboard"
@@ -492,12 +492,28 @@ platforms = ["hs", "linux"]
 # ===========================================
 
 [[features.hotstrings.autocorrection]]
-id = "caps"
+id = "names"
 default = { enabled = false, time_activation_seconds = 0.5 }
 recommended = { enabled = false, time_activation_seconds = 0.5 }
 input_altering = true
 type = "feature"
-description_key = "menu.hotstrings.autocorrection.caps"
+description_key = "menu.hotstrings.autocorrection.names"
+
+[[features.hotstrings.autocorrection]]
+id = "abbreviations"
+default = { enabled = false, time_activation_seconds = 0.5 }
+recommended = { enabled = false, time_activation_seconds = 0.5 }
+input_altering = true
+type = "feature"
+description_key = "menu.hotstrings.autocorrection.abbreviations"
+
+[[features.hotstrings.autocorrection]]
+id = "technical_terms"
+default = { enabled = false, time_activation_seconds = 0.5 }
+recommended = { enabled = false, time_activation_seconds = 0.5 }
+input_altering = true
+type = "feature"
+description_key = "menu.hotstrings.autocorrection.technical_terms"
 
 
 
@@ -1026,6 +1042,14 @@ recommended = { enabled = false }
 input_altering = true
 type = "feature"
 description_key = "menu.hotstrings.dynamic.ssn_prefixes"
+
+[[features.hotstrings.dynamic]]
+id = "user_code"
+default = { enabled = false, time_activation_seconds = 0.5 }
+recommended = { enabled = false, time_activation_seconds = 0.5 }
+input_altering = true
+type = "feature"
+description_key = "menu.hotstrings.user_code.title"
 
 [[features.hotstrings.dynamic]]
 id = "text_expansion_personal_information"
@@ -1899,7 +1923,7 @@ platforms = ["ahk"]
 # three pairs only and in that order only (2026-10-01).
 [[features.shortcuts.key_combination_taps]]
 id = "alt_gr_then_left_alt"
-platforms = ["ahk"]
+platforms = ["ahk", "linux"]
 default = "none"
 recommended = "ctrl_backspace"
 input_altering = true
@@ -1908,7 +1932,7 @@ description_key = "menu.shortcuts.key_combinations"
 
 [[features.shortcuts.key_combination_taps]]
 id = "alt_gr_then_caps_lock"
-platforms = ["ahk"]
+platforms = ["ahk", "linux"]
 default = "none"
 recommended = "ctrl_delete"
 input_altering = true
@@ -1917,9 +1941,9 @@ description_key = "menu.shortcuts.key_combinations"
 
 [[features.shortcuts.key_combination_taps]]
 id = "left_alt_then_caps_lock"
-platforms = ["ahk"]
+platforms = ["ahk", "linux"]
 default = "none"
-recommended = "caps_word"
+recommended_per_platform = { ahk = "caps_word", linux = "none" }
 input_altering = true
 type = "action"
 description_key = "menu.shortcuts.key_combinations"
@@ -3411,13 +3435,13 @@ superseded_reason_key = "menu.layout.superseded_ergopti_only"
 
 [[features.layout]]
 id = "direct_access_digits"
-platforms = ["ahk"]
-default = false
-recommended = true
+platforms = ["ahk", "hs", "linux"]
+default = "native"
+recommended_per_platform = { ahk = "digits", hs = "native", linux = "native" }
 input_altering = true
-type = "boolean"
-description_key = "menu.layout.direct_access_digits"
-superseded_reason_key = "menu.layout.superseded_digit_row"
+type = "enum"
+enum_values = ["native", "digits", "symbols"]
+description_key = "menu.layout.number_row"
 
 [[features.layout]]
 id = "ergopti_alt_gr"
@@ -3515,7 +3539,7 @@ description_key = "menu.category_enabled.tap_holds"
 # would both disable upgraded configs and never persist.
 [[features.category_enabled]]
 id = "key_combinations"
-platforms = ["ahk"]
+platforms = ["ahk", "linux"]
 default = true
 recommended = true
 input_altering = false
@@ -3647,6 +3671,87 @@ i18n = "dynamichotstrings.textexpansionpersonalinformation"
 legacy_key = "TextExpansionPersonalInformation"
 is_module_placeholder = true
 
+# Programmable hotstrings remain opt-in. Native adapters supply file execution
+# and source-opening ports; the labels and command order have one shared owner.
+[[menu.programmable_hotstring_entry]]
+type = "group"
+id = "programmable_hotstrings"
+i18n = "menu.hotstrings.user_code.title"
+platforms = ["hs", "linux"]
+# Windows projects the declared source controls inline in its dynamic category.
+# The additional parent belongs only to the Lua category providers.
+unavailable = "hide"
+
+[[menu.programmable_hotstrings]]
+type = "feature"
+path = "hotstrings.dynamic.user_code"
+i18n = "menu.hotstrings.user_code.title"
+
+[[menu.programmable_hotstrings]]
+type = "command"
+id = "open_user_hotstring_source"
+i18n = "menu.hotstrings.user_code.open_source"
+
+[[menu.programmable_hotstrings]]
+type = "command"
+id = "reload_user_hotstring_source"
+i18n = "menu.hotstrings.user_code.reload_source"
+
+[[menu.programmable_hotstrings]]
+type = "command"
+id = "create_user_hotstring_example"
+i18n = "menu.hotstrings.user_code.create_example"
+
+# Personal-source controls share their order and capability refusal policy.
+[[menu.personal_file_controls]]
+type = "check"
+id = "personal_file_enabled"
+i18n = "menu.common.enabled"
+checked_when = ["personal_file_enabled"]
+disabled_when = ["personal_file_owner_ready"]
+
+[[menu.personal_file_controls]]
+type = "command"
+id = "personal_file_delay"
+i18n = "hs_config.label_delay"
+disabled_when = ["personal_file_owner_ready"]
+disabled_reason_key = "menu.hotstrings.personal_file_unavailable"
+
+[[menu.personal_file_controls]]
+type = "command"
+id = "personal_file_priority"
+i18n = "hs_config.label_priority"
+disabled_when = ["personal_file_owner_ready"]
+disabled_reason_key = "menu.hotstrings.personal_file_unavailable"
+
+[[menu.personal_file_controls]]
+type = "command"
+id = "personal_file_color"
+i18n = "hs_config.label_color"
+disabled_when = ["personal_file_owner_ready"]
+disabled_reason_key = "menu.hotstrings.personal_file_unavailable"
+
+[[menu.personal_file_controls]]
+type = "check"
+id = "personal_file_tooltip"
+i18n = "hs_config.label_tooltip"
+checked_when = ["personal_file_tooltip"]
+disabled_when = ["personal_file_owner_ready"]
+
+[[menu.personal_file_unavailable]]
+type = "command"
+id = "personal_file_unavailable"
+i18n = "healthcheck.state.unavailable"
+disabled_when = ["personal_file_owner_ready"]
+disabled_reason_key = "menu.hotstrings.personal_file_unavailable"
+
+[[menu.personal_directory_unavailable]]
+type = "command"
+id = "personal_directory_unavailable"
+i18n = "healthcheck.state.unavailable"
+disabled_when = ["personal_directory_ready"]
+disabled_reason_key = "menu.hotstrings.personal_directory_unavailable"
+
 [menu.gesture_slots]
 2 = ["tap_2", "swipe_2_left", "swipe_2_right", "swipe_2_up", "swipe_2_down", "swipe_2_left_up", "swipe_2_right_up", "swipe_2_left_down", "swipe_2_right_down"]
 3 = ["tap_3", "swipe_3_left", "swipe_3_right", "swipe_3_up", "swipe_3_down", "swipe_3_left_up", "swipe_3_right_up", "swipe_3_left_down", "swipe_3_right_down"]
@@ -3655,7 +3760,7 @@ is_module_placeholder = true
 
 [menu.hotstring_groups]
 standard = ["autocorrection", "magic_key"]
-ergopti = ["distances_reduction", "sfbs_reduction", "rolls"]
+ergopti = ["distances_reduction", "sfbs_reduction", "rolls", "french_distancesreduction"]
 dynamic = ["dynamic_hotstrings"]
 
 [menu.hotstring_category_keys]
@@ -3853,6 +3958,13 @@ type = "---"
 [[menu.llm_menu]]
 type = "dynamic"
 id = "llm_backend"
+# Static provider status belongs to this live backend row, not another menu.
+# Inert labels are status text, not section headings or executable commands.
+status_rows.unavailable = [
+	{ type = "---" },
+	{ type = "label", i18n = "menu.llm.local_servers.header" },
+	{ type = "label", i18n = "menu.llm.unavailable" },
+]
 disabled_when_off = false
 health_dot = false
 platforms = ["ahk", "hs"]
@@ -4482,6 +4594,19 @@ unavailable = "hide"
 type = "---"
 
 [[menu.shortcuts_menu]]
+type = "command"
+id = "physical_shortcuts_editor"
+i18n = "physical_shortcuts.window_title"
+platforms = ["hs", "linux"]
+unavailable = "grey"
+reason_key = "physical_shortcuts.windows_unavailable"
+disabled_when = ["physical_shortcuts_editor_ready"]
+disabled_reason_key = "physical_shortcuts.window_unavailable"
+
+[[menu.shortcuts_menu]]
+type = "---"
+
+[[menu.shortcuts_menu]]
 type = "list"
 id = "keyboard_slots"
 # The configurable keyboard-shortcut groups. A "list" rather than a "group"
@@ -4511,7 +4636,8 @@ platforms = ["ahk", "hs", "linux"]
 
 # « Combinaisons de touches »: every combination of two tap-hold keys, in one
 # group with a first-row switch of its own. Its rows are
-# key_combinations_group. Linux's tap-hold engine binds no combination yet.
+# key_combinations_group. Linux owns ordered tap/hold slots; simultaneous
+# first-press chord buffering remains unavailable there.
 # A separator sets it apart from the submenus above, which each create
 # shortcuts under one modifier.
 [[menu.shortcuts_menu]]
@@ -4522,7 +4648,7 @@ type = "group"
 id = "key_combinations"
 i18n = "menu.shortcuts.key_combinations"
 checked_when = ["key_combinations_enabled"]
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 reason_key = "platform_reason.remap_engine_is_per_driver"
 # « Raccourcis de gestion du script »: the script chords, a group whose title
 # is ticked while its first-row switch is on. Its rows are
@@ -4589,7 +4715,7 @@ id = "key_combinations_toggle"
 i18n = "menu.shortcuts.key_combinations_enable"
 checked_when = ["key_combinations_enabled"]
 category = "KeyCombinations"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 reason_key = "platform_reason.remap_engine_is_per_driver"
 
 [[menu.key_combinations_group]]
@@ -4648,7 +4774,7 @@ type = "---"
 [[menu.key_combinations_group]]
 type = "list"
 id = "key_combination_rows_left"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 reason_key = "platform_reason.remap_engine_is_per_driver"
 
 [[menu.key_combinations_group]]
@@ -4658,12 +4784,13 @@ platforms = ["ahk", "hs"]
 [[menu.key_combinations_group]]
 type = "list"
 id = "key_combination_rows_right"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 reason_key = "platform_reason.remap_engine_is_per_driver"
 
 # Every category has explicit commands: neither command depends on its current
 # gate or section posture. Native owners commit the selected gate and sections
-# together while leaving the root engine, other categories and remapping alone.
+# together while preserving the root engine and all unselected categories and
+# section choices, including MagicKey sections outside an extension binding.
 [[menu.hotstring_category_menu]]
 type = "command"
 id = "hotstring_category_enable_all"
@@ -4697,7 +4824,7 @@ type = "command"
 id = "key_combination_clear"
 i18n = "menu.tapholds.nothing_combo"
 disabled_when = ["key_combination_pair_assigned"]
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 reason_key = "platform_reason.remap_engine_is_per_driver"
 
 [[menu.key_combination_pair_menu]]
@@ -4707,7 +4834,7 @@ platforms = ["ahk", "hs"]
 [[menu.key_combination_pair_menu]]
 type = "list"
 id = "key_combination_slots"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 reason_key = "platform_reason.remap_engine_is_per_driver"
 
 # « Raccourcis de gestion du script », the maintainer's first group of every
@@ -5101,13 +5228,12 @@ id = "base_layouts"
 platforms = ["linux"]
 reason_key = "platform_reason.base_layout_is_the_linux_decode_table"
 
-# Swaps digits and symbols on any layout whose digits sit behind Shift (AZERTY,
-# BÉPO) — not an Ergopti-only setting.
+# One policy, with actual source-scoped availability supplied by native owners.
+# Lua drivers report native input only; Windows can also force digits and can
+# force symbols through a supported registry source's original action machine.
 [[menu.layout_menu]]
-type = "feature"
-path = "layout.direct_access_digits"
-platforms = ["ahk"]
-reason_key = "platform_reason.lists_windows_only_settings"
+type = "list"
+id = "number_row_policy"
 
 # Works on every layout since 2026-09-21: the chords follow the key that types
 # the accented letter directly in the user's own layout, not Ergopti's positions.
@@ -5127,12 +5253,7 @@ id = "layout_switching"
 platforms = ["hs"]
 reason_key = "platform_reason.layout_bundle_and_menubar_are_macos"
 
-[[menu.layout_menu]]
-type = "feature"
-path = "hotstrings.magic_key.replace"
-i18n = "menu.layout.replace"
-
-# The physical key the replace switch above turns into the magic key
+# The physical key whose replacement choice lives in Hotstrings Ergopti
 # (hotstrings.magic_key_source), on every driver: one row naming the key in
 # effect, whose submenu captures the next key pressed, restores the automatic
 # key or lists every candidate. A `list`, because each candidate is labelled
@@ -6132,8 +6253,8 @@ exclude = ["shortcuts.personal"]
 # which the Shortcuts master no longer reaches, while this page still lists the
 # Windows pairs that ship a recommendation: a re-run answered No must leave
 # them off as the master once did. macOS lists no combination here and Linux
-# has no combination engine.
-sub_switch = { ahk = { path = "category_enabled.key_combinations", sections = ["shortcuts.key_combination_taps"] } }
+# owns ordered combinations independently of the Shortcuts master.
+sub_switch = { ahk = { path = "category_enabled.key_combinations", sections = ["shortcuts.key_combination_taps"] }, linux = { path = "category_enabled.key_combinations", sections = ["shortcuts.key_combination_taps"] } }
 
 [onboarding.pages.shortcuts.labels]
 "shortcuts.select_line" = "sg_actions.select_line"
@@ -6189,17 +6310,18 @@ settings_label_key = "menu.hotstrings.preview_bubbles"
 
 [onboarding.pages.hotstrings.magic_key]
 path = "hotstrings.trigger_char"
-# Linux accepts only the symbols of keymap/terminators.validate_magic_key,
-# which refuses the proposed ; and ù: its tray chooses the trigger, which it
-# keeps as config.toml's hotstrings.trigger_char.
-platforms = ["ahk", "hs"]
+# Linux keeps its existing rare-symbol policy; common-character presets are
+# offered only where the runtime accepts them. Custom Linux answers go through
+# the same shared validator as the tray before the wizard changes preferences.
+platforms = ["ahk", "hs", "linux"]
+validation = { linux = "safe_magic_key" }
 label_key = "onboarding.magic_key.desc"
 hint_key = "onboarding.magic_key.choose_freely"
 custom_label_key = "onboarding.magic_key.option_custom"
 # One code point, as config.schema.json and every runtime validate it: a longer
 # custom trigger would be saved, then stop the Windows driver at every start.
 max_characters = 1
-options = [{ value = "★", label_key = "onboarding.magic_key.option_blackstar" }, { value = "ù", label_key = "onboarding.magic_key.option_ugrave" }, { value = ";", label_key = "onboarding.magic_key.option_semicolon" }]
+options = [{ value = "★", label_key = "onboarding.magic_key.option_blackstar" }, { value = "ù", label_key = "onboarding.magic_key.option_ugrave", platforms = ["ahk", "hs"] }, { value = ";", label_key = "onboarding.magic_key.option_semicolon", platforms = ["ahk", "hs"] }]
 
 [onboarding.pages.llm]
 title_key = "menu.llm.title"
@@ -6292,3 +6414,108 @@ i18n = "menu.shortcuts.to_titlecase"
 disabled_when = ["titlecase_selection_ready"]
 platforms = ["linux"]
 unavailable = "hide"
+
+# Linux exposes these immediate selection operations in its tray. The other
+# drivers keep their existing keyboard bindings rather than duplicate rows.
+[[menu.selection_helper_commands]]
+type = "command"
+id = "selection_select_word"
+i18n = "menu.shortcuts.select_word"
+disabled_when = ["selection_select_word_ready"]
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.selection_helper_commands]]
+type = "command"
+id = "selection_select_line"
+i18n = "sg_actions.select_line"
+disabled_when = ["selection_select_line_ready"]
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.selection_helper_commands]]
+type = "command"
+id = "selection_paste_plain"
+i18n = "sg_actions.paste_plain"
+disabled_when = ["selection_paste_plain_ready"]
+platforms = ["linux"]
+unavailable = "hide"
+
+# A key's native/no-action command keeps its established caption per platform.
+# Native binding persistence and reload/deployment remain owned by each driver.
+[[menu.tap_hold_key_native_commands]]
+type = "command"
+id = "tap_hold_key_native"
+i18n = "tap_hold.action.disable"
+disabled_when = ["tap_hold_key_configured"]
+platforms = ["ahk", "linux"]
+unavailable = "hide"
+
+[[menu.tap_hold_key_native_commands]]
+type = "command"
+id = "tap_hold_key_no_action"
+i18n = "menu.tapholds.nothing_tap_hold"
+disabled_when = ["tap_hold_key_configured"]
+platforms = ["hs"]
+unavailable = "hide"
+
+# Per-key providers supply callback and picker data; this head owns row order,
+# platform caption variants and interpolation of the current action labels.
+[[menu.tap_hold_key_head]]
+type = "include"
+section = "tap_hold_key_native_commands"
+
+[[menu.tap_hold_key_head]]
+type = "---"
+
+[[menu.tap_hold_key_head]]
+type = "command"
+id = "tap_hold_key_tap"
+i18n = "tap_hold.picker.tap"
+caption_getter = "tap_hold_key_tap_caption"
+platforms = ["ahk", "linux"]
+unavailable = "hide"
+
+[[menu.tap_hold_key_head]]
+type = "group"
+id = "tap_hold_key_tap_picker"
+i18n = "menu.tapholds.tap_arrow"
+caption_getter = "tap_hold_key_tap_caption"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.tap_hold_key_head]]
+type = "group"
+id = "tap_hold_key_hold"
+i18n = "tap_hold.picker.hold"
+caption_getter = "tap_hold_key_hold_caption"
+platforms = ["ahk", "linux"]
+unavailable = "hide"
+
+[[menu.tap_hold_key_head]]
+type = "group"
+id = "tap_hold_key_hold_picker"
+i18n = "menu.tapholds.hold_arrow"
+caption_getter = "tap_hold_key_hold_caption"
+platforms = ["hs"]
+unavailable = "hide"
+
+# Native prompts and modifier picker subtrees retain their own settings owners.
+[[menu.llm_navigation_rows]]
+type = "list"
+id = "llm_nav_modifiers"
+i18n = "menu.llm.nav_label"
+
+[[menu.llm_navigation_rows]]
+type = "list"
+id = "llm_val_modifiers"
+i18n = "menu.llm.val_label"
+
+# The existing choice renderer supplies provider DATA; availability and writes
+# remain native-owned. This child declaration owns all labels and value order.
+[[menu.number_row_policy_rows]]
+type = "choice"
+id = "number_row_mode"
+path = "layout.direct_access_digits"
+i18n = "menu.layout.number_row"
+choice_label_prefix = "menu.layout.number_row_"

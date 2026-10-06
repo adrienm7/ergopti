@@ -105,3 +105,55 @@ _OTO_MainRunsBeforeFinalLoggerFlush() {
 }
 Test("OnExit: lifecycle precedes the final logger flush "
 	. "(onexit-logger-last)", _OTO_MainRunsBeforeFinalLoggerFlush)
+
+; A counted native refusal is legitimate only while it delegates unchanged
+; context to the existing stricter admission, with no alternate success path.
+_OTO_AssertNativeRefusalWrapper(Source) {
+	Assert(Source != "", "The actual native-retirement wrapper must remain source-visible.")
+	Code := _DriverMaskNonCode(&Source)
+	Assert(RegExMatch(Code,
+		"im)^[ \t]*_LifecycleRefuseNativeRetirement\([ \t]*([A-Za-z_][A-Za-z0-9_]*)[ \t]*\)[ \t]*\{", &Definition),
+		"The native refusal wrapper must retain one explicit context parameter.")
+	Parameter := Definition[1]
+	Expected := "_LifecycleRefuseNativeRetirement(" . Parameter . "){return_LifecycleRefuseShutdown(" . Parameter . ",true)}"
+	Compact := RegExReplace(Code, "\s", "")
+	AssertEqual(StrLower(Expected), StrLower(Compact),
+		"The wrapper must forward its exact context with true, without any alternate effects or return.")
+}
+
+_OTO_NativeRefusalHasExactDelegation() {
+	Source := _DriverFuncBody("_LifecycleRefuseNativeRetirement")
+	_OTO_AssertNativeRefusalWrapper(Source)
+	Valid := "_LifecycleRefuseNativeRetirement(Context) {`n`treturn _LifecycleRefuseShutdown(Context, true)`n}"
+	_OTO_AssertNativeRefusalWrapper(Valid)
+	for Variant in [StrReplace(Valid, ", true", ", false"),
+		StrReplace(Valid, "Shutdown(Context,", "Shutdown(OtherContext,"),
+		StrReplace(Valid, "return _LifecycleRefuseShutdown(Context, true)", "return 0"),
+		StrReplace(Valid, "return _LifecycleRefuseShutdown(Context, true)", 'Text := "return _LifecycleRefuseShutdown(Context, true)"')] {
+		AssertThrows(_OTO_AssertNativeRefusalWrapper.Bind(Variant),
+			"Only the actual strict context-preserving wrapper is authorized for refusal counting.")
+	}
+}
+Test("OnExit: native retirement refusal delegates exact context and true", _OTO_NativeRefusalHasExactDelegation)
+
+_OTO_RefusalPatternCountsOnlyTwoWrappers() {
+	global _SHUTDOWN_REFUSAL_PATTERN
+	Corpus := "return _LifecycleRefuseShutdown(Context)`n"
+		. "return _LifecycleRefuseNativeRetirement(Context)`n"
+		. "return _UnrelatedShutdown(Context)`n"
+		. "return _LifecycleRefuseShutdownOther(Context)`n"
+		. "return _LifecycleRefuseNativeRetirementOther(Context)`n"
+		. '; return _LifecycleRefuseNativeRetirement(Context)' . "`n"
+		. 'Text := "return _LifecycleRefuseShutdown(Context)"' . "`n"
+	Code := _DriverMaskNonCode(&Corpus)
+	Count := 0
+	RegExReplace(Code, _SHUTDOWN_REFUSAL_PATTERN, "", &Count)
+	AssertEqual(2, Count, "Exactly the two independently declared lifecycle wrappers count.")
+	for Name in ["_LifecycleRefuseShutdown", "_LifecycleRefuseNativeRetirement"]
+		Assert(RegExMatch("return " . Name . "(Context)", _SHUTDOWN_REFUSAL_PATTERN),
+			"Each authorized wrapper independently contributes one refusal.")
+	for Name in ["_UnrelatedShutdown", "_LifecycleRefuseShutdownOther", "_LifecycleRefuseNativeRetirementOther"]
+		AssertFalse(RegExMatch("return " . Name . "(Context)", _SHUTDOWN_REFUSAL_PATTERN),
+			"An unrelated or lookalike wrapper never enters the legitimate refusal count.")
+}
+Test("OnExit: canonical refusal count admits exactly two wrappers", _OTO_RefusalPatternCountsOnlyTwoWrappers)

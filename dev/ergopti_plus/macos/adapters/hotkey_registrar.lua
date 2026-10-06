@@ -205,8 +205,15 @@ function M.replace_physical_claims(owner, rows)
 	if _claim_transaction then return false end
 	local claims = {}
 	for _, row in ipairs(rows) do
-		local parsed = assert(Chord.parse(row.chord), "physical claim chord is invalid")
-		local identity = M.physical_identity(parsed.mods, parsed.key)
+		local mods, key
+		if row.native_code ~= nil then
+			assert(type(row.mods) == "table" and row.chord == nil, "physical native claim is invalid")
+			mods, key = row.mods, row.native_code
+		else
+			local parsed = assert(Chord.parse(row.chord), "physical claim chord is invalid")
+			mods, key = parsed.mods, parsed.key
+		end
+		local identity = M.physical_identity(mods, key)
 		if identity then claims[identity] = { action = row.action, binding_id = row.binding_id } end
 	end
 	local previous = _physical_claims[owner]
@@ -267,6 +274,21 @@ function M.replace_physical_claims(owner, rows)
 	for _, handle in ipairs(restored) do _claim_suspensions[handle] = nil end
 	_claim_transaction = false
 	return true
+end
+
+--- Checks every owner independently so merged-map order cannot hide a collision.
+--- Only the caller's exact assignment is exempt; conditional recommendations yield.
+function M.has_physical_conflict(mods, native_code, owner, binding_id)
+	local identity = M.physical_identity(mods, native_code)
+	if identity == nil then return true end
+	for claimant, rows in pairs(_physical_claims) do
+		local row = rows[identity]
+		if row and (claimant ~= owner or row.binding_id ~= binding_id) then return true end
+	end
+	for _, entry in pairs(_bindings) do
+		if entry.identity == identity and not entry.conditional then return true end
+	end
+	return false
 end
 
 --- Reads all explicit native claims independently from conditional bindings.

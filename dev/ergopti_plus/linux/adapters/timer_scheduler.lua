@@ -14,7 +14,7 @@
 ---    the busy-wait overhead of os.clock-based polling. Each handle maps to
 ---    a uv_timer_t under the hood.
 --- 2. Opaque handles: every scheduled action returns a {timer, fired} table.
----    Callers hold the handle; cancelAll() drains a weak registry.
+---    Callers can hold the handle; cancelAll() drains the scheduler's registry.
 --- 3. Exception isolation: the user callback is wrapped in pcall so a crash
 ---    inside fn never propagates to the libuv event loop.
 --- 4. Idempotent cancel: cancel() on a nil, already-fired, or already-cancelled
@@ -24,6 +24,9 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local NativeTimer = require("infra.native_timer")
+local NumberPolicy = require("number_policy")
+local ErrorDescription = require("error_description")
 
 local LOG = "adapters.timer_scheduler"
 
@@ -34,10 +37,10 @@ local LOG = "adapters.timer_scheduler"
 -- =========================================
 -- =========================================
 
--- Weak-value table of all live timer handles issued by this adapter instance.
--- Using weak references prevents the registry from keeping timers alive after
--- all other references are dropped.
-local _live_timers = setmetatable({}, { __mode = "v" })
+-- The scheduler owns every armed token until firing or accepted cancellation.
+-- Weak values let GC erase a fire-and-forget repeater while its native timer
+-- remained live, making cancelAll() report success without stopping it.
+local _live_timers = {}
 
 -- Monotonically increasing ID used to key entries in _live_timers.
 local _next_id = 0
@@ -45,6 +48,17 @@ local _next_id = 0
 local function _new_id()
 	_next_id = _next_id + 1
 	return _next_id
+end
+
+--- Converts an admitted finite duration before any native allocation.
+--- @param seconds any Duration in seconds.
+--- @param minimum_ms number Existing method-specific finite clamping floor.
+--- @return number|nil milliseconds Finite normalized duration, or refusal.
+local function _duration_ms(seconds, minimum_ms)
+	if not NumberPolicy.is_finite(seconds) then return nil end
+	local milliseconds = seconds * 1000
+	if not NumberPolicy.is_finite(milliseconds) then return nil end
+	return math.max(minimum_ms, math.floor(milliseconds))
 end
 
 -- luv is the LuaJIT libuv binding (lua-luv package on most Linux distros).
@@ -83,6 +97,12 @@ function M.after(delaySec, fn)
 		handle.fired = true
 		return handle
 	end
+	local delay_ms = _duration_ms(delaySec, 0)
+	if delay_ms == nil then
+		Logger.error(LOG, "after(): duration must be finite in seconds and milliseconds — timer rejected.")
+		handle.fired = true
+		return handle
+	end
 	if not luv then
 		Logger.error(LOG, "after(): luv not available — timer was not armed.")
 		handle.fired = true
@@ -92,8 +112,7 @@ function M.after(delaySec, fn)
 	local ok, timer_or_err = pcall(function()
 		local t = assert(luv.new_timer(), "luv.new_timer returned nil")
 		allocated_timer = t
-		local delay_ms = math.max(0, math.floor(delaySec * 1000))
-		local started = luv.timer_start(t, delay_ms, 0, function()
+		local started = NativeTimer.start(luv, t, delay_ms, 0, function()
 			handle.fired = true
 			handle.armed = false
 			_live_timers[handle.id] = nil
@@ -110,7 +129,7 @@ function M.after(delaySec, fn)
 			end
 			local ok_fn, err = pcall(fn)
 			if not ok_fn then
-				Logger.error(LOG, "after() callback raised: %s", tostring(err))
+				Logger.error(LOG, "after() callback raised: %s", ErrorDescription.describe(err))
 			end
 		end)
 		if started == false or started == nil then error("luv.timer_start rejected the timer") end
@@ -140,6 +159,12 @@ function M.every(intervalSec, fn)
 		handle.fired = true
 		return handle
 	end
+	local interval_ms = _duration_ms(intervalSec, 1)
+	if interval_ms == nil then
+		Logger.error(LOG, "every(): duration must be finite in seconds and milliseconds — timer rejected.")
+		handle.fired = true
+		return handle
+	end
 	if not luv then
 		Logger.error(LOG, "every(): luv not available — timer was not armed.")
 		handle.fired = true
@@ -149,11 +174,10 @@ function M.every(intervalSec, fn)
 	local ok, timer_or_err = pcall(function()
 		local t = assert(luv.new_timer(), "luv.new_timer returned nil")
 		allocated_timer = t
-		local interval_ms = math.max(1, math.floor(intervalSec * 1000))
-		local started = luv.timer_start(t, interval_ms, interval_ms, function()
+		local started = NativeTimer.start(luv, t, interval_ms, interval_ms, function()
 			local ok_fn, err = pcall(fn)
 			if not ok_fn then
-				Logger.error(LOG, "every() callback raised: %s", tostring(err))
+				Logger.error(LOG, "every() callback raised: %s", ErrorDescription.describe(err))
 			end
 		end)
 		if started == false or started == nil then error("luv.timer_start rejected the timer") end

@@ -630,7 +630,7 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
 ; =============================
 
 
-#HotIf IsSet(Features) and Features["layout"]["direct_access_digits"]
+#HotIf NumberRowEffectiveMode() == "digits"
 ; We need to use SendEvent for symbols, otherwise it may trigger and lock AltGr. This issue happens on AZERTY at least.
 ; For digits, it is better to remap with sending the down event instead of using the RemapKey function.
 ; Otherwise, there is a problem of digit password boxes that skips to the n+2 box instead of n+2 because two down key events are sent by key

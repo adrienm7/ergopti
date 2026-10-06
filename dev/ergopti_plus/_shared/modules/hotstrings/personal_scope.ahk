@@ -4,7 +4,7 @@
 ; MODULE: Personal File Scope Admission (Windows Port)
 ; DESCRIPTION:
 ; Replays the shared admission contract without treating provenance as an
-; exclusive gate. Windows additional-file gates remain unavailable.
+; exclusive gate. Native owners must adopt and recheck additional-file gates.
 ; ==============================================================================
 
 /**
@@ -72,4 +72,43 @@ PersonalScopeAdmit(Inventory, Selected, &Reason) {
 		}
 	}
 	return Map("source", PersonalFileDescriptorCopy(Found["source"]), "owner", Found["owner"], "path", Found["path"])
+}
+
+/** Mirrors the shared detached adoption plan; native capability admission remains separate. */
+PersonalScopePlanAdoption(Candidates) {
+	if !(Candidates is Array)
+		throw TypeError("Invalid personal-file adoption candidates.")
+	Inventory := [], Ids := Map(), Paths := Map(), Physical := Map(), Legacy := Map()
+	for Candidate in Candidates {
+		if !(Candidate is Map) || !Candidate.Has("source") || !PersonalFileDescriptorValid(Candidate["source"])
+			|| !Candidate.Has("path") || !(Candidate["path"] is String) || Candidate["path"] == ""
+			throw TypeError("Invalid personal-file adoption evidence.")
+		for Field in ["physical", "legacy_owner"] {
+			if Candidate.Has(Field) && (!(Candidate[Field] is String) || Candidate[Field] == "")
+				throw TypeError("Invalid personal-file adoption evidence.")
+		}
+		Inventory.Push(Map("source", PersonalFileDescriptorCopy(Candidate["source"]),
+			"owner", Candidate["source"]["id"], "path", Candidate["path"], "admitted", true, "exclusive", true))
+		for Field, Values in Map("id", Ids, "path", Paths, "physical", Physical, "legacy_owner", Legacy) {
+			if Field != "id" && !Candidate.Has(Field)
+				continue
+			Key := Field == "id" ? Candidate["source"]["id"] : Candidate[Field]
+			if !Values.Has(Key)
+				Values[Key] := []
+			Values[Key].Push(Inventory.Length)
+		}
+	}
+	for Pair in [[Ids, "duplicate-source"], [Paths, "path-alias"], [Physical, "physical-alias"], [Legacy, "ambiguous-legacy-owner"]] {
+		for Key, Indices in Pair[1] {
+			if Indices.Length > 1 {
+				for Index in Indices {
+					Inventory[Index]["admitted"] := false
+					Inventory[Index]["exclusive"] := false
+					if !Inventory[Index].Has("reason")
+						Inventory[Index]["reason"] := Pair[2]
+				}
+			}
+		}
+	}
+	return Inventory
 }

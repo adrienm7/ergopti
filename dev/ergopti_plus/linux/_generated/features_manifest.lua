@@ -42,7 +42,7 @@ M.sections = {
 	["llm.navigation"] = { description_key = "menu.llm.navigation", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["metrics"] = { description_key = "menu.metrics", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["shortcuts"] = { description_key = "menu.shortcuts", platforms = { "ahk", "hs", "linux" }, subsections = { "key_combination_taps", "keyboard", "personal", "script_control", "tap_keys" } },
-	["shortcuts.key_combination_taps"] = { description_key = "menu.shortcuts.key_combinations", platforms = { "ahk" }, subsections = {  } },
+	["shortcuts.key_combination_taps"] = { description_key = "menu.shortcuts.key_combinations", platforms = { "ahk", "linux" }, subsections = {  } },
 	["shortcuts.keyboard"] = { description_key = "menu.shortcuts.keyboard", platforms = { "ahk" }, subsections = {  } },
 	["shortcuts.personal"] = { description_key = "menu.shortcuts.personal", platforms = { "ahk" }, subsections = {  } },
 	["shortcuts.script_control"] = { description_key = "menu.shortcuts.script_control", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
@@ -90,7 +90,13 @@ M.features = {
 		path = "hotstrings.preview_star_enabled", id = "preview_star_enabled", section = "hotstrings", default = false, type = "boolean", description_key = "menu.hotstrings.preview_star_enabled", platforms = { "hs", "linux" }, recommended = true, input_altering = true,
 	},
 	{
-		path = "hotstrings.autocorrection.caps", id = "caps", section = "hotstrings.autocorrection", default = { enabled = false, time_activation_seconds = 0.5 }, type = "feature", description_key = "menu.hotstrings.autocorrection.caps", platforms = { "ahk", "hs", "linux" }, recommended = { enabled = false, time_activation_seconds = 0.5 }, input_altering = true,
+		path = "hotstrings.autocorrection.names", id = "names", section = "hotstrings.autocorrection", default = { enabled = false, time_activation_seconds = 0.5 }, type = "feature", description_key = "menu.hotstrings.autocorrection.names", platforms = { "ahk", "hs", "linux" }, recommended = { enabled = false, time_activation_seconds = 0.5 }, input_altering = true,
+	},
+	{
+		path = "hotstrings.autocorrection.abbreviations", id = "abbreviations", section = "hotstrings.autocorrection", default = { enabled = false, time_activation_seconds = 0.5 }, type = "feature", description_key = "menu.hotstrings.autocorrection.abbreviations", platforms = { "ahk", "hs", "linux" }, recommended = { enabled = false, time_activation_seconds = 0.5 }, input_altering = true,
+	},
+	{
+		path = "hotstrings.autocorrection.technical_terms", id = "technical_terms", section = "hotstrings.autocorrection", default = { enabled = false, time_activation_seconds = 0.5 }, type = "feature", description_key = "menu.hotstrings.autocorrection.technical_terms", platforms = { "ahk", "hs", "linux" }, recommended = { enabled = false, time_activation_seconds = 0.5 }, input_altering = true,
 	},
 	{
 		path = "hotstrings.distances_reduction.qu", id = "qu", section = "hotstrings.distances_reduction", default = { enabled = false, time_activation_seconds = 0.5 }, type = "feature", description_key = "menu.hotstrings.distances_reduction.qu", platforms = { "ahk", "hs", "linux" }, recommended = { enabled = false, time_activation_seconds = 0.5 }, input_altering = true,
@@ -273,6 +279,9 @@ M.features = {
 		path = "hotstrings.dynamic.ssn_prefixes", id = "ssn_prefixes", section = "hotstrings.dynamic", default = { enabled = false }, type = "feature", description_key = "menu.hotstrings.dynamic.ssn_prefixes", platforms = { "ahk", "hs", "linux" }, recommended = { enabled = false }, input_altering = true,
 	},
 	{
+		path = "hotstrings.dynamic.user_code", id = "user_code", section = "hotstrings.dynamic", default = { enabled = false, time_activation_seconds = 0.5 }, type = "feature", description_key = "menu.hotstrings.user_code.title", platforms = { "ahk", "hs", "linux" }, recommended = { enabled = false, time_activation_seconds = 0.5 }, input_altering = true,
+	},
+	{
 		path = "hotstrings.dynamic.text_expansion_personal_information", id = "text_expansion_personal_information", section = "hotstrings.dynamic", default = { enabled = false, pattern_max_length = 1 }, type = "feature", description_key = "menu.hotstrings.dynamic.text_expansion_personal_information", platforms = { "ahk", "hs", "linux" }, recommended = { enabled = false, pattern_max_length = 1 }, input_altering = true,
 	},
 	{
@@ -415,6 +424,15 @@ M.features = {
 	},
 	{
 		path = "shortcuts.wrap_text_if_selected", id = "wrap_text_if_selected", section = "shortcuts", default = false, type = "boolean", description_key = "shortcuts.label_wrap_text", platforms = { "ahk", "linux" }, recommended = true, input_altering = true,
+	},
+	{
+		path = "shortcuts.key_combination_taps.alt_gr_then_left_alt", id = "alt_gr_then_left_alt", section = "shortcuts.key_combination_taps", default = "none", type = "action", description_key = "menu.shortcuts.key_combinations", platforms = { "ahk", "linux" }, recommended = "ctrl_backspace", input_altering = true,
+	},
+	{
+		path = "shortcuts.key_combination_taps.alt_gr_then_caps_lock", id = "alt_gr_then_caps_lock", section = "shortcuts.key_combination_taps", default = "none", type = "action", description_key = "menu.shortcuts.key_combinations", platforms = { "ahk", "linux" }, recommended = "ctrl_delete", input_altering = true,
+	},
+	{
+		path = "shortcuts.key_combination_taps.left_alt_then_caps_lock", id = "left_alt_then_caps_lock", section = "shortcuts.key_combination_taps", default = "none", type = "action", description_key = "menu.shortcuts.key_combinations", platforms = { "ahk", "linux" }, recommended = "none", input_altering = true,
 	},
 	{
 		path = "shortcuts.script_control.chords_enabled", id = "chords_enabled", section = "shortcuts.script_control", default = true, type = "boolean", description_key = "menu.shortcuts.script_shortcuts_enable", platforms = { "ahk", "hs", "linux" }, recommended = true, input_altering = false,
@@ -570,6 +588,12 @@ M.features = {
 		path = "gestures.tap_5", id = "tap_5", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.tap_5", platforms = { "hs", "linux" }, recommended = "none", input_altering = true,
 	},
 	{
+		path = "layout.direct_access_digits", id = "direct_access_digits", section = "layout", default = "native", type = "enum", description_key = "menu.layout.number_row", platforms = { "ahk", "hs", "linux" }, recommended = "native", input_altering = true, enum_values = { "native", "digits", "symbols" },
+	},
+	{
+		path = "category_enabled.key_combinations", id = "key_combinations", section = "category_enabled", default = true, type = "boolean", description_key = "menu.shortcuts.key_combinations", platforms = { "ahk", "linux" }, recommended = true, input_altering = false,
+	},
+	{
 		path = "tap_holds.enabled", id = "enabled", section = "tap_holds", default = false, type = "boolean", description_key = "menu.tap_holds", platforms = { "hs", "linux" }, recommended = true, input_altering = true,
 	},
 }
@@ -697,15 +721,6 @@ M.unavailable = {
 	},
 	{
 		path = "shortcuts.e_grave.letter", section = "shortcuts.e_grave", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.key_combination_taps.alt_gr_then_left_alt", section = "shortcuts.key_combination_taps", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.key_combination_taps.alt_gr_then_caps_lock", section = "shortcuts.key_combination_taps", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.key_combination_taps.left_alt_then_caps_lock", section = "shortcuts.key_combination_taps", reason_key = "", platforms = { "ahk" },
 	},
 	{
 		path = "shortcuts.personal.laptop_broken_key", section = "shortcuts.personal", reason_key = "", platforms = { "ahk" },
@@ -999,9 +1014,6 @@ M.unavailable = {
 		path = "layout.ergopti_base", section = "layout", reason_key = "", platforms = { "ahk" },
 	},
 	{
-		path = "layout.direct_access_digits", section = "layout", reason_key = "", platforms = { "ahk" },
-	},
-	{
 		path = "layout.ergopti_alt_gr", section = "layout", reason_key = "", platforms = { "ahk" },
 	},
 	{
@@ -1024,9 +1036,6 @@ M.unavailable = {
 	},
 	{
 		path = "category_enabled.tap_holds", section = "category_enabled", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "category_enabled.key_combinations", section = "category_enabled", reason_key = "", platforms = { "ahk" },
 	},
 	{
 		path = "ui.menubar_icon", section = "ui", reason_key = "", platforms = { "hs" },

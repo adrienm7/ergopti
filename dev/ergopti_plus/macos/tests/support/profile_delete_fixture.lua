@@ -13,6 +13,7 @@ local ManifestRenderer = require("menu.renderer")
 local json = require("json")
 
 local MODULES = {
+	"diagnostics.operation_reporter",
 	"adapters.hotkey_registrar",
 	"adapters.timer_scheduler",
 	"chord",

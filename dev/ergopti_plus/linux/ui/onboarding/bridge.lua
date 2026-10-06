@@ -367,13 +367,13 @@ local function finish(state, answers)
 		report_failure(state, "onboarding.error.invalid_answers")
 		return { done = false }
 	end
-	local rows, refusal = Answers.rows(index, answers.operations, authorities.manifest)
+	local rows, refusal, reason_key = Answers.rows(index, answers.operations, authorities.manifest)
 	local tap_hold_keys = rows and Answers.tap_hold_keys(index, answers.operations, authorities.manifest)
 	local target_dir = normalize_config_dir(authorities.config_paths, answers.config_dir)
 	if not rows or not locale_available(authorities.i18n, answers.locale) or not target_dir then
 		Logger.error(LOG, "Onboarding finish refused — %s.",
 			tostring(refusal or "the language or the configuration folder is invalid"))
-		report_failure(state, "onboarding.error.invalid_answers")
+		report_failure(state, reason_key or "onboarding.error.invalid_answers")
 		return { done = false }
 	end
 
@@ -382,7 +382,7 @@ local function finish(state, answers)
 		config_dir = authorities.config_paths.get_config_dir(),
 	}
 	for _, operation in ipairs({
-		{ "locale", function() return authorities.i18n.set_locale(answers.locale) end,
+		{ "locale", function() return authorities.i18n.persist_locale(answers.locale) == true end,
 			"onboarding.error.locale_persist_failed" },
 		{ "config directory", function() return authorities.config_paths.set_config_dir(target_dir) end,
 			"paths_editor.save_failed" },

@@ -173,7 +173,9 @@
 				"hotstrings.preview_colored_tooltips",
 				"hotstrings.preview_star_enabled",
 				"hotstrings.french_autocorrection.accents",
-				"hotstrings.autocorrection.caps",
+				"hotstrings.autocorrection.names",
+				"hotstrings.autocorrection.abbreviations",
+				"hotstrings.autocorrection.technical_terms",
 				"hotstrings.french_autocorrection.errors",
 				"hotstrings.french_autocorrection.minus",
 				"hotstrings.french_autocorrection.minus_apostrophe",
@@ -316,9 +318,55 @@
 				"static/ergopti_plus/linux/tests/unit/ui/test_wpm_readouts.lua",
 				"static/ergopti_plus/linux/tests/hardware/run_wpm_readouts_live.lua"
 			]
+		},
+		"ordered_key_combinations": {
+			"members": [
+				"category_enabled.key_combinations",
+				"shortcuts.key_combination_taps.alt_gr_then_left_alt",
+				"shortcuts.key_combination_taps.alt_gr_then_caps_lock",
+				"shortcuts.key_combination_taps.left_alt_then_caps_lock"
+			],
+			"registered": "yes",
+			"production_caller": "yes",
+			"persisted": "yes",
+			"applied": "yes",
+			"hardware_proven": "no",
+			"proof_tier": "integration",
+			"intentional": true,
+			"evidence": [
+				"static/ergopti_plus/linux/platform/remap/tap_hold_manager.lua",
+				"static/ergopti_plus/linux/platform/remap/key_combination_engine.lua",
+				"static/ergopti_plus/linux/modules/shortcuts/key_combinations.lua",
+				"static/ergopti_plus/linux/infra/key_combinations_scope.lua",
+				"static/ergopti_plus/linux/ui/menu/key_combinations.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/test_key_combinations.lua",
+				"static/ergopti_plus/linux/tests/unit/infra/test_key_combinations_scope.lua"
+			]
 		}
 	},
 	"overrides": {
+		"hotstrings.dynamic.user_code": {
+			"registered": "yes",
+			"production_caller": "yes",
+			"persisted": "yes",
+			"applied": "yes",
+			"hardware_proven": "no",
+			"proof_tier": "unit",
+			"intentional": true,
+			"evidence": [
+				"static/ergopti_plus/linux/modules/dynamic_hotstrings/manager.lua",
+				"static/ergopti_plus/linux/modules/dynamic_hotstrings/user_code.lua",
+				"static/ergopti_plus/linux/infra/user_hotstring_runtime.lua",
+				"static/ergopti_plus/linux/infra/hotstring_preferences.lua",
+				"static/ergopti_plus/linux/adapters/user_hotstring_destination.lua",
+				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
+				"static/ergopti_plus/linux/ui/menu/menu_builder.lua",
+				"static/ergopti_plus/linux/tests/unit/meta/test_user_code_contract.lua",
+				"static/ergopti_plus/linux/tests/unit/infra/test_user_hotstring_runtime.lua",
+				"static/ergopti_plus/linux/tests/unit/adapters/test_user_hotstring_destination.lua",
+				"static/ergopti_plus/linux/tests/unit/ui/test_user_hotstring_menu.lua"
+			]
+		},
 		"script.locale": {
 			"registered": "yes",
 			"production_caller": "yes",
@@ -753,6 +801,20 @@
 				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/test_magic_editor_policy.lua",
 				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/test_keyboard_shortcuts.lua",
 				"static/ergopti_plus/linux/tests/hardware/run_xkb_source_qualification.lua"
+			]
+		},
+		"layout.direct_access_digits": {
+			"registered": "yes",
+			"production_caller": "yes",
+			"persisted": "not_applicable",
+			"applied": "yes",
+			"hardware_proven": "not_applicable",
+			"proof_tier": "unit",
+			"intentional": true,
+			"evidence": [
+				"static/ergopti_plus/linux/tests/unit/keymap/test_number_row_policy.lua",
+				"static/ergopti_plus/_shared/lua/test/number_row_policy_contract.lua",
+				"static/ergopti_plus/linux/ui/menu/menu_builder.lua"
 			]
 		}
 	}

@@ -1,0 +1,6 @@
+[case]
+description = "The shipped common split preserves occupied ancestor and descendant namespaces rather than extending or replacing explicit future choices."
+drivers = ["ahk", "hs", "linux"]
+outcome = "migrated"
+from_version = 10
+to_version = 11

@@ -2584,3 +2584,53 @@ _LMT_SharedApiActiveCommandRows() {
 }
 Test("LLM API: actual shared active commands preserve Edit and refuse revoked owners",
 	_LMT_SharedApiActiveCommandRows)
+
+
+_LMT_SharedNavigationDeclarationOwner() {
+	global _LLM_Menu, _SharedDir
+	Corpus := JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\menus\llm_navigation_rows.json"))
+	Root := _MR_GetManifestRoot()
+	SavedDefinitions := Root["llm_navigation_rows"]
+	Previous := _LMT_InstallFixture()
+	try {
+		AssertEqual(2, SavedDefinitions.Length)
+		for Index, Expected in Corpus["rows"] {
+			AssertEqual(Expected["id"], SavedDefinitions[Index]["id"])
+			AssertEqual(Expected["type"], SavedDefinitions[Index]["type"])
+			AssertEqual(Expected["i18n"], SavedDefinitions[Index]["i18n"])
+		}
+		_LLM_Menu["nav_modifiers"] := ""
+		_LLM_Menu["val_modifiers"] := ""
+		for Vector in Corpus["prediction_ranges"] {
+			_LLM_Menu["n_predictions"] := Vector["count"]
+			Rows := _LLM_Menu_NavRows()
+			AssertEqual(2, Rows.Length)
+			AssertEqual(t("menu.llm.nav_label") . " — " . t("menu.llm.arrows_only"), Rows[1]["label"])
+			AssertEqual(StrReplace(t("menu.llm.val_label"), "%s", Vector["range"]) . " — " . t("menu.llm.digits_only"), Rows[2]["label"])
+			AssertEqual(Vector["disabled"], Rows[1]["disabled"])
+			AssertEqual(Vector["disabled"], Rows[2]["disabled"])
+			Assert(HasMethod(Rows[1]["action"], "Call"))
+			Built := LLM_Menu_BuildNavMenu()
+			try {
+				AssertEqual(Rows[1]["label"], _CTC_LabelAt(Built, 0))
+				AssertEqual(Rows[2]["label"], _CTC_LabelAt(Built, 1))
+			} finally _CTC_ReleaseMenu(Built)
+		}
+		Changed := [SavedDefinitions[2].Clone(), SavedDefinitions[1].Clone()]
+		Changed[1]["i18n"] := "button.cancel"
+		Root["llm_navigation_rows"] := Changed
+		Rows := _LLM_Menu_NavRows()
+		AssertEqual(StrReplace(t("button.cancel"), "%s", "1-0") . " — " . t("menu.llm.digits_only"), Rows[1]["label"])
+		AssertEqual(t("menu.llm.nav_label") . " — " . t("menu.llm.arrows_only"), Rows[2]["label"])
+		Root["llm_navigation_rows"] := []
+		AssertEqual(0, _LLM_Menu_NavRows().Length, "absence is never repaired by native fallback rows")
+		Changed[1]["i18n"] := 2
+		Root["llm_navigation_rows"] := Changed
+		AssertEqual(1, _LLM_Menu_NavRows().Length)
+	} finally {
+		Root["llm_navigation_rows"] := SavedDefinitions
+		_LMT_RestoreFixture(Previous)
+	}
+	AssertTrue(Root["llm_navigation_rows"] == SavedDefinitions, "the exact canonical cache identity is restored")
+}
+Test("LLM navigation: actual child declaration owns label order presence and native prompts", _LMT_SharedNavigationDeclarationOwner)

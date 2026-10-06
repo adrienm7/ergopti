@@ -467,7 +467,7 @@ helpers.describe("magic key source: physical editor evidence", function()
 end)
 
 
-helpers.describe("magic replacement: the layout prerequisite", function()
+helpers.describe("magic replacement: the Ergopti extension control", function()
 	local Choices = require("tests.support.hotstring_choices")
 	local SOURCE = '[hotstrings]\ngroups = { magickey = true }\n'
 		.. '[hotstrings.modules.magickey]\nreplace = false\n'
@@ -486,7 +486,8 @@ helpers.describe("magic replacement: the layout prerequisite", function()
 			load_catalogue = function()
 				return { committed = true, errors = 0, categories = {
 					magickey = { id = "magickey", sections_order = { "replace" },
-						sections = { replace = { count = 1 } }, count = 1 },
+						sections = { replace = { count = 1, description = "Native replacement",
+							extension = { id = "ergopti", name = "Ergopti+" } } }, count = 1 },
 				}, mappings = { { trigger = "j", replacement = "★", group = "magickey", section = "replace" } } }
 			end,
 		}
@@ -506,14 +507,20 @@ helpers.describe("magic replacement: the layout prerequisite", function()
 						paused = state.paused, is_paused = function() return state.paused end,
 						on_menu_changed = function() state.redraw = state.redraw + 1 end,
 						magic_key_source = state.source })
-					for _, item in ipairs(items) do
-						if item.title == I18n.get("menu.layout.title") then
-							for index, child in ipairs(item.menu or {}) do
-								if child.title == I18n.get("menu.layout.replace") then return child, index, item end
-							end
-							return nil, nil, item
+					local extension_label = string.format(I18n.get("menu.extensions.hotstrings_of"), "Ergopti+")
+					local extension, layout
+					local function find(rows)
+						for _, item in ipairs(rows or {}) do
+							if item.title == extension_label then extension = item end
+							if item.title == I18n.get("menu.layout.title") then layout = item end
+							find(item.menu)
 						end
 					end
+					find(items)
+					for index, child in ipairs(extension and extension.menu or {}) do
+						if child.title == "Native replacement (1)" then return child, index, layout end
+					end
+					return nil, nil, layout
 				end
 				body(Config, path, state, row)
 			end)
@@ -522,10 +529,10 @@ helpers.describe("magic replacement: the layout prerequisite", function()
 		if not ok then error(err, 0) end
 	end
 
-	helpers.it("(layout-magic-replace) renders the prerequisite and commits the current choice once", function()
+	helpers.it("(ergopti-magic-replace) renders the prerequisite and commits the current choice once", function()
 		with_replace(SOURCE, function(Config, path, state, row)
 			local first = row()
-			helpers.assert_type(first, "table", "the shared layout feature must reach the tray")
+			helpers.assert_type(first, "table", "the extension-owned native feature must reach the tray")
 			helpers.assert_eq(first.checked, false)
 			helpers.assert_type(first.fn, "function")
 			helpers.assert_eq(first.fn(), true)
@@ -543,7 +550,7 @@ helpers.describe("magic replacement: the layout prerequisite", function()
 	end)
 
 	for _, refusal in ipairs({ "false", "nil", "throw", "runtime" }) do
-		helpers.it("(layout-magic-replace) preserves source and runtime after " .. refusal, function()
+		helpers.it("(ergopti-magic-replace) preserves source and runtime after " .. refusal, function()
 			with_replace(SOURCE, function(Config, path, state, row)
 				local item = row()
 				helpers.assert_type(item, "table")
@@ -575,7 +582,7 @@ helpers.describe("magic replacement: the layout prerequisite", function()
 		end)
 	end
 
-	helpers.it("(layout-magic-replace) keeps a checked choice behind a closed group", function()
+	helpers.it("(ergopti-magic-replace) keeps a checked choice behind a closed group", function()
 		local source = SOURCE:gsub("magickey = true", "magickey = false"):gsub("replace = false", "replace = true")
 		with_replace(source, function(_, path, state, row)
 			local item = row()
@@ -588,23 +595,27 @@ helpers.describe("magic replacement: the layout prerequisite", function()
 		end)
 	end)
 
-	helpers.it("(layout-magic-replace) follows the published order directly before the physical picker", function()
+	helpers.it("(ergopti-magic-replace) leaves physical source capture in Layout while replacement moves to Ergopti", function()
 		with_source('[hotstrings]\nmagic_key_source = "KeyJ"\n', function(Source)
 			wire(Source, { active = true, replace = true, typed_ok = true })
 			with_replace(SOURCE, function(_, _, state, row)
 				state.source = Source
-				local item, index, layout = row()
-				helpers.assert_type(item, "table")
-				local physical = layout.menu[index + 1]
+				local item, _, layout = row()
+				helpers.assert_type(item, "table", "replacement is in its extension")
 				local I18n = require("infra.i18n")
-				helpers.assert_eq(physical.title, I18n.get("menu.layout.magic_key_source") .. " : j   (KeyJ)")
+				local physical
+				for _, child in ipairs(layout.menu or {}) do
+					helpers.assert_true(child.title ~= I18n.get("menu.layout.replace"), "the old duplicate is removed")
+					if child.title == I18n.get("menu.layout.magic_key_source") .. " : j   (KeyJ)" then physical = child end
+				end
+				helpers.assert_type(physical, "table")
 				helpers.assert_type(physical.menu[1].fn, "function", "the capture picker remains available")
 			end)
 			Source._reset_for_test()
 		end)
 	end)
 
-	helpers.it("(layout-magic-replace) refuses an old callback after its group closes", function()
+	helpers.it("(ergopti-magic-replace) refuses an old callback after its group closes", function()
 		with_replace(SOURCE, function(Config, path, state, row)
 			local before = row()
 			helpers.assert_type(before, "table")
@@ -617,7 +628,7 @@ helpers.describe("magic replacement: the layout prerequisite", function()
 		end)
 	end)
 
-	helpers.it("(layout-magic-replace) strips paused actions and refuses an old callback", function()
+	helpers.it("(ergopti-magic-replace) strips paused actions and refuses an old callback", function()
 		with_replace(SOURCE, function(_, path, state, row)
 			local before = row()
 			helpers.assert_type(before, "table")

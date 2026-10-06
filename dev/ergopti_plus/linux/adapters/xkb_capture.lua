@@ -31,6 +31,8 @@
 --- ==============================================================================
 
 local M = {}
+local NumberRow = require("layout.number_row_native")
+local number_row_receipts = setmetatable({}, { __mode = "k" })
 
 local Logger = require("logger.shim")
 local Keysym = require("infra.keysym")
@@ -110,6 +112,8 @@ local _session = nil
 local _keymap_text = nil
 local _locale = nil
 local _source_generation = 0
+local _physical_probe_epoch = 0
+local _physical_chord_receipts = setmetatable({}, { __mode = "k" })
 local _source_group = nil
 local _source_native_generation = nil
 local _capture_group, _capture_generation = nil, 0
@@ -224,6 +228,7 @@ local function bind_ffi_backend()
 		unsigned int xkb_keymap_min_keycode(struct xkb_keymap *keymap);
 		unsigned int xkb_keymap_max_keycode(struct xkb_keymap *keymap);
 		unsigned int xkb_keymap_num_layouts(struct xkb_keymap *keymap);
+		unsigned int xkb_keymap_mod_get_index(struct xkb_keymap *keymap, const char *name);
 		char *xkb_keymap_get_as_string(struct xkb_keymap *keymap, int format);
 		void free(void *pointer);
 		const char *xkb_keymap_key_get_name(struct xkb_keymap *keymap, unsigned int key);
@@ -409,6 +414,108 @@ local function bind_ffi_backend()
 		if probe ~= nil then lib.xkb_state_unref(probe) end
 		if not ok then return nil, tostring(result) end
 		return result
+	end
+
+
+	-- Forty detached native translations retain the selected group and native
+	-- lock semantics without touching live Compose or the capture state.
+	function backend.number_row_levels(session, codes, group)
+		local bit = require("bit")
+		local lock = tonumber(lib.xkb_keymap_mod_get_index(session.keymap, "Lock"))
+		if not lock or lock < 0 or lock >= 32 then return nil, "number-row-lock-modifier-unavailable" end
+		local shift_index = tonumber(lib.xkb_keymap_mod_get_index(session.keymap, "Shift"))
+		if not shift_index or shift_index < 0 or shift_index >= 32 then return nil, "number-row-shift-modifier-unavailable" end
+		local shift_mask = tonumber(ffi.cast("uint32_t", bit.lshift(1, shift_index)))
+		local shift_proof = lib.xkb_state_new(session.keymap)
+		if shift_proof == nil then return nil, "number-row-shift-state-unavailable" end
+		lib.xkb_state_update_key(shift_proof, XKB_LEFTSHIFT, XKB_KEY_DOWN)
+		local effective_shift = tonumber(lib.xkb_state_serialize_mods(shift_proof, 1))
+		local shift_locks = tonumber(lib.xkb_state_serialize_mods(shift_proof, 4))
+		local shift_group = tonumber(lib.xkb_state_serialize_layout(shift_proof, XKB_STATE_LAYOUT_EFFECTIVE))
+		lib.xkb_state_unref(shift_proof)
+		if effective_shift ~= shift_mask or shift_locks ~= 0 or shift_group ~= 0 then
+			return nil, "number-row-shift-emitter-unverified"
+		end
+		local lock_mask = bit.lshift(1, lock)
+		local locked = tonumber(lib.xkb_state_serialize_mods(session.state, 4))
+		local probe
+		local name_buffer = ffi.new("char[128]")
+		local called, result = pcall(function()
+			local rows = {}
+			for _, caps in ipairs({ false, true }) do
+				for _, shift in ipairs({ false, true }) do
+					probe = lib.xkb_state_new(session.keymap)
+					assert(probe ~= nil, "number-row-state-unavailable")
+					local mask = caps and bit.bor(locked, lock_mask) or bit.band(locked, bit.bnot(lock_mask))
+					lib.xkb_state_update_mask(probe, 0, 0, tonumber(ffi.cast("uint32_t", mask)), 0, 0, group)
+					if shift then lib.xkb_state_update_key(probe, XKB_LEFTSHIFT, XKB_KEY_DOWN) end
+					for _, code in ipairs(codes) do
+						local sym = tonumber(lib.xkb_state_key_get_one_sym(probe, code + EVDEV_TO_XKB_OFFSET)) or 0
+						local text = Keysym.from_id(sym) or ""
+						local length = tonumber(lib.xkb_keysym_get_name(sym, name_buffer, 128)) or 0
+						local name = length > 0 and ffi.string(name_buffer) or ""
+						rows[#rows + 1] = { code = code, caps = caps, shift = shift,
+							text = text, keysym = sym, dead = name:sub(1, 5) == "dead_" }
+					end
+					lib.xkb_state_unref(probe)
+					probe = nil
+				end
+			end
+			return rows
+		end)
+		if probe ~= nil then lib.xkb_state_unref(probe) end
+		if not called then return nil, "number-row-native-translation-refused" end
+		return result
+	end
+
+	function backend.chord_source_identity(session)
+		if not session.identity then return nil end
+		local Probe = require("adapters.xkb_source_probe")
+		if type(Probe.read_input_state) ~= "function" then return nil, "physical-input-modifiers-unavailable" end
+		return Probe.read_input_state(session.identity, session.groups)
+	end
+
+	function backend.chord_sources(session, requests, group, locked_mods)
+		local probe, rows = nil, {}
+		local names = { ctrl = "Control", alt = "Alt", shift = "Shift", super = "Super" }
+		local indices = {}
+		for role, name in pairs(names) do
+			local index = tonumber(lib.xkb_keymap_mod_get_index(session.keymap, name))
+			if index and index < 32 then indices[role] = index end
+		end
+		local locked = locked_mods or tonumber(lib.xkb_state_serialize_mods(session.state, 4))
+		local bit = require("bit")
+		local lock = tonumber(lib.xkb_keymap_mod_get_index(session.keymap, "Lock"))
+		if not lock or lock < 0 or lock >= 32 then return nil, "physical-lock-modifier-unavailable" end
+		local lock_mask = bit.lshift(1, lock)
+		local unlocked = bit.band(locked, bit.bnot(lock_mask))
+		local name_buffer = ffi.new("char[128]")
+		local called, reason = pcall(function()
+			for _, request in ipairs(requests) do
+				local depressed, used = 0, {}
+				for role, wanted in pairs(request.mods) do
+					if wanted then
+						assert(indices[role] ~= nil, "physical modifier unavailable in this XKB keymap")
+						if not used[indices[role]] then depressed = depressed + 2 ^ indices[role]; used[indices[role]] = true end
+					end
+				end
+				for _, caps in ipairs({ false, true }) do
+				probe = lib.xkb_state_new(session.keymap)
+				assert(probe ~= nil, "xkb_state_new failed for physical chord")
+				lib.xkb_state_update_mask(probe, depressed, 0, caps and bit.bor(unlocked, lock_mask) or unlocked, 0, 0, group)
+				local symbol = tonumber(lib.xkb_state_key_get_one_sym(probe, request.code + EVDEV_TO_XKB_OFFSET)) or 0
+				local size = tonumber(lib.xkb_keysym_get_name(symbol, name_buffer, 128)) or 0
+				local name = size > 0 and ffi.string(name_buffer) or ""
+				local mods = {}; for role, wanted in pairs(request.mods) do mods[role] = wanted end
+				rows[#rows + 1] = { code = request.code, mods = mods, caps = caps, identity = Keysym.from_id(symbol), dead = name:sub(1, 5) == "dead_",
+					keysym = symbol > 0 and symbol or nil }
+				lib.xkb_state_unref(probe); probe = nil
+				end
+			end
+		end)
+		if probe ~= nil then lib.xkb_state_unref(probe) end
+		if not called then return nil, tostring(reason) end
+		return rows
 	end
 
 	function backend.compose_feed(session, sym)
@@ -637,6 +744,207 @@ function M.direct_sources(codes)
 	return rows
 end
 
+
+--- Captures forty Caps/Shift levels from the exact selected native keymap.
+--- Generation, group and session must survive every native probe callback.
+--- @param codes table Ten unique physical evdev positions in number-row order.
+--- @return table|nil receipt Native map/source identity and ordered levels.
+--- @return string|nil reason Closed refusal category.
+function M.number_row_levels(codes)
+	if not _session or type(codes) ~= "table" or #codes ~= 10
+		or type(_backend.number_row_levels) ~= "function" then return nil, "number-row-source-unavailable" end
+	local count, seen = 0, {}
+	for key, code in pairs(codes) do
+		if type(key) ~= "number" or key % 1 ~= 0 or key < 1 or key > 10
+			or type(code) ~= "number" or code % 1 ~= 0 or code < 1 or code > UINPUT_KEY_MAX
+			or seen[code] then return nil, "number-row-invalid-positions" end
+		count, seen[code] = count + 1, true
+	end
+	if count ~= 10 then return nil, "number-row-invalid-positions" end
+	local generation = source_identity()
+	if not generation then return nil, "number-row-native-source-unverified" end
+	local session, backend, group, raw_map = _session, _backend, _source_group, _keymap_text
+	local groups = session.groups
+	if type(groups) ~= "number" or groups % 1 ~= 0 or groups < 1 or groups > 32 then return nil, "number-row-native-groups-unavailable" end
+	local map = session.identity
+	if type(map) ~= "string" or map == "" then return nil, "number-row-native-map-unavailable" end
+	local called, rows = pcall(backend.number_row_levels, session, codes, group)
+	local after_generation = source_identity()
+	if not called or type(rows) ~= "table" or _session ~= session or _backend ~= backend
+		or after_generation ~= generation or _source_group ~= group or _keymap_text ~= raw_map
+		or session.identity ~= map or session.groups ~= groups then
+		return nil, "number-row-native-source-changed"
+	end
+	local levels = NumberRow.levels("linux", rows, codes)
+	if not levels then return nil, "number-row-native-levels-refused" end
+	local capability = setmetatable({}, { __newindex = function() error("native row receipts are immutable", 2) end, __metatable = false })
+	local exact_codes = {}; for index, code in ipairs(codes) do exact_codes[index] = code end
+	number_row_receipts[capability] = { generation = generation, group = group, keymap = map, raw_map = raw_map,
+		session = session, backend = backend, groups = groups, levels = levels, codes = exact_codes }
+	return capability
+end
+
+--- Reads only this producer's exact native receipt while its source is current.
+--- Returned action descriptors are detached; callers cannot mutate retained proof.
+function M.number_row_view(capability, codes)
+	local owned = number_row_receipts[capability]
+	if not owned then return nil end
+	local generation = source_identity()
+	if owned.session ~= _session or owned.backend ~= _backend
+		or owned.raw_map ~= _keymap_text or owned.keymap ~= owned.session.identity or owned.generation ~= generation
+		or owned.group ~= _source_group or owned.session.groups ~= owned.groups or type(codes) ~= "table" or #codes ~= 10 then return nil end
+	for index, code in ipairs(owned.codes) do if codes[index] ~= code then return nil end end
+	local function copy(value)
+		if type(value) ~= "table" then return value end
+		local result = {}; for key, child in pairs(value) do result[key] = copy(child) end; return result
+	end
+	return { generation = owned.generation, group = owned.group, groups = owned.groups, keymap = owned.keymap,
+		levels = copy(owned.levels), codes = copy(owned.codes) }
+end
+
+--- Native-library qualification only; this does not prove a desktop source.
+function M._capture_number_row_levels_for_test(codes)
+	local _, group = capture_identity()
+	if group == nil or not _backend or type(_backend.number_row_levels) ~= "function" then return nil end
+	return _backend.number_row_levels(_session, codes, group)
+end
+
+--- Reads exact source-owner locks independently of reconstructed capture state.
+local function physical_locked_identity(session, backend)
+ local called, proof = pcall(backend.chord_source_identity, session)
+ if not called or type(proof) ~= "table" then return nil, "physical-input-modifiers-unavailable" end
+ for _, field in ipairs({ "group", "generation", "locked_mods", "locked_generation", "input_generation",
+  "mods", "base_mods", "latched_mods" }) do
+  local value = proof[field]
+  if type(value) ~= "number" or value < 0 or value % 1 ~= 0 then return nil, "physical-input-modifiers-unavailable" end
+ end
+ for _, field in ipairs({ "mods", "base_mods", "latched_mods", "locked_mods" }) do
+  if proof[field] > 255 then return nil, "physical-input-modifiers-unavailable" end
+ end
+ if proof.base_mods ~= 0 or proof.latched_mods ~= 0 or proof.mods ~= proof.locked_mods then
+  return nil, "physical-input-modifiers-unsupported"
+ end
+ return { group = proof.group, generation = proof.generation,
+  locked_mods = proof.locked_mods, locked_generation = proof.locked_generation,
+  input_generation = proof.input_generation, mods = proof.mods,
+  base_mods = proof.base_mods, latched_mods = proof.latched_mods,
+  observed_current = type(proof.observed_current) == "function" and proof.observed_current or nil }
+end
+local function physical_same_locked(left, right)
+ return left and right and left.group == right.group and left.generation == right.generation
+  and left.locked_mods == right.locked_mods and left.locked_generation == right.locked_generation
+  and left.input_generation == right.input_generation and left.mods == right.mods
+  and left.base_mods == right.base_mods and left.latched_mods == right.latched_mods
+end
+
+--- Proves actual chord identities for physical editor admission on the current source.
+--- Requests are detached; callbacks cannot mutate the original request snapshot.
+function M.chord_sources(requests)
+	if not _session or type(requests) ~= "table" or getmetatable(requests) ~= nil
+		or type(_backend.chord_sources) ~= "function" or type(_backend.chord_source_identity) ~= "function" then return nil, "physical-source-unavailable" end
+	local count, snapshot, expected = 0, {}, {}
+	for index, request in pairs(requests) do
+		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > #requests
+			or type(request) ~= "table" or getmetatable(request) ~= nil or type(request.code) ~= "number"
+			or request.code < 1 or request.code > UINPUT_KEY_MAX or request.code % 1 ~= 0
+			or type(request.mods) ~= "table" or getmetatable(request.mods) ~= nil then return nil, "physical-source-invalid-request" end
+		for field in pairs(request) do if field ~= "code" and field ~= "mods" then return nil, "physical-source-invalid-request" end end
+		local mods = {}
+		for role, value in pairs(request.mods) do
+			if role ~= "ctrl" and role ~= "alt" and role ~= "shift" and role ~= "super" or type(value) ~= "boolean" then
+				return nil, "physical-source-invalid-request"
+			end
+			mods[role] = value
+		end
+		snapshot[index], count = { code = request.code, mods = mods }, count + 1
+		local expected_mods = {}; for role, value in pairs(mods) do expected_mods[role] = value end
+		expected[index] = { code = request.code, mods = expected_mods }
+	end
+	if count ~= #requests then return nil, "physical-source-invalid-request" end
+	local session, backend, probe_epoch = _session, _backend, _physical_probe_epoch
+	local generation = source_identity()
+	if not generation or _session ~= session or _backend ~= backend or _physical_probe_epoch ~= probe_epoch then return nil, "physical-source-unverified" end
+	local group, epoch = _source_group, _source_generation
+	local proof, proof_reason = physical_locked_identity(session, backend)
+	if not proof then return nil, proof_reason end
+	if proof.group ~= group or proof.generation ~= _source_native_generation
+		or _session ~= session or _backend ~= backend or _source_generation ~= epoch
+		or _physical_probe_epoch ~= probe_epoch then return nil, "physical-source-unverified" end
+	local called, rows = pcall(backend.chord_sources, session, snapshot, group, proof.locked_mods)
+	if not called or type(rows) ~= "table" or _session ~= session or _backend ~= backend or _source_generation ~= epoch or _physical_probe_epoch ~= probe_epoch then
+		return nil, "physical-source-changed"
+	end
+	local current = source_identity()
+	local final_proof = physical_locked_identity(session, backend)
+	if not physical_same_locked(proof, final_proof) or current ~= generation or _session ~= session or _backend ~= backend or _source_generation ~= epoch or _physical_probe_epoch ~= probe_epoch then return nil, "physical-source-changed" end
+	local facts, row_count = {}, 0
+	for index, row in pairs(rows) do
+		local request = type(index) == "number" and index % 1 == 0 and expected[math.floor((index + 1) / 2)] or nil
+		if type(index) ~= "number" or not request or type(row) ~= "table" or row.code ~= request.code
+			or type(row.mods) ~= "table" or type(row.dead) ~= "boolean" or row.caps ~= (index % 2 == 0)
+			or row.keysym ~= nil and (type(row.keysym) ~= "number" or row.keysym % 1 ~= 0 or row.keysym < 1 or row.keysym > 4294967295)
+			or row.identity ~= nil and type(row.identity) ~= "string" then return nil, "physical-source-invalid-response" end
+		for role, value in pairs(row.mods) do if request.mods[role] ~= value then return nil, "physical-source-invalid-response" end end
+		local mods = {}; for role, value in pairs(request.mods) do
+			if row.mods[role] ~= value then return nil, "physical-source-invalid-response" end
+			mods[role] = value
+		end
+		facts[index], row_count = { code = row.code, mods = mods, caps = row.caps, identity = row.identity, dead = row.dead, keysym = row.keysym }, row_count + 1
+	end
+	if row_count ~= #snapshot * 2 then return nil, "physical-source-invalid-response" end
+	local capability = {}
+	_physical_chord_receipts[capability] = { session = session, backend = backend, epoch = epoch,
+		probe_epoch = probe_epoch, generation = generation, group = group, locked = final_proof,
+		raw_map = _keymap_text, native_map = session.identity, chords = facts }
+	return capability
+end
+
+--- Reads only capabilities issued by this actual source owner while still current.
+function M.chord_source_view(capability)
+	local record = _physical_chord_receipts[capability]
+	if not record then return nil, "physical-source-unowned" end
+	local function current()
+		return _session == record.session and _backend == record.backend and _source_generation == record.epoch
+			and _physical_probe_epoch == record.probe_epoch and _source_group == record.group
+	end
+	if not current() then return nil, "physical-source-changed" end
+	local generation = source_identity()
+	local proof, proof_reason = physical_locked_identity(record.session, record.backend)
+	if not proof then return nil, proof_reason end
+	if not physical_same_locked(proof, record.locked) or not current() or generation ~= record.generation then return nil, "physical-source-changed" end
+	local rows = {}
+	for index, row in ipairs(record.chords) do
+		local mods = {}; for role, value in pairs(row.mods) do mods[role] = value end
+		rows[index] = { code = row.code, mods = mods, caps = row.caps, identity = row.identity, dead = row.dead, keysym = row.keysym }
+	end
+	return { generation = record.generation, group = record.group, chords = rows }
+end
+
+--- Seals private and already-observed source currency without another read.
+--- This does not attest an unobserved external native source transition.
+--- @param capability table Exact opaque receipt issued by this capture owner.
+--- @return boolean current
+function M.chord_source_current(capability)
+	local record = _physical_chord_receipts[capability]
+	if not record or type(record.locked.observed_current) ~= "function" then return false end
+	local function private()
+		return _session == record.session and _backend == record.backend and _source_generation == record.epoch
+			and _physical_probe_epoch == record.probe_epoch and _source_group == record.group
+			and _source_native_generation == record.locked.generation
+			and _keymap_text == record.raw_map and record.session.identity == record.native_map
+	end
+	if not private() then return false end
+	local called, observed = pcall(record.locked.observed_current)
+	return called and observed == true and private()
+end
+
+--- Native-library-only probe; never qualifies desktop source or physical delivery.
+function M._capture_chord_sources_for_test(requests)
+	local _, group = capture_identity()
+	if group == nil or not _backend or type(_backend.chord_sources) ~= "function" then return nil end
+	return _backend.chord_sources(_session, requests, group)
+end
+
 --- The validated keymap and active-group epoch, independent of ordinary keys.
 --- @return integer|nil generation
 --- @return string|nil error
@@ -735,6 +1043,7 @@ end
 --- @param value integer 0 release, 1 press, 2 repeat.
 --- @return string|nil text, string|nil identity, string|nil error
 function M.process(evdev_code, value)
+	_physical_probe_epoch = _physical_probe_epoch + 1
 	if not _session then return nil, nil, "XKB capture state is not ready" end
 	if type(evdev_code) ~= "number" or evdev_code < 0 or evdev_code % 1 ~= 0 then
 		return nil, nil, "evdev keycode must be a non-negative integer"

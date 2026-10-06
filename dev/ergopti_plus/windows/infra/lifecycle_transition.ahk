@@ -5,7 +5,7 @@
 ; but once an owner is present its exception or explicit false result is debt.
 global LIFECYCLE_REQUIRED_OWNERS := Map(
 	"suspend", [
-		"navigation-event", "llm-aux-context", "keylogger-system-intervals", "tap-hold-synthetic-keys",
+		"user-programs", "navigation-event", "llm-aux-context", "llm-local-servers", "keylogger-system-intervals", "tap-hold-synthetic-keys",
 		"screen-brightness", "tray-root", "gesture-screenshot", "hotstring-prefix-watcher",
 		"selection-capture", "space-hold-input-hook",
 		"suppressive-input-hooks", "magic-key-editor-input-hook",
@@ -15,11 +15,11 @@ global LIFECYCLE_REQUIRED_OWNERS := Map(
 		"keylogger-prefetch-typing", "keylogger-prefetch-apps",
 		"keylogger-prefetch-range", "uia-selection-worker",
 		"keylogger-text-migration", "keep-awake", "gesture-left-hold",
-		"gesture-right-hold", "caps-word", "hotstring-engine",
+		"gesture-right-hold", "caps-word", "hotstring-engine", "user-hotstrings",
 		"llm-dependency-poll"
 	],
 	"resume", [
-		"navigation-event", "hotstring-prefix-watcher", "prefix-buffer",
+		"user-programs", "navigation-event", "hotstring-prefix-watcher", "prefix-buffer",
 		"prefix-index", "llm-dependency-poll", "llm-pointer-watch",
 		"metrics-focus-refresh", "keylogger-webview",
 		"keylogger-text-migration", "llm-menu", "updater",

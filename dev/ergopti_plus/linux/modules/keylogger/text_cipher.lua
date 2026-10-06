@@ -27,8 +27,9 @@
 local M = {}
 
 local Logger  = require("logger.shim")
-local Shell   = require("adapters.shell_runner")
 local Crypto  = require("adapters.crypto")
+local Base64  = require("compat.base64")
+local OpenSSL = require("infra.openssl_command")
 local TextCrypto = require("keylogger.text_crypto")
 
 local LOG = "modules.keylogger.text_cipher"
@@ -48,7 +49,7 @@ local LOG = "modules.keylogger.text_cipher"
 local MACHINE_ID_PATH = "/etc/machine-id"
 
 --- Older/alternative location, populated by dbus on non-systemd systems.
-local MACHINE_ID_FALLBACK_PATH = "/var/infra/dbus/machine-id"
+local MACHINE_ID_FALLBACK_PATH = "/var/lib/dbus/machine-id"
 
 
 
@@ -132,10 +133,11 @@ local function ensure_key()
 	end
 
 	Logger.start(LOG, "Deriving the at-rest key from the machine id…")
-	local key = TextCrypto.parse_derived_key(Shell.exec(cmd))
+	local derived, native_error = OpenSSL.exec(cmd)
+	local key = TextCrypto.parse_derived_key(derived)
 	if not key then
 		_derivation_failed = true
-		Logger.error(LOG, "Key derivation produced no usable key — is openssl installed?")
+		Logger.error(LOG, "Key derivation failed or returned no usable key — %s.", native_error or "invalid key output")
 		return nil
 	end
 
@@ -208,9 +210,19 @@ function M.encrypt(device_id, event_id, plaintext)
 	-- Byte-exact stdin, never the plain heredoc: that one normalises the payload's
 	-- trailing newlines away, so "line\n\n" would be stored as the ciphertext of
 	-- "line" and read back as a value the user never typed.
-	local ciphertext = Shell.exec_exact_stdin(cmd, plaintext)
+	local input, pipeline_options = plaintext, nil
+	if plaintext:find("\0", 1, true) then
+		-- The shell command reaches exec as a C string; a raw NUL truncates the
+		-- heredoc while OpenSSL still encrypts the surviving prefix successfully.
+		-- Transport only textual bytes, then restore them at the native boundary.
+		input = Base64.encode(plaintext)
+		cmd = "openssl base64 -d -A | " .. cmd
+		pipeline_options = { pipefail = true }
+	end
+	local ciphertext, native_error = OpenSSL.exec(cmd, input, pipeline_options)
 	if type(ciphertext) ~= "string" or ciphertext == "" then
-		Logger.error(LOG, "Encryption produced no output — refusing to store plaintext.")
+		Logger.error(LOG, "Encryption did not complete successfully — %s; refusing to store plaintext.",
+			native_error or "empty ciphertext")
 		return nil
 	end
 
@@ -236,8 +248,11 @@ function M.decrypt(value)
 		return ""
 	end
 
-	local plaintext = Shell.exec_exact_stdin(cmd, ciphertext)
-	if type(plaintext) ~= "string" then return "" end
+	local plaintext, native_error = OpenSSL.exec(cmd, ciphertext)
+	if type(plaintext) ~= "string" then
+		Logger.error(LOG, "Decryption did not complete successfully — %s.", native_error or "invalid plaintext output")
+		return ""
+	end
 	return plaintext
 end
 

@@ -69,7 +69,7 @@ end
 --- Every decision below is taken on this and never on the whole string: the
 --- heredoc body is the user's own text and could contain any flag we look for.
 local function command_line(cmd)
-	return cmd:match("^([^\n]*)") or ""
+	return helpers.openssl_script_command(cmd):match("^([^\n]*)") or ""
 end
 
 --- Reproduces the bytes the SHELL would hand the command's standard input.
@@ -80,6 +80,16 @@ end
 --- @param cmd string The fully composed command.
 --- @return string|nil The delivered bytes, or nil when there is no heredoc.
 local function delivered_stdin(cmd)
+	local header = cmd:match("^([^\n]*)") or ""
+	local data_token = header:match(" 4<<'([%w_]+)' 0<&4 4<&%-$")
+	if data_token then
+		local program_token = header:match("<<'([%w_]+)'")
+		local data_document = cmd:match("\n.-\n" .. program_token .. "\n(.*)$")
+		local body = data_document and data_document:match("^(.-)\n" .. data_token .. "\n$")
+		local limit = tonumber(command_line(cmd):match("^head %-c (%d+) "))
+		if body == nil or not limit then return nil end
+		return (body .. "\n"):sub(1, limit)
+	end
 	local token = command_line(cmd):match("<<'([%w_]+)'")
 	if not token then return nil end
 	local body = cmd:match("\n(.-)\n" .. token .. "\n$")
@@ -102,7 +112,7 @@ local function install_shell(opts)
 		-- The one key derivation. Recognised by -pbkdf2, which no per-value
 		-- command carries: re-deriving per value would cost half a second each.
 		if head:find("pbkdf2", 1, true) then
-			return "salt=00\nkey=" .. KEY .. "\niv=" .. IV .. "\n"
+			return helpers.openssl_stdout_receipt(cmd, "salt=00\nkey=" .. KEY .. "\niv=" .. IV .. "\n")
 		end
 		-- The per-row IV, which also goes through the shell.
 		if head:find("dgst", 1, true) then
@@ -113,8 +123,8 @@ local function install_shell(opts)
 		if opts.fail_crypto then return "" end
 		local payload = delivered_stdin(cmd)
 		if payload == nil then return "" end
-		if head:find("enc %-d ") then return from_hex(payload) end
-		return to_hex(payload)
+		if head:find("enc %-d ") then return helpers.openssl_stdout_receipt(cmd, from_hex(payload)) end
+		return helpers.openssl_stdout_receipt(cmd, to_hex(payload))
 	end)
 	return seen
 end
@@ -268,6 +278,25 @@ helpers.describe("text_migration plan — what may be rewritten", function()
 		local sql = Plan.update_row_sql(DEVICE, 1, { { name = "text", value = "it's" } })
 		helpers.assert_contains(sql, "text = 'it''s'")
 	end)
+end)
+
+
+helpers.describe("text_migration plan — literal byte preservation", function()
+	for _, case in ipairs({
+		{ "CRLF", "a\r\nb", "a'||char(13)||'\nb" },
+		{ "NUL", "a\0b", "a'||char(0)||'b" },
+		{ "mixed", "'\0\r\n'", "''" .. "'||char(0)||'" .. "'||char(13)||'\n''" },
+	}) do
+		helpers.it("linux-migration-literal: " .. case[1] .. " retains complete decrypted values in owned SQL", function()
+			local escaped = Plan.sql_quote(case[2])
+			helpers.assert_eq(escaped, case[3])
+			local sql = assert(Plan.update_row_sql(DEVICE, 7, {{ name = "text", value = case[2] }}))
+			helpers.assert_contains(sql, "text = '" .. escaped .. "'")
+			helpers.assert_contains(sql, "device_id = '" .. DEVICE .. "' AND id = 7")
+			helpers.assert_true(sql:find("\0", 1, true) == nil and sql:find("\r", 1, true) == nil,
+				"native script must represent these data bytes rather than pass unrepresentable framing")
+		end)
+	end
 end)
 
 

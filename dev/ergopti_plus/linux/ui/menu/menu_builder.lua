@@ -25,10 +25,13 @@
 
 local M = {}
 local WindowTitles = require("window_titles")
+local NumberRowPolicy = require("layout.number_row_policy")
 local ParameterLabel = require("action_parameter_label")
 
 local Logger = require("logger.shim")
 local Extensions = require("hotstrings.extensions")
+local PersonalFiles = require("hotstrings.personal_files")
+local PersonalFileMenu = require("menu.personal_files")
 local Languages = require("hotstrings.languages")
 local LocaleTable = require("_generated.locale_table")
 local MagicKey = require("modules.hotstrings.magic_key")
@@ -39,7 +42,15 @@ local Modal = require("ui.modal")
 local TextPrompt = require("ui.text_prompt")
 local PrivacyPolicy = require("llm.trigger_policy")
 local LlmBackendRows = require("ui.menu.llm_backend_rows")
+local ProgrammableHotstrings = require("ui.menu.programmatic_hotstrings")
+local ProgrammableMenuPolicy = require("menu.programmable_hotstrings")
 local LOG = "ui.menu.menu_builder"
+
+--- Keeps private executable/argv data out of persistent menu presentation.
+local function binding_label(label, registry, binding, action)
+	if type(registry.get_action_parameter_spec) == "function" and registry.get_action_parameter_spec(action) == "program" then return label end
+	return ParameterLabel.for_binding(label, registry, binding, action)
+end
 
 -- Delays are stored in seconds and typed in milliseconds: seconds is what the
 -- cascade and the TOMLs speak, milliseconds is what a person means by "wait a
@@ -181,6 +192,11 @@ end
 local function assign_parameterized_action(ctx, gestures, binding, action, assign, picked)
 	local spec = type(gestures.get_action_parameter_spec) == "function"
 		and gestures.get_action_parameter_spec(action) or nil
+	local bindings = package.loaded["infra.program_binding_transaction"]
+	if spec ~= "program" and type(bindings) == "table" and bindings.pending() then
+		Logger.error(LOG, "Binding edit refused while private user program compensation remains pending.")
+		return false
+	end
 	if not spec then return assign() == true end
 
 	local prior = type(gestures.get_action_parameter) == "function"
@@ -213,6 +229,9 @@ local function assign_parameterized_action(ctx, gestures, binding, action, assig
 		show_error(zenity_plain(gestures.get_action_parameter_error(action)))
 		return false
 	end
+	if spec == "program" then
+		return require("infra.program_binding_transaction").apply(binding, value, ctx.is_paused)
+	end
 	if type(gestures.set_action_parameter) ~= "function"
 		or not gestures.set_action_parameter(binding, action, value)
 	then
@@ -231,14 +250,14 @@ end
 --- @param on_confirm function Transactional assignment callback, given the action
 ---   id and the value the picker's editor collected, if any.
 --- @return boolean opened
-local function open_action_picker(title, current, binding, on_confirm)
+local function open_action_picker(title, current, binding, on_confirm, selected_items)
 	local ok_picker, Picker = pcall(require, "ui.action_picker.bridge")
 	local ok_gestures, Gestures = pcall(require, "modules.gestures.manager")
 	if not ok_picker or type(Picker.open) ~= "function" or not ok_gestures then
 		Logger.error(LOG, "Action picker is unavailable for '%s'.", tostring(title))
 		return false
 	end
-	local items = Gestures.get_picker_items()
+	local items = type(selected_items) == "table" and selected_items or Gestures.get_picker_items()
 	local editor = Gestures.get_picker_parameter_fields(items, binding)
 	return Picker.open({
 		title = title,
@@ -422,43 +441,6 @@ local function _build_layouts(ctx)
 		return ctx.webview.show("layout_manager")
 	end
 
-	-- The manifest owns this switch and its position before the physical picker.
-	-- The canonical choice owner also owns the runtime publication and redraw.
-	render_ctx.feature_rows = {}
-	for key, value in pairs(ctx.feature_rows or {}) do render_ctx.feature_rows[key] = value end
-	local replace_path = "hotstrings.magic_key.replace"
-	for _, declaration in ipairs(ManifestMenu and ManifestMenu.get_array("layout_menu") or {}) do
-		if declaration.type == "feature" and declaration.path == replace_path then
-			render_ctx.feature_rows[replace_path] = function()
-				local config = ctx.config
-				if type(config) ~= "table" or type(config.is_group_enabled) ~= "function"
-					or type(config.is_section_checked) ~= "function" or type(config.toggle_section) ~= "function" then
-					Logger.error(LOG, "No canonical magic replacement choice owner in the layout menu.")
-					return nil
-				end
-				local function admitted()
-					return ctx.paused ~= true and not (type(ctx.is_paused) == "function" and ctx.is_paused())
-						and config.is_group_enabled("magickey") == true
-				end
-				local enabled = admitted()
-				return {
-					label = i18n_safe(declaration.i18n),
-					checked = config.is_section_checked("magickey", "replace") == true,
-					disabled = not enabled,
-					action = enabled and function()
-						if not admitted() then return false end
-						local ok, committed = pcall(config.toggle_section, "magickey", "replace")
-						if not ok or committed ~= true then
-							Logger.error(LOG, "Magic replacement choice was not committed: %s.", tostring(committed))
-							show_error(i18n_safe("dialog.bulk_toggle.save_failed"))
-							return false
-						end
-						return true
-					end or nil,
-				}
-			end
-		end
-	end
 
 	local providers = {
 		-- The custom layout picker: the registry layouts the layout manager
@@ -543,7 +525,7 @@ local function _build_layouts(ctx)
 			return {}
 		end
 		local function notify(key, level)
-			local ok_notifier, Notifier = pcall(require, "adapters.notifier")
+			local ok_notifier, Notifier = pcall(require, "adapters.application_notifier")
 			if ok_notifier then
 				Notifier.send(i18n_safe(key), { title = i18n_safe("dialog.magic_key_source.title"), level = level })
 			else
@@ -576,6 +558,9 @@ local function _build_layouts(ctx)
 		})
 	end
 
+	-- Native-only status never acquires a preference or forced-input writer.
+	render_ctx.commands["number_row_mode"] = function() return false end
+	providers["number_row_policy"] = function() return NumberRowPolicy.native_rows(ManifestMenu, render_ctx.commands) end
 	local rows = ManifestMenu
 		and ManifestMenu.build("layout_menu", "Layout", nil, nil, render_ctx, providers)
 		or {}
@@ -661,6 +646,10 @@ local function _manifest_hotstring_rows(ctx, config)
 	--- @param category table|nil Category metadata from the loader.
 	--- @return string
 	local function category_label(id, category)
+		if PersonalFiles.components(id) and category and PersonalFiles.is_descriptor(category.personal_source) then
+			local descriptor = category.personal_source
+			return descriptor.label ~= "" and descriptor.label or descriptor.components[#descriptor.components]
+		end
 		local description = category and category.description or nil
 		-- A pack whose [_meta] description is a plain string, not a locale table —
 		-- which is what the editor writes for personal.toml — used to fall straight
@@ -778,6 +767,13 @@ local function _manifest_hotstring_rows(ctx, config)
 		local category = (type(config.get_category) == "function") and config.get_category(id) or nil
 		local on = config.is_group_enabled and config.is_group_enabled(id)
 		local count = category and category.count or 0
+		local personal = PersonalFiles.components(id) ~= nil
+		local binding = personal and type(config.personal_file_scope_binding) == "function"
+			and config.personal_file_scope_binding(id) or nil
+		local function current_source()
+			return not personal or type(binding) == "table" and type(binding.current) == "function"
+				and binding.current() == true
+		end
 
 		local sub = {}
 
@@ -808,6 +804,7 @@ local function _manifest_hotstring_rows(ctx, config)
 					disabled = not on,
 					action = function()
 						local called, committed = pcall(function()
+							if not current_source() then return false end
 							if type(config.toggle_section) ~= "function" then return false end
 							return config.toggle_section(id, name)
 						end)
@@ -824,6 +821,7 @@ local function _manifest_hotstring_rows(ctx, config)
 
 		local function commit_scope(enabled)
 			local called, committed = pcall(function()
+				if not current_source() then return false end
 				return config.set_category_scope_enabled({ id }, enabled)
 			end)
 			if called and committed == true then return true end
@@ -852,13 +850,36 @@ local function _manifest_hotstring_rows(ctx, config)
 				end,
 				["hotstring_category_sections"] = function() return sub end,
 			})
+		if personal then
+			local controls = type(config.personal_metadata_controls) == "function" and config.personal_metadata_controls(id) or nil
+			local rows = PersonalFileMenu.build({ manifest = ManifestMenu, current = current_source,
+				enabled = function() return type(config.is_group_enabled) == "function" and config.is_group_enabled(id) == true end,
+				available = function(field) return controls ~= nil and controls.file[field] ~= true end,
+				enable = function(enabled)
+					return (enabled and config.enable_group or config.disable_group)(id) == true
+				end,
+				tooltip_enabled = function() return type(config.resolve) == "function" and config.resolve(id, nil).show_tooltip == true end,
+				tooltip = function(value) return config.set_personal_metadata(id, nil, "show_tooltip", value) == true end,
+				edit = function() return ctx.webview ~= nil and type(ctx.webview.show) == "function"
+					and ctx.webview.show("hotstrings_config_window") == true end,
+				metadata_reason = function() return i18n_safe("menu.hotstrings.personal_metadata_unavailable") end,
+				changed = function() if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end end,
+			})
+			for index = #rows, 1, -1 do table.insert(rendered, 1, rows[index]) end
+		end
+		if personal then
+			PersonalFileMenu.apply_category_admission(rendered, {
+				manifest = ManifestMenu, translate = i18n_safe, current = current_source,
+			})
+		end
 
 		return {
 			-- The ACTIVE count, not the file's total. A user reads this figure as
 			-- "what is firing right now" and checks a disable by watching it fall;
 			-- it never moved, so a fully disabled Autocorrection went on advertising
 			-- every entry it would have had.
-			label   = string.format("%s (%d)", category_label(id, category), active_count(id, category)),
+			label   = string.format("%s (%d)", category_label(id, category), active_count(id, category))
+				.. (personal and not current_source() and (" — " .. i18n_safe("menu.hotstrings.personal_source_unavailable")) or ""),
 			checked = on and true or false,
 			submenu = rendered,
 		}
@@ -1352,6 +1373,9 @@ local function _manifest_hotstring_rows(ctx, config)
 			-- category would have advertised 3 while offering 13, and would not have
 			-- moved when a family was switched off.
 			local count = type(dyn.active_count) == "function" and dyn.active_count() or 0
+			if on and type(dyn.user_code_is_enabled) == "function" and dyn.user_code_is_enabled() then
+				count = count + dyn.user_code_count()
+			end
 
 			local sub = {
 				{
@@ -1379,7 +1403,7 @@ local function _manifest_hotstring_rows(ctx, config)
 					if family.separator then
 						sub[#sub + 1] = { separator = true }
 					else
-						local section, enabled = family.section, family.enabled
+						local section, enabled, family_id = family.section, family.enabled, family.id
 						-- The count, on the families that have one. A prefix family with
 						-- 0 behind it is a switch that can do nothing until the user
 						-- fills in that field of personal_info.toml, and the count is
@@ -1397,21 +1421,59 @@ local function _manifest_hotstring_rows(ctx, config)
 							-- switched on.
 							disabled = not on,
 							action       = function()
-								dyn.set_rule_enabled(section, not enabled)
+								local current_family
+								local called, committed = pcall(function()
+									local current = ctx.dyn_hotstrings
+									if current ~= dyn or type(current.is_enabled) ~= "function"
+										or type(current.rule_families) ~= "function"
+										or type(current.is_rule_enabled) ~= "function"
+										or type(current.set_rule_enabled) ~= "function" then return false end
+									local declared = 0
+									for _, entry in ipairs(ManifestMenu.get_dynamic_hotstring_families()) do
+										if entry.id == family_id and (entry.linux_section or entry.section) == section then
+											declared = declared + 1
+										end
+									end
+									if declared ~= 1 then return false end
+									for _, entry in ipairs(current.rule_families()) do
+										if entry.id == family_id and entry.section == section then
+											if current_family ~= nil then return false end
+											current_family = entry
+										end
+									end
+									if type(current_family) ~= "table" or type(current_family.enabled) ~= "boolean"
+										or current.is_enabled() ~= true then return false end
+									local live_enabled = current.is_rule_enabled(nil, section)
+									if type(live_enabled) ~= "boolean" or live_enabled ~= current_family.enabled
+										or ctx.dyn_hotstrings ~= current then return false end
+									return current.set_rule_enabled(section, not live_enabled)
+								end)
+								if not called or committed ~= true then
+									Logger.error(LOG, "Dynamic hotstring family refused (%s).", called and "owner-not-committed" or "owner-error")
+									show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+									return false
+								end
 								-- A prefix family is matched by the ORDINARY engine, which
 								-- knows nothing about dynamic families — so its switch has
 								-- to add or remove mappings rather than filter them, and
 								-- that means a reload. The date families need none of this;
 								-- their guard is read at match time.
-								if family.count and config and type(config.reload) == "function" then
+								-- The preference receipt above does not acknowledge this
+								-- separate catalogue reload or invent its compensation.
+								if current_family.count and config and type(config.reload) == "function" then
 									config.reload()
 								end
 								if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+								return true
 							end,
 						}
 					end
 				end
 			end
+
+			local programmable = ProgrammableMenuPolicy.build_entry_rows(ManifestMenu,
+				function() return ProgrammableHotstrings.build(ctx) end)
+			for _, row in ipairs(programmable) do sub[#sub + 1] = row end
 
 			local function commit_scope(enabled)
 				local called, committed = pcall(function() return dyn.set_scope_enabled(enabled, config) end)
@@ -1505,7 +1567,7 @@ local function _manifest_hotstring_rows(ctx, config)
 
 			rows[#rows + 1] = { separator = true }
 
-			local added = 0
+			local added, represented = 0, {}
 			for _, name in ipairs(groups) do
 				-- Extension packs are unclassified too, but they are not personal
 				-- files: they belong to the extension that shipped them and get their
@@ -1513,6 +1575,31 @@ local function _manifest_hotstring_rows(ctx, config)
 				-- heading that told the user they had written them.
 				if not classified[name] and not Extensions.parse_category_key(name) then
 					rows[#rows + 1] = group_row(name)
+					represented[name] = true
+					added = added + 1
+				end
+			end
+			-- Empty or unavailable sources still own a file row; mappings are not
+			-- a discovery inventory and must not hide their source controls.
+			if type(config.personal_file_sources) == "function" then
+				for _, source in ipairs(config.personal_file_sources()) do
+					local descriptor = source.descriptor
+					if PersonalFiles.is_descriptor(descriptor) and not represented[descriptor.id] then
+						local row = group_row(descriptor.id)
+						row.label = descriptor.label .. " (0)"
+						if type(config.personal_file_scope_binding) ~= "function"
+							or config.personal_file_scope_binding(descriptor.id) == nil then
+							row.label = row.label .. " — " .. i18n_safe("menu.hotstrings.personal_source_unavailable")
+						end
+						rows[#rows + 1], represented[descriptor.id] = row, true
+						added = added + 1
+					end
+				end
+			end
+			if type(config.personal_unavailable_directories) == "function" then
+				for _, blocked in ipairs(config.personal_unavailable_directories()) do
+					rows[#rows + 1] = { label = blocked.label,
+						submenu = PersonalFileMenu.directory_unavailable(ManifestMenu) }
 					added = added + 1
 				end
 			end
@@ -1570,7 +1657,8 @@ local function _manifest_hotstring_rows(ctx, config)
 						names[extension.id] = names[extension.id] or extension.name
 						local list = bound_sections[extension.id] or {}
 						bound_sections[extension.id] = list
-						list[#list + 1] = { category = name, section = section, count = record.count or 0 }
+						list[#list + 1] = { category = name, section = section, count = record.count or 0,
+							description = record.description }
 					end
 				end
 			end
@@ -1594,9 +1682,14 @@ local function _manifest_hotstring_rows(ctx, config)
 				local packs = by_extension[extension_id]
 				local sub = {}
 				local function commit_gates(enabled)
+					if ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused()) then return false end
+					local bindings = {}
+					for _, leaf in ipairs(bound_sections[extension_id] or {}) do
+						bindings[#bindings + 1] = { group = leaf.category, section = leaf.section }
+					end
 					local called, committed = pcall(function()
-						if type(config.set_category_gates_enabled) ~= "function" then return false end
-						return config.set_category_gates_enabled(packs, enabled)
+						if type(config.set_extension_sections_enabled) ~= "function" then return false end
+						return config.set_extension_sections_enabled(packs, bindings, enabled)
 					end)
 					if called and committed == true then
 						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
@@ -1630,12 +1723,20 @@ local function _manifest_hotstring_rows(ctx, config)
 					local checked = config.is_section_checked
 						and config.is_section_checked(bound.category, bound.section)
 						or (config.is_section_enabled and config.is_section_enabled(bound.category, bound.section))
+					local description = bound.description
+					if type(description) == "table" then
+						local locale = require("infra.i18n").get_locale()
+						description = description[locale] or description.en
+					end
+					if type(description) ~= "string" or description == "" then description = bound.section end
 					sub[#sub + 1] = {
-						label    = string.format("%s (%d)", bound.section, bound.count),
+						label    = string.format("%s (%d)", description, bound.count),
 						checked  = checked and true or false,
 						-- Greyed while its category is off, like a section row there.
-						disabled = not category_on,
-						action   = function()
+						disabled = not category_on or ctx.paused == true,
+						action   = (category_on and ctx.paused ~= true) and function()
+							if ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused())
+								or config.is_group_enabled(bound.category) ~= true then return false end
 							local called, committed = pcall(function()
 								if type(config.toggle_section) ~= "function" then return false end
 								return config.toggle_section(bound.category, bound.section)
@@ -1645,7 +1746,7 @@ local function _manifest_hotstring_rows(ctx, config)
 								called and "owner-not-committed" or "owner-error")
 							show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
 							return false
-						end,
+						end or nil,
 					}
 				end
 
@@ -2357,8 +2458,14 @@ local function _build_llm(ctx)
 					label = label,
 					checked = checked,
 					action = function()
-						set(option)
+						local called, committed = pcall(set, option)
+						if not called or committed ~= true then
+							Logger.error(LOG, "Prediction modifier choice was not durably acknowledged.")
+							show_error(i18n_safe("dialog.bulk_toggle.save_failed"))
+							return false
+						end
 						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+						return true
 					end,
 				}
 			end
@@ -2368,20 +2475,38 @@ local function _build_llm(ctx)
 		local no_modifier = i18n_safe("menu.settings.no_modifier")
 		local navigation = NavigationSettings.get_navigation()
 		local validation = NavigationSettings.get()
-		append_rendered_row(target, {
-			label = i18n_safe("menu.llm.nav_menu_title"),
-			items = {
-				{
-					label = i18n_safe("menu.llm.nav_label") .. " — "
+		local definitions = {}
+		for _, definition in ipairs(ManifestMenu.get_array("llm_navigation_rows")) do
+			if type(definition) == "table" and definition.type == "list"
+				and type(definition.i18n) == "string" and definition.i18n ~= ""
+				and (definition.id == "llm_nav_modifiers" or definition.id == "llm_val_modifiers") then
+				definitions[definition.id] = definition
+			end
+		end
+		local navigation_providers = {
+			["llm_nav_modifiers"] = function()
+				local definition = definitions.llm_nav_modifiers
+				if not definition then return {} end
+				return { {
+					label = i18n_safe(definition.i18n) .. " — "
 						.. (#navigation > 0 and table.concat(navigation, "+") or arrows_only),
 					items = chord_rows(navigation, arrows_only, NavigationSettings.set_navigation),
-				},
-				{
-					label = string.format(i18n_safe("menu.llm.val_label"),
+				} }
+			end,
+			["llm_val_modifiers"] = function()
+				local definition = definitions.llm_val_modifiers
+				if not definition then return {} end
+				return { {
+					label = string.format(i18n_safe(definition.i18n),
 						#validation > 0 and table.concat(validation, "+") or no_modifier),
 					items = chord_rows(validation, no_modifier, NavigationSettings.set),
-				},
-			},
+				} }
+			end,
+		}
+		local rows = ManifestMenu.build("llm_navigation_rows", "LLM navigation", nil, nil, ctx, navigation_providers)
+		append_rendered_row(target, {
+			label = i18n_safe("menu.llm.nav_menu_title"),
+			submenu = rows,
 			disabled = not enabled or nil,
 		}, "llm_navigation")
 	end
@@ -3133,15 +3258,26 @@ local function _build_shortcuts(ctx)
 		if row then selection_rows[#selection_rows + 1] = row end
 	end
 	selection_rows[#selection_rows + 1] = { separator = true }
-	for _, helper in ipairs({
-		{ key = "menu.shortcuts.select_word", run = sc.select_word },
-		{ key = "sg_actions.select_line",     run = sc.select_line },
-		{ key = "sg_actions.paste_plain",     run = sc.paste_plain },
-	}) do
-		selection_rows[#selection_rows + 1] = {
-			label  = i18n_safe(helper.key),
-			action = function() helper.run() end,
-		}
+	local helper_methods = {
+		["selection_select_word"] = "select_word",
+		["selection_select_line"] = "select_line",
+		["selection_paste_plain"] = "paste_plain",
+	}
+	local helper_getters = {
+		selection_select_word_ready = function() return case_ready(helper_methods.selection_select_word) end,
+		selection_select_line_ready = function() return case_ready(helper_methods.selection_select_line) end,
+		selection_paste_plain_ready = function() return case_ready(helper_methods.selection_paste_plain) end,
+	}
+	for _, command in ipairs(ManifestMenu.get_array("selection_helper_commands")) do
+		local id, method = command.id, helper_methods[command.id]
+		local ready = assert(helper_getters[id .. "_ready"], "Selection helper command has no native owner")
+		local row = ManifestMenu.command_row("selection_helper_commands", id, {
+			[id] = function()
+				if not ready() or sc[method]() ~= true then return false end
+				return true
+			end,
+		}, helper_getters)
+		if row then selection_rows[#selection_rows + 1] = row end
 	end
 
 	-- Wrap symbols submenu. Ordered, because `get_wrap_pairs` returns a map and
@@ -3216,7 +3352,7 @@ local function _build_shortcuts(ctx)
 					function(option, picked) return assign_slot(slot, option, picked) end)
 				rows[#rows + 1] = {
 					label = slot_label
-						.. " → " .. ParameterLabel.for_binding(Gestures.get_action_label(bound),
+						.. " → " .. binding_label(Gestures.get_action_label(bound),
 							Gestures, Keyboard.binding_id(slot), bound),
 					items = choices,
 				}
@@ -3258,7 +3394,7 @@ local function _build_shortcuts(ctx)
 				return assigned
 			end
 			rows[#rows + 1] = {
-				label = name .. " → " .. (bound ~= "none" and ParameterLabel.for_binding(
+				label = name .. " → " .. (bound ~= "none" and binding_label(
 					Gestures.get_action_label(bound), Gestures, TapKeys.binding_id(key.id), bound)
 					or i18n_safe("menu.shortcuts.tap_keys.unassigned")),
 				items = slot_binding_rows(name, bound, TapKeys.binding_id(key.id), assign),
@@ -3274,6 +3410,30 @@ local function _build_shortcuts(ctx)
 	-- narrowed to the chords; the clear writes "none" in every slot, since an
 	-- absent slot starts with its preset. The title is ticked from the switch.
 	local group_builders = {}
+	group_builders["key_combinations"] = function()
+		return require("ui.menu.key_combinations").build(ctx, {
+			manifest = ManifestMenu, get = i18n_safe, key_label = function(entry)
+				local label = i18n_safe(entry.label_key); return label == entry.label_key and entry.id or label
+			end,
+			action_label = function(action, gestures) return gestures.get_action_label(action) end,
+			open_picker = open_action_picker, error = show_error,
+			prompt_hold = function(label, current, choices)
+				return TextPrompt.ask(label, zenity_plain(string.format(i18n_safe("menu.shortcuts.key_combinations_hold_hold"), current)), current, false, choices)
+			end,
+			parameter = function(context, gestures, binding, action, spec)
+				local prior = gestures.get_action_parameter(binding, action)
+				if type(context.prompt_action_parameter) == "function" then
+					return context.prompt_action_parameter(binding, action, spec, prior)
+				end
+				if spec == "program" then return nil end
+				if spec == "app" then
+					return require("ui.app_chooser").pick(require("adapters.shell_runner"), gestures.get_action_parameter_prompt(action))
+				end
+				local title = _fill(i18n_safe("dialog.gestures.param_title"), "{1}", gestures.get_action_label(action))
+				return prompt_text(title, zenity_plain(gestures.get_action_parameter_prompt(action)), prior)
+			end,
+		})
+	end
 	group_builders["script_control"] = function()
 		local ok_chords, Chords = pcall(require, "modules.shortcuts.script_chords")
 		local ok_gestures, Gestures = pcall(require, "modules.gestures.manager")
@@ -3295,7 +3455,7 @@ local function _build_shortcuts(ctx)
 					return assigned
 				end
 				rows[#rows + 1] = {
-					label = name .. " → " .. ParameterLabel.for_binding(Gestures.get_action_label(bound),
+					label = name .. " → " .. binding_label(Gestures.get_action_label(bound),
 						Gestures, Chords.binding_id(slot.id), bound),
 					items = slot_binding_rows(name, bound, Chords.binding_id(slot.id), assign),
 				}
@@ -3411,7 +3571,21 @@ local function _build_shortcuts(ctx)
 	end
 	sc_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do sc_ctx.state_getters[key] = value end
+	local physical_editor = require("shortcuts.physical_editor_menu").new({
+		paused = function()
+			if ctx.paused == true or type(ctx.is_paused) ~= "function" then return nil end
+			return ctx.is_paused()
+		end,
+		scope = function() return require("infra.shortcuts_scope").editor_owner(ctx.is_paused) end,
+		host = function() return require("ui.physical_shortcuts.bridge") end,
+		refused = function() show_error(i18n_safe("physical_shortcuts.window_unavailable")) end,
+	})
+	sc_ctx.commands["physical_shortcuts_editor"] = physical_editor.open
+	sc_ctx.state_getters["physical_shortcuts_editor_ready"] = physical_editor.ready
 	sc_ctx.state_getters["shortcuts_enabled"] = function() return enabled end
+	sc_ctx.state_getters["key_combinations_enabled"] = function()
+		return require("modules.shortcuts.key_combinations").is_enabled() == true
+	end
 	-- Ticks « Raccourcis de gestion du script » while its switch is on.
 	sc_ctx.state_getters["script_control_enabled"] = function()
 		local ok_chords, Chords = pcall(require, "modules.shortcuts.script_chords")
@@ -3593,36 +3767,31 @@ local function _build_tap_holds(ctx)
 				}
 			end
 
-			rows[#rows + 1] = {
-				label = _tap_hold_key_label(catalog_entry) .. "  :  "
-					.. (configured and (tap_label .. "  /  " .. hold_label) or "—"),
-				checked = configured or nil,
-				items = {
-					{
-						label = i18n_safe("tap_hold.action.disable"),
-						disabled = not configured or nil,
-						action = function() changed(Writer.set_native(key_id)) end,
-					},
-					{ separator = true },
-					{
-						label = string.format(i18n_safe("tap_hold.picker.tap"), tap_label),
-						action = function() pick_tap(catalog_entry, tap) end,
-					},
-					{
-						label = string.format(i18n_safe("tap_hold.picker.hold"), hold_label),
-						items = hold_rows,
-					},
-					{
-						label = string.format(i18n_safe("menu.tapholds.key_tap_delay"), ms .. " ms"),
-						items = {
-							{
-								label = i18n_safe("menu.tapholds.key_tap_delay_set"),
-								action = function() ask_delay(key_id, ms) end,
-							},
+			local key_rows = ManifestMenu.template_rows("tap_hold_key_head", {
+				["tap_hold_key_native"] = function() changed(Writer.set_native(key_id)) end,
+				["tap_hold_key_tap"] = function() pick_tap(catalog_entry, tap) end,
+			}, {
+				["tap_hold_key_configured"] = function() return configured end,
+				["tap_hold_key_tap_caption"] = function() return tap_label end,
+				["tap_hold_key_hold_caption"] = function() return hold_label end,
+			}, { ["tap_hold_key_hold"] = hold_rows })
+			if key_rows then
+				key_rows[#key_rows + 1] = {
+					label = string.format(i18n_safe("menu.tapholds.key_tap_delay"), ms .. " ms"),
+					items = {
+						{
+							label = i18n_safe("menu.tapholds.key_tap_delay_set"),
+							action = function() ask_delay(key_id, ms) end,
 						},
 					},
-				},
-			}
+				}
+				rows[#rows + 1] = {
+					label = _tap_hold_key_label(catalog_entry) .. "  :  "
+						.. (configured and (tap_label .. "  /  " .. hold_label) or "—"),
+					checked = configured or nil,
+					items = key_rows,
+				}
+			end
 		end
 		return rows
 	end
@@ -3976,7 +4145,8 @@ end
 local function _channel_picker(ctx, up)
 	return ManifestMenu.choice_row("about_update_channel_menu", "update_channel", {
 		update_channel = function(id)
-			if not up.set_channel(id) then return end
+			local ok, committed = pcall(up.set_channel, id)
+			if not ok or committed ~= true then return false end
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 			-- An open Versions page follows only an acknowledged subscription.
 			local ok_bridge, Changelog = pcall(require, "ui.changelog.bridge")
@@ -3985,6 +4155,7 @@ local function _channel_picker(ctx, up)
 			else
 				Logger.error(LOG, "The Versions page bridge is unavailable: %s.", tostring(Changelog))
 			end
+			return true
 		end,
 	}, { ["updater.channel"] = function() return up.get_channel() end })
 end
@@ -4104,16 +4275,7 @@ local function _about_update_rows(ctx)
 				action = function()
 					-- Consent names the release this row shows: the manager refuses
 					-- it if a background check replaced the cached release since.
-					up.download_update(rel.download_url, function(archive, err)
-						local installed = archive ~= nil and up.install_update(archive)
-						if not archive then
-							Logger.error(LOG, "Update download failed: %s.", tostring(err))
-						end
-						-- The daemon restarts on the new version, or tells why not.
-						if type(ctx.on_update_finished) == "function" then
-							ctx.on_update_finished(installed, rel.tag, archive and "install" or "download")
-						end
-					end)
+					require("ui.update_check.bridge").download_offered(up, rel, ctx)
 				end,
 			}
 		end

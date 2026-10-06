@@ -46,6 +46,8 @@
 ;    layered on top in a later phase.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\_generated\personal_file_descriptors.ahk
+
 
 
 
@@ -113,6 +115,8 @@ _HSE_SourcePriority(CategoryName) {
 		Cat := StrLower(CategoryName)
 		if (Cat == "personal")
 				return HSE_PRIORITY_PERSONAL
+		if PersonalFileComponents(CategoryName)
+				return HSE_PRIORITY_PACKAGE
 		if (SubStr(Cat, 1, 4) == "ext." || SubStr(Cat, 1, 4) == "ext:")
 				return HSE_PRIORITY_PACKAGE
 		return HSE_PRIORITY_COMMON
@@ -1215,6 +1219,8 @@ HSE_PreviewNextDecision(Buffer, NextChar) {
 				; Space here used to invent a repeat such as "b " that can never fire.
 				if (Match == "" and NextChar == MagicKey)
 						Match := HSE_TryPersonalInfoCombo(MagicKey)
+				if (Match == "" and NextChar == MagicKey and IsSet(UserHotstringsPreviewSpec))
+						Match := UserHotstringsPreviewSpec(Buffer, NextChar)
 				if (Match == "" and NextChar == MagicKey)
 						Match := HSE_TryRepeatKey(MagicKey)
 				SimulatedBuffer := HSE_Buffer
@@ -1250,6 +1256,8 @@ HSE_PreviewNextDecision(Buffer, NextChar) {
 				if (RegistryGeneration != HSE_RegistryGeneration
 						or RuntimeDecisionGeneration != HSE_RuntimeDecisionGeneration)
 						return ""
+				if Match.HasOwnProp("UserCodeGeneration")
+						Decision.UserCodeGeneration := Match.UserCodeGeneration
 				Decision.RegistryGeneration := RegistryGeneration
 				Decision.RuntimeDecisionGeneration := RuntimeDecisionGeneration
 				Decision.BufferBefore := Buffer

@@ -250,13 +250,22 @@ HotstringsLanguageCategories() {
 	return Cache
 }
 
-; Give every language-pack category its own gate in ``GateTarget`` (the
+; Give declared native and language categories their own gates in ``GateTarget`` (the
 ; CategoryEnabled Map), using the declared neutral default. Called once at boot
 ; before the gates are read from config.toml; a gate already present is kept.
 HotstringsSeedLanguageCategoryGates(GateTarget) {
 	global HS_LANGUAGE_GATE_KEYS
 	if !(GateTarget is Map)
 		throw Error("HotstringsSeedLanguageCategoryGates requires the category gate Map.")
+	Groups := MenuManifest_LoadHotstringGroups(), CategoryGroups := _MG_LoadSubCategories()
+	for Categories in [Groups.standard, Groups.ergopti] {
+		for Category in Categories {
+			Group := CategoryGroups[Category]
+			HS_LANGUAGE_GATE_KEYS[Category] := Group
+			if !GateTarget.Has(Category)
+				GateTarget[Category] := ManifestDefaultFor("category_enabled." . Group)
+		}
+	}
 	for _, Pack in HotstringsLanguageCategories() {
 		for _, Cat in Pack["categories"] {
 			HS_LANGUAGE_GATE_KEYS[Cat["v1"]] := Cat["v2"]
@@ -283,6 +292,11 @@ HotstringsLanguageName(Locale) {
 ; id. Underscores and case are ignored when matching so the file-stem, config and
 ; menu spellings of one group resolve to the same file.
 HotstringsBundledTomlPath(Category) {
+	if IsSet(PersonalFileControls) {
+		Adopted := PersonalFileControls.Path(Category)
+		if Adopted != ""
+			return Adopted
+	}
 	global _SharedDir
 	; A category a layout extension binds whole loads from the extension's file.
 	Bound := HotstringsBoundTomlPath(Category)

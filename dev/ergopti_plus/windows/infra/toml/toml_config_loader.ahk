@@ -98,8 +98,12 @@ TomlConfigManifestPath(Header) {
 	if !(Parts is Array)
 		return ""
 	Path := ""
-	for Part in Parts
+	for Part in Parts {
+		; Literal empty names and dots cannot borrow a manifest path identity.
+		if Part == "" || InStr(Part, ".")
+			return ""
 		Path .= (Path == "" ? "" : ".") . Part
+	}
 	return Path
 }
 
@@ -107,7 +111,7 @@ TomlSectionIsDynamicPersonalNamespace(SectionPath) {
 	Parts := TomlConfigSectionParts(SectionPath)
 	if !(Parts is Array)
 		return false
-	return Parts.Length >= 2 && Parts[1] == "hotstrings" && Parts[2] == "personal"
+	return _ConfigTomlDynamicPersonal(Parts)
 }
 
 ; Keys stored in config.toml but deliberately loaded by a subsystem other than
@@ -115,26 +119,7 @@ TomlSectionIsDynamicPersonalNamespace(SectionPath) {
 ; in one of these sections remains a configuration error instead of inheriting
 ; a broad section-level exemption.
 TomlConfigForeignOwnershipRegistry() {
-	static Registry := Map(
-		"category_enabled", Map(
-			"autocorrection", "FeatureState",
-			"distances_reduction", "FeatureState",
-			"magic_key", "FeatureState",
-			"rolls", "FeatureState",
-			"sfbs_reduction", "FeatureState"),
-		"gestures", Map(
-			"auto_configure_on_next_start", "Gestures"),
-		"personal_editor", Map(
-			"compact_view", "PersonalEditor",
-			"close_on_add", "PersonalEditor",
-			"default_section", "PersonalEditor"),
-		"llm", Map(
-			"api_entry_id", "LLMMenu",
-			"ollama_port", "LLMMenu"),
-		"llm.navigation", Map(
-			"nav_modifiers", "LLMMenu"),
-		"llm.trigger", Map(
-			"disabled_apps", "LLMMenu"))
+	Registry := TomlConfigStaticForeignOwnershipRegistry()
 	; Language packs add category gates through the same catalog FeatureState
 	; seeds at boot. These are owned settings, never unused configuration keys.
 	for _, Pack in HotstringsLanguageCategories() {
@@ -195,6 +180,12 @@ TomlConfigForeignOwner(SectionPath, Key) {
 ; the dissolved ``[ahk.*]`` silo is "obsolete" and the next canonical full save
 ; removes it. Returns "" for a section the manifest tree must account for.
 TomlConfigSectionSkipKind(Header) {
+	Parts := TomlConfigSectionParts(Header)
+	; The record consumer owns its exact namespaces, including unknown row
+	; metadata. Neither the Features loader nor cleanup may acquire those rows.
+	if Parts is Array && Parts.Length >= 2 && Parts[1] == "hotstrings"
+			&& (Parts[2] == "terminators" || Parts[2] == "terminator_states")
+		return "foreign"
 	if (Header == "ahk" or InStr(Header, "ahk.") == 1)
 		return "obsolete"
 	if (SubStr(Header, 1, 1) == "_" or Header == "updater")
@@ -225,8 +216,6 @@ TomlConfigUnknownKind(Features, SectionPath, Key, &ForeignOwner := "") {
 	if !(Parts is Array)
 		return "section"
 	for _, Part in Parts {
-		if (Part == "")
-			continue
 		if (Type(Node) == "Map" and Node.Has(Part))
 			Node := Node[Part]
 		else if (IsObject(Node) and Node.HasOwnProp(Part))
@@ -278,8 +267,6 @@ TomlConfigShapeReason(Features, Section, Key, Value) {
 		return ""
 	Node := Features
 	for _, Part in Parts {
-		if (Part == "")
-			continue
 		if (Type(Node) == "Map" and Node.Has(Part))
 			Node := Node[Part]
 		else if (IsObject(Node) and Node.HasOwnProp(Part))
@@ -363,6 +350,15 @@ TomlConfigEnumUsesBooleanLiterals(Entry) {
 
 /** Resolves the same schema owner for configuration reads and writes. */
 TomlConfigExpectedType(CurrentSection, Key, &Entry) {
+	Parts := TomlConfigSectionParts(CurrentSection)
+	if Parts is Array && Parts.Length >= 3 && _ConfigTomlDynamicPersonal(Parts) {
+		Entry := false
+		if Key == "enabled"
+			return "boolean"
+		if Key == "time_activation_seconds"
+			return "non-negative number"
+		return ""
+	}
 	CurrentSection := TomlConfigManifestPath(CurrentSection)
 	ExpectedType := ""
 	Entry := ManifestFindEntryByPath(CurrentSection . "." . Key)
@@ -458,6 +454,52 @@ TomlConfigValueMatchesManifest(CurrentSection, Key, Value, &ExpectedType,
 	return true
 }
 
+; Inline feature records retain their leaf identity while applying supplied
+; children through the same policies as physical child sections. Untouched
+; defaults and every ignored source child remain outside runtime mutation.
+TomlConfigMergeFeatureRecord(Features, Section, Seed, Typed, ChildRaw,
+		&Applied, &Migrated, OutdatedEntries, &UnknownKeys, &UnknownNames, &OutdatedNames) {
+	Applied := 0, Migrated := 0
+	Merged := _ConfigTomlNativeValue(Seed)
+	for Key, Child in Typed {
+		Value := _ConfigTomlNativeValue(Child)
+		Raw := ChildRaw[Key] is Map ? TOML_RenderValue(Child) : ChildRaw[Key]
+		Reason := TomlConfigOutdatedReason(Features, Section, Key, Value, Raw)
+		if Reason != "" {
+			OutdatedEntries[Section . "`n" . Key] := Reason
+			OutdatedNames .= (OutdatedNames == "" ? "" : ", ") . "[" . Section . "]." . Key
+			continue
+		}
+		if TomlConfigUnknownKind(Features, Section, Key, &ForeignOwner) != "" {
+			UnknownKeys += 1
+			UnknownNames .= (UnknownNames == "" ? "" : ", ") . "[" . Section . "]." . Key
+			continue
+		}
+		if ForeignOwner != ""
+			continue
+		if Child is Map && Merged.Has(Key) && Merged[Key] is Map {
+			Parts := TomlConfigSectionParts(Section)
+			Parts.Push(Key), Parts.Push("_")
+			Value := TomlConfigMergeFeatureRecord(Features, _ConfigTomlSection(Parts),
+				Merged[Key], Child, ChildRaw[Key], &ChildApplied, &ChildMigrated, OutdatedEntries,
+				&UnknownKeys, &UnknownNames, &OutdatedNames)
+			Migrated += ChildMigrated
+			if !ChildApplied
+				continue
+		} else {
+			ChildType := TomlConfigExpectedType(Section, Key, &Entry)
+			if ChildType == "boolean"
+					&& TOML_LiteralKind(Raw) == "number" {
+				Migrated += 1
+				try LoggerInfo("TomlConfigLoader", "migrated legacy boolean [{1}].{2} = {3}; the next save persists it as canonical true/false.", Section, Key, Value)
+			}
+		}
+		Merged[Key] := Value
+		Applied += 1
+	}
+	return Merged
+}
+
 ; Apply the user's v2 ``config.toml`` onto the given v2-shaped Features Map.
 ; Returns the number of overrides applied (mostly for diagnostics).
 ; Idempotent and resilient to a missing file (returns 0 silently).
@@ -493,20 +535,21 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
 	MigratedOverrides := 0
 	OutdatedEntries := Map()
 	Applied := 0
-	if !FileExist(FilePath) {
-		try LoggerDebug("TomlConfigLoader", "v2 config.toml not found at '{1}' — skipping.", FilePath)
-		return Applied
-	}
+
 	try LoggerStart("TomlConfigLoader", "Applying v2 config from '{1}'…", FilePath)
 
-	; Read once and check for an unreadable-but-existing file BEFORE applying
-	; anything. ReadTomlFile returns "" in that case, which `loop parse` happily
-	; treats as "zero overrides" — leaving Features at manifest DEFAULTS while
-	; the apply still logs SUCCESS "0 value(s)". The deferred boot save then
-	; serializes that default tree over the user's real config. Abort loudly and
-	; latch the failure so SaveFullConfig refuses to persist the feature tree.
+	; Admit the complete semantic image before applying any feature. A native
+	; read refusal must never mean an empty configuration whose defaults may
+	; later overwrite the source; the existing session latch retains that debt.
 	global _ConfigBootReadFailed
-	Content := ReadTomlFile(FilePath)
+	try Snapshot := ConfigTomlReadSnapshot(FilePath)
+	catch as Err {
+		if !TOML_UnreadableFile(FilePath) {
+			RejectedOverrides += 1
+			try LoggerError("TomlConfigLoader", "Semantic configuration at '{1}' could not be admitted; applying NOTHING.", FilePath)
+			return -1
+		}
+	}
 	if TOML_UnreadableFile(FilePath) {
 		_ConfigBootReadFailed := true
 		try LoggerError("TomlConfigLoader",
@@ -514,75 +557,35 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
 		return -1
 	}
 
-	CurrentSection := ""
-	SkippingForeign := false
+	if !Snapshot.Present {
+		try LoggerDebug("TomlConfigLoader", "v2 config.toml not found at '{1}' — skipping.", FilePath)
+		return Applied
+	}
+
+	; Both bootstrap readers use this admitted image. No second parse can
+	; observe another source generation or publish a partially read namespace.
 	ObsoleteDriverSections := 0
-	; Unknown and outdated entries each share one warning that names them, and
-	; the post-ready cleanup proposal lists them.
+	SkippedSections := Map()
 	UnknownKeys := 0
 	UnknownNames := ""
 	OutdatedNames := ""
 	ForeignOwnedKeys := 0
-	IgnoredSectionKeys := 0
+	IgnoredSectionKeys := Snapshot.SkippedRecords
 
-	loop parse, Content, "`n", "`r" {
-		Line := Trim(A_LoopField, " `t")
-		if (Line == "" or SubStr(Line, 1, 1) == "#") {
-			continue
-		}
-
-		; Section header — capture the dotted path and decide whether to apply
-		; or skip its contents. The comment is cut first because this pattern is
-		; anchored: on a commented header it simply fails to match, the line
-		; falls through to the key parser, fails that too, and ``continue``
-		; leaves CurrentSection on the PREVIOUS section — so every key that
-		; follows is silently applied to the wrong section.
-		if RegExMatch(TOML_StripInlineComment(Line), "^\[([^\[\]]+)\]$", &SecMatch) {
-			Header := Trim(SecMatch[1])
-			SkippingForeign := false
-
-			; ``[_meta]`` and any ``[_*]`` section are TOML metadata blocks, not
-			; driver features. ``[updater]`` is consumed by the updater module at
-			; start-up independently of the Features Map. Both skip silently.
-			;
-			; Lot 4 dissolved the old ``[ahk.*]`` silo. Reject those sections
-			; without treating an expected migration remnant as a runtime failure;
-			; the next canonical full save removes the obsolete subtree. Do not
-			; strip the prefix and apply it: a file carrying both spellings would
-			; otherwise become order-dependent.
-			SkipKind := TomlConfigSectionSkipKind(Header)
-			if (SkipKind != "") {
-				CurrentSection := ""
-				SkippingForeign := true
-				if (SkipKind == "obsolete")
-					ObsoleteDriverSections += 1
-				continue
-			}
-
-			CurrentSection := Header
-			continue
-		}
-
-		if (CurrentSection == "" and !SkippingForeign) {
-			; Out-of-section key=value lines are not part of v2.
-			continue
-		}
-		if SkippingForeign {
+	for Row in Snapshot.Rows {
+		CurrentSection := Row.Section
+		Key := Row.Key
+		SkipKind := TomlConfigSectionSkipKind(CurrentSection == "" ? TOML_RenderKey(Key) : CurrentSection)
+		if SkipKind != "" {
 			IgnoredSectionKeys += 1
+			if SkipKind == "obsolete" && !SkippedSections.Has(CurrentSection) {
+				SkippedSections[CurrentSection] := true
+				ObsoleteDriverSections += 1
+			}
 			continue
 		}
-
-		; Parse ``key = value``. Quoted keys are accepted for IDs that
-		; contain reserved characters (rare in the manifest-generated config).
-		if RegExMatch(Line, '^"([^"\\]+)"\s*=\s*(.*)$', &Match) {
-			Key := Match[1]
-		} else if RegExMatch(Line, "^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$", &Match) {
-			Key := Match[1]
-		} else {
-			continue
-		}
-		RawValue := TOML_StripInlineComment(Match[2])
-		Value := TomlCoerceValueExt(RawValue)
+		RawValue := TOML_StripInlineComment(Row.Raw)
+		Value := _ConfigTomlNativeValue(Row.Value)
 		if !TomlConfigValueMatchesManifest(CurrentSection, Key, Value,
 				&ExpectedType, RawValue) {
 			OutdatedReason := TomlConfigOutdatedReason(Features, CurrentSection, Key,
@@ -631,9 +634,6 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
 		Node := Features
 		Failed := false
 		for _, Part in Parts {
-			if (Part == "") {
-				continue
-			}
 			if (Type(Node) == "Map" and Node.Has(Part)) {
 				Node := Node[Part]
 			} else if (IsObject(Node) and Node.HasOwnProp(Part)) {
@@ -653,6 +653,20 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
 			try LoggerError("TomlConfigLoader",
 				"v2 override skipped — dynamic section '[{1}]' crosses a manifest node that is not a table.", CurrentSection)
 			continue
+		}
+
+		if ExpectedType == "feature" && Value is Map && Node is Map && Node.Has(Key)
+				&& Node[Key] is Map {
+			SectionParts := Parts.Clone()
+			SectionParts.Push(Key)
+			SectionParts.Push("_")
+			FeatureSection := _ConfigTomlSection(SectionParts)
+			Value := TomlConfigMergeFeatureRecord(Features, FeatureSection, Node[Key],
+				Row.Typed, Row.ChildRaw, &RecordApplied, &RecordMigrated, OutdatedEntries,
+				&UnknownKeys, &UnknownNames, &OutdatedNames)
+			MigratedOverrides += RecordMigrated
+			if !RecordApplied
+				continue
 		}
 
 		; Assign the leaf key on the resolved node. Nested Map vs object

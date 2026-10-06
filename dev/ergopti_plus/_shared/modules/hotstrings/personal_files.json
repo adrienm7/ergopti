@@ -3,5 +3,9 @@
 	"namespace": "personal-file:",
 	"component_separator": ":",
 	"label_separator": " / ",
-	"extension": ".toml"
+	"extension": ".toml",
+	"additional_default_enabled": true,
+	"additional_priority_tier": "package",
+	"additional_default_delay_seconds": 0,
+	"additional_scan_max_depth": 16
 }

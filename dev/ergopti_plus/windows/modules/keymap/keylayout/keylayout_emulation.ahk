@@ -174,7 +174,7 @@ _KLE_MagicKeyOwnsKey(Sc) {
 
 _KLE_DigitsOwnKey(Sc, Shift, ForegroundFn := 0) {
 	global Features, _SHIFT_DIGIT_SCS
-	if !Features["layout"].Get("direct_access_digits", false)
+	if NumberRowEffectiveMode() != "digits"
 		return false
 	if Shift {
 		Hkl := IsObject(ForegroundFn) ? ForegroundFn.Call() : GetForegroundKeyboardLayout()
@@ -366,7 +366,7 @@ KeylayoutEmulation_PressNative(Sc, Shift, Caps, Hkl) {
 	global KLE_Model, KLE_State, KLE_Compositions, KEYLAYOUT_NEUTRAL_STATE, Features
 	Code := Integer("0x" . SubStr(Sc, 3))
 	Native := KS_KeyTextNoStateChange(KS_ScancodeToVk(Code, Hkl), Code, Hkl, Shift, Caps)
-	if Features["layout"].Get("direct_access_digits", false) {
+	if NumberRowEffectiveMode() == "digits" {
 		if !Shift && Code >= 0x02 && Code <= 0x0B
 			Native := {Count: 1, Text: Mod(Code - 1, 10) . ""}
 		else if !Shift && ErgoptiNumberRowEdgeMapping().Has(Code)
@@ -422,6 +422,17 @@ _KLE_Emit(Sc, Shift, Option) {
 
 _KLE_OnKey(Sc, Shift, *) {
 	global _SHIFT_DIGIT_SCS
+	if NumberRowEffectiveMode() == "symbols" && _SHIFT_DIGIT_SCS.Has(Sc)
+			&& NumberRowSymbolsCapable(GetKeyState("CapsLock", "T")) {
+		Code := Integer("0x" . SubStr(Sc, 3))
+		Level := NumberRowSymbolsLevel(Code, GetKeyState("CapsLock", "T"))
+		if Level["supported"] {
+			; Walk the same original source action machine, including pending dead
+			; keys and repeats. Ctrl/AltGr registrations retain their own levels.
+			_KLE_Emit(Sc, Level["shift"] != Shift, false)
+			return
+		}
+	}
 	if Shift && _SHIFT_DIGIT_SCS.Has(Sc) {
 		Code := Integer("0x" . SubStr(Sc, 3))
 		Resolution := _DigitRowSwapResolution(Code, GetForegroundKeyboardLayout())

@@ -26,7 +26,7 @@
 ---    is cheaper than rediscovering it.
 --- 5. Dependency-free by construction. This module is installed before any
 ---    adapter, and `adapters/shell_runner.lua` itself requires the logger — so
----    using it here would be a load-time cycle. The one shell-out (mkdir) quotes
+---    using it here would be a load-time cycle. mkdir and mktemp quote
 ---    inline with the same POSIX idiom, and a unit test pins that quoting against
 ---    `shell_runner.quote()` so the two can never diverge.
 --- 6. Never fatal. A directory that cannot be created degrades to stdout-only and
@@ -179,14 +179,8 @@ end
 local function ensure_dir(dir)
 	-- `mkdir -p` is idempotent, so this is safe to call on every install.
 	local ok = os.execute("mkdir -p " .. M.shell_quote(dir) .. " 2>/dev/null")
-	-- os.execute returns true / 0 / (true, "exit", 0) depending on the Lua build,
-	-- so probe the result by actually opening a file rather than trusting it.
-	local probe = io.open(dir .. "/.write_probe", "a")
-	if probe then
-		probe:close()
-		os.remove(dir .. "/.write_probe")
-		return true
-	end
+	-- The actual log handles prove writability at install/repoint. A fixed probe
+	-- here deleted unrelated files and followed unrelated symlinks.
 	return ok == true or ok == 0
 end
 
@@ -263,6 +257,28 @@ end
 -- ===========================================
 -- ===========================================
 
+--- Appends one complete line and retires a failed native channel immediately.
+--- @param handle userdata Owned append handle.
+--- @param line string
+--- @param channel string Technical diagnostic label.
+--- @return userdata|nil The retained handle, only after write and flush succeed.
+local function append_line(handle, line, channel)
+	local protected, accepted, failure = pcall(function()
+		local written, write_error = handle:write(line, "\n")
+		if not written then return nil, write_error end
+		return handle:flush()
+	end)
+	if protected and accepted ~= nil and accepted ~= false then return handle end
+	pcall(function() handle:close() end)
+	local reason = protected and failure or accepted
+	-- Calling Logger here would recursively invoke this same failed sink.
+	pcall(function()
+		io.stderr:write("[logger_sink] " .. channel .. " write/flush failed: " .. tostring(reason)
+			.. " — channel retired; logging continues through other outputs.\n")
+	end)
+	return nil
+end
+
 --- Writes one formatted line to every configured output.
 --- Signature is the shared core's sink contract: (line, variant).
 --- @param line string Already-formatted log line.
@@ -278,13 +294,11 @@ local function sink(line, variant)
 	rollover_if_needed()
 
 	if _main_handle then
-		_main_handle:write(line, "\n")
-		_main_handle:flush()
+		_main_handle = append_line(_main_handle, line, "main")
 	end
 
 	if _errors_handle and ERROR_VARIANTS[variant] then
-		_errors_handle:write(line, "\n")
-		_errors_handle:flush()
+		_errors_handle = append_line(_errors_handle, line, "errors")
 	end
 end
 
@@ -309,7 +323,7 @@ function M.install(logger, opts)
 		io.stderr:write("[logger_sink] install(): logger is not the shared core — no output installed.\n")
 		return false
 	end
-	if _installed then return not _stdout_only end
+	if _installed then return M.is_file_sink_active() end
 
 	opts = opts or {}
 	_dir = opts.log_dir or M.log_dir()
@@ -353,21 +367,43 @@ end
 --- @return boolean ready
 --- @return string|nil error_message
 function M.prepare_dir(dir)
-	if type(dir) ~= "string" or dir:sub(1, 1) ~= "/" then
+	if type(dir) ~= "string" or dir:sub(1, 1) ~= "/" or dir:find("\0", 1, true) then
 		return false, "the logs folder must be an absolute path"
 	end
 	if not ensure_dir(dir) then
 		return false, "the logs folder '" .. dir .. "' could not be created"
 	end
-	-- ensure_dir() trusts a zero mkdir status when its probe fails, which an
-	-- existing read-only folder returns: prove the write here.
-	local probe_path = dir .. "/.write_probe"
-	local probe = io.open(probe_path, "a")
-	if not probe then
+	-- mktemp exclusively creates a mode-0600 file. Only that owned path may be
+	-- opened and removed; .write_probe may already belong to somebody else.
+	local created, probe_path = pcall(function()
+		local pipe = io.popen("mktemp -- " .. M.shell_quote(dir .. "/.ergopti-log-probe-XXXXXXXXXX")
+			.. " 2>/dev/null", "r")
+		if not pipe then return nil end
+		local path = pipe:read("*a")
+		pipe:close()
+		-- Preserve any literal line breaks in dir; only mktemp's final LF frames it.
+		if type(path) ~= "string" or path:sub(-1) ~= "\n" then return nil end
+		path = path:sub(1, -2)
+		local prefix = dir .. "/.ergopti-log-probe-"
+		if path:sub(1, #prefix) ~= prefix or not path:sub(#prefix + 1):match("^%w+$") then return nil end
+		return path
+	end)
+	if not created or not probe_path then
 		return false, "the logs folder '" .. dir .. "' is not writable"
 	end
-	probe:close()
-	os.remove(probe_path)
+	local opened, probe = pcall(io.open, probe_path, "a")
+	local wrote, accepted = false, false
+	local closed_ok, closed = false, false
+	if opened and probe then
+		wrote, accepted = pcall(function()
+			return probe:write("Ergopti logger write probe.\n") and probe:flush()
+		end)
+		closed_ok, closed = pcall(probe.close, probe)
+	end
+	local removed_ok, removed = pcall(os.remove, probe_path)
+	if not wrote or not accepted or not closed_ok or not closed or not removed_ok or not removed then
+		return false, "the logs folder '" .. dir .. "' could not complete a write probe"
+	end
 	return true
 end
 
@@ -382,23 +418,25 @@ end
 function M.repoint()
 	if not _installed then return true end
 	local target = require("infra.config_paths").get_logs_dir()
-	if target == _dir and not _stdout_only then return true end
+	if target == _dir and not _stdout_only and _main_handle ~= nil then return true end
 	if not ensure_dir(target) then
 		return false, "the logs folder '" .. target .. "' could not be created"
 	end
-	local previous, previous_stdout_only = _dir, _stdout_only
-	close_handles()
-	_dir = target
-	open_handles(today())
-	if not _main_handle then
-		-- Back to the folder that worked: a sink with no file loses every line.
-		close_handles()
-		_dir = previous
-		open_handles(today())
-		_stdout_only = previous_stdout_only
+	-- Acquired descriptors may still work after their path becomes unwritable.
+	-- Keep them until the candidate is usable; reopening is not a rollback.
+	local date = today()
+	local main_ok, main = pcall(io.open, target .. "/" .. MAIN_PREFIX .. date .. LOG_EXT, "a")
+	local errors_ok, errors = pcall(io.open, target .. "/" .. ERRORS_PREFIX .. date .. LOG_EXT, "a")
+	if not main_ok or not main then
+		if errors_ok and errors then pcall(function() errors:close() end) end
 		return false, "the logs folder '" .. target .. "' is not writable"
 	end
+	local previous_main, previous_errors = _main_handle, _errors_handle
+	_dir, _date = target, date
+	_main_handle, _errors_handle = main, errors_ok and errors or nil
 	_stdout_only = false
+	if previous_main then pcall(function() previous_main:close() end) end
+	if previous_errors then pcall(function() previous_errors:close() end) end
 	purge_old()
 	return true
 end

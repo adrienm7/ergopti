@@ -57,8 +57,10 @@ function M.relay_command(pid, wrapper, args)
 	for _, value in ipairs(args or {}) do argv[#argv + 1] = ShellRunner.quote(tostring(value)) end
 	-- A zombie has exited: its parent may reap it late (or, as PID 1 in a
 	-- container, never), and kill -0 alone would wait on it forever.
+	-- stat embeds raw comm bytes, including newlines; status escapes that name
+	-- and supplies a separate State record safe to read one line at a time.
 	local script = string.format("while kill -0 %d 2>/dev/null"
-		.. " && [ \"$(sed 's/^.*) //;s/ .*//' /proc/%d/stat 2>/dev/null)\" != Z ]; do sleep 0.2; done; exec %s",
+		.. " && [ \"$(sed -n 's/^State:[[:space:]]*\\([A-Z]\\).*/\\1/p' /proc/%d/status 2>/dev/null)\" != Z ]; do sleep 0.2; done; exec %s",
 		pid, pid, table.concat(argv, " "))
 	return "setsid sh -c " .. ShellRunner.quote(script) .. " </dev/null >/dev/null 2>&1 &"
 end

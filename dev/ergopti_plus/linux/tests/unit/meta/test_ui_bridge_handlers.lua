@@ -130,6 +130,37 @@ helpers.describe("ui.bridge_handlers", function()
     if not ok then error(err, 0) end
   end
 
+  -- Existing personal persistence tests now enter through an accepted displayed source.
+  local function with_opened_spies(reader, writer, state, fn)
+    local RealWriter = require("toml_codec.writer")
+    local Shell = require("adapters.shell_runner")
+    local directory = os.tmpname(); assert(os.remove(directory)); directory = directory .. "-personal-opening"
+    assert(Shell.run("mkdir -p " .. Shell.quote(directory)) == true)
+    local path = directory .. "/personal.toml"
+    local file = assert(io.open(path, "wb"))
+    assert(file:write('[_meta]\nsections_order = ["english"]\n[english]\n"omw" = { output = "on my way", is_word = true, auto_expand = false, is_case_sensitive = true, is_case_sensitive_strict = true, final_result = false }\n"ty" = { output = "thank you", is_word = true, final_result = false }\n'))
+    assert(file:close())
+    local old_dir, manager, native_write = state.config.get_config_dir, package.loaded["ui.webview_manager"], writer.write
+    state.config.get_config_dir = function() return directory end
+    local context = { app_name = "hotstring_editor", epoch = 41 }
+    package.loaded["ui.webview_manager"] = { current_epoch = function() return 41 end,
+      eval_js = function() return true end }
+    writer.write = function(...)
+      local accepted, detail = native_write(...)
+      if accepted ~= true then return accepted, detail end
+      return RealWriter.write(...)
+    end
+    local ok, err = pcall(function()
+      with_spies("ui.hotstring_editor.bridge", reader, writer, function(h)
+        assert(h.push_init(state, context) == true, "The original save case requires an accepted opening")
+        fn(h, context)
+      end)
+    end)
+    writer.write, state.config.get_config_dir, package.loaded["ui.webview_manager"] = native_write, old_dir, manager
+    assert(Shell.run("rm -rf " .. Shell.quote(directory)) == true)
+    if not ok then error(err, 0) end
+  end
+
   -- ==========================================================================
   -- 1. webview_manager
   -- ==========================================================================
@@ -140,6 +171,15 @@ helpers.describe("ui.bridge_handlers", function()
     local wm = require("ui.webview_manager")
     local real_create_gtk_window = wm._create_gtk_window
     local function fake_create_gtk_window() return true end
+
+    local function manager_without_gtk()
+      local original = package.loaded["ui.webview_manager"]
+      local ok, manager = pcall(helpers.load_module_with_dependency,
+        "ui.webview_manager", "lgi", false)
+      package.loaded["ui.webview_manager"] = original
+      if not ok then error(manager, 0) end
+      return manager
+    end
 
     helpers.it("exports init", function()
       helpers.assert_true(type(wm.init) == "function")
@@ -160,10 +200,11 @@ helpers.describe("ui.bridge_handlers", function()
       helpers.assert_true(type(wm.get_daemon_state) == "function")
     end)
     helpers.it("show fails without a native window instead of inventing visibility (lnx-067)", function()
-      helpers.assert_eq(wm.show("action_picker", "fr"), false)
-      helpers.assert_eq(wm.is_visible("action_picker"), false,
+      local headless = manager_without_gtk()
+      helpers.assert_eq(headless.show("action_picker", "fr"), false)
+      helpers.assert_eq(headless.is_visible("action_picker"), false,
         "headless bridge routing must not masquerade as a user-visible window")
-      helpers.assert_eq(wm.current_epoch("action_picker"), nil,
+      helpers.assert_eq(headless.current_epoch("action_picker"), nil,
         "failed native creation must roll back its provisional page context")
     end)
     wm._create_gtk_window = fake_create_gtk_window
@@ -321,11 +362,15 @@ helpers.describe("ui.bridge_handlers", function()
     end)
     wm._create_gtk_window = real_create_gtk_window
     helpers.it("_create_gtk_window reports failure safely without GTK", function()
+      local headless = manager_without_gtk()
       -- Called directly: a raise fails with the real error. The claim is the
       -- refusal — with no GTK the window must not be registered, or every later
       -- show/focus call addresses a window that does not exist.
-      helpers.assert_eq(wm._create_gtk_window("test", "<html></html>", nil), false)
-      helpers.assert_true(wm.is_open == nil or wm.is_open("test") ~= true,
+      local created, detail = headless._create_gtk_window("action_picker", "<html></html>", nil)
+      helpers.assert_eq(created, false)
+      helpers.assert_eq(detail, "GTK/WebKit unavailable",
+        "the refusal must come from the explicitly unavailable native dependency")
+      helpers.assert_true(headless.is_open == nil or headless.is_open("action_picker") ~= true,
         "no GTK means no window, and no window means nothing registered")
     end)
     helpers.it("_destroy_gtk_window no-ops safely without GTK", function()
@@ -877,6 +922,7 @@ helpers.describe("ui.bridge_handlers", function()
 					list_locales = function() return { "en", "fr" } end,
 					get = function(key) return key end,
 					set_locale = function(value) values.locale = value; return true end,
+					persist_locale = function(value) values.locale = value; return true end,
 				},
 				config_paths = {
 					default_config_dir = function() return default_dir end,
@@ -1095,9 +1141,10 @@ helpers.describe("ui.bridge_handlers", function()
 			}, function(...) marked[#marked + 1] = table.concat({ ... }, ".") end)
 			helpers.assert_eq(values, {
 				["gestures.enabled"] = false, ["hotstrings.modules.distancesreduction.qu"] = true,
-			}, "an explicit false is a configured value, not an absent one")
+				["hotstrings.trigger_char"] = ";",
+			}, "explicit false and the preserved raw trigger are configured values, not absent ones")
 			table.sort(marked)
-			helpers.assert_eq(marked, { "gestures.enabled", "hotstrings.modules.distancesreduction.qu" },
+			helpers.assert_eq(marked, { "gestures.enabled", "hotstrings.modules.distancesreduction.qu", "hotstrings.trigger_char" },
 				"the unused-key cleanup must never offer a key the wizard reads, and only those")
 		end)
 
@@ -1343,6 +1390,214 @@ helpers.describe("ui.bridge_handlers", function()
 			helpers.assert_eq(captured.writes[1].path, target .. "/config.toml")
 		end)
 
+		-- The page exposes Linux trigger selection, but forged common characters
+		-- must not turn an ordinary word into a destructive hotstring trigger.
+		for _, case in ipairs({
+			{ ";", "dialog.magic_key.error_common" }, { "ù", "dialog.magic_key.error_common" },
+			{ "e", "dialog.magic_key.error_common" }, { "א", "dialog.magic_key.error_common" },
+			{ "ab", "dialog.magic_key.error_length" }, { "\255", "dialog.magic_key.error_length" },
+			{ "\192\175", "dialog.magic_key.error_length" }, { "", "dialog.magic_key.error_empty" },
+		}) do
+			helpers.it("(onboarding-linux-trigger) refuses unsafe answer " .. case[2] .. " " .. string.format("%q", case[1]), function()
+				local state, values, captured = onboarding_state()
+				local previous = values.config_dir
+				local changes = 0
+				state.i18n.persist_locale = function() changes = changes + 1; return true end
+				state.config_paths.set_config_dir = function() changes = changes + 1; return true end
+				local result = finish(state, { locale = "fr", config_dir = scratch_dir(), operations = {
+					{ path = "gestures.enabled", value = true },
+					{ path = "hotstrings.trigger_char", value = case[1] },
+				} })
+				helpers.assert_eq(result, { done = false })
+				helpers.assert_eq(changes, 0, "the whole payload is refused before changing either preference")
+				helpers.assert_eq(values, { locale = "en", config_dir = previous })
+				helpers.assert_eq(captured.writes, {})
+				helpers.assert_eq(captured.prepared, {})
+				helpers.assert_eq(captured.hidden, 0, "the wizard remains available for retry")
+				helpers.assert_eq(captured.restarts, {})
+				helpers.assert_eq(captured.errors, { case[2] }, "the existing translated reason reaches the user")
+				-- Retrying the same wizard needs no new state or reinitialization.
+				captured.errors = {}
+				state.i18n.persist_locale = function(value) values.locale = value; return true end
+				state.config_paths.set_config_dir = function(value) values.config_dir = value; return true end
+				local retried = finish(state, { locale = "en", config_dir = "", operations = {
+					{ path = "hotstrings.trigger_char", value = "§" },
+				} })
+				helpers.assert_true(retried.done)
+				helpers.assert_eq(captured.errors, {})
+				helpers.assert_eq(captured.writes[1].updates, { { section = "hotstrings", key = "trigger_char", value = "§" } })
+			end)
+		end
+
+		for _, stale in ipairs({ ";", "ù" }) do
+			helpers.it("(onboarding-linux-trigger) preserves an existing outdated trigger until explicit replacement " .. stale, function()
+				local state, _, captured = onboarding_state()
+				local target = scratch_dir()
+				local path = target .. "/config.toml"
+				local raw = '[_meta]\nschema_version = 7\n[hotstrings]\ntrigger_char = "' .. stale
+					.. '"\n[future]\nkeep = "independent"\n'
+				local ok, err = pcall(function()
+					helpers.assert_true(os.execute("mkdir -p '" .. target .. "'"))
+					write_file(path, raw)
+					state.writer = require("toml_codec.writer")
+					local ready = handler.on_message({ action = "loadExistingConfig", config_dir = target, request = 17 }, state)
+					helpers.assert_true(ready.loaded)
+					helpers.assert_eq(ready.values["hotstrings.trigger_char"], stale)
+					helpers.assert_contains(captured.pushes[#captured.pushes].code, '"request":17', "the selected folder keeps its request identity")
+					local retained = finish(state, { locale = "en", config_dir = target, operations = {} })
+					helpers.assert_true(retained.done)
+					local fh = assert(io.open(path, "r")); local kept = fh:read("*a"); fh:close()
+					helpers.assert_eq(kept, raw, "an untouched outdated trigger and future neighbor remain byte-exact")
+					local replaced = finish(state, { locale = "en", config_dir = target, operations = {
+						{ path = "hotstrings.trigger_char", value = "§" },
+					} })
+					helpers.assert_true(replaced.done)
+					helpers.assert_eq(captured.errors, {})
+					fh = assert(io.open(path, "r"))
+					local decoded = require("toml_codec").decode(fh:read("*a")); fh:close()
+					helpers.assert_eq(decoded.hotstrings.trigger_char, "§", "the explicit accepted choice replaces only its leaf")
+					helpers.assert_eq(decoded.future.keep, "independent")
+				end)
+				os.remove(path); os.remove(path .. ".tmp"); os.remove(target)
+				if not ok then error(err, 0) end
+			end)
+		end
+
+		for _, fixture in ipairs({
+			{ name = "number", value = 7, toml = "trigger_char = 7\n" },
+			{ name = "false", value = false, toml = "trigger_char = false\n" },
+			{ name = "empty", value = "", toml = 'trigger_char = ""\n' },
+			{ name = "inline table", value = { retained = "independent" }, toml = 'trigger_char = { retained = "independent" }\n' },
+			{ name = "table header", value = { retained = "independent" }, toml = '[hotstrings.trigger_char]\nretained = "independent"\n' },
+		}) do
+			helpers.it("(onboarding-linux-trigger) retains untouched outdated " .. fixture.name .. " and accepts an explicit leaf replacement", function()
+				local state, _, captured = onboarding_state()
+				local target = scratch_dir()
+				local path = target .. "/config.toml"
+				local raw = '[_meta]\nschema_version = 7\n[hotstrings]\n' .. fixture.toml
+					.. '[future]\nkeep = "independent"\n'
+				local ok, err = pcall(function()
+					helpers.assert_true(os.execute("mkdir -p '" .. target .. "'"))
+					write_file(path, raw)
+					state.writer = require("toml_codec.writer")
+					local ready = handler.on_message({ action = "loadExistingConfig", config_dir = target, request = 23 }, state)
+					helpers.assert_true(ready.loaded)
+					helpers.assert_eq(ready.values["hotstrings.trigger_char"], fixture.value)
+					local retained = finish(state, { locale = "en", config_dir = target, operations = {} })
+					helpers.assert_true(retained.done)
+					local fh = assert(io.open(path, "r")); local bytes = fh:read("*a"); fh:close()
+					helpers.assert_eq(bytes, raw, "without explicit trigger intent the complete source is byte-exact")
+					local changed = finish(state, { locale = "en", config_dir = target, operations = {
+						{ path = "hotstrings.trigger_char", value = "§" },
+					} })
+					helpers.assert_true(changed.done)
+					helpers.assert_eq(captured.errors, {})
+					fh = assert(io.open(path, "r"))
+					local document = require("toml_codec").decode(fh:read("*a")); fh:close()
+					helpers.assert_eq(document, { _meta = { schema_version = 7 },
+						hotstrings = { trigger_char = "§" }, future = { keep = "independent" } },
+						"explicit replacement changes only the owned leaf, preserving the complete neighbor document")
+				end)
+				os.remove(path); os.remove(path .. ".tmp"); os.remove(target)
+				if not ok then error(err, 0) end
+			end)
+		end
+
+		helpers.it("(onboarding-linux-trigger) retains a concurrent source change and retries after writer publication refusal", function()
+			local state, values, captured = onboarding_state()
+			local previous_dir = values.config_dir
+			local target = scratch_dir()
+			local path = target .. "/config.toml"
+			local raw = '[_meta]\nschema_version = 7\n[hotstrings]\ntrigger_char = false\n[future]\nkeep = "independent"\n'
+			local concurrent = raw .. '# concurrent edit during candidate staging\n'
+			local original_open, staged = io.open, 0
+			local ok, err = pcall(function()
+				helpers.assert_true(os.execute("mkdir -p '" .. target .. "'"))
+				write_file(path, raw)
+				state.writer = require("toml_codec.writer")
+				io.open = function(open_path, mode)
+					local fh, why, code = original_open(open_path, mode)
+					if fh and open_path == path .. ".tmp" and mode == "w" then
+						return {
+							write = function(_, content) return fh:write(content) end,
+							close = function()
+								local closed = fh:close()
+								staged = staged + 1
+								local source = assert(original_open(path, "w"))
+								assert(source:write(concurrent)); assert(source:close())
+								return closed
+							end,
+						}
+					end
+					return fh, why, code
+				end
+				local refused = finish(state, { locale = "fr", config_dir = target, operations = {
+					{ path = "hotstrings.trigger_char", value = "§" },
+				} })
+				io.open = original_open
+				helpers.assert_eq(staged, 1, "the actual writer reaches the concurrent staging boundary")
+				helpers.assert_eq(refused, { done = false })
+				helpers.assert_eq(values, { locale = "en", config_dir = previous_dir }, "the failed commit restores preferences")
+				helpers.assert_eq(captured.errors, { "onboarding.error.write_failed" })
+				helpers.assert_eq(captured.hidden, 0)
+				helpers.assert_eq(captured.restarts, {})
+				local fh = assert(original_open(path, "r")); local bytes = fh:read("*a"); fh:close()
+				helpers.assert_eq(bytes, concurrent, "the real exact-source fence preserves the external edit")
+				helpers.assert_nil(original_open(path .. ".tmp", "r"), "no rejected staging file remains")
+				captured.errors = {}
+				local retried = finish(state, { locale = "en", config_dir = target, operations = {
+					{ path = "hotstrings.trigger_char", value = "§" },
+				} })
+				helpers.assert_true(retried.done)
+				helpers.assert_eq(captured.errors, {})
+				fh = assert(original_open(path, "r")); bytes = fh:read("*a"); fh:close()
+				helpers.assert_true(bytes:find('# concurrent edit during candidate staging', 1, true) ~= nil)
+				helpers.assert_eq(require("toml_codec").decode(bytes).hotstrings.trigger_char, "§")
+			end)
+			io.open = original_open
+			os.remove(path); os.remove(path .. ".tmp"); os.remove(target)
+			if not ok then error(err, 0) end
+		end)
+
+		for _, candidate in ipairs({ "§", "★", "→", "😀" }) do
+			helpers.it("(onboarding-linux-trigger) persists and re-reads safe symbol " .. candidate, function()
+				local state, values, captured = onboarding_state()
+				local target = scratch_dir()
+				local path = target .. "/config.toml"
+				local stored = nil
+				if candidate ~= "★" then stored = candidate end
+				local saved_preferences = package.loaded["infra.hotstring_preferences"]
+				local saved_magic = package.loaded["modules.hotstrings.magic_key"]
+				local ok, err = pcall(function()
+					helpers.assert_true(os.execute("mkdir -p '" .. target .. "'"))
+					write_file(path, '[_meta]\nschema_version = 7\n[future]\nkeep = "independent"\n')
+					state.writer = require("toml_codec.writer")
+					local result = finish(state, { locale = "en", config_dir = target, operations = {
+						{ path = "hotstrings.trigger_char", value = candidate },
+					} })
+					helpers.assert_true(result.done)
+					helpers.assert_eq(captured.errors, {})
+					local fh = assert(io.open(path, "r"))
+					local decoded = require("toml_codec").decode(fh:read("*a")); fh:close()
+					helpers.assert_eq(decoded.future.keep, "independent", "a future neighbor is preserved")
+					helpers.assert_eq(decoded._meta.schema_version, 7)
+					helpers.assert_eq((decoded.hotstrings or {}).trigger_char, stored)
+					local preferences = helpers.load_module("infra.hotstring_preferences")
+					preferences._set_file_for_test(path)
+					helpers.assert_true(preferences.refresh())
+					local magic = helpers.load_module("modules.hotstrings.magic_key")
+					helpers.assert_eq(magic.get(), candidate, "a fresh runtime owner reads the wizard's choice")
+					local ready = handler.on_message({ action = "ready" }, state)
+					helpers.assert_eq(ready.data.current["hotstrings.trigger_char"], stored,
+						"a re-run shows the persisted custom value and leaves the default sparse")
+				end)
+				package.loaded["infra.hotstring_preferences"] = saved_preferences
+				package.loaded["modules.hotstrings.magic_key"] = saved_magic
+				os.remove(path); os.remove(path .. ".tmp"); os.remove(target)
+				if not ok then error(err, 0) end
+			end)
+		end
+
 		helpers.it("rejects malformed finish data without writing or closing", function()
 			for label, answers in pairs({
 				["string value"] = { locale = "en", config_dir = "",
@@ -1381,7 +1636,7 @@ helpers.describe("ui.bridge_handlers", function()
 					state.writer.batch_write = function() return false, "disk full" end
 				end },
 				["refused language"] = { "onboarding.error.locale_persist_failed", function(state)
-					state.i18n.set_locale = function() return false end
+					state.i18n.persist_locale = function() return false end
 				end },
 				["refused folder"] = { "paths_editor.save_failed", function(state)
 					state.config_paths.set_config_dir = function() return false end
@@ -1707,6 +1962,29 @@ helpers.describe("ui.bridge_handlers", function()
 
   helpers.describe("dl_bridge", function()
     local handler = helpers.load_module("ui.download_window.bridge")
+	helpers.it("linux-model-pull-retry-retirement: progress retries preserve successful settlement", function()
+		local previous_manager = package.loaded["ui.webview_manager"]
+		local evaluated, retries = {}, 0
+		package.loaded["ui.webview_manager"] = {
+			show = function() return true end,
+			hide = function() return true end,
+			eval_js = function(_, code) evaluated[#evaluated + 1] = code; return true end,
+		}
+		local ok, err = xpcall(function()
+			handler._reset()
+			local session_id = handler.show({ kind = "ollama_model", label = "Successful fixture",
+				on_retry = function() retries = retries + 1; return false end })
+			helpers.assert_true(handler.complete(session_id, true, "Installed"))
+			helpers.assert_eq(handler.on_message("retry").retried, false)
+			helpers.assert_eq(retries, 0, "a successful session never invokes a retry controller")
+			helpers.assert_true(handler.on_message("ready").pushed)
+			helpers.assert_true(evaluated[#evaluated]:find("done(true", 1, true) ~= nil,
+				"stale retry must preserve the successful terminal receipt")
+		end, debug.traceback)
+		handler._reset()
+		package.loaded["ui.webview_manager"] = previous_manager
+		if not ok then error(err) end
+	end)
 
     helpers.it("has correct bridge_name", function()
       helpers.assert_eq(handler.bridge_name, "dl_bridge")
@@ -1737,11 +2015,19 @@ helpers.describe("ui.bridge_handlers", function()
       helpers.assert_true(handler.update(session_id, 42, "pulling manifest", "line"))
       helpers.assert_true(evaluated[#evaluated].code:find("update(42", 1, true) ~= nil)
 
-      local cancel = handler.on_message("cancel")
+      local cancel = handler.on_message({ action = "cancel", session = session_id })
       helpers.assert_true(cancel.cancelled)
       helpers.assert_eq(cancelled, 1)
       helpers.assert_true(evaluated[#evaluated].code:find("done(false", 1, true) ~= nil)
-      local retry = handler.on_message("retry")
+      helpers.assert_eq(handler.on_message("retry").retried, false, "an unbound retained string cannot retry cancellation")
+      -- A new explicit request owns a failed retry fixture; cancellation itself
+      -- does not keep authorization to restart the retired native operation.
+      local retry_id = handler.show({ kind = "ollama_model", label = "Owned retry fixture",
+        on_retry = function() retried = retried + 1; return true end })
+      helpers.assert_true(handler.complete(retry_id, false, "Independent download failure"))
+      local failure_epoch = handler.on_message("ready").failure_epoch
+      local retry = handler.on_message({ action = "failure_action", id = "retry",
+        session = retry_id, epoch = failure_epoch })
       helpers.assert_true(retry.retried)
       helpers.assert_eq(retried, 1)
       package.loaded["ui.webview_manager"] = previous_manager
@@ -1813,9 +2099,10 @@ helpers.describe("ui.bridge_handlers", function()
       local pushed = {}
       local manager = package.loaded["ui.webview_manager"]
       package.loaded["ui.webview_manager"] = {
+        current_epoch = function() return 41 end,
         eval_js = function(app, js) pushed[#pushed + 1] = { app = app, js = js }; return true end,
       }
-      local ok, err = pcall(handler.on_message, "ready", state)
+      local ok, err = pcall(handler.on_message, "ready", state, { app_name = "hotstring_editor", epoch = 41 })
       package.loaded["ui.webview_manager"] = manager
       helpers.assert_true(ok, "the ready branch must not throw: " .. tostring(err))
 
@@ -1834,13 +2121,14 @@ helpers.describe("ui.bridge_handlers", function()
     end)
     helpers.it("'ready' carries strict-case state into the shared frontend", function()
       local reader, writer = make_spies(true)
-      with_spies("ui.hotstring_editor.bridge", reader, writer, function(h)
+      with_opened_spies(reader, writer, state, function(h, context)
         local pushed = {}
         local manager = package.loaded["ui.webview_manager"]
         package.loaded["ui.webview_manager"] = {
+          current_epoch = function() return 41 end,
           eval_js = function(_, js) pushed[#pushed + 1] = js; return true end,
         }
-        local ok, err = pcall(h.on_message, "ready", state)
+        local ok, err = pcall(h.on_message, "ready", state, context)
         package.loaded["ui.webview_manager"] = manager
         helpers.assert_true(ok, "the strict payload push must not throw: " .. tostring(err))
         helpers.assert_eq(#pushed, 1, "strict state must be pushed exactly once")
@@ -1850,7 +2138,7 @@ helpers.describe("ui.bridge_handlers", function()
     end)
     helpers.it("'save' writes the whole model the editor sent", function()
       local reader, writer, captured = make_spies(true)
-      with_spies("ui.hotstring_editor.bridge", reader, writer, function(h)
+      with_opened_spies(reader, writer, state, function(h, context)
         local result = h.on_message({
           action = "save",
           data = {
@@ -1861,7 +2149,7 @@ helpers.describe("ui.bridge_handlers", function()
               { trigger = "omw", output = "on my way" },
             } } },
           },
-        }, state)
+        }, state, context)
         helpers.assert_true(result.saved, "a successful write must report saved = true")
         local entries = captured.data.sections.work.entries
         helpers.assert_eq(#entries, 2, "every entry the editor sent must be written")
@@ -1873,7 +2161,7 @@ helpers.describe("ui.bridge_handlers", function()
     end)
     helpers.it("'save' replaces rather than merges, so a deletion sticks", function()
       local reader, writer, captured = make_spies(true)
-      with_spies("ui.hotstring_editor.bridge", reader, writer, function(h)
+      with_opened_spies(reader, writer, state, function(h, context)
         -- The shared script sends its ENTIRE state on every save, so an entry the
         -- user deleted is simply absent from the payload. Merging into what is on
         -- disk would bring it back, and the deletion would appear to work until
@@ -1886,7 +2174,7 @@ helpers.describe("ui.bridge_handlers", function()
               { trigger = "ty", output = "thank you" },
             } } },
           },
-        }, state)
+        }, state, context)
         local entries = captured.data.sections.english.entries
         helpers.assert_eq(#entries, 1, "only what the editor sent may be on disk")
         helpers.assert_eq(entries[1].trigger, "ty", "and it must be the entry it sent")
@@ -1894,7 +2182,7 @@ helpers.describe("ui.bridge_handlers", function()
     end)
     helpers.it("'save' drops an entry with no trigger instead of writing it", function()
       local reader, writer, captured = make_spies(true)
-      with_spies("ui.hotstring_editor.bridge", reader, writer, function(h)
+      with_opened_spies(reader, writer, state, function(h, context)
         h.on_message({
           action = "save",
           data = {
@@ -1904,7 +2192,7 @@ helpers.describe("ui.bridge_handlers", function()
               { trigger = "ok", output = "okay" },
             } } },
           },
-        }, state)
+        }, state, context)
         local entries = captured.data.sections.work.entries
         helpers.assert_eq(#entries, 1,
           "a triggerless entry can never fire, and on disk it is a row nobody can delete from the UI")
@@ -1913,11 +2201,11 @@ helpers.describe("ui.bridge_handlers", function()
     end)
     helpers.it("'save' reports failure when the write fails", function()
       local reader, writer = make_spies(false, "disk full")
-      with_spies("ui.hotstring_editor.bridge", reader, writer, function(h)
+      with_opened_spies(reader, writer, state, function(h, context)
         local result = h.on_message({
           action = "save",
           data = { sections_order = { "work" }, sections = { work = { entries = {} } } },
-        }, state)
+        }, state, context)
         helpers.assert_eq(result.saved, false, "a failed write must not report success")
       end)
     end)
@@ -2104,7 +2392,7 @@ helpers.describe("ui.bridge_handlers", function()
       }
       state.config.reload = function()
         captured.reload_count = captured.reload_count + 1
-        return reload_result
+        return reload_result, true
       end
       local context = {
         close_owned_window = function()
@@ -2397,4 +2685,660 @@ helpers.describe("personal_toml_editor save (toml-save)", function()
     if not ok then error(err, 0) end
   end)
 
+end)
+
+helpers.describe("personal editor: canonical reload acknowledgement", function()
+	local function state_for(reload)
+		local observed = { saves = 0, closes = 0, refreshes = 0 }
+		local state = {
+			dyn_hotstrings = { save_info = function() observed.saves = observed.saves + 1;return true end },
+			config = { reload = reload },
+			on_config_changed = function() observed.refreshes = observed.refreshes + 1 end,
+		}
+		local context = { close_owned_window = function() observed.closes = observed.closes + 1;return true end }
+		return state, context, observed
+	end
+	for _, count in ipairs({ 0, 7 }) do
+		helpers.it("admits a canonical successful reload count " .. count, function()
+			local state, context, seen = state_for(function() return count, true end)
+			local result = helpers.load_module("ui.personal_info_editor.bridge").on_message(
+				{ action = "save", values = { first_name = "independent" } }, state, context)
+			helpers.assert_eq(result, { saved = true, reloaded = true, closed = true })
+			helpers.assert_eq(seen, { saves = 1, closes = 1, refreshes = 1 })
+		end)
+	end
+	for _, outcome in ipairs({ "false", "nil", "number", "text", "throw", "missing" }) do
+		helpers.it("retains a saved editor after reload acknowledgement " .. outcome, function()
+			local reload = function()
+				if outcome == "throw" then error("inert catalogue reload refusal") end
+				if outcome == "nil" then return 0, nil end
+				if outcome == "number" then return 0, 2 end
+				if outcome == "text" then return 0, "true" end
+				return 0, false, "inert catalogue reload refusal"
+			end
+			if outcome == "missing" then reload = nil end
+			local state, context, seen = state_for(reload)
+			local result = helpers.load_module("ui.personal_info_editor.bridge").on_message(
+				{ action = "save", values = { first_name = "independent" } }, state, context)
+			helpers.assert_eq(result, { saved = true, reloaded = false, closed = false })
+			helpers.assert_eq(seen, { saves = 1, closes = 0, refreshes = 0 })
+		end)
+	end
+	local function read(path)
+		local file = assert(io.open(path, "rb"));local text = file:read("*a");assert(file:close());return text
+	end
+	local function write(path, content)
+		local file = assert(io.open(path, "wb"));assert(file:write(content));assert(file:close())
+	end
+	local function with_native_owners(body)
+		local directory = os.tmpname();assert(os.remove(directory));directory = directory .. "-ergopti-personal-reload"
+		local Shell = require("adapters.shell_runner")
+		local quote = Shell.quote
+		assert(Shell.run("mkdir -p " .. quote(directory)) == true)
+		local path, choices, empty = directory .. "/personal_info.toml", directory .. "/config.toml", directory .. "/personal_hotstrings.toml"
+		local original = '# independent personal fields\n[info]\nfirst_name = "Ada"\n[letters]\np = "first_name"\n[future]\nvalues = [3, 9] # keep this comment\n'
+		write(path, original);write(choices, '[future]\nlabel = "unchanged"\n');write(empty, '# deliberately empty valid hotstring catalogue\n[raw]\n')
+		local prior = {};for name, value in pairs(package.loaded) do prior[name] = value end
+		local called, failure = pcall(function()
+			for _, name in ipairs({ "modules.dynamic_hotstrings.manager", "dynamic_hotstrings", "infra.hotstring_preferences",
+				"modules.hotstrings.hotstrings_config" }) do package.loaded[name] = nil end
+			local preferences = require("infra.hotstring_preferences")
+			assert(preferences._set_file_for_test(choices))
+			local dynamic = require("modules.dynamic_hotstrings.manager")
+			assert(dynamic.init({ personal_info_path = path, trigger_char = "★" }))
+			local config = require("modules.hotstrings.hotstrings_config")
+			assert(config._set_config_file_for_test(choices))
+			assert(config._set_override_config_dir_for_test(directory))
+			body({ dynamic = dynamic, config = config, path = path, choices = choices, empty = empty,
+				original = original, directory = directory })
+		end)
+		for name in pairs(package.loaded) do if prior[name] == nil then package.loaded[name] = nil end end
+		for name, value in pairs(prior) do package.loaded[name] = value end
+		local removed = Shell.run("rm -rf " .. quote(directory))
+		assert(removed == true, "the owned native-file fixture is physically retired")
+		for name, value in pairs(prior) do assert(package.loaded[name] == value, "every prior module identity is restored") end
+		if not called then error(failure, 0) end
+	end
+	for _, outcome in ipairs({ "committed", "uninitialized", "false", "nil", "number", "throw" }) do
+		helpers.it("consumes the actual canonical catalogue receipt after a real personal save " .. outcome, function()
+			with_native_owners(function(c)
+				local engine = require("hotstring_engine").new()
+				local native_load = engine.load_mappings
+				if outcome ~= "uninitialized" then assert(c.config.init(engine, c.empty)) end
+				local calls = 0
+				if outcome ~= "committed" and outcome ~= "uninitialized" then
+					engine.load_mappings = function()
+						calls = calls + 1
+						if outcome == "throw" then error("inert engine publication refusal") end
+						if outcome == "nil" then return nil end
+						if outcome == "number" then return 2 end
+						return false
+					end
+				end
+				local closes, refreshes = 0, 0
+				local native_reload, receipt = c.config.reload, nil
+				c.config.reload = function()
+					local count, committed, reason = native_reload()
+					receipt = { count = count, committed = committed }
+					return count, committed, reason
+				end
+				local handler = helpers.load_module("ui.personal_info_editor.bridge")
+				local called, result = pcall(handler.on_message, { action = "save", values = { first_name = "Grace" } },
+					{ dyn_hotstrings = c.dynamic, config = c.config,
+						on_config_changed = function() refreshes = refreshes + 1 end },
+					{ close_owned_window = function() closes = closes + 1;return true end })
+				engine.load_mappings, c.config.reload = native_load, native_reload
+				print(string.format("PERSONAL_RELOAD outcome=%s native_count=%s native_ack=%s closes=%d refreshes=%d", outcome,
+					tostring(receipt and receipt.count), tostring(receipt and receipt.committed), closes, refreshes))
+				helpers.assert_eq({ called, result }, { true,
+					{ saved = true, reloaded = outcome == "committed", closed = outcome == "committed" } },
+					"the protected native handler returns the acknowledged save and runtime outcome")
+				helpers.assert_eq(receipt, { count = 0, committed = outcome == "committed" })
+				helpers.assert_eq(read(c.path), c.original:gsub('first_name = "Ada"', 'first_name = "Grace"', 1),
+					"the actual acknowledged leaf writer retains independent future data and comments")
+				helpers.assert_eq(c.dynamic.get_info().first_name, "Grace", "the real dynamic save refreshed its own rules")
+				helpers.assert_eq(result, { saved = true, reloaded = outcome == "committed", closed = outcome == "committed" },
+					"durable save and static-catalogue runtime publication remain separate acknowledgements")
+				helpers.assert_eq(closes, outcome == "committed" and 1 or 0)
+				helpers.assert_eq(refreshes, outcome == "committed" and 1 or 0)
+				helpers.assert_eq(calls, (outcome == "committed" or outcome == "uninitialized") and 0 or 1)
+				if outcome == "committed" then
+					local count, published = c.config.reload()
+					helpers.assert_eq(count, 0, "a legitimately empty actual catalogue still commits")
+					helpers.assert_eq(published, true)
+				end
+				if outcome ~= "committed" then
+					if outcome == "uninitialized" then assert(c.config.init(engine, c.empty)) end
+					local retry = handler.on_message({ action = "save", values = { first_name = "Grace" } },
+						{ dyn_hotstrings = c.dynamic, config = c.config,
+							on_config_changed = function() refreshes = refreshes + 1 end },
+						{ close_owned_window = function() closes = closes + 1;return true end })
+					helpers.assert_eq(retry, { saved = true, reloaded = true, closed = true })
+					helpers.assert_eq(closes, 1);helpers.assert_eq(refreshes, 1)
+					helpers.assert_eq(read(c.path), c.original:gsub('first_name = "Ada"', 'first_name = "Grace"', 1))
+				end
+			end)
+		end)
+	end
+end)
+
+helpers.describe("wizard explicit locale acknowledgment", function()
+	local function read(path)
+		local fh = assert(io.open(path, "rb"))
+		local raw = assert(fh:read("*a")); assert(fh:close())
+		return raw
+	end
+
+	local function write(path, raw)
+		local fh = assert(io.open(path, "wb"))
+		assert(fh:write(raw)); assert(fh:close())
+	end
+
+	local function with_real_locale(options)
+		local names = { "infra.i18n", "infra.locale", "infra.config_paths", "adapters.storage" }
+		local saved = {}
+		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+		local root = os.tmpname()
+		os.remove(root)
+		local made = os.execute("mkdir -p " .. string.format("%q", root .. "/ergopti_plus")
+			.. " " .. string.format("%q", root .. "/config"))
+		helpers.assert_true(made == true or made == 0)
+		local storage_path = root .. "/ergopti_plus/storage.json"
+		local config_path = root .. "/config/config.toml"
+		local storage_seed = '{"locale":"zz_UNSUPPORTED","future":{"retained":true}}\n'
+		local config_seed = '[gestures]\nenabled = false\n[future]\nvalue = "retained"\n'
+		write(storage_path, storage_seed); write(config_path, config_seed)
+		local original_rename = os.rename
+		local captured = { storage_attempts = 0, writes = 0, hidden = 0, restarts = 0, errors = {} }
+		local observed = nil
+		local ok, err = xpcall(function()
+			package.loaded["infra.config_paths"] = { config_home = function() return root end }
+			package.loaded["infra.locale"] = nil
+			package.loaded["adapters.storage"] = nil
+			package.loaded["infra.i18n"] = nil
+			local i18n = require("infra.i18n")
+			i18n.init()
+			local before_locale = i18n.get_locale()
+			os.rename = function(from, to)
+				if from == storage_path .. ".tmp" and to == storage_path then
+					captured.storage_attempts = captured.storage_attempts + 1
+					if options.rename == "throw" then error("owned locale rename refused") end
+					if options.rename == "false" then return nil, "owned locale rename refused", 13 end
+				end
+				return original_rename(from, to)
+			end
+			if options.receipt then
+				i18n.persist_locale = function()
+					if options.receipt == "throw" then error("locale owner refused") end
+					if options.receipt == "nil" then return nil end
+					if options.receipt == "truthy" then return "unconfirmed" end
+					return false
+				end
+			end
+			if options.missing_owner then i18n.persist_locale = nil end
+			local Writer = require("toml_codec.writer")
+			local state = {
+				i18n = i18n,
+				manifest = require("infra.manifest_reader"),
+				config_paths = {
+					default_config_dir = function() return root .. "/config" end,
+					get_config_dir = function() return root .. "/config" end,
+					set_config_dir = function() return true end,
+				},
+				prepare_destination = function() return true end,
+				writer = { batch_write = function(path, rows)
+					captured.writes = captured.writes + 1
+					if options.config_refusal then return false, "owned configuration refusal" end
+					return Writer.batch_write(path, rows)
+				end },
+				webview_manager = { hide = function() captured.hidden = captured.hidden + 1 end },
+				restart = function() captured.restarts = captured.restarts + 1; return true end,
+				notify_error = function(key) captured.errors[#captured.errors + 1] = key end,
+			}
+			local result = require("ui.onboarding.bridge").on_message({ action = "finish", answers = {
+				locale = options.code or "fr", config_dir = "",
+				operations = { { path = "gestures.enabled", value = true } },
+			} }, state)
+			observed = {
+				result = result, captured = captured, before = before_locale, after = i18n.get_locale(),
+				storage_raw = read(storage_path), config_raw = read(config_path),
+				storage_original = read(storage_path) == storage_seed,
+				config_original = read(config_path) == config_seed,
+			}
+		end, debug.traceback)
+		os.rename = original_rename
+		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+		os.remove(storage_path .. ".tmp"); os.remove(storage_path); os.remove(config_path)
+		os.execute("rmdir " .. string.format("%q", root .. "/ergopti_plus")
+			.. " " .. string.format("%q", root .. "/config"))
+		os.execute("rmdir " .. string.format("%q", root))
+		if not ok then error(err, 0) end
+		return observed
+	end
+
+	local function assert_refused(observed, key)
+		helpers.assert_eq(observed.result.done, false)
+		helpers.assert_eq(observed.before, "fr", "unsupported persisted selection uses the runtime fallback")
+		helpers.assert_eq(observed.after, "fr", "refusal cannot publish a different runtime locale")
+		helpers.assert_eq(observed.captured.writes, 0)
+		helpers.assert_eq(observed.captured.hidden, 0)
+		helpers.assert_eq(observed.captured.restarts, 0)
+		helpers.assert_eq(observed.captured.errors, { key })
+		helpers.assert_true(observed.storage_original)
+		helpers.assert_true(observed.config_original)
+	end
+
+	for _, code in ipairs({ "fr", "en" }) do
+		for _, mode in ipairs({ "false", "throw" }) do
+			helpers.it("(wizard-locale-ack) keeps the wizard open after " .. mode .. " publication of " .. code, function()
+				local observed = with_real_locale({ code = code, rename = mode })
+				assert_refused(observed, "onboarding.error.locale_persist_failed")
+				helpers.assert_eq(observed.captured.storage_attempts, 1)
+			end)
+		end
+	end
+
+	for _, code in ipairs({ "fr", "en" }) do
+		helpers.it("(wizard-locale-ack) completes only after actual locale and configuration readback for " .. code, function()
+			local observed = with_real_locale({ code = code })
+			helpers.assert_eq(observed.result, { done = true, restarted = true })
+			helpers.assert_eq(observed.after, code)
+			helpers.assert_eq(require("json").decode(observed.storage_raw),
+				{ locale = code, future = { retained = true } })
+			helpers.assert_contains(observed.config_raw, "enabled = true")
+			helpers.assert_contains(observed.config_raw, 'value = "retained"')
+			helpers.assert_eq(observed.captured.storage_attempts, 1)
+			helpers.assert_eq(observed.captured.writes, 1)
+			helpers.assert_eq(observed.captured.hidden, 1)
+			helpers.assert_eq(observed.captured.restarts, 1)
+			helpers.assert_eq(observed.captured.errors, {})
+		end)
+	end
+
+	for _, receipt in ipairs({ "false", "nil", "truthy", "throw" }) do
+		helpers.it("(wizard-locale-ack) rejects a " .. receipt .. " explicit owner receipt", function()
+			local observed = with_real_locale({ receipt = receipt })
+			assert_refused(observed, "onboarding.error.locale_persist_failed")
+			helpers.assert_eq(observed.captured.storage_attempts, 0)
+		end)
+	end
+
+	helpers.it("(wizard-locale-ack) refuses a missing explicit owner", function()
+		local observed = with_real_locale({ missing_owner = true })
+		assert_refused(observed, "onboarding.error.locale_persist_failed")
+	end)
+
+	for _, code in ipairs({ "fr", "en" }) do
+		helpers.it("(wizard-locale-ack) retains existing runtime rollback after later config refusal for " .. code, function()
+			local observed = with_real_locale({ code = code, config_refusal = true })
+			helpers.assert_eq(observed.result.done, false)
+			helpers.assert_eq(observed.after, "fr")
+			helpers.assert_eq(observed.captured.hidden, 0)
+			helpers.assert_eq(observed.captured.restarts, 0)
+			helpers.assert_eq(observed.captured.errors, { "onboarding.error.write_failed" })
+			helpers.assert_true(observed.config_original)
+			helpers.assert_eq(require("json").decode(observed.storage_raw),
+				{ locale = "fr", future = { retained = true } },
+				"the existing runtime rollback persists its runtime snapshot, not an invented raw-source transaction")
+		end)
+	end
+end)
+
+helpers.describe("personal editor fixture process ABI", function()
+	local function with_real_shell(body)
+		local prior = package.loaded["adapters.shell_runner"]
+		package.loaded["adapters.shell_runner"] = nil
+		local Shell = require("adapters.shell_runner")
+		local native_execute = os.execute
+		local called, failure = pcall(body, Shell, native_execute)
+		os.execute = native_execute
+		package.loaded["adapters.shell_runner"] = prior
+		if not called then error(failure, 0) end
+	end
+	helpers.it("requires physical mkdir, exact data readback and cleanup through the existing status owner", function()
+		with_real_shell(function(Shell, native_execute)
+			local directory = os.tmpname(); assert(os.remove(directory))
+			directory = directory .. "-ergopti-personal-abi"
+			local quote, path = Shell.quote, directory .. "/independent.txt"
+			local calls = 0
+			os.execute = function(command)
+				calls = calls + 1
+				return native_execute(command)
+			end
+			local made = Shell.run("mkdir -p " .. quote(directory))
+			local called, readback = pcall(function()
+				local file = assert(io.open(path, "wb")); assert(file:write("independent physical bytes\n")); assert(file:close())
+				file = assert(io.open(path, "rb")); local data = assert(file:read("*a")); assert(file:close())
+				return data
+			end)
+			local refused = Shell.run("exit 1")
+			local removed = Shell.run("rm -rf " .. quote(directory))
+			os.execute = native_execute
+			helpers.assert_eq(made, true)
+			helpers.assert_eq({ called, readback }, { true, "independent physical bytes\n" })
+			helpers.assert_eq(refused, false, "an actual nonzero child cannot become an acknowledgement")
+			helpers.assert_eq(removed, true)
+			helpers.assert_eq(calls, 3, "all three owned command boundaries reached the real os.execute port")
+			local file = io.open(path, "rb"); if file then file:close() end
+			helpers.assert_eq(file, nil, "the physical private source was retired")
+		end)
+	end)
+	for _, outcome in ipairs({ "false", "nil", "number", "text", "throw" }) do
+		helpers.it("refuses a non-success process receipt " .. outcome, function()
+			with_real_shell(function(Shell, native_execute)
+				local calls = 0
+				os.execute = function()
+					calls = calls + 1
+					if outcome == "throw" then error("inert native process refusal") end
+					if outcome == "nil" then return nil, "exit", 1 end
+					if outcome == "number" then return 2 end
+					if outcome == "text" then return "true" end
+					return false, "exit", 1
+				end
+				local acknowledged = Shell.run("inert-non-executed-fixture-command")
+				os.execute = native_execute
+				helpers.assert_eq(acknowledged, false)
+				helpers.assert_eq(calls, 1, "a retained test runner must not bypass the real status boundary")
+			end)
+		end)
+	end
+end)
+
+
+-- Real private source publication exercises the displayed model's consent boundary.
+local OPENING_SOURCE = '[_meta]\nsections_order = ["english"]\n[english]\n"old" = { output = "original", is_word = true, final_result = false }\n'
+local OPENING_FOREIGN = OPENING_SOURCE .. '[outside]\n"future" = { output = "independent external edit", final_result = false } # retain exact bytes\n'
+
+local function opening_model(output)
+	return { sections_order = { "english" }, sections = {
+		english = { description = "English", entries = { { trigger = "old", output = output } } },
+	} }
+end
+
+local function with_opening_file(callback)
+	local Shell, Writer = require("adapters.shell_runner"), require("toml_codec.writer")
+	local directory = os.tmpname(); assert(os.remove(directory)); directory = directory .. "-personal-view-consent"
+	assert(Shell.run("mkdir -p " .. Shell.quote(directory)) == true)
+	local path = directory .. "/personal.toml"
+	local function put(content)
+		local file = assert(io.open(path, "wb")); assert(file:write(content)); assert(file:close())
+	end
+	local function read()
+		local file = assert(io.open(path, "rb")); local bytes = assert(file:read("*a")); assert(file:close()); return bytes
+	end
+	put(OPENING_SOURCE)
+	local manager, previous = package.loaded["ui.webview_manager"], package.loaded["ui.hotstring_editor.bridge"]
+	local writer_previous = package.loaded["toml_codec.writer"]
+	local seen = { epoch = 51, deliveries = {}, alerts = {}, reloads = 0, writes = 0 }
+	local publisher = {}
+	for key, value in pairs(Writer) do publisher[key] = value end
+	publisher.write = function(...)
+		seen.writes = seen.writes + 1
+		return Writer.write(...)
+	end
+	package.loaded["toml_codec.writer"] = publisher
+	package.loaded["ui.webview_manager"] = {
+		current_epoch = function() return seen.epoch end,
+		eval_js = function(_, js)
+			if js:find("window.initData(", 1, true) then
+				seen.deliveries[#seen.deliveries + 1] = js
+				if seen.delivery == "throw" then error("inert delivery refusal") end
+				if seen.delivery == "false" then return false end
+				if seen.delivery == "nil" then return nil end
+				if seen.delivery == "number" then return 1 end
+				return true
+			end
+			seen.alerts[#seen.alerts + 1] = js; return true
+		end,
+	}
+	package.loaded["ui.hotstring_editor.bridge"] = nil
+	local handler = require("ui.hotstring_editor.bridge")
+	local context = { app_name = "hotstring_editor", epoch = 51 }
+	local state = { config = { get_config_dir = function() return directory end,
+		reload = function() seen.reloads = seen.reloads + 1; if seen.reload_throw then error("inert reload refusal") end; return true end } }
+	local f = { path = path, handler = handler, context = context, state = state, seen = seen,
+		publisher = publisher, writer = Writer, put = put, read = read }
+	f.ready = function() return handler.push_init(state, context) end
+	f.save = function(output, selected) return handler.on_message({ action = "save", data = opening_model(output) }, state, selected or context) end
+	local ok, err = pcall(callback, f)
+	package.loaded["ui.webview_manager"], package.loaded["ui.hotstring_editor.bridge"], package.loaded["toml_codec.writer"] = manager, previous, writer_previous
+	assert(Shell.run("rm -rf " .. Shell.quote(directory)) == true)
+	if not ok then error(err, 0) end
+end
+
+helpers.describe("personal editor opening-source admission", function()
+	helpers.it("refuses a foreign section added after the actual displayed model", function()
+		with_opening_file(function(f)
+			helpers.assert_eq(f.ready(), true)
+			helpers.assert_true(f.seen.deliveries[1]:find('"original"', 1, true) ~= nil)
+			f.put(OPENING_FOREIGN)
+			local result = f.save("stale replacement")
+			helpers.assert_eq(result.saved, false)
+			helpers.assert_eq(f.read(), OPENING_FOREIGN)
+			helpers.assert_eq(f.seen.writes, 0)
+			helpers.assert_eq(f.seen.reloads, 0)
+			helpers.assert_eq(#f.seen.alerts, 1)
+		end)
+	end)
+
+	helpers.it("advances only our committed payload for a second actual save", function()
+		with_opening_file(function(f)
+			helpers.assert_eq(f.ready(), true)
+			local first = f.save("first own edit")
+			helpers.assert_eq(first.saved, true)
+			helpers.assert_true(f.read():find('first own edit', 1, true) ~= nil)
+			local second = f.save("second own edit")
+			helpers.assert_eq(second.saved, true)
+			helpers.assert_true(f.read():find('second own edit', 1, true) ~= nil)
+			helpers.assert_eq(f.seen.reloads, 2)
+		end)
+	end)
+
+	helpers.it("fresh reopening admits the new source while the old held view refuses", function()
+		with_opening_file(function(f)
+			helpers.assert_eq(f.ready(), true); f.put(OPENING_FOREIGN)
+			helpers.assert_eq(f.save("old").saved, false)
+			helpers.assert_eq(f.ready(), true)
+			helpers.assert_true(f.seen.deliveries[2]:find('"future"', 1, true) ~= nil)
+			helpers.assert_eq(f.save("explicit new view edit").saved, true)
+		end)
+	end)
+
+	for _, change in ipairs({ "epoch", "route", "context", "missing" }) do
+		helpers.it("refuses a retired opening owner: " .. change, function()
+			with_opening_file(function(f)
+				helpers.assert_eq(f.ready(), true)
+				local selected = f.context
+				if change == "epoch" then f.seen.epoch = 52
+				elseif change == "route" then f.state.config.get_config_dir = function() return f.path .. "-foreign-route" end
+				elseif change == "context" then selected = { app_name = "another_app", epoch = 51 }
+				else selected = {} end
+				local result = f.save("retired", selected)
+				helpers.assert_eq(result.saved, false)
+				helpers.assert_eq(f.read(), OPENING_SOURCE)
+				helpers.assert_eq(f.seen.writes, 0)
+			end)
+		end)
+	end
+
+	for _, refusal in ipairs({ "false", "nil", "number", "throw" }) do
+		helpers.it("failed initData cannot lend editable authority: " .. refusal, function()
+			with_opening_file(function(f)
+				f.seen.delivery = refusal
+				local opened = f.ready()
+				local result = f.save("never displayed")
+				helpers.assert_eq(opened, false)
+				helpers.assert_eq(result.saved, false)
+				helpers.assert_eq(f.read(), OPENING_SOURCE)
+				helpers.assert_eq(f.seen.writes, 0)
+			end)
+		end)
+	end
+
+	for _, source in ipairs({ "malformed", "read_refusal", "absent" }) do
+		helpers.it("classifies the opening source before displaying it: " .. source, function()
+			with_opening_file(function(f)
+				if source == "malformed" then f.put('[english\nbroken = 2\n')
+				elseif source == "read_refusal" then f.publisher.read_classified = function() return nil, "error" end
+				else assert(os.remove(f.path)) end
+				local opened = f.ready()
+				local result = f.save("admitted absence")
+				if source == "absent" then
+					helpers.assert_eq(opened, true); helpers.assert_eq(result.saved, true)
+					helpers.assert_true(f.read():find('admitted absence', 1, true) ~= nil)
+				else
+					helpers.assert_eq(opened, false); helpers.assert_eq(result.saved, false)
+					helpers.assert_eq(f.seen.writes, 0)
+				end
+			end)
+		end)
+	end
+
+	for _, result in ipairs({ "false", "nil", "number", "text", "throw" }) do
+		helpers.it("refused publication preserves opening authority and supports owned retry: " .. result, function()
+			with_opening_file(function(f)
+				helpers.assert_eq(f.ready(), true)
+				local real = f.publisher.write
+				f.publisher.write = function()
+					if result == "throw" then error("inert write refusal") end
+					if result == "number" then return 1, nil, OPENING_SOURCE end
+					if result == "text" then return "accepted", nil, OPENING_SOURCE end
+					if result == "false" then return false end
+					return nil
+				end
+				local refused = f.save("not published")
+				helpers.assert_eq(refused.saved, false)
+				helpers.assert_eq(f.read(), OPENING_SOURCE)
+				helpers.assert_eq(f.seen.reloads, 0)
+				f.publisher.write = real
+				helpers.assert_eq(f.save("owned retry").saved, true)
+			end)
+		end)
+	end
+
+	helpers.it("passes the retained source into the actual stage-time CAS owner", function()
+		with_opening_file(function(f)
+			helpers.assert_eq(f.ready(), true)
+			local captured
+			f.publisher.write = function(path, data, adapter, create, source)
+				captured = source.content
+				f.put(OPENING_FOREIGN)
+				return f.writer.write(path, data, adapter, create, source)
+			end
+			local result = f.save("stage replacement")
+			helpers.assert_eq(captured, OPENING_SOURCE)
+			helpers.assert_eq(result.saved, false)
+			helpers.assert_eq(f.read(), OPENING_FOREIGN)
+			helpers.assert_eq(f.seen.reloads, 0)
+		end)
+	end)
+
+	helpers.it("post-ACK foreign bytes cannot become our next-save authority", function()
+		with_opening_file(function(f)
+			helpers.assert_eq(f.ready(), true)
+			f.publisher.write = function(...)
+				local ok, detail, payload = f.writer.write(...)
+				f.put(OPENING_FOREIGN)
+				return ok, detail, payload
+			end
+			local first = f.save("our committed edit")
+			helpers.assert_eq(first.saved, true, "existing publication ACK is separate from later external replacement")
+			local second = f.save("must not borrow foreign source")
+			helpers.assert_eq(second.saved, false)
+			helpers.assert_eq(f.read(), OPENING_FOREIGN)
+		end)
+	end)
+
+	helpers.it("keeps the existing saved-but-reload-refused policy", function()
+		with_opening_file(function(f)
+			helpers.assert_eq(f.ready(), true); f.seen.reload_throw = true
+			local saved = f.save("durable despite reload refusal")
+			helpers.assert_eq(saved.saved, true)
+			helpers.assert_true(f.read():find('durable despite reload refusal', 1, true) ~= nil)
+			f.seen.reload_throw = false
+			helpers.assert_eq(f.save("later owned save").saved, true)
+		end)
+	end)
+end)
+
+helpers.describe("personal editor opening-source admission", function()
+	helpers.it("uses the actual manager route and rejects retired page epochs", function()
+		with_opening_file(function(f)
+			local port = package.loaded["ui.webview_manager"]
+			package.loaded["ui.webview_manager"] = nil
+			local Manager = require("ui.webview_manager")
+			local html, creator, evaluate = Manager.build_page_html, Manager._create_gtk_window, Manager.eval_js
+			Manager.build_page_html = function() return "<html>inert recorded page</html>" end
+			Manager._create_gtk_window = function() return true end
+			Manager.eval_js = port.eval_js
+			Manager.set_daemon_state(f.state)
+			local ok, err = pcall(function()
+				helpers.assert_eq(Manager.show("hotstring_editor", "en"), true)
+				local first = Manager.current_epoch("hotstring_editor")
+				Manager.route_message("hotstring_editor", "hsEditor", "ready", first)
+				local saved = Manager.route_message("hotstring_editor", "hsEditor", {
+					action = "save", data = opening_model("actual managed route") }, first)
+				helpers.assert_eq(saved.saved, true)
+				helpers.assert_eq(Manager.hide("hotstring_editor", first), true)
+				helpers.assert_eq(Manager.show("hotstring_editor", "en"), true)
+				local second = Manager.current_epoch("hotstring_editor")
+				helpers.assert_true(second > first)
+				local bytes = f.read()
+				local routed = Manager.route_message("hotstring_editor", "hsEditor", {
+					action = "save", data = opening_model("stale route") }, first)
+				local direct = f.save("stale direct owner", { app_name = "hotstring_editor", epoch = first })
+				helpers.assert_nil(routed)
+				helpers.assert_eq(direct.saved, false)
+				helpers.assert_eq(f.read(), bytes)
+				Manager.route_message("hotstring_editor", "hsEditor", "ready", second)
+				local fresh = Manager.route_message("hotstring_editor", "hsEditor", {
+					action = "save", data = opening_model("new managed opening") }, second)
+				helpers.assert_eq(fresh.saved, true)
+			end)
+			Manager.hide("hotstring_editor", Manager.current_epoch("hotstring_editor"))
+			Manager.build_page_html, Manager._create_gtk_window, Manager.eval_js = html, creator, evaluate
+			package.loaded["ui.webview_manager"] = port
+			if not ok then error(err, 0) end
+		end)
+	end)
+
+	helpers.it("missing committed-payload receipt does not invent a next-save source", function()
+		with_opening_file(function(f)
+			helpers.assert_eq(f.ready(), true)
+			local native = f.publisher.write
+			f.publisher.write = function(...)
+				local ok, detail = native(...)
+				return ok, detail
+			end
+			local result = f.save("physically saved without payload ACK")
+			helpers.assert_eq(result.saved, false)
+			helpers.assert_true(f.read():find('physically saved without payload ACK', 1, true) ~= nil)
+			helpers.assert_eq(f.seen.reloads, 0)
+			f.publisher.write = native
+			helpers.assert_eq(f.save("cannot invent authority").saved, false)
+			helpers.assert_eq(f.ready(), true)
+			helpers.assert_eq(f.save("reopened actual bytes").saved, true)
+		end)
+	end)
+
+	helpers.it("a failed reentrant opening cannot be revived by an older write ACK", function()
+		with_opening_file(function(f)
+			helpers.assert_eq(f.ready(), true)
+			local native = f.publisher.write
+			local reentered
+			f.publisher.write = function(...)
+				local ok, detail, payload = native(...)
+				f.seen.delivery = "false"
+				reentered = f.ready()
+				return ok, detail, payload
+			end
+			local result = f.save("accepted old write")
+			helpers.assert_eq(reentered, false)
+			helpers.assert_eq(result.saved, false)
+			helpers.assert_eq(f.seen.reloads, 0)
+			helpers.assert_true(f.read():find('accepted old write', 1, true) ~= nil)
+			f.publisher.write = native
+			helpers.assert_eq(f.save("must reopen").saved, false)
+		end)
+	end)
 end)

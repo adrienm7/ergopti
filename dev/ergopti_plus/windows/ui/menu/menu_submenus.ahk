@@ -53,7 +53,8 @@ InitSubMenus() {
 			SectionsOrder := ReadTomlSectionsOrder(V1Cat, TomlPath)
 			if (SectionsOrder.Length > 0) {
 				; Render following TOML sections_order, honouring "-" separators.
-				; "replace" (J→★ key remapping) is shown in Disposition Ergopti instead.
+				; Extension-owned leaves, including the native replacement choice,
+				; are listed under their supplying Hotstrings extension.
 				_PrevWasSep := true ; Treat start as a virtual separator to suppress a leading "--"
 				for _, SecId in SectionsOrder {
 					if (SecId == "-") {
@@ -61,9 +62,6 @@ InitSubMenus() {
 							Rows.Push(Map("separator", true))
 							_PrevWasSep := true
 						}
-						continue
-					}
-					if (V1Cat == "MagicKey" and SecId == "replace") {
 						continue
 					}
 					; A section an extension binds (Ergopti's repeat corrections) is
@@ -81,10 +79,10 @@ InitSubMenus() {
 				}
 			} else {
 				; No sections_order in TOML — fall back to manifest order.
-				; Still skip "replace" for MagicKey (shown in Disposition Ergopti).
+				; Apply the same extension ownership rule when source order is absent.
 				for _, Entry in Entries {
 					Parts := StrSplit(Entry["path"], ".")
-					if (V1Cat == "MagicKey" and Parts[Parts.Length] == "replace") {
+					if HotstringsBoundSections(V1Cat).Has(StrLower(Parts[Parts.Length])) {
 						continue
 					}
 					Row := MenuRowFromManifest(Entry, V1Cat)
@@ -122,12 +120,22 @@ InitSubMenus() {
 	BootProfile_Mark("MENU/InitSub: tapholds submenu")
 }
 
-; Add every language-pack category to the flat category tables the submenu
-; builder, the counters and the bulk actions walk. The neutral five are listed in
-; tray_menu.ahk; the language ones come from the shared hotstring index, so a new
-; language needs no entry here. Idempotent: a tray rebuild calls it again.
+; Register declared native groups before language additions. A category can move
+; from a language pack into a shipped extension while retaining its shared menu
+; identity and feature paths. Rebuilds preserve already registered categories.
 _HS_RegisterLanguageMenuCategories() {
 	global _FLAT_HOTSTRING_V1_CATS, _V1CatToV2CatMap, _LegacyTopCategoryMap
+	Groups := MenuManifest_LoadHotstringGroups(), CategoryGroups := _MG_LoadSubCategories()
+	for Categories in [Groups.standard, Groups.ergopti] {
+		for Category in Categories {
+			if _V1CatToV2CatMap.Has(Category)
+				continue
+			Group := CategoryGroups[Category]
+			_FLAT_HOTSTRING_V1_CATS.Push(Category)
+			_V1CatToV2CatMap[Category] := Group
+			_LegacyTopCategoryMap[Category] := "hotstrings." . Group
+		}
+	}
 	for _, Pack in HotstringsLanguageCategories() {
 		for _, Cat in Pack["categories"] {
 			if _V1CatToV2CatMap.Has(Cat["v1"])
@@ -207,6 +215,11 @@ _BuildDynamicHotstringsSubmenu(Options := unset) {
 			continue
 		}
 		V2Id := _LegacyDynamicHotstringsKeyMap[V1Id]
+		if V2Id == "user_code" {
+			for UserRow in _HS_ProgrammableHotstringRows()
+				Rows.Push(UserRow)
+			continue
+		}
 		Entry := ManifestFindEntryByPath("hotstrings.dynamic." . V2Id)
 		if (Entry == false) {
 			try LoggerWarn("Menu",
@@ -290,4 +303,3 @@ _CollectAllHotstringsV2Paths(FeaturesTarget, SeedPersonal := true) {
 
 	return Paths
 }
-

@@ -258,7 +258,7 @@ _MET_ActualSourceOwner() {
 	global Features, ScriptInformation, KLE_Model, TapHold
 	Saved := [Features, ScriptInformation, KLE_Model, TapHold]
 	try {
-		Features := Map("layout", Map("ergopti_base", false, "direct_access_digits", false, "emulated_layout", ""),
+		Features := Map("layout", Map("ergopti_base", false, "direct_access_digits", "native", "emulated_layout", ""),
 			"hotstrings", Map("magic_key", Map("replace", Map("enabled", true))))
 		ScriptInformation := Map("MagicKey", ";", "MagicKeySourceScan", "SC024", "MagicKeySourceChosen", true,
 			"MagicKeySourceOverridesEmulation", true)

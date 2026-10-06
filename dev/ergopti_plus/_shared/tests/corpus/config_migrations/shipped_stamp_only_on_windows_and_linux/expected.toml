@@ -1,7 +1,7 @@
 # _shared/tests/corpus/config_migrations/shipped_stamp_only_on_windows_and_linux/expected.toml
 
 [_meta]
-schema_version = 9
+schema_version = 11
 
 [gestures]
 enabled = true

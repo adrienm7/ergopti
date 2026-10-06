@@ -59,9 +59,15 @@ local _installed_refusals_reported = {}
 -- =========================================
 -- =========================================
 
---- The process working directory, or nil when it cannot be read.
+--- Reads the actual process working directory rather than inherited PWD.
+--- Native cwd queries also preserve legal newline bytes in directory names.
 --- @return string|nil
-local function current_dir()
+function M.current_directory()
+	local ok_uv, uv = pcall(require, "luv")
+	if ok_uv and type(uv.cwd) == "function" then
+		local ok, cwd = pcall(uv.cwd)
+		if ok and type(cwd) == "string" and cwd ~= "" then return cwd end
+	end
 	local ok_ffi, ffi = pcall(require, "ffi")
 	if ok_ffi and ffi.os ~= "Windows" then
 		pcall(ffi.cdef, "char *getcwd(char *buf, size_t size);")
@@ -69,13 +75,25 @@ local function current_dir()
 		local ok, res = pcall(function() return ffi.C.getcwd(buf, 4096) end)
 		if ok and res ~= nil then return ffi.string(buf) end
 	end
-	local pwd = os.getenv("PWD")
-	if type(pwd) == "string" and pwd:sub(1, 1) == "/" then return pwd end
-	local pipe = io.popen("pwd 2>/dev/null")
-	if not pipe then return nil end
-	local out = (pipe:read("*l") or "")
-	pipe:close()
+	local ok, pipe = pcall(io.popen, "pwd 2>/dev/null")
+	if not ok or not pipe then return nil end
+	local out = (pipe:read("*a") or "")
+	local first, kind, code = pipe:close()
+	if not (first == 0 or (first == true and (kind == nil or kind == "exit")
+		and (code == nil or code == 0))) then return nil end
+	-- Remove only pwd's record terminator, never whitespace belonging to the cwd.
+	out = out:gsub("\n$", "")
 	return out ~= "" and out or nil
+end
+
+--- Normalises native separators without rewriting POSIX filename bytes.
+--- The bootstrap and updater share this boundary; backslash is data on Linux.
+--- @param path string
+--- @return string
+function M.normalize_native_separators(path)
+	assert(type(path) == "string", "native path must be a string")
+	if package.config:sub(1, 1) == "\\" then return (path:gsub("\\", "/")) end
+	return path
 end
 
 --- Anchors a path to the working directory when it is relative.
@@ -89,20 +107,20 @@ end
 --- @return string
 local function absolute(path)
 	if path:sub(1, 1) == "/" or path:match("^%a:/") then return path end
-	local cwd = current_dir()
+	local cwd = M.current_directory()
 	if not cwd then return path end
-	cwd = cwd:gsub("\\", "/"):gsub("/+$", "")
+	cwd = M.normalize_native_separators(cwd):gsub("/+$", "")
 	if path == "." then return cwd end
 	local relative = path:gsub("^%./", "")
 	return cwd .. "/" .. relative
 end
 
 --- The driver root (…/static/ergopti_plus/linux), derived from this file.
---- @return string Absolute path, forward slashes, no trailing slash.
+--- @return string Absolute native path with no trailing slash.
 local function driver_root()
 	local src = debug.getinfo(1, "S").source
 	if src:sub(1, 1) == "@" then src = src:sub(2) end
-	src = src:gsub("\\", "/")
+	src = M.normalize_native_separators(src)
 	-- src is <driver root>/infra/paths.lua
 	return absolute(src:match("^(.*)/infra/paths%.lua$") or ".")
 end

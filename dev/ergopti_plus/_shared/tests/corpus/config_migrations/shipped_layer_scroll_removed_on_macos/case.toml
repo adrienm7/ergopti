@@ -1,8 +1,8 @@
 # _shared/tests/corpus/config_migrations/shipped_layer_scroll_removed_on_macos/case.toml
 
 [case]
-description = "The shipped step deletes the retired Layer + Scroll switch from a macOS file stamped 6, whatever its value, and keeps the other shortcut keys."
+description = "Shipped migrations preserve the retired macOS Layer + Scroll switch and its sibling keys until explicit cleanup."
 drivers = ["hs"]
 outcome = "migrated"
 from_version = 6
-to_version = 9
+to_version = 11

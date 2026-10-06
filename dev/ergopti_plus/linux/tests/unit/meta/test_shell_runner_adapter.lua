@@ -20,6 +20,160 @@
 local helpers = require("tests.helpers")
 local sh      = helpers.load_module("adapters.shell_runner")
 
+helpers.describe("linux-shell-command-nul", function()
+	for _, method in ipairs({ "run", "exec", "exec_line", "exec_stdin", "exec_exact_stdin", "exec_checked" }) do
+		for index, command in ipairs({ "printf literal\0private-suffix", "printf literal\0", "\0printf literal" }) do
+			helpers.it("linux-shell-command-nul: " .. method .. " refuses byte position " .. index .. " before dispatch", function()
+				local calls = 0
+				local shell = helpers.load_module("adapters.shell_runner")
+				shell._set_runner(function() calls = calls + 1; return "Shortened prefix stdout" end)
+				local value, output, reason
+				if method == "exec_stdin" or method == "exec_exact_stdin" then value = shell[method](command, "valid stdin")
+				else value, output, reason = shell[method](command) end
+				shell._reset_runner()
+				helpers.assert_eq(calls, 0, "invalid native bytes must not reach even a simulated dispatcher")
+				if method == "run" or method == "exec_checked" then helpers.assert_eq(value, false)
+				elseif method == "exec_line" then helpers.assert_nil(value)
+				else helpers.assert_eq(value, "") end
+				if method == "exec_checked" then
+					helpers.assert_eq(output, "")
+					helpers.assert_true(type(reason) == "string" and #reason < 200)
+					helpers.assert_contains(reason, "NUL")
+					helpers.assert_nil(reason:find("private-suffix", 1, true))
+				end
+			end)
+		end
+	end
+	for _, method in ipairs({ "exec_stdin", "exec_exact_stdin" }) do
+		helpers.it("linux-shell-command-nul: " .. method .. " refuses a NUL-bearing textual stdin before dispatch", function()
+			local calls = 0
+			local shell = helpers.load_module("adapters.shell_runner")
+			shell._set_runner(function() calls = calls + 1; return "Truncated prefix" end)
+			local value = shell[method]("cat", "prefix\0private-suffix")
+			shell._reset_runner()
+			helpers.assert_eq(value, "")
+			helpers.assert_eq(calls, 0)
+		end)
+	end
+end)
+
+helpers.describe("linux-shell-private-error-receipts", function()
+	for _, failure in ipairs({ "errno7", "errno24", "no errno", "open raised", "read raised", "close raised" }) do
+		helpers.it("linux-shell-private-error-receipts: " .. failure .. " cannot echo command arguments", function()
+			local Logger = require("logger.shim")
+			local shell = helpers.load_module("adapters.shell_runner")
+			local previous_popen, previous_level = io.popen, Logger.get_level()
+			local canary = "SYNTHETIC_PRIVATE_PIPE_ARGUMENT"
+			Logger.set_level("debug")
+			Logger.ring_buffer_clear()
+			io.popen = function(command)
+				local message = command .. ": " .. canary .. " native refusal"
+				if failure == "open raised" then error(message) end
+				if failure == "read raised" or failure == "close raised" then
+					return {
+						read = function()
+							if failure == "read raised" then error(message) end
+							return "0 3\nabc"
+						end,
+						close = function() error(message) end,
+					}
+				end
+				local code = failure == "errno7" and 7 or (failure == "errno24" and 24 or nil)
+				return nil, message, code
+			end
+			local ok, err = xpcall(function()
+				local accepted, output, reason = shell.exec_checked("printf '%s' " .. shell.quote(canary))
+				helpers.assert_eq(accepted, false)
+				helpers.assert_eq(output, "")
+				for _, line in ipairs(Logger.ring_buffer_snapshot()) do
+					helpers.assert_nil(line:find(canary, 1, true), "logger cannot copy private native errors")
+				end
+				helpers.assert_eq(type(reason), "string")
+				helpers.assert_true(reason ~= "" and #reason < 200, "failure still needs a bounded diagnostic")
+				helpers.assert_nil(reason:find(canary, 1, true), "returned failure cannot carry caller data")
+				if failure == "errno7" then helpers.assert_contains(reason, "errno 7") end
+				if failure == "errno24" then helpers.assert_contains(reason, "errno 24") end
+			end, debug.traceback)
+			io.popen = previous_popen
+			Logger.set_level(previous_level)
+			if not ok then error(err, 0) end
+		end)
+	end
+end)
+
+helpers.describe("linux-checked-output-receipts", function()
+	helpers.it("linux-checked-output-receipts: quotes the owner's complete literal staging directory", function()
+		local dir = "/owned/quote-é'漢\nparent"
+		local previous_popen, command, calls = io.popen, nil, 0
+		io.popen = function(value)
+			command, calls = value, calls + 1
+			return { read = function() return "0 3\nabc\nERGOPTI_CAPTURE_COMPLETE\n" end, close = function() return true end }
+		end
+		local protected, ok, output, reason = pcall(sh.exec_checked, "printf abc", { output_dir = dir })
+		io.popen = previous_popen
+		helpers.assert_true(protected, tostring(ok))
+		helpers.assert_true(ok, tostring(reason))
+		helpers.assert_eq(output, "abc")
+		helpers.assert_eq(calls, 1)
+		helpers.assert_contains(command, sh.quote(dir), "selected staging must cross native argv as one literal word")
+	end)
+	for _, row in ipairs({
+		{ name = "invalid options", options = false },
+		{ name = "numeric directory", options = { output_dir = 42 } },
+		{ name = "empty directory", options = { output_dir = "" } },
+		{ name = "NUL directory", options = { output_dir = "/owned/\0suffix" } },
+	}) do
+		helpers.it("linux-checked-output-receipts: refuses " .. row.name .. " before dispatch", function()
+			local calls = 0
+			sh._set_runner(function() calls = calls + 1; return "abc" end)
+			local protected, ok, output, reason = pcall(sh.exec_checked, "printf abc", row.options)
+			sh._reset_runner()
+			helpers.assert_true(protected, tostring(ok))
+			helpers.assert_eq(ok, false)
+			helpers.assert_eq(output, "")
+			helpers.assert_true(type(reason) == "string" and reason ~= "")
+			helpers.assert_eq(calls, 0)
+		end)
+	end
+end)
+
+helpers.describe("linux-checked-pipe-completion", function()
+	-- These are simulated libc receipts; the hardware capture test runs the
+	-- complete-frame transmitter failure through native children and pipes.
+	for _, failure in ipairs({ "read returned error", "read raised", "close returned error", "close raised", "missing trailer" }) do
+		helpers.it("linux-checked-pipe-completion: rejects " .. failure .. " and closes once", function()
+			local shell = helpers.load_module("adapters.shell_runner")
+			local previous_popen, closes = io.popen, 0
+			local canary = "SYNTHETIC_PRIVATE_RECEIPT_ERROR"
+			io.popen = function()
+				return {
+					read = function()
+						if failure == "read returned error" then return nil, canary, 5 end
+						if failure == "read raised" then error(canary) end
+						return "0 3\nabc" .. (failure == "missing trailer" and "" or "\nERGOPTI_CAPTURE_COMPLETE\n")
+					end,
+					close = function()
+						closes = closes + 1
+						if failure == "close returned error" then return nil, canary, 10 end
+						if failure == "close raised" then error(canary) end
+						return true
+					end,
+				}
+			end
+			local ok, err = xpcall(function()
+				local accepted, output, reason = shell.exec_checked("printf abc")
+				helpers.assert_eq(accepted, false, "an incomplete capture must not certify success")
+				helpers.assert_eq(closes, 1, "even failed reads must retire the pipe and reap its child")
+				helpers.assert_eq(output, (failure == "close returned error" or failure == "missing trailer") and "abc" or "")
+				helpers.assert_true(type(reason) == "string" and reason ~= "" and #reason < 200)
+				helpers.assert_nil(reason:find(canary, 1, true), "libc error text must stay private")
+			end, debug.traceback)
+			io.popen = previous_popen
+			if not ok then error(err, 0) end
+		end)
+	end
+end)
+
 -- Strings whose characters the shell would otherwise act on. Each one is a
 -- real payload this driver handles: SSIDs, window titles, clipboard content
 -- and hotstring replacements are all user-authored.

@@ -142,9 +142,18 @@ _RBL_EveryVetoHandsTheReloadBack() {
 		. "before keeping this instance alive, or its successor waits and prompts forever")
 	Terminal := InStr(Shutdown, "ShutdownTerminal := true", true)
 	Abandon := InStr(Shutdown, "ReloadTerminalHandoffAbandon(SupersededReload", true)
-	Assert(Terminal > 0 && Abandon > Terminal,
-		"an ordinary exit may stop the successor it supersedes only after every "
-		. "refusal gate accepted")
+	PrepareAbandon := InStr(Shutdown, "ReloadTerminalHandoffPrepareAbandon(SupersededReload", true)
+	ReadGate := InStr(Shutdown, "if FileReadActivityBusy()", true)
+	FinalExit := InStr(Shutdown, "_Updater_SignalFinalExitForIntent()", true)
+	Transfer := InStr(Shutdown, "_Updater_TransferExitIntentAfterShutdownGates()", true)
+	Recovery := InStr(Shutdown, "_Updater_CompleteRecoveryHandoffOnExit()", true)
+	Assert(ReadGate > 0 && PrepareAbandon > ReadGate && FinalExit > PrepareAbandon
+		&& Transfer > PrepareAbandon && Recovery > PrepareAbandon && Terminal > PrepareAbandon
+		&& Abandon > Terminal,
+		"ordinary exit proves native successor quiescence after reversible read/save gates "
+		. "and before any FinalExit, ownership transfer, recovery or terminal admission; only final close follows acceptance")
+	Assert(InStr(Shutdown, "_LifecycleRefuseNativeRetirement(" . Chr(34) . "a reload successor still owns native retirement", true) > 0,
+		"An unproven native stop remains an actual reversible veto.")
 	Assert(InStr(Shutdown, "ReloadTerminalHandoffPending()", true) > 0,
 		"an ordinary exit must borrow the pending reload's bundle instead of "
 		. "refusing on the barrier it holds")

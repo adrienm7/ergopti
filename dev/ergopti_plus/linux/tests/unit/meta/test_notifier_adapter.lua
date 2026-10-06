@@ -107,6 +107,25 @@ helpers.describe("notifier: sending", function()
 		end)
 	end)
 
+	for index, pair in ipairs({
+		{ "--help", "Literal title" }, { "-u", "Short title" },
+		{ "Ordinary title", "--help" }, { "Ordinary title", "--urgency=critical" },
+		{ "Ordinary title", "--expire-time=1" }, { "Ordinary title", "--app-name=another-app" },
+		{ "Ordinary title", "--" }, { "Ordinary title", "-?" },
+	}) do
+		helpers.it("separates literal notification operands from native options " .. index .. " (notification-option-receipts)", function()
+			with_shell(nil, function(notifier, commands)
+				helpers.assert_true(notifier.send(pair[2], { title = pair[1] }))
+				helpers.assert_eq(#commands, 1)
+				local boundary = commands[1]:find(" -- ", 1, true)
+				helpers.assert_true(boundary ~= nil, "shell quoting alone cannot prevent native option parsing")
+				local operands = commands[1]:sub(boundary + 4)
+				helpers.assert_true(operands:find("'" .. pair[1] .. "' '" .. pair[2] .. "'", 1, true) == 1,
+					"both caller operands must follow the native option boundary in order")
+			end)
+		end)
+	end
+
 	helpers.it("shows an unknown level rather than dropping it", function()
 		with_shell(nil, function(notifier, commands)
 			notifier.send("quelque chose", { level = "catastrophic" })
@@ -196,4 +215,3 @@ helpers.describe("notifier: it is used, not merely present", function()
 	end)
 
 end)
-

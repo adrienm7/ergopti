@@ -24,7 +24,7 @@ local hs     = hs
 local Logger = require("infra.logger")
 local dialog = require("infra.dialog_util")
 local i18n   = require("infra.i18n")
-local Notifier = require("adapters.notifier")
+local Notifier = require("adapters.application_notifier")
 
 local LOG = "update_launcher"
 local COMMAND_ROOT = "ergoptiplus://updater/"

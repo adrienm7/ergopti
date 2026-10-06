@@ -1,0 +1,163 @@
+{
+	"contract": "versioned executable and literal argv; target availability is native and separate",
+	"cases": [
+		{
+			"id": "posix-empty",
+			"platforms": ["hs", "linux"],
+			"value": "{\"version\":1,\"executable\":\"/tmp/program\",\"arguments\":[]}",
+			"expected": {
+				"executable": "/tmp/program",
+				"arguments": []
+			}
+		},
+		{
+			"id": "literal-argv",
+			"platforms": ["hs", "linux"],
+			"value": "{\"version\":1,\"executable\":\"/tmp/été program\",\"arguments\":[\"\",\"two words\",\"日本語\",\"\\\"quoted\\\"\",\"\\\\tail\\\\\",\"$(touch ignored); %TOKEN%\",\"line\\nnext\"]}",
+			"expected": {
+				"executable": "/tmp/été program",
+				"arguments": [
+					"",
+					"two words",
+					"日本語",
+					"\"quoted\"",
+					"\\tail\\",
+					"$(touch ignored); %TOKEN%",
+					"line\nnext"
+				]
+			}
+		},
+		{
+			"id": "windows-literal",
+			"platforms": ["ahk"],
+			"value": "{\"version\":1,\"executable\":\"C:\\\\Program Files\\\\été\\\\program.exe\",\"arguments\":[\"\",\"two words\",\"日本語\",\"\\\"quote\\\"\",\"trail\\\\\",\"%TOKEN%\",\"a&b\"]}",
+			"expected": {
+				"executable": "C:\\Program Files\\été\\program.exe",
+				"arguments": ["", "two words", "日本語", "\"quote\"", "trail\\", "%TOKEN%", "a&b"]
+			}
+		},
+		{
+			"id": "unc-file",
+			"platforms": ["ahk"],
+			"value": "{\"version\":1,\"executable\":\"\\\\\\\\server\\\\share\\\\program.exe\",\"arguments\":[]}",
+			"expected": {
+				"executable": "\\\\server\\share\\program.exe",
+				"arguments": []
+			}
+		},
+		{
+			"id": "null",
+			"platforms": ["ahk", "hs", "linux"],
+			"value": "null",
+			"expected": null
+		},
+		{
+			"id": "empty-object",
+			"platforms": ["ahk", "hs", "linux"],
+			"value": "{}",
+			"expected": null
+		},
+		{
+			"id": "array",
+			"platforms": ["ahk", "hs", "linux"],
+			"value": "[]",
+			"expected": null
+		},
+		{
+			"id": "version-two",
+			"platforms": ["ahk", "hs", "linux"],
+			"value": "{\"version\":2,\"executable\":\"/bin/true\",\"arguments\":[]}",
+			"expected": null
+		},
+		{
+			"id": "version-bool",
+			"platforms": ["ahk", "hs", "linux"],
+			"value": "{\"version\":true,\"executable\":\"/bin/true\",\"arguments\":[]}",
+			"expected": null
+		},
+		{
+			"id": "version-text",
+			"platforms": ["ahk", "hs", "linux"],
+			"value": "{\"version\":\"1\",\"executable\":\"/bin/true\",\"arguments\":[]}",
+			"expected": null
+		},
+		{
+			"id": "args-object",
+			"platforms": ["ahk", "hs", "linux"],
+			"value": "{\"version\":1,\"executable\":\"/bin/true\",\"arguments\":{}}",
+			"expected": null
+		},
+		{
+			"id": "args-null",
+			"platforms": ["ahk", "hs", "linux"],
+			"value": "{\"version\":1,\"executable\":\"/bin/true\",\"arguments\":null}",
+			"expected": null
+		},
+		{
+			"id": "argument-number",
+			"platforms": ["ahk", "hs", "linux"],
+			"value": "{\"version\":1,\"executable\":\"/bin/true\",\"arguments\":[2]}",
+			"expected": null
+		},
+		{
+			"id": "argument-null",
+			"platforms": ["ahk", "hs", "linux"],
+			"value": "{\"version\":1,\"executable\":\"/bin/true\",\"arguments\":[null]}",
+			"expected": null
+		},
+		{
+			"id": "argument-object",
+			"platforms": ["ahk", "hs", "linux"],
+			"value": "{\"version\":1,\"executable\":\"/bin/true\",\"arguments\":[{}]}",
+			"expected": null
+		},
+		{
+			"id": "duplicate-executable",
+			"platforms": ["ahk", "hs", "linux"],
+			"value": "{\"version\":1,\"executable\":\"/bin/false\",\"executable\":\"/bin/true\",\"arguments\":[]}",
+			"expected": null
+		},
+		{
+			"id": "duplicate-escaped-key",
+			"platforms": ["ahk", "hs", "linux"],
+			"value": "{\"version\":1,\"executable\":\"/bin/true\",\"argum\\u0065nts\":[],\"arguments\":[]}",
+			"expected": null
+		},
+		{
+			"id": "extra-field",
+			"platforms": ["ahk", "hs", "linux"],
+			"value": "{\"version\":1,\"executable\":\"/bin/true\",\"arguments\":[],\"shell\":true}",
+			"expected": null
+		},
+		{
+			"id": "missing-arguments",
+			"platforms": ["ahk", "hs", "linux"],
+			"value": "{\"version\":1,\"executable\":\"/bin/true\"}",
+			"expected": null
+		},
+		{
+			"id": "relative-executable",
+			"platforms": ["ahk", "hs", "linux"],
+			"value": "{\"version\":1,\"executable\":\"program\",\"arguments\":[]}",
+			"expected": null
+		},
+		{
+			"id": "nul-executable",
+			"platforms": ["ahk", "hs", "linux"],
+			"value": "{\"version\":1,\"executable\":\"/tmp/a\\u0000b\",\"arguments\":[]}",
+			"expected": null
+		},
+		{
+			"id": "nul-argument",
+			"platforms": ["ahk", "hs", "linux"],
+			"value": "{\"version\":1,\"executable\":\"/bin/true\",\"arguments\":[\"a\\u0000b\"]}",
+			"expected": null
+		},
+		{
+			"id": "invalid-surrogate",
+			"platforms": ["ahk", "hs", "linux"],
+			"value": "{\"version\":1,\"executable\":\"/bin/true\",\"arguments\":[\"\\ud800\"]}",
+			"expected": null
+		}
+	]
+}

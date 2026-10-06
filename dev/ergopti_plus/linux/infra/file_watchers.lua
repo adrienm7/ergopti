@@ -310,8 +310,8 @@ local function _arm_luv_watcher(path, accept_fn)
 		return
 	end
 
-	local ok_err, err_msg = pcall(function()
-		luv.fs_event_start(handle, path, FS_EVENT_FLAGS, function(err, fname, events)
+	local protected, activated, activation_error = pcall(function()
+		return luv.fs_event_start(handle, path, FS_EVENT_FLAGS, function(err, fname, events)
 			if err then
 				Logger.warn(LOG, "fs_event error on '%s': %s", path, tostring(err))
 				return
@@ -330,8 +330,9 @@ local function _arm_luv_watcher(path, accept_fn)
 		end)
 	end)
 
-	if not ok_err then
-		Logger.warn(LOG, "luv.fs_event_start() failed for '%s': %s — skipping.", path, tostring(err_msg))
+	if not protected or activated == nil or activated == false then
+		local reason = protected and activation_error or activated
+		Logger.warn(LOG, "luv.fs_event_start() failed for '%s': %s — skipping.", path, tostring(reason))
 		pcall(function() luv.close(handle) end)
 		return
 	end

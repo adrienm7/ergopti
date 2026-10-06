@@ -920,6 +920,7 @@ _RemoteCancelPublication_Poll(State, ReqId) {
 
 _RemoteCancelPublication_CurlPort(State, RunFn) {
 	return Map(
+		"resolve_proxy", _Stub_CurlResolveProxyDirect.Bind(State),
 		"file_exists", (*) => true,
 		"temp_dir", (*) => A_Temp,
 		"write", (*) => true,
@@ -954,6 +955,7 @@ _RemoteCancelPublication_CurlRunBoundary() {
 			_RemoteCancelPublication_Resolved(), "https://safe.invalid/v1", "{}",
 			(*) => 0, (*) => 0, 1000, Port))
 		Sleep(30)
+		AssertEqual(1, State["proxy_resolutions"], "the real continuation admits the recorded direct route once")
 		AssertFalse(_LLM_Remote_Async.Has(ReqId),
 			"cancellation inside Run must not be overwritten by a live publication")
 		AssertEqual(0, State["polls"],
@@ -991,6 +993,7 @@ _RemoteCancelPublication_CurlOwnedLaunchFailure() {
 		AssertTrue(_LLMRemote_DispatchCurl(ReqId,
 			_RemoteCancelPublication_Resolved(), "https://safe.invalid/v1", "{}",
 			(*) => 0, _RemoteAdoptionFailure_Record.Bind(State), 1000, Port))
+		AssertEqual(1, State["proxy_resolutions"], "owned launch crosses the direct proxy continuation once")
 		AssertFalse(_LLM_Remote_Async.Has(ReqId),
 			"a launch failure after process creation must retire the reservation")
 		AssertEqual(0, State["polls"],
@@ -1026,6 +1029,7 @@ _RemoteAdoptionFailure_AbortsDispatch() {
 		AssertTrue(_LLMRemote_DispatchCurl(ReqId,
 			_RemoteCancelPublication_Resolved(), "https://safe.invalid/v1", "{}",
 			(*) => 0, _RemoteAdoptionFailure_Record.Bind(State), 1000, Port))
+		AssertEqual(1, State["proxy_resolutions"], "failed adoption still crosses the real proxy continuation once")
 		AssertEqual(0, State["opens"],
 			"owned curl launch must not use a second fallible OpenProcess step")
 		AssertEqual(1, State["fail_calls"],
@@ -1461,3 +1465,149 @@ _Remote_DeadlineTickFallsBack() {
 		"deadline_ms must fall back to 30000 ms when LLM_REMOTE_TIMEOUT_MS is the 0 sentinel")
 }
 Test("api_remote: deadline_ms falls back to 30 s when LLM_REMOTE_TIMEOUT_MS is 0 sentinel", _Remote_DeadlineTickFallsBack)
+
+
+_RemoteProxy_CaptureResolve(State, Url, Callback) {
+	State["url"] := Url
+	State["continue"] := Callback
+	return true
+}
+
+_RemoteProxy_Write(State, Path, Text) {
+	State["writes"].Push(Map("path", Path, "text", Text))
+	return true
+}
+
+_RemoteProxy_Run(State, Command, WorkingDir, Options, &Pid, &ProcessOwner) {
+	State["command"] := Command
+	_RemoteCancelPublication_RunWithoutCancel(State, Command, WorkingDir, Options, &Pid, &ProcessOwner)
+}
+
+_RemoteProxy_DeferredGeneration(ProbeCase := "success") {
+	global _LLM_Remote_Async
+	SavedRegistry := _LLM_Remote_Async
+	_LLM_Remote_Async := Map()
+	State := _RemoteCancelPublication_NewState()
+	State["writes"] := []
+	State["fail_calls"] := 0
+	State["tick"] := 1313
+	Port := _RemoteCancelPublication_CurlPort(State, _RemoteProxy_Run.Bind(State))
+	Port["resolve_proxy"] := _RemoteProxy_CaptureResolve.Bind(State)
+	Port["write"] := _RemoteProxy_Write.Bind(State)
+	Port["tick"] := (*) => State["tick"]
+	ReqId := "group6_proxy_generation"
+	Resolved := Map("Format", "gemini", "Token", "private-api-key", "Model", "model")
+	Url := "https://remote.invalid:8443/v1/models/test?key=private-api-key"
+	try {
+		AssertTrue(_LLMRemote_DispatchCurl(ReqId, Resolved, Url, '{"text":"private-context"}',
+			(*) => 0, _RemoteAdoptionFailure_Record.Bind(State), 1000, Port))
+		Reservation := _LLM_Remote_Async[ReqId]
+		AssertEqual(Url, State["url"], "the first request must resolve its actual destination")
+		AssertEqual(0, State["writes"].Length, "no credential or payload staging before admission")
+		AssertEqual(0, State["runs"], "curl must wait for the first PAC answer")
+		if ProbeCase == "cancel"
+			LLM_RemoteCancelAsync(ReqId)
+		else if ProbeCase == "replace"
+			_LLM_Remote_Async[ReqId] := Map("transport", "pending", "cancelled", false)
+		else if ProbeCase == "timeout"
+			State["tick"] += 1000
+		State["continue"].Call(Map("ok", ProbeCase != "reject", "inherit", false, "proxy", "http://managed.corp:3128"))
+		State["continue"].Call(Map("ok", true, "inherit", false, "proxy", "http://late.corp:80"))
+		if ProbeCase != "success" {
+			AssertEqual(0, State["writes"].Length, "stale or cancelled admission must not stage private data")
+			AssertEqual(0, State["runs"], "stale or expired admission must launch no child")
+			AssertEqual((ProbeCase == "timeout" || ProbeCase == "reject") ? 1 : 0, State["fail_calls"], "timeout fails once; cancellation stays silent")
+			if ProbeCase == "replace"
+				AssertEqual("pending", _LLM_Remote_Async[ReqId]["transport"], "old completion must preserve successor")
+			return
+		}
+		AssertEqual(1, State["runs"], "duplicate resolver completion must launch exactly once")
+		AssertEqual(2, State["writes"].Length, "one payload and one private config are staged")
+		AssertContains(State["writes"][2]["text"], 'proxy = "http://managed.corp:3128"')
+		AssertContains(State["writes"][2]["text"], "proxy-anyauth")
+		AssertContains(State["writes"][2]["text"], 'proxy-user = ":"')
+		AssertFalse(InStr(State["command"]["command_line"], "private-api-key") > 0, "API credentials must remain outside argv")
+		AssertFalse(InStr(State["command"]["command_line"], "private-context") > 0, "typed text must remain outside argv")
+	} finally {
+		if IsSet(Reservation) {
+			if Reservation.Has("proxy_deadline")
+				SetTimer(Reservation["proxy_deadline"], 0)
+			if Reservation.Has("process_owner")
+				_LLMRemote_CancelCurlReservation(ReqId, Reservation, Port)
+		}
+		_LLM_Remote_Async := SavedRegistry
+	}
+}
+Test("remote proxy: first generation waits and admits one private child", _RemoteProxy_DeferredGeneration)
+Test("remote proxy: cancelled admission cannot stage or launch", _RemoteProxy_DeferredGeneration.Bind("cancel"))
+Test("remote proxy: late admission cannot consume a successor", _RemoteProxy_DeferredGeneration.Bind("replace"))
+Test("remote proxy: resolution consumes the request timeout", _RemoteProxy_DeferredGeneration.Bind("timeout"))
+Test("remote proxy: unresolved receipt cannot become direct generation", _RemoteProxy_DeferredGeneration.Bind("reject"))
+
+class _RemoteProxy_ReadyHttp {
+	__New(State) {
+		this.State := State
+	}
+	Open(*) {
+	}
+	SetTimeouts(*) {
+	}
+	SetRequestHeader(*) {
+	}
+	SetProxy(Proxy) {
+		this.State["proxy"] := Proxy
+	}
+	Send(*) {
+		this.State["sends"] += 1
+	}
+	Abort() {
+		this.State["aborts"] += 1
+		return true
+	}
+}
+
+_RemoteProxy_ReadyCreate(State) {
+	State["creates"] += 1
+	return _RemoteProxy_ReadyHttp(State)
+}
+
+_RemoteProxy_ReadyAdmission(ProbeCase := "success") {
+	global LLM_API_PROVIDERS
+	SavedProviders := LLM_API_PROVIDERS
+	LLM_API_PROVIDERS := Map("group6_fixture", Map("Format", "openai", "BaseUrl", "https://ready.invalid:8443/v1"))
+	State := Map("creates", 0, "sends", 0, "aborts", 0, "results", [])
+	Owner := LLM_AuxBegin("group6_ready", Map("backend", "api", "endpoint", "https://ready.invalid:8443/v1", "identity", "fixture"))
+	Port := Map("resolve_proxy", _RemoteProxy_CaptureResolve.Bind(State),
+		"create_http", _RemoteProxy_ReadyCreate.Bind(State), "poll_ready", (*) => true)
+	try {
+		LLM_RemoteIsReady_Async(Map("Provider", "group6_fixture", "Token", "private-api-key"), (Value) => State["results"].Push(Value), Owner, Port)
+		AssertTrue(State.Has("continue"), "readiness must use the system admission resolver")
+		AssertEqual("https://ready.invalid:8443/v1/models", State["url"])
+		AssertEqual(0, State["creates"], "no readiness child before the first PAC answer")
+		if ProbeCase == "replace"
+			Successor := LLM_AuxBegin("group6_ready", Map("backend", "api", "endpoint", "next", "identity", "successor"))
+		State["continue"].Call(Map("ok", ProbeCase != "reject", "inherit", false, "proxy", "http://managed.corp:3128"))
+		State["continue"].Call(Map("ok", true, "inherit", false, "proxy", "http://late.corp:80"))
+		if ProbeCase == "reject" {
+			AssertEqual(0, State["creates"], "unresolved receipt must create no readiness transport")
+			AssertEqual(1, State["results"].Length, "native refusal must settle once")
+			AssertFalse(State["results"][1], "unresolved proxy must remain unavailable")
+		} else if ProbeCase == "replace" {
+			AssertEqual(0, State["creates"], "a superseded readiness owner may create no transport")
+			AssertTrue(LLM_AuxIsCurrent(Successor), "late completion must retain successor ownership")
+		} else {
+			AssertEqual(1, State["creates"], "duplicate completion must create exactly one transport")
+			AssertEqual(1, State["sends"], "readiness must send exactly once")
+			AssertEqual("http://managed.corp:3128", State["proxy"], "readiness and generation must share relay admission")
+		}
+	} finally {
+		_LLM_AuxRetireOwner(Owner)
+		if IsSet(Successor)
+			_LLM_AuxRetireOwner(Successor)
+		LLM_API_PROVIDERS := SavedProviders
+	}
+}
+Test("remote proxy: readiness waits for and applies the same relay", _RemoteProxy_ReadyAdmission)
+Test("remote proxy: superseded readiness cannot launch a child", _RemoteProxy_ReadyAdmission.Bind("replace"))
+
+Test("remote proxy: unresolved receipt refuses readiness once", _RemoteProxy_ReadyAdmission.Bind("reject"))
