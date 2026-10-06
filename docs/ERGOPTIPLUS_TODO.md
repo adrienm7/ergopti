@@ -4728,6 +4728,13 @@ These are implementation tasks; separate installed tray/input acceptance.
       uncommitted in the local worktree of `fix/downloads-on-managed-networks`
       when the session stopped; redo it if that worktree is gone.
 
+Validation curl now prepares a private Debian archive keyring from the exact
+signed-distribution package and checks its complete aggregate hash. The original
+full InRelease verifier, successful gpgv command and required signer are unchanged.
+All 21 receiving controls pass; genuine private preparation and strict full
+signature verification pass locally. Host trust stores are untouched. Hosted
+validation-tool setup and the complete company-network matrix remain required.
+
 The latest hosted Nix refusal reaches pinned-source metadata. Four fixed
 checkpoints distinguish command, decoding, routing and exact pin agreement;
 all original 35 controls and seven native requirements remain. Local admission
