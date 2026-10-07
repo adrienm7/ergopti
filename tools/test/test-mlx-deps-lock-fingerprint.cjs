@@ -14,6 +14,7 @@
 'use strict';
 
 const crypto = require('crypto');
+const TOML = require('smol-toml');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -152,6 +153,279 @@ sha256sum "\${3:?missing input path}"
 	fs.writeFileSync(shasumPath, source, { encoding: 'utf8', mode: 0o755 });
 	fs.chmodSync(shasumPath, 0o755);
 }
+
+// Literal artifact receipts from https://pypi.org/pypi/truststore/0.10.4/json.
+// Independent metadata SHA256: 803a5dafe852bdd8b209c3df0dd7488c8f949ce7d1862820557704db1134cb41.
+const TRUSTSTORE_PYPI_RELEASE = {
+	version: '0.10.4',
+	artifacts: [
+		{
+			url: 'https://files.pythonhosted.org/packages/19/97/56608b2249fe206a67cd573bc93cd9896e1efb9e98bce9c163bcdc704b88/truststore-0.10.4-py3-none-any.whl',
+			hash: 'sha256:adaeaecf1cbb5f4de3b1959b42d41f6fab57b2b1666adb59e89cb0b53361d981',
+			size: 18660,
+			kind: 'wheel'
+		},
+		{
+			url: 'https://files.pythonhosted.org/packages/53/a3/1585216310e344e8102c22482f6060c7a6ea0322b63e026372e6dcefcfd6/truststore-0.10.4.tar.gz',
+			hash: 'sha256:9d91bd436463ad5e4ee4aba766628dd6cd7010cf3e2461756b3303710eebc301',
+			size: 26169,
+			kind: 'sdist'
+		}
+	]
+};
+
+/**
+ * Checks the shipped TOML resolution without executing uv or installing packages.
+ * @param {object} project Parsed pyproject.toml.
+ * @param {object} lock Parsed uv.lock.
+ * @returns {string[]} Literal refusal reasons for inconsistent truststore records.
+ */
+function truststoreLockIssues(project, lock) {
+	const issues = [];
+	const dependencies = project.project && project.project.dependencies;
+	const direct = Array.isArray(dependencies)
+		? dependencies.filter(
+				(value) => typeof value === 'string' && /^truststore(?:[<>=!~;\s\[]|$)/i.test(value)
+			)
+		: [];
+	const pin = direct.length === 1 && /^truststore==([A-Za-z0-9][A-Za-z0-9.!+_-]*)$/.exec(direct[0]);
+	if (!pin) issues.push('direct-pin');
+	const packages = Array.isArray(lock.package) ? lock.package : [];
+	const resolved = packages.filter((entry) => entry.name === 'truststore');
+	const distribution = resolved.length === 1 ? resolved[0] : null;
+	if (
+		!distribution ||
+		!pin ||
+		distribution.version !== pin[1] ||
+		distribution.version !== TRUSTSTORE_PYPI_RELEASE.version
+	)
+		issues.push('resolved-version');
+	const projects = packages.filter(
+		(entry) => project.project && entry.name === project.project.name
+	);
+	const virtual = projects.length === 1 ? projects[0] : null;
+	if (
+		!virtual ||
+		!virtual.source ||
+		virtual.source.virtual !== '.' ||
+		virtual.version !== project.project.version
+	)
+		issues.push('virtual-project');
+	const virtualDependencies = virtual && virtual.dependencies;
+	const linked = Array.isArray(virtualDependencies)
+		? virtualDependencies.filter((entry) => entry.name === 'truststore')
+		: [];
+	if (
+		linked.length !== 1 ||
+		linked[0].marker !== undefined ||
+		(linked[0].version !== undefined &&
+			(!distribution || linked[0].version !== distribution.version))
+	)
+		issues.push('virtual-dependency');
+	const metadata = virtual && virtual.metadata && virtual.metadata['requires-dist'];
+	const declared = Array.isArray(metadata)
+		? metadata.filter((entry) => entry.name === 'truststore')
+		: [];
+	if (
+		declared.length !== 1 ||
+		!pin ||
+		declared[0].specifier !== `==${pin[1]}` ||
+		declared[0].marker !== undefined
+	)
+		issues.push('requires-dist');
+	if (
+		!distribution ||
+		!distribution.source ||
+		distribution.source.registry !== 'https://pypi.org/simple'
+	)
+		issues.push('pypi-registry');
+	function officialArtifact(artifact, wheel) {
+		if (
+			!artifact ||
+			typeof artifact.url !== 'string' ||
+			!/^sha256:[0-9a-f]{64}$/.test(artifact.hash) ||
+			!Number.isSafeInteger(artifact.size) ||
+			artifact.size <= 0 ||
+			!distribution
+		)
+			return false;
+		let url;
+		try {
+			url = new URL(artifact.url);
+		} catch {
+			return false;
+		}
+		if (
+			url.protocol !== 'https:' ||
+			url.hostname !== 'files.pythonhosted.org' ||
+			url.port ||
+			url.username ||
+			url.password ||
+			url.search ||
+			url.hash ||
+			!url.pathname.startsWith('/packages/')
+		)
+			return false;
+		const filename = url.pathname.slice(url.pathname.lastIndexOf('/') + 1);
+		const matchesFilename = wheel
+			? filename.startsWith(`truststore-${distribution.version}-`) && filename.endsWith('.whl')
+			: filename === `truststore-${distribution.version}.tar.gz`;
+		return (
+			matchesFilename &&
+			TRUSTSTORE_PYPI_RELEASE.artifacts.some(
+				(expected) =>
+					expected.kind === (wheel ? 'wheel' : 'sdist') &&
+					expected.url === artifact.url &&
+					expected.hash === artifact.hash &&
+					expected.size === artifact.size
+			)
+		);
+	}
+	if (!distribution || !officialArtifact(distribution.sdist, false)) issues.push('sdist-artifact');
+	if (
+		!distribution ||
+		!Array.isArray(distribution.wheels) ||
+		distribution.wheels.length !==
+			TRUSTSTORE_PYPI_RELEASE.artifacts.filter((entry) => entry.kind === 'wheel').length ||
+		!distribution.wheels.every((artifact) => officialArtifact(artifact, true))
+	)
+		issues.push('wheel-artifact');
+	return issues;
+}
+
+/**
+ * Parses real source TOML, then checks independent causal mutations of its records.
+ * These static controls do not claim native uv, Python import or macOS acceptance.
+ */
+function checkShippedTruststoreLock() {
+	let project;
+	let lock;
+	try {
+		project = TOML.parse(fs.readFileSync(SOURCE_PYPROJECT, 'utf8'));
+		lock = TOML.parse(fs.readFileSync(SOURCE_LOCK, 'utf8'));
+	} catch (error) {
+		test('shipped MLX dependency sources parse as TOML', false, error.message);
+		return;
+	}
+	test('shipped MLX dependency sources parse as TOML', true);
+	const issues = truststoreLockIssues(project, lock);
+	test(
+		'shipped truststore pin, virtual project, metadata and PyPI artifacts agree',
+		issues.length === 0,
+		issues.join(', ')
+	);
+	function mutant(name, expected, change) {
+		const changedProject = JSON.parse(JSON.stringify(project));
+		const changedLock = JSON.parse(JSON.stringify(lock));
+		let observed = [];
+		try {
+			change(changedProject, changedLock);
+			observed = truststoreLockIssues(
+				TOML.parse(TOML.stringify(changedProject)),
+				TOML.parse(TOML.stringify(changedLock))
+			);
+		} catch (error) {
+			test(name, false, error.message);
+			return;
+		}
+		// A broken shipped baseline cannot earn mutation credit vacuously.
+		test(name, issues.length === 0 && observed.includes(expected), observed.join(', '));
+	}
+	const virtual = (value) => value.package.find((entry) => entry.name === project.project.name);
+	const distribution = (value) => value.package.find((entry) => entry.name === 'truststore');
+	mutant('missing direct truststore pin is refused', 'direct-pin', (value) => {
+		value.project.dependencies = value.project.dependencies.filter(
+			(entry) => !entry.startsWith('truststore')
+		);
+	});
+	mutant('unpinned direct truststore range is refused', 'direct-pin', (value) => {
+		value.project.dependencies = value.project.dependencies.map((entry) =>
+			entry.startsWith('truststore') ? 'truststore>=0.9.1' : entry
+		);
+	});
+	mutant(
+		'missing virtual-project truststore dependency is refused',
+		'virtual-dependency',
+		(_, value) => {
+			virtual(value).dependencies = virtual(value).dependencies.filter(
+				(entry) => entry.name !== 'truststore'
+			);
+		}
+	);
+	mutant('missing requires-dist truststore metadata is refused', 'requires-dist', (_, value) => {
+		virtual(value).metadata['requires-dist'] = virtual(value).metadata['requires-dist'].filter(
+			(entry) => entry.name !== 'truststore'
+		);
+	});
+	mutant('missing resolved truststore package is refused', 'resolved-version', (_, value) => {
+		value.package = value.package.filter((entry) => entry.name !== 'truststore');
+	});
+	mutant(
+		'resolved truststore version differing from direct pin is refused',
+		'resolved-version',
+		(_, value) => {
+			distribution(value).version = '0.0.0';
+		}
+	);
+	mutant(
+		'requires-dist version differing from direct pin is refused',
+		'requires-dist',
+		(_, value) => {
+			virtual(value).metadata['requires-dist'].find(
+				(entry) => entry.name === 'truststore'
+			).specifier = '==0.0.0';
+		}
+	);
+	mutant('non-virtual MLX project source is refused', 'virtual-project', (_, value) => {
+		virtual(value).source = { registry: 'https://pypi.org/simple' };
+	});
+	mutant('non-PyPI truststore registry is refused', 'pypi-registry', (_, value) => {
+		distribution(value).source.registry = 'https://example.invalid/simple';
+	});
+	mutant('missing truststore sdist is refused', 'sdist-artifact', (_, value) => {
+		delete distribution(value).sdist;
+	});
+	mutant('missing truststore wheels are refused', 'wheel-artifact', (_, value) => {
+		distribution(value).wheels = [];
+	});
+	mutant('foreign truststore wheel host is refused', 'wheel-artifact', (_, value) => {
+		distribution(value).wheels[0].url = distribution(value).wheels[0].url.replace(
+			'files.pythonhosted.org',
+			'example.invalid'
+		);
+	});
+	mutant('malformed truststore sdist SHA256 is refused', 'sdist-artifact', (_, value) => {
+		distribution(value).sdist.hash = 'sha256:invalid';
+	});
+	mutant('malformed truststore wheel SHA256 is refused', 'wheel-artifact', (_, value) => {
+		distribution(value).wheels[0].hash = 'sha256:invalid';
+	});
+	mutant('well-formed foreign truststore sdist digest is refused', 'sdist-artifact', (_, value) => {
+		distribution(value).sdist.hash = `sha256:${'0'.repeat(64)}`;
+	});
+	mutant('well-formed foreign truststore wheel digest is refused', 'wheel-artifact', (_, value) => {
+		distribution(value).wheels[0].hash = `sha256:${'0'.repeat(64)}`;
+	});
+	mutant(
+		'truststore artifact size differing from official PyPI is refused',
+		'wheel-artifact',
+		(_, value) => {
+			distribution(value).wheels[0].size += 1;
+		}
+	);
+	mutant(
+		'foreign artifact path on the official PyPI host is refused',
+		'sdist-artifact',
+		(_, value) => {
+			distribution(value).sdist.url = distribution(value).sdist.url.replace(
+				'/packages/',
+				'/packages/foreign/'
+			);
+		}
+	);
+}
+
+checkShippedTruststoreLock();
 
 const bash = bashExecutable();
 
