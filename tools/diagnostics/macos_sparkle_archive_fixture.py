@@ -18,6 +18,64 @@ import sys
 import uuid
 
 
+SERVER_DIAGNOSTIC_PHASE = "entry"
+SERVER_DIAGNOSTIC_PHASES = frozenset(
+    [
+        "entry",
+        "directory-admission",
+        "nonce-admission",
+        "socket-bind",
+        "signal-registration",
+        "readiness-publication",
+        "request-loop",
+        "server-retirement",
+    ]
+)
+SERVER_DIAGNOSTIC_EXCEPTIONS = frozenset(
+    [
+        "RuntimeError",
+        "OSError",
+        "PermissionError",
+        "FileNotFoundError",
+        "ValueError",
+        "TypeError",
+        "NameError",
+        "ImportError",
+        "ModuleNotFoundError",
+        "OverflowError",
+    ]
+)
+
+
+def export_server_refusal(arguments, failure):
+    """Opt-in typed facts only; collection can never replace the original refusal."""
+    try:
+        if (
+            len(arguments) != 3
+            or arguments[0] != "serve"
+            or os.environ.get("ERGOPTI_SPARKLE_SERVER_DIAGNOSTICS") != "1"
+        ):
+            return
+        category = type(failure).__name__
+        packet = {
+            "schema": 1,
+            "pid": os.getpid(),
+            "phase": SERVER_DIAGNOSTIC_PHASE
+            if SERVER_DIAGNOSTIC_PHASE in SERVER_DIAGNOSTIC_PHASES
+            else "entry",
+            "exception_type": category
+            if category in SERVER_DIAGNOSTIC_EXCEPTIONS
+            else "unclassified",
+        }
+        encoded = json.dumps(packet, sort_keys=True)
+        if len(encoded.encode("utf-8")) > 512:
+            return
+        print("Sparkle server diagnostic: " + encoded, file=sys.stderr)
+    except Exception:
+        # The caller's failure verdict remains 1 even if this secondary observer refuses.
+        return
+
+
 class NativeCensusRefusal(RuntimeError):
     """Bounded facts about this helper, never a process path or exception text."""
 
@@ -158,7 +216,10 @@ def private_directory(path):
 
 def serve(root, nonce):
     """Allow exactly two loopback-only resources; retain each served-byte digest."""
+    global SERVER_DIAGNOSTIC_PHASE
+    SERVER_DIAGNOSTIC_PHASE = "directory-admission"
     root = private_directory(root)
+    SERVER_DIAGNOSTIC_PHASE = "nonce-admission"
     if len(nonce) != 32 or any(c not in "0123456789abcdef" for c in nonce):
         raise RuntimeError("Private Sparkle session refused")
     state = {"stopping": False, "requests": 0}
@@ -259,11 +320,14 @@ def serve(root, nonce):
         def handle_error(self, _request, _address):
             raise RuntimeError("Private Sparkle resource handling refused")
 
+    SERVER_DIAGNOSTIC_PHASE = "socket-bind"
     server = PrivateServer(("127.0.0.1", 0), Handler)
     try:
         server.timeout = 0.2
+        SERVER_DIAGNOSTIC_PHASE = "signal-registration"
         signal.signal(signal.SIGTERM, server.request_stop)
         signal.signal(signal.SIGINT, server.request_stop)
+        SERVER_DIAGNOSTIC_PHASE = "readiness-publication"
         publish(
             root / "server-start.json",
             {
@@ -272,11 +336,14 @@ def serve(root, nonce):
                 "port": server.server_port,
             },
         )
+        SERVER_DIAGNOSTIC_PHASE = "request-loop"
         while not state["stopping"]:
             server.handle_request()
         if server.stop_failure is not None:
             raise RuntimeError("Private Sparkle accepted-socket stop refused")
     finally:
+        if sys.exc_info()[0] is None:
+            SERVER_DIAGNOSTIC_PHASE = "server-retirement"
         server.server_close()
         publish(
             root / "server-retired.json",
@@ -339,14 +406,17 @@ def main(arguments):
 
 def entrypoint(arguments):
     """Export fixed refusal facts without changing strict native admission."""
+    global SERVER_DIAGNOSTIC_PHASE
+    SERVER_DIAGNOSTIC_PHASE = "entry"
     try:
         main(arguments)
     except NativeCensusRefusal as failure:
         print(json.dumps(failure.packet, sort_keys=True))
         print("Private Sparkle fixture refused.", file=sys.stderr)
         return 1
-    except Exception:
+    except Exception as failure:
         print("Private Sparkle fixture refused.", file=sys.stderr)
+        export_server_refusal(arguments, failure)
         return 1
     return 0
 
