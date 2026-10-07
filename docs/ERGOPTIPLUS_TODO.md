@@ -3175,6 +3175,16 @@ and native ten-case source. Actual UI cause remains unknown until exact-source
 macOS execution; guardian/Login Items and physical tap-hold acceptance remain
 required. Item24 stays partial.
 
+Actual macOS run37609704457 refuses permission UI qualification at
+observation_deadline; the cause remains UNKNOWN. The generated init now emits
+bounded stderr entry phase markers while preserving the original refusal,
+the original33 portable cases, all10 native cases and30/35/10 ownership budgets.
+The loaded marker establishes only a truthy dofile result, and the returned
+marker only the top-level call return; neither proves the first scheduler
+tick, completed cases or native UI success. These new markers remain native
+unexecuted and add no permission, ready or activation authority. Item24 stays
+partial; actual WebKit/UI and physical guardian/tap-hold acceptance remain open.
+
 - [~] **30.** Physical magic-key setting on all three OSes: one
   `hotstrings.magic_key_source` (a KeyboardEvent.code, `auto` by default),
   config schema v5 migrating every spelling of the Windows

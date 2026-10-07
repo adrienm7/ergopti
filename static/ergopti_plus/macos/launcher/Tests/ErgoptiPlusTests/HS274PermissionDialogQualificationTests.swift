@@ -797,10 +797,30 @@ extension HS274NativePolicyQualificationTests {
 	        },
 	    )
 	    config = output / "init.lua"
-	    config.write_text("""local location = assert(debug.getinfo(1, "S").source:match("^@(.+)/[^/]+$"))
-	local config = assert(hs.json.read(location .. "/configuration.json"))
-	package.path = config.source .. "/static/ergopti_plus/macos/?.lua;" .. config.source .. "/static/ergopti_plus/macos/?/init.lua;" .. config.source .. "/static/ergopti_plus/_shared/lua/?.lua;" .. config.source .. "/static/ergopti_plus/_shared/lua/?/init.lua;" .. package.path
-	assert(dofile(config.source .. "/tools/diagnostics/hs_permission_dialog_native.lua"))(config)
+	    config.write_text("""local function entry_phase(phase)
+	    -- Failure-only evidence uses the exact owned child's captured stream.
+	    -- A diagnostic I/O failure must not change the original configuration result.
+	    pcall(function()
+	        io.stderr:write('ERGOPTI_PERMISSION_UI_ENTRY {"schema":1,"kind":"permission_ui_entry_observation","authority":false,"native_verdict":"unchanged","phase":"' .. phase .. '"}\\n')
+	        io.stderr:flush()
+	    end)
+	end
+	entry_phase("init_entered")
+	local completed, original_error = xpcall(function()
+	    local location = assert(debug.getinfo(1, "S").source:match("^@(.+)/[^/]+$"))
+	    local config = assert(hs.json.read(location .. "/configuration.json"))
+	    entry_phase("config_decoded")
+	    package.path = config.source .. "/static/ergopti_plus/macos/?.lua;" .. config.source .. "/static/ergopti_plus/macos/?/init.lua;" .. config.source .. "/static/ergopti_plus/_shared/lua/?.lua;" .. config.source .. "/static/ergopti_plus/_shared/lua/?/init.lua;" .. package.path
+	    entry_phase("paths_bound")
+	    local producer = assert(dofile(config.source .. "/tools/diagnostics/hs_permission_dialog_native.lua"))
+	    entry_phase("native_entry_loaded")
+	    producer(config)
+	    entry_phase("call_returned")
+	end, function(failure)
+	    entry_phase("synchronous_error")
+	    return failure
+	end)
+	if not completed then error(original_error, 0) end
 	""")
 	    retained = {
 	        path: hashlib.sha256(path.read_bytes()).hexdigest()

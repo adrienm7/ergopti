@@ -2192,3 +2192,15 @@ The immutable license file retains all upstream bytes and its fixed 19 genuine
 whitespace warnings. Publication requires strict checks on the other 22 paths,
 plus the exact license hash/provenance and warning census; no whitespace-green
 claim or repository-wide exclusion is introduced.
+
+## Bounded permission UI entry phase observations
+
+Actual macOS run37609704457 refuses permission UI qualification at
+observation_deadline; the cause remains UNKNOWN. The generated init now emits
+bounded stderr entry phase markers while preserving the original refusal,
+the original33 portable cases, all10 native cases and30/35/10 ownership budgets.
+The loaded marker establishes only a truthy dofile result, and the returned
+marker only the top-level call return; neither proves the first scheduler
+tick, completed cases or native UI success. These new markers remain native
+unexecuted and add no permission, ready or activation authority. Item24 stays
+partial; actual WebKit/UI and physical guardian/tap-hold acceptance remain open.
