@@ -167,6 +167,11 @@ jobs:
         # Canonical XKB controls below require xkbcli before their first use.
         run: |
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y luajit lua-filesystem sqlite3 libxkbcommon-tools xkb-data
+          # Acquire native dependencies before the one-minute receiving clocks.
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends libgtk-3-bin dbus-x11 xvfb x11-utils
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends build-essential curl libffi-dev liblua5.4-dev lua-luv lua5.4 meson ninja-build openssl pkg-config python3 strace
+          luajit -e 'assert(require("luv"), "native E2E luv integration is mandatory")'
+        timeout-minutes: 10
 
       # The virtual-keyboard harness, stubbed: this step runs on ubuntu-latest
       # against the pure-Lua hotstring engine — no real evdev device, no ydotool

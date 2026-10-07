@@ -6376,6 +6376,27 @@ PAC evaluation in initial stock-curl installer downloads; that is remaining
 CODE. Schannel's documented ephemeral-key constraint needs genuine native
 qualification, preserving the original key ownership and TLS assertions.
 
+Manual37670051601 at1b0b3be0a passes shared and Linux unit/official-runtime
+checks, but its early GTK dependency/receiving step exceeds the one-minute
+boundary and subsequent native cases fail before the Nix step. Terminal raw
+logs are still pending; the full failure cause is not yet established. Native
+GTK and process-group dependencies now also acquire in the existing preparation
+step, before either unchanged one-minute native receiving clock. The original
+in-case signed dependency checks, package lists, actual providers and every
+fixture assertion remain byte-exact. Preparation requires real luv before the
+first native case. The first local JS run correctly refuses removing those
+original checks; they are retained, and the corrected receiving must rerun.
+Two additional signed acquisitions strengthen the independently declared
+Ubuntu invocation floor from34 to36. Every original status/mutation assertion
+remains unchanged; removing one of those acquisitions still refuses. This
+additive prerequisite preparation remains unqualified until the new hosted run.
+
+Manual37670051601 at1b0b3be0a now completes: its original genuine Nix
+installed-runtime step passes, including the complete seven-case admission.
+The run's shared/Linux unit/official-runtime checks pass, while broader E2E
+fails and package/install remain skipped. Release is skipped. The Nix log-root
+repair is natively qualified; this does not close62 or qualify the full lane.
+
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard
   layers on all three drivers. Windows and macOS also support their existing
