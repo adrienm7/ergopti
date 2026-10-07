@@ -1837,6 +1837,59 @@ try {
 }
 // SPARKLE_CHILD_POSIX_ADMISSION_END
 
+// NATIVE_SPARKLE_UPDATE_PROGRESS_BEGIN
+try {
+	const assert = require('node:assert/strict');
+	const child = fs.readFileSync(
+		path.join(root, 'tools/diagnostics/macos_sparkle_archive_child.swift'),
+		'utf8'
+	);
+	const fixture = fs.readFileSync(
+		path.join(
+			root,
+			'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/SparkleArchiveUpdateAcceptanceTests.swift'
+		),
+		'utf8'
+	);
+	assert.match(
+		child,
+		/guard unlink\(stage.path\) == 0 else \{ throw Failure.refused \}\s*progress\(event\)/
+	);
+	assert.match(
+		child,
+		/progress\("updater-start-attempt"\)\s*try owner.start\(\)\s*progress\("updater-started"\)/
+	);
+	assert.match(child, /progress\("check-requested-1"\)\s*owner.checkForUpdates\(\)/);
+	assert.match(
+		child,
+		/showUserInitiatedUpdateCheck\(cancellation: @escaping \(\) -> Void\) \{ progress\("user-check-" \+ String\(phase\)\) \}/
+	);
+	assert.match(
+		fixture,
+		/guard launched, observedExit, let cachedReceipt else \{ return \.unavailable \}/
+	);
+	assert.match(
+		fixture,
+		/parseUpdateProgress\(cachedReceipt.stdout,\s*expectedPID: process.processIdentifier\)/
+	);
+	assert.match(fixture, /text.utf8.count <= 4096/);
+	assert.match(fixture, /!events.contains\(event\)/);
+	assert.match(fixture, /guard events.first == \.e0/);
+	assert.match(fixture, /CFGetTypeID\(number\) != CFBooleanGetTypeID\(\)/);
+	assert.match(fixture, /number.doubleValue == Double\(number.intValue\)/);
+	assert.match(
+		fixture,
+		/let retired = try application.finish\(15\)\s*guard retired.status == 0 else \{ throw Failure.evidence\("application-retirement"\) \}/
+	);
+	assert.match(fixture, /waitFor\("refused-1", root: root\)/);
+	console.log(
+		'[OK] Native Sparkle progress uses exact retired capture and authentic admitted-resource counter without granting acceptance.'
+	);
+} catch (error) {
+	errors.push('Native Sparkle bounded progress guard: ' + error.message);
+}
+// NATIVE_SPARKLE_UPDATE_PROGRESS_END
+
 if (errors.length > 0) {
 	for (const error of errors) console.error(`[FAIL] ${error}`);
 	process.exit(1);

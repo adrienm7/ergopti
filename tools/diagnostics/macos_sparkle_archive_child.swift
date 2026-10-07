@@ -22,6 +22,29 @@ final class PrivateArchiveChild: NSObject, NSApplicationDelegate, SPUUserDriver,
 		self.version = version
 	}
 
+
+	/// Optional fixed diagnostics use the already owned child stdout, never a
+	/// new path or receipt. Missing/noisy output grants no updater progress.
+	private func progress(_ event: String) {
+		let allowed: Set<String> = [
+			"started-1", "started-2", "updater-start-attempt", "updater-started",
+			"updater-policy-admitted", "check-requested-1", "check-requested-2", "user-check-1",
+			"user-check-2", "start-refused", "unexpected-permission-1", "unexpected-permission-2",
+			"offer-refused-1", "offer-refused-2", "offered-1", "offered-2",
+			"not-found-1", "not-found-2", "refused-1", "refused-2",
+			"routed-1", "routed-2", "download-1", "download-2",
+			"extracting-1", "extracting-2", "ready-1", "ready-2",
+			"installing-1", "installing-2", "relaunch-requested-2", "cycle-refused-1",
+			"cycle-refused-2", "retry-accepted", "terminated-1", "terminated-2",
+			"transport-refused-1", "transport-refused-2", "control-refused-1", "control-refused-2",
+			"deadline-1", "deadline-2"
+		]
+		guard allowed.contains(event) else { return }
+		_ = fputs("SPARKLE_PROGRESS/1 pid=" + String(ProcessInfo.processInfo.processIdentifier)
+			+ " event=" + event + "\n", stdout)
+		_ = fflush(stdout)
+	}
+
 	/// Exclusive final links prevent another callback from replacing evidence.
 	private func record(_ event: String, details: [String: Any] = [:]) {
 		do {
@@ -40,6 +63,7 @@ final class PrivateArchiveChild: NSObject, NSApplicationDelegate, SPUUserDriver,
 			let target = root.appendingPathComponent(event + ".json")
 			guard link(stage.path, target.path) == 0 else { throw Failure.refused }
 			guard unlink(stage.path) == 0 else { throw Failure.refused }
+			progress(event)
 		} catch {
 			fputs("SPARKLE_CHILD_REFUSAL/1 receipt-publication\n", stderr)
 			fputs("Private Sparkle receipt publication refused.\n", stderr)
@@ -74,9 +98,13 @@ final class PrivateArchiveChild: NSObject, NSApplicationDelegate, SPUUserDriver,
 			userDriver: self, delegate: self)
 		updater = owner
 		do {
+			progress("updater-start-attempt")
 			try owner.start()
+			progress("updater-started")
 			guard !owner.automaticallyChecksForUpdates, !owner.automaticallyDownloadsUpdates,
 				!owner.allowsAutomaticUpdates else { throw Failure.refused }
+			progress("updater-policy-admitted")
+			progress("check-requested-1")
 			owner.checkForUpdates()
 		} catch {
 			record("start-refused", details: ["errors": identities(error)])
@@ -101,6 +129,7 @@ final class PrivateArchiveChild: NSObject, NSApplicationDelegate, SPUUserDriver,
 				let owner = updater, !owner.sessionInProgress else { return }
 			phase = 2
 			record("retry-accepted")
+			progress("check-requested-2")
 			owner.checkForUpdates()
 		}
 	}
@@ -116,7 +145,7 @@ final class PrivateArchiveChild: NSObject, NSApplicationDelegate, SPUUserDriver,
 		reply(SUUpdatePermissionResponse(automaticUpdateChecks: false, sendSystemProfile: false))
 	}
 
-	func showUserInitiatedUpdateCheck(cancellation: @escaping () -> Void) {}
+	func showUserInitiatedUpdateCheck(cancellation: @escaping () -> Void) { progress("user-check-" + String(phase)) }
 
 	func showUpdateFound(with appcastItem: SUAppcastItem, state: SPUUserUpdateState,
 		reply: @escaping @Sendable (SPUUserUpdateChoice) -> Void) {

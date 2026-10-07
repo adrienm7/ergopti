@@ -86,6 +86,69 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		return StartupFacts(capture: .observed, phase: last, bytes: bytes.count)
 	}
 
+
+	private enum UpdateProgressEvent: String, CaseIterable {
+		case e0 = "started-1", e1 = "started-2", e2 = "updater-start-attempt",
+		case e3 = "updater-started", e4 = "updater-policy-admitted", e5 = "check-requested-1",
+		case e6 = "check-requested-2", e7 = "user-check-1", e8 = "user-check-2",
+		case e9 = "start-refused", e10 = "unexpected-permission-1", e11 = "unexpected-permission-2",
+		case e12 = "offer-refused-1", e13 = "offer-refused-2", e14 = "offered-1",
+		case e15 = "offered-2", e16 = "not-found-1", e17 = "not-found-2",
+		case e18 = "refused-1", e19 = "refused-2", e20 = "routed-1",
+		case e21 = "routed-2", e22 = "download-1", e23 = "download-2",
+		case e24 = "extracting-1", e25 = "extracting-2", e26 = "ready-1",
+		case e27 = "ready-2", e28 = "installing-1", e29 = "installing-2",
+		case e30 = "relaunch-requested-2", e31 = "cycle-refused-1", e32 = "cycle-refused-2",
+		case e33 = "retry-accepted", e34 = "terminated-1", e35 = "terminated-2",
+		case e36 = "transport-refused-1", e37 = "transport-refused-2", e38 = "control-refused-1",
+		case e39 = "control-refused-2", e40 = "deadline-1", e41 = "deadline-2"
+	}
+	private enum UpdateProgressCapture: String { case unavailable, empty, malformed, observed }
+	private struct UpdateProgressFacts {
+		let capture: UpdateProgressCapture
+		let events: [UpdateProgressEvent]
+		static let unavailable = UpdateProgressFacts(capture: .unavailable, events: [])
+	}
+
+	/// Parse only complete fixed frames from the existing physically retired
+	/// direct child's cached receipt. An inherited/relaunched PID is not borrowed.
+	private static func parseUpdateProgress(_ text: String, expectedPID: Int32) -> UpdateProgressFacts {
+		guard expectedPID > 0, text.utf8.count <= 4096 else { return .unavailable }
+		if text.isEmpty { return UpdateProgressFacts(capture: .empty, events: []) }
+		guard text.utf8.allSatisfy({ $0 < 128 }), text.hasSuffix("\n") else {
+			return UpdateProgressFacts(capture: .malformed, events: [])
+		}
+		let lines = String(text.dropLast()).components(separatedBy: "\n")
+		guard lines.count <= UpdateProgressEvent.allCases.count else { return .unavailable }
+		let prefix = "SPARKLE_PROGRESS/1 pid=" + String(expectedPID) + " event="
+		var events: [UpdateProgressEvent] = []
+		for line in lines {
+			guard line.hasPrefix(prefix), let event = UpdateProgressEvent(rawValue: String(line.dropFirst(prefix.count))),
+				!events.contains(event) else {
+				return UpdateProgressFacts(capture: .malformed, events: [])
+			}
+			events.append(event)
+		}
+		guard events.first == .e0 else { return UpdateProgressFacts(capture: .malformed, events: []) }
+		return UpdateProgressFacts(capture: .observed, events: events)
+	}
+
+	private func updateProgressMessage(_ facts: UpdateProgressFacts) -> String {
+		let events = facts.capture == .observed ? facts.events.map { $0.rawValue }.joined(separator: ",") : "unavailable"
+		return "Native Sparkle update progress: capture=" + facts.capture.rawValue + " events=" + events
+	}
+
+	/// This existing counter is incremented after real resource read+close,
+	/// before response writing. It does not acknowledge network delivery.
+	private func resourceReadsMessage(_ value: Any?) -> String {
+		guard let number = value as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID(),
+			number.doubleValue.isFinite, (0...64).contains(number.intValue),
+			number.doubleValue == Double(number.intValue) else {
+			return "Native Sparkle network progress: admitted_resource_reads=unavailable"
+		}
+		return "Native Sparkle network progress: admitted_resource_reads=" + String(number.intValue)
+	}
+
 	private enum ChildRefusalCode: String, CaseIterable {
 		case configuration, targetRoot = "target-root", targetBundle = "target-bundle"
 		case receiptPublication = "receipt-publication", control, transport
@@ -320,6 +383,15 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 
 		/// The original finish() has already joined exit and closed both captures.
 		/// No path reopen, descriptor, wait, signal or retirement attempt is added.
+
+		/// finish() already acquired the actual exit ACK, closed captures and
+		/// populated this immutable receipt. No new FD/wait/poll/signal is used.
+		func observedUpdateProgress() -> UpdateProgressFacts {
+			guard launched, observedExit, let cachedReceipt else { return .unavailable }
+			return SparkleArchiveUpdateAcceptanceTests.parseUpdateProgress(cachedReceipt.stdout,
+				expectedPID: process.processIdentifier)
+		}
+
 		func observedChildRefusalCode() -> String? {
 			guard launched, observedExit, !process.isRunning, let cachedReceipt,
 				cachedReceipt.status == 78 else { return nil }
@@ -793,6 +865,37 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 			"Native Sparkle application retirement refusal: code=unavailable native_reason=unavailable native_status=unavailable")
 	}
 
+
+	func testUpdateProgressRequiresCompleteClosedFramesAndTheActualChildPID() {
+		let text = "SPARKLE_PROGRESS/1 pid=321 event=started-1\nSPARKLE_PROGRESS/1 pid=321 event=check-requested-1\nSPARKLE_PROGRESS/1 pid=321 event=not-found-1\n"
+		let facts = Self.parseUpdateProgress(text, expectedPID: 321)
+		XCTAssertEqual(facts.capture, .observed)
+		XCTAssertEqual(updateProgressMessage(facts), "Native Sparkle update progress: capture=observed events=started-1,check-requested-1,not-found-1")
+		XCTAssertEqual(Self.parseUpdateProgress("", expectedPID: 321).capture, .empty)
+		for invalid in [text.replacingOccurrences(of: "pid=321", with: "pid=322"),
+			text.replacingOccurrences(of: "pid=321", with: "pid=0321"), String(text.dropLast()),
+			text + "SPARKLE_PROGRESS/1 pid=321 event=not-found-1\n", text + "foreign private text\n",
+			text.replacingOccurrences(of: "not-found-1", with: "invented"),
+			text.replacingOccurrences(of: "not-found-1", with: "not-found-1\0"),
+			"SPARKLE_PROGRESS/1 pid=321 event=check-requested-1\n"] {
+			let rejected = Self.parseUpdateProgress(invalid, expectedPID: 321)
+			XCTAssertNotEqual(rejected.capture, .observed)
+			XCTAssertTrue(rejected.events.isEmpty)
+			XCTAssertFalse(updateProgressMessage(rejected).contains("foreign private text"))
+		}
+		XCTAssertEqual(Self.parseUpdateProgress(String(repeating: "x", count: 4097), expectedPID: 321).capture, .unavailable)
+		XCTAssertEqual(Self.parseUpdateProgress(text, expectedPID: 0).capture, .unavailable)
+	}
+
+	func testNetworkProgressCounterDoesNotInventSuccessfulDelivery() {
+		XCTAssertEqual(resourceReadsMessage(NSNumber(value: 0)), "Native Sparkle network progress: admitted_resource_reads=0")
+		XCTAssertEqual(resourceReadsMessage(NSNumber(value: 4)), "Native Sparkle network progress: admitted_resource_reads=4")
+		let invalid: [Any?] = [nil, true, false, -1, 65, 1.5, "4", NSNumber(value: Double.infinity)]
+		for value in invalid {
+			XCTAssertEqual(resourceReadsMessage(value), "Native Sparkle network progress: admitted_resource_reads=unavailable")
+		}
+	}
+
 	func testServerExitRefusalMessageProjectsOnlyClosedFacts() {
 		XCTAssertEqual(serverExitRefusalMessage(Failure.deadline("private-input-never-exported"), termination: .unavailable),
 			"Native Sparkle server retirement refusal: code=deadline native_reason=unavailable native_status=unavailable")
@@ -954,6 +1057,7 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 				}
 				if let application, application.process.processIdentifier > 0 {
 					attempt("application-exit") {
+						defer { print("::notice title=Native Sparkle update::" + updateProgressMessage(application.observedUpdateProgress())) }
 						let retired = try application.finish(15)
 						guard retired.status == 0 else { throw Failure.evidence("application-retirement") }
 					}
@@ -976,6 +1080,7 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 						(terminal["pid"] as? NSNumber)?.int32Value == server.process.processIdentifier else {
 						throw Failure.evidence("server-retirement-receipt")
 					}
+					print("::notice title=Native Sparkle network::" + resourceReadsMessage(terminal["requests"]))
 				}
 			}
 			// Each owner gets an independent retry even when a different owner's
