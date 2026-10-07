@@ -54,7 +54,7 @@
 		{
 			"group": "launcher-sources",
 			"reason": "The Swift launcher is compiled into Contents/MacOS; its sources, package manifest and XCTests are never read by the running app.",
-			"patterns": ["ergopti_plus/macos/launcher/**", "ergopti_plus/macos/native/**"]
+			"patterns": ["ergopti_plus/macos/launcher/**"]
 		},
 		{
 			"group": "tests",

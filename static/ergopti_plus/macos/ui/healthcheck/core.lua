@@ -225,32 +225,6 @@ end
 -- greps production sources for a require("adapters.<id>") call site and fails if
 -- the flag disagrees with what it finds.
 local ADAPTER_SPECS = {
-	-- Reachable interfaces only; native execution and consent are checked separately.
-	{
-		id       = "adapters.apple_shortcuts",
-		contract = { "valid_identifier", "validate_reply", "new" },
-		wired    = true,
-	},
-	{
-		id       = "adapters.apple_shortcuts_native",
-		contract = { "available", "create", "is_chosen_program", "revalidate_program" },
-		wired    = true,
-	},
-	{
-		id       = "adapters.system_switcher_sampler",
-		contract = { "new" },
-		wired    = true,
-	},
-	{
-		id       = "adapters.system_switcher_input",
-		contract = { "new" },
-		wired    = true,
-	},
-	{
-		id       = "adapters.system_switcher_runtime",
-		contract = { "descriptor" },
-		wired    = true,
-	},
 	{
 		id       = "adapters.physical_shortcut_hook",
 		contract = { "new" },
