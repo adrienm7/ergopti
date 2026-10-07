@@ -105,7 +105,7 @@ assert.deepEqual(catalogue.network_runtime.portable.system_ca_files, [
 ]);
 assert.equal(Object.keys(catalogue.libraries).join(','), 'xkbcommon,xkbcommon_x11,x11,x11_xcb');
 passed++;
-const modules = generator
+const allModules = generator
 	.flatpakModules(catalogue)
 	.split('\n')
 	.filter(Boolean)
@@ -113,6 +113,86 @@ const modules = generator
 		assert.ok(line.startsWith('  - {'));
 		return JSON.parse(line.slice(4));
 	});
+// A required GSS build must carry its own SDK dependency before curl.
+const kerberos = allModules.find((module) => module.name === 'network-krb5');
+assert.ok(kerberos, 'Flatpak GSS requires a pinned Kerberos build before curl');
+assert.equal(allModules.length, 7);
+assert.equal(allModules.filter((module) => module.name === 'network-krb5').length, 1);
+assert.ok(
+	allModules.indexOf(kerberos) < allModules.findIndex((module) => module.name === 'network-curl')
+);
+assert.equal(kerberos.buildsystem, 'autotools');
+assert.equal(kerberos.subdir, 'src');
+assert.deepEqual(kerberos.sources, [
+	{
+		type: 'archive',
+		url: 'https://web.mit.edu/kerberos/dist/krb5/1.22/krb5-1.22.2.tar.gz',
+		sha256: '3243ffbc8ea4d4ac22ddc7dd2a1dc54c57874c40648b60ff97009763554eaf13'
+	}
+]);
+assert.ok(kerberos['config-opts'].includes('--libdir=/app/lib'));
+assert.ok(kerberos['post-install'].includes('test -f /app/include/gssapi/gssapi.h'));
+assert.ok(
+	kerberos['post-install'].includes('test "$(pkg-config --variable=prefix mit-krb5-gssapi)" = /app')
+);
+const flatpakCurl = allModules.find((module) => module.name === 'network-curl');
+assert.ok(flatpakCurl['config-opts'].includes('-DCURL_USE_GSSAPI=ON'));
+assert.ok(flatpakCurl['config-opts'].includes('-DGSS_ROOT_DIR=/app'));
+assert.ok(flatpakCurl['post-install'].some((command) => command.includes('GSS-API( |$)')));
+assert.ok(flatpakCurl['post-install'].some((command) => command.includes('SPNEGO( |$)')));
+passed++;
+// Execute the generated capability command with an explicit recording curl port.
+// These parser/exit controls do not claim a native Flatpak curl or Kerberos session.
+const featureCommands = flatpakCurl['post-install'].filter((command) =>
+	command.includes('--version')
+);
+assert.equal(featureCommands.length, 1);
+for (const [label, output, status, admitted] of [
+	['complete features', 'curl fixture\nFeatures: GSS-API SPNEGO SSL', 0, true],
+	['missing GSS', 'curl fixture\nFeatures: SPNEGO SSL', 0, false],
+	['missing SPNEGO', 'curl fixture\nFeatures: GSS-API SSL', 0, false],
+	['protocol names are not features', 'Protocols: GSS-API SPNEGO\nFeatures: SSL', 0, false],
+	['foreign GSS suffix', 'Features: GSS-API-foreign SPNEGO', 0, false],
+	['foreign SPNEGO suffix', 'Features: GSS-API SPNEGO-foreign', 0, false],
+	['failed capability process', 'Features: GSS-API SPNEGO SSL', 1, false]
+]) {
+	const command =
+		'curl() { test "$*" = "--disable --version" || return 91; ' +
+		'printf "%s\\n" "$GSS_FIXTURE_OUTPUT"; return "$GSS_FIXTURE_STATUS"; }; ' +
+		featureCommands[0].replaceAll('/app/bin/curl', 'curl');
+	const result = spawnSync(bashExecutable(), ['-c', command], {
+		cwd: root,
+		encoding: 'utf8',
+		env: { ...process.env, GSS_FIXTURE_OUTPUT: output, GSS_FIXTURE_STATUS: String(status) }
+	});
+	assert.ifError(result.error);
+	assert.equal(result.signal, null, label);
+	assert.equal(result.stderr, '', label);
+	assert.equal(result.status === 0, admitted, label);
+	passed++;
+}
+for (const mutation of [
+	(data) => {
+		delete data.network_runtime.portable.flatpak_sources.krb5;
+	},
+	(data) => {
+		data.network_runtime.portable.flatpak_sources.krb5.url = 'https://foreign.invalid/krb5.tar.gz';
+	},
+	(data) => {
+		data.network_runtime.portable.flatpak_sources.krb5.sha256 = 'unverified';
+	},
+	(data) => {
+		data.network_runtime.portable.flatpak_sources.krb5.url =
+			'http://web.mit.edu/kerberos/dist/krb5/1.22/krb5-1.22.2.tar.gz';
+	}
+]) {
+	const invalid = structuredClone(catalogue);
+	mutation(invalid);
+	assert.throws(() => generator.validate(invalid));
+	passed++;
+}
+// Preserve the complete original six-module order, source and option oracles.
+const modules = allModules.filter((module) => module.name !== 'network-krb5');
 assert.deepEqual(
 	modules.map((module) => module.name),
 	[

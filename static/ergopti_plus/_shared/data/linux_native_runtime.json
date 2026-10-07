@@ -146,6 +146,10 @@
 					"url": "https://github.com/GNOME/gsettings-desktop-schemas.git",
 					"commit": "cf1946e8886bb29d9c4b793d0ee4253e38ae6fa8"
 				},
+				"krb5": {
+					"url": "https://web.mit.edu/kerberos/dist/krb5/1.22/krb5-1.22.2.tar.gz",
+					"sha256": "3243ffbc8ea4d4ac22ddc7dd2a1dc54c57874c40648b60ff97009763554eaf13"
+				},
 				"curl": {
 					"url": "https://github.com/curl/curl.git",
 					"commit": "01346829096c61b372692f6dc43ffa778c6caccd"

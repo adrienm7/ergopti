@@ -99,17 +99,21 @@ function validate(data) {
 	const sources = portable.flatpak_sources;
 	if (
 		!sources ||
-		Object.keys(sources).join(',') !== 'luv,schemas,curl,duktape,libproxy,glib_networking'
+		Object.keys(sources).join(',') !== 'luv,schemas,krb5,curl,duktape,libproxy,glib_networking'
 	)
 		throw new TypeError('Incomplete portable native source inventory.');
 	for (const [name, source] of Object.entries(sources)) {
 		if (
-			!/^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_./-]+$/.test(source.url) ||
+			!(name === 'krb5'
+				? /^https:\/\/web\.mit\.edu\/kerberos\/dist\/krb5\/[0-9]+\.[0-9]+\/krb5-[0-9]+\.[0-9]+\.[0-9]+\.tar\.gz$/.test(
+						source.url
+					)
+				: /^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_./-]+$/.test(source.url)) ||
 			source.url.includes('..')
 		)
 			throw new TypeError('Invalid portable native source identity.');
 		if (
-			name === 'duktape'
+			name === 'duktape' || name === 'krb5'
 				? !/^[a-f0-9]{64}$/.test(source.sha256)
 				: !/^[a-f0-9]{40}$/.test(source.commit)
 		)
@@ -162,6 +166,17 @@ function flatpakModules(data) {
 			source: 'schemas'
 		},
 		{
+			name: 'network-krb5',
+			buildsystem: 'autotools',
+			subdir: 'src',
+			'config-opts': ['--disable-static', '--with-crypto-impl=openssl', '--libdir=/app/lib'],
+			'post-install': [
+				'test -f /app/include/gssapi/gssapi.h',
+				'test "$(pkg-config --variable=prefix mit-krb5-gssapi)" = /app'
+			],
+			source: 'krb5'
+		},
+		{
 			name: 'network-curl',
 			buildsystem: 'cmake-ninja',
 			'config-opts': [
@@ -169,9 +184,13 @@ function flatpakModules(data) {
 				'-DBUILD_SHARED_LIBS=ON',
 				'-DBUILD_TESTING=OFF',
 				'-DCURL_USE_OPENSSL=ON',
-				'-DCURL_USE_GSSAPI=ON'
+				'-DCURL_USE_GSSAPI=ON',
+				'-DGSS_ROOT_DIR=/app'
 			],
-			'post-install': ['test -x /app/bin/curl'],
+			'post-install': [
+				'test -x /app/bin/curl',
+				"features=$(/app/bin/curl --disable --version) && printf '%s\\n' \"$features\" | grep -Eq '^Features: (.* )?GSS-API( |$)' && printf '%s\\n' \"$features\" | grep -Eq '^Features: (.* )?SPNEGO( |$)'"
+			],
 			source: 'curl'
 		},
 		{
@@ -217,7 +236,7 @@ function flatpakModules(data) {
 		.map(({ source, ...recipe }) => {
 			const input = sources[source];
 			const pinned =
-				source === 'duktape'
+				source === 'duktape' || source === 'krb5'
 					? { type: 'archive', url: input.url, sha256: input.sha256 }
 					: { type: 'git', url: input.url, commit: input.commit };
 			return '  - ' + JSON.stringify({ ...recipe, sources: [pinned] }) + '\n';
