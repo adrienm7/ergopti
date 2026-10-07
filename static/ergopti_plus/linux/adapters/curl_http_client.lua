@@ -911,6 +911,11 @@ local function admit_metadata(url, headers, body, options)
 	end
 	for _, key in ipairs({ "etag_compare", "etag_save", "etag_expected_url", "etag_expected_value" }) do
 		local value = options[key]
+		-- These paths become native argv; retain the safe byte-boundary diagnostic.
+		if (key == "etag_compare" or key == "etag_save") and type(value) == "string"
+			and value:find("\0", 1, true) then
+			return nil, "curl conditional file argument cannot contain NUL"
+		end
 		if value ~= nil and (type(value) ~= "string" or value == "" or value:find("[%z\r\n]")) then
 			return nil, "native HTTP conditional options are invalid"
 		end
