@@ -5617,5 +5617,37 @@
 			],
 			"unavailable": "hide"
 		}
+	],
+	"tap_hold_action_picker_frame": [
+		{
+			"type": "list",
+			"id": "tap_hold_picker_special_rows",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "include",
+			"section": "tap_hold_action_picker_boundary",
+			"present_when": "tap_hold_picker_has_boundary"
+		},
+		{
+			"type": "list",
+			"id": "tap_hold_picker_grouped_rows",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"tap_hold_action_picker_boundary": [
+		{
+			"type": "---",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
 	]
 }
