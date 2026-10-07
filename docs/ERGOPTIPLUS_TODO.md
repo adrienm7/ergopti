@@ -3228,6 +3228,14 @@ WP3 prerequisite: the actual macOS physical accounting owner now requires exact 
   Linux layers.toml startup, Hammerspoon and installed three-OS qualification
   remain separate acceptance work. The macOS unread-entry scan is deferred
   off the boot critical path; its native main-thread cost still needs measurement.
+  The Lua configuration lifecycle now admits ordinary writes, onboarding,
+  scope operations, removals and hydration through its private source/schema
+  journal and the genuine initializer-issued native port identities. Future
+  or invalid schema metadata refuses before registry reads, backup and runtime
+  effects; source classification remains available for strict initial boot.
+  Withdrawn, copied or replaced native ports cannot borrow configuration
+  authority. Registered causal controls preserve all original assertions;
+  Windows, native Hammerspoon and final installed qualification remain separate.
   Maintainer decisions are resolved: invalid schema stamps retain strict boot
   and session-write refusal (site 108); retired keys reported for explicit
   cleanup are exempt from automatic deletion migrations and remain on disk
@@ -3949,8 +3957,14 @@ The signed native checkpoint 37116923472 reached the actual independent JSON cod
   support a captured strict final logical admission. The new APIs detach
   classified source scalars before native callbacks; refused operations
   preserve external successor bytes and existing release-only cleanup.
-  This is a prerequisite for the closed-schema and retired-Script consumers,
-  which remain pending, together with final-source native qualification.
+  The Lua closed-schema writer and scope consumers now use the private
+  source/schema journal and initializer-issued native identities before
+  acquired-source readers and native mutation. An initial invalid or newer
+  schema remains readable only through its captured native source image; it
+  grants no write, migration or scope-effect admission. Constructor source
+  identity accepts genuine relative and absolute loader spellings while
+  retaining the original native-owner checks. Retired-Script consumers and
+  final-source native/installed qualification remain separate follow-ups.
 
   Current source implements the Windows typed dotted/inline document reader,
   targeted saves and full-state publication. The nineteen FullSnapshot cases
