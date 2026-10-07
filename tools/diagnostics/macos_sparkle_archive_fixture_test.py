@@ -781,5 +781,79 @@ class AcceptedSocketStopControls(unittest.TestCase):
         self.observe_admitted_response_stop(native_signal=True)
 
 
+class SparkleStartupDiagnosticTests(unittest.TestCase):
+    def testActualEntrypointTypedPhaseAndSecondaryExportFailurePreserveRefusal(self):
+        spec = importlib.util.spec_from_file_location("sparkle_startup_diagnostic", HELPER)
+        helper = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(helper)
+        failure = RuntimeError("PRIVATE_EXCEPTION_TEXT")
+        stdout, stderr = io.StringIO(), io.StringIO()
+        # Call actual serve admission, not a replacement of entrypoint or its collector.
+        with (
+            mock.patch.dict(helper.os.environ, {"ERGOPTI_SPARKLE_SERVER_DIAGNOSTICS": "1"}),
+            mock.patch.object(helper, "private_directory", side_effect=failure),
+            contextlib.redirect_stdout(stdout),
+            contextlib.redirect_stderr(stderr),
+        ):
+            self.assertEqual(helper.entrypoint(["serve", "/PRIVATE", NONCE]), 1)
+        self.assertEqual(stdout.getvalue(), "")
+        lines = stderr.getvalue().splitlines()
+        self.assertEqual(lines[0], "Private Sparkle fixture refused.")
+        self.assertEqual(len(lines), 2)
+        packet = json.loads(lines[1].removeprefix("Sparkle server diagnostic: "))
+        self.assertEqual(
+            packet,
+            {
+                "schema": 1,
+                "pid": os.getpid(),
+                "phase": "directory-admission",
+                "exception_type": "RuntimeError",
+            },
+        )
+        self.assertNotIn("PRIVATE", stderr.getvalue())
+        self.assertLessEqual(len(lines[1].split(": ", 1)[1].encode("utf-8")), 512)
+        # The real collector fails during JSON encoding, after the primary refusal.
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with (
+            mock.patch.dict(helper.os.environ, {"ERGOPTI_SPARKLE_SERVER_DIAGNOSTICS": "1"}),
+            mock.patch.object(helper, "private_directory", side_effect=failure),
+            mock.patch.object(helper.json, "dumps", side_effect=OSError("PRIVATE_SECONDARY")),
+            contextlib.redirect_stdout(stdout),
+            contextlib.redirect_stderr(stderr),
+        ):
+            self.assertEqual(helper.entrypoint(["serve", "/PRIVATE", NONCE]), 1)
+        self.assertEqual(
+            (stdout.getvalue(), stderr.getvalue()), ("", "Private Sparkle fixture refused.\n")
+        )
+        # Even option admission is a secondary observer operation, not an error replacement.
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with (
+            mock.patch.object(helper, "private_directory", side_effect=failure),
+            mock.patch.object(helper.os.environ, "get", side_effect=OSError("PRIVATE_OPTION")),
+            contextlib.redirect_stdout(stdout),
+            contextlib.redirect_stderr(stderr),
+        ):
+            self.assertEqual(helper.entrypoint(["serve", "/PRIVATE", NONCE]), 1)
+        self.assertEqual(
+            (stdout.getvalue(), stderr.getvalue()), ("", "Private Sparkle fixture refused.\n")
+        )
+        # Opt-out and census retain the old exact output contract.
+        for argv, environment in [
+            (["serve", "/PRIVATE", NONCE], {}),
+            (["census", "/PRIVATE"], {"ERGOPTI_SPARKLE_SERVER_DIAGNOSTICS": "1"}),
+        ]:
+            stdout, stderr = io.StringIO(), io.StringIO()
+            with (
+                mock.patch.dict(helper.os.environ, environment, clear=True),
+                mock.patch.object(helper, "main", side_effect=failure),
+                contextlib.redirect_stdout(stdout),
+                contextlib.redirect_stderr(stderr),
+            ):
+                self.assertEqual(helper.entrypoint(argv), 1)
+            self.assertEqual(
+                (stdout.getvalue(), stderr.getvalue()), ("", "Private Sparkle fixture refused.\n")
+            )
+
+
 if __name__ == "__main__":
     unittest.main()
