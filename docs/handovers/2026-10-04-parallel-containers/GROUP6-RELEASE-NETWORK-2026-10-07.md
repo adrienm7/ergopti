@@ -194,6 +194,31 @@ occupied logs, and preserves the original seven cases, pins and deadlines.
 This fixes a reproduced prerequisite defect; complete hosted receiving remains
 required and is not inferred from this two-case regression.
 
+Manual [37670051601](https://github.com/adrienm7/ergopti/actions/runs/37670051601)
+at `1b0b3be0a9fb6720fd0a19c1c7780f1cecfde36d` subsequently completes the
+original genuine Nix installed-runtime step successfully, including all seven
+mandatory admission cases. Shared and Linux unit/official-runtime checks pass.
+The broader Linux E2E job fails; package and installation are skipped. Release
+is skipped. This qualifies the Nix log-root repair, not the full Linux lane.
+The first GTK dependency/receiving step times out; later native cases also fail.
+Raw terminal logs cannot currently be retrieved, so the full cascade's cause
+remains unproved.
+
+Commit `9d7b838d570004ba66d974a12410d7032df8eb83` adds signed GTK/process
+dependency preparation before the original one-minute receiving clocks and
+requires actual luv before native cases. Every original in-case acquisition,
+package list, native assertion and workflow byte remains intact. The independent
+signed-acquisition floor increases from34 to36 for the two additions; the
+original missing-invocation mutation must still fail. Local formatting262,
+JS382 and all original runtime/temporary-registration controls pass, with
+status0, no signal/error and no retained owned phase. The initial local attempts
+failed existing registration/mutation controls; those failed receipts remain,
+and no assertion was removed or relaxed. Linux-only manual
+[37677432702](https://github.com/adrienm7/ergopti/actions/runs/37677432702)
+tests exactly9d7b838d5 and is still running at this checkpoint. Its native result
+and final package/install verdict remain pending. Automatic exact-SHA runs are
+cancelled; the manual run is preserved. No integration into dev is claimed.
+
 [Remaining source packets](GROUP6-REMAINING-PACKETS-2026-10-07.tar.gz)
 retain four inactive preparations, archive SHA256
 `a9a46664b600e3a0caae090cdca843dde389566cef82c0d2e357c67b0803ab73`:
