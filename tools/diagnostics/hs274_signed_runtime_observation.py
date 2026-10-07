@@ -17,7 +17,7 @@ import sys
 import time
 
 # Insert final fixture hash at sealing; execute exact held source, never a pyc.
-FIXTURE_SHA256 = "41f82ede9010a299fd4a21bf371114fff3d27b23d1fe5a3534c1f92f1f4113a9"
+FIXTURE_SHA256 = "ede30b2f9c1eccc8fc587dfecd92bb622d4114584241c76e92a194a7ea785c5a"
 _path = Path(__file__).with_name("hs274_native_signing_fixture.py")
 _data = _path.read_bytes()
 if hashlib.sha256(_data).hexdigest() != FIXTURE_SHA256:

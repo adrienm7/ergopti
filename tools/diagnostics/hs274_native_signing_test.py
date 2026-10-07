@@ -2,6 +2,9 @@
 """Frozen portable refusal controls; native tools and credentials are UNEXECUTED."""
 
 import importlib.util
+import contextlib
+import io
+from unittest.mock import patch
 import os
 from pathlib import Path
 import tempfile
@@ -302,6 +305,43 @@ class KeychainModeBoundaryControl(unittest.TestCase):
             self.assertIs(observation["foreign_same_bytes"], True)
             self.assertNotIn("set-keychain-settings", observation["modeled_native_ports"])
             self.assertEqual(observation["actual_native_commands"], 0)
+
+
+class ClosedDiagnosticControls(unittest.TestCase):
+    def check_refusal(self, error, code):
+        output, errors = io.StringIO(), io.StringIO()
+        with (
+            patch.object(F, "setup", side_effect=error),
+            contextlib.redirect_stdout(output),
+            contextlib.redirect_stderr(errors),
+        ):
+            status = F.main(["setup", "/private/not-consumed", "/public/not-consumed"])
+        self.assertEqual(status, 1)
+        self.assertEqual(output.getvalue(), "")
+        self.assertEqual(
+            errors.getvalue(), "Native signing TEST-ONLY fixture refused: " + code + "\n"
+        )
+        self.assertNotIn("SECRET", errors.getvalue())
+
+    def test_ancestry_closed_code(self):
+        self.check_refusal(F.FixtureRefusal("ancestry"), "ancestry")
+
+    def test_evidence_boundary_closed_code(self):
+        self.check_refusal(F.FixtureRefusal("private_in_evidence"), "private_in_evidence")
+
+    def test_native_command_closed_code(self):
+        self.check_refusal(F.FixtureRefusal("native_command"), "native_command")
+
+    def test_unknown_code_cannot_export_payload(self):
+        self.check_refusal(
+            F.FixtureRefusal("SECRET private native command output"), "unknown_refusal"
+        )
+
+    def test_oserror_cannot_export_payload(self):
+        self.check_refusal(PermissionError("SECRET /private/path"), "system_io")
+
+    def test_valueerror_cannot_export_payload(self):
+        self.check_refusal(ValueError("SECRET credential state"), "invalid_value")
 
 
 if __name__ == "__main__":

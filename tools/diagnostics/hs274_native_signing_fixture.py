@@ -585,6 +585,49 @@ def cleanup(root):
     return {"schema": 1, "status": "removed", "test_only": True}
 
 
+# These literal policy codes are the complete reviewed fixture vocabulary.
+# Unknown exception payloads never become public diagnostics.
+_CLOSED_REFUSAL_CODES = frozenset(
+    (
+        "ancestry",
+        "ancestry_changed",
+        "arguments",
+        "cleanup_inventory",
+        "cleanup_refused",
+        "cleanup_unknown",
+        "collision",
+        "command",
+        "credential_changed",
+        "credential_mode",
+        "deadline",
+        "file",
+        "file_changed",
+        "file_size",
+        "identity",
+        "keychain_changed",
+        "keychain_list",
+        "mode",
+        "native_command",
+        "openssl_version",
+        "path",
+        "platform",
+        "private_in_evidence",
+        "record",
+        "root",
+        "search_changed",
+        "state",
+    )
+)
+
+
+def _diagnostic_code(error):
+    """Return only fixed public policy literals, never exception text or arguments."""
+    if isinstance(error, FixtureRefusal):
+        code = error.code
+        return code if type(code) is str and code in _CLOSED_REFUSAL_CODES else "unknown_refusal"
+    return "system_io" if isinstance(error, OSError) else "invalid_value"
+
+
 def main(args):
     try:
         require(len(args) in (2, 3), "arguments")
@@ -596,9 +639,11 @@ def main(args):
             raise FixtureRefusal("arguments")
         print(json.dumps(record, sort_keys=True))
         return 0
-    except (FixtureRefusal, OSError, ValueError):
+    except (FixtureRefusal, OSError, ValueError) as error:
         # No raw error, command arguments, private paths or subprocess output.
-        print("Native signing TEST-ONLY fixture refused", file=sys.stderr)
+        print(
+            "Native signing TEST-ONLY fixture refused: " + _diagnostic_code(error), file=sys.stderr
+        )
         return 1
 
 

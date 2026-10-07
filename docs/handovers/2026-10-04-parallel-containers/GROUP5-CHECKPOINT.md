@@ -1784,3 +1784,15 @@ owned compilation now reports source_identity; preparation still reports124;
 native UI reports unsupported. Its full native artifact is currently unavailable
 behind the exact productionresultssa2 network refusal, so complete XCTest counts
 remain unknown. Installation and release are skipped. Item31 stays open.
+
+## Closed native signing refusal diagnostics
+
+The independently reviewed three-path diagnostic adds only fixed allow-listed
+refusal codes and six frozen negative controls to the disposable signer. All
+original20 test bodies, actual setup/cleanup commands, confidentiality guards,
+failure exit/stdout and native budgets remain unchanged. The observer follows
+the exact new fixture digest; its independently pending exporter builder pin is
+unmodified in this tranche. Independent qualification covers78 healthy tests,
+12 preimage assertion failures and four causal mutant refusals. Root covering
+checks precede publication. Native replay must identify the actual setup refusal;
+neither the cause nor production signing is qualified. Item31 stays open.
