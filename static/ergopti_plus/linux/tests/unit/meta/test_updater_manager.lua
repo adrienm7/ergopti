@@ -535,6 +535,7 @@ helpers.describe("modules/updater/manager.lua", function()
 				end,
 				cancel = function() return true end,
 			}
+			fresh._http_client = require("tests.support.release_http_fixture").attach(fresh._http_client)
 			fresh._file_digest = { cancel = function() return true end }
 			for index = 1, 3 do
 				local count = 0
@@ -580,6 +581,7 @@ helpers.describe("modules/updater/manager.lua", function()
 		fresh._http_client = { get = function(_, _, options, callback)
 			requests[#requests + 1] = options; callback(assert(table.remove(responses, 1))); return true
 		end }
+		fresh._http_client = require("tests.support.release_http_fixture").attach(fresh._http_client)
 		for index = 1, 3 do
 			local callbacks = 0
 			helpers.assert_true(fresh._fetch_releases("main", function(body, status, err)
@@ -628,6 +630,7 @@ helpers.describe("modules/updater/manager.lua", function()
 			end,
 			cancel = function() return true end,
 		}
+		fresh._http_client = require("tests.support.release_http_fixture").attach(fresh._http_client)
 		fresh.current_version = function() return "local" end
 
 		local results = {}
@@ -1272,6 +1275,7 @@ helpers.describe("updater bounded pagination", function()
 			cb(response)
 			return true
 		end }
+		M._http_client = require("tests.support.release_http_fixture").attach(M._http_client)
 		for _ = 1, 2 do
 			M._fetch_releases("dev", function(body, _, err)
 				completions = completions + 1
@@ -1304,6 +1308,7 @@ helpers.describe("updater bounded pagination", function()
 				end,
 				cancel = function() return true end,
 			}
+			M._http_client = require("tests.support.release_http_fixture").attach(M._http_client)
 			M._file_digest = { cancel = function() return true end }
 			M._fetch_releases("dev", function(body, _, err)
 				completions = completions + 1
