@@ -1299,7 +1299,7 @@ function M.split_action_parameter_key(key)
 end
 
 function M.get_action_parameter(binding, action_name)
-	if type(binding) == "string" and (binding:sub(1, 9) == "tap_key__" or binding:sub(1, 10) == "keyboard__") then
+	if type(binding) == "string" and (binding:sub(1, 9) == "tap_key__" or binding:sub(1, 10) == "keyboard__" or binding:sub(1, 8) == "script__") then
 		local fits, reason = M.action_parameter_binding_fits(binding)
 		if fits == false then
 			if _action_params[parameter_key(binding, action_name)] ~= nil then

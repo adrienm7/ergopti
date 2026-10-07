@@ -1,0 +1,52 @@
+{
+	"content_order": {
+		"ahk": ["extension_bound_head", "extension_pack_rows", "extension_scope_tail"],
+		"hs": [
+			"extension_bulk_head",
+			"separator",
+			"extension_pack_rows",
+			"extension_bound_boundary",
+			"extension_bound_tail"
+		],
+		"linux": [
+			"extension_bulk_head",
+			"separator",
+			"extension_pack_rows",
+			"extension_bound_boundary",
+			"extension_bound_tail"
+		]
+	},
+	"bulk_order": {
+		"ahk": [],
+		"hs": ["extension_all_sections"],
+		"linux": ["extension_enable_all", "extension_disable_all"]
+	},
+	"captions": {
+		"extension_all_sections": "menu.hotstrings.enable_all_sections",
+		"extension_enable_all": "menu.hotstrings.check_all",
+		"extension_disable_all": "menu.hotstrings.uncheck_all",
+		"extension_empty_file": "menu.extensions.empty"
+	},
+	"native_order": {
+		"hs": [
+			"bulk",
+			"separator",
+			"sfbsreduction (5)",
+			"rolls (7)",
+			"separator",
+			"Repeat corrections (14)"
+		],
+		"linux": [
+			"enable",
+			"disable",
+			"separator",
+			"sfbsreduction (5)",
+			"Rolls (7)",
+			"separator",
+			"repeat_corrections (14)"
+		]
+	},
+	"bulk_checked": true,
+	"scope_source_ids": ["sfbsreduction", "rolls", "magickey.repeat_corrections"],
+	"linux_without_extensions_returns_nil": true
+}

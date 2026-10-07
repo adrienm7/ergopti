@@ -24,6 +24,22 @@ local ManifestMenu = require("infra.manifest_menu")
 
 local LOG = "models_selector"
 
+-- Projects the native values through the complete declared information frame.
+local function model_frame_getters(values)
+	local getters = {}
+	for name, value in pairs(values) do
+		local captured = value
+		getters[name] = function() return captured end
+	end
+	return getters
+end
+
+local function append_model_rows(target, rows)
+	if not rows then return false end
+	for _, row in ipairs(rows) do target[#target + 1] = row end
+	return true
+end
+
 -- hs.chooser objects are garbage-collected as soon as no Lua reference remains.
 -- The "browse all models" chooser was held only in a local inside the click
 -- handler, so it could be collected before macOS finished presenting it — the
@@ -401,30 +417,33 @@ function M.build(ctx)
 	-- =====================================================
 
 	-- "No model" option so the user can explicitly disable predictions
-	table.insert(menu, {
-		label    = i18n.get("menu.llm.no_model"),
-		checked  = (not state.llm_model or state.llm_model == ""),
-		disabled = paused or nil,
-		action       = function()
+	local none_rows = ManifestMenu.template_rows("llm_model_picker_head", {
+		["llm_model_none"] = function()
 			Logger.info(LOG, "Switching model to None (disabled).")
 			return disable_model()
-		end
-	})
+		end,
+	}, {
+		model_none_selected = function() return not state.llm_model or state.llm_model == "" end,
+		model_picker_ready = function() return not paused end,
+	}, {})
+	if not append_model_rows(menu, none_rows) then return {} end
 
 	local backend_default_raw = (active_backend == "mlx")
 		and DEFAULT_STATE.llm_model_mlx
 		or  DEFAULT_STATE.llm_model_ollama
 	local backend_default = get_display_model_name(backend_default_raw, presets)
 	if backend_default and backend_default ~= "" then
-		table.insert(menu, {
-			label    = string.format(i18n.get("menu.llm.backend_default_model"), backend_default),
-			checked  = (active_display_model == backend_default),
-			disabled = paused or nil,
-			action       = function()
+		local default_rows = ManifestMenu.template_rows("llm_model_picker_default", {
+			["llm_model_backend_default"] = function()
 				Logger.info(LOG, string.format("Restoring backend default model -> %s", backend_default))
 				switch_model(backend_default)
-			end
-		})
+			end,
+		}, {
+			model_backend_default_caption = function() return backend_default end,
+			model_default_selected = function() return active_display_model == backend_default end,
+			model_picker_ready = function() return not paused end,
+		}, {})
+		if not append_model_rows(menu, default_rows) then return {} end
 	end
 
 	-- HuggingFace token row — only meaningful for the MLX backend which downloads from HF
@@ -439,18 +458,20 @@ function M.build(ctx)
 		local token_status = has_hf_token
 			and i18n.get("menu.llm.hf_token_set")
 			or  i18n.get("menu.llm.hf_token_unset")
-		table.insert(menu, {
-			label    = string.format(i18n.get("menu.llm.hf_token_label"), token_status),
-			disabled = paused or nil,
-			action       = function()
+		local token_rows = ManifestMenu.template_rows("llm_model_hf_token_command", {
+			["llm_model_hf_token"] = function()
 				if models_mgr and type(models_mgr.prompt_hf_login) == "function" then
 					models_mgr.prompt_hf_login(function()
 						if save_prefs() ~= true then return false end
 						update_menu()
 					end)
 				end
-			end
-		})
+			end,
+		}, {
+			model_hf_token_caption = function() return token_status end,
+			model_picker_ready = function() return not paused end,
+		}, {})
+		if not append_model_rows(menu, token_rows) then return {} end
 	end
 
 	local header_rows = ManifestMenu.template_rows("llm_model_header_boundary", {}, {}, {})
@@ -532,7 +553,11 @@ function M.build(ctx)
 			})
 			end
 		end
-		table.insert(menu, { label = i18n.get("menu.llm.my_models"), items = user_sub })
+		local saved_rows = ManifestMenu.template_rows("llm_saved_models_frame", {}, {}, {
+			["llm_saved_models"] = function() return user_sub end,
+		})
+		if type(saved_rows) ~= "table" or #saved_rows ~= 1 or type(saved_rows[1].items) ~= "table" then return {} end
+		for _, row in ipairs(saved_rows) do menu[#menu + 1] = row end
 	end
 
 
@@ -572,128 +597,107 @@ function M.build(ctx)
 				end
 
 				local model_submenu = {}
-
-				table.insert(model_submenu, {
-					label    = i18n.get("menu.llm.select_model"),
-					checked  = (active_display_model == m_name),
-					disabled = paused or nil,
-					action       = function() switch_model(m_name) end
-				})
-
+				local frame = {
+					model_selected = active_display_model == m_name,
+					model_select_ready = not paused,
+					model_delete_present = not not is_inst,
+					model_download_present = false,
+					model_backend_caption = display_backend,
+					model_source_caption = active_source,
+				}
+				local model_commands = {
+					["model_select"] = function() switch_model(m_name) end,
+					["model_backend_hs"] = function() end,
+					["model_type_hs"] = function() end,
+					["model_date_hs"] = function() end,
+					["model_params_total_hs"] = function() end,
+					["model_params_active_hs"] = function() end,
+					["model_speed_hs"] = function() end,
+					["model_tags_hs"] = function() end,
+					["model_hw_download_hs"] = function() end,
+					["model_hw_disk_hs"] = function() end,
+					["model_hw_ram_hs"] = function() end,
+					["model_source"] = function()
+						local hs = hs  -- luacheck: ignore — intentional global access
+						pcall(hs.urlevent.openURL, active_source)
+					end,
+				}
 				if is_inst then
-					table.insert(model_submenu, {
-						label = i18n.get("menu.llm.delete_model_cache"),
-						action = function()
-							local ok, choice = pcall(dialog.block_alert,
-								i18n.get("menu.llm.delete_model_title"),
-								string.format(i18n.get("menu.llm.delete_model_body"), m_name),
-								i18n.get("button.delete"), i18n.get("button.cancel"), "warning")
-							if ok and choice == i18n.get("button.delete") then
-								models_mgr.delete_model(m_name)
-							end
+					model_commands["model_delete"] = function()
+						local ok, choice = pcall(dialog.block_alert,
+							i18n.get("menu.llm.delete_model_title"),
+							string.format(i18n.get("menu.llm.delete_model_body"), m_name),
+							i18n.get("button.delete"), i18n.get("button.cancel"), "warning")
+						if ok and choice == i18n.get("button.delete") then
+							models_mgr.delete_model(m_name)
 						end
-					})
+					end
 				end
-
+				if not append_model_rows(model_submenu, ManifestMenu.template_rows("llm_model_action_rows", model_commands, model_frame_getters(frame), {})) then return {} end
 				local origin_rows = ManifestMenu.template_rows("llm_model_origin_boundary", {}, {}, {})
 				if not origin_rows then return {} end
 				for _, row in ipairs(origin_rows) do model_submenu[#model_submenu + 1] = row end
-				table.insert(model_submenu, {
-					label = string.format(i18n.get("menu.llm.model_backend"), display_backend),
-					action    = function() end
-				})
-				table.insert(model_submenu, {
-					label = string.format(i18n.get("menu.llm.model_source"), active_source),
-					action    = function()
-						local hs = hs  -- luacheck: ignore — intentional global access
-						pcall(hs.urlevent.openURL, active_source)
-					end
-				})
-
+				if not append_model_rows(model_submenu, ManifestMenu.template_rows("llm_model_identity_rows", model_commands, model_frame_getters(frame), {})) then return {} end
 				local specs_rows = ManifestMenu.template_rows("llm_model_specs_frame", {}, {}, {})
 				if not specs_rows then return {} end
 				for _, row in ipairs(specs_rows) do model_submenu[#model_submenu + 1] = row end
 
-				local m_type    = m.type or info.type or "Inconnu"
+				local m_type = m.type or info.type or "Inconnu"
 				local type_label = i18n.get((m_type == "completion")
 					and "menu.llm.model_type_completion"
-					or  "menu.llm.model_type_chat")
-				table.insert(model_submenu, {
-					label = string.format(i18n.get("menu.llm.model_type"), type_label),
-					action    = function() end
-				})
-
+					or "menu.llm.model_type_chat")
+				frame.model_type_caption = type_label
+				frame.model_date_present = false
 				if m.last_updated and m.last_updated ~= "Unknown" then
 					local y, mo, d = m.last_updated:match("^(%d+)%-(%d+)%-(%d+)$")
 					local formatted_date = (y and mo and d) and (d .. "/" .. mo .. "/" .. y) or m.last_updated
-					table.insert(model_submenu, {
-						label = string.format(i18n.get("menu.llm.model_date"), formatted_date),
-						action    = function() end
-					})
+					frame.model_date_present, frame.model_date_caption = true, formatted_date
 				end
-
+				frame.model_params_total_present, frame.model_params_active_present = false, false
 				if m.parameters then
 					if m.parameters.total and m.parameters.total ~= "N/A" then
-						table.insert(model_submenu, {
-							label = string.format(i18n.get("menu.llm.model_params_total"), m.parameters.total),
-							action    = function() end
-						})
+						frame.model_params_total_present, frame.model_params_total_caption = true, tostring(m.parameters.total)
 					end
 					if m.parameters.active and m.parameters.active ~= "N/A" then
-						table.insert(model_submenu, {
-							label = string.format(i18n.get("menu.llm.model_params_active"), m.parameters.active),
-							action    = function() end
-						})
+						frame.model_params_active_present, frame.model_params_active_caption = true, tostring(m.parameters.active)
 					end
 				end
+				if not append_model_rows(model_submenu, ManifestMenu.template_rows("llm_model_spec_rows", model_commands, model_frame_getters(frame), {})) then return {} end
 
 				if m.capabilities then
 					local caps_rows = ManifestMenu.template_rows("llm_model_caps_frame", {}, {}, {})
 					if not caps_rows then return {} end
 					for _, row in ipairs(caps_rows) do model_submenu[#model_submenu + 1] = row end
+					frame.model_speed_present, frame.model_tags_present = false, false
 					if m.capabilities.speed_tok_s then
-						table.insert(model_submenu, {
-							label = string.format(i18n.get("menu.llm.model_speed"), m.capabilities.speed_tok_s),
-							action    = function() end
-						})
+						frame.model_speed_present, frame.model_speed_caption = true, tostring(m.capabilities.speed_tok_s)
 					end
 					local tags = m.capabilities.tags
 					if tags and type(tags) == "table" and #tags > 0 then
-						table.insert(model_submenu, {
-							label = string.format(i18n.get("menu.llm.model_tags"), table.concat(tags, ", ")),
-							action    = function() end
-						})
+						frame.model_tags_present, frame.model_tags_caption = true, table.concat(tags, ", ")
 					end
+					if not append_model_rows(model_submenu, ManifestMenu.template_rows("llm_model_capability_rows", model_commands, model_frame_getters(frame), {})) then return {} end
 				end
 
 				if hw_active.download_gb or hw_active.disk_gb or hw_active.ram_gb then
 					local hardware_rows = ManifestMenu.template_rows("llm_model_hardware_boundary", {}, {}, {})
 					if not hardware_rows then return {} end
 					for _, row in ipairs(hardware_rows) do model_submenu[#model_submenu + 1] = row end
-					table.insert(model_submenu, {
-						label    = i18n.decorate_section(string.format(i18n.get("menu.llm.hw_header"), display_backend)),
-						disabled = true
-					})
+					frame.model_hw_backend_caption = display_backend
+					frame.model_hw_download_present = false
 					if hw_active.download_gb then
-						table.insert(model_submenu, {
-							label = string.format(i18n.get("menu.llm.hw_download"), hw_active.download_gb),
-							action    = function() end
-						})
+						frame.model_hw_download_present, frame.model_hw_download_caption = true, tostring(hw_active.download_gb)
 					end
+					frame.model_hw_disk_present = false
 					if hw_active.disk_gb then
-						table.insert(model_submenu, {
-							label = string.format(i18n.get("menu.llm.hw_disk"), hw_active.disk_gb),
-							action    = function() end
-						})
+						frame.model_hw_disk_present, frame.model_hw_disk_caption = true, tostring(hw_active.disk_gb)
 					end
+					frame.model_hw_ram_present = false
 					if hw_active.ram_gb then
-						table.insert(model_submenu, {
-							label = string.format(i18n.get("menu.llm.hw_ram"), hw_active.ram_gb),
-							action    = function() end
-						})
+						frame.model_hw_ram_present, frame.model_hw_ram_caption = true, tostring(hw_active.ram_gb)
 					end
+					if not append_model_rows(model_submenu, ManifestMenu.template_rows("llm_model_hardware_rows", model_commands, model_frame_getters(frame), {})) then return {} end
 				end
-
 				table.insert(family_sub, {
 					label    = row_label,
 					items    = model_submenu,
@@ -845,11 +849,10 @@ function M.build(ctx)
 		["llm_browse_models"] = open_model_browser,
 	}, { ["llm_model_browser_ready"] = model_browser_ready })
 	if browser_row then table.insert(menu, browser_row) end
-	table.insert(menu, {
-		label    = i18n.get("menu.llm.add_model_entry"),
-		disabled = paused or nil,
-		action       = function() return prompt_add_user_model() end,
-	})
+	local add_rows = ManifestMenu.template_rows("llm_model_add_command", {
+		["llm_add_model_entry"] = function() return prompt_add_user_model() end,
+	}, { model_picker_ready = function() return not paused end }, {})
+	if not append_model_rows(menu, add_rows) then return {} end
 
 	return menu
 end

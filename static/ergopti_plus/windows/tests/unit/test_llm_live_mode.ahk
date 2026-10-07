@@ -553,7 +553,8 @@ _LLV_MenuListsRewritePrompts() {
 	}
 	Emit := _DriverFuncBody("_LLM_Menu_EmitRow")
 	AssertContains(Emit, 'case "llm_live_mode":', "the AI menu draws the live mode row")
-	AssertContains(Emit, "LLM_Menu_BuildLiveModeMenu()", "as the live mode submenu")
+	AssertContains(Emit, 'Map("llm_live_mode", LLM_Menu_BuildLiveModeMenu)', "as the live mode submenu")
+	Assert(_LMNM_LiveRoute(Emit), "the native live group consumes the same callable and handle through its typed renderer")
 }
 Test("LLM live mode: the AI menu lists Off and the rewrite prompts, sharing the action's state",
 	_LLV_MenuListsRewritePrompts)

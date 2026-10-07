@@ -519,3 +519,56 @@ helpers.describe("Linux native absent inline scalar preference",function()
 		end)
 	end)
 end)
+
+helpers.describe("Linux actual preference schema drift and runtime reload", function()
+	local Migration = require("config_migrate")
+	local registry = assert(Migration.load_registry(require("infra.paths").shared(Migration.REGISTRY_PATH)))
+	local function current(enabled)
+		return '# retain every foreign byte\n[_meta]\nschema_version = ' .. registry.current
+			.. '\n[llm]\nenabled = ' .. tostring(enabled)
+			.. '\n[future]\nprecise = 0.1234567890123456789\nmax = 9223372036854775807\nempty = [] # exact\n'
+	end
+	local function put(path, content)
+		local file = assert(io.open(path, "wb"))
+		assert(file:write(content))
+		assert(file:close())
+	end
+	for _, token in ipairs({ tostring(registry.current + 1), "true", '"11"', "11.5" }) do
+		helpers.it("refuses actual ordinary publication after current boot and later schema replacement " .. token, function()
+			with_config(current(false), function(path)
+				helpers.assert_eq(Migration.boot({ path = path, driver = "linux", registry = registry }).status, "current")
+				local preferences = require("infra.llm_preferences")
+				local drift = current(false):gsub("schema_version = " .. registry.current, "schema_version = " .. token)
+				put(path, drift)
+				helpers.assert_eq(preferences.set("llm.enabled", true), false)
+				helpers.assert_eq(Sandbox.read_bytes(path), drift, "the genuine file is neither repaired nor rewritten")
+				put(path, current(false))
+				helpers.assert_true(preferences.set("llm.enabled", true), "manual repair permits a fresh explicit request")
+				helpers.assert_eq(Sandbox.read_bytes(path), current(true), "complete independently authored source")
+				package.loaded["infra.llm_preferences"] = nil
+				helpers.assert_eq(require("infra.llm_preferences").get("llm.enabled"), true, "fresh native readback")
+			end)
+		end)
+	end
+	helpers.it("the actual profile reload refuses future consent and keeps the old runtime state", function()
+		with_config(current(false), function(path)
+			helpers.assert_eq(Migration.boot({ path = path, driver = "linux", registry = registry }).status, "current")
+			local previous = package.loaded["modules.llm.profiles"]
+			package.loaded["modules.llm.profiles"] = nil
+			local Profiles = require("modules.llm.profiles")
+			local called, detail = pcall(function()
+				Profiles.init()
+				helpers.assert_eq(Profiles.is_enabled(), false)
+				local future = current(true):gsub("schema_version = " .. registry.current,
+					"schema_version = " .. (registry.current + 1))
+				put(path, future)
+				local reloaded, accepted = pcall(Profiles.reload_configuration)
+				helpers.assert_true(not reloaded or accepted ~= true)
+				helpers.assert_eq(Profiles.is_enabled(), false, "future source cannot grant runtime consent")
+				helpers.assert_eq(Sandbox.read_bytes(path), future)
+			end)
+			package.loaded["modules.llm.profiles"] = previous
+			if not called then error(detail, 0) end
+		end)
+	end)
+end)

@@ -986,3 +986,104 @@ _HSDT_NativePreviewCallbackPositiveControl() {
 }
 Test("preview unavailable fixture: actual native callback and enabled-state positive control",
 	_HSDT_NativePreviewCallbackPositiveControl)
+
+
+_HSDT_ParameterFrameCaptionAuthority() {
+	global _HSDT_WriteCalls
+	Root := _MR_GetManifestRoot()
+	Original := Root["hotstrings_delay_captions"]
+	Saved := _HSDT_SaveState()
+	try {
+		_HSDT_Seed("parameter-caption-frame")
+		Root["hotstrings_delay_captions"] := Map("default", "button.ok", "magic_key", "button.ok",
+			"autocorrection", "button.ok", "ai_acceptance", "button.ok", "autocompletion", "button.ok")
+		Rows := _HS_DelaysColorsRows(_HSDT_ObserveDelayWindow.Bind(Map("opens", 0)))
+		Assert(Rows is Array && Rows.Length == 1, "the actual complete delay parent must be returned")
+		AssertEqual(t("menu.hotstrings.delays_colors"), Rows[1]["label"])
+		Items := Rows[1]["items"]
+		AssertEqual(8, Items.Length)
+		AssertEqual(t("menu.hotstrings.config_item"), Items[1]["label"])
+		AssertEqual(true, Items[2]["separator"])
+		AssertEqual(true, Items[6]["separator"])
+		for Index in [3, 4, 5, 7, 8]
+			AssertEqual(t("button.ok"), SubStr(Items[Index]["label"], 1, StrLen(t("button.ok"))))
+		AssertEqual(0, _HSDT_WriteCalls, "rendering the complete frame performs no persistent callback")
+		for Mode in ["missing", "foreign", "wrong_type", "wrong_case"] {
+			Captions := Root["hotstrings_delay_captions"].Clone()
+			if Mode == "missing"
+				Captions.Delete("default")
+			else if Mode == "foreign"
+				Captions["unrelated"] := "button.ok"
+			else if Mode == "wrong_case" {
+				Captions := Map()
+				Captions.CaseSense := "On"
+				for Key, Value in Root["hotstrings_delay_captions"]
+					Captions[Key == "default" ? "Default" : Key] := Value
+			} else
+				Captions["default"] := false
+			Root["hotstrings_delay_captions"] := Captions
+			AssertEqual(0, _HS_DelaysColorsRows().Length, "invalid named caption data refuses its native provider")
+			Root["hotstrings_delay_captions"] := Map("default", "button.ok", "magic_key", "button.ok",
+				"autocorrection", "button.ok", "ai_acceptance", "button.ok", "autocompletion", "button.ok")
+		}
+	} finally {
+		Root["hotstrings_delay_captions"] := Original
+		_HSDT_Restore(Saved)
+	}
+}
+Test("hotstrings parameter frames: every caption field is current and malformed maps refuse",
+	_HSDT_ParameterFrameCaptionAuthority)
+
+_HSDT_ParameterFrameNativeMenuContract() {
+	Root := _MR_GetManifestRoot()
+	Saved := _HSDT_SaveState()
+	Original := Root["hotstrings_word_expander_frame"]
+	OwnedMenus := []
+	try {
+		_HSDT_Seed("parameter-native-word-frame")
+		Rows := _HS_WordExpanderRows(_HSDT_ControlCommands(_HSDT_AcceptWriter))
+		if Rows is Array {
+			for Row in Rows {
+				if Row is Map && Row.Has("submenu") && Row["submenu"] is Menu
+					OwnedMenus.Push(Row["submenu"])
+			}
+		}
+		Assert(Rows is Array && Rows.Length == 1)
+		AssertEqual(t("menu.hotstrings.word_expanders"), Rows[1]["label"])
+		Assert(Rows[1]["submenu"] is Menu, "the original native child Menu contract remains real")
+		AssertFalse(Rows[1].Has("items"), "the existing native child is not duplicated as detached row data")
+		Assert(DllCall("GetMenuItemCount", "Ptr", Rows[1]["submenu"].Handle, "Int") > 4,
+			"the canonical controls and genuine catalogue have materialized into the Win32 child")
+		Root.Delete("hotstrings_word_expander_frame")
+		AssertEqual(0, _HS_WordExpanderRows(_HSDT_ControlCommands(_HSDT_AcceptWriter)).Length)
+		Root["hotstrings_word_expander_frame"] := Original
+		RepairedRows := _HS_WordExpanderRows(_HSDT_ControlCommands(_HSDT_AcceptWriter))
+		if RepairedRows is Array {
+			for Row in RepairedRows {
+				if Row is Map && Row.Has("submenu") && Row["submenu"] is Menu
+					OwnedMenus.Push(Row["submenu"])
+			}
+		}
+		AssertEqual(1, RepairedRows.Length)
+	} finally {
+		try {
+			ReleaseError := false
+			for Built in OwnedMenus {
+				try {
+					try Built.Delete()
+					finally MenuDispatcher_PruneMenu(Built)
+				} catch as e {
+					if !IsObject(ReleaseError)
+						ReleaseError := e
+				}
+			}
+			if IsObject(ReleaseError)
+				throw ReleaseError
+		} finally {
+			Root["hotstrings_word_expander_frame"] := Original
+			_HSDT_Restore(Saved)
+		}
+	}
+}
+Test("hotstrings parameter frames: genuine native child Menu and withdrawal retain the original contract",
+	_HSDT_ParameterFrameNativeMenuContract)

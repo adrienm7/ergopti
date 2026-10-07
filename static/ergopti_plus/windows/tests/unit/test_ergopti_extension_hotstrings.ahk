@@ -427,3 +427,240 @@ _EHX_SuffixesLoadNatively() {
 }
 Test("ergopti extension: every relocated suffix loads through the native registry (ergopti-suffixes-ext)",
 	_EHX_SuffixesLoadNatively)
+
+
+; The exact native empty-file presentation consumes its current declaration.
+_EHX_EmptyExtensionDeclaration() {
+	global _HS_ExtensionsCacheLoaded, _HS_ExtensionsCache
+	Root := _MR_GetManifestRoot()
+	Original := Root["hotstring_extension_empty_file"]
+	Saved := [_HS_ExtensionsCacheLoaded, _HS_ExtensionsCache]
+	try {
+		_HS_ExtensionsCacheLoaded := true, _HS_ExtensionsCache := []
+		Rows := _HS_ExtensionRows()
+		Assert(Rows is Array && Rows.Length == 1)
+		AssertEqual(t("menu.extensions.empty"), Rows[1]["label"])
+		AssertEqual(true, Rows[1]["disabled"])
+		Assert(!Rows[1].Has("action"), "the old empty-file status remains inert")
+		Marker := Original[1].Clone()
+		Marker["i18n"] := "button.ok"
+		Root["hotstring_extension_empty_file"] := [Marker]
+		AssertEqual(t("button.ok"), _HS_ExtensionRows()[1]["label"], "the native provider reads the published caption")
+		Root.Delete("hotstring_extension_empty_file")
+		AssertEqual(0, _HS_ExtensionRows().Length, "missing empty-file presentation refuses")
+		Marker["foreign_field"] := true
+		Root["hotstring_extension_empty_file"] := [Marker]
+		AssertEqual(0, _HS_ExtensionRows().Length, "malformed inert presentation refuses")
+		Root["hotstring_extension_empty_file"] := Original
+		AssertEqual(1, _HS_ExtensionRows().Length, "repair restores the genuine provider")
+	} finally {
+		Root["hotstring_extension_empty_file"] := Original
+		_HS_ExtensionsCacheLoaded := Saved[1], _HS_ExtensionsCache := Saved[2]
+	}
+}
+Test("hotstring extension frame: the actual empty native provider consumes current inert declaration",
+	_EHX_EmptyExtensionDeclaration)
+
+; Discovery is genuine; this fixture owns a neutral category context, as the
+; existing shipped-label case does, while retaining the actual scope commands.
+_EHX_InstalledExtensionFrame() {
+	global _HS_ExtensionsCacheLoaded, _HS_ExtensionsCache
+	global HotstringCategoriesStd, HotstringCategoriesErgopti, SubMenus
+	Root := _MR_GetManifestRoot()
+	Original := Root["hotstring_extension_content_frame"]
+	SavedCache := [_HS_ExtensionsCacheLoaded, _HS_ExtensionsCache]
+	SavedStd := IsSet(HotstringCategoriesStd) ? HotstringCategoriesStd : unset
+	SavedErgopti := IsSet(HotstringCategoriesErgopti) ? HotstringCategoriesErgopti : unset
+	SavedMenus := IsSet(SubMenus) ? SubMenus : unset
+	try {
+		HotstringCategoriesStd := [], HotstringCategoriesErgopti := [], SubMenus := Map()
+		_EHX_WithRoutes(_LCT_RegistryDir(), Check)
+	} finally {
+		Root["hotstring_extension_content_frame"] := Original
+		_HS_ExtensionsCacheLoaded := SavedCache[1], _HS_ExtensionsCache := SavedCache[2]
+		HotstringCategoriesStd := IsSet(SavedStd) ? SavedStd : unset
+		HotstringCategoriesErgopti := IsSet(SavedErgopti) ? SavedErgopti : unset
+		SubMenus := IsSet(SavedMenus) ? SavedMenus : unset
+	}
+	Check(Packs) {
+		global _HS_ExtensionsCacheLoaded, _HS_ExtensionsCache, _MenuDispatchCallbacks
+		for Pack in Packs {
+			if Pack.id != "ergopti"
+				continue
+			_HS_ExtensionsCacheLoaded := true, _HS_ExtensionsCache := [Pack]
+			Rows := _HS_ExtensionRows()
+			Assert(Rows is Array && Rows.Length == 1, "genuine discovery reaches the complete installed frame")
+			Items := Rows[1]["items"]
+			AssertEqual(3, Items.Length, "empty native catalogue precedes the two existing scope commands")
+			AssertEqual(t("menu.extensions.empty"), Items[1]["label"])
+			AssertEqual(t("menu.hotstrings.scope_enable_all"), Items[2]["label"])
+			AssertEqual(t("menu.hotstrings.scope_disable_all"), Items[3]["label"])
+			AssertEqual(true, Items[1]["disabled"])
+			Assert(!Items[1].Has("action"))
+			Native := Menu()
+			try {
+				MenuRenderer_AppendRows(Native, "hotstrings_menu", "hotstring_extensions", Items)
+				AssertEqual(3, DllCall("GetMenuItemCount", "Ptr", Native.Handle, "Int"))
+				for Index in [1, 2] {
+					Id := DllCall("GetMenuItemID", "Ptr", Native.Handle, "Int", Index, "UInt")
+					Assert(_MenuDispatchCallbacks.Has(Id), "each actual scope item retains its genuine dispatch binding")
+				}
+				Root.Delete("hotstring_extension_content_frame")
+				AssertEqual(0, _HS_ExtensionRows().Length, "withdrawal refuses the installed provider")
+				Root["hotstring_extension_content_frame"] := Original
+				Foreign := []
+				for Row in Original
+					Foreign.Push(Row.Clone())
+				Foreign[3]["id"] := "foreign_extension_bound_head"
+				Root["hotstring_extension_content_frame"] := Foreign
+				AssertEqual(0, _HS_ExtensionRows().Length, "an unbound declared child refuses the whole frame")
+				Root["hotstring_extension_content_frame"] := Original
+				AssertEqual(1, _HS_ExtensionRows().Length, "repair preserves the real extension submenu")
+			} finally {
+				try Native.Delete()
+				finally MenuDispatcher_PruneMenu(Native)
+			}
+			return
+		}
+		throw Error("The genuine shipped extension is required for the native frame test.")
+	}
+}
+Test("hotstring extension frame: genuine installed catalogue retains order, native scope callbacks and withdrawal",
+	_EHX_InstalledExtensionFrame)
+
+
+; Actual discovered TOML files allocate their native children before final frame
+; admission. Refusal must dispose only those children and preserve existing owners.
+_EHX_FilePackRefusalOwnsNativeChildren() {
+	global _HotstringExtensionPaths, HotstringGroupConfig, _HotstringBoundSources
+	SavedPaths := _HotstringExtensionPaths, SavedGroups := HotstringGroupConfig
+	SavedBoundSources := _HotstringBoundSources
+	try {
+		; Prepare mutates its routing maps. Keep the real caller-owned maps private
+		; while the inherited file-pack helper performs its genuine source work.
+		_HotstringExtensionPaths := Map(), HotstringGroupConfig := Map()
+		_L4R_WithPack(Check)
+	} finally {
+		_HotstringExtensionPaths := SavedPaths, HotstringGroupConfig := SavedGroups
+		_HotstringBoundSources := SavedBoundSources
+		; Keep resolver generations monotonic after restoring the actual owners.
+		HotstringsResolveBumpGen()
+	}
+	Check(PackRoot, SourcePath) {
+		global Features, CategoryEnabled, _HS_ExtensionsCacheLoaded, _HS_ExtensionsCache, _HotstringExtensionPacks
+		global HotstringCategoriesStd, HotstringCategoriesErgopti, SubMenus
+		global _MenuDispatchCallbacks, _MenuDispatchLastFire, _MenuDispatchTokens
+		global _MenuDispatchClickSequences, _MenuDispatchOwnerHandles
+		Root := _MR_GetManifestRoot()
+		Original := Root["hotstring_extension_content_frame"]
+		SavedFeatures := Features, SavedCategories := CategoryEnabled, SavedPacks := _HotstringExtensionPacks
+		SavedCache := [_HS_ExtensionsCacheLoaded, _HS_ExtensionsCache]
+		SavedStd := IsSet(HotstringCategoriesStd) ? HotstringCategoriesStd : unset
+		SavedErgopti := IsSet(HotstringCategoriesErgopti) ? HotstringCategoriesErgopti : unset
+		SavedMenus := IsSet(SubMenus) ? SubMenus : unset
+		State := MasterGateState(), SavedState := State.Clone()
+		Owned := []
+		ReadRows() {
+			Rows := _HS_ExtensionRows()
+			if Rows is Array {
+				for ExtensionRow in Rows {
+					if !ExtensionRow.Has("items")
+						continue
+					for Item in ExtensionRow["items"]
+						if Item.Has("submenu") && Item["submenu"] is Menu
+							Owned.Push(Item["submenu"])
+				}
+			}
+			return Rows
+		}
+		try {
+			Features := ManifestBuildFeaturesMap()
+			_HotstringExtensionPacks := HotstringExtensions_Prepare(Features, [PackRoot])
+			AssertEqual(1, _HotstringExtensionPacks.Length)
+			AssertEqual(1, _HotstringExtensionPacks[1].toml_files.Length)
+			AssertEqual(SourcePath, _HotstringExtensionPacks[1].toml_files[1].path)
+			Features["hotstrings"]["groups"]["ext:sample:words"] := true
+			State["initialized"] := false
+			CategoryEnabled := Map("Hotstrings", false)
+			MasterGateInitialize(Features, Map("keys", Map()), (*) => false)
+			HotstringCategoriesStd := [], HotstringCategoriesErgopti := [], SubMenus := Map()
+			_HS_ExtensionsCacheLoaded := true, _HS_ExtensionsCache := _HotstringExtensionPacks
+			Source := FSReadUtf8Exact(SourcePath)
+			File := _HotstringExtensionPacks[1].toml_files[1]
+			AssertEqual(SourcePath, File.path)
+			AssertEqual(2, File.sections.Length, "the complete genuine file catalogue contains both sections")
+			Wanted := false, Hidden := false
+			for Section in File.sections {
+				if Section["name"] == "wanted"
+					Wanted := Section
+				else if Section["name"] == "hidden"
+					Hidden := Section
+			}
+			Assert(Wanted is Map && Hidden is Map, "both ordered inputs are authentic scanned section records")
+			AssertEqual("wanted", Wanted["name"])
+			AssertEqual("hidden", Hidden["name"])
+			AssertEqual(2, Wanted["count"])
+			AssertEqual(1, Hidden["count"])
+			; Scan's Counts Map has no physical-source ordering contract. This
+			; private complete Array owns wanted/hidden order without replacing records.
+			File.sections := [Wanted, Hidden]
+			Assert(File.sections[1] == Wanted && File.sections[2] == Hidden, "the exact original record identities supply the controlled order")
+			AssertEqual(Source, FSReadUtf8Exact(SourcePath), "ordering the owned catalogue preserves the whole physical source")
+			Cleaner := Menu()
+			try Cleaner.Delete()
+			finally MenuDispatcher_PruneMenu(Cleaner)
+			Maps := [_MenuDispatchCallbacks, _MenuDispatchLastFire, _MenuDispatchTokens,
+				_MenuDispatchClickSequences, _MenuDispatchOwnerHandles]
+			Before := []
+			for Table in Maps
+				Before.Push(Table.Clone())
+			Rows := ReadRows()
+			Assert(Rows is Array && Rows.Length == 1, "the actual file catalogue reaches the native frame")
+			AssertEqual(1, Owned.Length, "one actual native file child transfers to the successful caller")
+			Assert(_MenuDispatchCallbacks.Count > Before[1].Count, "the real child registered genuine callbacks")
+			AssertEqual("Wanted (2)", _CTC_LabelAt(Owned[1], 4), "native source section order and count stay intact")
+			for Child in Owned
+				_HS_PersonalReleaseMenus([Child])
+			Owned := []
+			Root.Delete("hotstring_extension_content_frame")
+			loop 3 {
+				Refused := ReadRows()
+				Assert(Refused is Array && Refused.Length == 0,
+					"the actual late declaration refusal never hands off a partial native child")
+				for Index, Table in Maps {
+					AssertEqual(Before[Index].Count, Table.Count, "refused file menus leave no dispatcher resources")
+					for Key, Value in Before[Index]
+						Assert(Table.Has(Key) && Table[Key] == Value, "existing dispatcher owner identities remain exact")
+				}
+				AssertEqual(Source, FSReadUtf8Exact(SourcePath), "presentation refusal preserves every real source byte")
+			}
+			Root["hotstring_extension_content_frame"] := Original
+			AssertEqual(1, ReadRows().Length, "exact declaration repair restores the native file pack")
+		} finally {
+			try {
+				CleanupFailure := 0
+				for Child in Owned {
+					try _HS_PersonalReleaseMenus([Child])
+					catch as ErrorInfo {
+						if !CleanupFailure
+							CleanupFailure := ErrorInfo
+					}
+				}
+				if CleanupFailure
+					throw CleanupFailure
+			} finally {
+				Root["hotstring_extension_content_frame"] := Original
+				Features := SavedFeatures, CategoryEnabled := SavedCategories, _HotstringExtensionPacks := SavedPacks
+				_HS_ExtensionsCacheLoaded := SavedCache[1], _HS_ExtensionsCache := SavedCache[2]
+				HotstringCategoriesStd := IsSet(SavedStd) ? SavedStd : unset
+				HotstringCategoriesErgopti := IsSet(SavedErgopti) ? SavedErgopti : unset
+				SubMenus := IsSet(SavedMenus) ? SavedMenus : unset
+				State.Clear()
+				for Key, Value in SavedState
+					State[Key] := Value
+			}
+		}
+	}
+}
+Test("hotstring extension frame: real file-pack refusal releases every owned native child and exact dispatch bindings",
+	_EHX_FilePackRefusalOwnsNativeChildren)
