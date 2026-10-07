@@ -80,6 +80,23 @@ execution and downstream qualification are required; static/source review does
 not claim native success. The real census owner regenerates only changed Windows
 coordinates; the 28/32/31 counts remain unchanged.
 
+## Corrective Windows qualification
+
+Windows-only manual [37621118292](https://github.com/adrienm7/ergopti/actions/runs/37621118292)
+tests source `ff3d2c5500227b6ce2539a425ab936c4a133fbf2`, tree
+`7d18691e6cc6933fc43bf44930767f1bc6330182`, via CI
+`09f67446fde6cc075c09b6bfcfcfa453ba3594bc`. Main AHK completed **10166 passed /
+1 failed**. The seventeen earlier menu failures and the new native cleanup
+controls pass. Both earlier brightness cases pass on this runner; this does not
+claim a brightness repair. The remaining failure is the unchanged Windows OS-call
+purity assertion: three added Win32 probes in `ui/` raise 126 to 129. Windows
+E2E, package and installation remain skipped. Release is skipped.
+
+The next correction moves those exact captured-handle probes into the existing
+native tray adapter. UI cleanup policy, native sentinel values, dispatcher
+ownership, all assertions and the frozen OS-call baseline remain unchanged.
+It requires a new Windows run before downstream qualification can be claimed.
+
 ## Remaining software and native qualification
 
 - Windows config-only writes need closed boot/current-schema/native-owner
