@@ -3652,6 +3652,22 @@ the complete three-OS checkpoint remain pending.
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 
+Manual macOS run37599507077 at704598298b2a5ebd3b9827b8fd11355d24eb0d1e
+observes the nonce/PID-bound wrong-key chain sparkle4005/4005/3002. Pinned
+Sparkle2.9.2 uses SUValidationError3002 for the independently confirmed failed
+Ed25519 verification. The native assertion now requires exactly the imported
+SUError.validationError and Sparkle domain; no error union or generic refusal
+replaces it. All other archive/signature/retirement assertions remain. Actual
+corrected native acceptance is still required.
+
+Brew's same failed deny-removal positive reports nonprompt permission status
+-1744 (errAEEventWouldRequireUserConsent). This proves a consent prerequisite
+for the original sender/target, not successful automation or all six archive
+cases. Retain the strict positive/full-policy-denial controls; exercise them
+on macOS with the original sender granted Automation consent, then complete
+ZIP installation, XZ upgrade, refusal/state preservation and physical closure.
+Package/install and transversal16/38 remain pending; item36 stays open.
+
 Manual macOS run37588921661 at89085c46707aa9972c787affb0f4102a5c8fff68
 confirms the fixture-key repair: four admitted resource reads, genuine
 foreign-key refusal, and installed-key retry through installation/relaunch.

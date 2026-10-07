@@ -1398,7 +1398,7 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		print("::notice title=Native Sparkle wrong-key refusal::" + Self.refusalErrorChainMessage(errors,
 			receipt: refusal, expectedPID: application?.process.processIdentifier ?? 0, nonce: nonce))
 		XCTAssertTrue(errors.contains { $0["domain"] as? String == SUSparkleErrorDomain
-			&& ($0["code"] as? NSNumber)?.intValue == 3001 }, "Wrong-key refusal must reach actual Sparkle signature validation")
+			&& ($0["code"] as? NSNumber)?.intValue == Int(SUError.validationError.rawValue) }, "Wrong-key refusal must reach actual Sparkle signature validation")
 		XCTAssertEqual(try snapshot(installed), oldSnapshot, "A refused archive cannot alter the installed signed source")
 		XCTAssertTrue(try XCTUnwrap(application).process.isRunning)
 		XCTAssertFalse(manager.fileExists(atPath: root.appendingPathComponent("ready-1.json").path))
