@@ -10,6 +10,39 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const pipeline = require('../ci-pipeline.cjs');
 
+/** Describes only closed native result fields; accessor and private values remain opaque. */
+function describeStartupLogCatalogRefusal(result) {
+	const data = (owner, key) => {
+		if (owner == null) return [true, undefined];
+		try {
+			const descriptor = Object.getOwnPropertyDescriptor(owner, key);
+			if (descriptor === undefined) return [true, undefined];
+			return Object.hasOwn(descriptor, 'value') ? [true, descriptor.value] : [false, undefined];
+		} catch {
+			return [false, undefined];
+		}
+	};
+	const [statusKnown, nativeStatus] = data(result, 'status');
+	const status = statusKnown && Number.isSafeInteger(nativeStatus) ? nativeStatus : null;
+	const [errorKnown, nativeError] = data(result, 'error');
+	let error = 'NONE';
+	if (!errorKnown || nativeError) {
+		error = 'OTHER';
+		const [codeKnown, code] = data(nativeError, 'code');
+		if (codeKnown && ['ETIMEDOUT', 'ENOENT', 'EACCES', 'ENOBUFS'].includes(code)) error = code;
+	}
+	const [signalKnown, nativeSignal] = data(result, 'signal');
+	let signal = 'NONE';
+	if (!signalKnown || (nativeSignal != null && nativeSignal !== '')) {
+		signal = ['SIGTERM', 'SIGKILL', 'SIGINT', 'SIGABRT', 'SIGSEGV', 'SIGBREAK'].includes(
+			nativeSignal
+		)
+			? nativeSignal
+			: 'OTHER';
+	}
+	return ` [result=${result == null ? 'absent' : 'present'}; status=${status}; error=${error}; signal=${signal}]`;
+}
+
 /** Uses the exact standard-library catalogue reader owned by the native workflow. */
 function readStartupLogCatalog(recipe, root = pipeline.ROOT, execute = spawnSync) {
 	assert.ok(
@@ -40,7 +73,7 @@ function readStartupLogCatalog(recipe, root = pipeline.ROOT, execute = spawnSync
 	});
 	assert.ok(
 		result && !result.error && result.status === 0,
-		'the actual native log catalogue reader refused'
+		'the actual native log catalogue reader refused' + describeStartupLogCatalogRefusal(result)
 	);
 	assert.ok(
 		result.stderr === '' && typeof result.stdout === 'string',
