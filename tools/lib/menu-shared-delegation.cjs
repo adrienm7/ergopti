@@ -7,7 +7,11 @@ const fs = require('fs');
 const path = require('path');
 const { scriptTokens, stripComments } = require('./script-source.cjs');
 
-const MODULES = new Set(['menu.personal_files', 'menu.programmable_hotstrings']);
+const MODULES = new Set([
+	'menu.personal_files',
+	'menu.programmable_hotstrings',
+	'keymap.magic_key_source'
+]);
 const values = (source) => scriptTokens(source, '.lua');
 const same = (tokens, index, expected) =>
 	expected.every(
@@ -27,11 +31,117 @@ function calls(source, owner) {
 			tokens[i + 1].value === '.' &&
 			tokens[i + 2].kind === 'identifier' &&
 			tokens[i + 3].value === '(' &&
-			tokens[i - 1]?.value !== 'function'
+			!['function', '.', ':'].includes(tokens[i - 1]?.value)
 		)
 			result.add(tokens[i + 2].value);
 	}
 	return result;
+}
+
+/** The physical-key family needs the actual native renderer as its explicit port. */
+function magicRendererPort(source, owner) {
+	const tokens = values(source);
+	const direct = tokens.some(
+		(token, i) =>
+			token.kind === 'identifier' &&
+			token.value === 'local' &&
+			tokens[i + 1]?.kind === 'identifier' &&
+			tokens[i + 1]?.value === 'ManifestMenu' &&
+			tokens[i + 2]?.value === '=' &&
+			tokens[i + 3]?.value === 'require' &&
+			tokens[i + 4]?.value === '(' &&
+			tokens[i + 5]?.kind === 'string' &&
+			tokens[i + 5]?.value === 'infra.manifest_menu' &&
+			tokens[i + 6]?.value === ')'
+	);
+	const protectedImport = tokens.some(
+		(token, i) =>
+			token.kind === 'identifier' &&
+			token.value === 'local' &&
+			tokens[i + 1]?.kind === 'identifier' &&
+			tokens[i + 2]?.value === ',' &&
+			tokens[i + 3]?.kind === 'identifier' &&
+			tokens[i + 3]?.value === 'ManifestMenu' &&
+			tokens[i + 4]?.value === '=' &&
+			tokens[i + 5]?.value === 'pcall' &&
+			tokens[i + 6]?.value === '(' &&
+			tokens[i + 7]?.kind === 'identifier' &&
+			tokens[i + 7]?.value === 'require' &&
+			tokens[i + 8]?.value === ',' &&
+			tokens[i + 9]?.kind === 'string' &&
+			tokens[i + 9]?.value === 'infra.manifest_menu' &&
+			tokens[i + 10]?.value === ')'
+	);
+	if (!direct && !protectedImport) return false;
+	for (let i = 0; i < tokens.length; i += 1) {
+		if (
+			tokens[i]?.kind !== 'identifier' ||
+			tokens[i].value !== owner ||
+			['.', ':', 'function'].includes(tokens[i - 1]?.value) ||
+			tokens[i + 1]?.value !== '.' ||
+			tokens[i + 2]?.kind !== 'identifier' ||
+			tokens[i + 2]?.value !== 'menu_rows' ||
+			tokens[i + 3]?.value !== '('
+		)
+			continue;
+		let depth = 0,
+			cursor = i + 4;
+		for (; cursor < tokens.length; cursor += 1) {
+			const token = tokens[cursor];
+			if (token.kind !== 'symbol') continue;
+			if (token.value === '(' || token.value === '{' || token.value === '[') depth += 1;
+			if (token.value === ')' || token.value === '}' || token.value === ']') {
+				if (depth === 0) break;
+				depth -= 1;
+			}
+			if (token.value === ',' && depth === 0) break;
+		}
+		if (tokens[cursor]?.value !== ',' || tokens[cursor + 1]?.value !== '{') continue;
+		depth = 1;
+		let manifests = 0,
+			genuine = false;
+		for (cursor += 2; cursor < tokens.length && depth > 0; cursor += 1) {
+			const token = tokens[cursor];
+			// Inspect the whole physical options literal: Lua's last duplicate field wins.
+			if (depth === 1 && [',', ';', '{'].includes(tokens[cursor - 1]?.value)) {
+				let key, valueAt;
+				if (token.kind === 'identifier' && tokens[cursor + 1]?.value === '=') {
+					key = token.value;
+					valueAt = cursor + 2;
+				} else if (token.kind === 'symbol' && token.value === '[') {
+					// A computed key could alias manifest: only a literal key is provable here.
+					if (
+						tokens[cursor + 1]?.kind !== 'string' ||
+						tokens[cursor + 2]?.value !== ']' ||
+						tokens[cursor + 3]?.value !== '='
+					)
+						return false;
+					const spelling = source.slice(tokens[cursor + 1].start, tokens[cursor + 1].end);
+					// The shared lexer records spelling, not Lua escape/long-string decoding.
+					// Only an ordinary unescaped quoted key can prove its actual identity.
+					if (
+						!['"', "'"].includes(spelling[0]) ||
+						spelling.at(-1) !== spelling[0] ||
+						spelling.includes('\\')
+					)
+						return false;
+					key = tokens[cursor + 1].value;
+					valueAt = cursor + 4;
+				}
+				if (key === 'manifest') {
+					manifests += 1;
+					genuine =
+						tokens[valueAt]?.kind === 'identifier' &&
+						tokens[valueAt].value === 'ManifestMenu' &&
+						[',', ';', '}'].includes(tokens[valueAt + 1]?.value);
+				}
+			}
+			if (token.kind === 'symbol' && ['{', '(', '['].includes(token.value)) depth += 1;
+			if (token.kind === 'symbol' && ['}', ')', ']'].includes(token.value)) depth -= 1;
+		}
+		if (depth === 0 && manifests === 1 && genuine) return true;
+	}
+	return false;
 }
 
 /** Splits the module's public methods, without crediting its unused neighbors. */
@@ -56,12 +166,29 @@ function methods(source) {
 /** A reached method must actually render, or delegate to a reached renderer. */
 function renders(source) {
 	const tokens = values(source);
+	const templatePort = tokens.some(
+		(token, i) =>
+			token.kind === 'identifier' &&
+			token.value === 'local' &&
+			tokens[i + 1]?.kind === 'identifier' &&
+			tokens[i + 1]?.value === 'manifest' &&
+			tokens[i + 2]?.value === '=' &&
+			tokens[i + 3]?.kind === 'identifier' &&
+			tokens[i + 3]?.value === 'opts' &&
+			tokens[i + 4]?.value === '.' &&
+			tokens[i + 5]?.kind === 'identifier' &&
+			tokens[i + 5]?.value === 'manifest'
+	);
 	return tokens.some(
 		(token, i) =>
 			token.kind === 'identifier' &&
 			token.value === 'manifest' &&
 			tokens[i + 1]?.value === '.' &&
-			tokens[i + 2]?.value === 'build' &&
+			(tokens[i + 2]?.value === 'build' ||
+				(tokens[i + 2]?.value === 'template_rows' &&
+					templatePort &&
+					!['.', ':', 'function'].includes(tokens[i - 1]?.value))) &&
+			tokens[i + 2]?.kind === 'identifier' &&
 			tokens[i + 3]?.value === '(' &&
 			tokens[i + 4]?.kind === 'string'
 	);
@@ -119,6 +246,8 @@ function delegatedMenuSources(
 				continue;
 			const module = tokens[i + 4].value;
 			if (!MODULES.has(module)) continue;
+			if (module === 'keymap.magic_key_source' && !magicRendererPort(native.src, tokens[i].value))
+				continue;
 			const shared = readFile(path.join(sharedRoot, module.replaceAll('.', '/') + '.lua'));
 			const bodies = methods(shared),
 				reached = new Set();

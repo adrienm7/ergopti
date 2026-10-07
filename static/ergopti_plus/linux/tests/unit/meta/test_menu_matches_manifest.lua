@@ -142,8 +142,22 @@ end
 --- Native editing is not exercised by this menu-shape fixture.
 local function build_fixture_menu(context)
 	local names = {"modules.shortcuts.key_combinations", "infra.key_combinations_scope", "ui.menu.key_combinations"}
+	local magic_path
+	if context.magic_key_source == nil then
+		names[#names + 1] = "modules.hotstrings.magic_key_source"
+		names[#names + 1] = "infra.hotstring_preferences"
+	end
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local ok, rows = pcall(function()
+		if context.magic_key_source == nil then
+			magic_path = os.tmpname()
+			local source = assert(io.open(magic_path, "wb"))
+			assert(source:write('[hotstrings]\nmagic_key_source = "auto"\n')); assert(source:close())
+			local preferences = helpers.load_module("infra.hotstring_preferences")
+			assert(preferences._set_file_for_test(magic_path))
+			context.magic_key_source = helpers.load_module("modules.hotstrings.magic_key_source")
+			helpers.assert_eq(context.magic_key_source.get(), "auto", "whole-tray fixture owns the actual automatic source")
+		end
 		local Paths = require("infra.paths")
 		local file = assert(io.open(Paths.shared("tap_hold/defaults.toml"), "rb"))
 		local defaults = assert(require("toml_codec").decode(file:read("*a"))); assert(file:close())
@@ -162,6 +176,7 @@ local function build_fixture_menu(context)
 		return with_api_source(function(builder) return builder.build(context) end)
 	end)
 	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+	if magic_path then assert(os.remove(magic_path)) end
 	if not ok then error(rows, 0) end
 	return rows
 end
@@ -322,6 +337,9 @@ helpers.describe("menu certification: the manifest's rows are rendered", functio
 						local label = (kind == "section_header")
 							and i18n.section(row.i18n)
 							or i18n.get(row.i18n)
+						if row.id == "magic_key_source_heading" then
+							label = label .. " : " .. i18n.get("menu.layout.magic_key_source.auto")
+						end
 						if row.caption_getter ~= nil then
 							local caption = fixture_captions[row.caption_getter]
 							helpers.assert_type(caption, "string", "every declared caption needs independent fixture state")
@@ -862,3 +880,56 @@ end)
 
 
 require("test.menu_native_child_rows").run(helpers, require("infra.manifest_menu"))
+
+helpers.describe("magic key source: actual complete tray provider", function()
+	helpers.it("(magic-key-source-family) native candidate rows preserve file-backed choices and declaration withdrawal", function()
+		local names = { "modules.hotstrings.magic_key_source", "infra.hotstring_preferences" }
+		local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
+		local path = os.tmpname()
+		local file = assert(io.open(path, "wb")); assert(file:write('[hotstrings]\nmagic_key_source = "KeyJ"\nfuture_setting = "retain"\n')); assert(file:close())
+		local declaration = ManifestMenu.get_root()
+		local child = declaration.magic_key_source_children
+		local ok, err = pcall(function()
+			local preferences = require("infra.hotstring_preferences"); assert(preferences._set_file_for_test(path))
+			local Source = require("modules.hotstrings.magic_key_source")
+			local changes, deferred = 0, {}
+			Source.init({ is_active = function() return true end, replace_on = function() return true end,
+				magic_key = function() return "★" end, can_type = function() return true end,
+				type_text = function() error("menu construction cannot type") end,
+				dispatch_char = function() error("menu construction cannot dispatch") end,
+				end_selection = function() end, can_capture = function() return true end,
+				key_text = function(code) return code == 36 and "j" or nil end,
+				defer = function(fn) deferred[#deferred + 1] = fn; return true end })
+			local context = full_context(); context.magic_key_source = Source
+			context.on_menu_changed = function() changes = changes + 1 end
+			local label = i18n.get("menu.layout.magic_key_source") .. " : j   (KeyJ)"
+			local heading = assert(find_item(build_full_menu(context), label))
+			helpers.assert_eq(heading.menu[1].title, i18n.get("menu.layout.magic_key_source.capture"))
+			helpers.assert_eq(heading.menu[2].title, "-")
+			helpers.assert_eq(heading.menu[3].title, i18n.get("menu.layout.magic_key_source.auto"))
+			helpers.assert_eq(heading.menu[4].title, "-")
+			helpers.assert_eq(#heading.menu, #Source.resolver().candidates() + 4)
+			helpers.assert_eq(changes, 0)
+			local retained = heading.menu[3].fn
+			declaration.magic_key_source_children = nil
+			helpers.assert_nil(find_item(build_full_menu(context), label), "actual native provider cannot reconstruct the withdrawn family")
+			helpers.assert_eq(retained(), false)
+			helpers.assert_eq(Source.get(), "KeyJ", "withdrawal never enters the genuine native writer")
+			helpers.assert_eq(changes, 0)
+			declaration.magic_key_source_children = child
+			local repaired = assert(find_item(build_full_menu(context), label))
+			repaired.menu[3].fn()
+			helpers.assert_eq(Source.get(), "auto")
+			helpers.assert_eq(changes, 1)
+			file = assert(io.open(path, "rb")); local bytes = assert(file:read("*a")); assert(file:close())
+			helpers.assert_eq(bytes, '[hotstrings]\nfuture_setting = "retain"\n', "actual native chooser publishes its neutral default sparsely and preserves the unknown neighbor")
+		end)
+		declaration.magic_key_source_children = child
+		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+		for _, suffix in ipairs({ "", ".tmp" }) do
+			local existing = io.open(path .. suffix, "rb")
+			if existing then assert(existing:close()); assert(os.remove(path .. suffix)) end
+		end
+		if not ok then error(err, 0) end
+	end)
+end)

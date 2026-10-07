@@ -538,6 +538,7 @@ local function _build_layouts(ctx)
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		end
 		return MagicKeySourceRows.menu_rows(Source.resolver(), {
+			manifest = ManifestMenu,
 			t = i18n_safe,
 			current = Source.get(),
 			key_text = Source.key_text,
