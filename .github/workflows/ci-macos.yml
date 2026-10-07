@@ -110,6 +110,160 @@ jobs:
             --role native-fixture \
             --output "$RUNNER_TEMP/shortcuts-event-phase/native-fixture"
 
+      - name: Publish validated fixed compiler labels through Checks annotations
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import re
+          import stat
+
+
+          def require(value):
+              if not value:
+                  raise ValueError("receipt refused")
+
+
+          def read_fixed(path):
+              with os.fdopen(os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK), "rb") as stream:
+                  before = os.fstat(stream.fileno())
+                  require(stat.S_ISREG(before.st_mode) and 0 < before.st_size <= 65536)
+                  raw = stream.read(65537)
+                  after = os.fstat(stream.fileno())
+              current = os.stat(path, follow_symlinks=False)
+              identity = lambda value: (value.st_dev, value.st_ino, value.st_size, value.st_mtime_ns, value.st_ctime_ns)
+              require(identity(before) == identity(after) == identity(current) and len(raw) == before.st_size)
+              return raw
+
+
+          def unique(pairs):
+              value = {}
+              for key, item in pairs:
+                  require(key not in value)
+                  value[key] = item
+              return value
+
+
+          def integer(value, low, high):
+              return type(value) is int and low <= value <= high
+
+
+          def digest(value):
+              return type(value) is str and re.fullmatch("[0-9a-f]{64}", value) is not None
+
+
+          try:
+              roles = ("raw-version", "sb-count", "native-fixture")
+              known = (
+                  "missing_appkit_header", "missing_foundation_header", "missing_coreservices_header",
+                  "missing_scriptingbridge_header", "missing_security_header", "missing_mach_message_header",
+                  "undeclared_no_prompt_flag", "undeclared_sender_audit_attribute",
+                  "undeclared_audit_descriptor_type", "undeclared_security_audit_guest_attribute",
+              )
+              unknown = {"empty_stderr", "unclassified", "unavailable_output_limit"}
+              source_sha = os.environ["GITHUB_SHA"]
+              run_id, attempt = os.environ["GITHUB_RUN_ID"], os.environ["GITHUB_RUN_ATTEMPT"]
+              require(os.environ.get("GITHUB_ACTIONS") == "true")
+              require(re.fullmatch("[0-9a-f]{40}", source_sha) is not None)
+              require(re.fullmatch("[1-9][0-9]{0,19}", run_id) is not None)
+              require(re.fullmatch("[1-9][0-9]{0,19}", attempt) is not None)
+              sources = (
+                  "tools/diagnostics/macos_owned_process.py",
+                  "tools/diagnostics/program_actions/ShortcutsEventPhaseProbe.m",
+                  "tools/diagnostics/program_actions/run_shortcuts_event_phase_probe.py",
+                  "tools/diagnostics/program_actions/test_shortcuts_event_phase_probe.py",
+                  "tools/diagnostics/program_actions/README-shortcuts-event-phase.md",
+              )
+              root = Path(os.environ["GITHUB_WORKSPACE"]).resolve(strict=True)
+              hashes = {name: hashlib.sha256(read_fixed(root / name)).hexdigest() for name in sources}
+              output = Path(os.environ["RUNNER_TEMP"]).resolve(strict=True) / "shortcuts-event-phase"
+              require(not output.is_symlink())
+              fields = {
+                  "schema", "contract", "result", "reason", "source_sha", "source_hashes", "baseline_sha",
+                  "baseline_discover_sha256", "baseline_cause", "role", "sender_equal_to_baseline",
+                  "catalogue_observed", "invocation_qualified", "remote_cancellation_qualified",
+                  "native_execution", "ci_run_id", "ci_run_attempt", "captures",
+              }
+              capture_fields = {
+                  "operation", "failure", "status", "retired", "business_deadline_seconds", "business_elapsed_us",
+                  "terminal_before_retirement", "receipt", "stdout_bytes", "stderr_bytes", "compiler_error_classes",
+              }
+              receipt_fields = {
+                  "worker_pid", "group_id", "closed", "reservation_lost", "signals", "live_group_members",
+                  "escaped_sessions_managed",
+              }
+              rows = []
+              for role in roles:
+                  directory = output / role
+                  require(not directory.is_symlink())
+                  record = json.loads(read_fixed(directory / "observation.json"), object_pairs_hook=unique,
+                                      parse_constant=lambda value: require(False))
+                  require(type(record) is dict and set(record) == fields)
+                  require(type(record["schema"]) is int and record["schema"] == 1)
+                  require(record["contract"] == "readonly-shortcuts-event-phase")
+                  require(record["result"] == "REFUSED" and record["baseline_cause"] == "not_determined")
+                  require(record["role"] == role and record["source_sha"] == source_sha)
+                  require(record["ci_run_id"] == run_id and record["ci_run_attempt"] == attempt)
+                  require(type(record["source_hashes"]) is dict and record["source_hashes"] == hashes)
+                  require(record["baseline_sha"] == "72599cb78fc02d5ae9656d94a8e31d09eb4adbbb")
+                  require(digest(record["baseline_discover_sha256"]))
+                  require(record["native_execution"] is True)
+                  require(all(record[key] is False for key in (
+                      "sender_equal_to_baseline", "catalogue_observed", "invocation_qualified", "remote_cancellation_qualified")))
+                  captures = record["captures"]
+                  require(type(captures) is list and len(captures) == 1)
+                  captured = captures[0]
+                  require(type(captured) is dict and set(captured) == capture_fields)
+                  require(captured["operation"] == "compile" and captured["retired"] is True)
+                  require(type(captured["business_deadline_seconds"]) is int and captured["business_deadline_seconds"] == 120)
+                  require(integer(captured["business_elapsed_us"], 0, 2**63 - 1))
+                  require(all(integer(captured[key], 0, 2**63 - 1) for key in ("stdout_bytes", "stderr_bytes")))
+                  require(integer(captured["status"], -255, 255))
+                  failure = captured["failure"]
+                  require(failure in {"none", "deadline", "output_limit", "interrupted", "native_capture_refused", "terminal_shape_refused"})
+                  require(record["reason"] == ("compile_refused" if failure == "none" else failure))
+                  require(failure != "none" or captured["status"] != 0)
+                  receipt = captured["receipt"]
+                  require(type(receipt) is dict and set(receipt) == receipt_fields)
+                  require(integer(receipt["worker_pid"], 1, 2**31 - 1) and type(receipt["group_id"]) is int
+                          and receipt["group_id"] == receipt["worker_pid"])
+                  require(receipt["closed"] is True and receipt["reservation_lost"] is False
+                          and receipt["escaped_sessions_managed"] is False)
+                  require(type(receipt["live_group_members"]) is list and not receipt["live_group_members"])
+                  require(type(receipt["signals"]) is list and len(receipt["signals"]) <= 1024
+                          and all(type(value) is int and value in (15, 9) for value in receipt["signals"]))
+                  terminal = captured["terminal_before_retirement"]
+                  require(terminal is None or (type(terminal) is dict and set(terminal) == {"pid", "code", "status"}
+                          and type(terminal["pid"]) is int and terminal["pid"] == receipt["worker_pid"]
+                          and integer(terminal["code"], 1, 3) and integer(terminal["status"], 0, 255)))
+                  require(failure != "none" or terminal is not None)
+                  if terminal is not None:
+                      require(terminal["status"] == (captured["status"] if terminal["code"] == 1 else -captured["status"]))
+                  labels = captured["compiler_error_classes"]
+                  require(type(labels) is list and 1 <= len(labels) <= 10
+                          and all(type(label) is str for label in labels) and len(set(labels)) == len(labels))
+                  require((len(labels) == 1 and labels[0] in unknown)
+                          or (all(label in known for label in labels) and labels == sorted(labels, key=known.index)))
+                  if captured["stdout_bytes"] > 65536 or captured["stderr_bytes"] > 65536:
+                      require(labels == ["unavailable_output_limit"])
+                  elif captured["stderr_bytes"] == 0:
+                      require(labels == ["empty_stderr"])
+                  else:
+                      require("empty_stderr" not in labels and "unavailable_output_limit" not in labels)
+                  rows.append((role, labels))
+              # No annotation is emitted until all three exact compiler-stage receipts pass.
+              for role, labels in rows:
+                  print("::notice title=Shortcuts fixed compiler labels::role=" + role + "; labels=" + ",".join(labels))
+          except Exception:
+              print("::error title=Shortcuts compiler receipt refusal::Fixed compiler labels unavailable; receipt validation refused.")
+              raise SystemExit(1)
+          PY
+
       - name: Require all three diagnostic role receipts
         if: always()
         shell: bash
