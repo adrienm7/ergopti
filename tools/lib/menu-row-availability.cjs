@@ -87,7 +87,30 @@ function validateMenuAvailability(menu) {
 	}
 }
 
-function validateChildTemplates(menu) {
+/** Recognizes the supported value slot without crediting an escaped percent. */
+function hasCaptionPlaceholder(format) {
+	if (typeof format !== 'string') return false;
+	for (let index = 0; index < format.length; index++) {
+		if (format[index] !== '%') continue;
+		if (format[index + 1] === 's') return true;
+		index++;
+	}
+	return false;
+}
+
+function validateChildTemplates(menu, captionFormat) {
+	function inertCaptionFits(row) {
+		if (row.caption_getter === undefined) return true;
+		if (typeof captionFormat !== 'function') return false;
+		try {
+			const title = captionFormat(row.i18n);
+			if (row.caption_layout !== undefined)
+				return typeof title === 'string' && title !== '' && !hasCaptionPlaceholder(title);
+			return hasCaptionPlaceholder(title);
+		} catch {
+			return false;
+		}
+	}
 	function inertPresentation(key, rowId, checking = new Set()) {
 		const rows = menu[key];
 		if (!Array.isArray(rows) || rows.length === 0 || checking.has(key)) return false;
@@ -147,6 +170,33 @@ function validateChildTemplates(menu) {
 	for (const [key, rows] of Object.entries(menu)) {
 		if (!Array.isArray(rows)) continue;
 		for (const row of rows) {
+			if (Object.hasOwn(row, 'label_prefix')) {
+				if (
+					row.type !== 'command' ||
+					typeof row.id !== 'string' ||
+					row.id === '' ||
+					typeof row.i18n !== 'string' ||
+					row.i18n === '' ||
+					typeof row.label_prefix !== 'string' ||
+					/[\x00-\x1f\x7f]/.test(row.label_prefix) ||
+					Buffer.from(row.label_prefix, 'utf8').toString('utf8') !== row.label_prefix
+				)
+					throw new Error(`menu.${key}: literal label_prefix needs a command and plain Unicode`);
+			}
+			if (row.caption_layout !== undefined || row.caption_joiner !== undefined) {
+				if (
+					!['label', 'command', 'group'].includes(row.type) ||
+					!['prefix', 'suffix'].includes(row.caption_layout) ||
+					typeof row.caption_joiner !== 'string' ||
+					/[\x00-\x1f\x7f]/.test(row.caption_joiner) ||
+					typeof row.caption_getter !== 'string' ||
+					row.caption_getter === '' ||
+					(row.type !== 'label' && !inertCaptionFits(row))
+				)
+					throw new Error(
+						`menu.${key}: caption layout needs an inert label, literal joiner and getter`
+					);
+			}
 			const where = `menu.${key} row "${row.id || row.type}"`;
 			if (row.on_refusal !== undefined && row.type !== 'include')
 				throw new Error(`${where}: on_refusal belongs to an inert presentation include`);
@@ -183,9 +233,20 @@ function validateChildTemplates(menu) {
 					row.id === '' ||
 					typeof row.i18n !== 'string' ||
 					row.i18n === '' ||
+					!inertCaptionFits(row) ||
 					(row.unavailable !== undefined && row.unavailable !== 'hide') ||
 					Object.keys(row).some(
-						(field) => !['type', 'id', 'i18n', 'platforms', 'unavailable'].includes(field)
+						(field) =>
+							![
+								'type',
+								'id',
+								'i18n',
+								'platforms',
+								'unavailable',
+								'caption_getter',
+								'caption_layout',
+								'caption_joiner'
+							].includes(field)
 					))
 			)
 				throw new Error(
@@ -194,20 +255,30 @@ function validateChildTemplates(menu) {
 			if (
 				row.type === 'section_header' &&
 				((row.id !== undefined && (typeof row.id !== 'string' || row.id === '')) ||
+					(row.caption_getter !== undefined && (typeof row.id !== 'string' || row.id === '')) ||
 					typeof row.i18n !== 'string' ||
 					row.i18n === '' ||
+					!inertCaptionFits(row) ||
 					(row.unavailable !== undefined && !['hide', 'grey'].includes(row.unavailable)) ||
 					(row.reason_key !== undefined &&
 						(typeof row.reason_key !== 'string' || row.reason_key === '')) ||
 					Object.keys(row).some(
 						(field) =>
-							!['type', 'id', 'i18n', 'platforms', 'unavailable', 'reason_key'].includes(field)
+							![
+								'type',
+								'id',
+								'i18n',
+								'platforms',
+								'unavailable',
+								'reason_key',
+								'caption_getter'
+							].includes(field)
 					))
 			)
 				throw new Error(`${where}: section header needs a caption without behavior metadata`);
 			if (
 				row.caption_getter !== undefined &&
-				(!['command', 'check', 'group'].includes(row.type) ||
+				(!['command', 'check', 'group', 'label', 'section_header'].includes(row.type) ||
 					typeof row.caption_getter !== 'string' ||
 					row.caption_getter === '' ||
 					typeof row.id !== 'string' ||
@@ -216,7 +287,7 @@ function validateChildTemplates(menu) {
 					row.i18n === '')
 			)
 				throw new Error(
-					`${where}: caption_getter needs a labelled command, check or group identity`
+					`${where}: caption_getter needs a labelled command, check or group identity, or a labelled inert label or section header`
 				);
 		}
 	}
@@ -233,4 +304,8 @@ function validateChildTemplates(menu) {
 	for (const [key, rows] of Object.entries(menu)) if (Array.isArray(rows)) visit(key);
 }
 
-module.exports = { classifyMenuRow, validateMenuAvailability, validateChildTemplates };
+module.exports = {
+	classifyMenuRow,
+	validateMenuAvailability,
+	validateChildTemplates
+};

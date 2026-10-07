@@ -102,6 +102,10 @@ local _context  = { appId = "", windowTitle = "" }
 -- Running flag — set after the device is successfully opened.
 local _running  = false
 
+-- One captured publisher and one in-flight source transaction belong to a start.
+local _capture_session, _capture_options, _capture_republisher = nil, nil, nil
+local _source_reconciliation = nil
+
 -- Every owned keyboard and observed pointer path. The first keyboard remains in
 -- _device for the public log/status contract, but it is never the whole state.
 local _devices = {}
@@ -480,7 +484,7 @@ local function _input_exports_current()
 end
 
 local function _input_runtime_current(ctx, active)
-	if not original_reader_load or not ctx or type(ctx.broker) ~= "table" or package.loaded["adapters.keyboard_hook"] ~= M
+	if _source_reconciliation or not original_reader_load or not ctx or type(ctx.broker) ~= "table" or package.loaded["adapters.keyboard_hook"] ~= M
 		or not _running or not _intercept or _remapper ~= ctx.engine
 		or _remapper_generation ~= ctx.generation or _remapper_input_owner ~= ctx.issuer
 		or _broker ~= ctx.broker or _emit_raw ~= ctx.emitter or _on_tap ~= ctx.callback
@@ -1432,6 +1436,7 @@ end
 --- file watchers advance even under an autorepeat backlog.
 function M.pump()
 	if not _running then return end
+	if _source_reconciliation then return end
 	local open_keyboards = 0
 	local sources = {}
 	for _, path in ipairs(_devices) do
@@ -1698,10 +1703,13 @@ local function _best_pointers()
 	return pointer and { pointer } or {}
 end
 
-local function _close_paths(paths, slot_for)
+local function _close_paths(paths, slot_for, tx)
 	for _, path in ipairs(paths) do
 		local slot = slot_for(path)
-		if _leased_reader_cleanup then
+		if tx and tx.authority then
+			local lease = tx.close_owners[slot]
+			if lease then _input_reader_ports.retire_source(lease) end
+		elseif _leased_reader_cleanup then
 			local lease = _leased_reader_cleanup[slot]
 			if lease then _input_reader_ports.retire_source(lease) end
 		else EvdevReader.close(slot) end
@@ -1757,13 +1765,228 @@ local function _all_pointers_open(paths)
 	return true
 end
 
+--- Retains only source leases issued by the construction-captured Reader.
+--- @param tx table Original source transaction.
+--- @param path string Intended device path.
+--- @param slot_for function Keyboard or pointer namespace.
+--- @param keyboard boolean Whether input admission requires the native grab.
+--- @return boolean accepted
+local function _capture_source_member(tx, path, slot_for, keyboard)
+	if not tx.authority then tx.native_complete = false; return not tx.managed end
+	local exports_current = _input_exports_current()
+	local slot = slot_for(path)
+	local lease, observer = _input_reader_ports.capture_source_owner(slot)
+	-- This retained getter is the genuine constructor, even after a public
+	-- export changes. Its opaque originals remain safe cleanup targets only.
+	if lease then
+		tx.cleanup[#tx.cleanup + 1] = lease
+		tx.close_owners[slot], tx.close_observers[slot] = lease, observer
+	end
+	if not exports_current then tx.native_complete = false; return not tx.managed end
+	local input, cleanup = _input_reader_ports.source_owner_current(lease, observer,
+		_input_reader_ports.capture_source_owner, _input_reader_ports.source_owner_current, _input_reader_ports.retire_source)
+	if cleanup ~= true or not _input_exports_current() then
+		tx.native_complete = false
+		return not tx.managed
+	end
+	local is_keyboard = slot_for == keyboard_slot
+	local owners, observers = is_keyboard and tx.sources or tx.pointers, is_keyboard and tx.source_observers or tx.pointer_observers
+	owners[slot], observers[slot] = lease, observer
+	if keyboard and _intercept and input ~= true then tx.native_complete = false; return not tx.managed end
+	return true
+end
+
+--- Captures the exact session and output owner before any watchdog callback.
+--- @return table tx
+local function _begin_source_transaction()
+	local tx = { session = _capture_session, options = _capture_options, publisher = _capture_republisher,
+		managed = _capture_republisher ~= nil, authority = original_reader_load,
+		engine = _remapper, generation = _remapper_generation, issuer = _remapper_input_owner,
+		broker = _broker, emitter = _emit_raw, callback = _on_tap, output = _input_output_owner,
+		sources = {}, source_observers = {}, pointers = {}, pointer_observers = {}, cleanup = {},
+		close_owners = {}, close_observers = {}, native_complete = true,
+		emergency = original_input_hook_ports.emergency_stop }
+	if tx.engine then tx.release = rawget(tx.engine, "release_all"); tx.ack = rawget(tx.engine, "ack_retirement") end
+	if tx.broker then
+		tx.output_ports = {}
+		for _, name in ipairs({ "view", "has_debt", "output_current", "output_retired", "retire" }) do
+			tx.output_ports[name] = rawget(tx.broker, name)
+		end
+	end
+	_source_reconciliation = tx
+	local function remember(paths, slot_for, owners, observers, keyboard)
+		for _, path in ipairs(paths) do
+			local slot = slot_for(path)
+			local lease, observer = owners and owners[slot], observers and observers[slot]
+			if tx.authority and lease then
+				tx.cleanup[#tx.cleanup + 1] = lease
+				tx.close_owners[slot], tx.close_observers[slot] = lease, observer
+				local input, cleanup = _input_reader_ports.source_owner_current(lease, observer,
+					_input_reader_ports.capture_source_owner, _input_reader_ports.source_owner_current, _input_reader_ports.retire_source)
+				if cleanup == true then
+					local staged, staged_observers = keyboard and tx.sources or tx.pointers,
+						keyboard and tx.source_observers or tx.pointer_observers
+					staged[slot], staged_observers[slot] = lease, observer
+					if keyboard and _intercept and input ~= true then tx.native_complete = false end
+				else tx.native_complete = false end
+			else tx.native_complete = false end
+		end
+	end
+	remember(_devices, keyboard_slot, _input_source_owners, _input_source_observers, true)
+	remember(_pointer_devices, pointer_slot, _input_pointer_owners, _input_pointer_observers, false)
+	tx.original_sources, tx.original_source_observers = tx.sources, tx.source_observers
+	tx.original_pointers, tx.original_pointer_observers = tx.pointers, tx.pointer_observers
+	return tx
+end
+
+--- Joins retained identities only; callback-bearing output observation stays separate.
+--- @param tx table Original source transaction.
+--- @return boolean current
+local function _source_transaction_current(tx)
+	if _source_reconciliation ~= tx or _capture_session ~= tx.session or _capture_options ~= tx.options
+		or _capture_republisher ~= tx.publisher or not tx.options
+		or rawget(tx.options, "onCaptureReacquired") ~= tx.publisher
+		or package.loaded["adapters.keyboard_hook"] ~= M or _remapper ~= tx.engine
+		or _remapper_generation ~= tx.generation or _remapper_input_owner ~= tx.issuer
+		or _broker ~= tx.broker or _emit_raw ~= tx.emitter or _on_tap ~= tx.callback
+		or tx.managed and (not tx.authority or not _input_exports_current()) then return false end
+	for _, name in ipairs(INPUT_HOOK_PORT_NAMES) do
+		if rawget(M, name) ~= original_input_hook_ports[name] then return false end
+	end
+	if tx.output then
+		if _input_output_owner ~= tx.output or package.loaded["adapters.uinput_writer"] ~= tx.output.writer
+			or package.loaded["adapters.modifier_broker"] ~= ModifierBroker
+			or rawget(ModifierBroker, "for_channel") ~= installed_output_broker then return false end
+		local exact, binding = installed_output_broker(tx.output.writer)
+		if exact ~= tx.broker or binding ~= tx.output.binding or binding(tx.broker) ~= true then return false end
+		for _, name in ipairs(INPUT_OUTPUT_PORT_NAMES) do
+			if rawget(tx.output.writer, name) ~= tx.output.ports[name] then return false end
+		end
+	end
+	for name, port in pairs(tx.output_ports or {}) do
+		if rawget(tx.broker, name) ~= port then return false end
+	end
+	return true
+end
+
+--- Refuses a previously captured native slot that a callback has replaced.
+--- @param tx table Original transaction.
+--- @param slot string Already-open slot.
+--- @return boolean owned
+local function _source_existing_current(tx, slot)
+	if not tx.authority then return not tx.managed end
+	local lease, observer = tx.close_owners[slot], tx.close_observers[slot]
+	if not lease then tx.native_complete = false; return not tx.managed end
+	local _, cleanup = _input_reader_ports.source_owner_current(lease, observer,
+		_input_reader_ports.capture_source_owner, _input_reader_ports.source_owner_current, _input_reader_ports.retire_source)
+	if cleanup ~= true then
+		tx.native_complete = false
+		-- Explicit unmanaged raw input keeps compatibility after an authority-port
+		-- substitution, but cannot adopt a genuine foreign native lifetime.
+		return not tx.managed and not _input_exports_current()
+	end
+	return _source_transaction_current(tx)
+end
+
+--- Rejoins original lifetimes before the first intentional source mutation.
+--- @param tx table Original transaction.
+--- @return boolean current
+local function _source_original_cohort_current(tx)
+	if not _source_transaction_current(tx) then return false end
+	for _, pair in ipairs({ { tx.original_sources, tx.original_source_observers },
+		{ tx.original_pointers, tx.original_pointer_observers } }) do
+		for slot, lease in pairs(pair[1]) do
+			local _, cleanup = _input_reader_ports.source_owner_current(lease, pair[2][slot],
+				_input_reader_ports.capture_source_owner, _input_reader_ports.source_owner_current, _input_reader_ports.retire_source)
+			if cleanup ~= true then return false end
+		end
+	end
+	return _source_transaction_current(tx)
+end
+
+--- Observes existing source lifetimes without inventing an event or an input lease.
+--- @param tx table Original source transaction.
+--- @return boolean current
+local function _source_cohort_current(tx)
+	if not _source_transaction_current(tx) then return false end
+	if not tx.native_complete then return not tx.managed end
+	for _, pair in ipairs({ { tx.sources, tx.source_observers, true }, { tx.pointers, tx.pointer_observers, false } }) do
+		for slot, lease in pairs(pair[1]) do
+			local input, cleanup = _input_reader_ports.source_owner_current(lease, pair[2][slot],
+				_input_reader_ports.capture_source_owner, _input_reader_ports.source_owner_current, _input_reader_ports.retire_source)
+			if cleanup ~= true or pair[3] and _intercept and input ~= true then return false end
+		end
+	end
+	return _source_transaction_current(tx)
+end
+
+--- Retires only captured originals; reopened descriptors and channels stay untouched.
+--- @param tx table Original source transaction.
+--- @param reason string Closed admission reason.
+--- @return boolean settled
+local function _retire_source_transaction(tx, reason)
+	local settled = true
+	if tx.authority then
+		for _, lease in ipairs(tx.cleanup) do
+			local called, acknowledged = pcall(_input_reader_ports.retire_source, lease)
+			settled = called and acknowledged == true and settled
+		end
+		if tx.output and tx.output_ports and type(tx.output_ports.retire) == "function" then
+			local called, acknowledged = pcall(tx.output_ports.retire)
+			settled = called and acknowledged == true and settled
+			if type(tx.output_ports.output_retired) == "function" and type(tx.release) == "function" then
+				local observed, terminal = pcall(tx.output_ports.output_retired)
+				if observed and terminal == true then
+					local released, rows = pcall(tx.release, tx.engine)
+					if released and type(rows) == "table" and type(tx.ack) == "function" then
+						local called_ack, acknowledged_ack = pcall(tx.ack, tx.engine, true, rows)
+						settled = called_ack and acknowledged_ack == true and settled
+					end
+				end
+			end
+		end
+		if _capture_session == tx.session then
+			_running, _reacquiring, _capture_session = false, false, nil
+			_devices, _pointer_devices, _device = {}, {}, nil
+			_armed_input, _live_input_context = nil, nil
+			_origin_ready = false
+		end
+	elseif _source_transaction_current(tx) and type(tx.emergency) == "function" then
+		-- Existing unmanaged recorder backends have no native source lease. They
+		-- keep their original raw-input cleanup contract, never logical admission.
+		pcall(tx.emergency, reason)
+	end
+	return settled
+end
+
+--- Publishes whole replacement maps only after every native and caller callback.
+--- @param tx table Original source transaction.
+--- @return boolean accepted
+local function _publish_source_transaction(tx)
+	if not _source_cohort_current(tx) then return false end
+	if tx.managed and _intercept then
+		if not tx.output or type(tx.output_ports.output_current) ~= "function" then return false end
+		local called, current = pcall(tx.output_ports.output_current)
+		if not called or current ~= true or not _source_cohort_current(tx) then return false end
+	end
+	if tx.changed == false then return true end
+	if tx.native_complete and tx.authority then
+		_input_source_owners, _input_source_observers = tx.sources, tx.source_observers
+		_input_pointer_owners, _input_pointer_observers = tx.pointers, tx.pointer_observers
+	else
+		_input_source_owners, _input_source_observers, _input_pointer_owners, _input_pointer_observers = nil, nil, nil, nil
+	end
+	return true
+end
+
+
 --- Opens and, when asked, grabs every desired keyboard as one transaction.
 --- Existing desired sources remain live while new ones are staged. A failed new
 --- source is rolled back, so hotplug cannot silently publish a partial set.
 --- @param paths table Device paths.
 --- @param force_path string|nil A same-path reconnect whose stale fd must close.
 --- @return boolean True when the complete desired set is live.
-local function _acquire(paths, force_path)
+local function _acquire(paths, force_path, tx)
 	local retained = {}
 	for _, path in ipairs(_devices) do retained[path] = true end
 	local opened = {}
@@ -1772,18 +1995,26 @@ local function _acquire(paths, force_path)
 		if path == force_path then
 			local released, release_err = _release_forwarded_sources({ path })
 			if not released then return false, release_err end
-			EvdevReader.close(slot)
+			_close_paths({ path }, keyboard_slot, tx)
 		end
-		if not EvdevReader.is_open(slot) then
+		local already_open = EvdevReader.is_open(slot)
+		if already_open and tx and not _source_existing_current(tx, slot) then return false, "original open source was replaced" end
+		if not already_open then
 			if not EvdevReader.open(path, slot) then
-				_close_paths(opened, keyboard_slot)
+				_close_paths(opened, keyboard_slot, tx)
 				return false
 			end
 			opened[#opened + 1] = path
+			if tx and not _capture_source_member(tx, path, keyboard_slot, false) then
+				return false, "original source cleanup authority refused"
+			end
 			if _intercept and not EvdevReader.grab(slot) then
-				_close_paths(opened, keyboard_slot)
+				_close_paths(opened, keyboard_slot, tx)
 				return false
 			end
+		end
+		if tx and not _capture_source_member(tx, path, keyboard_slot, true) then
+			return false, "original grabbed source authority refused"
 		end
 		retained[path] = nil
 	end
@@ -1792,10 +2023,10 @@ local function _acquire(paths, force_path)
 	table.sort(retired)
 	local released, release_err = _release_forwarded_sources(retired)
 	if not released then
-		_close_paths(opened, keyboard_slot)
+		_close_paths(opened, keyboard_slot, tx)
 		return false, release_err
 	end
-	_close_paths(retired, keyboard_slot)
+	_close_paths(retired, keyboard_slot, tx)
 	_devices = {}
 	for index, path in ipairs(paths) do _devices[index] = path end
 	_device = _devices[1]
@@ -1805,25 +2036,35 @@ end
 
 --- Reconciles the non-grabbed pointer observers independently of keyboards.
 --- @param paths table Device paths.
-local function _acquire_pointers(paths)
+local function _acquire_pointers(paths, tx)
 	local retained = {}
 	for _, path in ipairs(_pointer_devices) do retained[path] = true end
 	local opened = {}
 	for _, path in ipairs(paths) do
 		local slot = pointer_slot(path)
-		if not EvdevReader.is_open(slot) then
+		local already_open = EvdevReader.is_open(slot)
+		if already_open and tx and not _source_existing_current(tx, slot) then return false, "original open source was replaced" end
+		if not already_open then
 			if not EvdevReader.open(path, slot) then
-				_close_paths(opened, pointer_slot)
+				_close_paths(opened, pointer_slot, tx)
 				Logger.warn(LOG, "Could not observe every pointer — keeping the previous set.")
+				if tx then
+					tx.native_complete = false
+					if tx.managed then return false end
+				end
 				return
 			end
 			opened[#opened + 1] = path
 		end
+		if tx and not _capture_source_member(tx, path, pointer_slot, false) then
+			return false
+		end
 		retained[path] = nil
 	end
-	for path in pairs(retained) do EvdevReader.close(pointer_slot(path)) end
+	for path in pairs(retained) do _close_paths({ path }, pointer_slot, tx) end
 	_pointer_devices = {}
 	for index, path in ipairs(paths) do _pointer_devices[index] = path end
+	return true
 end
 
 --- Re-checks which device should be read, and switches when it has changed.
@@ -1840,131 +2081,165 @@ end
 --- Called from the daemon's periodic callback, not the idle one: it re-reads
 --- /proc/bus/input/devices, which has no business on the keystroke path.
 function M.check_device()
+	if _source_reconciliation then return end
 	if not _running and not _reacquiring then return end
 
 	_ticks_since_check = _ticks_since_check + 1
 	if _ticks_since_check < DEVICE_CHECK_TICKS then return end
 	_ticks_since_check = 0
-
-	local keyboards, pointers = {}, {}
-	if _pinned_device then
-		pointers = _on_click and _best_pointers() or {}
-		local available = EvdevReader.is_available(_pinned_device)
-		if not available then
-			_pinned_missing = true
-			if not _reported_missing then
-				Logger.warn(LOG, "Pinned input device %s is unavailable — waiting for that exact path.",
-					_pinned_device)
-				_reported_missing = true
-			end
-			return
-		end
-		-- Readable is not the same as "can produce key events", and the kernel
-		-- reuses eventN numbers across hotplug: the exact path may now name a
-		-- mouse or another non-keyboard node. start() refuses those, so the
-		-- watchdog must not adopt one behind its back and grab it as a keyboard.
-		local ok_finder, Finder = pcall(require, "modules.hotstrings.device_finder")
-		if ok_finder and type(Finder.is_key_device) == "function" then
-			local is_key, key_why = Finder.is_key_device(_pinned_device)
-			if not is_key then
+	local tx = _begin_source_transaction()
+	tx.changed = false
+	local called, accepted = pcall(function()
+	
+		local keyboards, pointers = {}, {}
+		if _pinned_device then
+			pointers = _on_click and _best_pointers() or {}
+			local available = EvdevReader.is_available(_pinned_device)
+			if not available then
 				_pinned_missing = true
 				if not _reported_missing then
-					Logger.warn(LOG, "Pinned input device %s no longer produces key events (%s) — waiting for that exact path.",
-						_pinned_device, tostring(key_why))
+					Logger.warn(LOG, "Pinned input device %s is unavailable — waiting for that exact path.",
+						_pinned_device)
 					_reported_missing = true
 				end
-				return
+				tx.waiting = true; return true
 			end
+			-- Readable is not the same as "can produce key events", and the kernel
+			-- reuses eventN numbers across hotplug: the exact path may now name a
+			-- mouse or another non-keyboard node. start() refuses those, so the
+			-- watchdog must not adopt one behind its back and grab it as a keyboard.
+			local ok_finder, Finder = pcall(require, "modules.hotstrings.device_finder")
+			if ok_finder and type(Finder.is_key_device) == "function" then
+				local is_key, key_why = Finder.is_key_device(_pinned_device)
+				if not is_key then
+					_pinned_missing = true
+					if not _reported_missing then
+						Logger.warn(LOG, "Pinned input device %s no longer produces key events (%s) — waiting for that exact path.",
+							_pinned_device, tostring(key_why))
+						_reported_missing = true
+					end
+					tx.waiting = true; return true
+				end
+			end
+			keyboards = { _pinned_device }
+		else
+			keyboards, pointers = _best_devices()
+			if not _on_click then pointers = {} end
 		end
-		keyboards = { _pinned_device }
-	else
-		keyboards, pointers = _best_devices()
-		if not _on_click then pointers = {} end
-	end
-	if #keyboards == 0 then
-		if not _reported_missing then
-			Logger.warn(LOG, "No keyboard source found — keeping the current set until one appears.")
-			_reported_missing = true
+		if #keyboards == 0 then
+			if not _reported_missing then
+				Logger.warn(LOG, "No keyboard source found — keeping the current set until one appears.")
+				_reported_missing = true
+			end
+			if not same_paths(pointers, _pointer_devices) or not _all_pointers_open(pointers) then
+				if _armed_input and _withdraw_input_arm(_armed_input) ~= true then return false end
+				if not _source_original_cohort_current(tx) then return false end
+				tx.changed = true
+				tx.sources, tx.source_observers, tx.pointers, tx.pointer_observers, tx.native_complete = {}, {}, {}, {}, true
+				for _, path in ipairs(_devices) do
+					if not _capture_source_member(tx, path, keyboard_slot, true) then return false end
+				end
+				if _acquire_pointers(pointers, tx) == false then return false end
+			end
+			tx.waiting = true; return true
 		end
-		_acquire_pointers(pointers)
-		return
-	end
-	_reported_missing = false
-
-	local keyboards_changed = not same_paths(keyboards, _devices)
-		or not _all_keyboards_open(keyboards) or _pinned_missing
-	local pointers_changed = not same_paths(pointers, _pointer_devices)
-		or not _all_pointers_open(pointers)
-	-- Refresh origin admission through this existing watchdog, including an
-	-- unchanged path whose kernel descriptor became synthetic or unknown.
-	M.physical_source_receipt()
-	if not keyboards_changed and not pointers_changed then return end
-	if not keyboards_changed then
-		_acquire_pointers(pointers)
-		return
-	end
-	local force_path = _pinned_missing and _pinned_device or nil
-	_pinned_missing = false
-
-	Logger.start(LOG, "Keyboard source set changed (%d → %d) — re-acquiring…",
-		#_devices, #keyboards)
-	local reset_ok, reset_err = XkbCapture.reset_state()
-	if not reset_ok then
-		Logger.error(LOG, "Cannot reset XKB state for the new source set — keeping the previous set: %s.",
-			tostring(reset_err))
-		return
-	end
-	local acquired, acquire_err = _acquire(keyboards, force_path)
-	if acquired then
-		_seed_caps_lock(_devices[1])
-		-- A source/capture change retires every old repeat callback, but the
-		-- application still never saw its consumed down. Keep that debt only
-		-- on committed source/key owners until an actual release arrives.
-		local sources, suppressed, physical, snapshots = {}, {}, {}, {}
-		for _, path in ipairs(_devices) do sources[path] = true end
-		for key, down in pairs(_physical_down) do
-			if _consumed_down[key] and sources[down.source] then
-				local snapshot = snapshots[down.source]
-				if snapshot == nil then
-					local keys, query_err = EvdevReader.pressed_keys(keyboard_slot(down.source), KEY_MAX)
-					snapshot = { keys = keys }
-					snapshots[down.source] = snapshot
-					if keys == nil then
-						Logger.warn(LOG, "Suppressed-key state unavailable on recovered source %s — "
-							.. "retaining consumed presses until release (%s).", down.source, tostring(query_err))
+		_reported_missing = false
+	
+		local keyboards_changed = not same_paths(keyboards, _devices)
+			or not _all_keyboards_open(keyboards) or _pinned_missing
+		local pointers_changed = not same_paths(pointers, _pointer_devices)
+			or not _all_pointers_open(pointers)
+		-- Refresh origin admission through this existing watchdog, including an
+		-- unchanged path whose kernel descriptor became synthetic or unknown.
+		M.physical_source_receipt()
+		if not keyboards_changed and not pointers_changed then return true end
+		if _armed_input and _withdraw_input_arm(_armed_input) ~= true then return false end
+		if not _source_original_cohort_current(tx) then return false end
+		tx.changed = true
+		if not keyboards_changed then
+			tx.sources, tx.source_observers, tx.pointers, tx.pointer_observers, tx.native_complete = {}, {}, {}, {}, true
+			for _, path in ipairs(_devices) do
+				if not _capture_source_member(tx, path, keyboard_slot, true) then return false end
+			end
+			if _acquire_pointers(pointers, tx) == false then return false end
+			return true
+		end
+		local force_path = _pinned_missing and _pinned_device or nil
+		_pinned_missing = false
+	
+		Logger.start(LOG, "Keyboard source set changed (%d → %d) — re-acquiring…",
+			#_devices, #keyboards)
+		local reset_ok, reset_err = XkbCapture.reset_state()
+		if not reset_ok then
+			Logger.error(LOG, "Cannot reset XKB state for the new source set — keeping the previous set: %s.",
+				tostring(reset_err))
+			return not tx.managed
+		end
+		tx.sources, tx.source_observers, tx.pointers, tx.pointer_observers, tx.native_complete = {}, {}, {}, {}, true
+		local acquired, acquire_err = _acquire(keyboards, force_path, tx)
+		if acquired then
+			_seed_caps_lock(_devices[1])
+			-- A source/capture change retires every old repeat callback, but the
+			-- application still never saw its consumed down. Keep that debt only
+			-- on committed source/key owners until an actual release arrives.
+			local sources, suppressed, physical, snapshots = {}, {}, {}, {}
+			for _, path in ipairs(_devices) do sources[path] = true end
+			for key, down in pairs(_physical_down) do
+				if _consumed_down[key] and sources[down.source] then
+					local snapshot = snapshots[down.source]
+					if snapshot == nil then
+						local keys, query_err = EvdevReader.pressed_keys(keyboard_slot(down.source), KEY_MAX)
+						snapshot = { keys = keys }
+						snapshots[down.source] = snapshot
+						if keys == nil then
+							Logger.warn(LOG, "Suppressed-key state unavailable on recovered source %s — "
+								.. "retaining consumed presses until release (%s).", down.source, tostring(query_err))
+						end
+					end
+					-- The kernel can prove a release whose event was lost while the
+					-- descriptor was closed. An unavailable query proves no release.
+					if snapshot.keys == nil or snapshot.keys[down.code] == true then
+						suppressed[key], physical[key] = true, down
 					end
 				end
-				-- The kernel can prove a release whose event was lost while the
-				-- descriptor was closed. An unavailable query proves no release.
-				if snapshot.keys == nil or snapshot.keys[down.code] == true then
-					suppressed[key], physical[key] = true, down
-				end
 			end
+			_reset_modifier_state()
+			_consumed_down, _physical_down = suppressed, physical
+			_sync_dropped = {}
+			if _acquire_pointers(pointers, tx) == false then return false end
+			if not _source_cohort_current(tx) then return false end
+			if tx.publisher then
+				local called, published = pcall(tx.publisher)
+				if not called or published ~= true or not _source_cohort_current(tx) then return false end
+			end
+			_running = true
+			_reacquiring = false
+			-- A cold reacquisition published before it was running. A warm one
+			-- already published ready through _acquire and needs no second scan.
+			if not _origin_ready then M.physical_source_receipt() end
+			Logger.success(LOG, "Re-acquired %d keyboard source(s) (intercept=%s).",
+				#keyboards, tostring(_intercept))
+		else
+			-- Deliberately not a silent retry loop: the next tick tries again, and
+			-- saying so each time is how a permission problem on a newly created node
+			-- becomes visible instead of looking like a dead daemon.
+			Logger.error(LOG, "Could not acquire the complete keyboard source set — will retry (%s).",
+				tostring(acquire_err or "open or grab refused"))
+			if acquire_err then
+				return false
+			end
+			if tx.managed then return false end
+			_running = _all_keyboards_open(_devices)
+			_reacquiring = not _running
+			tx.changed = false; tx.waiting = true
 		end
-		_reset_modifier_state()
-		_consumed_down, _physical_down = suppressed, physical
-		_sync_dropped = {}
-		_acquire_pointers(pointers)
-		_running = true
-		_reacquiring = false
-		-- A cold reacquisition published before it was running. A warm one
-		-- already published ready through _acquire and needs no second scan.
-		if not _origin_ready then M.physical_source_receipt() end
-		Logger.success(LOG, "Re-acquired %d keyboard source(s) (intercept=%s).",
-			#keyboards, tostring(_intercept))
-	else
-		-- Deliberately not a silent retry loop: the next tick tries again, and
-		-- saying so each time is how a permission problem on a newly created node
-		-- becomes visible instead of looking like a dead daemon.
-		Logger.error(LOG, "Could not acquire the complete keyboard source set — will retry (%s).",
-			tostring(acquire_err or "open or grab refused"))
-		if acquire_err then
-			M.emergency_stop("keyboard source retirement failed: " .. tostring(acquire_err))
-			return
-		end
-		_running = _all_keyboards_open(_devices)
-		_reacquiring = not _running
-	end
+		return true
+	end)
+	local current = called and accepted == true and (tx.waiting and not tx.changed
+		and _source_transaction_current(tx) or _publish_source_transaction(tx))
+	if not current then _retire_source_transaction(tx, "source reconciliation refused") end
+	if _source_reconciliation == tx then _source_reconciliation = nil end
+	return current
 end
 
 
@@ -2020,7 +2295,11 @@ end
 ---                                  grabbed, read-only descriptor on the pointer.
 ---              device    string    Override /dev/input/eventN path.
 ---              pinned    boolean   Reacquire only device; never auto-switch it.
+---              onCaptureReacquired function Original selected-map publisher after
+---                                  keyboard replacement and CapsLock seeding. A
+---                                  refusal stops managed input before it resumes.
 function M.start(opts)
+	if _source_reconciliation then return false end
 	if _running then
 		Logger.debug(LOG, "start() called while already running — no-op.")
 		return
@@ -2031,6 +2310,17 @@ function M.start(opts)
 	-- retain their cold-construction originals and authenticate every returned receipt.
 	_input_reader_ports.capture_event = rawget(EvdevReader, "capture_event")
 	local options = type(opts) == "table" and opts or {}
+	_capture_session, _capture_options = {}, options
+	local capture_session = _capture_session
+	_capture_republisher = rawget(options, "onCaptureReacquired")
+	if _capture_republisher ~= nil and type(_capture_republisher) ~= "function" then
+		Logger.error(LOG, "start(): current capture publisher is invalid — refusing input.")
+		return false
+	end
+	if _capture_republisher and (not original_reader_load or not _input_exports_current()) then
+		Logger.error(LOG, "start(): original Reader authority is unavailable — refusing managed capture.")
+		return false
+	end
 	_pinned_device = options.pinned == true and type(options.device) == "string"
 		and options.device ~= "" and options.device or nil
 	_pinned_missing = false
@@ -2141,47 +2431,36 @@ function M.start(opts)
 	-- Refresh the foreground context before starting.
 	_read_context()
 
-	if not _acquire(targets) then
-		Logger.error(LOG, "start(): failed to open or grab the complete keyboard source set.")
-		_device = nil
-		return
-	end
-	_seed_caps_lock(_devices[1])
-
-	-- The pointer is opened last and its failure is not fatal: a machine with no
-	-- pointer, or one whose node this user cannot read, still expands hotstrings.
-	-- It simply cannot notice a click, which is the behaviour this driver had for
-	-- its whole life until now.
-	if _on_click then _acquire_pointers(pointers) end
-
-	_input_source_owners, _input_pointer_owners = nil, nil
-	_input_source_observers, _input_pointer_observers = nil, nil
-	if _input_exports_current() then
-		local owners, observers = {}, {}
-		for _, path in ipairs(_devices) do
-			local slot = keyboard_slot(path); local lease, observer = _input_reader_ports.capture_source_owner(slot)
-			if not lease or type(observer) ~= "function" or observer(lease, _input_reader_ports.capture_source_owner,
-				_input_reader_ports.source_owner_current, _input_reader_ports.retire_source) ~= true then owners, observers = nil, nil; break end
-			owners[slot], observers[slot] = lease, observer
+	if _capture_session ~= capture_session then return false end
+	local tx = _begin_source_transaction()
+	tx.sources, tx.source_observers, tx.pointers, tx.pointer_observers, tx.native_complete = {}, {}, {}, {}, true
+	local called, accepted = pcall(function()
+		if not _source_transaction_current(tx) or not _acquire(targets, nil, tx) then
+			Logger.error(LOG, "start(): failed to open or grab the complete keyboard source set.")
+			return false
 		end
-		_input_source_owners, _input_source_observers = owners, observers
-		local pointers, pointer_observers = {}, {}
-		for _, path in ipairs(_pointer_devices) do
-			local slot = pointer_slot(path); local lease, observer = _input_reader_ports.capture_source_owner(slot)
-			if not lease or type(observer) ~= "function" or observer(lease, _input_reader_ports.capture_source_owner,
-				_input_reader_ports.source_owner_current, _input_reader_ports.retire_source) ~= true then pointers, pointer_observers = nil, nil; break end
-			pointers[slot], pointer_observers[slot] = lease, observer
-		end
-		_input_pointer_owners, _input_pointer_observers = pointers, pointer_observers
-	end
-	_ticks_since_check = 0
-	_reported_missing = false
-	_running = true
-	-- Acquisition proved the device before it was running. Publish admission
-	-- at the completed lifecycle boundary so the first press can own repeats.
-	M.physical_source_receipt()
-	Logger.success(LOG, "Keyboard hook started (keyboards=%d pointers=%d layout=%s intercept=%s).",
-		#_devices, #_pointer_devices, _layout, tostring(_intercept))
+		_seed_caps_lock(_devices[1])
+	
+		-- The pointer is opened last and its failure is not fatal: a machine with no
+		-- pointer, or one whose node this user cannot read, still expands hotstrings.
+		-- It simply cannot notice a click, which is the behaviour this driver had for
+		-- its whole life until now.
+		-- Managed capture must also retain its complete original cleanup cohort.
+		if _on_click and _acquire_pointers(pointers, tx) == false then return false end
+	
+		_ticks_since_check = 0
+		_reported_missing = false
+		_running = true
+		-- Acquisition proved the device before it was running. Publish admission
+		-- at the completed lifecycle boundary so the first press can own repeats.
+		M.physical_source_receipt()
+		Logger.success(LOG, "Keyboard hook started (keyboards=%d pointers=%d layout=%s intercept=%s).",
+			#_devices, #_pointer_devices, _layout, tostring(_intercept))
+		return _publish_source_transaction(tx)
+	end)
+	if not called or accepted ~= true then _retire_source_transaction(tx, "startup source publication refused") end
+	if _source_reconciliation == tx then _source_reconciliation = nil end
+	return called and accepted == true
 end
 
 --- Stops the keyboard hook. Safe to call when not running.
@@ -2222,6 +2501,7 @@ function M.set_layout(layout)
 end
 
 function M.stop()
+	_capture_session = nil
 	if not _running and not _reacquiring then return end
 	if _release_remapped() == false then
 		M.emergency_stop("combination key retirement refused during stop")
@@ -2260,6 +2540,7 @@ end
 --- the descriptor is the kernel-guaranteed emergency ungrab.
 --- @param reason string|nil
 function M.emergency_stop(reason)
+	_capture_session = nil
 	local message = tostring(reason or "keyboard output path failed")
 	Logger.error(LOG, "Emergency keyboard stop — %s.", message)
 	-- Best effort, before the descriptors close: a Ctrl the virtual keyboard

@@ -15,7 +15,7 @@
 local M = {}
 
 local llm_mod = require("modules.llm")
-local i18n    = require("infra.i18n")
+local ManifestMenu = require("infra.manifest_menu")
 
 
 
@@ -38,19 +38,18 @@ function M.build(ctx, out)
 	local is_disabled  = ctx.is_disabled
 	local settings_mgr = ctx.settings_mgr
 
-	-- Temperature input with reset if changed from default
-	table.insert(out, {
-		label    = string.format(i18n.get("menu.llm.temperature_label"), tostring(state.llm_temperature)),
-		disabled = is_disabled or nil,
-		action   = settings_mgr.set_temperature,
-	})
-	if state.llm_temperature ~= llm_mod.DEFAULT_STATE.llm_temperature then
-		table.insert(out, {
-			label    = string.format(i18n.get("menu.llm.reset_label"), tostring(llm_mod.DEFAULT_STATE.llm_temperature)),
-			disabled = is_disabled or nil,
-			action   = settings_mgr.reset_temperature,
-		})
-	end
+	-- The declaration owns label, order and reset presence; native callbacks are unchanged.
+	local rows = ManifestMenu.template_rows("llm_generation_temperature_controls", {
+		["llm_generation_temperature"] = settings_mgr.set_temperature,
+		["llm_generation_temperature_reset"] = settings_mgr.reset_temperature,
+	}, {
+		llm_generation_ready = function() return not is_disabled end,
+		llm_generation_temperature_caption = function() return tostring(state.llm_temperature) end,
+		llm_generation_temperature_reset_caption = function() return tostring(llm_mod.DEFAULT_STATE.llm_temperature) end,
+		llm_generation_temperature_reset_present = function() return state.llm_temperature ~= llm_mod.DEFAULT_STATE.llm_temperature end,
+	}, {})
+	if not rows then return nil end
+	for _, row in ipairs(rows) do out[#out + 1] = row end
 
 	--- Reads current native facts before rendering or delivering the command.
 	--- @return boolean ready

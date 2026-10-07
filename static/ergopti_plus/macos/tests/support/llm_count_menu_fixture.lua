@@ -24,6 +24,8 @@ return function(callback)
 		local noop = function() end
 		local accept = function() return true end
 		local calls = {}
+		local command_deliveries = 0
+		local function unobserved_command() command_deliveries = command_deliveries + 1 end
 		local outcome = true
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.notifications"] = { notify = noop }
@@ -44,6 +46,12 @@ return function(callback)
 		package.loaded["ui.menu.menu_llm.settings_manager"] = { new = function()
 			return { build_nav_modifier_menu = function() return {} end,
 				build_val_modifier_menu = function() return {} end,
+				set_context_length = unobserved_command,
+				reset_context_length = unobserved_command,
+				set_min_words = unobserved_command,
+				reset_min_words = unobserved_command,
+				set_max_words = unobserved_command,
+				reset_max_words = unobserved_command,
 				apply_setting_transaction = function(request)
 					calls[#calls + 1] = request
 					return outcome
@@ -73,6 +81,7 @@ return function(callback)
 			keymap = { set_llm_model = accept }, save_prefs = accept, update_menu = accept, active_tasks = {} })
 		helpers.assert_type(menu.build_item, "function")
 		callback(menu, state, calls, function(value) outcome = value end)
+		helpers.assert_eq(command_deliveries, 0, "count-only scenarios never deliver the newly bound setting commands")
 	end, debug.traceback)
 	for name in pairs(package.loaded) do if saved[name] == nil then package.loaded[name] = nil end end
 	for name, value in pairs(saved) do package.loaded[name] = value end

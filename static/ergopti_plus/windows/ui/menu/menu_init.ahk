@@ -42,11 +42,11 @@ _AppendPersonalShortcutsSubmenuIfAny(ShortcutsMenu) {
 			PersonalRows.Push(Row)
 		}
 	}
-	FrameRows := MenuRenderer_TemplateRows("personal_shortcuts_frame", Map(), Map(),
-		Map("personal_shortcuts_registered", PersonalRows))
+	FrameRows := MenuRenderer_TemplateRows("personal_shortcuts_frame", Map(), Map(), Map("personal_shortcuts_registered", PersonalRows))
 	if !(FrameRows is Array)
-		return
-	MenuRenderer_AppendRows(ShortcutsMenu, "shortcuts_menu", "personal_shortcuts", FrameRows)
+		return 0
+	MenuRenderer_AppendTemplate(ShortcutsMenu, "personal_shortcuts_frame", Map(), Map(),
+		Map("personal_shortcuts_registered", PersonalRows))
 }
 
 

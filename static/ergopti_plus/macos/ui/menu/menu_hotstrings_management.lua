@@ -34,15 +34,104 @@ local LOG               = "menu_hotstrings"
 -- =============================
 -- =============================
 
+--- Reads only the complete canonical quick-delay caption policy.
+--- @return table|nil Captions; invalid declarations refuse the parameter rows.
+local function delay_captions()
+	local root = ManifestMenu.get_root()
+	local captions = type(root) == "table" and rawget(root, "hotstrings_delay_captions") or nil
+	local keys = { default = true, magic_key = true, autocorrection = true,
+		ai_acceptance = true, autocompletion = true }
+	if type(captions) ~= "table" or getmetatable(captions) ~= nil then return nil end
+	local count = 0
+	for key, value in next, captions do
+		if keys[key] ~= true or type(value) ~= "string" or value == "" then return nil end
+		count = count + 1
+	end
+	if count ~= 5 then return nil end
+	return captions
+end
+
 --- Builds the management sub-menu.
 --- @param ctx table Context.
 --- @return table
+
+-- Captures the actual declared frame before native value readers can reenter it.
+local function magic_frame_snapshot(renderer, key, expected)
+	key, expected = key or "hotstrings_magic_trigger_frame", expected or 3
+	local root = renderer.get_root()
+	local frame = type(root) == "table" and rawget(root, key)
+	if type(frame) ~= "table" or getmetatable(frame) ~= nil or #frame ~= expected then return nil end
+	local slots = 0
+	for index in next, frame do
+		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > expected then return nil end
+		slots = slots + 1
+	end
+	if slots ~= expected then return nil end
+	local snapshot = {}
+	for index, row in ipairs(frame) do
+		if type(row) ~= "table" or getmetatable(row) ~= nil then return nil end
+		local fields = {}
+		for key, value in next, row do
+			if type(value) == "table" then
+				if getmetatable(value) ~= nil then return nil end
+				local entries = {}
+				for field, item in next, value do
+					if type(item) == "table" or type(item) == "function" then return nil end
+					entries[field] = item
+				end
+				fields[key] = { identity = value, entries = entries }
+			elseif type(value) == "function" then return nil
+			else fields[key] = value end
+		end
+		snapshot[index] = { identity = row, fields = fields }
+	end
+	return { root = root, frame = frame, rows = snapshot, key = key }
+end
+
+-- Publication is withheld when any captured declaration identity or field changed.
+local function magic_frame_current(renderer, snapshot)
+	if not snapshot or not rawequal(renderer.get_root(), snapshot.root)
+		or not rawequal(rawget(snapshot.root, snapshot.key), snapshot.frame)
+		or getmetatable(snapshot.frame) ~= nil or #snapshot.frame ~= #snapshot.rows then return false end
+	local slots = 0
+	for index in next, snapshot.frame do
+		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > #snapshot.rows then return false end
+		slots = slots + 1
+	end
+	if slots ~= #snapshot.rows then return false end
+	for index, saved in ipairs(snapshot.rows) do
+		local row = rawget(snapshot.frame, index)
+		if not rawequal(row, saved.identity) or getmetatable(row) ~= nil then return false end
+		local count, expected = 0, 0
+		for key, value in next, row do
+			count = count + 1
+			local prior = saved.fields[key]
+			if type(prior) == "table" then
+				if not rawequal(value, prior.identity) or getmetatable(value) ~= nil then return false end
+				local entries, wanted = 0, 0
+				for field, item in next, value do
+					entries = entries + 1
+					if not rawequal(item, prior.entries[field]) then return false end
+				end
+				for _ in next, prior.entries do wanted = wanted + 1 end
+				if entries ~= wanted then return false end
+			elseif not rawequal(value, prior) then return false end
+		end
+		for _ in next, saved.fields do expected = expected + 1 end
+		if count ~= expected then return false end
+	end
+	return true
+end
+
 function M.build_management(ctx)
 	local state  = ctx.state
 	local paused = ctx.paused
 	local bubble_item = nil
 	local exp_item = nil
 	local delays_item = nil
+	local captions = delay_captions()
+	local boundaries = ManifestMenu.template_rows("hotstrings_parameter_boundary", {}, {}, {})
+	if not captions or not boundaries then return nil end
 
 	local bubble_sub = {}
 
@@ -61,6 +150,8 @@ function M.build_management(ctx)
 	})
 	if magic_row then table.insert(bubble_sub, magic_row) end
 
+	local preview_magic_rows = bubble_sub
+	bubble_sub = {}
 	local presence_commands = {}
 	local presence_getters = { preview_presence_ready = function() return not ctx.paused end }
 	for key, notify_key in pairs({
@@ -80,7 +171,8 @@ function M.build_management(ctx)
 		if row then table.insert(bubble_sub, row) end
 	end
 
-	table.insert(bubble_sub, { separator = true })
+	local preview_presence_rows = bubble_sub
+	bubble_sub = {}
 
 	local colored_row = ManifestMenu.check_row("preview_colored_control", "preview_colored_tooltips", {
 		["preview_colored_tooltips"] = function()
@@ -97,7 +189,17 @@ function M.build_management(ctx)
 	})
 	if colored_row then table.insert(bubble_sub, colored_row) end
 
-	bubble_item = { label = i18n.get("menu.hotstrings.preview_bubbles"), disabled = paused or nil, items = bubble_sub }
+	local preview_rows = ManifestMenu.template_rows("hotstrings_preview_frame", {}, {}, {
+		["parameter_preview_magic"] = function() return preview_magic_rows end,
+		["parameter_preview_presence"] = function() return preview_presence_rows end,
+		["parameter_preview_colored"] = function() return bubble_sub end,
+	})
+	if not preview_rows then return nil end
+	local preview_parent = ManifestMenu.template_rows("hotstrings_preview_parent", {},
+		{ ["parameter_parent_ready"] = function() return not paused end },
+		{ ["parameter_preview_children"] = preview_rows })
+	if not preview_parent then return nil end
+	bubble_item = preview_parent[1]
 
 	local defs    = ctx.keymap and type(ctx.keymap.get_terminator_defs) == "function" and ctx.keymap.get_terminator_defs() or {}
 	local exp_sub = {}
@@ -150,7 +252,7 @@ function M.build_management(ctx)
 	for _, def in ipairs(defs) do
 		if type(def) == "table" and not def.custom then
 			if def.type == "separator" then
-				exp_sub[#exp_sub + 1] = { separator = true }
+				for _, boundary in ipairs(boundaries) do exp_sub[#exp_sub + 1] = boundary end
 			elseif def.key then
 				local enabled_t = ctx.keymap and type(ctx.keymap.is_terminator_enabled) == "function" and ctx.keymap.is_terminator_enabled(def.key) or false
 
@@ -189,7 +291,8 @@ function M.build_management(ctx)
 	end
 
 	-- Custom terminators + add button, grouped together at the bottom
-	exp_sub[#exp_sub + 1] = { separator = true }
+	local catalogue_rows = exp_sub
+	exp_sub = {}
 
 	for _, ct in ipairs(type(state.custom_terminators) == "table" and state.custom_terminators or {}) do
 		if type(ct) ~= "table" or type(ct.char) ~= "string" or ct.char == "" then goto continue_ct end
@@ -318,10 +421,20 @@ function M.build_management(ctx)
 		},
 		state_getters = { ["word_expanders_ready"] = word_expanders_ready },
 	}
+	local entry_rows = ManifestMenu.template_rows("hotstrings_word_expander_frame", {}, {}, {
+		["parameter_catalogue_entries"] = function() return catalogue_rows end,
+		["parameter_custom_entries"] = function() return exp_sub end,
+	})
+	if not entry_rows then return nil end
 	local rendered_expanders = ManifestMenu.build("word_expanders_menu", "HotstringsParams", nil, nil,
-		exp_ctx, { ["word_expander_entries"] = function() return exp_sub end })
-	exp_item = { label = i18n.get("menu.hotstrings.word_expanders"), disabled = paused or nil,
-		submenu = rendered_expanders }
+		exp_ctx, { ["word_expander_entries"] = function() return entry_rows end })
+	local expander_submenu_rows = ManifestMenu.native_child_rows(rendered_expanders)
+	if not expander_submenu_rows then return nil end
+	local expander_parent = ManifestMenu.template_rows("hotstrings_word_expander_parent", {},
+		{ ["parameter_parent_ready"] = function() return not paused end },
+		{ ["parameter_word_expander_children"] = expander_submenu_rows })
+	if not expander_parent then return nil end
+	exp_item = expander_parent[1]
 
 	local delay_menu = {}
 	local function make_delay_item(title, key, default_val, is_base)
@@ -457,33 +570,36 @@ function M.build_management(ctx)
 			pcall(win.open)
 		end,
 	}, { hotstrings_config_ready = function() return not paused end })
-	if settings_row then table.insert(delay_menu, settings_row) end
-	table.insert(delay_menu, { separator = true })
-	if def_delays then
-		table.insert(delay_menu, make_delay_item(i18n.get("menu.hotstrings.tooltip_ai_acceptance"), "llm_prediction", def_delays.llm_prediction, false))
-		table.insert(delay_menu, make_delay_item(i18n.get("menu.hotstrings.tooltip_autocompletion"), "dynamichotstrings", def_delays.dynamichotstrings, false))
-	end
-	if def_base then
-		table.insert(delay_menu, make_delay_item(i18n.get("menu.hotstrings.tooltip_default"), nil, def_base, true))
-	end
-
-	-- The ★ magic-key and autocorrection delays are TOML-backed categories
-	-- (also tunable in the config window). Surface them here too, mirroring the
-	-- AHK tray, so the most-used per-category delays are one click away.
-	if def_delays then
-		table.insert(delay_menu, { separator = true })
-		table.insert(delay_menu, make_category_delay_item(i18n.get("menu.hotstrings.delay_magic_key"), "STAR_TRIGGER", "magickey"))
-		table.insert(delay_menu, make_category_delay_item(i18n.get("menu.hotstrings.delay_autocorrection"), "autocorrection", "autocorrection"))
-	end
-
-	delays_item = { label = i18n.get("menu.hotstrings.delays_colors"), disabled = paused or nil, items = delay_menu }
+	local delay_providers = {
+		["parameter_delay_config"] = function() return settings_row and { settings_row } or {} end,
+		["parameter_delay_ai_acceptance"] = function()
+			return def_delays and { make_delay_item(i18n.get(captions.ai_acceptance), "llm_prediction", def_delays.llm_prediction, false) } or {}
+		end,
+		["parameter_delay_autocompletion"] = function()
+			return def_delays and { make_delay_item(i18n.get(captions.autocompletion), "dynamichotstrings", def_delays.dynamichotstrings, false) } or {}
+		end,
+		["parameter_delay_default"] = function()
+			return def_base and { make_delay_item(i18n.get(captions.default), nil, def_base, true) } or {}
+		end,
+		["parameter_delay_category_boundary"] = function() return def_delays and boundaries or {} end,
+		["parameter_delay_magic_key"] = function()
+			return def_delays and { make_category_delay_item(i18n.get(captions.magic_key), "STAR_TRIGGER", "magickey") } or {}
+		end,
+		["parameter_delay_autocorrection"] = function()
+			return def_delays and { make_category_delay_item(i18n.get(captions.autocorrection), "autocorrection", "autocorrection") } or {}
+		end,
+	}
+	delay_menu = ManifestMenu.template_rows("hotstrings_delays_frame", {}, {}, delay_providers)
+	if not delay_menu then return nil end
+	local delay_parent = ManifestMenu.template_rows("hotstrings_delays_parent", {},
+		{ ["parameter_parent_ready"] = function() return not paused end }, { ["parameter_delays_children"] = delay_menu })
+	if not delay_parent then return nil end
+	delays_item = delay_parent[1]
 
 	local hs_state  = ctx and ctx.state
 	local hs_paused = ctx and ctx.paused
-	local magic_key_item = ({
-		label    = i18n.get("menu.hotstrings.magic_key_prefix") .. (hs_state and hs_state.trigger_char or ManifestReader.default_for("hotstrings.trigger_char")),
-		disabled = hs_paused or nil,
-		action       = not hs_paused and function()
+	local magic_key_value = (hs_state and hs_state.trigger_char or ManifestReader.default_for("hotstrings.trigger_char"))
+	local magic_key_action = function()
 			if not hs_state then return end
 			local ok_p, btn, raw = pcall(dialog.text_prompt,
 				i18n.get("menu.hotstrings.magic_key_title"),
@@ -515,8 +631,7 @@ function M.build_management(ctx)
 					return true
 				end
 			end
-		end or nil,
-	})
+		end
 	local repeat_enabled = ctx and ctx.keymap
 		and type(ctx.keymap.is_repeat_feature_enabled) == "function"
 		and ctx.keymap.is_repeat_feature_enabled()
@@ -580,8 +695,13 @@ function M.build_management(ctx)
 		-- `list` since 2026-08-07, with the same reasoning: the magic-key row and
 		-- its reset were built three times from a declaration that named the slot.
 		["magic_key_config"] = function()
-			if not magic_key_item then return {} end
-			return { magic_key_item }
+			local source = magic_frame_snapshot(ManifestMenu)
+			if not source then return {} end
+			local items = ManifestMenu.template_rows("hotstrings_magic_trigger_frame", { magic_key_change = magic_key_action },
+				{ magic_key_value = function() return magic_key_value end, magic_key_ready = function() return not hs_paused end }, {})
+			if not items or not magic_frame_current(ManifestMenu, source) then return {} end
+			if hs_paused then for _, item in ipairs(items) do item.action = nil end end
+			return items
 		end,
 		-- `list` since 2026-08-07, the last row of this group to move.
 		["delays_colors"] = function()

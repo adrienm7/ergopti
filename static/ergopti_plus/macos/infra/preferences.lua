@@ -33,12 +33,40 @@ local M = {}
 local hs        = hs
 local TomlCodec = require("infra.toml.codec")
 local TomlWriter = require("toml_codec.writer")
+-- Use the constructor's captured checker, never a replaceable public getter.
+-- This is the same trusted normal-loader boundary as the shared writer; it
+-- does not authenticate arbitrary source-spoofing searchers or debug mutation.
+local SchemaOwner = require("config_migrate")
+local schema_factory = assert(rawget(SchemaOwner, "writer_admission_factory"))
+local SourceIdentity = require("module_source_identity")
+local source_sibling, source_same = SourceIdentity.sibling, SourceIdentity.same
+local source_directory = require("module_source_directory").capture()
+local constructor_source = debug.getinfo(1, "S").source
+local schema_source = source_sibling(constructor_source, "infra/preferences.lua",
+	"../_shared/lua/config_migrate.lua", source_directory)
+assert(source_same(debug.getinfo(schema_factory, "S").source, schema_source, source_directory),
+	"preference schema owner is not canonical")
+local schema_origin, _, schema_reader = schema_factory()
+assert(rawequal(schema_origin, SchemaOwner) and type(schema_reader) == "function", "preference schema origin is invalid")
+local function capture_schema_read(path, file_adapter)
+	if not rawequal(rawget(package.loaded, "toml_codec.writer"), TomlWriter)
+		or not rawequal(rawget(package.loaded, "config_migrate"), SchemaOwner)
+		or not rawequal(rawget(SchemaOwner, "writer_admission_factory"), schema_factory) then return false end
+	return schema_reader(path, file_adapter)
+end
+local function schema_read_admitted(check, content, status)
+	if check == nil then return true end
+	if type(check) ~= "function" then return false end
+	local called, accepted = pcall(check, content, status)
+	return called and accepted == true
+end
 local Logger    = require("infra.logger")
 local FileSystem = require("adapters.file_system")
 local Manifest = require("infra.manifest_reader")
 local HotstringLanguages = require("hotstrings.languages")
 local ConfigOutdated = require("config_outdated")
 local BindingIdentity = require("config_binding_identity")
+local BindingPublication = require("config_binding_publication")
 local PersonalFiles = require("hotstrings.personal_files")
 local PersonalAdoption = require("infra.personal_file_adoption")
 local Agent     = require("llm.agent")
@@ -964,7 +992,10 @@ local _load_outdated = {}
 --- @param prefs_file string Destination path.
 --- @return table|nil snapshot Exact `ok`/`absent` source classification.
 local function classify_source(prefs_file, on_error)
+	local schema_check = capture_schema_read(prefs_file, FileSystem)
+	if schema_check == false then return nil end
 	local content, read_status = FileSystem.read_with_status(prefs_file, on_error)
+	if not schema_read_admitted(schema_check, content, read_status) then return nil end
 	if read_status == "ok" and type(content) == "string" then
 		return { status = "ok", content = content }
 	end
@@ -1060,7 +1091,18 @@ end
 --- @return string "ok" | "absent" | "corrupt"
 function M.load(prefs_file)
 	assert(not _owned_publications[prefs_file], "preference publication is still active")
+	local schema_check = capture_schema_read(prefs_file, FileSystem)
+	if schema_check == false then
+		_source_snapshots[prefs_file] = nil
+		Logger.error(LOG, "config.toml schema reader owner is unavailable; keeping its source untouched.")
+		return {}, "corrupt"
+	end
 	local content, read_status = FileSystem.read_with_status(prefs_file)
+	if not schema_read_admitted(schema_check, content, read_status) then
+		_source_snapshots[prefs_file] = nil
+		Logger.error(LOG, "config.toml has unsupported schema metadata; keeping its source untouched.")
+		return {}, "corrupt"
+	end
 	if read_status ~= "ok" then
 		if read_status == "absent" then
 			_source_snapshots[prefs_file] = { status = "absent" }
@@ -1092,6 +1134,11 @@ function M.load(prefs_file)
 	if not flattened then
 		_source_snapshots[prefs_file] = nil
 		Logger.error(LOG, "config.toml contains an invalid owned setting; keeping its source untouched.")
+		return {}, "corrupt"
+	end
+	if not schema_read_admitted(schema_check, content, read_status) then
+		_source_snapshots[prefs_file] = nil
+		Logger.error(LOG, "config.toml reader admission changed during hydration; keeping its source untouched.")
 		return {}, "corrupt"
 	end
 	_source_snapshots[prefs_file] = { status = "ok", content = content }
@@ -1261,13 +1308,44 @@ function M.prepare_gesture_updates(source, updates)
 			inline["gestures." .. record.key] = record.key
 		end
 	end
+	local admitted_updates, retained_script_inline = {}, false
 	for _, row in ipairs(updates) do
+		local retained_script = false
+		if row.section == "gestures.action_parameters" and type(row.key) == "string" and row.key:sub(1, 8) == "script__" then
+			local parameters = disk_gestures.action_parameters
+			local prior = type(parameters) == "table" and parameters[row.key] or nil
+			if row.delete ~= true and prior ~= nil and rawequal(prior, row.value) then
+				-- A semantic no-op does not own the original source spelling or comment,
+				-- including when the genuine catalogue is not currently published.
+				retained_script = true
+			else
+				local fits, reason = action_parameter_fits(row.key, row.value)
+				if not fits and reason == BindingIdentity.RETIRED_SCRIPT then
+					assert(row.delete == true,
+						"Obsolete script parameter requires explicit source cleanup before replacement")
+					retained_script = true
+				end
+			end
+		end
+		if retained_script and inline[row.section] == "action_parameters" then retained_script_inline = true end
+		if not retained_script then admitted_updates[#admitted_updates + 1] = row end
+	end
+	local direct_parents = {}
+	if retained_script_inline then
+		local direct_detail
+		direct_parents, direct_detail = TomlWriter.source_inline_scalar_parents(source.content or "", admitted_updates)
+		assert(direct_parents, direct_detail)
+	end
+	for _, row in ipairs(admitted_updates) do
 		local key = inline[row.section]
 		local empty_runtime_table = row.section == "gestures" and type(row.value) == "table"
 			and next(row.value) == nil and (row.key == "action_parameters" or row.key == "modes" or row.key == "sensitivities")
 		if empty_runtime_table then
 			-- Empty runtime ownership cannot authorize replacing an entire source
 			-- table: unknown or other-domain neighbors may still be stored there.
+		elseif key == "action_parameters" and retained_script_inline then
+			assert(direct_parents[row.section], "Retained script parameters require exact inline leaf ownership")
+			rows[#rows + 1] = row
 		elseif key then
 			assert(type(disk_gestures[key]) == "table", "scope owned table is malformed")
 			local candidate = candidates[key] or clone_value(disk_gestures[key])
@@ -1750,6 +1828,29 @@ local function reset_keeping_outdated(row, outdated, document)
 	return rows
 end
 
+
+--- Captures the already loaded script publisher without initializing its source.
+--- @return function admission Pure final native owner and catalogue fence.
+local function script_parameter_admission()
+	local namespace = "infra.script_chord_catalogue"
+	local owner = rawget(package.loaded, namespace)
+	local getter = type(owner) == "table" and rawget(owner, "published_binding_catalogue") or nil
+	local captured = BindingPublication.current("script", namespace, owner)
+	if captured ~= nil then BindingIdentity.script_binding_fits("script__", captured) end
+	return function()
+		if not rawequal(rawget(package.loaded, namespace), owner)
+			or type(owner) == "table" and not rawequal(rawget(owner, "published_binding_catalogue"), getter) then return false end
+		local current = BindingPublication.current("script", namespace, owner)
+		if captured == nil then return current == nil end
+		if current == nil then return false end
+		BindingIdentity.script_binding_fits("script__", current)
+		if current.prefix ~= captured.prefix then return false end
+		for id, value in pairs(captured.slots) do if current.slots[id] ~= value then return false end end
+		for id, value in pairs(current.slots) do if captured.slots[id] ~= value then return false end end
+		return true
+	end
+end
+
 --- Save the current state to the TOML configuration file. Atomic via
 --- .tmp + rename so a crash mid-write cannot leave a half-written
 --- file on disk. The sections Preferences owns come from the state; every
@@ -1782,11 +1883,16 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view, on_error,
 			prefs_file, refusal)
 		return false
 	end
+	local script_admission = script_parameter_admission()
 	local runtime = M.snapshot(state, hotfiles, core_mods)
 	local existing = runtime
 	if snapshot_view then
 		existing = snapshot_view(clone_value(runtime))
 		if type(existing) ~= "table" then error("snapshot_view must return a table", 2) end
+	end
+	local has_script_parameters = false
+	for key in pairs(type(existing.gesture_action_parameters) == "table" and existing.gesture_action_parameters or {}) do
+		if type(key) == "string" and key:sub(1, 8) == "script__" then has_script_parameters = true; break end
 	end
 	local expected_source = _source_snapshots[prefs_file]
 	if type(expected_source) ~= "table" then
@@ -1808,6 +1914,10 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view, on_error,
 		local document, shapes
 		if expected_source.status == "ok" then
 			document, shapes = require("toml_codec.leaf_rows").decode_source(expected_source.content)
+		end
+		local source_parameters = document and type(document.gestures) == "table" and document.gestures.action_parameters
+		for key in pairs(type(source_parameters) == "table" and source_parameters or {}) do
+			if type(key) == "string" and key:sub(1, 8) == "script__" then has_script_parameters = true; break end
 		end
 		if user_models_scalar_is_obsolete(document) and existing.llm_user_models ~= nil then
 			-- Reject a changed carried snapshot before sparse encoding can omit it
@@ -1876,7 +1986,8 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view, on_error,
 		updates,
 		FileSystem,
 		expected_source,
-		on_error
+		on_error,
+		has_script_parameters and script_admission or nil
 	)
 	local owned_native = write_ok and handoff_native_publication(prefs_file, expected_source, candidate, native, on_error, publication_observer, written)
 	if not write_ok or written ~= true then

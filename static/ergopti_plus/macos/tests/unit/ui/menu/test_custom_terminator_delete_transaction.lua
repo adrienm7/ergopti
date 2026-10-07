@@ -76,8 +76,13 @@ local function with_fixture(outcome, callback)
 			command_row = command_renderer.command_row,
 			check_row = command_renderer.check_row,
 			get_array = command_renderer.get_array,
-			build = function(section, _, _, _, _, providers)
-				if section == "word_expanders_menu" then return providers.word_expander_entries() end
+			template_rows = command_renderer.template_rows,
+			get_root = command_renderer.get_root,
+			native_child_rows = command_renderer.native_child_rows,
+			build = function(section, category, dynamic, groups, context, providers)
+				if section == "word_expanders_menu" then
+					return command_renderer.build(section, category, dynamic, groups, context, providers)
+				end
 				return providers.word_expanders()
 			end,
 		}
