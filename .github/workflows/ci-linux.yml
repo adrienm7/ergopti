@@ -1273,6 +1273,22 @@ jobs:
           sudo bash static/ergopti_plus/linux/tests/hardware/run_daemon_live.sh
         timeout-minutes: 6
 
+      - name: Saved ordered-pair Manager — genuine native source lifetimes
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        env:
+          LUA_PATH: './?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+        run: |
+          set -euo pipefail
+          if sudo env LUA_PATH="$LUA_PATH" python3 tests/hardware/run_manager_input_owner_real.py > "$RUNNER_TEMP/linux-manager-input-owner.log" 2>&1; then
+            manager_status=0
+          else
+            manager_status=$?
+          fi
+          cat "$RUNNER_TEMP/linux-manager-input-owner.log"
+          exit "$manager_status"
+        timeout-minutes: 3
+
       # The updater a user runs, run: this tree built as an old release and
       # installed with its own install.sh, then its updater finds the newest
       # published release on GitHub, verifies and installs it, and restarts the

@@ -515,3 +515,192 @@ helpers.describe("tap-hold manager: the daemon's action executor", function()
 	end)
 
 end)
+
+helpers.describe("native OneShot Manager route", function()
+	local Fixture = require("tests.support.input_owner_fixture")
+	local PREFIX = "29:1,29:0,29:1,29:0"
+	local function rows(s)
+		local result = {}; for _, row in ipairs(s.rows) do result[#result + 1] = row[1] .. ":" .. row[2] end
+		return table.concat(result, ",")
+	end
+	local function consume(s)
+		s.edge("a", 58, 0, 150); s.edge("a", 30, 1, 200); s.edge("a", 30, 2, 210); s.edge("a", 30, 0, 220)
+	end
+	helpers.it("loads the saved action and arms through the actual Manager callback", function()
+		Fixture.with_manager_session({}, function(s)
+			helpers.assert_eq(s.owner.get_action("caps_lock_then_tab"), "one_shot_shift")
+			s.pair(); helpers.assert_eq(s.arm_deadline(), 10 + require("infra.timings").ms("tap_hold", "one_shot_shift_timeout_ms"))
+			helpers.assert_eq(#s.actions, 0, "logical intent is never a generic action ACK")
+			consume(s); helpers.assert_eq(rows(s), PREFIX .. ",42:1,30:1,30:2,30:0,42:0")
+			helpers.assert_eq(next(s.writer.output_view(s.output).down), nil)
+		end)
+	end)
+	helpers.it("refuses all-positive public ports replaced before Manager construction", function()
+		local calls = 0
+		Fixture.with_manager_session({ before_manager = function(s)
+			for _, name in ipairs({ "capture_input_owner", "input_owner_current", "arm_one_shot" }) do
+				s.hook[name] = function() calls = calls + 1; return name == "capture_input_owner" and {} or true end
+			end
+		end }, function(s)
+			s.pair(); helpers.assert_nil(s.arm_deadline()); helpers.assert_eq(calls, 0)
+			consume(s); helpers.assert_eq(rows(s), PREFIX .. ",30:1,30:2,30:0")
+			helpers.assert_eq(#s.actions, 0)
+		end)
+	end)
+	helpers.it("refuses public ports rebound after Manager construction without calling them", function()
+		Fixture.with_manager_session({}, function(s)
+			local calls = 0
+			for _, name in ipairs({ "capture_input_owner", "input_owner_current", "arm_one_shot" }) do
+				s.hook[name] = function() calls = calls + 1; return name == "capture_input_owner" and {} or true end
+			end
+			s.pair(); helpers.assert_nil(s.arm_deadline()); helpers.assert_eq(calls, 0)
+			consume(s); helpers.assert_eq(rows(s), PREFIX .. ",30:1,30:2,30:0")
+		end)
+	end)
+	helpers.it("refuses missing required public arm authority at the final frame join", function()
+		local options = {}
+		options.on_guard = function(s) if s.remove_arm then s.hook.arm_one_shot = nil; s.remove_arm = false end end
+		Fixture.with_manager_session(options, function(s)
+			s.remove_arm = true; s.pair(); helpers.assert_nil(s.arm_deadline()); helpers.assert_eq(#s.actions, 0)
+			consume(s); helpers.assert_eq(rows(s), PREFIX .. ",30:1,30:2,30:0")
+		end)
+	end)
+	helpers.it("does not arm when the original source changes during command admission", function()
+		local options = {}
+		options.on_guard = function(s)
+			if s.change_command then s.bytes = '[shortcuts.key_combination_taps]\ncaps_lock_then_tab = "copy"\n'; s.change_command = false end
+		end
+		Fixture.with_manager_session(options, function(s)
+			s.edge("a", 58, 1, 0); s.edge("a", 15, 1, 10); s.change_command = true; s.edge("a", 15, 0, 100)
+			helpers.assert_nil(s.arm_deadline()); helpers.assert_eq(#s.actions, 0)
+		end)
+	end)
+	helpers.it("withdraws an unspent arm before a foreign keyboard is forwarded", function()
+		Fixture.with_manager_session({}, function(s)
+			s.pair(); helpers.assert_true(type(s.arm_deadline()) == "number")
+			s.edge("a", 58, 0, 150); s.edge("b", 30, 1, 200); s.edge("b", 30, 0, 210)
+			helpers.assert_nil(s.arm_deadline()); helpers.assert_eq(rows(s), PREFIX .. ",30:1,30:0")
+			helpers.assert_true(s.hook.isRunning()); helpers.assert_eq(next(s.writer.output_view(s.output).down), nil)
+		end)
+	end)
+	helpers.it("retains the ordinary generic action route", function()
+		Fixture.with_manager_session({}, function(s)
+			s.bytes = '[shortcuts.key_combination_taps]\ncaps_lock_then_tab = "copy"\n'
+			helpers.assert_true(s.manager.reload()); s.engine = s.manager.configuration_snapshot().engine
+			s.pair(); helpers.assert_eq(s.actions, { { "copy", "combination__caps_lock_then_tab" } })
+			helpers.assert_nil(s.arm_deadline())
+		end)
+	end)
+	helpers.it("keeps unknown actions and unwired CapsWord unavailable", function()
+		Fixture.with_manager_session({}, function(s)
+			for _, action in ipairs({ "caps_word", "not_a_catalogue_action" }) do
+				local valid = pcall(s.owner.configuration_candidate, { shortcuts = { key_combination_taps = { caps_lock_then_tab = action } } }, true)
+				helpers.assert_eq(valid, false)
+			end
+		end)
+	end)
+	helpers.it("does not grant a lease outside the exact Manager action frame", function()
+		Fixture.with_manager_session({}, function(s)
+			helpers.assert_nil(s.hook.capture_input_owner()); helpers.assert_eq(s.hook.arm_one_shot({}), false)
+			s.pair(); helpers.assert_nil(s.hook.capture_input_owner()); helpers.assert_eq(s.hook.arm_one_shot({}), false)
+		end)
+	end)
+	helpers.it("settles original inverse ACK after consumed source descriptor replacement", function()
+		local options = { recycle_descriptor = true }
+		options.after_sync = function(s, code, value)
+			if code == 42 and value == 1 and not s.reopened then
+				s.reopened = true; local slot = "keyboard:" .. s.paths.a
+				s.old_fd = s.descriptor("a"); s.reader.close(slot)
+				helpers.assert_true(s.reader.open(s.paths.a, slot)); helpers.assert_true(s.reader.grab(slot))
+				s.successor_source = s.reader.capture_source_owner(slot)
+			end
+		end
+		Fixture.with_manager_session(options, function(s)
+			s.pair(); s.edge("a", 58, 0, 150); s.edge("a", 30, 1, 200)
+			helpers.assert_true(s.reopened); helpers.assert_eq(s.descriptor("a"), s.old_fd)
+			helpers.assert_eq(s.hook.isRunning(), false); helpers.assert_eq(rows(s), PREFIX .. ",42:1,42:0")
+			helpers.assert_eq(next(s.writer.output_view(s.output).down), nil)
+			helpers.assert_true(s.hook.set_remapper(nil)); helpers.assert_true(s.reader.source_owner_current(s.successor_source))
+		end)
+	end)
+	helpers.it("settles exact retired original output without borrowing its reopened successor", function()
+		Fixture.with_manager_session({}, function(s)
+			s.pair(); s.edge("a", 58, 0, 150)
+			helpers.assert_true(s.writer.close_owned(s.output)); helpers.assert_true(s.writer.open()); s.successor = s.writer.capture_output()
+			s.edge("a", 30, 1, 200)
+			helpers.assert_eq(s.hook.isRunning(), false); helpers.assert_eq(rows(s), PREFIX)
+			helpers.assert_true(s.hook.set_remapper(nil)); helpers.assert_true(s.writer.output_current(s.successor))
+			helpers.assert_eq(next(s.writer.output_view(s.successor).down), nil)
+		end)
+	end)
+	helpers.it("retires uncertain original inverse output instead of claiming healthy settlement", function()
+		local options = { fail_sync = function(_, code, value) return code == 42 and value == 0 end }
+		options.after_sync = function(s, code, value)
+			if code == 42 and value == 1 and not s.reopened then
+				s.reopened = true; local slot = "keyboard:" .. s.paths.a
+				s.reader.close(slot); assert(s.reader.open(s.paths.a, slot)); assert(s.reader.grab(slot))
+			end
+		end
+		Fixture.with_manager_session(options, function(s)
+			s.pair(); s.edge("a", 58, 0, 150); s.edge("a", 30, 1, 200)
+			helpers.assert_eq(s.hook.isRunning(), false); helpers.assert_nil(s.writer.output_view(s.output))
+			helpers.assert_eq(s.output_destroys, 1); helpers.assert_eq(s.output_closes, 1)
+			helpers.assert_true(s.hook.set_remapper(nil))
+		end)
+	end)
+end)
+
+helpers.describe("OneShot daemon Manager bootstrap", function()
+	helpers.it("selects Hook at setup when keylogger already constructed Manager before it", function()
+		local file = assert(io.open("ergopti_hotstrings.lua", "r")); local daemon = file:read("*a"); file:close()
+		local keylogger_at = assert(daemon:find('require("modules.keylogger.keylogger")', 1, true))
+		local hook_at = assert(daemon:find('require("adapters.keyboard_hook")', 1, true))
+		helpers.assert_true(keylogger_at < hook_at, "actual daemon loads keylogger before its Hook import")
+		file = assert(io.open("modules/keylogger/keylogger.lua", "r")); local source = file:read("*a"); file:close()
+		helpers.assert_true(source:find('require("platform.remap.tap_hold_manager")', 1, true) ~= nil,
+			"actual keylogger constructs Manager before daemon Hook setup")
+		local options = {}
+		options.before_manager = function(s)
+			local hook = package.loaded["adapters.keyboard_hook"]
+			package.loaded["adapters.keyboard_hook"] = nil
+			local ok, manager = pcall(helpers.load_module, "platform.remap.tap_hold_manager")
+			package.loaded["adapters.keyboard_hook"] = hook
+			if not ok then error(manager, 0) end
+			options.cached_manager = manager
+		end
+		require("tests.support.input_owner_fixture").with_manager_session(options, function(s)
+			helpers.assert_eq(s.manager, options.cached_manager, "setup must use the genuinely preloaded module")
+			helpers.assert_eq(s.owner.get_action("caps_lock_then_tab"), "one_shot_shift")
+			s.pair(); helpers.assert_true(type(s.arm_deadline()) == "number")
+			s.edge("a", 58, 0, 150); s.edge("a", 30, 1, 200); s.edge("a", 30, 0, 210)
+			local rows = {}; for _, row in ipairs(s.rows) do rows[#rows + 1] = row[1] .. ":" .. row[2] end
+			helpers.assert_eq(table.concat(rows, ","), "29:1,29:0,29:1,29:0,42:1,30:1,30:0,42:0")
+			helpers.assert_eq(next(s.writer.output_view(s.output).down), nil)
+		end)
+	end)
+end)
+
+helpers.describe("OneShot construction-original text source", function()
+	for _, timing in ipairs({ "before_manager", "after_manager" }) do
+		helpers.it("refuses a rebound text getter " .. timing .. " without changing raw input", function()
+			local calls = 0
+			local function replace(s) s.hook.key_text = function() calls = calls + 1; return "b" end end
+			local options = {}
+			if timing == "before_manager" then options.before_manager = replace end
+			require("tests.support.input_owner_fixture").with_manager_session(options, function(s)
+				require("adapters.keyboard_layout")._set_table_for_test({
+					a = { keycode = 30, level = 1, mods = {} }, A = { keycode = 30, level = 2, mods = { "shift" } },
+					b = { keycode = 48, level = 1, mods = {} }, B = { keycode = 48, level = 2, mods = { "shift" } },
+				})
+				if timing == "after_manager" then replace(s) end
+				s.pair(); helpers.assert_nil(s.arm_deadline())
+				s.edge("a", 58, 0, 150); s.edge("a", 30, 1, 200); s.edge("a", 30, 0, 220)
+				local rows = {}; for _, row in ipairs(s.rows) do rows[#rows + 1] = row[1] .. ":" .. row[2] end
+				helpers.assert_eq(calls, 0)
+				helpers.assert_eq(table.concat(rows, ","), "29:1,29:0,29:1,29:0,30:1,30:0")
+				helpers.assert_eq(next(s.writer.output_view(s.output).down), nil)
+				helpers.assert_true(s.hook.isRunning())
+			end)
+		end)
+	end
+end)

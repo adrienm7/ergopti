@@ -859,7 +859,14 @@ _KCT_ObservationActualFile() {
 		Assert(Lease.Handle != 0, "the native diagnostic file is created and pinned before the child starts")
 		AssertEqual(0, _KCT_ObservationOpen(Path).Handle, "a preexisting diagnostic path is never adopted")
 		Row := "suffix-123456-7319|7319|8291|9472|1|1|8|1|1|0|0|0|-1`n"
-		FileAppend(Row, Path, "UTF-8-RAW")
+		AppendRefused := false
+		try FileAppend(Row, Path, "UTF-8-RAW")
+		catch OSError as Err
+			AppendRefused := Err.Number == 32
+		AssertTrue(AppendRefused, "the original FileAppend sharing ABI refuses while the native parent pin is held")
+		AppendStream := FileOpen(Path, "a-d", "UTF-8-RAW")
+		try AssertEqual(StrLen(Row), AppendStream.Write(Row), "the shared append writes every independent ASCII observation byte")
+		finally AppendStream.Close()
 		AssertEqual(" [observation records=1,phase=8,scenario=1,owned=1,error=0,source=0,line=0,exit=-1]",
 			_KCT_ObservationRead(Lease, 7319, "suffix-123456-7319", "candidate", 9472))
 		RenameRefused := false
