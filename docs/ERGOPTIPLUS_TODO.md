@@ -5380,6 +5380,16 @@ remain byte-exact. Independent review passes 29 inert admission cases and
 eight causal corruption controls; source-native execution and the distinct
 installed compiled-upgrade scenario remain unexecuted at this checkpoint.
 
+Preparatory Windows CI37559480162 passes all 10,106 main units, including
+nine layout-picker regressions, but fails the subsequent C# reload fixture
+before actual clone startup: the admitted failed successor did not acknowledge
+terminal cleanup within its unchanged bound. E2E, packaging and installation
+are skipped. Its observer now records closed termination, wait and exit-query
+facts from that exact admitted handle; original authority, ten census controls,
+two native-exit cases and 1000 ms runtime/5000 ms observer bounds remain intact.
+Fifteen extracted-census recording controls pass locally. Actual Win32 cause
+and native requalification remain unobserved; this diagnostic closes no item.
+
 - [ ] **73.** Partial: Windows combination families and pairs already use
       the canonical translated tap-hold key labels; macOS now resolves both
       physical keys through the same catalogue and invalidates its picker
