@@ -172,7 +172,7 @@ function M.new(native, report)
 				-- Malformed FD/absence receipts confer no destructive authority.
 				token._uncertain = true
 			end
-			return nil
+			return nil, native_status
 		end
 		if token._cancelled then close(record); return nil end
 		return record
@@ -240,6 +240,30 @@ function M.new(native, report)
 		if type(executable) ~= "string" or #executable > 4096 or executable:sub(1, 1) ~= "/"
 			or executable:find("[%z\r\n]") then self._sealed = true; settle(); return nil end
 		return observe(nil, executable)
+	end
+	--- Captures bounded regular-file bytes under this existing descriptor ledger.
+	--- Missing conditional files match curl's explicit empty-validator behavior.
+	function token:read_regular(path, maximum, missing_allowed)
+		if self._sealed or self._constructing or flags == nil or type(path) ~= "string"
+			or path == "" or path:find("%z") or not safe_integer(maximum) or maximum < 1 then return nil end
+		self._constructing = true
+		local bytes
+		local live, status = acquire(path)
+		if not live and status == "ENOENT" and missing_allowed == true then bytes = ""
+		elseif live then
+			local before = snapshot(live)
+			if before and before.size <= maximum then
+				local content = native_value("fs_read", live.fd, maximum + 1, 0)
+				local eof = type(content) == "string" and #content <= maximum
+					and native_value("fs_read", live.fd, 1, #content) or nil
+				local after = snapshot(live)
+				if eof == "" and M.equal(before, after) then bytes = content end
+			end
+		end
+		for _, record in ipairs(self._records) do close(record) end
+		self._constructing, self._sealed = false, true
+		settle()
+		return self._settled and not self._cancelled and bytes or nil
 	end
 	return token
 end

@@ -467,6 +467,65 @@ end
 	// callbacks remain simulated libuv ports; this is not a native-wire proof.
 	const managedAuthenticationHarness = authenticationHarness
 		.replace(
+			"local driver = assert(arg[1], 'authentication fixture needs the explicit driver root')",
+			`-- These are deterministic simulated pipe/ENOENT receipts, not native-wire evidence.
+uv.constants = { O_RDONLY = 0, O_NONBLOCK = 2048 }
+native.descriptors, native.next_fd = {}, 6000
+function uv.pipe(read_options, write_options)
+ assert(read_options.nonblock == true and write_options.nonblock == true, 'conditional pipe lost nonblocking admission')
+ native.next_fd = native.next_fd + 2
+ local read_fd, write_fd = native.next_fd, native.next_fd + 1
+ native.descriptors[read_fd] = { peer = write_fd, direction = 'read', inode = read_fd }
+ native.descriptors[write_fd] = { peer = read_fd, direction = 'write', inode = read_fd }
+ return { read = read_fd, write = write_fd }
+end
+function uv.fs_fstat(fd)
+ local descriptor = assert(native.descriptors[fd], 'fixture observed an unowned descriptor')
+ assert(not descriptor.closed, 'fixture reused a closed descriptor')
+ return { dev = 1, ino = descriptor.inode, type = 'fifo' }
+end
+function uv.pipe_open(handle, fd)
+ local descriptor = assert(native.descriptors[fd], 'fixture attached an unowned descriptor')
+ assert(not descriptor.closed and descriptor.handle == nil and handle.fd == nil, 'fixture repeated descriptor transfer')
+ descriptor.handle, handle.fd = handle, fd
+ return true
+end
+function uv.fs_open(filename, flags, mode)
+ assert((filename == '/owned/etag-in' or filename == '/owned/etag-out') and flags == 2048 and mode == 0, 'conditional snapshot escaped its original missing-file fixture')
+ return nil, 'ENOENT', 'ENOENT'
+end
+function uv.fs_read() error('missing validator file cannot yield owned reads') end
+function uv.fs_close(fd)
+ local descriptor = assert(native.descriptors[fd], 'fixture closed an unowned descriptor')
+ assert(not descriptor.closed and descriptor.handle == nil, 'fixture closed a transferred descriptor twice')
+ descriptor.closed = true
+ return true
+end
+local driver = assert(arg[1], 'authentication fixture needs the explicit driver root')`
+		)
+		.replace(
+			"assert((argv:find('--location', 1, true) == nil) == (expected[2] and os.getenv('GITHUB_ACTIONS') == 'true'), 'native curl redirect policy escaped authentication scope')",
+			`-- Literal eligibility of the unchanged seven authored managedCases, independent of candidate URL parsing.
+ local hop_eligible = { true, true, true, true, true, true, false }
+ assert(#rows == 7 and type(hop_eligible[count]) == 'boolean', 'managed dispatch inventory lost its literal seven-case eligibility')
+ local follows = not (expected[2] and os.getenv('GITHUB_ACTIONS') == 'true')
+ if hop_eligible[count] or not follows then
+  assert(not argv:find('--location', 1, true), 'managed conditional request must retain sole per-hop redirect ownership')
+ else
+  assert(argv:find('--location', 1, true), 'literal userinfo exclusion lost original native-follow ownership')
+ end
+ if hop_eligible[count] then
+  assert((argv:find('ERGOPTI_GET_REDIRECT_JSON:', 1, true) ~= nil) == follows, 'managed native receipt lost original caller redirect permission')
+ else
+  assert(not argv:find('ERGOPTI_GET_REDIRECT_JSON:', 1, true), 'literal userinfo exclusion acquired a managed-hop receipt')
+ end
+ assert(argv:find('--dump-header\\n/dev/fd/4', 1, true), 'conditional response lost its exact FD4 header destination')
+ assert(native.pipes[4] == nil and type(native.pipes[5]) == 'table', 'buffered GET header FD4 collided with body FD3')
+ local writer = native.descriptors[assert(native.pipes[5].fd)]
+ local reader = native.descriptors[writer.peer]
+ assert(writer.direction == 'write' and writer.closed and reader.direction == 'read' and reader.handle and not reader.closed, 'conditional pipe transfer or parent writer close was not acknowledged')`
+		)
+		.replace(
 			"function uv.kill() error('completed receipt must not cancel a live successor') end",
 			`function uv.kill(pid, signal)
  assert(pid == -native.group and signal == 0, 'managed group observation targeted another owner')
@@ -480,10 +539,36 @@ end`
  native.group, native.absent_group = 4000 + native.requests, nil`
 		)
 		.replace(
+			'native.pipes[3].read(nil, nil)',
+			`if http_status == 304 and follows and hop_eligible[count] then
+  -- Literal terminal304 endpoints of the original seven cases, not native-argv-derived metadata.
+  local final_urls = {
+   'https://api.github.com/repos/adrienm7/ergopti/releases',
+   'https://api.github.com/repos/adrienm7/ergopti/releases?per_page=20&page=2',
+   'https://api.github.com/repos/fixture-owner/other-project/releases',
+   'https://release-assets.githubusercontent.com/package.tar.gz',
+   'https://API.GITHUB.COM/repos/adrienm7/ergopti/releases',
+   'https://api.github.com.evil.invalid/repos/adrienm7/ergopti/releases',
+   'https://user:password@api.github.com/repos/adrienm7/ergopti/releases',
+  }
+  local final_url = assert(final_urls[count], 'literal conditional final endpoint inventory changed')
+  assert(url == final_url, 'conditional request differs from independently authored terminal endpoint')
+  local terminal = { http_code = 304, response_code = 304, exitcode = 0,
+   num_redirects = 0, url_effective = final_url, redirect_url = '' }
+  native.pipes[3].read(nil, '\\nERGOPTI_GET_REDIRECT_JSON:\\n' .. final_url .. '\\n\\n' .. Json.encode(terminal) .. '\\n')
+ end
+ native.pipes[3].read(nil, nil)`
+		)
+		.replace(
 			'native.exit(http_status >= 400 and 22 or 0, 0)',
 			`-- Distinct exact-group model receipt, independent of leader/stream ACKs.
  native.absent_group = native.group
- native.exit(http_status >= 400 and 22 or 0, 0)`
+ native.exit(http_status >= 400 and 22 or 0, 0)
+ -- Child/group and both ordinary stream receipts cannot replace FD4 EOF.
+ assert(not delivered, 'managed callback borrowed completion without conditional header EOF')
+ reader.handle.read(nil, 'HTTP/1.1 ' .. http_status .. ' Fixture\\r\\nContent-Length: ' .. #response_body .. '\\r\\n\\r\\n')
+ assert(not delivered, 'managed callback borrowed header bytes without exact header EOF')
+ reader.handle.read(nil, nil)`
 		)
 		.replace(
 			'local native = { requests = 0 }',
@@ -507,6 +592,11 @@ end`
  assert(not handle.closed, 'managed fixture retried an acknowledged native close')
  handle.closing, handle.closed = true, true
  native.closed = native.closed + 1
+ if handle.fd then
+  local descriptor = assert(native.descriptors[handle.fd], 'managed close lost the attached conditional descriptor')
+  assert(descriptor.handle == handle and not descriptor.closed, 'managed close borrowed another descriptor receipt')
+  descriptor.closed = true
+ end
  if callback then callback() end
 end`
 		)
@@ -526,7 +616,10 @@ end`
 		.replace(
 			"assert(delivered and not Client.isActive('updater'), 'native terminal receipt did not settle')",
 			`assert(delivered and not Client.isActive('updater'), 'native terminal receipt did not settle')
- assert(native.acquired == native.closed, 'managed public completion lost a physical close ACK')`
+ assert(native.acquired == native.closed, 'managed public completion lost a physical close ACK')
+ for _, descriptor in pairs(native.descriptors) do
+  assert(descriptor.closed and descriptor.handle and descriptor.handle.closed, 'managed public completion lost conditional descriptor retirement')
+ end`
 		);
 	const managedCases = [
 		[releaseOrigin, true],

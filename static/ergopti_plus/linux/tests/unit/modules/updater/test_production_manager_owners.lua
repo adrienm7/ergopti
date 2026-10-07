@@ -11,6 +11,30 @@ local function scenario(options, body)
  local saved = {}; for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
  local h = { paused = false, persistence = 0, dispatches = 0, callbacks = {}, flow_physical = false, observers = {},
   cancellation = 0, artifact_closed = false, artifact_listeners = {}, reads = 0, installs = 0, install_physical = false }
+ -- Reached repository Lua closures can retain this scenario's fake owners.
+ -- Native providers retain VM types and loop userdata, so never roll them back.
+ local source = debug.getinfo(1, "S").source:gsub("^@", ""):gsub("\\", "/")
+ local driver_root = source:match("^(.*)/tests/unit/modules/updater/[^/]+%.lua$")
+ local drivers_root = driver_root and driver_root:match("^(.*)/[^/]+$")
+ if not drivers_root or type(package.searchpath) ~= "function" then
+  error("updater fixture repository source roots unavailable", 0)
+ end
+ local shared_root = drivers_root .. "/_shared/lua"
+ local original_require, original_searchpath, original_path = require, package.searchpath, package.path
+ _G.require = function(name, ...)
+  if type(name) == "string" and saved[name] == nil and package.preload[name] == nil
+   and name ~= "ffi" and name ~= "luv" and name ~= "lfs" then
+   local path = original_searchpath(name, original_path)
+   path = path and path:gsub("\\", "/")
+   if path and path:sub(-4) == ".lua" and not path:find("/../", 1, true)
+    and (path:sub(1, #driver_root + 1) == driver_root .. "/"
+     or path:sub(1, #shared_root + 1) == shared_root .. "/") then
+    saved[name] = { value = package.loaded[name] }
+    names[#names + 1] = name
+   end
+  end
+  return original_require(name, ...)
+ end
  local ok, err = xpcall(function()
   local actual_installer = options.actual_installer and require("modules.updater.installer") or nil
   local brand, transaction = {}, {}; h.brand = brand
@@ -102,6 +126,7 @@ local function scenario(options, body)
   end
   body(h)
  end, debug.traceback)
+ _G.require = original_require
  for _, name in ipairs(names) do package.loaded[name] = saved[name].value end
  if not ok then error(err, 0) end
 end

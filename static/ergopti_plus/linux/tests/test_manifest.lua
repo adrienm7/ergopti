@@ -50,6 +50,7 @@ return {
 	"tests.unit.adapters.test_managed_get_redirect_boundaries",
 	"tests.unit.adapters.test_managed_get_redirect_policy",
 	"tests.unit.adapters.test_managed_get_redirect_receipts",
+	"tests.unit.adapters.test_managed_etag_receipts",
 	"tests.unit.adapters.test_managed_get_redirects",
 	"tests.unit.adapters.test_managed_owned_authorization",
 	"tests.unit.adapters.test_system_proxy",

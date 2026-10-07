@@ -92,10 +92,18 @@ function M.new(dependencies)
 	end
 
 	--- Removes only private hop metadata; ordinary result identity is unchanged.
-	local function public_result(result)
-		if type(result) ~= "table" or result.redirect_receipt == nil then return result end
+	local function copy_etag(receipt)
+		if type(receipt) ~= "table" then return nil end
 		local copy = {}
-		for key, value in pairs(result) do if key ~= "redirect_receipt" then copy[key] = value end end
+		for key, value in next, receipt do
+			if type(key) == "string" and (type(value) == "string" or type(value) == "boolean") then copy[key] = value end
+		end
+		return copy
+	end
+	local function public_result(result)
+		if type(result) ~= "table" or (result.redirect_receipt == nil and result.etag_receipt == nil) then return result end
+		local copy = {}
+		for key, value in pairs(result) do if key ~= "redirect_receipt" then copy[key] = key == "etag_receipt" and copy_etag(value) or value end end
 		return copy
 	end
 
@@ -106,7 +114,8 @@ function M.new(dependencies)
 		local copy = {}
 		for key, value in next, result do
 			if key ~= "redirect_receipt" then
-				if key == "headers" and type(value) == "table" then
+				if key == "etag_receipt" then copy[key] = copy_etag(value)
+				elseif key == "headers" and type(value) == "table" then
 					local headers = {}
 					for name, field in next, value do
 						if type(name) == "string" and type(field) == "string" then headers[name] = field end
@@ -857,9 +866,16 @@ function M.new(dependencies)
 			and redirect_options.archive_redirects == true and type(next_output) == "function"
 		local buffered_hops = redirect_options.buffered == true and redirect_options.follow_redirects
 			and redirect_options.output_target == nil
+		-- Legacy singleton cache options retain native handling. The updater
+		-- explicitly admits a cold save-only page to learn its final endpoint.
+		local etag_hops = redirect_options.etag_compare == nil and redirect_options.etag_save == nil
+			or buffered_hops and (redirect_options.etag_compare ~= nil and redirect_options.etag_save ~= nil
+				or redirect_options.etag_affinity == true and redirect_options.etag_save ~= nil)
 		local hop_eligible = dependencies.redirect ~= nil and redirect_options.method == "GET" and (buffered_hops or archive_hops)
-			and body == nil and redirect_options.output_path == nil
-			and redirect_options.etag_compare == nil and redirect_options.etag_save == nil and authority and not authority:find("@", 1, true)
+			and body == nil and redirect_options.output_path == nil and etag_hops
+			and authority and not authority:find("@", 1, true)
+			-- Leave malformed line endings to the canonical route refusal.
+			and not url:find("[\r\n]")
 		local function redirect_still_current()
 			local generation = record.generation
 			if admission and not source_admitted(record) then
