@@ -5660,6 +5660,31 @@ deferral is superseded. This item and items16/38 remain open.
 
 Current Group 3 source checkpoint (item 91, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Complete Windows simultaneous chords, delay/copy, hold arbitration and fake-AltGr-LCtrl hook ownership, then native hook/compiled acceptance on the maintainer Windows workstation. Separate device/evidence boundary: Real key ordering and actual AltGr generation.
 
+The current source adds standard-AltGr suffix registration before the
+standalone prefix owner, retaining admitted pair and fake-Ctrl handback debt.
+Five controlled cases and one interpreted native GUI/hook case are registered;
+the native case explicitly requires interactive execution. Its owned child
+pins the current US HKL, foreground HWND/PID/thread, nonce and retirement.
+Root-selected source gates pass366 JS checks and encoding; actual native
+AltGr hook/priority and physical ordering remain pending. Injected Ctrl/RAlt
+priority is not proof of physical AltGr. Simultaneous chords, third-slot copy,
+first-key hold and genuine raw fake-Ctrl input admission remain open.
+
+Source tranche A91 (2026-10-07): shared policy defines the third slot,
+catalogue-ordered symmetric selection and an inclusive positive finite delay.
+The macOS tap-to-chord copy reads fresh disk bytes, validates every known pair
+and publishes through the existing bulk/WAL owner and the already published
+native filesystem final-admission protocol. Registry checks surround caller
+admission; lifecycle, current-route, source and cleanup/inverse fences remain.
+Only known chord leaves change; hold slots, recommendations, future records and
+unrelated action parameters remain exact. All original assertions and the new
+independent chord corpus are preserved. Private qualification passed JS365,
+macOS16686 and Linux10357 unit checks, plus E2E101/189 with one declared macOS
+host/driver skip. Root revalidates the joined Linux source before publication.
+Native Darwin publication/package acceptance and genuine device ordering remain
+pending. Windows/Linux simultaneous input still needs its actual native engine;
+this policy does not admit those capabilities.
+
 - [~] **93.** Linux: the key combinations of item 91. The shared ordered-pair
   model now runs through the actual tap-hold engine, keyboard hook and
   native configuration owner, using the same pair IDs, slots and sections.
@@ -5758,6 +5783,28 @@ qualification remains pending. The container has no input/uinput devices; its
 window fixture refuses before allocation without the process-children
 supervisor interface. Controlled wire ports do not prove kernel delivery.
 
+Current-source repair (2026-10-07): Linux captures the active native XKB group
+and retains the exact source/probe cohort through final output publication.
+Gesture fallback requires a genuine single-use idle witness from the original
+output owner; pending native inverse debt cannot become a raw-key fallback.
+Controlled fixtures use the real production layout publication seam and restore
+the previously captured injector and layout owners after success or refusal.
+Independent source, original-producer and mutation controls are retained. Root
+verification includes the complete JS and driver suites plus actual X11 source
+checks. The container's window-supervisor prerequisite remains unavailable;
+repaired hosted kernel delivery and subsequent daemon/tray acceptance are pending.
+No arbitrary physical-key output or simultaneous/cross-device capability is
+admitted by this repair.
+
+Native fixture correction (2026-10-07): the exact output Reader journals actual
+KEY/SYN observations before EVIOCGKEY can flush queued key events. The original
+four-frame oracle, native ACKs, deadlines, scenarios and cleanup remain exact;
+observations are consumed once and are never synthesized from bitmap state.
+Independent controls reproduce the old missing-DOWN failure and reject omitted,
+repeated, foreign and fabricated observations on both Lua ABIs. The actual hosted
+79-pass/1-fail receipt is retained. The repaired hosted kernel execution is still
+pending and controlled queue models are not physical-delivery evidence.
+
 - [ ] **96.** Remove the separate Ergopti+ AltGr-adjustments option from the
       Layout menu. Selecting the Ergopti+ keylayout in the emulation picker must
       suffice. Verify that the layout supplies every intended change, retire
@@ -5838,6 +5885,22 @@ Independent forward controls pass147/0 on macOS ports and143/0 on Linux ports,
 plus98 reference cases/249 driver replays/37 rejected defects. Windows native
 execution remains pending for this tranche; portable Root qualification is
 recorded above.
+
+The hosted Windows failures on exact E6 were stale source-scanning fixtures
+and the retired Ergopti default expectation. Four scanners now observe only
+the actual injected registration ports and their native defaults; closed
+executable usage refuses reassignment, aliases and counterfeits. Original
+203 assertion calls and57 registrations remain, apart from the reviewed
+neutral-none expectation and its explicit inactive assertion. Per-port call
+floors and a nonempty criterion census prevent vacuous green scans. Both
+original finite-scan failures are causally reproduced and repaired without
+changing the ratchet or its baseline. Independent source review,82 portable
+pattern controls and ten adversarial controls pass. The complete Root gate additionally
+exposed two loop-capture hazards in the added refusal cases; each must bind
+the actual per-item source before invocation rather than pass on UnsetError.
+Root selected encoding, formatting and JS gates are recorded with this tranche; native AHK execution
+and three-driver packaging/installation on the final source remain pending.
+Item96 and transverse16/38 remain open.
 
 - [~] **97.** Replace the fixed accent/direct-symbol shortcut submenu with
   user-owned entries, empty by default and offering "+ Add". Let a user on
@@ -6959,6 +7022,14 @@ deferral is superseded. This item and items16/38 remain open.
 
 Current Group 3 source checkpoint (item 108, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Complete effective-source retargeting, all-owner collisions and modifier/output transactions while preserving None, personal overrides and compensation. Separate device/evidence boundary: Actual layout changes and editor-key delivery on supported keyboards/seats.
 
+Current-source editor fence (2026-10-07): the Linux direct-source caller checks
+its captured native and pure logical issuer before and after the final session
+refresh. A retired getter, changed group or replaced probe cannot authorize the
+editor key; absent native closure stays absent. The original caller assertions
+and independent stale-source counterexamples are preserved. Final installed
+source changes, complete cross-owner collisions and physical delivery remain
+separate pending requirements.
+
 - [~] **109.** Give every application window the same "ErgoptiPlus — Title"
   format. GUI/WebView titles now use one prefix/separator policy in
   `_shared/ui/apps.manifest.json`, with generated Lua/AHK composers; an empty
@@ -7293,6 +7364,27 @@ Fresh hosted qualification and delivery/clicks remain separate; item109 is parti
 
 Current Group 3 source checkpoint (item 109, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Preserve genuine constructor captions/returns; establish supported fresh invisible Variables/KeyHistory capture before separate owned GUI/title qualification, retaining runtime HWND identity. Separate device/evidence boundary: Physical key history and notification/focus behavior outside observable hosted cases.
 
+Five appended interactive console cases retain the real production owner
+and ten native child probes. They distinguish stale hidden Edit text from
+public ListVars/no-argument KeyHistory refresh, visible/foreground disruption,
+restored final state and explicit KeyHistory capacity. Restoring the final
+state cannot qualify invisible capture. Root-selected portable gates pass;
+actual native execution is pending. Existing console/title and constructor
+assertions remain unchanged. Fresh invisible capture remains unavailable,
+and interpreted checks do not prove compiled console behavior.
+
+The Windows workflow now runs five named console cases and six named
+AltGr suffix cases serially after the ordinary suite. Exact TAP/case censuses,
+actual native integer exit zero, fresh timing evidence and diagnostic-free
+stderr are mandatory; evidence uploads on failure. Portable actual PowerShell
+controls prove the positive case and17 refusals, including a native-exit
+omission counterexample. All prior365 JS checks, old workflow bytes and
+compiled package/startup/upgrade/full-save gates are retained; the new gate
+makes366. The actual eleven-case desktop replay and its twelve internal
+native children remain pending. This interpreted runner cannot qualify
+compiled console capture, physical input or invisible refreshing. Items91,
+109 and16/38 remain partial.
+
 - [~] **111.** Provide two distinct, explicitly labelled shared window-switching
   actions on Windows, macOS and Linux: the operating system's normal Alt+Tab switcher
   (the native equivalent on macOS), and switching only among windows on the display
@@ -7470,6 +7562,18 @@ chown, all five corrected distributions and integrated package/install
 acceptance still require hosted qualification; item111 stays partial.
 
 Current Group 3 source checkpoint (item 111, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Complete Mac broker/wiring and exact retirement qualification; preserve final Linux supervision five, external recovery one and window 34 successes without rebuilding the switcher. Separate device/evidence boundary: Genuine dual screens, independent cursor/focus and moved/closed windows.
+
+Twelve published macOS prerequisite corrections are composed through a
+normal merge, retaining their original commit identities. They preserve the
+native closed-owner and refusal gates while correcting current Swift/AppKit
+startup, numeric local Sparkle binding, actual private event-table identity
+and owned AppleEvent fixture observations. The independent source review
+passes163 focused portable controls and verifies all24 merged source images;
+no unrelated Windows feature commits are imported. This is source composition,
+not native acceptance. Exact final-source macOS packaging, installation,
+private-table and AppleEvent qualification remain pending; the separately
+prepared system_app_switcher product packet is not adopted by this merge.
+Item111 and transverse16/38 remain partial.
 
 - [ ] **112.** Accept an AI prediction immediately with its configured
       modifier-plus-digit shortcut, with matching shortcut hints on all three OSes.

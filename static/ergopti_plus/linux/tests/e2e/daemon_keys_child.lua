@@ -105,19 +105,8 @@ local function code_for(c)
 end
 
 package.preload["adapters.keyboard_layout"] = function()
-	return {
-		refresh = function() return true end,
-		is_ready = function() return true end,
-		source = function() return "scripted" end,
-		resolve = function(c) return { keycode = code_for(c), level = 1, mods = {} } end,
-		plan = function(text)
-			local plan = {}
-			for _, c in ipairs(chars(text)) do plan[#plan + 1] = { keycode = code_for(c), level = 1, mods = {} } end
-			return plan
-		end,
-		shortcut_keycode = function(_, us_code) return us_code end,
-		_set_table_for_test = function() end,
-	}
+	-- The layout is controlled; opaque plan custody is actual KeyboardLayout logic.
+	return require("tests.support.layout_cohort_fixture").layout(code_for)
 end
 
 package.preload["adapters.uinput_writer"] = function()
