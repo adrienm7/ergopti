@@ -198,6 +198,53 @@ return function(run)
 				end,
 				resolve_layout_actions = function() return 0 end,
 			}
+			-- Controlled source port for the shared copy planner. The original save
+			-- callback and its failure/counter contract remain the publication port.
+			local CopyCodec = require("toml_codec")
+			local CopyWriter = require("toml_codec.writer")
+			local CopyPolicy = require("tap_hold.key_combinations")
+			local copy_config = package.loaded["platform.remap.config"]
+			local original_save = copy_config.save_user_config
+			calls.copy_source = ""
+			copy_config.save_user_config = function(state)
+				local accepted = original_save(state)
+				if accepted == true then
+					calls.copy_source = CopyCodec.encode({ mod_combos = {
+						enabled = state.mod_combos_enabled, config = state.mod_combos_config,
+						simultaneous_threshold_ms = state.simultaneous_threshold_ms,
+						symmetric = state.combo_symmetric,
+					} })
+				end
+				return accepted
+			end
+			copy_config.prepare_copy_taps_to_chords = function(entries, _, path)
+				if calls.copy_read then calls.copy_read() end
+				local expected = { status = "ok", content = calls.copy_source }
+				local plan = CopyPolicy.plan_chord_copy(expected.content, {
+					entries = entries, is_action = function(action)
+						return action == "escape" or action == "layer" or action == "caps_word"
+					end,
+					settings = { simultaneous_threshold_ms = 50, combo_symmetric = false },
+				})
+				local prepared, detail, candidate = CopyWriter.prepare_batch(path, plan.rows, {
+					read_with_status = function() return calls.copy_source, "ok" end,
+				}, expected)
+				assert(prepared == true, detail)
+				plan.path, plan.expected_source, plan.candidate = path, expected, candidate
+				return plan
+			end
+			copy_config.publish_copy_taps_to_chords = function(plan, path)
+				if calls.copy_publish then calls.copy_publish() end
+				if plan.path ~= path or calls.copy_source ~= plan.expected_source.content then return false end
+				local payload = clone_payload(calls.saved_payloads[#calls.saved_payloads] or {})
+				payload.mod_combos_config = plan.mod_combos_config
+				payload.mod_combos_enabled = plan.mod_combos_enabled
+				payload.simultaneous_threshold_ms = plan.settings.simultaneous_threshold_ms
+				payload.combo_symmetric = plan.settings.combo_symmetric
+				local accepted = original_save(payload)
+				if accepted == true then calls.copy_source = plan.candidate end
+				return accepted
+			end
 			package.loaded["platform.remap.generator"] = {
 				-- The facade only delegates to this rule; the real one is pinned
 				-- by test_generator_combo_gate_split.lua.

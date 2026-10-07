@@ -5670,6 +5670,21 @@ AltGr hook/priority and physical ordering remain pending. Injected Ctrl/RAlt
 priority is not proof of physical AltGr. Simultaneous chords, third-slot copy,
 first-key hold and genuine raw fake-Ctrl input admission remain open.
 
+Source tranche A91 (2026-10-07): shared policy defines the third slot,
+catalogue-ordered symmetric selection and an inclusive positive finite delay.
+The macOS tap-to-chord copy reads fresh disk bytes, validates every known pair
+and publishes through the existing bulk/WAL owner and the already published
+native filesystem final-admission protocol. Registry checks surround caller
+admission; lifecycle, current-route, source and cleanup/inverse fences remain.
+Only known chord leaves change; hold slots, recommendations, future records and
+unrelated action parameters remain exact. All original assertions and the new
+independent chord corpus are preserved. Private qualification passed JS365,
+macOS16686 and Linux10357 unit checks, plus E2E101/189 with one declared macOS
+host/driver skip. Root revalidates the joined Linux source before publication.
+Native Darwin publication/package acceptance and genuine device ordering remain
+pending. Windows/Linux simultaneous input still needs its actual native engine;
+this policy does not admit those capabilities.
+
 - [~] **93.** Linux: the key combinations of item 91. The shared ordered-pair
   model now runs through the actual tap-hold engine, keyboard hook and
   native configuration owner, using the same pair IDs, slots and sections.
