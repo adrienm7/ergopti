@@ -323,6 +323,17 @@ check(
 		);
 		const appkit = receiver.slice(appkitStart, appkitEnd);
 		assert.match(appkit, /if \(application == nil\) return AppKitApplicationMissing;/);
+		const currentPolicy = appkit.indexOf(
+			'if ([application activationPolicy] == NSApplicationActivationPolicyAccessory)'
+		);
+		const setterPolicy = appkit.indexOf(
+			'if (![application setActivationPolicy:NSApplicationActivationPolicyAccessory])'
+		);
+		assert.ok(currentPolicy >= 0 && setterPolicy > currentPolicy);
+		assert.match(
+			appkit,
+			/if \(\[application activationPolicy\] == NSApplicationActivationPolicyAccessory\) \{\s*return AppKitAdmitted;\s*\}/
+		);
 		assert.match(
 			appkit,
 			/if \(!\[application setActivationPolicy:NSApplicationActivationPolicyAccessory\]\) \{\s*return AppKitPolicyRefused;/
@@ -332,7 +343,8 @@ check(
 			/if \(\[application activationPolicy\] != NSApplicationActivationPolicyAccessory\) \{\s*return AppKitPolicyUnconfirmed;/
 		);
 		assert.ok(
-			appkit.indexOf('return AppKitPolicyUnconfirmed;') < appkit.indexOf('return AppKitAdmitted;')
+			appkit.indexOf('return AppKitPolicyUnconfirmed;') <
+				appkit.lastIndexOf('return AppKitAdmitted;')
 		);
 		assert.ok(
 			receiver.indexOf('if (admission != AppKitAdmitted)') <
@@ -357,7 +369,7 @@ check(
 		);
 		assert.match(
 			boundary,
-			/registration_controls\.stdout == "native_appkit_registration_controls=4\\n"/
+			/registration_controls\.stdout == "native_appkit_registration_controls=5\\n"/
 		);
 		assert.doesNotMatch(boundary, /NSWorkspace|\/usr\/bin\/open/);
 	}
