@@ -1800,6 +1800,18 @@ const CHECKS = [
 		repro: 'npm run test:ollama-bootstrap-network-hardening'
 	},
 	{
+		name: 'MLX emitted downloader refuses failed system trust activation',
+		cmd: process.execPath,
+		args: ['tools/test/test-mlx-download-trust-activation.cjs'],
+		repro: 'node tools/test/test-mlx-download-trust-activation.cjs'
+	},
+	{
+		name: 'CPython resolution refuses configured interpreter substitution',
+		cmd: process.execPath,
+		args: ['tools/test/test-python-resolution.cjs'],
+		repro: 'node tools/test/test-python-resolution.cjs'
+	},
+	{
 		name: 'Ollama server command preserves exact process ownership',
 		cmd: 'node',
 		args: ['tools/test/test-ollama-server-command.cjs'],

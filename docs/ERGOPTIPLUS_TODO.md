@@ -5412,6 +5412,14 @@ The fixed Specifications and Capabilities frames of the Windows/macOS per-model 
       uncommitted in the local worktree of `fix/downloads-on-managed-networks`
       when the session stopped; redo it if that worktree is gone.
 
+MLX downloads now refuse missing or failed system-trust activation through the
+existing dependency-failure path, before importing Hugging Face or starting a
+watcher/download. The actual production-emitted Python is exercised against five
+independent offline vectors and its original session exit path; the unchanged
+predecessor reports two passes/three failures. This does not qualify native
+Keychain trust, corporate proxies or transitive Rust/Xet downloads. Item62 and
+its Windows/company-network acceptance requirements remain open.
+
 Current Linux checkpoint (2026-10-06, working sources over eeb6fd58f):
 retained temporary namespace conflicts now carry an explicit, pre-destructive
 retry disposition. Only the same owner can retry after the independently
