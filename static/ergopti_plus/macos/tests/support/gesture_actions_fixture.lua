@@ -50,6 +50,12 @@ local OWNERS = {
 	"llm.vision",
 	"modules.gestures",
 	"modules.gestures.actions",
+	"modules.gestures.native_app_switcher_action",
+	"modules.gestures.native_app_switcher",
+	"adapters.system_switcher_input",
+	"adapters.system_switcher_sampler",
+	"adapters.system_switcher_runtime",
+
 	"modules.gestures.actions_aux_owner",
 	"modules.gestures.actions_click",
 	"modules.gestures.conflicts",
@@ -77,6 +83,12 @@ local function fresh_actions(options)
 	local controls = options or {}
 	for _, name in ipairs({
 		"modules.gestures.actions",
+	"modules.gestures.native_app_switcher_action",
+	"modules.gestures.native_app_switcher",
+	"adapters.system_switcher_input",
+	"adapters.system_switcher_sampler",
+	"adapters.system_switcher_runtime",
+
 		"infra.notifications",
 		"adapters.timer_scheduler",
 		"modules.gestures.actions_aux_owner",

@@ -263,6 +263,14 @@ aux_shell_timeout_ms = 10000
 # HS: gestures/actions_aux_owner.lua SHELL_CLEANUP_RETRY_SEC.
 aux_shell_cleanup_retry_ms = 500
 
+# Native switcher observation deadline, separate from process and gesture timers.
+# HS: gestures/native_app_switcher_action.lua; this does not bound retirement debt.
+native_switcher_deadline_ms = 8000
+
+# Native switcher input/sampling and broker polling cadence, never a blocking sleep.
+# HS: gestures/native_app_switcher_action.lua.
+native_switcher_poll_ms = 20
+
 # Slow health-check cadence once touch frames are flowing normally.
 # HS: gestures/init.lua HEALTH_CHECK_INTERVAL_SEC.
 health_check_interval_ms = 30000
