@@ -26,6 +26,7 @@ local hs            = hs
 local notifications = require("infra.notifications")
 local Logger        = require("infra.logger")
 local NetworkEnv    = require("modules.llm.network_env")
+local NetworkAdmission = require("modules.llm.opaque_network_admission")
 local i18n          = require("infra.i18n")
 local text_utils    = require("infra.text_utils")
 local TaskLifecycle = require("adapters.task_lifecycle")
@@ -680,6 +681,7 @@ function M.install(ctx)
 			-- authoritative cross-stage lease used by entry, cancellation and late
 			-- callbacks.
 			local launcher_task
+			local network_admission = NetworkAdmission.new()
 			local operation_closed = false
 			local do_cancel
 			local function still_current()
@@ -1116,7 +1118,7 @@ function M.install(ctx)
 			end
 
 			local clean_repo = repo:gsub("[%c%s]", "")
-			local network_prelude, network_err = NetworkEnv.prelude("MLX")
+			local network_prelude, network_err = NetworkEnv.opaque_prelude("MLX")
 			if not network_prelude then
 				Logger.error(LOG, "The MLX model download cannot start: %s.", tostring(network_err))
 				do_cancel(true, "network_policy_missing")
@@ -1150,8 +1152,6 @@ function M.install(ctx)
 			py:write("atexit.register(_write_exit, 1)\n")
 			py:write("try:\n")
 			py:write("    import truststore; truststore.inject_into_ssl()\n")
-			py:write("except Exception: pass\n")
-			py:write("try:\n")
 			py:write("    from huggingface_hub import snapshot_download\n")
 			py:write("except Exception:\n")
 			py:write("    print('--- ERREUR DEPENDANCES ---', flush=True)\n")
@@ -1822,7 +1822,7 @@ function M.install(ctx)
 				if encode_ok ~= true or type(encoded) ~= "string" then return false end
 				return publish_owned_file(session_file, encoded, "MLX download session PID")
 			end
-			local function finish_launcher(code)
+			local function finish_launcher(code, _stdout, stderr)
 				if owner.tasks.launcher ~= launcher_task then return false end
 				owner.tasks.launcher = nil
 				if deps.active_tasks and deps.active_tasks["download"] == launcher_task then
@@ -1837,6 +1837,17 @@ function M.install(ctx)
 					do_cancel(true, "stale")
 					return false
 				end
+				local network_report
+				if launcher_start_committed == true then
+					network_admission.push(stderr or "")
+					local network_receipt = network_admission.finish(code)
+					if network_receipt then
+						local reported, report = Logger.callback(LOG, "MLX owned network admission report",
+							NetworkAdmission.report, network_receipt, {})
+						if reported then network_report = report end
+					end
+				end
+				if not current_or_cancel() then return false end
 				-- stdout/stderr are empty when a streaming callback is active — the
 				-- owner PID was already set by the __DLPID__ stream sentinel.
 				if not owner.partial.pid or code ~= 0 then
@@ -1848,7 +1859,8 @@ function M.install(ctx)
 					end
 					if not current_or_cancel() then return false end
 					pcall(notifications.notify, i18n.get("mlx.launcher_failed"),
-						string.format(i18n.get("mlx.launcher_failed_body"), code),
+						network_report and i18n.get(network_report.message_key)
+							or string.format(i18n.get("mlx.launcher_failed_body"), code),
 						"error")
 					if not current_or_cancel() then return false end
 					do_cancel(true, "launcher_failed")
@@ -1873,20 +1885,21 @@ function M.install(ctx)
 			launcher_task = run_owner_task_acquisition(owner,
 				"MLX detached launcher construction transaction",
 				TaskLifecycle.native, "MLX detached download launcher", script_path,
-				function(code)
+				function(code, stdout, stderr)
 					return run_owner_callback(owner,
 						"MLX detached launcher completion callback", function()
 							if launcher_starting then
 								if pending_launcher_completion == nil then
-									pending_launcher_completion = table.pack(code)
+									pending_launcher_completion = table.pack(code, stdout, stderr)
 								end
 								return true
 							end
-							return finish_launcher(code)
+							return finish_launcher(code, stdout, stderr)
 						end)
 				end, function(_, stdout, stderr)
 					return run_owner_callback(owner,
 						"MLX detached launcher stream callback", function()
+							if still_current() then network_admission.push(stderr or "") end
 							local out = (stdout or "") .. (stderr or "")
 							-- Resource discovery remains live after logical revocation: a queued PID
 							-- sentinel is cleanup evidence, never publication authority.

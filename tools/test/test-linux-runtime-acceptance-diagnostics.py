@@ -210,6 +210,14 @@ class MainDiagnosticTests(unittest.TestCase):
                 shutil.copyfile(
                     REPOSITORY / "static/ergopti_plus/_shared/modules/llm" / name, shared / name
                 )
+            for native_source in (
+                "tools/build/build-linux-native-output.sh",
+                "static/ergopti_plus/linux/native/archive_output/archive_publication.c",
+                "static/ergopti_plus/linux/native/archive_output/archive_publication.h",
+            ):
+                destination = repository / native_source
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(REPOSITORY / native_source, destination)
             home = temporary / "home"
             home.mkdir(mode=0o700)
             evidence = temporary / "evidence"

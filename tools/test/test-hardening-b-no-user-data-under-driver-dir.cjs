@@ -40,6 +40,10 @@
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
+const {
+	generatedNativeRecipe,
+	isGeneratedLinuxAsset
+} = require('./generated-linux-native-artifacts.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const revArg = process.argv.indexOf('--rev');
@@ -255,6 +259,9 @@ function isAllowed(file, text) {
 }
 
 const tree = trackedTree();
+// Native generated assets have their own complete tracked source recipe; the
+// tracked tree remains untouched and historical revisions keep their own recipe.
+const generatedNative = generatedNativeRecipe(ROOT, REV).artifacts;
 const errors = [];
 const counts = { macos: 0, linux: 0 };
 const allowedSeen = new Set();
@@ -289,6 +296,7 @@ for (const driver of ['macos', 'linux']) {
 		for (const p of anchoredPaths(code, driver)) {
 			counts[driver]++;
 			if (p.target !== null && tree.has(p.target)) continue;
+			if (driver === 'linux' && isGeneratedLinuxAsset(p.target, generatedNative)) continue;
 			if (isAllowed(rel, p.text)) {
 				allowedSeen.add(`${rel}|${p.text}`);
 				continue;

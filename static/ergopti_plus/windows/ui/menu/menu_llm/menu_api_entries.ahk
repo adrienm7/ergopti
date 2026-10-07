@@ -741,6 +741,7 @@ _LLM_Menu_ApiTestSurface(Title, Body, Icon, Ok, NotifyFn := 0) {
 ; (not a chat model) asks api_providers.json's decisions_test questions and
 ; succeeds when answers come back.
 _LLM_Menu_TestActiveApiEntry(NotifyFn := 0, EntryId := "") {
+	global _LLM_Menu_ApiFailureEpoch, _LLM_Menu_ApiPrivateAuthorityGeneration
 	global _LLM_Menu, LLM_REMOTE_TEST_REQUEST, LLM_REMOTE_KIND_API_TEST,
 		LLM_API_TEST_TIMEOUT_MS, LLM_REMOTE_DECISIONS_TEST
 	active_id := (EntryId != "") ? EntryId
@@ -796,6 +797,10 @@ _LLM_Menu_TestActiveApiEntry(NotifyFn := 0, EntryId := "") {
 		try LoggerError("LLM", "API test owner acquisition failed: {1}.", Err.Message)
 		return false
 	}
+	Owner["api_failure_epoch"] := ++_LLM_Menu_ApiFailureEpoch
+	Owner["api_failure_authority"] := _LLM_Menu_ApiPrivateAuthorityGeneration
+	Owner["api_failure_snapshot"] := snapshot.Clone()
+	ManagedNetworkTerminalFailure.Retire("api_test")
 	StartedTick := A_TickCount
 	; Immediate visible feedback at click time; the Cancel button and the
 	; request id are attached below once dispatch owns them.
@@ -858,6 +863,9 @@ _LLM_Menu_ApiTestTip(Ok, Name, Ms, Text, Info := "") {
 			"body", Format(t("menu.llm.api_test_ok_body"), Name, Ms, Excerpt))
 	}
 	Body := StrReplace(t("menu.llm.api_unreachable_body"), "%s", Name)
+	NetworkKey := Info is Map ? ManagedNetworkFailureWindows_MessageKey(Info.Get("network_report", 0)) : ""
+	if NetworkKey != ""
+		Body .= "`n" . t(NetworkKey)
 	ServerLine := _LLM_Menu_ApiTestServerLine(Info)
 	if (ServerLine != "")
 		Body .= "`n" . ServerLine
@@ -911,6 +919,8 @@ _LLM_Menu_OnApiTestDone(Ok, Text, EntryId, Name, StartedTick, Owner,
 	Tip := _LLM_Menu_ApiTestTip(Ok, Name, Ms, Text, Info)
 	_LLM_Menu_ApiTestSurface(Tip["title"], Tip["body"],
 		Tip["ok"] ? "Iconi" : "Icon!", Tip["ok"], NotifyFn)
+	if !Tip["ok"]
+		_LLM_Menu_ShowApiManagedFailure(Owner, Info, NotifyFn)
 	if (Tip["ok"]) {
 		try LoggerInfo("LLM", "API test for '{1}' succeeded in {2} ms ({3} reply chars).",
 			Name, Ms, StrLen(Text))
@@ -1951,4 +1961,40 @@ class LLM_Menu_ApiPrivateSourceOwner {
 			Candidate["backend"] := "api"
 		return true
 	}
+}
+
+
+global _LLM_Menu_ApiFailureEpoch := 0
+
+_LLM_Menu_ApiFailureCurrent(Owner) {
+	global _LLM_Menu, _LLM_Menu_ApiFailureEpoch, _LLM_Menu_ApiPrivateAuthorityGeneration
+	if !(Owner is Map) || Owner.Get("api_failure_epoch", 0) != _LLM_Menu_ApiFailureEpoch
+		|| Owner.Get("api_failure_authority", -1) != _LLM_Menu_ApiPrivateAuthorityGeneration
+		|| Owner.Get("backend_generation", -1) != LLM_AuxGeneration()
+		|| Owner.Get("endpoint_generation", -1) != LLM_AuxGeneration()
+		|| Owner.Get("lifecycle_generation", -1) != LLM_AuxGeneration()
+		|| !(Owner.Get("api_failure_snapshot", 0) is Map)
+		return false
+	Snapshot := Owner["api_failure_snapshot"]
+	Matches := 0
+	if _LLM_Menu is Map && _LLM_Menu.Get("api_entries", 0) is Array {
+		for Entry in _LLM_Menu["api_entries"] {
+			if !_ManagedNetwork_Equal(_LLM_MenuApiEntryGet(Entry, "Id", ""), Snapshot["Id"])
+				continue
+			for Field, Value in Snapshot
+				if !_ManagedNetwork_Equal(_LLM_MenuApiEntryGet(Entry, Field, ""), Value)
+					return false
+			Matches += 1
+		}
+	}
+	return Matches == 1 && !A_IsSuspended
+}
+
+_LLM_Menu_ShowApiManagedFailure(Owner, Info, NotifyFn := 0, PresentFn := 0) {
+	if !(Info is Map) || !_LLM_Menu_ApiFailureCurrent(Owner)
+		return false
+	EntryId := Owner["api_failure_snapshot"]["Id"]
+	return ManagedNetworkTerminalFailure.Publish("api_test", Info.Get("network_report", 0),
+		() => _LLM_Menu_ApiFailureCurrent(Owner), "menu.llm.api_unreachable_title",
+		() => _LLM_Menu_TestActiveApiEntry(NotifyFn, EntryId), PresentFn)
 }

@@ -1005,14 +1005,14 @@ try {
 	assert.ifError(result.error);
 	assert.equal(result.signal, null, result.stderr);
 	assert.equal(result.status, 0, result.stderr);
-	assert.match(result.stderr, /Ran 24 tests in /);
-	const skipped = process.platform === 'win32' ? 7 : process.platform === 'darwin' ? 1 : 0;
+	assert.match(result.stderr, /Ran 46 tests in /);
+	const skipped = process.platform === 'win32' ? 17 : process.platform === 'darwin' ? 1 : 0;
 	assert.match(
 		result.stderr,
 		skipped ? new RegExp(`\\nOK \\(skipped=${skipped}\\)\\s*$`) : /\nOK\s*$/
 	);
 	console.log(
-		`Sparkle transport controls: ${24 - skipped} passed, ${skipped} platform cases skipped.`
+		`Sparkle transport controls: ${46 - skipped} passed, ${skipped} platform cases skipped.`
 	);
 	const fixture = fs.readFileSync(
 		path.join(
@@ -1073,11 +1073,40 @@ try {
 		/let schema = integer\("schema", maximum: 2\), schema == 1 \|\| schema == 2/
 	);
 	assert.match(annotation, /guard bytes == 136, nativeErrno == 0/);
+	assert.match(
+		annotation,
+		/Set\(packet.keys\) == Set\(\["schema", "code", "helper_pid", "stage"\]\)/
+	);
+	assert.match(annotation, /\["private-root", "library", "inventory", "unexpected"\]/);
+	assert.match(
+		annotation,
+		/Set\(packet.keys\) == Set\(\["schema", "code", "helper_pid", "reason"\]\)/
+	);
+	assert.match(annotation, /integer\("schema", maximum: 4\) == 4/);
+	assert.match(
+		annotation,
+		/\["metadata", "missing", "not-absolute", "not-directory", "mode", "owner", "canonical"\]/
+	);
+	assert.match(
+		annotation,
+		/XCTFail\("Native Sparkle census refusal: code=directory-refused helper_pid=/
+	);
+	assert.match(fixture, /XCTFail\("Native Sparkle census refusal: code=diagnostic-unavailable"\)/);
+
 	assert.doesNotMatch(
 		annotation,
 		/(?:print|XCTFail)\(stdout|summary \+= stdout|packet\["(?:argv|path|stderr|comm|name)"\]/
 	);
 	assert.doesNotMatch(annotation, /print\(stdout|stderr|String\(reflecting|ownedPIDs/);
+	assert.match(fixture, /testOwnedCensusPathAdmitsParentAliasWithoutAdoptingDirectoryReplacement/);
+	assert.match(fixture, /let paths = try roots\.map \{ try ownedCensusPath\(\$0\) \}/);
+	assert.match(fixture, /\["python3", helper\.path, "census"\] \+ paths/);
+	assert.match(fixture, /Darwin\.realpath\(spelling, nil\)/);
+	assert.match(fixture, /target\.st_dev == original\.st_dev, target\.st_ino == original\.st_ino/);
+	assert.match(fixture, /metadata\.st_dev == owned\.device, metadata\.st_ino == owned\.inode/);
+	assert.match(fixture, /String\(cString: resolved\) == owned\.physicalSpelling/);
+	assert.match(fixture, /return owned\.physicalSpelling/);
+	assert.match(fixture, /XCTAssertThrowsError\(try ownedCensusPath\(child\)\)/);
 	assert.match(fixture, /macos_owned_process\.py/);
 	assert.match(fixture, /packet\["closed"\] as\? Bool == true/);
 	assert.match(fixture, /packet\["exit_status"\] as\? NSNumber/);
@@ -1120,10 +1149,7 @@ try {
 	assert.match(fixture, /fetchedFeeds\.count, 2/);
 	assert.match(fixture, /hash\(refusedFeed\), hash\(acceptedFeed\)/);
 	assert.doesNotMatch(fixture, /<rss|private func feed\(/);
-	assert.match(
-		child,
-		/willDownloadUpdate item: SUAppcastItem, withRequest request: NSMutableURLRequest/
-	);
+	assert.match(child, /willDownloadUpdate item: SUAppcastItem, with request: NSMutableURLRequest/);
 	assert.match(child, /item\.fileURL == origin, request\.url == origin/);
 	assert.match(child, /transport\.scheme == "http", transport\.host == "localhost"/);
 	assert.match(
@@ -1139,6 +1165,1018 @@ try {
 	);
 } catch (error) {
 	errors.push(`Native generated appcast composition guard failed: ${error.message}`);
+}
+
+// Bounded server-exit facts must reuse the existing exit ACK and preserve failure.
+try {
+	const assert = require('node:assert/strict');
+	const { annotation, evaluate } = require('../diagnostics/swift_xctest_evidence.cjs');
+	const nativeFile = path.join(
+		root,
+		'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/SparkleArchiveUpdateAcceptanceTests.swift'
+	);
+	const fixture = fs.readFileSync(nativeFile, 'utf8');
+	function assertServerExitDiagnosticSource(source) {
+		const factsStart = source.indexOf('func observedTerminationFacts()');
+		const facts = source.slice(
+			factsStart,
+			source.indexOf('/// Repeated observations reuse', factsStart)
+		);
+		assert.match(
+			facts,
+			/guard launched, observedExit, !process\.isRunning else \{ return \.unavailable \}/
+		);
+		assert.match(
+			facts,
+			/case \.exit where \(0\.\.\.255\)\.contains\(status\): return \.exit\(status\)/
+		);
+		assert.match(
+			facts,
+			/case \.uncaughtSignal where \(1\.\.\.64\)\.contains\(status\): return \.signal\(status\)/
+		);
+		assert.doesNotMatch(
+			facts,
+			/observeExit\(|\.wait\(|\.terminate\(|kill\(|\.run\(|read|close|stdout|stderr/
+		);
+		const formatterStart = source.indexOf('private func serverExitRefusalMessage(');
+		const formatter = source.slice(
+			formatterStart,
+			source.indexOf('private struct OwnedCensusDirectory', formatterStart)
+		);
+		assert.match(formatter, /case Failure\.deadline: code = "deadline"/);
+		assert.match(formatter, /case "server-retirement": code = "exit-status"/);
+		assert.match(formatter, /case "native-child-signal": code = "native-signal"/);
+		assert.match(formatter, /default: code = "unavailable"/);
+		assert.match(formatter, /default: reason = "unavailable"; status = "unavailable"/);
+		assert.doesNotMatch(
+			formatter,
+			/localizedDescription|String\(describing:|stdout|stderr|\.path|nonce/
+		);
+		const cleanupStart = source.indexOf('attempt("server-exit")');
+		const cleanup = source.slice(
+			cleanupStart,
+			source.indexOf('attempt("server-terminal")', cleanupStart)
+		);
+		assert.match(cleanup, /if server\.process\.isRunning \{ server\.process\.terminate\(\) \}/);
+		assert.match(cleanup, /let retired = try server\.finish\(10\)/);
+		assert.match(
+			cleanup,
+			/guard retired.status == 0 else \{ throw Failure\.evidence\("server-retirement"\) \}/
+		);
+		assert.match(
+			cleanup,
+			/catch \{\s*XCTFail\(serverExitRefusalMessage\(error, termination: server\.observedTerminationFacts\(\)\)\)\s*throw error/
+		);
+		assert.match(source, /func testServerExitRefusalMessageProjectsOnlyClosedFacts\(\)/);
+	}
+	assertServerExitDiagnosticSource(fixture);
+	for (const [reason, mutated] of [
+		[
+			'unobserved child status',
+			fixture.replace(
+				'guard launched, observedExit, !process.isRunning',
+				'guard launched, !process.isRunning'
+			)
+		],
+		[
+			'diagnostic acquires another wait',
+			fixture.replace(
+				'let status = process.terminationStatus',
+				'let status = process.terminationStatus; _ = observeExit(0)'
+			)
+		],
+		[
+			'raw error export',
+			fixture.replace('default: code = "unavailable"', 'default: code = error.localizedDescription')
+		],
+		[
+			'primary failure swallowed',
+			fixture.replace(
+				'XCTFail(serverExitRefusalMessage(error, termination: server.observedTerminationFacts()))\n\t\t\t\t\t\tthrow error',
+				'XCTFail(serverExitRefusalMessage(error, termination: server.observedTerminationFacts()))'
+			)
+		]
+	])
+		assert.throws(() => assertServerExitDiagnosticSource(mutated), reason);
+	// This independent authentic XCTest fixture exercises the actual annotation owner.
+	const fixedFacts =
+		'Native Sparkle server retirement refusal: code=deadline native_reason=signal native_status=9';
+	const text = [
+		"Test Suite 'All tests' started at 2026-10-05 01:00:00.000.",
+		"Test Case '-[ErgoptiPlusTests.SparkleArchiveUpdateAcceptanceTests testArchive]' started.",
+		nativeFile + ':777: error: failed - ' + fixedFacts,
+		"Test Case '-[ErgoptiPlusTests.SparkleArchiveUpdateAcceptanceTests testArchive]' failed (0.100 seconds).",
+		"Test Suite 'All tests' failed at 2026-10-05 01:00:01.000.",
+		'\t Executed 1 test, with 1 failure (0 unexpected) in 0.100 (0.110) seconds'
+	].join('\n');
+	const verdict = evaluate(text, 1, 0, root);
+	const diagnostic = verdict.failures.find((failure) => failure.message.endsWith(fixedFacts));
+	assert.notEqual(diagnostic, undefined, 'real XCTest failures expose only closed server facts');
+	assert.equal(
+		annotation(diagnostic),
+		'::error title=Swift XCTest failure,file=static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/SparkleArchiveUpdateAcceptanceTests.swift,line=777::failed - ' +
+			fixedFacts
+	);
+	assert.equal(verdict.exit_status, 1);
+	assert.equal(verdict.complete, false, 'a observed exit signal is not retirement success');
+	assert.equal(
+		evaluate(fixedFacts, 1, 0, root).failures.some((failure) =>
+			failure.message.endsWith(fixedFacts)
+		),
+		false,
+		'a raw print cannot stand in for the native XCTest diagnostic'
+	);
+	console.log(
+		'Sparkle server-exit refusal uses bounded existing native exit facts without changing retirement.'
+	);
+} catch (error) {
+	errors.push(`Native Sparkle server-exit diagnostic guard failed: ${error.message}`);
+}
+
+// An admitted Foundation parent alias must cross the helper API physically.
+try {
+	const assert = require('node:assert/strict');
+	const fixture = fs.readFileSync(
+		path.join(
+			root,
+			'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/SparkleArchiveUpdateAcceptanceTests.swift'
+		),
+		'utf8'
+	);
+	const helper = fs.readFileSync(
+		path.join(root, 'tools/diagnostics/macos_sparkle_archive_fixture.py'),
+		'utf8'
+	);
+	function assertPhysicalHelperInputs(source) {
+		assert.match(source, /\["python3", helper\.path, "serve", try ownedCensusPath\(www\), nonce\]/);
+		assert.doesNotMatch(source, /"serve", www\.path/);
+		assert.match(source, /let paths = try roots\.map \{ try ownedCensusPath\(\$0\) \}/);
+		assert.match(source, /\["python3", helper\.path, "census"\] \+ paths/);
+		assert.match(source, /helper\.path, physical\], root: root/);
+	}
+	assertPhysicalHelperInputs(fixture);
+	assert.match(helper, /observed\("canonical", lambda: path\.resolve\(\) != path\)/);
+	assert.throws(
+		() =>
+			assertPhysicalHelperInputs(
+				fixture.replace('"serve", try ownedCensusPath(www)', '"serve", www.path')
+			),
+		'original lexical alias handoff fails the exact source composition guard'
+	);
+	console.log(
+		'Sparkle native serve and census use retained physical directory identity; canonical helper admission stays strict.'
+	);
+} catch (error) {
+	errors.push(`Native Sparkle physical helper input guard failed: ${error.message}`);
+}
+
+// SPARKLE_STARTUP_DIAGNOSTIC_CONTROLS_BEGIN
+// Fixed startup facts never substitute readiness, native exit or retirement.
+try {
+	const assert = require('node:assert/strict');
+	const fixture = fs.readFileSync(
+		path.join(
+			root,
+			'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/SparkleArchiveUpdateAcceptanceTests.swift'
+		),
+		'utf8'
+	);
+	const helper = fs.readFileSync(
+		path.join(root, 'tools/diagnostics/macos_sparkle_archive_fixture.py'),
+		'utf8'
+	);
+	function assertStartupProjection(source, python) {
+		assert.ok(python.indexOf('startup_phase("python-entry")') < python.indexOf('import ctypes'));
+		assert.match(python, /os\.environ\.get\("ERGOPTI_SPARKLE_STARTUP_DIAGNOSTICS"\) == "1"/);
+		assert.match(python, /len\(sys\.argv\) == 4[\s\S]*sys\.argv\[1\] == "serve"/);
+		assert.match(python, /type\(phase\) is not str or phase not in _STARTUP_PHASES/);
+		assert.match(python, /os\.write\(1, frame\) != len\(frame\)/);
+		assert.match(
+			python,
+			/except BaseException as failure:\n        [^\n]*\n        primary_failure = failure\n        raise/
+		);
+		assert.match(python, /finally:\n            server\.server_close\(\)/);
+		assert.match(
+			python,
+			/if primary_failure is None and trace_failure is not None:\n            raise trace_failure/
+		);
+		assert.match(python, /signal\.signal\(signal\.SIGTERM, server\.request_stop\)/);
+		assert.match(source, /workerTimeout: Double = 60, startupDiagnostics: Bool = false/);
+		assert.match(
+			source,
+			/if readable \{ descriptor = open\(url.path, O_RDWR \| O_CREAT \| O_EXCL \| O_NOFOLLOW, 0o600\) \}/
+		);
+		assert.match(
+			source,
+			/else \{ descriptor = open\(url.path, O_WRONLY \| O_CREAT \| O_EXCL \| O_NOFOLLOW, 0o600\) \}/
+		);
+		assert.match(
+			source,
+			/"serve", try ownedCensusPath\(www\), nonce\], root: root, startupDiagnostics: true/
+		);
+		const capture = source.slice(
+			source.indexOf('private func observeStartupCapture()'),
+			source.indexOf('private func emitStartupNoticeOnce()')
+		);
+		assert.match(
+			capture,
+			/guard startupDiagnostics, launched, observedExit, !startupObserved, !closedStreams\.contains\(0\)/
+		);
+		assert.match(capture, /startupObserved = true/);
+		assert.match(capture, /fstat\(streams\[0\]\.fileDescriptor, &metadata\)/);
+		assert.match(capture, /metadata\.st_nlink == 1/);
+		assert.match(capture, /metadata\.st_size >= 0, metadata\.st_size <= 512/);
+		assert.match(capture, /read\(upToCount: 513\), bytes\.count == Int\(metadata\.st_size\)/);
+		assert.doesNotMatch(
+			capture,
+			/\bopen\(|Data\(contentsOf:|readToEnd|\.wait\(|\.terminate\(|kill\(|\.close\(/
+		);
+		const parser = source.slice(
+			source.indexOf('private static func parseStartupFrames('),
+			source.indexOf('private struct Receipt')
+		);
+		assert.match(parser, /bytes\.count <= 512/);
+		assert.match(parser, /bytes\.allSatisfy\(\{ \$0 < 128 \}\), bytes\.last == 10/);
+		assert.match(parser, /observed > index/);
+		assert.match(parser, /index != -1 \|\| phase == \.pythonEntry/);
+		assert.match(
+			source,
+			/guard process\.terminationReason == \.exit else \{ throw Failure\.evidence\("native-child-signal"\) \}/
+		);
+		assert.match(
+			source,
+			/guard retired\.status == 0 else \{ throw Failure\.evidence\("server-retirement"\) \}/
+		);
+		assert.match(source, /let listening = try waitFor\("server-start", root: www, seconds: 10\)/);
+		assert.match(source, /func testStartupFramesDistinguishActualPrefixEmptyAndRefusedCapture\(\)/);
+	}
+	assertStartupProjection(fixture, helper);
+	for (const [name, candidate, python] of [
+		[
+			'unobserved stdout capture',
+			fixture.replace(
+				'guard startupDiagnostics, launched, observedExit, !startupObserved',
+				'guard startupDiagnostics, launched, !startupObserved'
+			),
+			helper
+		],
+		['unbounded startup read', fixture.replace('read(upToCount: 513)', 'readToEnd()'), helper],
+		[
+			'foreign path reopened',
+			fixture.replace(
+				'try streams[0].seek(toOffset: 0)',
+				'let foreign = try Data(contentsOf: stdout); try streams[0].seek(toOffset: 0)'
+			),
+			helper
+		],
+		['duplicate stage admission', fixture.replace('observed > index', 'observed >= index'), helper],
+		[
+			'signal accepted as retirement',
+			fixture.replace('guard process.terminationReason == .exit else', 'guard true else'),
+			helper
+		],
+		[
+			'instrumentation masks primary',
+			fixture,
+			helper.replace(
+				'if primary_failure is None and trace_failure is not None:',
+				'if trace_failure is not None:'
+			)
+		]
+	])
+		assert.throws(() => assertStartupProjection(candidate, python), name);
+	console.log(
+		'Sparkle startup diagnostics reuse the exact post-exit capture; native signal/readiness/retirement remain strict.'
+	);
+} catch (error) {
+	errors.push(`Native Sparkle startup diagnostic guard failed: ${error.message}`);
+}
+// SPARKLE_STARTUP_DIAGNOSTIC_CONTROLS_END
+
+// SPARKLE_NUMERIC_BIND_CONTROLS_BEGIN
+// Numeric loopback authority must not introduce an unrelated reverse-DNS wait.
+try {
+	const assert = require('node:assert/strict');
+	const helper = fs.readFileSync(
+		path.join(root, 'tools/diagnostics/macos_sparkle_archive_fixture.py'),
+		'utf8'
+	);
+	function assertNumericLoopbackBinding(python) {
+		const start = python.indexOf('    class PrivateServer(http.server.HTTPServer):');
+		assert.ok(start >= 0);
+		const end = python.indexOf('        def process_request(', start);
+		assert.ok(end > start);
+		const binding = python.slice(start, end);
+		assert.match(binding, /def server_bind\(self\):/);
+		assert.match(binding, /http\.server\.socketserver\.TCPServer\.server_bind\(self\)/);
+		assert.match(binding, /self\.server_name, self\.server_port = self\.server_address\[:2\]/);
+		assert.doesNotMatch(binding, /getfqdn\s*\(/);
+		assert.ok(
+			binding.indexOf('TCPServer.server_bind(self)') <
+				binding.indexOf('self.server_name, self.server_port')
+		);
+		assert.match(python, /server = PrivateServer\(\("127\.0\.0\.1", 0\), Handler\)/);
+		assert.match(python, /timeout = 5/);
+		assert.match(python, /server\.timeout = 0\.2/);
+		assert.match(python, /server\.handle_request\(\)/);
+		assert.match(python, /finally:\n            server\.server_close\(\)/);
+	}
+	assertNumericLoopbackBinding(helper);
+	for (const [name, needle, replacement] of [
+		[
+			'original reverse DNS dependency',
+			'http.server.socketserver.TCPServer.server_bind(self)',
+			'http.server.HTTPServer.server_bind(self)'
+		],
+		['manufactured bind success', 'http.server.socketserver.TCPServer.server_bind(self)', 'pass'],
+		[
+			'manufactured port',
+			'self.server_name, self.server_port = self.server_address[:2]',
+			'self.server_name, self.server_port = "127.0.0.1", 1'
+		]
+	]) {
+		assert.equal(helper.split(needle).length - 1, 1, 'One exact numeric binding mutation');
+		const candidate = helper.replace(needle, replacement);
+		assert.throws(() => assertNumericLoopbackBinding(candidate), name);
+	}
+	console.log(
+		'Sparkle private loopback binds its real socket and port without reverse-DNS authority; native retirement remains mandatory.'
+	);
+} catch (error) {
+	errors.push(`Native Sparkle numeric loopback binding guard failed: ${error.message}`);
+}
+// SPARKLE_NUMERIC_BIND_CONTROLS_END
+
+// SPARKLE_SIGNATURE_APPLICATION_FACTS_BEGIN
+// Actual signer/exit diagnostics add observations while the original refusal remains mandatory.
+try {
+	const assert = require('node:assert/strict');
+	const { annotation, evaluate } = require('../diagnostics/swift_xctest_evidence.cjs');
+	const nativeFile = path.join(
+		root,
+		'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/SparkleArchiveUpdateAcceptanceTests.swift'
+	);
+	const fixture = fs.readFileSync(nativeFile, 'utf8');
+	function assertSignerApplicationFacts(source) {
+		const start = source.indexOf('private enum SignatureProbe:');
+		const end = source.indexOf('private let manager =', start);
+		assert.ok(start >= 0 && end > start, 'Closed diagnostic source is present');
+		const closed = source.slice(start, end);
+		assert.match(closed, /case installedKey = "installed-key", foreignKey = "foreign-key"/);
+		assert.match(closed, /signature64: Bool, independentValid: Bool/);
+		assert.match(closed, /installedValid: Bool, payloadEqual: Bool\?, signatureEqual: Bool\?/);
+		assert.match(closed, /\? "true" : "false" \} \?\? "unavailable"/);
+		assert.doesNotMatch(
+			closed,
+			/localizedDescription|String\(describing:|Data|stdout|stderr|\.path|nonce|\.wait\(|finish\(|terminate\(|kill\(/
+		);
+		assert.match(closed, /fact == "application-retirement"/);
+		assert.match(closed, /projected = Failure\.evidence\("server-retirement"\)/);
+		assert.match(closed, /else \{ projected = error \}/);
+		assert.match(closed, /serverExitRefusalMessage\(projected, termination: termination\)/);
+		assert.match(
+			source,
+			/if label == "application-exit", let application \{\s*XCTFail\(applicationExitRefusalMessage\(error, termination: application\.observedTerminationFacts\(\)\)\)/
+		);
+		assert.match(
+			source,
+			/let retired = try application\.finish\(15\)\s*guard retired.status == 0 else \{ throw Failure\.evidence\("application-retirement"\) \}/
+		);
+		assert.match(
+			source,
+			/let independentInstalledSignature = try\? key\.signature\(for: payload\)/
+		);
+		assert.match(
+			source,
+			/let installedSignatureEqual = independentInstalledSignature\.map \{ \$0 == signatureBytes \}/
+		);
+		assert.match(
+			source,
+			/let officialForeignSignature = try XCTUnwrap\(Data\(base64Encoded: foreignSignature\)\)/
+		);
+		assert.match(
+			source,
+			/let copiedForeignPayload = try Data\(contentsOf: foreignArchives\.appendingPathComponent\("ErgoptiPlus.app.tar.xz"\)\)/
+		);
+		assert.match(
+			source,
+			/let officialForeignValid = foreignKey\.publicKey\.isValidSignature\(officialForeignSignature, for: payload\)/
+		);
+		assert.match(
+			source,
+			/let officialInstalledValid = key\.publicKey\.isValidSignature\(officialForeignSignature, for: payload\)/
+		);
+		assert.match(source, /let foreignPayloadEqual = copiedForeignPayload == payload/);
+		assert.match(source, /XCTAssertEqual\(officialForeignSignature.count, 64,/);
+		assert.match(source, /XCTAssertTrue\(officialForeignValid,/);
+		assert.match(source, /XCTAssertFalse\(officialInstalledValid,/);
+		assert.match(source, /XCTAssertTrue\(foreignPayloadEqual,/);
+		assert.match(source, /XCTAssertEqual\(signatureBytes.count, 64,/);
+		assert.match(
+			source,
+			/XCTAssertFalse\(foreignKey\.publicKey\.isValidSignature\(signatureBytes, for: payload\),/
+		);
+		assert.match(
+			source,
+			/guard !copiedForeignPayload\.isEmpty else \{ throw Failure\.evidence\("signature-payload-empty"\) \}/
+		);
+		assert.match(source, /var alteredPayload = copiedForeignPayload/);
+		assert.match(source, /alteredPayload\[alteredPayload\.startIndex\] \^= 0x01/);
+		assert.match(source, /XCTAssertEqual\(alteredPayload.count, payload.count,/);
+		assert.match(
+			source,
+			/XCTAssertTrue\(!foreignKey\.publicKey\.isValidSignature\(officialForeignSignature, for: alteredPayload\)\s*&& !key\.publicKey\.isValidSignature\(signatureBytes, for: alteredPayload\),\s*"Both official signatures must refuse a one-byte change to the independently authenticated archive"\)/
+		);
+		assert.match(source, /func testSignatureAndApplicationFactsContainOnlyClosedObservations\(\)/);
+	}
+	assertSignerApplicationFacts(fixture);
+	for (const [label, before, after] of [
+		[
+			'foreign public-key admission replaced',
+			'let officialForeignValid = foreignKey.publicKey.isValidSignature(officialForeignSignature, for: payload)',
+			'let officialForeignValid = true'
+		],
+		[
+			'installed key refusal replaced',
+			'let officialInstalledValid = key.publicKey.isValidSignature(officialForeignSignature, for: payload)',
+			'let officialInstalledValid = false'
+		],
+		[
+			'payload identity replaced',
+			'let foreignPayloadEqual = copiedForeignPayload == payload',
+			'let foreignPayloadEqual = true'
+		],
+		[
+			'counterfactual foreign signature refusal replaced',
+			'XCTAssertTrue(!foreignKey.publicKey.isValidSignature(officialForeignSignature, for: alteredPayload)',
+			'XCTAssertTrue(true'
+		],
+		[
+			'counterfactual installed signature refusal replaced',
+			'&& !key.publicKey.isValidSignature(signatureBytes, for: alteredPayload)',
+			'&& true'
+		],
+		[
+			'counterfactual byte mutation removed',
+			'alteredPayload[alteredPayload.startIndex] ^= 0x01',
+			'alteredPayload[alteredPayload.startIndex] ^= 0x00'
+		],
+		[
+			'installed signature opposite-key refusal replaced',
+			'XCTAssertFalse(foreignKey.publicKey.isValidSignature(signatureBytes, for: payload),',
+			'XCTAssertFalse(false,'
+		],
+		[
+			'counterfactual length admission replaced',
+			'XCTAssertEqual(alteredPayload.count, payload.count,',
+			'XCTAssertEqual(payload.count, payload.count,'
+		]
+	]) {
+		assert.equal(fixture.split(before).length - 1, 1, 'One exact independent mutation');
+		assert.throws(() => assertSignerApplicationFacts(fixture.replace(before, after)), label);
+	}
+	const fixed =
+		'Native Sparkle application retirement refusal: code=exit-status native_reason=exit native_status=78';
+	const transcript = [
+		"Test Suite 'All tests' started at 2026-10-06 01:00:00.000.",
+		"Test Case '-[ErgoptiPlusTests.SparkleArchiveUpdateAcceptanceTests testArchive]' started.",
+		nativeFile + ':777: error: failed - ' + fixed,
+		"Test Case '-[ErgoptiPlusTests.SparkleArchiveUpdateAcceptanceTests testArchive]' failed (0.100 seconds).",
+		"Test Suite 'All tests' failed at 2026-10-06 01:00:01.000.",
+		'\t Executed 1 test, with 1 failure (0 unexpected) in 0.100 (0.110) seconds'
+	].join('\n');
+	const verdict = evaluate(transcript, 1, 0, root);
+	const refusal = verdict.failures.find((failure) => failure.message.endsWith(fixed));
+	assert.notEqual(refusal, undefined, 'Authentic XCTest carries only fixed application exit facts');
+	assert.match(
+		annotation(refusal),
+		/::failed - Native Sparkle application retirement refusal: code=exit-status native_reason=exit native_status=78$/
+	);
+	assert.equal(verdict.exit_status, 1);
+	assert.equal(verdict.complete, false);
+	assert.equal(
+		evaluate(fixed, 1, 0, root).failures.some((failure) => failure.message.endsWith(fixed)),
+		false,
+		'Raw output never becomes native retirement proof'
+	);
+	console.log(
+		'Sparkle independent signer and already-observed application exit facts preserve original refusal predicates.'
+	);
+} catch (error) {
+	errors.push(`Native Sparkle signer/application diagnostic guard failed: ${error.message}`);
+}
+// SPARKLE_SIGNATURE_APPLICATION_FACTS_END
+
+// SPARKLE_CHILD_REFUSAL_VISIBILITY_BEGIN
+// Closed child refusal facts reuse the original observed exit and cached capture.
+try {
+	const assert = require('node:assert/strict');
+	const { evaluate, annotation } = require('../diagnostics/swift_xctest_evidence.cjs');
+	const file = path.join(
+		root,
+		'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/SparkleArchiveUpdateAcceptanceTests.swift'
+	);
+	const fixture = fs.readFileSync(file, 'utf8');
+	const child = fs.readFileSync(
+		path.join(root, 'tools/diagnostics/macos_sparkle_archive_child.swift'),
+		'utf8'
+	);
+	function assertClosedChildVisibility(source) {
+		const start = source.indexOf('func observedChildRefusalCode() -> String? {');
+		const end = source.indexOf('\n\t\t}', start);
+		assert.ok(start >= 0 && end > start, 'Actual cached native capture observer is present');
+		const observer = source.slice(start, end);
+		assert.match(observer, /guard launched, observedExit, !process\.isRunning, let cachedReceipt,/);
+		assert.match(observer, /cachedReceipt\.status == 78 else \{ return nil \}/);
+		assert.match(observer, /parseChildRefusalCode\(cachedReceipt\.stderr\)/);
+		assert.doesNotMatch(observer, /finish\(|wait|open\(|read|terminate\(|kill\(|close\(/);
+		assert.match(source, /frames\.count == 1, let frame = frames\.first/);
+		assert.match(
+			source,
+			/ChildRefusalCode\(rawValue: String\(frame\.dropFirst\(prefix\.count\)\)\)/
+		);
+		assert.match(source, /text\.utf8\.count <= 16_384, text\.hasSuffix\("\\n"\)/);
+		assert.match(
+			source,
+			/if let code = application\.observedChildRefusalCode\(\) \{\s*XCTFail\("Native Sparkle child refusal: category=" \+ code\)/
+		);
+	}
+	assertClosedChildVisibility(fixture);
+	for (const [before, after] of [
+		[
+			'cachedReceipt.status == 78 else { return nil }',
+			'cachedReceipt.status >= 0 else { return nil }'
+		],
+		['parseChildRefusalCode(cachedReceipt.stderr)', 'cachedReceipt.stderr'],
+		['frames.count == 1, let frame = frames.first', 'frames.count >= 1, let frame = frames.first']
+	]) {
+		assert.equal(fixture.split(before).length - 1, 1, 'One exact source mutation');
+		const mutated = fixture.replace(before, () => after);
+		assert.throws(() => assertClosedChildVisibility(mutated));
+	}
+	for (const code of [
+		'configuration',
+		'target-root',
+		'target-bundle',
+		'receipt-publication',
+		'control',
+		'transport'
+	]) {
+		assert.equal(
+			child.split('SPARKLE_CHILD_REFUSAL/1 ' + code + '\\n').length - 1,
+			1,
+			'One literal failed-branch category emission'
+		);
+	}
+	assert.match(
+		child,
+		/guard let nativeRoot = nativeDirectoryPath\(rootPath\), nativeRoot == rootPath else/
+	);
+	assert.match(
+		child,
+		/guard nativeDirectoryPath\(Bundle\.main\.bundleURL\.path\) == nativeRoot \+ "\/installed\/ErgoptiPlus.app" else/
+	);
+	assert.match(child, /try stream\.close\(\)[\s\S]*guard link\(stage\.path, target\.path\) == 0/);
+	const fixed = 'Native Sparkle child refusal: category=target-root';
+	const makeTranscript = (message) =>
+		[
+			"Test Suite 'All tests' started at 2026-10-06 01:00:00.000.",
+			"Test Case '-[ErgoptiPlusTests.SparkleArchiveUpdateAcceptanceTests testArchive]' started.",
+			file + ':777: error: failed - ' + message,
+			"Test Case '-[ErgoptiPlusTests.SparkleArchiveUpdateAcceptanceTests testArchive]' failed (0.100 seconds).",
+			"Test Suite 'All tests' failed at 2026-10-06 01:00:01.000.",
+			'\t Executed 1 test, with 1 failure (0 unexpected) in 0.100 (0.110) seconds'
+		].join('\n');
+	const old = evaluate(
+		makeTranscript(
+			'Native Sparkle application retirement refusal: code=exit-status native_reason=exit native_status=78'
+		),
+		1,
+		0,
+		root
+	);
+	assert.equal(
+		old.failures.some((failure) => failure.message.endsWith(fixed)),
+		false,
+		'Actual old exit annotation cannot expose the child branch'
+	);
+	const result = evaluate(makeTranscript(fixed), 1, 0, root);
+	const failure = result.failures.find((entry) => entry.message.endsWith(fixed));
+	assert.notEqual(failure, undefined);
+	assert.match(
+		annotation(failure),
+		/::failed - Native Sparkle child refusal: category=target-root$/
+	);
+	assert.equal(result.exit_status, 1, 'Diagnostic observation preserves failure');
+	assert.equal(
+		evaluate(fixed, 1, 0, root).failures.some((entry) => entry.message.endsWith(fixed)),
+		false,
+		'Raw print is not an annotated native failure'
+	);
+} catch (error) {
+	errors.push(`Native Sparkle child refusal visibility guard failed: ${error.message}`);
+}
+// SPARKLE_CHILD_REFUSAL_VISIBILITY_END
+
+// SPARKLE_CHILD_POSIX_ADMISSION_BEGIN
+// The signed root is the captured native directory, not a Foundation alias.
+try {
+	const assert = require('node:assert/strict');
+	const fixture = fs.readFileSync(
+		path.join(
+			root,
+			'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/SparkleArchiveUpdateAcceptanceTests.swift'
+		),
+		'utf8'
+	);
+	const child = fs.readFileSync(
+		path.join(root, 'tools/diagnostics/macos_sparkle_archive_child.swift'),
+		'utf8'
+	);
+	function assertNativeChildPaths(signed, receiver) {
+		assert.match(signed, /"FixtureRoot": try ownedCensusPath\(root\), "FixtureNonce": nonce/);
+		const start = receiver.indexOf('private func nativeDirectoryPath(_ path: String) -> String? {');
+		const end = receiver.indexOf('\nlet application = NSApplication.shared', start);
+		assert.ok(start >= 0 && end > start, 'The native admission precedes application startup');
+		const admission = receiver.slice(start, end);
+		assert.match(admission, /Darwin\.realpath\(path, nil\)/);
+		assert.match(admission, /defer \{ free\(resolved\) \}/);
+		assert.match(admission, /Darwin\.lstat\(resolved, &metadata\) == 0/);
+		assert.match(admission, /metadata\.st_mode & mode_t\(S_IFMT\) == mode_t\(S_IFDIR\)/);
+		assert.match(admission, /return String\(validatingUTF8: resolved\)/);
+		assert.match(
+			admission,
+			/guard let nativeRoot = nativeDirectoryPath\(rootPath\), nativeRoot == rootPath else/
+		);
+		assert.match(
+			admission,
+			/guard nativeDirectoryPath\(Bundle\.main\.bundleURL\.path\) == nativeRoot \+ "\/installed\/ErgoptiPlus.app" else/
+		);
+		assert.doesNotMatch(admission, /resolvingSymlinksInPath|standardized|root\.path == rootPath/);
+	}
+	assertNativeChildPaths(fixture, child);
+	for (const [before, after] of [
+		['"FixtureRoot": try ownedCensusPath(root)', '"FixtureRoot": root.path']
+	]) {
+		assert.equal(fixture.split(before).length - 1, 1);
+		assert.throws(() => assertNativeChildPaths(fixture.replace(before, after), child));
+	}
+	for (const [before, after] of [
+		['nativeRoot == rootPath else', 'nativeRoot != rootPath else'],
+		['nativeRoot + "/installed/ErgoptiPlus.app"', 'nativeRoot + "/source/ErgoptiPlus.app"'],
+		[
+			'return String(validatingUTF8: resolved)',
+			'return URL(fileURLWithPath: path).resolvingSymlinksInPath().path'
+		]
+	]) {
+		assert.equal(child.split(before).length - 1, 1);
+		assert.throws(() => assertNativeChildPaths(fixture, child.replace(before, after)));
+	}
+} catch (error) {
+	errors.push(`Native Sparkle POSIX child admission guard failed: ${error.message}`);
+}
+// SPARKLE_CHILD_POSIX_ADMISSION_END
+
+// NATIVE_SPARKLE_UPDATE_PROGRESS_BEGIN
+try {
+	const assert = require('node:assert/strict');
+	const child = fs.readFileSync(
+		path.join(root, 'tools/diagnostics/macos_sparkle_archive_child.swift'),
+		'utf8'
+	);
+	const fixture = fs.readFileSync(
+		path.join(
+			root,
+			'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/SparkleArchiveUpdateAcceptanceTests.swift'
+		),
+		'utf8'
+	);
+	const progressEnum = fixture.slice(
+		fixture.indexOf('private enum UpdateProgressEvent:'),
+		fixture.indexOf('private enum UpdateProgressCapture:')
+	);
+	assert.doesNotMatch(progressEnum, /,\s*\n\s*case\b/);
+	assert.equal((progressEnum.match(/\be[0-9]+ = "[a-z0-9-]+"/g) || []).length, 42);
+	assert.match(
+		child,
+		/guard unlink\(stage.path\) == 0 else \{ throw Failure.refused \}\s*progress\(event\)/
+	);
+	assert.match(
+		child,
+		/progress\("updater-start-attempt"\)\s*try owner.start\(\)\s*progress\("updater-started"\)/
+	);
+	assert.match(child, /progress\("check-requested-1"\)\s*owner.checkForUpdates\(\)/);
+	assert.match(
+		child,
+		/showUserInitiatedUpdateCheck\(cancellation: @escaping \(\) -> Void\) \{ progress\("user-check-" \+ String\(phase\)\) \}/
+	);
+	assert.match(
+		fixture,
+		/guard launched, observedExit, let cachedReceipt else \{ return \.unavailable \}/
+	);
+	assert.match(
+		fixture,
+		/parseUpdateProgress\(cachedReceipt.stdout,\s*expectedPID: process.processIdentifier\)/
+	);
+	assert.match(fixture, /text.utf8.count <= 4096/);
+	assert.match(fixture, /!events.contains\(event\)/);
+	assert.match(fixture, /guard events.first == \.e0/);
+	assert.match(fixture, /CFGetTypeID\(number\) != CFBooleanGetTypeID\(\)/);
+	assert.match(fixture, /number.doubleValue == Double\(number.intValue\)/);
+	assert.match(
+		fixture,
+		/let retired = try application.finish\(15\)\s*guard retired.status == 0 else \{ throw Failure.evidence\("application-retirement"\) \}/
+	);
+	assert.match(fixture, /waitFor\("refused-1", root: root\)/);
+	console.log(
+		'[OK] Native Sparkle progress uses exact retired capture and authentic admitted-resource counter without granting acceptance.'
+	);
+} catch (error) {
+	errors.push('Native Sparkle bounded progress guard: ' + error.message);
+}
+// NATIVE_SPARKLE_UPDATE_PROGRESS_END
+
+// NATIVE_SPARKLE_STARTUP_ADMISSION_REFUSAL_IDENTITY_BEGIN
+try {
+	const assert = require('node:assert/strict');
+	const child = fs.readFileSync(
+		path.join(root, 'tools/diagnostics/macos_sparkle_archive_child.swift'),
+		'utf8'
+	);
+	const fixture = fs.readFileSync(
+		path.join(
+			root,
+			'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/SparkleArchiveUpdateAcceptanceTests.swift'
+		),
+		'utf8'
+	);
+	function admission(source, producer) {
+		assert.match(
+			producer,
+			/record\("start-refused", details: \["errors": identities\(error\)\]\)\s*startupAdmissionRefusal\(error, startReturned: startReturned\)/
+		);
+		assert.match(producer, /var startReturned = false/);
+		assert.match(
+			producer,
+			/try owner.start\(\)\s*progress\("updater-started"\)\s*startReturned = true\s*guard !owner.automaticallyChecksForUpdates/
+		);
+		assert.match(producer, /startReturned \? "policy-validation" : "native-start"/);
+		assert.match(
+			producer,
+			/switch native.domain[\s\S]*?case SUSparkleErrorDomain: domain = "sparkle"[\s\S]*?case NSCocoaErrorDomain: domain = "cocoa"[\s\S]*?default: domain = "other"/
+		);
+		const emit = producer.slice(
+			producer.indexOf('private func startupAdmissionRefusal('),
+			producer.indexOf('/// Capture only typed error identities')
+		);
+		assert.match(emit, /let native = error as NSError/);
+		assert.match(emit, /String\(native.code\)/);
+		assert.doesNotMatch(
+			emit,
+			/localizedDescription|userInfo|\.path|absoluteString|String\(describing:/
+		);
+		const observe = source.slice(
+			source.indexOf('func observedStartupAdmissionRefusalIdentity()'),
+			source.indexOf('func observedChildRefusalCode()')
+		);
+		assert.match(observe, /guard launched, observedExit, let cachedReceipt else \{ return nil \}/);
+		assert.match(
+			observe,
+			/parseStartupAdmissionRefusalIdentity\(cachedReceipt.stdout,\s*expectedPID: process.processIdentifier\)/
+		);
+		assert.doesNotMatch(observe, /Data\(|FileHandle|Thread|Date\(|finish\(|terminate\(|read/);
+		assert.match(source, /!startupIdentitySeen, events.last == \.e9/);
+		assert.match(source, /StartupAdmissionRefusalStage\(rawValue: fields\[0\]\)/);
+		assert.match(source, /String\(code\) == codeFields\[1\]/);
+		assert.match(source, /frames.count == 1/);
+		assert.match(
+			source,
+			/Native Sparkle startup admission refusal: stage=unavailable domain=unavailable code=unavailable/
+		);
+		assert.match(
+			source,
+			/testStartupAdmissionRefusalIdentityRequiresExactRetiredProgressAndFixedTypedFields/
+		);
+		assert.match(source, /stage=policy-validation domain=other code=0/);
+	}
+	admission(fixture, child);
+	for (const [from, to] of [
+		[
+			'guard launched, observedExit, let cachedReceipt else { return nil }',
+			'guard launched, let cachedReceipt else { return nil }'
+		],
+		['!startupIdentitySeen, events.last == .e9', '!startupIdentitySeen'],
+		['String(code) == codeFields[1]', 'true']
+	]) {
+		assert.equal(fixture.split(from).length - 1, 1);
+		const changed = fixture.replace(from, to);
+		assert.notEqual(changed, fixture);
+		assert.throws(() => admission(changed, child));
+	}
+	console.log(
+		'[OK] Native Sparkle startup admission identity uses exact closed capture and actual catch stage only.'
+	);
+} catch (error) {
+	errors.push('Native Sparkle startup admission identity guard: ' + error.message);
+}
+// NATIVE_SPARKLE_STARTUP_ADMISSION_REFUSAL_IDENTITY_END
+
+// NATIVE_SPARKLE_FIXTURE_PUBLIC_KEY_BEGIN
+try {
+	const assert = require('node:assert/strict');
+	const fixture = fs.readFileSync(
+		path.join(
+			root,
+			'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/SparkleArchiveUpdateAcceptanceTests.swift'
+		),
+		'utf8'
+	);
+	function assertFixturePublicKey(source) {
+		// Preserve Swift string literals while excluding comments from source evidence.
+		const executable = source.replace(/"(?:\\.|[^"\\])*"|\/\/[^\n]*|\/\*[\s\S]*?\*\//g, (token) =>
+			token.startsWith('/') ? '' : token
+		);
+		const declarations = [...executable.matchAll(/private func makeBundle\(/g)];
+		assert.equal(declarations.length, 1, 'One actual native bundle constructor');
+		const start = declarations[0].index;
+		const end = executable.indexOf('\n\tprivate func ', start + 1);
+		assert.ok(end > start, 'The native bundle constructor has a closed source boundary');
+		const body = executable.slice(start, end);
+		assert.match(body, /publicKey: String/, 'The constructor receives the signing public key');
+		const dictionaries = [
+			...body.matchAll(/let plist:\s*\[String:\s*Any\]\s*=\s*\[([\s\S]*?)\n[ \t]*\]/g)
+		];
+		assert.equal(dictionaries.length, 1, 'One actual fixture Info.plist dictionary');
+		const plist = dictionaries[0][1];
+		assert.equal(
+			(plist.match(/"SUPublicEDKey"\s*:/g) || []).length,
+			1,
+			'Sparkle reads exactly one SUPublicEDKey entry'
+		);
+		assert.match(
+			plist,
+			/"SUPublicEDKey"\s*:\s*publicKey\s*,/,
+			'The admitted signing key must reach Sparkle'
+		);
+		assert.doesNotMatch(
+			plist,
+			/"SUEdPublicKey"\s*:/,
+			'The ignored legacy spelling cannot replace the native key'
+		);
+		assert.match(
+			body,
+			/PropertyListSerialization\.data\(fromPropertyList: plist/,
+			'The guarded dictionary is serialized into the bundle'
+		);
+	}
+	assertFixturePublicKey(fixture);
+	const entry = '"SUPublicEDKey": publicKey, ';
+	for (const [label, replacement] of [
+		['missing public key', ''],
+		['ignored legacy spelling', '"SUEdPublicKey": publicKey, '],
+		['null public key value', '"SUPublicEDKey": NSNull(), ']
+	]) {
+		assert.equal(fixture.split(entry).length - 1, 1, 'One exact native fixture entry');
+		const changed = fixture.replace(entry, replacement);
+		assert.notEqual(changed, fixture);
+		assert.throws(() => assertFixturePublicKey(changed), label);
+	}
+	console.log('[OK] The native Sparkle fixture publishes its signing key under SUPublicEDKey.');
+} catch (error) {
+	errors.push('Native Sparkle fixture public key guard: ' + error.message);
+}
+// NATIVE_SPARKLE_FIXTURE_PUBLIC_KEY_END
+
+// NATIVE_SPARKLE_REFUSAL_CHAIN_BEGIN
+try {
+	const assert = require('node:assert/strict');
+	const fixture = fs.readFileSync(
+		path.join(
+			root,
+			'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/SparkleArchiveUpdateAcceptanceTests.swift'
+		),
+		'utf8'
+	);
+	function assertClosedRefusalChain(source) {
+		const executable = source.replace(/"(?:\\.|[^"\\])*"|\/\/[^\n]*|\/\*[\s\S]*?\*\//g, (token) =>
+			token.startsWith('/') ? '' : token
+		);
+		const begin = executable.indexOf('private static func refusalErrorChainMessage(');
+		const end = executable.indexOf('\n\tprivate func ', begin);
+		assert.ok(begin >= 0 && end > begin, 'Actual refusal projection is present');
+		const body = executable.slice(begin, end);
+		assert.match(body, /expectedPID > 0, receipt\["nonce"\] as\? String == nonce/);
+		assert.match(
+			body,
+			/receipt\["event"\] as\? String == "refused-1", receipt\["version"\] as\? String == "1"/
+		);
+		assert.match(
+			body,
+			/pid\.stringValue == String\(expectedPID\), !errors\.isEmpty, errors\.count <= 8/
+		);
+		assert.match(body, /Set\(identity\.keys\) == Set\(\["domain", "code"\]\)/);
+		assert.match(body, /CFGetTypeID\(value\) != CFBooleanGetTypeID\(\)/);
+		assert.match(body, /String\(value\.int64Value\) == value\.stringValue/);
+		assert.match(body, /case SUSparkleErrorDomain: domain = "sparkle"/);
+		assert.match(body, /case NSCocoaErrorDomain: domain = "cocoa"/);
+		assert.match(body, /default: domain = "other"/);
+		assert.match(body, /chain\.append\(domain \+ ":" \+ String\(value\.int64Value\)\)/);
+		assert.doesNotMatch(
+			body,
+			/userInfo|localizedDescription|String\(reflecting:|\+ nativeDomain|Data\(|FileHandle|waitFor\(|Thread|Date\(/
+		);
+		const read = executable.indexOf(
+			'let errors = try XCTUnwrap(details["errors"] as? [[String: Any]])'
+		);
+		const notice = executable.indexOf(
+			'print("::notice title=Native Sparkle wrong-key refusal::"',
+			read
+		);
+		const assertion = executable.indexOf('XCTAssertTrue(errors.contains {', read);
+		assert.ok(
+			read >= 0 && notice > read && assertion > notice,
+			'Existing captured identities are projected before the unchanged signature assertion'
+		);
+		assert.match(
+			executable.slice(notice, assertion),
+			/Self\.refusalErrorChainMessage\(errors,\s*receipt: refusal, expectedPID: application\?\.process\.processIdentifier \?\? 0, nonce: nonce\)/
+		);
+		for (const name of [
+			'testRefusalErrorChainAdmitsOnlyBoundReceiptAndClosedDomainLabels',
+			'testRefusalErrorChainRejectsForeignRecipientEventVersionAndNonce',
+			'testRefusalErrorChainRejectsMalformedOrExcessiveIdentityRecords'
+		])
+			assert.match(executable, new RegExp('func ' + name + '\\(\\)'));
+	}
+	assertClosedRefusalChain(fixture);
+	for (const [from, to] of [
+		['receipt["nonce"] as? String == nonce', 'true'],
+		['errors.count <= 8', 'errors.count <= 9'],
+		[
+			'chain.append(domain + ":" + String(value.int64Value))',
+			'chain.append(nativeDomain + ":" + String(value.int64Value))'
+		]
+	]) {
+		assert.equal(fixture.split(from).length - 1, 1, 'One independent refusal source mutation');
+		assert.throws(() => assertClosedRefusalChain(fixture.replace(from, to)));
+	}
+	console.log(
+		'[OK] Native wrong-key refusal diagnostics use the bound original receipt and closed error identities.'
+	);
+} catch (error) {
+	errors.push('Native Sparkle refusal chain guard: ' + error.message);
+}
+// NATIVE_SPARKLE_REFUSAL_CHAIN_END
+
+// The actual wrong-key receipt uses Sparkle's validation error, through native wrappers.
+try {
+	const assert = require('node:assert/strict');
+	const fixture = fs.readFileSync(
+		path.join(
+			root,
+			'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/SparkleArchiveUpdateAcceptanceTests.swift'
+		),
+		'utf8'
+	);
+	function requireExactValidationError(source) {
+		const executable = source.replace(/"(?:\\.|[^"\\])*"|\/\/[^\n]*|\/\*[\s\S]*?\*\//g, (token) =>
+			token.startsWith('/') ? '' : token
+		);
+		const anchor = 'XCTAssertTrue(errors.contains {';
+		assert.equal(
+			executable.split(anchor).length - 1,
+			1,
+			'Exactly one original wrong-key assertion'
+		);
+		const offset = executable.indexOf(anchor);
+		const end = executable.indexOf(
+			'}, "Wrong-key refusal must reach actual Sparkle signature validation")',
+			offset
+		);
+		assert.ok(end > offset, 'The original assertion and failure message remain');
+		assert.match(
+			executable.slice(offset, end),
+			/^XCTAssertTrue\(errors\.contains \{ \$0\["domain"\] as\? String == SUSparkleErrorDomain\s*&& \(\$0\["code"\] as\? NSNumber\)\?\.intValue == Int\(SUError\.validationError\.rawValue\) $/
+		);
+	}
+	requireExactValidationError(fixture);
+	for (const replacement of ['3001', '4005', 'Int(SUError.validationError.rawValue) || true']) {
+		assert.throws(() =>
+			requireExactValidationError(
+				fixture.replace('Int(SUError.validationError.rawValue)', replacement)
+			)
+		);
+	}
+	assert.throws(() =>
+		requireExactValidationError(
+			fixture.replace('$0["domain"] as? String == SUSparkleErrorDomain', 'true')
+		)
+	);
+	console.log(
+		'[OK] Wrong-key archive acceptance requires the exact native Sparkle validation error.'
+	);
+} catch (error) {
+	errors.push('Native Sparkle exact validation error guard: ' + error.message);
 }
 
 if (errors.length > 0) {

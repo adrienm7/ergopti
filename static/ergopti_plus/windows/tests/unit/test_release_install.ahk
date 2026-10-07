@@ -326,3 +326,46 @@ _RIT_BackgroundCheckNeverInstalls() {
 }
 Test("Updater: the background check announces a release and never installs it (update-notify-only)",
 	_RIT_BackgroundCheckNeverInstalls)
+
+
+; A same-tag retry must not let the previous transaction's observer publish.
+_RIT_SameTagObserverHasExactOperation() {
+	global _RIT_Reports
+	_RIT_Reset()
+	Observers := []
+	Deps := _RIT_Deps()
+	Deps["install"] := (Release, Observer) => (Observers.Push(Observer), true)
+	AssertTrue(ReleaseInstall_Start("v-owner", "dev", Deps))
+	Observers[1].Call("failed", "changelog_window.install_error_download")
+	AssertTrue(ReleaseInstall_Start("v-owner", "dev", Deps))
+	Count := _RIT_Reports.Length
+	Observers[1].Call("installing")
+	Observers[1].Call("failed", "changelog_window.install_error_verify")
+	AssertEqual(Count, _RIT_Reports.Length, "retired same-tag observer cannot publish or retire the new transaction")
+	AssertTrue(ReleaseInstall_Busy(), "the newer exact transaction still owns the install")
+	Observers[2].Call("installing")
+	AssertEqual(Count + 1, _RIT_Reports.Length, "the exact current observer can publish")
+	_RIT_Reset()
+}
+Test("Release install: same-tag retry fences the previous exact observer", _RIT_SameTagObserverHasExactOperation)
+
+_RIT_PublicFailureJsonNeverSerializesNativeReceipt() {
+	Receipt := Map("url", "https://credential@private", "stderr", "secret", "path", "C:\secret")
+	Report := Map("cause", "proxy", "message_key", "network.failure.proxy", "evidence", "proxy_connect_authentication",
+		"actions", [Map("id", "retry", "label_key", "network.action.retry")], "receipt", Receipt)
+	Message := Map("tag", "v1.2.3", "phase", "failed", "backup_path", "C:\cfg\backup", "operation", 31,
+		"failure_epoch", 44, "failure_report", Report, "receipt", Receipt, "owner", Map("secret", "credential"))
+	Encoded := ReleaseInstall_MessageJson(Message)
+	Decoded := JsonParse(Encoded)
+	AssertEqual(31, Decoded["operation"])
+	AssertEqual(44, Decoded["failure_epoch"])
+	AssertEqual("proxy", Decoded["failure_report"]["cause"])
+	AssertEqual("retry", Decoded["failure_report"]["actions"][1]["id"])
+	AssertFalse(Decoded.Has("receipt"))
+	AssertFalse(Decoded.Has("owner"))
+	AssertFalse(Decoded["failure_report"].Has("receipt"))
+	AssertEqual(0, InStr(Encoded, "credential"))
+	AssertEqual(0, InStr(Encoded, "secret"))
+	AssertEqual("C:\cfg\backup", Decoded["backup_path"], "the original user-visible backup is preserved")
+}
+Test("Release install: page JSON contains only canonical safe failure fields", _RIT_PublicFailureJsonNeverSerializesNativeReceipt)

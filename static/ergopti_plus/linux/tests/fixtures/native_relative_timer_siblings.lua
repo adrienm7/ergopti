@@ -16,6 +16,49 @@ local directory = assert(uv.fs_mkdtemp("/tmp/ergopti-relative-siblings-XXXXXX"))
 local checks, failures, handles, paths, tokens, pids = 0, 0, {}, {}, {}, {}
 local ABC = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
 
+-- Passive private observations: original native functions, callbacks, metadata
+-- and result tuples are forwarded once unchanged; no deadline/clock refresh added.
+local pack = function(...) return { n = select("#", ...), ... } end
+local unpack_values = table.unpack or unpack
+local active_http_trace
+local function observe_http(phase, delay)
+ pcall(function()
+  local trace = active_http_trace
+  if not trace or #trace.events >= 64 then return end
+  local now, cached = uv.hrtime() / 1000000, uv.now()
+  if type(now) ~= "number" or type(cached) ~= "number" then return end
+  trace.events[#trace.events + 1] = { phase = phase, time = now - trace.start,
+   cached = cached - trace.cached, delay = type(delay) == "number" and delay or -1 }
+ end)
+end
+local function flush_http_trace()
+ local trace = active_http_trace
+ active_http_trace = nil
+ if not trace then return end
+ pcall(function()
+  io.stderr:write("PRIVATE_RELATIVE_HTTP_TRACE mode=", trace.mode, " clock=", trace.clock, "\n")
+  for _, row in ipairs(trace.events) do
+   io.stderr:write(string.format("PRIVATE_RELATIVE_HTTP_TRACE phase=%s t_ms=%.3f cached_delta_ms=%.3f delay_ms=%.3f\n",
+    row.phase, row.time, row.cached, row.delay))
+  end
+ end)
+end
+local NativeTimer = require("infra.native_timer")
+local original_native_start, original_spawn = NativeTimer.start, uv.spawn
+NativeTimer.start = function(...)
+ local delay = select(3, ...)
+ observe_http("timer-enter", delay)
+ local results = pack(original_native_start(...))
+ observe_http("timer-return", delay)
+ return unpack_values(results, 1, results.n)
+end
+uv.spawn = function(...)
+ observe_http("spawn-enter")
+ local results = pack(original_spawn(...))
+ observe_http("spawn-return")
+ return unpack_values(results, 1, results.n)
+end
+
 local function retain(handle) handles[#handles + 1] = handle; return handle end
 local function close(handle) if not uv.is_closing(handle) then uv.close(handle) end end
 local function elapsed(start) return (uv.hrtime() - start) / 1000000 end
@@ -72,8 +115,10 @@ local function server()
 			input = input .. chunk
 			if handled or not input:find("\r\n\r\n", 1, true) then return end
 			handled, requests = true, requests + 1
+			observe_http("server-request")
 			assert(Scheduler.after(0.040, function()
 				if uv.is_closing(socket) then return end
+				observe_http("server-reply")
 				socket:write("HTTP/1.1 200 OK\r\nContent-Length: 3\r\nConnection: close\r\n\r\nabc", function(write_error)
 					assert(not write_error, tostring(write_error))
 					socket:shutdown(function() close(socket) end)
@@ -87,6 +132,7 @@ end
 local function check(name, test)
 	checks = checks + 1
 	local ok, err = xpcall(test, debug.traceback)
+	pcall(flush_http_trace) -- Optional diagnostics cannot replace the original assertion failure.
 	assert(Digest.cancel("clock-fixture") and Http.cancel("clock-fixture"))
 	for _, token in ipairs(tokens) do token.cancel() end
 	assert(Scheduler.cancelAll())
@@ -131,8 +177,16 @@ for _, in_callback in ipairs({ false, true }) do
 		local results, start = {}, nil
 		local function arm()
 			uv.sleep(160); start = uv.hrtime()
+			pcall(function()
+				local clock = require("infra.monotonic").backend()
+				active_http_trace = { start = start / 1000000, cached = uv.now(), events = {},
+					mode = in_callback and "inside-callback" or "after-blocking",
+					clock = clock == "luv.hrtime" and "luv.hrtime" or "Other" }
+			end)
+			observe_http("public-enter")
 			assert(Http.get(url, {}, { owner = "clock-fixture", timeout_ms = 100 },
-				function(result) results[#results + 1] = result end))
+				function(result) observe_http("public-callback"); results[#results + 1] = result end))
+			observe_http("public-return")
 			remember_processes()
 		end
 		uv.update_time()
@@ -209,4 +263,5 @@ end)
 
 assert(uv.fs_rmdir(directory))
 print(string.format("native relative sibling checks: %d passed, %d failed", checks - failures, failures))
+NativeTimer.start, uv.spawn = original_native_start, original_spawn
 if failures > 0 then os.exit(1) end

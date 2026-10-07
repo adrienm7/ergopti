@@ -78,6 +78,11 @@ echo "--- Copying Linux driver sources ---"
 # so an allow-list of one was only ever going to rot.
 copy_tree "${LINUX_SRC}/" "${BUILD_DIR}/linux/" --exclude vendor
 
+# Generate the private native backend from the canonical C/header after the
+# tracked copy. Ignored local .so files and prior private fixture outputs never
+# enter this bundle. The helper refuses an already occupied destination.
+bash "${SCRIPT_DIR}/build-linux-native-output.sh"
+
 # ============================================================================
 # 3. Copy the shared runtime tree
 # ============================================================================
@@ -138,6 +143,7 @@ echo ""
 echo "--- Integrity check ---"
 
 REQUIRED_FILES=(
+	"linux/bin/libergopti_archive_publication.so"
 	"linux/ergopti_hotstrings.lua"
 	"linux/modules/hotstrings/engine.lua"
 	"linux/modules/hotstrings/loader.lua"

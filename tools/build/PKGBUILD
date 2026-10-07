@@ -12,7 +12,7 @@ arch=('any')
 url="https://github.com/adrienm7/ergopti"
 license=('MIT')
 # BEGIN GENERATED LINUX NATIVE REQUIREMENTS
-depends=('luajit' 'xclip' 'libnotify' 'curl' 'libxkbcommon' 'at-spi2-core' 'libxkbcommon-x11' 'libx11')
+depends=('luajit' 'xclip' 'libnotify' 'curl' 'libxkbcommon' 'at-spi2-core' 'libxkbcommon-x11' 'libx11' 'glib-networking' 'gsettings-desktop-schemas' 'lua51-luv')
 # END GENERATED LINUX NATIVE REQUIREMENTS
 optdepends=('lua-luv: async I/O for timers and HTTP'
             'lua-filesystem: faster file discovery'

@@ -6,9 +6,10 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
-$Source = Get-Content -LiteralPath $WorkerPath -Raw -Encoding UTF8
+$NativePath = Join-Path (Split-Path -Parent $WorkerPath) 'ergopti_native_proxy.ps1'
+$Source = Get-Content -LiteralPath $NativePath -Raw -Encoding UTF8
 $Match = [regex]::Match($Source, "(?s)Add-Type -TypeDefinition @'\r?\n(.*?)\r?\n'@")
-if (-not $Match.Success -or $Match.Groups[1].Value -eq '') { throw 'Native worker source owner not found.' }
+if (-not $Match.Success -or $Match.Groups[1].Value -eq '') { throw 'Canonical native proxy source owner not found.' }
 Add-Type -TypeDefinition $Match.Groups[1].Value
 Add-Type -TypeDefinition @'
 using System;

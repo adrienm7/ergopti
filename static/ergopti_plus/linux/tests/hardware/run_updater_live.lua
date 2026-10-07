@@ -139,6 +139,9 @@ Updater._http_client.get = function(url, headers, options, callback)
 		-- Even a same-origin redirect can leave this repository's release list.
 		-- A genuine 3xx is a refusal, never an authenticated retry or fallback.
 		sent_options.follow_redirects = false
+		-- This request has one fixed endpoint, so it needs no managed-hop permission.
+		-- Keep the conditional files and expected endpoint for final ETag association.
+		sent_options.etag_affinity = nil
 	end
 	return transport_get(url, sent_headers, sent_options, function(result, ...)
 		local captured = pcall(observe_response, result)
@@ -147,13 +150,24 @@ Updater._http_client.get = function(url, headers, options, callback)
 	end)
 end
 
+-- The real daemon's controller owns pause; the probe owns this controller's
+-- lifetime. Lifecycle requests revoke admission rather than fabricating a
+-- forever-active source for the native transfer/installation.
+local probe_active = true
+local function retire_probe() probe_active = false end
+local script_actions = require("modules.shortcuts.script_actions").new({
+	reset = retire_probe, reload = retire_probe, quit = retire_probe,
+})
+local is_paused = script_actions.is_paused
+
 --- Releases the probe wrapper before the original process verdict is published.
 local function finish(status)
+	retire_probe()
 	Updater._http_client.get = transport_get
 	os.exit(status)
 end
 
-Updater.init({ interval_sec = 0 })
+Updater.init({ interval_sec = 0, is_paused = is_paused })
 print("  installed " .. Updater.current_version() .. ", channel " .. Updater.get_channel())
 expect(Updater.current_version() == "0.0.0-dev.1", "the installed build reports its old version")
 expect(Updater.get_channel() == "dev", "a prerelease build follows the prerelease channel by default")
@@ -177,7 +191,30 @@ local done, archive, download_error = false, nil, nil
 Updater.download_update(nil, function(path, err) done, archive, download_error = true, path, err end)
 run_until(function() return done end, 300)
 if not expect(archive ~= nil, "downloaded and SHA-256 verified (" .. tostring(download_error) .. ")") then finish(1) end
-if not expect(Updater.install_update(archive) == true, "installed") then finish(1) end
+-- A displayed archive path is not install authority. The manager keeps its
+-- authentic private artifact and calls back only after physical settlement.
+local install = Updater.install_update_async
+local get_release = Updater.get_cached_release
+local get_state = Updater.get_state
+local selected = get_release()
+local selected_tag = selected and selected.tag
+local install_done, installed = false, false
+local accepted = install(archive, function(ok)
+	install_done, installed = true, ok == true
+end, function()
+	return probe_active and not install_done
+		and package.loaded["modules.updater.manager"] == Updater
+		and Updater.install_update_async == install and Updater.get_cached_release == get_release
+		and Updater.get_state == get_state
+		and script_actions.is_paused == is_paused and is_paused() == false
+		and get_release() == selected and selected_tag == first.tag and selected.tag == selected_tag
+end)
+-- Admission is not completion. The retained installer owns its canonical
+-- deadline and cleanup; no successful verdict/restart precedes its callback.
+if accepted == true or get_state() == "installing" then
+	while not install_done do luv.run("once") end
+end
+if not expect(accepted == true and install_done and installed, "installed") then finish(1) end
 
 local stamp = read(HOME .. "/.local/lib/ergopti/_shared/build_stamp.txt") or ""
 local installed = stamp:match("version=([^\n]+)")

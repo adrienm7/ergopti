@@ -31,6 +31,12 @@ const FULL = process.argv.includes('--full');
 // Each check mirrors a CI "Validate ·" step. command/args are run from ROOT.
 const CHECKS = [
 	{
+		name: 'Nix runtime receipts and hosted registration preserve native admission',
+		cmd: process.execPath,
+		args: ['tools/test/test-linux-nix-native.cjs'],
+		repro: 'node tools/test/test-linux-nix-native.cjs'
+	},
+	{
 		name: 'Ubuntu CI dependencies retain signed archive scope and native failure status',
 		cmd: process.execPath,
 		args: ['tools/test/test-ubuntu-ci-acquisition.cjs'],
@@ -1033,6 +1039,24 @@ const CHECKS = [
 		repro: 'node tools/test/test-linux-tracked-copy.cjs'
 	},
 	{
+		name: 'Linux portable network packages retain native ABI and command ownership',
+		cmd: 'node',
+		args: ['tools/test/test-linux-portable-network-runtime.cjs'],
+		repro: 'npm run test:linux-portable-network-runtime'
+	},
+	{
+		name: 'Linux portable native admission rejects incomplete and skipped receipts',
+		cmd: 'node',
+		args: ['tools/test/test-linux-portable-network-registration.cjs'],
+		repro: 'npm run test:linux-portable-network-registration'
+	},
+	{
+		name: 'Linux native FD digest admission requires completed physical receipts',
+		cmd: 'node',
+		args: ['tools/test/test-linux-fd-sha256-native-gate.cjs'],
+		repro: 'npm run test:linux-fd-sha256-native-gate'
+	},
+	{
 		name: 'Linux CI requires successful mandatory jobs and assertion evidence',
 		cmd: 'node',
 		args: ['tools/test/test-linux-ci-evidence.cjs'],
@@ -1127,6 +1151,60 @@ const CHECKS = [
 		cmd: 'node',
 		args: ['tools/test/test-linux-launcher-deps.cjs'],
 		repro: 'node tools/test/test-linux-launcher-deps.cjs'
+	},
+	{
+		name: 'Linux managed networking admits actual runtime after package repair',
+		cmd: 'node',
+		args: ['tools/test/test-linux-network-runtime.cjs'],
+		repro: 'npm run test:linux-network-runtime'
+	},
+	{
+		name: 'Linux native network runtime is registered and refuses omitted receipts',
+		cmd: 'node',
+		args: ['tools/test/test-linux-network-runtime-registration.cjs'],
+		repro: 'npm run test:linux-network-runtime-registration'
+	},
+	{
+		name: 'Managed native HTTP phase owners preserve original modeled closure protocol',
+		cmd: 'node',
+		args: ['tools/test/test-linux-managed-http-phase-protocol.cjs'],
+		repro: 'npm run test:linux-managed-http-phase-protocol'
+	},
+	{
+		name: 'Managed native HTTP CI admits authenticated tools and complete source-bound receipts',
+		cmd: 'node',
+		args: ['tools/test/test-linux-managed-http-ci-registration.cjs'],
+		repro: 'npm run test:linux-managed-http-ci-registration'
+	},
+	{
+		name: 'test:linux-updater-temp-receipt',
+		cmd: 'node',
+		args: ['tools/test/test-linux-updater-temp-native.cjs'],
+		repro: 'npm run test:linux-updater-temp-receipt'
+	},
+	{
+		name: 'test:linux-updater-temp-registration',
+		cmd: 'node',
+		args: ['tools/test/test-linux-updater-temp-registration.cjs'],
+		repro: 'npm run test:linux-updater-temp-registration'
+	},
+	{
+		name: 'test:linux-updater-archive-receipt',
+		cmd: 'node',
+		args: ['tools/test/test-linux-updater-archive-receipt.cjs'],
+		repro: 'npm run test:linux-updater-archive-receipt'
+	},
+	{
+		name: 'test:linux-updater-archive-registration',
+		cmd: 'node',
+		args: ['tools/test/test-linux-updater-archive-registration.cjs'],
+		repro: 'npm run test:linux-updater-archive-registration'
+	},
+	{
+		name: 'Linux native digest runtime preserves exact OpenSSL 3 projection and build owners',
+		cmd: 'node',
+		args: ['tools/test/test-linux-crypto-runtime.cjs'],
+		repro: 'npm run test:linux-crypto-runtime'
 	},
 	{
 		name: 'extension-pack paths resolve (every read site lands on a real pack; pre-reorg prefix ratcheted out)',
@@ -1722,6 +1800,24 @@ const CHECKS = [
 		repro: 'npm run test:ollama-bootstrap-network-hardening'
 	},
 	{
+		name: 'MLX emitted downloader refuses failed system trust activation',
+		cmd: process.execPath,
+		args: ['tools/test/test-mlx-download-trust-activation.cjs'],
+		repro: 'node tools/test/test-mlx-download-trust-activation.cjs'
+	},
+	{
+		name: 'macOS opaque clients refuse unsupported automatic proxy routing',
+		cmd: process.execPath,
+		args: ['tools/test/test-macos-opaque-network-admission.cjs'],
+		repro: 'node tools/test/test-macos-opaque-network-admission.cjs'
+	},
+	{
+		name: 'CPython resolution refuses configured interpreter substitution',
+		cmd: process.execPath,
+		args: ['tools/test/test-python-resolution.cjs'],
+		repro: 'node tools/test/test-python-resolution.cjs'
+	},
+	{
 		name: 'Ollama server command preserves exact process ownership',
 		cmd: 'node',
 		args: ['tools/test/test-ollama-server-command.cjs'],
@@ -1984,6 +2080,21 @@ const CHECKS = [
 		cmd: 'node',
 		args: ['tools/test/test-changelog-channel-sync.cjs'],
 		repro: 'npm run test:changelog-channel-sync'
+	},
+	{
+		name: 'Versions managed failures retain safe report and exact action ownership',
+		cmd: 'node',
+		args: ['tools/test/test-changelog-managed-failure.cjs'],
+		repro: 'npm run test:changelog-managed-failure'
+	},
+	{
+		name: 'Linux document bridge challenges retain intrinsic page nonce and exact lease',
+		cmd: 'node',
+		args: [
+			'tools/test/test-linux-document-lease.cjs',
+			'static/ergopti_plus/_shared/ui/host_bridge.js'
+		],
+		repro: 'npm run test:linux-document-lease'
 	},
 	{
 		name: 'Versions page: one click installs a chosen release through the host, restore banner',

@@ -48,6 +48,15 @@ const updaterProbe = path.join(
 	'static/ergopti_plus/linux/tests/hardware/run_updater_live.lua'
 );
 const updaterDriver = path.join(ROOT, 'static/ergopti_plus/linux');
+// The live probe now loads the real Linux pause owner before any check.
+// These injected refusal observers must resolve driver and shared modules.
+const updaterLuaPath =
+	[
+		path.join(updaterDriver, '?.lua'),
+		path.join(updaterDriver, '?/init.lua'),
+		path.join(ROOT, 'static/ergopti_plus/_shared/lua/?.lua'),
+		path.join(ROOT, 'static/ergopti_plus/_shared/lua/?/init.lua')
+	].join(';') + ';;';
 // The native Linux lane must never certify POSIX observations with Windows Lua.
 const targetCwd = 'C:\\owned checkout\\static\\ergopti_plus\\linux';
 const targetArgv = ['tests/run.lua', '--only', 'an exact case with spaces'];
@@ -383,7 +392,7 @@ end
 					GITHUB_ACTIONS: ci,
 					GITHUB_TOKEN: token,
 					ERGOPTI_UPDATER_LIVE_EVIDENCE_DIR: evidence,
-					UPDATER_NATIVE_CLIENT: path.join(updaterDriver, 'adapters/http_client.lua'),
+					UPDATER_NATIVE_CLIENT: path.join(updaterDriver, 'adapters/curl_http_client.lua'),
 					UPDATER_TRUSTED_RELEASE_URL: `${variant.origin}?per_page=100`,
 					UPDATER_HTTP_STATUS: String(variant.status),
 					UPDATER_ECHO_CI_TOKEN: variant.echo ? 'true' : 'false',
@@ -451,6 +460,323 @@ end
 			assert.ok(!captured.includes(privateText), 'artifact leaked private request state');
 		}
 	}
+
+	// The complete original auth matrix above exercises the sole extracted curl
+	// producer: exact origin/header/stdin/privacy/status laws are unchanged.
+	// These additional controls load the actual managed public port. Native
+	// callbacks remain simulated libuv ports; this is not a native-wire proof.
+	const managedAuthenticationHarness = authenticationHarness
+		.replace(
+			"local driver = assert(arg[1], 'authentication fixture needs the explicit driver root')",
+			`-- These are deterministic simulated pipe/ENOENT receipts, not native-wire evidence.
+uv.constants = { O_RDONLY = 0, O_NONBLOCK = 2048 }
+native.descriptors, native.next_fd = {}, 6000
+function uv.pipe(read_options, write_options)
+ assert(read_options.nonblock == true and write_options.nonblock == true, 'conditional pipe lost nonblocking admission')
+ native.next_fd = native.next_fd + 2
+ local read_fd, write_fd = native.next_fd, native.next_fd + 1
+ native.descriptors[read_fd] = { peer = write_fd, direction = 'read', inode = read_fd }
+ native.descriptors[write_fd] = { peer = read_fd, direction = 'write', inode = read_fd }
+ return { read = read_fd, write = write_fd }
+end
+function uv.fs_fstat(fd)
+ local descriptor = assert(native.descriptors[fd], 'fixture observed an unowned descriptor')
+ assert(not descriptor.closed, 'fixture reused a closed descriptor')
+ return { dev = 1, ino = descriptor.inode, type = 'fifo' }
+end
+function uv.pipe_open(handle, fd)
+ local descriptor = assert(native.descriptors[fd], 'fixture attached an unowned descriptor')
+ assert(not descriptor.closed and descriptor.handle == nil and handle.fd == nil, 'fixture repeated descriptor transfer')
+ descriptor.handle, handle.fd = handle, fd
+ return true
+end
+function uv.fs_open(filename, flags, mode)
+ assert((filename == '/owned/etag-in' or filename == '/owned/etag-out') and flags == 2048 and mode == 0, 'conditional snapshot escaped its original missing-file fixture')
+ return nil, 'ENOENT', 'ENOENT'
+end
+function uv.fs_read() error('missing validator file cannot yield owned reads') end
+function uv.fs_close(fd)
+ local descriptor = assert(native.descriptors[fd], 'fixture closed an unowned descriptor')
+ assert(not descriptor.closed and descriptor.handle == nil, 'fixture closed a transferred descriptor twice')
+ descriptor.closed = true
+ return true
+end
+local driver = assert(arg[1], 'authentication fixture needs the explicit driver root')`
+		)
+		.replace(
+			"assert((argv:find('--location', 1, true) == nil) == (expected[2] and os.getenv('GITHUB_ACTIONS') == 'true'), 'native curl redirect policy escaped authentication scope')",
+			`-- Literal eligibility of the unchanged seven authored managedCases, independent of candidate URL parsing.
+ local hop_eligible = { true, true, true, true, true, true, false }
+ assert(#rows == 7 and type(hop_eligible[count]) == 'boolean', 'managed dispatch inventory lost its literal seven-case eligibility')
+ local follows = not (expected[2] and os.getenv('GITHUB_ACTIONS') == 'true')
+ if hop_eligible[count] or not follows then
+  assert(not argv:find('--location', 1, true), 'managed conditional request must retain sole per-hop redirect ownership')
+ else
+  assert(argv:find('--location', 1, true), 'literal userinfo exclusion lost original native-follow ownership')
+ end
+ if hop_eligible[count] then
+  assert((argv:find('ERGOPTI_GET_REDIRECT_JSON:', 1, true) ~= nil) == follows, 'managed native receipt lost original caller redirect permission')
+ else
+  assert(not argv:find('ERGOPTI_GET_REDIRECT_JSON:', 1, true), 'literal userinfo exclusion acquired a managed-hop receipt')
+ end
+ assert(argv:find('--dump-header\\n/dev/fd/4', 1, true), 'conditional response lost its exact FD4 header destination')
+ assert(native.pipes[4] == nil and type(native.pipes[5]) == 'table', 'buffered GET header FD4 collided with body FD3')
+ local writer = native.descriptors[assert(native.pipes[5].fd)]
+ local reader = native.descriptors[writer.peer]
+ assert(writer.direction == 'write' and writer.closed and reader.direction == 'read' and reader.handle and not reader.closed, 'conditional pipe transfer or parent writer close was not acknowledged')`
+		)
+		.replace(
+			"function uv.kill() error('completed receipt must not cancel a live successor') end",
+			`function uv.kill(pid, signal)
+ assert(pid == -native.group and signal == 0, 'managed group observation targeted another owner')
+ assert(native.absent_group == native.group, 'leader exit alone is not group retirement')
+ return nil, 'ESRCH', 'ESRCH'
+end`
+		)
+		.replace(
+			'native.requests = native.requests + 1',
+			`native.requests = native.requests + 1
+ native.group, native.absent_group = 4000 + native.requests, nil`
+		)
+		.replace(
+			'native.pipes[3].read(nil, nil)',
+			`if http_status == 304 and follows and hop_eligible[count] then
+  -- Literal terminal304 endpoints of the original seven cases, not native-argv-derived metadata.
+  local final_urls = {
+   'https://api.github.com/repos/adrienm7/ergopti/releases',
+   'https://api.github.com/repos/adrienm7/ergopti/releases?per_page=20&page=2',
+   'https://api.github.com/repos/fixture-owner/other-project/releases',
+   'https://release-assets.githubusercontent.com/package.tar.gz',
+   'https://API.GITHUB.COM/repos/adrienm7/ergopti/releases',
+   'https://api.github.com.evil.invalid/repos/adrienm7/ergopti/releases',
+   'https://user:password@api.github.com/repos/adrienm7/ergopti/releases',
+  }
+  local final_url = assert(final_urls[count], 'literal conditional final endpoint inventory changed')
+  assert(url == final_url, 'conditional request differs from independently authored terminal endpoint')
+  local terminal = { http_code = 304, response_code = 304, exitcode = 0,
+   num_redirects = 0, url_effective = final_url, redirect_url = '' }
+  native.pipes[3].read(nil, '\\nERGOPTI_GET_REDIRECT_JSON:\\n' .. final_url .. '\\n\\n' .. Json.encode(terminal) .. '\\n')
+ end
+ native.pipes[3].read(nil, nil)`
+		)
+		.replace(
+			'native.exit(http_status >= 400 and 22 or 0, 0)',
+			`-- Distinct exact-group model receipt, independent of leader/stream ACKs.
+ native.absent_group = native.group
+ native.exit(http_status >= 400 and 22 or 0, 0)
+ -- Child/group and both ordinary stream receipts cannot replace FD4 EOF.
+ assert(not delivered, 'managed callback borrowed completion without conditional header EOF')
+ reader.handle.read(nil, 'HTTP/1.1 ' .. http_status .. ' Fixture\\r\\nContent-Length: ' .. #response_body .. '\\r\\n\\r\\n')
+ assert(not delivered, 'managed callback borrowed header bytes without exact header EOF')
+ reader.handle.read(nil, nil)`
+		)
+		.replace(
+			'local native = { requests = 0 }',
+			`local native = { requests = 0, acquired = 0, closed = 0 }
+local function allocated(kind)
+ native.acquired = native.acquired + 1
+ return { kind = kind }
+end`
+		)
+		.replace(
+			'function uv.new_pipe() return {} end',
+			"function uv.new_pipe() return allocated('pipe') end"
+		)
+		.replace(
+			'function uv.new_timer() return {} end',
+			"function uv.new_timer() return allocated('timer') end\nfunction uv.hrtime() return 1000000 end"
+		)
+		.replace(
+			'function uv.close(handle) handle.closing = true end',
+			`function uv.close(handle, callback)
+ assert(not handle.closed, 'managed fixture retried an acknowledged native close')
+ handle.closing, handle.closed = true, true
+ native.closed = native.closed + 1
+ if handle.fd then
+  local descriptor = assert(native.descriptors[handle.fd], 'managed close lost the attached conditional descriptor')
+  assert(descriptor.handle == handle and not descriptor.closed, 'managed close borrowed another descriptor receipt')
+  descriptor.closed = true
+ end
+ if callback then callback() end
+end`
+		)
+		.replace(
+			'return {}, 4000 + native.requests',
+			"return allocated('process'), 4000 + native.requests"
+		)
+		.replace(
+			"if format == 'HTTP terminal callback raised: %s.' then native.callback_error = detail end",
+			`if format == 'HTTP terminal callback raised: %s.'
+   or format == 'Owned HTTP terminal callback raised: %s.'
+   or format == 'Owned HTTP settlement callback raised: %s.'
+   or (format == '%s' and type(detail) == 'string' and detail:find('callback raised.', 1, true)) then
+   native.callback_error = 'protected callback raised'
+  end`
+		)
+		.replace(
+			"assert(delivered and not Client.isActive('updater'), 'native terminal receipt did not settle')",
+			`assert(delivered and not Client.isActive('updater'), 'native terminal receipt did not settle')
+ assert(native.acquired == native.closed, 'managed public completion lost a physical close ACK')
+ for _, descriptor in pairs(native.descriptors) do
+  assert(descriptor.closed and descriptor.handle and descriptor.handle.closed, 'managed public completion lost conditional descriptor retirement')
+ end`
+		);
+	const managedCases = [
+		[releaseOrigin, true],
+		[`${releaseOrigin}?per_page=20&page=2`, true],
+		[customOrigin, false],
+		['https://release-assets.githubusercontent.com/package.tar.gz', false],
+		['https://API.GITHUB.COM/repos/adrienm7/ergopti/releases', false],
+		['https://api.github.com.evil.invalid/repos/adrienm7/ergopti/releases', false],
+		['https://user:password@api.github.com/repos/adrienm7/ergopti/releases', false]
+	];
+	const managedVariants = [
+		{ name: 'ci-scoped', ci: 'true', status: 403 },
+		{ name: 'non-ci', ci: 'false', status: 403 },
+		{ name: 'conditional', ci: 'true', status: 304 }
+	];
+	const managedEnvironment = (evidence, ci, status, cases) => ({
+		...process.env,
+		LUA_PATH: `${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?.lua')};${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?/init.lua')};;`,
+		GITHUB_ACTIONS: ci,
+		GITHUB_TOKEN: fixtureToken,
+		ERGOPTI_UPDATER_LIVE_EVIDENCE_DIR: evidence,
+		UPDATER_NATIVE_CLIENT: path.join(updaterDriver, 'adapters/http_client.lua'),
+		UPDATER_TRUSTED_RELEASE_URL: `${releaseOrigin}?per_page=100`,
+		UPDATER_HTTP_STATUS: String(status),
+		UPDATER_ECHO_CI_TOKEN: 'false',
+		UPDATER_AUTH_CASES: JSON.stringify(cases),
+		// Real canonical environment admission, confined to this simulated child.
+		// No OS settings/helper/route receipt override is provided.
+		http_proxy: 'http://127.0.0.1:9',
+		https_proxy: 'http://127.0.0.1:9',
+		HTTP_PROXY: '',
+		HTTPS_PROXY: '',
+		all_proxy: '',
+		ALL_PROXY: '',
+		NO_PROXY: '',
+		no_proxy: ''
+	});
+	for (const variant of managedVariants) {
+		const evidence = path.join(updaterScratch, `managed-authentication-${variant.name}`);
+		fs.mkdirSync(evidence);
+		const observed = spawnSync(
+			nativeLua,
+			['-e', managedAuthenticationHarness, updaterProbe, updaterDriver, updaterScratch],
+			{
+				encoding: 'utf8',
+				env: managedEnvironment(evidence, variant.ci, variant.status, managedCases)
+			}
+		);
+		assert.ifError(observed.error);
+		assert.strictEqual(
+			observed.status,
+			1,
+			'managed authentication cannot forgive the original update refusal'
+		);
+		assert.match(observed.stdout, /FAIL the newest release is found/);
+		assert.ok(
+			observed.stdout.includes(`scoped request and cleanup observations: 7${NATIVE_LUA_EOL}`)
+		);
+		const captured = fs.readFileSync(path.join(evidence, 'http.json'), 'utf8');
+		const responses = JSON.parse(captured).responses;
+		assert.strictEqual(responses.length, 7);
+		assert.ok(responses.every((response) => response.status === variant.status));
+		if (variant.status === 304) {
+			assert.strictEqual(
+				(observed.stderr.match(/^::notice title=Linux updater live HTTP::/gm) || []).length,
+				7
+			);
+			assert.doesNotMatch(observed.stderr, /^::error title=Linux updater live HTTP::/m);
+			assert.ok(
+				responses.every((response) => response.body === '' && response.headers_available === false)
+			);
+		}
+		for (const privateText of [fixtureToken, 'Authorization', 'original-etag', 'user:password']) {
+			assert.ok(
+				!observed.stdout.includes(privateText),
+				'managed stdout leaked private request state'
+			);
+			assert.ok(
+				!observed.stderr.includes(privateText),
+				'managed stderr leaked private request state'
+			);
+			assert.ok(!captured.includes(privateText), 'managed artifact leaked private request state');
+		}
+	}
+	// A malformed external URI must still reach the original observational
+	// wrapper without CI authentication, then fail closed before acquisition.
+	const originalGetStart = managedAuthenticationHarness.indexOf('local original_get = function');
+	const originalGetEnd = managedAuthenticationHarness.indexOf('local trusted_url, getter_calls');
+	assert.ok(originalGetStart >= 0 && originalGetEnd > originalGetStart);
+	const refusedGet = `local original_get = function(url, headers, sent_options, callback)
+ assert(url == expected[1], 'managed refusal changed the exact invalid URI')
+ assert(headers == original_headers and headers.Authorization == nil, 'invalid URI was authenticated')
+ assert(sent_options == options, 'invalid URI changed caller options')
+ count = count + 1
+ local delivered = false
+ local sent = Client.get(url, headers, sent_options, function(result)
+  assert(result.ok == false and result.status == 0 and result.body == '', 'invalid route fabricated an HTTP response')
+  assert(result.error == 'proxy-route-invalid', 'invalid route lost its canonical refusal')
+  answer = result
+  assert(callback(result, 'original callback receipt') == 'original callback return')
+  delivered = true
+ end)
+ assert(sent == false and delivered, 'invalid route must refuse before native dispatch')
+ assert(native.requests == 0 and native.acquired == 0 and native.closed == 0, 'invalid route acquired a native owner')
+ assert(native.callback_error == nil and not Client.isActive('updater'), 'invalid refusal lost its completion fence')
+ return sent
+end
+`;
+	const refusedManagerStart = managedAuthenticationHarness.indexOf(
+		'manager.check_for_updates = function'
+	);
+	const refusedManagerEnd = managedAuthenticationHarness.indexOf(
+		"package.preload['modules.updater.manager']"
+	);
+	assert.ok(refusedManagerStart > originalGetEnd && refusedManagerEnd > refusedManagerStart);
+	const refusedManager = `manager.check_for_updates = function(_, callback)
+ assert(#rows == 1, 'invalid route fixture inventory changed')
+ expected = rows[1]
+ assert(manager._http_client.get(expected[1], original_headers, options, function(result, receipt)
+  assert(result == answer and receipt == 'original callback receipt', 'invalid refusal changed response ownership')
+  callbacks = callbacks + 1
+  return 'original callback return'
+ end) == false, 'invalid route dispatch was admitted')
+ assert(count == 1 and callbacks == 1, 'invalid route skipped its observed request')
+ callback(false, nil, answer.error)
+end
+`;
+	const managedRefusalHarness =
+		managedAuthenticationHarness.slice(0, originalGetStart) +
+		refusedGet +
+		managedAuthenticationHarness.slice(originalGetEnd, refusedManagerStart) +
+		refusedManager +
+		managedAuthenticationHarness.slice(refusedManagerEnd);
+	const invalidEvidence = path.join(updaterScratch, 'managed-authentication-invalid-newline');
+	fs.mkdirSync(invalidEvidence);
+	const invalid = spawnSync(
+		nativeLua,
+		['-e', managedRefusalHarness, updaterProbe, updaterDriver, updaterScratch],
+		{
+			encoding: 'utf8',
+			env: managedEnvironment(invalidEvidence, 'true', 403, [[`${releaseOrigin}?page=2\n`, false]])
+		}
+	);
+	assert.ifError(invalid.error);
+	assert.strictEqual(invalid.status, 1, 'a refused managed route must keep the updater red');
+	assert.match(invalid.stdout, /FAIL the newest release is found/);
+	assert.ok(invalid.stdout.includes(`scoped request and cleanup observations: 1${NATIVE_LUA_EOL}`));
+	const invalidCaptured = fs.readFileSync(path.join(invalidEvidence, 'http.json'), 'utf8');
+	assert.strictEqual(JSON.parse(invalidCaptured).responses.length, 1);
+	assert.strictEqual(JSON.parse(invalidCaptured).responses[0].status, 0);
+	assert.strictEqual(JSON.parse(invalidCaptured).responses[0].error, 'proxy-route-invalid');
+	for (const privateText of [fixtureToken, 'Authorization', 'original-etag', 'user:password']) {
+		assert.ok(!invalid.stdout.includes(privateText));
+		assert.ok(!invalid.stderr.includes(privateText));
+		assert.ok(!invalidCaptured.includes(privateText));
+	}
+
 	for (const token of [
 		'',
 		fixtureToken + '\n',
@@ -477,7 +803,7 @@ end
 					LUA_PATH: `${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?.lua')};${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?/init.lua')};;`,
 					GITHUB_ACTIONS: 'true',
 					GITHUB_TOKEN: token,
-					UPDATER_NATIVE_CLIENT: path.join(updaterDriver, 'adapters/http_client.lua'),
+					UPDATER_NATIVE_CLIENT: path.join(updaterDriver, 'adapters/curl_http_client.lua'),
 					UPDATER_TRUSTED_RELEASE_URL: `${releaseOrigin}?per_page=100`,
 					UPDATER_AUTH_CASES: JSON.stringify(authenticationCases)
 				}
@@ -509,7 +835,7 @@ end
 					GITHUB_TOKEN: fixtureToken,
 					UPDATER_GETTER_ABSENT: endpoint === null ? 'true' : 'false',
 					UPDATER_TRUSTED_RELEASE_URL: endpoint || '',
-					UPDATER_NATIVE_CLIENT: path.join(updaterDriver, 'adapters/http_client.lua'),
+					UPDATER_NATIVE_CLIENT: path.join(updaterDriver, 'adapters/curl_http_client.lua'),
 					UPDATER_AUTH_CASES: JSON.stringify(authenticationCases)
 				}
 			}
@@ -569,7 +895,7 @@ end
 			encoding: 'utf8',
 			env: {
 				...process.env,
-				LUA_PATH: `${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?.lua')};${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?/init.lua')};;`,
+				LUA_PATH: updaterLuaPath,
 				GITHUB_ACTIONS: 'true',
 				GITHUB_TOKEN: fixtureToken,
 				ERGOPTI_UPDATER_LIVE_EVIDENCE_DIR: updaterScratch,
@@ -631,7 +957,7 @@ end
 			encoding: 'utf8',
 			env: {
 				...process.env,
-				LUA_PATH: `${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?.lua')};${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?/init.lua')};;`,
+				LUA_PATH: updaterLuaPath,
 				GITHUB_ACTIONS: 'true',
 				GITHUB_TOKEN: fixtureToken,
 				ERGOPTI_UPDATER_LIVE_EVIDENCE_DIR: boundedDir,
@@ -669,7 +995,7 @@ end
 			encoding: 'utf8',
 			env: {
 				...process.env,
-				LUA_PATH: `${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?.lua')};${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?/init.lua')};;`,
+				LUA_PATH: updaterLuaPath,
 				GITHUB_ACTIONS: 'true',
 				GITHUB_TOKEN: fixtureToken,
 				ERGOPTI_UPDATER_LIVE_EVIDENCE_DIR: blockedEvidence,
@@ -1232,11 +1558,173 @@ for (const boxJob of pipeline.jobs(LINUX_BOX)) {
 // without pipefail, is pinned pipeline-wide by
 // tools/test/test-ci-pipeline-wiring.cjs.
 const testLinux = pipeline.job('test-linux');
-assert.match(
-	pipeline.stepField(pipeline.step(testLinux, 'Run the driver unit test suite'), 'run') ?? '',
-	/^node \.\.\/\.\.\/\.\.\/tools\/test\/report\.cjs --name linux-lua --json "\$\{\{ runner\.temp \}\}\/linux-lua\.json" -- luajit tests\/run\.lua$/,
-	'the unit suite must write the report its evidence counts'
+/**
+ * Requires the actual original unit reporter and its immediate pipeline receipt.
+ * @param {string} job The actual test-linux job from the canonical pipeline loader.
+ */
+function assertLinuxUnitFailureLog(job) {
+	const unit = pipeline.step(job, 'Run the driver unit test suite');
+	assert.strictEqual(pipeline.stepField(unit, 'working-directory'), 'static/ergopti_plus/linux');
+	assert.strictEqual(pipeline.stepField(unit, 'id'), 'linux_unit');
+	assert.strictEqual(pipeline.stepField(unit, 'shell'), 'bash');
+	assert.strictEqual(pipeline.stepField(unit, 'if'), null);
+	assert.strictEqual(pipeline.stepField(unit, 'continue-on-error'), null);
+	const code = pipeline.runOf(unit);
+	assert.ok(Array.isArray(code) && code.length === 7, 'the original unit pipeline must be present');
+	const capture = ' 2>&1 | tee "$RUNNER_TEMP/linux-unit.log"';
+	assert.ok(code[2].endsWith(capture), 'both public streams reach the single log');
+	const reporter = code[2].slice(0, -capture.length);
+	assert.match(
+		reporter,
+		/^node \.\.\/\.\.\/\.\.\/tools\/test\/report\.cjs --name linux-lua --json "\$\{\{ runner\.temp \}\}\/linux-lua\.json" -- luajit tests\/run\.lua$/,
+		'the unit suite must write the report its evidence counts'
+	);
+	assert.deepStrictEqual(
+		code,
+		[
+			'set -euo pipefail',
+			'set +e',
+			reporter + capture,
+			'unit_pipeline_status=("${PIPESTATUS[@]}")',
+			'set -e',
+			'if [ "${unit_pipeline_status[0]}" -ne 0 ]; then exit "${unit_pipeline_status[0]}"; fi',
+			'exit "${unit_pipeline_status[1]}"'
+		],
+		'capture both statuses immediately; retain the reporter failure and refuse a failed log sink'
+	);
+	const upload = pipeline.step(job, 'Upload failed unit log');
+	assert.strictEqual(
+		pipeline.stepField(upload, 'if'),
+		"${{ failure() && !cancelled() && steps.linux_unit.outcome == 'failure' }}"
+	);
+	assert.strictEqual(pipeline.stepField(upload, 'uses'), 'actions/upload-artifact@v4');
+	assert.strictEqual(pipeline.stepField(upload, 'continue-on-error'), null);
+	assert.match(upload, /^          name: linux-unit-failure-log$/m);
+	assert.match(upload, /^          retention-days: 7$/m);
+	assert.match(upload, /^          path: \$\{\{ runner\.temp \}\}\/linux-unit\.log$/m);
+	assert.match(upload, /^          if-no-files-found: error$/m);
+	const steps = pipeline.steps(job);
+	const at = steps.findIndex((step) => step.name === 'Run the driver unit test suite');
+	assert.strictEqual(steps[at + 1]?.name, 'Upload failed unit log');
+}
+assertLinuxUnitFailureLog(testLinux);
+// Build every altered source before the expected rejection: a missing anchor is red.
+const unitLogMutations = [
+	['set -euo pipefail', 'set -eu'],
+	['unit_pipeline_status=("${PIPESTATUS[@]}")', 'unit_pipeline_status=("$?")'],
+	[
+		'unit_pipeline_status=("${PIPESTATUS[@]}")\n          set -e',
+		'set -e\n          unit_pipeline_status=("${PIPESTATUS[@]}")'
+	],
+	['then exit "${unit_pipeline_status[0]}"', 'then exit 0'],
+	['exit "${unit_pipeline_status[1]}"', 'exit 0'],
+	['-- luajit tests/run.lua 2>&1 | tee', '-- luajit tests/run.lua || true 2>&1 | tee'],
+	['-- luajit tests/run.lua 2>&1 | tee', '-- luajit tests/run.lua | tee'],
+	['working-directory: static/ergopti_plus/linux', 'working-directory: static/ergopti_plus'],
+	["failure() && !cancelled() && steps.linux_unit.outcome == 'failure'", 'success()'],
+	["failure() && !cancelled() && steps.linux_unit.outcome == 'failure'", 'failure()'],
+	['path: ${{ runner.temp }}/linux-unit.log', 'path: ${{ runner.temp }}'],
+	['if-no-files-found: error', 'if-no-files-found: ignore']
+];
+assert.strictEqual(
+	unitLogMutations.length,
+	12,
+	'all independent diagnostic wiring mutations are present'
 );
+for (const [from, to] of unitLogMutations) {
+	const unit = pipeline.step(testLinux, 'Run the driver unit test suite');
+	const upload = pipeline.step(testLinux, 'Upload failed unit log');
+	const target = unit.includes(from) ? unit : upload;
+	assert.strictEqual(
+		target.split(from).length - 1,
+		1,
+		'the actual diagnostic mutation anchor is unique'
+	);
+	assert.strictEqual(testLinux.split(target).length - 1, 1, 'the selected actual step is unique');
+	const changed = testLinux.replace(target, () => target.replace(from, () => to));
+	assert.notStrictEqual(changed, testLinux);
+	assert.throws(() => assertLinuxUnitFailureLog(changed));
+}
+/**
+ * Keeps the original unit and upload intact, then annotates only their own log.
+ * @param {string} job Actual test-linux job from the canonical pipeline loader.
+ */
+function assertLinuxUnitFailureExcerpt(job) {
+	assertLinuxUnitFailureLog(job);
+	const excerpt = pipeline.step(job, 'Emit Configuration assertion from failed unit log');
+	assert.strictEqual(
+		pipeline.stepField(excerpt, 'if'),
+		"${{ failure() && !cancelled() && steps.linux_unit.outcome == 'failure' }}"
+	);
+	assert.strictEqual(pipeline.stepField(excerpt, 'shell'), 'bash');
+	assert.strictEqual(pipeline.stepField(excerpt, 'working-directory'), null);
+	assert.strictEqual(pipeline.stepField(excerpt, 'continue-on-error'), null);
+	assert.strictEqual(pipeline.stepField(excerpt, 'uses'), null);
+	assert.deepStrictEqual(pipeline.runOf(excerpt), [
+		'node tools/test/linux-unit-failure-excerpt.cjs "$RUNNER_TEMP/linux-unit.log"'
+	]);
+	const steps = pipeline.steps(job);
+	const uploadAt = steps.findIndex((step) => step.name === 'Upload failed unit log');
+	assert.strictEqual(
+		steps[uploadAt + 1]?.name,
+		'Emit Configuration assertion from failed unit log'
+	);
+	assert.strictEqual(steps[uploadAt + 2]?.name, 'Run manual official runtime and model acceptance');
+}
+assertLinuxUnitFailureExcerpt(testLinux);
+const unitExcerptMutations = [
+	[
+		'name: Emit Configuration assertion from failed unit log',
+		'name: Omitted Configuration assertion'
+	],
+	["failure() && !cancelled() && steps.linux_unit.outcome == 'failure'", 'success()'],
+	["failure() && !cancelled() && steps.linux_unit.outcome == 'failure'", 'failure()'],
+	['shell: bash', 'shell: sh'],
+	['shell: bash', 'shell: bash\n        continue-on-error: true'],
+	['shell: bash', 'shell: bash\n        working-directory: static/ergopti_plus/linux'],
+	['"$RUNNER_TEMP/linux-unit.log"', '"$RUNNER_TEMP/another.log"'],
+	['"$RUNNER_TEMP/linux-unit.log"', '"$RUNNER_TEMP/linux-unit.log" || true'],
+	['node tools/test/linux-unit-failure-excerpt.cjs', 'node tools/test/report.cjs']
+];
+assert.strictEqual(
+	unitExcerptMutations.length,
+	9,
+	'every independent excerpt wiring mutation is present'
+);
+for (const [from, to] of unitExcerptMutations) {
+	const excerpt = pipeline.step(testLinux, 'Emit Configuration assertion from failed unit log');
+	assert.strictEqual(excerpt.split(from).length - 1, 1, 'the excerpt mutation anchor is unique');
+	assert.strictEqual(testLinux.split(excerpt).length - 1, 1, 'the actual excerpt step is unique');
+	const changed = testLinux.replace(excerpt, () => excerpt.replace(from, () => to));
+	assert.notStrictEqual(changed, testLinux);
+	assert.throws(() => assertLinuxUnitFailureExcerpt(changed));
+}
+const actualExcerpt = pipeline.step(testLinux, 'Emit Configuration assertion from failed unit log');
+assert.throws(
+	() =>
+		assertLinuxUnitFailureExcerpt(
+			testLinux.replace(actualExcerpt, () => actualExcerpt + '\n\n' + actualExcerpt)
+		),
+	'a duplicate annotation must be rejected by the actual step loader'
+);
+const actualUpload = pipeline.step(testLinux, 'Upload failed unit log');
+assert.strictEqual(testLinux.split(actualUpload).length - 1, 1);
+assert.strictEqual(testLinux.split(actualExcerpt).length - 1, 1);
+const swapMarker = '__ERGOPTI_CONFIGURATION_EXCERPT_SWAP__';
+assert.ok(
+	!testLinux.includes(swapMarker),
+	'the temporary swap marker is absent from the actual job'
+);
+const reorderedExcerpt = testLinux
+	.replace(actualUpload, () => swapMarker)
+	.replace(actualExcerpt, () => actualUpload)
+	.replace(swapMarker, () => actualExcerpt);
+assert.notStrictEqual(reorderedExcerpt, testLinux);
+assert.throws(
+	() => assertLinuxUnitFailureExcerpt(reorderedExcerpt),
+	'the annotation cannot interrupt original unit-to-uploader adjacency'
+);
+
 assert.ok(
 	(
 		pipeline.runOf(
@@ -1260,6 +1748,17 @@ for (const line of [
 		`the test-linux evidence must read its count with: ${line}`
 	);
 }
+assert.ok(
+	recordScript.includes(
+		'network_runtime_assertions=$(node tools/test/linux-network-runtime-evidence.cjs "$RUNNER_TEMP/linux-network-runtime.log")'
+	),
+	'the actual runtime count must come from its independently validated native receipt'
+);
+assert.strictEqual(MANIFEST.jobs['e2e-linux'].subjects['managed-network-runtime'], 4);
+assert.strictEqual(MANIFEST.jobs['e2e-linux'].subjects['nix-installed-runtime'], 7);
+assert.strictEqual(MANIFEST.jobs['e2e-linux'].subjects['retained-fd-sha256'], 12);
+assert.strictEqual(MANIFEST.jobs['e2e-linux'].subjects['managed-http-output'], 18);
+assert.strictEqual(MANIFEST.jobs['e2e-linux'].subjects['managed-http-public'], 30);
 const recorded = [...recordScript.join('\n').matchAll(/--subject "?([a-z0-9-]+)=([^\s"]+)"?/g)];
 assert.deepStrictEqual(
 	recorded.map((match) => match[1]).sort(),
@@ -1276,6 +1775,19 @@ for (const [, subject, value] of recorded) {
 			'hotstring-e2e': '$e2e_assertions',
 			'xkb-source-qualification': '$xkb_source_assertions',
 			'http-stream-receipts': '$http_stream_assertions',
+			'managed-network-runtime': '$network_runtime_assertions',
+			'nix-installed-runtime': '$nix_runtime_assertions',
+			'retained-fd-sha256': '$fd_sha256_assertions',
+			'managed-http-output': '$managed_http_output_assertions',
+			'managed-http-public': '$managed_http_public_assertions',
+			'updater-native-namespace-cleanup': '$updater_native_namespace_assertions',
+			'updater-temp-ownership': '$updater_temp_ownership_assertions',
+			'updater-temp-allocation': '$updater_temp_allocation_assertions',
+			'updater-archive-pipeline': '$updater_archive_assertions',
+			'archive-source-crypto': '$archive_crypto_assertions',
+			'archive-source-bin-parent': '$archive_bin_parent_assertions',
+			'archive-private-snapshot': '$archive_snapshot_assertions',
+			'connect-terminal-protocol-model': '$connect_protocol_assertions',
 			'window-switch-receipts': '$window_switch_assertions',
 			'native-fixture-family': '$native_family_assertions'
 		}[subject] ?? '1';
