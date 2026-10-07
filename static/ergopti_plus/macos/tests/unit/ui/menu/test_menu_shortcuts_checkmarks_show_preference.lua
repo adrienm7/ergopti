@@ -38,9 +38,13 @@ local function build_ctrl_rows(bindings, state_shortcuts)
 		package.loaded["infra.i18n"] = {
 			get = function(key) return key end,
 			decorate_section = function(value) return value end,
+			section = function(value) return value end,
 		}
 		package.loaded["ui.menu.menu_utils"] = {}
+		local native_renderer = require("infra.manifest_menu")
+		assert(type(native_renderer.template_rows) == "function")
 		package.loaded["infra.manifest_menu"] = {
+			template_rows = native_renderer.template_rows,
 			build = function(_, _, _, _, _, lists) return lists.keyboard_slots() end,
 		}
 		package.loaded["ui.menu.shortcut_utils"] = {}

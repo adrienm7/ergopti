@@ -220,3 +220,106 @@ _SMB_PersonalShortcutFrameChildren() {
 	AssertFalse(MenuRenderer_TemplateRows("personal_shortcuts_frame", Map(), Map(), Map()))
 }
 Test("personal shortcut frame: original child identity, callbacks and empty array", _SMB_PersonalShortcutFrameChildren)
+
+_SMB_WrapFrameUsesCurrentDeclaration() {
+	Root := _MR_GetManifestRoot()
+	Original := Root["shortcut_wrap_frame"]
+	try {
+		Current := _SC_WrapSymbolRows()
+		AssertEqual(1, Current.Length)
+		AssertEqual(t("menu.shortcuts.wrap_symbols_title"), Current[1]["label"])
+		Assert(Current[1]["items"] is Array && Current[1]["items"].Length > 0,
+			"the actual canonical wrap catalogue and controls remain reachable")
+		Root.Delete("shortcut_wrap_frame")
+		AssertEqual(0, _SC_WrapSymbolRows().Length, "no undeclared fixed parent is fabricated")
+		Root["shortcut_wrap_frame"] := Original
+		AssertEqual(1, _SC_WrapSymbolRows().Length, "the actual repaired source restores the parent")
+	} finally {
+		Root["shortcut_wrap_frame"] := Original
+	}
+}
+Test("shortcut wrap frame: actual native children, current declaration withdrawal and repair", _SMB_WrapFrameUsesCurrentDeclaration)
+
+/** Native late declaration refusal keeps borrowed children and primary failure. */
+_SMB_ExtensionMarkerLifetime(CleanupRefuses := false) {
+	global _ExtensionsDir, _MenuDispatchCallbacks
+	global _SMB_MarkerBuildCalls, _SMB_MarkerMenus, _SMB_MarkerBorrowed, _SMB_MarkerCleanupRefuses
+	Root := A_Temp . "\ergopti-shortcut-marker-" . DllCall("GetCurrentProcessId") . "-" . A_TickCount
+	SavedDir := _ExtensionsDir
+	SavedCalls := IsSet(_SMB_MarkerBuildCalls) ? _SMB_MarkerBuildCalls : unset
+	SavedMenus := IsSet(_SMB_MarkerMenus) ? _SMB_MarkerMenus : unset
+	SavedBorrowed := IsSet(_SMB_MarkerBorrowed) ? _SMB_MarkerBorrowed : unset
+	SavedCleanup := IsSet(_SMB_MarkerCleanupRefuses) ? _SMB_MarkerCleanupRefuses : unset
+	Definition := _MM_GetManifestRoot()
+	ErrorFrame := _MR_GetMenuDef("shortcut_extension_error_frame")
+	EmptyFrame := _MR_GetMenuDef("shortcut_extension_empty_frame")
+	Borrowed := Menu(), Menus := [], Failure := "", ResultReturned := false
+	try {
+		_ExtensionsDir := Root
+		_SMB_MarkerBuildCalls := 0, _SMB_MarkerMenus := Menus
+		_SMB_MarkerBorrowed := Borrowed, _SMB_MarkerCleanupRefuses := CleanupRefuses
+		DirCreate(Root . "\g1-shortcut-marker\shortcuts")
+		FileAppend("; Uses the real compiled BuildExtMenu_g1_shortcut_marker below.`n",
+			Root . "\g1-shortcut-marker\shortcuts\menu.ahk", "UTF-8")
+		RegisterMenuItem(Borrowed, "Borrowed native callback", _SMB_MarkerBorrowedCallback)
+		BorrowedId := DllCall("GetMenuItemID", "ptr", Borrowed.Handle, "int", 0, "uint")
+		BorrowedCallback := _MenuDispatchCallbacks[BorrowedId]
+		Definition.Delete("shortcut_extension_empty_frame")
+		AssertEqual(0, _SC_ExtensionRows().Length, "missing complete marker refuses before native allocation or builder")
+		AssertEqual(0, _SMB_MarkerBuildCalls)
+		AssertEqual(0, Menus.Length)
+		Definition["shortcut_extension_empty_frame"] := EmptyFrame
+		try {
+			_SC_ExtensionRows()
+			ResultReturned := true
+		} catch as Err {
+			Failure := Err.Message
+		}
+		AssertFalse(ResultReturned, "late refusal must not publish a partial extension list")
+		AssertEqual("Shortcut extension error marker was withdrawn during its native builder", Failure,
+			"cleanup failure must preserve the actual primary declaration refusal")
+		AssertEqual(1, _SMB_MarkerBuildCalls, "actual physical source invokes the genuine compiled builder once")
+		AssertEqual(1, Menus.Length)
+		AssertEqual(CleanupRefuses ? 1 : 0, _ExtMenuItemCount(Menus[1]),
+			"only the explicitly allocated owner is deleted; a forced cleanup failure remains observable")
+		AssertEqual(1, _ExtMenuItemCount(Borrowed), "borrowed child remains intact")
+		AssertTrue(_MenuDispatchCallbacks.Has(BorrowedId))
+		Assert(_MenuDispatchCallbacks[BorrowedId] == BorrowedCallback, "borrowed native callback identity remains exact")
+	} finally {
+		Definition["shortcut_extension_error_frame"] := ErrorFrame
+		Definition["shortcut_extension_empty_frame"] := EmptyFrame
+		_ExtensionsDir := SavedDir
+		_SMB_MarkerBuildCalls := IsSet(SavedCalls) ? SavedCalls : unset
+		_SMB_MarkerMenus := IsSet(SavedMenus) ? SavedMenus : unset
+		_SMB_MarkerBorrowed := IsSet(SavedBorrowed) ? SavedBorrowed : unset
+		_SMB_MarkerCleanupRefuses := IsSet(SavedCleanup) ? SavedCleanup : unset
+		for Owned in Menus {
+			if Owned.HasOwnProp("Delete")
+				Owned.DeleteProp("Delete")
+			try Owned.Delete()
+			finally MenuDispatcher_PruneMenu(Owned)
+		}
+		_CTC_ReleaseMenu(Borrowed)
+		if DirExist(Root)
+			DirDelete(Root, true)
+	}
+}
+
+BuildExtMenu_g1_shortcut_marker(ExtMenu, ExtName) {
+	global _SMB_MarkerBuildCalls, _SMB_MarkerMenus, _SMB_MarkerBorrowed, _SMB_MarkerCleanupRefuses
+	_SMB_MarkerBuildCalls += 1
+	_SMB_MarkerMenus.Push(ExtMenu)
+	ExtMenu.Add("Borrowed child", _SMB_MarkerBorrowed)
+	if _SMB_MarkerCleanupRefuses
+		ExtMenu.DefineProp("Delete", {Call: _SMB_MarkerDeleteRefuses})
+	_MM_GetManifestRoot().Delete("shortcut_extension_error_frame")
+	throw Error("The real fixture builder fails after attaching a borrowed child")
+}
+
+_SMB_MarkerDeleteRefuses(OwnedMenu, *) {
+	throw Error("The real owned native menu cleanup refuses")
+}
+_SMB_MarkerBorrowedCallback(*) => 7
+
+Test("shortcut extension frame: genuine late refusal preserves borrowed native menus", (*) => _SMB_ExtensionMarkerLifetime())
+Test("shortcut extension frame: genuine cleanup failure preserves primary refusal", (*) => _SMB_ExtensionMarkerLifetime(true))

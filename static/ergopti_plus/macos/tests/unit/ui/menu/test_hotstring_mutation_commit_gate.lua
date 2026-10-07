@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local CaptionFixture = require("tests.support.personal_menu_caption_fixture")
 
 local FAILURE_OUTCOMES = { "false", "nil", "throw" }
 
@@ -178,7 +179,7 @@ helpers.describe("hotstring menu mutations: publish only exact commitments", fun
 				updateMenu = function() calls.updates = calls.updates + 1 end,
 			}
 
-			local built = Custom.build_custom(ctx, { group_counts = {} })
+			local built = CaptionFixture.build_custom(Custom, ctx, { group_counts = {} })
 			local action = find_action(built.submenu, "TARGET_CUSTOM_SECTION")
 			helpers.assert_eq(type(action), "function",
 				"the custom section row must be reachable below the submenu parent")
@@ -248,5 +249,55 @@ helpers.describe("hotstring menu mutations: publish only exact commitments", fun
 		helpers.assert_eq(calls.saves, 0)
 		helpers.assert_eq(calls.updates, 0)
 		helpers.assert_eq(calls.error_notices, 1)
+	end)
+end)
+
+
+helpers.describe("Personal menu native caption fixture isolation", function()
+	local function captured_i18n(custom)
+		for index = 1, math.huge do
+			local name, value = debug.getupvalue(custom.build_custom, index)
+			if name == nil then break end
+			if name == "i18n" then return value end
+		end
+		error("actual Personal builder i18n capture missing")
+	end
+
+	helpers.it("reads the real English source and restores exact caption and cache owners", function()
+		local Custom = helpers.load_with_stubs("ui.menu.menu_hotstrings_custom")
+		local owner = captured_i18n(Custom)
+		local original_get = owner.get
+		local names = { "infra.i18n", "infra.locale", "locale.core", "infra.paths" }
+		for _, prior in ipairs({ false, {}, "nil" }) do
+			local expected = prior
+			if prior == "nil" then expected = nil end
+			helpers.with_fresh_modules(names, function()
+				for _, name in ipairs(names) do package.loaded[name] = expected end
+				local result = CaptionFixture.with_captions(Custom, function()
+					local caption = owner.get("menu.hotstrings.default_category_prefix")
+					helpers.assert_true(type(caption) == "string" and caption ~= "" and caption ~= "menu.hotstrings.default_category_prefix")
+					helpers.assert_eq(owner.get("fixture.unrelated.identity"), "fixture.unrelated.identity")
+					return prior
+				end)
+				helpers.assert_eq(result, prior)
+				helpers.assert_eq(owner.get, original_get)
+				for _, name in ipairs(names) do helpers.assert_eq(package.loaded[name], expected) end
+			end)
+		end
+	end)
+
+	helpers.it("restores the actual captured caption reader when the body raises", function()
+		local Custom = helpers.load_with_stubs("ui.menu.menu_hotstrings_custom")
+		local owner = captured_i18n(Custom)
+		local original_get = owner.get
+		local calls = 0
+		local ok, err = pcall(CaptionFixture.with_captions, Custom, function()
+			calls = calls + 1
+			error("caption fixture body failed")
+		end)
+		helpers.assert_eq(ok, false)
+		helpers.assert_true(tostring(err):find("caption fixture body failed", 1, true) ~= nil)
+		helpers.assert_eq(calls, 1)
+		helpers.assert_eq(owner.get, original_get)
 	end)
 end)

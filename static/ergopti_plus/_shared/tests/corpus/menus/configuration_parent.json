@@ -1,0 +1,28 @@
+{
+	"en": {
+		"parent": "Configuration",
+		"quit": "⏹ Quit",
+		"children": [
+			"↺ Restore recommended values",
+			"✕ Clear all (system behaviour)",
+			"-",
+			"Clean config.toml",
+			"-",
+			"Paths (configuration & logs)…",
+			"Setup wizard…"
+		]
+	},
+	"fr": {
+		"parent": "Configuration",
+		"quit": "⏹ Quitter",
+		"children": [
+			"↺ Restaurer les valeurs conseillées",
+			"✕ Tout effacer (comportement du système)",
+			"-",
+			"Nettoyer config.toml",
+			"-",
+			"Chemins (configuration & logs)…",
+			"Assistant de configuration…"
+		]
+	}
+}

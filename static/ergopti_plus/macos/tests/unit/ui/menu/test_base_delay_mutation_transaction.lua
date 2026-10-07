@@ -51,7 +51,7 @@ local function with_fixture(outcome, callback)
 			logger = require("infra.logger"),
 		}))
 		package.loaded["infra.manifest_menu"] = {
-			get_array = renderer.get_array, check_row = renderer.check_row,
+			native_child_rows = renderer.native_child_rows, get_root = renderer.get_root, template_rows = renderer.template_rows, get_array = renderer.get_array, check_row = renderer.check_row,
 			command_row = renderer.command_row, build = renderer.build,
 		}
 		package.loaded["modules.hotstrings.hotstrings_config"] = { resolve = function() return { delay = 0.1 } end }

@@ -79,6 +79,14 @@ _MakeOpenSectionFn(SecName) {
 ; item (duplicate-personal-section-desc-menu-mistarget).
 _SetPersonalDefaultSection(SecName, PersonalMenu, TomlData, DefaultSectionMenu, DisambiguatedLabels) {
 		global _PrevDefaultLabel
+		NewLabel := (SecName == "") ? t("menu.hotstrings.default_none")
+				: (DisambiguatedLabels.Has(SecName) ? DisambiguatedLabels[SecName] : SecName)
+		OldCaption := MenuRenderer_GroupRow("hotstring_personal_default_parent", "personal_default_caption",
+			DefaultSectionMenu, Map("personal_default_label", (*) => _PrevDefaultLabel))
+		NewCaption := MenuRenderer_GroupRow("hotstring_personal_default_parent", "personal_default_caption",
+			DefaultSectionMenu, Map("personal_default_label", (*) => NewLabel))
+		if !(OldCaption is Map) || !(NewCaption is Map)
+			return false
 		_EditorPrefSet("DefaultSection", SecName)
 		DefaultSectionMenu.Uncheck(t("menu.hotstrings.default_none"))
 		for _, SN in TomlData["sections_order"] {
@@ -93,12 +101,10 @@ _SetPersonalDefaultSection(SecName, PersonalMenu, TomlData, DefaultSectionMenu, 
 		} else if (TomlData["sections"].Has(SecName)) {
 				DefaultSectionMenu.Check(DisambiguatedLabels[SecName])
 		}
-		NewLabel := (SecName == "") ? t("menu.hotstrings.default_none")
-				: (DisambiguatedLabels.Has(SecName) ? DisambiguatedLabels[SecName] : SecName)
-		try PersonalMenu.Rename(t("menu.hotstrings.default_category_prefix") . _PrevDefaultLabel,
-				t("menu.hotstrings.default_category_prefix") . NewLabel)
+		try PersonalMenu.Rename(OldCaption["label"], NewCaption["label"])
 		_PrevDefaultLabel := NewLabel
 }
+
 _MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData, DefaultSectionMenu, DisambiguatedLabels) {
 		return (*) => _SetPersonalDefaultSection(SecName, PersonalMenu, TomlData, DefaultSectionMenu, DisambiguatedLabels)
 }

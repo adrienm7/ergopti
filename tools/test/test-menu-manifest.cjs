@@ -269,10 +269,12 @@ function checkChoiceProjection() {
 			'tools/build/build-menu-manifest.js',
 			'tools/lib/paths.cjs',
 			'tools/lib/menu-row-availability.cjs',
+			'static/ergopti_plus/_shared/data/locales/en.json',
 			'static/ergopti_plus/_shared/modules/updater/channels.json',
 			'static/ergopti_plus/_shared/ui/update_channels.js',
 			'static/ergopti_plus/_shared/modules/updater/defaults.json',
-			'static/ergopti_plus/_shared/modules/updater/schedule.js'
+			'static/ergopti_plus/_shared/modules/updater/schedule.js',
+			'static/ergopti_plus/_shared/data/locales/en.json'
 		]) {
 			const target = path.join(fixture, relativePath);
 			fs.mkdirSync(path.dirname(target), { recursive: true });
@@ -1306,7 +1308,7 @@ function checkAutomaticTriggerControls() {
 		[
 			'linux/ui/menu/menu_builder.lua',
 			'group_builders["llm_trigger"] = function',
-			'dynamic_handlers["llm_live_mode"] = function'
+			'group_builders["llm_live_mode"] = function'
 		]
 	]) {
 		const source = readFileSync(resolve(SHARED, '..', file), 'utf8');
@@ -1535,7 +1537,7 @@ function checkPrivacyTriggerControls() {
 		[
 			'linux/ui/menu/menu_builder.lua',
 			'group_builders["llm_trigger"] = function',
-			'dynamic_handlers["llm_live_mode"] = function'
+			'group_builders["llm_live_mode"] = function'
 		]
 	]) {
 		const source = readFileSync(resolve(SHARED, '..', file), 'utf8');
@@ -1586,6 +1588,156 @@ checkPrivacyTriggerControls();
 	assert(vectors.some((v) => v.enabled && v.calls === 1));
 	assert(vectors.some((v) => v.enabled && v.calls === 0));
 	assert(vectors.some((v) => !v.enabled && v.calls === 0));
+	// Scope21's genuine AHK owner boundary: canonical executable code lines also
+	// mask continuation-data braces, while the existing lexer retains real literals.
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const loopSource = readFileSync(
+		resolve(REPO_ROOT, 'tools/test/test-ahk-loop-capture.cjs'),
+		'utf8'
+	);
+	const maskStart = loopSource.indexOf('function codeLines(src) {');
+	const maskEnd = loopSource.indexOf('/**', maskStart);
+	assert(maskStart >= 0 && maskEnd > maskStart, 'actual canonical native code mask is present');
+	const codeLines = require('node:vm').runInNewContext(
+		loopSource.slice(maskStart, maskEnd) + '\ncodeLines'
+	);
+	function executableTokens(source) {
+		const lines = codeLines(source);
+		return scriptTokens(source, '.ahk').filter((token) => {
+			if (token.kind === 'string') {
+				token.raw = source.slice(token.start, token.end);
+				return true;
+			}
+			const line = source.slice(0, token.start).split('\n').length - 1;
+			const column = token.start - source.lastIndexOf('\n', token.start - 1) - 1;
+			return lines[line]?.slice(column, column + token.value.length) === token.value;
+		});
+	}
+	function matches(tokens, start, wanted) {
+		return wanted.every(
+			(token, offset) =>
+				tokens[start + offset]?.kind === token.kind && tokens[start + offset]?.value === token.value
+		);
+	}
+	function actualPersonalBody(source) {
+		const tokens = executableTokens(source);
+		const signature = scriptTokens('_HS_PersonalRows(Options := unset) {', '.ahk');
+		const bodies = [];
+		for (let start = 0; start < tokens.length; start++) {
+			if (!matches(tokens, start, signature)) continue;
+			if (
+				source
+					.slice(source.lastIndexOf('\n', tokens[start].start - 1) + 1, tokens[start].start)
+					.trim() !== ''
+			)
+				continue;
+			let depth = 1;
+			for (let index = start + signature.length; index < tokens.length; index++) {
+				if (tokens[index].kind !== 'symbol') continue;
+				if (tokens[index].value === '{') depth++;
+				if (tokens[index].value === '}') depth--;
+				if (!depth) {
+					bodies.push(source.slice(tokens[start + signature.length - 1].end, tokens[index].start));
+					break;
+				}
+			}
+		}
+		return bodies.length === 1 && bodies[0].trim() ? bodies[0] : null;
+	}
+	function callArguments(tokens, open) {
+		if (tokens[open]?.value !== '(') return null;
+		const args = [],
+			stack = ['('];
+		let start = open + 1;
+		for (let index = start; index < tokens.length; index++) {
+			const token = tokens[index];
+			if (token.kind !== 'symbol') continue;
+			if (['(', '[', '{'].includes(token.value)) stack.push(token.value);
+			else if ([')', ']', '}'].includes(token.value)) {
+				if ({ ')': '(', ']': '[', '}': '{' }[token.value] !== stack.pop()) return null;
+				if (!stack.length) {
+					args.push(tokens.slice(start, index));
+					return args;
+				}
+			} else if (token.value === ',' && stack.length === 1) {
+				args.push(tokens.slice(start, index));
+				start = index + 1;
+			}
+		}
+		return null;
+	}
+	function uniqueStatement(tokens, text) {
+		const wanted = scriptTokens(text, '.ahk');
+		const found = [];
+		for (let index = 0; index < tokens.length; index++) {
+			if (matches(tokens, index, wanted) && !['.', ':'].includes(tokens[index - 1]?.value))
+				found.push(index);
+		}
+		return found.length === 1 ? found[0] : -1;
+	}
+	function providerBinding(tokens, key, expression) {
+		if (tokens?.[0]?.value !== 'Map') return false;
+		const args = callArguments(tokens, 1);
+		if (!args || args.length % 2) return false;
+		const keys = [];
+		for (let index = 0; index < args.length; index += 2) {
+			if (
+				args[index].length !== 1 ||
+				args[index][0].kind !== 'string' ||
+				args[index][0].raw !== JSON.stringify(args[index][0].value)
+			)
+				return false;
+			keys.push(args[index][0].value);
+		}
+		if (new Set(keys).size !== keys.length) return false;
+		const wanted = scriptTokens(expression, '.ahk');
+		const bindings = [];
+		for (let index = 0; index < args.length; index += 2) {
+			if (
+				args[index].length === 1 &&
+				args[index][0].kind === 'string' &&
+				args[index][0].value === key
+			)
+				bindings.push(args[index + 1]);
+		}
+		return (
+			bindings.length === 1 &&
+			bindings[0].length === wanted.length &&
+			matches(bindings[0], 0, wanted)
+		);
+	}
+	function personalEditorFrameDelegation(source) {
+		const body = actualPersonalBody(source);
+		if (!body) return false;
+		const tokens = executableTokens(body);
+		const capture = uniqueStatement(
+			tokens,
+			'EditorRow := _HS_PersonalEditorRow((*) => OpenPersonalEditor())'
+		);
+		const controls = uniqueStatement(tokens, 'Controls := MenuRenderer_TemplateRows(');
+		const content = uniqueStatement(tokens, 'PersonalRows := MenuRenderer_TemplateRows(');
+		const render = uniqueStatement(tokens, '_HS_CategoryMenu("Personal", "", PersonalRows,');
+		if (!(capture >= 0 && capture < controls && controls < content && content < render))
+			return false;
+		const controlArgs = callArguments(tokens, controls + 3);
+		const contentArgs = callArguments(tokens, content + 3);
+		return (
+			controlArgs?.length === 4 &&
+			contentArgs?.length === 4 &&
+			controlArgs[0].length === 1 &&
+			controlArgs[0][0].kind === 'string' &&
+			controlArgs[0][0].raw === '"hotstring_personal_controls_frame"' &&
+			contentArgs[0].length === 1 &&
+			contentArgs[0][0].kind === 'string' &&
+			contentArgs[0][0].raw === '"hotstring_personal_content_frame"' &&
+			providerBinding(
+				controlArgs[3],
+				'personal_editor',
+				'(*) => EditorRow is Map ? [EditorRow] : []'
+			) &&
+			providerBinding(contentArgs[3], 'personal_controls', '(*) => Controls')
+		);
+	}
 	for (const [file, site] of [
 		[
 			'windows/ui/menu/menu_hotstrings.ahk',
@@ -1598,7 +1750,10 @@ checkPrivacyTriggerControls();
 		['linux/ui/menu/menu_builder.lua', 'ManifestMenu.command_row("personal_hotstring_commands"']
 	]) {
 		const source = readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus', file), 'utf8');
-		assert(source.includes(site), `${file}: the actual personal provider consumes the declaration`);
+		assert(
+			file.startsWith('windows/') ? personalEditorFrameDelegation(source) : source.includes(site),
+			`${file}: the actual personal provider consumes the declaration`
+		);
 		assert(
 			!/label\s*=\s*i18n(?:_safe|\.get)\("menu\.hotstrings\.open_editor"\)|Map\("label",\s*t\("menu\.hotstrings\.open_editor"\)/.test(
 				source
@@ -1606,6 +1761,69 @@ checkPrivacyTriggerControls();
 			`${file}: the canonical row owns its label`
 		);
 	}
+	const personalSource = readFileSync(
+		resolve(SHARED, '../windows/ui/menu/menu_hotstrings.ahk'),
+		'utf8'
+	);
+	const realBody = actualPersonalBody(personalSource);
+	assert(realBody, 'the genuine personal owner has a nonempty executable body');
+	assert(
+		personalEditorFrameDelegation(personalSource),
+		'the genuine complete frame owns the captured editor row'
+	);
+	const personalStatements = [
+		'EditorRow := _HS_PersonalEditorRow((*) => OpenPersonalEditor())',
+		'Controls := MenuRenderer_TemplateRows("hotstring_personal_controls_frame",',
+		'"personal_editor", (*) => EditorRow is Map ? [EditorRow] : []',
+		'PersonalRows := MenuRenderer_TemplateRows("hotstring_personal_content_frame",',
+		'"personal_controls", (*) => Controls,',
+		'_HS_CategoryMenu("Personal", "", PersonalRows,'
+	];
+	for (const statement of personalStatements) {
+		assert(realBody.includes(statement), 'each authored native binding exists before its mutation');
+		const missing = realBody.replace(
+			statement,
+			statement.replace(/[A-Za-z_][A-Za-z_0-9]*/, 'Withdrawn')
+		);
+		const quoted = realBody.replace(statement, "'(" + '\n' + statement + "\n)'");
+		const commented = realBody.replace(statement, '/* ' + statement + ' */');
+		for (const mutant of [missing, quoted, commented])
+			assert.equal(
+				personalEditorFrameDelegation(personalSource.replace(realBody, mutant)),
+				false,
+				'missing or data-only native bindings cannot borrow declaration authority'
+			);
+	}
+	const continuationOwner = personalSource.replace(
+		realBody,
+		"AuditText := '\n(\n" + realBody + "\n)\n'\nreturn []"
+	);
+	assert.equal(
+		personalEditorFrameDelegation(continuationOwner),
+		false,
+		'a whole continuation-data owner cannot borrow executable bindings or braces'
+	);
+	const foreignOwner =
+		personalSource.replace(realBody, 'return []') +
+		'\n_PersonalForeignProof() {\n' +
+		realBody +
+		'\n}\n';
+	assert.equal(
+		personalEditorFrameDelegation(foreignOwner),
+		false,
+		'an executable foreign body cannot replace the actual personal owner'
+	);
+	const legacy = 'PersonalRows.Push(_HS_PersonalEditorRow((*) => OpenPersonalEditor()))';
+	const legacyOwner = '_HS_PersonalRows(Options := unset) {\n' + legacy + '\n}\n';
+	assert(
+		legacyOwner.includes(legacy),
+		'the exact predecessor literal remains an explicit old-premise control'
+	);
+	assert.equal(
+		personalEditorFrameDelegation(legacyOwner),
+		false,
+		'the old literal alone is not the current whole-frame authority'
+	);
 	console.log(
 		'Personal editor command: one shared declaration, three actual providers and seven independent owner states.'
 	);
@@ -5139,15 +5357,15 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		assert.deepEqual(declared[0].platforms, ['ahk', 'hs', 'linux']);
 	}
 	for (const row of menu.llm_menu.filter((row) =>
-		[
-			'llm_backend',
-			'llm_model',
-			'llm_profile',
-			'llm_live_mode',
-			'llm_generation_settings'
-		].includes(row.id)
+		['llm_backend', 'llm_model', 'llm_profile'].includes(row.id)
 	))
 		assert.equal(row.type, 'dynamic', 'other dynamic child families keep their existing API');
+	for (const id of ['llm_live_mode', 'llm_generation_settings']) {
+		const rows = menu.llm_menu.filter((row) => row.id === id);
+		assert.equal(rows.length, 1, 'the complete fixed parent has one genuine identity');
+		assert.equal(rows[0].type, 'group', 'the migrated complete child is a shared native group');
+	}
+
 	function hasSequence(source, extension, values) {
 		const tokens = scriptTokens(source, extension);
 		const kind = (value) =>
@@ -5225,12 +5443,20 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 				'llm_navigation',
 				',',
 				'LLM_Menu_BuildNavMenu',
+				',',
+				'llm_live_mode',
+				',',
+				'LLM_Menu_BuildLiveModeMenu',
+				',',
+				'llm_generation_settings',
+				',',
+				'LLM_Menu_BuildGenerationMenu',
 				')'
 			];
 			assert.deepEqual(
 				scriptTokens(actualGroupBody, ext).map((token) => token.value),
 				values,
-				'actual returned group Map is the complete native three-child construction'
+				'actual returned group Map is the complete native five-child construction'
 			);
 			assert.ok(
 				hasSequence(actualGroupBody, ext, values),
@@ -5624,7 +5850,7 @@ console.log(
 		);
 		assert.ok(
 			exactSequence(
-				'if !(FrameRows is Array) return MenuRenderer_AppendRows(ShortcutsMenu, "shortcuts_menu", "personal_shortcuts", FrameRows)'
+				'if !(FrameRows is Array) return 0 MenuRenderer_AppendTemplate(ShortcutsMenu, "personal_shortcuts_frame", Map(), Map(), Map("personal_shortcuts_registered", PersonalRows))'
 			),
 			'actual refusal and publication lexical kinds'
 		);
@@ -5644,7 +5870,7 @@ console.log(
 		);
 		assert.ok(
 			sequence.includes(
-				'if|!|(|FrameRows|is|Array|)|return|MenuRenderer_AppendRows|(|ShortcutsMenu|,|shortcuts_menu|,|personal_shortcuts|,|FrameRows|)'
+				'if|!|(|FrameRows|is|Array|)|return|0|MenuRenderer_AppendTemplate|(|ShortcutsMenu|,|personal_shortcuts_frame|,|Map|(|)|,|Map|(|)|,|Map|(|personal_shortcuts_registered|,|PersonalRows|)|)'
 			),
 			'refusal precedes actual publication'
 		);
@@ -5967,5 +6193,3012 @@ console.log(
 	}
 	console.log(
 		'[OK] inert dynamic captions: real English format ownership, existing21 locale parity, strict physical compiler and omission refusal.'
+	);
+})();
+
+// Complete parameter frames retain native values and callbacks, with canonical fixed presentation.
+{
+	const assert = require('node:assert/strict');
+	const { publishesMenuTemplate } = require('../lib/menu-shared-delegation.cjs');
+	const expected = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/hotstrings_parameter_frames.json'), 'utf8')
+	);
+	const menu = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	assert.deepEqual(menu.hotstrings_delay_captions, expected.captions);
+	const locales = readdirSync(LOCALES_DIR)
+		.filter((file) => file.endsWith('.json'))
+		.sort();
+	assert.equal(locales.length, 21);
+	assert.deepEqual(
+		locales.map((file) => file.slice(0, -5)),
+		expected.locales
+	);
+	for (const file of locales) {
+		const catalog = JSON.parse(
+			readFileSync(resolve(LOCALES_DIR, file), 'utf8').replace(/^\uFEFF/, '')
+		);
+		for (const key of Object.values(expected.captions).concat(Object.values(expected.parents))) {
+			assert.equal(typeof catalog[key], 'string');
+			assert.ok(catalog[key].trim().length > 0 && catalog[key] !== key);
+		}
+	}
+	function projected(section, platform) {
+		return menu[section]
+			.filter((row) => !row.platforms || row.platforms.includes(platform))
+			.map((row) => (row.type === '---' ? 'separator' : row.id));
+	}
+	for (const platform of ['ahk', 'hs', 'linux']) {
+		assert.deepEqual(projected('hotstrings_delays_frame', platform), expected.delays[platform]);
+		assert.deepEqual(projected('hotstrings_preview_frame', platform), expected.preview[platform]);
+		assert.deepEqual(projected('hotstrings_word_expander_frame', platform), expected.word);
+	}
+	assert.deepEqual(menu.hotstrings_parameter_boundary, [{ type: '---' }]);
+	for (const [name, label] of Object.entries(expected.parents)) {
+		const rows = menu['hotstrings_' + name + '_parent'];
+		assert.equal(rows.length, 1);
+		assert.equal(rows[0].type, 'group');
+		assert.equal(rows[0].i18n, label);
+		assert.equal(rows[0].id, 'parameter_' + name + '_children');
+		assert.deepEqual(rows[0].disabled_when, ['parameter_parent_ready']);
+		assert.equal(Object.hasOwn(rows[0], 'action'), false);
+	}
+	const owners = [
+		['../windows/ui/menu/menu_hotstrings.ahk', '.ahk', ['word_expander', 'delays']],
+		[
+			'../macos/ui/menu/menu_hotstrings_management.lua',
+			'.lua',
+			['word_expander', 'preview', 'delays']
+		],
+		['../linux/ui/menu/menu_builder.lua', '.lua', ['word_expander', 'preview', 'delays']]
+	];
+	for (const [file, extension, names] of owners) {
+		const source = readFileSync(resolve(SHARED, file), 'utf8');
+		for (const name of names) {
+			for (const suffix of ['frame', 'parent']) {
+				const section = 'hotstrings_' + name + '_' + suffix;
+				assert.equal(publishesMenuTemplate(source, extension, section), true, file + ':' + section);
+				const call =
+					extension === '.ahk' ? 'MenuRenderer_TemplateRows' : 'ManifestMenu.template_rows';
+				const needle = call + '("' + section + '"';
+				assert.equal(source.split(needle).length, 2, 'one actual current frame route');
+				const withdrawn = source.replace(needle, call + '("foreign_unpublished_frame"');
+				assert.equal(publishesMenuTemplate(withdrawn, extension, section), false);
+				const data = extension === '.ahk' ? '; ' + needle + ')\n' : '-- ' + needle + ')\n';
+				assert.equal(publishesMenuTemplate(data, extension, section), false);
+			}
+		}
+	}
+}
+
+// macOS Agent frames own the complete fixed presentation around authentic native choices.
+{
+	const assert = require('node:assert/strict');
+	const { publishesMenuTemplate } = require('../lib/menu-shared-delegation.cjs');
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const hand = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/agent_panel_frames.json'), 'utf8')
+	);
+	const menu = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const native = readFileSync(resolve(SHARED, '../macos/ui/menu/menu_llm/agent_panel.lua'), 'utf8');
+	// Actual top-level native conventions bind each frame to its constructing function.
+	function nativeBody(source, name) {
+		const tokens = scriptTokens(source, '.lua');
+		const bodies = [];
+		for (let index = 0; index < tokens.length; index += 1) {
+			const token = tokens[index];
+			if (token.kind !== 'identifier' || token.value !== 'function') continue;
+			const expected = name === 'M.build' ? ['M', '.', 'build', '('] : [name, '('];
+			if (
+				!expected.every(
+					(value, offset) =>
+						tokens[index + 1 + offset]?.value === value &&
+						tokens[index + 1 + offset]?.kind ===
+							(['.', '('].includes(value) ? 'symbol' : 'identifier')
+				)
+			)
+				continue;
+			const prefix = source.slice(source.lastIndexOf('\n', token.start - 1) + 1, token.start);
+			if (prefix !== (name === 'M.build' ? '' : 'local ')) continue;
+			for (let close = index + expected.length + 1; close < tokens.length; close += 1) {
+				const end = tokens[close];
+				if (end.kind !== 'identifier' || end.value !== 'end') continue;
+				const lineStart = source.lastIndexOf('\n', end.start - 1) + 1;
+				const lineEnd = source.indexOf('\n', end.end);
+				if (
+					lineStart !== end.start ||
+					!/^\s*$/.test(source.slice(end.end, lineEnd < 0 ? source.length : lineEnd))
+				)
+					continue;
+				bodies.push(source.slice(token.start, end.end));
+				break;
+			}
+		}
+		return bodies.length === 1 ? bodies[0] : '';
+	}
+	const constructors = {
+		agent_system1_frame: 'system_rows',
+		agent_system2_frame: 'system_rows',
+		agent_download_frame: 'system_rows',
+		agent_excluded_apps_frame: 'disabled_apps_rows',
+		agent_panel_frame: 'M.build'
+	};
+	function actualFrame(source, section) {
+		return publishesMenuTemplate(nativeBody(source, constructors[section]), '.lua', section);
+	}
+	const locales = readdirSync(LOCALES_DIR).filter((file) => file.endsWith('.json'));
+	assert.equal(locales.length, 21);
+	for (const [section, rows] of Object.entries(hand.frames)) {
+		assert.deepEqual(menu[section], rows, 'independent complete Agent declaration: ' + section);
+		assert.equal(actualFrame(native, section), true, 'actual Agent frame route: ' + section);
+		const needle = 'ManifestMenu.template_rows("' + section + '"';
+		assert.equal(native.split(needle).length, 2, 'one authentic executed frame publication');
+		for (const changed of [
+			native.replace(needle, 'Foreign.' + needle),
+			native.replace(needle, 'ManifestMenu.template_rows("foreign_agent_frame"'),
+			'-- ' + needle + ')',
+			JSON.stringify(needle + ')'),
+			'function ' + needle + ')'
+		])
+			assert.equal(
+				actualFrame(changed, section),
+				false,
+				'non-publication cannot credit ' + section
+			);
+		const borrowed =
+			native.replace(needle, 'Unowned.template_rows("' + section + '"') +
+			'\nlocal function unrelated_agent_example()\n\t' +
+			needle +
+			', {})\nend\n';
+		assert.equal(
+			actualFrame(borrowed, section),
+			false,
+			'an unrelated function cannot lend publication authority'
+		);
+		const name = constructors[section];
+		const declaration = name === 'M.build' ? 'function M.build(' : 'local function ' + name + '(';
+		assert.equal(
+			native.split(declaration).length,
+			2,
+			'the real current constructor is present exactly once'
+		);
+		assert.equal(
+			actualFrame(native.replace(declaration, 'if ' + name + '('), section),
+			false,
+			'a conditional call cannot replace the real constructor definition'
+		);
+		for (const file of locales) {
+			const catalog = JSON.parse(
+				readFileSync(resolve(LOCALES_DIR, file), 'utf8').replace(/^\uFEFF/, '')
+			);
+			assert.equal(typeof catalog[rows[0].i18n], 'string');
+			assert.ok(catalog[rows[0].i18n].trim().length > 0 && catalog[rows[0].i18n] !== rows[0].i18n);
+		}
+	}
+	assert.deepEqual(hand.native_top_order, [
+		'mode',
+		'separator',
+		'agent_system1',
+		'agent_system2',
+		'separator',
+		'agent_disabled_apps'
+	]);
+	assert.deepEqual(hand.system_fixed_order, [
+		'off',
+		'actual_backend_choices',
+		'separator',
+		'observed_model',
+		'download_if_missing'
+	]);
+	console.log(
+		'[OK] complete macOS Agent frames: independent declarations, all21 labels, actual executed native ports.'
+	);
+}
+
+// Complete installed extension frames own presentation, never native catalogue or write policy.
+{
+	const assert = require('node:assert/strict');
+	const { publishesMenuTemplate } = require('../lib/menu-shared-delegation.cjs');
+	const expected = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/hotstring_extension_frames.json'), 'utf8')
+	);
+	const menu = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	function projected(section, platform) {
+		return menu[section]
+			.filter((row) => !row.platforms || row.platforms.includes(platform))
+			.map((row) => (row.type === '---' ? 'separator' : row.id));
+	}
+	for (const platform of ['ahk', 'hs', 'linux']) {
+		assert.deepEqual(
+			projected('hotstring_extension_content_frame', platform),
+			expected.content_order[platform]
+		);
+		assert.deepEqual(
+			projected('hotstring_extension_bulk_controls', platform),
+			expected.bulk_order[platform]
+		);
+	}
+	assert.deepEqual(menu.hotstring_extension_empty_file, [
+		{
+			type: 'label',
+			id: 'extension_empty_file',
+			i18n: expected.captions.extension_empty_file,
+			platforms: ['ahk'],
+			unavailable: 'hide'
+		}
+	]);
+	const macBulk = menu.hotstring_extension_bulk_controls[0];
+	assert.equal(macBulk.type, 'check');
+	assert.deepEqual(macBulk.checked_when, ['extension_all_sections_enabled']);
+	assert.deepEqual(macBulk.disabled_when, ['extension_bulk_ready']);
+	for (const row of menu.hotstring_extension_bulk_controls) {
+		assert.equal(row.i18n, expected.captions[row.id]);
+		assert.equal(Object.hasOwn(row, 'action'), false);
+		if (row.platforms.includes('linux')) {
+			assert.equal(row.type, 'command');
+			assert.equal(
+				Object.hasOwn(row, 'disabled_when'),
+				false,
+				'existing Linux commands retain their native live pause refusal'
+			);
+		}
+	}
+	for (const file of readdirSync(LOCALES_DIR).filter((file) => file.endsWith('.json'))) {
+		const catalog = JSON.parse(
+			readFileSync(resolve(LOCALES_DIR, file), 'utf8').replace(/^\uFEFF/, '')
+		);
+		for (const key of Object.values(expected.captions)) {
+			assert.equal(typeof catalog[key], 'string');
+			assert.ok(catalog[key].trim().length > 0 && catalog[key] !== key);
+		}
+	}
+	const owners = [
+		['../windows/ui/menu/menu_hotstrings.ahk', '.ahk', ['content_frame', 'empty_file']],
+		['../macos/ui/menu/menu_hotstrings.lua', '.lua', ['bulk_controls']],
+		['../macos/ui/menu/builder.lua', '.lua', ['content_frame']],
+		['../linux/ui/menu/menu_builder.lua', '.lua', ['content_frame', 'bulk_controls']]
+	];
+	for (const [file, extension, names] of owners) {
+		const source = readFileSync(resolve(SHARED, file), 'utf8');
+		for (const name of names) {
+			const section = 'hotstring_extension_' + name;
+			assert.equal(publishesMenuTemplate(source, extension, section), true, file + ':' + section);
+			const call =
+				extension === '.ahk' ? 'MenuRenderer_TemplateRows' : 'ManifestMenu.template_rows';
+			const needle = call + '("' + section + '"';
+			const withdrawn = source.split(needle).join(call + '("foreign_unpublished_extension_frame"');
+			assert.notEqual(source, withdrawn);
+			assert.equal(publishesMenuTemplate(withdrawn, extension, section), false);
+			const comment = extension === '.ahk' ? '; ' : '-- ';
+			assert.equal(publishesMenuTemplate(comment + needle + ')\n', extension, section), false);
+			assert.equal(publishesMenuTemplate("'" + needle + ")'", extension, section), false);
+		}
+	}
+}
+
+// Real canonical affix admission never grants arbitrary dynamic inert captions.
+(function inertCaptionLayoutsOwnTheirPhysicalSource() {
+	const assert = require('assert');
+	const fs = require('fs');
+	const path = require('path');
+	const os = require('os');
+	const { spawnSync } = require('child_process');
+	const { validateChildTemplates } = require('../lib/menu-row-availability.cjs');
+	const corpus = JSON.parse(
+		fs.readFileSync(path.join(SHARED, 'tests/corpus/menus/inert_caption_layouts.json'), 'utf8')
+	);
+	const english = JSON.parse(fs.readFileSync(path.join(LOCALES_DIR, 'en.json'), 'utf8'));
+	const source = { layout_frame: corpus.rows };
+	assert.throws(() => validateChildTemplates(source), /inert label needs/);
+	assert.doesNotThrow(() => validateChildTemplates(source, (key) => english[key]));
+	for (const filename of fs.readdirSync(LOCALES_DIR).filter((name) => name.endsWith('.json'))) {
+		const locale = JSON.parse(fs.readFileSync(path.join(LOCALES_DIR, filename), 'utf8'));
+		for (const row of corpus.rows) assert.equal(typeof locale[row.i18n], 'string', filename);
+	}
+	const mutations = [
+		[
+			'bad layout',
+			(row) => {
+				row.caption_layout = 'infix';
+			}
+		],
+		[
+			'numeric layout',
+			(row) => {
+				row.caption_layout = 7;
+			}
+		],
+		[
+			'missing joiner',
+			(row) => {
+				delete row.caption_joiner;
+			}
+		],
+		[
+			'numeric joiner',
+			(row) => {
+				row.caption_joiner = 7;
+			}
+		],
+		[
+			'control joiner',
+			(row) => {
+				row.caption_joiner = '\n';
+			}
+		],
+		[
+			'missing getter',
+			(row) => {
+				delete row.caption_getter;
+			}
+		],
+		[
+			'empty getter',
+			(row) => {
+				row.caption_getter = '';
+			}
+		],
+		[
+			'header layout',
+			(row) => {
+				row.type = 'section_header';
+			}
+		],
+		[
+			'command layout',
+			(row) => {
+				row.type = 'command';
+			}
+		],
+		[
+			'unknown key',
+			(row) => {
+				row.i18n = 'future.unowned_caption';
+			}
+		],
+		[
+			'format key',
+			(row) => {
+				row.i18n = 'menu.llm.hw_header';
+			}
+		],
+		[
+			'joiner without layout',
+			(row) => {
+				delete row.caption_layout;
+			}
+		],
+		[
+			'empty identity',
+			(row) => {
+				row.id = '';
+			}
+		]
+	];
+	const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-caption-layout-'));
+	try {
+		fs.cpSync(SHARED, path.join(fixture, 'static/ergopti_plus/_shared'), {
+			recursive: true
+		});
+		fs.mkdirSync(path.join(fixture, 'tools/build'), { recursive: true });
+		fs.copyFileSync(
+			path.join(REPO_ROOT, 'tools/build/build-menu-manifest.js'),
+			path.join(fixture, 'tools/build/build-menu-manifest.js')
+		);
+		fs.cpSync(path.join(REPO_ROOT, 'tools/lib'), path.join(fixture, 'tools/lib'), {
+			recursive: true
+		});
+		fs.mkdirSync(path.join(fixture, 'node_modules'), { recursive: true });
+		fs.cpSync(
+			path.join(REPO_ROOT, 'node_modules/smol-toml'),
+			path.join(fixture, 'node_modules/smol-toml'),
+			{ recursive: true }
+		);
+		fs.writeFileSync(path.join(fixture, 'package.json'), '{"type":"module"}\n');
+		const manifest = path.join(
+			fixture,
+			'static/ergopti_plus/_shared/modules/features/manifest.toml'
+		);
+		const output = path.join(
+			fixture,
+			'static/ergopti_plus/_shared/modules/menu/menu_manifest.json'
+		);
+		const original = fs.readFileSync(manifest, 'utf8');
+		const compile = (rows, extra = '') => {
+			const addition = rows
+				.map(
+					(row) =>
+						'\n[[menu.layout_frame]]\n' +
+						Object.entries(row)
+							.map(([key, value]) => key + ' = ' + JSON.stringify(value))
+							.join('\n') +
+						'\n'
+				)
+				.join('');
+			fs.writeFileSync(manifest, original + addition + extra);
+			return spawnSync(process.execPath, ['tools/build/build-menu-manifest.js'], {
+				cwd: fixture,
+				encoding: 'utf8'
+			});
+		};
+		let result = compile(corpus.rows);
+		assert.equal(result.status, 0, result.stderr);
+		assert.deepEqual(JSON.parse(fs.readFileSync(output, 'utf8')).layout_frame, corpus.rows);
+		const accepted = fs.readFileSync(output);
+		for (const [name, mutate] of mutations) {
+			const rows = structuredClone(corpus.rows);
+			mutate(rows[0]);
+			assert.notDeepEqual(rows, corpus.rows, name + ': genuine target exists');
+			if (name === 'command layout') {
+				assert.doesNotThrow(() =>
+					validateChildTemplates({ layout_frame: rows }, (key) => english[key])
+				);
+				result = compile(rows);
+				assert.equal(result.status, 0, result.stderr);
+				assert.deepEqual(JSON.parse(fs.readFileSync(output, 'utf8')).layout_frame, rows);
+				assert.deepEqual(
+					rows.slice(1),
+					corpus.rows.slice(1),
+					'other physical declarations stay exact'
+				);
+				result = compile(corpus.rows);
+				assert.equal(result.status, 0, result.stderr);
+				assert.deepEqual(fs.readFileSync(output), accepted, 'old inert repair remains exact');
+				continue;
+			}
+			assert.throws(
+				() => validateChildTemplates({ layout_frame: rows }, (key) => english[key]),
+				/caption layout|inert label needs/,
+				name
+			);
+			result = compile(rows);
+			assert.notEqual(result.status, 0, name);
+			assert.match(result.stderr, /caption layout|inert label needs/);
+			assert.deepEqual(fs.readFileSync(output), accepted, name + ': no partial output');
+		}
+		result = compile(
+			corpus.rows,
+			'\n[[menu.layout_omit]]\ntype = "include"\nsection = "layout_frame"\non_refusal = "omit_presentation"\n'
+		);
+		assert.notEqual(result.status, 0);
+		assert.match(result.stderr, /exclusively inert presentation/);
+		assert.deepEqual(fs.readFileSync(output), accepted);
+		result = compile(corpus.rows);
+		assert.equal(result.status, 0, result.stderr);
+		assert.deepEqual(fs.readFileSync(output), accepted, 'physical source repair is byte-exact');
+	} finally {
+		fs.rmSync(fixture, { recursive: true, force: true });
+	}
+	console.log(
+		'[OK] inert caption layouts: explicit affix/joiner, genuine English source, twelve physical refusals, explicit command admission, exact repair.'
+	);
+})();
+
+// The whole Shortcut family consumes fixed declarations through actual native owners.
+{
+	const assert = require('node:assert/strict');
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const hand = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/shortcut_presentation_frames.json'), 'utf8')
+	);
+	const current = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const files = {
+		ahk: resolve(SHARED, '../windows/ui/menu/menu_shortcuts.ahk'),
+		hs: resolve(SHARED, '../macos/ui/menu/menu_shortcuts.lua'),
+		linux: resolve(SHARED, '../linux/ui/menu/menu_builder.lua')
+	};
+	const frames = {
+		shortcut_wrap_frame: [
+			'shortcut_wrap_symbols_ahk',
+			'shortcut_wrap_symbols_hs',
+			'shortcut_wrap_symbols_linux'
+		],
+		shortcut_chatgpt_editor_frame: ['shortcut_chatgpt_editor'],
+		shortcut_wrap_live_control: ['shortcut_wrap_on_type'],
+		shortcut_extension_error_frame: [
+			'shortcut_extension_error_ahk',
+			'shortcut_extension_error_linux'
+		],
+		shortcut_extension_empty_frame: ['shortcut_extension_empty_ahk']
+	};
+	for (const [key, ids] of Object.entries(frames))
+		assert.deepEqual(
+			current[key].map((row) => row.id),
+			ids
+		);
+	assert.equal(current.shortcut_extension_error_frame[0].caption_layout, 'prefix');
+	assert.equal(current.shortcut_extension_error_frame[0].caption_joiner, '');
+	assert.equal(current.shortcut_extension_error_frame[1].caption_layout, 'suffix');
+	assert.equal(current.shortcut_extension_error_frame[1].caption_joiner, ' — ');
+	assert.equal(hand.native_order.windows.extension.nonempty, 'exact supplied native Menu retained');
+	assert.equal(hand.states.empty_native_children, 'actual valid empty array stays valid');
+	for (const [code, localeName] of [
+		['en', 'en.json'],
+		['fr', 'fr.json']
+	]) {
+		const locale = JSON.parse(readFileSync(resolve(LOCALES_DIR, localeName), 'utf8'));
+		for (const [key, field] of [
+			['menu.shortcuts.wrap_symbols_title', 'windows_wrap'],
+			['menu.shortcuts.wrap_symbols', 'lua_wrap'],
+			['menu.shortcuts.chatgpt_url_item', 'mac_url'],
+			['common.error_prefix', 'error_prefix'],
+			['common.error_title', 'error_title'],
+			['menu.extensions.empty', 'empty'],
+			['shortcuts.label_wrap_text', 'linux_wrap_feature']
+		])
+			assert.equal(locale[key], hand[code][field]);
+	}
+	const canonicalLoopSource = readFileSync(
+		resolve(REPO_ROOT, 'tools/test/test-ahk-loop-capture.cjs'),
+		'utf8'
+	);
+	const maskStart = canonicalLoopSource.indexOf('function codeLines(src) {');
+	const maskEnd = canonicalLoopSource.indexOf('/**', maskStart);
+	assert(maskStart >= 0 && maskEnd > maskStart, 'actual canonical native code mask is present');
+	const nativeCodeLines = require('node:vm').runInNewContext(
+		canonicalLoopSource.slice(maskStart, maskEnd) + '\ncodeLines'
+	);
+	function hasBareCall(source, extension, method, section) {
+		const tokens = scriptTokens(source, extension);
+		const nativeLines = extension === '.ahk' ? nativeCodeLines(source) : null;
+		return tokens.some((token, index) => {
+			if (token.kind !== 'identifier') return false;
+			if (nativeLines) {
+				const line = source.slice(0, token.start).split('\n').length - 1;
+				const column = token.start - source.lastIndexOf('\n', token.start - 1) - 1;
+				if (nativeLines[line]?.slice(column, column + token.value.length) !== token.value)
+					return false;
+			}
+			let open;
+			if (extension === '.lua') {
+				if (
+					token.value !== 'ManifestMenu' ||
+					['.', ':', 'function'].includes(tokens[index - 1]?.value)
+				)
+					return false;
+				if (
+					tokens[index + 1]?.kind !== 'symbol' ||
+					tokens[index + 1].value !== '.' ||
+					tokens[index + 2]?.kind !== 'identifier' ||
+					tokens[index + 2].value !== method
+				)
+					return false;
+				open = index + 3;
+			} else {
+				if (token.value !== method || ['.', ':'].includes(tokens[index - 1]?.value)) return false;
+				if (/[A-Za-z0-9_$\u0080-\uffff]/.test(source[token.start - 1] || '')) return false;
+				open = index + 1;
+			}
+			const argument = method === 'MenuRenderer_AppendTemplate' ? open + 3 : open + 1;
+			if (
+				argument !== open + 1 &&
+				(tokens[open + 1]?.kind !== 'identifier' ||
+					tokens[open + 1]?.value !== 'ExtMenu' ||
+					tokens[open + 2]?.value !== ',')
+			)
+				return false;
+			const key = tokens[argument];
+			return (
+				tokens[open]?.kind === 'symbol' &&
+				tokens[open].value === '(' &&
+				key?.kind === 'string' &&
+				key.value === section &&
+				source.slice(key.start, key.end) === '"' + section + '"' &&
+				tokens[argument + 1]?.kind === 'symbol' &&
+				tokens[argument + 1].value === ','
+			);
+		});
+	}
+	function authenticBody(source, extension, functionName) {
+		const tokens = scriptTokens(source, extension);
+		const signature = scriptTokens(
+			extension === '.ahk'
+				? functionName + '() {'
+				: functionName.startsWith('M.')
+					? 'function ' + functionName + (functionName === 'M.rows_from_menu' ? '(menu)' : '(ctx)')
+					: 'local function ' +
+						functionName +
+						(functionName === '_extension_shortcut_rows'
+							? '()'
+							: functionName === '_as_provider_row_list'
+								? '(list)'
+								: '(ctx)'),
+			extension
+		);
+		const definitions = [];
+		const nativeLines = extension === '.ahk' ? nativeCodeLines(source) : null;
+		for (let start = 0; start < tokens.length; start++) {
+			const first = tokens[start];
+			if (source.slice(source.lastIndexOf('\n', first.start - 1) + 1, first.start).trim() !== '')
+				continue;
+			if (
+				!signature.every(
+					(wanted, offset) =>
+						tokens[start + offset]?.kind === wanted.kind &&
+						tokens[start + offset]?.value === wanted.value
+				)
+			)
+				continue;
+			if (nativeLines) {
+				const line = source.slice(0, first.start).split('\n').length - 1;
+				const column = first.start - source.lastIndexOf('\n', first.start - 1) - 1;
+				if (nativeLines[line]?.slice(column, column + first.value.length) !== first.value) continue;
+				let depth = 1;
+				for (let index = start + signature.length; index < tokens.length; index++) {
+					if (tokens[index].kind !== 'symbol' || !['{', '}'].includes(tokens[index].value))
+						continue;
+					const brace = tokens[index];
+					const braceLine = source.slice(0, brace.start).split('\n').length - 1;
+					const braceColumn = brace.start - source.lastIndexOf('\n', brace.start - 1) - 1;
+					if (nativeLines[braceLine]?.[braceColumn] !== brace.value) continue;
+					if (tokens[index].value === '{') depth++;
+					if (tokens[index].value === '}') depth--;
+					if (!depth) {
+						definitions.push(
+							source.slice(tokens[start + signature.length - 1].end, tokens[index].start)
+						);
+						break;
+					}
+				}
+			} else {
+				const blocks = ['function'];
+				let awaitingDo = 0;
+				for (let index = start + signature.length; index < tokens.length; index++) {
+					const token = tokens[index];
+					if (token.kind !== 'identifier' || ['.', ':'].includes(tokens[index - 1]?.value))
+						continue;
+					if (['function', 'if', 'for', 'while', 'repeat'].includes(token.value)) {
+						blocks.push(token.value);
+						if (token.value === 'for' || token.value === 'while') awaitingDo++;
+					} else if (token.value === 'do') {
+						if (awaitingDo) awaitingDo--;
+						else blocks.push('do');
+					} else if (token.value === 'end' || token.value === 'until') {
+						if (token.value === 'until' && blocks.at(-1) !== 'repeat')
+							throw new Error('actual function grammar');
+						blocks.pop();
+						if (!blocks.length) {
+							definitions.push(source.slice(tokens[start + signature.length - 1].end, token.start));
+							break;
+						}
+					}
+				}
+			}
+		}
+		assert.equal(definitions.length, 1, 'one actual native owner definition');
+		return definitions[0];
+	}
+	const routes = {
+		ahk: [
+			'shortcut_wrap_frame',
+			'shortcut_extension_error_frame',
+			'shortcut_extension_empty_frame'
+		],
+		hs: ['shortcut_wrap_frame', 'shortcut_chatgpt_editor_frame'],
+		linux: ['shortcut_wrap_frame', 'shortcut_wrap_live_control', 'shortcut_extension_error_frame']
+	};
+	for (const [driver, keys] of Object.entries(routes)) {
+		const source = readFileSync(files[driver], 'utf8'),
+			extension = driver === 'ahk' ? '.ahk' : '.lua';
+		const method = driver === 'ahk' ? 'MenuRenderer_TemplateRows' : 'template_rows';
+		for (const key of keys) {
+			const ownerName =
+				driver === 'ahk'
+					? key === 'shortcut_wrap_frame'
+						? '_SC_WrapSymbolRows'
+						: '_SC_ExtensionRows'
+					: 'M.build';
+			const nativeOwner =
+				driver === 'linux'
+					? key === 'shortcut_extension_error_frame'
+						? '_extension_shortcut_rows'
+						: '_build_shortcuts'
+					: ownerName;
+			const ownedSource = authenticBody(source, extension, nativeOwner);
+			assert(
+				hasBareCall(ownedSource, extension, method, key),
+				driver + ' actual declaration ' + key
+			);
+			const name = driver === 'ahk' ? method : 'ManifestMenu.' + method;
+			const needle = name + '("' + key + '"';
+			for (const replacement of ['Foreign.' + needle, needle.replace(key, 'unowned_frame')]) {
+				const changed = source.replaceAll(needle, replacement);
+				assert.notEqual(changed, source);
+				assert.equal(
+					hasBareCall(changed, extension, method, key),
+					false,
+					'foreign receiver or key is not actual ownership'
+				);
+			}
+			// A real isolated call is data when placed in a native continuation or Lua long literal.
+			const callData = needle + ', Map())';
+			const data =
+				extension === '.lua'
+					? 'local Caption = [====[' + callData + ']====]'
+					: 'Caption := "\n(\n' + callData + '\n)"';
+			assert.equal(
+				hasBareCall(data, extension, method, key),
+				false,
+				'data-only owner cannot publish a frame'
+			);
+			const withdrawnBody = ownedSource.replaceAll(needle, needle.replace(key, 'unowned_frame'));
+			const unusedLoan =
+				source.replace(ownedSource, withdrawnBody) +
+				'\nUnusedSourceLoan() {\n' +
+				needle +
+				', Map())\n}';
+			assert.equal(
+				hasBareCall(authenticBody(unusedLoan, extension, nativeOwner), extension, method, key),
+				false,
+				'unused foreign body cannot lend declaration ownership'
+			);
+			if (extension === '.ahk') {
+				const braceLoan =
+					source.replace(ownedSource, '\n\tCaption := "\n(\n" { "\n)"\n' + withdrawnBody) +
+					'\n\n_UnusedBorrowedFrame() {\n\tCaption := "\n(\n" } "\n)"\n\treturn ' +
+					needle +
+					', Map())\n}\n';
+				const authentic = authenticBody(braceLoan, extension, nativeOwner);
+				assert.equal(
+					authentic.includes('_UnusedBorrowedFrame'),
+					false,
+					'continuation brace data cannot extend the actual owner body'
+				);
+				assert.equal(
+					hasBareCall(authentic, extension, method, key),
+					false,
+					'actual owner cannot borrow a later real call across continuation brace data'
+				);
+			}
+			const declaration =
+				extension === '.ahk'
+					? nativeOwner + '() {'
+					: nativeOwner === 'M.build'
+						? 'function M.build(ctx)'
+						: 'local function ' +
+							nativeOwner +
+							(nativeOwner === '_extension_shortcut_rows' ? '()' : '(ctx)');
+			assert(source.includes(declaration));
+			const noDefinition = source.replace(declaration, 'if ' + declaration);
+			assert.throws(
+				() => authenticBody(noDefinition, extension, nativeOwner),
+				/one actual native owner definition/,
+				'conditional call is not the actual function definition'
+			);
+		}
+	}
+	const windows = readFileSync(files.ahk, 'utf8');
+	for (const key of ['shortcut_extension_error_frame', 'shortcut_extension_empty_frame']) {
+		assert(
+			hasBareCall(
+				authenticBody(windows, '.ahk', '_SC_ExtensionRows'),
+				'.ahk',
+				'MenuRenderer_AppendTemplate',
+				key
+			)
+		);
+		assert.equal(
+			hasBareCall(
+				windows.replaceAll('MenuRenderer_AppendTemplate', 'Foreign.MenuRenderer_AppendTemplate'),
+				'.ahk',
+				'MenuRenderer_AppendTemplate',
+				key
+			),
+			false
+		);
+	}
+	const earlyError = windows.indexOf(
+		'ErrorRows := MenuRenderer_TemplateRows("shortcut_extension_error_frame"'
+	);
+	const earlyEmpty = windows.indexOf(
+		'EmptyRows := MenuRenderer_TemplateRows("shortcut_extension_empty_frame"'
+	);
+	const allocated = windows.indexOf('ExtMenu := Menu()');
+	const builder = windows.indexOf('%BuilderFn%(ExtMenu, ExtName)');
+	assert(
+		earlyError >= 0 && earlyEmpty > earlyError && allocated > earlyEmpty && builder > allocated,
+		'genuine marker admission precedes actual owned allocation and builder invocation'
+	);
+	assert(
+		windows.includes('if !Completed\n\t\t\t_SC_ExtensionDisposeOwnedMenus(OwnedMenus)'),
+		'unpublished owned menus have bounded cleanup'
+	);
+	assert(
+		windows.includes('try MenuDispatcher_PruneMenu(OwnedMenu)'),
+		'existing dispatcher lifetime owner retained'
+	);
+	for (const driver of ['hs', 'linux']) {
+		const utility =
+			driver === 'hs' ? resolve(SHARED, '../macos/ui/menu/menu_utils.lua') : files.linux;
+		const source = readFileSync(utility, 'utf8');
+		const statement =
+			driver === 'hs' ? 'return RowDialect.rows(menu)' : 'return RowDialect.rows(list)';
+		const functionName = driver === 'hs' ? 'M.rows_from_menu' : '_as_provider_row_list';
+		const expected = scriptTokens(statement, '.lua');
+		function delegates(text) {
+			const tokens = scriptTokens(text, '.lua');
+			return tokens.some((token, start) =>
+				expected.every(
+					(wanted, offset) =>
+						tokens[start + offset]?.kind === wanted.kind &&
+						tokens[start + offset]?.value === wanted.value
+				)
+			);
+		}
+		assert(
+			delegates(authenticBody(source, '.lua', functionName)),
+			'actual shared whole external-tree adapter'
+		);
+		assert.equal(
+			delegates(
+				source.replaceAll(statement, statement.replace('RowDialect.', 'Foreign.RowDialect.'))
+			),
+			false
+		);
+		assert.equal(delegates('-- no owner\nlocal Caption = [=[' + source + ']=]'), false);
+		const withdrawn =
+			source.replace(statement, 'return nil') + '\nlocal function unused()\n' + statement + '\nend';
+		assert.equal(
+			delegates(authenticBody(withdrawn, '.lua', functionName)),
+			false,
+			'unused adapter cannot lend source ownership'
+		);
+	}
+	console.log(
+		'[OK] whole Shortcut frames: hand hierarchy, actual declarations and native owners, strict external-tree delegation and bounded owned refusal cleanup.'
+	);
+}
+
+// Command/group affixes use physical translated keys and complete typed declarations.
+(function declaredCommandGroupAffixesOwnTheirSource() {
+	const assert = require('assert');
+	const fs = require('fs');
+	const path = require('path');
+	const { validateChildTemplates } = require('../lib/menu-row-availability.cjs');
+	const corpus = JSON.parse(
+		fs.readFileSync(
+			path.join(SHARED, 'tests/corpus/menus/command_group_caption_layouts.json'),
+			'utf8'
+		)
+	);
+	const english = JSON.parse(fs.readFileSync(path.join(LOCALES_DIR, 'en.json'), 'utf8'));
+	const source = { affix_frame: corpus.rows };
+	assert.doesNotThrow(() => validateChildTemplates(source, (key) => english[key]));
+	for (const language of ['en', 'fr']) {
+		const locale = JSON.parse(fs.readFileSync(path.join(LOCALES_DIR, language + '.json'), 'utf8'));
+		assert.deepEqual(
+			corpus.rows.map((row) =>
+				row.caption_layout === 'prefix'
+					? locale[row.i18n] + row.caption_joiner + corpus.value
+					: corpus.value + row.caption_joiner + locale[row.i18n]
+			),
+			corpus.expected[language]
+		);
+	}
+	for (const mutate of [
+		(row) => {
+			row.type = 'check';
+		},
+		(row) => {
+			row.caption_layout = 'infix';
+		},
+		(row) => {
+			delete row.caption_joiner;
+		},
+		(row) => {
+			row.caption_joiner = '\n';
+		},
+		(row) => {
+			delete row.caption_getter;
+		},
+		(row) => {
+			row.caption_getter = '';
+		},
+		(row) => {
+			row.i18n = 'future.unowned_caption';
+		},
+		(row) => {
+			row.i18n = 'menu.llm.hw_header';
+		},
+		(row) => {
+			row.id = '';
+		}
+	]) {
+		for (const index of [0, 1]) {
+			const rows = structuredClone(corpus.rows);
+			mutate(rows[index]);
+			assert.throws(() => validateChildTemplates({ affix_frame: rows }, (key) => english[key]));
+		}
+	}
+	assert.throws(() => validateChildTemplates(source));
+	console.log(
+		'[OK] command/group affixes: typed physical source, EN/FR complete hand images, eighteen malformed refusals.'
+	);
+})();
+
+// Every finite LLM frame belongs to an executed constructor, with source withdrawal controls.
+{
+	const assert = require('node:assert/strict');
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const expected = JSON.parse(
+		readFileSync(
+			resolve(SHARED, 'tests/corpus/menus/llm_complete_presentation_owners.json'),
+			'utf8'
+		)
+	);
+	const apiManagement = expected.api_management;
+	const declaredFrames = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	assert.deepEqual(declaredFrames[apiManagement.section], apiManagement.declaration);
+	assert.equal(apiManagement.edit_ready_guard, false);
+	const actualLocales = loadLocaleKeys();
+	assert.equal(Object.keys(actualLocales).length, 21);
+	for (const [locale, keys] of Object.entries(actualLocales))
+		for (const key of apiManagement.keys)
+			assert(keys.has(key), 'the genuine management caption is published in ' + locale);
+	const canonicalLoopSource = readFileSync(
+		resolve(REPO_ROOT, 'tools/test/test-ahk-loop-capture.cjs'),
+		'utf8'
+	);
+	const maskStart = canonicalLoopSource.indexOf('function codeLines(src) {');
+	const maskEnd = canonicalLoopSource.indexOf('/**', maskStart);
+	assert(maskStart >= 0 && maskEnd > maskStart);
+	const nativeCodeLines = require('node:vm').runInNewContext(
+		canonicalLoopSource.slice(maskStart, maskEnd) + '\ncodeLines'
+	);
+	function hasBareCall(source, extension, method, section) {
+		const tokens = scriptTokens(source, extension);
+		const nativeLines = extension === '.ahk' ? nativeCodeLines(source) : null;
+		return tokens.some((token, index) => {
+			if (token.kind !== 'identifier') return false;
+			if (nativeLines) {
+				const line = source.slice(0, token.start).split('\n').length - 1;
+				const column = token.start - source.lastIndexOf('\n', token.start - 1) - 1;
+				if (nativeLines[line]?.slice(column, column + token.value.length) !== token.value)
+					return false;
+			}
+			let open;
+			if (extension === '.lua') {
+				if (
+					token.value !== 'ManifestMenu' ||
+					['.', ':', 'function'].includes(tokens[index - 1]?.value)
+				)
+					return false;
+				if (
+					tokens[index + 1]?.kind !== 'symbol' ||
+					tokens[index + 1].value !== '.' ||
+					tokens[index + 2]?.kind !== 'identifier' ||
+					tokens[index + 2].value !== method
+				)
+					return false;
+				open = index + 3;
+			} else {
+				if (token.value !== method || ['.', ':'].includes(tokens[index - 1]?.value)) return false;
+				if (/[A-Za-z0-9_$\u0080-\uffff]/.test(source[token.start - 1] || '')) return false;
+				open = index + 1;
+			}
+			const argument = method === 'MenuRenderer_AppendTemplate' ? open + 3 : open + 1;
+			if (
+				argument !== open + 1 &&
+				(tokens[open + 1]?.kind !== 'identifier' ||
+					tokens[open + 1]?.value !== 'ExtMenu' ||
+					tokens[open + 2]?.value !== ',')
+			)
+				return false;
+			const key = tokens[argument];
+			return (
+				tokens[open]?.kind === 'symbol' &&
+				tokens[open].value === '(' &&
+				key?.kind === 'string' &&
+				key.value === section &&
+				source.slice(key.start, key.end) === '"' + section + '"' &&
+				tokens[argument + 1]?.kind === 'symbol' &&
+				tokens[argument + 1].value === ','
+			);
+		});
+	}
+	function authenticBody(source, extension, functionName) {
+		const tokens = scriptTokens(source, extension);
+		const signature = scriptTokens(functionName, extension);
+		const definitions = [];
+		const nativeLines = extension === '.ahk' ? nativeCodeLines(source) : null;
+		for (let start = 0; start < tokens.length; start++) {
+			const first = tokens[start];
+			if (source.slice(source.lastIndexOf('\n', first.start - 1) + 1, first.start).trim() !== '')
+				continue;
+			if (
+				!signature.every(
+					(wanted, offset) =>
+						tokens[start + offset]?.kind === wanted.kind &&
+						tokens[start + offset]?.value === wanted.value
+				)
+			)
+				continue;
+			if (nativeLines) {
+				const line = source.slice(0, first.start).split('\n').length - 1;
+				const column = first.start - source.lastIndexOf('\n', first.start - 1) - 1;
+				if (nativeLines[line]?.slice(column, column + first.value.length) !== first.value) continue;
+				let depth = 1;
+				for (let index = start + signature.length; index < tokens.length; index++) {
+					if (tokens[index].kind !== 'symbol' || !['{', '}'].includes(tokens[index].value))
+						continue;
+					const brace = tokens[index];
+					const braceLine = source.slice(0, brace.start).split('\n').length - 1;
+					const braceColumn = brace.start - source.lastIndexOf('\n', brace.start - 1) - 1;
+					if (nativeLines[braceLine]?.[braceColumn] !== brace.value) continue;
+					if (tokens[index].value === '{') depth++;
+					if (tokens[index].value === '}') depth--;
+					if (!depth) {
+						definitions.push(
+							source.slice(tokens[start + signature.length - 1].end, tokens[index].start)
+						);
+						break;
+					}
+				}
+			} else {
+				const blocks = ['function'];
+				let awaitingDo = 0;
+				for (let index = start + signature.length; index < tokens.length; index++) {
+					const token = tokens[index];
+					if (
+						token.kind !== 'identifier' ||
+						tokens[index - 1]?.value === '.' ||
+						(tokens[index - 1]?.value === ':' && tokens[index - 2]?.value !== ':')
+					)
+						continue;
+					if (['function', 'if', 'for', 'while', 'repeat'].includes(token.value)) {
+						blocks.push(token.value);
+						if (token.value === 'for' || token.value === 'while') awaitingDo++;
+					} else if (token.value === 'do') {
+						if (awaitingDo) awaitingDo--;
+						else blocks.push('do');
+					} else if (token.value === 'end' || token.value === 'until') {
+						if (token.value === 'until' && blocks.at(-1) !== 'repeat')
+							throw new Error('actual function grammar');
+						blocks.pop();
+						if (!blocks.length) {
+							definitions.push(source.slice(tokens[start + signature.length - 1].end, token.start));
+							break;
+						}
+					}
+				}
+			}
+		}
+		assert.equal(definitions.length, 1, 'one actual native owner definition: ' + functionName);
+		return definitions[0];
+	}
+	const outerBoundary = expected.outer_boundaries;
+	for (const boundary of outerBoundary.rows) {
+		const parent = declaredFrames[outerBoundary.section];
+		const index = parent.findIndex((row) => row.id === boundary.preceding_id);
+		assert(index >= 0, 'the actual model/profile parent remains declared');
+		assert.deepEqual(
+			parent[index + 1],
+			boundary.declaration,
+			'the whole native parent context owns its genuine macOS boundary'
+		);
+	}
+	const linuxBoundary = outerBoundary.linux_presentation_boundary;
+	const linuxIndex = declaredFrames[outerBoundary.section].findIndex(
+		(row) => row.id === linuxBoundary.preceding_id
+	);
+	assert(linuxIndex >= 0, 'the actual Linux model list retains its adjacent boundary');
+	function assertOnlyLinuxPresentationBoundary(row) {
+		assert.deepEqual(
+			row,
+			linuxBoundary.declaration,
+			'HIDE classifies only the actual inert Linux separator'
+		);
+	}
+	assertOnlyLinuxPresentationBoundary(declaredFrames[outerBoundary.section][linuxIndex + 1]);
+	assert.throws(
+		() =>
+			assertOnlyLinuxPresentationBoundary({
+				type: 'command',
+				id: 'new_functional_row',
+				i18n: 'button.cancel',
+				platforms: ['linux'],
+				unavailable: 'hide'
+			}),
+		assert.AssertionError,
+		'a newly functional row cannot borrow this presentation-only classification'
+	);
+	const outerSource = readFileSync(resolve(SHARED, '..', outerBoundary.owner), 'utf8');
+	assert(
+		hasBareCall(
+			authenticBody(outerSource, '.lua', outerBoundary.signature),
+			'.lua',
+			'build',
+			outerBoundary.section
+		),
+		'the real complete LLM build owns the boundaries'
+	);
+	const routes = {
+		ahk: [
+			'shortcut_wrap_frame',
+			'shortcut_extension_error_frame',
+			'shortcut_extension_empty_frame'
+		],
+		hs: ['shortcut_wrap_frame', 'shortcut_chatgpt_editor_frame'],
+		linux: ['shortcut_wrap_frame', 'shortcut_wrap_live_control', 'shortcut_extension_error_frame']
+	};
+	for (const edge of expected.producer_edges) {
+		for (const [platform, relative] of Object.entries(edge.owners)) {
+			const extension = platform === 'ahk' ? '.ahk' : '.lua';
+			const method = platform === 'ahk' ? 'MenuRenderer_TemplateRows' : 'template_rows';
+			const source = readFileSync(resolve(SHARED, '..', relative), 'utf8');
+			const signature = edge.signatures[platform];
+			const call = platform === 'ahk' ? method : 'ManifestMenu.' + method;
+			const literal = call + '("' + edge.section + '"';
+			const body = authenticBody(source, extension, signature);
+			assert(body.trim().length > 0, 'the actual native constructor has executable content');
+			assert(
+				hasBareCall(body, extension, method, edge.section),
+				'the actual native constructor owns ' + edge.section
+			);
+			assert(
+				source.includes(literal),
+				'the actual native mutation reaches the genuine literal call'
+			);
+			for (const mutant of [
+				source.replaceAll(literal, 'Foreign.' + literal),
+				source.replaceAll(literal, call + '("removed_complete_frame"') +
+					'\n' +
+					(extension === '.ahk' ? '; ' : '-- ') +
+					literal,
+				source.replaceAll(literal, call + '("removed_complete_frame"') +
+					'\n' +
+					(extension === '.ahk' ? 'Unused() {\n' : 'local function unused()\n') +
+					literal +
+					', {})\n' +
+					(extension === '.ahk' ? '}' : 'end')
+			])
+				assert.equal(
+					hasBareCall(authenticBody(mutant, extension, signature), extension, method, edge.section),
+					false,
+					'foreign, commented or unused-frame evidence cannot replace the actual constructor'
+				);
+		}
+	}
+	console.log(
+		'[OK] complete fixed LLM presentation: hand native constructor boundaries and authentic source/refusal ownership.'
+	);
+}
+// Personal frames retain the complete independently recorded platform order.
+{
+	const assert = require('node:assert/strict');
+	const current = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const hand = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/hotstring_personal_frames.json'), 'utf8')
+	);
+	const orders = {
+		hotstring_personal_default_frame: [
+			'hotstring_personal_none',
+			'hotstrings_parameter_boundary',
+			'personal_default_choices'
+		],
+		hotstring_personal_controls_frame: [
+			'personal_editor',
+			'hotstring_file_commands',
+			'hotstrings_parameter_boundary',
+			'personal_legacy_before',
+			'personal_default_parent',
+			'personal_legacy_after',
+			'hotstring_personal_close',
+			'hotstrings_parameter_boundary'
+		],
+		hotstring_personal_content_frame: [
+			'personal_controls',
+			'hotstrings_parameter_boundary',
+			'personal_main_sections',
+			'personal_unavailable_directories',
+			'hotstrings_parameter_boundary',
+			'personal_tree',
+			'hotstrings_parameter_boundary',
+			'personal_custom_sections',
+			'hotstring_personal_empty'
+		],
+		hotstring_personal_file_frame: [
+			'hotstring_file_commands',
+			'hotstrings_parameter_boundary',
+			'personal_file_controls',
+			'personal_file_sections'
+		],
+		hotstring_personal_directory_frame: [
+			'personal_folders',
+			'hotstrings_parameter_boundary',
+			'personal_files'
+		]
+	};
+	const conditions = {
+		hotstring_personal_default_frame: [null, 'personal_default_boundary', null],
+		hotstring_personal_controls_frame: [
+			null,
+			'personal_open_present',
+			'personal_controls_head_boundary',
+			null,
+			null,
+			null,
+			'personal_preferences_present',
+			'personal_controls_tail_boundary'
+		],
+		hotstring_personal_content_frame: [
+			null,
+			'personal_main_boundary',
+			null,
+			null,
+			'personal_tree_boundary',
+			null,
+			'personal_custom_boundary',
+			null,
+			'personal_empty'
+		],
+		hotstring_personal_file_frame: [
+			'personal_file_open_present',
+			'personal_file_boundary',
+			null,
+			null
+		],
+		hotstring_personal_directory_frame: [null, 'personal_folder_file_boundary', null]
+	};
+	for (const [key, expected] of Object.entries(orders)) {
+		assert.deepEqual(
+			current[key].map((row) => (row.type === 'include' ? row.section : row.id)),
+			expected,
+			'the complete hand-recorded frame retains its source order'
+		);
+		assert.deepEqual(
+			current[key].map((row) => row.present_when || null),
+			conditions[key],
+			'all original conditional boundaries remain explicitly declared'
+		);
+		assert(
+			current[key].every((row) => ['include', 'list'].includes(row.type)),
+			'native content remains supplied by its genuine provider; no copied commands or catalogue'
+		);
+	}
+	assert.deepEqual(current.hotstring_personal_none, [
+		{
+			type: 'check',
+			id: 'personal_default_none',
+			i18n: 'menu.hotstrings.default_none',
+			checked_when: ['personal_default_unset'],
+			platforms: ['ahk', 'hs'],
+			unavailable: 'hide'
+		},
+		{
+			type: 'check',
+			id: 'personal_default_none',
+			i18n: 'common.none',
+			checked_when: ['personal_default_unset'],
+			platforms: ['linux'],
+			unavailable: 'hide'
+		}
+	]);
+	assert.deepEqual(current.hotstring_personal_close, [
+		{
+			type: 'check',
+			id: 'personal_close_on_add',
+			i18n: 'menu.hotstrings.close_on_add',
+			checked_when: ['personal_close_on_add'],
+			disabled_when: ['personal_controls_ready']
+		}
+	]);
+	assert.deepEqual(current.hotstring_personal_empty, [
+		{
+			type: 'label',
+			id: 'personal_empty',
+			i18n: 'menu.hotstrings.no_group_loaded',
+			platforms: ['linux'],
+			unavailable: 'hide'
+		}
+	]);
+	assert.deepEqual(hand.default_choices.ahk_duplicates, [
+		'none',
+		'separator',
+		'Repeated',
+		'Placeholder',
+		'Repeated #2'
+	]);
+	assert.deepEqual(hand.default_choices.hs_duplicate_and_placeholder, [
+		'none',
+		'separator',
+		'Repeated',
+		'Repeated'
+	]);
+	assert.deepEqual(hand.default_choices.linux_native_order, [
+		'none',
+		'alpha',
+		'-',
+		'module',
+		'beta'
+	]);
+	assert.deepEqual(hand.directory_cases.find((entry) => entry.name === 'empty').expected, []);
+	for (const [code, filename] of [
+		['en', 'en.json'],
+		['fr', 'fr.json']
+	]) {
+		const locale = JSON.parse(readFileSync(resolve(LOCALES_DIR, filename), 'utf8'));
+		assert.equal(locale['menu.hotstrings.default_none'], hand.none_captions.ahk[code]);
+		assert.equal(locale['menu.hotstrings.default_none'], hand.none_captions.hs[code]);
+		assert.equal(locale['common.none'], hand.none_captions.linux[code]);
+		assert.equal(locale['menu.hotstrings.close_on_add'], hand.close_caption[code]);
+		assert.equal(locale['menu.hotstrings.open_file'], hand.open_file_caption[code]);
+		assert.equal(locale['menu.hotstrings.no_group_loaded'], hand.empty_linux[code]);
+	}
+	console.log(
+		'[OK] Personal hotstring frames: independent platform orders, literal source state/captions and complete native-owner composition.'
+	);
+}
+
+// The two native Language parents admit canonical DATA before completing the actual child.
+(function checkDeclaredLanguageParents() {
+	const assert = require('node:assert/strict');
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const menu = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const parent = menu.top_level.filter((row) => row.id === 'language');
+	assert.equal(parent.length, 1);
+	assert.deepEqual(parent[0], {
+		type: 'group',
+		id: 'language',
+		i18n: 'menu.global.language',
+		rows: []
+	});
+	assert.deepEqual(menu.language_menu, [{ type: 'list', id: 'locales' }]);
+	function ownerBody(source, signature) {
+		const tokens = scriptTokens(source, '.lua');
+		const wanted = scriptTokens(signature, '.lua');
+		const bodies = [];
+		for (let start = 0; start < tokens.length; start++) {
+			if (
+				source
+					.slice(source.lastIndexOf('\n', tokens[start].start - 1) + 1, tokens[start].start)
+					.trim()
+			)
+				continue;
+			if (
+				!wanted.every(
+					(token, offset) =>
+						tokens[start + offset]?.kind === token.kind &&
+						tokens[start + offset]?.value === token.value
+				)
+			)
+				continue;
+			// String identity is the physical simple Lua spelling, not an undecoded alias.
+			if (
+				!wanted.every(
+					(token, offset) =>
+						token.kind !== 'string' ||
+						source.slice(tokens[start + offset].start, tokens[start + offset].end) ===
+							signature.slice(token.start, token.end)
+				)
+			)
+				continue;
+			const blocks = ['function'];
+			let awaitingDo = 0;
+			for (let index = start + wanted.length; index < tokens.length; index++) {
+				const token = tokens[index];
+				if (token.kind !== 'identifier' || ['.', ':'].includes(tokens[index - 1]?.value)) continue;
+				if (['function', 'if', 'for', 'while', 'repeat'].includes(token.value)) {
+					blocks.push(token.value);
+					if (['for', 'while'].includes(token.value)) awaitingDo++;
+				} else if (token.value === 'do') {
+					if (awaitingDo) awaitingDo--;
+					else blocks.push('do');
+				} else if (token.value === 'end' || token.value === 'until') {
+					if (token.value === 'until' && blocks.at(-1) !== 'repeat')
+						throw new Error('invalid actual Lua owner');
+					blocks.pop();
+					if (!blocks.length) {
+						bodies.push(source.slice(tokens[start + wanted.length - 1].end, token.start));
+						break;
+					}
+				}
+			}
+		}
+		assert.equal(bodies.length, 1, 'one complete physical native Language owner');
+		return bodies[0];
+	}
+	function hasStatement(source, statement, requiredDepth = 0) {
+		const tokens = scriptTokens(source, '.lua');
+		const wanted = scriptTokens(statement, '.lua');
+		let depth = 0,
+			awaitingDo = 0;
+		const depths = tokens.map((token, index) => {
+			const before = depth;
+			if (token.kind !== 'identifier' || ['.', ':'].includes(tokens[index - 1]?.value))
+				return before;
+			if (['function', 'if', 'for', 'while', 'repeat'].includes(token.value)) {
+				depth++;
+				if (['for', 'while'].includes(token.value)) awaitingDo++;
+			} else if (token.value === 'do') {
+				if (awaitingDo) awaitingDo--;
+				else depth++;
+			} else if (['end', 'until'].includes(token.value)) depth--;
+			return before;
+		});
+		return tokens.some(
+			(first, index) =>
+				depths[index] === requiredDepth &&
+				!['.', ':', 'function'].includes(tokens[index - 1]?.value) &&
+				wanted.every((token, offset) => {
+					const actual = tokens[index + offset];
+					return (
+						actual?.kind === token.kind &&
+						actual.value === token.value &&
+						(token.kind !== 'string' ||
+							source.slice(actual.start, actual.end) === statement.slice(token.start, token.end))
+					);
+				})
+		);
+	}
+	const native = [
+		[
+			'macos/ui/menu/builder.lua',
+			'["language"] = function()',
+			[
+				'if type(i18n.build_language_menu_items) ~= "function" then return {} end',
+				'local ok_locales, locales = pcall(i18n.build_language_menu_items)',
+				'if not ok_locales then return {} end',
+				'local admitted = ManifestMenu.template_rows("language_menu", {}, {}, {',
+				'["locales"] = function() return locales end',
+				'if not admitted then return {} end',
+				'local rendered = ManifestMenu.render_rows(admitted, "language_menu")',
+				'local parent = ManifestMenu.group_row("top_level", "language", rendered, {})',
+				'return parent and { parent } or {}'
+			]
+		],
+		[
+			'linux/ui/menu/menu_builder.lua',
+			'local function _build_language(ctx)',
+			[
+				'local locales = i18n.list_locales()',
+				'ManifestMenu.template_rows("language_menu", {}, {}, {',
+				'["locales"] = function() return items end',
+				'if not admitted then return nil end',
+				'local rows = ManifestMenu.render_rows(admitted, "language_menu")',
+				'return ManifestMenu.group_row("top_level", "language", rows, {})'
+			]
+		]
+	];
+	for (const [file, signature, statements] of native) {
+		const source = readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus', file), 'utf8');
+		const body = ownerBody(source, signature);
+		for (const statement of statements) {
+			const requiredDepth =
+				file.startsWith('linux') && statement === 'local locales = i18n.list_locales()' ? 1 : 0;
+			assert(
+				hasStatement(body, statement, requiredDepth),
+				file + ': actual Language chronology ' + statement
+			);
+			assert(
+				!hasStatement('if false then\n' + body + '\nend', statement, requiredDepth),
+				'unreachable conditional route never owns Language'
+			);
+			assert(
+				!hasStatement(JSON.stringify(statement), statement),
+				'quoted code never authenticates a route'
+			);
+			assert(!hasStatement('-- ' + statement, statement), 'comment never authenticates a route');
+			if (statement.includes('ManifestMenu.')) {
+				const changed = body.replace(
+					statement,
+					statement.replace('ManifestMenu.', 'Foreign.ManifestMenu.')
+				);
+				assert(
+					!hasStatement(changed, statement, requiredDepth),
+					'a different receiver is not the shared owner'
+				);
+				const withdrawn = source.replace(statement, '-- route withdrawn');
+				const loan =
+					withdrawn + '\nlocal function unused_language_loan()\n' + statement + '\nend\n';
+				assert(
+					!hasStatement(ownerBody(loan, signature), statement, requiredDepth),
+					'unused helper cannot lend native ownership'
+				);
+			}
+		}
+		const physicalSignature = file.startsWith('macos')
+			? source.match(/^\s*\["language"\]\s*=\s*function\(\)/m)[0].trimStart()
+			: signature;
+		assert.throws(
+			() => ownerBody(source.replace(physicalSignature, '-- ' + physicalSignature), signature),
+			/physical native Language owner/
+		);
+		assert.throws(
+			() => ownerBody(source + '\n' + signature + '\nend\n', signature),
+			/physical native Language owner/
+		);
+	}
+	console.log(
+		'[OK] Language: unique existing parent, two physical native DATA/complete-child routes and source withdrawals.'
+	);
+})();
+
+// Debug keeps the real choice renderer, with source-presence admission around the completed child.
+(function checkDeclaredDebugParents() {
+	const assert = require('node:assert/strict');
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const fs = require('node:fs');
+	const path = require('node:path');
+	const base = path.resolve(__dirname, '../..', 'static/ergopti_plus');
+	const menu = JSON.parse(
+		fs.readFileSync(path.join(base, '_shared/modules/menu/menu_manifest.json'), 'utf8')
+	);
+	assert.deepEqual(
+		menu.top_level.filter((row) => row.id === 'debug'),
+		[{ type: 'group', id: 'debug', i18n: 'menu.debug.title', rows: [] }]
+	);
+	const hand = JSON.parse(
+		fs.readFileSync(path.join(base, '_shared/tests/corpus/menus/debug_parent.json'), 'utf8')
+	);
+	for (const code of ['en', 'fr']) {
+		const locale = JSON.parse(
+			fs.readFileSync(path.join(base, '_shared/data/locales', code + '.json'), 'utf8')
+		);
+		assert.equal(hand[code].parent, locale['menu.debug.title']);
+		assert.equal(hand[code].linux[0], locale['menu.debug.log_level'] + ' : ℹ️ INFO');
+		assert.equal(hand[code].hs[2], hand[code].linux[0]);
+	}
+	function tokenDepths(tokens) {
+		let depth = 0,
+			awaitingDo = 0;
+		return tokens.map((token, index) => {
+			const before = depth;
+			if (
+				token.kind !== 'identifier' ||
+				(['.', ':'].includes(tokens[index - 1]?.value) &&
+					!(tokens[index - 1]?.value === ':' && tokens[index - 2]?.value === ':'))
+			)
+				return before;
+			if (['function', 'if', 'for', 'while', 'repeat'].includes(token.value)) {
+				depth++;
+				if (['for', 'while'].includes(token.value)) awaitingDo++;
+			} else if (token.value === 'do') {
+				if (awaitingDo) awaitingDo--;
+				else depth++;
+			} else if (['end', 'until'].includes(token.value)) depth--;
+			return before;
+		});
+	}
+	function ownerBody(source, signature) {
+		const tokens = scriptTokens(source, '.lua');
+		const wanted = scriptTokens(signature, '.lua');
+		const sourceDepths = tokenDepths(tokens);
+		const bodies = [];
+		for (let start = 0; start < tokens.length; start++) {
+			if (sourceDepths[start] !== 0) continue;
+			if (
+				source
+					.slice(source.lastIndexOf('\n', tokens[start].start - 1) + 1, tokens[start].start)
+					.trim()
+			)
+				continue;
+			if (
+				!wanted.every(
+					(token, offset) =>
+						tokens[start + offset]?.kind === token.kind &&
+						tokens[start + offset]?.value === token.value
+				)
+			)
+				continue;
+			// String identity is the physical simple Lua spelling, not an undecoded alias.
+			if (
+				!wanted.every(
+					(token, offset) =>
+						token.kind !== 'string' ||
+						source.slice(tokens[start + offset].start, tokens[start + offset].end) ===
+							signature.slice(token.start, token.end)
+				)
+			)
+				continue;
+			const blocks = ['function'];
+			let awaitingDo = 0;
+			for (let index = start + wanted.length; index < tokens.length; index++) {
+				const token = tokens[index];
+				if (
+					token.kind !== 'identifier' ||
+					(['.', ':'].includes(tokens[index - 1]?.value) &&
+						!(tokens[index - 1]?.value === ':' && tokens[index - 2]?.value === ':'))
+				)
+					continue;
+				if (['function', 'if', 'for', 'while', 'repeat'].includes(token.value)) {
+					blocks.push(token.value);
+					if (['for', 'while'].includes(token.value)) awaitingDo++;
+				} else if (token.value === 'do') {
+					if (awaitingDo) awaitingDo--;
+					else blocks.push('do');
+				} else if (token.value === 'end' || token.value === 'until') {
+					if (token.value === 'until' && blocks.at(-1) !== 'repeat')
+						throw new Error('invalid actual Lua owner');
+					blocks.pop();
+					if (!blocks.length) {
+						bodies.push(source.slice(tokens[start + wanted.length - 1].end, token.start));
+						break;
+					}
+				}
+			}
+		}
+		assert.equal(bodies.length, 1, 'one complete physical native Debug owner');
+		return bodies[0];
+	}
+	function hasStatement(source, statement, requiredDepth = 0) {
+		const tokens = scriptTokens(source, '.lua');
+		const wanted = scriptTokens(statement, '.lua');
+		let depth = 0,
+			awaitingDo = 0;
+		const depths = tokens.map((token, index) => {
+			const before = depth;
+			if (
+				token.kind !== 'identifier' ||
+				(['.', ':'].includes(tokens[index - 1]?.value) &&
+					!(tokens[index - 1]?.value === ':' && tokens[index - 2]?.value === ':'))
+			)
+				return before;
+			if (['function', 'if', 'for', 'while', 'repeat'].includes(token.value)) {
+				depth++;
+				if (['for', 'while'].includes(token.value)) awaitingDo++;
+			} else if (token.value === 'do') {
+				if (awaitingDo) awaitingDo--;
+				else depth++;
+			} else if (['end', 'until'].includes(token.value)) depth--;
+			return before;
+		});
+		return tokens.some(
+			(first, index) =>
+				depths[index] === requiredDepth &&
+				!['.', ':', 'function'].includes(tokens[index - 1]?.value) &&
+				wanted.every((token, offset) => {
+					const actual = tokens[index + offset];
+					return (
+						actual?.kind === token.kind &&
+						actual.value === token.value &&
+						(token.kind !== 'string' ||
+							source.slice(actual.start, actual.end) === statement.slice(token.start, token.end))
+					);
+				})
+		);
+	}
+	for (const [driver, file, signature, child, finish] of [
+		[
+			'hs',
+			'macos/ui/menu/builder.lua',
+			'["debug"] = function()',
+			'debug_items',
+			'local row = ManifestMenu.group_row("top_level", "debug", debug_items, dbg_ctx.state_getters)'
+		],
+		[
+			'linux',
+			'linux/ui/menu/menu_builder.lua',
+			'local function _build_debug(ctx)',
+			'rows',
+			'return ManifestMenu.group_row("top_level", "debug", rows, render_ctx.state_getters)'
+		]
+	]) {
+		const source = fs.readFileSync(path.join(base, file), 'utf8');
+		const outer =
+			driver === 'hs' ? ownerBody(source, 'function M.generate(ctx, menu_mods, actions)') : source;
+		const native = ownerBody(outer, signature);
+		const context = driver === 'hs' ? 'dbg_ctx' : 'render_ctx';
+		const refused = driver === 'hs' ? '{}' : 'nil';
+		const chronology = [
+			`local root, top, section, parent, fields = debug_source(ManifestMenu, "${driver}")`,
+			`if root == nil then return ${refused} end`,
+			`local ${child} = ManifestMenu.build("debug_menu", "Debug", nil, nil, ${context}, {})`,
+			`if not debug_dense(${child}, true) then return ${refused} end`,
+			`local current_root, current_top, current_section, current_parent = debug_source(ManifestMenu, "${driver}")`,
+			`if not rawequal(root, current_root) or not rawequal(top, current_top) or not rawequal(section, current_section) or not rawequal(parent, current_parent) or not debug_parent_unchanged(parent, fields) then return ${refused} end`,
+			finish
+		];
+		const tokens = scriptTokens(native, '.lua'),
+			depths = tokenDepths(tokens);
+		let previous = -1;
+		for (const statement of chronology) {
+			const wanted = scriptTokens(statement, '.lua');
+			const at = tokens.findIndex(
+				(_, index) =>
+					index > previous &&
+					depths[index] === 0 &&
+					wanted.every(
+						(token, offset) =>
+							tokens[index + offset]?.kind === token.kind &&
+							tokens[index + offset]?.value === token.value
+					)
+			);
+			assert(at >= 0, 'actual source/child/recheck/parent chronology');
+			previous = at;
+		}
+		for (const statement of chronology) {
+			assert(
+				hasStatement(native, statement),
+				file + ': actual Debug source/choice/finished-child owner ' + statement
+			);
+			assert(
+				!hasStatement('if false then\n' + native + '\nend', statement),
+				'conditional data is not the native owner'
+			);
+			assert(!hasStatement(JSON.stringify(statement), statement), 'quoted native route refused');
+			assert(!hasStatement('-- ' + statement, statement), 'commented route refused');
+			if (statement.includes('ManifestMenu.')) {
+				const changed = native.replace(
+					statement,
+					statement.replace('ManifestMenu.', 'Foreign.ManifestMenu.')
+				);
+				assert(!hasStatement(changed, statement), 'foreign renderer cannot own Debug');
+			}
+		}
+		for (const [name, statements] of [
+			[
+				'debug_source',
+				[
+					'local root = renderer.get_root()',
+					'local top, children = rawget(root, "top_level"), rawget(root, "debug_menu")',
+					'if not debug_dense(top, true) or not debug_dense(children, true) then return nil end',
+					'local fields = {}',
+					'return root, top, children, parent, fields'
+				]
+			],
+			[
+				'debug_dense',
+				[
+					'if type(value) ~= "table" or getmetatable(value) ~= nil then return false end',
+					'return count == maximum'
+				]
+			],
+			['debug_parent_unchanged', ['return true']]
+		]) {
+			const definition =
+				name === 'debug_source'
+					? 'local function debug_source(renderer, platform)'
+					: name === 'debug_dense'
+						? 'local function debug_dense(value, records)'
+						: 'local function debug_parent_unchanged(parent, fields)';
+			const actual = ownerBody(source, definition);
+			assert.throws(
+				() => ownerBody('if false then\n' + source + '\nend', definition),
+				/physical native Debug owner/
+			);
+			for (const statement of statements)
+				assert(hasStatement(actual, statement), 'actual raw structural helper ' + statement);
+			assert.throws(
+				() => ownerBody(source.replace(definition, '-- ' + definition), definition),
+				/physical native Debug owner/
+			);
+			assert.throws(
+				() => ownerBody(source + '\n' + definition + '\nend\n', definition),
+				/physical native Debug owner/
+			);
+		}
+		const withdrawn =
+			source.replace(finish, 'return nil') +
+			'\nlocal function unused_debug_owner()\n' +
+			finish +
+			'\nend\n';
+		assert(
+			!hasStatement(
+				ownerBody(
+					driver === 'hs'
+						? ownerBody(withdrawn, 'function M.generate(ctx, menu_mods, actions)')
+						: withdrawn,
+					signature
+				),
+				finish
+			),
+			'unused function cannot lend parent publication'
+		);
+		const physicalSignature =
+			driver === 'hs'
+				? source.match(/^\s*\["debug"\]\s*=\s*function\(\)/m)[0].trimStart()
+				: signature;
+		assert.throws(
+			() =>
+				ownerBody(
+					driver === 'hs'
+						? ownerBody(
+								source.replace(physicalSignature, '-- ' + physicalSignature),
+								'function M.generate(ctx, menu_mods, actions)'
+							)
+						: source.replace(physicalSignature, '-- ' + physicalSignature),
+					signature
+				),
+			/physical native Debug owner/
+		);
+	}
+	console.log(
+		'[OK] Debug: unique typed parent, actual structural admission and retained full-choice native routes.'
+	);
+})();
+// Configuration keeps the real command renderer, with source-presence admission around the completed child.
+(function checkDeclaredConfigurationParents() {
+	const assert = require('node:assert/strict');
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const fs = require('node:fs');
+	const path = require('node:path');
+	const base = path.resolve(__dirname, '../..', 'static/ergopti_plus');
+	const menu = JSON.parse(
+		fs.readFileSync(path.join(base, '_shared/modules/menu/menu_manifest.json'), 'utf8')
+	);
+	assert.deepEqual(
+		menu.top_level.filter((row) => row.id === 'configuration'),
+		[{ type: 'group', id: 'configuration', i18n: 'menu.configuration.title', rows: [] }]
+	);
+	const hand = JSON.parse(
+		fs.readFileSync(path.join(base, '_shared/tests/corpus/menus/configuration_parent.json'), 'utf8')
+	);
+	for (const code of ['en', 'fr']) {
+		const locale = JSON.parse(
+			fs.readFileSync(path.join(base, '_shared/data/locales', code + '.json'), 'utf8')
+		);
+		assert.equal(hand[code].parent, locale['menu.configuration.title']);
+		assert.deepEqual(hand[code].children, [
+			locale['common.restore_recommended'],
+			locale['common.clear_to_system'],
+			'-',
+			locale['menu.global.clean_unused_keys'],
+			'-',
+			locale['menu.global.config_folder'],
+			locale['menu.global.setup_wizard']
+		]);
+	}
+	function tokenDepths(tokens) {
+		let depth = 0,
+			awaitingDo = 0;
+		return tokens.map((token, index) => {
+			const before = depth;
+			if (
+				token.kind !== 'identifier' ||
+				(['.', ':'].includes(tokens[index - 1]?.value) &&
+					!(tokens[index - 1]?.value === ':' && tokens[index - 2]?.value === ':'))
+			)
+				return before;
+			if (['function', 'if', 'for', 'while', 'repeat'].includes(token.value)) {
+				depth++;
+				if (['for', 'while'].includes(token.value)) awaitingDo++;
+			} else if (token.value === 'do') {
+				if (awaitingDo) awaitingDo--;
+				else depth++;
+			} else if (['end', 'until'].includes(token.value)) depth--;
+			return before;
+		});
+	}
+	function ownerBody(source, signature) {
+		const tokens = scriptTokens(source, '.lua');
+		const wanted = scriptTokens(signature, '.lua');
+		const sourceDepths = tokenDepths(tokens);
+		const bodies = [];
+		for (let start = 0; start < tokens.length; start++) {
+			if (sourceDepths[start] !== 0) continue;
+			if (
+				source
+					.slice(source.lastIndexOf('\n', tokens[start].start - 1) + 1, tokens[start].start)
+					.trim()
+			)
+				continue;
+			if (
+				!wanted.every(
+					(token, offset) =>
+						tokens[start + offset]?.kind === token.kind &&
+						tokens[start + offset]?.value === token.value
+				)
+			)
+				continue;
+			// String identity is the physical simple Lua spelling, not an undecoded alias.
+			if (
+				!wanted.every(
+					(token, offset) =>
+						token.kind !== 'string' ||
+						source.slice(tokens[start + offset].start, tokens[start + offset].end) ===
+							signature.slice(token.start, token.end)
+				)
+			)
+				continue;
+			const blocks = ['function'];
+			let awaitingDo = 0;
+			for (let index = start + wanted.length; index < tokens.length; index++) {
+				const token = tokens[index];
+				if (
+					token.kind !== 'identifier' ||
+					(['.', ':'].includes(tokens[index - 1]?.value) &&
+						!(tokens[index - 1]?.value === ':' && tokens[index - 2]?.value === ':'))
+				)
+					continue;
+				if (['function', 'if', 'for', 'while', 'repeat'].includes(token.value)) {
+					blocks.push(token.value);
+					if (['for', 'while'].includes(token.value)) awaitingDo++;
+				} else if (token.value === 'do') {
+					if (awaitingDo) awaitingDo--;
+					else blocks.push('do');
+				} else if (token.value === 'end' || token.value === 'until') {
+					if (token.value === 'until' && blocks.at(-1) !== 'repeat')
+						throw new Error('invalid actual Lua owner');
+					blocks.pop();
+					if (!blocks.length) {
+						bodies.push(source.slice(tokens[start + wanted.length - 1].end, token.start));
+						break;
+					}
+				}
+			}
+		}
+		assert.equal(bodies.length, 1, 'one complete physical native Configuration owner');
+		return bodies[0];
+	}
+	function hasStatement(source, statement, requiredDepth = 0) {
+		const tokens = scriptTokens(source, '.lua');
+		const wanted = scriptTokens(statement, '.lua');
+		let depth = 0,
+			awaitingDo = 0;
+		const depths = tokens.map((token, index) => {
+			const before = depth;
+			if (
+				token.kind !== 'identifier' ||
+				(['.', ':'].includes(tokens[index - 1]?.value) &&
+					!(tokens[index - 1]?.value === ':' && tokens[index - 2]?.value === ':'))
+			)
+				return before;
+			if (['function', 'if', 'for', 'while', 'repeat'].includes(token.value)) {
+				depth++;
+				if (['for', 'while'].includes(token.value)) awaitingDo++;
+			} else if (token.value === 'do') {
+				if (awaitingDo) awaitingDo--;
+				else depth++;
+			} else if (['end', 'until'].includes(token.value)) depth--;
+			return before;
+		});
+		return tokens.some(
+			(first, index) =>
+				depths[index] === requiredDepth &&
+				!['.', ':', 'function'].includes(tokens[index - 1]?.value) &&
+				wanted.every((token, offset) => {
+					const actual = tokens[index + offset];
+					return (
+						actual?.kind === token.kind &&
+						actual.value === token.value &&
+						(token.kind !== 'string' ||
+							source.slice(actual.start, actual.end) === statement.slice(token.start, token.end))
+					);
+				})
+		);
+	}
+	for (const [driver, file, signature, child, finish] of [
+		[
+			'hs',
+			'macos/ui/menu/builder.lua',
+			'["configuration"] = function()',
+			'rows',
+			'local row = ManifestMenu.group_row("top_level", "configuration", rows, cfg_ctx.state_getters)'
+		],
+		[
+			'linux',
+			'linux/ui/menu/menu_builder.lua',
+			'local function _build_configuration(ctx)',
+			'rows',
+			'return ManifestMenu.group_row("top_level", "configuration", rows, render_ctx.state_getters)'
+		]
+	]) {
+		const source = fs.readFileSync(path.join(base, file), 'utf8');
+		const outer =
+			driver === 'hs' ? ownerBody(source, 'function M.generate(ctx, menu_mods, actions)') : source;
+		const native = ownerBody(outer, signature);
+		const context = driver === 'hs' ? 'cfg_ctx' : 'render_ctx';
+		const refused = driver === 'hs' ? '{}' : 'nil';
+		const chronology = [
+			`local root, top, section, parent, fields = configuration_source(ManifestMenu, "${driver}")`,
+			`if root == nil then return ${refused} end`,
+			`local ${child} = ManifestMenu.build("configuration_menu", "Configuration", nil, nil, ${context})`,
+			`if not configuration_dense(${child}, true) then return ${refused} end`,
+			`local current_root, current_top, current_section, current_parent = configuration_source(ManifestMenu, "${driver}")`,
+			`if not rawequal(root, current_root) or not rawequal(top, current_top) or not rawequal(section, current_section) or not rawequal(parent, current_parent) or not configuration_parent_unchanged(parent, fields) then return ${refused} end`,
+			finish
+		];
+		const tokens = scriptTokens(native, '.lua'),
+			depths = tokenDepths(tokens);
+		let previous = -1;
+		for (const statement of chronology) {
+			const wanted = scriptTokens(statement, '.lua');
+			const at = tokens.findIndex(
+				(_, index) =>
+					index > previous &&
+					depths[index] === 0 &&
+					wanted.every(
+						(token, offset) =>
+							tokens[index + offset]?.kind === token.kind &&
+							tokens[index + offset]?.value === token.value
+					)
+			);
+			assert(at >= 0, 'actual source/child/recheck/parent chronology');
+			previous = at;
+		}
+		for (const statement of chronology) {
+			assert(
+				hasStatement(native, statement),
+				file + ': actual Configuration source/choice/finished-child owner ' + statement
+			);
+			assert(
+				!hasStatement('if false then\n' + native + '\nend', statement),
+				'conditional data is not the native owner'
+			);
+			assert(!hasStatement(JSON.stringify(statement), statement), 'quoted native route refused');
+			assert(!hasStatement('-- ' + statement, statement), 'commented route refused');
+			if (statement.includes('ManifestMenu.')) {
+				const changed = native.replace(
+					statement,
+					statement.replace('ManifestMenu.', 'Foreign.ManifestMenu.')
+				);
+				assert(!hasStatement(changed, statement), 'foreign renderer cannot own Configuration');
+			}
+		}
+		for (const [name, statements] of [
+			[
+				'configuration_source',
+				[
+					'local root = renderer.get_root()',
+					'local top, children = rawget(root, "top_level"), rawget(root, "configuration_menu")',
+					'if not configuration_dense(top, true) or not configuration_dense(children, true) then return nil end',
+					'local fields = {}',
+					'return root, top, children, parent, fields'
+				]
+			],
+			[
+				'configuration_dense',
+				[
+					'if type(value) ~= "table" or getmetatable(value) ~= nil then return false end',
+					'return count == maximum'
+				]
+			],
+			['configuration_parent_unchanged', ['return true']]
+		]) {
+			const definition =
+				name === 'configuration_source'
+					? 'local function configuration_source(renderer, platform)'
+					: name === 'configuration_dense'
+						? 'local function configuration_dense(value, records)'
+						: 'local function configuration_parent_unchanged(parent, fields)';
+			const actual = ownerBody(source, definition);
+			assert.throws(
+				() => ownerBody('if false then\n' + source + '\nend', definition),
+				/physical native Configuration owner/
+			);
+			for (const statement of statements)
+				assert(hasStatement(actual, statement), 'actual raw structural helper ' + statement);
+			assert.throws(
+				() => ownerBody(source.replace(definition, '-- ' + definition), definition),
+				/physical native Configuration owner/
+			);
+			assert.throws(
+				() => ownerBody(source + '\n' + definition + '\nend\n', definition),
+				/physical native Configuration owner/
+			);
+		}
+		const withdrawn =
+			source.replace(finish, 'return nil') +
+			'\nlocal function unused_configuration_owner()\n' +
+			finish +
+			'\nend\n';
+		assert(
+			!hasStatement(
+				ownerBody(
+					driver === 'hs'
+						? ownerBody(withdrawn, 'function M.generate(ctx, menu_mods, actions)')
+						: withdrawn,
+					signature
+				),
+				finish
+			),
+			'unused function cannot lend parent publication'
+		);
+		const physicalSignature =
+			driver === 'hs'
+				? source.match(/^\s*\["configuration"\]\s*=\s*function\(\)/m)[0].trimStart()
+				: signature;
+		assert.throws(
+			() =>
+				ownerBody(
+					driver === 'hs'
+						? ownerBody(
+								source.replace(physicalSignature, '-- ' + physicalSignature),
+								'function M.generate(ctx, menu_mods, actions)'
+							)
+						: source.replace(physicalSignature, '-- ' + physicalSignature),
+					signature
+				),
+			/physical native Configuration owner/
+		);
+	}
+	console.log(
+		'[OK] Configuration: unique typed parent, actual structural admission and retained full-command native routes.'
+	);
+})();
+
+// Apps keeps the completed native children and admits only its real HS parent.
+(function checkDeclaredAppsParent() {
+	const assert = require('node:assert/strict');
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const fs = require('node:fs');
+	const path = require('node:path');
+	const base = path.resolve(__dirname, '../..', 'static/ergopti_plus');
+	const menu = JSON.parse(
+		fs.readFileSync(path.join(base, '_shared/modules/menu/menu_manifest.json'), 'utf8')
+	);
+	const hand = JSON.parse(
+		fs.readFileSync(path.join(base, '_shared/tests/corpus/menus/apps_parent.json'), 'utf8')
+	);
+	assert.deepEqual(
+		menu.top_level.filter((row) => row.id === 'apps'),
+		[hand.row]
+	);
+	assert.deepEqual(hand.platform_presence, { hs: true, ahk: false, linux: false });
+	assert.equal(Object.keys(hand.captions).length, 21);
+	for (const [code, caption] of Object.entries(hand.captions)) {
+		assert.equal(
+			JSON.parse(fs.readFileSync(path.join(base, '_shared/data/locales', code + '.json'), 'utf8'))[
+				'menu.apps.title'
+			],
+			caption
+		);
+	}
+	function tokenDepths(tokens) {
+		let depth = 0,
+			awaitingDo = 0;
+		return tokens.map((token, index) => {
+			const before = depth;
+			if (
+				token.kind !== 'identifier' ||
+				(['.', ':'].includes(tokens[index - 1]?.value) &&
+					!(tokens[index - 1]?.value === ':' && tokens[index - 2]?.value === ':'))
+			)
+				return before;
+			if (['function', 'if', 'for', 'while', 'repeat'].includes(token.value)) {
+				depth++;
+				if (['for', 'while'].includes(token.value)) awaitingDo++;
+			} else if (token.value === 'do') {
+				if (awaitingDo) awaitingDo--;
+				else depth++;
+			} else if (['end', 'until'].includes(token.value)) depth--;
+			return before;
+		});
+	}
+	function ownerBody(source, signature) {
+		const tokens = scriptTokens(source, '.lua');
+		const wanted = scriptTokens(signature, '.lua');
+		const sourceDepths = tokenDepths(tokens);
+		const bodies = [];
+		for (let start = 0; start < tokens.length; start++) {
+			if (sourceDepths[start] !== 0) continue;
+			if (
+				source
+					.slice(source.lastIndexOf('\n', tokens[start].start - 1) + 1, tokens[start].start)
+					.trim()
+			)
+				continue;
+			if (
+				!wanted.every(
+					(token, offset) =>
+						tokens[start + offset]?.kind === token.kind &&
+						tokens[start + offset]?.value === token.value
+				)
+			)
+				continue;
+			// String identity is the physical simple Lua spelling, not an undecoded alias.
+			if (
+				!wanted.every(
+					(token, offset) =>
+						token.kind !== 'string' ||
+						source.slice(tokens[start + offset].start, tokens[start + offset].end) ===
+							signature.slice(token.start, token.end)
+				)
+			)
+				continue;
+			const blocks = ['function'];
+			let awaitingDo = 0;
+			for (let index = start + wanted.length; index < tokens.length; index++) {
+				const token = tokens[index];
+				if (
+					token.kind !== 'identifier' ||
+					(['.', ':'].includes(tokens[index - 1]?.value) &&
+						!(tokens[index - 1]?.value === ':' && tokens[index - 2]?.value === ':'))
+				)
+					continue;
+				if (['function', 'if', 'for', 'while', 'repeat'].includes(token.value)) {
+					blocks.push(token.value);
+					if (['for', 'while'].includes(token.value)) awaitingDo++;
+				} else if (token.value === 'do') {
+					if (awaitingDo) awaitingDo--;
+					else blocks.push('do');
+				} else if (token.value === 'end' || token.value === 'until') {
+					if (token.value === 'until' && blocks.at(-1) !== 'repeat')
+						throw new Error('invalid actual Lua owner');
+					blocks.pop();
+					if (!blocks.length) {
+						bodies.push(source.slice(tokens[start + wanted.length - 1].end, token.start));
+						break;
+					}
+				}
+			}
+		}
+		assert.equal(bodies.length, 1, 'one complete physical native Apps owner');
+		return bodies[0];
+	}
+	function hasStatement(source, statement, requiredDepth = 0) {
+		const tokens = scriptTokens(source, '.lua');
+		const wanted = scriptTokens(statement, '.lua');
+		let depth = 0,
+			awaitingDo = 0;
+		const depths = tokens.map((token, index) => {
+			const before = depth;
+			if (
+				token.kind !== 'identifier' ||
+				(['.', ':'].includes(tokens[index - 1]?.value) &&
+					!(tokens[index - 1]?.value === ':' && tokens[index - 2]?.value === ':'))
+			)
+				return before;
+			if (['function', 'if', 'for', 'while', 'repeat'].includes(token.value)) {
+				depth++;
+				if (['for', 'while'].includes(token.value)) awaitingDo++;
+			} else if (token.value === 'do') {
+				if (awaitingDo) awaitingDo--;
+				else depth++;
+			} else if (['end', 'until'].includes(token.value)) depth--;
+			return before;
+		});
+		return tokens.some(
+			(first, index) =>
+				depths[index] === requiredDepth &&
+				!['.', ':', 'function'].includes(tokens[index - 1]?.value) &&
+				wanted.every((token, offset) => {
+					const actual = tokens[index + offset];
+					return (
+						actual?.kind === token.kind &&
+						actual.value === token.value &&
+						(token.kind !== 'string' ||
+							source.slice(actual.start, actual.end) === statement.slice(token.start, token.end))
+					);
+				})
+		);
+	}
+
+	const source = fs.readFileSync(path.join(base, 'macos/ui/menu/menu_apps.lua'), 'utf8');
+	const signature = 'function M.build(ctx)';
+	const actual = ownerBody(source, signature);
+	const statements = [
+		'local source = apps_source()',
+		'if source == nil then return nil end',
+		'local apps = discover_bundled_apps(ctx)',
+		'local rendered = ManifestMenu.build("apps_menu", "Apps", nil, nil, ctx, {',
+		'if type(rendered) ~= "table" or not apps_source_current(source) then return nil end',
+		'local parent = source.group_row("top_level", "apps", rendered, {})',
+		'if parent == nil or not apps_source_current(source) then return nil end',
+		'return parent'
+	];
+	for (const statement of statements) {
+		assert(hasStatement(actual, statement), 'physical Apps build route: ' + statement);
+		assert(!hasStatement('-- ' + statement, statement), 'comment cannot lend Apps publication');
+		assert(
+			!hasStatement('local decoy = ' + JSON.stringify(statement), statement),
+			'string cannot lend Apps publication'
+		);
+		const withdrawn =
+			source.replace(statement, 'return nil') +
+			'\nlocal function unused_apps_owner()\n' +
+			statement +
+			'\nend\n';
+		assert(
+			!hasStatement(ownerBody(withdrawn, signature), statement),
+			'unused function cannot lend Apps route'
+		);
+	}
+	assert(
+		actual.indexOf(statements[0]) < actual.indexOf(statements[2]),
+		'admission precedes native discovery'
+	);
+	assert.throws(
+		() => ownerBody('if false then\n' + source + '\nend', signature),
+		/physical native Apps owner/
+	);
+	assert.throws(
+		() => ownerBody(source.replace(signature, '-- ' + signature), signature),
+		/physical native Apps owner/
+	);
+	assert.throws(
+		() => ownerBody(source + '\n' + signature + '\nend\n', signature),
+		/physical native Apps owner/
+	);
+	assert(
+		!hasStatement(
+			actual.replace('local parent = source.group_row', 'Foreign.parent = source.group_row'),
+			statements[5]
+		),
+		'foreign field cannot bind parent'
+	);
+	const admission = ownerBody(source, 'local function apps_source()');
+	for (const statement of [
+		'local root = get_root()',
+		'if group_row("top_level", "apps", {}, {}) == nil then return nil end'
+	])
+		assert(hasStatement(admission, statement));
+	const current = ownerBody(source, 'local function apps_source_current(receipt)');
+	assert(hasStatement(current, 'local root = receipt.get_root()'));
+	assert(hasStatement(current, 'return true'));
+	console.log(
+		'[OK] Apps: actual HS-only parent, 21 existing captions, source admission and completed native children.'
+	);
+})();
+// Metrics preserves the native lifecycle and completed children before canonical parent projection.
+(function checkDeclaredMetricsParents() {
+	const assert = require('node:assert/strict');
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const fs = require('node:fs');
+	const path = require('node:path');
+	const base = path.resolve(__dirname, '../..', 'static/ergopti_plus');
+	const menu = JSON.parse(
+		fs.readFileSync(path.join(base, '_shared/modules/menu/menu_manifest.json'), 'utf8')
+	);
+	assert.deepEqual(
+		menu.top_level.filter((row) => row.id === 'metrics'),
+		[
+			{
+				type: 'group',
+				id: 'metrics',
+				i18n: 'menu.metrics.title',
+				rows: [],
+				checked_when: ['keylogger_enabled'],
+				greyed_when_paused: true
+			}
+		]
+	);
+	const hand = JSON.parse(
+		fs.readFileSync(path.join(base, '_shared/tests/corpus/menus/metrics_parent.json'), 'utf8')
+	);
+	for (const code of ['en', 'fr']) {
+		const locale = JSON.parse(
+			fs.readFileSync(path.join(base, '_shared/data/locales', code + '.json'), 'utf8')
+		);
+		assert.equal(hand[code], locale['menu.metrics.title']);
+	}
+	function tokenDepths(tokens) {
+		let depth = 0,
+			awaitingDo = 0;
+		return tokens.map((token, index) => {
+			const before = depth;
+			if (
+				token.kind !== 'identifier' ||
+				(['.', ':'].includes(tokens[index - 1]?.value) &&
+					!(tokens[index - 1]?.value === ':' && tokens[index - 2]?.value === ':'))
+			)
+				return before;
+			if (['function', 'if', 'for', 'while', 'repeat'].includes(token.value)) {
+				depth++;
+				if (['for', 'while'].includes(token.value)) awaitingDo++;
+			} else if (token.value === 'do') {
+				if (awaitingDo) awaitingDo--;
+				else depth++;
+			} else if (['end', 'until'].includes(token.value)) depth--;
+			return before;
+		});
+	}
+	function ownerBody(source, signature) {
+		const tokens = scriptTokens(source, '.lua');
+		const wanted = scriptTokens(signature, '.lua');
+		const sourceDepths = tokenDepths(tokens);
+		const bodies = [];
+		for (let start = 0; start < tokens.length; start++) {
+			if (sourceDepths[start] !== 0) continue;
+			if (
+				source
+					.slice(source.lastIndexOf('\n', tokens[start].start - 1) + 1, tokens[start].start)
+					.trim()
+			)
+				continue;
+			if (
+				!wanted.every(
+					(token, offset) =>
+						tokens[start + offset]?.kind === token.kind &&
+						tokens[start + offset]?.value === token.value
+				)
+			)
+				continue;
+			// String identity is the physical simple Lua spelling, not an undecoded alias.
+			if (
+				!wanted.every(
+					(token, offset) =>
+						token.kind !== 'string' ||
+						source.slice(tokens[start + offset].start, tokens[start + offset].end) ===
+							signature.slice(token.start, token.end)
+				)
+			)
+				continue;
+			const blocks = ['function'];
+			let awaitingDo = 0;
+			for (let index = start + wanted.length; index < tokens.length; index++) {
+				const token = tokens[index];
+				if (
+					token.kind !== 'identifier' ||
+					(['.', ':'].includes(tokens[index - 1]?.value) &&
+						!(tokens[index - 1]?.value === ':' && tokens[index - 2]?.value === ':'))
+				)
+					continue;
+				if (['function', 'if', 'for', 'while', 'repeat'].includes(token.value)) {
+					blocks.push(token.value);
+					if (['for', 'while'].includes(token.value)) awaitingDo++;
+				} else if (token.value === 'do') {
+					if (awaitingDo) awaitingDo--;
+					else blocks.push('do');
+				} else if (token.value === 'end' || token.value === 'until') {
+					if (token.value === 'until' && blocks.at(-1) !== 'repeat')
+						throw new Error('invalid actual Lua owner');
+					blocks.pop();
+					if (!blocks.length) {
+						bodies.push(source.slice(tokens[start + wanted.length - 1].end, token.start));
+						break;
+					}
+				}
+			}
+		}
+		assert.equal(bodies.length, 1, 'one complete physical native Metrics owner');
+		return bodies[0];
+	}
+	function hasStatement(source, statement, requiredDepth = 0) {
+		const tokens = scriptTokens(source, '.lua');
+		const wanted = scriptTokens(statement, '.lua');
+		let depth = 0,
+			awaitingDo = 0;
+		const depths = tokens.map((token, index) => {
+			const before = depth;
+			if (
+				token.kind !== 'identifier' ||
+				(['.', ':'].includes(tokens[index - 1]?.value) &&
+					!(tokens[index - 1]?.value === ':' && tokens[index - 2]?.value === ':'))
+			)
+				return before;
+			if (['function', 'if', 'for', 'while', 'repeat'].includes(token.value)) {
+				depth++;
+				if (['for', 'while'].includes(token.value)) awaitingDo++;
+			} else if (token.value === 'do') {
+				if (awaitingDo) awaitingDo--;
+				else depth++;
+			} else if (['end', 'until'].includes(token.value)) depth--;
+			return before;
+		});
+		return tokens.some(
+			(first, index) =>
+				depths[index] === requiredDepth &&
+				!['.', ':', 'function'].includes(tokens[index - 1]?.value) &&
+				wanted.every((token, offset) => {
+					const actual = tokens[index + offset];
+					return (
+						actual?.kind === token.kind &&
+						actual.value === token.value &&
+						(token.kind !== 'string' ||
+							source.slice(actual.start, actual.end) === statement.slice(token.start, token.end))
+					);
+				})
+		);
+	}
+	for (const [driver, file, signature] of [
+		['hs', 'macos/ui/menu/menu_metrics.lua', 'function M.build(ctx)'],
+		['linux', 'linux/ui/menu/menu_builder.lua', 'local function _build_metrics(ctx)']
+	]) {
+		const source = fs.readFileSync(path.join(base, file), 'utf8');
+		const native = ownerBody(source, signature);
+		const checked =
+			driver === 'hs' ? 'STATE_GETTERS' : '{ keylogger_enabled = function() return on end }';
+		const child = driver === 'hs' ? 'menu' : 'items';
+		const finish = `local projected = ManifestMenu.group_row("top_level", "metrics", ${child}, ${checked})`;
+		const chronology = [
+			`local root, top, section, parent, fields = metrics_source(ManifestMenu, "${driver}")`,
+			driver === 'hs'
+				? 'local menu = ManifestMenu.build("metrics_menu", "Metrics", dyn_handlers, nil, render_ctx, list_providers)'
+				: 'local items = _manifest_metrics_rows(ctx, k)',
+			driver === 'hs'
+				? 'if root == nil or not metrics_dense(menu, true) then return nil end'
+				: 'local on = type(k.is_enabled) == "function" and k.is_enabled() == true',
+			`local current_root, current_top, current_section, current_parent = metrics_source(ManifestMenu, "${driver}")`,
+			'if not rawequal(root, current_root) or not rawequal(top, current_top) or not rawequal(section, current_section) or not rawequal(parent, current_parent) or not metrics_parent_unchanged(parent, fields) then return nil end',
+			finish,
+			`current_root, current_top, current_section, current_parent = metrics_source(ManifestMenu, "${driver}")`,
+			'if not rawequal(root, current_root) or not rawequal(top, current_top) or not rawequal(section, current_section) or not rawequal(parent, current_parent) or not metrics_parent_unchanged(parent, fields) then return nil end',
+			'return projected'
+		];
+		const tokens = scriptTokens(native, '.lua'),
+			depths = tokenDepths(tokens);
+		let previous = -1;
+		for (const statement of chronology) {
+			assert(hasStatement(native, statement), 'actual native Metrics route ' + statement);
+			const wanted = scriptTokens(statement, '.lua');
+			const at = tokens.findIndex(
+				(_, index) =>
+					index > previous &&
+					depths[index] === 0 &&
+					wanted.every(
+						(token, offset) =>
+							tokens[index + offset]?.kind === token.kind &&
+							tokens[index + offset]?.value === token.value
+					)
+			);
+			assert(at > previous, 'actual lifecycle/child/final parent chronology');
+			previous = at;
+			assert(!hasStatement(JSON.stringify(statement), statement), 'quoted owner refused');
+			assert(!hasStatement('-- ' + statement, statement), 'comment owner refused');
+			if (statement.includes('ManifestMenu.'))
+				assert(
+					!hasStatement(statement.replace('ManifestMenu.', 'Foreign.ManifestMenu.'), statement),
+					'foreign renderer refused'
+				);
+		}
+		if (driver === 'hs') {
+			const firstPhase = chronology[1];
+			const before = native.slice(0, native.indexOf(firstPhase));
+			assert(
+				!hasStatement(before, 'if root == nil then return nil end'),
+				'source capture must not bypass WPM cleanup'
+			);
+			const lifecycle = ownerBody(
+				native,
+				'local function sync_wpm_visibility(state_key, label, module, ...)'
+			);
+			assert(
+				hasStatement(lifecycle, 'if state[state_key] and not paused then'),
+				'unchanged shared WPM pause gate'
+			);
+			assert(
+				hasStatement(
+					native,
+					'sync_wpm_visibility("keylogger_menubar_wpm", "WPM menubar", WpmMenubar)',
+					1
+				)
+			);
+			assert(
+				hasStatement(
+					native,
+					'sync_wpm_visibility("keylogger_float_wpm", "WPM widget", WpmWidget, state.keylogger_float_graph)',
+					1
+				)
+			);
+		} else {
+			let absentPrevious = -1;
+			for (const statement of [
+				'local status_rows = ManifestMenu and ManifestMenu.template_rows("linux_metrics_absent_rows", {}, {}, {})',
+				'local items = ManifestMenu.render_rows(status_rows, "linux_metrics_absent_rows")',
+				'local projected = ManifestMenu.group_row("top_level", "metrics", items, { keylogger_enabled = function() return nil end })',
+				'current_root, current_top, current_section, current_parent = metrics_source(ManifestMenu, "linux")',
+				'if not rawequal(root, current_root) or not rawequal(top, current_top) or not rawequal(section, current_section) or not rawequal(parent, current_parent) or not metrics_parent_unchanged(parent, fields) then return nil end',
+				'return projected'
+			]) {
+				assert(
+					hasStatement(native, statement, 1),
+					'actual absent status materializes once before parent ' + statement
+				);
+				const wanted = scriptTokens(statement, '.lua');
+				const at = tokens.findIndex(
+					(_, index) =>
+						index > absentPrevious &&
+						depths[index] === 1 &&
+						wanted.every(
+							(token, offset) =>
+								tokens[index + offset]?.kind === token.kind &&
+								tokens[index + offset]?.value === token.value
+						)
+				);
+				assert(
+					at > absentPrevious,
+					'absent parent source fence follows all actual GroupRow callbacks'
+				);
+				absentPrevious = at;
+			}
+		}
+		for (const [name, signature, statements] of [
+			[
+				'metrics_source',
+				'local function metrics_source(renderer, platform)',
+				[
+					'local ok, root = pcall(renderer.get_root)',
+					'if not ok then return nil end',
+					'local top, children = rawget(root, "top_level"), rawget(root, "metrics_menu")',
+					'if not metrics_dense(top, true) or not metrics_dense(children, true) then return nil end',
+					'return root, top, children, parent, fields'
+				]
+			],
+			[
+				'metrics_dense',
+				'local function metrics_dense(value, records)',
+				[
+					'if type(value) ~= "table" or getmetatable(value) ~= nil then return false end',
+					'return count == maximum'
+				]
+			],
+			[
+				'metrics_parent_unchanged',
+				'local function metrics_parent_unchanged(parent, fields)',
+				['return true']
+			]
+		]) {
+			const body = ownerBody(source, signature);
+			for (const statement of statements)
+				assert(hasStatement(body, statement), 'actual raw structural helper ' + name);
+			assert.throws(
+				() => ownerBody('if false then\n' + source + '\nend', signature),
+				/physical native Metrics owner/
+			);
+			assert.throws(
+				() => ownerBody(source.replace(signature, '-- ' + signature), signature),
+				/physical native Metrics owner/
+			);
+			assert.throws(
+				() => ownerBody(source + '\n' + signature + '\nend\n', signature),
+				/physical native Metrics owner/
+			);
+		}
+		const withdrawn =
+			source.replace(finish, 'return nil') +
+			'\nlocal function unused_metrics_owner()\n' +
+			finish +
+			'\nend\n';
+		assert(
+			!hasStatement(ownerBody(withdrawn, signature), finish),
+			'unused function cannot lend parent projection'
+		);
+	}
+	console.log(
+		'[OK] Metrics: lifecycle-preserving structural source fences, genuine completed children and singleton checked ABI.'
+	);
+})();
+
+(function declaredCommandLiteralPrefixesKeepTheirFinalCaption() {
+	const assert = require('node:assert/strict');
+	const fs = require('node:fs');
+	const path = require('node:path');
+	const os = require('node:os');
+	const { spawnSync } = require('node:child_process');
+	const base = REPO_ROOT;
+	const candidate = REPO_ROOT;
+	const corpusPath = path.join(SHARED, 'tests/corpus/menus/command_literal_prefixes.json');
+	const availability = require(path.join(candidate, 'tools/lib/menu-row-availability.cjs'));
+	const corpus = JSON.parse(fs.readFileSync(corpusPath, 'utf8'));
+	const locale = JSON.parse(
+		fs.readFileSync(path.join(base, 'static/ergopti_plus/_shared/data/locales/en.json'), 'utf8')
+	);
+	const invalid = [false, 7, [], {}, null, '\n', '\t', '\0', '\x7f', '\ud800', '\udfff'];
+	for (const value of invalid) {
+		const row = {
+			type: 'command',
+			id: 'reset',
+			i18n: 'menu.hotstrings.magic_key_reset',
+			label_prefix: value
+		};
+		assert.throws(
+			() => availability.validateChildTemplates({ prefix_frame: [row] }),
+			/literal label_prefix/
+		);
+	}
+	for (const type of ['check', 'group', 'label', 'section_header', 'list', '---', 'choice']) {
+		assert.throws(
+			() =>
+				availability.validateChildTemplates({
+					prefix_frame: [
+						{ type, id: 'reset', i18n: 'menu.hotstrings.magic_key_reset', label_prefix: '' }
+					]
+				}),
+			/literal label_prefix/
+		);
+	}
+	availability.validateChildTemplates({ prefix_frame: corpus.rows }, (key) => locale[key]);
+	const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti command prefix '));
+	try {
+		for (const rel of [
+			'tools/build/build-menu-manifest.js',
+			'tools/lib/paths.cjs',
+			'static/ergopti_plus/_shared/modules/updater/schedule.js',
+			'static/ergopti_plus/_shared/data/locales/en.json'
+		]) {
+			const destination = path.join(fixture, rel);
+			fs.mkdirSync(path.dirname(destination), { recursive: true });
+			fs.copyFileSync(path.join(base, rel), destination);
+		}
+		fs.copyFileSync(
+			path.join(candidate, 'tools/lib/menu-row-availability.cjs'),
+			path.join(fixture, 'tools/lib/menu-row-availability.cjs')
+		);
+		fs.cpSync(
+			path.join(base, 'node_modules/smol-toml'),
+			path.join(fixture, 'node_modules/smol-toml'),
+			{ recursive: true, dereference: true }
+		);
+		fs.writeFileSync(path.join(fixture, 'package.json'), '{"type":"module"}\n');
+		const manifest = path.join(
+			fixture,
+			'static/ergopti_plus/_shared/modules/features/manifest.toml'
+		);
+		const output = path.join(
+			fixture,
+			'static/ergopti_plus/_shared/modules/menu/menu_manifest.json'
+		);
+		fs.mkdirSync(path.dirname(manifest), { recursive: true });
+		fs.mkdirSync(path.dirname(output), { recursive: true });
+		const toml = (rows) =>
+			rows
+				.map(
+					(row) =>
+						'\n[[menu.prefix_frame]]\n' +
+						Object.entries(row)
+							.map(
+								([key, value]) =>
+									key +
+									' = ' +
+									(value && !Array.isArray(value) && typeof value === 'object'
+										? '{}'
+										: JSON.stringify(value).replace(/\x7f/g, '\\u007f'))
+							)
+							.join('\n') +
+						'\n'
+				)
+				.join('');
+		const compile = (rows) => {
+			fs.writeFileSync(manifest, toml(rows));
+			return spawnSync(process.execPath, ['tools/build/build-menu-manifest.js'], {
+				cwd: fixture,
+				encoding: 'utf8',
+				timeout: 30000
+			});
+		};
+		let result = compile(corpus.rows);
+		assert.equal(result.status, 0, result.stderr);
+		assert.deepEqual(JSON.parse(fs.readFileSync(output, 'utf8')).prefix_frame, corpus.rows);
+		const accepted = fs.readFileSync(output);
+		const rejected = [];
+		for (const value of [false, 7, [], {}, '\n', '\t', '\0', '\x7f']) {
+			const rows = structuredClone(corpus.rows);
+			rows[0].label_prefix = value;
+			result = compile(rows);
+			assert.notEqual(result.status, 0, JSON.stringify(value));
+			assert.match(
+				result.stderr,
+				/literal label_prefix/,
+				'actual admission predicate refused this declaration'
+			);
+			assert.deepEqual(
+				fs.readFileSync(output),
+				accepted,
+				'refusal leaves the accepted output exact'
+			);
+			rejected.push(value);
+		}
+		console.log(
+			'[OK] command literal prefixes: exact hand source, strict Unicode and real compiler refusal preserve prior output.'
+		);
+	} finally {
+		fs.rmSync(fixture, { recursive: true, force: true });
+	}
+})();
+
+(function completeMagicTriggerFrameUsesItsActualNativeProviders() {
+	const assert = require('node:assert/strict');
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const { publishesMenuTemplate } = require('../lib/menu-shared-delegation.cjs');
+	const root = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	assert.deepEqual(root.hotstrings_magic_trigger_frame, [
+		{
+			type: 'command',
+			id: 'magic_key_config_native',
+			command: 'magic_key_change',
+			i18n: 'menu.hotstrings.magic_key_prefix',
+			platforms: ['ahk', 'hs'],
+			unavailable: 'hide',
+			caption_getter: 'magic_key_value',
+			caption_layout: 'prefix',
+			caption_joiner: '',
+			disabled_when: ['magic_key_ready']
+		},
+		{
+			type: 'command',
+			id: 'magic_key_config_linux',
+			command: 'magic_key_change',
+			i18n: 'menu.hotstrings.magic_key',
+			platforms: ['linux'],
+			unavailable: 'hide',
+			caption_getter: 'magic_key_value',
+			caption_layout: 'prefix',
+			caption_joiner: ' : '
+		},
+		{ type: 'list', id: 'magic_key_reset_if_custom', platforms: ['linux'], unavailable: 'hide' }
+	]);
+	assert.deepEqual(root.hotstrings_magic_trigger_reset, [
+		{
+			type: 'command',
+			id: 'magic_key_reset',
+			i18n: 'menu.hotstrings.magic_key_reset',
+			platforms: ['linux'],
+			unavailable: 'hide',
+			label_prefix: '    '
+		}
+	]);
+	function body(source, signature, extension) {
+		const tokens = scriptTokens(source, extension),
+			wanted = scriptTokens(signature, extension),
+			found = [];
+		let depth = 0,
+			waiting = 0;
+		for (let at = 0; at < tokens.length; at++) {
+			const token = tokens[at];
+			if (
+				depth === 0 &&
+				wanted.every(
+					(part, offset) =>
+						tokens[at + offset]?.kind === part.kind && tokens[at + offset]?.value === part.value
+				)
+			) {
+				let stack = 1,
+					awaits = 0;
+				for (let index = at + wanted.length; index < tokens.length; index++) {
+					const part = tokens[index];
+					if (extension === '.ahk') {
+						if (part.kind === 'symbol' && part.value === '{') stack++;
+						if (part.kind === 'symbol' && part.value === '}') stack--;
+					} else if (part.kind === 'identifier') {
+						if (['function', 'if', 'for', 'while', 'repeat'].includes(part.value)) {
+							stack++;
+							if (['for', 'while'].includes(part.value)) awaits++;
+						} else if (part.value === 'do') {
+							if (awaits) awaits--;
+							else stack++;
+						} else if (['end', 'until'].includes(part.value)) stack--;
+					}
+					if (!stack) {
+						found.push(source.slice(tokens[at + wanted.length - 1].end, part.start));
+						break;
+					}
+				}
+			}
+			if (extension === '.ahk') {
+				if (token.kind === 'symbol' && token.value === '{') depth++;
+				if (token.kind === 'symbol' && token.value === '}') depth--;
+			} else if (token.kind === 'identifier') {
+				if (['function', 'if', 'for', 'while', 'repeat'].includes(token.value)) {
+					depth++;
+					if (['for', 'while'].includes(token.value)) waiting++;
+				} else if (token.value === 'do') {
+					if (waiting) waiting--;
+					else depth++;
+				} else if (['end', 'until'].includes(token.value)) depth--;
+			}
+		}
+		assert.equal(found.length, 1, 'one actual executable native Magic owner');
+		assert(found[0].trim());
+		return found[0];
+	}
+	function statement(source, expected, extension) {
+		const tokens = scriptTokens(source, extension),
+			wanted = scriptTokens(expected, extension);
+		return tokens.some((_, index) =>
+			wanted.every(
+				(token, offset) =>
+					tokens[index + offset]?.kind === token.kind &&
+					tokens[index + offset]?.value === token.value
+			)
+		);
+	}
+	// AHK's physical newline terminates return; token adjacency alone is insufficient.
+	// Bind the top-level return and its exact value in the real captured owner body.
+	function nativeReturnRows(owner) {
+		const tokens = scriptTokens(owner, '.ahk');
+		let depth = 0,
+			count = 0;
+		for (let at = 0; at < tokens.length; at++) {
+			const token = tokens[at],
+				value = tokens[at + 1];
+			if (
+				depth === 0 &&
+				token.kind === 'identifier' &&
+				token.value === 'return' &&
+				value?.kind === 'identifier' &&
+				value.value === 'Rows' &&
+				at + 2 === tokens.length &&
+				/^[ \t]+$/.test(owner.slice(token.end, value.start))
+			)
+				count++;
+			if (token.kind === 'symbol' && token.value === '{') depth++;
+			if (token.kind === 'symbol' && token.value === '}') depth--;
+		}
+		return count === 1;
+	}
+	for (const [relative, extension, signature, required] of [
+		[
+			'windows/ui/menu/menu_hotstrings.ahk',
+			'.ahk',
+			'_HS_MagicKeyRows() {',
+			[
+				'Map("magic_key_change", MagicKeyEditor)',
+				'Map("magic_key_value", () => ScriptInformation["MagicKey"], "magic_key_ready", () => true)',
+				'return Rows'
+			]
+		],
+		[
+			'macos/ui/menu/menu_hotstrings_management.lua',
+			'.lua',
+			'function M.build_management(ctx)',
+			[
+				'local magic_key_action = function()',
+				'magic_key_change = magic_key_action',
+				'magic_key_value = function() return magic_key_value end',
+				'if not items or not magic_frame_current(ManifestMenu, source) then return {} end',
+				'if hs_paused then for _, item in ipairs(items) do item.action = nil end end'
+			]
+		],
+		[
+			'linux/ui/menu/menu_builder.lua',
+			'.lua',
+			'local function _manifest_hotstring_rows(ctx, config)',
+			[
+				'local current = MagicKey.get()',
+				'local customised = MagicKey.is_customised()',
+				'magic_key_change = change, magic_key_reset = reset',
+				'if not customised then return {} end',
+				'ManifestMenu.template_rows("hotstrings_magic_trigger_reset", { magic_key_reset = reset }, {}, {})',
+				'if not reset_rows or not magic_frame_current(ManifestMenu, reset_source) then return nil end',
+				'if not rows or not magic_frame_current(ManifestMenu, source) then return {} end'
+			]
+		]
+	]) {
+		const source = readFileSync(resolve(SHARED, '..', relative), 'utf8');
+		const owner = body(source, signature, extension);
+		assert(
+			publishesMenuTemplate(owner, extension, 'hotstrings_magic_trigger_frame'),
+			'real owning frame consumption'
+		);
+		for (const wanted of required)
+			assert(statement(owner, wanted, extension), 'real executable binding ' + wanted);
+		if (extension === '.ahk') {
+			assert(
+				nativeReturnRows(owner),
+				'the actual native provider returns its rows on one physical statement'
+			);
+			const tokens = scriptTokens(owner, '.ahk');
+			const returnAt = tokens.findIndex(
+				(token, index) =>
+					token.kind === 'identifier' &&
+					token.value === 'return' &&
+					tokens[index + 1]?.kind === 'identifier' &&
+					tokens[index + 1]?.value === 'Rows'
+			);
+			assert(returnAt >= 0);
+			const changed =
+				owner.slice(0, tokens[returnAt].end) + '\n' + owner.slice(tokens[returnAt + 1].start);
+			assert(
+				!nativeReturnRows(changed),
+				'a genuine physical return newline must not lend a rows handoff'
+			);
+			assert(
+				!nativeReturnRows("Data := '\n(\n" + owner + "\n)'"),
+				'literal rows return cannot lend executable credit'
+			);
+			assert(
+				!nativeReturnRows('unused() {\n' + owner + '\n}\nreturn []'),
+				'an unused nested body cannot lend the return'
+			);
+		}
+		const delegate =
+			extension === '.ahk' ? 'MenuRenderer_TemplateRows' : 'ManifestMenu.template_rows';
+		const removed = owner.replaceAll(delegate, 'withdrawn_magic_template');
+		assert(!publishesMenuTemplate(removed, extension, 'hotstrings_magic_trigger_frame'));
+		const quoted =
+			extension === '.lua' ? 'local data = [=[' + owner + ']=]' : "Data := '\n(\n" + owner + "\n)'";
+		assert(
+			!publishesMenuTemplate(quoted, extension, 'hotstrings_magic_trigger_frame'),
+			'quoted data is not the provider'
+		);
+		const foreign =
+			extension === '.lua'
+				? source.replace(
+						signature,
+						signature + ' return nil end\nlocal function unused_magic_owner()'
+					)
+				: source.replace(signature, signature + ' return []\n}\nunused_magic_owner() {');
+		assert(
+			!publishesMenuTemplate(
+				body(foreign, signature, extension),
+				extension,
+				'hotstrings_magic_trigger_frame'
+			),
+			'foreign body cannot lend the real provider'
+		);
+	}
+	console.log(
+		'[OK] complete Magic trigger: exact declared captions/order and executable native binding/refusal owners.'
 	);
 })();

@@ -155,4 +155,48 @@ helpers.describe("Linux shared Debug log choices", function()
 
 end)
 
+
+
+--- Runs the shared source-presence contract through the actual complete native tray.
+--- @param body function Independent native row/source assertions.
+local function debug_parent_fixture(body)
+	-- These real modules capture one another. A preceding registered fixture may
+	-- reload locale alone; retain a fresh coherent native chain for this case.
+	local names = { "locale.core", "infra.locale", "infra.i18n", "infra.manifest_menu", "ui.menu.menu_builder" }
+	local previous, original_i18n_safe = {}, rawget(_G, "i18n_safe")
+	for module, value in pairs(package.loaded) do previous[module] = value end
+	for _, module in ipairs(names) do rawset(package.loaded, module, nil) end
+	local completed, failure = xpcall(function()
+	-- Complete the genuine discovery/read phase before a requested test locale;
+	-- the Language child must not lazily initialize it back to the saved locale.
+	require("infra.i18n").init()
+	local native = helpers.load_module("ui.menu.menu_builder")
+	local renderer, locale = require("infra.manifest_menu"), require("infra.locale")
+	local language = locale.current_locale()
+	local callbacks = {}
+	local function setter(value) callbacks[#callbacks + 1] = value; return false end
+	local context = { log_level = "INFO", on_set_log_level = setter,
+		on_toggle_pause = function() end, on_quit = function() end,
+		config = { get_groups = function() return {} end, get_categories = function() return {} end,
+			language_packs = function() return {} end, resolve = function() return { delay = 0.75, color = "#1e88e5", has_override = false } end,
+			get_global_delay = function() return 0.75 end, has_global_delay_override = function() return false end } }
+	local function build(paused) context.paused = paused; return native.build(context) end
+	local ok, detail = xpcall(function() body(renderer, build, callbacks, locale) end, debug.traceback)
+	locale.set_locale(language)
+	if not ok then error(detail, 0) end
+	end, debug.traceback)
+	for module in pairs(package.loaded) do if previous[module] == nil then rawset(package.loaded, module, nil) end end
+	for module, value in pairs(previous) do rawset(package.loaded, module, value) end
+	rawset(_G, "i18n_safe", original_i18n_safe)
+	helpers.assert_true(rawequal(rawget(_G, "i18n_safe"), original_i18n_safe))
+	for _, module in ipairs(names) do helpers.assert_true(rawequal(rawget(package.loaded, module), previous[module]), module) end
+	if not completed then error(failure, 0) end
+end
+
+local debug_parent_file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/debug_parent.json"), "rb"))
+local debug_parent_raw = debug_parent_file:read("*a")
+debug_parent_file:close()
+require("test.debug_parent_contract").register(helpers, debug_parent_fixture,
+	assert(require("json").decode(debug_parent_raw)), "linux")
+
 return true

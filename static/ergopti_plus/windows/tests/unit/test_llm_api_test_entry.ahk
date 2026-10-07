@@ -628,3 +628,62 @@ _LAT_EmptyStatusRefusal() {
 	}
 }
 Test("API empty status refuses missing and unbound owners (llm-empty-status)", _LAT_EmptyStatusRefusal)
+
+
+/** The existing native API list consumes the complete fixed Edit declaration. */
+_LAT_CompleteEditCorpus() {
+	global _SharedDir
+	return JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\llm_complete_presentation_owners.json", "UTF-8"))["api_management"]
+}
+
+_LAT_CompleteEditFrame() {
+	global _LLM_Menu
+	Corpus := _LAT_CompleteEditCorpus()
+	SavedMenu := _LAT_FixtureMenu()
+	Definition := _MR_GetMenuDef(Corpus["section"]), Original := Definition[1]
+	try {
+		Rows := _LLM_Menu_ApiEntriesRows()
+		Position := Rows.Length - 2
+		for Offset, Key in Corpus["keys"] {
+			Row := Rows[Position + Offset - 1]
+			AssertEqual(t(Key), Row["label"], "the independent management order remains Test, Edit, Remove")
+			AssertTrue(HasMethod(Row.Get("action", 0), "Call"), "each actual retained native callback stays callable")
+		}
+		_LLM_Menu["api_entry_id"] := "missing"
+		Rows := _LLM_Menu_ApiEntriesRows()
+		AssertFalse(Rows[Rows.Length - 1].Get("disabled", false), "Edit retains its old lazy callback and no new readiness guard")
+		Definition[1] := Map("type", "command", "id", "api_edit_entry", "i18n", Corpus["mutated_key"],
+			"platforms", Corpus["platforms"], "unavailable", "hide")
+		Rows := _LLM_Menu_ApiEntriesRows()
+		AssertEqual(t(Corpus["mutated_key"]), Rows[Rows.Length - 1]["label"], "the actual native Edit caption comes from its declaration")
+		_LLM_Menu["api_entries"] := []
+		for Row in _LLM_Menu_ApiEntriesRows()
+			AssertFalse(Row.Get("label", "") == t(Corpus["mutated_key"]), "empty entries retain the absence of management rows")
+	} finally {
+		Definition[1] := Original
+		_LAT_RestoreMenu(SavedMenu)
+	}
+}
+Test("complete API Edit frame retains native management order and lazy posture", _LAT_CompleteEditFrame)
+
+_LAT_CompleteEditRefusal() {
+	global _LLM_Menu
+	Corpus := _LAT_CompleteEditCorpus()
+	SavedMenu := _LAT_FixtureMenu()
+	Root := _MM_GetManifestRoot(), Original := Root[Corpus["section"]]
+	try {
+		Root.Delete(Corpus["section"])
+		AssertEqual(0, _LLM_Menu_ApiEntriesRows().Length, "missing Edit declaration refuses the complete list before callbacks")
+		Root[Corpus["section"]] := [Map("type", "command", "id", "unowned_api_edit", "i18n", Corpus["keys"][2])]
+		AssertEqual(0, _LLM_Menu_ApiEntriesRows().Length, "unbound Edit command cannot acquire a native dialog owner")
+		AssertEqual("prod", _LLM_Menu["api_entry_id"])
+		AssertEqual(1, _LLM_Menu["api_entries"].Length, "construction and refusal never edit the actual entry source")
+		Root[Corpus["section"]] := Original
+		Rows := _LLM_Menu_ApiEntriesRows()
+		AssertEqual(t(Corpus["keys"][2]), Rows[Rows.Length - 1]["label"], "exact original declaration repairs the same actual owner")
+	} finally {
+		Root[Corpus["section"]] := Original
+		_LAT_RestoreMenu(SavedMenu)
+	}
+}
+Test("complete API Edit frame refuses withdrawal and repairs its actual owner", _LAT_CompleteEditRefusal)

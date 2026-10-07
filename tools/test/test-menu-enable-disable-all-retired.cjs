@@ -28,6 +28,8 @@
 
 const fs = require('fs');
 const path = require('path');
+const assert = require('node:assert/strict');
+const { scriptTokens } = require('../lib/script-source.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
@@ -80,6 +82,21 @@ const RETIRED_SYMBOLS = {
 		]
 	}
 };
+
+function retiredSymbolUsed(text, name, extension) {
+	if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) return text.includes(name);
+	return scriptTokens(text, extension).some(
+		(token) => ['identifier', 'string'].includes(token.kind) && token.value === name
+	);
+}
+for (const extension of ['.lua', '.ahk']) {
+	for (const name of ['on_enable_all', 'on_disable_all']) {
+		assert.equal(retiredSymbolUsed('extension_' + name.slice(3), name, extension), false);
+		assert.equal(retiredSymbolUsed(name + '()', name, extension), true);
+		assert.equal(retiredSymbolUsed('"' + name + '"', name, extension), true);
+		assert.equal(retiredSymbolUsed('"extension_' + name.slice(3) + '"', name, extension), false);
+	}
+}
 
 const errors = [];
 
@@ -163,7 +180,7 @@ for (const [driver, { ext, names }] of Object.entries(RETIRED_SYMBOLS)) {
 		continue;
 	}
 	for (const name of names) {
-		if (text.includes(name))
+		if (retiredSymbolUsed(text, name, ext))
 			errors.push(`${driver} production source still uses the retired "${name}".`);
 	}
 }
