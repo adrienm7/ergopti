@@ -40,7 +40,9 @@ _ManagedRoutes_NativeDiagnostic(Observation) {
 		return
 	Pattern := "m)^ROUTE_DIAG stage=(load_routes|abi_sizes|compile_server|start_server|vector_lookup|vector_receipt|vector_order|fresh_lookup|fresh_order|unsupported_lookup|unsupported_receipt|settings_read|settings_receipt|server_receipt|cleanup)"
 		. " vector=([0-3]) native_observed=([01]) native_errno=(-?(?:0|[1-9][0-9]{0,9}))"
-		. " status=(unknown|unavailable|invalid_configuration|pac_failed|wpad_failed)`r?$"
+		. " status=(unknown|unavailable|invalid_configuration|pac_failed|wpad_failed)"
+		. " result_shape=(unknown|null|hashtable|array|other) ok=(unknown|true|false)"
+		. " route_count=(-1|0|[1-9][0-9]{0,3}) limits=(unknown|match|mismatch)`r?$"
 	if !RegExMatch(Err, Pattern, &Fact)
 		return
 	; Refuse duplicate observations rather than choosing a later failure frame.
@@ -50,7 +52,12 @@ _ManagedRoutes_NativeDiagnostic(Observation) {
 		return
 	if Fact[3] == "0" && Fact[4] != "0"
 		return
+	if Integer(Fact[8]) < -1 || Integer(Fact[8]) > 4096
+		return
+	if Fact[6] != "hashtable" && (Fact[7] != "unknown" || Fact[8] != "-1" || Fact[9] != "unknown")
+		return
 	FileAppend("::notice title=Windows native route diagnostic::stage=" . Fact[1] . " vector=" . Fact[2]
 		. " native_observed=" . Fact[3] . " native_errno=" . Fact[4]
-		. " status=" . Fact[5] . "`n", "*")
+		. " status=" . Fact[5] . " result_shape=" . Fact[6] . " ok=" . Fact[7]
+		. " route_count=" . Fact[8] . " limits=" . Fact[9] . "`n", "*")
 }

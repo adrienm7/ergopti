@@ -6285,6 +6285,21 @@ group1 branch's unit step is unchanged; the patch is isolated on group6 and
 preserves all other workflow spans, including the French/German audio packages.
 This diagnostic supplies no successful unit, native packaging or cause credit.
 
+Current Windows native run37651111440 at `0b0be55e` reports 10,265 passes
+and five failures, with E2E, package and installation skipped. The previously
+failing integer, ordinal-inventory, CLR layout and held-response paths now pass;
+this does not qualify the full Windows lane. Source-reviewed diagnostics retain
+all original assertions, native calls, 8-second capability budget, 10-second
+receiver budget, cleanup and ephemeral certificate ownership. The canonical
+route fixture now emits only bounded returned shape/Boolean/count/limit facts;
+30 source-bound receiving model controls and 12 genuine portable PowerShell
+routing/projection controls pass, without AHK or WinHTTP native credit. The
+remote TLS service exposes only the first fixed stage/exception family/signed
+HRESULT; the fixture-only curl capability receipt exposes only a cached phase.
+Their actual native receiving is still unrun. None of the five native failures
+is relabelled or waived. Diagnose the next original Windows run before claiming
+a cause or a successful fix; item62 remains open.
+
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard
   layers on all three drivers. Windows and macOS also support their existing

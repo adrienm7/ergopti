@@ -12,6 +12,10 @@ $ManagedRoutesDiagnosticVector=0
 $ManagedRoutesDiagnosticNativeObserved=$false
 $ManagedRoutesDiagnosticNativeErrno=0
 $ManagedRoutesDiagnosticStatus='unknown'
+$ManagedRoutesDiagnosticResultShape='unknown'
+$ManagedRoutesDiagnosticOk='unknown'
+$ManagedRoutesDiagnosticRouteCount=-1
+$ManagedRoutesDiagnosticLimits='unknown'
 $ManagedRoutesDiagnosticAttempted=$false
 # Optional fixed observations only; never read exception messages or input metadata.
 function Set-ManagedRoutesDiagnosticResult {
@@ -19,8 +23,28 @@ function Set-ManagedRoutesDiagnosticResult {
     $script:ManagedRoutesDiagnosticNativeObserved=$false
     $script:ManagedRoutesDiagnosticNativeErrno=0
     $script:ManagedRoutesDiagnosticStatus='unknown'
+    $script:ManagedRoutesDiagnosticResultShape='unknown'
+    $script:ManagedRoutesDiagnosticOk='unknown'
+    $script:ManagedRoutesDiagnosticRouteCount=-1
+    $script:ManagedRoutesDiagnosticLimits='unknown'
     try {
-        if($Result -isnot [hashtable] -or $Result.Receipt -isnot [hashtable]){return}
+        # Closed scalars from the already-returned result; no route metadata.
+        if($null -eq $Result){$script:ManagedRoutesDiagnosticResultShape='null';return}
+        if($Result -is [array]){$script:ManagedRoutesDiagnosticResultShape='array';return}
+        if($Result -isnot [hashtable]){$script:ManagedRoutesDiagnosticResultShape='other';return}
+        $script:ManagedRoutesDiagnosticResultShape='hashtable'
+        if($Result['Ok'] -is [bool]) {
+            $script:ManagedRoutesDiagnosticOk=$(if($Result['Ok']){'true'}else{'false'})
+        }
+        if($Result['Routes'] -is [array] -and $Result['Routes'].Count -le 4096) {
+            $script:ManagedRoutesDiagnosticRouteCount=$Result['Routes'].Count
+        }
+        if(($Result['MaxRoutes'] -is [int] -or $Result['MaxRoutes'] -is [long]) -and
+            ($Result['MaxRedirects'] -is [int] -or $Result['MaxRedirects'] -is [long])) {
+            $script:ManagedRoutesDiagnosticLimits=$(if($Result['MaxRoutes'] -eq 128 -and
+                $Result['MaxRedirects'] -eq 50){'match'}else{'mismatch'})
+        }
+        if($Result.Receipt -isnot [hashtable]){return}
         $Receipt=$Result.Receipt
         if($Receipt.proxy_resolution_status -is [string] -and
             $Receipt.proxy_resolution_status -cin @('unavailable','invalid_configuration','pac_failed','wpad_failed')) {
@@ -39,10 +63,11 @@ function Write-ManagedRoutesDiagnostic {
     if($script:ManagedRoutesDiagnosticAttempted){return}
     $script:ManagedRoutesDiagnosticAttempted=$true
     try {
-        [Console]::Error.WriteLine(('ROUTE_DIAG stage={0} vector={1} native_observed={2} native_errno={3} status={4}' -f
+        [Console]::Error.WriteLine(('ROUTE_DIAG stage={0} vector={1} native_observed={2} native_errno={3} status={4} result_shape={5} ok={6} route_count={7} limits={8}' -f
             $script:ManagedRoutesDiagnosticStage,$script:ManagedRoutesDiagnosticVector,
             [int]$script:ManagedRoutesDiagnosticNativeObserved,$script:ManagedRoutesDiagnosticNativeErrno,
-            $script:ManagedRoutesDiagnosticStatus))
+            $script:ManagedRoutesDiagnosticStatus,$script:ManagedRoutesDiagnosticResultShape,
+            $script:ManagedRoutesDiagnosticOk,$script:ManagedRoutesDiagnosticRouteCount,$script:ManagedRoutesDiagnosticLimits))
     } catch { }
 }
 try {
