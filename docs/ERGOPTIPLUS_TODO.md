@@ -6475,6 +6475,14 @@ receiving clocks/assertions remain unchanged. The independent acquisition floor
 stays36. This fixes the combined setup's failure propagation; actual complete
 Linux qualification must still rerun. Items36/62 and transversal16/38 stay open.
 
+Windows service diagnostics now use the existing native TAP receipt writer.
+The CI-owned AHK process has no reliable console handle; console-only optional
+output can disappear before the retained transcript is printed. The same closed
+stage/kind/HRESULT projection now reaches that transcript and its GitHub notice.
+This changes observation only: every original native assertion, receiving clock,
+retirement requirement and privacy admission stays intact. Genuine receiving
+of this channel remains pending; no native failure is counted as repaired.
+
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard
   layers on all three drivers. Windows and macOS also support their existing

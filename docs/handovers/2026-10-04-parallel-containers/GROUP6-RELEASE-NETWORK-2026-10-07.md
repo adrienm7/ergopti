@@ -318,6 +318,17 @@ signed-acquisition floor stays36. This removes the combined setup's failure
 propagation without borrowing a failed prerequisite as a successful native
 receipt. Complete Linux E2E/package/install receiving is still required.
 
+The feature's84 atomic commits are integrated without squash at091743921.
+Manual37688807101 receives that exact SHA on all three OS lanes without Release.
+Its terminal result is still pending; group6 retains its integration lock.
+
+A subsequent observational correction routes the existing closed Windows service
+diagnostic through \_TestPrint, the canonical native TAP receipt writer. CI reads
+and prints that transcript only after the AHK process exits; console-only
+FileAppend output is not a reliable channel for this process. The admitted
+stage/kind/HRESULT values and all original native assertions/clocks remain
+unchanged. The change has no native repair or receiving credit yet.
+
 ## Remaining CODE and hosted work
 
 - **Windows62:** Join one packaged owned curl attempt engine to both the real
