@@ -5587,6 +5587,15 @@ native closure; these are not official Ollama or corporate-network acceptance.
 Final composed-source, real package/server/pull and installed-format receiving
 remain required before this item can close.
 
+The exact-revision local Git flake request now explicitly admits the depth-one
+CI checkout with `shallow=1`. Genuine Nix2.26.3 receiving preserves four
+independent controls: full-source metadata, the original shallow refusal and
+shallow/full opt-in metadata with identical revision and NAR. Both checkout
+HEADs and source bytes remain clean, and native phase owners close physically.
+All49 existing runner controls remain unchanged. Seven installed-runtime
+product cases and the exact final hosted package result remain unqualified;
+this protocol proof does not establish the hidden historical CI failure cause.
+
 The portable MLX fingerprint mirror now explicitly owns its fake UV route and
 clears inherited proxy, bypass and CA selections. The unchanged27 assertions
 reproduce21 passes/six failures without the old ambient relay, then pass27/0
