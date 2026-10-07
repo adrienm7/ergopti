@@ -42,6 +42,94 @@ permissions:
   contents: read
 
 jobs:
+  # Temporary diagnostic overlay: this independent job supplies compiler facts.
+  # Its refusal/read-only statuses intentionally keep the overall run non-PASS.
+  shortcuts-event-phase-diagnostic:
+    name: 'Temporary Shortcuts compiler and readonly phase observations'
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Prepare Python for diagnostic native nonreaping waits
+        if: always()
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Admit diagnostic native nonreaping Python prerequisites
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+          names = ("waitid", "P_PID", "WEXITED", "WNOHANG", "WNOWAIT", "CLD_EXITED", "CLD_KILLED", "CLD_DUMPED")
+          if sys.platform != "darwin" or sys.version_info < (3, 13):
+              raise RuntimeError("Native nonreaping fixtures require macOS CPython >= 3.13")
+          missing = [name for name in names if not hasattr(os, name)]
+          if missing:
+              raise RuntimeError("Missing native nonreaping APIs: " + ", ".join(missing))
+          print(json.dumps({"python": sys.executable, "version": list(sys.version_info[:3]), "nonreaping_apis": list(names)}, sort_keys=True))
+          PY
+
+      - name: Observe Shortcuts raw readonly transport independently
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/diagnostics/program_actions/run_shortcuts_event_phase_probe.py \
+            --source-root "$GITHUB_WORKSPACE" \
+            --source-sha "$GITHUB_SHA" \
+            --role raw-version \
+            --output "$RUNNER_TEMP/shortcuts-event-phase/raw-version"
+
+      - name: Observe Shortcuts readonly SB phases independently
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/diagnostics/program_actions/run_shortcuts_event_phase_probe.py \
+            --source-root "$GITHUB_WORKSPACE" \
+            --source-sha "$GITHUB_SHA" \
+            --role sb-count \
+            --output "$RUNNER_TEMP/shortcuts-event-phase/sb-count"
+
+      - name: Observe native self-targeted AppleEvent fixture independently
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/diagnostics/program_actions/run_shortcuts_event_phase_probe.py \
+            --source-root "$GITHUB_WORKSPACE" \
+            --source-sha "$GITHUB_SHA" \
+            --role native-fixture \
+            --output "$RUNNER_TEMP/shortcuts-event-phase/native-fixture"
+
+      - name: Require all three diagnostic role receipts
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f "$RUNNER_TEMP/shortcuts-event-phase/raw-version/observation.json"
+          test -f "$RUNNER_TEMP/shortcuts-event-phase/sb-count/observation.json"
+          test -f "$RUNNER_TEMP/shortcuts-event-phase/native-fixture/observation.json"
+
+      - name: Retain mandatory compiler and readonly diagnostic receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shortcuts-event-phase-diagnostic-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: error
+          path: |
+            ${{ runner.temp }}/shortcuts-event-phase/raw-version/observation.json
+            ${{ runner.temp }}/shortcuts-event-phase/sb-count/observation.json
+            ${{ runner.temp }}/shortcuts-event-phase/native-fixture/observation.json
+
   # ─────────────────────────────────────────────────
   # 1) Hammerspoon unit and contract tests
   # ─────────────────────────────────────────────────
