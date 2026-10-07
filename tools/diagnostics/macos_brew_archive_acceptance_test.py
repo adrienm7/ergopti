@@ -617,7 +617,7 @@ class AppleEventBoundaryControls(unittest.TestCase):
                 if arguments == [str(root / "native-appleevent-registration-test")]:
                     judge.assertTrue(options["confined"])
                     return subprocess.CompletedProcess(
-                        arguments, 0, "native_appkit_registration_controls=4\n", ""
+                        arguments, 0, "native_appkit_registration_controls=5\n", ""
                     )
                 if arguments[-1] not in ("success", "denied"):
                     return subprocess.CompletedProcess(arguments, 0, "", "")

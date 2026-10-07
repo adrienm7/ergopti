@@ -1087,7 +1087,7 @@ def _admit_appleevent_boundary(children, repository):
     )
     registration_controls = children.run([str(registration_test)], confined=True)
     require(
-        registration_controls.stdout == "native_appkit_registration_controls=4\n"
+        registration_controls.stdout == "native_appkit_registration_controls=5\n"
         and not registration_controls.stderr,
         "Controlled AppKit registration refusals were not independently admitted",
     )
