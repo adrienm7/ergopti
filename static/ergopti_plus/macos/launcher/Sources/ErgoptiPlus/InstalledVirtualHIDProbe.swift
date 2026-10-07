@@ -84,7 +84,7 @@ enum InstalledVHDProbeNative {
 	}
 }
 
-private struct InstalledVHDFileIdentity: Equatable {
+struct InstalledVHDFileIdentity: Equatable {
 	let device: dev_t, inode: ino_t
 	let mode: mode_t, uid: uid_t, gid: gid_t
 	let size: off_t, modified: time_t, modifiedNS: Int, changed: time_t, changedNS: Int
@@ -96,7 +96,7 @@ private struct InstalledVHDFileIdentity: Equatable {
 		changed = directory ? 0 : s.st_ctimespec.tv_sec; changedNS = directory ? 0 : s.st_ctimespec.tv_nsec
 	}
 }
-private final class InstalledVHDStaticSnapshot {
+final class InstalledVHDStaticSnapshot {
 	struct Node {
 		let fd: Int32, parent: Int32?, name: String, path: String
 		let identity: InstalledVHDFileIdentity
@@ -250,7 +250,7 @@ private final class InstalledVHDStaticSnapshot {
 	}
 }
 
-private struct InstalledVHDReference {
+struct InstalledVHDReference {
 	let role: String, identifier: String, executable: String, version: String
 	let executableHash: String, plistHash: String
 	let daemonHashes: [String: String]
@@ -271,8 +271,18 @@ enum InstalledVirtualHIDProbe {
 		let refused = components.first { $0.status != "observed" }
 		return InstalledVHDProbeReceipt(status: refused?.status ?? "observed", components: components, reason: refused?.reason)
 	}
-	private static func observeComponent(_ url: URL, reference: InstalledVHDReference, boundary: ((InstalledVHDProbeBoundary) throws -> Void)?) -> InstalledVHDComponentObservation {
+	/// Transfers custody before any native acquisition; diagnostics never request this seam.
+	static func retainComponent(_ url: URL, reference: InstalledVHDReference,
+		custody: @escaping (InstalledVHDStaticSnapshot) -> Void,
+		boundary: ((InstalledVHDProbeBoundary) throws -> Void)?) -> InstalledVHDComponentObservation {
+		observeComponent(url, reference: reference, boundary: boundary, custody: custody)
+	}
+
+	private static func observeComponent(_ url: URL, reference: InstalledVHDReference,
+		boundary: ((InstalledVHDProbeBoundary) throws -> Void)?,
+		custody: ((InstalledVHDStaticSnapshot) -> Void)? = nil) -> InstalledVHDComponentObservation {
 		let snapshot = InstalledVHDStaticSnapshot()
+		custody?(snapshot)
 		var result = InstalledVHDComponentObservation(role: reference.role, status: "unverified")
 		func invoke(_ stage: String) throws {
 			do { try boundary?(InstalledVHDProbeBoundary(role: reference.role, stage: stage)) }
@@ -333,10 +343,12 @@ enum InstalledVirtualHIDProbe {
 			result.ordinaryRootOwned = snapshot.ordinaryRootOwned == true ? nil : snapshot.ordinaryRootOwned
 			result.bundleIdentityValid = nil; result.signatureValid = nil
 		}
-		do { try snapshot.closeAll() } catch let failure as InstalledVHDProbeFailure {
-			result.status = failure.status; result.reason = failure.reason; result.errorDomain = failure.domain; result.errorCode = failure.code
-			result.ordinaryRootOwned = nil; result.signatureValid = nil; result.bundleIdentityValid = nil
-		} catch { result.status = "refused"; result.reason = "descriptor_close_failed"; result.ordinaryRootOwned = nil; result.signatureValid = nil }
+		if custody == nil {
+			do { try snapshot.closeAll() } catch let failure as InstalledVHDProbeFailure {
+				result.status = failure.status; result.reason = failure.reason; result.errorDomain = failure.domain; result.errorCode = failure.code
+				result.ordinaryRootOwned = nil; result.signatureValid = nil; result.bundleIdentityValid = nil
+			} catch { result.status = "refused"; result.reason = "descriptor_close_failed"; result.ordinaryRootOwned = nil; result.signatureValid = nil }
+		}
 		return result
 	}
 }

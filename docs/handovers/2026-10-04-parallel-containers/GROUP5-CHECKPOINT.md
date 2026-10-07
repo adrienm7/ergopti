@@ -1725,3 +1725,44 @@ existing source/assertions remain whole. Both Lua ABIs qualify85 focused cases;
 six mutants refuse. Actual native effects, UI, provisioning and production caller
 remain unavailable. Full selected Root verification precedes publication; no
 physical, install or version compatibility proof is inferred. Item31 stays open.
+
+## Retained native VirtualHIDDevice reference qualification
+
+Five independently reviewed paths add a fixed internal native reference owner
+and an ordinary SDK-owned protected fixture. Descriptor custody precedes native
+verification; token currentness rereads held identity, bytes, metadata and original
+signature/protection facts. The default probe and false reference qualification
+stay whole. Thirteen original semantic bodies are byte-conserved:11 protected
+cases run within one real fixture, and2 native ordinary-file denials remain
+individually discovered. Genuine official8.4/8.5/8.6 package inventories were
+frozen before implementation; only fixed8.5 can supply accepted held references.
+
+Portable21 pass normally, explicitly optimized and with inherited optimization.
+Actual Swift, privileged Python/root creation, pkgutil, codesign, ACL acquisition
+and native13 remain unexecuted until exact-source Mac CI. The worker25 and
+SDK30/35/10 budgets are unchanged. Namespace cleanup requires all native owner
+and Guardian retirement, and exact retained preparation/source/root/inventory
+identity; refusal preserves its private stage. A close-error tombstone lasts only
+as long as its owner: dropping that owner does not acknowledge cleanup. Actual
+installed/active DEXT, live broker/client, package readiness, production stable
+leaf and physical input remain unqualified. Full selected Root gates precede
+publication; no default activation or TODO completion follows from this fixture.
+
+The first full Root gate passes365 JavaScript checks and17539 portable Mac
+cases, with native Swift explicitly deferred. Only the two new Python files
+refuse the repository Ruff configuration. An independently reviewed format-only
+amendment preserves both complete ASTs, all21 frozen test ASTs, every Swift byte
+and all three native dependency pins. Corrected format/JS checks and63 focused
+Python executions cover the final bytes; the unchanged portable Mac receipt
+remains separate from native13, which are still unexecuted.
+
+Manual macOS run37573793511 at2a902a2fa terminates failed. Supported artifact
+HTTP Range reads retain complete selected members with stable ETag and CRC,
+without downloading the1.295GB archive or claiming its full-byte SHA. Actual
+XCTest completes401 cases:377 pass,9 fail,15 skip, with29 assertion failures
+and5 unexpected. The canonical verdict remains incomplete with summary=null.
+G5 failures are two owned compilation timeouts, a permission receipt-field
+refusal and TEST-ONLY signing setup refusal. Source phase receipts report no
+compiler failure: ownership/source validation overhead remains under diagnosis.
+Packaging fails, installation is skipped, no release runs. Other native failures
+remain coordinated with their owners; no earlier success qualifies this SHA.

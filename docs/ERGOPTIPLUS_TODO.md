@@ -3537,6 +3537,33 @@ branch, invoker and budget. Unknown stderr remains unclassified. Swift/native
 execution of these additions requires the next exact-source CI. Item31 remains
 partial; no deadline is relaxed or failure attributed to runner capacity.
 
+An internal fixed installed VirtualHIDDevice reference owner now retains actual
+native descriptors before verification and rechecks held bytes, metadata,
+ancestry and signatures for currentness. Default diagnostic probe behavior and
+referenceQualified=false remain unchanged. Retirement revokes admission before
+closing; a close refusal remains an object-lifetime tombstone and must be retained
+and reported by future production callers. Deinitialization supplies no ACK.
+All13 frozen native case bodies are conserved. An ordinary SDK-owned native
+fixture runs11 protected cases and2 separate actual-file denials, using exact
+official packages and an exclusive root-owned Library namespace. Native workers
+use25 seconds and unchanged SDK30/35/10; every retained owner and Guardian must
+retire before identity/source/inventory-bound namespace cleanup. All21 portable
+controls pass in three optimization modes. Swift, root/pkgutil/codesign/ACL and
+actual fixture execution remain pending. This does not qualify installed active
+DEXT ancestry, live broker/client, driver approval, production installation or
+physical capture. Item31 and transverse16/38 stay open.
+
+The retained-reference Root gate passes365 JS and17539 portable Mac cases;
+only new Python formatting refuses. A separately reviewed repository-config
+format amendment preserves full ASTs and frozen21 expectations; covering format,
+JS and focused controls are required before publication. Native13 stay pending.
+Latest macOS run37573793511 at2a902a2fa completes401 actual XCTest cases
+(377 pass,9 fail,15 skip;29 failed assertions,5 unexpected), while its canonical
+verdict is incomplete. Two owned compilation Guardians time out between reported
+passing phases, TEST-ONLY credential setup refuses, and permission UI refuses
+native receipt fields. Native installation and production authority remain
+unqualified; no native limit or assertion is relaxed.
+
 The owned native compilation prerequisite now has a normally discovered Swift
 case for actual unsigned pinned Core-Service and CLI builds. It applies a strict
 25-file sealed complete producer candidate only inside its owned temporary tree;
