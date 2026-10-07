@@ -792,7 +792,15 @@ global _UpdaterDownloadArtifacts := 0
 global _UpdaterDownloadStartedTick := 0
 global _UpdaterStagingTransportCounter := 0
 global UPDATER_STAGING_ENV_MAX_CHARS := 7000
+; Application source-publication budget, not a Windows environment-block limit.
+; Eight individually bounded fragments admit the production worker with room
+; for growth while refusing an unbounded encoded source before any EnvSet.
+global UPDATER_STAGING_MAX_SCRIPT_CHUNKS := 8
 global _UpdaterSwapOwner := 0
+; Boot installs an admitted recovery claim before loading this module. Other
+; ordinary module consumers own an absent target; never overwrite a boot claim.
+if !IsSet(_UpdaterRecoveryPublishTarget)
+	global _UpdaterRecoveryPublishTarget := ""
 global _UpdaterExitIntent := 0
 global _UpdaterExitInvocation := 0
 global _UpdaterSwapTransactionCounter := 0
@@ -1641,7 +1649,7 @@ _Updater_StagingNativeDebtToken(Stdout) {
 _Updater_ParseStagingFailure(Stdout) {
 	global _UpdaterManagedFailureContract
 	Unknown := Map("valid", false, "reason", "download", "receipt", Map(), "cleanup_debt", [], "native_cleanup_debt", false)
-	if !(Stdout is String) || StrLen(Stdout) > 4096 || InStr(Stdout, Chr(0))
+	if !(Stdout is String) || StrLen(Stdout) > 4096 || _ManagedNetworkWindows_HasStoredNul(Stdout)
 		return Unknown
 	try Envelope := JsonParse(Stdout)
 	catch
@@ -1740,7 +1748,7 @@ _Updater_RetireManagedFailure(ExpectedOwner := unset) {
 		Critical(PreviousCritical)
 	}
 	if Owner is Map
-		SetTimer(_Updater_DispatchManagedFailureRetirement.Bind(Owner), -1)
+		TimerSetCallback(_Updater_DispatchManagedFailureRetirement.Bind(Owner), -1)
 	return true
 }
 
@@ -2099,19 +2107,19 @@ _Updater_BuildStagingTransport(Script, SwapScript, AssetUrl, ExpectedSha256, New
 	SwapScriptPath, CurrentExe,
 	MinimumSize, TimeoutMs, DownloadModulePath := "", DeadlineMs := 0, StartedTick := 0,
 	ProxyPolicyPath := "", UpdaterDefaultsPath := "") {
-	global _UpdaterStagingTransportCounter, UPDATER_STAGING_ENV_MAX_CHARS
+	global _UpdaterStagingTransportCounter, UPDATER_STAGING_ENV_MAX_CHARS, UPDATER_STAGING_MAX_SCRIPT_CHUNKS
 	_UpdaterStagingTransportCounter += 1
 	Prefix := "ERGOPTI_UPDATER_" . DllCall("GetCurrentProcessId", "UInt")
 		. "_" . A_TickCount . "_" . _UpdaterStagingTransportCounter
 	ScriptPayload := _Updater_EncodePowerShellCommand(Script)
 	SwapScriptPayload := _Updater_EncodeUtf8Payload(SwapScript)
-	if (ScriptPayload == ""
-		or StrLen(ScriptPayload) > UPDATER_STAGING_ENV_MAX_CHARS)
-		throw ValueError("Encoded staging worker exceeds the environment transport budget")
+	ScriptChunkCount := Ceil(StrLen(ScriptPayload) / UPDATER_STAGING_ENV_MAX_CHARS)
+	if (ScriptPayload == "" or ScriptChunkCount > UPDATER_STAGING_MAX_SCRIPT_CHUNKS)
+		throw ValueError("Encoded staging worker exceeds the bounded chunk transport budget")
 	if (SwapScriptPayload == "")
 		throw ValueError("Encoded swap worker is empty")
 	Environment := [
-		{ Name: Prefix . "_SCRIPT", Value: ScriptPayload },
+		{ Name: Prefix . "_SCRIPT", Value: SubStr(ScriptPayload, 1, UPDATER_STAGING_ENV_MAX_CHARS) },
 		{ Name: Prefix . "_URL", Value: AssetUrl },
 		{ Name: Prefix . "_DIGEST", Value: ExpectedSha256 },
 		{ Name: Prefix . "_NEW_EXE", Value: NewExe },
@@ -2125,6 +2133,15 @@ _Updater_BuildStagingTransport(Script, SwapScript, AssetUrl, ExpectedSha256, New
 		{ Name: Prefix . "_PROXY_POLICY", Value: ProxyPolicyPath },
 		{ Name: Prefix . "_UPDATER_DEFAULTS", Value: UpdaterDefaultsPath }
 	]
+	Environment.Push({ Name: Prefix . "_SCRIPT_COUNT", Value: ScriptChunkCount })
+	Loop ScriptChunkCount - 1 {
+		ChunkNumber := A_Index + 1
+		Environment.Push({
+			Name: Prefix . "_SCRIPT_" . ChunkNumber,
+			Value: SubStr(ScriptPayload, ((ChunkNumber - 1) * UPDATER_STAGING_ENV_MAX_CHARS) + 1,
+				UPDATER_STAGING_ENV_MAX_CHARS)
+		})
+	}
 	SwapChunkCount := Ceil(StrLen(SwapScriptPayload)
 		/ UPDATER_STAGING_ENV_MAX_CHARS)
 	Environment.Push({ Name: Prefix . "_SWAP_COUNT", Value: SwapChunkCount })
@@ -2142,7 +2159,9 @@ _Updater_BuildStagingTransport(Script, SwapScript, AssetUrl, ExpectedSha256, New
 	}
 	Bootstrap := '$ErrorActionPreference=' . Chr(39) . 'Stop' . Chr(39) . ';'
 		. '$ProgressPreference=' . Chr(39) . 'SilentlyContinue' . Chr(39) . ';'
-		. '$source=[Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($env:' . Prefix . '_SCRIPT));'
+		. '$scriptPayload=$env:' . Prefix . '_SCRIPT;'
+		. 'for($i=2;$i -le [int]$env:' . Prefix . '_SCRIPT_COUNT;$i++){$scriptPayload+=[Environment]::GetEnvironmentVariable(' . Chr(39) . Prefix . '_SCRIPT_' . Chr(39) . '+$i)};'
+		. '$source=[Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($scriptPayload));'
 		. '$swapPayload=' . Chr(39) . Chr(39) . ';'
 		. 'for($i=1;$i -le [int]$env:' . Prefix . '_SWAP_COUNT;$i++){$swapPayload+=[Environment]::GetEnvironmentVariable(' . Chr(39) . Prefix . '_SWAP_' . Chr(39) . '+$i)};'
 		. '$worker=[ScriptBlock]::Create($source);'
@@ -2170,6 +2189,7 @@ _Updater_BuildStagingTransport(Script, SwapScript, AssetUrl, ExpectedSha256, New
 		Args: Args,
 		Environment: Environment,
 		ScriptPayload: ScriptPayload,
+		ScriptChunkCount: ScriptChunkCount,
 		SwapScriptPayload: SwapScriptPayload,
 		SwapChunkCount: SwapChunkCount,
 		Bootstrap: Bootstrap
@@ -2424,7 +2444,7 @@ _Updater_PollDownloadAsync(ExitCode, Stdout, Stderr, SwapScriptPath, NewExe, Cur
 		if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch)
 			return
 		_UpdaterDownloadWorker := 0
-		SetTimer(_Updater_MonitorStagingWorker, 0)
+		TimerSetCallback(_Updater_MonitorStagingWorker, 0)
 	} finally {
 		Critical(PreviousCritical)
 	}

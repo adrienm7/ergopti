@@ -893,8 +893,10 @@ class CurlAsyncRequest {
 		BeforeLaunchFn := this._DispatchPortFn("before_launch")
 		if IsObject(BeforeLaunchFn)
 			BeforeLaunchFn.Call(this)
-		if this.Aborted || this._Remaining() <= 0
-			return this.Abort()
+		if this.Aborted || this._Remaining() <= 0 {
+			this.Abort()
+			return false
+		}
 		if this.ProxySelection is Map {
 			CurrentFn := this.ProxySelection.Get("current", 0)
 			try Current := !IsObject(CurrentFn) || CurrentFn.Call()

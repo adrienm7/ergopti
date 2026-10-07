@@ -14,6 +14,24 @@ global _ManagedNetworkWindowsContract := 0
 global _ManagedNetworkWindowsPorts := 0
 global _ManagedNetworkWindowsInitializing := false
 
+; AHK native string searches terminate at NUL; inspect stored UTF-16 units.
+_ManagedNetworkWindows_HasStoredNul(Text) {
+	loop StrLen(Text)
+		if NumGet(StrPtr(Text), (A_Index - 1) * 2, "UShort") == 0
+			return true
+	return false
+}
+
+; Native locale access stays in the adapter; the presenter uses exact translated
+; bytes and validates them before constructing its renderer invocation.
+_ManagedNetworkWindows_LocaleScript() {
+	global _SharedDir, _I18nLocale
+	Raw := FileRead(_SharedDir . "\data\locales\" . _I18nLocale . ".json", "UTF-8")
+	if !(JsonParse(Raw) is Map)
+		throw TypeError("The managed failure locale is invalid")
+	return "window._i18n_strings=" . Raw . ";window.i18n_apply(window._i18n_strings);"
+}
+
 ; Root boot owns initialization, after JSON, shared paths, i18n and logging.
 ; @param Policy {Map|Unset} Canonical policy; omitted in production.
 ; @param Ports {Map|Integer} Controlled native ports for isolated tests only.

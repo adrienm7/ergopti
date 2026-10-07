@@ -103,7 +103,7 @@ class _ManagedRemoteFixtureOwner {
 		this.Port := Map("managed_settings", this.Reader)
 	}
 
-	OnNativeAdopt(State) {
+	OnNativeAdopt(State, Native) {
 		this.NativeState := State
 	}
 
