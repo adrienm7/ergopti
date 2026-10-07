@@ -5855,8 +5855,11 @@ callback. All 34 independent JSON vectors and every old assertion remain exact;
 three additional Boolean-only fixtures now declare their explicit modeled
 no-resource settlement without a production Boolean fallback.
 The required archive port fixture is explicit and throws on unexpected use;
-no archive success or physical IO is modeled as native acceptance. Full selected
-verification and genuine installed live-download CI on these sources remain
+no archive success or physical IO is modeled as native acceptance. The composed
+local change-scoped verification passes all 11 selected gates: 379 JavaScript,
+16,675 portable macOS and 11,225 Linux unit tests, plus genuine Linux archive,
+HTTP, temporary-allocation and runtime controls. Native Swift compilation is
+explicitly deferred. Genuine installed live-download CI on these sources remains
 required; TODO 62 and transversal 16/38 stay open.
 
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled

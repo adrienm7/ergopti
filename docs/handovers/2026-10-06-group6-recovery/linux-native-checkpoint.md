@@ -239,3 +239,66 @@ Windows PC steps still apply. Items 36/62 and transversal requirements 16/38
 remain open. Next qualification uses the group-owned CI test branch; final
 integration reserves codex/ci-lock exclusively and tests the exact integrated
 SHA on codex/ci-validation without publishing any release.
+
+## Composed release-check and Swift correction, 2026-10-07
+
+The Linux retirement correction is committed as
+1a2fa790a11c9c12ddc69d8b1478cf085400b28f. Its final managed receipt is
+source-bound and detached, and the release manager waits for the original
+physical child/deadline acknowledgement before parsing or publishing results.
+The original producer fails 22 of the same 25 new controls on each actual Lua
+ABI; the corrected producer passes all 25 plus all 134 historical cases per
+ABI. The five entire old fixture modules retain their original assertions,
+including the 34 independent JSON vectors. Explicit scripted fixture ownership
+provides no native IO credit or production Boolean-only fallback.
+
+The composed local 15-path working-source qualification over
+2ef3cc25a2b703c56e7eecb75355b38cd97d9138 passes all 11 selected gates.
+The physically closed root QevMgp result has SHA-256
+35860c65c3cf31ade38489078c0e4f8294f8933e98068e37f7d2ab44f87e6f50,
+status zero and no retained debt. Its complete raw stdout has SHA-256
+e29845000e2596a2f5edc2dd117653a47384453e14c79f51b3ad999dfa93750f.
+
+| Scope                             | Result                                            | Limit                                                             |
+| --------------------------------- | ------------------------------------------------- | ----------------------------------------------------------------- |
+| JavaScript                        | 379 passed, zero failed                           | Source and portable controls                                      |
+| Portable macOS                    | 16,675 passed, zero failed; 1,537 modules         | Hammerspoon stubs, not native Swift                               |
+| Linux units                       | 11,225 passed, zero failed; 498 modules           | Includes explicit scripted HTTP owners                            |
+| Native Linux HTTP                 | Streaming262/API48 passed                         | Loopback, not an enterprise session                               |
+| Native Linux temporary lifetime   | 63 distinct product controls passed; zero skipped | Original optional CFFI union control skipped77, no product credit |
+| Native Linux archive              | Three cases/fifteen checks passed; zero skipped   | Private installed archive, not the whole packaged desktop         |
+| Native Linux managed HTTP/runtime | Output18/public30 and runtime82 passed            | Original physical owners closed                                   |
+| Native Swift                      | Deferred to macOS                                 | No Linux compilation claim                                        |
+
+The syntax-only Swift correction c18442429284bbb0e5e5838846333939143f771b
+removes the 13 invalid separators introduced by the progress diagnostic while
+retaining all 42 event identities/values/order and every current assertion.
+Manual run [37551458196](https://github.com/adrienm7/ergopti/actions/runs/37551458196)
+on exact67d563584b05426f2e2564b61cbbc1ddd61d6eb0 failed at this native compile
+boundary. It yielded no new AppKit or Sparkle runtime fact. macOS portable
+unit/E2E/tooltip checks passed; installation was skipped.
+
+That same run failed Linux units with 11,199 passes and one failure:
+`routes the Configuration restore row to the recommended hotstrings`.
+The check annotation identifies test_hotstrings_scope.lua:409 but does not
+expose the actual assertion. Job-log delivery remained Forbidden; source
+candidates are not a demonstrated cause. Linux E2E/package/install were
+skipped, including the new Nix phase diagnostic and live download. Windows
+was not selected. Release/Publish was skipped.
+
+The feature composes current dev70fda177fd4c1411197aec908aadb954f01c8ca1
+in ece8de48ef87437355c0224ac625c8e4256c1deb. Manual all-OS run
+[37556022981](https://github.com/adrienm7/ergopti/actions/runs/37556022981)
+tests that exact composed source on codex/ci-release-network. Its result is
+pending at this checkpoint. It is not an integrated-dev qualification.
+Every own push cancels only its exact-SHA automatic runs; manual runs continue.
+The final integration lock currently belongs to group3; it must release its
+own lock before group6 reserves a new one. No TODO item has been removed.
+
+The implementation continuations above, twelve Windows steps, native macOS
+acceptance, and transversal16/38 still apply. In particular, outgoing Ollama,
+managed ETag/archive redirects, macOS child PAC/WPAD and integrated enterprise
+authentication are remaining code work, not merely local PC verification.
+The commit inventory in [group6-commits.md](group6-commits.md) records the
+prepared feature commits; their presence in origin/dev must be proved after
+serialized integration.
