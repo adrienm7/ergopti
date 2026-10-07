@@ -79,8 +79,13 @@ enum AppKitAdmission {
 
 static enum AppKitAdmission admit_appkit(NSApplication *application) {
     if (application == nil) return AppKitApplicationMissing;
-    if (![application setActivationPolicy:NSApplicationActivationPolicyAccessory]) {
-        return AppKitPolicyRefused;
+    // An actual existing accessory policy needs no modifying setter. Always
+    // reconfirm it freshly before granting admission, including this branch.
+    const NSApplicationActivationPolicy initial = [application activationPolicy];
+    if (initial != NSApplicationActivationPolicyAccessory) {
+        if (![application setActivationPolicy:NSApplicationActivationPolicyAccessory]) {
+            return AppKitPolicyRefused;
+        }
     }
     if ([application activationPolicy] != NSApplicationActivationPolicyAccessory) {
         return AppKitPolicyUnconfirmed;
