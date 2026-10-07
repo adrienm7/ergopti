@@ -1677,6 +1677,29 @@ local function main()
 		print("Error: could not start the keyboard hook.")
 		os.exit(1)
 	end
+	-- start() recreates capture and seeds CapsLock from the acquired keyboard.
+	-- Publish the selected inverse on that exact state before any input is pumped.
+	do
+		local await_retirement = event_loop.run
+		local publication, ready, running = keyboard_layout.publish_current_capture,
+			keyboard_layout.is_ready, keyboard_hook.isRunning
+		local ok, published = pcall(function()
+			return type(publication) == "function" and publication(opts.keymap) == true
+				and running() == true and ready() == true
+		end)
+		if not ok or published ~= true or keyboard_layout.publish_current_capture ~= publication
+			or keyboard_layout.is_ready ~= ready or keyboard_hook.isRunning ~= running
+			or event_loop.run ~= await_retirement
+			or running() ~= true then
+			shutdown.request("startup layout publication refused", "startup layout publication refused")
+			if shutdown.is_pending() then
+				await_retirement({ onIdle = shutdown.poll, onPeriodic = shutdown.poll, periodSec = 0.25 })
+			end
+			if shutdown.is_pending() then error("Startup native cleanup remains unacknowledged", 0) end
+			if injector.close_fast_channel() ~= true then error("Startup output retirement remains unacknowledged", 0) end
+			error("Current capture inverse publication refused at startup", 0)
+		end
+	end
 	BootProfiler.stage_done("input hooks", string.format("mode %s, layout %s",
 		tostring(keyboard_hook.get_mode and keyboard_hook.get_mode() or "unknown"),
 		keyboard_layout.is_ready() and "resolved" or "unresolved"))
