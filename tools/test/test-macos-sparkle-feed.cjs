@@ -1851,6 +1851,12 @@ try {
 		),
 		'utf8'
 	);
+	const progressEnum = fixture.slice(
+		fixture.indexOf('private enum UpdateProgressEvent:'),
+		fixture.indexOf('private enum UpdateProgressCapture:')
+	);
+	assert.doesNotMatch(progressEnum, /,\s*\n\s*case\b/);
+	assert.equal((progressEnum.match(/\be[0-9]+ = "[a-z0-9-]+"/g) || []).length, 42);
 	assert.match(
 		child,
 		/guard unlink\(stage.path\) == 0 else \{ throw Failure.refused \}\s*progress\(event\)/
