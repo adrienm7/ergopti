@@ -6483,6 +6483,22 @@ This changes observation only: every original native assertion, receiving clock,
 retirement requirement and privacy admission stays intact. Genuine receiving
 of this channel remains pending; no native failure is counted as repaired.
 
+Integrated manual37688807101 at091743921 completes with shared checks passing,
+Linux11,644 unit passes/zero failures and all157 E2E steps passing with none
+skipped. The Linux package fails in Flatpak curl configuration because no GSS
+implementation is available in the24.08 SDK. Windows retains its four native
+failures; Mac Sparkle passes, Brew's deny-removal AppleEvent positive fails, and
+the separate native global-switcher/Shortcuts package probes fail. All installed
+runtime lanes and Release are skipped. No complete packaging claim is made.
+
+The Flatpak source inventory now adds MIT Kerberos1.22.2 at the exact upstream
+commit8570e77819563e036027e1da789d08ec9333ed4d before curl. Its native GSS library
+and krb5-config must exist under/app; curl retains mandatory GSSAPI and explicitly
+finds that prefix. The regression fails against the old missing dependency;
+all original source pins, requirements and assertions stay intact. Actual
+Flatpak build/package/installation receiving is pending. This Linux-only
+catalogue/generator region is owned by group6; other fields remain unchanged.
+
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard
   layers on all three drivers. Windows and macOS also support their existing

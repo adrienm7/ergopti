@@ -331,6 +331,30 @@ unchanged. The change has no native repair or receiving credit yet.
 
 ## Remaining CODE and hosted work
 
+Manual37688807101 at091743921 is terminal FAIL. Shared checks pass; Linux has
+11,644 unit passes/zero failures and157 successful E2E steps with zero skipped.
+Flatpak package configuration fails because curl requires GSS but the24.08 SDK
+does not supply it. Windows retains the same four failures. Mac's exact Sparkle
+case passes; Brew's unchanged deny-removal AppleEvent positive fails with send0,
+reply-read-1701, error-10004 and no receiver marker; permission query is-1744.
+Native global-switcher and Shortcuts package probes also fail. All installation
+lanes and Release are skipped. The source's full scope remains unqualified.
+
+Windows diagnostic candidate c00cec629 is separately received in37690927221:
+10,268 passes/four unchanged failures, no admitted service-stage notice. Canonical
+TAP output is used, but no successful service diagnosis or transport repair is
+claimed. Raw job downloads still require productionresultssa7 network access.
+After publication of the domain1 draft, genuine Mac artifact downloads succeed;
+the container's files, worktrees and pinned SDKs restore unchanged.
+
+The next Linux correction adds a pinned MIT Kerberos1.22.2 Flatpak dependency,
+commit8570e77819563e036027e1da789d08ec9333ed4d, before curl. Group6 owns only this
+catalogue source inventory and flatpakModules generator region. The existing
+GSS requirement stays enabled and its native prefix is explicitly/app. Missing
+or malformed Kerberos pins are refused. The independent recipe regression fails
+before the fix and passes afterward; complete native Flatpak receiving remains
+required. Other catalogue fields and all historical requirements stay intact.
+
 - **Windows62:** Join one packaged owned curl attempt engine to both the real
   request consumer and artifact staging producer. Bare NTLM-only CONNECT must
   use genuine SSPI evidence and one causal fallback after exact first-child and

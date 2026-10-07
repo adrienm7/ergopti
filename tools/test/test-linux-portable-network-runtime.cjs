@@ -118,6 +118,7 @@ assert.deepEqual(
 	[
 		'network-luv',
 		'network-schemas',
+		'network-krb5',
 		'network-curl',
 		'network-duktape',
 		'network-libproxy',
@@ -129,6 +130,7 @@ assert.deepEqual(
 	[
 		'https://github.com/luvit/luv.git',
 		'https://github.com/GNOME/gsettings-desktop-schemas.git',
+		'https://github.com/krb5/krb5.git',
 		'https://github.com/curl/curl.git',
 		'https://github.com/svaarala/duktape/releases/download/v2.7.0/duktape-2.7.0.tar.xz',
 		'https://github.com/libproxy/libproxy.git',
@@ -136,9 +138,16 @@ assert.deepEqual(
 	]
 );
 assert.ok(modules[0]['config-opts'].includes('-DLUA_BUILD_TYPE=System'));
-assert.ok(modules[4]['config-opts'].includes('-Dconfig-xdp=true'));
-assert.ok(modules[5]['config-opts'].includes('-Dgnome_proxy=disabled'));
-assert.ok(modules[5]['config-opts'].includes('-Dlibproxy=enabled'));
+assert.equal(modules[2].buildsystem, 'autotools');
+assert.equal(modules[2].subdir, 'src');
+assert.equal(modules[2].sources[0].commit, '8570e77819563e036027e1da789d08ec9333ed4d');
+assert.ok(modules[2]['config-opts'].includes('--disable-static'));
+assert.ok(modules[2]['post-install'].includes('test -f /app/lib/libgssapi_krb5.so'));
+assert.ok(modules[3]['config-opts'].includes('-DCURL_USE_GSSAPI=ON'));
+assert.ok(modules[3]['config-opts'].includes('-DGSS_ROOT_DIR=/app'));
+assert.ok(modules[5]['config-opts'].includes('-Dconfig-xdp=true'));
+assert.ok(modules[6]['config-opts'].includes('-Dgnome_proxy=disabled'));
+assert.ok(modules[6]['config-opts'].includes('-Dlibproxy=enabled'));
 passed++;
 for (const mutate of [
 	(data) => {
@@ -161,6 +170,12 @@ for (const mutate of [
 	},
 	(data) => {
 		data.network_runtime.portable.flatpak_sources.luv.url = 'http://foreign.invalid/source';
+	},
+	(data) => {
+		delete data.network_runtime.portable.flatpak_sources.krb5;
+	},
+	(data) => {
+		data.network_runtime.portable.flatpak_sources.krb5.commit = 'unversioned';
 	}
 ]) {
 	const invalid = structuredClone(catalogue);
