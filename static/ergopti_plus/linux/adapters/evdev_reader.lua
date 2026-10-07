@@ -48,6 +48,7 @@
 --- ==============================================================================
 
 local M = {}
+local original_source_owner_ports = {}
 
 local Logger = require("logger.shim")
 local InputEvent = require("infra.input_event")
@@ -124,6 +125,7 @@ local _generation = 0
 local _events = setmetatable({}, { __mode = "kv" })
 local _receipts = setmetatable({}, { __mode = "k" })
 local _held_receipts = setmetatable({}, { __mode = "k" })
+local _source_owners = setmetatable({}, { __mode = "k" })
 local _codec = {}
 for _, name in ipairs({ "decode", "native_size", "unpack_u16_le", "unpack_i32_le", "unpack_uint_le", "EV_KEY", "EV_SYN" }) do
 	_codec[name] = rawget(InputEvent, name)
@@ -372,6 +374,7 @@ function M.open(path, slot)
 	st.native_grab = false
 	st.native_close = st.native and _native_ports.close or nil
 	st.native_ioctl = st.native and _native_ports.ioctl or nil
+	st.descriptor_owner = { state = "open", native = st.native, backend = backend, fd = fd, close = st.native_close, ioctl = st.native_ioctl }
 	pcall(Logger.success, LOG, "Reading %s (non-blocking).", path)
 	_busy = false
 	return true
@@ -439,6 +442,8 @@ function M.close(slot)
 	_busy = true
 	local fd, path, backend = st.fd, st.path, _backend
 	local native = st.native == true
+	local descriptor_owner = st.descriptor_owner
+	if descriptor_owner then descriptor_owner.state = "closing" end
 	-- Revoke every receipt before callbacks, and retire this numeric fd once.
 	st.fd, st.path, st.native_grab, st.synchronized, st.pending_record = nil, nil, false, false, nil
 	_generation = _generation + 1
@@ -448,16 +453,20 @@ function M.close(slot)
 	local called, acknowledged, detail = pcall(st.native_close or rawget(backend, "close"), fd)
 	if not called or (native and acknowledged ~= true)
 		or (not native and acknowledged ~= nil and acknowledged ~= true) then
+		if descriptor_owner then descriptor_owner.state = "debt" end
 		st.close_error = tostring(not called and acknowledged or detail or "backend did not acknowledge close")
 		if native then _native_debt = true end
 		pcall(Logger.error, LOG, "Close of %s is not acknowledged; restart is required.", tostring(path))
 		_busy = false
 		return false, st.close_error
 	end
+	if descriptor_owner then descriptor_owner.state = "retired" end
 	pcall(Logger.info, LOG, "Closed %s.", tostring(path))
 	_busy = false
 	return true
 end
+
+local retire_original_slot = M.close
 
 --- @return boolean True when a device is open.
 function M.is_open(slot)
@@ -564,6 +573,69 @@ local function native_session_current(record)
 		if not rawequal(rawget(InputEvent, name), port) then return false end
 	end
 	return true
+end
+
+--- Captures only this genuine native descriptor's original open lifetime.
+--- A pointer may retain cleanup ownership; only a grabbed synchronized keyboard
+--- can pass source_owner_current. Neither token proves physical classification.
+--- @param slot string|nil Exact already-open Reader slot.
+--- @return table|nil lease Opaque original descriptor identity, never its fd.
+--- @return function|nil observer Original private issuer/port/lifetime RAM join.
+function M.capture_source_owner(slot)
+	local key = slot or M.KEYBOARD
+	local st = _slots[key]
+	local owner = st and st.descriptor_owner
+	if _busy or _native_debt or not owner or owner.state ~= "open" or owner.native ~= true
+		or st.fd ~= owner.fd or st.native ~= true or not rawequal(_backend, owner.backend)
+		or not rawequal(_native_backend, owner.backend) then return nil end
+	for name, port in pairs(_native_ports or {}) do if not rawequal(rawget(owner.backend, name), port) then return nil end end
+	local lease = {}
+	local record = { state = st, slot = key, descriptor = owner, backend = owner.backend,
+		fd = owner.fd, generation = st.generation, input = st.grabbed == true and st.native_grab == true }
+	_source_owners[lease] = record
+	local observer = function(original, capture, current, retire)
+		if not rawequal(original, lease) or _source_owners[original] ~= record
+			or getmetatable(original) ~= nil or next(original) ~= nil
+			or capture ~= original_source_owner_ports.capture or current ~= original_source_owner_ports.current
+			or retire ~= original_source_owner_ports.retire
+			or rawget(M, "capture_source_owner") ~= capture or rawget(M, "source_owner_current") ~= current
+			or rawget(M, "retire_source") ~= retire or _busy or _native_debt
+			or owner.state ~= "open" or not rawequal(_slots[key], st) or not rawequal(st.descriptor_owner, owner)
+			or st.fd ~= owner.fd or st.generation ~= record.generation
+			or not rawequal(_backend, owner.backend) or not rawequal(_native_backend, owner.backend) then return false end
+		for name, port in pairs(_native_ports or {}) do
+			if not rawequal(rawget(owner.backend, name), port) then return false end
+		end
+		return true
+	end
+	record.observer = observer
+	return lease, observer
+end
+
+--- Observes the original grabbed input session without querying a native provider.
+--- @param lease table Exact captured source owner.
+--- @return boolean current Native input currency; not physical-device proof.
+function M.source_owner_current(lease)
+	local record = _source_owners[lease]
+	return record ~= nil and getmetatable(lease) == nil and next(lease) == nil and record.input
+		and record.descriptor.state == "open" and rawequal(record.state.descriptor_owner, record.descriptor)
+		and native_session_current(record)
+end
+
+--- Retires only the original descriptor; a reopened slot/FD remains untouched.
+--- A prior acknowledged original close is idempotent, while close debt is never retried.
+--- @param lease table Exact original descriptor owner.
+--- @return boolean acknowledged Original descriptor settled.
+function M.retire_source(lease)
+	local record = _source_owners[lease]
+	if not record or getmetatable(lease) ~= nil or next(lease) ~= nil then return false end
+	local owner, st = record.descriptor, record.state
+	if owner.state == "retired" then return true end
+	if _busy or owner.state ~= "open" or not rawequal(_slots[record.slot], st)
+		or not rawequal(st.descriptor_owner, owner) or st.fd ~= owner.fd
+		or not rawequal(_backend, owner.backend) or not rawequal(_native_backend, owner.backend)
+		or st.native_close ~= owner.close or st.native_ioctl ~= owner.ioctl then return false end
+	return retire_original_slot(record.slot) == true and owner.state == "retired"
 end
 
 --- Reads the full requested native key bitmap on this exact grabbed session.
@@ -786,11 +858,27 @@ end
 --- This proves session currency, not that the original key is still pressed.
 --- Revoked by queue loss, ungrab/close, rebind, codec/provider change or native debt.
 --- @param capability table Opaque native-origin receipt.
+--- @param lease table|nil Exact optional source owner for input admission.
+--- @param observer function|nil Exact private source observer, never a public predicate.
+--- @param capture function|nil Captured original source getter.
+--- @param current function|nil Captured original input currency port.
+--- @param retire function|nil Captured original lifetime retirement port.
 --- @return boolean current
-function M.source_current(capability)
+function M.source_current(capability, lease, observer, capture, current, retire)
 	local record = _receipts[capability]
-	return record ~= nil and rawequal(capability, record.capability[1])
+	local valid = record ~= nil and rawequal(capability, record.capability[1])
 		and native_session_current(record) and original_row(record)
+	if lease == nil and observer == nil and capture == nil and current == nil and retire == nil then return valid end
+	if not valid then return false end
+	-- Authenticate the returned source observer against the actual event's private
+	-- issuer record; invoking an arbitrary positive returned lambda grants no rights.
+	local owned = _source_owners[lease]
+	return owned ~= nil and getmetatable(lease) == nil and next(lease) == nil
+		and owned.state == record.state and owned.slot == record.slot and owned.generation == record.generation
+		and rawequal(owned.descriptor, record.state.descriptor_owner) and owned.observer == observer
+		and type(observer) == "function" and capture == original_source_owner_ports.capture
+		and current == original_source_owner_ports.current and retire == original_source_owner_ports.retire
+		and observer(lease, capture, current, retire) == true
 end
 
 --- Reports unknown native retirement without exposing a reusable numeric descriptor.
@@ -807,5 +895,9 @@ M.O_NONBLOCK = O_NONBLOCK
 M.MAX_EVENTS_PER_DRAIN = MAX_EVENTS_PER_DRAIN
 M.EVIOCGKEY_NR = EVIOCGKEY_NR
 M.EVIOCGLED_NR = EVIOCGLED_NR
+
+original_source_owner_ports.capture = M.capture_source_owner
+original_source_owner_ports.current = M.source_owner_current
+original_source_owner_ports.retire = M.retire_source
 
 return M

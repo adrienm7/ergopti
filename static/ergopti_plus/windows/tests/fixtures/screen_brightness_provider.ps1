@@ -2,7 +2,7 @@
 # Replays the actual shipped worker in a native PowerShell child. Provider doubles
 # do not touch physical screens; they assert the real WMI ABI and readback protocol.
 param([string]$Worker, [string]$FixturePolicyPath, [string]$Action, [string]$Mode,
-    [string]$FixtureDiagnosticPath = '', [switch]$FixturePolicyProbe)
+    [string]$FixtureDiagnosticPath = '')
 # Optional observation only: last successfully written closed phase. A refused
 # diagnostic write stops further observation and never replaces worker outcomes.
 $script:DiagnosticAvailable = $FixtureDiagnosticPath -cne ''
@@ -16,39 +16,6 @@ function Set-FixtureDiagnosticPhase {
     }
 }
 Set-FixtureDiagnosticPhase 'fixture_enter'
-# Opt-in phase comparator only. Defining these functions performs no original
-# cmdlet lookup/module import or policy read. Module-qualified originals resolve
-# lazily only when the unchanged shipped worker reaches each actual command.
-# Command lookup differs from the five ordinary native cases; these facts alone
-# cannot establish the cause of a previous uninstrumented timeout.
-if ($FixturePolicyProbe) {
-    $script:PolicyProbeActive = $false
-    function Get-Content {
-        [CmdletBinding()]
-        param([Parameter(Mandatory = $true)][string]$LiteralPath,
-            [switch]$Raw, [string]$Encoding)
-        if (-not $script:PolicyProbeActive -or $LiteralPath -cne $FixturePolicyPath -or
-            -not $Raw.IsPresent -or $Encoding -cne 'UTF8') {
-            throw 'The policy comparator must retain the exact worker command.'
-        }
-        # This is the first worker policy command hook, not a script-entry
-        # breakpoint: no fact is inferred about earlier parse/binding steps.
-        Set-FixtureDiagnosticPhase 'worker_policy_entry'
-        Set-FixtureDiagnosticPhase 'policy_read'
-        $PolicyProbeRead = @(Microsoft.PowerShell.Management\Get-Content `
-            -LiteralPath $LiteralPath -Raw:$Raw -Encoding $Encoding)
-        Set-FixtureDiagnosticPhase 'policy_read_done'
-        $PolicyProbeRead
-    }
-    function ConvertFrom-Json {
-        [CmdletBinding()]
-        param([Parameter(Mandatory = $true, ValueFromPipeline = $true)][string]$InputObject)
-        process {
-            if ($script:PolicyProbeActive) { Set-FixtureDiagnosticPhase 'policy_decode' }
-            Microsoft.PowerShell.Utility\ConvertFrom-Json -InputObject $InputObject
-        }
-    }
-}
 $script:Calls = 0
 $script:Written = $false
 $script:Stage = 'before_provider'
@@ -95,16 +62,7 @@ if ($Mode -eq 'typed-policy-collision') { [string]$Policy = $FixturePolicyPath }
 # process's exit. Retain that exact native result before any receipt formatting.
 $global:LASTEXITCODE = 0
 Set-FixtureDiagnosticPhase 'before_worker'
-if ($FixturePolicyProbe) {
-    $script:PolicyProbeActive = $true
-    try {
-        $WorkerOutput = @(. $Worker -PolicyPath $FixturePolicyPath -Action $Action)
-    } finally {
-        $script:PolicyProbeActive = $false
-    }
-} else {
-    $WorkerOutput = @(. $Worker -PolicyPath $FixturePolicyPath -Action $Action)
-}
+$WorkerOutput = @(. $Worker -PolicyPath $FixturePolicyPath -Action $Action)
 $WorkerExit = $LASTEXITCODE
 Set-FixtureDiagnosticPhase 'worker_return'
 if ($WorkerExit -isnot [int] -or $WorkerOutput.Count -ne 1) {

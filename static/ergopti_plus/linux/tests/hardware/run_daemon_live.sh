@@ -42,6 +42,13 @@ sleep 2
 # two explicit sources and output use real production FFI ports, then retire.
 luajit tests/hardware/run_modifier_custody.lua
 CUSTODY=$?
+# The input-owner prerequisite must cross real evdev/uinput descriptors too.
+# The existing subreaper retains its exact 40-second deadline and owned cleanup;
+# unavailable devices, missing bootstrap admission and any native failure refuse.
+if [ "${CUSTODY}" = "0" ]; then
+	python3 tests/hardware/run_native_subreaper.py luajit tests/hardware/run_input_owner_real.lua
+	CUSTODY=$?
+fi
 if [ "${CUSTODY}" != "0" ]; then
 	# shellcheck disable=SC2086
 	kill ${PIDS} 2>/dev/null
