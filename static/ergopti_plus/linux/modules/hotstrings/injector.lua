@@ -503,17 +503,39 @@ function M.open_fast_channel()
 		Logger.error(LOG, "uinput channel could not be opened — check /dev/uinput permissions.")
 		return false
 	end
+	local Broker = require("adapters.modifier_broker")
+	if not Broker.attach(mod) then
+		mod.close()
+		Logger.error(LOG, "The acknowledged output channel could not be reserved.")
+		return false
+	end
 	_uinput = mod
 	Logger.success(LOG, "Non-forking uinput channel open.")
 	return true
 end
 
+--- Returns the exact shared output owner installed before native input opens.
+--- @return table|nil broker
+function M.output_broker()
+	return _uinput and require("adapters.modifier_broker").for_channel(_uinput) or nil
+end
+
 --- Closes the non-forking channel, if one is open.
 function M.close_fast_channel()
 	if not _uinput then return end
-	_uinput.close()
+	local Broker = require("adapters.modifier_broker")
+	if Broker.for_channel(_uinput) then
+		local acknowledged = _uinput.close() == true
+		if not acknowledged and (not _uinput.is_open()) and not _uinput.has_output_debt() then acknowledged = true end
+		if not acknowledged then
+			Logger.error(LOG, "Output channel retirement remains unacknowledged.")
+			return false
+		end
+		Broker.detach(_uinput)
+	else _uinput.close() end
 	_uinput = nil
 	Logger.done(LOG, "Non-forking uinput channel closed.")
+	return true
 end
 
 --- Test seam: injects (or clears) the uinput channel without touching /dev.

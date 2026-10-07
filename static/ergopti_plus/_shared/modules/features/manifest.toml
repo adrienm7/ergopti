@@ -3465,12 +3465,14 @@ description_key = "menu.layout.ergopti_alt_gr"
 superseded_reason_key = "menu.layout.superseded_ergopti_only"
 
 [[features.layout]]
-id = "ergopti_plus"
+id = "ergopti_variant"
 platforms = ["ahk"]
-default = false
-recommended = true
+reason_key = "platform_reason.legacy_helpers_use_windows_scan_code_hotkeys"
+default = "none"
+recommended = "ergopti_plus"
 input_altering = true
-type = "boolean"
+type = "enum"
+enum_values = ["none", "ergopti", "ergopti_plus"]
 description_key = "menu.layout.ergopti_plus"
 superseded_reason_key = "menu.layout.superseded_ergopti_only"
 

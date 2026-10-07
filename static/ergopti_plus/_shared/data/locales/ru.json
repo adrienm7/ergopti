@@ -3242,5 +3242,6 @@
 	"physical_shortcuts.position_unavailable": "Это положение клавиши здесь недоступно.",
 	"physical_shortcuts.windows_unavailable": "Пока недоступно в Windows: Редактор физических сочетаний клавиш пока недоступен в Windows.",
 	"physical_shortcuts.collision": "Это сочетание клавиш уже используется. Выберите другое.",
-	"physical_shortcuts.window_unavailable": "Это окно недоступно: Попробуйте открыть его снова."
+	"physical_shortcuts.window_unavailable": "Это окно недоступно: Попробуйте открыть его снова.",
+	"platform_reason.legacy_helpers_use_windows_scan_code_hotkeys": "Эти прежние вспомогательные функции эмуляции используют горячие клавиши Windows на основе скан-кодов. Другие системы используют сопоставления своих штатных раскладок."
 }

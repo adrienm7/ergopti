@@ -64,7 +64,7 @@
 # tools/test/test-config-migrations.cjs.
 
 [registry]
-current_version = 11
+current_version = 12
 unstamped_version = 2
 
 
@@ -285,4 +285,14 @@ ops = [
 	{ op = "delete", section = "hotstrings.autocorrection.caps", key = "enabled" },
 	{ op = "delete", section = "hotstrings.autocorrection.caps", key = "time_activation_seconds" },
 	{ op = "delete", section = "hotstrings.modules.autocorrection", key = "caps" },
+]
+
+# Preserve helper-backed Windows variants and independent source/layer ownership.
+[steps.v11_to_v12]
+from = 11
+to = 12
+drivers = ["ahk"]
+reason = "Represent the helper-backed built-in variant without changing registry or layer intent."
+ops = [
+	{ op = "move_ergopti_variant", section = "layout", key = "ergopti_plus", to_key = "ergopti_variant", base_key = "ergopti_base", alt_gr_key = "ergopti_alt_gr", source_key = "emulated_layout", false_variant = "ergopti", true_variant = "ergopti_plus", neutral_variant = "none" },
 ]

@@ -1912,9 +1912,9 @@
 										]
 									},
 									{
-										"path": "layout.ergopti_plus",
-										"value": true,
-										"default": false,
+										"path": "layout.ergopti_variant",
+										"value": "ergopti_plus",
+										"default": "none",
 										"recommended": true,
 										"label": [
 											{

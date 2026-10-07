@@ -201,10 +201,8 @@ jobs:
       scenarios: ${{ steps.profile.outputs.scenarios }}
 
     steps:
-      # Temporary diagnostic overlay: retain the exact historical JXA source.
+      # A depth-1 clone: the build reads tracked files and HEAD, never history.
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Prepare Node for native policy fixtures and XCTest evidence
         uses: actions/setup-node@v4
@@ -219,15 +217,11 @@ jobs:
 
       # CPython intentionally omitted Darwin os.waitid until Python 3.13.
       - name: Prepare Python for native nonreaping waits
-        id: shortcuts-phase-python
-        if: ${{ always() }}
         uses: actions/setup-python@v5
         with:
           python-version: '3.13'
 
       - name: Admit native nonreaping Python prerequisites
-        id: shortcuts-phase-readiness
-        if: ${{ always() }}
         run: |
           python3 - <<'PY'
           import json
@@ -241,39 +235,6 @@ jobs:
               raise RuntimeError("Missing native nonreaping APIs: " + ", ".join(missing))
           print(json.dumps({"python": sys.executable, "version": list(sys.version_info[:3]), "nonreaping_apis": list(names)}, sort_keys=True))
           PY
-
-      # TEMPORARY PREPARATORY OVERLAY ONLY: all three roles intentionally return
-      # refusal (1) or partial readonly/fixture evidence (2), never PASS. Remove
-      # this overlay after the exact-source diagnostic run; do not ship it as a
-      # permanent production workflow. Each role retains its original custody.
-      - name: Shortcuts raw readonly transport observation
-        if: ${{ always() }}
-        run: >-
-          python3 tools/diagnostics/program_actions/run_shortcuts_event_phase_probe.py
-          --source-root "$GITHUB_WORKSPACE" --source-sha "$GITHUB_SHA"
-          --role raw-version --output "$RUNNER_TEMP/shortcuts-event-phase-raw"
-
-      - name: Shortcuts readonly SB phase observation
-        if: ${{ always() }}
-        run: >-
-          python3 tools/diagnostics/program_actions/run_shortcuts_event_phase_probe.py
-          --source-root "$GITHUB_WORKSPACE" --source-sha "$GITHUB_SHA"
-          --role sb-count --output "$RUNNER_TEMP/shortcuts-event-phase-sb"
-
-      - name: Native self-targeted Apple Event fixture
-        if: ${{ always() }}
-        run: >-
-          python3 tools/diagnostics/program_actions/run_shortcuts_event_phase_probe.py
-          --source-root "$GITHUB_WORKSPACE" --source-sha "$GITHUB_SHA"
-          --role native-fixture --output "$RUNNER_TEMP/shortcuts-event-phase-fixture"
-
-      - name: Retain readonly phase observations on failure
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: shortcuts-event-phase-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/shortcuts-event-phase-*/observation.json
-          if-no-files-found: error
 
       - name: Cache SwiftPM dependencies
         uses: actions/cache@v4

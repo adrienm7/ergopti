@@ -3242,5 +3242,6 @@
 	"physical_shortcuts.position_unavailable": "موضع المفتاح هذا غير متاح هنا.",
 	"physical_shortcuts.windows_unavailable": "غير متاح بعد على Windows: محرر اختصارات المفاتيح الفعلية غير متاح بعد على Windows.",
 	"physical_shortcuts.collision": "تركيبة المفاتيح هذه مستخدمة بالفعل. اختر تركيبة أخرى.",
-	"physical_shortcuts.window_unavailable": "هذه النافذة غير متاحة: حاول فتحها مجددًا."
+	"physical_shortcuts.window_unavailable": "هذه النافذة غير متاحة: حاول فتحها مجددًا.",
+	"platform_reason.legacy_helpers_use_windows_scan_code_hotkeys": "تستخدم وظائف المحاكاة القديمة هذه اختصارات Windows القائمة على رموز المسح. وتستخدم الأنظمة الأخرى تعيينات تخطيطها الأصلي."
 }

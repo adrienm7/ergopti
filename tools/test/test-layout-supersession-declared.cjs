@@ -7,7 +7,7 @@
  * The Windows driver can emulate a registry layout instead of Ergopti
  * ([layout] emulated_layout). The Ergopti emulation's own features, with the
  * overlays they carry (typography, selection wrapping, the Ergopti+ changes),
- * and the digit-row swap stop applying then. The manifest declares each of
+ * stop applying then; the independent digit-row policy stays available. The manifest declares each of
  * them with `superseded_reason_key`, the reason the menu shows next to the
  * greyed row.
  *
@@ -15,8 +15,8 @@
  * A declaration that no driver reads, a reason that does not translate, or a
  * reason key the generator drops on the way to the driver all look fine in
  * manifest.toml and show the user nothing (or a dotted key). So:
- *   1. at least the four Ergopti emulation features are declared, each on a
- *      Windows-only boolean (only that driver emulates layouts);
+ *   1. at least the three Ergopti emulation features are declared: two Windows
+ *      booleans and the exact closed internal helper-backed variant;
  *   2. every reason resolves in all 21 locales;
  *   3. the generated Windows manifest ships every declaration;
  *   4. the master gate and the menu read the declaration outside comments;
@@ -45,7 +45,7 @@ const CONSUMERS = [
 		token: 'LayoutSupersededReason('
 	}
 ];
-const EXPECTED = ['ergopti_base', 'ergopti_alt_gr', 'ergopti_plus'];
+const EXPECTED = ['ergopti_base', 'ergopti_alt_gr', 'ergopti_variant'];
 
 let failures = 0;
 
@@ -109,7 +109,7 @@ check('number-row modes are independently source-scoped rather than boolean supe
 	assert.ok(!declared.some((d) => d.section === 'layout' && d.id === 'direct_access_digits'));
 });
 
-check('the Ergopti emulation features are declared, on Windows-only booleans', () => {
+check('the Ergopti emulation declares two Windows booleans and one closed internal variant', () => {
 	assert.ok(declared.length >= EXPECTED.length, `only ${declared.length} declaration(s) found`);
 	for (const id of EXPECTED) {
 		assert.ok(
@@ -123,11 +123,28 @@ check('the Ergopti emulation features are declared, on Windows-only booleans', (
 			'["ahk"]',
 			`${d.section}.${d.id}: only the Windows driver emulates layouts`
 		);
-		assert.strictEqual(
-			d.type,
-			'"boolean"',
-			`${d.section}.${d.id}: the gate can only turn a boolean off`
-		);
+		if (d.section === 'layout' && d.id === 'ergopti_variant') {
+			const row = blocks.find((b) => b.section === 'layout' && JSON.parse(b.fields.id) === d.id);
+			assert.strictEqual(d.type, '"enum"');
+			assert.deepStrictEqual(JSON.parse(row.fields.enum_values), [
+				'none',
+				'ergopti',
+				'ergopti_plus'
+			]);
+			assert.strictEqual(row.fields.default, '"none"');
+			assert.strictEqual(row.fields.recommended, '"ergopti_plus"');
+			assert.strictEqual(
+				row.fields.choice,
+				undefined,
+				'internal source intent cannot add a public chooser'
+			);
+		} else {
+			assert.strictEqual(
+				d.type,
+				'"boolean"',
+				`${d.section}.${d.id}: the gate can only turn a boolean off`
+			);
+		}
 	}
 });
 

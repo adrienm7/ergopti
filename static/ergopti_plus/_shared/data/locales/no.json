@@ -3242,5 +3242,6 @@
 	"physical_shortcuts.position_unavailable": "Denne tastposisjonen er ikke tilgjengelig her.",
 	"physical_shortcuts.windows_unavailable": "Ikke tilgjengelig på Windows ennå: Redigereren for fysiske snarveier er ennå ikke tilgjengelig på Windows.",
 	"physical_shortcuts.collision": "Denne tastekombinasjonen er allerede i bruk. Velg en annen.",
-	"physical_shortcuts.window_unavailable": "Dette vinduet er ikke tilgjengelig: Prøv å åpne det igjen."
+	"physical_shortcuts.window_unavailable": "Dette vinduet er ikke tilgjengelig: Prøv å åpne det igjen.",
+	"platform_reason.legacy_helpers_use_windows_scan_code_hotkeys": "Disse eldre emuleringsfunksjonene bruker Windows-hurtigtaster basert på skannekoder. Andre systemer bruker sine innebygde tastaturoppsett."
 }

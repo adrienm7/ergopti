@@ -3242,5 +3242,6 @@
 	"physical_shortcuts.position_unavailable": "Diese Tastenposition ist hier nicht verfügbar.",
 	"physical_shortcuts.windows_unavailable": "Noch nicht für Windows: Der Editor für physische Tastenkürzel ist unter Windows noch nicht verfügbar.",
 	"physical_shortcuts.collision": "Diese Tastenkombination wird bereits verwendet. Wählen Sie eine andere.",
-	"physical_shortcuts.window_unavailable": "Dieses Fenster ist nicht verfügbar: Versuchen Sie, es erneut zu öffnen."
+	"physical_shortcuts.window_unavailable": "Dieses Fenster ist nicht verfügbar: Versuchen Sie, es erneut zu öffnen.",
+	"platform_reason.legacy_helpers_use_windows_scan_code_hotkeys": "Diese älteren Emulationshilfen verwenden Windows-Tastenkürzel auf Basis von Scancodes. Andere Systeme verwenden die Zuordnungen ihrer nativen Tastaturlayouts."
 }

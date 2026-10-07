@@ -3242,5 +3242,6 @@
 	"physical_shortcuts.position_unavailable": "यह कुंजी स्थिति यहाँ उपलब्ध नहीं है।",
 	"physical_shortcuts.windows_unavailable": "अभी Windows पर उपलब्ध नहीं: भौतिक कुंजी शॉर्टकट संपादक अभी Windows पर उपलब्ध नहीं है।",
 	"physical_shortcuts.collision": "यह कुंजी संयोजन पहले से उपयोग में है। दूसरा चुनें।",
-	"physical_shortcuts.window_unavailable": "यह विंडो उपलब्ध नहीं है: इसे फिर खोलने की कोशिश करें।"
+	"physical_shortcuts.window_unavailable": "यह विंडो उपलब्ध नहीं है: इसे फिर खोलने की कोशिश करें।",
+	"platform_reason.legacy_helpers_use_windows_scan_code_hotkeys": "ये पुरानी एमुलेशन सहायक सुविधाएँ Windows के स्कैन-कोड हॉटकी का उपयोग करती हैं। अन्य सिस्टम अपने मूल कीबोर्ड लेआउट की मैपिंग का उपयोग करते हैं।"
 }
