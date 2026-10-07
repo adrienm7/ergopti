@@ -1988,6 +1988,7 @@
 	"sg_actions.app_previous": "⇥ Předchozí aplikace — všechny obrazovky",
 	"sg_actions.app_previous_screen": "⇥ Předchozí aplikace — tato obrazovka",
 	"sg_actions.app_switcher": "⇥ Systémový Alt+Tab",
+	"sg_actions.system_app_switcher": "⇥ Systémový Alt+Tab",
 	"sg_actions.app_window_previous": "◱ → Další okno, bez přepínače (Alt+Esc)",
 	"sg_actions.arrow_down": "↓ Šipka dolů",
 	"sg_actions.arrow_left": "← Šipka vlevo",
