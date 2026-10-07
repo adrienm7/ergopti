@@ -138,6 +138,40 @@ from actual latest dev. Successful Windows installed acceptance is now
 qualified above. Whole-group completion is not claimed; final integrated
 qualification and cleanup are recorded separately after actual completion.
 
+## Final partial delivery qualification
+
+The final no-squash merge `70fda177fd4c1411197aec908aadb954f01c8ca1` preserves both actual dev
+`2d8d8357e06e76371d41c8c9f4ab8f2fd8bfc939` and the complete feature tip
+`ac7ca6bca99fe427cd1e587b1af2841ee255d9d0`. All feature commits are ancestors of
+actual remote dev. The proper empty lock `00398d8b12a9ab75741bf5991f1d8c2016afc00a`
+was created from that current dev, with the same tree and exactly one parent.
+The automatic workflow on the merged SHA was canceled; no manual run was canceled.
+
+[Final integrated Windows run 37555144797](https://github.com/adrienm7/ergopti/actions/runs/37555144797)
+completed successfully on `codex/ci-validation` SHA `dd194edaa4c6e2c7bd42e621bd8d38f4d84e92fe`,
+exactly integrated tree `d3bcec2d598c56404f7b8952e11a8e2b2128c759`. All twelve jobs are terminal:
+nine PASS, zero FAIL and three SKIP. Core 364 JS checks and property gates, all
+10,097 native unit records, 70 E2E cases, source/fresh-clone/reload/warm
+startup, packaging, installation and all 23 compiled programmable cases pass.
+The compiled cases record native exit 0 and acknowledged owned process-tree
+closure. The six readonly number-row cases include two genuine French/US
+HKL probes and four controlled native adapter-boundary cases; they all pass,
+including the preserved dead-key refusal. The 32-bit native variant and physical
+forced output remain unexecuted. Linux/macOS are intentionally unselected,
+Release/Publish skipped; no release is published. The unaffected Linux and
+macOS component qualifications and failed complete macOS package scope above
+remain distinct from this successful Windows qualification.
+
+Terminal aggregate ZIP: 2813243 bytes, 141 members;
+SHA-256 `fbd777ef6428582c9b0a5f376e9bb60673622e1af0ba84463baf5d66efb702ef`. A following documentation-only
+commit records these receipts without changing any tracked non-documentation
+input from the tested integrated tree. Cleanup may delete only this group's
+feature branch and owned lock after terminal CI, exact remote ancestry and
+source-projection checks; the final cleanup receipt is reported separately.
+All thirteen items remain partial. No TODO is removed, items 16 and 38 keep
+their requirements, and item 22 remains withdrawn. This section supersedes
+older Group 3 checkpoint status lines; those lines retain historical evidence.
+
 ## Actual provider qualification
 
 [Manual run 37523199350](https://github.com/adrienm7/ergopti/actions/runs/37523199350)
@@ -266,8 +300,9 @@ SHA-256: `1505ad60fe61684482c51d27d38e06db8f9cf1c5e64c4bc6384214f95b6f1ba2`.
 Only the Windows driver and its CI/test admission source differ from latest
 composed dev. Final integration therefore requires Windows native CI; the
 previous separately qualified Linux scopes and explicit failed macOS package
-scopes remain retained, without rerunning unaffected native lanes. Final
-Dev/tree qualification and branch cleanup follow under a new owned lock.
+scopes remain retained, without rerunning unaffected native lanes.
+The final Dev/tree qualification is recorded above; only the owned feature and
+lock are eligible for cleanup after the required terminal and ancestry checks.
 
 ## Preserved inactive preparations
 
