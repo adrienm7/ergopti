@@ -36,6 +36,9 @@
 --- ==============================================================================
 
 local M = {}
+local SourceIdentity = require("module_source_identity")
+local source_sibling, source_same = SourceIdentity.sibling, SourceIdentity.same
+local source_directory = require("module_source_directory").capture()
 
 -- Resolved softly, like toml_codec.writer: macOS has its ring-buffer logger,
 -- the Linux daemon and the LuaJIT runners use the shim.
@@ -44,10 +47,69 @@ if not _ok_log or type(Logger) ~= "table" then
 	Logger = require("logger.shim")
 end
 local TomlCodec  = require("toml_codec")
-local TomlWriter = require("toml_codec.writer")
+local writer_bindings = setmetatable({}, { __mode = "k" })
+local TomlWriter, native_reader, native_publisher
+local function writer()
+	local published = rawget(package.loaded, "toml_codec.writer")
+	if type(published) ~= "table" then published = require("toml_codec.writer") end
+	local ports = writer_bindings[published]
+	assert(type(ports) == "function", "migration writer was not issued by the constructor")
+	local origin, reader, publisher = ports()
+	assert(rawequal(origin, published) and type(reader) == "function"
+		and type(publisher) == "function", "migration writer origin is invalid")
+	TomlWriter, native_reader, native_publisher = published, reader, publisher
+	return TomlWriter
+end
+local function writer_live(origin)
+	local published = rawget(package.loaded, "toml_codec.writer")
+	if not rawequal(published, origin or TomlWriter) then return false end
+	local ports = writer_bindings[published]
+	if type(ports) ~= "function" then return false end
+	local issued, reader, publisher, preparation = ports()
+	return rawequal(issued, published) and rawequal(rawget(published, "read_classified"), reader)
+		and rawequal(rawget(published, "publish_if_unchanged"), publisher)
+		and rawequal(rawget(published, "preparation_admission"), preparation)
+end
 local LeafRows   = require("toml_codec.leaf_rows")
-local Records    = require("config_unused_keys")
+local Records
+local function records()
+	if Records == nil then Records = require("config_unused_keys") end
+	return Records
+end
 local LOG        = "config_migrate"
+local canonical_decode = assert(rawget(TomlCodec, "decode_with_shapes"))
+
+-- The native initializer's pure receipt retains original methods, including
+-- absence. Generic unregistered adapter seams need no native constructor;
+-- a boot destination captures only an actual initializer owner/issuer tuple.
+-- This assumes the trusted normal loader, not hostile searcher/debug mutation.
+local function native_configuration_ports(driver)
+	local owner = rawget(package.loaded, "adapters.file_system")
+	if owner == nil then owner = require("adapters.file_system") end
+	if type(owner) ~= "table" then return nil end
+	local issuer = rawget(owner, "configuration_ports")
+	if type(issuer) ~= "function" then return nil end
+	local source = debug.getinfo(1, "S").source
+	local folder = driver == "hs" and "macos" or driver
+	local expected = source_sibling(debug.getinfo(issuer, "S").source,
+		folder .. "/adapters/file_system.lua", "_shared/lua/config_migrate.lua", source_directory)
+	if not source_same(source, expected, source_directory) then return nil end
+	local called, issued, reader, writer_method, publisher, remover, admitted_remover, exact_remover, delete = pcall(issuer)
+	if not called or not rawequal(issued, owner) or type(reader) ~= "function"
+		or type(writer_method) ~= "function" or type(publisher) ~= "function" or type(delete) ~= "function"
+		or remover ~= nil and type(remover) ~= "function"
+		or admitted_remover ~= nil and type(admitted_remover) ~= "function"
+		or exact_remover ~= nil and type(exact_remover) ~= "function" then return nil end
+	if not rawequal(rawget(owner, "read_with_status"), reader)
+		or not rawequal(rawget(owner, "write_if_unchanged"), writer_method)
+		or not rawequal(rawget(owner, "write_if_unchanged_admitted"), publisher)
+		or not rawequal(rawget(owner, "remove_if_unchanged"), remover)
+		or not rawequal(rawget(owner, "remove_if_unchanged_admitted"), admitted_remover)
+		or not rawequal(rawget(owner, "remove_exact"), exact_remover)
+		or not rawequal(rawget(owner, "delete"), delete) then return nil end
+	return { owner = owner, issuer = issuer, reader = reader, writer = writer_method, publisher = publisher,
+		remover = remover, admitted_remover = admitted_remover, exact_remover = exact_remover, delete = delete }
+end
 
 local BOM = string.char(0xEF, 0xBB, 0xBF)
 
@@ -99,6 +161,147 @@ local OPS = {
 local function is_version(value)
 	return type(value) == "number" and value >= 1 and value == math.floor(value) and value < 2 ^ 53
 end
+
+-- The constructor owns these destinations. Public defaults/rows and a copied
+-- module cannot grant readiness. The normal loader constructs one journal;
+-- arbitrary replacement searchers/debug mutation are outside this boundary.
+local destinations = {}
+local validated_registries = setmetatable({}, { __mode = "k" })
+local admission_factory
+
+local function detached(value)
+	if type(value) ~= "table" then return value end
+	local copy = {}
+	for key, child in pairs(value) do copy[key] = detached(child) end
+	return copy
+end
+
+-- Resolve only a journal key, never rewrite a native path or fold its case.
+-- Dot spellings of a known destination are refused: '..' through a symlink
+-- does not establish physical equivalence to the lexically reduced path.
+local function destination_key(path)
+	local spelling = tostring(path):gsub("\\", "/"):gsub("/+", "/")
+	local parts, ambiguous = {}, false
+	for part in spelling:gmatch("[^/]+") do
+		if part == "." then ambiguous = true
+		elseif part == ".." then
+			ambiguous = true
+			if #parts > 0 and parts[#parts] ~= ".." then table.remove(parts)
+			else parts[#parts + 1] = part end
+		else parts[#parts + 1] = part end
+	end
+	return (spelling:sub(1, 1) == "/" and "/" or "") .. table.concat(parts, "/"), ambiguous
+end
+
+local function current_schema(source, version)
+	if type(source) ~= "table" then return false end
+	if source.status == "absent" then return true end
+	if source.status ~= "ok" or type(source.content) ~= "string" then return false end
+	local called, document, shapes = pcall(canonical_decode, source.content)
+	if not called or type(document) ~= "table" or type(shapes) ~= "table" then return false end
+	local meta = document._meta
+	return type(meta) == "table" and shapes.arrays[meta] ~= true
+		and is_version(meta.schema_version) and meta.schema_version == version
+end
+
+local function native_ports_live(record)
+	local owner = record.port_owner
+	return owner == nil or rawequal(rawget(package.loaded, "adapters.file_system"), owner)
+		and rawequal(rawget(owner, "configuration_ports"), record.port_issuer)
+		and rawequal(rawget(owner, "read_with_status"), record.port_reader)
+		and rawequal(rawget(owner, "write_if_unchanged"), record.port_writer)
+		and rawequal(rawget(owner, "write_if_unchanged_admitted"), record.port_publisher)
+		and rawequal(rawget(owner, "remove_if_unchanged"), record.port_conditional_remover)
+		and rawequal(rawget(owner, "remove_if_unchanged_admitted"), record.port_remover)
+		and rawequal(rawget(owner, "remove_exact"), record.port_exact_remover)
+		and rawequal(rawget(owner, "delete"), record.port_delete)
+end
+local function native_port_admitted(record, adapter)
+	if adapter == nil then return record.shared_native end
+	return record.port_owner ~= nil and rawequal(adapter, record.port_owner) and native_ports_live(record)
+end
+local function destination_live(record)
+	return writer_live(record.writer) and native_ports_live(record)
+		and rawequal(rawget(TomlCodec, "decode_with_shapes"), canonical_decode)
+		and rawequal(rawget(package.loaded, "config_migrate"), M)
+		and rawequal(rawget(M, "writer_admission_factory"), admission_factory)
+		and rawequal(destinations[record.key], record)
+end
+
+local function capture_admission(path, source, candidate, operation, adapter)
+	local key, ambiguous = destination_key(path)
+	local record = destinations[key]
+	if record == nil then return nil end
+	if ambiguous or not destination_live(record) or not native_port_admitted(record, adapter) then return false end
+	local snapshot = { status = source.status, content = source.content }
+	local migration = record.publication
+	if operation == "publish" and migration ~= nil and not migration.consumed
+		and snapshot.status == migration.status and snapshot.content == migration.source
+		and candidate == migration.candidate then
+		migration.consumed = true
+		return function()
+			return destination_live(record) and rawequal(record.publication, migration)
+				and migration.consumed and current_schema({ status = "ok", content = candidate }, record.current)
+		end, snapshot
+	end
+	if record.phase ~= "ready" or not current_schema(snapshot, record.current)
+		or candidate ~= nil and not current_schema({ status = "ok", content = candidate }, record.current) then
+		return false
+	end
+	return function()
+		return destination_live(record) and record.phase == "ready"
+			and current_schema(snapshot, record.current)
+			and (candidate == nil or current_schema({ status = "ok", content = candidate }, record.current))
+	end, snapshot
+end
+
+local function read_admitted(path, adapter)
+	local key, ambiguous = destination_key(path)
+	local record = destinations[key]
+	if record == nil then return nil end
+	if ambiguous or not destination_live(record) or not native_port_admitted(record, adapter) then return false end
+	if record.reading then
+		record.reading = nil
+		return function() return destination_live(record) end
+	end
+	-- A version-refused boot may still read precisely the validated physical
+	-- image it captured. This grants no READY state or publication admission.
+	local refused_source = record.version_refused_source
+	if record.phase == "preparing" and type(refused_source) == "string" then
+		return function(content, status)
+			return destination_live(record) and record.phase == "preparing"
+				and record.version_refused_source == refused_source
+				and status == "ok" and content == refused_source
+		end
+	end
+	if record.phase ~= "ready" then return false end
+	return function(content, status)
+		return destination_live(record) and record.phase == "ready"
+			and current_schema({ status = status, content = content }, record.current)
+	end
+end
+
+--- Captures the constructor's checking functions; it exposes no phase setter.
+--- Writer calls this during real construction and pins the exact origin/factory.
+--- @return table origin
+--- @return function capture
+--- @return function read_check
+admission_factory = function(origin, ports)
+	if origin ~= nil then
+		-- Only the canonical initializer performs this handoff. A public call,
+		-- copied module or replacement getter cannot register native ports. This
+		-- is loader-cooperative authentication, not a hostile-searcher sandbox.
+		local caller = debug.getinfo(2, "S")
+		local own = debug.getinfo(1, "S").source
+		local expected = source_sibling(own, "config_migrate.lua", "toml_codec/writer.lua", source_directory)
+		assert(type(origin) == "table" and type(ports) == "function" and caller.what == "main"
+			and source_same(caller.source, expected, source_directory), "writer admission must originate in its canonical constructor")
+		assert(writer_bindings[origin] == nil, "writer constructor was already issued")
+		writer_bindings[origin] = ports
+	end
+	return M, capture_admission, read_admitted
+end
+M.writer_admission_factory = admission_factory
 
 --- A version as an integer where the runtime has an integer subtype, so every
 --- writer renders it ``3`` and never ``3.0``.
@@ -324,7 +527,9 @@ function M.validate_registry(decoded)
 			return nil, "the chain has a gap at v" .. version_text(step.from)
 		end
 	end
-	return { current = as_integer(current), unstamped = as_integer(unstamped), steps = steps }
+	local registry = { current = as_integer(current), unstamped = as_integer(unstamped), steps = steps }
+	validated_registries[registry] = detached(registry)
+	return registry
 end
 
 --- Reads and validates a registry file.
@@ -334,7 +539,7 @@ end
 --- @return string|nil detail
 function M.load_registry(path, file_adapter)
 	if type(path) ~= "string" or path == "" then return nil, "no registry path" end
-	local content, status, detail = TomlWriter.read_classified(path, file_adapter)
+	local content, status, detail = writer().read_classified(path, file_adapter)
 	if status ~= "ok" or type(content) ~= "string" then
 		return nil, "the registry '" .. path .. "' could not be read (" .. tostring(detail or status) .. ")"
 	end
@@ -375,7 +580,7 @@ function M.model_from_source(source)
 	if type(source) ~= "string" then return nil, "no source" end
 	local decoded_ok, decoded = pcall(TomlCodec.decode, source)
 	if not decoded_ok or type(decoded) ~= "table" then return nil, "the file is not valid TOML" end
-	local scan, scan_err = Records.scan_records(source)
+	local scan, scan_err = records().scan_records(source)
 	if not scan then return nil, scan_err end
 	local sections, opaque_sections = {}, {}
 	for _, header in ipairs(scan.headers) do
@@ -961,7 +1166,7 @@ end
 function M.load_context(path, action_catalogue, file_adapter)
 	local acquired, context, detail = pcall(function()
 		if type(path) ~= "string" or path == "" then return nil, "no modifier catalogue path" end
-		local ok, content, status = pcall(TomlWriter.read_classified, path, file_adapter)
+		local ok, content, status = pcall(writer().read_classified, path, file_adapter)
 		if not ok or status ~= "ok" or type(content) ~= "string" then
 			return nil, "the modifier catalogue could not be read"
 		end
@@ -1008,7 +1213,7 @@ end
 --- @param path string
 --- @return string|nil
 function M.read_only_reason(path)
-	return TomlWriter.write_refusal(path)
+	return writer().write_refusal(path)
 end
 
 --- Migrates a config file at boot. Every outcome other than "absent",
@@ -1023,12 +1228,41 @@ end
 ---   file_adapter?, read?, create_backup?, publish?, logger? }`.
 --- @return table result `{ status, from?, to?, backup?, read_only, detail? }`.
 function M.run(opts)
-	if type(opts) ~= "table" or type(opts.path) ~= "string" or opts.path == "" then
-		error("config_migrate.run needs a path", 2)
+	if type(opts) ~= "table" or getmetatable(opts) ~= nil
+		or type(rawget(opts, "path")) ~= "string" or rawget(opts, "path") == "" then
+		error("config_migrate.run needs a plain options table and a path", 2)
 	end
+	-- Copy callback identities before the first external function. An observer
+	-- cannot turn a custom seam into native authority by editing opts later.
+	local supplied = opts
+	opts = {}
+	for _, name in ipairs({ "path", "driver", "registry", "registry_path", "stamp", "file_adapter", "read",
+		"create_backup", "publish", "logger", "context", "context_error" }) do opts[name] = rawget(supplied, name) end
 	if not M.DRIVERS[opts.driver] then error("config_migrate.run needs a known driver", 2) end
-	local log = opts.logger or Logger
 	local path = opts.path
+	local key, ambiguous = destination_key(path)
+	if ambiguous then error("config migration needs a canonical path spelling", 2) end
+	local record = { key = key, phase = "preparing" }
+	destinations[key] = record
+	record.writer = writer()
+	record.adapter = opts.file_adapter
+	local native_ports = native_configuration_ports(opts.driver)
+	if native_ports ~= nil then
+		record.port_owner, record.port_issuer = native_ports.owner, native_ports.issuer
+		record.port_reader, record.port_writer, record.port_publisher =
+			native_ports.reader, native_ports.writer, native_ports.publisher
+		record.port_conditional_remover, record.port_remover, record.port_exact_remover, record.port_delete =
+			native_ports.remover, native_ports.admitted_remover, native_ports.exact_remover, native_ports.delete
+	end
+	record.native_adapter = record.port_owner ~= nil and rawequal(record.adapter, record.port_owner)
+	record.shared_native = record.adapter == nil or record.native_adapter and opts.driver == "linux"
+	if type(record.adapter) == "table" then
+		record.adapter_reader = rawget(record.adapter, "read_with_status")
+		record.adapter_publisher = rawget(record.adapter, "write_if_unchanged_admitted")
+	end
+	local registry = opts.registry and detached(validated_registries[opts.registry]) or nil
+	local supplied_registry = opts.registry ~= nil
+	local log = opts.logger or Logger
 	local result = { status = "failed", read_only = false }
 	log.start(LOG, "Checking the config schema version of '%s' (%s driver)…", path, opts.driver)
 
@@ -1037,28 +1271,77 @@ function M.run(opts)
 		result.status = status
 		result.detail = detail
 		result.read_only = true
-		TomlWriter.refuse_writes(path, detail)
+		writer().refuse_writes(path, detail)
 		log.error(LOG, "Config migration of '%s' refused (%s): %s. The file is left untouched and "
 			.. "this session will not write it.", path, status, tostring(detail))
 		return result
 	end
 
-	local registry, registry_err = opts.registry, nil
-	if registry == nil then registry, registry_err = M.load_registry(opts.registry_path, opts.file_adapter) end
+	if not destination_live(record) then return refuse("failed", "config admission owner changed before registry read") end
+	if opts.read == nil and opts.publish == nil and opts.create_backup == nil
+		and (record.port_owner == nil or record.adapter ~= nil and not record.native_adapter) then
+		return refuse("failed", "native configuration initializer is unavailable")
+	end
+
+	local registry_err
+	if supplied_registry and registry == nil then return refuse("failed", "registry was not issued by validation") end
+	if not supplied_registry then
+		local loaded
+		loaded, registry_err = M.load_registry(opts.registry_path, opts.file_adapter)
+		registry = loaded and detached(validated_registries[loaded])
+	end
 	if not registry then return refuse("failed", registry_err) end
 	if opts.context_error ~= nil then return refuse("failed", opts.context_error) end
 	result.to = registry.current
+	record.current = registry.current
+	if not destination_live(record) then return refuse("failed", "config admission owner changed during boot") end
 
+	local adapter = opts.file_adapter
+	local native_adapter = adapter == nil or record.native_adapter
+	local native_io_adapter = adapter
+	if record.native_adapter and opts.driver == "linux" then
+		-- The Linux adapter is exactly the shared writer delegate. Use its same
+		-- captured native owner once, rather than recursively consuming a permit.
+		local reader_source = type(record.adapter_reader) == "function" and debug.getinfo(record.adapter_reader, "S").source
+		local expected = source_sibling(reader_source, "linux/adapters/file_system.lua",
+			"_shared/lua/config_migrate.lua", source_directory)
+		if source_same(debug.getinfo(1, "S").source, expected, source_directory) then native_io_adapter = nil
+		else native_adapter = false end
+	end
+	local native_default = opts.read == nil and opts.publish == nil and opts.create_backup == nil
+		and native_adapter and record.port_owner ~= nil
+	local default_read
 	-- The file is writable this session: whatever creates it again stamps it.
 	local function writable(status)
+		if not destination_live(record) then return refuse("failed", "config admission owner changed during boot") end
+		if writer().write_refusal(path) ~= nil then return refuse("failed", "this destination remains refused for the session") end
 		result.status = status
-		TomlWriter.set_create_rows(path, {
+		-- Custom IO seams retain their model/testing contract but do not prove a
+		-- native destination was admitted by this constructor.
+		if native_default then
+			local content, current_status = default_read(path)
+			if not current_schema({ status = current_status, content = content }, registry.current) then
+				return refuse("failed", "fresh native source is not current before runtime admission")
+			end
+			record.phase = "ready"
+		end
+		writer().set_create_rows(path, {
 			{ section = M.META_SECTION, key = M.VERSION_KEY, value = registry.current },
 		})
 		return result
 	end
 
-	local read = opts.read or function(target) return TomlWriter.read_classified(target, opts.file_adapter) end
+	local native_read = native_reader
+	default_read = function(target)
+		if not rawequal(rawget(writer(), "read_classified"), native_read) then return nil, "error", "migration reader changed" end
+		record.reading = true
+		local called, content, status, detail = pcall(native_read, target, native_io_adapter)
+		record.reading = nil
+		if not called then return nil, "error", tostring(content) end
+		if not destination_live(record) then return nil, "error", "config admission owner changed during read" end
+		return content, status, detail
+	end
+	local read = opts.read or default_read
 	local read_ok, source, status, detail = pcall(read, path)
 	if not read_ok then return refuse("failed", "reading the file raised: " .. tostring(source)) end
 	if status == "absent" then
@@ -1069,7 +1352,33 @@ function M.run(opts)
 		return refuse("failed", "the file could not be read (" .. tostring(detail or status) .. ")")
 	end
 
+	local canonical_ok, canonical, canonical_shapes = pcall(canonical_decode, source)
+	if not canonical_ok or type(canonical) ~= "table" then return refuse("failed", "source is not valid canonical TOML") end
+	local meta = canonical._meta
+	if meta ~= nil and (type(meta) ~= "table" or canonical_shapes.arrays[meta] == true) then
+		return refuse("invalid", "canonical _meta must be a non-array table")
+	end
+	local version
+	if type(meta) == "table" then version = meta.schema_version end
+	local function refuse_version(status, detail)
+		-- Only the genuine default reader and canonical document/meta checks
+		-- above establish this initial image. Custom seams grant no reader port.
+		if native_default and destination_live(record) then record.version_refused_source = source end
+		return refuse(status, detail)
+	end
+	if version ~= nil and not is_version(version) then return refuse_version("invalid", "canonical schema version is invalid") end
+	if version ~= nil and version > registry.current then return refuse_version("newer", "canonical schema version is newer than this build") end
 	local plan = M.plan(source, registry, opts.driver, opts.context)
+	if version ~= nil and version ~= registry.current and plan.version ~= version then
+		return refuse("unsupported", "legacy metadata is not addressable by this migration owner")
+	end
+	-- The strict canonical document, not the flat migration operation model,
+	-- owns current-schema admission for inline/dotted/quoted metadata.
+	if current_schema({ status = "ok", content = source }, registry.current) then
+		plan = { outcome = "current", version = registry.current, candidate = source }
+	elseif plan.outcome == "current" then
+		return refuse("invalid", "canonical schema metadata is not current")
+	end
 	result.from = plan.version
 	if plan.outcome == "current" then
 		log.success(LOG, "'%s' is at schema v%s; nothing to migrate.", path, version_text(registry.current))
@@ -1090,10 +1399,16 @@ function M.run(opts)
 	end
 	if plan.outcome ~= "migrated" then return refuse("failed", plan.detail) end
 
+	-- Reacquire the physical source before any backup effect. A callback can
+	-- replace the file after its earlier observation without changing the plan.
+	if opts.create_backup == nil then
+		local fresh, fresh_status = default_read(path)
+		if fresh_status ~= "ok" or fresh ~= source then return refuse("failed", "source changed before migration backup") end
+	end
 	local backup = M.backup_path(path, registry.current, opts.stamp or os.date(M.STAMP_FORMAT))
 	result.backup = backup
 	local create_backup = opts.create_backup or function(target, content)
-		return TomlWriter.publish_if_unchanged(target, content, opts.file_adapter, { status = "absent" })
+		return writer().publish_if_unchanged(target, content, opts.file_adapter, { status = "absent" })
 	end
 	local create_ok, created, create_detail = pcall(create_backup, backup, source)
 	if not create_ok or created ~= true then
@@ -1106,7 +1421,12 @@ function M.run(opts)
 	end
 
 	local publish = opts.publish or function(target, content, expected_source)
-		return TomlWriter.publish_if_unchanged(target, content, opts.file_adapter, expected_source)
+		local publisher = native_publisher
+		record.publication = { status = expected_source.status, source = expected_source.content, candidate = content }
+		local called, published, detail = pcall(publisher, target, content, native_io_adapter, expected_source)
+		record.publication = nil
+		if not called then return false, tostring(published) end
+		return published, detail
 	end
 	local publish_ok, published, publish_detail = pcall(publish, path, plan.candidate,
 		{ status = "ok", content = source })
@@ -1114,6 +1434,12 @@ function M.run(opts)
 		return refuse("failed", "publication failed: " .. tostring(publish_ok and publish_detail or published))
 	end
 
+	if native_default then
+		local actual, actual_status = default_read(path)
+		if actual_status ~= "ok" or actual ~= plan.candidate then
+			return refuse("failed", "native migration did not publish its exact candidate")
+		end
+	end
 	result.content = plan.candidate
 	result.previous = source
 	log.success(LOG, "Migrated '%s' from schema v%s to v%s; backup at '%s'.", path,
@@ -1133,7 +1459,7 @@ function M.boot(opts)
 	local ok, result = xpcall(M.run, debug.traceback, opts)
 	if ok then return result end
 	local detail = "the config migration raised: " .. tostring(result)
-	TomlWriter.refuse_writes(opts.path, detail)
+	writer().refuse_writes(opts.path, detail)
 	local log = opts.logger or Logger
 	log.error(LOG, "Config migration of '%s' refused (failed): %s. The file is left untouched and "
 		.. "this session will not write it.", opts.path, detail)

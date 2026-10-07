@@ -1,0 +1,400 @@
+{
+	"producer_edges": [
+		{
+			"parent": "llm_model",
+			"section": "llm_model_action_rows",
+			"owners": {
+				"ahk": "windows/ui/menu/menu_llm/menu_models.ahk",
+				"hs": "macos/ui/menu/menu_llm/models_selector.lua"
+			},
+			"signatures": {
+				"ahk": "_LLM_Menu_PerModelRows(name, model, ollama_url, active, deps_ready := true) {",
+				"hs": "function M.build(ctx)"
+			}
+		},
+		{
+			"parent": "llm_model",
+			"section": "llm_model_identity_rows",
+			"owners": {
+				"ahk": "windows/ui/menu/menu_llm/menu_models.ahk",
+				"hs": "macos/ui/menu/menu_llm/models_selector.lua"
+			},
+			"signatures": {
+				"ahk": "_LLM_Menu_PerModelRows(name, model, ollama_url, active, deps_ready := true) {",
+				"hs": "function M.build(ctx)"
+			}
+		},
+		{
+			"parent": "llm_model",
+			"section": "llm_model_spec_rows",
+			"owners": {
+				"ahk": "windows/ui/menu/menu_llm/menu_models.ahk",
+				"hs": "macos/ui/menu/menu_llm/models_selector.lua"
+			},
+			"signatures": {
+				"ahk": "_LLM_Menu_PerModelRows(name, model, ollama_url, active, deps_ready := true) {",
+				"hs": "function M.build(ctx)"
+			}
+		},
+		{
+			"parent": "llm_model",
+			"section": "llm_model_capability_rows",
+			"owners": {
+				"ahk": "windows/ui/menu/menu_llm/menu_models.ahk",
+				"hs": "macos/ui/menu/menu_llm/models_selector.lua"
+			},
+			"signatures": {
+				"ahk": "_LLM_Menu_PerModelRows(name, model, ollama_url, active, deps_ready := true) {",
+				"hs": "function M.build(ctx)"
+			}
+		},
+		{
+			"parent": "llm_model",
+			"section": "llm_model_hardware_rows",
+			"owners": {
+				"ahk": "windows/ui/menu/menu_llm/menu_models.ahk",
+				"hs": "macos/ui/menu/menu_llm/models_selector.lua"
+			},
+			"signatures": {
+				"ahk": "_LLM_Menu_PerModelRows(name, model, ollama_url, active, deps_ready := true) {",
+				"hs": "function M.build(ctx)"
+			}
+		},
+		{
+			"parent": "llm_model",
+			"section": "llm_model_picker_head",
+			"owners": {
+				"ahk": "windows/ui/menu/menu_llm/menu_models.ahk",
+				"hs": "macos/ui/menu/menu_llm/models_selector.lua"
+			},
+			"signatures": {
+				"ahk": "LLM_Menu_BuildModelMenu() {",
+				"hs": "function M.build(ctx)"
+			}
+		},
+		{
+			"parent": "llm_model",
+			"section": "llm_model_picker_default",
+			"owners": {
+				"ahk": "windows/ui/menu/menu_llm/menu_models.ahk",
+				"hs": "macos/ui/menu/menu_llm/models_selector.lua"
+			},
+			"signatures": {
+				"ahk": "LLM_Menu_BuildModelMenu() {",
+				"hs": "function M.build(ctx)"
+			}
+		},
+		{
+			"parent": "llm_model",
+			"section": "llm_model_add_command",
+			"owners": {
+				"ahk": "windows/ui/menu/menu_llm/menu_models.ahk",
+				"hs": "macos/ui/menu/menu_llm/models_selector.lua"
+			},
+			"signatures": {
+				"ahk": "_LLM_Menu_ModelTailRows() {",
+				"hs": "function M.build(ctx)"
+			}
+		},
+		{
+			"parent": "llm_model",
+			"section": "llm_model_hf_token_command",
+			"owners": {
+				"hs": "macos/ui/menu/menu_llm/models_selector.lua"
+			},
+			"signatures": {
+				"hs": "function M.build(ctx)"
+			}
+		},
+		{
+			"parent": "llm_model",
+			"section": "llm_saved_models_frame",
+			"owners": {
+				"hs": "macos/ui/menu/menu_llm/models_selector.lua"
+			},
+			"signatures": {
+				"hs": "function M.build(ctx)"
+			}
+		},
+		{
+			"parent": "llm_model",
+			"section": "llm_thinking_info",
+			"owners": {
+				"ahk": "windows/ui/menu/menu_llm/menu_main.ahk",
+				"hs": "macos/ui/menu/menu_llm/init.lua"
+			},
+			"signatures": {
+				"ahk": "_LLM_Menu_EmitRow(id, disabled, llm_is_operational, has_health_dot := false) {",
+				"hs": "local function build_item()"
+			}
+		},
+		{
+			"parent": "llm_model",
+			"section": "llm_after_model_boundary",
+			"owners": {
+				"hs": "macos/ui/menu/menu_llm/init.lua"
+			},
+			"signatures": {
+				"hs": "local function build_item()"
+			}
+		},
+		{
+			"parent": "llm_model",
+			"section": "llm_mlx_port_frame",
+			"owners": {
+				"hs": "macos/ui/menu/menu_llm/init.lua"
+			},
+			"signatures": {
+				"hs": "local function build_item()"
+			}
+		},
+		{
+			"parent": "llm_backend",
+			"section": "llm_install_warning_frame",
+			"owners": {
+				"ahk": "windows/ui/menu/menu_llm/menu_main.ahk"
+			},
+			"signatures": {
+				"ahk": "LLM_Menu_BuildSubmenu() {"
+			}
+		},
+		{
+			"parent": "llm",
+			"section": "llm_download_shortcut_frame",
+			"owners": {
+				"hs": "macos/ui/menu/menu_llm/init.lua"
+			},
+			"signatures": {
+				"hs": "local function build_download_item()"
+			}
+		},
+		{
+			"parent": "llm_profile",
+			"section": "llm_after_profile_boundary",
+			"owners": {
+				"ahk": "windows/ui/menu/menu_llm/menu_main.ahk",
+				"hs": "macos/ui/menu/menu_llm/init.lua"
+			},
+			"signatures": {
+				"ahk": "_LLM_Menu_EmitRow(id, disabled, llm_is_operational, has_health_dot := false) {",
+				"hs": "local function build_item()"
+			}
+		},
+		{
+			"parent": "llm_profile",
+			"section": "llm_profile_app_override_frame",
+			"owners": {
+				"ahk": "windows/ui/menu/menu_llm/menu_profiles.ahk"
+			},
+			"signatures": {
+				"ahk": "_LLM_Menu_PerAppProfileRows() {"
+			}
+		},
+		{
+			"parent": "llm_navigation",
+			"section": "llm_modifier_picker_frame",
+			"owners": {
+				"hs": "macos/ui/menu/menu_llm/settings_manager.lua"
+			},
+			"signatures": {
+				"hs": "local function build_modifier_menu(key, default_mods, hs_fn)"
+			}
+		},
+		{
+			"parent": "llm_backend",
+			"section": "llm_api_selection_frame",
+			"owners": {
+				"hs": "macos/ui/menu/menu_llm/api_panel.lua"
+			},
+			"signatures": {
+				"hs": "function M.build_model_picker(ctx)"
+			}
+		},
+		{
+			"parent": "llm_backend",
+			"section": "llm_api_active_boundary",
+			"owners": {
+				"hs": "macos/ui/menu/menu_llm/api_panel.lua"
+			},
+			"signatures": {
+				"hs": "function M.build(ctx)"
+			}
+		},
+		{
+			"parent": "llm_backend",
+			"section": "llm_api_system1_frame",
+			"owners": {
+				"hs": "macos/ui/menu/menu_llm/api_panel.lua"
+			},
+			"signatures": {
+				"hs": "function M.build(ctx)"
+			}
+		},
+		{
+			"parent": "llm_generation_settings",
+			"section": "llm_generation_count_control",
+			"owners": {
+				"ahk": "windows/ui/menu/menu_llm/menu_settings.ahk",
+				"hs": "macos/ui/menu/menu_llm/init.lua"
+			},
+			"signatures": {
+				"ahk": "_LLM_Menu_GenerationRows() {",
+				"hs": "local function build_item()"
+			}
+		},
+		{
+			"parent": "llm_generation_settings",
+			"section": "llm_generation_count_reset_control",
+			"owners": {
+				"hs": "macos/ui/menu/menu_llm/init.lua"
+			},
+			"signatures": {
+				"hs": "local function build_item()"
+			}
+		},
+		{
+			"parent": "llm_generation_settings",
+			"section": "llm_generation_native_controls",
+			"owners": {
+				"hs": "macos/ui/menu/menu_llm/init.lua"
+			},
+			"signatures": {
+				"hs": "local function build_item()"
+			}
+		},
+		{
+			"parent": "llm_generation_settings",
+			"section": "llm_generation_context_controls",
+			"owners": {
+				"ahk": "windows/ui/menu/menu_llm/menu_settings.ahk"
+			},
+			"signatures": {
+				"ahk": "_LLM_Menu_GenerationRows() {"
+			}
+		},
+		{
+			"parent": "llm_generation_settings",
+			"section": "llm_generation_word_controls",
+			"owners": {
+				"ahk": "windows/ui/menu/menu_llm/menu_settings.ahk"
+			},
+			"signatures": {
+				"ahk": "_LLM_Menu_GenerationRows() {"
+			}
+		},
+		{
+			"parent": "llm_generation_settings",
+			"section": "llm_native_numeric_reset",
+			"owners": {
+				"ahk": "windows/ui/menu/menu_llm/menu_settings.ahk"
+			},
+			"signatures": {
+				"ahk": "_LLM_MaybeResetRow(Rows, current, default_val, on_click) {"
+			}
+		},
+		{
+			"parent": "llm_generation_settings",
+			"section": "llm_generation_temperature_controls",
+			"owners": {
+				"ahk": "windows/ui/menu/menu_llm/menu_settings.ahk",
+				"hs": "macos/ui/menu/menu_llm/temperature_panel.lua"
+			},
+			"signatures": {
+				"ahk": "_LLM_Menu_GenerationRows() {",
+				"hs": "function M.build(ctx, out)"
+			}
+		},
+		{
+			"parent": "llm_trigger",
+			"section": "llm_trigger_debounce_control",
+			"owners": {
+				"ahk": "windows/ui/menu/menu_llm/menu_settings.ahk"
+			},
+			"signatures": {
+				"ahk": "_LLM_Menu_TriggerRows(Position := \"all\") {"
+			}
+		},
+		{
+			"parent": "llm_display",
+			"section": "llm_display_inline_control",
+			"owners": {
+				"ahk": "windows/ui/menu/menu_llm/menu_settings.ahk"
+			},
+			"signatures": {
+				"ahk": "_LLM_Menu_DisplayRows(Position := \"all\") {"
+			}
+		},
+		{
+			"parent": "llm_model",
+			"section": "llm_api_edit_command",
+			"owners": {
+				"ahk": "windows/ui/menu/menu_llm/menu_api_entries.ahk"
+			},
+			"signatures": {
+				"ahk": "_LLM_Menu_ApiEntriesRows() {"
+			}
+		}
+	],
+	"fixed_parents": ["llm_live_mode", "llm_generation_settings"],
+	"unchanged_dynamic_parents": ["llm_backend", "llm_model", "llm_profile"],
+	"native_callback_posture": {
+		"model_details": {
+			"ahk": "inert",
+			"hs": "existing-noop",
+			"linux": "absent"
+		},
+		"no_model": "selectable-check",
+		"download": "actual-active-task-command",
+		"saved_models": "actual-record-children"
+	},
+	"api_management": {
+		"section": "llm_api_edit_command",
+		"keys": ["menu.llm.api_test_entry", "menu.llm.api_edit_entry", "menu.llm.api_remove_entry"],
+		"mutated_key": "button.cancel",
+		"platforms": ["ahk"],
+		"other_platforms": ["hs", "linux"],
+		"edit_ready_guard": false,
+		"declaration": [
+			{
+				"type": "command",
+				"id": "api_edit_entry",
+				"i18n": "menu.llm.api_edit_entry",
+				"platforms": ["ahk"],
+				"unavailable": "hide"
+			}
+		]
+	},
+	"outer_boundaries": {
+		"section": "llm_menu",
+		"rows": [
+			{
+				"preceding_id": "llm_model",
+				"declaration": {
+					"type": "list",
+					"id": "llm_after_model_boundary",
+					"platforms": ["hs"],
+					"unavailable": "hide"
+				}
+			},
+			{
+				"preceding_id": "llm_profile",
+				"declaration": {
+					"type": "list",
+					"id": "llm_after_profile_boundary",
+					"platforms": ["hs"],
+					"unavailable": "hide"
+				}
+			}
+		],
+		"owner": "macos/ui/menu/menu_llm/init.lua",
+		"signature": "local function build_item()",
+		"linux_presentation_boundary": {
+			"preceding_id": "llm_models",
+			"declaration": {
+				"type": "---",
+				"platforms": ["linux"],
+				"unavailable": "hide"
+			}
+		}
+	}
+}

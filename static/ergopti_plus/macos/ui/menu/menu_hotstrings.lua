@@ -432,14 +432,18 @@ function M.build_extension_bulk_actions(ctx, groups, bound)
 			all_on = false
 		end
 	end
-	return { {
-		label = i18n.get("menu.hotstrings.enable_all_sections"),
-		checked = all_on,
-		disabled = ctx.paused or nil,
-		action = not ctx.paused and function()
+	local rows = ManifestMenu.template_rows("hotstring_extension_bulk_controls", {
+		["extension_all_sections"] = function()
 			return M.commit_extension_selection(ctx, groups, bound, not all_on)
-		end or nil,
-	} }
+		end,
+	}, {
+		["extension_all_sections_enabled"] = function() return all_on end,
+		["extension_bulk_ready"] = function() return not ctx.paused end,
+	}, {})
+	if rows and ctx.paused then
+		for _, row in ipairs(rows) do row.action = nil end
+	end
+	return rows
 end
 
 --- Builds the main hotstring groups menu.

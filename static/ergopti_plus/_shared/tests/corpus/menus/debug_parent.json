@@ -1,0 +1,58 @@
+{
+	"en": {
+		"parent": "⚠ Debug",
+		"quit": "⏹ Quit",
+		"hs": [
+			"Console",
+			"-",
+			"Log level : ℹ️ INFO",
+			"Open logs folder",
+			"Open today's log file",
+			"Open today's errors file",
+			"-",
+			"System diagnostics",
+			"Show a window for every error",
+			"Report a bug",
+			"Suggest a feature"
+		],
+		"linux": [
+			"Log level : ℹ️ INFO",
+			"Open logs folder",
+			"Open today's log file",
+			"Open today's errors file",
+			"-",
+			"System diagnostics",
+			"Show a window for every error",
+			"Report a bug",
+			"Suggest a feature"
+		]
+	},
+	"fr": {
+		"parent": "⚠ Débogage",
+		"quit": "⏹ Quitter",
+		"hs": [
+			"Console",
+			"-",
+			"Niveau de log : ℹ️ INFO",
+			"Ouvrir le dossier de logs",
+			"Ouvrir le fichier de log du jour",
+			"Ouvrir le fichier des erreurs du jour",
+			"-",
+			"Diagnostic système",
+			"Afficher une fenêtre à chaque erreur",
+			"Signaler un bug",
+			"Proposer une fonctionnalité"
+		],
+		"linux": [
+			"Niveau de log : ℹ️ INFO",
+			"Ouvrir le dossier de logs",
+			"Ouvrir le fichier de log du jour",
+			"Ouvrir le fichier des erreurs du jour",
+			"-",
+			"Diagnostic système",
+			"Afficher une fenêtre à chaque erreur",
+			"Signaler un bug",
+			"Proposer une fonctionnalité"
+		]
+	}
+}

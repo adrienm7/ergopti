@@ -614,12 +614,24 @@ end
 
 --- Observes the original grabbed input session without querying a native provider.
 --- @param lease table Exact captured source owner.
+--- @param observer function|nil Original private observer for staged cleanup currency.
+--- @param capture function|nil Construction-captured original source getter.
+--- @param current function|nil Construction-captured original input currency port.
+--- @param retire function|nil Construction-captured original retirement port.
 --- @return boolean current Native input currency; not physical-device proof.
-function M.source_owner_current(lease)
+--- @return boolean|nil cleanup Optional original cleanup currency, never input rights.
+function M.source_owner_current(lease, observer, capture, current, retire)
 	local record = _source_owners[lease]
-	return record ~= nil and getmetatable(lease) == nil and next(lease) == nil and record.input
+	local input = record ~= nil and getmetatable(lease) == nil and next(lease) == nil and record.input
 		and record.descriptor.state == "open" and rawequal(record.state.descriptor_owner, record.descriptor)
 		and native_session_current(record)
+	if observer == nil and capture == nil and current == nil and retire == nil then return input end
+	-- Only this constructor's registered observer may certify its existing
+	-- per-open cleanup lifetime; a pointer still cannot pass the input result.
+	local cleanup = record ~= nil and record.observer == observer and type(observer) == "function"
+		and capture == original_source_owner_ports.capture and current == original_source_owner_ports.current
+		and retire == original_source_owner_ports.retire and observer(lease, capture, current, retire) == true
+	return input and cleanup, cleanup
 end
 
 --- Retires only the original descriptor; a reopened slot/FD remains untouched.

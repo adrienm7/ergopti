@@ -20,6 +20,7 @@ local function with_fixture(collision, body)
 		"infra.notifications", "ui.menu.keymap_lifecycle", "modules.keymap.registry", "modules.keymap.registry_index",
 		"modules.keymap.registry_groups", "ui.menu.menu_hotstrings_custom", "infra.personal_file_scope",
 		"infra.personal_hotstrings",
+		"infra.i18n", "infra.manifest_menu", "infra.locale", "locale.core",
 	}, function()
 		-- These fixtures own registered sources, not the boot scanner catalogue.
 		-- Keep only its empty diagnostics port scoped; the real registry and
@@ -99,6 +100,21 @@ local function with_fixture(collision, body)
 		for _, entry in ipairs(definitions) do ctx.hotfile_paths[entry.name] = entry.path end
 		ctx.save_prefs = function() return Preferences.save(config, ctx.state, names, { keymap = R }) end
 		local Custom = helpers.load_with_stubs("ui.menu.menu_hotstrings_custom")
+		-- Only the two newly declared affixes need a physical translated source.
+		-- Keep every existing identity-caption assertion on its original test port.
+		local NativeLocale = require("infra.locale")
+		NativeLocale.set_locale("en")
+		assert(NativeLocale.current_locale() == "en")
+		local CaptionPort, PreviousGet = require("infra.i18n")
+		PreviousGet = CaptionPort.get
+		CaptionPort.get = function(key)
+			if key == "menu.hotstrings.default_category_prefix" or key == "menu.hotstrings.shortcut_prefix" then
+				local value = NativeLocale.get(key)
+				assert(type(value) == "string" and value ~= "" and value ~= key)
+				return value
+			end
+			return PreviousGet(key)
+		end
 		local function commands()
 			local result = {}
 			local function walk(rows)
@@ -266,4 +282,138 @@ helpers.describe("personal file callback admission", function()
 		end)
 	end)
 
+end)
+
+
+helpers.describe("personal whole file and directory frame admission", function()
+	helpers.it("refuses missing file and directory declarations without source or registry effects", function()
+		with_fixture(false, function(f)
+			local custom = require("ui.menu.menu_hotstrings_custom")
+			local root = require("infra.manifest_menu").get_root()
+			local before, first, second = f.content(), f.state.mappings[1], f.state.mappings[2]
+			helpers.assert_type(custom.build_custom(f.ctx, { group_counts = {} }), "table")
+			for _, key in ipairs({ "hotstring_personal_file_frame", "hotstring_personal_directory_frame" }) do
+				local original = root[key]
+				local ok, detail = xpcall(function()
+					root[key] = nil
+					helpers.assert_eq(custom.build_custom(f.ctx, { group_counts = {} }), nil)
+					root[key] = original
+					helpers.assert_type(custom.build_custom(f.ctx, { group_counts = {} }), "table")
+				end, debug.traceback)
+				root[key] = original
+				if not ok then error(detail, 0) end
+			end
+			helpers.assert_eq(f.content(), before)
+			helpers.assert_true(rawequal(f.state.mappings[1], first))
+			helpers.assert_true(rawequal(f.state.mappings[2], second))
+			helpers.assert_eq({ f.observations.writes, f.observations.refreshes, f.observations.starts }, { 0, 0, 0 })
+		end)
+	end)
+	helpers.it("rejects malformed directory children and repairs the genuine physical file controls", function()
+		with_fixture(false, function(f)
+			local custom = require("ui.menu.menu_hotstrings_custom")
+			local root = require("infra.manifest_menu").get_root()
+			local original = root.hotstring_personal_directory_frame
+			local before, first, second = f.content(), f.state.mappings[1], f.state.mappings[2]
+			local ok, detail = xpcall(function()
+				root.hotstring_personal_directory_frame = { { type = "list", id = "foreign_personal_files" } }
+				helpers.assert_eq(custom.build_custom(f.ctx, { group_counts = {} }), nil)
+				root.hotstring_personal_directory_frame = original
+				helpers.assert_eq(#f.commands(), 2, "both genuine physical source command scopes remain reachable")
+			end, debug.traceback)
+			root.hotstring_personal_directory_frame = original
+			if not ok then error(detail, 0) end
+			helpers.assert_eq(f.content(), before)
+			helpers.assert_true(rawequal(f.state.mappings[1], first))
+			helpers.assert_true(rawequal(f.state.mappings[2], second))
+			helpers.assert_eq({ f.observations.writes, f.observations.refreshes, f.observations.starts }, { 0, 0, 0 })
+		end)
+	end)
+end)
+
+
+helpers.describe("personal native legacy tree order", function()
+	helpers.it("retains duplicate legacy leaves and their distinct native file menus", function()
+		with_fixture(true, function(f)
+			local custom = require("ui.menu.menu_hotstrings_custom")
+			local rows = assert(custom.build_custom(f.ctx, { group_counts = {} })).submenu
+			local folder
+			local function stem(row) return row.title:gsub(" %(%d+%)$", "") end
+			for _, row in ipairs(rows) do if stem(row) == "a" then folder = row end end
+			helpers.assert_type(folder, "table")
+			local children = folder.menu
+			helpers.assert_eq(#children, 2, "the native legacy-name tree retains both discovered source entries")
+			helpers.assert_eq(stem(children[1]), "b")
+			helpers.assert_eq(stem(children[2]), "b")
+			helpers.assert_type(children[1].menu, "table")
+			helpers.assert_type(children[2].menu, "table")
+			helpers.assert_eq(rawequal(children[1].menu, children[2].menu), false, "colliding legacy names retain distinct file menus")
+			helpers.assert_eq(#f.commands(), 2)
+			helpers.assert_eq({ f.observations.writes, f.observations.refreshes, f.observations.starts }, { 0, 0, 0 })
+		end)
+	end)
+end)
+
+
+helpers.describe("personal directory hand corpus drives the genuine native separator policy", function()
+	helpers.it("replays every directory vector including explicit separate_files=false", function()
+		local saved_hs = rawget(_G, "hs")
+		local saved_i18n = rawget(package.loaded, "infra.i18n")
+		local saved_get = type(saved_i18n) == "table" and rawget(saved_i18n, "get") or nil
+		local saved_renderer = rawget(package.loaded, "infra.manifest_menu")
+		local fixture_root
+		local completed, detail = xpcall(function()
+		with_fixture(true, function(f)
+			fixture_root = f.root
+			local renderer = require("infra.manifest_menu")
+			local original, native_tree = renderer.template_rows, nil
+			renderer.template_rows = function(key,...)
+				if key == "hotstring_personal_directory_frame" then
+					local caller=debug.getinfo(2,"f").func
+					if native_tree then helpers.assert_true(rawequal(native_tree,caller))else native_tree=caller end
+				end
+				return original(key,...)
+			end
+			local custom = require("ui.menu.menu_hotstrings_custom")
+			local ok, actual = pcall(custom.build_custom,f.ctx,{group_counts={}})
+			renderer.template_rows = original
+			helpers.assert_type(actual,"table");helpers.assert_true(ok)
+			helpers.assert_type(native_tree,"function","actual physical-file provider invokes its native tree renderer")
+			local held = assert(f.commands()[1]).row.menu
+			local file=assert(io.open(require("infra.paths").shared("tests/corpus/menus/hotstring_personal_frames.json"),"rb"))
+			local bytes=file:read("*a");assert(file:close())
+			local hand=assert(require("json").decode(assert(bytes)))
+			local vectors, explicit_false = 0, 0
+			for _,vector in ipairs(hand.directory_cases)do
+				local node={folders={},files={}}
+				for _,name in ipairs(vector.folders)do node.folders[name]={folders={},files={}}end
+				for _,name in ipairs(vector.files)do node.files[#node.files+1]={label=name,count=0,submenu=held}end
+				local data={}
+				helpers.assert_eq(native_tree(node,data,vector.separate_files),true)
+				local rows=renderer.render_rows(data,"hotstring_personal_directory_frame")
+				helpers.assert_eq(#rows,#vector.expected,vector.name)
+				for index,expected in ipairs(vector.expected)do
+					helpers.assert_eq(rows[index].title,expected=="separator"and"-"or expected,vector.name)
+				end
+				if vector.separate_files==false then explicit_false=explicit_false+1 end
+				vectors=vectors+1
+			end
+			helpers.assert_eq(vectors,5,"all hand-authored directory vectors ran")
+			helpers.assert_eq(explicit_false,1,"the no-boundary input is an exercised native policy")
+			helpers.assert_eq({f.observations.writes,f.observations.refreshes,f.observations.starts},{0,0,0})
+		end)
+		end, debug.traceback)
+		helpers.assert_true(rawequal(rawget(_G, "hs"), saved_hs), "the genuine fixture restores the raw native global")
+		helpers.assert_true(rawequal(rawget(package.loaded, "infra.i18n"), saved_i18n), "the genuine caption module identity is restored")
+		if saved_i18n then helpers.assert_true(rawequal(rawget(saved_i18n, "get"), saved_get)) end
+		helpers.assert_true(rawequal(rawget(package.loaded, "infra.manifest_menu"), saved_renderer))
+		if fixture_root then
+			for _, suffix in ipairs({ "/a__b.toml", "/a/b.toml" }) do
+				local remaining = io.open(fixture_root .. suffix, "rb")
+				if remaining then remaining:close() end
+				helpers.assert_eq(remaining, nil, "the genuine fixture retires each physical source")
+			end
+		end
+		if not completed then error(detail, 0) end
+	end)
 end)

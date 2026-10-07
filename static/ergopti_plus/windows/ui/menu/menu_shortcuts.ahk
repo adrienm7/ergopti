@@ -143,54 +143,87 @@ _SC_ExtensionRows() {
 		return []
 	for Row in BoundaryRows
 		Rows.Push(Row)
-	Loop Files ExtShortcutsBaseDir . "*", "D" {
-		ExtId       := A_LoopFileName
-		ExtDir      := A_LoopFileFullPath
-		MenuAhkPath := ExtDir . "\shortcuts\menu.ahk"
-		if !FileExist(MenuAhkPath)
-			continue
-		ExtName      := ExtId
-		ManifestPath := ExtDir . "\manifest.toml"
-		if FileExist(ManifestPath) {
-			try {
-				MC := FileRead(ManifestPath, "UTF-8")
-				if RegExMatch(MC, 'name\s*=\s*"([^"]+)"', &NM)
-					ExtName := NM[1]
+	OwnedMenus := [], Completed := false
+	try {
+		Loop Files ExtShortcutsBaseDir . "*", "D" {
+			ExtId       := A_LoopFileName
+			ExtDir      := A_LoopFileFullPath
+			MenuAhkPath := ExtDir . "\shortcuts\menu.ahk"
+			if !FileExist(MenuAhkPath)
+				continue
+			ExtName      := ExtId
+			ManifestPath := ExtDir . "\manifest.toml"
+			if FileExist(ManifestPath) {
+				try {
+					MC := FileRead(ManifestPath, "UTF-8")
+					if RegExMatch(MC, 'name\s*=\s*"([^"]+)"', &NM)
+						ExtName := NM[1]
+				}
 			}
+			MarkerState := Map("shortcut_extension_name", (*) => ExtId)
+			; Admit both possible complete markers before native allocation or builders.
+			ErrorRows := MenuRenderer_TemplateRows("shortcut_extension_error_frame", Map(), MarkerState, Map())
+			EmptyRows := MenuRenderer_TemplateRows("shortcut_extension_empty_frame", Map(), Map(), Map())
+			if !(ErrorRows is Array) || ErrorRows.Length == 0
+					|| !_MR_AppendTemplateRowsAdmitted(ErrorRows, 1, Map())
+					|| !(EmptyRows is Array) || EmptyRows.Length == 0
+					|| !_MR_AppendTemplateRowsAdmitted(EmptyRows, 1, Map())
+				return []
+			ExtMenu := Menu()
+			OwnedMenus.Push(ExtMenu)
+			BuilderFn := "BuildExtMenu_" . StrReplace(ExtId, "-", "_")
+			if IsSet(%BuilderFn%) and HasMethod(%BuilderFn%) {
+				BuildFailed := false
+				try {
+					%BuilderFn%(ExtMenu, ExtName)
+				} catch as Err {
+					; A broken bundled extension is user-actionable, so fail LOUD:
+					; ERROR (not a Warn the user never reads) plus a visible disabled
+					; row in the submenu so a crashed builder is not indistinguishable
+					; from an absent one.
+					LoggerError("Extensions", "BuildExtMenu for '{1}' threw: {2}.", ExtId, Err.Message)
+					BuildFailed := true
+				}
+				; Even a builder that returns without throwing may have populated
+				; nothing (bad TOML, missing global) — an empty submenu is just as
+				; opaque, so surface the same marker.
+				if (BuildFailed or _ExtMenuItemCount(ExtMenu) == 0) {
+					if !BuildFailed
+						LoggerError("Extensions", "BuildExtMenu for '{1}' added no items — extension menu is empty.", ExtId)
+					; A label and nothing else: the renderer draws it inert and greyed,
+					; which is exactly what a marker is.
+					if MenuRenderer_AppendTemplate(ExtMenu, "shortcut_extension_error_frame", Map(), MarkerState, Map()) == 0
+						throw Error("Shortcut extension error marker was withdrawn during its native builder")
+				}
+			} else {
+				LoggerWarn("Extensions", "No BuildExtMenu_{1} function found — menu.ahk not loaded?", StrReplace(ExtId, "-", "_"))
+				if MenuRenderer_AppendTemplate(ExtMenu, "shortcut_extension_empty_frame", Map(), Map(), Map()) == 0
+					throw Error("Shortcut extension empty marker was withdrawn before publication")
+			}
+			Rows.Push(Map("label", ExtName, "submenu", ExtMenu))
 		}
-		ExtMenu   := Menu()
-		BuilderFn := "BuildExtMenu_" . StrReplace(ExtId, "-", "_")
-		if IsSet(%BuilderFn%) and HasMethod(%BuilderFn%) {
-			BuildFailed := false
-			try {
-				%BuilderFn%(ExtMenu, ExtName)
-			} catch as Err {
-				; A broken bundled extension is user-actionable, so fail LOUD:
-				; ERROR (not a Warn the user never reads) plus a visible disabled
-				; row in the submenu so a crashed builder is not indistinguishable
-				; from an absent one.
-				LoggerError("Extensions", "BuildExtMenu for '{1}' threw: {2}.", ExtId, Err.Message)
-				BuildFailed := true
-			}
-			; Even a builder that returns without throwing may have populated
-			; nothing (bad TOML, missing global) — an empty submenu is just as
-			; opaque, so surface the same marker.
-			if (BuildFailed or _ExtMenuItemCount(ExtMenu) == 0) {
-				if !BuildFailed
-					LoggerError("Extensions", "BuildExtMenu for '{1}' added no items — extension menu is empty.", ExtId)
-				; A label and nothing else: the renderer draws it inert and greyed,
-				; which is exactly what a marker is.
-				MenuRenderer_AppendRows(ExtMenu, "shortcuts_menu", "extensions_shortcuts",
-					[Map("label", t("common.error_prefix") . ExtId)])
-			}
-		} else {
-			LoggerWarn("Extensions", "No BuildExtMenu_{1} function found — menu.ahk not loaded?", StrReplace(ExtId, "-", "_"))
-			MenuRenderer_AppendRows(ExtMenu, "shortcuts_menu", "extensions_shortcuts",
-				[Map("label", t("menu.extensions.empty"))])
-		}
-		Rows.Push(Map("label", ExtName, "submenu", ExtMenu))
+		Completed := true
+	} finally {
+		if !Completed
+			_SC_ExtensionDisposeOwnedMenus(OwnedMenus)
 	}
 	return Rows
+}
+
+
+; These are exactly the top-level menus allocated above. External builders may
+; attach borrowed children: their reachability is not an ownership receipt.
+; Delete detaches them; the existing dispatcher preserves their live callbacks.
+_SC_ExtensionDisposeOwnedMenus(OwnedMenus) {
+	for OwnedMenu in OwnedMenus {
+		try {
+			OwnedMenu.Delete()
+		} catch as CleanupError {
+			try LoggerError("Extensions", "Owned extension menu cleanup failed: {1}.", CleanupError.Message)
+		} finally {
+			try MenuDispatcher_PruneMenu(OwnedMenu)
+		}
+	}
 }
 
 ; Returns how many items a Menu currently holds, via its native HMENU. Used to
@@ -215,9 +248,9 @@ _ExtMenuItemCount(MenuObj) {
 ; shared `list` row now; the tree behind it is still this driver's native Menu,
 ; handed over through the renderer's `submenu` field.
 _SC_WrapSymbolRows() {
-	return [Map(
-		"label", t("menu.shortcuts.wrap_symbols_title"),
-		"items", _WS_BuildSymbolRows())]
+	Rows := MenuRenderer_TemplateRows("shortcut_wrap_frame", Map(), Map(),
+		Map("shortcut_wrap_symbols_ahk", _WS_BuildSymbolRows))
+	return Rows is Array ? Rows : []
 }
 
 ; The wrap-symbols tree, as row DATA.

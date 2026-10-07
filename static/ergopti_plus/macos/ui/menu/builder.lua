@@ -21,6 +21,138 @@ local i18n       = require("infra.i18n")
 -- The single reader of menu_manifest.json. See load_manifest below for why this
 -- module no longer has one of its own.
 local ManifestMenu = require("infra.manifest_menu")
+
+--- Checks raw dense arrays without triggering source metamethods.
+--- @param value table Source array.
+--- @param records boolean Whether its values must be plain records.
+--- @return boolean
+local function debug_dense(value, records)
+	if type(value) ~= "table" or getmetatable(value) ~= nil then return false end
+	local count, maximum = 0, 0
+	for index, row in next, value do
+		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 then return false end
+		if records and (type(row) ~= "table" or getmetatable(row) ~= nil) then return false end
+		count, maximum = count + 1, math.max(maximum, index)
+	end
+	return count == maximum
+end
+
+--- Admits the actual Debug source structure without interpreting choice grammar.
+--- @param renderer table|nil Actual manifest renderer.
+--- @param platform string Native platform token.
+--- @return table|nil root, table|nil top, table|nil children, table|nil parent, table|nil fields
+local function debug_source(renderer, platform)
+	if type(renderer) ~= "table" or type(rawget(renderer, "get_root")) ~= "function"
+		or type(rawget(renderer, "build")) ~= "function" or type(rawget(renderer, "group_row")) ~= "function" then return nil end
+
+	local root = renderer.get_root()
+	if type(root) ~= "table" or getmetatable(root) ~= nil then return nil end
+	local top, children = rawget(root, "top_level"), rawget(root, "debug_menu")
+	if not debug_dense(top, true) or not debug_dense(children, true) then return nil end
+	local parent
+	for _, row in next, top do
+		if rawget(row, "id") == "debug" then
+			if parent then return nil end
+			parent = row
+		end
+	end
+	if parent == nil or rawget(parent, "type") ~= "group" or type(rawget(parent, "i18n")) ~= "string"
+		or rawget(parent, "i18n") == "" or not debug_dense(rawget(parent, "rows"), true) then return nil end
+	local platforms = rawget(parent, "platforms")
+	if platforms ~= nil then
+		if not debug_dense(platforms, false) then return nil end
+		local visible = false
+		for _, token in next, platforms do
+			if type(token) ~= "string" then return nil end
+			if token == platform then visible = true end
+		end
+		if not visible then return nil end
+	end
+	local fields = {}
+	for key, value in next, parent do fields[key] = value end
+	return root, top, children, parent, fields
+end
+
+--- Rechecks the captured direct parent fields without source metamethods.
+--- @param parent table Actual direct source row.
+--- @param fields table Captured raw field references and scalar values.
+--- @return boolean
+local function debug_parent_unchanged(parent, fields)
+	for key, value in next, parent do
+		if not rawequal(value, rawget(fields, key)) then return false end
+	end
+	for key, value in next, fields do
+		if not rawequal(value, rawget(parent, key)) then return false end
+	end
+	return true
+end
+
+--- Checks raw dense arrays without triggering source metamethods.
+--- @param value table Source array.
+--- @param records boolean Whether its values must be plain records.
+--- @return boolean
+local function configuration_dense(value, records)
+	if type(value) ~= "table" or getmetatable(value) ~= nil then return false end
+	local count, maximum = 0, 0
+	for index, row in next, value do
+		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 then return false end
+		if records and (type(row) ~= "table" or getmetatable(row) ~= nil) then return false end
+		count, maximum = count + 1, math.max(maximum, index)
+	end
+	return count == maximum
+end
+
+--- Admits the actual Configuration source structure without interpreting command grammar.
+--- @param renderer table|nil Actual manifest renderer.
+--- @param platform string Native platform token.
+--- @return table|nil root, table|nil top, table|nil children, table|nil parent, table|nil fields
+local function configuration_source(renderer, platform)
+	if type(renderer) ~= "table" or type(rawget(renderer, "get_root")) ~= "function"
+		or type(rawget(renderer, "build")) ~= "function" or type(rawget(renderer, "group_row")) ~= "function" then return nil end
+
+	local root = renderer.get_root()
+	if type(root) ~= "table" or getmetatable(root) ~= nil then return nil end
+	local top, children = rawget(root, "top_level"), rawget(root, "configuration_menu")
+	if not configuration_dense(top, true) or not configuration_dense(children, true) then return nil end
+	local parent
+	for _, row in next, top do
+		if rawget(row, "id") == "configuration" then
+			if parent then return nil end
+			parent = row
+		end
+	end
+	if parent == nil or rawget(parent, "type") ~= "group" or type(rawget(parent, "i18n")) ~= "string"
+		or rawget(parent, "i18n") == "" or not configuration_dense(rawget(parent, "rows"), true) then return nil end
+	local platforms = rawget(parent, "platforms")
+	if platforms ~= nil then
+		if not configuration_dense(platforms, false) then return nil end
+		local visible = false
+		for _, token in next, platforms do
+			if type(token) ~= "string" then return nil end
+			if token == platform then visible = true end
+		end
+		if not visible then return nil end
+	end
+	local fields = {}
+	for key, value in next, parent do fields[key] = value end
+	return root, top, children, parent, fields
+end
+
+--- Rechecks the captured direct parent fields without source metamethods.
+--- @param parent table Actual direct source row.
+--- @param fields table Captured raw field references and scalar values.
+--- @return boolean
+local function configuration_parent_unchanged(parent, fields)
+	for key, value in next, parent do
+		if not rawequal(value, rawget(fields, key)) then return false end
+	end
+	for key, value in next, fields do
+		if not rawequal(value, rawget(parent, key)) then return false end
+	end
+	return true
+end
+
+
 local HotCounter  = require("ui.menu.hotstring_counter")
 local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
 local CanvasBadge = require("ui.menu.canvas_badge")
@@ -347,28 +479,35 @@ local function build_hotstrings_rows(ctx, menu_mods)
 	local BOUND_SECTIONS = type(menu_mods.hotstrings.bound_sections) == "function"
 		and menu_mods.hotstrings.bound_sections(ctx) or {}
 	for _, menu in ipairs(M.extension_menus(ctx, counts, BOUND_BY_EXTENSION, BOUND_SECTIONS)) do
-		local items = {}
+		local pack_rows = {}
 		local bulk = type(menu_mods.hotstrings.build_extension_bulk_actions) == "function"
-			and menu_mods.hotstrings.build_extension_bulk_actions(ctx, menu.groups, menu.sections) or {}
-		for _, row in ipairs(bulk) do items[#items + 1] = row end
-		items[#items + 1] = { separator = true }
+			and menu_mods.hotstrings.build_extension_bulk_actions(ctx, menu.groups, menu.sections) or nil
 		-- One group at a time: a single pass over the loaded groups would draw them
 		-- in load order instead of the submenu's own.
 		for _, name in ipairs(menu.groups) do
-			for _, row in ipairs(collect_groups({ [name] = true }, counts)) do items[#items + 1] = row end
+			for _, row in ipairs(collect_groups({ [name] = true }, counts)) do pack_rows[#pack_rows + 1] = row end
 		end
 		-- The sections it binds inside a bundled category (the repeat corrections).
 		local section_rows, section_total = {}, 0
 		if #menu.sections > 0 and type(menu_mods.hotstrings.build_bound_section_rows) == "function" then
 			section_rows, section_total = menu_mods.hotstrings.build_bound_section_rows(ctx, menu.sections)
 		end
-		if #section_rows > 0 and #menu.groups > 0 then items[#items + 1] = { separator = true } end
-		for _, row in ipairs(section_rows) do items[#items + 1] = row end
-		extension_rows[#extension_rows + 1] = {
+		local items = type(bulk) == "table" and ManifestMenu.template_rows("hotstring_extension_content_frame", {}, {}, {
+			["extension_bulk_head"] = function() return bulk end,
+			["extension_pack_rows"] = function() return pack_rows end,
+			["extension_bound_boundary"] = function()
+				if #section_rows > 0 and #menu.groups > 0 then
+					return ManifestMenu.template_rows("hotstrings_parameter_boundary", {}, {}, {})
+				end
+				return {}
+			end,
+			["extension_bound_tail"] = function() return section_rows end,
+		}) or nil
+		if items then extension_rows[#extension_rows + 1] = {
 			label = string.format(i18n.get("menu.extensions.hotstrings_of"), menu.name)
 				.. " (" .. fmt_grand(menu.total + section_total) .. ")",
 			items = items,
-		}
+		} end
 	end
 	Logger.debug(LOG, "Built manifest row '%s' (%d extension(s)).", manifest_row, #extension_rows)
 
@@ -592,6 +731,8 @@ function M.generate(ctx, menu_mods, actions)
 		["gestures"]        = function() return module_rows("gestures") end,
 		["apps"]            = function() return module_rows("apps") end,
 		["configuration"]   = function()
+			local root, top, section, parent, fields = configuration_source(ManifestMenu, "hs")
+			if root == nil then return {} end
 			-- Every row is `type = "command"` in the manifest: labels, order and
 			-- the separators are declared, and this file supplies only what each
 			-- row does. Read once, so the pause gate below can tell the rows apart
@@ -633,7 +774,8 @@ function M.generate(ctx, menu_mods, actions)
 				-- An unregistered command draws no row, so it has nothing to gate.
 				if type(fn) == "function" then pause_gated[fn] = true end
 			end
-			local rows = ManifestMenu.build("configuration_menu", "Configuration", nil, nil, cfg_ctx) or {}
+			local rows = ManifestMenu.build("configuration_menu", "Configuration", nil, nil, cfg_ctx)
+			if not configuration_dense(rows, true) then return {} end
 			if ctx.paused then
 				for _, row in ipairs(rows) do
 					if row.fn ~= nil and pause_gated[row.fn] then
@@ -642,16 +784,27 @@ function M.generate(ctx, menu_mods, actions)
 					end
 				end
 			end
-			return { { label = i18n.get("menu.configuration.title"), submenu = rows } }
+			local current_root, current_top, current_section, current_parent = configuration_source(ManifestMenu, "hs")
+			if not rawequal(root, current_root) or not rawequal(top, current_top)
+				or not rawequal(section, current_section) or not rawequal(parent, current_parent)
+				or not configuration_parent_unchanged(parent, fields) then return {} end
+			local row = ManifestMenu.group_row("top_level", "configuration", rows, cfg_ctx.state_getters)
+			return row and { row } or {}
 		end,
 		["language"]        = function()
 			-- The locale rows reach the tray through the manifest's `language_menu`.
 			-- They were the same twenty-one entries on every driver, from the same
 			-- shared catalogue, and nothing described the menu holding them.
-			local rendered = ManifestMenu.build("language_menu", "Language", nil, nil, ctx, {
-				["locales"] = function() return i18n.build_language_menu_items() or {} end,
+			if type(i18n.build_language_menu_items) ~= "function" then return {} end
+			local ok_locales, locales = pcall(i18n.build_language_menu_items)
+			if not ok_locales then return {} end
+			local admitted = ManifestMenu.template_rows("language_menu", {}, {}, {
+				["locales"] = function() return locales end,
 			})
-			return { { label = i18n.get("menu.global.language"), submenu = rendered } }
+			if not admitted then return {} end
+			local rendered = ManifestMenu.render_rows(admitted, "language_menu")
+			local parent = ManifestMenu.group_row("top_level", "language", rendered, {})
+			return parent and { parent } or {}
 		end,
 		["about"]           = function()
 			if type(menu_mods.about) ~= "table" or type(menu_mods.about.build) ~= "function" then
@@ -680,6 +833,8 @@ function M.generate(ctx, menu_mods, actions)
 			return { row }
 		end,
 		["debug"]           = function()
+			local root, top, section, parent, fields = debug_source(ManifestMenu, "hs")
+			if root == nil then return {} end
 			-- The manifest declares every row of this submenu and the shared
 			-- renderer places them; this file supplies only what each one does.
 			local active_level_name
@@ -706,8 +861,14 @@ function M.generate(ctx, menu_mods, actions)
 			dbg_ctx.state_getters["error_dialog_enabled"] = function()
 				return require("ui.error_dialog").is_enabled()
 			end
-			local debug_items = ManifestMenu.build("debug_menu", "Debug", nil, nil, dbg_ctx, {}) or {}
-			return { { label = i18n.get("menu.debug.title"), submenu = debug_items } }
+			local debug_items = ManifestMenu.build("debug_menu", "Debug", nil, nil, dbg_ctx, {})
+			if not debug_dense(debug_items, true) then return {} end
+			local current_root, current_top, current_section, current_parent = debug_source(ManifestMenu, "hs")
+			if not rawequal(root, current_root) or not rawequal(top, current_top)
+				or not rawequal(section, current_section) or not rawequal(parent, current_parent)
+				or not debug_parent_unchanged(parent, fields) then return {} end
+			local row = ManifestMenu.group_row("top_level", "debug", debug_items, dbg_ctx.state_getters)
+			return row and { row } or {}
 		end,
 	}
 

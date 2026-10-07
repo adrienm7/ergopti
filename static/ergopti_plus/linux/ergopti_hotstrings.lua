@@ -1645,7 +1645,23 @@ local function main()
 		capture_owned_scancodes[scancode] = nil
 	end)
 
+	-- Retain the selected inverse publisher before any source-acquisition callback.
+	local capture_layout = keyboard_layout
+	local capture_publish, capture_ready = keyboard_layout.publish_current_capture, keyboard_layout.is_ready
+	local capture_override = opts.keymap
+	local function publish_reacquired_capture()
+		local function current()
+			return package.loaded["adapters.keyboard_layout"] == capture_layout
+				and capture_layout.publish_current_capture == capture_publish
+				and capture_layout.is_ready == capture_ready and opts.keymap == capture_override
+		end
+		if not current() or type(capture_publish) ~= "function" or type(capture_ready) ~= "function" then return false end
+		if capture_publish(capture_override) ~= true or not current() then return false end
+		return capture_ready() == true and current()
+	end
+
 	keyboard_hook.start({
+		onCaptureReacquired = publish_reacquired_capture,
 		device = device,
 		pinned = opts.device ~= nil,
 		layout = opts.layout,

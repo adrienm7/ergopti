@@ -490,3 +490,124 @@ helpers.describe("Template groups: existing readiness and reason policy (templat
 		end)
 	end
 end)
+
+
+--- Replays the actual complete Linux tray with an authentic Metrics module boundary.
+--- @param body function Structural source and parent assertions.
+local function metrics_parent_fixture(body)
+	-- These real modules capture one another. A preceding registered fixture may
+	-- reload locale alone; retain a fresh coherent native chain for this case.
+	local names = { "locale.core", "infra.locale", "infra.i18n", "infra.manifest_menu", "ui.menu.menu_builder" }
+	local previous, original_i18n_safe = {}, rawget(_G, "i18n_safe")
+	for module, value in pairs(package.loaded) do previous[module] = value end
+	for _, module in ipairs(names) do rawset(package.loaded, module, nil) end
+	local completed, failure = xpcall(function()
+	-- Complete the genuine discovery/read phase before a requested test locale;
+	-- the Language child must not lazily initialize it back to the saved locale.
+	require("infra.i18n").init()
+	local native = helpers.load_module("ui.menu.menu_builder")
+	local renderer, locale = require("infra.manifest_menu"), require("infra.locale")
+	local language = locale.current_locale();locale.set_locale("en")
+	local observed = {builds=0,parents=0,getters=0}
+	local context = { keylogger={is_enabled=function()return false end,get_privacy_state=function()return{}end} }
+	local function build(paused, enabled)
+		context.paused=paused==true
+		observed.child_complete=false;observed.native_reads_after_child=0
+		context.keylogger.is_enabled=function()
+			if observed.child_complete then observed.native_reads_after_child=observed.native_reads_after_child+1 end
+			return enabled==true
+		end
+		local rows = native.build(context)
+		for _,row in ipairs(rows) do if row.menu and rawequal(row.menu,observed.child) then return row end end
+		return nil
+	end
+	local ok, detail = xpcall(function()body(renderer,build,observed,locale)end,debug.traceback)
+	locale.set_locale(language)
+	if not ok then error(detail,0) end
+	end, debug.traceback)
+	for module in pairs(package.loaded) do if previous[module] == nil then rawset(package.loaded, module, nil) end end
+	for module, value in pairs(previous) do rawset(package.loaded, module, value) end
+	rawset(_G, "i18n_safe", original_i18n_safe)
+	helpers.assert_true(rawequal(rawget(_G, "i18n_safe"), original_i18n_safe))
+	for _, module in ipairs(names) do helpers.assert_true(rawequal(rawget(package.loaded, module), previous[module]), module) end
+	if not completed then error(failure, 0) end
+end
+local metrics_parent_file = assert(io.open(helpers.driver_root() .. "/../_shared/tests/corpus/menus/metrics_parent.json", "rb"))
+local metrics_parent_raw = metrics_parent_file:read("*a");metrics_parent_file:close()
+require("test.metrics_parent_contract").register(helpers,metrics_parent_fixture,assert(Json.decode(metrics_parent_raw)),"linux")
+
+
+helpers.describe("Metrics absent native module keeps genuine shared status children", function()
+	helpers.it("materializes absent status once without inventing a checked flag", function()
+		local renderer = require("infra.manifest_menu")
+		local original = renderer.render_rows
+		local deliveries, finished = 0
+		renderer.render_rows = function(rows, key)
+			local result = original(rows,key)
+			if key == "linux_metrics_absent_rows" then deliveries=deliveries+1;finished=result end
+			return result
+		end
+		local ok, detail = xpcall(function()
+			local rows = helpers.load_module("ui.menu.menu_builder").build({})
+			local parent
+			for _,row in ipairs(rows)do if row.title==require("infra.i18n").get("menu.metrics.title")then parent=row end end
+			helpers.assert_true(parent ~= nil);helpers.assert_nil(parent.checked)
+			helpers.assert_true(rawequal(parent.menu,finished));helpers.assert_eq(deliveries,1)
+			helpers.assert_eq(#parent.menu,1);helpers.assert_eq(parent.menu[1].disabled,true)
+			helpers.assert_nil(parent.menu[1].fn)
+		end,debug.traceback)
+		renderer.render_rows=original
+		if not ok then error(detail,0)end
+	end)
+end)
+
+
+helpers.describe("Metrics absent parent final source fence", function()
+	helpers.it("refuses after the genuine final caption withdraws an absent-module parent", function()
+		local renderer, i18n = require("infra.manifest_menu"), require("infra.i18n")
+		local root = assert(renderer.get_root())
+		local top, old_group, old_get, old_render = root.top_level, renderer.group_row, i18n.get, renderer.render_rows
+		local inside, calls, deliveries, projected = false, 0, 0, nil
+		renderer.group_row = function(key, id, ...)
+			inside = key == "top_level" and id == "metrics"
+			local row = old_group(key,id,...)
+			inside = false
+			if key == "top_level" and id == "metrics" then projected=row end
+			return row
+		end
+		i18n.get = function(key,...)
+			local label=old_get(key,...)
+			if inside and key=="menu.metrics.title" then calls=calls+1;root.top_level={} end
+			return label
+		end
+		renderer.render_rows=function(rows,key)
+			local result=old_render(rows,key)
+			if key=="linux_metrics_absent_rows" then deliveries=deliveries+1 end
+			return result
+		end
+		local ok, rows=pcall(helpers.load_module("ui.menu.menu_builder").build,{})
+		i18n.get,renderer.group_row,renderer.render_rows,root.top_level=old_get,old_group,old_render,top
+		helpers.assert_type(rows,"table","the protected native build returns actual rows, never an error receipt")
+		helpers.assert_true(ok);helpers.assert_eq(calls,1);helpers.assert_eq(deliveries,1)
+		helpers.assert_true(projected~=nil,"the genuine GroupRow ran before its authority was rechecked")
+		for _,row in ipairs(rows)do helpers.assert_true(not rawequal(row.menu,projected.submenu),"withdrawn absent parent cannot escape")end
+	end)
+end)
+
+
+helpers.describe("Metrics absent native failure receipt", function()
+	helpers.it("preserves the exact producer error identity through the protected full build", function()
+		local renderer = require("infra.manifest_menu")
+		local original = renderer.render_rows
+		local sentinel, calls = {}, 0
+		renderer.render_rows = function(rows, key)
+			if key == "linux_metrics_absent_rows" then calls=calls+1;error(sentinel,0) end
+			return original(rows,key)
+		end
+		local ok, detail = pcall(helpers.load_module("ui.menu.menu_builder").build,{})
+		renderer.render_rows = original
+		helpers.assert_eq(ok,false)
+		helpers.assert_true(rawequal(detail,sentinel),"the actual renderer exception must not become rows or a different error")
+		helpers.assert_eq(calls,1,"the genuine absent status renderer was reached")
+	end)
+end)

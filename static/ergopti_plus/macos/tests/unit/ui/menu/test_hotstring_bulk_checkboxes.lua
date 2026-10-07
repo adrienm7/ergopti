@@ -10,6 +10,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local CaptionFixture = require("tests.support.personal_menu_caption_fixture")
 
 local RETIRED = {
 	"menu.hotstrings.category_on", "menu.hotstrings.category_off",
@@ -220,7 +221,7 @@ helpers.describe("hotstring scope commands and independent bulk checkboxes", fun
 				ctx.keymap.start = function() starts = starts + 1; return true end
 				ctx.save_prefs = function() saves = saves + 1; return true end
 				ctx.updateMenu = function() updates = updates + 1 end
-				local built = custom.build_custom(ctx, { group_counts = {} })
+				local built = CaptionFixture.build_custom(custom, ctx, { group_counts = {} })
 				local rows = built.submenu
 				helpers.assert_true(type(rows) == "table", "the personal menu must use the shared declaration")
 				helpers.assert_eq(rows[1].title, "menu.hotstrings.scope_enable_all")
@@ -249,7 +250,7 @@ helpers.describe("hotstring scope commands and independent bulk checkboxes", fun
 					if refusal == "false" then return false end
 				end
 				ctx.updateMenu = function() updates = updates + 1 end
-				local rows = custom.build_custom(ctx, { group_counts = {} }).submenu
+				local rows = CaptionFixture.build_custom(custom, ctx, { group_counts = {} }).submenu
 				helpers.assert_true(type(rows) == "table", "personal scope commands must render")
 				helpers.assert_eq(rows[enabled and 1 or 2].fn(), false)
 				helpers.assert_eq(batches, { { names = { "personal", "personal_ext_work", "custom" }, enabled = enabled } })
@@ -274,7 +275,7 @@ helpers.describe("hotstring scope commands and independent bulk checkboxes", fun
 			ctx.state.trigger_char = "★"
 			ctx.hotfile_paths = { personal_ext_work = "/user/work.toml" }
 			ctx.hotstring_editor = { open = function() end }
-			local rows = custom.build_custom(ctx, { group_counts = {} }).submenu
+			local rows = CaptionFixture.build_custom(custom, ctx, { group_counts = {} }).submenu
 			local file
 			for _, row in ipairs(rows) do if row.title == "work" then file = row end end
 			helpers.assert_true(file ~= nil, "the personal file must survive native subtree rendering")
