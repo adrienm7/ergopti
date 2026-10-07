@@ -3372,6 +3372,15 @@ leaf binding, acquisition, installation and runtime authentication remain
 unqualified; no production caller, release or activation is added. Item31 stays
 partial.
 
+The portable CF Team metadata whole-source conservation check now composes the
+exact independently reviewed retired-compilation diagnostic addition before its
+original historical inverse. The compressed oracle, all seven original test
+bodies and strict status/producer guards remain intact. Exact tested FCD source
+reproduces six passes and one assertion failure; the corrected source passes
+all seven in normal and optimized modes, including meaningful mutation checks.
+Corrected native CI execution remains pending and does not qualify CF metadata
+or the runtime. Item31 remains partial.
+
 WP3 prerequisite: the actual macOS physical accounting owner now requires exact held-modifier settlement before accepting source transitions. The keylogger retires each crossing physical release without emitting an orphan hold or a new press, including pause and secure-context crossings; ordinary legacy and collision behavior remains unchanged. Existing native fixture parents restore their settlement child through the scoped cache owner, while normal production stop/restart retains the same CoreState. Portable focused tests pass (32 held-key cases, 24 policy cases, 3 legacy collision cases, 23 existing cache-scope cases, and 9 unchanged alias configuration/privacy cases); the original real gap-release source fails all eight side-key cases. This does not enable a producer or headless mode, alter transport/baseline versions, or complete WP3/WP4/native acceptance. Full root and hosted macOS qualification remain required.
 
 WP3 remains partial. An explicitly initialized, dormant physical-capture session

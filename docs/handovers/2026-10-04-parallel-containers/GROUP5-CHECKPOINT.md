@@ -1838,3 +1838,17 @@ cases pass unchanged in this run, while the genuine previous stale copied-curren
 trace remains evidence requiring harness lifecycle qualification. Supported bounded
 HTTPRange/ETag/CRC retrieval retains26 actual archive members; no full1.2GB download
 or archive-wide digest is claimed. No group TODO is removed;16/38 remain open.
+
+## Portable Team metadata diagnostic composition correction
+
+Exact FCD source reproduces the authentic native wrapper's seven-case portable
+failure: the historical whole-file comparison omitted the legitimate closed
+compilation-refusal message introduced in d9e242b0d. A one-source correction
+requires that exact addition once and reverses only it before the unchanged
+historical equality. Original compressed oracle, all seven test bodies, status0
+and producer/source guards remain whole. Independent normal/optimized replay,
+missing/malformed/status1/wrong-producer/removed-guard controls and strict inverse
+qualify the source correction; detailed native A834 stderr was not archived.
+Root focused checks and selected verification precede publication. Corrected
+Mac CI, actual CF metadata, packaging and installation remain unqualified.
+Item31 and transverse16/38 remain open.

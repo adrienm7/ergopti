@@ -69,6 +69,14 @@ ADDITION = """			guard products.status == 0, products.stdout ==
 """
 
 
+# d9e242b0dda7e8c766b71b418bb80d3db9274a0d added a closed failure message
+# without changing the status assertion. Compose its exact inverse with the
+# metadata addition; the historical whole-file oracle remains immutable.
+OWNED_REFUSAL_DIAGNOSTIC = """			XCTAssertEqual(compiled.status, 0, "Retired owned compilation refusal code: "
+				+ HS274RetiredBuildRefusal.code(compiled.stderr, producer: .owned))
+"""
+
+
 class PortableSourceTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -114,6 +122,10 @@ class PortableSourceTests(unittest.TestCase):
 
     def test_existing_caller_exact_inverse_and_post_products_guard(self):
         current = (CANDIDATE / SWIFT_PATH).read_text()
+        self.assertEqual(current.count(OWNED_REFUSAL_DIAGNOSTIC), 1)
+        current = current.replace(
+            OWNED_REFUSAL_DIAGNOSTIC, "\t\t\tXCTAssertEqual(compiled.status, 0)\n", 1
+        )
         before = (PACKET / "before" / SWIFT_PATH).read_text()
         self.assertEqual(current.count(ADDITION), 1)
         self.assertEqual(current.replace(ADDITION, "", 1), before)
