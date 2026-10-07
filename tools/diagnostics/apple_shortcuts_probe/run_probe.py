@@ -45,41 +45,176 @@ def retire(owners):
             signal.signal(sig, handler)
 
 
+class ProbeObservationRefused(ValueError):
+    """Closed diagnostic cause; neither private native text nor a success verdict."""
+
+    def __init__(self, kind):
+        super().__init__("probe_refused")
+        self.kind = kind
+
+
+def checkpoint_summary(raw, role):
+    """Admit only an ordered fixed marker prefix, never native names or errors."""
+    expected = [b"ASCP:1\n", b"ASCP:2\n", b"ASCP:3\n", b"ASCP:4\n"]
+    if role != "discovery":
+        return {"valid": raw == b"", "last": 0}
+    for count in range(5):
+        if raw == b"".join(expected[:count]):
+            return {"valid": True, "last": count}
+    return {"valid": False, "last": 0}
+
+
+def terminal_summary(observation, group):
+    """Copy the existing WNOWAIT sample before retirement, with exact child binding."""
+    if observation is None:
+        return None
+    values = [getattr(observation, key, None) for key in ("si_pid", "si_code", "si_status")]
+    if (
+        any(type(value) is not int for value in values)
+        or values[0] != group.process.pid
+        or values[0] <= 0
+        or not 1 <= values[1] <= 6
+        or not 0 <= values[2] <= 255
+    ):
+        raise ProbeObservationRefused("terminal_shape")
+    return dict(zip(("pid", "code", "status"), values))
+
+
+def observation_interrupted(error, ownership):
+    """Recognize the exact native owner's cancellation without replacing its object."""
+    interruption = getattr(ownership, "OwnedProcessInterrupted", None)
+    return not isinstance(error, Exception) or (
+        isinstance(interruption, type)
+        and issubclass(interruption, BaseException)
+        and isinstance(error, interruption)
+    )
+
+
 def capture(arguments, native, ownership, evidence, role):
     owners = []
+    started = time.monotonic()
+    failure_kind = "none"
+    observed_terminal = None
+    primary_error = None
     with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
         try:
             group = ownership.acquire_owned(
                 arguments, native, owners.append, stdout=out, stderr=err
             )
             deadline = time.monotonic() + 20
-            while group.observe_exit() is None:
-                require(time.monotonic() < deadline)
-                require(
-                    os.fstat(out.fileno()).st_size <= LIMIT
-                    and os.fstat(err.fileno()).st_size <= LIMIT
-                )
+            while True:
+                observation = group.observe_exit()
+                if observation is not None:
+                    observed_terminal = terminal_summary(observation, group)
+                    break
+                if time.monotonic() >= deadline:
+                    raise ProbeObservationRefused("deadline")
+                if os.fstat(out.fileno()).st_size > LIMIT or os.fstat(err.fileno()).st_size > LIMIT:
+                    raise ProbeObservationRefused("output_bound")
                 time.sleep(0.02)
+        except BaseException as error:
+            primary_error = error
+            failure_kind = (
+                error.kind if isinstance(error, ProbeObservationRefused) else "capture_refused"
+            )
+            raise
         finally:
             acknowledged = False
+            retirement_error = None
             try:
                 retire(owners)
                 acknowledged = True
+            except BaseException as error:
+                # The original retirement refusal keeps priority over capture.
+                retirement_error = error
+                raise
             finally:
+                pending_error = retirement_error if retirement_error is not None else primary_error
+                observation = {
+                    "failure": failure_kind,
+                    "terminal_before_retirement": observed_terminal,
+                    "metadata_available": False,
+                    "metadata_failure": "pending",
+                }
+                diagnostic_error = None
+                try:
+                    elapsed_us = min(
+                        86400000000, max(0, int((time.monotonic() - started) * 1000000))
+                    )
+                    stdout_bytes = os.fstat(out.fileno()).st_size
+                    stderr_bytes = os.fstat(err.fileno()).st_size
+                    checkpoint = _checkpoint_from_capture(err, role)
+                    if (
+                        type(stdout_bytes) is not int
+                        or stdout_bytes < 0
+                        or type(stderr_bytes) is not int
+                        or stderr_bytes < 0
+                        or type(checkpoint) is not dict
+                        or set(checkpoint) != {"valid", "last"}
+                        or type(checkpoint["valid"]) is not bool
+                        or type(checkpoint["last"]) is not int
+                        or not 0 <= checkpoint["last"] <= 4
+                        or (checkpoint["valid"] is False and checkpoint["last"] != 0)
+                    ):
+                        raise ProbeObservationRefused("diagnostic_shape")
+                    observation.update(
+                        {
+                            "elapsed_us": elapsed_us,
+                            "stdout_bytes": stdout_bytes,
+                            "stderr_bytes": stderr_bytes,
+                            "checkpoint": checkpoint,
+                            "metadata_available": True,
+                            "metadata_failure": "none",
+                        }
+                    )
+                except BaseException as error:
+                    diagnostic_error = error
+                    if observation_interrupted(error, ownership):
+                        observation["metadata_failure"] = "observation_interrupted"
+                    elif isinstance(error, OSError):
+                        observation["metadata_failure"] = "capture_io"
+                    elif isinstance(error, ProbeObservationRefused):
+                        observation["metadata_failure"] = error.kind
+                    else:
+                        observation["metadata_failure"] = "capture_refused"
+                    if failure_kind == "none":
+                        observation["failure"] = observation["metadata_failure"]
                 evidence.append(
                     {
                         "role": role,
                         "registered": len(owners),
                         "retirement_ack": acknowledged,
                         "groups": [retained.receipt() for retained in owners],
+                        "observation": observation,
                     }
                 )
-        require(group.process.returncode == 0)
+                if diagnostic_error is not None:
+                    # A new cancellation wins even over an earlier ordinary
+                    # error. Optional metadata IO cannot replace a pending one.
+                    if observation_interrupted(diagnostic_error, ownership):
+                        raise diagnostic_error
+                    if pending_error is None:
+                        raise ProbeObservationRefused(observation["metadata_failure"]) from None
+        if group.process.returncode != 0:
+            evidence[-1]["observation"]["failure"] = "native_exit"
+            raise ProbeObservationRefused("native_exit")
         out.seek(0)
         err.seek(0)
         raw, errors = out.read(LIMIT + 1), err.read(LIMIT + 1)
-        require(0 < len(raw) <= LIMIT and len(errors) == 0)
+        if not 0 < len(raw) <= LIMIT or len(errors) > LIMIT:
+            evidence[-1]["observation"]["failure"] = "output_bound"
+            raise ProbeObservationRefused("output_bound")
+        checkpoints = checkpoint_summary(errors, role)
+        if not checkpoints["valid"]:
+            evidence[-1]["observation"]["failure"] = "diagnostic_shape"
+            raise ProbeObservationRefused("diagnostic_shape")
         return raw
+
+
+def _checkpoint_from_capture(stream, role):
+    """Read the same acquired temporary descriptor after physical retirement."""
+    stream.seek(0)
+    return checkpoint_summary(stream.read(LIMIT + 1), role)
 
 
 def validate(raw):
