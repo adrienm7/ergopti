@@ -5711,3 +5711,116 @@ console.log(
 			assert.equal(locale['menu.shortcuts.personal'], expected.french_caption);
 	}
 }
+
+// The complete physical-key family owns every fixed native row, not a lone boundary.
+{
+	const assert = require('node:assert/strict');
+	const fs = require('fs');
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const { delegatedMenuSources } = require('../lib/menu-shared-delegation.cjs');
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/magic_key_source_family.json'), 'utf8')
+	);
+	const menu = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	assert.deepEqual(menu.magic_key_source_menu, corpus.parent);
+	assert.deepEqual(menu.magic_key_source_children, corpus.children);
+	assert.deepEqual(
+		menu.layout_menu.filter((row) => row.id === 'magic_key_source'),
+		[{ type: 'list', id: 'magic_key_source' }]
+	);
+	for (const language of readdirSync(LOCALES_DIR).filter((file) => file.endsWith('.json'))) {
+		const locale = JSON.parse(readFileSync(resolve(LOCALES_DIR, language), 'utf8'));
+		for (const key of [...corpus.parent, ...corpus.children]
+			.map((row) => row.i18n)
+			.filter(Boolean)
+			.concat(corpus.reason_key))
+			assert.equal(
+				typeof locale[key],
+				'string',
+				`${language}: existing physical-key caption ${key}`
+			);
+	}
+	const sharedRoot = resolve(SHARED, 'lua');
+	const mac = 'macos/ui/menu/magic_key_source_menu.lua',
+		linux = 'linux/ui/menu/menu_builder.lua';
+	for (const rel of [mac, linux]) {
+		const source = fs.readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus', rel), 'utf8');
+		const reached = delegatedMenuSources([{ rel, src: source }], sharedRoot).find(
+			(entry) => entry.rel === 'keymap.magic_key_source.menu_rows'
+		);
+		assert(reached, `${rel}: actual native call must reach the real shared renderer`);
+		for (const id of [
+			'magic_key_source_capture',
+			'magic_key_source_automatic',
+			'magic_key_source_candidates'
+		])
+			assert(reached.handlers.has(id), `${rel}: actual callable owner ${id}`);
+		const method = rel === mac ? 'Shared.menu_rows' : 'MagicKeySourceRows.menu_rows';
+		for (const inactive of [
+			source.replace(method + '(', 'Foreign.' + method + '('),
+			source.replace('manifest = ManifestMenu', 'manifest = Foreign.ManifestMenu'),
+			source.replace('manifest = ManifestMenu', 'unowned = ManifestMenu')
+		])
+			assert(
+				!delegatedMenuSources([{ rel, src: inactive }], sharedRoot).some(
+					(entry) => entry.rel === 'keymap.magic_key_source.menu_rows'
+				),
+				`${rel}: foreign receiver or missing renderer port cannot borrow the shared family`
+			);
+	}
+	const native = fs.readFileSync(
+		resolve(REPO_ROOT, 'static/ergopti_plus/windows/ui/editors.ahk'),
+		'utf8'
+	);
+	function physicalFamily(source) {
+		const tokens = scriptTokens(source, '.ahk');
+		const bodies = [];
+		for (let i = 0; i < tokens.length; i += 1) {
+			if (
+				tokens[i].kind !== 'identifier' ||
+				tokens[i].value !== 'MagicKeySourceMenuRows' ||
+				tokens[i + 1]?.value !== '(' ||
+				tokens[i + 2]?.value !== ')' ||
+				tokens[i + 3]?.value !== '{' ||
+				!/^\s*$/.test(
+					source.slice(source.lastIndexOf('\n', tokens[i].start - 1) + 1, tokens[i].start)
+				)
+			)
+				continue;
+			let depth = 1,
+				end = i + 4;
+			for (; end < tokens.length && depth > 0; end += 1) {
+				if (tokens[end].kind !== 'symbol') continue;
+				if (tokens[end].value === '{') depth += 1;
+				if (tokens[end].value === '}') depth -= 1;
+			}
+			if (depth === 0) bodies.push(tokens.slice(i + 4, end - 1));
+		}
+		if (bodies.length !== 1) return false;
+		return ['magic_key_source_children', 'magic_key_source_menu'].every((frame) =>
+			bodies[0].some(
+				(token, i, body) =>
+					token.kind === 'identifier' &&
+					token.value === 'MenuRenderer_TemplateRows' &&
+					!['.', ':'].includes(body[i - 1]?.value) &&
+					body[i + 1]?.value === '(' &&
+					body[i + 2]?.kind === 'string' &&
+					body[i + 2]?.value === frame &&
+					body[i + 3]?.value === ','
+			)
+		);
+	}
+	assert(physicalFamily(native), 'the actual Windows family must construct both shared templates');
+	for (const invalid of [
+		native.replaceAll('MenuRenderer_TemplateRows(', 'Foreign.MenuRenderer_TemplateRows('),
+		native.replace('MagicKeySourceMenuRows() {', 'if MagicKeySourceMenuRows() {'),
+		native.replace('"magic_key_source_children", Commands', '"foreign_children", Commands')
+	])
+		assert(
+			!physicalFamily(invalid),
+			'foreign/data/conditional native routes cannot credit the genuine family'
+		);
+	console.log(
+		'[OK] physical magic-key family: complete hand hierarchy, all21 existing captions and executed native/shared ownership.'
+	);
+}
