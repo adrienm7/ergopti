@@ -1988,7 +1988,6 @@
 	"sg_actions.app_previous": "⇥ Предыдущее приложение — все экраны",
 	"sg_actions.app_previous_screen": "⇥ Предыдущее приложение — этот экран",
 	"sg_actions.app_switcher": "⇥ Системный Alt+Tab",
-	"sg_actions.system_app_switcher": "⇥ Системный Alt+Tab",
 	"sg_actions.app_window_previous": "◱ → Следующее окно, без переключателя (Alt+Esc)",
 	"sg_actions.arrow_down": "↓ Стрелка вниз",
 	"sg_actions.arrow_left": "← Стрелка влево",

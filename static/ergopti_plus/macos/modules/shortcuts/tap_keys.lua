@@ -226,17 +226,6 @@ function M.get_action(id)
 	return _assignments[id] or "none"
 end
 
---- Captures the private tap assignment without calling a public getter at seal.
---- @param binding string Canonical tap binding.
---- @param action string Exact selected action.
---- @return function|nil guard Pure terminal seal.
-function M.capture_action_delivery_guard(binding, action)
-	if type(binding) ~= "string" or binding:sub(1, 9) ~= "tap_key__" then return nil end
-	local id, assignments = binding:sub(10), _assignments
-	if not assignments or assignments[id] ~= action then return nil end
-	return function() return _assignments == assignments and assignments[id] == action end
-end
-
 --- Whether a loaded explicit assignment requires the shared native dispatcher.
 --- @return boolean assigned
 function M.has_assignments()
