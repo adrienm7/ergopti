@@ -55,8 +55,8 @@ _CNP_HasMarker(Text, Kind, Marker) {
 
 /** Requires the exact owned witness foreground, thread, process and child focus. */
 _CNP_RequireWitness(Witness, WitnessEdit, Pid, MainThread) {
-	Thread := DllCall("GetWindowThreadProcessId", "Ptr", Witness.Hwnd, "UInt*", &OwnerPid := 0, "UInt")
-	_CNP_Require(OwnerPid == Pid && Thread == MainThread
+	WitnessThread := DllCall("GetWindowThreadProcessId", "Ptr", Witness.Hwnd, "UInt*", &OwnerPid := 0, "UInt")
+	_CNP_Require(OwnerPid == Pid && WitnessThread == MainThread
 		&& DllCall("GetParent", "Ptr", WitnessEdit.Hwnd, "Ptr") == Witness.Hwnd
 		&& DllCall("GetForegroundWindow", "Ptr") == Witness.Hwnd
 		&& DllCall("GetFocus", "Ptr") == WitnessEdit.Hwnd,
@@ -75,15 +75,15 @@ _CNP_Run(Kind, Operation) {
 	Pid := DllCall("GetCurrentProcessId", "UInt")
 	_CNP_Require(!DllCall("IsWindowVisible", "Ptr", Main), "The source runtime must start hidden.")
 	_CNP_Require(WinGetClass("ahk_id " . Main) == "AutoHotkey", "The source must be the native runtime.")
-	Edit := DllCall("GetDlgItem", "Ptr", Main, "Int", 1, "Ptr")
-	_CNP_Require(Edit && DllCall("GetParent", "Ptr", Edit, "Ptr") == Main,
+	RuntimeEdit := DllCall("GetDlgItem", "Ptr", Main, "Int", 1, "Ptr")
+	_CNP_Require(RuntimeEdit && DllCall("GetParent", "Ptr", RuntimeEdit, "Ptr") == Main,
 		"The Edit must belong to this exact runtime.")
-	_CNP_Require(WinGetClass("ahk_id " . Edit) == "Edit", "The source must be the native Edit.")
-	EditThread := DllCall("GetWindowThreadProcessId", "Ptr", Edit, "UInt*", &EditPid := 0, "UInt")
+	_CNP_Require(WinGetClass("ahk_id " . RuntimeEdit) == "Edit", "The source must be the native Edit.")
+	EditThread := DllCall("GetWindowThreadProcessId", "Ptr", RuntimeEdit, "UInt*", &EditPid := 0, "UInt")
 	MainThread := DllCall("GetWindowThreadProcessId", "Ptr", Main, "UInt*", &MainPid := 0, "UInt")
 	_CNP_Require(EditPid == Pid && MainPid == Pid && EditThread == MainThread,
 		"Native capture must retain process and thread ownership.")
-	ReadOnly := !!(WinGetStyle("ahk_id " . Edit) & 0x800)
+	ReadOnly := !!(WinGetStyle("ahk_id " . RuntimeEdit) & 0x800)
 	_CNP_Require(ReadOnly, "The runtime Edit must retain its native read-only style.")
 	Witness := Gui(, "CNP_OLD_FOREGROUND_7263")
 	WitnessEdit := Witness.AddEdit("w280", "Private focus witness")
@@ -95,7 +95,7 @@ _CNP_Run(Kind, Operation) {
 		_CNP_Require(WinWaitActive("ahk_id " . Witness.Hwnd, , 3), "The native focus witness must activate.")
 		_CNP_RequireWitness(Witness, WitnessEdit, Pid, MainThread)
 		_CNP_Require(ConsoleWindowNative.Open(Kind) == true, "The production native adapter must acknowledge priming.")
-		Cached := ControlGetText(Edit)
+		Cached := ControlGetText(RuntimeEdit)
 		OldMarker := Kind == "list_vars" ? "CNP_OLD_VALUE_8291" : "Window: CNP_OLD_FOREGROUND_7263"
 		NewMarker := Kind == "list_vars" ? "CNP_FRESH_VALUE_9472" : "Window: CNP_FRESH_FOREGROUND_3186"
 		_CNP_Require(_CNP_HasMarker(Cached, Kind, OldMarker), "Priming must capture the independently owned old sentinel.")
@@ -105,7 +105,7 @@ _CNP_Run(Kind, Operation) {
 		WitnessEdit.Focus()
 		_CNP_Require(WinWaitActive("ahk_id " . Witness.Hwnd, , 3), "The changed foreground witness must activate.")
 		_CNPSentinel := "CNP_FRESH_VALUE_9472"
-		_CNP_Require(!_CNP_HasMarker(ControlGetText(Edit), Kind, NewMarker), "Cached text must precede the new sentinel.")
+		_CNP_Require(!_CNP_HasMarker(ControlGetText(RuntimeEdit), Kind, NewMarker), "Cached text must precede the new sentinel.")
 		_CNP_Require(!DllCall("IsWindowVisible", "Ptr", Main), "Acquisition must start with a hidden runtime.")
 		_CNP_Require(DllCall("GetFocus", "Ptr") == WitnessEdit.Hwnd, "Acquisition must start with exact child focus.")
 		; Drain priming events before installing either whole-acquisition witness.
@@ -131,18 +131,18 @@ _CNP_Run(Kind, Operation) {
 		}
 		; Out-of-context WinEvents are queued on this thread, even after restoration.
 		Sleep(80)
-		Fresh := _CNP_HasMarker(ControlGetText(Edit), Kind, NewMarker)
+		Fresh := _CNP_HasMarker(ControlGetText(RuntimeEdit), Kind, NewMarker)
 		Visible := !!DllCall("IsWindowVisible", "Ptr", Main)
 		Foreground := DllCall("GetForegroundWindow", "Ptr") == Main
 		FinalMainThread := DllCall("GetWindowThreadProcessId", "Ptr", Main, "UInt*", &FinalMainPid := 0, "UInt")
-		FinalEditThread := DllCall("GetWindowThreadProcessId", "Ptr", Edit, "UInt*", &FinalEditPid := 0, "UInt")
+		FinalEditThread := DllCall("GetWindowThreadProcessId", "Ptr", RuntimeEdit, "UInt*", &FinalEditPid := 0, "UInt")
 		Identity := Main == A_ScriptHwnd && Title == WinGetTitle("ahk_id " . Main)
-			&& Edit == DllCall("GetDlgItem", "Ptr", Main, "Int", 1, "Ptr")
-			&& DllCall("GetParent", "Ptr", Edit, "Ptr") == Main
-			&& WinGetClass("ahk_id " . Main) == "AutoHotkey" && WinGetClass("ahk_id " . Edit) == "Edit"
+			&& RuntimeEdit == DllCall("GetDlgItem", "Ptr", Main, "Int", 1, "Ptr")
+			&& DllCall("GetParent", "Ptr", RuntimeEdit, "Ptr") == Main
+			&& WinGetClass("ahk_id " . Main) == "AutoHotkey" && WinGetClass("ahk_id " . RuntimeEdit) == "Edit"
 			&& FinalMainPid == Pid && FinalEditPid == Pid
 			&& FinalMainThread == MainThread && FinalEditThread == EditThread
-		ReadOnly := !!(WinGetStyle("ahk_id " . Edit) & 0x800)
+		ReadOnly := !!(WinGetStyle("ahk_id " . RuntimeEdit) & 0x800)
 		WitnessFocused := DllCall("GetForegroundWindow", "Ptr") == Witness.Hwnd
 			&& DllCall("GetFocus", "Ptr") == WitnessEdit.Hwnd
 		Receipt := Format("{1}|{2}|{3}|{4}|{5}|{6}|{7}|{8}", Fresh, Visible, Foreground,

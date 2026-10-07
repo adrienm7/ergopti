@@ -1988,7 +1988,6 @@
 	"sg_actions.app_previous": "⇥ 前のアプリ — すべての画面",
 	"sg_actions.app_previous_screen": "⇥ 前のアプリ — この画面",
 	"sg_actions.app_switcher": "⇥ システムの Alt+Tab",
-	"sg_actions.system_app_switcher": "⇥ システムの Alt+Tab",
 	"sg_actions.app_window_previous": "◱ → 次のウィンドウ（スイッチャーなし、Alt+Esc）",
 	"sg_actions.arrow_down": "↓ 下矢印",
 	"sg_actions.arrow_left": "← 左矢印",

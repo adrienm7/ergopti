@@ -285,7 +285,7 @@ _SBT_DiagnosticMarkerFact(Path, ReadFn := 0) {
 		Observed := ReadFn.Call(Path)
 		Known := Map()
 		Known.CaseSense := "On"
-		for PhaseName in ["fixture_enter", "before_worker", "enumerate_monitors", "enumerate_methods", "write", "readback", "worker_return", "emit"]
+		for PhaseName in ["fixture_enter", "before_worker", "enumerate_monitors", "enumerate_methods", "write", "readback", "worker_return", "emit", "worker_policy_entry", "policy_read", "policy_read_done", "policy_decode"]
 			Known[PhaseName] := true
 		if (Observed is String) && Known.Has(Observed)
 			Phase := Observed
@@ -406,7 +406,7 @@ Test("screen brightness: closed diagnostic refuses malformed private observation
 
 
 _SBT_NativeProvider(Mode, ExpectedStatus, ExpectedExit, ExpectedCalls := 1,
-		ExpectedStage := "readback", ExpectedPolicyType := "object") {
+		ExpectedStage := "readback", ExpectedPolicyType := "object", FixturePolicyProbe := false) {
 	global _DriverDir, _SharedDir, _VendorDir
 	Observed := [], Control := Map(), Polls := 0
 	Args := ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
@@ -417,6 +417,8 @@ _SBT_NativeProvider(Mode, ExpectedStatus, ExpectedExit, ExpectedCalls := 1,
 	MarkerPath := _SBT_DiagnosticMarkerCreate()
 	if MarkerPath != ""
 		Args.Push("-FixtureDiagnosticPath", MarkerPath)
+	if FixturePolicyProbe
+		Args.Push("-FixturePolicyProbe")
 	try Handle := ShellRunner_SpawnTreeOwned("powershell.exe", Args,
 		(Code, Out, Err) => Observed.Push(Map("exit", Code, "stdout", Out, "stderr", Err)), , _SBT_ObserveNative.Bind(Control), 8192)
 	catch Any as Err {
@@ -601,3 +603,23 @@ _SBT_DiagnosticMarkerControls() {
 	} finally _SBT_DiagnosticMarkerDelete(Path)
 }
 Test("screen brightness: optional phase marker reads closed bounded facts without exposing paths", _SBT_DiagnosticMarkerControls)
+
+; Separate opt-in comparisons preserve all five ordinary native provider trials.
+; Lazy command forwarding may change lookup timing; a comparator pass does not
+; establish a previous timeout cause or qualify a physical WMI provider.
+Test("screen brightness: policy command comparator uses the actual native worker", () => _SBT_NativeProvider("applied", "applied", 0, 1, "readback", "object", true))
+Test("screen brightness: policy command comparator retains absent provider refusal", () => _SBT_NativeProvider("unsupported", "unsupported", 0, 0, "enumerate_methods", "object", true))
+
+_SBT_PolicyComparatorMarkerValue(Value, *) {
+	return Value
+}
+
+_SBT_PolicyComparatorMarkerLabels() {
+	for Phase in ["worker_policy_entry", "policy_read", "policy_read_done", "policy_decode"] {
+		AssertEqual(";phase_observed=" . Phase, _SBT_DiagnosticMarkerFact("controlled marker", _SBT_PolicyComparatorMarkerValue.Bind(Phase)))
+	}
+	for Unknown in ["policy_read PRIVATE_BODY", "policy_decode`n", "POLICY_READ", "worker_enter", "C:\PRIVATE_POLICY_PATH"] {
+		AssertEqual(";phase_observed=unavailable", _SBT_DiagnosticMarkerFact("controlled marker", _SBT_PolicyComparatorMarkerValue.Bind(Unknown)))
+	}
+}
+Test("screen brightness: policy comparator facts admit only their closed phase labels", _SBT_PolicyComparatorMarkerLabels)
