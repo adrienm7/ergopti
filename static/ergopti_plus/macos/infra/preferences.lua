@@ -33,6 +33,33 @@ local M = {}
 local hs        = hs
 local TomlCodec = require("infra.toml.codec")
 local TomlWriter = require("toml_codec.writer")
+-- Use the constructor's captured checker, never a replaceable public getter.
+-- This is the same trusted normal-loader boundary as the shared writer; it
+-- does not authenticate arbitrary source-spoofing searchers or debug mutation.
+local SchemaOwner = require("config_migrate")
+local schema_factory = assert(rawget(SchemaOwner, "writer_admission_factory"))
+local SourceIdentity = require("module_source_identity")
+local source_sibling, source_same = SourceIdentity.sibling, SourceIdentity.same
+local source_directory = require("module_source_directory").capture()
+local constructor_source = debug.getinfo(1, "S").source
+local schema_source = source_sibling(constructor_source, "infra/preferences.lua",
+	"../_shared/lua/config_migrate.lua", source_directory)
+assert(source_same(debug.getinfo(schema_factory, "S").source, schema_source, source_directory),
+	"preference schema owner is not canonical")
+local schema_origin, _, schema_reader = schema_factory()
+assert(rawequal(schema_origin, SchemaOwner) and type(schema_reader) == "function", "preference schema origin is invalid")
+local function capture_schema_read(path, file_adapter)
+	if not rawequal(rawget(package.loaded, "toml_codec.writer"), TomlWriter)
+		or not rawequal(rawget(package.loaded, "config_migrate"), SchemaOwner)
+		or not rawequal(rawget(SchemaOwner, "writer_admission_factory"), schema_factory) then return false end
+	return schema_reader(path, file_adapter)
+end
+local function schema_read_admitted(check, content, status)
+	if check == nil then return true end
+	if type(check) ~= "function" then return false end
+	local called, accepted = pcall(check, content, status)
+	return called and accepted == true
+end
 local Logger    = require("infra.logger")
 local FileSystem = require("adapters.file_system")
 local Manifest = require("infra.manifest_reader")
@@ -965,7 +992,10 @@ local _load_outdated = {}
 --- @param prefs_file string Destination path.
 --- @return table|nil snapshot Exact `ok`/`absent` source classification.
 local function classify_source(prefs_file, on_error)
+	local schema_check = capture_schema_read(prefs_file, FileSystem)
+	if schema_check == false then return nil end
 	local content, read_status = FileSystem.read_with_status(prefs_file, on_error)
+	if not schema_read_admitted(schema_check, content, read_status) then return nil end
 	if read_status == "ok" and type(content) == "string" then
 		return { status = "ok", content = content }
 	end
@@ -1061,7 +1091,18 @@ end
 --- @return string "ok" | "absent" | "corrupt"
 function M.load(prefs_file)
 	assert(not _owned_publications[prefs_file], "preference publication is still active")
+	local schema_check = capture_schema_read(prefs_file, FileSystem)
+	if schema_check == false then
+		_source_snapshots[prefs_file] = nil
+		Logger.error(LOG, "config.toml schema reader owner is unavailable; keeping its source untouched.")
+		return {}, "corrupt"
+	end
 	local content, read_status = FileSystem.read_with_status(prefs_file)
+	if not schema_read_admitted(schema_check, content, read_status) then
+		_source_snapshots[prefs_file] = nil
+		Logger.error(LOG, "config.toml has unsupported schema metadata; keeping its source untouched.")
+		return {}, "corrupt"
+	end
 	if read_status ~= "ok" then
 		if read_status == "absent" then
 			_source_snapshots[prefs_file] = { status = "absent" }
@@ -1093,6 +1134,11 @@ function M.load(prefs_file)
 	if not flattened then
 		_source_snapshots[prefs_file] = nil
 		Logger.error(LOG, "config.toml contains an invalid owned setting; keeping its source untouched.")
+		return {}, "corrupt"
+	end
+	if not schema_read_admitted(schema_check, content, read_status) then
+		_source_snapshots[prefs_file] = nil
+		Logger.error(LOG, "config.toml reader admission changed during hydration; keeping its source untouched.")
 		return {}, "corrupt"
 	end
 	_source_snapshots[prefs_file] = { status = "ok", content = content }
