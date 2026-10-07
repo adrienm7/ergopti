@@ -869,3 +869,62 @@ TestMsgBoxCount(Record := false) {
 		Count += 1
 	return Count
 }
+
+; Resolve an exported top-level function to its unique authored source file.
+; Native child fixtures use this path in their actual #Include statements,
+; retaining production registration while following module moves by symbol.
+; A fresh complete census refuses missing, duplicate and unreadable sources;
+; no first match or cached path may hide a moved or newly duplicated export.
+; @param Name {String} Unqualified function name; AHK identity ignores case.
+; @param Root {String} Driver root; the suite's windows parent by default.
+; @returns {String} Absolute path of the unique production definition.
+_DriverProductionFileForSymbol(Name, Root := "") {
+	if !(Name is String) || !RegExMatch(Name, "^[A-Za-z_][A-Za-z0-9_]*$")
+		throw ValueError("Invalid production function symbol.")
+	if !(Root is String)
+		throw TypeError("The production source root must be a path string.")
+	if Root == ""
+		SplitPath(A_ScriptDir, , &Root)
+	if !InStr(FileExist(Root), "D")
+		throw ValueError("The production source root must be an existing directory.", -1, Root)
+	Matches := []
+	Loop Files, Root . "\*.ahk", "FR" {
+		Path := A_LoopFileFullPath
+		if !_DriverIsProductionSource(Path)
+			continue
+		Source := FileRead(Path, "UTF-8")
+		Code := _DriverMaskNonCode(&Source)
+		Count := _DriverTopLevelDefinitionCount(&Code, Name)
+		Loop Count
+			Matches.Push(Path)
+	}
+	if Matches.Length == 0
+		throw Error("No production definition for function '" . Name . "'.")
+	if Matches.Length != 1
+		throw Error("Multiple production definitions for function '" . Name . "': " . Matches.Length . ".")
+	return Matches[1]
+}
+
+; Definition syntax comes from the existing signature scanner. Prefix brace
+; depth excludes class methods and nested functions from exported global names;
+; literals and comments were already masked without changing native offsets.
+_DriverTopLevelDefinitionCount(&Code, Name) {
+	Count := 0
+	Depth := 0
+	ScannedThrough := 1
+	SearchFrom := 1
+	; Both declaration forms share one signature validator. This view preserves
+	; every native offset; only original masked code determines lexical depth.
+	Syntax := StrReplace(Code, "=>", "{ ")
+	while IsObject(Definition := _DriverFindFunctionDefinition(&Syntax, Name, SearchFrom, true)) {
+		Prefix := SubStr(Code, ScannedThrough, Definition.Idx - ScannedThrough)
+		StrReplace(Prefix, "{", , , &Opens)
+		StrReplace(Prefix, "}", , , &Closes)
+		Depth += Opens - Closes
+		if Depth == 0
+			Count += 1
+		ScannedThrough := Definition.Idx
+		SearchFrom := Definition.OpenPos + 1
+	}
+	return Count
+}

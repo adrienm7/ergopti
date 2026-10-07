@@ -6811,6 +6811,22 @@ modifier/output custody. Existing conditional/native-owner requirements above
 remain open, including real layout changes, explicit-none precedence and
 physical acceptance; legacy menus remain reachable.
 
+The Windows physical magic-key boot cohort now retains exact native retirement
+and personal restoration obligations across false, throwing or malformed
+acknowledgements. It claims personal restoration before disable, refuses
+replacement over retained debt and fences source/HKL epoch changes on boot
+retry. Settlement retries only the retained tokens and drops each obligation
+after an exact native acknowledgement. Nine appended regressions include a
+disposable actual AHK registrar child; every previous test remains unchanged.
+Its production includes resolve unique top-level exports through a fresh source
+census, refusing missing, duplicate or unreadable braced and arrow definitions.
+Fifteen appended resolver cases retain the existing location-pin baseline and
+source ownership exclusions; original scanner behavior remains unchanged.
+Independent source review and packet checks pass; native cases and five
+original-producer causal controls remain unexecuted at this checkpoint.
+This repairs failed-acquisition compensation, without claiming complete live
+retargeting, modifier/output custody or physical delivery.
+
 Remaining work for item108 (CI-feasible software first):
 
 - [ ] Software implementation/repair: Qualify existing conditional-editor policy without reimplementing completed work. Complete missing effective-source retargeting, all-owner collisions and modifier/output custody; preserve explicit None, personal overrides, migration and pause/reload fences. Keep unsupported seats honest and new physical delivery disabled until proved.
