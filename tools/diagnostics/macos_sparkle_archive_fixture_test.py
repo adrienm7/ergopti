@@ -31,6 +31,48 @@ NONCE = "a" * 32
 
 
 class PrivateSparkleTransportTests(unittest.TestCase):
+    def testNumericLoopbackConstructionNeverConsultsDNS(self):
+        spec = importlib.util.spec_from_file_location("private_sparkle_numeric_bind", HELPER)
+        helper = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(helper)
+        original = helper.http.server.HTTPServer.__init__
+        acquired = []
+
+        def capture(server, *args, **kwargs):
+            original(server, *args, **kwargs)
+            acquired.append(server)
+
+        handlers = {
+            number: helper.signal.getsignal(number)
+            for number in [helper.signal.SIGTERM, helper.signal.SIGINT]
+        }
+        try:
+            with (
+                mock.patch.object(helper, "private_directory", return_value=self.root),
+                mock.patch.object(
+                    helper.socket, "getfqdn", side_effect=RuntimeError("DNS consulted")
+                ) as dns,
+                mock.patch.object(helper.http.server.HTTPServer, "__init__", capture),
+                mock.patch.object(
+                    helper, "publish", side_effect=RuntimeError("publication boundary")
+                ),
+                contextlib.redirect_stderr(io.StringIO()),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "publication boundary"):
+                    helper.serve(str(self.root), NONCE)
+                dns.assert_not_called()
+            self.assertEqual(len(acquired), 1)
+            server = acquired[0]
+            self.assertEqual(server.server_address[0], "127.0.0.1")
+            self.assertGreater(server.server_address[1], 0)
+            self.assertEqual(server.server_name, "127.0.0.1")
+            self.assertEqual(server.server_port, server.server_address[1])
+            self.assertEqual(server.socket.fileno(), -1)
+            self.assertFalse((self.root / "server-start.json").exists())
+        finally:
+            for number, handler in handlers.items():
+                helper.signal.signal(number, handler)
+
     def setUp(self):
         self.root = Path(tempfile.mkdtemp(prefix="ergopti-private-sparkle-")).resolve()
         self.root.chmod(0o700)

@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import signal
 import socket
+import socketserver
 import stat
 import subprocess
 import sys
@@ -293,6 +294,16 @@ def serve(root, nonce):
     # Sparkle 2.9.2 explicitly supports local-network testing. Only the private
     # fixture has NSAllowsLocalNetworking; archive EdDSA admission remains on.
     class PrivateServer(http.server.HTTPServer):
+        def server_bind(self):
+            # The declared numeric loopback origin has no DNS authority. The
+            # HTTPServer default performs reverse resolution during acquisition.
+            socketserver.TCPServer.server_bind(self)
+            host, port = self.server_address
+            if host != "127.0.0.1" or port <= 0:
+                raise RuntimeError("Private Sparkle numeric loopback binding refused")
+            self.server_name = host
+            self.server_port = port
+
         def __init__(self, *arguments, **options):
             self.active_request = None
             self.active_handler_admitted = False
