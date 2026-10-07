@@ -1138,6 +1138,22 @@ try {
 	errors.push(`Native generated appcast composition guard failed: ${error.message}`);
 }
 
+// Independent OpenSSL verification bound to the actual native signature fixture.
+try {
+	const control = require('./fixtures/sparkle-signature-physical-controls.cjs');
+	control.runSignatureControls({
+		fixture: fs.readFileSync(
+			path.join(
+				root,
+				'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/SparkleArchiveUpdateAcceptanceTests.swift'
+			),
+			'utf8'
+		)
+	});
+} catch (error) {
+	errors.push(`Signature fixture regression failed: ${error.message}`);
+}
+
 if (errors.length > 0) {
 	for (const error of errors) console.error(`[FAIL] ${error}`);
 	process.exit(1);
