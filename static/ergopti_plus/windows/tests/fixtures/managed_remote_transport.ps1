@@ -45,6 +45,16 @@ $Events = @()
 $RootInstalled = $false
 $State = @{ version = 1; state = 'starting'; phase = 'untrusted'; sequence = 0; root_removed = $false; service_stopped = $false }
 function Publish-State {
+    try {
+    if ($null -ne $Fixture) {
+        $Fact = $Fixture.ReadServiceFailure()
+        if ($Fact.Stage -cne 'none') {
+            $State.service_failure_stage = $Fact.Stage
+            $State.service_failure_kind = $Fact.Kind
+            $State.service_failure_hresult = $Fact.HResult
+        }
+    }
+    } catch { } # Observation cannot suppress the original state write.
     $State.sequence++
     [IO.File]::WriteAllText($StatePath, ($State | ConvertTo-Json -Compress), [Text.UTF8Encoding]::new($false))
 }
@@ -78,6 +88,37 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
     private readonly List<Thread> workers = new List<Thread>();
     private readonly List<TcpClient> clients = new List<TcpClient>();
     private readonly object gate = new object();
+    // Closed first-failure facts only; the original counters and catches retain ownership.
+    private readonly object diagnosticGate = new object();
+    public sealed class FailureFact
+    {
+        public string Stage = "none";
+        public string Kind = "none";
+        public int HResult;
+    }
+    private FailureFact firstFailure = new FailureFact();
+    private void CaptureServiceFailure(string stage, Exception failure)
+    {
+        try {
+        lock (diagnosticGate) {
+            if (firstFailure.Stage != "none") return;
+            string kind = "other";
+            if (failure is SocketException) kind = "socket";
+            else if (failure is System.ComponentModel.Win32Exception) kind = "win32";
+            else if (failure is System.Security.Authentication.AuthenticationException) kind = "authentication";
+            else if (failure is InvalidDataException) kind = "invalid_data";
+            else if (failure is IOException) kind = "io";
+            else if (failure is ObjectDisposedException) kind = "disposed";
+            else if (failure is InvalidOperationException) kind = "invalid_operation";
+            firstFailure = new FailureFact { Stage = stage, Kind = kind, HResult = failure.HResult };
+        }
+        } catch (Exception) { } // Observation must not replace the original counter or rethrow.
+    }
+    public FailureFact ReadServiceFailure()
+    {
+        lock (diagnosticGate) return new FailureFact {
+            Stage = firstFailure.Stage, Kind = firstFailure.Kind, HResult = firstFailure.HResult };
+    }
     private volatile bool stopping;
     private readonly RSA rootKey;
     private readonly RSA leafKey;
@@ -181,14 +222,14 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
                         catch (IOException) { Interlocked.Increment(ref ClosedConnections); }
                         catch (SocketException) { Interlocked.Increment(ref ClosedConnections); }
                         catch (ObjectDisposedException) { Interlocked.Increment(ref ClosedConnections); }
-                        catch (Exception) { Interlocked.Increment(ref ServiceFailures); }
+                        catch (Exception failure) { CaptureServiceFailure("service_request", failure); Interlocked.Increment(ref ServiceFailures); }
                         finally { client.Close(); lock (gate) clients.Remove(client); }
                     });
                     worker.IsBackground = true;
                     lock (gate) { clients.Add(client); workers.Add(worker); }
                     worker.Start();
-                } catch (SocketException) { if (!stopping) Interlocked.Increment(ref ServiceFailures); return; }
-                catch (ObjectDisposedException) { if (!stopping) Interlocked.Increment(ref ServiceFailures); return; }
+                } catch (SocketException failure) { if (!stopping) { CaptureServiceFailure("listener_accept", failure); Interlocked.Increment(ref ServiceFailures); } return; }
+                catch (ObjectDisposedException failure) { if (!stopping) { CaptureServiceFailure("listener_accept", failure); Interlocked.Increment(ref ServiceFailures); } return; }
             }
         });
         accept.IsBackground = true; listenersThreads.Add(accept); accept.Start();
@@ -213,6 +254,7 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
             try { tls.AuthenticateAsServer(leaf, false, System.Security.Authentication.SslProtocols.Tls12, true); }
             catch (System.Security.Authentication.AuthenticationException) { Interlocked.Increment(ref FailedTls); return; }
             catch (IOException) { Interlocked.Increment(ref FailedTls); return; }
+            catch (Exception failure) { CaptureServiceFailure("tls_authenticate", failure); throw; }
             string header = Header(tls);
             string first = header.Split('\n')[0].Trim();
             if (updater && first.StartsWith("GET /updater/", StringComparison.Ordinal)) {
@@ -253,7 +295,7 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
                     try { source.CopyTo(target); }
                     catch (IOException) { Interlocked.Increment(ref ClosedConnections); }
                     catch (ObjectDisposedException) { Interlocked.Increment(ref ClosedConnections); }
-                    catch (Exception) { Interlocked.Increment(ref ServiceFailures); }
+                    catch (Exception failure) { CaptureServiceFailure("tunnel_pump", failure); Interlocked.Increment(ref ServiceFailures); }
                     finally { destination.Close(); }
                 });
                 inbound.IsBackground = true; lock (gate) workers.Add(inbound); inbound.Start();
@@ -441,6 +483,9 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
     $State.state = 'failed'
     $State.failure_type = $_.Exception.GetType().Name
     $State.failure_hresult = $_.Exception.HResult
+    $State.service_failure_stage = 'fixture_boundary'
+    $State.service_failure_kind = 'other'
+    $State.service_failure_hresult = $_.Exception.HResult
 } finally {
     try {
         if ($null -ne $Fixture) { $Fixture.Dispose(); $State.service_stopped = $true }
@@ -452,6 +497,11 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
     } catch {
         $State.state = 'failed'
         $State.cleanup_refused = $true
+        if (-not $State.ContainsKey('service_failure_stage')) {
+            $State.service_failure_stage = 'fixture_cleanup'
+            $State.service_failure_kind = 'other'
+            $State.service_failure_hresult = $_.Exception.HResult
+        }
     }
     foreach ($Event in $Events) { $Event.Dispose() }
     if ($State.state -ne 'failed') { $State.state = 'stopped' }

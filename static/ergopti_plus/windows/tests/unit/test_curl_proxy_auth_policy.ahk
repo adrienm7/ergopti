@@ -35,6 +35,37 @@ _CurlAuth_IntegratedOnlyConfig() {
 Test("curl proxy auth: missing native features and unfinished owners refuse admission", _CurlAuth_RefusesMissingNativeFeature)
 Test("curl proxy auth: sole Negotiate current-user config cannot permit ANYAUTH downgrade", _CurlAuth_IntegratedOnlyConfig)
 
+_CurlAuth_CapabilityPhase(Raw) {
+	if Type(Raw) != "String" || StrLen(Raw) > 256
+		return ""
+	try Fact := JsonParse(Raw)
+	catch
+		return ""
+	if !(Fact is Map) || Fact.Count != 2 || Type(Fact.Get("diagnostic_version", "")) != "Integer" || Fact["diagnostic_version"] != 1
+		return ""
+	Phase := Fact.Get("phase", "")
+	if Type(Phase) != "String" || !RegExMatch(Phase, "\A(?:setup_compile|setup_budget|native_start|native_wait|pipe_retirement|receipt_parse|child_retirement|settled)\z")
+		return ""
+	return Phase
+}
+_CurlAuth_EmitCapabilityPhase(Path) {
+	try {
+		if FileGetSize(Path) > 256
+			return
+		Phase := _CurlAuth_CapabilityPhase(FileRead(Path, "UTF-8"))
+		if Phase != ""
+			FileAppend("::notice title=Windows native capability diagnostic::phase=" . Phase . "`n", "*")
+	}
+}
+_CurlAuth_CapabilityPhaseControls() {
+	AssertEqual("setup_compile", _CurlAuth_CapabilityPhase('{"diagnostic_version":1,"phase":"setup_compile"}'), "cache projects only a fixed stage")
+	for Raw in ['{"diagnostic_version":1,"phase":"setup_compile","message":"private"}',
+		'{"diagnostic_version":1,"phase":"private provider name"}', '{"diagnostic_version":"1","phase":"native_wait"}',
+		'{"schema_version":1,"budget_ms":8000}', '{"diagnostic_version":1,"phase":"native_wait\nprivate"}', "not JSON"]
+		AssertEqual("", _CurlAuth_CapabilityPhase(Raw), "unknown cache bytes cannot become a native annotation")
+}
+Test("curl proxy auth: optional native phase cache has a closed annotation domain", _CurlAuth_CapabilityPhaseControls)
+
 _CurlAuth_NativeCapabilityObservation() {
 	global _VendorDir
 	Directory := _SR_AcquireCaptureDirectory()
@@ -45,7 +76,7 @@ _CurlAuth_NativeCapabilityObservation() {
 		AssertTrue(FSWrite(Capture["TmpFile"], '{"schema_version":1,"budget_ms":8000}'), "owned native capability input must be staged")
 		Handle := ShellRunner_SpawnTreeOwned(A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe",
 			["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
-				_VendorDir . "\ergopti_curl_capabilities_worker.ps1", "-InputPath", Capture["TmpFile"]],
+				_VendorDir . "\ergopti_curl_capabilities_worker.ps1", "-InputPath", Capture["TmpFile"], "-DiagnosticPath", Capture["TmpFile"]],
 			(Code, Out, Err) => Observed.Push(Map("exit", Code, "stdout", Out, "stderr", Err)), , , 8192)
 		AssertTrue(Handle.start(), "native feature worker must actually start inside its owned Job")
 		Started := A_TickCount
@@ -53,6 +84,8 @@ _CurlAuth_NativeCapabilityObservation() {
 			_SR_TreePoll()
 			Sleep(10)
 		}
+		if Observed.Length != 1 || Observed[1]["exit"] != 0
+			_CurlAuth_EmitCapabilityPhase(Capture["TmpFile"])
 		AssertEqual(1, Observed.Length, "the native capability worker must settle within the test deadline")
 		AssertEqual(0, Observed[1]["exit"], "actual shipped curl must produce a closed native feature receipt")
 		AssertEqual("", Observed[1]["stderr"], "native feature errors cannot be hidden")

@@ -35,6 +35,48 @@ _ManagedRemoteFixtureExitCleanup(*) {
 	_ManagedRemoteFixtureRetryCleanup()
 }
 
+; Diagnostics admit only a closed scalar projection, never raw state or exceptions.
+_ManagedRemoteFixtureDiagnostic(State) {
+	if !(State is Map) || Type(State.Get("version", "")) != "Integer" || State["version"] != 1
+		return ""
+	Stage := State.Get("service_failure_stage", "")
+	Kind := State.Get("service_failure_kind", "")
+	Code := State.Get("service_failure_hresult", "")
+	if Type(Stage) != "String" || !RegExMatch(Stage, "\A(?:tls_authenticate|service_request|tunnel_pump|listener_accept|fixture_boundary|fixture_cleanup)\z")
+		return ""
+	if Type(Kind) != "String" || !RegExMatch(Kind, "\A(?:socket|win32|authentication|invalid_data|io|disposed|invalid_operation|other)\z")
+		return ""
+	if Type(Code) != "Integer" || Code < -2147483648 || Code > 2147483647
+		return ""
+	return "stage=" . Stage . " kind=" . Kind . " hresult=" . Format("{:d}", Code)
+}
+
+_ManagedRemoteFixtureEmitDiagnostic(State) {
+	try {
+		Fact := _ManagedRemoteFixtureDiagnostic(State)
+		if Fact != ""
+			FileAppend("::notice title=Windows native service diagnostic::" . Fact . "`n", "*")
+	}
+}
+
+_ManagedRemoteFixtureDiagnosticControls() {
+	State := Map("version", 1, "service_failure_stage", "tls_authenticate",
+		"service_failure_kind", "win32", "service_failure_hresult", -2146893042,
+		"message", "private exception text", "root_subject", "private certificate identity")
+	AssertEqual("stage=tls_authenticate kind=win32 hresult=-2146893042", _ManagedRemoteFixtureDiagnostic(State), "only closed scalar facts enter the native annotation")
+	for Pair in [["service_failure_stage", "tls_authenticate`nprivate"], ["service_failure_kind", "CryptographicException"],
+		["service_failure_hresult", "-2146893042"], ["service_failure_hresult", 2147483648], ["service_failure_hresult", -2147483649], ["version", "1"]] {
+		Invalid := State.Clone()
+		Invalid[Pair[1]] := Pair[2]
+		AssertEqual("", _ManagedRemoteFixtureDiagnostic(Invalid), "unknown domains and noncanonical native integers cannot reach output")
+	}
+	State["service_failure_hresult"] := -2147483648
+	AssertContains(_ManagedRemoteFixtureDiagnostic(State), "hresult=-2147483648")
+	State["service_failure_hresult"] := 2147483647
+	AssertContains(_ManagedRemoteFixtureDiagnostic(State), "hresult=2147483647")
+}
+Test("managed remote native: diagnostic annotation admits only closed scalar domains", _ManagedRemoteFixtureDiagnosticControls)
+
 class _ManagedRemoteFixtureOwner {
 	__New() {
 		global _DriverDir, _ManagedRemoteFixtureCleanupExitRegistered
@@ -126,8 +168,10 @@ class _ManagedRemoteFixtureOwner {
 		}
 		if !(State is Map) || State.Get("version", 0) != 1
 			throw Error("Actual fixture published an unsupported state receipt.")
-		if State.Get("state", "") == "failed"
+		if State.Get("state", "") == "failed" {
+			_ManagedRemoteFixtureEmitDiagnostic(State)
 			throw Error("Actual managed-network fixture reported native failure.")
+		}
 		this.State := State
 		return true
 	}
@@ -165,6 +209,8 @@ class _ManagedRemoteFixtureOwner {
 		Phase := this.State["phase"]
 		this.Signal("Observe")
 		this.WaitState("ready", Phase, 5000, Sequence)
+		if this.State.Get("ServiceFailures", 0) > 0
+			_ManagedRemoteFixtureEmitDiagnostic(this.State)
 		AssertEqual(0, this.State.Get("ServiceFailures", -1), "owned fixture must expose unexpected native service failures")
 	}
 
@@ -341,6 +387,12 @@ class _ManagedRemoteFixtureOwner {
 					return false
 				if this.NativeState is Map && !this.NativeState.Get("TreeQuiesced", false)
 					return false
+			}
+			; Reuse the original owned state after native tree quiescence, before its removal.
+			; Diagnostic I/O is bounded and cannot replace the original cleanup assertion.
+			try {
+				if this.Capture is Map && FileGetSize(this.Capture["TmpFile"]) <= 8192
+					_ManagedRemoteFixtureEmitDiagnostic(JsonParse(FileRead(this.Capture["TmpFile"], "UTF-8")))
 			}
 			if this.Completions.Length == 1 && this.Completions[1]["exit"] == 0
 					&& Trim(this.Completions[1]["stdout"], "`r`n ") == "OWNED_FIXTURE_STOPPED_ROOT_REMOVED"
