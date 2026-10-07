@@ -5614,6 +5614,17 @@ with the correction. Conflicting inherited proxy/CA inputs also pass27/0.
 Production system-routing and opaque-download refusal guards remain unchanged;
 this hermetic fixture correction does not qualify native Mac networking.
 
+Windows receiving37641625052 at74ad5da0b passes10,257 assertions and fails11;
+E2E/package/install are skipped. The repair binds both native receipt readers
+to the original combined stdout, launch-failure cleanup to actual counter-owned
+payload paths, and integrity/timeout guards to the selected real vendor owner.
+The existing state-only Critical completion admission is isolated before
+handoff with exact current/successor and prior-Critical controls. All original
+assertion sites/messages remain; deadline guards require the smaller original
+remaining budget. Five native route/held-response/CA/cleanup cases remain
+unresolved CODE pending actual Windows replay; no physical-PC-only deferral
+or full Windows acceptance is claimed. Artifact NTLM-only CODE stays open.
+
 Manual all-driver receiving37631791924 at6855c1e6 reports10,242 Windows
 AHK passes and24 failures. The receiving correction preserves all original
 assertions while fixing stored UTF-16 NUL admission, ordinary recovery-target

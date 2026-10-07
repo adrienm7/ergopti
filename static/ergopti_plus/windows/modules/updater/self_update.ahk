@@ -2426,6 +2426,21 @@ _Updater_EnforceDownloadDeadline(NowTick := unset, RebuildMenu := true,
 	return true
 }
 
+; State-only admission ends before any completion diagnostics, UI or native handoff.
+_Updater_AdmitStagingCompletion(StagingEpoch) {
+	global _UpdaterDownloadWorker
+	PreviousCritical := Critical("On")
+	try {
+		if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch)
+			return false
+		_UpdaterDownloadWorker := 0
+		TimerSetCallback(_Updater_MonitorStagingWorker, 0)
+		return true
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
 ; The only staging completion callback running in AHK. The worker's READY
 ; token means it has already persisted and verified the executable plus the
 ; UTF-8 PowerShell swap worker.
@@ -2439,15 +2454,8 @@ _Updater_PollDownloadAsync(ExitCode, Stdout, Stderr, SwapScriptPath, NewExe, Cur
 	if _Updater_EnforceDownloadDeadline(NowTick, true, DeadlineNotifyFn,
 		_Updater_CancelSelfUpdateTransaction, StagingEpoch)
 		return
-	PreviousCritical := Critical("On")
-	try {
-		if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch)
-			return
-		_UpdaterDownloadWorker := 0
-		TimerSetCallback(_Updater_MonitorStagingWorker, 0)
-	} finally {
-		Critical(PreviousCritical)
-	}
+	if !_Updater_AdmitStagingCompletion(StagingEpoch)
+		return
 	if A_IsSuspended {
 		try LoggerWarn("Updater", "Update staging completion discarded while suspended.")
 		_Updater_NotifyInstallPhase("failed", "changelog_window.install_error_download")

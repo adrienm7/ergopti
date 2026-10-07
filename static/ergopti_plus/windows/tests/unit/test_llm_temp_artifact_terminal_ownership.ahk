@@ -194,6 +194,22 @@ Test("filesystem: appends reject short writes (AHK-165)", _LTATO_AppendRejectsSh
 ; ====================================================
 ; ====================================================
 
+
+; The real producer adds a unique request counter to its staged filename. Bind
+; injected launch artifacts to the actual admitted payload, never a guessed uid.
+_LTATO_RemoteCaptureActualPaths(State, Paths, Path, Content) {
+	if RegExMatch(Path, "\.json$") {
+		State["payload_claims"] := State.Get("payload_claims", 0) + 1
+		Paths[1] := Path
+		Paths[2] := RegExReplace(Path, "\.json$", ".out")
+		Paths[3] := RegExReplace(Path, "\.json$", ".conf")
+		Paths[4] := Paths[2] . ".status"
+		Paths[5] := Paths[2] . ".exit"
+		State["launch_paths"] := [Paths[2], Paths[4], Paths[5]]
+	}
+	return FSWrite(Path, Content)
+}
+
 _LTATO_RemoteLaunchFailureDeletesEveryArtifact() {
 	global _LLM_Remote_Async
 	Dir := _LTATO_UniqueDir("remote")
@@ -206,7 +222,7 @@ _LTATO_RemoteLaunchFailureDeletesEveryArtifact() {
 		"resolve_proxy", _Stub_CurlResolveProxyDirect.Bind(State),
 		"file_exists", (*) => true,
 		"temp_dir", (*) => Dir,
-		"write", FSWrite,
+		"write", _LTATO_RemoteCaptureActualPaths.Bind(State, Paths),
 		"delete", FSDelete,
 		"run", _LTATO_RemoteRunWritesThenThrows.Bind(State),
 		"tick", (*) => Tick)
@@ -216,6 +232,7 @@ _LTATO_RemoteLaunchFailureDeletesEveryArtifact() {
 			(*) => 0, _LTATO_RecordFailure.Bind(State), 1000, Port)
 		AssertTrue(Owned, "curl availability transfers terminal failure to the dispatcher callback")
 		AssertEqual(1, State["proxy_resolutions"], "temporary artifact ownership crosses direct proxy admission once")
+		AssertEqual(1, State["payload_claims"], "launch injection must bind exactly one actual admitted payload")
 		AssertEqual(1, State["run_calls"], "remote dispatch must invoke its child-process port exactly once")
 		AssertEqual(1, State["fail_calls"], "launch failure must invoke on_fail exactly once")
 		_LTATO_AssertAbsent(Paths, "remote launch failure")

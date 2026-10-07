@@ -92,6 +92,21 @@ _UST_ExactBuilderOutputCrossesShellRunnerConstraint() {
 Test("Updater staging transport: exact worker uses adapter-safe encoding (updater-staging-transport)",
 	_UST_ExactBuilderOutputCrossesShellRunnerConstraint)
 
+
+; ShellRunner combines stdout/stderr. Accept only the complete declared native
+; receipt plus marker; unexpected output remains visible to the original oracle.
+_UST_ReceiveNativeCmd(State, MultiChunk, ExitCode, Stdout, Stderr) {
+	State.ExitCode := ExitCode
+	State.Stdout := Stdout
+	State.EnvironmentReceipt := Stderr
+	if MultiChunk && Stderr == "" && RegExMatch(Stdout,
+		"^ENV_UNITS:(\d+)\r?\n(TRANSPORT_OK)\z", &Receipt) {
+		State.EnvironmentReceipt := "ENV_UNITS:" . Receipt[1]
+		State.Stdout := Receipt[2]
+	}
+	State.Done := true
+}
+
 _UST_RealCmdEnvironmentRoundTrip(MultiChunk := false) {
 	global _UpdaterStagingTransportCounter, UPDATER_STAGING_ENV_MAX_CHARS
 	SavedCounter := _UpdaterStagingTransportCounter
@@ -128,11 +143,7 @@ _UST_RealCmdEnvironmentRoundTrip(MultiChunk := false) {
 		Script .= "`n# transport padding 0123456789abcdef0123456789abcdef"
 	if MultiChunk
 		Script .= "`n" . 'Write-Output "TRANSPORT_OK"'
-	OnDone := (ExitCode, Stdout, Stderr) => (
-		State.ExitCode := ExitCode,
-		State.Stdout := Stdout,
-		State.EnvironmentReceipt := Stderr,
-		State.Done := true)
+	OnDone := _UST_ReceiveNativeCmd.Bind(State, MultiChunk)
 	try {
 		Transport := _Updater_BuildStagingTransport(
 			Script,
@@ -218,3 +229,25 @@ Test("Updater staging transport: production passes no raw multiline worker (upda
 
 Test("Updater staging transport: real cmd executes the exact three-fragment source (updater-staging-transport)",
 	_UST_RealCmdEnvironmentRoundTrip.Bind(true))
+
+_UST_CombinedNativeReceiptRejectsExtraOutput() {
+	Valid := {Done: false}
+	_UST_ReceiveNativeCmd(Valid, true, 0, "ENV_UNITS:40037`r`nTRANSPORT_OK", "")
+	AssertEqual("TRANSPORT_OK", Valid.Stdout, "actual merged receipt preserves the exact native output marker")
+	AssertEqual("ENV_UNITS:40037", Valid.EnvironmentReceipt, "actual merged receipt retains its numeric environment units")
+	for Raw in ["ENV_UNITS:40037`nTRANSPORT_OK`nprivate extra", "unexpected`nENV_UNITS:40037`nTRANSPORT_OK", "ENV_UNITS:bad`nTRANSPORT_OK", "ENV_UNITS:40037`nENV_UNITS:40037`nTRANSPORT_OK"] {
+		Refused := {Done: false}
+		_UST_ReceiveNativeCmd(Refused, true, 0, Raw, "")
+		AssertEqual(Raw, Refused.Stdout, "undeclared output remains intact for the native exact-marker refusal")
+		AssertEqual("", Refused.EnvironmentReceipt, "undeclared output cannot manufacture an aggregate receipt")
+	}
+	Separate := {Done: false}
+	_UST_ReceiveNativeCmd(Separate, true, 0, "ENV_UNITS:40037`nTRANSPORT_OK", "unexpected")
+	AssertEqual("ENV_UNITS:40037`nTRANSPORT_OK", Separate.Stdout, "foreign separate stderr cannot be hidden by protocol reception")
+	Single := {Done: false}
+	_UST_ReceiveNativeCmd(Single, false, 0, "TRANSPORT_OK", "")
+	AssertEqual("TRANSPORT_OK", Single.Stdout, "original single-fragment native receiver stays exact")
+}
+
+Test("Updater staging transport: actual merged native receipt refuses undeclared output",
+	_UST_CombinedNativeReceiptRejectsExtraOutput)
