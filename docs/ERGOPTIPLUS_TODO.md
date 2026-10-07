@@ -5830,8 +5830,25 @@ dispatched. Genuine Nix fails at pinned-source-metadata before its native
 build/runtime cases. Additive fixed owned-phase diagnostics preserve the
 original physical owner, clocks, pins and predicates; actual command/fence
 refusal remains to be observed. This is diagnostic work, not a Nix fix or
-native packaging credit. The release-check-to-download physical join and
-the previously recorded company-network implementation remain unfinished.
+native packaging credit. The previously recorded company-network implementation
+remains unfinished.
+
+The Linux release-check owner now waits for its original child and deadline
+retirement before parsing, caching, pagination or publishing a check result.
+Its final receipt is source-bound and detached from consumer mutation;
+cancellation retains pending check ownership until the same physical ACK.
+The existing GET Boolean remains first in the return tuple, followed by the
+exact original operation. Controlled receiving passes 25 new cases on each
+actual Lua ABI, retaining all 134 historical cases across five complete modules
+(Manager 73, changelog 13, feedback 8, JSON admission 34, channel 6). The
+original producer fails 22 of the same 25 cases, including the early-download
+callback. All 34 independent JSON vectors and every old assertion remain exact;
+three additional Boolean-only fixtures now declare their explicit modeled
+no-resource settlement without a production Boolean fallback.
+The required archive port fixture is explicit and throws on unexpected use;
+no archive success or physical IO is modeled as native acceptance. Full selected
+verification and genuine installed live-download CI on these sources remain
+required; TODO 62 and transversal 16/38 stay open.
 
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard

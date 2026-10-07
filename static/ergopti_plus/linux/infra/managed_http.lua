@@ -99,6 +99,25 @@ function M.new(dependencies)
 		return copy
 	end
 
+	--- Detaches public value data while retaining actual private failure evidence.
+	--- Raw iteration cannot invoke receipt/header getters during ownership capture.
+	local function snapshot_result(result)
+		if type(result) ~= "table" then return nil end
+		local copy = {}
+		for key, value in next, result do
+			if key ~= "redirect_receipt" then
+				if key == "headers" and type(value) == "table" then
+					local headers = {}
+					for name, field in next, value do
+						if type(name) == "string" and type(field) == "string" then headers[name] = field end
+					end
+					copy.headers = headers
+				else copy[key] = value end
+			end
+		end
+		return copy
+	end
+
 	--- Publishes a boolean terminal without acknowledging native retirement.
 	--- @param record table
 	--- @param result table
@@ -122,7 +141,14 @@ function M.new(dependencies)
 			record.expired, record.visible_active = true, false
 			result = refusal("timeout")
 		end
-		record.pending_result = public_result(result)
+		local retained
+		if rawequal(result, record.pending_receipt_source) and record.pending_settled_result then
+			retained = snapshot_result(record.pending_settled_result)
+		elseif rawequal(result, record.native_terminal_result) then
+			retained = snapshot_result(record.native_terminal_snapshot)
+		else retained = snapshot_result(result) end
+		record.pending_result, record.pending_settled_result = public_result(result), retained
+		record.pending_receipt_source = record.pending_result
 		if record.constructing or record.deadline_constructing or record.admitting or record.authorizing or not child_settled(record) then return end
 		if record.deadline_child then
 			if record.finalizing then return end
@@ -147,6 +173,7 @@ function M.new(dependencies)
 		if record.admitted and not record.prestart_refused and not record.operation._cancelled and remaining(record) <= 0 then
 			record.expired, record.visible_active = true, false
 			record.pending_result = refusal("timeout")
+			record.pending_settled_result = snapshot_result(record.pending_result)
 		end
 		if record.authorized and not record.operation._cancelled then
 			record.admitting = true
@@ -154,10 +181,15 @@ function M.new(dependencies)
 			if record.admitted and not record.prestart_refused and not record.operation._cancelled and remaining(record) <= 0 then
 				record.expired, record.visible_active = true, false
 				record.pending_result = refusal("timeout")
+			record.pending_settled_result = snapshot_result(record.pending_result)
 			end
 			record.admitting = false
 		end
 		result = record.pending_result
+		-- This lexical receipt becomes available only at genuine final retirement.
+		-- A writable public _settled field cannot manufacture receipt authority.
+		record.settled_receipt = snapshot_result(record.operation._cancelled
+			and refusal("cancelled") or record.pending_settled_result)
 		if record.predecessor and record.predecessor.successor == record then
 			record.predecessor.successor = nil
 		end
@@ -449,6 +481,8 @@ function M.new(dependencies)
 		if not choice then finish(record, refusal("proxy-selection-invalid")); return end
 		record.stage, record.child, record.result, record.done_received = "curl", nil, nil, false
 		record.construction_terminal = nil
+		record.native_terminal_result, record.native_terminal_snapshot = nil, nil
+		record.native_terminal_captured = false
 		record.generation = record.generation + 1
 		local generation = record.generation
 		local options = {}
@@ -501,6 +535,11 @@ function M.new(dependencies)
 		end
 		options.on_native_terminal = function(result)
 			if owned[record.owner] ~= record or record.generation ~= generation then return end
+			-- Capture before the first original logical callback can mutate values.
+			if not record.native_terminal_captured then
+				record.native_terminal_captured = true
+				record.native_terminal_result, record.native_terminal_snapshot = result, snapshot_result(result)
+			end
 			-- A pre-start refusal can still own pipes, timers or descriptors.
 			-- Its original failure publishes through physical completion, while
 			-- an admitted native child keeps ordinary early logical terminals.
@@ -738,6 +777,8 @@ function M.new(dependencies)
 			deadline = admission and 0 or math.min(dependencies.clock() + options.timeout_ms, rawget(options, "absolute_deadline_ms") or math.huge),
 		}
 		function operation:is_settled() return self._settled end
+		--- Returns detached final public data only after exact physical retirement.
+		function operation:settled_result() return snapshot_result(record.settled_receipt) end
 		function operation:on_settled(listener)
 			if type(listener) ~= "function" then return false end
 			if self._settled then

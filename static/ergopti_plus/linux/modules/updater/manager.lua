@@ -500,7 +500,9 @@ M._build_fetch_request = _build_fetch_request
 --- Fetches a GitHub Releases response asynchronously.
 --- @param channel string
 --- @param callback function Receives body, status, error.
---- @return boolean Whether the asynchronous request was dispatched.
+--- @return boolean Whether asynchronous check work was admitted. A native
+--- started=false constructor may still retain pipe/deadline cleanup and its
+--- eventual failure; only physically closed no-acquisition refusal is false.
 local function _fetch_releases(channel, callback)
 	local count = tonumber(M.release_api_url():match("[?&]per_page=(%d+)"))
 	if not count or count < 1 or count % RELEASE_PAGE_SIZE ~= 0 then
@@ -508,11 +510,12 @@ local function _fetch_releases(channel, callback)
 		return false
 	end
 	local chunks, terminal, all_unchanged = {}, false, true
-	local active_key
-	local cancel
+	local active_key, active_page
+	local cancelled = false
+	local cancel, publish_page
 	-- reason: the updater.check_result reason a failure is shown with
 	local function finish(body, status, err, reason)
-		if terminal then return end
+		if terminal or _release_fetch_cancel ~= cancel then return end
 		terminal = true
 		-- Native etag_save can advance its file before transport/JSON acceptance.
 		-- A failed page must fetch fully next time, never pair that file with its
@@ -521,17 +524,90 @@ local function _fetch_releases(channel, callback)
 		if _release_fetch_cancel == cancel then _release_fetch_cancel = nil end
 		callback(body, status, err, reason)
 	end
-	cancel = function() finish(nil, 0, "cancelled", "unexpected") end
+	local function page_current(work)
+		return not terminal and _release_fetch_cancel == cancel and rawequal(active_page, work)
+	end
+	local function signal_page(work)
+		if not page_current(work) or not cancelled or work.signalled or not work.methods then return end
+		work.signalled = true
+		pcall(work.methods.cancel, work.operation)
+	end
+	cancel = function()
+		if terminal or _release_fetch_cancel ~= cancel then return end
+		cancelled = true
+		if active_page then signal_page(active_page); publish_page(active_page) end
+	end
 	_release_fetch_cancel = cancel
 	local fetch_page
+	local accept_page
+	publish_page = function(work)
+		if not page_current(work) or work.constructing or work.publishing or work.delivered
+			or work.uncertain or not work.methods then return end
+		work.publishing = true
+		local called, settled = pcall(work.methods.is_settled, work.operation)
+		if not page_current(work) or work.delivered or not called or settled ~= true then
+			work.publishing = false; return
+		end
+		local received, result = pcall(work.methods.settled_result, work.operation)
+		if not page_current(work) or work.delivered then work.publishing = false; return end
+		if not received or type(result) ~= "table" then
+			work.uncertain = true; work.publishing = false; return
+		end
+		-- No logical callback or public table can substitute this final receipt.
+		work.delivered = true
+		if cancelled then finish(nil, 0, "cancelled", "unexpected")
+		elseif work.sent ~= true and not work.answered then finish(nil, 0, "release page dispatch refused", "no_connection")
+		else accept_page(work, result) end
+		work.publishing = false
+	end
 	fetch_page = function(page)
-		local url, headers, options = M._build_fetch_request(channel, page)
+		if terminal or cancelled or _release_fetch_cancel ~= cancel then return false end
 		local key = channel .. "-page-" .. page .. "-size-" .. RELEASE_PAGE_SIZE
 		active_key = key
-		local answered = false
-		local sent = M._http_client.get(url, headers, options, function(result)
-			if terminal or answered then return end
-			answered = true
+		local work = { constructing = true, page = page, key = key }
+		active_page = work -- Reservation precedes metadata/callback/constructor reentry.
+		local prepared, url, headers, options = pcall(M._build_fetch_request, channel, page)
+		if not page_current(work) then work.constructing = false; return false end
+		if cancelled or not prepared then
+			-- No transport constructor was invoked by this known metadata path.
+			work.constructing = false
+			finish(nil, 0, cancelled and "cancelled" or "release request preparation failed", "unexpected")
+			return false
+		end
+		local get = type(M._http_client) == "table" and rawget(M._http_client, "get") or nil
+		local called, sent, operation = pcall(function()
+			if type(get) ~= "function" then error("release HTTP operation unavailable") end
+			return get(url, headers, options, function()
+				if not page_current(work) or work.answered then return end
+				work.answered = true
+				-- Generic get still reports logical terminals. Only original final
+				-- physical data below can authorize parsing or the next request.
+				publish_page(work)
+			end)
+		end)
+		work.sent, work.operation = sent, operation
+		if called and type(operation) == "table" then
+			local methods = { is_settled = rawget(operation, "is_settled"),
+				on_settled = rawget(operation, "on_settled"), cancel = rawget(operation, "cancel"),
+				settled_result = rawget(operation, "settled_result") }
+			if type(methods.is_settled) == "function" and type(methods.on_settled) == "function"
+				and type(methods.cancel) == "function" and type(methods.settled_result) == "function" then
+				work.methods = methods
+				local registered, accepted = pcall(methods.on_settled, operation, function() publish_page(work) end)
+				if not registered or accepted ~= true then work.uncertain = true end
+			else work.uncertain = true end
+		else work.uncertain = true end
+		work.constructing = false
+		if not page_current(work) then return sent == true end
+		signal_page(work)
+		publish_page(work)
+		-- Unknown constructor/observer debt remains retained; absence of an
+		-- operation or callback cannot fabricate a physically closed refusal.
+		return sent == true or (page_current(work) and not work.delivered)
+	end
+	accept_page = function(work, result)
+			if not page_current(work) then return end
+			local key, page = work.key, work.page
 			local status = tonumber(result and result.status) or 0
 			local body = result and result.body
 			if status == 304 then
@@ -561,7 +637,11 @@ local function _fetch_releases(channel, callback)
 				finish(nil, status, "invalid release page JSON", "parse_failed")
 				return
 			end
+			if not page_current(work) then return end
+			if cancelled then finish(nil, 0, "cancelled", "unexpected"); return end
 			local entries = Parser.split_releases_array(body)
+			if not page_current(work) then return end
+			if cancelled then finish(nil, 0, "cancelled", "unexpected"); return end
 			if #entries ~= #decoded or #entries > RELEASE_PAGE_SIZE then
 				finish(nil, status, "invalid release page entries", "parse_failed")
 				return
@@ -573,9 +653,6 @@ local function _fetch_releases(channel, callback)
 			else
 				fetch_page(page + 1)
 			end
-		end)
-		if sent ~= true and not answered then finish(nil, 0, "release page dispatch refused", "no_connection") end
-		return sent == true
 	end
 	return fetch_page(1)
 end
@@ -759,7 +836,9 @@ end
 --- @param channel string|nil Registry channel id; defaults to the active channel.
 --- @param callback function|nil Receives available, release, error and the
 ---   updater.check_result answer (state, latest, other channels, reason).
---- @return boolean Whether the asynchronous request was dispatched.
+--- @return boolean Whether asynchronous check work was admitted. True can
+--- retain an original native start refusal's physical cleanup; it does not
+--- assert that a network request started. Closed no-acquisition refusal is false.
 function M.check_for_updates(channel, callback)
 	channel = channel or _channel
 	local base = { channel = channel, current = M.current_version() }
@@ -1351,6 +1430,11 @@ function M.cancel_update()
  if not retire_verified_artifact() then return false end
 	local http_cancelled = M._http_client.cancel(REQUEST_OWNER)
 	if http_cancelled and _release_fetch_cancel then _release_fetch_cancel() end
+	if _release_fetch_cancel then
+		-- Accepted cancellation is logical. Keep checking and its exact retained
+		-- page until original HTTP child/deadline retirement authorizes completion.
+		return http_cancelled == true
+	end
 	local digest_cancelled = M._file_digest.cancel(REQUEST_OWNER)
 	if not http_cancelled or not digest_cancelled then return false end
 	if _state == "installing" then return true end
@@ -1555,7 +1639,7 @@ function M.set_channel(new_channel)
    and _channel_persisted == intent.persisted and _cached_release == intent.cached and native_generation == intent.generation
  end
  local guarded, changed = pcall(function()
-  if (_state == "checking" or _state == "downloading") and (not M.cancel_update() or native_transfer ~= nil) then return false end
+  if (_state == "checking" or _state == "downloading") and (not M.cancel_update() or native_transfer ~= nil or _release_fetch_cancel ~= nil) then return false end
   if not intact() or not retire_verified_artifact() or not intact() then return false end
   -- Commit persistence/channel/cache only after exact predecessor namespace disposal.
   if not _persist_channel(new_channel) or not intact() then return false end
@@ -1626,7 +1710,7 @@ end
 --- Clears the cached release data.
 function M.clear_cached_release()
  if native_install or native_channel_intent then return false end
-	if (_state == "checking" or _state == "downloading") and (not M.cancel_update() or native_transfer ~= nil) then
+	if (_state == "checking" or _state == "downloading") and (not M.cancel_update() or native_transfer ~= nil or _release_fetch_cancel ~= nil) then
 		Logger.error(LOG, "Cached release cannot clear while updater ownership is live.")
 		return false
 	end

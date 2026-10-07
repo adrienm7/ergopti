@@ -62,6 +62,9 @@ end
 local function rejected(message, callback)
 	local operation = { started = false }
 	function operation:is_settled() return true end
+	function operation:settled_result()
+		return { ok = false, status = 0, body = "", error = message }
+	end
 	function operation:cancel() return true end
 	function operation:on_settled(listener)
 		if type(listener) ~= "function" then return false end
@@ -208,10 +211,14 @@ end
 --- @param headers table
 --- @param options table|nil
 --- @param callback function
---- @return boolean
+--- @return boolean Existing dispatch admission (first return is unchanged).
+--- @return table Exact operation; settled_result() exposes only final physical data.
+--- The second return is additive and observable; logical callback timing and
+--- existing zero-argument on_settled listeners retain their original contracts.
 function M.get(url, headers, options, callback)
-	return dispatch(url, type(headers) == "table" and headers or {}, nil,
-		options, "GET", true, false, nil, callback).started
+	local operation = dispatch(url, type(headers) == "table" and headers or {}, nil,
+		options, "GET", true, false, nil, callback)
+	return operation.started, operation
 end
 
 --- Sends a GET retaining actual lookup/curl/process/pipe settlement ownership.

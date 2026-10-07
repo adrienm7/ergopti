@@ -494,6 +494,7 @@ helpers.describe("updater: nothing installs without a click (Linux)", function()
 		}
 		M._file_digest = { sha256 = function() effects[#effects + 1] = "digest"; return true end,
 			cancel = function() return true end }
+		M._http_client = require("tests.support.release_http_fixture").attach(M._http_client)
 		M.current_version = function() return "0.0.0-dev.1" end
 		local now = 1700000000
 		M._now = function() return now end
