@@ -5574,6 +5574,17 @@ The fixed Specifications and Capabilities frames of the Windows/macOS per-model 
       uncommitted in the local worktree of `fix/downloads-on-managed-networks`
       when the session stopped; redo it if that worktree is gone.
 
+The official Linux acceptance now builds its actual original native archive
+helper under the existing930-second subreaper before running the unchanged
+900-second Lua fixture. Fresh generated ELF admission preserves existing
+helpers and rejects foreign bytes/symlinks; full source/tool/helper identities
+are rechecked. Eight actual build-prerequisite controls pass across both Lua
+ABIs with exact physical closure. The official fixture observes real retained
+transport, FD digest and successful adoption; its independent1198635318-byte
+archive/SHA expectations and every original assertion remain unchanged.
+Current official package/model and complete lane acceptance remain pending;
+tiny authored archives and build controls do not qualify those effects.
+
 The Linux Ollama archive continuation joins pinned artifact admission to the
 retained download descriptor, native SHA256, same-inode tar/zstd extraction and
 owned stage publication under the original absolute bootstrap deadline.
