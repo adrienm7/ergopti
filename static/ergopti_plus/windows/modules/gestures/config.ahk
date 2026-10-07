@@ -75,7 +75,8 @@ GestureActionParameterKey(BindingId, ActionName) {
 GestureGetActionParameter(BindingId, ActionName) {
 		global GestureActionParameters, ConfigurationFile
 		Key := GestureActionParameterKey(BindingId, ActionName)
-		if Type(BindingId) == "String" && SubStr(BindingId, 1, 9) == "tap_key__"
+		if Type(BindingId) == "String"
+				&& (SubStr(BindingId, 1, 9) == "tap_key__" || SubStr(BindingId, 1, 8) == "script__")
 				&& TomlConfigParameterBindingStatus(BindingId) == "retired" {
 				if GestureActionParameters.Has(Key) && IsSet(ConfigurationFile)
 						&& Type(ConfigurationFile) == "String" && ConfigurationFile != ""

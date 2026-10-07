@@ -645,3 +645,5 @@ require("test.tap_binding_publication_contract").register(require("tests.helpers
 require("test.binding_publication_authority_contract").register(require("tests.helpers"), "macos")
 
 require("test.keyboard_binding_publication_contract").register(require("tests.helpers"), "macos")
+
+require("test.script_binding_publication_contract").register_late(require("tests.helpers"), "macos")
