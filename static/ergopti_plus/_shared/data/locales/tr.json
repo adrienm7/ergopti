@@ -1988,6 +1988,7 @@
 	"sg_actions.app_previous": "⇥ Önceki uygulama — tüm ekranlar",
 	"sg_actions.app_previous_screen": "⇥ Önceki uygulama — bu ekran",
 	"sg_actions.app_switcher": "⇥ Sistem Alt+Tab'ı",
+	"sg_actions.system_app_switcher": "⇥ Sistem Alt+Tab'ı",
 	"sg_actions.app_window_previous": "◱ → Sonraki pencere, geçiş ekranı olmadan (Alt+Esc)",
 	"sg_actions.arrow_down": "↓ Aşağı Ok",
 	"sg_actions.arrow_left": "← Sol Ok",
