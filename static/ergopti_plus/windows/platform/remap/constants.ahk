@@ -1299,8 +1299,8 @@ _TapHoldKeyTapModifiers(Mods) {
 	if !TapHoldAnyModifierHeld()
 		return Mods
 	Words := "Blind"
-	for _, TapModifierName in Mods
-		Words .= " " . TapModifierName
+	for _, Mod in Mods
+		Words .= " " . Mod
 	return Words
 }
 

@@ -31,6 +31,12 @@ const FULL = process.argv.includes('--full');
 // Each check mirrors a CI "Validate ·" step. command/args are run from ROOT.
 const CHECKS = [
 	{
+		name: 'Signed native query CI publisher retains compiler and nested-signature provenance',
+		cmd: process.execPath,
+		args: ['tools/test/test-automation-query-ci-publisher.cjs'],
+		repro: 'npm run test:automation-query-ci-publisher'
+	},
+	{
 		name: 'Ubuntu CI dependencies retain signed archive scope and native failure status',
 		cmd: process.execPath,
 		args: ['tools/test/test-ubuntu-ci-acquisition.cjs'],

@@ -6034,13 +6034,27 @@ and installation qualification are still required.
   implement their real availability/invocation contracts. Add bounded Apple
   Shortcuts catalogue ownership, chosen-ID revalidation, safe native invocation,
   cancellation and retirement. Complete cross-consumer parameters/concurrency
-  and native Mac publication/lock qualification; coordinate the unadopted Mac79
-  program-helper tranche rather than claiming it is already integrated. Native
+  and native Mac publication/lock qualification; the reviewed Mac program-helper
+  and image-bound query source now belongs to this branch. Its original strict
+  publisher now includes the exact genuine SwiftPM-created root Package.resolved
+  as tracked source, with the Sparkle pin, complete input census and compiler
+  lock immutability unchanged. Final native tracked-input admission and signed
+  helper execution remain unrun. Native
   qualification: genuine Unicode/space/empty/literal argv, refused start, exit
   errors and cancellation, then final three-OS package/install/startup. Mac
   Sparkle/Brew/switcher package failures remain software/ownership blockers.
   Device work is limited to automation requiring actual peripherals or user
   sessions; discovery, ordinary execution and packaging remain software tasks.
+
+The normal Mac product tranche preserves every original locale field and adds
+literal switcher aliases in all21 languages. Existing program consumers retain
+private source, callback, modifier and retirement custody. Source-equivalent
+trial37641402757/ab72 attempt2 compiles the release launcher and passes all14
+native QueryV2 tests, including all four original capture/EOF/overflow/retirement
+cases. Whole XCTest343 is341 passed/two failed (Brew/Sparkle), six assertions;
+installed package acceptance remains failed. Private diagnostic workflows,
+Census3 and G6 test-policy overlays are excluded from canonical product source.
+Final joined-source gates and remote Shortcut retirement remain required.
 
 - [~] **107.** Expose native, digits-direct and symbols-direct number-row
   policy, with acknowledged legacy Windows-Boolean migration and unrelated data
@@ -6127,20 +6141,31 @@ and installation qualification are still required.
   retains an explicit translated reason. Native Mac global product switching is
   not admitted by the isolated signed-Hammerspoon probe.
 
-  Remaining software: compose the separately reviewed, unadopted Mac79 product
-  global-switcher/input broker, native helper and bounded observer with exact
-  input/tap/timer retirement. The private helper's four queries failed at five
-  seconds with setsid EPERM; this is not a proved TCC cause. The image-bound QueryV2 source review passes. Mac trial37636879841 at
-  CIca72ac38d149b9e7632b4d6da6a4c0c1a7476b55 passes Core, controlled Lua/E2E
-  and native canvas12, then release compilation fails because the C global
-  kSecCSNoNetworkAccess is unavailable in Swift. A one-expression public
-  .noNetworkAccess repair preserves the offline flag and is independently
-  source clear. Trial37641402757 at CIab72b661b1c1268939a9efaf970dc38aad209d7e
-  is in progress; corrected compilation/query/installation remain unqualified. This is not source adoption or native query qualification. Preserve distinct picker
-  labels, current-pointer geometry, spanning-window placement, eligibility and
-  activation refusal. Native qualification: actual product compile/sign/query,
-  switch/retirement and helper input census; preserve the unchanged package
-  verdict and resolve its software/ownership blockers before install/startup.
+  The reviewed normal Mac79 product, shared switcher owner, input broker,
+  native helper and bounded observer are now on this branch. All79 whole-source
+  pre/postimages, five ordered suppliers,21 literal locale additions and640
+  independent corpus/schema paths were independently checked. The genuine
+  action-catalogue and domain generators reproduce the reviewed outputs;
+  incoming G1 menus and script\_\_ admission remain intact.
+
+  Source-equivalent trial37641402757/ab72 attempt2 proves release compilation
+  with the public Swift .noNetworkAccess member and all14 native QueryV2 tests,
+  including all four original held-source/capture/EOF/overflow/retirement cases.
+  Actual dynamic self/stopped-child image validation and original deadlines
+  remain enforced. Whole XCTest343:341 pass/two fail (Brew/Sparkle), six
+  assertions. The exact genuine302-byte SwiftPM root Package.resolved is
+  now tracked without changing its Sparkle pin, cache policy or strict
+  input/staging census. Final native tracked64 admission, independent
+  clean regeneration, signed readonly helper and installation are unrun.
+  The earlier setsid EPERM and unavailable C-global failures remain distinct
+  historical receipts, not current causes or inferred TCC permission.
+
+  Remaining software/native qualification: qualify the tracked real
+  generator-owned lock with unchanged strict input census and actual product
+  compile/sign/query, tap/timer/modifier retirement and switch delivery on the
+  final joined source. Preserve distinct labels, current-pointer geometry,
+  spanning-window placement, eligibility and activation refusal. Resolve the
+  separately owned Brew/Sparkle package failures before installation/startup.
   Device work: genuine dual displays on supported OSes, independent cursor/focus,
   moved cursors, spanning/negative/minimized/closed windows and refused activation.
   Virtual RandR regions and posted-event success cannot prove physical display

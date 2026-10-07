@@ -24,16 +24,17 @@ local window = Desk.window
 local FRONT, OTHER, THIRD = Desk.FRONT, Desk.OTHER, Desk.THIRD
 local LEFT_SCREEN, RIGHT_SCREEN = Desk.LEFT_SCREEN, Desk.RIGHT_SCREEN
 
--- Every id that has ever switched applications or windows in the catalogue.
+-- Direct activation family. The native switcher has independent input/source
+-- tests in test_native_app_switcher_action and test_system_switcher_input.
 local SWITCHING = {
-	"app_switcher", "app_previous", "app_previous_screen", "alt_tab_apps",
+	"app_previous", "app_previous_screen", "alt_tab_apps",
 	"cmd_shift_tab", "app_window_previous", "alt_tab_windows", "alt_tab_monitor",
 	"win_prev", "win_next", "win_app_prev", "win_app_next", "cycle_windows_in_app",
 }
 
 -- The ids the v5_to_v6 migration maps away on macOS.
 local MERGED = {
-	app_switcher = "app_previous", alt_tab_apps = "app_previous",
+	alt_tab_apps = "app_previous",
 	app_window_previous = "win_app_next", cycle_windows_in_app = "win_app_next",
 	win_prev = "win_app_prev", win_next = "win_app_next",
 }

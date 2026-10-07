@@ -1110,6 +1110,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 // spawned by Hammerspoon owns no GUI/application lifecycle.
 installPrivateProcessUmask()
 
+if OwnedAutomationQueryWorker.handles(arguments: CommandLine.arguments) {
+	Darwin.exit(OwnedAutomationQueryWorker.run(arguments: CommandLine.arguments))
+}
+
 if OwnedProgramWorker.handles(arguments: CommandLine.arguments) {
 	Darwin.exit(OwnedProgramWorker.run(arguments: CommandLine.arguments))
 }
