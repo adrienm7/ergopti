@@ -171,6 +171,7 @@
 		"test:keyboard-slot-defaults": "node ./tools/test/test-keyboard-slot-recommended-bindings.cjs",
 		"test:number-row-full-capture": "node ./tools/test/test-number-row-full-capture.cjs",
 		"test:app-switch-labels": "node ./tools/test/test-app-switch-labels.cjs",
+		"test:automation-query-ci-publisher": "node ./tools/test/test-automation-query-ci-publisher.cjs",
 		"test:js": "node ./tools/test/run-js-suite.cjs",
 		"test:touchpad-registry": "node ./tools/test/test-touchpad-registry-single-source.cjs",
 		"test:gui-title-audit": "node ./tools/test/test-gui-title-audit.cjs",
