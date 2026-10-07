@@ -5886,6 +5886,22 @@ plus98 reference cases/249 driver replays/37 rejected defects. Windows native
 execution remains pending for this tranche; portable Root qualification is
 recorded above.
 
+The hosted Windows failures on exact E6 were stale source-scanning fixtures
+and the retired Ergopti default expectation. Four scanners now observe only
+the actual injected registration ports and their native defaults; closed
+executable usage refuses reassignment, aliases and counterfeits. Original
+203 assertion calls and57 registrations remain, apart from the reviewed
+neutral-none expectation and its explicit inactive assertion. Per-port call
+floors and a nonempty criterion census prevent vacuous green scans. Both
+original finite-scan failures are causally reproduced and repaired without
+changing the ratchet or its baseline. Independent source review,82 portable
+pattern controls and ten adversarial controls pass. The complete Root gate additionally
+exposed two loop-capture hazards in the added refusal cases; each must bind
+the actual per-item source before invocation rather than pass on UnsetError.
+Root selected encoding, formatting and JS gates are recorded with this tranche; native AHK execution
+and three-driver packaging/installation on the final source remain pending.
+Item96 and transverse16/38 remain open.
+
 - [~] **97.** Replace the fixed accent/direct-symbol shortcut submenu with
   user-owned entries, empty by default and offering "+ Add". Let a user on
   any keyboard layout choose an action from the shared catalogue or enter
