@@ -3381,6 +3381,18 @@ all seven in normal and optimized modes, including meaningful mutation checks.
 Corrected native CI execution remains pending and does not qualify CF metadata
 or the runtime. Item31 remains partial.
 
+The original owned runtime compilation now retains a bounded private journal of
+named source/currentness/product/native-phase entry and completion boundaries.
+The journal starts only after existing owner admission, retains original errors,
+arguments and absolute deadline reads, and grants no runtime authority. Fixed
+512-event/128KiB limits preserve an explicit incomplete marker. Independent
+review reproduced a same-inode descriptor-reuse defect in the first draft; the
+corrected owner attempts close once and retains unknown debt on error, without
+closing a reused descriptor. Existing assertions and controls remain intact.
+Actual Mac journal execution, cost and the failing300-second boundary still need
+qualification; the latest285 run reaches the unchanged25-minute aggregate limit.
+Item31 stays partial.
+
 WP3 prerequisite: the actual macOS physical accounting owner now requires exact held-modifier settlement before accepting source transitions. The keylogger retires each crossing physical release without emitting an orphan hold or a new press, including pause and secure-context crossings; ordinary legacy and collision behavior remains unchanged. Existing native fixture parents restore their settlement child through the scoped cache owner, while normal production stop/restart retains the same CoreState. Portable focused tests pass (32 held-key cases, 24 policy cases, 3 legacy collision cases, 23 existing cache-scope cases, and 9 unchanged alias configuration/privacy cases); the original real gap-release source fails all eight side-key cases. This does not enable a producer or headless mode, alter transport/baseline versions, or complete WP3/WP4/native acceptance. Full root and hosted macOS qualification remain required.
 
 WP3 remains partial. An explicitly initialized, dormant physical-capture session

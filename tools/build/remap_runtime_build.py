@@ -2,6 +2,8 @@
 """Compile a fixed unsigned four-target tree with retained pristine source ownership."""
 
 import argparse
+from contextlib import contextmanager as _contextmanager, nullcontext as _nullcontext
+from contextvars import ContextVar as _ContextVar
 import hashlib
 from dataclasses import dataclass
 import importlib.util
@@ -130,6 +132,348 @@ def _directory_identity(info):
     return (info.st_dev, info.st_ino, info.st_uid, info.st_mode)
 
 
+# Additive timing witnesses never grant source, native, shipping or retirement authority.
+_BOUNDARY_OBSERVER = _ContextVar("owned_compilation_boundary_observer", default=None)
+_BOUNDARY_STAGES = frozenset(
+    {
+        "inputs",
+        "products",
+        "product_capture",
+        "staged_source",
+        "pristine_source",
+        "source_prepare",
+        "source_dependencies",
+        "source_materialize",
+        "native_dispatch",
+        "artifact_capture",
+        "tool_acquisition",
+    }
+)
+_BOUNDARY_PHASES = (
+    frozenset(BASELINE_PHASES)
+    | frozenset(
+        label + "_" + suffix
+        for label, _, _ in TARGETS
+        for suffix in ("generate", "build", "architectures")
+    )
+    | frozenset({"signing_identity"})
+    | frozenset(
+        "signing_" + str(index) + "_" + str(level) + suffix
+        for index in range(3)
+        for level in range(2)
+        for suffix in (
+            "_sign",
+            "_verify",
+            "_x86_64_requirement",
+            "_arm64_requirement",
+            "_x86_64_leaf",
+            "_arm64_leaf",
+        )
+    )
+)
+_BOUNDARY_CODES = frozenset(
+    {
+        "source_identity",
+        "source_changed",
+        "dependency_changed",
+        "inventory",
+        "unsafe_path",
+        "owner_path",
+        "owner_mode",
+        "owner_identity",
+        "tool_unavailable",
+        "invalid_budget",
+        "deadline",
+        "phase_deadline",
+        "phase_failed",
+        "phase_log_limit",
+        "phase_exit",
+        "product_identity",
+        "product_architectures",
+        "product_metadata",
+    }
+)
+
+
+class _BoundaryStopped(Exception):
+    """Only the diagnostic writer stopped; original operations remain unchanged."""
+
+
+def _boundary_clock():
+    # Separate clock: never read/reset the original deadline's monotonic() calls.
+    value = time.perf_counter_ns()
+    if type(value) is not int or not 0 <= value < 10**20:
+        raise _BoundaryStopped()
+    return value
+
+
+def _boundary_code(error):
+    if type(error) is BASE.NativeBuildError:
+        code = error.code
+        return code if type(code) is str and code in _BOUNDARY_CODES else "other_refusal"
+    return "unexpected"
+
+
+class _BoundaryJournal:
+    """Bounded private append-only observations, with exact held descriptor custody."""
+
+    MAX_EVENTS = 512
+    MAX_BYTES = 128 * 1024
+    RESERVED_BYTES = 1024
+
+    def __init__(self, owner):
+        self.owner = _OWNER(owner)
+        self.ancestors = tuple(
+            (path, _directory_identity(path.lstat()))
+            for path in reversed((self.owner,) + tuple(self.owner.parents))
+        )
+        self.path = self.owner / "owned-compilation-boundaries.jsonl"
+        self.descriptor = None
+        self.stamp = None
+        self.close_debt = False
+        self.closed = False
+        self.disabled = False
+        self.truncated = False
+        self.sequence = 0
+        self.next_span = 0
+        self.stack = []
+        self.data = b""
+        self.sync_ns = 0
+        self.started = 0
+        try:
+            self._ancestors_current()
+            self.descriptor = os.open(
+                self.path,
+                os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_NONBLOCK,
+                0o600,
+            )
+            self.stamp = _identity(os.fstat(self.descriptor))
+            os.set_inheritable(self.descriptor, False)
+            os.fchmod(self.descriptor, 0o600)
+            self.stamp = _identity(os.fstat(self.descriptor))
+            self._guard()
+            self.started = _boundary_clock()
+            self._append("writer_start", mono=self.started)
+        except (OSError, _BoundaryStopped):
+            self.disabled = True
+            self.close()
+            # Keep any unobserved allocation debt in this private writer object.
+
+    def _ancestors_current(self):
+        for path, stamp in self.ancestors:
+            info = path.lstat()
+            if not stat.S_ISDIR(info.st_mode) or _directory_identity(info) != stamp:
+                raise _BoundaryStopped()
+        if self.owner.resolve(strict=True) != self.owner:
+            raise _BoundaryStopped()
+
+    def _guard(self):
+        self._ancestors_current()
+        actual = os.fstat(self.descriptor)
+        named = self.path.lstat()
+        if (
+            not stat.S_ISREG(actual.st_mode)
+            or actual.st_uid != os.getuid()
+            or stat.S_IMODE(actual.st_mode) != 0o600
+            or actual.st_nlink != 1
+            or _identity(actual) != self.stamp
+            or _identity(named) != self.stamp
+            or actual.st_size != len(self.data)
+        ):
+            raise _BoundaryStopped()
+
+    def _append(
+        self,
+        event,
+        span=0,
+        parent=0,
+        stage="compilation",
+        phase="",
+        elapsed=0,
+        code="",
+        mono=None,
+        *,
+        reserved=False,
+    ):
+        if self.disabled or self.closed:
+            return False
+        try:
+            now = _boundary_clock() if mono is None else mono
+            if type(elapsed) is not int or not 0 <= elapsed < 10**20:
+                raise _BoundaryStopped()
+            record = {
+                "schema": 1,
+                "seq": self.sequence + 1,
+                "event": event,
+                "span": span,
+                "parent": parent,
+                "stage": stage,
+                "phase": phase,
+                "mono_ns": now,
+                "elapsed_ns": elapsed,
+                "sync_ns": self.sync_ns,
+                "code": code,
+            }
+            payload = (
+                json.dumps(record, sort_keys=True, allow_nan=False, separators=(",", ":")) + "\n"
+            ).encode("utf-8")
+            if not reserved and (
+                self.sequence >= self.MAX_EVENTS - 2
+                or len(self.data) + len(payload) > self.MAX_BYTES - self.RESERVED_BYTES
+            ):
+                self._append("overflow", code="limit", reserved=True)
+                self.truncated = True
+                self.disabled = True
+                return False
+            if self.sequence >= self.MAX_EVENTS or len(self.data) + len(payload) > self.MAX_BYTES:
+                raise _BoundaryStopped()
+            self._guard()
+            offset = 0
+            while offset < len(payload):
+                count = os.write(self.descriptor, payload[offset:])
+                if type(count) is not int or not 0 < count <= len(payload) - offset:
+                    raise _BoundaryStopped()
+                offset += count
+            began = _boundary_clock()
+            os.fsync(self.descriptor)
+            ended = _boundary_clock()
+            if ended < began or self.sync_ns + ended - began >= 10**20:
+                raise _BoundaryStopped()
+            self.sync_ns += ended - began
+            expected = self.data + payload
+            after = os.fstat(self.descriptor)
+            if (
+                _identity(after)[:5] != self.stamp[:5]
+                or after.st_size != len(expected)
+                or os.pread(self.descriptor, len(expected) + 1, 0) != expected
+                or _identity(os.fstat(self.descriptor)) != _identity(after)
+                or _identity(self.path.lstat()) != _identity(after)
+            ):
+                raise _BoundaryStopped()
+            self._ancestors_current()
+            self.stamp = _identity(after)
+            self.data = expected
+            self.sequence += 1
+            return True
+        except (OSError, _BoundaryStopped, ValueError, OverflowError):
+            self.disabled = True
+            return False
+
+    def finish_span(self, event, span, parent, stage, phase, started, code=""):
+        try:
+            ended = _boundary_clock()
+            if ended < started:
+                raise _BoundaryStopped()
+            self._append(event, span, parent, stage, phase, ended - started, code, ended)
+        except _BoundaryStopped:
+            self.disabled = True
+
+    def close(self):
+        if self.closed:
+            return
+        if not self.disabled and not self.truncated:
+            self.finish_span("writer_end", 0, 0, "compilation", "", self.started)
+        self.closed = True
+        if self.descriptor is None:
+            return
+        if self.stamp is None:
+            self.close_debt = True
+            return  # Unknown incarnation cannot authorize a descriptor close.
+        # Namespace refusal stops writes. Closing our exact FD is still mandatory.
+        # Never close a reused foreign descriptor after loss of its incarnation.
+        try:
+            actual = os.fstat(self.descriptor)
+            if not stat.S_ISREG(actual.st_mode) or _identity(actual)[:3] != self.stamp[:3]:
+                self.close_debt = True
+                return
+            # Close at most once. An error may arrive after the FD was released;
+            # even the same inode at the same number cannot authorize a retry.
+            os.close(self.descriptor)
+            self.close_debt = False
+        except OSError:
+            # Physical retirement is unknown. Retain debt without a new fstat
+            # or close, and preserve the original native/source result or error.
+            self.close_debt = True
+
+
+@_contextmanager
+def _observe_compilation(owner):
+    journal = None
+    try:
+        journal = _BoundaryJournal(owner)
+    except (BASE.NativeBuildError, _BoundaryStopped, OSError):
+        pass  # Missing/unknown diagnostic evidence never becomes qualification.
+    token = _BOUNDARY_OBSERVER.set(journal)
+    try:
+        yield journal
+    finally:
+        _BOUNDARY_OBSERVER.reset(token)
+        if journal is not None:
+            journal.close()
+
+
+@_contextmanager
+def _observe_span(stage, phase=None):
+    if type(stage) is not str or stage not in _BOUNDARY_STAGES:
+        raise ValueError("stage")
+    phase = phase if type(phase) is str and phase in _BOUNDARY_PHASES else "unclassified"
+    if stage != "native_dispatch":
+        phase = ""
+    journal = _BOUNDARY_OBSERVER.get()
+    if (
+        journal is None
+        or journal.disabled
+        or journal.closed
+        or (stage == "product_capture" and journal.stack and journal.stack[-1][1] == "products")
+    ):
+        yield
+        return
+    journal.next_span += 1
+    span = journal.next_span
+    parent = journal.stack[-1][0] if journal.stack else 0
+    entered = journal._append("enter", span, parent, stage, phase)
+    try:
+        started = _boundary_clock()
+    except _BoundaryStopped:
+        journal.disabled = True
+        entered = False
+        started = 0
+    if entered:
+        journal.stack.append((span, stage))
+    try:
+        yield
+    except BaseException as error:
+        if entered:
+            journal.finish_span(
+                "refused", span, parent, stage, phase, started, _boundary_code(error)
+            )
+        raise
+    else:
+        if entered:
+            journal.finish_span("complete", span, parent, stage, phase, started)
+    finally:
+        if entered:
+            journal.stack.pop()
+
+
+def _observed_run_phase(name, args, cwd, owner, deadline):
+    with _observe_span("native_dispatch", name):
+        return _RUN_PHASE(name, args, cwd, owner, deadline)
+
+
+def _factory_span(factory, operation):
+    if factory is _SOURCE_FACTORY:
+        for name, stage in (
+            ("current_staged_source", "staged_source"),
+            ("revalidate_owned_source", "pristine_source"),
+            ("prepare_owned_source", "source_prepare"),
+            ("capture_dependencies", "source_dependencies"),
+        ):
+            if operation is getattr(factory, name):
+                return _observe_span(stage)
+    return _nullcontext()
+
+
 def _relative(value):
     _REQUIRE(
         type(value) is str and value and "\0" not in value,
@@ -235,23 +579,24 @@ def snapshot_inputs(root, expected, deadline):
 
 def current_inputs(snapshot, deadline, *, maximum=BASE.MAX_INPUT_BYTES):
     """Reject replacement or mutation of every retained source incarnation."""
-    check_deadline(deadline)
-    _REQUIRE(
-        type(snapshot) is InputSnapshot,
-        "source_identity",
-        "Source snapshot is not private typed input",
-    )
-    _REQUIRE(
-        snapshot.root.resolve(strict=True) == snapshot.root
-        and _directory_identity(snapshot.root.lstat()) == snapshot.root_identity,
-        "source_identity",
-        "Source owner changed",
-    )
-    for previous in snapshot.files:
+    with _observe_span("inputs"):
         check_deadline(deadline)
-        current = _ordinary(snapshot.root / previous.path, snapshot.root, maximum)
-        _REQUIRE(current == previous, "source_identity", "Retained source changed")
-        check_deadline(deadline)
+        _REQUIRE(
+            type(snapshot) is InputSnapshot,
+            "source_identity",
+            "Source snapshot is not private typed input",
+        )
+        _REQUIRE(
+            snapshot.root.resolve(strict=True) == snapshot.root
+            and _directory_identity(snapshot.root.lstat()) == snapshot.root_identity,
+            "source_identity",
+            "Source owner changed",
+        )
+        for previous in snapshot.files:
+            check_deadline(deadline)
+            current = _ordinary(snapshot.root / previous.path, snapshot.root, maximum)
+            _REQUIRE(current == previous, "source_identity", "Retained source changed")
+            check_deadline(deadline)
 
 
 def stage_inputs(snapshot, owner, deadline):
@@ -346,17 +691,19 @@ def architectures(output):
 
 def product_snapshot(path, root):
     """Capture an actual ordinary retained image; dummy fixture bytes prove no native build."""
-    snapshot = _ordinary(path, root, PRODUCT_MAX_BYTES)
-    _REQUIRE(snapshot.data, "product_identity", "Native product is empty")
-    return snapshot
+    with _observe_span("product_capture"):
+        snapshot = _ordinary(path, root, PRODUCT_MAX_BYTES)
+        _REQUIRE(snapshot.data, "product_identity", "Native product is empty")
+        return snapshot
 
 
 def current_product(snapshot, root):
-    _REQUIRE(
-        product_snapshot(Path(root) / snapshot.path, root) == snapshot,
-        "source_identity",
-        "Native product changed across a foreign phase",
-    )
+    with _observe_span("products"):
+        _REQUIRE(
+            product_snapshot(Path(root) / snapshot.path, root) == snapshot,
+            "source_identity",
+            "Native product changed across a foreign phase",
+        )
 
 
 def validate_products(products):
@@ -1038,7 +1385,7 @@ class _SigningSink(_PreparationSink):
                 ):
                     boundary()
                     try:
-                        _RUN_PHASE(name, command, signed, self.owner.path, deadline)
+                        _observed_run_phase(name, command, signed, self.owner.path, deadline)
                     finally:
                         # Even a failed native child cannot bypass source/unsigned recuts.
                         current()
@@ -1484,7 +1831,9 @@ def _compile_product_images(
         ):
             _current_build_inputs(source_snapshot, deadline, staged_image)
             _preparation_current(shipping_sink, retained, deadline)
-            phases.append(_RUN_PHASE(label + "_" + suffix, command, project, owner, deadline))
+            phases.append(
+                _observed_run_phase(label + "_" + suffix, command, project, owner, deadline)
+            )
             _preparation_current(shipping_sink, retained, deadline)
             check_deadline(deadline)
             _current_build_inputs(source_snapshot, deadline, staged_image)
@@ -1516,7 +1865,7 @@ def _compile_product_images(
         _current_build_inputs(source_snapshot, deadline, staged_image)
         _preparation_current(shipping_sink, retained, deadline)
         phases.append(
-            _RUN_PHASE(
+            _observed_run_phase(
                 label + "_architectures",
                 [tools["xcrun"], "lipo", "-archs", str(output)],
                 project,
@@ -1819,7 +2168,7 @@ def observe_products(source, owner, *, repository=None):
         check_deadline(deadline)
         image = product_snapshot(source / recipe / relative, source)
         images.append(image)
-        _RUN_PHASE(
+        _observed_run_phase(
             label + "_observed_architectures",
             [str(xcrun), "lipo", "-archs", str(source / image.path)],
             owner,
@@ -1899,12 +2248,13 @@ def _source_factory():
 
 def _factory_operation(factory, operation, *arguments):
     """Preserve the fixed factory's typed refusal without an unbounded traceback."""
-    try:
-        return operation(*arguments)
-    except factory.SourceRefusal as error:
-        raise BASE.NativeBuildError(
-            error.code, "The fixed actual source operation refused"
-        ) from error
+    with _factory_span(factory, operation):
+        try:
+            return operation(*arguments)
+        except factory.SourceRefusal as error:
+            raise BASE.NativeBuildError(
+                error.code, "The fixed actual source operation refused"
+            ) from error
 
 
 def materialize_owned_source(projection, owner, deadline):
@@ -1914,103 +2264,106 @@ def materialize_owned_source(projection, owner, deadline):
     describes the full physical staging, before the actual version generator.
     Failed private staging is retained for diagnosis and grants no authority.
     """
-    factory = _source_factory()
-    _REQUIRE(
-        type(projection) is factory.PreparedSource,
-        "source_identity",
-        "The source projection is not the actual fixed factory result",
-    )
-    check_deadline(deadline)
-    owner = _OWNER(owner)
-    owner_identity = _directory_identity(owner.lstat())
-    _REQUIRE(
-        owner != projection.upstream and projection.upstream not in owner.parents,
-        "unsafe_path",
-        "Detached owned staging overlaps the retained pristine source",
-    )
-    destination = owner / "upstream"
-    _REQUIRE(
-        not destination.exists() and not destination.is_symlink(),
-        "unsafe_path",
-        "The owned source destination already exists",
-    )
-    _factory_operation(factory, factory.revalidate_owned_source, projection, deadline)
-    staging = owner / (".owned-source-staging-" + uuid.uuid4().hex)
-    staging.mkdir(mode=0o700)
-    for relative, mode, _, wanted in projection.inventory:
+    with _observe_span("source_materialize"):
+        factory = _source_factory()
+        _REQUIRE(
+            type(projection) is factory.PreparedSource,
+            "source_identity",
+            "The source projection is not the actual fixed factory result",
+        )
         check_deadline(deadline)
-        _relative(relative)
-        if mode == "160000":
-            continue  # Genuine recursive submodule leaves follow in the inventory.
-        target = staging / relative
-        target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-        source = projection.upstream / relative
-        if mode == "120000":
-            before = source.lstat()
-            _REQUIRE(
-                stat.S_ISLNK(before.st_mode) and before.st_uid == os.getuid(),
-                "source_identity",
-                "A tracked symbolic link changed its physical type or owner",
-            )
-            link = os.readlink(source)
-            _REQUIRE(
-                BASE.digest(os.fsencode(link)) == wanted
-                and _identity(source.lstat()) == _identity(before),
-                "source_identity",
-                "The genuine tracked link changed during materialization",
-            )
-            # Retain genuine relative links, including the upstream broken-link
-            # test fixture. The factory's closed inventory owns their targets.
-            os.symlink(link, target)
-        else:
-            _REQUIRE(mode in {"100644", "100755"}, "source_identity", "Unknown tracked mode")
-            retained = _ordinary(source, projection.upstream, SOURCE_TREE_MAX_BYTES)
-            _REQUIRE(
-                BASE.digest(retained.data) == wanted,
-                "source_identity",
-                "An actual tracked input differs from the factory inventory",
-            )
-            _WRITE_EXCLUSIVE(target, retained.data)
-            target.chmod(0o755 if mode == "100755" else 0o644)
+        owner = _OWNER(owner)
+        owner_identity = _directory_identity(owner.lstat())
+        _REQUIRE(
+            owner != projection.upstream and projection.upstream not in owner.parents,
+            "unsafe_path",
+            "Detached owned staging overlaps the retained pristine source",
+        )
+        destination = owner / "upstream"
+        _REQUIRE(
+            not destination.exists() and not destination.is_symlink(),
+            "unsafe_path",
+            "The owned source destination already exists",
+        )
+        _factory_operation(factory, factory.revalidate_owned_source, projection, deadline)
+        staging = owner / (".owned-source-staging-" + uuid.uuid4().hex)
+        staging.mkdir(mode=0o700)
+        for relative, mode, _, wanted in projection.inventory:
+            check_deadline(deadline)
+            _relative(relative)
+            if mode == "160000":
+                continue  # Genuine recursive submodule leaves follow in the inventory.
+            target = staging / relative
+            target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+            source = projection.upstream / relative
+            if mode == "120000":
+                before = source.lstat()
+                _REQUIRE(
+                    stat.S_ISLNK(before.st_mode) and before.st_uid == os.getuid(),
+                    "source_identity",
+                    "A tracked symbolic link changed its physical type or owner",
+                )
+                link = os.readlink(source)
+                _REQUIRE(
+                    BASE.digest(os.fsencode(link)) == wanted
+                    and _identity(source.lstat()) == _identity(before),
+                    "source_identity",
+                    "The genuine tracked link changed during materialization",
+                )
+                # Retain genuine relative links, including the upstream broken-link
+                # test fixture. The factory's closed inventory owns their targets.
+                os.symlink(link, target)
+            else:
+                _REQUIRE(mode in {"100644", "100755"}, "source_identity", "Unknown tracked mode")
+                retained = _ordinary(source, projection.upstream, SOURCE_TREE_MAX_BYTES)
+                _REQUIRE(
+                    BASE.digest(retained.data) == wanted,
+                    "source_identity",
+                    "An actual tracked input differs from the factory inventory",
+                )
+                _WRITE_EXCLUSIVE(target, retained.data)
+                target.chmod(0o755 if mode == "100755" else 0o644)
+            check_deadline(deadline)
+        for relative, data in projection.replacements:
+            check_deadline(deadline)
+            _relative(relative)
+            target = staging / relative
+            target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+            if target.exists() or target.is_symlink():
+                retained = _ordinary(target, staging, SOURCE_TREE_MAX_BYTES)
+                target.unlink()
+                _WRITE_EXCLUSIVE(target, data)
+                target.chmod(stat.S_IMODE(retained.identity[3]))
+            else:
+                _WRITE_EXCLUSIVE(target, data)
+                target.chmod(0o644)
+            check_deadline(deadline)
+        _factory_operation(factory, factory.validate_staged_source, projection, staging, deadline)
+        _factory_operation(factory, factory.revalidate_owned_source, projection, deadline)
+        _REQUIRE(
+            _directory_identity(_OWNER(owner).lstat()) == owner_identity,
+            "owner_identity",
+            "The owned staging root changed before publication",
+        )
+        try:
+            destination.mkdir(mode=0o700)
+        except OSError as error:
+            raise BASE.NativeBuildError(
+                "unsafe_path", "Exclusive owned publication refused"
+            ) from error
+        reserved = _directory_identity(destination.lstat())
+        _REQUIRE(
+            _directory_identity(destination.lstat()) == reserved and not any(destination.iterdir()),
+            "owner_identity",
+            "The reserved owned source destination changed",
+        )
+        os.rename(staging, destination)
         check_deadline(deadline)
-    for relative, data in projection.replacements:
-        check_deadline(deadline)
-        _relative(relative)
-        target = staging / relative
-        target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-        if target.exists() or target.is_symlink():
-            retained = _ordinary(target, staging, SOURCE_TREE_MAX_BYTES)
-            target.unlink()
-            _WRITE_EXCLUSIVE(target, data)
-            target.chmod(stat.S_IMODE(retained.identity[3]))
-        else:
-            _WRITE_EXCLUSIVE(target, data)
-            target.chmod(0o644)
-        check_deadline(deadline)
-    _factory_operation(factory, factory.validate_staged_source, projection, staging, deadline)
-    _factory_operation(factory, factory.revalidate_owned_source, projection, deadline)
-    _REQUIRE(
-        _directory_identity(_OWNER(owner).lstat()) == owner_identity,
-        "owner_identity",
-        "The owned staging root changed before publication",
-    )
-    try:
-        destination.mkdir(mode=0o700)
-    except OSError as error:
-        raise BASE.NativeBuildError("unsafe_path", "Exclusive owned publication refused") from error
-    reserved = _directory_identity(destination.lstat())
-    _REQUIRE(
-        _directory_identity(destination.lstat()) == reserved and not any(destination.iterdir()),
-        "owner_identity",
-        "The reserved owned source destination changed",
-    )
-    os.rename(staging, destination)
-    check_deadline(deadline)
-    image = _factory_operation(
-        factory, factory.validate_staged_source, projection, destination, deadline
-    )
-    _factory_operation(factory, factory.current_staged_source, image, deadline)
-    return image
+        image = _factory_operation(
+            factory, factory.validate_staged_source, projection, destination, deadline
+        )
+        _factory_operation(factory, factory.current_staged_source, image, deadline)
+        return image
 
 
 def dependency_ready(repository, owner, seconds):
@@ -2060,7 +2413,7 @@ def _acquire_pristine(owner, tools, deadline, phases, *, shipping_sink=None):
     for name, command in commands:
         if shipping_sink is not None:
             shipping_sink.current(deadline)
-        phases.append(_RUN_PHASE(name, command, owner, owner, deadline))
+        phases.append(_observed_run_phase(name, command, owner, owner, deadline))
         if shipping_sink is not None:
             shipping_sink.current(deadline)
         check_deadline(deadline)
@@ -2074,7 +2427,7 @@ def _acquire_pristine(owner, tools, deadline, phases, *, shipping_sink=None):
         if shipping_sink is not None:
             shipping_sink.current(deadline)
         phases.append(
-            _RUN_PHASE(
+            _observed_run_phase(
                 phase,
                 [tools["git"], "-C", str(checkout / relative), "rev-parse", "HEAD"],
                 owner,
@@ -2092,7 +2445,7 @@ def _acquire_pristine(owner, tools, deadline, phases, *, shipping_sink=None):
     if shipping_sink is not None:
         shipping_sink.current(deadline)
     phases.append(
-        _RUN_PHASE(
+        _observed_run_phase(
             "source_clean",
             [tools["git"], "-C", str(checkout), "diff", "--exit-code"],
             owner,
@@ -2188,140 +2541,151 @@ def _compile_owned(
         not any(owner.iterdir()), "unsafe_path", "Actual owned build requires a fresh empty owner"
     )
     deadline = time.monotonic() + seconds
-    _REQUIRE(
-        type(distribution) is bool and (not distribution or (prepare and signing is not None)),
-        "invalid_budget",
-        "Distribution requires the fixed live signing path",
-    )
-    shipping_sink = (
-        _DistributionSink(repository, owner, deadline, owner_identity, *signing)
-        if distribution
-        else (
-            _SigningSink(repository, owner, deadline, owner_identity, *signing)
-            if signing is not None
+    with _observe_compilation(owner):
+        _REQUIRE(
+            type(distribution) is bool and (not distribution or (prepare and signing is not None)),
+            "invalid_budget",
+            "Distribution requires the fixed live signing path",
+        )
+        shipping_sink = (
+            _DistributionSink(repository, owner, deadline, owner_identity, *signing)
+            if distribution
             else (
-                _PreparationSink(repository, owner, deadline, owner_identity) if prepare else None
+                _SigningSink(repository, owner, deadline, owner_identity, *signing)
+                if signing is not None
+                else (
+                    _PreparationSink(repository, owner, deadline, owner_identity)
+                    if prepare
+                    else None
+                )
             )
         )
-    )
-    factory = _source_factory()
-    _factory_operation(factory, factory.capture_dependencies, Path(repository), deadline)
-    if shipping_sink is not None:
-        shipping_sink.current(deadline)
-    _REQUIRE(
-        sys.platform == "darwin",
-        "tool_unavailable",
-        "Actual owned compilation requires the Darwin SDK",
-    )
-    tools = {}
-    for name in ("git", "xcodebuild", "xcrun"):
-        path = shutil.which(name)
-        _REQUIRE(path is not None, "tool_unavailable", "An actual fixed native tool is unavailable")
-        tools[name] = str(Path(path).resolve(strict=True))
-    if shipping_sink is not None:
-        shipping_sink.current(deadline)
-    phases = [
-        _RUN_PHASE("xcode_version", [tools["xcodebuild"], "-version"], owner, owner, deadline)
-    ]
-    if shipping_sink is not None:
-        shipping_sink.current(deadline)
-    binary, acquisition = BASE.acquire_xcodegen(owner, deadline)
-    if shipping_sink is not None:
-        shipping_sink.current(deadline)
-    phases.append(acquisition)
-    tools["xcodegen"] = str(binary.resolve(strict=True))
-    if shipping_sink is not None:
-        shipping_sink.current(deadline)
-    phases.append(
-        _RUN_PHASE("xcodegen_version", [tools["xcodegen"], "--version"], owner, owner, deadline)
-    )
-    if shipping_sink is not None:
-        shipping_sink.current(deadline)
-    phases.append(
-        _RUN_PHASE("sdk_path", [tools["xcrun"], "--show-sdk-path"], owner, owner, deadline)
-    )
-    if shipping_sink is not None:
-        shipping_sink.current(deadline)
-    pristine = (
-        Path(upstream)
-        if upstream is not None
-        else (
-            _acquire_pristine(owner, tools, deadline, phases, shipping_sink=shipping_sink)
-            if shipping_sink is not None
-            else _acquire_pristine(owner, tools, deadline, phases)
+        factory = _source_factory()
+        _factory_operation(factory, factory.capture_dependencies, Path(repository), deadline)
+        if shipping_sink is not None:
+            shipping_sink.current(deadline)
+        _REQUIRE(
+            sys.platform == "darwin",
+            "tool_unavailable",
+            "Actual owned compilation requires the Darwin SDK",
         )
-    )
-    if shipping_sink is not None:
-        shipping_sink.current(deadline)
-    projection = _factory_operation(
-        factory, factory.prepare_owned_source, Path(repository), pristine, deadline
-    )
-    image = materialize_owned_source(projection, owner, deadline)
-    _factory_operation(factory, factory.current_staged_source, image, deadline)
-    if shipping_sink is not None:
-        shipping_sink.current(deadline)
-    phases.append(
-        _RUN_PHASE(
-            "version",
-            [sys.executable, str(image.root / "scripts/update_version.py")],
-            image.root,
+        tools = {}
+        for name in ("git", "xcodebuild", "xcrun"):
+            path = shutil.which(name)
+            _REQUIRE(
+                path is not None, "tool_unavailable", "An actual fixed native tool is unavailable"
+            )
+            tools[name] = str(Path(path).resolve(strict=True))
+        if shipping_sink is not None:
+            shipping_sink.current(deadline)
+        phases = [
+            _observed_run_phase(
+                "xcode_version", [tools["xcodebuild"], "-version"], owner, owner, deadline
+            )
+        ]
+        if shipping_sink is not None:
+            shipping_sink.current(deadline)
+        binary, acquisition = BASE.acquire_xcodegen(owner, deadline)
+        if shipping_sink is not None:
+            shipping_sink.current(deadline)
+        phases.append(acquisition)
+        tools["xcodegen"] = str(binary.resolve(strict=True))
+        if shipping_sink is not None:
+            shipping_sink.current(deadline)
+        phases.append(
+            _observed_run_phase(
+                "xcodegen_version", [tools["xcodegen"], "--version"], owner, owner, deadline
+            )
+        )
+        if shipping_sink is not None:
+            shipping_sink.current(deadline)
+        phases.append(
+            _observed_run_phase(
+                "sdk_path", [tools["xcrun"], "--show-sdk-path"], owner, owner, deadline
+            )
+        )
+        if shipping_sink is not None:
+            shipping_sink.current(deadline)
+        pristine = (
+            Path(upstream)
+            if upstream is not None
+            else (
+                _acquire_pristine(owner, tools, deadline, phases, shipping_sink=shipping_sink)
+                if shipping_sink is not None
+                else _acquire_pristine(owner, tools, deadline, phases)
+            )
+        )
+        if shipping_sink is not None:
+            shipping_sink.current(deadline)
+        projection = _factory_operation(
+            factory, factory.prepare_owned_source, Path(repository), pristine, deadline
+        )
+        image = materialize_owned_source(projection, owner, deadline)
+        _factory_operation(factory, factory.current_staged_source, image, deadline)
+        if shipping_sink is not None:
+            shipping_sink.current(deadline)
+        phases.append(
+            _observed_run_phase(
+                "version",
+                [sys.executable, str(image.root / "scripts/update_version.py")],
+                image.root,
+                owner,
+                deadline,
+            )
+        )
+        if shipping_sink is not None:
+            shipping_sink.current(deadline)
+        inputs = capture_generated_inputs(image, deadline)
+        compilation_keywords = {"staged_image": image}
+        if shipping_sink is not None:
+            compilation_keywords["shipping_sink"] = shipping_sink
+        products, native_phases, retained_products = _compile_product_images(
+            inputs,
             owner,
+            {name: tools[name] for name in ("xcodegen", "xcodebuild", "xcrun")},
             deadline,
+            **compilation_keywords,
         )
-    )
-    if shipping_sink is not None:
-        shipping_sink.current(deadline)
-    inputs = capture_generated_inputs(image, deadline)
-    compilation_keywords = {"staged_image": image}
-    if shipping_sink is not None:
-        compilation_keywords["shipping_sink"] = shipping_sink
-    products, native_phases, retained_products = _compile_product_images(
-        inputs,
-        owner,
-        {name: tools[name] for name in ("xcodegen", "xcodebuild", "xcrun")},
-        deadline,
-        **compilation_keywords,
-    )
-    phases.extend(native_phases)
-    _current_build_inputs(inputs, deadline, image)
-    check_deadline(deadline)
-    record = {
-        "schema": 1,
-        "status": "passed",
-        "qualification": "unsigned_actual_owned_four_target_compilation",
-        "budget_seconds": seconds,
-        "pins": dict(projection.pins),
-        "products": products,
-        "phases": phases,
-        "source_inventory_entries": len(projection.inventory),
-        "owned_replacements": len(projection.replacements),
-        "staged_files": len(image.files),
-        "staged_links": len(image.links),
-        "generated_inputs": [
-            {"path": row.path, "sha256": BASE.digest(row.data), "bytes": len(row.data)}
-            for row in inputs.files[len(image.files) :]
-        ],
-        "native_capture_executed": False,
-        "installation_executed": False,
-        "signing_executed": False,
-        "auth_executed": False,
-    }
-    validate_owned_record(record)
-    pending_receipt = owner / ".owned-native-build-result.pending.json"
-    BASE.write_json(pending_receipt, record)
-    _current_build_inputs(inputs, deadline, image)
-    for previous, root in retained_products:
-        current_product(previous, root)
+        phases.extend(native_phases)
+        _current_build_inputs(inputs, deadline, image)
         check_deadline(deadline)
-    receipt = owner / "owned-native-build-result.json"
-    _WRITE_EXCLUSIVE(receipt, _ordinary(pending_receipt, owner, BASE.MAX_INPUT_BYTES).data)
-    for previous, root in retained_products:
-        current_product(previous, root)
-    _current_build_inputs(inputs, deadline, image)
-    check_deadline(deadline)
-    if shipping_sink is not None:
-        return shipping_sink.prepare(record, inputs, image, retained_products, deadline)
-    return record
+        record = {
+            "schema": 1,
+            "status": "passed",
+            "qualification": "unsigned_actual_owned_four_target_compilation",
+            "budget_seconds": seconds,
+            "pins": dict(projection.pins),
+            "products": products,
+            "phases": phases,
+            "source_inventory_entries": len(projection.inventory),
+            "owned_replacements": len(projection.replacements),
+            "staged_files": len(image.files),
+            "staged_links": len(image.links),
+            "generated_inputs": [
+                {"path": row.path, "sha256": BASE.digest(row.data), "bytes": len(row.data)}
+                for row in inputs.files[len(image.files) :]
+            ],
+            "native_capture_executed": False,
+            "installation_executed": False,
+            "signing_executed": False,
+            "auth_executed": False,
+        }
+        validate_owned_record(record)
+        pending_receipt = owner / ".owned-native-build-result.pending.json"
+        BASE.write_json(pending_receipt, record)
+        _current_build_inputs(inputs, deadline, image)
+        for previous, root in retained_products:
+            current_product(previous, root)
+            check_deadline(deadline)
+        receipt = owner / "owned-native-build-result.json"
+        _WRITE_EXCLUSIVE(receipt, _ordinary(pending_receipt, owner, BASE.MAX_INPUT_BYTES).data)
+        for previous, root in retained_products:
+            current_product(previous, root)
+        _current_build_inputs(inputs, deadline, image)
+        check_deadline(deadline)
+        if shipping_sink is not None:
+            return shipping_sink.prepare(record, inputs, image, retained_products, deadline)
+        return record
 
 
 def preflight(repository, owner, seconds):
@@ -2636,7 +3000,7 @@ def source_controls(repository, owner, seconds):
     ):
         current()
         # run_phase returns only after the genuine foreground child has exited.
-        phases.append(_RUN_PHASE(name, command, owner, owner, deadline))
+        phases.append(_observed_run_phase(name, command, owner, owner, deadline))
         current()
         stdout = _ordinary(owner / (name + ".stdout"), owner, BASE.MAX_INPUT_BYTES).data.decode(
             "utf-8"

@@ -1852,3 +1852,30 @@ qualify the source correction; detailed native A834 stderr was not archived.
 Root focused checks and selected verification precede publication. Corrected
 Mac CI, actual CF metadata, packaging and installation remain unqualified.
 Item31 and transverse16/38 remain open.
+
+## Named native compilation boundaries and one-attempt journal retirement
+
+A coherent six-path prerequisite adds finite private entry/completion observations
+at existing source/currentness/product/native boundaries, with four mechanical
+builder bindings. Original module AST, error/result frames, native invocation
+arguments, monotonic/deadline statements and old21 controls are conserved after
+the declared instrumentation inverse. A real Linux descriptor release/reopen/reuse
+with modeled lateEIO proves the first draft's same-inode retry defect. The frozen
+control is unchanged in the correction: exactly one close attempt; ambiguous
+failure retains unknown physical debt and cannot authorize a later numeric-FD
+retry. Source-only independent review passes292 healthy controls plus three
+standalone corrected controls and rejects17 semantic mutants. The author passes
+810 focused executions. No actual Darwin failure delivery or Mac cost is claimed.
+
+Manual37582060104/285 terminatesFAILURE. Swift reaches the existing25-minute
+limit after188 complete case receipts:165PASS/8FAIL/15SKIP; later cases remain
+unexecuted or incomplete and cannot be counted passed. Fresh baseline-plus-owned
+compilation takes554.748s with owned exit124; preparation takes300.512s. Existing
+baseline-only native calibration passes290.995s. New private configuration writes
+one actual variant but refuses complete/cleanup; protected-reference acquisition
+refuses; signer now exposes ancestry. Team metadata retains its known portable
+conflict on this older tested source; the correction is published separately.
+Permission UI has no admitted result and Brew receiver-live fails. Packaging and
+verdict fail, installation/Release skip. Actual journal and corrected final-source
+CI remain required; no assertion, deadline, workflow or native expectation changes.
+Item31 and transverse16/38 remain open.
