@@ -3452,6 +3452,22 @@ unexecuted on this Linux host. The full Core-Service build, native acquisition,
 namespace/authentication, coverage, installation and default activation remain
 separate requirements. Source/CLI baseline1 stays unchanged; TODO31 stays open.
 
+The exact macOS manual run37565110623 at8dfdde104 completes399 XCTest cases:
+381 pass,3 fail and15 skip; the raw footer counts10 failed assertions with2
+unexpected errors. The canonical report remains complete=false with no summary,
+so this is not full native acceptance. Actual unsigned four-target compilation,
+the separate fresh baseline, public initial power subscription and all10 native
+permission-dialog cases pass. The fresh-baseline product observer then refuses
+unsafe_path before starting its first architecture child: its sibling source
+working directory escapes the existing phase owner. The correction uses the
+observation owner as cwd while retaining explicit absolute image paths, original
+source recuts and the unchanged foreign-cwd refusal. Four new handwritten
+filesystem/actual-child controls pass with modeled architecture replies; fresh
+Darwin observation remains pending. Brew and Sparkle failures remain with their
+release owners. Packaging fails and installation is skipped; capture, signing,
+VirtualHIDDevice replacement and physical validation remain open. TODO31 stays
+partial, and transverse16/38 remain required.
+
 The owned native compilation prerequisite now has a normally discovered Swift
 case for actual unsigned pinned Core-Service and CLI builds. It applies a strict
 25-file sealed complete producer candidate only inside its owned temporary tree;

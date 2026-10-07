@@ -1589,7 +1589,7 @@ def observe_products(source, owner, *, repository=None):
         _RUN_PHASE(
             label + "_observed_architectures",
             [str(xcrun), "lipo", "-archs", str(source / image.path)],
-            source,
+            owner,
             owner,
             deadline,
         )

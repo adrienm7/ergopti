@@ -1620,3 +1620,30 @@ process owner stay whole; the separately reviewed signer builder is composed
 without a dependency from these three new sources. A two-line comment amendment
 corrects kernel ACK chronology without changing source predicates or frozen35.
 Item31 and all production/session-lock obligations remain open.
+
+## Product observer phase ownership and terminal native evidence
+
+Manual macOS run37565110623 at8dfdde104900e9205c0a16c21d2f9af241fe48e4
+terminates with package/verdict failures and installation skipped. Its actual
+399 completed XCTest cases contain381 passes,3 failing tests and15 skips;
+the raw footer records10 assertion failures,2 unexpected. The canonical report
+has complete=false and summary=null, so no complete native acceptance is claimed.
+Actual unsigned four-target compilation passes, as do the fresh source baseline,
+public initial power subscription and10 native permission-dialog cases. Original
+native assertions, cleanup guardians and budgets remain intact.
+
+The fresh-baseline product observer refuses unsafe_path before any architecture
+child. Actual artifacts show all four compiled products and passed build receipts;
+the unchanged phase boundary rejects the sibling source cwd. The one-argument
+builder correction sets cwd to the observation owner, preserving absolute image
+arguments, source identity recuts and all original phase ownership assertions.
+Three dependent builder pins move together. Four independently frozen controls
+use actual filesystem/children and explicitly modeled lipo replies: before-code
+has2 passes,1 failure and1 error; the corrected source passes all4. An additive
+ordinary Swift SDK test uses the unchanged30/35/10 worker. Actual Darwin product
+observation remains pending; this portable evidence proves no native image.
+
+The other failures are actual Brew receiver retirement and Sparkle server
+retirement, owned by release/network. Native installation, runtime signing,
+production capture and physical-device validation remain unqualified. All six
+remaining Group5 items stay partial; no item is removed by this correction.
