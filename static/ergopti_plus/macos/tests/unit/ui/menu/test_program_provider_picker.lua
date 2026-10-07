@@ -180,3 +180,69 @@ helpers.describe("Production macOS program provider picker sessions", function()
 		end)
 	end)
 end)
+
+local function automation(f)
+	local owners = {}
+	package.loaded["adapters.apple_shortcuts_native"] = { create = function()
+		local owner = { invalidations = 0, retirement = true }
+		owner.discover = function(callback) owner.callback = callback; return true end
+		owner.invalidate = function() owner.invalidations = owner.invalidations + 1; return owner.retirement end
+		owners[#owners + 1] = owner
+		return owner
+	end }
+	return owners
+end
+
+helpers.describe("Production readonly automation picker sessions", function()
+	helpers.it("publishes a closed pending inventory independently of ordinary providers", function()
+		fixture(function(f)
+			local owners = automation(f)
+			helpers.assert_true(f.open())
+			f.message(f.pages[1], { action = "ready" })
+			helpers.assert_eq(f.payload.automationProviders, { title = "Apple Shortcuts", choices = {}, truncated = false })
+			helpers.assert_eq(f.payload.programProviderStrings.unavailableBinding, "platform_reason.program_runner_unavailable")
+			owners[1].callback({ choices = { { key = "7:1", label = "日本 e\204\129\n<name>", provider = "apple_shortcuts" } }, truncated = true })
+			f.message(f.pages[1], { action = "ready" })
+			helpers.assert_eq(f.payload.automationProviders, { title = "Apple Shortcuts", choices = {
+				{ key = "automation:7:1", label = "日本 e\204\129\n<name>", provider = "apple_shortcuts", available = false },
+			}, truncated = true })
+			helpers.assert_eq(f.payload.programProviders, { choices = { { key = "opaque-choice", label = "Reviewed provider" } } })
+			helpers.assert_true(f.pages[1].scripts[#f.pages[1].scripts - 1]:find("updateAutomationProviders", 1, true) ~= nil)
+			f.confirm(f.pages[1], "automation:7:1")
+			helpers.assert_eq(#f.calls, 0)
+			helpers.assert_eq(f.owners[1].resolutions, 0)
+			f.confirm(f.pages[1])
+			helpers.assert_eq(f.calls, { { "run_program", SCALAR } })
+			helpers.assert_eq(owners[1].invalidations, 1)
+		end)
+	end)
+	helpers.it("suppresses a retired native callback after window replacement", function()
+		fixture(function(f)
+			local owners = automation(f)
+			helpers.assert_true(f.open())
+			helpers.assert_true(f.open())
+			local old_scripts, new_scripts = #f.pages[1].scripts, #f.pages[2].scripts
+			owners[1].callback({ choices = { { key = "1:1", label = "retired", provider = "apple_shortcuts" } }, truncated = false })
+			helpers.assert_eq(#f.pages[1].scripts, old_scripts)
+			helpers.assert_eq(#f.pages[2].scripts, new_scripts)
+			f.message(f.pages[2], { action = "ready" })
+			helpers.assert_eq(f.payload.automationProviders.choices, {})
+		end)
+	end)
+	helpers.it("retains native query debt without constructing a replacement query owner", function()
+		fixture(function(f)
+			local owners = automation(f)
+			helpers.assert_true(f.open())
+			owners[1].retirement = false
+			helpers.assert_true(f.picker.close(), "window closure need not imply query retirement")
+			helpers.assert_true(f.open(), "a manual picker remains usable")
+			helpers.assert_eq(#owners, 1, "native query debt fences successor acquisition")
+			f.message(f.pages[2], { action = "ready" })
+			helpers.assert_eq(f.payload.programProviders, { unavailable = true })
+			helpers.assert_eq(f.payload.automationProviders.choices, {})
+			owners[1].retirement = true
+			helpers.assert_true(f.open())
+			helpers.assert_eq(#owners, 2)
+		end)
+	end)
+end)

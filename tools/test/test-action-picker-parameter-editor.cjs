@@ -176,7 +176,11 @@ const IDS = [
 	'param-program-provider-label',
 	'param-program-provider-select',
 	'param-program-provider-hint',
-	'param-program-provider-status'
+	'param-program-provider-status',
+	'param-program-automation',
+	'param-program-automation-title',
+	'param-program-automation-reason',
+	'param-program-automation-list'
 ];
 for (const id of IDS) check(html.includes(`id="${id}"`), `index.html must declare #${id}`);
 
@@ -844,6 +848,57 @@ for (const platform of ['hs', 'linux', 'ahk']) {
 	);
 }
 
+// 14. Native readonly automation inventory remains separate from script assignment.
+{
+	const page = loadPage('hs');
+	vm.runInContext(
+		`programProviders={choices:[{key:'8:1',label:'Owned script.py'}]};
+		programProviderStrings={manual:'Manual',unavailableBinding:'Translated native unavailable'};
+		doConfirm('run_program'); appendProgramArgument('literal before native query')`,
+		page.context
+	);
+	page.byId['param-program-executable'].value = '/private/literal tool';
+	vm.runInContext(
+		`updateAutomationProviders({title:'Apple Shortcuts',choices:[
+		{key:'automation:9:1',label:'日本 e\\u0301\\n<script>private name</script>',available:false}],truncated:false})`,
+		page.context
+	);
+	check(page.byId['param-program-automation'].hidden === false, 'actual native inventory appears');
+	check(
+		page.byId['param-program-automation-title'].textContent === 'Apple Shortcuts',
+		'separate provider identity'
+	);
+	check(
+		page.byId['param-program-automation-reason'].textContent === 'Translated native unavailable',
+		'existing translated unavailable reason'
+	);
+	check(
+		page.byId['param-program-automation-list'].children[0].textContent ===
+			'日本 e\u0301\n<script>private name</script>',
+		'native names remain literal Unicode text'
+	);
+	check(
+		page.byId['param-program-provider-select'].children.length === 2,
+		'readonly workflows never enter script select'
+	);
+	check(
+		page.byId['param-program-executable'].value === '/private/literal tool',
+		'asynchronous native update preserves manual executable'
+	);
+	check(
+		page.byId['param-program-arguments'].querySelectorAll('textarea')[0].value ===
+			'literal before native query',
+		'asynchronous native update preserves literal arguments'
+	);
+	check(page.posted.length === 0, 'inventory update cannot confirm an automation');
+	page.byId['param-save'].dispatch('click');
+	check(
+		page.posted.length === 1 &&
+			JSON.parse(page.posted[0].parameter).executable === '/private/literal tool',
+		'manual literal assignment remains available'
+	);
+}
+
 // Parser controls qualify receipt admission only; native Hammerspoon runs in CI.
 {
 	const controls = spawnSync(
@@ -918,6 +973,29 @@ for (const platform of ['hs', 'linux', 'ahk']) {
 	check(
 		/Ran 18 tests in /.test(parser.stderr) && /\nOK\s*$/.test(parser.stderr),
 		'all eighteen Shortcuts parser and diagnostic controls execute without skip'
+	);
+}
+
+// Portable signed-query protocol/provenance references run on every host.
+// Actual nonreaping pipe controls and native Swift/SB execution are Darwin CI-owned.
+{
+	const reference = spawnSync(
+		process.platform === 'win32' ? 'python' : 'python3',
+		['-m', 'unittest', 'test_signed_query_probe.ProtocolControls'],
+		{
+			cwd: path.join(ROOT, 'tools', 'diagnostics', 'program_actions'),
+			encoding: 'utf8',
+			timeout: 30000,
+			env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1' }
+		}
+	);
+	check(
+		!reference.error && reference.signal === null && reference.status === 0,
+		'signed-query protocol/provenance controls complete'
+	);
+	check(
+		/Ran 9 tests in /.test(reference.stderr) && /\nOK\s*$/.test(reference.stderr),
+		'all nine independent signed-query references execute without skip'
 	);
 }
 
