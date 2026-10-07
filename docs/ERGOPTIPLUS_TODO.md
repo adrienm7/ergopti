@@ -6074,6 +6074,14 @@ deferral is superseded. This item and items16/38 remain open.
 
 Current Group3 qualification checkpoint (item71, 2026-10-07): [Group3 continuation](handovers/2026-10-04-parallel-containers/GROUP3-2026-10-06-CONTINUATION.md). Preserve the completed Metrics retirement, unknown-source comments and successful native Windows runtime/startup/package/install qualification37546977032. Integrated configuration run37547053814 passes Windows and Linux delivery; native macOS packaging fails and installation is skipped. Keep final-source full-save/upgrade and complete three-OS acceptance open. No new device-only task is established; item38 retains its independent physical requirements.
 
+Final partial integration `70fda177fd4c1411197aec908aadb954f01c8ca1` is qualified by Windows-only
+manual CI 37555144797 on exact validation SHA `dd194edaa4c6e2c7bd42e621bd8d38f4d84e92fe` and tree
+`d3bcec2d598c56404f7b8952e11a8e2b2128c759`. All 10,097 units, 70 E2E cases, native startup,
+package/install and 23 compiled acceptance cases pass; nine jobs pass and
+three are skipped, including Release/Publish. The final documentation receipt
+changes no native inputs. Complete final-source three-OS save/upgrade and
+macOS package/install acceptance remain open; this is not item 71 completion.
+
 - [ ] **73.** Partial: Windows combination families and pairs already use
       the canonical translated tap-hold key labels; macOS now resolves both
       physical keys through the same catalogue and invalidates its picker
@@ -7411,6 +7419,15 @@ closure. All12 jobs terminate:9 PASS / zero FAIL /3 SKIP; Linux/macOS
 are intentionally unselected and Release/Publish skipped. All six new
 cases pass, including the preserved actual dead-key refusal. Item107
 remains partial for forced-output ownership and physical delivery.
+
+Final integrated Windows qualification 37555144797 tests CI `dd194edaa4c6e2c7bd42e621bd8d38f4d84e92fe`,
+exact dev merge `70fda177fd4c1411197aec908aadb954f01c8ca1`, tree `d3bcec2d598c56404f7b8952e11a8e2b2128c759`:
+10,097 units, 70 E2E cases and all 23 compiled programmable cases pass;
+all six readonly observation cases pass, including two genuine HKL probes.
+All twelve jobs terminate: nine PASS / zero FAIL / three SKIP. Linux/macOS
+are intentionally unselected, Release/Publish skipped and the 32-bit native
+variant unrun. The forced-output software and physical acceptance below
+remain open; item 107 is not removed.
 
 Remaining work for item107 (CI-feasible software first):
 
