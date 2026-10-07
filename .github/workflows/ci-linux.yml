@@ -1695,7 +1695,7 @@ jobs:
           set -euo pipefail
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends nix-bin
           # This dedicated ephemeral runner may not adopt an occupied foreign store.
-          if [ -L /nix ] || [ -L /nix/store ] || [ -L /nix/var ] || [ -L /nix/var/nix ]; then
+          if [ -L /nix ] || [ -L /nix/store ] || [ -L /nix/var ] || [ -L /nix/var/nix ] || [ -L /nix/var/log ] || [ -L /nix/var/log/nix ]; then
             echo "::error::Literal standard Nix store required."
             exit 1
           fi
@@ -1707,9 +1707,14 @@ jobs:
             echo "::error::Existing Nix database cannot be adopted."
             exit 1
           fi
+          if [ -d /nix/var/log/nix ] && [ -n "$(find /nix/var/log/nix -mindepth 1 -maxdepth 1 -print -quit)" ]; then
+            echo "::error::Occupied Nix build logs cannot be adopted."
+            exit 1
+          fi
           runner_uid=$(id -u)
           runner_gid=$(id -g)
-          sudo install -d -m 0755 -o "$runner_uid" -g "$runner_gid" /nix/store /nix/var/nix
+          # Builds also write the separate standard log tree; metadata does not.
+          sudo install -d -m 0755 -o "$runner_uid" -g "$runner_gid" /nix/store /nix/var/nix /nix/var/log/nix
           umask 077
           npm run --silent test:linux:nix-native | tee "$RUNNER_TEMP/linux-nix-native.log"
         timeout-minutes: 35
