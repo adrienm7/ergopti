@@ -1308,5 +1308,312 @@ class NativeCompilerSelectionControls(unittest.TestCase):
             )
 
 
+class AppleEventSenderDiagnosticControls(unittest.TestCase):
+    """Recording reply/owner observations are distinct from unexecuted macOS delivery."""
+
+    def setUp(self):
+        constants = patch.multiple(probe.os, CLD_EXITED=1, CLD_KILLED=2, CLD_DUMPED=3, create=True)
+        constants.start()
+        self.addCleanup(constants.stop)
+
+    def packet(self):
+        return {
+            "schema": 1,
+            "mode": 1,
+            "send_status": 0,
+            "nonce_read_available": True,
+            "nonce_read_status": -1701,
+            "nonce_size": 0,
+            "nonce_match": False,
+            "reply_type": 0x61657674,
+            "error_read_available": True,
+            "error_read_status": 0,
+            "error_type": 0x6C6F6E67,
+            "error_size": 4,
+            "error_available": True,
+            "error_number": -1708,
+        }
+
+    def marker(self, packet=None):
+        packet = self.packet() if packet is None else packet
+        return (
+            "Owned AppleEvent outcome admission failed: "
+            + str(packet["send_status"])
+            + "\n"
+            + "Owned AppleEvent sender diagnostic: "
+            + json.dumps(packet, separators=(",", ":"))
+            + "\n"
+        )
+
+    def world(self, observation=None):
+        receiver = Mock(pid=73136, returncode=None)
+        group = Mock(process=receiver, reaped=False)
+        group.observe_exit.return_value = observation
+        evidence = Mock()
+        evidence.record.return_value = True
+        children = SimpleNamespace(groups={receiver: group}, evidence=evidence)
+        return children, receiver, group
+
+    def test_actual_parser_preserves_numeric_reply_error_without_private_bytes(self):
+        packet = probe._appleevent_sender_diagnostic(self.marker())
+        self.assertEqual(packet, self.packet())
+        self.assertEqual(packet["nonce_read_status"], -1701)
+        self.assertEqual(packet["error_number"], -1708)
+        self.assertNotIn("nonce", packet)
+        self.assertNotIn("raw", json.dumps(packet))
+        for key, value in (("nonce_size", 35), ("nonce_size", 37), ("nonce_read_status", -1700)):
+            changed = self.packet()
+            changed[key] = value
+            self.assertEqual(probe._appleevent_sender_diagnostic(self.marker(changed))[key], value)
+
+    def test_unknown_extra_duplicate_and_unavailable_fields_refuse(self):
+        for key, value in (
+            ("raw", "PRIVATE_NONCE"),
+            ("schema", True),
+            ("nonce_size", 4097),
+            ("error_available", False),
+            ("error_number", True),
+            ("reply_type", 2**32),
+        ):
+            with self.subTest(key=key):
+                changed = self.packet()
+                changed[key] = value
+                with self.assertRaises(probe.AdmissionError):
+                    probe._appleevent_sender_diagnostic(self.marker(changed))
+        duplicate = self.marker().replace('"schema":1', '"schema":1,"schema":1')
+        for text in (duplicate, self.marker() + "PRIVATE\n", self.marker() * 10):
+            with self.assertRaises(probe.AdmissionError):
+                probe._appleevent_sender_diagnostic(text)
+        changed = self.packet()
+        changed.update(
+            error_read_status=-1701,
+            error_type=0x6E756C6C,
+            error_size=0,
+            error_available=False,
+            error_number=None,
+        )
+        self.assertIsNone(probe._appleevent_sender_diagnostic(self.marker(changed))["error_number"])
+        changed["error_number"] = -1708
+        with self.assertRaises(probe.AdmissionError):
+            probe._appleevent_sender_diagnostic(self.marker(changed))
+
+    def test_exact_held_receiver_terminal_is_observed_before_any_retirement(self):
+        observed = SimpleNamespace(si_pid=73136, si_code=1, si_status=68)
+        children, receiver, group = self.world(observed)
+        original = probe.AdmissionError("ORIGINAL_REFUSAL")
+        with patch.object(
+            probe,
+            "_appleevent_capture",
+            return_value=(b"", b"Owned AppleEvent dispatch failed: -36\n"),
+        ):
+            result = probe._observe_sender_failure(
+                children, receiver, group, "unconfined-positive", self.marker(), original
+            )
+        self.assertEqual(result["receiver_state"], "terminal")
+        self.assertEqual(result["native_terminal"]["si_status"], 68)
+        self.assertEqual(result["native_terminal"]["stderr_osstatus"], -36)
+        self.assertFalse(group.reaped)
+        self.assertIsNone(receiver.returncode)
+        group.settle.assert_not_called()
+        children.evidence.record.assert_called_once()
+        self.assertEqual(children.evidence.record.call_args.kwargs["sender_failure"], result)
+
+    def test_pending_and_failed_observations_do_not_invent_exit_or_mask_original(self):
+        children, receiver, group = self.world()
+        original = probe.AdmissionError("ORIGINAL_REFUSAL")
+        result = probe._observe_sender_failure(
+            children, receiver, group, "unconfined-positive", self.marker(), original
+        )
+        self.assertEqual(result["receiver_state"], "pending")
+        self.assertIsNone(result["native_terminal"])
+        group.observe_exit.side_effect = OSError("PRIVATE_PATH")
+        result = probe._observe_sender_failure(
+            children, receiver, group, "unconfined-positive", "PRIVATE_NONCE", original
+        )
+        self.assertEqual(result["receiver_state"], "unavailable")
+        self.assertEqual(result["sender_observation"], "unclassified")
+        self.assertNotIn("PRIVATE", json.dumps(result))
+        children.evidence.record.return_value = False
+        probe._observe_sender_failure(
+            children, receiver, group, "unconfined-positive", None, original
+        )
+        self.assertEqual(str(original), "ORIGINAL_REFUSAL")
+        self.assertEqual(
+            original.__notes__,
+            ["Owned AppleEvent optional sender observation publication was refused."],
+        )
+
+    def test_new_owner_cancellation_and_base_exceptions_are_never_metadata(self):
+        for interruption in (
+            process_owner.OwnedProcessInterrupted("CONTROL_CANCEL"),
+            KeyboardInterrupt(),
+            SystemExit(71),
+        ):
+            with self.subTest(kind=type(interruption).__name__):
+                children, receiver, group = self.world()
+                group.observe_exit.side_effect = interruption
+                with self.assertRaises(type(interruption)) as caught:
+                    probe._observe_sender_failure(
+                        children,
+                        receiver,
+                        group,
+                        "unconfined-positive",
+                        None,
+                        probe.AdmissionError("ORIGINAL_REFUSAL"),
+                    )
+                self.assertIs(caught.exception, interruption)
+                self.assertFalse(group.reaped)
+                children.evidence.record.assert_not_called()
+                group.observe_exit.side_effect = OSError("PRIVATE_SECONDARY")
+                children.run = Mock(side_effect=interruption)
+                with self.assertRaises(type(interruption)) as primary_caught:
+                    probe._run_appleevent_sender(
+                        children, receiver, group, "unconfined-positive", ["sender", "success"]
+                    )
+                self.assertIs(primary_caught.exception, interruption)
+        interruption = process_owner.OwnedProcessInterrupted("CONTROL_CANCEL")
+        with patch.object(probe, "_admit_appleevent_boundary", side_effect=interruption):
+            with self.assertRaises(process_owner.OwnedProcessInterrupted) as caught:
+                probe.admit_appleevent_boundary(None, None)
+            self.assertIs(caught.exception, interruption)
+
+    def test_first_sender_failure_keeps_original_error_and_blocks_later_effects(self):
+        children, receiver, group = self.world()
+        original = probe.AdmissionError("ORIGINAL_REFUSAL")
+        children.run = Mock(side_effect=original)
+        with self.assertRaises(probe.AdmissionError) as caught:
+            probe._run_appleevent_sender(
+                children, receiver, group, "unconfined-positive", ["sender", "success"]
+            )
+        self.assertIs(caught.exception, original)
+        children.run.assert_called_once_with(["sender", "success"], check=False, confined=False)
+        self.assertEqual(
+            children.evidence.record.call_args.kwargs["sender_failure"]["sender_observation"],
+            "unavailable",
+        )
+        children.run.side_effect = None
+        children.run.return_value = subprocess.CompletedProcess(
+            ["sender", "success"], 66, "", self.marker()
+        )
+        with self.assertRaisesRegex(probe.AdmissionError, "Owned sender failed with exit 66"):
+            probe._run_appleevent_sender(
+                children, receiver, group, "unconfined-positive", ["sender", "success"]
+            )
+        self.assertEqual(
+            children.evidence.record.call_args.kwargs["sender_failure"]["sender"], self.packet()
+        )
+        self.assertFalse(group.reaped)
+
+    def test_actual_boundary_first_sender_refusal_never_reaches_second_or_third_send(self):
+        judge = AppleEventBoundaryControls()
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "sandbox.sb").write_text(judge.policy)
+            children = judge.model(root)
+            children.evidence = Mock()
+            children.evidence.record.return_value = True
+            original_start, original_run = children.start, children.run
+
+            def start(arguments):
+                receiver = original_start(arguments)
+                children.groups[receiver].process = receiver
+                receiver.returncode = None
+                return receiver
+
+            def run(arguments, **options):
+                if arguments[-1] == "success":
+                    children.sender_calls.append((arguments, options))
+                    return subprocess.CompletedProcess(arguments, 66, "", self.marker())
+                return original_run(arguments, **options)
+
+            children.start, children.run = start, run
+            with (
+                patch.object(probe.uuid, "uuid4", return_value=judge.nonce),
+                patch.object(
+                    probe, "native_compiler", return_value=[str(root / "modeled-native-clang")]
+                ),
+            ):
+                with self.assertRaisesRegex(
+                    probe.AppleEventBoundaryError, "Owned sender failed with exit 66"
+                ):
+                    probe.admit_appleevent_boundary(children, root)
+            self.assertEqual(len(children.sender_calls), 1)
+            self.assertEqual(children.sender_calls[0][0][-1], "success")
+            self.assertEqual(children.deliveries, 0)
+            self.assertFalse((root / "appleevent-delivered.1").exists())
+            self.assertFalse((root / "appleevent-delivered.2").exists())
+            self.assertFalse((root / "appleevent-delivered.3").exists())
+            self.assertEqual(len(children.active), 1)
+            self.assertFalse(children.groups[children.active[0]].reaped)
+            fact = children.evidence.record.call_args.kwargs["sender_failure"]
+            self.assertEqual(fact["role"], "unconfined-positive")
+            self.assertEqual(fact["sender"], self.packet())
+            self.assertEqual(fact["receiver_state"], "pending")
+
+    def test_sender_phase_writer_refuses_acceptance_and_foreign_group(self):
+        children, receiver, group = self.world()
+        original = probe.AdmissionError("ORIGINAL_REFUSAL")
+        packet = probe._observe_sender_failure(
+            children, receiver, group, "unconfined-positive", self.marker(), original
+        )
+        evidence = object.__new__(probe.PhaseEvidence)
+        evidence.descriptor = 19
+        evidence.started = probe.time.monotonic()
+        evidence.sequence = 0
+        evidence.failed = False
+        evidence.ownership_closed = False
+        evidence.previous = None
+        stream = Mock()
+        stream.fileno.return_value = 20
+        context = Mock()
+        context.__enter__ = Mock(return_value=stream)
+        context.__exit__ = Mock(return_value=False)
+        with (
+            patch.object(probe.os, "O_NOFOLLOW", 0, create=True),
+            patch.object(probe.os, "open", return_value=20),
+            patch.object(probe.os, "fdopen", return_value=context),
+            patch.object(probe.os, "fsync"),
+            patch.object(probe.os, "link") as link,
+            patch.object(probe.os, "replace") as replace,
+            patch.object(probe.os, "unlink"),
+            patch.object(probe.os, "close") as close,
+        ):
+            try:
+                self.assertTrue(
+                    evidence.record(
+                        "appleevent.sender-refusal",
+                        status="refused",
+                        groups=[group],
+                        sender_failure=packet,
+                    )
+                )
+                written = json.loads(stream.write.call_args.args[0])
+                self.assertEqual(written["sender_failure"], packet)
+                self.assertFalse(written["ownership_closed"])
+                self.assertNotIn("PRIVATE", json.dumps(written))
+                link.assert_called_once()
+                replace.assert_called_once()
+                self.assertFalse(
+                    evidence.record(
+                        "appleevent.sender-refusal",
+                        status="accepted",
+                        groups=[group],
+                        sender_failure=packet,
+                    )
+                )
+                self.assertFalse(
+                    evidence.record(
+                        "appleevent.sender-refusal",
+                        status="refused",
+                        groups=[Mock(process=Mock(pid=73137), reaped=False)],
+                        sender_failure=packet,
+                    )
+                )
+                stream.write.assert_called_once()
+            finally:
+                evidence.close()
+            close.assert_called_once_with(19)
+
+
 if __name__ == "__main__":
     unittest.main()
