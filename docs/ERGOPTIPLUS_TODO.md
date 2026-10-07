@@ -2409,11 +2409,18 @@ These are software implementations; final hardware verification remains below.
   not a current recommendation target. Do not assume deletion implements the
   recommendation.
 
-  The Windows cold-start fixture now includes the genuine parameter-status
-  loader before feature state, matching the real entry-point dependency order.
-  The original late Script publication assertion is retained. An actual
-  full-suite diagnostic identified the missing callable; exact-source native
-  replay remains required before qualifying this harness correction.
+  The Windows cold-start fixture includes the genuine parameter-status loader
+  before feature state, matching the real entry-point dependency order. The
+  original late Script publication assertion is retained. Terminal manual run
+  37573751428 qualifies published source `7596cf86` on CI `0ab3d7e3`, with the
+  same complete tree `3a9baf94` and no diagnostic overlay: native units execute
+  all 10,100 planned assertions with zero failures, including the original
+  Script case and include-order regression. Engine E2E, packaging, fresh-clone
+  and compiled startup, compiled programmable admission, install/launch and
+  mandatory verdicts pass. Release is skipped; macOS/Linux are unselected.
+  Separate version-to-version compiled upgrade and physical acceptance remain
+  unqualified. This current Windows receipt does not complete item 5 or replace
+  the source-specific older failures below.
   At published `409b8ee0`, manual all-OS run 37476981548 is still in progress:
   Windows lifecycle capture fails with ENOBUFS before the full native suite;
   its engine E2E/package/install are skipped. macOS packaging has actual Sparkle
