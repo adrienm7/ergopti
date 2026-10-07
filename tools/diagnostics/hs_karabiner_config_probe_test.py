@@ -499,5 +499,256 @@ class NativeReceiptTests(unittest.TestCase):
             self.assertFalse((Path(folder) / "native-karabiner-config.json").exists())
 
 
+def owned_receipt():
+    """Declare independent native NSArray-empty serialization and complete profile witnesses."""
+    value = receipt()
+    value = {key: item for key, item in value.items() if key in probe.IDENTITY_FIELDS}
+    value.update(
+        {
+            "contract": probe.OWNED_CONTRACT,
+            "publication_scope": "private-file-only",
+            "installation": False,
+            "remapping": False,
+            "lease_initialized": False,
+            "complete": True,
+            "cleanup_settled": True,
+            "stock_sentinel_preserved": True,
+            "errors": [],
+            "variants": [],
+        }
+    )
+    for preset in ("default", "recommended"):
+        for tap in (False, True):
+            for combination in (False, True):
+                rules = graph()["profiles"][1]["complex_modifications"]["rules"][1:]
+                config = {
+                    "profiles": [
+                        {
+                            "name": "Default profile",
+                            "selected": True,
+                            "devices": [
+                                {
+                                    "identifiers": {"is_keyboard": True},
+                                    "simple_modifications": [],
+                                }
+                            ],
+                            "virtual_hid_keyboard": {
+                                "country_code": 0,
+                                "keyboard_type_v2": "ansi",
+                            },
+                            "complex_modifications": {"rules": rules},
+                        }
+                    ]
+                }
+                value["variants"].append(
+                    {
+                        "preset": preset,
+                        "tap_holds": tap,
+                        "combinations": combination,
+                        "config": config,
+                        "exact_publication_receipt": True,
+                        "cleanup_settled": True,
+                    }
+                )
+    return value
+
+
+class NativeOwnedReceiptTests(unittest.TestCase):
+    """No private-file pass flag authorizes runtime installation or remapping."""
+
+    def judge(self, value):
+        return probe.validate_owned_receipt(value, NONCE, 42, EXECUTABLE, DOMAIN)
+
+    def test_healthy_complete_document_has_actual_witnesses(self):
+        summary = self.judge(owned_receipt())
+        self.assertEqual(summary["variant_count"], 8)
+        self.assertEqual(summary["manipulator_count"], 480)
+        self.assertIs(summary["installation"], False)
+        self.assertIs(summary["remapping"], False)
+
+    def test_every_closed_identity_and_observation_is_required(self):
+        original = owned_receipt()
+        for key in original:
+            with self.subTest(missing=key):
+                value = copy.deepcopy(original)
+                del value[key]
+                with self.assertRaisesRegex(
+                    ValueError, "Malformed complete private publication inventory"
+                ):
+                    self.judge(value)
+        for key, changed in {
+            "pid": 43,
+            "nonce": "b" * 32,
+            "version": "0.0.0",
+            "bundle_id": "foreign",
+            "executable": "/foreign",
+            "installation": True,
+            "remapping": True,
+            "lease_initialized": True,
+            "complete": False,
+            "cleanup_settled": False,
+            "stock_sentinel_preserved": False,
+            "publication_scope": "runtime-active",
+        }.items():
+            with self.subTest(changed=key):
+                value = copy.deepcopy(original)
+                value[key] = changed
+                with self.assertRaisesRegex(ValueError, "identity or observation differs"):
+                    self.judge(value)
+
+    def test_complete_document_inventory_cannot_be_a_stock_merge(self):
+        for mutation in (
+            "root",
+            "profile",
+            "devices",
+            "vhd",
+            "complex",
+            "selected",
+            "name",
+        ):
+            with self.subTest(mutation=mutation):
+                value = owned_receipt()
+                config = value["variants"][0]["config"]
+                profile = config["profiles"][0]
+                if mutation == "root":
+                    config["global"] = {}
+                elif mutation == "profile":
+                    config["profiles"].append(copy.deepcopy(profile))
+                elif mutation == "devices":
+                    profile["devices"] = []
+                elif mutation == "vhd":
+                    profile["virtual_hid_keyboard"]["country_code"] = True
+                elif mutation == "complex":
+                    profile["complex_modifications"]["parameters"] = {}
+                elif mutation == "selected":
+                    profile["selected"] = 1
+                else:
+                    profile["name"] = "Personal"
+                with self.assertRaisesRegex(ValueError, "Complete private publication"):
+                    self.judge(value)
+
+    def test_native_empty_array_expectation_is_not_the_test_encoder_object(self):
+        value = owned_receipt()
+        value["variants"][0]["config"]["profiles"][0]["devices"][0]["simple_modifications"] = {}
+        with self.assertRaisesRegex(ValueError, "device configuration differs"):
+            self.judge(value)
+
+    def test_graph_conditions_generation_modes_and_floor_are_independent(self):
+        for mutation in (
+            "nonce",
+            "condition",
+            "duplicate",
+            "foreign",
+            "mode",
+            "floor",
+            "shape",
+            "empty",
+        ):
+            with self.subTest(mutation=mutation):
+                value = owned_receipt()
+                rules = value["variants"][0]["config"]["profiles"][0]["complex_modifications"][
+                    "rules"
+                ]
+                manipulator = rules[0]["manipulators"][0]
+                if mutation == "nonce":
+                    rules[0]["description"] = rules[0]["description"].replace(NONCE, "b" * 32)
+                elif mutation == "condition":
+                    manipulator["conditions"][0]["value"] = True
+                elif mutation == "duplicate":
+                    manipulator["conditions"].append(copy.deepcopy(manipulator["conditions"][0]))
+                elif mutation == "foreign":
+                    manipulator["conditions"].append(
+                        {
+                            "name": "ergopti_mode_" + "b" * 32,
+                            "type": "variable_if",
+                            "value": 1,
+                        }
+                    )
+                elif mutation == "mode":
+                    rules.pop()
+                elif mutation == "floor":
+                    for rule in rules:
+                        rule["manipulators"] = rule["manipulators"][:1]
+                elif mutation == "shape":
+                    manipulator["type"] = "foreign"
+                else:
+                    rules[0]["manipulators"] = []
+                with self.assertRaisesRegex(ValueError, "Complete private publication"):
+                    self.judge(value)
+
+    def test_all_eight_actual_publications_and_receipts_are_required(self):
+        for mutation in (
+            "missing",
+            "duplicate",
+            "switch",
+            "receipt",
+            "cleanup",
+            "error",
+        ):
+            with self.subTest(mutation=mutation):
+                value = owned_receipt()
+                if mutation == "missing":
+                    value["variants"].pop()
+                elif mutation == "duplicate":
+                    value["variants"][1] = copy.deepcopy(value["variants"][0])
+                elif mutation == "switch":
+                    value["variants"][0]["tap_holds"] = 1
+                elif mutation == "receipt":
+                    value["variants"][0]["exact_publication_receipt"] = 1
+                elif mutation == "cleanup":
+                    value["variants"][0]["cleanup_settled"] = False
+                else:
+                    value["errors"] = ["failure"]
+                with self.assertRaisesRegex(ValueError, "[Cc]omplete private publication"):
+                    self.judge(value)
+
+    def test_actual_private_file_and_stock_sentinel_are_admitted(self):
+        with tempfile.TemporaryDirectory() as folder:
+            output = Path(folder)
+            owner = probe.NativeKarabinerConfigProbe(
+                Path("/Applications/ErgoptiPlus.app"), output, DOMAIN
+            )
+            owner.nonce = NONCE
+            value = owned_receipt()
+
+            def execute(source):
+                self.assertIn(".run_owned(", source)
+                self.assertEqual(owner.runtime_owner[0], 42)
+                root = output / "ergopti-owned-private-root"
+                self.assertEqual(root.stat().st_mode & 0o777, 0o700)
+                self.assertEqual((root / "karabiner").stat().st_mode & 0o777, 0o700)
+                (root / "karabiner/karabiner.json").write_text(
+                    json.dumps(value["variants"][-1]["config"])
+                )
+                (output / "native-karabiner-owned-config.json").write_text(json.dumps(value))
+
+            with mock.patch.object(owner, "execute", side_effect=execute):
+                summary = owner.observe_owned(42, lambda _: [42])
+            self.assertEqual(summary["manipulator_count"], 480)
+
+    def test_changed_actual_final_file_and_stock_bytes_are_rejected(self):
+        for changed in ("final", "stock"):
+            with self.subTest(changed=changed), tempfile.TemporaryDirectory() as folder:
+                output = Path(folder)
+                owner = probe.NativeKarabinerConfigProbe(
+                    Path("/Applications/ErgoptiPlus.app"), output, DOMAIN
+                )
+                owner.nonce = NONCE
+                value = owned_receipt()
+
+                def execute(_source):
+                    root = output / "ergopti-owned-private-root"
+                    (root / "karabiner/karabiner.json").write_text(
+                        json.dumps({} if changed == "final" else value["variants"][-1]["config"])
+                    )
+                    (output / "native-karabiner-owned-config.json").write_text(json.dumps(value))
+                    if changed == "stock":
+                        (root / "stock-personal.json").write_bytes(b"foreign")
+
+                with mock.patch.object(owner, "execute", side_effect=execute):
+                    with self.assertRaisesRegex(RuntimeError, "Complete private publication"):
+                        owner.observe_owned(42, lambda _: [42])
+
+
 if __name__ == "__main__":
     unittest.main()

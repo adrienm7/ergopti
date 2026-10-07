@@ -108,4 +108,70 @@ function M.run(receipt_path, destination, nonce)
 	return nonce
 end
 
+--- Publishes eight complete configurations into an explicit private owner, without merge.
+---@param receipt_path string Fresh diagnostic receipt destination.
+---@param private_root string Existing ordinary private ErgoptiPlus parent directory.
+---@param nonce string Private diagnostic generation token.
+---@param uid number Actual Python creator UID.
+---@param pid number Exact live scripting process PID.
+---@return string nonce Original diagnostic challenge.
+function M.run_owned(receipt_path, private_root, nonce, uid, pid)
+	local Codec = require("adapters.json_codec")
+	local Config = require("platform.remap.config")
+	local Owned = require("platform.remap.owned_configuration")
+	local Controller = require("platform.remap.lease_controller")
+	local result = {
+		schema_version = 1, contract = "karabiner.owned-private-publication", nonce = nonce,
+		pid = hs.processInfo.processID, executable = hs.processInfo.executablePath,
+		bundle_id = hs.processInfo.bundleID, version = hs.processInfo.version,
+		publication_scope = "private-file-only", installation = false, remapping = false,
+		lease_initialized = false, complete = false, cleanup_settled = false,
+		stock_sentinel_preserved = false, variants = {}, errors = {},
+	}
+	local owner, publisher, token = {}, nil, nil
+	local stock_path = private_root .. "/stock-personal.json"
+	local destination = private_root .. "/karabiner/karabiner.json"
+	local original = read(stock_path)
+	local ok = xpcall(function()
+		assert(not Controller.is_initialized(), "A real lease owner already exists")
+		publisher = assert(Owned.bind_private(owner, private_root, uid, pid))
+		token = assert(publisher.identity(owner))
+		local config_source = assert(package.searchpath("platform.remap.config", package.path))
+		local data = assert(config_source:match("^(.*[/\\])")) .. "data/"
+		local actions = assert(Config.load_available_actions(data .. "actions.json"))
+		local keys = assert(Config.load_tap_hold_keys(data .. "tap_hold_keys.json"))
+		local combos = assert(Config.load_mod_combos(data .. "mod_combos.json"))
+		local non_canonical = Config.compute_non_canonical_combos(combos)
+		for _, preset in ipairs({ "default", "recommended" }) do
+			for _, tap_holds in ipairs({ false, true }) do
+				for _, combinations in ipairs({ false, true }) do
+					local state = preset == "recommended" and Config.build_recommended_state(keys, combos)
+						or Config.build_default_state(keys, combos)
+					state.tap_holds_enabled, state.mod_combos_enabled = tap_holds, combinations
+					assert(publisher.publish(owner, token, { state = state, actions = actions, keys = keys,
+						combos = combos, non_canonical = non_canonical, data = data, lease_token = nonce }) == true,
+						"Complete private publication refused")
+					result.variants[#result.variants + 1] = { preset = preset, tap_holds = tap_holds,
+						combinations = combinations, config = assert(Codec.decode(read(destination))),
+						exact_publication_receipt = true, cleanup_settled = true }
+				end
+			end
+		end
+	end, function() return "owned_private_publication_failed" end)
+	if not ok then result.errors[#result.errors + 1] = "owned_private_publication_failed" end
+	if publisher and token then
+		local detached, acknowledged = pcall(publisher.detach, owner, token)
+		result.cleanup_settled = detached and acknowledged == true and publisher.retired(owner, token) == true
+	end
+	local stock_ok, stock = pcall(read, stock_path)
+	result.stock_sentinel_preserved = stock_ok and stock == original
+	result.lease_initialized = Controller.is_initialized()
+	result.complete = ok and result.cleanup_settled and result.stock_sentinel_preserved
+		and not result.lease_initialized
+	local file = assert(io.open(receipt_path .. ".pending", "wb"))
+	assert(file:write(assert(Codec.encode(result)) .. "\n")); assert(file:close())
+	assert(os.rename(receipt_path .. ".pending", receipt_path))
+	return nonce
+end
+
 return M

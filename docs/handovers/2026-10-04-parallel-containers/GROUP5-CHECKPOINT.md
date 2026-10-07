@@ -1766,3 +1766,21 @@ refusal and TEST-ONLY signing setup refusal. Source phase receipts report no
 compiler failure: ownership/source validation overhead remains under diagnosis.
 Packaging fails, installation is skipped, no release runs. Other native failures
 remain coordinated with their owners; no earlier success qualifies this SHA.
+
+## Owned configuration publication source prerequisite
+
+The independently reviewed coherent nine-path WP7 slice adds a dormant shared
+publication owner, its native filesystem adapter,42 behavioral cases and an
+ordinary Swift consumer of the private actual Hammerspoon fixture. Executing
+provider module and definition identities, source bytes and both JSON contracts
+must remain current before acquisition and every existing phase fence. The
+original six-path sources, frozen expectations, native deadlines and legacy
+probe entry remain whole. Independent qualification covers80 Python executions
+and12 causal mutant refusals, with no native execution or installed authority.
+Eight complete generated graphs use compact stdout plus retained full private
+receipts; no output limit is widened. Root selected gates precede publication.
+The preceding macOS run37576456893 at fcd043d1 terminated in failure: fresh
+owned compilation now reports source_identity; preparation still reports124;
+native UI reports unsupported. Its full native artifact is currently unavailable
+behind the exact productionresultssa2 network refusal, so complete XCTest counts
+remain unknown. Installation and release are skipped. Item31 stays open.

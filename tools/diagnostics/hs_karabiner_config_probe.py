@@ -456,6 +456,147 @@ def validate_summary(summary):
         raise ValueError("Foreign packaged Karabiner qualification executable")
 
 
+OWNED_CONTRACT = "karabiner.owned-private-publication"
+OWNED_RECEIPT_FIELDS = IDENTITY_FIELDS | {
+    "publication_scope",
+    "installation",
+    "remapping",
+    "lease_initialized",
+    "complete",
+    "cleanup_settled",
+    "stock_sentinel_preserved",
+    "variants",
+    "errors",
+}
+
+
+def validate_owned_receipt(result, nonce, pid, executable, bundle_id):
+    """Judge complete private documents without deriving expectations from their generator."""
+    if type(result) is not dict or set(result) != OWNED_RECEIPT_FIELDS:
+        raise ValueError("Malformed complete private publication inventory")
+    fixed = {
+        "schema_version": 1,
+        "contract": OWNED_CONTRACT,
+        "nonce": nonce,
+        "pid": pid,
+        "executable": str(executable),
+        "bundle_id": bundle_id,
+        "version": TIMER_CONTRACT["runtime_version"],
+        "publication_scope": "private-file-only",
+        "installation": False,
+        "remapping": False,
+        "lease_initialized": False,
+        "complete": True,
+        "cleanup_settled": True,
+        "stock_sentinel_preserved": True,
+    }
+    for key, expected in fixed.items():
+        if type(result[key]) is not type(expected) or result[key] != expected:
+            raise ValueError(f"Complete private publication identity or observation differs: {key}")
+    if result["errors"] != [] or type(result["variants"]) is not list:
+        raise ValueError("Complete private publication failed")
+    seen, total = [], 0
+    for variant in result["variants"]:
+        if type(variant) is not dict or set(variant) != {
+            "preset",
+            "tap_holds",
+            "combinations",
+            "config",
+            "exact_publication_receipt",
+            "cleanup_settled",
+        }:
+            raise ValueError("Malformed complete private publication variant")
+        if type(variant["tap_holds"]) is not bool or type(variant["combinations"]) is not bool:
+            raise ValueError("Complete private publication switches are not Boolean")
+        seen.append((variant["preset"], variant["tap_holds"], variant["combinations"]))
+        if (
+            variant["exact_publication_receipt"] is not True
+            or variant["cleanup_settled"] is not True
+        ):
+            raise ValueError("Complete private publication lacks actual receipt settlement")
+        config = variant["config"]
+        if type(config) is not dict or set(config) != {"profiles"}:
+            raise ValueError("Complete private publication is not the complete owned document")
+        profiles = config["profiles"]
+        if type(profiles) is not list or len(profiles) != 1 or type(profiles[0]) is not dict:
+            raise ValueError("Complete private publication has foreign or missing profiles")
+        profile = profiles[0]
+        if set(profile) != {
+            "name",
+            "selected",
+            "devices",
+            "virtual_hid_keyboard",
+            "complex_modifications",
+        }:
+            raise ValueError("Complete private publication profile inventory differs")
+        if profile["name"] != "Default profile" or profile["selected"] is not True:
+            raise ValueError("Complete private publication profile identity differs")
+        if not typed_equal(
+            profile["devices"],
+            [{"simple_modifications": [], "identifiers": {"is_keyboard": True}}],
+        ):
+            raise ValueError("Complete private publication device configuration differs")
+        if not typed_equal(
+            profile["virtual_hid_keyboard"],
+            {"country_code": 0, "keyboard_type_v2": "ansi"},
+        ):
+            raise ValueError("Complete private publication virtual keyboard configuration differs")
+        complex_modifications = profile["complex_modifications"]
+        if type(complex_modifications) is not dict or set(complex_modifications) != {"rules"}:
+            raise ValueError("Complete private publication complex configuration differs")
+        rules = complex_modifications["rules"]
+        if type(rules) is not list or not rules:
+            raise ValueError("Complete private publication has no rules")
+        modes, count = set(), 0
+        for rule in rules:
+            if type(rule) is not dict or type(rule.get("description")) is not str:
+                raise ValueError("Complete private publication rule shape differs")
+            tag = re.match(
+                r"^\[ErgoptiPlus managed:([0-9a-f]{32}):(normal|pause)\] ",
+                rule["description"],
+            )
+            if tag is None or tag[1] != nonce:
+                raise ValueError("Complete private publication generation differs")
+            modes.add(tag[2])
+            manipulators = rule.get("manipulators")
+            if type(manipulators) is not list or not manipulators:
+                raise ValueError("Complete private publication manipulator cohort is empty")
+            for manipulator in manipulators:
+                if type(manipulator) is not dict or manipulator.get("type") != "basic":
+                    raise ValueError("Complete private publication manipulator shape differs")
+                conditions = manipulator.get("conditions")
+                if type(conditions) is not list or not all(type(row) is dict for row in conditions):
+                    raise ValueError("Complete private publication has no actual condition cohort")
+                expected_conditions = {
+                    "ergopti_mode_" + nonce: CONTRACT["mode_values"][tag[2]],
+                    "ergopti_revoked_" + nonce: CONTRACT["revoked_value"],
+                }
+                for name, value in expected_conditions.items():
+                    found = [row for row in conditions if row.get("name") == name]
+                    if (
+                        len(found) != 1
+                        or found[0].get("type") != "variable_if"
+                        or type(found[0].get("value")) is not int
+                        or found[0]["value"] != value
+                    ):
+                        raise ValueError("Complete private publication condition cohort differs")
+                if any(
+                    str(row.get("name", "")).startswith(("ergopti_mode_", "ergopti_revoked_"))
+                    and row.get("name") not in expected_conditions
+                    for row in conditions
+                ):
+                    raise ValueError("Complete private publication contains a foreign generation")
+                count += 1
+        if modes != set(CONTRACT["mode_values"]) or count < CONTRACT["minimum_manipulators"]:
+            raise ValueError(
+                "Complete private publication graph lacks its actual modes or witnesses"
+            )
+        total += count
+    if sorted(seen) != sorted(VARIANTS):
+        raise ValueError("Complete private publication preset and switch cohort differs")
+    return {**fixed, "variant_count": len(VARIANTS), "manipulator_count": total}
+
+
 class NativeKarabinerConfigProbe(NativeDelayedTimerProbe):
     """Reuse the existing owned scripting transport; never acquire a runtime lease."""
 
@@ -484,3 +625,39 @@ class NativeKarabinerConfigProbe(NativeDelayedTimerProbe):
                 "Native Karabiner probe did not restore its exact private source bytes"
             )
         return validate_receipt(result, self.nonce, pid, self.executable, self.domain)
+
+    def observe_owned(self, pid, processes):
+        """Qualify explicit private whole-document publication without installing a runtime."""
+        import os
+
+        receipt = self.output / "native-karabiner-owned-config.json"
+        private_root = self.output / "ergopti-owned-private-root"
+        if receipt.exists() or processes(self.executable) != [pid]:
+            raise RuntimeError("Complete private publication lacks its fresh exact runtime")
+        private_root.mkdir(mode=0o700)
+        (private_root / "karabiner").mkdir(mode=0o700)
+        stock = private_root / "stock-personal.json"
+        original = (json.dumps(INITIAL_CONFIG, indent=2) + "\n").encode()
+        with stock.open("xb") as handle:
+            handle.write(original)
+        self.bind_runtime(pid, processes)
+        fixture = Path(__file__).with_name("hs_karabiner_config_native.lua")
+        source = "return dofile({}).run_owned({}, {}, {}, {}, {})".format(
+            *(json.dumps(str(value)) for value in (fixture, receipt, private_root, self.nonce)),
+            os.getuid(),
+            pid,
+        )
+        self.execute(source)
+        if processes(self.executable) != [pid]:
+            raise RuntimeError(
+                "Complete private publication runtime changed before receipt admission"
+            )
+        result = json.loads(receipt.read_text(), object_pairs_hook=unique_object)
+        summary = validate_owned_receipt(result, self.nonce, pid, self.executable, self.domain)
+        destination = private_root / "karabiner/karabiner.json"
+        published = json.loads(destination.read_bytes(), object_pairs_hook=unique_object)
+        if not typed_equal(published, result["variants"][-1]["config"]):
+            raise RuntimeError("Complete private publication does not match its actual final file")
+        if stock.read_bytes() != original:
+            raise RuntimeError("Complete private publication changed its separate stock sentinel")
+        return summary
