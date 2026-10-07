@@ -392,7 +392,7 @@ async function run({
 			180000
 		);
 		const pinned = lockReceipt(JSON.parse(metadata.stdout));
-		const flake = `git+file://${root}?dir=tools/build/nix&rev=${head}`;
+		const flake = `git+file://${root}?dir=tools/build/nix&rev=${head}&shallow=1`;
 		const override = [
 			'--override-input',
 			'nixpkgs',
