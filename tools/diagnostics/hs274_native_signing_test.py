@@ -344,5 +344,100 @@ class ClosedDiagnosticControls(unittest.TestCase):
         self.check_refusal(ValueError("SECRET credential state"), "invalid_value")
 
 
+class AncestryDiagnosticControls(unittest.TestCase):
+    """Real directory aliases; no native command or credential acquisition."""
+
+    def alias_case(self, private_alias):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp).resolve(strict=True)
+            physical = base / "physical"
+            physical.mkdir(mode=0o700)
+            alias = base / "alias"
+            alias.symlink_to(physical, target_is_directory=True)
+            evidence = base / "evidence"
+            evidence.mkdir(mode=0o700)
+            public = evidence / "public"
+            public.mkdir(mode=0o700)
+            root = (alias if private_alias else base) / "private"
+            supplied_public = public if private_alias else alias
+            output, errors = io.StringIO(), io.StringIO()
+            with (
+                patch.object(F.sys, "platform", "darwin"),
+                patch.object(F, "command", side_effect=AssertionError("Native port must not run")),
+                contextlib.redirect_stdout(output),
+                contextlib.redirect_stderr(errors),
+            ):
+                status = F.main(["setup", str(root), str(supplied_public)])
+            self.assertEqual(status, 1)
+            self.assertEqual(output.getvalue(), "")
+            self.assertFalse(root.exists())
+            self.assertFalse((physical / "private").exists())
+            lines = errors.getvalue().splitlines()
+            self.assertEqual(lines[0], "Native signing TEST-ONLY fixture refused: ancestry")
+            self.assertEqual(len(lines), 2)
+            import json
+
+            prefix = "ERGOPTI_SIGNER_ANCESTRY_DIAGNOSTIC "
+            self.assertTrue(lines[1].startswith(prefix))
+            observed = json.loads(lines[1][len(prefix) :])
+            self.assertEqual(
+                observed["stage"], "private_creation" if private_alias else "public_ancestry"
+            )
+            self.assertEqual(observed["check"], "canonical_path")
+            self.assertIs(observed["authority"], False)
+            self.assertEqual(observed["native_verdict"], "unchanged")
+            self.assertNotIn(str(base), lines[1])
+            self.assertLessEqual(len(lines[1].encode()) + 1, 1024)
+
+    def test_genuine_public_alias_refuses_before_private_creation(self):
+        self.alias_case(False)
+
+    def test_genuine_private_parent_alias_refuses_before_private_creation(self):
+        self.alias_case(True)
+
+    def test_each_fixed_stage_and_guard_is_closed(self):
+        for stage in ("public_ancestry", "private_creation", "fixture_source", "native_tools"):
+            for check in ("canonical_path", "ancestor_directory"):
+                error = F.FixtureRefusal("ancestry")
+                error.ancestry_stage, error.ancestry_check = stage, check
+                observed = F._ancestry_failure_observation(error)
+                self.assertEqual(
+                    set(observed),
+                    {"schema", "kind", "authority", "native_verdict", "stage", "check"},
+                )
+                self.assertEqual((observed["stage"], observed["check"]), (stage, check))
+
+    def test_foreign_metadata_never_exports_private_text(self):
+        for stage, check, code in (
+            ("SECRET/private", "canonical_path", "ancestry"),
+            ("public_ancestry", "SECRET credential", "ancestry"),
+            ("public_ancestry", "canonical_path", "SECRET reason"),
+            (True, "canonical_path", "ancestry"),
+            ("public_ancestry", 1, "ancestry"),
+            (None, None, "ancestry"),
+        ):
+            error = F.FixtureRefusal(code)
+            error.ancestry_stage, error.ancestry_check = stage, check
+            self.assertIsNone(F._ancestry_failure_observation(error))
+        self.assertIsNone(F._ancestry_failure_observation(PermissionError("SECRET /private/path")))
+
+    def test_healthy_actual_ancestry_produces_no_failure(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            physical = Path(tmp).resolve(strict=True)
+            result = F._setup_stage("public_ancestry", lambda: F._ancestors(physical))
+            self.assertEqual(result[-1][0], physical)
+            self.assertIsNone(F._ancestry_failure_observation(F.FixtureRefusal("ancestry")))
+
+    def test_current_ancestry_keeps_its_original_refusal(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            physical = Path(tmp).resolve(strict=True)
+            held = F._ancestors(physical)
+            physical.chmod(0o755)
+            with self.assertRaises(F.FixtureRefusal) as context:
+                F._current_ancestors(held)
+            self.assertEqual(context.exception.code, "ancestry_changed")
+            self.assertIsNone(F._ancestry_failure_observation(context.exception))
+
+
 if __name__ == "__main__":
     unittest.main()

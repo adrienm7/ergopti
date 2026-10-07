@@ -3323,6 +3323,19 @@ Markdown formatter refuses; source hashes remain exact while documentation
 formatting and its covering checks are corrected separately. Native media input
 and physical acceptance remain unexecuted. Item31 stays partial.
 
+Native prerequisite diagnostics now retain a second closed ancestry-stage/guard
+observation and a fixed protected-reference preparation reason without exposing
+paths, credentials or private exception text. Actual prior signer failure proves
+only ancestry; the exact failing site and protected-reference native cause remain
+unknown. Original guards, failure status, setup/cleanup and all eleven reference
+cases remain whole. New Swift parser/privacy controls require actual Mac execution.
+The active-extension portable controls also canonicalize only their own temporary
+roots: real alias paths previously failed before the intended inode guard, while
+leaf-negative tests could borrow that earlier refusal. Independent real-filesystem
+replays preserve all13 original assertions and reach the intended guards after the
+two producer changes. No production input guard, deadline or expectation is
+relaxed. Native API/approval/ready and item31 remain unqualified.
+
 An explicit dormant shared VirtualHIDDevice update-consent owner now composes
 the unchanged four-source dependency policy and canonical subscription Lifetime.
 Only a current incompatible-version decision creates an opaque offer; literal

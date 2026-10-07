@@ -1895,3 +1895,31 @@ These modeled contexts do not prove a native UI cause or physical ACK. Optional
 extracted-Python formatting did not pass; the formatter-owned Swift source must
 pass ordinary Root gates. New native execution remains unexecuted on Linux.
 Item24 and transverse16/38 remain open.
+
+## Closed native prerequisites and canonical portable fixture inputs
+
+The actual signer ancestry refusal now gains a bounded six-field stage/guard
+observation after the unchanged original diagnostic. Original26 control bodies,
+module guard predicates, native invocations, setup/cleanup and deadlines are
+conserved. Only two consumers bind the new fixture digest; the existing profiler
+builder pin remains exact. Independent168 portable controls pass, genuine alias
+predecessor controls assertion-refuse four times, and eight semantic mutants
+refuse. No extra filesystem, environment, credential or native-tool read is added.
+The actual Mac failing stage/path remains unknown pending new exact-source CI.
+
+Protected-reference preparation retains all eleven native cases and strict
+status0/empty-stderr guards. A bounded six-field/null-root/fixed-reason summary is
+added only to the failure message. One new Swift control has a healthy packet and
+ten privacy/type/refusal packets. Source inverse and producer reason allowlist are
+independently clear; Swift/Foundation parser runtime and native execution remain
+unexecuted on Linux. The old Mac0.406s prerequisite reason is still unknown.
+
+Active-extension portable controls canonicalize exactly two self-created temp
+roots. Genuine inherited symlink TMPDIR reproduces predecessor12PASS/1ERROR on
+both modes; canonical TMPDIR passes13. Four corrected canonical/alias and normal/
+optimized combinations pass52 original cases, with unchanged assertions and a
+whole byte inverse. Independent guard observation distinguishes real inode/leaf
+checks from an ancestry shortcut; omission controls refuse without replacing the
+actual provider. Native372CE trace is unavailable, so its precise cause remains
+unknown. Production ancestry/pins/Swift/budgets are unchanged. No item is removed;
+item31 and transverse16/38 remain partial.

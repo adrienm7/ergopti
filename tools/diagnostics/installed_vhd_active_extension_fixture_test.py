@@ -168,7 +168,7 @@ class ObservationControls(unittest.TestCase):
 
     def test_real_input_inode_replacement_refuses_before_consumer(self):
         with tempfile.TemporaryDirectory() as name:
-            root = Path(name)
+            root = Path(name).resolve(strict=True)
             source = root / "source.swift"
             source.write_bytes(b"fixed input")
             held = F.capture(source)
@@ -180,7 +180,7 @@ class ObservationControls(unittest.TestCase):
 
     def test_real_symlink_and_hardlink_inputs_refuse(self):
         with tempfile.TemporaryDirectory() as name:
-            root = Path(name)
+            root = Path(name).resolve(strict=True)
             source = root / "source.swift"
             source.write_bytes(b"fixed input")
             link = root / "link"

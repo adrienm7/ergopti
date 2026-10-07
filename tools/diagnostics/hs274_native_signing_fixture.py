@@ -48,11 +48,19 @@ def _full(s):
 
 
 def _ancestors(path):
-    require(path.is_absolute() and path.resolve(strict=True) == path, "ancestry")
+    try:
+        require(path.is_absolute() and path.resolve(strict=True) == path, "ancestry")
+    except FixtureRefusal as error:
+        error.ancestry_check = "canonical_path"
+        raise
     result = []
     for parent in reversed((path,) + tuple(path.parents)):
         s = parent.lstat()
-        require(stat.S_ISDIR(s.st_mode), "ancestry")
+        try:
+            require(stat.S_ISDIR(s.st_mode), "ancestry")
+        except FixtureRefusal as error:
+            error.ancestry_check = "ancestor_directory"
+            raise
         result.append((parent, _stamp(s)))
     return tuple(result)
 
@@ -227,11 +235,21 @@ def _search(deadline, guard):
     )
 
 
+def _setup_stage(stage, operation):
+    """Retain only a fixed setup caller for the original ancestry refusal."""
+    try:
+        return operation()
+    except FixtureRefusal as error:
+        if error.code == "ancestry":
+            error.ancestry_stage = stage
+        raise
+
+
 def setup(root, public):
     require(supported(sys.platform), "platform")
     root, public = Path(root), Path(public)
     require(root.is_absolute() and public.is_absolute(), "path")
-    public_ancestors = _ancestors(public)
+    public_ancestors = _setup_stage("public_ancestry", lambda: _ancestors(public))
     require(
         public not in root.parents
         and public.parent not in root.parents
@@ -240,9 +258,13 @@ def setup(root, public):
         and root != public.parent,
         "private_in_evidence",
     )
-    ancestors = create_private(root)
-    source = ordinary(Path(__file__).resolve(), limit=1024 * 1024)
-    tools = tuple(ordinary(Path(path), owned=False) for path in _NATIVE)
+    ancestors = _setup_stage("private_creation", lambda: create_private(root))
+    source = _setup_stage(
+        "fixture_source", lambda: ordinary(Path(__file__).resolve(), limit=1024 * 1024)
+    )
+    tools = _setup_stage(
+        "native_tools", lambda: tuple(ordinary(Path(path), owned=False) for path in _NATIVE)
+    )
     held_credentials = {}
 
     def guard():
@@ -628,6 +650,34 @@ def _diagnostic_code(error):
     return "system_io" if isinstance(error, OSError) else "invalid_value"
 
 
+def _ancestry_failure_observation(error):
+    """Decode fixed failure metadata without paths, credential bytes or new native reads."""
+    try:
+        if type(error) is not FixtureRefusal or error.code != "ancestry":
+            return None
+        stage = getattr(error, "ancestry_stage", None)
+        check = getattr(error, "ancestry_check", None)
+        if type(stage) is not str or stage not in (
+            "public_ancestry",
+            "private_creation",
+            "fixture_source",
+            "native_tools",
+        ):
+            return None
+        if type(check) is not str or check not in ("canonical_path", "ancestor_directory"):
+            return None
+        return {
+            "schema": 1,
+            "kind": "test_only_signer_ancestry_failure_observation",
+            "authority": False,
+            "native_verdict": "unchanged",
+            "stage": stage,
+            "check": check,
+        }
+    except Exception:
+        return None
+
+
 def main(args):
     try:
         require(len(args) in (2, 3), "arguments")
@@ -644,6 +694,13 @@ def main(args):
         print(
             "Native signing TEST-ONLY fixture refused: " + _diagnostic_code(error), file=sys.stderr
         )
+        observation = _ancestry_failure_observation(error)
+        if observation is not None:
+            print(
+                "ERGOPTI_SIGNER_ANCESTRY_DIAGNOSTIC "
+                + json.dumps(observation, sort_keys=True, separators=(",", ":")),
+                file=sys.stderr,
+            )
         return 1
 
 

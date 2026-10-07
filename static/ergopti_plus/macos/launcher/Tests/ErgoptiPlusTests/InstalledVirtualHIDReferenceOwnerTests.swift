@@ -1,6 +1,7 @@
 // Tests/ErgoptiPlusTests/InstalledVirtualHIDReferenceOwnerTests.swift
 // Actual protected static references; package trust and driver readiness stay separate.
 import Darwin
+import CoreFoundation
 import Foundation
 import XCTest
 @testable import ErgoptiPlus
@@ -179,6 +180,52 @@ extension RetainedStaticReferenceControls {
 private enum ProtectedReferenceFixtureError: Error { case prerequisite, ownership, cases, retirement, cleanup }
 
 extension HS274NativePolicyQualificationTests {
+
+	private static func protectedReferenceFailureSummary(_ stdout: String) -> String {
+		let unsupported = "reference preparation observation unsupported"
+		guard stdout.utf8.count <= 1024, let data = stdout.data(using: .utf8),
+			let packet = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+			Set(packet.keys) == Set(["schema", "status", "reason", "fixture_root",
+				"installation_qualified", "reference_qualified"]),
+			let schema = packet["schema"] as? NSNumber, CFGetTypeID(schema) != CFBooleanGetTypeID(),
+			Set(["c", "s", "i", "l", "q", "C", "S", "I", "L", "Q"]).contains(String(cString: schema.objCType)),
+			schema.doubleValue == 1, packet["status"] as? String == "refused",
+			packet["fixture_root"] is NSNull,
+			let installation = packet["installation_qualified"] as? NSNumber,
+			CFGetTypeID(installation) == CFBooleanGetTypeID(), !installation.boolValue,
+			let reference = packet["reference_qualified"] as? NSNumber,
+			CFGetTypeID(reference) == CFBooleanGetTypeID(), !reference.boolValue,
+			let reason = packet["reason"] as? String else { return unsupported }
+		let reasons: Set<String> = [
+			"native_prerequisite", "owner", "owner_inventory", "native_image", "native_image_changed",
+			"native_output", "native_status", "expand_prerequisite", "source_name", "source_type",
+			"source_changed", "package_version", "package_pin", "download_output", "expand_output",
+			"codesign_output", "package_changed", "payload_inventory", "payload_mode", "payload_bytes",
+			"compiler_output", "ancestry_source", "ancestry_source_changed", "deadline",
+			"FileNotFoundError", "PermissionError", "OSError", "ValueError", "TimeoutExpired", "CalledProcessError",
+		]
+		guard reasons.contains(reason) else { return unsupported }
+		return "reference preparation reason=" + reason
+	}
+
+	func testProtectedReferenceFailureSummaryKeepsPrivateAndMalformedFactsUnsupported() {
+		let refused = #"{"schema":1,"status":"refused","reason":"owner","fixture_root":null,"installation_qualified":false,"reference_qualified":false}"#
+		XCTAssertEqual(Self.protectedReferenceFailureSummary(refused), "reference preparation reason=owner")
+		for malformed in [
+			refused.replacingOccurrences(of: "owner", with: "SECRET private cause"),
+			refused.replacingOccurrences(of: "null", with: #""/private/SECRET""#),
+			refused.replacingOccurrences(of: #""schema":1"#, with: #""schema":true"#),
+			refused.replacingOccurrences(of: #""schema":1"#, with: #""schema":1.0"#),
+			refused.replacingOccurrences(of: #""reference_qualified":false"#, with: #""reference_qualified":0"#),
+			refused.replacingOccurrences(of: #""reference_qualified":false"#, with: #""reference_qualified":true"#),
+			refused.replacingOccurrences(of: #""schema":1"#, with: #""schema":1,"extra":"SECRET""#),
+			refused + "SECRET", String(repeating: "x", count: 1025), "invalid SECRET",
+		] {
+			XCTAssertEqual(Self.protectedReferenceFailureSummary(malformed),
+				"reference preparation observation unsupported")
+		}
+	}
+
 	/// Runs all eleven protected-reference controls inside one explicit SDK-owned fixture.
 	func testActualOwnedProtectedVirtualHIDReferenceCases() throws {
 		try fixture { root in
@@ -189,7 +236,8 @@ extension HS274NativePolicyQualificationTests {
 				attributes: [.posixPermissions: 0o700])
 			let prepared = try run(URL(fileURLWithPath: "/usr/bin/env"),
 				["python3", script.path, "prepare", stage.path], root: root)
-			XCTAssertEqual(prepared.status, 0, "Actual pinned package acquisition/verification prerequisite refused")
+			XCTAssertEqual(prepared.status, 0, "Actual pinned package acquisition/verification prerequisite refused; "
+				+ Self.protectedReferenceFailureSummary(prepared.stdout))
 			XCTAssertTrue(prepared.stderr.isEmpty)
 			guard prepared.status == 0, prepared.stderr.isEmpty else { throw ProtectedReferenceFixtureError.prerequisite }
 			let preparation = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(prepared.stdout.utf8)) as? [String: Any])
