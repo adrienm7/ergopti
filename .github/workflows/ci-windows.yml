@@ -690,6 +690,10 @@ jobs:
           name: assets-windows
           path: ${{ runner.temp }}/package
 
+      - name: Install locked native acceptance dependencies
+        shell: pwsh
+        run: npm ci --ignore-scripts
+
       - name: Test native compiled startup admission
         shell: pwsh
         timeout-minutes: 3
@@ -1118,6 +1122,26 @@ jobs:
               Stop-LaunchedApp $proc
           }
 
+      - name: Qualify compiled prior-release upgrade and installed full save
+        shell: pwsh
+        timeout-minutes: 10
+        run: |
+          ./tools/test/run-compiled-save-upgrade.ps1 `
+            -Executable "$env:RUNNER_TEMP/package/ergopti_plus/windows/ErgoptiPlus.exe" `
+            -Checkout "$env:GITHUB_WORKSPACE" `
+            -StartupEvidence "$env:RUNNER_TEMP/evidence.json" `
+            -EvidenceDirectory "$env:RUNNER_TEMP/windows-compiled-upgrade-evidence"
+
+      - name: Upload mandatory compiled upgrade failure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-compiled-upgrade-evidence
+          overwrite: true
+          path: ${{ runner.temp }}/windows-compiled-upgrade-evidence
+          retention-days: 7
+          if-no-files-found: error
+
       - name: Qualify programmable hotstrings in the actual compiled package
         if: ${{ !cancelled() }}
         shell: pwsh
@@ -1171,6 +1195,9 @@ jobs:
         with:
           pattern: windows-launch-evidence
           path: ${{ runner.temp }}/launch-evidence
+
+      - name: Install locked evidence validation dependencies
+        run: npm ci --ignore-scripts
 
       - name: Verify mandatory jobs and launch scenarios
         env:
