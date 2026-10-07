@@ -4429,8 +4429,11 @@ integrated, then publish one grouped release.
   Corrective Windows CI `37621118292` completes 10166/1: the earlier menu
   regressions and native cleanup controls pass. The sole remaining OS-call
   purity failure is addressed by moving exact captured-handle probes into
-  the existing native tray adapter, without raising its baseline. New native
-  qualification remains required; this item stays partial.
+  the existing native tray adapter, without raising its baseline. Follow-up
+  Windows CI `37625043296` completes 10166/1: the purity and menu controls now
+  pass; the sole failure is the actual Python program-provider argv receipt,
+  routed to its Group 3 owner without changing its assertions. Windows E2E,
+  package and installation stay skipped; this item remains partial.
 
   Current Group 1 software and device boundaries are recorded in the
   [2026-10-07 checkpoint](handovers/2026-10-04-parallel-containers/GROUP1-CURRENT-CHECKPOINT.md).
@@ -5547,8 +5550,11 @@ Current Group 3 source checkpoint (item 73, 2026-10-06): [Group 3 current checkp
   Corrective Windows CI `37621118292` completes 10166/1: the earlier menu
   regressions and native cleanup controls pass. The sole remaining OS-call
   purity failure is addressed by moving exact captured-handle probes into
-  the existing native tray adapter, without raising its baseline. New native
-  qualification remains required; this item stays partial.
+  the existing native tray adapter, without raising its baseline. Follow-up
+  Windows CI `37625043296` completes 10166/1: the purity and menu controls now
+  pass; the sole failure is the actual Python program-provider argv receipt,
+  routed to its Group 3 owner without changing its assertions. Windows E2E,
+  package and installation stay skipped; this item remains partial.
 
   Current Group 1 software and device boundaries are recorded in the
   [2026-10-07 checkpoint](handovers/2026-10-04-parallel-containers/GROUP1-CURRENT-CHECKPOINT.md).
