@@ -6406,6 +6406,24 @@ manual37677432702 tests exactly9d7b838d5 and remains in progress at this
 checkpoint. Native E2E/package/install qualification and dev integration remain
 pending. Items36/62 and transversal16/38 stay open.
 
+The closed Windows route diagnostic now records only the single-route source
+and kind from the already-returned receipt. All original native PAC bytes,
+providers, ordering assertions, clocks and cleanup remain byte-exact. Actual
+portable PowerShell AST/helper controls pass74 cases; the source-bound AHK
+receiver model passes61 cases. Both close under the original command owner,
+status0 without signal/error or retained phase. These are passive projection
+controls, not WinHTTP, AutoHotkey or Windows native qualification. A subsequent
+native observation must distinguish native DIRECT from static/environment
+admission before claiming why vector1 returns one route. Item62 stays open.
+
+Linux manual37677432702 at9d7b838d5 records11,643 unit passes and one genuine
+relative-clock failure. Its native trace shows a refreshed clock, request arrival
+at79.959ms, the unchanged40ms response delay and callback at100.670ms under the
+original100ms budget. This failed receipt remains; neither assertions nor
+deadlines are changed. One fresh-run diagnostic is requested at ef67fa390,
+whose only delta is the qualification documentation. Complete Linux acceptance
+and the early E2E prerequisite receiving remain pending.
+
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard
   layers on all three drivers. Windows and macOS also support their existing
