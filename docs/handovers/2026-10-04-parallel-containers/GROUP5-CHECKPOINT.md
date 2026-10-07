@@ -1996,3 +1996,38 @@ ancestry callers within that stage; the permission operation reports its deadlin
 Packaging fails and installation/Release skip. The new projection still requires
 final-source native execution and separate service/capture integration. Item31
 and transverse16/38 stay open; no Group5 TODO item is removed by this slice.
+
+## Native signing producer before-correction observation
+
+A separately reviewed native BEFORE XCTest passes the exact existing Foundation
+`temporaryDirectory.resolvingSymlinksInPath()` plus UUID producer to the unchanged
+E026 signer helper. Observation-only tracing over genuine helper code/caller
+frames distinguishes `parent_before_creation` and `new_leaf_after_creation` and
+retains the existing closed ancestry marker after exception unwinding. It adds
+no guard replacement, producer normalization, credential read or signing-tool
+invocation. Stdout contains only fixed Boolean/reason fields; a genuine owned
+symlink-parent case must refuse before creation.
+
+The original SDK Guardian must acknowledge physical retirement before cleanup
+starts, and the cleanup child must retire too. Only the exclusive0600 ticket's
+current original empty nodes can be removed. Foreign, successor, nonempty and
+unacknowledged partial nodes refuse and retain custody; a Python function return
+cannot stand in for physical Guardian ACK. The original signing method, E026
+helper,32 source controls and SDK30/35/10 budgets remain whole.
+
+Independent replay passes111 original/frozen portable controls and12 additional
+real Linux custody checks; two explicit injected mkdir/mode-change controls retain
+actual partial directories. Nine guard omissions assertion-refuse. Whole Swift
+and embedded-Python inverses, strict patch roundtrip and Root Ruff100 pass. These
+source/software controls include modeled native endpoints; actual Foundation,
+Swift compilation and Guardian execution remain unperformed on Linux.
+
+Authentic manual37593824199/cb35 finished412 XCTest cases:385 passed,12 failed and
+15 skipped, with35 reported failure events including six unexpected events.
+The retained signer reports `private_creation/canonical_path`, shared by the
+first `_ancestors(path.parent)` and second `_ancestors(path)` caller. Retained
+argv/private-root evidence is absent, so first versus second and the exact cause
+remain UNKNOWN. The new actual Mac BEFORE assertion may fail diagnostically;
+no producer correction or item completion follows from its source adoption.
+Packaging failed; installation and Release skipped. Item31 and transverse16/38
+remain open.

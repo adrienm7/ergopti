@@ -4563,6 +4563,19 @@ classes imply neither full awake nor session unlock. Actual public SDK,
 Swift and native qualification are pending. This adds no production
 activation and does not complete31.
 
+A separate native signing BEFORE control now observes the unchanged Foundation
+private-directory producer against the exact E026 helper, distinguishing its
+parent-before-creation and new-leaf-after-creation ancestor calls. Authentic
+manual37593824199/cb35 completed412 XCTest cases:385 passed,12 failed and15 skipped;
+35 reported failure events include six unexpected events. Its existing
+private_creation/canonical_path refusal identifies neither ancestor caller;
+retained argv/private-root evidence is absent and the precise native cause stays
+UNKNOWN. Independent source/portable custody review preserves the original
+signer method, all32 controls and SDK30/35/10 budgets. No producer normalization
+or correction is applied. Actual Swift/Foundation/Guardian execution remains
+unperformed; the new native BEFORE assertion may fail diagnostically. Item31
+and transverse16/38 stay open.
+
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
   listed; see `docs/memory/text-input-and-config.md`. Current source already
