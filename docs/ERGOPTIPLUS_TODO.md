@@ -3136,6 +3136,17 @@ mutation cases reject the predecessor and a narrow guard-reread mutant. This
 is observation only: actual native geometry cause and item24 acceptance remain
 unqualified pending fresh exact-source macOS CI.
 
+Permission dialogs now opt in to an exact outer-frame setter after native
+chrome and before content/presentation. Four original scalar coordinates are
+held before foreign callbacks; an exact current-session predicate fences the
+setter, and refused or retired candidates follow existing cleanup ownership.
+Pinned Hammerspoon creates a content rectangle, so decoration can enlarge the
+outer window even without a resizable style. Twenty-eight frozen modeled
+controls cover geometry, aliases, retirement and refusal; all original native
+geometry assertions and ten-case receipt remain unchanged. Exact-source native
+UI qualification and physical guardian/tap-hold acceptance remain required.
+This correction does not complete item24.
+
 - [~] **30.** Physical magic-key setting on all three OSes: one
   `hotstrings.magic_key_source` (a KeyboardEvent.code, `auto` by default),
   config schema v5 migrating every spelling of the Windows

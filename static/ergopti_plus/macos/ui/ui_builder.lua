@@ -634,6 +634,38 @@ end
 --- @return userdata|nil The configured webview instance.
 function M.show_webview(opts)
 	if type(opts) ~= "table" then return nil end
+	-- Only permission dialogs opt in to canonical outer-frame dimensions.
+	-- Keep the ordinary factory's native content-frame behavior unchanged.
+	local normalize_outer_frame = opts.normalize_outer_frame
+	local outer_frame_is_current = opts.outer_frame_is_current
+	local outer_x, outer_y, outer_w, outer_h
+	if normalize_outer_frame ~= nil or outer_frame_is_current ~= nil then
+		if normalize_outer_frame ~= true or type(outer_frame_is_current) ~= "function" then
+			Logger.error(LOG, "WebView factory refused an incomplete outer-frame policy.")
+			return nil
+		end
+		local frame = opts.frame
+		if type(frame) ~= "table" then
+			Logger.error(LOG, "WebView factory refused an invalid outer frame.")
+			return nil
+		end
+		-- Hold the original scalar rectangle before cleanup, logging, native
+		-- construction or ownership callbacks can mutate the caller's table.
+		outer_x, outer_y = rawget(frame, "x"), rawget(frame, "y")
+		outer_w, outer_h = rawget(frame, "w"), rawget(frame, "h")
+		for _, value in ipairs({ outer_x, outer_y, outer_w, outer_h }) do
+			if type(value) ~= "number" or value ~= value or value == math.huge or value == -math.huge then
+				Logger.error(LOG, "WebView factory refused a nonfinite outer frame.")
+				return nil
+			end
+		end
+		if type(outer_x) ~= "number" or type(outer_y) ~= "number"
+			or type(outer_w) ~= "number" or type(outer_h) ~= "number"
+			or outer_w <= 0 or outer_h <= 0 then
+			Logger.error(LOG, "WebView factory refused an invalid outer-frame dimension.")
+			return nil
+		end
+	end
 	if M.can_create_webview() ~= true then return nil end
 	if opts.level ~= nil then
 		-- Refused before the native window exists, so nothing is left to clean up.
@@ -713,14 +745,20 @@ function M.show_webview(opts)
 		-- to exact ownership. Strict callers fail closed on any native exception.
 		return true
 	end
-	local function apply_required_webview_mutation(callback, label)
-		if not webview_current() then return false end
+	local function apply_required_webview_mutation(callback, label, scoped_is_current)
+		local function required_current()
+			if not webview_current() then return false end
+			if scoped_is_current == nil then return true end
+			local ok, current = xpcall(scoped_is_current, debug.traceback)
+			return ok == true and current == true
+		end
+		if not required_current() then return false end
 		local ok, result = xpcall(callback, debug.traceback)
 		if ok ~= true then
 			Logger.error(LOG, "Required webview %s failed: %s.", label, tostring(result))
 			return false
 		end
-		if not webview_current() then
+		if not required_current() then
 			Logger.error(LOG, "Required webview %s lost its lifecycle owner.", label)
 			return false
 		end
@@ -745,6 +783,13 @@ function M.show_webview(opts)
 	-- window can be built with only part of it.
 	for _, step in ipairs(M.window_chrome_steps(wv, opts)) do
 		if not apply_webview_mutation(step.apply) then return abandon_required_mutation() end
+	end
+	if normalize_outer_frame == true then
+		-- hs.webview.new accepts a content rectangle; chrome can enlarge the
+		-- native outer frame. Its frame setter applies the full window rectangle.
+		if not apply_required_webview_mutation(function()
+			wv:frame({ x = outer_x, y = outer_y, w = outer_w, h = outer_h })
+		end, "outer frame", outer_frame_is_current) then return abandon_required_mutation() end
 	end
 	-- Hammerspoon's webview window becomes key only while it allows text entry
 	-- (libwebview.m canBecomeKeyWindow): without it a click never brings the

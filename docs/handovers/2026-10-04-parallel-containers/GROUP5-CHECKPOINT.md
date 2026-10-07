@@ -1566,3 +1566,23 @@ runs pass. Native CF/IOKit/Darwin/Core/signing are not inferred; original30s
 monitor versus10s cleanup admission retains its fail-closed boundary. Stock
 metadata HTTP403 and interrupted baseline CLI remain separate actual failures.
 Items24/30/31/40/43/44 and transverse16/38 acceptance remain open.
+
+## Permission dialog outer-frame correction
+
+Reviewed four-path successor normalizes only explicit permission sessions after
+chrome and before presentation, using held finite scalar coordinates and exact
+session fences. Original tests retain every assertion; their native fake gains
+only the public scalar-copying frame API. Twenty-eight before-code controls
+reject original geometry, alias and retirement defects; focused Lua54 passes
+87 cases. Private incomplete-checkout full17428PASS/45FAIL is not qualified or
+exonerated. Root complete-checkout gates and fresh native CI remain necessary.
+Original native geometry predicate, ten-case receipt, cleanup ownership and
+budgets remain unchanged. Item24 and transverse16/38 stay open.
+
+The first Root complete-checkout run passes17483 units and101 E2E with1 skip,
+but fails1/365 JS checks because the new loader adds a pinned source read76>75.
+A one-path amendment uses the canonical unique-declaration source reader and
+keeps all28 case bodies/assertions exact; original semantic loader gives2/26,
+corrected28/0 in Lua54, and absent/ambiguous sources refuse. The ratchet remains 75. Amended JIT discovery cannot run because the unchanged canonical helper
+requires table.pack; earlier direct frozen JIT controls are separate evidence.
+Final Root local qualification is recorded separately; actual native UI remains pending.

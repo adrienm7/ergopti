@@ -138,9 +138,19 @@ local function with_untrusted_factory(body)
 			end,
 		}
 		local view = {}
+		local native_frame
 		for _, name in ipairs({ "windowTitle", "windowStyle", "shadow", "allowTextEntry", "allowGestures",
 			"windowCallback", "navigationCallback", "html" }) do
 			view[name] = function(self) return self end
+		end
+		-- The public native frame API copies scalar rectangles in both directions.
+		function view.frame(self, rectangle)
+			if rectangle ~= nil then
+				native_frame = { x = rectangle.x, y = rectangle.y, w = rectangle.w, h = rectangle.h }
+				return self
+			end
+			if native_frame == nil then return nil end
+			return { x = native_frame.x, y = native_frame.y, w = native_frame.w, h = native_frame.h }
 		end
 		function view.level(self, level) h.levels[#h.levels + 1] = level; return self end
 		function view.show(self) h.shows = h.shows + 1; return self end
@@ -152,7 +162,10 @@ local function with_untrusted_factory(body)
 		helpers.load_with_stubs("ui.permission_dialog", {
 			webview = {
 				windowMasks = { titled = 1, closable = 2, utility = 16 },
-				new = function() return view end,
+				new = function(rectangle)
+					native_frame = { x = rectangle.x, y = rectangle.y, w = rectangle.w, h = rectangle.h }
+					return view
+				end,
 				usercontent = { new = function()
 					return { setCallback = function(self) return self end }
 				end },

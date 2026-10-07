@@ -344,6 +344,8 @@ function M.show(spec)
 	_session = session
 	local built, webview = xpcall(ui_builder.show_webview, debug.traceback, {
 		frame         = dialog_frame(geometry),
+		normalize_outer_frame = true,
+		outer_frame_is_current = function() return _session == session end,
 		title         = content.window_title,
 		usercontent   = usercontent,
 		html_string   = M.render(content, spec.bundle_path, app_icon_url()),
