@@ -1674,3 +1674,23 @@ The completed retry passes365 JS,17490 Mac units,101 Mac E2E with1 skip,
 Markdown formatting. All five source/test postimages remain exact; documentation
 is formatted and its covering gates rerun separately before publication. No
 native systemDefined/physical or installation acceptance is inferred.
+
+## Actual disposable signing qualification registration
+
+The five-path independently reviewed successor retains the final20-control
+credential fixture and moves only the readonly observer's builder pin to981ea.
+An ordinary Swift XCTest invokes actual setup, the one live compile/copy/sign
+handoff and independent two-architecture/five-target observations. Its disposable
+TEST-ONLY certificate is never a shipping identity. The existing helper gains
+only a throwing retained-child retirement loop; credentials are purged only
+after every original Guardian acknowledges actual retirement. A refusal retains
+private inputs outside the uploaded evidence parent. All prior native assertions,
+unsigned acceptance,20 controls and MachO oracle stay whole.
+
+Portable20 pass normal, explicit and inherited optimization. Actual native/Swift
+execution remains pending. The workflow stays exact with25/45-minute aggregate
+and package boundaries; measured396 seconds of headroom is less than410 healthy
+observation waits, plus potential40 retirement seconds. An unchanged bounded CI
+trial is useful but is not guaranteed to fit. A timeout fails qualification;
+no release, production signing, installation or authentication is authorized
+by this TEST-ONLY mechanical witness. Item31 remains partial.

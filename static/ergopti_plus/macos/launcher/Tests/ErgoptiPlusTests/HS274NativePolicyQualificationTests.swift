@@ -234,6 +234,12 @@ final class HS274NativePolicyQualificationTests: XCTestCase {
 		return true
 	}
 
+	/// Acknowledges every retained direct Guardian before private credential cleanup.
+	/// A refusal keeps the complete child array for the fixture's independent retry.
+	func retireOwnedChildren() throws {
+		for child in children { try child.retire() }
+	}
+
 	func fixture(parent: URL? = nil, _ body: (URL) throws -> Void) throws {
 		guard children.isEmpty else { throw FixtureError.ownership }
 		let root = (parent ?? manager.temporaryDirectory.resolvingSymlinksInPath())

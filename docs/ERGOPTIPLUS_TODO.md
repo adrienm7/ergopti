@@ -3492,6 +3492,20 @@ release owners. Packaging fails and installation is skipped; capture, signing,
 VirtualHIDDevice replacement and physical validation remain open. TODO31 stays
 partial, and transverse16/38 remain required.
 
+An additive ordinary XCTest now prepares a disposable TEST-ONLY credential,
+invokes the existing single live compile/copy/sign handoff and checks all five
+signed targets in both architectures. A tiny throwing seam delegates only to
+the original retained Guardian children; any missing retirement ACK prevents
+credential removal, preserving private inputs for retry. Private credentials
+remain outside uploaded evidence. All20 frozen Python custody controls pass in
+three optimization modes; original unsigned acceptance, MachO expectations and
+every native assertion remain unchanged. No workflow or deadline changes: the
+existing25-minute aggregate has396 measured seconds of headroom against410
+seconds of new healthy observation waits, so fit is not guaranteed. A timeout
+is a failed whole qualification. Actual Swift/signing execution remains pending;
+this test cannot qualify the production identity, install or live authentication.
+Item31 and transverse16/38 stay open.
+
 The owned native compilation prerequisite now has a normally discovered Swift
 case for actual unsigned pinned Core-Service and CLI builds. It applies a strict
 25-file sealed complete producer candidate only inside its owned temporary tree;
