@@ -164,46 +164,6 @@ jobs:
         timeout-minutes: 3
         run: ./tools/test/install-ci-kana-layout.ps1
 
-      - name: Diagnose isolated script late parameter child
-        # Diagnostic only: preserve its real exit while the unchanged suite runs.
-        continue-on-error: true
-        shell: pwsh
-        timeout-minutes: 3
-        run: |
-          $ahk = Get-ChildItem "C:\AutoHotkey" -Filter "AutoHotkey64.exe" |
-              Select-Object -First 1 -ExpandProperty FullName
-          if (-not $ahk) { throw "AutoHotkey64.exe not found for the diagnostic child." }
-          $tests = "${{ github.workspace }}\static\ergopti_plus\windows\tests"
-          $harness = Join-Path $tests "support\feature_state_boot_smoke.ahk"
-          if (-not (Test-Path -LiteralPath $harness -PathType Leaf)) {
-              throw "The real feature-state diagnostic child is missing."
-          }
-          $receipt = Join-Path $env:RUNNER_TEMP "group1-script-late-parameter-child.txt"
-          Remove-Item -LiteralPath $receipt -Force -ErrorAction SilentlyContinue
-          # Observe a nonzero native exit before exiting with that same code.
-          $PSNativeCommandUseErrorActionPreference = $false
-          Push-Location $tests
-          try {
-              # /wait owns the actual GUI-subsystem process; cmd inherits redirected
-              # stdout/stderr so the child's existing Message/Stack writes survive.
-              & cmd /d /c "start `"`" /wait `"$ahk`" /ErrorStdOut `"$harness`" script_late_parameter > `"$receipt`" 2>&1"
-              $childExit = $LASTEXITCODE
-          } finally {
-              Pop-Location
-          }
-          if ($null -eq $childExit -or -not (Test-Path -LiteralPath $receipt -PathType Leaf)) {
-              throw "The real diagnostic child exit/output receipt is unavailable."
-          }
-          $output = [System.IO.File]::ReadAllText($receipt, [System.Text.Encoding]::UTF8)
-          $bounded = $output.Substring(0, [Math]::Min(3000, $output.Length))
-          $escaped = $bounded.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
-          if ($output.Length -gt 3000) {
-              $escaped += "%0A[truncated at 3000 characters; full task-owned receipt retained]"
-          }
-          Write-Host "::notice title=Group1 real script late parameter child::native_exit=$childExit; output_chars=$($output.Length); output=$escaped"
-          # This step is observational, not a replacement native qualification.
-          exit $childExit
-
       - name: Run AHK test suite
         shell: pwsh
         timeout-minutes: 25
