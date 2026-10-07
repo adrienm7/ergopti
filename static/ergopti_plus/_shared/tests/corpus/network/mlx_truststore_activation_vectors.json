@@ -1,0 +1,47 @@
+[
+	{
+		"id": "missing_truststore",
+		"truststore": "missing",
+		"hub": "available",
+		"status": 1,
+		"hub_imports": 0,
+		"snapshots": 0,
+		"watchers": 0
+	},
+	{
+		"id": "activation_refused",
+		"truststore": "refused",
+		"hub": "available",
+		"status": 1,
+		"hub_imports": 0,
+		"snapshots": 0,
+		"watchers": 0
+	},
+	{
+		"id": "activation_api_missing",
+		"truststore": "api_missing",
+		"hub": "available",
+		"status": 1,
+		"hub_imports": 0,
+		"snapshots": 0,
+		"watchers": 0
+	},
+	{
+		"id": "hub_missing_after_activation",
+		"truststore": "available",
+		"hub": "missing",
+		"status": 1,
+		"hub_imports": 1,
+		"snapshots": 0,
+		"watchers": 0
+	},
+	{
+		"id": "activation_before_download",
+		"truststore": "available",
+		"hub": "available",
+		"status": 0,
+		"hub_imports": 1,
+		"snapshots": 1,
+		"watchers": 1
+	}
+]
