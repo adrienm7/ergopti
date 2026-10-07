@@ -2012,5 +2012,145 @@ class AppKitRegistrationFactControls(unittest.TestCase):
                 children.groups[child].settle.assert_not_called()
 
 
+class AppKitPolicyStateControls(unittest.TestCase):
+    """Fixed policy snapshots do not authorize registration or diagnose its cause."""
+
+    def capture(self, root, value):
+        return RegistrationFactControls.capture(self, root, value)
+
+    def frame(self, initial, after, reason=2):
+        return (
+            "Owned AppleEvent recipient AppKit admission refused (reason "
+            + str(reason)
+            + ").\nAPPKIT_POLICY/1 initial="
+            + initial
+            + " after="
+            + after
+            + "\n"
+        ).encode("ascii")
+
+    def test_fixed_initial_and_after_no_labels_project_only_observed_states(self):
+        labels = ("regular", "accessory", "prohibited", "unrecognized")
+        for initial in labels:
+            for after in labels:
+                with self.subTest(initial=initial, after=after), TemporaryDirectory() as directory:
+                    value = self.frame(initial, after)
+                    self.assertLessEqual(len(value), 128)
+                    children, receiver, _path = self.capture(Path(directory), value)
+                    expected = {
+                        "phase": "appkit-admission",
+                        "appkit_reason": "policy-refused",
+                        "appkit_initial_policy": initial,
+                        "appkit_after_no_policy": after,
+                    }
+                    if not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "O_DIRECTORY"):
+                        expected = {}
+                    self.assertEqual(
+                        probe.appleevent_registration_fact(children, receiver), expected
+                    )
+                    receiver.poll.assert_not_called()
+                    receiver.wait.assert_not_called()
+
+    def test_unknown_noisy_or_wrong_admission_frames_do_not_project_policy(self):
+        valid = self.frame("accessory", "accessory")
+        for value in (
+            self.frame("accessory", "accessory", reason=1),
+            self.frame("accessory", "accessory", reason=3),
+            self.frame("unavailable", "accessory"),
+            self.frame("0", "1"),
+            valid.replace(
+                b"initial=accessory after=accessory", b"after=accessory initial=accessory"
+            ),
+            valid.replace(b"APPKIT_POLICY/1", b"APPKIT_POLICY/2"),
+            valid.replace(b"after=accessory", b"after=accessory\0"),
+            valid + b"noise\n",
+            valid + valid,
+            valid[:-1],
+            valid.split(b"\n", 1)[1],
+            b"x" * 129,
+        ):
+            with self.subTest(value=value), TemporaryDirectory() as directory:
+                children, receiver, _path = self.capture(Path(directory), value)
+                self.assertEqual(probe.appleevent_registration_fact(children, receiver), {})
+
+    def test_policy_projection_preserves_capture_refusals_and_no_process_observation(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            value = self.frame("regular", "prohibited")
+            children, receiver, path = self.capture(root, value)
+            original = root / "original.stderr"
+            path.rename(original)
+            path.symlink_to(original)
+            self.assertEqual(probe.appleevent_registration_fact(children, receiver), {})
+            path.unlink()
+            os.link(original, path)
+            self.assertEqual(probe.appleevent_registration_fact(children, receiver), {})
+            path.unlink()
+            original.rename(path)
+            root.chmod(0o755)
+            self.assertEqual(probe.appleevent_registration_fact(children, receiver), {})
+            root.chmod(0o700)
+            with patch.object(probe.os, "read", return_value=value[:-1]):
+                self.assertEqual(probe.appleevent_registration_fact(children, receiver), {})
+            receiver.poll.assert_not_called()
+            receiver.wait.assert_not_called()
+
+    def test_policy_snapshot_uses_same_exit65_and_keeps_readiness_refused(self):
+        boundary = AppleEventBoundaryControls()
+        for code, status, reason in ((21, 65, 2), (21, 68, 2), (22, 65, 2), (21, 65, 3)):
+            with (
+                self.subTest(code=code, status=status, reason=reason),
+                TemporaryDirectory() as directory,
+            ):
+                root = Path(directory)
+                root.chmod(0o700)
+                (root / "sandbox.sb").write_text(boundary.policy)
+                children = boundary.model(root)
+                children.captures = {}
+                acquire = children.start
+
+                def start(arguments):
+                    child = acquire(arguments)
+                    capture = root / "child-1.stderr"
+                    capture.write_bytes(self.frame("accessory", "accessory", reason))
+                    children.captures[child] = (root / "child-1.stdout", capture)
+                    children.groups[child].observe_exit.return_value = Mock(
+                        si_pid=73136, si_code=code, si_status=status
+                    )
+                    return child
+
+                children.start = start
+                with (
+                    patch.object(probe.uuid, "uuid4", return_value=boundary.nonce),
+                    patch.object(probe, "native_compiler", return_value=["modeled-native-clang"]),
+                    patch.multiple(
+                        probe.os, CLD_EXITED=21, CLD_KILLED=22, CLD_DUMPED=23, create=True
+                    ),
+                ):
+                    with self.assertRaises(probe.AppleEventBoundaryError) as failed:
+                        probe.admit_appleevent_boundary(children, root)
+                detail = str(failed.exception)
+                if (
+                    code == 21
+                    and status == 65
+                    and reason == 2
+                    and hasattr(os, "O_NOFOLLOW")
+                    and hasattr(os, "O_DIRECTORY")
+                ):
+                    self.assertIn("registration_appkit_initial_policy=accessory", detail)
+                    self.assertIn("registration_appkit_after_no_policy=accessory", detail)
+                else:
+                    self.assertNotIn("registration_appkit_initial_policy=", detail)
+                    self.assertNotIn("registration_appkit_after_no_policy=", detail)
+                self.assertIn("checkpoint=readiness", detail)
+                self.assertNotIn(directory, detail)
+                self.assertNotIn(boundary.nonce, detail)
+                self.assertEqual(children.sender_calls, [])
+                self.assertEqual(len(children.active), 1)
+                child = children.active[0]
+                self.assertEqual(children.groups[child].observe_exit.call_count, 1)
+                children.groups[child].settle.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -278,7 +278,7 @@ check('portable Brew ownership controls remain registered and mandatory', () => 
 	assert.ifError(result.error);
 	assert.strictEqual(result.signal, null, result.stderr);
 	assert.strictEqual(result.status, 0, result.stderr);
-	assert.match(result.stderr, /Ran 63 tests in /);
+	assert.match(result.stderr, /Ran 67 tests in /);
 	assert.match(result.stderr, /\nOK\s*$/);
 	assert.doesNotMatch(result.stderr, /skipped=/);
 });
@@ -312,7 +312,7 @@ check(
 		);
 		assert.match(
 			registration,
-			/const enum AppKitAdmission admission = admit_appkit\(\[NSApplication sharedApplication\]\);\s*if \(admission != AppKitAdmitted\) \{[\s\S]*?return 65;/
+			/const enum AppKitAdmission admission = admit_appkit\(application\);\s*if \(admission != AppKitAdmitted\) \{[\s\S]*?return 65;/
 		);
 		assert.doesNotMatch(receiver, /\bTransformProcessType\s*\(/);
 		const appkitStart = receiver.indexOf('static enum AppKitAdmission admit_appkit(');
@@ -431,7 +431,7 @@ check('owned receiver uses guarded AppKit accessory admission without front acti
 		path.join(ROOT, 'tools/diagnostics/native_appleevent_probe_receiver.c'),
 		'utf8'
 	);
-	assert.match(receiver, /admit_appkit\(\[NSApplication sharedApplication\]\)/);
+	assert.match(receiver, /admit_appkit\(application\)/);
 	assert.doesNotMatch(receiver, /kProcessTransformToUIElementApplication/);
 	assert.doesNotMatch(receiver, /SetFrontProcess\s*\(|ShowHideProcess\s*\(|NSApplicationLoad\s*\(/);
 	const registration = receiver.slice(
@@ -757,6 +757,46 @@ check('owned AppKit readiness diagnosis preserves native enum and refusal author
 	assert.match(helper, /registration\.get\("phase"\) == "appkit-admission"/);
 	assert.match(helper, /registration_appkit_reason=\{registration\['appkit_reason'\]\}/);
 	assert.match(helper, /observation\.si_code == os\.CLD_EXITED and observation\.si_status == 65/);
+});
+
+check('refused AppKit policy snapshots never grant readiness', () => {
+	const receiver = fs.readFileSync(
+		path.join(ROOT, 'tools/diagnostics/native_appleevent_probe_receiver.c'),
+		'utf8'
+	);
+	const helper = fs.readFileSync(
+		path.join(ROOT, 'tools/diagnostics/macos_brew_archive_acceptance.py'),
+		'utf8'
+	);
+	const registration = receiver.slice(
+		receiver.indexOf('ProcessSerialNumber serial;'),
+		receiver.indexOf('const AEEventHandlerUPP handler')
+	);
+	assert.match(registration, /NSApplication \*application = \[NSApplication sharedApplication\];/);
+	assert.ok(
+		registration.indexOf('appkit_policy_label([application activationPolicy])') <
+			registration.indexOf('admit_appkit(application)')
+	);
+	assert.match(
+		registration,
+		/if \(admission == AppKitPolicyRefused\) \{[\s\S]*?APPKIT_POLICY\/1 initial=%s after=%s\\n[\s\S]*?appkit_policy_label\(\[application activationPolicy\]\)/
+	);
+	for (const name of ['Regular', 'Accessory', 'Prohibited'])
+		assert.match(
+			receiver,
+			new RegExp(
+				'case NSApplicationActivationPolicy' + name + ': return "' + name.toLowerCase() + '";'
+			)
+		);
+	assert.match(receiver, /default: return "unrecognized";/);
+	assert.match(helper, /if appkit\[2\] is not None:\s*if appkit\[1\] != b"2":\s*return \{\}/);
+	assert.match(helper, /"appkit_initial_policy": appkit\[2\]\.decode\("ascii"\)/);
+	assert.match(helper, /"appkit_after_no_policy": appkit\[3\]\.decode\("ascii"\)/);
+	assert.match(helper, /observation\.si_code == os\.CLD_EXITED and observation\.si_status == 65/);
+	assert.doesNotMatch(
+		registration,
+		/finishLaunching|NSApplicationLoad|SetFrontProcess|activateIgnoringOtherApps/
+	);
 });
 
 if (failures > 0) {
