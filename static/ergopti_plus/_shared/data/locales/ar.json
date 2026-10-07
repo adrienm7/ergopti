@@ -1988,6 +1988,7 @@
 	"sg_actions.app_previous": "⇥ التطبيق السابق — كل الشاشات",
 	"sg_actions.app_previous_screen": "⇥ التطبيق السابق — هذه الشاشة",
 	"sg_actions.app_switcher": "⇥ Alt+Tab الخاص بالنظام",
+	"sg_actions.system_app_switcher": "⇥ Alt+Tab الخاص بالنظام",
 	"sg_actions.app_window_previous": "◱ → النافذة التالية، بدون مبدّل (Alt+Esc)",
 	"sg_actions.arrow_down": "↓ سهم لأسفل",
 	"sg_actions.arrow_left": "← سهم لليسار",
