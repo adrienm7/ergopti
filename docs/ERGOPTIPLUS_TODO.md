@@ -3220,6 +3220,11 @@ WP3 prerequisite: the actual macOS physical accounting owner now requires exact 
   cleanup are exempt from automatic deletion migrations and remain on disk
   until that cleanup (site 112).
 
+  Linux and macOS filesystem modules now expose their genuine initializer
+  identity and seven original function or nil identities through a pure tuple.
+  Existing I/O, acknowledgement and lock bodies remain byte-exact. The consuming
+  closed schema/session fences and native qualification remain pending.
+
   Carried Script action parameters are now judged again by the existing genuine
   publication on every late read on Windows, macOS and Linux. A proved retired
   value is neutral and reported once; the raw source and inverse snapshot remain.
