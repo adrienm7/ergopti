@@ -1,0 +1,16 @@
+# tools/test/fixtures/windows-upgrade-profile.toml
+# The released schema-6 owner has genuine string Metrics shortcut settings.
+[_meta]
+schema_version = 6
+
+[script]
+locale = "en"
+show_error_dialog = false
+
+# retained installed dashboard bindings
+[metrics]
+enabled = false
+metrics_enabled = false
+metrics_shortcut_typing = "Ctrl+Alt+M" # retained typing
+metrics_shortcut_apps = "Ctrl+Alt+A" # retained apps
+future_dashboard = { keep = 9, enabled = false } # retained foreign extension

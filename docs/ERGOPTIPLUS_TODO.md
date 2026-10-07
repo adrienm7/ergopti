@@ -5390,6 +5390,25 @@ two native-exit cases and 1000 ms runtime/5000 ms observer bounds remain intact.
 Fifteen extracted-census recording controls pass locally. Actual Win32 cause
 and native requalification remain unobserved; this diagnostic closes no item.
 
+Windows installed acceptance now requires a real published prior executable
+(v0.0.0-dev.155, pinned size/digest and two actual embedded assets), its
+installed schema-6 profile, then two exact current compiled boots over that
+same installation. Each current process must acknowledge the existing boot
+full-save generation through the production collector/WAL before readiness
+and exit. Both receipts report one shared native runtime identity; installed
+build/source-run product decisions retain their existing owner. Unknown retired Metrics values, comments and typed foreign records
+must survive; exact nonce/PID/package/bundle, clean output and acknowledged
+native process-tree retirement remain mandatory in the final Windows verdict.
+Independent source review and portable refusal/producer controls pass. The
+prior executable's actual embedded script forces its own installed bundle,
+without a checkout-root fallback. Its original serializer can discard comments;
+the fixture observes its real schema-6 profile first, after native tree closure,
+then records an explicit offline user edit of the retained comment rows. Every
+other installed byte and semantic value stays unchanged. Native before-edit
+and actual edited images are retained with a strict hash-linked boundary; the
+old executable is not claimed to preserve comments. Genuine Windows compiled execution remains
+unexecuted at this checkpoint; other-driver final acceptance is still open.
+
 - [ ] **73.** Partial: Windows combination families and pairs already use
       the canonical translated tap-hold key labels; macOS now resolves both
       physical keys through the same catalogue and invalidates its picker
