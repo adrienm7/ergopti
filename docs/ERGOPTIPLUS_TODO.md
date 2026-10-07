@@ -6499,6 +6499,17 @@ all original source pins, requirements and assertions stay intact. Actual
 Flatpak build/package/installation receiving is pending. This Linux-only
 catalogue/generator region is owned by group6; other fields remain unchanged.
 
+Manual37695878081 at2cbcea144 passes shared checks, Linux11,644 unit assertions
+and all157 E2E steps, including genuine Nix. Package refuses before the Kerberos
+build because Flatpak's implicit Autotools bootstrap requires an autogen script
+that the pinned upstream does not provide. Installation and Release are skipped.
+The generator now declares explicit SDK commands for autoreconf, configuration,
+build and installation under/app; the original source pin, disabled static/rpath
+and bundled-verto choices, GSSAPI requirement and installed-library checks remain.
+Actual host-source compilation/install passes with physical closure; it does not
+qualify the Flatpak SDK. The independent recipe regression fails before this
+repair. Native package/installation receiving on the repaired source is pending.
+
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard
   layers on all three drivers. Windows and macOS also support their existing

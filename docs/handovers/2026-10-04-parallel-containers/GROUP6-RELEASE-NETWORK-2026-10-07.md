@@ -319,15 +319,20 @@ propagation without borrowing a failed prerequisite as a successful native
 receipt. Complete Linux E2E/package/install receiving is still required.
 
 The feature's84 atomic commits are integrated without squash at091743921.
-Manual37688807101 receives that exact SHA on all three OS lanes without Release.
-Its terminal result is still pending; group6 retains its integration lock.
+Manual37688807101 receives that exact SHA on all three OS lanes without Release
+and completes with the failures recorded below. Group6 releases its owned
+lock0c66f2c88 after the terminal result at22:16UTC; subsequent feature
+validation does not reserve the integration phase.
 
 A subsequent observational correction routes the existing closed Windows service
 diagnostic through \_TestPrint, the canonical native TAP receipt writer. CI reads
 and prints that transcript only after the AHK process exits; console-only
 FileAppend output is not a reliable channel for this process. The admitted
 stage/kind/HRESULT values and all original native assertions/clocks remain
-unchanged. The change has no native repair or receiving credit yet.
+unchanged. Manual37690927221 receives exactlyc00cec629 and completes with
+10,268 Windows passes/four failures, unchanged from the preceding native run.
+No admitted service-stage notice is emitted. The channel change therefore has
+no demonstrated native repair credit, and the lower causes remain unknown.
 
 ## Remaining CODE and hosted work
 
@@ -354,6 +359,23 @@ GSS requirement stays enabled and its native prefix is explicitly/app. Missing
 or malformed Kerberos pins are refused. The independent recipe regression fails
 before the fix and passes afterward; complete native Flatpak receiving remains
 required. Other catalogue fields and all historical requirements stay intact.
+
+Manual37695878081 receives exactly2cbcea144 and is terminal FAIL. Shared checks,
+11,644 Linux unit assertions and all157 E2E steps pass, including genuine Nix.
+Package stops at network-krb5 before configuration: the upstream Git source
+has no autogen, autogen.sh or bootstrap script for Flatpak's implicit Autotools
+mode. Installation and Release are skipped. The repaired module instead uses
+explicit SDK commands for autoreconf, configure with prefix/app, build and
+installation. Source pins, library checks, required GSSAPI and all other modules
+remain unchanged; full native package/install qualification is pending.
+
+The same pinned MIT Kerberos source is actually autoreconf-generated, configured,
+compiled and installed in the host container under a private prefix. The original
+disable-static, disable-rpath and without-system-verto choices are preserved.
+Installed krb5-config reports1.22.2 and the expected GSS libraries; the owned phase
+ends with status0, no signal/error and no retained physical debt. Initial isolated
+Autoconf relocation failures are retained separately. This host-source PASS does
+not prove the Flatpak SDK build, recipient trust or authenticated Kerberos traffic.
 
 - **Windows62:** Join one packaged owned curl attempt engine to both the real
   request consumer and artifact staging producer. Bare NTLM-only CONNECT must
