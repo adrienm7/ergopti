@@ -3,6 +3,7 @@
 """Compile the fixed native query product and seal its final signed CI provenance."""
 
 import argparse
+import base64
 import hashlib
 import importlib.util
 import json
@@ -11,6 +12,7 @@ from pathlib import Path
 import re
 import shutil
 import signal
+import stat
 import subprocess
 import sys
 import time
@@ -60,6 +62,159 @@ def context(root):
     return sha, run_id, attempt
 
 
+def public_sparkle_lock(raw):
+    """Permit diagnostic bytes only for the fixed public dependency schema."""
+
+    def unique(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("duplicate field")
+            result[key] = value
+        return result
+
+    try:
+        packet = json.loads(raw.decode("utf-8"), object_pairs_hook=unique)
+        if not isinstance(packet, dict) or type(packet.get("version")) is not int:
+            return None
+        version = packet["version"]
+        if version == 2:
+            if set(packet) != {"pins", "version"}:
+                return None
+        elif version == 3:
+            if set(packet) != {"originHash", "pins", "version"}:
+                return None
+            if not isinstance(packet["originHash"], str) or not re.fullmatch(
+                "[0-9a-f]{64}", packet["originHash"]
+            ):
+                return None
+        else:
+            return None
+        pins = packet["pins"]
+        if not isinstance(pins, list) or len(pins) != 1:
+            return None
+        pin = pins[0]
+        if not isinstance(pin, dict) or set(pin) != {"identity", "kind", "location", "state"}:
+            return None
+        if (pin["identity"], pin["kind"], pin["location"]) != (
+            "sparkle",
+            "remoteSourceControl",
+            "https://github.com/sparkle-project/Sparkle",
+        ):
+            return None
+        state = pin["state"]
+        if not isinstance(state, dict) or set(state) != {"revision", "version"}:
+            return None
+        if state["version"] != "2.9.2" or not isinstance(state["revision"], str):
+            return None
+        if not re.fullmatch("[0-9a-f]{40}", state["revision"]):
+            return None
+        return version
+    except (ValueError, UnicodeError, TypeError):
+        return None
+
+
+def current_lockfile_facts(root):
+    """Read only the fixed lockfile, with bounded no-follow stable-file custody."""
+    path = root / LAUNCHER / "Package.resolved"
+    facts = {"path": LAUNCHER + "Package.resolved", "status": "read_refused"}
+    descriptor = None
+    try:
+        before_path = path.lstat()
+        if not stat.S_ISREG(before_path.st_mode):
+            facts["status"] = "nonregular"
+            return facts
+        descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        before = os.fstat(descriptor)
+        if not stat.S_ISREG(before.st_mode):
+            facts["status"] = "nonregular"
+            return facts
+        if before.st_size > 16384:
+            facts.update(status="oversized", byte_count=before.st_size)
+            return facts
+        raw = bytearray()
+        while len(raw) <= 16384:
+            part = os.read(descriptor, min(4096, 16385 - len(raw)))
+            if not part:
+                break
+            raw.extend(part)
+        after = os.fstat(descriptor)
+        after_path = path.lstat()
+
+        def identity(info):
+            return (
+                info.st_dev,
+                info.st_ino,
+                info.st_mode,
+                info.st_size,
+                info.st_mtime_ns,
+                info.st_ctime_ns,
+            )
+
+        if not (
+            identity(before_path) == identity(before) == identity(after) == identity(after_path)
+        ):
+            facts["status"] = "changed"
+            return facts
+        if len(raw) > 16384 or len(raw) != after.st_size:
+            facts["status"] = "changed"
+            return facts
+        raw = bytes(raw)
+        schema = public_sparkle_lock(raw)
+        facts.update(
+            status="stable",
+            byte_count=len(raw),
+            sha256=hashlib.sha256(raw).hexdigest(),
+            public_sparkle_schema=schema,
+        )
+        if schema is not None:
+            facts["validated_public_bytes_base64"] = base64.b64encode(raw).decode("ascii")
+        return facts
+    except FileNotFoundError:
+        facts["status"] = "absent"
+        return facts
+    except (OSError, ValueError, OverflowError):
+        return facts
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+
+
+def census_refusal_facts(root, sha, expected, actual):
+    """Failure-only facts confer no compiler, source, or receipt admission."""
+    try:
+        missing = sorted(expected - actual)
+        # Missing names come only from the committed observer input cohort.
+        names = [
+            name
+            for name in missing
+            if len(name) <= 240
+            and re.fullmatch(r"static/ergopti_plus/macos/launcher/[A-Za-z0-9_./+-]+", name)
+        ]
+        packet = {
+            "schema": 1,
+            "source_sha": sha,
+            "expected_count": len(expected),
+            "actual_count": len(actual),
+            "missing_count": len(missing),
+            "missing_paths": names[:128],
+            "missing_paths_complete": len(names) == len(missing) and len(names) <= 128,
+            "extra_count": len(actual - expected),
+            "only_root_lockfile_extra": actual - expected == {LAUNCHER + "Package.resolved"},
+            "root_lockfile_expected": LAUNCHER + "Package.resolved" in expected,
+            "root_lockfile_observed": LAUNCHER + "Package.resolved" in actual,
+            "lockfile": current_lockfile_facts(root),
+        }
+        print(
+            "Automation query publisher census refusal facts: "
+            + json.dumps(packet, sort_keys=True, separators=(",", ":")),
+            file=sys.stderr,
+        )
+    except Exception:
+        # Reporting must never replace the original strict census refusal.
+        pass
+
+
 def snapshot(root, sha):
     # Use the observer's exact input set, not a caller-supplied census.
     observer_path = "tools/diagnostics/program_actions/run_signed_query_probe.py"
@@ -82,6 +237,8 @@ def snapshot(root, sha):
                 "Package.resolved",
             }:
                 actual.add(path.relative_to(root).as_posix())
+    if actual != expected or not expected:
+        census_refusal_facts(root, sha, expected, actual)
     require(actual == expected and bool(expected), "native_input_census_mismatch")
     hashes = {}
     for relative in paths:

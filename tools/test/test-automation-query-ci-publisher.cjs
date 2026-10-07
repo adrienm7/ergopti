@@ -122,8 +122,8 @@ assert(
 	result.stderr || 'publisher controls failed'
 );
 assert(
-	/Ran 18 tests in /.test(result.stderr) && /\nOK\s*$/.test(result.stderr),
-	'all 18 independent controlled publisher cases execute'
+	/Ran 28 tests in /.test(result.stderr) && /\nOK\s*$/.test(result.stderr),
+	'all 28 independent controlled publisher cases execute'
 );
 console.log(
 	'[OK] query CI publisher keeps complete compiler provenance and immutable nested signature; native CI unrun'
