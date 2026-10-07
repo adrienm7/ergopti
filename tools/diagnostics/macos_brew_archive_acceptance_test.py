@@ -917,6 +917,46 @@ class AppleEventTerminalControls(unittest.TestCase):
         observed = SimpleNamespace(si_pid=73136, si_code=probe.os.CLD_EXITED, si_status=status)
         return children, receiver, group, observed
 
+    def test_closed_appkit_policy_observation_preserves_refusal_and_availability(self):
+        for before, after, expected in (("1/1", "1/1", True), ("0/3", "0/3", False)):
+            with self.subTest(before=before):
+                children, receiver, group, observed = self.world()
+                errors = f"Owned AppleEvent recipient AppKit admission refused (reason 2; before {before}; after {after}).\n".encode()
+                with patch.object(probe, "_appleevent_capture", return_value=(b"", errors)):
+                    packet = probe._appleevent_terminal_packet(children, receiver, group, observed)
+                self.assertEqual(packet["si_status"], 65)
+                self.assertIsNone(receiver.returncode)
+                self.assertFalse(group.reaped)
+                self.assertEqual(packet["stderr_phase"], "appkit-policy")
+                self.assertIsNone(packet["stderr_osstatus"])
+                self.assertEqual(
+                    packet["appkit_policy"],
+                    {
+                        "reason": 2,
+                        "before_available": expected,
+                        "before_policy": 1 if expected else 3,
+                        "after_available": expected,
+                        "after_policy": 1 if expected else 3,
+                    },
+                )
+                self.assertEqual(packet["stderr_sha256"], hashlib.sha256(errors).hexdigest())
+        children, receiver, group, observed = self.world()
+        for malformed in (
+            b"Owned AppleEvent recipient AppKit admission refused (reason 2; before 1/3; after 0/3).\n",
+            b"Owned AppleEvent recipient AppKit admission refused (reason 2; before 0/1; after 0/3).\n",
+        ):
+            with patch.object(probe, "_appleevent_capture", return_value=(b"", malformed)):
+                with self.assertRaises(probe.AdmissionError):
+                    probe._appleevent_terminal_packet(children, receiver, group, observed)
+        for private in (
+            b"Owned AppleEvent recipient AppKit admission refused (reason 2; before 1/1; after 1/1).\nPRIVATE\n",
+            b"Owned AppleEvent recipient AppKit admission refused (reason 2; before 1/1; after 1/1)!\n",
+        ):
+            with patch.object(probe, "_appleevent_capture", return_value=(b"", private)):
+                packet = probe._appleevent_terminal_packet(children, receiver, group, observed)
+            self.assertEqual(packet["stderr_phase"], "unclassified")
+            self.assertNotIn("appkit_policy", packet)
+
     def test_current_process_and_transform_registration_refusals_remain_distinct(self):
         for stage, phase in (
             ("current-process", "registration-current-process"),

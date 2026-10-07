@@ -147,7 +147,34 @@ def _validate_appleevent_terminal(packet):
         "stderr_osstatus",
         "capture_status",
     }
-    require(type(packet) is dict and set(packet) == keys, "Unadmitted native terminal fact")
+    require(type(packet) is dict, "Unadmitted native terminal fact")
+    appkit = packet.get("appkit_policy")
+    require(
+        set(packet) == keys or (appkit is not None and set(packet) == keys | {"appkit_policy"}),
+        "Unadmitted native terminal fact",
+    )
+    if appkit is not None:
+        require(
+            type(appkit) is dict
+            and set(appkit)
+            == {"reason", "before_available", "before_policy", "after_available", "after_policy"}
+            and type(appkit["reason"]) is int
+            and 1 <= appkit["reason"] <= 3,
+            "Unadmitted AppKit policy observation",
+        )
+        for stage in ("before", "after"):
+            available = appkit[stage + "_available"]
+            policy = appkit[stage + "_policy"]
+            require(
+                type(available) is bool
+                and type(policy) is int
+                and ((available and policy in (0, 1, 2)) or (not available and policy == 3)),
+                "Unavailable AppKit policy cannot publish an invented state",
+            )
+    require(
+        (packet["stderr_phase"] == "appkit-policy") == (appkit is not None),
+        "AppKit observation and phase differ",
+    )
     require(type(packet["schema"]) is int and packet["schema"] == 1, "Invalid terminal schema")
     require(type(packet["si_pid"]) is int and packet["si_pid"] > 0, "Invalid terminal child")
     require(
@@ -183,6 +210,7 @@ def _validate_appleevent_terminal(packet):
             "registration",
             "registration-current-process",
             "registration-transform",
+            "appkit-policy",
             "handler",
             "receipt",
             "dispatch",
@@ -324,6 +352,24 @@ def _appleevent_terminal_packet(children, receiver, group, observation):
     )
     if match is not None and -(2**31) <= int(match[2]) < 2**31:
         phase, status = lines[match[1]], int(match[2])
+    appkit_match = (
+        re.fullmatch(
+            rb"Owned AppleEvent recipient AppKit admission refused \(reason ([1-3]); before ([01])/([0-3]); after ([01])/([0-3])\)\.\n",
+            errors,
+        )
+        if available
+        else None
+    )
+    appkit_policy = None
+    if appkit_match is not None:
+        phase = "appkit-policy"
+        appkit_policy = {
+            "reason": int(appkit_match[1]),
+            "before_available": appkit_match[2] == b"1",
+            "before_policy": int(appkit_match[3]),
+            "after_available": appkit_match[4] == b"1",
+            "after_policy": int(appkit_match[5]),
+        }
     packet = {
         "schema": 1,
         "si_pid": observation.si_pid,
@@ -337,6 +383,8 @@ def _appleevent_terminal_packet(children, receiver, group, observation):
         "stderr_phase": phase,
         "stderr_osstatus": status,
     }
+    if appkit_policy is not None:
+        packet["appkit_policy"] = appkit_policy
     return _validate_appleevent_terminal(packet)
 
 
