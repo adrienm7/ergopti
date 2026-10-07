@@ -360,10 +360,146 @@ const linuxMenu = stripLineComments(
 	'.lua'
 );
 
+const linuxHook = stripLineComments(
+	read(path.join(SP, 'linux/adapters/keyboard_hook.lua')),
+	'.lua'
+);
+const linuxDaemon = stripLineComments(read(path.join(SP, 'linux/ergopti_hotstrings.lua')), '.lua');
+const linuxKeylogger = stripLineComments(
+	read(path.join(SP, 'linux/modules/keylogger/keylogger.lua')),
+	'.lua'
+);
+
+/**
+ * Reads a named Lua body between consecutive declarations; absence is never evidence.
+ * @param {string} source Comment-stripped source.
+ * @param {string} declaration Exact function declaration.
+ * @param {string} successor Next function declaration.
+ * @returns {string} Body, or empty when either boundary is absent.
+ */
+function luaBody(source, declaration, successor) {
+	const start = source.indexOf(declaration);
+	const end = source.indexOf(successor, start + declaration.length);
+	if (start < 0 || end < 0) return '';
+	const body = source.slice(start + declaration.length, end).trim();
+	return body.endsWith('end') ? body.slice(0, -3).trim() : '';
+}
+
+/**
+ * Checks the saved intent route through its original live input controller.
+ * @param {string[]} sources Manager, wrapper, owner, menu, Hook and bootstrap sources.
+ * @returns {boolean} Bounded saved admission without public input authority.
+ */
+function savedLinuxOneShotClosure(sources) {
+	const [manager, , , , hook, daemon, keylogger] = sources;
+	const bodies = {
+		tap: luaBody(
+			manager,
+			'local function _run_tap(action, binding)',
+			'local function _read_one_shot()'
+		),
+		build: luaBody(manager, 'local function _build(loaded, boot)', 'local function _load(boot)'),
+		init: luaBody(manager, 'function M.init(opts)', 'function M.reload()'),
+		frame: luaBody(
+			hook,
+			'local function _run_owned_tap_frame(frame, tap, binding, exact, original_generation, origin, origin_view, source, at_ms)',
+			'local function _dispatch_event(ev, source)'
+		),
+		runtime: luaBody(
+			hook,
+			'local function _input_runtime_current(ctx, active)',
+			'local function _input_guard_current(ctx)'
+		),
+		guard: luaBody(
+			hook,
+			'local function _input_guard_current(ctx)',
+			'local function _input_cleanup_current(ctx)'
+		),
+		capture: luaBody(
+			hook,
+			'function M.capture_input_owner()',
+			'function M.input_owner_current(lease)'
+		),
+		current: luaBody(
+			hook,
+			'function M.input_owner_current(lease)',
+			'function M.arm_one_shot(lease)'
+		),
+		arm: luaBody(hook, 'function M.arm_one_shot(lease)', 'local function _forward_raw(ev, source)')
+	};
+	if (Object.values(bodies).some((body) => body === '')) return false;
+	const assignment = bodies.build.match(
+		/actions = \{ is_assignable = function\(action\)([\s\S]*?)end \}/
+	)?.[1];
+	const capture = '_native_hook = package.loaded["adapters.keyboard_hook"]';
+	const managerAt = daemon.indexOf('require("modules.keylogger.keylogger")');
+	const hookAt = daemon.indexOf('require("adapters.keyboard_hook")');
+	return (
+		assignment?.trim().replace(/\s+/g, ' ') ===
+			'return action ~= "caps_word" and (action ~= "one_shot_shift" or _hook == _native_hook) and _tap_action_set()[action] == true' &&
+		bodies.init.includes(capture) &&
+		bodies.init.indexOf(capture) < bodies.init.indexOf('Logger.start(') &&
+		bodies.init.indexOf(capture) < bodies.init.indexOf('_load(true)') &&
+		manager.split('package.loaded["adapters.keyboard_hook"]').length === 2 &&
+		manager.includes('local _native_hook = nil') &&
+		managerAt >= 0 &&
+		hookAt > managerAt &&
+		daemon.indexOf('TapHold.init({') > hookAt &&
+		keylogger.includes('require("platform.remap.tap_hold_manager")') &&
+		bodies.tap.startsWith('if action == "one_shot_shift" then return "one_shot_shift" end') &&
+		!/(?:capture_input_owner|input_owner_current|arm_one_shot)\s*\(/.test(manager) &&
+		bodies.frame.includes('origin_view.origin == "native-evdev" and _remapper_input_owner') &&
+		bodies.frame.includes('origin_view.source == source') &&
+		bodies.frame.includes('callback = _on_tap, at_ms = at_ms') &&
+		bodies.frame.includes('local requested = callback(action, selected)') &&
+		bodies.frame.includes('requested ~= "one_shot_shift" or action ~= tap') &&
+		bodies.frame.includes('local lease = original_input_hook_ports.capture_input_owner()') &&
+		bodies.frame.includes(
+			'if not lease or original_input_hook_ports.input_owner_current(lease) ~= true then return false end'
+		) &&
+		bodies.frame.includes('return original_input_hook_ports.arm_one_shot(lease) == true') &&
+		bodies.frame.includes('and original_input_hook_ports.input_owner_current(lease) == true') &&
+		!/M\.(?:capture_input_owner|input_owner_current|arm_one_shot)\s*\(/.test(bodies.frame) &&
+		hook.includes(
+			'local INPUT_HOOK_PORT_NAMES = { "capture_input_owner", "input_owner_current", "arm_one_shot", "set_remapper", "stop", "emergency_stop", "key_text" }'
+		) &&
+		hook.includes(
+			'for _, name in ipairs(INPUT_HOOK_PORT_NAMES) do original_input_hook_ports[name] = rawget(M, name) end'
+		) &&
+		bodies.runtime.includes('active and _live_input_context ~= ctx') &&
+		bodies.runtime.includes('_remapper_generation ~= ctx.generation') &&
+		bodies.runtime.includes('_on_tap ~= ctx.callback') &&
+		bodies.runtime.includes('_physical_sources[ctx.source] ~= true') &&
+		bodies.runtime.includes('port ~= original_input_hook_ports[name]') &&
+		bodies.runtime.includes('rawget(M, name) ~= port') &&
+		bodies.runtime.includes(
+			'_input_reader_ports.source_current(ctx.origin, ctx.sources[keyboard_slot(ctx.source)]'
+		) &&
+		bodies.runtime.includes('rawget(ctx.broker, "output_current") ~= ctx.output_current') &&
+		bodies.runtime.includes('output.writer, name) ~= port') &&
+		bodies.guard.includes('local checked, configured = pcall(ctx.guard)') &&
+		bodies.guard.includes('configured ~= true or not _input_runtime_current(ctx, false)') &&
+		bodies.guard.includes('view.busy == false and view.debt == false') &&
+		bodies.guard.includes('debt == false and output_ok and output == true') &&
+		bodies.capture.includes('_input_runtime_current(ctx, true)') &&
+		bodies.capture.includes(
+			'pcall(_input_ports.capture_input_guard, ctx.issuer, ctx.frame, ctx.action)'
+		) &&
+		bodies.capture.includes('local lease = {}; ctx.lease = lease; _input_leases[lease] = ctx') &&
+		bodies.current.includes('getmetatable(lease) ~= nil or next(lease) ~= nil') &&
+		bodies.current.includes('and _input_guard_current(ctx)') &&
+		bodies.arm.includes('ctx.used or ctx.arming') &&
+		bodies.arm.includes(
+			'local function current() return _input_runtime_current(ctx, not ctx.used) and _input_guard_current(ctx) end'
+		) &&
+		bodies.arm.includes('pcall(_input_ports.arm_one_shot, ctx.issuer, ctx.at_ms, current)')
+	);
+}
+
 /**
  * Checks actual declaration and dispatch boundaries, including unavailable modes.
  * @param {object} declaration Canonical shared manifest.
- * @param {string[]} sources Manager, wrapper, owner and menu source bytes.
+ * @param {string[]} sources Manager, wrapper, owner, menu, Hook and bootstrap source bytes.
  * @returns {boolean} Exact ordered Linux admission, never a chord claim.
  */
 function orderedLinuxAdmission(declaration, sources) {
@@ -388,13 +524,24 @@ function orderedLinuxAdmission(declaration, sources) {
 		wrapper.includes('current.source == receipt.source') &&
 		wrapper.includes('function result.admit(') &&
 		wrapper.includes('function owner.begin_delivery(') &&
-		manager.includes('action ~= "one_shot_shift" and action ~= "caps_word"') &&
+		taps.every(
+			(item) => (item.recommended_per_platform?.linux ?? item.recommended) !== 'one_shot_shift'
+		) &&
+		savedLinuxOneShotClosure(sources) &&
 		menu.includes('KeyCatalog.of_hand(keys,hand)') &&
 		menu.includes('Shared.pair(first.id,second.id)') &&
 		menu.includes('Scope.edit(rows,ctx.is_paused,source)')
 	);
 }
-const linuxSources = [linuxManager, linuxPairs, linuxOwner, linuxMenu];
+const linuxSources = [
+	linuxManager,
+	linuxPairs,
+	linuxOwner,
+	linuxMenu,
+	linuxHook,
+	linuxDaemon,
+	linuxKeylogger
+];
 if (!orderedLinuxAdmission(manifest, linuxSources)) {
 	errors.push(
 		'Linux ordered combinations need their real shared/native source-fenced engine and truthful mode limits'
@@ -406,13 +553,70 @@ for (const [index, token] of [
 	[0, 'require("platform.remap.key_combination_engine")'],
 	[1, 'receipt.physical == true'],
 	[1, 'current.source == receipt.source'],
-	[0, 'action ~= "one_shot_shift" and action ~= "caps_word"'],
+	[0, 'action ~= "caps_word"'],
 	[3, 'Scope.edit(rows,ctx.is_paused,source)']
 ]) {
 	const changed = linuxSources.slice();
 	changed[index] = changed[index].replace(token, 'OMITTED_BOUNDARY');
 	if (orderedLinuxAdmission(manifest, changed))
 		errors.push('Linux ordered admission accepted a missing native/source boundary');
+}
+// Each new saved-route boundary must independently remain necessary.
+for (const [index, token] of [
+	[0, '_hook == _native_hook'],
+	[0, '_tap_action_set()[action] == true'],
+	[0, '_native_hook = package.loaded["adapters.keyboard_hook"]'],
+	[0, 'if action == "one_shot_shift" then return "one_shot_shift" end'],
+	[0, 'function M.init(opts)'],
+	[4, 'origin_view.origin == "native-evdev" and _remapper_input_owner'],
+	[4, 'origin_view.source == source'],
+	[4, 'callback = _on_tap, at_ms = at_ms'],
+	[4, 'local requested = callback(action, selected)'],
+	[4, 'requested ~= "one_shot_shift" or action ~= tap'],
+	[4, 'local lease = original_input_hook_ports.capture_input_owner()'],
+	[
+		4,
+		'if not lease or original_input_hook_ports.input_owner_current(lease) ~= true then return false end'
+	],
+	[4, 'return original_input_hook_ports.arm_one_shot(lease) == true'],
+	[4, 'and original_input_hook_ports.input_owner_current(lease) == true'],
+	[4, '"stop", "emergency_stop", "key_text"'],
+	[
+		4,
+		'for _, name in ipairs(INPUT_HOOK_PORT_NAMES) do original_input_hook_ports[name] = rawget(M, name) end'
+	],
+	[4, 'active and _live_input_context ~= ctx'],
+	[4, '_remapper_generation ~= ctx.generation'],
+	[4, '_on_tap ~= ctx.callback'],
+	[4, '_physical_sources[ctx.source] ~= true'],
+	[4, 'port ~= original_input_hook_ports[name]'],
+	[4, 'rawget(M, name) ~= port'],
+	[4, '_input_reader_ports.source_current(ctx.origin, ctx.sources[keyboard_slot(ctx.source)]'],
+	[4, 'rawget(ctx.broker, "output_current") ~= ctx.output_current'],
+	[4, 'output.writer, name) ~= port'],
+	[4, 'local checked, configured = pcall(ctx.guard)'],
+	[4, 'configured ~= true or not _input_runtime_current(ctx, false)'],
+	[4, 'view.busy == false and view.debt == false'],
+	[4, 'debt == false and output_ok and output == true'],
+	[4, 'pcall(_input_ports.capture_input_guard, ctx.issuer, ctx.frame, ctx.action)'],
+	[4, 'local lease = {}; ctx.lease = lease; _input_leases[lease] = ctx'],
+	[4, 'getmetatable(lease) ~= nil or next(lease) ~= nil'],
+	[4, 'ctx.used or ctx.arming'],
+	[
+		4,
+		'local function current() return _input_runtime_current(ctx, not ctx.used) and _input_guard_current(ctx) end'
+	],
+	[4, 'pcall(_input_ports.arm_one_shot, ctx.issuer, ctx.at_ms, current)'],
+	[5, 'require("modules.keylogger.keylogger")'],
+	[5, 'TapHold.init({'],
+	[6, 'require("platform.remap.tap_hold_manager")']
+]) {
+	const changed = linuxSources.slice();
+	if (!changed[index].includes(token))
+		errors.push(`Missing saved-route omission subject: ${token}`);
+	changed[index] = changed[index].replace(token, 'OMITTED_SAVED_BOUNDARY');
+	if (orderedLinuxAdmission(manifest, changed))
+		errors.push(`Linux saved OneShot admission accepted an omitted boundary: ${token}`);
 }
 const unsupported = structuredClone(manifest);
 unsupported.menu.shortcuts_menu.find((row) => row.id === 'key_combinations').platforms = [
@@ -428,6 +632,20 @@ unavailableTap.feature_records.find(
 ).recommended_per_platform.linux = 'caps_word';
 if (orderedLinuxAdmission(unavailableTap, linuxSources))
 	errors.push('Linux must not recommend an undispatched native-only pair tap');
+for (const inherited of [false, true]) {
+	const unavailableOneShot = structuredClone(manifest);
+	const tap = unavailableOneShot.feature_records.find(
+		(row) =>
+			row.section_path === 'shortcuts.key_combination_taps' && row.id === 'alt_gr_then_left_alt'
+	);
+	if (inherited) {
+		tap.recommended = 'one_shot_shift';
+		delete tap.recommended_per_platform;
+	} else
+		tap.recommended_per_platform = { ...tap.recommended_per_platform, linux: 'one_shot_shift' };
+	if (orderedLinuxAdmission(unavailableOneShot, linuxSources))
+		errors.push('Linux saved OneShot input intent must not open a public recommendation');
+}
 for (const locale of locales) {
 	if (
 		typeof locale.data[combinations?.reason_key] !== 'string' ||

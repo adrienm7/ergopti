@@ -68,7 +68,7 @@ local INPUT_OUTPUT_PORT_NAMES = { "capture_output", "capture_output_observer", "
 	"transaction_emit", "dispatch_transaction", "commit_transaction", "retire_transaction", "close_owned" }
 local InputIssuer = require("platform.remap.key_combination_engine")
 local original_input_hook_ports = {}
-local INPUT_HOOK_PORT_NAMES = { "capture_input_owner", "input_owner_current", "arm_one_shot", "set_remapper", "stop", "emergency_stop" }
+local INPUT_HOOK_PORT_NAMES = { "capture_input_owner", "input_owner_current", "arm_one_shot", "set_remapper", "stop", "emergency_stop", "key_text" }
 local INPUT_PORT_NAMES = { "capture_input_owner", "input_owner_current", "capture_input_guard", "arm_one_shot", "input_owner_state", "clear_input_arm" }
 local _input_ports = {}
 for _, name in ipairs(INPUT_PORT_NAMES) do _input_ports[name] = rawget(InputIssuer, name) end
@@ -949,6 +949,7 @@ end
 --- @param at_ms number Original event time.
 local function _run_owned_tap_frame(frame, tap, binding, exact, original_generation, origin, origin_view, source, at_ms)
 	if tap and _on_tap then
+		local callback = _on_tap
 		local prior = _live_input_context
 		_live_input_context = nil
 		if tap == "one_shot_shift" and origin_view and origin_view.source == source
@@ -972,7 +973,18 @@ local function _run_owned_tap_frame(frame, tap, binding, exact, original_generat
 				output_view = rawget(_broker, "view"), output_debt = rawget(_broker, "has_debt"),
 				output_current = rawget(_broker, "output_current"), output_retired = _input_output_owner and _input_output_owner.terminal }
 		end
-		frame.run(_on_tap, _combination_source(source))
+		if tap == "one_shot_shift" then
+			-- The action callback returns semantic intent only. Retain construction
+			-- originals: a late Manager snapshot of public ports is not an issuer.
+			frame.run(function(action, selected)
+				local requested = callback(action, selected)
+				if requested ~= "one_shot_shift" or action ~= tap then return false end
+				local lease = original_input_hook_ports.capture_input_owner()
+				if not lease or original_input_hook_ports.input_owner_current(lease) ~= true then return false end
+				return original_input_hook_ports.arm_one_shot(lease) == true
+					and original_input_hook_ports.input_owner_current(lease) == true
+			end, _combination_source(source))
+		else frame.run(callback, _combination_source(source)) end
 		_live_input_context = prior
 	end
 end

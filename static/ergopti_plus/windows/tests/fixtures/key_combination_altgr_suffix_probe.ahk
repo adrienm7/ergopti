@@ -244,7 +244,12 @@ ProbeObservePhase(PobStage, PobErrorKind := 0, PobErrorSource := 0, PobErrorLine
 			. "|" . (ProbeEnabled ? 1 : 2) . "|" . ProbeObservationSerial . "|" . PobStage
 			. "|" . ProbeObservationScenario . "|" . ProbeOwned.Count . "|" . PobErrorKind
 			. "|" . PobErrorSource . "|" . PobErrorLine . "|" . PobExitCode . "`n"
-		FileAppend(PobRow, A_Args[1] . ".observation", "UTF-8-RAW")
+		; FileAppend excludes all sharing and conflicts with the parent's identity pin.
+		PobStream := FileOpen(A_Args[1] . ".observation", "a-d", "UTF-8-RAW")
+		try {
+			if PobStream.Write(PobRow) != StrLen(PobRow)
+				throw Error("Incomplete observation append")
+		} finally PobStream.Close()
 	} catch Any {
 		; Optional observation refusal cannot replace any original effect or verdict.
 		ProbeObservationFailed := true

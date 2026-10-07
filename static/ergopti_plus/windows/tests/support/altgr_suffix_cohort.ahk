@@ -376,6 +376,7 @@ _KCT_ObservationFacts(KctText, KctPid, KctNonce, KctMode, KctGeneration) {
 			|| KctFields[12] > 65535 || KctFields[13] > 0xFFFFFFFF
 			|| (!KctFields[11] && KctFields[12]) || (KctFields[11] && !KctFields[12])
 			|| (KctFields[7] != 14 && KctFields[13] != -1)
+			|| (KctFields[7] == 14 && KctIndex == 1)
 			|| ((KctFields[7] != 15 && KctFields[7] != 16) && (KctFields[10] || KctFields[11] || KctFields[12]))
 			return KctInvalid
 		KctThread := KctFields[3]

@@ -225,6 +225,7 @@ jobs:
           }
 
       - name: Run native desktop AHK cohorts
+        if: ${{ !cancelled() }}
         shell: pwsh
         timeout-minutes: 25
         run: ./tools/test/run-windows-native-desktop.ps1
