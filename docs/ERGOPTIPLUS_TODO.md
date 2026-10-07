@@ -2408,6 +2408,12 @@ These are software implementations; final hardware verification remains below.
   namespace is obsolete source data, preserved until explicit cleanup; it is
   not a current recommendation target. Do not assume deletion implements the
   recommendation.
+
+  The Windows cold-start fixture now includes the genuine parameter-status
+  loader before feature state, matching the real entry-point dependency order.
+  The original late Script publication assertion is retained. An actual
+  full-suite diagnostic identified the missing callable; exact-source native
+  replay remains required before qualifying this harness correction.
   At published `409b8ee0`, manual all-OS run 37476981548 is still in progress:
   Windows lifecycle capture fails with ENOBUFS before the full native suite;
   its engine E2E/package/install are skipped. macOS packaging has actual Sparkle
