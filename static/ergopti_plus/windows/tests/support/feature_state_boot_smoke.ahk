@@ -12,15 +12,6 @@
 #Requires AutoHotkey v2.0+
 #SingleInstance Off
 #NoTrayIcon
-; CI-only error channel: remove the optional final pair before native includes
-; and before the original fixture argument validation sees its unchanged inputs.
-global _FeatureStateCiErrorReceipt := ""
-if A_Args.Length == 3 && A_Args[1] == "script_late_parameter"
-		&& A_Args[A_Args.Length - 1] == "--ci-error-receipt" {
-	_FeatureStateCiErrorReceipt := A_Args[A_Args.Length]
-	A_Args.RemoveAt(A_Args.Length - 1, 2)
-}
-
 SetWorkingDir(A_ScriptDir)
 #Warn All, StdOut
 #Warn VarUnset, Off
@@ -28,7 +19,6 @@ SetWorkingDir(A_ScriptDir)
 ; Initialization failures must fail the headless harness instead of opening a
 ; modal dialog before the fixture's own exception boundary is reached.
 _FeatureStateSmokeFatal(Err, Mode) {
-	_FeatureStateCiWriteErrorReceipt(Err)
 	FileAppend("feature-state initialization failed: " . Err.Message . "`n" . Err.Stack . "`n", "*")
 	ExitApp(1)
 	return 1
@@ -48,6 +38,8 @@ global HSE_RepeatEnabled := true
 #Include ..\..\adapters\key_state.ahk
 #Include ..\..\infra\toml\toml_helpers.ahk
 #Include ..\..\infra\manifest_reader.ahk
+; The getter consumes the actual configuration-owner binding policy.
+#Include ..\..\infra\toml\toml_config_loader.ahk
 #Include ..\..\infra\feature_state.ahk
 ; A second ordinary include must not reset the already published data owner.
 TapKeyAssignments["feature_state_include_once_probe"] := "none"
@@ -123,7 +115,6 @@ try {
             throw Error("unknown startup fixture: " . A_Args[1])
     }
 } catch as Err {
-	_FeatureStateCiWriteErrorReceipt(Err)
     try FileAppend("feature-state boot smoke failed: " . Err.Message . "`n" . Err.Stack . "`n", "*")
     ExitApp(1)
 }
@@ -471,22 +462,5 @@ _FeatureStateSmokeScriptLateParameter() {
 		GestureActionParameters := IsSet(PreviousParameters) ? PreviousParameters : unset
 		ConfigurationFile := IsSet(PreviousFile) ? PreviousFile : unset
 		try FileDelete(Path)
-	}
-}
-
-; The parent owns the empty CREATE_NEW file. Diagnostic errors cannot replace
-; the original exception, stdout write or unchanged failing native exit.
-_FeatureStateCiWriteErrorReceipt(Err) {
-	global _FeatureStateCiErrorReceipt
-	if _FeatureStateCiErrorReceipt == ""
-		return
-	try {
-		Text := "type=" . Type(Err) . "; message=" . Err.Message
-			. "; file=" . Err.File . "; line=" . Err.Line . "`nstack=" . Err.Stack
-		Text := StrReplace(StrReplace(Text, "`r`n", "`n"), "`r", "`n")
-		Bounded := SubStr(Text, 1, 3000)
-		if StrLen(Text) > 3000
-			Bounded .= "`n[truncated at 3000 characters]"
-		FileAppend(Bounded, _FeatureStateCiErrorReceipt, "UTF-8-RAW")
 	}
 }

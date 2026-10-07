@@ -31,9 +31,7 @@ local M = {}
 local MODIFIERS = { "shift", "ctrl", "alt", "altgr", "meta", "cmd" }
 
 -- The i18n keys of the menu rows, shared by both Lua drivers.
-local LABEL_KEY = "menu.layout.magic_key_source"
 local AUTOMATIC_KEY = "menu.layout.magic_key_source.auto"
-local CAPTURE_KEY = "menu.layout.magic_key_source.capture"
 
 -- Reuse the assignment-priority reason already translated for every driver.
 M.TAP_CONFLICT_REASON = "menu.shortcuts.keyboard.magic_editor_reason.explicit_assignment"
@@ -246,7 +244,8 @@ end
 ---   current  string                   The value in effect.
 ---   key_text fn(code) -> string|nil   What the OS layout types on that key.
 ---   choose   fn(value)                Persists and applies a value.
----   capture  fn()|nil                 Captures the next key; nil greys the row. }
+---   capture  fn()|nil                 Captures the next key; nil greys the row.
+---   manifest table                   Initialized native manifest renderer. }
 --- @return table rows
 function M.menu_rows(resolver, opts)
 	if type(resolver) ~= "table" or type(opts) ~= "table" then
@@ -254,6 +253,10 @@ function M.menu_rows(resolver, opts)
 	end
 	for _, name in ipairs({ "t", "key_text", "choose" }) do
 		if type(opts[name]) ~= "function" then error("magic_key_source.menu_rows needs " .. name, 2) end
+	end
+	local manifest = opts.manifest
+	if type(manifest) ~= "table" or type(manifest.template_rows) ~= "function" then
+		error("magic_key_source.menu_rows needs an initialized manifest renderer", 2)
 	end
 	local t, current = opts.t, opts.current
 	-- A layout that cannot answer leaves the code alone: the row still names
@@ -267,21 +270,37 @@ function M.menu_rows(resolver, opts)
 	end
 
 	local capture = type(opts.capture) == "function" and opts.capture or nil
-	local items = {
-		{ label = t(CAPTURE_KEY), disabled = capture == nil or nil, action = capture },
-		{ separator = true },
-		{ label = t(AUTOMATIC_KEY), checked = current == resolver.automatic, action = chooser(resolver.automatic) },
-		{ separator = true },
-	}
-	for _, code in ipairs(resolver.candidates()) do
+	local candidates = resolver.candidates()
+	local items = {}
+	for _, code in ipairs(candidates) do
 		local reason = opts.reason and opts.reason(code) or nil
 		local label = label_of(code)
 		if reason ~= nil then label = label .. " — " .. t(reason) end
 		items[#items + 1] = { label = label, checked = current == code,
 			disabled = reason ~= nil or nil, action = reason == nil and chooser(code) or nil }
 	end
+	local automatic = chooser(resolver.automatic)
+	local commands = {
+		magic_key_source_capture = function() if capture then return capture() end return false end,
+		magic_key_source_automatic = function() return automatic() end,
+	}
+	local getters = {
+		magic_key_source_capture_ready = function() return capture ~= nil end,
+		magic_key_source_is_automatic = function() return current == resolver.automatic end,
+	}
+	local children = manifest.template_rows("magic_key_source_children", commands, getters, {
+		magic_key_source_candidates = function() return items end,
+	})
+	if type(children) ~= "table" or #children ~= #candidates + 4 then return nil end
+	-- The native capture owner supplies no callback while capture is unavailable.
+	if capture == nil then children[1].action = nil end
+	local rows = manifest.template_rows("magic_key_source_menu", commands, getters, {
+		magic_key_source_heading = children,
+	})
+	if type(rows) ~= "table" or #rows ~= 1 or type(rows[1].items) ~= "table" then return nil end
 	local shown = current == resolver.automatic and t(AUTOMATIC_KEY) or label_of(current)
-	return { { label = t(LABEL_KEY) .. " : " .. shown, items = items } }
+	rows[1].label = rows[1].label .. " : " .. shown
+	return rows
 end
 
 return M

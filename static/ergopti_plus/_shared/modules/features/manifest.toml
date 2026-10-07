@@ -7284,3 +7284,32 @@ id = "personal_shortcuts_registered"
 i18n = "menu.shortcuts.personal"
 platforms = ["ahk"]
 unavailable = "hide"
+
+# Complete physical magic-key presentation. Native ports supply only current
+# key text, candidate data and the existing capture/choice command callbacks.
+[[menu.magic_key_source_menu]]
+type = "group"
+id = "magic_key_source_heading"
+i18n = "menu.layout.magic_key_source"
+
+[[menu.magic_key_source_children]]
+type = "command"
+id = "magic_key_source_capture"
+i18n = "menu.layout.magic_key_source.capture"
+disabled_when = ["magic_key_source_capture_ready"]
+
+[[menu.magic_key_source_children]]
+type = "---"
+
+[[menu.magic_key_source_children]]
+type = "check"
+id = "magic_key_source_automatic"
+i18n = "menu.layout.magic_key_source.auto"
+checked_when = ["magic_key_source_is_automatic"]
+
+[[menu.magic_key_source_children]]
+type = "---"
+
+[[menu.magic_key_source_children]]
+type = "list"
+id = "magic_key_source_candidates"

@@ -13,34 +13,9 @@ _FeatureStateBootRun(Fixture) {
     Harness := A_ScriptDir . "\support\feature_state_boot_smoke.ahk"
     AssertTrue(FileExist(Harness) != "", "feature-state startup harness must exist")
     Command := Chr(34) . A_AhkPath . Chr(34) . " " . Chr(34) . Harness . Chr(34) . " " . Fixture
-	; CI-only observation: keep the actual RunWait transport and native verdict.
-	Receipt := Fixture == "script_late_parameter" ? _FeatureStateBootCiReceipt() : ""
-	if Receipt != ""
-		Command .= " --ci-error-receipt " . Chr(34) . Receipt . Chr(34)
-	try {
-		ExitCode := RunWait(Command, A_ScriptDir, "Hide")
-		Diagnostic := ""
-		if Fixture == "script_late_parameter" && ExitCode != 0 {
-			Diagnostic := "; child diagnostic unavailable"
-			if Receipt != "" {
-				try {
-					Content := FileRead(Receipt, "UTF-8")
-					if Content != "" {
-						Content := StrReplace(StrReplace(Content, "`r`n", "`n"), "`r", "`n")
-						Diagnostic := "; child diagnostic: " . StrReplace(SubStr(Content, 1, 3000), "`n", " | ")
-						if StrLen(Content) > 3000
-							Diagnostic .= " [truncated at 3000 characters]"
-					}
-				}
-			}
-		}
-		AssertEqual(0, ExitCode, "feature-state startup fixture must exit cleanly: " . Fixture . Diagnostic)
-		return ExitCode
-	} finally {
-		; Only an atomically created, task-owned receipt is eligible for disposal.
-		if Receipt != ""
-			try FileDelete(Receipt)
-	}
+    ExitCode := RunWait(Command, A_ScriptDir, "Hide")
+    AssertEqual(0, ExitCode, "feature-state startup fixture must exit cleanly: " . Fixture)
+	return ExitCode
 }
 
 _FeatureStateBootRunFails(Fixture) {
@@ -139,6 +114,18 @@ TestFeatureStateBootSourceWiring() {
         "feature-state must call the configuration accessor directly")
     AssertTrue(InStr(FeatureStateSource, 'Func("IniCacheGet").Call') = 0,
         "feature-state must not use the boot-fragile Func(...).Call accessor")
+	HarnessSource := FileRead(A_ScriptDir . "\support\feature_state_boot_smoke.ahk", "UTF-8")
+	PolicyInclude := _FeatureStateBootFindOwnerInclude(Source, "TomlConfigParameterBindingStatus")
+	HarnessHelpers := InStr(HarnessSource, _FeatureStateBootNativeInclude(Source, HelpersPos))
+	HarnessLoader := InStr(HarnessSource, PolicyInclude)
+	HarnessState := InStr(HarnessSource, _FeatureStateBootNativeInclude(Source, StatePos))
+	AssertTrue(HarnessHelpers > 0 && HarnessLoader > 0 && HarnessState > 0,
+		"the native child must include the actual configuration-owner parameter policy")
+	AssertTrue(HarnessHelpers < HarnessLoader && HarnessLoader < HarnessState,
+		"the native child preserves the production helper/loader/state dependency order")
+	AssertTrue(InStr(_DriverFuncBody("TomlConfigParameterBindingStatus"),
+		"TomlConfigParameterBindingStatus(BindingId, Catalogue?) {") > 0,
+		"the included native owner declares the actual binding-status callable")
 }
 Test("Feature-state startup: production include order and direct loader dependency stay wired (feature-state-boot-wiring)", TestFeatureStateBootSourceWiring)
 
@@ -184,27 +171,29 @@ TestFeatureStateBootTapBindingSourceWiring() {
 Test("feature-state startup: tap publication source ordering retains the later native read stage (tap-binding-identity)",
 	TestFeatureStateBootTapBindingSourceWiring)
 
-; Atomically reserve a fresh private file; a collision never grants ownership.
-_FeatureStateBootCiReceipt() {
-	static Counter := 0
-	Loop 8 {
-		Counter += 1
-		Path := A_Temp . "\ergopti_feature_state_ci_error_" . DllCall("GetCurrentProcessId")
-			. "_" . A_TickCount . "_" . Counter . ".txt"
-		Handle := -1
-		try {
-			Handle := DllCall("kernel32\CreateFileW", "Str", Path, "UInt", 0x40000000,
-				"UInt", 0, "Ptr", 0, "UInt", 1, "UInt", 0x80, "Ptr", 0, "Ptr")
-			if Handle != -1
-				return Path
-			if A_LastError != 80 && A_LastError != 183
-				return ""
-		} catch {
-			return ""
-		} finally {
-			if Handle != -1
-				try DllCall("kernel32\CloseHandle", "Ptr", Handle)
-		}
+; Follow the real entry-point includes and the canonical definition reader, so
+; moving the policy owner preserves this dependency assertion without a pin.
+_FeatureStateBootFindOwnerInclude(DriverSource, Symbol) {
+	Includes := []
+	for Line in StrSplit(_StripFullLineComments(DriverSource), "`n", "`r") {
+		if !RegExMatch(Line, "^#Include[ `t]+(.+)$", &Directive)
+			continue
+		Operand := Trim(Directive[1])
+		CandidatePath := A_ScriptDir . "\..\" . Operand
+		if !FileExist(CandidatePath)
+			continue
+		CandidateSource := FileRead(CandidatePath, "UTF-8")
+		if !_DriverFindFunctionDefinition(&CandidateSource, Symbol)
+			continue
+		Includes.Push("#Include ..\..\" . StrReplace(Operand, "/", "\"))
 	}
-	return ""
+	if Includes.Length != 1
+		throw Error("The native binding policy must have exactly one real entry-point include owner.")
+	return Includes[1]
+}
+
+_FeatureStateBootNativeInclude(DriverSource, Position) {
+	End := InStr(DriverSource, "`n", false, Position)
+	Line := Trim(SubStr(DriverSource, Position, End ? End - Position : unset), "`r`n `t")
+	return "#Include ..\..\" . StrReplace(SubStr(Line, 10), "/", "\")
 }

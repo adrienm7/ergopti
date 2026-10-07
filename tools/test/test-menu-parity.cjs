@@ -86,6 +86,16 @@ const SEPARATOR = '---';
 // be a rule with four exceptions — and a missing entry here would silently make
 // a whole submenu unreachable, which is one of the things being checked.
 const OPENS_SUBMENU = {
+	magic_key_source: {
+		menu: 'magic_key_source_menu',
+		platforms: ['ahk', 'hs', 'linux'],
+		kind: 'submenu'
+	},
+	magic_key_source_heading: {
+		menu: 'magic_key_source_children',
+		platforms: ['ahk', 'hs', 'linux'],
+		kind: 'submenu'
+	},
 	// The empty native Input Sources provider composes its actual shared command.
 	active_layouts: {
 		menu: 'layout_active_source_empty_commands',

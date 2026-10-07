@@ -2408,6 +2408,12 @@ These are software implementations; final hardware verification remains below.
   namespace is obsolete source data, preserved until explicit cleanup; it is
   not a current recommendation target. Do not assume deletion implements the
   recommendation.
+
+  The Windows cold-start fixture now includes the genuine parameter-status
+  loader before feature state, matching the real entry-point dependency order.
+  The original late Script publication assertion is retained. An actual
+  full-suite diagnostic identified the missing callable; exact-source native
+  replay remains required before qualifying this harness correction.
   At published `409b8ee0`, manual all-OS run 37476981548 is still in progress:
   Windows lifecycle capture fails with ENOBUFS before the full native suite;
   its engine E2E/package/install are skipped. macOS packaging has actual Sparkle
@@ -3219,6 +3225,11 @@ WP3 prerequisite: the actual macOS physical accounting owner now requires exact 
   and session-write refusal (site 108); retired keys reported for explicit
   cleanup are exempt from automatic deletion migrations and remain on disk
   until that cleanup (site 112).
+
+  Linux and macOS filesystem modules now expose their genuine initializer
+  identity and seven original function or nil identities through a pure tuple.
+  Existing I/O, acknowledgement and lock bodies remain byte-exact. The consuming
+  closed schema/session fences and native qualification remain pending.
 
   Carried Script action parameters are now judged again by the existing genuine
   publication on every late read on Windows, macOS and Linux. A proved retired
@@ -4380,13 +4391,20 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 53, macOS 86, Linux 61, each
+  drivers still build (current baseline: Windows 48, macOS 86, Linux 61, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
   existing rows during the migration (proposal in the menu-first-group
   report: most hide; greyed: Linux edit_shortcuts, Linux key
   combinations, Linux metrics shortcut rows, Windows preview_bubbles).
+  The complete MagicKey source frame now consumes the canonical capture,
+  automatic choice, candidate list and separators on all three drivers. Native
+  selection, readiness and publication callbacks remain unchanged. Both owners
+  regenerate byte-exact artifacts; the census retires five Windows sites,
+  establishing 48/86/61. Independent source and portable controls pass; final
+  integrated native and installed qualification remain required.
+
   Published `409b8ee0` includes the shared model-readout migration and its two
   owner-generated artifacts; the remaining sites are software migration work.
   Native allocators and computed user-data captions alone do not prove missing
@@ -5438,7 +5456,7 @@ Current Group 3 source checkpoint (item 73, 2026-10-06): [Group 3 current checkp
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 53, macOS 86 and Linux 61 rows are still built by the
+  Windows 48, macOS 86 and Linux 61 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). Read on
   2026-10-01, the sites are of four kinds, and three of them need the
   manifest to say more than it can today:
