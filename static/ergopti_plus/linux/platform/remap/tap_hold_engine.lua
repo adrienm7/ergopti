@@ -434,26 +434,83 @@ end
 --- @return string|nil verdict nil: the key passes as it is; "shift": wrap it
 ---   in Shift, which types its capital; "text": type `text` instead of it.
 --- @return string|nil text
+local input_arms = setmetatable({}, { __mode = "k" })
+
+--- Publishes the existing logical deadline without acquiring output authority.
+local function arm_one_shot(self, now_ms, guard)
+	if type(now_ms) ~= "number" or now_ms ~= now_ms or math.abs(now_ms) == math.huge
+		or type(self.key_text) ~= "function" or type(self.plan_text) ~= "function"
+		or type(self.one_shot_result) ~= "function" then return false end
+	if input_arms[self] and input_arms[self].state == "consumed" then return false end
+	if guard then
+		local ok, current = pcall(guard)
+		if not ok or current ~= true then return false end
+	end
+	self.one_shot_until = now_ms + self.one_shot_timeout_ms
+	input_arms[self] = guard and { current = guard, state = "armed" } or nil
+	return true
+end
+
+--- Arms only the input owner's retained guard; standalone state creates no lease.
+--- @param now_ms number Original event clock.
+--- @param guard function Captured installed input-owner currency.
+--- @return boolean published
+function M:arm_one_shot(now_ms, guard)
+	if type(guard) ~= "function" then return false end
+	return arm_one_shot(self, now_ms, guard)
+end
+
+--- Observes private logical ownership without calling an external provider.
+--- @return string|nil state
+function M:input_arm_state()
+	local arm = input_arms[self]
+	return arm and arm.state or nil
+end
+
+--- Clears only an unspent logical arm; consumed output requires release_all ACK.
+--- @return boolean cleared
+function M:clear_input_arm()
+	local arm = input_arms[self]
+	if arm and arm.state == "consumed" then return false end
+	if arm then self.one_shot_until, input_arms[self] = nil, nil end
+	return true
+end
+
+local function input_arm_current(self, arm)
+	if not arm then return true end
+	local ok, current = pcall(arm.current)
+	return ok and current == true and input_arms[self] == arm
+end
+
 local function take_one_shot(self, code, now_ms)
 	if not self.one_shot_until then return nil end
+	local arm = input_arms[self]
+	if not input_arm_current(self, arm) then self:clear_input_arm(); return nil end
 	if MODIFIER_KEYS[code] or code == EvdevCodes.KEY_CAPSLOCK then return nil end
 	local control = EvdevCodes.CONTROL_NAME_OF[code]
 	if OneShotShift.spends_unshifted(control) then
 		self.one_shot_until = nil
+		input_arms[self] = nil
 		return nil
 	end
 	local text = self.key_text(code)
+	if not input_arm_current(self, arm) then self:clear_input_arm(); return nil end
 	if type(text) ~= "string" or text == "" then return nil end
 	local armed = now_ms <= self.one_shot_until
 	self.one_shot_until = nil
-	if not armed then return nil end
+	if not armed then input_arms[self] = nil; return nil end
 	-- The capital on the same key's Shift level is that key under Shift: a real
 	-- keystroke that repeats. Anywhere else ("É" on AZERTY), it is typed.
-	return OneShotShift.resolve(text, self.one_shot_result, function(title)
+	local verdict, result = OneShotShift.resolve(text, self.one_shot_result, function(title)
 		local steps = self.plan_text(title)
 		local step = steps and #steps == 1 and steps[1]
 		return step and step.keycode == code and #step.mods == 1 and step.mods[1] == "shift"
 	end)
+	if not input_arm_current(self, arm) then self:clear_input_arm(); return nil end
+	if arm then
+		if verdict then arm.state, arm.code = "consumed", code else input_arms[self] = nil end
+	end
+	return verdict, result
 end
 
 -- The level keys the engine counts as held when no live layout names them.
@@ -489,9 +546,12 @@ end
 --- after it, as Windows' SendEvent {Text} lifts them.
 --- @return table|nil tap { type_text = text } when the layout cannot type it.
 local function type_text(self, out, text)
+	local arm = input_arms[self]
 	local steps = self.plan_text(text)
-	if not steps then return { type_text = text } end
+	if not input_arm_current(self, arm) then return nil end
+	if not steps then return not arm and { type_text = text } or nil end
 	local lifted = held_level_keys(self)
+	if not input_arm_current(self, arm) then return nil end
 	for _, code in ipairs(lifted) do out[#out + 1] = { code = code, value = UP, handoff = "suspended" } end
 	for _, step in ipairs(steps) do
 		local mods = {}
@@ -641,7 +701,7 @@ end
 local function fire_instant(self, out, config, now_ms)
 	if config.tap == "none" then return out, nil end
 	if config.tap == "one_shot_shift" then
-		self.one_shot_until = now_ms + self.one_shot_timeout_ms
+		arm_one_shot(self, now_ms)
 		return out, nil
 	end
 	local typed = M.KEY_TAPS[config.tap]
@@ -887,7 +947,7 @@ function M:process(code, value, now_ms)
 		end
 		if state.tapped or not is_tap or config.tap == "none" then return out, nil end
 		if config.tap == "one_shot_shift" then
-			self.one_shot_until = now_ms + self.one_shot_timeout_ms
+			arm_one_shot(self, now_ms)
 			return out, nil
 		end
 		-- The native key (as if nothing were configured on a tap) or a key tap.
@@ -901,7 +961,10 @@ function M:process(code, value, now_ms)
 	-- A key the one-shot Shift replaced by its result: its repeats and its
 	-- release belong to the result, which is already typed.
 	if self.one_shot_swallowed[code] then
-		if value == UP then self.one_shot_swallowed[code] = nil end
+		if value == UP then
+			self.one_shot_swallowed[code] = nil
+			if input_arms[self] and input_arms[self].code == code then input_arms[self] = nil end
+		end
 		return out
 	end
 
@@ -918,6 +981,11 @@ function M:process(code, value, now_ms)
 		self.one_shot_keys[code] = nil
 		release(self, out, code)
 		release(self, out, KEY_LEFTSHIFT)
+		if input_arms[self] and input_arms[self].code == code then input_arms[self] = nil end
+		return out
+	end
+	if self.one_shot_keys[code] and value == REPEAT and input_arms[self] then
+		hold_row(self, out, code, REPEAT)
 		return out
 	end
 	if value == DOWN and not self.one_shot_keys[code] then
@@ -992,6 +1060,7 @@ function M:release_all()
 	self.held, self.layer_keys, self.layer_depth = {}, {}, 0
 	self.undecided = nil
 	self.one_shot_until, self.one_shot_keys, self.key_refs = nil, {}, {}
+	input_arms[self] = nil
 	self.one_shot_swallowed, self.instant_down = {}, {}
 	self.native_keys, self.modifiers_down, self.passed_down = {}, {}, {}
 	-- The hook swallows the rest of every key it took from this engine, so

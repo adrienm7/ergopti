@@ -123,6 +123,9 @@ function M.evdev_reader(opts)
 	function fake.event_current() return false end
 	function fake.event_view() return nil end
 	function fake.source_current() return false end
+	function fake.capture_source_owner() return nil end
+	function fake.source_owner_current() return false end
+	function fake.retire_source() return false end
 	function fake.capture_pressed_keys() return nil end
 	function fake.pressed_keys_current() return false end
 	function fake.pressed_keys_view() return nil end

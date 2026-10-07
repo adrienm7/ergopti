@@ -5837,6 +5837,38 @@ current successful native window cases. Real whole-daemon/package/install
 CI remains pending. Hotplug reset
 publication and the other native logical/input-owner gaps below remain open.
 
+The startup republish correction is now qualified on hosted Linux CI
+37604040136 at exact source56632538e: 10,477 unit cases, the real daemon
+and ADN probe, 81 kernel modifier-custody checks, 34 native window cases,
+packaging and all 17 installation launches pass. This historical result
+does not qualify the new logical-frame source tranche below.
+
+The reviewed input-owner software tranche captures original Reader authority
+during trusted cold Hook construction, before configurable native callbacks.
+A late or pre-mutated Reader cannot authorize the new logical owner, while
+ordinary lowercase DOWN/repeat/UP delivery remains intact. Per-open source
+and original output identities fence logical modifier frames; arm reserves
+or emits nothing. Complete original output destruction and descriptor close
+may acknowledge local terminal settlement, without claiming physical key-up
+delivery. The controlled final source passes 495 checks per Lua ABI and
+155 registered pair tests, with preserved assertion prefixes, exact source
+inverses and independently reproduced counterfeit-source refusals. The
+normal trusted module loader is the explicit construction boundary.
+Native kernel scenarios, hotplug reconciliation and final affected-driver
+CI remain pending. One-shot Shift and CapsWord picker admission stay closed;
+this software prerequisite does not complete item93 or physical delivery.
+
+The mandatory whole-daemon kernel gate now includes a reviewed original
+Reader/Writer/Hook input-owner harness after the existing modifier-custody
+checks. Its four handwritten wire scenarios require actual KEY/SYN rows,
+kernel held bitmaps, per-open descriptor replacement with observed FD reuse,
+and exact original output destruction while protecting a native successor.
+Virtual fixture selection remains explicit and cannot admit a production
+picker capability. Original subreaper deadlines, older scenarios and shell
+failure propagation are preserved. Portable oracle, transport and cleanup
+controls pass; the four kernel scenarios are not executed in this container
+because /dev/input and /dev/uinput are unavailable. Hosted execution is required.
+
 - [ ] **96.** Remove the separate Ergopti+ AltGr-adjustments option from the
       Layout menu. Selecting the Ergopti+ keylayout in the emulation picker must
       suffice. Verify that the layout supplies every intended change, retire
