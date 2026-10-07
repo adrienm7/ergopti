@@ -638,6 +638,8 @@ class AppleEventBoundaryControls(unittest.TestCase):
                         (
                             "native_appkit_registration_controls=5\n"
                             "native_private_appleevent_controls=1\n"
+                            "native_sender_registration_controls=5\n"
+                            "native_sender_identity_controls=7\n"
                         )
                         if registration_output is None
                         else registration_output,
@@ -1339,6 +1341,17 @@ class AppleEventSenderDiagnosticControls(unittest.TestCase):
             "error_size": 4,
             "error_available": True,
             "error_number": -1708,
+            "identity": {
+                "self_available": True,
+                "target_available": True,
+                "self_team": False,
+                "target_team": False,
+                "team_equal": None,
+                "identifier_equal": True,
+                "hash_equal": True,
+            },
+            "appkit_before": 2,
+            "appkit_after": 1,
         }
 
     def marker(self, packet=None):
@@ -1360,6 +1373,50 @@ class AppleEventSenderDiagnosticControls(unittest.TestCase):
         evidence.record.return_value = True
         children = SimpleNamespace(groups={receiver: group}, evidence=evidence)
         return children, receiver, group
+
+    def test_sender_identity_metadata_refuses_unknown_or_unavailable_facts(self):
+        for field, value in (
+            ("self_available", 1),
+            ("target_available", 1),
+            ("self_team", "raw-team"),
+            ("target_team", "raw-team"),
+            ("team_equal", True),
+            ("identifier_equal", "raw-identifier"),
+            ("hash_equal", "raw-hash"),
+            ("unknown", False),
+        ):
+            with self.subTest(field=field):
+                packet = self.packet()
+                packet["identity"][field] = value
+                with self.assertRaises(RuntimeError):
+                    probe._appleevent_sender_diagnostic(self.marker(packet))
+        for role in ("self", "target"):
+            packet = self.packet()
+            packet["identity"][role + "_available"] = False
+            with self.assertRaises(RuntimeError):
+                probe._appleevent_sender_diagnostic(self.marker(packet))
+        for value in (-2, 3, True, "accessory"):
+            packet = self.packet()
+            packet["appkit_after"] = value
+            with self.assertRaises(RuntimeError):
+                probe._appleevent_sender_diagnostic(self.marker(packet))
+
+    def test_unavailable_sender_metadata_preserves_original_reply_error(self):
+        packet = self.packet()
+        packet["appkit_before"] = -1
+        packet["appkit_after"] = -1
+        packet["identity"] = {
+            "self_available": False,
+            "target_available": False,
+            "self_team": None,
+            "target_team": None,
+            "team_equal": None,
+            "identifier_equal": None,
+            "hash_equal": None,
+        }
+        admitted = probe._appleevent_sender_diagnostic(self.marker(packet))
+        self.assertEqual(admitted["error_number"], -1708)
+        self.assertEqual(admitted["appkit_after"], -1)
 
     def test_actual_parser_preserves_numeric_reply_error_without_private_bytes(self):
         packet = probe._appleevent_sender_diagnostic(self.marker())

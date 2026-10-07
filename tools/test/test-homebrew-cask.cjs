@@ -278,7 +278,7 @@ check('portable Brew ownership controls remain registered and mandatory', () => 
 	assert.ifError(result.error);
 	assert.strictEqual(result.signal, null, result.stderr);
 	assert.strictEqual(result.status, 0, result.stderr);
-	assert.match(result.stderr, /Ran 51 tests in /);
+	assert.match(result.stderr, /Ran 53 tests in /);
 	assert.match(result.stderr, /\nOK\s*$/);
 	assert.doesNotMatch(result.stderr, /skipped=/);
 });
@@ -376,7 +376,7 @@ check(
 		);
 		assert.match(
 			boundary,
-			/registration_controls\.stdout\s*==\s*"native_appkit_registration_controls=5\\nnative_private_appleevent_controls=1\\n"/
+			/registration_controls\.stdout\s*==\s*"native_appkit_registration_controls=5\\nnative_private_appleevent_controls=1\\nnative_sender_registration_controls=5\\nnative_sender_identity_controls=7\\n"/
 		);
 		assert.doesNotMatch(boundary, /NSWorkspace|\/usr\/bin\/open/);
 	}
@@ -406,7 +406,7 @@ check('owned AppleEvent probe constructs the shared private SDK event before any
 	const helper = diagnostic('macos_brew_archive_acceptance.py');
 	assert.match(
 		helper,
-		/registration_controls\.stdout\s*==\s*"native_appkit_registration_controls=5\\nnative_private_appleevent_controls=1\\n"/
+		/registration_controls\.stdout\s*==\s*"native_appkit_registration_controls=5\\nnative_private_appleevent_controls=1\\nnative_sender_registration_controls=5\\nnative_sender_identity_controls=7\\n"/
 	);
 	assert.match(helper, /"tools\/diagnostics\/native_appleevent_probe_protocol\.h",/);
 });
@@ -421,6 +421,19 @@ check('owned AppleEvent roles use one image without replacing non-self nonce adm
 	}
 	const sender = diagnostic('native_appleevent_probe_sender.c');
 	assert.match(sender, /parsed > INT_MAX \|\| parsed == getpid\(\)/);
+	const senderAdmission = sender.indexOf('const int admission = admit_sender_appkit(application)');
+	const senderRejection = sender.indexOf('if (admission != 0)');
+	const actualSend = sender.indexOf('status = AESendMessage(');
+	assert.ok(
+		senderAdmission >= 0 && senderRejection > senderAdmission && actualSend > senderRejection
+	);
+	assert.match(sender, /GetCurrentProcess\(&serial\)/);
+	assert.match(sender, /NSApplication \*application = \[NSApplication sharedApplication\]/);
+	assert.match(sender, /SecCodeCopyGuestWithAttributes\(NULL, attributes/);
+	assert.match(sender, /SecCodeCopyStaticCode\(code/);
+	assert.match(sender, /SecCodeCopySigningInformation\(static_code/);
+	assert.doesNotMatch(sender, /AEDeterminePermissionToAutomateTarget\s*\(|SecTaskSetValue\s*\(/);
+
 	assert.match(sender, /nonce_observation\.matches = read == noErr/);
 	assert.match(sender, /kAEWaitReply \| kAENeverInteract \| kAEDoNotPromptForUserConsent/);
 	assert.doesNotMatch(pair, /TCC|entitlement|AESendMessage|AEPutParamPtr|AEInstallEventHandler/);
@@ -618,7 +631,7 @@ check(
 		assert.ok(emission.length > 100);
 		assert.match(emission, /keyErrorNumber, typeWildCard/);
 		assert.match(emission, /actual_type == typeSInt32 && actual_size == sizeof\(number\)/);
-		assert.match(emission, /char diagnostic\[512\]/);
+		assert.match(emission, /char diagnostic\[1024\]/);
 		assert.doesNotMatch(
 			emission,
 			/keyErrorString|argv\[|expected_nonce|delivery_path|printf\([^;]*stdout/s

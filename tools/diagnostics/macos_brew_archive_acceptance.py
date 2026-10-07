@@ -405,6 +405,9 @@ def _validate_appleevent_sender(packet):
         "error_size",
         "error_available",
         "error_number",
+        "identity",
+        "appkit_before",
+        "appkit_after",
     }
     require(type(packet) is dict and set(packet) == fields, "Unadmitted sender diagnostic")
     require(type(packet["schema"]) is int and packet["schema"] == 1, "Invalid sender schema")
@@ -465,6 +468,46 @@ def _validate_appleevent_sender(packet):
         or (not packet["error_available"] and error is None),
         "Unavailable sender error was invented",
     )
+    identity = packet["identity"]
+    identity_fields = {
+        "self_available",
+        "target_available",
+        "self_team",
+        "target_team",
+        "team_equal",
+        "identifier_equal",
+        "hash_equal",
+    }
+    require(
+        type(identity) is dict and set(identity) == identity_fields,
+        "Unadmitted sender identity observation",
+    )
+    for role in ("self", "target"):
+        available = identity[role + "_available"]
+        require(type(available) is bool, "Invalid identity availability")
+        require(
+            (available and type(identity[role + "_team"]) is bool)
+            or (not available and identity[role + "_team"] is None),
+            "Unavailable team observation was invented",
+        )
+    for key in ("team_equal", "identifier_equal", "hash_equal"):
+        value = identity[key]
+        require(
+            value is None
+            or (
+                type(value) is bool and identity["self_available"] and identity["target_available"]
+            ),
+            "Unavailable identity equality was invented",
+        )
+    require(
+        identity["team_equal"] is None
+        or (identity["self_team"] is True and identity["target_team"] is True),
+        "Absent team equality was invented",
+    )
+    for key in ("appkit_before", "appkit_after"):
+        require(
+            type(packet[key]) is int and -1 <= packet[key] <= 2, "Invalid sender AppKit observation"
+        )
     return dict(packet)
 
 
@@ -485,7 +528,7 @@ def _appleevent_sender_diagnostic(errors):
     require(
         lines[1].startswith(prefix)
         and lines[1].endswith("\n")
-        and len(lines[1].encode("utf-8")) < 512,
+        and len(lines[1].encode("utf-8")) < 1024,
         "Sender reply marker is unclassified",
     )
 
@@ -1359,6 +1402,8 @@ def _build_appleevent_pair(children, repository, root, compiler, nonce):
             "-framework",
             "AppKit",
             str(repository / "tools/diagnostics/native_appleevent_probe_pair.m"),
+            "-framework",
+            "Security",
             "-o",
             str(executable),
         ],
@@ -1388,6 +1433,8 @@ def _admit_appleevent_boundary(children, repository):
             "-framework",
             "AppKit",
             str(repository / "tools/diagnostics/native_appleevent_registration_test.m"),
+            "-framework",
+            "Security",
             "-o",
             str(registration_test),
         ],
@@ -1396,7 +1443,7 @@ def _admit_appleevent_boundary(children, repository):
     registration_controls = children.run([str(registration_test)], confined=True)
     require(
         registration_controls.stdout
-        == "native_appkit_registration_controls=5\nnative_private_appleevent_controls=1\n"
+        == "native_appkit_registration_controls=5\nnative_private_appleevent_controls=1\nnative_sender_registration_controls=5\nnative_sender_identity_controls=7\n"
         and not registration_controls.stderr,
         "Controlled AppKit registration refusals were not independently admitted",
     )
