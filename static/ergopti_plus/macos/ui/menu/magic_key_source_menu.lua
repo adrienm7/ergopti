@@ -33,6 +33,7 @@ local Timings         = require("infra.timings")
 local Timer           = require("adapters.timer_scheduler")
 local EventProvenance = require("adapters.event_provenance")
 local Shared          = require("keymap.magic_key_source")
+local ManifestMenu    = require("infra.manifest_menu")
 local Source          = require("modules.keymap.magic_key_source")
 
 local LOG = "menu.magic_key_source"
@@ -187,6 +188,7 @@ end
 function M.rows(ctx)
 	local resolver = Source.resolver()
 	return Shared.menu_rows(resolver, {
+		manifest = ManifestMenu,
 		t = i18n.get,
 		current = Source.get(),
 		reason = Source.choice_reason,

@@ -457,18 +457,15 @@ function M.build_custom(ctx, counts)
 		return state.custom_default_section
 	end
 
-	local cat_menu = { {
-		label   = i18n.get("menu.hotstrings.default_none"),
-		checked = (not state.custom_default_section) or nil,
-		action      = function()
+	local none_action = function()
 			state.custom_default_section = nil
 			if ctx.hotstring_editor and type(ctx.hotstring_editor.set_default_section) == "function" then
 				pcall(ctx.hotstring_editor.set_default_section, nil)
 			end
 			if ctx.save_prefs() ~= true then return false end
 			ctx.updateMenu()
-		end,
-	} }
+		end
+	local cat_choices = {}
 	if type(personal_secs) == "table" then
 		local has_real = false
 		for _, sec in ipairs(personal_secs) do
@@ -477,14 +474,13 @@ function M.build_custom(ctx, counts)
 			end
 		end
 		if has_real then
-			table.insert(cat_menu, { separator = true })
 			for _, sec in ipairs(personal_secs) do
 				if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder then
 					local lbl   = (type(sec.description) == "string" and sec.description ~= "")
 						and sec.description or tostring(sec.name):gsub("_", " ")
 					lbl = ctx.applyTriggerChar(lbl)
 					local sname = sec.name
-					table.insert(cat_menu, {
+					table.insert(cat_choices, {
 						label   = lbl,
 						checked = (state.custom_default_section == sname) or nil,
 						action      = function()
@@ -501,6 +497,14 @@ function M.build_custom(ctx, counts)
 		end
 	end
 
+	local cat_menu = ManifestMenu.template_rows("hotstring_personal_default_frame", {
+		["personal_default_none"] = none_action,
+	}, {
+		["personal_default_unset"] = function() return not state.custom_default_section end,
+		["personal_default_boundary"] = function() return #cat_choices > 0 end,
+	}, { ["personal_default_choices"] = function() return cat_choices end })
+	if type(cat_menu) ~= "table" then return nil end
+
 
 	-- =====================
 	-- Build section rows
@@ -512,20 +516,23 @@ function M.build_custom(ctx, counts)
 	--- @param secs table Section list from keymap.get_sections().
 	--- @param group_enabled boolean Whether the group itself is on.
 	--- @param admission function|nil Current exclusive personal-file owner check.
+	--- @return boolean Complete declared section rows were admitted.
 	local function append_section_rows(target, group_name, secs, group_enabled, admission)
-		if type(secs) ~= "table" then return end
+		if type(secs) ~= "table" then return true end
 		local has_real = false
 		for _, sec in ipairs(secs) do
 			if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder then
 				has_real = true; break
 			end
 		end
-		if not has_real then return end
+		if not has_real then return true end
 
 		for _, sec in ipairs(secs) do
 			if type(sec) ~= "table" then goto continue_sec end
 			if sec.name == "-" then
-				target[#target + 1] = { separator = true }
+				local boundary = ManifestMenu.template_rows("hotstrings_parameter_boundary", {}, {}, {})
+				if type(boundary) ~= "table" then return false end
+				for _, row in ipairs(boundary) do target[#target + 1] = row end
 			elseif not sec.is_module_placeholder then
 				local sec_on = ctx.keymap and type(ctx.keymap.is_section_enabled) == "function"
 					and ctx.keymap.is_section_enabled(group_name, sec.name) or false
@@ -542,6 +549,7 @@ function M.build_custom(ctx, counts)
 			end
 			::continue_sec::
 		end
+		return true
 	end
 
 
@@ -563,41 +571,53 @@ function M.build_custom(ctx, counts)
 	local editor_row = ManifestMenu.command_row("personal_hotstring_commands", "personal_hotstring_open_editor",
 		{ personal_hotstring_open_editor = open_editor },
 		{ personal_hotstring_editor_ready = editor_ready })
-	local menu_items = {
-		{
-			label    = i18n.get("menu.hotstrings.open_file"),
-			disabled = paused or nil,
-			action       = not paused and function() open_toml_path(toml_path_for_group(ctx, "personal")) end or nil,
-		},
-		{ separator = true },
-		{
-			label = i18n.get("menu.hotstrings.default_category_prefix") .. default_section_label(),
-			items  = cat_menu,
-		},
-		{
-			label    = i18n.get("menu.hotstrings.close_on_add"),
-			checked  = state.custom_close_on_add or nil,
-			action       = not paused and function()
+	local close_action = function()
 				state.custom_close_on_add = not state.custom_close_on_add
 				if ctx.hotstring_editor and type(ctx.hotstring_editor.set_close_on_add) == "function" then
 					pcall(ctx.hotstring_editor.set_close_on_add, state.custom_close_on_add)
 				end
 				if ctx.save_prefs() ~= true then return false end
 				ctx.updateMenu()
-			end or nil,
-			disabled = paused or nil,
-		},
-	}
-	if editor_row then table.insert(menu_items, 1, editor_row) end
-	-- An unsupported legacy chord retains its acknowledged owner and editing
-	-- surface until the ordinary-slot migration can prove a replacement.
+			end
+	local legacy_rows = {}
 	if state.custom_editor_shortcut ~= nil then
-		table.insert(menu_items, 4, {
-			label = i18n.get("menu.hotstrings.shortcut_prefix") .. sc_label(),
-			disabled = paused or nil,
-			action = not paused and sc_fn or nil,
-		})
+		local declared_legacy = ManifestMenu.template_rows("hotstring_personal_legacy_shortcut",
+			{ personal_legacy_shortcut = sc_fn },
+			{ personal_shortcut_label = sc_label, personal_legacy_ready = function() return not paused end }, {})
+		if type(declared_legacy) ~= "table" or #declared_legacy ~= 1 then return nil end
+		local legacy = declared_legacy[1]
+		-- Retain the old native posture: a menu built while paused has no action.
+		if paused then legacy.action = nil end
+		legacy_rows[1] = legacy
 	end
+	local default_parent = ManifestMenu.template_rows("hotstring_personal_default_parent", {},
+		{ personal_default_label = default_section_label },
+		{ personal_default_caption = function() return cat_menu end })
+	if type(default_parent) ~= "table" or #default_parent ~= 1 then return nil end
+	local controls = ManifestMenu.template_rows("hotstring_personal_controls_frame", {
+		["hotstring_file_open"] = function() open_toml_path(toml_path_for_group(ctx, "personal")) end,
+		["personal_close_on_add"] = close_action,
+	}, {
+		["hotstring_file_ready"] = function() return not paused end,
+		["personal_open_present"] = function() return true end,
+		["personal_controls_head_boundary"] = function() return true end,
+		["personal_controls_tail_boundary"] = function() return false end,
+		["personal_preferences_present"] = function() return true end,
+		["personal_controls_ready"] = function() return not paused end,
+		["personal_close_on_add"] = function() return state.custom_close_on_add == true end,
+	}, {
+		["personal_editor"] = function() return editor_row and { editor_row } or {} end,
+		["personal_default_parent"] = function() return default_parent end,
+		["personal_legacy_before"] = function() return editor_row and legacy_rows or {} end,
+		["personal_legacy_after"] = function() return not editor_row and legacy_rows or {} end,
+	})
+	if type(controls) ~= "table" then return nil end
+	if paused then
+		for _, row in ipairs(controls) do
+			if row ~= editor_row and row.disabled then row.action = nil end
+		end
+	end
+	local main_sections, unavailable_rows, tree_rows = {}, {}, {}
 
 	local ext_tree = { folders = {}, files = {} }
 	local function scope_menu(names, file_rows, section_rows)
@@ -611,14 +631,19 @@ function M.build_custom(ctx, counts)
 			})
 	end
 	local function file_menu_for_group(gname, rows, check, readonly)
-		local file_rows = {}
 		local path = toml_path_for_group(ctx, gname)
-		if path then
-			file_rows[1] = {
-				label = i18n.get("menu.hotstrings.open_file"),
-				action = function() open_toml_path(path) end,
-			}
-		end
+		local file_rows = ManifestMenu.template_rows("hotstring_personal_file_frame", {
+			["hotstring_file_open"] = function() open_toml_path(path) end,
+		}, {
+			["hotstring_file_ready"] = function() return true end,
+			["personal_file_open_present"] = function() return path ~= nil end,
+			["personal_file_boundary"] = function() return false end,
+		}, {
+			["personal_file_controls"] = function() return {} end,
+			["personal_file_sections"] = function() return {} end,
+		})
+		if type(file_rows) ~= "table" then return nil end
+
 		local rendered = ManifestMenu.build("hotstring_category_menu", "Hotstrings", nil, nil,
 			{ commands = {
 				["hotstring_category_enable_all"] = M.category_scope_fn(ctx, { gname }, true, check),
@@ -699,21 +724,30 @@ function M.build_custom(ctx, counts)
 	-- and took the whole hotstrings menu with it.
 	local function render_ext_tree(node, target, separate_files)
 		if separate_files == nil then separate_files = true end
+		local folder_rows, file_rows = {}, {}
 		local folder_names = sorted_keys(node.folders)
 		for _, folder_name in ipairs(folder_names) do
 			local folder_menu = {}
-			render_ext_tree(node.folders[folder_name], folder_menu, true)
+			if render_ext_tree(node.folders[folder_name], folder_menu, true) ~= true then return false end
 			local folder_total = node_total(node.folders[folder_name])
 			local folder_label = folder_name .. (folder_total > 0 and (" (" .. fmt_count(folder_total) .. ")") or "")
-			target[#target + 1] = { label = folder_label, items = folder_menu }
-		end
-		if separate_files and #folder_names > 0 and #node.files > 0 then
-			target[#target + 1] = { separator = true }
+			folder_rows[#folder_rows + 1] = { label = folder_label, items = folder_menu }
 		end
 		table.sort(node.files, function(a, b) return a.label < b.label end)
 		for _, file in ipairs(node.files) do
-			target[#target + 1] = { label = file.label, submenu = file.submenu }
+			file_rows[#file_rows + 1] = { label = file.label, submenu = file.submenu }
 		end
+		local rows = ManifestMenu.template_rows("hotstring_personal_directory_frame", {}, {
+			["personal_folder_file_boundary"] = function()
+				return separate_files and #folder_rows > 0 and #file_rows > 0
+			end,
+		}, {
+			["personal_folders"] = function() return folder_rows end,
+			["personal_files"] = function() return file_rows end,
+		})
+		if type(rows) ~= "table" then return false end
+		for _, row in ipairs(rows) do target[#target + 1] = row end
+		return true
 	end
 
 	local used_sources = {}
@@ -730,12 +764,11 @@ function M.build_custom(ctx, counts)
 		local g_secs    = all_personal_secs_by_group[gname]
 		local g_rows    = {}
 		local admission = gname ~= "personal" and PersonalFileScope.bind(ctx, record) or nil
-		append_section_rows(g_rows, gname, g_secs, g_enabled, admission)
+		if append_section_rows(g_rows, gname, g_secs, g_enabled, admission) ~= true then return nil end
 
 		if #g_rows > 0 or PersonalFiles.components(gname) then
 			if gname == "personal" then
-				table.insert(menu_items, { separator = true })
-				for _, row in ipairs(g_rows) do table.insert(menu_items, row) end
+				for _, row in ipairs(g_rows) do main_sections[#main_sections + 1] = row end
 			else
 				local parts = PersonalFiles.components(gname)
 				if parts then
@@ -770,10 +803,12 @@ function M.build_custom(ctx, counts)
 					local file_label = parts[#parts] .. (g_count > 0 and (" (" .. fmt_count(g_count) .. ")") or "")
 					local readonly = record and record.admitted == false
 					if readonly then file_label = file_label .. " — " .. i18n.get("menu.hotstrings.personal_source_unavailable") end
+					local file_menu = file_menu_for_group(gname, g_rows, admission, readonly)
+					if type(file_menu) ~= "table" then return nil end
 					node.files[#node.files + 1] = {
 						label = file_label,
 						count = g_count,
-						submenu = file_menu_for_group(gname, g_rows, admission, readonly),
+						submenu = file_menu,
 					}
 				end
 			end
@@ -781,22 +816,30 @@ function M.build_custom(ctx, counts)
 	end
 
 	for _, blocked in ipairs(require("infra.personal_hotstrings").unavailable_directories()) do
-		menu_items[#menu_items + 1] = { label = blocked.label,
+		unavailable_rows[#unavailable_rows + 1] = { label = blocked.label,
 			submenu = PersonalFileMenu.directory_unavailable(ManifestMenu) }
 	end
 
 	if #ext_tree.files > 0 or next(ext_tree.folders) ~= nil then
-		table.insert(menu_items, { separator = true })
-		render_ext_tree(ext_tree, menu_items, false)
+		if render_ext_tree(ext_tree, tree_rows, false) ~= true then return nil end
 	end
 
 	-- Custom/dynamic hotstrings sections (group "custom")
 	local custom_rows = {}
-	append_section_rows(custom_rows, "custom", custom_secs, custom_enabled)
-	if #custom_rows > 0 then
-		table.insert(menu_items, { separator = true })
-		for _, row in ipairs(custom_rows) do table.insert(menu_items, row) end
-	end
+	if append_section_rows(custom_rows, "custom", custom_secs, custom_enabled) ~= true then return nil end
+	local menu_items = ManifestMenu.template_rows("hotstring_personal_content_frame", {}, {
+		["personal_main_boundary"] = function() return #main_sections > 0 end,
+		["personal_tree_boundary"] = function() return #tree_rows > 0 end,
+		["personal_custom_boundary"] = function() return #custom_rows > 0 end,
+		["personal_empty"] = function() return false end,
+	}, {
+		["personal_controls"] = function() return controls end,
+		["personal_main_sections"] = function() return main_sections end,
+		["personal_unavailable_directories"] = function() return unavailable_rows end,
+		["personal_tree"] = function() return tree_rows end,
+		["personal_custom_sections"] = function() return custom_rows end,
+	})
+	if type(menu_items) ~= "table" then return nil end
 
 	-- The parent tick summarizes the desired gates. The shared commands select
 	-- these groups together without starting capture or inferring mixed state.

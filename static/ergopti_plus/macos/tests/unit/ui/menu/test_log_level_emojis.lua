@@ -233,3 +233,38 @@ helpers.describe("macOS actual Debug settings owner", function()
 	end
 	helpers.it("publishes the threshold and invalidates UI only after acknowledged settings", function() check_log_commit("true") end)
 end)
+
+
+--- Runs the shared source-presence contract through the actual complete native tray.
+--- @param body function Independent native row/source assertions.
+local function debug_parent_fixture(body)
+	local saved = {}
+	for _, name in ipairs({ "ui.menu.builder", "infra.i18n", "infra.locale", "infra.manifest_menu" }) do saved[name] = package.loaded[name] end
+	helpers.load_with_stubs("infra.paths")
+	for _, name in ipairs({ "ui.menu.builder", "infra.i18n", "infra.locale", "infra.manifest_menu" }) do package.loaded[name] = nil end
+	local native = require("ui.menu.builder")
+	local renderer, locale = require("infra.manifest_menu"), require("infra.locale")
+	local language = locale.current_locale()
+	local callbacks = {}
+	local function setter(value) callbacks[#callbacks + 1] = value; return false end
+	local logger = require("infra.logger")
+	local threshold = logger.current_level
+	logger.set_level("INFO")
+	local actions = { set_log_level = setter }
+	for _, name in ipairs({ "open_console", "open_logs", "open_today_log", "open_error_log", "toggle_error_dialog" }) do
+		local action = name
+		actions[action] = function() callbacks[#callbacks + 1] = action; return false end
+	end
+	local function build(paused) return native.generate({ paused = paused }, {}, actions) end
+	local ok, detail = xpcall(function() body(renderer, build, callbacks, locale, logger) end, debug.traceback)
+	locale.set_locale(language)
+	logger.current_level = threshold
+	for _, name in ipairs({ "ui.menu.builder", "infra.i18n", "infra.locale", "infra.manifest_menu" }) do package.loaded[name] = saved[name] end
+	if not ok then error(detail, 0) end
+end
+
+local debug_parent_file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/debug_parent.json"), "rb"))
+local debug_parent_raw = debug_parent_file:read("*a")
+debug_parent_file:close()
+require("test.debug_parent_contract").register(helpers, debug_parent_fixture,
+	assert(require("adapters.json_codec").decode(debug_parent_raw)), "hs")

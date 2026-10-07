@@ -336,10 +336,45 @@ console.log(
 	// Exercise the compiler's actual wrappers with the real imported pure owner,
 	// without executing build() or writing generated metadata.
 	const compiler = fs.readFileSync(path.join(ROOT, 'tools/build/build-menu-manifest.js'), 'utf8');
+	function compilerWrapper(source, name) {
+		const declarations = require('acorn')
+			.parse(source, { ecmaVersion: 'latest', sourceType: 'module' })
+			.body.filter((node) => node.type === 'FunctionDeclaration' && node.id?.name === name);
+		assert.equal(declarations.length, 1, name + ' has one genuine top-level function owner');
+		const declaration = declarations[0];
+		assert(declaration.body.body.length > 0, name + ' actual wrapper is nonempty');
+		assert.equal(declaration.params.length, 1);
+		assert.equal(declaration.params[0].name, 'menu');
+		return source.slice(declaration.start, declaration.end);
+	}
 	for (const name of ['validateGreyedRows', 'validateChildTemplates']) {
-		const owner = compiler.match(new RegExp('function ' + name + '\\(menu\\) \\{[^}]+\\}'));
+		const owner = [compilerWrapper(compiler, name)];
 		assert.ok(owner, name + ' must retain its actual compiler call boundary');
-		const validate = new Function('menuAvailability', owner[0] + '; return ' + name)(availability);
+		for (const replacement of [
+			'',
+			'const WrapperAsData = ' + JSON.stringify(owner[0]) + ';',
+			owner[0]
+				.split('\n')
+				.map((line) => '// ' + line)
+				.join('\n')
+		])
+			assert.throws(
+				() => compilerWrapper(compiler.replace(owner[0], replacement), name),
+				/one genuine top-level function owner/,
+				'missing or data-only wrapper cannot borrow compiler authority'
+			);
+		assert.throws(
+			() => compilerWrapper(compiler.replace(owner[0], 'function ' + name + '(menu) {}'), name),
+			/actual wrapper is nonempty/,
+			'empty actual body refuses'
+		);
+
+		const validate = new Function(
+			'menuAvailability',
+			'readFileSync',
+			'shared',
+			owner[0] + '; return ' + name
+		)(availability, fs.readFileSync, require('../lib/paths.cjs').shared);
 		validate({ hand: [{ ...base, unavailable: 'hide' }] });
 		if (name === 'validateGreyedRows')
 			assert.throws(

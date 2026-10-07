@@ -1,0 +1,91 @@
+{
+	"description": "Handwritten original macOS Agent presentation: outer Agent, mode/separator/two system groups/separator/excluded apps; system Off/backend data/model observation plus optional download. Runtime choices remain authentic owner data.",
+	"frames": {
+		"agent_system1_frame": [
+			{
+				"type": "group",
+				"id": "agent_system1",
+				"i18n": "menu.agent.system1",
+				"platforms": ["hs"],
+				"unavailable": "hide"
+			}
+		],
+		"agent_system2_frame": [
+			{
+				"type": "group",
+				"id": "agent_system2",
+				"i18n": "menu.agent.system2",
+				"platforms": ["hs"],
+				"unavailable": "hide"
+			}
+		],
+		"agent_download_frame": [
+			{
+				"type": "command",
+				"id": "agent_download_model",
+				"i18n": "menu.agent.download_model",
+				"platforms": ["hs"],
+				"unavailable": "hide"
+			}
+		],
+		"agent_excluded_apps_frame": [
+			{
+				"type": "group",
+				"id": "agent_disabled_apps",
+				"i18n": "menu.agent.disabled_apps",
+				"platforms": ["hs"],
+				"unavailable": "hide"
+			}
+		],
+		"agent_panel_frame": [
+			{
+				"type": "group",
+				"id": "agent_panel",
+				"i18n": "menu.agent.title",
+				"platforms": ["hs"],
+				"unavailable": "hide"
+			}
+		]
+	},
+	"native_top_order": [
+		"mode",
+		"separator",
+		"agent_system1",
+		"agent_system2",
+		"separator",
+		"agent_disabled_apps"
+	],
+	"system_fixed_order": [
+		"off",
+		"actual_backend_choices",
+		"separator",
+		"observed_model",
+		"download_if_missing"
+	],
+	"en": {
+		"outer": "🤖 AI agent",
+		"mode": "Mode: On action (gesture or shortcut)",
+		"system1": "⚡ System 1 (fast): Off",
+		"system2": "🧠 System 2 (thorough): Local (Ollama)",
+		"excluded": "Apps excluded from the automatic mode (2)",
+		"model": "Model… (qwen2.5:7b, not installed)",
+		"download": "⬇️ Download qwen2.5:7b"
+	},
+	"fr": {
+		"outer": "🤖 Agent IA",
+		"mode": "Mode : Sur action (geste ou raccourci)",
+		"system1": "⚡ Système 1 (rapide) : Désactivé",
+		"system2": "🧠 Système 2 (réfléchi) : Local (Ollama)",
+		"excluded": "Applications exclues du mode automatique (2)",
+		"model": "Modèle… (qwen2.5:7b, non installé)",
+		"download": "⬇️ Télécharger qwen2.5:7b"
+	},
+	"state": {
+		"llm_agent_system1": "",
+		"llm_agent_system2": "local",
+		"llm_agent_mode": "action",
+		"llm_agent_disabled_apps": ["hand.alpha", "hand.beta"]
+	},
+	"model": "qwen2.5:7b",
+	"picker_label": "picker-row"
+}
