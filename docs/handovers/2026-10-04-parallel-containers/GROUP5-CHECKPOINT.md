@@ -2329,3 +2329,29 @@ The new normally discovered Lua controls pass 12 with modeled HS endpoints.
 Earlier Python control drafts remain private evidence, not SDK registration.
 Native execution of this new diagnostic remains UNEXECUTED; it grants no UI,
 permission, retirement or ready authority. Item 24 remains partial.
+
+## Core-only generated asset-symbol build policy
+
+Actual CI376449 preparation completed universal Duktape and Core, then entered
+Console near 294 seconds and exceeded the original 300-second limit. The Core
+log compiled an unused generated asset-symbol Swift helper that imports SwiftUI
+and DeveloperToolsSupport. Authentic source slices and independent bridge/catalogue
+checks found no Core/vendor consumers. The reviewed candidate appends only
+ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS=NO to the admitted Core build command;
+the original command factory, other three commands, eight genuine vendor Swift
+implementations, catalogue/icon/resources and all four product and both-architecture,
+source, tool, custody, signature and reference requirements remain intact.
+
+The coherent change to 14 source files recuts eight builder pins, three exact image-size
+literals and four existing Core-producer consumers through whole byte/AST/SDK
+string inverses. Original41/53/29 counts, historical oracles, fixed corpora,
+ordinary 131,072-byte source bounds and native 300/SDK budgets remain unchanged.
+Focused portable qualification passes 450 tests and 8 stale-binding refusals;
+one initial sparse CPP-support setup error is retained and corrected by copying
+the exact original source, with all assertions conserved. Source 2's independent
+review also retains its original failure controls and explicit native 0 limit.
+
+No final native compilation, resource equivalence or timing improvement is
+claimed. Performance remains UNMEASURED and complete four-product fit under 300
+seconds UNPROVED until targeted Mac CI qualifies the integrated sources. TODO 31
+and transverse 16/38 remain open; no item is removed.

@@ -4799,6 +4799,25 @@ remains UNKNOWN; the separate XcodeGen HTTPS refusal is not fixed by this source
 change. No observed native regression is claimed resolved before targeted CI.
 TODO31 and transverse16/38 remain open.
 
+The reviewed Core build now disables only generated asset-symbol helpers. Actual
+Mac evidence identifies an unused generated Swift file importing SwiftUI and
+DeveloperToolsSupport; recovered Core/vendor sources contain no consumers, and
+independent bridging-header/catalogue checks preserve the same scope. The eight
+genuine vendor Swift implementations, catalogue/icon/resources, all four products,
+both architectures, source/tool/currentness checks and the original 300-second
+limit remain mandatory. Console's real SwiftUI code and the other three build
+commands remain unchanged. Exact builder/producer hash and image-size references
+are updated through their existing consumers; independent expectations and
+ordinary 131,072-byte admission bounds remain whole.
+
+Focused portable checks pass 450 cases and 8 stale-binding refusals. Source-only
+review does not prove native resource equivalence or speed: actual final
+compilation remains unexecuted, performance savings UNMEASURED and completion
+within 300 seconds UNPROVED. Original CI376449 entered Console near 294 seconds
+and interrupted its build; this source change is not declared to fix that
+failure before actual Mac qualification. TODO 31 and transverse 16/38 remain open;
+no item is removed.
+
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
   listed; see `docs/memory/text-input-and-config.md`. Current source already

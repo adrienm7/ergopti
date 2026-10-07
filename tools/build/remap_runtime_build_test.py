@@ -458,11 +458,13 @@ class PreparationControls(unittest.TestCase):
         native_platform = m.sys.platform
         old_run = m._RUN_PHASE
         phases = []
+        build_commands = []
 
         def modeled_phase(name, command, project, owner, deadline):
             phases.append(name)
             if name.endswith("_build"):
                 label = name.removesuffix("_build")
+                build_commands.append((label, list(command)))
                 output = products[label]
                 output.parent.mkdir(parents=True, exist_ok=True)
                 output.write_bytes(b"original-image-" + label.encode())
@@ -506,6 +508,32 @@ class PreparationControls(unittest.TestCase):
                 "native": "UNEXECUTED",
             }
         )
+        # Freeze exact actual loop commands independently of the command factory.
+        self.assertEqual(
+            [label for label, _ in build_commands], ["duktape", "core", "console", "cli"]
+        )
+        for label, recipe in (
+            ("duktape", "vendor/duktape-src"),
+            ("core", "src/apps/CoreService"),
+            ("console", "src/apps/ConsoleUserServer"),
+            ("cli", "src/bin/cli"),
+        ):
+            with self.subTest(actual_build_target=label):
+                expected_command = [
+                    tools["xcodebuild"],
+                    "-configuration",
+                    "Release",
+                    "-alltargets",
+                    "SYMROOT=" + str(source / recipe / "build"),
+                    "ARCHS=arm64 x86_64",
+                    "ONLY_ACTIVE_ARCH=NO",
+                    "CODE_SIGNING_ALLOWED=NO",
+                    "CODE_SIGNING_REQUIRED=NO",
+                    "GCC_GENERATE_DEBUGGING_SYMBOLS=NO",
+                ]
+                if label == "core":
+                    expected_command.append("ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS=NO")
+                self.assertEqual(dict(build_commands)[label], expected_command)
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["actual"], "REFUSED")
 

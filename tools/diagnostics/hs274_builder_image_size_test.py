@@ -15,8 +15,8 @@ SUBJECT = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = SUBJECT
 exec(compile(SOURCE.read_bytes(), str(SOURCE), "exec"), SUBJECT.__dict__)
 BUILDER = CANDIDATE / "tools/build/remap_runtime_build.py"
-FIXED = "b78f590249839bc6bccf43b4fd01e08d2b7470f2b7d1b2272f41927122748a29"
-EXACT_BYTES = 133931
+FIXED = "f1cd9c3be1c3793a4fb829955406807dcb16df84542aa377af5ce167eb5faf7d"
+EXACT_BYTES = 134077
 
 
 class FixedSourceAdmission(unittest.TestCase):

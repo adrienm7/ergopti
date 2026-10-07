@@ -1909,7 +1909,11 @@ def _compile_product_images(
         )
         for suffix, command in (
             ("generate", [tools["xcodegen"], "generate"]),
-            ("build", build_command(tools["xcodebuild"], project)),
+            (
+                "build",
+                build_command(tools["xcodebuild"], project)
+                + (["ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS=NO"] if label == "core" else []),
+            ),
         ):
             _current_build_inputs(source_snapshot, deadline, staged_image)
             _preparation_current(shipping_sink, retained, deadline)
