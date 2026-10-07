@@ -308,27 +308,45 @@ _LayMgrWeb_PushState(Deps, *) {
 }
 
 /**
- * Makes ``Id`` the layout typing uses: an Ergopti layout selects the built-in
- * emulation (with or without Ergopti+), any other installed layout becomes the
- * emulated layout. Persists, then reloads so the emulation registers.
- * @param {string} Id
- * @returns {boolean} Whether the reload was started.
+ * Selects a layout through the acknowledged configuration handoff.
+ * @param {String} Id Registry layout identifier.
+ * @param {Map} Options Configuration lifecycle ports for owner tests.
+ * @returns {Boolean} Whether the successor launch was accepted.
  */
-LayoutManager_Select(Id) {
-	global Features, ERGOPTI_PLUS_LAYOUT_ID
-	Builtin := LayoutManager_BuiltinIds()
-	if Builtin.Has(Id)
-		Entries := [
-			Map("path", "layout.emulated_layout", "value", ""),
-			Map("path", "layout.ergopti_base", "value", true),
-			Map("path", "layout.ergopti_plus", "value", Id == ERGOPTI_PLUS_LAYOUT_ID),
+LayoutManager_Select(Id, Options := unset) {
+	Receipt := IsSet(Options) ? LayoutManager_SelectTransition(Id, Options) : LayoutManager_SelectTransition(Id)
+	return Receipt["status"] == "pending" || Receipt["status"] == "committed"
+}
+
+/**
+ * Retains the selected configuration until successor completion or rollback.
+ * The resident input owner keeps its admitted layout while the reload is pending.
+ * @param {String} Id Registry layout identifier.
+ * @param {Map} Options Configuration lifecycle ports for owner tests.
+ * @returns {Map} Pending or terminal configuration receipt.
+ */
+LayoutManager_SelectTransition(Id, Options := unset) {
+	if !LayoutRegistry_IsValidId(Id)
+		throw ValueError("The layout selection requires a valid registry identifier.")
+	if !IsSet(Options)
+		Options := Map()
+	if !(Options is Map)
+		throw TypeError("The layout selection requires explicit lifecycle options.")
+	LoggerInfo("LayoutManager", "Selecting the '{1}' layout through the owned reload handoff.", Id)
+	return ConfigScopeCommitOperations("keyboard_layout", "select", _LayMgrWeb_SelectionOperations.Bind(Id), Options)
+}
+
+; Built-in selections keep the existing empty-emulation contract and overlays.
+; A registry selection changes only its source identifier; it owns no layer gate.
+_LayMgrWeb_SelectionOperations(Id) {
+	global ERGOPTI_PLUS_LAYOUT_ID
+	if LayoutManager_BuiltinIds().Has(Id)
+		return [
+			ManifestSparseOperation("layout.emulated_layout", ""),
+			ManifestSparseOperation("layout.ergopti_base", true),
+			ManifestSparseOperation("layout.ergopti_plus", Id == ERGOPTI_PLUS_LAYOUT_ID),
 		]
-	else
-		Entries := [Map("path", "layout.emulated_layout", "value", Id)]
-	LoggerInfo("LayoutManager", "Selecting the '{1}' layout and reloading.", Id)
-	if (WriteFeatureBatchV2(Features, Entries) != Entries.Length)
-		return ConfigReportPersistenceFailure("the layout selection")
-	return ReloadPreservingSuspend()
+	return [ManifestSparseOperation("layout.emulated_layout", Id)]
 }
 
 ; The successor discovers committed extension roots even for nonselected layouts.
