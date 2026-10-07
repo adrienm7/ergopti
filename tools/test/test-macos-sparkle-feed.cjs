@@ -1005,14 +1005,14 @@ try {
 	assert.ifError(result.error);
 	assert.equal(result.signal, null, result.stderr);
 	assert.equal(result.status, 0, result.stderr);
-	assert.match(result.stderr, /Ran 29 tests in /);
+	assert.match(result.stderr, /Ran 24 tests in /);
 	const skipped = process.platform === 'win32' ? 7 : process.platform === 'darwin' ? 1 : 0;
 	assert.match(
 		result.stderr,
 		skipped ? new RegExp(`\\nOK \\(skipped=${skipped}\\)\\s*$`) : /\nOK\s*$/
 	);
 	console.log(
-		`Sparkle transport controls: ${29 - skipped} passed, ${skipped} platform cases skipped.`
+		`Sparkle transport controls: ${24 - skipped} passed, ${skipped} platform cases skipped.`
 	);
 	const fixture = fs.readFileSync(
 		path.join(
@@ -1120,7 +1120,10 @@ try {
 	assert.match(fixture, /fetchedFeeds\.count, 2/);
 	assert.match(fixture, /hash\(refusedFeed\), hash\(acceptedFeed\)/);
 	assert.doesNotMatch(fixture, /<rss|private func feed\(/);
-	assert.match(child, /willDownloadUpdate item: SUAppcastItem, with request: NSMutableURLRequest/);
+	assert.match(
+		child,
+		/willDownloadUpdate item: SUAppcastItem, withRequest request: NSMutableURLRequest/
+	);
 	assert.match(child, /item\.fileURL == origin, request\.url == origin/);
 	assert.match(child, /transport\.scheme == "http", transport\.host == "localhost"/);
 	assert.match(

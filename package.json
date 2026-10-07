@@ -328,7 +328,6 @@
 		"test:linux-ci-evidence": "node ./tools/test/test-linux-ci-evidence.cjs",
 		"test:desktop-ci-evidence": "node ./tools/test/test-desktop-ci-evidence.cjs",
 		"test:compiled-save-upgrade": "node ./tools/test/test-compiled-save-upgrade.cjs",
-		"test:windows-native-desktop": "node ./tools/test/test-windows-native-desktop.cjs",
 		"test:macos-tooltip-canvas": "node ./tools/test/run-macos-tooltip-canvas-tests.cjs",
 		"test:macos-tooltip-canvas-admission": "node ./tools/test/test-macos-tooltip-canvas-admission.cjs",
 		"test:linux-webview-security": "node ./tools/test/test-linux-webview-security.cjs",

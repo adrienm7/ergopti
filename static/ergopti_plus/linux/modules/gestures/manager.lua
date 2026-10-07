@@ -59,22 +59,6 @@ local ScriptActions = require("modules.shortcuts.script_actions")
 local ShellRunner = require("adapters.shell_runner")
 local DesktopNavigation = require("desktop_navigation")
 local SystemActions = require("modules.gestures.system_actions")
-
--- Retain the admitted issuer at owner construction. Later module/export swaps
--- cannot appoint another producer or certify unavailable custody.
-local _emitter_ok, _emitter_owner = pcall(require, "modules.gestures.combo_emitter")
-local _emitter_press, _emitter_certify
-if _emitter_ok and type(_emitter_owner) == "table" and getmetatable(_emitter_owner) == nil then
-	_emitter_press = rawget(_emitter_owner, "press")
-	_emitter_certify = rawget(_emitter_owner, "can_fallback")
-end
-local function emitter_authority_current()
-	return _emitter_ok and type(_emitter_owner) == "table"
-		and getmetatable(_emitter_owner) == nil and type(_emitter_press) == "function"
-		and rawequal(package.loaded["modules.gestures.combo_emitter"], _emitter_owner)
-		and rawequal(rawget(_emitter_owner, "press"), _emitter_press)
-		and rawequal(rawget(_emitter_owner, "can_fallback"), _emitter_certify)
-end
 local LOG = "modules.gestures.manager"
 local ENABLED_PATH = "gestures.enabled"
 local DEFAULT_ENABLED = Manifest.default_for(ENABLED_PATH)
@@ -577,8 +561,8 @@ local function _execute_action(action_name, go_next, binding)
 		pcall(function() os.execute(cmd .. " 2>/dev/null &") end)
 	end
 
-	--- Presses one combination: xdotool requires a positively observed unavailable
-	--- channel before native acquisition, never a failed or unsettled native send.
+	--- Presses one combination: uinput first, xdotool only if it could not be
+	--- written.
 	---
 	--- `xdotool key` is X11 only, and under Wayland it talks to nothing: the
 	--- command succeeds, the shell exits zero, and the gesture does nothing.
@@ -591,21 +575,9 @@ local function _execute_action(action_name, go_next, binding)
 	--- mode for a worse one.
 	--- @param combo string X keysym names joined by "+", as xdotool takes them.
 	local function _press_combo(combo)
-		if not emitter_authority_current() then
-			Logger.error(LOG, "The gesture emitter is unavailable; '%s' was refused.", combo)
-			return
-		end
-		local press, certify = _emitter_press, _emitter_certify
-		local emitted, result = press(combo)
-		if emitted == true then return end
-		Logger.debug(LOG, "Checking pre-acquisition fallback admission for '%s' (X11 only).", combo)
-		if emitted ~= false or type(certify) ~= "function"
-			or not emitter_authority_current()
-			or certify(result, combo) ~= true
-			or not emitter_authority_current() then
-			Logger.warn(LOG, "Gesture '%s' refused another output producer after native refusal or unknown custody.", combo)
-			return
-		end
+		local ok_emitter, Emitter = pcall(require, "modules.gestures.combo_emitter")
+		if ok_emitter and Emitter.press(combo) then return end
+		Logger.debug(LOG, "uinput unavailable for '%s' — falling back to xdotool (X11 only).", combo)
 		_run("xdotool key " .. combo)
 	end
 
