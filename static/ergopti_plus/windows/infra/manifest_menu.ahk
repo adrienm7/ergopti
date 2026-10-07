@@ -775,11 +775,13 @@ _MR_TemplateRows(ManifestKey, Commands, StateGetters, Children, Visiting, Status
 		else if IsSet(StatusDefinition) && ItemType == "label"
 			Row := Map("label", t(Item["i18n"]), "disabled", true)
 		else if ItemType == "label" {
-			Fields := Map("type", true, "id", true, "i18n", true, "platforms", true, "unavailable", true)
+			Fields := Map("type", true, "id", true, "i18n", true, "platforms", true, "unavailable", true, "caption_getter", true)
 			I18nKey := _MR_Get(Item, "i18n")
 			Unavailable := _MR_Get(Item, "unavailable")
 			Valid := Type(Id) == "String" && Id != "" && Type(I18nKey) == "String" && I18nKey != ""
 				&& (!Item.Has("unavailable") || Unavailable == "hide")
+			Valid := Valid && (!Item.Has("caption_getter") || (Type(Item["caption_getter"]) == "String"
+				&& Item["caption_getter"] != "" && Type(Id) == "String" && Id != ""))
 			for Field in Item {
 				if !Fields.Has(Field)
 					Valid := false
@@ -792,7 +794,7 @@ _MR_TemplateRows(ManifestKey, Commands, StateGetters, Children, Visiting, Status
 		}
 		else if ItemType == "section_header" {
 			Fields := Map("type", true, "id", true, "i18n", true, "platforms", true,
-				"unavailable", true, "reason_key", true)
+				"unavailable", true, "reason_key", true, "caption_getter", true)
 			I18nKey := _MR_Get(Item, "i18n")
 			Unavailable := _MR_Get(Item, "unavailable")
 			Reason := _MR_Get(Item, "reason_key")
@@ -802,6 +804,8 @@ _MR_TemplateRows(ManifestKey, Commands, StateGetters, Children, Visiting, Status
 				&& (Unavailable != "grey" || Item.Has("reason_key"))
 				&& (!Item.Has("reason_key") || (Type(Reason) == "String" && Reason != ""
 					&& Unavailable != "hide"))
+			Valid := Valid && (!Item.Has("caption_getter") || (Type(Item["caption_getter"]) == "String"
+				&& Item["caption_getter"] != "" && Type(Id) == "String" && Id != ""))
 			for Field in Item {
 				if !Fields.Has(Field)
 					Valid := false
@@ -844,18 +848,48 @@ _MR_TemplateRows(ManifestKey, Commands, StateGetters, Children, Visiting, Status
 				try LoggerError("MenuRenderer", "Missing or invalid caption getter in template '{1}' — provider rows refused.", ManifestKey)
 				return false
 			}
+			RawTitle := t(_MR_Get(Item, "i18n"))
+			if ItemType == "label" || ItemType == "section_header" {
+				_MR_CaptionFormat(RawTitle, "", &SourceSlot)
+				if !SourceSlot {
+					try LoggerError("MenuRenderer", "Invalid inert caption format in template '{1}' — provider rows refused.", ManifestKey)
+					return false
+				}
+			}
 			Value := StateGetters[CaptionGetter].Call()
-			Title := t(_MR_Get(Item, "i18n"))
+			Title := ItemType == "section_header" ? Row["label"] : RawTitle
 			if Type(Value) != "String" {
 				try LoggerError("MenuRenderer", "Invalid caption getter in template '{1}' — provider rows refused.", ManifestKey)
 				return false
 			}
-			Row["label"] := StrReplace(Title, "%s", Value)
+			Caption := _MR_CaptionFormat(Title, Value, &HasSlot)
+			if (ItemType == "label" || ItemType == "section_header") && !HasSlot {
+				try LoggerError("MenuRenderer", "Invalid inert caption format in template '{1}' — provider rows refused.", ManifestKey)
+				return false
+			}
+			Row["label"] := Caption
 		}
 		Rows.Push(Row)
 	}
 	Visiting.Delete(ManifestKey)
 	return Rows
+}
+
+; Formats supported slots without interpreting percent bytes inside the native value.
+_MR_CaptionFormat(Title, Value, &HasSlot) {
+	HasSlot := false
+	Caption := "", Position := 1
+	while Position <= StrLen(Title) {
+		Character := SubStr(Title, Position, 1), Following := SubStr(Title, Position + 1, 1)
+		if Character == "%" && Following == "%" {
+			Caption .= "%", Position += 2
+		} else if Character == "%" && Following == "s" {
+			Caption .= Value, HasSlot := true, Position += 2
+		} else {
+			Caption .= Character, Position += 1
+		}
+	}
+	return Caption
 }
 
 ; Shares strict native provider admission between template lists and lazy groups.

@@ -4412,6 +4412,17 @@ integrated, then publish one grouped release.
   establishing 48/86/61. Independent source and portable controls pass; final
   integrated native and installed qualification remain required.
 
+  Shared dynamic captions now validate the actual English format before any
+  lazy native getter runs. Literal captions, escaped percent signs and user
+  data retain their original rendering; malformed or withdrawn declarations
+  refuse before getters and native allocation. Independent corpus and causal
+  controls cover all three renderers. This API prerequisite retires no native
+  sites: the census remains 48/86/61. The compiler-boundary fixture now
+  parses actual nonempty top-level functions instead of truncating nested
+  blocks; original assertions and new missing/data/comment/empty controls
+  remain mandatory. Final composed native, installed and
+  physical-device qualification remain separate; items 54 and 81 stay partial.
+
   Published `409b8ee0` includes the shared model-readout migration and its two
   owner-generated artifacts; the remaining sites are software migration work.
   Native allocators and computed user-data captions alone do not prove missing
@@ -5481,6 +5492,10 @@ Current Group 3 source checkpoint (item 73, 2026-10-06): [Group 3 current checkp
   sites): they follow (b), as part of the template;
   (d) the tray root bootstrap (Windows `tray_bootstrap.ahk`,
   `menu_init.ahk`).
+  Dynamic caption admission now validates the genuine English formatter
+  before lazy getters, with literal and escaped-percent controls. It is a
+  renderer prerequisite and does not retire native sites or close this item.
+
   Current shared child-template, native-list/lazy-group, presence and inert
   presentation-refusal APIs are implemented. The historical classification
   above does not mean these APIs are absent; remaining provider families still
