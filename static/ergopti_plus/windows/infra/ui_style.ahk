@@ -107,6 +107,7 @@ global UI_LLM_SLOT_PLACEHOLDER      := ""
 global UI_LLM_INACTIVE_ALIGN_CHAR   := ""
 global UI_LLM_FOOTER_SPACE_DIV      := ""
 global UI_LLM_FOOTER_COMBINED_SEP   := ""
+global UI_LLM_SHORTCUT_COLUMN_GAP := 0
 global UI_LLM_SHORTCUT_LABEL_GAP    := ""
 global UI_LLM_HINT_ACCEPT_SINGLE    := ""
 global UI_LLM_HINT_NAV_LEFT         := ""
@@ -268,6 +269,7 @@ UiStyle_LoadSharedConst() {
 	global UI_LLM_INACTIVE_ALIGN_CHAR  := _UiStyleRequire(c, "llm_ui", "inactive_align_char")
 	global UI_LLM_FOOTER_SPACE_DIV     := _UiStyleRequire(c, "llm_ui", "footer_space_divider")
 	global UI_LLM_FOOTER_COMBINED_SEP  := _UiStyleRequire(c, "llm_ui", "footer_combined_separator")
+	global UI_LLM_SHORTCUT_COLUMN_GAP := Integer(_UiStyleRequire(c, "llm_ui", "shortcut_column_gap"))
 	global UI_LLM_SHORTCUT_LABEL_GAP   := _UiStyleRequire(c, "llm_ui", "shortcut_label_gap")
 	global UI_LLM_HINT_ACCEPT_SINGLE   := _UiStyleRequire(c, "llm_ui", "hint_accept_single")
 	global UI_LLM_HINT_NAV_LEFT        := _UiStyleRequire(c, "llm_ui", "hint_nav_left")

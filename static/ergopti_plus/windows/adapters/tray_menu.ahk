@@ -154,6 +154,14 @@ TrayMenuDestroy() {
 	}
 }
 
+
+/** Reads a native popup child; zero means the indexed item is not a submenu. */
+TrayMenuNativeSubmenuHandle(OwnerMenu, Position) {
+	if !(OwnerMenu is Menu) || !(Position is Integer) || Position < 0
+		throw TypeError("Native submenu lookup requires an owned menu and position")
+	return DllCall("GetSubMenu", "ptr", OwnerMenu.Handle, "int", Position, "ptr")
+}
+
 ; Machine-readable contract map - consumed by the generic adapter compliance test
 ; (tests/test_adapter_compliance_new.ahk) to verify every required method exists
 ; and is callable without manually listing functions per-adapter.

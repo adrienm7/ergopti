@@ -1005,14 +1005,14 @@ try {
 	assert.ifError(result.error);
 	assert.equal(result.signal, null, result.stderr);
 	assert.equal(result.status, 0, result.stderr);
-	assert.match(result.stderr, /Ran 24 tests in /);
-	const skipped = process.platform === 'win32' ? 7 : process.platform === 'darwin' ? 1 : 0;
+	assert.match(result.stderr, /Ran 30 tests in /);
+	const skipped = process.platform === 'win32' ? 8 : process.platform === 'darwin' ? 1 : 0;
 	assert.match(
 		result.stderr,
 		skipped ? new RegExp(`\\nOK \\(skipped=${skipped}\\)\\s*$`) : /\nOK\s*$/
 	);
 	console.log(
-		`Sparkle transport controls: ${24 - skipped} passed, ${skipped} platform cases skipped.`
+		`Sparkle transport controls: ${30 - skipped} passed, ${skipped} platform cases skipped.`
 	);
 	const fixture = fs.readFileSync(
 		path.join(
@@ -1022,6 +1022,7 @@ try {
 		'utf8'
 	);
 	for (const method of [
+		'testNativeCensusBindsAnExecutableLaunchedThroughAnOwnedAlias',
 		'testDirectNativeChildExitACKAndCaptureRetirementAreIdempotent',
 		'testActualSparkleTarXZUpdateRefusesWrongKeyPreservesOldAppAndRetriesThroughRelaunch'
 	]) {
@@ -1120,10 +1121,7 @@ try {
 	assert.match(fixture, /fetchedFeeds\.count, 2/);
 	assert.match(fixture, /hash\(refusedFeed\), hash\(acceptedFeed\)/);
 	assert.doesNotMatch(fixture, /<rss|private func feed\(/);
-	assert.match(
-		child,
-		/willDownloadUpdate item: SUAppcastItem, withRequest request: NSMutableURLRequest/
-	);
+	assert.match(child, /willDownloadUpdate item: SUAppcastItem, with request: NSMutableURLRequest/);
 	assert.match(child, /item\.fileURL == origin, request\.url == origin/);
 	assert.match(child, /transport\.scheme == "http", transport\.host == "localhost"/);
 	assert.match(
@@ -1139,6 +1137,46 @@ try {
 	);
 } catch (error) {
 	errors.push(`Native generated appcast composition guard failed: ${error.message}`);
+}
+
+// Independent OpenSSL verification bound to the actual native signature fixture.
+try {
+	const control = require('./fixtures/sparkle-signature-physical-controls.cjs');
+	control.runSignatureControls({
+		fixture: fs.readFileSync(
+			path.join(
+				root,
+				'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/SparkleArchiveUpdateAcceptanceTests.swift'
+			),
+			'utf8'
+		)
+	});
+} catch (error) {
+	errors.push(`Signature fixture regression failed: ${error.message}`);
+}
+
+// The separate physical change registers its actual-helper native XCTest.
+try {
+	const control = require('./fixtures/sparkle-signature-physical-controls.cjs');
+	control.runPhysicalControls({
+		child: fs.readFileSync(
+			path.join(root, 'tools/diagnostics/macos_sparkle_archive_child.swift'),
+			'utf8'
+		),
+		fixture: fs.readFileSync(
+			path.join(
+				root,
+				'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/SparkleArchiveUpdateAcceptanceTests.swift'
+			),
+			'utf8'
+		),
+		probe: fs.readFileSync(
+			path.join(root, 'tools/test/fixtures/prepare-sparkle-native-physical-probe.py'),
+			'utf8'
+		)
+	});
+} catch (error) {
+	errors.push(`Physical fixture regression failed: ${error.message}`);
 }
 
 if (errors.length > 0) {

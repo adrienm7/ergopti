@@ -210,8 +210,8 @@ local function make_counting_canvas()
 		frame = function() end,
 		show  = function() end,
 	}
-	-- render() writes into elements 1..6 by index.
-	for i = 1, 7 do canvas[i] = {} end
+	-- The production canvas owns seven original elements and ten shortcut labels.
+	for i = 1, 17 do canvas[i] = {} end
 	return canvas, measurements
 end
 

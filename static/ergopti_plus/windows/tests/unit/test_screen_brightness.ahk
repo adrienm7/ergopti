@@ -406,7 +406,7 @@ Test("screen brightness: closed diagnostic refuses malformed private observation
 
 
 _SBT_NativeProvider(Mode, ExpectedStatus, ExpectedExit, ExpectedCalls := 1,
-		ExpectedStage := "readback", ExpectedPolicyType := "object") {
+		ExpectedStage := "readback", ExpectedPolicyType := "object", FixtureModulePath := "", FixtureOwner := 0) {
 	global _DriverDir, _SharedDir, _VendorDir
 	Observed := [], Control := Map(), Polls := 0
 	Args := ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
@@ -414,6 +414,8 @@ _SBT_NativeProvider(Mode, ExpectedStatus, ExpectedExit, ExpectedCalls := 1,
 		"-Worker", _VendorDir . "\ergopti_brightness_worker.ps1",
 		"-FixturePolicyPath", _SharedDir . "\modules\actions\brightness.json",
 		"-Action", "brightness_up", "-Mode", Mode]
+	if FixtureModulePath != ""
+		Args.Push("-FixtureModulePath", FixtureModulePath)
 	MarkerPath := _SBT_DiagnosticMarkerCreate()
 	if MarkerPath != ""
 		Args.Push("-FixtureDiagnosticPath", MarkerPath)
@@ -424,6 +426,10 @@ _SBT_NativeProvider(Mode, ExpectedStatus, ExpectedExit, ExpectedCalls := 1,
 		if MarkerPath != ""
 			_SBT_DiagnosticMarkerDelete(MarkerPath)
 		throw Err
+	}
+	if FixtureOwner is Map {
+		FixtureOwner["handle"] := Handle
+		FixtureOwner["acquired"] := true
 	}
 	try {
 		AssertTrue(Handle.start(), "the native owned child must really start")
@@ -448,6 +454,8 @@ _SBT_NativeProvider(Mode, ExpectedStatus, ExpectedExit, ExpectedCalls := 1,
 			"the real worker and shared readback policy agree")
 	} finally {
 		AssertTrue(Handle.terminate(), "the exact native child tree must physically settle")
+		if FixtureOwner is Map
+			FixtureOwner["retired"] := true
 		; Failed native retirement retains the marker instead of deleting a file
 		; a still-owned child may continue writing. No termination retry is added.
 		if MarkerPath != ""
@@ -601,3 +609,44 @@ _SBT_DiagnosticMarkerControls() {
 	} finally _SBT_DiagnosticMarkerDelete(Path)
 }
 Test("screen brightness: optional phase marker reads closed bounded facts without exposing paths", _SBT_DiagnosticMarkerControls)
+
+
+; Failed physical retirement retains these exact private module resources.
+global _SBT_MODULE_DEBTS := Map()
+
+_SBT_ForeignModulePath(ModuleName, ExportName) {
+	global _SBT_MODULE_DEBTS
+	static Sequence := 0
+	local namespace := A_Temp . "\ergopti_brightness_modules_" . DllCall("Kernel32\GetCurrentProcessId", "UInt")
+		. "_" . A_TickCount . "_" . ++Sequence
+	local acquired := false, owner := Map("handle", 0, "acquired", false, "retired", false)
+	local parent_modules := EnvGet("PSModulePath")
+	try {
+		AssertTrue(FSCreateDirectoryExclusiveStrict(namespace), "The foreign-module fixture requires an exclusive namespace.")
+		acquired := true
+		local module_directory := namespace . "\" . ModuleName
+		AssertTrue(FSCreateDirectoryExclusiveStrict(module_directory))
+		local manifest := "@{RootModule='" . ModuleName . ".psm1';ModuleVersion='99.0.0';"
+			. "GUID='bc4784ad-a677-4bb0-91ad-21e7280e7e15';PowerShellVersion='7.0';FunctionsToExport=@('"
+			. ExportName . "');CmdletsToExport=@();VariablesToExport=@();AliasesToExport=@()}"
+		local body := "function " . ExportName . " { throw 'A foreign module must never execute.' }"
+		FileAppend(manifest, module_directory . "\" . ModuleName . ".psd1", "UTF-8-RAW")
+		FileAppend(body, module_directory . "\" . ModuleName . ".psm1", "UTF-8-RAW")
+		_SBT_NativeProvider("applied", "applied", 0, 1, "readback", "object", namespace, owner)
+		AssertTrue(owner["acquired"] && owner["retired"], "The real child must retire before its modules.")
+		AssertTrue(StrCompare(parent_modules, EnvGet("PSModulePath"), true) == 0,
+			"A child-only module policy cannot replace its parent's environment.")
+	} finally {
+		if acquired {
+			if !owner["acquired"] || owner["retired"]
+				DirDelete(namespace, true)
+			else
+				_SBT_MODULE_DEBTS[namespace] := owner
+		}
+	}
+}
+
+Test("screen brightness: native worker rejects foreign Utility module precedence",
+	_SBT_ForeignModulePath.Bind("Microsoft.PowerShell.Utility", "ConvertFrom-Json"))
+Test("screen brightness: native worker rejects foreign Management module precedence",
+	_SBT_ForeignModulePath.Bind("Microsoft.PowerShell.Management", "Get-Content"))

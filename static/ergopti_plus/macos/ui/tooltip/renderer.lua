@@ -19,6 +19,7 @@ local Config = require("ui.tooltip.config")
 -- are pinned to the same JSON vectors on both.
 local SharedTint   = require("tooltip.tint")
 local SharedLayout = require("tooltip.layout")
+local ShortcutColumn = require("tooltip.shortcut_column")
 
 -- Corner arc radius for ALL tooltip rounding (single + stacked canvases). Read
 -- from the shared cross-driver source (_shared/modules/tooltip/constants.toml → Config)
@@ -60,7 +61,12 @@ if M.canvas then
 		{ type = "rectangle" },
 		{ type = "text" },
 		{ type = "text" },
-		{ type = "text", action = "skip" }
+		{ type = "text", action = "skip" },
+		table.unpack((function()
+			local columns = {}
+			for index = 1, 10 do columns[index] = { type = "text", action = "skip" } end
+			return columns
+		end)())
 	)
 end
 
@@ -347,6 +353,26 @@ function M.compute_position(anchor, canvas, screen_frame)
 	})
 end
 
+--- Measures the shared shortcut column independently of the prediction bodies.
+--- @param blocks table The assembled body and shortcut payloads.
+--- @return number The widest shortcut label.
+local function shortcut_width(blocks)
+	local width = 0
+	for _, row in ipairs(blocks.shortcuts or {}) do
+		width = math.max(width, M.canvas:minimumTextSize(3, row.text).w)
+	end
+	return width
+end
+
+--- The minimum width of prediction bodies and their separate shortcut column.
+--- @param blocks table The assembled body and shortcut payloads.
+--- @return number The complete prediction width.
+function M.prediction_width(blocks)
+	local body_width = M.canvas:minimumTextSize(3, blocks.preds).w
+	local column_width = shortcut_width(blocks)
+	return ShortcutColumn.width(body_width, column_width, Config.llm_ui.shortcut_column_gap)
+end
+
 --- Compiles the component blocks, applies layout logic, and draws the canvas.
 --- @param blocks table|userdata The text payloads to draw.
 --- @param state table The orchestrator state object.
@@ -375,7 +401,7 @@ function M.render(blocks, state, start_watchers_callback)
 		local size_hint = hint_styled and M.canvas:minimumTextSize(3, hint_styled) or { w = 0, h = 0 }
 		local size_info = info_styled and M.canvas:minimumTextSize(3, info_styled) or { w = 0, h = 0 }
 
-		local max_width = state.fixed_width or size_predictions.w
+		local max_width = math.max(state.fixed_width or 0, M.prediction_width(blocks))
 		local is_combined_layout = false
 		local combined_styled = nil
 		-- Hoisted out of the layout decision below so the draw site can reuse it.
@@ -400,8 +426,27 @@ function M.render(blocks, state, start_watchers_callback)
 		local canvas_width = max_width + Config.layout.pad_x * 2
 		local current_y = Config.layout.pad_y
 
+		local column_width = shortcut_width(blocks)
+		local column_span = column_width > 0 and (Config.llm_ui.shortcut_column_gap + column_width) or 0
 		M.canvas[3].text  = blocks.preds
-		M.canvas[3].frame = { x = Config.layout.pad_x, y = current_y, w = max_width, h = size_predictions.h }
+		M.canvas[3].frame = { x = Config.layout.pad_x, y = current_y, w = max_width - column_span, h = size_predictions.h }
+		for index = 1, 10 do
+			local element = M.canvas[7 + index]
+			local row = blocks.shortcuts and blocks.shortcuts[index]
+			if row then
+				local label_size = M.canvas:minimumTextSize(3, row.text)
+				-- Measure the attributed body through this row: its exact bottom
+				-- includes the same font changes and inter-row spacing as element 3.
+				local through_size = M.canvas:minimumTextSize(3, row.through)
+				element.text = row.text
+				element.frame = { x = ShortcutColumn.left(Config.layout.pad_x + max_width, label_size.w),
+					y = current_y + through_size.h - label_size.h,
+					w = label_size.w, h = label_size.h }
+				element.action = "fill"
+			else
+				element.action = "skip"
+			end
+		end
 		current_y = current_y + size_predictions.h + Config.layout.line_spacing
 
 		if hint_styled or info_styled then

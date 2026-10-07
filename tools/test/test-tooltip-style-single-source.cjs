@@ -76,6 +76,7 @@ const SHARED = [
 	['llm_ui', 'footer_space_divider'],
 	['llm_ui', 'footer_combined_separator'],
 	['llm_ui', 'shortcut_label_gap'],
+	['llm_ui', 'shortcut_column_gap'],
 	['tint', 'lightness'],
 	['tint', 'saturation']
 ];

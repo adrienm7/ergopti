@@ -100,8 +100,28 @@ _SetPersonalDefaultSection(SecName, PersonalMenu, TomlData, DefaultSectionMenu, 
 		_PrevDefaultLabel := NewLabel
 }
 _MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData, DefaultSectionMenu, DisambiguatedLabels) {
-		return (*) => _SetPersonalDefaultSection(SecName, PersonalMenu, TomlData, DefaultSectionMenu, DisambiguatedLabels)
+		; Native menu disposal releases callbacks; retaining either menu here
+		; would recursively dispose its own item list during process shutdown.
+		return _SetPersonalDefaultSectionFromHandles.Bind(SecName, PersonalMenu.Handle,
+				TomlData, DefaultSectionMenu.Handle, DisambiguatedLabels)
 }
+/** Resolves live menu objects only for the duration of one dispatched action. */
+_SetPersonalDefaultSectionFromHandles(SecName, PersonalHandle, TomlData, DefaultHandle, Labels, *) {
+		PersonalMenu := MenuFromHandle(PersonalHandle)
+		DefaultMenu := MenuFromHandle(DefaultHandle)
+		if !(PersonalMenu is Menu) || !(DefaultMenu is Menu)
+				throw Error("The personal section menu owner is no longer live.")
+		return _SetPersonalDefaultSection(SecName, PersonalMenu, TomlData, DefaultMenu, Labels)
+}
+
+/** Keeps a repaint callback from retaining its own native menu object. */
+_TogglePersonalCloseOnAddFromHandle(PersonalHandle, *) {
+		PersonalMenu := MenuFromHandle(PersonalHandle)
+		if !(PersonalMenu is Menu)
+				throw Error("The personal hotstring menu owner is no longer live.")
+		return _TogglePersonalCloseOnAdd(PersonalMenu)
+}
+
 _TogglePersonalCloseOnAdd(PersonalMenu) {
 		Label  := t("menu.hotstrings.close_on_add")
 		NewVal := (_EditorPrefGet("close_on_add", "1") == "1") ? "0" : "1"

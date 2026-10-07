@@ -37,6 +37,18 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		}
 	}
 
+	private func collectServerDiagnostic(_ server: OwnedProcess?, stage: String) throws {
+		guard let server, let phaseEvidence else { return }
+		guard phaseEvidence.record("server.observation", status: stage == "readiness-refused" ? "refused" : "pending", server: server.serverDiagnostic(stage: stage)) else {
+			throw Failure.evidence("server-diagnostic-publication")
+		}
+	}
+
+	private func diagnosticRefused() {
+		evidenceRefused = true
+		XCTFail("Safe Sparkle server diagnostic publication refused")
+	}
+
 	private struct Receipt {
 		let status: Int32
 		let stdout: String
@@ -52,13 +64,15 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		let guardianReceipt: URL?
 		let originalExecutable: String
 		private var launched = false
+		private var acquiredPID: Int32 = 0
 		private var startRequested = false
 		private var observedExit = false
 		private var closedStreams: Set<Int> = []
 		private var cachedReceipt: Receipt?
+		private var cachedCaptures: (stdout: String, stderr: String)?
 
 		init(_ executable: String, _ arguments: [String], root: URL,
-			guarded: Bool = false, workerTimeout: Double = 60) throws {
+			guarded: Bool = false, workerTimeout: Double = 60, serverDiagnostics: Bool = false) throws {
 			let identity = UUID().uuidString
 			originalExecutable = executable
 			stdout = root.appendingPathComponent(identity + ".stdout")
@@ -84,6 +98,7 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 				process.arguments = arguments
 			}
 			process.environment = NativeFixtureChildEnvironment.make()
+			if serverDiagnostics { process.environment?["ERGOPTI_SPARKLE_SERVER_DIAGNOSTICS"] = "1" }
 			process.standardOutput = streams[0]
 			process.standardError = streams[1]
 			process.terminationHandler = { [completed] _ in completed.signal() }
@@ -96,11 +111,13 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 			startRequested = true
 			do {
 				try process.run()
+				acquiredPID = process.processIdentifier
 				launched = true
 			} catch {
 				// A failed launch still owns both descriptors, and any native PID
 				// acquired before Foundation reported the failure.
-				launched = process.processIdentifier > 0
+				acquiredPID = process.processIdentifier
+				launched = acquiredPID > 0
 				try? retire()
 				throw error
 			}
@@ -111,6 +128,34 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 			guard completed.wait(timeout: .now() + seconds) == .success else { return false }
 			observedExit = true
 			return !process.isRunning
+		}
+
+		/// No wait, signal, PID reopen or success inference is permitted for diagnostic collection.
+		func serverDiagnostic(stage: String) -> ArchiveAcceptanceEvidence.ServerDiagnostic {
+			guard launched, acquiredPID > 0 else {
+				return .init(stage: stage, pid: acquiredPID, state: "unavailable", nativeStatus: nil, nativeReason: nil, captures: "unavailable")
+			}
+			guard observeExit(0) else {
+				return .init(stage: stage, pid: acquiredPID, state: "pending", nativeStatus: nil, nativeReason: nil, captures: "pending")
+			}
+			let reason = process.terminationReason == .exit ? "exit" : "signal"
+			var diagnostic = ArchiveAcceptanceEvidence.ServerDiagnostic(stage: stage, pid: acquiredPID, state: "terminal",
+				nativeStatus: process.terminationStatus, nativeReason: reason, captures: "unavailable")
+			// The shared reader requires the exact native callback ACK and close ACK.
+			// Diagnostic capture does not require or authorize a successful exit.
+			if let receipt = try? terminalCaptures() {
+				let output = Data(receipt.stdout.utf8), errors = Data(receipt.stderr.utf8)
+				diagnostic = .init(stage: stage, pid: acquiredPID, state: "terminal",
+					nativeStatus: process.terminationStatus, nativeReason: reason, captures: "available")
+				diagnostic.stdoutBytes = output.count; diagnostic.stderrBytes = errors.count
+				diagnostic.stdoutSHA256 = SHA256.hash(data: output).map { String(format: "%02x", $0) }.joined()
+				diagnostic.stderrSHA256 = SHA256.hash(data: errors).map { String(format: "%02x", $0) }.joined()
+				diagnostic.lastPhase = ArchiveAcceptanceEvidence.ServerDiagnostic.progressMarker(receipt.stderr, pid: acquiredPID)
+				if let marker = ArchiveAcceptanceEvidence.ServerDiagnostic.helperMarker(receipt.stderr, pid: acquiredPID) {
+					diagnostic.helperPhase = marker.0; diagnostic.helperException = marker.1
+				}
+			}
+			return diagnostic
 		}
 
 		private func closeCaptures() throws {
@@ -177,6 +222,25 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 			try admitGuardRetirement()
 		}
 
+		/// Captures require this original process's terminal ACK and physical close.
+		/// A signaled child supplies diagnostics only; finish still requires .exit.
+		private func terminalCaptures() throws -> (stdout: String, stderr: String) {
+			guard launched, observedExit, !process.isRunning else { throw Failure.evidence("native-child-capture-before-terminal") }
+			try closeCaptures()
+			try admitGuardRetirement()
+			if let cachedCaptures { return cachedCaptures }
+			let output = try Data(contentsOf: stdout)
+			let errors = try Data(contentsOf: stderr)
+			guard output.count < 4_000_000, errors.count < 4_000_000,
+				let outputText = String(data: output, encoding: .utf8),
+				let errorText = String(data: errors, encoding: .utf8) else {
+				throw Failure.evidence("native-child-capture")
+			}
+			let captured = (stdout: outputText, stderr: errorText)
+			cachedCaptures = captured
+			return captured
+		}
+
 		/// Repeated observations reuse the physical exit ACK and immutable receipt;
 		/// consuming the semaphore once can never turn an exited child into a timeout.
 		func finish(_ seconds: Double) throws -> Receipt {
@@ -190,17 +254,78 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 			try closeCaptures()
 			try admitGuardRetirement()
 			guard process.terminationReason == .exit else { throw Failure.evidence("native-child-signal") }
-			let output = try Data(contentsOf: stdout)
-			let errors = try Data(contentsOf: stderr)
-			guard output.count < 4_000_000, errors.count < 4_000_000,
-				let outputText = String(data: output, encoding: .utf8),
-				let errorText = String(data: errors, encoding: .utf8) else {
-				throw Failure.evidence("native-child-capture")
-			}
-			let receipt = Receipt(status: process.terminationStatus, stdout: outputText, stderr: errorText)
+			let captures = try terminalCaptures()
+			let receipt = Receipt(status: process.terminationStatus, stdout: captures.stdout, stderr: captures.stderr)
 			cachedReceipt = receipt
 			return receipt
 		}
+	}
+
+	/// Signature identity is the exact message/public-key binding, not nonce bytes.
+	private static func foreignSignatureIsBound(_ signature: Data, payload: Data,
+		foreign: Curve25519.Signing.PublicKey, installed: Curve25519.Signing.PublicKey) -> Bool {
+		return signature.count == 64 && foreign.isValidSignature(signature, for: payload)
+			&& !installed.isValidSignature(signature, for: payload)
+	}
+
+	func testForeignSignatureBindingRejectsInstalledKeyAndChangedPayload() throws {
+		let foreign = Curve25519.Signing.PrivateKey()
+		let installed = Curve25519.Signing.PrivateKey()
+		let payload = Data("independent signature binding fixture".utf8)
+		let first = try foreign.signature(for: payload)
+		let second = try foreign.signature(for: payload)
+		XCTAssertTrue(Self.foreignSignatureIsBound(first, payload: payload,
+			foreign: foreign.publicKey, installed: installed.publicKey))
+		XCTAssertTrue(Self.foreignSignatureIsBound(second, payload: payload,
+			foreign: foreign.publicKey, installed: installed.publicKey))
+		XCTAssertFalse(Self.foreignSignatureIsBound(try installed.signature(for: payload), payload: payload,
+			foreign: foreign.publicKey, installed: installed.publicKey))
+		XCTAssertFalse(Self.foreignSignatureIsBound(first, payload: Data("changed fixture payload".utf8),
+			foreign: foreign.publicKey, installed: installed.publicKey))
+		XCTAssertFalse(Self.foreignSignatureIsBound(Data(), payload: payload,
+			foreign: foreign.publicKey, installed: installed.publicKey))
+	}
+
+	func testActualChildPhysicalHelperFiveControlsAndLegacyProjectionInverse() throws {
+		let parent = try Self.physicalDirectoryURL(manager.temporaryDirectory)
+		let root = parent.appendingPathComponent("ErgoptiSparkleChildPhysical-" + UUID().uuidString, isDirectory: true)
+		try privateDirectory(root)
+		var passed = false
+		let failuresBefore = try XCTUnwrap(testRun?.failureCount)
+		defer {
+			for command in commands {
+				do { try command.retire() }
+				catch { retirementDebt = true; XCTFail("Exact child physical control retirement refused") }
+			}
+			if passed, !retirementDebt, testRun?.failureCount == failuresBefore {
+				do { try manager.removeItem(at: root) }
+				catch { XCTFail("Owned child physical control inputs could not retire") }
+			} else { XCTFail("Child physical control inputs retained for inspection") }
+		}
+		let source = repository.appendingPathComponent("tools/diagnostics/macos_sparkle_archive_child.swift")
+		let sourceBytes = try Data(contentsOf: source)
+		let sourceHash = SHA256.hash(data: sourceBytes).map { String(format: "%02x", $0) }.joined()
+		let preparer = repository.appendingPathComponent("tools/test/fixtures/prepare-sparkle-native-physical-probe.py")
+		for (index, profile) in ["fixed", "legacy-projection", "fixed"].enumerated() {
+			let generated = root.appendingPathComponent("probe-" + String(index) + ".swift")
+			let executable = root.appendingPathComponent("probe-" + String(index))
+			_ = try run("/usr/bin/env", ["python3", preparer.path, "--source", source.path,
+				"--sha256", sourceHash, "--output", generated.path, "--profile", profile], root: root)
+			XCTAssertEqual(try Data(contentsOf: source), sourceBytes, "The extracted child source cannot drift")
+			_ = try run("/usr/bin/xcrun", ["swiftc", generated.path, "-o", executable.path], root: root)
+			let receipt = try run(executable.path, [root.path], root: root, expecting: profile == "fixed" ? 0 : 1)
+			if profile == "fixed" {
+				XCTAssertEqual(receipt.stdout, "SPARKLE_CHILD_PHYSICAL_PROBE_COMPLETE:5\n")
+				XCTAssertEqual(receipt.stderr, "")
+			} else {
+				XCTAssertEqual(receipt.stdout, "")
+				XCTAssertEqual(receipt.stderr, "SPARKLE_CHILD_PHYSICAL_PROBE_REFUSED:parent-physical\n",
+					"The legacy inverse must fail the physical parent binding, never setup or cleanup")
+			}
+			XCTAssertFalse(try manager.contentsOfDirectory(atPath: root.path).contains { $0.hasPrefix("OwnedChildPhysicalProbe-") },
+				"Every physically acquired probe directory must retire before the next pass")
+		}
+		passed = testRun?.failureCount == failuresBefore
 	}
 
 	private let manager = FileManager.default
@@ -524,6 +649,38 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		}
 	}
 
+	func testNativeCensusBindsAnExecutableLaunchedThroughAnOwnedAlias() throws {
+		let parent = try Self.physicalDirectoryURL(manager.temporaryDirectory)
+		let root = parent.appendingPathComponent("ErgoptiSparkleCensusAlias-" + UUID().uuidString)
+		try privateDirectory(root)
+		var child: OwnedProcess?
+		var passed = false
+		let failuresBefore = try XCTUnwrap(testRun?.failureCount)
+		defer {
+			do {
+				try child?.retire()
+				if passed { try manager.removeItem(at: root) }
+				else { XCTFail("Native executable alias control retained at " + root.path) }
+			} catch { XCTFail("Native executable alias retirement refused") }
+		}
+		let image = root.appendingPathComponent("physical-sleep")
+		try manager.copyItem(at: URL(fileURLWithPath: "/bin/sleep"), to: image)
+		let alias = root.appendingPathComponent("owned-image-alias")
+		try manager.createSymbolicLink(at: alias, withDestinationURL: image)
+		child = try OwnedProcess(alias.path, ["10"], root: root)
+		let owner = try XCTUnwrap(child)
+		try owner.start()
+		let observed = try census([root], root: root)
+		XCTAssertTrue(observed.contains {
+			($0["pid"] as? NSNumber)?.int32Value == owner.process.processIdentifier
+				&& $0["executable"] as? String == image.path
+		}, "The actual acquired PID must bind to its physical image through the owned alias")
+		XCTAssertFalse(observed.contains { $0["executable"] as? String == alias.path })
+		try owner.retire()
+		XCTAssertFalse(owner.process.isRunning)
+		passed = testRun?.failureCount == failuresBefore
+	}
+
 	func testDirectNativeChildExitACKAndCaptureRetirementAreIdempotent() throws {
 		let root = manager.temporaryDirectory.resolvingSymlinksInPath()
 			.appendingPathComponent("ErgoptiSparkleChildACK-" + UUID().uuidString)
@@ -553,6 +710,32 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		passed = testRun?.failureCount == failuresBefore
 	}
 
+	func testSignaledOwnedChildProvidesTerminalCapturesWithoutAdmittingFinish() throws {
+		let root = manager.temporaryDirectory.resolvingSymlinksInPath().appendingPathComponent("ErgoptiSparkleSignalCapture-" + UUID().uuidString)
+		try privateDirectory(root)
+		let child = try OwnedProcess("/usr/bin/env", ["python3", "-c", "import os,signal,sys; print('signal-capture-control',flush=True); print('signal-capture-error',file=sys.stderr,flush=True); os.kill(os.getpid(),signal.SIGTERM)"], root: root)
+		var passed = false
+		let failuresBefore = try XCTUnwrap(testRun?.failureCount)
+		defer {
+			do { try child.retire(); if passed { try manager.removeItem(at: root) } }
+			catch { XCTFail("Owned signal control retirement refused") }
+		}
+		try child.start()
+		XCTAssertThrowsError(try child.finish(5))
+		let diagnostic = child.serverDiagnostic(stage: "after-server-exit")
+		let packet = try XCTUnwrap(diagnostic.packet)
+		XCTAssertEqual(packet["state"] as? String, "terminal")
+		XCTAssertEqual(packet["native_reason"] as? String, "signal")
+		XCTAssertEqual(packet["native_status"] as? Int32, SIGTERM)
+		XCTAssertEqual(packet["captures"] as? String, "available")
+		XCTAssertEqual(packet["stdout_bytes"] as? Int, Data("signal-capture-control\n".utf8).count)
+		XCTAssertEqual(packet["stderr_bytes"] as? Int, Data("signal-capture-error\n".utf8).count)
+		XCTAssertEqual(packet["stdout_sha256"] as? String, SHA256.hash(data: Data("signal-capture-control\n".utf8)).map { String(format: "%02x", $0) }.joined())
+		XCTAssertThrowsError(try child.finish(0))
+		XCTAssertFalse(child.process.isRunning)
+		passed = testRun?.failureCount == failuresBefore
+	}
+
 	func testActualSparkleTarXZUpdateRefusesWrongKeyPreservesOldAppAndRetriesThroughRelaunch() throws {
 		phaseEvidence = try ArchiveAcceptanceEvidence(owner: .sparkle)
 		evidenceRefused = false
@@ -575,6 +758,7 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		let failuresBefore = try XCTUnwrap(testRun?.failureCount)
 		var passed = false
 		defer {
+			do { try collectServerDiagnostic(server, stage: "before-cleanup") } catch { diagnosticRefused() }
 			checkpoint("cleanup.begin", pids: [application, server].compactMap { $0?.process.processIdentifier }.filter { $0 > 0 })
 			func attempt(_ label: String, _ action: () throws -> Void) {
 				do { try action() }
@@ -601,6 +785,7 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 					let retired = try server.finish(10)
 					guard retired.status == 0 else { throw Failure.evidence("server-retirement") }
 				}
+				do { try collectServerDiagnostic(server, stage: "after-server-exit") } catch { diagnosticRefused() }
 				attempt("server-terminal") {
 					let terminal = try waitFor("server-retired", root: root.appendingPathComponent("www"), seconds: 2)
 					guard terminal["nonce"] as? String == nonce,
@@ -660,10 +845,13 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		let helper = repository.appendingPathComponent("tools/diagnostics/macos_sparkle_archive_fixture.py")
 		let www = root.appendingPathComponent("www")
 		try privateDirectory(www)
-		server = try OwnedProcess("/usr/bin/env", ["python3", helper.path, "serve", www.path, nonce], root: root)
+		server = try OwnedProcess("/usr/bin/env", ["python3", helper.path, "serve", www.path, nonce], root: root, serverDiagnostics: true)
 		commands.append(try XCTUnwrap(server))
 		try server?.start()
-		let listening = try waitFor("server-start", root: www, seconds: 10)
+		let listening = try ArchiveAcceptanceEvidence.preservingPrimaryFailure(
+			operation: { try waitFor("server-start", root: www, seconds: 10) },
+			collect: { try collectServerDiagnostic(server, stage: "readiness-refused") },
+			collectionRefused: { diagnosticRefused() })
 		let port = try XCTUnwrap(listening["port"] as? Int)
 		guard listening["nonce"] as? String == nonce,
 			(listening["pid"] as? NSNumber)?.int32Value == server?.process.processIdentifier,
@@ -718,7 +906,9 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		let foreignFragment = try String(contentsOf: foreignArchives.appendingPathComponent("_ErgoptiPlus.app.tar.xz.sig"), encoding: .utf8)
 		let foreignMatch = try XCTUnwrap(expression.firstMatch(in: foreignFragment, range: NSRange(foreignFragment.startIndex..., in: foreignFragment)))
 		let foreignSignature = String(foreignFragment[try XCTUnwrap(Range(foreignMatch.range(at: 1), in: foreignFragment))])
-		XCTAssertTrue(Data(base64Encoded: foreignSignature) == wrongSignature, "The official signer must agree with the independent foreign Ed25519 key")
+		let foreignSignatureBytes = try XCTUnwrap(Data(base64Encoded: foreignSignature))
+		XCTAssertTrue(Self.foreignSignatureIsBound(foreignSignatureBytes, payload: payload,
+			foreign: foreignKey.publicKey, installed: key.publicKey), "The official signature must verify with the foreign key and fail with the installed key")
 		XCTAssertEqual(Int(foreignFragment[try XCTUnwrap(Range(foreignMatch.range(at: 2), in: foreignFragment))]), payload.count)
 		try payload.write(to: www.appendingPathComponent("archive.tar.xz"), options: .withoutOverwriting)
 		let refusedFeed = try generatedFeed(foreignArchives, destination: www.appendingPathComponent("feed.xml"), root: root, identity: identity)
@@ -733,7 +923,33 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		let actual = try census([root, cache], root: root)
 		XCTAssertTrue(actual.contains { ($0["pid"] as? NSNumber)?.int32Value == application?.process.processIdentifier
 			&& $0["executable"] as? String == installed.appendingPathComponent("Contents/MacOS/PrivateSparkleChild").path })
-		let refusal = try waitFor("refused-1", root: root)
+		let refusal: [String: Any]
+		do { refusal = try waitFor("refused-1", root: root) }
+		catch {
+			let pid = try XCTUnwrap(application).process.processIdentifier
+			let stages = ["started-1", "updater-started-1", "check-requested-1", "start-refused",
+				"unexpected-permission-1", "offered-1", "offer-refused-1", "not-found-1",
+				"transport-refused-1", "routed-1", "download-1", "refused-1", "cycle-refused-1"]
+			for stage in stages {
+				let target = root.appendingPathComponent(stage + ".json")
+				guard manager.fileExists(atPath: target.path) else { continue }
+				let descriptor = open(target.path, O_RDONLY | O_NOFOLLOW)
+				guard descriptor >= 0 else { throw Failure.evidence("child-progress-acquisition") }
+				let stream = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+				defer { try? stream.close() }
+				var metadata = stat()
+				guard fstat(descriptor, &metadata) == 0, metadata.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG),
+					metadata.st_size > 0, metadata.st_size <= 65536,
+					let data = try stream.read(upToCount: 65537), Int64(data.count) == metadata.st_size,
+					let packet = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+					packet["nonce"] as? String == nonce, packet["version"] as? String == "1",
+					(packet["pid"] as? NSNumber)?.int32Value == pid,
+					packet["event"] as? String == stage else { throw Failure.evidence("child-progress-identity") }
+				// Only an exact, owned, closed stage label reaches the XCTest receipt.
+				XCTFail("Native Sparkle progress observed: " + stage)
+			}
+			throw error
+		}
 		_ = try waitFor("cycle-refused-1", root: root)
 		let details = try XCTUnwrap(refusal["details"] as? [String: Any])
 		let errors = try XCTUnwrap(details["errors"] as? [[String: Any]])

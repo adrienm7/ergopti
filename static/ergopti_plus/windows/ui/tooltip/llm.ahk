@@ -1155,6 +1155,19 @@ _LLM_BuildShortcutSuffix(idx, slotCount, valMods := "") {
 	return ""
 }
 
+/**
+ * Formats the bound digit separately from the prediction body.
+ * @param {Integer} Idx - One-based prediction index.
+ * @param {String} ValMods - Current validation modifiers.
+ * @returns {String} The effective shortcut, or empty for an unbound slot.
+ */
+_LLM_BuildShortcutLabel(Idx, ValMods) {
+	if !(Idx is Integer) || Idx < 1 || Idx > 10 || ValMods == "none"
+		return ""
+	Modifiers := _LLM_FormatValModifiers(ValMods)
+	return (Modifiers != "" ? Modifiers . "+" : "") . (Idx == 10 ? "0" : Idx)
+}
+
 ; Build the display string for a slot row (used by the plain-string path).
 _LLM_SlotBuildText(slot, is_active, slotIdx := 1, slotCount := 1) {
 	global LLM_TOOLTIP_PLACEHOLDER, LLM_TOOLTIP_TAB_SUFFIX, _LLM_Tooltip_ValMods
@@ -1532,7 +1545,7 @@ _LLM_TooltipDrawFooter(G, Layout, Texts, Footer) {
 
 ; Build a single Gui that renders all LLM slots with per-chunk coloring, laid
 ; out like the macOS canvas: one plain panel, the lines stacked as one block,
-; the shortcut label inline after each line. Active slot: the typed text
+; the shortcut label in a separate right-aligned column. Active slot: the typed text
 ; (equal chunks) unsel_gray, the corrections (insert chunks) corr_sel (green),
 ; the next words nw_sel (orange). Inactive slots: unsel_gray throughout.
 ; Placeholder slots: italic slot placeholder in the loading color.
@@ -1544,6 +1557,7 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 	global _LLM_Tooltip_ValMods, LLM_TOOLTIP_PLACEHOLDER, LLM_TOOLTIP_TAB_SUFFIX
 	global UI_LLM_CORR_SEL_HEX, UI_LLM_NW_SEL_HEX, UI_LLM_UNSEL_GRAY_HEX, UI_LLM_LOADING_HEX
 	global UI_LLM_CURSOR_HEX, UI_LLM_CMD_SEL_HEX, UI_LLM_CMD_DIM_HEX
+	global UI_LLM_SHORTCUT_COLUMN_GAP
 
 	G := 0
 	CandidateHandedOff := false
@@ -1565,6 +1579,8 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 	RowSegments := []
 	RowSpanSizes := []
 	SuffixSize := 0
+	ShortcutColumnW := 0
+	PredictionBodyW := 0
 	ActivePrefixSize := _TooltipMeasureText(activePrefix)
 	InactivePrefixSize := _TooltipMeasureText(inactivePrefix)
 	for i, slot in slots {
@@ -1574,11 +1590,12 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 			Shortcut := ""
 		} else if _LLM_SlotIsEmpty(slot) {
 			Body := LLM_TOOLTIP_PLACEHOLDER
-			Shortcut := _LLM_BuildShortcutSuffix(i, slotCount, _LLM_Tooltip_ValMods)
+			; Reserved streaming capacity has no mapped prediction to accept.
+			Shortcut := ""
 		} else {
 			Segments := _LLM_SlotSegments(slot, i == active_idx)
 			Body := ""
-			Shortcut := _LLM_BuildShortcutSuffix(i, slotCount, _LLM_Tooltip_ValMods)
+			Shortcut := _LLM_BuildShortcutLabel(i, _LLM_Tooltip_ValMods)
 		}
 		Bodies.Push(Body)
 		Shortcuts.Push(Shortcut)
@@ -1591,6 +1608,7 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 		}
 		SpanSizes.Shortcut := _LLM_TooltipMeasureOptional(Shortcut, _TOOLTIP_LABEL_FONT_SIZE)
 		ShortcutW := IsObject(SpanSizes.Shortcut) ? SpanSizes.Shortcut.W : 0
+		ShortcutColumnW := Max(ShortcutColumnW, ShortcutW)
 		if (Segments.Length > 0) {
 			; A real line is drawn piece by piece after its prefix, so it is
 			; measured the same way.
@@ -1609,6 +1627,15 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 		SpanSizes.Body := _LLM_TooltipMeasureOptional(Body, _TOOLTIP_FONT_SIZE)
 		PredRows.Push({ W: Max(Active.W, Inactive.W) + ShortcutW,
 			H: Max(Active.H, Inactive.H) })
+	}
+	; Reserve one column after the widest body, including every selected rendering.
+	for Idx, PredRow in PredRows {
+		ShortcutW := IsObject(RowSpanSizes[Idx].Shortcut) ? RowSpanSizes[Idx].Shortcut.W : 0
+		PredictionBodyW := Max(PredictionBodyW, PredRow.W - ShortcutW)
+	}
+	if ShortcutColumnW > 0 {
+		for PredRow in PredRows
+			PredRow.W := PredictionBodyW + UI_LLM_SHORTCUT_COLUMN_GAP + ShortcutColumnW
 	}
 	; The all-placeholder panel is the macOS loading panel: label only, no footer.
 	Texts := all_placeholder ? { Hint: "", Info: "", InfoSizing: "" }
@@ -1655,8 +1682,10 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 				X += _LLM_TooltipDrawText(G, X, RowY, RowH, UI_LLM_NW_SEL_HEX,
 					_TOOLTIP_FONT_SIZE, LLM_TOOLTIP_TAB_SUFFIX, "norm", SuffixSize)
 		}
-		; Inline after the line, bottom-aligned at the smaller hint size.
-		_LLM_TooltipDrawText(G, X, RowY, RowH, is_active ? UI_LLM_CMD_SEL_HEX : UI_LLM_CMD_DIM_HEX,
+		; The common inner right edge keeps hints aligned across unequal bodies.
+		ShortcutW := IsObject(SpanSizes.Shortcut) ? SpanSizes.Shortcut.W : 0
+		ShortcutX := Layout.W - _TOOLTIP_PADDING_X - ShortcutW
+		_LLM_TooltipDrawText(G, ShortcutX, RowY, RowH, UI_LLM_CMD_DIM_HEX,
 			_TOOLTIP_LABEL_FONT_SIZE, Shortcuts[Idx], "norm", SpanSizes.Shortcut)
 	}
 	_LLM_TooltipDrawFooter(G, Layout, Texts, Footer)

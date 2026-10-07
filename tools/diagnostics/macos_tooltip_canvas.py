@@ -122,6 +122,7 @@ def supervise(group, output, expected_version, unchanged, timeout=60):
                 "native_execution": "executed",
                 "native_process_observed": True,
                 "painted_captures": 12,
+                "shortcut_captures": 3,
                 "result": result,
                 "pixels": pixels,
             }

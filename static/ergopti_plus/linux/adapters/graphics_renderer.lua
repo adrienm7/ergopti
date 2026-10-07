@@ -32,6 +32,7 @@
 --- ==============================================================================
 
 local M = {}
+local ShortcutColumn = require("tooltip.shortcut_column")
 
 local Logger = require("logger.shim")
 local Tint = require("tooltip.tint")
@@ -174,8 +175,13 @@ local function measure_segmented_row(row, style, pango_layout)
 		width = width + w
 		height = math.max(height, h)
 	end
+	local label_w, label_h = 0, 0
+	if row.label and row.label ~= "" then
+		label_w, label_h = measure(pango_layout, row.label, style.fonts.main, style.sizes.hint)
+	end
 	return {
-		text_w = width, text_h = height, label_w = 0, height = height,
+		text_w = width, text_h = height, label_w = label_w, label_h = label_h,
+		height = math.max(height, label_h),
 		prefix_w = prefix_w, segments = sizes,
 	}
 end
@@ -192,12 +198,18 @@ function M.measure_rows(rows, style, pango_layout)
 
 	local metrics = {}
 	local widest, total_height = 0, 0
+	local body_column, label_column, column_gap = 0, 0, 0
 
 	for i, row in ipairs(rows) do
 		local row_w, row_h
 		if type(row.segments) == "table" then
 			metrics[i] = measure_segmented_row(row, style, pango_layout)
-			row_w, row_h = metrics[i].text_w, metrics[i].height
+			row_w = ShortcutColumn.width(metrics[i].text_w, metrics[i].label_w,
+				row.label_gap or style.layout.label_gap)
+			row_h = metrics[i].height
+			body_column = math.max(body_column, metrics[i].text_w)
+			label_column = math.max(label_column, metrics[i].label_w)
+			column_gap = math.max(column_gap, row.label_gap or style.layout.label_gap)
 		else
 			local text_w, text_h = measure(pango_layout, row.text or "", style.fonts.main, style.sizes.main)
 			local label_w, label_h = 0, 0
@@ -217,6 +229,7 @@ function M.measure_rows(rows, style, pango_layout)
 		if i < #rows then total_height = total_height + style.layout.line_spacing end
 	end
 
+	widest = math.max(widest, ShortcutColumn.width(body_column, label_column, column_gap))
 	return {
 		w = widest + style.layout.pad_x * 2,
 		h = total_height + style.layout.pad_y * 2,
@@ -257,7 +270,7 @@ end
 --- @param m table The row's metrics from measure_segmented_row.
 --- @param style table
 --- @param y number Top of the row.
-local function paint_segmented_row(cr, pango_layout, row, m, style, y)
+local function paint_segmented_row(cr, pango_layout, row, m, style, y, panel_width)
 	local g = bind()
 	local x = style.layout.pad_x
 
@@ -280,6 +293,10 @@ local function paint_segmented_row(cr, pango_layout, row, m, style, y)
 		local font, size = segment_font(segment, style)
 		draw(segment.text or "", font, size, segment.color, m.segments[index].h)
 		x = x + m.segments[index].w
+	end
+	if m.label_w > 0 then
+		x = ShortcutColumn.left(panel_width - style.layout.pad_x, m.label_w)
+		draw(row.label, style.fonts.main, style.sizes.hint, row.label_color, m.label_h)
 	end
 end
 
@@ -316,7 +333,7 @@ local function paint(cr, rows, metrics, style, size, background)
 	for i, row in ipairs(rows) do
 		local m = metrics[i]
 		if type(row.segments) == "table" then
-			paint_segmented_row(cr, pango_layout, row, m, style, y)
+			paint_segmented_row(cr, pango_layout, row, m, style, y, size.w)
 			y = y + m.height + style.layout.line_spacing
 			goto continue
 		end

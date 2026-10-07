@@ -4,6 +4,9 @@ param(
     [Parameter(Mandatory = $true)][string]$PolicyPath,
     [Parameter(Mandatory = $true)][string]$Action
 )
+# This child loads only modules belonging to its actual PowerShell runtime.
+# A PS7 parent can pass incompatible module paths through the native launcher.
+$env:PSModulePath = [IO.Path]::Combine($PSHOME, 'Modules')
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 $Receipt = @{ version = 1; action = $Action; status = 'refused'; displays = @() }

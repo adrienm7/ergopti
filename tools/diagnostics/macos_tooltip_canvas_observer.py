@@ -235,6 +235,109 @@ def validate_pixels(case, directory):
     }
 
 
+def validate_shortcut_columns(case, directory):
+    """Observe distinct native bound labels, their common right edge and gray ink."""
+    count = {1: 10, 2: 1, 3: 3}[case["ordinal"]]
+    require(
+        case.get("image") == f"shortcut-{case['ordinal']:02d}.png",
+        "shortcut capture identity differs",
+    )
+    require(
+        case.get("showing") is True
+        and case.get("hidden_after") is True
+        and case.get("retired_after") is True,
+        "shortcut canvas retirement differs",
+    )
+    labels = case.get("labels")
+    require(isinstance(labels, list) and len(labels) == count, "shortcut label matrix incomplete")
+    frame, body = case["frame"], case["body_frame"]
+    body_right = body["x"] + body["w"]
+    expected_right = frame["w"] - 14
+    expected_texts = [
+        ({1: "⌥", 2: "", 3: "⌃⇧"}[case["ordinal"]]) + ("0" if index == 10 else str(index))
+        for index in range(1, count + 1)
+    ]
+    if case["ordinal"] == 3:
+        require(
+            case["body"][0] == "✨ MMMMM M\n\u2009MMM\nMMMMMMMMMMM\n\u2009MMMMMM",
+            "bound correction/multiline body differs",
+        )
+        for byte in (8, 9):
+            attributes = attribute_at(case["body"], byte)
+            require(
+                all(
+                    abs(channel - expected) < 0.015
+                    for channel, expected in zip(rgb(attributes), (0.25, 0.90, 0.40))
+                ),
+                "bound selected correction color differs",
+            )
+    require(
+        not any(text in case["body"][0] for text in expected_texts),
+        "shortcut remains inline in the body",
+    )
+    path = Path(directory) / case["image"]
+    original = path.read_bytes()
+    with Image.open(path) as decoded:
+        require(decoded.format == "PNG", "shortcut capture is not PNG")
+        decoded.load()
+        image = decoded.convert("RGBA")
+    sx, sy = image.width / frame["w"], image.height / frame["h"]
+    require(0.5 <= sx <= 4 and abs(sx - sy) < 0.03, "shortcut native point geometry differs")
+    pixels = image.load()
+    counts = []
+    previous_bottom = -1
+    for label, expected in zip(labels, expected_texts):
+        zone, styled = label["frame"], label["styled"]
+        require(styled[0] == expected, "effective native shortcut differs")
+        require(abs(zone["x"] + zone["w"] - expected_right) < 0.05, "shortcut right edges differ")
+        require(zone["x"] >= body_right + 12 - 0.05, "shortcut overlaps the body column")
+        require(
+            zone["w"] > 0 and zone["h"] > 0 and zone["y"] >= previous_bottom,
+            "shortcut row geometry overlaps",
+        )
+        require(
+            zone["x"] >= 0
+            and zone["y"] >= 0
+            and zone["x"] + zone["w"] <= frame["w"]
+            and zone["y"] + zone["h"] <= frame["h"],
+            "shortcut is clipped by the canvas",
+        )
+        previous_bottom = zone["y"] + zone["h"]
+        for byte in range(1, len(expected.encode("utf-8")) + 1):
+            attributes = attribute_at(styled, byte)
+            require(
+                all(abs(channel - 0.45) < 0.015 for channel in rgb(attributes))
+                and abs(attributes["color"].get("alpha", 1) - 1) < 0.01,
+                "shortcut is not muted gray",
+            )
+            require(abs(attributes["font"]["size"] - 11) < 0.01, "shortcut hint font differs")
+        ink = 0
+        for y in range(math.ceil(zone["y"] * sy), math.floor((zone["y"] + zone["h"]) * sy)):
+            for x in range(math.ceil(zone["x"] * sx), math.floor((zone["x"] + zone["w"]) * sx)):
+                red, green, blue, alpha = pixels[x, y]
+                require(
+                    not (
+                        max(red, green, blue) - min(red, green, blue) > 25
+                        and max(red, green, blue) > 100
+                    ),
+                    "colored shortcut ink differs",
+                )
+                if (
+                    alpha >= 250
+                    and max(red, green, blue) - min(red, green, blue) <= 3
+                    and 100 <= red <= 120
+                ):
+                    ink += 1
+        require(ink > 0, "native gray shortcut pixels are absent")
+        counts.append(ink)
+    require(path.read_bytes() == original, "shortcut observer modified the capture")
+    return {
+        "image": case["image"],
+        "sha256": hashlib.sha256(original).hexdigest(),
+        "gray_ink": counts,
+    }
+
+
 def observe(result, directory):
     require(
         result.get("status") == "ok" and result.get("runtime") == "native Hammerspoon",
@@ -278,4 +381,12 @@ def observe(result, directory):
         )
         validate_attributes(case)
         observations.append(validate_pixels(case, directory))
+    shortcut_columns = result.get("shortcut_columns")
+    require(
+        isinstance(shortcut_columns, list) and len(shortcut_columns) == 3,
+        "native bound-shortcut captures incomplete",
+    )
+    for ordinal, case in enumerate(shortcut_columns, 1):
+        require(case.get("ordinal") == ordinal, "shortcut ordinal differs")
+        observations.append(validate_shortcut_columns(case, directory))
     return observations

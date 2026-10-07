@@ -777,17 +777,85 @@ Test("custom word expanders: actual suspended Add entry keeps its native dialog 
 _HSDT_CustomAddProviderKeepsPostModalAdmission() {
 	Provider := _DriverFuncBody("_HS_WordExpanderRows")
 	Owner := _DriverFuncBody("_HS_DelimAddCustom")
-	Assert(Provider != "" && Owner != "", "the actual provider and modal owner must both exist")
+	RecordCommit := _DriverFuncBody("_HS_DelimAddRecordCommit")
+	StringCommit := _DriverFuncBody("_HS_DelimAddCustomCommit")
+	Assert(Provider != "" && Owner != "" && RecordCommit != "" && StringCommit != "",
+		"the provider, modal owner and both distinct commit owners must exist")
 	Assert(InStr(Provider, 'MenuRenderer_CommandRow("word_expander_custom_menu", "word_expander_add"'))
 	AssertFalse(InStr(Provider, 'Map("label", t("menu.hotstrings.add_delimiter")'),
 		"the native provider must not replace the canonical Add label")
-	CloseReceipt := InStr(Owner, 'finally _HS_DelimAddGui := ""')
-	LatePause := InStr(Owner, "if A_IsSuspended", true, CloseReceipt)
-	Commit := InStr(Owner, "return _HS_DelimAddCustomCommit")
-	Assert(CloseReceipt > 0 && LatePause > CloseReceipt && Commit > LatePause,
+	_HSDT_AssertPostModalRecordAdmission(Owner)
+	RecordCode := _DriverMaskNonCode(&RecordCommit)
+	Assert(InStr(RecordCode, "HotstringsTerminatorRecordCharacter(Char)")
+		&& InStr(RecordCode, "Consume is Integer") && InStr(RecordCode, "A_IsSuspended"),
+		"the typed commit must retain scalar, consume-type and suspension admission")
+	AssertEqual(1, _HSDT_PostModalCodeCount(RecordCode, "\bHotstringsTerminatorRecordsEdit\("),
+		"the typed commit must acquire exactly one actual record transaction")
+	StringCode := _DriverMaskNonCode(&StringCommit)
+	AssertEqual(1, _HSDT_PostModalCodeCount(StringCode, "\b_HS_DelimCommit\("),
+		"historical anonymous strings must retain their distinct transaction owner")
+	ClosePosition := InStr(Owner, 'finally _HS_DelimAddGui := ""')
+	Assert(ClosePosition > 0, "the real close receipt must exist before deriving mutations")
+	ModalPrefix := SubStr(Owner, 1, ClosePosition - 1)
+	ModalTail := SubStr(Owner, ClosePosition)
+	LatePause := "`tif A_IsSuspended`n`t`treturn false`n"
+	NoLatePause := ModalPrefix . StrReplace(ModalTail, LatePause, "", true, &PauseReplacements, 1)
+	AssertEqual(1, PauseReplacements, "the mutant removes only the actual post-close pause gate")
+	_HSDT_ExpectPostModalRefusal(NoLatePause,
 		"a completed native dialog must recheck its actual pause owner before acquiring the transaction")
-	Assert(InStr(Owner, "!Result.OK or Result.Char ==") > LatePause,
+	Cancel := '`tif (!Result.OK or Result.Char == "") {`n`t`treturn false`n`t}`n'
+	NoCancel := StrReplace(Owner, Cancel, "", true, &CancelReplacements, 1)
+	AssertEqual(1, CancelReplacements, "the mutant removes only the actual cancelled-result gate")
+	_HSDT_ExpectPostModalRefusal(NoCancel, "cancelled and empty native results must remain unpublished")
+	TypedCall := "return _HS_DelimAddRecordCommit(Result.Char, Result.Consume)"
+	LegacyCall := "return _HS_DelimAddCustomCommit(Result.Char, Result.Consume)"
+	WrongOwner := StrReplace(Owner, TypedCall, LegacyCall, true, &CommitReplacements, 1)
+	AssertEqual(1, CommitReplacements, "the mutant redirects the actual typed transaction once")
+	_HSDT_ExpectPostModalRefusal(WrongOwner, "the modal result must acquire exactly one typed record owner")
+	CommentOnly := StrReplace(Owner, TypedCall, "; " . TypedCall, true, &CommentReplacements, 1)
+	AssertEqual(1, CommentReplacements, "the comment mutant removes the only executable typed transaction")
+	_HSDT_ExpectPostModalRefusal(CommentOnly, "the modal result must acquire exactly one typed record owner")
+}
+
+; Native close admission and its typed destination share one ordered source body.
+; Code masking prevents prose or a removed call left in a comment from passing.
+_HSDT_AssertPostModalRecordAdmission(ModalSource) {
+	Assert(ModalSource != "", "the native modal owner must not be empty")
+	ModalCode := _DriverMaskNonCode(&ModalSource)
+	ClosePattern := "m)^[ `t]*finally[ `t]+_HS_DelimAddGui[ `t]*:=[ `t]*$"
+	CommitPattern := "m)^[ `t]*return _HS_DelimAddRecordCommit\(Result\.Char, Result\.Consume\)[ `t]*$"
+	AssertEqual(1, _HSDT_PostModalCodeCount(ModalCode, ClosePattern),
+		"the native dialog must have one actual close receipt")
+	Assert(_HSDT_PostModalCodeCount(ModalCode, CommitPattern) == 1,
+		"the modal result must acquire exactly one typed record owner")
+	ClosePosition := RegExMatch(ModalCode, ClosePattern)
+	CommitPosition := RegExMatch(ModalCode, CommitPattern)
+	PausePosition := RegExMatch(ModalCode,
+		"m)^[ `t]*if A_IsSuspended[ `t]*`n[ `t]*return false[ `t]*$",, ClosePosition)
+	Assert(ClosePosition > 0 && PausePosition > ClosePosition && CommitPosition > PausePosition,
+		"a completed native dialog must recheck its actual pause owner before acquiring the transaction")
+	CancelPosition := RegExMatch(ModalCode,
+		"m)^[ `t]*if \(!Result\.OK or Result\.Char ==[ `t]*\) \{[ `t]*`n[ `t]*return false[ `t]*`n[ `t]*\}")
+	Assert(CancelPosition > PausePosition && CommitPosition > CancelPosition,
 		"cancelled and empty native results must remain unpublished")
+	AssertFalse(InStr(ModalCode, "_HS_DelimAddCustomCommit("),
+		"the native record dialog must not publish an anonymous delimiter string")
+}
+
+_HSDT_PostModalCodeCount(ModalCode, Pattern) {
+	RegExReplace(ModalCode, Pattern, "", &ModalMatches)
+	return ModalMatches
+}
+
+_HSDT_ExpectPostModalRefusal(ModalSource, ExpectedMessage) {
+	try {
+		_HSDT_AssertPostModalRecordAdmission(ModalSource)
+	} catch as Refusal {
+		AssertEqual(ExpectedMessage, Refusal.Message,
+			"the actual source mutation must fail at its independent admission assertion")
+		return
+	}
+	Assert(false, "the weakened native modal source must be refused")
 }
 Test("custom word expanders: actual Add dialog rechecks admission after its native close receipt",
 	_HSDT_CustomAddProviderKeepsPostModalAdmission)

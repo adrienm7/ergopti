@@ -66,7 +66,7 @@ end
 --- A prediction row is a prefix and coloured segments, as on macOS: the mark
 --- in front of the selected line, the typed text grey, the corrections green
 --- and the continuation orange on it, every other line grey, and the
---- validation chord after each line.
+--- validation chord in a separate right-aligned column.
 --- @param candidates table Array of { to_type, chunks?, nw?, has_corrections? }.
 --- @param active_index integer
 --- @param meta table { model?, profile?, validation_modifiers?, loading? }
@@ -99,18 +99,15 @@ function M.build_rows(candidates, active_index, meta)
 				color = active and chrome.colors[segment.role] or chrome.colors.typed,
 			}
 		end
-		segments[#segments + 1] = {
-			text = chrome.label_gap .. validation_label(entry.index, meta.validation_modifiers),
-			role = "label",
-			small = true,
-			color = active and chrome.colors.label_selected or chrome.colors.label_unselected,
-		}
 		rows[#rows + 1] = {
 			-- The mark is drawn on the selected line only; elsewhere the prefix
 			-- is spacing, of the width its characters would take.
 			prefix = active and selected_prefix or unselected_prefix,
 			prefix_color = active and chrome.colors.cursor or nil,
 			segments = segments,
+			label = validation_label(entry.index, meta.validation_modifiers),
+			label_color = chrome.colors.label_unselected,
+			label_gap = chrome.column_gap,
 			selected = active,
 		}
 	end

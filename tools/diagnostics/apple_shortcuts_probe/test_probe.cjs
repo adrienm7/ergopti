@@ -11,6 +11,7 @@ function entry(id, name, accepts = false) {
 }
 function evaluate(collections, throws) {
 	let calls = 0;
+	const checkpoints = [];
 	const collection = function () {
 		calls++;
 		if (throws) throw throws;
@@ -25,11 +26,14 @@ function evaluate(collections, throws) {
 		},
 		$: {
 			NSUTF8StringEncoding: 4,
+			NSFileHandle: {
+				fileHandleWithStandardError: { writeData: (data) => checkpoints.push(data.bytes) }
+			},
 			NSString: {
 				stringWithString: (value) => ({
 					dataUsingEncoding: (encoding) => {
 						assert.equal(encoding, 4);
-						return { length: Buffer.byteLength(value, 'utf8') };
+						return { length: Buffer.byteLength(value, 'utf8'), bytes: value };
 					}
 				})
 			}
@@ -38,7 +42,7 @@ function evaluate(collections, throws) {
 	vm.createContext(context);
 	vm.runInContext(source, context);
 	const raw = context.run();
-	return { value: JSON.parse(raw), raw, calls };
+	return { value: JSON.parse(raw), raw, calls, checkpoints };
 }
 function test(name, fn) {
 	fn();
@@ -121,5 +125,14 @@ test('final JSON byte cap refuses without emitting catalogue', () => {
 	assert.equal(result.value.stage, 5);
 	assert.ok(result.raw.length < 128);
 });
-assert.equal(passed, 12);
-process.stdout.write('Controlled JXA cases: 12 passed, 0 failed; native execution untested\n');
+test('fixed stage markers bracket both actual catalogue calls without payload content', () => {
+	assert.deepEqual(evaluate([[entry('private-id', 'private-name')]]).checkpoints, [
+		'ASCP:1\n',
+		'ASCP:2\n',
+		'ASCP:3\n',
+		'ASCP:4\n'
+	]);
+	assert.deepEqual(evaluate([], new Error('private')).checkpoints, ['ASCP:1\n']);
+});
+assert.equal(passed, 13);
+process.stdout.write('Controlled JXA cases: 13 passed, 0 failed; native execution untested\n');

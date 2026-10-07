@@ -30,7 +30,11 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { spawnSync } = require('child_process');
+const { spawnSync, spawn } = require('child_process');
+const {
+	launchNaturalExit,
+	naturalExitReceiptProblem
+} = require('./lib/ahk-startup-natural-exit.cjs');
 const crypto = require('node:crypto');
 const {
 	createStartupCodeFixture,
@@ -297,6 +301,7 @@ async function main() {
 		: null;
 	const code = createStartupCodeFixture(path.join(scratch, 'code'), WINDOWS);
 	const wrapper = path.join(code.windows, `.ergopti_startup_smoke_${process.pid}.ahk`);
+	let startupSucceeded = false;
 	try {
 		// The private entry preserves relative includes without sharing writable
 		// generated code. Its identity cannot replace the maintainer's live driver.
@@ -305,7 +310,7 @@ async function main() {
 			'\uFEFF#Requires AutoHotkey v2.0+\n_DriverStartupSmokeInspect := _StartupSmokeReceipts\n_DriverStartupSmokeInspectShell := _StartupSmokeShellReceipt\n_DriverStartupSmokeInspectAdmission := _StartupSmokeAdmissionReceipt\n_DriverStartupSmokeInspectBootstrap := _StartupSmokeEarlyClick\n#Include ErgoptiPlus.ahk\n' +
 				'_StartupSmokeEarlyClick(*) {\n\tglobal _TrayStartupClick\n\t_TrayStartupClick.PopupFn := (*) => SetTimer(_StartupSmokePumpReceipt, -1)\n\tPostMessage(0x404, 0, 0x205, , A_ScriptHwnd)\n}\n' +
 				'_StartupSmokePumpReceipt(*) {\n\tglobal _TrayStartupClick, _DriverReady\n\tif !_TrayStartupClick.Pending || (IsSet(_DriverReady) && _DriverReady) || _TrayStartupClick.MenuLoopOpen\n\t\tthrow Error("the retained probe must leave bootstrap and timers running")\n\tFileAppend("pumped", EnvGet("ERGOPTI_STARTUP_SMOKE_DIR") . "\\startup-pump.txt", "UTF-8")\n}\n' +
-				'_StartupSmokeReceipts(*) {\n\t_StartupSmokeFullSaveReceipt()\n\t_ScriptChordSmokeReceipt()\n\t_LayoutExtensionSmokeReceipt()\n}\n' +
+				'_StartupSmokeReceipts(*) {\n\t_StartupSmokeFullSaveReceipt()\n\t_ScriptChordSmokeReceipt()\n\t_LayoutExtensionSmokeReceipt()\n\tif EnvGet("ERGOPTI_STARTUP_SMOKE_NATURAL_EXIT") == "1"\n\t\t_StartupSmokeNaturalShutdown()\n}\n' +
 				'_StartupSmokeShellReceipt(*) {\n\tglobal _TrayFeatureHeadLabels, _TrayRootBootDetailsPending, _TrayStartupClick, _DriverReady, _DriverMenuReady, _MenuStartupCommands\n\tif _DriverReady || !_DriverMenuReady || _TrayRootBootDetailsPending || _TrayFeatureHeadLabels.Length < 4\n\t\tthrow Error("the complete configured root must be published before input readiness")\n\tif _TrayStartupClick.RequestCount != 1\n\t\tthrow Error("the early native context request was lost")\n\tglobal _StartupSmokeSelections\n\tSelections := []\n\t_StartupSmokeSelections := Selections\n\tMenuCommandRun((*) => Selections.Push(1), [])\n\tif Selections.Length || _MenuStartupCommands.Pending.Length != 1\n\t\tthrow Error("an early feature command bypassed startup admission")\n\tRows := Map()\n\tloop TrayMenuItemCount(A_TrayMenu) {\n\t\tText := Buffer(2048, 0)\n\t\tDllCall("GetMenuStringW", "ptr", A_TrayMenu.Handle, "uint", A_Index - 1, "ptr", Text, "int", 1024, "uint", 0x400)\n\t\tRows[StrGet(Text, "UTF-16")] := DllCall("GetMenuState", "ptr", A_TrayMenu.Handle, "uint", A_Index - 1, "uint", 0x400, "uint")\n\t}\n\tif Rows.Has(t("common.loading")) || Rows.Has(t("menu.global.starting"))\n\t\tthrow Error("the usable root still advertises driver startup")\n\tfor Key in ["menu.global.suspend", "menu.global.reload", "menu.global.quit"] {\n\t\tLabel := t(Key)\n\t\tif !Rows.Has(Label) || (Rows[Label] & 3) || (Rows[Label] & 0x10)\n\t\t\tthrow Error("the configured root has no enabled command for " . Key)\n\t}\n\tFileAppend("ready", EnvGet("ERGOPTI_STARTUP_SMOKE_DIR") . "\\tray-shell.txt", "UTF-8")\n}\n' +
 				'_StartupSmokeAdmissionReceipt(*) {\n\tglobal _StartupSmokeSelections\n\tExpected := EnvGet("ERGOPTI_STARTUP_SMOKE_EXPECT_SUSPENDED") == "1" ? 0 : 1\n\tStarted := A_TickCount\n\tif Expected\n\t\twhile !_StartupSmokeSelections.Length && !TickExpired(Started, 1000)\n\t\t\tSleep(10)\n\telse\n\t\tSleep(50)\n\tif _StartupSmokeSelections.Length != Expected\n\t\tthrow Error("retained startup selection did not obey restored pause or execute exactly once")\n}\n' +
 				'_StartupSmokeFullSaveReceipt() {\n\tglobal DriverPid\n\t_StartupSmokeRequireFullSaveAcknowledged()\n\tSaveState := _ConfigFullSaveCoordinator()\n\tPreviousCritical := Critical("On")\n\ttry {\n\t\tRequested := SaveState.requested_generation\n\t\tCommitted := SaveState.committed_generation\n\t\tSettled := SaveState.settled_generation\n\t\tPending := _ConfigFullSaveHasPending()\n\t} finally Critical(PreviousCritical)\n\tNonce := EnvGet("ERGOPTI_STARTUP_SMOKE_NONCE")\n\tif !RegExMatch(Nonce, "^[0-9a-f]{32}$")\n\t\tthrow ValueError("Invalid startup full-save nonce.")\n\tReceipt := \'{"schema_version":1,"nonce":\' . JsonStringLiteral(Nonce)\n\t\t. \',"pid":\' . DriverPid . \',"requested":\' . Requested\n\t\t. \',"committed":\' . Committed . \',"settled":\' . Settled\n\t\t. \',"pending":\' . (Pending ? "true" : "false") . \'}\' . "`n"\n\tif !FSWriteCreateDurable(EnvGet("ERGOPTI_STARTUP_SMOKE_DIR") . "\\full-save.json", Receipt)\n\t\tthrow Error("The startup full-save receipt could not be created durably.")\n}\n' +
@@ -331,6 +336,12 @@ async function main() {
 				'\tFileAppend(State, EnvGet("ERGOPTI_STARTUP_SMOKE_DIR") . "\\extension-receipt.txt", "UTF-8")\n}\n' +
 				fs
 					.readFileSync(path.join(WINDOWS, 'tests/fixtures/startup_full_save_observer.ahk'), 'utf8')
+					.replace(/^\uFEFF/, '') +
+				fs
+					.readFileSync(
+						path.join(WINDOWS, 'tests/fixtures/startup_natural_shutdown_observer.ahk'),
+						'utf8'
+					)
 					.replace(/^\uFEFF/, ''),
 			'utf8'
 		);
@@ -479,22 +490,74 @@ async function main() {
 				if (reloaded !== null) return reloaded;
 			}
 		}
+		// The startup-only probes above retain their complete historical contracts.
+		// This separate process proves accepted production cleanup and destruction.
+		const naturalRoot = path.join(scratch, 'natural-shutdown');
+		fs.mkdirSync(naturalRoot, { recursive: true });
+		prepareStartupPersonalInclude(code.windows, path.join(naturalRoot, 'config'));
+		const naturalNonce = crypto.randomBytes(16).toString('hex');
+		const natural = await launchNaturalExit(
+			spawn,
+			ahk,
+			['/ErrorStdOut', wrapper],
+			{
+				cwd: code.windows,
+				env: {
+					...process.env,
+					LOCALAPPDATA: naturalRoot,
+					ERGOPTI_STARTUP_SMOKE_DIR: naturalRoot,
+					ERGOPTI_STARTUP_SMOKE_NONCE: naturalNonce,
+					ERGOPTI_STARTUP_SMOKE_NATURAL_EXIT: '1',
+					ERGOPTI_STARTUP_SMOKE_EXPECT_SUSPENDED: ''
+				}
+			},
+			120000
+		);
+		const naturalProblem = naturalExitReceiptProblem(naturalRoot, natural, naturalNonce);
+		if (naturalProblem)
+			return fail(
+				'natural-shutdown: ' +
+					naturalProblem +
+					'\n' +
+					(natural.stdout || '') +
+					(natural.stderr || '') +
+					'\n' +
+					logTail(naturalRoot)
+			);
+		const naturalReady = startupReceiptProblem(naturalRoot, natural.pid, naturalNonce, ahk);
+		if (naturalReady) return fail('natural-shutdown: ' + naturalReady);
+		const naturalSave = fullSaveReceiptProblem(naturalRoot, natural.pid, naturalNonce);
+		if (naturalSave) return fail('natural-shutdown: ' + naturalSave);
+		const naturalChords = scriptChordReceiptProblem(naturalRoot, SCRIPT_CHORD_SLOTS);
+		if (naturalChords) return fail('natural-shutdown: ' + naturalChords);
+		if (
+			!fs.existsSync(path.join(naturalRoot, 'startup-pump.txt')) ||
+			!fs.existsSync(path.join(naturalRoot, 'tray-shell.txt'))
+		)
+			return fail('natural-shutdown: the real pre-ready startup contracts are incomplete');
+		const naturalLogged = failOnLoggedErrors('natural-shutdown', naturalRoot);
+		if (naturalLogged !== null) return naturalLogged;
+		startupSucceeded = true;
 		console.log(
 			'\x1b[32m[OK] full AHK startup smoke: fresh, reloaded, independent, suspend-marker, extension opt-in, ' +
 				'script-chord, neutral-defaults and older-release boots reached ready with no error logged ' +
-				'and every script chord registered.\x1b[0m'
+				'and every script chord registered; actual production shutdown retired naturally.\x1b[0m'
 		);
 		return 0;
 	} finally {
 		code.close();
-		fs.rmSync(wrapper, { force: true });
-		await new Promise((resolve) => setImmediate(resolve));
-		await fs.promises.rm(scratch, {
-			recursive: true,
-			force: true,
-			maxRetries: 12,
-			retryDelay: 100
-		});
+		if (startupSucceeded) fs.rmSync(wrapper, { force: true });
+		if (startupSucceeded) {
+			await new Promise((resolve) => setImmediate(resolve));
+			await fs.promises.rm(scratch, {
+				recursive: true,
+				force: true,
+				maxRetries: 12,
+				retryDelay: 100
+			});
+		} else {
+			console.error('Failed startup/shutdown evidence retained: ' + scratch);
+		}
 		const currentForwarder = fs.existsSync(productionForwarder)
 			? fs.readFileSync(productionForwarder)
 			: null;

@@ -4,6 +4,7 @@
 """Serve private Sparkle archives and observe actual owned macOS executables."""
 
 import ctypes
+import errno
 import hashlib
 import http.server
 import importlib.util
@@ -12,10 +13,86 @@ import os
 from pathlib import Path
 import signal
 import socket
+import socketserver
 import stat
 import subprocess
 import sys
 import uuid
+
+
+SERVER_DIAGNOSTIC_PHASE = "entry"
+SERVER_DIAGNOSTIC_PHASES = frozenset(
+    [
+        "entry",
+        "directory-admission",
+        "nonce-admission",
+        "socket-bind",
+        "signal-registration",
+        "readiness-publication",
+        "request-loop",
+        "server-retirement",
+    ]
+)
+SERVER_DIAGNOSTIC_EXCEPTIONS = frozenset(
+    [
+        "RuntimeError",
+        "OSError",
+        "PermissionError",
+        "FileNotFoundError",
+        "ValueError",
+        "TypeError",
+        "NameError",
+        "ImportError",
+        "ModuleNotFoundError",
+        "OverflowError",
+    ]
+)
+
+
+def server_phase(phase):
+    """Opt-in closed checkpoints; no paths, nonces, content or exception text."""
+    global SERVER_DIAGNOSTIC_PHASE
+    if phase not in SERVER_DIAGNOSTIC_PHASES:
+        raise ValueError("Sparkle phase identity refused")
+    SERVER_DIAGNOSTIC_PHASE = phase
+    try:
+        if os.environ.get("ERGOPTI_SPARKLE_SERVER_DIAGNOSTICS") != "1":
+            return
+        encoded = json.dumps({"schema": 1, "pid": os.getpid(), "phase": phase}, sort_keys=True)
+        if len(encoded.encode("utf-8")) <= 512:
+            print("Sparkle server progress: " + encoded, file=sys.stderr, flush=True)
+    except Exception:
+        # Optional progress cannot replace functional admission or its primary error.
+        return
+
+
+def export_server_refusal(arguments, failure):
+    """Opt-in typed facts only; collection can never replace the original refusal."""
+    try:
+        if (
+            len(arguments) != 3
+            or arguments[0] != "serve"
+            or os.environ.get("ERGOPTI_SPARKLE_SERVER_DIAGNOSTICS") != "1"
+        ):
+            return
+        category = type(failure).__name__
+        packet = {
+            "schema": 1,
+            "pid": os.getpid(),
+            "phase": SERVER_DIAGNOSTIC_PHASE
+            if SERVER_DIAGNOSTIC_PHASE in SERVER_DIAGNOSTIC_PHASES
+            else "entry",
+            "exception_type": category
+            if category in SERVER_DIAGNOSTIC_EXCEPTIONS
+            else "unclassified",
+        }
+        encoded = json.dumps(packet, sort_keys=True)
+        if len(encoded.encode("utf-8")) > 512:
+            return
+        print("Sparkle server diagnostic: " + encoded, file=sys.stderr)
+    except Exception:
+        # The caller's failure verdict remains 1 even if this secondary observer refuses.
+        return
 
 
 class NativeCensusRefusal(RuntimeError):
@@ -158,7 +235,10 @@ def private_directory(path):
 
 def serve(root, nonce):
     """Allow exactly two loopback-only resources; retain each served-byte digest."""
+    global SERVER_DIAGNOSTIC_PHASE
+    server_phase("directory-admission")
     root = private_directory(root)
+    server_phase("nonce-admission")
     if len(nonce) != 32 or any(c not in "0123456789abcdef" for c in nonce):
         raise RuntimeError("Private Sparkle session refused")
     state = {"stopping": False, "requests": 0}
@@ -215,6 +295,16 @@ def serve(root, nonce):
     # Sparkle 2.9.2 explicitly supports local-network testing. Only the private
     # fixture has NSAllowsLocalNetworking; archive EdDSA admission remains on.
     class PrivateServer(http.server.HTTPServer):
+        def server_bind(self):
+            # The declared numeric loopback origin has no DNS authority. The
+            # HTTPServer default performs reverse resolution during acquisition.
+            socketserver.TCPServer.server_bind(self)
+            host, port = self.server_address
+            if host != "127.0.0.1" or port <= 0:
+                raise RuntimeError("Private Sparkle numeric loopback binding refused")
+            self.server_name = host
+            self.server_port = port
+
         def __init__(self, *arguments, **options):
             self.active_request = None
             self.active_handler_admitted = False
@@ -248,7 +338,21 @@ def serve(root, nonce):
             # The native accepted socket has one unconditional physical owner.
             try:
                 if not state["stopping"]:
-                    self.finish_request(request, client_address)
+                    try:
+                        self.finish_request(request, client_address)
+                    except OSError as failure:
+                        # Winsock reports an interrupted read as WSAESHUTDOWN
+                        # when our exact successful stop preceded the read.
+                        if not (
+                            sys.platform == "win32"
+                            and failure.errno == errno.WSAESHUTDOWN
+                            and state["stopping"]
+                            and self.active_request is request
+                            and self.active_stop_attempted
+                            and not self.active_handler_admitted
+                            and self.stop_failure is None
+                        ):
+                            raise
             finally:
                 # Header/body handling is now terminal; the local request still
                 # owns its capability while canonical shutdown closes it below.
@@ -259,11 +363,14 @@ def serve(root, nonce):
         def handle_error(self, _request, _address):
             raise RuntimeError("Private Sparkle resource handling refused")
 
+    server_phase("socket-bind")
     server = PrivateServer(("127.0.0.1", 0), Handler)
     try:
         server.timeout = 0.2
+        server_phase("signal-registration")
         signal.signal(signal.SIGTERM, server.request_stop)
         signal.signal(signal.SIGINT, server.request_stop)
+        server_phase("readiness-publication")
         publish(
             root / "server-start.json",
             {
@@ -272,11 +379,14 @@ def serve(root, nonce):
                 "port": server.server_port,
             },
         )
+        server_phase("request-loop")
         while not state["stopping"]:
             server.handle_request()
         if server.stop_failure is not None:
             raise RuntimeError("Private Sparkle accepted-socket stop refused")
     finally:
+        if sys.exc_info()[0] is None:
+            server_phase("server-retirement")
         server.server_close()
         publish(
             root / "server-retired.json",
@@ -286,6 +396,21 @@ def serve(root, nonce):
                 "requests": state["requests"],
             },
         )
+
+
+def physical_executable(path):
+    """Resolve a kernel-reported alias using the filesystem, never prefix rules."""
+    if not os.path.isabs(path):
+        raise RuntimeError("Native Sparkle executable path refused")
+    resolved = os.path.realpath(path, strict=True)
+    requested = os.stat(path)
+    physical = os.stat(resolved, follow_symlinks=False)
+    if not stat.S_ISREG(physical.st_mode) or (requested.st_dev, requested.st_ino) != (
+        physical.st_dev,
+        physical.st_ino,
+    ):
+        raise RuntimeError("Native Sparkle executable identity refused")
+    return resolved
 
 
 def census(roots):
@@ -321,7 +446,16 @@ def census(roots):
             except ProcessLookupError:
                 continue
             raise NativeCensusRefusal(path_errno, bsd_diagnostic(library, pid, owner))
-        executable = os.fsdecode(buffer.value)
+        try:
+            executable = physical_executable(os.fsdecode(buffer.value))
+        except FileNotFoundError:
+            # A vanished image is never proof that a live process is foreign.
+            # Preserve the existing exact-PID exit observation for this race.
+            try:
+                os.kill(pid, 0)
+            except ProcessLookupError:
+                continue
+            raise
         if any(executable.startswith(str(root) + "/") for root in admitted):
             result.append({"pid": pid, "executable": executable})
     return sorted(result, key=lambda entry: entry["pid"])
@@ -339,14 +473,19 @@ def main(arguments):
 
 def entrypoint(arguments):
     """Export fixed refusal facts without changing strict native admission."""
+    global SERVER_DIAGNOSTIC_PHASE
+    SERVER_DIAGNOSTIC_PHASE = "entry"
+    if len(arguments) == 3 and arguments[0] == "serve":
+        server_phase("entry")
     try:
         main(arguments)
     except NativeCensusRefusal as failure:
         print(json.dumps(failure.packet, sort_keys=True))
         print("Private Sparkle fixture refused.", file=sys.stderr)
         return 1
-    except Exception:
+    except Exception as failure:
         print("Private Sparkle fixture refused.", file=sys.stderr)
+        export_server_refusal(arguments, failure)
         return 1
     return 0
 
