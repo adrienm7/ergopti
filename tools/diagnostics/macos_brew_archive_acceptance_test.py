@@ -2152,5 +2152,94 @@ class AppKitPolicyStateControls(unittest.TestCase):
                 children.groups[child].settle.assert_not_called()
 
 
+class SenderNonpromptPermissionControls(unittest.TestCase):
+    """Constructed capture controls; actual Darwin permission behavior remains unqualified."""
+
+    FAILURE = (
+        "Owned AppleEvent outcome admission failed: phase=reply-read, send=0, read=-1701, "
+        "length=unobserved, match=unobserved, error_read=0, error_length=4, "
+        "error_value=-10004, marker2=absent\n"
+    )
+
+    def test_fixed_signed_statuses_are_projected_without_permission_cause_labels(self):
+        for status in (0, -1742, -1743, -1744, -10004, -(2**31), 2**31 - 1):
+            with self.subTest(status=status):
+                self.assertEqual(
+                    probe.appleevent_permission_query_fact(
+                        "OWNED_APPLEEVENT_PERMISSION/1 osstatus=" + str(status) + "\n"
+                    ),
+                    {"osstatus": status},
+                )
+
+    def test_noise_noncanonical_and_out_of_range_statuses_cannot_publish_capture(self):
+        for value in (
+            None,
+            "",
+            "OWNED_APPLEEVENT_PERMISSION/1 osstatus=0",
+            "OWNED_APPLEEVENT_PERMISSION/1 osstatus=00\n",
+            "OWNED_APPLEEVENT_PERMISSION/1 osstatus=-0\n",
+            "OWNED_APPLEEVENT_PERMISSION/1 osstatus=+0\n",
+            "OWNED_APPLEEVENT_PERMISSION/1 osstatus=0.0\n",
+            "OWNED_APPLEEVENT_PERMISSION/1 osstatus=2147483648\n",
+            "OWNED_APPLEEVENT_PERMISSION/1 osstatus=-2147483649\n",
+            "OWNED_APPLEEVENT_PERMISSION/1 osstatus=0\nnoise\n",
+            "OWNED_APPLEEVENT_PERMISSION/1 osstatus=0\n" * 2,
+            "OWNED_APPLEEVENT_PERMISSION/1 osstatus=private-path-or-nonce\n",
+            "OWNED_APPLEEVENT_PERMISSION/1 osstatus=0\x00\n",
+            "x" * 97,
+        ):
+            with self.subTest(value=value):
+                self.assertEqual(probe.appleevent_permission_query_fact(value), {})
+
+    def test_permission_zero_never_exonerates_original_sender_error_or_changes_owner(self):
+        for status in (0, -1743, -1744):
+            with self.subTest(status=status):
+                owner = Mock()
+                owner.run.return_value = subprocess.CompletedProcess(
+                    [],
+                    66,
+                    "OWNED_APPLEEVENT_PERMISSION/1 osstatus=" + str(status) + "\n",
+                    self.FAILURE,
+                )
+                with self.assertRaises(probe.AdmissionError) as failure:
+                    probe.run_appleevent_sender(
+                        owner, ["owned-sender"], "deny-removal-positive", confined=True
+                    )
+                detail = str(failure.exception)
+                self.assertIn("control=deny-removal-positive, exit=66", detail)
+                self.assertIn('"error_number": -10004', detail)
+                self.assertIn('"marker2_snapshot": "absent"', detail)
+                self.assertIn('permission_query_fact={"osstatus": ' + str(status) + "}", detail)
+                owner.run.assert_called_once_with(["owned-sender"], check=False, confined=True)
+                self.assertEqual(len(owner.mock_calls), 1)
+                owner.settle.assert_not_called()
+
+    def test_other_exit_or_full_denial_cannot_borrow_a_positive_permission_frame(self):
+        for status, control in ((65, "deny-removal-positive"), (66, "full-policy-denial")):
+            with self.subTest(status=status, control=control):
+                owner = Mock()
+                owner.run.return_value = subprocess.CompletedProcess(
+                    [], status, "OWNED_APPLEEVENT_PERMISSION/1 osstatus=0\n", self.FAILURE
+                )
+                with self.assertRaises(probe.AdmissionError) as failure:
+                    probe.run_appleevent_sender(owner, [], control)
+                self.assertIn("exit=" + str(status), str(failure.exception))
+                self.assertNotIn("permission_query_fact=", str(failure.exception))
+
+    def test_optional_frame_never_replaces_success_or_primary_failure_evidence(self):
+        owner = Mock()
+        for capture in ("", "noise-private-input\n"):
+            owner.run.return_value = subprocess.CompletedProcess([], 66, capture, self.FAILURE)
+            with self.assertRaises(probe.AdmissionError) as failure:
+                probe.run_appleevent_sender(owner, [], "unconfined-positive")
+            self.assertIn('"error_number": -10004', str(failure.exception))
+            self.assertNotIn("permission_query_fact=", str(failure.exception))
+        owner.run.return_value = subprocess.CompletedProcess(
+            [], 0, "OWNED_APPLEEVENT_PERMISSION/1 osstatus=0\n", ""
+        )
+        with self.assertRaises(probe.AdmissionError):
+            probe.run_appleevent_sender(owner, [], "unconfined-positive")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -3652,6 +3652,22 @@ the complete three-OS checkpoint remain pending.
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 
+Manual macOS run37588921661 at89085c46707aa9972c787affb0f4102a5c8fff68
+confirms the fixture-key repair: four admitted resource reads, genuine
+foreign-key refusal, and installed-key retry through installation/relaunch.
+The exact wrong-key signature-code assertion still fails; actual bound callback
+identities are not yet observed. A bounded diagnostic now projects only the
+original refusal receipt into closed domain labels and signed codes, preserving
+all138 original assertions and adding five direct Swift assertions.
+
+Brew retains its original failed positive sender, exit66 and physical owner.
+A nonprompt AppleEvent permission query now adds only a canonical signed status
+to that failure. All67 original portable cases remain; five additive controls
+pass in the72-case candidate and expose the unchanged predecessor. This does
+not establish a permission cause or grant consent. Real native diagnostic
+execution, full-policy denial, all six Brew cases and package/install remain
+required; item36 stays open.
+
 Manual macOS run 37581581322 tested exact candidate
 6072016f31f78ab517c31ab4d5c00a6cdf865d42 and failed native archive acceptance.
 Sparkle's original startup catch reports stage=native-start, domain=sparkle,

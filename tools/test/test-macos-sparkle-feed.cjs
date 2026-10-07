@@ -2047,6 +2047,87 @@ try {
 }
 // NATIVE_SPARKLE_FIXTURE_PUBLIC_KEY_END
 
+// NATIVE_SPARKLE_REFUSAL_CHAIN_BEGIN
+try {
+	const assert = require('node:assert/strict');
+	const fixture = fs.readFileSync(
+		path.join(
+			root,
+			'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/SparkleArchiveUpdateAcceptanceTests.swift'
+		),
+		'utf8'
+	);
+	function assertClosedRefusalChain(source) {
+		const executable = source.replace(/"(?:\\.|[^"\\])*"|\/\/[^\n]*|\/\*[\s\S]*?\*\//g, (token) =>
+			token.startsWith('/') ? '' : token
+		);
+		const begin = executable.indexOf('private static func refusalErrorChainMessage(');
+		const end = executable.indexOf('\n\tprivate func ', begin);
+		assert.ok(begin >= 0 && end > begin, 'Actual refusal projection is present');
+		const body = executable.slice(begin, end);
+		assert.match(body, /expectedPID > 0, receipt\["nonce"\] as\? String == nonce/);
+		assert.match(
+			body,
+			/receipt\["event"\] as\? String == "refused-1", receipt\["version"\] as\? String == "1"/
+		);
+		assert.match(
+			body,
+			/pid\.stringValue == String\(expectedPID\), !errors\.isEmpty, errors\.count <= 8/
+		);
+		assert.match(body, /Set\(identity\.keys\) == Set\(\["domain", "code"\]\)/);
+		assert.match(body, /CFGetTypeID\(value\) != CFBooleanGetTypeID\(\)/);
+		assert.match(body, /String\(value\.int64Value\) == value\.stringValue/);
+		assert.match(body, /case SUSparkleErrorDomain: domain = "sparkle"/);
+		assert.match(body, /case NSCocoaErrorDomain: domain = "cocoa"/);
+		assert.match(body, /default: domain = "other"/);
+		assert.match(body, /chain\.append\(domain \+ ":" \+ String\(value\.int64Value\)\)/);
+		assert.doesNotMatch(
+			body,
+			/userInfo|localizedDescription|String\(reflecting:|\+ nativeDomain|Data\(|FileHandle|waitFor\(|Thread|Date\(/
+		);
+		const read = executable.indexOf(
+			'let errors = try XCTUnwrap(details["errors"] as? [[String: Any]])'
+		);
+		const notice = executable.indexOf(
+			'print("::notice title=Native Sparkle wrong-key refusal::"',
+			read
+		);
+		const assertion = executable.indexOf('XCTAssertTrue(errors.contains {', read);
+		assert.ok(
+			read >= 0 && notice > read && assertion > notice,
+			'Existing captured identities are projected before the unchanged signature assertion'
+		);
+		assert.match(
+			executable.slice(notice, assertion),
+			/Self\.refusalErrorChainMessage\(errors,\s*receipt: refusal, expectedPID: application\?\.process\.processIdentifier \?\? 0, nonce: nonce\)/
+		);
+		for (const name of [
+			'testRefusalErrorChainAdmitsOnlyBoundReceiptAndClosedDomainLabels',
+			'testRefusalErrorChainRejectsForeignRecipientEventVersionAndNonce',
+			'testRefusalErrorChainRejectsMalformedOrExcessiveIdentityRecords'
+		])
+			assert.match(executable, new RegExp('func ' + name + '\\(\\)'));
+	}
+	assertClosedRefusalChain(fixture);
+	for (const [from, to] of [
+		['receipt["nonce"] as? String == nonce', 'true'],
+		['errors.count <= 8', 'errors.count <= 9'],
+		[
+			'chain.append(domain + ":" + String(value.int64Value))',
+			'chain.append(nativeDomain + ":" + String(value.int64Value))'
+		]
+	]) {
+		assert.equal(fixture.split(from).length - 1, 1, 'One independent refusal source mutation');
+		assert.throws(() => assertClosedRefusalChain(fixture.replace(from, to)));
+	}
+	console.log(
+		'[OK] Native wrong-key refusal diagnostics use the bound original receipt and closed error identities.'
+	);
+} catch (error) {
+	errors.push('Native Sparkle refusal chain guard: ' + error.message);
+}
+// NATIVE_SPARKLE_REFUSAL_CHAIN_END
+
 if (errors.length > 0) {
 	for (const error of errors) console.error(`[FAIL] ${error}`);
 	process.exit(1);

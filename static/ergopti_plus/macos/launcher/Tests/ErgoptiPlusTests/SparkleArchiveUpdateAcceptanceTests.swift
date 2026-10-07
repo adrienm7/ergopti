@@ -141,6 +141,32 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		return parseStartupAdmissionRefusalFrame(frames[0], expectedPID: expectedPID)
 	}
 
+	/// Project only the original refused-1 callback's bound, typed error identities.
+	private static func refusalErrorChainMessage(_ errors: [[String: Any]], receipt: [String: Any],
+		expectedPID: Int32, nonce: String) -> String {
+		let unavailable = "Native Sparkle wrong-key refusal: capture=unavailable depth=unavailable chain=unavailable"
+		guard expectedPID > 0, receipt["nonce"] as? String == nonce,
+			receipt["event"] as? String == "refused-1", receipt["version"] as? String == "1",
+			let pid = receipt["pid"] as? NSNumber, CFGetTypeID(pid) != CFBooleanGetTypeID(),
+			pid.stringValue == String(expectedPID), !errors.isEmpty, errors.count <= 8 else { return unavailable }
+		var chain: [String] = []
+		for identity in errors {
+			guard Set(identity.keys) == Set(["domain", "code"]),
+				let nativeDomain = identity["domain"] as? String,
+				let value = identity["code"] as? NSNumber, CFGetTypeID(value) != CFBooleanGetTypeID(),
+				String(value.int64Value) == value.stringValue else { return unavailable }
+			let domain: String
+			switch nativeDomain {
+			case SUSparkleErrorDomain: domain = "sparkle"
+			case NSCocoaErrorDomain: domain = "cocoa"
+			default: domain = "other"
+			}
+			chain.append(domain + ":" + String(value.int64Value))
+		}
+		return "Native Sparkle wrong-key refusal: capture=observed depth=" + String(chain.count)
+			+ " chain=" + chain.joined(separator: ",")
+	}
+
 	private func startupAdmissionRefusalMessage(_ identity: StartupAdmissionRefusalIdentity?) -> String {
 		guard let identity else { return "Native Sparkle startup admission refusal: stage=unavailable domain=unavailable code=unavailable" }
 		return "Native Sparkle startup admission refusal: stage=" + identity.stage.rawValue
@@ -974,6 +1000,45 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		XCTAssertNil(Self.parseStartupAdmissionRefusalIdentity(text, expectedPID: 0))
 	}
 
+	func testRefusalErrorChainAdmitsOnlyBoundReceiptAndClosedDomainLabels() {
+		let receipt: [String: Any] = ["nonce": "independent-nonce", "pid": 321, "event": "refused-1", "version": "1"]
+		let errors: [[String: Any]] = [["domain": SUSparkleErrorDomain, "code": 4005],
+			["domain": SUSparkleErrorDomain, "code": 3002], ["domain": "untrusted-domain", "code": -7]]
+		XCTAssertEqual(Self.refusalErrorChainMessage(errors, receipt: receipt, expectedPID: 321, nonce: "independent-nonce"),
+			"Native Sparkle wrong-key refusal: capture=observed depth=3 chain=sparkle:4005,sparkle:3002,other:-7")
+		let boundary: [[String: Any]] = [["domain": NSCocoaErrorDomain, "code": NSNumber(value: Int64.min)],
+			["domain": NSCocoaErrorDomain, "code": NSNumber(value: Int64.max)]]
+		XCTAssertEqual(Self.refusalErrorChainMessage(boundary, receipt: receipt, expectedPID: 321, nonce: "independent-nonce"),
+			"Native Sparkle wrong-key refusal: capture=observed depth=2 chain=cocoa:-9223372036854775808,cocoa:9223372036854775807")
+	}
+
+	func testRefusalErrorChainRejectsForeignRecipientEventVersionAndNonce() {
+		let receipt: [String: Any] = ["nonce": "independent-nonce", "pid": 321, "event": "refused-1", "version": "1"]
+		let errors: [[String: Any]] = [["domain": SUSparkleErrorDomain, "code": 3002]]
+		let unavailable = "Native Sparkle wrong-key refusal: capture=unavailable depth=unavailable chain=unavailable"
+		for (field, value) in [("nonce", "foreign-nonce" as Any), ("pid", 322 as Any),
+			("event", "refused-2" as Any), ("version", "2" as Any), ("pid", true as Any), ("pid", 321.5 as Any)] {
+			var foreign = receipt
+			foreign[field] = value
+			XCTAssertEqual(Self.refusalErrorChainMessage(errors, receipt: foreign, expectedPID: 321, nonce: "independent-nonce"), unavailable)
+		}
+		XCTAssertEqual(Self.refusalErrorChainMessage(errors, receipt: receipt, expectedPID: 0, nonce: "independent-nonce"), unavailable)
+	}
+
+	func testRefusalErrorChainRejectsMalformedOrExcessiveIdentityRecords() {
+		let receipt: [String: Any] = ["nonce": "independent-nonce", "pid": 321, "event": "refused-1", "version": "1"]
+		let invalid: [[[String: Any]]] = [[], Array(repeating: ["domain": SUSparkleErrorDomain, "code": 3002], count: 9),
+			[["domain": SUSparkleErrorDomain, "code": true]], [["domain": SUSparkleErrorDomain, "code": 1.5]],
+			[["domain": SUSparkleErrorDomain, "code": "3002"]], [["domain": NSNull(), "code": 3002]],
+			[["domain": SUSparkleErrorDomain, "code": NSNumber(value: UInt64.max)]],
+			[["domain": SUSparkleErrorDomain, "code": NSNumber(value: Double.infinity)]],
+			[["domain": SUSparkleErrorDomain, "code": 3002, "extra": "untrusted-detail"]]]
+		for errors in invalid {
+			XCTAssertEqual(Self.refusalErrorChainMessage(errors, receipt: receipt, expectedPID: 321, nonce: "independent-nonce"),
+				"Native Sparkle wrong-key refusal: capture=unavailable depth=unavailable chain=unavailable")
+		}
+	}
+
 	func testNetworkProgressCounterDoesNotInventSuccessfulDelivery() {
 		XCTAssertEqual(resourceReadsMessage(NSNumber(value: 0)), "Native Sparkle network progress: admitted_resource_reads=0")
 		XCTAssertEqual(resourceReadsMessage(NSNumber(value: 4)), "Native Sparkle network progress: admitted_resource_reads=4")
@@ -1330,6 +1395,8 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		_ = try waitFor("cycle-refused-1", root: root)
 		let details = try XCTUnwrap(refusal["details"] as? [String: Any])
 		let errors = try XCTUnwrap(details["errors"] as? [[String: Any]])
+		print("::notice title=Native Sparkle wrong-key refusal::" + Self.refusalErrorChainMessage(errors,
+			receipt: refusal, expectedPID: application?.process.processIdentifier ?? 0, nonce: nonce))
 		XCTAssertTrue(errors.contains { $0["domain"] as? String == SUSparkleErrorDomain
 			&& ($0["code"] as? NSNumber)?.intValue == 3001 }, "Wrong-key refusal must reach actual Sparkle signature validation")
 		XCTAssertEqual(try snapshot(installed), oldSnapshot, "A refused archive cannot alter the installed signed source")
