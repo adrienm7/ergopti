@@ -73,15 +73,27 @@ function syncCount(countPath) {
 }
 
 function runBootstrap(bash, scriptPath, fixtureRoot) {
+	const environment = {
+		...process.env,
+		HOME: toBashPath(fixtureRoot),
+		ERGOPTI_CONFIG_DIR: ''
+	};
+	// Fake uv owns the child operations; its supported route is fixture input.
+	// Do not depend on a developer relay or native scutil in this portable mirror.
+	for (const key of Object.keys(environment)) {
+		if (
+			/^(?:https?_proxy|all_proxy|no_proxy|ssl_cert_file|ssl_cert_dir|requests_ca_bundle|curl_ca_bundle|uv_system_certs)$/i.test(
+				key
+			)
+		)
+			delete environment[key];
+	}
+	environment.HTTPS_PROXY = 'http://fixture.invalid:3128';
 	return spawnSync(bash, [toBashPath(scriptPath)], {
 		cwd: fixtureRoot,
 		encoding: 'utf8',
 		maxBuffer: 16 * 1024 * 1024,
-		env: {
-			...process.env,
-			HOME: toBashPath(fixtureRoot),
-			ERGOPTI_CONFIG_DIR: ''
-		}
+		env: environment
 	});
 }
 
