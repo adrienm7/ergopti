@@ -61,6 +61,15 @@ function M.layout(code_for)
 		publish(built)
 		return true
 	end
+	-- This fixture has no native capture reset. Re-publish only its owned table;
+	-- actual plan receipts still retire when that controlled table is replaced.
+	local controlled_publication
+	controlled_publication = function()
+		if layout.publish_current_capture ~= controlled_publication then return false end
+		publish(built)
+		return layout.is_ready() == true
+	end
+	layout.publish_current_capture = controlled_publication
 	layout.source = function() return "scripted" end
 	layout.shortcut_keycode = function(_, us_code) return us_code, {} end
 	layout._set_table_for_test = function(value)

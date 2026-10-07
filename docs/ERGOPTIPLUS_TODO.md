@@ -5819,6 +5819,24 @@ repeated, foreign and fabricated observations on both Lua ABIs. The actual hoste
 79-pass/1-fail receipt is retained. The repaired hosted kernel execution is still
 pending and controlled queue models are not physical-delivery evidence.
 
+Native daemon startup repair (2026-10-07): exact-source run37592219446
+started the daemon and recognized adn, but the hook reset retired the layout
+inverse published earlier, so ADN output correctly refused. Startup now
+requires fresh inverse publication on the same original native map after hook
+acquisition and CapsLock seeding, before tray/input readiness. Reset preserves
+map provenance; every load, even equal text, and changed backend/issuer ports
+retire it. Original receipts remain stale. The selected override route and
+final source/currentness are checked; failure runs only captured owned shutdown
+polling, waits for actual retirement acknowledgement and exits nonzero.
+All302 original assertions and the normal input loop remain intact. Independent
+source and actual libxkbcommon controls preserve seeded CapsLock; author gates
+pass366 JS,10477 Linux units,E2E189 and native X11/source53. Root covering format, JS366, Linux10477, E2E189 and actual X11/source53
+gates also pass. The native window gate refuses before allocation because
+this container lacks its own proc task children prerequisite; it has no
+current successful native window cases. Real whole-daemon/package/install
+CI remains pending. Hotplug reset
+publication and the other native logical/input-owner gaps below remain open.
+
 - [ ] **96.** Remove the separate Ergopti+ AltGr-adjustments option from the
       Layout menu. Selecting the Ergopti+ keylayout in the emulation picker must
       suffice. Verify that the layout supplies every intended change, retire

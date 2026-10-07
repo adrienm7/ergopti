@@ -45,6 +45,7 @@ local XkbKeymap = require("infra.xkb_keymap")
 local Keysym = require("infra.keysym")
 local XkbCapture = require("adapters.xkb_capture")
 local inverse_table, inverse_current = XkbCapture.inverse_table, XkbCapture.inverse_current
+local inverse_republish = XkbCapture.inverse_republish
 local XkbRmlvo = require("infra.xkb_rmlvo")
 local ConfigPaths = require("infra.config_paths")
 local EvdevCodes = require("infra.evdev_codes")
@@ -88,6 +89,7 @@ local MIN_PLAUSIBLE_ENTRIES = 60
 local _table = nil
 local _cohort = nil
 local _refresh_epoch = 0
+local _selection_override = nil
 local _plan_receipts = setmetatable({}, { __mode = "k" })
 
 -- What produced the loaded keymap (a command or "override"), for diagnostics.
@@ -307,10 +309,48 @@ end
 -- ===============================================
 -- ===============================================
 
+--- Re-publishes the selected inverse after the hook resets its capture state.
+--- Keeps the current capture state, including the CapsLock seed, unchanged.
+--- @param override_path string|nil The unchanged selected keymap override route.
+--- @return boolean True only when a fresh genuine inverse receipt is published.
+function M.publish_current_capture(override_path)
+	local cohort, epoch, source, base = _cohort, _refresh_epoch, _source, _base
+	if not cohort or not cohort.receipt or type(inverse_republish) ~= "function"
+		or override_path ~= _selection_override then return false end
+	local require_source = source ~= "override" and DisplayServer.is_x11()
+	local function same_selection()
+		return _cohort == cohort and _refresh_epoch == epoch and _source == source and _base == base
+			and _selection_override == override_path
+			and XkbCapture.inverse_table == inverse_table and XkbCapture.inverse_current == inverse_current
+			and XkbCapture.inverse_republish == inverse_republish
+	end
+	if not same_selection() then return false end
+	local ok, built, reason, receipt = pcall(inverse_republish, cohort.receipt, require_source)
+	if not same_selection() then return false end
+	if not ok or not built or not receipt then
+		_table, _cohort = nil, nil
+		Logger.error(LOG, "Current capture inverse publication refused — %s.", tostring(ok and reason or built))
+		return false
+	end
+	local count = 0
+	for _ in pairs(built) do count = count + 1 end
+	if count < MIN_PLAUSIBLE_ENTRIES then _table, _cohort = nil, nil; return false end
+	local checked, current = pcall(inverse_current, receipt)
+	if not checked or current ~= true or not same_selection() then return false end
+	Logger.success(LOG, "Current capture inverse published: %d typable character(s).", count)
+	if not same_selection() then return false end
+	checked, current = pcall(inverse_current, receipt, true)
+	if not checked or current ~= true or not same_selection() then return false end
+	publish(built, receipt)
+	return true
+end
+
+
 --- Builds the table from the running session, replacing any cached one.
 --- @param override_path string|nil Optional keymap file to use instead of probing.
 --- @return boolean True when a usable table is loaded.
 function M.refresh(override_path)
+	_selection_override = override_path
 	_refresh_epoch = _refresh_epoch + 1
 	local epoch = _refresh_epoch
 	_table, _base, _cohort = nil, nil, nil
