@@ -278,7 +278,7 @@ check('portable Brew ownership controls remain registered and mandatory', () => 
 	assert.ifError(result.error);
 	assert.strictEqual(result.signal, null, result.stderr);
 	assert.strictEqual(result.status, 0, result.stderr);
-	assert.match(result.stderr, /Ran 40 tests in /);
+	assert.match(result.stderr, /Ran 48 tests in /);
 	assert.match(result.stderr, /\nOK\s*$/);
 	assert.doesNotMatch(result.stderr, /skipped=/);
 });
@@ -571,6 +571,48 @@ check('shared native process ownership controls remain registered and mandatory'
 	assert.match(result.stderr, /\nOK\s*$/);
 	assert.doesNotMatch(result.stderr, /skipped=/);
 });
+
+check(
+	'owned AppleEvent failed sender diagnostics preserve scalar privacy and exact receiver ownership',
+	() => {
+		const diagnostic = (name) =>
+			fs.readFileSync(path.join(ROOT, 'tools/diagnostics', name), 'utf8');
+		const sender = diagnostic('native_appleevent_probe_sender.c');
+		const emission = sender.slice(
+			sender.indexOf('static void emit_sender_diagnostic'),
+			sender.indexOf('int main(')
+		);
+		assert.ok(emission.length > 100);
+		assert.match(emission, /keyErrorNumber, typeWildCard/);
+		assert.match(emission, /actual_type == typeSInt32 && actual_size == sizeof\(number\)/);
+		assert.match(emission, /char diagnostic\[512\]/);
+		assert.doesNotMatch(
+			emission,
+			/keyErrorString|argv\[|expected_nonce|delivery_path|printf\([^;]*stdout/s
+		);
+		const failure = sender.slice(
+			sender.indexOf('if (result != 0)'),
+			sender.lastIndexOf('AEDisposeDesc(&reply)')
+		);
+		assert.match(failure, /emit_sender_diagnostic\(status,/);
+		assert.match(failure, /else \{\s*printf\("native_appleevent_status=%d/);
+		const helper = diagnostic('macos_brew_archive_acceptance.py');
+		assert.match(
+			helper,
+			/children\.groups\.get\(receiver\) is group\s+and group\.process is receiver/
+		);
+		assert.match(helper, /observation = group\.observe_exit\(\)/);
+		assert.match(helper, /except OwnedProcessInterrupted:\s*raise/);
+		assert.match(helper, /sender_failure=_validate_sender_failure\(packet\)/);
+		assert.doesNotMatch(
+			helper.slice(
+				helper.indexOf('def _observe_sender_failure'),
+				helper.indexOf('class PhaseEvidence:')
+			),
+			/killpg|os\.kill|\.settle\(|\.wait_for_exit\(/
+		);
+	}
+);
 
 if (failures > 0) {
 	console.error(`\n${failures} Homebrew cask check(s) failed.`);
