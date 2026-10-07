@@ -114,7 +114,7 @@ function healthyUpgrade(sha = 'a'.repeat(40), digest = 'b'.repeat(64)) {
 				saved_profile: {
 					sha256: (index ? 'f' : 'c').repeat(64),
 					preserved_records: 5,
-					schema_version: 11
+					schema_version: 12
 				}
 			};
 		})
@@ -126,7 +126,7 @@ function runContractCases(verifyStartup) {
 	const sha = 'a'.repeat(40);
 	const digest = 'b'.repeat(64);
 	const healthy = healthyUpgrade();
-	const validate = (subject) => verifyUpgrade(subject, sha, digest, verifyStartup, 11);
+	const validate = (subject) => verifyUpgrade(subject, sha, digest, verifyStartup, 12);
 	validate(healthy);
 	let refused = 0;
 	for (const mutate of [
@@ -287,7 +287,7 @@ function runContractCases(verifyStartup) {
 function runBoundaryCases(verifyStartup) {
 	const healthy = healthyUpgrade();
 	const validate = (subject) =>
-		verifyUpgrade(subject, 'a'.repeat(40), 'b'.repeat(64), verifyStartup, 11);
+		verifyUpgrade(subject, 'a'.repeat(40), 'b'.repeat(64), verifyStartup, 12);
 	validate(healthy);
 	for (const observed of [0, 1, 5]) {
 		const input = structuredClone(healthy);

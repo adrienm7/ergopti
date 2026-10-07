@@ -1591,7 +1591,7 @@ if (windowsSmokeStep !== null && windowsLaunchUpload !== null) {
 				saved_profile: {
 					sha256: (index === 0 ? 'f' : '8').repeat(64),
 					preserved_records: 5,
-					schema_version: 11
+					schema_version: 12
 				}
 			};
 		})

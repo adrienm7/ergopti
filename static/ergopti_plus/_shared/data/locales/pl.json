@@ -3242,5 +3242,6 @@
 	"physical_shortcuts.position_unavailable": "To położenie klawisza jest tutaj niedostępne.",
 	"physical_shortcuts.windows_unavailable": "Jeszcze niedostępne w Windows: Edytor skrótów fizycznych nie jest jeszcze dostępny w systemie Windows.",
 	"physical_shortcuts.collision": "Ta kombinacja klawiszy jest już używana. Wybierz inną.",
-	"physical_shortcuts.window_unavailable": "To okno jest niedostępne: Spróbuj otworzyć je ponownie."
+	"physical_shortcuts.window_unavailable": "To okno jest niedostępne: Spróbuj otworzyć je ponownie.",
+	"platform_reason.legacy_helpers_use_windows_scan_code_hotkeys": "Te starsze funkcje emulacji używają skrótów Windows opartych na kodach skanowania. Inne systemy używają mapowań swoich natywnych układów klawiatury."
 }

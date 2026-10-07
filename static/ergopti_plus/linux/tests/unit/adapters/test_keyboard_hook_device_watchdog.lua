@@ -694,3 +694,249 @@ helpers.describe("keyboard_hook: the watchdog when no device is there", function
 	end)
 
 end)
+
+helpers.describe("keyboard_hook: ordinary overlapping physical-source release", function()
+
+	helpers.it("keeps the single acknowledged output Shift bit held until its last source releases", function()
+		local a, b = fake_node("shared-shift-a"), fake_node("shared-shift-b")
+		local InputEvent = require("infra.input_event")
+		local queues = {
+			[a] = { InputEvent.encode(1, 42, 1, nil, 1), InputEvent.encode(1, 42, 0, nil, 3) },
+			[b] = { InputEvent.encode(1, 42, 1, nil, 2) },
+		}
+		package.loaded["modules.hotstrings.device_finder"] = {
+			find_devices = function() return { a, b }, {} end,
+			is_key_device = function() return true end,
+		}
+		local reader = helpers.load_module("adapters.evdev_reader")
+		local backend = multi_recorder(queues)
+		reader._set_backend(backend)
+		local writer = helpers.load_module("adapters.uinput_writer")
+		local rows = {}
+		writer._set_backend({
+			open = function() return 9 end,
+			ioctl = function() return true end,
+			write = function(_, bytes) rows[#rows + 1] = bytes; return true end,
+			close = function() return true end,
+		})
+		assert(writer.open())
+		local output = assert(writer.capture_output())
+		local hook = load_hook()
+		hook.start({ intercept = true, onEmitRaw = writer.emit })
+		hook.pump()
+		local held = hook.held_text_modifier_codes()
+		local output_after_first_release = writer.output_view(output)
+		queues[b][1] = InputEvent.encode(1, 42, 0, nil, 4)
+		hook.pump()
+		local final = writer.output_view(output)
+		hook.stop()
+		reader._reset_backend()
+		writer.close_owned(output)
+		os.remove(a); os.remove(b)
+		helpers.assert_eq(held, { 42 }, "the second source still physically owns Shift")
+		helpers.assert_eq(output_after_first_release.down, { 42 },
+			"a first-source up must not lift the shared virtual modifier bit")
+		helpers.assert_eq(final.down, {}, "the final-source up must release the virtual bit")
+	end)
+
+end)
+
+--- Starts the real Hook, reviewed Writer and Reader with controlled syscalls/layout.
+--- The XKB port records actual Hook transitions and models a single desktop key bit.
+--- No kernel, display, libuv handle or native command is acquired by these controls.
+local function aggregate_consumer_session(streams, options)
+	options = options or {}
+	local Input = require("infra.input_event")
+	local paths, queues, desired = {}, {}, {}
+	for _, id in ipairs({ "a", "b" }) do
+		if streams[id] then
+			local path = fake_node("aggregate-" .. id)
+			paths[id], desired[#desired + 1], queues[path] = path, path, {}
+			for _, row in ipairs(streams[id]) do
+				queues[path][#queues[path] + 1] = Input.encode(1, row[1], row[2], nil, row[3])
+			end
+		end
+	end
+	package.loaded["modules.hotstrings.device_finder"] = {
+		find_devices = function() return desired, {} end,
+		is_key_device = function() return true end,
+	}
+	local reader = helpers.load_module("adapters.evdev_reader")
+	reader._set_backend((multi_recorder(queues)))
+	local writer = helpers.load_module("adapters.uinput_writer")
+	local session = { rows = {}, captures = {}, paths = paths, queues = queues, Input = Input }
+	writer._set_backend({
+		open = function() return 7 end, ioctl = function() return true end,
+		write = function(_, bytes)
+			local row = Input.decode(bytes)
+			if row.type == 1 then session.rows[#session.rows + 1] = { row.code, row.value } end
+			return true
+		end,
+		close = function() return true end,
+	})
+	assert(writer.open()); session.cap = assert(writer.capture_output()); session.writer = writer
+	local saved_xkb = package.loaded["adapters.xkb_capture"]
+	local held = {}
+	package.loaded["adapters.xkb_capture"] = {
+		is_ready = function() return true end,
+		reset_state = function() held = {}; return true end,
+		modifier_role = function(code)
+			return options.roles and options.roles[code] or require("infra.evdev_codes").MODIFIER_OF[code], nil
+		end,
+		process = function(code, value)
+			session.captures[#session.captures + 1] = { code, value }
+			if value == 1 then held[code] = true elseif value == 0 then held[code] = nil end
+			if code == 30 and value ~= 0 then return held[42] and "A" or "a", "a" end
+			return nil, nil, nil
+		end,
+		caps_locked = function() return false end,
+	}
+	local hook = helpers.load_module("adapters.keyboard_hook")
+	package.loaded["adapters.xkb_capture"] = saved_xkb
+	session.hook = hook
+	if options.engine then assert(hook.set_remapper(options.engine)) end
+	hook.start({ intercept = true, onEmitRaw = function(code, value)
+		local acknowledged = writer.emit(code, value)
+		if options.after_emit then options.after_emit(session, code, value) end
+		return acknowledged
+	end })
+	assert(hook.isRunning())
+	function session.pump() hook.pump() end
+	function session.queue(id, code, value, at)
+		queues[paths[id]][#queues[paths[id]] + 1] = Input.encode(1, code, value, nil, at)
+	end
+	function session.retire(id) queues[paths[id]][1] = { fatal = "controlled exact source loss" } end
+	function session.view() return writer.output_view(session.cap) end
+	function session.close()
+		options.after_emit = nil
+		pcall(hook.stop); pcall(hook.set_remapper, nil)
+		reader._reset_backend(); writer.close_owned(session.cap)
+		for _, path in pairs(paths) do os.remove(path) end
+	end
+	function session.inject_text(text)
+		local saved = package.loaded["adapters.xkb_capture"]
+		package.loaded["adapters.xkb_capture"] = { caps_locked = function() return false end }
+		local layout = helpers.load_module("adapters.keyboard_layout")
+		layout._set_table_for_test({ x = { keycode = 45, level = 1, mods = {} } })
+		local injector = helpers.load_module("modules.hotstrings.injector")
+		package.loaded["adapters.xkb_capture"] = saved
+		injector._set_uinput(writer); injector._set_nanosleep_for_test(function() end)
+		local result = injector.type_directly(text)
+		injector._set_uinput(nil)
+		return result
+	end
+	return session
+end
+
+helpers.describe("Hook aggregate modifier contract: preserved red controls", function()
+
+	helpers.it("coalesces shared modifier capture to one global XKB down and final up", function()
+		local session = aggregate_consumer_session({
+			a = { { 42, 1, 1 }, { 42, 0, 3 } }, b = { { 42, 1, 2 }, { 42, 0, 4 } },
+		})
+		session.pump(); local captures = session.captures; session.close()
+		helpers.assert_eq(captures, { { 42, 1 }, { 42, 0 } }, "per-source edge counts cannot replace a global XKB key bit")
+	end)
+
+	helpers.it("deduplicates a source down while retaining its real autorepeat", function()
+		local session = aggregate_consumer_session({ a = { { 42, 1, 1 }, { 42, 1, 2 }, { 42, 2, 3 }, { 42, 0, 4 } } })
+		session.pump(); local rows = session.rows; session.close()
+		helpers.assert_eq(rows, { { 42, 1 }, { 42, 2 }, { 42, 0 } }, "duplicate ownership needs zero-wire settlement, repeat remains native")
+	end)
+
+	helpers.it("does not use a hardcoded modifier set when the live layout assigns Menu to Ctrl", function()
+		local session = aggregate_consumer_session({
+			a = { { 139, 1, 1 }, { 139, 0, 3 } }, b = { { 139, 1, 2 } },
+		}, { roles = { [139] = "ctrl" } })
+		session.pump(); local held, view = session.hook.held_modifiers(), session.view(); session.close()
+		helpers.assert_eq(held.ctrl, true)
+		helpers.assert_eq(view.down, { 139 }, "the actual layout role must retain the second Ctrl owner")
+	end)
+
+	helpers.it("retires lost-source modifier ownership while preserving the remaining source", function()
+		local session = aggregate_consumer_session({ a = { { 42, 1, 1 } }, b = { { 42, 1, 2 } } })
+		session.pump(); session.retire("a"); session.pump()
+		local held, view = session.hook.held_text_modifier_codes(), session.view(); session.close()
+		helpers.assert_eq(view.down, { 42 }, "native output retirement already retains the other source")
+		helpers.assert_eq(held, { 42 }, "the lost source must leave the live held-owner roster")
+	end)
+
+	helpers.it("does not publish a modifier ACK after emitter reentry closes its input source", function()
+		local stopped = false
+		local session = aggregate_consumer_session({ a = { { 42, 1, 1 } } }, {
+			after_emit = function(current, code, value)
+				if code == 42 and value == 1 and not stopped then stopped = true; current.hook.stop() end
+			end,
+		})
+		session.pump(); local running, view = session.hook.isRunning(), session.view(); session.close()
+		helpers.assert_eq(running, false)
+		helpers.assert_eq(view.down, {}, "closed-source reentry must not strand a later committed native bit")
+	end)
+
+	helpers.it("neutralizes one shared Shift bit once during actual Injector restoration", function()
+		local session = aggregate_consumer_session({ a = { { 42, 1, 1 } }, b = { { 42, 1, 2 } } })
+		session.pump(); local start = #session.rows
+		local result = session.inject_text("x")
+		local modifier_rows = {}
+		for index = start + 1, #session.rows do
+			local row = session.rows[index]
+			if row[1] == 42 then modifier_rows[#modifier_rows + 1] = row end
+		end
+		session.close(); helpers.assert_eq(result.ok, true)
+		helpers.assert_eq(modifier_rows, { { 42, 0 }, { 42, 1 } }, "one aggregate bit has one lift and one restoration")
+	end)
+
+end)
+
+helpers.describe("actual shared-output handoff dependencies: green controls", function()
+
+	helpers.it("does not orphan the retained physical Shift when retiring its synthetic TapHold owner", function()
+		local Engine = require("platform.remap.tap_hold_engine")
+		local engine = Engine.new({ keys = { caps_lock = { tap_action = "none", hold_modifier = "shift", time_activation_seconds = 10 } },
+			tap_min_ms = 0, one_shot_timeout_ms = 2000 })
+		local session = aggregate_consumer_session({ a = { { 58, 1, 1 }, { 42, 1, 2 } } }, { engine = engine })
+		session.pump(); local before = session.view()
+		local retired = session.hook.set_remapper(nil); local after = session.view()
+		session.queue("a", 42, 0, 3); session.pump(); local final = session.view(); session.close()
+		helpers.assert_eq(before.down, { 42 }); helpers.assert_eq(retired, true)
+		helpers.assert_eq(after.down, { 42 }, "existing engine transfers the still-physical bit rather than lifting it")
+		helpers.assert_eq(final.down, {})
+	end)
+
+	helpers.it("records actual Injector spending Alt while its originating physical owner remains held", function()
+		local session = aggregate_consumer_session({ a = { { 56, 1, 1 } } })
+		session.pump(); local before = session.view()
+		local result = session.inject_text("x"); local after = session.view()
+		local physical = session.hook.held_modifiers(); session.close()
+		helpers.assert_eq(result.ok, true); helpers.assert_eq(after.down, {})
+		helpers.assert_eq(physical.alt, true, "physical/source ownership differs from intentionally spent output")
+		helpers.assert_true(after.write_epoch > before.write_epoch)
+	end)
+
+	helpers.it("records legitimate ComboEmitter writes on the same exact output capability", function()
+		local session = aggregate_consumer_session({ a = { { 42, 1, 1 } } })
+		session.pump(); local before = session.view()
+		local combo = helpers.load_module("modules.gestures.combo_emitter")
+		local accepted = combo.press_codes({ 56 }, { 30 }, "controlled shared writer")
+		local after = session.view(); session.close()
+		helpers.assert_eq(accepted, true); helpers.assert_eq(after.down, { 42 })
+		helpers.assert_eq(after.write_epoch, before.write_epoch + 4,
+			"a private Hook-only epoch would mistake a legitimate same-channel gesture for foreign ownership")
+	end)
+
+	helpers.it("retains temporary Writer exact-baseline release instead of silently committing persistent Shift", function()
+		local session = aggregate_consumer_session({ a = {} })
+		local writer, cap = session.writer, session.cap
+		local token = assert(writer.acquire_transaction(cap))
+		assert(writer.transaction_emit(token, 42, 1))
+		local released = writer.release_transaction(token)
+		local retained = writer.transaction_current(token)
+		local restored = writer.restore_transaction(token)
+		local finally_released = writer.release_transaction(token)
+		local view = session.view(); session.close()
+		helpers.assert_eq(released, false); helpers.assert_eq(retained, true)
+		helpers.assert_eq(restored, true); helpers.assert_eq(finally_released, true)
+		helpers.assert_eq(view.down, {}, "persistent forwarding needs its own commit contract, not a weaker temporary release")
+	end)
+
+end)

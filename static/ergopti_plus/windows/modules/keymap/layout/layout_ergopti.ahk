@@ -648,3 +648,45 @@ ErgoptiNumberRowEdgeMapping() {
 		0x0D, "=", ; SC00D, second right of 0
 	)
 }
+
+/**
+ * Resolves the helper-backed variant from effective features, never a raw registry layout.
+ * A runtime gate projects the variant to Ergopti while retained desired intent stays intact.
+ * @param {Map} FeaturesSource Effective features; the live map when omitted.
+ * @returns {String} Built-in variant, or an empty string for malformed input.
+ */
+ErgoptiLayout_BuiltinVariant(FeaturesSource := unset) {
+	global Features
+	if !IsSet(FeaturesSource) {
+		if !IsSet(Features)
+			return ""
+		FeaturesSource := Features
+	}
+	if !(FeaturesSource is Map)
+		return ""
+	Layout := FeaturesSource.Get("layout", Map())
+	if !(Layout is Map)
+		return ""
+	Variant := Layout.Get("ergopti_variant", "none")
+	return (Variant is String) && (StrCompare(Variant, "none", true) == 0 || StrCompare(Variant, "ergopti", true) == 0 || StrCompare(Variant, "ergopti_plus", true) == 0) ? Variant : ""
+}
+
+/**
+ * Keeps the helper overlay independent from base and general AltGr admission.
+ * A selected registry source supersedes helpers even before its model is loaded.
+ * @param {Map} FeaturesSource Effective feature source; the live source when omitted.
+ * @returns {Boolean}
+ */
+ErgoptiLayout_PlusIsActive(FeaturesSource := unset) {
+	global Features
+	if !IsSet(FeaturesSource) {
+		if !IsSet(Features)
+			return false
+		FeaturesSource := Features
+	}
+	if ErgoptiLayout_BuiltinVariant(FeaturesSource) != "ergopti_plus"
+		return false
+	Layout := FeaturesSource["layout"]
+	Selected := Layout.Get("emulated_layout", "")
+	return (Selected is String) && Selected == ""
+}

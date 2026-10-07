@@ -3242,5 +3242,6 @@
 	"physical_shortcuts.position_unavailable": "Esta posición de tecla no está disponible aquí.",
 	"physical_shortcuts.windows_unavailable": "Aún no disponible en Windows: El editor de atajos físicos aún no está disponible en Windows.",
 	"physical_shortcuts.collision": "Esta combinación de teclas ya está en uso. Elige otra.",
-	"physical_shortcuts.window_unavailable": "Esta ventana no está disponible: Intenta abrirla de nuevo."
+	"physical_shortcuts.window_unavailable": "Esta ventana no está disponible: Intenta abrirla de nuevo.",
+	"platform_reason.legacy_helpers_use_windows_scan_code_hotkeys": "Estas funciones de emulación heredadas usan atajos de Windows basados en códigos de exploración. Los demás sistemas usan las asignaciones de sus distribuciones nativas."
 }

@@ -3242,5 +3242,6 @@
 	"physical_shortcuts.position_unavailable": "이 키 위치는 여기서 사용할 수 없습니다.",
 	"physical_shortcuts.windows_unavailable": "아직 Windows에서 지원되지 않음: 물리 키 단축키 편집기는 아직 Windows에서 사용할 수 없습니다.",
 	"physical_shortcuts.collision": "이 키 조합은 이미 사용 중입니다. 다른 조합을 선택하세요.",
-	"physical_shortcuts.window_unavailable": "이 창을 사용할 수 없습니다: 다시 열어 보세요."
+	"physical_shortcuts.window_unavailable": "이 창을 사용할 수 없습니다: 다시 열어 보세요.",
+	"platform_reason.legacy_helpers_use_windows_scan_code_hotkeys": "이 기존 에뮬레이션 보조 기능은 Windows 스캔 코드 단축키를 사용합니다. 다른 시스템은 기본 키보드 배열 매핑을 사용합니다."
 }

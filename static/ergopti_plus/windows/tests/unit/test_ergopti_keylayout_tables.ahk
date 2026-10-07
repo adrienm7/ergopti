@@ -484,12 +484,15 @@ _EKT_PlusRollScript() {
 	Code .= "#SingleInstance Off`n"
 	Code .= '#Include ' . _DriverDir . '\infra\json.ahk' . "`n"
 	Code .= '#Include ' . _DriverDir . '\adapters\file_system.ahk' . "`n"
-	for Name in ["_RollChevronEqualEmit", "AddRollEqual", "_RollEmitCritical", "AltGrLayerShiftHeld"] {
+	AssertEqual(_DriverProductionFileForSymbol("ErgoptiLayout_BuiltinVariant"),
+		_DriverProductionFileForSymbol("ErgoptiLayout_PlusIsActive"), "both source-intent helpers have the same unique production owner")
+	for Name in ["_RollChevronEqualEmit", "AddRollEqual", "_RollEmitCritical", "AltGrLayerShiftHeld",
+		"ErgoptiLayout_BuiltinVariant", "ErgoptiLayout_PlusIsActive"] {
 		Definition := _DriverFuncBody(Name)
 		AssertTrue(Definition != "", "the actual roll definition must exist before constructing the native fixture")
 		Code .= Definition . "`n"
 	}
-	Code .= 'global Features := Map("layout", Map("ergopti_plus", false))' . "`n"
+	Code .= 'global Features := Map("layout", Map("ergopti_variant", "ergopti"))' . "`n"
 	Code .= 'global _TH_SyntheticHeldKeys := Map(), _PP_Mode := "none", _PP_Kind := "", _PP_Output := "", _PP_Calls := 0' . "`n"
 	Code .= 'global _TapHoldKeyIsDown := _PP_ShiftQuery' . "`n"
 	Code .= '_PP_ShiftQuery(Name, Mode) => _PP_Mode == "physical" && Name == "Shift" && Mode == "P"' . "`n"
@@ -499,7 +502,7 @@ _EKT_PlusRollScript() {
 	Code .= 'WrapTextIfSelected(Symbol, Left, Right) {`nglobal _PP_Kind, _PP_Output, _PP_Calls`n_PP_Calls += 1`nif Symbol != Left || Symbol != Right`nthrow Error("the real percent wrap must preserve both boundaries")`n_PP_Kind := "wrap"`n_PP_Output := Symbol`n}' . "`n"
 	Code .= 'Rows := JsonParse(FileRead(A_Args[1], "UTF-8"))["roll_rows"]' . "`n"
 	Code .= 'Packet := "["' . "`n"
-	Code .= 'for Row in Rows {`nFeatures["layout"]["ergopti_plus"] := Row["plus"]`n_PP_Mode := Row["shift"]`n_TH_SyntheticHeldKeys := Map()`nif _PP_Mode == "left_hold"`n_TH_SyntheticHeldKeys["LShift"] := 1`nif _PP_Mode == "right_hold"`n_TH_SyntheticHeldKeys["RShift"] := 1`n_PP_Kind := ""`n_PP_Output := ""`n_PP_Calls := 0`n_RollChevronEqualEmit()`nPacket .= (A_Index > 1 ? "," : "") . "[" . JsonStringLiteral(_PP_Kind) . "," . JsonStringLiteral(_PP_Output) . "," . _PP_Calls . "]"`n}' . "`n"
+	Code .= 'for Row in Rows {`nFeatures["layout"]["ergopti_variant"] := Row["plus"] ? "ergopti_plus" : "ergopti"`n_PP_Mode := Row["shift"]`n_TH_SyntheticHeldKeys := Map()`nif _PP_Mode == "left_hold"`n_TH_SyntheticHeldKeys["LShift"] := 1`nif _PP_Mode == "right_hold"`n_TH_SyntheticHeldKeys["RShift"] := 1`n_PP_Kind := ""`n_PP_Output := ""`n_PP_Calls := 0`n_RollChevronEqualEmit()`nPacket .= (A_Index > 1 ? "," : "") . "[" . JsonStringLiteral(_PP_Kind) . "," . JsonStringLiteral(_PP_Output) . "," . _PP_Calls . "]"`n}' . "`n"
 	Code .= 'Packet .= "]"' . "`n"
 	Code .= 'if !FSWriteCreateDurable(A_Args[2], Packet)`nthrow Error("the owned roll receipt could not become durable")' . "`n"
 	Code .= 'FileAppend("roll-matrix-written", "*")`nExitApp(0)`n'
@@ -572,3 +575,149 @@ _EKT_PlusRollNativeCase() {
 }
 Test("Ergopti+ matrix: the actual native SC012 roll preserves extra percent and ligature outputs (todo96-output-matrix)",
 	_EKT_PlusRollNativeCase)
+
+
+; These are software registration/descriptor observations, with no injected keys.
+_EKT_VariantTruthTable() {
+	for Variant in ["ergopti", "ergopti_plus"] {
+		for Base in [false, true] {
+			for GeneralAltGr in [false, true] {
+				for Source in ["", "unrecorded"] {
+					Candidate := Map("layout", Map("ergopti_variant", Variant, "ergopti_base", Base,
+						"ergopti_alt_gr", GeneralAltGr, "emulated_layout", Source))
+					AssertEqual(Variant, ErgoptiLayout_BuiltinVariant(Candidate))
+					AssertEqual(Variant == "ergopti_plus" && Source == "", ErgoptiLayout_PlusIsActive(Candidate),
+						"only built-in source intent owns the helper overlay; independent layers stay independent")
+					AssertEqual(Base, Candidate["layout"]["ergopti_base"])
+					AssertEqual(GeneralAltGr, Candidate["layout"]["ergopti_alt_gr"])
+					AssertEqual(Source, Candidate["layout"]["emulated_layout"])
+				}
+			}
+		}
+	}
+	for Invalid in [true, 1, "unknown", "ERGOPTI_PLUS", Map()] {
+		Candidate := Map("layout", Map("ergopti_variant", Invalid, "emulated_layout", ""))
+		AssertEqual("", ErgoptiLayout_BuiltinVariant(Candidate), "unknown typed ownership refuses instead of choosing a variant")
+		AssertFalse(ErgoptiLayout_PlusIsActive(Candidate))
+	}
+	AssertEqual("ergopti", ErgoptiLayout_BuiltinVariant(Map("layout", Map())), "absent variant keeps historical defaults")
+	AssertFalse(ErgoptiLayout_PlusIsActive(Map("layout", Map("ergopti_variant", "ergopti_plus", "emulated_layout", true))),
+		"malformed source intent cannot authorize helper ownership")
+}
+Test("Ergopti variant: full legacy layer truth table and typed source refusal (todo96-helper-variant)",
+	_EKT_VariantTruthTable)
+
+_EKT_RegisteredRealAltGr(State, *) => State.Admitted
+
+_EKT_RegisteredDispatch(State, Scan, Table, *) {
+	State.Dispatched.Push(Scan)
+	Cb := AltGrLayerEntryCallable(Table[Scan])
+	Cb.Call()
+}
+
+; Capture the actual producer's bound criterion and action, preserving its order.
+_EKT_RegisteredPlusCase() {
+	global Features, ALTGR_PLUS_OVERRIDES, ALTGR_BASE_ROWS, ALTGR_NUMBER_ROW, CTRL_ALT_NUMPAD, SpaceAroundSymbols
+	global _TapHoldKeyIsDown, _TH_SyntheticHeldKeys, _Stub_SentText, _Stub_RecordedSends, _Stub_LastChars
+	global LastSentCharacterKeyTime, _LSC_RING, _LSC_CURSOR, _LSC_LEN
+	_TestEnsureErgoptiLayout()
+	Saved := [Features, ALTGR_PLUS_OVERRIDES, ALTGR_BASE_ROWS, ALTGR_NUMBER_ROW, CTRL_ALT_NUMPAD,
+		SpaceAroundSymbols, _TapHoldKeyIsDown, _TH_SyntheticHeldKeys, _Stub_SentText, _Stub_RecordedSends,
+		_Stub_LastChars, LastSentCharacterKeyTime, _LSC_RING, _LSC_CURSOR, _LSC_LEN]
+	Criterion := 0, Registrations := []
+	State := {Admitted: true, Dispatched: []}
+	SetCriterion(Fn := unset) {
+		Criterion := IsSet(Fn) ? Fn : 0
+	}
+	Capture(Key, Callback, Options) {
+		Registrations.Push({Key: Key, Callback: Callback, Criterion: Criterion, Options: Options})
+	}
+	try {
+		LastSentCharacterKeyTime := LastSentCharacterKeyTime.Clone()
+		_LSC_RING := _LSC_RING.Clone()
+		RegisterAltGrLayer(Capture, SetCriterion, _EKT_RegisteredDispatch.Bind(State), _EKT_RegisteredRealAltGr.Bind(State))
+		AssertEqual(0, Criterion, "the actual registration producer always resets the process-wide criterion")
+		AssertEqual(ALTGR_PLUS_OVERRIDES.Count + ALTGR_NUMBER_ROW.Count + CTRL_ALT_NUMPAD.Count + ALTGR_BASE_ROWS.Count,
+			Registrations.Length, "every original layer registration remains present")
+		AssertEqual(3, ALTGR_PLUS_OVERRIDES.Count, "three-key-only legacy intent does not turn on unrelated layers")
+		for Index in [1, 2, 3] {
+			Registration := Registrations[Index]
+			AssertEqual("I2", Registration.Options)
+			for Variant in ["ergopti", "ergopti_plus"] {
+				for Base in [false, true] {
+					for General in [false, true] {
+						for Source in ["", "unrecorded"] {
+							Features := Map("layout", Map("ergopti_variant", Variant, "ergopti_base", Base,
+								"ergopti_alt_gr", General, "emulated_layout", Source))
+							AssertEqual(Variant == "ergopti_plus" && Source == "", Registration.Criterion.Call(),
+								"the actual registered helper criterion follows typed source intent")
+						}
+					}
+				}
+			}
+			Features := Map("layout", Map("ergopti_variant", "ergopti_plus", "ergopti_base", false,
+				"ergopti_alt_gr", false, "emulated_layout", ""))
+			State.Admitted := false
+			AssertFalse(Registration.Criterion.Call(), "source intent cannot bypass actual physical eligibility")
+			State.Admitted := true
+		}
+		for Row in _EKT_PlusMatrix()["rows"] {
+			Match := 0
+			for Index in [1, 2, 3]
+				if Registrations[Index].Key == "SC138 & " . Row["scan"]
+					Match := Registrations[Index]
+			AssertTrue(IsObject(Match), "all independent matrix keys have an actual registered helper action")
+			AssertTrue(Match.Criterion.Call(), "migrated three-key-only intent admits each helper")
+			_TapHoldKeyIsDown := _EKT_PlusPhysicalShift.Bind(Row["shift"])
+			_TH_SyntheticHeldKeys := Map()
+			for Spacing in ["", " "] {
+				SpaceAroundSymbols := Spacing
+				_Stub_SentText := [], _Stub_RecordedSends := [], _Stub_LastChars := []
+				Match.Callback.Call()
+				Descriptor := Row["descriptor"]
+				if Descriptor.Has("wrap") {
+					AssertEqual(1, _Stub_SentText.Length)
+					AssertEqual("wrap", _Stub_SentText[1].kind)
+					AssertEqual(Descriptor["wrap"], _Stub_SentText[1].symbol)
+					AssertEqual(Descriptor["left"], _Stub_SentText[1].left)
+					AssertEqual(Descriptor["right"], _Stub_SentText[1].right)
+				} else {
+					AssertEqual(0, _Stub_SentText.Length)
+					Texts := []
+					for Send in _Stub_RecordedSends
+						if Send.fn == "SendNewResult"
+							Texts.Push(Send.args[1])
+					AssertEqual(1, Texts.Length)
+					AssertEqual(Descriptor.Has("word") ? Descriptor["word"] . Spacing : Descriptor["text"], Texts[1],
+						"actual registered actions preserve independent word spacing and Shift deviations")
+				}
+			}
+		}
+		AssertEqual(12, State.Dispatched.Length, "six independent rows run under both spacing settings")
+	} finally {
+		Features := Saved[1], ALTGR_PLUS_OVERRIDES := Saved[2], ALTGR_BASE_ROWS := Saved[3]
+		ALTGR_NUMBER_ROW := Saved[4], CTRL_ALT_NUMPAD := Saved[5], SpaceAroundSymbols := Saved[6]
+		_TapHoldKeyIsDown := Saved[7], _TH_SyntheticHeldKeys := Saved[8]
+		_Stub_SentText := Saved[9], _Stub_RecordedSends := Saved[10], _Stub_LastChars := Saved[11]
+		LastSentCharacterKeyTime := Saved[12], _LSC_RING := Saved[13], _LSC_CURSOR := Saved[14], _LSC_LEN := Saved[15]
+	}
+}
+Test("Ergopti variant: actual registrar criteria and descriptors preserve three-key legacy intent (todo96-helper-variant)",
+	_EKT_RegisteredPlusCase)
+
+_EKT_NeutralVariantCase() {
+	AssertEqual("none", ManifestDefaultFor("layout.ergopti_variant"))
+	for Base in [false, true] {
+		for General in [false, true] {
+			Source := Map("layout", Map("ergopti_variant", "none", "ergopti_base", Base,
+				"ergopti_alt_gr", General, "emulated_layout", ""))
+			AssertEqual("none", ErgoptiLayout_BuiltinVariant(Source))
+			AssertFalse(ErgoptiLayout_PlusIsActive(Source))
+			AssertEqual(Base, Source["layout"]["ergopti_base"])
+			AssertEqual(General, Source["layout"]["ergopti_alt_gr"])
+		}
+	}
+	AssertEqual("none", ErgoptiLayout_BuiltinVariant(Map("layout", Map())))
+}
+Test("Ergopti variant: neutral default disables helpers and preserves independent base and AltGr intent (todo96-helper-variant)",
+	_EKT_NeutralVariantCase)

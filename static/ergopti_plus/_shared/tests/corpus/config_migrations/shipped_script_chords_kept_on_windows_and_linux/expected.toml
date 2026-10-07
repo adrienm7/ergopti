@@ -1,7 +1,7 @@
 # _shared/tests/corpus/config_migrations/shipped_script_chords_kept_on_windows_and_linux/expected.toml
 
 [_meta]
-schema_version = 11
+schema_version = 12
 
 [shortcuts.script_control]
 chords_enabled = false
