@@ -2128,6 +2128,57 @@ try {
 }
 // NATIVE_SPARKLE_REFUSAL_CHAIN_END
 
+// The actual wrong-key receipt uses Sparkle's validation error, through native wrappers.
+try {
+	const assert = require('node:assert/strict');
+	const fixture = fs.readFileSync(
+		path.join(
+			root,
+			'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/SparkleArchiveUpdateAcceptanceTests.swift'
+		),
+		'utf8'
+	);
+	function requireExactValidationError(source) {
+		const executable = source.replace(/"(?:\\.|[^"\\])*"|\/\/[^\n]*|\/\*[\s\S]*?\*\//g, (token) =>
+			token.startsWith('/') ? '' : token
+		);
+		const anchor = 'XCTAssertTrue(errors.contains {';
+		assert.equal(
+			executable.split(anchor).length - 1,
+			1,
+			'Exactly one original wrong-key assertion'
+		);
+		const offset = executable.indexOf(anchor);
+		const end = executable.indexOf(
+			'}, "Wrong-key refusal must reach actual Sparkle signature validation")',
+			offset
+		);
+		assert.ok(end > offset, 'The original assertion and failure message remain');
+		assert.match(
+			executable.slice(offset, end),
+			/^XCTAssertTrue\(errors\.contains \{ \$0\["domain"\] as\? String == SUSparkleErrorDomain\s*&& \(\$0\["code"\] as\? NSNumber\)\?\.intValue == Int\(SUError\.validationError\.rawValue\) $/
+		);
+	}
+	requireExactValidationError(fixture);
+	for (const replacement of ['3001', '4005', 'Int(SUError.validationError.rawValue) || true']) {
+		assert.throws(() =>
+			requireExactValidationError(
+				fixture.replace('Int(SUError.validationError.rawValue)', replacement)
+			)
+		);
+	}
+	assert.throws(() =>
+		requireExactValidationError(
+			fixture.replace('$0["domain"] as? String == SUSparkleErrorDomain', 'true')
+		)
+	);
+	console.log(
+		'[OK] Wrong-key archive acceptance requires the exact native Sparkle validation error.'
+	);
+} catch (error) {
+	errors.push('Native Sparkle exact validation error guard: ' + error.message);
+}
+
 if (errors.length > 0) {
 	for (const error of errors) console.error(`[FAIL] ${error}`);
 	process.exit(1);
