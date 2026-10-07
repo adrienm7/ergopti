@@ -4087,6 +4087,15 @@ remain exact and ordered; two new Swift receiving controls still require
 genuine macOS compilation/execution. No deadline, signature expectation,
 readiness predicate, installer authorization or cleanup law is relaxed.
 
+Manual run 37551458196 on 67d563584b05426f2e2564b61cbbc1ddd61d6eb0
+passes macOS portable unit/E2E/tooltip lanes but refuses native Sparkle test
+compilation: the added progress enum used commas before subsequent case
+declarations. The syntax-only correction removes 13 separators, retains all 42
+event identifiers/values/order and every current Swift assertion, and adds
+an independent source grammar guard. Actual corrected compilation and complete
+AppKit/Sparkle/Homebrew acceptance remain required; this failed run supplied
+no new policy-state or progress runtime observation.
+
 - [~] **37.** Always show the shipped Ergopti hotstring pack, including when
   its keyboard layout is not installed. Move French `suffixes_a` and magic-key
   `replace` into that extension without a beta compatibility layer. The runtime

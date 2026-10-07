@@ -88,19 +88,19 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 
 
 	private enum UpdateProgressEvent: String, CaseIterable {
-		case e0 = "started-1", e1 = "started-2", e2 = "updater-start-attempt",
-		case e3 = "updater-started", e4 = "updater-policy-admitted", e5 = "check-requested-1",
-		case e6 = "check-requested-2", e7 = "user-check-1", e8 = "user-check-2",
-		case e9 = "start-refused", e10 = "unexpected-permission-1", e11 = "unexpected-permission-2",
-		case e12 = "offer-refused-1", e13 = "offer-refused-2", e14 = "offered-1",
-		case e15 = "offered-2", e16 = "not-found-1", e17 = "not-found-2",
-		case e18 = "refused-1", e19 = "refused-2", e20 = "routed-1",
-		case e21 = "routed-2", e22 = "download-1", e23 = "download-2",
-		case e24 = "extracting-1", e25 = "extracting-2", e26 = "ready-1",
-		case e27 = "ready-2", e28 = "installing-1", e29 = "installing-2",
-		case e30 = "relaunch-requested-2", e31 = "cycle-refused-1", e32 = "cycle-refused-2",
-		case e33 = "retry-accepted", e34 = "terminated-1", e35 = "terminated-2",
-		case e36 = "transport-refused-1", e37 = "transport-refused-2", e38 = "control-refused-1",
+		case e0 = "started-1", e1 = "started-2", e2 = "updater-start-attempt"
+		case e3 = "updater-started", e4 = "updater-policy-admitted", e5 = "check-requested-1"
+		case e6 = "check-requested-2", e7 = "user-check-1", e8 = "user-check-2"
+		case e9 = "start-refused", e10 = "unexpected-permission-1", e11 = "unexpected-permission-2"
+		case e12 = "offer-refused-1", e13 = "offer-refused-2", e14 = "offered-1"
+		case e15 = "offered-2", e16 = "not-found-1", e17 = "not-found-2"
+		case e18 = "refused-1", e19 = "refused-2", e20 = "routed-1"
+		case e21 = "routed-2", e22 = "download-1", e23 = "download-2"
+		case e24 = "extracting-1", e25 = "extracting-2", e26 = "ready-1"
+		case e27 = "ready-2", e28 = "installing-1", e29 = "installing-2"
+		case e30 = "relaunch-requested-2", e31 = "cycle-refused-1", e32 = "cycle-refused-2"
+		case e33 = "retry-accepted", e34 = "terminated-1", e35 = "terminated-2"
+		case e36 = "transport-refused-1", e37 = "transport-refused-2", e38 = "control-refused-1"
 		case e39 = "control-refused-2", e40 = "deadline-1", e41 = "deadline-2"
 	}
 	private enum UpdateProgressCapture: String { case unavailable, empty, malformed, observed }
