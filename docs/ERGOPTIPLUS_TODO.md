@@ -3241,6 +3241,16 @@ WP3 prerequisite: the actual macOS physical accounting owner now requires exact 
   cleanup are exempt from automatic deletion migrations and remain on disk
   until that cleanup (site 112).
 
+  Windows migration planning and execution now classify metadata through the
+  canonical typed document they already validate. Current dotted, inline and
+  quoted stamps preserve source without a rewrite; scalar/array/invalid/newer
+  metadata and unaddressable older stamps refuse before backup or publication.
+  Twelve independent registered native cases preserve the complete old test
+  prefix and cover exact source, typed foreign neighbors and retained no-op/write
+  refusal. Native execution remains unrun until the targeted Windows CI; this
+  bounded classification correction does not grant a constructor-issued source
+  journal or close item 33.
+
   Linux and macOS filesystem modules now expose their genuine initializer
   identity and seven original function or nil identities through a pure tuple.
   Existing I/O, acknowledgement and lock bodies remain byte-exact. The consuming

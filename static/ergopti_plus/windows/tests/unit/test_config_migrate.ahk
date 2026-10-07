@@ -697,3 +697,76 @@ Test("config migrate: a current semantic snapshot consumes root settings without
 	_CMG_SemanticCurrentSourceConsumesRootSettings)
 Test("config migrate: semantic readers cannot clear invalid/newer stamp write refusal (config-semantic-snapshot)",
 	_CMG_SemanticInvalidStampsStayReadOnly)
+
+
+; Independent complete source subjects distinguish semantic metadata from the
+; migration operation model. The existing native boot owner receives each one;
+; callbacks only observe that no backup or publication effect was attempted.
+_CMG_CanonicalMetadataBoot(Metadata, ExpectedStatus, ExpectedVersion) {
+	Dir := _CMG_NewDir(), Path := Dir . "\config.toml"
+	Registry := _CMR_CopyRegistry()
+	Source := Metadata . '`n[future]`nkeep = { flag=false, number=1, text="1" } # preserve`n'
+	Calls := { Backup: 0, Publish: 0 }
+	Backup(Destination, Content) {
+		Calls.Backup += 1
+		return 1
+	}
+	Publish(Destination, Candidate, Previous) {
+		Calls.Publish += 1
+		return ""
+	}
+	try {
+		AssertTrue(FSWriteDurable(Path, Source), "the complete native subject must exist")
+		Plan := ConfigMigratePlan(Source, Registry, "ahk")
+		AssertEqual(ExpectedStatus, Plan["outcome"], "canonical metadata owns the pure plan")
+		AssertFalse(Plan.Has("candidate"), "current or refused metadata has no rewrite candidate")
+		Result := ConfigMigrateRun(Path, Registry, _CMG_STAMP, Backup, Publish)
+		AssertEqual(ExpectedStatus, Result["status"], "the genuine native boot owner has the same decision")
+		AssertEqual(0, Calls.Backup, "metadata classification precedes every backup effect")
+		AssertEqual(0, Calls.Publish, "metadata classification precedes every publication effect")
+		AssertEqual("", Result["backup"], "no unused backup intention may be published")
+		AssertTrue(FSUtf8ExactMatches(Path, Source), "every subject preserves its complete source bytes")
+		Document := TOML_ParseDocument(FSReadUtf8Exact(Path))
+		AssertTrue(Document["future"]["keep"]["flag"] is TOML_Bool)
+		AssertEqual(false, Document["future"]["keep"]["flag"].Value)
+		AssertTrue(Document["future"]["keep"]["number"] is Integer)
+		AssertTrue(Document["future"]["keep"]["text"] is String)
+		if ExpectedStatus == "current" {
+			AssertEqual(ExpectedVersion, Result["from"], "a canonical current stamp is not an unstamped file")
+			AssertEqual(0, Result["read_only"])
+			AssertEqual("", TOML_WriteRefusal(Path), "a genuine current document needs no migration refusal")
+		} else {
+			AssertEqual(1, Result["read_only"])
+			Assert(TOML_WriteRefusal(Path) != "", "the actual boot owner latches the refusal")
+			AssertFalse(TOML_ConfigBatchWrite(Path, []), "even a configuration no-op retains that refusal")
+			AssertFalse(TOML_ConfigBatchWrite(Path, [{ Section: "future", Key: "changed", Value: 7 }]))
+			AssertTrue(FSUtf8ExactMatches(Path, Source), "subsequent writes retain complete source bytes")
+		}
+	} finally {
+		Refusals := _TOML_WriteRefusals(), RefusalKey := _TOML_WriteRefusalKey(Path)
+		if Refusals.Has(RefusalKey)
+			Refusals.Delete(RefusalKey)
+		DirDelete(Dir, true)
+	}
+}
+
+for Index, Metadata in ['_meta.schema_version = 2', '_meta = { schema_version=2 }',
+		'["_meta"]`n"schema_version" = 2',
+		'"_meta.schema_version" = 999`n_meta.schema_version = 2'] {
+	Test("config migrate: current canonical metadata preserves exact source " . Index,
+		_CMG_CanonicalMetadataBoot.Bind(Metadata, "current", 2))
+}
+
+for Index, Subject in [
+	{ Metadata: '_meta = true', Status: "invalid" },
+	{ Metadata: '[["_meta"]]`nschema_version = 2', Status: "invalid" },
+	{ Metadata: '_meta.schema_version = "2"', Status: "invalid" },
+	{ Metadata: '_meta = { schema_version=false }', Status: "invalid" },
+	{ Metadata: '_meta.schema_version = 3', Status: "newer" },
+	{ Metadata: '_meta = { schema_version=3 }', Status: "newer" },
+	{ Metadata: '_meta.schema_version = 1', Status: "unsupported" },
+	{ Metadata: '_meta = { schema_version=1 }', Status: "unsupported" }
+] {
+	Test("config migrate: canonical metadata refuses before backup and publication " . Index,
+		_CMG_CanonicalMetadataBoot.Bind(Subject.Metadata, Subject.Status, 0))
+}
