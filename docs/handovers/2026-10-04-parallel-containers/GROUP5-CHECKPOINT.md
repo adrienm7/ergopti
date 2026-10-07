@@ -2293,3 +2293,25 @@ precise inverses. No corpus, original assertion, budget, backend, credential,
 installation or production readiness policy changes. A new Mac CI must qualify
 the final source; no observed native failures are declared fixed. TODO31 and
 transverse16/38 remain open, and no item is removed.
+
+## Native keyboard fixture completion acknowledgment
+
+The four test-only source paths add actual fresh-current/selected/enabled
+acknowledgment before selected-source bodies, temporary-source disabling and
+restoration return. Exact source cleanup debt remains retained on refusal.
+Original33 assertions and native selection/restoration order are preserved;
+no production translator, diagnostic transport, sharedSDK or workflow changes.
+The previously reviewed one absolute5s scope cap is not renewed and existing
+30/35/10 SDK plus25/45-minute workflow limits stay whole.
+
+The authentic2465 native run431/400/16/15 exposed restoreUS status0 followed
+by a stale fresh-copy French and disabling, unlike the same-byte e871 passing
+TIS session. Evidence is sealed at /tmp/tis376449-triage-52dnsr_i, findings
+190231709ad9c439bffb1e89d755b1398afc018dd242c42d02eb2867602da622.
+Carbon timing mechanism remains UNKNOWN. Source-only review preserves all
+old source bodies; new12 Swift controls and actual native AFTER are unexecuted
+locally. Root assessed these paths as Group5-owned with no announced active
+overlap from the published Group6 branch and current coordination evidence.
+This is not a Group6 grant and does not claim knowledge of unpublished foreign
+state. The exact assessment and actual notice are required before adoption;
+final macOS CI remains required. No item is removed;30 and16/38 stay open.

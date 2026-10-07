@@ -3295,6 +3295,26 @@ and modeled transport checks, not native TIS or physical-key acceptance. Current
 native375455 passes six source cases on the previous source, not this successor.
 Item30 remains partial; keyboard/device qualification is still required.
 
+Test-only native keyboard fixture completion is now guarded by freshly copied
+current-source identity together with selected/enabled state after its original
+selection and both restoration calls. A temporary layout is disabled only after
+actual original-source restoration acknowledgment; unresolved exact-source
+cleanup debt refuses successors. All33 old assertion statements, native call
+order and glyph/direct/dead-accent/sourceChanged expectations remain intact.
+One previously reviewed absolute5s scope cap covers selection and restoration;
+ordinary SDK30/35/10 and workflow25/45-minute limits are unchanged. There is no
+polling, sleep, selection retry or production translator change.
+
+Authentic run37644984245 at2465d26d5 completed431 XCTest methods:400 passed,
+16 failed,15 skipped. Its preceding mapping test returned restoreUS status0
+while freshly copied current still named French, then disabled French. Three
+later US probes captured disabled French and failed; e871 run37639891893 copied
+US before disabling and all three passed with identical TIS source files.
+This establishes the missing fixture completion boundary; underlying Carbon
+cache/notification timing remains UNKNOWN. The new12 controlled Swift methods
+and actual native AFTER require macOS CI; no fix, physical keyboard, package or
+installation acceptance is claimed. Item30 and transverse16/38 remain partial.
+
 - [~] **31.** HS-274 exact physical key accounting with an Ergopti-owned
   background Karabiner runtime (no Karabiner-Elements app). Plan, decisions and
   ADR 011 in the overnight handoff and `static/ergopti_plus/docs/adr/`. WP0-WP2

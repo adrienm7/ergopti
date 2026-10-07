@@ -19,14 +19,18 @@ final class KeyboardSourceProbeTests: XCTestCase {
 			"Input-source switching is restricted to disposable CI hosts")
 		let diagnostics = KeyboardSourceTestDiagnostics(name + ":" + identifier)
 		defer { diagnostics.emit() }
+		let selection = try KeyboardSourceTestSelection()
+		defer { selection.close() }
 		diagnostics.witness("original.capture.call.entered")
 		let captured = TISCopyCurrentKeyboardInputSource()
 		diagnostics.witness("original.capture.call.returned")
 		let original = captured!.takeRetainedValue()
 		diagnostics.record("original.capture", original: original)
+		try selection.validateOriginal(original)
 		defer {
 			let status = diagnostics.nativeCall("restore.outer", original: original) { TISSelectInputSource(original) }
 			XCTAssertEqual(status, noErr)
+			XCTAssertTrue(selection.acknowledge(original, status: status), "Outer restoration needs actual current-source completion")
 		}
 		let filter = [kTISPropertyInputSourceID as String: identifier] as CFDictionary
 		diagnostics.witness("target.list.call.entered")
@@ -41,19 +45,29 @@ final class KeyboardSourceProbeTests: XCTestCase {
 		let wasEnabled = CFBooleanGetValue(Unmanaged<CFBoolean>.fromOpaque(pointer).takeUnretainedValue())
 		diagnostics.record("target.inventory", original: original, target: source)
 		if !wasEnabled {
+			try selection.retainEnabled(source)
 			let status = diagnostics.nativeCall("enable", original: original, target: source) { TISEnableInputSource(source) }
 			XCTAssertEqual(status, noErr)
 		}
 		defer {
 			let status = diagnostics.nativeCall("restore.inner", original: original, target: source) { TISSelectInputSource(original) }
 			XCTAssertEqual(status, noErr)
+			let restored = selection.acknowledge(original, status: status)
+			XCTAssertTrue(restored, "Inner restoration needs actual current-source completion")
 			if !wasEnabled {
-				let disabled = diagnostics.nativeCall("disable", original: original, target: source) { TISDisableInputSource(source) }
-				XCTAssertEqual(disabled, noErr)
+				if restored && selection.mayDisable(source, original: original) {
+					let disabled = diagnostics.nativeCall("disable", original: original, target: source) { TISDisableInputSource(source) }
+					XCTAssertEqual(disabled, noErr)
+					selection.releaseDisabled(source, original: original, status: disabled)
+				} else {
+					XCTFail("Restoration is unacknowledged; enabled source retained as cleanup debt")
+				}
 			}
 		}
+		try selection.prepareSelection()
 		let status = diagnostics.nativeCall("select", original: original, target: source) { TISSelectInputSource(source) }
 		XCTAssertEqual(status, noErr)
+		try selection.requireSelection(source, status: status)
 		diagnostics.record("body.before", original: original, target: source)
 		defer { diagnostics.record("body.after", original: original, target: source) }
 		try body(diagnostics)
