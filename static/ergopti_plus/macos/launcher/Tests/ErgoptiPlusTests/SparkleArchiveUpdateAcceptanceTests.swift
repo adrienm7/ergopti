@@ -760,7 +760,7 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 			"FixtureArchiveOrigin": identity.archiveOrigin,
 			"FixtureArchiveTransport": "http://localhost:" + String(port) + "/archive.tar.xz",
 			"SUFeedURL": "http://localhost:" + String(port) + "/feed.xml",
-			"SUEdPublicKey": publicKey, "SUVerifyUpdateBeforeExtraction": true,
+			"SUPublicEDKey": publicKey, "SUVerifyUpdateBeforeExtraction": true,
 			"SUEnableAutomaticChecks": false, "SUAutomaticallyUpdate": false,
 			"SUAllowsAutomaticUpdates": false, "SUEnableDownloaderService": false,
 			"SUEnableInstallerLauncherService": false,

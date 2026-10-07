@@ -1981,6 +1981,72 @@ try {
 }
 // NATIVE_SPARKLE_STARTUP_ADMISSION_REFUSAL_IDENTITY_END
 
+// NATIVE_SPARKLE_FIXTURE_PUBLIC_KEY_BEGIN
+try {
+	const assert = require('node:assert/strict');
+	const fixture = fs.readFileSync(
+		path.join(
+			root,
+			'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/SparkleArchiveUpdateAcceptanceTests.swift'
+		),
+		'utf8'
+	);
+	function assertFixturePublicKey(source) {
+		// Preserve Swift string literals while excluding comments from source evidence.
+		const executable = source.replace(/"(?:\\.|[^"\\])*"|\/\/[^\n]*|\/\*[\s\S]*?\*\//g, (token) =>
+			token.startsWith('/') ? '' : token
+		);
+		const declarations = [...executable.matchAll(/private func makeBundle\(/g)];
+		assert.equal(declarations.length, 1, 'One actual native bundle constructor');
+		const start = declarations[0].index;
+		const end = executable.indexOf('\n\tprivate func ', start + 1);
+		assert.ok(end > start, 'The native bundle constructor has a closed source boundary');
+		const body = executable.slice(start, end);
+		assert.match(body, /publicKey: String/, 'The constructor receives the signing public key');
+		const dictionaries = [
+			...body.matchAll(/let plist:\s*\[String:\s*Any\]\s*=\s*\[([\s\S]*?)\n[ \t]*\]/g)
+		];
+		assert.equal(dictionaries.length, 1, 'One actual fixture Info.plist dictionary');
+		const plist = dictionaries[0][1];
+		assert.equal(
+			(plist.match(/"SUPublicEDKey"\s*:/g) || []).length,
+			1,
+			'Sparkle reads exactly one SUPublicEDKey entry'
+		);
+		assert.match(
+			plist,
+			/"SUPublicEDKey"\s*:\s*publicKey\s*,/,
+			'The admitted signing key must reach Sparkle'
+		);
+		assert.doesNotMatch(
+			plist,
+			/"SUEdPublicKey"\s*:/,
+			'The ignored legacy spelling cannot replace the native key'
+		);
+		assert.match(
+			body,
+			/PropertyListSerialization\.data\(fromPropertyList: plist/,
+			'The guarded dictionary is serialized into the bundle'
+		);
+	}
+	assertFixturePublicKey(fixture);
+	const entry = '"SUPublicEDKey": publicKey, ';
+	for (const [label, replacement] of [
+		['missing public key', ''],
+		['ignored legacy spelling', '"SUEdPublicKey": publicKey, '],
+		['null public key value', '"SUPublicEDKey": NSNull(), ']
+	]) {
+		assert.equal(fixture.split(entry).length - 1, 1, 'One exact native fixture entry');
+		const changed = fixture.replace(entry, replacement);
+		assert.notEqual(changed, fixture);
+		assert.throws(() => assertFixturePublicKey(changed), label);
+	}
+	console.log('[OK] The native Sparkle fixture publishes its signing key under SUPublicEDKey.');
+} catch (error) {
+	errors.push('Native Sparkle fixture public key guard: ' + error.message);
+}
+// NATIVE_SPARKLE_FIXTURE_PUBLIC_KEY_END
+
 if (errors.length > 0) {
 	for (const error of errors) console.error(`[FAIL] ${error}`);
 	process.exit(1);

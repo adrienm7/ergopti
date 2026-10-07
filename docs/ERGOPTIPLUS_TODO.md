@@ -3652,6 +3652,26 @@ the complete three-OS checkpoint remain pending.
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 
+Manual macOS run 37581581322 tested exact candidate
+6072016f31f78ab517c31ab4d5c00a6cdf865d42 and failed native archive acceptance.
+Sparkle's original startup catch reports stage=native-start, domain=sparkle,
+code=1 (the pinned Sparkle 2.9.2 missing-public-key error), with zero admitted
+resource reads. The signed fixture used SUEdPublicKey; Sparkle reads
+SUPublicEDKey. The one-key correction retains the original publicKey
+expression, every native assertion, independent Ed25519 checks, typed failure
+frame and physical retirement rules. Its additive normal source guard rejects
+missing, legacy-spelled and null-valued fixture keys; qualification and the
+corrected real native archive run remain pending.
+
+Six native AppKit registration controls and unconfined AppleEvent delivery
+completed before Brew's deny-removal positive failed with reply error -10004,
+missing nonce reply -1701 and absent second marker. This does not establish TCC
+or another permission cause. Full-policy denial and all six Brew archive
+scenarios remain unrun. Package creation and installed launch checks were
+skipped. Item 36 stays partial until the existing real archive, Brew and
+package/install acceptance completes; no policy, deadline or ownership gate
+is relaxed.
+
 Native run 37525448527 on ad95a2693 confirms independent signature validity but
 refuses Sparkle application retirement with exit 78. The added diagnostic reads
 only the original cached capture and projects six closed refusal categories.
