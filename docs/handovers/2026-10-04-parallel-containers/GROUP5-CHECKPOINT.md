@@ -2140,3 +2140,25 @@ positive principal/Core qualification remain pending. The failed run
 passes shared checks, macOS stub unit/E2E and tooltip captures; main
 XCTest and the installed launch matrix were not executed. No Group5
 item is removed; TODO31 and transverse items16/38 remain open.
+
+## Actual signing fixture canonical parent spelling
+
+Authentic manual run 37609704457 retains parent_before_creation/canonical_path
+from the original signing BEFORE assertion. Parent observation is present,
+parent canonicality is false, and the new leaf is not observed. The exact alias,
+component and argv remain unknown. Source currentness proves the helper code
+recuts; captured_for_retirement denies an unacknowledged partial leaf and
+does not establish successful parent custody.
+
+The independently reviewed producer uses actual Darwin realpath allocation,
+checked UTF-8/native representation and a second realpath/strcmp recut, with
+freeing of only its own successfully allocated buffers. Its new actual Mac case
+checks the canonical spelling; the original BEFORE assertions, embedded E026
+helper, strict consumer/creation policy, Guardian retirement and budgets remain
+whole. No source-policy or parent inode/FD ownership is inferred from spelling.
+
+Independent source review qualifies only the bounded source correction and
+portable filesystem controls. Actual Swift/Darwin execution, the original
+BEFORE assertion after this change, signing/activation, packaging and installation
+remain unqualified until targeted final-source macOS CI. TODO31 and transverse
+items16/38 remain open.

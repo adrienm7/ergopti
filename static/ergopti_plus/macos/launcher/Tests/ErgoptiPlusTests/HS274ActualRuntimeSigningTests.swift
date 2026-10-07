@@ -2,12 +2,94 @@
 // Native disposable TEST-ONLY signing qualification; no production identity.
 // Retained direct Guardians retire before private credential cleanup.
 
+import Darwin
 import Foundation
 import XCTest
 
 private enum NativeDisposableSigningError: Error { case ownership }
 
+private enum NativeSigningParentError: Error { case invalid; case system(Int32) }
+
+/// Produce the same Foundation-selected parent through the actual Darwin filesystem.
+/// The strict signer helper owns creation/custody; this producer acquires no authority.
+private func nativeSigningParent(_ selected: URL) throws -> URL {
+	guard selected.isFileURL, selected.path.hasPrefix("/"),
+		!selected.path.utf8.contains(0) else { throw NativeSigningParentError.invalid }
+	return try selected.withUnsafeFileSystemRepresentation { input in
+		guard let input, input.pointee == 47 else { throw NativeSigningParentError.invalid }
+		errno = 0
+		guard let resolved = Darwin.realpath(input, nil) else {
+			throw NativeSigningParentError.system(errno)
+		}
+		defer { Darwin.free(resolved) }
+		guard let path = String(validatingUTF8: resolved), !path.isEmpty,
+			path.hasPrefix("/") else { throw NativeSigningParentError.invalid }
+		let result = URL(fileURLWithFileSystemRepresentation: resolved,
+			isDirectory: true, relativeTo: nil)
+		guard result.isFileURL, result.path.utf8.elementsEqual(path.utf8) else {
+			throw NativeSigningParentError.invalid
+		}
+		// Refuse a namespace/URL round-trip change before appending the new UUID.
+		return try result.withUnsafeFileSystemRepresentation { check in
+			guard let check else { throw NativeSigningParentError.invalid }
+			errno = 0
+			guard let current = Darwin.realpath(check, nil) else {
+				throw NativeSigningParentError.system(errno)
+			}
+			defer { Darwin.free(current) }
+			guard Darwin.strcmp(resolved, current) == 0 else {
+				throw NativeSigningParentError.invalid
+			}
+			return result
+		}
+	}
+}
+
 extension HS274NativePolicyQualificationTests {
+
+	/// Actual Darwin calls only; no credentials, subprocesses or native leaf models.
+	func testActualSigningParentCanonicalizationRefusesMissingAndLoopInputs() throws {
+		let parent = try compilationEvidenceParent()
+		try fixture(parent: parent) { root in
+			let manager = FileManager.default
+			let real = root.appendingPathComponent("parent-real")
+			let alias = root.appendingPathComponent("parent-alias")
+			let missing = root.appendingPathComponent("parent-missing")
+			let loop = root.appendingPathComponent("parent-loop")
+			try manager.createDirectory(at: real, withIntermediateDirectories: false,
+				attributes: [.posixPermissions: 0o700])
+			try manager.createSymbolicLink(at: alias, withDestinationURL: real)
+			try manager.createSymbolicLink(at: loop, withDestinationURL: loop)
+			let ordinary = try nativeSigningParent(real)
+			let canonical = try nativeSigningParent(alias)
+			XCTAssertEqual(canonical.path.utf8.map { $0 }, ordinary.path.utf8.map { $0 })
+			XCTAssertTrue(canonical.isFileURL && canonical.path.hasPrefix("/"))
+			XCTAssertEqual(try nativeSigningParent(canonical), canonical)
+			XCTAssertEqual(try manager.contentsOfDirectory(atPath: real.path), [])
+			for (input, expected) in [(missing, ENOENT), (loop, ELOOP)] {
+				XCTAssertThrowsError(try nativeSigningParent(input)) { error in
+					guard let native = error as? NativeSigningParentError,
+						case .system(let actual) = native else {
+						XCTFail("Actual native parent errno refusal was not retained")
+						return
+					}
+					XCTAssertEqual(actual, expected)
+				}
+			}
+			let nonFile = try XCTUnwrap(URL(string: "https://example.invalid/signing-parent"))
+			XCTAssertThrowsError(try nativeSigningParent(nonFile)) { error in
+				guard let native = error as? NativeSigningParentError,
+					case .invalid = native else {
+					XCTFail("Non-filesystem parent must refuse before native resolution")
+					return
+				}
+			}
+			XCTAssertFalse(manager.fileExists(atPath: missing.path))
+			XCTAssertEqual(Set(try manager.contentsOfDirectory(atPath: root.path)),
+				Set(["parent-real", "parent-alias", "parent-loop"]))
+		}
+	}
+
 
 	/// One ordinary XCTest retains the existing worker and SDK caller budgets.
 	/// A disposable TEST-ONLY certificate is not a production identity fallback.
@@ -17,7 +99,7 @@ extension HS274NativePolicyQualificationTests {
 		let parent = try compilationEvidenceParent()
 		try fixture(parent: parent) { root in
 			let helper = source("hs274_native_signing_fixture.py")
-			let privateRoot = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
+			let privateRoot = try nativeSigningParent(FileManager.default.temporaryDirectory)
 				.appendingPathComponent("ErgoptiTestOnlySigning-" + UUID().uuidString)
 			guard !privateRoot.path.hasPrefix(parent.path + "/"), privateRoot != parent else {
 				throw NativeDisposableSigningError.ownership
@@ -347,7 +429,7 @@ extension HS274NativePolicyQualificationTests {
 			let fixtureScript = diagnostics.appendingPathComponent("hs274_native_signing_fixture.py")
 			let observerScript = diagnostics.appendingPathComponent("hs274_signed_runtime_observation.py")
 			// Kept outside swift-launcher-evidence, including every refusal path.
-			let privateRoot = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
+			let privateRoot = try nativeSigningParent(FileManager.default.temporaryDirectory)
 				.appendingPathComponent("ErgoptiTestOnlySigning-" + UUID().uuidString)
 			guard !privateRoot.path.hasPrefix(parent.path + "/"), privateRoot != parent else {
 				throw NativeDisposableSigningError.ownership

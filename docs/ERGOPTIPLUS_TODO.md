@@ -4650,6 +4650,16 @@ or correction is applied. Actual Swift/Foundation/Guardian execution remains
 unperformed; the new native BEFORE assertion may fail diagnostically. Item31
 and transverse16/38 stay open.
 
+Authentic manual run 37609704457 reports the original signing BEFORE
+refusal at parent_before_creation/canonical_path; the exact offending
+alias, component and argv remain unknown. A reviewed fixture producer
+now obtains canonical path spelling through actual Darwin realpath, with
+allocated-buffer cleanup and a new actual native case. The original
+BEFORE assertions, strict E026 consumer, Guardian retirement and budgets
+remain whole. This source adoption does not prove the Mac correction,
+parent inode/FD custody or native signing readiness. Swift/Darwin execution
+remains unqualified; TODO31 and transverse16/38 acceptance stay open.
+
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
   listed; see `docs/memory/text-input-and-config.md`. Current source already
