@@ -494,22 +494,118 @@ Test("CAPSLOCK_SYMBOLS: every entry runs without crashing", TestLT_CapsLockSymbo
 ; condition for ALTGR_NUMBER_ROW does not require ergopti_base. When that
 ; requirement existed, AltGr+digit (superscripts, subscripts, euro) were silently
 ; disabled for users who had Ergopti AltGr on but Ergopti base emulation off.
+; Native delegate calls count only inside the actual declared registrar, whose
+; defaults remain the native Hotkey/HotIf and whose ports are never rebound.
+; @param Source {String} Optional immutable source image for causal refusal tests.
+; @return {String} Nonempty actual registration body with declared native ports.
+_LT_NativeAltGrRegistrationBody(Source := unset) {
+	Body := IsSet(Source) ? _DriverFunctionBodyCache((*) => Source).Get("RegisterAltGrLayer") : _DriverFuncBody("RegisterAltGrLayer")
+	Assert(Body != "", "the actual AltGr registration producer must remain present")
+	Signature := "^RegisterAltGrLayer\(HotkeyFn := Hotkey, HotIfFn := HotIf, DispatchFn := AltGrShiftDispatch, RealAltGrFn := IsRealAltGrPress\)\s*\{"
+	Assert(RegExMatch(Body, Signature, &Declared), "only the declared native registration and physical-state defaults authorize delegate scans")
+	Code := _DriverMaskNonCode(&Body)
+	; Exclude only the already-admitted default declaration; every executable
+	; body position must preserve the exact native port, including nested writes.
+	BodyCode := SubStr(Code, Declared.Len + 1)
+	for Port in ["HotkeyFn", "HotIfFn", "DispatchFn", "RealAltGrFn"] {
+		; A closed native-port vocabulary rejects every other executable use,
+		; including foreach/catch bindings, aliases and property mutation.
+		At := 1
+		NativePortUses := 0
+		Method := Port == "DispatchFn" ? "Bind" : "Call"
+		while (At := RegExMatch(BodyCode, "i)\b" . Port . "\b", &Use, At)) {
+			Absolute := Declared.Len + Use.Pos
+			GuardStart := Absolute - StrLen("HasMethod(")
+			GuardText := 'HasMethod(' . Port . ', "Call")'
+			NativeGuard := GuardStart > 1 && SubStr(Code, GuardStart - 1, 1) == "!"
+				&& SubStr(Body, GuardStart, StrLen(GuardText)) == GuardText
+				&& InStr(SubStr(Code, GuardStart), "HasMethod(") == 1
+			Before := RTrim(SubStr(BodyCode, 1, Use.Pos - 1), " `t`r`n")
+			Previous := Before == "" ? "" : SubStr(Before, StrLen(Before), 1)
+			NativeCall := Previous != "." && Previous != "&"
+				&& RegExMatch(SubStr(BodyCode, Use.Pos), "^" . Port . "\." . Method . "\(")
+			if NativeCall
+				NativePortUses += 1
+			Assert(NativeGuard || NativeCall, "only actual native guard arguments and invoked methods may use a declared port: " . Port)
+			At := Use.Pos + Use.Len
+		}
+		Assert(NativePortUses >= 2, "each native port must retain multiple executable native invocations: " . Port)
+		Guard := InStr(Body, 'HasMethod(' . Port . ', "Call")')
+		Assert(Guard > 0 && InStr(SubStr(Code, Guard), "HasMethod(") == 1,
+			"each native-default delegate retains its actual callable guard: " . Port)
+	}
+	for Table in ["ALTGR_PLUS_OVERRIDES", "ALTGR_NUMBER_ROW", "ALTGR_BASE_ROWS"] {
+		Pattern := 's)for SC in ' . Table . '\s*\{\s*HotkeyFn\.Call\("SC138 & " \. SC, DispatchFn\.Bind\(SC, ' . Table . '\), "I2"\)'
+		Assert(RegExMatch(Body, Pattern, &Registration) && _LT_NativeDelegateIsCode(Body, Registration, "for SC in " . Table),
+			"every original AltGr table retains its own executable native-default registration: " . Table)
+	}
+	Pattern := 's)for SC, Combo in CTRL_ALT_NUMPAD\s*\{\s*HotkeyFn\.Call\("\^!" \. SC, CtrlAltDispatch\.Bind\(Combo\), "I2"\)'
+	Assert(RegExMatch(Body, Pattern, &Registration) && _LT_NativeDelegateIsCode(Body, Registration, "for SC, Combo in CTRL_ALT_NUMPAD"),
+		"the original Ctrl+Alt table retains its executable native-default registration")
+	return Body
+}
+
+; Match positions share the framework's UTF-16-preserving code mask. A comment
+; or quoted fake call can never count as an executable delegate registration.
+; @param Body {String} Actual function source.
+; @param Match {RegExMatchInfo} Exact source match.
+; @param Prefix {String} The one admitted native delegate's call prefix.
+; @return {Boolean}
+_LT_NativeDelegateIsCode(Body, Match, Prefix) {
+	Code := _DriverMaskNonCode(&Body)
+	return InStr(LTrim(SubStr(Code, Match.Pos, Match.Len), " `t"), Prefix) == 1
+}
+
+_LT_NativeAltGrSourceAdmissionRefusals() {
+	Source := _DriverFuncBody("RegisterAltGrLayer")
+	AssertContains(_LT_NativeAltGrRegistrationBody(Source), 'HotkeyFn.Call("SC138 & " . SC,')
+	for Mutant in [StrReplace(Source, "RegisterAltGrLayer(", "RetiredAltGrLayer("),
+		StrReplace(Source, "HotkeyFn := Hotkey", "HotkeyFn := FakeHotkey"),
+		StrReplace(Source, "HotIfFn := HotIf", "HotIfFn := FakeHotIf"),
+		StrReplace(Source, "DispatchFn := AltGrShiftDispatch", "DispatchFn := FakeDispatch"),
+		StrReplace(Source, "RealAltGrFn := IsRealAltGrPress", "RealAltGrFn := FakePhysicalState"),
+		StrReplace(Source, "    _BuildAltGrTables()", "    HotkeyFn := FakeHotkey`n    _BuildAltGrTables()"),
+		StrReplace(Source, '!HasMethod(HotkeyFn, "Call") || ', ""),
+		StrReplace(Source, 'HotkeyFn.Call("SC138 & " . SC, DispatchFn.Bind(SC, ALTGR_NUMBER_ROW), "I2")', ""),
+		StrReplace(Source, 'HotkeyFn.Call("^!" . SC, CtrlAltDispatch.Bind(Combo), "I2")', "")] {
+		AssertThrows(_LT_NativeAltGrRegistrationBody.Bind(Mutant), "a missing, forged or rebound producer cannot supply registration evidence")
+	}
+	for SparsePhysical in [StrReplace(Source, 'Features["layout"]["ergopti_alt_gr"] and RealAltGrFn.Call()', 'Features["layout"]["ergopti_alt_gr"] and true'),
+		StrReplace(Source, "RealAltGrFn.Call()", "true")] {
+		AssertThrows(_LT_NativeAltGrRegistrationBody.Bind(SparsePhysical), "one or zero physical-state invocations cannot supply native registration evidence")
+	}
+	for Port in ["HotkeyFn", "HotIfFn", "DispatchFn", "RealAltGrFn"] {
+		for Write in ["Ignored := (" . Port . " := ((Args*) => 0))",
+			"Ignored := (" . StrLower(Port) . " := ((Args*) => 0))",
+			"for " . Port . " in [((Args*) => 0)] { }",
+			"try {`n        Fail()`n    } catch as " . Port . " {`n    }",
+			"Alias := " . Port, Port . '.DefineProp("Call", {Call: ((Args*) => 0)})',
+			"OtherHasMethod(" . Port . ', "Call")', "Object.HasMethod(" . Port . ', "Call")',
+			Port . ' .= "fake"', "MutatePort(&" . Port . ")", "++" . Port] {
+			Mutant := StrReplace(Source, "    _BuildAltGrTables()", "    " . Write . "`n    _BuildAltGrTables()")
+			AssertThrows(_LT_NativeAltGrRegistrationBody.Bind(Mutant), "unknown uses or bindings cannot replace or mutate a native port")
+		}
+	}
+}
+Test("AltGr source admission: only declared unrebound native ports provide registration evidence (altgr-native-source-admission)",
+	_LT_NativeAltGrSourceAdmissionRefusals)
+
 TestLT_AltGrNumberRowRegistrationNoErgoptiBase() {
-	; Move-resilient: scan the layout module dir via the framework helper instead of
-	; a pinned modules/keymap/layout/layout_altgr.ahk read. The ergopti_alt_gr HotIf token is
-	; unique to layout_altgr.ahk within modules/keymap/layout, so the scan stays scoped to it.
-	Content := _DriverDirConcat("modules/keymap/layout")
+	; The framework resolves the actual producer by symbol, preserving move safety.
+	; Delegates count only after their unchanged native defaults are observed.
+	Content := _LT_NativeAltGrRegistrationBody()
 	; Locate the HotIf line that gates ALTGR_NUMBER_ROW registration.
 	; That line should contain "ergopti_alt_gr" but must NOT contain "ergopti_base".
 	; NOT "HotIf\([^)]*…": the real registration is
-	;   HotIf((*) => Features["layout"]["ergopti_alt_gr"] and IsRealAltGrPress())
+	;   HotIfFn.Call((*) => Features["layout"]["ergopti_alt_gr"] and RealAltGrFn.Call())
 	; and [^)] stops dead at the ")" in "(*)", so that pattern matched NOTHING and
 	; this guard scanned an empty result set while reporting a pass. Anchor on the
 	; whole line instead — the condition is written on one line.
-	Pattern := "m)^.*HotIf\(.*ergopti_alt_gr.*$"
+	Pattern := "m)^[ `t]*HotIfFn\.Call\(.*ergopti_alt_gr.*$"
 	Pos := 1
 	Seen := 0
 	while (Pos := RegExMatch(Content, Pattern, &M, Pos)) {
+		Assert(_LT_NativeDelegateIsCode(Content, M, "HotIfFn.Call("), "the AltGr criterion must be executable native-default code")
 		Seen += 1
 		if InStr(M[], "ergopti_base") {
 			AssertFalse(true,

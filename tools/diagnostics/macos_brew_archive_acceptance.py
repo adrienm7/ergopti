@@ -147,7 +147,34 @@ def _validate_appleevent_terminal(packet):
         "stderr_osstatus",
         "capture_status",
     }
-    require(type(packet) is dict and set(packet) == keys, "Unadmitted native terminal fact")
+    require(type(packet) is dict, "Unadmitted native terminal fact")
+    appkit = packet.get("appkit_policy")
+    require(
+        set(packet) == keys or (appkit is not None and set(packet) == keys | {"appkit_policy"}),
+        "Unadmitted native terminal fact",
+    )
+    if appkit is not None:
+        require(
+            type(appkit) is dict
+            and set(appkit)
+            == {"reason", "before_available", "before_policy", "after_available", "after_policy"}
+            and type(appkit["reason"]) is int
+            and 1 <= appkit["reason"] <= 3,
+            "Unadmitted AppKit policy observation",
+        )
+        for stage in ("before", "after"):
+            available = appkit[stage + "_available"]
+            policy = appkit[stage + "_policy"]
+            require(
+                type(available) is bool
+                and type(policy) is int
+                and ((available and policy in (0, 1, 2)) or (not available and policy == 3)),
+                "Unavailable AppKit policy cannot publish an invented state",
+            )
+    require(
+        (packet["stderr_phase"] == "appkit-policy") == (appkit is not None),
+        "AppKit observation and phase differ",
+    )
     require(type(packet["schema"]) is int and packet["schema"] == 1, "Invalid terminal schema")
     require(type(packet["si_pid"]) is int and packet["si_pid"] > 0, "Invalid terminal child")
     require(
@@ -183,6 +210,7 @@ def _validate_appleevent_terminal(packet):
             "registration",
             "registration-current-process",
             "registration-transform",
+            "appkit-policy",
             "handler",
             "receipt",
             "dispatch",
@@ -324,6 +352,24 @@ def _appleevent_terminal_packet(children, receiver, group, observation):
     )
     if match is not None and -(2**31) <= int(match[2]) < 2**31:
         phase, status = lines[match[1]], int(match[2])
+    appkit_match = (
+        re.fullmatch(
+            rb"Owned AppleEvent recipient AppKit admission refused \(reason ([1-3]); before ([01])/([0-3]); after ([01])/([0-3])\)\.\n",
+            errors,
+        )
+        if available
+        else None
+    )
+    appkit_policy = None
+    if appkit_match is not None:
+        phase = "appkit-policy"
+        appkit_policy = {
+            "reason": int(appkit_match[1]),
+            "before_available": appkit_match[2] == b"1",
+            "before_policy": int(appkit_match[3]),
+            "after_available": appkit_match[4] == b"1",
+            "after_policy": int(appkit_match[5]),
+        }
     packet = {
         "schema": 1,
         "si_pid": observation.si_pid,
@@ -337,7 +383,263 @@ def _appleevent_terminal_packet(children, receiver, group, observation):
         "stderr_phase": phase,
         "stderr_osstatus": status,
     }
+    if appkit_policy is not None:
+        packet["appkit_policy"] = appkit_policy
     return _validate_appleevent_terminal(packet)
+
+
+def _validate_appleevent_sender(packet):
+    """Accept exact bounded numeric reply facts, never a new native success receipt."""
+    fields = {
+        "schema",
+        "mode",
+        "send_status",
+        "nonce_read_available",
+        "nonce_read_status",
+        "nonce_size",
+        "nonce_match",
+        "reply_type",
+        "error_read_available",
+        "error_read_status",
+        "error_type",
+        "error_size",
+        "error_available",
+        "error_number",
+    }
+    require(type(packet) is dict and set(packet) == fields, "Unadmitted sender diagnostic")
+    require(type(packet["schema"]) is int and packet["schema"] == 1, "Invalid sender schema")
+    require(type(packet["mode"]) is int and packet["mode"] in (1, 2), "Invalid sender mode")
+    require(
+        type(packet["send_status"]) is int and -(2**31) <= packet["send_status"] < 2**31,
+        "Invalid sender native status",
+    )
+    require(
+        type(packet["reply_type"]) is int and 0 <= packet["reply_type"] < 2**32,
+        "Invalid sender reply type",
+    )
+    for prefix in ("nonce", "error"):
+        available = packet[prefix + "_read_available"]
+        require(type(available) is bool, "Invalid sender observation availability")
+        status = packet[prefix + "_read_status"]
+        size = packet[prefix + "_size"]
+        require(
+            (available and type(status) is int and -(2**31) <= status < 2**31)
+            or (not available and status is None),
+            "Unavailable sender status was invented",
+        )
+        require(
+            size is None or (available and type(size) is int and 0 <= size <= 4096),
+            "Invalid sender parameter size",
+        )
+    require(
+        (packet["nonce_read_available"] and type(packet["nonce_match"]) is bool)
+        or (not packet["nonce_read_available"] and packet["nonce_match"] is None),
+        "Unavailable nonce observation was invented",
+    )
+    require(
+        not packet["nonce_read_available"] or (packet["mode"] == 1 and packet["send_status"] == 0),
+        "Sender nonce observation differs from original execution",
+    )
+    require(
+        not packet["nonce_match"]
+        or (packet["nonce_read_status"] == 0 and packet["nonce_size"] == 36),
+        "Invalid sender nonce match",
+    )
+    error_type = packet["error_type"]
+    require(
+        (packet["error_read_available"] and type(error_type) is int and 0 <= error_type < 2**32)
+        or (not packet["error_read_available"] and error_type is None),
+        "Invalid sender error type",
+    )
+    require(type(packet["error_available"]) is bool, "Invalid sender error availability")
+    expected_available = (
+        packet["error_read_available"]
+        and packet["error_read_status"] == 0
+        and packet["error_type"] == 0x6C6F6E67
+        and packet["error_size"] == 4
+    )
+    require(packet["error_available"] == expected_available, "Sender error type or size differs")
+    error = packet["error_number"]
+    require(
+        (packet["error_available"] and type(error) is int and -(2**31) <= error < 2**31)
+        or (not packet["error_available"] and error is None),
+        "Unavailable sender error was invented",
+    )
+    return dict(packet)
+
+
+def _appleevent_sender_diagnostic(errors):
+    """Parse one closed failure marker only; unknown text stays unclassified."""
+    require(
+        type(errors) is str and len(errors.encode("utf-8")) <= 4096,
+        "Sender diagnostic capture is unavailable",
+    )
+    lines = errors.splitlines(keepends=True)
+    require(
+        len(lines) == 2
+        and re.fullmatch(r"Owned AppleEvent outcome admission failed: -?[0-9]{1,11}\n", lines[0])
+        is not None,
+        "Sender failure marker is unclassified",
+    )
+    prefix = "Owned AppleEvent sender diagnostic: "
+    require(
+        lines[1].startswith(prefix)
+        and lines[1].endswith("\n")
+        and len(lines[1].encode("utf-8")) < 512,
+        "Sender reply marker is unclassified",
+    )
+
+    def unique_fields(pairs):
+        result = {}
+        for key, value in pairs:
+            require(key not in result, "Duplicate sender diagnostic field")
+            result[key] = value
+        return result
+
+    packet = _validate_appleevent_sender(
+        json.loads(lines[1][len(prefix) :], object_pairs_hook=unique_fields)
+    )
+    require(int(lines[0].split(": ")[1]) == packet["send_status"], "Sender status markers differ")
+    return packet
+
+
+def _validate_sender_failure(packet):
+    """Keep exact pre-retirement receiver state separate from sender/admission failure."""
+    require(
+        type(packet) is dict
+        and set(packet)
+        == {
+            "schema",
+            "role",
+            "sender_observation",
+            "sender",
+            "receiver_observation",
+            "receiver_pid",
+            "receiver_state",
+            "native_terminal",
+        },
+        "Unadmitted sender failure observation",
+    )
+    require(
+        type(packet["schema"]) is int
+        and packet["schema"] == 1
+        and packet["role"] in ("unconfined-positive", "deny-removal-positive", "denied"),
+        "Invalid sender failure role",
+    )
+    require(
+        type(packet["receiver_pid"]) is int and packet["receiver_pid"] > 0,
+        "Invalid sender receiver identity",
+    )
+    require(
+        packet["sender_observation"] in ("available", "unavailable", "unclassified")
+        and packet["receiver_observation"] in ("available", "unavailable"),
+        "Invalid sender failure availability",
+    )
+    if packet["sender_observation"] == "available":
+        sender = _validate_appleevent_sender(packet["sender"])
+        require(
+            sender["mode"] == (2 if packet["role"] == "denied" else 1),
+            "Sender mode and role differ",
+        )
+    else:
+        require(packet["sender"] is None, "Unavailable sender facts were invented")
+    state = packet["receiver_state"]
+    require(
+        state in ("pending", "terminal", "unavailable"), "Invalid pre-retirement receiver state"
+    )
+    require(
+        (packet["receiver_observation"] == "unavailable") == (state == "unavailable"),
+        "Receiver observation and state differ",
+    )
+    if state == "terminal":
+        terminal = _validate_appleevent_terminal(packet["native_terminal"])
+        require(terminal["si_pid"] == packet["receiver_pid"], "Terminal receiver identity differs")
+    else:
+        require(
+            packet["native_terminal"] is None, "Unobserved receiver terminal status was invented"
+        )
+    return dict(packet)
+
+
+def _observe_sender_failure(children, receiver, group, role, errors, primary):
+    """Observe the held receiver before cleanup; optional refusal cannot replace primary failure."""
+    packet = {
+        "schema": 1,
+        "role": role,
+        "sender_observation": "unavailable",
+        "sender": None,
+        "receiver_observation": "unavailable",
+        "receiver_pid": receiver.pid,
+        "receiver_state": "unavailable",
+        "native_terminal": None,
+    }
+    if errors is not None:
+        try:
+            candidate = _appleevent_sender_diagnostic(errors)
+            require(
+                candidate["mode"] == (2 if role == "denied" else 1), "Sender mode and role differ"
+            )
+            packet["sender"] = candidate
+            packet["sender_observation"] = "available"
+        except (OwnedProcessInterrupted, KeyboardInterrupt, SystemExit):
+            raise
+        except Exception:
+            packet["sender_observation"] = "unclassified"
+    try:
+        require(
+            children.groups.get(receiver) is group
+            and group.process is receiver
+            and not group.reaped
+            and receiver.returncode is None,
+            "Sender diagnostic lost its acquired receiver",
+        )
+        observation = group.observe_exit()
+        packet["receiver_observation"] = "available"
+        packet["receiver_state"] = "pending" if observation is None else "terminal"
+        if observation is not None:
+            packet["native_terminal"] = _appleevent_terminal_packet(
+                children, receiver, group, observation
+            )
+    except (OwnedProcessInterrupted, KeyboardInterrupt, SystemExit):
+        raise
+    except Exception:
+        packet["receiver_observation"] = "unavailable"
+        packet["receiver_state"] = "unavailable"
+        packet["native_terminal"] = None
+    evidence = getattr(children, "evidence", None)
+    try:
+        if evidence is not None:
+            require(
+                evidence.record(
+                    "appleevent.sender-refusal",
+                    status="refused",
+                    groups=[group],
+                    sender_failure=_validate_sender_failure(packet),
+                ),
+                "Sender diagnostic publication was refused",
+            )
+    except (OwnedProcessInterrupted, KeyboardInterrupt, SystemExit):
+        raise
+    except Exception:
+        primary.add_note("Owned AppleEvent optional sender observation publication was refused.")
+    return _validate_sender_failure(packet)
+
+
+def _run_appleevent_sender(children, receiver, group, role, arguments, *, confined=False):
+    """Retain original native exit admission while observing any failed sender before cleanup."""
+    result = None
+    try:
+        result = children.run(arguments, check=False, confined=confined)
+        require(
+            result.returncode == 0,
+            f"Owned sender failed with exit {result.returncode}: {result.stderr[:2048]!r}",
+        )
+        return result
+    except BaseException as primary:
+        _observe_sender_failure(
+            children, receiver, group, role, result.stderr if result is not None else None, primary
+        )
+        raise
 
 
 class PhaseEvidence:
@@ -391,6 +693,7 @@ class PhaseEvidence:
         command=None,
         debt_kinds=(),
         native_terminal=None,
+        sender_failure=None,
     ):
         if self.descriptor is None:
             return True
@@ -457,6 +760,18 @@ class PhaseEvidence:
                     and packet["groups"][0]["pid"] == native_terminal["si_pid"]
                     and not packet["groups"][0]["closed"],
                     "Native terminal evidence lost its exact unreaped group",
+                )
+            if sender_failure is not None:
+                require(
+                    phase == "appleevent.sender-refusal" and status == "refused" and not closed,
+                    "Sender observation cannot claim acceptance or closure",
+                )
+                packet["sender_failure"] = _validate_sender_failure(sender_failure)
+                require(
+                    len(packet["groups"]) == 1
+                    and packet["groups"][0]["pid"] == sender_failure["receiver_pid"]
+                    and not packet["groups"][0]["closed"],
+                    "Sender observation lost its exact unreaped receiver",
                 )
             semantic = json.dumps(packet, sort_keys=True)
             if semantic == self.previous:
@@ -952,6 +1267,8 @@ def admit_appleevent_boundary(children, repository):
     """Retain a failed native admission fixture without extending process ownership."""
     try:
         return _admit_appleevent_boundary(children, repository)
+    except OwnedProcessInterrupted:
+        raise  # Real owner cancellation is never wrapped as optional boundary metadata.
     except Exception as error:
         raise AppleEventBoundaryError(
             "Native AppleEvent boundary unavailable: " + str(error)
@@ -1012,11 +1329,50 @@ def native_compiler(children):
     ]
 
 
+def _build_appleevent_pair(children, repository, root, compiler, nonce):
+    """Build one owned signed image for two distinct processes, without privacy grants."""
+    app = root / "OwnedAppleEvent.app"
+    executable = app / "Contents/MacOS/owned-probe"
+    executable.parent.mkdir(parents=True)
+    (app / "Contents/Info.plist").write_bytes(
+        plistlib.dumps(
+            {
+                "CFBundleIdentifier": "com.ergopti.private.appleevent." + nonce,
+                "CFBundleName": "Owned AppleEvent sandbox admission",
+                "CFBundleExecutable": "owned-probe",
+                "CFBundlePackageType": "APPL",
+                "LSUIElement": True,
+                "NSAppleEventsUsageDescription": "Private native sandbox delivery admission.",
+            }
+        )
+    )
+    children.run(
+        [
+            *compiler,
+            "-std=c11",
+            "-O2",
+            "-fobjc-arc",
+            "-framework",
+            "ApplicationServices",
+            "-framework",
+            "Carbon",
+            "-framework",
+            "AppKit",
+            str(repository / "tools/diagnostics/native_appleevent_probe_pair.m"),
+            "-o",
+            str(executable),
+        ],
+        confined=True,
+    )
+    children.run(["/usr/bin/codesign", "--force", "--sign", "-", str(app)], confined=True)
+    children.run(["/usr/bin/codesign", "--verify", "--deep", "--strict", str(app)], confined=True)
+    return {role: [str(executable), role] for role in ("receiver", "sender")}
+
+
 def _admit_appleevent_boundary(children, repository):
     """Require two real owned deliveries before admitting the full policy's refusal."""
     root = children.root
     nonce = str(uuid.uuid4())
-    executables = {}
     compiler = native_compiler(children)
     registration_test = root / "native-appleevent-registration-test"
     children.run(
@@ -1039,57 +1395,19 @@ def _admit_appleevent_boundary(children, repository):
     )
     registration_controls = children.run([str(registration_test)], confined=True)
     require(
-        registration_controls.stdout == "native_appkit_registration_controls=4\n"
+        registration_controls.stdout
+        == "native_appkit_registration_controls=5\nnative_private_appleevent_controls=1\n"
         and not registration_controls.stderr,
         "Controlled AppKit registration refusals were not independently admitted",
     )
-    for role in ("receiver", "sender"):
-        app = root / ("OwnedAppleEvent-" + role + ".app")
-        executable = app / "Contents/MacOS" / role
-        executable.parent.mkdir(parents=True)
-        (app / "Contents/Info.plist").write_bytes(
-            plistlib.dumps(
-                {
-                    "CFBundleIdentifier": "com.ergopti.private.appleevent." + role + "." + nonce,
-                    "CFBundleName": "Owned AppleEvent sandbox admission",
-                    "CFBundleExecutable": role,
-                    "CFBundlePackageType": "APPL",
-                    "LSUIElement": True,
-                    "NSAppleEventsUsageDescription": "Private native sandbox delivery admission.",
-                }
-            )
-        )
-        command = [
-            *compiler,
-            "-std=c11",
-            "-O2",
-            "-framework",
-            "ApplicationServices",
-        ]
-        if role == "receiver":
-            command += [
-                "-x",
-                "objective-c",
-                "-fobjc-arc",
-                "-framework",
-                "Carbon",
-                "-framework",
-                "AppKit",
-            ]
-        command += [
-            str(repository / ("tools/diagnostics/native_appleevent_probe_" + role + ".c")),
-            "-o",
-            str(executable),
-        ]
-        children.run(command, confined=True)
-        children.run(["/usr/bin/codesign", "--force", "--sign", "-", str(app)], confined=True)
-        children.run(
-            ["/usr/bin/codesign", "--verify", "--deep", "--strict", str(app)], confined=True
-        )
-        executables[role] = executable
+    # Two separately signed application identities need TCC consent even for
+    # this private event. Keep distinct acquired PIDs but one fixture image.
+    # The native positive/deny-removal/denied controls remain mandatory; this
+    # construction does not qualify authorization to any external application.
+    executables = _build_appleevent_pair(children, repository, root, compiler, nonce)
     ready = root / "appleevent-ready"
     marker = root / "appleevent-delivered"
-    receiver = children.start([str(executables["receiver"]), str(ready), str(marker), nonce])
+    receiver = children.start([*executables["receiver"], str(ready), str(marker), nonce])
     group = children.groups[receiver]
 
     def same_live_receiver():
@@ -1128,8 +1446,10 @@ def _admit_appleevent_boundary(children, repository):
         )
         time.sleep(0.02)
     same_live_receiver()
-    sender = [str(executables["sender"]), str(receiver.pid), nonce]
-    positive = children.run([*sender, "success"])
+    sender = [*executables["sender"], str(receiver.pid), nonce]
+    positive = _run_appleevent_sender(
+        children, receiver, group, "unconfined-positive", [*sender, "success"]
+    )
     require(
         positive.stdout == "native_appleevent_status=0\n" and not positive.stderr,
         "Owned unconfined AppleEvent route was not independently admitted",
@@ -1157,7 +1477,13 @@ def _admit_appleevent_boundary(children, repository):
     )
     removed = root / "sandbox-appleevent-positive.sb"
     removed.write_text(policy.replace(deny, ""), encoding="utf-8", newline="\n")
-    positive = children.run(["/usr/bin/sandbox-exec", "-f", str(removed), *sender, "success"])
+    positive = _run_appleevent_sender(
+        children,
+        receiver,
+        group,
+        "deny-removal-positive",
+        ["/usr/bin/sandbox-exec", "-f", str(removed), *sender, "success"],
+    )
     require(
         positive.stdout == "native_appleevent_status=0\n" and not positive.stderr,
         "Same-policy deny-removal AppleEvent route was not independently admitted",
@@ -1165,7 +1491,9 @@ def _admit_appleevent_boundary(children, repository):
     second = marker_bytes(2)
     require(marker_bytes(1) == first, "Deny-removal delivery altered the first positive marker")
     same_live_receiver()
-    refused = children.run([*sender, "denied"], confined=True)
+    refused = _run_appleevent_sender(
+        children, receiver, group, "denied", [*sender, "denied"], confined=True
+    )
     require(
         refused.stdout in ("native_appleevent_status=-1742\n", "native_appleevent_status=-1743\n")
         and not refused.stderr,
@@ -1470,6 +1798,8 @@ def _observe(repository, output, *, fixture_parent=None, evidence):
                 "tools/diagnostics/native_appleevent_probe_receiver.c",
                 "tools/diagnostics/native_appleevent_probe_sender.c",
                 "tools/diagnostics/native_appleevent_registration_test.m",
+                "tools/diagnostics/native_appleevent_probe_protocol.h",
+                "tools/diagnostics/native_appleevent_probe_pair.m",
             )
         },
         "cases": {},
