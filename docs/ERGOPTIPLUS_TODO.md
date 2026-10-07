@@ -5294,7 +5294,7 @@ is committed; one request is one commit with its regression test.
   retirement; complete native three-OS CI, packaging and installation
   validation remain pending.
 
-The exact composed source retirement passes 13,281 macOS unit cases, 4,960 Linux cases and E2E suites of 101 and 154 checks. Four comment-banner widths caused the initial JS parent failure; the exact comment-only correction range and complete 353-check JS rerun pass, with the original failed receipt retained. Both canonical generators produced the owned artifacts. Exactly two save calls disappeared with the retired binding methods; every one of the remaining 57 calls and strict acknowledgement predicates is unchanged, and independent missing-call and unguarded-call mutations are rejected. Fresh integration retains the existing native Metrics consent and compensation owners, general action catalogue and exact historical unknown-source preservation. Native Windows and complete packaging/installation qualification remain pending.
+The exact composed source retirement passes 13,281 macOS unit cases, 4,960 Linux cases and E2E suites of 101 and 154 checks. Four comment-banner widths caused the initial JS parent failure; the exact comment-only correction range and complete 353-check JS rerun pass, with the original failed receipt retained. Both canonical generators produced the owned artifacts. Exactly two save calls disappeared with the retired binding methods; every one of the remaining 57 calls and strict acknowledgement predicates is unchanged, and independent missing-call and unguarded-call mutations are rejected. Fresh integration retains the existing native Metrics consent and compensation owners, general action catalogue and exact historical unknown-source preservation. Native Windows and complete packaging/installation qualification were pending at this historical source checkpoint; the later actual receipts below supersede that status.
 
 Native Windows checkpoint 37107656277 retains 7,958 passing unit cases but exposes two genuine source-preservation failures: the real full save retains the retired Metrics values while its canonical serializer discards their unowned comments. Ordinary candidate composition now retains unmatched physical records and comments around explicitly owned canonical rows, checks the complete requested semantic model, and keeps source, lease, staging and publication refusals unchanged. Independent handwritten byte vectors run through both shared Lua ports and the actual Windows builder/publication owner; the original collector assertions and namespace no-op controls remain intact. The shared corpus also qualifies header-only comments and fully owned scalar records; a changed quoted literal-dot assignment stays explicitly refused before IO on the Lua ports, while Windows keeps its existing writable canonical contract. Portable full qualification passed 13,289 macOS units, 4,989 Linux units and 101/176 E2E checks; the final formatting/comment delta reruns the required static gates. Keep item 71 partial until a non-release native Windows checkpoint qualifies this repair and the complete three-OS package/install/launch gate finishes.
 
@@ -5313,9 +5313,41 @@ the newly archived evidence's long paths, before application startup. The
 fixture now configures `core.longpaths=true` only in its new private clone,
 before checkout, and verifies the local setting. The complete clone, exact
 HEAD, tracked driver projection and all native boot/retirement assertions
-remain mandatory. Native Windows requalification is pending. Separate
+remain mandatory. Separate
 macOS TIS, Brew receiver, switcher and Shortcuts failures remain explicit;
 downstream Windows/macOS delivery was skipped and Release/Publish skipped.
+
+The integrated clone correction `5d1d06854` was replayed by Windows-only
+manual run `37542732140`, exact CI SHA `6c9d575ce`. All 9,734 AHK records,
+70 E2E cases, complete source boot, fresh clone/reload/warm startup and
+packaging passed. Installation admission then refused the actual Python
+catalogue reader before compiled boot; the original assertion retained no
+child error/status, so its cause is unknown. The downstream 23 programmable
+cases were unexecuted, not failed test cases. Release/Publish was skipped.
+At that historical checkpoint both manual runs were terminal, the owned
+integration lock was released and the feature remained for isolated
+preparation and qualification.
+The reviewed diagnostic successor keeps the exact original execution,
+predicate, 5-second deadline, buffer and all earlier assertions, exposing
+only closed result/status/error/signal facts without streams or private
+values. Independent controls retain 55 assertions: fourteen observability
+failures on the old helper, none on the successor. The later successful
+native replay below does not diagnose the original refusal cause.
+Published diagnostic successor `0ce682b1f` preserves those boundaries. The
+Windows launch job now selects the repository Node version and Python 3.12
+using the existing packaging setup policy, after bounded ownership
+coordination. The observed unpinned Node version is corrected; the native
+Python refusal cause remains unknown. Manual Windows run37546977032
+on CI `f3473b8b0fa29ac20032fbd2dc01908ffac5e458`, exact candidate
+`92ae2ba0af9f3bc57789d0786c61f4b944ba4564`, completes successfully:
+9,734 units, 70 E2E cases, complete source/fresh-clone/warm startup,
+package/install and 23 compiled programmable cases. Native install admission
+uses actual Node22.22.2 and CPython3.12.10; no original assertion or
+deadline changed. Integrated configuration run37547053814 on dev8cba7a0c
+also passes the complete Windows chain (10,089 units) and all17 Linux
+installation scenarios. Its complete CI fails native macOS packaging;
+macOS installation and release are skipped. Item71 remains partial for
+final-source full-save/upgrade and complete three-OS qualification.
 
 - [ ] Software implementation/repair: Keep the completed dedicated Metrics-shortcut retirement and ordinary Metrics actions; repair only demonstrated regressions in unknown retired values/comments, consent or compensation.
 - [ ] Hosted native qualification: Requalify native full-save, installed upgrade/startup and complete three-OS unit/E2E/package/install/launch gates on final sources.
@@ -5329,7 +5361,7 @@ unexecuted unit, E2E, package, installation and launch gates.
 retains historical commands and packet ownership; the earlier PC-only software
 deferral is superseded. This item and items16/38 remain open.
 
-Current Group 3 source checkpoint (item 71, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Preserve completed Metrics retirement and unknown values/comments; finish full-save, upgrade and complete three-OS package/install/startup acceptance. Separate device/evidence boundary: No new device-only task is established for this retirement.
+Current Group3 qualification checkpoint (item71, 2026-10-07): [Group3 continuation](handovers/2026-10-04-parallel-containers/GROUP3-2026-10-06-CONTINUATION.md). Preserve the completed Metrics retirement, unknown-source comments and successful native Windows runtime/startup/package/install qualification37546977032. Integrated configuration run37547053814 passes Windows and Linux delivery; native macOS packaging fails and installation is skipped. Keep final-source full-save/upgrade and complete three-OS acceptance open. No new device-only task is established; item38 retains its independent physical requirements.
 
 - [ ] **73.** Partial: Windows combination families and pairs already use
       the canonical translated tap-hold key labels; macOS now resolves both
@@ -6218,20 +6250,25 @@ packaging, installation and launch. This includes actual AutoHotkey, Python
 and PowerShell script arguments and native retained-handle retirement. The run
 is globally FAILED: Core, Linux and the Ubuntu-hosted macOS portable job stop
 at `Ubuntu archive authority ownership refused`; Release is SKIPPED. The shared
-metadata still needs exact-source Linux/macOS hosted qualification after that
-separately owned prerequisite repair. Real interpreter invocation does not
+metadata required Linux/macOS qualification at that historical checkpoint.
+Later integrated run37539552261 passes the complete Linux chain and all17
+installation scenarios, plus the actual signed Hammerspoon inventory16full
+and5shim cases, including interpreter symlinks and owned retirement.
+Preserve those qualified component scopes; complete macOS package/install
+remains failed or skipped. Real interpreter invocation does not
 qualify broader automation inventory, Apple Shortcuts or physical keyboard
 acceptance, and this tranche does not complete item 106.
 
-The latest retained native macOS inventory baseline is run 37494746572 on
+The earlier retained native macOS inventory baseline is run 37494746572 on
 CI `ad22d308` / dev `4dfbb9a5`: all 16 inventory and five shim cases PASS,
 including `real_interpreter_symlink`. The current native adapter, directory
 owner, full/shim fixtures and controller are byte-identical to that qualified
 baseline. Older 15/16 notes below are historical failures, not a demonstrated
 current symlink regression. The Windows additions changed shared provider
 policy/data while preserving the macOS projection, so the current complete
-source still requires hosted macOS qualification. Preserve the 21 existing
-cases; Apple Shortcuts, broader inventory and full package/install remain open.
+source was subsequently replayed in integrated run37539552261 with all21
+native inventory cases passing. Preserve those21 cases; Apple Shortcuts,
+broader inventory and full macOS package/install remain open.
 
 Complete selected gates, hosted native execution, packaging and installation
 remain required. Automation-provider discovery and Apple Shortcuts are still
@@ -6317,9 +6354,11 @@ arguments, refused starts, exit37 and cancellation with closed process groups.
 The registered macOS controlled fixtures cover exact native64-bit integers,
 stale identities, source privacy and retained cleanup debt. A signed official
 Hammerspoon native inventory fixture is registered in macOS CI; its portable
-parser controls are not native qualification. Hosted execution of that fixture,
-Apple Shortcuts, installed automation/application providers, Windows discovery,
-consumer parity and full packaging/installation remain unfinished.
+parser controls are not native qualification. Later integrated run37539552261
+qualifies all21 actual native inventory cases, and the Windows34-case
+provider tranche passes its separate native qualification above. Apple
+Shortcuts, installed automation/application providers, complete cross-consumer
+parity and full macOS packaging/installation remain unfinished.
 
 A separately owned read-only Apple Shortcuts observer is registered after the
 native Hammerspoon inventory in hosted macOS CI. It calls the actual structured
@@ -6576,7 +6615,7 @@ budget are unchanged; fifteen additive wiring controls refuse missing
 prerequisites, changed budgets and shared setup/native clocks. Fresh hosted
 qualification remains required; no native assertion or item is waived.
 
-Current Group 3 source checkpoint (item 106, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Preserve the qualified 21-case inventory and owned-program provider; diagnose the current GTK delayed-identity observation with its original poll unchanged; record Windows discovery/invocation for the maintainer workstation, then complete Linux/macOS providers and real Shortcuts discovery/invocation. Separate device/evidence boundary: Only device-dependent automation workflows require external device acceptance.
+Current Group3 qualification checkpoint (item106, 2026-10-07): [Group3 continuation](handovers/2026-10-04-parallel-containers/GROUP3-2026-10-06-CONTINUATION.md). Preserve the actual qualified Windows34-case provider, Linux process/GTK/install cohorts and signed native macOS21-case inventory. Complete broader automation/application inventory, bounded Apple Shortcuts chosen-ID discovery/revalidation/invocation/cancellation and cross-consumer behavior; ordinary program discovery/start/cancel does not depend on the modifier broker. Keep complete macOS package/install qualification open. Only actual device-dependent automation workflows require separate device acceptance.
 
 The Ubuntu prerequisite is now separately published and integrated upstream:
 `b70f98236` restores actual native acquisition; dev `a576915cf` CI
@@ -6587,8 +6626,11 @@ constrains modeled private UID facts to captured directory/file identity,
 original UID and exclusive creation. Thirty-one controls pass under UID 1000;
 the same boundary corpus has eleven failing subtests against the published
 pathname-only model. Production root/signature policy is unchanged. Selected
-formatting and all 364 JS checks pass; final integrated CI remains required.
-The earlier dev macOS package
+formatting and all364 JS checks pass under actual UID1000. Integrated
+run37539552261 and later configuration run37547053814 pass the complete
+Linux chain and all17 installation variants. These actual hosted results
+supersede the earlier Ubuntu/GTK prerequisite-pending checkpoint.
+The separately owned macOS package
 still fails owned Brew receiver lifetime and Sparkle server retirement; its
 complete native/package/install scope is unqualified. These are automated
 software/ownership prerequisites, not device-only checks. Item 106 remains
@@ -6627,6 +6669,37 @@ owner and physical row/repeat/Nav/AltGr/Caps/dead-key qualification remain open.
 The unintegrated number-row runtime/provenance preparation stored only in
 /tmp is unavailable after the cloud restart and needs reconstruction and
 review. Linux/macOS forced native capabilities remain unavailable.
+
+The reviewed Windows observation precursor now exposes native key levels and
+number-row descriptors through two append-only native adapter APIs. Captured
+external scalar getters are read once before validation; returned observations
+never grant input, owner, forced-output or dead-state authority. The original
+ToUnicodeEx reader, no-state-change flag `0x4`, independent ten-key corpus and
+every old test assertion remain byte-identical. Six additional registered
+cases include two genuine French/US HKL probes and four controlled native
+adapter-boundary cases. Exact-source run37552051028 executes all six
+successfully within 10,097 passed / zero failed AHK records; the complete
+Windows E2E/package/install/compiled acceptance chain passes. Readonly
+previews do not complete the forced-output policy or item107. The existing layout fixture is unchanged; no new explicit HKL unload
+qualification is claimed.
+
+Native observation checkpoint 37549417973 reached all 10,095 registered
+AHK cases: 10,094 passed and one failed. Five new observation cases passed;
+the actual French dead-key refusal exposed an indexed read of an absent
+Action field in the shared AHK descriptor validator. The successor consistently
+uses the existing empty defaults for missing Text, Action and State, preserving
+the native refusal assertion and every independent expectation. Eight added
+missing-field checks exercise both source positions without depending on HKL
+availability. Lua already safely refuses absent fields and is unchanged.
+Corrected native qualification37552051028 on exact CI
+`18c69e27a753bec1816e926455e4f1e0ed944afd`, candidate
+`454847c2fcd04ba0e61697412929632dec492636`, passes all10,097 units,
+70 E2E cases, source/fresh-clone/reload/warm startup, package/install and
+all23 compiled programmable cases with native exit0 and owned process-tree
+closure. All12 jobs terminate:9 PASS / zero FAIL /3 SKIP; Linux/macOS
+are intentionally unselected and Release/Publish skipped. All six new
+cases pass, including the preserved actual dead-key refusal. Item107
+remains partial for forced-output ownership and physical delivery.
 
 Remaining work for item107 (CI-feasible software first):
 
