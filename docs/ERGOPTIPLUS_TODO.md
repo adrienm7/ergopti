@@ -5371,6 +5371,15 @@ three are skipped, including Release/Publish. The final documentation receipt
 changes no native inputs. Complete final-source three-OS save/upgrade and
 macOS package/install acceptance remain open; this is not item 71 completion.
 
+The actual Windows source-startup smoke now boots a separately handwritten
+legacy Metrics profile and checks its saved image after the unchanged
+nonce/PID-bound committed full-save acknowledgement. It requires each unowned
+comment and record exactly once and verifies their original typed values.
+The original migration corpus, admission regex and native receipt predicates
+remain byte-exact. Independent review passes 29 inert admission cases and
+eight causal corruption controls; source-native execution and the distinct
+installed compiled-upgrade scenario remain unexecuted at this checkpoint.
+
 - [ ] **73.** Partial: Windows combination families and pairs already use
       the canonical translated tap-hold key labels; macOS now resolves both
       physical keys through the same catalogue and invalidates its picker
