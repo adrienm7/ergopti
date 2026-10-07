@@ -38,6 +38,8 @@ global HSE_RepeatEnabled := true
 #Include ..\..\adapters\key_state.ahk
 #Include ..\..\infra\toml\toml_helpers.ahk
 #Include ..\..\infra\manifest_reader.ahk
+; The getter consumes the actual configuration-owner binding policy.
+#Include ..\..\infra\toml\toml_config_loader.ahk
 #Include ..\..\infra\feature_state.ahk
 ; A second ordinary include must not reset the already published data owner.
 TapKeyAssignments["feature_state_include_once_probe"] := "none"
