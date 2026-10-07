@@ -3915,6 +3915,13 @@ The packaged macOS launch matrix now contains a Karabiner configuration scenario
 The signed native checkpoint 37116923472 reached the actual independent JSON codec and production build/merge owners, then refused its first variant because the canonical French action registry gives distinct Cmd+Tab and Option+F17 outputs the same localized label. Legacy reconstruction now keeps validated action-label candidates: unused descriptive ambiguity cannot block foreign profiles, while a complete historical block referencing distinct candidates remains unowned and refuses publication. The eight real-catalogue default/recommended switch vectors prove merge, exact-source publication and unchanged confirmation locally. Signed native qualification of all eight variants remains pending; the original AppleEvent controls and deadlines remain mandatory.
 
 - [~] **42.** config.toml batch writer follow-ups (`toml-batch-existing-key`):
+  macOS conditional writes, unchanged acknowledgements and removals now
+  support a captured strict final logical admission. The new APIs detach
+  classified source scalars before native callbacks; refused operations
+  preserve external successor bytes and existing release-only cleanup.
+  This is a prerequisite for the closed-schema and retired-Script consumers,
+  which remain pending, together with final-source native qualification.
+
   Current source implements the Windows typed dotted/inline document reader,
   targeted saves and full-state publication. The nineteen FullSnapshot cases
   passed natively in diagnostic run 37466163822 (feature `682d373e` plus one
