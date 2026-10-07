@@ -586,6 +586,26 @@ _EHX_FilePackRefusalOwnsNativeChildren() {
 			HotstringCategoriesStd := [], HotstringCategoriesErgopti := [], SubMenus := Map()
 			_HS_ExtensionsCacheLoaded := true, _HS_ExtensionsCache := _HotstringExtensionPacks
 			Source := FSReadUtf8Exact(SourcePath)
+			File := _HotstringExtensionPacks[1].toml_files[1]
+			AssertEqual(SourcePath, File.path)
+			AssertEqual(2, File.sections.Length, "the complete genuine file catalogue contains both sections")
+			Wanted := false, Hidden := false
+			for Section in File.sections {
+				if Section["name"] == "wanted"
+					Wanted := Section
+				else if Section["name"] == "hidden"
+					Hidden := Section
+			}
+			Assert(Wanted is Map && Hidden is Map, "both ordered inputs are authentic scanned section records")
+			AssertEqual("wanted", Wanted["name"])
+			AssertEqual("hidden", Hidden["name"])
+			AssertEqual(2, Wanted["count"])
+			AssertEqual(1, Hidden["count"])
+			; Scan's Counts Map has no physical-source ordering contract. This
+			; private complete Array owns wanted/hidden order without replacing records.
+			File.sections := [Wanted, Hidden]
+			Assert(File.sections[1] == Wanted && File.sections[2] == Hidden, "the exact original record identities supply the controlled order")
+			AssertEqual(Source, FSReadUtf8Exact(SourcePath), "ordering the owned catalogue preserves the whole physical source")
 			Cleaner := Menu()
 			try Cleaner.Delete()
 			finally MenuDispatcher_PruneMenu(Cleaner)
@@ -600,7 +620,7 @@ _EHX_FilePackRefusalOwnsNativeChildren() {
 			Assert(_MenuDispatchCallbacks.Count > Before[1].Count, "the real child registered genuine callbacks")
 			AssertEqual("Wanted (2)", _CTC_LabelAt(Owned[1], 4), "native source section order and count stay intact")
 			for Child in Owned
-				_CTC_ReleaseMenu(Child)
+				_HS_PersonalReleaseMenus([Child])
 			Owned := []
 			Root.Delete("hotstring_extension_content_frame")
 			loop 3 {
@@ -620,7 +640,7 @@ _EHX_FilePackRefusalOwnsNativeChildren() {
 			try {
 				CleanupFailure := 0
 				for Child in Owned {
-					try _CTC_ReleaseMenu(Child)
+					try _HS_PersonalReleaseMenus([Child])
 					catch as ErrorInfo {
 						if !CleanupFailure
 							CleanupFailure := ErrorInfo

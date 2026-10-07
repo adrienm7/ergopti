@@ -265,7 +265,8 @@ _LBMD_ModelPickerBoundaryConsumer() {
 		"the actual native model-menu consumer must render the complete tail provider")
 	Tail := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_ModelTailRows"))
 	AssertContains(Tail, 'MenuRenderer_StatusRows("llm_menu", "llm_model", "model_picker_tail")')
-	AssertContains(Tail, '"action", (*) => LLM_Menu_PromptAddModel()', "original Add dialog callback body remains native")
+	AssertContains(Tail, '"llm_add_model_entry", (*) => LLM_Menu_PromptAddModel()', "original Add dialog callback body remains native")
+	Assert(_LMNM_AddRoute(Tail), "the named Add binding must reach and join the actual typed tail consumer")
 	AssertContains(Tail, '_LLM_Menu_ModelBrowserRow()', "original browser admission owner remains native")
 	Assert(InStr(Tail, 'Map("separator", true)') == 0, "no native fallback separator may replace a refused declaration")
 }
@@ -819,6 +820,8 @@ _LBMD_CompletePerAppFrame() {
 	Root := _MM_GetManifestRoot(), Original := Root["llm_profile_app_override_frame"]
 	try {
 		_LLM_Menu := Saved.Clone()
+		; Match the genuine menu constructor rather than inheriting another fixture's profile array.
+		_LLM_Menu["user_profiles"] := []
 		_LLM_Menu["app_profile_overrides"] := Map()
 		Empty := _LLM_Menu_PerAppProfileRows()
 		AssertEqual(1, Empty.Length)
@@ -841,3 +844,24 @@ _LBMD_CompletePerAppFrame() {
 	}
 }
 Test("complete per-app frame: actual empty/populated override owner and strict withdrawal", _LBMD_CompletePerAppFrame)
+
+
+; The native profile reader legitimately requires assigned canonical profile records.
+; Seed a real sparse Array to prove this fixture never inherits another case's holes.
+_LBMD_PerAppFrameIsolatesProfiles() {
+	global _LLM_Menu
+	Saved := _LLM_Menu, Holey := []
+	Holey.Length := 1
+	try {
+		_LLM_Menu := Saved.Clone()
+		_LLM_Menu["user_profiles"] := Holey
+		Owner := _LLM_Menu
+		AssertThrows(LLM_Menu_GetProfileLabel.Bind("default"), "the genuine profile reader rejects an unassigned inherited record")
+		_LBMD_CompletePerAppFrame()
+		AssertEqual(Owner, _LLM_Menu, "the per-app fixture restores the same prior map")
+		AssertEqual(Holey, _LLM_Menu["user_profiles"], "the per-app fixture restores the same prior profile array")
+		AssertFalse(Holey.Has(1), "the fixture cannot fill or mutate the borrowed sparse array")
+	} finally _LLM_Menu := Saved
+}
+Test("per-app fixture: isolate canonical profiles and restore the genuine borrowed sparse array",
+	_LBMD_PerAppFrameIsolatesProfiles)
