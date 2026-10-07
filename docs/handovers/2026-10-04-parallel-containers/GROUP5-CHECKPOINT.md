@@ -1814,3 +1814,27 @@ readiness, approval, provisioning and production callers stay unqualified. Root
 selected gates precede publication; actual Swift/Darwin execution remains CI-only.
 No default, activation, initializer, entitlement, manifest or workflow changes.
 Item31 and transverse16/38 stay open.
+
+## Live-scope TEST-ONLY runtime distribution prerequisite
+
+The eight-path exporter adds a finite three-product container inside the actual
+signing owner, with captured member/source/provenance identities and revocation
+at lexical retirement. Original runtime/build/source scopes, assertions, deadlines
+and false shipping/install/authentication fields remain intact. Independent source
+and formatting reviews cover the immutable inputs. Root independently verifies
+all140 composition subjects, two complete literal inverses and all current eight
+preimages before adoption; the signer fixture remains the published ede30 image.
+Native signer/export and stable production wrapper binding are not qualified.
+
+Latest recovered authentic manual37576456893/fcd evidence completes401 XCTest
+case receipts:379PASS/7FAIL/15SKIP. The canonical verdict remains incomplete with
+no successful summary; packaging fails and installation/Release are skipped.
+Fresh owned compilation refuses source_identity, unsigned preparation exits124,
+permission UI has no admitted native result and disposable signer setup refuses.
+A new portable Team metadata conservation assertion fails; its historical control
+must compose the legitimate closed diagnostic addition without weakening its
+whole-source equality. Brew/Sparkle failures remain with Group6. All three TIS
+cases pass unchanged in this run, while the genuine previous stale copied-current
+trace remains evidence requiring harness lifecycle qualification. Supported bounded
+HTTPRange/ETag/CRC retrieval retains26 actual archive members; no full1.2GB download
+or archive-wide digest is claimed. No group TODO is removed;16/38 remain open.

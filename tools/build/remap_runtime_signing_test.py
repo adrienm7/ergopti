@@ -459,5 +459,248 @@ class SigningCustodyControls(unittest.TestCase):
         self.failed("deadline", sink)
 
 
+class DistributionSigningCustodyControls(unittest.TestCase):
+    """Actual files and live signer gates; compiler and Security endpoints are modeled."""
+
+    def setUp(self):
+        from types import SimpleNamespace
+
+        self.case = SigningCustodyControls()
+        self.case.setUp()
+        self.addCleanup(self.case.doCleanups)
+        self.repository = HERE.parents[1]
+        factory = BUILDER._source_factory()
+        dependencies = factory.capture_dependencies(self.repository, self.case.deadline)
+        sample = BUILDER.InputFile("src/share/retained.hpp", (), b"MODELED CAPTURED SOURCE")
+        self.case.inputs = SimpleNamespace(files=(sample,))
+        self.case.image = SimpleNamespace(
+            projection=SimpleNamespace(dependencies=dependencies),
+            links=(),
+        )
+        original = load("distribution_closed_record_fixture", HERE / "remap_runtime_build_test.py")
+        self.case.record = original.OwnedRecordControls().record()
+        for phase in ("xcode_version", "xcodegen_version", "sdk_path"):
+            for channel, data in (("stdout", b"MODELED TOOL OBSERVATION"), ("stderr", b"")):
+                path = self.case.owner / (phase + "." + channel)
+                path.write_bytes(data)
+                path.chmod(0o600)
+
+    def sink(self):
+        sink = BUILDER._DistributionSink(
+            self.repository,
+            self.case.owner,
+            self.case.deadline,
+            BUILDER._directory_identity(self.case.owner.lstat()),
+            LAYOUT.IDENTITY,
+            self.case.keychain,
+            self.case.leaf,
+        )
+        for target in ("core", "console", "cli"):
+            sink.capture(target, self.case.case.stage, self.case.deadline)
+        return sink
+
+    def export(self, sink=None):
+        return self.case.prepare(self.sink() if sink is None else sink)
+
+    def failed(self, code, sink=None):
+        result = self.export(sink)
+        self.assertEqual(result.distribution.status, "refused")
+        self.assertEqual(result.distribution.code, code)
+        self.assertIs(result.compilation, self.case.record)
+        self.assertFalse(result.compilation["signing_executed"])
+        return result
+
+    def test_live_fixed_export_retains_old_outcomes_and_closed_false_authority(self):
+        result = self.export()
+        self.assertEqual(result.preparation.status, "prepared_unsigned_snapshot")
+        self.assertEqual(result.signing.status, "prepared_signed_snapshot")
+        self.assertFalse(result.signing.shipping_qualified)
+        self.assertFalse(result.signing.installation_qualified)
+        self.assertFalse(result.signing.authentication_qualified)
+        self.assertEqual(result.distribution.status, "prepared_test_only_distribution")
+        self.assertTrue(result.distribution.test_only)
+        self.assertFalse(result.distribution.shipping_qualified)
+        self.assertFalse(result.distribution.installation_qualified)
+        self.assertFalse(result.distribution.authentication_qualified)
+        self.assertEqual(
+            result.distribution.root, self.case.owner / ".test-only-runtime-distribution"
+        )
+        self.assertEqual(sum("--sign" in args for _, args in self.case.calls), 5)
+        self.assertEqual(sum("--extract-certificates" in args for _, args in self.case.calls), 10)
+
+    def test_old_signing_mode_does_not_create_distribution_or_change_result_type(self):
+        result = self.case.prepare()
+        self.assertIs(type(result), BUILDER.CompilationSigning)
+        self.assertFalse(hasattr(result, "distribution"))
+        self.assertFalse((self.case.owner / ".test-only-runtime-distribution").exists())
+
+    def test_same_byte_source_provider_replacement_after_admission_refuses(self):
+        sink = self.sink()
+        path = self.repository / "tools/build/remap_runtime_distribution.py"
+        original = path.read_bytes()
+        parked = path.with_name(path.name + ".held-original")
+        path.rename(parked)
+        try:
+            path.write_bytes(original)
+            path.chmod(0o644)
+            self.failed("source_identity", sink)
+            self.assertFalse((self.case.owner / ".test-only-runtime-distribution").exists())
+        finally:
+            path.unlink()
+            parked.rename(path)
+
+    def test_same_byte_source_member_replacement_during_final_native_boundary_refuses(self):
+        def hook(name, _):
+            if name == "signing_2_0_arm64_leaf":
+                self.case.replace_same_bytes(self.case.case.resources["core"])
+
+        self.case.hook = hook
+        self.failed("identity_changed")
+        self.assertFalse((self.case.owner / ".test-only-runtime-distribution").exists())
+
+    def test_same_byte_signed_member_replacement_during_export_refuses(self):
+        sink = self.sink()
+        actual = sink.distribution_module.export_live
+
+        def intercepted(*args):
+            self.case.replace_same_bytes(
+                self.case.owner / ".signed-runtime-preparation" / DESTINATIONS[2]
+            )
+            return actual(*args)
+
+        with mock.patch.object(sink.distribution_module, "export_live", side_effect=intercepted):
+            self.failed("signed_inventory", sink)
+        self.assertFalse((self.case.owner / ".test-only-runtime-distribution").exists())
+
+    def test_unchanged_original_wrong_leaf_or_identifier_or_code_refusals_remain(self):
+        self.case.foreign_leaf = True
+        self.failed("signature_leaf")
+        self.assertFalse((self.case.owner / ".test-only-runtime-distribution").exists())
+
+    def test_existing_export_owner_refuses_without_erasing_native_signature_facts(self):
+        root = self.case.owner / ".test-only-runtime-distribution"
+        root.mkdir(mode=0o700)
+        foreign = root / "foreign"
+        foreign.write_bytes(b"preserve")
+        result = self.failed("collision")
+        self.assertEqual(result.signing.status, "prepared_signed_snapshot")
+        self.assertEqual(foreign.read_bytes(), b"preserve")
+
+    def test_unknown_tool_observation_refuses_distribution_only(self):
+        (self.case.owner / "sdk_path.stdout").unlink()
+        result = self.failed("unsafe_path")
+        self.assertEqual(result.signing.status, "prepared_signed_snapshot")
+
+    def test_same_byte_tool_observation_replacement_during_export_refuses(self):
+        sink = self.sink()
+        actual = sink.distribution_module.export_live
+
+        def intercepted(*args):
+            self.case.replace_same_bytes(self.case.owner / "xcode_version.stdout")
+            return actual(*args)
+
+        with mock.patch.object(sink.distribution_module, "export_live", side_effect=intercepted):
+            self.failed("source_identity", sink)
+
+    def test_retired_outcome_or_receipt_does_not_offer_export_api(self):
+        result = self.case.prepare()
+        for value in (result, result.signing, result.compilation):
+            self.assertFalse(hasattr(value, "export_live"))
+            self.assertFalse(hasattr(value, "export_signed"))
+        self.assertFalse((self.case.owner / ".test-only-runtime-distribution").exists())
+
+    def test_caught_nested_export_marks_outer_claim_refused(self):
+        sink = self.sink()
+        actual = sink.distribution_module.export_live
+        nested = False
+
+        def intercepted(*args):
+            nonlocal nested
+            if not nested:
+                nested = True
+                prior = self.case.prepare(sink)
+                self.assertEqual(prior.distribution.status, "refused")
+            return actual(*args)
+
+        with mock.patch.object(sink.distribution_module, "export_live", side_effect=intercepted):
+            self.failed("reentered", sink)
+
+    def test_live_export_provenance_records_actual_held_sources_and_tool_digests(self):
+        import json
+
+        result = self.export()
+        self.assertEqual(result.distribution.status, "prepared_test_only_distribution")
+        value = json.loads((result.distribution.root / "provenance.json").read_bytes())
+        self.assertEqual(value["identity"]["certificate_sha1"], LAYOUT.IDENTITY)
+        self.assertEqual(
+            value["identity"]["public_leaf_sha256"], hashlib.sha256(LAYOUT.LEAF).hexdigest()
+        )
+        self.assertEqual(value["pins"], self.case.record["pins"])
+        self.assertEqual(
+            value["sources"]["staged_inputs"],
+            [
+                {
+                    "path": "src/share/retained.hpp",
+                    "bytes": 23,
+                    "sha256": hashlib.sha256(b"MODELED CAPTURED SOURCE").hexdigest(),
+                }
+            ],
+        )
+        paths = {row["path"] for row in value["sources"]["owned_inputs"]}
+        self.assertIn("tools/build/remap_runtime_distribution.py", paths)
+        self.assertIn("tools/build/remap_runtime_build.py", paths)
+        self.assertEqual(
+            {row["phase"] for row in value["native_observations"]},
+            {"xcode_version", "xcodegen_version", "sdk_path"},
+        )
+        self.assertNotIn(str(self.case.owner), json.dumps(value))
+        self.assertTrue(value["test_only"])
+        self.assertFalse(value["shipping_qualified"])
+
+    def test_detached_signed_files_and_receipt_cannot_enter_export_continuation(self):
+        prior = self.case.prepare()
+        self.assertEqual(prior.signing.status, "prepared_signed_snapshot")
+        sink = self.sink()
+        root = prior.signing.root
+        directories, files = {}, {}
+        for path in root.rglob("*"):
+            relative = str(path.relative_to(root))
+            if path.is_dir():
+                directories[relative] = BUILDER._directory_identity(path.lstat())
+            else:
+                files[relative] = BUILDER._ordinary(path, root, BUILDER.PRODUCT_MAX_BYTES)
+        sink.export_signed(
+            self.case.record,
+            self.case.inputs,
+            self.case.image,
+            directories,
+            files,
+            LAYOUT.LEAF,
+            LAYOUT.IDENTITY,
+            lambda: None,
+            self.case.deadline,
+        )
+        self.assertEqual(sink.exported.status, "refused")
+        self.assertEqual(sink.exported.code, "handoff_required")
+        self.assertFalse((self.case.owner / ".test-only-runtime-distribution").exists())
+
+    def test_export_guard_cannot_be_reused_after_lexical_retirement(self):
+        sink = self.sink()
+        actual = sink.distribution_module.export_live
+        captured = []
+
+        def intercepted(*args):
+            captured.append(args[-1])
+            return actual(*args)
+
+        with mock.patch.object(sink.distribution_module, "export_live", side_effect=intercepted):
+            result = self.export(sink)
+        self.assertEqual(result.distribution.status, "prepared_test_only_distribution")
+        self.assertEqual(len(captured), 1)
+        with self.assertRaises(BUILDER.BASE.NativeBuildError) as caught:
+            captured[0]()
+        self.assertEqual(caught.exception.code, "handoff_required")
+
+
 if __name__ == "__main__":
     unittest.main()

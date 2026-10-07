@@ -3360,6 +3360,18 @@ bodies and25/30/35/10 budgets conserved. Native Swift/API/actual signed query
 execution remains required. No activation, approval, installation, production
 caller or live broker authority is added. Item31 stays partial.
 
+A bounded TEST-ONLY runtime distribution encoder now captures the three actual
+runtime products inside the existing live signing scope. Exclusive ordinary-file
+publication retains fixed product/source/identity bytes and refuses detached,
+changed or retired ownership. Deterministic encoding concerns the retained bytes,
+not independent Xcode build reproducibility. Original compilation, preparation
+and signing outcomes remain separate from a later export refusal. Source review,
+formatter-only inverses and the current disposable-signer composition preserve
+all original controls. Actual native signing/export, stable production wrapper
+leaf binding, acquisition, installation and runtime authentication remain
+unqualified; no production caller, release or activation is added. Item31 stays
+partial.
+
 WP3 prerequisite: the actual macOS physical accounting owner now requires exact held-modifier settlement before accepting source transitions. The keylogger retires each crossing physical release without emitting an orphan hold or a new press, including pause and secure-context crossings; ordinary legacy and collision behavior remains unchanged. Existing native fixture parents restore their settlement child through the scoped cache owner, while normal production stop/restart retains the same CoreState. Portable focused tests pass (32 held-key cases, 24 policy cases, 3 legacy collision cases, 23 existing cache-scope cases, and 9 unchanged alias configuration/privacy cases); the original real gap-release source fails all eight side-key cases. This does not enable a producer or headless mode, alter transport/baseline versions, or complete WP3/WP4/native acceptance. Full root and hosted macOS qualification remain required.
 
 WP3 remains partial. An explicitly initialized, dormant physical-capture session

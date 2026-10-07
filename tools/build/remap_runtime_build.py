@@ -1186,6 +1186,48 @@ class _SigningSink(_PreparationSink):
                 signed_outcome = SignedPreparationOutcome(
                     signed, tuple(row[0] for row in _SIGNED_PRODUCTS)
                 )
+                if type(self) is _DistributionSink:
+                    signing_sink = self
+                    signed_directories, signed_files = previous_directories, previous_files
+                    active = True
+
+                    class _LiveSignedClaim:
+                        # Only the verified five-object continuation mints this
+                        # exact local instance. No detached root or JSON can.
+                        def current(claim):
+                            _REQUIRE(
+                                active and signing_sink._distribution_claim is claim,
+                                "handoff_required",
+                                "The original signed scope retired",
+                            )
+                            boundary()
+
+                        def members(claim):
+                            claim.current()
+                            return signed_directories, signed_files
+
+                        def inputs(claim):
+                            claim.current()
+                            return record, inputs, image
+
+                    claim = _LiveSignedClaim()
+                    self._distribution_claim = claim
+                    try:
+                        self.export_signed(
+                            record,
+                            inputs,
+                            image,
+                            signed_directories,
+                            signed_files,
+                            leaf.data,
+                            identity,
+                            claim,
+                            deadline,
+                        )
+                        boundary()
+                    finally:
+                        active = False
+                        self._distribution_claim = None
             current()
         except (BASE.NativeBuildError, self.module.ArtifactRefusal, OSError) as error:
             code = getattr(error, "code", "signed_inventory")
@@ -1197,6 +1239,197 @@ class _SigningSink(_PreparationSink):
                 SigningFailure(code),
             )
         return CompilationSigning(record, unsigned, signed_outcome)
+
+
+DISTRIBUTION_RELATIVE = "tools/build/remap_runtime_distribution.py"
+DISTRIBUTION_SHA256 = "c5c1101fd2b88293cd806cb361d347c021c8b70f9273ee7db12039a8d048918f"
+
+
+@dataclass(frozen=True, slots=True)
+class DistributionFailure:
+    """A later export refusal never rewrites original compile/signing outcomes."""
+
+    code: str
+    status: str = "refused"
+
+
+@dataclass(frozen=True, slots=True)
+class CompilationDistribution:
+    """Keep the original three outcomes separate from ordinary TEST-ONLY export."""
+
+    compilation: dict
+    preparation: object
+    signing: object
+    distribution: object
+
+
+class _DistributionSink(_SigningSink):
+    """Fixed opt-in continuation admitted only within the original live signing scope."""
+
+    def __init__(
+        self, repository, owner, deadline, owner_identity, identity, keychain, public_leaf
+    ):
+        self.distribution_source = None
+        self.distribution_module = None
+        self.export_observations = ()
+        self.exported = None
+        self._distribution_claim = None
+        super().__init__(
+            repository, owner, deadline, owner_identity, identity, keychain, public_leaf
+        )
+        self.distribution_source = snapshot_inputs(
+            Path(repository), {DISTRIBUTION_RELATIVE: DISTRIBUTION_SHA256}, deadline
+        )
+        held = self.distribution_source.files[0]
+        self.distribution_module = _load(
+            "fixed_test_only_runtime_distribution", Path(repository) / held.path, held.data
+        )
+        self.captured_providers = tuple(
+            _ordinary(Path(repository) / relative, Path(repository), BASE.MAX_INPUT_BYTES)
+            for relative in (
+                "tools/build/remap_runtime_build.py",
+                "tools/build/remap_runtime_source.py",
+                "tools/diagnostics/hs274_native_build.py",
+            )
+        )
+        self.current(deadline)
+
+    def current(self, deadline):
+        super().current(deadline)
+        if self.distribution_source is not None:
+            current_inputs(self.distribution_source, deadline)
+        if hasattr(self, "captured_providers"):
+            for held in self.captured_providers:
+                _REQUIRE(
+                    _ordinary(self.source.root / held.path, self.source.root, BASE.MAX_INPUT_BYTES)
+                    == held,
+                    "source_identity",
+                    "An actual export source changed",
+                )
+        for held in self.export_observations:
+            _REQUIRE(
+                _ordinary(self.owner.path / held.path, self.owner.path, 65536) == held,
+                "source_identity",
+                "An original tool observation changed during export",
+            )
+
+    def export_signed(
+        self, record, inputs, image, directories, files, leaf, identity, claim, deadline
+    ):
+        # This private method is not a path/receipt re-admission API. Its guard
+        # closes over the STILL-ACTIVE original unsigned and native signing scope.
+        active = True
+
+        def retained_current():
+            _REQUIRE(
+                active and claim is not None and claim is self._distribution_claim,
+                "handoff_required",
+                "The original signed claim is absent or retired",
+            )
+            claim.current()
+            self.current(deadline)
+            _REQUIRE(active, "handoff_required", "The original export scope retired")
+            return True
+
+        try:
+            retained_current()
+            original_directories, original_files = claim.members()
+            original_record, original_inputs, original_image = claim.inputs()
+            _REQUIRE(
+                directories is original_directories
+                and files is original_files
+                and record is original_record
+                and inputs is original_inputs
+                and image is original_image,
+                "handoff_required",
+                "Caller projections cannot replace the original signed claim",
+            )
+            validate_owned_record(record)
+            observations = []
+            native = []
+            for phase in ("xcode_version", "xcodegen_version", "sdk_path"):
+                row = {"phase": phase}
+                for channel in ("stdout", "stderr"):
+                    held = _ordinary(
+                        self.owner.path / (phase + "." + channel), self.owner.path, 65536
+                    )
+                    observations.append(held)
+                    row[channel + "_bytes"] = len(held.data)
+                    row[channel + "_sha256"] = hashlib.sha256(held.data).hexdigest()
+                native.append(row)
+            self.export_observations = tuple(observations)
+            retained_current()
+
+            def source_rows(rows):
+                unique = {}
+                for held in rows:
+                    row = {
+                        "path": held.path,
+                        "bytes": len(held.data),
+                        "sha256": hashlib.sha256(held.data).hexdigest(),
+                    }
+                    _REQUIRE(
+                        held.path not in unique or unique[held.path] == row,
+                        "source_identity",
+                        "Captured export source rows conflict",
+                    )
+                    unique[held.path] = row
+                return [unique[name] for name in sorted(unique)]
+
+            provenance = {
+                "schema": 1,
+                "scope": "captured_live_export_inputs",
+                "test_only": True,
+                "pins": dict(record["pins"]),
+                "identity": {
+                    "certificate_sha1": identity,
+                    "public_leaf_sha256": hashlib.sha256(leaf).hexdigest(),
+                },
+                "sources": {
+                    "owned_inputs": source_rows(
+                        tuple(image.projection.dependencies)
+                        + self.source.files
+                        + self.macho_source.files
+                        + self.distribution_source.files
+                        + self.captured_providers
+                    ),
+                    "staged_inputs": source_rows(inputs.files),
+                    "staged_links": source_rows(image.links),
+                },
+                "native_observations": native,
+                "shipping_qualified": False,
+                "installation_qualified": False,
+                "authentication_qualified": False,
+            }
+            self.exported = self.distribution_module.export_live(
+                self.owner.path,
+                tuple((name, stat.S_IMODE(stamp[3])) for name, stamp in directories.items()),
+                tuple(
+                    (name, stat.S_IMODE(held.identity[3]), held.data)
+                    for name, held in files.items()
+                ),
+                provenance,
+                deadline,
+                retained_current,
+            )
+            retained_current()
+        except (
+            BASE.NativeBuildError,
+            self.module.ArtifactRefusal,
+            self.distribution_module.DistributionRefusal,
+            OSError,
+        ) as error:
+            self.exported = DistributionFailure(getattr(error, "code", "io"))
+        finally:
+            active = False
+
+    def prepare(self, record, inputs, image, retained_products, deadline):
+        result = super().prepare(record, inputs, image, retained_products, deadline)
+        if self.exported is None or type(result.signing) is SigningFailure:
+            self.exported = DistributionFailure(getattr(result.signing, "code", "signing_refused"))
+        return CompilationDistribution(
+            result.compilation, result.preparation, result.signing, self.exported
+        )
 
 
 def _preparation_current(sink, retained, deadline):
@@ -1918,7 +2151,24 @@ def compile_owned_prepare_and_sign(
     )
 
 
-def _compile_owned(repository, owner, seconds, upstream=None, *, prepare=False, signing=None):
+def compile_owned_prepare_sign_and_export(
+    repository, owner, seconds, upstream=None, *, identity, keychain, public_leaf
+):
+    """Opt in to mechanical TEST-ONLY export; production distribution remains unqualified."""
+    return _compile_owned(
+        repository,
+        owner,
+        seconds,
+        upstream,
+        prepare=True,
+        signing=(identity, keychain, public_leaf),
+        distribution=True,
+    )
+
+
+def _compile_owned(
+    repository, owner, seconds, upstream=None, *, prepare=False, signing=None, distribution=False
+):
     """Compile the complete canonical owned tree using the genuine Darwin SDK.
 
     A separate pristine acquisition is retained through all phase boundaries.
@@ -1938,10 +2188,21 @@ def _compile_owned(repository, owner, seconds, upstream=None, *, prepare=False, 
         not any(owner.iterdir()), "unsafe_path", "Actual owned build requires a fresh empty owner"
     )
     deadline = time.monotonic() + seconds
+    _REQUIRE(
+        type(distribution) is bool and (not distribution or (prepare and signing is not None)),
+        "invalid_budget",
+        "Distribution requires the fixed live signing path",
+    )
     shipping_sink = (
-        _SigningSink(repository, owner, deadline, owner_identity, *signing)
-        if signing is not None
-        else (_PreparationSink(repository, owner, deadline, owner_identity) if prepare else None)
+        _DistributionSink(repository, owner, deadline, owner_identity, *signing)
+        if distribution
+        else (
+            _SigningSink(repository, owner, deadline, owner_identity, *signing)
+            if signing is not None
+            else (
+                _PreparationSink(repository, owner, deadline, owner_identity) if prepare else None
+            )
+        )
     )
     factory = _source_factory()
     _factory_operation(factory, factory.capture_dependencies, Path(repository), deadline)
