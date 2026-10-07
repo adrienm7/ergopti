@@ -99,7 +99,7 @@ function validate(data) {
 	const sources = portable.flatpak_sources;
 	if (
 		!sources ||
-		Object.keys(sources).join(',') !== 'luv,schemas,curl,duktape,libproxy,glib_networking'
+		Object.keys(sources).join(',') !== 'luv,schemas,krb5,curl,duktape,libproxy,glib_networking'
 	)
 		throw new TypeError('Incomplete portable native source inventory.');
 	for (const [name, source] of Object.entries(sources)) {
@@ -162,6 +162,18 @@ function flatpakModules(data) {
 			source: 'schemas'
 		},
 		{
+			name: 'network-krb5',
+			buildsystem: 'autotools',
+			subdir: 'src',
+			'config-opts': ['--disable-static', '--disable-rpath', '--without-system-verto'],
+			'post-install': [
+				'test -x /app/bin/krb5-config',
+				'test -f /app/lib/libgssapi_krb5.so',
+				'/app/bin/krb5-config --libs gssapi'
+			],
+			source: 'krb5'
+		},
+		{
 			name: 'network-curl',
 			buildsystem: 'cmake-ninja',
 			'config-opts': [
@@ -169,7 +181,8 @@ function flatpakModules(data) {
 				'-DBUILD_SHARED_LIBS=ON',
 				'-DBUILD_TESTING=OFF',
 				'-DCURL_USE_OPENSSL=ON',
-				'-DCURL_USE_GSSAPI=ON'
+				'-DCURL_USE_GSSAPI=ON',
+				'-DGSS_ROOT_DIR=/app'
 			],
 			'post-install': ['test -x /app/bin/curl'],
 			source: 'curl'
