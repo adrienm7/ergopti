@@ -434,3 +434,263 @@ _MET_PrivateNativeRegistry() {
 	}
 }
 Test("magic editor: private actual AHK registry proves physical and VK variant handoff", _MET_PrivateNativeRegistry)
+
+/** Existing handle custody must refuse reacquisition before any native effect. */
+_MET_CohortRetainedNativeCannotBeOverwritten() {
+	Handles := Map("SC027", "original-native-token"), Calls := 0
+	Reserve(Scan) {
+		Calls += 1
+		return "replacement-native-token"
+	}
+	Ports := Map("reserve", Reserve, "activate", (*) => true, "retire", (*) => true,
+		"set_enabled", (*) => true)
+	Refused := false
+	try MagicEditorAcquireCohort(Map("SC027", true), [], Handles, Ports)
+	catch as Failure
+		Refused := InStr(Failure.Message, "unsettled cohort compensation") > 0
+	AssertTrue(Refused, "retained native debt must refuse before another cohort can start")
+	AssertEqual(0, Calls, "the old native owner forbids even a replacement reservation")
+	AssertEqual(1, Handles.Count)
+	AssertEqual("original-native-token", Handles["SC027"], "reacquisition must retain the exact first token")
+}
+Test("magic editor custody: retained native handles fence replacement (todo108-custody)",
+	_MET_CohortRetainedNativeCannotBeOverwritten)
+
+/** A native disable may take effect before it refuses or throws its receipt. */
+_MET_CohortUnacknowledgedDisableCase(Mode) {
+	Handles := Map(), Enabled := true, Restores := 0
+	SetEnabled(Handle, Desired) {
+		AssertEqual("exact-personal-token", Handle)
+		Enabled := Desired
+		if Desired {
+			Restores += 1
+			return true
+		}
+		if Mode == "throw"
+			throw Error("native disable mutated before its exception")
+		return Mode == "malformed" ? "1" : false
+	}
+	Ports := Map("reserve", (Scan) => "exact-native-token", "activate", (*) => true,
+		"retire", (*) => true, "set_enabled", SetEnabled)
+	Refused := false
+	try MagicEditorAcquireCohort(Map("SC027", true), ["exact-personal-token"], Handles, Ports)
+	catch
+		Refused := true
+	AssertTrue(Refused, "a missing exact disable acknowledgement cannot publish a broker")
+	AssertTrue(Enabled, "even a disable that mutated before refusal must restore its exact personal owner")
+	AssertEqual(1, Restores, "restoration custody must be captured before the native disable call")
+	AssertEqual(0, Handles.Count, "the rejected native broker must retire before returning")
+}
+Test("magic editor custody: false disable after mutation restores its owner (todo108-custody)",
+	_MET_CohortUnacknowledgedDisableCase.Bind("false"))
+Test("magic editor custody: throwing disable after mutation restores its owner (todo108-custody)",
+	_MET_CohortUnacknowledgedDisableCase.Bind("throw"))
+Test("magic editor custody: malformed disable cannot acknowledge handoff (todo108-custody)",
+	_MET_CohortUnacknowledgedDisableCase.Bind("malformed"))
+
+/** Failed native retire and personal restoration survive as exact retry duties. */
+_MET_CohortRetainedCompensationCase(Mode) {
+	Handles := Map(), RestoreDebt := Map(), Enabled := true, Reservations := 0
+	RefuseRestore := true, RefuseRetire := true, Restores := [], Retirements := []
+	Reserve(Scan) {
+		Reservations += 1
+		return "native-first-token"
+	}
+	SetEnabled(Handle, Desired) {
+		if !Desired {
+			Enabled := false
+			return true
+		}
+		Restores.Push(Handle)
+		if RefuseRestore {
+			if Mode == "throw"
+				throw Error("controlled native personal restore exception")
+			return Mode == "malformed" ? "1" : false
+		}
+		Enabled := true
+		return true
+	}
+	Retire(Handle) {
+		Retirements.Push(Handle)
+		if RefuseRetire {
+			if Mode == "throw"
+				throw Error("controlled native retirement exception")
+			return Mode == "malformed" ? "1" : false
+		}
+		return true
+	}
+	Ports := Map("reserve", Reserve, "activate", (*) => false, "retire", Retire,
+		"set_enabled", SetEnabled)
+	AssertThrows(() => MagicEditorAcquireCohort(Map("SC027", true), ["personal-first-token"],
+		Handles, Ports, RestoreDebt))
+	AssertEqual("native-first-token", Handles["SC027"], "failed retirement keeps the exact native capability")
+	AssertTrue(RestoreDebt.Has("personal-first-token"), "failed restoration keeps the exact personal capability")
+	AssertFalse(Enabled, "a refused restoration must never be represented as accepted")
+	Before := Reservations
+	AssertThrows(() => MagicEditorAcquireCohort(Map("SC027", true), ["another-personal-token"],
+		Handles, Ports, RestoreDebt))
+	AssertEqual(Before, Reservations, "retained compensation forbids another native reservation")
+	Receipt := MagicEditorSettleCohortDebt(Handles, RestoreDebt, Ports)
+	AssertEqual("retained", Receipt["status"], "repeated false, malformed or throwing acknowledgements retain custody")
+	AssertEqual("native-first-token", Handles["SC027"])
+	AssertTrue(RestoreDebt.Has("personal-first-token"))
+	RefuseRetire := false, RefuseRestore := false
+	Receipt := MagicEditorSettleCohortDebt(Handles, RestoreDebt, Ports)
+	AssertEqual("settled", Receipt["status"])
+	AssertEqual(0, Handles.Count)
+	AssertEqual(0, RestoreDebt.Count)
+	AssertTrue(Enabled, "only a genuine restoration acknowledgement reopens personal delivery")
+	for Handle in Retirements
+		AssertEqual("native-first-token", Handle, "every retry addresses only the first native capability")
+	for Handle in Restores
+		AssertEqual("personal-first-token", Handle, "every retry addresses only the first personal capability")
+}
+Test("magic editor custody: false compensation retains exact retry duties (todo108-custody)",
+	_MET_CohortRetainedCompensationCase.Bind("false"))
+Test("magic editor custody: throwing compensation retains exact retry duties (todo108-custody)",
+	_MET_CohortRetainedCompensationCase.Bind("throw"))
+Test("magic editor custody: malformed compensation retains exact retry duties (todo108-custody)",
+	_MET_CohortRetainedCompensationCase.Bind("malformed"))
+
+/** Boot retry cannot change a source epoch before retained owners are settled. */
+_MET_CohortBootRetryKeepsSourceEpoch() {
+	State := MagicEditorState(), Saved := State.Clone()
+	try {
+		State["initialized"] := false
+		State["native_handles"] := Map("SC027", "first-native-token")
+		State["ordinary_restore"] := Map("first-personal-token", true)
+		State["source_generation"] := 77
+		State["hkl"] := 1234
+		State["source_signature"] := "first-source-recipe"
+		Refused := false
+		try MagicEditorStart()
+		catch as Failure
+			Refused := InStr(Failure.Message, "unsettled cohort compensation") > 0
+		AssertTrue(Refused, "boot reentry refuses the exact retained compensation owner")
+		AssertEqual(77, State["source_generation"], "cleanup debt cannot gain another source epoch")
+		AssertEqual(1234, State["hkl"])
+		AssertEqual("first-source-recipe", State["source_signature"])
+		AssertEqual("first-native-token", State["native_handles"]["SC027"])
+		AssertTrue(State["ordinary_restore"].Has("first-personal-token"))
+	} finally {
+		State.Clear()
+		for Key, Value in Saved
+			State[Key] := Value
+	}
+}
+Test("magic editor custody: boot retry preserves the retained source epoch (todo108-custody)",
+	_MET_CohortBootRetryKeepsSourceEpoch)
+
+/** Runs the exact production cohort bodies over genuine private AHK variants. */
+_MET_CohortRealNativeCustody() {
+	Root := A_Temp . "\ergopti_magic_custody_" . A_ScriptHwnd . "_" . A_TickCount
+	AssertFalse(DirExist(Root), "native cohort custody requires an exclusive fixture directory")
+	DirCreate(Root)
+	Receipt := {Calls: 0, Code: -1, Output: "", Errors: ""}, Handle := 0, Settled := false
+	Done(Code, Output, Errors) {
+		Receipt.Calls += 1
+		Receipt.Code := Code
+		Receipt.Output := Output
+		Receipt.Errors := Errors
+	}
+	try {
+		Source := '#Requires AutoHotkey v2.0' . "`n" . '#SingleInstance Off' . "`n"
+			. '#NoTrayIcon' . "`n" . '#Warn All, StdOut' . "`n" . '#ErrorStdOut' . "`n"
+			. '#Include ' . _DriverProductionFileForSymbol("ChordParse") . "`n"
+			. '#Include ' . _DriverProductionFileForSymbol("HotkeyRegistrarReservePhysicalBroker") . "`n"
+			. 'LoggerDebug(*) => 0' . "`n" . 'LoggerWarn(*) => 0' . "`n" . 'LoggerError(*) => 0' . "`n"
+		for Name in ["MagicEditorState", "MagicEditorAcquireCohort", "MagicEditorSettleCohortDebt"] {
+			Body := _DriverFuncBody(Name)
+			Assert(Body != "", "the native child must execute each actual production cohort body")
+			Source .= Body . "`n"
+		}
+		Source .= _MET_CohortNativeProbeSource()
+		Probe := Root . "\native_custody.ahk"
+		FileAppend(Source, Probe, "UTF-8")
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath, ["/ErrorStdOut", Probe], Done)
+		AssertTrue(Handle.start(), "the exact native cohort probe must start")
+		Started := A_TickCount
+		while !Receipt.Calls && TickElapsed(Started) < 10000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AssertEqual(1, Receipt.Calls, "the native cohort child must complete exactly once")
+		AssertEqual(0, Receipt.Code, "the genuine registrar/cohort probe must run: " . Receipt.Output . Receipt.Errors)
+		AssertEqual("", Receipt.Errors, "native cohort errors cannot be hidden")
+		AssertEqual("native-retired|personal-restored|retry-fenced", Receipt.Output)
+	} finally {
+		if Handle is Object
+			Settled := Handle.terminate()
+		else
+			Settled := true
+		if Settled
+			DirDelete(Root, true)
+		AssertTrue(Settled, "the exact native cohort process tree must retire before fixture removal")
+	}
+}
+
+/** Produces assertions over actual retained registrar capabilities, without input. */
+_MET_CohortNativeProbeSource() {
+	return '
+	(
+_MCC_Require(Value, Message) {
+	if !Value
+		throw Error(Message)
+}
+_MCC_Run() {
+	global HOTKEY_REGISTRAR_BINDINGS
+	Criterion := (*) => false
+	Ordinary := _HotkeyRegistrarReserveResolvedOwned("Cmd+D", (*) => 0, "custody-personal",
+		HotkeyRegistrarResolvedNativeDescriptor("#d"))
+	_MCC_Require(Ordinary != "" && _HotkeyRegistrarActivate(Ordinary), "The exact personal owner must acquire.")
+	Entry := HOTKEY_REGISTRAR_BINDINGS[Ordinary]
+	Handles := Map(), RestoreDebt := Map(), RefuseCleanup := true, Reservations := 0
+	Reserve(Scan) {
+		Reservations += 1
+		return HotkeyRegistrarReservePhysicalBroker("Cmd+" . Scan, (*) => 0, "custody-broker",
+			HotkeyRegistrarResolvedNativeDescriptor("#" . Scan), Criterion)
+	}
+	Activate(Token) {
+		_MCC_Require(_HotkeyRegistrarActivate(Token), "The real broker native On must acknowledge.")
+		return false
+	}
+	Retire(Token) => RefuseCleanup ? false : HotkeyRegistrarUnbind(Token)
+	SetEnabled(Token, Enabled) => Enabled && RefuseCleanup ? false : HotkeyRegistrarSetEnabled(Token, Enabled)
+	Ports := Map("reserve", Reserve, "activate", Activate, "retire", Retire, "set_enabled", SetEnabled)
+	try {
+		Refused := false
+		try MagicEditorAcquireCohort(Map("SC020", true), [Ordinary], Handles, Ports, RestoreDebt)
+		catch as Failure
+			Refused := InStr(Failure.Message, "Unacknowledged compensation") > 0
+		_MCC_Require(Refused && Handles.Count == 1 && RestoreDebt.Has(Ordinary), "Both exact obligations must survive refusal.")
+		Broker := Handles["SC020"]
+		_MCC_Require(HOTKEY_REGISTRAR_BINDINGS[Broker]["state"]["phase"] == "active", "The retained broker must be genuinely native active.")
+		_MCC_Require(HOTKEY_REGISTRAR_BINDINGS[Ordinary]["state"]["phase"] == "disabled", "The retained personal owner must be genuinely disabled.")
+		try MagicEditorAcquireCohort(Map("SC020", true), [], Handles, Ports, RestoreDebt)
+		catch as Failure
+			_MCC_Require(InStr(Failure.Message, "unsettled cohort compensation"), "Only retained custody may refuse the retry.")
+		_MCC_Require(Reservations == 1 && Handles["SC020"] == Broker, "Retry cannot replace the original native token.")
+		RefuseCleanup := false
+		Result := MagicEditorSettleCohortDebt(Handles, RestoreDebt, Ports)
+		_MCC_Require(Result["status"] == "settled" && !Handles.Count && !RestoreDebt.Count, "Exact native compensation must settle.")
+		_MCC_Require(!HOTKEY_REGISTRAR_BINDINGS.Has(Broker), "Only the exact broker token must retire.")
+		_MCC_Require(HOTKEY_REGISTRAR_BINDINGS[Ordinary] == Entry && Entry["state"]["phase"] == "active", "The same personal owner must regain native On.")
+	} finally {
+		RefuseCleanup := false
+		Result := MagicEditorSettleCohortDebt(Handles, RestoreDebt, Ports)
+		_MCC_Require(Result["status"] == "settled", "Native cleanup debt must settle before exit.")
+		_MCC_Require(HotkeyRegistrarUnbind(Ordinary), "The exact restored personal owner must retire.")
+	}
+	FileAppend("native-retired|personal-restored|retry-fenced", "*", "UTF-8-RAW")
+}
+try {
+	_MCC_Run()
+	ExitApp(0)
+} catch as Failure {
+	FileAppend(Failure.Message, "**", "UTF-8-RAW")
+	ExitApp(2)
+}
+	)'
+}
+Test("magic editor custody: actual native variants retain and settle exact owners (todo108-custody)",
+	_MET_CohortRealNativeCustody)
