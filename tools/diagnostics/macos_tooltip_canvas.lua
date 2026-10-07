@@ -3,7 +3,7 @@
 local directory = assert(debug.getinfo(1, "S").source:match("^@(.+)/[^/]+$"))
 local json = require("hs.json")
 local config = assert(json.read(directory .. "/probe-config.json"))
-local probe = { timers = {}, cases = {}, errors = {}, finished = false, storage_reads = 0, storage_writes = 0 }
+local probe = { timers = {}, cases = {}, shortcut_columns = {}, errors = {}, finished = false, storage_reads = 0, storage_writes = 0 }
 _G.ERGOPTI_TOOLTIP_PIXEL_PROBE = probe
 local Renderer
 
@@ -47,7 +47,7 @@ local function finish(failure)
 	local ok, err = xpcall(cleanup, debug.traceback)
 	local receipt = { status = failure and "error" or "ok", error = failure,
 		runtime = "native Hammerspoon", version = hs.processInfo.version, pid = hs.processInfo.processID,
-		cases = probe.cases, production_errors = probe.errors,
+		cases = probe.cases, shortcut_columns = probe.shortcut_columns, production_errors = probe.errors,
 		canvas_cleanup = ok, cleanup_error = not ok and tostring(err) or nil,
 		isolation = { logger = true, locale = true, input_tag_storage = "strict in-memory reservation",
 			storage_reads = probe.storage_reads, storage_writes = probe.storage_writes },
@@ -126,10 +126,65 @@ guarded(function()
 	local regular = hs.styledtext.fontInfo({ name = ".AppleSystemUIFont", size = 14 })
 	local bold = hs.styledtext.fontInfo({ name = ".AppleSystemUIFontBold", size = 14 })
 	assert(regular.fontName ~= bold.fontName, "native regular/bold fonts are identical")
+	local shortcut_ordinal = 0
+	local function next_shortcut_case()
+		shortcut_ordinal = shortcut_ordinal + 1
+		if shortcut_ordinal > 3 then finish(); return end
+		local count = shortcut_ordinal == 1 and 10 or (shortcut_ordinal == 2 and 1 or 3)
+		local predictions = {}
+		for index = 1, count do
+			predictions[index] = { chunks = {}, nw = string.rep("M", index * 2) }
+		end
+		if shortcut_ordinal == 3 then
+			predictions[1] = { chunks = { { type = "equal", text = "MMM" },
+				{ type = "insert", text = "MM" } }, nw = " M", has_corrections = true }
+			predictions[2] = { chunks = {}, nw = "MMM\nMMMMMMMMMMM" }
+		end
+		local shortcut_mod = ({ "alt", "\226\128\139", "ctrl+shift" })[shortcut_ordinal]
+		local state = { raw_predictions = predictions, current_index = shortcut_ordinal == 3 and 1 or count,
+			indent = 0, shortcut_mod = shortcut_mod,
+			nav_mod_str = "none" }
+		local blocks = assemble(state, count)
+		assert(type(blocks.shortcuts) == "table" and #blocks.shortcuts == count,
+			"production shortcut column is missing")
+		assert(Renderer.render(blocks, state) == true, "shortcut column render refused")
+		later(function()
+			assert(Renderer.canvas:isShowing() == true, "shortcut canvas is not showing")
+			local image = assert(Renderer.canvas:imageFromCanvas(), "shortcut capture refused")
+			local name = string.format("shortcut-%02d.png", shortcut_ordinal)
+			assert(not hs.fs.attributes(config.output_dir .. "/" .. name), "existing shortcut capture refused")
+			assert(image:saveToFile(config.output_dir .. "/" .. name, false, "PNG") == true,
+				"shortcut native PNG export failed")
+			local labels = {}
+			for index = 1, count do
+				local element = Renderer.canvas[7 + index]
+				assert(element.action == "fill", "shortcut element is not drawn")
+				labels[index] = { frame = plain_frame(element.frame), styled = observed_styles(element.text) }
+			end
+			local record = { ordinal = shortcut_ordinal, image = name, labels = labels,
+				showing = Renderer.canvas:isShowing(), frame = plain_frame(Renderer.canvas:frame()),
+				image_size = { w = image:size().w, h = image:size().h },
+				body = observed_styles(Renderer.canvas[3].text),
+				body_frame = plain_frame(Renderer.canvas[3].frame) }
+			-- Repaint the same canvas without a bound chord: prior hints must retire.
+			state.shortcut_mod = "none"
+			assert(Renderer.render(assemble(state, count), state) == true, "shortcut retirement render refused")
+			for index = 1, 10 do
+				assert(Renderer.canvas[7 + index].action == "skip", "stale shortcut pixels remain armed")
+			end
+			record.retired_after = true
+			assert(Renderer.hide() == true and Renderer.canvas:isShowing() == false,
+				"shortcut canvas hide did not settle")
+			record.hidden_after = true
+			probe.shortcut_columns[#probe.shortcut_columns + 1] = record
+			assert(#probe.errors == 0, "shortcut render logged an error")
+			next_shortcut_case()
+		end)
+	end
 	local ordinal = 0
 	local function next_case()
 		ordinal = ordinal + 1
-		if ordinal > 12 then finish(); return end
+		if ordinal > 12 then next_shortcut_case(); return end
 		local indent = ({ 0, 2, -1, -3 })[math.floor((ordinal - 1) / 3) + 1]
 		local selected = (ordinal - 1) % 3 + 1
 		local predictions = {}

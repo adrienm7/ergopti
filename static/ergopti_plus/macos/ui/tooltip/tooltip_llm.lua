@@ -23,6 +23,7 @@ local LOG = "tooltip_llm"
 local Config = require("ui.tooltip.config")
 local Renderer = require("ui.tooltip.renderer")
 local LlmLine = require("tooltip.llm_line")
+local ShortcutColumn = require("tooltip.shortcut_column")
 local HotPath = require("infra.hotpath_profiler")
 
 local MAC_KEYCODES_NUMBERS = {
@@ -1030,6 +1031,7 @@ local function assemble_blocks(state, reserved_count)
 	local styled_gap = hs.styledtext.new("\n", { font = { name = Config.fonts.main, size = Config.sizes.gap }, color = Config.colors.invis })
 
 	local assembled_result = nil
+	local shortcut_rows = {}
 
 	for i = 1, display_count do
 		local prediction = state.raw_predictions[i]
@@ -1053,25 +1055,27 @@ local function assemble_blocks(state, reserved_count)
 		end
 
 		local shortcut_string = ""
-		if display_count > 1 and state.shortcut_mod ~= "none" then
+		if state.shortcut_mod ~= "none" then
 			local modifier_symbol = tostring(state.shortcut_mod):gsub("cmd", "⌘"):gsub("ctrl", "⌃"):gsub("alt", "⌥"):gsub("shift", "⇧"):gsub("%+", "")
-			if modifier_symbol == "" or modifier_symbol == "nil" then modifier_symbol = "⌥" end
+			modifier_symbol = modifier_symbol:gsub("\226\128\139", "")
 			
-			local sc_gap = ui.shortcut_label_gap
+			local sc_gap = ""
 			if i <= 9 then shortcut_string = sc_gap .. modifier_symbol .. i
 			elseif i == 10 then shortcut_string = sc_gap .. modifier_symbol .. "0"
 			end
 		end
 
-		local full_line
-		if shortcut_string ~= "" then
-			local shortcut_segment = hs.styledtext.new(shortcut_string, { font = { name = Config.fonts.main, size = Config.sizes.hint }, color = is_selected and Config.colors.cmd_sel or Config.colors.cmd_dim })
-			full_line = prefix_block .. body_block .. shortcut_segment
-		else
-			full_line = prefix_block .. body_block
-		end
-
+		local full_line = prefix_block .. body_block
 		assembled_result = assembled_result and (assembled_result .. styled_gap .. full_line) or full_line
+		if shortcut_string ~= "" then
+			shortcut_rows[#shortcut_rows + 1] = {
+				text = hs.styledtext.new(shortcut_string, {
+					font = { name = Config.fonts.main, size = Config.sizes.hint },
+					color = Config.colors.cmd_dim,
+				}),
+				through = assembled_result,
+			}
+		end
 		::continue::
 	end
 
@@ -1114,7 +1118,7 @@ local function assemble_blocks(state, reserved_count)
 		styled_info = hs.styledtext.new(info_text, { font = { name = Config.fonts.main, size = Config.sizes.info }, color = Config.colors.info_bar, paragraphStyle = { alignment = "center" } })
 	end
 
-	return { preds = assembled_result, hint_st = styled_hint, info_st = styled_info, SP = space_divider }
+	return { preds = assembled_result, shortcuts = shortcut_rows, hint_st = styled_hint, info_st = styled_info, SP = space_divider }
 end
 
 
@@ -1503,6 +1507,11 @@ function M.show_predictions(predictions, current_index, is_enabled, info_bar, sh
 
 			local blocks = assemble_blocks(simulation_state, render_count)
 			local width_predictions = Renderer.canvas:minimumTextSize(3, blocks.preds).w
+			local column_width = 0
+			for _, row in ipairs(blocks.shortcuts or {}) do
+				column_width = math.max(column_width, Renderer.canvas:minimumTextSize(3, row.text).w)
+			end
+			width_predictions = ShortcutColumn.width(width_predictions, column_width, Config.llm_ui.shortcut_column_gap)
 			if width_hint_memo == nil then
 				width_hint_memo = blocks.hint_st and Renderer.canvas:minimumTextSize(3, blocks.hint_st).w or 0
 				width_info_memo = blocks.info_st and Renderer.canvas:minimumTextSize(3, blocks.info_st).w or 0

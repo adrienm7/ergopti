@@ -116,3 +116,38 @@ helpers.describe("tooltip_llm: the colours of a line (llm-line-style)", function
 		end)
 	end)
 end)
+
+helpers.describe("prediction shortcut column", function()
+	helpers.it("builds ten gray labels separately and retires them when no chord is bound", function()
+		support.with_fixture(function(fixture)
+			local context = fixture.load_tooltip(support.CASES[1])
+			local blocks
+			local render = context.renderer.render
+			context.renderer.render = function(content, state, on_shown)
+				blocks = content
+				return render(content, state, on_shown)
+			end
+			local predictions = {}
+			for index = 1, 10 do predictions[index] = { chunks = {}, nw = string.rep("M", index) } end
+			for _, modifiers in ipairs({ "\226\128\139", "alt", "ctrl", "shift", "cmd",
+				"ctrl+alt", "ctrl+shift", "alt+shift", "shift+cmd" }) do
+				helpers.assert_true(context.tooltip.show_predictions(predictions, 3, true, nil, modifiers))
+				helpers.assert_eq(#blocks.shortcuts, 10)
+				local prefix = modifiers:gsub("alt", "⌥"):gsub("cmd", "⌘"):gsub("shift", "⇧"):gsub("ctrl", "⌃")
+					:gsub("%+", ""):gsub("\226\128\139", "")
+				for index, row in ipairs(blocks.shortcuts) do
+					helpers.assert_eq(row.text, prefix .. (index == 10 and "0" or index))
+				end
+			end
+			helpers.assert_true(context.tooltip.show_predictions(predictions, 3, true, nil, "none"))
+			helpers.assert_eq(#blocks.shortcuts, 0)
+			local corrected = { chunks = { { type = "equal", text = "MMM" },
+				{ type = "insert", text = "MM" } }, nw = " M", has_corrections = true }
+			helpers.assert_true(context.tooltip.show_predictions({ corrected,
+				{ chunks = {}, nw = "MMM\nMMMMMMMMMMM" }, { chunks = {}, nw = "MMMMMM" } },
+				1, true, nil, "ctrl+shift"))
+			helpers.assert_eq(blocks.preds, "✨ MMMMM M\n\226\128\137MMM\nMMMMMMMMMMM\n\226\128\137MMMMMM")
+			helpers.assert_eq(#blocks.shortcuts, 3)
+		end)
+	end)
+end)

@@ -129,3 +129,21 @@ _StrReplaceParam5LiteralPresent(Body) {
 	}
 	return false
 }
+
+/**
+ * Checks each supported slot against its actual native modifier spelling.
+ */
+_TestRender_ShortcutColumnLabels() {
+	for Modifiers, Prefix in Map("", "", "alt", "Alt+", "ctrl", "Ctrl+", "shift", "Shift+",
+			"cmd", "Win+", "ctrl+alt", "Ctrl+Alt+", "ctrl+shift", "Ctrl+Shift+",
+			"alt+shift", "Alt+Shift+", "shift+cmd", "Shift+Win+") {
+		Loop 10 {
+			Digit := A_Index == 10 ? "0" : String(A_Index)
+			AssertEqual(Prefix . Digit, _LLM_BuildShortcutLabel(A_Index, Modifiers),
+				"every bound slot must display its configured modifier and digit")
+		}
+	}
+	AssertEqual("", _LLM_BuildShortcutLabel(1, "none"), "no binding displays no shortcut")
+	AssertEqual("", _LLM_BuildShortcutLabel(11, "alt"), "no eleventh digit shortcut")
+}
+Test("render: shortcut column labels follow all ten configured digit bindings", _TestRender_ShortcutColumnLabels)

@@ -326,6 +326,7 @@ local function load_from_shared()
 		footer_space_divider = require_key("llm_ui", "footer_space_divider"),
 		footer_combined_sep  = require_key("llm_ui", "footer_combined_separator"),
 		shortcut_label_gap   = require_key("llm_ui", "shortcut_label_gap"),
+		shortcut_column_gap  = require_key("llm_ui", "shortcut_column_gap"),
 		hint_accept_single   = require_key("llm_ui", "hint_accept_single"),
 		hint_nav_left        = require_key("llm_ui", "hint_nav_left"),
 		hint_nav_right       = require_key("llm_ui", "hint_nav_right"),

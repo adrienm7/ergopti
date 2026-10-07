@@ -862,5 +862,111 @@ class NativeScriptOverlayControls(unittest.TestCase):
         self.assertEqual(result["installed_package"], "unmeasured")
 
 
+class ShortcutColumnObserverControls(unittest.TestCase):
+    """Independent synthetic inverse controls; these do not claim native Mac paint."""
+
+    def setUp(self):
+        from PIL import Image, ImageDraw
+
+        self.temporary = TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        self.case = {
+            "ordinal": 2,
+            "image": "shortcut-02.png",
+            "showing": True,
+            "hidden_after": True,
+            "retired_after": True,
+            "frame": {"x": 0, "y": 0, "w": 100, "h": 40},
+            "body_frame": {"x": 14, "y": 7, "w": 40, "h": 20},
+            "body": ["✨ MM"],
+            "labels": [
+                {
+                    "frame": {"x": 76, "y": 10, "w": 10, "h": 12},
+                    "styled": [
+                        "1",
+                        {
+                            "starts": 1,
+                            "ends": 1,
+                            "attributes": {
+                                "color": {"white": 0.45, "alpha": 1},
+                                "font": {"name": "regular", "size": 11},
+                            },
+                        },
+                    ],
+                }
+            ],
+        }
+        image = Image.new("RGBA", (100, 40), (20, 20, 20, 255))
+        ImageDraw.Draw(image).rectangle((79, 13, 81, 18), fill=(115, 115, 115, 255))
+        image.save(self.root / "shortcut-02.png")
+
+    def test_independent_gray_column_is_observed_without_rewriting(self):
+        self.assertGreater(
+            observer.validate_shortcut_columns(self.case, self.root)["gray_ink"][0], 0
+        )
+
+    def test_geometry_color_binding_and_retirement_inverses_refuse(self):
+        mutations = [
+            (lambda case: case["labels"][0]["frame"].update(x=75), "right edges"),
+            (lambda case: case["body_frame"].update(w=60), "overlaps the body"),
+            (lambda case: case["labels"][0]["styled"].__setitem__(0, "2"), "shortcut differs"),
+            (
+                lambda case: case["labels"][0]["styled"][1]["attributes"]["color"].update(
+                    white=0.8
+                ),
+                "muted gray",
+            ),
+            (lambda case: case.update(retired_after=False), "retirement"),
+            (lambda case: case.__setitem__("body", ["MM 1"]), "inline"),
+        ]
+        for mutate, reason in mutations:
+            case = deepcopy(self.case)
+            mutate(case)
+            with self.subTest(reason=reason), self.assertRaisesRegex(ValueError, reason):
+                observer.validate_shortcut_columns(case, self.root)
+
+    def test_bound_correction_and_multiline_body_have_their_own_observer_control(self):
+        from PIL import Image, ImageDraw
+
+        case = deepcopy(self.case)
+        case.update(ordinal=3, image="shortcut-03.png")
+        case["frame"].update(w=120, h=80)
+        case["body"] = [
+            "✨ MMMMM M\n\u2009MMM\nMMMMMMMMMMM\n\u2009MMMMMM",
+            {
+                "starts": 8,
+                "ends": 9,
+                "attributes": {
+                    "color": {"red": 0.25, "green": 0.90, "blue": 0.40},
+                    "font": {"name": "regular", "size": 14},
+                },
+            },
+        ]
+        case["labels"] = []
+        image = Image.new("RGBA", (120, 80), (20, 20, 20, 255))
+        draw = ImageDraw.Draw(image)
+        for index in range(1, 4):
+            top = index * 20 - 10
+            label = deepcopy(self.case["labels"][0])
+            label["frame"].update(x=86, y=top, w=20)
+            label["styled"][0] = "⌃⇧" + str(index)
+            label["styled"][1].update(ends=7)
+            case["labels"].append(label)
+            draw.rectangle((89, top + 3, 91, top + 8), fill=(115, 115, 115, 255))
+        image.save(self.root / "shortcut-03.png")
+        self.assertEqual(len(observer.validate_shortcut_columns(case, self.root)["gray_ink"]), 3)
+        case["body"][1]["attributes"]["color"]["green"] = 0.25
+        with self.assertRaisesRegex(ValueError, "selected correction color"):
+            observer.validate_shortcut_columns(case, self.root)
+
+    def test_attributed_label_without_any_painted_ink_refuses(self):
+        from PIL import Image
+
+        Image.new("RGBA", (100, 40), (20, 20, 20, 255)).save(self.root / "shortcut-02.png")
+        with self.assertRaisesRegex(ValueError, "pixels are absent"):
+            observer.validate_shortcut_columns(self.case, self.root)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -187,6 +187,7 @@ function M.llm_line()
 		mark      = require_key("llm_ui", "active_prefix"),
 		align     = require_key("llm_ui", "inactive_align_char"),
 		label_gap = require_key("llm_ui", "shortcut_label_gap"),
+		column_gap = require_key("llm_ui", "shortcut_column_gap"),
 		colors = {
 			typed            = parse_hex(require_key("llm_colors", "unsel_gray_hex")),
 			corrected        = parse_hex(require_key("llm_colors", "corr_sel_hex")),

@@ -340,6 +340,8 @@ footer_combined_separator = "|"
 
 # Gap before modifier+digit shortcut labels (e.g. "   ⌥1").
 shortcut_label_gap = "   "
+# Space between the widest prediction body and the right-aligned shortcut column.
+shortcut_column_gap = 12
 
 # Vertical gap between stacked prediction lines (HS canvas gap font size).
 prediction_line_gap_hs = 3
