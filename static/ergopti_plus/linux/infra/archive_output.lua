@@ -670,8 +670,10 @@ end
 -- this operation before native artifact cleanup. Supervisor owns PIPE closure;
 -- this worker owns its allocated original reader duplicate and pending I/O.
 local retained_tar_operations = {} -- Module lifetime retains unresolved native debt.
-local function new_private_tar_feeder(backend, listing_max_output_bytes)
- if type(listing_max_output_bytes) ~= "number" or listing_max_output_bytes <= 0
+local function new_private_tar_feeder(backend, listing_max_output_bytes, ollama_zstd)
+ if ollama_zstd == true then
+  if listing_max_output_bytes ~= nil then return nil end
+ elseif type(listing_max_output_bytes) ~= "number" or listing_max_output_bytes <= 0
   or listing_max_output_bytes % 1 ~= 0 then return nil end
 	local uv = require("luv")
 	local Deadline = require("infra.managed_http_deadline")
@@ -701,7 +703,12 @@ local function new_private_tar_feeder(backend, listing_max_output_bytes)
 			or not finite(length) or length % 1 ~= 0 or length == 0 or not finite(deadline)
 			or type(current) ~= "function" or type(callback) ~= "function" then return nil end
 		local args, max_output_bytes
-		if mode == "names" then args = { "-tzf", "-" }
+		if ollama_zstd == true then
+			if mode ~= "extract" or type(work_dir) ~= "string" or work_dir:sub(1, 1) ~= "/"
+				or work_dir:find("\0", 1, true) then return nil end
+			args = { "--zstd", "--extract", "--file", "-", "--directory", work_dir,
+				"--no-same-owner", "--no-same-permissions" }
+		elseif mode == "names" then args = { "-tzf", "-" }
 		elseif mode == "verbose" then args = { "-tvzf", "-" }
 		elseif mode == "extract" and type(work_dir) == "string" and work_dir:sub(1, 1) == "/"
 			and not work_dir:find("\0", 1, true) then
@@ -776,6 +783,7 @@ local function new_private_tar_feeder(backend, listing_max_output_bytes)
 			if not ok then error_message = "retained tar operation failed" end
 			operation.result = { ok = ok, stdout = type(result) == "table" and result.stdout or nil,
 				receipt = state.receipt, error = error_message }
+			if ollama_zstd == true and type(result) == "table" then operation.result.exit_code = result.exit_code end
 			pcall(callback, operation.result)
 			local listeners = state.listeners; state.listeners = {}
 			for _, listener in ipairs(listeners) do pcall(listener) end
@@ -919,8 +927,12 @@ local function new_private_tar_feeder(backend, listing_max_output_bytes)
 				if state.completion_seen then state.completion = nil; state.completion_refused = true; drain(); return end
 				state.completion_seen = true
 				if type(result) == "table" and type(rawget(result, "ok")) == "boolean"
-					and type(rawget(result, "stdout")) == "string" then
+					and type(rawget(result, "stdout")) == "string"
+					and (ollama_zstd ~= true or (type(rawget(result, "exit_code")) == "number"
+						and rawget(result, "exit_code") % 1 == 0
+						and (rawget(result, "ok") ~= true or rawget(result, "exit_code") == 0))) then
 					state.completion = { ok = rawget(result, "ok"), stdout = rawget(result, "stdout") }
+					if ollama_zstd == true then state.completion.exit_code = rawget(result, "exit_code") end
 				else state.completion_refused = true end
 				drain()
 			end)
@@ -943,7 +955,7 @@ end
 --- Constructs only the fixed native registry; no stage callback/FD is accepted.
 --- basename is the captured canonical release asset selected by shared defaults.
 --- Missing native capability refuses; a displayed pathname is never a fallback.
-function M.native_artifact(basename)
+local function native_artifact(basename, pinned)
  if type(basename) ~= "string" or basename == "" or basename:find("\0", 1, true)
   or basename:find("/", 1, true) or basename == "." or basename == ".." then return unavailable("invalid_native_archive_name") end
  local backend = native_artifact_backend()
@@ -956,6 +968,15 @@ function M.native_artifact(basename)
  local install_readers_settled = function() return true end
  local function current(record, phase, limit)
   if records[record.brand] ~= record or record.cancelled or record.constructing then return false end
+  if record.master then
+   if record.master_probing then return false end
+   record.master_probing = true
+   local permitted, alive = pcall(record.master.current)
+   local bounded, deadline = pcall(record.master.deadline_ms)
+   record.master_probing = false
+   if not permitted or alive ~= true or not bounded or deadline ~= record.deadline
+    or records[record.brand] ~= record or record.cancelled or record.constructing then return false end
+  end
   local checked, consent = pcall(phase and record.phase_current or record.lineage)
   local timed, now = pcall(now_ms)
   return checked and consent == true and timed and finite(now) and now >= 0 and now < (limit or record.deadline)
@@ -1036,6 +1057,14 @@ function M.native_artifact(basename)
  end
  local function cancel(record)
   record.cancelled = true
+  if record.master then
+   for _, child in ipairs(record.install_readers or {}) do
+    if child.operation and child.methods and not child.signalled then
+     child.signalled = true
+     pcall(child.methods.cancel, child.operation)
+    end
+   end
+  end
   if record.lease and not record.lease_cancelled then
    record.lease_cancelled = true
    pcall(record.lease_methods.cancel, record.lease)
@@ -1099,18 +1128,18 @@ function M.native_artifact(basename)
    cancel(record)
   end
  end
- function factory.reserve_transfer(meta, transaction, lineage, phase_current, deadline)
-  if type(meta) ~= "table" or transaction == nil or type(lineage) ~= "function"
-   or type(phase_current) ~= "function" or not finite(deadline) then return nil end
-  local selected = {}
-  for _, key in ipairs({ "tag", "download_url", "checksum_url" }) do
-   local value = rawget(meta, key)
-   if type(value) ~= "string" or value == "" or value:find("\0", 1, true) then return nil end
-   selected[key] = value
-  end
+ local function reserve(selected, transaction, lineage, phase_current, deadline, master)
   local record = { brand = {}, transaction = transaction, meta = selected, lineage = lineage,
-   phase_current = phase_current, deadline = deadline, listeners = {}, cancelled = false, constructing = false }
+   phase_current = phase_current, deadline = deadline, master = master, asset = pinned,
+   expected = pinned and pinned.sha256 or nil,
+   listeners = {}, cancelled = false, constructing = false }
   records[record.brand], retained_artifacts[record] = record, true
+  if master then
+   record.constructing = true
+   local subscribed, ack = pcall(master.on_cancel, function() cancel(record) end)
+   record.constructing = false
+   if not subscribed or ack ~= true then cancel(record); return record.brand, nil end
+  end
   if not current(record, true) then cancel(record); return record.brand, nil end
   record.constructing = true
   local owner = ffi.new("struct ergopti_archive_publication *[1]")
@@ -1149,13 +1178,16 @@ function M.native_artifact(basename)
   local output = new_factory(ports, function(lease, descriptor, bytes, hash_deadline)
    if not rawequal(record.lease, lease) or not record.adoption or record.adoption.deadline ~= hash_deadline
     or record.staged or not current(record, true, hash_deadline) then return false end
+   if record.asset and bytes ~= record.asset.bytes then return false end
    record.stage_attempted = true
    local staged, result = pcall(native.stage, record.pointer, descriptor, ffi.cast("int64_t", bytes), basename, hash_deadline)
    record.staged = staged and result == 0
    if record.staged then record.sealed_length = bytes end
    return record.staged and current(record, true, hash_deadline) and rawequal(record.lease, lease)
   end)
-  local reserved, lease = pcall(output.reserve, backend.parent, transaction, phase_current, deadline)
+  local lease_current = phase_current
+  if master then lease_current = function() return current(record, true) end end
+  local reserved, lease = pcall(output.reserve, backend.parent, transaction, lease_current, deadline)
   if not reserved or not lease or not current(record, true) then cancel(record); return record.brand, nil end
   local begun, ticket = pcall(record.lease_methods.begin, lease)
   local made, target = pcall(create_target, lease, ticket)
@@ -1163,6 +1195,34 @@ function M.native_artifact(basename)
    cancel(record); return record.brand, nil
   end
   return record.brand, target
+ end
+ function factory.reserve_transfer(meta, transaction, lineage, phase_current, deadline)
+  if pinned or type(meta) ~= "table" or transaction == nil or type(lineage) ~= "function"
+   or type(phase_current) ~= "function" or not finite(deadline) then return nil end
+  local selected = {}
+  for _, key in ipairs({ "tag", "download_url", "checksum_url" }) do
+   local value = rawget(meta, key)
+   if type(value) ~= "string" or value == "" or value:find("\0", 1, true) then return nil end
+   selected[key] = value
+  end
+  return reserve(selected, transaction, lineage, phase_current, deadline)
+ end
+ local reserving_pinned = false
+ function factory.reserve_ollama(transaction, lineage, phase_current, budget)
+  if not pinned or reserving_pinned or transaction == nil or type(lineage) ~= "function"
+   or type(phase_current) ~= "function" or type(budget) ~= "table" then return nil end
+  reserving_pinned = true
+  local captured, brand, target = pcall(function()
+   local master = { current = budget.current, deadline_ms = budget.deadline_ms, on_cancel = budget.on_cancel }
+   if type(master.current) ~= "function" or type(master.deadline_ms) ~= "function"
+    or type(master.on_cancel) ~= "function" then return nil end
+   local bounded, deadline = pcall(master.deadline_ms)
+   if not bounded or not finite(deadline) or deadline < 0 then return nil end
+   return reserve(nil, transaction, lineage, phase_current, deadline, master)
+  end)
+  reserving_pinned = false
+  if not captured then error(brand, 0) end -- Unknown acquisition is not an empty native receipt.
+  return brand, target
  end
  function factory.bind_checksum(brand, expected)
   local record = records[brand]
@@ -1281,7 +1341,15 @@ function M.native_artifact(basename)
   work.probing = true
   local checked, active = pcall(work.execution)
   local clocked, now = pcall(now_ms)
-  local timed, valid = pcall(admit_install_budget, work.budget, now)
+  local timed, valid
+  if work.master then
+   timed, valid = pcall(function()
+    local bounded, deadline = pcall(work.master.deadline_ms)
+    local admitted, active = pcall(work.master.current)
+    return bounded and deadline == work.deadline and admitted and active == true
+     and finite(now) and now >= 0 and now < work.deadline
+   end)
+  else timed, valid = pcall(admit_install_budget, work.budget, now) end
   work.probing = false
   return checked and active == true and clocked and timed and valid == true and install_identity(work)
    and work.accepted and not work.finishing
@@ -1297,6 +1365,7 @@ function M.native_artifact(basename)
  end
  install_readers_settled = readers_settled
  function factory.begin_install(brand, transaction, defaults, admission, execution)
+  if pinned then return nil end
   local record = records[brand]
   if not record or not rawequal(transaction, record.transaction) or record.install ~= nil or not record.committed
    or not record.transfer_ack or record.cancelled or record.pointer == nil or not record.sealed_length
@@ -1339,6 +1408,31 @@ function M.native_artifact(basename)
   work.accepted = true
   return work.token
  end
+ function factory.begin_ollama_install(brand, transaction, admission, execution)
+  local record = records[brand]
+  if not pinned or not record or not rawequal(transaction, record.transaction) or record.install ~= nil
+   or not record.committed or not record.transfer_ack or record.cancelled or record.pointer == nil
+   or record.sealed_length ~= pinned.bytes or not record.master
+   or type(admission) ~= "function" or type(execution) ~= "function" then return nil end
+  local work = { token = {}, record = record, constructing = true, accepted = false, done = false,
+   execution = execution, master = record.master, deadline = record.deadline, listeners = {} }
+  record.install, installs[work.token] = work, work
+  local called, ready = pcall(function()
+   if not current(record, false) or not install_identity(work) then return false end
+   work.feeder = new_private_tar_feeder(backend, nil, true)
+   if type(work.feeder) ~= "function" or not install_identity(work) then return false end
+   local admitted, active = pcall(admission)
+   return admitted and active == true and current(record, false) and install_identity(work)
+  end)
+  work.constructing = false
+  if not called or ready ~= true or not install_identity(work) then
+   installs[work.token] = nil
+   if record.install == work then record.install = nil end
+   return nil
+  end
+  work.accepted = true
+  return work.token
+ end
  function factory.install_current(token)
   local work = installs[token]
   return work ~= nil and install_active(work)
@@ -1349,6 +1443,8 @@ function M.native_artifact(basename)
   if type(result) == "table" then
    local stdout = rawget(result, "stdout")
    if type(stdout) == "string" then copy.stdout = stdout end
+   local exit_code = rawget(result, "exit_code")
+   if pinned and type(exit_code) == "number" and exit_code % 1 == 0 then copy.exit_code = exit_code end
    local receipt = rawget(result, "receipt")
    if type(receipt) == "table" then
     copy.receipt = {}
@@ -1363,6 +1459,7 @@ function M.native_artifact(basename)
  end
  function factory.install_feed(token, mode, directory, callback)
   local work = installs[token]
+  if work and work.master and mode ~= "extract" then return nil end
   if not work or type(callback) ~= "function" or not install_active(work) or work.child ~= nil then return nil end
   local record = work.record
   local child = { constructing = true, received = false, done = false }
@@ -1402,7 +1499,8 @@ function M.native_artifact(basename)
   else child.unknown = true end -- Thrown/unknown helper acquisition never proves physical retirement.
   child.constructing = false
   if child.unknown then record.reader_unknown = true end
-  if child.operation and (child.unknown or not install_identity(work) or work.finishing) then
+  if child.operation and (child.unknown or not install_identity(work) or work.finishing
+   or (work.master and record.cancelled)) then
    child.signalled = true; pcall(child.methods.cancel, child.operation)
   end
   deliver()
@@ -1415,7 +1513,8 @@ function M.native_artifact(basename)
   local checked = pcall(function()
    local observed, ready = pcall(readers_settled, record)
    if not observed or ready ~= true or work.finish ~= finish or finish.done then return end
-   local retired, ack = pcall(retire_install, work.budget)
+   local retired, ack = true, true
+   if not work.master then retired, ack = pcall(retire_install, work.budget) end
    if not retired or ack ~= true or work.finish ~= finish or finish.done then return end
    local settled = finish.keep == true
    if not settled then record.cancelled = true; settled = cleanup(record) == true end
@@ -1457,6 +1556,33 @@ function M.native_artifact(basename)
 
 
  return factory
+end
+
+--- Constructs the existing fixed updater registry with its original defaults.
+--- @param basename string Captured canonical release asset name.
+--- @return table|nil factory
+--- @return table|nil refusal
+function M.native_artifact(basename)
+ return native_artifact(basename)
+end
+
+--- Constructs only a fixed pinned official Linux Ollama artifact.
+--- No updater metadata, caller-selected codec, path or native descriptor is used.
+--- @param asset table Captured canonical Linux release asset.
+--- @return table|nil factory
+--- @return table|nil refusal
+function M.native_ollama_artifact(asset)
+ if type(asset) ~= "table" then return unavailable("invalid_pinned_ollama_asset") end
+ local selected = {}
+ for _, key in ipairs({ "key", "version", "name", "url", "bytes", "sha256" }) do selected[key] = rawget(asset, key) end
+ local names = { ["linux-amd64"] = "ollama-linux-amd64.tar.zst", ["linux-arm64"] = "ollama-linux-arm64.tar.zst" }
+ if not names[selected.key] or selected.name ~= names[selected.key] or type(selected.version) ~= "string"
+  or not selected.version:match("^%d+%.%d+%.%d+$")
+  or selected.url ~= "https://github.com/ollama/ollama/releases/download/v" .. selected.version .. "/" .. selected.name
+  or type(selected.sha256) ~= "string" or #selected.sha256 ~= 64 or not selected.sha256:match("^[0-9a-f]+$")
+  or type(selected.bytes) ~= "number" or not finite(selected.bytes) or selected.bytes <= 0
+  or selected.bytes > MAX_SIZE or selected.bytes % 1 ~= 0 then return unavailable("invalid_pinned_ollama_asset") end
+ return native_artifact(selected.name, selected)
 end
 
 return M

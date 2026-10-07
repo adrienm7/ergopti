@@ -11,6 +11,13 @@
 return {
 	"tests.unit.modules.updater.test_production_dispatch_refusal",
 	"tests.unit.modules.updater.test_production_manager_owners",
+	"tests.unit.infra.test_ollama_pinned_artifact",
+	"tests.unit.infra.test_ollama_zstd_feed",
+	"tests.unit.modules.llm.test_runtime_bootstrap_deadline",
+	"tests.unit.modules.llm.test_ollama_retained_installer",
+	"tests.unit.modules.llm.test_ollama_retained_files",
+	"tests.unit.modules.llm.test_ollama_retained_phase",
+	"tests.unit.modules.llm.test_ollama_retained_composition",
 	"tests.unit.modules.updater.test_archive_allocation_refusal",
 	"tests.unit.modules.updater.test_archive_transfer_publication",
 	"tests.unit.meta.test_release_install_async",
