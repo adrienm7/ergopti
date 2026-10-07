@@ -5540,6 +5540,15 @@ Conditional URL/value/affinity and ownership laws are unchanged. Current source
 passes11245 Linux assertions plus genuine native archive, managed HTTP and
 runtime checks; the hosted E2E/package/install replay remains required.
 
+The authenticated live-updater wrapper now clears only its copied hop-affinity
+opt-in when it deliberately disables redirects. Conditional save/compare and
+endpoint/value ownership remain intact, as do the original caller options.
+Four genuine curl7.88.1/curl8.14.1 and LuaJIT/Lua5.4 cohorts preserve eight
+predecessor failures and eight candidate passes for cold200/warm304 and
+no-follow authenticated302 refusal. Original owners, TLS servers and accepted
+connections close physically, with zero skips. These controlled wire receipts
+are not official GitHub-release or company-network qualification.
+
 Manual Linux run37591679813 at9195a6419f4d36581e4404198cd152753791f2e6
 failed the Configuration restore assertion at test_hotstrings_scope.lua:432:
 rolls remained false. Two unrelated passing unsafe-answer fixture names contain

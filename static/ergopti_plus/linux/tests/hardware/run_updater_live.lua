@@ -139,6 +139,9 @@ Updater._http_client.get = function(url, headers, options, callback)
 		-- Even a same-origin redirect can leave this repository's release list.
 		-- A genuine 3xx is a refusal, never an authenticated retry or fallback.
 		sent_options.follow_redirects = false
+		-- This request has one fixed endpoint, so it needs no managed-hop permission.
+		-- Keep the conditional files and expected endpoint for final ETag association.
+		sent_options.etag_affinity = nil
 	end
 	return transport_get(url, sent_headers, sent_options, function(result, ...)
 		local captured = pcall(observe_response, result)
