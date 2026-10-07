@@ -3242,5 +3242,6 @@
 	"physical_shortcuts.position_unavailable": "מיקום המקש הזה אינו זמין כאן.",
 	"physical_shortcuts.windows_unavailable": "עדיין לא זמין ב־Windows: עורך קיצורי המקשים הפיזיים עדיין אינו זמין ב־Windows.",
 	"physical_shortcuts.collision": "צירוף המקשים הזה כבר בשימוש. בחרו צירוף אחר.",
-	"physical_shortcuts.window_unavailable": "החלון הזה אינו זמין: נסו לפתוח אותו מחדש."
+	"physical_shortcuts.window_unavailable": "החלון הזה אינו זמין: נסו לפתוח אותו מחדש.",
+	"platform_reason.legacy_helpers_use_windows_scan_code_hotkeys": "פונקציות האמולציה הישנות האלה משתמשות בקיצורי Windows המבוססים על קודי סריקה. מערכות אחרות משתמשות במיפויים של פריסת המקלדת המקורית שלהן."
 }

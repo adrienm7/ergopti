@@ -456,3 +456,24 @@ _A1_TapWriterSharesMasterAdmission() {
 }
 Test("master intent: tap-hold writer shares admission with its category master (a1-admission)",
 	_A1_WithDesiredFixture.Bind(_A1_TapWriterSharesMasterAdmission))
+
+
+_MG_VariantProjectionCase() {
+	Desired := Map("layout", Map("ergopti_variant", "ergopti_plus", "ergopti_base", false,
+		"ergopti_alt_gr", false, "emulated_layout", ""))
+	Effective := _HSDeepCloneMap(Desired)
+	_MG_DisableFeatureNode(Effective["layout"], "layout")
+	AssertEqual("ergopti", Effective["layout"]["ergopti_variant"], "closed category removes helper effects using its typed inactive value")
+	AssertFalse(ErgoptiLayout_PlusIsActive(Effective))
+	AssertEqual("ergopti_plus", Desired["layout"]["ergopti_variant"], "effective projection cannot consume saved helper intent")
+	AssertFalse(Desired["layout"]["ergopti_base"])
+	AssertFalse(Desired["layout"]["ergopti_alt_gr"])
+	Effective := _HSDeepCloneMap(Desired)
+	Effective["layout"]["emulated_layout"] := "unrecorded"
+	_MG_SupersedeForEmulatedLayout(Effective)
+	AssertEqual("ergopti", Effective["layout"]["ergopti_variant"])
+	AssertFalse(ErgoptiLayout_PlusIsActive(Effective), "even an unavailable raw source supersedes helpers")
+	AssertEqual("ergopti_plus", Desired["layout"]["ergopti_variant"])
+}
+Test("master gates: internal helper variant uses typed projection and retains desired source intent (todo96-helper-variant)",
+	_MG_VariantProjectionCase)

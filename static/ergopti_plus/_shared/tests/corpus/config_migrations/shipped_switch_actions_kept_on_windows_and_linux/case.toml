@@ -5,4 +5,4 @@ description = "The v5 to v6 step names macOS alone: Windows and Linux keep app_s
 drivers = ["ahk", "linux"]
 outcome = "migrated"
 from_version = 5
-to_version = 11
+to_version = 12

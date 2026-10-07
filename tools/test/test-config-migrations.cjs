@@ -51,6 +51,19 @@ const BARE = /^[A-Za-z0-9_-]+$/;
 const OPS = {
 	rename: { required: ['section', 'key'], optional: ['to_section', 'to_key'] },
 	copy_if_absent: { required: ['section', 'key'], optional: ['to_section', 'to_key'] },
+	move_ergopti_variant: {
+		required: [
+			'section',
+			'key',
+			'to_key',
+			'base_key',
+			'alt_gr_key',
+			'source_key',
+			'false_variant',
+			'true_variant'
+		],
+		optional: ['neutral_variant']
+	},
 	move_chord_action: {
 		required: [
 			'section',
@@ -177,6 +190,26 @@ function validateOp(op, where) {
 		if (from === to || intoOwnSubtree || outOfOwnParent) {
 			fail(where, `${op.op} cannot move a section onto itself or across its own subtree`);
 		}
+	}
+	if (op.op === 'move_ergopti_variant') {
+		for (const field of ['base_key', 'alt_gr_key', 'source_key', 'false_variant', 'true_variant'])
+			if (typeof op[field] !== 'string' || !BARE.test(op[field]))
+				fail(where, 'variant intent fields must be declared bare identifiers');
+		if (op.key === op.to_key || op.false_variant === op.true_variant)
+			fail(where, 'variant handoff requires distinct source, destination and choices');
+		if (
+			op.neutral_variant !== undefined &&
+			(typeof op.neutral_variant !== 'string' ||
+				!BARE.test(op.neutral_variant) ||
+				op.neutral_variant === op.false_variant ||
+				op.neutral_variant === op.true_variant)
+		)
+			fail(where, 'neutral variant must be a distinct declared bare identifier');
+		const names = ['key', 'to_key', 'base_key', 'alt_gr_key', 'source_key'].map(
+			(field) => op[field]
+		);
+		if (new Set(names).size !== names.length)
+			fail(where, 'variant intent participants must be distinct');
 	}
 	if (op.op === 'move_chord_action') {
 		if (op.platform !== 'macos') fail(where, 'move_chord_action requires platform macos');
@@ -460,8 +493,52 @@ function moveChordAction(model, op, context) {
 	}
 }
 
+class VariantMigrationRefusal extends Error {}
+
+function moveErgoptiVariant(model, op) {
+	const source = model.get(op.section) || new Map();
+	const refuse = (detail) => {
+		throw new VariantMigrationRefusal('Ergopti variant migration refused: ' + detail);
+	};
+	for (const field of ['key', 'to_key', 'base_key', 'alt_gr_key', 'source_key']) {
+		const view = new Map([...model].map(([section, values]) => [section, new Map(values)]));
+		view.get(op.section)?.delete(op[field]);
+		if (!copyDestinationAbsent(view, op.section, op[field]))
+			refuse('an intent participant has an occupied namespace');
+	}
+	for (const field of ['base_key', 'alt_gr_key'])
+		if (source.has(op[field]) && typeof source.get(op[field]) !== 'boolean')
+			refuse('an independent layer gate is not an exact TOML boolean');
+	if (source.has(op.source_key)) {
+		const selected = source.get(op.source_key);
+		if (typeof selected !== 'string' || (selected !== '' && !/^[a-z][a-z0-9_]*$/.test(selected)))
+			refuse('the registry source intent is malformed');
+	}
+	if (source.has(op.to_key)) {
+		const target = source.get(op.to_key);
+		if (
+			typeof target !== 'string' ||
+			(target !== op.false_variant && target !== op.true_variant && target !== op.neutral_variant)
+		)
+			refuse('the new variant is not a recognized exact choice');
+	}
+	if (!source.has(op.key)) return;
+	if (typeof source.get(op.key) !== 'boolean')
+		refuse('the historical variant is not an exact TOML boolean');
+	const variant = source.get(op.key) ? op.true_variant : op.false_variant;
+	if (source.has(op.to_key) && source.get(op.to_key) !== variant)
+		refuse('recognized old and new variants conflict');
+	// The independent reference consumes a source only after every participant matches.
+	source.set(op.to_key, variant);
+	source.delete(op.key);
+}
+
 function applyOp(model, op, context) {
 	switch (op.op) {
+		case 'move_ergopti_variant': {
+			moveErgoptiVariant(model, op);
+			break;
+		}
 		case 'rename': {
 			const toSection = op.to_section ?? op.section;
 			moveValue(model, op.section, op.key, toSection, op.to_key ?? op.key);
@@ -544,9 +621,14 @@ function migrate(model, registry, driver, context) {
 	if (version === registry.current) return { outcome: 'current' };
 	if (version < registry.unstamped) return { outcome: 'unsupported' };
 	const out = cloneModel(model);
-	for (const step of registry.steps) {
-		if (step.from < version) continue;
-		if (step.drivers.includes(driver)) for (const op of step.ops) applyOp(out, op, context);
+	try {
+		for (const step of registry.steps) {
+			if (step.from < version) continue;
+			if (step.drivers.includes(driver)) for (const op of step.ops) applyOp(out, op, context);
+		}
+	} catch (error) {
+		if (error instanceof VariantMigrationRefusal) return { outcome: 'invalid' };
+		throw error;
 	}
 	if (!out.has('_meta')) out.set('_meta', new Map());
 	out.get('_meta').set('schema_version', registry.current);

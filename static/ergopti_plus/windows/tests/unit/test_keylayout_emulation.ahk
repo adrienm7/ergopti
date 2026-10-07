@@ -372,7 +372,7 @@ _KLT_IndependentLayersCase() {
 	Saved := [Features, CategoryEnabled, LayerEnabled, KLE_Registered, State.Clone()]
 	try {
 		Desired := Map("emulated_layout", "ergol", "ergopti_base", false,
-			"ergopti_alt_gr", true, "ergopti_plus", false, "direct_access_digits", "native")
+			"ergopti_alt_gr", true, "ergopti_variant", "ergopti", "direct_access_digits", "native")
 		Features := Map("layout", Desired.Clone())
 		CategoryEnabled := Map("Layout", true)
 		LayerEnabled := false
@@ -560,7 +560,7 @@ _KLT_MagicKeyYieldCase() {
 	try {
 		Replace := Map("enabled", true)
 		Features := Map("layout", Map("emulated_layout", "ergol", "ergopti_base", true,
-			"ergopti_alt_gr", true, "ergopti_plus", false, "direct_access_digits", "native"),
+			"ergopti_alt_gr", true, "ergopti_variant", "ergopti", "direct_access_digits", "native"),
 			"hotstrings", Map("magic_key", Map("replace", Replace)))
 		CategoryEnabled := Map("Layout", true)
 		LayerEnabled := false
@@ -648,19 +648,19 @@ Test("master gates: a selected registry layout supersedes the Ergopti emulation 
 
 _KLT_SupersedeCase() {
 	global Features, TapHold
-	Selected := Map("ergopti_base", true, "ergopti_alt_gr", true, "ergopti_plus", true,
+	Selected := Map("ergopti_base", true, "ergopti_alt_gr", true, "ergopti_variant", "ergopti_plus",
 		"direct_access_digits", "digits", "ctrl_magic_save", true, "emulated_layout", "ergol")
 	_KLT_WithLayoutFeatures(Selected, () => (
 		ApplyMasterGatesToFeatures(Features, TapHold, IsCategoryGated),
 		AssertFalse(Features["layout"]["ergopti_base"], "the Ergopti base layer stands down"),
 		AssertFalse(Features["layout"]["ergopti_alt_gr"], "the Ergopti AltGr layer stands down"),
-		AssertFalse(Features["layout"]["ergopti_plus"], "the Ergopti+ changes stand down"),
+		AssertFalse(ErgoptiLayout_PlusIsActive(Features), "the Ergopti+ changes stand down"),
 		AssertTrue(Features["layout"]["direct_access_digits"], "the independent digit override keeps its choice"),
 		AssertEqual("digits", Features["layout"]["direct_access_digits"], "the typed intent remains digits rather than a truthy native/symbols string"),
 		AssertTrue(Features["layout"]["ctrl_magic_save"], "a feature that works on any layout is kept"),
 		AssertEqual("ergol", Features["layout"]["emulated_layout"], "the selection itself is kept")
 	))
-	NoneSelected := Map("ergopti_base", true, "ergopti_alt_gr", true, "ergopti_plus", true,
+	NoneSelected := Map("ergopti_base", true, "ergopti_alt_gr", true, "ergopti_variant", "ergopti_plus",
 		"direct_access_digits", "digits", "ctrl_magic_save", true, "emulated_layout", "")
 	_KLT_WithLayoutFeatures(NoneSelected, () => (
 		ApplyMasterGatesToFeatures(Features, TapHold, IsCategoryGated),

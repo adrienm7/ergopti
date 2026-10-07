@@ -737,4 +737,104 @@ function M.register(h, opts)
 	register_boot(h, opts.driver)
 end
 
+
+-- Keep the existing registration body and every prior contract unchanged.
+local register_without_variant = M.register
+function M.register(h, opts)
+	register_without_variant(h, opts)
+	h.describe("Internal helper-variant record migration (" .. opts.driver .. ")", function()
+		local operation = { op = "move_ergopti_variant", section = "layout", key = "ergopti_plus",
+			to_key = "ergopti_variant", base_key = "ergopti_base", alt_gr_key = "ergopti_alt_gr",
+			source_key = "emulated_layout", false_variant = "ergopti", true_variant = "ergopti_plus" }
+		h.it("transfers recognized three-key-only intent without changing metadata or independent layers", function()
+			local source = '[_meta]\nschema_version = 7\n[layout]\nergopti_plus = true\nergopti_base = false\nergopti_alt_gr = false\nemulated_layout = ""\n[private]\nopaque = "retain" # independent source\n'
+			local plan = Engine.plan_operations(source, { operation })
+			h.assert_eq(plan.outcome, "migrated", plan.detail)
+			h.assert_eq(Engine.plain(plan.model), { _meta = { schema_version = 7 },
+				layout = { ergopti_variant = "ergopti_plus", ergopti_base = false, ergopti_alt_gr = false, emulated_layout = "" },
+				private = { opaque = "retain" } })
+			h.assert_true(plan.candidate:find('[private]\nopaque = "retain" # independent source\n', 1, true) ~= nil)
+			local replay = Engine.plan_operations(plan.candidate, { operation })
+			h.assert_eq(replay.outcome, "current")
+			h.assert_eq(replay.candidate, plan.candidate)
+		end)
+		h.it("unknown absent-source and conflicting current choices return typed refusals without candidates", function()
+			for _, source in ipairs({ '[layout]\nergopti_variant = "future"\n',
+				'[layout]\nergopti_variant = "ERGOPTI_PLUS"\n',
+				'[layout]\nergopti_plus = true\nergopti_variant = "ergopti"\n' }) do
+				local accepted, plan = pcall(Engine.plan_operations, source, { operation })
+				h.assert_true(accepted, "the new typed refusal remains an outcome instead of an unhandled exception")
+				h.assert_eq(plan.outcome, "invalid")
+				h.assert_nil(plan.candidate)
+				h.assert_true(plan.detail:find("Ergopti variant migration refused:", 1, true) == 1)
+			end
+		end)
+		h.it("the actual mutable step refuses before consuming old or conflicting ownership", function()
+			local registry = assert(Engine.load_registry(shared_root() .. "/tests/corpus/config_migrations/joint_variant_true_overlay/migrations.toml"))
+			for _, source in ipairs({ '[_meta]\nschema_version = 1\n[layout]\nergopti_plus = 1\n',
+				'[_meta]\nschema_version = 1\n[layout]\nergopti_plus = true\nergopti_base = 0\n',
+				'[_meta]\nschema_version = 1\n[layout]\nergopti_plus = true\nergopti_alt_gr = "false"\n',
+				'[_meta]\nschema_version = 1\n[layout]\nergopti_plus = true\nemulated_layout = false\n',
+				'[_meta]\nschema_version = 1\n[layout]\nergopti_plus = true\nergopti_variant = "ergopti"\n',
+				'[_meta]\nschema_version = 1\n[layout]\nergopti_variant = "future"\n' }) do
+				local model = assert(Engine.model_from_source(source))
+				local before = Engine.plain(model)
+				local accepted, refusal = pcall(Engine.apply_steps, model, registry, opts.driver, 1)
+				h.assert_true(not accepted, "the real mutable operation must refuse each malformed participant")
+				h.assert_true(tostring(refusal):find("Ergopti variant migration refused:", 1, true) == 1)
+				h.assert_eq(Engine.plain(model), before, "every old/current/independent typed value survives direct refusal")
+			end
+		end)
+		h.it("malformed legacy and retained layer/source participants cannot reach a record candidate", function()
+			for _, source in ipairs({ '[layout]\nergopti_plus = 1\n',
+				'[layout]\nergopti_plus = true\nergopti_base = 0\n',
+				'[layout]\nergopti_plus = true\nergopti_alt_gr = "false"\n',
+				'[layout]\nergopti_plus = true\nemulated_layout = false\n' }) do
+				local plan = Engine.plan_operations(source, { operation })
+				h.assert_eq(plan.outcome, "invalid")
+				h.assert_nil(plan.candidate)
+				h.assert_true(plan.detail:find("Ergopti variant migration refused:", 1, true) == 1)
+			end
+		end)
+	end)
+end
+
+local register_without_neutral = M.register
+function M.register(h, opts)
+	register_without_neutral(h, opts)
+	h.describe("Neutral internal helper intent (" .. opts.driver .. ")", function()
+		local operation = { op = "move_ergopti_variant", section = "layout", key = "ergopti_plus",
+			to_key = "ergopti_variant", base_key = "ergopti_base", alt_gr_key = "ergopti_alt_gr",
+			source_key = "emulated_layout", false_variant = "ergopti", true_variant = "ergopti_plus", neutral_variant = "none" }
+		h.it("registry admission requires a typed neutral choice distinct from both legacy choices", function()
+			local decoded = { registry = { current_version = 2, unstamped_version = 1 },
+				steps = { v1_to_v2 = { from = 1, to = 2, drivers = { "ahk", "hs", "linux" },
+					reason = "Independent neutral admission.", ops = { operation } } } }
+			h.assert_true(Engine.validate_registry(decoded) ~= nil)
+			for _, bad in ipairs({ false, 1, "ergopti", "ergopti_plus" }) do
+				operation.neutral_variant = bad
+				local registry, detail = Engine.validate_registry(decoded)
+				h.assert_nil(registry)
+				h.assert_true(detail:find("neutral variant", 1, true) ~= nil)
+			end
+			operation.neutral_variant = "none"
+		end)
+		h.it("admits current neutral intent without enabling or rewriting independent layers", function()
+			local source = '[layout]\nergopti_variant = "none"\nergopti_base = true\nergopti_alt_gr = false\nemulated_layout = ""\n'
+			local plan = Engine.plan_operations(source, { operation })
+			h.assert_eq(plan.outcome, "current", plan.detail)
+			h.assert_eq(plan.candidate, source)
+			h.assert_eq(Engine.plain(plan.model).layout, { ergopti_variant = "none", ergopti_base = true, ergopti_alt_gr = false, emulated_layout = "" })
+		end)
+		h.it("refuses neutral conflict and occupied ownership before consuming any source", function()
+			for _, source in ipairs({ '[layout]\nergopti_plus = false\nergopti_variant = "none"\n',
+				'[layout]\nergopti_variant = { value = "none" }\n', '[layout]\nergopti_variant = "NONE"\n' }) do
+				local plan = Engine.plan_operations(source, { operation })
+				h.assert_eq(plan.outcome, "invalid")
+				h.assert_nil(plan.candidate)
+			end
+		end)
+	end)
+end
+
 return M
