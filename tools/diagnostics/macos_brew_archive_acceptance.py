@@ -1103,7 +1103,9 @@ def appleevent_registration_fact(children, receiver):
         # This native enum is not a Carbon OSStatus. Project only the exact
         # producer's three refusal values, never an admitted/unknown reason.
         appkit = re.fullmatch(
-            rb"Owned AppleEvent recipient AppKit admission refused \(reason ([123])\)\.\n",
+            rb"Owned AppleEvent recipient AppKit admission refused \(reason ([123])\)\.\n"
+            rb"(?:APPKIT_POLICY/1 initial=(regular|accessory|prohibited|unrecognized) "
+            rb"after=(regular|accessory|prohibited|unrecognized)\n)?",
             value,
         )
         if appkit is not None:
@@ -1112,6 +1114,15 @@ def appleevent_registration_fact(children, receiver):
                 b"2": "policy-refused",
                 b"3": "policy-unconfirmed",
             }[appkit[1]]
+            if appkit[2] is not None:
+                if appkit[1] != b"2":
+                    return {}
+                return {
+                    "phase": "appkit-admission",
+                    "appkit_reason": reason,
+                    "appkit_initial_policy": appkit[2].decode("ascii"),
+                    "appkit_after_no_policy": appkit[3].decode("ascii"),
+                }
             return {"phase": "appkit-admission", "appkit_reason": reason}
         for phase in ("get-current-process", "transform-process-type"):
             prefix = (
@@ -1389,6 +1400,11 @@ def _admit_appleevent_boundary(children, repository):
                     ", registration_phase=appkit-admission, "
                     f"registration_appkit_reason={registration['appkit_reason']}"
                 )
+                if "appkit_initial_policy" in registration:
+                    detail += (
+                        f", registration_appkit_initial_policy={registration['appkit_initial_policy']}, "
+                        f"registration_appkit_after_no_policy={registration['appkit_after_no_policy']}"
+                    )
             else:
                 detail = (
                     f", registration_phase={registration['phase']}, "

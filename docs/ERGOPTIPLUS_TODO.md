@@ -4067,6 +4067,17 @@ and hosted HTTP replays are required. Pending output-hop, fixture335 and four
 body-pipe failures remain implementation work. The installed native archive/
 update chain remains required; saved patches do not close this item.
 
+Current native qualification on f346157c726b96e36f12701ea61b60be76e9e3e9
+(run 37546410275) reports AppKit policy-refused before any sender and Sparkle
+deadline(refused-1) after accepted startup/census. The corrected POSIX root
+admission progressed; final Sparkle cleanup reported ownership_closed=true.
+Neither result qualifies signature refusal, successful upgrade, or Homebrew.
+An additive bounded AppKit diagnostic observes only fixed initial/after-NO
+policy labels without relaxing admission. Portable receiving controls pass
+all 63 original and all 67 current tests; the new positive projection against
+the original helper fails its 16 subcases. Genuine policy-state observation
+and the remaining native lifecycle/install scenarios are still required.
+
 - [~] **37.** Always show the shipped Ergopti hotstring pack, including when
   its keyboard layout is not installed. Move French `suffixes_a` and magic-key
   `replace` into that extension without a beta compatibility layer. The runtime
@@ -5430,7 +5441,7 @@ The current Linux working-source qualification passes 375 JavaScript checks,
 all 10,106 normal Linux tests in 495 modules, 124 focused updater controls
 under each Lua ABI, and the original uninstrumented 20 real body-pipe cases
 with unchanged 1 ms caller budgets. Earlier failures remain recorded. Strict
-native output18/public30 now pass with physical closure; the successful
+native output 18/public 30 now pass with physical closure; the successful
 CONNECT fixture retires its HTTP connection after tunnelling. Source controls
 pass separately: metadata8, filesystem4, actual private Git snapshots5 and
 modeled CONNECT5; registration89 and receipt19 also pass. Protocol models do
@@ -5735,8 +5746,8 @@ macOS device-only follow-up. Item 62 and transversal items 16/38 remain open.
 Final reviewed local sources retain the unchanged nine actual relative-clock
 cases:9/0, with first/second loopback HTTP56.24/52.00ms and acknowledged
 physical closure. The change-scoped gates pass format, JS379/0, stub macOS
-15154/0 and Linux10142/0. The earlier complete a5a07 range additionally passes
-all63 mandatory genuine temporary-native controls and installed archive3/15;
+15154/0 and Linux 10142/0. The earlier complete a5a07 range additionally passes
+all63 mandatory genuine temporary-native controls and installed archive 3/15;
 its window-supervisor and Nix local-store prerequisites refuse, so that full
 range remains FAIL and the seven native Nix cases remain unexecuted. Final
 hosted E2E, package/install and enterprise-session qualification remain required.
