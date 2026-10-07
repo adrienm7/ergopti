@@ -3331,8 +3331,8 @@ Item30 remains partial; keyboard/device qualification is still required.
   assertions and native compilation deadlines. Portable Asio/source controls
   pass; actual macOS wholeCore compilation within the original 300-second
   budget, installed healthy delivery and capture remain unqualified. New
-  initializer controls still need their separately owned durable SDK fixture
-  registration. TODO31 and transverse items16/38 remain open.
+  initializer controls now have their separately owned durable SDK fixture
+  registration; actual native execution and suite fit remain unqualified. TODO31 and transverse items16/38 remain open.
   Manual macOS run37619482111 at ea317c6f8 fails release-launcher
   compilation at two `SecCodeCopyPath` calls: the SDK requires
   `SecStaticCode`, while the owner supplied retained dynamic `SecCode`.
@@ -4672,6 +4672,16 @@ BEFORE assertions, strict E026 consumer, Guardian retirement and budgets
 remain whole. This source adoption does not prove the Mac correction,
 parent inode/FD custody or native signing readiness. Swift/Darwin execution
 remains unqualified; TODO31 and transverse16/38 acceptance stay open.
+
+The coherent reviewed offline qualification sources now include authenticated
+VHD fixture inputs and verbatim notices, fixed product-equality diagnostics,
+current source-pin closure, and durable registration of all 22 frozen
+initializer controls (one selected case per child, both Python modes).
+Existing 13 portable assertions, the original twelve-case C++ source and all
+SDK assertions and 25/30/35/10 budgets remain whole. This is source evidence;
+macOS compilation, Guardian execution, the original 37 native controls,
+IOKit/physical input, installation and suite fit remain unqualified. TODO31
+and transverse16/38 acceptance stay open.
 
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review

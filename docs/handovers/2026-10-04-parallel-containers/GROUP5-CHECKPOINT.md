@@ -2162,3 +2162,33 @@ portable filesystem controls. Actual Swift/Darwin execution, the original
 BEFORE assertion after this change, signing/activation, packaging and installation
 remain unqualified until targeted final-source macOS CI. TODO31 and transverse
 items16/38 remain open.
+
+## Coherent offline runtime qualification source tranche
+
+The independently reviewed offline fixture, product-equality diagnostic closure
+and durable initializer registration are composed using exact reviewed bytes,
+in that order. The final SDK and Team witnesses preserve each preceding
+registration and inverse. All eight authenticated offline inputs/notices, the
+fixed 22 expectations, the entire original twelve-case C++ source and original
+13 portable assertions stay unchanged. The source corpus import/export is the
+explicitly authorized authenticated fixture exception, not an ordinary product
+output generator or registry entry.
+
+The fixed product-equality diagnostics retain their original refusals and expose
+only closed axes. Six consumers admit the exact reviewed builder image at its
+fixed byte count; ordinary 131072-byte source bounds and all physical/source
+currentness guards remain unchanged. Source13 history above remains historical;
+its legitimately superseded consumer pins are not restored.
+
+This is one source qualification tranche, with no feature item removed. The
+SDK invokes 22 selected initializer cases in both Python modes (44 children),
+retaining existing controller25/worker30/observation35/retirement10 bounds and
+the enclosing 25-minute cap. Actual Swift/macOS Guardian execution, original37
+native controls, healthy IOKit initializer/capture, physical input, installation
+and full-suite fit remain unqualified (suite fit UNKNOWN). Portable Linux C++
+observations do not establish those results; TODO31 and transverse16/38 stay open.
+
+The immutable license file retains all upstream bytes and its fixed 19 genuine
+whitespace warnings. Publication requires strict checks on the other 22 paths,
+plus the exact license hash/provenance and warning census; no whitespace-green
+claim or repository-wide exclusion is introduced.

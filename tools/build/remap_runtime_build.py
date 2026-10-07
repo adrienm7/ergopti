@@ -731,12 +731,61 @@ def product_snapshot(path, root):
 
 
 def current_product(snapshot, root):
-    with _observe_span("products"):
-        _REQUIRE(
-            product_snapshot(Path(root) / snapshot.path, root) == snapshot,
-            "source_identity",
-            "Native product changed across a foreign phase",
+    current = None
+    try:
+        with _observe_span("products"):
+            current = product_snapshot(Path(root) / snapshot.path, root)
+            _REQUIRE(
+                current == snapshot,
+                "source_identity",
+                "Native product changed across a foreign phase",
+            )
+    except BASE.NativeBuildError as error:
+        if _product_refusal_cut(error) == "held_product_changed":
+            _observe_product_difference(snapshot, current)
+        raise
+
+
+def _product_difference_axes(previous, current):
+    """Pure closed booleans from already captured rows; no paths or values exported."""
+    for row in (previous, current):
+        if (
+            type(row) is not InputFile
+            or type(row.path) is not str
+            or type(row.identity) is not tuple
+            or len(row.identity) != 8
+            or any(type(value) is not int for value in row.identity)
+            or type(row.data) is not bytes
+        ):
+            return ()
+    axes = tuple(
+        name
+        for name, old, new in zip(
+            ("dev", "ino", "uid", "mode", "nlink", "size", "mtime", "ctime"),
+            previous.identity,
+            current.identity,
         )
+        if old != new
+    )
+    if previous.data != current.data:
+        axes += ("data",)
+    if previous.path != current.path:
+        axes += ("path",)
+    return axes
+
+
+def _observe_product_difference(previous, current):
+    """Failure-only diagnostic rows follow the unchanged original refusal rows."""
+    try:
+        axes = _product_difference_axes(previous, current)
+        journal = _BOUNDARY_OBSERVER.get()
+        if journal is None or journal.disabled or journal.closed:
+            return
+        for axis in axes:
+            # Zero span is a chronological diagnostic, never a new operation owner.
+            journal._append("product_difference", stage="products", code=axis)
+    except BaseException:
+        pass  # Diagnostic failure cannot replace the original product refusal.
 
 
 def validate_products(products):

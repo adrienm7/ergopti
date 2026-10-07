@@ -302,3 +302,120 @@ extension HS274NativePolicyQualificationTests {
 		}
 	}
 }
+
+extension HS274NativePolicyQualificationTests {
+	func testPortablePinnedVHDSourceUsesTenOriginalControls() throws {
+		try fixture { root in
+			let modes: [[String]] = [[], ["-O"]]
+			for mode in modes {
+				let script = source("hs274_native_build.py").deletingLastPathComponent()
+					.deletingLastPathComponent().appendingPathComponent("build/remap_runtime_vhd_fixture.py")
+				let receipt = try run(URL(fileURLWithPath: "/usr/bin/env"),
+					["python3"] + mode + [script.path, "--group", "source", "--owner", root.path], root: root)
+				XCTAssertEqual(receipt.status, 0)
+				XCTAssertEqual(receipt.stdout, "PASS portable VHD group=source tests=10; native=unexecuted\n")
+				XCTAssertTrue(receipt.stderr.contains("Ran 10 tests in "))
+				XCTAssertTrue(receipt.stderr.hasSuffix("\nOK\n"))
+			}
+		}
+	}
+	func testPortablePinnedVHDTimerRetainsGenuineCancellationControl() throws {
+		try fixture { root in
+			let modes: [[String]] = [[], ["-O"]]
+			for mode in modes {
+				let script = source("hs274_native_build.py").deletingLastPathComponent()
+					.deletingLastPathComponent().appendingPathComponent("build/remap_runtime_vhd_fixture.py")
+				let receipt = try run(URL(fileURLWithPath: "/usr/bin/env"),
+					["python3"] + mode + [script.path, "--group", "timer", "--owner", root.path], root: root)
+				XCTAssertEqual(receipt.status, 0)
+				XCTAssertEqual(receipt.stdout, "PASS portable VHD group=timer tests=1; native=unexecuted\n")
+				XCTAssertTrue(receipt.stderr.contains("Ran 1 test in "))
+				XCTAssertTrue(receipt.stderr.hasSuffix("\nOK\n"))
+			}
+		}
+	}
+	func testPortablePinnedVHDCallbackRetainsGenuineDestructionControl() throws {
+		try fixture { root in
+			let modes: [[String]] = [[], ["-O"]]
+			for mode in modes {
+				let script = source("hs274_native_build.py").deletingLastPathComponent()
+					.deletingLastPathComponent().appendingPathComponent("build/remap_runtime_vhd_fixture.py")
+				let receipt = try run(URL(fileURLWithPath: "/usr/bin/env"),
+					["python3"] + mode + [script.path, "--group", "callback", "--owner", root.path], root: root)
+				XCTAssertEqual(receipt.status, 0)
+				XCTAssertEqual(receipt.stdout, "PASS portable VHD group=callback tests=1; native=unexecuted\n")
+				XCTAssertTrue(receipt.stderr.contains("Ran 1 test in "))
+				XCTAssertTrue(receipt.stderr.hasSuffix("\nOK\n"))
+			}
+		}
+	}
+	func testPortablePinnedVHDLowerPeerUsesGenuineComposedHeaders() throws {
+		try fixture { root in
+			let modes: [[String]] = [[], ["-O"]]
+			for mode in modes {
+				let script = source("hs274_native_build.py").deletingLastPathComponent()
+					.deletingLastPathComponent().appendingPathComponent("build/remap_runtime_vhd_fixture.py")
+				let receipt = try run(URL(fileURLWithPath: "/usr/bin/env"),
+					["python3"] + mode + [script.path, "--group", "lower", "--owner", root.path], root: root)
+				XCTAssertEqual(receipt.status, 0)
+				XCTAssertEqual(receipt.stdout, "PASS portable VHD group=lower tests=1; native=unexecuted\n")
+				XCTAssertTrue(receipt.stderr.contains("Ran 1 test in "))
+				XCTAssertTrue(receipt.stderr.hasSuffix("\nOK\n"))
+			}
+		}
+	}
+	func testPortablePinnedVHDFixtureRefusesPhysicalInputTampering() throws {
+		try fixture { root in
+			let modes: [[String]] = [[], ["-O"]]
+			for mode in modes {
+				let script = source("hs274_native_build.py").deletingLastPathComponent()
+					.deletingLastPathComponent().appendingPathComponent("build/remap_runtime_vhd_fixture_test.py")
+				let receipt = try run(URL(fileURLWithPath: "/usr/bin/env"),
+					["python3"] + mode + [script.path], root: root)
+				XCTAssertEqual(receipt.status, 0)
+				XCTAssertTrue(receipt.stdout.isEmpty)
+				XCTAssertTrue(receipt.stderr.contains("Ran 21 tests in "))
+				XCTAssertTrue(receipt.stderr.hasSuffix("\nOK\n"))
+			}
+		}
+	}
+}
+
+extension HS274NativePolicyQualificationTests {
+	func testPortableProductDifferenceAxesPreserveOriginalRefusals() throws {
+		try fixture { root in
+			let modes: [[String]] = [[], ["-O"]]
+			for mode in modes {
+				let script = source("hs274_native_build.py").deletingLastPathComponent()
+					.deletingLastPathComponent().appendingPathComponent("build/remap_runtime_product_axes_test.py")
+				let receipt = try run(URL(fileURLWithPath: "/usr/bin/env"),
+					["python3"] + mode + [script.path], root: root)
+				XCTAssertEqual(receipt.status, 0)
+				XCTAssertTrue(receipt.stdout.isEmpty)
+				XCTAssertTrue(receipt.stderr.contains("Ran 10 tests in "))
+				XCTAssertTrue(receipt.stderr.hasSuffix("\nOK\n"))
+			}
+		}
+	}
+}
+
+extension HS274NativePolicyQualificationTests {
+	func testPortableInitializerDeliveryRetainsAllTwentyTwoFrozenControls() throws {
+		try fixture { root in
+			let cases: [String] = ["healthy", "unbound", "bytes_mismatch", "empty", "noncanonical", "error", "unknown_response", "duplicate", "retired", "changed_peer", "timer", "queue_refusal", "callback", "foreign_debt", "timer_observation", "empty_refusal", "reserved_kind", "outbound_wire", "pending_cancel", "completion_reentry", "peer_reentry", "completion_exception"]
+			let modes: [[String]] = [[], ["-O"]]
+			for selected in cases {
+				for mode in modes {
+					let script = source("hs274_native_build.py").deletingLastPathComponent()
+						.deletingLastPathComponent().appendingPathComponent("build/remap_runtime_initializer_test.py")
+					let receipt = try run(URL(fileURLWithPath: "/usr/bin/env"),
+						["python3"] + mode + [script.path, "--case", selected, "--owner", root.path], root: root)
+					XCTAssertEqual(receipt.status, 0)
+					XCTAssertTrue(receipt.stdout.isEmpty)
+					XCTAssertTrue(receipt.stderr.contains("Ran 1 test in "))
+					XCTAssertTrue(receipt.stderr.hasSuffix("\nOK\n"))
+				}
+			}
+		}
+	}
+}

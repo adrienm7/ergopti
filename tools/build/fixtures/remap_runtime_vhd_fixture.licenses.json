@@ -1,0 +1,317 @@
+{
+	"schema": 1,
+	"scope": "Additive license texts for fixed genuine portable test inputs; no replacement or modification of the 1019 input rows/archive.",
+	"genuine_main_pin": "9312593e1a3bf72b94c63c524ebabe2637442e8a",
+	"vhd_submodule_pin": "bdfcb459b2eaca8ccda680a73b0dc898f330f4bb",
+	"lock_submodule_pin": "6a8b2d64b993746d489432b45455e33b7fb8e09f",
+	"lock_path": "vendor/cpm-cmake-package-lock/cmake/package-lock.cmake",
+	"lock_sha256": "3b2ed450c95b2108679686e8dc6a76677f7e8112a262e0465ac008d25bcb2cf0",
+	"texts": [
+		{
+			"package": "asio",
+			"repository": "chriskohlhoff/asio",
+			"locked_tag_or_commit": "asio-1-38-2",
+			"commit": "8806a6803cde7054c3049d3666d3ec36786568c5",
+			"source_url": "https://raw.githubusercontent.com/chriskohlhoff/asio/8806a6803cde7054c3049d3666d3ec36786568c5/LICENSE_1_0.txt",
+			"upstream_path": "LICENSE_1_0.txt",
+			"bytes": 1338,
+			"sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+			"git_blob_oid": "36b7cd93cdfbac762f5be4c6ce276df2ea6305c2",
+			"transformation": "none; complete original upstream text; already LF",
+			"lock_declaration": "CPMDeclarePackage(asio                                        NAME asio                                        GITHUB_REPOSITORY chriskohlhoff/asio                                  GIT_TAG asio-1-38-2                                 DOWNLOAD_ONLY true)",
+			"publication_file": "tools/build/fixtures/remap_runtime_vhd_fixture.LICENSES.md",
+			"publication_byte_range": [468, 1806],
+			"source_text_name": "Boost-1.0.txt"
+		},
+		{
+			"package": "cxxopts",
+			"repository": "jarro2783/cxxopts",
+			"locked_tag_or_commit": "v3.3.1",
+			"commit": "44380e5a44706ab7347f400698c703eb2a196202",
+			"source_url": "https://raw.githubusercontent.com/jarro2783/cxxopts/44380e5a44706ab7347f400698c703eb2a196202/LICENSE",
+			"upstream_path": "LICENSE",
+			"bytes": 1055,
+			"sha256": "aa324fbe633a96546bebca975fbbab65caa175894bd00cfa13d7335e7363400c",
+			"git_blob_oid": "324a203585bf5dd897e28dd999ccf9dfcdcaed3b",
+			"transformation": "none; complete original upstream text; already LF",
+			"lock_declaration": "CPMDeclarePackage(cxxopts                                     NAME cxxopts                                     GITHUB_REPOSITORY jarro2783/cxxopts                                   GIT_TAG v3.3.1                                      DOWNLOAD_ONLY true)",
+			"publication_file": "tools/build/fixtures/remap_runtime_vhd_fixture.LICENSES.md",
+			"publication_byte_range": [1864, 2919],
+			"source_text_name": "cxxopts-MIT.txt"
+		},
+		{
+			"package": "debug_assert",
+			"repository": "foonathan/debug_assert",
+			"locked_tag_or_commit": "v1.3.4",
+			"commit": "faedee673ed065fea802f5b347652737837958bd",
+			"source_url": "https://raw.githubusercontent.com/foonathan/debug_assert/faedee673ed065fea802f5b347652737837958bd/LICENSE",
+			"upstream_path": "LICENSE",
+			"bytes": 900,
+			"sha256": "195c95c8dc2349255994fe270c623a79b058ede80e0484d3361ca394133e2306",
+			"git_blob_oid": "76a9da5171c5a323d646b33dd08bb1b061db12fb",
+			"transformation": "none; complete original upstream text; already LF",
+			"lock_declaration": "CPMDeclarePackage(debug_assert                                NAME debug_assert                                GITHUB_REPOSITORY foonathan/debug_assert                              GIT_TAG v1.3.4                                      DOWNLOAD_ONLY true)",
+			"publication_file": "tools/build/fixtures/remap_runtime_vhd_fixture.LICENSES.md",
+			"publication_byte_range": [2983, 3883],
+			"source_text_name": "debug_assert-Zlib.txt"
+		},
+		{
+			"package": "eternal",
+			"repository": "mapbox/eternal",
+			"locked_tag_or_commit": "v1.0.1",
+			"commit": "42801e2a736f362ae851b7962b4aa1d4f4b2d424",
+			"source_url": "https://raw.githubusercontent.com/mapbox/eternal/42801e2a736f362ae851b7962b4aa1d4f4b2d424/LICENSE.md",
+			"upstream_path": "LICENSE.md",
+			"bytes": 738,
+			"sha256": "2c620eaf6c3ee3e33b07f3b6ef0dfd0a9e0a52c93a46aa4ccf7773dbb562daec",
+			"git_blob_oid": "9bcf13e1e3c32ce89c96c01363a909a7e601a4ae",
+			"transformation": "none; complete original upstream text; already LF",
+			"lock_declaration": "CPMDeclarePackage(eternal                                     NAME eternal                                     GITHUB_REPOSITORY mapbox/eternal                                      GIT_TAG v1.0.1                                      DOWNLOAD_ONLY true)",
+			"publication_file": "tools/build/fixtures/remap_runtime_vhd_fixture.LICENSES.md",
+			"publication_byte_range": [3948, 4686],
+			"source_text_name": "mapbox-eternal-ISC.txt"
+		},
+		{
+			"package": "exprtk",
+			"repository": "ArashPartow/exprtk",
+			"locked_tag_or_commit": "0.0.3",
+			"commit": "a4b17d543f072d2e3ba564e4bc5c3a0d2b05c338",
+			"source_url": "https://raw.githubusercontent.com/ArashPartow/exprtk/a4b17d543f072d2e3ba564e4bc5c3a0d2b05c338/license.txt",
+			"upstream_path": "license.txt",
+			"bytes": 1175,
+			"sha256": "195cbc4d3705eb043fbbf53dd4a4d48a516cd3acdf3759a40a418d56a59813cd",
+			"git_blob_oid": "1135827f7d6705361a17f0a34bdf0cd9b1239c47",
+			"transformation": "none; complete original upstream text; already LF",
+			"lock_declaration": "CPMDeclarePackage(exprtk                                      NAME exprtk                                      GITHUB_REPOSITORY ArashPartow/exprtk                                  GIT_TAG 0.0.3                                       DOWNLOAD_ONLY true)",
+			"publication_file": "tools/build/fixtures/remap_runtime_vhd_fixture.LICENSES.md",
+			"publication_byte_range": [4743, 5918],
+			"source_text_name": "ExprTk-MIT.txt"
+		},
+		{
+			"package": "glob",
+			"repository": "p-ranav/glob",
+			"locked_tag_or_commit": "e796e3ca94e0c514296425d9884e2198c41699ee",
+			"commit": "e796e3ca94e0c514296425d9884e2198c41699ee",
+			"source_url": "https://raw.githubusercontent.com/p-ranav/glob/e796e3ca94e0c514296425d9884e2198c41699ee/LICENSE",
+			"upstream_path": "LICENSE",
+			"bytes": 1063,
+			"sha256": "46035285f8a5547b5b6a50f0433243a5ffc494b825dd51855bb1903a6c54382b",
+			"git_blob_oid": "bcae1c6a21083c6bdd4bbcc5fb34feb50ee89d90",
+			"transformation": "none; complete original upstream text; already LF",
+			"lock_declaration": "CPMDeclarePackage(glob                                        NAME glob                                        GITHUB_REPOSITORY p-ranav/glob                                        GIT_TAG e796e3ca94e0c514296425d9884e2198c41699ee    DOWNLOAD_ONLY true)",
+			"publication_file": "tools/build/fixtures/remap_runtime_vhd_fixture.LICENSES.md",
+			"publication_byte_range": [5973, 7036],
+			"source_text_name": "glob-MIT.txt"
+		},
+		{
+			"package": "gsl",
+			"repository": "microsoft/GSL",
+			"locked_tag_or_commit": "v5.0.0",
+			"commit": "417ef685eafd626db765f0027b7fc5a0057e0770",
+			"source_url": "https://raw.githubusercontent.com/microsoft/GSL/417ef685eafd626db765f0027b7fc5a0057e0770/LICENSE",
+			"upstream_path": "LICENSE",
+			"bytes": 1157,
+			"sha256": "4c21dc82a1c7186ea754fd59d504c00947953a3401fe8e24eaa44109ef8e2555",
+			"git_blob_oid": "aa58667a3fd3784b0dfa11bf17f05f5e8dbd7d02",
+			"transformation": "none; complete original upstream text; already LF",
+			"lock_declaration": "CPMDeclarePackage(gsl                                         NAME gsl                                         GITHUB_REPOSITORY microsoft/GSL                                       GIT_TAG v5.0.0                                      DOWNLOAD_ONLY true)",
+			"publication_file": "tools/build/fixtures/remap_runtime_vhd_fixture.LICENSES.md",
+			"publication_byte_range": [7090, 8247],
+			"source_text_name": "GSL-MIT.txt"
+		},
+		{
+			"package": "natural_sort",
+			"repository": "scopeInfinity/NaturalSort",
+			"locked_tag_or_commit": "5c71f466f29d44c8d976dc1ba077eae9b6ce672a",
+			"commit": "5c71f466f29d44c8d976dc1ba077eae9b6ce672a",
+			"source_url": "https://raw.githubusercontent.com/scopeInfinity/NaturalSort/5c71f466f29d44c8d976dc1ba077eae9b6ce672a/LICENSE.md",
+			"upstream_path": "LICENSE.md",
+			"bytes": 1078,
+			"sha256": "93ae4f4ebd20c87eb2da242d9587cf5e7137463a5fdba71b167cea27dc607715",
+			"git_blob_oid": "02b51c98732138c2f09f660cfe68e838009eeaa8",
+			"transformation": "none; complete original upstream text; already LF",
+			"lock_declaration": "CPMDeclarePackage(natural_sort                                NAME natural_sort                                GITHUB_REPOSITORY scopeInfinity/NaturalSort                           GIT_TAG 5c71f466f29d44c8d976dc1ba077eae9b6ce672a    DOWNLOAD_ONLY true)",
+			"publication_file": "tools/build/fixtures/remap_runtime_vhd_fixture.LICENSES.md",
+			"publication_byte_range": [8309, 9387],
+			"source_text_name": "NaturalSort-MIT.txt"
+		},
+		{
+			"package": "nlohmann_json",
+			"repository": "nlohmann/json",
+			"locked_tag_or_commit": "v3.12.0",
+			"commit": "55f93686c01528224f448c19128836e7df245f72",
+			"source_url": "https://raw.githubusercontent.com/nlohmann/json/55f93686c01528224f448c19128836e7df245f72/LICENSE.MIT",
+			"upstream_path": "LICENSE.MIT",
+			"bytes": 1076,
+			"sha256": "46a65cffd1ea955132d95a8dd921640714a8d6b537d2e4e482d31145ae95b603",
+			"git_blob_oid": "a1dacc8dbbd907c4b622ff1f08e279c27465dcbc",
+			"transformation": "none; complete original upstream text; already LF",
+			"lock_declaration": "CPMDeclarePackage(nlohmann_json                               NAME nlohmann_json                               GITHUB_REPOSITORY nlohmann/json                                       GIT_TAG v3.12.0                                     DOWNLOAD_ONLY true)",
+			"publication_file": "tools/build/fixtures/remap_runtime_vhd_fixture.LICENSES.md",
+			"publication_byte_range": [9451, 10527],
+			"source_text_name": "nlohmann-json-MIT.txt"
+		},
+		{
+			"package": "nod",
+			"repository": "fr00b0/nod",
+			"locked_tag_or_commit": "v0.5.4",
+			"commit": "23e4190f3d15964dd1f00677120a788824d74ec9",
+			"source_url": "https://raw.githubusercontent.com/fr00b0/nod/23e4190f3d15964dd1f00677120a788824d74ec9/LICENSE",
+			"upstream_path": "LICENSE",
+			"bytes": 1073,
+			"sha256": "e807458b70e8e0b92fabec57c9a8cbb06cc640472508ffd051ab1869d0586194",
+			"git_blob_oid": "dc9e3659043eb441029082d85baf6d6dac4c6035",
+			"transformation": "none; complete original upstream text; already LF",
+			"lock_declaration": "CPMDeclarePackage(nod                                         NAME nod                                         GITHUB_REPOSITORY fr00b0/nod                                          GIT_TAG v0.5.4                                      DOWNLOAD_ONLY true)",
+			"publication_file": "tools/build/fixtures/remap_runtime_vhd_fixture.LICENSES.md",
+			"publication_byte_range": [10581, 11654],
+			"source_text_name": "nod-MIT.txt"
+		},
+		{
+			"package": "spdlog",
+			"repository": "gabime/spdlog",
+			"locked_tag_or_commit": "v1.17.0",
+			"commit": "79524ddd08a4ec981b7fea76afd08ee05f83755d",
+			"source_url": "https://raw.githubusercontent.com/gabime/spdlog/79524ddd08a4ec981b7fea76afd08ee05f83755d/LICENSE",
+			"upstream_path": "LICENSE",
+			"bytes": 1323,
+			"sha256": "d678c20826e1392578508e1c78649a1e3c31bda05ef4388d967dbd654461b140",
+			"git_blob_oid": "4b1b23357f9685fb6b6291aa33489fc9fe1c122c",
+			"transformation": "none; complete original upstream text; already LF",
+			"lock_declaration": "CPMDeclarePackage(spdlog                                      NAME spdlog                                      GITHUB_REPOSITORY gabime/spdlog                                       GIT_TAG v1.17.0                                     DOWNLOAD_ONLY true)",
+			"publication_file": "tools/build/fixtures/remap_runtime_vhd_fixture.LICENSES.md",
+			"publication_byte_range": [11711, 13034],
+			"source_text_name": "spdlog-MIT.txt"
+		},
+		{
+			"package": "type_safe",
+			"repository": "foonathan/type_safe",
+			"locked_tag_or_commit": "v0.2.4",
+			"commit": "1dbea7936a1e389caa692d01bb3f5ba4b6da7d82",
+			"source_url": "https://raw.githubusercontent.com/foonathan/type_safe/1dbea7936a1e389caa692d01bb3f5ba4b6da7d82/LICENSE",
+			"upstream_path": "LICENSE",
+			"bytes": 1078,
+			"sha256": "c9b2c3b9c65bf163d4338d9f56edb0ce0846e91d7b89e1a1e35326abbc8997ae",
+			"git_blob_oid": "8a13e584921f7f10c3e379c835f5ff1d174cd48a",
+			"transformation": "none; complete original upstream text; already LF",
+			"lock_declaration": "CPMDeclarePackage(type_safe                                   NAME type_safe                                   GITHUB_REPOSITORY foonathan/type_safe                                 GIT_TAG v0.2.4                                      DOWNLOAD_ONLY true)",
+			"publication_file": "tools/build/fixtures/remap_runtime_vhd_fixture.LICENSES.md",
+			"publication_byte_range": [13094, 14172],
+			"source_text_name": "type_safe-MIT.txt"
+		},
+		{
+			"package": "Google Abseil integer_sequence excerpt",
+			"commit": "10cb35e459f5ecca5b2ff107635da0bfa41011b4",
+			"source_url": "https://raw.githubusercontent.com/abseil/abseil-cpp/10cb35e459f5ecca5b2ff107635da0bfa41011b4/LICENSE",
+			"bytes": 11361,
+			"sha256": "c79a7fea0e3cac04cd43f20e7b648e5a0ff8fa5344e644b0ee09ca1162b62747",
+			"transformation": "none; complete original upstream text; already LF",
+			"publication_file": "tools/build/fixtures/remap_runtime_vhd_fixture.LICENSES.md",
+			"publication_byte_range": [14236, 25597],
+			"source_text_name": "Abseil-Apache-2.0.txt"
+		},
+		{
+			"package": "Google Abseil retained integer_sequence excerpt",
+			"commit": "10cb35e459f5ecca5b2ff107635da0bfa41011b4",
+			"source_url": "https://raw.githubusercontent.com/abseil/abseil-cpp/10cb35e459f5ecca5b2ff107635da0bfa41011b4/absl/utility/utility.h",
+			"source_file_sha256": "e0aacbd1982ab9304064d956e6960ea5ee55b162abbbdf0c027a3f3b323f0292",
+			"source_file_bytes": 11643,
+			"original_byte_slice": [0, 598],
+			"bytes": 598,
+			"sha256": "165703cc7aea4bca4303e8630110d49970e5e291a8691e3904059b310c060008",
+			"transformation": "exact original copyright/license preamble byte slice, no fabricated notice",
+			"pinned_reference_in_archive": "vendor/vendor/include/nlohmann/detail/meta/cpp_future.hpp",
+			"publication_file": "tools/build/fixtures/remap_runtime_vhd_fixture.LICENSES.md",
+			"publication_byte_range": [25674, 26272],
+			"source_text_name": "Abseil-utility-original-notice.txt"
+		}
+	],
+	"retained_vendor_roots": {
+		"asio": {
+			"files": 633,
+			"texts": ["Boost-1.0.txt"]
+		},
+		"asio.hpp": {
+			"files": 1,
+			"texts": ["Boost-1.0.txt"]
+		},
+		"boost": {
+			"files": 2,
+			"texts": ["Boost-1.0.txt"],
+			"original_component_lock_declaration": "CPMDeclarePackage(ut                                          NAME ut                                          GITHUB_REPOSITORY boost-ext/ut                                        GIT_TAG v2.3.1                                      DOWNLOAD_ONLY true)",
+			"text_origin": "Shared standard Boost1.0 text from immutable Asio and official Boost commits; not a claim that boost/ut headers originate in Asio."
+		},
+		"pqrs": {
+			"files": 171,
+			"texts": ["Boost-1.0.txt"],
+			"text_origin": "Shared standard Boost1.0 text; original per-file copyright and package provenance remain in the unchanged authenticated source tree."
+		},
+		"cxxopts.hpp": {
+			"files": 1,
+			"texts": ["cxxopts-MIT.txt"]
+		},
+		"debug_assert.hpp": {
+			"files": 1,
+			"texts": ["debug_assert-Zlib.txt"]
+		},
+		"exprtk": {
+			"files": 1,
+			"texts": ["ExprTk-MIT.txt"]
+		},
+		"glob": {
+			"files": 1,
+			"texts": ["glob-MIT.txt"]
+		},
+		"gsl": {
+			"files": 11,
+			"texts": ["GSL-MIT.txt"]
+		},
+		"mapbox": {
+			"files": 1,
+			"texts": ["mapbox-eternal-ISC.txt"]
+		},
+		"natural_sort.hpp": {
+			"files": 1,
+			"texts": ["NaturalSort-MIT.txt"]
+		},
+		"nlohmann": {
+			"files": 46,
+			"texts": [
+				"nlohmann-json-MIT.txt",
+				"Abseil-Apache-2.0.txt",
+				"Abseil-utility-original-notice.txt"
+			]
+		},
+		"nod": {
+			"files": 1,
+			"texts": ["nod-MIT.txt"]
+		},
+		"spdlog": {
+			"files": 105,
+			"texts": ["spdlog-MIT.txt"]
+		},
+		"type_safe": {
+			"files": 33,
+			"texts": ["type_safe-MIT.txt"]
+		}
+	},
+	"retained_inline_notices": "Every original copyright/license notice inside all1019 raw inputs remains whole, including bundled fmt permission text and optional exception in the two actual spdlog fmt headers.",
+	"existing_main_and_vhd_LICENSE_md": "Both complete unmodified original license files already belong to the fixed archive.",
+	"upstream_commit_resolution": "Exact lock tags resolved through upstream Git ref/tag objects; raw receipts retained privately; immutable commit URLs used for actual license bytes.",
+	"native_authority": false,
+	"combined_publication_sha256": "045d999df2333dfe04136c072ead34b8002512030d3c617b2039580277b3262d",
+	"combination": "Markdown framing only; each original source text has an exact recorded byte range. No source license notice is rewritten.",
+	"import_export_classification": "Canonical vendored independent corpus input, exported by its explicitly documented provenance owner; ordinary product generator registry is deliberately unchanged.",
+	"formatter_preservation": "Local prettier-ignore on raw third-party text blocks; full original bytes, including upstream whitespace, must remain exact.",
+	"common_boost_license_official_source": {
+		"official_repository": "boostorg/boost",
+		"tag": "boost-1.87.0",
+		"resolved_commit": "c89e6267665516192015a9e40955e154466f4f68",
+		"immutable_source_url": "https://raw.githubusercontent.com/boostorg/boost/c89e6267665516192015a9e40955e154466f4f68/LICENSE_1_0.txt",
+		"bytes": 1338,
+		"sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+		"exact_equal_to_locked_asio_LICENSE_1_0": true,
+		"immutable_asio_commit": "8806a6803cde7054c3049d3666d3ec36786568c5",
+		"coverage": "Shared standard Boost1.0 text, while original copyrights remain in each unchanged header."
+	}
+}
