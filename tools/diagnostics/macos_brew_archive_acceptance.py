@@ -1287,6 +1287,52 @@ def appleevent_permission_query_fact(value):
     return {"osstatus": status}
 
 
+def appleevent_sender_identity_frame(value):
+    """Split one bounded scalar observation; retain the original failure line exactly."""
+    if not isinstance(value, str) or len(value) > 512:
+        return value, {}
+    lines = value.splitlines(keepends=True)
+    if len(lines) != 2:
+        return value, {}
+    pattern = (
+        r"OWNED_APPLEEVENT_IDENTITY/1 before=(-1|0|1|2) after=(-1|0|1|2) "
+        r"self=(0|1) target=(0|1) self_team=(-1|0|1) target_team=(-1|0|1) "
+        r"team=(-1|0|1) identifier=(-1|0|1) hash=(-1|0|1)\n"
+    )
+    matched = re.fullmatch(pattern, lines[1])
+    if matched is None:
+        return value, {}
+    before, after, own, target, own_team, target_team, team, identifier, unique = (
+        int(item) for item in matched.groups()
+    )
+    if (own == 0 and own_team != -1) or (target == 0 and target_team != -1):
+        return value, {}
+    if (own == 1 and own_team == -1) or (target == 1 and target_team == -1):
+        return value, {}
+    if (not own or not target) and (team, identifier, unique) != (-1, -1, -1):
+        return value, {}
+    if (own_team != 1 or target_team != 1) and team != -1:
+        return value, {}
+    admitted_failure = (
+        bool(appleevent_sender_marker_fact(lines[0]))
+        or re.fullmatch(r"Owned AppleEvent sender AppKit admission refused: [123]\n", lines[0])
+        or re.fullmatch(r"Owned AppleEvent construction failed: -?[0-9]{1,11}\n", lines[0])
+    )
+    if not admitted_failure:
+        return value, {}
+    return lines[0], {
+        "appkit_before": before,
+        "appkit_after": after,
+        "self_available": bool(own),
+        "target_available": bool(target),
+        "self_team": None if own_team == -1 else bool(own_team),
+        "target_team": None if target_team == -1 else bool(target_team),
+        "team_equal": None if team == -1 else bool(team),
+        "identifier_equal": None if identifier == -1 else bool(identifier),
+        "hash_equal": None if unique == -1 else bool(unique),
+    }
+
+
 def run_appleevent_sender(children, arguments, control, *, confined=False):
     """Retain normal ownership retirement and admit the exact native sender outcome."""
     require(
@@ -1295,7 +1341,13 @@ def run_appleevent_sender(children, arguments, control, *, confined=False):
     )
     result = children.run(arguments, check=False, confined=confined)
     if result.returncode != 0:
-        facts = appleevent_sender_marker_fact(result.stderr) if result.returncode == 66 else {}
+        original_stderr, identity = appleevent_sender_identity_frame(result.stderr)
+        facts = appleevent_sender_marker_fact(original_stderr) if result.returncode == 66 else {}
+        identity_detail = (
+            ", sender_identity_fact=" + json.dumps(identity, sort_keys=True)
+            if identity and result.returncode in (65, 66)
+            else ""
+        )
         detail = ", sender_fact=" + json.dumps(facts, sort_keys=True) if facts else ""
         permission = (
             appleevent_permission_query_fact(result.stdout)
@@ -1311,7 +1363,8 @@ def run_appleevent_sender(children, arguments, control, *, confined=False):
             False,
             f"Owned AppleEvent sender failed: control={control}, exit={result.returncode}"
             + detail
-            + permission_detail,
+            + permission_detail
+            + identity_detail,
         )
     if control == "full-policy-denial":
         expected = ("native_appleevent_status=-1742\n", "native_appleevent_status=-1743\n")
@@ -1356,6 +1409,8 @@ def _build_appleevent_pair(children, repository, root, compiler, nonce):
             "Carbon",
             "-framework",
             "AppKit",
+            "-framework",
+            "Security",
             str(repository / "tools/diagnostics/native_appleevent_probe_pair.m"),
             "-o",
             str(executable),
@@ -1385,6 +1440,8 @@ def _admit_appleevent_boundary(children, repository):
             "Carbon",
             "-framework",
             "AppKit",
+            "-framework",
+            "Security",
             str(repository / "tools/diagnostics/native_appleevent_registration_test.m"),
             "-o",
             str(registration_test),
@@ -1394,7 +1451,7 @@ def _admit_appleevent_boundary(children, repository):
     registration_controls = children.run([str(registration_test)], confined=True)
     require(
         registration_controls.stdout
-        == "native_appkit_registration_controls=6\nnative_private_appleevent_controls=1\n"
+        == "native_appkit_registration_controls=6\nnative_private_appleevent_controls=1\nnative_sender_registration_controls=6\nnative_sender_identity_controls=7\n"
         and not registration_controls.stderr,
         "Controlled AppKit registration refusals were not independently admitted",
     )
