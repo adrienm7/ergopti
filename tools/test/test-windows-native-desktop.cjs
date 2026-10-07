@@ -61,7 +61,9 @@ function checkWorkflow(body) {
 	assert.equal(pipeline.stepField(native, 'run'), './tools/test/run-windows-native-desktop.ps1');
 	assert.equal(pipeline.stepField(native, 'shell'), 'pwsh');
 	assert.equal(pipeline.stepField(native, 'timeout-minutes'), '25');
-	assert.equal(pipeline.stepField(native, 'if'), null);
+	assert.equal(pipeline.stepField(native, 'if'), '${{ !cancelled() }}');
+	assert.equal(pipeline.stepField(main, 'if'), null);
+	assert.equal(pipeline.stepField(main, 'continue-on-error'), null);
 	assert.equal(pipeline.stepField(native, 'continue-on-error'), null);
 	assert.ok(body.indexOf(main) < body.indexOf(native));
 	assert.ok(body.indexOf(native) < body.indexOf(upload));
@@ -210,6 +212,44 @@ for (const [before, after] of [
 	],
 	['path: ${{ runner.temp }}/windows-ahk-native-desktop/', 'path: unrelated/'],
 	['if-no-files-found: error', 'if-no-files-found: warn']
+]) {
+	const changed = body.replace(before, after);
+	assert.notEqual(changed, body);
+	assert.throws(() => checkWorkflow(changed));
+	refused += 1;
+}
+// A status function overrides Actions' default success() check, so these
+// original observations run after a failed main suite unless cancelled. The
+// main suite still has its original failing exit and no failure forgiveness.
+const nativeHead = '      - name: Run native desktop AHK cohorts\n';
+const nativeCondition = nativeHead + '        if: ${{ !cancelled() }}\n';
+assert.equal(body.split(nativeCondition).length, 2);
+for (const condition of [
+	'',
+	'false',
+	'success()',
+	'always()',
+	'${{ always() }}',
+	'${{ !failure() }}',
+	'${{ cancelled() }}',
+	'${{ !cancelled() && false }}',
+	'${{ !cancelled() || true }}'
+]) {
+	const changed = body.replace(
+		nativeCondition,
+		nativeHead + (condition ? `        if: ${condition}\n` : '')
+	);
+	assert.notEqual(changed, body);
+	assert.throws(() => checkWorkflow(changed));
+	refused += 1;
+}
+for (const [before, after] of [
+	[nativeHead, '      - name: Omitted native desktop AHK cohorts\n'],
+	['      - name: Run AHK test suite\n', '      - name: Run AHK test suite\n        if: false\n'],
+	[
+		'      - name: Run AHK test suite\n',
+		'      - name: Run AHK test suite\n        continue-on-error: true\n'
+	]
 ]) {
 	const changed = body.replace(before, after);
 	assert.notEqual(changed, body);

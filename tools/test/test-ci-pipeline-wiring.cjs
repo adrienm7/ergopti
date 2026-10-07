@@ -265,6 +265,7 @@ const STEP_CONDITIONS = [
 	[WINDOWS_BOX, 'package-windows', 'Sign and verify ErgoptiPlus.exe', 'inputs.release'],
 	[WINDOWS_BOX, 'test-ahk', 'Annotate AHK results', 'always()'],
 	[WINDOWS_BOX, 'test-ahk', 'Publish AHK execution manifest', 'always()'],
+	[WINDOWS_BOX, 'test-ahk', 'Run native desktop AHK cohorts', NOT_CANCELLED],
 	[WINDOWS_BOX, 'test-ahk', 'Publish native desktop AHK evidence', 'always()'],
 	[
 		WINDOWS_BOX,
@@ -1332,6 +1333,43 @@ function stepProblems(files) {
 		problems.push(`STEP_CONDITIONS lists ${key}, which the pipeline no longer has`);
 	return problems;
 }
+
+// Only this original Windows desktop cohort step may bypass a prior failure.
+// Exact !cancelled() keeps cancellation meaningful without forgiving main red.
+for (const condition of [
+	'',
+	'false',
+	'success()',
+	'always()',
+	'${{ always() }}',
+	'${{ !failure() }}',
+	'${{ cancelled() }}',
+	'${{ !cancelled() && false }}',
+	'${{ !cancelled() || true }}'
+]) {
+	const head = '      - name: Run native desktop AHK cohorts\n';
+	mustCatch(
+		'Windows native desktop condition ' + (condition || 'missing'),
+		WINDOWS_BOX,
+		head + `        if: ${NOT_CANCELLED}\n`,
+		head + (condition ? `        if: ${condition}\n` : ''),
+		stepProblems
+	);
+}
+mustCatch(
+	'missing Windows native desktop cohort step',
+	WINDOWS_BOX,
+	'      - name: Run native desktop AHK cohorts\n',
+	'      - name: Omitted native desktop AHK cohorts\n',
+	stepProblems
+);
+mustCatch(
+	'Windows native desktop condition cannot skip the ordinary main suite',
+	WINDOWS_BOX,
+	'      - name: Run AHK test suite\n',
+	`      - name: Run AHK test suite\n        if: ${NOT_CANCELLED}\n`,
+	stepProblems
+);
 
 // Raw failure logs are diagnostics, separate from success-only distro evidence.
 for (const condition of [
