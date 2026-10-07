@@ -1896,6 +1896,91 @@ try {
 }
 // NATIVE_SPARKLE_UPDATE_PROGRESS_END
 
+// NATIVE_SPARKLE_STARTUP_ADMISSION_REFUSAL_IDENTITY_BEGIN
+try {
+	const assert = require('node:assert/strict');
+	const child = fs.readFileSync(
+		path.join(root, 'tools/diagnostics/macos_sparkle_archive_child.swift'),
+		'utf8'
+	);
+	const fixture = fs.readFileSync(
+		path.join(
+			root,
+			'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/SparkleArchiveUpdateAcceptanceTests.swift'
+		),
+		'utf8'
+	);
+	function admission(source, producer) {
+		assert.match(
+			producer,
+			/record\("start-refused", details: \["errors": identities\(error\)\]\)\s*startupAdmissionRefusal\(error, startReturned: startReturned\)/
+		);
+		assert.match(producer, /var startReturned = false/);
+		assert.match(
+			producer,
+			/try owner.start\(\)\s*progress\("updater-started"\)\s*startReturned = true\s*guard !owner.automaticallyChecksForUpdates/
+		);
+		assert.match(producer, /startReturned \? "policy-validation" : "native-start"/);
+		assert.match(
+			producer,
+			/switch native.domain[\s\S]*?case SUSparkleErrorDomain: domain = "sparkle"[\s\S]*?case NSCocoaErrorDomain: domain = "cocoa"[\s\S]*?default: domain = "other"/
+		);
+		const emit = producer.slice(
+			producer.indexOf('private func startupAdmissionRefusal('),
+			producer.indexOf('/// Capture only typed error identities')
+		);
+		assert.match(emit, /let native = error as NSError/);
+		assert.match(emit, /String\(native.code\)/);
+		assert.doesNotMatch(
+			emit,
+			/localizedDescription|userInfo|\.path|absoluteString|String\(describing:/
+		);
+		const observe = source.slice(
+			source.indexOf('func observedStartupAdmissionRefusalIdentity()'),
+			source.indexOf('func observedChildRefusalCode()')
+		);
+		assert.match(observe, /guard launched, observedExit, let cachedReceipt else \{ return nil \}/);
+		assert.match(
+			observe,
+			/parseStartupAdmissionRefusalIdentity\(cachedReceipt.stdout,\s*expectedPID: process.processIdentifier\)/
+		);
+		assert.doesNotMatch(observe, /Data\(|FileHandle|Thread|Date\(|finish\(|terminate\(|read/);
+		assert.match(source, /!startupIdentitySeen, events.last == \.e9/);
+		assert.match(source, /StartupAdmissionRefusalStage\(rawValue: fields\[0\]\)/);
+		assert.match(source, /String\(code\) == codeFields\[1\]/);
+		assert.match(source, /frames.count == 1/);
+		assert.match(
+			source,
+			/Native Sparkle startup admission refusal: stage=unavailable domain=unavailable code=unavailable/
+		);
+		assert.match(
+			source,
+			/testStartupAdmissionRefusalIdentityRequiresExactRetiredProgressAndFixedTypedFields/
+		);
+		assert.match(source, /stage=policy-validation domain=other code=0/);
+	}
+	admission(fixture, child);
+	for (const [from, to] of [
+		[
+			'guard launched, observedExit, let cachedReceipt else { return nil }',
+			'guard launched, let cachedReceipt else { return nil }'
+		],
+		['!startupIdentitySeen, events.last == .e9', '!startupIdentitySeen'],
+		['String(code) == codeFields[1]', 'true']
+	]) {
+		assert.equal(fixture.split(from).length - 1, 1);
+		const changed = fixture.replace(from, to);
+		assert.notEqual(changed, fixture);
+		assert.throws(() => admission(changed, child));
+	}
+	console.log(
+		'[OK] Native Sparkle startup admission identity uses exact closed capture and actual catch stage only.'
+	);
+} catch (error) {
+	errors.push('Native Sparkle startup admission identity guard: ' + error.message);
+}
+// NATIVE_SPARKLE_STARTUP_ADMISSION_REFUSAL_IDENTITY_END
+
 if (errors.length > 0) {
 	for (const error of errors) console.error(`[FAIL] ${error}`);
 	process.exit(1);
