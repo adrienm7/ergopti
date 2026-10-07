@@ -140,6 +140,7 @@ graph TD
         WINDOWS_mouse_control["MouseControl.ahk"]
         WINDOWS_native_folder_picker["NativeFolderPicker.ahk"]
         WINDOWS_native_number["NativeNumber.ahk"]
+        WINDOWS_network_failure_host["NetworkFailureHost.ahk"]
         WINDOWS_network_info["NetworkInfo.ahk"]
         WINDOWS_notifier["Notifier.ahk"]
         WINDOWS_process_lifecycle["ProcessLifecycle.ahk"]

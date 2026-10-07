@@ -5574,6 +5574,21 @@ The fixed Specifications and Capabilities frames of the Windows/macOS per-model 
       uncommitted in the local worktree of `fix/downloads-on-managed-networks`
       when the session stopped; redo it if that worktree is gone.
 
+The Windows receiving slice adds full-URL native route observations, bounded
+owned curl requests, endpoint-aware updater downloads and shared terminal
+failure actions. Observer publication and refusal rollback now use separate
+epochs inside a short Critical admission; network and UI work remain outside
+that section. The registered original38 action vectors and eight CA vectors
+remain intact, with two additive actual-AHK observer race controls. The private
+composed source passes382 JS checks, encoding, formatting and real Linux HTTP
+and managed-network checks. The same selected checks pass on the main receiving
+sources composed with actual dev33a5227ea; its native owners close physically.
+Native AHK parsing, unit, E2E, package and installed
+acceptance remain UNRUN until the current-source Windows CI completes.
+The actual artifact producer still lacks bare NTLM-only CONNECT support: this
+is remaining CODE, not a device-only validation. Keep full corporate-network
+PAC/WPAD, SSPI/domain authentication, system trust and physical UI checks open.
+
 Actual macOS HF-download and Ollama-pull owners now refuse opaque fetches when
 a verified native configuration needs unsupported PAC/WPAD or SOCKS routing.
 Failed, malformed, duplicate or divergent scoped native facts remain unavailable,

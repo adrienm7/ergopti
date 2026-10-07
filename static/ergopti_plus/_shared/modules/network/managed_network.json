@@ -315,5 +315,8 @@
 			}
 		}
 	],
-	"default_cause": "unknown"
+	"default_cause": "unknown",
+	"presentation": {
+		"render_ack_timeout_ms": 5000
+	}
 }
