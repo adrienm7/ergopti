@@ -6839,6 +6839,16 @@ retargeting, modifier/output custody or physical delivery.
 
 Remaining work for item108 (CI-feasible software first):
 
+Linux direct magic-source enumeration now fences its captured native session,
+backend, map and group/source generation before and after enumeration. It
+detaches requested positions and refuses substitutions or stale rows; ordinary
+reconstructed key events preserve a current source proof. Eight appended
+registered regressions retain every previous case; independent predecessor
+controls reproduce the stale-source and request-substitution failures on both
+Lua ABIs. Source review is complete. Hosted native qualification is pending;
+delivery capabilities and independent corpora remain unchanged. This does not
+complete default-binding retargeting or physical acceptance.
+
 - [ ] Software implementation/repair: Qualify existing conditional-editor policy without reimplementing completed work. Complete missing effective-source retargeting, all-owner collisions and modifier/output custody; preserve explicit None, personal overrides, migration and pause/reload fences. Keep unsupported seats honest and new physical delivery disabled until proved.
 - [ ] Hosted native qualification: Run actual HKL/TIS/XKB source, registrar and scoped publication/compensation cases for direct star/ù, missing/ambiguous/dead source and conflicts, then affected OS unit/E2E/package/install/startup.
 - [ ] Separate device/evidence boundary: Verify real layout changes and direct magic-key/editor delivery on supported keyboards/seats; source-only and controlled native owners do not prove physical delivery.
