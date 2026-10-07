@@ -16,6 +16,8 @@ $ManagedRoutesDiagnosticResultShape='unknown'
 $ManagedRoutesDiagnosticOk='unknown'
 $ManagedRoutesDiagnosticRouteCount=-1
 $ManagedRoutesDiagnosticLimits='unknown'
+$ManagedRoutesDiagnosticSingleSource='unknown'
+$ManagedRoutesDiagnosticSingleKind='unknown'
 $ManagedRoutesDiagnosticAttempted=$false
 # Optional fixed observations only; never read exception messages or input metadata.
 function Set-ManagedRoutesDiagnosticResult {
@@ -27,6 +29,8 @@ function Set-ManagedRoutesDiagnosticResult {
     $script:ManagedRoutesDiagnosticOk='unknown'
     $script:ManagedRoutesDiagnosticRouteCount=-1
     $script:ManagedRoutesDiagnosticLimits='unknown'
+    $script:ManagedRoutesDiagnosticSingleSource='unknown'
+    $script:ManagedRoutesDiagnosticSingleKind='unknown'
     try {
         # Closed scalars from the already-returned result; no route metadata.
         if($null -eq $Result){$script:ManagedRoutesDiagnosticResultShape='null';return}
@@ -38,6 +42,20 @@ function Set-ManagedRoutesDiagnosticResult {
         }
         if($Result['Routes'] -is [array] -and $Result['Routes'].Count -le 4096) {
             $script:ManagedRoutesDiagnosticRouteCount=$Result['Routes'].Count
+        }
+        if($Result['Routes'] -is [array] -and $Result['Routes'].Count -eq 1 -and
+            $Result['Routes'][0] -is [hashtable]) {
+            $Route=$Result['Routes'][0]
+            if($Route['Source'] -is [string] -and $Route['Source'] -cin @(
+                'loopback','environment','environment_bypass','system_direct','system_bypass',
+                'system_config_absent_direct','system_config_absent_bypass','system_proxy',
+                'system_config_absent_proxy','wpad_absent_direct','wpad_absent_bypass','wpad_absent_proxy',
+                'native_proxy','native_direct','native_bypass')) {
+                $script:ManagedRoutesDiagnosticSingleSource=$Route['Source']
+            }
+            if($Route['Kind'] -is [string] -and $Route['Kind'] -cin @('direct','proxy')) {
+                $script:ManagedRoutesDiagnosticSingleKind=$Route['Kind']
+            }
         }
         if(($Result['MaxRoutes'] -is [int] -or $Result['MaxRoutes'] -is [long]) -and
             ($Result['MaxRedirects'] -is [int] -or $Result['MaxRedirects'] -is [long])) {
@@ -63,11 +81,12 @@ function Write-ManagedRoutesDiagnostic {
     if($script:ManagedRoutesDiagnosticAttempted){return}
     $script:ManagedRoutesDiagnosticAttempted=$true
     try {
-        [Console]::Error.WriteLine(('ROUTE_DIAG stage={0} vector={1} native_observed={2} native_errno={3} status={4} result_shape={5} ok={6} route_count={7} limits={8}' -f
+        [Console]::Error.WriteLine(('ROUTE_DIAG stage={0} vector={1} native_observed={2} native_errno={3} status={4} result_shape={5} ok={6} route_count={7} limits={8} single_source={9} single_kind={10}' -f
             $script:ManagedRoutesDiagnosticStage,$script:ManagedRoutesDiagnosticVector,
             [int]$script:ManagedRoutesDiagnosticNativeObserved,$script:ManagedRoutesDiagnosticNativeErrno,
             $script:ManagedRoutesDiagnosticStatus,$script:ManagedRoutesDiagnosticResultShape,
-            $script:ManagedRoutesDiagnosticOk,$script:ManagedRoutesDiagnosticRouteCount,$script:ManagedRoutesDiagnosticLimits))
+            $script:ManagedRoutesDiagnosticOk,$script:ManagedRoutesDiagnosticRouteCount,$script:ManagedRoutesDiagnosticLimits,
+            $script:ManagedRoutesDiagnosticSingleSource,$script:ManagedRoutesDiagnosticSingleKind))
     } catch { }
 }
 try {

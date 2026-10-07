@@ -237,10 +237,27 @@ retain four inactive preparations, archive SHA256
   redirects; uv/Ollama need actual client integration or native offline staging.
   Initial stock-curl installer downloads also lack native PAC evaluation.
 
-All four packets are SOURCE-only and unexecuted. They are not installed product
-code and do not close either item. Inspect MANIFEST.json and actual preimages
-before applying a packet. Old native providers/assertions and independent
-expected corpora must remain authoritative.
+The archive preserves the original SOURCE-only, unexecuted preparations. The
+route-origin diagnostic is subsequently applied with exact preimages and inverse
+checks: every original native acceptance byte and AHK assertion remains intact.
+Actual portable PowerShell AST/helper receiving passes74 cases and the
+source-bound AHK receiver model passes61, with status0, no signal/error and no
+retained owned phase. This passive projection is not native WinHTTP or AHK
+qualification and does not fix the unproved vector1 cause. The other three
+preparations remain inactive and unexecuted. No item is closed by these packets.
+Inspect MANIFEST.json and actual preimages before applying any preparation;
+old native providers/assertions and independent expected corpora remain
+authoritative.
+
+The new Linux manual37677432702 at9d7b838d5 passes shared checks but records
+11,643 unit passes and one genuine relative-clock failure. Its actual trace
+shows refreshed native timer admission, request arrival79.959ms, the original
+40ms response delay and callback100.670ms under the unchanged100ms budget.
+This demonstrates actual expiry after request latency; the full host cause is
+not established. The failed receipt remains. A fresh-run diagnostic at
+ef67fa39075f35b990dbaf0a23dd6d8a4987222a changes only the qualification
+documents, preserving every unit and production byte. Early E2E prerequisite
+receiving and complete Linux package/install acceptance remain pending.
 
 ## Remaining CODE and hosted work
 
