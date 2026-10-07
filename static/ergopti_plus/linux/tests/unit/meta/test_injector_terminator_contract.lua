@@ -71,10 +71,9 @@ end
 helpers.describe("linux injector: non-consumed terminator replay", function()
 
 	helpers.it("replays Space and punctuation after the replacement (lnx-001)", function()
-		local injector = helpers.load_module("modules.hotstrings.injector")
-		local layout = require("adapters.keyboard_layout")
+		local saved_layout = package.loaded["adapters.keyboard_layout"]
+		local saved_injector = package.loaded["modules.hotstrings.injector"]
 		local codes = require("infra.evdev_codes")
-		local original_ready, original_plan = layout.is_ready, layout.plan
 		local rendered, active_terminator
 		local keycodes = { t = 1001, h = 1002, e = 1003, terminator = 1004 }
 		local chars = { [1001] = "t", [1002] = "h", [1003] = "e" }
@@ -90,20 +89,11 @@ helpers.describe("linux injector: non-consumed terminator replay", function()
 			end
 			return true
 		end
-		layout.is_ready = function() return true end
-		layout.plan = function(text)
-			if text == "the" then
-				return {
-					{ keycode = keycodes.t, mods = {} },
-					{ keycode = keycodes.h, mods = {} },
-					{ keycode = keycodes.e, mods = {} },
-				}
-			end
-			if text == active_terminator then
-				return { { keycode = keycodes.terminator, mods = {} } }
-			end
-			error("unexpected text in terminator replay test")
-		end
+		package.loaded["adapters.keyboard_layout"] = require("tests.support.layout_cohort_fixture").layout(function(char)
+			if char == active_terminator then return keycodes.terminator end
+			return assert(keycodes[char], "unexpected text in terminator replay test")
+		end)
+		local injector = helpers.load_module("modules.hotstrings.injector")
 		injector._set_uinput(channel)
 		injector._set_nanosleep_for_test(function() end)
 
@@ -119,15 +109,15 @@ helpers.describe("linux injector: non-consumed terminator replay", function()
 
 		injector._set_uinput(nil)
 		injector._set_nanosleep_for_test(nil)
-		layout.is_ready, layout.plan = original_ready, original_plan
+		package.loaded["adapters.keyboard_layout"] = saved_layout
+		package.loaded["modules.hotstrings.injector"] = saved_injector
 		if not ok then error(err, 0) end
 	end)
 
 	helpers.it("replays Enter and Tab as control keystrokes after text (lnx-002)", function()
-		local injector = helpers.load_module("modules.hotstrings.injector")
-		local layout = require("adapters.keyboard_layout")
+		local saved_layout = package.loaded["adapters.keyboard_layout"]
+		local saved_injector = package.loaded["modules.hotstrings.injector"]
 		local codes = require("infra.evdev_codes")
-		local original_ready, original_plan = layout.is_ready, layout.plan
 		local emitted = {}
 		local channel = {
 			is_open = function() return true end,
@@ -136,11 +126,11 @@ helpers.describe("linux injector: non-consumed terminator replay", function()
 				return true
 			end,
 		}
-		layout.is_ready = function() return true end
-		layout.plan = function(text)
-			if text == "x" then return { { keycode = 1001, mods = {} } } end
+		package.loaded["adapters.keyboard_layout"] = require("tests.support.layout_cohort_fixture").layout(function(char)
+			if char == "x" then return 1001 end
 			error("control terminators must bypass the text planner")
-		end
+		end)
+		local injector = helpers.load_module("modules.hotstrings.injector")
 		injector._set_uinput(channel)
 		injector._set_nanosleep_for_test(function() end)
 
@@ -159,7 +149,8 @@ helpers.describe("linux injector: non-consumed terminator replay", function()
 
 		injector._set_uinput(nil)
 		injector._set_nanosleep_for_test(nil)
-		layout.is_ready, layout.plan = original_ready, original_plan
+		package.loaded["adapters.keyboard_layout"] = saved_layout
+		package.loaded["modules.hotstrings.injector"] = saved_injector
 		if not ok then error(err, 0) end
 	end)
 
