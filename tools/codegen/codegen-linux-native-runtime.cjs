@@ -194,6 +194,8 @@ function flatpakModules(data) {
 			'post-install': [
 				'test -x /app/bin/krb5-config',
 				'test -f /app/lib/libgssapi_krb5.so',
+				'test -f /app/include/gssapi/gssapi.h',
+				'test "$(pkg-config --variable=prefix mit-krb5-gssapi)" = /app',
 				'/app/bin/krb5-config --libs gssapi'
 			],
 			source: 'krb5'
@@ -209,7 +211,10 @@ function flatpakModules(data) {
 				'-DCURL_USE_GSSAPI=ON',
 				'-DGSS_ROOT_DIR=/app'
 			],
-			'post-install': ['test -x /app/bin/curl'],
+			'post-install': [
+				'test -x /app/bin/curl',
+				"features=$(/app/bin/curl --disable --version) && printf '%s\\n' \"$features\" | grep -Eq '^Features: (.* )?GSS-API( |$)' && printf '%s\\n' \"$features\" | grep -Eq '^Features: (.* )?SPNEGO( |$)'"
+			],
 			source: 'curl'
 		},
 		{
