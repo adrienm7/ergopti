@@ -163,9 +163,13 @@ function flatpakModules(data) {
 		},
 		{
 			name: 'network-krb5',
-			buildsystem: 'autotools',
-			subdir: 'src',
-			'config-opts': ['--disable-static', '--disable-rpath', '--without-system-verto'],
+			buildsystem: 'simple',
+			'build-commands': [
+				'cd src && autoreconf --verbose --force --install',
+				'cd src && ./configure --prefix=/app --disable-static --disable-rpath --without-system-verto',
+				'make -C src',
+				'make -C src install'
+			],
 			'post-install': [
 				'test -x /app/bin/krb5-config',
 				'test -f /app/lib/libgssapi_krb5.so',

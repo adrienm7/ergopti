@@ -138,10 +138,16 @@ assert.deepEqual(
 	]
 );
 assert.ok(modules[0]['config-opts'].includes('-DLUA_BUILD_TYPE=System'));
-assert.equal(modules[2].buildsystem, 'autotools');
-assert.equal(modules[2].subdir, 'src');
+assert.equal(modules[2].buildsystem, 'simple');
+assert.equal(modules[2].subdir, undefined);
+assert.deepEqual(modules[2]['build-commands'], [
+	'cd src && autoreconf --verbose --force --install',
+	'cd src && ./configure --prefix=/app --disable-static --disable-rpath --without-system-verto',
+	'make -C src',
+	'make -C src install'
+]);
 assert.equal(modules[2].sources[0].commit, '8570e77819563e036027e1da789d08ec9333ed4d');
-assert.ok(modules[2]['config-opts'].includes('--disable-static'));
+assert.ok(modules[2]['build-commands'][1].includes('--disable-static'));
 assert.ok(modules[2]['post-install'].includes('test -f /app/lib/libgssapi_krb5.so'));
 assert.ok(modules[3]['config-opts'].includes('-DCURL_USE_GSSAPI=ON'));
 assert.ok(modules[3]['config-opts'].includes('-DGSS_ROOT_DIR=/app'));
