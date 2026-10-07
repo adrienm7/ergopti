@@ -7,6 +7,13 @@ $Answer = @{ schema_version = 1; ok = $false; status = 0; child_quiesced = $fals
     receipt = @{ backend = 'curl'; stage = 'connect'; failure_provenance = 'unknown' } }
 $Child = $null
 
+function Test-ErgoptiManagedInt32 {
+    param($Value)
+    # JSON integer storage may be Int32 or Int64; never coerce other JSON kinds.
+    return (($Value -is [int] -or $Value -is [long]) -and
+        $Value -ge [int]::MinValue -and $Value -le [int]::MaxValue)
+}
+
 function Get-RemainingBudget {
     $Remaining = Get-NativeRemainingBudget
     if ($Remaining -le 0) { throw 'The original request budget expired.' }
@@ -184,14 +191,14 @@ function Test-CausalNtlmChallenge {
 
 try {
     $InputValue = Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8 | ConvertFrom-Json
-    if ($InputValue.schema_version -ne 1 -or $InputValue.budget_ms -isnot [int] -or $InputValue.budget_ms -lt 1 -or
+    if (-not (Test-ErgoptiManagedInt32 $InputValue.schema_version) -or $InputValue.schema_version -ne 1 -or -not (Test-ErgoptiManagedInt32 $InputValue.budget_ms) -or $InputValue.budget_ms -lt 1 -or
         ($InputValue.started_tick -isnot [int] -and $InputValue.started_tick -isnot [long]) -or $InputValue.started_tick -lt 0 -or
-        $InputValue.deadline_ms -isnot [int] -or $InputValue.deadline_ms -lt 1 -or
+        -not (Test-ErgoptiManagedInt32 $InputValue.deadline_ms) -or $InputValue.deadline_ms -lt 1 -or
         $InputValue.request_id -isnot [string] -or $InputValue.request_id -cnotmatch '^[0-9]+_[0-9]+$' -or
         $InputValue.method -cnotin @('GET', 'POST', 'DELETE') -or $InputValue.body -isnot [string] -or
-        $InputValue.headers -isnot [array] -or $InputValue.max_response_bytes -isnot [int] -or
-        $InputValue.max_response_bytes -lt 1 -or $InputValue.max_header_bytes -isnot [int] -or
-        $InputValue.max_header_bytes -lt 1 -or $InputValue.connect_timeout_ms -isnot [int] -or
+        $InputValue.headers -isnot [array] -or -not (Test-ErgoptiManagedInt32 $InputValue.max_response_bytes) -or
+        $InputValue.max_response_bytes -lt 1 -or -not (Test-ErgoptiManagedInt32 $InputValue.max_header_bytes) -or
+        $InputValue.max_header_bytes -lt 1 -or -not (Test-ErgoptiManagedInt32 $InputValue.connect_timeout_ms) -or
         $InputValue.connect_timeout_ms -lt 1 -or $InputValue.revocation_best_effort -isnot [bool]) {
         throw 'The private managed HTTP input was refused.'
     }

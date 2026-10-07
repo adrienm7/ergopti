@@ -5,9 +5,16 @@ $ErrorActionPreference='Stop'
 $ProgressPreference='SilentlyContinue'
 $Answer=@{schema_version=1;state='unavailable';backend='curl';child_quiesced=$false}
 $WorkerClock=[Diagnostics.Stopwatch]::StartNew()
+function Test-ErgoptiCapabilityInt32 {
+    param($Value)
+    # JSON integer storage may be Int32 or Int64; never coerce other JSON kinds.
+    return (($Value -is [int] -or $Value -is [long]) -and
+        $Value -ge [int]::MinValue -and $Value -le [int]::MaxValue)
+}
+
 try {
     $InputValue=Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8 | ConvertFrom-Json
-    if($InputValue.schema_version -ne 1 -or $InputValue.budget_ms -isnot [int] -or $InputValue.budget_ms -lt 1){throw 'Private capability request was refused.'}
+    if(-not (Test-ErgoptiCapabilityInt32 $InputValue.schema_version) -or $InputValue.schema_version -ne 1 -or -not (Test-ErgoptiCapabilityInt32 $InputValue.budget_ms) -or $InputValue.budget_ms -lt 1){throw 'Private capability request was refused.'}
     Add-Type -TypeDefinition @'
 using System;
 using System.Diagnostics;

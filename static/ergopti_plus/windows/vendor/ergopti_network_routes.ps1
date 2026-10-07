@@ -4,6 +4,13 @@
 . (Join-Path $PSScriptRoot 'ergopti_windows_proxy_config.ps1')
 . (Join-Path $PSScriptRoot 'ergopti_native_proxy_ex.ps1')
 
+function Test-ErgoptiNetworkInt32 {
+    param($Value)
+    # JSON integer storage may be Int32 or Int64; never coerce other JSON kinds.
+    return (($Value -is [int] -or $Value -is [long]) -and
+        $Value -ge [int]::MinValue -and $Value -le [int]::MaxValue)
+}
+
 function New-ErgoptiRouteRefusal {
     param([string]$Backend = 'winhttp', [string]$Status = 'unavailable',
         [int]$NativeError = 0, [bool]$ObservedNative = $false)
@@ -20,11 +27,11 @@ function New-ErgoptiRouteRefusal {
 function Get-ErgoptiNetworkPolicy {
     param([Parameter(Mandatory=$true)][string]$Path)
     $Policy = Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json
-    if ($Policy.schema_version -ne 1 -or $Policy.max_selections -isnot [int] -or
+    if (-not (Test-ErgoptiNetworkInt32 $Policy.schema_version) -or $Policy.schema_version -ne 1 -or -not (Test-ErgoptiNetworkInt32 $Policy.max_selections) -or
         $Policy.max_selections -lt 1 -or $Policy.max_selections -gt 4096 -or
-        $Policy.max_proxy_bytes -isnot [int] -or $Policy.max_proxy_bytes -lt 2 -or
+        -not (Test-ErgoptiNetworkInt32 $Policy.max_proxy_bytes) -or $Policy.max_proxy_bytes -lt 2 -or
         $Policy.max_proxy_bytes -gt 1048576 -or $Policy.missing_native_capability -cne 'environment' -or
-        $Policy.redirects.max_hops -isnot [int] -or $Policy.redirects.max_hops -lt 1) {
+        -not (Test-ErgoptiNetworkInt32 $Policy.redirects.max_hops) -or $Policy.redirects.max_hops -lt 1) {
         throw 'Canonical proxy inventory was refused.'
     }
     foreach ($Inventory in @($Policy.allowed_proxy_schemes,
@@ -33,7 +40,7 @@ function Get-ErgoptiNetworkPolicy {
         $Policy.loopback.dns_hosts, $Policy.loopback.dns_suffixes,
         $Policy.loopback.ipv4_cidrs, $Policy.loopback.ipv6_addresses)) {
         if ($Inventory -isnot [array] -or $Inventory.Count -eq 0) { throw 'Invalid canonical proxy inventory.' }
-        $Seen = @{}
+        $Seen = [Collections.Generic.Dictionary[string,bool]]::new([StringComparer]::Ordinal)
         foreach ($Name in $Inventory) {
             if ($Name -isnot [string] -or $Name -eq '' -or $Seen.ContainsKey($Name)) {
                 throw 'Invalid canonical proxy inventory member.'
@@ -209,7 +216,7 @@ function Resolve-ErgoptiNativeNetworkRoutes {
         $Policy = Get-ErgoptiNetworkPolicy $PolicyPath
         $Defaults = Get-Content -LiteralPath $UpdaterDefaultsPath -Raw -Encoding UTF8 | ConvertFrom-Json
         $LookupBudget = $Defaults.release_sources.proxy_resolve_timeout_sec
-        if ($LookupBudget -isnot [int] -or $LookupBudget -le 0 -or $LookupBudget -gt [int]::MaxValue / 1000) {
+        if (-not (Test-ErgoptiNetworkInt32 $LookupBudget) -or $LookupBudget -le 0 -or $LookupBudget -gt [int]::MaxValue / 1000) {
             throw 'Canonical proxy lookup budget was refused.'
         }
         $LookupBudget *= 1000
