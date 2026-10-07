@@ -100,3 +100,86 @@ _SSRT_ObserverAcknowledgment() {
 	}
 }
 Test("source readiness requires its own bounded observer acknowledgment (startup-observer-ack)", _SSRT_ObserverAcknowledgment)
+
+_SSRT_FullSaveGeneration() {
+	global Features, _LLM_Menu, _LLM_Menu_Loaded
+	global _DriverMenuReady, _DriverBootPhase, CONFIG_SAVE_OK
+	Runtime := _CFGFS_CaptureRuntime()
+	Coordinator := _ConfigFullSaveCoordinator()
+	SavedFeatures := Features
+	SavedLLM := _LLM_Menu
+	SavedLoaded := IsSet(_LLM_Menu_Loaded) ? _LLM_Menu_Loaded : unset
+	SavedMenu := IsSet(_DriverMenuReady) ? _DriverMenuReady : unset
+	SavedPhase := IsSet(_DriverBootPhase) ? _DriverBootPhase : unset
+	Root := A_Temp . "\ergopti_full_save_receipt_" . DllCall("GetCurrentProcessId") . "_" . Random(100000, 999999)
+	DirCreate(Root)
+	Path := Root . "\config.toml"
+	Nonce := "abcdef0123456789abcdef0123456789"
+	try {
+		_CFGFS_Prepare(Path)
+		_DriverMenuReady := true
+		_DriverBootPhase := "ready"
+		Features := ManifestBuildFeaturesMap()
+		_LLM_Menu := _HSDeepCloneMap(SavedLLM)
+		_LLM_Menu["onboarding_seen"] := false
+		_LLM_Menu["app_profile_overrides"] := Map()
+		_LLM_Menu["user_profiles"] := []
+		_LLM_Menu_Loaded := true
+		Legacy := '# retained installed dashboard bindings`n[metrics]`nmetrics_shortcut_typing = "Ctrl+Alt+M" # retained typing`nmetrics_shortcut_apps = "Ctrl+Alt+A" # retained apps`nfuture_dashboard = { keep = 9, enabled = false } # retained foreign extension`n'
+		AssertTrue(FSWrite(Path, Legacy), "the native old profile is independently authored")
+		Caught := 0
+		try StartupSmokePublishFullSave(Root, Nonce)
+		catch as Err
+			Caught := Err
+		AssertTrue(IsObject(Caught), "zero accepted generations cannot manufacture a receipt")
+		AssertFalse(FileExist(Root . "\full-save.json"), "missing obligation publishes no receipt")
+		AssertEqual(0, _ConfigFullSaveCoordinator().requested_generation)
+		Generation := _ConfigFullSaveRequest()
+		AssertEqual(1, Generation, "the observer uses exactly one already accepted obligation")
+		ReceiptPath := StartupSmokePublishFullSave(Root, Nonce)
+		ReceiptBytes := FileRead(ReceiptPath, "UTF-8")
+		Receipt := JsonParse(ReceiptBytes)
+		AssertEqual(Nonce, Receipt["nonce"])
+		AssertEqual(DllCall("GetCurrentProcessId"), Receipt["pid"])
+		AssertEqual(A_AhkPath, Receipt["executable"])
+		AssertFalse(Receipt["compiled"], "the unit process cannot claim compiled acceptance")
+		for Field in ["requested", "committed", "settled"]
+			AssertEqual(Generation, Receipt[Field], "real collection and WAL publication acknowledged " . Field)
+		AssertFalse(Receipt["pending"])
+		for Line in StrSplit(Legacy, "`n") {
+			if Line != ""
+				AssertContains(FSRead(Path), Line . "`n", "the production save preserves the unowned source record")
+		}
+		AssertEqual("Ctrl+Alt+A", TOML_Read(Path, "metrics", "metrics_shortcut_apps", "missing"))
+		Caught := 0
+		try StartupSmokePublishFullSave(Root, Nonce)
+		catch as Err
+			Caught := Err
+		AssertTrue(IsObject(Caught), "a foreign occupied receipt is never overwritten")
+		AssertEqual(ReceiptBytes, FileRead(ReceiptPath, "UTF-8"))
+		AssertEqual(Generation, _ConfigFullSaveCoordinator().requested_generation, "publication creates no successor request")
+		FileDelete(ReceiptPath)
+		_CFGFS_Prepare(Path, true, true)
+		Refused := _ConfigFullSaveRequest()
+		State := _ConfigFullSaveCoordinator()
+		State.settled_generation := Refused
+		Caught := 0
+		try StartupSmokePublishFullSave(Root, Nonce)
+		catch as Err
+			Caught := Err
+		AssertTrue(IsObject(Caught), "settled abandonment and native read refusal cannot acknowledge commitment")
+		AssertFalse(FileExist(ReceiptPath))
+		AssertEqual(Refused, State.requested_generation, "refusal does not manufacture a retry request")
+		AssertEqual(0, State.committed_generation)
+	} finally {
+		Features := SavedFeatures
+		_LLM_Menu := SavedLLM
+		_LLM_Menu_Loaded := IsSet(SavedLoaded) ? SavedLoaded : unset
+		_DriverMenuReady := IsSet(SavedMenu) ? SavedMenu : unset
+		_DriverBootPhase := IsSet(SavedPhase) ? SavedPhase : unset
+		_ConfigFullSaveCoordinator(Coordinator)
+		_CFGFS_RestoreRuntime(Runtime)
+		try DirDelete(Root, true)
+	}
+}
+Test("startup full save acknowledges the existing native collector/WAL generation (compiled-full-save-receipt)", _SSRT_FullSaveGeneration)

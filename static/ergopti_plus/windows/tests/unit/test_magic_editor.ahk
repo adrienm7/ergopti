@@ -686,8 +686,8 @@ _MCC_Run() {
 try {
 	_MCC_Run()
 	ExitApp(0)
-} catch as Failure {
-	FileAppend(Failure.Message, "**", "UTF-8-RAW")
+} catch as CustodyProbeTerminalFailure {
+	FileAppend(CustodyProbeTerminalFailure.Message, "**", "UTF-8-RAW")
 	ExitApp(2)
 }
 	)'

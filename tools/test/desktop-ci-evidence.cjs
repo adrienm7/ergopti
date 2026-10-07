@@ -20,6 +20,22 @@ const { execFileSync } = require('node:child_process');
 const timerContract = require('../diagnostics/hs_delayed_timer_contract.json');
 const karabinerContract = require('../diagnostics/hs_karabiner_config_contract.json');
 
+/** Mac launch/verdict jobs remain dependency-free; only Windows loads TOML. */
+function verifyUpgrade(...args) {
+	return require('./compiled-upgrade-contract.cjs').verifyUpgrade(...args);
+}
+
+/** Reads the version from the same canonical registry the compiled owner ships. */
+function currentSchemaVersion() {
+	const { parse: parseToml } = require('smol-toml');
+	return parseToml(
+		fs.readFileSync(
+			path.join(__dirname, '../../static/ergopti_plus/_shared/core/config_schema/migrations.toml'),
+			'utf8'
+		)
+	).registry.current_version;
+}
+
 /** Requires the complete measured native admission receipt on every clean Mac. */
 function verifyNativeTimer(summary) {
 	assert.ok(summary && typeof summary === 'object', 'Missing native delayed-timer evidence');
@@ -212,6 +228,21 @@ function verify({ platform, needs, evidence, sha, scenarios, release }) {
 			assert.equal(record.marker_seen, true, 'Bundle was not extracted');
 			assert.equal(record.crashed_early, false, 'Application exited early');
 			verifyWindowsStartup(record.native_startup, sha, record.package_sha256);
+			verifyUpgrade(
+				record.compiled_upgrade,
+				sha,
+				record.package_sha256,
+				verifyWindowsStartup,
+				currentSchemaVersion()
+			);
+			assert.equal(
+				new Set([
+					record.native_startup.nonce,
+					...record.compiled_upgrade.launches.map((launch) => launch.native_startup.nonce)
+				]).size,
+				3,
+				'Upgrade borrowed the fresh-startup nonce'
+			);
 		} else if (record.scenario === 'clean') {
 			verifyNativeTimer(record.native_delayed_timer);
 		} else if (record.scenario === 'karabiner_config') {
@@ -253,6 +284,43 @@ function recordWindows(resultFile, archive, output) {
 	);
 }
 
+/** Adds only admitted actual prior-package upgrade and installed warm observations. */
+function recordWindowsUpgrade(resultFile, archive, output) {
+	const summary = JSON.parse(fs.readFileSync(resultFile, 'utf8'));
+	const existing = JSON.parse(fs.readFileSync(output, 'utf8'));
+	const sha = process.env.GITHUB_SHA;
+	assert.match(sha, /^[a-f0-9]{40}$/, 'Invalid commit');
+	const digest = crypto.createHash('sha256').update(fs.readFileSync(archive)).digest('hex');
+	assert.equal(existing.sha, sha, 'Fresh startup evidence belongs to another commit');
+	assert.equal(existing.package_sha256, digest, 'Upgrade uses a different packaged executable');
+	assert.deepEqual(existing.failures, []);
+	verifyWindowsStartup(existing.native_startup, sha, digest);
+	assert.equal(
+		path.win32.normalize(path.resolve(archive)).toLowerCase(),
+		path.win32.normalize(existing.native_startup.executable).toLowerCase(),
+		'The upgrade package was not the admitted executable'
+	);
+	verifyUpgrade(summary, sha, digest, verifyWindowsStartup, currentSchemaVersion());
+	const nonces = new Set([
+		existing.native_startup.nonce,
+		...summary.launches.map((launch) => launch.native_startup.nonce)
+	]);
+	assert.equal(nonces.size, 3, 'Upgrade borrowed the fresh-startup nonce');
+	assert.equal(existing.compiled_upgrade, undefined, 'Compiled upgrade evidence is already owned');
+	// Retain the distinct native old-output and externally edited installed-input
+	// observations. A prior boot receipt alone never attributes comment preservation
+	// or the explicit offline user edit to the historical executable.
+	assert.ok(
+		summary.prior_install.native_profile_before_edit,
+		'Missing native installed profile observation'
+	);
+	assert.ok(
+		summary.prior_install.installed_user_edit,
+		'Missing installed-user boundary observation'
+	);
+	fs.writeFileSync(output, JSON.stringify({ ...existing, compiled_upgrade: summary }) + '\n');
+}
+
 /** Reads records without merging identically named files from matrix artifacts. */
 function readEvidence(directory) {
 	return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -289,7 +357,10 @@ function recordMac(resultFile, archive, output) {
 
 if (require.main === module) {
 	const [command, ...args] = process.argv.slice(2);
-	if (command === 'record-macos' || command === 'record-windows') {
+	if (command === 'record-windows-upgrade') {
+		assert.equal(args.length, 3);
+		recordWindowsUpgrade(...args);
+	} else if (command === 'record-macos' || command === 'record-windows') {
 		assert.equal(args.length, 3);
 		(command === 'record-macos' ? recordMac : recordWindows)(...args);
 	} else {
@@ -326,4 +397,11 @@ if (require.main === module) {
 	}
 }
 
-module.exports = { verify, verifyWindowsStartup, readEvidence, recordMac, recordWindows };
+module.exports = {
+	verify,
+	verifyWindowsStartup,
+	readEvidence,
+	recordMac,
+	recordWindows,
+	recordWindowsUpgrade
+};

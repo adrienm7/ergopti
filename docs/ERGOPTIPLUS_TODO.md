@@ -5390,6 +5390,25 @@ two native-exit cases and 1000 ms runtime/5000 ms observer bounds remain intact.
 Fifteen extracted-census recording controls pass locally. Actual Win32 cause
 and native requalification remain unobserved; this diagnostic closes no item.
 
+Windows installed acceptance now requires a real published prior executable
+(v0.0.0-dev.155, pinned size/digest and two actual embedded assets), its
+installed schema-6 profile, then two exact current compiled boots over that
+same installation. Each current process must acknowledge the existing boot
+full-save generation through the production collector/WAL before readiness
+and exit. Both receipts report one shared native runtime identity; installed
+build/source-run product decisions retain their existing owner. Unknown retired Metrics values, comments and typed foreign records
+must survive; exact nonce/PID/package/bundle, clean output and acknowledged
+native process-tree retirement remain mandatory in the final Windows verdict.
+Independent source review and portable refusal/producer controls pass. The
+prior executable's actual embedded script forces its own installed bundle,
+without a checkout-root fallback. Its original serializer can discard comments;
+the fixture observes its real schema-6 profile first, after native tree closure,
+then records an explicit offline user edit of the retained comment rows. Every
+other installed byte and semantic value stays unchanged. Native before-edit
+and actual edited images are retained with a strict hash-linked boundary; the
+old executable is not claimed to preserve comments. Genuine Windows compiled execution remains
+unexecuted at this checkpoint; other-driver final acceptance is still open.
+
 - [ ] **73.** Partial: Windows combination families and pairs already use
       the canonical translated tap-hold key labels; macOS now resolves both
       physical keys through the same catalogue and invalidates its picker
@@ -6837,7 +6856,27 @@ original-producer causal controls remain unexecuted at this checkpoint.
 This repairs failed-acquisition compensation, without claiming complete live
 retargeting, modifier/output custody or physical delivery.
 
+Windows manual run37566070271 executed 10122 passing and eight failing
+unit cases. Seven resolver fixtures used a short temporary-root spelling or
+an empty exception substring; the native custody child triggered a genuine
+strict-warning collision between local and global exception names. The fixtures
+now independently obtain their owned directory's native long path, require
+sharing-error code32 and use a distinct terminal exception binding. Production
+resolution, native custody, all assertions and strict warnings are unchanged.
+Windows native revalidation is pending; E2E, packaging, installation and the
+source-reload diagnostics were not reached in that failed run.
+
 Remaining work for item108 (CI-feasible software first):
+
+Linux direct magic-source enumeration now fences its captured native session,
+backend, map and group/source generation before and after enumeration. It
+detaches requested positions and refuses substitutions or stale rows; ordinary
+reconstructed key events preserve a current source proof. Eight appended
+registered regressions retain every previous case; independent predecessor
+controls reproduce the stale-source and request-substitution failures on both
+Lua ABIs. Source review is complete. Hosted native qualification is pending;
+delivery capabilities and independent corpora remain unchanged. This does not
+complete default-binding retargeting or physical acceptance.
 
 - [ ] Software implementation/repair: Qualify existing conditional-editor policy without reimplementing completed work. Complete missing effective-source retargeting, all-owner collisions and modifier/output custody; preserve explicit None, personal overrides, migration and pause/reload fences. Keep unsupported seats honest and new physical delivery disabled until proved.
 - [ ] Hosted native qualification: Run actual HKL/TIS/XKB source, registrar and scoped publication/compensation cases for direct star/ù, missing/ambiguous/dead source and conflicts, then affected OS unit/E2E/package/install/startup.
