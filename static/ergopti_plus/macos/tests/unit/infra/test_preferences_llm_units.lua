@@ -74,3 +74,55 @@ helpers.describe("canonical LLM debounce persistence", function()
 end)
 package.loaded["adapters.file_system"] = FS
 package.loaded["infra.preferences"] = nil
+
+helpers.describe("Mac actual preference schema reader and publication", function()
+	local Sandbox = require("test.config_unused_keys_contract").sandbox
+	local Migration = require("config_migrate")
+	local registry = assert(Migration.load_registry(helpers.shared(Migration.REGISTRY_PATH)))
+	local function current(enabled)
+		return '# retain every foreign byte\n[_meta]\nschema_version = ' .. registry.current
+			.. '\n[llm]\nenabled = ' .. tostring(enabled)
+			.. '\n[future]\nprecise = 0.1234567890123456789\nmax = 9223372036854775807\nempty = [] # exact\n'
+	end
+	local function put(path, content)
+		local file = assert(io.open(path, "wb"))
+		assert(file:write(content))
+		assert(file:close())
+	end
+	for _, token in ipairs({ tostring(registry.current + 1), "true", '"11"', "11.5" }) do
+		helpers.it("rejects future/invalid native hydration and ordinary save after real boot " .. token, function()
+			Sandbox.with_config(current(false), function(path)
+				local previous, adapter = package.loaded["infra.preferences"], package.loaded["adapters.file_system"]
+				package.loaded["adapters.file_system"] = FS
+				package.loaded["infra.preferences"] = nil
+				local called, detail = pcall(function()
+					helpers.assert_eq(Migration.boot({ path = path, driver = "hs", registry = registry, file_adapter = FS }).status, "current")
+					local prefs = require("infra.preferences")
+					local old, old_status = prefs.load(path)
+					helpers.assert_eq(old_status, "ok")
+					helpers.assert_eq(old.llm_enabled, false)
+					local drift = current(true):gsub("schema_version = " .. registry.current, "schema_version = " .. token)
+					put(path, drift)
+					local values, status = prefs.load(path)
+					helpers.assert_eq(status, "corrupt", "explicit error classification, never absence")
+					helpers.assert_nil(values.llm_enabled, "unsupported metadata never hydrates fresh consent")
+					old.llm_enabled = true
+					helpers.assert_eq(prefs.save(path, old, {}, {}), false)
+					helpers.assert_eq(Sandbox.read_bytes(path), drift)
+					put(path, current(false))
+					local repaired, repaired_status = prefs.load(path)
+					helpers.assert_eq(repaired_status, "ok")
+					repaired.llm_enabled = true
+					helpers.assert_true(prefs.save(path, repaired, {}, {}))
+					helpers.assert_eq(Sandbox.read_bytes(path), current(true) .. '\n[hotstrings]\nmodules = {  }\n\n[shortcuts]\nkeys = {  }\n', "complete independently authored source")
+					package.loaded["infra.preferences"] = nil
+					local fresh, fresh_status = require("infra.preferences").load(path)
+					helpers.assert_eq(fresh_status, "ok")
+					helpers.assert_eq(fresh.llm_enabled, true, "fresh native reader and canonical decoder")
+				end)
+				package.loaded["infra.preferences"], package.loaded["adapters.file_system"] = previous, adapter
+				if not called then error(detail, 0) end
+			end)
+		end)
+	end
+end)

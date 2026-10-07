@@ -518,4 +518,138 @@ return function(helpers)
 		end)
 	end)
 
+	helpers.describe("authentic configuration scope preparation epoch", function()
+		local Sandbox = require("test.config_unused_keys_contract").sandbox
+		local Migration = require("config_migrate")
+		local NativeFiles = require("adapters.file_system")
+		local Writer = require("toml_codec.writer")
+		local shared = debug.getinfo(1, "S").source:sub(2):gsub("/lua/test/config_scope_transaction_contract%.lua$", "")
+		local registry = assert(Migration.load_registry(shared .. "/" .. Migration.REGISTRY_PATH))
+		local driver = debug.getinfo(NativeFiles.read_with_status, "S").source:find("/macos/", 1, true) and "hs" or "linux"
+		local original = '# exact foreign bytes\n[_meta]\nschema_version = ' .. registry.current
+			.. '\n[llm]\nenabled = true\n[future]\nprecise=0.1234567890123456789\nmax=9223372036854775807\nempty=[] # retain\n'
+		local function put(path, bytes)
+			local file = assert(io.open(path, "wb"))
+			assert(file:write(bytes)); assert(file:close())
+		end
+		local function scenario(body)
+			Sandbox.with_config(original, function(path)
+				local backup = path .. ".scope-backup"
+				local function boot()
+					return Migration.boot({ path = path, driver = driver, registry = registry, file_adapter = NativeFiles })
+				end
+				helpers.assert_eq(boot().status, "current")
+				local capture, apply, restore = 0, 0, 0
+				-- Native files/manifest/transaction are genuine. Runtime ports are
+				-- controlled observations of ordering, not platform SDK proof.
+				local options = { path = path, backup_path = backup, manifest = Manifest, files = NativeFiles,
+					capture = function() capture = capture + 1; return {} end,
+					apply = function() apply = apply + 1; return true end,
+					restore = function() restore = restore + 1; return true end,
+				}
+				local called, detail = pcall(body, path, backup, boot, options,
+					function() return capture, apply, restore end)
+				os.remove(backup); os.remove(backup .. ".tmp")
+				if not called then error(detail, 0) end
+			end)
+		end
+		for _, event in ipairs({ "boot", "future", "invalid", "source receipt mutation" }) do
+			helpers.it("refuses " .. event .. " during capture before backup and runtime", function()
+				scenario(function(path, backup, boot, options, counts)
+					local before, capture = original, options.capture
+					options.capture = function(source, ...)
+						local snapshot = capture(source, ...)
+						if event == "boot" then helpers.assert_eq(boot().status, "current")
+						elseif event == "source receipt mutation" then source.content = original .. "# forged\n"
+						else
+							before = original:gsub("schema_version = " .. registry.current,
+								"schema_version = " .. (event == "future" and tostring(registry.current + 1) or '"invalid"'))
+							put(path, before)
+						end
+						return snapshot
+					end
+					local owner = require("config_scope_transaction").new(options)
+					helpers.assert_eq(owner.apply("llm", "clear"), false)
+					local captured, applied, restored = counts()
+					helpers.assert_eq(captured, 1)
+					helpers.assert_eq(applied, 0)
+					helpers.assert_eq(restored, 0)
+					helpers.assert_eq(Sandbox.read_bytes(backup), nil, "no real backup before admission")
+					helpers.assert_eq(Sandbox.read_bytes(path), before, "complete exact source survives refusal")
+					helpers.assert_eq(owner.pending(), false)
+				end)
+			end)
+		end
+		helpers.it("refuses cloned and altered prepared snapshots without issuing authority", function()
+			scenario(function(path, backup, _, options, counts)
+				options.prepare_batch = function(...)
+					local accepted, why, candidate, source = Writer.prepare_batch(...)
+					return accepted, why, candidate, { status = source.status, content = source.content }
+				end
+				helpers.assert_eq(require("config_scope_transaction").new(options).apply("llm", "clear"), false)
+				local captured, applied = counts()
+				helpers.assert_eq(captured, 0); helpers.assert_eq(applied, 0)
+				helpers.assert_eq(Sandbox.read_bytes(path), original)
+				helpers.assert_nil(Sandbox.read_bytes(backup))
+				local accepted, _, candidate, source = Writer.prepare_batch(path,
+					{ { section = "llm", key = "enabled", value = false } }, NativeFiles)
+				helpers.assert_eq(accepted, true)
+				helpers.assert_eq(Writer.preparation_admission(path, { status = source.status, content = source.content }, candidate), false)
+				helpers.assert_eq(Writer.preparation_admission(path .. ".foreign", source, candidate), false)
+				helpers.assert_eq(Writer.preparation_admission(path, source, candidate .. "# altered\n"), false)
+				helpers.assert_true(Writer.preparation_admission(path, source, candidate)())
+			end)
+		end)
+		helpers.it("refuses withdrawn preparation authority instead of trusting an accessor", function()
+			scenario(function(path, backup, _, options, counts)
+				local previous, lookup = getmetatable(Writer), rawget(Writer, "preparation_admission")
+				local accesses = 0
+				rawset(Writer, "preparation_admission", nil)
+				setmetatable(Writer, { __index = function(_, key)
+					if key == "preparation_admission" then accesses = accesses + 1; return lookup end
+				end })
+				local called, accepted = pcall(require("config_scope_transaction").new(options).apply, "llm", "clear")
+				setmetatable(Writer, previous); rawset(Writer, "preparation_admission", lookup)
+				helpers.assert_eq(called, true); helpers.assert_eq(accepted, false)
+				helpers.assert_eq(accesses, 0)
+				local captured, applied = counts()
+				helpers.assert_eq(captured, 0); helpers.assert_eq(applied, 0)
+				helpers.assert_nil(Sandbox.read_bytes(backup))
+				helpers.assert_eq(Sandbox.read_bytes(path), original)
+			end)
+		end)
+		helpers.it("retires an old preparation while a fresh explicit current intent can succeed", function()
+			scenario(function(path, backup, boot, options)
+				local accepted, _, candidate, source = Writer.prepare_batch(path,
+					{ { section = "llm", key = "enabled", value = false } }, NativeFiles)
+				helpers.assert_eq(accepted, true)
+				local check = Writer.preparation_admission(path, source, candidate)
+				helpers.assert_true(check())
+				helpers.assert_eq(boot().status, "current")
+				helpers.assert_eq(check(), false)
+				helpers.assert_eq(Writer.publish_if_unchanged(path, candidate, NativeFiles, source), false)
+				helpers.assert_eq(Sandbox.read_bytes(path), original)
+				helpers.assert_true(require("config_scope_transaction").new(options).apply("llm", "clear"))
+				helpers.assert_eq(Sandbox.read_bytes(backup), original, "real backup retains exact pre-publication bytes")
+				helpers.assert_nil(Codec.decode(Sandbox.read_bytes(path)).llm.enabled)
+				helpers.assert_true(Sandbox.read_bytes(path):find('[future]\nprecise=0.1234567890123456789\nmax=9223372036854775807\nempty=[] # retain\n', 1, true) ~= nil)
+			end)
+		end)
+		helpers.it("rechecks preparation after runtime and compensates without primary publication", function()
+			scenario(function(path, backup, boot, options, counts)
+				local apply = options.apply
+				options.apply = function(...)
+					local accepted = apply(...)
+					helpers.assert_eq(boot().status, "current")
+					return accepted
+				end
+				helpers.assert_eq(require("config_scope_transaction").new(options).apply("llm", "clear"), false)
+				local captured, applied, restored = counts()
+				helpers.assert_eq(captured, 1); helpers.assert_eq(applied, 1); helpers.assert_eq(restored, 1)
+				helpers.assert_eq(Sandbox.read_bytes(path), original)
+				helpers.assert_eq(Sandbox.read_bytes(backup), original)
+			end)
+		end)
+	end)
+
 end
