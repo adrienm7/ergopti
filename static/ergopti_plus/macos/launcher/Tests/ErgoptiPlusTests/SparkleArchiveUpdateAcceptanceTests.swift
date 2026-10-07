@@ -261,6 +261,31 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		}
 	}
 
+	/// Signature identity is the exact message/public-key binding, not nonce bytes.
+	private static func foreignSignatureIsBound(_ signature: Data, payload: Data,
+		foreign: Curve25519.Signing.PublicKey, installed: Curve25519.Signing.PublicKey) -> Bool {
+		return signature.count == 64 && foreign.isValidSignature(signature, for: payload)
+			&& !installed.isValidSignature(signature, for: payload)
+	}
+
+	func testForeignSignatureBindingRejectsInstalledKeyAndChangedPayload() throws {
+		let foreign = Curve25519.Signing.PrivateKey()
+		let installed = Curve25519.Signing.PrivateKey()
+		let payload = Data("independent signature binding fixture".utf8)
+		let first = try foreign.signature(for: payload)
+		let second = try foreign.signature(for: payload)
+		XCTAssertTrue(Self.foreignSignatureIsBound(first, payload: payload,
+			foreign: foreign.publicKey, installed: installed.publicKey))
+		XCTAssertTrue(Self.foreignSignatureIsBound(second, payload: payload,
+			foreign: foreign.publicKey, installed: installed.publicKey))
+		XCTAssertFalse(Self.foreignSignatureIsBound(try installed.signature(for: payload), payload: payload,
+			foreign: foreign.publicKey, installed: installed.publicKey))
+		XCTAssertFalse(Self.foreignSignatureIsBound(first, payload: Data("changed fixture payload".utf8),
+			foreign: foreign.publicKey, installed: installed.publicKey))
+		XCTAssertFalse(Self.foreignSignatureIsBound(Data(), payload: payload,
+			foreign: foreign.publicKey, installed: installed.publicKey))
+	}
+
 	private let manager = FileManager.default
 	private var commands: [OwnedProcess] = []
 	private var retirementDebt = false
@@ -807,7 +832,9 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		let foreignFragment = try String(contentsOf: foreignArchives.appendingPathComponent("_ErgoptiPlus.app.tar.xz.sig"), encoding: .utf8)
 		let foreignMatch = try XCTUnwrap(expression.firstMatch(in: foreignFragment, range: NSRange(foreignFragment.startIndex..., in: foreignFragment)))
 		let foreignSignature = String(foreignFragment[try XCTUnwrap(Range(foreignMatch.range(at: 1), in: foreignFragment))])
-		XCTAssertTrue(Data(base64Encoded: foreignSignature) == wrongSignature, "The official signer must agree with the independent foreign Ed25519 key")
+		let foreignSignatureBytes = try XCTUnwrap(Data(base64Encoded: foreignSignature))
+		XCTAssertTrue(Self.foreignSignatureIsBound(foreignSignatureBytes, payload: payload,
+			foreign: foreignKey.publicKey, installed: key.publicKey), "The official signature must verify with the foreign key and fail with the installed key")
 		XCTAssertEqual(Int(foreignFragment[try XCTUnwrap(Range(foreignMatch.range(at: 2), in: foreignFragment))]), payload.count)
 		try payload.write(to: www.appendingPathComponent("archive.tar.xz"), options: .withoutOverwriting)
 		let refusedFeed = try generatedFeed(foreignArchives, destination: www.appendingPathComponent("feed.xml"), root: root, identity: identity)
