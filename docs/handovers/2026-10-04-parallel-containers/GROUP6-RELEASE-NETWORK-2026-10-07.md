@@ -301,6 +301,23 @@ CODE, not an implemented or CI-qualified fix. The source audit supplies seven
 native continuation requirements without changing any original assertion,
 deadline, positive, full-policy denial or six-case Brew acceptance.
 
+Manual37682193508 subsequently completes with10,268 Windows passes/four
+failures. The canonical route diagnostic now observes native_bypass/direct
+for the single entry. Origin is established; the full-URL PAC bypass cause is
+not. Managed-remote graceful cleanup, updater TLS/connect classification and
+updater deadline/cancellation cleanup remain failed. E2E/package/install and
+Release are skipped. Raw job logs return Forbidden; exact API annotations are
+retained. No complete Windows or native TLS repair qualification is claimed.
+
+The Linux dependency owner now separates core LuaJIT/luv, GTK and compiler
+setup attempts. Real luv is acquired and required in the first bootstrap;
+later roles attempt signed acquisition even if an earlier role fails. Each
+setup attempt remains bounded. Original in-case checks, package lists,
+receiving clocks and assertions remain intact; the independently declared
+signed-acquisition floor stays36. This removes the combined setup's failure
+propagation without borrowing a failed prerequisite as a successful native
+receipt. Complete Linux E2E/package/install receiving is still required.
+
 ## Remaining CODE and hosted work
 
 - **Windows62:** Join one packaged owned curl attempt engine to both the real

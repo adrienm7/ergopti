@@ -166,10 +166,7 @@ jobs:
         # Test discovery alone does not prove their filesystem admission.
         # Canonical XKB controls below require xkbcli before their first use.
         run: |
-          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y luajit lua-filesystem sqlite3 libxkbcommon-tools xkb-data
-          # Acquire native dependencies before the one-minute receiving clocks.
-          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends libgtk-3-bin dbus-x11 xvfb x11-utils
-          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends build-essential curl libffi-dev liblua5.4-dev lua-luv lua5.4 meson ninja-build openssl pkg-config python3 strace
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y luajit lua-luv lua-filesystem sqlite3 libxkbcommon-tools xkb-data
           luajit -e 'assert(require("luv"), "native E2E luv integration is mandatory")'
         timeout-minutes: 10
 
@@ -193,6 +190,18 @@ jobs:
           set -euo pipefail
           luajit tests/e2e/run_e2e.lua | tee "$RUNNER_TEMP/linux-e2e.log"
         timeout-minutes: 5
+
+      # Separate preparation attempts cannot suppress another role's acquisition.
+      # The original signed in-case checks and one-minute receiving clocks remain.
+      - name: Prepare native GTK dependencies
+        if: ${{ !cancelled() }}
+        run: sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends libgtk-3-bin dbus-x11 xvfb x11-utils
+        timeout-minutes: 10
+
+      - name: Prepare native process and compiler dependencies
+        if: ${{ !cancelled() }}
+        run: sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends build-essential curl libffi-dev liblua5.4-dev lua-luv lua5.4 meson ninja-build openssl pkg-config python3 strace
+        timeout-minutes: 10
 
       - name: Launch option-looking application ids through actual GTK desktop entries
         if: ${{ !cancelled() }}

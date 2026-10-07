@@ -6458,6 +6458,23 @@ summaries, SHA256 d9d2ef1ffb91a82ead067a060d6f9619009d1692276c5ab0afa826dd5baa79
 Original source-only packet statuses remain distinct from subsequent execution;
 no raw private captures, signed redirect URLs or private keys are included.
 
+Windows manual37682193508 at6695173f80e1560aca298ce6cab5252019529e6d
+subsequently completes with10,268 passes/four failures. The unchanged canonical
+route expectation receives one native_bypass/direct entry; this proves origin,
+not why the full-URL PAC selection bypassed. Managed-remote graceful cleanup,
+updater TLS versus connect classification and updater deadline/cancellation
+cleanup still fail. E2E/package/install and Release are skipped. Raw job logs
+are refused; API annotations retain the exact failures. No full Windows
+qualification or native TLS repair success is claimed.
+
+Linux preparation now separates core LuaJIT/luv, GTK and compiler acquisitions.
+Each dependency role retains its own bounded setup attempt; a prior failed role
+cannot prevent a later role's signed acquisition. Real luv is mandatory in the
+first bootstrap. All original in-case signed checks, package lists and native
+receiving clocks/assertions remain unchanged. The independent acquisition floor
+stays36. This fixes the combined setup's failure propagation; actual complete
+Linux qualification must still rerun. Items36/62 and transversal16/38 stay open.
+
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard
   layers on all three drivers. Windows and macOS also support their existing
