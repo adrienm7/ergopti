@@ -439,5 +439,195 @@ class AncestryDiagnosticControls(unittest.TestCase):
             self.assertIsNone(F._ancestry_failure_observation(context.exception))
 
 
+class KeychainFailureDiagnosticControls(unittest.TestCase):
+    """Real ordinary-file metadata; native credential ports remain unexecuted."""
+
+    def capture(self, error, actual, expected, stage="setup_credentials"):
+        method = getattr(F, "_keychain_failure_capture", None)
+        self.assertTrue(callable(method), "Closed keychain capture is absent")
+        method(error, actual, expected, stage)
+        return error
+
+    def decode(self, error):
+        method = getattr(F, "_keychain_failure_observation", None)
+        self.assertTrue(callable(method), "Closed keychain observation is absent")
+        return method(error)
+
+    def test_each_independent_axis_and_closed_fields(self):
+        for index, axis in enumerate(("dev", "ino", "uid", "mode")):
+            expected = [11, 22, 33, 0o600]
+            actual = list(expected)
+            actual[index] += 1
+            error = F.FixtureRefusal("keychain_changed")
+            self.assertIs(self.capture(error, tuple(actual), expected), error)
+            row = self.decode(error)
+            self.assertEqual(
+                row,
+                {
+                    "schema": 1,
+                    "kind": "test_only_signer_keychain_failure_observation",
+                    "authority": False,
+                    "native_verdict": "unchanged",
+                    "stage": "setup_credentials",
+                    "endpoint": "none",
+                    "phase": "entry",
+                    "mismatch_axes": [axis],
+                },
+            )
+            self.assertEqual(error.code, "keychain_changed")
+            self.assertEqual(str(error), "keychain_changed")
+
+    def genuine_cleanup(self, mutation):
+        import json
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve() / "owned"
+            root.mkdir(mode=0o700)
+            key = root / "fixture.keychain-db"
+            key.write_bytes(b"ordinary-file control, not a native keychain")
+            key.chmod(0o600)
+            original = key.lstat()
+            wanted = [original.st_dev, original.st_ino, original.st_uid, 0o600]
+            if mutation == "mode":
+                key.chmod(0o644)
+                axes = ["mode"]
+            else:
+                replacement = root / "replacement"
+                replacement.write_bytes(key.read_bytes())
+                replacement.chmod(0o600)
+                os.replace(replacement, key)
+                axes = ["ino"]
+            root_info = root.lstat()
+            state = {
+                "schema": 1,
+                "root": [root_info.st_dev, root_info.st_ino, root_info.st_uid, 0o700],
+                "before": [],
+                "keychain": wanted,
+                "files": {},
+            }
+            (root / ".state.json").write_text(json.dumps(state))
+            (root / ".state.json").chmod(0o600)
+            output, errors = io.StringIO(), io.StringIO()
+            with (
+                patch.object(F.sys, "platform", "darwin"),
+                contextlib.redirect_stdout(output),
+                contextlib.redirect_stderr(errors),
+            ):
+                status = F.main(["cleanup", str(root)])
+            self.assertEqual(status, 1)
+            self.assertEqual(output.getvalue(), "")
+            lines = errors.getvalue().splitlines()
+            self.assertEqual(lines[0], "Native signing TEST-ONLY fixture refused: keychain_changed")
+            self.assertEqual(len(lines), 2, "Failure has no closed mismatch observation")
+            prefix = "ERGOPTI_SIGNER_KEYCHAIN_DIAGNOSTIC "
+            self.assertTrue(lines[1].startswith(prefix))
+            row = json.loads(lines[1][len(prefix) :])
+            self.assertEqual(row["mismatch_axes"], axes)
+            self.assertEqual(
+                (row["stage"], row["endpoint"], row["phase"]), ("cleanup_entry", "none", "entry")
+            )
+            self.assertIs(row["authority"], False)
+            self.assertEqual(row["native_verdict"], "unchanged")
+            self.assertNotIn(str(root), errors.getvalue())
+            self.assertTrue(key.exists())
+            self.assertTrue((root / ".state.json").exists())
+
+    def test_genuine_mode_change_retains_original_refusal_and_names(self):
+        self.genuine_cleanup("mode")
+
+    def test_genuine_same_byte_inode_replacement_retains_original_refusal(self):
+        self.genuine_cleanup("ino")
+
+    def test_guard_endpoint_observes_original_exception_without_native_dispatch(self):
+        error = self.capture(
+            F.FixtureRefusal("keychain_changed"), (11, 23, 33, 0o600), [11, 22, 33, 0o600]
+        )
+
+        def refusal():
+            raise error
+
+        with self.assertRaises(F.FixtureRefusal) as caught:
+            F.command(
+                ["/usr/bin/security", "import", "SECRET /private/key"],
+                time.monotonic() + 5,
+                refusal,
+            )
+        self.assertIs(caught.exception, error)
+        row = self.decode(error)
+        self.assertEqual(
+            (row["stage"], row["endpoint"], row["phase"]), ("setup_credentials", "import", "before")
+        )
+        self.assertEqual(row["mismatch_axes"], ["ino"])
+        self.assertNotIn("SECRET", repr(row))
+
+    def test_fixed_completion_endpoint_and_unknown_metadata_do_not_disclose(self):
+        method = getattr(F, "_keychain_command_failure", None)
+        self.assertTrue(callable(method), "Fixed native-boundary classifier is absent")
+        error = self.capture(
+            F.FixtureRefusal("keychain_changed"), (11, 22, 33, 0o644), [11, 22, 33, 0o600]
+        )
+        method(error, ["/usr/bin/security", "set-keychain-settings", "SECRET"], "after")
+        self.assertEqual(
+            (self.decode(error)["endpoint"], self.decode(error)["phase"]),
+            ("set-keychain-settings", "after"),
+        )
+        for actual, expected, stage in [
+            ((True, 22, 33, 0o644), [11, 22, 33, 0o600], "setup_credentials"),
+            ((11, 22, 33, 0o644), [11, 22, "SECRET", 0o600], "setup_credentials"),
+            ((11, 22, 33, 0o644), [11, 22, 33, 0o600], "SECRET/private"),
+            ((11, 22, 33, 0o600), [11, 22, 33, 0o600], "setup_credentials"),
+            ((11, 22, 33, 0o644), [11, 22, 33, 0o600, 99], "setup_credentials"),
+        ]:
+            invalid = self.capture(F.FixtureRefusal("keychain_changed"), actual, expected, stage)
+            self.assertIsNone(self.decode(invalid))
+
+        class Foreign(F.FixtureRefusal):
+            pass
+
+        subclass = self.capture(
+            Foreign("keychain_changed"), (11, 22, 33, 0o644), [11, 22, 33, 0o600]
+        )
+        self.assertIsNone(self.decode(subclass))
+        invalid = F.FixtureRefusal("keychain_changed")
+        invalid.keychain_failure = {"SECRET": "PRIVATE /path"}
+        self.assertIsNone(self.decode(invalid))
+
+    def test_malformed_error_main_preserves_one_original_line(self):
+        error = self.capture(
+            F.FixtureRefusal("keychain_changed"), (11, 22, 33, 0o644), [11, 22, 33, 0o600]
+        )
+        error.keychain_failure = {
+            "stage": "SECRET /private",
+            "endpoint": "import",
+            "phase": "after",
+            "mismatch_axes": ["SECRET"],
+        }
+        output, errors = io.StringIO(), io.StringIO()
+        with (
+            patch.object(F, "setup", side_effect=error),
+            contextlib.redirect_stdout(output),
+            contextlib.redirect_stderr(errors),
+        ):
+            status = F.main(["setup", "/unused", "/unused"])
+        self.assertEqual(status, 1)
+        self.assertEqual(output.getvalue(), "")
+        self.assertEqual(
+            errors.getvalue(), "Native signing TEST-ONLY fixture refused: keychain_changed\n"
+        )
+
+    def test_success_never_emits_failure_diagnostic(self):
+        output, errors = io.StringIO(), io.StringIO()
+        record = F.public_record("A" * 40, "b" * 64)
+        with (
+            patch.object(F, "setup", return_value=record),
+            contextlib.redirect_stdout(output),
+            contextlib.redirect_stderr(errors),
+        ):
+            status = F.main(["setup", "/unused", "/unused"])
+        self.assertEqual(status, 0)
+        self.assertEqual(errors.getvalue(), "")
+        self.assertNotIn("DIAGNOSTIC", output.getvalue())
+
+
 if __name__ == "__main__":
     unittest.main()

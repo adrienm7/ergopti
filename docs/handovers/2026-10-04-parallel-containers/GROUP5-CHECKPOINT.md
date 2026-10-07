@@ -2204,3 +2204,19 @@ marker only the top-level call return; neither proves the first scheduler
 tick, completed cases or native UI success. These new markers remain native
 unexecuted and add no permission, ready or activation authority. Item24 stays
 partial; actual WebKit/UI and physical guardian/tap-hold acceptance remain open.
+
+## Closed native signer keychain identity diagnostic
+
+Authentic Mac37631140009 at20c1 reports400 passed,9 failed and15 skipped XCTest
+cases. Both canonical-parent signing BEFORE and realpath producer cases pass;
+actual disposable credential setup/cleanup each retain keychain_changed with
+only59-byte stderr. The cause is UNKNOWN until a new native observation.
+
+The reviewed diagnostic preserves every original error, typed keychain stamp,
+read, command, short circuit and SDK30/35/10 budget. It appends only closed
+mismatch axes and existing native endpoint/side on failure, with authorityfalse
+and unchanged native verdict. Original32 plus frozen7 controls pass in all
+three Python modes (117); source5 composes only the three actual helper hashes.
+Main/worker wiring is a separate held tranche. Native diagnostic AFTER execution,
+signing, activation, packaging and installation remain unqualified. No feature
+item is removed; TODO31 and transverse16/38 stay open.

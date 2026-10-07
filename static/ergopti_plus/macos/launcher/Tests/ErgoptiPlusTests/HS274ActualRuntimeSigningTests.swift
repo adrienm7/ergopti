@@ -118,7 +118,7 @@ extension HS274NativePolicyQualificationTests {
 			import sys
 			import time
 
-			PIN = "e026f815b4b301fedb96a3be95250637cf1134ed3c14df58212fde5c856c15f0"
+			PIN = "7efe296e0f0fe9040f310fba5e64cbbac1a20481df76e8f5118c200cbe0ab859"
 			TICKET = "signing-producer-custody.json"
 
 

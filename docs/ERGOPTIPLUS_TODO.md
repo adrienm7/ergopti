@@ -4693,6 +4693,22 @@ macOS compilation, Guardian execution, the original 37 native controls,
 IOKit/physical input, installation and suite fit remain unqualified. TODO31
 and transverse16/38 acceptance stay open.
 
+Authentic manual run37631140009 at20c1 completed424 XCTest cases:400 passed,
+9 failed and15 skipped. The original canonical-parent signing BEFORE control
+and the actual realpath producer case both pass. Disposable credential setup
+and cleanup still refuse keychain_changed; their original59-byte stderr gives
+no stage or mismatch axis, so the precise cause remains UNKNOWN.
+
+A closed failure-only diagnostic now records only changed dev/ino/uid/mode axes
+from the stamp already read by the original guard, plus its fixed stage and
+existing native endpoint/side. Original error instances, first stderr line,
+status, typed stamps, reads, commands, custody and SDK30/35/10 budgets remain
+whole. All32 old portable controls plus7 independently frozen additions pass
+in three modes (117). Three existing consumer hashes are composed mechanically;
+no native BEFORE assertion is weakened. Actual diagnostic execution after this
+change is unperformed; signing, packaging, installation and activation remain
+unqualified. TODO31 and transverse16/38 stay open.
+
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
   listed; see `docs/memory/text-input-and-config.md`. Current source already

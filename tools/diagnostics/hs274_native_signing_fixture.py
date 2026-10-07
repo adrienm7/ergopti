@@ -186,9 +186,120 @@ def public_record(identity, sha):
 _NATIVE = ("/usr/bin/security", "/usr/bin/openssl")
 
 
+_KEYCHAIN_AXES = ("dev", "ino", "uid", "mode")
+_KEYCHAIN_STAGES = ("setup_credentials", "cleanup_entry", "cleanup_delete")
+_KEYCHAIN_ENDPOINTS = (
+    "set-keychain-settings",
+    "unlock-keychain",
+    "import",
+    "set-key-partition-list",
+    "find-identity",
+    "list-keychains",
+    "delete-keychain",
+)
+
+
+def _keychain_failure_capture(error, actual, expected, stage):
+    """Annotate only the original refusal from its already-read fixed identity."""
+    try:
+        if (
+            type(error) is not FixtureRefusal
+            or type(error.code) is not str
+            or error.code != "keychain_changed"
+        ):
+            return
+        if type(stage) is not str or stage not in _KEYCHAIN_STAGES:
+            return
+        if type(actual) is not tuple or type(expected) not in (list, tuple):
+            return
+        if len(actual) != 4 or len(expected) != 4:
+            return
+        if not all(
+            type(value) is int and 0 <= value <= 2**64 - 1 for value in (*actual, *expected)
+        ):
+            return
+        axes = [axis for axis, seen, held in zip(_KEYCHAIN_AXES, actual, expected) if seen != held]
+        if axes:
+            error.keychain_failure = {
+                "stage": stage,
+                "endpoint": "none",
+                "phase": "entry",
+                "mismatch_axes": axes,
+            }
+    except Exception:
+        # A diagnostic can never replace the caller's original refusal.
+        return
+
+
+def _keychain_failure_observation(error):
+    """Decode only closed failure labels; no raw stat values, paths or extra I/O."""
+    try:
+        if (
+            type(error) is not FixtureRefusal
+            or type(error.code) is not str
+            or error.code != "keychain_changed"
+        ):
+            return None
+        row = getattr(error, "keychain_failure", None)
+        if type(row) is not dict or set(row) != {"stage", "endpoint", "phase", "mismatch_axes"}:
+            return None
+        stage, endpoint, phase = row["stage"], row["endpoint"], row["phase"]
+        if type(stage) is not str or stage not in _KEYCHAIN_STAGES:
+            return None
+        if type(endpoint) is not str or endpoint not in ("none", *_KEYCHAIN_ENDPOINTS):
+            return None
+        if type(phase) is not str or phase not in ("entry", "before", "after"):
+            return None
+        if (phase == "entry") != (endpoint == "none"):
+            return None
+        axes = row["mismatch_axes"]
+        if type(axes) is not list or not 1 <= len(axes) <= 4:
+            return None
+        if not all(type(axis) is str and axis in _KEYCHAIN_AXES for axis in axes):
+            return None
+        if axes != [axis for axis in _KEYCHAIN_AXES if axis in axes]:
+            return None
+        return {
+            "schema": 1,
+            "kind": "test_only_signer_keychain_failure_observation",
+            "authority": False,
+            "native_verdict": "unchanged",
+            "stage": stage,
+            "endpoint": endpoint,
+            "phase": phase,
+            "mismatch_axes": list(axes),
+        }
+    except Exception:
+        return None
+
+
+def _keychain_command_failure(error, arguments, phase):
+    """Bind a failed existing guard to its literal security endpoint and side."""
+    try:
+        if _keychain_failure_observation(error) is None:
+            return
+        if type(arguments) not in (list, tuple) or len(arguments) < 2:
+            return
+        if type(arguments[0]) is not str or arguments[0] != "/usr/bin/security":
+            return
+        endpoint = arguments[1]
+        if type(endpoint) is not str or endpoint not in _KEYCHAIN_ENDPOINTS:
+            return
+        if type(phase) is not str or phase not in ("before", "after"):
+            return
+        error.keychain_failure["endpoint"] = endpoint
+        error.keychain_failure["phase"] = phase
+    except Exception:
+        return
+
+
 def command(arguments, deadline, guard, env=None):
     require(arguments[0] in _NATIVE, "command")
-    guard()
+    try:
+        guard()
+    except FixtureRefusal as error:
+        _keychain_command_failure(error, arguments, "before")
+        raise
     remaining(deadline)
     try:
         result = subprocess.run(
@@ -202,7 +313,11 @@ def command(arguments, deadline, guard, env=None):
         )
     except (OSError, subprocess.TimeoutExpired) as e:
         raise FixtureRefusal("native_command") from e
-    guard()
+    try:
+        guard()
+    except FixtureRefusal as error:
+        _keychain_command_failure(error, arguments, "after")
+        raise
     remaining(deadline)
     require(
         result.returncode == 0 and len(result.stdout) + len(result.stderr) <= 2 * 1024 * 1024,
@@ -412,7 +527,16 @@ def setup(root, public):
 
     def credentials_current():
         guard()
-        require(_stamp(keychain.lstat()) == tuple(record["keychain"]), "keychain_changed")
+        try:
+            require(
+                (observed_keychain := _stamp(keychain.lstat())) == tuple(record["keychain"]),
+                "keychain_changed",
+            )
+        except FixtureRefusal as error:
+            _keychain_failure_capture(
+                error, observed_keychain, record["keychain"], "setup_credentials"
+            )
+            raise
         for name, identity in record["files"].items():
             require(
                 ordinary(root / name, identity[3]).identity == tuple(identity), "credential_changed"
@@ -538,11 +662,15 @@ def cleanup(root):
     )
     require(record["keychain"] is not None, "cleanup_unknown")
     keychain = root / "fixture.keychain-db"
-    require(
-        _stamp(keychain.lstat()) == tuple(record["keychain"])
-        and stat.S_ISREG(keychain.lstat().st_mode),
-        "keychain_changed",
-    )
+    try:
+        require(
+            (observed_keychain := _stamp(keychain.lstat())) == tuple(record["keychain"])
+            and stat.S_ISREG(keychain.lstat().st_mode),
+            "keychain_changed",
+        )
+    except FixtureRefusal as error:
+        _keychain_failure_capture(error, observed_keychain, record["keychain"], "cleanup_entry")
+        raise
     known = {".state.json", "fixture.keychain-db"} | set(record["files"])
     observed = set()
     with os.scandir(root) as entries:
@@ -580,11 +708,17 @@ def cleanup(root):
         nonlocal delete_cuts
         guard()
         if delete_cuts == 0:
-            require(
-                _stamp(keychain.lstat()) == tuple(record["keychain"])
-                and stat.S_ISREG(keychain.lstat().st_mode),
-                "keychain_changed",
-            )
+            try:
+                require(
+                    (observed_keychain := _stamp(keychain.lstat())) == tuple(record["keychain"])
+                    and stat.S_ISREG(keychain.lstat().st_mode),
+                    "keychain_changed",
+                )
+            except FixtureRefusal as error:
+                _keychain_failure_capture(
+                    error, observed_keychain, record["keychain"], "cleanup_delete"
+                )
+                raise
         else:
             require(not os.path.lexists(keychain), "cleanup_refused")
         delete_cuts += 1
@@ -699,6 +833,13 @@ def main(args):
             print(
                 "ERGOPTI_SIGNER_ANCESTRY_DIAGNOSTIC "
                 + json.dumps(observation, sort_keys=True, separators=(",", ":")),
+                file=sys.stderr,
+            )
+        keychain_observation = _keychain_failure_observation(error)
+        if keychain_observation is not None:
+            print(
+                "ERGOPTI_SIGNER_KEYCHAIN_DIAGNOSTIC "
+                + json.dumps(keychain_observation, sort_keys=True, separators=(",", ":")),
                 file=sys.stderr,
             )
         return 1
