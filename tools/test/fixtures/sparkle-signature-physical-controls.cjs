@@ -148,4 +148,115 @@ function runSignatureControls({ fixture }) {
 	);
 }
 
-module.exports = { runSignatureControls };
+function physicalModel(rawRoot, bundle, native) {
+	const root = native(rawRoot),
+		target = native(bundle);
+	if (!root || !target || root.kind !== 'directory' || target.kind !== 'directory') return false;
+	if (
+		typeof root.path !== 'string' ||
+		typeof target.path !== 'string' ||
+		!root.path.startsWith('/')
+	)
+		return false;
+	return root.path === rawRoot && target.path === rawRoot + '/installed/ErgoptiPlus.app';
+}
+
+function runPhysicalControls({ child, fixture, probe }) {
+	assert.equal(typeof child, 'string');
+	assert.equal(typeof fixture, 'string');
+	assert.equal(typeof probe, 'string');
+	assert.match(
+		fixture,
+		/func testActualChildPhysicalHelperFiveControlsAndLegacyProjectionInverse\(\) throws/,
+		'The actual child helper native XCTest must be registered'
+	);
+	assert.match(
+		fixture,
+		/\["fixed", "legacy-projection", "fixed"\]\.enumerated\(\)/,
+		'Native fixed/inverse/restored execution cannot be omitted'
+	);
+	assert.match(
+		fixture,
+		/tools\/test\/fixtures\/prepare-sparkle-native-physical-probe\.py/,
+		'Native XCTest must consume the registered exact helper extractor'
+	);
+	assert.match(
+		fixture,
+		/"\/usr\/bin\/xcrun", \["swiftc", generated\.path, "-o", executable\.path\]/,
+		'The generated actual helper requires real native compilation'
+	);
+	assert.match(fixture, /SPARKLE_CHILD_PHYSICAL_PROBE_COMPLETE:5/);
+	assert.match(fixture, /SPARKLE_CHILD_PHYSICAL_PROBE_REFUSED:parent-physical/);
+	assert.match(
+		fixture,
+		/Every physically acquired probe directory must retire before the next pass/
+	);
+	assert.match(
+		probe,
+		/hashlib\.sha256\(data\)\.hexdigest\(\) != args\.sha256/,
+		'The extractor must pin the complete actual child source'
+	);
+	assert.match(
+		probe,
+		/body = text\[start:end\]/,
+		'The fixed native probe must compile the exact actual helper body'
+	);
+	assert.match(probe, /first\.st_dev == second\.st_dev && first\.st_ino == second\.st_ino/);
+	assert.match(probe, /String\(validatingUTF8: pointer\)/);
+	assert.match(probe, /manager\.removeItem\(at: root\)/);
+	assert.match(child, /return Darwin\.realpath\(value, nil\)/);
+	assert.match(child, /metadata\.st_mode & mode_t\(S_IFMT\) == mode_t\(S_IFDIR\)/);
+	assert.match(child, /String\(validatingUTF8: resolved\)/);
+	assert.match(child, /guard result\.path == nativePath else/);
+	assert.match(
+		child,
+		/root = try physicalFixtureDirectory\(URL\(fileURLWithPath: rootPath, isDirectory: true\)\)/
+	);
+	assert.match(child, /physicalBundle = try physicalFixtureDirectory\(Bundle\.main\.bundleURL\)/);
+	assert.match(
+		child,
+		/guard root\.path == rootPath,\s*physicalBundle == root\.appendingPathComponent\("installed\/ErgoptiPlus\.app", isDirectory: true\)/,
+		'Both physical targets must remain exact before AppKit effects'
+	);
+	assert.doesNotMatch(child.slice(child.indexOf('let root: URL')), /resolvingSymlinksInPath/);
+	const physical = '/private/var/fixture',
+		alias = '/var/fixture';
+	const native = (input) => ({
+		path: input.replace(/^\/var\//, '/private/var/'),
+		kind: 'directory'
+	});
+	assert.equal(
+		physicalModel(physical, alias + '/installed/ErgoptiPlus.app', native),
+		true,
+		'Recorded alias must map to its one native physical directory'
+	);
+	assert.equal(
+		physicalModel(alias, alias + '/installed/ErgoptiPlus.app', native),
+		false,
+		'A noncanonical root is still refused'
+	);
+	assert.equal(physicalModel(physical, physical + '/foreign.app', native), false);
+	assert.equal(
+		physicalModel(physical, alias + '/installed/ErgoptiPlus.app', () => null),
+		false
+	);
+	assert.equal(
+		physicalModel(physical, alias + '/installed/ErgoptiPlus.app', () => ({
+			path: physical,
+			kind: 'file'
+		})),
+		false
+	);
+	assert.equal(
+		physicalModel(physical, alias + '/installed/ErgoptiPlus.app', () => ({
+			path: null,
+			kind: 'directory'
+		})),
+		false
+	);
+	console.log(
+		'Sparkle physical controls: recorded refusal and source wiring; six native Swift cases pending.'
+	);
+}
+
+module.exports = { runSignatureControls, runPhysicalControls };

@@ -7,6 +7,28 @@ import AppKit
 import Darwin
 import Sparkle
 
+private enum PhysicalFixtureFailure: Error { case refused }
+
+/// Foundation may project /private aliases; only Darwin supplies physical identity.
+private func physicalFixtureDirectory(_ source: URL) throws -> URL {
+	guard source.isFileURL, source.path.hasPrefix("/") else { throw PhysicalFixtureFailure.refused }
+	let resolved = source.withUnsafeFileSystemRepresentation { value -> UnsafeMutablePointer<CChar>? in
+		guard let value else { return nil }
+		return Darwin.realpath(value, nil)
+	}
+	guard let resolved else { throw PhysicalFixtureFailure.refused }
+	defer { free(resolved) }
+	var metadata = stat()
+	guard lstat(resolved, &metadata) == 0,
+		metadata.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR),
+		let nativePath = String(validatingUTF8: resolved), nativePath.hasPrefix("/") else {
+		throw PhysicalFixtureFailure.refused
+	}
+	let result = URL(fileURLWithPath: nativePath, isDirectory: true)
+	guard result.path == nativePath else { throw PhysicalFixtureFailure.refused }
+	return result
+}
+
 final class PrivateArchiveChild: NSObject, NSApplicationDelegate, SPUUserDriver, SPUUpdaterDelegate {
 	private let root: URL
 	private let nonce: String
@@ -213,9 +235,17 @@ guard let rootPath = Bundle.main.object(forInfoDictionaryKey: "FixtureRoot") as?
 	fputs("Private Sparkle child configuration refused.\n", stderr)
 	exit(78)
 }
-let root = URL(fileURLWithPath: rootPath).resolvingSymlinksInPath()
+let root: URL
+let physicalBundle: URL
+do {
+	root = try physicalFixtureDirectory(URL(fileURLWithPath: rootPath, isDirectory: true))
+	physicalBundle = try physicalFixtureDirectory(Bundle.main.bundleURL)
+} catch {
+	fputs("Private Sparkle child target refused.\n", stderr)
+	exit(78)
+}
 guard root.path == rootPath,
-	Bundle.main.bundleURL.resolvingSymlinksInPath() == root.appendingPathComponent("installed/ErgoptiPlus.app") else {
+	physicalBundle == root.appendingPathComponent("installed/ErgoptiPlus.app", isDirectory: true) else {
 	fputs("Private Sparkle child target refused.\n", stderr)
 	exit(78)
 }
