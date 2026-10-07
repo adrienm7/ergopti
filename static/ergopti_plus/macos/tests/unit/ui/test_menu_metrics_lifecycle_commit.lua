@@ -35,16 +35,26 @@ local function load_menu(start_result)
 	package.loaded["infra.dialog_util"] = {
 		block_alert = function() return "button.activate" end,
 	}
+	package.loaded["infra.i18n"] = nil
+	local renderer_i18n = require("infra.i18n")
 	package.loaded["infra.i18n"] = { get = function(key) return key end }
 	-- The switch is the command registered for the manifest's metrics_toggle
 	-- row, captured where the menu hands it to the renderer.
-	package.loaded["infra.manifest_menu"] = {
-		build = function(_, _, _, _, render_ctx)
+	local renderer = assert(require("menu.renderer").new({
+		platform = "hs",
+		manifest_path = function()
+			return helpers.driver_root() .. "../_shared/modules/menu/menu_manifest.json"
+		end,
+		json_decode = require("adapters.json_codec").decode,
+		i18n = renderer_i18n,
+		logger = helpers.make_logger_stub(),
+	}))
+	local capture = function(_, _, _, _, render_ctx)
 			ctx.commands = render_ctx.commands
 			return {}
-		end,
-		resolve_disabled_when = function() return false end,
-	}
+		end
+	renderer.build = capture
+	package.loaded["infra.manifest_menu"] = renderer
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	package.loaded["ui.wpm.wpm_menubar"] = {
 		start = function() ctx.menubar_starts = ctx.menubar_starts + 1 end,

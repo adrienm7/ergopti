@@ -19,6 +19,7 @@
 
 local M = {}
 local i18n = require("infra.i18n")
+local RowDialect = require("menu.row_dialect")
 
 --- Builds a disabled section header formatted as "— Label —".
 --- @param label string The section label (already localized).
@@ -68,27 +69,14 @@ end
 --- @return table The same row as provider data.
 function M.as_provider_row(row)
 	if type(row) ~= "table" then return row end
-	if row.title == "-" then return { separator = true } end
-
-	local out = { label = row.title, disabled = row.disabled }
-	if row.checked ~= nil then out.checked = row.checked and true or false end
-	if type(row.menu) == "table" then
-		local items = {}
-		for index, child in ipairs(row.menu) do items[index] = M.as_provider_row(child) end
-		out.items = items
-	elseif type(row.fn) == "function" then
-		out.action = row.fn
-	end
-	return out
+	return RowDialect.row(row)
 end
 
 --- Converts a whole hs.menubar subtree to provider rows.
 --- @param menu table Array of hs.menubar-shaped rows.
 --- @return table
 function M.rows_from_menu(menu)
-	local out = {}
-	for index, row in ipairs(menu or {}) do out[index] = M.as_provider_row(row) end
-	return out
+	return RowDialect.rows(menu)
 end
 
 return M

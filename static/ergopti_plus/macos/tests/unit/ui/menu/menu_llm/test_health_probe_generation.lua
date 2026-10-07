@@ -152,6 +152,15 @@ local function with_fixture(callback, options)
 				return {
 					build_nav_modifier_menu = function() return {} end,
 					build_val_modifier_menu = function() return {} end,
+					set_context_length = noop,
+					reset_context_length = noop,
+					set_min_words = noop,
+					reset_min_words = noop,
+					set_max_words = noop,
+					reset_max_words = noop,
+					set_temperature = noop,
+					reset_temperature = noop,
+					apply_setting_transaction = accept,
 					set_mlx_port = function(on_applied)
 						local committed = false
 						local function commit_port()
@@ -167,7 +176,7 @@ local function with_fixture(callback, options)
 				}
 			end,
 		}
-		package.loaded["ui.menu.menu_llm.temperature_panel"] = { build = noop }
+		package.loaded["ui.menu.menu_llm.temperature_panel"] = nil
 		package.loaded["ui.menu.menu_llm.streaming_panel"] = {
 			build = function() return {} end,
 		}
@@ -222,13 +231,23 @@ local function with_fixture(callback, options)
 			row_disabled = function() return false end,
 			has_health_dot = function(id) return id == "llm_model" end,
 		}
+		local presentation_renderer = assert(require("menu.renderer").new({
+			platform = "hs",
+			manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
+			json_decode = require("adapters.json_codec").decode,
+			i18n = { get = package.loaded["infra.i18n"].get, section = package.loaded["infra.i18n"].get },
+			logger = package.loaded["infra.logger"],
+		}))
 		package.loaded["infra.manifest_menu"] = {
 			command_row = native_renderer.command_row,
-			template_rows = native_renderer.template_rows,
+			template_rows = presentation_renderer.template_rows,
 		check_row = native_renderer.check_row,
 			native_child_rows = native_renderer.native_child_rows,
-			get_array = native_renderer.get_array,
-			render_rows = function(rows) return rows end,
+			get_array = presentation_renderer.get_array,
+			render_rows = function(rows, slot)
+				if slot == "llm_generation_settings" then return native_renderer.render_rows(rows, slot) end
+				return rows
+			end,
 			build = function(key, _, handlers, _, render_ctx, providers)
 				-- Only the health-bearing top-level handlers are observed here.
 				-- Generation's declared child retains the old pass-through numeric
