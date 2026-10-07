@@ -134,7 +134,11 @@ function M.new(owner, source, ports)
 				debts[record] = nil
 				assert(life.leave(record.frame), "Publication debt frame was already released")
 			end
-			if written ~= true or type(view) ~= "table" or view.published ~= true
+			-- Equal observed bytes alone grant no authority: an unchanged acknowledgement
+			-- must originate from this exact native issuer and its original desired source.
+			local unchanged = type(view) == "table" and view.published == false and view.unchanged == true
+				and expected.status == "ok" and expected.content == bytes
+			if written ~= true or type(view) ~= "table" or (view.published ~= true and not unchanged)
 				or type(view.source) ~= "table" or view.source.status ~= "ok" or view.source.content ~= bytes
 				or type(record.matches) ~= "function" or record.matches() ~= true or not native_settled then
 				return refusal("owned_publication_native_refused", write_detail)
@@ -143,6 +147,11 @@ function M.new(owner, source, ports)
 			local final = operations.read(path)
 			if type(final) ~= "table" or final.status ~= "ok" or final.content ~= bytes
 				or not current() then return refusal("owned_publication_readback_refused") end
+			-- The final read port may have completed a cooperative same-byte replacement.
+			-- Recheck this original issuer, then its logical epoch after matcher reentry.
+			if record.matches() ~= true or not current() then
+				return refusal("owned_publication_readback_refused")
+			end
 			return true
 		end))
 		busy = false

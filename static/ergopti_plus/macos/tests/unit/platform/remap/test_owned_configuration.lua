@@ -314,3 +314,123 @@ h.describe("unadmitted native receipt retirement", function()
 		for _, call in ipairs(d.calls) do h.assert_true(call ~= "retry", "unadmitted cleanup cannot execute") end
 	end)
 end)
+
+h.describe("issuer-bound unchanged private publication", function()
+	local function unchanged_fixture()
+		local d = fixture(); d.published, d.bytes = false, "complete"
+		local view = d.ports.receipt_view
+		d.ports.receipt_view = function(...)
+			local result = view(...)
+			if result then result.unchanged = d.unchanged end
+			return result
+		end
+		d.unchanged = true
+		-- Capture the new exact port before binding, preserving the original fixture.
+		d.publisher = assert(require("remap.owned_configuration_publication").new(d.owner, d.source, d.ports))
+		return d
+	end
+	h.it("admits only an actual unchanged issuer over the original desired bytes", function()
+		local d = unchanged_fixture()
+		h.assert_eq(d.publisher.publish(d.owner, d.token, {bytes="complete"}), true)
+		h.assert_eq(d.writes, 1); h.assert_eq(d.expected.content, "complete")
+		h.assert_eq(d.publisher.detach(d.owner, d.token), true)
+		h.assert_eq(d.publisher.retired(d.owner, d.token), true)
+	end)
+	for _, marker in ipairs({false, 1, "true"}) do
+		h.it("refuses a nonliteral unchanged issuer marker " .. tostring(marker), function()
+			local d = unchanged_fixture(); d.unchanged = marker
+			h.assert_eq(d.publisher.publish(d.owner, d.token, {bytes="complete"}), false)
+		end)
+	end
+	h.it("equal bytes without an unchanged issuer marker provide no authority", function()
+		local d = unchanged_fixture(); d.unchanged = nil
+		h.assert_eq(d.publisher.publish(d.owner, d.token, {bytes="complete"}), false)
+	end)
+	h.it("the unchanged issuer cannot acknowledge bytes absent from the original source", function()
+		local d = unchanged_fixture(); d.bytes = "personal"
+		h.assert_eq(d.publisher.publish(d.owner, d.token, {bytes="complete"}), false)
+		h.assert_eq(d.publisher.detach(d.owner, d.token), false)
+		h.assert_eq(d.publisher.retired(d.owner, d.token), false)
+	end)
+	h.it("an unknown no-op receipt cannot release original cleanup debt", function()
+		local d = unchanged_fixture(); d.view_refused = true
+		h.assert_eq(d.publisher.publish(d.owner, d.token, {bytes="complete"}), false)
+		h.assert_eq(d.publisher.detach(d.owner, d.token), false)
+		h.assert_eq(d.publisher.retired(d.owner, d.token), false)
+	end)
+	h.it("an unchanged receipt still requires the exact current physical source", function()
+		local d = unchanged_fixture(); d.match = false
+		h.assert_eq(d.publisher.publish(d.owner, d.token, {bytes="complete"}), false)
+	end)
+	h.it("retains unchanged native debt and retires only after its real cleanup acknowledgement", function()
+		local d = unchanged_fixture(); d.settled, d.write_ack = false, false
+		h.assert_eq(d.publisher.publish(d.owner, d.token, {bytes="complete"}), false)
+		h.assert_eq(d.publisher.detach(d.owner, d.token), false)
+		h.assert_eq(d.publisher.retired(d.owner, d.token), false)
+		d.retry_hook = function()
+			h.assert_eq(d.publisher.retired(d.owner, d.token), false)
+			d.settled = true
+		end
+		h.assert_eq(d.publisher.detach(d.owner, d.token), true)
+		h.assert_eq(d.publisher.retired(d.owner, d.token), true)
+	end)
+	h.it("stop reentered from unchanged receipt admission revokes before final logical acknowledgement", function()
+		local d = unchanged_fixture()
+		d.view_hook = function()
+			h.assert_eq(d.publisher.detach(d.owner, d.token), false)
+			h.assert_eq(d.publisher.retired(d.owner, d.token), false)
+		end
+		h.assert_eq(d.publisher.publish(d.owner, d.token, {bytes="complete"}), false)
+		h.assert_eq(d.publisher.detach(d.owner, d.token), true)
+		h.assert_eq(d.publisher.retired(d.owner, d.token), true)
+	end)
+	h.it("a changed source epoch during no-op admission cannot accept or renew the writer", function()
+		local d = unchanged_fixture(); d.view_hook = function() d.active = false end
+		h.assert_eq(d.publisher.publish(d.owner, d.token, {bytes="complete"}), false)
+		h.assert_eq(d.publisher.publish(d.owner, d.token, {bytes="complete"}), false)
+		h.assert_eq(d.writes, 1)
+	end)
+end)
+
+h.describe("final issuer matcher logical reentry fence", function()
+	local function final_match_fixture(hook)
+		local d = fixture(); d.bytes, d.published = "complete", false
+		local write, view = d.ports.write, d.ports.receipt_view
+		d.match_calls = 0
+		d.ports.write = function(...)
+			local written, detail, receipt = write(...)
+			local matcher = receipt.matches_source
+			receipt.matches_source = function()
+				d.match_calls = d.match_calls + 1
+				if d.match_calls == 2 then hook(d) end
+				return matcher()
+			end
+			return written, detail, receipt
+		end
+		d.ports.receipt_view = function(...)
+			local result = view(...)
+			if result then result.unchanged = true end
+			return result
+		end
+		d.publisher = assert(require("remap.owned_configuration_publication").new(d.owner, d.source, d.ports))
+		return d
+	end
+	h.it("an epoch revoked by the final native matcher cannot acknowledge unchanged bytes", function()
+		local d = final_match_fixture(function(owner) owner.active = false end)
+		h.assert_eq(d.publisher.publish(d.owner, d.token, {bytes="complete"}), false)
+		h.assert_eq(d.match_calls, 2)
+		h.assert_eq(d.publisher.publish(d.owner, d.token, {bytes="complete"}), false)
+		h.assert_eq(d.writes, 1)
+		h.assert_eq(d.publisher.detach(d.owner, d.token), true)
+		h.assert_eq(d.publisher.retired(d.owner, d.token), true)
+	end)
+	h.it("stop inside the final native matcher retains its in-flight callback before retirement", function()
+		local d = final_match_fixture(function(owner)
+			h.assert_eq(owner.publisher.detach(owner.owner, owner.token), true)
+			h.assert_eq(owner.publisher.retired(owner.owner, owner.token), false)
+		end)
+		h.assert_eq(d.publisher.publish(d.owner, d.token, {bytes="complete"}), false)
+		h.assert_eq(d.match_calls, 2)
+		h.assert_eq(d.publisher.retired(d.owner, d.token), true)
+	end)
+end)

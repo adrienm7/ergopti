@@ -3288,6 +3288,12 @@ Item30 remains partial; keyboard/device qualification is still required.
   assumption and fn/globe), WP10 enable and retire. Media metrics identities
   now exist for play/pause, track skips and brightness; production capture and
   native UI/physical acceptance remain unfinished.
+  Owned publication now accepts an unchanged document only through the exact
+  native issuer's completed lock-held receipt, and rechecks its physical source
+  and logical epoch after final readback. The filesystem preserves the released
+  configuration admission and captured-port identity APIs. Portable source
+  controls pass; the unchanged eight-variant native case, installation and
+  runtime activation remain pending. This does not complete WP7 or item31.
   VirtualHIDDevice version skew must block the incompatible runtime with an
   explicit explanation and offer an update only after confirmation (maintainer
   decision, 2026-10-04); implementation and native acceptance remain pending.

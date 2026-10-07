@@ -1923,3 +1923,27 @@ checks from an ancestry shortcut; omission controls refuse without replacing the
 actual provider. Native372CE trace is unavailable, so its precise cause remains
 unknown. Production ancestry/pins/Swift/budgets are unchanged. No item is removed;
 item31 and transverse16/38 remain partial.
+
+## Owned no-op publication and released filesystem preservation
+
+An unchanged desired document requires an opaque receipt from the actual native
+issuer after its completed lock-held comparison and final literal admission.
+It remains `published=false`; matching bytes or a caller-created table cannot
+grant acknowledgement. Final readback is followed by the captured issuer's
+physical-source match and logical-source currentness check. Genuine cooperative
+same-byte inode replacement during final read previously escaped that fence.
+
+The exact filesystem cuts released by group1 in `7ef778f3430f942bd92b26243bc89b5b6e6dc4bb`
+and `79ab781bef606b236b805b2ed76f5b2c3b2cd17c` are preserved under its explicit issue86
+ownership grant. Whole declared inverses recover both the published group1
+filesystem and the reviewed no-op filesystem. Its seven captured function-or-nil
+ports, final admission, detached source and release-only cleanup remain whole.
+No unrelated group1 controllers or TODO blocks are imported.
+
+The original 83 controls and 32 verbatim released group1 controls pass on both
+Lua ABIs. Eight semantic mutations assertion-refuse; one ineffective redundant
+copy omission is retained as passing evidence. Native ports are modeled; actual
+host inode/file operations are exercised. Native Swift execution is unperformed
+on Linux. The existing eight-variant native producer, independent expectations,
+assertions and deadlines are unchanged. WP7, item31 and transverse16/38 remain
+partial; no TODO item is removed by this slice.

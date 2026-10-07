@@ -586,3 +586,543 @@ helpers.describe("FileSystem no-op retains its native source fence", function()
 		end)
 	end)
 end)
+
+--- Native filesystem primitives are modeled; host bytes and inodes are real.
+helpers.describe("private unchanged publication issuer", function()
+	helpers.it("issues an exact immutable unchanged receipt without staging or rename", function()
+		with_fixture(function(fixture)
+			local path = os.tmpname():gsub("\\", "/")
+			local handle = assert(io.open(path, "wb")); assert(handle:write("complete")); assert(handle:close())
+			local before = fixture.HOST_ATTRIBUTES(path)
+			local held, locks, unlocks = false, 0, 0
+			local adapter, staging = fixture.make_adapter(nil, nil, nil, nil,
+				function() locks, held = locks + 1, true; return true end,
+				function() unlocks, held = unlocks + 1, false; return true end)
+			local original_read = adapter.read_with_status
+			adapter.read_with_status = function(target, diagnostic)
+				helpers.assert_eq(held, true, "the no-op observation must own its native writer lock")
+				return original_read(target, diagnostic)
+			end
+			local reporter = function() end
+			local expected = { status = "ok", content = "complete" }
+			local written, detail, receipt = adapter.write_if_unchanged(path, "complete", expected, reporter)
+			adapter.read_with_status = original_read
+			local after = fixture.HOST_ATTRIBUTES(path)
+			os.remove(path); os.remove(path .. fixture.WRITE_LOCK_SUFFIX)
+			helpers.assert_eq(written, true, detail)
+			helpers.assert_eq(type(receipt), "table", "a private no-op needs its actual issuer receipt")
+			helpers.assert_eq(adapter.publication_receipt_view(receipt, path, expected, "complete", reporter),
+				{ published = false, unchanged = true, source = { status = "ok", content = "complete" } })
+			helpers.assert_eq(receipt.is_settled(), true)
+			helpers.assert_eq(adapter.publication_receipt_view({}, path, expected, "complete", reporter), nil)
+			helpers.assert_eq(adapter.publication_receipt_view(receipt, path, expected, "wrong", reporter), nil)
+			helpers.assert_eq(adapter.publication_receipt_view(receipt, path, {status="ok",content="wrong"}, "complete", reporter), nil)
+			helpers.assert_eq(adapter.publication_receipt_view(receipt, path, expected, "complete", function() end), nil)
+			local mutation_called, mutation_error = pcall(function() receipt.unchanged = true end)
+			helpers.assert_eq(mutation_called, false)
+			helpers.assert_eq(type(mutation_error), "string")
+			helpers.assert_eq(mutation_error:match("native publication capabilities are immutable$"),
+				"native publication capabilities are immutable")
+			helpers.assert_eq(before.dev, after.dev); helpers.assert_eq(before.ino, after.ino)
+			helpers.assert_eq(before.permissions, after.permissions)
+			helpers.assert_eq(locks, 1); helpers.assert_eq(unlocks, 1); helpers.assert_eq(held, false)
+			helpers.assert_eq(next(staging), nil)
+		end)
+	end)
+
+	helpers.it("retains the no-op issuer lock debt until its exact native release succeeds", function()
+		with_fixture(function(fixture)
+			local path = os.tmpname():gsub("\\", "/")
+			local handle = assert(io.open(path, "wb")); assert(handle:write("complete")); assert(handle:close())
+			local releases = 0
+			local adapter = fixture.make_adapter(nil, nil, nil, nil, nil,
+				function() releases = releases + 1; return releases > 1 end)
+			local reporter = function() end
+			local expected = {status="ok",content="complete"}
+			local original_open = io.open
+			io.open = function(target, mode)
+				local handle, detail = original_open(target, mode)
+				if not handle or target ~= path .. fixture.WRITE_LOCK_SUFFIX then return handle, detail end
+				return {
+					close = function()
+						if releases <= 1 then return false, "modeled retained native descriptor" end
+						return handle:close()
+					end,
+				}
+			end
+			local written, _, receipt = adapter.write_if_unchanged(path, "complete", expected, reporter)
+			io.open = original_open
+			helpers.assert_eq(written, false, "pending lock release is no publication acknowledgement")
+			helpers.assert_eq(type(receipt), "table")
+			helpers.assert_eq(receipt.is_settled(), false)
+			helpers.assert_eq(adapter.publication_receipt_view(receipt, path, expected, "complete", reporter).unchanged, true)
+			helpers.assert_eq(receipt.matches_source(), true)
+			helpers.assert_eq(receipt.retry(), true)
+			helpers.assert_eq(receipt.is_settled(), true); helpers.assert_eq(releases, 2)
+			os.remove(path); os.remove(path .. fixture.WRITE_LOCK_SUFFIX)
+		end)
+	end)
+
+	helpers.it("a same-byte successor inode cannot inherit the no-op issuer source", function()
+		with_fixture(function(fixture)
+			local path = os.tmpname():gsub("\\", "/")
+			local handle = assert(io.open(path, "wb")); assert(handle:write("complete")); assert(handle:close())
+			local adapter = fixture.make_adapter()
+			local written, _, receipt = adapter.write_if_unchanged(path, "complete", {status="ok",content="complete"}, function() end)
+			helpers.assert_eq(written, true); helpers.assert_eq(type(receipt), "table")
+			helpers.assert_eq(receipt.matches_source(), true)
+			local replacement = os.tmpname():gsub("\\", "/")
+			local next_handle = assert(io.open(replacement, "wb")); assert(next_handle:write("complete")); assert(next_handle:close())
+			assert(os.rename(replacement, path))
+			helpers.assert_eq(receipt.matches_source(), false, "equal bytes do not grant a successor inode authority")
+			os.remove(path); os.remove(path .. fixture.WRITE_LOCK_SUFFIX)
+		end)
+	end)
+
+	helpers.it("the actual adapter acknowledges an initial publish followed by the same complete document", function()
+		with_fixture(function(fixture)
+			local path = os.tmpname():gsub("\\", "/"); os.remove(path)
+			local adapter = fixture.make_adapter()
+			local owner, token, active, stopped = {}, {}, true, false
+			local source = {
+				identity = function(who) if rawequal(who, owner) then return token end end,
+				current = function(who, which) return rawequal(who, owner) and rawequal(which, token) and active end,
+				route = function(who, which) if rawequal(who, owner) and rawequal(which, token) then return path end end,
+				detach = function(who, which)
+					if rawequal(who, owner) and rawequal(which, token) then active, stopped = false, true; return true end
+					return false
+				end,
+				retired = function(who, which) return rawequal(who, owner) and rawequal(which, token) and stopped end,
+			}
+			local ports = {
+				build = function(input) return input end,
+				encode = function(input) return input.bytes end,
+				prepare = function() return true end,
+				read = function(target)
+					local bytes, status = adapter.read_with_status(target)
+					return {status=status,content=bytes}
+				end,
+				write = adapter.write_if_unchanged,
+				receipt_view = adapter.publication_receipt_view,
+				on_error = function() end,
+			}
+			local publisher = assert(require("remap.owned_configuration_publication").new(owner, source, ports))
+			local first, first_reason = publisher.publish(owner, token, {bytes="complete independent document"})
+			local second, second_reason = publisher.publish(owner, token, {bytes="complete independent document"})
+			local detached, retired = publisher.detach(owner, token), publisher.retired(owner, token)
+			local bytes = adapter.read(path)
+			os.remove(path); os.remove(path .. fixture.WRITE_LOCK_SUFFIX)
+			helpers.assert_eq(first, true, first_reason)
+			helpers.assert_eq(second, true, second_reason)
+			helpers.assert_eq(detached, true); helpers.assert_eq(retired, true)
+			helpers.assert_eq(bytes, "complete independent document")
+		end)
+	end)
+end)
+
+helpers.describe("final native issuer source admission", function()
+	for _, interference in ipairs({ false, true }) do
+		helpers.it("rechecks the original issuer after final readback, replacement=" .. tostring(interference), function()
+			with_fixture(function(f)
+  local path=os.tmpname()
+  local seed=assert(io.open(path,'wb')); assert(seed:write('complete')); assert(seed:close())
+  -- Hold the original real inode open through both genuine cooperative replacements.
+  local held=assert(io.open(path,'rb'))
+  local original=assert(f.HOST_ATTRIBUTES(path))
+  local adapter=f.make_adapter()
+  local owner,token={},{}
+  local active,stopped=true,false
+  local source={}
+  function source.identity(o) if rawequal(o,owner) then return token end end
+  function source.current(o,t) return rawequal(o,owner) and rawequal(t,token) and active end
+  function source.route(o,t) if rawequal(o,owner) and rawequal(t,token) then return path end end
+  function source.detach(o,t) if rawequal(o,owner) and rawequal(t,token) then active,stopped=false,true; return true end end
+  function source.retired(o,t) return rawequal(o,owner) and rawequal(t,token) and stopped end
+  local reads,receipt,first_write,second_write=0,nil,nil,nil
+  local ports={}
+  function ports.build(input) return input end
+  function ports.encode(input) return input.bytes end
+  function ports.prepare() return true end
+  function ports.read(target)
+    reads=reads+1
+    if interference and reads==2 then
+      first_write=adapter.write(target,'temporary different complete document')
+      assert(first_write==true,'First genuine cooperative write must complete')
+      second_write=adapter.write(target,'complete')
+      assert(second_write==true,'Second genuine cooperative write must complete')
+    end
+    local bytes,status=adapter.read_with_status(target)
+    return {status=status,content=bytes}
+  end
+  function ports.write(target,bytes,expected,diagnostic)
+    local accepted,detail,native=adapter.write_if_unchanged(target,bytes,expected,diagnostic)
+    receipt=native
+    return accepted,detail,native
+  end
+  ports.receipt_view=adapter.publication_receipt_view
+  function ports.on_error() end
+  local publisher=assert(require('remap.owned_configuration_publication').new(owner,source,ports))
+  local accepted,reason=publisher.publish(owner,token,{bytes='complete'})
+  local final=assert(f.HOST_ATTRIBUTES(path))
+  local receipt_current=type(receipt)=='table' and receipt.matches_source()==true
+  local bytes=assert(io.open(path,'rb')); local content=bytes:read('*a'); assert(bytes:close())
+  print('OBSERVATION '..tostring(accepted)..' '..tostring(reason)..' '..tostring(receipt_current)..' '..tostring(original.ino)..' '..tostring(final.ino)..' '..tostring(reads)..' '..tostring(first_write)..' '..tostring(second_write))
+  assert(held:close()); assert(os.remove(path))
+  os.remove(path..f.WRITE_LOCK_SUFFIX)
+  assert(content=='complete','Final genuine bytes must equal desired bytes')
+  assert(reads==2,'Final readback port must actually run')
+  if interference then
+    assert(original.ino~=final.ino,'Held original inode must differ from genuine replacement inode')
+    assert(receipt_current==false,'Actual issuer must detect the original source is no longer current')
+    assert(accepted==false,'Final no-op admission must refuse an observably replaced issuer source')
+  else
+    assert(original.ino==final.ino and receipt_current==true,'Healthy original no-op receipt must remain current')
+    assert(accepted==true,'Healthy exact no-op must remain accepted')
+  end
+			end)
+		end)
+	end
+end)
+
+
+helpers.describe("adapters.file_system: final logical publication admission", function()
+	local with_fixture = require("tests.support.file_system_transaction_fixture").with_fixture
+	for _, unchanged in ipairs({ false, true }) do
+		local no_op = unchanged
+		for _, result in ipairs({ "true", "false", "nil", "truthy", "throw" }) do
+			local mode = result
+			helpers.it("checks " .. mode .. " admission after the final source read, unchanged=" .. tostring(no_op), function()
+				with_fixture(function(fixture)
+					local path = os.tmpname()
+					local file = assert(io.open(path, "wb")); assert(file:write("original")); assert(file:close())
+					local adapter = fixture.make_adapter()
+					local read, rename = adapter.read_with_status, os.rename
+					local reads, admitted_after, admissions, replacements = 0, 0, 0, 0
+					adapter.read_with_status = function(...)
+						local content, status, detail = read(...)
+						reads = reads + 1
+						return content, status, detail
+					end
+					os.rename = function(...)
+						replacements = replacements + 1
+						return rename(...)
+					end
+					local called, written, detail = pcall(adapter.write_if_unchanged_admitted,
+						path, no_op and "original" or "changed", { status = "ok", content = "original" }, nil,
+						function()
+							admissions, admitted_after = admissions + 1, reads
+							if mode == "throw" then error("controlled logical refusal") end
+							if mode == "true" then return true end
+							if mode == "false" then return false end
+							if mode == "truthy" then return {} end
+						end)
+					os.rename, adapter.read_with_status = rename, read
+					local handle = assert(io.open(path, "rb"))
+					local actual = assert(handle:read("*a")); assert(handle:close())
+					os.remove(path); os.remove(path .. fixture.WRITE_LOCK_SUFFIX)
+					helpers.assert_eq(called, true)
+					helpers.assert_eq(written, mode == "true", tostring(detail))
+					helpers.assert_eq(admissions, 1)
+					helpers.assert_true(reads > 0)
+					helpers.assert_eq(admitted_after, reads, "no logical/source reader follows final admission")
+					helpers.assert_eq(replacements, mode == "true" and not no_op and 1 or 0)
+					helpers.assert_eq(actual, mode == "true" and not no_op and "changed" or "original")
+				end)
+			end)
+		end
+	end
+end)
+
+
+helpers.describe("FileSystem admitted publication captures exact source before callbacks", function()
+	local with_fixture = require("tests.support.file_system_transaction_fixture").with_fixture
+	for _, unchanged in ipairs({ false, true }) do
+		local no_op = unchanged
+		helpers.it("refuses a mutated caller precondition and keeps the genuine external image, unchanged=" .. tostring(no_op), function()
+			with_fixture(function(fixture)
+				local path = os.tmpname()
+				local function put(content)
+					local file = assert(io.open(path, "wb")); assert(file:write(content)); assert(file:close())
+				end
+				put("original")
+				local adapter = fixture.make_adapter()
+				local read, rename = adapter.read_with_status, os.rename
+				local expected = { status = "ok", content = "original" }
+				local observed, reads, replacements, admissions = false, 0, 0, 0
+				adapter.read_with_status = function(...)
+					reads = reads + 1
+					if not observed then
+						observed = true
+						put("external-successor")
+						expected.content = "external-successor"
+					end
+					return read(...)
+				end
+				os.rename = function(...) replacements = replacements + 1; return rename(...) end
+				local called, written = pcall(adapter.write_if_unchanged_admitted,
+					path, no_op and "original" or "candidate", expected, nil,
+					function() admissions = admissions + 1; return true end)
+				os.rename, adapter.read_with_status = rename, read
+				local file = assert(io.open(path, "rb"))
+				local actual = assert(file:read("*a")); assert(file:close())
+				os.remove(path); os.remove(path .. fixture.WRITE_LOCK_SUFFIX)
+				helpers.assert_eq(called, true)
+				helpers.assert_eq(written, false)
+				helpers.assert_eq(actual, "external-successor")
+				helpers.assert_true(reads > 0)
+				helpers.assert_eq(replacements, 0)
+				helpers.assert_eq(admissions, 0, "source drift is rejected before logical admission")
+			end)
+		end)
+	end
+end)
+
+
+helpers.describe("FileSystem admitted source requires raw plain classified scalars", function()
+	local with_fixture = require("tests.support.file_system_transaction_fixture").with_fixture
+	helpers.it("rejects malformed and inherited source fields before any native reader or admission", function()
+		with_fixture(function(fixture)
+			local path = os.tmpname()
+			local handle = assert(io.open(path, "wb")); assert(handle:write("owned")); assert(handle:close())
+			local adapter = fixture.make_adapter()
+			local effects, reads, admissions = 0, 0, 0
+			local read = adapter.read_with_status
+			adapter.read_with_status = function(...) reads = reads + 1; return read(...) end
+			local inherited = setmetatable({}, { __index = function()
+				effects = effects + 1; return "owned"
+			end, __eq = function() effects = effects + 1; return true end })
+			local shapes = { false, {}, { status = "ok", content = 1 }, { status = false, content = "owned" },
+				{ status = "OK", content = "owned" }, { status = "absent", content = "owned" }, inherited,
+				setmetatable({ status = "ok", content = "owned" }, { __eq = function() effects = effects + 1; return true end }) }
+			for _, expected in ipairs(shapes) do
+				local pub_called, written = pcall(adapter.write_if_unchanged_admitted,
+					path, "candidate", expected, nil, function() admissions = admissions + 1; return true end)
+				local remove_called, removed = pcall(adapter.remove_if_unchanged_admitted,
+					path, expected, nil, function() admissions = admissions + 1; return true end)
+				helpers.assert_eq(pub_called, true)
+				helpers.assert_eq(written, false)
+				helpers.assert_eq(remove_called, true)
+				helpers.assert_eq(removed, false)
+			end
+			adapter.read_with_status = read
+			local file = assert(io.open(path, "rb"))
+			local actual = assert(file:read("*a")); assert(file:close())
+			os.remove(path)
+			helpers.assert_eq(actual, "owned")
+			helpers.assert_eq(reads, 0)
+			helpers.assert_eq(effects, 0)
+			helpers.assert_eq(admissions, 0)
+		end)
+	end)
+end)
+
+
+helpers.describe("FileSystem final logical removal admission", function()
+	for _, result in ipairs({ "true", "false", "nil", "truthy", "throw" }) do
+		local mode = result
+		helpers.it("conditional-remove admits only literal true after its final native read: " .. mode, function()
+			with_fixture(function(fixture)
+				local path = os.tmpname()
+				local handle = assert(io.open(path, "wb")); assert(handle:write("owned")); assert(handle:close())
+				local adapter = fixture.make_adapter()
+				local read, remove = adapter.read_with_status, os.remove
+				local reads, admission_read, admissions, unlinks = 0, 0, 0, 0
+				adapter.read_with_status = function(...)
+					local content, status, detail = read(...)
+					reads = reads + 1
+					return content, status, detail
+				end
+				os.remove = function(target)
+					if target == path then
+						unlinks = unlinks + 1
+						helpers.assert_eq(admission_read, reads, "no reader intervenes between final admission and unlink")
+					end
+					return remove(target)
+				end
+				local called, removed, detail, receipt = pcall(adapter.remove_if_unchanged_admitted,
+					path, { status = "ok", content = "owned" }, nil, function()
+						admissions, admission_read = admissions + 1, reads
+						if mode == "throw" then error("controlled removal refusal") end
+						if mode == "true" then return true end
+						if mode == "false" then return false end
+						if mode == "truthy" then return {} end
+					end)
+				os.remove, adapter.read_with_status = remove, read
+				local actual, status = adapter.read_with_status(path)
+				remove(path); remove(path .. fixture.WRITE_LOCK_SUFFIX)
+				helpers.assert_eq(called, true)
+				helpers.assert_eq(removed, mode == "true", tostring(detail))
+				helpers.assert_eq(admissions, 1)
+				helpers.assert_true(admission_read > 0)
+				helpers.assert_eq(unlinks, mode == "true" and 1 or 0)
+				helpers.assert_eq(status, mode == "true" and "absent" or "ok")
+				if mode == "true" then helpers.assert_nil(actual) else helpers.assert_eq(actual, "owned") end
+				helpers.assert_eq(receipt.is_settled(), true)
+			end)
+		end)
+	end
+end)
+
+
+helpers.describe("FileSystem admitted removal retains release ownership", function()
+	for _, permitted in ipairs({ false, true }) do
+		local accepted = permitted
+		helpers.it("settles release-only cleanup without readmission or repeat unlink, accepted=" .. tostring(accepted), function()
+			with_fixture(function(fixture)
+				local path = os.tmpname()
+				local file = assert(io.open(path, "wb")); assert(file:write("owned")); assert(file:close())
+				local release_refused, allowed, admissions, unlinks = true, accepted, 0, 0
+				local adapter = fixture.make_adapter(nil, nil, nil, nil, nil, function() return not release_refused end)
+				local remove, open = os.remove, io.open
+				io.open = function(target, mode)
+					local handle, detail = open(target, mode)
+					if target ~= path .. fixture.WRITE_LOCK_SUFFIX or mode ~= "a+" then return handle, detail end
+					return { close = function() if release_refused then return false end; return handle:close() end }
+				end
+				os.remove = function(target)
+					if target == path then unlinks = unlinks + 1 end
+					return remove(target)
+				end
+				local called, removed, detail, receipt, cleanup = pcall(adapter.remove_if_unchanged_admitted,
+					path, { status = "ok", content = "owned" }, nil, function()
+						admissions = admissions + 1
+						return allowed
+					end)
+				os.remove, io.open = remove, open
+				local actual, status = adapter.read_with_status(path)
+				allowed, release_refused = false, false
+				local cleaned = cleanup()
+				local cleaned_again = cleanup()
+				remove(path); remove(path .. fixture.WRITE_LOCK_SUFFIX)
+				helpers.assert_eq(called, true, tostring(detail))
+				helpers.assert_eq(removed, false)
+				helpers.assert_eq(receipt.removed, accepted)
+				helpers.assert_eq(unlinks, accepted and 1 or 0)
+				helpers.assert_eq(status, accepted and "absent" or "ok")
+				if accepted then helpers.assert_nil(actual) else helpers.assert_eq(actual, "owned") end
+				helpers.assert_eq(cleaned, true)
+				helpers.assert_eq(cleaned_again, true)
+				helpers.assert_eq(receipt.is_settled(), true)
+				helpers.assert_eq(admissions, 1, "release-only cleanup does not repeat logical admission")
+			end)
+		end)
+	end
+end)
+
+
+helpers.describe("FileSystem admitted removal captures exact source before callbacks", function()
+	helpers.it("refuses mutated expected bytes and never unlinks the genuine external source", function()
+		with_fixture(function(fixture)
+			local path = os.tmpname()
+			local function put(content)
+				local file = assert(io.open(path, "wb")); assert(file:write(content)); assert(file:close())
+			end
+			put("owned")
+			local adapter = fixture.make_adapter()
+			local read, remove = adapter.read_with_status, os.remove
+			local expected = { status = "ok", content = "owned" }
+			local observed, admissions, unlinks = false, 0, 0
+			adapter.read_with_status = function(...)
+				if not observed then
+					observed = true; put("external-successor"); expected.content = "external-successor"
+				end
+				return read(...)
+			end
+			os.remove = function(target)
+				if target == path then unlinks = unlinks + 1 end
+				return remove(target)
+			end
+			local called, removed = pcall(adapter.remove_if_unchanged_admitted,
+				path, expected, nil, function() admissions = admissions + 1; return true end)
+			os.remove, adapter.read_with_status = remove, read
+			local file = assert(io.open(path, "rb"))
+			local actual = assert(file:read("*a")); assert(file:close())
+			remove(path); remove(path .. fixture.WRITE_LOCK_SUFFIX)
+			helpers.assert_eq(called, true)
+			helpers.assert_eq(removed, false)
+			helpers.assert_eq(actual, "external-successor")
+			helpers.assert_eq(unlinks, 0)
+			helpers.assert_eq(admissions, 0)
+		end)
+	end)
+end)
+
+
+helpers.describe("FileSystem initializer configuration identities", function()
+	local fields = { "read_with_status", "write_if_unchanged", "write_if_unchanged_admitted",
+		"remove_if_unchanged", "remove_if_unchanged_admitted", "remove_exact", "delete" }
+	local function exercise(body)
+		with_fixture(function(fixture) body(fixture.make_adapter()) end)
+	end
+	helpers.it("returns genuine native identities without IO or invoking any native method", function()
+		exercise(function(adapter)
+			local open, remove, calls = io.open, os.remove, 0
+			local function unexpected() calls = calls + 1; error("identity lookup invoked IO") end
+			io.open, os.remove = unexpected, unexpected
+			local called, owner, reader, writer, publisher, remover, admitted, exact, delete =
+				pcall(adapter.configuration_ports)
+			io.open, os.remove = open, remove
+			helpers.assert_true(called)
+			helpers.assert_true(rawequal(owner, adapter))
+			local actual = { reader, writer, publisher, remover, admitted, exact, delete }
+			for index, field in ipairs(fields) do
+				helpers.assert_true(rawequal(actual[index], rawget(adapter, field)), field)
+			end
+			helpers.assert_eq(calls, 0)
+		end)
+	end)
+	for index, field in ipairs(fields) do
+		helpers.it("retains initializer identity after public export replacement: " .. field, function()
+			exercise(function(adapter)
+				local original = rawget(adapter, field)
+				local calls = 0
+				local function fake() calls = calls + 1; return true end
+				rawset(adapter, field, fake)
+				local called, owner, reader, writer, publisher, remover, admitted, exact, delete =
+					pcall(adapter.configuration_ports)
+				rawset(adapter, field, original)
+				local actual = { reader, writer, publisher, remover, admitted, exact, delete }
+				helpers.assert_true(called)
+				helpers.assert_true(rawequal(owner, adapter))
+				helpers.assert_true(rawequal(actual[index], original), "the receipt retains original absence or method")
+				helpers.assert_eq(rawequal(actual[index], fake), false)
+				helpers.assert_eq(calls, 0)
+			end)
+		end)
+	end
+
+	helpers.it("a borrowed getter retains the actual initializer owner, never a copied receiver", function()
+		exercise(function(adapter)
+			local getter = rawget(adapter, "configuration_ports")
+			local copy = setmetatable({ configuration_ports = getter }, { __eq = function() return true end })
+			local owner = copy.configuration_ports(copy)
+			helpers.assert_true(rawequal(owner, adapter))
+			helpers.assert_eq(rawequal(owner, copy), false)
+		end)
+	end)
+	helpers.it("returned identities are independent scalar values, not a mutable authority table", function()
+		exercise(function(adapter)
+			local owner, reader = adapter.configuration_ports()
+			owner, reader = {}, function() error("mutated result must not be invoked") end
+			local current_owner, current_reader = adapter.configuration_ports()
+			helpers.assert_true(rawequal(current_owner, adapter))
+			helpers.assert_true(rawequal(current_reader, rawget(adapter, "read_with_status")))
+			helpers.assert_eq(rawequal(current_owner, owner), false)
+			helpers.assert_eq(rawequal(current_reader, reader), false)
+		end)
+	end)
+	helpers.it("raw issuer withdrawal is distinguishable from an accessor fallback", function()
+		exercise(function(adapter)
+			local getter, previous = rawget(adapter, "configuration_ports"), getmetatable(adapter)
+			local reached = 0
+			rawset(adapter, "configuration_ports", nil)
+			setmetatable(adapter, { __index = function(_, key)
+				if key == "configuration_ports" then reached = reached + 1; return getter end
+			end })
+			local issuer = rawget(adapter, "configuration_ports")
+			setmetatable(adapter, previous); rawset(adapter, "configuration_ports", getter)
+			helpers.assert_nil(issuer)
+			helpers.assert_eq(reached, 0)
+		end)
+	end)
+end)
