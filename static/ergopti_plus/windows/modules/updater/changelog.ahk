@@ -133,7 +133,8 @@ _Updater_OneClickUpdateCallback(Json, Current, Request, Terminal := 0) {
 		if !_Updater_RequestMayPublish(Request)
 			return UpdateCheck_Abandon(Request)
 		UpdateCheck_ShowResult(Request, Map("state", "error", "current", Current,
-			"reason", "no_connection", "detail", "GitHub could not be reached"))
+			"reason", "no_connection", "detail", "GitHub could not be reached",
+			"network_report", Request.HasOwnProp("NetworkFailureReport") ? Request.NetworkFailureReport : 0))
 		return
 	}
 	if _Updater_JsonIsNoChannelRelease(Json) {
@@ -624,17 +625,54 @@ _Updater_InstallChosenRelease(G, Release) {
 
 ; Hands a chosen release to the update path with an install observer.
 ; @returns {Boolean} Whether the update path started.
-_Updater_StartObservedInstall(Release, Observer, Request) {
-	global _UpdaterInstallObserver
-	_UpdaterInstallObserver := Observer
+_Updater_StartObservedInstall(Release, Observer, Request, ExpectedFailureOwner := 0) {
+	Admission := _Updater_AdmitInstallObserver(Release, Observer, Request, ExpectedFailureOwner)
+	if !(Admission is Map)
+		return false
 	Started := false
 	try {
-		Started := Updater_DownloadAndInstall(Release, Request) == true
+		Started := Updater_DownloadAndInstall(Release, Request, , 0, 0, ExpectedFailureOwner) == true
 	} finally {
-		if !Started && IsObject(_UpdaterInstallObserver) && ObjPtr(_UpdaterInstallObserver) == ObjPtr(Observer)
-			_UpdaterInstallObserver := 0
+		if !Started
+			_Updater_RestoreInstallObserver(Admission)
 	}
 	return Started
+}
+
+; Only validation and publication are indivisible; no install/network/UI runs here.
+_Updater_AdmitInstallObserver(Release, Observer, Request, ExpectedFailureOwner := 0) {
+	global _UpdaterInstallObserver, _UpdaterInstallObserverEpoch
+	PreviousCritical := Critical("On")
+	try {
+		if !(ExpectedFailureOwner is Map) && ExpectedFailureOwner != 0
+			return 0
+		if ExpectedFailureOwner is Map
+			&& (_Updater_GetManagedFailureOwnerFor(Request, Release) != ExpectedFailureOwner
+				|| !_Updater_ManagedFailureOwnerIsCurrent(ExpectedFailureOwner))
+			return 0
+		Admission := Map("previous", _UpdaterInstallObserver, "observer", Observer,
+			"epoch", ++_UpdaterInstallObserverEpoch)
+		_UpdaterInstallObserver := Observer
+		return Admission
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+; An older refusal cannot clear a successor, even when both reuse one callback.
+_Updater_RestoreInstallObserver(Admission) {
+	global _UpdaterInstallObserver, _UpdaterInstallObserverEpoch
+	PreviousCritical := Critical("On")
+	try {
+		if !(Admission is Map) || Admission["epoch"] != _UpdaterInstallObserverEpoch
+			|| _UpdaterInstallObserver != Admission["observer"]
+			return false
+		_UpdaterInstallObserver := Admission["previous"]
+		_UpdaterInstallObserverEpoch += 1
+		return true
+	} finally {
+		Critical(PreviousCritical)
+	}
 }
 
 ; The native window has closed: only a failure is shown, with its reason and

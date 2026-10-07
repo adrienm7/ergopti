@@ -4,6 +4,8 @@
 		"http": ["http_proxy", "all_proxy", "ALL_PROXY"],
 		"https": ["https_proxy", "HTTPS_PROXY", "all_proxy", "ALL_PROXY"]
 	},
+	"environment_bypass_precedence": ["no_proxy", "NO_PROXY"],
+	"redirects": { "max_hops": 50 },
 	"system_lookup_environment_exclusions": [
 		"http_proxy",
 		"HTTP_PROXY",
