@@ -4,6 +4,7 @@
 """Serve private Sparkle archives and observe actual owned macOS executables."""
 
 import ctypes
+import errno
 import hashlib
 import http.server
 import importlib.util
@@ -337,7 +338,21 @@ def serve(root, nonce):
             # The native accepted socket has one unconditional physical owner.
             try:
                 if not state["stopping"]:
-                    self.finish_request(request, client_address)
+                    try:
+                        self.finish_request(request, client_address)
+                    except OSError as failure:
+                        # Winsock reports an interrupted read as WSAESHUTDOWN
+                        # when our exact successful stop preceded the read.
+                        if not (
+                            sys.platform == "win32"
+                            and failure.errno == errno.WSAESHUTDOWN
+                            and state["stopping"]
+                            and self.active_request is request
+                            and self.active_stop_attempted
+                            and not self.active_handler_admitted
+                            and self.stop_failure is None
+                        ):
+                            raise
             finally:
                 # Header/body handling is now terminal; the local request still
                 # owns its capability while canonical shutdown closes it below.

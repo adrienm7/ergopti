@@ -507,13 +507,20 @@ class AcceptedSocketStopControls(unittest.TestCase):
     """Real loopback EOF/close; filesystem and Windows signal ports are modeled."""
 
     def observe_stop(
-        self, partial=False, native_signal=False, shutdown_refused=False, publication_cut=False
+        self,
+        partial=False,
+        native_signal=False,
+        shutdown_refused=False,
+        publication_cut=False,
+        stop_before_read=False,
+        resource_refused=False,
     ):
         spec = importlib.util.spec_from_file_location("sparkle_accepted_socket_control", HELPER)
         helper = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(helper)
         ready, accepted, headers = threading.Event(), threading.Event(), threading.Event()
         ports, publications, captures, failures, peers = [], [], [], [], []
+        stopped = threading.Event()
         handlers = {}
         old_handlers = {
             number: signal.getsignal(number) for number in (signal.SIGTERM, signal.SIGINT)
@@ -534,6 +541,10 @@ class AcceptedSocketStopControls(unittest.TestCase):
             self.assertIs(server.active_request, request)
             captures.append((server, request))
             accepted.set()
+            if stop_before_read and not stopped.wait(2):
+                raise AssertionError("the exact socket must stop before its first read")
+            if resource_refused:
+                raise PermissionError(errno.EACCES, "controlled unrelated read refusal")
             return original_finish(server, request, address)
 
         def install(number, callback):
@@ -564,7 +575,10 @@ class AcceptedSocketStopControls(unittest.TestCase):
             if shutdown_refused and how == socket.SHUT_RDWR:
                 failures.append("shutdown-refused")
                 raise OSError(errno.EPERM, "controlled accepted-socket shutdown refusal")
-            return original_shutdown(request, how)
+            result = original_shutdown(request, how)
+            if how == socket.SHUT_RDWR:
+                stopped.set()
+            return result
 
         def peer():
             try:
@@ -652,7 +666,12 @@ class AcceptedSocketStopControls(unittest.TestCase):
             [name for name, _ in publications], ["server-start.json", "server-retired.json"]
         )
         self.assertEqual(publications[-1][1], {"nonce": NONCE, "pid": os.getpid(), "requests": 0})
-        if shutdown_refused:
+        if resource_refused:
+            self.assertIsInstance(raised, RuntimeError)
+            self.assertEqual(str(raised), "Private Sparkle resource handling refused")
+            self.assertEqual(failures, [])
+            self.assertEqual(peers, [b""])
+        elif shutdown_refused:
             self.assertIsInstance(raised, RuntimeError)
             self.assertEqual(str(raised), "Private Sparkle accepted-socket stop refused")
             self.assertIsInstance(server.stop_failure, OSError)
@@ -672,7 +691,11 @@ class AcceptedSocketStopControls(unittest.TestCase):
         self.observe_stop(publication_cut=True)
 
     def testModeledStopInterruptsActualIdleAcceptedSocketAndClosesBothOwners(self):
-        self.observe_stop()
+        for stop_before_read in (False, True):
+            with self.subTest(stop_before_read=stop_before_read):
+                self.observe_stop(stop_before_read=stop_before_read)
+        with self.subTest(unrelated_read_refusal=True):
+            self.observe_stop(stop_before_read=True, resource_refused=True)
 
     def testModeledStopInterruptsPartialHeadersWithoutReadingOrPublishingResource(self):
         self.observe_stop(partial=True)
