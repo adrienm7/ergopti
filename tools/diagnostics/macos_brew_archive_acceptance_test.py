@@ -233,6 +233,7 @@ class ArchiveAcceptanceControls(unittest.TestCase):
                 "tools/diagnostics/native_appleevent_probe_sender.c",
                 "tools/diagnostics/native_appleevent_registration_test.m",
                 "tools/diagnostics/native_appleevent_probe_protocol.h",
+                "tools/diagnostics/native_appleevent_probe_pair.m",
             ):
                 file = repository / name
                 file.parent.mkdir(parents=True, exist_ok=True)
@@ -282,6 +283,7 @@ class ArchiveAcceptanceControls(unittest.TestCase):
                 "tools/diagnostics/native_appleevent_probe_sender.c",
                 "tools/diagnostics/native_appleevent_registration_test.m",
                 "tools/diagnostics/native_appleevent_probe_protocol.h",
+                "tools/diagnostics/native_appleevent_probe_pair.m",
             ):
                 file = repository / name
                 file.parent.mkdir(parents=True, exist_ok=True)
@@ -613,11 +615,16 @@ class AppleEventBoundaryControls(unittest.TestCase):
                 self.deliveries = 0
 
             def start(self, arguments):
+                judge.assertEqual(
+                    arguments[:2],
+                    [str(root / "OwnedAppleEvent.app/Contents/MacOS/owned-probe"), "receiver"],
+                )
+                judge.assertEqual(len(arguments), 5)
                 child = Mock(pid=73136)
                 self.active.append(child)
                 self.groups[child] = Mock(reaped=False)
                 self.groups[child].observe_exit.return_value = None
-                Path(arguments[1]).write_bytes(
+                Path(arguments[2]).write_bytes(
                     b"" if partial_ready else b"73136\n" + judge.nonce.encode() + b"\n"
                 )
                 return child
@@ -2267,6 +2274,72 @@ class SenderNonpromptPermissionControls(unittest.TestCase):
         )
         with self.assertRaises(probe.AdmissionError):
             probe.run_appleevent_sender(owner, [], "unconfined-positive")
+
+
+class SharedImageAppleEventRecipeControls(unittest.TestCase):
+    """Real recipe/filesystem over an explicit compiler port, never native delivery."""
+
+    def test_two_roles_share_one_compiled_signed_image_without_privacy_changes(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            calls = []
+            children = SimpleNamespace(run=lambda args, **options: calls.append((args, options)))
+            nonce = "54bc7a36-e2f0-43f8-917e-ce3d286d7520"
+            roles = probe._build_appleevent_pair(children, root, root, ["owned-clang"], nonce)
+            self.assertEqual(set(roles), {"receiver", "sender"})
+            self.assertEqual(roles["receiver"][0], roles["sender"][0])
+            self.assertEqual(roles["receiver"][1], "receiver")
+            self.assertEqual(roles["sender"][1], "sender")
+            self.assertEqual(len(calls), 3)
+            self.assertEqual(calls[0][0][0], "owned-clang")
+            self.assertIn(
+                str(root / "tools/diagnostics/native_appleevent_probe_pair.m"), calls[0][0]
+            )
+            self.assertEqual(calls[0][0][-1], roles["receiver"][0])
+            app = root / "OwnedAppleEvent.app"
+            self.assertEqual(calls[1][0], ["/usr/bin/codesign", "--force", "--sign", "-", str(app)])
+            self.assertEqual(
+                calls[2][0], ["/usr/bin/codesign", "--verify", "--deep", "--strict", str(app)]
+            )
+            self.assertTrue(all(options == {"confined": True} for _, options in calls))
+            info = probe.plistlib.loads((app / "Contents/Info.plist").read_bytes())
+            self.assertEqual(info["CFBundleIdentifier"], "com.ergopti.private.appleevent." + nonce)
+            self.assertEqual(info["CFBundleExecutable"], "owned-probe")
+            self.assertNotIn("NSAppleScriptEnabled", info)
+            self.assertNotIn("--entitlements", str(calls))
+
+    def test_compiler_refusal_cannot_sign_or_supply_role_routes(self):
+        with TemporaryDirectory() as directory:
+            run = Mock(side_effect=probe.AdmissionError("actual compiler refusal"))
+            with self.assertRaisesRegex(probe.AdmissionError, "actual compiler refusal"):
+                probe._build_appleevent_pair(
+                    SimpleNamespace(run=run),
+                    Path(directory),
+                    Path(directory),
+                    ["owned-clang"],
+                    "54bc7a36-e2f0-43f8-917e-ce3d286d7520",
+                )
+            self.assertEqual(run.call_count, 1)
+            self.assertEqual(run.call_args.kwargs, {"confined": True})
+
+    def test_an_existing_bundle_is_never_replaced_or_signed(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            existing = root / "OwnedAppleEvent.app/Contents/MacOS"
+            existing.mkdir(parents=True)
+            sentinel = existing / "foreign"
+            sentinel.write_bytes(b"independent foreign bytes")
+            run = Mock()
+            with self.assertRaises(FileExistsError):
+                probe._build_appleevent_pair(
+                    SimpleNamespace(run=run),
+                    root,
+                    root,
+                    ["owned-clang"],
+                    "54bc7a36-e2f0-43f8-917e-ce3d286d7520",
+                )
+            run.assert_not_called()
+            self.assertEqual(sentinel.read_bytes(), b"independent foreign bytes")
 
 
 if __name__ == "__main__":

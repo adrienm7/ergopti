@@ -1327,11 +1327,50 @@ def run_appleevent_sender(children, arguments, control, *, confined=False):
     return result
 
 
+def _build_appleevent_pair(children, repository, root, compiler, nonce):
+    """Build one owned signed image for two distinct processes, without privacy grants."""
+    app = root / "OwnedAppleEvent.app"
+    executable = app / "Contents/MacOS/owned-probe"
+    executable.parent.mkdir(parents=True)
+    (app / "Contents/Info.plist").write_bytes(
+        plistlib.dumps(
+            {
+                "CFBundleIdentifier": "com.ergopti.private.appleevent." + nonce,
+                "CFBundleName": "Owned AppleEvent sandbox admission",
+                "CFBundleExecutable": "owned-probe",
+                "CFBundlePackageType": "APPL",
+                "LSUIElement": True,
+                "NSAppleEventsUsageDescription": "Private native sandbox delivery admission.",
+            }
+        )
+    )
+    children.run(
+        [
+            *compiler,
+            "-std=c11",
+            "-O2",
+            "-fobjc-arc",
+            "-framework",
+            "ApplicationServices",
+            "-framework",
+            "Carbon",
+            "-framework",
+            "AppKit",
+            str(repository / "tools/diagnostics/native_appleevent_probe_pair.m"),
+            "-o",
+            str(executable),
+        ],
+        confined=True,
+    )
+    children.run(["/usr/bin/codesign", "--force", "--sign", "-", str(app)], confined=True)
+    children.run(["/usr/bin/codesign", "--verify", "--deep", "--strict", str(app)], confined=True)
+    return {role: [str(executable), role] for role in ("receiver", "sender")}
+
+
 def _admit_appleevent_boundary(children, repository):
     """Require two real owned deliveries before admitting the full policy's refusal."""
     root = children.root
     nonce = str(uuid.uuid4())
-    executables = {}
     compiler = native_compiler(children)
     registration_test = root / "native-appleevent-registration-test"
     children.run(
@@ -1359,53 +1398,14 @@ def _admit_appleevent_boundary(children, repository):
         and not registration_controls.stderr,
         "Controlled AppKit registration refusals were not independently admitted",
     )
-    for role in ("receiver", "sender"):
-        app = root / ("OwnedAppleEvent-" + role + ".app")
-        executable = app / "Contents/MacOS" / role
-        executable.parent.mkdir(parents=True)
-        (app / "Contents/Info.plist").write_bytes(
-            plistlib.dumps(
-                {
-                    "CFBundleIdentifier": "com.ergopti.private.appleevent." + role + "." + nonce,
-                    "CFBundleName": "Owned AppleEvent sandbox admission",
-                    "CFBundleExecutable": role,
-                    "CFBundlePackageType": "APPL",
-                    "LSUIElement": True,
-                    "NSAppleEventsUsageDescription": "Private native sandbox delivery admission.",
-                }
-            )
-        )
-        command = [
-            *compiler,
-            "-std=c11",
-            "-O2",
-            "-framework",
-            "ApplicationServices",
-        ]
-        if role == "receiver":
-            command += [
-                "-x",
-                "objective-c",
-                "-fobjc-arc",
-                "-framework",
-                "Carbon",
-                "-framework",
-                "AppKit",
-            ]
-        command += [
-            str(repository / ("tools/diagnostics/native_appleevent_probe_" + role + ".c")),
-            "-o",
-            str(executable),
-        ]
-        children.run(command, confined=True)
-        children.run(["/usr/bin/codesign", "--force", "--sign", "-", str(app)], confined=True)
-        children.run(
-            ["/usr/bin/codesign", "--verify", "--deep", "--strict", str(app)], confined=True
-        )
-        executables[role] = executable
+    # Two separately signed application identities need TCC consent even for
+    # this private event. Keep distinct acquired PIDs but one fixture image.
+    # The native positive/deny-removal/denied controls remain mandatory; this
+    # construction does not qualify authorization to any external application.
+    executables = _build_appleevent_pair(children, repository, root, compiler, nonce)
     ready = root / "appleevent-ready"
     marker = root / "appleevent-delivered"
-    receiver = children.start([str(executables["receiver"]), str(ready), str(marker), nonce])
+    receiver = children.start([*executables["receiver"], str(ready), str(marker), nonce])
     group = children.groups[receiver]
 
     def same_live_receiver(checkpoint):
@@ -1479,7 +1479,7 @@ def _admit_appleevent_boundary(children, repository):
         )
         time.sleep(0.02)
     same_live_receiver("before-unconfined-positive")
-    sender = [str(executables["sender"]), str(receiver.pid), nonce]
+    sender = [*executables["sender"], str(receiver.pid), nonce]
     positive = run_appleevent_sender_observed(
         children, [*sender, "success"], "unconfined-positive", receiver=receiver, group=group
     )
@@ -1837,6 +1837,7 @@ def _observe(repository, output, *, fixture_parent=None, evidence):
                 "tools/diagnostics/native_appleevent_probe_sender.c",
                 "tools/diagnostics/native_appleevent_registration_test.m",
                 "tools/diagnostics/native_appleevent_probe_protocol.h",
+                "tools/diagnostics/native_appleevent_probe_pair.m",
             )
         },
         "cases": {},
