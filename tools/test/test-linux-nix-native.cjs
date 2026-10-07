@@ -315,6 +315,185 @@ check('removing the public annotation fails the same independent receipt', () =>
 		assert.AssertionError
 	);
 });
+
+// Independent literals exercise the actual passive projection, never Nix.
+const closedBuild = (stderr) => ({
+	checkpoint: 'native-build',
+	boundary: 'result_or_physical_debt_gate',
+	result: { status: 1, signal: null, error: null, stderr }
+});
+function receiveBuild(observation, expected, retained = false, code = diagnostic) {
+	const observed = projection(observation, retained, code);
+	const hint = 'NIX_NATIVE_BUILD_ERROR_KINDS kinds=' + expected;
+	assert.deepEqual(observed.slice(2), [
+		hint,
+		'::error title=Nix native build classification::' + hint
+	]);
+}
+for (const [name, text, expected] of [
+	['missing attribute', "       error: attribute 'luv' missing\n", 'evaluation'],
+	['undefined evaluator name', "error: undefined variable 'fixture'\n", 'evaluation'],
+	['evaluator type refusal', 'error: cannot coerce a list to a string\n', 'evaluation'],
+	[
+		'Nixpkgs implementation prerequisite',
+		'       This version of Nixpkgs requires an implementation of Nix with the following features:\n',
+		'nixpkgs-requirements'
+	],
+	[
+		'closed transfer refusal',
+		"error: unable to download 'https://private.invalid/?token=opaque': HTTP error 403\n",
+		'fetch'
+	],
+	[
+		'builder exit',
+		"error: builder for '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-private.drv' failed with exit code 1;\n",
+		'builder'
+	],
+	[
+		'failed dependency',
+		"error: 1 dependencies of derivation '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-private.drv' failed to build\n",
+		'dependency'
+	],
+	[
+		'disk refusal',
+		"error: writing to file '/private/fixture': No space left on device\n",
+		'disk-space'
+	],
+	[
+		'combined independent hints',
+		"error: unable to download 'https://private.invalid/opaque': HTTP error 403\nerror: 2 dependencies of derivation '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-private.drv' failed to build\n",
+		'fetch,dependency'
+	],
+	['unrecognized private failure', 'private token=opaque\n::error::private-suffix\n', 'unknown'],
+	['empty stderr invents no cause', '', 'unknown'],
+	['stdout-style lookalike is not an error', "echo error: attribute 'luv' missing\n", 'unknown'],
+	[
+		'oversized attribute is not selected',
+		"error: attribute '" + 'a'.repeat(129) + "' missing\n",
+		'unknown'
+	],
+	['over-capture bound is unavailable', 'a'.repeat(1024 * 1024 + 1), 'unavailable'],
+	['NUL capture refused', "error: attribute 'luv' missing\n\0", 'unavailable'],
+	['ANSI capture refused', "error: attribute 'luv' missing\n\x1b[0m", 'unavailable'],
+	['replacement decoding refused', "error: attribute 'luv' missing\n\ufffd", 'unavailable'],
+	['CR capture refused', "error: attribute 'luv' missing\r\n", 'unavailable']
+])
+	check('native build lexical hint: ' + name, () => receiveBuild(closedBuild(text), expected));
+check('non-ASCII private capture emits only the finite literal label', () => {
+	const text =
+		'é😀'.repeat(200000) +
+		"\nerror: attribute 'luv' missing\n/private/秘密 ::error::opaque-suffix\n";
+	receiveBuild(closedBuild(text), 'evaluation');
+	assert.ok(projection(closedBuild(text)).every((line) => !/é|😀|秘密|opaque|private/.test(line)));
+});
+check('private suffix, URLs, paths and workflow commands never reach the build hint', () => {
+	const text =
+		"error: unable to download 'https://dummy-user:dummy-pass@private.invalid/?token=opaque%0A': HTTP error 403\n::error::private-suffix\n/private/config HOME=secret\n";
+	const observation = closedBuild(text);
+	receiveBuild(observation, 'fetch');
+	assert.equal(observation.result.stderr, text);
+	assert.ok(
+		projection(observation).every((line) => !/opaque|secret|private|dummy|https|HOME=/.test(line))
+	);
+});
+check('stderr accessors never run', () => {
+	const observation = closedBuild('');
+	let reads = 0;
+	Object.defineProperty(observation.result, 'stderr', {
+		get() {
+			reads++;
+			throw new Error('private');
+		}
+	});
+	receiveBuild(observation, 'unavailable');
+	assert.equal(reads, 0);
+});
+check('inherited stderr cannot fabricate a build hint', () => {
+	const observation = closedBuild('');
+	delete observation.result.stderr;
+	Object.setPrototypeOf(observation.result, { stderr: "error: attribute 'luv' missing\n" });
+	receiveBuild(observation, 'unavailable');
+});
+for (const [name, mutate, retained] of [
+	[
+		'wrong phase',
+		(o) => {
+			o.checkpoint = 'pinned-source-metadata';
+		},
+		false
+	],
+	[
+		'source fence failure',
+		(o) => {
+			o.boundary = 'execution_source_fence';
+		},
+		false
+	],
+	[
+		'successful build',
+		(o) => {
+			o.result.status = 0;
+		},
+		false
+	],
+	[
+		'invalid status',
+		(o) => {
+			o.result.status = 256;
+		},
+		false
+	],
+	[
+		'signalled build',
+		(o) => {
+			o.result.signal = 'SIGTERM';
+		},
+		false
+	],
+	[
+		'owner error',
+		(o) => {
+			o.result.error = 'deadline';
+		},
+		false
+	],
+	['retained physical debt', () => {}, true]
+])
+	check('unqualified build has no lexical hint: ' + name, () => {
+		const observation = closedBuild("error: attribute 'luv' missing\n");
+		mutate(observation);
+		assert.equal(projection(observation, retained).length, 2);
+	});
+check('removing the build annotation fails independent receiving', () => {
+	const inverse = diagnostic.replace(
+		/\n\s*error\(['"]::error title=Nix native build classification::['"] \+ buildHint\);/,
+		''
+	);
+	assert.notEqual(inverse, diagnostic);
+	assert.throws(
+		() =>
+			receiveBuild(closedBuild("error: attribute 'luv' missing\n"), 'evaluation', false, inverse),
+		assert.AssertionError
+	);
+});
+check('reflecting stderr fails independent fixed privacy receipt', () => {
+	const inverse = diagnostic.replace(
+		"'NIX_NATIVE_BUILD_ERROR_KINDS kinds=' + kinds",
+		"'NIX_NATIVE_BUILD_ERROR_KINDS kinds=' + stderr"
+	);
+	assert.notEqual(inverse, diagnostic);
+	assert.throws(
+		() =>
+			receiveBuild(
+				closedBuild("error: attribute 'luv' missing\n::error::private-suffix"),
+				'evaluation',
+				false,
+				inverse
+			),
+		assert.AssertionError
+	);
+});
+
 process.stdout.write(
 	`PASS Nix source/receipt/registration controls: ${checks}; native execution unqualified.\n`
 );

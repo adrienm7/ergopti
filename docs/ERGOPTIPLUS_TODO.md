@@ -5574,6 +5574,18 @@ The fixed Specifications and Capabilities frames of the Windows/macOS per-model 
       uncommitted in the local worktree of `fix/downloads-on-managed-networks`
       when the session stopped; redo it if that worktree is gone.
 
+Linux manual37646124429 atc18f0796b2f708a1650d4a1eb5dc316b7bf263dd
+passes shared checks, Linux units, actual official Ollama installation/model
+pull/inference/shutdown and every other native E2E step. Genuine Nix now passes
+pinned-source metadata and revision/NAR agreement, then fails native-build
+with status1, no signal/owner error and no retained physical debt. Package and
+installation are skipped, strict lane verdicts fail and Release is skipped.
+The native-build diagnostic now projects only closed captured stderr into
+fixed lexical error-kind hints; no raw URL/path/credential or lifetime change.
+The original49 runner controls remain intact with31 additive privacy/boundary
+controls. The actual build cause and all seven installed-runtime cases remain
+unqualified; a hinted error kind is not native acceptance.
+
 The Windows native routing policy and request/capability workers now admit
 actual decoded JSON Int32/Int64 integers within the original signed Int32
 domain, preserving every semantic limit and the original 64-bit started clock.
