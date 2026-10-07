@@ -286,6 +286,48 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 			foreign: foreign.publicKey, installed: installed.publicKey))
 	}
 
+	func testActualChildPhysicalHelperFiveControlsAndLegacyProjectionInverse() throws {
+		let parent = try Self.physicalDirectoryURL(manager.temporaryDirectory)
+		let root = parent.appendingPathComponent("ErgoptiSparkleChildPhysical-" + UUID().uuidString, isDirectory: true)
+		try privateDirectory(root)
+		var passed = false
+		let failuresBefore = try XCTUnwrap(testRun?.failureCount)
+		defer {
+			for command in commands {
+				do { try command.retire() }
+				catch { retirementDebt = true; XCTFail("Exact child physical control retirement refused") }
+			}
+			if passed, !retirementDebt, testRun?.failureCount == failuresBefore {
+				do { try manager.removeItem(at: root) }
+				catch { XCTFail("Owned child physical control inputs could not retire") }
+			} else { XCTFail("Child physical control inputs retained for inspection") }
+		}
+		let source = repository.appendingPathComponent("tools/diagnostics/macos_sparkle_archive_child.swift")
+		let sourceBytes = try Data(contentsOf: source)
+		let sourceHash = SHA256.hash(data: sourceBytes).map { String(format: "%02x", $0) }.joined()
+		let preparer = repository.appendingPathComponent("tools/test/fixtures/prepare-sparkle-native-physical-probe.py")
+		for (index, profile) in ["fixed", "legacy-projection", "fixed"].enumerated() {
+			let generated = root.appendingPathComponent("probe-" + String(index) + ".swift")
+			let executable = root.appendingPathComponent("probe-" + String(index))
+			_ = try run("/usr/bin/env", ["python3", preparer.path, "--source", source.path,
+				"--sha256", sourceHash, "--output", generated.path, "--profile", profile], root: root)
+			XCTAssertEqual(try Data(contentsOf: source), sourceBytes, "The extracted child source cannot drift")
+			_ = try run("/usr/bin/xcrun", ["swiftc", generated.path, "-o", executable.path], root: root)
+			let receipt = try run(executable.path, [root.path], root: root, expecting: profile == "fixed" ? 0 : 1)
+			if profile == "fixed" {
+				XCTAssertEqual(receipt.stdout, "SPARKLE_CHILD_PHYSICAL_PROBE_COMPLETE:5\n")
+				XCTAssertEqual(receipt.stderr, "")
+			} else {
+				XCTAssertEqual(receipt.stdout, "")
+				XCTAssertEqual(receipt.stderr, "SPARKLE_CHILD_PHYSICAL_PROBE_REFUSED:parent-physical\n",
+					"The legacy inverse must fail the physical parent binding, never setup or cleanup")
+			}
+			XCTAssertFalse(try manager.contentsOfDirectory(atPath: root.path).contains { $0.hasPrefix("OwnedChildPhysicalProbe-") },
+				"Every physically acquired probe directory must retire before the next pass")
+		}
+		passed = testRun?.failureCount == failuresBefore
+	}
+
 	private let manager = FileManager.default
 	private var commands: [OwnedProcess] = []
 	private var retirementDebt = false

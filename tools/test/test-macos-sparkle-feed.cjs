@@ -1154,6 +1154,30 @@ try {
 	errors.push(`Signature fixture regression failed: ${error.message}`);
 }
 
+// The separate physical change registers its actual-helper native XCTest.
+try {
+	const control = require('./fixtures/sparkle-signature-physical-controls.cjs');
+	control.runPhysicalControls({
+		child: fs.readFileSync(
+			path.join(root, 'tools/diagnostics/macos_sparkle_archive_child.swift'),
+			'utf8'
+		),
+		fixture: fs.readFileSync(
+			path.join(
+				root,
+				'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/SparkleArchiveUpdateAcceptanceTests.swift'
+			),
+			'utf8'
+		),
+		probe: fs.readFileSync(
+			path.join(root, 'tools/test/fixtures/prepare-sparkle-native-physical-probe.py'),
+			'utf8'
+		)
+	});
+} catch (error) {
+	errors.push(`Physical fixture regression failed: ${error.message}`);
+}
+
 if (errors.length > 0) {
 	for (const error of errors) console.error(`[FAIL] ${error}`);
 	process.exit(1);
