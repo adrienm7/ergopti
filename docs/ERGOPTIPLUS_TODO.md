@@ -4210,6 +4210,26 @@ after physical retirement; all original admission, signature, update and cleanup
 assertions remain mandatory. Its native compilation/receiving controls and the
 actual refusal identity remain unexecuted until the next macOS validation.
 
+Group 6 end-of-slice checklist, 2026-10-07. Item36 remains open. Source
+checkpoint `e25d938f9c77f49295741b0ba2eb9d5988a965e9` preserves the delivered
+archive, signature, native AppKit and bounded diagnostic changes. Historical
+component receipts do not qualify the final integrated package/install matrix.
+The [partial delivery handover](handovers/2026-10-04-parallel-containers/GROUP6-RELEASE-NETWORK-2026-10-07.md)
+retains exact runs, source SHAs and continuation requirements.
+
+- [x] Retain the delivered XZ/ZIP admission, wrong-key refusal/retry, signing
+      identity, native ownership and physical-retirement assertions.
+- [ ] Qualify the complete native macOS Package job on the final source:
+      Sparkle install/refusal/retry/relaunch, both Brew positives, full-policy
+      denial and all six Brew archive cases. Filtered Sparkle success does not
+      qualify Brew or the complete package verdict.
+- [ ] Establish any required Automation prerequisite for the same actual owned
+      sender/receiver identities. Query -1744 proves a consent requirement for
+      that query, not the sole cause of reply -10004 or a demonstrated grant.
+- [ ] Complete all eleven CI installation legs on the same final source and
+      retain exact passed/failed/skipped receipts. Keep independent items16/38
+      and genuine device validation open.
+
 - [~] **37.** Always show the shipped Ergopti hotstring pack, including when
   its keyboard layout is not installed. Move French `suffixes_a` and magic-key
   `replace` into that extension without a beta compatibility layer. The runtime
@@ -5563,16 +5583,16 @@ The existing Windows/Linux separator after backend choices now uses one canonica
 
 The fixed Specifications and Capabilities frames of the Windows/macOS per-model detail sheets now consume shared child templates. Existing separators, platform decoration, capability predicates and native callbacks are preserved; Linux has no corresponding detail sheet and retains its declared absence without a native change. The owning generators lower Windows 70/macOS 102/Linux 73 to 66/98/73. Independent source review preserves every predecessor corpus file, all 21 locale files and original registered assertions. Portable Mac owning probes pass 8/0 and French-warm probes pass 5/0 in both Lua runtimes; the genuine original producer gives 6/2 and 3/2. The unchanged Linux whole-tray fixture passes 9/0 in English and French on both runtimes. Final composed native CI, Windows allocator execution and installed-device acceptance remain separate; items 54/81 remain partial.
 
-- [ ] **62.** Downloads on managed company networks, Windows and Linux:
-      system trust store and system proxy for every download child (the Ollama
-      installer and server for `ollama pull`, the updater and rollback, remote
-      AI APIs), and the shared failure contract (certificate, proxy, host
-      blocked, offline, disk, permission) whose dialogs name the cause in
-      French with actions that can work. macOS is integrated (uv from a
-      checksummed PyPI wheel, `UV_SYSTEM_CERTS`, the `scutil --proxy` relay,
-      the `network.failure.*` keys). The Windows and Linux work stayed
-      uncommitted in the local worktree of `fix/downloads-on-managed-networks`
-      when the session stopped; redo it if that worktree is gone.
+- [ ] **62.** Downloads on managed company networks: system trust and
+      system proxy for every download child (Ollama installation/server/pull,
+      updater/rollback and remote AI), with translated certificate/proxy/blocked/
+      offline/disk/permission causes and useful recovery actions in all21 locales.
+      Committed source at `b21bea3ee3ed0f3a21b90096ab0e9607a5ac688a` includes
+      Windows/Linux transport, publication and receiving repairs; those changes
+      must be preserved rather than rebuilt from the old interrupted worktree.
+      Complete native, package, installation and enterprise acceptance remains
+      open. macOS system trust and explicit proxy relays are integrated, while
+      opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
 
 Linux manual37646124429 atc18f0796b2f708a1650d4a1eb5dc316b7bf263dd
 passes shared checks, Linux units, actual official Ollama installation/model
@@ -6299,6 +6319,62 @@ HRESULT; the fixture-only curl capability receipt exposes only a cached phase.
 Their actual native receiving is still unrun. None of the five native failures
 is relabelled or waived. Diagnose the next original Windows run before claiming
 a cause or a successful fix; item62 remains open.
+
+Group 6 end-of-slice checklist, 2026-10-07. Item62 remains open. Delivered
+source includes the Linux retained transport/archive chain, the Windows e25
+receiving repairs and committed `0b0be55e` integer/ordinal-inventory/CLR fixes.
+The [partial delivery handover](handovers/2026-10-04-parallel-containers/GROUP6-RELEASE-NETWORK-2026-10-07.md)
+keeps historical failures and separates CODE, native and device requirements.
+
+- [x] Retain Linux per-hop transport, endpoint-owned ETags, same-FD digest,
+      archive publication/install/rollback, original pins/clocks and physical
+      cleanup. Current official runtime/model receiving passes; full lane and
+      final-source package acceptance remain separate.
+- [x] Record native Windows37651111440 at0b0be55e:10,265 passes/five failures.
+      Integer/inventory/CLR and held HTTP response paths now pass. Subsequent
+      diagnostics are committed in b21bea3ee; manual37657524885 reports10,268
+      passes/four failures. Package/install remain skipped, without waiver.
+- [x] Native Windows1 — original System32 curl capability completion passes in
+      manual37657524885 at b21bea3ee under unchanged request/receiving clocks.
+      This component pass does not qualify the complete Windows lane.
+- [ ] Native Windows2 — receive canonical WinHTTP vector1's exact shape/order/
+      limit facts, fix the demonstrated mismatch and replay the full URL/PAC
+      vector with original native ownership. Portable PowerShell is not WinHTTP.
+- [ ] Native Windows3 — receive the TLS fixture's service failure stage, fix
+      its demonstrated cause and preserve the original failure-count expectation,
+      ephemeral key ownership and actual server retirement.
+- [ ] Native Windows4 — receive actual updater route/trust failure and correct
+      classification only with causal evidence. Preserve the original TLS
+      expectation, system trust, proxy refusal and provenance; no TLS bypass.
+- [ ] Native Windows5 — receive updater service/child/Job cleanup ACK, fix its
+      demonstrated join/receiving defect and replay the original failure count.
+      Namespace removal cannot replace physical closure or release retained debt.
+- [ ] Native/hosted — replay the complete Windows lane on the final SHA. Obtain
+      complete Linux E2E/package/install and the original seven-case Nix runner.
+      c18's lane failed only Nix native-build; manual37657530026@b21 confirms
+      that current failure, with every other E2E step passing. The runner now
+      prepares the separate standard build-log directory; independent genuine
+      Nix reproduces its missing permission and passes after preparation.
+      Complete hosted receiving remains required. Genuine Ubuntu OCI build,
+      help and five runtime observations pass, without full seven-case credit.
+- [ ] CODE — complete Windows packaged artifact/request owned-curl SSPI/NTLM
+      join and causal fallback after exact first-child/pipe closure. Preserve
+      full-URL routing, absolute clocks, Schannel trust/revocation, exclusive
+      staging/integrity and Job retirement; request SSPI does not prove artifact.
+- [ ] CODE — implement macOS full-request-URL PAC/WPAD, ordered fallback and
+      redirect routing for uv, HTTPX/HF/Xet and outgoing Ollama Go requests.
+      Preserve verified unsupported-route refusal until those paths exist.
+- [ ] Device — exercise corporate PAC/WPAD/static proxy, CA/revocation and
+      authentication, actual child/redirect failures and useful cause/actions
+      on every OS. Check native UI cancellation/successor windows/retry and
+      installed upgrade/rollback. Keep transversal16/38 and item36 open.
+
+Prepared Windows routing/TLS diagnostics, curl-engine extraction and macOS
+opaque-client continuation are saved in the handover's source-packet archive.
+They remain inactive and unexecuted. The macOS audit also finds missing native
+PAC evaluation in initial stock-curl installer downloads; that is remaining
+CODE. Schannel's documented ephemeral-key constraint needs genuine native
+qualification, preserving the original key ownership and TLS assertions.
 
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard
