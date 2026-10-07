@@ -399,3 +399,100 @@ _DesktopCapture_WarningFactsAreClosed() {
 }
 Test("Desktop capture: native warning identity diagnostics remain closed (desktop-parse-warning-facts)",
 	_DesktopCapture_WarningFactsAreClosed)
+
+
+/** Restores only genuine native warning locals in the actual canonical graph. */
+_DesktopCapture_NativeWarningSource(DnwMode, DnwRoot) {
+	DnwSource := _DesktopCapture_ParseSource("clean", DnwRoot)
+	DnwSources := Map()
+	for DnwOwner in [
+		{Symbol: "_TextSenderNativePollReceipt", Name: "PollOsErrorCode", Original: "OsError", Count: 3, Mode: "editor"},
+		{Symbol: "_TextSenderKeystroke", Name: "KeystrokeModifierName", Original: "Mod", Count: 4, Mode: "text"},
+		{Symbol: "_TapHoldKeyTapModifiers", Name: "TapModifierName", Original: "Mod", Count: 2, Mode: "tap"}
+	] {
+		DnwPath := _ConsoleCapture_Canonical(_DriverProductionFileForSymbol(DnwOwner.Symbol))
+		DnwOwnerSource := FileRead(DnwPath, "UTF-8")
+		StrReplace(DnwOwnerSource, DnwOwner.Name, , true, &DnwNames)
+		AssertEqual(DnwOwner.Count, DnwNames, "each real owner retains all references to its uniquely renamed local")
+		if DnwMode == DnwOwner.Mode || DnwMode == "all" {
+			DnwOwnerSource := StrReplace(DnwOwnerSource, DnwOwner.Name, DnwOwner.Original, true, &DnwChanges)
+			AssertEqual(DnwOwner.Count, DnwChanges, "a native causal control restores only the original local and all its uses")
+		}
+		SplitPath(DnwPath, &DnwLeaf)
+		DnwPrivate := DnwRoot . "\" . DnwLeaf
+		AssertFalse(FileExist(DnwPrivate), "native warning copies require fresh independently owned paths")
+		DnwSources[DnwOwner.Mode] := {Path: DnwPath, Private: DnwPrivate, Source: DnwOwnerSource}
+	}
+	; Keep the sender's one authored nested include, routing its genuine owner only.
+	DnwText := DnwSources["text"]
+	DnwEditor := DnwSources["editor"]
+	DnwTextSource := DnwText.Source
+	DnwTextCode := _DriverMaskNonCode(&DnwTextSource)
+	RegExReplace(DnwTextCode, "m)^#Include ([^\r\n]+)$", "", &DnwNestedIncludes)
+	AssertEqual(1, DnwNestedIncludes, "the real sender has exactly one authored nested native owner")
+	AssertTrue(RegExMatch(DnwTextCode, "m)^#Include ([^\r\n]+)$", &DnwInclude) > 0,
+		"the actual nested creator route must be present")
+	DnwNestedPath := StrReplace(DnwInclude[1], "%A_LineFile%", DnwText.Path, true, &DnwLineFiles)
+	AssertEqual(1, DnwLineFiles, "only the actual sender source supplies its authored include base")
+	AssertEqual(DnwEditor.Path, _ConsoleCapture_Canonical(DnwNestedPath),
+		"the native causal copy routes to the actual poll-receipt owner")
+	DnwText.Source := SubStr(DnwText.Source, 1, DnwInclude.Pos - 1) . "#Include " . DnwEditor.Private
+		. SubStr(DnwText.Source, DnwInclude.Pos + DnwInclude.Len)
+	for DnwModeName, DnwOwner in DnwSources
+		FileAppend(DnwOwner.Source, DnwOwner.Private, "UTF-8")
+	DnwSource := StrReplace(DnwSource, "#Include " . DnwText.Path, "#Include " . DnwText.Private, true, &DnwTextRoutes)
+	AssertEqual(1, DnwTextRoutes, "the actual canonical graph has one native sender include")
+	DnwTap := DnwSources["tap"]
+	DnwSource := StrReplace(DnwSource, "#Include " . DnwTap.Path, "#Include " . DnwTap.Private, true, &DnwTapRoutes)
+	AssertEqual(1, DnwTapRoutes, "the actual canonical graph has one tap-modifier owner include")
+	DnwCode := _DriverMaskNonCode(&DnwSource)
+	RegExReplace(DnwCode, "m)^#Include ([^\r\n]+)$", "", &DnwIncludes)
+	AssertEqual(16, DnwIncludes, "native warning controls retain every actual canonical direct dependency")
+	return DnwSource
+}
+
+/** Actual parser receipts identify each original native local without warning filtering. */
+_DesktopCapture_NativeWarningLocalsAreCausal() {
+	DnwRoot := _ConsoleCapture_PrivateDirectory(A_Temp . "\ergopti_native_warning_" . A_ScriptHwnd . "_" . A_TickCount)
+	DnwOwnership := {CanRetire: true}
+	DnwAck := "DESKTOP_PARSE_ACK_8364"
+	try {
+		for DnwMode in ["clean", "editor", "text", "tap", "all"] {
+			DnwModeRoot := _ConsoleCapture_PrivateDirectory(DnwRoot . "\" . DnwMode)
+			DnwSource := _DesktopCapture_NativeWarningSource(DnwMode, DnwModeRoot)
+			AssertTrue(InStr(DnwSource, "#Warn All, StdOut", true) > 0, "actual native owner parse warnings remain enabled")
+			DnwReceiptPath := DnwModeRoot . "\independent_parent.tap"
+			AssertFalse(FileExist(DnwReceiptPath), "each native warning child inherits a fresh independently owned receipt")
+			FileAppend("1..2`r`nok 1 - independent parent sentinel`r`nok 2 - preserved before child`r`n# parent receipt marker 7319`r`n",
+				DnwReceiptPath, "UTF-8-RAW")
+			DnwExpectedHash := "9f76654b66843ad8b1d13b7be80335a04a87e4e4b7d5e18310643368a6b1d186"
+			AssertEqual(DnwExpectedHash, CryptoSha256Bytes(FileRead(DnwReceiptPath, "RAW")),
+				"the independent sentinel is admitted before native creation")
+			DnwPriorRequest := EnvGet("ERGOPTI_AHK_RESULTS_FILE")
+			DnwOutput := _ConsoleCapture_ParseChild(DnwSource, DnwModeRoot, "native_" . DnwMode, DnwOwnership, DnwReceiptPath)
+			AssertEqual(DnwPriorRequest, EnvGet("ERGOPTI_AHK_RESULTS_FILE"), "the parent's receipt request survives every native warning mode")
+			AssertEqual(DnwExpectedHash, CryptoSha256Bytes(FileRead(DnwReceiptPath, "RAW")),
+				"native warning causal children preserve the actual inherited sentinel bytes")
+			StrReplace(DnwOutput, DnwAck, , true, &DnwAcks)
+			StrReplace(DnwOutput, "Warning:", , true, &DnwWarnings)
+			AssertEqual(1, DnwAcks, "every native warning control completes with its sole fixed acknowledgment")
+			AssertTrue(SubStr(DnwOutput, -StrLen(DnwAck)) == DnwAck, "native warning diagnostics precede the sole completion acknowledgment")
+			AssertEqual(DnwMode == "all" ? 3 : DnwMode == "clean" ? 0 : 1, DnwWarnings,
+				"only the independently restored three native locals may warn" . _DesktopCapture_WarningFacts(DnwOutput))
+			for DnwWarning in [
+				{Mode: "editor", Text: "Specifically: OsError  (in function _TextSenderNativePollReceipt)"},
+				{Mode: "text", Text: "Specifically: Mod  (in function _TextSenderKeystroke)"},
+				{Mode: "tap", Text: "Specifically: Mod  (in function _TapHoldKeyTapModifiers)"}
+			]
+				AssertEqual(DnwMode == DnwWarning.Mode || DnwMode == "all", !!InStr(DnwOutput, DnwWarning.Text, true),
+					"the actual parser identifies the independently restored native local in its genuine function")
+			if DnwMode == "clean"
+				AssertTrue(DnwOutput == DnwAck, "the repaired native graph keeps stdout exactly closed without filtering warnings")
+		}
+	} finally {
+		if DnwOwnership.CanRetire
+			DirDelete(DnwRoot, true)
+	}
+}
+Test("Desktop capture: actual native owners isolate three builtin locals (desktop-native-owner-warning)",
+	_DesktopCapture_NativeWarningLocalsAreCausal)
