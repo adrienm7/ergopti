@@ -1647,3 +1647,30 @@ The other failures are actual Brew receiver retirement and Sparkle server
 retirement, owned by release/network. Native installation, runtime signing,
 production capture and physical-device validation remain unqualified. All six
 remaining Group5 items stay partial; no item is removed by this correction.
+
+## Shared media metrics identity
+
+The five-path source-reviewed slice adds a pure shared consumer whitelist and
+metrics-only integer namespace, an explicit Mac metric resolver and managed
+History wiring. Legacy resolver/pointer and all87 prior assertions remain whole.
+Independent official Apple/Hammerspoon pins ground the five usages/system names;
+94 focused cases pass and six mutations fail. Real Lua54 delivery/persistence
+and two aggregate rebuilds preserve independently written IDs; LuaJIT covers
+the narrower numeric/SQL component. Full source-selected Root gates and actual
+native/systemDefined/physical/UI qualification remain separate. No capture is
+enabled, no geometry or bindable code is added, and item31 remains partial.
+
+Initial Root JS rejects2/365 checks: the shared source header omits its canonical
+\_shared/lua prefix and one new nil-resolver assertion checks only pcall status.
+The two-path amendment fixes that header and adds exact semantic error checks;
+six new case bodies and the other assertions remain exact, as do all87 old cases.
+Both focused lint checks pass with ratchet0. The remaining first execution loses
+its command session without a terminal receipt; identified task processes are
+all defunct. Interrupted E2E and unexecuted later gates are not credited. Final
+selected verification is retried against the amended immutable postimages.
+
+The completed retry passes365 JS,17490 Mac units,101 Mac E2E with1 skip,
+10191 Linux units and all Linux E2E scenarios. Its only failed gate is checkpoint
+Markdown formatting. All five source/test postimages remain exact; documentation
+is formatted and its covering gates rerun separately before publication. No
+native systemDefined/physical or installation acceptance is inferred.

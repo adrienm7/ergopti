@@ -98,4 +98,13 @@ function M.resolve(page, usage, keyboard_type)
 	return record[keyboard_type]
 end
 
+-- The virtual resolver above keeps its original contract, including unmapped media.
+--- Resolves physical metrics without inventing a macOS virtual or bindable keycode.
+--- @param page number HID usage page.
+--- @param usage number HID usage.
+--- @param keyboard_type string Physical keyboard form for existing virtual-keycode rules.
+--- @return number|nil identity Existing macOS keycode or approved reserved HID metrics ID.
+--- @return string|nil reason Original refusal for an unsupported usage.
+M.resolve_metric = require("keylogger.hid_metric_identity").with_virtual_keycodes(M.resolve)
+
 return M

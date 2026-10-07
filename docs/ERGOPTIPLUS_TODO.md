@@ -3270,8 +3270,9 @@ Item30 remains partial; keyboard/device qualification is still required.
   artifact, WP6 install/launchd ownership and the default-on "close other
   Karabiner instances" option, WP7 owned configuration, WP8 native acceptance,
   WP9 real-Mac acceptance (internal keyboard: verify the ISO 0x35/0x64
-  assumption and fn/globe), WP10 enable and retire. Open: an identity for media
-  keys without a macOS keycode (play/pause, track skips, brightness).
+  assumption and fn/globe), WP10 enable and retire. Media metrics identities
+  now exist for play/pause, track skips and brightness; production capture and
+  native UI/physical acceptance remain unfinished.
   VirtualHIDDevice version skew must block the incompatible runtime with an
   explicit explanation and offer an update only after confirmation (maintainer
   decision, 2026-10-04); implementation and native acceptance remain pending.
@@ -3283,6 +3284,29 @@ Item30 remains partial; keyboard/device qualification is still required.
   incomplete; every new hold prerequisite still needs native acceptance.
   About 30-40 agent-days plus maintainer
   hardware time.
+
+A reviewed shared metrics-only namespace now gives five independently grounded
+consumer HID usages stable integer identities: play/pause, next/previous track
+and brightness up/down. Explicit managed History uses the captured shared
+resolver; the original virtual resolver and exact legacy History pointer remain
+unchanged. Public Hammerspoon system-key names resolve to the same IDs without
+enabling an event source. All94 focused cases pass (7 new,87 unchanged); six
+causal mutations refuse. Actual Lua54 delivery/raw metadata/SQLite and two
+poisoned aggregate rebuilds preserve all five media IDs plus virtual keycode0.
+LuaJIT qualifies numeric identity and real SQLite aggregate SQL only; existing
+Mac delivery/log modules require Lua54. No bindable code, heatmap position,
+production acquisition or native/physical acceptance is claimed. Full Root
+selected verification remains required; item31 stays partial.
+The first Root JS gate rejects a stale shared-path header and a pcall-only
+assertion. A narrow amendment corrects the header and additionally checks the
+exact semantic nil-resolver error, preserving the healthy wrapper controls and
+all existing assertions. No ratchet or baseline changes. The interrupted
+remaining suites have no terminal receipt and are unqualified; retry is required.
+The retry completes365 JS checks,17490 Mac units,101 Mac E2E with1 skip,
+and10191 Linux units plus the full Linux E2E suite. Only the checkpoint
+Markdown formatter refuses; source hashes remain exact while documentation
+formatting and its covering checks are corrected separately. Native media input
+and physical acceptance remain unexecuted. Item31 stays partial.
 
 WP3 prerequisite: the actual macOS physical accounting owner now requires exact held-modifier settlement before accepting source transitions. The keylogger retires each crossing physical release without emitting an orphan hold or a new press, including pause and secure-context crossings; ordinary legacy and collision behavior remains unchanged. Existing native fixture parents restore their settlement child through the scoped cache owner, while normal production stop/restart retains the same CoreState. Portable focused tests pass (32 held-key cases, 24 policy cases, 3 legacy collision cases, 23 existing cache-scope cases, and 9 unchanged alias configuration/privacy cases); the original real gap-release source fails all eight side-key cases. This does not enable a producer or headless mode, alter transport/baseline versions, or complete WP3/WP4/native acceptance. Full root and hosted macOS qualification remain required.
 

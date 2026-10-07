@@ -546,7 +546,9 @@ local function new_manager(capacity, on_refused, native_ports)
 		baseline_ready = function() return routes("baseline_ready") end,
 		context = function(ticks) return routes("context", ticks) end,
 		context_interval = function(first, last) return routes("context_interval", first, last) end,
-		keycode = port(Identity, "resolve"), emit = port(LogManager, "log_physical_press"),
+		-- Explicit managed metrics preserve platform IDs and add only the shared HID whitelist.
+		keycode = require("keylogger.hid_metric_identity").with_virtual_keycodes(port(Identity, "resolve")),
+		emit = port(LogManager, "log_physical_press"),
 		emit_release = port(LogManager, "log_physical_release"), on_verdict = verdict,
 	}
 	initializing = true
