@@ -170,6 +170,12 @@ const STEP_CONDITIONS = [
 	[
 		LINUX_BOX,
 		'test-linux',
+		'Emit Configuration assertion from failed unit log',
+		"${{ failure() && !cancelled() && steps.linux_unit.outcome == 'failure' }}"
+	],
+	[
+		LINUX_BOX,
+		'test-linux',
 		'Upload failed unit log',
 		"${{ failure() && !cancelled() && steps.linux_unit.outcome == 'failure' }}"
 	],
@@ -1366,6 +1372,26 @@ mustCatch(
 	LINUX_BOX,
 	'      - name: Upload the native distro unit log\n',
 	'      - name: Omitted native distro unit raw log upload\n',
+	stepProblems
+);
+// The assertion annotation belongs only to the original failed unit run.
+// A skipped or renamed diagnostic must be observed by the normal wiring gate.
+for (const condition of ['', 'success()', 'failure()', 'always()', 'false']) {
+	const head = '      - name: Emit Configuration assertion from failed unit log\n';
+	mustCatch(
+		'Configuration assertion condition ' + condition,
+		LINUX_BOX,
+		head +
+			"        if: ${{ failure() && !cancelled() && steps.linux_unit.outcome == 'failure' }}\n",
+		head + (condition ? '        if: ' + condition + '\n' : ''),
+		stepProblems
+	);
+}
+mustCatch(
+	'missing Configuration assertion diagnostic',
+	LINUX_BOX,
+	'      - name: Emit Configuration assertion from failed unit log\n',
+	'      - name: Omitted Configuration assertion diagnostic\n',
 	stepProblems
 );
 // Upload only closed receipts: the owned script corpus contains newline names,

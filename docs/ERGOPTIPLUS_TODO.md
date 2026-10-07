@@ -5432,6 +5432,15 @@ The fixed Specifications and Capabilities frames of the Windows/macOS per-model 
       uncommitted in the local worktree of `fix/downloads-on-managed-networks`
       when the session stopped; redo it if that worktree is gone.
 
+A failure-only Linux CI annotation now reads the completed current-run unit log
+after its existing failure-artifact upload. It publishes only the fixed
+Configuration restore assertion when the inline failure, terminal replay and
+original reporter agree; incomplete, ambiguous or oversized evidence is refused.
+The original unit status, reporter, fixture and upload remain unchanged. The
+assertion behind run37563506830 is still unknown: a fresh Linux manual run must
+provide authentic evidence before a product correction or qualification claim.
+This diagnostic does not complete item62.
+
 MLX downloads now refuse missing or failed system-trust activation through the
 existing dependency-failure path, before importing Hugging Face or starting a
 watcher/download. The actual production-emitted Python is exercised against five
