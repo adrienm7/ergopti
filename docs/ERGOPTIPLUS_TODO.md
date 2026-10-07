@@ -5547,6 +5547,24 @@ The shared per-model Specifications and Capabilities frames retire four genuine 
   53 real X11 source controls. Local window supervision refuses its
   missing process-children prerequisite before allocation; local kernel input is unrun.
 
+  The saved ordered-pair one-shot route now captures its native receiver at
+  Manager initialization, after the genuine keylogger-before-Hook bootstrap.
+  Hook retains its construction-original text getter and refuses replaced
+  semantic providers before logical arming or consumption; raw input and
+  original output/retirement owners remain intact. Independent component
+  qualification passes493 assertions on each Lua ABI; six omissions fail
+  causally, including actual cached-Manager chronology and A-to-B
+  substitution. Final selected local gates pass 10,994 Linux units,
+  189 E2E cases, 53 actual X11 source controls and all 367 JS checks.
+  The JS source guard retains every previous catalogue/locale/ordered-pair
+  boundary, adds 38 necessary saved-route omission controls, and still
+  refuses public OneShot recommendations and CapsWord. The initial selected
+  run failed only the obsolete blanket source assertion; the reviewed
+  stronger contract and complete JS rerun close that failure. Native saved-
+  Manager route execution remains unrun. Existing kernel132 exercises the direct OneShot callback,
+  so it is prerequisite regression proof only. The picker stays closed
+  until a genuine saved-configuration Manager supplement is qualified.
+
   Native source25 qualification 37636576661 tests the exact feature tree:
   10,979 units, actual E2E, 132 input-owner controls with all four mandatory
   kernel scenarios and 81 modifier-custody controls pass. Package and all17

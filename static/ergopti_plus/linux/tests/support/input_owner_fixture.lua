@@ -204,4 +204,58 @@ function M.with_session(options, body)
 	package.preload.ffi = previous_preload; Input._reset_measurement()
 	if not called then error(err, 0) end
 end
+--- Runs the actual Manager's saved-source and installed logical-action callback.
+--- The layout seam and constructor remain explicitly controlled software ports.
+--- @param options table|nil Controlled source/callback failures.
+--- @param body function Receives the real Manager consumer session.
+function M.with_manager_session(options, body)
+	options = options or {}
+	M.with_session(options, function(s)
+		local ConfigPaths = require("infra.config_paths")
+		local Files = require("adapters.file_system")
+		local original_route, original_read = ConfigPaths.config, Files.read_with_status
+		local names = { "platform.remap.tap_hold_manager", "adapters.keyboard_layout", "platform.remap.nav_layer" }
+		local saved = {}; for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
+		local folder = os.tmpname(); os.remove(folder)
+		assert(os.execute("mkdir '" .. folder:gsub("'", "'\\''") .. "'"))
+		local source_path, tap_path = folder .. "/config.toml", folder .. "/tap_hold.toml"
+		local function write(path, text)
+			local file = assert(io.open(path, "w")); assert(file:write(text)); assert(file:close())
+		end
+		write(source_path, s.bytes)
+		write(tap_path, require("tests.support.tap_hold_fixture").with_preset(""))
+		ConfigPaths.config = function(name) return name == "config.toml" and source_path or original_route(name) end
+		Files.read_with_status = function(path)
+			if path == source_path then
+				if options.on_guard then options.on_guard(s) end
+				write(source_path, s.bytes)
+			end
+			return original_read(path)
+		end
+		local manager
+		local called, failure = pcall(function()
+			if options.before_manager then options.before_manager(s) end
+			local Layout = h.load_module("adapters.keyboard_layout")
+			Layout._set_table_for_test({ a = { keycode = 30, level = 1, mods = {} }, A = { keycode = 30, level = 2, mods = { "shift" } } })
+			manager = options.cached_manager or h.load_module("platform.remap.tap_hold_manager")
+			s.actions = {}
+			assert(manager.init({ keyboard_hook = s.hook,
+				execute_action = function(action, binding)
+					s.actions[#s.actions + 1] = { action, binding }
+					if options.on_generic_action then return options.on_generic_action(s, action, binding) end
+					return true
+				end, action_names = function() return { "copy" } end, on_text_injected = function() end,
+				defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"), user_path = tap_path }) == true)
+			s.manager, s.engine, s.owner = manager, manager.configuration_snapshot().engine, manager.configuration_snapshot().combinations
+			s.arm_deadline = function() return s.engine.one_shot_until end
+			body(s)
+		end)
+		if manager then pcall(manager._reset_for_test) end
+		ConfigPaths.config, Files.read_with_status = original_route, original_read
+		for _, name in ipairs(names) do package.loaded[name] = saved[name][1] end
+		os.remove(source_path); os.remove(tap_path)
+		os.execute("rmdir '" .. folder:gsub("'", "'\\''") .. "'")
+		if not called then error(failure, 0) end
+	end)
+end
 return M
