@@ -1988,6 +1988,7 @@
 	"sg_actions.app_previous": "⇥ 上一个应用 — 所有屏幕",
 	"sg_actions.app_previous_screen": "⇥ 上一个应用 — 此屏幕",
 	"sg_actions.app_switcher": "⇥ 系统 Alt+Tab",
+	"sg_actions.system_app_switcher": "⇥ 系统 Alt+Tab",
 	"sg_actions.app_window_previous": "◱ → 下一个窗口，无切换器（Alt+Esc）",
 	"sg_actions.arrow_down": "↓ 向下箭头",
 	"sg_actions.arrow_left": "← 向左箭头",
