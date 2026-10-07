@@ -64,7 +64,7 @@ end
 local function make_canvas(options)
 	options = options or {}
 	local canvas = { showing = options.showing ~= false }
-	local element_count = options.element_count or 7
+	local element_count = options.element_count or 17
 	for index = 1, element_count do
 		local element_options = index == 7 and options.model_element or nil
 		canvas[index] = select(1, make_element(element_options))
