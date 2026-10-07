@@ -7312,6 +7312,18 @@ actual native execution is pending. Existing console/title and constructor
 assertions remain unchanged. Fresh invisible capture remains unavailable,
 and interpreted checks do not prove compiled console behavior.
 
+The Windows workflow now runs five named console cases and six named
+AltGr suffix cases serially after the ordinary suite. Exact TAP/case censuses,
+actual native integer exit zero, fresh timing evidence and diagnostic-free
+stderr are mandatory; evidence uploads on failure. Portable actual PowerShell
+controls prove the positive case and17 refusals, including a native-exit
+omission counterexample. All prior365 JS checks, old workflow bytes and
+compiled package/startup/upgrade/full-save gates are retained; the new gate
+makes366. The actual eleven-case desktop replay and its twelve internal
+native children remain pending. This interpreted runner cannot qualify
+compiled console capture, physical input or invisible refreshing. Items91,
+109 and16/38 remain partial.
+
 - [~] **111.** Provide two distinct, explicitly labelled shared window-switching
   actions on Windows, macOS and Linux: the operating system's normal Alt+Tab switcher
   (the native equivalent on macOS), and switching only among windows on the display
