@@ -182,6 +182,14 @@ local function identity_scalar(value)
         and value >= -9007199254740991 and value <= 9007199254740991
     return available and value or nil, available
 end
+local function admit_private_state(value)
+    -- Private creation allocates a unique table ID; -1 selects creation. Pin
+    -- the actual constructor's ID and require it for every later native edge.
+    if type(value) ~= "number" or value % 1 ~= 0 or value < -2147483648 or value > 4294967295
+        or value == -1 or value == 0 or value == 1 or value == 4294967295 then return false end
+    if owner.private_state == nil then owner.private_state = value end
+    return owner.private_state == value
+end
 local function record_event_identity(event, command, cleanup)
     if #result.event_identity >= 8 then
         result.event_identity_truncated = true
@@ -194,7 +202,8 @@ local function record_event_identity(event, command, cleanup)
         phase = owner.phase, cleanup = cleanup == true,
         tag = diagnostic_tag, source_pid = diagnostic_pid, source_state = diagnostic_state,
         tag_available = tag_available, pid_available = pid_available, state_available = state_available,
-        expected_tag = command[1], expected_pid = pid, expected_state = -1,
+        expected_tag = command[1], expected_pid = pid, expected_state = owner.private_state,
+        private_state_bound = owner.private_state ~= nil,
     }
 end
 local function post(command, cleanup)
@@ -205,10 +214,11 @@ local function post(command, cleanup)
         revoke("explicit_modifier_constructor_refused"); return false
     end
     event:setProperty(properties.eventSourceUserData, command[1])
+    local identity_accepted = event:getProperty(properties.eventSourceUserData) == command[1]
+        and event:getProperty(properties.eventSourceUnixProcessID) == pid
+        and admit_private_state(event:getProperty(properties.eventSourceStateID))
     record_event_identity(event, command, cleanup)
-    if event:getProperty(properties.eventSourceUserData) ~= command[1]
-        or event:getProperty(properties.eventSourceUnixProcessID) ~= pid
-        or event:getProperty(properties.eventSourceStateID) ~= -1 then
+    if not identity_accepted then
         revoke("native_event_identity_refused"); return false
     end
     if command[2] == 55 and command[3] then owner.cmd_debt = true; owner.session_debt = true end
@@ -226,7 +236,7 @@ local function observed(event)
     if not waiting or tag ~= waiting.command[1] then return false end
     local command = waiting.command
     if event:getProperty(properties.eventSourceUnixProcessID) ~= pid
-        or event:getProperty(properties.eventSourceStateID) ~= -1
+        or owner.private_state == nil or event:getProperty(properties.eventSourceStateID) ~= owner.private_state
         or event:getKeyCode() ~= command[2] or event:getType() ~= command[4]
         or (event:getFlags().cmd == true) ~= command[5] or waiting.observed then
         revoke("native_observation_refused"); return false

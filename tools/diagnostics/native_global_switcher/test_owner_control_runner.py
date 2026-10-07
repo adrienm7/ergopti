@@ -38,7 +38,7 @@ class PortableRunner(unittest.TestCase):
                 sorted(path.name for path in scope.iterdir() if path.is_dir()),
                 sorted("control-" + name for name in run_owner_controls.CONTROL_CASES),
             )
-            self.assertEqual(len(list(scope.glob("control-*"))), 43)
+            self.assertEqual(len(list(scope.glob("control-*"))), 47)
             for name, content in before.items():
                 self.assertEqual((scope / name).read_bytes(), content)
             (scope / "controlled-symlink").symlink_to(self.foreign)

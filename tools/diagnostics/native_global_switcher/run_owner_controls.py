@@ -1,5 +1,5 @@
 # tools/diagnostics/native_global_switcher/run_owner_controls.py
-"""Run the original forty controls and three diagnostic controls in an owned scope."""
+"""Run the original controls and private-table regressions in an owned scope."""
 
 import argparse
 from pathlib import Path
@@ -53,6 +53,10 @@ CONTROL_CASES = (
     "identity_prepost_tag",
     "identity_prepost_pid",
     "identity_prepost_state",
+    "private_state_instance",
+    "private_state_selector_refused",
+    "private_state_session_refused",
+    "foreign_event_state",
 )
 
 
