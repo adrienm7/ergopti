@@ -175,6 +175,35 @@ extension HS274NativePolicyQualificationTests {
 			XCTAssertEqual(compiled.status, 0, "Retired owned compilation refusal code: "
 				+ HS274RetiredBuildRefusal.code(compiled.stderr, producer: .owned))
 			XCTAssertTrue(compiled.stderr.isEmpty)
+			// This separate partial calibration uses the untouched source retained
+			// by the already retired four-target worker, including its failure path.
+			// It cannot qualify the original four-target result or transfer ownership.
+			let coreConstructor = root.appendingPathComponent("core-constructor")
+			try FileManager.default.createDirectory(at: coreConstructor, withIntermediateDirectories: false,
+				attributes: [.posixPermissions: 0o700])
+			let coreReceipt = try runCoreConstructorCompilation([
+				"--owner", coreConstructor.path, "--pristine", owned.appendingPathComponent("pristine").path,
+				"--budget", "300"], root: root)
+			XCTAssertEqual(coreReceipt.status, 0, "Separate Core constructor calibration refused: " + coreReceipt.stderr)
+			XCTAssertTrue(coreReceipt.stderr.isEmpty)
+			if coreReceipt.status == 0 {
+				let partial = try JSONSerialization.jsonObject(with: Data(coreReceipt.stdout.utf8)) as? [String: Any]
+				XCTAssertNotNil(partial)
+				XCTAssertEqual(partial?["qualification"] as? String,
+					"unsigned_actual_core_constructor_compilation_only")
+				XCTAssertEqual(partial?["producer_sha256"] as? String,
+					"c0c3f2d741711c199e4bea202e878ccdd5323b654b9de8fe99bb6437940a36e7")
+				XCTAssertEqual(partial?["source_factory_sha256"] as? String,
+					"854dc3ef556e2540d4a64e0d935610a2a2fe8c947e3f7fe315c1641ceaaedd7d")
+				XCTAssertEqual(partial?["architectures"] as? [String], ["arm64", "x86_64"])
+				XCTAssertEqual(partial?["core_relative_path"] as? String,
+					"upstream/src/apps/CoreService/build/Release/ErgoptiPlus-Remap-Core.app")
+				XCTAssertEqual(partial?["descriptor_retirement_ack"] as? Bool, true)
+				for excluded in ["full_four_target_qualified", "signing_executed", "main_principal_qualified",
+					"root_placement_qualified", "child_group_retirement_qualified", "installation_executed", "capture_executed"] {
+					XCTAssertEqual(partial?[excluded] as? Bool, false)
+				}
+			}
 			guard compiled.status == 0, compiled.stderr.isEmpty else { return }
 			let ownedCheck = #"""
 			import importlib.util

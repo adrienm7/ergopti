@@ -307,6 +307,17 @@ final class HS274NativePolicyQualificationTests: XCTestCase {
 		return receipt
 	}
 
+	/// Partial Core constructor compilation has its own fixed Guardian calibration.
+	/// It cannot replace either mandatory complete-source compilation entry.
+	func runCoreConstructorCompilation(_ arguments: [String], root: URL) throws -> Receipt {
+		let child = try GuardianChild(executable: URL(fileURLWithPath: "/usr/bin/env"),
+			arguments: ["python3", source("owned_runtime_service_reference_core_fixture_calibration.py").path] + arguments,
+			repository: Self.repository, root: root, budget: .sourceCalibration)
+		children.append(child)
+		try child.start()
+		return try child.finish()
+	}
+
 	/// CI already archives this parent. Admit its canonical ordinary owner before
 	/// creating a unique private child, so failures retain useful phase evidence.
 	func compilationEvidenceParent() throws -> URL {

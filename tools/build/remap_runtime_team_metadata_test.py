@@ -100,6 +100,9 @@ CURRENT_PROFILE_CONSUMER = "module.validate_current_owned_record(module.parse_js
 HISTORICAL_PROFILE_CONSUMER = "module.validate_owned_record(module.parse_json(row.data))"
 
 
+CORE_CONSTRUCTOR_ADDITION = '\t\t\t// This separate partial calibration uses the untouched source retained\n\t\t\t// by the already retired four-target worker, including its failure path.\n\t\t\t// It cannot qualify the original four-target result or transfer ownership.\n\t\t\tlet coreConstructor = root.appendingPathComponent("core-constructor")\n\t\t\ttry FileManager.default.createDirectory(at: coreConstructor, withIntermediateDirectories: false,\n\t\t\t\tattributes: [.posixPermissions: 0o700])\n\t\t\tlet coreReceipt = try runCoreConstructorCompilation([\n\t\t\t\t"--owner", coreConstructor.path, "--pristine", owned.appendingPathComponent("pristine").path,\n\t\t\t\t"--budget", "300"], root: root)\n\t\t\tXCTAssertEqual(coreReceipt.status, 0, "Separate Core constructor calibration refused: " + coreReceipt.stderr)\n\t\t\tXCTAssertTrue(coreReceipt.stderr.isEmpty)\n\t\t\tif coreReceipt.status == 0 {\n\t\t\t\tlet partial = try JSONSerialization.jsonObject(with: Data(coreReceipt.stdout.utf8)) as? [String: Any]\n\t\t\t\tXCTAssertNotNil(partial)\n\t\t\t\tXCTAssertEqual(partial?["qualification"] as? String,\n\t\t\t\t\t"unsigned_actual_core_constructor_compilation_only")\n\t\t\t\tXCTAssertEqual(partial?["producer_sha256"] as? String,\n\t\t\t\t\t"c0c3f2d741711c199e4bea202e878ccdd5323b654b9de8fe99bb6437940a36e7")\n\t\t\t\tXCTAssertEqual(partial?["source_factory_sha256"] as? String,\n\t\t\t\t\t"854dc3ef556e2540d4a64e0d935610a2a2fe8c947e3f7fe315c1641ceaaedd7d")\n\t\t\t\tXCTAssertEqual(partial?["architectures"] as? [String], ["arm64", "x86_64"])\n\t\t\t\tXCTAssertEqual(partial?["core_relative_path"] as? String,\n\t\t\t\t\t"upstream/src/apps/CoreService/build/Release/ErgoptiPlus-Remap-Core.app")\n\t\t\t\tXCTAssertEqual(partial?["descriptor_retirement_ack"] as? Bool, true)\n\t\t\t\tfor excluded in ["full_four_target_qualified", "signing_executed", "main_principal_qualified",\n\t\t\t\t\t"root_placement_qualified", "child_group_retirement_qualified", "installation_executed", "capture_executed"] {\n\t\t\t\t\tXCTAssertEqual(partial?[excluded] as? Bool, false)\n\t\t\t\t}\n\t\t\t}\n'
+
+
 class PortableSourceTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -145,6 +148,8 @@ class PortableSourceTests(unittest.TestCase):
 
     def test_existing_caller_exact_inverse_and_post_products_guard(self):
         current = (CANDIDATE / SWIFT_PATH).read_text()
+        self.assertEqual(current.count(CORE_CONSTRUCTOR_ADDITION), 1)
+        current = current.replace(CORE_CONSTRUCTOR_ADDITION, "", 1)
         self.assertEqual(current.count(INITIALIZER_CONTROLS_ADDITION), 1)
         current = current.replace(INITIALIZER_CONTROLS_ADDITION, "", 1)
         self.assertEqual(current.count(PRODUCT_DIFFERENCE_AXES_ADDITION), 1)

@@ -4726,6 +4726,28 @@ prerequisites exist. Native Swift/Main execution, signing, readiness, install,
 stream/capture and physical retirement remain unqualified. This dormant source
 tranche does not complete WP6 or TODO31; transverse16/38 stay open.
 
+A separately named Core constructor calibration now consumes the genuine
+untouched owned/pristine source retained by the same four-target test scope.
+The original four-target worker must first return its acknowledged retired
+Receipt, including failure. Its original status/stderr assertions and success
+guard remain unchanged; the partial Core result cannot turn a failed whole
+compilation green. A fresh private owner, fixed current source factory and
+actual universal Duktape/Core compilation retain the genuine Core continuation
+and executing-source descriptors until currentness and descriptor-close ACKs.
+Scalar JSON is a terminal observation and cannot transfer that continuation.
+
+Independent portable qualification records33 passing executions across
+normal/-O/inherited modes (11 distinct cases), plus8 assertion-refused source
+admission mutations. Genuine missing or fabricated pristine source is refused
+without a positive packet. Guardian ordering controls inspect source; they do
+not execute native retirement. The original full four-target300 and existing
+SDK30/35/10 bounds remain intact; the separate Core calibration uses the
+existing300/305/retirement10 envelope. Actual Mac/Swift/Guardian/Core compilation
+after this change is unexecuted and total suite fit is UNKNOWN. The prior actual
+e871 native qualification reported xcodegen_transport and did not qualify Core
+compilation. This partial source tranche completes no WP6/runtime/install or
+capture acceptance; TODO31 and transverse16/38 stay open.
+
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
   listed; see `docs/memory/text-input-and-config.md`. Current source already

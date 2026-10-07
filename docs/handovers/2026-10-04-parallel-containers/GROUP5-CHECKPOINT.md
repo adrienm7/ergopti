@@ -2240,3 +2240,31 @@ protected source prerequisite, Swift/Darwin compilation, signing, readiness,
 install/launchd, stream/capture and physical retirement remain unqualified.
 The worker remains dormant, the controller grants no production authority, and
 no feature item is removed. TODO31 and transverse16/38 stay open.
+
+## Separately owned held-pristine Core constructor calibration
+
+The reviewed seven-path source tranche binds the fixed Core-only producer and
+its executing source descriptors to the current authenticated factory/provider.
+Its standalone Guardian entry uses the existing300/305/retirement10 calibration
+envelope. The original complete four-target300 and ordinary SDK30/35/10 remain
+unchanged. No source acquisition, workflow, Main role or service activation is
+added by this tranche.
+
+The actual existing four-target test invokes the separate constructor only
+after receiving the original retired Receipt and making its original status
+and stderr assertions, before the unchanged success guard. It passes only the
+same scope's untouched owned/pristine and a fresh private0700 Core owner.
+Missing/fabricated source explicitly refuses; no staged upstream, offline
+fixture, environment, cache or test-order substitute is admitted. Partial
+Core success cannot erase the original full four-target failed verdict.
+
+Independent portable checks pass33 executions across three modes (11 distinct
+cases), with8 assertion-refused source admission mutations. The entire prior
+caller and Team historical oracle recover through exact declared inverses;
+all five preceding source images remain unchanged. Genuine Linux source
+refusals are distinct from source-inspected Guardian ordering. Native Swift,
+Guardian, Core compilation and actual300-second fit remain unexecuted/UNKNOWN.
+The prior e871 native qualification refused xcodegen_transport; it grants no
+Core credit. JSON cannot transfer the actual held Core/source continuation.
+Whole artifact, signing, Main/root fixture, installation, readiness, capture
+and physical input remain separate. TODO31 and transverse16/38 stay open.
