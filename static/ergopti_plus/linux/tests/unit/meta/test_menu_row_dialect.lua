@@ -305,3 +305,5 @@ helpers.describe("renderer: a category switch with no registered command", funct
 			"a submenu shown without its switch cannot be turned on from the tray; a DEBUG line hid exactly that")
 	end)
 end)
+
+require("test.menu_row_dialect_contract").register(helpers)

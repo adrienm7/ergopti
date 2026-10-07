@@ -85,6 +85,7 @@ const SEPARATOR = '---';
 // `debug_menu`, `keyboard_layout` opens `layout_menu`) that a naming rule would
 // be a rule with four exceptions — and a missing entry here would silently make
 // a whole submenu unreachable, which is one of the things being checked.
+
 const OPENS_SUBMENU = {
 	magic_key_source: {
 		menu: 'magic_key_source_menu',
@@ -146,6 +147,18 @@ const OPENS_SUBMENU = {
 		}
 	],
 	agent_system1: [
+		{
+			menu: 'agent_system1_frame',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_llm/agent_panel.lua' }
+		},
+		{
+			menu: 'agent_download_frame',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_llm/agent_panel.lua' }
+		},
 		'agent_system_controls',
 		{
 			menu: 'agent_server_empty_status',
@@ -168,6 +181,18 @@ const OPENS_SUBMENU = {
 		}
 	],
 	agent_system2: [
+		{
+			menu: 'agent_system2_frame',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_llm/agent_panel.lua' }
+		},
+		{
+			menu: 'agent_download_frame',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_llm/agent_panel.lua' }
+		},
 		'agent_system_controls',
 		{
 			menu: 'agent_server_empty_status',
@@ -194,6 +219,28 @@ const OPENS_SUBMENU = {
 	shortcuts: [
 		'shortcuts_menu',
 		{
+			menu: 'shortcut_wrap_frame',
+			platforms: ['ahk', 'hs', 'linux'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_shortcuts.ahk',
+				hs: 'macos/ui/menu/menu_shortcuts.lua',
+				linux: 'linux/ui/menu/menu_builder.lua'
+			}
+		},
+		{
+			menu: 'shortcut_chatgpt_editor_frame',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_shortcuts.lua' }
+		},
+		{
+			menu: 'shortcut_wrap_live_control',
+			platforms: ['linux'],
+			kind: 'compose',
+			native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+		},
+		{
 			menu: 'linux_shortcuts_absent_rows',
 			platforms: ['linux'],
 			kind: 'compose',
@@ -206,15 +253,32 @@ const OPENS_SUBMENU = {
 		kind: 'compose',
 		native_sources: { ahk: 'windows/ui/menu/menu_init.ahk' }
 	},
-	extensions_shortcuts: {
-		menu: 'shortcut_extension_boundary',
-		platforms: ['ahk', 'hs'],
-		kind: 'compose',
-		native_sources: {
-			ahk: 'windows/ui/menu/menu_shortcuts.ahk',
-			hs: 'macos/ui/menu/menu_shortcuts.lua'
+	extensions_shortcuts: [
+		{
+			menu: 'shortcut_extension_boundary',
+			platforms: ['ahk', 'hs'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_shortcuts.ahk',
+				hs: 'macos/ui/menu/menu_shortcuts.lua'
+			}
+		},
+		{
+			menu: 'shortcut_extension_error_frame',
+			platforms: ['ahk', 'linux'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_shortcuts.ahk',
+				linux: 'linux/ui/menu/menu_builder.lua'
+			}
+		},
+		{
+			menu: 'shortcut_extension_empty_frame',
+			platforms: ['ahk'],
+			kind: 'compose',
+			native_sources: { ahk: 'windows/ui/menu/menu_shortcuts.ahk' }
 		}
-	},
+	],
 	// Native wrap providers compose these fixed fragments into their existing picker.
 	wrap_symbols_menu: [
 		{
@@ -294,11 +358,92 @@ const OPENS_SUBMENU = {
 	],
 	// The personal provider renders the shared editor command head on every driver.
 	hotstring_personal: [
+		{
+			menu: 'hotstring_personal_default_parent',
+			platforms: ['ahk', 'hs', 'linux'],
+			kind: 'compose',
+			selected_group: {
+				ahk: {
+					row: {
+						type: 'group',
+						id: 'personal_default_caption',
+						i18n: 'menu.hotstrings.default_category_prefix',
+						caption_getter: 'personal_default_label',
+						caption_layout: 'prefix',
+						caption_joiner: ''
+					},
+					owner_signature: '_HS_PersonalRows(Options := unset) {',
+					call: 'DefaultCaption := MenuRenderer_GroupRow("hotstring_personal_default_parent", "personal_default_caption", DefaultSectionMenu, Map("personal_default_label", (*) => CurDefaultLabel))',
+					handoff: 'DefaultParent := [DefaultCaption]',
+					consumer: '"personal_default_parent", (*) => DefaultParent,'
+				}
+			},
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_hotstrings.ahk',
+				hs: 'macos/ui/menu/menu_hotstrings_custom.lua',
+				linux: 'linux/ui/menu/menu_builder.lua'
+			}
+		},
+		{
+			menu: 'hotstring_personal_legacy_shortcut',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_hotstrings_custom.lua' }
+		},
 		'personal_hotstring_commands',
 		'personal_file_controls',
 		'personal_file_unavailable',
-		'personal_directory_unavailable'
+		'personal_directory_unavailable',
+		{
+			menu: 'hotstring_personal_default_frame',
+			platforms: ['ahk', 'hs', 'linux'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_hotstrings.ahk',
+				hs: 'macos/ui/menu/menu_hotstrings_custom.lua',
+				linux: 'linux/ui/menu/menu_builder.lua'
+			}
+		},
+		{
+			menu: 'hotstring_personal_controls_frame',
+			platforms: ['ahk', 'hs', 'linux'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_hotstrings.ahk',
+				hs: 'macos/ui/menu/menu_hotstrings_custom.lua',
+				linux: 'linux/ui/menu/menu_builder.lua'
+			}
+		},
+		{
+			menu: 'hotstring_personal_content_frame',
+			platforms: ['ahk', 'hs', 'linux'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_hotstrings.ahk',
+				hs: 'macos/ui/menu/menu_hotstrings_custom.lua',
+				linux: 'linux/ui/menu/menu_builder.lua'
+			}
+		},
+		{
+			menu: 'hotstring_personal_file_frame',
+			platforms: ['ahk', 'hs'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_hotstrings.ahk',
+				hs: 'macos/ui/menu/menu_hotstrings_custom.lua'
+			}
+		},
+		{
+			menu: 'hotstring_personal_directory_frame',
+			platforms: ['ahk', 'hs'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_hotstrings.ahk',
+				hs: 'macos/ui/menu/menu_hotstrings_custom.lua'
+			}
+		}
 	],
+	personal_default_caption: 'hotstring_personal_default_frame',
 	// Lua category providers build the parent; Windows publishes its child inline.
 	hotstring_category_sections: [
 		{ menu: 'programmable_hotstring_entry', platforms: ['hs', 'linux'] },
@@ -452,12 +597,138 @@ const OPENS_SUBMENU = {
 	// « Raccourcis de gestion du script », the script chords of the three drivers.
 	script_control: 'script_control_group',
 	accented_letters: 'accented_letters_group',
+	hotstring_extensions: [
+		{
+			menu: 'hotstring_extension_content_frame',
+			platforms: ['ahk', 'hs', 'linux'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_hotstrings.ahk',
+				hs: 'macos/ui/menu/builder.lua',
+				linux: 'linux/ui/menu/menu_builder.lua'
+			}
+		},
+		{
+			menu: 'hotstring_extension_bulk_controls',
+			platforms: ['hs', 'linux'],
+			kind: 'compose',
+			native_sources: {
+				hs: 'macos/ui/menu/menu_hotstrings.lua',
+				linux: 'linux/ui/menu/menu_builder.lua'
+			}
+		},
+		{
+			menu: 'hotstring_extension_empty_file',
+			platforms: ['ahk'],
+			kind: 'compose',
+			native_sources: { ahk: 'windows/ui/menu/menu_hotstrings.ahk' }
+		},
+		{
+			menu: 'hotstrings_parameter_boundary',
+			platforms: ['ahk', 'hs', 'linux'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_hotstrings.ahk',
+				hs: 'macos/ui/menu/builder.lua',
+				linux: 'linux/ui/menu/menu_builder.lua'
+			}
+		}
+	],
 	hotstrings_params: 'hotstrings_params_group',
-	word_expanders: 'word_expanders_menu',
+	word_expanders: [
+		'word_expanders_menu',
+		{
+			menu: 'hotstrings_word_expander_parent',
+			platforms: ['ahk', 'hs', 'linux'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_hotstrings.ahk',
+				hs: 'macos/ui/menu/menu_hotstrings_management.lua',
+				linux: 'linux/ui/menu/menu_builder.lua'
+			}
+		},
+		{
+			menu: 'hotstrings_word_expander_frame',
+			platforms: ['ahk', 'hs', 'linux'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_hotstrings.ahk',
+				hs: 'macos/ui/menu/menu_hotstrings_management.lua',
+				linux: 'linux/ui/menu/menu_builder.lua'
+			}
+		},
+		{
+			menu: 'hotstrings_parameter_boundary',
+			platforms: ['ahk', 'hs', 'linux'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_hotstrings.ahk',
+				hs: 'macos/ui/menu/menu_hotstrings_management.lua',
+				linux: 'linux/ui/menu/menu_builder.lua'
+			}
+		}
+	],
+	// The actual Magic trigger provider consumes this frame; Linux alone owns reset.
+	magic_key_config: {
+		menu: 'hotstrings_magic_trigger_frame',
+		platforms: ['ahk', 'hs', 'linux'],
+		kind: 'compose',
+		native_sources: {
+			ahk: 'windows/ui/menu/menu_hotstrings.ahk',
+			hs: 'macos/ui/menu/menu_hotstrings_management.lua',
+			linux: 'linux/ui/menu/menu_builder.lua'
+		}
+	},
+	magic_key_reset_if_custom: {
+		menu: 'hotstrings_magic_trigger_reset',
+		platforms: ['linux'],
+		kind: 'compose',
+		native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+	},
 	// The native delay providers open the same declared configuration command.
-	delays_colors: 'hotstrings_delays_menu',
+	delays_colors: [
+		'hotstrings_delays_menu',
+		{
+			menu: 'hotstrings_delays_parent',
+			platforms: ['ahk', 'hs', 'linux'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_hotstrings.ahk',
+				hs: 'macos/ui/menu/menu_hotstrings_management.lua',
+				linux: 'linux/ui/menu/menu_builder.lua'
+			}
+		},
+		{
+			menu: 'hotstrings_delays_frame',
+			platforms: ['ahk', 'hs', 'linux'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_hotstrings.ahk',
+				hs: 'macos/ui/menu/menu_hotstrings_management.lua',
+				linux: 'linux/ui/menu/menu_builder.lua'
+			}
+		}
+	],
 	// Both Lua preview providers consume the same declared coloured checkbox.
 	preview_bubbles: [
+		{
+			menu: 'hotstrings_preview_parent',
+			platforms: ['hs', 'linux'],
+			kind: 'compose',
+			native_sources: {
+				hs: 'macos/ui/menu/menu_hotstrings_management.lua',
+				linux: 'linux/ui/menu/menu_builder.lua'
+			}
+		},
+		{
+			menu: 'hotstrings_preview_frame',
+			platforms: ['hs', 'linux'],
+			kind: 'compose',
+			native_sources: {
+				hs: 'macos/ui/menu/menu_hotstrings_management.lua',
+				linux: 'linux/ui/menu/menu_builder.lua'
+			}
+		},
 		'preview_magic_control',
 		'preview_presence_controls',
 		'preview_colored_control'
@@ -725,8 +996,250 @@ const OPENS_SUBMENU = {
 		}
 	],
 	// The AI agent submenu (_shared/modules/llm/agent.json), on every driver.
-	agent: 'agent_menu'
+	agent_disabled_apps: {
+		menu: 'agent_excluded_apps_frame',
+		platforms: ['hs'],
+		kind: 'compose',
+		native_sources: { hs: 'macos/ui/menu/menu_llm/agent_panel.lua' }
+	},
+	agent: [
+		'agent_menu',
+		{
+			menu: 'agent_panel_frame',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_llm/agent_panel.lua' }
+		}
+	]
 };
+
+// Complete finite LLM frames consume actual native children; the graph admits only their genuine calls.
+OPENS_SUBMENU.llm_model.push({
+	menu: 'llm_model_action_rows',
+	platforms: ['ahk', 'hs'],
+	kind: 'compose',
+	native_sources: {
+		ahk: 'windows/ui/menu/menu_llm/menu_models.ahk',
+		hs: 'macos/ui/menu/menu_llm/models_selector.lua'
+	}
+});
+OPENS_SUBMENU.llm_model.push({
+	menu: 'llm_model_identity_rows',
+	platforms: ['ahk', 'hs'],
+	kind: 'compose',
+	native_sources: {
+		ahk: 'windows/ui/menu/menu_llm/menu_models.ahk',
+		hs: 'macos/ui/menu/menu_llm/models_selector.lua'
+	}
+});
+OPENS_SUBMENU.llm_model.push({
+	menu: 'llm_model_spec_rows',
+	platforms: ['ahk', 'hs'],
+	kind: 'compose',
+	native_sources: {
+		ahk: 'windows/ui/menu/menu_llm/menu_models.ahk',
+		hs: 'macos/ui/menu/menu_llm/models_selector.lua'
+	}
+});
+OPENS_SUBMENU.llm_model.push({
+	menu: 'llm_model_capability_rows',
+	platforms: ['ahk', 'hs'],
+	kind: 'compose',
+	native_sources: {
+		ahk: 'windows/ui/menu/menu_llm/menu_models.ahk',
+		hs: 'macos/ui/menu/menu_llm/models_selector.lua'
+	}
+});
+OPENS_SUBMENU.llm_model.push({
+	menu: 'llm_model_hardware_rows',
+	platforms: ['ahk', 'hs'],
+	kind: 'compose',
+	native_sources: {
+		ahk: 'windows/ui/menu/menu_llm/menu_models.ahk',
+		hs: 'macos/ui/menu/menu_llm/models_selector.lua'
+	}
+});
+OPENS_SUBMENU.llm_model.push({
+	menu: 'llm_model_picker_head',
+	platforms: ['ahk', 'hs'],
+	kind: 'compose',
+	native_sources: {
+		ahk: 'windows/ui/menu/menu_llm/menu_models.ahk',
+		hs: 'macos/ui/menu/menu_llm/models_selector.lua'
+	}
+});
+OPENS_SUBMENU.llm_model.push({
+	menu: 'llm_model_picker_default',
+	platforms: ['ahk', 'hs'],
+	kind: 'compose',
+	native_sources: {
+		ahk: 'windows/ui/menu/menu_llm/menu_models.ahk',
+		hs: 'macos/ui/menu/menu_llm/models_selector.lua'
+	}
+});
+OPENS_SUBMENU.llm_model.push({
+	menu: 'llm_model_add_command',
+	platforms: ['ahk', 'hs'],
+	kind: 'compose',
+	native_sources: {
+		ahk: 'windows/ui/menu/menu_llm/menu_models.ahk',
+		hs: 'macos/ui/menu/menu_llm/models_selector.lua'
+	}
+});
+OPENS_SUBMENU.llm_model.push({
+	menu: 'llm_model_hf_token_command',
+	platforms: ['hs'],
+	kind: 'compose',
+	native_sources: { hs: 'macos/ui/menu/menu_llm/models_selector.lua' }
+});
+OPENS_SUBMENU.llm_model.push({
+	menu: 'llm_saved_models_frame',
+	platforms: ['hs'],
+	kind: 'compose',
+	native_sources: { hs: 'macos/ui/menu/menu_llm/models_selector.lua' }
+});
+OPENS_SUBMENU.llm_model.push({
+	menu: 'llm_thinking_info',
+	platforms: ['ahk', 'hs'],
+	kind: 'compose',
+	native_sources: {
+		ahk: 'windows/ui/menu/menu_llm/menu_main.ahk',
+		hs: 'macos/ui/menu/menu_llm/init.lua'
+	}
+});
+OPENS_SUBMENU.llm_model.push({
+	menu: 'llm_after_model_boundary',
+	platforms: ['hs'],
+	kind: 'compose',
+	native_sources: { hs: 'macos/ui/menu/menu_llm/init.lua' }
+});
+OPENS_SUBMENU.llm_model.push({
+	menu: 'llm_mlx_port_frame',
+	platforms: ['hs'],
+	kind: 'compose',
+	native_sources: { hs: 'macos/ui/menu/menu_llm/init.lua' }
+});
+OPENS_SUBMENU.llm_backend.push({
+	menu: 'llm_install_warning_frame',
+	platforms: ['ahk'],
+	kind: 'compose',
+	native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_main.ahk' }
+});
+OPENS_SUBMENU.llm.push({
+	menu: 'llm_download_shortcut_frame',
+	platforms: ['hs'],
+	kind: 'compose',
+	native_sources: { hs: 'macos/ui/menu/menu_llm/init.lua' }
+});
+OPENS_SUBMENU.llm_profile.push({
+	menu: 'llm_after_profile_boundary',
+	platforms: ['ahk', 'hs'],
+	kind: 'compose',
+	native_sources: {
+		ahk: 'windows/ui/menu/menu_llm/menu_main.ahk',
+		hs: 'macos/ui/menu/menu_llm/init.lua'
+	}
+});
+OPENS_SUBMENU.llm_profile.push({
+	menu: 'llm_profile_app_override_frame',
+	platforms: ['ahk'],
+	kind: 'compose',
+	native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_profiles.ahk' }
+});
+OPENS_SUBMENU.llm_navigation = [
+	OPENS_SUBMENU.llm_navigation,
+	{
+		menu: 'llm_modifier_picker_frame',
+		platforms: ['hs'],
+		kind: 'compose',
+		native_sources: { hs: 'macos/ui/menu/menu_llm/settings_manager.lua' }
+	}
+];
+OPENS_SUBMENU.llm_backend.push({
+	menu: 'llm_api_selection_frame',
+	platforms: ['hs'],
+	kind: 'compose',
+	native_sources: { hs: 'macos/ui/menu/menu_llm/api_panel.lua' }
+});
+OPENS_SUBMENU.llm_backend.push({
+	menu: 'llm_api_active_boundary',
+	platforms: ['hs'],
+	kind: 'compose',
+	native_sources: { hs: 'macos/ui/menu/menu_llm/api_panel.lua' }
+});
+OPENS_SUBMENU.llm_backend.push({
+	menu: 'llm_api_system1_frame',
+	platforms: ['hs'],
+	kind: 'compose',
+	native_sources: { hs: 'macos/ui/menu/menu_llm/api_panel.lua' }
+});
+OPENS_SUBMENU.llm_model.push({
+	menu: 'llm_api_edit_command',
+	platforms: ['ahk'],
+	kind: 'compose',
+	native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_api_entries.ahk' }
+});
+OPENS_SUBMENU.llm_generation_settings.push({
+	menu: 'llm_generation_count_control',
+	platforms: ['ahk', 'hs'],
+	kind: 'compose',
+	native_sources: {
+		ahk: 'windows/ui/menu/menu_llm/menu_settings.ahk',
+		hs: 'macos/ui/menu/menu_llm/init.lua'
+	}
+});
+OPENS_SUBMENU.llm_generation_settings.push({
+	menu: 'llm_generation_count_reset_control',
+	platforms: ['hs'],
+	kind: 'compose',
+	native_sources: { hs: 'macos/ui/menu/menu_llm/init.lua' }
+});
+OPENS_SUBMENU.llm_generation_settings.push({
+	menu: 'llm_generation_native_controls',
+	platforms: ['hs'],
+	kind: 'compose',
+	native_sources: { hs: 'macos/ui/menu/menu_llm/init.lua' }
+});
+OPENS_SUBMENU.llm_generation_settings.push({
+	menu: 'llm_generation_context_controls',
+	platforms: ['ahk'],
+	kind: 'compose',
+	native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_settings.ahk' }
+});
+OPENS_SUBMENU.llm_generation_settings.push({
+	menu: 'llm_generation_word_controls',
+	platforms: ['ahk'],
+	kind: 'compose',
+	native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_settings.ahk' }
+});
+OPENS_SUBMENU.llm_generation_settings.push({
+	menu: 'llm_native_numeric_reset',
+	platforms: ['ahk'],
+	kind: 'compose',
+	native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_settings.ahk' }
+});
+OPENS_SUBMENU.llm_generation_settings.push({
+	menu: 'llm_generation_temperature_controls',
+	platforms: ['ahk', 'hs'],
+	kind: 'compose',
+	native_sources: {
+		ahk: 'windows/ui/menu/menu_llm/menu_settings.ahk',
+		hs: 'macos/ui/menu/menu_llm/temperature_panel.lua'
+	}
+});
+OPENS_SUBMENU.llm_trigger.push({
+	menu: 'llm_trigger_debounce_control',
+	platforms: ['ahk'],
+	kind: 'compose',
+	native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_settings.ahk' }
+});
+OPENS_SUBMENU.llm_display.push({
+	menu: 'llm_display_inline_control',
+	platforms: ['ahk'],
+	kind: 'compose',
+	native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_settings.ahk' }
+});
+const PERSONAL_DEFAULT_GROUP_PROOF = OPENS_SUBMENU.hotstring_personal[0].selected_group.ahk;
 
 /**
  * The native personal provider must actually consume its declared command head.
@@ -925,6 +1438,23 @@ const reachedByKinds = {};
 function isComposedFragment(rows, kinds) {
 	if (kinds.size !== 1 || !kinds.has('compose') || rows.length === 0) return false;
 	return rows.every((row) => {
+		if (
+			['label', 'section_header'].includes(row.type) &&
+			(Object.hasOwn(row, 'caption_getter') ||
+				Object.hasOwn(row, 'caption_layout') ||
+				Object.hasOwn(row, 'caption_joiner'))
+		) {
+			try {
+				const english = JSON.parse(fs.readFileSync(path.join(LOCALES, 'en.json'), 'utf8'));
+				require('../lib/menu-row-availability.cjs').validateChildTemplates(
+					{ composed_caption: [row] },
+					(key) => (Object.hasOwn(english, key) ? english[key] : undefined)
+				);
+				return true;
+			} catch {
+				return false;
+			}
+		}
 		if (row.type === SEPARATOR)
 			return Object.keys(row).every((key) => ['type', 'platforms', 'unavailable'].includes(key));
 		return (
@@ -940,7 +1470,150 @@ function isComposedFragment(rows, kinds) {
 	});
 }
 
-const { publishesMenuTemplate: publishesTemplate } = require('../lib/menu-shared-delegation.cjs');
+// A real translated format is inert composition, never an empty clicked submenu.
+{
+	const assert = require('node:assert/strict');
+	for (const type of ['label', 'section_header']) {
+		const row = {
+			type,
+			id: 'actual_model_backend',
+			i18n: 'menu.llm.model_backend',
+			caption_getter: 'actual_backend'
+		};
+		assert.equal(isComposedFragment([row], new Set(['compose'])), true);
+		assert.equal(isComposedFragment([row], new Set(['submenu'])), false);
+		assert.equal(isComposedFragment([row], new Set(['compose', 'submenu'])), false);
+		for (const fields of [
+			{ i18n: 'menu.metrics.status' },
+			{ i18n: 'menu.llm.prediction_count_label_one' },
+			{ i18n: 'missing_native_translation' },
+			{ caption_getter: '' },
+			{ caption_getter: 0 },
+			{ caption_getter: ['actual_backend'] },
+			{ type: 'feature', path: 'llm.enabled' },
+			{ action: 'undeclared_native_callback' },
+			{ checked_when: ['native_checked'] }
+		])
+			assert.equal(isComposedFragment([{ ...row, ...fields }], new Set(['compose'])), false);
+	}
+}
+
+// Explicit affixes remain inert composition only under the genuine canonical owner.
+{
+	const assert = require('node:assert/strict');
+	const prefix = {
+		type: 'label',
+		id: 'native_error',
+		i18n: 'common.error_prefix',
+		caption_getter: 'native_name',
+		caption_layout: 'prefix',
+		caption_joiner: ''
+	};
+	const suffix = {
+		...prefix,
+		i18n: 'common.error_title',
+		caption_layout: 'suffix',
+		caption_joiner: ' — '
+	};
+	for (const row of [prefix, suffix]) {
+		assert.equal(isComposedFragment([row], new Set(['compose'])), true);
+		assert.equal(isComposedFragment([row], new Set(['submenu'])), false);
+		assert.equal(isComposedFragment([row], new Set(['compose', 'submenu'])), false);
+	}
+	for (const changes of [
+		{ caption_layout: 'infix' },
+		{ caption_layout: false },
+		{ caption_joiner: 7 },
+		{ caption_joiner: '\n' },
+		{ caption_getter: undefined },
+		{ i18n: 'future.unknown' },
+		{ i18n: 'menu.llm.hw_header' },
+		{ type: 'section_header' },
+		{ type: 'command' },
+		{ callback: 'foreign' },
+		{ children: [] },
+		{ id: '' }
+	])
+		assert.equal(isComposedFragment([{ ...prefix, ...changes }], new Set(['compose'])), false);
+}
+
+const {
+	publishesMenuTemplate: publishesTemplate,
+	publishesSelectedMenuGroup
+} = require('../lib/menu-shared-delegation.cjs');
+// A selected row never grants authority to additional, unconsumed group siblings.
+{
+	const assert = require('node:assert/strict');
+	const source = fs.readFileSync(path.join(SP, 'windows/ui/menu/menu_hotstrings.ahk'), 'utf8');
+	const key = 'hotstring_personal_default_parent',
+		rows = manifest[key];
+	const credits = (candidate, definition = rows) =>
+		publishesSelectedMenuGroup(candidate, '.ahk', key, definition, PERSONAL_DEFAULT_GROUP_PROOF);
+	assert.equal(
+		credits(source),
+		true,
+		'the actual singleton parent call, captured child and frame binding are executable in their genuine owner'
+	);
+	for (const definition of [
+		[],
+		[rows[0], rows[0]],
+		[{ ...rows[0], type: 'command' }],
+		[{ ...rows[0], id: 'foreign_parent' }],
+		[{ ...rows[0], i18n: 'future.unowned' }],
+		[{ ...rows[0], caption_getter: 'foreign_getter' }]
+	])
+		assert.equal(
+			credits(source, definition),
+			false,
+			'missing, malformed, foreign or multirow selected declarations earn no whole-section credit'
+		);
+	const actualCall =
+		'DefaultCaption := MenuRenderer_GroupRow("hotstring_personal_default_parent", "personal_default_caption",\n\t\t\tDefaultSectionMenu, Map("personal_default_label", (*) => CurDefaultLabel))';
+	assert(
+		source.includes(actualCall),
+		'the actual two-line native caption capture is present before mutation'
+	);
+	for (const candidate of [
+		source.replace(actualCall, 'DefaultCaption := false'),
+		source.replace(
+			actualCall,
+			"AuditText := '\n(\n" + actualCall + "\n)\n'\nDefaultCaption := false"
+		),
+		source.replace(actualCall, '/* ' + actualCall + ' */\nDefaultCaption := false'),
+		source.replace(actualCall, 'DefaultCaption := false') +
+			'\n_ForeignPersonalProjection() {\n' +
+			actualCall +
+			'\n}\n',
+		source.replace('DefaultParent := [DefaultCaption]', 'DefaultParent := []'),
+		source.replace(
+			'"personal_default_parent", (*) => DefaultParent,',
+			'"personal_default_parent", (*) => [],'
+		),
+		source.replace(
+			'MenuRenderer_GroupRow("hotstring_personal_default_parent", "personal_default_caption"',
+			'MenuRenderer_GroupRow("hotstring_personal_default_parent", "foreign_parent"'
+		)
+	])
+		assert.equal(
+			credits(candidate),
+			false,
+			'missing, data-only, foreign-owner or misbound native projections earn no credit'
+		);
+	assert.equal(
+		credits(source),
+		true,
+		'exact original source repair restores the selected publication'
+	);
+	assert.equal(
+		publishesTemplate(
+			'MenuRenderer_GroupRow("hotstring_personal_default_parent", "personal_default_caption", Child, Getters)',
+			'.ahk',
+			key
+		),
+		false,
+		'the original whole-template predicate does not silently credit selected projections'
+	);
+}
 
 // An inert readout is admissible only through composition. A clicked parent,
 // including one sharing the same target, still owes a usable child on that OS.
@@ -1040,11 +1713,19 @@ for (let pass = 0; pass < MENU_KEYS.length + 1; pass += 1) {
 					if (
 						typeof file !== 'string' ||
 						!file.startsWith(driver + '/') ||
-						!publishesTemplate(
-							fs.readFileSync(path.join(SP, file), 'utf8'),
-							path.extname(file),
-							target
-						)
+						!(opened.selected_group?.[platform]
+							? publishesSelectedMenuGroup(
+									fs.readFileSync(path.join(SP, file), 'utf8'),
+									path.extname(file),
+									target,
+									manifest[target],
+									opened.selected_group[platform]
+								)
+							: publishesTemplate(
+									fs.readFileSync(path.join(SP, file), 'utf8'),
+									path.extname(file),
+									target
+								))
 					)
 						errors.push(
 							`${menuKey}/${row.id}: ${kind} ${target} has no native template publication on ${platform}`
@@ -1534,6 +2215,10 @@ const renderedCounts = {};
 for (const [driver, root] of Object.entries(DRIVER_ROOTS)) {
 	const { src, delegated } = driverSource(root);
 	const keys = new Set([...src.matchAll(/ManifestMenu\.build\(\s*"([a-z_]+)"/g)].map((m) => m[1]));
+	// This parent now completes admitted canonical DATA without invoking Build.
+	const languageFile = driver === 'hs' ? 'ui/menu/builder.lua' : 'ui/menu/menu_builder.lua';
+	if (languageParentSource(fs.readFileSync(path.join(root, languageFile), 'utf8'), driver))
+		keys.add('language_menu');
 	renderedCounts[driver] = keys.size;
 
 	// A disabled_when / checked_when key with no getter is not a row that stays
@@ -1680,3 +2365,1110 @@ console.log(
 		for (const key of names) delete manifest[key];
 	}
 }
+
+/** Counts only the actual completed Language child route inside its physical native owner. */
+function languageParentSource(source, driver) {
+	const assert = require('node:assert/strict');
+	function ownerBody(source, signature) {
+		const tokens = scriptTokens(source, '.lua');
+		const wanted = scriptTokens(signature, '.lua');
+		const bodies = [];
+		for (let start = 0; start < tokens.length; start++) {
+			if (
+				source
+					.slice(source.lastIndexOf('\n', tokens[start].start - 1) + 1, tokens[start].start)
+					.trim()
+			)
+				continue;
+			if (
+				!wanted.every(
+					(token, offset) =>
+						tokens[start + offset]?.kind === token.kind &&
+						tokens[start + offset]?.value === token.value
+				)
+			)
+				continue;
+			// String identity is the physical simple Lua spelling, not an undecoded alias.
+			if (
+				!wanted.every(
+					(token, offset) =>
+						token.kind !== 'string' ||
+						source.slice(tokens[start + offset].start, tokens[start + offset].end) ===
+							signature.slice(token.start, token.end)
+				)
+			)
+				continue;
+			const blocks = ['function'];
+			let awaitingDo = 0;
+			for (let index = start + wanted.length; index < tokens.length; index++) {
+				const token = tokens[index];
+				if (token.kind !== 'identifier' || ['.', ':'].includes(tokens[index - 1]?.value)) continue;
+				if (['function', 'if', 'for', 'while', 'repeat'].includes(token.value)) {
+					blocks.push(token.value);
+					if (['for', 'while'].includes(token.value)) awaitingDo++;
+				} else if (token.value === 'do') {
+					if (awaitingDo) awaitingDo--;
+					else blocks.push('do');
+				} else if (token.value === 'end' || token.value === 'until') {
+					if (token.value === 'until' && blocks.at(-1) !== 'repeat')
+						throw new Error('invalid actual Lua owner');
+					blocks.pop();
+					if (!blocks.length) {
+						bodies.push(source.slice(tokens[start + wanted.length - 1].end, token.start));
+						break;
+					}
+				}
+			}
+		}
+		assert.equal(bodies.length, 1, 'one complete physical native Language owner');
+		return bodies[0];
+	}
+	function hasStatement(source, statement, requiredDepth = 0) {
+		const tokens = scriptTokens(source, '.lua');
+		const wanted = scriptTokens(statement, '.lua');
+		let depth = 0,
+			awaitingDo = 0;
+		const depths = tokens.map((token, index) => {
+			const before = depth;
+			if (token.kind !== 'identifier' || ['.', ':'].includes(tokens[index - 1]?.value))
+				return before;
+			if (['function', 'if', 'for', 'while', 'repeat'].includes(token.value)) {
+				depth++;
+				if (['for', 'while'].includes(token.value)) awaitingDo++;
+			} else if (token.value === 'do') {
+				if (awaitingDo) awaitingDo--;
+				else depth++;
+			} else if (['end', 'until'].includes(token.value)) depth--;
+			return before;
+		});
+		return tokens.some(
+			(first, index) =>
+				depths[index] === requiredDepth &&
+				!['.', ':', 'function'].includes(tokens[index - 1]?.value) &&
+				wanted.every((token, offset) => {
+					const actual = tokens[index + offset];
+					return (
+						actual?.kind === token.kind &&
+						actual.value === token.value &&
+						(token.kind !== 'string' ||
+							source.slice(actual.start, actual.end) === statement.slice(token.start, token.end))
+					);
+				})
+		);
+	}
+	const native = [
+		[
+			'macos/ui/menu/builder.lua',
+			'["language"] = function()',
+			[
+				'if type(i18n.build_language_menu_items) ~= "function" then return {} end',
+				'local ok_locales, locales = pcall(i18n.build_language_menu_items)',
+				'if not ok_locales then return {} end',
+				'local admitted = ManifestMenu.template_rows("language_menu", {}, {}, {',
+				'["locales"] = function() return locales end',
+				'if not admitted then return {} end',
+				'local rendered = ManifestMenu.render_rows(admitted, "language_menu")',
+				'local parent = ManifestMenu.group_row("top_level", "language", rendered, {})',
+				'return parent and { parent } or {}'
+			]
+		],
+		[
+			'linux/ui/menu/menu_builder.lua',
+			'local function _build_language(ctx)',
+			[
+				'local locales = i18n.list_locales()',
+				'ManifestMenu.template_rows("language_menu", {}, {}, {',
+				'["locales"] = function() return items end',
+				'if not admitted then return nil end',
+				'local rows = ManifestMenu.render_rows(admitted, "language_menu")',
+				'return ManifestMenu.group_row("top_level", "language", rows, {})'
+			]
+		]
+	];
+
+	const index = driver === 'hs' ? 0 : driver === 'linux' ? 1 : -1;
+	if (index < 0) return false;
+	const [, signature, statements] = native[index];
+	try {
+		const body = ownerBody(source, signature);
+		return statements.every((statement) =>
+			hasStatement(
+				body,
+				statement,
+				driver === 'linux' && statement === 'local locales = i18n.list_locales()' ? 1 : 0
+			)
+		);
+	} catch {
+		return false;
+	}
+}
+
+// Actual native bodies provide the positive and unchanged foreign/data/unused-owner controls.
+{
+	const assert = require('node:assert/strict');
+	for (const [driver, file] of [
+		['hs', 'macos/ui/menu/builder.lua'],
+		['linux', 'linux/ui/menu/menu_builder.lua']
+	]) {
+		const source = fs.readFileSync(path.join(SP, file), 'utf8');
+		assert(
+			languageParentSource(source, driver),
+			'the actual new Language route has genuine renderer ownership'
+		);
+		for (const method of ['template_rows', 'render_rows', 'group_row']) {
+			const prefix = 'ManifestMenu.' + method;
+			const actual = source.indexOf(
+				prefix,
+				source.indexOf(driver === 'hs' ? '["language"]' : 'local function _build_language(ctx)')
+			);
+			assert(actual >= 0);
+			const foreign = source.slice(0, actual) + 'Foreign.' + source.slice(actual);
+			assert.equal(
+				languageParentSource(foreign, driver),
+				false,
+				'foreign receiver cannot lend shared renderer coverage'
+			);
+			const withdrawn =
+				source.slice(0, actual) + 'Withdrawn.' + source.slice(actual + 'ManifestMenu.'.length);
+			const loan =
+				withdrawn +
+				'\nlocal function unused_language_owner()\n' +
+				prefix +
+				'("language_menu")\nend\n';
+			assert.equal(
+				languageParentSource(loan, driver),
+				false,
+				'unused neighbor cannot lend actual Language ownership'
+			);
+		}
+		assert.equal(
+			languageParentSource(JSON.stringify(source), driver),
+			false,
+			'quoted native source is no route'
+		);
+		assert.equal(
+			languageParentSource(
+				source
+					.split('\n')
+					.map((line) => '-- ' + line)
+					.join('\n'),
+				driver
+			),
+			false,
+			'commented native source is no route'
+		);
+	}
+}
+
+// Debug keeps the real choice renderer, with source-presence admission around the completed child.
+(function checkDeclaredDebugParents() {
+	const assert = require('node:assert/strict');
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const fs = require('node:fs');
+	const path = require('node:path');
+	const base = path.resolve(__dirname, '../..', 'static/ergopti_plus');
+	const menu = JSON.parse(
+		fs.readFileSync(path.join(base, '_shared/modules/menu/menu_manifest.json'), 'utf8')
+	);
+	assert.deepEqual(
+		menu.top_level.filter((row) => row.id === 'debug'),
+		[{ type: 'group', id: 'debug', i18n: 'menu.debug.title', rows: [] }]
+	);
+	const hand = JSON.parse(
+		fs.readFileSync(path.join(base, '_shared/tests/corpus/menus/debug_parent.json'), 'utf8')
+	);
+	for (const code of ['en', 'fr']) {
+		const locale = JSON.parse(
+			fs.readFileSync(path.join(base, '_shared/data/locales', code + '.json'), 'utf8')
+		);
+		assert.equal(hand[code].parent, locale['menu.debug.title']);
+		assert.equal(hand[code].linux[0], locale['menu.debug.log_level'] + ' : ℹ️ INFO');
+		assert.equal(hand[code].hs[2], hand[code].linux[0]);
+	}
+	function tokenDepths(tokens) {
+		let depth = 0,
+			awaitingDo = 0;
+		return tokens.map((token, index) => {
+			const before = depth;
+			if (
+				token.kind !== 'identifier' ||
+				(['.', ':'].includes(tokens[index - 1]?.value) &&
+					!(tokens[index - 1]?.value === ':' && tokens[index - 2]?.value === ':'))
+			)
+				return before;
+			if (['function', 'if', 'for', 'while', 'repeat'].includes(token.value)) {
+				depth++;
+				if (['for', 'while'].includes(token.value)) awaitingDo++;
+			} else if (token.value === 'do') {
+				if (awaitingDo) awaitingDo--;
+				else depth++;
+			} else if (['end', 'until'].includes(token.value)) depth--;
+			return before;
+		});
+	}
+	function ownerBody(source, signature) {
+		const tokens = scriptTokens(source, '.lua');
+		const wanted = scriptTokens(signature, '.lua');
+		const sourceDepths = tokenDepths(tokens);
+		const bodies = [];
+		for (let start = 0; start < tokens.length; start++) {
+			if (sourceDepths[start] !== 0) continue;
+			if (
+				source
+					.slice(source.lastIndexOf('\n', tokens[start].start - 1) + 1, tokens[start].start)
+					.trim()
+			)
+				continue;
+			if (
+				!wanted.every(
+					(token, offset) =>
+						tokens[start + offset]?.kind === token.kind &&
+						tokens[start + offset]?.value === token.value
+				)
+			)
+				continue;
+			// String identity is the physical simple Lua spelling, not an undecoded alias.
+			if (
+				!wanted.every(
+					(token, offset) =>
+						token.kind !== 'string' ||
+						source.slice(tokens[start + offset].start, tokens[start + offset].end) ===
+							signature.slice(token.start, token.end)
+				)
+			)
+				continue;
+			const blocks = ['function'];
+			let awaitingDo = 0;
+			for (let index = start + wanted.length; index < tokens.length; index++) {
+				const token = tokens[index];
+				if (
+					token.kind !== 'identifier' ||
+					(['.', ':'].includes(tokens[index - 1]?.value) &&
+						!(tokens[index - 1]?.value === ':' && tokens[index - 2]?.value === ':'))
+				)
+					continue;
+				if (['function', 'if', 'for', 'while', 'repeat'].includes(token.value)) {
+					blocks.push(token.value);
+					if (['for', 'while'].includes(token.value)) awaitingDo++;
+				} else if (token.value === 'do') {
+					if (awaitingDo) awaitingDo--;
+					else blocks.push('do');
+				} else if (token.value === 'end' || token.value === 'until') {
+					if (token.value === 'until' && blocks.at(-1) !== 'repeat')
+						throw new Error('invalid actual Lua owner');
+					blocks.pop();
+					if (!blocks.length) {
+						bodies.push(source.slice(tokens[start + wanted.length - 1].end, token.start));
+						break;
+					}
+				}
+			}
+		}
+		assert.equal(bodies.length, 1, 'one complete physical native Debug owner');
+		return bodies[0];
+	}
+	function hasStatement(source, statement, requiredDepth = 0) {
+		const tokens = scriptTokens(source, '.lua');
+		const wanted = scriptTokens(statement, '.lua');
+		let depth = 0,
+			awaitingDo = 0;
+		const depths = tokens.map((token, index) => {
+			const before = depth;
+			if (
+				token.kind !== 'identifier' ||
+				(['.', ':'].includes(tokens[index - 1]?.value) &&
+					!(tokens[index - 1]?.value === ':' && tokens[index - 2]?.value === ':'))
+			)
+				return before;
+			if (['function', 'if', 'for', 'while', 'repeat'].includes(token.value)) {
+				depth++;
+				if (['for', 'while'].includes(token.value)) awaitingDo++;
+			} else if (token.value === 'do') {
+				if (awaitingDo) awaitingDo--;
+				else depth++;
+			} else if (['end', 'until'].includes(token.value)) depth--;
+			return before;
+		});
+		return tokens.some(
+			(first, index) =>
+				depths[index] === requiredDepth &&
+				!['.', ':', 'function'].includes(tokens[index - 1]?.value) &&
+				wanted.every((token, offset) => {
+					const actual = tokens[index + offset];
+					return (
+						actual?.kind === token.kind &&
+						actual.value === token.value &&
+						(token.kind !== 'string' ||
+							source.slice(actual.start, actual.end) === statement.slice(token.start, token.end))
+					);
+				})
+		);
+	}
+	for (const [driver, file, signature, child, finish] of [
+		[
+			'hs',
+			'macos/ui/menu/builder.lua',
+			'["debug"] = function()',
+			'debug_items',
+			'local row = ManifestMenu.group_row("top_level", "debug", debug_items, dbg_ctx.state_getters)'
+		],
+		[
+			'linux',
+			'linux/ui/menu/menu_builder.lua',
+			'local function _build_debug(ctx)',
+			'rows',
+			'return ManifestMenu.group_row("top_level", "debug", rows, render_ctx.state_getters)'
+		]
+	]) {
+		const source = fs.readFileSync(path.join(base, file), 'utf8');
+		const outer =
+			driver === 'hs' ? ownerBody(source, 'function M.generate(ctx, menu_mods, actions)') : source;
+		const native = ownerBody(outer, signature);
+		const context = driver === 'hs' ? 'dbg_ctx' : 'render_ctx';
+		const refused = driver === 'hs' ? '{}' : 'nil';
+		const chronology = [
+			`local root, top, section, parent, fields = debug_source(ManifestMenu, "${driver}")`,
+			`if root == nil then return ${refused} end`,
+			`local ${child} = ManifestMenu.build("debug_menu", "Debug", nil, nil, ${context}, {})`,
+			`if not debug_dense(${child}, true) then return ${refused} end`,
+			`local current_root, current_top, current_section, current_parent = debug_source(ManifestMenu, "${driver}")`,
+			`if not rawequal(root, current_root) or not rawequal(top, current_top) or not rawequal(section, current_section) or not rawequal(parent, current_parent) or not debug_parent_unchanged(parent, fields) then return ${refused} end`,
+			finish
+		];
+		const tokens = scriptTokens(native, '.lua'),
+			depths = tokenDepths(tokens);
+		let previous = -1;
+		for (const statement of chronology) {
+			const wanted = scriptTokens(statement, '.lua');
+			const at = tokens.findIndex(
+				(_, index) =>
+					index > previous &&
+					depths[index] === 0 &&
+					wanted.every(
+						(token, offset) =>
+							tokens[index + offset]?.kind === token.kind &&
+							tokens[index + offset]?.value === token.value
+					)
+			);
+			assert(at >= 0, 'actual source/child/recheck/parent chronology');
+			previous = at;
+		}
+		for (const statement of chronology) {
+			assert(
+				hasStatement(native, statement),
+				file + ': actual Debug source/choice/finished-child owner ' + statement
+			);
+			assert(
+				!hasStatement('if false then\n' + native + '\nend', statement),
+				'conditional data is not the native owner'
+			);
+			assert(!hasStatement(JSON.stringify(statement), statement), 'quoted native route refused');
+			assert(!hasStatement('-- ' + statement, statement), 'commented route refused');
+			if (statement.includes('ManifestMenu.')) {
+				const changed = native.replace(
+					statement,
+					statement.replace('ManifestMenu.', 'Foreign.ManifestMenu.')
+				);
+				assert(!hasStatement(changed, statement), 'foreign renderer cannot own Debug');
+			}
+		}
+		for (const [name, statements] of [
+			[
+				'debug_source',
+				[
+					'local root = renderer.get_root()',
+					'local top, children = rawget(root, "top_level"), rawget(root, "debug_menu")',
+					'if not debug_dense(top, true) or not debug_dense(children, true) then return nil end',
+					'local fields = {}',
+					'return root, top, children, parent, fields'
+				]
+			],
+			[
+				'debug_dense',
+				[
+					'if type(value) ~= "table" or getmetatable(value) ~= nil then return false end',
+					'return count == maximum'
+				]
+			],
+			['debug_parent_unchanged', ['return true']]
+		]) {
+			const definition =
+				name === 'debug_source'
+					? 'local function debug_source(renderer, platform)'
+					: name === 'debug_dense'
+						? 'local function debug_dense(value, records)'
+						: 'local function debug_parent_unchanged(parent, fields)';
+			const actual = ownerBody(source, definition);
+			assert.throws(
+				() => ownerBody('if false then\n' + source + '\nend', definition),
+				/physical native Debug owner/
+			);
+			for (const statement of statements)
+				assert(hasStatement(actual, statement), 'actual raw structural helper ' + statement);
+			assert.throws(
+				() => ownerBody(source.replace(definition, '-- ' + definition), definition),
+				/physical native Debug owner/
+			);
+			assert.throws(
+				() => ownerBody(source + '\n' + definition + '\nend\n', definition),
+				/physical native Debug owner/
+			);
+		}
+		const withdrawn =
+			source.replace(finish, 'return nil') +
+			'\nlocal function unused_debug_owner()\n' +
+			finish +
+			'\nend\n';
+		assert(
+			!hasStatement(
+				ownerBody(
+					driver === 'hs'
+						? ownerBody(withdrawn, 'function M.generate(ctx, menu_mods, actions)')
+						: withdrawn,
+					signature
+				),
+				finish
+			),
+			'unused function cannot lend parent publication'
+		);
+		const physicalSignature =
+			driver === 'hs'
+				? source.match(/^\s*\["debug"\]\s*=\s*function\(\)/m)[0].trimStart()
+				: signature;
+		assert.throws(
+			() =>
+				ownerBody(
+					driver === 'hs'
+						? ownerBody(
+								source.replace(physicalSignature, '-- ' + physicalSignature),
+								'function M.generate(ctx, menu_mods, actions)'
+							)
+						: source.replace(physicalSignature, '-- ' + physicalSignature),
+					signature
+				),
+			/physical native Debug owner/
+		);
+	}
+	console.log(
+		'[OK] Debug: unique typed parent, actual structural admission and retained full-choice native routes.'
+	);
+})();
+// Configuration keeps the real command renderer, with source-presence admission around the completed child.
+(function checkDeclaredConfigurationParents() {
+	const assert = require('node:assert/strict');
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const fs = require('node:fs');
+	const path = require('node:path');
+	const base = path.resolve(__dirname, '../..', 'static/ergopti_plus');
+	const menu = JSON.parse(
+		fs.readFileSync(path.join(base, '_shared/modules/menu/menu_manifest.json'), 'utf8')
+	);
+	assert.deepEqual(
+		menu.top_level.filter((row) => row.id === 'configuration'),
+		[{ type: 'group', id: 'configuration', i18n: 'menu.configuration.title', rows: [] }]
+	);
+	const hand = JSON.parse(
+		fs.readFileSync(path.join(base, '_shared/tests/corpus/menus/configuration_parent.json'), 'utf8')
+	);
+	for (const code of ['en', 'fr']) {
+		const locale = JSON.parse(
+			fs.readFileSync(path.join(base, '_shared/data/locales', code + '.json'), 'utf8')
+		);
+		assert.equal(hand[code].parent, locale['menu.configuration.title']);
+		assert.deepEqual(hand[code].children, [
+			locale['common.restore_recommended'],
+			locale['common.clear_to_system'],
+			'-',
+			locale['menu.global.clean_unused_keys'],
+			'-',
+			locale['menu.global.config_folder'],
+			locale['menu.global.setup_wizard']
+		]);
+	}
+	function tokenDepths(tokens) {
+		let depth = 0,
+			awaitingDo = 0;
+		return tokens.map((token, index) => {
+			const before = depth;
+			if (
+				token.kind !== 'identifier' ||
+				(['.', ':'].includes(tokens[index - 1]?.value) &&
+					!(tokens[index - 1]?.value === ':' && tokens[index - 2]?.value === ':'))
+			)
+				return before;
+			if (['function', 'if', 'for', 'while', 'repeat'].includes(token.value)) {
+				depth++;
+				if (['for', 'while'].includes(token.value)) awaitingDo++;
+			} else if (token.value === 'do') {
+				if (awaitingDo) awaitingDo--;
+				else depth++;
+			} else if (['end', 'until'].includes(token.value)) depth--;
+			return before;
+		});
+	}
+	function ownerBody(source, signature) {
+		const tokens = scriptTokens(source, '.lua');
+		const wanted = scriptTokens(signature, '.lua');
+		const sourceDepths = tokenDepths(tokens);
+		const bodies = [];
+		for (let start = 0; start < tokens.length; start++) {
+			if (sourceDepths[start] !== 0) continue;
+			if (
+				source
+					.slice(source.lastIndexOf('\n', tokens[start].start - 1) + 1, tokens[start].start)
+					.trim()
+			)
+				continue;
+			if (
+				!wanted.every(
+					(token, offset) =>
+						tokens[start + offset]?.kind === token.kind &&
+						tokens[start + offset]?.value === token.value
+				)
+			)
+				continue;
+			// String identity is the physical simple Lua spelling, not an undecoded alias.
+			if (
+				!wanted.every(
+					(token, offset) =>
+						token.kind !== 'string' ||
+						source.slice(tokens[start + offset].start, tokens[start + offset].end) ===
+							signature.slice(token.start, token.end)
+				)
+			)
+				continue;
+			const blocks = ['function'];
+			let awaitingDo = 0;
+			for (let index = start + wanted.length; index < tokens.length; index++) {
+				const token = tokens[index];
+				if (
+					token.kind !== 'identifier' ||
+					(['.', ':'].includes(tokens[index - 1]?.value) &&
+						!(tokens[index - 1]?.value === ':' && tokens[index - 2]?.value === ':'))
+				)
+					continue;
+				if (['function', 'if', 'for', 'while', 'repeat'].includes(token.value)) {
+					blocks.push(token.value);
+					if (['for', 'while'].includes(token.value)) awaitingDo++;
+				} else if (token.value === 'do') {
+					if (awaitingDo) awaitingDo--;
+					else blocks.push('do');
+				} else if (token.value === 'end' || token.value === 'until') {
+					if (token.value === 'until' && blocks.at(-1) !== 'repeat')
+						throw new Error('invalid actual Lua owner');
+					blocks.pop();
+					if (!blocks.length) {
+						bodies.push(source.slice(tokens[start + wanted.length - 1].end, token.start));
+						break;
+					}
+				}
+			}
+		}
+		assert.equal(bodies.length, 1, 'one complete physical native Configuration owner');
+		return bodies[0];
+	}
+	function hasStatement(source, statement, requiredDepth = 0) {
+		const tokens = scriptTokens(source, '.lua');
+		const wanted = scriptTokens(statement, '.lua');
+		let depth = 0,
+			awaitingDo = 0;
+		const depths = tokens.map((token, index) => {
+			const before = depth;
+			if (
+				token.kind !== 'identifier' ||
+				(['.', ':'].includes(tokens[index - 1]?.value) &&
+					!(tokens[index - 1]?.value === ':' && tokens[index - 2]?.value === ':'))
+			)
+				return before;
+			if (['function', 'if', 'for', 'while', 'repeat'].includes(token.value)) {
+				depth++;
+				if (['for', 'while'].includes(token.value)) awaitingDo++;
+			} else if (token.value === 'do') {
+				if (awaitingDo) awaitingDo--;
+				else depth++;
+			} else if (['end', 'until'].includes(token.value)) depth--;
+			return before;
+		});
+		return tokens.some(
+			(first, index) =>
+				depths[index] === requiredDepth &&
+				!['.', ':', 'function'].includes(tokens[index - 1]?.value) &&
+				wanted.every((token, offset) => {
+					const actual = tokens[index + offset];
+					return (
+						actual?.kind === token.kind &&
+						actual.value === token.value &&
+						(token.kind !== 'string' ||
+							source.slice(actual.start, actual.end) === statement.slice(token.start, token.end))
+					);
+				})
+		);
+	}
+	for (const [driver, file, signature, child, finish] of [
+		[
+			'hs',
+			'macos/ui/menu/builder.lua',
+			'["configuration"] = function()',
+			'rows',
+			'local row = ManifestMenu.group_row("top_level", "configuration", rows, cfg_ctx.state_getters)'
+		],
+		[
+			'linux',
+			'linux/ui/menu/menu_builder.lua',
+			'local function _build_configuration(ctx)',
+			'rows',
+			'return ManifestMenu.group_row("top_level", "configuration", rows, render_ctx.state_getters)'
+		]
+	]) {
+		const source = fs.readFileSync(path.join(base, file), 'utf8');
+		const outer =
+			driver === 'hs' ? ownerBody(source, 'function M.generate(ctx, menu_mods, actions)') : source;
+		const native = ownerBody(outer, signature);
+		const context = driver === 'hs' ? 'cfg_ctx' : 'render_ctx';
+		const refused = driver === 'hs' ? '{}' : 'nil';
+		const chronology = [
+			`local root, top, section, parent, fields = configuration_source(ManifestMenu, "${driver}")`,
+			`if root == nil then return ${refused} end`,
+			`local ${child} = ManifestMenu.build("configuration_menu", "Configuration", nil, nil, ${context})`,
+			`if not configuration_dense(${child}, true) then return ${refused} end`,
+			`local current_root, current_top, current_section, current_parent = configuration_source(ManifestMenu, "${driver}")`,
+			`if not rawequal(root, current_root) or not rawequal(top, current_top) or not rawequal(section, current_section) or not rawequal(parent, current_parent) or not configuration_parent_unchanged(parent, fields) then return ${refused} end`,
+			finish
+		];
+		const tokens = scriptTokens(native, '.lua'),
+			depths = tokenDepths(tokens);
+		let previous = -1;
+		for (const statement of chronology) {
+			const wanted = scriptTokens(statement, '.lua');
+			const at = tokens.findIndex(
+				(_, index) =>
+					index > previous &&
+					depths[index] === 0 &&
+					wanted.every(
+						(token, offset) =>
+							tokens[index + offset]?.kind === token.kind &&
+							tokens[index + offset]?.value === token.value
+					)
+			);
+			assert(at >= 0, 'actual source/child/recheck/parent chronology');
+			previous = at;
+		}
+		for (const statement of chronology) {
+			assert(
+				hasStatement(native, statement),
+				file + ': actual Configuration source/choice/finished-child owner ' + statement
+			);
+			assert(
+				!hasStatement('if false then\n' + native + '\nend', statement),
+				'conditional data is not the native owner'
+			);
+			assert(!hasStatement(JSON.stringify(statement), statement), 'quoted native route refused');
+			assert(!hasStatement('-- ' + statement, statement), 'commented route refused');
+			if (statement.includes('ManifestMenu.')) {
+				const changed = native.replace(
+					statement,
+					statement.replace('ManifestMenu.', 'Foreign.ManifestMenu.')
+				);
+				assert(!hasStatement(changed, statement), 'foreign renderer cannot own Configuration');
+			}
+		}
+		for (const [name, statements] of [
+			[
+				'configuration_source',
+				[
+					'local root = renderer.get_root()',
+					'local top, children = rawget(root, "top_level"), rawget(root, "configuration_menu")',
+					'if not configuration_dense(top, true) or not configuration_dense(children, true) then return nil end',
+					'local fields = {}',
+					'return root, top, children, parent, fields'
+				]
+			],
+			[
+				'configuration_dense',
+				[
+					'if type(value) ~= "table" or getmetatable(value) ~= nil then return false end',
+					'return count == maximum'
+				]
+			],
+			['configuration_parent_unchanged', ['return true']]
+		]) {
+			const definition =
+				name === 'configuration_source'
+					? 'local function configuration_source(renderer, platform)'
+					: name === 'configuration_dense'
+						? 'local function configuration_dense(value, records)'
+						: 'local function configuration_parent_unchanged(parent, fields)';
+			const actual = ownerBody(source, definition);
+			assert.throws(
+				() => ownerBody('if false then\n' + source + '\nend', definition),
+				/physical native Configuration owner/
+			);
+			for (const statement of statements)
+				assert(hasStatement(actual, statement), 'actual raw structural helper ' + statement);
+			assert.throws(
+				() => ownerBody(source.replace(definition, '-- ' + definition), definition),
+				/physical native Configuration owner/
+			);
+			assert.throws(
+				() => ownerBody(source + '\n' + definition + '\nend\n', definition),
+				/physical native Configuration owner/
+			);
+		}
+		const withdrawn =
+			source.replace(finish, 'return nil') +
+			'\nlocal function unused_configuration_owner()\n' +
+			finish +
+			'\nend\n';
+		assert(
+			!hasStatement(
+				ownerBody(
+					driver === 'hs'
+						? ownerBody(withdrawn, 'function M.generate(ctx, menu_mods, actions)')
+						: withdrawn,
+					signature
+				),
+				finish
+			),
+			'unused function cannot lend parent publication'
+		);
+		const physicalSignature =
+			driver === 'hs'
+				? source.match(/^\s*\["configuration"\]\s*=\s*function\(\)/m)[0].trimStart()
+				: signature;
+		assert.throws(
+			() =>
+				ownerBody(
+					driver === 'hs'
+						? ownerBody(
+								source.replace(physicalSignature, '-- ' + physicalSignature),
+								'function M.generate(ctx, menu_mods, actions)'
+							)
+						: source.replace(physicalSignature, '-- ' + physicalSignature),
+					signature
+				),
+			/physical native Configuration owner/
+		);
+	}
+	console.log(
+		'[OK] Configuration: unique typed parent, actual structural admission and retained full-command native routes.'
+	);
+})();
+// Metrics preserves the native lifecycle and completed children before canonical parent projection.
+(function checkDeclaredMetricsParents() {
+	const assert = require('node:assert/strict');
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const fs = require('node:fs');
+	const path = require('node:path');
+	const base = path.resolve(__dirname, '../..', 'static/ergopti_plus');
+	const menu = JSON.parse(
+		fs.readFileSync(path.join(base, '_shared/modules/menu/menu_manifest.json'), 'utf8')
+	);
+	assert.deepEqual(
+		menu.top_level.filter((row) => row.id === 'metrics'),
+		[
+			{
+				type: 'group',
+				id: 'metrics',
+				i18n: 'menu.metrics.title',
+				rows: [],
+				checked_when: ['keylogger_enabled'],
+				greyed_when_paused: true
+			}
+		]
+	);
+	const hand = JSON.parse(
+		fs.readFileSync(path.join(base, '_shared/tests/corpus/menus/metrics_parent.json'), 'utf8')
+	);
+	for (const code of ['en', 'fr']) {
+		const locale = JSON.parse(
+			fs.readFileSync(path.join(base, '_shared/data/locales', code + '.json'), 'utf8')
+		);
+		assert.equal(hand[code], locale['menu.metrics.title']);
+	}
+	function tokenDepths(tokens) {
+		let depth = 0,
+			awaitingDo = 0;
+		return tokens.map((token, index) => {
+			const before = depth;
+			if (
+				token.kind !== 'identifier' ||
+				(['.', ':'].includes(tokens[index - 1]?.value) &&
+					!(tokens[index - 1]?.value === ':' && tokens[index - 2]?.value === ':'))
+			)
+				return before;
+			if (['function', 'if', 'for', 'while', 'repeat'].includes(token.value)) {
+				depth++;
+				if (['for', 'while'].includes(token.value)) awaitingDo++;
+			} else if (token.value === 'do') {
+				if (awaitingDo) awaitingDo--;
+				else depth++;
+			} else if (['end', 'until'].includes(token.value)) depth--;
+			return before;
+		});
+	}
+	function ownerBody(source, signature) {
+		const tokens = scriptTokens(source, '.lua');
+		const wanted = scriptTokens(signature, '.lua');
+		const sourceDepths = tokenDepths(tokens);
+		const bodies = [];
+		for (let start = 0; start < tokens.length; start++) {
+			if (sourceDepths[start] !== 0) continue;
+			if (
+				source
+					.slice(source.lastIndexOf('\n', tokens[start].start - 1) + 1, tokens[start].start)
+					.trim()
+			)
+				continue;
+			if (
+				!wanted.every(
+					(token, offset) =>
+						tokens[start + offset]?.kind === token.kind &&
+						tokens[start + offset]?.value === token.value
+				)
+			)
+				continue;
+			// String identity is the physical simple Lua spelling, not an undecoded alias.
+			if (
+				!wanted.every(
+					(token, offset) =>
+						token.kind !== 'string' ||
+						source.slice(tokens[start + offset].start, tokens[start + offset].end) ===
+							signature.slice(token.start, token.end)
+				)
+			)
+				continue;
+			const blocks = ['function'];
+			let awaitingDo = 0;
+			for (let index = start + wanted.length; index < tokens.length; index++) {
+				const token = tokens[index];
+				if (
+					token.kind !== 'identifier' ||
+					(['.', ':'].includes(tokens[index - 1]?.value) &&
+						!(tokens[index - 1]?.value === ':' && tokens[index - 2]?.value === ':'))
+				)
+					continue;
+				if (['function', 'if', 'for', 'while', 'repeat'].includes(token.value)) {
+					blocks.push(token.value);
+					if (['for', 'while'].includes(token.value)) awaitingDo++;
+				} else if (token.value === 'do') {
+					if (awaitingDo) awaitingDo--;
+					else blocks.push('do');
+				} else if (token.value === 'end' || token.value === 'until') {
+					if (token.value === 'until' && blocks.at(-1) !== 'repeat')
+						throw new Error('invalid actual Lua owner');
+					blocks.pop();
+					if (!blocks.length) {
+						bodies.push(source.slice(tokens[start + wanted.length - 1].end, token.start));
+						break;
+					}
+				}
+			}
+		}
+		assert.equal(bodies.length, 1, 'one complete physical native Metrics owner');
+		return bodies[0];
+	}
+	function hasStatement(source, statement, requiredDepth = 0) {
+		const tokens = scriptTokens(source, '.lua');
+		const wanted = scriptTokens(statement, '.lua');
+		let depth = 0,
+			awaitingDo = 0;
+		const depths = tokens.map((token, index) => {
+			const before = depth;
+			if (
+				token.kind !== 'identifier' ||
+				(['.', ':'].includes(tokens[index - 1]?.value) &&
+					!(tokens[index - 1]?.value === ':' && tokens[index - 2]?.value === ':'))
+			)
+				return before;
+			if (['function', 'if', 'for', 'while', 'repeat'].includes(token.value)) {
+				depth++;
+				if (['for', 'while'].includes(token.value)) awaitingDo++;
+			} else if (token.value === 'do') {
+				if (awaitingDo) awaitingDo--;
+				else depth++;
+			} else if (['end', 'until'].includes(token.value)) depth--;
+			return before;
+		});
+		return tokens.some(
+			(first, index) =>
+				depths[index] === requiredDepth &&
+				!['.', ':', 'function'].includes(tokens[index - 1]?.value) &&
+				wanted.every((token, offset) => {
+					const actual = tokens[index + offset];
+					return (
+						actual?.kind === token.kind &&
+						actual.value === token.value &&
+						(token.kind !== 'string' ||
+							source.slice(actual.start, actual.end) === statement.slice(token.start, token.end))
+					);
+				})
+		);
+	}
+	for (const [driver, file, signature] of [
+		['hs', 'macos/ui/menu/menu_metrics.lua', 'function M.build(ctx)'],
+		['linux', 'linux/ui/menu/menu_builder.lua', 'local function _build_metrics(ctx)']
+	]) {
+		const source = fs.readFileSync(path.join(base, file), 'utf8');
+		const native = ownerBody(source, signature);
+		const checked =
+			driver === 'hs' ? 'STATE_GETTERS' : '{ keylogger_enabled = function() return on end }';
+		const child = driver === 'hs' ? 'menu' : 'items';
+		const finish = `local projected = ManifestMenu.group_row("top_level", "metrics", ${child}, ${checked})`;
+		const chronology = [
+			`local root, top, section, parent, fields = metrics_source(ManifestMenu, "${driver}")`,
+			driver === 'hs'
+				? 'local menu = ManifestMenu.build("metrics_menu", "Metrics", dyn_handlers, nil, render_ctx, list_providers)'
+				: 'local items = _manifest_metrics_rows(ctx, k)',
+			driver === 'hs'
+				? 'if root == nil or not metrics_dense(menu, true) then return nil end'
+				: 'local on = type(k.is_enabled) == "function" and k.is_enabled() == true',
+			`local current_root, current_top, current_section, current_parent = metrics_source(ManifestMenu, "${driver}")`,
+			'if not rawequal(root, current_root) or not rawequal(top, current_top) or not rawequal(section, current_section) or not rawequal(parent, current_parent) or not metrics_parent_unchanged(parent, fields) then return nil end',
+			finish,
+			`current_root, current_top, current_section, current_parent = metrics_source(ManifestMenu, "${driver}")`,
+			'if not rawequal(root, current_root) or not rawequal(top, current_top) or not rawequal(section, current_section) or not rawequal(parent, current_parent) or not metrics_parent_unchanged(parent, fields) then return nil end',
+			'return projected'
+		];
+		const tokens = scriptTokens(native, '.lua'),
+			depths = tokenDepths(tokens);
+		let previous = -1;
+		for (const statement of chronology) {
+			assert(hasStatement(native, statement), 'actual native Metrics route ' + statement);
+			const wanted = scriptTokens(statement, '.lua');
+			const at = tokens.findIndex(
+				(_, index) =>
+					index > previous &&
+					depths[index] === 0 &&
+					wanted.every(
+						(token, offset) =>
+							tokens[index + offset]?.kind === token.kind &&
+							tokens[index + offset]?.value === token.value
+					)
+			);
+			assert(at > previous, 'actual lifecycle/child/final parent chronology');
+			previous = at;
+			assert(!hasStatement(JSON.stringify(statement), statement), 'quoted owner refused');
+			assert(!hasStatement('-- ' + statement, statement), 'comment owner refused');
+			if (statement.includes('ManifestMenu.'))
+				assert(
+					!hasStatement(statement.replace('ManifestMenu.', 'Foreign.ManifestMenu.'), statement),
+					'foreign renderer refused'
+				);
+		}
+		if (driver === 'hs') {
+			const firstPhase = chronology[1];
+			const before = native.slice(0, native.indexOf(firstPhase));
+			assert(
+				!hasStatement(before, 'if root == nil then return nil end'),
+				'source capture must not bypass WPM cleanup'
+			);
+			const lifecycle = ownerBody(
+				native,
+				'local function sync_wpm_visibility(state_key, label, module, ...)'
+			);
+			assert(
+				hasStatement(lifecycle, 'if state[state_key] and not paused then'),
+				'unchanged shared WPM pause gate'
+			);
+			assert(
+				hasStatement(
+					native,
+					'sync_wpm_visibility("keylogger_menubar_wpm", "WPM menubar", WpmMenubar)',
+					1
+				)
+			);
+			assert(
+				hasStatement(
+					native,
+					'sync_wpm_visibility("keylogger_float_wpm", "WPM widget", WpmWidget, state.keylogger_float_graph)',
+					1
+				)
+			);
+		} else {
+			let absentPrevious = -1;
+			for (const statement of [
+				'local status_rows = ManifestMenu and ManifestMenu.template_rows("linux_metrics_absent_rows", {}, {}, {})',
+				'local items = ManifestMenu.render_rows(status_rows, "linux_metrics_absent_rows")',
+				'local projected = ManifestMenu.group_row("top_level", "metrics", items, { keylogger_enabled = function() return nil end })',
+				'current_root, current_top, current_section, current_parent = metrics_source(ManifestMenu, "linux")',
+				'if not rawequal(root, current_root) or not rawequal(top, current_top) or not rawequal(section, current_section) or not rawequal(parent, current_parent) or not metrics_parent_unchanged(parent, fields) then return nil end',
+				'return projected'
+			]) {
+				assert(
+					hasStatement(native, statement, 1),
+					'actual absent status materializes once before parent ' + statement
+				);
+				const wanted = scriptTokens(statement, '.lua');
+				const at = tokens.findIndex(
+					(_, index) =>
+						index > absentPrevious &&
+						depths[index] === 1 &&
+						wanted.every(
+							(token, offset) =>
+								tokens[index + offset]?.kind === token.kind &&
+								tokens[index + offset]?.value === token.value
+						)
+				);
+				assert(
+					at > absentPrevious,
+					'absent parent source fence follows all actual GroupRow callbacks'
+				);
+				absentPrevious = at;
+			}
+		}
+		for (const [name, signature, statements] of [
+			[
+				'metrics_source',
+				'local function metrics_source(renderer, platform)',
+				[
+					'local ok, root = pcall(renderer.get_root)',
+					'if not ok then return nil end',
+					'local top, children = rawget(root, "top_level"), rawget(root, "metrics_menu")',
+					'if not metrics_dense(top, true) or not metrics_dense(children, true) then return nil end',
+					'return root, top, children, parent, fields'
+				]
+			],
+			[
+				'metrics_dense',
+				'local function metrics_dense(value, records)',
+				[
+					'if type(value) ~= "table" or getmetatable(value) ~= nil then return false end',
+					'return count == maximum'
+				]
+			],
+			[
+				'metrics_parent_unchanged',
+				'local function metrics_parent_unchanged(parent, fields)',
+				['return true']
+			]
+		]) {
+			const body = ownerBody(source, signature);
+			for (const statement of statements)
+				assert(hasStatement(body, statement), 'actual raw structural helper ' + name);
+			assert.throws(
+				() => ownerBody('if false then\n' + source + '\nend', signature),
+				/physical native Metrics owner/
+			);
+			assert.throws(
+				() => ownerBody(source.replace(signature, '-- ' + signature), signature),
+				/physical native Metrics owner/
+			);
+			assert.throws(
+				() => ownerBody(source + '\n' + signature + '\nend\n', signature),
+				/physical native Metrics owner/
+			);
+		}
+		const withdrawn =
+			source.replace(finish, 'return nil') +
+			'\nlocal function unused_metrics_owner()\n' +
+			finish +
+			'\nend\n';
+		assert(
+			!hasStatement(ownerBody(withdrawn, signature), finish),
+			'unused function cannot lend parent projection'
+		);
+	}
+	console.log(
+		'[OK] Metrics: lifecycle-preserving structural source fences, genuine completed children and singleton checked ABI.'
+	);
+})();

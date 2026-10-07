@@ -227,3 +227,39 @@ helpers.describe("configuration submenu (macOS): « Ergopti uses Karabiner »", 
 		helpers.assert_eq(table.concat(calls, ", "), "set_enabled:true")
 	end)
 end)
+
+
+--- Replays structural admission through the actual complete tray and native action closures.
+--- @param body function Independent source and finished-row assertions.
+local function configuration_parent_fixture(body)
+	local saved = {}
+	for _, name in ipairs({ "ui.menu.builder", "infra.i18n", "infra.locale", "infra.manifest_menu" }) do saved[name] = package.loaded[name] end
+	helpers.load_with_stubs("infra.paths")
+	for _, name in ipairs({ "ui.menu.builder", "infra.i18n", "infra.locale", "infra.manifest_menu" }) do package.loaded[name] = nil end
+	local native = require("ui.menu.builder")
+	local renderer, locale = require("infra.manifest_menu"), require("infra.locale")
+	local language = locale.current_locale()
+	local callbacks, actions = {}, {}
+	local getter_observer = { calls = 0 }
+	for key, label in pairs({ reset_defaults = "recommended", clear_to_system = "clear", clean_unused_keys = "cleanup",
+		open_paths = "paths_editor", show_setup_wizard = "setup_wizard" }) do
+		local value = label
+		actions[key] = function() callbacks[#callbacks + 1] = value; return false end
+	end
+	local published_actions = setmetatable({}, { __index = function(_, key)
+		local value = rawget(actions, key)
+		if value ~= nil then getter_observer.calls = getter_observer.calls + 1 end
+		return value
+	end })
+	local function build(paused) return native.generate({ paused = paused }, {}, published_actions) end
+	local ok, detail = xpcall(function() body(renderer, build, callbacks, locale, getter_observer) end, debug.traceback)
+	locale.set_locale(language)
+	for _, name in ipairs({ "ui.menu.builder", "infra.i18n", "infra.locale", "infra.manifest_menu" }) do package.loaded[name] = saved[name] end
+	if not ok then error(detail, 0) end
+end
+
+local configuration_parent_file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/configuration_parent.json"), "rb"))
+local configuration_parent_raw = configuration_parent_file:read("*a")
+configuration_parent_file:close()
+require("test.configuration_parent_contract").register(helpers, configuration_parent_fixture,
+	assert(require("adapters.json_codec").decode(configuration_parent_raw)), "hs")

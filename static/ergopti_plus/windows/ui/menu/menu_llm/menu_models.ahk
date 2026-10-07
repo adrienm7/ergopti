@@ -229,20 +229,25 @@ LLM_Menu_BuildModelMenu() {
 	deps_ready := LLM_Deps_IsReady()
 
 	; "Aucun modèle (Désactivé)" — first row of the HS menu.
-	HeadRows := [Map(
-		"label",   t("menu.llm.no_model"),
-		"checked", (active == ""),
-		"action",  _LLM_Menu_MakeSetModelHandler(""))]
+	HeadRows := MenuRenderer_TemplateRows("llm_model_picker_head",
+		Map("llm_model_none", _LLM_Menu_MakeSetModelHandler("")),
+		Map("model_none_selected", (*) => active == "", "model_picker_ready", (*) => true), Map())
+	if !(HeadRows is Array)
+		return m
 
 	; Backend default — shortcut that restores the canonical Ollama tag
 	; without scrolling the catalogue. Reads from the shared defaults.json
 	; so any change to the canonical default propagates here automatically.
 	default_name := _LLM_DefaultFor("llm_model", "")
 	if (default_name != "") {
-		HeadRows.Push(Map(
-			"label",   StrReplace(t("menu.llm.backend_default_model"), "%s", default_name),
-			"checked", (active == default_name),
-			"action",  _LLM_Menu_MakeSetModelHandler(default_name)))
+		DefaultRows := MenuRenderer_TemplateRows("llm_model_picker_default",
+			Map("llm_model_backend_default", _LLM_Menu_MakeSetModelHandler(default_name)),
+			Map("model_backend_default_caption", (*) => default_name, "model_default_selected", (*) => active == default_name,
+				"model_picker_ready", (*) => true), Map())
+		if !(DefaultRows is Array)
+			return m
+		for Row in DefaultRows
+			HeadRows.Push(Row)
 	}
 	HeaderRows := MenuRenderer_TemplateRows("llm_model_header_boundary", Map(), Map(), Map())
 	if !(HeaderRows is Array)
@@ -296,7 +301,12 @@ LLM_Menu_BuildModelMenu() {
 _LLM_Menu_ModelTailRows() {
 	BoundaryRows := MenuRenderer_StatusRows("llm_menu", "llm_model", "model_picker_tail")
 	TailRows := BoundaryRows is Array ? BoundaryRows : []
-	TailRows.Push(Map("label", t("menu.llm.add_model_entry"), "action", (*) => LLM_Menu_PromptAddModel()))
+	AddRows := MenuRenderer_TemplateRows("llm_model_add_command",
+		Map("llm_add_model_entry", (*) => LLM_Menu_PromptAddModel()), Map("model_picker_ready", (*) => true), Map())
+	if !(AddRows is Array)
+		return []
+	for Row in AddRows
+		TailRows.Push(Row)
 	BrowserRow := _LLM_Menu_ModelBrowserRow()
 	if BrowserRow is Map
 		TailRows.Push(BrowserRow)
@@ -457,34 +467,33 @@ _LLM_Menu_BuildModelRowTitle(name, active, deps_ready := true) {
  * @returns {Array} The per-model rows.
  */
 _LLM_Menu_PerModelRows(name, model, ollama_url, active, deps_ready := true) {
-	Rows := [Map(
-		"label",   t("menu.llm.select_model"),
-		"checked", (name == active),
-		"action",  _LLM_Menu_MakeSetModelHandler(name))]
-
+	Frame := Map("model_backend_caption", _LLM_Menu_OptionHead(_LLM_Menu_BackendOptionLabel("ollama")),
+		"model_source_caption", ollama_url, "model_selected", name == active,
+		"model_select_ready", true)
+	Commands := Map("model_select", _LLM_Menu_MakeSetModelHandler(name),
+		"model_source", _LLM_Menu_MakeOpenUrlHandler(ollama_url))
 	if (deps_ready and LLM_IsModelInstalled(name)) {
-		Rows.Push(Map(
-			"label",  t("menu.llm.delete_model_cache"),
-			"action", _LLM_Menu_MakeDeleteCacheHandler(name)))
+		Frame["model_delete_present"] := true
+		Frame["model_download_present"] := false
+		Commands["model_delete"] := _LLM_Menu_MakeDeleteCacheHandler(name)
 	} else {
-		Rows.Push(Map(
-			"label",  t("menu.llm.download_model"),
-			"action", _LLM_Menu_MakeDownloadModelHandler(name)))
+		Frame["model_delete_present"] := false
+		Frame["model_download_present"] := true
+		Commands["model_download"] := _LLM_Menu_MakeDownloadModelHandler(name)
 	}
-
+	Rows := MenuRenderer_TemplateRows("llm_model_action_rows", Commands, _LLM_Menu_ModelFrameGetters(Frame), Map())
+	if !(Rows is Array)
+		return []
 	OriginRows := MenuRenderer_TemplateRows("llm_model_origin_boundary", Map(), Map(), Map())
 	if !(OriginRows is Array)
 		return []
 	for Row in OriginRows
 		Rows.Push(Row)
-	; A row with no action is drawn disabled by the renderer, which is what every
-	; spec line below is: information, not a click target.
-	Rows.Push(Map("label", StrReplace(t("menu.llm.model_backend"), "%s",
-		_LLM_Menu_OptionHead(_LLM_Menu_BackendOptionLabel("ollama")))))
-	Rows.Push(Map(
-		"label",  StrReplace(t("menu.llm.model_source"), "%s", ollama_url),
-		"action", _LLM_Menu_MakeOpenUrlHandler(ollama_url)))
-
+	IdentityRows := _LLM_Menu_ModelDetailAbi(MenuRenderer_TemplateRows("llm_model_identity_rows", Commands, _LLM_Menu_ModelFrameGetters(Frame), Map()))
+	if !(IdentityRows is Array)
+		return []
+	for Row in IdentityRows
+		Rows.Push(Row)
 	SpecsRows := MenuRenderer_TemplateRows("llm_model_specs_frame", Map(), Map(), Map())
 	if !(SpecsRows is Array)
 		return []
@@ -493,22 +502,33 @@ _LLM_Menu_PerModelRows(name, model, ollama_url, active, deps_ready := true) {
 
 	type_val := model.Has("type") ? model["type"] : ""
 	type_label_text := t((type_val == "completion") ? "menu.llm.model_type_completion" : "menu.llm.model_type_chat")
-	Rows.Push(Map("label", StrReplace(t("menu.llm.model_type"), "%s", type_label_text)))
-
+	Frame["model_type_caption"] := type_label_text
+	Frame["model_date_present"] := false
 	if (model.Has("last_updated") and model["last_updated"] != "" and model["last_updated"] != "Unknown") {
 		date_val := model["last_updated"]
 		if RegExMatch(date_val, "^(\d{4})-(\d{2})-(\d{2})$", &dm)
 			date_val := dm[3] . "/" . dm[2] . "/" . dm[1]
-		Rows.Push(Map("label", StrReplace(t("menu.llm.model_date"), "%s", date_val)))
+		Frame["model_date_present"] := true
+		Frame["model_date_caption"] := "" . date_val
 	}
-
+	Frame["model_params_total_present"] := false
+	Frame["model_params_active_present"] := false
 	if (model.Has("parameters") and Type(model["parameters"]) == "Map") {
 		params := model["parameters"]
-		if (params.Has("total") and params["total"] != "" and params["total"] != "N/A")
-			Rows.Push(Map("label", StrReplace(t("menu.llm.model_params_total"), "%s", params["total"])))
-		if (params.Has("active") and params["active"] != "" and params["active"] != "N/A")
-			Rows.Push(Map("label", StrReplace(t("menu.llm.model_params_active"), "%s", params["active"])))
+		if (params.Has("total") and params["total"] != "" and params["total"] != "N/A") {
+			Frame["model_params_total_present"] := true
+			Frame["model_params_total_caption"] := "" . params["total"]
+		}
+		if (params.Has("active") and params["active"] != "" and params["active"] != "N/A") {
+			Frame["model_params_active_present"] := true
+			Frame["model_params_active_caption"] := "" . params["active"]
+		}
 	}
+	DetailRows := _LLM_Menu_ModelDetailAbi(MenuRenderer_TemplateRows("llm_model_spec_rows", Commands, _LLM_Menu_ModelFrameGetters(Frame), Map()))
+	if !(DetailRows is Array)
+		return []
+	for Row in DetailRows
+		Rows.Push(Row)
 
 	if (model.Has("capabilities") and Type(model["capabilities"]) == "Map") {
 		caps := model["capabilities"]
@@ -517,15 +537,25 @@ _LLM_Menu_PerModelRows(name, model, ollama_url, active, deps_ready := true) {
 			return []
 		for Row in CapsRows
 			Rows.Push(Row)
-		if (caps.Has("speed_tok_s") and _LLM_Menu_IsNumber(caps["speed_tok_s"]))
-			Rows.Push(Map("label", StrReplace(t("menu.llm.model_speed"), "%s", caps["speed_tok_s"])))
+		Frame["model_speed_present"] := false
+		if (caps.Has("speed_tok_s") and _LLM_Menu_IsNumber(caps["speed_tok_s"])) {
+			Frame["model_speed_present"] := true
+			Frame["model_speed_caption"] := "" . caps["speed_tok_s"]
+		}
+		Frame["model_tags_present"] := false
 		if (caps.Has("tags") and Type(caps["tags"]) == "Array" and caps["tags"].Length > 0) {
 			joined := ""
 			for tag in caps["tags"] {
 				joined .= (joined == "" ? "" : ", ") . tag
 			}
-			Rows.Push(Map("label", StrReplace(t("menu.llm.model_tags"), "%s", joined)))
+			Frame["model_tags_present"] := true
+			Frame["model_tags_caption"] := joined
 		}
+		CapabilityRows := _LLM_Menu_ModelDetailAbi(MenuRenderer_TemplateRows("llm_model_capability_rows", Commands, _LLM_Menu_ModelFrameGetters(Frame), Map()))
+		if !(CapabilityRows is Array)
+			return []
+		for Row in CapabilityRows
+			Rows.Push(Row)
 	}
 
 	if (model.Has("hardware_requirements") and Type(model["hardware_requirements"]) == "Map") {
@@ -537,16 +567,53 @@ _LLM_Menu_PerModelRows(name, model, ollama_url, active, deps_ready := true) {
 				return []
 			for Row in HardwareRows
 				Rows.Push(Row)
-			Rows.Push(Map("label", StrReplace(t("menu.llm.hw_header"), "%s", "Ollama")))
-			if (hw.Has("download_gb") and _LLM_Menu_IsNumber(hw["download_gb"]))
-				Rows.Push(Map("label", StrReplace(t("menu.llm.hw_download"), "%s", hw["download_gb"])))
-			if (hw.Has("disk_gb") and _LLM_Menu_IsNumber(hw["disk_gb"]))
-				Rows.Push(Map("label", StrReplace(t("menu.llm.hw_disk"), "%s", hw["disk_gb"])))
-			if (hw.Has("ram_gb") and _LLM_Menu_IsNumber(hw["ram_gb"]))
-				Rows.Push(Map("label", StrReplace(t("menu.llm.hw_ram"), "%s", hw["ram_gb"])))
+			Frame["model_hw_backend_caption"] := "Ollama"
+			Frame["model_hw_download_present"] := false
+			if (hw.Has("download_gb") and _LLM_Menu_IsNumber(hw["download_gb"])) {
+				Frame["model_hw_download_present"] := true
+				Frame["model_hw_download_caption"] := "" . hw["download_gb"]
+			}
+			Frame["model_hw_disk_present"] := false
+			if (hw.Has("disk_gb") and _LLM_Menu_IsNumber(hw["disk_gb"])) {
+				Frame["model_hw_disk_present"] := true
+				Frame["model_hw_disk_caption"] := "" . hw["disk_gb"]
+			}
+			Frame["model_hw_ram_present"] := false
+			if (hw.Has("ram_gb") and _LLM_Menu_IsNumber(hw["ram_gb"])) {
+				Frame["model_hw_ram_present"] := true
+				Frame["model_hw_ram_caption"] := "" . hw["ram_gb"]
+			}
+			HardwareDetails := _LLM_Menu_ModelDetailAbi(MenuRenderer_TemplateRows("llm_model_hardware_rows", Commands, _LLM_Menu_ModelFrameGetters(Frame), Map()))
+			if !(HardwareDetails is Array)
+				return []
+			for Row in HardwareDetails
+				Rows.Push(Row)
 		}
 	}
+	return Rows
+}
 
+; The private native values are snapshots of the unchanged catalogue predicates.
+_LLM_Menu_ModelFrameValue(Frame, Key) {
+	return Frame[Key]
+}
+
+_LLM_Menu_ModelFrameGetters(Frame) {
+	Getters := Map()
+	for Key in Frame
+		Getters[Key] := _LLM_Menu_ModelFrameValue.Bind(Frame, Key)
+	return Getters
+}
+
+_LLM_Menu_ModelDetailAbi(Rows) {
+	if !(Rows is Array)
+		return false
+	for Row in Rows {
+		; The existing native renderer disables callback-free data without this flag.
+		; Only information frames use this bridge; explicit section headers stay separate.
+		if !Row.Has("action") && !Row.Has("items") && !Row.Has("menu") && Row.Get("disabled", false) == true
+			Row.Delete("disabled")
+	}
 	return Rows
 }
 

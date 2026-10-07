@@ -123,3 +123,53 @@ _LLMPC_GenerationBoundary(Key) {
 }
 for Key in ["count", "context", "words"]
 	Test("generation boundaries: authentic numeric owner " . Key, _LLMPC_GenerationBoundary.Bind(Key))
+
+
+/** Retains the hand numeric order while each true complete frame is withdrawn. */
+_LLMPC_CompleteGenerationFrame(Section) {
+	global _LLM_Menu
+	Saved := _LLM_Menu
+	Root := _MM_GetManifestRoot(), Original := Root[Section]
+	try {
+		_LLM_Menu := Saved.Clone()
+		_LLM_Menu["n_predictions"] := _LLM_DefaultFor("llm_num_predictions")
+		_LLM_Menu["ctx_chars"] := _LLM_DefaultFor("llm_context_length", 500)
+		_LLM_Menu["min_words"] := _LLM_DefaultFor("llm_min_words", 3)
+		_LLM_Menu["max_words"] := _LLM_DefaultFor("llm_max_words", 15)
+		_LLM_Menu["temperature"] := Format("{:.2f}", Float(_LLM_DefaultFor("llm_temperature", "0.10")) + 0)
+		if Section == "llm_native_numeric_reset"
+			_LLM_Menu["n_predictions"] += 1
+		Rows := _LLM_Menu_GenerationRows()
+		Offset := Section == "llm_native_numeric_reset" ? 1 : 0
+		AssertEqual(9 + Offset, Rows.Length)
+		AssertEqual(StrReplace(t("menu.llm.num_predictions_label"), "%s", _LLM_Menu["n_predictions"]), Rows[1]["label"])
+		AssertTrue(Rows[1]["items"] is Array)
+		if Offset
+			AssertTrue(HasMethod(Rows[2]["action"], "Call"))
+		for Position in [2, 5, 8]
+			AssertTrue(Rows[Position + Offset]["separator"])
+		for Position in [3, 4, 6, 7, 9]
+			AssertTrue(HasMethod(Rows[Position + Offset]["action"], "Call"))
+		AssertEqual(StrReplace(t("menu.llm.context_length_label"), "%s", _LLM_Menu["ctx_chars"]), Rows[3 + Offset]["label"])
+		AssertEqual(t("menu.llm.reset_on_nav"), Rows[4 + Offset]["label"])
+		Before := _LLM_Menu.Clone()
+		Root.Delete(Section)
+		if Section == "llm_native_numeric_reset"
+			AssertThrows(_LLM_Menu_GenerationRows, "a withdrawn required native reset refuses construction")
+		else
+			AssertEqual(0, _LLM_Menu_GenerationRows().Length, "a withdrawn real frame refuses the complete numeric menu")
+		Root[Section] := [Map("type", "command", "id", "unbound_generation_command", "i18n", "button.cancel")]
+		if Section == "llm_native_numeric_reset"
+			AssertThrows(_LLM_Menu_GenerationRows, "an unowned required reset command refuses construction")
+		else
+			AssertEqual(0, _LLM_Menu_GenerationRows().Length, "an unowned action cannot be silently omitted")
+		AssertEqual("", _LVS_DeepEqual(Before, _LLM_Menu, "generation_state"), "construction/refusal cannot change any native setting")
+	} finally {
+		Root[Section] := Original
+		_LLM_Menu := Saved
+	}
+	Assert(_LLM_Menu_GenerationRows() is Array, "the repaired physical declaration is usable")
+}
+for Section in ["llm_generation_count_control", "llm_generation_context_controls", "llm_generation_word_controls",
+	"llm_generation_temperature_controls", "llm_native_numeric_reset"]
+	Test("complete generation frame: actual native numeric owner " . Section, _LLMPC_CompleteGenerationFrame.Bind(Section))

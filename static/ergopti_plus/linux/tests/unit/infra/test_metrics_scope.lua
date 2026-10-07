@@ -236,7 +236,11 @@ helpers.describe("Linux metrics scope rendered commands", function()
 					local source = Sandbox.read_bytes(path)
 					local passed, detail = pcall(function()
 						root.metrics_menu = {{ type = "command", id = id, i18n = key }}
-						root.top_level = {{ id = "metrics" }}
+						local metrics_parent
+						for _, declared in ipairs(old_top) do if declared.id == "metrics" then metrics_parent = declared end end
+						helpers.assert_type(metrics_parent, "table", "the scope fixture retains its authentic physical parent")
+						helpers.assert_eq(metrics_parent.type, "group")
+						root.top_level = { metrics_parent }
 						controls.on_publish = function(target)
 							if target ~= path then backups[#backups + 1] = target end
 						end

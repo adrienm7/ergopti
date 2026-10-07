@@ -43,11 +43,11 @@ local ProviderUses = require("modules.llm.provider_uses")
 
 local LOG = "menu_llm.agent_panel"
 
--- The two systems: their setting, runtime setter and title key
+-- The two systems: their setting, runtime setter and provider use
 local SYSTEMS = {
-	agent_system1 = { key = "llm_agent_system1", setter = "set_llm_agent_system1", title = "menu.agent.system1",
+	agent_system1 = { key = "llm_agent_system1", setter = "set_llm_agent_system1",
 		use = ProviderUses.SYSTEM1 },
-	agent_system2 = { key = "llm_agent_system2", setter = "set_llm_agent_system2", title = "menu.agent.system2",
+	agent_system2 = { key = "llm_agent_system2", setter = "set_llm_agent_system2",
 		use = ProviderUses.SYSTEM2 },
 }
 
@@ -313,13 +313,23 @@ local function system_rows(ctx, system)
 		items[#items + 1] = row
 	end
 	if installed == false then
-		items[#items + 1] = {
-			label = i18n.format("menu.agent.download_model", model),
-			action = function() return require("modules.llm.local_model_offer").install(model) end,
-		}
+		local download = ManifestMenu.template_rows("agent_download_frame", {
+			["agent_download_model"] = function() return require("modules.llm.local_model_offer").install(model) end,
+		})
+		if not download or #download ~= 1 or type(download[1].action) ~= "function" then return nil end
+		download[1].label = download[1].label:gsub("{1}", function() return model end)
+		items[#items + 1] = download[1]
 	end
 	local current = parsed and backend_label(parsed.backend) or i18n.get("menu.agent.off")
-	return { { label = i18n.format(system.title, current), items = items } }
+	local frame
+	if system.key == "llm_agent_system1" then
+		frame = ManifestMenu.template_rows("agent_system1_frame", {}, {}, { agent_system1 = items })
+	else
+		frame = ManifestMenu.template_rows("agent_system2_frame", {}, {}, { agent_system2 = items })
+	end
+	if not frame or #frame ~= 1 or type(frame[1].items) ~= "table" then return nil end
+	frame[1].label = frame[1].label:gsub("{1}", function() return current end)
+	return frame
 end
 
 --- Rows of the excluded-applications submenu.
@@ -327,13 +337,19 @@ end
 --- @return table rows
 local function disabled_apps_rows(ctx)
 	local apps = type(ctx.state.llm_agent_disabled_apps) == "table" and ctx.state.llm_agent_disabled_apps or {}
-	local label = i18n.format("menu.agent.disabled_apps", #apps)
-	return { {
-		label = label,
-		items = AppPickerLib.build_menu(apps, function(new_list)
+	local definition = ManifestMenu.get_array("agent_excluded_apps_frame")
+	if type(definition) ~= "table" or #definition ~= 1
+		or type(definition[1]) ~= "table" or type(definition[1].i18n) ~= "string"
+		or definition[1].i18n == "" then return nil end
+	local label = i18n.get(definition[1].i18n):gsub("{1}", function() return tostring(#apps) end)
+	local frame = ManifestMenu.template_rows("agent_excluded_apps_frame", {}, {}, {
+		agent_disabled_apps = AppPickerLib.build_menu(apps, function(new_list)
 			return apply(ctx, "llm_agent_disabled_apps", new_list, "set_llm_agent_disabled_apps")
 		end, label),
-	} }
+	})
+	if not frame or #frame ~= 1 or type(frame[1].items) ~= "table" then return nil end
+	frame[1].label = frame[1].label:gsub("{1}", function() return tostring(#apps) end)
+	return frame
 end
 
 
@@ -353,6 +369,14 @@ function M.build(ctx)
 	if type(ctx) ~= "table" or type(ctx.state) ~= "table" or type(ctx.settings_mgr) ~= "table"
 		or type(ctx.settings_mgr.apply_setting_transaction) ~= "function" then
 		error("agent_panel.build: a state and a settings manager are required")
+	end
+	if type(rawget(ManifestMenu.get_root(), "agent_menu")) ~= "table" then return nil end
+	for _, key in ipairs({ "agent_panel_frame", "agent_system1_frame", "agent_system2_frame",
+		"agent_excluded_apps_frame", "agent_download_frame" }) do
+		local definition = ManifestMenu.get_array(key)
+		if type(definition) ~= "table" or #definition ~= 1
+			or type(definition[1]) ~= "table" or type(definition[1].i18n) ~= "string"
+			or definition[1].i18n == "" then return nil end
 	end
 	-- A local server's missing-model notice fixes the Systems through this context
 	require("ui.menu.menu_llm.local_server_panel").set_agent_context(ctx)
@@ -385,9 +409,13 @@ function M.build(ctx)
 	--- @param id string Row id, for the warnings.
 	--- @param provider function Returns the rows.
 	--- @return function handler
+	local refused_frame = false
 	local function dynamic(id, provider)
 		return function(result)
-			for _, row in ipairs(ManifestMenu.render_rows(provider(), id)) do result[#result + 1] = row end
+			local ok, rows = pcall(provider)
+			if not ok then refused_frame = true; error(rows, 0) end
+			if rows == nil then refused_frame = true; return end
+			for _, row in ipairs(ManifestMenu.render_rows(rows, id)) do result[#result + 1] = row end
 		end
 	end
 	local submenu = ManifestMenu.build("agent_menu", "AI agent", {
@@ -400,8 +428,16 @@ function M.build(ctx)
 			["llm.agent_mode"] = function() return ctx.state.llm_agent_mode end,
 			agent_mode_ready = function() return type(ctx.settings_mgr) == "table" and type(ctx.settings_mgr.apply_setting_transaction) == "function" end,
 		},
-	}) or {}
-	return { label = i18n.get("menu.agent.title"), submenu = submenu }
+	})
+	if not submenu or refused_frame then return nil end
+	local children = ManifestMenu.native_child_rows(submenu)
+	if not children then return nil end
+	local frame = ManifestMenu.template_rows("agent_panel_frame", {}, {}, { agent_panel = children })
+	if not frame or #frame ~= 1 or type(frame[1].items) ~= "table" then return nil end
+	-- Preserve the existing public finished-submenu shape and its native callback identities.
+	frame[1].items = nil
+	frame[1].submenu = submenu
+	return frame[1]
 end
 
 return M

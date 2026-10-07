@@ -16,6 +16,7 @@ local Storage = require("adapters.storage")
 local i18n    = require("infra.i18n")
 local dialog  = require("infra.dialog_util")
 local Notifications = require("infra.notifications")
+local ManifestMenu = require("infra.manifest_menu")
 
 local LOG = "menu_llm.settings"
 
@@ -710,8 +711,6 @@ function M.new(deps)
 		local paused = is_paused(deps, "Modifier menu pause-state read")
 
 		local opts = {
-			{title = i18n.get("menu.settings.disabled"), mods = {"none"}},
-			{title = i18n.get("menu.settings.no_modifier"), mods = {}},
 			{title = "⇧ Shift", mods = {"shift"}},
 			{title = "⌘ Cmd", mods = {"cmd"}},
 			{title = "⌥ Option", mods = {"alt"}},
@@ -719,21 +718,34 @@ function M.new(deps)
 			{title = "⇧⌘ Shift + Cmd", mods = {"shift", "cmd"}},
 			{title = "⇧⌥ Shift + Option", mods = {"shift", "alt"}},
 		}
-
-		local menu = {}
-		for _, opt in ipairs(opts) do
-			table.insert(menu, {
-				title = opt.title,
-				checked = (table.concat(opt.mods, "+") == current_str) or nil,
-				fn = not paused and function()
-					return obj.apply_setting_transaction({
-						key = key,
-						value = opt.mods,
-						runtime_fn = hs_fn,
-						publish_setting = true,
-					})
-				end or nil,
+		local function apply_modifiers(mods)
+			return obj.apply_setting_transaction({
+				key = key,
+				value = mods,
+				runtime_fn = hs_fn,
+				publish_setting = true,
 			})
+		end
+		local key_rows = {}
+		for _, opt in ipairs(opts) do
+			key_rows[#key_rows + 1] = {
+				label = opt.title,
+				checked = (table.concat(opt.mods, "+") == current_str) or nil,
+				action = not paused and function() return apply_modifiers(opt.mods) end or nil,
+			}
+		end
+		local rows = ManifestMenu.template_rows("llm_modifier_picker_frame", {
+			["llm_modifier_disabled"] = function() return apply_modifiers({"none"}) end,
+			["llm_modifier_none"] = function() return apply_modifiers({}) end,
+		}, {
+			llm_modifier_disabled_checked = function() return current_str == "none" end,
+			llm_modifier_none_checked = function() return current_str == "" end,
+			llm_modifier_ready = function() return not paused end,
+		}, { ["llm_modifier_key_rows"] = function() return key_rows end })
+		if not rows then return {} end
+		local menu = ManifestMenu.render_rows(rows, "llm_modifier_picker_frame")
+		for _, row in ipairs(menu) do
+			if row.checked == false then row.checked = nil end
 		end
 		return menu
 	end

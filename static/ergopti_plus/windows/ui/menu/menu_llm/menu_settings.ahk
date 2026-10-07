@@ -177,9 +177,13 @@ _LLM_Menu_TriggerRows(Position := "all") {
 	Rows := []
 
 	; Debounce — dialog like HS (free numeric input)
-	Rows.Push(Map(
-		"label",  StrReplace(t("menu.llm.debounce_label"), "%s", _LLM_Menu["debounce_ms"] . " ms"),
-		"action", (*) => LLM_Menu_PromptDebounce()))
+	DebounceRows := MenuRenderer_TemplateRows("llm_trigger_debounce_control",
+		Map("llm_trigger_debounce", (*) => LLM_Menu_PromptDebounce()),
+		Map("llm_trigger_debounce_caption", () => _LLM_Menu["debounce_ms"] . " ms"), Map())
+	if !(DebounceRows is Array)
+		return []
+	for Row in DebounceRows
+		Rows.Push(Row)
 	_LLM_MaybeResetRow(Rows,
 		_LLM_Menu["debounce_ms"],
 		_LLM_DefaultFor("llm_debounce_ms", 500),
@@ -308,9 +312,13 @@ _LLM_Menu_GenerationRows() {
 	Rows := []
 
 	; Suggestion count — a generation parameter, the first one on every driver.
-	Rows.Push(Map(
-		"label", StrReplace(t("menu.llm.num_predictions_label"), "%s", _LLM_Menu["n_predictions"]),
-		"items", _LLM_Menu_NRows()))
+	CountRows := MenuRenderer_TemplateRows("llm_generation_count_control", Map(),
+		Map("llm_generation_count_caption", () => "" . _LLM_Menu["n_predictions"],
+			"llm_generation_ready", () => true), Map("llm_generation_count", _LLM_Menu_NRows))
+	if !(CountRows is Array)
+		return []
+	for Row in CountRows
+		Rows.Push(Row)
 	; defaults.json always carries llm_num_predictions (the loader parses it), so
 	; no per-call fallback shadows the shared default here.
 	_LLM_MaybeResetRow(Rows,
@@ -324,68 +332,62 @@ _LLM_Menu_GenerationRows() {
 	for Row in CountBoundaryRows
 		Rows.Push(Row)
 
-	; Context length — dialog
-	Rows.Push(Map(
-		"label",  StrReplace(t("menu.llm.context_length_label"), "%s", _LLM_Menu["ctx_chars"]),
-		"action", (*) => LLM_Menu_PromptCtxChars()))
-	_LLM_MaybeResetRow(Rows,
-		_LLM_Menu["ctx_chars"],
-		_LLM_DefaultFor("llm_context_length", 500),
-		(*) => _LLM_AssignAndRebuild("ctx_chars",
-			_LLM_DefaultFor("llm_context_length", 500)))
-
-	; Reset on nav toggle
-	Rows.Push(Map(
-		"label",   t("menu.llm.reset_on_nav"),
-		"checked", _LLM_Menu["reset_on_nav"],
-		"action",  (*) => LLM_Menu_ToggleBool("reset_on_nav")))
-
+	ContextDefault := _LLM_DefaultFor("llm_context_length", 500)
+	MinDefault := _LLM_DefaultFor("llm_min_words", 3)
+	MaxDefault := _LLM_DefaultFor("llm_max_words", 15)
+	TempDefault := Format("{:.2f}", Float(_LLM_DefaultFor("llm_temperature", "0.10")) + 0)
+	max_val := _LLM_Menu["max_words"]
+	max_display := (max_val == 0) ? t("menu.llm.unlimited") : max_val
+	GenerationCommands := Map(
+		"llm_generation_context", (*) => LLM_Menu_PromptCtxChars(),
+		"llm_generation_context_reset", (*) => _LLM_AssignAndRebuild("ctx_chars", _LLM_DefaultFor("llm_context_length", 500)),
+		"llm_generation_min_words", (*) => LLM_Menu_PromptMinWords(),
+		"llm_generation_min_words_reset", (*) => _LLM_AssignAndRebuild("min_words", _LLM_DefaultFor("llm_min_words", 3)),
+		"llm_generation_max_words", (*) => LLM_Menu_PromptMaxWords(),
+		"llm_generation_max_words_reset", (*) => _LLM_AssignAndRebuild("max_words", _LLM_DefaultFor("llm_max_words", 15)),
+		"llm_generation_temperature", (*) => LLM_Menu_PromptTemperature(),
+		"llm_generation_temperature_reset", (*) => _LLM_AssignAndRebuild("temperature", TempDefault),
+		"llm_reset_on_nav", (*) => LLM_Menu_ToggleBool("reset_on_nav"))
+	GenerationGetters := Map(
+		"llm_generation_ready", () => true,
+		"llm_generation_context_caption", () => "" . _LLM_Menu["ctx_chars"],
+		"llm_generation_context_reset_caption", () => "" . ContextDefault,
+		"llm_generation_context_reset_present", () => _LLM_Menu["ctx_chars"] != ContextDefault,
+		"llm_reset_on_nav_checked", () => _LLM_Menu["reset_on_nav"],
+		"llm_generation_min_words_caption", () => "" . _LLM_Menu["min_words"],
+		"llm_generation_min_words_reset_caption", () => "" . MinDefault,
+		"llm_generation_min_words_reset_present", () => _LLM_Menu["min_words"] != MinDefault,
+		"llm_generation_max_words_caption", () => "" . max_display,
+		"llm_generation_max_words_reset_caption", () => "" . MaxDefault,
+		"llm_generation_max_words_reset_present", () => _LLM_Menu["max_words"] != MaxDefault,
+		"llm_generation_temperature_caption", () => _LLM_Menu["temperature"],
+		"llm_generation_temperature_reset_caption", () => TempDefault,
+		"llm_generation_temperature_reset_present", () => _LLM_Menu["temperature"] != TempDefault)
+	ContextRows := MenuRenderer_TemplateRows("llm_generation_context_controls", GenerationCommands, GenerationGetters, Map())
+	if !(ContextRows is Array)
+		return []
+	for Row in ContextRows
+		Rows.Push(Row)
 	ContextBoundaryRows := MenuRenderer_TemplateRows("llm_generation_context_boundary", Map(), Map(), Map())
 	if !(ContextBoundaryRows is Array)
 		return []
 	for Row in ContextBoundaryRows
 		Rows.Push(Row)
-
-	; Min words — dialog
-	Rows.Push(Map(
-		"label",  StrReplace(t("menu.llm.min_words_label"), "%s", _LLM_Menu["min_words"]),
-		"action", (*) => LLM_Menu_PromptMinWords()))
-	_LLM_MaybeResetRow(Rows,
-		_LLM_Menu["min_words"],
-		_LLM_DefaultFor("llm_min_words", 3),
-		(*) => _LLM_AssignAndRebuild("min_words",
-			_LLM_DefaultFor("llm_min_words", 3)))
-
-	; Max words — dialog
-	max_val     := _LLM_Menu["max_words"]
-	max_display := (max_val == 0) ? t("menu.llm.unlimited") : max_val
-	Rows.Push(Map(
-		"label",  StrReplace(t("menu.llm.max_words_label"), "%s", max_display),
-		"action", (*) => LLM_Menu_PromptMaxWords()))
-	_LLM_MaybeResetRow(Rows,
-		_LLM_Menu["max_words"],
-		_LLM_DefaultFor("llm_max_words", 15),
-		(*) => _LLM_AssignAndRebuild("max_words",
-			_LLM_DefaultFor("llm_max_words", 15)))
-
-	WordsBoundaryRows := MenuRenderer_TemplateRows("llm_generation_words_boundary", Map(), Map(), Map())
-	if !(WordsBoundaryRows is Array)
+	WordRows := MenuRenderer_TemplateRows("llm_generation_word_controls", GenerationCommands, GenerationGetters, Map())
+	if !(WordRows is Array)
 		return []
-	for Row in WordsBoundaryRows
+	for Row in WordRows
 		Rows.Push(Row)
-
-	; Temperature — dialog
-	Rows.Push(Map(
-		"label",  StrReplace(t("menu.llm.temperature_label"), "%s", _LLM_Menu["temperature"]),
-		"action", (*) => LLM_Menu_PromptTemperature()))
-	; ``temperature`` is stored as a formatted string ("0.10"), so compare the
-	; canonical form of the default to avoid spurious resets when the JSON
-	; carries a numeric 0.1 vs the stored "0.10".
-	_temp_default := Format("{:.2f}", Float(_LLM_DefaultFor("llm_temperature", "0.10")) + 0)
-	_LLM_MaybeResetRow(Rows,
-		_LLM_Menu["temperature"],
-		_temp_default,
-		(*) => _LLM_AssignAndRebuild("temperature", _temp_default))
+	WordBoundaryRows := MenuRenderer_TemplateRows("llm_generation_words_boundary", Map(), Map(), Map())
+	if !(WordBoundaryRows is Array)
+		return []
+	for Row in WordBoundaryRows
+		Rows.Push(Row)
+	TemperatureRows := MenuRenderer_TemplateRows("llm_generation_temperature_controls", GenerationCommands, GenerationGetters, Map())
+	if !(TemperatureRows is Array)
+		return []
+	for Row in TemperatureRows
+		Rows.Push(Row)
 
 	return Rows
 }
@@ -593,10 +595,13 @@ _LLM_Menu_DisplayRows(Position := "all") {
 	; engine forces n=1 internally so we never race two variants. The
 	; user keeps the option of bare Backspace / Ctrl+Z to roll back what
 	; was typed.
-	Rows.Push(Map(
-		"label",   t("menu.llm.inline_autotype"),
-		"checked", _LLM_Menu["inline_autotype"],
-		"action",  (*) => LLM_Menu_ToggleBool("inline_autotype")))
+	InlineRows := MenuRenderer_TemplateRows("llm_display_inline_control",
+		Map("llm_display_inline", (*) => LLM_Menu_ToggleBool("inline_autotype")),
+		Map("llm_display_inline_checked", () => _LLM_Menu["inline_autotype"]), Map())
+	if !(InlineRows is Array)
+		return []
+	for Row in InlineRows
+		Rows.Push(Row)
 
 	BoundaryRows := MenuRenderer_TemplateRows("llm_display_provider_boundary", Map(), Map(), Map())
 	if !(BoundaryRows is Array)
@@ -804,9 +809,13 @@ _LLM_AssignAndRebuild(tray_key, value) {
 _LLM_MaybeResetRow(Rows, current, default_val, on_click) {
 	if (current = default_val)
 		return
-	Rows.Push(Map(
-		"label",  StrReplace(t("menu.llm.reset_label"), "%s", default_val),
-		"action", (*) => on_click()))
+	ResetRows := MenuRenderer_TemplateRows("llm_native_numeric_reset",
+		Map("llm_native_numeric_reset", on_click),
+		Map("llm_numeric_reset_caption", () => "" . default_val), Map())
+	if !(ResetRows is Array)
+		throw Error("Declared numeric reset control was refused.")
+	for Row in ResetRows
+		Rows.Push(Row)
 }
 
 LLM_Menu_PromptDebounce() {
