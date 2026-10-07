@@ -118,6 +118,8 @@ local _source_group = nil
 local _source_native_generation = nil
 local _capture_group, _capture_generation = nil, 0
 local _inverse_receipts = setmetatable({}, { __mode = "k" })
+-- A reset keeps the loaded map owner; a load or backend replacement retires it.
+local _inverse_map_owner = 0
 
 --- Tracks source changes without treating an ordinary key-up as a rebind.
 local function source_identity()
@@ -173,6 +175,7 @@ function M._set_backend(backend)
 	_locale = nil
 	_source_group, _source_native_generation = nil, nil
 	_capture_group, _capture_generation = nil, _capture_generation + 1
+	_inverse_map_owner = _inverse_map_owner + 1
 	_source_generation = _source_generation + 1
 end
 
@@ -662,6 +665,7 @@ function M.load(text, locale)
 	_locale = selected_locale
 	_source_group, _source_native_generation = nil, nil
 	_capture_group, _capture_generation = nil, _capture_generation + 1
+	_inverse_map_owner = _inverse_map_owner + 1
 	_source_generation = _source_generation + 1
 	destroy(previous)
 	return true
@@ -692,6 +696,7 @@ function M.clear()
 	_locale = nil
 	_source_group, _source_native_generation = nil, nil
 	_capture_group, _capture_generation = nil, _capture_generation + 1
+	_inverse_map_owner = _inverse_map_owner + 1
 	_source_generation = _source_generation + 1
 end
 
@@ -787,8 +792,10 @@ function M.inverse_table(require_source)
 	local receipt = {}
 	_inverse_receipts[receipt] = { session = session, backend = backend, raw_map = raw_map,
 		native_map = native_map, getter = getter, inverse = enumerate, generation = generation,
+		map_owner = _inverse_map_owner, create = backend.create, destroy = backend.destroy,
 		group = group, epoch = epoch, desktop_generation = desktop_generation,
-		desktop_epoch = desktop_epoch, source_getter = source_getter, observed_current = after_observed }
+		desktop_epoch = desktop_epoch, desktop_native_generation = _source_native_generation,
+		source_getter = source_getter, observed_current = after_observed }
 	return detached, nil, receipt
 end
 
@@ -834,6 +841,46 @@ function M.inverse_current(receipt, cached)
 	end
 	return true
 end
+
+local issue_inverse, check_inverse = M.inverse_table, M.inverse_current
+
+--- Publishes a fresh inverse for an unchanged map recreated by reset_state().
+--- The prior receipt provides provenance only; its retired currency is never revived.
+--- @param previous table Opaque inverse receipt issued before the reset.
+--- @param require_source boolean|nil Preserve the original native desktop requirement.
+--- @return table|nil Detached inverse table.
+--- @return string|nil Refusal reason.
+--- @return table|nil Fresh opaque receipt.
+function M.inverse_republish(previous, require_source)
+	local owned = _inverse_receipts[previous]
+	local function provenance()
+		return owned and _session and _session ~= owned.session
+			and _backend == owned.backend and _keymap_text == owned.raw_map
+			and _inverse_map_owner == owned.map_owner
+			and _backend.create == owned.create and _backend.destroy == owned.destroy
+			and (_backend.capture_group or _backend.source_group) == owned.getter
+			and _backend.inverse == owned.inverse
+			and (not owned.desktop_generation or _backend.source_group == owned.source_getter)
+			and M.inverse_table == issue_inverse and M.inverse_current == check_inverse
+	end
+	if not provenance() or (require_source == true) ~= (owned.desktop_generation ~= nil) then
+		return nil, "inverse-reset-provenance-refused"
+	end
+	-- Retire the original even if a fresh acquisition subsequently refuses.
+	owned.revoked = true
+	local built, reason, receipt = issue_inverse(require_source)
+	local fresh = _inverse_receipts[receipt]
+	if not built or not fresh then return nil, reason or "inverse-reset-publication-refused" end
+	local checked, current = pcall(check_inverse, receipt)
+	if not provenance() or not checked or current ~= true or fresh.group ~= owned.group
+		or fresh.map_owner ~= owned.map_owner
+		or owned.desktop_generation and fresh.desktop_native_generation ~= owned.desktop_native_generation then
+		fresh.revoked = true
+		return nil, "inverse-reset-source-changed"
+	end
+	return built, nil, receipt
+end
+
 
 --- Enumerates every plain output in a detached state of the active group.
 --- This preserves duplicates for the shared owner to refuse ambiguity.
