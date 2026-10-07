@@ -134,7 +134,7 @@ const PERSONAL_REGIONS = [
 			'"hotstring_category_disable_all"',
 			'M.category_scope_fn(ctx, names,',
 			'submenu = scope_menu(scope_names, {}, menu_items)',
-			'submenu = file_menu_for_group(gname, g_rows, admission, readonly)',
+			'local file_menu = file_menu_for_group(gname, g_rows, admission, readonly)',
 			'PersonalFileScope.bind(ctx, record)',
 			'PersonalFiles.components(gname)',
 			'record and record.admitted == false'
@@ -334,7 +334,7 @@ for (const region of PERSONAL_REGIONS) {
 			'local parts = PersonalFiles.components(gname)',
 			'local admission = gname ~= "personal" and PersonalFileScope.bind(ctx, record) or nil',
 			'local readonly = record and record.admitted == false',
-			'submenu = file_menu_for_group(gname, g_rows, admission, readonly)',
+			'local file_menu = file_menu_for_group(gname, g_rows, admission, readonly)',
 			'M.category_scope_fn(ctx, { gname }, true, check)',
 			'M.category_scope_fn(ctx, { gname }, false, check)',
 			'local controls = PersonalFileMenu.build({ manifest = ManifestMenu, current = personal_current'
@@ -348,6 +348,56 @@ for (const region of PERSONAL_REGIONS) {
 			'the owner, admission, destination and callbacks all have causal controls'
 		);
 		assert.equal(validatesBinding(text), true);
+		const filePublication = [
+			'local file_menu = file_menu_for_group(gname, g_rows, admission, readonly)',
+			'if type(file_menu) ~= "table" then return nil end',
+			'submenu = file_menu,'
+		];
+		const publishesCapturedFile = (source) => {
+			const ranges = filePublication.map((fragment) => executableRange(source, fragment));
+			return (
+				ranges.every((range) => range !== null) &&
+				ranges[0].end <= ranges[1].start &&
+				ranges[1].end <= ranges[2].start
+			);
+		};
+		assert.equal(publishesCapturedFile(text), true);
+		for (const [before, after] of [
+			[
+				filePublication[0],
+				'local file_menu = Foreign.file_menu_for_group(gname, g_rows, admission, readonly)'
+			],
+			[filePublication[1], 'if false then return nil end'],
+			[filePublication[2], 'submenu = Foreign.file_menu,']
+		]) {
+			const range = executableRange(text, before);
+			assert.notEqual(range, null);
+			assert.equal(
+				publishesCapturedFile(text.slice(0, range.start) + after + text.slice(range.end)),
+				false
+			);
+		}
+
+		for (const fragment of [
+			'if type(file_menu) ~= "table" then return nil end',
+			'submenu = file_menu,'
+		]) {
+			const range = executableRange(text, fragment);
+			assert.notEqual(
+				range,
+				null,
+				'captured complete file rows retain refusal and identity publication'
+			);
+			for (const replacement of ['-- ' + fragment + '\n', 'local dormant = [[' + fragment + ']]\n'])
+				assert.equal(
+					executableRange(
+						text.slice(0, range.start) + replacement + text.slice(range.end),
+						fragment
+					),
+					null
+				);
+		}
+
 		for (const removed of actualRoute) {
 			const range = executableRange(text, removed);
 			assert.notEqual(range, null, 'the mutation must replace the actual executable owner route');

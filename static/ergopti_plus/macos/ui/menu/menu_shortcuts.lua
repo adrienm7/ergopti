@@ -567,10 +567,7 @@ function M.build(ctx)
 						table.insert(ctrl_items, mi)
 						-- Inject ChatGPT URL editor inline below ctrl_g
 						if s.id == "ctrl_g" then
-							table.insert(ctrl_items, {
-								label    = i18n.get("menu.shortcuts.chatgpt_url_item"),
-								disabled = paused or nil,
-								action   = not paused and function()
+							local chatgpt_action = not paused and function()
 									local ok_p, clicked, url = pcall(dialog.text_prompt,
 										i18n.get("dialog.shortcuts.chatgpt_title"),
 										i18n.get("dialog.shortcuts.chatgpt_prompt"),
@@ -583,8 +580,16 @@ function M.build(ctx)
 										if ctx.save_prefs() ~= true then return false end
 										ctx.updateMenu()
 									end
-								end or nil,
-							})
+								end or nil
+							local editor_rows = ManifestMenu.template_rows("shortcut_chatgpt_editor_frame", {
+								["shortcut_chatgpt_editor"] = function(...)
+									if type(chatgpt_action) ~= "function" then return false end
+									return chatgpt_action(...)
+								end,
+							}, { shortcut_chatgpt_editor_ready = function() return not paused end }, {})
+							if not editor_rows then return nil end
+							if paused then editor_rows[1].action = nil end
+							for _, row in ipairs(editor_rows) do ctrl_items[#ctrl_items + 1] = row end
 						end
 					elseif s.id:sub(1, 4) == "cmd_" then
 						table.insert(cmd_items, mi)
@@ -786,7 +791,7 @@ function M.build(ctx)
 				end
 
 				if #collected > 0 then
-					table.insert(ext_menu_items, { title = pack.name, menu = collected })
+					table.insert(ext_menu_items, { label = pack.name, items = collected })
 				end
 			end
 		end
@@ -795,9 +800,9 @@ function M.build(ctx)
 			local boundary_rows = ManifestMenu.template_rows("shortcut_extension_boundary", {}, {}, {})
 			if not boundary_rows then return {} end
 			for _, row in ipairs(boundary_rows) do items[#items + 1] = row end
-			for _, it in ipairs(ext_menu_items) do
-				table.insert(items, MenuUtils.as_provider_row(it))
-			end
+			local external_rows = MenuUtils.rows_from_menu(ext_menu_items)
+			if not external_rows then return {} end
+			for _, row in ipairs(external_rows) do items[#items + 1] = row end
 		end
 		return items
 	end
@@ -857,9 +862,15 @@ function M.build(ctx)
 		["wrap_symbols_menu"] = function()
 			local rows = {}
 			for _, row in ipairs(top_items) do rows[#rows + 1] = row end
-			rows[#rows + 1] = { label = i18n.get("menu.shortcuts.wrap_symbols"),
-			                    disabled = not state.shortcuts or paused or nil,
-			                    items = build_wrap_symbols_submenu(ctx, state, paused, shortcuts) }
+			local frame = ManifestMenu.template_rows("shortcut_wrap_frame", {}, {
+				shortcut_wrap_hs_ready = function() return state.shortcuts and not paused or false end,
+			}, { shortcut_wrap_symbols_hs = function()
+				return build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
+			end })
+			if not frame then return nil end
+			-- The native outer row historically retains a truthy pause payload.
+			if state.shortcuts and paused then frame[1].disabled = paused end
+			for _, row in ipairs(frame) do rows[#rows + 1] = row end
 			return rows
 		end,
 		keyboard_slots = function(_ctx)

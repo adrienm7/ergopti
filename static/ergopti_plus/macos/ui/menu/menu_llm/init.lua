@@ -959,6 +959,7 @@ local function create_menu(deps)
 				-- here and second there, from one description.
 				local rows_by_id = {}
 				local group_builders = {}
+				local list_providers = {}
 				local function child_group_for(id, children, disabled)
 						local rows = ManifestMenu.native_child_rows(children)
 						group_builders[id] = function()
@@ -1143,27 +1144,39 @@ local function create_menu(deps)
 								-- Row DATA appended to the selector's finished tree: the rows
 								-- above it are ModelsSelector's, these three are this file's,
 								-- and the renderer materialises this file's.
-								local port_rows = {
-										{ separator = true },
-										{
-												label    = string.format(i18n.get("menu.llm.mlx_port_label"), tostring(ApiMlx.get_port())),
-										disabled = paused or nil,
-										action   = not paused and function()
-												return settings_mgr.set_mlx_port(restart_mlx_for_current_port)
-										end or nil,
-								},
-								}
-								if type(ApiMlx.get_default_port) == "function" and ApiMlx.get_port() ~= ApiMlx.get_default_port() then
-										port_rows[#port_rows + 1] = {
-												label    = string.format(i18n.get("menu.llm.reset_label"), tostring(ApiMlx.get_default_port())),
-											disabled = paused or nil,
-											action   = not paused and function()
-													return settings_mgr.reset_mlx_port(restart_mlx_for_current_port)
-											end or nil,
-										}
-								end
-								for _, row in ipairs(ManifestMenu.render_rows(port_rows, "llm_model")) do
-										table.insert(model_submenu, row)
+								local port_rows = ManifestMenu.template_rows("llm_mlx_port_frame", {
+									["llm_mlx_port"] = function()
+										return settings_mgr.set_mlx_port(restart_mlx_for_current_port)
+									end,
+									["llm_mlx_port_reset"] = function()
+										return settings_mgr.reset_mlx_port(restart_mlx_for_current_port)
+									end,
+								}, {
+									llm_mlx_port_caption = function() return tostring(ApiMlx.get_port()) end,
+									llm_mlx_port_reset_caption = function() return tostring(ApiMlx.get_default_port()) end,
+									llm_mlx_port_reset_present = function()
+										return type(ApiMlx.get_default_port) == "function" and ApiMlx.get_port() ~= ApiMlx.get_default_port()
+									end,
+									llm_mlx_port_ready = function() return not paused end,
+								}, {})
+								if not port_rows then return {} end
+								-- Use the actual terminal row DATA as context without rebuilding completed
+								-- catalogue trees. The original row object remains in the selector data.
+								local tail = model_submenu[#model_submenu]
+								if tail ~= nil and (type(tail) ~= "table" or getmetatable(tail) ~= nil
+										or (rawget(tail, "separator") ~= true
+											and (type(rawget(tail, "label")) ~= "string" or rawget(tail, "label") == ""))) then return {} end
+								local context = tail and { tail } or {}
+								for _, row in ipairs(port_rows) do context[#context + 1] = row end
+								local rendered = ManifestMenu.render_rows(context, "llm_model")
+								local first_new = tail and tail.separator ~= true and 2 or 1
+								if first_new == 2 and (rendered[1] == nil
+										or rendered[1].title ~= tail.label
+										or not rawequal(rendered[1].fn,
+											(type(tail.items) ~= "table" and type(tail.submenu) ~= "table") and tail.action or nil)
+										or not rawequal(rendered[1].image, tail.image)) then return {} end
+								for index = first_new, #rendered do
+										table.insert(model_submenu, rendered[index])
 								end
 						end
 				end
@@ -1177,15 +1190,23 @@ local function create_menu(deps)
 				-- Anchored to the model row it describes. It used to be inserted BEFORE
 				-- that row, because the row itself was placed further down.
 				if info and info.emojis and info.emojis:find("🧠💭") then
-						row_for("llm_model", { title = i18n.get("menu.llm.thinking_model_info"), disabled = true })
+						local info_rows = ManifestMenu.template_rows("llm_thinking_info", {}, {}, {})
+						if not info_rows then return {} end
+						for _, row in ipairs(ManifestMenu.render_rows(info_rows, "llm_model")) do row_for("llm_model", row) end
 				end
 
-				row_for("llm_model", { title = "-" })
+				local model_boundary_rows = ManifestMenu.template_rows("llm_after_model_boundary", {}, {}, {})
+				if not model_boundary_rows then return {} end
+				list_providers.llm_after_model_boundary = function() return model_boundary_rows end
+
 
 				local profiles_item = profiles_mgr.get_menu_item()
 				profiles_item.disabled = MenuLayout.row_disabled("llm_profile", is_disabled, paused)
 				row_for("llm_profile", profiles_item)
-				row_for("llm_profile", { title = "-" })
+				local profile_boundary_rows = ManifestMenu.template_rows("llm_after_profile_boundary", {}, {}, {})
+				if not profile_boundary_rows then return {} end
+				list_providers.llm_after_profile_boundary = function() return profile_boundary_rows end
+
 
 
 				-- ===== Trigger submenu =====
@@ -1205,17 +1226,13 @@ local function create_menu(deps)
 
 				-- ===== Live mode submenu =====
 
-				row_for("llm_live_mode", {
-						title    = i18n.get("menu.llm.live_mode_title"),
-						disabled = MenuLayout.row_disabled("llm_live_mode", is_disabled, paused),
-						menu     = LiveModePanel.build({
+				child_group_for("llm_live_mode", LiveModePanel.build({
 								llm_mod     = llm_mod,
 								keymap      = keymap,
 								count       = state.llm_num_predictions or llm_mod.DEFAULT_STATE.llm_num_predictions,
 								is_disabled = is_disabled,
 								update_menu = update_menu,
-						}),
-				})
+						}), MenuLayout.row_disabled("llm_live_mode", is_disabled, paused))
 
 
 				-- ===== Generation settings submenu =====
@@ -1224,16 +1241,19 @@ local function create_menu(deps)
 
 				-- The suggestion count is a generation parameter, the first one on
 				-- every driver; its choices are build_num_pred_menu's tree, handed over whole.
-				table.insert(generation_rows, {
-						label    = string.format(i18n.get("menu.llm.num_predictions_label"), tostring(state.llm_num_predictions or llm_mod.DEFAULT_STATE.llm_num_predictions)),
-						disabled = is_disabled or nil,
-						submenu  = build_num_pred_menu(),
-				})
+				local count_rows = ManifestMenu.template_rows("llm_generation_count_control", {}, {
+					llm_generation_count_caption = function()
+						return tostring(state.llm_num_predictions or llm_mod.DEFAULT_STATE.llm_num_predictions)
+					end,
+					llm_generation_ready = function() return not is_disabled end,
+				}, { llm_generation_count = function()
+					return ManifestMenu.native_child_rows(build_num_pred_menu())
+				end })
+				if not count_rows then return {} end
+				for _, row in ipairs(count_rows) do generation_rows[#generation_rows + 1] = row end
 				if state.llm_num_predictions ~= llm_mod.DEFAULT_STATE.llm_num_predictions then
-						table.insert(generation_rows, {
-								label    = string.format(i18n.get("menu.llm.reset_label"), tostring(llm_mod.DEFAULT_STATE.llm_num_predictions)),
-								disabled = is_disabled or nil,
-								action   = function()
+					local reset_rows = ManifestMenu.template_rows("llm_generation_count_reset_control", {
+						["llm_generation_count_reset"] = function()
 										return settings_mgr.apply_setting_transaction({
 												key = "llm_num_predictions",
 												value = llm_mod.DEFAULT_STATE.llm_num_predictions,
@@ -1241,45 +1261,53 @@ local function create_menu(deps)
 												publish_setting = false,
 										})
 								end,
-						})
+					}, {
+						llm_generation_count_reset_caption = function() return tostring(llm_mod.DEFAULT_STATE.llm_num_predictions) end,
+						llm_generation_ready = function() return not is_disabled end,
+					}, {})
+					if not reset_rows then return {} end
+					for _, row in ipairs(reset_rows) do generation_rows[#generation_rows + 1] = row end
 				end
 				local count_boundary_rows = ManifestMenu.template_rows("llm_generation_count_boundary", {}, {}, {})
 				if not count_boundary_rows then return {} end
 				for _, row in ipairs(count_boundary_rows) do generation_rows[#generation_rows + 1] = row end
 
-				table.insert(generation_rows, { label = string.format(i18n.get("menu.llm.context_length_label"), tostring(state.llm_context_length)), disabled = is_disabled or nil, action = settings_mgr.set_context_length })
-				if state.llm_context_length ~= llm_mod.DEFAULT_STATE.llm_context_length then
-						table.insert(generation_rows, { label = string.format(i18n.get("menu.llm.reset_label"), tostring(llm_mod.DEFAULT_STATE.llm_context_length)), disabled = is_disabled or nil, action = settings_mgr.reset_context_length })
-				end
-
-				table.insert(generation_rows, {
-						label    = i18n.get("menu.llm.reset_on_nav"),
-						checked  = state.llm_reset_on_nav,
-						disabled = is_disabled or nil,
-						action   = function()
-								return settings_mgr.apply_setting_transaction({
-										key = "llm_reset_on_nav",
-										value = not state.llm_reset_on_nav,
-										runtime_fn = "set_llm_reset_on_nav",
-										publish_setting = false,
-								})
-						end
-				})
-
 				local mw_min = tonumber(state.llm_min_words)
 				local min_words_display = (mw_min and mw_min > 0) and tostring(mw_min) or "1"
-				table.insert(generation_rows, { label = string.format(i18n.get("menu.llm.min_words_label"), min_words_display), disabled = is_disabled or nil, action = settings_mgr.set_min_words })
-				if state.llm_min_words ~= llm_mod.DEFAULT_STATE.llm_min_words then
-						table.insert(generation_rows, { label = string.format(i18n.get("menu.llm.reset_label"), tostring(llm_mod.DEFAULT_STATE.llm_min_words)), disabled = is_disabled or nil, action = settings_mgr.reset_min_words })
-				end
-
 				local mw_max = tonumber(state.llm_max_words)
 				local max_words_display = (mw_max and mw_max > 0) and tostring(mw_max) or i18n.get("menu.llm.unlimited")
-				table.insert(generation_rows, { label = string.format(i18n.get("menu.llm.max_words_label"), max_words_display), disabled = is_disabled or nil, action = settings_mgr.set_max_words })
-				if state.llm_max_words ~= llm_mod.DEFAULT_STATE.llm_max_words then
-						local def_w_disp = (llm_mod.DEFAULT_STATE.llm_max_words and llm_mod.DEFAULT_STATE.llm_max_words > 0) and tostring(llm_mod.DEFAULT_STATE.llm_max_words) or i18n.get("menu.llm.unlimited")
-						table.insert(generation_rows, { label = string.format(i18n.get("menu.llm.reset_label"), def_w_disp), disabled = is_disabled or nil, action = settings_mgr.reset_max_words })
-				end
+				local default_max_display = (llm_mod.DEFAULT_STATE.llm_max_words and llm_mod.DEFAULT_STATE.llm_max_words > 0)
+					and tostring(llm_mod.DEFAULT_STATE.llm_max_words) or i18n.get("menu.llm.unlimited")
+				local native_generation_rows = ManifestMenu.template_rows("llm_generation_native_controls", {
+					["llm_generation_context"] = settings_mgr.set_context_length,
+					["llm_generation_context_reset"] = settings_mgr.reset_context_length,
+					["llm_generation_min_words"] = settings_mgr.set_min_words,
+					["llm_generation_min_words_reset"] = settings_mgr.reset_min_words,
+					["llm_generation_max_words"] = settings_mgr.set_max_words,
+					["llm_generation_max_words_reset"] = settings_mgr.reset_max_words,
+					["llm_reset_on_nav"] = function()
+						return settings_mgr.apply_setting_transaction({
+							key = "llm_reset_on_nav",
+							value = not state.llm_reset_on_nav,
+							runtime_fn = "set_llm_reset_on_nav",
+							publish_setting = false,
+						})
+					end,
+				}, {
+					llm_generation_ready = function() return not is_disabled end,
+					llm_generation_context_caption = function() return tostring(state.llm_context_length) end,
+					llm_generation_context_reset_caption = function() return tostring(llm_mod.DEFAULT_STATE.llm_context_length) end,
+					llm_generation_context_reset_present = function() return state.llm_context_length ~= llm_mod.DEFAULT_STATE.llm_context_length end,
+					llm_reset_on_nav_checked = function() return state.llm_reset_on_nav end,
+					llm_generation_min_words_caption = function() return min_words_display end,
+					llm_generation_min_words_reset_caption = function() return tostring(llm_mod.DEFAULT_STATE.llm_min_words) end,
+					llm_generation_min_words_reset_present = function() return state.llm_min_words ~= llm_mod.DEFAULT_STATE.llm_min_words end,
+					llm_generation_max_words_caption = function() return max_words_display end,
+					llm_generation_max_words_reset_caption = function() return default_max_display end,
+					llm_generation_max_words_reset_present = function() return state.llm_max_words ~= llm_mod.DEFAULT_STATE.llm_max_words end,
+				}, {})
+				if not native_generation_rows then return {} end
+				for _, row in ipairs(native_generation_rows) do generation_rows[#generation_rows + 1] = row end
 
 				local generation_ctx = TempPanel.build({
 						state        = state,
@@ -1290,13 +1318,10 @@ local function create_menu(deps)
 						settings_mgr = settings_mgr,
 				}, generation_rows)
 
-				row_for("llm_generation_settings", {
-						title    = i18n.get("menu.llm.generation_menu_title"),
-						disabled = MenuLayout.row_disabled("llm_generation_settings", is_disabled, paused),
-						menu     = ManifestMenu.build("llm_generation_menu", "LLM", nil, nil, generation_ctx, {
-							["llm_generation_values"] = function() return generation_rows end,
-						}),
-				})
+				if not generation_ctx then return {} end
+				child_group_for("llm_generation_settings", ManifestMenu.build("llm_generation_menu", "LLM", nil, nil, generation_ctx, {
+					["llm_generation_values"] = function() return generation_rows end,
+				}), MenuLayout.row_disabled("llm_generation_settings", is_disabled, paused))
 
 
 				-- ===== Display submenu =====
@@ -1902,7 +1927,7 @@ local function create_menu(deps)
 												llm_toggle_ready = function() return toggle_ready == true end,
 										},
 								}
-								main_menu = ManifestMenu.build("llm_menu", "LLM", handlers, group_builders, render_ctx, {}) or {}
+								main_menu = ManifestMenu.build("llm_menu", "LLM", handlers, group_builders, render_ctx, list_providers) or {}
 						else
 								Logger.error(LOG, "Manifest renderer unavailable — the IA submenu has no settings row.")
 						end
@@ -1947,17 +1972,19 @@ local function create_menu(deps)
 				)
 				if not is_active then return nil end
 				local _dw = package.loaded["ui.download_window"]
-				return {
-						title = i18n.get("menu.llm.show_download_window"),
-						fn = function()
+				local rows = ManifestMenu.template_rows("llm_download_shortcut_frame", {
+					["llm_download_shortcut"] = function()
 								if _dw and type(_dw.focus) == "function" then
 										pcall(_dw.focus)
 								elseif _dw and type(_dw.is_active) == "function" and not _dw.is_active() then
 										-- Window was closed without cancelling — download still runs in background
 										pcall(notifications.notify, i18n.get("menu.llm.download_window_lost"), i18n.get("menu.llm.download_window_lost_body"), "info")
 								end
-						end
-				}
+						end,
+				}, {}, {})
+				if type(rows) ~= "table" or #rows ~= 1 or type(rows[1].action) ~= "function" then return nil end
+				local row = rows[1]
+				return { title = row.label, fn = row.action }
 		end
 
 		local scope_runtime = require("ui.menu.menu_llm.scope_runtime").new({

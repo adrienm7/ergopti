@@ -329,10 +329,20 @@ local function build_fixture(backend, save_results, options)
 				scope_idle = function() return options.scope_blocked ~= true end,
 				build_nav_modifier_menu = function() return {} end,
 				build_val_modifier_menu = function() return {} end,
+				set_context_length = noop,
+				reset_context_length = noop,
+				set_min_words = noop,
+				reset_min_words = noop,
+				set_max_words = noop,
+				reset_max_words = noop,
+				set_temperature = function() calls.temperature_sets = (calls.temperature_sets or 0) + 1; return true end,
+				reset_temperature = function() calls.temperature_resets = (calls.temperature_resets or 0) + 1; return true end,
+				apply_setting_transaction = function(request) calls.temperature_request = request; return true end,
 			}
 		end,
 	}
-	package.loaded["ui.menu.menu_llm.temperature_panel"] = { build = noop }
+	-- The genuine panel binds the fixture's callbacks after its manifest port exists.
+	package.loaded["ui.menu.menu_llm.temperature_panel"] = nil
 	package.loaded["ui.menu.menu_llm.streaming_panel"] = { build = function() return {} end }
 	package.loaded["ui.menu.menu_llm.warmup_controller"] = { warmup = noop }
 	package.loaded["ui.menu.menu_llm.backend_panel"] = {
@@ -401,12 +411,22 @@ local function build_fixture(backend, save_results, options)
 		row_disabled = function() return false end,
 		has_health_dot = function() return false end,
 	}
+	local presentation_renderer = assert(require("menu.renderer").new({
+		platform = "hs",
+		manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
+		json_decode = require("adapters.json_codec").decode,
+		i18n = { get = package.loaded["infra.i18n"].get, section = package.loaded["infra.i18n"].get },
+		logger = package.loaded["infra.logger"],
+	}))
 	package.loaded["infra.manifest_menu"] = {
 		check_row = native_renderer.check_row,
 		native_child_rows = native_renderer.native_child_rows,
-		template_rows = native_renderer.template_rows,
-		get_array = native_renderer.get_array,
-		render_rows = function(rows) return rows end,
+		template_rows = presentation_renderer.template_rows,
+		get_array = presentation_renderer.get_array,
+		render_rows = function(rows, slot)
+			if slot == "llm_generation_settings" then return native_renderer.render_rows(rows, slot) end
+			return rows
+		end,
 		-- The render context is kept so a test can hand it to the real renderer.
 		build = function(_key, _category, _handlers, _groups, render_ctx)
 			calls.render_ctx = render_ctx
@@ -638,6 +658,7 @@ local function build_fixture(backend, save_results, options)
 	package.loaded["modules.llm.api_ollama"] = service
 
 	package.loaded["ui.menu.menu_llm.runtime_install_offer"] = nil
+	calls.temperature_builder = require("ui.menu.menu_llm.temperature_panel").build
 	package.loaded["ui.menu.menu_llm"] = nil
 	MenuLLM = require("ui.menu.menu_llm")
 	deps = {

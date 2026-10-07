@@ -1,0 +1,25 @@
+{
+	"value": "Native %s $1 50%",
+	"rows": [
+		{
+			"type": "label",
+			"id": "native_prefix",
+			"i18n": "common.error_prefix",
+			"caption_getter": "native_detail",
+			"caption_layout": "prefix",
+			"caption_joiner": ""
+		},
+		{
+			"type": "label",
+			"id": "native_suffix",
+			"i18n": "common.error_title",
+			"caption_getter": "native_detail",
+			"caption_layout": "suffix",
+			"caption_joiner": " — "
+		}
+	],
+	"expected": {
+		"en": ["Error — Native %s $1 50%", "Native %s $1 50% — Error"],
+		"fr": ["Erreur — Native %s $1 50%", "Native %s $1 50% — Erreur"]
+	}
+}

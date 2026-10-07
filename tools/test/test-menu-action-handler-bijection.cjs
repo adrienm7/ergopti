@@ -51,7 +51,12 @@
 
 const fs = require('fs');
 const path = require('path');
+const assert = require('node:assert/strict');
+const { scriptTokens } = require('../lib/script-source.cjs');
+const { publishesMenuTemplate } = require('../lib/menu-shared-delegation.cjs');
 const { delegatedMenuSources } = require('../lib/menu-shared-delegation.cjs');
+
+const { nativeTemplateBinding } = require('../lib/menu-template-binding.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
@@ -176,6 +181,432 @@ function visibleOn(entry, platform) {
 	return entry.platforms.includes(platform);
 }
 
+/** Credits actual bare callback references only in a reached renderer command table. */
+function nativeFunctionReferenceKeys(source) {
+	const tokens = scriptTokens(source, '.lua'),
+		scopes = [],
+		stack = [],
+		functions = [],
+		result = new Set();
+	let nextScope = 0;
+	for (let i = 0; i < tokens.length; i++) {
+		scopes[i] = stack.slice();
+		if (tokens[i].kind !== 'identifier') continue;
+		const word = tokens[i].value;
+		if (word === 'elseif' || word === 'else') stack.pop();
+		if (['function', 'do', 'then', 'repeat', 'else'].includes(word)) stack.push(++nextScope);
+		if (word === 'end' || word === 'until') stack.pop();
+	}
+	const ancestor = (parent, child) =>
+		parent.length <= child.length && parent.every((id, i) => id === child[i]);
+	for (let i = 0; i + 4 < tokens.length; i++) {
+		if (
+			tokens[i].kind !== 'identifier' ||
+			tokens[i].value !== 'local' ||
+			tokens[i + 1]?.kind !== 'identifier' ||
+			tokens[i + 1].value !== 'function' ||
+			tokens[i + 2]?.kind !== 'identifier' ||
+			tokens[i + 3]?.kind !== 'symbol' ||
+			tokens[i + 3].value !== '('
+		)
+			continue;
+		let cursor = i + 4,
+			depth = 1;
+		for (; cursor < tokens.length && depth; cursor++) {
+			if (tokens[cursor].kind === 'symbol' && tokens[cursor].value === '(') depth++;
+			if (tokens[cursor].kind === 'symbol' && tokens[cursor].value === ')') depth--;
+		}
+		if (depth === 0 && tokens[cursor] && tokens[cursor].value !== 'end')
+			functions.push({ name: tokens[i + 2].value, declared: i, body: cursor, scope: scopes[i] });
+	}
+	function withdrawn(fn, call) {
+		for (let i = fn.body; i < call; i++) {
+			if (tokens[i].kind !== 'identifier') continue;
+			if (tokens[i].value === 'local') {
+				let cursor = i + 1;
+				if (tokens[cursor]?.value === 'function') cursor++;
+				while (tokens[cursor]?.kind === 'identifier') {
+					if (tokens[cursor].value === fn.name) return true;
+					if (tokens[cursor + 1]?.value !== ',') break;
+					cursor += 2;
+				}
+			}
+			if (tokens[i].value === 'function') {
+				let cursor = i + 1;
+				while (cursor < call && tokens[cursor].value !== '(') cursor++;
+				for (cursor++; cursor < call && tokens[cursor].value !== ')'; cursor++)
+					if (tokens[cursor].kind === 'identifier' && tokens[cursor].value === fn.name) return true;
+			}
+			if (tokens[i].value !== fn.name || ['.', ':'].includes(tokens[i - 1]?.value)) continue;
+			let cursor = i + 1;
+			while (tokens[cursor]?.value === ',' && tokens[cursor + 1]?.kind === 'identifier')
+				cursor += 2;
+			if (tokens[cursor]?.kind === 'symbol' && tokens[cursor].value === '=') return true;
+		}
+		return false;
+	}
+	for (let i = 0; i + 7 < tokens.length; i++) {
+		if (
+			tokens[i].kind !== 'identifier' ||
+			tokens[i].value !== 'ManifestMenu' ||
+			['.', ':', 'function'].includes(tokens[i - 1]?.value) ||
+			tokens[i + 1]?.kind !== 'symbol' ||
+			tokens[i + 1].value !== '.' ||
+			tokens[i + 2]?.kind !== 'identifier' ||
+			tokens[i + 2].value !== 'template_rows' ||
+			tokens[i + 3]?.kind !== 'symbol' ||
+			tokens[i + 3].value !== '(' ||
+			tokens[i + 4]?.kind !== 'string' ||
+			tokens[i + 5]?.kind !== 'symbol' ||
+			tokens[i + 5].value !== ',' ||
+			tokens[i + 6]?.kind !== 'symbol' ||
+			tokens[i + 6].value !== '{' ||
+			!publishesMenuTemplate(source, '.lua', tokens[i + 4].value)
+		)
+			continue;
+		const entries = [],
+			keys = new Set();
+		let cursor = i + 7,
+			ambiguous = false;
+		while (cursor < tokens.length && tokens[cursor].value !== '}') {
+			let key;
+			if (tokens[cursor]?.kind === 'identifier' && tokens[cursor + 1]?.value === '=') {
+				key = tokens[cursor].value;
+				cursor += 2;
+			} else if (
+				tokens[cursor]?.kind === 'symbol' &&
+				tokens[cursor].value === '[' &&
+				tokens[cursor + 1]?.kind === 'string' &&
+				tokens[cursor + 2]?.kind === 'symbol' &&
+				tokens[cursor + 2].value === ']' &&
+				tokens[cursor + 3]?.value === '='
+			) {
+				const spelling = source.slice(tokens[cursor + 1].start, tokens[cursor + 1].end);
+				if (
+					!['"', "'"].includes(spelling[0]) ||
+					spelling.at(-1) !== spelling[0] ||
+					spelling.includes('\\')
+				) {
+					ambiguous = true;
+					break;
+				}
+				key = tokens[cursor + 1].value;
+				cursor += 4;
+			} else {
+				ambiguous = true;
+				break;
+			}
+			if (keys.has(key)) {
+				ambiguous = true;
+				break;
+			}
+			keys.add(key);
+			const value = cursor;
+			let depth = 0;
+			for (; cursor < tokens.length; cursor++) {
+				const token = tokens[cursor];
+				if (token.kind === 'symbol' && depth === 0 && [',', ';', '}'].includes(token.value)) break;
+				if (token.kind === 'symbol' && ['{', '(', '['].includes(token.value)) depth++;
+				if (token.kind === 'symbol' && ['}', ')', ']'].includes(token.value)) depth--;
+				// A function expression is a supported ordinary binding but ambiguous to
+				// this extra reference-only proof. The original quoted-id scan remains.
+				if (token.kind === 'identifier' && token.value === 'function') {
+					ambiguous = true;
+					break;
+				}
+			}
+			if (ambiguous || depth !== 0 || !tokens[cursor]) {
+				ambiguous = true;
+				break;
+			}
+			if (cursor === value + 1 && tokens[value]?.kind === 'identifier')
+				entries.push({ key, name: tokens[value].value });
+			if (tokens[cursor].value === '}') break;
+			cursor++;
+		}
+		if (ambiguous || tokens[cursor]?.kind !== 'symbol' || tokens[cursor].value !== '}') continue;
+		for (const entry of entries) {
+			const candidates = functions.filter(
+				(fn) => fn.name === entry.name && fn.body < i && ancestor(fn.scope, scopes[i])
+			);
+			if (candidates.length !== 1 || withdrawn(candidates[0], i)) continue;
+			result.add(entry.key);
+		}
+	}
+	return result;
+}
+{
+	const source =
+		'local function actual_callback() return real_owner() end\nManifestMenu.template_rows("frame", { actual_row = actual_callback }, {}, {})';
+	assert.equal(nativeFunctionReferenceKeys(source).has('actual_row'), true);
+	for (const changed of [
+		source.replace('actual_row = actual_callback', 'actual_row = "actual_callback"'),
+		source.replace('actual_row = actual_callback', 'actual_row = Foreign.actual_callback'),
+		source.replace('return real_owner()', ''),
+		source.replace('ManifestMenu.template_rows', 'Foreign.ManifestMenu.template_rows'),
+		source.replace('ManifestMenu.template_rows', '-- ManifestMenu.template_rows'),
+		source.replace(
+			'ManifestMenu.template_rows',
+			'actual_callback = nil; ManifestMenu.template_rows'
+		)
+	])
+		assert.equal(nativeFunctionReferenceKeys(changed).has('actual_row'), false);
+
+	for (const changed of [
+		source.replace(
+			'ManifestMenu.template_rows',
+			'local actual_callback; ManifestMenu.template_rows'
+		),
+		source.replace(
+			'ManifestMenu.template_rows',
+			'local other, actual_callback; ManifestMenu.template_rows'
+		),
+		source.replace(
+			'ManifestMenu.template_rows',
+			'local other; actual_callback, other = nil, nil; ManifestMenu.template_rows'
+		),
+		source.replace(
+			'{ actual_row = actual_callback }',
+			'{ actual_row = actual_callback, actual_row = nil }'
+		),
+		source.replace(
+			'{ actual_row = actual_callback }',
+			'{ actual_row = actual_callback, ["actual_row"] = nil }'
+		),
+		source.replace(
+			'{ actual_row = actual_callback }',
+			'{ actual_row = actual_callback, [chosen] = nil }'
+		),
+		source.replace(
+			'local function actual_callback() return real_owner() end',
+			'do local function actual_callback() return real_owner() end end'
+		),
+		source.replace(
+			'ManifestMenu.template_rows',
+			'local function other_owner(actual_callback) return ManifestMenu.template_rows'
+		) + ' end'
+	])
+		assert.equal(nativeFunctionReferenceKeys(changed).has('actual_row'), false);
+	const actual = fs.readFileSync(path.join(SP, 'macos/ui/menu/menu_hotstrings_custom.lua'), 'utf8');
+	assert.equal(nativeFunctionReferenceKeys(actual).has('personal_legacy_shortcut'), true);
+	for (const changed of [
+		actual.replace('local legacy_rows = {}', 'local sc_fn\n\tlocal legacy_rows = {}'),
+		actual.replace(
+			'{ personal_legacy_shortcut = sc_fn }',
+			String.raw`{ personal_legacy_shortcut = sc_fn, ["personal_legacy_short\099ut"] = nil }`
+		),
+		actual.replace(
+			'{ personal_legacy_shortcut = sc_fn }',
+			'{ personal_legacy_shortcut = sc_fn, [ [=[personal_legacy_shortcut]=] ] = nil }'
+		),
+		actual.replace('local legacy_rows = {}', 'local other, sc_fn\n\tlocal legacy_rows = {}'),
+		actual.replace(
+			'{ personal_legacy_shortcut = sc_fn }',
+			'{ personal_legacy_shortcut = sc_fn, personal_legacy_shortcut = nil }'
+		),
+		actual.replace(
+			'{ personal_legacy_shortcut = sc_fn }',
+			'{ personal_legacy_shortcut = sc_fn, ["personal_legacy_shortcut"] = nil }'
+		),
+		actual.replace(
+			'{ personal_legacy_shortcut = sc_fn }',
+			'{ personal_legacy_shortcut = sc_fn, [chosen] = nil }'
+		)
+	])
+		assert.equal(nativeFunctionReferenceKeys(changed).has('personal_legacy_shortcut'), false);
+
+	for (const changed of [
+		actual.replace(
+			'{ personal_legacy_shortcut = sc_fn }',
+			'{ personal_legacy_shortcut = "sc_fn" }'
+		),
+		actual.replace('local function sc_fn()', 'local function withdrawn_sc_fn()'),
+		actual.replace(
+			'ManifestMenu.template_rows("hotstring_personal_legacy_shortcut"',
+			'Foreign.ManifestMenu.template_rows("hotstring_personal_legacy_shortcut"'
+		)
+	])
+		assert.equal(nativeFunctionReferenceKeys(changed).has('personal_legacy_shortcut'), false);
+}
+
+// Independently authored binding controls preserve necessary static evidence.
+{
+	const assigned =
+		'local callback = function() return real_owner() end\nManifestMenu.template_rows("actual_frame", { actual_command = callback }, {}, {})';
+	assert.equal(nativeTemplateBinding(assigned, '.lua', 'actual_frame', 'actual_command', 1), true);
+	for (const changed of [
+		assigned.replace('actual_command = callback', 'other_command = callback'),
+		assigned.replace('actual_command = callback', 'actual_command = "callback"'),
+		assigned.replace('actual_command = callback', 'actual_command = Foreign.callback'),
+		assigned.replace('return real_owner()', ''),
+		assigned.replace('ManifestMenu.template_rows', '-- ManifestMenu.template_rows'),
+		assigned.replace('ManifestMenu.template_rows', 'Foreign.ManifestMenu.template_rows'),
+		assigned.replace('ManifestMenu.template_rows', 'local callback; ManifestMenu.template_rows'),
+		assigned.replace(
+			'ManifestMenu.template_rows',
+			'local other, callback; ManifestMenu.template_rows'
+		),
+		assigned.replace('ManifestMenu.template_rows', 'callback = nil; ManifestMenu.template_rows'),
+		assigned.replace(
+			'actual_command = callback',
+			'actual_command = callback, actual_command = nil'
+		),
+		assigned.replace(
+			'actual_command = callback',
+			String.raw`actual_command = callback, ["actual_\099ommand"] = nil`
+		),
+		assigned.replace('actual_command = callback', 'actual_command = callback, [chosen] = nil'),
+		assigned.replace('actual_command = callback', '[ [=[actual_command]=] ] = callback'),
+		assigned.replace(
+			'local callback = function() return real_owner() end',
+			'do local callback = function() return real_owner() end end'
+		)
+	])
+		assert.equal(
+			nativeTemplateBinding(changed, '.lua', 'actual_frame', 'actual_command', 1),
+			false
+		);
+	const child =
+		'ManifestMenu.template_rows("actual_frame", {}, {}, { actual_children = function() return real_children end })';
+	assert.equal(nativeTemplateBinding(child, '.lua', 'actual_frame', 'actual_children', 3), true);
+	for (const changed of [
+		child.replace('actual_children = function', 'withdrawn = function'),
+		child.replace('return real_children', ''),
+		child.replace('function() return real_children end', '"not_callable"')
+	])
+		assert.equal(
+			nativeTemplateBinding(changed, '.lua', 'actual_frame', 'actual_children', 3),
+			false
+		);
+	const callback = 'ActualCallback(*) {\n NativeAction()\n}\n',
+		ahk =
+			callback +
+			'Owner() {\n MenuRenderer_TemplateRows("actual_frame", Map("actual_command", ActualCallback), Map(), Map())\n}';
+	assert.equal(nativeTemplateBinding(ahk, '.ahk', 'actual_frame', 'actual_command', 1), true);
+	for (const changed of [
+		ahk.replace('"actual_command",', '"withdrawn",'),
+		ahk.replace('Map("actual_command", ActualCallback)', 'Map("actual_command", "ActualCallback")'),
+		ahk.replace(
+			'Map("actual_command", ActualCallback)',
+			'Map("actual_command", Foreign.ActualCallback)'
+		),
+		ahk.replace(
+			'Map("actual_command", ActualCallback)',
+			'Map("actual_command", ActualCallback, "actual_command", false)'
+		),
+		ahk.replace(' NativeAction()', ''),
+		ahk.replace(' MenuRenderer_', ' local ActualCallback\n MenuRenderer_'),
+		ahk.replace(' MenuRenderer_', ' local other, ActualCallback\n MenuRenderer_'),
+		ahk.replace('Owner()', 'Owner(ActualCallback)'),
+		ahk.replace('Owner()', 'Owner(actualcallback)'),
+		ahk.replace(' MenuRenderer_', ' LOCAL other, actualcallback\n MenuRenderer_'),
+		ahk.replace(
+			'Map("actual_command", ActualCallback)',
+			'Map("actual_command", ActualCallback, "ACTUAL_COMMAND", false)'
+		),
+		ahk.replace(callback, 'Outer() {\n' + callback + '}\n'),
+		ahk.replace(' MenuRenderer_', ' ActualCallback := false\n MenuRenderer_')
+	])
+		assert.equal(
+			nativeTemplateBinding(changed, '.ahk', 'actual_frame', 'actual_command', 1),
+			false
+		);
+	const mac = fs.readFileSync(
+		path.join(SP, 'macos/ui/menu/menu_hotstrings_management.lua'),
+		'utf8'
+	);
+	assert.equal(
+		nativeTemplateBinding(mac, '.lua', 'hotstrings_magic_trigger_frame', 'magic_key_change', 1),
+		true
+	);
+	assert.equal(
+		nativeTemplateBinding(
+			mac.replace('magic_key_change = magic_key_action', 'withdrawn = magic_key_action'),
+			'.lua',
+			'hotstrings_magic_trigger_frame',
+			'magic_key_change',
+			1
+		),
+		false
+	);
+	const linux = fs.readFileSync(path.join(SP, 'linux/ui/menu/menu_builder.lua'), 'utf8');
+	assert.equal(
+		nativeTemplateBinding(linux, '.lua', 'hotstrings_magic_trigger_frame', 'magic_key_change', 1),
+		true
+	);
+	assert.equal(
+		nativeTemplateBinding(
+			linux,
+			'.lua',
+			'hotstrings_magic_trigger_frame',
+			'magic_key_reset_if_custom',
+			3
+		),
+		true
+	);
+	assert.equal(
+		nativeTemplateBinding(linux, '.lua', 'hotstrings_magic_trigger_reset', 'magic_key_reset', 1),
+		true
+	);
+	for (const [section, key, port, from, to] of [
+		[
+			'hotstrings_magic_trigger_frame',
+			'magic_key_change',
+			1,
+			'magic_key_change = change',
+			'withdrawn = change'
+		],
+		[
+			'hotstrings_magic_trigger_frame',
+			'magic_key_change',
+			1,
+			'local change = function()',
+			'local change = false; local withdrawn = function()'
+		],
+		[
+			'hotstrings_magic_trigger_reset',
+			'magic_key_reset',
+			1,
+			'{ magic_key_reset = reset }',
+			'{ magic_key_reset = "reset" }'
+		],
+		[
+			'hotstrings_magic_trigger_frame',
+			'magic_key_reset_if_custom',
+			3,
+			'magic_key_reset_if_custom = function()',
+			'withdrawn_children = function()'
+		]
+	])
+		assert.equal(nativeTemplateBinding(linux.replace(from, to), '.lua', section, key, port), false);
+	const win = fs.readFileSync(path.join(SP, 'windows/ui/menu/menu_hotstrings.ahk'), 'utf8'),
+		editor = fs.readFileSync(path.join(SP, 'windows/ui/editors.ahk'), 'utf8');
+	assert.equal(
+		nativeTemplateBinding(win, '.ahk', 'hotstrings_magic_trigger_frame', 'magic_key_change', 1, [
+			{ src: win },
+			{ src: editor }
+		]),
+		true
+	);
+	assert.equal(
+		nativeTemplateBinding(
+			win.replace('Map("magic_key_change", MagicKeyEditor)', 'Map("withdrawn", MagicKeyEditor)'),
+			'.ahk',
+			'hotstrings_magic_trigger_frame',
+			'magic_key_change',
+			1,
+			[{ src: win }, { src: editor }]
+		),
+		false
+	);
+	assert.equal(
+		nativeTemplateBinding(win, '.ahk', 'hotstrings_magic_trigger_frame', 'magic_key_change', 1, [
+			{ src: win }
+		]),
+		false
+	);
+}
+
 const errors = [];
 const summary = [];
 
@@ -205,6 +636,10 @@ for (const { key, driver, ext } of PLATFORMS) {
 	})(base);
 	const delegated = delegatedMenuSources(nativeSources, path.join(SP, '_shared', 'lua'));
 	const sharedHandlers = new Set(delegated.flatMap((source) => [...source.handlers]));
+	const nativeReferences =
+		ext === '.lua'
+			? new Set(nativeSources.flatMap((source) => [...nativeFunctionReferenceKeys(source.src)]))
+			: new Set();
 	const corpus = chunks.concat(delegated.map((source) => source.src)).join('\n');
 
 	if (chunks.length < 20) {
@@ -239,8 +674,24 @@ for (const { key, driver, ext } of PLATFORMS) {
 	}
 
 	const unresolved = declared.filter(
-		({ id }) =>
-			!corpus.includes(`"${id}"`) && !corpus.includes(`'${id}'`) && !sharedHandlers.has(id)
+		({ section, id }) =>
+			!corpus.includes(`"${id}"`) &&
+			!corpus.includes(`'${id}'`) &&
+			!sharedHandlers.has(id) &&
+			!nativeReferences.has(id) &&
+			!nativeSources.some((native) => {
+				const row = manifest[section]?.find((r) => r.id === id);
+				if (!row || !['command', 'list'].includes(row.type) || !native.src.includes(section))
+					return false;
+				return nativeTemplateBinding(
+					native.src,
+					ext,
+					section,
+					row.command || row.id,
+					row.type === 'list' ? 3 : 1,
+					nativeSources
+				);
+			})
 	);
 	summary.push(`${key} ${unresolved.length}/${BASELINE[key]}`);
 

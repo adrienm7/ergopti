@@ -1,0 +1,53 @@
+{
+	"value": "Native 🦀 %s 50%",
+	"rows": [
+		{
+			"type": "group",
+			"id": "personal_default_parent",
+			"i18n": "menu.hotstrings.default_category_prefix",
+			"caption_getter": "personal_default_label",
+			"caption_layout": "prefix",
+			"caption_joiner": "",
+			"checked_when": ["enabled"]
+		},
+		{
+			"type": "command",
+			"id": "personal_legacy_shortcut",
+			"i18n": "menu.hotstrings.shortcut_prefix",
+			"caption_getter": "personal_shortcut_label",
+			"caption_layout": "prefix",
+			"caption_joiner": "",
+			"disabled_when": ["not_paused"]
+		},
+		{
+			"type": "group",
+			"id": "default_suffix",
+			"i18n": "menu.hotstrings.default_category_prefix",
+			"caption_getter": "personal_default_label",
+			"caption_layout": "suffix",
+			"caption_joiner": " / "
+		},
+		{
+			"type": "command",
+			"id": "shortcut_suffix",
+			"i18n": "menu.hotstrings.shortcut_prefix",
+			"caption_getter": "personal_shortcut_label",
+			"caption_layout": "suffix",
+			"caption_joiner": " — "
+		}
+	],
+	"expected": {
+		"en": [
+			"Default category: Native 🦀 %s 50%",
+			"Shortcut: Win + Native 🦀 %s 50%",
+			"Native 🦀 %s 50% / Default category: ",
+			"Native 🦀 %s 50% — Shortcut: Win + "
+		],
+		"fr": [
+			"Catégorie par défaut : Native 🦀 %s 50%",
+			"Raccourci : Win + Native 🦀 %s 50%",
+			"Native 🦀 %s 50% / Catégorie par défaut : ",
+			"Native 🦀 %s 50% — Raccourci : Win + "
+		]
+	}
+}

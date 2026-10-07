@@ -220,11 +220,8 @@ _LLM_Menu_PerAppProfileRows() {
 	; "Override active app with the currently-selected profile". Lazy
 	; closure so WinGetProcessName fires when the user clicks, not when
 	; the menu is built.
-	Rows := [Map(
-		"label",  t("menu.profiles.override_active_app_with_current"),
-		"action", (*) => _LLM_Menu_AddOverrideForActiveApp())]
+	Rows := []
 	if (overrides is Map and overrides.Count > 0) {
-		Rows.Push(Map("separator", true))
 		; List each override: "slack → informel"  + click clears it.
 		for app_name, profile_id in overrides {
 			Rows.Push(Map(
@@ -232,6 +229,12 @@ _LLM_Menu_PerAppProfileRows() {
 				"action", _LLM_Menu_MakeClearOverrideHandler(app_name)))
 		}
 	}
+	Rows := MenuRenderer_TemplateRows("llm_profile_app_override_frame", Map(
+		"llm_profile_override_active_app", (*) => _LLM_Menu_AddOverrideForActiveApp()),
+		Map("llm_profile_overrides_present", () => overrides is Map && overrides.Count > 0),
+		Map("llm_profile_override_rows", () => Rows))
+	if !(Rows is Array)
+		throw Error("Declared per-application profile controls were refused.")
 	return Rows
 }
 

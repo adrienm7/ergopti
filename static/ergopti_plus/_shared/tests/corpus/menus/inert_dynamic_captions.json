@@ -1,0 +1,58 @@
+{
+	"rows": [
+		{
+			"type": "label",
+			"id": "backend_readout",
+			"i18n": "menu.llm.model_backend",
+			"caption_getter": "native_detail"
+		},
+		{
+			"type": "section_header",
+			"id": "hardware_heading",
+			"i18n": "menu.llm.hw_header",
+			"caption_getter": "native_detail"
+		}
+	],
+	"value": "50% / $1 / %s",
+	"expected": {
+		"en": ["Backend: 50% / $1 / %s", "REQUIREMENTS (50% / $1 / %s)"],
+		"fr": ["Backend : 50% / $1 / %s", "CONFIGURATION REQUISE (50% / $1 / %s)"]
+	},
+	"format_cases": [
+		{
+			"format": "[%s]",
+			"expected": "[50% / $1 / %s]",
+			"slot": true
+		},
+		{
+			"format": "%%s + %s",
+			"expected": "%s + 50% / $1 / %s",
+			"slot": true
+		},
+		{
+			"format": "%%%s",
+			"expected": "%50% / $1 / %s",
+			"slot": true
+		},
+		{
+			"format": "%s / %s",
+			"expected": "50% / $1 / %s / 50% / $1 / %s",
+			"slot": true
+		},
+		{
+			"format": "%%s",
+			"expected": "%s",
+			"slot": false
+		},
+		{
+			"format": "%%%d",
+			"expected": "%%d",
+			"slot": false
+		},
+		{
+			"format": "static",
+			"expected": "static",
+			"slot": false
+		}
+	]
+}
