@@ -293,7 +293,7 @@ enum OwnedAutomationQueryWorker {
 			// Dynamic offline validation is supported starting with macOS 11.3.
 			// Earlier/unsigned/unknown observations close admission without fallback.
 			guard #available(macOS 11.3, *),
-				SecCodeCheckValidity(code, SecCSFlags(rawValue: kSecCSNoNetworkAccess), nil) == errSecSuccess else { return nil }
+				SecCodeCheckValidity(code, .noNetworkAccess, nil) == errSecSuccess else { return nil }
 			var staticCode: SecStaticCode?
 			guard SecCodeCopyStaticCode(code, SecCSFlags(), &staticCode) == errSecSuccess, let staticCode else { return nil }
 			var information: CFDictionary?
