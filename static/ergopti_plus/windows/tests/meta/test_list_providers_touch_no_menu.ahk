@@ -121,6 +121,7 @@ _LPTM_ProvidersTouchNoMenu() {
 		Body := _DriverFuncBodyOrEmpty(Name)
 		Assert(Body != "", "list provider '" . Name . "()' must exist in the driver")
 
+		Body := _DriverMaskNonCode(&Body)
 		Targets := []
 		Pos := 1
 		while (Pos := RegExMatch(Body, "(\w+)\.(?:Add|Check|Disable|Enable)\(", &Mt, Pos)) {
@@ -135,10 +136,10 @@ _LPTM_ProvidersTouchNoMenu() {
 		; The renderer entry points take the menu to fill as their FIRST argument,
 		; and the rule is the same one: it must be a menu this provider created. A
 		; provider that builds its rows as data and renders them — which is what
-		; they all do since 2026-08-07 — touches a menu only through these two, so
+		; they all do since 2026-08-07 — touches a menu through these entry points, so
 		; without them the scan finds nothing to check and the floor below fires.
 		Pos := 1
-		while (Pos := RegExMatch(Body, "MenuRenderer_(?:AppendRows|FillFromList)\(\s*(\w+)", &Mf, Pos)) {
+		while (Pos := RegExMatch(Body, "MenuRenderer_(?:AppendRows|AppendTemplate|FillFromList)\(\s*(\w+)", &Mf, Pos)) {
 			Targets.Push(Mf[1])
 			Pos += Mf.Len[0]
 		}
@@ -196,3 +197,23 @@ _LPTM_ProvidersReturnRows() {
 	}
 }
 Test("list-providers: every provider can actually produce a row", _LPTM_ProvidersReturnRows)
+
+
+; The actual provider keeps both native menus for repaint; typed row rendering
+; still mutates its owned target, whereas literal/comment examples do not.
+_LPTM_AppendTemplateTargetProof() {
+	Body := _DriverFuncBody("_HS_PersonalRows")
+	Code := _DriverMaskNonCode(&Body)
+	Assert(RegExMatch(Code, "MenuRenderer_AppendTemplate\(\s*(\w+)", &Target) > 0,
+		"the genuine personal provider must still render into its retained native menu")
+	AssertEqual("DefaultSectionMenu", Target[1])
+	Assert(_LPTM_IsAssignedIn(Code, Target[1]), "the real renderer target is locally created")
+	WithoutOwner := StrReplace(Code, "DefaultSectionMenu := Menu()", "")
+	AssertFalse(_LPTM_IsAssignedIn(WithoutOwner, Target[1]), "withdrawing the actual owner defeats the assignment proof")
+	Decoy := '; MenuRenderer_AppendTemplate(ForeignMenu, Map())' . "`n"
+		. 'Text := "MenuRenderer_AppendTemplate(ForeignMenu, Map())"'
+	Masked := _DriverMaskNonCode(&Decoy)
+	AssertEqual(0, RegExMatch(Masked, "MenuRenderer_AppendTemplate\(\s*(\w+)"),
+		"a comment or quoted call cannot stand in for native menu mutation")
+}
+Test("list-providers: actual AppendTemplate target ownership and non-code decoys", _LPTM_AppendTemplateTargetProof)

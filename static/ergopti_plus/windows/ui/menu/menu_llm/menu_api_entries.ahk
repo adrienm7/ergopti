@@ -90,11 +90,15 @@ _LLM_Menu_ApiEntriesRows() {
 			"api_remove_active", (*) => _LLM_Menu_RemoveActiveApiEntry())
 		Getters := Map("llm_api_active_ready", _LLM_Menu_ActiveApiCommandsReady)
 		for Declaration in _MR_GetMenuDef("llm_api_active_commands") {
-			; Keep the existing native Edit action immediately before removal.
-			if Declaration["id"] == "api_remove_active"
-				Rows.Push(Map(
-					"label",  t("menu.llm.api_edit_entry"),
-					"action", (*) => _LLM_Menu_PromptApiEntry(_LLM_Menu["api_entry_id"])))
+			; Keep the existing lazy Edit owner immediately before removal.
+			if Declaration["id"] == "api_remove_active" {
+				EditRows := MenuRenderer_TemplateRows("llm_api_edit_command",
+					Map("api_edit_entry", (*) => _LLM_Menu_PromptApiEntry(_LLM_Menu["api_entry_id"])), Map(), Map())
+				if !(EditRows is Array)
+					return []
+				for EditRow in EditRows
+					Rows.Push(EditRow)
+			}
 			Row := MenuRenderer_CommandRow("llm_api_active_commands", Declaration["id"], Commands, Getters)
 			if Row is Map
 				Rows.Push(Row)

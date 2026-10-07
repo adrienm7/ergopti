@@ -368,12 +368,7 @@ MagicKeySourceMenuRows() {
 	Automatic := ManifestDefaultFor("hotstrings.magic_key_source")
 	Keycodes := LayoutRegistry_Keycodes()
 	Hkl := KS_ResolveKeyboardLayout()
-	Items := [
-		Map("label", t("menu.layout.magic_key_source.capture"), "action", MagicKeySourceCapture),
-		Map("separator", true),
-		Map("label", t("menu.layout.magic_key_source.auto"), "checked", Current == Automatic,
-			"action", (*) => ModifyMagicKeySource(Automatic)),
-		Map("separator", true)]
+	Items := []
 	for Code in ManifestFindEntryByPath("hotstrings.magic_key_source")["enum_values"] {
 		if (Code == Automatic)
 			continue
@@ -384,9 +379,22 @@ MagicKeySourceMenuRows() {
 		Items.Push(Map("label", Label, "checked", Current == Code, "disabled", Reason != "",
 			"action", ((Chosen) => (*) => ModifyMagicKeySource(Chosen))(Code)))
 	}
+	Commands := Map("magic_key_source_capture", MagicKeySourceCapture,
+		"magic_key_source_automatic", (*) => ModifyMagicKeySource(Automatic))
+	Getters := Map("magic_key_source_capture_ready", (*) => true,
+		"magic_key_source_is_automatic", (*) => Current == Automatic)
+	Children := MenuRenderer_TemplateRows("magic_key_source_children", Commands, Getters,
+		Map("magic_key_source_candidates", (*) => Items))
+	if !(Children is Array) || Children.Length != ManifestFindEntryByPath("hotstrings.magic_key_source")["enum_values"].Length + 3
+		return []
+	Rows := MenuRenderer_TemplateRows("magic_key_source_menu", Commands, Getters,
+		Map("magic_key_source_heading", Children))
+	if !(Rows is Array) || Rows.Length != 1 || !(Rows[1]["items"] is Array)
+		return []
 	Shown := (Current == Automatic) ? t("menu.layout.magic_key_source.auto")
 		: _MagicKeySourceLabel(Current, Keycodes, Hkl)
-	return [Map("label", t("menu.layout.magic_key_source") . " : " . Shown, "items", Items)]
+	Rows[1]["label"] .= " : " . Shown
+	return Rows
 }
 
 ; The refusal reason of a candidate already owned by a configured tap action.

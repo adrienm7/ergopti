@@ -329,3 +329,92 @@ _MKS_TapClaimCorpusCase() {
 		ScriptInformation["MagicKeySource"] := SavedSource
 	}
 }
+
+Test("magic key source: the complete declared family follows the independent hand corpus (magic-key-source)",
+	_MKS_SharedFamilyCorpusCase)
+
+_MKS_SharedFamilyCorpusCase() {
+	global _SharedDir, ScriptInformation
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\magic_key_source_family.json", "UTF-8"))
+	Root := _MR_GetManifestRoot()
+	Assert(Root is Map, "the actual canonical menu loader must supply its current root")
+	_MKS_AssertDeclaredData(Corpus["parent"], Root["magic_key_source_menu"])
+	_MKS_AssertDeclaredData(Corpus["children"], Root["magic_key_source_children"])
+	Values := ManifestFindEntryByPath("hotstrings.magic_key_source")["enum_values"]
+	AssertEqual(Corpus["candidates"].Length + 1, Values.Length)
+	for Index, Code in Corpus["candidates"]
+		AssertEqual(Code, Values[Index + 1], "the original physical candidate order: " . Code)
+	SavedSource := ScriptInformation["MagicKeySource"]
+	SavedChild := Root["magic_key_source_children"]
+	SavedParent := Root["magic_key_source_menu"]
+	try {
+		ScriptInformation["MagicKeySource"] := "KeyJ"
+		Rows := MagicKeySourceMenuRows()
+		AssertEqual(Corpus["candidates"].Length + 4, Rows[1]["items"].Length)
+		Root.Delete("magic_key_source_children")
+		AssertEqual(0, MagicKeySourceMenuRows().Length, "withdrawal cannot reconstruct native fixed children")
+		Root["magic_key_source_children"] := SavedChild
+		Root.Delete("magic_key_source_menu")
+		AssertEqual(0, MagicKeySourceMenuRows().Length, "withdrawal cannot reconstruct the native fixed parent")
+		Root["magic_key_source_menu"] := SavedParent
+		AssertEqual(Corpus["candidates"].Length + 4, MagicKeySourceMenuRows()[1]["items"].Length,
+			"a repaired genuine declaration restores the family")
+	} finally {
+		Root["magic_key_source_children"] := SavedChild
+		Root["magic_key_source_menu"] := SavedParent
+		ScriptInformation["MagicKeySource"] := SavedSource
+	}
+}
+
+Test("magic key source: declared capture readiness and live withdrawal guard native callback delivery (magic-key-source)",
+	_MKS_DeclaredCallbackRefusalCase)
+
+_MKS_DeclaredCallbackRefusalCase() {
+	Root := _MR_GetManifestRoot()
+	Saved := Root["magic_key_source_children"]
+	Calls := { capture: 0, automatic: 0 }
+	Ready := { capture: false }
+	Commands := Map("magic_key_source_capture", (*) => (Calls.capture += 1),
+		"magic_key_source_automatic", (*) => (Calls.automatic += 1))
+	Getters := Map("magic_key_source_capture_ready", (*) => Ready.capture,
+		"magic_key_source_is_automatic", (*) => true)
+	Rows := MenuRenderer_TemplateRows("magic_key_source_children", Commands, Getters,
+		Map("magic_key_source_candidates", (*) => []))
+	AssertEqual(4, Rows.Length, "the genuine empty candidate data leaves the fixed template intact")
+	AssertTrue(Rows[1]["disabled"])
+	AssertTrue(Rows[3]["checked"])
+	Rows[1]["action"].Call()
+	AssertEqual(0, Calls.capture, "declared readiness precedes native capture delivery")
+	try {
+		Root.Delete("magic_key_source_children")
+		Rows[1]["action"].Call()
+		Rows[3]["action"].Call()
+		AssertEqual(0, Calls.capture)
+		AssertEqual(0, Calls.automatic, "actual declaration withdrawal precedes both callbacks")
+	} finally {
+		Root["magic_key_source_children"] := Saved
+	}
+	Ready.capture := true
+	Rows[1]["action"].Call()
+	Rows[3]["action"].Call()
+	AssertEqual(1, Calls.capture, "repaired declaration and readiness restore the same retained callback")
+	AssertEqual(1, Calls.automatic)
+}
+
+_MKS_AssertDeclaredData(Expected, Actual) {
+	if Expected is Array {
+		Assert(Actual is Array, "the current declared child data must be an Array")
+		AssertEqual(Expected.Length, Actual.Length)
+		for Index, Value in Expected
+			_MKS_AssertDeclaredData(Value, Actual[Index])
+	} else if Expected is Map {
+		Assert(Actual is Map, "the current declared row must be a Map")
+		AssertEqual(Expected.Count, Actual.Count)
+		for Key, Value in Expected {
+			Assert(Actual.Has(Key), "the current declaration must retain " . Key)
+			_MKS_AssertDeclaredData(Value, Actual[Key])
+		}
+	} else {
+		AssertEqual(Expected, Actual)
+	}
+}

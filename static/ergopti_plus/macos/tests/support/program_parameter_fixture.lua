@@ -40,6 +40,16 @@ return function(gestures, state, kind, read_action, save_attempt, controls)
 			return settled, nil, receipt
 		end,
 	}
+	-- Script saves carry a final pure native-publication fence, not merely CAS.
+	function files_port.write_if_unchanged_admitted(path, value, expected, _, admission)
+		if type(expected) ~= "table" or getmetatable(expected) ~= nil or type(admission) ~= "function" then return false end
+		local status, content = rawget(expected, "status"), rawget(expected, "content")
+		if not (status == "ok" and type(content) == "string" or status == "absent" and content == nil) then return false end
+		local called, admitted = pcall(admission)
+		if not called or admitted ~= true then return false end
+		if status ~= (files[path] and "ok" or "absent") or status == "ok" and files[path] ~= content then return false end
+		return files_port.write_if_unchanged(path, value, { status = status, content = content })
+	end
 	package.loaded["adapters.file_system"] = files_port
 	package.loaded["infra.preferences"] = nil
 	local preferences = require("infra.preferences")

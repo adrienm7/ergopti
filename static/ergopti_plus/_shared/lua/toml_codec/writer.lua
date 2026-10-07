@@ -23,6 +23,9 @@
 --- ==============================================================================
 
 local M = {}
+local SourceIdentity = require("module_source_identity")
+local source_sibling, source_same = SourceIdentity.sibling, SourceIdentity.same
+local source_directory = require("module_source_directory").capture()
 -- Logger / i18n are resolved SOFTLY so this shared module genuinely loads on every
 -- Lua runtime (the Linux daemon, LuaJIT test runners, build scripts), not only the
 -- macOS driver. macOS still gets its real ring-buffer logger and localised section
@@ -45,6 +48,61 @@ local Bom = require("toml_codec.bom")
 local KeyPath = require("toml_codec.key_path")
 local Codec = require("toml_codec.codec")
 local inline_member_spans = Codec.inline_member_spans
+-- Capture the genuine constructor while this module is being initialized.
+-- Its factory returns only checks; public callers cannot set journal phases.
+-- This assumes the normal cooperative loader, not hostile searcher/debug code.
+local SchemaOwner = require("config_migrate")
+local schema_factory = rawget(SchemaOwner, "writer_admission_factory")
+assert(type(schema_factory) == "function", "configuration admission constructor is unavailable")
+local constructor_source = debug.getinfo(1, "S").source
+local schema_source = source_sibling(constructor_source, "toml_codec/writer.lua", "config_migrate.lua", source_directory)
+assert(source_same(debug.getinfo(schema_factory, "S").source, schema_source, source_directory),
+	"configuration admission must come from its canonical constructor")
+local constructed_read, constructed_publish, constructed_preparation
+local function constructor_ports() return M, constructed_read, constructed_publish, constructed_preparation end
+local schema_origin, schema_capture, schema_read = schema_factory(M, constructor_ports)
+assert(rawequal(schema_origin, SchemaOwner) and type(schema_capture) == "function"
+	and type(schema_read) == "function", "configuration admission origin is invalid")
+local function schema_live()
+	return rawequal(rawget(package.loaded, "toml_codec.writer"), M)
+		and rawequal(rawget(package.loaded, "config_migrate"), SchemaOwner)
+		and rawequal(rawget(SchemaOwner, "writer_admission_factory"), schema_factory)
+end
+local function source_admission(path, source, candidate, operation, file_adapter)
+	local admission, snapshot = schema_capture(path, source, candidate, operation, file_adapter)
+	if admission == nil then return nil end
+	if admission == false or not schema_live() then return false end
+	return function() return schema_live() and admission() == true end, snapshot
+end
+-- Authentic preparation snapshots retain the original schema epoch. The weak
+-- journal issues only from prepare_batch; lookup cannot mint readiness.
+local prepared_sources = setmetatable({}, { __mode = "k" })
+local preparation_lookup
+preparation_lookup = function(path, source, candidate)
+	local record = type(source) == "table" and prepared_sources[source]
+	if record == nil then
+		-- Generic data files keep their historical plain source contract. A
+		-- registered configuration requires its actual producer's receipt.
+		if schema_read(path) == nil then return nil end
+		return false
+	end
+	if record.path ~= path or record.candidate ~= candidate then return false end
+	return function()
+		return schema_live() and rawequal(rawget(M, "preparation_admission"), preparation_lookup)
+			and getmetatable(source) == nil and rawget(source, "status") == record.status
+			and rawget(source, "content") == record.content
+			and record.admission() == true
+	end
+end
+
+--- Looks up an authentic preparation's captured schema epoch without issuing it.
+--- Generic data files return nil; registered configuration refuses forged copies.
+--- @param path string Destination path.
+--- @param source table Exact source returned by prepare_batch.
+--- @param candidate string Exact prepared candidate.
+--- @return function|boolean|nil admission
+M.preparation_admission = preparation_lookup
+
 local math_type = math.type
 local OperationReporter = require("diagnostics.operation_reporter")
 
@@ -264,12 +322,65 @@ local function publish_content(path, content, file_adapter, expected_source, on_
 	if admission ~= nil and type(admission) ~= "function" then
 		return false, "publication admission must be a function"
 	end
+	local prepared_admission
+	if type(expected_source) == "table" and prepared_sources[expected_source] then
+		prepared_admission = preparation_lookup(path, expected_source, content)
+	end
+	if prepared_admission ~= nil then
+		if not publication_admitted(prepared_admission) then return false, "configuration preparation epoch refused" end
+		local caller_admission = admission
+		admission = function()
+			return publication_admitted(caller_admission) and publication_admitted(prepared_admission)
+		end
+	end
+	local acquired_source = expected_source
+	if acquired_source == nil then
+		local check = schema_read(path, file_adapter)
+		if check == false or check ~= nil and not schema_live() then
+			return false, "configuration schema admission refused"
+		end
+		if check ~= nil then
+			local current, status, detail = read_existing(path, file_adapter, on_error)
+			if status ~= "ok" and status ~= "absent" then return false, tostring(detail or status) end
+			acquired_source = { status = status, content = current }
+			expected_source = acquired_source
+		end
+	end
+	local schema_admission, admitted_source = source_admission(path, acquired_source or {}, content, "publish", file_adapter)
+	if schema_admission == false then return false, "configuration schema admission refused" end
+	-- Native configuration crosses callbacks with detached source fields; generic
+	-- adapters retain their historical exact source-reference/receipt contract.
+	if schema_admission ~= nil then
+		expected_source = admitted_source
+	elseif type(expected_source) == "table" and prepared_admission ~= nil then
+		expected_source = { status = expected_source.status, content = expected_source.content }
+	end
+	if schema_admission ~= nil then
+		local caller_admission = admission
+		admission = function()
+			return publication_admitted(caller_admission) and schema_admission() == true
+		end
+	end
 	local admitted_publisher
+	local captured_reader = type(file_adapter) == "table" and rawget(file_adapter, "read_with_status")
+	local adapter_alias
+	if type(file_adapter) == "table" and rawequal(rawget(package.loaded, "adapters.file_system"), file_adapter) then
+		adapter_alias = "adapters.file_system"
+	end
 	if admission ~= nil and type(file_adapter) == "table" then
 		-- Capture the advertised owner before its classified reader can reenter.
-		admitted_publisher = type(expected_source) == "table" and file_adapter.write_if_unchanged_admitted
+		admitted_publisher = type(expected_source) == "table" and rawget(file_adapter, "write_if_unchanged_admitted")
 		if type(admitted_publisher) ~= "function" then
 			return false, "explicit file adapter has no final publication admission"
+		end
+	end
+	if schema_admission ~= nil and admission ~= nil and type(file_adapter) == "table" then
+		local logical_admission = admission
+		admission = function()
+			return publication_admitted(logical_admission)
+				and rawequal(rawget(file_adapter, "read_with_status"), captured_reader)
+				and rawequal(rawget(file_adapter, "write_if_unchanged_admitted"), admitted_publisher)
+				and (adapter_alias == nil or rawequal(rawget(package.loaded, adapter_alias), file_adapter))
 		end
 	end
 	local refusal = _refused_writes[refusal_key(path)]
@@ -495,7 +606,21 @@ function M.write(path, data, file_adapter, create_only, expected_source)
 	local payload = table.concat(L, "\n")
 	local published, publish_err
 	local committed_payload = nil
-	if create_only == true and type(file_adapter) == "table"
+	local create_admission
+	if create_only == true then create_admission = schema_read(path, file_adapter) end
+	if create_admission == false or create_admission ~= nil and not schema_live() then
+		return false, "configuration schema admission refused"
+	end
+	if create_only == true and create_admission ~= nil then
+		local current, status, detail = read_existing(path, file_adapter)
+		local check = source_admission(path, { status = status, content = current }, status == "ok" and current or payload, "publish", file_adapter)
+		if check == false or not publication_admitted(check) then return false, "configuration schema admission refused" end
+		if status == "ok" then
+			published = publication_admitted(check)
+		elseif status == "absent" then
+			published, publish_err = publish_content(path, payload, file_adapter, { status = "absent" })
+		else return false, tostring(detail or status) end
+	elseif create_only == true and type(file_adapter) == "table"
 			and type(file_adapter.create_if_absent) == "function" then
 		local call_ok, created, create_status, create_detail = pcall(
 			file_adapter.create_if_absent,
@@ -766,6 +891,7 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 		report("validation", "error", "batch_write: invalid path.")
 		return false, "Invalid path."
 	end
+	if _refused_writes[refusal_key(path)] then return false, "configuration writes remain refused for this session" end
 	if type(updates) ~= "table" then
 		report("validation", "error", "batch_write: updates must be a table.")
 		return false, "updates must be a table."
@@ -861,7 +987,14 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 
 	-- Read existing lines (empty table only when absence is proven).
 	local lines = {}
+	local read_admission = schema_read(path, file_adapter)
+	if read_admission == false or read_admission ~= nil and not schema_live() then
+		return false, "configuration preparation reader admission refused"
+	end
 	local source, read_status, read_detail = read_existing(path, file_adapter, on_error)
+	if read_admission ~= nil and (not schema_live() or read_admission(source, read_status) ~= true) then
+		return false, "configuration preparation source admission refused"
+	end
 	if read_status == "error" then
 		report("read", "error", "batch_write: refusing unreadable destination '%s' — %s.", path, tostring(read_detail))
 		return false, tostring(read_detail)
@@ -872,6 +1005,8 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 			return false, "source changed before preparing the batch"
 		end
 	end
+	local preparation_admission = source_admission(path, { status = read_status, content = source }, nil, "prepare", file_adapter)
+	if preparation_admission == false then return false, "configuration source schema admission refused" end
 	for _, row in ipairs(updates) do
 		local called, literal = pcall(require("toml_codec.leaf_rows").publication_literal, row.source_row, source or "")
 		if not called then return false, tostring(literal) end
@@ -1298,10 +1433,21 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 			return false, "the numeric scalar candidate differs from the requested value"
 		end
 	end
-	return true, nil, content, {
-		status = read_status,
-		content = source,
-	}
+	local candidate_admission = source_admission(path, { status = read_status, content = source }, content, "prepare", file_adapter)
+	if candidate_admission == false or preparation_admission ~= nil and not publication_admitted(preparation_admission)
+		or candidate_admission ~= nil and not publication_admitted(candidate_admission) then
+		return false, "configuration candidate schema admission refused"
+	end
+	local snapshot = { status = read_status, content = source }
+	if preparation_admission ~= nil then
+		prepared_sources[snapshot] = {
+			path = path, status = read_status, content = source, candidate = content,
+			admission = function()
+				return publication_admitted(preparation_admission) and publication_admitted(candidate_admission)
+			end,
+		}
+	end
+	return true, nil, content, snapshot
 end
 
 --- Prepares and atomically publishes one explicit set/delete batch.
@@ -1347,7 +1493,15 @@ end
 --- @return string status `ok`, `absent`, or `error`.
 --- @return string|nil detail Failure detail.
 function M.read_classified(path, file_adapter, on_error)
-	return read_existing(path, file_adapter, on_error)
+	local admission = schema_read(path, file_adapter)
+	if admission == false or admission ~= nil and not schema_live() then
+		return nil, "error", "configuration schema reader admission refused"
+	end
+	local content, status, detail = read_existing(path, file_adapter, on_error)
+	if admission ~= nil and (not schema_live() or admission(content, status) ~= true) then
+		return nil, "error", "configuration source schema admission refused"
+	end
+	return content, status, detail
 end
 
 --- @param admission function|nil Captured final logical admission.
@@ -1408,9 +1562,31 @@ function M.remove_if_unchanged(path, file_adapter, expected_source, operation_po
 	if refusal then
 		return false, "writes to this file are refused for the session: " .. refusal
 	end
+	expected_source = { status = expected_source.status, content = expected_source.content }
 	local on_error = operation_policy and operation_policy.on_error
-	if type(file_adapter) == "table" and type(file_adapter.remove_if_unchanged) == "function" then
-		local called, removed, detail, receipt, retry_cleanup = pcall(file_adapter.remove_if_unchanged, path, expected_source, on_error)
+	local admission = source_admission(path, expected_source, nil, "remove", file_adapter)
+	if admission == false then return false, "configuration removal schema admission refused" end
+	local conditional_remover
+	if type(file_adapter) == "table" then
+		if admission ~= nil then
+			conditional_remover = rawget(file_adapter, "remove_if_unchanged_admitted")
+			if type(file_adapter.remove_if_unchanged) == "function" and type(conditional_remover) ~= "function" then
+				return false, "final removal admission unavailable"
+			end
+		else conditional_remover = file_adapter.remove_if_unchanged end
+	end
+	if admission ~= nil and type(conditional_remover) == "function" then
+		local schema_check = admission
+		local reader = rawget(file_adapter, "read_with_status")
+		local native_alias = rawequal(rawget(package.loaded, "adapters.file_system"), file_adapter)
+		admission = function()
+			return schema_check() == true and rawequal(rawget(file_adapter, "read_with_status"), reader)
+				and rawequal(rawget(file_adapter, "remove_if_unchanged_admitted"), conditional_remover)
+				and (not native_alias or rawequal(rawget(package.loaded, "adapters.file_system"), file_adapter))
+		end
+	end
+	if type(conditional_remover) == "function" then
+		local called, removed, detail, receipt, retry_cleanup = pcall(conditional_remover, path, expected_source, on_error, admission)
 		if not called then return false, tostring(removed) end
 		if operation_policy and operation_policy.require_conditional == true then
 			return removed == true, detail, receipt
@@ -1436,11 +1612,14 @@ function M.remove_if_unchanged(path, file_adapter, expected_source, operation_po
 	end
 	local remover = os.remove
 	if type(file_adapter) == "table" then
-		remover = file_adapter.remove_exact or file_adapter.delete
+		if admission ~= nil then
+			remover = rawget(file_adapter, "remove_exact") or rawget(file_adapter, "delete")
+		else remover = file_adapter.remove_exact or file_adapter.delete end
 		if type(remover) ~= "function" then
 			return false, "explicit file adapter has no removal method"
 		end
 	end
+	if not publication_admitted(admission) then return false, "configuration removal schema admission refused" end
 	local call_ok, removed, remove_detail = pcall(remover, path)
 	if call_ok and removed == true then return true end
 	return false, tostring((call_ok and remove_detail) or removed or "removal failed")
@@ -1516,4 +1695,5 @@ function M.create_rows(path)
 	return copy
 end
 
+constructed_read, constructed_publish, constructed_preparation = M.read_classified, M.publish_if_unchanged, preparation_lookup
 return M

@@ -1588,16 +1588,18 @@ end
 --- @param path string Caller-visible source pathname.
 --- @param expected_source table Exact prior classified regular-file bytes.
 --- @param on_error function|nil Per-operation fixed-category diagnostic owner.
+--- @param admission function|nil Pure final logical admission; true only to unlink.
 --- @return boolean removed Whether unlink and native release both committed.
 --- @return string|nil detail
 --- @return table|nil receipt Retained physical inverse and release owner.
 --- @return function|nil retry_cleanup Exact release-only owner; never retries unlink.
-function M.remove_if_unchanged(path, expected_source, on_error)
+function M.remove_if_unchanged(path, expected_source, on_error, admission)
 	local report = OperationReporter.new(on_error, Logger, LOG)
 	if type(path) ~= "string" or path == "" or type(expected_source) ~= "table"
 		or expected_source.status ~= "ok" or type(expected_source.content) ~= "string" then
 		return false, "conditional removal requires an exact regular source"
 	end
+	if admission ~= nil and type(admission) ~= "function" then return false, "removal admission must be a function" end
 	local pending = _conditional_remove_debt
 	if pending then
 		if pending.path ~= path or pending.expected.content ~= expected_source.content then return false, "conditional removal owner changed" end
@@ -1657,6 +1659,10 @@ function M.remove_if_unchanged(path, expected_source, on_error)
 	local called, removed, detail = pcall(function()
 		local exact, reason = exact_route_and_source()
 		if not exact then return false, reason end
+		if admission ~= nil then
+			local accepted, allowed = pcall(admission)
+			if not accepted or allowed ~= true then return false, "removal admission refused" end
+		end
 		local unlinked, unlink_err = M.remove_exact(resolved)
 		if unlinked ~= true then return false, unlink_err end
 		removed_by_owner, receipt.removed = true, true
@@ -1673,6 +1679,26 @@ function M.remove_if_unchanged(path, expected_source, on_error)
 		return false, called and detail or tostring(removed), receipt, retry_cleanup
 	end
 	return released == true, release_err, receipt, retry_cleanup
+end
+
+--- Removes an exact source only while a pure final logical owner admits unlink.
+--- Release-only cleanup of a retained native receipt never repeats admission or unlink.
+--- @param path string Caller-visible source pathname.
+--- @param expected_source table Exact classified regular-file bytes.
+--- @param on_error function|nil Receives fixed diagnostic categories.
+--- @param admission function Pure final logical admission, true only to unlink.
+--- @return boolean removed
+--- @return string|nil detail
+--- @return table|nil receipt Existing retained physical inverse and release owner.
+--- @return function|nil retry_cleanup Existing release-only owner.
+function M.remove_if_unchanged_admitted(path, expected_source, on_error, admission)
+	if type(expected_source) ~= "table" or getmetatable(expected_source) ~= nil or type(admission) ~= "function" then
+		return false, "classified source and removal admission required"
+	end
+	local status, content = rawget(expected_source, "status"), rawget(expected_source, "content")
+	if status ~= "ok" or type(content) ~= "string" then return false, "exact regular source required" end
+	local captured = { status = status, content = content }
+	return M.remove_if_unchanged(path, captured, on_error, admission)
 end
 
 --- Issues an opaque capability for one actual private native writer owner.
@@ -1766,8 +1792,16 @@ end
 --- @param content string UTF-8 content to write.
 --- @return boolean true on success, false on any error.
 --- @return string|nil error_message Concrete failure reason when available.
-local function write_atomic(path, content, expected_source, on_error)
+local function write_atomic(path, content, expected_source, on_error, admission)
 	local report = OperationReporter.new(on_error, Logger, LOG)
+	if admission ~= nil and type(admission) ~= "function" then
+		return false, "publication admission must be a function"
+	end
+	local function admitted()
+		if admission == nil then return true end
+		local called, allowed = pcall(admission)
+		return called and allowed == true
+	end
 	if type(path) ~= "string" or path == "" then
 		report("publication", "error", "write(): path must be a non-empty string.")
 		return false, "path must be a non-empty string"
@@ -1905,6 +1939,10 @@ local function write_atomic(path, content, expected_source, on_error)
 				report("publication", "error", "write(): no-op destination changed under its lock — %s.", tostring(route_detail))
 				return false, route_detail
 			end
+			if not admitted() then
+				report("publication", "error", "write(): publication admission refused.")
+				return false, "publication admission refused"
+			end
 			return true
 		end
 
@@ -2032,6 +2070,10 @@ local function write_atomic(path, content, expected_source, on_error)
 		end
 		local staged_identity
 		if private then staged_identity = capture_identity(staging_area.payload_identity, resolved_path) end
+		if not admitted() then
+			report("publication", "error", "write(): publication admission refused.")
+			return fail_after_cleanup("publication admission refusal", "publication admission refused")
+		end
 		local rename_ok, rename_err = os.rename(tmp_path, resolved_path)
 		if not rename_ok then
 			local reason = tostring(rename_err or "rename failed")
@@ -2207,6 +2249,27 @@ function M.write_if_unchanged(path, content, expected_source, on_error)
 	return write_atomic(path, content, expected_source, on_error)
 end
 
+--- Publishes an exact source only while the captured logical owner still admits it.
+--- @param path string Absolute destination path.
+--- @param content string Candidate UTF-8 content.
+--- @param expected_source table Exact classified source precondition.
+--- @param on_error function|nil Receives fixed failure categories.
+--- @param admission function Pure final logical admission, true only to publish.
+--- @return boolean written
+--- @return string|nil detail
+--- @return function|table|nil receipt Existing native publication or release owner.
+function M.write_if_unchanged_admitted(path, content, expected_source, on_error, admission)
+	if type(expected_source) ~= "table" or getmetatable(expected_source) ~= nil or type(admission) ~= "function" then
+		return false, "classified source and publication admission required"
+	end
+	local status, source = rawget(expected_source, "status"), rawget(expected_source, "content")
+	if not (status == "ok" and type(source) == "string" or status == "absent" and source == nil) then
+		return false, "invalid classified publication source"
+	end
+	local captured = { status = status, content = source }
+	return write_atomic(path, content, captured, on_error, admission)
+end
+
 --- Appends content to a file, creating it if it does not exist.
 --- @param path    string Absolute path to the file.
 --- @param content string UTF-8 content to append.
@@ -2315,6 +2378,30 @@ function M.delete(path)
 		return false
 	end
 	return true
+end
+
+
+-- Preserve the actual constructor's methods, including absent capabilities.
+-- This pure identity receipt neither invokes IO nor grants config readiness.
+local configuration_reader, configuration_writer, configuration_publisher =
+	rawget(M, "read_with_status"), rawget(M, "write_if_unchanged"), rawget(M, "write_if_unchanged_admitted")
+local configuration_remover, configuration_admitted_remover, configuration_exact_remover, configuration_delete =
+	rawget(M, "remove_if_unchanged"), rawget(M, "remove_if_unchanged_admitted"), rawget(M, "remove_exact"), rawget(M, "delete")
+
+--- Returns this initializer's actual native method identities without IO.
+--- Public export replacement cannot change these captured values. Consumers
+--- still own loader-origin, raw live-export and source/publication admission.
+--- @return table owner
+--- @return function reader
+--- @return function writer
+--- @return function publisher
+--- @return function|nil remover
+--- @return function|nil admitted_remover
+--- @return function|nil exact_remover
+--- @return function delete
+function M.configuration_ports()
+	return M, configuration_reader, configuration_writer, configuration_publisher,
+		configuration_remover, configuration_admitted_remover, configuration_exact_remover, configuration_delete
 end
 
 return M

@@ -122,6 +122,21 @@ TrayMenuItemCount(TargetMenu) {
 	return Count
 }
 
+; Reads the exact captured native menu handle used by an owning operation.
+; @param Handle {Integer} Captured HMENU, without reacquiring Menu.Handle.
+; @returns {Integer} Native row count, or -1 when the handle is unavailable.
+TrayMenuHandleItemCount(Handle) {
+	return DllCall("GetMenuItemCount", "ptr", Handle, "int")
+}
+
+; Reads a child from the same captured native parent during owned-tree cleanup.
+; @param Handle {Integer} Captured parent HMENU.
+; @param Position {Integer} Zero-based row position.
+; @returns {Integer} Native submenu handle, or 0 when the row has no submenu.
+TrayMenuSubmenuHandle(Handle, Position) {
+	return DllCall("GetSubMenu", "ptr", Handle, "int", Position, "ptr")
+}
+
 ; Tells whether the row at a zero-based position of a native menu is a separator.
 ; @param TargetMenu {Menu} A rendered AHK menu.
 ; @param Position {Integer} Zero-based row position.

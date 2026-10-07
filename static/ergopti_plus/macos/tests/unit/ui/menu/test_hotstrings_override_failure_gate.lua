@@ -22,15 +22,24 @@ helpers.describe("hotstring category delay is fail-closed", function()
 		package.loaded["infra.manifest_reader"] = {
 			default_for = function() return "★" end,
 		}
+		local renderer = require("infra.manifest_menu")
 		local command_row = require("infra.manifest_menu").command_row
 		local check_row = require("infra.manifest_menu").check_row
 		local get_array = require("infra.manifest_menu").get_array
+		local template_rows = require("infra.manifest_menu").template_rows
+		local get_root = require("infra.manifest_menu").get_root
+		local native_child_rows = require("infra.manifest_menu").native_child_rows
 		package.loaded["infra.manifest_menu"] = {
 			command_row = command_row,
 			check_row = check_row,
 			get_array = get_array,
-			build = function(section, _, _, _, _, providers)
-				if section == "word_expanders_menu" then return providers.word_expander_entries() end
+			template_rows = template_rows,
+			get_root = get_root,
+			native_child_rows = native_child_rows,
+			build = function(section, category, dynamic, groups, context, providers)
+				if section == "word_expanders_menu" then
+					return renderer.build(section, category, dynamic, groups, context, providers)
+				end
 				return providers.delays_colors()
 			end,
 		}

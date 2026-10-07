@@ -385,3 +385,110 @@ helpers.describe("magic key: a missing manifest default is said out loud", funct
 	end)
 
 end)
+
+-- Uses the actual native builder closure and genuine shared factory; no provider stand-in.
+local function with_magic_frame(language, stored, mode, body)
+	local names = { "infra.manifest_menu", "ui.menu.menu_builder", "modules.hotstrings.magic_key", "infra.i18n", "infra.locale", "locale.core", "ui.text_prompt" }
+	local saved = {}
+	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+	local storage, restore_storage, restore_manifest
+	local root, frame, first_i18n, prompt_owner, prior_ask
+	local effects = { prompts = 0, redraws = 0, frame_hooks = 0 }
+	local ok, detail = xpcall(function()
+		storage, restore_storage = stub_storage({ stored = stored })
+		restore_manifest = stub_manifest("★")
+		local json = require("json")
+		local Paths = require("infra.paths")
+		package.loaded["infra.i18n"], package.loaded["infra.locale"], package.loaded["locale.core"] = nil, nil, nil
+		local native_locale = require("infra.locale")
+		native_locale.set_locale(language)
+		local native_i18n = require("infra.i18n")
+		prompt_owner = require("ui.text_prompt")
+		prior_ask = prompt_owner.ask
+		prompt_owner.ask = function() effects.prompts = effects.prompts + 1; return "§" end
+		local renderer = assert(require("menu.renderer").new({ platform = "linux", json_decode = json.decode,
+			manifest_path = function() return Paths.shared("modules/menu/menu_manifest.json") end,
+			i18n = native_i18n, logger = { error = function() end, warn = function() end } }))
+		root = renderer.get_root(); frame = root.hotstrings_magic_trigger_frame; first_i18n = frame and frame[1].i18n
+		local template = renderer.template_rows
+		renderer.template_rows = function(...)
+			local rows = template(...)
+			if select(1, ...) == "hotstrings_magic_trigger_frame" then
+				if mode == "withdrawal" then root.hotstrings_magic_trigger_frame = nil end
+				if mode == "drift" then frame[1].i18n = "menu.hotstrings.params" end
+				if mode == "slots" then frame.foreign = true end
+				if mode == "meta" then setmetatable(frame, { __len = function() effects.frame_hooks = effects.frame_hooks + 1; return 3 end }) end
+			end
+			return rows
+		end
+		package.loaded["infra.manifest_menu"] = renderer
+		package.loaded["modules.hotstrings.magic_key"] = nil
+		package.loaded["ui.menu.menu_builder"] = nil
+		local native = require("ui.menu.menu_builder")
+		local function upvalue(fn, wanted)
+			for index = 1, math.huge do
+				local name, value = debug.getupvalue(fn, index)
+				if name == nil then break end
+				if name == wanted then return value end
+			end
+		end
+		local hotstrings = assert(upvalue(native.build, "_build_hotstrings"))
+		local actual = assert(upvalue(hotstrings, "_manifest_hotstring_rows"))
+		local captured
+		local build = renderer.build
+		renderer.build = function(section, category, dynamic, groups, context, providers)
+			if section == "hotstrings_params_group" then
+				captured = assert(providers.magic_key_config)()
+				return build(section, category, dynamic, groups, context, providers)
+			end
+			return build(section, category, dynamic, groups, context, providers)
+		end
+		local config = { any_enabled = function() return false end, get_categories = function() return {} end, get_groups = function() return {} end }
+		actual({ config = config, state = {}, paused = false, on_menu_changed = function() effects.redraws = effects.redraws + 1 end }, config)
+		body(assert(captured), effects, storage)
+	end, debug.traceback)
+	if root then root.hotstrings_magic_trigger_frame = frame end
+	if frame then frame[1].i18n = first_i18n; frame.foreign = nil; setmetatable(frame, nil) end
+	if prompt_owner then prompt_owner.ask = prior_ask end
+	if restore_manifest then restore_manifest() end
+	if restore_storage then restore_storage() end
+	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+	if not ok then error(detail, 0) end
+end
+
+helpers.describe("Magic trigger declared native provider", function()
+	for _, code in ipairs({ "en", "fr" }) do
+		local language = code
+		helpers.it("keeps native default order and current character in " .. language, function()
+			with_magic_frame(language, nil, nil, function(rows, effects, storage)
+				helpers.assert_eq(#rows, 1)
+				helpers.assert_eq(rows[1].label, language == "en" and "Magic key : ★" or "Touche magique : ★")
+				helpers.assert_eq(effects.prompts, 0); helpers.assert_eq(storage.writes, 0)
+				rows[1].action()
+				helpers.assert_eq(effects.prompts, 1); helpers.assert_eq(storage.writes, 1)
+				helpers.assert_eq(effects.redraws, 1)
+			end)
+		end)
+		helpers.it("keeps actual customised reset and native reset callback in " .. language, function()
+			with_magic_frame(language, "§", nil, function(rows, effects, storage)
+				helpers.assert_eq(#rows, 2)
+				helpers.assert_eq(rows[1].label, language == "en" and "Magic key : §" or "Touche magique : §")
+				helpers.assert_eq(rows[2].label, language == "en" and "    Restore the default key" or "    Rétablir la touche par défaut")
+				rows[2].action()
+				helpers.assert_eq(storage.deletes, 1); helpers.assert_eq(effects.redraws, 1)
+				helpers.assert_eq(effects.prompts, 0)
+			end)
+		end)
+	end
+	for _, mode_name in ipairs({ "withdrawal", "drift", "slots", "meta" }) do
+		local mode = mode_name
+		helpers.it("withholds actual rows after late " .. mode .. " and all native effects", function()
+			with_magic_frame("en", "§", mode, function(rows, effects, storage)
+				helpers.assert_eq(#rows, 0)
+				helpers.assert_eq(effects.frame_hooks, 0)
+				helpers.assert_eq(effects.prompts, 0); helpers.assert_eq(effects.redraws, 0)
+				helpers.assert_eq(storage.writes, 0); helpers.assert_eq(storage.deletes, 0)
+			end)
+		end)
+	end
+end)
