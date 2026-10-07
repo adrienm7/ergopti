@@ -179,7 +179,7 @@
 		"detail_limits": "All-failures annotation is truncated during case22; 21 complete details are visible, not all50."
 	},
 	"current_successor": {
-		"status": "Published feature source; exact current Windows native chain passes; old all-OS macOS package failure retained; final dev integration and integrated-source all-OS CI pending",
+		"status": "Partial delivery integrated and published on dev8cba; final exact integrated-source all-OS CI terminal failed only macOS package/verdicts; Windows and Linux chains pass; all six items remain partial",
 		"historical_fields": "Every preceding JSON field, key order and value is preserved as its historical checkpoint; this successor does not retroactively qualify later sources",
 		"prepared_observed_utc": null,
 		"published_feature_head": "20352edb6702bfbb92d4c9ced08fb85f3845cd13",
@@ -418,11 +418,26 @@
 			"qualification_boundary": "Actual named phases qualify exact source20352/tree6641. No individual programmable or personal-case receipt/artifact fields inferred; physical acceptance not executed."
 		},
 		"final_integration": {
-			"integrated_dev_commit": null,
-			"integrated_dev_tree": null,
-			"integration_lease_receipt": null,
+			"integrated_dev_commit": "8cba7a0c45950383904ab6db11274f20823fc465",
+			"integrated_dev_tree": "c0a8c8095a1e9d97a138b37a6365c49dbb5f0bff",
+			"parents": [
+				"5d1d06854b412e91c9350e05f03b20f83b297db8",
+				"d2598009d211ca70d7cb01b36927c9e601e432cb"
+			],
+			"integration_lease_receipt": {
+				"original_path": "/workspace/ergopti-delivery/group1-final-serialized-delivery.json",
+				"captured_path": "/tmp/group1-partial-delivery-integrated-template-v1/captured-evidence/group1-final-serialized-delivery.json",
+				"sha256": "339097c589ef32d1736918e559897b4caedd024113da41ec7fc1cea8808bd1bc"
+			},
+			"integration_lock_sha": "d2598009d211ca70d7cb01b36927c9e601e432cb",
+			"integration_lock_acquisition": "create-only owned lock per actual serialized delivery receipt",
 			"documentation_commit": null,
-			"status": "Pending serialized partial no-ff integration; corrected Windows source20352 qualification now passes. No dev push or lease owned by this preparation."
+			"status": "integrated_dev_published",
+			"feature_commits_integrated": 117,
+			"feature_commit_range": "5d1d06854b412e91c9350e05f03b20f83b297db8..d2598009d211ca70d7cb01b36927c9e601e432cb",
+			"feature_comparison_url": "https://github.com/adrienm7/ergopti/compare/5d1d06854b412e91c9350e05f03b20f83b297db8...d2598009d211ca70d7cb01b36927c9e601e432cb",
+			"complete_feature_commits_sha256": "9881610abe28c584fa68490c5a6d4c2b326849ccf9b2e68da4d95929453c5b13",
+			"integrated_commit_url": "https://github.com/adrienm7/ergopti/commit/8cba7a0c45950383904ab6db11274f20823fc465"
 		},
 		"todo_state": {
 			"items": [5, 7, 33, 42, 54, 81],
@@ -529,12 +544,50 @@
 			{
 				"path": "/workspace/ergopti-delivery/group1-current-clone-windows-native-ci-watch.exit",
 				"sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+			},
+			{
+				"original_path": "/workspace/ergopti-delivery/group1-final-serialized-delivery.json",
+				"captured_path": "/tmp/group1-partial-delivery-integrated-template-v1/captured-evidence/group1-final-serialized-delivery.json",
+				"sha256": "339097c589ef32d1736918e559897b4caedd024113da41ec7fc1cea8808bd1bc"
+			},
+			{
+				"original_path": "/workspace/ergopti-delivery/group1-final-integrated-native-ci.json",
+				"captured_path": "/tmp/group1-partial-delivery-integrated-template-v1/captured-evidence/group1-final-integrated-native-ci.json",
+				"sha256": "663c2877f00a4a8b3f8bbdf3c9d09daf0880705871d19f4baa401217ca60586f"
+			},
+			{
+				"original_path": "/workspace/ergopti-delivery/group1-final-integrated-native-ci-terminal.json",
+				"captured_path": "/tmp/group1-partial-delivery-integrated-final-v1/captured-evidence/group1-final-integrated-native-ci-terminal.json",
+				"sha256": "c4373c2fdc6372e7062f37ad4504cd367159a009309d5d703668d22adc03b633"
+			},
+			{
+				"original_path": "/workspace/ergopti-delivery/group1-final-macos-native-owner-source-comparison.json",
+				"captured_path": "/tmp/group1-partial-delivery-integrated-final-v1/captured-evidence/group1-final-macos-native-owner-source-comparison.json",
+				"sha256": "18efe14db690ec48032769a6936baa5491edac902631b70c47d58510c00cbbc1"
+			},
+			{
+				"original_path": "/workspace/ergopti-delivery/group1-final-integrated-native-ci-watch.log",
+				"captured_path": "/tmp/group1-partial-delivery-integrated-final-v1/captured-evidence/group1-final-integrated-native-ci-watch.log",
+				"sha256": "a37105729540ae819b9889ccaa5d741774aefac9af2d54eda24c61380f5cffc6"
+			},
+			{
+				"original_path": "/workspace/ergopti-delivery/group1-final-integrated-native-ci-watch.exit",
+				"captured_path": "/tmp/group1-partial-delivery-integrated-final-v1/captured-evidence/group1-final-integrated-native-ci-watch.exit",
+				"sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+			},
+			{
+				"original_path": "/workspace/ergopti-delivery/group1-final-dev-automatic-runs-followup.json",
+				"captured_path": "/tmp/group1-partial-delivery-integrated-final-v1/captured-evidence/group1-final-dev-automatic-runs-followup.json",
+				"sha256": "46fbe39eaf9755d8d22fb5171b89c8181fb1f742c6a0417447c32e97730e6bee"
+			},
+			{
+				"path": "/tmp/group1-partial-delivery-integrated-final-v1/captured-evidence/automatic-dev-ci-terminal-readonly.json",
+				"sha256": "542bec4e2f8a7cef935151ac015b0acf38bde190563ed7de6071a8b1a8e4b146"
 			}
 		],
 		"remaining_final_note_fields": [
-			"Final serialized dev merge/tree and integration-lease receipt",
-			"Exact final integrated-source all-OS CI identity/outcomes with release=false",
-			"Final documentation commit; bounded post-CI documentary commit if required"
+			"Actual feature deletion and own integration-lease release receipt",
+			"Final documentary commit recorded externally after publication; self SHA remains unknown"
 		],
 		"historical_own_manual_ci": {
 			"run_id": 37530839023,
@@ -649,15 +702,323 @@
 			"physical_acceptance": "not executed"
 		},
 		"final_integrated_source_ci": {
-			"source_sha": null,
-			"source_tree": null,
-			"tested_ci_sha": null,
-			"run_id": null,
-			"url": null,
-			"conclusion": null,
-			"release_result": null,
+			"source_sha": "8cba7a0c45950383904ab6db11274f20823fc465",
+			"source_tree": "c0a8c8095a1e9d97a138b37a6365c49dbb5f0bff",
+			"tested_ci_sha": "34782db782bf206710cb459890927645bb5f7d26",
+			"previous_ci_sha": "6c9d575ced36354c2ea87e96bd367575a79d2640",
+			"run_id": 37547053814,
+			"url": "https://github.com/adrienm7/ergopti/actions/runs/37547053814",
+			"status": "completed",
+			"conclusion": "failure",
+			"jobs": [
+				{
+					"id": 112553466777,
+					"name": "Validate / Checks and plan",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112553701853,
+					"name": "Core / js",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112553701897,
+					"name": "Core / properties",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112553702015,
+					"name": "macOS / Unit tests (stubbed)",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112553702062,
+					"name": "Linux / Unit tests",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112553702085,
+					"name": "Windows / Unit tests",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112554669046,
+					"name": "Linux / E2E tests",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112556521543,
+					"name": "macOS / E2E tests (stubbed)",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112557262199,
+					"name": "macOS / Native tooltip canvas · 12 captures",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112557262225,
+					"name": "macOS / Package",
+					"status": "completed",
+					"conclusion": "failure"
+				},
+				{
+					"id": 112558418880,
+					"name": "Linux / Package",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112558719919,
+					"name": "Windows / E2E tests (engine)",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112558944498,
+					"name": "Windows / Package",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112558998072,
+					"name": "macOS / Verdict",
+					"status": "completed",
+					"conclusion": "failure"
+				},
+				{
+					"id": 112558998579,
+					"name": "macOS / Install and launch · ${{ matrix.scenario }} · ${{ matrix.runner }}",
+					"status": "completed",
+					"conclusion": "skipped"
+				},
+				{
+					"id": 112559270025,
+					"name": "Windows / Install and launch",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112559298743,
+					"name": "Linux / Install and launch · Install · alpine",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112559298762,
+					"name": "Linux / Install and launch · First install · fedora-latest",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112559298765,
+					"name": "Linux / Install and launch · Install · arch",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112559298768,
+					"name": "Linux / Install and launch · Install · opensuse",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112559298779,
+					"name": "Linux / Install and launch · Install · fedora",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112559298780,
+					"name": "Linux / Install and launch · First install · fedora-41",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112559298795,
+					"name": "Linux / Install and launch · First install · debian-12",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112559298814,
+					"name": "Linux / Install and launch · First install · ubuntu-24.04",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112559298840,
+					"name": "Linux / Install and launch · First install · ubuntu-22.04",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112559298872,
+					"name": "Linux / Install and launch · First install · alpine",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112559298876,
+					"name": "Linux / Install and launch · First install · opensuse-tumbleweed",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112559298884,
+					"name": "Linux / Install and launch · First install · debian-13",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112559298892,
+					"name": "Linux / Install and launch · Run · .deb",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112559298907,
+					"name": "Linux / Install and launch · Install · debian",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112559298942,
+					"name": "Linux / Install and launch · First install · arch",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112559298947,
+					"name": "Linux / Install and launch · Run · .rpm",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112559299004,
+					"name": "Linux / Install and launch · Run · AppImage",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112559616925,
+					"name": "Windows / Verdict",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112560465675,
+					"name": "Linux / Verdict",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112560567583,
+					"name": "Validate / Selected OS verdict",
+					"status": "completed",
+					"conclusion": "failure"
+				},
+				{
+					"id": 112560568850,
+					"name": "Release / Publish",
+					"status": "completed",
+					"conclusion": "skipped"
+				}
+			],
+			"release_result": "skipped",
 			"os_lanes": "all",
-			"expected_release_input": false
+			"expected_release_input": false,
+			"dispatch_receipt": {
+				"original_path": "/workspace/ergopti-delivery/group1-final-integrated-native-ci.json",
+				"captured_path": "/tmp/group1-partial-delivery-integrated-template-v1/captured-evidence/group1-final-integrated-native-ci.json",
+				"sha256": "663c2877f00a4a8b3f8bbdf3c9d09daf0880705871d19f4baa401217ca60586f"
+			},
+			"windows_units": {
+				"passed": 10089,
+				"failed": 0
+			},
+			"macos_units": "passed (stubbed)",
+			"macos_e2e": "passed (stubbed)",
+			"macos_canvas": {
+				"captures": 12,
+				"conclusion": "success"
+			},
+			"macos_package": "failure",
+			"linux_units": "passed",
+			"linux_e2e": "passed",
+			"linux_package": "passed",
+			"installed_results": {
+				"windows": "passed",
+				"linux": {
+					"passed_install_run_first_install_jobs": 17,
+					"variants": [
+						"Install · alpine",
+						"First install · fedora-latest",
+						"Install · arch",
+						"Install · opensuse",
+						"Install · fedora",
+						"First install · fedora-41",
+						"First install · debian-12",
+						"First install · ubuntu-24.04",
+						"First install · ubuntu-22.04",
+						"First install · alpine",
+						"First install · opensuse-tumbleweed",
+						"First install · debian-13",
+						"Run · .deb",
+						"Install · debian",
+						"First install · arch",
+						"Run · .rpm",
+						"Run · AppImage"
+					]
+				},
+				"macos": "skipped after package failure"
+			},
+			"qualification_boundary": "Actual final integrated-source phase outcomes; no individual case/artifact identity inferred, no whole-CI-green or all-six-complete claim.",
+			"terminal_jobs": 37,
+			"passed_jobs": 32,
+			"failed_jobs": 3,
+			"skipped_jobs": 2,
+			"failed_job_names": ["macOS / Package", "macOS / Verdict", "Validate / Selected OS verdict"],
+			"skipped_job_names": [
+				"macOS / Install and launch · ${{ matrix.scenario }} · ${{ matrix.runner }}",
+				"Release / Publish"
+			],
+			"terminal_receipt": {
+				"original_path": "/workspace/ergopti-delivery/group1-final-integrated-native-ci-terminal.json",
+				"captured_path": "/tmp/group1-partial-delivery-integrated-final-v1/captured-evidence/group1-final-integrated-native-ci-terminal.json",
+				"sha256": "c4373c2fdc6372e7062f37ad4504cd367159a009309d5d703668d22adc03b633"
+			},
+			"raw_watch_exit": 1,
+			"raw_watch_sha256": "a37105729540ae819b9889ccaa5d741774aefac9af2d54eda24c61380f5cffc6",
+			"windows_full_startup": "passed",
+			"windows_fresh_clone_startup": "passed",
+			"windows_e2e": "passed",
+			"windows_package": "passed",
+			"windows_install_and_launch": "passed",
+			"windows_compiled_startup_admission": "passed",
+			"windows_programmable_qualification": "passed",
+			"windows_mandatory_evidence": "passed",
+			"windows_verdict": "passed",
+			"macos_install_and_launch": "skipped",
+			"linux_verdict": "passed",
+			"macos_failure_observations": {
+				"sparkle": ["server-retired", "server-terminal", "server-exit"],
+				"homebrew": "Exact owned AppleEvent receiver is no longer live",
+				"global_switcher": "Native prerequisites refused; UNQUALIFIED, never passed or skipped; no TCC grant attempted",
+				"precise_failure_cause_proved": false
+			},
+			"individual_native_case_manifests": null,
+			"downloaded_artifact_identity": null,
+			"physical_acceptance": "not executed"
 		},
 		"foreign_integration_owner": {
 			"lock": "323873fd",
@@ -728,6 +1089,64 @@
 				"Existing virtual X11 probes can pass without proving physical input, uinput, Wayland or an actual daemon restart; replay the latter only in the real installed session."
 			],
 			"scope": "Replay guidance for existing items7/16/38/42; no additional acceptance requirement or reversible test is introduced. Supplemental Group5 Karabiner work is not a Group1 criterion."
+		},
+		"integrated_source_sha": "8cba7a0c45950383904ab6db11274f20823fc465",
+		"integrated_source_tree": "c0a8c8095a1e9d97a138b37a6365c49dbb5f0bff",
+		"integrated_native_input_conservation": {
+			"qualified_windows_source": "20352edb6702bfbb92d4c9ced08fb85f3845cd13",
+			"integrated_source": "8cba7a0c45950383904ab6db11274f20823fc465",
+			"actual_changed_paths": [
+				"docs/ERGOPTIPLUS_TODO.md",
+				"docs/handovers/2026-10-04-config-menus/PARTIAL-DELIVERY.md",
+				"docs/handovers/2026-10-04-config-menus/partial-delivery.json"
+			],
+			"only_documentation_changed": true,
+			"native_production_and_test_inputs_identical": true,
+			"qualification_promoted_to_integrated_ci": false
+		},
+		"macos_native_owner_source_comparison": {
+			"receipt": {
+				"original_path": "/workspace/ergopti-delivery/group1-final-macos-native-owner-source-comparison.json",
+				"captured_path": "/tmp/group1-partial-delivery-integrated-final-v1/captured-evidence/group1-final-macos-native-owner-source-comparison.json",
+				"sha256": "18efe14db690ec48032769a6936baa5491edac902631b70c47d58510c00cbbc1"
+			},
+			"baseline_source": "5d1d06854b412e91c9350e05f03b20f83b297db8",
+			"current_integrated_source": "8cba7a0c45950383904ab6db11274f20823fc465",
+			"checked_native_paths": 77,
+			"paths_equal": 77,
+			"changed_launch_gate": {
+				"path": "tools/diagnostics/macos_launch_gate.py",
+				"source_commit": "bf2c7e9a197b8788f100660f3d0efd7ca2282f52",
+				"scope": "Adds isolated Script participant summary only after required original owners retire in karabiner_config installation scenario; this is not an unchanged file and not executed by the failed Package phase.",
+				"no_direct_brew_acceptance_reference": true
+			},
+			"boundary": "Bounded source conservation and similar failure messages are not proof of cause or exoneration. Supplemental changed launch gate belongs to skipped Mac Install and remains unexecuted."
+		},
+		"automatic_dev_ci": {
+			"run_id": 37546955202,
+			"source_sha": "8cba7a0c45950383904ab6db11274f20823fc465",
+			"status": "completed",
+			"conclusion": "cancelled",
+			"observation_authority": "Actual read-only GitHub run API terminal receipt; earlier active snapshots remain historical",
+			"captured_historical_followup": {
+				"original_path": "/workspace/ergopti-delivery/group1-final-dev-automatic-runs-followup.json",
+				"captured_path": "/tmp/group1-partial-delivery-integrated-final-v1/captured-evidence/group1-final-dev-automatic-runs-followup.json",
+				"sha256": "46fbe39eaf9755d8d22fb5171b89c8181fb1f742c6a0417447c32e97730e6bee"
+			},
+			"actual_terminal_receipt": {
+				"path": "/tmp/group1-partial-delivery-integrated-final-v1/captured-evidence/automatic-dev-ci-terminal-readonly.json",
+				"sha256": "542bec4e2f8a7cef935151ac015b0acf38bde190563ed7de6071a8b1a8e4b146",
+				"read_only_api": "gh run view37546955202 --json databaseId,status,conclusion,headSha,url,event",
+				"status": "completed",
+				"conclusion": "cancelled"
+			}
+		},
+		"delivery_cleanup": {
+			"feature_branch_deletion": "pending actual owner cleanup receipt",
+			"integration_lock_release": "pending actual owner cleanup receipt",
+			"integration_lock_sha": "d2598009d211ca70d7cb01b36927c9e601e432cb",
+			"cleanup_authorization": "Explicitly authorized partial-delivery cleanup; this preparer does not modify branches or leases",
+			"cleanup_receipt": null
 		}
 	}
 }
