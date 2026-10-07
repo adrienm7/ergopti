@@ -797,7 +797,11 @@ class SparkleStartupDiagnosticTests(unittest.TestCase):
         ):
             self.assertEqual(helper.entrypoint(["serve", "/PRIVATE", NONCE]), 1)
         self.assertEqual(stdout.getvalue(), "")
-        lines = stderr.getvalue().splitlines()
+        lines = [
+            line
+            for line in stderr.getvalue().splitlines()
+            if not line.startswith("Sparkle server progress: ")
+        ]
         self.assertEqual(lines[0], "Private Sparkle fixture refused.")
         self.assertEqual(len(lines), 2)
         packet = json.loads(lines[1].removeprefix("Sparkle server diagnostic: "))
@@ -853,6 +857,75 @@ class SparkleStartupDiagnosticTests(unittest.TestCase):
             self.assertEqual(
                 (stdout.getvalue(), stderr.getvalue()), ("", "Private Sparkle fixture refused.\n")
             )
+
+
+class SparkleProgressDiagnosticTests(unittest.TestCase):
+    def load_helper(self):
+        spec = importlib.util.spec_from_file_location("sparkle_progress_control", HELPER)
+        helper = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(helper)
+        return helper
+
+    def testOptInProgressCarriesOnlyClosedPhaseAndPIDAtActualAdmissionCut(self):
+        helper = self.load_helper()
+        failure = RuntimeError("PRIVATE_PATH_EXCEPTION")
+        stream = io.StringIO()
+        with (
+            mock.patch.dict(helper.os.environ, {"ERGOPTI_SPARKLE_SERVER_DIAGNOSTICS": "1"}),
+            mock.patch.object(helper, "private_directory", side_effect=failure),
+            contextlib.redirect_stderr(stream),
+        ):
+            self.assertEqual(helper.entrypoint(["serve", "/PRIVATE_PATH", NONCE]), 1)
+        rows = [
+            json.loads(row.removeprefix("Sparkle server progress: "))
+            for row in stream.getvalue().splitlines()
+            if row.startswith("Sparkle server progress: ")
+        ]
+        self.assertEqual(
+            rows,
+            [
+                {"schema": 1, "pid": os.getpid(), "phase": "entry"},
+                {"schema": 1, "pid": os.getpid(), "phase": "directory-admission"},
+            ],
+        )
+        self.assertNotIn("PRIVATE", stream.getvalue())
+        self.assertNotIn(NONCE, stream.getvalue())
+        self.assertTrue(all(len(json.dumps(row).encode()) <= 512 for row in rows))
+
+    def testProgressOptionAndWriteFailureCannotChangePrimaryRefusal(self):
+        helper = self.load_helper()
+        failure = RuntimeError("PRIVATE_PRIMARY")
+        with (
+            mock.patch.dict(helper.os.environ, {"ERGOPTI_SPARKLE_SERVER_DIAGNOSTICS": "1"}),
+            mock.patch.object(helper, "private_directory", side_effect=failure),
+            mock.patch.object(helper.json, "dumps", side_effect=OSError("PRIVATE_SECONDARY")),
+            contextlib.redirect_stderr(io.StringIO()),
+        ):
+            self.assertEqual(helper.entrypoint(["serve", "/PRIVATE", NONCE]), 1)
+        for cancellation in [KeyboardInterrupt(), SystemExit(73)]:
+            with (
+                mock.patch.dict(helper.os.environ, {"ERGOPTI_SPARKLE_SERVER_DIAGNOSTICS": "1"}),
+                mock.patch.object(helper.json, "dumps", side_effect=cancellation),
+            ):
+                with self.assertRaises(type(cancellation)) as received:
+                    helper.server_phase("entry")
+                self.assertIs(received.exception, cancellation)
+
+    def testProgressOptOutInvalidPhaseAndCensusCannotPublishPrivateCheckpoint(self):
+        helper = self.load_helper()
+        stream = io.StringIO()
+        with mock.patch.dict(helper.os.environ, {}, clear=True), contextlib.redirect_stderr(stream):
+            helper.server_phase("socket-bind")
+        self.assertEqual(stream.getvalue(), "")
+        with self.assertRaises(ValueError):
+            helper.server_phase("/PRIVATE")
+        with (
+            mock.patch.dict(helper.os.environ, {"ERGOPTI_SPARKLE_SERVER_DIAGNOSTICS": "1"}),
+            mock.patch.object(helper, "main", side_effect=RuntimeError("PRIVATE")),
+            contextlib.redirect_stderr(stream),
+        ):
+            self.assertEqual(helper.entrypoint(["census", "/PRIVATE"]), 1)
+        self.assertNotIn("Sparkle server progress:", stream.getvalue())
 
 
 if __name__ == "__main__":
