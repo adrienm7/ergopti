@@ -3288,6 +3288,14 @@ Item30 remains partial; keyboard/device qualification is still required.
   assumption and fn/globe), WP10 enable and retire. Media metrics identities
   now exist for play/pause, track skips and brightness; production capture and
   native UI/physical acceptance remain unfinished.
+  The following source projection now captures the authenticated official VHD
+  broker prerequisites under a separately closed current profile:34 dependencies,
+  31 original inputs,60 owned outputs and4527 staged files plus four links. Current
+  schema2 admission binds the exact factory; the historical schema1 oracle remains
+  independent. Portable source/lifetime controls and genuine full-source staging
+  qualify these prerequisites only. The positive protected-root broker consumer
+  remains unregistered, initialization/ready proof is absent, and whole native
+  compilation, artifact preparation, installation and capture remain unfinished.
   Owned publication now accepts an unchanged document only through the exact
   native issuer's completed lock-held receipt, and rechecks its physical source
   and logical epoch after final readback. The filesystem preserves the released

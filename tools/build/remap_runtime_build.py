@@ -195,6 +195,35 @@ _BOUNDARY_CODES = frozenset(
 )
 
 
+_PRODUCT_REFUSAL_CUTS = (
+    ("Native product changed across a foreign phase", "held_product_changed"),
+    (
+        "Actually opened input differs from selected filesystem incarnation",
+        "opened_incarnation",
+    ),
+    ("Retained descriptor or selected input changed during read", "read_currentness"),
+)
+
+
+def _product_refusal_cut(error):
+    """Classify only fixed existing product guards; never export an exception payload."""
+    if type(error) is not BASE.NativeBuildError:
+        return ""
+    code, arguments = error.code, error.args
+    if (
+        type(code) is not str
+        or code != "source_identity"
+        or type(arguments) is not tuple
+        or len(arguments) != 1
+        or type(arguments[0]) is not str
+    ):
+        return ""
+    for message, cut in _PRODUCT_REFUSAL_CUTS:
+        if arguments[0] == message:
+            return cut
+    return ""
+
+
 class _BoundaryStopped(Exception):
     """Only the diagnostic writer stopped; original operations remain unchanged."""
 
@@ -447,6 +476,10 @@ def _observe_span(stage, phase=None):
             journal.finish_span(
                 "refused", span, parent, stage, phase, started, _boundary_code(error)
             )
+            if stage == "products":
+                cut = _product_refusal_cut(error)
+                if cut:
+                    journal.finish_span("refused", span, parent, stage, phase, started, cut)
         raise
     else:
         if entered:
@@ -1691,7 +1724,7 @@ class _DistributionSink(_SigningSink):
                 "handoff_required",
                 "Caller projections cannot replace the original signed claim",
             )
-            validate_owned_record(record)
+            validate_current_owned_record(record)
             observations = []
             native = []
             for phase in ("xcode_version", "xcodegen_version", "sdk_path"):
@@ -1959,7 +1992,31 @@ def owned_output(status, stdout, stderr):
     )
 
 
+CURRENT_OWNED_SOURCE_PROFILE = "owned_vhd_broker_source_v1"
+CURRENT_OWNED_SOURCE_FACTORY_SHA256 = (
+    "70d90ede3bdfbf44e146ba4a26f101ebfec2a1745bc05a8260db001d5a236537"
+)
+_HISTORICAL_OWNED_RECORD_PROFILE = object()
+_CURRENT_OWNED_RECORD_PROFILE = object()
+
+
 def validate_owned_record(record):
+    """Preserve the historical closed schema-1 oracle for independent controls."""
+    _validate_owned_record(record, _HISTORICAL_OWNED_RECORD_PROFILE)
+
+
+def validate_current_owned_record(record):
+    """Check current closed metadata only, bound to the actual fixed source factory."""
+    _REQUIRE(
+        SOURCE_FACTORY_SHA256 == CURRENT_OWNED_SOURCE_FACTORY_SHA256,
+        "dependency_unreleased",
+        "The current owned source profile requires its fixed complete factory",
+    )
+    _source_factory()
+    _validate_owned_record(record, _CURRENT_OWNED_RECORD_PROFILE)
+
+
+def _validate_owned_record(record, profile):
     """Check closed metadata only; actual phase/source/product ownership is separate."""
     fields = {
         "schema",
@@ -1987,15 +2044,25 @@ def validate_owned_record(record):
             "Owned compilation metadata is not the closed actual contract",
         )
 
+    require(profile is _HISTORICAL_OWNED_RECORD_PROFILE or profile is _CURRENT_OWNED_RECORD_PROFILE)
+    if profile is _CURRENT_OWNED_RECORD_PROFILE:
+        fields |= {"source_profile", "source_factory_sha256"}
     require(type(record) is dict and set(record) == fields)
     require(
         type(record["schema"]) is int
-        and record["schema"] == 1
+        and record["schema"] == (1 if profile is _HISTORICAL_OWNED_RECORD_PROFILE else 2)
         and record["status"] == "passed"
         and record["qualification"] == "unsigned_actual_owned_four_target_compilation"
         and type(record["budget_seconds"]) is int
         and record["budget_seconds"] == 300
     )
+    if profile is _CURRENT_OWNED_RECORD_PROFILE:
+        require(
+            type(record["source_profile"]) is str
+            and record["source_profile"] == CURRENT_OWNED_SOURCE_PROFILE
+            and type(record["source_factory_sha256"]) is str
+            and record["source_factory_sha256"] == CURRENT_OWNED_SOURCE_FACTORY_SHA256
+        )
     require(record["pins"] == {"upstream": BASE.UPSTREAM, "cpm": BASE.CPM, "vhd": BASE.VIRTUAL_HID})
     for key in (
         "native_capture_executed",
@@ -2004,12 +2071,21 @@ def validate_owned_record(record):
         "auth_executed",
     ):
         require(record[key] is False)
-    for key, count in (
-        ("source_inventory_entries", 4505),
-        ("owned_replacements", 57),
-        ("staged_files", 4526),
-        ("staged_links", 4),
-    ):
+    if profile is _HISTORICAL_OWNED_RECORD_PROFILE:
+        counts = (
+            ("source_inventory_entries", 4505),
+            ("owned_replacements", 57),
+            ("staged_files", 4526),
+            ("staged_links", 4),
+        )
+    else:
+        counts = (
+            ("source_inventory_entries", 4505),
+            ("owned_replacements", 60),
+            ("staged_files", 4527),
+            ("staged_links", 4),
+        )
+    for key, count in counts:
         require(type(record[key]) is int and record[key] == count)
     try:
         validate_products(record["products"])
@@ -2209,7 +2285,7 @@ def observe_products(source, owner, *, repository=None):
     return validate_products(result)
 
 
-SOURCE_FACTORY_SHA256 = "8485a317bb3e1f0cd6a4b290246114e42266b5b9771f12cb1fe1f45e18ace265"
+SOURCE_FACTORY_SHA256 = "70d90ede3bdfbf44e146ba4a26f101ebfec2a1745bc05a8260db001d5a236537"
 _SOURCE_FACTORY = None
 
 
@@ -2377,6 +2453,7 @@ def dependency_ready(repository, owner, seconds):
     deadline = time.monotonic() + seconds
     factory = _source_factory()
     _factory_operation(factory, factory.capture_dependencies, Path(repository), deadline)
+    _factory_operation(factory, factory.capture_vhd_dependencies, Path(repository), deadline)
     check_deadline(deadline)
     return factory
 
@@ -2562,6 +2639,7 @@ def _compile_owned(
         )
         factory = _source_factory()
         _factory_operation(factory, factory.capture_dependencies, Path(repository), deadline)
+        _factory_operation(factory, factory.capture_vhd_dependencies, Path(repository), deadline)
         if shipping_sink is not None:
             shipping_sink.current(deadline)
         _REQUIRE(
@@ -2650,7 +2728,9 @@ def _compile_owned(
         _current_build_inputs(inputs, deadline, image)
         check_deadline(deadline)
         record = {
-            "schema": 1,
+            "schema": 2,
+            "source_profile": CURRENT_OWNED_SOURCE_PROFILE,
+            "source_factory_sha256": CURRENT_OWNED_SOURCE_FACTORY_SHA256,
             "status": "passed",
             "qualification": "unsigned_actual_owned_four_target_compilation",
             "budget_seconds": seconds,
@@ -2670,7 +2750,7 @@ def _compile_owned(
             "signing_executed": False,
             "auth_executed": False,
         }
-        validate_owned_record(record)
+        validate_current_owned_record(record)
         pending_receipt = owner / ".owned-native-build-result.pending.json"
         BASE.write_json(pending_receipt, record)
         _current_build_inputs(inputs, deadline, image)

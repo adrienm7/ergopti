@@ -10,7 +10,8 @@ from pathlib import Path
 import stat
 import sys
 
-BUILDER_SHA256 = "cfae5cc9d67537b0caa2b70b70672f828e666fac72c5e04e0b0a02890aaa1a16"
+BUILDER_SHA256 = "fa6a6915e9152adf3704dde17848d5a2f03866e38c9335b9bcbb09c1c9ae1bef"
+BUILDER_SOURCE_BYTES = 132154
 MAX_RECORD_BYTES = 4096
 MAX_CAPTURE_BYTES = 32 * 1024 * 1024
 MAX_PUBLIC_BYTES = 2048
@@ -65,7 +66,14 @@ def source_image(path, wanted, sources):
     before = path.lstat()
     require(path.resolve(strict=True) == path and stat.S_ISREG(before.st_mode))
     require(before.st_uid == os.geteuid() and before.st_nlink == 1)
-    require(not before.st_mode & 0o022 and 0 < before.st_size <= 128 * 1024)
+    require(
+        not before.st_mode & 0o022
+        and (
+            before.st_size == BUILDER_SOURCE_BYTES
+            if wanted == BUILDER_SHA256
+            else 0 < before.st_size <= 128 * 1024
+        )
+    )
     descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     sources.append((path, descriptor, before))
     require(identity(os.fstat(descriptor)) == identity(before))

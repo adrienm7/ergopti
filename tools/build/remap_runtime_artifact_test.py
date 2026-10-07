@@ -494,6 +494,9 @@ class ActualBuilderCustodyControls(unittest.TestCase):
         for relative in (
             "tools/build/remap_runtime_artifact.py",
             "tools/build/remap_runtime_build.py",
+            "tools/build/remap_runtime_source.py",
+            "tools/build/remap_runtime_vhd.hpp",
+            "tools/build/remap_runtime_vhd_transport.py",
             "tools/diagnostics/hs274_native_build.py",
         ):
             source = MODULE_PATH.resolve().parents[2] / relative
@@ -516,6 +519,9 @@ class ActualBuilderCustodyControls(unittest.TestCase):
         self.factory = SimpleNamespace(
             SourceRefusal=RuntimeError,
             capture_dependencies=lambda repository, deadline: None,
+            # This modeled preflight returns no genuine source/broker capability.
+            # Separate negative controls inspect the physically copied fixed inputs.
+            capture_vhd_dependencies=lambda repository, deadline: None,
             prepare_owned_source=lambda repository, pristine, deadline: self.projection,
             current_staged_source=lambda image, deadline: None,
         )
@@ -526,7 +532,7 @@ class ActualBuilderCustodyControls(unittest.TestCase):
                 "vhd": self.builder.BASE.VIRTUAL_HID,
             },
             inventory=tuple(range(4505)),
-            replacements=tuple(range(57)),
+            replacements=tuple(range(60)),
             repository=self.repository,
         )
         patches = (
@@ -539,7 +545,7 @@ class ActualBuilderCustodyControls(unittest.TestCase):
             patch.object(self.builder, "capture_generated_inputs", side_effect=self.generated),
             patch.object(self.builder, "validate_plist", return_value=None),
             # Modeled endpoints cannot satisfy real native inventory metadata.
-            patch.object(self.builder, "validate_owned_record", return_value=None),
+            patch.object(self.builder, "validate_current_owned_record", return_value=None),
         )
         for item in patches:
             item.start()

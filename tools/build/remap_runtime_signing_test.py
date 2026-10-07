@@ -470,7 +470,9 @@ class DistributionSigningCustodyControls(unittest.TestCase):
         self.addCleanup(self.case.doCleanups)
         self.repository = HERE.parents[1]
         factory = BUILDER._source_factory()
-        dependencies = factory.capture_dependencies(self.repository, self.case.deadline)
+        dependencies = factory.capture_dependencies(
+            self.repository, self.case.deadline
+        ) + factory.capture_vhd_dependencies(self.repository, self.case.deadline)
         sample = BUILDER.InputFile("src/share/retained.hpp", (), b"MODELED CAPTURED SOURCE")
         self.case.inputs = SimpleNamespace(files=(sample,))
         self.case.image = SimpleNamespace(
@@ -479,6 +481,17 @@ class DistributionSigningCustodyControls(unittest.TestCase):
         )
         original = load("distribution_closed_record_fixture", HERE / "remap_runtime_build_test.py")
         self.case.record = original.OwnedRecordControls().record()
+        # Modeled compiler metadata follows the fixed current source contract;
+        # the independent historical schema-1 oracle remains unchanged.
+        self.case.record.update(
+            schema=2,
+            source_profile="owned_vhd_broker_source_v1",
+            source_factory_sha256="70d90ede3bdfbf44e146ba4a26f101ebfec2a1745bc05a8260db001d5a236537",
+            source_inventory_entries=4505,
+            owned_replacements=60,
+            staged_files=4527,
+            staged_links=4,
+        )
         for phase in ("xcode_version", "xcodegen_version", "sdk_path"):
             for channel, data in (("stdout", b"MODELED TOOL OBSERVATION"), ("stderr", b"")):
                 path = self.case.owner / (phase + "." + channel)

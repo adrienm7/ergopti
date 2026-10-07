@@ -28,7 +28,7 @@ sys.modules[_spec.name] = F
 exec(compile(_data, str(_path), "exec"), F.__dict__)
 FixtureRefusal = F.FixtureRefusal
 require = F.require
-BUILDER_SHA256 = "cfae5cc9d67537b0caa2b70b70672f828e666fac72c5e04e0b0a02890aaa1a16"
+BUILDER_SHA256 = "fa6a6915e9152adf3704dde17848d5a2f03866e38c9335b9bcbb09c1c9ae1bef"
 TARGETS = (
     (
         "Runtime/ErgoptiPlus-Remap-Core.app/Contents/MacOS/ErgoptiPlus-Remap-Core",
@@ -243,9 +243,11 @@ def observe(repository, owner, public_leaf, captures):
     sys.modules[spec.name] = builder
     exec(compile(builder_source.data, str(builder_source.path), "exec"), builder.__dict__)
     factory = builder._source_factory()
-    dependencies = factory.capture_dependencies(repository, deadline)
+    dependencies = factory.capture_dependencies(
+        repository, deadline
+    ) + factory.capture_vhd_dependencies(repository, deadline)
     metadata = F.ordinary(owner / "owned-native-build-result.json", 0o600, 2 * 1024 * 1024)
-    builder.validate_owned_record(builder.parse_json(metadata.data))
+    builder.validate_current_owned_record(builder.parse_json(metadata.data))
     leaf = F.ordinary(public_leaf, 0o644, 1024 * 1024)
     identity = hashlib.sha1(leaf.data).hexdigest().upper()
     unsigned = owner / ".unsigned-runtime-preparation"
@@ -293,7 +295,9 @@ def observe(repository, owner, public_leaf, captures):
             and set(_inventory(signed)[0]) == set(actual),
             "inventory_changed",
         )
-        fresh = factory.capture_dependencies(repository, deadline)
+        fresh = factory.capture_dependencies(
+            repository, deadline
+        ) + factory.capture_vhd_dependencies(repository, deadline)
         require(fresh == dependencies, "source_changed")
 
     def command(args):

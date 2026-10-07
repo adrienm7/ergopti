@@ -14,7 +14,7 @@ import stat
 import sys
 import time
 
-BUILD_SHA256 = "cfae5cc9d67537b0caa2b70b70672f828e666fac72c5e04e0b0a02890aaa1a16"
+BUILD_SHA256 = "fa6a6915e9152adf3704dde17848d5a2f03866e38c9335b9bcbb09c1c9ae1bef"
 MAX_FILE_BYTES = 128 * 1024 * 1024
 MAX_TOTAL_BYTES = 512 * 1024 * 1024
 MAX_MEMBERS = 2048
@@ -271,7 +271,7 @@ def _observe(repository, owner, *, compilation_only):
     try:
         raw = _read(owner / "owned-native-build-result.json", deadline, cuts, maximum=_CODE_BYTES)
         record = build.parse_json(raw)
-        build.validate_owned_record(record)
+        build.validate_current_owned_record(record)
     except build.BASE.NativeBuildError as error:
         raise ObservationRefusal("metadata") from error
     _recut(cuts, deadline)

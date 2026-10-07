@@ -77,6 +77,17 @@ OWNED_REFUSAL_DIAGNOSTIC = """			XCTAssertEqual(compiled.status, 0, "Retired own
 """
 
 
+FIXED_BUILDER_SIZE_ADDITION = '\n\tfunc testPortableFixedBuilderImageSizeKeepsOrdinarySourceBounds() throws {\n\t\tlet modes: [[String]] = [[], ["-O"]]\n\t\tfor mode in modes {\n\t\t\ttry fixture { root in\n\t\t\t\tlet script = source("hs274_native_build.py").deletingLastPathComponent()\n\t\t\t\t\t.appendingPathComponent("hs274_builder_image_size_test.py")\n\t\t\t\tlet receipt = try run(URL(fileURLWithPath: "/usr/bin/env"),\n\t\t\t\t\t["python3"] + mode + [script.path], root: root)\n\t\t\t\tXCTAssertEqual(receipt.status, 0)\n\t\t\t\tXCTAssertTrue(receipt.stdout.isEmpty)\n\t\t\t\tXCTAssertTrue(receipt.stderr.contains("Ran 5 tests in "))\n\t\t\t\tXCTAssertTrue(receipt.stderr.hasSuffix("\\nOK\\n"))\n\t\t\t}\n\t\t}\n\t}\n'
+
+
+PRODUCT_CURRENTNESS_ADDITION = '\n\tfunc testPortableProductCurrentnessCutsPreserveOriginalRefusals() throws {\n\t\tlet modes: [[String]] = [[], ["-O"]]\n\t\tfor mode in modes {\n\t\t\ttry fixture { root in\n\t\t\t\tlet script = source("hs274_native_build.py").deletingLastPathComponent()\n\t\t\t\t\t.deletingLastPathComponent().appendingPathComponent("build/remap_runtime_product_cut_test.py")\n\t\t\t\tlet receipt = try run(URL(fileURLWithPath: "/usr/bin/env"),\n\t\t\t\t\t["python3"] + mode + [script.path], root: root)\n\t\t\t\tXCTAssertEqual(receipt.status, 0)\n\t\t\t\tXCTAssertTrue(receipt.stdout.isEmpty)\n\t\t\t\tXCTAssertTrue(receipt.stderr.contains("Ran 6 tests in "))\n\t\t\t\tXCTAssertTrue(receipt.stderr.hasSuffix("\\nOK\\n"))\n\t\t\t}\n\t\t}\n\t}\n'
+
+
+FOLLOWING_PROFILE_ADDITION = '\n\tfunc testPortableCurrentOwnedProfileUsesPrivateActualSourceControls() throws {\n\t\tlet modes: [[String]] = [[], ["-O"]]\n\t\tfor mode in modes {\n\t\t\ttry fixture { root in\n\t\t\t\tlet script = source("hs274_native_build.py").deletingLastPathComponent()\n\t\t\t\t\t.deletingLastPathComponent().appendingPathComponent("build/remap_runtime_following_profile_test.py")\n\t\t\t\tlet receipt = try run(URL(fileURLWithPath: "/usr/bin/env"),\n\t\t\t\t\t["python3"] + mode + [script.path], root: root)\n\t\t\t\tXCTAssertEqual(receipt.status, 0)\n\t\t\t\tXCTAssertEqual(receipt.stdout,\n\t\t\t\t\t"PASS portable current owned source profile tests=17 failures=0 errors=0 skipped=0 native=unexecuted\\n")\n\t\t\t\tXCTAssertTrue(receipt.stderr.contains("Ran 17 tests in "))\n\t\t\t\tXCTAssertTrue(receipt.stderr.hasSuffix("\\nOK\\n"))\n\t\t\t}\n\t\t}\n\t}\n'
+CURRENT_PROFILE_CONSUMER = "module.validate_current_owned_record(module.parse_json(row.data))"
+HISTORICAL_PROFILE_CONSUMER = "module.validate_owned_record(module.parse_json(row.data))"
+
+
 class PortableSourceTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -122,6 +133,14 @@ class PortableSourceTests(unittest.TestCase):
 
     def test_existing_caller_exact_inverse_and_post_products_guard(self):
         current = (CANDIDATE / SWIFT_PATH).read_text()
+        self.assertEqual(current.count(FIXED_BUILDER_SIZE_ADDITION), 1)
+        current = current.replace(FIXED_BUILDER_SIZE_ADDITION, "", 1)
+        self.assertEqual(current.count(PRODUCT_CURRENTNESS_ADDITION), 1)
+        current = current.replace(PRODUCT_CURRENTNESS_ADDITION, "", 1)
+        self.assertEqual(current.count(FOLLOWING_PROFILE_ADDITION), 1)
+        current = current.replace(FOLLOWING_PROFILE_ADDITION, "", 1)
+        self.assertEqual(current.count(CURRENT_PROFILE_CONSUMER), 1)
+        current = current.replace(CURRENT_PROFILE_CONSUMER, HISTORICAL_PROFILE_CONSUMER, 1)
         self.assertEqual(current.count(OWNED_REFUSAL_DIAGNOSTIC), 1)
         current = current.replace(
             OWNED_REFUSAL_DIAGNOSTIC, "\t\t\tXCTAssertEqual(compiled.status, 0)\n", 1

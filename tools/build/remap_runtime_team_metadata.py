@@ -11,7 +11,7 @@ import stat
 import sys
 import time
 
-BUILDER_SHA256 = "cfae5cc9d67537b0caa2b70b70672f828e666fac72c5e04e0b0a02890aaa1a16"
+BUILDER_SHA256 = "fa6a6915e9152adf3704dde17848d5a2f03866e38c9335b9bcbb09c1c9ae1bef"
 HEADER_SHA256 = "f6b921d8ce74938463b6d28dc50bda457755da1602f62c9e52e8bba760604a75"
 CONTROL_SHA256 = "8ead4c6e4b9100d58d91d3464a6349a4b69891c6017b4e9ffecabb0c233fc947"
 CORPUS_SHA256 = "fe38a9f21227093543541d9f19cfdaf0bd7c052f15f7dc18dff6a0a4558ec335"
@@ -116,7 +116,7 @@ def run(repository, owned, owner):
         owned / "owned-native-build-result.json", owned, builder.BASE.MAX_INPUT_BYTES
     )
     record = builder.parse_json(record_image.data)
-    builder.validate_owned_record(record)
+    builder.validate_current_owned_record(record)
     actual_generated = [
         {
             "path": row.path,

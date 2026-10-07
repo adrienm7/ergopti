@@ -1947,3 +1947,52 @@ host inode/file operations are exercised. Native Swift execution is unperformed
 on Linux. The existing eight-variant native producer, independent expectations,
 assertions and deadlines are unchanged. WP7, item31 and transverse16/38 remain
 partial; no TODO item is removed by this slice.
+
+## Closed following VHD source projection and coherent consumer binding
+
+The actual pinned upstream source receives the authenticated official broker
+prerequisites through a following projection. The original57-output renderer and
+historical schema1/41-control oracle remain intact. Current metadata is separately
+schema2, tied to the exact following factory, with34 dependencies,31 original
+inputs,60 replacements,4527 ordinary staged files and four symbolic links. A stale
+4526-file currentness guard refused the real healthy stage; a one-count correction
+now passes27 unchanged physical cases over the actual190 MB source tree, including
+missing/extra leaves, same-byte incarnation replacement and symlink changes.
+
+The current validator, factory loader, all four actual builder consumers and two
+test-source bindings form one coherent cohort. Artifact40, preparation46 and
+signing45 fixtures retain every original test body/assertion and supply explicit
+handwritten current-profile inputs; they do not regenerate the historical oracle.
+The existing seven-case historical Swift comparison reverses only exact declared
+new methods and current API additions before its unchanged compressed expectation.
+Separate SDK methods invoke the new17 current-profile, six product-currentness
+and five exact-builder-image controls in normal and optimized modes.
+
+Failure-only product observations classify the original three fixed currentness
+messages without altering their errors, guards, filesystem reads, native arguments
+or deadlines. The journal keeps its eleven fields and512-record/128 KiB limits.
+The reviewed following builder was eight bytes below the passive source reader's
+128 KiB ceiling; the diagnostic makes its exact image132154 bytes. Only that
+already-pinned builder now requires its exact byte count before opening. Every
+other input retains the original128 KiB limit and all hash/incarnation guards.
+The original25 observer controls remain unchanged; the failing predecessor,
+private missing-Swift replay and corrected meaningful negatives are retained.
+
+Independent source reviews qualify these finite source cuts and their declared
+inverses. Genuine Asio/PQRs wire, descriptor and retirement controls are distinct
+from explicitly modeled Security/audit/official-reference ports. No actual Darwin
+compiler, signed broker, initialization/ready, protected-root ownership, production
+capture or hardware acceptance follows from the portable controls. The separate
+positive protected-root broker test is held and unregistered. No extra fresh300s
+producer is added to the existing native case, and no native budget is increased.
+
+Authentic manual37593824199/cb35 completed412 XCTest cases:385 passed,12 failed
+and15 skipped;35 reported failure events include six unexpected events. Its
+retained journals show completed Duktape and Core builds plus both architectures;
+whole four-target compilation and unsigned preparation expire at their unchanged
+deadline. They do not reproduce the earlier product source-identity refusal.
+The signer reports private_creation/canonical_path but cannot identify the two
+ancestry callers within that stage; the permission operation reports its deadline.
+Packaging fails and installation/Release skip. The new projection still requires
+final-source native execution and separate service/capture integration. Item31
+and transverse16/38 stay open; no Group5 TODO item is removed by this slice.

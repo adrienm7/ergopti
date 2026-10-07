@@ -23,6 +23,55 @@ extension HS274NativePolicyQualificationTests {
 		}
 	}
 
+	func testPortableCurrentOwnedProfileUsesPrivateActualSourceControls() throws {
+		let modes: [[String]] = [[], ["-O"]]
+		for mode in modes {
+			try fixture { root in
+				let script = source("hs274_native_build.py").deletingLastPathComponent()
+					.deletingLastPathComponent().appendingPathComponent("build/remap_runtime_following_profile_test.py")
+				let receipt = try run(URL(fileURLWithPath: "/usr/bin/env"),
+					["python3"] + mode + [script.path], root: root)
+				XCTAssertEqual(receipt.status, 0)
+				XCTAssertEqual(receipt.stdout,
+					"PASS portable current owned source profile tests=17 failures=0 errors=0 skipped=0 native=unexecuted\n")
+				XCTAssertTrue(receipt.stderr.contains("Ran 17 tests in "))
+				XCTAssertTrue(receipt.stderr.hasSuffix("\nOK\n"))
+			}
+		}
+	}
+
+	func testPortableProductCurrentnessCutsPreserveOriginalRefusals() throws {
+		let modes: [[String]] = [[], ["-O"]]
+		for mode in modes {
+			try fixture { root in
+				let script = source("hs274_native_build.py").deletingLastPathComponent()
+					.deletingLastPathComponent().appendingPathComponent("build/remap_runtime_product_cut_test.py")
+				let receipt = try run(URL(fileURLWithPath: "/usr/bin/env"),
+					["python3"] + mode + [script.path], root: root)
+				XCTAssertEqual(receipt.status, 0)
+				XCTAssertTrue(receipt.stdout.isEmpty)
+				XCTAssertTrue(receipt.stderr.contains("Ran 6 tests in "))
+				XCTAssertTrue(receipt.stderr.hasSuffix("\nOK\n"))
+			}
+		}
+	}
+
+	func testPortableFixedBuilderImageSizeKeepsOrdinarySourceBounds() throws {
+		let modes: [[String]] = [[], ["-O"]]
+		for mode in modes {
+			try fixture { root in
+				let script = source("hs274_native_build.py").deletingLastPathComponent()
+					.appendingPathComponent("hs274_builder_image_size_test.py")
+				let receipt = try run(URL(fileURLWithPath: "/usr/bin/env"),
+					["python3"] + mode + [script.path], root: root)
+				XCTAssertEqual(receipt.status, 0)
+				XCTAssertTrue(receipt.stdout.isEmpty)
+				XCTAssertTrue(receipt.stderr.contains("Ran 5 tests in "))
+				XCTAssertTrue(receipt.stderr.hasSuffix("\nOK\n"))
+			}
+		}
+	}
+
 	func testActualFreshBaselineRetiresBeforeSeparateOwnedFourTargetCompilation() throws {
 		let parent = try compilationEvidenceParent()
 		try fixture(parent: parent) { root in
@@ -107,7 +156,7 @@ extension HS274NativePolicyQualificationTests {
 			module.owned_output(0,sys.argv[3],"")
 			owner=Path(sys.argv[2])
 			row=module._ordinary(owner/"owned-native-build-result.json",owner,module.BASE.MAX_INPUT_BYTES)
-			module.validate_owned_record(module.parse_json(row.data))
+			module.validate_current_owned_record(module.parse_json(row.data))
 			print("PASS closed actual owned result; signing and activation unqualified")
 			"""#
 			let ownedEvidence = try run(URL(fileURLWithPath: "/usr/bin/env"),

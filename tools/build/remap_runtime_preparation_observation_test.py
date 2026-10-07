@@ -69,6 +69,9 @@ class ObservationControls(unittest.TestCase):
         for relative in (
             "tools/build/remap_runtime_build.py",
             "tools/build/remap_runtime_patch.py",
+            "tools/build/remap_runtime_source.py",
+            "tools/build/remap_runtime_vhd.hpp",
+            "tools/build/remap_runtime_vhd_transport.py",
             "tools/diagnostics/hs274_native_build.py",
         ):
             source = HERE.parents[1] / relative
@@ -109,6 +112,17 @@ class ObservationControls(unittest.TestCase):
         )
         (self.output / "Runtime/bin/ergoptiplus_remap_cli").chmod(0o755)
         self.record = ORIGINAL.OwnedRecordControls().record()
+        # Handwritten following-profile metadata from the independently frozen
+        # genuine4505 inventory; synthetic product bytes grant no native authority.
+        self.record.update(
+            schema=2,
+            source_profile="owned_vhd_broker_source_v1",
+            source_factory_sha256="70d90ede3bdfbf44e146ba4a26f101ebfec2a1745bc05a8260db001d5a236537",
+            source_inventory_entries=4505,
+            owned_replacements=60,
+            staged_files=4527,
+            staged_links=4,
+        )
         for row, (_, relative) in zip(self.record["products"], PRODUCTS, strict=True):
             data = (self.stage / relative).read_bytes()
             row.update(sha256=hashlib.sha256(data).hexdigest(), bytes=len(data))

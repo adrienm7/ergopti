@@ -540,12 +540,115 @@ def _assemble_outputs(originals, dependencies, absolute_deadline):
     return tuple(sorted(prepared.items()))
 
 
+# The retained official-broker prerequisite is a following, separately closed
+# projection. The original 32-input/57-output auth renderer remains intact.
+VHD_DEPENDENCIES = (
+    (
+        "tools/build/remap_runtime_vhd.hpp",
+        "53b887aab0d3247538123c69c65d8e4aa82eff3cac17f15ccbfabd4a5fcaa24e",
+    ),
+    (
+        "tools/build/remap_runtime_vhd_transport.py",
+        "53f434f3b56a28364792da77d291eb622daa8310f313ef8551da0e0335bf81cb",
+    ),
+)
+VHD_ORIGINAL_INPUTS = (
+    (
+        "src/apps/CoreService/include/core_service/daemon/device_grabber.hpp",
+        "9aa96f3ce8e2cc8c07a08f4c0d4630d6a70f82d7959030289b7b0e21c6e7a43a",
+    ),
+    (
+        "vendor/Karabiner-DriverKit-VirtualHIDDevice/include/pqrs/karabiner/driverkit/virtual_hid_device_service/client.hpp",
+        "0e590ff9f652a92dd40fb9c47dd0d61e98f4eb14f0983918a29b223f9c27a8c7",
+    ),
+)
+VHD_NATIVE_HEADER = "src/share/remap_runtime_vhd.hpp"
+
+
+def capture_vhd_dependencies(repository, absolute_deadline):
+    require(
+        type(VHD_DEPENDENCIES) is tuple
+        and tuple(path for path, _ in VHD_DEPENDENCIES)
+        == ("tools/build/remap_runtime_vhd.hpp", "tools/build/remap_runtime_vhd_transport.py"),
+        "dependency_unreleased",
+        "Official broker dependency scope differs",
+    )
+    rows = []
+    for relative, expected in VHD_DEPENDENCIES:
+        row = read_input(repository, relative, 8 * 1024 * 1024, absolute_deadline)
+        require(
+            hashlib.sha256(row.data).hexdigest() == expected,
+            "dependency_changed",
+            "Actual official broker source dependency changed",
+        )
+        rows.append(row)
+    return tuple(rows)
+
+
+def _assemble_vhd_outputs(originals, dependencies, absolute_deadline):
+    require(
+        type(originals) is dict
+        and type(dependencies) is tuple
+        and tuple((row.path, hashlib.sha256(row.data).hexdigest()) for row in dependencies)
+        == DEPENDENCIES + VHD_DEPENDENCIES,
+        "dependency_changed",
+        "Complete official broker source inventory differs",
+    )
+    base_originals = dict(originals)
+    for path, expected in VHD_ORIGINAL_INPUTS:
+        require(
+            path in base_originals
+            and type(base_originals[path]) is bytes
+            and hashlib.sha256(base_originals[path]).hexdigest() == expected,
+            "preimage",
+            "Actual official broker caller preimage differs",
+        )
+        del base_originals[path]
+    base = dict(_assemble_outputs(base_originals, dependencies[:32], absolute_deadline))
+    require(len(base) == 57, "inventory", "Original auth projection scope differs")
+    by_path = {row.path: row for row in dependencies}
+    transport = load_fixed(
+        "fixed_official_vhd_source_transport", by_path["tools/build/remap_runtime_vhd_transport.py"]
+    )
+    require(
+        tuple(path for path, _ in transport.PREIMAGES)
+        == (
+            "vendor/vendor/include/pqrs/unix_domain_stream/client.hpp",
+            "vendor/vendor/include/pqrs/unix_domain_stream/impl/peer.hpp",
+            "vendor/vendor/include/pqrs/unix_domain_stream/impl/request_manager.hpp",
+            *tuple(path for path, _ in VHD_ORIGINAL_INPUTS),
+        ),
+        "inventory",
+        "Official broker following projection scope differs",
+    )
+    selected = {
+        path: base[path] if path in base else originals[path] for path, _ in transport.PREIMAGES
+    }
+    changed = transport.assemble_vhd_transport(
+        selected, by_path["tools/build/remap_runtime_vhd.hpp"].data, absolute_deadline
+    )
+    require(set(changed) == set(selected), "inventory", "Official broker output scope differs")
+    old_unchanged = {path: data for path, data in base.items() if path not in changed}
+    require(len(old_unchanged) == 54, "inventory", "Original auth conserved scope differs")
+    base.update(changed)
+    require(VHD_NATIVE_HEADER not in base, "inventory", "Official broker header already owned")
+    base[VHD_NATIVE_HEADER] = by_path["tools/build/remap_runtime_vhd.hpp"].data
+    require(
+        len(base) == 60 and all(base[path] == data for path, data in old_unchanged.items()),
+        "inventory",
+        "Complete following projection or conserved auth bytes differ",
+    )
+    return tuple(sorted(base.items()))
+
+
 def prepare_owned_source(repository, upstream, absolute_deadline):
     """Return immutable exact changes only after all real pins/preimages revalidate."""
     deadline(absolute_deadline)
     repository, upstream = Path(repository), Path(upstream)
     repo_id, source_id = root_identity(repository), root_identity(upstream)
-    dependencies = capture_dependencies(repository, absolute_deadline)
+    dependencies = capture_dependencies(repository, absolute_deadline) + capture_vhd_dependencies(
+        repository, absolute_deadline
+    )
     by_path = {row.path: row for row in dependencies}
     provider = load_fixed(
         "fixed_owned_source_provider", by_path["tools/build/remap_runtime_patch.py"]
@@ -570,6 +673,9 @@ def prepare_owned_source(repository, upstream, absolute_deadline):
             "Stream original overlaps disagree",
         )
         wanted[path] = expected
+    for path, expected in VHD_ORIGINAL_INPUTS:
+        require(path not in wanted, "inventory", "Official broker original scope overlaps")
+        wanted[path] = expected
     original_rows = []
     for path, expected in wanted.items():
         row = read_input(upstream, path, provider.MAX_SOURCE_BYTES, absolute_deadline)
@@ -580,7 +686,7 @@ def prepare_owned_source(repository, upstream, absolute_deadline):
         )
         original_rows.append(row)
     originals = {row.path: row.data for row in original_rows}
-    replacements = _assemble_outputs(originals, dependencies, absolute_deadline)
+    replacements = _assemble_vhd_outputs(originals, dependencies, absolute_deadline)
     for path, _ in replacements:
         if path not in wanted:
             require(
@@ -628,7 +734,9 @@ def revalidate_owned_source(projection, absolute_deadline):
                 "Retained source input changed before publication",
             )
     require(
-        capture_dependencies(projection.repository, absolute_deadline) == projection.dependencies,
+        capture_dependencies(projection.repository, absolute_deadline)
+        + capture_vhd_dependencies(projection.repository, absolute_deadline)
+        == projection.dependencies,
         "dependency_changed",
         "Retained executable dependencies differ from the closed factory",
     )
@@ -654,7 +762,7 @@ def revalidate_owned_source(projection, absolute_deadline):
         "Retained source projection pins differ",
     )
     require(
-        _assemble_outputs(
+        _assemble_vhd_outputs(
             {row.path: row.data for row in projection.source_inputs},
             projection.dependencies,
             absolute_deadline,
@@ -689,8 +797,27 @@ def _staged_expectations(projection):
         path: (mode, digest) for path, mode, _, digest in projection.inventory if mode != "160000"
     }
     for path, data in projection.replacements:
+        if path == VHD_NATIVE_HEADER:
+            continue
         rows[path] = (rows.get(path, ("100644", ""))[0], hashlib.sha256(data).hexdigest())
     require(len(rows) == 4530, "inventory", "Actual full staged source inventory differs")
+    header = next(
+        (row for row in projection.dependencies if row.path == "tools/build/remap_runtime_vhd.hpp"),
+        None,
+    )
+    require(
+        header is not None
+        and dict(projection.replacements).get(VHD_NATIVE_HEADER) == header.data
+        and VHD_NATIVE_HEADER not in rows,
+        "inventory",
+        "Actual official broker header ownership differs",
+    )
+    rows[VHD_NATIVE_HEADER] = ("100644", hashlib.sha256(header.data).hexdigest())
+    require(
+        len(rows) == 4531,
+        "inventory",
+        "Actual official broker full staged source inventory differs",
+    )
     return rows
 
 
@@ -807,7 +934,7 @@ def current_staged_source(image, absolute_deadline):
     )
     expected = _staged_expectations(image.projection)
     require(
-        len(image.files) == 4526
+        len(image.files) == 4527
         and len(image.links) == 4
         and {row.path for row in image.files}
         == {path for path, (mode, _) in expected.items() if mode != "120000"}
