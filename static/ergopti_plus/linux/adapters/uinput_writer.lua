@@ -45,6 +45,7 @@
 --- ==============================================================================
 
 local M = {}
+local original_output_observer_factory, original_capture_output = nil, nil
 
 local Logger = require("logger.shim")
 local LOG = "adapters.uinput_writer"
@@ -301,6 +302,7 @@ local function close_owned(capability, transaction)
 	end
 	local acknowledged = destroyed and destroy_ack == true and closed and close_ack == true and same
 	if acknowledged then
+		output.retirement_ack = true
 		_output = nil
 		if _transaction ~= nil then _transaction.retired = true end
 		_transaction = nil
@@ -614,10 +616,12 @@ end
 
 --- Captures a fresh, strictly acknowledged channel before any untracked wire attempt.
 --- @return table|nil capability Opaque; carries no descriptor/backend.
+--- @return function|nil factory Original private observer issuer; grants no new rights.
 function M.capture_output()
 	if _busy or _debt or _transaction ~= nil or _fd == nil or not _strict_constructor or _legacy_wire then return nil end
 	if _output ~= nil then
-		return output_identity(_output) and _output.capability or nil
+		if output_identity(_output) then return _output.capability, original_output_observer_factory end
+		return nil
 	end
 	if _constructor_ports == nil or not rawequal(_constructor_ports.open, rawget(_backend, "open"))
 		or not rawequal(_constructor_ports.ioctl, rawget(_backend, "ioctl"))
@@ -629,7 +633,7 @@ function M.capture_output()
 	_output = { capability = capability, backend = _backend, fd = _fd,
 		write = rawget(_backend, "write"), ioctl = rawget(_backend, "ioctl"), close = rawget(_backend, "close"),
 		generation = _generation, write_epoch = 0, down = {}, roster_known = true }
-	return capability
+	return capability, original_output_observer_factory
 end
 
 --- Pure observation of one exact issued capability; never reads native state.
@@ -649,6 +653,45 @@ function M.output_view(capability)
 	table.sort(down)
 	return { generation = _output.generation, write_epoch = _output.write_epoch,
 		down = down, roster_known = _output.roster_known }
+end
+
+--- Captures a pure observer of this exact private output issuer.
+--- It accepts only the original capability and compares the caller's expected
+--- cursor/roster against private acknowledged state; public views grant no rights.
+--- @param capability table Original opaque output capability.
+--- @param capture_getter function|nil Original constructor getter when wiring input proof.
+--- @return function|nil observer No syscall, reservation, mutation or new authority.
+--- @return function|nil retired Exact original destroy/close acknowledgement only.
+function M.capture_output_observer(capability, capture_getter)
+	if capture_getter ~= nil and capture_getter ~= original_capture_output then return nil end
+	if not output_current(capability) then return nil end
+	local output = _output
+	if not output.observer then
+		local factory, view = M.capture_output_observer, M.output_view
+		output.observer = function(original, cursor, expected)
+			if not rawequal(original, output.capability) or not output_current(original)
+				or not rawequal(_output, output) or rawget(M, "capture_output_observer") ~= factory
+				or rawget(M, "output_view") ~= view or output.roster_known ~= true or cursor ~= output.write_epoch
+				or type(expected) ~= "table" or getmetatable(expected) ~= nil then return false end
+			local seen, count = {}, 0
+			for index, code in pairs(expected) do
+				if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > #expected
+					or type(code) ~= "number" or seen[code] or output.down[code] ~= true then return false end
+				seen[code], count = true, count + 1
+			end
+			if count ~= #expected then return false end
+			for code in pairs(output.down) do if seen[code] ~= true then return false end end
+			return true
+		end
+	end
+	if not output.retirement_observer then
+		-- This closure survives successor construction. It refers only to this
+		-- private original lifetime, never public views or the mutable current slot.
+		output.retirement_observer = function(original)
+			return rawequal(original, output.capability) and output.retirement_ack == true
+		end
+	end
+	return output.observer, output.retirement_observer
 end
 
 --- Emits one exact native key and its SYN through the captured channel.
@@ -841,5 +884,7 @@ M.UI_DEV_SETUP   = UI_DEV_SETUP
 M.UI_DEV_CREATE  = UI_DEV_CREATE
 M.UI_DEV_DESTROY = UI_DEV_DESTROY
 M.UINPUT_PATH = UINPUT_PATH
+
+original_output_observer_factory, original_capture_output = M.capture_output_observer, M.capture_output
 
 return M

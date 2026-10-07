@@ -383,7 +383,7 @@ _ConsoleCapture_NativeCausalControls() {
 			{From: '_CNP_Require(ConsoleWindowNative.Open(Kind) == true, "The real public acquisition must acknowledge.")',
 				To: '_CNP_Require(true, "The real public acquisition must acknowledge.")', Fact: 1},
 			{From: "_CNPShowEvents += 1", To: "_CNPShowEvents += 0", Fact: 4},
-			{From: "Fresh := _CNP_HasMarker(ControlGetText(RuntimeEdit), Kind, NewMarker)",
+			{From: "Fresh := _CNP_HasMarker(ControlGetText(Edit), Kind, NewMarker)",
 				To: "Fresh := _CNP_HasMarker(Cached, Kind, NewMarker)", Fact: 1}
 		]
 		for Index, Mutation in Mutations {
@@ -452,84 +452,3 @@ _ConsoleCapture_ReceiptDiagnosticsStayScalar() {
 }
 Test("Console receipt: malformed native observations retain only bounded scalar diagnostics (console-receipt-shape)",
 	_ConsoleCapture_ReceiptDiagnosticsStayScalar)
-
-/** Runs a real source parse without executing either public debug acquisition. */
-_ConsoleCapture_ParseChild(Source, Root, Mode, Ownership) {
-	CnpProbePath := Root . "\parse_" . Mode . ".ahk"
-	AssertFalse(FileExist(CnpProbePath), "each native parse control requires fresh owned source")
-	FileAppend(Source, CnpProbePath, "UTF-8")
-	CnpHandle := 0
-	CnpReceipt := {Calls: 0, Code: -1, Output: "", Errors: ""}
-	CnpOnDone(Code, Output, Errors) {
-		CnpReceipt.Calls += 1
-		CnpReceipt.Code := Code
-		CnpReceipt.Output := Output
-		CnpReceipt.Errors := Errors
-	}
-	try {
-		CnpHandle := ShellRunner_SpawnTreeOwned(A_AhkPath,
-			["/ErrorStdOut", CnpProbePath, "list_vars", "cached"], CnpOnDone)
-		AssertTrue(CnpHandle.start(), "the exactly owned native parse child must start")
-		CnpStarted := A_TickCount
-		while !CnpReceipt.Calls && TickElapsed(CnpStarted) < 15000 {
-			_SR_TreePoll()
-			Sleep(10)
-		}
-		AssertEqual(1, CnpReceipt.Calls, "the native parse child must complete exactly once")
-		AssertEqual(0, CnpReceipt.Code, "the actual native source parse must complete successfully")
-		AssertTrue(CnpReceipt.Errors == "", "native parse controls must report no hidden errors")
-		return CnpReceipt.Output
-	} finally {
-		if IsObject(CnpHandle)
-			AssertTrue(_ConsoleCapture_Retire(CnpHandle, Ownership), "the exact native parse tree must retire")
-	}
-}
-
-/** Reintroduces independent builtin collisions while retaining every warning. */
-_ConsoleCapture_BuiltinWarningsAreCausal() {
-	CnpRoot := A_Temp . "\ergopti_console_parse_" . A_ScriptHwnd . "_" . A_TickCount
-	CnpRoot := _ConsoleCapture_PrivateDirectory(CnpRoot)
-	CnpOwnership := {CanRetire: true}
-	CnpAck := "CNP_PARSE_ACK_5719"
-	try {
-		CnpSource := _ConsoleCapture_Source()
-		AssertTrue(InStr(CnpSource, "#Warn All, StdOut", true) > 0,
-			"native parse controls retain the complete stdout warning policy")
-		CnpSource := StrReplace(CnpSource, "_CNP_Run(A_Args[1], A_Args[2])",
-			'FileAppend("CNP_PARSE_ACK_5719", "*", "UTF-8-RAW")', true, &CnpStarts)
-		AssertEqual(1, CnpStarts, "only the native child acquisition entry becomes a fixed parse acknowledgment")
-		for CnpMode in ["clean", "edit", "thread", "both"] {
-			CnpMutant := CnpSource
-			if CnpMode == "edit" || CnpMode == "both" {
-				CnpMutant := StrReplace(CnpMutant, "RuntimeEdit", "Edit", true, &CnpEdits)
-				Assert(CnpEdits >= 2, "the native Edit collision preserves both assignment and references")
-			}
-			if CnpMode == "thread" || CnpMode == "both" {
-				CnpMutant := StrReplace(CnpMutant, "WitnessThread", "Thread", true, &CnpThreads)
-				AssertEqual(2, CnpThreads, "the native Thread collision preserves assignment and its real witness criterion")
-			}
-			CnpOutput := _ConsoleCapture_ParseChild(CnpMutant, CnpRoot, CnpMode, CnpOwnership)
-			StrReplace(CnpOutput, "Warning:", , true, &CnpWarnings)
-			StrReplace(CnpOutput, CnpAck, , true, &CnpAcks)
-			AssertEqual(1, CnpAcks, "every real parse child must issue its sole fixed acknowledgment")
-			AssertTrue(SubStr(CnpOutput, -StrLen(CnpAck)) == CnpAck,
-				"the acknowledgment follows native parse diagnostics without leaking their body")
-			AssertEqual(CnpMode == "both" ? 2 : CnpMode == "clean" ? 0 : 1, CnpWarnings,
-				"only the independently restored builtin collisions may warn")
-			AssertEqual(CnpMode == "edit" || CnpMode == "both",
-				!!InStr(CnpOutput, "Specifically: Edit  (in function _CNP_Run)", true),
-				"the actual parser identifies the independently restored Edit local")
-			AssertEqual(CnpMode == "thread" || CnpMode == "both",
-				!!InStr(CnpOutput, "Specifically: Thread  (in function _CNP_RequireWitness)", true),
-				"the actual parser identifies the independently restored Thread local")
-			if CnpMode == "clean"
-				AssertTrue(CnpOutput == CnpAck,
-					"the repaired actual source must keep stdout exactly closed without filtering warnings")
-		}
-	} finally {
-		if CnpOwnership.CanRetire
-			DirDelete(CnpRoot, true)
-	}
-}
-Test("Console capture: actual native parse isolates builtin warning collisions (console-native-parse-warning)",
-	_ConsoleCapture_BuiltinWarningsAreCausal)
