@@ -6036,8 +6036,10 @@ and installation qualification are still required.
   cancellation and retirement. Complete cross-consumer parameters/concurrency
   and native Mac publication/lock qualification; the reviewed Mac program-helper
   and image-bound query source now belongs to this branch. Its original strict
-  publisher still refuses the genuine SwiftPM-created root Package.resolved
-  until that generator-owned input is admitted; signed helper execution is unrun. Native
+  publisher now includes the exact genuine SwiftPM-created root Package.resolved
+  as tracked source, with the Sparkle pin, complete input census and compiler
+  lock immutability unchanged. Final native tracked-input admission and signed
+  helper execution remain unrun. Native
   qualification: genuine Unicode/space/empty/literal argv, refused start, exit
   errors and cancellation, then final three-OS package/install/startup. Mac
   Sparkle/Brew/switcher package failures remain software/ownership blockers.
@@ -6151,13 +6153,15 @@ Final joined-source gates and remote Shortcut retirement remain required.
   including all four original held-source/capture/EOF/overflow/retirement cases.
   Actual dynamic self/stopped-child image validation and original deadlines
   remain enforced. Whole XCTest343:341 pass/two fail (Brew/Sparkle), six
-  assertions. The helper publisher refuses only the genuine302-byte SwiftPM
-  root Package.resolved; signed readonly helper and installation are unrun.
+  assertions. The exact genuine302-byte SwiftPM root Package.resolved is
+  now tracked without changing its Sparkle pin, cache policy or strict
+  input/staging census. Final native tracked64 admission, independent
+  clean regeneration, signed readonly helper and installation are unrun.
   The earlier setsid EPERM and unavailable C-global failures remain distinct
   historical receipts, not current causes or inferred TCC permission.
 
-  Remaining software/native qualification: admit the real generator-owned
-  lock without weakening strict input census, then qualify actual product
+  Remaining software/native qualification: qualify the tracked real
+  generator-owned lock with unchanged strict input census and actual product
   compile/sign/query, tap/timer/modifier retirement and switch delivery on the
   final joined source. Preserve distinct labels, current-pointer geometry,
   spanning-window placement, eligibility and activation refusal. Resolve the
