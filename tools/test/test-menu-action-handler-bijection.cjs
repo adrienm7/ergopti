@@ -610,6 +610,74 @@ function nativeFunctionReferenceKeys(source) {
 const errors = [];
 const summary = [];
 
+// Root ports also own declared transitive child rows, never arbitrary string neighbors.
+{
+	const owner = [
+		'local function build()',
+		' local function command() return real_action() end',
+		' local function children() return real_children end',
+		' return ManifestMenu.template_rows("parent_frame", { real_command = command }, {}, { real_children = children })',
+		'end'
+	].join('\n');
+	const graph = {
+		parent_frame: [{ type: 'include', section: 'middle_frame', platforms: ['hs'] }],
+		middle_frame: [{ type: 'include', section: 'child_frame' }],
+		child_frame: [
+			{ type: 'command', id: 'child_action', command: 'real_command' },
+			{ type: 'list', id: 'real_children' }
+		]
+	};
+	const proves = (source, manifest, key, port, platform = 'hs') =>
+		nativeTemplateBinding(
+			source,
+			'.lua',
+			'child_frame',
+			key,
+			port,
+			[{ src: source }],
+			manifest,
+			platform
+		);
+	assert.equal(proves(owner, graph, 'real_command', 1), true);
+	assert.equal(proves(owner, graph, 'real_children', 3), true);
+	assert.equal(proves(owner, graph, 'real_command', 3), false);
+	assert.equal(proves(owner, graph, 'real_children', 1), false);
+	for (const changed of [
+		owner.replace('real_command = command', 'real_command = "command"'),
+		owner.replace('return real_action()', ''),
+		owner.replace('return ManifestMenu', 'command = nil; return ManifestMenu'),
+		owner.replace('return ManifestMenu', 'local command; return ManifestMenu'),
+		owner.replace('ManifestMenu.template_rows', 'Foreign.ManifestMenu.template_rows'),
+		owner.replace('ManifestMenu.template_rows', '-- ManifestMenu.template_rows'),
+		owner.replace('"parent_frame"', '"unrelated_frame"')
+	])
+		assert.equal(proves(changed, graph, 'real_command', 1), false);
+	assert.equal(proves(owner, graph, 'real_command', 1, 'linux'), false);
+	for (const mutate of [
+		(copy) => {
+			copy.parent_frame = [];
+		},
+		(copy) => {
+			copy.parent_frame[0].section = 'missing_frame';
+		},
+		(copy) => {
+			delete copy.middle_frame;
+		},
+		(copy) => {
+			copy.middle_frame[0].section = 'unrelated_frame';
+			copy.unrelated_frame = [];
+		},
+		(copy) => {
+			copy.child_frame.push({ type: 'include', section: 'parent_frame' });
+		}
+	]) {
+		const changed = JSON.parse(JSON.stringify(graph));
+		mutate(changed);
+		assert.equal(proves(owner, changed, 'real_command', 1), false);
+		assert.equal(proves(owner, changed, 'real_children', 3), false);
+	}
+}
+
 for (const { key, driver, ext } of PLATFORMS) {
 	const base = path.join(SP, driver);
 	if (!fs.existsSync(base)) {
@@ -681,7 +749,13 @@ for (const { key, driver, ext } of PLATFORMS) {
 			!nativeReferences.has(id) &&
 			!nativeSources.some((native) => {
 				const row = manifest[section]?.find((r) => r.id === id);
-				if (!row || !['command', 'list'].includes(row.type) || !native.src.includes(section))
+				if (
+					!row ||
+					!['command', 'list'].includes(row.type) ||
+					!(
+						native.src.includes('template_rows') || native.src.includes('MenuRenderer_TemplateRows')
+					)
+				)
 					return false;
 				return nativeTemplateBinding(
 					native.src,
@@ -689,7 +763,9 @@ for (const { key, driver, ext } of PLATFORMS) {
 					section,
 					row.command || row.id,
 					row.type === 'list' ? 3 : 1,
-					nativeSources
+					nativeSources,
+					manifest,
+					key
 				);
 			})
 	);

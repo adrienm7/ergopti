@@ -5485,5 +5485,137 @@
 			"unavailable": "hide",
 			"label_prefix": "    "
 		}
+	],
+	"keyboard_group_frame": [
+		{
+			"type": "include",
+			"section": "keyboard_group_fixed_frame",
+			"present_when": "keyboard_group_has_fixed"
+		},
+		{
+			"type": "list",
+			"id": "keyboard_group_assigned_rows",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "include",
+			"section": "keyboard_group_add_option_control",
+			"present_when": "keyboard_group_add_option"
+		},
+		{
+			"type": "include",
+			"section": "keyboard_group_add_ctrl_control",
+			"present_when": "keyboard_group_add_ctrl"
+		},
+		{
+			"type": "include",
+			"section": "keyboard_group_add_ctrl_shift_control",
+			"present_when": "keyboard_group_add_ctrl_shift"
+		},
+		{
+			"type": "include",
+			"section": "keyboard_group_add_cmd_control",
+			"present_when": "keyboard_group_add_cmd"
+		},
+		{
+			"type": "include",
+			"section": "keyboard_group_add_cmd_shift_control",
+			"present_when": "keyboard_group_add_cmd_shift"
+		}
+	],
+	"keyboard_group_fixed_frame": [
+		{
+			"type": "list",
+			"id": "keyboard_group_fixed_rows",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "---",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"keyboard_group_add_option_control": [
+		{
+			"type": "command",
+			"id": "keyboard_group_add_option",
+			"command": "keyboard_group_add",
+			"i18n": "menu.shortcuts.alt_add",
+			"disabled_when": [
+				"keyboard_group_ready"
+			],
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"keyboard_group_add_ctrl_control": [
+		{
+			"type": "command",
+			"id": "keyboard_group_add_ctrl",
+			"command": "keyboard_group_add",
+			"i18n": "menu.shortcuts.ctrl_add",
+			"disabled_when": [
+				"keyboard_group_ready"
+			],
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"keyboard_group_add_ctrl_shift_control": [
+		{
+			"type": "command",
+			"id": "keyboard_group_add_ctrl_shift",
+			"command": "keyboard_group_add",
+			"i18n": "menu.shortcuts.ctrl_shift_add",
+			"disabled_when": [
+				"keyboard_group_ready"
+			],
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"keyboard_group_add_cmd_control": [
+		{
+			"type": "command",
+			"id": "keyboard_group_add_cmd",
+			"command": "keyboard_group_add",
+			"i18n": "menu.shortcuts.cmd_add",
+			"disabled_when": [
+				"keyboard_group_ready"
+			],
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"keyboard_group_add_cmd_shift_control": [
+		{
+			"type": "command",
+			"id": "keyboard_group_add_cmd_shift",
+			"command": "keyboard_group_add",
+			"i18n": "menu.shortcuts.cmd_shift_add",
+			"disabled_when": [
+				"keyboard_group_ready"
+			],
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
 	]
 }

@@ -4412,13 +4412,27 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 28, macOS 32, Linux 31, each
+  drivers still build (current baseline: Windows 28, macOS 31, Linux 31, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
   existing rows during the migration (proposal in the menu-first-group
   report: most hide; greyed: Linux edit_shortcuts, Linux key
   combinations, Linux metrics shortcut rows, Windows preview_bubbles).
+  The macOS keyboard group now consumes one complete shared frame: native
+  fixed children, their conditional boundary, assigned slots and the native
+  Add control. Complete declaration admission precedes genuine assignment and
+  caption reads; retained Add callbacks refuse while paused or disabled. All
+  21 existing translated captions and original picker/persistence owners stay
+  intact. Controlled tests pass 35/0; the eager predecessor fails all six new
+  source-read controls. Current live keyboard/parameter-label controls pass
+  38/0 using the actual renderer; typed port/include and full-tree parity
+  checks pass without raising their baselines. Selected formatting, all 364
+  JS checks, portable Mac E2E and 17,084 Mac unit assertions pass. Native
+  macOS qualification remains pending.
+  The owning generators retire one actual macOS separator site: 28/31/31.
+  This bounded migration does not complete the remaining menu families.
+
   The complete MagicKey source frame now consumes the canonical capture,
   automatic choice, candidate list and separators on all three drivers. Native
   selection, readiness and publication callbacks remain unchanged. Both owners
@@ -5525,7 +5539,7 @@ Current Group 3 source checkpoint (item 73, 2026-10-06): [Group 3 current checkp
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 28, macOS 32 and Linux 31 rows are still built by the
+  Windows 28, macOS 31 and Linux 31 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). Read on
   2026-10-01, the sites are of four kinds, and three of them need the
   manifest to say more than it can today:
@@ -5543,6 +5557,20 @@ Current Group 3 source checkpoint (item 73, 2026-10-06): [Group 3 current checkp
   sites): they follow (b), as part of the template;
   (d) the tray root bootstrap (Windows `tray_bootstrap.ahk`,
   `menu_init.ahk`).
+  The macOS keyboard group now consumes one complete shared frame: native
+  fixed children, their conditional boundary, assigned slots and the native
+  Add control. Complete declaration admission precedes genuine assignment and
+  caption reads; retained Add callbacks refuse while paused or disabled. All
+  21 existing translated captions and original picker/persistence owners stay
+  intact. Controlled tests pass 35/0; the eager predecessor fails all six new
+  source-read controls. Current live keyboard/parameter-label controls pass
+  38/0 using the actual renderer; typed port/include and full-tree parity
+  checks pass without raising their baselines. Selected formatting, all 364
+  JS checks, portable Mac E2E and 17,084 Mac unit assertions pass. Native
+  macOS qualification remains pending.
+  The owning generators retire one actual macOS separator site: 28/31/31.
+  This bounded migration does not complete the remaining menu families.
+
   Dynamic caption admission now validates the genuine English formatter
   before lazy getters, with literal and escaped-percent controls. It is a
   renderer prerequisite and does not retire native sites or close this item.

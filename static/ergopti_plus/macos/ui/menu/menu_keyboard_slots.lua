@@ -35,6 +35,7 @@ local ActionPicker = require("ui.action_picker")
 local ShortcutUtils = require("ui.menu.shortcut_utils")
 local KbShortcuts  = require("modules.shortcuts")
 local InputSourceConflict = require("modules.shortcuts.input_source_conflict")
+local ManifestMenu = require("infra.manifest_menu")
 local ShellRunner  = require("adapters.shell_runner")
 local dialog       = require("infra.dialog_util")
 
@@ -249,12 +250,38 @@ end
 ---     drawn first so one submenu holds every shortcut of that modifier.
 --- @return table rows
 local function build_group_rows(group, ctx, disabled, fixed_rows)
-	local rows = {}
+	local fixed = type(fixed_rows) == "table" and fixed_rows or {}
+	local assigned = {}
 	local gestures = ctx.gestures
 
-	if type(fixed_rows) == "table" and #fixed_rows > 0 then
-		for _, row in ipairs(fixed_rows) do rows[#rows + 1] = row end
-		rows[#rows + 1] = { separator = true }
+	local function add_for(prefix)
+		return function() return not group.fixed and group.prefix == prefix end
+	end
+	local getters = {
+		keyboard_group_has_fixed = function() return #fixed > 0 end,
+		keyboard_group_ready = function() return not disabled and ctx.paused ~= true and not group.fixed end,
+		keyboard_group_add_option = add_for("hs_option_"),
+		keyboard_group_add_ctrl = add_for("hs_ctrl_"),
+		keyboard_group_add_ctrl_shift = add_for("hs_ctrl_shift_"),
+		keyboard_group_add_cmd = add_for("cmd_"),
+		keyboard_group_add_cmd_shift = add_for("cmd_shift_"),
+	}
+	local function add_action()
+		if not getters.keyboard_group_ready() then return false end
+		return add_binding_to(group.prefix, ctx)
+	end
+	local function fixed_provider() return fixed end
+	local function assigned_provider() return assigned end
+	-- Admit the entire declared frame before querying the genuine assignment and
+	-- parameter owners. Empty assigned data exercises the same renderer policy.
+	local admission = ManifestMenu.template_rows("keyboard_group_frame", { keyboard_group_add = add_action }, getters, {
+		keyboard_group_fixed_rows = fixed_provider,
+		keyboard_group_assigned_rows = assigned_provider,
+	})
+	local fixed_count = #fixed + (#fixed > 0 and 1 or 0) + (not group.fixed and 1 or 0)
+	if type(admission) ~= "table" or #admission ~= fixed_count then
+		Logger.error(LOG, "Declared keyboard group admission refused for '%s'.", tostring(group.prefix))
+		return nil
 	end
 
 	for _, slot in ipairs(KbShortcuts.assigned_keyboard_slots(group.prefix)) do
@@ -263,19 +290,22 @@ local function build_group_rows(group, ctx, disabled, fixed_rows)
 			action_label = ParameterLabel.for_binding(gestures.get_action_label(slot.action) or slot.action,
 				gestures, KbShortcuts.keyboard_binding_id(slot.id), slot.action)
 		end
-		rows[#rows + 1] = {
+		assigned[#assigned + 1] = {
 			label    = KbShortcuts.get_keyboard_slot_label(slot.id) .. " : " .. action_label,
 			disabled = disabled or nil,
 			action   = function() choose_action_for(slot.id, ctx) end,
 		}
 	end
 
-	if not group.fixed then
-		rows[#rows + 1] = {
-			label    = i18n.get(group.add_key),
-			disabled = disabled or nil,
-			action   = function() add_binding_to(group.prefix, ctx) end,
-		}
+	local rows = ManifestMenu.template_rows("keyboard_group_frame", { keyboard_group_add = add_action }, getters, {
+		keyboard_group_fixed_rows = fixed_provider,
+		keyboard_group_assigned_rows = assigned_provider,
+	})
+	-- A withdrawn Add declaration must not publish a group with no creation port.
+	local expected = #fixed + (#fixed > 0 and 1 or 0) + #assigned + (not group.fixed and 1 or 0)
+	if type(rows) ~= "table" or #rows ~= expected then
+		Logger.error(LOG, "Declared keyboard group frame refused for '%s'.", tostring(group.prefix))
+		return nil
 	end
 	return rows
 end
@@ -292,10 +322,12 @@ function M.provide_rows(ctx, disabled, fixed_by_prefix)
 	local rows = {}
 	for _, group in ipairs(KbShortcuts.get_keyboard_slot_groups()) do
 		local fixed = type(fixed_by_prefix) == "table" and fixed_by_prefix[group.prefix] or nil
+		local items = build_group_rows(group, ctx, disabled, fixed)
+		if not items then return {} end
 		rows[#rows + 1] = {
 			label    = i18n.get(group.group_key),
 			disabled = disabled or nil,
-			items    = build_group_rows(group, ctx, disabled, fixed),
+			items    = items,
 		}
 	end
 	return rows
