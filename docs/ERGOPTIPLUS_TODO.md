@@ -5574,6 +5574,19 @@ The fixed Specifications and Capabilities frames of the Windows/macOS per-model 
       uncommitted in the local worktree of `fix/downloads-on-managed-networks`
       when the session stopped; redo it if that worktree is gone.
 
+The Linux Ollama archive continuation joins pinned artifact admission to the
+retained download descriptor, native SHA256, same-inode tar/zstd extraction and
+owned stage publication under the original absolute bootstrap deadline.
+Retained native debt blocks successors and publication. Seven additive modules
+are registered after the original two priority updater fixtures; all existing
+inventory entries and independent expectations remain intact. Separate private
+receiving preserves44 predecessor failures and44 candidate passes on each
+genuine Lua ABI. Six tiny authored TLS/archive outcomes cover successful
+publication, wrong digest and missing completion across both ABIs with actual
+native closure; these are not official Ollama or corporate-network acceptance.
+Final composed-source, real package/server/pull and installed-format receiving
+remain required before this item can close.
+
 The portable MLX fingerprint mirror now explicitly owns its fake UV route and
 clears inherited proxy, bypass and CA selections. The unchanged27 assertions
 reproduce21 passes/six failures without the old ambient relay, then pass27/0
