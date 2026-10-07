@@ -4748,6 +4748,25 @@ e871 native qualification reported xcodegen_transport and did not qualify Core
 compilation. This partial source tranche completes no WP6/runtime/install or
 capture acceptance; TODO31 and transverse16/38 stay open.
 
+The ordinary native test fixture's default parent now uses the same
+Foundation-selected temporary directory through the already tested Darwin
+realpath producer before its UUID child is created. The unchanged producer is
+shared only inside the XCTest module; its guards, errno handling, allocation,
+free and round-trip recut remain whole. Explicit parents retain lazy unchanged
+behavior. A new ordinary SDK integration case feeds this default owner to the
+unmodified independent source10 courier. All existing assertions, physical
+owner checks, corpora, cleanup and30/35/10 budgets remain intact.
+
+Independent source checks pass8 executions; the old source refuses6 assertions.
+The unchanged real POSIX courier refuses2 alias inputs and passes20 original
+source tests using the same physical canonical directory across normal/-O.
+Earlier actual Mac observations passed both original native parent controls,
+but the new caller and integration case remain native unexecuted. Actual e871
+portable stderr is absent from the uploaded artifact, so the Mac failure cause
+remains UNKNOWN; the separate XcodeGen HTTPS refusal is not fixed by this source
+change. No observed native regression is claimed resolved before targeted CI.
+TODO31 and transverse16/38 remain open.
+
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
   listed; see `docs/memory/text-input-and-config.md`. Current source already

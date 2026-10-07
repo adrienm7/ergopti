@@ -242,7 +242,7 @@ final class HS274NativePolicyQualificationTests: XCTestCase {
 
 	func fixture(parent: URL? = nil, _ body: (URL) throws -> Void) throws {
 		guard children.isEmpty else { throw FixtureError.ownership }
-		let root = (parent ?? manager.temporaryDirectory.resolvingSymlinksInPath())
+		let root = try (parent ?? nativeSigningParent(manager.temporaryDirectory))
 			.appendingPathComponent("ErgoptiHS274NativePolicy-" + UUID().uuidString)
 		try manager.createDirectory(at: root, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
 		let failuresBefore = try XCTUnwrap(testRun?.failureCount)
@@ -458,5 +458,21 @@ final class HS274NativePolicyQualificationTests: XCTestCase {
 			"{\"schema\":1,\"guardian_pid\":41,\"worker_pid\":42,\"group_id\":{\"value\":42},\"closed\":true,\"exit_status\":0}"
 		]
 		for packet in refused { XCTAssertFalse(Self.validTerminal(Data(packet.utf8), guardian: 41, status: 0)) }
+	}
+}
+
+extension HS274NativePolicyQualificationTests {
+	/// The independent Python courier retains its physical canonical-owner guard.
+	func testActualDefaultFixtureFeedsStrictOfflineSourceOwner() throws {
+		try fixture { root in
+			let script = source("hs274_native_build.py").deletingLastPathComponent()
+				.deletingLastPathComponent().appendingPathComponent("build/remap_runtime_vhd_fixture.py")
+			let receipt = try run(URL(fileURLWithPath: "/usr/bin/env"),
+				["python3", script.path, "--group", "source", "--owner", root.path], root: root)
+			XCTAssertEqual(receipt.status, 0)
+			XCTAssertEqual(receipt.stdout, "PASS portable VHD group=source tests=10; native=unexecuted\n")
+			XCTAssertTrue(receipt.stderr.contains("Ran 10 tests in "))
+			XCTAssertTrue(receipt.stderr.hasSuffix("\nOK\n"))
+		}
 	}
 }

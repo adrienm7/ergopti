@@ -2268,3 +2268,28 @@ The prior e871 native qualification refused xcodegen_transport; it grants no
 Core credit. JSON cannot transfer the actual held Core/source continuation.
 Whole artifact, signing, Main/root fixture, installation, readiness, capture
 and physical input remain separate. TODO31 and transverse16/38 stay open.
+
+## Physical default parents for native test fixtures
+
+The reviewed two-path correction shares the already tested Darwin realpath
+producer only within XCTest and calls it once for the ordinary fixture's
+same Foundation-selected default parent, before appending its UUID. The
+entire native helper body and all enums, guards, reads, source pins and original
+native assertions remain whole. Explicit parent behavior stays lazy and
+unchanged. One existing SDK registration adds a strict independent source10
+courier integration case through the original30/35/10 Guardian envelope.
+
+Independent source checks pass8 executions and refuse6 assertions on the old
+source. Genuine unchanged POSIX courier controls refuse2 alias inputs and pass20
+original source cases for their same physical canonical owner in normal/-O.
+These observations prove portable source admission only. Earlier actual Mac
+runs passed both native parent controls, while the new default caller and SDK
+integration remain unexecuted on Mac. Prior e871 portable stderr is absent
+from its uploaded artifact and the failure cause remains UNKNOWN. Its separate
+XcodeGen HTTPS acquisition refusal remains unresolved by this correction.
+
+The entire reviewed Corecaller dc2d and signer7 Swift4357 sources recover under
+precise inverses. No corpus, original assertion, budget, backend, credential,
+installation or production readiness policy changes. A new Mac CI must qualify
+the final source; no observed native failures are declared fixed. TODO31 and
+transverse16/38 remain open, and no item is removed.

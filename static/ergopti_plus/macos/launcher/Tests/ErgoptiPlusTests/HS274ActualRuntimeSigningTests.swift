@@ -12,7 +12,7 @@ private enum NativeSigningParentError: Error { case invalid; case system(Int32) 
 
 /// Produce the same Foundation-selected parent through the actual Darwin filesystem.
 /// The strict signer helper owns creation/custody; this producer acquires no authority.
-private func nativeSigningParent(_ selected: URL) throws -> URL {
+func nativeSigningParent(_ selected: URL) throws -> URL {
 	guard selected.isFileURL, selected.path.hasPrefix("/"),
 		!selected.path.utf8.contains(0) else { throw NativeSigningParentError.invalid }
 	return try selected.withUnsafeFileSystemRepresentation { input in
