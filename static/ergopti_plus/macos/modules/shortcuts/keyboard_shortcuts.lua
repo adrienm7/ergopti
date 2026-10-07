@@ -874,6 +874,22 @@ function M.physical_assignments()
 	return result
 end
 
+--- Captures private live keyboard assignment and lifecycle across native callbacks.
+--- @param binding string Canonical keyboard binding.
+--- @param action string Exact selected action.
+--- @return function|nil guard Pure terminal seal.
+function M.capture_action_delivery_guard(binding, action)
+	if type(binding) ~= "string" or binding:sub(1, #BINDING_PREFIX) ~= BINDING_PREFIX then return nil end
+	local slot = binding:sub(#BINDING_PREFIX + 1)
+	local assignments, lifecycle, configuration = _actions, _lifecycle_epoch, _configuration_generation
+	if assignments[slot] ~= action then return nil end
+	return function()
+		return _started and _delivery_enabled and not _editing and not _lifecycle_paused
+			and _actions == assignments and _actions[slot] == action
+			and _lifecycle_epoch == lifecycle and _configuration_generation == configuration
+	end
+end
+
 --- The binding a slot's action is dispatched under, and its parameter stored under.
 --- @param slot_id string
 --- @return string

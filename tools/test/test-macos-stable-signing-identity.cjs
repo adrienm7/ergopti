@@ -155,6 +155,8 @@ build_launcher() { printf '%s\\n' "$T/launcher.bin"; }
 assemble_native_runtime() {
 	mkdir -p "$APP_PATH/Contents/MacOS" "$APP_PATH/Contents/Frameworks/Sparkle.framework"
 	: > "$APP_PATH/Contents/MacOS/ErgoptiPlus"
+	: > "$APP_PATH/Contents/MacOS/SystemSwitcherState"
+	: > "$APP_PATH/Contents/MacOS/ErgoptiAutomationQuery"
 }
 assemble_app() {
 	assemble_native_runtime

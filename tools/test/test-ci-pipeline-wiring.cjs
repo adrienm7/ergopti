@@ -167,6 +167,24 @@ const PLAN_STEPS = ['Load the Linux release artifact contract', 'Compute tag and
 // accepted value. Every other step runs whenever its job runs, so no edit can
 // skip a gate while its job stays green.
 const STEP_CONDITIONS = [
+	[
+		MACOS_BOX,
+		'package-macos',
+		'Build the signed readonly helper diagnostic',
+		"${{ always() && !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/codex/ci-actions' && !inputs.release }}"
+	],
+	[
+		MACOS_BOX,
+		'package-macos',
+		'Observe the signed readonly query without granting consent',
+		"${{ always() && !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/codex/ci-actions' && !inputs.release && steps.mac79_native_helper_build.outcome == 'success' }}"
+	],
+	[
+		MACOS_BOX,
+		'package-macos',
+		'Retain the private signed helper observation evidence',
+		"${{ always() && !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/codex/ci-actions' && !inputs.release }}"
+	],
 	[LINUX_BOX, 'test-linux', 'Run manual official runtime and model acceptance', MANUAL_RUNTIME_IF],
 	[
 		LINUX_BOX,
@@ -3235,6 +3253,233 @@ for (const [what, from, to] of [
 ]) {
 	mustCatch(what, LINUX_BOX, from, to, linuxAudioPrerequisiteProblems);
 }
+
+// This private diagnostic overlay admits no new product or release authority.
+const READONLY_HELPER_IF =
+	"${{ always() && !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/codex/ci-actions' && !inputs.release }}";
+const READONLY_QUERY_IF = READONLY_HELPER_IF.replace(
+	' }}',
+	" && steps.mac79_native_helper_build.outcome == 'success' }}"
+);
+const READONLY_BUILD_NAME = 'Build the signed readonly helper diagnostic';
+const READONLY_QUERY_NAME = 'Observe the signed readonly query without granting consent';
+const READONLY_UPLOAD_NAME = 'Retain the private signed helper observation evidence';
+
+/** Executes the actual workflow's pure ledger admissions against independent typed vectors. */
+function readonlyLedgerControls(source) {
+	const controls =
+		'import copy\nimport json\nimport sys\n\nnamespace = {"__name__": "policy_controls"}\nexec(compile(sys.stdin.read(), "actual-workflow-ledger-guard", "exec"), namespace)\nadmit = namespace["admit"]\nadmit_run = namespace["admit_run"]\nunique = namespace["unique"]\nsource_sha = "a" * 40\nrun_id = 17\nattempt = 3\nnames = ["Validate / Checks and plan", "Core / js", "Core / properties"]\npacket = {"total_count": 3, "jobs": [{"name": name, "run_id": 17, "run_attempt": 3,\n          "head_sha": source_sha, "status": "completed", "conclusion": "success"} for name in names]}\nrun = {"id": 17, "run_attempt": 3, "head_sha": source_sha, "head_branch": "codex/ci-actions",\n       "event": "workflow_dispatch", "path": ".github/workflows/ci.yml", "name": "CI",\n       "repository": {"full_name": "adrienm7/ergopti"}, "head_repository": {"full_name": "adrienm7/ergopti"}}\nrecords = []\n\n\ndef accepted(label, callback):\n    callback()\n    records.append({"name": label, "refused": False})\n\n\ndef refused(label, callback):\n    try:\n        callback()\n    except RuntimeError:\n        records.append({"name": label, "refused": True})\n        return\n    raise AssertionError("Actual workflow guard admitted: " + label)\n\n\nexpected = {"source_sha": source_sha, "ci_run_id": 17, "ci_run_attempt": 3,\n            "shared_jobs": sorted(names), "shared_jobs_successful": True}\naccepted("all three actual fixed shared jobs", lambda: (_ for _ in ()).throw(AssertionError())\n         if admit(copy.deepcopy(packet), source_sha, 17, 3) != expected else None)\naccepted("actual fixed run cohort", lambda: (_ for _ in ()).throw(AssertionError())\n         if admit_run(copy.deepcopy(run), source_sha, 17, 3) is not True else None)\nfor label, value in [("missing packet", None), ("list packet", []), ("typed count", {"total_count": True, "jobs": packet["jobs"]}),\n                     ("truncated", {"total_count": 4, "jobs": packet["jobs"]}), ("unknown packet key", {**packet, "other": True}),\n                     ("missing jobs", {"total_count": 3}), ("typed jobs", {"total_count": 3, "jobs": "wrong"})]:\n    refused(label, lambda value=value: admit(value, source_sha, 17, 3))\nfor index, name in enumerate(names):\n    value = copy.deepcopy(packet)\n    value["jobs"].pop(index)\n    value["total_count"] = 2\n    refused(name + " missing", lambda value=value: admit(value, source_sha, 17, 3))\n    value = copy.deepcopy(packet)\n    value["jobs"].append(copy.deepcopy(value["jobs"][index]))\n    value["total_count"] = 4\n    refused(name + " duplicate", lambda value=value: admit(value, source_sha, 17, 3))\n    for field, bad_values in {"run_id": [True, "17", 18, None], "run_attempt": [True, "3", 4, None],\n                             "head_sha": ["b" * 40, None], "status": ["queued", "in_progress", None],\n                             "conclusion": ["failure", "skipped", "cancelled", None]}.items():\n        for bad in bad_values:\n            value = copy.deepcopy(packet)\n            value["jobs"][index][field] = bad\n            refused(name + " wrong " + field + "=" + str(bad), lambda value=value: admit(value, source_sha, 17, 3))\nfor field, bad in [("id", True), ("id", 18), ("run_attempt", "3"), ("run_attempt", 4),\n                   ("head_sha", "b" * 40), ("head_branch", "dev"), ("head_branch", "refs/heads/codex/ci-actions"),\n                   ("event", "push"), ("path", ".github/workflows/other.yml"), ("name", "Other")]:\n    value = copy.deepcopy(run)\n    value[field] = bad\n    refused("run cohort wrong " + field + "=" + str(bad), lambda value=value: admit_run(value, source_sha, 17, 3))\nfor field in run:\n    value = copy.deepcopy(run)\n    del value[field]\n    refused("run cohort missing " + field, lambda value=value: admit_run(value, source_sha, 17, 3))\nfor field in ["repository", "head_repository"]:\n    for bad in [None, {"full_name": "fork/ergopti"}, {"full_name": True}]:\n        value = copy.deepcopy(run)\n        value[field] = bad\n        refused("run cohort wrong " + field + "=" + str(bad), lambda value=value: admit_run(value, source_sha, 17, 3))\nfor context in [(source_sha, True, 3), (source_sha, 17, True), (source_sha, 0, 3), (source_sha, 17, 0),\n                ("bad-source", 17, 3), (None, 17, 3)]:\n    refused("typed admission context " + str(context), lambda context=context: admit(copy.deepcopy(packet), *context))\nrefused("duplicate public JSON field", lambda: json.loads(\'{"total_count": 0, "total_count": 3}\', object_pairs_hook=unique))\n# Exercise the unchanged actual entry point with controlled public-read ports.\n# These ports qualify admission and receipt bytes; they do not qualify HTTP or native execution.\nimport os\nimport pathlib\nimport tempfile\nmain = namespace["main"]\nbase_context = {"GITHUB_SHA": source_sha, "GITHUB_RUN_ID": "17", "GITHUB_RUN_ATTEMPT": "3",\n                "GITHUB_REPOSITORY": "adrienm7/ergopti", "GITHUB_EVENT_NAME": "workflow_dispatch",\n                "GITHUB_REF": "refs/heads/codex/ci-actions"}\nbase_url = "https://api.github.com/repos/adrienm7/ergopti/actions/runs/17/attempts/3"\n\n\ndef entry_case(label, context, run_record, job_packet, allowed):\n    previous = dict(os.environ)\n    calls = []\n    with tempfile.TemporaryDirectory(prefix="mac79-ledger-control-") as temporary:\n        folder = pathlib.Path(temporary) / "mac79-native-helper-evidence"\n        folder.mkdir()\n        target = folder / "shared-jobs.json"\n        os.environ.update(base_context)\n        os.environ.update(context)\n        os.environ["RUNNER_TEMP"] = temporary\n        def controlled_read(url):\n            calls.append(url)\n            if len(calls) == 1 and url == base_url:\n                return copy.deepcopy(run_record)\n            if len(calls) == 2 and url == base_url + "/jobs?per_page=100":\n                return copy.deepcopy(job_packet)\n            raise AssertionError("Unexpected public ledger source or read order")\n        original = namespace["public_json"]\n        namespace["public_json"] = controlled_read\n        try:\n            if allowed:\n                main()\n                value = json.loads(target.read_text())\n                wanted = {**expected, "workflow_path": ".github/workflows/ci.yml", "event": "workflow_dispatch",\n                          "branch": "codex/ci-actions", "public_ledger_observed": True}\n                assert value == wanted and value["shared_jobs_successful"] is True\n                assert calls == [base_url, base_url + "/jobs?per_page=100"]\n            else:\n                try:\n                    main()\n                except RuntimeError:\n                    pass\n                else:\n                    raise AssertionError("Entry point admitted " + label)\n                assert not target.exists()\n                if context:\n                    assert not calls, "Invalid context must refuse before public reads"\n            records.append({"name": "actual main controlled public ports: " + label, "refused": not allowed})\n        finally:\n            namespace["public_json"] = original\n            os.environ.clear()\n            os.environ.update(previous)\n\n\nentry_case("healthy source and exclusive receipt", {}, run, packet, True)\nfor key, bad in [("GITHUB_SHA", "b"), ("GITHUB_RUN_ID", "0"), ("GITHUB_RUN_ATTEMPT", "01"),\n                 ("GITHUB_REPOSITORY", "fork/ergopti"), ("GITHUB_EVENT_NAME", "push"),\n                 ("GITHUB_REF", "refs/heads/dev")]:\n    entry_case("invalid " + key, {key: bad}, run, packet, False)\nfor key, bad in [("head_sha", "b" * 40), ("run_attempt", 2), ("event", "push"),\n                 ("head_branch", "dev"), ("path", ".github/workflows/other.yml")]:\n    value = copy.deepcopy(run)\n    value[key] = bad\n    entry_case("wrong public run " + key, {}, value, packet, False)\nfor index, name in enumerate(names):\n    value = copy.deepcopy(packet)\n    value["jobs"][index]["conclusion"] = "failure"\n    entry_case("red " + name, {}, run, value, False)\nprint(json.dumps({"cases": len(records), "records": records,\n                  "classification": "Actual workflow admission functions and main with controlled API ports; no network/native execution"}))\n';
+	const program =
+		'SOURCE = ' + JSON.stringify(source) + '\n' + controls.replace('sys.stdin.read()', 'SOURCE');
+	const result = spawnSync(process.platform === 'win32' ? 'python' : 'python3', ['-'], {
+		cwd: pipeline.ROOT,
+		encoding: 'utf8',
+		input: program,
+		timeout: 15000
+	});
+	if (result.status !== 0) return false;
+	try {
+		return JSON.parse(result.stdout).cases >= 80;
+	} catch {
+		return false;
+	}
+}
+
+/** Requires the fixed signed product owner and actual current-run Core admission. */
+function readonlyHelperProblems(files) {
+	const source = files.find((entry) => entry.rel === MACOS_BOX);
+	const job =
+		source &&
+		pipeline.jobsOfText(source.text, MACOS_BOX).find((item) => item.id === 'package-macos');
+	if (!job) return ['the readonly diagnostic requires the original package job'];
+	const steps = pipeline.steps(job.body);
+	const names = [READONLY_BUILD_NAME, READONLY_QUERY_NAME, READONLY_UPLOAD_NAME];
+	const found = names.map((name) => steps.filter((step) => step.name === name));
+	if (found.some((matches) => matches.length !== 1))
+		return ['the readonly diagnostic requires three unique authored steps'];
+	const [build, query, upload] = found.map((matches) => matches[0]);
+	const problems = [];
+	const before = steps.findIndex(
+		(step) => step.name === 'Retain native Apple Shortcuts observation'
+	);
+	const after = steps.findIndex(
+		(step) => step.name === 'Remove the launcher log the Swift tests wrote'
+	);
+	if (
+		!(
+			steps.indexOf(build) === before + 1 &&
+			steps.indexOf(query) === before + 2 &&
+			steps.indexOf(upload) === before + 3 &&
+			after === before + 4
+		)
+	)
+		problems.push(
+			'the readonly diagnostic must follow the original observations without moving original steps'
+		);
+	for (const [step, expected] of [
+		[build, READONLY_HELPER_IF],
+		[query, READONLY_QUERY_IF],
+		[upload, READONLY_HELPER_IF]
+	]) {
+		if (pipeline.stepField(step.body, 'if') !== expected)
+			problems.push(
+				'the readonly diagnostic must keep exact manual/private/nonrelease/noncancelled admission'
+			);
+		if (pipeline.stepField(step.body, 'continue-on-error') !== null)
+			problems.push('the readonly diagnostic cannot forgive its original nonzero status');
+	}
+	if (
+		pipeline.field(job.body, 'timeout-minutes') !== '45' ||
+		pipeline.stepField(build.body, 'timeout-minutes') !== '10' ||
+		pipeline.stepField(query.body, 'timeout-minutes') !== '2'
+	)
+		problems.push('the readonly diagnostic cannot broaden existing native deadlines');
+	const script = (pipeline.runOf(build.body) || []).join('\n');
+	const python = /^python3 - <<'PY'\n([\s\S]*?)\nPY$/m.exec(script);
+	const compiler = script.indexOf('bash tools/build/build_macos_app.sh --native-helper-only');
+	if (
+		!python ||
+		!(compiler > script.indexOf(python[0])) ||
+		script.indexOf('set +e') < script.indexOf(python[0]) ||
+		!script.startsWith('set -euo pipefail\n') ||
+		!script.includes('test "$(git rev-parse HEAD)" = "$GITHUB_SHA"')
+	)
+		problems.push(
+			'native compilation must follow executed fail-fast same-source shared-job admission'
+		);
+	if (
+		!python ||
+		!python[1].includes('admit_run(public_json(url), source_sha, int(run), int(attempt))') ||
+		!python[1].includes(
+			'receipt = admit(public_json(url + "/jobs?per_page=100"), source_sha, int(run), int(attempt))'
+		) ||
+		!python[1].endsWith('if __name__ == "__main__":\n    main()') ||
+		/Authorization|GITHUB_TOKEN|GH_TOKEN/.test(python[1])
+	)
+		problems.push(
+			'the readonly Core prerequisite must execute its unauthenticated exact public ledger guard'
+		);
+	if (python && !readonlyLedgerControls(python[1]))
+		problems.push(
+			'the actual public ledger admissions must refuse all independent typed/stale/missing Core controls'
+		);
+	for (const line of [
+		"ERGOPTI_AUTOMATION_QUERY_CI_PUBLISH: '1'",
+		"MACOS_SIGNING_CERTIFICATE_BASE64: ''",
+		"MACOS_SIGNING_CERTIFICATE_PASSWORD: ''"
+	])
+		if (!build.body.includes(line))
+			problems.push('the private diagnostic must retain its fixed ad hoc source owner');
+	if (
+		!script.includes(
+			'ERGOPTI_BUILD_COMMIT="$GITHUB_SHA" bash tools/build/build_macos_app.sh --native-helper-only'
+		)
+	)
+		problems.push('the readonly helper must receive its exact source commit locally');
+	const observe = logicalLines(query.body)
+		.join('\n')
+		.replace(/[ \t]+/g, ' ');
+	if (
+		!observe.includes(
+			'python3 tools/diagnostics/program_actions/run_signed_query_probe.py --source-root "$PWD" --source-sha "$GITHUB_SHA" --app "$PWD/build/macos-native-helper/ErgoptiPlus.app" --build-receipt "$PWD/build/macos-native-helper/ErgoptiPlus.app/Contents/Resources/automation-query-build.json" --output "$RUNNER_TEMP/mac79-native-helper-evidence/query"'
+		) ||
+		!observe.includes('exit "${native_query_status[0]}"') ||
+		!observe.includes('if [ "${native_query_status[0]}" -eq 0 ]; then') ||
+		!observe.includes('native_query_status=("${PIPESTATUS[@]}")') ||
+		/--fixture-id|--cancel-held|\|\|\s*true/.test(observe)
+	)
+		problems.push(
+			'the fixed readonly query must retain signed provenance and its actual PARTIAL/refusal exit'
+		);
+	if (
+		pipeline.stepField(upload.body, 'uses') !== 'actions/upload-artifact@v4' ||
+		!upload.body.includes('if-no-files-found: error') ||
+		!upload.body.includes('retention-days: 3') ||
+		/\.zip|release-assets|assets-/.test(upload.body)
+	)
+		problems.push(
+			'the private diagnostic must retain only its bounded observations, never publication binaries'
+		);
+	return problems;
+}
+
+errors.push(...readonlyHelperProblems(pipeline.files()));
+for (const safeguard of [
+	'always() && ',
+	'!cancelled() && ',
+	"github.event_name == 'workflow_dispatch' && ",
+	"github.ref == 'refs/heads/codex/ci-actions' && ",
+	' && !inputs.release'
+]) {
+	for (const [name, condition] of [
+		[READONLY_BUILD_NAME, READONLY_HELPER_IF],
+		[READONLY_QUERY_NAME, READONLY_QUERY_IF],
+		[READONLY_UPLOAD_NAME, READONLY_HELPER_IF]
+	]) {
+		mustCatch(
+			'readonly diagnostic drops ' + safeguard + ' in ' + name,
+			MACOS_BOX,
+			'      - name: ' +
+				name +
+				'\n' +
+				(name === READONLY_BUILD_NAME ? '        id: mac79_native_helper_build\n' : '') +
+				'        if: ' +
+				condition +
+				'\n',
+			'      - name: ' +
+				name +
+				'\n' +
+				(name === READONLY_BUILD_NAME ? '        id: mac79_native_helper_build\n' : '') +
+				'        if: ' +
+				condition.replace(safeguard, '') +
+				'\n',
+			readonlyHelperProblems
+		);
+	}
+}
+for (const [what, from, to] of [
+	[
+		'inert entry point before retained guards',
+		'          def main():\n',
+		'          def main():\n              return\n'
+	],
+	[
+		'Core source admission bypass',
+		'    receipt = admit(public_json(url + "/jobs?per_page=100"), source_sha, int(run), int(attempt))',
+		'    receipt = {}'
+	],
+	[
+		'wrong source run path',
+		'"path": ".github/workflows/ci.yml", "name": "CI"',
+		'"path": ".github/workflows/ci-other.yml", "name": "CI"'
+	],
+	[
+		'missing executable public run admission',
+		'    admit_run(public_json(url), source_sha, int(run), int(attempt))',
+		'    pass'
+	],
+	['full app substituted for finite helper', '--native-helper-only 2>&1', '--wrong-helper 2>&1'],
+	[
+		'forgiven native query outcome',
+		'          exit "${native_query_status[0]}"',
+		'          exit 0'
+	],
+	[
+		'fake build receipt source',
+		'--build-receipt "$PWD/build/macos-native-helper/ErgoptiPlus.app/Contents/Resources/automation-query-build.json"',
+		'--build-receipt "$RUNNER_TEMP/fabricated.json"'
+	]
+]) {
+	mustCatch('readonly diagnostic ' + what, MACOS_BOX, from, to, readonlyHelperProblems);
+}
+const readonlyCoreHead = "  core:\n    name: 'Core / ${{ matrix.suite }}'\n    needs: [validate]\n";
+mustCatch(
+	'mandatory Core loses its actual validate ancestor',
+	ENTRY,
+	readonlyCoreHead,
+	readonlyCoreHead.replace('needs: [validate]', 'needs: []'),
+	graphProblems
+);
 
 if (errors.length > 0) {
 	console.error(
