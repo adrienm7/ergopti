@@ -3429,6 +3429,39 @@ Actual Mac journal execution, cost and the failing300-second boundary still need
 qualification; the latest285 run reaches the unchanged25-minute aggregate limit.
 Item31 stays partial.
 
+WP6 now has a dormant read-only owned Core reference source prerequisite:
+separate shared policy/reference generation, a thin ordinary Node wrapper and
+actual CLI controls, plus a native owner bound to the actual executing production
+launcher principal. The owner preserves strict all-architecture signatures and
+exact certificate DER equality, protected root/ACL and held/named source fences
+after reading, hashing and final validation. This local same-principal policy is
+not immutable maintainer trust and supplies no install, launchd, process or
+runtime authority. Three existing native refusal tests remain whole; two added
+SDK methods exercise only the actual generator and portable CLI controls.
+
+The coherent source composition passes the canonical generator check and
+five actual CLI tests in normal and optimized modes. Prior independent reviews
+qualify source ordering and refusing mutations only. Swift compilation, actual
+macOS principal/Core/ACL/nonempty descriptor custody, installation and service
+ownership remain unqualified. Production Main wiring is excluded pending its
+separate ownership request. TODO31 and transverse
+items16/38 stay open; no Group5 item is removed by this source preparation.
+
+The canonical renderer now matches repository JSON tabs and the fixed role
+array; decoded policy/reference semantics stay whole except the physical policy
+hash. Original13 generator and five CLI controls pass in all three Python modes;
+five format controls reproduce the original two assertion failures and pass after
+correction. The ordinary registry gains only this leaf/output owner, preserving
+every existing entry and order. The first selected gate retains its formatting
+and untracked-versus-indexed bundle failures; exact owned index admission resolves
+the package source closure without changing its assertions. Final selected gates
+and actual macOS qualification remain required. The second selected gate
+retains its missing generated-output ignore assertion; adding only the exact
+reference output to `.prettierignore` preserves every previous entry and the
+assertion. The two new SDK methods now hold one fixture across both Python
+modes, matching the existing child retirement lifecycle without changing its
+guards, assertions or deadlines. These changes are not native execution proof.
+
 WP3 prerequisite: the actual macOS physical accounting owner now requires exact held-modifier settlement before accepting source transitions. The keylogger retires each crossing physical release without emitting an orphan hold or a new press, including pause and secure-context crossings; ordinary legacy and collision behavior remains unchanged. Existing native fixture parents restore their settlement child through the scoped cache owner, while normal production stop/restart retains the same CoreState. Portable focused tests pass (32 held-key cases, 24 policy cases, 3 legacy collision cases, 23 existing cache-scope cases, and 9 unchanged alias configuration/privacy cases); the original real gap-release source fails all eight side-key cases. This does not enable a producer or headless mode, alter transport/baseline versions, or complete WP3/WP4/native acceptance. Full root and hosted macOS qualification remain required.
 
 WP3 remains partial. An explicitly initialized, dormant physical-capture session

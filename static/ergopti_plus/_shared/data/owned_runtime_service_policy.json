@@ -1,0 +1,14 @@
+{
+	"schema": 1,
+	"roles": ["core", "console", "cli"],
+	"service": {
+		"role": "core",
+		"label": "com.ergoptiplus.runtime.core",
+		"plist": "/Library/LaunchDaemons/com.ergoptiplus.runtime.core.plist",
+		"bundle": "/Library/Application Support/ErgoptiPlus/Runtime/ErgoptiPlus-Remap-Core.app",
+		"executable_relative": "Contents/MacOS/ErgoptiPlus-Remap-Core",
+		"run_at_load": false,
+		"keep_alive": false,
+		"user_name": "root"
+	}
+}

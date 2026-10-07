@@ -194,6 +194,10 @@ const GENERATORS = [
 		outputs: ['static/ergopti_plus/macos/_generated/hid_key_identity.lua']
 	},
 	{
+		script: 'build/generate-owned-runtime-service-reference.cjs',
+		outputs: ['static/ergopti_plus/_shared/data/owned_runtime_service_reference.generated.json']
+	},
+	{
 		script: 'codegen/gen-architecture-diagram.cjs',
 		note: 'runs last: it describes the tree the others have just finished writing',
 		outputs: ['static/ergopti_plus/docs/architecture.md']

@@ -2031,3 +2031,49 @@ remain UNKNOWN. The new actual Mac BEFORE assertion may fail diagnostically;
 no producer correction or item completion follows from its source adoption.
 Packaging failed; installation and Release skipped. Item31 and transverse16/38
 remain open.
+
+## Owned Core reference source prerequisite (WP6)
+
+WP6 now has a dormant read-only owned Core reference source prerequisite:
+separate shared policy/reference generation, a thin ordinary Node wrapper and
+actual CLI controls, plus a native owner bound to the actual executing production
+launcher principal. The owner preserves strict all-architecture signatures and
+exact certificate DER equality, protected root/ACL and held/named source fences
+after reading, hashing and final validation. This local same-principal policy is
+not immutable maintainer trust and supplies no install, launchd, process or
+runtime authority. Three existing native refusal tests remain whole; two added
+SDK methods exercise only the actual generator and portable CLI controls.
+
+The coherent source composition passes the canonical generator check and
+five actual CLI tests in normal and optimized modes. Prior independent reviews
+qualify source ordering and refusing mutations only. Swift compilation, actual
+macOS principal/Core/ACL/nonempty descriptor custody, installation and service
+ownership remain unqualified. Production Main wiring is excluded pending its
+separate ownership request. TODO31 and transverse
+items16/38 stay open; no Group5 item is removed by this source preparation.
+
+The canonical renderer now matches repository JSON tabs and the fixed role
+array; decoded policy/reference semantics stay whole except the physical policy
+hash. Original13 generator and five CLI controls pass in all three Python modes;
+five format controls reproduce the original two assertion failures and pass after
+correction. The ordinary registry gains only this leaf/output owner, preserving
+every existing entry and order. The first selected gate retains its formatting
+and untracked-versus-indexed bundle failures; exact owned index admission resolves
+the package source closure without changing its assertions. Final selected gates
+and actual macOS qualification remain required. The second selected gate
+retains its missing generated-output ignore assertion; adding only the exact
+reference output to `.prettierignore` preserves every previous entry and the
+assertion. The two new SDK methods now hold one fixture across both Python
+modes, matching the existing child retirement lifecycle without changing its
+guards, assertions or deadlines. These changes are not native execution proof.
+
+The nine source and formatter paths compose the preserved policy/reference/generator,
+the independently reviewed post-read owner and exact additive SDK/Node/CLI
+wiring. The original three native methods recover byteexact by removing the
+frozen addition. Actual Root new preimages are absent and the current canonical
+provider remains the original a4ef identity source; generated provenance is
+unchanged. Only one additive registry owner is added; Main, appbuilder, provider,
+factory and workflows remain untouched.
+Root selected gates and exact final-source manual macOS CI remain necessary.
+This preparation does not qualify protected-root signature or owner retirement
+positives and cannot substitute stdout, PID or process exit for native ACK.
