@@ -3153,6 +3153,15 @@ reports unsupported observation, without a qualified detailed cause. The earlier
 positive result does not qualify the final source or physical guardian/Login
 Items/tap-hold behavior. Original assertions and30/35/10 limits remain mandatory.
 
+A second bounded failure-only observation exposes seven exact controller
+refusals after authentic exact-child retirement, without logging private errors,
+paths or payloads. It preserves the original refusal, primary packet schema,
+status, assertions and native deadlines; error reports never gain success or
+input authority. Independent review preserves all original17/16 portable controls
+and native ten-case source. Actual UI cause remains unknown until exact-source
+macOS execution; guardian/Login Items and physical tap-hold acceptance remain
+required. Item24 stays partial.
+
 - [~] **30.** Physical magic-key setting on all three OSes: one
   `hotstrings.magic_key_source` (a KeyboardEvent.code, `auto` by default),
   config schema v5 migrating every spelling of the Windows

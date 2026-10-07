@@ -1879,3 +1879,19 @@ Permission UI has no admitted result and Brew receiver-live fails. Packaging and
 verdict fail, installation/Release skip. Actual journal and corrected final-source
 CI remain required; no assertion, deadline, workflow or native expectation changes.
 Item31 and transverse16/38 remain open.
+
+## Closed permission-controller operation refusal observation
+
+One existing Swift qualification controller gains a second failure-only closed
+six-field stderr observation. Seven exact full-message refusals are allowlisted;
+unknown, private, malformed, foreign-owner or cleanup-debt reports remain
+unsupported. Authentic exact PID/PGID retirement and unchanged source facts are
+required without promoting status=error or admitting a native result. The original
+failure line, ten native Lua cases, all original Swift assertions,17/16 embedded
+portable controls and deadlines remain conserved after a complete byte inverse.
+Independent source review passes132 original portable controls, eight new private
+method executions and104 modeled contexts, and rejects eight mutant executions.
+These modeled contexts do not prove a native UI cause or physical ACK. Optional
+extracted-Python formatting did not pass; the formatter-owned Swift source must
+pass ordinary Root gates. New native execution remains unexecuted on Linux.
+Item24 and transverse16/38 remain open.

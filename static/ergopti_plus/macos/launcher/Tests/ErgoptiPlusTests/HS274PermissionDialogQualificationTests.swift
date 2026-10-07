@@ -708,6 +708,64 @@ extension HS274NativePolicyQualificationTests {
 	    )
 
 
+	OPERATION_DIAGNOSTIC_PREFIX = "ERGOPTI_PERMISSION_UI_OPERATION "
+	OPERATION_DIAGNOSTIC_CHECKS = {
+	    "Actual permission UI observation deadline": "observation_deadline",
+	    "Exact native child exited before receipt": "child_exited_before_receipt",
+	    "Native child exited during receipt": "child_exited_during_receipt",
+	    "Native receipt exceeded probe deadline": "receipt_deadline",
+	    "Live production source changed": "live_source_changed",
+	    "Copied production source changed": "copied_source_changed",
+	    "Native entry, configuration, or runtime changed": "retained_input_changed",
+	}
+
+
+	def operation_failure_observation(report, pid, before, after):
+	    """Expose a fixed controller refusal only after the exact native owner retires."""
+	    unsupported = {
+	        "schema": 1,
+	        "status": "unsupported",
+	        "kind": "permission_ui_controller_failure_observation",
+	        "authority": False,
+	        "native_verdict": "unchanged",
+	        "controller_check": "unclassified",
+	    }
+	    try:
+	        require(type(report) is dict and report.get("status") == "error", "Unsupported report")
+	        require("native_result" not in report, "Controller operation returned a native packet")
+	        require(
+	            report.get("cleanup_errors") == []
+	            and type(report.get("cleanup_errors")) is list
+	            and report.get("application_cleanup") == "confirmed inherited PGID retired",
+	            "Unsupported cleanup",
+	        )
+	        native = report.get("native_owner")
+	        require(
+	            type(pid) is int and pid > 0 and type(native) is dict
+	            and type(native.get("worker_pid")) is int and native["worker_pid"] == pid
+	            and type(native.get("group_id")) is int and native["group_id"] == pid
+	            and native.get("closed") is True and native.get("reservation_lost") is False
+	            and type(native.get("live_group_members")) is list
+	            and native["live_group_members"] == []
+	            and native.get("escaped_sessions_managed") is False,
+	            "Unsupported exact native retirement",
+	        )
+	        require(type(before) is dict and bool(before) and before == after, "Unsupported source facts")
+	        error = report.get("operation_error")
+	        require(type(error) is str, "Unsupported controller refusal")
+	        check = OPERATION_DIAGNOSTIC_CHECKS.get(error)
+	        require(check is not None, "Unknown controller refusal")
+	        return dict(unsupported, status="observed", controller_check=check)
+	    except Exception:
+	        return unsupported
+
+
+	def operation_diagnostic_line(value):
+	    return OPERATION_DIAGNOSTIC_PREFIX + json.dumps(
+	        value, sort_keys=True, separators=(",", ":"), allow_nan=False
+	    )
+
+
 	def native(repo, root):
 	    require(
 	        sys.platform == "darwin" and sys.version_info >= (3, 13),
@@ -815,6 +873,12 @@ extension HS274NativePolicyQualificationTests {
 	            deadline,
 	        )
 	        print(diagnostic_line(diagnostic), file=sys.stderr)
+	        print(
+	            operation_diagnostic_line(
+	                operation_failure_observation(report, actual_pid, before, after)
+	            ),
+	            file=sys.stderr,
+	        )
 	        raise
 	    packet["observation_retirement_seconds"] = time.monotonic() - start
 	    packet["runtime_provisioning"] = provision
