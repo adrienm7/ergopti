@@ -365,3 +365,72 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
   end)
 
 end)
+
+helpers.describe("daemon startup-capture-publication", function()
+	for _, mode in ipairs({ "success", "refusal", "throw", "rebound", "pending", "debt", "late-rebound", "late-stop", "runner-rebound" }) do
+		helpers.it("startup-capture-publication " .. mode .. " cannot publish false readiness", function()
+			local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "r"))
+			local source = file:read("*a"); file:close()
+			local begin = source:find("\t-- start() recreates capture", 1, true)
+			local ending = begin and source:find('\tBootProfiler.stage_done("input hooks"', begin, true)
+			helpers.assert_true(begin ~= nil and ending ~= nil and ending > begin, "the actual admission block must exist")
+			local block = source:sub(begin, ending - 1)
+			local calls, retired, closed, pending = {}, false, false, mode == "pending" or mode == "debt" or mode == "runner-rebound"
+			local layout = require("tests.support.layout_cohort_fixture").layout(function() return 30 end)
+			local publication = layout.publish_current_capture
+			local loop = { run = function(opts) calls[#calls + 1] = "loop"; opts.onIdle() end }
+			if mode ~= "success" and mode ~= "late-rebound" and mode ~= "late-stop" then
+				layout.publish_current_capture = function()
+					if mode == "throw" then error("controlled publication failure") end
+					if mode == "rebound" then layout.publish_current_capture = function() return true end; return true end
+					if mode == "runner-rebound" then loop.run = function() error("the substituted loop must never run") end; return true end
+					return false
+				end
+			end
+			local hook = { isRunning = function() return not retired end }
+			if mode == "late-rebound" or mode == "late-stop" then
+				local ready = layout.is_ready
+				layout.is_ready = function()
+					local admitted = ready()
+					if mode == "late-rebound" then layout.publish_current_capture = function() return true end
+					else retired = true end
+					return admitted
+				end
+			end
+			local shutdown = {
+				request = function(reason, emergency)
+					helpers.assert_eq(reason, "startup layout publication refused")
+					helpers.assert_eq(emergency, reason)
+					calls[#calls + 1] = "retire"; retired = true
+				end,
+				is_pending = function() return pending end,
+				poll = function() calls[#calls + 1] = "ack"; if mode ~= "debt" then pending = false end end,
+			}
+			local env = { opts = {}, keyboard_layout = layout, keyboard_hook = hook, shutdown = shutdown,
+				injector = { close_fast_channel = function() calls[#calls + 1] = "close"; closed = true; return true end },
+				event_loop = loop,
+				pcall = pcall, type = type, error = error }
+			local chunk
+			if setfenv then chunk = assert(loadstring(block, "actual startup capture admission")); setfenv(chunk, env)
+			else chunk = assert(load(block, "actual startup capture admission", "t", env)) end
+			local ok, failure = pcall(chunk)
+			if mode == "success" then
+				helpers.assert_true(ok and not retired and not closed)
+				helpers.assert_eq(#calls, 0)
+				helpers.assert_true(layout.is_ready())
+			else
+				helpers.assert_eq(ok, false, "no failed publication may reach readiness")
+				helpers.assert_true(retired, "the owned input hook must retire first")
+				if mode == "debt" then
+					helpers.assert_true(tostring(failure):find("unacknowledged", 1, true) ~= nil)
+					helpers.assert_eq(closed, false, "unacknowledged native debt never receives a close success")
+				else
+					helpers.assert_true(closed)
+					helpers.assert_eq(calls[#calls], "close")
+				end
+				if mode == "pending" or mode == "debt" or mode == "runner-rebound" then helpers.assert_eq(calls[2], "loop"); helpers.assert_eq(calls[3], "ack") end
+			end
+			layout.publish_current_capture = publication
+		end)
+	end
+end)
