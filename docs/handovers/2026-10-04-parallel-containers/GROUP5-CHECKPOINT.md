@@ -1602,3 +1602,21 @@ Swift, actual credentials/signing/Console layout, package/install and live
 authentication remain unqualified. Proposed actual-native signing worker is
 private pending genuine cleanup ACK seam and shared outer-budget coordination;
 original direct unsigned native acceptance remains unchanged. Item31 stays open.
+
+## Public priority initial capability qualification
+
+The reviewed three additive sources register one ordinary Swift SDK test,
+using one unchanged30 worker including compile and observation, plus35/10
+observation/retirement boundaries. Public IOKit registration and the initial
+payload are grounded in retained official SDK/kernel sources; no private
+powerd interest, payload mutation or power ACK is used. Provider/source lifetime
+must remain exact through actual receive-right absence and run-loop drain.
+Independent eight portable runs pass280 assertions; fourteen compiled mutants
+refuse. A real FIFO before control blocks and the nonblocking successor refuses
+its type. These qualify portable source only; SDK, Swift and native execution
+remain pending. Raw capability classes grant no full-awake, unlock or capture
+authority, and physical transitions remain unrun. Original helper, posture and
+process owner stay whole; the separately reviewed signer builder is composed
+without a dependency from these three new sources. A two-line comment amendment
+corrects kernel ACK chronology without changing source predicates or frozen35.
+Item31 and all production/session-lock obligations remain open.

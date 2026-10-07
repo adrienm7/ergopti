@@ -4338,6 +4338,17 @@ Core compilation, codesign, credential/native-layout qualification, protected
 shipping and installation remain required. An actual native fixture and its
 outer workflow budget are still being prepared; this does not complete31.
 
+A separately reviewed public IOKit priority subscription now has an additive
+native qualification test for one genuine initial capability sample and
+acknowledged source/notification-port retirement. Thirty-five independent
+portable controls pass with GCC and Clang in eight build modes; fourteen
+compiled causal mutants refuse. One original SDK30 worker owns compilation,
+controls and native observation together, without private powerd interest
+or any power ACK. Negative observations remain valid; CPU/dark/graphics
+classes imply neither full awake nor session unlock. Actual public SDK,
+Swift and native qualification are pending. This adds no production
+activation and does not complete31.
+
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
   listed; see `docs/memory/text-input-and-config.md`. Current source already
