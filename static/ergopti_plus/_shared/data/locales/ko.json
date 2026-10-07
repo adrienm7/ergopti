@@ -1988,7 +1988,6 @@
 	"sg_actions.app_previous": "⇥ 이전 앱 — 모든 화면",
 	"sg_actions.app_previous_screen": "⇥ 이전 앱 — 이 화면",
 	"sg_actions.app_switcher": "⇥ 시스템 Alt+Tab",
-	"sg_actions.system_app_switcher": "⇥ 시스템 Alt+Tab",
 	"sg_actions.app_window_previous": "◱ → 다음 창, 전환기 없이 (Alt+Esc)",
 	"sg_actions.arrow_down": "↓ 아래 화살표",
 	"sg_actions.arrow_left": "← 왼쪽 화살표",

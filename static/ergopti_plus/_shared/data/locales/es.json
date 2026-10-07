@@ -1988,7 +1988,6 @@
 	"sg_actions.app_previous": "⇥ App anterior — todas las pantallas",
 	"sg_actions.app_previous_screen": "⇥ App anterior — esta pantalla",
 	"sg_actions.app_switcher": "⇥ Alt+Tab del sistema",
-	"sg_actions.system_app_switcher": "⇥ Alt+Tab del sistema",
 	"sg_actions.app_window_previous": "◱ → Ventana siguiente, sin selector (Alt+Esc)",
 	"sg_actions.arrow_down": "↓ Flecha Abajo",
 	"sg_actions.arrow_left": "← Flecha Izquierda",
