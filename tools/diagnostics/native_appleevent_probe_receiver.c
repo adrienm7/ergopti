@@ -1,5 +1,5 @@
 // tools/diagnostics/native_appleevent_probe_receiver.c
-// Owned open-application recipient for non-self native sandbox admission only.
+// Owned private nonce recipient for non-self native sandbox admission only.
 
 #include <Carbon/Carbon.h>
 #include <ApplicationServices/ApplicationServices.h>
@@ -11,10 +11,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include "native_appleevent_probe_protocol.h"
 
-static const AEEventClass probe_class = kCoreEventClass;
-static const AEEventID probe_event = kAEOpenApplication;
-static const AEKeyword nonce_parameter = 0x45674e63; /* EgNc */
+static const AEEventClass probe_class = ERGOPTI_PROBE_EVENT_CLASS;
+static const AEEventID probe_event = ERGOPTI_PROBE_EVENT_ID;
+static const AEKeyword nonce_parameter = ERGOPTI_PROBE_NONCE_PARAMETER;
 static const char *expected_nonce;
 static const char *delivery_path;
 static unsigned int delivered;
@@ -79,6 +80,10 @@ enum AppKitAdmission {
 
 static enum AppKitAdmission admit_appkit(NSApplication *application) {
     if (application == nil) return AppKitApplicationMissing;
+    /* The required current state needs no transition or redundant setter. */
+    if ([application activationPolicy] == NSApplicationActivationPolicyAccessory) {
+        return AppKitAdmitted;
+    }
     if (![application setActivationPolicy:NSApplicationActivationPolicyAccessory]) {
         return AppKitPolicyRefused;
     }
@@ -86,6 +91,37 @@ static enum AppKitAdmission admit_appkit(NSApplication *application) {
         return AppKitPolicyUnconfirmed;
     }
     return AppKitAdmitted;
+}
+
+/* Closed diagnostic metadata; an unavailable sample never supplies a policy. */
+struct AppKitPolicyObservation {
+    int available;
+    int policy; /* 0 regular, 1 accessory, 2 prohibited; 3 unavailable only. */
+};
+
+static struct AppKitPolicyObservation observe_appkit_policy(NSApplication *application) {
+    struct AppKitPolicyObservation observation = {0, 3};
+    if (application == nil) return observation;
+    @try {
+        const NSApplicationActivationPolicy policy = [application activationPolicy];
+        if (policy >= NSApplicationActivationPolicyRegular &&
+            policy <= NSApplicationActivationPolicyProhibited) {
+            observation.available = 1;
+            observation.policy = (int)policy;
+        }
+    } @catch (NSException *observationFailure) {
+        (void)observationFailure;
+        /* Keep the original admission/exit verdict; export no exception text. */
+    }
+    return observation;
+}
+
+/* Observation health is separate from the unchanged functional admission. */
+static enum AppKitAdmission observe_appkit_admission(NSApplication *application,
+    struct AppKitPolicyObservation *before) {
+    *before = observe_appkit_policy(application);
+    const enum AppKitAdmission admission = admit_appkit(application);
+    return admission;
 }
 
 static int receiver_main(int argc, char **argv) {
@@ -98,11 +134,15 @@ static int receiver_main(int argc, char **argv) {
         fprintf(stderr, "Owned AppleEvent recipient current-process registration failed: %d\n", (int)status);
         return 65;
     }
-    const enum AppKitAdmission admission = admit_appkit([NSApplication sharedApplication]);
+    NSApplication *application = [NSApplication sharedApplication];
+    struct AppKitPolicyObservation before;
+    const enum AppKitAdmission admission = observe_appkit_admission(application, &before);
     if (admission != AppKitAdmitted) {
-        // This reason is not an OSStatus. Existing bounded terminal diagnostics
-        // retain it as unclassified instead of inventing a Carbon status.
-        fprintf(stderr, "Owned AppleEvent recipient AppKit admission refused (reason %d).\n", (int)admission);
+        const struct AppKitPolicyObservation after = observe_appkit_policy(application);
+        /* Only the original admission refusal supplies the functional reason. */
+        const int reason = (int)admission;
+        fprintf(stderr, "Owned AppleEvent recipient AppKit admission refused (reason %d; before %d/%d; after %d/%d).\n",
+            reason, before.available, before.policy, after.available, after.policy);
         return 65;
     }
     const AEEventHandlerUPP handler = NewAEEventHandlerUPP(receive_probe);

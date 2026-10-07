@@ -37,6 +37,7 @@ local M = {}
 local Logger = require("logger.shim")
 local EvdevCodes = require("infra.evdev_codes")
 local KeyboardLayout = require("adapters.keyboard_layout")
+local layout_plan, layout_plan_current, layout_plan_view = KeyboardLayout.plan, KeyboardLayout.plan_current, KeyboardLayout.plan_view
 local XkbCapture = require("adapters.xkb_capture")
 local Clipboard = require("adapters.clipboard")
 local OutputTransaction = require("modules.hotstrings.output_transaction")
@@ -108,8 +109,8 @@ local function held_forwarded_keys()
 	return (ok_call and type(held) == "table") and held or {}
 end
 
-local function must_emit(tx, code, value, phase)
-	if not tx.emit(code, value, phase) then
+local function must_emit(tx, code, value, phase, admission)
+	if not tx.emit(code, value, phase, admission) then
 		error(tx.error() or (phase .. " failed"), 0)
 	end
 end
@@ -210,10 +211,30 @@ local function send_text_native(tx, text)
 	if not (_uinput and _uinput.is_open()) then return false end
 	if not KeyboardLayout.is_ready() then return false end
 
-	local plan, blocker = KeyboardLayout.plan(text)
+	if KeyboardLayout.plan ~= layout_plan or KeyboardLayout.plan_current ~= layout_plan_current
+		or KeyboardLayout.plan_view ~= layout_plan_view then return false end
+	local offered, blocker, receipt = layout_plan(text)
+	local check, view = layout_plan_current, layout_plan_view
+	local plan = offered and type(view) == "function" and view(receipt) or nil
 	if not plan then
 		Logger.debug(LOG, "Layout cannot type %s — falling back.", tostring(blocker))
 		return false
+	end
+	local function current_plan(cached)
+		local ok, current = pcall(check, receipt, cached)
+		if KeyboardLayout.plan ~= layout_plan or KeyboardLayout.plan_current ~= check or KeyboardLayout.plan_view ~= view or not ok or current ~= true then
+			error("layout plan is no longer current", 0)
+		end
+	end
+	local function admission()
+		current_plan(false)
+		-- The source read can reenter another owner. The publication seal runs
+		-- next, followed by the captured RAM source seal with no native callback.
+		require_publication(tx.publication, true)
+		current_plan(true)
+	end
+	local function press(code, phase)
+		must_emit(tx, code, EVDEV_VALUE_DOWN, phase, admission)
 	end
 
 	-- The plan is the chord for each character with CapsLock OFF. Typed under a
@@ -223,16 +244,16 @@ local function send_text_native(tx, text)
 	-- restored even when an emit fails, or the user is left with CapsLock off.
 	local caps = XkbCapture.caps_locked()
 	if caps then
-		must_emit(tx, EvdevCodes.KEY_CAPSLOCK, EVDEV_VALUE_DOWN, "capslock release down")
+		press(EvdevCodes.KEY_CAPSLOCK, "capslock release down")
 		must_emit(tx, EvdevCodes.KEY_CAPSLOCK, EVDEV_VALUE_UP, "capslock release up")
 	end
 	local ok_typed, typed_err = pcall(function()
 		require_publication(tx.publication, false)
 		for _, step in ipairs(plan) do
 			for _, mod in ipairs(step.mods) do
-				must_emit(tx, MODIFIER_CODES[mod], EVDEV_VALUE_DOWN, "layout modifier down")
+				press(MODIFIER_CODES[mod], "layout modifier down")
 			end
-			must_emit(tx, step.keycode, EVDEV_VALUE_DOWN, "replacement key down")
+			press(step.keycode, "replacement key down")
 			must_emit(tx, step.keycode, EVDEV_VALUE_UP, "replacement key up")
 			-- Released in reverse, and always: a modifier left held after an
 			-- interrupted injection turns every subsequent keystroke into a shortcut.
@@ -348,23 +369,22 @@ end
 --- @return table Commit result.
 local function run_transaction(label, body, publication)
 	local native_tx = OutputTransaction.new(_uinput)
-	local tx = native_tx
-	if publication ~= nil then
-		-- Cleanup remains on the original transaction wire, so a refused late
-		-- publication never prevents owned key-ups or physical modifier restore.
-		tx = setmetatable({ publication = publication,
-			emit = function(code, value, phase)
-				if value == EVDEV_VALUE_DOWN and phase ~= "capslock restore down" then
-					require_publication(publication, true)
-				end
-				return native_tx.emit(code, value, phase)
-			end,
-		}, { __index = native_tx })
-		tx.channel = function()
-			local channel = native_tx.channel()
-			return { is_open = channel.is_open,
-				emit = function(code, value) return tx.emit(code, value, "clipboard paste chord") end }
-		end
+	local tx
+	-- Cleanup remains on the original transaction wire, so a refused late
+	-- publication never prevents owned key-ups or physical modifier restore.
+	tx = setmetatable({ publication = publication,
+		emit = function(code, value, phase, admission)
+			if value == EVDEV_VALUE_DOWN and phase ~= "capslock restore down" then
+				require_publication(publication, true)
+			end
+			if value == EVDEV_VALUE_DOWN and admission then admission() end
+			return native_tx.emit(code, value, phase)
+		end,
+	}, { __index = native_tx })
+	tx.channel = function()
+		local channel = native_tx.channel()
+		return { is_open = channel.is_open,
+			emit = function(code, value) return tx.emit(code, value, "clipboard paste chord") end }
 	end
 	local ok, err = pcall(function()
 		require_publication(publication, false)
