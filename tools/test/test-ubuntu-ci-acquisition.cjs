@@ -11,7 +11,7 @@ const browsers = require('../ci/install-playwright.cjs');
 
 const root = path.resolve(__dirname, '../..');
 const scopes = new Map([
-	['ci-linux.yml', 34],
+	['ci-linux.yml', 36],
 	['ci-macos.yml', 2],
 	['ci.yml', 1],
 	['linux-layout.yml', 2],
