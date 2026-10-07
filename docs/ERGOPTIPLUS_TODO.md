@@ -5532,6 +5532,14 @@ metadata. Packaging/install are skipped; Release is skipped. The first two
 failures are reproduced locally; the Nix cause remains unproved. Historical
 Ubuntu Configuration assertion432 causality also remains unproved.
 
+NUL-bearing conditional compare/save paths now retain their original fixed
+argument-refusal diagnostic before any file or child acquisition. The unchanged
+native byte fixture reproduces10 passes/two failures before correction and
+passes12/0 afterwards; the original native HTTP preflight also passes25/0.
+Conditional URL/value/affinity and ownership laws are unchanged. Current source
+passes11245 Linux assertions plus genuine native archive, managed HTTP and
+runtime checks; the hosted E2E/package/install replay remains required.
+
 Manual Linux run37591679813 at9195a6419f4d36581e4404198cd152753791f2e6
 failed the Configuration restore assertion at test_hotstrings_scope.lua:432:
 rolls remained false. Two unrelated passing unsafe-answer fixture names contain
