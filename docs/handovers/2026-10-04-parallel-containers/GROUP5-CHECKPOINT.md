@@ -1711,3 +1711,17 @@ saved in the configuration draft, without claiming live application. The prior
 10-case permission pass on8dfdde104 remains separate from this refusal. Future
 exact-source native CI must preserve all assertions and current budgets. No
 native readiness, installation or completion of items24/31/40 is claimed.
+
+## Explicit VirtualHIDDevice update consent policy
+
+The independently reviewed two-path source adds a dormant shared consent owner
+and49 registered behavioral cases. It composes original dependency policy and
+Lifetime, requires literal confirmation of a current incompatible-version offer,
+and distinguishes accepted async handoff from physical settlement. Exact tokens
+and per-phase nonces protect pending retirement/replacement debt across stop,
+completion-before-return and recursive callbacks. Successful replacement admits
+nothing until real fresh requalification. Original36 dependency tests and all
+existing source/assertions remain whole. Both Lua ABIs qualify85 focused cases;
+six mutants refuse. Actual native effects, UI, provisioning and production caller
+remain unavailable. Full selected Root verification precedes publication; no
+physical, install or version compatibility proof is inferred. Item31 stays open.

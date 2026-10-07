@@ -3314,6 +3314,19 @@ Markdown formatter refuses; source hashes remain exact while documentation
 formatting and its covering checks are corrected separately. Native media input
 and physical acceptance remain unexecuted. Item31 stays partial.
 
+An explicit dormant shared VirtualHIDDevice update-consent owner now composes
+the unchanged four-source dependency policy and canonical subscription Lifetime.
+Only a current incompatible-version decision creates an opaque offer; literal
+confirmation is consumed before native effects. Asynchronous physical retirement
+and replacement have separate exact nonce/owner acknowledgements; a logical
+handoff or installer success cannot qualify a driver. Stop/reentry retains pending
+debt, and a late exact retirement cannot resume installation after stop. Unknown
+facts remain unknown; successful replacement requires fresh requalification.
+All49 consent and36 original dependency cases pass independently on both Lua
+ABIs; six causal mutants refuse. Native target/effect adapters and UI remain
+unimplemented, with no production caller, download, install or compatibility
+claim. Full Root gates are recorded separately. Item31 stays partial.
+
 WP3 prerequisite: the actual macOS physical accounting owner now requires exact held-modifier settlement before accepting source transitions. The keylogger retires each crossing physical release without emitting an orphan hold or a new press, including pause and secure-context crossings; ordinary legacy and collision behavior remains unchanged. Existing native fixture parents restore their settlement child through the scoped cache owner, while normal production stop/restart retains the same CoreState. Portable focused tests pass (32 held-key cases, 24 policy cases, 3 legacy collision cases, 23 existing cache-scope cases, and 9 unchanged alias configuration/privacy cases); the original real gap-release source fails all eight side-key cases. This does not enable a producer or headless mode, alter transport/baseline versions, or complete WP3/WP4/native acceptance. Full root and hosted macOS qualification remain required.
 
 WP3 remains partial. An explicitly initialized, dormant physical-capture session
