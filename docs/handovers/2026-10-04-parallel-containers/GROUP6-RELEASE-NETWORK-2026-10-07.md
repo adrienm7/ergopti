@@ -259,6 +259,22 @@ ef67fa39075f35b990dbaf0a23dd6d8a4987222a changes only the qualification
 documents, preserving every unit and production byte. Early E2E prerequisite
 receiving and complete Linux package/install acceptance remain pending.
 
+The source-reviewed Windows TLS fixture candidate replaces only the server
+backend with native OpenSSL3 memory BIOs over the original TcpClient streams.
+Both original CNG keys stay ephemeral, with Framework-compatible PKCS8 export
+only in pinned process memory and observed clearing. Actual provider PE/import/
+path/hash/version/export and stream/context/DLL/fence closure receipts strengthen
+the existing ready/graceful acceptance. Every original108 AHK assertion is
+byte-exact;11 provider/closure call sites are added, and the updater receiving
+file is unchanged. Production Schannel/.NET clients, root/CRL/PAC/CONNECT,
+payloads, counters, socket timeouts and native deadlines remain intact.
+Genuine portable PowerShell parsing/whole CSharp compilation and29 independent
+pure-helper controls pass under the original closed command owner, status0
+without signal/error or retained phase. No Windows native DLL or TLS operation
+has run locally. Native trust/refusal, updater staging/cleanup and the complete
+Windows lane still require actual hosted qualification; no native repair
+success is inferred from compilation or metadata controls.
+
 ## Remaining CODE and hosted work
 
 - **Windows62:** Join one packaged owned curl attempt engine to both the real

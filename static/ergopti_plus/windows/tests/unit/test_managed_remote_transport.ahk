@@ -133,6 +133,16 @@ class _ManagedRemoteFixtureOwner {
 			throw Error("Actual managed-network native fixture did not start.")
 		this.WaitState("ready", "untrusted", 20000)
 		AssertTrue(this.State.Get("curl_schannel", false), "the actual shipped curl backend must be Schannel")
+		AssertEqual("native_openssl3", this.State.Get("server_tls_backend", ""), "the independent fixture server must execute native TLS")
+		AssertTrue(Type(this.State.Get("server_tls_version", "")) == "Integer"
+			&& this.State["server_tls_version"] >= 0x30000000 && this.State["server_tls_version"] < 0x40000000, "actual server OpenSSL3 ABI")
+		for Name in ["server_tls_ssl_image_sha256", "server_tls_crypto_image_sha256"]
+			AssertTrue(RegExMatch(this.State.Get(Name, ""), "\A[0-9a-f]{64}\z") > 0, "actual source-fenced native TLS image hash")
+		for Name in ["server_tls_key_ephemeral", "server_tls_private_der_cleared", "server_tls_source_unchanged"]
+			AssertTrue(this.State.Get(Name, false), "actual in-memory TLS key and provider ownership")
+		AssertEqual(2, this.State.Get("server_tls_owned_modules", -1), "only the two explicitly acquired native module references are owned")
+		AssertTrue(this.State.Get("server_tls_owned_source_fences", -1) >= 2, "both exact provider images stay fenced during native use")
+		AssertEqual(0, this.State.Get("server_tls_owned_streams", -1), "ready server has no borrowed TLS connection")
 		this.RootThumbprint := this.State.Get("root_thumbprint", "")
 		this.RootSubject := this.State.Get("root_subject", "")
 		AssertTrue(RegExMatch(this.RootThumbprint, "^[0-9A-F]{40}$") > 0, "owned root thumbprint is required before any store change")
@@ -401,6 +411,14 @@ class _ManagedRemoteFixtureOwner {
 					FinalState := JsonParse(FileRead(this.Capture["TmpFile"], "UTF-8"))
 					this.GracefulReceiptVerified := FinalState is Map && FinalState.Get("state", "") == "stopped"
 						&& FinalState.Get("root_removed", false) && FinalState.Get("service_stopped", false)
+					if this.GracefulReceiptVerified {
+						this.GracefulReceiptVerified := false
+						AssertEqual(0, FinalState.Get("server_tls_owned_streams", -1), "all actual native TLS connections retired before service acknowledgment")
+						AssertEqual(0, FinalState.Get("server_tls_owned_modules", -1), "all exact acquired native provider references retired")
+						AssertEqual(0, FinalState.Get("server_tls_owned_source_fences", -1), "native provider source fences close only after TLS retirement")
+						AssertTrue(FinalState.Get("server_tls_source_unchanged", false), "native provider bytes remain unchanged through retirement")
+						this.GracefulReceiptVerified := true
+					}
 				} catch as FinalReceiptError {
 					this.LastFinalReceiptError := Type(FinalReceiptError)
 				}

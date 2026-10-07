@@ -47,6 +47,16 @@ $State = @{ version = 1; state = 'starting'; phase = 'untrusted'; sequence = 0; 
 function Publish-State {
     try {
     if ($null -ne $Fixture) {
+        $State.server_tls_backend = 'native_openssl3'
+        $State.server_tls_version = $Fixture.NativeTls.Version
+        $State.server_tls_ssl_image_sha256 = $Fixture.NativeTls.SslImageHash
+        $State.server_tls_crypto_image_sha256 = $Fixture.NativeTls.CryptoImageHash
+        $State.server_tls_key_ephemeral = $Fixture.NativeTls.KeyEphemeral
+        $State.server_tls_private_der_cleared = $Fixture.NativeTls.PrivateDerCleared
+        $State.server_tls_source_unchanged = $Fixture.NativeTls.SourceUnchanged
+        $State.server_tls_owned_modules = $Fixture.NativeTls.OwnedModuleReferences
+        $State.server_tls_owned_source_fences = $Fixture.NativeTls.OwnedSourceFences
+        $State.server_tls_owned_streams = $Fixture.NativeTls.OwnedStreams
         $Fact = $Fixture.ReadServiceFailure()
         if ($Fact.Stage -cne 'none') {
             $State.service_failure_stage = $Fact.Stage
@@ -80,6 +90,579 @@ using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading;
+
+// Fixture-only native TLS: the clients still use Windows Schannel and system trust.
+public sealed class ErgoptiFixtureOpenSsl : IDisposable
+{
+    private sealed class ImageFence : IDisposable
+    {
+        public readonly string Path;
+        public readonly string Hash;
+        public readonly List<string> Imports;
+        private readonly FileStream file;
+        public ImageFence(string path)
+        {
+            Path = System.IO.Path.GetFullPath(path);
+            if ((File.GetAttributes(Path) & FileAttributes.ReparsePoint) != 0)
+                throw new InvalidOperationException("Native TLS image reparse point refused.");
+            file = new FileStream(Path, FileMode.Open, FileAccess.Read, FileShare.Read);
+            try {
+                if (file.Length < 512 || file.Length > 33554432)
+                    throw new InvalidDataException("Native TLS image size refused.");
+                byte[] bytes = new byte[(int)file.Length];
+                int offset = 0;
+                while (offset < bytes.Length) {
+                    int count = file.Read(bytes, offset, bytes.Length - offset);
+                    if (count <= 0) throw new EndOfStreamException();
+                    offset += count;
+                }
+                using (SHA256 sha = SHA256.Create()) Hash = Hex(sha.ComputeHash(bytes));
+                Imports = InspectNativeImage(bytes);
+                file.Position = 0;
+            } catch { file.Dispose(); throw; }
+        }
+        public void Verify()
+        {
+            file.Position = 0;
+            string current;
+            using (SHA256 sha = SHA256.Create()) current = Hex(sha.ComputeHash(file));
+            file.Position = 0;
+            if (!String.Equals(current, Hash, StringComparison.Ordinal))
+                throw new InvalidOperationException("Native TLS image changed under its source fence.");
+        }
+        public void Dispose() { file.Dispose(); }
+    }
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+    private static extern IntPtr LoadLibraryExW(string path, IntPtr file, uint flags);
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Ansi, ExactSpelling = true, SetLastError = true)]
+    private static extern IntPtr GetProcAddress(IntPtr module, string name);
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+    private static extern uint GetModuleFileNameW(IntPtr module, StringBuilder path, uint capacity);
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+    private static extern IntPtr GetModuleHandleW(string name);
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
+    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+    private static extern bool FreeLibrary(IntPtr module);
+
+    [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.Cdecl)]
+    private delegate uint VersionCall();
+    [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.Cdecl)]
+    private delegate int InitializeCall(ulong flags, IntPtr settings);
+    [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.Cdecl)]
+    private delegate IntPtr MethodCall();
+    [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.Cdecl)]
+    private delegate IntPtr NewCall(IntPtr input);
+    [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.Cdecl)]
+    private delegate void FreeCall(IntPtr input);
+    [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.Cdecl)]
+    private delegate int ContextControlCall(IntPtr context, int command, int argument, IntPtr pointer);
+    [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.Cdecl)]
+    private delegate int CertificateCall(IntPtr context, int count, IntPtr der);
+    [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.Cdecl)]
+    private delegate int PrivateKeyCall(int type, IntPtr context, IntPtr der, int count);
+    [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.Cdecl)]
+    private delegate int OneCall(IntPtr input);
+    [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.Cdecl)]
+    private delegate void BioPairCall(IntPtr ssl, IntPtr input, IntPtr output);
+    [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.Cdecl)]
+    private delegate int IoCall(IntPtr owner, IntPtr bytes, int count);
+    [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.Cdecl)]
+    private delegate int ErrorCall(IntPtr ssl, int result);
+    [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.Cdecl)]
+    private delegate void ClearErrorCall();
+    [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.Cdecl)]
+    private delegate uint LastErrorCall();
+
+    private readonly List<ImageFence> images = new List<ImageFence>();
+    private readonly Dictionary<string, string> imports = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    private readonly string nativeDirectory;
+    private readonly string systemDirectory;
+    private IntPtr cryptoModule;
+    private IntPtr sslModule;
+    private IntPtr context;
+    private int streams;
+    private bool closed;
+    private readonly object gate = new object();
+    private NewCall sslNew;
+    private FreeCall sslFree;
+    private FreeCall contextFree;
+    private MethodCall bioMethod;
+    private NewCall bioNew;
+    private OneCall bioFree;
+    private BioPairCall setBio;
+    private FreeCall acceptState;
+    private OneCall handshake;
+    private OneCall shutdown;
+    private IoCall sslRead;
+    private IoCall sslWrite;
+    private IoCall bioRead;
+    private IoCall bioWrite;
+    private ErrorCall sslError;
+    private ClearErrorCall clearError;
+    private LastErrorCall lastError;
+    public readonly uint Version;
+    public readonly bool KeyEphemeral;
+    public readonly string SslImageHash;
+    public readonly string CryptoImageHash;
+    public bool PrivateDerCleared { get; private set; }
+    public bool SourceUnchanged { get; private set; }
+    public int OwnedModuleReferences { get { return (sslModule != IntPtr.Zero ? 1 : 0) + (cryptoModule != IntPtr.Zero ? 1 : 0); } }
+    public int OwnedSourceFences { get { return images.Count; } }
+    public int OwnedStreams { get { lock (gate) return streams; } }
+
+    private static string Hex(byte[] bytes)
+    {
+        StringBuilder value = new StringBuilder(bytes.Length * 2);
+        foreach (byte one in bytes) value.Append(one.ToString("x2", CultureInfo.InvariantCulture));
+        return value.ToString();
+    }
+    private static bool ApiSet(string name)
+    {
+        return name.StartsWith("api-ms-win-", StringComparison.OrdinalIgnoreCase) ||
+            name.StartsWith("ext-ms-win-", StringComparison.OrdinalIgnoreCase);
+    }
+    private static void VerifyDirectory(string path)
+    {
+        DirectoryInfo directory = new DirectoryInfo(path);
+        while (directory != null) {
+            if (!directory.Exists || (directory.Attributes & FileAttributes.ReparsePoint) != 0)
+                throw new InvalidOperationException("Native TLS installation directory refused.");
+            directory = directory.Parent;
+        }
+    }
+    private static int RvaOffset(byte[] image, uint rva, int table, int sections)
+    {
+        for (int index = 0; index < sections; index++) {
+            int section = table + index * 40;
+            uint address = BitConverter.ToUInt32(image, section + 12);
+            uint rawSize = BitConverter.ToUInt32(image, section + 16);
+            uint rawAddress = BitConverter.ToUInt32(image, section + 20);
+            if (rva >= address && (ulong)rva - address < rawSize) {
+                ulong offset = (ulong)rawAddress + rva - address;
+                if (offset >= (ulong)image.Length) break;
+                return (int)offset;
+            }
+        }
+        throw new InvalidDataException("Native TLS image address refused.");
+    }
+    public static List<string> InspectNativeImage(byte[] image)
+    {
+        if (image == null || image.Length < 512 || image.Length > 33554432 ||
+            image[0] != 0x4d || image[1] != 0x5a)
+            throw new InvalidDataException("Native TLS PE header refused.");
+        int pe = BitConverter.ToInt32(image, 60);
+        if (pe < 64 || pe > image.Length - 264 || BitConverter.ToUInt32(image, pe) != 0x4550 ||
+            BitConverter.ToUInt16(image, pe + 4) != 0x8664 ||
+            (BitConverter.ToUInt16(image, pe + 22) & 0x2000) == 0)
+            throw new InvalidDataException("Native TLS AMD64 DLL identity refused.");
+        int sections = BitConverter.ToUInt16(image, pe + 6);
+        int optionalSize = BitConverter.ToUInt16(image, pe + 20);
+        int optional = pe + 24;
+        int table = optional + optionalSize;
+        if (sections < 1 || sections > 96 || optionalSize < 240 ||
+            table > image.Length - sections * 40 ||
+            BitConverter.ToUInt16(image, optional) != 0x20b ||
+            BitConverter.ToUInt32(image, optional + 108) < 2)
+            throw new InvalidDataException("Native TLS PE32+ sections refused.");
+        uint rva = BitConverter.ToUInt32(image, optional + 120);
+        uint size = BitConverter.ToUInt32(image, optional + 124);
+        if (rva == 0 || size < 20 || size > 1048576)
+            throw new InvalidDataException("Native TLS import directory refused.");
+        List<string> result = new List<string>();
+        int descriptor = RvaOffset(image, rva, table, sections);
+        for (int index = 0; index < 256 && index * 20 < size; index++) {
+            int row = descriptor + index * 20;
+            if (row < 0 || row > image.Length - 20)
+                throw new InvalidDataException("Native TLS import descriptor refused.");
+            bool terminal = true;
+            for (int byteIndex = 0; byteIndex < 20; byteIndex++) terminal &= image[row + byteIndex] == 0;
+            if (terminal) {
+                if (result.Count == 0) throw new InvalidDataException("Native TLS imports absent.");
+                return result;
+            }
+            int name = RvaOffset(image, BitConverter.ToUInt32(image, row + 12), table, sections);
+            StringBuilder text = new StringBuilder();
+            while (text.Length < 128 && name < image.Length && image[name] != 0) {
+                byte one = image[name++];
+                if (!((one >= 0x41 && one <= 0x5a) || (one >= 0x61 && one <= 0x7a) ||
+                    (one >= 0x30 && one <= 0x39) || one == 0x2d || one == 0x2e || one == 0x5f))
+                    throw new InvalidDataException("Native TLS import name refused.");
+                text.Append((char)one);
+            }
+            string dependency = text.ToString();
+            if (name >= image.Length || image[name] != 0 || dependency.Length < 5 ||
+                !dependency.EndsWith(".dll", StringComparison.OrdinalIgnoreCase) ||
+                dependency.IndexOf("..", StringComparison.Ordinal) >= 0)
+                throw new InvalidDataException("Native TLS import name refused.");
+            if (dependency.Equals("msys-2.0.dll", StringComparison.OrdinalIgnoreCase) ||
+                dependency.StartsWith("msys-", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("MSYS TLS libraries are not native Windows libraries.");
+            result.Add(dependency);
+        }
+        throw new InvalidDataException("Native TLS imports did not terminate.");
+    }
+    private ImageFence Fence(string path)
+    {
+        foreach (ImageFence existing in images)
+            if (String.Equals(existing.Path, path, StringComparison.OrdinalIgnoreCase)) return existing;
+        if (images.Count >= 16) throw new InvalidDataException("Native TLS dependency ceiling exceeded.");
+        ImageFence image = new ImageFence(path);
+        images.Add(image);
+        foreach (string name in image.Imports) {
+            if (imports.ContainsKey(name)) continue;
+            if (ApiSet(name)) { imports.Add(name, ""); continue; }
+            string local = Path.Combine(nativeDirectory, name);
+            string system = Path.Combine(systemDirectory, name);
+            if (File.Exists(local)) {
+                imports.Add(name, local);
+                Fence(local);
+            } else if (File.Exists(system)) imports.Add(name, system);
+            else throw new InvalidOperationException("Native TLS dependency unavailable.");
+        }
+        return image;
+    }
+    private static string ModulePath(IntPtr module)
+    {
+        StringBuilder path = new StringBuilder(32768);
+        uint count = GetModuleFileNameW(module, path, (uint)path.Capacity);
+        if (count == 0 || count >= path.Capacity)
+            throw new System.ComponentModel.Win32Exception(System.Runtime.InteropServices.Marshal.GetLastWin32Error());
+        return Path.GetFullPath(path.ToString());
+    }
+    private static void VerifyModule(IntPtr module, string expected)
+    {
+        if (module == IntPtr.Zero || !String.Equals(ModulePath(module), expected, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Native TLS loaded image identity refused.");
+    }
+    private IntPtr LoadImage(string path)
+    {
+        IntPtr previous = GetModuleHandleW(Path.GetFileName(path));
+        if (previous != IntPtr.Zero) VerifyModule(previous, path);
+        IntPtr module = LoadLibraryExW(path, IntPtr.Zero, 0x00000100u | 0x00000800u);
+        if (module == IntPtr.Zero)
+            throw new System.ComponentModel.Win32Exception(System.Runtime.InteropServices.Marshal.GetLastWin32Error());
+        try { VerifyModule(module, path); return module; }
+        catch { if (!FreeLibrary(module)) throw new InvalidOperationException("Refused TLS image reference did not retire."); throw; }
+    }
+    private void VerifyLoadedImports()
+    {
+        foreach (KeyValuePair<string, string> import in imports) {
+            IntPtr module = GetModuleHandleW(import.Key);
+            if (ApiSet(import.Key)) {
+                if (module != IntPtr.Zero && !String.Equals(Path.GetDirectoryName(ModulePath(module)), systemDirectory, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("Native TLS API-set image escaped system directory.");
+            } else VerifyModule(module, import.Value);
+        }
+    }
+    private T Export<T>(IntPtr module, string name) where T : class
+    {
+        IntPtr address = GetProcAddress(module, name);
+        if (address == IntPtr.Zero) throw new InvalidOperationException("Required native TLS export unavailable.");
+        return (T)(object)System.Runtime.InteropServices.Marshal.GetDelegateForFunctionPointer(address, typeof(T));
+    }
+    private void VerifySources()
+    {
+        SourceUnchanged = false;
+        foreach (ImageFence image in images) image.Verify();
+        SourceUnchanged = true;
+    }
+    public static bool ClearPrivateDer(byte[] bytes)
+    {
+        if (bytes == null) return false;
+        Array.Clear(bytes, 0, bytes.Length);
+        if (bytes.Length < 1 || bytes.Length > 65536) return false;
+        foreach (byte one in bytes) if (one != 0) return false;
+        return true;
+    }
+    public static bool IsExpectedClientTrustRefusal(bool trustAdmitted, uint error)
+    {
+        if (trustAdmitted || ((error >> 23) & 0xffu) != 20u) return false;
+        uint reason = error & 0x7fffffu;
+        // Actual peer certificate alerts, confined to the original untrusted phases.
+        return reason == 1042u || reason == 1044u || reason == 1045u || reason == 1046u || reason == 1048u;
+    }
+    public ErgoptiFixtureOpenSsl(X509Certificate2 leaf, RSACng key)
+    {
+        if (Environment.OSVersion.Platform != PlatformID.Win32NT || IntPtr.Size != 8 ||
+            leaf == null || key == null || !key.Key.IsEphemeral)
+            throw new InvalidOperationException("Native in-memory TLS fixture prerequisite unavailable.");
+        KeyEphemeral = key.Key.IsEphemeral;
+        nativeDirectory = Path.GetFullPath(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Git", "mingw64", "bin"));
+        systemDirectory = Path.GetFullPath(Environment.GetFolderPath(Environment.SpecialFolder.System));
+        VerifyDirectory(nativeDirectory);
+        string cryptoPath = Path.Combine(nativeDirectory, "libcrypto-3-x64.dll");
+        string sslPath = Path.Combine(nativeDirectory, "libssl-3-x64.dll");
+        byte[] privateDer = null;
+        try {
+            ImageFence crypto = Fence(cryptoPath);
+            ImageFence ssl = Fence(sslPath);
+            CryptoImageHash = crypto.Hash;
+            SslImageHash = ssl.Hash;
+            cryptoModule = LoadImage(cryptoPath);
+            sslModule = LoadImage(sslPath);
+            VerifyLoadedImports();
+            VersionCall major = Export<VersionCall>(cryptoModule, "OPENSSL_version_major");
+            VersionCall version = Export<VersionCall>(cryptoModule, "OpenSSL_version_num");
+            Version = version();
+            if (major() != 3 || Version < 0x30000000u || Version >= 0x40000000u)
+                throw new InvalidOperationException("Native OpenSSL3 identity refused.");
+            InitializeCall initialize = Export<InitializeCall>(sslModule, "OPENSSL_init_ssl");
+            if (initialize(0x00000080ul, IntPtr.Zero) != 1)
+                throw new InvalidOperationException("Native TLS configuration-free initialization refused.");
+            MethodCall method = Export<MethodCall>(sslModule, "TLS_server_method");
+            NewCall contextNew = Export<NewCall>(sslModule, "SSL_CTX_new");
+            contextFree = Export<FreeCall>(sslModule, "SSL_CTX_free");
+            ContextControlCall control = Export<ContextControlCall>(sslModule, "SSL_CTX_ctrl");
+            CertificateCall certificate = Export<CertificateCall>(sslModule, "SSL_CTX_use_certificate_ASN1");
+            PrivateKeyCall privateKey = Export<PrivateKeyCall>(sslModule, "SSL_CTX_use_PrivateKey_ASN1");
+            OneCall checkKey = Export<OneCall>(sslModule, "SSL_CTX_check_private_key");
+            sslNew = Export<NewCall>(sslModule, "SSL_new");
+            sslFree = Export<FreeCall>(sslModule, "SSL_free");
+            setBio = Export<BioPairCall>(sslModule, "SSL_set_bio");
+            acceptState = Export<FreeCall>(sslModule, "SSL_set_accept_state");
+            handshake = Export<OneCall>(sslModule, "SSL_do_handshake");
+            shutdown = Export<OneCall>(sslModule, "SSL_shutdown");
+            sslRead = Export<IoCall>(sslModule, "SSL_read");
+            sslWrite = Export<IoCall>(sslModule, "SSL_write");
+            sslError = Export<ErrorCall>(sslModule, "SSL_get_error");
+            bioMethod = Export<MethodCall>(cryptoModule, "BIO_s_mem");
+            bioNew = Export<NewCall>(cryptoModule, "BIO_new");
+            bioFree = Export<OneCall>(cryptoModule, "BIO_free");
+            bioRead = Export<IoCall>(cryptoModule, "BIO_read");
+            bioWrite = Export<IoCall>(cryptoModule, "BIO_write");
+            clearError = Export<ClearErrorCall>(cryptoModule, "ERR_clear_error");
+            lastError = Export<LastErrorCall>(cryptoModule, "ERR_peek_last_error");
+            context = contextNew(method());
+            if (context == IntPtr.Zero || control(context, 123, 0x0303, IntPtr.Zero) != 1 ||
+                control(context, 124, 0x0303, IntPtr.Zero) != 1)
+                throw new InvalidOperationException("Native TLS1.2 server context refused.");
+            byte[] publicDer = leaf.Export(X509ContentType.Cert);
+            System.Runtime.InteropServices.GCHandle publicPin = System.Runtime.InteropServices.GCHandle.Alloc(publicDer, System.Runtime.InteropServices.GCHandleType.Pinned);
+            try {
+                if (certificate(context, publicDer.Length, publicPin.AddrOfPinnedObject()) != 1)
+                    throw new CryptographicException("Native TLS fixture certificate refused.");
+            } finally { publicPin.Free(); Array.Clear(publicDer, 0, publicDer.Length); }
+            privateDer = key.Key.Export(CngKeyBlobFormat.Pkcs8PrivateBlob);
+            if (privateDer.Length < 1 || privateDer.Length > 65536)
+                throw new CryptographicException("Native TLS private DER ceiling refused.");
+            System.Runtime.InteropServices.GCHandle privatePin = System.Runtime.InteropServices.GCHandle.Alloc(privateDer, System.Runtime.InteropServices.GCHandleType.Pinned);
+            try {
+                if (privateKey(6, context, privatePin.AddrOfPinnedObject(), privateDer.Length) != 1 || checkKey(context) != 1)
+                    throw new CryptographicException("Native TLS fixture key match refused.");
+            } finally { privatePin.Free(); PrivateDerCleared = ClearPrivateDer(privateDer); }
+            if (!PrivateDerCleared) throw new CryptographicException("Native TLS private DER clearing refused.");
+            VerifySources();
+        } catch {
+            if (privateDer != null) PrivateDerCleared = ClearPrivateDer(privateDer);
+            Dispose();
+            throw;
+        }
+    }
+    public Stream Open(NetworkStream network, Func<bool> trustAdmitted)
+    {
+        lock (gate) {
+            if (closed || context == IntPtr.Zero) throw new ObjectDisposedException("Owned native TLS fixture");
+            NativeStream stream = new NativeStream(this, network, trustAdmitted);
+            streams++;
+            return stream;
+        }
+    }
+    public void Authenticate(Stream stream)
+    {
+        NativeStream native = stream as NativeStream;
+        if (native == null || !Object.ReferenceEquals(native.Owner, this))
+            throw new InvalidOperationException("Native TLS stream ownership refused.");
+        native.Authenticate();
+    }
+    public void Dispose()
+    {
+        lock (gate) {
+            if (closed) return;
+            if (streams != 0) throw new InvalidOperationException("Native TLS streams remain owned.");
+            VerifySources();
+            if (context != IntPtr.Zero) { contextFree(context); context = IntPtr.Zero; }
+            if (sslModule != IntPtr.Zero) {
+                if (!FreeLibrary(sslModule)) throw new System.ComponentModel.Win32Exception(System.Runtime.InteropServices.Marshal.GetLastWin32Error());
+                sslModule = IntPtr.Zero;
+            }
+            if (cryptoModule != IntPtr.Zero) {
+                if (!FreeLibrary(cryptoModule)) throw new System.ComponentModel.Win32Exception(System.Runtime.InteropServices.Marshal.GetLastWin32Error());
+                cryptoModule = IntPtr.Zero;
+            }
+            VerifySources();
+            foreach (ImageFence image in images) image.Dispose();
+            images.Clear();
+            closed = true;
+        }
+    }
+    private sealed class NativeStream : Stream
+    {
+        public readonly ErgoptiFixtureOpenSsl Owner;
+        private readonly NetworkStream network;
+        private readonly Func<bool> trustAdmitted;
+        private IntPtr ssl;
+        private IntPtr input;
+        private IntPtr output;
+        private readonly byte[] encrypted = new byte[16384];
+        private bool disposed;
+        private bool authenticated;
+        public NativeStream(ErgoptiFixtureOpenSsl owner, NetworkStream network, Func<bool> trustAdmitted)
+        {
+            if (network == null || trustAdmitted == null) throw new ArgumentNullException();
+            Owner = owner; this.network = network; this.trustAdmitted = trustAdmitted;
+            bool attached = false;
+            try {
+                ssl = owner.sslNew(owner.context);
+                if (ssl == IntPtr.Zero) throw new InvalidOperationException("Native TLS connection allocation refused.");
+                input = owner.bioNew(owner.bioMethod());
+                output = owner.bioNew(owner.bioMethod());
+                if (input == IntPtr.Zero || output == IntPtr.Zero)
+                    throw new InvalidOperationException("Native TLS memory BIO allocation refused.");
+                owner.setBio(ssl, input, output);
+                attached = true;
+                owner.acceptState(ssl);
+            } catch {
+                if (!attached && input != IntPtr.Zero) owner.bioFree(input);
+                if (!attached && output != IntPtr.Zero) owner.bioFree(output);
+                if (ssl != IntPtr.Zero) owner.sslFree(ssl);
+                input = output = ssl = IntPtr.Zero;
+                throw;
+            }
+        }
+        private int Drain()
+        {
+            int total = 0;
+            System.Runtime.InteropServices.GCHandle pin = System.Runtime.InteropServices.GCHandle.Alloc(encrypted, System.Runtime.InteropServices.GCHandleType.Pinned);
+            try {
+                while (true) {
+                    int count = Owner.bioRead(output, pin.AddrOfPinnedObject(), encrypted.Length);
+                    if (count <= 0) return total;
+                    if (count > encrypted.Length || total > 1048576 - count)
+                        throw new InvalidDataException("Native TLS encrypted output ceiling refused.");
+                    network.Write(encrypted, 0, count);
+                    total += count;
+                }
+            } finally { pin.Free(); Array.Clear(encrypted, 0, encrypted.Length); }
+        }
+        private void Receive()
+        {
+            int count = network.Read(encrypted, 0, encrypted.Length);
+            if (count <= 0) throw new EndOfStreamException("Owned TLS peer closed before protocol completion.");
+            System.Runtime.InteropServices.GCHandle pin = System.Runtime.InteropServices.GCHandle.Alloc(encrypted, System.Runtime.InteropServices.GCHandleType.Pinned);
+            try {
+                if (Owner.bioWrite(input, pin.AddrOfPinnedObject(), count) != count)
+                    throw new InvalidOperationException("Native TLS encrypted input admission refused.");
+            } finally { pin.Free(); Array.Clear(encrypted, 0, encrypted.Length); }
+        }
+        private void Continue(int error, uint nativeError, bool authenticating)
+        {
+            if (authenticating && error == 1 && IsExpectedClientTrustRefusal(trustAdmitted(), nativeError)) {
+                Drain();
+                throw new System.Security.Authentication.AuthenticationException("Actual untrusted client certificate alert.");
+            }
+            if (error == 6) { Drain(); throw new EndOfStreamException("Owned TLS peer acknowledged closure."); }
+            if (error == 2 || error == 3) {
+                int written = Drain();
+                if (error == 2) { Receive(); return; } // SSL_ERROR_WANT_READ.
+                if (written > 0) return; // SSL_ERROR_WANT_WRITE requires actual progress.
+            }
+            // Unexpected native TLS faults stay visible even if the socket has also closed.
+            throw new InvalidOperationException("Actual native TLS protocol operation refused.");
+        }
+        public void Authenticate()
+        {
+            for (int attempts = 0; attempts < 512; attempts++) {
+                Owner.clearError();
+                int result = Owner.handshake(ssl);
+                int error = result == 1 ? 0 : Owner.sslError(ssl, result);
+                uint nativeError = result == 1 ? 0u : Owner.lastError();
+                if (result == 1) { Drain(); authenticated = true; return; }
+                Continue(error, nativeError, true);
+            }
+            throw new InvalidDataException("Native TLS handshake progress ceiling exceeded.");
+        }
+        public override int Read(byte[] bytes, int offset, int count)
+        {
+            if (disposed) throw new ObjectDisposedException("Owned native TLS stream");
+            if (bytes == null || offset < 0 || count < 0 || offset > bytes.Length - count)
+                throw new ArgumentOutOfRangeException();
+            if (count == 0) return 0;
+            System.Runtime.InteropServices.GCHandle pin = System.Runtime.InteropServices.GCHandle.Alloc(bytes, System.Runtime.InteropServices.GCHandleType.Pinned);
+            try {
+                for (int attempts = 0; attempts < 512; attempts++) {
+                    Owner.clearError();
+                    int result = Owner.sslRead(ssl, IntPtr.Add(pin.AddrOfPinnedObject(), offset), count);
+                    int error = result > 0 ? 0 : Owner.sslError(ssl, result);
+                    uint nativeError = result > 0 ? 0u : Owner.lastError();
+                    if (result > 0) { Drain(); return result; }
+                    if (error == 6) { Drain(); return 0; }
+                    Continue(error, nativeError, false);
+                }
+                throw new InvalidDataException("Native TLS read progress ceiling exceeded.");
+            } finally { pin.Free(); }
+        }
+        public override void Write(byte[] bytes, int offset, int count)
+        {
+            if (disposed) throw new ObjectDisposedException("Owned native TLS stream");
+            if (bytes == null || offset < 0 || count < 0 || offset > bytes.Length - count)
+                throw new ArgumentOutOfRangeException();
+            System.Runtime.InteropServices.GCHandle pin = System.Runtime.InteropServices.GCHandle.Alloc(bytes, System.Runtime.InteropServices.GCHandleType.Pinned);
+            try {
+                while (count > 0) {
+                    int chunk = Math.Min(count, 16384);
+                    bool completed = false;
+                    for (int attempts = 0; attempts < 512; attempts++) {
+                        Owner.clearError();
+                        int result = Owner.sslWrite(ssl, IntPtr.Add(pin.AddrOfPinnedObject(), offset), chunk);
+                        int error = result > 0 ? 0 : Owner.sslError(ssl, result);
+                        uint nativeError = result > 0 ? 0u : Owner.lastError();
+                        if (result > 0) {
+                            if (result > chunk) throw new InvalidDataException("Native TLS write length refused.");
+                            Drain(); offset += result; count -= result; completed = true; break;
+                        }
+                        Continue(error, nativeError, false);
+                    }
+                    if (!completed) throw new InvalidDataException("Native TLS write progress ceiling exceeded.");
+                }
+            } finally { pin.Free(); }
+        }
+        protected override void Dispose(bool disposing)
+        {
+            if (disposed) return;
+            if (disposing) {
+                try {
+                    if (authenticated && ssl != IntPtr.Zero) {
+                        Owner.clearError();
+                        int result = Owner.shutdown(ssl);
+                        int error = result < 0 ? Owner.sslError(ssl, result) : 0;
+                        if (result < 0 && error != 2 && error != 3 && error != 6)
+                            throw new InvalidOperationException("Native TLS close notification refused.");
+                        // Send close_notify once; never wait for a peer during retirement.
+                        Drain();
+                    }
+                } finally {
+                    if (ssl != IntPtr.Zero) { Owner.sslFree(ssl); ssl = input = output = IntPtr.Zero; }
+                    try { network.Dispose(); }
+                    finally {
+                        Array.Clear(encrypted, 0, encrypted.Length);
+                        lock (Owner.gate) Owner.streams--;
+                        disposed = true;
+                    }
+                }
+            }
+            base.Dispose(disposing);
+        }
+        public override void Flush() { if (disposed) throw new ObjectDisposedException("Owned native TLS stream"); Drain(); network.Flush(); }
+        public override bool CanRead { get { return !disposed; } }
+        public override bool CanWrite { get { return !disposed; } }
+        public override bool CanSeek { get { return false; } }
+        public override long Length { get { throw new NotSupportedException(); } }
+        public override long Position { get { throw new NotSupportedException(); } set { throw new NotSupportedException(); } }
+        public override long Seek(long offset, SeekOrigin origin) { throw new NotSupportedException(); }
+        public override void SetLength(long value) { throw new NotSupportedException(); }
+    }
+}
 
 public sealed class ErgoptiManagedRemoteFixture : IDisposable
 {
@@ -122,6 +705,8 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
     private volatile bool stopping;
     private readonly RSA rootKey;
     private readonly RSA leafKey;
+    public readonly ErgoptiFixtureOpenSsl NativeTls;
+    public volatile bool TrustAdmitted;
     public readonly X509Certificate2 Root;
     private readonly X509Certificate2 leaf;
     private readonly byte[] crl;
@@ -194,6 +779,7 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
         using (X509Certificate2 issued = leafRequest.Create(Root, from, until, serial))
             leaf = RSACertificateExtensions.CopyWithPrivateKey(issued, leafKey);
         crl = CreateCrl(Root.SubjectName.RawData, rootKey);
+        NativeTls = new ErgoptiFixtureOpenSsl(leaf, (RSACng)leafKey);
         Start(tls, Tls);
         Start(proxy, Proxy);
         Start(http, Http);
@@ -250,8 +836,8 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
     }
     private void Tls(TcpClient client)
     {
-        using (SslStream tls = new SslStream(client.GetStream(), false)) {
-            try { tls.AuthenticateAsServer(leaf, false, System.Security.Authentication.SslProtocols.Tls12, true); }
+        using (Stream tls = NativeTls.Open(client.GetStream(), () => TrustAdmitted)) {
+            try { NativeTls.Authenticate(tls); }
             catch (System.Security.Authentication.AuthenticationException) { Interlocked.Increment(ref FailedTls); return; }
             catch (IOException) { Interlocked.Increment(ref FailedTls); return; }
             catch (Exception failure) { CaptureServiceFailure("tls_authenticate", failure); throw; }
@@ -314,7 +900,7 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
         for (int i = 0; i < bytes.Length; i++) bytes[i] = (byte)(i % 256);
         return bytes;
     }
-    private void Download(SslStream tls, string header, string first)
+    private void Download(Stream tls, string header, string first)
     {
         Interlocked.Increment(ref DownloadRequests);
         if (header.IndexOf("\r\nAuthorization:", StringComparison.OrdinalIgnoreCase) >= 0 ||
@@ -428,6 +1014,7 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
         foreach(Thread thread in listenersThreads) if(!thread.Join(3000))throw new InvalidOperationException("Owned fixture accept thread did not settle.");
         Thread[] pending;lock(gate)pending=workers.ToArray();
         foreach(Thread thread in pending) if(!thread.Join(3000))throw new InvalidOperationException("Owned fixture worker did not settle.");
+        NativeTls.Dispose();
         leaf.Dispose();Root.Dispose();leafKey.Dispose();rootKey.Dispose();
     }
 }
@@ -465,11 +1052,13 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
                     throw 'Unique owned root installation was not acknowledged.'
                 }
             } finally { $Store.Close(); $Store.Dispose() }
+            $Fixture.TrustAdmitted = $true
             $State.phase = 'trusted'
         } elseif ($Choice -eq 1) {
             Remove-OwnedRoot $State.root_thumbprint $State.root_subject
             $RootInstalled = $false
             $State.root_removed = $true
+            $Fixture.TrustAdmitted = $false
             $State.phase = 'removed'
         } elseif ($Choice -eq 3) { break }
         if ($Choice -ne [Threading.WaitHandle]::WaitTimeout) {

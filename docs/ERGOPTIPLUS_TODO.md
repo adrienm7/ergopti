@@ -6424,6 +6424,20 @@ deadlines are changed. One fresh-run diagnostic is requested at ef67fa390,
 whose only delta is the qualification documentation. Complete Linux acceptance
 and the early E2E prerequisite receiving remain pending.
 
+The Windows fixture server now uses actual native OpenSSL3 memory BIOs over its
+original TcpClient streams. Production Schannel/.NET clients, system-root/CRL
+admission, PAC/CONNECT, payloads, counters and original native clocks remain.
+Both original RSACng keys stay ephemeral; Framework-compatible PKCS8 export is
+pinned only in memory, imported and cleared. Native provider PE/import/path/
+hash/version/export fences and exact stream/context/DLL retirement must admit
+before the strengthened ready/graceful receipts. All108 original AHK assertions
+remain byte-exact;11 provider/closure assertion call sites are added. The updater
+receiving source is unchanged. Genuine portable PowerShell parsing and whole
+CSharp compilation pass;29 independently specified pure-helper controls pass,
+status0 without signal/error or retained phase. No native Windows DLL or TLS
+call ran in this container. Native trust/refusal, full updater staging/cleanup
+and complete Windows E2E/package/install receiving remain pending;62 stays open.
+
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard
   layers on all three drivers. Windows and macOS also support their existing
