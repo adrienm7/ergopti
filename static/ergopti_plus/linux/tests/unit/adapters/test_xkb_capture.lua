@@ -405,3 +405,101 @@ helpers.describe("xkb_capture: physical magic editor source receipts", function(
 		capture._reset_backend()
 	end)
 end)
+
+
+helpers.describe("xkb_capture: direct source callback currency", function()
+	local function fixture(body)
+		local capture = helpers.load_module("adapters.xkb_capture")
+		local state = { group = 0, generation = 7, calls = 0 }
+		local backend = {
+			create = function() return { identity = "controlled-direct-map" } end,
+			destroy = function() end,
+			update_key = function() end,
+		}
+		backend.source_group = function()
+			state.calls = state.calls + 1
+			if state.on_group then state.on_group() end
+			return state.group, state.generation
+		end
+		backend.direct_sources = function(_, codes, group)
+			local rows = { { code = codes[1], text = group == 0 and ";" or "ù",
+				mods = {}, plain = true, direct = true, dead = false } }
+			if state.on_rows then state.on_rows(codes, rows) end
+			return rows
+		end
+		capture._set_backend(backend)
+		helpers.assert_true(capture.load("controlled-direct-map", "C"))
+		local called, err = pcall(body, capture, state, backend)
+		capture._reset_backend()
+		if not called then error(err, 0) end
+	end
+
+	helpers.it("refuses stale plain rows after a native group transition during enumeration", function()
+		fixture(function(capture, state)
+			state.on_rows = function() state.group, state.generation = 1, 8 end
+			helpers.assert_nil(capture.direct_sources({ 36 }), "old semicolon rows cannot identify the new ù source")
+		end)
+	end)
+
+	helpers.it("refuses a later native source epoch despite the same group", function()
+		fixture(function(capture, state)
+			state.on_rows = function() state.generation = 8 end
+			helpers.assert_nil(capture.direct_sources({ 36 }))
+		end)
+	end)
+
+	helpers.it("refuses retired-session rows after a same-map replacement during enumeration", function()
+		fixture(function(capture, state)
+			state.on_rows = function() helpers.assert_true(capture.load("controlled-direct-map", "C")) end
+			helpers.assert_nil(capture.direct_sources({ 36 }))
+		end)
+	end)
+
+	helpers.it("refuses a session replaced by the initial source observation", function()
+		fixture(function(capture, state)
+			state.on_group = function()
+				state.on_group = nil
+				helpers.assert_true(capture.load("controlled-direct-map", "C"))
+			end
+			helpers.assert_nil(capture.direct_sources({ 36 }))
+		end)
+	end)
+
+	helpers.it("refuses a session replaced by the final source observation", function()
+		fixture(function(capture, state)
+			state.on_rows = function()
+				state.on_group = function()
+					state.on_group = nil
+					helpers.assert_true(capture.load("controlled-direct-map", "C"))
+				end
+			end
+			helpers.assert_nil(capture.direct_sources({ 36 }))
+		end)
+	end)
+
+	helpers.it("detaches requested positions and refuses backend request substitution", function()
+		fixture(function(capture, state)
+			local codes = { 36 }
+			state.on_rows = function(copy, rows) copy[1], rows[1].code = 40, 40 end
+			helpers.assert_nil(capture.direct_sources(codes))
+			helpers.assert_eq(codes, { 36 }, "native enumeration does not own the caller's request")
+		end)
+	end)
+
+	helpers.it("keeps the validated positions when source callbacks mutate the caller", function()
+		fixture(function(capture, state)
+			local codes = { 36 }
+			state.on_group = function() codes[1] = 40 end
+			local rows = assert(capture.direct_sources(codes))
+			helpers.assert_eq(rows[1].code, 36, "only the detached validated position reaches enumeration")
+		end)
+	end)
+
+	helpers.it("keeps direct-source proof across ordinary reconstructed key events", function()
+		fixture(function(capture, state)
+			state.on_rows = function() capture.process(42, 0) end
+			local rows = assert(capture.direct_sources({ 36 }))
+			helpers.assert_eq(rows[1].text, ";")
+		end)
+	end)
+end)

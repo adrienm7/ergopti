@@ -726,21 +726,38 @@ end
 function M.direct_sources(codes)
 	if not _session then return nil, "XKB capture state is not ready" end
 	if type(codes) ~= "table" then return nil, "direct source codes are required" end
-	local count, seen = 0, {}
+	local count, seen, expected = 0, {}, {}
 	for key, code in pairs(codes) do
 		if type(key) ~= "number" or key % 1 ~= 0 or key < 1 or key > #codes
 			or type(code) ~= "number" or code < 1 or code > UINPUT_KEY_MAX or code % 1 ~= 0 or seen[code] then
 			return nil, "invalid direct source codes"
 		end
-		seen[code], count = true, count + 1
+		seen[code], expected[key], count = true, code, count + 1
 	end
 	if count ~= #codes then return nil, "direct source codes must be dense" end
 	if type(_backend.direct_sources) ~= "function" then return nil, "the capture backend cannot prove direct sources" end
+	local session, backend, raw_map = _session, _backend, _keymap_text
 	local generation, detail = source_identity()
 	if not generation then return nil, detail end
-	local ok, rows, err = pcall(_backend.direct_sources, _session, codes, _source_group)
+	if _session ~= session or _backend ~= backend or _keymap_text ~= raw_map then
+		return nil, "direct-source-changed"
+	end
+	local group, native_map = _source_group, session.identity
+	local snapshot = {}; for index, code in ipairs(expected) do snapshot[index] = code end
+	local ok, rows, err = pcall(backend.direct_sources, session, snapshot, group)
 	if not ok then return nil, tostring(rows) end
 	if type(rows) ~= "table" then return nil, err or "the capture backend returned no direct sources" end
+	local after_generation = source_identity()
+	if _session ~= session or _backend ~= backend or _keymap_text ~= raw_map
+		or after_generation ~= generation or _source_group ~= group or session.identity ~= native_map then
+		return nil, "direct-source-changed"
+	end
+	local snapshot_count = 0
+	for index, code in pairs(snapshot) do
+		if expected[index] ~= code then return nil, "direct-source-invalid-response" end
+		snapshot_count = snapshot_count + 1
+	end
+	if snapshot_count ~= count then return nil, "direct-source-invalid-response" end
 	return rows
 end
 
