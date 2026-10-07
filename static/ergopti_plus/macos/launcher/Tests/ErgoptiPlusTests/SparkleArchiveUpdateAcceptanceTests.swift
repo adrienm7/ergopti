@@ -69,6 +69,7 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		private var observedExit = false
 		private var closedStreams: Set<Int> = []
 		private var cachedReceipt: Receipt?
+		private var cachedCaptures: (stdout: String, stderr: String)?
 
 		init(_ executable: String, _ arguments: [String], root: URL,
 			guarded: Bool = false, workerTimeout: Double = 60, serverDiagnostics: Bool = false) throws {
@@ -140,15 +141,16 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 			let reason = process.terminationReason == .exit ? "exit" : "signal"
 			var diagnostic = ArchiveAcceptanceEvidence.ServerDiagnostic(stage: stage, pid: acquiredPID, state: "terminal",
 				nativeStatus: process.terminationStatus, nativeReason: reason, captures: "unavailable")
-			// finish(0) is legal only after the exact owner's native callback ACK. Its
-			// existing capture bounds and idempotent close/cache remain authoritative.
-			if reason == "exit", let receipt = try? finish(0) {
+			// The shared reader requires the exact native callback ACK and close ACK.
+			// Diagnostic capture does not require or authorize a successful exit.
+			if let receipt = try? terminalCaptures() {
 				let output = Data(receipt.stdout.utf8), errors = Data(receipt.stderr.utf8)
 				diagnostic = .init(stage: stage, pid: acquiredPID, state: "terminal",
-					nativeStatus: receipt.status, nativeReason: reason, captures: "available")
+					nativeStatus: process.terminationStatus, nativeReason: reason, captures: "available")
 				diagnostic.stdoutBytes = output.count; diagnostic.stderrBytes = errors.count
 				diagnostic.stdoutSHA256 = SHA256.hash(data: output).map { String(format: "%02x", $0) }.joined()
 				diagnostic.stderrSHA256 = SHA256.hash(data: errors).map { String(format: "%02x", $0) }.joined()
+				diagnostic.lastPhase = ArchiveAcceptanceEvidence.ServerDiagnostic.progressMarker(receipt.stderr, pid: acquiredPID)
 				if let marker = ArchiveAcceptanceEvidence.ServerDiagnostic.helperMarker(receipt.stderr, pid: acquiredPID) {
 					diagnostic.helperPhase = marker.0; diagnostic.helperException = marker.1
 				}
@@ -220,6 +222,25 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 			try admitGuardRetirement()
 		}
 
+		/// Captures require this original process's terminal ACK and physical close.
+		/// A signaled child supplies diagnostics only; finish still requires .exit.
+		private func terminalCaptures() throws -> (stdout: String, stderr: String) {
+			guard launched, observedExit, !process.isRunning else { throw Failure.evidence("native-child-capture-before-terminal") }
+			try closeCaptures()
+			try admitGuardRetirement()
+			if let cachedCaptures { return cachedCaptures }
+			let output = try Data(contentsOf: stdout)
+			let errors = try Data(contentsOf: stderr)
+			guard output.count < 4_000_000, errors.count < 4_000_000,
+				let outputText = String(data: output, encoding: .utf8),
+				let errorText = String(data: errors, encoding: .utf8) else {
+				throw Failure.evidence("native-child-capture")
+			}
+			let captured = (stdout: outputText, stderr: errorText)
+			cachedCaptures = captured
+			return captured
+		}
+
 		/// Repeated observations reuse the physical exit ACK and immutable receipt;
 		/// consuming the semaphore once can never turn an exited child into a timeout.
 		func finish(_ seconds: Double) throws -> Receipt {
@@ -233,14 +254,8 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 			try closeCaptures()
 			try admitGuardRetirement()
 			guard process.terminationReason == .exit else { throw Failure.evidence("native-child-signal") }
-			let output = try Data(contentsOf: stdout)
-			let errors = try Data(contentsOf: stderr)
-			guard output.count < 4_000_000, errors.count < 4_000_000,
-				let outputText = String(data: output, encoding: .utf8),
-				let errorText = String(data: errors, encoding: .utf8) else {
-				throw Failure.evidence("native-child-capture")
-			}
-			let receipt = Receipt(status: process.terminationStatus, stdout: outputText, stderr: errorText)
+			let captures = try terminalCaptures()
+			let receipt = Receipt(status: process.terminationStatus, stdout: captures.stdout, stderr: captures.stderr)
 			cachedReceipt = receipt
 			return receipt
 		}
@@ -593,6 +608,32 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		XCTAssertFalse(owner.process.isRunning)
 		try owner.retire()
 		try owner.retire()
+		passed = testRun?.failureCount == failuresBefore
+	}
+
+	func testSignaledOwnedChildProvidesTerminalCapturesWithoutAdmittingFinish() throws {
+		let root = manager.temporaryDirectory.resolvingSymlinksInPath().appendingPathComponent("ErgoptiSparkleSignalCapture-" + UUID().uuidString)
+		try privateDirectory(root)
+		let child = try OwnedProcess("/usr/bin/env", ["python3", "-c", "import os,signal,sys; print('signal-capture-control',flush=True); print('signal-capture-error',file=sys.stderr,flush=True); os.kill(os.getpid(),signal.SIGTERM)"], root: root)
+		var passed = false
+		let failuresBefore = try XCTUnwrap(testRun?.failureCount)
+		defer {
+			do { try child.retire(); if passed { try manager.removeItem(at: root) } }
+			catch { XCTFail("Owned signal control retirement refused") }
+		}
+		try child.start()
+		XCTAssertThrowsError(try child.finish(5))
+		let diagnostic = child.serverDiagnostic(stage: "after-server-exit")
+		let packet = try XCTUnwrap(diagnostic.packet)
+		XCTAssertEqual(packet["state"] as? String, "terminal")
+		XCTAssertEqual(packet["native_reason"] as? String, "signal")
+		XCTAssertEqual(packet["native_status"] as? Int32, SIGTERM)
+		XCTAssertEqual(packet["captures"] as? String, "available")
+		XCTAssertEqual(packet["stdout_bytes"] as? Int, Data("signal-capture-control\n".utf8).count)
+		XCTAssertEqual(packet["stderr_bytes"] as? Int, Data("signal-capture-error\n".utf8).count)
+		XCTAssertEqual(packet["stdout_sha256"] as? String, SHA256.hash(data: Data("signal-capture-control\n".utf8)).map { String(format: "%02x", $0) }.joined())
+		XCTAssertThrowsError(try child.finish(0))
+		XCTAssertFalse(child.process.isRunning)
 		passed = testRun?.failureCount == failuresBefore
 	}
 

@@ -22,6 +22,7 @@ final class ArchiveAcceptanceEvidence {
 		var stderrSHA256: String? = nil
 		var helperPhase: String? = nil
 		var helperException: String? = nil
+		var lastPhase: String? = nil
 
 		var packet: [String: Any]? {
 			guard ["readiness-refused", "before-cleanup", "after-server-exit"].contains(stage),
@@ -36,7 +37,7 @@ final class ArchiveAcceptanceEvidence {
 				result["native_status"] = nativeStatus; result["native_reason"] = nativeReason
 			}
 			if captures == "available" {
-				guard state == "terminal", nativeReason == "exit", let stdoutBytes, let stderrBytes,
+				guard state == "terminal", let stdoutBytes, let stderrBytes,
 					(0..<4_000_000).contains(stdoutBytes), (0..<4_000_000).contains(stderrBytes),
 					let stdoutSHA256, let stderrSHA256, Self.digest(stdoutSHA256), Self.digest(stderrSHA256) else { return nil }
 				result["stdout_bytes"] = stdoutBytes; result["stderr_bytes"] = stderrBytes
@@ -47,6 +48,10 @@ final class ArchiveAcceptanceEvidence {
 					Self.helperPhases.contains(helperPhase), Self.helperExceptions.contains(helperException) else { return nil }
 				result["helper_phase"] = helperPhase; result["helper_exception"] = helperException
 			}
+			if let lastPhase {
+				guard captures == "available", Self.helperPhases.contains(lastPhase) else { return nil }
+				result["last_phase"] = lastPhase
+			}
 			return result
 		}
 
@@ -55,6 +60,26 @@ final class ArchiveAcceptanceEvidence {
 		}
 		static let helperPhases = Set(["entry", "directory-admission", "nonce-admission", "socket-bind", "signal-registration", "readiness-publication", "request-loop", "server-retirement"])
 		static let helperExceptions = Set(["RuntimeError", "OSError", "PermissionError", "FileNotFoundError", "ValueError", "TypeError", "NameError", "ImportError", "ModuleNotFoundError", "OverflowError", "unclassified"])
+
+		/// At most eight fixed phase checkpoints; every row must belong to this child.
+		static func progressMarker(_ stderr: String, pid: Int32) -> String? {
+			let prefix = "Sparkle server progress: "
+			let lines = stderr.split(separator: "\n").filter { $0.hasPrefix(prefix) }
+			guard !lines.isEmpty, lines.count <= helperPhases.count else { return nil }
+			var last: String?
+			for line in lines {
+				let data = Data(line.dropFirst(prefix.count).utf8)
+				guard data.count <= 512, let object = try? JSONSerialization.jsonObject(with: data),
+					let packet = object as? [String: Any], Set(packet.keys) == Set(["schema", "pid", "phase"]),
+					let schema = packet["schema"] as? NSNumber, let nativePID = packet["pid"] as? NSNumber,
+					CFGetTypeID(schema) != CFBooleanGetTypeID(), CFGetTypeID(nativePID) != CFBooleanGetTypeID(),
+					!["f", "d"].contains(String(cString: schema.objCType)), !["f", "d"].contains(String(cString: nativePID.objCType)),
+					schema.int64Value == 1, nativePID.int64Value == Int64(pid),
+					let phase = packet["phase"] as? String, helperPhases.contains(phase) else { return nil }
+				last = phase
+			}
+			return last
+		}
 
 		/// The marker is optional, bounded, and tied to this acquired child, never a path or exception message.
 		static func helperMarker(_ stderr: String, pid: Int32) -> (String, String)? {
@@ -260,6 +285,29 @@ final class ArchiveAcceptanceEvidenceTests: XCTestCase {
 		XCTAssertNil(ArchiveAcceptanceEvidence.ServerDiagnostic.helperMarker(marker + "\n" + marker, pid: 123))
 		XCTAssertNil(ArchiveAcceptanceEvidence.ServerDiagnostic.helperMarker(marker.replacingOccurrences(of: "socket-bind", with: "/PRIVATE"), pid: 123))
 		XCTAssertNil(ArchiveAcceptanceEvidence.ServerDiagnostic.helperMarker(marker.replacingOccurrences(of: #""schema":1"#, with: #""raw":"PRIVATE","schema":1"#), pid: 123))
+	}
+
+	func testProgressMarkersRequireExactChildClosedTypesAndFiniteRows() throws {
+		let first = #"Sparkle server progress: {"schema":1,"pid":123,"phase":"directory-admission"}"#
+		let last = #"Sparkle server progress: {"schema":1,"pid":123,"phase":"socket-bind"}"#
+		XCTAssertEqual(ArchiveAcceptanceEvidence.ServerDiagnostic.progressMarker(first + "\n" + last, pid: 123), "socket-bind")
+		for refused in [last.replacingOccurrences(of: #""pid":123"#, with: #""pid":true"#), last.replacingOccurrences(of: #""schema":1"#, with: #""schema":1.0"#), last.replacingOccurrences(of: "socket-bind", with: "/PRIVATE"), last.replacingOccurrences(of: #""schema":1"#, with: #""private":"SECRET","schema":1"#), String(repeating: last + "\n", count: 9)] {
+			XCTAssertNil(ArchiveAcceptanceEvidence.ServerDiagnostic.progressMarker(refused, pid: 123))
+		}
+		XCTAssertNil(ArchiveAcceptanceEvidence.ServerDiagnostic.progressMarker(last, pid: 124))
+	}
+
+	func testSignaledDiagnosticExportsOnlyClosedFactsAndProgress() throws {
+		var terminal = ArchiveAcceptanceEvidence.ServerDiagnostic(stage: "after-server-exit", pid: 123, state: "terminal", nativeStatus: 15, nativeReason: "signal", captures: "available")
+		terminal.stdoutBytes = 0; terminal.stderrBytes = 100
+		terminal.stdoutSHA256 = String(repeating: "a", count: 64); terminal.stderrSHA256 = String(repeating: "b", count: 64)
+		terminal.lastPhase = "socket-bind"
+		let packet = try XCTUnwrap(terminal.packet)
+		XCTAssertEqual(packet["last_phase"] as? String, "socket-bind")
+		XCTAssertEqual(packet["native_reason"] as? String, "signal")
+		XCTAssertNil(packet["stdout"]); XCTAssertNil(packet["stderr"])
+		terminal.lastPhase = "/PRIVATE"; XCTAssertNil(terminal.packet)
+		terminal.lastPhase = "socket-bind"; terminal.stderrBytes = 4_000_000; XCTAssertNil(terminal.packet)
 	}
 
 	func testDiagnosticCloseOrPublicationFailureCannotReplacePrimaryException() throws {
