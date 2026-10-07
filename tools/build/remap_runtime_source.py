@@ -22,7 +22,7 @@ DEPENDENCIES = (
     ),
     (
         "tools/build/remap_runtime_auth_transport.py",
-        "b05ac69eee607a245b41d250d4a89be3665b672194625f8a5d3bde0cea7cad78",
+        "1942feef1492cb2e9524964e614561590cb41fd4c664ff2c74fde235238ee6fb",
     ),
     (
         "tools/build/remap_runtime_identity.hpp",
@@ -38,7 +38,7 @@ DEPENDENCIES = (
     ),
     (
         "tools/build/remap_runtime_patch.py",
-        "6655ddeae27826d7dd9e7e54e907eba82f5477cb0212fb443eb0bafa367f8352",
+        "a4ef0f4b7bd2c9cdabb4b8eb9e0a7249eab4f9e06f9991bcdb2f59a230220b4f",
     ),
     (
         "tools/diagnostics/hs274-key-element.hpp",

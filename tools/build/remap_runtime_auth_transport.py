@@ -680,7 +680,7 @@ def _wrappers(prepared):
         )
         one(
             "private:\n",
-            "private:\n  const std::shared_ptr<ergoptiplus::remap::auth::channel_owner> owned_channel_;\n  template<class F> bool enqueue_owned(F function) const {\n    auto debt = owned_channel_ ? owned_channel_->retain_construction() : nullptr;\n    if (!debt) return false;\n    return enqueue_to_dispatcher([this, debt, function=std::move(function)] {\n      if (owned_channel_->current_gate()) function();\n    });\n  }\n",
+            "private:\n  const std::shared_ptr<ergoptiplus::remap::auth::channel_owner> owned_channel_;\n  template<class F> bool enqueue_owned(F function) const {\n    auto debt = owned_channel_ ? owned_channel_->retain_construction() : nullptr;\n    if (!debt) return false;\n    return enqueue_to_dispatcher([this, debt, function=std::move(function)]() mutable {\n      if (owned_channel_->current_gate()) function();\n    });\n  }\n",
         )
         result[str(path)] = source.encode("utf-8")
     return result
@@ -794,7 +794,7 @@ def _session(prepared):
     )
     one(
         "private:\n",
-        "private:\n  const std::shared_ptr<ergoptiplus::remap::auth::channel_owner> owned_channel_;\n  template<class F> bool enqueue_owned(F function) const {\n    auto debt = owned_channel_ ? owned_channel_->retain_construction() : nullptr;\n    if (!debt) return false;\n    return enqueue_to_dispatcher([this, debt, function=std::move(function)] {\n      if (owned_channel_->current_gate()) function();\n    });\n  }\n",
+        "private:\n  const std::shared_ptr<ergoptiplus::remap::auth::channel_owner> owned_channel_;\n  template<class F> bool enqueue_owned(F function) const {\n    auto debt = owned_channel_ ? owned_channel_->retain_construction() : nullptr;\n    if (!debt) return false;\n    return enqueue_to_dispatcher([this, debt, function=std::move(function)]() mutable {\n      if (owned_channel_->current_gate()) function();\n    });\n  }\n",
     )
     result[str(path)] = source.encode("utf-8")
     return result

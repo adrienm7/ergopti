@@ -4302,6 +4302,18 @@ still refuse. This fixture-only correction does not establish the cause of the
 native36103-byte stderr failure or qualify actual compilation/preparation.
 Fresh exact-source macOS CI remains required; item31 is still partial.
 
+The canonical runtime generator now removes an inaccessible private monitor
+pre-detach and makes three owned enqueue closures mutable. Cleanup remains on
+the same dispatcher: manager-ID detach, stop, pending sleep acknowledgment,
+public monitor destruction/drain, cleanup-ID detach and worker join. The AUTH
+header and34 debt wrappers stay unchanged; all five downstream edits are exact
+source-pin updates. Actual emitted original fragments reject16 compiler runs;
+corrected fragments pass16 under GCC14/Clang19 O0/O2. Independent existing418
+controls and four lifecycle runs pass. Genuine Darwin/Core compilation is still
+unqualified until fresh exact-source CI. Monitor30s versus cleanup10s retains
+its existing fail-closed path; no deadline or original assertion is weakened.
+Item31 remains partial, including unsigned/signed artifact and activation work.
+
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
   listed; see `docs/memory/text-input-and-config.md`. Current source already
@@ -5600,6 +5612,19 @@ integrated, then publish one grouped release.
   shared policy. Final native binding/order/caption and installed acceptance
   remain required; source review and the local portable gates are insufficient.
 
+  Integrated partial-delivery checkpoint: published Dev8cba7a0c/treec0a8c809
+  includes117 feature commits and the actual create-only lease receipt.
+  Final exact-source CI37547053814 is terminal failed:37jobs,32pass/3fail/2skip.
+  Windows native10089/0/startup/fresh-clone/E2E/package/compiled-install/
+  programmable/evidence/verdict and the entire Linux chain with17 acceptance
+  variants pass. Mac stubbed units/E2E and native canvas12 pass; Package fails
+  on named Sparkle/AppleEvent/GlobalSwitcher receipts, causing Mac Install skip;
+  no precise cause or TCC grant is claimed. Release is skipped. The77-path
+  source equality proof does not establish runtime equivalence or exoneration;
+  changed supplemental macOS launch-gate inverse remains unexecuted there.
+  All six items remain partial:53/86/61 retains200 software sites plus genuine
+  item33 producer gaps and separate installed/device requirements.
+
   Current qualification checkpoint: own all-OS CI37541202298 tested exact
   published cee55e1a/treea17350f2: native AHK10089/0, macOS canvas12 and the
   entire Linux chain with17 install/launch variants pass, but Windows fresh-clone
@@ -6614,6 +6639,13 @@ Current Group 3 source checkpoint (item 73, 2026-10-06): [Group 3 current checkp
   presentation-refusal APIs are implemented. The historical classification
   above does not mean these APIs are absent; remaining provider families still
   need genuine shared data/order/policy consumption on the applicable drivers.
+
+  Integrated partial-delivery checkpoint: Dev8cba7a0c/treec0a8c809 contains
+  all117 feature commits. Final CI37547053814 is failed only at macOS Package
+  and its verdicts; Windows10089/0/full installed chain and Linux17 acceptance
+  variants pass, while Mac stubbed units/E2E/native canvas12 pass and Mac
+  Install/Release skip.53/86/61 retains200 software sites. All six items stay
+  partial; items16/38 and source-specific historical receipts remain intact.
 
   Current qualification checkpoint: exact cee55e1a/treea17350f2 CI37541202298
   has native AHK10089/0, macOS canvas12 and the entire Linux chain with17

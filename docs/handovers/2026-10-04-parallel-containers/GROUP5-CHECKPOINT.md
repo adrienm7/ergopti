@@ -1549,3 +1549,20 @@ continue to refuse. Native failed child's actual stderr was not in the artifact,
 so native cause attribution stays provisional until fresh exact-source CI.
 This changes test-root construction, not production path admission, deadlines,
 owned compiler behavior, signing or shipping. Item31 remains incomplete.
+
+## Canonical generated runtime compiler correction
+
+Exact current Dev2d8d8357e06e76371d41c8c9f4ab8f2fd8bfc939 is composed, including
+its Windows-owned descendant-PID receipt tests and Group1 final documentation.
+Those incoming paths remain exact; Windows execution is locally deferred and
+remains with its owner/maintainer PC. Own fixturea46 and TIS source postimages
+are preserved. Seven reviewed runtime source paths fix private monitor access
+and const ordered-task invocation in three generated callers; five edits only
+update exact source pins. Genuine dispatcher cleanup, pending sleep ACK, debt
+field order,34 wrappers and all existing budgets stay unchanged. Canonical
+factory capture/recut keeps57 outputs with exactly4 narrow changes and53 whole.
+Independent418 software controls,16 emitted compiler runs and four lifecycle
+runs pass. Native CF/IOKit/Darwin/Core/signing are not inferred; original30s
+monitor versus10s cleanup admission retains its fail-closed boundary. Stock
+metadata HTTP403 and interrupted baseline CLI remain separate actual failures.
+Items24/30/31/40/43/44 and transverse16/38 acceptance remain open.

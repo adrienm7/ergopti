@@ -19,7 +19,7 @@ import uuid
 
 BASE_PATH = Path(__file__).resolve().parents[1] / "diagnostics/hs274_native_build.py"
 BASE_SHA256 = "aa54be49feca564a455bc0f1804939a8bf3658ddeb5f56a691a914114c69aee2"
-PROVIDER_SHA256 = "6655ddeae27826d7dd9e7e54e907eba82f5477cb0212fb443eb0bafa367f8352"
+PROVIDER_SHA256 = "a4ef0f4b7bd2c9cdabb4b8eb9e0a7249eab4f9e06f9991bcdb2f59a230220b4f"
 
 
 def _load(name, path, data):
@@ -1000,7 +1000,7 @@ def observe_products(source, owner, *, repository=None):
     return validate_products(result)
 
 
-SOURCE_FACTORY_SHA256 = "d5a80cb19f2774f8d3019a8db589866539f981e1a856b785cf9c1b5d2825628e"
+SOURCE_FACTORY_SHA256 = "8485a317bb3e1f0cd6a4b290246114e42266b5b9771f12cb1fe1f45e18ace265"
 _SOURCE_FACTORY = None
 
 
