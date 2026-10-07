@@ -589,13 +589,27 @@ const OPENS_SUBMENU = {
 			platforms: ['hs'],
 			kind: 'compose',
 			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
+		},
+		{
+			menu: 'tap_hold_action_picker_frame',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
 		}
 	],
 	// Both hand providers render this declared fixed command under every native key.
 	tap_hold_keys_left: 'tap_hold_key_rows',
 	tap_hold_keys_right: 'tap_hold_key_rows',
 	tap_hold_key_delay: 'tap_hold_key_delay_rows',
-	key_combinations: 'key_combinations_group',
+	key_combinations: [
+		'key_combinations_group',
+		{
+			menu: 'tap_hold_action_picker_frame',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
+		}
+	],
 	// Both drivers render each pair's declaration: Windows opens it at the
 	// pointer, while macOS hangs it under the cached pair row.
 	key_combination_rows_left: { menu: 'key_combination_pair_menu', platforms: ['ahk', 'hs'] },

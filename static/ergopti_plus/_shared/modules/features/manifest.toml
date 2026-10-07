@@ -8623,3 +8623,25 @@ disabled_when = ["keyboard_group_ready"]
 platforms = ["hs"]
 unavailable = "hide"
 
+# Action-picker composition retains the actual native catalogue and selection owners.
+[[menu.tap_hold_action_picker_frame]]
+type = "list"
+id = "tap_hold_picker_special_rows"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.tap_hold_action_picker_frame]]
+type = "include"
+section = "tap_hold_action_picker_boundary"
+present_when = "tap_hold_picker_has_boundary"
+
+[[menu.tap_hold_action_picker_frame]]
+type = "list"
+id = "tap_hold_picker_grouped_rows"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.tap_hold_action_picker_boundary]]
+type = "---"
+platforms = ["hs"]
+unavailable = "hide"

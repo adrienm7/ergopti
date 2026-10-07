@@ -4412,13 +4412,25 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 28, macOS 31, Linux 31, each
+  drivers still build (current baseline: Windows 28, macOS 30, Linux 31, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
   existing rows during the migration (proposal in the menu-first-group
   report: most hide; greyed: Linux edit_shortcuts, Linux key
   combinations, Linux metrics shortcut rows, Windows preview_bubbles).
+  The macOS Tap-Hold action picker now consumes one complete shared frame:
+  genuine Special choices, their conditional boundary and the actual grouped
+  native catalogue. Declaration admission precedes local catalogue reads;
+  withdrawal during an admitted read refuses final publication. Existing
+  Tap/Hold and combination setters, filters, check states and callbacks remain
+  unchanged. The independent candidate controls pass 41/0; the predecessor
+  fails eight declaration/refusal controls. Live registered picker and all
+  five setter routes pass 78/0. Both owning generators retire one real native
+  separator site, giving 28/30/31. Selected formatting, all 364 JS checks,
+  portable Mac E2E and 17,095 Mac unit assertions pass. Complete native
+  qualification remains required; this bounded migration leaves the item partial.
+
   The macOS keyboard group now consumes one complete shared frame: native
   fixed children, their conditional boundary, assigned slots and the native
   Add control. Complete declaration admission precedes genuine assignment and
@@ -5539,7 +5551,7 @@ Current Group 3 source checkpoint (item 73, 2026-10-06): [Group 3 current checkp
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 28, macOS 31 and Linux 31 rows are still built by the
+  Windows 28, macOS 30 and Linux 31 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). Read on
   2026-10-01, the sites are of four kinds, and three of them need the
   manifest to say more than it can today:
@@ -5557,6 +5569,18 @@ Current Group 3 source checkpoint (item 73, 2026-10-06): [Group 3 current checkp
   sites): they follow (b), as part of the template;
   (d) the tray root bootstrap (Windows `tray_bootstrap.ahk`,
   `menu_init.ahk`).
+  The macOS Tap-Hold action picker now consumes one complete shared frame:
+  genuine Special choices, their conditional boundary and the actual grouped
+  native catalogue. Declaration admission precedes local catalogue reads;
+  withdrawal during an admitted read refuses final publication. Existing
+  Tap/Hold and combination setters, filters, check states and callbacks remain
+  unchanged. The independent candidate controls pass 41/0; the predecessor
+  fails eight declaration/refusal controls. Live registered picker and all
+  five setter routes pass 78/0. Both owning generators retire one real native
+  separator site, giving 28/30/31. Selected formatting, all 364 JS checks,
+  portable Mac E2E and 17,095 Mac unit assertions pass. Complete native
+  qualification remains required; this bounded migration leaves the item partial.
+
   The macOS keyboard group now consumes one complete shared frame: native
   fixed children, their conditional boundary, assigned slots and the native
   Add control. Complete declaration admission precedes genuine assignment and
