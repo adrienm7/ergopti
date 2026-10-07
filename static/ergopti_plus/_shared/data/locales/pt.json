@@ -3242,5 +3242,12 @@
 	"physical_shortcuts.position_unavailable": "Esta posição de tecla não está disponível aqui.",
 	"physical_shortcuts.windows_unavailable": "Ainda indisponível no Windows: O editor de atalhos físicos ainda não está disponível no Windows.",
 	"physical_shortcuts.collision": "Esta combinação de teclas já está em uso. Escolha outra.",
-	"physical_shortcuts.window_unavailable": "Esta janela está indisponível: Tente reabri-la."
+	"physical_shortcuts.window_unavailable": "Esta janela está indisponível: Tente reabri-la.",
+	"gestures.system.conflicts_caption": "⚠ %s possíveis conflitos",
+	"gestures.system.pinch_enabled": "Gesto de pinça do sistema : Ativado",
+	"gestures.system.pinch_disabled": "Gesto de pinça do sistema : Desativado",
+	"gestures.system.pinch_unknown": "Gesto de pinça do sistema : Gestos do sistema: não verificados",
+	"gestures.system.slot_unknown_caption": "%s — Gestos do sistema: não verificados",
+	"gestures.system.slot_configured_caption": "%s — Configurado para ErgoptiPlus",
+	"gestures.system.slot_not_configured_caption": "%s — Não configurado para ErgoptiPlus"
 }

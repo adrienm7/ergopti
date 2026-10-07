@@ -5649,5 +5649,283 @@
 			],
 			"unavailable": "hide"
 		}
+	],
+	"gesture_system_status_windows_frame": [
+		{
+			"type": "include",
+			"section": "gesture_system_status_unknown",
+			"present_when": "gesture_system_is_unverified"
+		},
+		{
+			"type": "include",
+			"section": "gesture_system_status_clear",
+			"present_when": "gesture_system_is_clear"
+		},
+		{
+			"type": "include",
+			"section": "gesture_system_status_conflicts",
+			"present_when": "gesture_system_has_conflicts"
+		}
+	],
+	"gesture_system_status_macos_frame": [
+		{
+			"type": "include",
+			"section": "gesture_system_status_clear",
+			"present_when": "gesture_system_is_clear"
+		},
+		{
+			"type": "include",
+			"section": "gesture_system_status_conflicts",
+			"present_when": "gesture_system_has_conflicts"
+		}
+	],
+	"gesture_system_status_linux_frame": [
+		{
+			"type": "include",
+			"section": "gesture_system_status_unknown"
+		}
+	],
+	"gesture_system_status_unknown": [
+		{
+			"type": "group",
+			"id": "gesture_system_unknown_children",
+			"i18n": "gestures.system.unknown",
+			"platforms": [
+				"ahk",
+				"linux"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"gesture_system_status_clear": [
+		{
+			"type": "group",
+			"id": "gesture_system_clear_children",
+			"i18n": "gestures.system.clear",
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"gesture_system_status_conflicts": [
+		{
+			"type": "group",
+			"id": "gesture_system_conflict_children",
+			"i18n": "gestures.system.conflicts_caption",
+			"caption_getter": "gesture_system_conflict_count",
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"gesture_system_windows_children": [
+		{
+			"type": "list",
+			"id": "gesture_system_cached_slots",
+			"platforms": [
+				"ahk"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "include",
+			"section": "gesture_system_status_controls"
+		}
+	],
+	"gesture_system_macos_children": [
+		{
+			"type": "list",
+			"id": "gesture_system_cached_conflicts",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "include",
+			"section": "gesture_system_pinch_frame"
+		},
+		{
+			"type": "include",
+			"section": "gesture_system_status_controls"
+		}
+	],
+	"gesture_system_linux_children": [
+		{
+			"type": "include",
+			"section": "gesture_system_linux_reading_frame"
+		},
+		{
+			"type": "list",
+			"id": "gesture_system_cached_overlap",
+			"platforms": [
+				"linux"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "include",
+			"section": "gesture_system_linux_settings_unavailable",
+			"present_when": "gesture_system_settings_unavailable"
+		}
+	],
+	"gesture_system_slot_windows_frame": [
+		{
+			"type": "include",
+			"section": "gesture_system_slot_unknown",
+			"present_when": "gesture_system_slot_unverified"
+		},
+		{
+			"type": "include",
+			"section": "gesture_system_slot_configured",
+			"present_when": "gesture_system_slot_configured"
+		},
+		{
+			"type": "include",
+			"section": "gesture_system_slot_not_configured",
+			"present_when": "gesture_system_slot_not_configured"
+		}
+	],
+	"gesture_system_slot_linux_frame": [
+		{
+			"type": "include",
+			"section": "gesture_system_slot_unknown"
+		}
+	],
+	"gesture_system_slot_unknown": [
+		{
+			"type": "command",
+			"id": "gesture_system_open_unknown_slot",
+			"i18n": "gestures.system.slot_unknown_caption",
+			"caption_getter": "gesture_system_slot_caption",
+			"platforms": [
+				"ahk",
+				"linux"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"gesture_system_slot_configured": [
+		{
+			"type": "command",
+			"id": "gesture_system_open_configured_slot",
+			"i18n": "gestures.system.slot_configured_caption",
+			"caption_getter": "gesture_system_slot_caption",
+			"platforms": [
+				"ahk"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"gesture_system_slot_not_configured": [
+		{
+			"type": "command",
+			"id": "gesture_system_open_not_configured_slot",
+			"i18n": "gestures.system.slot_not_configured_caption",
+			"caption_getter": "gesture_system_slot_caption",
+			"platforms": [
+				"ahk"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"gesture_system_pinch_frame": [
+		{
+			"type": "include",
+			"section": "gesture_system_pinch_enabled",
+			"present_when": "gesture_system_pinch_is_enabled"
+		},
+		{
+			"type": "include",
+			"section": "gesture_system_pinch_disabled",
+			"present_when": "gesture_system_pinch_is_disabled"
+		},
+		{
+			"type": "include",
+			"section": "gesture_system_pinch_unknown",
+			"present_when": "gesture_system_pinch_is_unknown"
+		}
+	],
+	"gesture_system_pinch_enabled": [
+		{
+			"type": "command",
+			"id": "gesture_system_open_enabled_pinch",
+			"i18n": "gestures.system.pinch_enabled",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"gesture_system_pinch_disabled": [
+		{
+			"type": "command",
+			"id": "gesture_system_open_disabled_pinch",
+			"i18n": "gestures.system.pinch_disabled",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"gesture_system_pinch_unknown": [
+		{
+			"type": "command",
+			"id": "gesture_system_open_unknown_pinch",
+			"i18n": "gestures.system.pinch_unknown",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"gesture_system_linux_reading_frame": [
+		{
+			"type": "include",
+			"section": "gesture_system_linux_reading_on",
+			"present_when": "gesture_system_reader_active"
+		},
+		{
+			"type": "include",
+			"section": "gesture_system_linux_reading_off",
+			"present_when": "gesture_system_reader_inactive"
+		}
+	],
+	"gesture_system_linux_reading_on": [
+		{
+			"type": "label",
+			"id": "gesture_system_linux_reading_on",
+			"i18n": "menu.gestures.reading_on",
+			"platforms": [
+				"linux"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"gesture_system_linux_reading_off": [
+		{
+			"type": "label",
+			"id": "gesture_system_linux_reading_off",
+			"i18n": "menu.gestures.reading_off",
+			"platforms": [
+				"linux"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"gesture_system_linux_settings_unavailable": [
+		{
+			"type": "label",
+			"id": "gesture_system_linux_settings_unavailable",
+			"i18n": "gestures.system.unknown",
+			"platforms": [
+				"linux"
+			],
+			"unavailable": "hide"
+		}
 	]
 }

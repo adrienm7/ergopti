@@ -3242,5 +3242,12 @@
 	"physical_shortcuts.position_unavailable": "Bu tuş konumu burada kullanılamıyor.",
 	"physical_shortcuts.windows_unavailable": "Henüz Windows'ta kullanılamıyor: Fiziksel tuş kısayolu düzenleyicisi Windows üzerinde henüz kullanılamıyor.",
 	"physical_shortcuts.collision": "Bu tuş birleşimi zaten kullanılıyor. Başka bir birleşim seçin.",
-	"physical_shortcuts.window_unavailable": "Bu pencere kullanılamıyor: Yeniden açmayı deneyin."
+	"physical_shortcuts.window_unavailable": "Bu pencere kullanılamıyor: Yeniden açmayı deneyin.",
+	"gestures.system.conflicts_caption": "⚠ %s olası çakışma",
+	"gestures.system.pinch_enabled": "Sistemin kıstırma hareketi : Etkin",
+	"gestures.system.pinch_disabled": "Sistemin kıstırma hareketi : Devre dışı",
+	"gestures.system.pinch_unknown": "Sistemin kıstırma hareketi : Sistem hareketleri: doğrulanmadı",
+	"gestures.system.slot_unknown_caption": "%s — Sistem hareketleri: doğrulanmadı",
+	"gestures.system.slot_configured_caption": "%s — ErgoptiPlus için yapılandırıldı",
+	"gestures.system.slot_not_configured_caption": "%s — ErgoptiPlus için yapılandırılmadı"
 }

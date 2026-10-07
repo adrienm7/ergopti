@@ -188,7 +188,8 @@ end
 --- Native editing is not exercised by this menu-shape fixture.
 local function build_fixture_menu(context)
 	local names = {"modules.shortcuts.key_combinations", "infra.key_combinations_scope", "ui.menu.key_combinations",
-		"adapters.storage", "ui.hotstring_editor.bridge"}
+		"adapters.storage", "ui.hotstring_editor.bridge", "ui.gesture_conflicts",
+		"infra.i18n", "infra.manifest_menu"}
 	local magic_path, editor_directory, editor_source, editor_fs
 	local original_getenv, original_i18n_safe = os.getenv, rawget(_G, "i18n_safe")
 	local all_previous = {}; for name, value in pairs(package.loaded) do all_previous[name] = value end
@@ -235,6 +236,10 @@ local function build_fixture_menu(context)
 		package.loaded["infra.key_combinations_scope"] = {retry_restore = function() return true end,
 			edit = function() error("menu-shape fixture cannot publish") end}
 		package.loaded["ui.menu.key_combinations"] = nil
+		-- Native delegates retain module tables. This fixture's new producer must
+		-- share the exact current locale/manifest cohort used by its assertions.
+		package.loaded["infra.i18n"], package.loaded["infra.manifest_menu"] = i18n, ManifestMenu
+		helpers.load_module("ui.gesture_conflicts")
 		local built = with_live_source(context, function()
 			return with_api_source(function(builder) return builder.build(context) end)
 		end)
@@ -323,6 +328,11 @@ local function full_context()
 			get_wrap_pairs      = function() return { ["("] = { left = "(", right = ")" } } end,
 		},
 		gestures = {
+			-- The cached native status producer already consumed these collaborators.
+			-- A neutral reader and genuine defaults describe fixture state only.
+			DEFAULT_GESTURES = require("modules.gestures.manager").DEFAULT_GESTURES,
+			is_reading     = function() return false end,
+			get_action_label = require("modules.gestures.manager").get_action_label,
 			is_enabled     = function() return true end,
 			toggle         = noop,
 			get_action     = function() return nil end,
@@ -1241,3 +1251,26 @@ helpers.describe("Language completed-child admission (linux)", function()
 end)
 
 require("test.menu_command_literal_prefix_contract").register(helpers, "linux")
+
+helpers.describe("Complete-menu gesture status fixture owns its native cohort", function()
+	helpers.it("rebuilds the native producer against current locale and manifest despite a stale loaded producer", function()
+		local previous = rawget(package.loaded, "ui.gesture_conflicts")
+		local stale = { rows = function() error("a stale gesture producer cannot own this fixture") end }
+		rawset(package.loaded, "ui.gesture_conflicts", stale)
+		local ok, rows = pcall(build_full_menu, full_context())
+		helpers.assert_true(rawequal(rawget(package.loaded, "ui.gesture_conflicts"), stale), "the exact preceding module owner is restored")
+		rawset(package.loaded, "ui.gesture_conflicts", previous)
+		if not ok then error(rows, 0) end
+		helpers.assert_not_nil(find_item(rows, i18n.get("gestures.system.unknown")), "the real native unknown-status parent survives the complete tray")
+	end)
+	helpers.it("provides the original reader ABI and genuine complete native defaults without starting input", function()
+		local context = full_context()
+		helpers.assert_eq(context.gestures.is_reading(), false)
+		helpers.assert_true(rawequal(context.gestures.DEFAULT_GESTURES, require("modules.gestures.manager").DEFAULT_GESTURES),
+			"the fixture uses the actual current native slot inventory")
+		helpers.assert_true(next(context.gestures.DEFAULT_GESTURES) ~= nil, "a fabricated empty inventory cannot satisfy the fixture")
+		local rows = build_full_menu(context)
+		helpers.assert_not_nil(find_item(rows, i18n.get("gestures.system.unknown")))
+		helpers.assert_true(#all_titles(rows) > 40, "the original whole-menu row-count floor remains meaningful")
+	end)
+end)

@@ -3541,12 +3541,37 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			sequence.every((value, offset) => tokens[index + offset]?.value === value)
 		);
 	}
-	function assertRefreshWiring(owner, extension) {
+	function assertRefreshWiring(owner, extension, declaration = source) {
+		const { nativeTemplateBinding } = require('../lib/menu-template-binding.cjs');
+		const mac = extension === '.lua';
+		const child = mac ? 'gesture_system_macos_children' : 'gesture_system_windows_children';
+		const parent = mac
+			? 'gesture_system_status_macos_frame'
+			: 'gesture_system_status_windows_frame';
 		const tokens = scriptTokens(owner, extension);
-		if (extension === '.lua') {
-			assert.ok(
-				hasSequence(tokens, ['ManifestMenu', '.', 'template_rows', '(', corpus.section, ',', '{'])
+		assert.deepEqual(
+			declaration[child].filter((row) => row.type === 'include' && row.section === corpus.section),
+			[{ type: 'include', section: corpus.section }],
+			'the genuinely consumed child frame includes the original refresh declaration exactly once'
+		);
+		assert.equal(
+			nativeTemplateBinding(owner, extension, child, 'gesture_system_refresh', 1),
+			true,
+			'the executable refresh owner is bound in the actual typed command port'
+		);
+		const cached = mac ? 'gesture_system_cached_conflicts' : 'gesture_system_cached_slots';
+		assert.equal(
+			nativeTemplateBinding(owner, extension, child, cached, 3),
+			true,
+			'the actual cached native inventory feeds the consumed child frame'
+		);
+		for (const group of ['gesture_system_clear_children', 'gesture_system_conflict_children'])
+			assert.equal(
+				nativeTemplateBinding(owner, extension, parent, group, 3),
+				true,
+				'the genuinely published status frame owns its cached child data'
 			);
+		if (mac) {
 			assert.ok(
 				hasSequence(tokens, ['[', 'gesture_system_refresh', ']', '=', 'function', '(', ')'])
 			);
@@ -3564,27 +3589,36 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 				])
 			);
 			assert.ok(
-				hasSequence(tokens, ['for', '_', ',', 'row', 'in', 'ipairs', '(', 'controls', ')'])
+				hasSequence(tokens, ['return', 'status']),
+				'the complete actual status frame is published'
 			);
-			assert.ok(hasSequence(tokens, ['items', '=', 'rows']));
 		} else {
 			assert.ok(
-				hasSequence(tokens, [
-					'MenuRenderer_TemplateRows',
-					'(',
-					corpus.section,
-					',',
-					'Map',
-					'(',
-					'gesture_system_refresh',
-					',',
-					'GestureSystemRequestRefresh',
-					')'
-				])
+				hasSequence(tokens, ['gesture_system_refresh', ',', 'GestureSystemRequestRefresh', ')'])
 			);
-			assert.ok(hasSequence(tokens, ['for', 'Row', 'in', 'Controls']));
-			assert.ok(hasSequence(tokens, ['Children', '.', 'Push', '(', 'Row', ')']));
-			assert.ok(hasSequence(tokens, ['SetTimer', '(', 'GestureSystemRefresh', ',', '-', '1', ')']));
+			assert.ok(
+				hasSequence(tokens, ['SetTimer', '(', 'GestureSystemRefresh', ',', '-', '1', ')']),
+				'Windows retains the original deferred complete-snapshot refresh'
+			);
+			assert.ok(
+				hasSequence(tokens, [
+					'return',
+					'Rows',
+					'is',
+					'Array',
+					'&',
+					'&',
+					'Rows',
+					'.',
+					'Length',
+					'=',
+					'=',
+					'1',
+					'?',
+					'Rows'
+				]),
+				'the complete actual status frame is published'
+			);
 		}
 	}
 	for (const [extension, nativePath] of [
@@ -3593,7 +3627,9 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	]) {
 		const owner = readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus', nativePath), 'utf8');
 		assertRefreshWiring(owner, extension);
-		for (const id of [corpus.section, 'gesture_system_refresh'])
+		const child =
+			extension === '.lua' ? 'gesture_system_macos_children' : 'gesture_system_windows_children';
+		for (const id of [child, 'gesture_system_refresh'])
 			assert.throws(() =>
 				assertRefreshWiring(owner.replaceAll('"' + id + '"', '"unowned_refresh"'), extension)
 			);
@@ -3603,13 +3639,35 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 				: owner.replaceAll('GestureSystemRequestRefresh)', 'UnownedRefresh)');
 		assert.throws(() => assertRefreshWiring(changed, extension));
 		const comment = extension === '.lua' ? '-- ' : '; ';
-		const erased = owner.replaceAll('"' + corpus.section + '"', '"unowned_refresh"');
+		const erased = owner.replaceAll('"' + child + '"', '"unowned_refresh"');
 		const call =
 			extension === '.lua'
-				? `ManifestMenu.template_rows("${corpus.section}", {})`
-				: `MenuRenderer_TemplateRows("${corpus.section}", Map(), Map(), Map())`;
+				? `ManifestMenu.template_rows("${child}", {})`
+				: `MenuRenderer_TemplateRows("${child}", Map(), Map(), Map())`;
 		assert.throws(() => assertRefreshWiring(erased + '\n' + comment + call, extension));
 		assert.throws(() => assertRefreshWiring(erased + '\n' + JSON.stringify(call), extension));
+		for (const mutate of [
+			(rows) => rows.filter((row) => row.type !== 'include' || row.section !== corpus.section),
+			(rows) =>
+				rows.map((row) =>
+					row.type === 'include' && row.section === corpus.section
+						? { ...row, section: 'unowned_refresh' }
+						: row
+				),
+			(rows) => [...rows, { type: 'include', section: corpus.section }]
+		]) {
+			const withdrawn = structuredClone(source);
+			withdrawn[child] = mutate(withdrawn[child]);
+			assert.throws(
+				() => assertRefreshWiring(owner, extension, withdrawn),
+				'missing, redirected or duplicate canonical refresh ownership is refused'
+			);
+		}
+		const wrongPort = owner.replaceAll('"gesture_system_refresh"', '"unused_refresh_port"');
+		assert.throws(
+			() => assertRefreshWiring(wrongPort, extension),
+			'a quoted refresh ID outside its actual command port has no authority'
+		);
 	}
 }
 
@@ -9309,5 +9367,209 @@ console.log(
 			mutate(wrong);
 			assert.throws(() => assertRoutes(wrong));
 		}
+	}
+}
+
+// Cached system status preserves independent prior translations and genuine native capabilities.
+{
+	const assert = require('node:assert/strict');
+	const { nativeTemplateBinding } = require('../lib/menu-template-binding.cjs');
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/gesture_system_status_captions.json'), 'utf8')
+	);
+	const declaration = parseToml(readFileSync(MANIFEST_PATH, 'utf8')).menu;
+	const generated = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const expected = {
+		gesture_system_status_windows_frame: [
+			{
+				type: 'include',
+				section: 'gesture_system_status_unknown',
+				present_when: 'gesture_system_is_unverified'
+			},
+			{
+				type: 'include',
+				section: 'gesture_system_status_clear',
+				present_when: 'gesture_system_is_clear'
+			},
+			{
+				type: 'include',
+				section: 'gesture_system_status_conflicts',
+				present_when: 'gesture_system_has_conflicts'
+			}
+		],
+		gesture_system_status_macos_frame: [
+			{
+				type: 'include',
+				section: 'gesture_system_status_clear',
+				present_when: 'gesture_system_is_clear'
+			},
+			{
+				type: 'include',
+				section: 'gesture_system_status_conflicts',
+				present_when: 'gesture_system_has_conflicts'
+			}
+		],
+		gesture_system_status_linux_frame: [
+			{ type: 'include', section: 'gesture_system_status_unknown' }
+		],
+		gesture_system_status_unknown: [
+			{
+				type: 'group',
+				id: 'gesture_system_unknown_children',
+				i18n: 'gestures.system.unknown',
+				platforms: ['ahk', 'linux'],
+				unavailable: 'hide'
+			}
+		],
+		gesture_system_status_clear: [
+			{
+				type: 'group',
+				id: 'gesture_system_clear_children',
+				i18n: 'gestures.system.clear',
+				platforms: ['ahk', 'hs'],
+				unavailable: 'hide'
+			}
+		],
+		gesture_system_status_conflicts: [
+			{
+				type: 'group',
+				id: 'gesture_system_conflict_children',
+				i18n: 'gestures.system.conflicts_caption',
+				caption_getter: 'gesture_system_conflict_count',
+				platforms: ['ahk', 'hs'],
+				unavailable: 'hide'
+			}
+		],
+		gesture_system_windows_children: [
+			{ type: 'list', id: 'gesture_system_cached_slots', platforms: ['ahk'], unavailable: 'hide' },
+			{ type: 'include', section: 'gesture_system_status_controls' }
+		],
+		gesture_system_macos_children: [
+			{
+				type: 'list',
+				id: 'gesture_system_cached_conflicts',
+				platforms: ['hs'],
+				unavailable: 'hide'
+			},
+			{ type: 'include', section: 'gesture_system_pinch_frame' },
+			{ type: 'include', section: 'gesture_system_status_controls' }
+		],
+		gesture_system_linux_children: [
+			{ type: 'include', section: 'gesture_system_linux_reading_frame' },
+			{
+				type: 'list',
+				id: 'gesture_system_cached_overlap',
+				platforms: ['linux'],
+				unavailable: 'hide'
+			},
+			{
+				type: 'include',
+				section: 'gesture_system_linux_settings_unavailable',
+				present_when: 'gesture_system_settings_unavailable'
+			}
+		]
+	};
+	for (const [key, rows] of Object.entries(expected)) {
+		assert.deepEqual(declaration[key], rows, 'independent fixed native policy: ' + key);
+		assert.deepEqual(generated[key], rows, 'actual owner output: ' + key);
+	}
+	const locales = JSON.parse(readFileSync(resolve(SHARED, 'data/locale_order.json'), 'utf8')).order;
+	assert.equal(locales.length, 21);
+	assert.deepEqual(Object.keys(corpus.captions).sort(), [...locales].sort());
+	for (const locale of locales) {
+		const strings = JSON.parse(readFileSync(resolve(LOCALES_DIR, locale + '.json'), 'utf8'));
+		const prior = corpus.captions[locale];
+		assert.equal(
+			strings['gestures.system.conflicts_caption'].split('%s').join('2'),
+			prior.conflicts_two
+		);
+		for (const state of ['enabled', 'disabled', 'unknown'])
+			assert.equal(strings['gestures.system.pinch_' + state], prior['pinch_' + state]);
+		for (const state of ['unknown', 'configured', 'not_configured'])
+			assert.equal(
+				strings['gestures.system.slot_' + state + '_caption'].split('%s').join('Independent Slot'),
+				prior['slot_' + state]
+			);
+	}
+	for (const [file, extension, section, key, port] of [
+		[
+			'windows/ui/gesture_conflicts.ahk',
+			'.ahk',
+			'gesture_system_slot_windows_frame',
+			'gesture_system_open_unknown_slot',
+			1
+		],
+		[
+			'windows/ui/gesture_conflicts.ahk',
+			'.ahk',
+			'gesture_system_windows_children',
+			'gesture_system_cached_slots',
+			3
+		],
+		[
+			'macos/ui/menu/menu_gestures.lua',
+			'.lua',
+			'gesture_system_macos_children',
+			'gesture_system_open_enabled_pinch',
+			1
+		],
+		[
+			'macos/ui/menu/menu_gestures.lua',
+			'.lua',
+			'gesture_system_macos_children',
+			'gesture_system_cached_conflicts',
+			3
+		],
+		[
+			'linux/ui/gesture_conflicts.lua',
+			'.lua',
+			'gesture_system_slot_linux_frame',
+			'gesture_system_open_unknown_slot',
+			1
+		],
+		[
+			'linux/ui/gesture_conflicts.lua',
+			'.lua',
+			'gesture_system_linux_children',
+			'gesture_system_cached_overlap',
+			3
+		],
+		[
+			'linux/ui/gesture_conflicts.lua',
+			'.lua',
+			'gesture_system_status_linux_frame',
+			'gesture_system_unknown_children',
+			3
+		]
+	]) {
+		const source = readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus', file), 'utf8');
+		assert.equal(nativeTemplateBinding(source, extension, section, key, port), true);
+		assert.equal(
+			nativeTemplateBinding(source, extension, section, key, port === 1 ? 3 : 1),
+			false,
+			'command and cached-data ports stay distinct'
+		);
+		const withdrawn = source.replaceAll('"' + key + '"', '"unused_native_port"');
+		assert.notEqual(withdrawn, source);
+		assert.equal(nativeTemplateBinding(withdrawn, extension, section, key, port), false);
+		const wrong = source.replaceAll('"' + section + '"', '"unrelated_status_frame"');
+		const fake =
+			extension === '.lua'
+				? 'ManifestMenu.template_rows("' + section + '", {})'
+				: 'MenuRenderer_TemplateRows("' + section + '", Map(), Map(), Map())';
+		assert.equal(
+			nativeTemplateBinding(
+				wrong + '\n' + (extension === '.lua' ? '-- ' : '; ') + fake,
+				extension,
+				section,
+				key,
+				port
+			),
+			false
+		);
+		assert.equal(
+			nativeTemplateBinding(wrong + '\n' + JSON.stringify(fake), extension, section, key, port),
+			false
+		);
 	}
 }

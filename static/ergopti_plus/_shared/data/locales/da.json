@@ -3242,5 +3242,12 @@
 	"physical_shortcuts.position_unavailable": "Denne tastposition er ikke tilgængelig her.",
 	"physical_shortcuts.windows_unavailable": "Endnu ikke på Windows: Editoren til fysiske genveje er endnu ikke tilgængelig på Windows.",
 	"physical_shortcuts.collision": "Denne tastkombination er allerede i brug. Vælg en anden.",
-	"physical_shortcuts.window_unavailable": "Dette vindue er ikke tilgængeligt: Prøv at åbne det igen."
+	"physical_shortcuts.window_unavailable": "Dette vindue er ikke tilgængeligt: Prøv at åbne det igen.",
+	"gestures.system.conflicts_caption": "⚠ %s mulige konflikter",
+	"gestures.system.pinch_enabled": "Systemets knibebevægelse : Aktiveret",
+	"gestures.system.pinch_disabled": "Systemets knibebevægelse : Deaktiveret",
+	"gestures.system.pinch_unknown": "Systemets knibebevægelse : Systembevægelser: ikke kontrolleret",
+	"gestures.system.slot_unknown_caption": "%s — Systembevægelser: ikke kontrolleret",
+	"gestures.system.slot_configured_caption": "%s — Konfigureret til ErgoptiPlus",
+	"gestures.system.slot_not_configured_caption": "%s — Ikke konfigureret til ErgoptiPlus"
 }

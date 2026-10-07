@@ -3242,5 +3242,12 @@
 	"physical_shortcuts.position_unavailable": "Questa posizione del tasto non è disponibile qui.",
 	"physical_shortcuts.windows_unavailable": "Non ancora su Windows: L’editor delle scorciatoie fisiche non è ancora disponibile su Windows.",
 	"physical_shortcuts.collision": "Questa combinazione di tasti è già in uso. Scegline un’altra.",
-	"physical_shortcuts.window_unavailable": "Questa finestra non è disponibile: Prova a riaprirla."
+	"physical_shortcuts.window_unavailable": "Questa finestra non è disponibile: Prova a riaprirla.",
+	"gestures.system.conflicts_caption": "⚠ %s possibili conflitti",
+	"gestures.system.pinch_enabled": "Gesto di pizzicamento del sistema : Attivo",
+	"gestures.system.pinch_disabled": "Gesto di pizzicamento del sistema : Disabilitato",
+	"gestures.system.pinch_unknown": "Gesto di pizzicamento del sistema : Gesti di sistema: non verificati",
+	"gestures.system.slot_unknown_caption": "%s — Gesti di sistema: non verificati",
+	"gestures.system.slot_configured_caption": "%s — Configurato per ErgoptiPlus",
+	"gestures.system.slot_not_configured_caption": "%s — Non configurato per ErgoptiPlus"
 }

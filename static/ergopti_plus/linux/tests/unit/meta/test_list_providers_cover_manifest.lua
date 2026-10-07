@@ -305,6 +305,137 @@ local function genuine_trigger_providers(damage, default_source)
 	return {}, result, observed
 end
 
+--- Observes the actual gesture closure, native status producer and typed list.
+--- Credit remains pending until the same cached leaf callback survives the
+--- successfully returned registered native closure and rendered status subtree.
+local function genuine_gesture_providers(damage)
+	local loaded, getenv = {}, os.getenv
+	local original_i18n_safe = rawget(_G, "i18n_safe")
+	for name, value in pairs(package.loaded) do loaded[name] = value end
+	local names = { "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu",
+		"ui.menu.menu_builder", "ui.gesture_conflicts", "modules.gestures.manager",
+		"adapters.storage", "infra.paths", "json", "menu.renderer" }
+	local directory, filesystem, created
+	local restore = function() end
+	local observed = { calls = 0, effects = 0, status_calls = 0 }
+	local ok, result = xpcall(function()
+		directory = os.tmpname(); assert(os.remove(directory))
+		filesystem = require("lfs"); assert(filesystem.mkdir(directory)); created = true
+		os.getenv = function(name)
+			if name == "XDG_CONFIG_HOME" or name == "XDG_DATA_HOME" or name == "XDG_STATE_HOME" then return directory end
+			if name == "XDG_CURRENT_DESKTOP" or name == "DESKTOP_SESSION" then return "" end
+			return getenv(name)
+		end
+		for _, name in ipairs(names) do package.loaded[name] = nil end
+		require("infra.i18n").init()
+		local manifest = require("infra.manifest_menu")
+		local native = require("modules.gestures.manager")
+		local producer = require("ui.gesture_conflicts")
+		local builder = require("ui.menu.menu_builder")
+		local closure, slot
+		for index = 1, 100 do
+			local name, value = debug.getupvalue(builder.build, index)
+			if name == nil then break end
+			if name == "_build_gestures" then closure, slot = value, index break end
+		end
+		assert(type(closure) == "function" and slot ~= nil, "the registered native gesture closure is required")
+		local selected
+		for name in pairs(native.DEFAULT_GESTURES) do
+			if name:match("^(%a+_%d+)") and (selected == nil or name < selected) then selected = name end
+		end
+		assert(type(selected) == "string", "the genuine native gesture catalogue contains a grouped slot")
+		local gestures = { DEFAULT_GESTURES = native.DEFAULT_GESTURES,
+			is_enabled = function() return true end, is_reading = function() return false end,
+			get_action = function(name) return name == selected and "copy" or "none" end,
+			get_action_label = native.get_action_label,
+			toggle = function() observed.effects = observed.effects + 1 end,
+			set_action = function() observed.effects = observed.effects + 1 end }
+		local build, template, rows_owner, settings = manifest.build, manifest.template_rows, producer.rows, producer.open_settings
+		local root = manifest.get_root()
+		local frames = { "gesture_system_slot_linux_frame", "gesture_system_linux_children", "gesture_system_status_linux_frame" }
+		local saved = {}; for _, key in ipairs(frames) do saved[key] = root[key] end
+		local leaf, consumed, successful_status, reached = nil, false, false, false
+		local pending = {}
+		local function contains(rows, callback)
+			if type(rows) ~= "table" or type(callback) ~= "function" then return false end
+			for _, row in ipairs(rows) do
+				if type(row) == "table" then
+					if rawequal(row.action or row.fn, callback) then return true end
+					if contains(row.items or row.submenu or row.menu, callback) then return true end
+				end
+			end
+			return false
+		end
+		restore = function()
+			manifest.build, manifest.template_rows, producer.rows, producer.open_settings = build, template, rows_owner, settings
+			for _, key in ipairs(frames) do root[key] = saved[key] end
+			debug.setupvalue(builder.build, slot, closure)
+		end
+		producer.open_settings = function() observed.effects = observed.effects + 1; return false end
+		manifest.template_rows = function(key, commands, getters, providers)
+			local delegated, invoked = {}, false
+			for id, provider in pairs(providers or {}) do
+				delegated[id] = type(provider) == "function" and function(...)
+					local supplied = provider(...)
+					if key == "gesture_system_linux_children" and id == "gesture_system_cached_overlap" then
+						observed.calls = observed.calls + 1
+						invoked = leaf ~= nil and contains(supplied, leaf)
+					end
+					return supplied
+				end or provider
+			end
+			local rows = template(key, commands, getters, delegated)
+			if key == "gesture_system_slot_linux_frame" and type(rows) == "table" and #rows == 1
+				and type(commands) == "table" and type(commands.gesture_system_open_unknown_slot) == "function"
+				and type(rows[1].action) == "function" then leaf = rows[1].action end
+			if key == "gesture_system_linux_children" and invoked and contains(rows, leaf) then
+				consumed = true
+				for _, entry in ipairs(manifest.get_array(key)) do
+					if entry.type == "list" and entry.id == "gesture_system_cached_overlap" then pending[entry.id] = true end
+				end
+			end
+			if key == "gesture_system_status_linux_frame" then
+				observed.status_calls = observed.status_calls + 1
+				successful_status = consumed and type(rows) == "table" and #rows == 1 and contains(rows, leaf)
+			end
+			return rows
+		end
+		local witnessed_rows = function(...)
+			local rows = rows_owner(...)
+			if not contains(rows, leaf) then successful_status = false end
+			return rows
+		end
+		producer.rows = witnessed_rows
+		manifest.build = function(key, ...)
+			local rows = build(key, ...)
+			if key == "gestures_menu" then reached = contains(rows, leaf) end
+			return rows
+		end
+		if damage then damage(builder, slot, producer, manifest, root) end
+		local active = select(2, debug.getupvalue(builder.build, slot))
+		local result_rows = active({ gestures = gestures, paused = false,
+			on_menu_changed = function() observed.effects = observed.effects + 1 end })
+		local current = rawequal(active, closure) and rawequal(producer.rows, witnessed_rows)
+			and rawequal(package.loaded["ui.gesture_conflicts"], producer)
+		for _, key in ipairs(frames) do current = current and rawequal(root[key], saved[key]) end
+		assert(observed.effects == 0, "coverage evidence cannot open settings or publish")
+		if current and consumed and successful_status and reached and type(result_rows) == "table"
+			and contains(result_rows.submenu, leaf) then return pending end
+		return {}
+	end, debug.traceback)
+	local cleaned, cleanup_error = pcall(restore)
+	os.getenv = getenv; rawset(_G, "i18n_safe", original_i18n_safe)
+	for name in pairs(package.loaded) do if loaded[name] == nil then package.loaded[name] = nil end end
+	for name, value in pairs(loaded) do package.loaded[name] = value end
+	if created then assert(filesystem.rmdir(directory)) end
+	assert(rawequal(os.getenv, getenv) and rawequal(rawget(_G, "i18n_safe"), original_i18n_safe))
+	for name, value in pairs(loaded) do assert(rawequal(package.loaded[name], value), name) end
+	for name in pairs(package.loaded) do assert(loaded[name] ~= nil, name) end
+	if not cleaned then error(cleanup_error, 0) end
+	if ok then return result, nil, observed end
+	return {}, result, observed
+end
+
 --- Every list id the menu builder registers a provider for.
 --- @return table Set of ids.
 local function registered_providers(omitted_delegate)
@@ -344,6 +475,9 @@ local function registered_providers(omitted_delegate)
 		for id in pairs(genuine_shared_providers()) do found[id] = true end
 	end
 	for id in pairs(genuine_trigger_providers()) do found[id] = true end
+	if omitted_delegate ~= "ui.gesture_conflicts" then
+		for id in pairs(genuine_gesture_providers()) do found[id] = true end
+	end
 	return found
 end
 
@@ -517,6 +651,110 @@ helpers.describe("Magic trigger evidence native global ownership", function()
 					else
 						helpers.assert_nil(refusal)
 						helpers.assert_true(found.magic_key_reset_if_custom == true)
+					end
+				end
+			end
+		end)
+		rawset(_G, "i18n_safe", original)
+		if not ok then error(err, 0) end
+	end)
+end)
+
+helpers.describe("Gesture status list evidence follows genuine native publication", function()
+	helpers.it("credits the consumed cached overlap only after the actual returned status survives", function()
+		local found, err, observed = genuine_gesture_providers()
+		helpers.assert_nil(err)
+		helpers.assert_true(found.gesture_system_cached_overlap == true)
+		helpers.assert_eq(observed.calls, 1)
+		helpers.assert_eq(observed.status_calls, 1)
+		helpers.assert_eq(observed.effects, 0)
+		local omitted = registered_providers("ui.gesture_conflicts")
+		helpers.assert_nil(omitted.gesture_system_cached_overlap)
+	end)
+	local mutations = {
+		{ name = "withdrawn registered native closure", apply = function(builder, slot)
+			debug.setupvalue(builder.build, slot, function() return {} end)
+		end },
+		{ name = "outer native closure discards its genuine body", apply = function(builder, slot)
+			local original = select(2, debug.getupvalue(builder.build, slot))
+			debug.setupvalue(builder.build, slot, function(...) original(...); return {} end)
+		end },
+		{ name = "withdrawn native rows owner", apply = function(_, _, producer)
+			producer.rows = function() return {} end
+		end },
+		{ name = "outer rows wrapper discards genuine returned status", apply = function(_, _, producer)
+			local original = producer.rows
+			producer.rows = function(...) original(...); return {} end
+		end },
+		{ name = "withdrawn actual template", apply = function(_, _, _, manifest)
+			manifest.template_rows = function() return {} end
+		end },
+		{ name = "outer template discards genuine status", apply = function(_, _, _, manifest)
+			local original = manifest.template_rows
+			manifest.template_rows = function(key, ...)
+				local rows = original(key, ...)
+				if key == "gesture_system_status_linux_frame" then return {} end
+				return rows
+			end
+		end },
+		{ name = "withdrawn actual cached provider", apply = function(_, _, _, manifest)
+			local original = manifest.template_rows
+			manifest.template_rows = function(key, commands, getters, providers)
+				if key == "gesture_system_linux_children" then providers.gesture_system_cached_overlap = nil end
+				return original(key, commands, getters, providers)
+			end
+		end },
+		{ name = "empty replacement cached provider", apply = function(_, _, _, manifest)
+			local original = manifest.template_rows
+			manifest.template_rows = function(key, commands, getters, providers)
+				if key == "gesture_system_linux_children" then providers.gesture_system_cached_overlap = function() return {} end end
+				return original(key, commands, getters, providers)
+			end
+		end },
+		{ name = "withdrawn actual native menu build", apply = function(_, _, _, manifest)
+			manifest.build = function() return {} end
+		end },
+		{ name = "outer native menu build discards genuine rows", apply = function(_, _, _, manifest)
+			local original = manifest.build
+			manifest.build = function(...) original(...); return {} end
+		end },
+		{ name = "withdrawn actual parent declaration", apply = function(_, _, _, _, root)
+			root.gesture_system_status_linux_frame = nil
+		end },
+		{ name = "late withdrawal of actual parent declaration", apply = function(_, _, _, manifest, root)
+			local original = manifest.template_rows
+			manifest.template_rows = function(key, ...)
+				local rows = original(key, ...)
+				if key == "gesture_system_status_linux_frame" then root.gesture_system_status_linux_frame = nil end
+				return rows
+			end
+		end },
+	}
+	for _, mutation in ipairs(mutations) do
+		helpers.it("denies provider credit for " .. mutation.name, function()
+			local refused, _, observed = genuine_gesture_providers(mutation.apply)
+			helpers.assert_nil(refused.gesture_system_cached_overlap)
+			helpers.assert_eq(observed.effects, 0)
+			local repaired, repair_error = genuine_gesture_providers()
+			helpers.assert_nil(repair_error)
+			helpers.assert_true(repaired.gesture_system_cached_overlap == true)
+		end)
+	end
+	helpers.it("restores complete module and raw global ownership after success and raised scenarios", function()
+		local original = rawget(_G, "i18n_safe")
+		local ok, err = pcall(function()
+			for _, prior in ipairs({ {}, { value = false }, { value = {} } }) do
+				for _, raised in ipairs({ false, true }) do
+					rawset(_G, "i18n_safe", prior.value)
+					local damage = raised and function() error("controlled native gesture evidence") end or nil
+					local found, detail = genuine_gesture_providers(damage)
+					helpers.assert_true(rawequal(rawget(_G, "i18n_safe"), prior.value))
+					if raised then
+						helpers.assert_nil(found.gesture_system_cached_overlap)
+						helpers.assert_true(type(detail) == "string" and detail:find("controlled native gesture evidence", 1, true) ~= nil)
+					else
+						helpers.assert_nil(detail)
+						helpers.assert_true(found.gesture_system_cached_overlap == true)
 					end
 				end
 			end
