@@ -1988,6 +1988,7 @@
 	"sg_actions.app_previous": "⇥ Föregående app — alla skärmar",
 	"sg_actions.app_previous_screen": "⇥ Föregående app — den här skärmen",
 	"sg_actions.app_switcher": "⇥ Systemets Alt+Tab",
+	"sg_actions.system_app_switcher": "⇥ Systemets Alt+Tab",
 	"sg_actions.app_window_previous": "◱ → Nästa fönster, utan växlare (Alt+Esc)",
 	"sg_actions.arrow_down": "↓ Pil ned",
 	"sg_actions.arrow_left": "← Pil vänster",
