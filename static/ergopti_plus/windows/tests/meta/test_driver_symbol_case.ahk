@@ -65,8 +65,14 @@ _DSFR_With(Body) {
 		. "-" . A_TickCount . "-" . Random(100000, 999999)
 	AssertTrue(DllCall("CreateDirectoryW", "str", Root, "ptr", 0, "int"),
 		"the fixture must exclusively own its native source root")
-	try Body.Call(Root)
-	finally DirDelete(Root, true)
+	try {
+		; Native enumeration expands 8.3 aliases. Obtain the independently owned
+		; directory's long spelling before authoring any expected fixture paths.
+		Storage := Buffer(65536)
+		Length := DllCall("GetLongPathNameW", "Str", Root, "Ptr", Storage, "UInt", 32768, "UInt")
+		Assert(Length > 0 && Length < 32768, "the owned fixture root must resolve its complete native long path")
+		Body.Call(StrGet(Storage, Length, "UTF-16"))
+	} finally DirDelete(Root, true)
 }
 
 _DSFR_Write(Root, Relative, Source) {
@@ -163,7 +169,7 @@ _DSFR_Unreadable(Root) {
 	Handle := DllCall("CreateFileW", "str", Locked, "uint", 0x80000000, "uint", 0,
 		"ptr", 0, "uint", 3, "uint", 0, "ptr", 0, "ptr")
 	Assert(Handle != -1, "the fixture must own a real exclusive native source lock")
-	try _DSFR_Failure(() => _DriverProductionFileForSymbol("ExportSubject", Root), "", "OSError")
+	try _DSFR_Failure(() => _DriverProductionFileForSymbol("ExportSubject", Root), "(32)", "OSError")
 	finally DllCall("CloseHandle", "ptr", Handle)
 	AssertEqual(Expected, _DriverProductionFileForSymbol("ExportSubject", Root),
 		"successful retry must census all production sources after the lock closes")

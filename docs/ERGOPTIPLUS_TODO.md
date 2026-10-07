@@ -6856,6 +6856,16 @@ original-producer causal controls remain unexecuted at this checkpoint.
 This repairs failed-acquisition compensation, without claiming complete live
 retargeting, modifier/output custody or physical delivery.
 
+Windows manual run37566070271 executed 10122 passing and eight failing
+unit cases. Seven resolver fixtures used a short temporary-root spelling or
+an empty exception substring; the native custody child triggered a genuine
+strict-warning collision between local and global exception names. The fixtures
+now independently obtain their owned directory's native long path, require
+sharing-error code32 and use a distinct terminal exception binding. Production
+resolution, native custody, all assertions and strict warnings are unchanged.
+Windows native revalidation is pending; E2E, packaging, installation and the
+source-reload diagnostics were not reached in that failed run.
+
 Remaining work for item108 (CI-feasible software first):
 
 Linux direct magic-source enumeration now fences its captured native session,
