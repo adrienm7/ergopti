@@ -7462,6 +7462,19 @@ unchanged. Independent source review clears only the diagnostic; actual
 AHK execution and a new native replay remain required. No console fix or
 item109 completion is claimed.
 
+Native console warning repair (2026-10-07): run37622104677 on exact
+private CI8f4d4da3f89b3ba0d2a247b6e0e9117336ca66e2 passes all five original
+interactive console cases and the registered four-child native parser control.
+Implicit Edit/Thread locals are renamed without suppressing #Warn or changing
+the strict eight-field receipt, status, HWND/Job ownership or deadlines. The
+main suite passes10159/0 on that private composition, which also contains a
+separate brightness diagnostic; this does not establish a brightness cause.
+The desktop launcher then refuses stdout/canonical-receipt inequality, so its
+six AltGr cases remain unexecuted. Core intentionally rejects the temporary
+always-only diagnostic workflow overlay; the full run fails, and E2E,
+packaging and installation are skipped. Invisible refresh, compiled capture
+and final-source qualification remain unfinished; item109 remains partial.
+
 - [~] **111.** Provide two distinct, explicitly labelled shared window-switching
   actions on Windows, macOS and Linux: the operating system's normal Alt+Tab switcher
   (the native equivalent on macOS), and switching only among windows on the display
