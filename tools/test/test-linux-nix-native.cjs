@@ -184,6 +184,137 @@ check('Git index observation does not refresh original locks', () => {
 	);
 	assert.ok(source.includes("LUA_INIT: '@' + path.join(snapshot, PROBE)"));
 });
+
+// Execute only the actual fixed projection in isolation: no Nix or phase owner.
+const vm = require('node:vm');
+const diagnosticSource = fs.readFileSync(
+	path.join(root, 'tools/test/run-linux-nix-native.cjs'),
+	'utf8'
+);
+const diagnosticStart = diagnosticSource.indexOf('\tfunction emitPhaseObservation() {');
+const diagnosticEnd = diagnosticSource.indexOf('\n\ttry {\n\t\tcurrent();', diagnosticStart);
+assert.ok(
+	diagnosticStart >= 0 && diagnosticEnd > diagnosticStart,
+	'actual diagnostic function required'
+);
+const diagnostic = diagnosticSource.slice(diagnosticStart, diagnosticEnd).trim();
+function projection(phaseObservation, retained = false, code = diagnostic) {
+	const lines = [];
+	vm.runInNewContext(
+		'(' + code + ')()',
+		{
+			phaseObservation,
+			hasRetainedPhases: () => retained,
+			error: (line) => lines.push(line)
+		},
+		{ timeout: 1000 }
+	);
+	return lines;
+}
+function receiveProjection(lines, suffix) {
+	const original =
+		'NIX_OWNED_PHASE_OBSERVATION checkpoint=pinned-source-metadata boundary=result_or_physical_debt_gate ' +
+		suffix;
+	assert.deepEqual(lines, [original, '::error title=Nix native owned phase::' + original]);
+}
+function phase(result) {
+	return { checkpoint: 'pinned-source-metadata', boundary: 'result_or_physical_debt_gate', result };
+}
+check('missing Nix phase has no invented observation', () =>
+	assert.deepEqual(projection(undefined), [])
+);
+check('closed nonzero Nix status reaches both original log and annotation', () => {
+	const result = Object.freeze({
+		status: 1,
+		signal: null,
+		error: null,
+		stderr: 'Private arbitrary cause'
+	});
+	receiveProjection(
+		projection(phase(result)),
+		'status=1 signal=none owner_error=none retained=false'
+	);
+	assert.equal(result.stderr, 'Private arbitrary cause');
+});
+check('unreturned Nix phase fields remain unknown', () =>
+	receiveProjection(
+		projection(phase(undefined)),
+		'status=unknown signal=unknown owner_error=unknown retained=false'
+	)
+);
+check('retained native cancellation remains distinct from closed child exit', () =>
+	receiveProjection(
+		projection(phase({ status: null, signal: 'SIGTERM', error: 'owned_cleanup_pending' }), true),
+		'status=unknown signal=SIGTERM owner_error=owned_cleanup_pending retained=true'
+	)
+);
+check('native upper status bound and accepted enum remain fixed', () =>
+	receiveProjection(
+		projection(phase({ status: 255, signal: 'SIGSEGV', error: 'deadline' })),
+		'status=255 signal=SIGSEGV owner_error=deadline retained=false'
+	)
+);
+for (const status of [-1, 256, 1.5, NaN, Infinity]) {
+	check('unsafe native status is never printed (' + String(status) + ')', () =>
+		receiveProjection(
+			projection(phase({ status, signal: null, error: null })),
+			'status=unknown signal=none owner_error=none retained=false'
+		)
+	);
+}
+check('inherited phase values cannot manufacture native facts', () =>
+	receiveProjection(
+		projection(phase(Object.create({ status: 1, signal: 'SIGTERM', error: 'deadline' }))),
+		'status=unknown signal=unknown owner_error=unknown retained=false'
+	)
+);
+check('phase getters are never invoked', () => {
+	let reads = 0;
+	const result = {};
+	for (const name of ['status', 'signal', 'error']) {
+		Object.defineProperty(result, name, {
+			get() {
+				reads++;
+				throw new Error('Synthetic private field');
+			}
+		});
+	}
+	receiveProjection(
+		projection(phase(result)),
+		'status=unknown signal=unknown owner_error=unknown retained=false'
+	);
+	assert.equal(reads, 0);
+});
+check('private URLs, workflow commands and exceptions cannot escape enum projection', () => {
+	const privateValue = 'https://private.invalid/?token=opaque%0A\n::error::private-suffix';
+	const result = {
+		status: privateValue,
+		signal: privateValue,
+		error: privateValue,
+		stderr: privateValue,
+		stdout: privateValue,
+		exception: privateValue
+	};
+	receiveProjection(
+		projection(phase(result)),
+		'status=unknown signal=other owner_error=other retained=false'
+	);
+});
+check('removing the public annotation fails the same independent receipt', () => {
+	const inverse = diagnostic.replace(
+		/\n\s*error\(["']::error title=Nix native owned phase::["'] \+ observation\);/,
+		''
+	);
+	assert.notEqual(inverse, diagnostic, 'actual annotation addition required');
+	assert.throws(
+		() =>
+			receiveProjection(
+				projection(phase({ status: 1, signal: null, error: null }), false, inverse),
+				'status=1 signal=none owner_error=none retained=false'
+			),
+		assert.AssertionError
+	);
+});
 process.stdout.write(
 	`PASS Nix source/receipt/registration controls: ${checks}; native execution unqualified.\n`
 );

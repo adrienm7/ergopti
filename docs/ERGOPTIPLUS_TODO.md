@@ -5549,6 +5549,15 @@ no-follow authenticated302 refusal. Original owners, TLS servers and accepted
 connections close physically, with zero skips. These controlled wire receipts
 are not official GitHub-release or company-network qualification.
 
+Nix failures now publish one bounded annotation from the original cached phase
+projection: fixed checkpoint/boundary, scalar status and closed error/signal
+categories plus retained-owner state. No raw stderr, URL, path, environment or
+exception text becomes public. All original phases, deadlines, predicates and
+cleanup remain mandatory. The original35 controls and14 additional independent
+receiving controls pass49/0. This container has neither the standard Nix store
+nor its native CLI; actual derivation and installed-runtime acceptance remain
+unrun here and must be replayed by the original hosted CI gate.
+
 Manual Linux run37591679813 at9195a6419f4d36581e4404198cd152753791f2e6
 failed the Configuration restore assertion at test_hotstrings_scope.lua:432:
 rolls remained false. Two unrelated passing unsafe-answer fixture names contain
