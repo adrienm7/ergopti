@@ -2,7 +2,7 @@
 # Replays the actual shipped worker in a native PowerShell child. Provider doubles
 # do not touch physical screens; they assert the real WMI ABI and readback protocol.
 param([string]$Worker, [string]$FixturePolicyPath, [string]$Action, [string]$Mode,
-    [string]$FixtureDiagnosticPath = '')
+    [string]$FixtureDiagnosticPath = '', [string]$FixtureModulePath = '')
 # Optional observation only: last successfully written closed phase. A refused
 # diagnostic write stops further observation and never replaces worker outcomes.
 $script:DiagnosticAvailable = $FixtureDiagnosticPath -cne ''
@@ -62,6 +62,9 @@ if ($Mode -eq 'typed-policy-collision') { [string]$Policy = $FixturePolicyPath }
 # process's exit. Retain that exact native result before any receipt formatting.
 $global:LASTEXITCODE = 0
 Set-FixtureDiagnosticPhase 'before_worker'
+if ($FixtureModulePath -cne '') {
+    $env:PSModulePath = $FixtureModulePath + [IO.Path]::PathSeparator + [IO.Path]::Combine($PSHOME, 'Modules')
+}
 $WorkerOutput = @(. $Worker -PolicyPath $FixturePolicyPath -Action $Action)
 $WorkerExit = $LASTEXITCODE
 Set-FixtureDiagnosticPhase 'worker_return'
