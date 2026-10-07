@@ -2315,3 +2315,17 @@ overlap from the published Group6 branch and current coordination evidence.
 This is not a Group6 grant and does not claim knowledge of unpublished foreign
 state. The exact assessment and actual notice are required before adoption;
 final macOS CI remains required. No item is removed;30 and16/38 stay open.
+
+## Closed permission UI stage and finish observations
+
+Actual retained macOS run37644984245 reached init return and production
+guide callbacks but refused at observation_deadline without a native result;
+the executing case and cause remain UNKNOWN. An explicit diagnostic-only
+configuration flag now enables failure-only saved stage and finish checkpoints
+in captured stderr, with authority false. It preserves the original 10 native
+cases, all 33 existing portable controls, geometry predicates, cleanup and
+ownership budgets; the unchanged geometry controls retain 21 source passes.
+The new normally discovered Lua controls pass 12 with modeled HS endpoints.
+Earlier Python control drafts remain private evidence, not SDK registration.
+Native execution of this new diagnostic remains UNEXECUTED; it grants no UI,
+permission, retirement or ready authority. Item 24 remains partial.

@@ -3185,6 +3185,18 @@ tick, completed cases or native UI success. These new markers remain native
 unexecuted and add no permission, ready or activation authority. Item24 stays
 partial; actual WebKit/UI and physical guardian/tap-hold acceptance remain open.
 
+Actual retained macOS run37644984245 reached init return and production
+guide callbacks but refused at observation_deadline without a native result;
+the executing case and cause remain UNKNOWN. An explicit diagnostic-only
+configuration flag now enables failure-only saved stage and finish checkpoints
+in captured stderr, with authority false. It preserves the original 10 native
+cases, all 33 existing portable controls, geometry predicates, cleanup and
+ownership budgets; the unchanged geometry controls retain 21 source passes.
+The new normally discovered Lua controls pass 12 with modeled HS endpoints.
+Earlier Python control drafts remain private evidence, not SDK registration.
+Native execution of this new diagnostic remains UNEXECUTED; it grants no UI,
+permission, retirement or ready authority. Item 24 remains partial.
+
 - [~] **30.** Physical magic-key setting on all three OSes: one
   `hotstrings.magic_key_source` (a KeyboardEvent.code, `auto` by default),
   config schema v5 migrating every spelling of the Windows

@@ -794,6 +794,7 @@ extension HS274NativePolicyQualificationTests {
 	            "nonce": nonce,
 	            "version": provision["version"],
 	            "bundle": str(executable.parent.parent.parent),
+	            "stage_failure_observation": True,
 	        },
 	    )
 	    config = output / "init.lua"

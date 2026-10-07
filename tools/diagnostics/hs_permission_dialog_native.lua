@@ -2,6 +2,8 @@
 -- Actual hosted WebKit/UI/timer acceptance; guardian and settings endpoints are modeled.
 
 return function(config)
+	local stage_failure_enabled = type(config) == "table" and getmetatable(config) == nil
+		and rawget(config, "stage_failure_observation") == true
 	local Logger = require("infra.logger")
 	local LogFiles = require("app_dirs").files
 	assert(hs.fs.mkdir(config.root .. "/logs"))
@@ -24,6 +26,7 @@ return function(config)
 	local observations, results = {}, {}
 	local state, enabled, settings_calls, unknown_reads = "requires_approval", false, 0, 0
 	local observer, busy, failure, stage, current = nil, false, nil, 1, nil
+	local finish_checkpoint = "not_entered"
 	local started = hs.timer.absoluteTime()
 	local deadline = started + 10 * 1000000000
 	local later_done, open_done, unknown_at = false, false, nil
@@ -45,6 +48,30 @@ return function(config)
 	end
 	local function record(id)
 		results[#results + 1] = { id = id, passed = true }
+	end
+
+	local function stage_failure(boundary, saved_stage, saved_checkpoint, saved_count, saved_busy)
+		if not stage_failure_enabled then return end
+		-- Plain saved state is diagnostic only; captured stderr is best effort.
+		pcall(function()
+			local boundaries = { tick_refused_before_cleanup = true, failure_finish_entered = true,
+				finish_refused = true }
+			local stages = { [1] = "1", [1.5] = "1.5", [2] = "2", [3] = "3", [4] = "4",
+				[5] = "5", [6] = "6", [7] = "7", [8] = "8", [8.5] = "8.5", [9] = "9",
+				[9.5] = "9.5", [10] = "10" }
+			local checkpoints = { not_entered = true, entered = true, factory_restored = true,
+				observer_retired = true, packet_built = true, packet_encoded = true,
+				pending_opened = true, pending_closed = true, result_published = true }
+			if type(boundary) ~= "string" or not boundaries[boundary]
+				or type(saved_stage) ~= "number" or not stages[saved_stage]
+				or type(saved_checkpoint) ~= "string" or not checkpoints[saved_checkpoint]
+				or math.type(saved_count) ~= "integer" or saved_count < 0 or saved_count > 10
+				or type(saved_busy) ~= "boolean" then return end
+			local encoded = string.format(
+				'ERGOPTI_PERMISSION_UI_STAGE_FAILURE {"schema":1,"kind":"permission_ui_stage_failure_observation","authority":false,"native_verdict":"unchanged","boundary":"%s","stage":%s,"finish_checkpoint":"%s","recorded_case_count":%d,"busy":%s}\n',
+				boundary, stages[saved_stage], saved_checkpoint, saved_count, saved_busy and "true" or "false")
+			if #encoded <= 512 then io.stderr:write(encoded) end
+		end)
 	end
 	local creation_width, creation_height = "unavailable", "unavailable"
 	local function geometry_dimension(value)
@@ -113,13 +140,19 @@ return function(config)
 		end)
 	end
 	local function finish()
+		finish_checkpoint = "entered"
+		if failure ~= nil then
+			stage_failure("failure_finish_entered", stage, finish_checkpoint, #results, busy)
+		end
 		check(UI.show_webview == forwarder, "Production factory observer changed")
 		UI.show_webview = original_show
+		finish_checkpoint = "factory_restored"
 		if observer ~= nil then
 			observer:stop()
 			check(observer:running() == false, "Actual observer timer did not retire")
 			observer = nil
 		end
+		finish_checkpoint = "observer_retired"
 		local packet = {
 			schema = 1, status = failure == nil and "ok" or "error",
 			runtime = "native Hammerspoon", pid = hs.processInfo.processID,
@@ -139,11 +172,16 @@ return function(config)
 				permission_granted = false, system_settings_opened = false, activation = false },
 			failure = failure or "",
 		}
+		finish_checkpoint = "packet_built"
 		local encoded, err = Json.encode(packet)
 		check(type(encoded) == "string" and err == nil, "Native receipt encoding failed")
+		finish_checkpoint = "packet_encoded"
 		local file = assert(io.open(config.root .. "/result.pending", "wb"))
+		finish_checkpoint = "pending_opened"
 		assert(file:write(encoded)); assert(file:close())
+		finish_checkpoint = "pending_closed"
 		assert(os.rename(config.root .. "/result.pending", config.root .. "/result.json"))
+		finish_checkpoint = "result_published"
 	end
 	local function tick()
 		if failure ~= nil then finish(); return end
@@ -258,9 +296,13 @@ return function(config)
 		local ok, detail = xpcall(tick, debug.traceback)
 		if not ok then
 			failure = detail
+			stage_failure("tick_refused_before_cleanup", stage, finish_checkpoint, #results, busy)
 			pcall(function() Dialog.close() end)
 			-- Cleanup stays native; an incomplete guide may retain debt until owned-child retirement.
 			local finished, err = pcall(finish)
+			if not finished then
+				stage_failure("finish_refused", stage, finish_checkpoint, #results, busy)
+			end
 			if not finished then Logger.error("permission_fixture", "%s", tostring(err)) end
 		end
 	end)
