@@ -431,3 +431,46 @@ helpers.describe("macOS ordinary obsolete shortcut parent policy", function()
 end)
 
 require("test.config_obsolete_parents_contract").register(helpers)
+
+helpers.describe("shortcut fixture final script publication admission", function()
+	helpers.it("refuses a withdrawn genuine accessor and retries with the original native owner", function()
+		Fixture.run(function(f)
+			local catalogue = require("infra.script_chord_catalogue")
+			local original = catalogue.published_binding_catalogue
+			local before, writes = f.files.config, f.controls.writes
+			local parameters = f.gestures.get_all_action_parameters()
+			local fake_calls = 0
+			f.controls.during_write = function()
+				catalogue.published_binding_catalogue = function() fake_calls = fake_calls + 1; return {} end
+			end
+			local result = f.save()
+			helpers.assert_eq(result, false)
+			helpers.assert_eq(fake_calls, 0)
+			helpers.assert_eq(f.files.config, before)
+			helpers.assert_eq(f.controls.writes, writes)
+			helpers.assert_eq(f.gestures.get_all_action_parameters(), parameters)
+			helpers.assert_eq(f.prefs.source_snapshot("config").content, before)
+			catalogue.published_binding_catalogue = original
+			f.controls.during_write = nil
+			helpers.assert_eq(f.save(), true)
+		end)
+	end)
+	helpers.it("retains a real callback's external source instead of accepting its caller alias", function()
+		Fixture.run(function(f)
+			local port = package.loaded["adapters.file_system"]
+			local expected = { status = "ok", content = f.files.config }
+			local writes, calls = f.controls.writes, 0
+			f.controls.during_write = function()
+				f.files.config = "external-successor"
+				expected.content = "external-successor"
+			end
+			local result = port.write_if_unchanged_admitted("config", "candidate", expected, nil, function()
+				calls = calls + 1; return true
+			end)
+			helpers.assert_eq(result, false)
+			helpers.assert_eq(calls, 1)
+			helpers.assert_eq(f.files.config, "external-successor")
+			helpers.assert_eq(f.controls.writes, writes)
+		end)
+	end)
+end)

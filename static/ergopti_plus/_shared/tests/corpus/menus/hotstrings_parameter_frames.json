@@ -1,0 +1,86 @@
+{
+	"captions": {
+		"default": "menu.hotstrings.tooltip_default",
+		"magic_key": "menu.hotstrings.delay_magic_key",
+		"autocorrection": "menu.hotstrings.delay_autocorrection",
+		"ai_acceptance": "menu.hotstrings.tooltip_ai_acceptance",
+		"autocompletion": "menu.hotstrings.tooltip_autocompletion"
+	},
+	"delays": {
+		"ahk": [
+			"parameter_delay_config",
+			"separator",
+			"parameter_delay_default",
+			"parameter_delay_magic_key",
+			"parameter_delay_autocorrection",
+			"separator",
+			"parameter_delay_ai_acceptance",
+			"parameter_delay_autocompletion"
+		],
+		"hs": [
+			"parameter_delay_config",
+			"separator",
+			"parameter_delay_ai_acceptance",
+			"parameter_delay_autocompletion",
+			"parameter_delay_default",
+			"parameter_delay_category_boundary",
+			"parameter_delay_magic_key",
+			"parameter_delay_autocorrection"
+		],
+		"linux": [
+			"parameter_delay_config",
+			"separator",
+			"parameter_delay_default",
+			"parameter_delay_magic_key",
+			"parameter_delay_autocorrection"
+		]
+	},
+	"preview": {
+		"ahk": [],
+		"hs": [
+			"parameter_preview_magic",
+			"parameter_preview_presence",
+			"separator",
+			"parameter_preview_colored"
+		],
+		"linux": [
+			"parameter_preview_magic",
+			"parameter_preview_presence",
+			"separator",
+			"parameter_preview_colored"
+		]
+	},
+	"word": ["parameter_catalogue_entries", "separator", "parameter_custom_entries"],
+	"parents": {
+		"word_expander": "menu.hotstrings.word_expanders",
+		"preview": "menu.hotstrings.preview_bubbles",
+		"delays": "menu.hotstrings.delays_colors"
+	},
+	"preview_states": [true, false, true, false],
+	"mac_word_titles": ["First", "separator", "Second", "separator", "custom", "add"],
+	"mac_delays_ms": [300, 400, 100, 250, 250],
+	"linux_delays_ms": [750, 750, 750],
+	"locales": [
+		"ar",
+		"cs",
+		"da",
+		"de",
+		"en",
+		"es",
+		"fr",
+		"he",
+		"hi",
+		"it",
+		"ja",
+		"ko",
+		"nl",
+		"no",
+		"pl",
+		"pt",
+		"ru",
+		"sv",
+		"tr",
+		"uk",
+		"zh"
+	]
+}
