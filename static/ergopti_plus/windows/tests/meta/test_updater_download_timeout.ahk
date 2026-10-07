@@ -35,7 +35,11 @@
 ; Returns the isolated worker body. The timeout must be owned by the worker,
 ; otherwise an AHK poll ceiling could still leave a blocked network request alive.
 _UDTO_FindPollBlock() {
-	return _DriverFuncBody("_Updater_BuildStagingWorkerScript")
+	Worker := _DriverFuncBody("_Updater_BuildStagingWorkerScript")
+	Assert(InStr(Worker, '$ExpectedSize=Invoke-ErgoptiUpdaterDownload $Request $NewExe $TimeoutMs $State $Resolver $DeadlineMs $StartedTick') > 0,
+		"timeout guard must follow the actual selected download owner and immutable original clock")
+	SplitPath(A_ScriptDir, , &Root)
+	return FileRead(Root . "\vendor\ergopti_updater_download.ps1", "UTF-8")
 }
 
 
@@ -59,7 +63,10 @@ Test("Updater: download poll ceiling raised to 600000 ms (updater-download-timeo
 _UDTO_No120SecCeiling() {
 	block := _UDTO_FindPollBlock()
 	; The MaxPolls expression must not still divide 120000.
-	Assert(InStr(block, "$Request.Timeout = $TimeoutMs") > 0 and InStr(block, "$Request.ReadWriteTimeout = $TimeoutMs") > 0,
+	Assert(InStr(block, "$Request.Timeout = [Math]::Min($Remaining, $TimeoutMs)") > 0 and InStr(block, "$Request.ReadWriteTimeout = [Math]::Min($Remaining, $TimeoutMs)") > 0,
 		"updater.ahk: worker must apply the supplied timeout to both connect and file-stream phases")
+	Assert(InStr(block, "$Input.ReadTimeout = [Math]::Min($Remaining, $TimeoutMs)") > 0
+		&& InStr(block, "$Remaining = Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State") > 0,
+		"each native stream read must retain the immutable original clock and smaller remaining deadline")
 }
 Test("Updater: worker applies the full timeout to every network phase (updater-download-timeout)", _UDTO_No120SecCeiling)

@@ -505,3 +505,37 @@ _UMF_StoredUtf16EnvelopeAdmission() {
 
 Test("Updater managed failure: stored UTF-16 NUL refusal preserves ordinary envelopes",
 	_UMF_StoredUtf16EnvelopeAdmission)
+
+_UMF_ActualCompletionAdmissionRestoresCriticalAndCurrentOwner() {
+	global _UpdaterDownloadWorker, _UpdaterDownloadInProgress, _UpdaterSelfUpdateEpoch
+	Saved := [_UpdaterDownloadWorker, _UpdaterDownloadInProgress, _UpdaterSelfUpdateEpoch]
+	SavedCritical := A_IsCritical
+	Worker := Map("owned", "first")
+	Successor := Map("owned", "successor")
+	try {
+		Critical("Off")
+		_UpdaterDownloadWorker := Worker
+		_UpdaterDownloadInProgress := true
+		_UpdaterSelfUpdateEpoch := 8123
+		Assert(!_Updater_AdmitStagingCompletion(8122), "stale completion cannot enter the actual state admission")
+		Assert(_UpdaterDownloadWorker == Worker, "stale completion retains the exact current worker")
+		AssertEqual(0, A_IsCritical, "refused admission restores the original noncritical caller")
+		Assert(_Updater_AdmitStagingCompletion(8123), "current completed owner can retire its actual monitor admission")
+		AssertEqual(0, _UpdaterDownloadWorker, "current completion releases only its own completed worker reference")
+		AssertEqual(0, A_IsCritical, "actual admission releases Critical before handoff can run")
+		Critical(17)
+		_UpdaterSelfUpdateEpoch := 8124
+		_UpdaterDownloadWorker := Successor
+		Assert(!_Updater_AdmitStagingCompletion(8123), "a successor epoch cannot be retired by an old completion")
+		Assert(_UpdaterDownloadWorker == Successor, "the exact successor worker remains owned")
+		AssertEqual(17, A_IsCritical, "refused admission restores an already critical caller exactly")
+	} finally {
+		_UpdaterDownloadWorker := Saved[1]
+		_UpdaterDownloadInProgress := Saved[2]
+		_UpdaterSelfUpdateEpoch := Saved[3]
+		Critical(SavedCritical)
+	}
+}
+
+Test("Updater managed failure: actual completion admission preserves current worker and Critical boundaries",
+	_UMF_ActualCompletionAdmissionRestoresCriticalAndCurrentOwner)
