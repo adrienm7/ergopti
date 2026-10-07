@@ -278,7 +278,7 @@ check('portable Brew ownership controls remain registered and mandatory', () => 
 	assert.ifError(result.error);
 	assert.strictEqual(result.signal, null, result.stderr);
 	assert.strictEqual(result.status, 0, result.stderr);
-	assert.match(result.stderr, /Ran 67 tests in /);
+	assert.match(result.stderr, /Ran 72 tests in /);
 	assert.match(result.stderr, /\nOK\s*$/);
 	assert.doesNotMatch(result.stderr, /skipped=/);
 });
@@ -885,6 +885,83 @@ check('existing accessory AppKit state is freshly confirmed without a modifying 
 	);
 	assert.match(portable, /arguments, 0, "native_appkit_registration_controls=6\\n", ""/);
 });
+
+// SENDER_NONPROMPT_PERMISSION_DIAGNOSTIC_BEGIN
+check(
+	'failed native AppleEvent permission observations never alter admission or ask for consent',
+	() => {
+		const sender = fs.readFileSync(
+			path.join(ROOT, 'tools/diagnostics/native_appleevent_probe_sender.c'),
+			'utf8'
+		);
+		const helper = fs.readFileSync(
+			path.join(ROOT, 'tools/diagnostics/macos_brew_archive_acceptance.py'),
+			'utf8'
+		);
+		function assertNonpromptObservation(source) {
+			const executable = source.replace(
+				/"(?:\\.|[^"\\])*"|\/\/[^\n]*|\/\*[\s\S]*?\*\//g,
+				(token) => (token.startsWith('/') ? '' : token)
+			);
+			const begin = executable.indexOf('    if (result != 0) {');
+			const end = executable.indexOf(
+				'    } else {\n        printf("native_appleevent_status=',
+				begin
+			);
+			assert.ok(begin >= 0 && end > begin, 'The original failed native send branch is present');
+			const failure = executable.slice(begin, end);
+			assert.equal((executable.match(/AEDeterminePermissionToAutomateTarget\(/g) || []).length, 1);
+			const queryAt = failure.indexOf('if (strcmp(argv[3], "success") == 0) {');
+			assert.ok(
+				queryAt > failure.indexOf('fprintf(stderr, "\\n");'),
+				'Only the original failed positive is observed'
+			);
+			const query = failure.slice(queryAt);
+			assert.match(
+				query,
+				/if \(strcmp\(argv\[3\], "success"\) == 0\) \{\s*const OSStatus permission = AEDeterminePermissionToAutomateTarget\(\s*&address, probe_class, probe_event, false\);\s*printf\("OWNED_APPLEEVENT_PERMISSION\/1 osstatus=%d\\n", \(int\)permission\);/
+			);
+			assert.doesNotMatch(
+				query,
+				/\b(?:result|status)\s*=|\breturn\b|\b(?:wait|kill|sleep|open|close|exit|system)\s*\(/
+			);
+			assert.match(executable, /AEDisposeDesc\(&address\);\s*return result;/);
+			assert.match(executable, /kAEWaitReply \| kAENeverInteract \| kAEDoNotPromptForUserConsent/);
+		}
+		assertNonpromptObservation(sender);
+		for (const [from, to] of [
+			['&address, probe_class, probe_event, false);', '&address, probe_class, probe_event, true);'],
+			['&address, probe_class, probe_event, false);', 'NULL, probe_class, probe_event, false);'],
+			[
+				'printf("OWNED_APPLEEVENT_PERMISSION/1 osstatus=%d\\n", (int)permission);',
+				'printf("OWNED_APPLEEVENT_PERMISSION/1 osstatus=%d\\n", (int)permission); result = 0;'
+			]
+		]) {
+			assert.equal(sender.split(from).length - 1, 1, 'One independent native source mutation');
+			assert.throws(() => assertNonpromptObservation(sender.replace(from, to)));
+		}
+		const projectionAt = helper.indexOf('def appleevent_permission_query_fact(');
+		const failureAt = helper.indexOf('def run_appleevent_sender(', projectionAt);
+		assert.ok(projectionAt >= 0 && failureAt > projectionAt);
+		const projection = helper.slice(projectionAt, failureAt);
+		assert.match(projection, /len\(value\) > 96/);
+		assert.match(
+			projection,
+			/re\.fullmatch\(r"OWNED_APPLEEVENT_PERMISSION\/1 osstatus=\(-\?\[0-9\]\{1,11\}\)\\n", value\)/
+		);
+		assert.match(projection, /not -\(2\*\*31\) <= status < 2\*\*31 or str\(status\) != encoded/);
+		assert.match(projection, /return \{"osstatus": status\}/);
+		assert.doesNotMatch(projection, /print\(|open\(|read|subprocess|TCC|consent|cause/);
+		const failure = helper.slice(
+			failureAt,
+			helper.indexOf('def _admit_appleevent_boundary', failureAt)
+		);
+		assert.match(failure, /if result\.returncode == 66 and control != "full-policy-denial"/);
+		assert.match(failure, /require\(\s*False,\s*f"Owned AppleEvent sender failed:/);
+		assert.match(failure, /result\.stdout in expected and not result\.stderr/);
+	}
+);
+// SENDER_NONPROMPT_PERMISSION_DIAGNOSTIC_END
 
 if (failures > 0) {
 	console.error(`\n${failures} Homebrew cask check(s) failed.`);

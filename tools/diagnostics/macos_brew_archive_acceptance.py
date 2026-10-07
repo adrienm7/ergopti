@@ -1273,6 +1273,20 @@ def appleevent_sender_marker_fact(value):
     return {**facts, "marker2_snapshot": snapshot}
 
 
+def appleevent_permission_query_fact(value):
+    """Project a single canonical signed OSStatus, never raw native capture bytes."""
+    if not isinstance(value, str) or len(value) > 96:
+        return {}
+    matched = re.fullmatch(r"OWNED_APPLEEVENT_PERMISSION/1 osstatus=(-?[0-9]{1,11})\n", value)
+    if matched is None:
+        return {}
+    encoded = matched[1]
+    status = int(encoded)
+    if not -(2**31) <= status < 2**31 or str(status) != encoded:
+        return {}
+    return {"osstatus": status}
+
+
 def run_appleevent_sender(children, arguments, control, *, confined=False):
     """Retain normal ownership retirement and admit the exact native sender outcome."""
     require(
@@ -1283,9 +1297,21 @@ def run_appleevent_sender(children, arguments, control, *, confined=False):
     if result.returncode != 0:
         facts = appleevent_sender_marker_fact(result.stderr) if result.returncode == 66 else {}
         detail = ", sender_fact=" + json.dumps(facts, sort_keys=True) if facts else ""
+        permission = (
+            appleevent_permission_query_fact(result.stdout)
+            if result.returncode == 66 and control != "full-policy-denial"
+            else {}
+        )
+        permission_detail = (
+            ", permission_query_fact=" + json.dumps(permission, sort_keys=True)
+            if permission
+            else ""
+        )
         require(
             False,
-            f"Owned AppleEvent sender failed: control={control}, exit={result.returncode}" + detail,
+            f"Owned AppleEvent sender failed: control={control}, exit={result.returncode}"
+            + detail
+            + permission_detail,
         )
     if control == "full-policy-denial":
         expected = ("native_appleevent_status=-1742\n", "native_appleevent_status=-1743\n")

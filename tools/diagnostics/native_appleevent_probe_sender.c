@@ -7,6 +7,7 @@
 #include <sys/stat.h>
 #include <limits.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -189,6 +190,13 @@ int main(int argc, char **argv) {
             error_read_detail, error_length_detail, error_value_detail);
         if (marker_attempted) fprintf(stderr, ", marker2=%s", marker_snapshot);
         fprintf(stderr, "\n");
+        // Observe only this failed positive sender's existing target and event.
+        // False forbids a consent prompt; the original refusal remains authoritative.
+        if (strcmp(argv[3], "success") == 0) {
+            const OSStatus permission = AEDeterminePermissionToAutomateTarget(
+                &address, probe_class, probe_event, false);
+            printf("OWNED_APPLEEVENT_PERMISSION/1 osstatus=%d\n", (int)permission);
+        }
     } else {
         printf("native_appleevent_status=%d\n", (int)status);
     }
