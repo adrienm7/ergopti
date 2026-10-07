@@ -25,11 +25,11 @@ NumberRowPolicyMode(Value) {
 
 _NumberRowPolicyDescriptor(Value) {
 	return Value is Map && Value.Get("Kind", "") is String && ((StrCompare(Value.Get("Kind", ""), "text", true) == 0
-		&& Value.Get("Text", "") is String && Value["Text"] != "")
+		&& Value.Get("Text", "") is String && Value.Get("Text", "") != "")
 		|| (StrCompare(Value.Get("Kind", ""), "dead", true) == 0
-		&& Value.Get("Action", "") is String && Value["Action"] != ""
-		&& Value.Get("State", "") is String && Value["State"] != ""
-		&& Value.Get("Text", "") is String && Value["Text"] != ""))
+		&& Value.Get("Action", "") is String && Value.Get("Action", "") != ""
+		&& Value.Get("State", "") is String && Value.Get("State", "") != ""
+		&& Value.Get("Text", "") is String && Value.Get("Text", "") != ""))
 }
 
 /** Returns {supported, shift}; emission still uses the original source index. */
