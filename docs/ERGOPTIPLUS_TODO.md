@@ -4426,6 +4426,12 @@ integrated, then publish one grouped release.
   establishing 48/86/61. Independent source and portable controls pass; final
   integrated native and installed qualification remain required.
 
+  Corrective Windows CI `37621118292` completes 10166/1: the earlier menu
+  regressions and native cleanup controls pass. The sole remaining OS-call
+  purity failure is addressed by moving exact captured-handle probes into
+  the existing native tray adapter, without raising its baseline. New native
+  qualification remains required; this item stays partial.
+
   Current Group 1 software and device boundaries are recorded in the
   [2026-10-07 checkpoint](handovers/2026-10-04-parallel-containers/GROUP1-CURRENT-CHECKPOINT.md).
   The selected local gates pass on published `fad59c821`; exact-source native
@@ -5537,6 +5543,12 @@ Current Group 3 source checkpoint (item 73, 2026-10-06): [Group 3 current checkp
   Dynamic caption admission now validates the genuine English formatter
   before lazy getters, with literal and escaped-percent controls. It is a
   renderer prerequisite and does not retire native sites or close this item.
+
+  Corrective Windows CI `37621118292` completes 10166/1: the earlier menu
+  regressions and native cleanup controls pass. The sole remaining OS-call
+  purity failure is addressed by moving exact captured-handle probes into
+  the existing native tray adapter, without raising its baseline. New native
+  qualification remains required; this item stays partial.
 
   Current Group 1 software and device boundaries are recorded in the
   [2026-10-07 checkpoint](handovers/2026-10-04-parallel-containers/GROUP1-CURRENT-CHECKPOINT.md).

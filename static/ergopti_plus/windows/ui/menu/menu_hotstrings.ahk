@@ -1293,11 +1293,11 @@ _HS_PersonalReleaseMenus(OwnedMenus) {
 			if Seen.Has(Handle)
 				return
 			Seen[Handle] := true
-			Count := DllCall("GetMenuItemCount", "ptr", Handle, "int")
+			Count := TrayMenuHandleItemCount(Handle)
 			if Count < 0
 				throw Error("The owned personal menu handle is unavailable during release.")
 			loop Count {
-				ChildHandle := DllCall("GetSubMenu", "ptr", Handle, "int", A_Index - 1, "ptr")
+				ChildHandle := TrayMenuSubmenuHandle(Handle, A_Index - 1)
 				if ChildHandle {
 					OwnedChild := MenuFromHandle(ChildHandle)
 					if !(OwnedChild is Menu)
@@ -1316,7 +1316,7 @@ _HS_PersonalReleaseMenus(OwnedMenus) {
 			finally {
 				; The fresh frame owns this exact empty handle. Retire only its
 				; registration; foreign detached menus retain their native owners.
-				if Handle && DllCall("GetMenuItemCount", "ptr", Handle, "int") == 0
+				if Handle && TrayMenuHandleItemCount(Handle) == 0
 					&& _MenuDispatchOwnerHandles.Has(Handle)
 					_MenuDispatchOwnerHandles.Delete(Handle)
 				MenuDispatcher_PruneMenu(Child)
