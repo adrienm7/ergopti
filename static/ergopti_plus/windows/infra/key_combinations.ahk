@@ -76,6 +76,9 @@ global _KeyCombinationKeysByScanName := Map()
 ; @returns {String}
 KeyCombinationPairId(First, Second) {
 	global KEY_COMBINATION_PAIR_SEPARATOR
+	; Parse-time criteria may run before the canonical slot grammar is assigned.
+	if !IsSet(KEY_COMBINATION_PAIR_SEPARATOR)
+		return ""
 	return First . KEY_COMBINATION_PAIR_SEPARATOR . Second
 }
 
@@ -217,6 +220,9 @@ KeyCombinationTapOf(PairId) {
 ; The hold a pair takes while its second key stays down, or "none".
 KeyCombinationHoldOf(PairId) {
 	global KeyCombinationHolds, KEY_COMBINATION_NONE
+	; Missing boot metadata is refusal, never a guessed canonical hold value.
+	if !IsSet(KeyCombinationHolds) || !IsSet(KEY_COMBINATION_NONE)
+		return ""
 	return KeyCombinationHolds.Get(PairId, KEY_COMBINATION_NONE)
 }
 
@@ -733,7 +739,17 @@ _KeyCombinationHoldOptionRow(PairId, Option, Current) {
 ; @param Passthrough {Boolean} Which custom variant is being evaluated.
 ; @param IsDownFn {Func} Physical-key port used by the registered unit cases.
 KeyCombinationOwnsAltGrSuffix(Passthrough, IsDownFn := 0) {
-	global _KeyCombinationTaken, KEY_COMBINATION_NONE
+	global _KeyCombinationTaken, KeyCombinationHolds, KEY_COMBINATION_NONE
+	global KEY_COMBINATION_PAIR_SEPARATOR, LayerEnabled
+	; Another key's layer owns AltGr before a new pair can claim its press.
+	if !IsSet(LayerEnabled) || LayerEnabled
+		return false
+	; #HotIf is armed before the first extraction pump initializes these owners.
+	; Refuse before KeyCombinationOwns can publish a partial pair admission.
+	if !IsSet(_KeyCombinationTaken) || !IsSet(KeyCombinationHolds)
+		|| !IsSet(KEY_COMBINATION_NONE) || !IsSet(KEY_COMBINATION_PAIR_SEPARATOR)
+		|| TapHoldHoldOptions().Length == 0
+		return false
 	if !KS_AltGrAddsFakeLCtrl() || !KeyCombinationOwns("alt_gr", IsDownFn)
 		return false
 	PairId := KeyCombinationPairId(_KeyCombinationTaken["alt_gr"], "alt_gr")

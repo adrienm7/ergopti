@@ -22,6 +22,7 @@
 #SingleInstance Off
 
 global TapHold := Map()
+global LayerEnabled := false
 global ProbeEnabled := A_Args[3] == "candidate"
 global ProbePair := true
 global ProbeNative := false

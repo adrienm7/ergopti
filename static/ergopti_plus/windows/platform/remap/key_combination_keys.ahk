@@ -167,8 +167,8 @@ SC036::
 ; and before altgr.ahk's custom variants through remap.ahk's include order.
 ; The ~ prefix preserves real LCtrl's own key-down owner. A native AltGr pair
 ; also passes RAlt through; its effect owner sends only additional members.
-#HotIf KeyCombinationOwnsAltGrSuffix(false)
+#HotIf not LayerEnabled and KeyCombinationOwnsAltGrSuffix(false)
 ~SC01D & SC138:: KeyCombinationFireAltGrSuffix(false)
-#HotIf KeyCombinationOwnsAltGrSuffix(true)
+#HotIf not LayerEnabled and KeyCombinationOwnsAltGrSuffix(true)
 ~SC01D & ~SC138:: KeyCombinationFireAltGrSuffix(true)
 #HotIf
