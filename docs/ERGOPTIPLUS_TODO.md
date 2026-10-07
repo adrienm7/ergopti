@@ -5869,6 +5869,28 @@ failure propagation are preserved. Portable oracle, transport and cleanup
 controls pass; the four kernel scenarios are not executed in this container
 because /dev/input and /dev/uinput are unavailable. Hosted execution is required.
 
+Managed Linux hotplug now withdraws the old logical input owner before
+replacing the source cohort, captures genuine per-open owners before callbacks,
+and republishes the selected native inverse without resetting XKB. Callback
+reentry or partial pointer acquisition refuses managed renewal and cleans only
+the captured new cohort; foreign successors remain intact. Original unmanaged
+raw delivery remains covered by its unchanged authority-refusal controls.
+Independent focused controls pass263/0 per Lua ABI and reject25 causal
+omissions; the private full software projection passes10618 Linux units,
+366 JS checks,189 E2E cases and53 actual X11 source controls. Local kernel
+coverage is unexecuted; the local native-window supervisor refuses its missing
+owned child-census prerequisite before allocation.
+
+The earlier source21 kernel run37622519896 on CI40b05238da4d66849d93b7777095ff393663815c
+is terminal FAILURE: its first shifted-repeat scenario passes, then actual
+same-FD source replacement protects the successor and delivers the Shift
+inverse but leaves remapper retirement pending. It records67 checks, three
+failures and one of four scenarios complete. Core and units pass; E2E fails,
+package/install and Release are skipped. Its causal retirement repair is a
+separate preparation, deliberately excluded from this hotplug tranche. UI
+OneShot/CapsWord admission and final-source native qualification remain closed;
+item93 remains partial.
+
 - [ ] **96.** Remove the separate Ergopti+ AltGr-adjustments option from the
       Layout menu. Selecting the Ergopti+ keylayout in the emulation picker must
       suffice. Verify that the layout supplies every intended change, retire
