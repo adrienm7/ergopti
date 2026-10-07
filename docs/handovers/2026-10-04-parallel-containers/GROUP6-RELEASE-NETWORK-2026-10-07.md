@@ -275,6 +275,32 @@ has run locally. Native trust/refusal, updater staging/cleanup and the complete
 Windows lane still require actual hosted qualification; no native repair
 success is inferred from compilation or metadata controls.
 
+[Native receiving source packets](GROUP6-NATIVE-RECEIVING-PACKETS-2026-10-07.tar.gz)
+preserve82 source/manifest records, SHA256
+`d9d2ef1ffb91a82ead067a060d6f9619009d1692276c5ab0afa826dd5baa7903`.
+They include original route/TLS candidate preimages and patches, independent
+portable controls, source authorities and the new Brew permission audit.
+Separate root receiving summaries distinguish actual portable controls from
+unrun native Windows calls. Raw private captures, redirected signed URLs and
+private keys are excluded. The old four-packet archive remains byte-exact.
+
+Windows-only manual
+[37682193508](https://github.com/adrienm7/ergopti/actions/runs/37682193508)
+tests exactly `6695173f80e1560aca298ce6cab5252019529e6d` and is in progress.
+Linux-only manual37679343730 at ef67fa390 passes the unchanged unit suite and
+official runtime/model acceptance but its combined dependency preparation
+fails after ten minutes; subsequent E2E receiving also fails. Its complete
+terminal result and setup log remain pending. Do not call either lane green.
+
+The Brew audit preserves the existing unconfined positive, then the observed
+sandboxed reply-10004 and separate nonprompt permission-query-1744. A public
+interactive permission request may block arbitrarily; actual responsible
+identity, visible prompt, grant and its effect on the original reply remain
+unmeasured. A future bounded same-executable interactive prerequisite remains
+CODE, not an implemented or CI-qualified fix. The source audit supplies seven
+native continuation requirements without changing any original assertion,
+deadline, positive, full-policy denial or six-case Brew acceptance.
+
 ## Remaining CODE and hosted work
 
 - **Windows62:** Join one packaged owned curl attempt engine to both the real
