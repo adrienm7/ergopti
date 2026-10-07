@@ -166,6 +166,7 @@ local _leased_reader_cleanup = nil
 local _leased_remapper_cleanup = nil
 local _input_pointer_owners = nil
 local _live_input_context, _armed_input = nil, nil
+local _retired_input_context = nil
 local _input_leases = setmetatable({}, { __mode = "k" })
 local _on_tap = nil
 local _release_remapped
@@ -553,13 +554,104 @@ local function _input_guard_current(ctx)
 		and _input_runtime_current(ctx, false)
 end
 
+-- Captured cleanup observes only its original engine and native output issuer.
+-- Input-source currency is deliberately absent: that source caused withdrawal.
+local function _input_cleanup_current(ctx)
+	if package.loaded["adapters.keyboard_hook"] ~= M or _remapper ~= ctx.engine
+		or _remapper_generation ~= ctx.generation or _broker ~= ctx.broker
+		or _input_output_owner ~= ctx.output_issuer or not _input_exports_current()
+		or rawget(ctx.engine, "release_all") ~= ctx.engine_release_all
+		or rawget(ctx.engine, "ack_retirement") ~= ctx.engine_ack_retirement
+		or rawget(ctx.engine, "output_holder") ~= ctx.engine_output_holder then return false end
+	for name, port in pairs(ctx.engine_ports) do
+		if rawget(ctx.engine, name) ~= port then return false end
+	end
+	for name, port in pairs(ctx.hook_ports) do
+		if rawget(M, name) ~= port or port ~= original_input_hook_ports[name] then return false end
+	end
+	local output = ctx.output_issuer
+	if not output or package.loaded["adapters.uinput_writer"] ~= output.writer
+		or package.loaded["adapters.modifier_broker"] ~= ModifierBroker
+		or rawget(ModifierBroker, "for_channel") ~= installed_output_broker then return false end
+	local broker, binding = installed_output_broker(output.writer)
+	if broker ~= ctx.broker or binding ~= output.binding or type(binding) ~= "function"
+		or binding(ctx.broker) ~= true then return false end
+	for name, port in pairs(output.ports) do
+		if rawget(output.writer, name) ~= port then return false end
+	end
+	return true
+end
+
+-- The cancelled suffix comes from this controller's original delivery iterator.
+-- A missing holder by itself never proves that a DOWN was not issued.
+local function _capture_input_retirement(ctx)
+	local called, rows = pcall(ctx.engine_release_all, ctx.engine)
+	if not called or type(rows) ~= "table" then return nil end
+	local record = { rows = rows, owners = {}, snapshots = {} }
+	local batch = ctx.delivery_batch
+	for index, row in ipairs(rows) do
+		local holder = row.holder or ctx.engine_output_holder(ctx.engine, row)
+		if row.value ~= InputEvent.VALUE_UP or type(holder) ~= "string" then return nil end
+		local holder_key = ctx.generation .. ":" .. holder .. ":" .. row.code
+		local original_source = _synthetic_source_of[holder_key]
+		local output_source = "remapper:" .. ctx.generation .. ":" .. holder .. ":" .. tostring(original_source or ctx.source)
+		local key = source_key(output_source, row.code)
+		local owner, forwarded = _output_owners[key], _forwarded_down[key]
+		local never_issued = false
+		if not owner and not forwarded and original_source == nil and batch
+			and batch.engine == ctx.engine and batch.generation == ctx.generation
+			and batch.source == ctx.source and batch.unwound == true then
+			for tail = batch.next_index, #batch.rows do
+				local witness = batch.snapshots[tail]
+				local pending = batch.rows[tail]
+				if pending ~= witness.row or pending.code ~= witness.code or pending.value ~= witness.value
+					or (pending.holder or ctx.engine_output_holder(ctx.engine, pending)) ~= witness.holder then return nil end
+				if pending.value == InputEvent.VALUE_DOWN and pending.code == row.code
+					and (pending.holder or ctx.engine_output_holder(ctx.engine, pending)) == holder then
+					never_issued = true; break
+				end
+			end
+		end
+		if not never_issued and (type(owner) ~= "table" or not forwarded
+			or forwarded.code ~= row.code or forwarded.owner_source ~= output_source) then return nil end
+		record.owners[index] = owner or false
+		record.snapshots[index] = { row = row, code = row.code, value = row.value, holder = holder,
+			key = key, never_issued = never_issued }
+	end
+	return record
+end
+
+local function _settle_current_input(ctx)
+	local record = ctx.retirement_record
+	if not record or not _input_cleanup_current(ctx) then return false end
+	local observed, current = pcall(ctx.output_current)
+	if not observed or current ~= true or not _input_cleanup_current(ctx) then return false end
+	-- The original view is a pure RAM roster after the native issuer join.
+	local seen, view = pcall(ctx.output_view)
+	if not seen or type(view) ~= "table" or view.busy ~= false or view.debt ~= false
+		or type(view.owners) ~= "table" then return false end
+	for index, snapshot in ipairs(record.snapshots) do
+		local row, owner = record.rows[index], record.owners[index]
+		if row ~= snapshot.row or row.code ~= snapshot.code or row.value ~= snapshot.value
+			or (row.holder or ctx.engine_output_holder(ctx.engine, row)) ~= snapshot.holder then return false end
+		if owner and view.owners[owner] ~= nil then return false end
+		if snapshot.never_issued and (_output_owners[snapshot.key] ~= nil
+			or _forwarded_down[snapshot.key] ~= nil) then return false end
+	end
+	if #record.rows ~= #record.snapshots or not _input_cleanup_current(ctx) then return false end
+	local released, exact = pcall(ctx.engine_release_all, ctx.engine)
+	if not released or exact ~= record.rows or not _input_cleanup_current(ctx) then return false end
+	local acknowledged, settled = pcall(ctx.engine_ack_retirement, ctx.engine, true, exact)
+	return acknowledged and settled == true
+end
+
 -- Acknowledged destruction of the original output lifetime settles only this
 -- exact producer's pending retirement. Unknown native close never grants an ACK.
 local function _settle_retired_input(ctx)
 	if type(ctx.output_retired) ~= "function" or type(ctx.engine_release_all) ~= "function"
 		or type(ctx.engine_ack_retirement) ~= "function" then return false end
 	local observed, terminal = pcall(ctx.output_retired)
-	if not observed or terminal ~= true then return false end
+	if not observed or terminal ~= true then return _settle_current_input(ctx) end
 	local released, rows = pcall(ctx.engine_release_all, ctx.engine)
 	if not released or type(rows) ~= "table" then return false end
 	local acknowledged, settled = pcall(ctx.engine_ack_retirement, ctx.engine, true, rows)
@@ -573,6 +665,8 @@ local function _withdraw_input_arm(ctx)
 	-- Consumed presses already own output. The current owner uses its existing
 	-- inverse/retirement path; a replaced owner may retire only its captured channel.
 	if _remapper == ctx.engine and _remapper_generation == ctx.generation and _broker == ctx.broker then
+		ctx.retirement_record = _capture_input_retirement(ctx)
+		_retired_input_context = ctx
 		local prior, prior_remapper = _leased_reader_cleanup, _leased_remapper_cleanup
 		_leased_remapper_cleanup = { engine = ctx.engine, release_all = ctx.engine_release_all }
 		_leased_reader_cleanup = {}
@@ -582,7 +676,7 @@ local function _withdraw_input_arm(ctx)
 		_leased_reader_cleanup, _leased_remapper_cleanup = prior, prior_remapper
 		if not stopped then ctx.output_retire() end
 	else ctx.output_retire() end
-	_settle_retired_input(ctx)
+	if _settle_retired_input(ctx) and _retired_input_context == ctx then _retired_input_context = nil end
 	return false
 end
 
@@ -860,13 +954,19 @@ local function _run_owned_tap_frame(frame, tap, binding, exact, original_generat
 		if tap == "one_shot_shift" and origin_view and origin_view.source == source
 			and origin_view.origin == "native-evdev" and _remapper_input_owner then
 			local hook_ports = {}; for _, name in ipairs(INPUT_HOOK_PORT_NAMES) do hook_ports[name] = rawget(M, name) end
+			local engine_ports = {}
+			for _, name in ipairs({ "process", "tick", "activity", "activate", "configure", "set_tap_holds_enabled",
+				"begin_delivery", "end_delivery", "release_all", "ack_retirement", "take_custody", "output_holder" }) do
+				engine_ports[name] = rawget(exact, name)
+			end
 			local finder = package.loaded["modules.hotstrings.device_finder"]
 			_live_input_context = { engine = exact, generation = original_generation,
-				hook_ports = hook_ports, finder = finder, classify_source = type(finder) == "table" and rawget(finder, "physical_sources") or nil,
+				hook_ports = hook_ports, engine_ports = engine_ports, finder = finder, classify_source = type(finder) == "table" and rawget(finder, "physical_sources") or nil,
 				issuer = _remapper_input_owner, origin = origin, source = source,
 				origin_generation = _origin_generation, frame = frame, action = tap, binding = binding,
 				broker = _broker, output_retire = rawget(_broker, "retire"), emergency_stop = rawget(M, "emergency_stop"),
 				engine_release_all = rawget(exact, "release_all"), engine_ack_retirement = rawget(exact, "ack_retirement"),
+				engine_output_holder = rawget(exact, "output_holder"),
 				sources = _input_source_owners, source_observers = _input_source_observers, pointer_sources = _input_pointer_owners,
 				pointer_observers = _input_pointer_observers, output_issuer = _input_output_owner, emitter = _emit_raw, callback = _on_tap, at_ms = at_ms,
 				output_view = rawget(_broker, "view"), output_debt = rawget(_broker, "has_debt"),
@@ -981,18 +1081,32 @@ local function _dispatch_event(ev, source)
 			local exact = _remapper
 			local delivery = exact and exact.begin_delivery and exact:begin_delivery(out) or nil
 			if exact and exact.begin_delivery and not delivery then return end
-			for _, remapped in ipairs(out) do
+			local input_batch = _armed_input and { engine = exact, generation = original_generation,
+				source = source, rows = out, snapshots = {}, next_index = 1, unwound = false } or nil
+			if input_batch then
+				for index, row in ipairs(out) do input_batch.snapshots[index] = { row = row, code = row.code,
+					value = row.value, holder = row.holder or exact:output_holder(row) } end
+				_armed_input.delivery_batch = input_batch
+			end
+			for index, remapped in ipairs(out) do
 				if _armed_input and (_remapper ~= exact or _remapper_generation ~= original_generation
 					or _broker ~= original_output or remapped.value ~= InputEvent.VALUE_UP and not _input_guard_current(_armed_input)) then
-					if delivery then exact:end_delivery(delivery) end
+					if delivery then
+						local unwound = exact:end_delivery(delivery)
+						if input_batch then input_batch.unwound = unwound == true end
+					end
 					_withdraw_input_arm(_armed_input); return
 				end
 				_dispatch_event({ type = EVDEV_TYPE_KEY, code = remapped.code, value = remapped.value,
 					remapped = true, original_owner = remapped.physical == true,
 					holder = remapped.holder or (exact.output_holder and exact:output_holder(remapped)), handoff = remapped.handoff },
 					remapped.physical and (_remap_source_of[remapped.code] or source) or source)
+				if input_batch then input_batch.next_index = index + 1 end
 				if _armed_input and not _input_guard_current(_armed_input) then
-					if delivery then exact:end_delivery(delivery) end
+					if delivery then
+						local unwound = exact:end_delivery(delivery)
+						if input_batch then input_batch.unwound = unwound == true end
+					end
 					_withdraw_input_arm(_armed_input); return
 				end
 				if not _running then
@@ -1260,6 +1374,10 @@ local function _remapper_batch_current(exact, generation, output)
 end
 
 _release_remapped = function()
+	if _retired_input_context then
+		if not _settle_retired_input(_retired_input_context) then return false end
+		_retired_input_context = nil
+	end
 	if not _remapper then return true end
 	local exact, generation, output, running = _remapper, _remapper_generation, _broker, _running
 	if exact.has_combinations then
