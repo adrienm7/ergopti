@@ -144,8 +144,11 @@ _ConsoleCapture_Run(Kind, Operation, ProbePath := "", Ownership := 0) {
 		AssertEqual(0, Receipt.Code, "the actual native capture probe must parse and run: "
 			. Receipt.Output . Receipt.Errors)
 		AssertEqual("", Receipt.Errors, "the native capture probe must report no hidden errors")
+		ShapeDiagnostic := ""
+		if !RegExMatch(Receipt.Output, "^[01]\|[01]\|[01]\|\d+\|\d+\|[01]\|[01]\|[01]$")
+			ShapeDiagnostic := _ConsoleCapture_ReceiptDiagnostic(Receipt.Output)
 		AssertTrue(RegExMatch(Receipt.Output, "^[01]\|[01]\|[01]\|\d+\|\d+\|[01]\|[01]\|[01]$"),
-			"the native capture receipt must contain only eight closed facts")
+			"the native capture receipt must contain only eight closed facts" . ShapeDiagnostic)
 		Facts := StrSplit(Receipt.Output, "|")
 		AssertEqual("1", Facts[6], "all capture operations must preserve native HWND, Edit, PID and title")
 		AssertEqual("1", Facts[7], "all capture operations must retain the native read-only Edit")
@@ -406,3 +409,46 @@ _ConsoleCapture_NativeCausalControls() {
 }
 Test("Console capture: three native causal controls break independent proofs (native-console-capture)",
 	_ConsoleCapture_NativeCausalControls, true)
+
+/** Returns fixed scalar shape facts from a bounded decoded sample, never its text. */
+_ConsoleCapture_ReceiptDiagnostic(CnpReceiptText) {
+	CnpLength := StrLen(CnpReceiptText)
+	CnpSample := SubStr(CnpReceiptText, 1, 4096)
+	StrReplace(CnpSample, "|", , , &CnpPipes)
+	CnpFactLines := 0
+	for CnpLine in StrSplit(CnpSample, "`n") {
+		if SubStr(CnpLine, -1) == "`r"
+			CnpLine := SubStr(CnpLine, 1, -1)
+		if RegExMatch(CnpLine, "^[01]\|[01]\|[01]\|\d+\|\d+\|[01]\|[01]\|[01]$")
+			CnpFactLines += 1
+	}
+	return Format(" [shape length={1}, sampled={2}, pipes={3}, bom={4}, cr={5}, lf={6}, nul={7}, other={8}, warning={9}, fact_lines={10}, truncated={11}]",
+		CnpLength, StrLen(CnpSample), CnpPipes, !!InStr(CnpSample, Chr(0xFEFF), true),
+		!!InStr(CnpSample, "`r", true), !!InStr(CnpSample, "`n", true),
+		!!RegExMatch(CnpSample, "\x00"), !!RegExMatch(CnpSample, "[^0-9|\r\n]"),
+		!!InStr(CnpSample, "Warning:", true), CnpFactLines, CnpLength > 4096)
+}
+
+/** Independent authored shapes prove diagnosis remains bounded and cannot echo content. */
+_ConsoleCapture_ReceiptDiagnosticsStayScalar() {
+	CnpVectors := [
+		{Text: "0|0|0|0|0|1|1|1", Expected: " [shape length=15, sampled=15, pipes=7, bom=0, cr=0, lf=0, nul=0, other=0, warning=0, fact_lines=1, truncated=0]"},
+		{Text: "Warning:`n0|0|0|0|0|1|1|1", Expected: " [shape length=24, sampled=24, pipes=7, bom=0, cr=0, lf=1, nul=0, other=1, warning=1, fact_lines=1, truncated=0]"},
+		{Text: Chr(0xFEFF) . "0|0|0|0|0|1|1|1", Expected: " [shape length=16, sampled=16, pipes=7, bom=1, cr=0, lf=0, nul=0, other=1, warning=0, fact_lines=0, truncated=0]"},
+		{Text: "0|0|0|0|0|1|1", Expected: " [shape length=13, sampled=13, pipes=6, bom=0, cr=0, lf=0, nul=0, other=0, warning=0, fact_lines=0, truncated=0]"},
+		{Text: "PRIVATE_SECRET_8376`r`n", Expected: " [shape length=21, sampled=21, pipes=0, bom=0, cr=1, lf=1, nul=0, other=1, warning=0, fact_lines=0, truncated=0]"}
+	]
+	for CnpVector in CnpVectors {
+		CnpDiagnostic := _ConsoleCapture_ReceiptDiagnostic(CnpVector.Text)
+		AssertEqual(CnpVector.Expected, CnpDiagnostic, "authored shape controls retain only independent scalar facts")
+		AssertFalse(InStr(CnpDiagnostic, "PRIVATE_SECRET_8376", true), "diagnosis cannot publish its source sample")
+		AssertTrue(StrLen(CnpDiagnostic) < 256, "diagnosis has a finite scalar error footprint")
+	}
+	CnpLongText := ""
+	Loop 4097
+		CnpLongText .= "9"
+	AssertEqual(" [shape length=4097, sampled=4096, pipes=0, bom=0, cr=0, lf=0, nul=0, other=0, warning=0, fact_lines=0, truncated=1]",
+		_ConsoleCapture_ReceiptDiagnostic(CnpLongText), "an oversized malformed receipt samples at most 4096 decoded characters")
+}
+Test("Console receipt: malformed native observations retain only bounded scalar diagnostics (console-receipt-shape)",
+	_ConsoleCapture_ReceiptDiagnosticsStayScalar)
