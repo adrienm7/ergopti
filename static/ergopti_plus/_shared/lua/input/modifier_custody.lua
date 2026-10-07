@@ -22,9 +22,22 @@ local function equal(left, right)
 	return true
 end
 
-function M.new(writer, capability)
+function M.new(writer, capability, captured_observer, captured_retirement_observer)
 	local owners, down = {}, {}
 	local epoch
+	local original_output_view = type(writer) == "table" and rawget(writer, "output_view") or nil
+	local original_observer_factory = type(writer) == "table" and rawget(writer, "capture_output_observer") or nil
+	local original_observer, original_retirement_observer = nil, nil
+	if capability and type(original_observer_factory) == "function" then
+		local called, observer, retirement_observer = pcall(original_observer_factory, capability, type(writer) == "table" and rawget(writer, "capture_output") or nil)
+		if called and type(observer) == "function" and rawget(writer, "capture_output_observer") == original_observer_factory
+			and (captured_observer == nil or rawequal(captured_observer, observer)) then original_observer = observer end
+		if called and type(retirement_observer) == "function" and original_observer ~= nil
+			and rawget(writer, "capture_output_observer") == original_observer_factory
+			and (captured_retirement_observer == nil or rawequal(captured_retirement_observer, retirement_observer)) then
+			original_retirement_observer = retirement_observer
+		end
+	end
 	if capability then
 		if type(writer) ~= "table" or type(writer.output_view) ~= "function" then return nil end
 		local ok, initial = pcall(writer.output_view, capability)
@@ -37,6 +50,7 @@ function M.new(writer, capability)
 	local reservation = nil
 	local lifted = {}
 	local broker = {}
+	local observation_revision, observing, retired = 0, false, false
 
 	local function reserve()
 		if debt or busy then return nil end
@@ -138,6 +152,7 @@ function M.new(writer, capability)
 	--- @param callback function|nil Exact raw forwarding adapter.
 	--- @return table receipt Explicit wire count and ownership disposition.
 	function broker.edge(owner, code, value, callback)
+		observation_revision = observation_revision + 1
 		if type(owner) ~= "table" then return { ok = false, native_writes = 0, disposition = "owner" } end
 		if busy then
 			if not debt and value == 0 and owners[owner] and owners[owner].code == code then
@@ -160,6 +175,7 @@ function M.new(writer, capability)
 	--- @param callback function Exact raw adapter.
 	--- @return table receipt
 	function broker.handoff(code, state, callback)
+		observation_revision = observation_revision + 1
 		local token = reserve()
 		if not token then return { ok = false, native_writes = 0 } end
 		local writes, accepted = 0, false
@@ -189,6 +205,7 @@ function M.new(writer, capability)
 	--- Reserves synthetic delivery and typed original-owner handoffs.
 	--- @return table|nil session Exact checked channel proxy.
 	function broker.begin()
+		observation_revision = observation_revision + 1
 		local token = reserve()
 		if not token then return nil end
 		local suspended, synthetic, finished = {}, {}, false
@@ -254,9 +271,56 @@ function M.new(writer, capability)
 	--- Retires only this broker's exact transport after unresolved output debt.
 	--- @return boolean acknowledged
 	function broker.retire()
+		retired = true
+		observation_revision = observation_revision + 1
 		if not capability then return false end
 		if reservation then return writer.retire_transaction(reservation) == true end
 		return writer.close_owned(capability) == true
+	end
+
+	--- Observes only the original output capability; never acquires a reservation.
+	--- The final RAM join rejects a getter that reenters or retires this owner.
+	--- @return boolean current Original admitted transport and exact acknowledged roster.
+	function broker.output_current()
+		if not capability or retired or observing or debt or busy or reservation
+			or next(pending) or next(lifted) or type(original_output_view) ~= "function"
+			or rawget(writer, "output_view") ~= original_output_view or type(original_observer) ~= "function"
+			or rawget(writer, "capture_output_observer") ~= original_observer_factory then return false end
+		local revision, cursor, expected = observation_revision, epoch, codes(down)
+		observing = true
+		local ok, view = pcall(original_output_view, capability)
+		local valid = ok and type(view) == "table" and getmetatable(view) == nil
+			and rawget(view, "write_epoch") == cursor and type(rawget(view, "down")) == "table"
+			and getmetatable(rawget(view, "down")) == nil
+		if valid then
+			local seen = 0
+			for index, code in pairs(view.down) do
+				if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > #expected
+					or expected[index] ~= code then valid = false; break end
+				seen = seen + 1
+			end
+			valid = valid and seen == #expected
+		end
+		local observed, issuer_current = pcall(original_observer, capability, cursor, expected)
+		observing = false
+		return valid and observed and issuer_current == true and not retired and not debt and not busy and not reservation
+			and next(pending) == nil and next(lifted) == nil and observation_revision == revision
+			and epoch == cursor and equal(codes(down), expected)
+			and rawget(writer, "output_view") == original_output_view
+			and rawget(writer, "capture_output_observer") == original_observer_factory
+	end
+
+	--- Observes only acknowledged destruction/close of the captured original issuer.
+	--- This settles local channel lifetime, never application delivery or new rights.
+	--- @return boolean acknowledged
+	function broker.output_retired()
+		if not capability or observing or type(original_retirement_observer) ~= "function" then return false end
+		local revision, cursor, expected = observation_revision, epoch, codes(down)
+		observing = true
+		local called, acknowledged = pcall(original_retirement_observer, capability)
+		observing = false
+		return called and acknowledged == true and observation_revision == revision
+			and epoch == cursor and equal(codes(down), expected)
 	end
 
 	function broker.has_debt() return debt end
