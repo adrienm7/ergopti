@@ -205,11 +205,6 @@ download_hammerspoon() {
 # Every architecture in LAUNCHER_ARCHS is required and verified: a missing slice
 # makes macOS reject the whole app on that CPU before the launcher can log.
 build_launcher() {
-	if [ "${ERGOPTI_AUTOMATION_QUERY_CI_PUBLISH:-0}" = "1" ]; then
-		python3 "$REPO_ROOT/tools/build/automation_query_ci_publisher.py" compile \
-			--root "$REPO_ROOT" --directory "$BUILD_DIR/automation-query-ci"
-		return
-	fi
 	log "Building Swift launcher (release, ${LAUNCHER_ARCHS[*]})"
 	(
 		cd "$LAUNCHER_DIR"
@@ -248,20 +243,6 @@ assemble_native_runtime() {
 	# Copy the launcher binary into the standard host-executable location.
 	cp "$launcher_bin" "$APP_PATH/Contents/MacOS/ErgoptiPlus"
 	chmod +x "$APP_PATH/Contents/MacOS/ErgoptiPlus"
-	# Keep readonly automation code separate from the outer resource-seal owner.
-	cp "$launcher_bin" "$APP_PATH/Contents/MacOS/ErgoptiAutomationQuery"
-	chmod +x "$APP_PATH/Contents/MacOS/ErgoptiAutomationQuery"
-	# The read-only helper ships in both full bundles and the source-run runtime.
-	local switcher_source="$REPO_ROOT/static/ergopti_plus/macos/native/SystemSwitcherState.swift"
-	local switcher_build="$BUILD_DIR/system-switcher-state"
-	mkdir -p "$switcher_build"
-	local arch
-	for arch in arm64 x86_64; do
-		xcrun swiftc -O -target "$arch-apple-macosx11.0" "$switcher_source" \
-			-o "$switcher_build/$arch"
-	done
-	lipo -create "$switcher_build/arm64" "$switcher_build/x86_64" \
-		-output "$APP_PATH/Contents/MacOS/SystemSwitcherState"
 	local remap_guardian_plist="$LAUNCHER_DIR/com.ergoptiplus.remap-guardian.plist"
 	[ -f "$remap_guardian_plist" ] || fail "Remap guardian LaunchAgent plist missing."
 	cp "$remap_guardian_plist" \
@@ -282,17 +263,13 @@ assemble_native_runtime() {
 	#   - .build/release/     (copied next to product by some SPM versions)
 	# We prefer the macOS slice from the XCFramework when present, then fall back
 	# to any Sparkle.framework found anywhere under .build.
-	local launcher_build_root="$LAUNCHER_DIR/.build"
-	if [ "${ERGOPTI_AUTOMATION_QUERY_CI_PUBLISH:-0}" = "1" ]; then
-		launcher_build_root="$BUILD_DIR/automation-query-ci/package/.build"
-	fi
 	local sparkle_fw
-	sparkle_fw="$(find "$launcher_build_root/artifacts" -name "Sparkle.framework" -type d 2>/dev/null | grep -i "macos" | head -1)"
+	sparkle_fw="$(find "$LAUNCHER_DIR/.build/artifacts" -name "Sparkle.framework" -type d 2>/dev/null | grep -i "macos" | head -1)"
 	if [ -z "$sparkle_fw" ]; then
-		sparkle_fw="$(find "$launcher_build_root/artifacts" -name "Sparkle.framework" -type d 2>/dev/null | head -1)"
+		sparkle_fw="$(find "$LAUNCHER_DIR/.build/artifacts" -name "Sparkle.framework" -type d 2>/dev/null | head -1)"
 	fi
 	if [ -z "$sparkle_fw" ]; then
-		sparkle_fw="$(find "$launcher_build_root" -name "Sparkle.framework" -type d 2>/dev/null | head -1)"
+		sparkle_fw="$(find "$LAUNCHER_DIR/.build" -name "Sparkle.framework" -type d 2>/dev/null | head -1)"
 	fi
 	[ -n "$sparkle_fw" ] || fail "Sparkle.framework not found under $LAUNCHER_DIR/.build — run 'swift build' in $LAUNCHER_DIR first."
 	log "Bundling Sparkle.framework (source: $sparkle_fw)"
@@ -647,10 +624,6 @@ verify_app_signature() {
 
 # Seal the shared runtime without depending on an embedded Hammerspoon bundle.
 codesign_native_runtime() {
-	if [ "${ERGOPTI_AUTOMATION_QUERY_CI_PUBLISH:-0}" = "1" ]; then
-		python3 "$REPO_ROOT/tools/build/automation_query_ci_publisher.py" copied \
-			--root "$REPO_ROOT" --directory "$BUILD_DIR/automation-query-ci" --app "$APP_PATH"
-	fi
 	local entitlements="$LAUNCHER_DIR/ErgoptiPlus.entitlements"
 	[ -f "$entitlements" ] || fail "Entitlements file missing: $entitlements"
 	sign_code --deep "$APP_PATH/Contents/Frameworks/Sparkle.framework"
@@ -660,30 +633,10 @@ codesign_native_runtime() {
 		--entitlements "$entitlements" \
 		"$APP_PATH/Contents/MacOS/ErgoptiPlus"
 
-	local automation_query="$APP_PATH/Contents/MacOS/ErgoptiAutomationQuery"
-	[ -f "$automation_query" ] || fail "Native automation query helper is missing."
-	sign_code --identifier "$BUNDLE_ID.automation-query" --entitlements "$entitlements" "$automation_query"
-
-	local switcher="$APP_PATH/Contents/MacOS/SystemSwitcherState"
-	[ -f "$switcher" ] || fail "Native switcher state helper is missing."
-	sign_code --identifier "$BUNDLE_ID.system-switcher-state" "$switcher"
-	mkdir -p "$APP_PATH/Contents/Resources"
-	shasum -a 256 "$switcher" | awk '{print $1}' \
-		> "$APP_PATH/Contents/Resources/system-switcher-state.sha256"
-
-	if [ "${ERGOPTI_AUTOMATION_QUERY_CI_PUBLISH:-0}" = "1" ]; then
-		python3 "$REPO_ROOT/tools/build/automation_query_ci_publisher.py" seal \
-			--root "$REPO_ROOT" --directory "$BUILD_DIR/automation-query-ci" --app "$APP_PATH"
-	fi
-
 	# Sign the outer bundle. --identifier here pins the bundle's own identity.
 	sign_code \
 		--identifier "$BUNDLE_ID" \
 		"$APP_PATH"
-	if [ "${ERGOPTI_AUTOMATION_QUERY_CI_PUBLISH:-0}" = "1" ]; then
-		python3 "$REPO_ROOT/tools/build/automation_query_ci_publisher.py" verify \
-			--root "$REPO_ROOT" --directory "$BUILD_DIR/automation-query-ci" --app "$APP_PATH"
-	fi
 }
 
 # Sign the app with an explicit --identifier anchored to the bundle ID. The
@@ -735,7 +688,7 @@ zip_app() {
 # Produce the native runtime used by a Git checkout without acquiring any of
 # the full application's bundled drivers, language runtimes or model engines.
 build_native_helper() {
-	for cmd in swift xcrun shasum awk lipo codesign plutil zip find; do require_cmd "$cmd"; done
+	for cmd in swift lipo codesign plutil zip find; do require_cmd "$cmd"; done
 	check_signing_configuration
 	BUILD_DIR="$REPO_ROOT/build/macos-native-helper"
 	APP_PATH="$BUILD_DIR/ErgoptiPlus.app"
@@ -768,7 +721,7 @@ main() {
 		return
 	fi
 	[[ $# -eq 0 ]] || fail "Expected no arguments or --native-helper-only."
-	for cmd in curl unzip zip ditto tar swift xcrun awk lipo codesign iconutil sips plutil shasum git node; do
+	for cmd in curl unzip zip ditto tar swift lipo codesign iconutil sips plutil shasum git node; do
 		require_cmd "$cmd"
 	done
 	check_signing_configuration
