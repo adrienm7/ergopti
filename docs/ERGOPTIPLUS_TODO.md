@@ -4096,6 +4096,16 @@ an independent source grammar guard. Actual corrected compilation and complete
 AppKit/Sparkle/Homebrew acceptance remain required; this failed run supplied
 no new policy-state or progress runtime observation.
 
+Manual run 37556022981 at ece8de48 observes actual AppKit initial=accessory
+and after-NO=accessory, yet refuses the unnecessary modifying setter. The
+receiver now skips that setter only for an initially observed Accessory state
+and requires a second fresh Accessory confirmation. Other initial states still
+require a successful setter; nil and changed policy remain refused. The four
+original native result controls remain and two same-state/change controls are
+added with a strict six-control receipt. Native compilation, both positive
+AppleEvent deliveries, full-policy denial and six Brew archive scenarios remain
+required on these sources; the portable fixture is not real AppKit acceptance.
+
 - [~] **37.** Always show the shipped Ergopti hotstring pack, including when
   its keyboard layout is not installed. Move French `suffixes_a` and magic-key
   `replace` into that extension without a beta compatibility layer. The runtime

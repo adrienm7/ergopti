@@ -357,7 +357,7 @@ check(
 		);
 		assert.match(
 			boundary,
-			/registration_controls\.stdout == "native_appkit_registration_controls=4\\n"/
+			/registration_controls\.stdout == "native_appkit_registration_controls=6\\n"/
 		);
 		assert.doesNotMatch(boundary, /NSWorkspace|\/usr\/bin\/open/);
 	}
@@ -797,6 +797,93 @@ check('refused AppKit policy snapshots never grant readiness', () => {
 		registration,
 		/finishLaunching|NSApplicationLoad|SetFrontProcess|activateIgnoringOtherApps/
 	);
+});
+
+check('existing accessory AppKit state is freshly confirmed without a modifying setter', () => {
+	const receiver = fs.readFileSync(
+		path.join(ROOT, 'tools/diagnostics/native_appleevent_probe_receiver.c'),
+		'utf8'
+	);
+	const controls = fs.readFileSync(
+		path.join(ROOT, 'tools/diagnostics/native_appleevent_registration_test.m'),
+		'utf8'
+	);
+	const helper = fs.readFileSync(
+		path.join(ROOT, 'tools/diagnostics/macos_brew_archive_acceptance.py'),
+		'utf8'
+	);
+	const portable = fs.readFileSync(
+		path.join(ROOT, 'tools/diagnostics/macos_brew_archive_acceptance_test.py'),
+		'utf8'
+	);
+	const begin = receiver.indexOf('static enum AppKitAdmission admit_appkit(');
+	const end = receiver.indexOf('static const char *appkit_policy_label(', begin);
+	assert.ok(begin >= 0 && end > begin);
+	const admission = receiver.slice(begin, end);
+	assert.match(admission, /if \(application == nil\) return AppKitApplicationMissing;/);
+	assert.match(
+		admission,
+		/const NSApplicationActivationPolicy initial = \[application activationPolicy\];\s*if \(initial != NSApplicationActivationPolicyAccessory\) \{\s*if \(!\[application setActivationPolicy:NSApplicationActivationPolicyAccessory\]\) \{\s*return AppKitPolicyRefused;\s*\}\s*\}/
+	);
+	assert.match(
+		admission,
+		/if \(\[application activationPolicy\] != NSApplicationActivationPolicyAccessory\) \{\s*return AppKitPolicyUnconfirmed;\s*\}\s*return AppKitAdmitted;/
+	);
+	assert.equal((admission.match(/\[application activationPolicy\]/g) || []).length, 2);
+	assert.equal((admission.match(/setActivationPolicy:/g) || []).length, 1);
+	assert.doesNotMatch(
+		admission,
+		/finishLaunching|NSApplicationLoad|SetFrontProcess|activateIgnoringOtherApps|sleep\s*\(/
+	);
+	assert.match(
+		controls,
+		/return self\.readCalls == 1 \? self\.initialPolicy : self\.observedPolicy;/
+	);
+	for (const name of ['refused', 'unconfirmed', 'admitted']) {
+		assert.match(
+			controls,
+			new RegExp(name + '\\.initialPolicy = NSApplicationActivationPolicyRegular;')
+		);
+	}
+	assert.match(controls, /refused\.acceptsPolicy = NO;/);
+	assert.match(
+		controls,
+		/assert\(admit_appkit\(\(NSApplication \*\)refused\) == AppKitPolicyRefused\);/
+	);
+	assert.match(controls, /refused\.setCalls == 1 && refused\.readCalls == 1/);
+	assert.match(controls, /unconfirmed\.setCalls == 1 && unconfirmed\.readCalls == 2/);
+	assert.match(controls, /admitted\.setCalls == 1 && admitted\.readCalls == 2/);
+	for (const [name, final, outcome] of [
+		['alreadyAccessory', 'Accessory', 'Admitted'],
+		['changedAccessory', 'Regular', 'PolicyUnconfirmed']
+	]) {
+		assert.match(
+			controls,
+			new RegExp(name + '\\.initialPolicy = NSApplicationActivationPolicyAccessory;')
+		);
+		assert.match(controls, new RegExp(name + '\\.acceptsPolicy = NO;'));
+		assert.match(
+			controls,
+			new RegExp(name + '\\.observedPolicy = NSApplicationActivationPolicy' + final + ';')
+		);
+		assert.match(
+			controls,
+			new RegExp(
+				'assert\\(admit_appkit\\(\\(NSApplication \\*\\)' +
+					name +
+					'\\) == AppKit' +
+					outcome +
+					'\\);'
+			)
+		);
+		assert.match(controls, new RegExp(name + '\\.setCalls == 0 && ' + name + '\\.readCalls == 2'));
+	}
+	assert.match(controls, /puts\("native_appkit_registration_controls=6"\);/);
+	assert.match(
+		helper,
+		/registration_controls\.stdout == "native_appkit_registration_controls=6\\n"/
+	);
+	assert.match(portable, /arguments, 0, "native_appkit_registration_controls=6\\n", ""/);
 });
 
 if (failures > 0) {
