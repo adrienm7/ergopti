@@ -232,6 +232,7 @@ class ArchiveAcceptanceControls(unittest.TestCase):
                 "tools/diagnostics/native_appleevent_probe_receiver.c",
                 "tools/diagnostics/native_appleevent_probe_sender.c",
                 "tools/diagnostics/native_appleevent_registration_test.m",
+                "tools/diagnostics/native_appleevent_probe_protocol.h",
             ):
                 file = repository / name
                 file.parent.mkdir(parents=True, exist_ok=True)
@@ -280,6 +281,7 @@ class ArchiveAcceptanceControls(unittest.TestCase):
                 "tools/diagnostics/native_appleevent_probe_receiver.c",
                 "tools/diagnostics/native_appleevent_probe_sender.c",
                 "tools/diagnostics/native_appleevent_registration_test.m",
+                "tools/diagnostics/native_appleevent_probe_protocol.h",
             ):
                 file = repository / name
                 file.parent.mkdir(parents=True, exist_ok=True)
@@ -591,7 +593,14 @@ class AppleEventBoundaryControls(unittest.TestCase):
     policy = "(version 1)\n(deny file-write*)\n(deny appleevent-send)\n(deny network-outbound)\n"
 
     def model(
-        self, root, *, outcome=-1743, failure=None, unexpected_delivery=False, partial_ready=False
+        self,
+        root,
+        *,
+        outcome=-1743,
+        failure=None,
+        unexpected_delivery=False,
+        partial_ready=False,
+        registration_output=None,
     ):
         judge = self
 
@@ -617,7 +626,15 @@ class AppleEventBoundaryControls(unittest.TestCase):
                 if arguments == [str(root / "native-appleevent-registration-test")]:
                     judge.assertTrue(options["confined"])
                     return subprocess.CompletedProcess(
-                        arguments, 0, "native_appkit_registration_controls=6\n", ""
+                        arguments,
+                        0,
+                        (
+                            "native_appkit_registration_controls=6\n"
+                            "native_private_appleevent_controls=1\n"
+                        )
+                        if registration_output is None
+                        else registration_output,
+                        "",
                     )
                 if arguments[-1] not in ("success", "denied"):
                     return subprocess.CompletedProcess(arguments, 0, "", "")
@@ -665,6 +682,17 @@ class AppleEventBoundaryControls(unittest.TestCase):
         ):
             receipt = probe.admit_appleevent_boundary(children, root)
         return children, receipt
+
+    def test_sdk_private_event_control_is_required_before_any_native_delivery(self):
+        for output in (
+            "native_appkit_registration_controls=6\n",
+            "native_appkit_registration_controls=6\nnative_private_appleevent_controls=0\n",
+        ):
+            with self.subTest(output=output), TemporaryDirectory() as directory:
+                with self.assertRaisesRegex(probe.AppleEventBoundaryError, "registration refusals"):
+                    self.invoke(directory, registration_output=output)
+                self.assertFalse((Path(directory) / "appleevent-ready").exists())
+                self.assertFalse((Path(directory) / "appleevent-delivered.1").exists())
 
     def test_two_independent_positive_routes_precede_each_documented_refusal(self):
         for status in (-1742, -1743):
