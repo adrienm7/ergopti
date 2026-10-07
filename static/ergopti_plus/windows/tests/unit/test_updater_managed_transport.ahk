@@ -38,11 +38,12 @@ class _UpdaterNativeDownloadRun {
 		this.Closed := false
 		this.Transport := 0
 		this.OldBytes := "Independent existing-app bytes " . Owner.Identity
-		this.SwapBytes := "# Owned acceptance swap placeholder; never executed`n"
+		; Receive the full production swap worker as UTF-8 data; never execute it.
+		this.SwapBytes := _Updater_BuildSwapWorkerScript()
 		this.Digest := "33bc8aab40703678c3ebe94d2dd8f2afff285dd901f9234e841e4679f8204fd5"
 	}
 
-	OnNativeAdopt(State) => this.NativeState := State
+	OnNativeAdopt(State, Native) => this.NativeState := State
 	OnDone(Code, Out, Err) => this.Results.Push(Map("exit", Code, "stdout", Out, "stderr", Err))
 
 	Start() {

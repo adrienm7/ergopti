@@ -7,8 +7,47 @@ $ErrorActionPreference='Stop'
 $ProgressPreference='SilentlyContinue'
 $Server=$null
 $Failed=$false
+$ManagedRoutesDiagnosticStage='load_routes'
+$ManagedRoutesDiagnosticVector=0
+$ManagedRoutesDiagnosticNativeObserved=$false
+$ManagedRoutesDiagnosticNativeErrno=0
+$ManagedRoutesDiagnosticStatus='unknown'
+$ManagedRoutesDiagnosticAttempted=$false
+# Optional fixed observations only; never read exception messages or input metadata.
+function Set-ManagedRoutesDiagnosticResult {
+    param($Result)
+    $script:ManagedRoutesDiagnosticNativeObserved=$false
+    $script:ManagedRoutesDiagnosticNativeErrno=0
+    $script:ManagedRoutesDiagnosticStatus='unknown'
+    try {
+        if($Result -isnot [hashtable] -or $Result.Receipt -isnot [hashtable]){return}
+        $Receipt=$Result.Receipt
+        if($Receipt.proxy_resolution_status -is [string] -and
+            $Receipt.proxy_resolution_status -cin @('unavailable','invalid_configuration','pac_failed','wpad_failed')) {
+            $script:ManagedRoutesDiagnosticStatus=$Receipt.proxy_resolution_status
+        }
+        if($Receipt.failure_provenance -cne 'verified' -or $Receipt.native_errno_domain -cne 'win32' -or
+            $Receipt.native_errno -isnot [string] -or $Receipt.native_errno -notmatch '^-?(?:0|[1-9][0-9]{0,9})$'){return}
+        [int]$Code=0
+        if([int]::TryParse($Receipt.native_errno,[ref]$Code)) {
+            $script:ManagedRoutesDiagnosticNativeObserved=$true
+            $script:ManagedRoutesDiagnosticNativeErrno=$Code
+        }
+    } catch { }
+}
+function Write-ManagedRoutesDiagnostic {
+    if($script:ManagedRoutesDiagnosticAttempted){return}
+    $script:ManagedRoutesDiagnosticAttempted=$true
+    try {
+        [Console]::Error.WriteLine(('ROUTE_DIAG stage={0} vector={1} native_observed={2} native_errno={3} status={4}' -f
+            $script:ManagedRoutesDiagnosticStage,$script:ManagedRoutesDiagnosticVector,
+            [int]$script:ManagedRoutesDiagnosticNativeObserved,$script:ManagedRoutesDiagnosticNativeErrno,
+            $script:ManagedRoutesDiagnosticStatus))
+    } catch { }
+}
 try {
     . $RoutesPath
+    $ManagedRoutesDiagnosticStage='abi_sizes'
     $ExpectedSizes=@(
         @{Type=[type][ErgoptiNativeProxyEx+NativeResult];Size=$(if([IntPtr]::Size -eq 8){16}else{8})},
         @{Type=[type][ErgoptiNativeProxyEx+NativeEntry];Size=$(if([IntPtr]::Size -eq 8){32}else{20})},
@@ -17,6 +56,7 @@ try {
     foreach($Expected in $ExpectedSizes) {
         if([Runtime.InteropServices.Marshal]::SizeOf($Expected.Type) -ne $Expected.Size){throw 'Native ABI mismatch.'}
     }
+    $ManagedRoutesDiagnosticStage='compile_server'
     Add-Type -TypeDefinition @'
 using System;
 using System.IO;
@@ -77,6 +117,7 @@ public sealed class ErgoptiOrderedPacServer : IDisposable
 }
 '@
 
+    $ManagedRoutesDiagnosticStage='start_server'
     $Server=[ErgoptiOrderedPacServer]::new()
     $Pac='http://127.0.0.1:'+$Server.Port+'/order.pac'
     $Reader={param($MaxBytes) @{Ok=$true;Absent=$false;AutoDetect=$false;PacUrl=$Pac;Proxy='';Bypass='';NativeError=0;FailureOrigin=''}}.GetNewClosure()
@@ -87,9 +128,15 @@ public sealed class ErgoptiOrderedPacServer : IDisposable
         @{Url='http://ordered-fixture.invalid:8080/direct-middle';Endpoints=@('http://first.invalid:38101/','','http://second.invalid:38102/')},
         @{Url='https://ordered-fixture.invalid/direct-only';Endpoints=@('')})
     foreach($Vector in $Vectors) {
+        $ManagedRoutesDiagnosticVector++
+        $ManagedRoutesDiagnosticStage='vector_lookup'
+        Set-ManagedRoutesDiagnosticResult $null
         $Result=Resolve-ErgoptiNativeNetworkRoutes -DestinationUrl $Vector.Url @Common
+        Set-ManagedRoutesDiagnosticResult $Result
+        $ManagedRoutesDiagnosticStage='vector_receipt'
         if($Result.Ok -isnot [bool] -or -not $Result.Ok -or $Result.Routes.Count -ne $Vector.Endpoints.Count -or
             $Result.MaxRoutes -ne 128 -or $Result.MaxRedirects -ne 50){throw 'Complete routing receipt was refused.'}
+        $ManagedRoutesDiagnosticStage='vector_order'
         for($Index=0;$Index -lt $Vector.Endpoints.Count;$Index++) {
             $Route=$Result.Routes[$Index]
             $Endpoint=$Vector.Endpoints[$Index]
@@ -100,23 +147,44 @@ public sealed class ErgoptiOrderedPacServer : IDisposable
     # The identical config URL now serves different PAC bytes. Strict lookup has
     # no application or WinHTTP PAC cache; all native routes must be refreshed.
     $Server.Revision=1
+    $ManagedRoutesDiagnosticVector=0
+    $ManagedRoutesDiagnosticStage='fresh_lookup'
+    Set-ManagedRoutesDiagnosticResult $null
     $Changed=Resolve-ErgoptiNativeNetworkRoutes -DestinationUrl $Vectors[0].Url @Common
+    Set-ManagedRoutesDiagnosticResult $Changed
+    $ManagedRoutesDiagnosticStage='fresh_order'
     if(-not $Changed.Ok -or $Changed.Routes[0].Endpoint -cne 'http://second.invalid:38102/' -or
         $Changed.Routes[1].Endpoint -cne 'http://first.invalid:38101/'){throw 'Dynamic PAC bytes were lifetime-cached.'}
+    $ManagedRoutesDiagnosticStage='unsupported_lookup'
+    Set-ManagedRoutesDiagnosticResult $null
     $Refused=Resolve-ErgoptiNativeNetworkRoutes -DestinationUrl 'https://ordered-fixture.invalid/unsupported' @Common
+    Set-ManagedRoutesDiagnosticResult $Refused
+    $ManagedRoutesDiagnosticStage='unsupported_receipt'
     if($Refused.Ok -or $Refused.Routes.Count -ne 0 -or $Refused.Receipt.stage -cne 'proxy_resolve'){throw 'Unsupported full-list entry silently fell back to DIRECT.'}
     # Actual settings discovery is independently observed without mutating it;
     # an unavailable native reader is a failed qualification, not a synthetic pass.
+    $ManagedRoutesDiagnosticStage='settings_read'
+    Set-ManagedRoutesDiagnosticResult $null
     $Actual=[ErgoptiWindowsProxyConfig]::Read(65536)
+    $ManagedRoutesDiagnosticStage='settings_receipt'
     if(-not $Actual.Ok -or $Actual.AutoDetect -isnot [bool] -or $Actual.PacUrl -isnot [string]){throw 'Actual current-user settings could not be observed.'}
+    $ManagedRoutesDiagnosticStage='server_receipt'
     if($Server.Requests -lt 5 -or $Server.Errors -ne 0){throw 'Owned native PAC service did not qualify.'}
     [Console]::Out.WriteLine('[OK] production routing helper: complete PAC order, DIRECT, dynamic freshness, unsupported-list refusal, real settings read')
 } catch {
     $Failed=$true
+    Write-ManagedRoutesDiagnostic
     [Console]::Error.WriteLine('Native complete routing acceptance failed.')
 } finally {
     if($null -ne $Server) {
-        try{$Server.Dispose()}catch{$Failed=$true;[Console]::Error.WriteLine('Owned PAC service did not retire.')}
+        try{$Server.Dispose()}catch{
+            if(-not $Failed){
+                $ManagedRoutesDiagnosticStage='cleanup'
+                Set-ManagedRoutesDiagnosticResult $null
+                Write-ManagedRoutesDiagnostic
+            }
+            $Failed=$true;[Console]::Error.WriteLine('Owned PAC service did not retire.')
+        }
     }
 }
 if($Failed){exit 1}

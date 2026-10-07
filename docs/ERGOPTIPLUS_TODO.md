@@ -5603,6 +5603,20 @@ with the correction. Conflicting inherited proxy/CA inputs also pass27/0.
 Production system-routing and opaque-download refusal guards remain unchanged;
 this hermetic fixture correction does not qualify native Mac networking.
 
+Manual all-driver receiving37631791924 at6855c1e6 reports10,242 Windows
+AHK passes and24 failures. The receiving correction preserves all original
+assertions while fixing stored UTF-16 NUL admission, ordinary recovery-target
+initialization, adapter-owned locale/timers, cancellation-before-spawn return,
+actual curl config indexing and both native adoption callback arities. Staging
+now reconstructs bounded UTF-16 SCRIPT fragments while preserving the original
+7000-character per-value limit. Additive real-cmd receiving covers three source
+fragments, full production UTF-8 swap data and exact environment retirement;
+the native updater fixture receives the full actual stage/swap pair. Final
+Windows unit/E2E/package/install qualification and artifact NTLM-only CODE
+remain required. Canonical WinHTTP Ex receiving publishes only fixed cached
+stage and verified native scalar diagnostics on an already-settled failure;
+all original assertions remain. These corrections do not close this item.
+
 The Windows receiving slice adds full-URL native route observations, bounded
 owned curl requests, endpoint-aware updater downloads and shared terminal
 failure actions. Observer publication and refusal rollback now use separate

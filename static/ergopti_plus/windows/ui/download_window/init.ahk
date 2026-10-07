@@ -213,7 +213,7 @@ class ManagedDownloadFailureWindow extends WebViewHost {
 		catch
 			return
 		if !this._NativeIsCurrent(ExpectedWindowEpoch) || this.WebView != ExpectedController || !(Raw is String)
-			|| StrLen(Raw) > 2048 || InStr(Raw, Chr(0))
+			|| StrLen(Raw) > 2048 || _ManagedNetworkWindows_HasStoredNul(Raw)
 			return
 		if _ManagedNetwork_Equal(Raw, "ready") {
 			this._FlushQueue()
@@ -299,11 +299,7 @@ class ManagedDownloadFailureWindow extends WebViewHost {
 
 	; Read actual translated bytes before the shared renderer runs; no language fallback.
 	_LocaleScript() {
-		global _SharedDir, _I18nLocale
-		Raw := FileRead(_SharedDir . "\data\locales\" . _I18nLocale . ".json", "UTF-8")
-		if !(JsonParse(Raw) is Map)
-			throw TypeError("The managed failure locale is invalid")
-		return "window._i18n_strings=" . Raw . ";window.i18n_apply(window._i18n_strings);"
+		return _ManagedNetworkWindows_LocaleScript()
 	}
 
 	Publish() {

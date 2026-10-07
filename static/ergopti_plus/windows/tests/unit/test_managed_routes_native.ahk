@@ -19,6 +19,10 @@ _ManagedRoutes_NativeAcceptance() {
 			Sleep(10)
 		}
 		AssertEqual(1, Observed.Length, "the exact native fixture must settle within its total test budget")
+		; Optional sink failure cannot replace any original assertion.
+		if Observed[1]["exit"] != 0 {
+			try _ManagedRoutes_NativeDiagnostic(Observed[1])
+		}
 		AssertEqual(0, Observed[1]["exit"], "the canonical native routing entrypoint must qualify")
 		AssertEqual("", Observed[1]["stderr"], "native errors and cleanup refusals must remain red")
 		AssertContains(Observed[1]["stdout"], "[OK] production routing helper:")
@@ -27,3 +31,26 @@ _ManagedRoutes_NativeAcceptance() {
 	}
 }
 Test("managed network: real canonical WinHTTP Ex preserves full PAC order and fresh bytes", _ManagedRoutes_NativeAcceptance)
+
+; Emit only a closed diagnostic from the already-settled exact child. Raw stderr
+; remains subject to the original failure assertion and is never forwarded here.
+_ManagedRoutes_NativeDiagnostic(Observation) {
+	Err := Observation.Get("stderr", "")
+	if !(Err is String) || StrLen(Err) > 8192
+		return
+	Pattern := "m)^ROUTE_DIAG stage=(load_routes|abi_sizes|compile_server|start_server|vector_lookup|vector_receipt|vector_order|fresh_lookup|fresh_order|unsupported_lookup|unsupported_receipt|settings_read|settings_receipt|server_receipt|cleanup)"
+		. " vector=([0-3]) native_observed=([01]) native_errno=(-?(?:0|[1-9][0-9]{0,9}))"
+		. " status=(unknown|unavailable|invalid_configuration|pac_failed|wpad_failed)`r?$"
+	if !RegExMatch(Err, Pattern, &Fact)
+		return
+	; Refuse duplicate observations rather than choosing a later failure frame.
+	if RegExMatch(Err, Pattern, , Fact.Pos + Fact.Len)
+		return
+	if Integer(Fact[4]) < -2147483648 || Integer(Fact[4]) > 2147483647
+		return
+	if Fact[3] == "0" && Fact[4] != "0"
+		return
+	FileAppend("::notice title=Windows native route diagnostic::stage=" . Fact[1] . " vector=" . Fact[2]
+		. " native_observed=" . Fact[3] . " native_errno=" . Fact[4]
+		. " status=" . Fact[5] . "`n", "*")
+}

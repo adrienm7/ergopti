@@ -62,10 +62,14 @@ _UST_ExactBuilderOutputCrossesShellRunnerConstraint() {
 		AssertEqual(Transport.Bootstrap,
 			_UST_DecodeUtf16Base64(Transport.Args[6]),
 			"the command-line payload must round-trip the exact bootstrap")
-		AssertEqual(Transport.ScriptPayload,
-			EnvGet(Transport.Environment[1].Name),
-			"the exact encoded worker must be published under the bootstrap contract")
 		Prefix := RegExReplace(Transport.Environment[1].Name, "_SCRIPT$")
+		InheritedScriptPayload := EnvGet(Transport.Environment[1].Name)
+		AssertEqual(Transport.ScriptChunkCount, Integer(EnvGet(Prefix . "_SCRIPT_COUNT")),
+			"the native bootstrap must receive the exact source fragment count")
+		Loop Transport.ScriptChunkCount - 1
+			InheritedScriptPayload .= EnvGet(Prefix . "_SCRIPT_" . (A_Index + 1))
+		AssertEqual(Transport.ScriptPayload, InheritedScriptPayload,
+			"the exact encoded worker must be published under the bootstrap contract")
 		InheritedSwapPayload := ""
 		Loop Transport.SwapChunkCount
 			InheritedSwapPayload .= EnvGet(Prefix . "_SWAP_" . A_Index)
@@ -88,7 +92,7 @@ _UST_ExactBuilderOutputCrossesShellRunnerConstraint() {
 Test("Updater staging transport: exact worker uses adapter-safe encoding (updater-staging-transport)",
 	_UST_ExactBuilderOutputCrossesShellRunnerConstraint)
 
-_UST_RealCmdEnvironmentRoundTrip() {
+_UST_RealCmdEnvironmentRoundTrip(MultiChunk := false) {
 	global _UpdaterStagingTransportCounter, UPDATER_STAGING_ENV_MAX_CHARS
 	SavedCounter := _UpdaterStagingTransportCounter
 	Transport := 0
@@ -105,11 +109,29 @@ _UST_RealCmdEnvironmentRoundTrip() {
 		. "`n" . 'Write-Output "TRANSPORT_OK"'
 	; Exercise the real high-water contract. A tiny EnvGet-only probe can pass
 	; even if cmd.exe silently drops a production-sized inherited value.
-	while StrLen(_Updater_EncodePowerShellCommand(Script)) < 6000
+	if MultiChunk {
+		; Carry the actual production swap worker as UTF-8 data; never execute it.
+		SwapScript := _Updater_BuildSwapWorkerScript() . "`n# é & 字"
+		while StrLen(_Updater_EncodeUtf8Payload(SwapScript)) < UPDATER_STAGING_ENV_MAX_CHARS * 2 + 100
+			SwapScript .= "`n# UTF-8 swap padding 0123456789abcdef"
+		ExpectedSwapHash := CryptoSha256(SwapScript)
+		Assert(RegExMatch(ExpectedSwapHash, "^[0-9a-f]{64}$"), "independent CNG swap digest must be available")
+		Script := StrReplace(Script,
+			'if ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($SwapScriptPayload)) -cne "SWAP_PAYLOAD_OK") { throw "swap payload mismatch" }',
+			'$swapBytes=[Convert]::FromBase64String($SwapScriptPayload);$sha=[Security.Cryptography.SHA256]::Create();try{if(([BitConverter]::ToString($sha.ComputeHash($swapBytes))).Replace("-","").ToLowerInvariant() -cne "' . ExpectedSwapHash . '"){throw "swap exact UTF-8 digest mismatch"}}finally{$sha.Dispose()}')
+		; The output marker must occur after all padding: a lost source tail cannot pass.
+		Script := StrReplace(Script, 'Write-Output "TRANSPORT_OK"', "")
+		Script .= "`n" . '$environmentUnits=1;foreach($entry in [Environment]::GetEnvironmentVariables().GetEnumerator()){$environmentUnits+=$entry.Key.Length+$entry.Value.Length+2};[Console]::Error.WriteLine("ENV_UNITS:"+$environmentUnits)'
+	}
+	TargetPayloadSize := MultiChunk ? UPDATER_STAGING_ENV_MAX_CHARS * 2 + 100 : 6000
+	while StrLen(_Updater_EncodePowerShellCommand(Script)) < TargetPayloadSize
 		Script .= "`n# transport padding 0123456789abcdef0123456789abcdef"
+	if MultiChunk
+		Script .= "`n" . 'Write-Output "TRANSPORT_OK"'
 	OnDone := (ExitCode, Stdout, Stderr) => (
 		State.ExitCode := ExitCode,
 		State.Stdout := Stdout,
+		State.EnvironmentReceipt := Stderr,
 		State.Done := true)
 	try {
 		Transport := _Updater_BuildStagingTransport(
@@ -122,14 +144,29 @@ _UST_RealCmdEnvironmentRoundTrip() {
 			"C:\Program Files\Ergopti é&x\ErgoptiPlus.exe",
 			1024,
 			30000)
-		Assert(StrLen(Transport.ScriptPayload) <= UPDATER_STAGING_ENV_MAX_CHARS,
-			"positive control: the real cmd probe must stay inside the production guard")
+		if !MultiChunk
+			Assert(StrLen(Transport.ScriptPayload) <= UPDATER_STAGING_ENV_MAX_CHARS,
+				"positive control: the real cmd probe must stay inside the production guard")
+		else {
+			AssertEqual(3, Transport.ScriptChunkCount, "actual cmd control must exercise three inherited fragments")
+			Assert(Transport.SwapChunkCount >= 3, "actual cmd control must receive the production UTF-8 swap worker across at least three fragments")
+			Assert(StrLen(Transport.ScriptPayload) > UPDATER_STAGING_ENV_MAX_CHARS * 2,
+				"an unchunked predecessor cannot admit this actual high-water worker")
+		}
+		for Pair in Transport.Environment
+			Assert(StrLen(Pair.Value) <= UPDATER_STAGING_ENV_MAX_CHARS,
+				"every actual cmd inherited fragment retains the original guarded value bound")
 		Worker := ShellRunner_SpawnTreeOwned(
 			_Updater_PowerShellPath(), Transport.Args, OnDone)
 		Assert(IsObject(Worker) and Worker.start(),
 			"the exact ShellRunner transport must start through cmd.exe")
 		_Updater_ClearStagingTransport(Transport)
 		TransportCleared := true
+		for Pair in Transport.Environment
+			AssertEqual("", EnvGet(Pair.Name), "all exact staging inherited fragments must retire after actual child admission")
+		SelectedTransportUnits := 1
+		for Pair in Transport.Environment
+			SelectedTransportUnits += StrLen(Pair.Name) + StrLen(Pair.Value) + 2
 		Deadline := A_TickCount + 10000
 		while (!State.Done and A_TickCount < Deadline)
 			Sleep(25)
@@ -139,6 +176,14 @@ _UST_RealCmdEnvironmentRoundTrip() {
 			"the encoded worker must execute successfully through the inherited environment")
 		AssertEqual("TRANSPORT_OK", State.Stdout,
 			"cmd.exe must preserve the Unicode and metacharacter argv decoded by the bootstrap")
+		if MultiChunk {
+			Assert(RegExMatch(Trim(State.EnvironmentReceipt), "^ENV_UNITS:(\d+)$", &EnvironmentMatch),
+				"the actual cmd child must report a numeric whole inherited environment high-water receipt")
+			Assert(Integer(EnvironmentMatch[1]) >= SelectedTransportUnits,
+				"whole inherited Unicode environment includes the exact complete selected transport")
+			Assert(StrLen(Transport.ScriptPayload) >= StrLen(_Updater_EncodePowerShellCommand(_Updater_BuildStagingWorkerScript())),
+				"native source high-water must cover the full current production staging payload")
+		}
 	} finally {
 		if !TransportCleared
 			_Updater_ClearStagingTransport(Transport)
@@ -170,3 +215,6 @@ _UST_ProductionNeverPassesRawWorkerToCommand() {
 
 Test("Updater staging transport: production passes no raw multiline worker (updater-staging-transport)",
 	_UST_ProductionNeverPassesRawWorkerToCommand)
+
+Test("Updater staging transport: real cmd executes the exact three-fragment source (updater-staging-transport)",
+	_UST_RealCmdEnvironmentRoundTrip.Bind(true))

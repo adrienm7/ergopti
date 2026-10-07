@@ -488,3 +488,20 @@ _UMF_ObserverRollbackPreservesPriorAndSameCallbackSuccessor() {
 }
 Test("Updater observer: own rollback preserves prior observer and same-callback successor epochs",
 	_UMF_ObserverRollbackPreservesPriorAndSameCallbackSuccessor)
+
+_UMF_StoredUtf16EnvelopeAdmission() {
+	Raw := '{"schema_version":1,"state":"failed","operation":"download","reason":"download","receipt":{}}'
+	Assert(_Updater_ParseStagingFailure(Raw)["valid"], "ordinary envelope cannot be mistaken for an empty NUL needle")
+	Assert(!_ManagedNetworkWindows_HasStoredNul(Raw), "ordinary stored UTF-16 units must pass the real shared admission helper")
+	Embedded := Raw . Chr(0) . "private trailing bytes"
+	Assert(StrLen(Embedded) > StrLen(Raw), "the refusal control owns stored trailing UTF-16 units")
+	AssertEqual(0, NumGet(StrPtr(Embedded), StrLen(Raw) * 2, "UShort"),
+		"independent memory fact: the owned string contains a zero unit exactly at its boundary")
+	AssertEqual(Ord("p"), NumGet(StrPtr(Embedded), (StrLen(Raw) + 1) * 2, "UShort"),
+		"the suffix remains stored after that zero unit")
+	Assert(_ManagedNetworkWindows_HasStoredNul(Embedded), "the actual helper must observe the stored zero instead of accepting a truncated prefix")
+	Assert(!_Updater_ParseStagingFailure(Embedded)["valid"], "a stored NUL cannot truncate an admitted worker envelope")
+}
+
+Test("Updater managed failure: stored UTF-16 NUL refusal preserves ordinary envelopes",
+	_UMF_StoredUtf16EnvelopeAdmission)
