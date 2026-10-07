@@ -97,6 +97,22 @@ native tray adapter. UI cleanup policy, native sentinel values, dispatcher
 ownership, all assertions and the frozen OS-call baseline remain unchanged.
 It requires a new Windows run before downstream qualification can be claimed.
 
+The follow-up Windows-only manual
+[37625043296](https://github.com/adrienm7/ergopti/actions/runs/37625043296)
+tests source `2a9abffb6fa6f88249f47b7a4253773877425be2`, tree
+`5d9c8ba614ba60594af45f9bfb328a1a7fc18f20`, through CI
+`31ef3962b5eb875753d1b0607afeeb3954c3c4aa`. It is terminal **10166 passed /
+1 failed**. The unchanged UI-purity assertion now passes at 126, as do the
+seventeen earlier menu cases and actual owned-tree cleanup. Both brightness
+cases pass on this runner. The sole failure is the actual installed Python
+program-provider argv receipt in `test_run_program_actions.ahk:1560`: the
+independently authored script has not produced its output within the original
+5000 ms gate. That fixture and its production action owner are unchanged by
+Group 1; the cause is not established and has been routed to Group 3. Preserve
+its assertions, time bound and independent byte vectors. Windows E2E, package
+and installation remain skipped, and Release is skipped. Native menu success
+is not full installed-driver qualification. All six Group 1 items stay partial.
+
 ## Remaining software and native qualification
 
 - Windows config-only writes need closed boot/current-schema/native-owner
