@@ -12,6 +12,7 @@ local config = assert(hs.json.decode(source))
 local pid = hs.processInfo.processID
 local result = { coverage = "isolated_fixture_only", status = "pending", hs_pid = pid,
     observations = {}, hardware = {}, hardware_sample_count = 0, hardware_truncated = false,
+    event_identity = {}, event_identity_truncated = false,
     cleanup_debt = false, tasks_retired = false,
     tap_retired = false, timer_retired = false, session_retired = false, source_current = false }
 local owner = { phase = 1, request = 0, observations = {}, tasks = {}, generation = 1 }
@@ -175,6 +176,27 @@ local function take_sample()
     if not clear then revoke("physical_modifier_or_tab_held") end
     return clear
 end
+-- Diagnostic values are bounded metadata, not authority for post or cleanup.
+local function identity_scalar(value)
+    local available = type(value) == "number" and value % 1 == 0
+        and value >= -9007199254740991 and value <= 9007199254740991
+    return available and value or nil, available
+end
+local function record_event_identity(event, command, cleanup)
+    if #result.event_identity >= 8 then
+        result.event_identity_truncated = true
+        return
+    end
+    local diagnostic_tag, tag_available = identity_scalar(event:getProperty(properties.eventSourceUserData))
+    local diagnostic_pid, pid_available = identity_scalar(event:getProperty(properties.eventSourceUnixProcessID))
+    local diagnostic_state, state_available = identity_scalar(event:getProperty(properties.eventSourceStateID))
+    result.event_identity[#result.event_identity + 1] = {
+        phase = owner.phase, cleanup = cleanup == true,
+        tag = diagnostic_tag, source_pid = diagnostic_pid, source_state = diagnostic_state,
+        tag_available = tag_available, pid_available = pid_available, state_available = state_available,
+        expected_tag = command[1], expected_pid = pid, expected_state = -1,
+    }
+end
 local function post(command, cleanup)
     if not cleanup and not current_admission() then revoke("source_revoked"); return false end
     local event = hs.eventtap.event.newKeyEvent(command[2], command[3])
@@ -183,6 +205,7 @@ local function post(command, cleanup)
         revoke("explicit_modifier_constructor_refused"); return false
     end
     event:setProperty(properties.eventSourceUserData, command[1])
+    record_event_identity(event, command, cleanup)
     if event:getProperty(properties.eventSourceUserData) ~= command[1]
         or event:getProperty(properties.eventSourceUnixProcessID) ~= pid
         or event:getProperty(properties.eventSourceStateID) ~= -1 then

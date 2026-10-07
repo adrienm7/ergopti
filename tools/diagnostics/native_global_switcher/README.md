@@ -8,15 +8,15 @@ python3 tools/diagnostics/native_global_switcher/run_ci_probe.py \
   --output "$RUNNER_TEMP/native-global-switcher"
 ```
 
-Before the native attempt, run the unchanged 40 Lua controls through their owned temporary-scope runner:
+Before the native attempt, run all 43 Lua controls through their owned temporary-scope runner: the original 40 control expectations remain, plus three independent pre-post identity diagnostics.
 
 ```sh
 python3 tools/diagnostics/native_global_switcher/run_owner_controls.py --lua lua5.4
 ```
 
-Use Lua 5.4: the unchanged probe uses native bitwise syntax and is not LuaJIT-compatible. The runner copies the exact probe and test bytes into a fresh temporary directory, prepares the reviewed version-1 control inventory, invokes the literal interpreter without a shell, preserves its failure status, and removes only its own controlled files. It never writes fixture artifacts into the tracked source directory. Its five Python tests verify scope isolation, exact bytes, inventory refusal, status propagation and cleanup after interpreter refusal; the actual Lua execution remains the qualification of the 40 controls.
+Use Lua 5.4: the unchanged probe uses native bitwise syntax and is not LuaJIT-compatible. The runner copies the exact probe and test bytes into a fresh temporary directory, prepares the reviewed version-1 control inventory, invokes the literal interpreter without a shell, preserves its failure status, and removes only its own controlled files. It never writes fixture artifacts into the tracked source directory. Its five Python tests verify scope isolation, exact bytes, inventory refusal, status propagation and cleanup after interpreter refusal; the actual Lua execution remains the qualification of the 43 controls.
 
-The output directory must not exist. The wrapper creates it with mode 0700, downloads and verifies the official archive with the existing provider verifier, compiles the two Swift fixtures, and runs the same persistent controller in-process. macOS, Python 3.13+, Xcode tools and a live WindowServer are required. The reviewed provider helper must match `21b51cdc242e6c2b1d2b5270d6ef0ddafd65b7e4658d955addd9a9c36697696d`; the native owner must match `d3bc862c737e444f22d84fc32368bb8669360bc33ba6008c208f7bf62001314b`. Official archive members, signatures and source identities are checked before and after observations.
+The output directory must not exist. The wrapper creates it with mode 0700, downloads and verifies the official archive with the existing provider verifier, compiles the two Swift fixtures, and runs the same persistent controller in-process. macOS, Python 3.13+, Xcode tools and a live WindowServer are required. The reviewed provider helper must match `ec22906ec34b4b7efdf304dab81ab62cee0ad03148e6006bcbdf4276c8976afe`; the native owner must match `d3bc862c737e444f22d84fc32368bb8669360bc33ba6008c208f7bf62001314b`. Official archive members, signatures and source identities are checked before and after observations.
 
 The fixture requires `hs.accessibilityState(false)` and native AX/listen/post prerequisites. It neither requests nor grants TCC permission. Missing permission is **UNQUALIFIED CI failure**, never a pass or skip.
 
@@ -33,4 +33,4 @@ Retain these fixed top-level evidence files with an `always()` artifact step:
 
 Both files are useful on failure when written; early prerequisite failures can occur before either exists. Capture the CI entry's stdout/stderr separately to preserve that outcome. There is no separate `physical-group.json` in this probe: process facts are embedded in `report.json`. Top-level `tool-*.log`, `a-launch.log`, `b-launch.log` and `hammerspoon-launch.log` are optional diagnostic logs, not closed verdict receipts. Never upload the output directory recursively: it contains copied runtime bundles, fixture binaries, the archive and private launch configuration.
 
-Exit zero qualifies only the isolated observed switch and acknowledged retirement. All other completed outcomes fail the CI entry; retained native debt does not exit. The portable suite has 40 Lua controls and 9 controller, 10 receipt and 2 CI-entry Python tests; their recording ports never qualify native input or a product owner.
+Exit zero qualifies only the isolated observed switch and acknowledged retirement. All other completed outcomes fail the CI entry; retained native debt does not exit. The portable suite has 43 Lua controls and 9 controller, 10 receipt and 2 CI-entry Python tests; their recording ports never qualify native input or a product owner.
