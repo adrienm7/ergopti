@@ -1,0 +1,73 @@
+{
+	"generation": {
+		"state": {
+			"count": 3,
+			"context": 300,
+			"min_words": 2,
+			"max_words": 7,
+			"temperature": "0.2"
+		},
+		"en": {
+			"parent": "Generation Settings",
+			"prefix": [
+				"Number of suggestions: 3",
+				"  ↳ Reset (default: 1)",
+				"-",
+				"Context size: 300 last characters",
+				"  ↳ Reset (default: 1500)",
+				"Clear context on click/navigation",
+				"Min words per suggestion: 2",
+				"  ↳ Reset (default: 4)",
+				"Max words per suggestion: 7",
+				"  ↳ Reset (default: 20)",
+				"Temperature (Creativity): 0.2",
+				"  ↳ Reset (default: 0.1)",
+				"  ↳ Auto-raise temperature (+0.1 per suggestion)"
+			],
+			"choices": [
+				"1 suggestion",
+				"2 suggestions",
+				"3 suggestions",
+				"4 suggestions",
+				"5 suggestions",
+				"6 suggestions",
+				"7 suggestions",
+				"8 suggestions",
+				"9 suggestions",
+				"10 suggestions"
+			]
+		},
+		"fr": {
+			"parent": "Paramètres de génération",
+			"prefix": [
+				"Nombre de suggestions : 3",
+				"  ↳ Réinitialiser (défaut : 1)",
+				"-",
+				"Taille du contexte : 300 derniers caractères",
+				"  ↳ Réinitialiser (défaut : 1500)",
+				"Vider le contexte sur clic/navigation",
+				"Mots min par suggestion : 2",
+				"  ↳ Réinitialiser (défaut : 4)",
+				"Mots max par suggestion : 7",
+				"  ↳ Réinitialiser (défaut : 20)",
+				"Température (Créativité) : 0.2",
+				"  ↳ Réinitialiser (défaut : 0.1)",
+				"  ↳ Hausser la temp. automatiquement (+0.1 par suggestion)"
+			],
+			"choices": [
+				"1 suggestion",
+				"2 suggestions",
+				"3 suggestions",
+				"4 suggestions",
+				"5 suggestions",
+				"6 suggestions",
+				"7 suggestions",
+				"8 suggestions",
+				"9 suggestions",
+				"10 suggestions"
+			]
+		},
+		"count": 13,
+		"callback_positions": [2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
+	}
+}

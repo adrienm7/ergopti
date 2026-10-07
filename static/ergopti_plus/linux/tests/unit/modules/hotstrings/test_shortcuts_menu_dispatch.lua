@@ -765,3 +765,169 @@ helpers.describe("shortcuts menu: current script chord publication", function()
 		end)
 	end
 end)
+
+helpers.describe("declared Shortcut wrap presentation source", function()
+	helpers.it("withdraws and repairs the actual wrap-parent source without a fixed fallback", function()
+		local renderer = require("infra.manifest_menu")
+		local root = renderer.get_root()
+		local original = root.shortcut_wrap_frame
+		local label = require("infra.i18n").get("menu.shortcuts.wrap_symbols")
+		local log = {}
+		local ok, detail = xpcall(function()
+			local current = assert(find_row(shortcuts_menu({ shortcuts = fake_shortcuts(log) }), label))
+			helpers.assert_eq(#current.menu, 2, "the actual source returns sorted unique pairs")
+			root.shortcut_wrap_frame = nil
+			helpers.assert_nil(find_row(shortcuts_menu({ shortcuts = fake_shortcuts(log) }), label), "no undeclared parent is fabricated")
+			helpers.assert_nil(log.wrapped, "presentation withdrawal never invokes a native selection action")
+			root.shortcut_wrap_frame = original
+			local repaired = assert(find_row(shortcuts_menu({ shortcuts = fake_shortcuts(log) }), label))
+			repaired.menu[1].fn()
+			helpers.assert_eq(log.wrapped, "()")
+		end, debug.traceback)
+		root.shortcut_wrap_frame = original
+		if not ok then error(detail, 0) end
+	end)
+
+	helpers.it("uses the declared live-wrap label and late source readiness before its unchanged native setter", function()
+		local renderer = require("infra.manifest_menu")
+		local root = renderer.get_root()
+		local original = root.shortcut_wrap_live_control
+		local i18n = require("infra.i18n")
+		local state, admitted, writes, redraws = false, true, 0, 0
+		local shortcuts = fake_shortcuts()
+		shortcuts.configuration_admitted = function() return admitted end
+		shortcuts.is_wrap_on_type_enabled = function() return state end
+		shortcuts.set_wrap_on_type_enabled = function(value) writes = writes + 1; state = value; return true end
+		local function rows() return shortcuts_menu({ shortcuts = shortcuts, on_menu_changed = function() redraws = redraws + 1 end }) end
+		local ok, detail = xpcall(function()
+			local row = assert(find_row(rows(), i18n.get("shortcuts.label_wrap_text")))
+			helpers.assert_eq(row.checked, false)
+			helpers.assert_nil(row.disabled)
+			helpers.assert_eq(writes + redraws, 0)
+			root.shortcut_wrap_live_control = nil
+			helpers.assert_eq(row.fn(), false, "retained callback cannot bypass actual declaration withdrawal")
+			helpers.assert_nil(find_row(rows(), i18n.get("shortcuts.label_wrap_text")))
+			helpers.assert_eq(writes + redraws, 0)
+			root.shortcut_wrap_live_control = original
+			admitted = false
+			helpers.assert_eq(row.fn(), false)
+			helpers.assert_eq(writes + redraws, 0)
+			admitted = true
+			helpers.assert_eq(row.fn(), true)
+			helpers.assert_eq(writes, 1)
+			helpers.assert_eq(redraws, 1)
+			helpers.assert_eq(assert(find_row(rows(), i18n.get("shortcuts.label_wrap_text"))).checked, true)
+		end, debug.traceback)
+		root.shortcut_wrap_live_control = original
+		if not ok then error(detail, 0) end
+	end)
+end)
+
+-- Own the genuine native translation cohort while exercising cold and warm trays.
+local function with_shortcut_locale(code, scenario)
+	local names = { "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu", "ui.menu.menu_builder" }
+	local prior = {}; for _, name in ipairs(names) do prior[name] = rawget(package.loaded, name) end
+	local native, owner, receipt, acquired
+	local ok, detail = xpcall(function()
+		for _, name in ipairs(names) do rawset(package.loaded, name, nil) end
+		native = require("infra.i18n")
+		native.init()
+		owner = { pending = function() return false end }
+		assert(native.scope_acquire(owner))
+		acquired = true
+		receipt = assert(native.scope_capture(owner))
+		assert(native.scope_apply(owner, receipt, code))
+		return scenario()
+	end, debug.traceback)
+	local restored = not receipt or native.scope_restore(owner, receipt)
+	local released = not acquired or native.scope_release(owner)
+	local forgotten = not receipt or (released and native.scope_forget(owner, receipt))
+	for _, name in ipairs(names) do rawset(package.loaded, name, prior[name]) end
+	assert(restored and released and forgotten, "genuine locale inverse or lease finalization refused")
+	for _, name in ipairs(names) do helpers.assert_true(rawequal(rawget(package.loaded, name), prior[name]), name) end
+	if not ok then error(detail, 0) end
+end
+
+helpers.describe("Shortcut frame genuine translated hierarchy", function()
+	for _, code in ipairs({ "en", "fr" }) do
+		local language = code
+		helpers.it("retains the handwritten cold and warm " .. language .. " wrap hierarchy and callbacks", function()
+			with_shortcut_locale(language, function()
+				local path = require("infra.paths").shared("tests/corpus/menus/shortcut_presentation_frames.json")
+				local file = assert(io.open(path, "rb"))
+				local bytes = assert(file:read("*a")); assert(file:close())
+				local expected = assert(require("json").decode(bytes))[language]
+				local state, writes, redraws = false, 0, 0
+				local log, shortcuts = {}, fake_shortcuts()
+				shortcuts.wrap_selection = function(left, right) log.wrapped = left .. right end
+				shortcuts.configuration_admitted = function() return true end
+				shortcuts.is_wrap_on_type_enabled = function() return state end
+				shortcuts.set_wrap_on_type_enabled = function(value) state = value; writes = writes + 1; return true end
+				local function build()
+					return shortcuts_menu({ shortcuts = shortcuts, on_menu_changed = function() redraws = redraws + 1 end })
+				end
+				local cold = assert(build())
+				local parent = assert(find_row(cold, expected.lua_wrap))
+				local live = assert(find_row(cold, expected.linux_wrap_feature))
+				helpers.assert_eq(#parent.menu, 2)
+				helpers.assert_eq(parent.menu[1].title, "( … )")
+				helpers.assert_eq(parent.menu[2].title, "« … »")
+				helpers.assert_eq(live.checked, false)
+				helpers.assert_eq(writes + redraws, 0, "building the complete hierarchy cannot apply native state")
+				parent.menu[1].fn()
+				helpers.assert_eq(log.wrapped, "()")
+				helpers.assert_eq(live.fn(), true)
+				helpers.assert_eq(writes, 1)
+				helpers.assert_eq(redraws, 1)
+				local warm = assert(build())
+				helpers.assert_eq(assert(find_row(warm, expected.linux_wrap_feature)).checked, true)
+				helpers.assert_eq(#assert(find_row(warm, expected.lua_wrap)).menu, 2)
+				helpers.assert_eq(writes + redraws, 2, "a warm rebuild retains state without repeating the setter")
+			end)
+		end)
+	end
+end)
+
+helpers.describe("Shortcut extension genuine physical failure marker", function()
+	for _, code in ipairs({ "en", "fr" }) do
+		local language = code
+		helpers.it("uses and withdraws the whole declared " .. language .. " marker after the real extension chunk fails", function()
+			with_shortcut_locale(language, function()
+				local lfs, Paths = require("lfs"), require("infra.paths")
+				local directory = os.tmpname(); assert(os.remove(directory)); assert(lfs.mkdir(directory))
+				local pack = directory .. "/g1-marker"
+				assert(lfs.mkdir(pack)); assert(lfs.mkdir(pack .. "/shortcuts")); assert(lfs.mkdir(pack .. "/hotstrings"))
+				local function write(path, bytes)
+					local file = assert(io.open(path, "wb")); assert(file:write(bytes)); assert(file:close())
+				end
+				write(pack .. "/manifest.toml", '[extension]\nname = "Native %s $1 50%"\n')
+				write(pack .. "/shortcuts/menu.lua", 'error("Actual compiled physical extension failure", 0)\n')
+				local original_roots = Paths.extension_roots
+				local root = require("infra.manifest_menu").get_root()
+				local original_frame = root.shortcut_extension_error_frame
+				local expected = language == "fr" and "Native %s $1 50% — Erreur" or "Native %s $1 50% — Error"
+				local ok, detail = xpcall(function()
+					Paths.extension_roots = function() return { directory } end
+					local current = assert(find_row(shortcuts_menu(), expected))
+					helpers.assert_eq(current.disabled, true)
+					helpers.assert_nil(current.fn, "a real failed extension marker is inert")
+					helpers.assert_nil(current.menu)
+					root.shortcut_extension_error_frame = nil
+					helpers.assert_nil(find_row(shortcuts_menu(), expected), "no raw-label fallback bypasses missing declaration")
+					root.shortcut_extension_error_frame = { { type = "command", id = "foreign_marker", i18n = "common.error_title" } }
+					helpers.assert_nil(find_row(shortcuts_menu(), expected), "a malformed whole frame cannot borrow an unrelated callback")
+					root.shortcut_extension_error_frame = original_frame
+					helpers.assert_eq(assert(find_row(shortcuts_menu(), expected)).disabled, true)
+					local file = assert(io.open(pack .. "/shortcuts/menu.lua", "rb"))
+					helpers.assert_eq(assert(file:read("*a")), 'error("Actual compiled physical extension failure", 0)\n')
+					assert(file:close())
+				end, debug.traceback)
+				Paths.extension_roots = original_roots
+				root.shortcut_extension_error_frame = original_frame
+				assert(os.remove(pack .. "/manifest.toml")); assert(os.remove(pack .. "/shortcuts/menu.lua"))
+				assert(lfs.rmdir(pack .. "/shortcuts")); assert(lfs.rmdir(pack .. "/hotstrings")); assert(lfs.rmdir(pack)); assert(lfs.rmdir(directory))
+				if not ok then error(detail, 0) end
+			end)
+		end)
+	end
+end)

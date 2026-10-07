@@ -68,6 +68,7 @@ helpers.describe("API panel runtime identity transaction", function()
 		}))
 		package.loaded["infra.manifest_menu"] = {
 			command_row = command_renderer.command_row,
+			template_rows = command_renderer.template_rows,
 			get_array = command_renderer.get_array,
 			render_rows = function(rows) return rows end,
 		}
@@ -165,7 +166,16 @@ helpers.describe("API panel runtime identity transaction", function()
 		}
 		package.loaded["infra.dialog_util"] = {}
 		package.loaded["infra.notifications"] = {}
+		local command_renderer = assert(require("menu.renderer").new({
+			platform = "hs",
+			manifest_path = function() return helpers.driver_root() .. "../_shared/modules/menu/menu_manifest.json" end,
+			json_decode = require("adapters.json_codec").decode,
+			i18n = { get = package.loaded["infra.i18n"].get,
+				section = package.loaded["infra.i18n"].get },
+			logger = helpers.make_logger_stub(),
+		}))
 		package.loaded["infra.manifest_menu"] = {
+			template_rows = command_renderer.template_rows,
 			render_rows = function(rows) return rows end,
 		}
 		package.loaded["ui.menu.menu_llm.api_panel"] = nil

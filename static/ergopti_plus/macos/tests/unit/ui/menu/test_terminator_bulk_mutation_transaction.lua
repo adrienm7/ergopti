@@ -100,6 +100,9 @@ local function run_action(label, outcome, options)
 		command_row = command_row,
 		check_row = native_renderer.check_row,
 		get_array = native_renderer.get_array,
+		template_rows = native_renderer.template_rows,
+		get_root = native_renderer.get_root,
+		native_child_rows = native_renderer.native_child_rows,
 		build = function(section, category, handlers, groups, ctx, providers)
 			return native_renderer.build(section, category, handlers, groups, ctx, providers)
 		end,

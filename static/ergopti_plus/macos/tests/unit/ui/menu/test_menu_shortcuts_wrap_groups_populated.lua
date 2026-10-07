@@ -574,3 +574,148 @@ helpers.describe("acknowledged native Wrap mutations", function()
 		end)
 	end)
 end)
+
+--- Runs the real outer Shortcuts renderer with the actual localized shared source.
+local function with_shortcut_presentation(language, scenario)
+	local names = {
+		"ui.menu.menu_shortcuts", "infra.manifest_menu", "ui.menu.menu_utils",
+		"ui.menu.menu_keyboard_slots", "ui.menu.shortcut_utils", "ui.menu.menu_tap_keys",
+		"infra.i18n", "infra.locale", "locale.core", "menu.renderer", "infra.logger",
+		"infra.dialog_util", "infra.paths", "modules.shortcuts", "menu.row_dialect",
+	}
+	return helpers.with_fresh_modules(names, function()
+		helpers.load_with_stubs("infra.manifest_menu")
+		package.loaded["infra.i18n"], package.loaded["infra.locale"] = nil, nil
+		local locale = require("infra.locale")
+		local native_i18n = require("infra.i18n")
+		native_i18n.set_locale_injector(function(code) locale.set_locale(code) end)
+		native_i18n.init()
+		local owner = { pending = function() return false end }
+		assert(native_i18n.scope_acquire(owner))
+		local receipt = assert(native_i18n.scope_capture(owner))
+		assert(native_i18n.scope_apply(owner, receipt, language))
+		assert(native_i18n.scope_release(owner))
+		assert(native_i18n.scope_forget(owner, receipt))
+		package.loaded["infra.manifest_menu"] = nil
+		local renderer = require("infra.manifest_menu")
+		local effects = { saves = 0, updates = 0, prompts = 0, urls = {}, catalogue_wires = 0 }
+		package.loaded["infra.dialog_util"] = {
+			text_prompt = function()
+				effects.prompts = effects.prompts + 1
+				return native_i18n.get("button.ok"), "https://hand.changed/"
+			end,
+			block_alert = function() return true end,
+		}
+		local menu = require("ui.menu.menu_shortcuts")
+		local context = {
+			state = { shortcuts = true, chatgpt_url = "https://hand.original/", wrap_symbol_states = {}, custom_wrap_symbols = {} },
+			shortcuts = {
+				list_shortcuts = function() return { { id = "ctrl_g", label = "Hand Ctrl+G", enabled = true } } end,
+				is_enabled = function() return true end,
+				set_wrap_pairs_getter = function() effects.catalogue_wires = effects.catalogue_wires + 1 end,
+				set_chatgpt_url = function(url) effects.urls[#effects.urls + 1] = url end,
+			},
+			applyTriggerChar = function(value) return value end,
+			save_prefs = function() effects.saves = effects.saves + 1; return true end,
+			updateMenu = function() effects.updates = effects.updates + 1 end,
+			notify_feature = function() end,
+		}
+		local function build()
+			local item = menu.build(context)
+			return item and renderer.render_rows({ item }, "top_level")[1] or nil
+		end
+		scenario({ build = build, ctx = context, renderer = renderer, effects = effects, i18n = native_i18n })
+	end)
+end
+
+local function shortcut_nested_row(rows, label)
+	for _, row in ipairs(rows or {}) do
+		if row.title == label then return row end
+		local found = shortcut_nested_row(row.menu, label)
+		if found then return found end
+	end
+end
+
+helpers.describe("complete declared Shortcut presentation", function()
+	for _, language in ipairs({ "en", "fr" }) do
+		helpers.it("keeps the original wrap and Ctrl+G hierarchy in " .. language, function()
+			with_shortcut_presentation(language, function(f)
+				local file = assert(io.open(helpers.shared("tests/corpus/menus/shortcut_presentation_frames.json"), "rb"))
+				local raw = assert(file:read("*a")); assert(file:close())
+				local hand = assert(require("adapters.json_codec").decode(raw))[language]
+				local actual = assert(f.build())
+				local wrap = assert(shortcut_nested_row(actual.menu, hand.lua_wrap))
+				helpers.assert_true(type(wrap.menu) == "table" and #wrap.menu > 0)
+				helpers.assert_nil(wrap.disabled)
+				local editor = assert(shortcut_nested_row(actual.menu, hand.mac_url))
+				helpers.assert_type(editor.fn, "function")
+				helpers.assert_nil(editor.disabled)
+				helpers.assert_eq(f.effects.saves + f.effects.updates + f.effects.prompts, 0)
+				helpers.assert_eq(#f.effects.urls, 0)
+				editor.fn()
+				helpers.assert_eq(f.effects.prompts, 1)
+				helpers.assert_eq(f.effects.urls, { "https://hand.changed/" })
+				helpers.assert_eq(f.ctx.state.chatgpt_url, "https://hand.changed/")
+				helpers.assert_eq(f.effects.saves, 1)
+				helpers.assert_eq(f.effects.updates, 1)
+			end)
+		end)
+	end
+
+	helpers.it("withdraws the true wrap declaration before native child construction and repairs it", function()
+		with_shortcut_presentation("en", function(f)
+			local root = f.renderer.get_root()
+			local original = root.shortcut_wrap_frame
+			local ok, detail = xpcall(function()
+				local initial = assert(f.build())
+				helpers.assert_not_nil(shortcut_nested_row(initial.menu, "Wrapping symbols"))
+				local wires = f.effects.catalogue_wires
+				root.shortcut_wrap_frame = nil
+				local withdrawn = assert(f.build())
+				helpers.assert_nil(shortcut_nested_row(withdrawn.menu, "Wrapping symbols"))
+				helpers.assert_eq(f.effects.catalogue_wires, wires)
+				root.shortcut_wrap_frame = original
+				helpers.assert_not_nil(shortcut_nested_row(assert(f.build()).menu, "Wrapping symbols"))
+				helpers.assert_eq(f.effects.catalogue_wires, wires + 1)
+				helpers.assert_eq(f.effects.saves + f.effects.updates + f.effects.prompts, 0)
+			end, debug.traceback)
+			root.shortcut_wrap_frame = original
+			if not ok then error(detail, 0) end
+		end)
+	end)
+
+	helpers.it("withdraws a retained declared editor callback without replacing its native command", function()
+		with_shortcut_presentation("en", function(f)
+			local root = f.renderer.get_root()
+			local original = root.shortcut_chatgpt_editor_frame
+			local ok, detail = xpcall(function()
+				local editor = assert(shortcut_nested_row(assert(f.build()).menu, "   ↳ Edit ChatGPT URL…"))
+				root.shortcut_chatgpt_editor_frame = nil
+				helpers.assert_eq(editor.fn(), false)
+				helpers.assert_nil(f.build(), "no undeclared fixed editor row is fabricated")
+				helpers.assert_eq(f.effects.saves + f.effects.updates + f.effects.prompts, 0)
+				root.shortcut_chatgpt_editor_frame = original
+				editor.fn()
+				helpers.assert_eq(f.effects.prompts, 1)
+				helpers.assert_eq(f.effects.saves, 1)
+			end, debug.traceback)
+			root.shortcut_chatgpt_editor_frame = original
+			if not ok then error(detail, 0) end
+		end)
+	end)
+
+	helpers.it("retains the native non-Boolean pause claim while every child transaction refuses", function()
+		with_shortcut_presentation("en", function(f)
+			f.ctx.paused = "native pause claim"
+			local actual = assert(f.build())
+			local wrap = assert(shortcut_nested_row(actual.menu, "Wrapping symbols"))
+			helpers.assert_eq(wrap.disabled, f.ctx.paused)
+			for _, child in ipairs(wrap.menu) do if child.fn then helpers.assert_eq(child.fn(), false) end end
+			local editor = assert(shortcut_nested_row(actual.menu, "   ↳ Edit ChatGPT URL…"))
+			helpers.assert_eq(editor.disabled, true)
+			helpers.assert_nil(editor.fn)
+			helpers.assert_eq(f.effects.saves + f.effects.updates + f.effects.prompts, 0)
+			helpers.assert_eq(#f.effects.urls, 0)
+		end)
+	end)
+end)

@@ -2408,6 +2408,19 @@ These are software implementations; final hardware verification remains below.
   namespace is obsolete source data, preserved until explicit cleanup; it is
   not a current recommendation target. Do not assume deletion implements the
   recommendation.
+
+  The Windows cold-start fixture includes the genuine parameter-status loader
+  before feature state, matching the real entry-point dependency order. The
+  original late Script publication assertion is retained. Terminal manual run
+  37573751428 qualifies published source `7596cf86` on CI `0ab3d7e3`, with the
+  same complete tree `3a9baf94` and no diagnostic overlay: native units execute
+  all 10,100 planned assertions with zero failures, including the original
+  Script case and include-order regression. Engine E2E, packaging, fresh-clone
+  and compiled startup, compiled programmable admission, install/launch and
+  mandatory verdicts pass. Release is skipped; macOS/Linux are unselected.
+  Separate version-to-version compiled upgrade and physical acceptance remain
+  unqualified. This current Windows receipt does not complete item 5 or replace
+  the source-specific older failures below.
   At published `409b8ee0`, manual all-OS run 37476981548 is still in progress:
   Windows lifecycle capture fails with ENOBUFS before the full native suite;
   its engine E2E/package/install are skipped. macOS packaging has actual Sparkle
@@ -4684,10 +4697,35 @@ remains unqualified; TODO31 and transverse16/38 acceptance stay open.
   Linux layers.toml startup, Hammerspoon and installed three-OS qualification
   remain separate acceptance work. The macOS unread-entry scan is deferred
   off the boot critical path; its native main-thread cost still needs measurement.
+  The Lua configuration lifecycle now admits ordinary writes, onboarding,
+  scope operations, removals and hydration through its private source/schema
+  journal and the genuine initializer-issued native port identities. Future
+  or invalid schema metadata refuses before registry reads, backup and runtime
+  effects; source classification remains available for strict initial boot.
+  Withdrawn, copied or replaced native ports cannot borrow configuration
+  authority. Registered causal controls preserve all original assertions;
+  Windows, native Hammerspoon and final installed qualification remain separate.
   Maintainer decisions are resolved: invalid schema stamps retain strict boot
   and session-write refusal (site 108); retired keys reported for explicit
   cleanup are exempt from automatic deletion migrations and remain on disk
   until that cleanup (site 112).
+
+  Linux and macOS filesystem modules now expose their genuine initializer
+  identity and seven original function or nil identities through a pure tuple.
+  Existing I/O, acknowledgement and lock bodies remain byte-exact. The consuming
+  closed schema/session fences and native qualification remain pending.
+
+  Carried Script action parameters are now judged again by the existing genuine
+  publication on every late read on Windows, macOS and Linux. A proved retired
+  value is neutral and reported once; the raw source and inverse snapshot remain.
+  The macOS ordinary save preserves unchanged Script fragments, including an
+  obsolete inline neighbor, and refuses changed retired values or publication
+  withdrawal before native replacement or unchanged acknowledgement. Actual
+  supported portable owning cases pass 184/0 on macOS and 190/0 on both Linux
+  runtimes; genuine old getter and save implementations reproduce the failures.
+  The registered Windows compiled-owner case, actual Hammerspoon and final
+  three-OS installed qualification remain pending. This is a bounded Script
+  completion; the other publication authorities listed above remain software work.
 
   The integration with current physical shortcuts preserves obsolete parents
   and releases or reacquires only the exact retained writer cohort. Independent
@@ -5407,6 +5445,19 @@ deadline, handler-admission or timeout-cause claim is introduced; exact-candidat
 native observations remain pending.
 
 - [~] **42.** config.toml batch writer follow-ups (`toml-batch-existing-key`):
+  macOS conditional writes, unchanged acknowledgements and removals now
+  support a captured strict final logical admission. The new APIs detach
+  classified source scalars before native callbacks; refused operations
+  preserve external successor bytes and existing release-only cleanup.
+  The Lua closed-schema writer and scope consumers now use the private
+  source/schema journal and initializer-issued native identities before
+  acquired-source readers and native mutation. An initial invalid or newer
+  schema remains readable only through its captured native source image; it
+  grants no write, migration or scope-effect admission. Constructor source
+  identity accepts genuine relative and absolute loader spellings while
+  retaining the original native-owner checks. Retired-Script consumers and
+  final-source native/installed qualification remain separate follow-ups.
+
   Current source implements the Windows typed dotted/inline document reader,
   targeted saves and full-state publication. The nineteen FullSnapshot cases
   passed natively in diagnostic run 37466163822 (feature `682d373e` plus one
@@ -5945,13 +5996,68 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 53, macOS 86, Linux 61, each
+  drivers still build (current baseline: Windows 28, macOS 32, Linux 31, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
   existing rows during the migration (proposal in the menu-first-group
   report: most hide; greyed: Linux edit_shortcuts, Linux key
   combinations, Linux metrics shortcut rows, Windows preview_bubbles).
+  The complete MagicKey source frame now consumes the canonical capture,
+  automatic choice, candidate list and separators on all three drivers. Native
+  selection, readiness and publication callbacks remain unchanged. Both owners
+  regenerate byte-exact artifacts; the census retires five Windows sites,
+  establishing 48/86/61. Independent source and portable controls pass; final
+  integrated native and installed qualification remain required.
+
+  Corrective Windows CI `37621118292` completes 10166/1: the earlier menu
+  regressions and native cleanup controls pass. The sole remaining OS-call
+  purity failure is addressed by moving exact captured-handle probes into
+  the existing native tray adapter, without raising its baseline. Follow-up
+  Windows CI `37625043296` completes 10166/1: the purity and menu controls now
+  pass; the sole failure is the actual Python program-provider argv receipt,
+  routed to its Group 3 owner without changing its assertions. Windows E2E,
+  package and installation stay skipped; this item remains partial.
+
+  Current Group 1 software and device boundaries are recorded in the
+  [2026-10-07 checkpoint](handovers/2026-10-04-parallel-containers/GROUP1-CURRENT-CHECKPOINT.md).
+  The selected local gates pass on published `fad59c821`; exact-source native
+  CI reported Windows menu/fixture failures and retained macOS packaging
+  failures. The Windows follow-up preserves foreign detached owners and
+  original assertions; final native qualification remains required. All six
+  Group 1 items and requirements 16/38 stay open.
+
+  Shared dynamic captions now validate the actual English format before any
+  lazy native getter runs. Literal captions, escaped percent signs and user
+  data retain their original rendering; malformed or withdrawn declarations
+  refuse before getters and native allocation. Independent corpus and causal
+  controls cover all three renderers. This API prerequisite retires no native
+  sites: the census remains 48/86/61. The compiler-boundary fixture now
+  parses actual nonempty top-level functions instead of truncating nested
+  blocks; original assertions and new missing/data/comment/empty controls
+  remain mandatory. Final composed native, installed and
+  physical-device qualification remain separate; items 54 and 81 stay partial.
+
+  The complete WordExpander parameter, delay-color, Agent, extension,
+  shortcut, internal LLM, personal-file, Language, Debug, Configuration,
+  Apps and Metrics frames now consume shared declarations on all drivers.
+  Native callbacks and the existing WPM lifecycle remain owned by their
+  original drivers. Child scopes, false check states, literal caption affixes
+  and command prefixes retain their original behavior. Both actual generators
+  reproduce the union's 28/33/33 source census. Independent source reviews and
+  focused causal controls pass; final composed local and native gates remain
+  required. Remaining native construction and Windows append placement are
+  software work; installed and physical-device acceptance remain separate.
+
+  The complete Magic trigger-character frame now consumes the shared main
+  command and the Linux-only customized reset fragment. Genuine Windows,
+  macOS and Linux getter/setter/reset bodies, macOS paused presentation and
+  Linux indentation remain unchanged. Source withdrawal, late metatables and
+  malformed declarations refuse before publishing the parent. Independent
+  causal controls pass; the two actual generators retire exactly zero Windows,
+  one macOS and two Linux sites, giving 28/32/31. Native Windows, final composed
+  gates, packaging/install and physical-device acceptance remain required.
+
   Published `409b8ee0` includes the shared model-readout migration and its two
   owner-generated artifacts; the remaining sites are software migration work.
   Native allocators and computed user-data captions alone do not prove missing
@@ -7003,7 +7109,7 @@ Current Group 3 source checkpoint (item 73, 2026-10-06): [Group 3 current checkp
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 53, macOS 86 and Linux 61 rows are still built by the
+  Windows 28, macOS 32 and Linux 31 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). Read on
   2026-10-01, the sites are of four kinds, and three of them need the
   manifest to say more than it can today:
@@ -7021,6 +7127,27 @@ Current Group 3 source checkpoint (item 73, 2026-10-06): [Group 3 current checkp
   sites): they follow (b), as part of the template;
   (d) the tray root bootstrap (Windows `tray_bootstrap.ahk`,
   `menu_init.ahk`).
+  Dynamic caption admission now validates the genuine English formatter
+  before lazy getters, with literal and escaped-percent controls. It is a
+  renderer prerequisite and does not retire native sites or close this item.
+
+  Corrective Windows CI `37621118292` completes 10166/1: the earlier menu
+  regressions and native cleanup controls pass. The sole remaining OS-call
+  purity failure is addressed by moving exact captured-handle probes into
+  the existing native tray adapter, without raising its baseline. Follow-up
+  Windows CI `37625043296` completes 10166/1: the purity and menu controls now
+  pass; the sole failure is the actual Python program-provider argv receipt,
+  routed to its Group 3 owner without changing its assertions. Windows E2E,
+  package and installation stay skipped; this item remains partial.
+
+  Current Group 1 software and device boundaries are recorded in the
+  [2026-10-07 checkpoint](handovers/2026-10-04-parallel-containers/GROUP1-CURRENT-CHECKPOINT.md).
+  The selected local gates pass on published `fad59c821`; exact-source native
+  CI reported Windows menu/fixture failures and retained macOS packaging
+  failures. The Windows follow-up preserves foreign detached owners and
+  original assertions; final native qualification remains required. All six
+  Group 1 items and requirements 16/38 stay open.
+
   Current shared child-template, native-list/lazy-group, presence and inert
   presentation-refusal APIs are implemented. The historical classification
   above does not mean these APIs are absent; remaining provider families still

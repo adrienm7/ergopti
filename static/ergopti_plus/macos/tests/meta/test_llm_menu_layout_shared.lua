@@ -187,16 +187,23 @@ helpers.describe("shared fixed LLM group declarations", function()
 	helpers.it("the selected parents are genuine groups with unchanged native policy", function()
 		local groups = { llm_trigger = true, llm_display = true, llm_navigation = true }
 		local count = 0
+		local additional_groups = 0
 		for _, row in ipairs(manifest_rows()) do
 			if groups[row.id] then
 				helpers.assert_eq(row.type, "group")
 				helpers.assert_eq(row.disabled_when_off, true)
 				helpers.assert_eq(row.health_dot, false)
 				count = count + 1
+			elseif row.id == "llm_live_mode" or row.id == "llm_generation_settings" then
+				helpers.assert_eq(row.type, "group")
+				helpers.assert_eq(row.disabled_when_off, true)
+				helpers.assert_eq(row.health_dot, false)
+				additional_groups = additional_groups + 1
 			else
 				helpers.assert_eq(row.type, "dynamic", "all other native parent contracts retain their existing shape")
 			end
 		end
 		helpers.assert_eq(count, 3)
+		helpers.assert_eq(additional_groups, 2)
 	end)
 end)

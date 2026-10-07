@@ -2434,7 +2434,7 @@ function M.llm_language_choices()
 end
 
 function M.get_action_parameter(binding, action)
-	if type(binding) == "string" and (binding:sub(1, 9) == "tap_key__" or binding:sub(1, 10) == "keyboard__") then
+	if type(binding) == "string" and (binding:sub(1, 9) == "tap_key__" or binding:sub(1, 10) == "keyboard__" or binding:sub(1, 8) == "script__") then
 		local fits, reason = M.action_parameter_binding_fits(binding)
 		if fits == false then
 			if _state and type(_state.action_params) == "table" and _state.action_params[parameter_key(binding, action)] ~= nil then

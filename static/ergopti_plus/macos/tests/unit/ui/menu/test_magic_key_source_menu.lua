@@ -20,7 +20,7 @@ local KEYCODE_ESCAPE = 53
 
 local MODULES = {
 	"ui.menu.magic_key_source_menu", "adapters.timer_scheduler", "infra.notifications",
-	"modules.keymap.magic_key_source", "modules.shortcuts.tap_keys",
+	"modules.keymap.magic_key_source", "modules.shortcuts.tap_keys", "infra.manifest_menu",
 }
 
 --- Runs body against the real menu module, its timers, notifications and
@@ -211,6 +211,54 @@ helpers.describe("magic key source menu: configured tap ownership", function()
 			helpers.assert_eq(ctx.saves, 0, "captured conflicts use the same pre-write refusal")
 			helpers.assert_eq(Tap.get_action("number_row_left"), "send_text")
 			helpers.assert_true(Menu.choose(ctx, "auto"), "automatic never takes a configured tap")
+		end)
+	end)
+end)
+
+helpers.describe("magic key source: the actual declared native menu", function()
+	helpers.it("(magic-key-source) cold English and warm French use the real native renderer and retain capture and choice callbacks", function()
+		helpers.with_stub_scope({ "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu", "ui.menu.magic_key_source_menu" }, function()
+			with_menu(function(_, world)
+				package.loaded["infra.i18n"], package.loaded["infra.locale"] = nil, nil
+				local translations = require("infra.i18n")
+				local locale = require("infra.locale")
+				package.loaded["infra.manifest_menu"], package.loaded["ui.menu.magic_key_source_menu"] = nil, nil
+				local Menu = require("ui.menu.magic_key_source_menu")
+				local Source = require("modules.keymap.magic_key_source")
+				Source.set("KeyJ")
+				for _, language in ipairs({ "en", "fr" }) do
+					locale.set_locale(language)
+					local ctx = context(true)
+					local rows = Menu.rows(ctx)
+					helpers.assert_eq(#world.taps, 0, "construction cannot start native capture")
+					helpers.assert_eq(ctx.saves, 0, "construction never persists")
+					helpers.assert_eq(rows[1].label, translations.get("menu.layout.magic_key_source") .. " : j   (KeyJ)")
+					helpers.assert_eq(rows[1].items[1].label, translations.get("menu.layout.magic_key_source.capture"))
+					helpers.assert_eq(rows[1].items[3].label, translations.get("menu.layout.magic_key_source.auto"))
+					helpers.assert_true(rows[1].items[2].separator)
+					helpers.assert_true(rows[1].items[4].separator)
+					rows[1].items[3].action()
+					helpers.assert_eq(ctx.saves, 1, "the actual native chooser saves once")
+					helpers.assert_eq(ctx.applied, { "auto" })
+				end
+				local renderer = require("infra.manifest_menu")
+				local declaration = renderer.get_root()
+				local saved = declaration.magic_key_source_children
+				local retained = Menu.rows(context(true))[1].items[1].action
+				local ok, err = pcall(function()
+					declaration.magic_key_source_children = nil
+					helpers.assert_nil(Menu.rows(context(true)), "withdrawal cannot resurrect native fixed rows")
+					helpers.assert_eq(retained(), false)
+					helpers.assert_eq(#world.taps, 0, "withdrawn capture never starts its actual event tap")
+				end)
+				declaration.magic_key_source_children = saved
+				if not ok then error(err, 0) end
+				local repaired = Menu.rows(context(true))
+				repaired[1].items[1].action()
+				helpers.assert_eq(#world.taps, 1, "restored declaration enters the genuine capture body")
+				world.taps[1].callback(key_down(KEYCODE_ESCAPE)); run_deferred(world)
+				helpers.assert_eq(Menu.capturing(), false)
+			end)
 		end)
 	end)
 end)

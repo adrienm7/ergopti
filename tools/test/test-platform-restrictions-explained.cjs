@@ -249,7 +249,12 @@ function readCoverage(src) {
 	if (!parsed.menu || typeof parsed.menu !== 'object' || Array.isArray(parsed.menu))
 		throw new Error('manifest.toml is missing the [menu] tables');
 	validateMenuAvailability(parsed.menu);
-	validateChildTemplates(parsed.menu);
+	const english = JSON.parse(
+		fs.readFileSync(path.join(ROOT, 'static/ergopti_plus/_shared/data/locales/en.json'), 'utf8')
+	);
+	validateChildTemplates(parsed.menu, (key) =>
+		Object.hasOwn(english, key) ? english[key] : undefined
+	);
 	const menuRows = new Set(Object.values(parsed.menu).filter(Array.isArray).flat());
 	const tables = [];
 	function walk(node, name) {
