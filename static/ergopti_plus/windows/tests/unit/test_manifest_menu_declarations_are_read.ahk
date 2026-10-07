@@ -193,3 +193,98 @@ _MUR_GreyedAndHiddenRows() {
 }
 Test("menu: a greyed row is drawn disabled with its reason, a hidden one is not (menu-unavailable-rows)",
 	_MUR_GreyedAndHiddenRows)
+
+Test("inert captions: genuine translated rows retain disabled posture and section decoration", _MM_InertCaptionRows)
+Test("inert captions: independent percent vectors keep literal native values", _MM_InertCaptionFormats)
+Test("inert captions: missing and nonstring receipts refuse the whole template", _MM_InertCaptionRefusals)
+
+_MM_InertCaptionCorpus() {
+	global _SharedDir
+	return JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\inert_dynamic_captions.json", "UTF-8"))
+}
+
+_MM_WithInertCaption(Body) {
+	Corpus := _MM_InertCaptionCorpus(), Root := _MR_GetManifestRoot()
+	Key := "inert_caption_fixture"
+	Present := Root.Has(Key), Previous := Present ? Root[Key] : false
+	try {
+		Root[Key] := Corpus["rows"]
+		Body.Call(Key, Corpus, Root)
+	} finally {
+		if Present
+			Root[Key] := Previous
+		else
+			Root.Delete(Key)
+	}
+}
+
+_MM_InertCaptionRows() {
+	_MM_WithInertCaption(_MM_InertCaptionRowsBody)
+}
+
+_MM_InertCaptionRowsBody(Key, Corpus, Root) {
+	Rows := MenuRenderer_TemplateRows(Key, Map(), Map("native_detail", (*) => Corpus["value"]), Map())
+	AssertTrue(Rows is Array)
+	AssertEqual(2, Rows.Length)
+	AssertEqual(StrReplace(t("menu.llm.model_backend"), "%s", Corpus["value"]), Rows[1]["label"])
+	AssertEqual("— " . StrReplace(t("menu.llm.hw_header"), "%s", Corpus["value"]) . " —", Rows[2]["label"])
+	for Row in Rows {
+		AssertTrue(Row["disabled"])
+		AssertFalse(Row.Has("action"))
+		AssertFalse(Row.Has("items"))
+	}
+	AssertFalse(_MR_TemplateInertPresentation(Key, Map()), "dynamic getter rows never grant omission")
+	Root[Key][1]["command"] := "foreign"
+	try AssertFalse(MenuRenderer_TemplateRows(Key, Map(), Map("native_detail", (*) => Corpus["value"]), Map()))
+	finally Root[Key][1].Delete("command")
+}
+
+_MM_InertCaptionFormats() {
+	Corpus := _MM_InertCaptionCorpus()
+	for Vector in Corpus["format_cases"] {
+		Actual := _MR_CaptionFormat(Vector["format"], Corpus["value"], &HasSlot)
+		AssertEqual(Vector["expected"], Actual, "handwritten full caption, including escaped percent")
+		AssertEqual(Vector["slot"], HasSlot, "only a supported unescaped slot grants format admission")
+	}
+}
+
+_MM_InertCaptionRefusals() {
+	_MM_WithInertCaption(_MM_InertCaptionRefusalsBody)
+}
+
+_MM_InertCaptionRefusalsBody(Key, Corpus, Root) {
+	AssertFalse(MenuRenderer_TemplateRows(Key, Map(), Map(), Map()))
+	AssertFalse(MenuRenderer_TemplateRows(Key, Map(), Map("native_detail", (*) => 7), Map()))
+	AssertFalse(MenuRenderer_TemplateRows(Key, Map(), Map("native_detail", (*) => false), Map()))
+	AssertFalse(MenuRenderer_TemplateRows(Key, Map(), Map("native_detail", (*) => Map()), Map()))
+	Root[Key][1]["caption_getter"] := ""
+	try AssertFalse(MenuRenderer_TemplateRows(Key, Map(), Map(), Map()))
+	finally Root[Key][1]["caption_getter"] := "native_detail"
+	AssertTrue(MenuRenderer_TemplateRows(Key, Map(), Map("native_detail", (*) => Corpus["value"]), Map()) is Array,
+		"repair restores the original native declaration")
+}
+
+Test("inert captions: raw static labels and headers refuse before native getter", _MM_InertCaptionSourceFormat)
+
+_MM_InertCaptionSourceFormat() {
+	_MM_WithInertCaption(_MM_InertCaptionSourceFormatBody)
+}
+
+_MM_InertCaptionSourceFormatBody(Key, Corpus, Root) {
+	for Kind in ["label", "section_header"] {
+		Calls := Map("count", 0)
+		Root[Key] := [Map("type", Kind, "id", "static", "i18n", "button.ok", "caption_getter", "native_detail")]
+		Getters := Map("native_detail", _MM_InertCaptionCount.Bind(Calls, Corpus["value"]))
+		AssertFalse(MenuRenderer_TemplateRows(Key, Map(), Getters, Map()))
+		AssertEqual(0, Calls["count"], "raw static translation refuses before the native caption getter")
+		Root[Key][1]["i18n"] := "menu.llm.model_backend"
+		AssertTrue(MenuRenderer_TemplateRows(Key, Map(), Getters, Map()) is Array,
+			"restoring the genuine supported format repairs native admission")
+		AssertEqual(1, Calls["count"])
+	}
+}
+
+_MM_InertCaptionCount(Calls, Value) {
+	Calls["count"] += 1
+	return Value
+}

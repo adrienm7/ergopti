@@ -5824,3 +5824,148 @@ console.log(
 		'[OK] physical magic-key family: complete hand hierarchy, all21 existing captions and executed native/shared ownership.'
 	);
 }
+
+// Dynamic inert captions are source-bound formats, never behavior or omission ports.
+(() => {
+	const assert = require('assert');
+	const fs = require('fs');
+	const path = require('path');
+	const os = require('os');
+	const { spawnSync } = require('child_process');
+	const { validateChildTemplates } = require('../lib/menu-row-availability.cjs');
+	const corpus = JSON.parse(
+		fs.readFileSync(path.join(SHARED, 'tests/corpus/menus/inert_dynamic_captions.json'), 'utf8')
+	);
+	const sourceRows = { caption_frame: corpus.rows };
+	assert.throws(
+		() => validateChildTemplates(sourceRows),
+		/inert label needs/,
+		'no format context grants no caption admission'
+	);
+	const english = JSON.parse(fs.readFileSync(path.join(LOCALES_DIR, 'en.json'), 'utf8'));
+	assert.doesNotThrow(() => validateChildTemplates(sourceRows, (key) => english[key]));
+	for (const caseRow of corpus.format_cases) {
+		const admit = () => validateChildTemplates(sourceRows, () => caseRow.format);
+		if (caseRow.slot) assert.doesNotThrow(admit, caseRow.format);
+		else assert.throws(admit, /inert label needs/, caseRow.format);
+	}
+	for (const file of fs.readdirSync(LOCALES_DIR).filter((name) => name.endsWith('.json'))) {
+		const locale = JSON.parse(fs.readFileSync(path.join(LOCALES_DIR, file), 'utf8'));
+		for (const row of corpus.rows) {
+			assert.equal(typeof locale[row.i18n], 'string', file + ': existing translated caption');
+			assert.equal(
+				(locale[row.i18n].replace(/%%/g, '').match(/%s/g) || []).length,
+				1,
+				file + ': original one-slot caption parity'
+			);
+		}
+	}
+	const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-inert-caption-'));
+	try {
+		fs.cpSync(SHARED, path.join(fixture, 'static/ergopti_plus/_shared'), { recursive: true });
+		fs.mkdirSync(path.join(fixture, 'tools/build'), { recursive: true });
+		fs.copyFileSync(
+			path.join(REPO_ROOT, 'tools/build/build-menu-manifest.js'),
+			path.join(fixture, 'tools/build/build-menu-manifest.js')
+		);
+		fs.cpSync(path.join(REPO_ROOT, 'tools/lib'), path.join(fixture, 'tools/lib'), {
+			recursive: true
+		});
+		fs.mkdirSync(path.join(fixture, 'node_modules'), { recursive: true });
+		fs.cpSync(
+			path.join(REPO_ROOT, 'node_modules/smol-toml'),
+			path.join(fixture, 'node_modules/smol-toml'),
+			{ recursive: true }
+		);
+		fs.writeFileSync(path.join(fixture, 'package.json'), '{"type":"module"}\n');
+		const manifest = path.join(
+			fixture,
+			'static/ergopti_plus/_shared/modules/features/manifest.toml'
+		);
+		const output = path.join(
+			fixture,
+			'static/ergopti_plus/_shared/modules/menu/menu_manifest.json'
+		);
+		const en = path.join(fixture, 'static/ergopti_plus/_shared/data/locales/en.json');
+		const original = fs.readFileSync(manifest, 'utf8');
+		const addition = corpus.rows
+			.map(
+				(row) =>
+					'\n[[menu.caption_frame]]\n' +
+					Object.entries(row)
+						.map(([key, value]) => key + ' = ' + JSON.stringify(value))
+						.join('\n') +
+					'\n'
+			)
+			.join('');
+		const compile = (text) => {
+			fs.writeFileSync(manifest, text);
+			return spawnSync(process.execPath, ['tools/build/build-menu-manifest.js'], {
+				cwd: fixture,
+				encoding: 'utf8'
+			});
+		};
+		let result = compile(original + addition);
+		assert.equal(result.status, 0, result.stderr);
+		assert.deepEqual(
+			JSON.parse(fs.readFileSync(output, 'utf8')).caption_frame,
+			corpus.rows,
+			'actual physical compiler projects independent inert rows without commands'
+		);
+		const accepted = fs.readFileSync(output);
+		for (const [name, mutated, reason] of [
+			[
+				'empty getter',
+				addition.replace('caption_getter = "native_detail"', 'caption_getter = ""'),
+				/caption_getter needs/
+			],
+			[
+				'numeric getter',
+				addition.replace('caption_getter = "native_detail"', 'caption_getter = 7'),
+				/caption_getter needs/
+			],
+			[
+				'missing header id',
+				addition.replace('id = "hardware_heading"\n', ''),
+				/section header needs/
+			],
+			[
+				'behavior',
+				addition.replace('id = "backend_readout"', 'id = "backend_readout"\ncommand = "foreign"'),
+				/inert label needs/
+			],
+			[
+				'omission',
+				addition +
+					'\n[[menu.caption_omit]]\ntype = "include"\nsection = "caption_frame"\non_refusal = "omit_presentation"\n',
+				/exclusively inert presentation/
+			]
+		]) {
+			assert.notEqual(mutated, addition, name + ': physical source target exists');
+			result = compile(original + mutated);
+			assert.notEqual(result.status, 0, name);
+			assert.match(result.stderr, reason);
+			assert.deepEqual(fs.readFileSync(output), accepted, name + ': no partial publication');
+		}
+		for (const format of ['static', '%%s', '%%s %%s']) {
+			fs.writeFileSync(en, JSON.stringify({ ...english, 'menu.llm.model_backend': format }));
+			result = compile(original + addition);
+			assert.notEqual(result.status, 0, format);
+			assert.match(result.stderr, /inert label needs/);
+			assert.deepEqual(fs.readFileSync(output), accepted, format + ': output retained');
+		}
+		fs.writeFileSync(en, JSON.stringify(english));
+		result = compile(original + addition);
+		assert.equal(result.status, 0, result.stderr);
+		assert.deepEqual(
+			fs.readFileSync(output),
+			accepted,
+			'actual source repair restores exact output'
+		);
+	} finally {
+		fs.rmSync(fixture, { recursive: true, force: true });
+	}
+	console.log(
+		'[OK] inert dynamic captions: real English format ownership, existing21 locale parity, strict physical compiler and omission refusal.'
+	);
+})();

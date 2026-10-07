@@ -600,3 +600,5 @@ end)
 
 
 require("test.menu_native_child_rows").run(helpers, require("infra.manifest_menu"))
+
+require("test.menu_dynamic_caption_contract").register(helpers, "macos")

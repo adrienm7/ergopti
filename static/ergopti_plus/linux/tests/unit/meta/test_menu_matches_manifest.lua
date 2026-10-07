@@ -933,3 +933,5 @@ helpers.describe("magic key source: actual complete tray provider", function()
 		if not ok then error(err, 0) end
 	end)
 end)
+
+require("test.menu_dynamic_caption_contract").register(helpers, "linux")

@@ -42,6 +42,24 @@
 
 local M = {}
 
+-- The caption value is literal data; percent escapes belong to the translation.
+local function caption_format(format, value)
+	if type(format) ~= "string" then return nil, false end
+	local parts, found, index = {}, false, 1
+	while index <= #format do
+		local character = format:sub(index, index)
+		local following = format:sub(index + 1, index + 1)
+		if character == "%" and following == "%" then
+			parts[#parts + 1], index = "%", index + 2
+		elseif character == "%" and following == "s" then
+			parts[#parts + 1], found, index = value, true, index + 2
+		else
+			parts[#parts + 1], index = character, index + 1
+		end
+	end
+	return table.concat(parts), found
+end
+
 -- Used only to report a malformed `new()` call, which by definition happens
 -- before an injected logger exists.
 local BootLogger = require("logger.shim")
@@ -829,10 +847,12 @@ function M.new(deps)
 					elseif status_definition and item.type == "label" then
 						row = { label = i18n.get(item.i18n), disabled = true }
 					elseif item.type == "label" then
-						local fields = { type = true, id = true, i18n = true, platforms = true, unavailable = true }
+						local fields = { type = true, id = true, i18n = true, platforms = true, unavailable = true, caption_getter = true }
 						local valid = type(item.id) == "string" and item.id ~= ""
 							and type(item.i18n) == "string" and item.i18n ~= ""
 							and (item.unavailable == nil or item.unavailable == "hide")
+						valid = valid and (item.caption_getter == nil or (type(item.caption_getter) == "string"
+							and item.caption_getter ~= "" and type(item.id) == "string" and item.id ~= ""))
 						for field in pairs(item) do if not fields[field] then valid = false end end
 						if not valid then
 							Logger.error(LOG, "Invalid inert label in template '%s' — provider rows refused.", key)
@@ -841,13 +861,15 @@ function M.new(deps)
 						row = { label = i18n.get(item.i18n), disabled = true }
 					elseif item.type == "section_header" then
 						local fields = { type = true, id = true, i18n = true, platforms = true,
-							unavailable = true, reason_key = true }
+							unavailable = true, reason_key = true, caption_getter = true }
 						local valid = (item.id == nil or (type(item.id) == "string" and item.id ~= ""))
 							and type(item.i18n) == "string" and item.i18n ~= ""
 							and (item.unavailable == nil or item.unavailable == "hide" or item.unavailable == "grey")
 							and (item.unavailable ~= "grey" or item.reason_key ~= nil)
 							and (item.reason_key == nil or (type(item.reason_key) == "string"
 								and item.reason_key ~= "" and item.unavailable ~= "hide"))
+						valid = valid and (item.caption_getter == nil or (type(item.caption_getter) == "string"
+							and item.caption_getter ~= "" and type(item.id) == "string" and item.id ~= ""))
 						for field in pairs(item) do if not fields[field] then valid = false end end
 						if not valid then
 							Logger.error(LOG, "Invalid section header in template '%s' — provider rows refused.", key)
@@ -880,14 +902,27 @@ function M.new(deps)
 						return nil
 					end
 					if row and item.caption_getter ~= nil then
+						local raw_title = i18n.get(item.i18n)
+						if item.type == "label" or item.type == "section_header" then
+							local _, source_slot = caption_format(raw_title, "")
+							if not source_slot then
+								Logger.error(LOG, "Invalid inert caption format in template '%s' — provider rows refused.", key)
+								return nil
+							end
+						end
 						local getter = getters[item.caption_getter]
 						local value = type(getter) == "function" and getter() or nil
-						local title = i18n.get(item.i18n)
+						local title = item.type == "section_header" and row.label or raw_title
 						if type(value) ~= "string" then
 							Logger.error(LOG, "Invalid caption getter in template '%s' — provider rows refused.", key)
 							return nil
 						end
-						row.label = title:gsub("%%s", function() return value end)
+						local caption, formatted = caption_format(title, value)
+						if (item.type == "label" or item.type == "section_header") and not formatted then
+							Logger.error(LOG, "Invalid inert caption format in template '%s' — provider rows refused.", key)
+							return nil
+						end
+						row.label = caption
 					end
 					if row then rows[#rows + 1] = row end
 				end
