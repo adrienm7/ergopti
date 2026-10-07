@@ -44,6 +44,7 @@ TapKeyAssignments["feature_state_include_once_probe"] := "none"
 #Include ..\..\infra\tap_keys.ahk
 #Include ..\..\infra\config_io.ahk
 #Include ..\..\infra\first_boot.ahk
+#Include ..\..\modules\gestures\config.ahk
 
 try {
     if (A_Args.Length != 1 && !(A_Args.Length == 3 && A_Args[1] == "distance_gate")
@@ -76,6 +77,8 @@ try {
 			_FeatureStateSmokeScriptNone()
 		case "script_binding_publication":
 			_FeatureStateSmokeScriptBindingPublication()
+		case "script_late_parameter":
+			_FeatureStateSmokeScriptLateParameter()
 		case "manifest_defaults":
 			_FeatureStateSmokeManifestDefaults()
         case "malformed":
@@ -408,4 +411,54 @@ _FeatureStateSmokeTapBindingPublication() {
 	}
 	if ConfigBindingIdentityTapStatus("tap_key__removed_tap_key", Catalogue) != "retired"
 		throw Error("The actual startup publication cannot identify a retired tap key")
+}
+
+; Only the actual compiled feature-state owner supplies this publication.
+_FeatureStateSmokeScriptLateParameter() {
+	global SCRIPT_SHORTCUT_SLOTS, _ScriptShortcutBindingPublication
+	global GestureActionParameters, ConfigurationFile
+	_FeatureStateSmokeScriptBindingPublication()
+	Publication := _ScriptShortcutBindingPublication
+	PreviousParameters := IsSet(GestureActionParameters) ? GestureActionParameters : unset
+	PreviousFile := IsSet(ConfigurationFile) ? ConfigurationFile : unset
+	Path := A_Temp . "\ergopti_script_late_parameter_" . DllCall("GetCurrentProcessId") . ".toml"
+	Source := '# Retained until explicit cleanup.`n[action_parameters]`n'
+		. 'script__removed_script_slot__open_url = "https://obsolete.example" # retain`n'
+		. 'script__script_altgr_enter__open_url = "https://current.example"`n'
+		. '[future]`nopaque = [1, "keep"]`n'
+	try {
+		FileAppend(Source, Path, "UTF-8-RAW")
+		ConfigurationFile := Path
+		GestureActionParameters := TOML_ParseFreshFile(Path)["action_parameters"]
+		_ScriptShortcutBindingPublication := unset
+		_FeatureStateSmokeAssert("https://obsolete.example",
+			GestureGetActionParameter("script__removed_script_slot", "open_url"), "cold carried parameter")
+		_ScriptShortcutBindingPublication := Publication
+		_FeatureStateSmokeAssert("",
+			GestureGetActionParameter("script__removed_script_slot", "open_url"), "late retired parameter")
+		_FeatureStateSmokeAssert("",
+			GestureGetActionParameter("script__removed_script_slot", "open_url"), "repeat retired parameter")
+		_FeatureStateSmokeAssert(false,
+			TomlConfigReportRetiredGestureParameter(Path, "script__removed_script_slot__open_url"), "claimed warning")
+		_FeatureStateSmokeAssert("https://current.example",
+			GestureGetActionParameter("script__script_altgr_enter", "open_url"), "current carried parameter")
+		_FeatureStateSmokeAssert("https://obsolete.example",
+			GestureActionParameters["script__removed_script_slot__open_url"], "exact inverse snapshot")
+		_FeatureStateSmokeAssert(false,
+			GestureSetActionParameter("script__removed_script_slot", "open_url", "https://must-not-write.example"),
+			"ordinary retired setter")
+		_ScriptShortcutBindingPublication := unset
+		_FeatureStateSmokeAssert("https://obsolete.example",
+			GestureGetActionParameter("script__removed_script_slot", "open_url"), "withdrawn publication")
+		_ScriptShortcutBindingPublication := Publication
+		_FeatureStateSmokeAssert("",
+			GestureGetActionParameter("script__removed_script_slot", "open_url"), "repaired publication")
+		if StrCompare(Source, FileRead(Path, "UTF-8"), true) != 0
+			throw Error("A late read changed the complete retained source")
+	} finally {
+		_ScriptShortcutBindingPublication := Publication
+		GestureActionParameters := IsSet(PreviousParameters) ? PreviousParameters : unset
+		ConfigurationFile := IsSet(PreviousFile) ? PreviousFile : unset
+		try FileDelete(Path)
+	}
 }

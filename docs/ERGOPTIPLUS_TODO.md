@@ -3220,6 +3220,18 @@ WP3 prerequisite: the actual macOS physical accounting owner now requires exact 
   cleanup are exempt from automatic deletion migrations and remain on disk
   until that cleanup (site 112).
 
+  Carried Script action parameters are now judged again by the existing genuine
+  publication on every late read on Windows, macOS and Linux. A proved retired
+  value is neutral and reported once; the raw source and inverse snapshot remain.
+  The macOS ordinary save preserves unchanged Script fragments, including an
+  obsolete inline neighbor, and refuses changed retired values or publication
+  withdrawal before native replacement or unchanged acknowledgement. Actual
+  supported portable owning cases pass 184/0 on macOS and 190/0 on both Linux
+  runtimes; genuine old getter and save implementations reproduce the failures.
+  The registered Windows compiled-owner case, actual Hammerspoon and final
+  three-OS installed qualification remain pending. This is a bounded Script
+  completion; the other publication authorities listed above remain software work.
+
   The integration with current physical shortcuts preserves obsolete parents
   and releases or reacquires only the exact retained writer cohort. Independent
   unchanged physical scope cases pass 27/0 on macOS Lua 5.4 and 35/0 on both
