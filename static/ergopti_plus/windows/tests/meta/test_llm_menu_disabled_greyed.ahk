@@ -59,8 +59,17 @@ _LMDG_BuildGreysRowsWhenOff() {
 		"LLM_Menu_BuildSubmenu must compute _disabled from the enabled flag to grey settings rows when off")
 	Assert(InStr(Seg, '_row["disabled_when_off"] ? _disabled : false') > 0,
 		"LLM_Menu_BuildSubmenu must resolve each row's greying against the shared spec policy (disabled_when_off ? _disabled : false) — so backend/model stay usable while the rest grey out")
-	Assert(InStr(Seg, 'MenuRenderer_AppendToggle(_LLM_Menu_Handle, "llm_menu", "llm_toggle",') > 0,
-		"LLM_Menu_BuildSubmenu must always add the manifest's IA switch (MenuRenderer_AppendToggle)")
+	Assert(_LMDG_ToggleRoute(Seg, _DriverFuncBody("MenuRenderer_Build")),
+		"LLM_Menu_BuildSubmenu must always add the manifest's IA switch through the genuine shared renderer")
+	Toggle := _MR_GetMenuDef("llm_menu")[1]
+	AssertEqual("toggle", Toggle["type"])
+	AssertEqual("llm_toggle", Toggle["id"])
+	AssertEqual("menu.llm.enable", Toggle["i18n"])
+	AssertEqual(1, Toggle["checked_when"].Length)
+	AssertEqual("llm_enabled", Toggle["checked_when"][1])
+	AssertEqual(1, Toggle["disabled_when"].Length)
+	AssertEqual("llm_toggle_ready", Toggle["disabled_when"][1])
+	Assert(_MR_IsForAhk(Toggle), "the genuine first toggle is available on Windows")
 }
 Test("menu_main: LLM_Menu_Build greys the settings rows when the feature is off (llm-menu-disabled-greyed)", _LMDG_BuildGreysRowsWhenOff)
 
@@ -105,3 +114,97 @@ _LMDG_ParentCheckFollowsIntent() {
 		"the parent IA tray check must not require backend readiness - that left the entry visually OFF while Ollama was missing")
 }
 Test("menu_main: parent IA check follows intent, not backend readiness (llm-parent-check-intent)", _LMDG_ParentCheckFollowsIntent)
+
+
+; Pins the actual executable route, not copied call text in comments or strings.
+_LMDG_Statement(Code, Pattern, Depth) {
+	Masked := _DriverMaskNonCode(&Code)
+	if !RegExMatch(Code, Pattern, &Found)
+		return 0
+	Position := Found.Pos(1), Token := Found[1]
+	if SubStr(Masked, Position, StrLen(Token)) != Token
+		return 0
+	Prefix := SubStr(Masked, 1, Position - 1), CurrentDepth := 0
+	if RegExMatch(RTrim(Prefix, " `t`r`n"), 'i)(?:^|\n)[ \t]*(?:if|else|for|while|loop|catch|try|finally)\b[^\r\n{]*$')
+		return 0
+	Loop Parse Prefix {
+		if A_LoopField == "{"
+			CurrentDepth++
+		else if A_LoopField == "}"
+			CurrentDepth--
+	}
+	return CurrentDepth == Depth ? Position : 0
+}
+
+_LMDG_ToggleRoute(Build, Render) {
+	Command := _LMDG_Statement(Build,
+		'm)^[ \t]*(Commands)\["llm_toggle"\] := LLM_Menu_OnToggle[ \t]*$', 2)
+	Reader := _LMDG_Statement(Build,
+		'm)^[ \t]*(StateGetters) := Map\("llm_enabled", \(\) => _LLM_Menu\["enabled"\],[ \t]*\n[ \t]*"llm_toggle_ready", \(\) => !A_IsSuspended\)', 2)
+	Publish := _LMDG_Statement(Build,
+		'm)^[ \t]*(MenuRenderer_Build)\("llm_menu", "LLM", DynamicHandlers, _LLM_Menu_GroupBuilders\(\),[ \t]*\n[ \t]*"", Commands, StateGetters, StagedHandle, GroupDisabled\)', 2)
+	if !(Command && Reader && Publish && Command < Reader && Reader < Publish)
+		return false
+	Stage := _LMDG_Statement(Build, 'm)^[ \t]*(try) \{[ \t]*$', 1)
+	if !(Stage && Stage < Command)
+		return false
+	Masked := _DriverMaskNonCode(&Build)
+	StageBody := SubStr(Masked, Stage), StageDepth := 1, StageEnd := 0
+	Loop Parse StageBody {
+		if A_LoopField == "{"
+			StageDepth++
+		else if A_LoopField == "}" {
+			StageDepth--
+			if StageDepth == 1 {
+				StageEnd := Stage + A_Index - 1
+				break
+			}
+		}
+	}
+	if !(StageEnd > Publish)
+		return false
+	if RegExMatch(SubStr(Masked, 1, Publish - 1), '\breturn\b')
+		return false
+	Branch := _LMDG_Statement(Render,
+		'm)^[ \t]*(if) ItemType == "toggle" \{[ \t]*\n[ \t]*ItemCount \+= _MR_RenderToggle\(Result, Item, ManifestKey, Commands, StateGetters\)', 2)
+	Call := _LMDG_Statement(Render,
+		'm)^[ \t]*(ItemCount) \+= _MR_RenderToggle\(Result, Item, ManifestKey, Commands, StateGetters\)', 3)
+	return Branch && Call && Branch < Call
+}
+
+_LMDG_ToggleRouteRefusesDecoy(Kind) {
+	Build := _DriverFuncBody("LLM_Menu_BuildSubmenu")
+	Render := _DriverFuncBody("MenuRenderer_Build")
+	Assert(_LMDG_ToggleRoute(Build, Render), "actual current native bodies publish the shared toggle")
+	if Kind == "missing-command"
+		Build := StrReplace(Build, 'Commands["llm_toggle"] := LLM_Menu_OnToggle', 'Commands["other_toggle"] := LLM_Menu_OnToggle')
+	else if Kind == "wrong-reader"
+		Build := StrReplace(Build, '"llm_toggle_ready", () => !A_IsSuspended', '"llm_toggle_ready", () => _LLM_Menu["enabled"]')
+	else if Kind == "conditional-command"
+		Build := StrReplace(Build, 'Commands["llm_toggle"] := LLM_Menu_OnToggle', 'if _LLM_Menu["enabled"] {`nCommands["llm_toggle"] := LLM_Menu_OnToggle`n}')
+	else if Kind == "outer-conditional" {
+		Build := StrReplace(Build, "try {", 'if _LLM_Menu["enabled"] {')
+		Build := StrReplace(Build, "} catch as e {", "} else {")
+	} else if Kind == "unbraced-command"
+		Build := StrReplace(Build, 'Commands["llm_toggle"] := LLM_Menu_OnToggle', 'if _LLM_Menu["enabled"]`nCommands["llm_toggle"] := LLM_Menu_OnToggle')
+	else if Kind == "comment-command"
+		Build := StrReplace(Build, 'Commands["llm_toggle"] := LLM_Menu_OnToggle', '; Commands["llm_toggle"] := LLM_Menu_OnToggle')
+	else if Kind == "string-command"
+		Build := StrReplace(Build, 'Commands["llm_toggle"] := LLM_Menu_OnToggle', "Audit := '(`nCommands[" . Chr(34) . "llm_toggle" . Chr(34) . "] := LLM_Menu_OnToggle`n)'")
+	else if Kind == "string-renderer"
+		Render := "Decoy() {`nAudit := '(`nif ItemType == " . Chr(34) . "toggle" . Chr(34) . " {`nItemCount += _MR_RenderToggle(Result, Item, ManifestKey, Commands, StateGetters)`n}`n)'`n}"
+	else if Kind == "wrong-target"
+		Build := StrReplace(Build, '"", Commands, StateGetters, StagedHandle, GroupDisabled)', '"", Commands, StateGetters, OtherHandle, GroupDisabled)')
+	else if Kind == "early-return"
+		Build := StrReplace(Build, 'Commands["llm_toggle"] := LLM_Menu_OnToggle', 'if !_LLM_Menu["enabled"]`nreturn StagedHandle`nCommands["llm_toggle"] := LLM_Menu_OnToggle')
+	else if Kind == "comment-renderer"
+		Render := StrReplace(Render, 'if ItemType == "toggle" {', '; if ItemType == "toggle" {')
+	else if Kind == "missing-renderer"
+		Render := StrReplace(Render, '_MR_RenderToggle(Result, Item, ManifestKey, Commands, StateGetters)', '_MR_RenderChoice(Result, Item, ManifestKey, Commands, StateGetters)')
+	else
+		throw Error("Unknown toggle route decoy")
+	Assert(!_LMDG_ToggleRoute(Build, Render), "data, conditional or unrelated source cannot supply the IA switch: " . Kind)
+}
+for Kind in ["missing-command", "wrong-reader", "conditional-command", "outer-conditional", "unbraced-command", "comment-command",
+	"string-command", "string-renderer", "wrong-target", "missing-renderer", "early-return", "comment-renderer"]
+	Test("shared IA toggle route refuses " . Kind, _LMDG_ToggleRouteRefusesDecoy.Bind(Kind))

@@ -66,7 +66,13 @@ from hs_karabiner_config_probe import (
     NativeKarabinerConfigProbe,
     validate_summary as validate_karabiner_summary,
 )
-from hs_native_bootstrap_probe import SupplementaryNativeBootstrap, bounded_refusal
+from hs_native_bootstrap_probe import (
+    SupplementaryNativeBootstrap,
+    bounded_refusal,
+    CONTRACT as BOOTSTRAP_CONTRACT,
+    QUALIFICATION as BOOTSTRAP_QUALIFICATION,
+)
+from hs_script_scope_probe import require_summary
 
 READY_MARKER = "Onboarding wizard opened."
 # The configured boot on a runner without Accessibility waits for the grant
@@ -997,17 +1003,48 @@ def run(app, output, scenario, seed_tag):
     if diagnostic_errors:
         report["diagnostic_errors"] = diagnostic_errors
         report["failures"].extend(diagnostic_errors)
+    supplementary = None
     if native_probe:
         # This separate startup measurement cannot satisfy or overwrite any
         # required original startup, AppleEvent or feature verdict above.
         try:
             if not native_owner_settled or processes(launcher) or processes(child):
                 raise RuntimeError("Original native owner debt refuses supplementary startup")
-            report["supplementary_native_bootstrap"] = SupplementaryNativeBootstrap(
-                app, output, HS_DOMAIN, processes
-            ).observe("delayed_timer" if scenario == "clean" else "karabiner_config")
+            supplementary = SupplementaryNativeBootstrap(app, output, HS_DOMAIN, processes)
+            report["supplementary_native_bootstrap"] = supplementary.observe(
+                "delayed_timer" if scenario == "clean" else "karabiner_config"
+            )
         except Exception as error:
             report["supplementary_native_bootstrap_error"] = bounded_refusal(error)
+    if scenario == "karabiner_config" and report["failures"]:
+        report["supplementary_native_script_scope"] = {
+            "status": "not_executed",
+            "reason": "blocked by required original launch failure",
+        }
+    elif scenario == "karabiner_config":
+        # Independent installed SDK/participant proof uses the same exact native
+        # startup owner after every prior owner has retired. It cannot replace
+        # the required managed launch or original feature verdict.
+        try:
+            if not native_owner_settled or processes(launcher) or processes(child):
+                raise RuntimeError(
+                    "Original native owner debt refuses supplementary script startup"
+                )
+            if supplementary is None:
+                raise RuntimeError("Original supplementary owner unavailable for script startup")
+            report["supplementary_native_script_scope"] = require_summary(
+                supplementary.observe_script_scope(),
+                child,
+                HS_DOMAIN,
+                BOOTSTRAP_CONTRACT,
+                BOOTSTRAP_QUALIFICATION,
+            )
+        except Exception as error:
+            report["supplementary_native_script_scope_error"] = bounded_refusal(error)
+            report["failures"].append(
+                "Required native Script SDK/participant qualification refused: "
+                + bounded_refusal(error)
+            )
     return report
 
 

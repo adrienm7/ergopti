@@ -96,14 +96,46 @@ helpers.describe("canonical macOS tap-key assignments", function()
 		end)
 	end)
 
-	helpers.it("refuses root inline ownership without changing source or dispatch", function()
-		with_fixture('shortcuts = { tap_keys = { number_row_left = "send_text", foreign = "keep" } }\n', function(taps, _, control, valid)
+	helpers.it("publishes existing root inline scalar assignments with exact source and fresh dispatch receipts", function()
+		local before = 'shortcuts = { tap_keys = { number_row_left = "send_text", foreign = "keep" } }\n'
+		local changed = 'shortcuts = { tap_keys = { number_row_left = "screen_capture", foreign = "keep" } }\n'
+		local removed = 'shortcuts = { tap_keys = { foreign = "keep" } }\n'
+		with_fixture(before, function(taps, preferences, control, valid)
 			taps.load(valid)
-			local before = control.content
-			helpers.assert_eq(taps.set_action("number_row_left", "none", valid), false)
+			local baseline = preferences.source_snapshot("config")
+			control.refuse = true
+			helpers.assert_eq(taps.set_action("number_row_left", "screen_capture", valid), false)
 			helpers.assert_eq(control.content, before)
 			helpers.assert_eq(control.writes, 0)
 			helpers.assert_eq(taps.decide(50), "send_text")
+			helpers.assert_eq(preferences.source_snapshot("config"), baseline)
+			control.refuse = false
+			helpers.assert_eq(taps.set_action("number_row_left", "screen_capture", valid), true)
+			helpers.assert_eq(control.content, changed)
+			helpers.assert_eq(control.writes, 1)
+			helpers.assert_eq(preferences.source_snapshot("config").content, changed)
+			for _, code in ipairs({ 50, 10 }) do
+				local action, binding = taps.decide(code)
+				helpers.assert_eq(action, "screen_capture")
+				helpers.assert_eq(binding, "tap_key__number_row_left")
+			end
+			package.loaded["modules.shortcuts.tap_keys"] = nil
+			local fresh = require("modules.shortcuts.tap_keys")
+			fresh.load(valid)
+			helpers.assert_eq(fresh.get_action("number_row_left"), "screen_capture")
+			helpers.assert_eq(fresh.decide(50), "screen_capture")
+			helpers.assert_eq(fresh.set_action("number_row_left", "none", valid), true)
+			helpers.assert_eq(control.content, removed)
+			helpers.assert_eq(control.writes, 2)
+			helpers.assert_eq(preferences.source_snapshot("config").content, removed)
+			package.loaded["modules.shortcuts.tap_keys"] = nil
+			local restarted = require("modules.shortcuts.tap_keys")
+			restarted.load(valid)
+			helpers.assert_eq(restarted.get_action("number_row_left"), "none")
+			for _, code in ipairs({ 50, 10 }) do
+				local action, binding = restarted.decide(code)
+				helpers.assert_nil(action); helpers.assert_nil(binding)
+			end
 		end)
 	end)
 

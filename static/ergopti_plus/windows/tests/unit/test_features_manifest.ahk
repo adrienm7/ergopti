@@ -1135,8 +1135,8 @@ Test("#HotIf Features[]: all occurrences have IsSet(Features) guard",
 ; Win+magic-key owner intercepted input outside that assignment model and could
 ; not be removed or rebound from the Shortcuts menu.
 TestFMv2_PersonalEditorHasNoDedicatedMagicBinding() {
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	Code := _StripFullLineComments(FileRead(WindowsDir . "\modules\keymap\layout.ahk", "UTF-8"))
+	Code := _StripFullLineComments(_DriverDirConcat("modules/keymap"))
+	Assert(Trim(Code) != "", "the complete actual keymap module must be readable and nonempty")
 	Assert(!InStr(Code, "OpenPersonalEditor()"),
 		"layout.ahk must never register an editor binding outside ordinary keyboard slots")
 	for Chosen in [false, true] {
@@ -1615,22 +1615,33 @@ _FMS_ChildPoliciesAndFullSave(Path, ExpectedSave) {
 		_ConfigBootOutdatedEntries := Map()
 		ParseConfigTomlFile(Path)
 		AssertEqual(1, ApplyBootConfigToml(Target, Path), "only the valid timing child applies")
-		Caps := Target["hotstrings"]["autocorrection"]["names"]
-		AssertFalse(Caps["enabled"], "an invalid known Boolean child cannot become truthy")
-		AssertEqual(0.25, Caps["time_activation_seconds"])
-		AssertFalse(Caps.Has("future"), "unowned fields are ignored in runtime, retained on disk")
+		Names := Target["hotstrings"]["autocorrection"]["names"]
+		AssertFalse(Names["enabled"], "an invalid known Boolean child cannot become truthy")
+		AssertEqual(0.25, Names["time_activation_seconds"])
+		AssertFalse(Names.Has("future"), "unowned fields are ignored in runtime, retained on disk")
 		AssertTrue(_ConfigBootOutdatedEntries.Has("hotstrings.autocorrection.names`nenabled"),
 			"the exact child identity, not the parent record, owns neutral-save preservation")
 		Collect() {
 			Updates := []
-			_CollectFeatureUpdates(Updates, "hotstrings.autocorrection.names", Caps)
+			_CollectFeatureUpdates(Updates, "hotstrings.autocorrection.names", Names)
 			return Updates
 		}
-		AssertEqual(ExpectedSave, SaveFullConfig(0, (*) => true, true, 0, Collect),
-			"the actual full-save owner distinguishes preserved physical no-op from unaddressable inline refusal")
+		BeforeRequested := _ConfigFullSaveCoordinator().requested_generation
+		BeforeCommitted := _ConfigFullSaveCoordinator().committed_generation
+		AssertEqual(BeforeRequested, BeforeCommitted, "the fixture starts with no uncommitted generation")
+		Requested := 0
+		Result := SaveFullConfig(0, (*) => true, true, 0, Collect, &Requested)
+		AssertTrue(Result is Integer, "the full-save capability preserves its strict native status type")
+		AssertEqual(ExpectedSave, Result,
+			"the actual full-save owner acknowledges preserved inline and physical semantic no-ops")
+		AssertEqual(BeforeRequested + 1, Requested, "one real request owns one new generation")
+		AssertEqual(Requested, _ConfigFullSaveCoordinator().requested_generation)
 		AssertEqual(Original, FSRead(Path), "neither outcome may erase the invalid or unowned source child")
-		if ExpectedSave == CONFIG_SAVE_OK
-			AssertEqual(_ConfigFullSaveCoordinator().requested_generation, _ConfigFullSaveCoordinator().committed_generation)
+		if ExpectedSave == CONFIG_SAVE_OK {
+			AssertEqual(Requested, _ConfigFullSaveCoordinator().committed_generation)
+			AssertEqual(Requested, _ConfigFullSaveCoordinator().settled_generation)
+			AssertFalse(_ConfigFullSaveHasPending(), "the successful no-op settles exactly its request")
+		}
 		else
 			Assert(_ConfigFullSaveCoordinator().committed_generation < _ConfigFullSaveCoordinator().requested_generation,
 				"an inline writer refusal must not acknowledge the requested generation")
@@ -1641,7 +1652,7 @@ _FMS_ChildPoliciesAndFullSave(Path, ExpectedSave) {
 }
 _FMS_InlineChildRefusalAndPhysicalPreservation() {
 	_FMS_WithSource("inline_child", '[hotstrings]`nautocorrection = { names = { enabled = "true", time_activation_seconds = 0.25, future = "retain" } } # preserve`n',
-		_FMS_ChildPoliciesAndFullSave.Bind(, CONFIG_SAVE_FAILED))
+		_FMS_ChildPoliciesAndFullSave.Bind(, CONFIG_SAVE_OK))
 	_FMS_WithSource("physical_child", '[hotstrings.autocorrection.names]`nenabled = "true" # outdated`ntime_activation_seconds = 0.25`nfuture = "retain" # unknown`n',
 		_FMS_ChildPoliciesAndFullSave.Bind(, CONFIG_SAVE_OK))
 }
@@ -1870,6 +1881,139 @@ _FMS_RepeatedArrayReadUsesRetainedSource() {
 Test("configuration snapshot: repeated array consumers cannot mutate retained source rows (config-semantic-snapshot)",
 	_FMS_RepeatedArrayReadUsesRetainedSource)
 
+; Actual publication is followed by a fresh native bootstrap reader process.
+; The complete expected image is authored here, independently of the renderer.
+_FMS_FullSaveChangedInlineSource(Path) {
+	global _ConfigBootRejectedOverrides, _ConfigBootOutdatedEntries
+	Runtime := _CFGFS_CaptureRuntime(), Coordinator := _ConfigFullSaveCoordinator()
+	Target := ManifestBuildFeaturesMap()
+	; A nondefault target exercises a durable leaf; the default 0.5 is sparse.
+	Expected := Chr(0xFEFF) . 'hotstrings.trigger_char = "@"`nhotstrings.autocorrection = {names = {enabled = "true", time_activation_seconds = 0.75, future = "retain"}}`n[future]`nold = "retain" # user data`n'
+	try {
+		_CFGFS_Prepare(Path)
+		_ConfigBootRejectedOverrides := 0
+		_ConfigBootOutdatedEntries := Map()
+		ParseConfigTomlFile(Path)
+		AssertEqual(2, ApplyBootConfigToml(Target, Path), "the supported trigger scalar and valid timing record both apply")
+		AssertEqual("@", Target["hotstrings"]["trigger_char"], "the independently supplied trigger leaf also reaches Features")
+		AssertEqual(0, _ConfigBootRejectedOverrides)
+		AssertTrue(_ConfigBootOutdatedEntries.Has("hotstrings.autocorrection.names`nenabled"))
+		Names := Target["hotstrings"]["autocorrection"]["names"]
+		AssertFalse(Names["enabled"])
+		AssertEqual(0.25, Names["time_activation_seconds"], "the real boot loader supplies the original valid timing")
+		Names["time_activation_seconds"] := 0.75
+		Collect() {
+			Updates := []
+			_CollectFeatureUpdates(Updates, "hotstrings.autocorrection.names", Names)
+			return Updates
+		}
+		Before := FSReadUtf8Exact(Path)
+		Requested := 0
+		AssertEqual(0, _ConfigFullSaveCoordinator().requested_generation)
+		AssertEqual(0, _ConfigFullSaveCoordinator().committed_generation)
+		Result := SaveFullConfig(0, (*) => true, true, 0, Collect, &Requested)
+		AssertTrue((Result is Integer) && Result == CONFIG_SAVE_OK, "only the strict durable status acknowledges the real feature")
+		AssertEqual(1, Requested)
+		AssertEqual(Requested, _ConfigFullSaveCoordinator().requested_generation)
+		AssertEqual(Requested, _ConfigFullSaveCoordinator().committed_generation)
+		AssertEqual(Requested, _ConfigFullSaveCoordinator().settled_generation)
+		AssertFalse(_ConfigFullSaveHasPending())
+		Assert(Before != Expected, "the actual feature changes a valid owned timing leaf")
+		AssertEqual(Expected, FSReadUtf8Exact(Path), "the complete image retains obsolete and foreign values")
+		Harness := A_ScriptDir . "\support\feature_state_boot_smoke.ahk"
+		Command := '"' . A_AhkPath . '" /ErrorStdOut "' . Harness . '" persisted_semantic "' . Path . '"'
+		AssertEqual(0, RunWait(Command, A_ScriptDir, "Hide"), "a new native process reads the durable semantic source")
+		AssertEqual(Expected, FSReadUtf8Exact(Path), "the fresh bootstrap reader cannot normalize or clean the source")
+	} finally {
+		_ConfigFullSaveCoordinator(Coordinator)
+		_CFGFS_RestoreRuntime(Runtime)
+	}
+}
+_FMS_FullSaveChangedInlineAndRestart() {
+	_FMS_WithSource("fullsave_inline_changed", 'hotstrings.trigger_char = "@"`nhotstrings.autocorrection = {names = {enabled = "true", time_activation_seconds = 0.25, future = "retain"}}`n[future]`nold = "retain" # user data`n',
+		_FMS_FullSaveChangedInlineSource)
+}
+Test("configuration snapshot: actual full save changes an inline leaf and survives fresh native bootstrap (config-full-semantic-successor)",
+	_FMS_FullSaveChangedInlineAndRestart)
+
+; A removed feature stays source data until the existing explicit cleanup owner
+; removes its exact offered keys. Ordinary publication owns only current names.
+_FMS_RemovedCapsPreservedUntilCleanup(Path) {
+	global _ConfigBootRejectedOverrides, _ConfigBootOutdatedEntries
+	Runtime := _CFGFS_CaptureRuntime(), Coordinator := _ConfigFullSaveCoordinator()
+	BackupPath := ""
+	Target := ManifestBuildFeaturesMap()
+	try {
+		_CFGFS_Prepare(Path)
+		_ConfigBootRejectedOverrides := 0
+		_ConfigBootOutdatedEntries := Map()
+		Original := FSReadUtf8Exact(Path)
+		AssertTrue(Target["hotstrings"]["autocorrection"].Has("names"), "the positive control has a published feature owner")
+		AssertFalse(Target["hotstrings"]["autocorrection"].Has("caps"), "the removed feature cannot be restored as a fixture shortcut")
+		AssertFalse(Target["hotstrings"]["autocorrection"]["names"]["enabled"])
+		AssertEqual(0.5, Target["hotstrings"]["autocorrection"]["names"]["time_activation_seconds"])
+		ParseConfigTomlFile(Path)
+		AssertEqual(2, ApplyBootConfigToml(Target, Path), "only the two actual known names children apply")
+		AssertEqual(0, _ConfigBootRejectedOverrides)
+		AssertEqual(0, _ConfigBootOutdatedEntries.Count, "removed paths are unused, not invalid known values")
+		AssertFalse(Target["hotstrings"]["autocorrection"].Has("caps"), "source parsing cannot manufacture removed runtime ownership")
+		Names := Target["hotstrings"]["autocorrection"]["names"]
+		AssertTrue(Names["enabled"])
+		AssertEqual(0.25, Names["time_activation_seconds"])
+		Names["time_activation_seconds"] := 0.75
+		Collect() {
+			Updates := []
+			_CollectFeatureUpdates(Updates, "hotstrings.autocorrection.names", Names)
+			return Updates
+		}
+		Requested := 0
+		Result := SaveFullConfig(0, (*) => true, true, 0, Collect, &Requested)
+		AssertTrue((Result is Integer) && Result == CONFIG_SAVE_OK)
+		AssertEqual(1, Requested)
+		AssertEqual(Requested, _ConfigFullSaveCoordinator().committed_generation)
+		Expected := StrReplace(Original, "time_activation_seconds = 0.25", "time_activation_seconds = 0.75")
+		AssertEqual(Expected, FSReadUtf8Exact(Path), "an unrelated admitted save retains the entire removed source namespace")
+		Document := TOML_ParseDocument(FSReadUtf8Exact(Path))
+		AssertTrue(Document["hotstrings"]["autocorrection"]["caps"]["enabled"].Value)
+		AssertEqual(0.125, Document["hotstrings"]["autocorrection"]["caps"]["time_activation_seconds"])
+		Scan := ConfigUnusedKeysFind(Path)
+		AssertEqual("ok", Scan["status"])
+		AssertEqual(2, Scan["keys"].Length, "only the two removed source children are offered")
+		Identities := Map()
+		for Entry in Scan["keys"] {
+			AssertEqual("hotstrings.autocorrection.caps", Entry["section"])
+			Identities[Entry["key"]] := true
+		}
+		AssertTrue(Identities.Has("enabled"))
+		AssertTrue(Identities.Has("time_activation_seconds"))
+		Stamp := "20990101-000312-" . ProcessExist() . "-" . A_TickCount
+		CandidateBackup := ConfigUnusedKeysBackupPath(Path, Stamp)
+		AssertFalse(FileExist(CandidateBackup), "the explicit cleanup fixture owns a fresh backup path")
+		Removal := ConfigUnusedKeysRemove(Path, Scan["keys"], Stamp, 0, 0, Expected)
+		AssertEqual("removed", Removal["status"])
+		BackupPath := Removal["backup"]
+		AssertEqual(CandidateBackup, BackupPath)
+		AssertEqual(2, Removal["removed"])
+		AssertEqual(Expected, FSReadUtf8Exact(Removal["backup"]), "cleanup backs up the exact admitted source first")
+		Document := TOML_ParseDocument(FSReadUtf8Exact(Path))
+		AssertFalse(Document["hotstrings"]["autocorrection"].Has("caps"))
+		AssertTrue(Document["hotstrings"]["autocorrection"]["names"]["enabled"].Value)
+		AssertEqual(0.75, Document["hotstrings"]["autocorrection"]["names"]["time_activation_seconds"])
+		AssertEqual(0, ConfigUnusedKeysFind(Path)["keys"].Length)
+	} finally {
+		if BackupPath != ""
+			try FileDelete(BackupPath)
+		_ConfigFullSaveCoordinator(Coordinator)
+		_CFGFS_RestoreRuntime(Runtime)
+	}
+}
+_FMS_RemovedCapsDoNotAcquireKnownOwnership() {
+	_FMS_WithSource("removed_caps", '[hotstrings.autocorrection.names]`nenabled = true`ntime_activation_seconds = 0.25`n[hotstrings.autocorrection.caps]`nenabled = true`ntime_activation_seconds = 0.125`n',
+		_FMS_RemovedCapsPreservedUntilCleanup)
+}
+Test("configuration snapshot: removed caps stays runtime unread and is preserved until explicit cleanup (config-current-feature-owner)",
+	_FMS_RemovedCapsDoNotAcquireKnownOwnership)
+
 ; Retired family source remains readable without becoming a current feature.
 _FMS_RetiredCorrectionFamily(Path) {
 	Original := FSRead(Path)
@@ -1888,3 +2032,641 @@ _FMS_RetiredCorrectionFamilyRemainsSourceOnly() {
 }
 Test("configuration snapshot: retired correction family stays source-only (config-semantic-snapshot)",
 	_FMS_RetiredCorrectionFamilyRemainsSourceOnly)
+
+; A genuine loader owns exact user names; full-state traversal must not flatten them.
+_FMS_ConfigExactNameFixtures() {
+	return [
+		{ name: "literal.ok", header: '[hotstrings.personal."literal.ok"]' },
+		{ name: "", header: '[hotstrings.personal.""]' },
+		{ name: Chr(0x1F680), header: '[hotstrings.personal."' . Chr(0x1F680) . '"]' },
+		{ name: "Twin", header: '[hotstrings.personal."Twin"]' },
+		{ name: "twin", header: '[hotstrings.personal."twin"]' }]
+}
+
+_FMS_ConfigExactNameSource(Fixture) {
+	return "# private exact-name source`n" . Fixture.header . "`n"
+		. "enabled = true # current choice`ntime_activation_seconds = 0.125`n"
+		. '# keep source trivia`n[future]`n"literal.dot" = { rows = [[1, "x"]], count = 9223372036854775807 }`n'
+}
+
+_FMS_ConfigExactWholeCollector(Path, Fixture) {
+	global _LLM_Menu
+	Target := ManifestBuildFeaturesMap()
+	AssertEqual(2, ApplyConfigToml(Target, Path), "the real reader admits both dynamic typed fields")
+	AssertTrue(Target["hotstrings"]["personal"].Has(Fixture.name))
+	Menu := _HSDeepCloneMap(_LLM_Menu)
+	Menu["onboarding_seen"] := false
+	Menu["app_profile_overrides"] := Map()
+	Menu["user_profiles"] := []
+	State := MasterGateState(), PriorState := State.Clone()
+	try {
+		State["initialized"] := false
+		Updates := _ConfigCollectFullSaveUpdates(Target, Menu)
+		Found := 0
+		for Update in Updates {
+			Parts := TOML_ParseKeyPath(Update.Section, true)
+			if !_FMS_ConfigExactPersonalRow(Parts, Fixture.name)
+				continue
+			AssertEqual(Fixture.name, Parts[3], "the real full-state collector retains the exact admitted name")
+			AssertTrue(Update.Key == "enabled" || Update.Key == "time_activation_seconds")
+			AssertFalse(Update.HasOwnProp("Delete"), "both explicit choices differ from their published defaults")
+			AssertEqual(Update.Key == "enabled" ? true : 0.125, Update.Value)
+			Found += 1
+		}
+		AssertEqual(2, Found, "the genuine whole collector must include both exact dynamic rows")
+	} finally {
+		State.Clear()
+		for Key, Value in PriorState
+			State[Key] := Value
+	}
+}
+_FMS_ConfigWholeCollectorsKeepExactNames() {
+	for Index, Fixture in _FMS_ConfigExactNameFixtures()
+		_FMS_WithSource("fullcollector_name_" . Index, _FMS_ConfigExactNameSource(Fixture),
+			_FMS_ConfigExactWholeCollector.Bind(, Fixture))
+}
+Test("configuration snapshot: actual whole full-state collector retains exact semantic names (config-full-state-exact-path)",
+	_FMS_ConfigWholeCollectorsKeepExactNames)
+
+; The same recursive collector and sparse adapter feed the real durable full-save owner.
+_FMS_ConfigExactCollectedSubtree(Target) {
+	Updates := []
+	_CollectFeatureUpdates(Updates, "hotstrings.personal", Target["hotstrings"]["personal"])
+	return _ConfigSparseUpdates(Updates)
+}
+
+_FMS_ConfigExactNameFullSave(Path, Fixture) {
+	global _ConfigBootRejectedOverrides, _ConfigBootOutdatedEntries
+	Runtime := _CFGFS_CaptureRuntime(), Coordinator := _ConfigFullSaveCoordinator()
+	Original := _FMS_ConfigExactNameSource(Fixture)
+	Target := ManifestBuildFeaturesMap()
+	try {
+		_CFGFS_Prepare(Path)
+		_ConfigBootRejectedOverrides := 0
+		_ConfigBootOutdatedEntries := Map()
+		AssertEqual(2, ApplyBootConfigToml(Target, Path))
+		AssertEqual(Original, FSRead(Path))
+		Collector := _FMS_ConfigExactCollectedSubtree.Bind(Target)
+		AssertEqual(CONFIG_SAVE_OK, SaveFullConfig(0, (*) => true, true, 0, Collector))
+		AssertEqual(Original, FSRead(Path), "a collected semantic no-op retains the complete handwritten source")
+		Target["hotstrings"]["personal"][Fixture.name]["enabled"] := false
+		AssertEqual(CONFIG_SAVE_OK, SaveFullConfig(0, (*) => true, true, 0, Collector))
+		ExpectedSource := "# private exact-name source`n" . Fixture.header . "`n"
+			. "time_activation_seconds = 0.125`n"
+			. '# keep source trivia`n[future]`n"literal.dot" = { rows = [[1, "x"]], count = 9223372036854775807 }`n'
+		AssertEqual(ExpectedSource, FSRead(Path), "only the explicitly cleared leaf is removed")
+		Personal := Map()
+		Personal.CaseSense := "On"
+		Personal[Fixture.name] := Map("time_activation_seconds", 0.125)
+		_FMS_AssertExactTree(Map("hotstrings", Map("personal", Personal),
+			"future", Map("literal.dot", Map("rows", [[1, "x"]], "count", 9223372036854775807))),
+			TOML_ParseDocument(FSRead(Path)))
+		Reloaded := ManifestBuildFeaturesMap()
+		AssertEqual(1, ApplyConfigToml(Reloaded, Path), "the genuine reload reader keeps the exact remaining owner")
+		AssertTrue(Reloaded["hotstrings"]["personal"].Has(Fixture.name))
+		AssertEqual(0.125, Reloaded["hotstrings"]["personal"][Fixture.name]["time_activation_seconds"])
+		AssertEqual(_ConfigFullSaveCoordinator().requested_generation,
+			_ConfigFullSaveCoordinator().committed_generation)
+		AssertFalse(_ConfigFullSaveHasPending())
+	} finally {
+		_ConfigFullSaveCoordinator(Coordinator)
+		_CFGFS_RestoreRuntime(Runtime)
+	}
+}
+_FMS_ConfigFullSaveKeepsExactNames() {
+	for Index, Fixture in _FMS_ConfigExactNameFixtures()
+		_FMS_WithSource("fullsave_name_" . Index, _FMS_ConfigExactNameSource(Fixture),
+			_FMS_ConfigExactNameFullSave.Bind(, Fixture))
+}
+Test("configuration snapshot: real full-save publication and reload preserve exact semantic names (config-full-state-exact-path)",
+	_FMS_ConfigFullSaveKeepsExactNames)
+
+_FMS_ConfigExactCaseTwins() {
+	Personal := Map()
+	Personal.CaseSense := "On"
+	Personal["Twin"] := Map("enabled", true)
+	Personal["twin"] := Map("enabled", true)
+	Rows := _FMS_ConfigExactCollectedSubtree(Map("hotstrings", Map("personal", Personal)))
+	AssertEqual(2, Rows.Length)
+	Seen := Map()
+	Seen.CaseSense := "On"
+	for Row in Rows {
+		Parts := TOML_ParseKeyPath(Row.Section, true)
+		AssertEqual(3, Parts.Length)
+		Seen[Parts[3]] := Row.Value
+	}
+	AssertEqual(2, Seen.Count, "a supplied exact native Map must not collapse case twins during collection")
+	AssertTrue(Seen.Has("Twin"))
+	AssertTrue(Seen.Has("twin"))
+	Exact := ManifestConfigSparseOperation('hotstrings.personal."literal.ok"', "enabled", true)
+	AssertEqual('hotstrings.personal."literal.ok"', Exact.Section)
+	AssertEqual("enabled", Exact.Key)
+	AssertEqual(true, Exact.Value)
+	AssertFalse(Exact.HasOwnProp("Delete"))
+	AssertTrue(ManifestDynamicEntry("hotstrings.personal.user.enabled") is Map)
+	AssertFalse(ManifestDynamicEntry('hotstrings.personal."literal.ok".enabled'),
+		"the generic path API retains its original lexical segment contract")
+	AssertThrows(ManifestConfigSparseOperation.Bind('hotstrings.personal."literal.ok"', "typo", true),
+		"an exact user name cannot invent a dynamic field")
+	AssertThrows(ManifestConfigSparseOperation.Bind('hotstrings.personall."literal.ok"', "enabled", true),
+		"an adjacent prefix cannot acquire dynamic ownership")
+}
+Test("configuration snapshot: config-row adapter preserves twins and unchanged generic domains (config-full-state-exact-path)",
+	_FMS_ConfigExactCaseTwins)
+
+
+; Full-save traverses initialized personal defaults too. Select the exact fixture
+; identity without relying on Map iteration order or flattening semantic segments.
+_FMS_ConfigExactPersonalRow(Parts, Name) {
+	return Parts is Array && Parts.Length == 3
+		&& StrCompare(Parts[1], "hotstrings", true) == 0
+		&& StrCompare(Parts[2], "personal", true) == 0
+		&& StrCompare(Parts[3], Name, true) == 0
+}
+_FMS_ConfigExactPersonalRowSelection() {
+	for Fixture in _FMS_ConfigExactNameFixtures() {
+		Parts := TOML_ParseKeyPath(SubStr(Fixture.header, 2, StrLen(Fixture.header) - 2), true)
+		AssertTrue(_FMS_ConfigExactPersonalRow(Parts, Fixture.name),
+			"the handwritten physical header resolves to the exact fixture identity")
+		AssertFalse(_FMS_ConfigExactPersonalRow(["hotstrings", "personal", "autocorrection"], Fixture.name),
+			"an initialized default sibling is not the fixture under test")
+		AssertFalse(_FMS_ConfigExactPersonalRow(["hotstrings", "personal", Fixture.name, "child"], Fixture.name),
+			"a descendant must not be mistaken for its literal parent name")
+		AssertFalse(_FMS_ConfigExactPersonalRow(["hotstrings", "Personal", Fixture.name], Fixture.name),
+			"a case-distinct category cannot acquire the fixture identity")
+	}
+	AssertFalse(_FMS_ConfigExactPersonalRow(["hotstrings", "personal", "Twin"], "twin"),
+		"two actual admitted case twins remain distinct")
+	AssertFalse(_FMS_ConfigExactPersonalRow(TOML_ParseKeyPath("hotstrings.personal.literal.ok", true), "literal.ok"),
+		"nested syntax is not the admitted literal-dot name")
+	Defaults := ManifestBuildFeaturesMap()
+	AssertTrue(Defaults["hotstrings"]["personal"].Has("autocorrection"),
+		"the real collector input contains the default sibling that exposed the old premise")
+}
+Test("configuration snapshot: exact fixture row selection rejects initialized siblings and semantic-name decoys",
+	_FMS_ConfigExactPersonalRowSelection)
+
+; The whole native collector remains real: isolate its unrelated runtime owners
+; at their published neutral values, then preserve one actual accepted change.
+_FMS_FullSnapshotParentSource(Literal) {
+	return '[_meta]`nschema_version = ' . ConfigMigrateCurrentVersion()
+		. '`n[hotstrings]`nautocorrection = ' . Literal . ' # retained until explicit cleanup`n'
+		. '[layout]`nergopti_plus = false`n'
+		. '[private]`n"literal.dot" = { keep = [1, "x"], date = 1979-05-27, count = 9223372036854775807 } # future source`n'
+		. '[[private."future.rows"]]`nvalue = "first"`n[[private."future.rows"]]`nvalue = "second"`n'
+}
+
+_FMS_FullSnapshotParent(Path, Literal, Scenario := "complete") {
+	global _I18nLocale, LOGGER_MIN_LEVEL, ScriptInformation
+	global ScriptShortcutAssignments, KeyboardShortcutAssignments, GestureAssignments
+	global CategoryEnabled, UPDATER_CHECK_INTERVAL, UPDATER_CHANNEL, _IniCache
+	global KEYBOARD_SHORTCUT_DEFAULTS
+	global _ConfigBootRejectedOverrides, _ConfigBootOutdatedEntries, Features
+	global _ParseTomlCache, _TomlFileCache, _ConfigTomlSnapshots, _LOGGER_TEST_SINK
+	Runtime := _CFGFS_CaptureRuntime(), Coordinator := _ConfigFullSaveCoordinator()
+	State := MasterGateState(), PriorState := State.Clone()
+	SavedI18nLocale := IsSet(_I18nLocale) ? _I18nLocale : unset
+	SavedLOGGERMINLEVEL := IsSet(LOGGER_MIN_LEVEL) ? LOGGER_MIN_LEVEL : unset
+	SavedScriptInformation := IsSet(ScriptInformation) ? ScriptInformation : unset
+	SavedScriptShortcutAssignments := IsSet(ScriptShortcutAssignments) ? ScriptShortcutAssignments : unset
+	SavedKeyboardShortcutAssignments := IsSet(KeyboardShortcutAssignments) ? KeyboardShortcutAssignments : unset
+	SavedKeyboardDefaults := IsSet(KEYBOARD_SHORTCUT_DEFAULTS) ? KEYBOARD_SHORTCUT_DEFAULTS : unset
+	SavedGestureAssignments := IsSet(GestureAssignments) ? GestureAssignments : unset
+	SavedCategoryEnabled := IsSet(CategoryEnabled) ? CategoryEnabled : unset
+	SavedUPDATERCHECKINTERVAL := IsSet(UPDATER_CHECK_INTERVAL) ? UPDATER_CHECK_INTERVAL : unset
+	SavedUPDATERCHANNEL := IsSet(UPDATER_CHANNEL) ? UPDATER_CHANNEL : unset
+	SavedIniCache := IsSet(_IniCache) ? _IniCache : unset
+	Fields := [
+		{ target: MetricsShortcuts, key: "enabled", path: "metrics.metrics_enabled" },
+		{ target: MetricsShortcuts, key: "wpm_menubar_colors", path: "metrics.metrics_wpm_menubar_colors" },
+		{ target: MetricsFilters, key: "private_browsing", path: "metrics.private_filter_enabled" },
+		{ target: MetricsFilters, key: "secure_field", path: "metrics.secure_filter_enabled" },
+		{ target: MetricsFilters, key: "system_auth", path: "metrics.system_auth_filter_enabled" },
+		{ target: MetricsFilters, key: "encrypt", path: "metrics.encrypt" },
+		{ target: WPMWidget, key: "visible", path: "metrics.wpm_widget_visible" },
+		{ target: WPMWidget, key: "pos_x", path: "metrics.wpm_widget_x" },
+		{ target: WPMWidget, key: "pos_y", path: "metrics.wpm_widget_y" },
+		{ target: WPMWidget, key: "use_colors", path: "metrics.wpm_widget_colors" },
+		{ target: WPMWidget, key: "show_graph", path: "metrics.wpm_widget_graph" }]
+	PriorFields := [], PriorApps := MetricsFilters.disabled_apps
+	Original := FSReadUtf8Exact(Path), Target := ManifestBuildFeaturesMap()
+	BeforeFeatures := _HSDeepCloneMap(Features), Borrowed := 0, Collected := 0
+	Foreign := Original . "# external generation during actual collection`n"
+	Expected := StrReplace(Original, "ergopti_plus = false`n", "ergopti_plus = true`n")
+	Collect() {
+		Collected += 1
+		Rows := _ConfigCollectFullSaveUpdates(Target, false)
+		Repeated := 0
+		for Row in Rows {
+			if Row.Section == "script" && Row.Key == "locale"
+				Repeated += 1
+		}
+		Assert(Repeated >= 2, "the actual whole-state producer has intentional repeated runtime-owner rows")
+		if Scenario == "late-neutral"
+			Rows.Push({ Section: "hotstrings.autocorrection.names", Key: "enabled", Delete: 1 })
+		if Scenario == "source" || Scenario == "absent"
+			Assert(FSWriteDurable(Path, Foreign), "the external successor must reach the real filesystem")
+		return Rows
+	}
+	try {
+		_CFGFS_Prepare(Path)
+		_ConfigBootRejectedOverrides := 0, _ConfigBootOutdatedEntries := Map()
+		ApplyBootConfigToml(Target, Path)
+		AssertEqual(0, _ConfigBootRejectedOverrides)
+		Assert(_ConfigBootOutdatedEntries.Has("hotstrings`nautocorrection"), "the actual loader owns the obsolete parent classification")
+		AssertFalse(Target["hotstrings"]["autocorrection"]["names"]["enabled"])
+		Target["layout"]["ergopti_plus"] := true
+		if Scenario == "nonneutral" || Scenario == "late-neutral"
+			Target["hotstrings"]["autocorrection"]["names"]["enabled"] := true
+		_I18nLocale := "fr", LOGGER_MIN_LEVEL := "INFO"
+		ScriptInformation := Map("MagicKey", "★")
+		ScriptShortcutAssignments := Map(), KeyboardShortcutAssignments := Map()
+		; The headless runner omits feature_state; use its exact manifest default projection.
+		KEYBOARD_SHORTCUT_DEFAULTS := Map()
+		for Entry in ManifestFeaturesForSection("shortcuts.keyboard")
+			KEYBOARD_SHORTCUT_DEFAULTS[Entry["id"]] := ManifestDefaultFor(Entry["path"])
+		Assert(KEYBOARD_SHORTCUT_DEFAULTS.Count > 0, "the real collector receives the native manifest-derived keyboard defaults")
+		GestureAssignments := Map(), CategoryEnabled := Map(), _IniCache := Map()
+		UPDATER_CHECK_INTERVAL := unset, UPDATER_CHANNEL := unset
+		MetricsFilters.disabled_apps := Map()
+		for Field in Fields {
+			PriorFields.Push({ target: Field.target, key: Field.key, value: Field.target.%Field.key% })
+			Field.target.%Field.key% := ManifestDefaultFor(Field.path)
+		}
+		State["initialized"] := false
+		if Scenario == "repair" {
+			Repair := StrReplace(Original, 'autocorrection = ' . Literal . ' # retained until explicit cleanup`n',
+				'[hotstrings.autocorrection.names]`nenabled = true`n')
+			Assert(FSWriteDurable(Path, Repair))
+			Expected := StrReplace(Repair, "ergopti_plus = false`n", "ergopti_plus = true`n")
+			Expected := StrReplace(Expected, "enabled = true`n", "")
+			Assert(_ConfigBootOutdatedEntries.Has("hotstrings`nautocorrection"), "the stale warning is deliberately retained")
+		}
+		if Scenario == "absent" {
+			Assert(FSDelete(Path))
+			AssertFalse(FileExist(Path), "source admission must observe genuine absence")
+		}
+		StampRefused := SubStr(Scenario, 1, 6) == "stamp-"
+		if StampRefused {
+			Registry := ConfigMigrateShippedRegistry()
+			Stamp := Scenario == "stamp-invalid" ? '"invalid"'
+				: Scenario == "stamp-newer" ? String(Registry["current"] + 1)
+				: Scenario == "stamp-older" ? String(Registry["unstamped"])
+				: Scenario == "stamp-boolean" ? "true"
+				: Scenario == "stamp-fractional" ? String(Registry["current"] + 0.5) : ""
+			ChangedSource := Scenario == "stamp-parent"
+				? StrReplace(Original, '[_meta]`nschema_version = ' . Registry["current"] . '`n', '_meta = false`n')
+				: StrReplace(Original, "schema_version = " . Registry["current"], "schema_version = " . Stamp)
+			AssertFalse(ChangedSource == Original, "the actual post-boot schema edit must change physical source")
+			Assert(FSWriteDurable(Path, ChangedSource))
+			Original := ChangedSource
+			AssertEqual("", TOML_WriteRefusal(Path), "fresh admission must not borrow a pre-existing session refusal")
+		}
+		if Scenario == "schema"
+			TOML_RefuseWrites(Path, "invalid schema stamp")
+		if Scenario == "borrowed" {
+			Borrowed := _ConfigWriteLeaseTryAcquire(Path, "full-parent-test")
+			Assert(Borrowed is Object)
+		}
+		Requested := 0
+		NativeLog := [], PriorLogSink := _LOGGER_TEST_SINK
+		try {
+			LoggerSetTestSink((Line) => NativeLog.Push(Line))
+			Result := SaveFullConfig(0, (*) => true, true, Borrowed, Collect, &Requested)
+		} finally {
+			_LOGGER_TEST_SINK := PriorLogSink
+		}
+		Trace := ""
+		for Line in NativeLog
+			Trace .= (Trace != "" ? "`n" : "") . Line
+		Diagnostic := " | scenario=" . Scenario . " collected=" . Collected
+			. " native_log=" . JsonStringLiteral(Trace)
+		if StampRefused || Scenario == "nonneutral" || Scenario == "late-neutral" || Scenario == "source" || Scenario == "absent" || Scenario == "schema" {
+			AssertEqual(CONFIG_SAVE_FAILED, Result, "a nonneutral collision or withdrawn source never receives a successful full-save ACK" . Diagnostic)
+			ActualSource := FSReadUtf8Exact(Path)
+			ExpectedSource := Scenario == "source" || Scenario == "absent" ? Foreign : Original
+			AssertEqual(ExpectedSource, ActualSource,
+				"the complete retained or external source survives refusal" . Diagnostic
+					. " expected=" . JsonStringLiteral(String(ExpectedSource))
+					. " actual=" . JsonStringLiteral(String(ActualSource)))
+			AssertEqual(0, _ConfigFullSaveCoordinator().committed_generation)
+			if Scenario == "schema" {
+				AssertEqual(0, Collected, "the strict session fence precedes the real collector")
+				AssertEqual("invalid schema stamp", TOML_WriteRefusal(Path))
+			} else if StampRefused {
+				AssertEqual(0, Collected, "the current physical schema stamp is admitted before invoking any collector")
+				Assert(Requested > 0 && _ConfigFullSaveHasPending(), "fresh schema refusal retains the exact outstanding request")
+				AssertEqual(0, _ConfigFullSaveCoordinator().settled_generation)
+				AssertEqual("", TOML_WriteRefusal(Path), "fresh snapshot refusal does not invent a session migration result")
+				AssertFalse(FileExist(Path . ".bak"), "refused source admission does not create a backup")
+			} else {
+				AssertEqual(1, Collected)
+				Assert(_ConfigFullSaveHasPending(), "failure retains the exact outstanding request")
+			}
+		} else {
+			AssertEqual(CONFIG_SAVE_OK, Result, "unrelated real snapshot changes can commit while obsolete parents remain" . Diagnostic)
+			AssertEqual(1, Collected)
+			AssertEqual(Expected, FSReadUtf8Exact(Path), "the complete handwritten physical image changes only admitted owned fields")
+			AssertEqual(Requested, _ConfigFullSaveCoordinator().committed_generation)
+			AssertEqual(Requested, _ConfigFullSaveCoordinator().settled_generation)
+			AssertFalse(_ConfigFullSaveHasPending())
+			Doc := TOML_ParseDocument(FSReadUtf8Exact(Path))
+			AssertTrue(Doc["layout"]["ergopti_plus"].Value)
+			if Scenario == "repair"
+				Assert(Doc["hotstrings"]["autocorrection"]["names"] is Map && Doc["hotstrings"]["autocorrection"]["names"].Count == 0)
+			else
+				Assert(TOML_SameValue(TOML_ParseDocument(Original)["hotstrings"], Doc["hotstrings"]), "the obsolete raw model is retained without normalization")
+			Assert(TOML_SameValue(TOML_ParseDocument(Original)["private"], Doc["private"]), "quoted future fields, dates, maximum integers and table-array generations remain unchanged")
+			Restart := Path . ".restart.toml"
+			try {
+				Assert(FSWriteCreateDurable(Restart, Expected))
+				Reloaded := ManifestBuildFeaturesMap()
+				ApplyConfigToml(Reloaded, Restart, &Rejected, , &Outdated)
+				AssertEqual(0, Rejected)
+				AssertTrue(Reloaded["layout"]["ergopti_plus"])
+				AssertFalse(Reloaded["hotstrings"]["autocorrection"]["names"]["enabled"])
+				if Scenario != "repair"
+					Assert(Outdated.Has("hotstrings`nautocorrection"))
+				AssertEqual(Expected, FSReadUtf8Exact(Restart))
+			} finally {
+				for Store in [_ParseTomlCache, _TomlFileCache, _ConfigTomlSnapshots] {
+					if Store.Has(Restart)
+						Store.Delete(Restart)
+				}
+				if FileExist(Restart)
+					FSDelete(Restart)
+			}
+		}
+		_FMS_AssertExactTree(BeforeFeatures, Features)
+		if Borrowed is Object {
+			Assert(_ConfigWriteLeaseOwns(Borrowed, Path), "a full save never releases its borrowed owner")
+			AssertFalse(_ConfigWriteLeaseTryAcquire(Path, "intruder"))
+		}
+	} finally {
+		if Borrowed is Object
+			_ConfigWriteLeaseRelease(Borrowed)
+		for Field in PriorFields
+			Field.target.%Field.key% := Field.value
+		MetricsFilters.disabled_apps := PriorApps
+		_I18nLocale := IsSet(SavedI18nLocale) ? SavedI18nLocale : unset
+		LOGGER_MIN_LEVEL := IsSet(SavedLOGGERMINLEVEL) ? SavedLOGGERMINLEVEL : unset
+		ScriptInformation := IsSet(SavedScriptInformation) ? SavedScriptInformation : unset
+		ScriptShortcutAssignments := IsSet(SavedScriptShortcutAssignments) ? SavedScriptShortcutAssignments : unset
+		KeyboardShortcutAssignments := IsSet(SavedKeyboardShortcutAssignments) ? SavedKeyboardShortcutAssignments : unset
+		KEYBOARD_SHORTCUT_DEFAULTS := IsSet(SavedKeyboardDefaults) ? SavedKeyboardDefaults : unset
+		GestureAssignments := IsSet(SavedGestureAssignments) ? SavedGestureAssignments : unset
+		CategoryEnabled := IsSet(SavedCategoryEnabled) ? SavedCategoryEnabled : unset
+		UPDATER_CHECK_INTERVAL := IsSet(SavedUPDATERCHECKINTERVAL) ? SavedUPDATERCHECKINTERVAL : unset
+		UPDATER_CHANNEL := IsSet(SavedUPDATERCHANNEL) ? SavedUPDATERCHANNEL : unset
+		_IniCache := IsSet(SavedIniCache) ? SavedIniCache : unset
+		State.Clear()
+		for Key, Value in PriorState
+			State[Key] := Value
+		_ConfigFullSaveCoordinator(Coordinator)
+		_CFGFS_RestoreRuntime(Runtime)
+	}
+}
+
+_FMS_FullSnapshotParentCase(Literal, Scenario := "complete") {
+	_FMS_WithSource("full_parent_" . Scenario . "_" . A_TickCount, _FMS_FullSnapshotParentSource(Literal),
+		_FMS_FullSnapshotParent.Bind(, Literal, Scenario))
+}
+Test("full-snapshot-obsolete-parent: actual scalar namespace retains source and unrelated state", _FMS_FullSnapshotParentCase.Bind('false'))
+Test("full-snapshot-obsolete-parent: actual string namespace retains source", _FMS_FullSnapshotParentCase.Bind('"old-shape"'))
+Test("full-snapshot-obsolete-parent: actual integer namespace retains source", _FMS_FullSnapshotParentCase.Bind('2'))
+Test("full-snapshot-obsolete-parent: actual float namespace retains source", _FMS_FullSnapshotParentCase.Bind('2.0'))
+Test("full-snapshot-obsolete-parent: actual array namespace retains source", _FMS_FullSnapshotParentCase.Bind('[1, "x"]'))
+Test("full-snapshot-obsolete-parent: actual borrowed lease remains owned", _FMS_FullSnapshotParentCase.Bind('false', "borrowed"))
+Test("full-snapshot-obsolete-parent: actual nonneutral child refuses complete source", _FMS_FullSnapshotParentCase.Bind('false', "nonneutral"))
+Test("full-snapshot-obsolete-parent: later neutral repetition cannot hide a nonneutral child", _FMS_FullSnapshotParentCase.Bind('false', "late-neutral"))
+Test("full-snapshot-obsolete-parent: actual collection cannot adopt an external generation", _FMS_FullSnapshotParentCase.Bind('false', "source"))
+Test("full-snapshot-obsolete-parent: admitted absence cannot adopt an external creation", _FMS_FullSnapshotParentCase.Bind('false', "absent"))
+Test("full-snapshot-obsolete-parent: actual schema fence precedes collection", _FMS_FullSnapshotParentCase.Bind('false', "schema"))
+Test("full-snapshot-obsolete-parent: actual repair supersedes stale boot warning", _FMS_FullSnapshotParentCase.Bind('false', "repair"))
+Test("full-snapshot-obsolete-parent: fresh invalid string stamp refuses before collection", _FMS_FullSnapshotParentCase.Bind('false', "stamp-invalid"))
+Test("full-snapshot-obsolete-parent: fresh newer stamp refuses before collection", _FMS_FullSnapshotParentCase.Bind('false', "stamp-newer"))
+Test("full-snapshot-obsolete-parent: fresh older migration-eligible stamp refuses before collection", _FMS_FullSnapshotParentCase.Bind('false', "stamp-older"))
+Test("full-snapshot-obsolete-parent: fresh Boolean stamp refuses before collection", _FMS_FullSnapshotParentCase.Bind('false', "stamp-boolean"))
+Test("full-snapshot-obsolete-parent: fresh fractional stamp refuses before collection", _FMS_FullSnapshotParentCase.Bind('false', "stamp-fractional"))
+Test("full-snapshot-obsolete-parent: fresh scalar metadata-parent stamp refuses before collection", _FMS_FullSnapshotParentCase.Bind('false', "stamp-parent"))
+
+_FMS_FullSnapshotScopeAndIndividualStayStrict() {
+	Source := '[hotstrings]`nautocorrection = false # retained`n'
+	AssertEqual(0, ConfigFullSnapshotCaptureObsoleteSource("").Length, "genuine absence retains the existing unstamped admission contract")
+	AssertEqual(1, ConfigFullSnapshotCaptureObsoleteSource(Source).Length, "unstamped source is classified without inventing a migration")
+	Delete := { Section: "hotstrings.autocorrection.names", Key: "enabled", Delete: 1 }
+	Repeated := [Delete, Delete.Clone()]
+	AssertThrows(ConfigScopePreserveObsoleteSource.Bind(Source, Repeated), "ordinary scope batches still refuse duplicate effects")
+	AssertEqual(0, ConfigFullSnapshotPreserveObsoleteSource(ConfigFullSnapshotCaptureObsoleteSource(Source), Repeated).Length, "every repeated neutral descendant retains the same obsolete parent")
+	Changed := [{ Section: Delete.Section, Key: Delete.Key, Value: true }, Delete]
+	AssertThrows(ConfigFullSnapshotPreserveObsoleteSource.Bind(ConfigFullSnapshotCaptureObsoleteSource(Source), Changed), "a later neutral effect cannot hide earlier nonneutral replacement")
+	Path := _FM_WriteFixture("full_snapshot_individual_strict", Source)
+	Original := FSReadUtf8Exact(Path)
+	try {
+		AssertFalse(TOML_ConfigBatchWrite(Path, [Delete]), "individual typed writes do not gain full-snapshot preservation semantics")
+		AssertEqual(Original, FSReadUtf8Exact(Path))
+	} finally {
+		if FileExist(Path)
+			FSDelete(Path)
+	}
+}
+Test("full-snapshot-obsolete-parent: scope duplicates and individual writer refusal stay strict", _FMS_FullSnapshotScopeAndIndividualStayStrict)
+
+; A file-backed personal category owns its canonical lowercase identity before
+; configuration boot. Exact TOML names do not grant a different alias its intent.
+_FMS_PersonalFileCaseAliasSource(Name) {
+	return '[_meta]`nschema_version = ' . ConfigMigrateCurrentVersion()
+		. '`n[hotstrings.personal.' . Name . ']`nenabled = true # exact source owner`n'
+		. '[future]`n"literal.dot" = { count = 9223372036854775807, date = 1979-05-27 } # retained`n'
+}
+
+_FMS_PersonalFileCaseAlias(Path, Name) {
+	global _I18nLocale, LOGGER_MIN_LEVEL, ScriptInformation
+	global ScriptShortcutAssignments, KeyboardShortcutAssignments, GestureAssignments
+	global KEYBOARD_SHORTCUT_DEFAULTS
+	global CategoryEnabled, UPDATER_CHECK_INTERVAL, UPDATER_CHANNEL, _IniCache
+	global _ConfigBootRejectedOverrides, _ConfigBootOutdatedEntries, Features
+	global _ParseTomlCache, _TomlFileCache, _ConfigTomlSnapshots, _ReadPersonalTomlCache
+	global _TomlUnreadableFiles, _TomlReadFailures
+	Runtime := _CFGFS_CaptureRuntime(), Coordinator := _ConfigFullSaveCoordinator()
+	State := MasterGateState(), PriorState := State.Clone()
+	SavedI18nLocale := IsSet(_I18nLocale) ? _I18nLocale : unset
+	SavedLOGGERMINLEVEL := IsSet(LOGGER_MIN_LEVEL) ? LOGGER_MIN_LEVEL : unset
+	SavedScriptInformation := IsSet(ScriptInformation) ? ScriptInformation : unset
+	SavedScriptShortcutAssignments := IsSet(ScriptShortcutAssignments) ? ScriptShortcutAssignments : unset
+	SavedKeyboardShortcutAssignments := IsSet(KeyboardShortcutAssignments) ? KeyboardShortcutAssignments : unset
+	SavedKeyboardDefaults := IsSet(KEYBOARD_SHORTCUT_DEFAULTS) ? KEYBOARD_SHORTCUT_DEFAULTS : unset
+	SavedGestureAssignments := IsSet(GestureAssignments) ? GestureAssignments : unset
+	SavedCategoryEnabled := IsSet(CategoryEnabled) ? CategoryEnabled : unset
+	SavedUPDATERCHECKINTERVAL := IsSet(UPDATER_CHECK_INTERVAL) ? UPDATER_CHECK_INTERVAL : unset
+	SavedUPDATERCHANNEL := IsSet(UPDATER_CHANNEL) ? UPDATER_CHANNEL : unset
+	SavedIniCache := IsSet(_IniCache) ? _IniCache : unset
+	Fields := [
+		{ target: MetricsShortcuts, key: "enabled", path: "metrics.metrics_enabled" },
+		{ target: MetricsShortcuts, key: "wpm_menubar_colors", path: "metrics.metrics_wpm_menubar_colors" },
+		{ target: MetricsFilters, key: "private_browsing", path: "metrics.private_filter_enabled" },
+		{ target: MetricsFilters, key: "secure_field", path: "metrics.secure_filter_enabled" },
+		{ target: MetricsFilters, key: "system_auth", path: "metrics.system_auth_filter_enabled" },
+		{ target: MetricsFilters, key: "encrypt", path: "metrics.encrypt" },
+		{ target: WPMWidget, key: "visible", path: "metrics.wpm_widget_visible" },
+		{ target: WPMWidget, key: "pos_x", path: "metrics.wpm_widget_x" },
+		{ target: WPMWidget, key: "pos_y", path: "metrics.wpm_widget_y" },
+		{ target: WPMWidget, key: "use_colors", path: "metrics.wpm_widget_colors" },
+		{ target: WPMWidget, key: "show_graph", path: "metrics.wpm_widget_graph" }]
+	PriorFields := [], PriorApps := MetricsFilters.disabled_apps
+	SavedFeatures := Features
+	SavedPersonalCache := _ReadPersonalTomlCache
+	PersonalPath := Path . ".personal_hotstrings.toml", Restart := Path . ".restart.toml"
+	; Retain only diagnostics belonging to these two newly owned paths. Store
+	; the actual prior value reference, including false or object sentinels.
+	OwnedDiagnostics := []
+	for Extra in [Restart, PersonalPath] {
+		for Store in [_TomlUnreadableFiles, _TomlReadFailures] {
+			Present := Store.Has(Extra)
+			OwnedDiagnostics.Push({ store: Store, key: Extra, present: Present,
+				value: Present ? Store[Extra] : false })
+		}
+		Store := _TOML_WriteRefusals(), Key := _TOML_WriteRefusalKey(Extra)
+		Present := Store.Has(Key)
+		OwnedDiagnostics.Push({ store: Store, key: Key, present: Present,
+			value: Present ? Store[Key] : false })
+	}
+	PersonalSource := Chr(0xFEFF) . '[_meta]`nsections_order = ["owned"]`n'
+		. '[[owned]]`n"zz_owned_probe" = { output = "PRIVATE", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }`n'
+	Original := FSReadUtf8Exact(Path)
+	Canonical := StrCompare(Name, "owned", true) == 0
+	try {
+		_CFGFS_Prepare(Path)
+		_ConfigBootRejectedOverrides := 0, _ConfigBootOutdatedEntries := Map()
+		_I18nLocale := "fr", LOGGER_MIN_LEVEL := "INFO"
+		ScriptInformation := Map("MagicKey", "★")
+		ScriptShortcutAssignments := Map(), KeyboardShortcutAssignments := Map()
+		; The headless runner omits feature_state; use its exact manifest default projection.
+		KEYBOARD_SHORTCUT_DEFAULTS := Map()
+		for Entry in ManifestFeaturesForSection("shortcuts.keyboard")
+			KEYBOARD_SHORTCUT_DEFAULTS[Entry["id"]] := ManifestDefaultFor(Entry["path"])
+		Assert(KEYBOARD_SHORTCUT_DEFAULTS.Count > 0, "the real alias collector receives the native manifest-derived keyboard defaults")
+		GestureAssignments := Map(), CategoryEnabled := Map(), _IniCache := Map()
+		UPDATER_CHECK_INTERVAL := unset, UPDATER_CHANNEL := unset
+		MetricsFilters.disabled_apps := Map()
+		for Field in Fields {
+			PriorFields.Push({ target: Field.target, key: Field.key, value: Field.target.%Field.key% })
+			Field.target.%Field.key% := ManifestDefaultFor(Field.path)
+		}
+		State["initialized"] := false
+		ScriptInformation["PersonalTomlPath"] := PersonalPath
+		Assert(FSWriteCreateDurable(PersonalPath, PersonalSource), "the actual personal owner must exist on disk")
+		_ReadPersonalTomlCache := false
+		Features := ManifestBuildFeaturesMap()
+		AssertFalse(Features["hotstrings"]["personal"].Has("owned"), "the category must be discovered from the real personal file")
+		Model := ReadPersonalToml(true)
+		AssertEqual(1, Model["sections_order"].Length)
+		AssertEqual("owned", Model["sections_order"][1])
+		AssertEqual(1, Model["sections"]["owned"]["entries"].Length)
+		AssertEqual("zz_owned_probe", Model["sections"]["owned"]["entries"][1]["trigger"])
+		AssertEqual("PRIVATE", Model["sections"]["owned"]["entries"][1]["output"])
+		Assert(_PersonalTomlCanonicalSectionOrder(Model, &Detail) is Array,
+			"the genuine personal file passes the actual canonical owner contract")
+		UpperModel := _HSDeepCloneMap(Model)
+		UpperModel["sections"] := Map("Owned", UpperModel["sections"]["owned"])
+		UpperModel["sections_order"] := ["Owned"]
+		AssertFalse(_PersonalTomlCanonicalSectionOrder(UpperModel, &UpperDetail),
+			"a distinct uppercase personal owner is outside the actual canonical file contract")
+		Assert(InStr(UpperDetail, "lowercase", true) > 0)
+		for Section in Model["sections_order"] {
+			if Section != "-"
+				EnsurePersonalHotstringFeature(Section)
+		}
+		ActualNames := []
+		for Key in Features["hotstrings"]["personal"] {
+			if StrCompare(Key, "owned", true) == 0
+				ActualNames.Push(Key)
+		}
+		AssertEqual(1, ActualNames.Length, "the real boot owner seeds exactly the stored lowercase category")
+		AssertFalse(Features["hotstrings"]["personal"]["owned"]["enabled"])
+		Snapshot := ConfigTomlReadSnapshot(Path)
+		Exact := Snapshot.Document["hotstrings"]["personal"]
+		AssertEqual("On", Exact.CaseSense)
+		AssertTrue(Exact.Has(Name))
+		AssertFalse(Exact.Has(Canonical ? "Owned" : "owned"), "the typed source must not collapse aliases")
+		AssertEqual("On", Snapshot.Cache.CaseSense)
+		AssertTrue(Snapshot.Cache.Has("hotstrings.personal." . Name))
+		AssertFalse(Snapshot.Cache.Has("hotstrings.personal." . (Canonical ? "Owned" : "owned")))
+		Assert(ApplyBootConfigToml(Features, Path) >= 0, "the real configured boot reader must admit the complete source")
+		AssertEqual(0, _ConfigBootRejectedOverrides)
+		AssertEqual(Original, FSReadUtf8Exact(Path), "boot must preserve the exact case-distinct physical source")
+		AssertEqual(Canonical, Features["hotstrings"]["personal"]["owned"]["enabled"],
+			"only the canonical file-backed owner may receive the persisted enabled intent")
+		Collect() => _ConfigCollectFullSaveUpdates(Features, false)
+		Requested := 0
+		AssertEqual(CONFIG_SAVE_OK, SaveFullConfig(0, (*) => true, true, 0, Collect, &Requested),
+			"the actual whole-state collector and native writer must acknowledge an ordinary save")
+		AssertEqual(Original, FSReadUtf8Exact(Path), "ordinary save retains the exact original source without normalizing the alias")
+		AssertEqual(PersonalSource, FSReadUtf8Exact(PersonalPath), "configuration save must not rewrite the actual personal owner")
+		AssertEqual(Requested, _ConfigFullSaveCoordinator().committed_generation)
+		AssertEqual(Requested, _ConfigFullSaveCoordinator().settled_generation)
+		AssertFalse(_ConfigFullSaveHasPending())
+		Assert(FSWriteCreateDurable(Restart, Original))
+		Features := ManifestBuildFeaturesMap()
+		_ReadPersonalTomlCache := false
+		ReloadedModel := ReadPersonalToml(true)
+		for Section in ReloadedModel["sections_order"] {
+			if Section != "-"
+				EnsurePersonalHotstringFeature(Section)
+		}
+		AssertFalse(Features["hotstrings"]["personal"]["owned"]["enabled"])
+		_ConfigBootRejectedOverrides := 0, _ConfigBootOutdatedEntries := Map()
+		Assert(ApplyBootConfigToml(Features, Restart) >= 0, "restart uses a fresh native configuration source identity")
+		AssertEqual(0, _ConfigBootRejectedOverrides)
+		AssertEqual(Canonical, Features["hotstrings"]["personal"]["owned"]["enabled"],
+			"the same actual file-backed owner retains the case-sensitive intent boundary after restart")
+		AssertEqual(Original, FSReadUtf8Exact(Restart))
+		AssertEqual(PersonalSource, FSReadUtf8Exact(PersonalPath))
+	} finally {
+		; Native read refusal and migration debt must not outlive this fixture.
+		; Restore presence as well as exact prior values; unrelated entries stay.
+		for Diagnostic in OwnedDiagnostics {
+			if Diagnostic.present
+				Diagnostic.store[Diagnostic.key] := Diagnostic.value
+			else if Diagnostic.store.Has(Diagnostic.key)
+				Diagnostic.store.Delete(Diagnostic.key)
+		}
+		Features := SavedFeatures
+		_ReadPersonalTomlCache := SavedPersonalCache
+		for Extra in [Restart, PersonalPath] {
+			for Store in [_ParseTomlCache, _TomlFileCache, _ConfigTomlSnapshots] {
+				if Store.Has(Extra)
+					Store.Delete(Extra)
+			}
+			if FileExist(Extra)
+				FSDelete(Extra)
+		}
+		for Field in PriorFields
+			Field.target.%Field.key% := Field.value
+		MetricsFilters.disabled_apps := PriorApps
+		_I18nLocale := IsSet(SavedI18nLocale) ? SavedI18nLocale : unset
+		LOGGER_MIN_LEVEL := IsSet(SavedLOGGERMINLEVEL) ? SavedLOGGERMINLEVEL : unset
+		ScriptInformation := IsSet(SavedScriptInformation) ? SavedScriptInformation : unset
+		ScriptShortcutAssignments := IsSet(SavedScriptShortcutAssignments) ? SavedScriptShortcutAssignments : unset
+		KeyboardShortcutAssignments := IsSet(SavedKeyboardShortcutAssignments) ? SavedKeyboardShortcutAssignments : unset
+		KEYBOARD_SHORTCUT_DEFAULTS := IsSet(SavedKeyboardDefaults) ? SavedKeyboardDefaults : unset
+		GestureAssignments := IsSet(SavedGestureAssignments) ? SavedGestureAssignments : unset
+		CategoryEnabled := IsSet(SavedCategoryEnabled) ? SavedCategoryEnabled : unset
+		UPDATER_CHECK_INTERVAL := IsSet(SavedUPDATERCHECKINTERVAL) ? SavedUPDATERCHECKINTERVAL : unset
+		UPDATER_CHANNEL := IsSet(SavedUPDATERCHANNEL) ? SavedUPDATERCHANNEL : unset
+		_IniCache := IsSet(SavedIniCache) ? SavedIniCache : unset
+		State.Clear()
+		for Key, Value in PriorState
+			State[Key] := Value
+		_ConfigFullSaveCoordinator(Coordinator)
+		_CFGFS_RestoreRuntime(Runtime)
+	}
+}
+
+_FMS_PersonalFileCaseAliases() {
+	for Name in ["owned", "Owned"]
+		_FMS_WithSource("personal_case_alias_" . Name, _FMS_PersonalFileCaseAliasSource(Name),
+			_FMS_PersonalFileCaseAlias.Bind(, Name))
+}
+Test("configuration snapshot: genuine personal file owner does not transfer case-distinct config intent (config-personal-file-case-alias)",
+	_FMS_PersonalFileCaseAliases)

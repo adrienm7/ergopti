@@ -7,6 +7,7 @@ local Manifest = require("infra.manifest_reader")
 local Transaction = require("config_scope_transaction")
 local Writer = require("toml_codec.writer")
 local Codec = require("toml_codec")
+local Parents = require("config_obsolete_parents")
 local Logger = require("logger.shim")
 local LOG = "infra.shortcuts_scope"
 local _owner, _sequence = nil, 0
@@ -53,6 +54,7 @@ function M.new(options)
 	local owner, held, source, document, legacy = {}, {}, nil, nil, nil
 	local editing, busy, retiring, uncertain_pair = false, false, false, false
 	local pair_source, published_source, publication_acked, delivery_held
+	local release_claims
 	local acquire
 	local ports = {
 		{ acquire = manager.acquire_configuration, release = manager.release_configuration },
@@ -64,10 +66,26 @@ function M.new(options)
 	}
 	local pair_port = combinations and { acquire = combinations.acquire_configuration, release = combinations.release_configuration, pair = true } or nil
 	if pair_port then table.insert(ports, 1, pair_port) end
+	local function reclaim_releases()
+		if release_claims then
+			for _, port in ipairs(release_claims) do
+				local retained = false
+				for _, existing in ipairs(held) do if existing == port then retained = true end end
+				if not retained then
+					local called, accepted = pcall(port.acquire, owner)
+					if not called or accepted ~= true then return false end
+					held[#held + 1] = port
+				end
+			end
+			release_claims = nil
+		end
+		return true
+	end
 	local function release(expected, restoring)
 		-- Any refused terminal acknowledgement must re-fence the exact Pair
 		-- owner after its native installation, before exposing inverse debt.
 		local function refuse()
+			reclaim_releases()
 			if combinations then
 				local known, exact = pcall(combinations.owns_configuration, owner)
 				if not known or type(exact) ~= "boolean" then uncertain_pair = true; return false end
@@ -85,6 +103,7 @@ function M.new(options)
 			return false
 		end
 		if uncertain_pair or retiring then return false end
+		if reclaim_releases() ~= true then return false end
 		local decoded = expected and Codec.decode(expected.content or "")
 		if expected and type(decoded) ~= "table" then return refuse() end
 		if expected then
@@ -102,6 +121,8 @@ function M.new(options)
 			if not called or accepted ~= true then return refuse() end
 			table.remove(held, pair_index)
 		end
+		local claimed = {}
+		for index, port in ipairs(held) do claimed[index] = port end
 		for index = #held, 1, -1 do
 			if expected then
 				local exact = combinations.owns_configuration(owner)
@@ -114,7 +135,10 @@ function M.new(options)
 				end
 			end
 			local called, accepted = pcall(held[index].release, owner)
-			if not called or accepted ~= true then return refuse() end
+			if not called or accepted ~= true then
+				if #held < #claimed then release_claims = claimed end
+				return refuse()
+			end
 			held[index] = nil
 		end
 		if expected then
@@ -255,26 +279,20 @@ function M.new(options)
 		end,
 		prepare_batch = function(path, updates, adapter)
 			local operations = {}
-			-- A plain value an older build left where this scope keeps a table of
-			-- assignments (`keyboard = "…"`) would make every row below it
-			-- unwritable. The scope owns that container, so the outdated value
-			-- goes with its reset instead of refusing it.
-			local section = type(document) == "table" and options.only == nil and not editing and document.shortcuts or nil
-			for _, key in ipairs(type(section) == "table" and { "keyboard", "tap_keys" } or {}) do
-				local value = section[key]
-				if value ~= nil and (type(value) ~= "table" or #value > 0) then
-					operations[#operations + 1] = { section = "shortcuts", key = key, delete = true }
-				end
-			end
 			for _, row in ipairs(updates) do operations[#operations + 1] = row end
 			for _, row in ipairs(legacy) do
 				if not editing and (options.only == nil or select_row(row.section .. "." .. row.key)) then
 					operations[#operations + 1] = row
 				end
 			end
+			-- Ordinary reset preserves obsolete assignment parents until explicit cleanup.
+			-- Editing keeps its exact source receipt and strict non-neutral collisions.
+			if options.only == nil then
+				operations = Parents.preserve(source.content or "", operations, Parents.shortcut_namespaces())
+			end
 			if editing and edit_source and (edit_source.path ~= path or edit_source.status ~= source.status
 			or edit_source.content ~= source.content) then return false, "source_changed" end
-		return Writer.prepare_batch(path, operations, adapter, source)
+			return Writer.prepare_batch(path, operations, adapter, source)
 		end,
 		apply = function(config, updates, _, candidate_bytes)
 			if options.is_paused() then return false end
@@ -317,7 +335,7 @@ function M.new(options)
 		end
 		publication_sequence = publication_sequence + 1
 	end
-	function owner.pending() return busy or retiring or uncertain_pair or delivery_held or #held > 0 or transaction.pending() end
+	function owner.pending() return busy or retiring or uncertain_pair or delivery_held or release_claims ~= nil or #held > 0 or transaction.pending() end
 	acquire = function()
 		for _, port in ipairs(ports) do
 			local retained = false
@@ -444,7 +462,11 @@ function M.new(options)
 		busy = false
 		return called and reverted == true and released == true, detail
 	end
-	function owner.release() transaction.release() end
+	function owner.release()
+		if owner.pending() then return false end
+		transaction.release()
+		return true
+	end
 	return owner
 end
 

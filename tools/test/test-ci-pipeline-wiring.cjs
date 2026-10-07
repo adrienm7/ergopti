@@ -79,6 +79,7 @@ const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 const manual = require('../ci/manual-ci-lanes.cjs');
+const { bashExecutable } = require('../lib/git-bash.cjs');
 
 const ENTRY = pipeline.ENTRY_REL;
 const MACOS_BOX = '.github/workflows/ci-macos.yml';
@@ -355,6 +356,12 @@ const STEP_CONDITIONS = [
 		'install-linux',
 		"The unit suite on this distribution's LuaJIT",
 		"matrix.kind == 'install'"
+	],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'Upload the native distro unit log',
+		"${{ !cancelled() && matrix.kind == 'install' }}"
 	],
 	[LINUX_BOX, 'install-linux', 'Record mandatory distro evidence', "matrix.kind == 'install'"],
 	[LINUX_BOX, 'install-linux', 'Upload mandatory distro evidence', "matrix.kind == 'install'"],
@@ -1382,6 +1389,31 @@ function stepProblems(files) {
 	return problems;
 }
 
+// Raw failure logs are diagnostics, separate from success-only distro evidence.
+for (const condition of [
+	'',
+	'false',
+	'success()',
+	"matrix.kind == 'install'",
+	'always()',
+	"always() && matrix.kind == 'install'"
+]) {
+	const head = '      - name: Upload the native distro unit log\n';
+	mustCatch(
+		'distro native unit raw log condition ' + condition,
+		LINUX_BOX,
+		head + "        if: ${{ !cancelled() && matrix.kind == 'install' }}\n",
+		head + (condition ? '        if: ' + condition + '\n' : ''),
+		stepProblems
+	);
+}
+mustCatch(
+	'missing native distro unit raw log upload',
+	LINUX_BOX,
+	'      - name: Upload the native distro unit log\n',
+	'      - name: Omitted native distro unit raw log upload\n',
+	stepProblems
+);
 // Upload only closed receipts: the owned script corpus contains newline names,
 // and recursively uploading its private fixture tree also exposes unnecessary data.
 const NATIVE_INVENTORY_ARTIFACT = 'Retain native Hammerspoon provider inventory';
@@ -2952,6 +2984,81 @@ const DISTRO_UNIT_HELPER = fs.readFileSync(
 const DISTRO_UNIT_SUITE =
 	'sudo -H -u ergopti-ci env -u SUDO_UID -u SUDO_GID -u SUDO_USER \\\n\tLUA_CPATH="$native_root/modules/?.so;;" TMPDIR="$unit_tmp" "$interpreter" tests/run.lua\n';
 
+// The supervised form adds diagnostics around the same one actual helper call.
+// Pin its shell ownership envelope separately from the existing direct form;
+// a comment, unreachable call or extra helper cannot satisfy this contract.
+const DISTRO_DIAGNOSTIC_COMMAND =
+	'python3 - "$unit_log" "$unit_root/static/ergopti_plus/linux/tests/run.lua" \'${{ matrix.distro }}\' "$native_status" <<\'PYTHON\'';
+const DISTRO_DIAGNOSTIC_SHA256 = '2788cc3783304c8424e34de365bff105acd60068ca892a802ae6a273251da9dc';
+const DISTRO_LOGGED_ENVELOPE = [
+	'set -euo pipefail',
+	'case "${{ matrix.distro }}" in',
+	'debian) apt-get install -y --no-install-recommends curl ;;',
+	'fedora) dnf install -y curl ;;',
+	'arch) pacman -Sy --noconfirm curl ;;',
+	'alpine) apk add --no-cache curl ;;',
+	'opensuse) zypper --non-interactive install curl ;;',
+	'*) echo "::error::unknown archive unit distribution"; exit 1 ;;',
+	'esac',
+	'command -v curl',
+	'test "$(id -u ergopti-ci)" -ge 1000',
+	'unit_root="$(mktemp -d)"',
+	'readonly unit_root',
+	'trap \'rm -rf -- "$unit_root"\' EXIT',
+	'cp -a "$GITHUB_WORKSPACE/." "$unit_root/"',
+	'chown -R ergopti-ci:ergopti-ci "$unit_root"',
+	'unit_log_dir="$RUNNER_TEMP/linux-distro-unit-logs"',
+	'mkdir -p "$unit_log_dir"',
+	'unit_log="$unit_log_dir/${{ matrix.distro }}.log"',
+	'set +e',
+	'(cd "$unit_root/static/ergopti_plus/linux" &&',
+	'bash "$GITHUB_WORKSPACE/tools/test/prepare-linux-distro-unit.sh" "${{ matrix.distro }}") 2>&1 | tee "$unit_log"',
+	'unit_pipeline_status=("${PIPESTATUS[@]}")',
+	'set -e',
+	'native_status="${unit_pipeline_status[0]}"',
+	'set +e',
+	'python3 - "$unit_log" "$unit_root/static/ergopti_plus/linux/tests/run.lua" \'${{ matrix.distro }}\' "$native_status" <<\'PYTHON\'',
+	'PYTHON',
+	'diagnostic_status=$?',
+	'set -e',
+	'if [[ "$native_status" -ne 0 ]]; then exit "$native_status"; fi',
+	'if [[ "${unit_pipeline_status[1]}" -ne 0 ]]; then exit "${unit_pipeline_status[1]}"; fi',
+	'exit "$diagnostic_status"'
+];
+
+/** Reads only the existing supervised diagnostic's single quoted heredoc. */
+function distroUnitDiagnostic(body) {
+	const script = pipeline.runOf(body) ?? [];
+	const opening = script
+		.map((line, index) =>
+			line.trim() === "'${{ matrix.distro }}' \"$native_status\" <<'PYTHON'" ? index : -1
+		)
+		.filter((index) => index >= 0);
+	const closing = script
+		.map((line, index) => (line === 'PYTHON' ? index : -1))
+		.filter((index) => index >= 0);
+	if (opening.length !== 1 || closing.length !== 1 || closing[0] <= opening[0]) return null;
+	return script.slice(opening[0] + 1, closing[0]).join('\n') + '\n';
+}
+
+/** Admits one exact direct command or the actual source-owned logged wrapper. */
+function distroUnitInvocationFits(body) {
+	const lines = logicalLines(body).filter((line) => line !== '');
+	if (JSON.stringify(lines) === JSON.stringify([DISTRO_UNIT_COMMAND])) return true;
+	const normalized = lines.map((line) => line.replace(/[ \t]+/g, ' ').trim());
+	const at = normalized.indexOf(DISTRO_DIAGNOSTIC_COMMAND);
+	const close = normalized.indexOf('PYTHON');
+	if (at < 0 || close <= at) return false;
+	const envelope = [...normalized.slice(0, at + 1), ...normalized.slice(close)];
+	const diagnostic = distroUnitDiagnostic(body);
+	return (
+		JSON.stringify(envelope) === JSON.stringify(DISTRO_LOGGED_ENVELOPE) &&
+		diagnostic !== null &&
+		require('node:crypto').createHash('sha256').update(diagnostic).digest('hex') ===
+			DISTRO_DIAGNOSTIC_SHA256
+	);
+}
+
 /** Rejects native distro suites whose wrapper omits their real prerequisites. */
 function distroUnitProblems(files, helper = DISTRO_UNIT_HELPER) {
 	const linux = files.find((entry) => entry.rel === LINUX_BOX);
@@ -2965,8 +3072,7 @@ function distroUnitProblems(files, helper = DISTRO_UNIT_HELPER) {
 	if (
 		units.length !== 1 ||
 		pipeline.stepField(units[0].body, 'shell') !== 'bash' ||
-		JSON.stringify(logicalLines(units[0].body).filter((line) => line !== '')) !==
-			JSON.stringify([DISTRO_UNIT_COMMAND])
+		!distroUnitInvocationFits(units[0].body)
 	) {
 		problems.push('the distro unit step must execute its fail-closed native prerequisite wrapper');
 	}
@@ -3181,6 +3287,278 @@ assert.ok(
 	distroUnitProblems(pipeline.files(), skippedWriteHelper).length > 0,
 	'disabled native directory writes must refuse'
 );
+
+// Preserve the incoming direct-command contract as a separately valid form.
+const directDistroUnitStep =
+	"      - name: The unit suite on this distribution's LuaJIT\n" +
+	"        if: matrix.kind == 'install'\n" +
+	'        working-directory: static/ergopti_plus/linux\n' +
+	'        shell: bash\n        run: |\n          ' +
+	DISTRO_UNIT_COMMAND +
+	'\n';
+const directDistroFiles = pipeline
+	.files()
+	.map((entry) =>
+		entry.rel === LINUX_BOX
+			? { ...entry, text: entry.text.replace(distroUnitBody, directDistroUnitStep) }
+			: entry
+	);
+assert.deepEqual(
+	distroUnitProblems(directDistroFiles),
+	[],
+	'the original exact one-command form remains admitted'
+);
+assert.equal(
+	distroUnitInvocationFits(distroUnitBody),
+	true,
+	'the actual supervised form remains admitted'
+);
+for (const [what, from, to] of [
+	['comment-only helper', DISTRO_UNIT_COMMAND, '# ' + DISTRO_UNIT_COMMAND],
+	['unreachable helper', DISTRO_UNIT_COMMAND, 'if false; then ' + DISTRO_UNIT_COMMAND + '; fi'],
+	['duplicated helper', DISTRO_UNIT_COMMAND, DISTRO_UNIT_COMMAND + '; ' + DISTRO_UNIT_COMMAND],
+	[
+		'helper redirected to a copy',
+		DISTRO_UNIT_COMMAND,
+		DISTRO_UNIT_COMMAND.replace('$GITHUB_WORKSPACE', '$unit_root')
+	],
+	['missing supervised curl', '          command -v curl\n', ''],
+	['root private-copy admission', '          test "$(id -u ergopti-ci)" -ge 1000\n', ''],
+	['missing private source copy', '          cp -a "$GITHUB_WORKSPACE/." "$unit_root/"\n', ''],
+	[
+		'suite runs in shared checkout',
+		'(cd "$unit_root/static/ergopti_plus/linux" &&',
+		'(cd "$GITHUB_WORKSPACE/static/ergopti_plus/linux" &&'
+	],
+	['missing raw log capture', '2>&1 | tee "$unit_log"', '2>&1'],
+	[
+		'late pipeline status capture',
+		'unit_pipeline_status=("${PIPESTATUS[@]}")',
+		'echo ignored\n          unit_pipeline_status=("${PIPESTATUS[@]}")'
+	],
+	[
+		'tee mistaken for native exit',
+		'native_status="${unit_pipeline_status[0]}"',
+		'native_status="${unit_pipeline_status[1]}"'
+	],
+	['native exit fabricated green', 'native_status="${unit_pipeline_status[0]}"', 'native_status=0'],
+	['diagnostic exit fabricated green', 'diagnostic_status=$?', 'diagnostic_status=0'],
+	[
+		'native failure swallowed',
+		'if [[ "$native_status" -ne 0 ]]; then exit "$native_status"; fi',
+		'if [[ "$native_status" -ne 0 ]]; then exit 0; fi'
+	],
+	[
+		'tee failure swallowed',
+		'if [[ "${unit_pipeline_status[1]}" -ne 0 ]]; then exit "${unit_pipeline_status[1]}"; fi',
+		'true'
+	],
+	['diagnostic failure swallowed', 'exit "$diagnostic_status"', 'exit 0'],
+	['zero tests accepted', 'passed + failed <= 0', 'passed + failed < 0'],
+	['duplicate summaries accepted', 'len(frames) != 1', 'len(frames) < 1'],
+	['contradictory native summary accepted', '(native_status == "0" and failed != 0)', 'False']
+]) {
+	const changed = distroUnitBody.replace(from, to);
+	assert.notEqual(changed, distroUnitBody, what + ' must actually mutate the supervised source');
+	mustCatch(what, LINUX_BOX, distroUnitBody, changed, distroUnitProblems);
+}
+
+// Execute the actual diagnostic and Bash exit tail with handwritten status/log
+// controls. These certify this transport, not a distro suite or native modules.
+const distroControlBash = bashExecutable();
+const distroControlPython = process.platform === 'win32' ? 'python' : 'python3';
+const distroControlWorkspace = path.resolve(__dirname, '../..').replaceAll('\\', '/');
+const distroControlRoot = fs.mkdtempSync(
+	path.join(require('node:os').tmpdir(), 'ergopti-distro wrapper-')
+);
+try {
+	const log = path.join(distroControlRoot, 'unit.log');
+	const runner = path.resolve(__dirname, '../../static/ergopti_plus/linux/tests/run.lua');
+	const diagnostic = distroUnitDiagnostic(distroUnitBody);
+	assert.notEqual(diagnostic, null, 'the current supervised diagnostic must be present');
+	const footer = (pipeline.runOf(distroUnitBody) ?? []).slice(-3).join('\n');
+	assert.equal(
+		footer,
+		DISTRO_LOGGED_ENVELOPE.slice(-3).join('\n'),
+		'execute the actual native/tee/diagnostic exit tail'
+	);
+	const frame = (modules, passed, failed) =>
+		'='.repeat(40) +
+		'\nOVERALL RESULTS:\n' +
+		'Total modules: ' +
+		modules +
+		'\nPassed tests:  ' +
+		passed +
+		'\nFailed tests:  ' +
+		failed +
+		'\n' +
+		'='.repeat(40) +
+		'\n';
+	for (const [what, text, native, expected] of [
+		['complete successful native log', frame(1, 7, 0), '0', 0],
+		['complete refused native log', frame(1, 6, 1), '17', 0],
+		['missing native summary', 'no terminal frame\n', '0', 2],
+		['duplicate native summaries', frame(1, 7, 0) + frame(1, 7, 0), '0', 2],
+		['zero native modules', frame(0, 7, 0), '0', 2],
+		['zero native cases', frame(1, 0, 0), '0', 2],
+		['green native exit with failed cases', frame(1, 6, 1), '0', 2],
+		['partial native frame', frame(1, 7, 0).slice(0, -42), '0', 2]
+	]) {
+		fs.writeFileSync(log, text);
+		const result = spawnSync(distroControlPython, ['-', log, runner, 'debian', native], {
+			input: diagnostic,
+			encoding: 'utf8',
+			timeout: 5000
+		});
+		assert.equal(result.error, undefined, what);
+		assert.equal(result.signal, null, what);
+		assert.equal(result.status, expected, what);
+		assert.equal(result.stderr, '', what);
+		const propagated = spawnSync(
+			distroControlBash,
+			[
+				'-c',
+				'set -euo pipefail\nnative_status="$1"\nunit_pipeline_status=("$1" 0)\ndiagnostic_status="$2"\n' +
+					footer,
+				'distro-diagnostic-transport',
+				native,
+				String(result.status)
+			],
+			{ encoding: 'utf8', timeout: 5000 }
+		);
+		assert.equal(propagated.error, undefined, what);
+		assert.equal(propagated.signal, null, what);
+		assert.equal(
+			propagated.status,
+			native === '0' ? expected : 17,
+			what + ': the actual Python outcome propagates through the real Bash tail'
+		);
+	}
+	for (const [native, tee, diagnosticStatus, expected] of [
+		[0, 0, 0, 0],
+		[17, 23, 31, 17],
+		[0, 23, 31, 23],
+		[0, 0, 31, 31],
+		[0, 23, 0, 23]
+	]) {
+		const result = spawnSync(
+			distroControlBash,
+			[
+				'-c',
+				'set -euo pipefail\nnative_status="$1"\nunit_pipeline_status=("$1" "$2")\ndiagnostic_status="$3"\n' +
+					footer,
+				'distro-transport',
+				String(native),
+				String(tee),
+				String(diagnosticStatus)
+			],
+			{ encoding: 'utf8', timeout: 5000 }
+		);
+		assert.equal(result.error, undefined);
+		assert.equal(result.signal, null);
+		assert.equal(
+			result.status,
+			expected,
+			'actual Bash tail preserves native/tee/diagnostic failure precedence'
+		);
+	}
+	// The genuine helper's unsupported-distro branch refuses before installs or
+	// native module builds. Trace proves one real call through the actual pipe;
+	// no fake helper or successful native-suite certificate is substituted.
+	const lines = pipeline.runOf(distroUnitBody) ?? [];
+	const start = lines.findIndex((line) => line === 'set +e');
+	const end = lines.findIndex(
+		(line, index) => index > start && line === 'native_status="${unit_pipeline_status[0]}"'
+	);
+	assert(start >= 0 && end > start, 'the actual supervised pipeline must be present');
+	const pipe = lines
+		.slice(start, end + 1)
+		.join('\n')
+		.replaceAll('${{ matrix.distro }}', '__guard_unsupported__');
+	const quote = (value) => "'" + value.replaceAll("'", "'\"'\"'") + "'";
+	const script =
+		'set -euo pipefail\nunit_root=' +
+		quote(distroControlWorkspace) +
+		'\nunit_log=' +
+		quote(log.replaceAll('\\', '/')) +
+		'\n' +
+		'unset BASH_XTRACEFD\nPS4="+ "\nset -x\n: "$GITHUB_WORKSPACE/tools/test/prepare-linux-distro-unit.sh"\n' +
+		pipe +
+		'\ndiagnostic_status=0\n' +
+		footer;
+	const result = spawnSync(distroControlBash, ['-c', script], {
+		encoding: 'utf8',
+		timeout: 5000,
+		env: { ...process.env, GITHUB_WORKSPACE: distroControlWorkspace },
+		stdio: ['pipe', 'pipe', 'pipe']
+	});
+	assert.equal(result.error, undefined, 'the genuine prerequisite helper refuses promptly');
+	assert.equal(result.signal, null);
+	assert.equal(
+		result.status,
+		1,
+		'the real helper refusal propagates through tee and the actual native exit tail'
+	);
+	assert.match(fs.readFileSync(log, 'utf8'), /Unsupported mandatory unit distribution\./);
+	// The real Bash renderer quotes this independently supplied exact path. Use
+	// that primitive's spelling to handle spaces and apostrophes without admitting
+	// a different helper, a guessed quote grammar, or an arbitrary helper suffix.
+	// Bash 3.2 has no BASH_XTRACEFD. Ordinary stderr carries the outer trace;
+	// the genuine pipeline's 2>&1 carries its helper trace into the raw log.
+	// Do not also include stdout: tee copies the same raw log there.
+	const traceLines = (result.stderr + fs.readFileSync(log, 'utf8')).split('\n');
+	const helperPathRenderings = traceLines.filter((line) => line.startsWith('+ : '));
+	assert.equal(helperPathRenderings.length, 1, 'the exact helper path has one Bash rendering');
+	const helperPathRendering = helperPathRenderings[0].slice('+ : '.length);
+	const calls = traceLines.filter(
+		(line) => line.replace(/^\++ /, '') === 'bash ' + helperPathRendering + ' __guard_unsupported__'
+	);
+	assert.equal(calls.length, 1, 'the actual wrapped prerequisite helper executes exactly once');
+
+	// Qualify a real tee write refusal independently of native-suite execution.
+	// A controlled printf child supplies transport bytes; it is not a fake helper.
+	const refusedLog = path.join(distroControlRoot, 'refused-log');
+	fs.mkdirSync(refusedLog);
+	const teePipe = pipe.replace(
+		DISTRO_UNIT_COMMAND.replaceAll('${{ matrix.distro }}', '__guard_unsupported__'),
+		'printf "%s\\n" "controlled transport"'
+	);
+	assert.notEqual(teePipe, pipe, 'the transport-only producer replacement must be exact');
+	const teeScript =
+		'set -euo pipefail\nunit_root=' +
+		quote(distroControlWorkspace) +
+		'\nunit_log=' +
+		quote(refusedLog.replaceAll('\\', '/')) +
+		'\n' +
+		'unset BASH_XTRACEFD\nPS4="+ "\nset -x\n' +
+		teePipe +
+		'\ndiagnostic_status=0\n' +
+		footer;
+	const refusedTee = spawnSync(distroControlBash, ['-c', teeScript], {
+		encoding: 'utf8',
+		timeout: 5000,
+		stdio: ['pipe', 'pipe', 'pipe']
+	});
+	assert.equal(refusedTee.error, undefined);
+	assert.equal(refusedTee.signal, null);
+	assert.equal(
+		refusedTee.status,
+		1,
+		'a real tee filesystem refusal cannot turn a successful producer green'
+	);
+	assert.match(
+		refusedTee.stderr,
+		/^\+ native_status=0$/m,
+		'the actual PIPESTATUS source is successful'
+	);
+	assert.match(
+		refusedTee.stderr,
+		/^\+ exit 1$/m,
+		'the genuine tee refusal reaches the actual Bash exit tail'
+	);
+} finally {
+	fs.rmSync(distroControlRoot, { recursive: true, force: true });
+}
 
 const PHYSICAL_BROWSER_STEP = 'Test shared physical shortcut rendering';
 const PHYSICAL_BROWSER_ALIAS = 'test:browser:physical-shortcuts';

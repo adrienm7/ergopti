@@ -400,8 +400,9 @@ end
 --- structural delimiters inside their content.
 --- @param body string Container body without its outer brackets/braces.
 --- @return table|nil fragments
-local function split_top_level_commas(body)
-	local fragments = {}
+local function split_top_level_commas(body, with_spans)
+	local fragments, spans = {}, with_spans and {} or nil
+	local first = 1
 	local current = {}
 	local quote = nil
 	local depth = 0
@@ -454,8 +455,14 @@ local function split_top_level_commas(body)
 			if depth < 0 then return nil end
 			current[#current + 1] = char
 			index = index + 1
+		elseif with_spans and char == "#" then
+			local finish = body:find("\n", index, true) or (#body + 1)
+			current[#current + 1] = body:sub(index, finish - 1)
+			index = finish
 		elseif char == "," and depth == 0 then
 			fragments[#fragments + 1] = table.concat(current)
+			if spans then spans[#spans + 1] = { first = first, last = index - 1 } end
+			first = index + 1
 			current = {}
 			index = index + 1
 		else
@@ -464,8 +471,11 @@ local function split_top_level_commas(body)
 		end
 	end
 	if quote ~= nil or depth ~= 0 then return nil end
-	if #current > 0 then fragments[#fragments + 1] = table.concat(current) end
-	return fragments
+	if #current > 0 then
+		fragments[#fragments + 1] = table.concat(current)
+		if spans then spans[#spans + 1] = { first = first, last = #body } end
+	end
+	return fragments, spans
 end
 
 --- Extracts a multiline body only when its first lexical closure ends the token.
@@ -726,24 +736,7 @@ end
 --- Parse a single key=value line, splitting on the FIRST '=' that is not
 --- inside a quoted region. Returns the trimmed key/value and original RHS,
 --- preserving string-owned whitespace for a pending multiline value.
-split_kv = function(line)
-	local in_dbl, in_sgl, escape = false, false, false
-	for i = 1, #line do
-		local c = line:sub(i, i)
-		if escape then
-			escape = false
-		elseif c == "\\" and in_dbl then
-			escape = true
-		elseif c == '"' and not in_sgl then
-			in_dbl = not in_dbl
-		elseif c == "'" and not in_dbl then
-			in_sgl = not in_sgl
-		elseif not in_dbl and not in_sgl and c == "=" then
-			return trim(line:sub(1, i - 1)), trim(line:sub(i + 1)), line:sub(i + 1)
-		end
-	end
-	return nil, nil
-end
+split_kv = RecordScanner.split_assignment
 
 --- Parse assignment segments with the same quoted identity as table headers.
 parse_key = function(raw)
@@ -953,6 +946,154 @@ local function decode_document(content, shapes)
 	return root
 end
 
+
+
+--- Describes scalar-edit boundaries of one canonically valid inline value.
+--- Offsets refer to the supplied exact bytes, including outer trivia/comments.
+--- This evidence is descriptive only; callers still own source liveness and
+--- publication admission. The established decoder owns all key/value grammar.
+--- @param raw string One physical inline-table value.
+--- @return table|nil spans Container/member byte boundaries and decoded identities.
+function M.inline_member_spans(raw)
+	if type(raw) ~= "string" or raw:find("[\r\n]") then return nil end
+	local clean = trim(strip_comments(raw))
+	if clean:sub(1, 1) ~= "{" or clean:sub(-1) ~= "}" then return nil end
+	local decoded = coerce_value(clean)
+	if decoded == PARSE_ERROR or type(decoded) ~= "table" then return nil end
+	local first = raw:find("%S")
+	local last = first + #clean - 1
+	if raw:sub(first, last) ~= clean then return nil end
+	local result = { first = first, last = last, members = {} }
+	local body = clean:sub(2, -2)
+	if trim(body) == "" then return result end
+	local fragments, spans = split_top_level_commas(body, true)
+	if not fragments then return nil end
+	for index, fragment in ipairs(fragments) do
+		local key, value, rhs = split_kv(fragment)
+		local segments = key and parse_key(key)
+		if not segments or not rhs or not value or value == "" then return nil end
+		local span = spans[index]
+		local value_first = first + span.first + #fragment - #rhs + #rhs:match("^%s*")
+		local value_last = value_first + #value - 1
+		if raw:sub(value_first, value_last) ~= value then return nil end
+		result.members[#result.members + 1] = {
+			segments = segments,
+			first = first + span.first,
+			last = first + span.last,
+			value_first = value_first,
+			value_last = value_last,
+			value_source = value,
+		}
+	end
+	return result
+end
+
+--- Describes one plain string token through the canonical decoder.
+--- @param raw string Exact assignment RHS, including its trailing comment.
+--- @return table|nil span Token byte boundaries; date literals are not strings.
+function M.string_value_span(raw)
+	if type(raw) ~= "string" then return nil end
+	local document, shapes = M.decode_with_shapes("value = " .. raw)
+	if not document or type(document.value) ~= "string" or shapes.strings[document] then return nil end
+	for key in pairs(document) do if key ~= "value" then return nil end end
+	local first = raw:find("%S")
+	if not first then return nil end
+	for last = first, #raw do
+		local char = raw:sub(last, last)
+		if char == '"' or char == "'" then
+			local candidate = M.decode("value = " .. raw:sub(first, last))
+			if candidate and candidate.value == document.value then return { first = first, last = last } end
+		end
+	end
+	return nil
+end
+
+--- Describes actual array elements without normalizing their source fragments.
+--- The canonical container/string lexer owns commas, nesting and comments.
+--- @param raw string Exact assignment RHS, including outer trivia.
+--- @return table|nil spans Array and element byte boundaries.
+function M.array_element_spans(raw)
+	if type(raw) ~= "string" then return nil end
+	local document, shapes = M.decode_with_shapes("value = " .. raw)
+	if not document or not shapes.arrays[document.value] then return nil end
+	for key in pairs(document) do if key ~= "value" then return nil end end
+	local first = raw:find("%S")
+	if not first or raw:sub(first, first) ~= "[" then return nil end
+	local last
+	for index = first + 1, #raw do
+		if raw:sub(index, index) == "]" then
+			local candidate, evidence = M.decode_with_shapes("value = " .. raw:sub(first, index))
+			if candidate and evidence.arrays[candidate.value] then last = index; break end
+		end
+	end
+	if not last then return nil end
+	local body = raw:sub(first + 1, last - 1)
+	local fragments, boundaries = split_top_level_commas(body, true)
+	if not fragments then return nil end
+	local result = { first = first, last = last, elements = {}, trailing = "" }
+	for index, fragment in ipairs(fragments) do
+		local parsed = M.decode("value = [" .. fragment .. "\n]")
+		if not parsed then return nil end
+		if #parsed.value == 0 then
+			if index ~= #fragments then return nil end
+			result.trailing = fragment
+		elseif #parsed.value == 1 then
+			result.elements[#result.elements + 1] = {
+				first = first + boundaries[index].first, last = first + boundaries[index].last,
+			}
+		else return nil end
+	end
+	if #result.elements ~= #document.value then return nil end
+	return result
+end
+
+--- Describes plain string fields in an actual inline record without rewriting it.
+--- @param raw string Exact inline-record fragment, including comments/trivia.
+--- @return table|nil fields Field names mapped to canonical string token spans.
+function M.record_string_spans(raw)
+	if type(raw) ~= "string" then return nil end
+	local document, shapes = M.decode_with_shapes("value = [" .. raw .. "\n]")
+	if not document or #document.value ~= 1 or type(document.value[1]) ~= "table"
+		or shapes.arrays[document.value[1]] then return nil end
+	local first = 1
+	while first <= #raw do
+		local char = raw:sub(first, first)
+		if char:match("%s") then first = first + 1
+		elseif char == "#" then first = (raw:find("\n", first, true) or #raw) + 1
+		else break end
+	end
+	if raw:sub(first, first) ~= "{" then return nil end
+	local last
+	for index = first + 1, #raw do
+		if raw:sub(index, index) == "}" and M.decode("value = " .. raw:sub(first, index)) then last = index; break end
+	end
+	if not last then return nil end
+	local fragments, boundaries = split_top_level_commas(raw:sub(first + 1, last - 1), true)
+	if not fragments then return nil end
+	local result = {}
+	for index, fragment in ipairs(fragments) do
+		local prefix = "[row]\n"
+		local scanned = RecordScanner.scan_records(prefix .. fragment, { quoted_headers = true })
+		if not scanned or #scanned.records ~= 1 then return nil end
+		local record = scanned.records[1]
+		local segments = record.key_text and parse_key(record.key_text)
+		if segments and #segments == 1 then
+			local offset = 1
+			for line = 1, record.first - 1 do offset = offset + #scanned.lines[line].text + #scanned.lines[line].eol end
+			local text = scanned.lines[record.first].text
+			local _, _, rhs = RecordScanner.split_assignment(text)
+			local rhs_offset = offset + #text - #rhs
+			local finish = offset - 1
+			for line = record.first, record.last do finish = finish + #scanned.lines[line].text + #scanned.lines[line].eol end
+			local token = M.string_value_span((prefix .. fragment):sub(rhs_offset, finish))
+			if token then
+				local base = first + boundaries[index].first - #prefix + rhs_offset - 1
+				result[segments[1]] = { first = base + token.first - 1, last = base + token.last - 1 }
+			end
+		end
+	end
+	return result
+end
 
 --- Decodes a document with the established untagged Lua value model.
 --- @param content string TOML source.

@@ -1487,3 +1487,40 @@ pause/private/gap cancellation are unchanged. Independent software replay passes
 Native task/timer/clock/calendar leaves are modeled. No production activation
 caller or supported initial awake/unlocked fact is added: fresh lease posture
 remains unknown and denied. Native qualification and TODO31 remain incomplete.
+
+## Current configuration/menu dev composition
+
+Group5 composes current origin/dev8cba7a0c45950383904ab6db11274f20823fc465
+after publishing Session suspend/resume5762ef589295da761aa817739bf16eb396698fa8.
+The sole TODO conflict preserves both new Group1 wizard paragraphs and the
+existing global legend; previously completed Group5 item13 is not reintroduced.
+All three reviewed physical-session source postimages remain exact. Incoming
+shared configuration, generated menus, native fixtures and every assertion are
+retained. Change-scoped source gates and native acceptance remain separate:
+manual macOS37545545612 tests fbb2a46823089c1e26c10cf6b007c0460f6e831d,
+which predates this composition and Session tranche. No final integration lock,
+validation-branch ownership, dev push or additional TODO closure is claimed.
+
+## Composition validation and current native failures
+
+The composition passes365 JS checks,17455 macOS Lua checks,101 macOS E2E
+cases with1 explicit skip,189 Linux E2E cases,10191 Linux Lua checks, actual
+X11 XKB53 checks, native Linux HTTP/runtime gates, formatting and AHK encoding.
+AHK execution is deferred because AutoHotkey is unavailable. The selected actual
+Linux window-switch gate is BLOCKED before child or namespace allocation: this
+container exposes subreaper and pidfd APIs but its own /proc task children file
+is absent (ENOENT), also under the approved unsandboxed diagnostic. The original
+aggregate exit1 is retained; no supervisor, fixture or assertion is weakened.
+Qualification requires a supported Linux CI runner. No entire-gate green claim
+is made.
+
+Actual manual macOS37545545612 at fbb2a468 finishes with372 Swift cases passed,
+7 failed and15 skipped;21 assertion failures include2 unexpected failures.
+All six native keyboard-source cases pass. Genuine owned Core compilation fails
+before unsigned preparation on private monitor dispatcher access and non-const
+ordered-task invocation in generated enqueue wrappers. Actual permission UI
+observes560x544 against560x520. The portable preparation observer also fails on
+macOS; a symlinked temporary-directory cause is reproduced locally, but its
+native stderr is not retained in the uploaded artifact. Stock calibration and
+Group6 archive acceptance also fail. Compilation, unsigned preparation, signed
+shipping and installation remain unqualified. Items24/30/31/40/43/44 stay open.

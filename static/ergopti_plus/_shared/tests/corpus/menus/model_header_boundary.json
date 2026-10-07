@@ -1,0 +1,40 @@
+{
+	"section": "llm_model_header_boundary",
+	"rows": [
+		{
+			"type": "---",
+			"platforms": ["ahk", "hs"],
+			"unavailable": "hide"
+		}
+	],
+	"platform_rows": {
+		"ahk": [
+			{
+				"separator": true
+			}
+		],
+		"hs": [
+			{
+				"separator": true
+			}
+		],
+		"linux": []
+	},
+	"header_controls": {
+		"empty_default": ["no_model", "boundary"],
+		"populated_default": ["no_model", "backend_default", "boundary"]
+	},
+	"caption_keys": [
+		"menu.llm.no_model",
+		"menu.llm.backend_default_model",
+		"menu.llm.hf_token_label",
+		"menu.llm.hf_token_set",
+		"menu.llm.hf_token_unset"
+	],
+	"english_no_model": "No model (Disabled)",
+	"french_no_model": "Aucun modèle (Désactivé)",
+	"marker_key": "menu.llm.specs_header",
+	"marker_english": "SPECIFICATIONS",
+	"default_name": "Qwen3-Coder-30B-A3B-Instruct",
+	"english_default": "↺ Backend default model (Qwen3-Coder-30B-A3B-Instruct)"
+}

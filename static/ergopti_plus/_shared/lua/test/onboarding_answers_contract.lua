@@ -274,6 +274,43 @@ function M.register(helpers, opts)
 			end
 		end)
 
+
+		for _, case in ipairs({
+			{ name = "overlong zero", value = string.char(0xE0, 0x80, 0x80) },
+			{ name = "UTF-16 surrogate", value = string.char(0xED, 0xA0, 0x80) },
+			{ name = "above Unicode limit", value = string.char(0xF4, 0x90, 0x80, 0x80) },
+		}) do
+			helpers.it("refuses malformed trigger scalar " .. case.name .. " before publication", function()
+				local prepared, written = 0, 0
+				local operations = { { path = "hotstrings.trigger_char", value = case.value } }
+				local committed = Answers.commit({
+					index = index, manifest = Manifest, path = "/unpublished-wizard-utf8-control.toml",
+					operations = operations,
+					prepare = function() prepared = prepared + 1; return true end,
+					write = function() written = written + 1; return true end,
+				})
+				helpers.assert_eq(committed, false, "malformed UTF-8 cannot reach an acknowledged write")
+				helpers.assert_eq(prepared, 0, "refusal precedes preparation")
+				helpers.assert_eq(written, 0, "refusal precedes publication")
+				local rows = Answers.rows(index, operations, Manifest)
+				helpers.assert_nil(rows, "the same actual planner rejects the malformed scalar")
+			end)
+		end
+
+		helpers.it("keeps valid BMP and non-BMP trigger scalars unchanged", function()
+			for _, value in ipairs({ "§", "←", "🦀" }) do
+				local rows = assert(Answers.rows(index, { { path = "hotstrings.trigger_char", value = value } }, Manifest))
+				helpers.assert_eq(rows[1].value, value, "one valid Unicode scalar retains exact bytes")
+			end
+			local ordinary, why = Answers.rows(index, { { path = "hotstrings.trigger_char", value = "a" } }, Manifest)
+			if driver == "linux" then
+				helpers.assert_nil(ordinary, "Linux still refuses prose characters through its rare-symbol policy")
+				helpers.assert_contains(tostring(why), "refused")
+			else
+				helpers.assert_eq(assert(ordinary)[1].value, "a", "macOS keeps its existing common-character capability")
+			end
+		end)
+
 		helpers.it("writes one versioned batch and never writes a refused one", function()
 			local path = new_config_path()
 			local writes, prepared = 0, {}

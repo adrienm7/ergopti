@@ -1,0 +1,559 @@
+{
+	"description": "Independent original physical parent and child hierarchies. Native callback identity is asserted separately; drawing never invokes it.",
+	"parents": [
+		{
+			"id": "llm_trigger",
+			"i18n": "menu.llm.trigger_menu_title",
+			"type": "group"
+		},
+		{
+			"id": "llm_display",
+			"i18n": "menu.llm.display_menu_title",
+			"type": "group"
+		},
+		{
+			"id": "llm_navigation",
+			"i18n": "menu.llm.nav_menu_title",
+			"type": "group"
+		}
+	],
+	"macos": [
+		{
+			"title": "menu.llm.trigger_menu_title",
+			"callback": false,
+			"children": [
+				{
+					"title": "menu.llm.debounce_label",
+					"callback": true
+				},
+				{
+					"title": "menu.llm.reset_label",
+					"callback": true
+				},
+				{
+					"title": "menu.llm.instant_on_word_end",
+					"callback": true,
+					"checked": false
+				},
+				{
+					"title": "menu.llm.after_hotstring",
+					"callback": true,
+					"checked": false
+				},
+				{
+					"title": "-",
+					"callback": false
+				},
+				{
+					"title": "menu.llm.disable_url_bars",
+					"callback": true,
+					"checked": false
+				},
+				{
+					"title": "menu.llm.disable_password_fields",
+					"callback": true,
+					"checked": false
+				},
+				{
+					"title": "menu.llm.disabled_in_label",
+					"callback": false,
+					"children": []
+				}
+			]
+		},
+		{
+			"title": "menu.llm.display_menu_title",
+			"callback": false,
+			"children": [
+				{
+					"title": "menu.llm.show_info_bar",
+					"callback": true,
+					"checked": true
+				},
+				{
+					"title": "menu.llm.show_streaming",
+					"callback": true,
+					"checked": false
+				},
+				{
+					"title": "menu.llm.show_all_at_once",
+					"callback": true,
+					"checked": false
+				},
+				{
+					"title": "-",
+					"callback": false
+				},
+				{
+					"title": "menu.llm.indent_label: +1 menu.llm.indent_space",
+					"callback": false,
+					"children": [
+						{
+							"title": "-7 menu.llm.indent_spaces",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "-6 menu.llm.indent_spaces",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "-5 menu.llm.indent_spaces",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "-4 menu.llm.indent_spaces",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "-3 menu.llm.indent_spaces",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "-2 menu.llm.indent_spaces",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "-1 menu.llm.indent_space",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "menu.llm.indent_none",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "+1 menu.llm.indent_space",
+							"callback": true,
+							"checked": true
+						},
+						{
+							"title": "+2 menu.llm.indent_spaces",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "+3 menu.llm.indent_spaces",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "+4 menu.llm.indent_spaces",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "+5 menu.llm.indent_spaces",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "+6 menu.llm.indent_spaces",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "+7 menu.llm.indent_spaces",
+							"callback": true,
+							"checked": false
+						}
+					]
+				}
+			]
+		},
+		{
+			"title": "menu.llm.nav_menu_title",
+			"callback": false,
+			"children": [
+				{
+					"title": "menu.llm.nav_label : ⌃ menu.llm.arrows",
+					"callback": false,
+					"children": [
+						{
+							"title": "menu.settings.disabled",
+							"callback": true
+						},
+						{
+							"title": "menu.settings.no_modifier",
+							"callback": true
+						},
+						{
+							"title": "⇧ Shift",
+							"callback": true
+						},
+						{
+							"title": "⌘ Cmd",
+							"callback": true
+						},
+						{
+							"title": "⌥ Option",
+							"callback": true
+						},
+						{
+							"title": "⌃ Ctrl",
+							"callback": true,
+							"checked": true
+						},
+						{
+							"title": "⇧⌘ Shift + Cmd",
+							"callback": true
+						},
+						{
+							"title": "⇧⌥ Shift + Option",
+							"callback": true
+						}
+					]
+				},
+				{
+					"title": "menu.llm.val_label : ⇧ menu.llm.digits",
+					"callback": false,
+					"children": [
+						{
+							"title": "menu.settings.disabled",
+							"callback": true
+						},
+						{
+							"title": "menu.settings.no_modifier",
+							"callback": true
+						},
+						{
+							"title": "⇧ Shift",
+							"callback": true,
+							"checked": true
+						},
+						{
+							"title": "⌘ Cmd",
+							"callback": true
+						},
+						{
+							"title": "⌥ Option",
+							"callback": true
+						},
+						{
+							"title": "⌃ Ctrl",
+							"callback": true
+						},
+						{
+							"title": "⇧⌘ Shift + Cmd",
+							"callback": true
+						},
+						{
+							"title": "⇧⌥ Shift + Option",
+							"callback": true
+						}
+					]
+				}
+			]
+		}
+	],
+	"linux": [
+		{
+			"title": "Déclenchement de l’IA",
+			"callback": false,
+			"children": [
+				{
+					"title": "Temps d’inactivité avant suggestion : 500 ms",
+					"callback": false,
+					"children": [
+						{
+							"title": "50 ms",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "100 ms",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "200 ms",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "300 ms",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "500 ms",
+							"callback": true,
+							"checked": true
+						},
+						{
+							"title": "750 ms",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "1000 ms",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "2000 ms",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "-",
+							"callback": false
+						},
+						{
+							"title": "Autre valeur…",
+							"callback": true
+						}
+					]
+				},
+				{
+					"title": "-",
+					"callback": false
+				},
+				{
+					"title": "Suggestion instantanée en fin de mot",
+					"callback": true,
+					"checked": false
+				},
+				{
+					"title": "Suggestion après expiration d’une bulle hotstring",
+					"callback": true,
+					"checked": false
+				},
+				{
+					"title": "-",
+					"callback": false
+				},
+				{
+					"title": "Désactiver dans les barres d’adresse des navigateurs",
+					"callback": true,
+					"checked": false
+				},
+				{
+					"title": "Désactiver dans les champs mot de passe",
+					"callback": true,
+					"checked": true
+				}
+			]
+		},
+		{
+			"title": "Affichage",
+			"callback": false,
+			"children": [
+				{
+					"title": "Afficher la barre d’info (modèle et latence)",
+					"callback": true,
+					"checked": false
+				},
+				{
+					"title": "Afficher chaque suggestion en streaming (token par token)",
+					"callback": true,
+					"checked": true
+				},
+				{
+					"title": "Afficher toutes les suggestions d’un coup (multi-prédictions)",
+					"callback": true,
+					"checked": false
+				},
+				{
+					"title": "-",
+					"callback": false
+				},
+				{
+					"title": "Indentation de la suggestion sélectionnée: Aucune indentation",
+					"callback": false,
+					"children": [
+						{
+							"title": "-7 espaces",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "-6 espaces",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "-5 espaces",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "-4 espaces",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "-3 espaces",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "-2 espaces",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "-1 espace",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "Aucune indentation",
+							"callback": true,
+							"checked": true
+						},
+						{
+							"title": "+1 espace",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "+2 espaces",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "+3 espaces",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "+4 espaces",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "+5 espaces",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "+6 espaces",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "+7 espaces",
+							"callback": true,
+							"checked": false
+						}
+					]
+				}
+			]
+		},
+		{
+			"title": "Navigation",
+			"callback": false,
+			"children": [
+				{
+					"title": "Naviguer dans les suggestions (↑/← et ↓/→) — Flèches seules",
+					"callback": false,
+					"children": [
+						{
+							"title": "Flèches seules",
+							"callback": true,
+							"checked": true
+						},
+						{
+							"title": "alt",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "ctrl",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "shift",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "cmd",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "ctrl+alt",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "ctrl+shift",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "alt+shift",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "shift+cmd",
+							"callback": true,
+							"checked": false
+						}
+					]
+				},
+				{
+					"title": "Sélectionner la suggestion n° (Aucun modificateur)",
+					"callback": false,
+					"children": [
+						{
+							"title": "Aucun modificateur",
+							"callback": true,
+							"checked": true
+						},
+						{
+							"title": "alt",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "ctrl",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "shift",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "cmd",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "ctrl+alt",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "ctrl+shift",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "alt+shift",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "shift+cmd",
+							"callback": true,
+							"checked": false
+						}
+					]
+				}
+			]
+		}
+	]
+}
