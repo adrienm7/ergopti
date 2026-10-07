@@ -549,6 +549,15 @@ function M.is_open()
 	return _fd ~= nil
 end
 
+--- Positively observes an idle unavailable channel before any caller acquires it.
+--- A failed constructor can retain native debt while is_open() is false.
+--- @return boolean unavailable
+--- @return integer generation Last successfully created native generation.
+function M.unavailable_for_output()
+	return _fd == nil and not _busy and not _debt and _constructor_debt == nil
+		and _output == nil and _transaction == nil and _dispatch == nil, _generation
+end
+
 
 
 

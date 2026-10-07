@@ -5768,6 +5768,19 @@ qualification remains pending. The container has no input/uinput devices; its
 window fixture refuses before allocation without the process-children
 supervisor interface. Controlled wire ports do not prove kernel delivery.
 
+Current-source repair (2026-10-07): Linux captures the active native XKB group
+and retains the exact source/probe cohort through final output publication.
+Gesture fallback requires a genuine single-use idle witness from the original
+output owner; pending native inverse debt cannot become a raw-key fallback.
+Controlled fixtures use the real production layout publication seam and restore
+the previously captured injector and layout owners after success or refusal.
+Independent source, original-producer and mutation controls are retained. Root
+verification includes the complete JS and driver suites plus actual X11 source
+checks. The container's window-supervisor prerequisite remains unavailable;
+repaired hosted kernel delivery and subsequent daemon/tray acceptance are pending.
+No arbitrary physical-key output or simultaneous/cross-device capability is
+admitted by this repair.
+
 - [ ] **96.** Remove the separate Ergopti+ AltGr-adjustments option from the
       Layout menu. Selecting the Ergopti+ keylayout in the emulation picker must
       suffice. Verify that the layout supplies every intended change, retire
@@ -6968,6 +6981,14 @@ retains historical commands and packet ownership; the earlier PC-only software
 deferral is superseded. This item and items16/38 remain open.
 
 Current Group 3 source checkpoint (item 108, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Complete effective-source retargeting, all-owner collisions and modifier/output transactions while preserving None, personal overrides and compensation. Separate device/evidence boundary: Actual layout changes and editor-key delivery on supported keyboards/seats.
+
+Current-source editor fence (2026-10-07): the Linux direct-source caller checks
+its captured native and pure logical issuer before and after the final session
+refresh. A retired getter, changed group or replaced probe cannot authorize the
+editor key; absent native closure stays absent. The original caller assertions
+and independent stale-source counterexamples are preserved. Final installed
+source changes, complete cross-owner collisions and physical delivery remain
+separate pending requirements.
 
 - [~] **109.** Give every application window the same "ErgoptiPlus — Title"
   format. GUI/WebView titles now use one prefix/separator policy in

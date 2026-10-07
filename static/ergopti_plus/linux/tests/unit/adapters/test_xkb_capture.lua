@@ -503,3 +503,243 @@ helpers.describe("xkb_capture: direct source callback currency", function()
 		end)
 	end)
 end)
+
+
+helpers.describe("xkb_capture: selected-group inverse source currency", function()
+	local function fixture(body)
+		local capture = helpers.load_module("adapters.xkb_capture")
+		local state = { calls = 0 }
+		local backend = {
+			create = function() return { identity = "controlled-inverse-map", group = 0, groups = 2 } end,
+			destroy = function() end,
+			key_sym = function() return nil end,
+			key_utf8 = function() return nil end,
+			compose_feed = function() end,
+			compose_status = function() return "nothing" end,
+			update_key = function(session, code, direction)
+				if code == 107 and direction == 1 then session.group = 1 - session.group end
+			end,
+		}
+		backend.capture_group = function(session)
+			if state.on_group then state.on_group() end
+			return session.group
+		end
+		backend.inverse = function(session, group)
+			state.calls = state.calls + 1
+			state.group = group
+			if state.on_rows then state.on_rows(session) end
+			return { z = { keycode = 44, level = 1, mods = {} } }
+		end
+		capture._set_backend(backend)
+		helpers.assert_true(capture.load("controlled-inverse-map", "C"))
+		local called, err = pcall(body, capture, state, backend)
+		capture._reset_backend()
+		if not called then error(err, 0) end
+	end
+
+	helpers.it("passes the actual selected group to inverse enumeration", function()
+		fixture(function(capture, state)
+			capture.process(99, 1)
+			helpers.assert_true(capture.inverse_table() ~= nil)
+			helpers.assert_eq(state.group, 1, "the native enumerator must receive the actual selected group")
+		end)
+	end)
+
+	helpers.it("refuses inverse rows after native group reentry", function()
+		fixture(function(capture, state)
+			state.on_rows = function() capture.process(99, 1) end
+			helpers.assert_nil(capture.inverse_table())
+		end)
+	end)
+
+	helpers.it("refuses inverse rows after an observed group away-and-back", function()
+		fixture(function(capture, state)
+			state.on_rows = function() capture.process(99, 1); capture.process(99, 1) end
+			helpers.assert_nil(capture.inverse_table(), "equal final group cannot revive a retired inverse source epoch")
+		end)
+	end)
+
+	helpers.it("refuses inverse rows from a retired same-map session", function()
+		fixture(function(capture, state)
+			state.on_rows = function() helpers.assert_true(capture.load("controlled-inverse-map", "C")) end
+			helpers.assert_nil(capture.inverse_table())
+		end)
+	end)
+
+	helpers.it("refuses session replacement by initial group observation", function()
+		fixture(function(capture, state)
+			state.on_group = function()
+				state.on_group = nil
+				helpers.assert_true(capture.load("controlled-inverse-map", "C"))
+			end
+			helpers.assert_nil(capture.inverse_table())
+		end)
+	end)
+
+	helpers.it("refuses session replacement by final group observation", function()
+		fixture(function(capture, state)
+			state.on_rows = function()
+				state.on_group = function()
+					state.on_group = nil
+					helpers.assert_true(capture.load("controlled-inverse-map", "C"))
+				end
+			end
+			helpers.assert_nil(capture.inverse_table())
+		end)
+	end)
+
+	helpers.it("refuses invalid native groups before enumeration", function()
+		for _, group in ipairs({ -1, 0.5, 2, math.huge, false }) do
+			fixture(function(capture, state, backend)
+				backend.capture_group = function() return group end
+				helpers.assert_nil(capture.inverse_table())
+				helpers.assert_eq(state.calls, 0)
+			end)
+		end
+	end)
+
+	helpers.it("preserves native inverse rows across ordinary key transitions", function()
+		fixture(function(capture, state)
+			state.on_rows = function() capture.process(42, 0) end
+			helpers.assert_true(capture.inverse_table() ~= nil)
+			helpers.assert_eq(capture.inverse_table().z.keycode, 44)
+		end)
+	end)
+end)
+
+--- Drives real capture, refresh and planning over a controlled native protocol.
+--- @param body function
+local function cohort_fixture(body)
+	local capture = helpers.load_module("adapters.xkb_capture")
+	local state = { rows = {} }
+	local backend = {
+		create = function() return { identity = "owned-cohort-map", group = 0, groups = 2 } end,
+		destroy = function() end,
+		key_sym = function() return nil end,
+		key_utf8 = function() return nil end,
+		compose_feed = function() end,
+		compose_status = function() return "nothing" end,
+		update_key = function(session, code, direction)
+			if code == 107 and direction == 1 then session.group = 1 - session.group end
+		end,
+		capture_group = function(session)
+			if state.on_group then state.on_group() end
+			return session.group
+		end,
+		caps_locked = function()
+			if state.on_caps then state.on_caps() end
+			return state.caps == true
+		end,
+	}
+	backend.inverse = function(session, group)
+		local rows = {}
+		for code = 32, 126 do rows[string.char(code)] = { keycode = code, level = 1, mods = {} } end
+		rows.z = { keycode = group == 1 and 21 or 44, level = 1, mods = {} }
+		rows.Z = { keycode = group == 1 and 21 or 44, level = 2, mods = { "shift" } }
+		state.rows = rows
+		if state.on_inverse then state.on_inverse() end
+		return rows
+	end
+	capture._set_backend(backend)
+	local path = os.tmpname()
+	local file = assert(io.open(path, "w"))
+	file:write("owned-cohort-map")
+	file:close()
+	local layout = helpers.load_module("adapters.keyboard_layout")
+	local ok, err = pcall(function()
+		helpers.assert_true(layout.refresh(path))
+		body(capture, layout, state, backend, path)
+	end)
+	layout._set_table_for_test(nil)
+	capture._reset_backend()
+	os.remove(path)
+	if not ok then error(err, 0) end
+end
+
+
+
+
+helpers.describe("xkb_capture: inverse receipt ownership", function()
+	helpers.it("retains original source currency without granting caller capabilities", function()
+		cohort_fixture(function(capture)
+			local _, _, receipt = capture.inverse_table()
+			helpers.assert_true(capture.inverse_current(receipt))
+			helpers.assert_eq(capture.inverse_current({}), false)
+			capture.process(42, 1)
+			capture.process(42, 0)
+			helpers.assert_true(capture.inverse_current(receipt))
+		end)
+	end)
+	helpers.it("retires receipt after actual group change and observed ABA", function()
+		cohort_fixture(function(capture)
+			local _, _, receipt = capture.inverse_table()
+			capture.process(99, 1)
+			helpers.assert_eq(capture.inverse_current(receipt), false)
+			capture.process(99, 1)
+			helpers.assert_eq(capture.inverse_current(receipt), false)
+		end)
+	end)
+	helpers.it("retires receipt when the same native map gets a new session", function()
+		cohort_fixture(function(capture)
+			local _, _, receipt = capture.inverse_table()
+			capture.reset_state()
+			helpers.assert_eq(capture.inverse_current(receipt), false)
+		end)
+	end)
+	helpers.it("refuses getter reentry replacing the original session", function()
+		cohort_fixture(function(capture, _, state)
+			local _, _, receipt = capture.inverse_table()
+			state.on_group = function()
+				state.on_group = nil
+				capture.reset_state()
+			end
+			helpers.assert_eq(capture.inverse_current(receipt), false)
+		end)
+	end)
+	helpers.it("refuses replacement of captured enumeration and observation exports", function()
+		cohort_fixture(function(capture, _, state, backend)
+			local _, _, receipt = capture.inverse_table()
+			backend.inverse = function() return state.rows end
+			helpers.assert_eq(capture.inverse_current(receipt), false)
+		end)
+		cohort_fixture(function(capture, _, _, backend)
+			local _, _, receipt = capture.inverse_table()
+			backend.capture_group = function() return 0 end
+			helpers.assert_eq(capture.inverse_current(receipt), false)
+		end)
+	end)
+	helpers.it("detaches native rows and modifier arrays for every enumeration", function()
+		cohort_fixture(function(capture, _, state)
+			local built = capture.inverse_table()
+			state.rows.Z.keycode = 30
+			state.rows.Z.mods[1] = "altgr"
+			helpers.assert_eq(built.Z.keycode, 44)
+			helpers.assert_eq(built.Z.mods[1], "shift")
+		end)
+	end)
+	helpers.it("refuses enumerator replacement within its native callback", function()
+		cohort_fixture(function(capture, _, state, backend)
+			state.on_inverse = function() backend.inverse = function() return state.rows end end
+			helpers.assert_nil(capture.inverse_table())
+		end)
+	end)
+	helpers.it("refuses malformed native inverse modifier data", function()
+		cohort_fixture(function(capture, _, state)
+			state.on_inverse = function() state.rows.Z.mods[3] = "altgr" end
+			helpers.assert_nil(capture.inverse_table())
+		end)
+	end)
+end)
+
+helpers.describe("xkb_capture: terminal inverse observation seal", function()
+	helpers.it("seals observations in RAM and never revives a refused full receipt", function()
+		cohort_fixture(function(capture, _, state)
+			local _, _, receipt = capture.inverse_table()
+			state.on_group = function() error("native reads are forbidden in the terminal RAM seal") end
+			helpers.assert_true(capture.inverse_current(receipt, true))
+			helpers.assert_eq(capture.inverse_current({}, true), false)
+			helpers.assert_eq(capture.inverse_current(receipt), false)
+			helpers.assert_eq(capture.inverse_current(receipt, true), false)
+		end)
+	end)
+end)
