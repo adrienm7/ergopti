@@ -65,7 +65,16 @@ def scenario_process(name):
     server = None
     try:
         server = subprocess.Popen(
-            [xvfb_program, "-displayfd", str(writer), "-screen", "0", "1024x768x24", "-nolisten", "tcp"],
+            [
+                xvfb_program,
+                "-displayfd",
+                str(writer),
+                "-screen",
+                "0",
+                "1024x768x24",
+                "-nolisten",
+                "tcp",
+            ],
             pass_fds=(writer,),
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
@@ -141,7 +150,9 @@ def verify_scenario(result, name, expected_count, oracle):
     if "following_rows" in oracle["case"]:
         expected["following"] = oracle["case"]["following_rows"]
     if wire != expected:
-        raise RuntimeError(f"{name}: observed kernel KEY/SYN reports differ from the literal oracle")
+        raise RuntimeError(
+            f"{name}: observed kernel KEY/SYN reports differ from the literal oracle"
+        )
     if result.stdout.splitlines().count(f"MANAGER_NATIVE_CHILD_EXIT {name} 0") != 1:
         raise RuntimeError(f"{name}: missing exact daemon wait receipt")
     if result.stdout.splitlines().count("MANAGER_NATIVE_XVFB_REAPED") != 1:
@@ -158,7 +169,9 @@ def main():
     try:
         prerequisites()
     except (OSError, RuntimeError, subprocess.SubprocessError) as error:
-        print(f"ENVIRONMENT: native saved-pair Manager prerequisite refused: {error}", file=sys.stderr)
+        print(
+            f"ENVIRONMENT: native saved-pair Manager prerequisite refused: {error}", file=sys.stderr
+        )
         return 2
     corpus = json.loads((HARDWARE / "manager_input_owner_oracles.json").read_text(encoding="utf-8"))
     if tuple(row["id"] for row in corpus["cases"]) != SCENARIOS or corpus["scenario_count"] != 4:
@@ -175,11 +188,16 @@ def main():
         if result.stderr:
             print(result.stderr, end="", file=sys.stderr, flush=True)
         checks += verify_scenario(
-            result, name, CHECKS[index], {"pair_prefix_rows": corpus["pair_prefix_rows"], "case": corpus["cases"][index]}
+            result,
+            name,
+            CHECKS[index],
+            {"pair_prefix_rows": corpus["pair_prefix_rows"], "case": corpus["cases"][index]},
         )
         completed.append(name)
     if tuple(completed) != SCENARIOS or checks != 55:
-        raise RuntimeError("the exact four Manager scenarios and fifty-five Lua checks did not complete")
+        raise RuntimeError(
+            "the exact four Manager scenarios and fifty-five Lua checks did not complete"
+        )
     print("MANAGER_INPUT_OWNER_KERNEL 55 0 4")
     return 0
 
