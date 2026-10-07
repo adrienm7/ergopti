@@ -3242,5 +3242,6 @@
 	"physical_shortcuts.position_unavailable": "Це розташування клавіші тут недоступне.",
 	"physical_shortcuts.windows_unavailable": "Поки недоступно у Windows: Редактор фізичних комбінацій клавіш поки недоступний у Windows.",
 	"physical_shortcuts.collision": "Ця комбінація клавіш уже використовується. Виберіть іншу.",
-	"physical_shortcuts.window_unavailable": "Це вікно недоступне: Спробуйте відкрити його знову."
+	"physical_shortcuts.window_unavailable": "Це вікно недоступне: Спробуйте відкрити його знову.",
+	"platform_reason.legacy_helpers_use_windows_scan_code_hotkeys": "Ці попередні допоміжні функції емуляції використовують гарячі клавіші Windows на основі скан-кодів. Інші системи використовують зіставлення своїх штатних розкладок."
 }

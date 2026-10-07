@@ -188,9 +188,9 @@ _LMH_ShippedFirstCase() {
 Test("layout manager host: the active layout follows the emulation settings (layout-manager-bridge)", () => (
 	AssertEqual("ergol", LayoutManager_ActiveId(Map("layout", Map("emulated_layout", "ergol", "ergopti_base", true)))),
 	AssertEqual(ERGOPTI_PLUS_LAYOUT_ID, LayoutManager_ActiveId(Map("layout",
-		Map("emulated_layout", "", "ergopti_base", true, "ergopti_plus", true)))),
+		Map("emulated_layout", "", "ergopti_base", true, "ergopti_variant", "ergopti_plus")))),
 	AssertEqual(ERGOPTI_LAYOUT_ID, LayoutManager_ActiveId(Map("layout",
-		Map("emulated_layout", "", "ergopti_base", true, "ergopti_plus", false)))),
+		Map("emulated_layout", "", "ergopti_base", true, "ergopti_variant", "ergopti")))),
 	AssertEqual("", LayoutManager_ActiveId(Map("layout", Map("emulated_layout", "", "ergopti_base", false))),
 		"without the Ergopti emulation Windows types its own layout")
 ))
@@ -212,9 +212,9 @@ _LMH_EmulationStatusCase(Layout, Enabled, Name) {
 Test("layout menu: no base emulation explicitly reports none (layout-menu-emulation-status)",
 	() => _LMH_EmulationStatusCase(Map("ergopti_base", false), true, ""))
 Test("layout menu: the built-in Ergopti emulation is named (layout-menu-emulation-status)",
-	() => _LMH_EmulationStatusCase(Map("ergopti_base", true, "ergopti_plus", false), true, "Ergopti"))
+	() => _LMH_EmulationStatusCase(Map("ergopti_base", true, "ergopti_variant", "ergopti"), true, "Ergopti"))
 Test("layout menu: the built-in Ergopti+ variant is distinguished (layout-menu-emulation-status)",
-	() => _LMH_EmulationStatusCase(Map("ergopti_base", true, "ergopti_plus", true), true, "Ergopti+"))
+	() => _LMH_EmulationStatusCase(Map("ergopti_base", true, "ergopti_variant", "ergopti_plus"), true, "Ergopti+"))
 Test("layout menu: a selected registry layout takes precedence (layout-menu-emulation-status)",
 	() => _LMH_EmulationStatusCase(Map("emulated_layout", "ergol", "ergopti_base", true), true, "Ergo-L"))
 Test("layout menu: a disabled category does not claim its saved emulation is active (layout-menu-emulation-status)",
@@ -267,7 +267,7 @@ Test("layout menu: the native status is grayed and management remains usable (la
 ; Only the replacement-process launch is controlled: a launch is not completion.
 _LMH_SelectionFixture() {
 	Fixture := _ScopeOwnerFixture()
-	Source := '[layout]`nemulated_layout = "ergol"`nergopti_base = false`nergopti_plus = true`nergopti_alt_gr = false`ndirect_access_digits = "symbols"`nfuture_owner = "retain"`n[category_enabled]`nlayout = false`n[private]`nvalue = "unchanged"`n'
+	Source := '[layout]`nemulated_layout = "ergol"`nergopti_base = false`nergopti_variant = "ergopti_plus"`nergopti_alt_gr = false`ndirect_access_digits = "symbols"`nfuture_owner = "retain"`n[category_enabled]`nlayout = false`n[private]`nvalue = "unchanged"`n'
 	AssertTrue(FSWriteDurable(Fixture.path, Source))
 	Fixture.source := Source
 	Fixture.options["stamp"] := "layout-selection"
@@ -299,13 +299,13 @@ _LMH_SelectionPendingCase(Id, Expected, Base, Plus) {
 		Parsed := TOML_ParseFreshFile(Fixture.path)
 		AssertEqual(Expected, Parsed["layout"].Get("emulated_layout", ""))
 		AssertEqual(Base, Parsed["layout"].Get("ergopti_base", false))
-		AssertEqual(Plus, Parsed["layout"].Get("ergopti_plus", false))
+		AssertEqual(Plus, (Parsed["layout"].Get("ergopti_variant", "ergopti") == "ergopti_plus"))
 		AssertEqual(false, Parsed["layout"]["ergopti_alt_gr"], "selection does not claim an independent AltGr layer")
 		AssertEqual("symbols", Parsed["layout"]["direct_access_digits"])
 		AssertEqual("retain", Parsed["layout"]["future_owner"])
 		AssertEqual(false, Parsed["category_enabled"]["layout"], "picker selection cannot grant a closed category")
 		AssertEqual("unchanged", Parsed["private"]["value"])
-		Loaded := Map("layout", Map("emulated_layout", "", "ergopti_base", false, "ergopti_plus", false))
+		Loaded := Map("layout", Map("emulated_layout", "", "ergopti_base", false, "ergopti_variant", "ergopti"))
 		SuccessorPath := Fixture.directory . "\successor-config.toml"
 		AssertTrue(FSWriteCreateDurable(SuccessorPath, FSReadUtf8Exact(Fixture.path)))
 		AssertTrue(ApplyConfigToml(Loaded, SuccessorPath) >= 1, "the actual native loader must admit a fresh detached candidate source")
@@ -412,3 +412,40 @@ Test("layout selection: a foreign backup refuses without overwriting its owner (
 	_LMH_SelectionPreconditionCase.Bind("backup"))
 Test("layout selection: source drift refuses without overwriting the new generation (todo96-picker-handoff)",
 	_LMH_SelectionPreconditionCase.Bind("drift"))
+
+
+_LMH_VariantSourceRefusalCase() {
+	for Fault in ["legacy", "unknown", "casealias", "base", "altgr", "source", "namespace"] {
+		Fixture := _ScopeOwnerFixture()
+		Calls := {Launch: 0}
+		Launch(*) {
+			Calls.Launch += 1
+			return true
+		}
+		Fixture.options["reload"] := Launch
+		Source := '[layout]`nergopti_variant = "ergopti_plus"`nergopti_base = false`nergopti_alt_gr = false`nemulated_layout = ""`n'
+		if Fault == "legacy"
+			Source .= 'ergopti_plus = true`n'
+		else if Fault == "unknown"
+			Source := StrReplace(Source, 'ergopti_variant = "ergopti_plus"', 'ergopti_variant = "future"')
+		else if Fault == "casealias"
+			Source := StrReplace(Source, 'ergopti_variant = "ergopti_plus"', 'ergopti_variant = "ERGOPTI_PLUS"')
+		else if Fault == "base"
+			Source := StrReplace(Source, "ergopti_base = false", "ergopti_base = 0")
+		else if Fault == "altgr"
+			Source := StrReplace(Source, "ergopti_alt_gr = false", 'ergopti_alt_gr = "false"')
+		else if Fault == "source"
+			Source := StrReplace(Source, 'emulated_layout = ""', "emulated_layout = false")
+		else
+			Source := '[layout]`nergopti_variant = "ergopti_plus"`n[layout.ergopti_base]`nfuture = "retain"`n'
+		try {
+			AssertTrue(FSWriteDurable(Fixture.path, Source))
+			AssertFalse(_LayMgrWeb_BuiltinVariantSnapshot(Fixture.path)["valid"], "all joint source types must be admitted before selection")
+			AssertFalse(LayoutManager_Select("ergopti_plus", Fixture.options), "the real transition refuses ambiguous old or current intent")
+			AssertEqual(0, Calls.Launch, "invalid source intent never starts a successor")
+			AssertTrue(FSUtf8ExactMatches(Fixture.path, Source), "refused picker selection preserves every source byte")
+		} finally _ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("layout selection: typed joint source refusal precedes picker publication or successor launch (todo96-helper-variant)",
+	_LMH_VariantSourceRefusalCase)

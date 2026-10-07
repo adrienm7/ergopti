@@ -1,7 +1,7 @@
 # Independently authored complete typed destination model.
 owner = "foreign root"
 [_meta]
-schema_version = 11
+schema_version = 12
 
 [hotstrings.autocorrection.caps]
 future = "retain the legacy unknown leaf"

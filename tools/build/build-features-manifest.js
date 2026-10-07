@@ -291,9 +291,20 @@ function validate(features) {
 			) {
 				throw new Error(`feature ${f.path} has an invalid superseded_reason_key`);
 			}
-			if (f.type !== 'boolean' || !Array.isArray(f.platforms) || f.platforms.join(',') !== 'ahk') {
+			const helperVariant =
+				f.path === 'layout.ergopti_variant' &&
+				f.type === 'enum' &&
+				Array.isArray(f.enum_values) &&
+				f.enum_values.join(',') === 'none,ergopti,ergopti_plus' &&
+				f.default === 'none' &&
+				f.recommended === 'ergopti_plus';
+			if (
+				(f.type !== 'boolean' && !helperVariant) ||
+				!Array.isArray(f.platforms) ||
+				f.platforms.join(',') !== 'ahk'
+			) {
 				throw new Error(
-					`feature ${f.path} declares superseded_reason_key but is not a Windows-only boolean`
+					`feature ${f.path} declares superseded_reason_key but is not a Windows-only boolean or the exact helper-backed variant`
 				);
 			}
 		}

@@ -909,7 +909,7 @@ _RollChevronEqualHandler(*) {
 }
 _RollChevronEqualEmit() {
 	if AltGrLayerShiftHeld() {
-		Features["layout"]["ergopti_plus"] ? _RollEmitCritical(" %") : _RollEmitCritical("Œ")
+		ErgoptiLayout_PlusIsActive() ? _RollEmitCritical(" %") : _RollEmitCritical("Œ")
 	} else {
 		AddRollEqual()
 	}
@@ -921,7 +921,7 @@ AddRollEqual() {
 	and A_TimeSincePriorHotkey < (HotstringsResolve("rolls", "chevron_equal").Delay * 1000
 	) {
 		_RollEmitCritical("=")
-	} else if Features["layout"]["ergopti_plus"] {
+	} else if ErgoptiLayout_PlusIsActive() {
 		WrapTextIfSelected("%", "%", "%")
 	} else {
 		_RollEmitCritical("œ")

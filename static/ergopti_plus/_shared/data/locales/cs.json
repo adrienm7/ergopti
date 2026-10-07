@@ -3242,5 +3242,6 @@
 	"physical_shortcuts.position_unavailable": "Tato pozice klávesy zde není dostupná.",
 	"physical_shortcuts.windows_unavailable": "Ve Windows zatím nedostupné: Editor fyzických zkratek zatím není dostupný ve Windows.",
 	"physical_shortcuts.collision": "Tato kombinace kláves se již používá. Vyberte jinou.",
-	"physical_shortcuts.window_unavailable": "Toto okno není dostupné: Zkuste je znovu otevřít."
+	"physical_shortcuts.window_unavailable": "Toto okno není dostupné: Zkuste je znovu otevřít.",
+	"platform_reason.legacy_helpers_use_windows_scan_code_hotkeys": "Tyto starší pomocné funkce emulace používají klávesové zkratky Windows založené na skenovacích kódech. Ostatní systémy používají nativní mapování rozložení."
 }

@@ -697,3 +697,161 @@ Test("config migrate: a current semantic snapshot consumes root settings without
 	_CMG_SemanticCurrentSourceConsumesRootSettings)
 Test("config migrate: semantic readers cannot clear invalid/newer stamp write refusal (config-semantic-snapshot)",
 	_CMG_SemanticInvalidStampsStayReadOnly)
+
+
+_CMG_VariantOperation() => Map("op", "move_ergopti_variant", "section", "layout", "key", "ergopti_plus",
+	"to_key", "ergopti_variant", "base_key", "ergopti_base", "alt_gr_key", "ergopti_alt_gr",
+	"source_key", "emulated_layout", "false_variant", "ergopti", "true_variant", "ergopti_plus")
+
+_CMG_VariantRegistry() {
+	return ConfigMigrateValidateRegistry(_ConfigMigrateParse('[registry]`ncurrent_version = 2`nunstamped_version = 1`n'
+		. '[steps.v1_to_v2]`nfrom = 1`nto = 2`ndrivers = ["ahk", "hs", "linux"]`n'
+		. 'reason = "Independent joint legacy intent."`nops = [{ op = "move_ergopti_variant", section = "layout", '
+		. 'key = "ergopti_plus", to_key = "ergopti_variant", base_key = "ergopti_base", alt_gr_key = "ergopti_alt_gr", '
+		. 'source_key = "emulated_layout", false_variant = "ergopti", true_variant = "ergopti_plus" }]`n', "joint variant registry"))
+}
+
+_CMG_VariantAtomicCase() {
+	for Legacy in [false, true] {
+		for Base in [false, true] {
+			for General in [false, true] {
+				for Selected in ["", "unrecorded"] {
+					Layer := Map("ergopti_plus", TOML_Bool(Legacy), "ergopti_base", TOML_Bool(Base),
+						"ergopti_alt_gr", TOML_Bool(General), "emulated_layout", Selected, "future", "retained")
+					Model := Map("layout", Layer, "private", Map("opaque", ["future", 9]))
+					Before := _ConfigMigrateClone(Model)
+					_ConfigMigrateApplyOp(Model, _CMG_VariantOperation())
+					AssertFalse(Layer.Has("ergopti_plus"), "recognized legacy ownership is consumed exactly once")
+					AssertEqual(Legacy ? "ergopti_plus" : "ergopti", Layer["ergopti_variant"])
+					for Key in ["ergopti_base", "ergopti_alt_gr", "emulated_layout", "future"]
+						AssertTrue(ConfigMigrateSameValue(Before["layout"][Key], Layer[Key]), "joint migration retains independent intent")
+					AssertTrue(ConfigMigrateSameValue(Before["private"], Model["private"]))
+					After := _ConfigMigrateClone(Model)
+					_ConfigMigrateApplyOp(Model, _CMG_VariantOperation())
+					AssertTrue(ConfigMigrateSameModel(After, Model), "recognized absent-source replay is inert")
+				}
+			}
+		}
+	}
+	for Fault in ["legacy-integer", "legacy-string", "base-integer", "altgr-string", "source-boolean", "unknown", "conflict", "casealias", "unknown-absent", "casealias-absent"] {
+		Layer := Map("ergopti_plus", TOML_Bool(true), "ergopti_base", TOML_Bool(false),
+			"ergopti_alt_gr", TOML_Bool(false), "emulated_layout", "", "future", "retained")
+		if Fault == "legacy-integer"
+			Layer["ergopti_plus"] := 1
+		else if Fault == "legacy-string"
+			Layer["ergopti_plus"] := "true"
+		else if Fault == "base-integer"
+			Layer["ergopti_base"] := 0
+		else if Fault == "altgr-string"
+			Layer["ergopti_alt_gr"] := "false"
+		else if Fault == "source-boolean"
+			Layer["emulated_layout"] := TOML_Bool(false)
+		else
+			Layer["ergopti_variant"] := InStr(Fault, "unknown") ? "future" : InStr(Fault, "casealias") ? "ERGOPTI_PLUS" : "ergopti"
+		if InStr(Fault, "-absent")
+			Layer.Delete("ergopti_plus")
+		Model := Map("layout", Layer)
+		Before := _ConfigMigrateClone(Model)
+		Failure := _CMG_VariantThrown(() => _ConfigMigrateApplyOp(Model, _CMG_VariantOperation()))
+		AssertTrue(Failure is ConfigMigrateVariantRefusal, "joint refusal has the startup-stop type")
+		AssertContains(Failure.Message, "Ergopti variant migration refused:")
+		AssertTrue(ConfigMigrateSameModel(Before, Model), "even direct mutable operation refuses before deleting historical intent")
+	}
+}
+Test("config migrate: joint variant operation preserves every legacy layer combination and refuses before consumption (todo96-helper-variant)",
+	_CMG_VariantAtomicCase)
+
+_CMG_VariantBootRefusalCase() {
+	Directory := _CMG_NewDir()
+	try {
+		for Choice in ["future", "ergopti", "ERGOPTI_PLUS"] {
+			Path := Directory . "\" . Choice . ".toml"
+			Source := '; independent retained bytes`n[_meta]`nschema_version = 11`n[layout]`nergopti_plus = true`n'
+				. 'ergopti_variant = "' . Choice . '"`nergopti_base = false`nergopti_alt_gr = false`nemulated_layout = ""`n'
+			AssertTrue(FSWriteDurable(Path, Source))
+			Failure := _CMG_VariantThrown(() => ConfigMigrateBoot(Path))
+			AssertTrue(Failure is ConfigMigrateVariantRefusal, "actual boot cannot admit a successor with unknown/conflicting helper intent")
+			AssertContains(Failure.Message, "Ergopti variant migration refused:")
+			AssertTrue(FSUtf8ExactMatches(Path, Source), "actual boot refusal keeps every original byte")
+			AssertFalse(TOML_BatchWrite(Path, [{Section: "layout", Key: "ergopti_variant", Value: "ergopti_plus"}]),
+				"the existing session refusal owner disarms subsequent saves")
+			AssertTrue(FSUtf8ExactMatches(Path, Source))
+		}
+	} finally DirDelete(Directory, true)
+}
+Test("config migrate: actual boot rejects readiness on unknown or conflicting joint variant intent (todo96-helper-variant)",
+	_CMG_VariantBootRefusalCase)
+
+_CMG_VariantThrown(Fn) {
+	try Fn.Call()
+	catch as Failure
+		return Failure
+	throw Error("The actual variant operation should have refused.")
+}
+
+
+_CMG_VariantBootPhysicalRefusalCase() {
+	Directory := _CMG_NewDir()
+	Sources := [
+		'[_meta]`nschema_version = 11`nlayout = { future = "unrelated" }`n',
+		'layout = { ergopti_plus = true, ergopti_base = false, ergopti_alt_gr = false, emulated_layout = "" }`n[_meta]`nschema_version = 11`n',
+		'[_meta]`nschema_version = 11`n[[layout]]`nergopti_plus = true`nergopti_base = false`nergopti_alt_gr = false`nemulated_layout = ""`n',
+		'[_meta]`nschema_version = ' . ConfigMigrateCurrentVersion() . '`n[layout]`nergopti_plus = true`n',
+		'[_meta]`nschema_version = ' . ConfigMigrateCurrentVersion() . '`n[layout]`nergopti_variant = "future"`n'
+	]
+	try {
+		for Index, Source in Sources {
+			Path := Directory . "\physical" . Index . ".toml"
+			AssertTrue(FSWriteDurable(Path, Source))
+			if Index == 1 {
+				Result := ConfigMigrateBoot(Path)
+				AssertTrue(Result is Map, "an unrelated opaque owner retains the existing generic startup policy")
+			} else {
+				Failure := _CMG_VariantThrown(() => ConfigMigrateBoot(Path))
+				AssertTrue(Failure is ConfigMigrateVariantRefusal, "actual boot cannot ignore historical/current variant ownership on generic record refusal")
+				AssertContains(Failure.Message, "Ergopti variant migration refused:")
+				AssertTrue(FSUtf8ExactMatches(Path, Source))
+			}
+		}
+	} finally DirDelete(Directory, true)
+}
+Test("config migrate: physical refusal and current-source ambiguity cannot silently neutralize a variant owner (todo96-helper-variant)",
+	_CMG_VariantBootPhysicalRefusalCase)
+
+_CMG_NeutralVariantCase() {
+	Operation := _CMG_VariantOperation()
+	Operation["neutral_variant"] := "none"
+	_ConfigMigrateValidateOp(Operation, "independent neutral admission")
+	for Bad in [false, 1, "ergopti", "ergopti_plus"] {
+		Malformed := Operation.Clone()
+		Malformed["neutral_variant"] := Bad
+		Failure := _CMG_VariantThrown(() => _ConfigMigrateValidateOp(Malformed, "independent neutral admission"))
+		AssertContains(Failure.Message, "neutral variant")
+	}
+	Model := Map("layout", Map("ergopti_variant", "none", "ergopti_base", TOML_Bool(true),
+		"ergopti_alt_gr", TOML_Bool(false), "emulated_layout", ""))
+	Before := _ConfigMigrateClone(Model)
+	_ConfigMigrateApplyOp(Model, Operation)
+	AssertTrue(ConfigMigrateSameModel(Before, Model))
+	Directory := _CMG_NewDir()
+	try {
+		Path := Directory . "\neutral.toml"
+		Source := '[_meta]`nschema_version = ' . ConfigMigrateCurrentVersion()
+			. '`n[layout]`nergopti_variant = "none"`nergopti_base = true`nergopti_alt_gr = false`nemulated_layout = ""`n'
+		AssertTrue(FSWriteDurable(Path, Source))
+		Result := ConfigMigrateBoot(Path)
+		AssertEqual("current", Result["status"])
+		AssertFalse(Result.Get("read_only", false))
+		AssertTrue(FSUtf8ExactMatches(Path, Source))
+	} finally DirDelete(Directory, true)
+	for Layer in [Map("ergopti_plus", TOML_Bool(false), "ergopti_variant", "none"),
+		Map("ergopti_variant", Map("value", "none")), Map("ergopti_variant", "NONE")] {
+		Model := Map("layout", Layer)
+		Before := _ConfigMigrateClone(Model)
+		Failure := _CMG_VariantThrown(() => _ConfigMigrateApplyOp(Model, Operation))
+		AssertContains(Failure.Message, "Ergopti variant migration refused:")
+		AssertTrue(ConfigMigrateSameModel(Before, Model))
+	}
+}
+Test("config migrate: neutral current choice remains distinct from legacy false and occupied owners (todo96-helper-variant)",
+	_CMG_NeutralVariantCase)
