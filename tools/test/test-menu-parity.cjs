@@ -116,14 +116,88 @@ const OPENS_SUBMENU = {
 		kind: 'compose',
 		native_sources: { hs: 'macos/ui/menu/menu_apps.lua' }
 	},
-	system_gesture_status: {
-		menu: 'gesture_system_status_controls',
-		platforms: ['ahk', 'hs'],
-		kind: 'compose',
-		native_sources: {
-			ahk: 'windows/ui/gesture_conflicts.ahk',
-			hs: 'macos/ui/menu/menu_gestures.lua'
+	system_gesture_status: [
+		{
+			menu: 'gesture_system_status_controls',
+			platforms: ['ahk', 'hs'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/gesture_conflicts.ahk',
+				hs: 'macos/ui/menu/menu_gestures.lua'
+			}
+		},
+		{
+			menu: 'gesture_system_status_windows_frame',
+			platforms: ['ahk'],
+			kind: 'compose',
+			native_sources: { ahk: 'windows/ui/gesture_conflicts.ahk' }
+		},
+		{
+			menu: 'gesture_system_status_macos_frame',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+		},
+		{
+			menu: 'gesture_system_status_linux_frame',
+			platforms: ['linux'],
+			kind: 'compose',
+			native_sources: { linux: 'linux/ui/gesture_conflicts.lua' }
 		}
+	],
+	gesture_system_unknown_children: [
+		{
+			menu: 'gesture_system_windows_children',
+			platforms: ['ahk'],
+			kind: 'submenu',
+			native_sources: { ahk: 'windows/ui/gesture_conflicts.ahk' }
+		},
+		{
+			menu: 'gesture_system_linux_children',
+			platforms: ['linux'],
+			kind: 'submenu',
+			native_sources: { linux: 'linux/ui/gesture_conflicts.lua' }
+		}
+	],
+	gesture_system_clear_children: [
+		{
+			menu: 'gesture_system_windows_children',
+			platforms: ['ahk'],
+			kind: 'submenu',
+			native_sources: { ahk: 'windows/ui/gesture_conflicts.ahk' }
+		},
+		{
+			menu: 'gesture_system_macos_children',
+			platforms: ['hs'],
+			kind: 'submenu',
+			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+		}
+	],
+	gesture_system_conflict_children: [
+		{
+			menu: 'gesture_system_windows_children',
+			platforms: ['ahk'],
+			kind: 'submenu',
+			native_sources: { ahk: 'windows/ui/gesture_conflicts.ahk' }
+		},
+		{
+			menu: 'gesture_system_macos_children',
+			platforms: ['hs'],
+			kind: 'submenu',
+			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+		}
+	],
+	gesture_system_cached_slots: {
+		menu: 'gesture_system_slot_windows_frame',
+		platforms: ['ahk'],
+		kind: 'compose',
+		native_sources: { ahk: 'windows/ui/gesture_conflicts.ahk' }
+	},
+	gesture_system_cached_overlap: {
+		menu: 'gesture_system_slot_linux_frame',
+		platforms: ['linux'],
+		kind: 'compose',
+		native_sources: { linux: 'linux/ui/gesture_conflicts.lua' }
 	},
 	selection_operations: [
 		'selection_caps_word_control',
@@ -1697,6 +1771,285 @@ for (const [extension, method, comment] of [
 	}
 }
 
+/** Command-only fragments may be published through a genuine typed include closure. */
+function publishesIncludedCommands(source, extension, section, declarations, platform) {
+	const { nativeTemplateBinding } = require('../lib/menu-template-binding.cjs');
+	const rows = declarations[section];
+	if (!Array.isArray(rows) || rows.length === 0) return false;
+	const visible = rows.filter((row) => !row.platforms || row.platforms.includes(platform));
+	return (
+		visible.length > 0 &&
+		visible.every(
+			(row) =>
+				row.type === 'command' &&
+				typeof row.id === 'string' &&
+				row.id !== '' &&
+				nativeTemplateBinding(
+					source,
+					extension,
+					section,
+					row.id,
+					1,
+					[{ src: source }],
+					declarations,
+					platform
+				)
+		)
+	);
+}
+
+// Actual system-status routes owe native typed callback/provider owners. This is
+// static necessary evidence, not certification of registry/desktop availability.
+{
+	const assert = require('node:assert/strict');
+	const { nativeTemplateBinding } = require('../lib/menu-template-binding.cjs');
+	assert.deepEqual(
+		OPENS_SUBMENU.system_gesture_status[0],
+		{
+			menu: 'gesture_system_status_controls',
+			platforms: ['ahk', 'hs'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/gesture_conflicts.ahk',
+				hs: 'macos/ui/menu/menu_gestures.lua'
+			}
+		},
+		'the original independently published controls edge is retained'
+	);
+	const owners = [
+		{
+			file: 'windows/ui/gesture_conflicts.ahk',
+			platform: 'ahk',
+			section: 'gesture_system_status_unknown',
+			key: 'gesture_system_unknown_children',
+			port: 3
+		},
+		{
+			file: 'windows/ui/gesture_conflicts.ahk',
+			platform: 'ahk',
+			section: 'gesture_system_status_clear',
+			key: 'gesture_system_clear_children',
+			port: 3
+		},
+		{
+			file: 'windows/ui/gesture_conflicts.ahk',
+			platform: 'ahk',
+			section: 'gesture_system_status_conflicts',
+			key: 'gesture_system_conflict_children',
+			port: 3
+		},
+		{
+			file: 'windows/ui/gesture_conflicts.ahk',
+			platform: 'ahk',
+			section: 'gesture_system_windows_children',
+			key: 'gesture_system_cached_slots',
+			port: 3
+		},
+		{
+			file: 'windows/ui/gesture_conflicts.ahk',
+			platform: 'ahk',
+			section: 'gesture_system_status_controls',
+			key: 'gesture_system_refresh',
+			port: 1
+		},
+		{
+			file: 'windows/ui/gesture_conflicts.ahk',
+			platform: 'ahk',
+			section: 'gesture_system_slot_unknown',
+			key: 'gesture_system_open_unknown_slot',
+			port: 1
+		},
+		{
+			file: 'windows/ui/gesture_conflicts.ahk',
+			platform: 'ahk',
+			section: 'gesture_system_slot_configured',
+			key: 'gesture_system_open_configured_slot',
+			port: 1
+		},
+		{
+			file: 'windows/ui/gesture_conflicts.ahk',
+			platform: 'ahk',
+			section: 'gesture_system_slot_not_configured',
+			key: 'gesture_system_open_not_configured_slot',
+			port: 1
+		},
+		{
+			file: 'macos/ui/menu/menu_gestures.lua',
+			platform: 'hs',
+			section: 'gesture_system_status_clear',
+			key: 'gesture_system_clear_children',
+			port: 3
+		},
+		{
+			file: 'macos/ui/menu/menu_gestures.lua',
+			platform: 'hs',
+			section: 'gesture_system_status_conflicts',
+			key: 'gesture_system_conflict_children',
+			port: 3
+		},
+		{
+			file: 'macos/ui/menu/menu_gestures.lua',
+			platform: 'hs',
+			section: 'gesture_system_macos_children',
+			key: 'gesture_system_cached_conflicts',
+			port: 3
+		},
+		{
+			file: 'macos/ui/menu/menu_gestures.lua',
+			platform: 'hs',
+			section: 'gesture_system_status_controls',
+			key: 'gesture_system_refresh',
+			port: 1
+		},
+		{
+			file: 'macos/ui/menu/menu_gestures.lua',
+			platform: 'hs',
+			section: 'gesture_system_pinch_enabled',
+			key: 'gesture_system_open_enabled_pinch',
+			port: 1
+		},
+		{
+			file: 'macos/ui/menu/menu_gestures.lua',
+			platform: 'hs',
+			section: 'gesture_system_pinch_disabled',
+			key: 'gesture_system_open_disabled_pinch',
+			port: 1
+		},
+		{
+			file: 'macos/ui/menu/menu_gestures.lua',
+			platform: 'hs',
+			section: 'gesture_system_pinch_unknown',
+			key: 'gesture_system_open_unknown_pinch',
+			port: 1
+		},
+		{
+			file: 'linux/ui/gesture_conflicts.lua',
+			platform: 'linux',
+			section: 'gesture_system_status_unknown',
+			key: 'gesture_system_unknown_children',
+			port: 3
+		},
+		{
+			file: 'linux/ui/gesture_conflicts.lua',
+			platform: 'linux',
+			section: 'gesture_system_linux_children',
+			key: 'gesture_system_cached_overlap',
+			port: 3
+		},
+		{
+			file: 'linux/ui/gesture_conflicts.lua',
+			platform: 'linux',
+			section: 'gesture_system_slot_unknown',
+			key: 'gesture_system_open_unknown_slot',
+			port: 1
+		}
+	];
+	for (const owner of owners) {
+		const native = fs.readFileSync(path.join(SP, owner.file), 'utf8');
+		const extension = path.extname(owner.file);
+		const credits = (candidate, declarations = manifest, port = owner.port) =>
+			nativeTemplateBinding(
+				candidate,
+				extension,
+				owner.section,
+				owner.key,
+				port,
+				[{ src: candidate }],
+				declarations,
+				owner.platform
+			);
+		assert.equal(
+			credits(native),
+			true,
+			`${owner.file}/${owner.section}/${owner.key}: actual native typed owner`
+		);
+		const needle = '"' + owner.key + '"';
+		assert.equal(
+			native.split(needle).length - 1,
+			1,
+			'the independently reviewed native binding is unique'
+		);
+		assert.equal(
+			credits(native.replace(needle, '"withdrawn_' + owner.key + '"')),
+			false,
+			'a withdrawn actual callback/provider earns no typed owner credit'
+		);
+		assert.equal(
+			credits(
+				native.replaceAll(
+					extension === '.ahk' ? 'MenuRenderer_TemplateRows' : 'ManifestMenu.template_rows',
+					extension === '.ahk' ? 'Foreign_TemplateRows' : 'Foreign.template_rows'
+				)
+			),
+			false,
+			'a foreign native receiver cannot publish the shared declarations'
+		);
+		assert.equal(
+			credits(JSON.stringify(native)),
+			false,
+			'quoted native source is data, not a producer'
+		);
+		assert.equal(
+			credits(native, manifest, owner.port === 1 ? 3 : 1),
+			false,
+			'command callbacks and cached child providers cannot exchange typed ports'
+		);
+		const withdrawn = { ...manifest };
+		delete withdrawn[owner.section];
+		assert.equal(
+			credits(native, withdrawn),
+			false,
+			'a removed required target invalidates the real include closure'
+		);
+		assert.equal(credits(native), true, 'exact owner restoration recovers the typed binding');
+	}
+}
+
+// Preserve the original refresh edge through its actual typed included publisher.
+{
+	const assert = require('node:assert/strict');
+	for (const [platform, file, child] of [
+		['ahk', 'windows/ui/gesture_conflicts.ahk', 'gesture_system_windows_children'],
+		['hs', 'macos/ui/menu/menu_gestures.lua', 'gesture_system_macos_children']
+	]) {
+		const native = fs.readFileSync(path.join(SP, file), 'utf8');
+		const extension = path.extname(file);
+		const credits = (candidate, declarations = manifest) =>
+			publishesIncludedCommands(
+				candidate,
+				extension,
+				'gesture_system_status_controls',
+				declarations,
+				platform
+			);
+		assert.equal(credits(native), true, 'the original controls edge has a genuine typed publisher');
+		assert.equal(
+			credits(native.replaceAll('"gesture_system_refresh"', '"withdrawn_refresh"')),
+			false
+		);
+		assert.equal(credits(native.replaceAll('"' + child + '"', '"withdrawn_children"')), false);
+		assert.equal(credits(JSON.stringify(native)), false);
+		for (const mutation of ['missing', 'redirected', 'cycle', 'wrong_type', 'empty']) {
+			const changed = structuredClone(manifest);
+			if (mutation === 'missing') delete changed.gesture_system_status_controls;
+			if (mutation === 'redirected')
+				changed[child] = changed[child].map((row) =>
+					row.section === 'gesture_system_status_controls'
+						? { ...row, section: 'withdrawn_controls' }
+						: row
+				);
+			if (mutation === 'cycle') changed[child].push({ type: 'include', section: child });
+			if (mutation === 'wrong_type') changed.gesture_system_status_controls[0].type = 'list';
+			if (mutation === 'empty') changed.gesture_system_status_controls = [];
+			assert.equal(
+				credits(native, changed),
+				false,
+				mutation + ' ownership earns no included command credit'
+			);
+		}
+	}
+}
+
 // Iterated to a fixed point rather than walked once: the graph is shallow today
 // but a group nested inside a group would make a single pass depth-dependent,
 // and a check that silently depends on declaration order is a check that breaks
@@ -1745,6 +2098,13 @@ for (let pass = 0; pass < MENU_KEYS.length + 1; pass += 1) {
 									fs.readFileSync(path.join(SP, file), 'utf8'),
 									path.extname(file),
 									target
+								) ||
+								publishesIncludedCommands(
+									fs.readFileSync(path.join(SP, file), 'utf8'),
+									path.extname(file),
+									target,
+									manifest,
+									platform
 								))
 					)
 						errors.push(

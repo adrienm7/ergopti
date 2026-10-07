@@ -3242,5 +3242,12 @@
 	"physical_shortcuts.position_unavailable": "此按键位置在这里不可用。",
 	"physical_shortcuts.windows_unavailable": "Windows 暂不支持: Windows上尚不能使用物理按键快捷键编辑器。",
 	"physical_shortcuts.collision": "此按键组合已被使用。请选择其他组合。",
-	"physical_shortcuts.window_unavailable": "此窗口不可用:请尝试重新打开。"
+	"physical_shortcuts.window_unavailable": "此窗口不可用:请尝试重新打开。",
+	"gestures.system.conflicts_caption": "⚠ %s 个潜在冲突",
+	"gestures.system.pinch_enabled": "系统捏合手势 : 已启用",
+	"gestures.system.pinch_disabled": "系统捏合手势 : 已禁用",
+	"gestures.system.pinch_unknown": "系统捏合手势 : 系统手势：尚未验证",
+	"gestures.system.slot_unknown_caption": "%s — 系统手势：尚未验证",
+	"gestures.system.slot_configured_caption": "%s — 已为 ErgoptiPlus 配置",
+	"gestures.system.slot_not_configured_caption": "%s — 未为 ErgoptiPlus 配置"
 }

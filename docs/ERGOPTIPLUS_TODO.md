@@ -4422,13 +4422,28 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 28, macOS 30, Linux 31, each
+  drivers still build (current baseline: Windows 27, macOS 29, Linux 31, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
   existing rows during the migration (proposal in the menu-first-group
   report: most hide; greyed: Linux edit_shortcuts, Linux key
   combinations, Linux metrics shortcut rows, Windows preview_bubbles).
+  Complete cached system-gesture status now consumes shared parent, slot,
+  pinch, reader and refresh frames through genuine native cached providers.
+  Seven additive keys in all 21 locales preserve an independently frozen prior
+  caption corpus; Settings callbacks and deferred probes retain native owners.
+  Portable focused controls pass 81/0 on macOS and 37/0 on Linux, against eleven
+  genuine predecessor failures per driver. Selected formatting, encoding and
+  all 364 JS checks pass; portable Mac units pass 17,128/0 and Linux units
+  10,590/0. Portable E2E passes 101/101 on Mac with one skipped scenario and
+  189/189 on Linux. Linux provider coverage follows the actual published status
+  subtree and retains all original assertions with independent withdrawal
+  controls. Windows parse, unit and E2E execution remain unavailable locally.
+  Both generators retire one Windows and one macOS native site, giving
+  27/29/31. Exact-source native, package and installed qualification remain
+  pending. This family does not complete the item.
+
   The macOS Tap-Hold action picker now consumes one complete shared frame:
   genuine Special choices, their conditional boundary and the actual grouped
   native catalogue. Declaration admission precedes local catalogue reads;
@@ -5561,7 +5576,7 @@ Current Group 3 source checkpoint (item 73, 2026-10-06): [Group 3 current checkp
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 28, macOS 30 and Linux 31 rows are still built by the
+  Windows 27, macOS 29 and Linux 31 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). Read on
   2026-10-01, the sites are of four kinds, and three of them need the
   manifest to say more than it can today:
@@ -5579,6 +5594,21 @@ Current Group 3 source checkpoint (item 73, 2026-10-06): [Group 3 current checkp
   sites): they follow (b), as part of the template;
   (d) the tray root bootstrap (Windows `tray_bootstrap.ahk`,
   `menu_init.ahk`).
+  Complete cached system-gesture status now consumes shared parent, slot,
+  pinch, reader and refresh frames through genuine native cached providers.
+  Seven additive keys in all 21 locales preserve an independently frozen prior
+  caption corpus; Settings callbacks and deferred probes retain native owners.
+  Portable focused controls pass 81/0 on macOS and 37/0 on Linux, against eleven
+  genuine predecessor failures per driver. Selected formatting, encoding and
+  all 364 JS checks pass; portable Mac units pass 17,128/0 and Linux units
+  10,590/0. Portable E2E passes 101/101 on Mac with one skipped scenario and
+  189/189 on Linux. Linux provider coverage follows the actual published status
+  subtree and retains all original assertions with independent withdrawal
+  controls. Windows parse, unit and E2E execution remain unavailable locally.
+  Both generators retire one Windows and one macOS native site, giving
+  27/29/31. Exact-source native, package and installed qualification remain
+  pending. This family does not complete the item.
+
   The macOS Tap-Hold action picker now consumes one complete shared frame:
   genuine Special choices, their conditional boundary and the actual grouped
   native catalogue. Declaration admission precedes local catalogue reads;
