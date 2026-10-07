@@ -61,12 +61,12 @@ _TextSenderNativeBegin(Owner) {
 
 _TextSenderNativePollReceipt(Token) {
 	Phase := 0
-	PollOsErrorCode := 0
+	OsError := 0
 	Status := DllCall(_LLM_NavEventOwnerNativeExport("ErgoptiEditor_Poll"),
-		"UInt64", Token, "UInt*", &Phase, "UInt*", &PollOsErrorCode, "Int")
+		"UInt64", Token, "UInt*", &Phase, "UInt*", &OsError, "Int")
 	if Status != 0
 		throw Error("native editor poll failed with status " . Status)
-	return Map("phase", Phase, "os_error", PollOsErrorCode)
+	return Map("phase", Phase, "os_error", OsError)
 }
 
 _TextSenderNativeDecide(Token, Commit) {

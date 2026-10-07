@@ -448,9 +448,9 @@ _KeyCombinationRunTap(First, Second, ActionId) {
 		OneShotShiftFix()
 	if (IsSet(LayerEnabled) && LayerEnabled)
 		DisableLayer()
-	PairActionFn := GestureInvokeAction.Bind(ActionId, KeyCombinationBindingId(KeyCombinationPairId(First, Second)))
+	Run := GestureInvokeAction.Bind(ActionId, KeyCombinationBindingId(KeyCombinationPairId(First, Second)))
 	Held := _TH_OwnedModifiers.Has(First) ? _TH_SyntheticKeyList(_TH_OwnedModifiers[First]) : []
-	return _KeyCombinationRunWithKeysUp(Held, 1, PairActionFn)
+	return _KeyCombinationRunWithKeysUp(Held, 1, Run)
 }
 
 ; Runs RunFn with every key of Names lifted, each given back afterwards to
