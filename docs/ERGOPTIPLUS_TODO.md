@@ -5781,6 +5781,15 @@ repaired hosted kernel delivery and subsequent daemon/tray acceptance are pendin
 No arbitrary physical-key output or simultaneous/cross-device capability is
 admitted by this repair.
 
+Native fixture correction (2026-10-07): the exact output Reader journals actual
+KEY/SYN observations before EVIOCGKEY can flush queued key events. The original
+four-frame oracle, native ACKs, deadlines, scenarios and cleanup remain exact;
+observations are consumed once and are never synthesized from bitmap state.
+Independent controls reproduce the old missing-DOWN failure and reject omitted,
+repeated, foreign and fabricated observations on both Lua ABIs. The actual hosted
+79-pass/1-fail receipt is retained. The repaired hosted kernel execution is still
+pending and controlled queue models are not physical-delivery evidence.
+
 - [ ] **96.** Remove the separate Ergopti+ AltGr-adjustments option from the
       Layout menu. Selecting the Ergopti+ keylayout in the emulation picker must
       suffice. Verify that the layout supplies every intended change, retire

@@ -101,12 +101,17 @@ local function drain_output()
 	return rows
 end
 
+-- EVIOCGKEY flushes queued EV_KEY rows on that same evdev reader. Retain actual
+-- output observations before querying its bitmap; frame checks consume them once.
+local output_journal = {}
+
 --- Compares real kernel reports against independently written literal frames.
 --- @param expected string
 --- @param count integer Exact KEY and SYN row count.
 --- @param label string
 local function expect_frames(expected, count, label)
-	local rows = {}
+	local rows = output_journal
+	output_journal = {}
 	local ready = await(function()
 		for _, row in ipairs(drain_output()) do rows[#rows + 1] = row end
 		return #rows >= count
@@ -121,6 +126,9 @@ end
 --- @param expected string Sorted held keycodes, joined with spaces.
 --- @param label string
 local function expect_held(slot, expected, label)
+	if slot == OUTPUT_SLOT then
+		for _, row in ipairs(drain_output()) do output_journal[#output_journal + 1] = row end
+	end
 	local capability = Reader.capture_pressed_keys(slot)
 	local view = capability and Reader.pressed_keys_view(capability)
 	check(view ~= nil and view.origin == "native-evdev"
