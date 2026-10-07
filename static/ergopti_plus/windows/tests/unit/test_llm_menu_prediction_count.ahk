@@ -72,14 +72,19 @@ Test("llm menu: the suggestion count heads the generation submenu (llm-count-row
 
 /** Exercises one true boundary through the actual native numeric allocator and Win32 menu. */
 _LLMPC_GenerationBoundary(Key) {
-	global _LLM_Menu, _SharedDir, LLM_MENU_N_OPTIONS
+	global _LLM_Menu, _SharedDir, LLM_MENU_N_OPTIONS, LLM_Defaults
 	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\generation_boundaries.json", "UTF-8"))
 	Expected := Corpus["boundaries"][Key]
 	Saved := _LLM_Menu
+	HadDefaults := IsSet(LLM_Defaults)
+	if HadDefaults
+		SavedDefaults := LLM_Defaults
 	Frame := _MR_GetMenuDef(Expected["section"])
 	Original := Frame[1]
 	Native := 0
 	try {
+		LLM_Defaults_Load()
+		Assert(Type(_LLM_DefaultFor("llm_num_predictions")) == "Integer", "the genuine defaults loader supplies the numeric fixture prerequisite")
 		_LLM_Menu := Saved.Clone()
 		_LLM_Menu["n_predictions"] := _LLM_DefaultFor("llm_num_predictions")
 		_LLM_Menu["ctx_chars"] := _LLM_DefaultFor("llm_context_length", 500)
@@ -117,6 +122,7 @@ _LLMPC_GenerationBoundary(Key) {
 	} finally {
 		Frame[1] := Original
 		_LLM_Menu := Saved
+		LLM_Defaults := HadDefaults ? SavedDefaults : unset
 		if Native is Menu
 			_CTC_ReleaseMenu(Native)
 	}
@@ -127,10 +133,15 @@ for Key in ["count", "context", "words"]
 
 /** Retains the hand numeric order while each true complete frame is withdrawn. */
 _LLMPC_CompleteGenerationFrame(Section) {
-	global _LLM_Menu
+	global _LLM_Menu, LLM_Defaults
 	Saved := _LLM_Menu
+	HadDefaults := IsSet(LLM_Defaults)
+	if HadDefaults
+		SavedDefaults := LLM_Defaults
 	Root := _MM_GetManifestRoot(), Original := Root[Section]
 	try {
+		LLM_Defaults_Load()
+		Assert(Type(_LLM_DefaultFor("llm_num_predictions")) == "Integer", "the genuine defaults loader supplies the numeric fixture prerequisite")
 		_LLM_Menu := Saved.Clone()
 		_LLM_Menu["n_predictions"] := _LLM_DefaultFor("llm_num_predictions")
 		_LLM_Menu["ctx_chars"] := _LLM_DefaultFor("llm_context_length", 500)
@@ -167,9 +178,43 @@ _LLMPC_CompleteGenerationFrame(Section) {
 	} finally {
 		Root[Section] := Original
 		_LLM_Menu := Saved
+		LLM_Defaults := HadDefaults ? SavedDefaults : unset
 	}
 	Assert(_LLM_Menu_GenerationRows() is Array, "the repaired physical declaration is usable")
 }
 for Section in ["llm_generation_count_control", "llm_generation_context_controls", "llm_generation_word_controls",
 	"llm_generation_temperature_controls", "llm_native_numeric_reset"]
 	Test("complete generation frame: actual native numeric owner " . Section, _LLMPC_CompleteGenerationFrame.Bind(Section))
+
+
+; Exercise the exact new fixture scope through real declaration admission/refusal.
+_LLMPC_DefaultFixtureRestoration() {
+	global _LLM_Menu, LLM_Defaults
+	SavedMenu := _LLM_Menu, HadDefaults := IsSet(LLM_Defaults)
+	if HadDefaults
+		SavedDefaults := LLM_Defaults
+	Root := _MM_GetManifestRoot(), Section := "llm_generation_count_control", Original := Root[Section]
+	Marker := Map("fixture_defaults_identity", true)
+	try {
+		for Mode in ["absent", "false", "reference"] {
+			LLM_Defaults := Mode == "absent" ? unset : Mode == "false" ? false : Marker
+			_LLMPC_CompleteGenerationFrame(Section)
+			AssertEqual(Mode != "absent", IsSet(LLM_Defaults), "successful native fixture restores exact defaults presence")
+			if Mode != "absent"
+				AssertEqual(Mode == "false" ? false : Marker, LLM_Defaults, "successful native fixture restores the original defaults identity")
+			Root[Section] := [Map("type", "command", "id", "fixture_unbound_count", "i18n", "button.cancel")]
+			AssertThrows(_LLMPC_CompleteGenerationFrame.Bind(Section), "the genuine unbound count frame raises after real defaults loading")
+			AssertEqual(Mode != "absent", IsSet(LLM_Defaults), "raised native fixture restores exact defaults presence")
+			if Mode != "absent"
+				AssertEqual(Mode == "false" ? false : Marker, LLM_Defaults, "raised native fixture restores the original defaults identity")
+			AssertEqual(SavedMenu, _LLM_Menu, "both outcomes restore the exact original menu state owner")
+			Root[Section] := Original
+		}
+	} finally {
+		Root[Section] := Original
+		_LLM_Menu := SavedMenu
+		LLM_Defaults := HadDefaults ? SavedDefaults : unset
+	}
+}
+Test("generation fixture: authentic defaults preserve absent/false/reference ownership on success and raise",
+	_LLMPC_DefaultFixtureRestoration)

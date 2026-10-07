@@ -184,7 +184,7 @@ _THRD_KeyRowsPolicy(Owners) {
 		"the provider must consume the command map through the declared row owner")
 	Data := Owners["_MR_CommandRowData"]
 	Assert(_THRD_ExecutablePattern(Data,
-		'i)Map\(\s*"label"\s*,\s*t\(I18nKey\)\s*,\s*"action"\s*,\s*Commands\[CmdId\]\s*\)', "Map"),
+		'i)Map\(\s*"label"\s*,\s*IsSet\(\s*Label\s*\)\s*\?\s*Label\s*:\s*t\(I18nKey\)\s*,\s*"action"\s*,\s*Commands\[CmdId\]\s*\)', "Map"),
 		"the declared command must construct the renderer action")
 	Renderer := Owners["_MR_RenderRows"]
 	Assert(_THRD_ExecutablePattern(Renderer,
@@ -268,7 +268,7 @@ _THRD_GlobalAndLocalTokenBoundaries() {
 			"the command factory must forward the actual owner callback map"],
 		["_TH_KeyRows", 'MenuRenderer_TemplateRows("tap_hold_key_rows"',
 			"native and tap callbacks plus configured state must reach the child template"],
-		["_MR_CommandRowData", 'Map("label", t(I18nKey), "action", Commands[CmdId])',
+		["_MR_CommandRowData", 'Map("label", IsSet(Label) ? Label : t(I18nKey), "action", Commands[CmdId])',
 			"the declared command must construct the renderer action"],
 		["_MR_RenderRows", 'RegisterMenuItem(TargetMenu, Label, Row["action"])',
 			"the shared renderer must register the row action with reliable dispatch"],

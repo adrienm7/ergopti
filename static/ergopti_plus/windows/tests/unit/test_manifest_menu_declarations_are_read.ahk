@@ -836,7 +836,7 @@ _CLP_PhysicalRows() {
 }
 
 _CLP_CheckRows(Key, Legacy, Root, Corpus, Language) {
-	Counts := Map("caption", 0, "command", 0), Native := Menu()
+	Counts := Map("caption", 0, "command", 0), Native := Menu(), SavedRows := Root[Key]
 	Action := _DA_RunCommand.Bind(Counts), Commands := Map("legacy", Action)
 	for Item in Corpus["rows"]
 		Commands[Item["id"]] := Action
@@ -850,6 +850,7 @@ _CLP_CheckRows(Key, Legacy, Root, Corpus, Language) {
 		AssertEqual(2, Counts["caption"])
 		AssertEqual(0, Counts["command"])
 		Rows := MenuRenderer_TemplateRows(Key, Commands, Getters, Map())
+		AssertEqual(7, Rows.Length, "all seven independent caption vectors remain in the canonical data tree")
 		for Index, Row in Rows
 			AssertEqual(Corpus["expected"][Language][Index], Row["label"])
 		AssertEqual(4, Counts["caption"], "the final explicit caption is prefixed exactly once")
@@ -859,15 +860,27 @@ _CLP_CheckRows(Key, Legacy, Root, Corpus, Language) {
 		Selected := MenuRenderer_CommandRow(Key, "indented", Commands, Getters)
 		AssertEqual("native-result", Selected["action"].Call())
 		AssertEqual(1, Counts["command"])
-		MenuRenderer_Build(Key, "Hotstrings", Map(), Map(), Map(), Commands, Getters, Native)
-		AssertEqual(7, TrayMenuItemCount(Native))
-		for Index, Caption in Corpus["expected"][Language]
-			AssertEqual(Caption, _CLP_NativeCaption(Native, Index))
+		; Equal labels update an existing AHK item. Isolate each unchanged hand vector.
+		NativeCount := 0
+		for Index, Caption in Corpus["expected"][Language] {
+			Root[Key] := [Corpus["rows"][Index]]
+			MenuRenderer_Build(Key, "Hotstrings", Map(), Map(), Map(), Commands, Getters, Native)
+			AssertEqual(1, TrayMenuItemCount(Native), "each original declaration publishes exactly one native caption")
+			NativeCount += TrayMenuItemCount(Native)
+			AssertEqual(Caption, _CLP_NativeCaption(Native, 1))
+			try Native.Delete()
+			finally MenuDispatcher_PruneMenu(Native)
+		}
+		AssertEqual(7, NativeCount)
 		AssertEqual(7, Counts["caption"])
 		AssertEqual(1, Counts["command"], "native construction does not deliver commands")
 	} finally {
+		Root[Key] := SavedRows
 		try Native.Delete()
-		finally MenuDispatcher_PruneMenu(Native)
+		finally {
+			try MenuDispatcher_PruneMenu(Native)
+			finally Native := unset
+		}
 	}
 }
 
