@@ -83,6 +83,63 @@ function annotation(log) {
 }
 
 /**
+ * Selects exact failure records before decoding unrelated binary fixture output.
+ * Every selected byte remains strict UTF-8; the original ordering and final
+ * reporter boundary must hold before the existing identity checks receive it.
+ * @param {Buffer} bytes The fresh unit log, without transport normalization.
+ * @returns {string} Strictly decoded original failure and completion records.
+ */
+function selectedLog(bytes) {
+	if (bytes.length > MAX_LOG_BYTES) refuse('unit log exceeds the read budget');
+	const markers = [
+		`  FAIL ${CASE} — `,
+		'OVERALL RESULTS:',
+		`  - ${CASE} : `,
+		`    replay: luajit tests/run.lua --only "${CASE}"`,
+		'[report:linux-lua]'
+	].map((marker) => Buffer.from(marker, 'utf8'));
+	const records = markers.map(() => []);
+	for (let start = 0; start < bytes.length; ) {
+		const newline = bytes.indexOf(10, start);
+		const end = newline === -1 ? bytes.length : newline + 1;
+		for (const [index, marker] of markers.entries()) {
+			if (bytes.subarray(start, start + marker.length).equals(marker)) {
+				records[index].push({ start, end });
+				if (records[index].length > 1) refuse('selected unit log record is duplicated');
+			}
+		}
+		start = end;
+	}
+	if (records.some((record) => record.length !== 1)) refuse('selected unit log record is missing');
+	const [inline, footer, terminal, replay, reporter] = records.map((record) => record[0]);
+	let footerEnd = footer.start;
+	// The runner's footer has exactly five complete lines, counted as raw bytes.
+	for (let line = 0; line < 5; line++) {
+		const newline = bytes.indexOf(10, footerEnd);
+		if (newline === -1) refuse('selected unit footer is incomplete');
+		footerEnd = newline + 1;
+	}
+	const detailLength = replay.start - 1 - terminal.start - markers[2].length;
+	const inlineEnd = inline.start + markers[0].length + detailLength + 1;
+	if (
+		detailLength < 1 ||
+		inlineEnd > footer.start ||
+		footerEnd > terminal.start ||
+		replay.end > reporter.start ||
+		reporter.end !== bytes.length ||
+		bytes[reporter.end - 1] !== 10
+	)
+		refuse('selected unit records are unfinished or out of order');
+	const selected = Buffer.concat([
+		bytes.subarray(inline.start, inlineEnd),
+		bytes.subarray(footer.start, footerEnd),
+		bytes.subarray(terminal.start, replay.end),
+		bytes.subarray(reporter.start, reporter.end)
+	]);
+	return new TextDecoder('utf-8', { fatal: true }).decode(selected);
+}
+
+/**
  * Opens only a regular log, retaining read refusals as fixed public diagnostics.
  * @param {string[]} argv Exactly one current-run log path.
  * @returns {void}
@@ -95,7 +152,7 @@ function main(argv) {
 		const stat = fs.fstatSync(descriptor);
 		if (!stat.isFile() || stat.size > MAX_LOG_BYTES)
 			refuse('unit log is not a regular bounded file');
-		const log = new TextDecoder('utf-8', { fatal: true }).decode(fs.readFileSync(descriptor));
+		const log = selectedLog(fs.readFileSync(descriptor));
 		process.stdout.write(annotation(log));
 	} catch (error) {
 		const reason =

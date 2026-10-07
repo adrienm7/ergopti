@@ -5448,6 +5448,19 @@ The fixed Specifications and Capabilities frames of the Windows/macOS per-model 
       uncommitted in the local worktree of `fix/downloads-on-managed-networks`
       when the session stopped; redo it if that worktree is gone.
 
+Manual Linux run37591679813 at9195a6419f4d36581e4404198cd152753791f2e6
+failed the Configuration restore assertion at test_hotstrings_scope.lua:432:
+rolls remained false. Two unrelated passing unsafe-answer fixture names contain
+invalid UTF-8 bytes and made the whole-log annotation decoder refuse. The
+annotation now selects complete fixed records as raw bytes before strict UTF-8
+decoding; original assertion identity, footer counts, reporter, failed unit exit
+and artifact remain authoritative. The authentic old CLI refuses and the new
+CLI publishes the complete unchanged assertion; twelve additive controls cover
+unrelated invalid bytes, selected invalid bytes and record boundaries. The
+Configuration failure cause remains unproved. Exact current-dev Linux manual
+run37596288622 passed unit/E2E/package/install and skipped Release; private
+exact and prefix native receiving also passed, without exonerating this branch.
+
 A failure-only Linux CI annotation now reads the completed current-run unit log
 after its existing failure-artifact upload. It publishes only the fixed
 Configuration restore assertion when the inline failure, terminal replay and

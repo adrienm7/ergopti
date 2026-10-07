@@ -415,6 +415,65 @@ try {
 			safe.stdout ===
 				'::notice title=linux-lua Configuration assertion::routes the Configuration restore row to the recommended hotstrings%0Atest_hotstrings_scope.lua:435: 50%25%0D%0A::error::injected\n'
 	);
+	// Real onboarding controls print unsafe byte strings in successful test
+	// names. Those unrelated bytes must not hide this valid completed failure.
+	for (const badBytes of [Buffer.from([0xff]), Buffer.from([0xc0, 0xaf])]) {
+		const binaryPass = Buffer.concat([
+			Buffer.from('  ok   unrelated unsafe-answer fixture "'),
+			badBytes,
+			Buffer.from('"\n')
+		]);
+		const mixed = receiveExcerpt(
+			Buffer.concat([Buffer.from(inline), binaryPass, Buffer.from(footer + detail + reporter)])
+		);
+		check(
+			'Configuration assertion survives unrelated invalid UTF-8 fixture bytes',
+			mixed.status === 0 &&
+				mixed.signal === null &&
+				mixed.stderr === '' &&
+				mixed.stdout ===
+					'::notice title=linux-lua Configuration assertion::routes the Configuration restore row to the recommended hotstrings%0Atest_hotstrings_scope.lua:435: the restored catalogue fires — actual: false\n'
+		);
+	}
+	// Each marked byte is inside a selected record. A permissive decoder could
+	// otherwise normalize an assertion; none may be repaired or ignored here.
+	for (const [label, text] of [
+		['inline assertion', transcript.replace(inline, inline.replace('false', 'fa\x7fse'))],
+		['terminal assertion', transcript.replace(detail, detail.replace('false', 'fa\x7fse'))],
+		['equal assertion copies', transcript.replaceAll(assertion, assertion + '\x7f')],
+		['footer', transcript.replace('Passed tests:  11224', 'Passed tests:  112\x7f24')],
+		['replay tail', transcript.replace(`--only "${caseName}"\n`, `--only "${caseName}"\x7f\n`)],
+		['reporter', transcript.replace('11\u202F224 passed', '11\u202F2\x7f24 passed')]
+	]) {
+		const corrupted = Buffer.from(text).map((byte) => (byte === 0x7f ? 0xff : byte));
+		const refusal = receiveExcerpt(corrupted);
+		check(
+			`Configuration excerpt strictly rejects invalid UTF-8 in ${label}`,
+			refusal.status === 2 &&
+				refusal.signal === null &&
+				refusal.stdout === '' &&
+				refusal.stderr ===
+					'Configuration assertion annotation refused: unit log is not valid UTF-8.\n'
+		);
+	}
+	for (const [label, log] of [
+		['finished reporter has a trailing unrelated record', transcript + '  ok   later record\n'],
+		['reporter moved before terminal replay', inline + footer + reporter + detail],
+		['inline moved after footer', footer + inline + detail + reporter],
+		[
+			'duplicate replay identity',
+			transcript.replace(detail, detail + `    replay: luajit tests/run.lua --only "${caseName}"\n`)
+		]
+	]) {
+		const refusal = receiveExcerpt(log);
+		check(
+			`Configuration byte selection refuses ${label}`,
+			refusal.status === 2 &&
+				refusal.signal === null &&
+				refusal.stdout === '' &&
+				refusal.stderr.startsWith('Configuration assertion annotation refused: ')
+		);
+	}
 	const refusedLogs = [
 		['missing inline case', transcript.replace(inline, '')],
 		['missing terminal case', inline + footer + reporter],
