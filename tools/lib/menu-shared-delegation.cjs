@@ -306,4 +306,99 @@ function publishesMenuTemplate(source, extension, section) {
 	});
 }
 
-module.exports = { delegatedMenuSources, combineMenuVisibility, publishesMenuTemplate };
+/** Credits only one independently pinned selected group in its real native owner. */
+function publishesSelectedMenuGroup(source, extension, section, definition, proof) {
+	if (
+		extension !== '.ahk' ||
+		!proof ||
+		!Array.isArray(definition) ||
+		definition.length !== 1 ||
+		!require('node:util').isDeepStrictEqual(definition, [proof.row]) ||
+		proof.row?.type !== 'group' ||
+		typeof proof.row.id !== 'string' ||
+		proof.row.id === ''
+	)
+		return false;
+	const loopSource = fs.readFileSync(
+		path.join(__dirname, '../test/test-ahk-loop-capture.cjs'),
+		'utf8'
+	);
+	const start = loopSource.indexOf('function codeLines(src) {'),
+		end = loopSource.indexOf('/**', start);
+	if (start < 0 || end <= start) return false;
+	const codeLines = require('node:vm').runInNewContext(
+		loopSource.slice(start, end) + '\ncodeLines'
+	);
+	const executable = (text) => {
+		const lines = codeLines(text);
+		return scriptTokens(text, '.ahk').filter((token) => {
+			if (token.kind === 'string')
+				return text.slice(token.start, token.end) === JSON.stringify(token.value);
+			const line = text.slice(0, token.start).split('\n').length - 1;
+			const column = token.start - text.lastIndexOf('\n', token.start - 1) - 1;
+			return lines[line]?.slice(column, column + token.value.length) === token.value;
+		});
+	};
+	const matches = (tokens, at, wanted) =>
+		wanted.every(
+			(token, offset) =>
+				tokens[at + offset]?.kind === token.kind && tokens[at + offset]?.value === token.value
+		);
+	const tokens = executable(source),
+		signature = scriptTokens(proof.owner_signature, '.ahk'),
+		bodies = [];
+	for (let at = 0; at < tokens.length; at++) {
+		if (
+			!matches(tokens, at, signature) ||
+			source.slice(source.lastIndexOf('\n', tokens[at].start - 1) + 1, tokens[at].start).trim() !==
+				''
+		)
+			continue;
+		let depth = 1;
+		for (let index = at + signature.length; index < tokens.length; index++) {
+			if (tokens[index].kind !== 'symbol') continue;
+			if (tokens[index].value === '{') depth++;
+			if (tokens[index].value === '}') depth--;
+			if (!depth) {
+				bodies.push(source.slice(tokens[at + signature.length - 1].end, tokens[index].start));
+				break;
+			}
+		}
+	}
+	if (bodies.length !== 1 || !bodies[0].trim()) return false;
+	const body = executable(bodies[0]);
+	const call = scriptTokens(proof.call, '.ahk');
+	// The authored source proof must actually name this selected physical row.
+	const method = call.findIndex(
+		(token) => token.kind === 'identifier' && token.value === 'MenuRenderer_GroupRow'
+	);
+	if (
+		method < 0 ||
+		call[method + 1]?.value !== '(' ||
+		call[method + 2]?.kind !== 'string' ||
+		call[method + 2].value !== section ||
+		call[method + 3]?.value !== ',' ||
+		call[method + 4]?.kind !== 'string' ||
+		call[method + 4].value !== proof.row.id
+	)
+		return false;
+	let previous = -1;
+	for (const statement of [proof.call, proof.handoff, proof.consumer]) {
+		const wanted = scriptTokens(statement, '.ahk'),
+			positions = [];
+		for (let index = 0; index < body.length; index++) {
+			if (matches(body, index, wanted) && !['.', ':'].includes(body[index - 1]?.value))
+				positions.push(index);
+		}
+		if (positions.length !== 1 || positions[0] <= previous) return false;
+		previous = positions[0];
+	}
+	return true;
+}
+
+module.exports = {
+	delegatedMenuSources,
+	combineMenuVisibility,
+	publishesMenuTemplate,
+	publishesSelectedMenuGroup
+};

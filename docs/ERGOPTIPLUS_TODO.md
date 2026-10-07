@@ -4412,7 +4412,7 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 48, macOS 86, Linux 61, each
+  drivers still build (current baseline: Windows 28, macOS 32, Linux 31, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
@@ -4436,6 +4436,26 @@ integrated, then publish one grouped release.
   blocks; original assertions and new missing/data/comment/empty controls
   remain mandatory. Final composed native, installed and
   physical-device qualification remain separate; items 54 and 81 stay partial.
+
+  The complete WordExpander parameter, delay-color, Agent, extension,
+  shortcut, internal LLM, personal-file, Language, Debug, Configuration,
+  Apps and Metrics frames now consume shared declarations on all drivers.
+  Native callbacks and the existing WPM lifecycle remain owned by their
+  original drivers. Child scopes, false check states, literal caption affixes
+  and command prefixes retain their original behavior. Both actual generators
+  reproduce the union's 28/33/33 source census. Independent source reviews and
+  focused causal controls pass; final composed local and native gates remain
+  required. Remaining native construction and Windows append placement are
+  software work; installed and physical-device acceptance remain separate.
+
+  The complete Magic trigger-character frame now consumes the shared main
+  command and the Linux-only customized reset fragment. Genuine Windows,
+  macOS and Linux getter/setter/reset bodies, macOS paused presentation and
+  Linux indentation remain unchanged. Source withdrawal, late metatables and
+  malformed declarations refuse before publishing the parent. Independent
+  causal controls pass; the two actual generators retire exactly zero Windows,
+  one macOS and two Linux sites, giving 28/32/31. Native Windows, final composed
+  gates, packaging/install and physical-device acceptance remain required.
 
   Published `409b8ee0` includes the shared model-readout migration and its two
   owner-generated artifacts; the remaining sites are software migration work.
@@ -5488,7 +5508,7 @@ Current Group 3 source checkpoint (item 73, 2026-10-06): [Group 3 current checkp
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 48, macOS 86 and Linux 61 rows are still built by the
+  Windows 28, macOS 32 and Linux 31 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). Read on
   2026-10-01, the sites are of four kinds, and three of them need the
   manifest to say more than it can today:

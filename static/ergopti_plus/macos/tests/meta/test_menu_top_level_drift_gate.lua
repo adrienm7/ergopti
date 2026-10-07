@@ -159,15 +159,35 @@ local function stub_row(key)
 	}
 end
 
+--- Captures the genuine native locale provider before the manifest fixture redirects Paths.
+--- Its real module closes the generated catalogue, active locale and original setter callbacks.
+--- @return function The actual initialized language-row provider.
+local function native_language_provider()
+	return helpers.with_stub_scope({
+		"infra.i18n", "infra.locale", "locale.core", "menu.labels", "_generated.locale_table",
+		"adapters.storage", "adapters.timer_scheduler",
+	}, function()
+		helpers.load_with_stubs("infra.i18n")
+		rawset(package.loaded, "infra.i18n", nil)
+		local native = require("infra.i18n")
+		native.init()
+		assert(type(native.build_language_menu_items) == "function", "actual native locale provider exists")
+		assert(#native.get_sorted_locales() == 21, "actual generated locale catalogue is complete")
+		return native.build_language_menu_items
+	end)
+end
+
 --- Renders the tray root over the manifest text given.
 --- @param manifest_text string Manifest JSON text.
 --- @param paused boolean|nil Whether the script is paused.
 --- @return table rows Rendered top-level rows, the title badge removed.
 --- @return table lines Recorded warnings and errors.
 local function render_root(manifest_text, paused, command_actions)
+	local language_provider = native_language_provider()
 	local lines = {}
 	local rendered = ManifestFixture.with_manifest(manifest_text, recording_logger(lines), function()
 		local builder = helpers.load_with_stubs("ui.menu.builder")
+		require("infra.i18n").build_language_menu_items = language_provider
 		local build = function(key) return { build = function() return stub_row(key) end } end
 		local mods = {
 			keyboard_layout = build("menu.layout.title"),
@@ -390,5 +410,37 @@ helpers.describe("shared lifecycle commands (macOS)", function()
 		helpers.assert_eq(reload.fn(), false)
 		helpers.assert_eq(quit.fn(), false)
 		helpers.assert_eq(calls, 0, "disabled presentation cannot conceal a callable native bypass")
+	end)
+end)
+
+helpers.describe("topology fixture owns genuine native Language data", function()
+	helpers.it("retains all original native locale rows and restores its private reader cohort", function()
+		local names = { "infra.i18n", "infra.locale", "locale.core", "menu.labels", "_generated.locale_table",
+			"adapters.storage", "adapters.timer_scheduler", "infra.paths", "infra.logger" }
+		local saved, old_hs = {}, rawget(_G, "hs")
+		for _, name in ipairs(names) do saved[name] = rawget(package.loaded, name) end
+		local provider = native_language_provider()
+		for _, name in ipairs(names) do
+			helpers.assert_true(rawequal(rawget(package.loaded, name), saved[name]), name .. " exact entry restored")
+		end
+		helpers.assert_true(rawequal(rawget(_G, "hs"), old_hs), "native fixture globals restored")
+		local file = assert(io.open(helpers.shared("tests/corpus/menus/language_parent.json"), "rb"))
+		local raw = assert(file:read("*a")); assert(file:close())
+		local corpus = assert(require("adapters.json_codec").decode(raw))
+		local rows = provider()
+		helpers.assert_eq(#rows, #corpus.locales, "a genuine complete catalogue is not an empty stand-in")
+		for index, expected in ipairs(corpus.locales) do
+			helpers.assert_eq(rows[index].label, expected.mac, "original independently handwritten caption/order")
+			helpers.assert_type(rows[index].action, "function", "the genuine setter callback is retained uncalled")
+		end
+		local drawn = render_root(read_manifest_text())
+		local parent
+		for _, row in ipairs(drawn) do if id_of(row) == "language" then parent = row; break end end
+		helpers.assert_not_nil(parent, "actual topology rendering consumes the supplied native provider")
+		helpers.assert_eq(#parent.menu, #corpus.locales, "the actual tray receives all real children")
+		for index, expected in ipairs(corpus.locales) do
+			helpers.assert_eq(parent.menu[index].title, expected.mac, "actual completed native caption/order")
+			helpers.assert_type(parent.menu[index].fn, "function", "original native setter closure survives rendering")
+		end
 	end)
 end)

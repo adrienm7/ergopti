@@ -118,3 +118,91 @@ helpers.describe("Hotstrings menu (linux): extension submenus", function()
 		helpers.assert_nil(row_starting(mb.build({ config = fake_config(false), _version = "9.9.9" }), label))
 	end)
 end)
+
+
+-- Capture only the fixture's actual renderer/consumer cohort and restore exact owners.
+local function with_extension_frame(body, paused)
+	local names = { "infra.manifest_menu", "ui.menu.menu_builder" }
+	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+	local ok, err = pcall(function()
+		local translator = require("infra.i18n")
+		local renderer = assert(require("menu.renderer").new({ platform = "linux",
+			manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
+			json_decode = require("json").decode, i18n = translator, logger = require("logger.shim"),
+		}))
+		package.loaded["infra.manifest_menu"] = renderer
+		local owner = helpers.load_module("ui.menu.menu_builder")
+		local context = { config = fake_config(true), paused = paused == true, _version = "9.9.9" }
+		context.is_paused = function() return context.paused end
+		local label = string.format(translator.get("menu.extensions.hotstrings_of"), "Ergopti+")
+		body({ root = renderer.get_root(), translator = translator, context = context,
+			build = function() return row_starting(owner.build(context), label) end })
+	end)
+	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+	if not ok then error(err, 0) end
+end
+
+helpers.describe("complete installed extension shared frames (Linux)", function()
+	helpers.it("retains the full command, category and bound-section order", function()
+		with_extension_frame(function(f)
+			local rows = assert(f.build()).menu
+			helpers.assert_eq(#rows, 7)
+			helpers.assert_eq(rows[1].title, f.translator.get("menu.hotstrings.check_all"))
+			helpers.assert_eq(rows[2].title, f.translator.get("menu.hotstrings.uncheck_all"))
+			helpers.assert_eq(rows[3].title, "-")
+			helpers.assert_eq(rows[4].title, "sfbsreduction (5)")
+			helpers.assert_eq(rows[5].title, f.translator.get("category.rolls") .. " (7)")
+			helpers.assert_eq(rows[6].title, "-")
+			helpers.assert_eq(rows[7].title, "repeat_corrections (14)")
+			helpers.assert_eq(rows[7].checked, true)
+			local writes = 0
+			f.context.config.set_extension_sections_enabled = function() writes = writes + 1; return true end
+			f.context.paused = true
+			helpers.assert_eq(rows[1].fn(), false); helpers.assert_eq(rows[2].fn(), false)
+			helpers.assert_eq(writes, 0)
+		end)
+	end)
+	helpers.it("preserves the genuine paused top-level withdrawal of extension children", function()
+		with_extension_frame(function(f)
+			helpers.assert_eq(f.build(), nil)
+		end, true)
+	end)
+	for _, section in ipairs({ "hotstring_extension_bulk_controls", "hotstring_extension_content_frame", "hotstrings_parameter_boundary" }) do
+		helpers.it("withdraws and repairs missing " .. section .. " in the real installed provider", function()
+			with_extension_frame(function(f)
+				local saved = f.root[section]; f.root[section] = nil
+				helpers.assert_eq(f.build(), nil)
+				f.root[section] = saved
+				helpers.assert_type(f.build(), "table")
+			end)
+		end)
+	end
+	helpers.it("refuses an unbound child slot and restores the current declaration", function()
+		with_extension_frame(function(f)
+			local row = f.root.hotstring_extension_content_frame[5]
+			local saved = row.id; row.id = "foreign_extension_bound_rows"
+			helpers.assert_eq(f.build(), nil)
+			row.id = saved
+			helpers.assert_type(f.build(), "table")
+		end)
+	end)
+	helpers.it("reads both declared bulk captions through the authentic native provider", function()
+		with_extension_frame(function(f)
+			f.root.hotstring_extension_bulk_controls[2].i18n = "button.ok"
+			f.root.hotstring_extension_bulk_controls[3].i18n = "button.cancel"
+			local rows = assert(f.build()).menu
+			helpers.assert_eq(rows[1].title, f.translator.get("button.ok"))
+			helpers.assert_eq(rows[2].title, f.translator.get("button.cancel"))
+		end)
+	end)
+	helpers.it("restores the genuine Linux cohort after a raised provider scenario", function()
+		local names = { "infra.manifest_menu", "ui.menu.menu_builder" }
+		local before = {}; for _, name in ipairs(names) do before[name] = package.loaded[name] end
+		local ok, err = pcall(function()
+			with_extension_frame(function(f) assert(f.build()); error("extension frame scenario sentinel", 0) end)
+		end)
+		helpers.assert_eq(ok, false)
+		helpers.assert_true(tostring(err):find("extension frame scenario sentinel", 1, true) ~= nil)
+		for _, name in ipairs(names) do helpers.assert_true(rawequal(package.loaded[name], before[name]), name) end
+	end)
+end)

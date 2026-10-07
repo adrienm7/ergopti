@@ -47,14 +47,35 @@ local function load_menu(options)
 	package.loaded["infra.dialog_util"] = {
 		block_alert = function() return "button.activate" end,
 	}
+	package.loaded["infra.i18n"] = nil
+	local renderer_i18n = require("infra.i18n")
 	package.loaded["infra.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.manifest_menu"] = {
-		build = function(_id, _label, _dynamic_handlers, _unused, render_context)
+	local renderer = assert(require("menu.renderer").new({
+		platform = "hs",
+		manifest_path = function()
+			return helpers.driver_root() .. "../_shared/modules/menu/menu_manifest.json"
+		end,
+		json_decode = require("adapters.json_codec").decode,
+		i18n = renderer_i18n,
+		logger = helpers.make_logger_stub(),
+	}))
+	local capture = function(_id, _label, _dynamic_handlers, _unused, render_context)
 			context.commands = render_context.commands
 			return {}
-		end,
-		resolve_disabled_when = function() return false end,
-	}
+		end
+	renderer.build = capture
+	context.parent_getters, context.parent_projections = 0, 0
+	local original_group = renderer.group_row
+	renderer.group_row = function(key, id, rows, getters)
+		context.parent_projections = context.parent_projections + 1
+		return original_group(key, id, rows, { keylogger_enabled = function()
+			context.parent_getters = context.parent_getters + 1
+			return getters.keylogger_enabled()
+		end })
+	end
+	if options.mutate_source then options.mutate_source(renderer.get_root()) end
+	if options.source_throw then renderer.get_root = function() error("actual source read refused") end end
+	package.loaded["infra.manifest_menu"] = renderer
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 
 	local menubar_start = options.menubar_start or function() return true end
@@ -84,6 +105,8 @@ local function load_menu(options)
 		set_use_source_colors = function() end,
 	}
 
+	if options.native_menubar then package.loaded["ui.wpm.wpm_menubar"] = options.native_menubar end
+
 	context.state = {}
 	for key, value in pairs(defaults) do context.state[key] = value end
 	package.loaded["ui.menu.menu_metrics"] = nil
@@ -95,7 +118,7 @@ local function load_menu(options)
 			return true
 		end,
 		updateMenu = function() context.updates = context.updates + 1 end,
-		script_control = { is_paused = function() return false end },
+		script_control = { is_paused = function() return options.paused == true end },
 	})
 	return context
 end
@@ -171,5 +194,58 @@ helpers.describe("menu_metrics WPM lifecycle reaches persisted checkmarks", func
 			"the menu must repaint the runtime-truthful state")
 		helpers.assert_eq(context.menubar_stops or 0, 1,
 			"menu-build reconciliation may stop a hidden WPM row once")
+	end)
+end)
+
+
+helpers.describe("Metrics parent refusal preserves existing WPM lifecycle reconciliation", function()
+	helpers.it("missing source still stops both paused producers without a parent getter", function()
+		local context = load_menu({ paused=true, keylogger_menubar_wpm=true, keylogger_float_wpm=true,
+			mutate_source=function(root)root.metrics_menu=nil end })
+		helpers.assert_nil(context.menu)
+		helpers.assert_eq(context.menubar_starts,0);helpers.assert_eq(context.widget_starts,0)
+		helpers.assert_eq(context.menubar_stops,1);helpers.assert_eq(context.widget_stops,1)
+		helpers.assert_eq(context.state.keylogger_menubar_wpm,true)
+		helpers.assert_eq(context.state.keylogger_float_wpm,true)
+		helpers.assert_eq(context.saves,0)
+		helpers.assert_eq(context.parent_getters,0);helpers.assert_eq(context.parent_projections,0)
+	end)
+	helpers.it("source capture refusal still performs the existing paused cleanup", function()
+		local context = load_menu({source_throw=true,paused=true,keylogger_menubar_wpm=true,keylogger_float_wpm=true})
+		helpers.assert_nil(context.menu)
+		helpers.assert_eq(context.menubar_starts,0);helpers.assert_eq(context.widget_starts,0)
+		helpers.assert_eq(context.menubar_stops,1);helpers.assert_eq(context.widget_stops,1)
+		helpers.assert_eq(context.saves,0)
+		helpers.assert_eq(context.parent_getters,0);helpers.assert_eq(context.parent_projections,0)
+	end)
+
+	helpers.it("malformed source retains exact failed-start compensation before parent refusal", function()
+		local context = load_menu({keylogger_menubar_wpm=true,menubar_start=function()return false end,
+			mutate_source=function(root)root.metrics_menu=false end})
+		helpers.assert_nil(context.menu)
+		helpers.assert_eq(context.menubar_starts,1);helpers.assert_eq(context.widget_starts,0)
+		helpers.assert_eq(context.widget_stops,1)
+		helpers.assert_eq(context.state.keylogger_menubar_wpm,false)
+		helpers.assert_eq(context.saves,1)
+		helpers.assert_eq(context.parent_getters,0);helpers.assert_eq(context.parent_projections,0)
+	end)
+	helpers.it("parent refusal retains then cancels the genuine WPM owner's exact timer", function()
+		require("tests.support.wpm_menubar_fixture")(function(native, observed)
+			helpers.assert_eq(native.start(),true)
+			local token = observed.timers[1]
+			local active = load_menu({native_menubar=native,keylogger_menubar_wpm=true,
+				mutate_source=function(root)root.metrics_menu=nil end})
+			helpers.assert_nil(active.menu)
+			helpers.assert_eq(#observed.timers,1,"reconciliation must retain the existing native timer")
+			helpers.assert_true(rawequal(observed.timers[1],token))
+			helpers.assert_true(token.timer ~= nil)
+			local paused = load_menu({native_menubar=native,keylogger_menubar_wpm=true,paused=true,
+				mutate_source=function(root)root.metrics_menu=nil end})
+			helpers.assert_nil(paused.menu)
+			helpers.assert_true(rawequal(observed.timers[1],token))
+			helpers.assert_nil(token.timer,"existing pause cleanup must cancel the exact retained token")
+			helpers.assert_eq(#observed.timers,1)
+			helpers.assert_eq(paused.parent_getters,0);helpers.assert_eq(paused.parent_projections,0)
+		end)
 	end)
 end)

@@ -121,7 +121,10 @@ LLM_Menu_BuildSubmenu() {
 	WarningRows := []
 	if (_LLM_Menu["enabled"] and _LLM_Menu["backend"] == "ollama" and !_deps_ready) {
 		LoggerInfo("LLM", "Tray: showing 'Ollama not installed' warning row.")
-		WarningRows := [Map("label", t("menu.llm.warning_install_ollama"), "action", _LLM_Menu_OnWarningInstallClick)]
+		WarningRows := MenuRenderer_TemplateRows("llm_install_warning_frame",
+			Map("llm_install_warning", _LLM_Menu_OnWarningInstallClick), Map(), Map())
+		if !(WarningRows is Array)
+			throw Error("Declared backend installation warning was refused.")
 	}
 
 	; ── Settings rows ────────────────────────────────────────────────────────
@@ -179,7 +182,9 @@ _LLM_Menu_EmitCapturedRow(Id, Disabled, Operational, HealthDot, WarningRows, Tar
 _LLM_Menu_GroupBuilders() {
 	return Map("llm_trigger", LLM_Menu_BuildTriggerMenu,
 		"llm_display", LLM_Menu_BuildDisplayMenu,
-		"llm_navigation", LLM_Menu_BuildNavMenu)
+		"llm_navigation", LLM_Menu_BuildNavMenu,
+		"llm_live_mode", LLM_Menu_BuildLiveModeMenu,
+		"llm_generation_settings", LLM_Menu_BuildGenerationMenu)
 }
 
 /**
@@ -377,23 +382,31 @@ _LLM_Menu_EmitRow(id, disabled, llm_is_operational, has_health_dot := false) {
 		_LLM_Menu_AddRow(health_dot . StrReplace(t("menu.llm.model_label"), "%s", model_shown), model_menu, disabled)
 		; Thinking-model info row — conditional, native-only (mirrors HS thinking-info).
 		if _LLM_Menu_IsThinkingModel(model_shown) {
-			warning_label := t("menu.llm.thinking_model_info")
-			_LLM_Menu_Handle.Add(warning_label, (*) => 0)
-			try _LLM_Menu_Handle.Disable(warning_label)
+			InfoRows := MenuRenderer_TemplateRows("llm_thinking_info", Map(), Map(), Map())
+			if !(InfoRows is Array)
+				throw Error("Declared thinking-model information was refused.")
+			MenuRenderer_AppendRows(_LLM_Menu_Handle, "llm_menu", "llm_thinking_info", InfoRows)
 		}
 	case "llm_profile":
 		_LLM_Menu_AddRow(StrReplace(t("menu.profiles.profile_label_prefix"), "%s", LLM_Menu_GetProfileLabel(_LLM_Menu["profile_id"])), LLM_Menu_BuildProfileMenu(), disabled)
 		; The separator before the trigger block. The suggestion count that sat
 		; between them is the first row of the generation submenu.
-		_LLM_Menu_Handle.Add()
+		BoundaryRows := MenuRenderer_TemplateRows("llm_after_profile_boundary", Map(), Map(), Map())
+		if !(BoundaryRows is Array)
+			throw Error("Declared profile boundary was refused.")
+		MenuRenderer_AppendRows(_LLM_Menu_Handle, "llm_menu", "llm_after_profile_boundary", BoundaryRows)
 	case "llm_trigger":
 		if !MenuRenderer_AppendGroup(_LLM_Menu_Handle, "llm_menu", "llm_trigger",
 			Map("llm_trigger", LLM_Menu_BuildTriggerMenu), disabled)
 			throw Error("Declared LLM group 'llm_trigger' was refused.")
 	case "llm_live_mode":
-		_LLM_Menu_AddRow(t("menu.llm.live_mode_title"), LLM_Menu_BuildLiveModeMenu(), disabled)
+		if !MenuRenderer_AppendGroup(_LLM_Menu_Handle, "llm_menu", "llm_live_mode",
+			Map("llm_live_mode", LLM_Menu_BuildLiveModeMenu), disabled)
+			throw Error("Declared LLM group 'llm_live_mode' was refused.")
 	case "llm_generation_settings":
-		_LLM_Menu_AddRow(t("menu.llm.generation_menu_title"), LLM_Menu_BuildGenerationMenu(), disabled)
+		if !MenuRenderer_AppendGroup(_LLM_Menu_Handle, "llm_menu", "llm_generation_settings",
+			Map("llm_generation_settings", LLM_Menu_BuildGenerationMenu), disabled)
+			throw Error("Declared LLM group 'llm_generation_settings' was refused.")
 	case "llm_display":
 		if !MenuRenderer_AppendGroup(_LLM_Menu_Handle, "llm_menu", "llm_display",
 			Map("llm_display", LLM_Menu_BuildDisplayMenu), disabled)

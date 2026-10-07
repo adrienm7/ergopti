@@ -3820,7 +3820,11 @@ id = "hotstrings"
 greyed_when_paused = true
 
 [[menu.top_level]]
+type = "group"
 id = "metrics"
+i18n = "menu.metrics.title"
+rows = []
+checked_when = ["keylogger_enabled"]
 greyed_when_paused = true
 
 [[menu.top_level]]
@@ -3841,7 +3845,10 @@ id = "---"
 # one too, holding a single config-folder row, and that row now lives under
 # Configuration with the other two drivers' copy of it.
 [[menu.top_level]]
+type = "group"
 id = "apps"
+i18n = "menu.apps.title"
+rows = []
 greyed_when_paused = true
 platforms = ["hs"]
 reason_key = "platform_reason.tray_top_level_rows_are_each_drivers"
@@ -3861,10 +3868,16 @@ id = "about"
 # « Configuration » replaced « Actions globales » and the two top-level rows
 # that opened configuration windows: its submenu is configuration_menu.
 [[menu.top_level]]
+type = "group"
 id = "configuration"
+i18n = "menu.configuration.title"
+rows = []
 
 [[menu.top_level]]
+type = "group"
 id = "language"
+i18n = "menu.global.language"
+rows = []
 
 [[menu.top_level]]
 id = "---"
@@ -3885,7 +3898,10 @@ id = "quit"
 i18n = "menu.global.quit"
 
 [[menu.top_level]]
+type = "group"
 id = "debug"
+i18n = "menu.debug.title"
+rows = []
 
 # The LLM submenu.
 #
@@ -3991,6 +4007,13 @@ health_dot = true
 platforms = ["ahk", "hs"]
 reason_key = "platform_reason.llm_configuration_surface_is_not_on_linux"
 
+# The macOS native model bucket ends here; the whole renderer owns this boundary.
+[[menu.llm_menu]]
+type = "list"
+id = "llm_after_model_boundary"
+platforms = ["hs"]
+unavailable = "hide"
+
 [[menu.llm_menu]]
 type = "list"
 id = "llm_models"
@@ -4001,6 +4024,7 @@ reason_key = "platform_reason.llm_lists_are_inline_on_linux"
 [[menu.llm_menu]]
 type = "---"
 platforms = ["linux"]
+unavailable = "hide"
 
 [[menu.llm_menu]]
 type = "dynamic"
@@ -4009,6 +4033,13 @@ i18n = "menu.profiles.profile_label_prefix"
 disabled_when_off = true
 health_dot = false
 platforms = ["ahk", "hs", "linux"]
+
+# Keep the macOS profile boundary in the complete parent, where separators defer.
+[[menu.llm_menu]]
+type = "list"
+id = "llm_after_profile_boundary"
+platforms = ["hs"]
+unavailable = "hide"
 
 # The suggestion count ("Nombre de suggestions") is a generation parameter: it
 # is the first row of the generation settings on every driver (the
@@ -4023,7 +4054,7 @@ health_dot = false
 platforms = ["ahk", "hs", "linux"]
 
 [[menu.llm_menu]]
-type = "dynamic"
+type = "group"
 id = "llm_live_mode"
 i18n = "menu.llm.live_mode_title"
 disabled_when_off = true
@@ -4039,7 +4070,7 @@ checked_when = ["llm_live_is_off"]
 disabled_when = ["llm_live_off_ready"]
 
 [[menu.llm_menu]]
-type = "dynamic"
+type = "group"
 id = "llm_generation_settings"
 i18n = "menu.llm.generation_menu_title"
 disabled_when_off = true
@@ -7313,3 +7344,1188 @@ type = "---"
 [[menu.magic_key_source_children]]
 type = "list"
 id = "magic_key_source_candidates"
+
+# Parameter providers retain their native state and mutation owners; these frames
+# own the fixed parent captions, child order and presentation boundaries.
+[menu.hotstrings_delay_captions]
+default = "menu.hotstrings.tooltip_default"
+magic_key = "menu.hotstrings.delay_magic_key"
+autocorrection = "menu.hotstrings.delay_autocorrection"
+ai_acceptance = "menu.hotstrings.tooltip_ai_acceptance"
+autocompletion = "menu.hotstrings.tooltip_autocompletion"
+
+[[menu.hotstrings_parameter_boundary]]
+type = "---"
+
+[[menu.hotstrings_word_expander_frame]]
+type = "list"
+id = "parameter_catalogue_entries"
+
+[[menu.hotstrings_word_expander_frame]]
+type = "---"
+
+[[menu.hotstrings_word_expander_frame]]
+type = "list"
+id = "parameter_custom_entries"
+
+[[menu.hotstrings_preview_frame]]
+type = "list"
+id = "parameter_preview_magic"
+platforms = ["hs", "linux"]
+unavailable = "hide"
+
+[[menu.hotstrings_preview_frame]]
+type = "list"
+id = "parameter_preview_presence"
+platforms = ["hs", "linux"]
+unavailable = "hide"
+
+[[menu.hotstrings_preview_frame]]
+type = "---"
+platforms = ["hs", "linux"]
+unavailable = "hide"
+
+[[menu.hotstrings_preview_frame]]
+type = "list"
+id = "parameter_preview_colored"
+platforms = ["hs", "linux"]
+unavailable = "hide"
+
+[[menu.hotstrings_delays_frame]]
+type = "list"
+id = "parameter_delay_config"
+
+[[menu.hotstrings_delays_frame]]
+type = "---"
+
+[[menu.hotstrings_delays_frame]]
+type = "list"
+id = "parameter_delay_ai_acceptance"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.hotstrings_delays_frame]]
+type = "list"
+id = "parameter_delay_autocompletion"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.hotstrings_delays_frame]]
+type = "list"
+id = "parameter_delay_default"
+
+[[menu.hotstrings_delays_frame]]
+type = "list"
+id = "parameter_delay_magic_key"
+platforms = ["ahk", "linux"]
+unavailable = "hide"
+
+[[menu.hotstrings_delays_frame]]
+type = "list"
+id = "parameter_delay_autocorrection"
+platforms = ["ahk", "linux"]
+unavailable = "hide"
+
+[[menu.hotstrings_delays_frame]]
+type = "---"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.hotstrings_delays_frame]]
+type = "list"
+id = "parameter_delay_category_boundary"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.hotstrings_delays_frame]]
+type = "list"
+id = "parameter_delay_magic_key"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.hotstrings_delays_frame]]
+type = "list"
+id = "parameter_delay_autocorrection"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.hotstrings_delays_frame]]
+type = "list"
+id = "parameter_delay_ai_acceptance"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.hotstrings_delays_frame]]
+type = "list"
+id = "parameter_delay_autocompletion"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.hotstrings_word_expander_parent]]
+type = "group"
+id = "parameter_word_expander_children"
+i18n = "menu.hotstrings.word_expanders"
+disabled_when = ["parameter_parent_ready"]
+
+[[menu.hotstrings_preview_parent]]
+type = "group"
+id = "parameter_preview_children"
+i18n = "menu.hotstrings.preview_bubbles"
+disabled_when = ["parameter_parent_ready"]
+platforms = ["hs", "linux"]
+unavailable = "hide"
+
+[[menu.hotstrings_delays_parent]]
+type = "group"
+id = "parameter_delays_children"
+i18n = "menu.hotstrings.delays_colors"
+disabled_when = ["parameter_parent_ready"]
+
+# macOS Agent presentation frames. Backend/model/app choices remain actual native data.
+[[menu.agent_system1_frame]]
+type = "group"
+id = "agent_system1"
+i18n = "menu.agent.system1"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.agent_system2_frame]]
+type = "group"
+id = "agent_system2"
+i18n = "menu.agent.system2"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.agent_download_frame]]
+type = "command"
+id = "agent_download_model"
+i18n = "menu.agent.download_model"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.agent_excluded_apps_frame]]
+type = "group"
+id = "agent_disabled_apps"
+i18n = "menu.agent.disabled_apps"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.agent_panel_frame]]
+type = "group"
+id = "agent_panel"
+i18n = "menu.agent.title"
+platforms = ["hs"]
+unavailable = "hide"
+
+# Installed extension presentation retains native catalogue and scope owners.
+[[menu.hotstring_extension_bulk_controls]]
+type = "check"
+id = "extension_all_sections"
+i18n = "menu.hotstrings.enable_all_sections"
+checked_when = ["extension_all_sections_enabled"]
+disabled_when = ["extension_bulk_ready"]
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.hotstring_extension_bulk_controls]]
+type = "command"
+id = "extension_enable_all"
+i18n = "menu.hotstrings.check_all"
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.hotstring_extension_bulk_controls]]
+type = "command"
+id = "extension_disable_all"
+i18n = "menu.hotstrings.uncheck_all"
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.hotstring_extension_content_frame]]
+type = "list"
+id = "extension_bulk_head"
+platforms = ["hs", "linux"]
+unavailable = "hide"
+
+[[menu.hotstring_extension_content_frame]]
+type = "---"
+platforms = ["hs", "linux"]
+unavailable = "hide"
+
+[[menu.hotstring_extension_content_frame]]
+type = "list"
+id = "extension_bound_head"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.hotstring_extension_content_frame]]
+type = "list"
+id = "extension_pack_rows"
+
+[[menu.hotstring_extension_content_frame]]
+type = "list"
+id = "extension_bound_boundary"
+platforms = ["hs", "linux"]
+unavailable = "hide"
+
+[[menu.hotstring_extension_content_frame]]
+type = "list"
+id = "extension_bound_tail"
+platforms = ["hs", "linux"]
+unavailable = "hide"
+
+[[menu.hotstring_extension_content_frame]]
+type = "list"
+id = "extension_scope_tail"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.hotstring_extension_empty_file]]
+type = "label"
+id = "extension_empty_file"
+i18n = "menu.extensions.empty"
+platforms = ["ahk"]
+unavailable = "hide"
+
+# The shared frame owns fixed wrap-parent presentation; symbol rows remain native data.
+[[menu.shortcut_wrap_frame]]
+type = "group"
+id = "shortcut_wrap_symbols_ahk"
+i18n = "menu.shortcuts.wrap_symbols_title"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.shortcut_wrap_frame]]
+type = "group"
+id = "shortcut_wrap_symbols_hs"
+i18n = "menu.shortcuts.wrap_symbols"
+disabled_when = ["shortcut_wrap_hs_ready"]
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.shortcut_wrap_frame]]
+type = "group"
+id = "shortcut_wrap_symbols_linux"
+i18n = "menu.shortcuts.wrap_symbols"
+platforms = ["linux"]
+unavailable = "hide"
+
+# macOS keeps this editor directly below its existing Ctrl+G action.
+[[menu.shortcut_chatgpt_editor_frame]]
+type = "command"
+id = "shortcut_chatgpt_editor"
+i18n = "menu.shortcuts.chatgpt_url_item"
+disabled_when = ["shortcut_chatgpt_editor_ready"]
+platforms = ["hs"]
+unavailable = "hide"
+
+# Linux's live wrap feature retains its genuine source getter and strict setter.
+[[menu.shortcut_wrap_live_control]]
+type = "check"
+id = "shortcut_wrap_on_type"
+i18n = "shortcuts.label_wrap_text"
+checked_when = ["shortcut_wrap_on_type_checked"]
+disabled_when = ["shortcut_wrap_on_type_ready"]
+platforms = ["linux"]
+unavailable = "hide"
+
+# Error and empty markers are fixed presentation; native extension data is literal.
+[[menu.shortcut_extension_error_frame]]
+type = "label"
+id = "shortcut_extension_error_ahk"
+i18n = "common.error_prefix"
+caption_getter = "shortcut_extension_name"
+caption_layout = "prefix"
+caption_joiner = ""
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.shortcut_extension_error_frame]]
+type = "label"
+id = "shortcut_extension_error_linux"
+i18n = "common.error_title"
+caption_getter = "shortcut_extension_name"
+caption_layout = "suffix"
+caption_joiner = " — "
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.shortcut_extension_empty_frame]]
+type = "label"
+id = "shortcut_extension_empty_ahk"
+i18n = "menu.extensions.empty"
+platforms = ["ahk"]
+unavailable = "hide"
+
+# Complete native per-model action, identity, specification, capability and hardware frames.
+
+[[menu.llm_model_action_rows]]
+type = "check"
+id = "model_select"
+i18n = "menu.llm.select_model"
+command = "model_select"
+checked_when = ["model_selected"]
+disabled_when = ["model_select_ready"]
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.llm_model_action_rows]]
+type = "include"
+section = "llm_model_delete_row"
+present_when = "model_delete_present"
+
+[[menu.llm_model_action_rows]]
+type = "include"
+section = "llm_model_download_row"
+present_when = "model_download_present"
+
+[[menu.llm_model_delete_row]]
+type = "command"
+id = "model_delete"
+i18n = "menu.llm.delete_model_cache"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.llm_model_download_row]]
+type = "command"
+id = "model_download"
+i18n = "menu.llm.download_model"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.llm_model_detail_backend]]
+type = "label"
+id = "model_backend_ahk"
+i18n = "menu.llm.model_backend"
+caption_getter = "model_backend_caption"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.llm_model_detail_backend]]
+type = "command"
+id = "model_backend_hs"
+i18n = "menu.llm.model_backend"
+caption_getter = "model_backend_caption"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.llm_model_identity_rows]]
+type = "include"
+section = "llm_model_detail_backend"
+
+[[menu.llm_model_identity_rows]]
+type = "command"
+id = "model_source"
+i18n = "menu.llm.model_source"
+caption_getter = "model_source_caption"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.llm_model_detail_type]]
+type = "label"
+id = "model_type_ahk"
+i18n = "menu.llm.model_type"
+caption_getter = "model_type_caption"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.llm_model_detail_type]]
+type = "command"
+id = "model_type_hs"
+i18n = "menu.llm.model_type"
+caption_getter = "model_type_caption"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.llm_model_spec_rows]]
+type = "include"
+section = "llm_model_detail_type"
+
+[[menu.llm_model_spec_rows]]
+type = "include"
+section = "llm_model_detail_date"
+present_when = "model_date_present"
+
+[[menu.llm_model_spec_rows]]
+type = "include"
+section = "llm_model_detail_params_total"
+present_when = "model_params_total_present"
+
+[[menu.llm_model_spec_rows]]
+type = "include"
+section = "llm_model_detail_params_active"
+present_when = "model_params_active_present"
+
+[[menu.llm_model_detail_date]]
+type = "label"
+id = "model_date_ahk"
+i18n = "menu.llm.model_date"
+caption_getter = "model_date_caption"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.llm_model_detail_date]]
+type = "command"
+id = "model_date_hs"
+i18n = "menu.llm.model_date"
+caption_getter = "model_date_caption"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.llm_model_detail_params_total]]
+type = "label"
+id = "model_params_total_ahk"
+i18n = "menu.llm.model_params_total"
+caption_getter = "model_params_total_caption"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.llm_model_detail_params_total]]
+type = "command"
+id = "model_params_total_hs"
+i18n = "menu.llm.model_params_total"
+caption_getter = "model_params_total_caption"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.llm_model_detail_params_active]]
+type = "label"
+id = "model_params_active_ahk"
+i18n = "menu.llm.model_params_active"
+caption_getter = "model_params_active_caption"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.llm_model_detail_params_active]]
+type = "command"
+id = "model_params_active_hs"
+i18n = "menu.llm.model_params_active"
+caption_getter = "model_params_active_caption"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.llm_model_detail_speed]]
+type = "label"
+id = "model_speed_ahk"
+i18n = "menu.llm.model_speed"
+caption_getter = "model_speed_caption"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.llm_model_detail_speed]]
+type = "command"
+id = "model_speed_hs"
+i18n = "menu.llm.model_speed"
+caption_getter = "model_speed_caption"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.llm_model_capability_rows]]
+type = "include"
+section = "llm_model_detail_speed"
+present_when = "model_speed_present"
+
+[[menu.llm_model_capability_rows]]
+type = "include"
+section = "llm_model_detail_tags"
+present_when = "model_tags_present"
+
+[[menu.llm_model_detail_tags]]
+type = "label"
+id = "model_tags_ahk"
+i18n = "menu.llm.model_tags"
+caption_getter = "model_tags_caption"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.llm_model_detail_tags]]
+type = "command"
+id = "model_tags_hs"
+i18n = "menu.llm.model_tags"
+caption_getter = "model_tags_caption"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.llm_model_hardware_rows]]
+type = "label"
+id = "model_hw_header_ahk"
+i18n = "menu.llm.hw_header"
+caption_getter = "model_hw_backend_caption"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.llm_model_hardware_rows]]
+type = "section_header"
+id = "model_hw_header_hs"
+i18n = "menu.llm.hw_header"
+caption_getter = "model_hw_backend_caption"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.llm_model_hardware_rows]]
+type = "include"
+section = "llm_model_detail_hw_download"
+present_when = "model_hw_download_present"
+
+[[menu.llm_model_hardware_rows]]
+type = "include"
+section = "llm_model_detail_hw_disk"
+present_when = "model_hw_disk_present"
+
+[[menu.llm_model_hardware_rows]]
+type = "include"
+section = "llm_model_detail_hw_ram"
+present_when = "model_hw_ram_present"
+
+[[menu.llm_model_detail_hw_download]]
+type = "label"
+id = "model_hw_download_ahk"
+i18n = "menu.llm.hw_download"
+caption_getter = "model_hw_download_caption"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.llm_model_detail_hw_download]]
+type = "command"
+id = "model_hw_download_hs"
+i18n = "menu.llm.hw_download"
+caption_getter = "model_hw_download_caption"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.llm_model_detail_hw_disk]]
+type = "label"
+id = "model_hw_disk_ahk"
+i18n = "menu.llm.hw_disk"
+caption_getter = "model_hw_disk_caption"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.llm_model_detail_hw_disk]]
+type = "command"
+id = "model_hw_disk_hs"
+i18n = "menu.llm.hw_disk"
+caption_getter = "model_hw_disk_caption"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.llm_model_detail_hw_ram]]
+type = "label"
+id = "model_hw_ram_ahk"
+i18n = "menu.llm.hw_ram"
+caption_getter = "model_hw_ram_caption"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.llm_model_detail_hw_ram]]
+type = "command"
+id = "model_hw_ram_hs"
+i18n = "menu.llm.hw_ram"
+caption_getter = "model_hw_ram_caption"
+platforms = ["hs"]
+unavailable = "hide"
+
+# The finite picker commands preserve each native state/paused predicate.
+[[menu.llm_model_picker_commands]]
+type = "check"
+id = "llm_model_none"
+i18n = "menu.llm.no_model"
+checked_when = ["model_none_selected"]
+disabled_when = ["model_picker_ready"]
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.llm_model_picker_commands]]
+type = "check"
+id = "llm_model_backend_default"
+i18n = "menu.llm.backend_default_model"
+caption_getter = "model_backend_default_caption"
+checked_when = ["model_default_selected"]
+disabled_when = ["model_picker_ready"]
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.llm_model_hf_token_command]]
+type = "command"
+id = "llm_model_hf_token"
+i18n = "menu.llm.hf_token_label"
+caption_getter = "model_hf_token_caption"
+disabled_when = ["model_picker_ready"]
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.llm_model_picker_head]]
+type = "include"
+section = "llm_model_picker_commands"
+row_id = "llm_model_none"
+
+[[menu.llm_model_picker_default]]
+type = "include"
+section = "llm_model_picker_commands"
+row_id = "llm_model_backend_default"
+
+[[menu.llm_model_add_command]]
+type = "command"
+id = "llm_add_model_entry"
+i18n = "menu.llm.add_model_entry"
+disabled_when = ["model_picker_ready"]
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+# Complete fixed per-application, modifier and model/profile anchor frames.
+
+[[menu.llm_profile_app_override_frame]]
+type = "command"
+id = "llm_profile_override_active_app"
+i18n = "menu.profiles.override_active_app_with_current"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.llm_profile_app_override_frame]]
+type = "include"
+section = "llm_profile_app_override_children"
+present_when = "llm_profile_overrides_present"
+
+[[menu.llm_profile_app_override_children]]
+type = "---"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.llm_profile_app_override_children]]
+type = "list"
+id = "llm_profile_override_rows"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.llm_modifier_picker_frame]]
+type = "check"
+id = "llm_modifier_disabled"
+i18n = "menu.settings.disabled"
+platforms = ["hs"]
+unavailable = "hide"
+checked_when = ["llm_modifier_disabled_checked"]
+disabled_when = ["llm_modifier_ready"]
+
+[[menu.llm_modifier_picker_frame]]
+type = "check"
+id = "llm_modifier_none"
+i18n = "menu.settings.no_modifier"
+platforms = ["hs"]
+unavailable = "hide"
+checked_when = ["llm_modifier_none_checked"]
+disabled_when = ["llm_modifier_ready"]
+
+[[menu.llm_modifier_picker_frame]]
+type = "list"
+id = "llm_modifier_key_rows"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.llm_thinking_info]]
+type = "label"
+id = "llm_thinking_info"
+i18n = "menu.llm.thinking_model_info"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.llm_after_profile_boundary]]
+type = "---"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+# Native MLX port and generation controls retain their actual transaction owners.
+
+[[menu.llm_generation_context_control]]
+type = "command"
+id = "llm_generation_context"
+i18n = "menu.llm.context_length_label"
+caption_getter = "llm_generation_context_caption"
+disabled_when = ["llm_generation_ready"]
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.llm_generation_context_reset_control]]
+type = "command"
+id = "llm_generation_context_reset"
+i18n = "menu.llm.reset_label"
+caption_getter = "llm_generation_context_reset_caption"
+disabled_when = ["llm_generation_ready"]
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.llm_generation_min_words_control]]
+type = "command"
+id = "llm_generation_min_words"
+i18n = "menu.llm.min_words_label"
+caption_getter = "llm_generation_min_words_caption"
+disabled_when = ["llm_generation_ready"]
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.llm_generation_min_words_reset_control]]
+type = "command"
+id = "llm_generation_min_words_reset"
+i18n = "menu.llm.reset_label"
+caption_getter = "llm_generation_min_words_reset_caption"
+disabled_when = ["llm_generation_ready"]
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.llm_generation_max_words_control]]
+type = "command"
+id = "llm_generation_max_words"
+i18n = "menu.llm.max_words_label"
+caption_getter = "llm_generation_max_words_caption"
+disabled_when = ["llm_generation_ready"]
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.llm_generation_max_words_reset_control]]
+type = "command"
+id = "llm_generation_max_words_reset"
+i18n = "menu.llm.reset_label"
+caption_getter = "llm_generation_max_words_reset_caption"
+disabled_when = ["llm_generation_ready"]
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.llm_generation_reset_navigation]]
+type = "check"
+id = "llm_reset_on_nav"
+i18n = "menu.llm.reset_on_nav"
+checked_when = ["llm_reset_on_nav_checked"]
+disabled_when = ["llm_generation_ready"]
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.llm_generation_context_controls]]
+type = "include"
+section = "llm_generation_context_control"
+
+[[menu.llm_generation_context_controls]]
+type = "include"
+section = "llm_generation_context_reset_control"
+present_when = "llm_generation_context_reset_present"
+
+[[menu.llm_generation_context_controls]]
+type = "include"
+section = "llm_generation_reset_navigation"
+
+[[menu.llm_generation_word_controls]]
+type = "include"
+section = "llm_generation_min_words_control"
+
+[[menu.llm_generation_word_controls]]
+type = "include"
+section = "llm_generation_min_words_reset_control"
+present_when = "llm_generation_min_words_reset_present"
+
+[[menu.llm_generation_word_controls]]
+type = "include"
+section = "llm_generation_max_words_control"
+
+[[menu.llm_generation_word_controls]]
+type = "include"
+section = "llm_generation_max_words_reset_control"
+present_when = "llm_generation_max_words_reset_present"
+
+[[menu.llm_generation_native_controls]]
+type = "include"
+section = "llm_generation_context_controls"
+
+[[menu.llm_generation_native_controls]]
+type = "include"
+section = "llm_generation_word_controls"
+
+[[menu.llm_mlx_port_control]]
+type = "command"
+id = "llm_mlx_port"
+i18n = "menu.llm.mlx_port_label"
+caption_getter = "llm_mlx_port_caption"
+disabled_when = ["llm_mlx_port_ready"]
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.llm_mlx_port_reset_control]]
+type = "command"
+id = "llm_mlx_port_reset"
+i18n = "menu.llm.reset_label"
+caption_getter = "llm_mlx_port_reset_caption"
+disabled_when = ["llm_mlx_port_ready"]
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.llm_mlx_port_frame]]
+type = "---"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.llm_mlx_port_frame]]
+type = "include"
+section = "llm_mlx_port_control"
+
+[[menu.llm_mlx_port_frame]]
+type = "include"
+section = "llm_mlx_port_reset_control"
+present_when = "llm_mlx_port_reset_present"
+
+# Native API selection and management boundaries retain their actual entry transactions.
+
+[[menu.llm_api_selection_frame]]
+type = "check"
+id = "llm_api_no_model"
+i18n = "menu.llm.no_model"
+checked_when = ["llm_api_no_model_checked"]
+disabled_when = ["llm_api_selection_ready"]
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.llm_api_selection_frame]]
+type = "include"
+section = "llm_api_existing_entry_boundary"
+present_when = "llm_api_entries_present"
+
+[[menu.llm_api_existing_entry_boundary]]
+type = "---"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.llm_api_active_boundary]]
+type = "---"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.llm_api_system1_frame]]
+type = "---"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.llm_api_system1_frame]]
+type = "list"
+id = "llm_api_system1_rows"
+platforms = ["hs"]
+unavailable = "hide"
+
+# Temperature commands keep the two genuine native transaction owners.
+
+[[menu.llm_generation_temperature_control]]
+type = "command"
+id = "llm_generation_temperature"
+i18n = "menu.llm.temperature_label"
+caption_getter = "llm_generation_temperature_caption"
+disabled_when = ["llm_generation_ready"]
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.llm_generation_temperature_reset_control]]
+type = "command"
+id = "llm_generation_temperature_reset"
+i18n = "menu.llm.reset_label"
+caption_getter = "llm_generation_temperature_reset_caption"
+disabled_when = ["llm_generation_ready"]
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.llm_generation_temperature_controls]]
+type = "include"
+section = "llm_generation_temperature_control"
+
+[[menu.llm_generation_temperature_controls]]
+type = "include"
+section = "llm_generation_temperature_reset_control"
+present_when = "llm_generation_temperature_reset_present"
+
+[[menu.llm_native_numeric_reset]]
+type = "command"
+id = "llm_native_numeric_reset"
+i18n = "menu.llm.reset_label"
+caption_getter = "llm_numeric_reset_caption"
+platforms = ["ahk"]
+unavailable = "hide"
+
+# Generation count children are the actual native numeric choices.
+[[menu.llm_generation_count_control]]
+type = "group"
+id = "llm_generation_count"
+i18n = "menu.llm.num_predictions_label"
+caption_getter = "llm_generation_count_caption"
+disabled_when = ["llm_generation_ready"]
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.llm_generation_count_reset_control]]
+type = "command"
+id = "llm_generation_count_reset"
+i18n = "menu.llm.reset_label"
+caption_getter = "llm_generation_count_reset_caption"
+disabled_when = ["llm_generation_ready"]
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.llm_trigger_debounce_control]]
+type = "command"
+id = "llm_trigger_debounce"
+i18n = "menu.llm.debounce_label"
+caption_getter = "llm_trigger_debounce_caption"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.llm_display_inline_control]]
+type = "check"
+id = "llm_display_inline"
+i18n = "menu.llm.inline_autotype"
+checked_when = ["llm_display_inline_checked"]
+platforms = ["ahk"]
+unavailable = "hide"
+
+# These complete fixed frames consume the actual native source children/actions.
+[[menu.llm_saved_models_frame]]
+type = "group"
+id = "llm_saved_models"
+i18n = "menu.llm.my_models"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.llm_install_warning_frame]]
+type = "command"
+id = "llm_install_warning"
+i18n = "menu.llm.warning_install_ollama"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.llm_download_shortcut_frame]]
+type = "command"
+id = "llm_download_shortcut"
+i18n = "menu.llm.show_download_window"
+platforms = ["hs"]
+unavailable = "hide"
+
+# Windows retains its existing lazy Edit dialog between Test and Remove.
+# macOS and Linux expose their own entry editors outside this list projection.
+[[menu.llm_api_edit_command]]
+type = "command"
+id = "api_edit_entry"
+i18n = "menu.llm.api_edit_entry"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.llm_after_model_boundary]]
+type = "---"
+platforms = ["hs"]
+unavailable = "hide"
+# Personal hotstring frames retain native source inventory and callback owners.
+[[menu.hotstring_personal_none]]
+type = "check"
+id = "personal_default_none"
+i18n = "menu.hotstrings.default_none"
+checked_when = ["personal_default_unset"]
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.hotstring_personal_none]]
+type = "check"
+id = "personal_default_none"
+i18n = "common.none"
+checked_when = ["personal_default_unset"]
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.hotstring_personal_default_frame]]
+type = "include"
+section = "hotstring_personal_none"
+
+[[menu.hotstring_personal_default_frame]]
+type = "include"
+section = "hotstrings_parameter_boundary"
+present_when = "personal_default_boundary"
+
+[[menu.hotstring_personal_default_frame]]
+type = "list"
+id = "personal_default_choices"
+
+[[menu.hotstring_personal_controls_frame]]
+type = "list"
+id = "personal_editor"
+
+[[menu.hotstring_personal_controls_frame]]
+type = "include"
+section = "hotstring_file_commands"
+present_when = "personal_open_present"
+
+[[menu.hotstring_personal_controls_frame]]
+type = "include"
+section = "hotstrings_parameter_boundary"
+present_when = "personal_controls_head_boundary"
+
+[[menu.hotstring_personal_controls_frame]]
+type = "list"
+id = "personal_legacy_before"
+
+[[menu.hotstring_personal_controls_frame]]
+type = "list"
+id = "personal_default_parent"
+
+[[menu.hotstring_personal_controls_frame]]
+type = "list"
+id = "personal_legacy_after"
+
+[[menu.hotstring_personal_controls_frame]]
+type = "include"
+section = "hotstring_personal_close"
+present_when = "personal_preferences_present"
+
+[[menu.hotstring_personal_controls_frame]]
+type = "include"
+section = "hotstrings_parameter_boundary"
+present_when = "personal_controls_tail_boundary"
+
+[[menu.hotstring_personal_close]]
+type = "check"
+id = "personal_close_on_add"
+i18n = "menu.hotstrings.close_on_add"
+checked_when = ["personal_close_on_add"]
+disabled_when = ["personal_controls_ready"]
+
+[[menu.hotstring_personal_content_frame]]
+type = "list"
+id = "personal_controls"
+
+[[menu.hotstring_personal_content_frame]]
+type = "include"
+section = "hotstrings_parameter_boundary"
+present_when = "personal_main_boundary"
+
+[[menu.hotstring_personal_content_frame]]
+type = "list"
+id = "personal_main_sections"
+
+[[menu.hotstring_personal_content_frame]]
+type = "list"
+id = "personal_unavailable_directories"
+
+[[menu.hotstring_personal_content_frame]]
+type = "include"
+section = "hotstrings_parameter_boundary"
+present_when = "personal_tree_boundary"
+
+[[menu.hotstring_personal_content_frame]]
+type = "list"
+id = "personal_tree"
+
+[[menu.hotstring_personal_content_frame]]
+type = "include"
+section = "hotstrings_parameter_boundary"
+present_when = "personal_custom_boundary"
+
+[[menu.hotstring_personal_content_frame]]
+type = "list"
+id = "personal_custom_sections"
+
+[[menu.hotstring_personal_content_frame]]
+type = "include"
+section = "hotstring_personal_empty"
+present_when = "personal_empty"
+
+[[menu.hotstring_personal_empty]]
+type = "label"
+id = "personal_empty"
+i18n = "menu.hotstrings.no_group_loaded"
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.hotstring_personal_file_frame]]
+type = "include"
+section = "hotstring_file_commands"
+present_when = "personal_file_open_present"
+
+[[menu.hotstring_personal_file_frame]]
+type = "include"
+section = "hotstrings_parameter_boundary"
+present_when = "personal_file_boundary"
+
+[[menu.hotstring_personal_file_frame]]
+type = "list"
+id = "personal_file_controls"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.hotstring_personal_file_frame]]
+type = "list"
+id = "personal_file_sections"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.hotstring_personal_directory_frame]]
+type = "list"
+id = "personal_folders"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.hotstring_personal_directory_frame]]
+type = "include"
+section = "hotstrings_parameter_boundary"
+present_when = "personal_folder_file_boundary"
+
+[[menu.hotstring_personal_directory_frame]]
+type = "list"
+id = "personal_files"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+# One selected caption around the existing completed native default child.
+[[menu.hotstring_personal_default_parent]]
+type = "group"
+id = "personal_default_caption"
+i18n = "menu.hotstrings.default_category_prefix"
+caption_getter = "personal_default_label"
+caption_layout = "prefix"
+caption_joiner = ""
+
+[[menu.hotstring_personal_legacy_shortcut]]
+type = "command"
+id = "personal_legacy_shortcut"
+i18n = "menu.hotstrings.shortcut_prefix"
+caption_getter = "personal_shortcut_label"
+caption_layout = "prefix"
+caption_joiner = ""
+disabled_when = ["personal_legacy_ready"]
+platforms = ["hs"]
+unavailable = "hide"
+
+# Complete Magic trigger provider: native snapshot and handlers, shared caption/order.
+[[menu.hotstrings_magic_trigger_frame]]
+type = "command"
+id = "magic_key_config_native"
+command = "magic_key_change"
+i18n = "menu.hotstrings.magic_key_prefix"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+caption_getter = "magic_key_value"
+caption_layout = "prefix"
+caption_joiner = ""
+disabled_when = ["magic_key_ready"]
+
+[[menu.hotstrings_magic_trigger_frame]]
+type = "command"
+id = "magic_key_config_linux"
+command = "magic_key_change"
+i18n = "menu.hotstrings.magic_key"
+platforms = ["linux"]
+unavailable = "hide"
+caption_getter = "magic_key_value"
+caption_layout = "prefix"
+caption_joiner = " : "
+
+[[menu.hotstrings_magic_trigger_frame]]
+type = "list"
+id = "magic_key_reset_if_custom"
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.hotstrings_magic_trigger_reset]]
+type = "command"
+id = "magic_key_reset"
+i18n = "menu.hotstrings.magic_key_reset"
+platforms = ["linux"]
+unavailable = "hide"
+label_prefix = "    "

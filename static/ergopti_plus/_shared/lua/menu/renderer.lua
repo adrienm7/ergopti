@@ -41,6 +41,17 @@
 --- ==============================================================================
 
 local M = {}
+local utf8_length = require("compat.utf8").len
+
+-- Literal command decoration does not interpret percent bytes or native data.
+local function command_literal_prefix(item)
+	if type(item) ~= "table" then return nil end
+	local prefix = rawget(item, "label_prefix")
+	if prefix == nil then return "" end
+	if rawget(item, "type") ~= "command" or type(prefix) ~= "string"
+		or prefix:find("[%z\1-\31\127]") or utf8_length(prefix) == nil then return nil end
+	return prefix
+end
 
 -- The caption value is literal data; percent escapes belong to the translation.
 local function caption_format(format, value)
@@ -587,6 +598,32 @@ function M.new(deps)
 		return nil
 	end
 
+	-- Explicit affixes are physical metadata, never inherited decoration.
+	local function has_caption_layout(item)
+		return rawget(item, "caption_layout") ~= nil or rawget(item, "caption_joiner") ~= nil
+	end
+
+	-- The same declared source/value policy serves templates, selected rows and builds.
+	local function explicit_caption(item, getters, title)
+		local layout, joiner = rawget(item, "caption_layout"), rawget(item, "caption_joiner")
+		local key = rawget(item, "caption_getter")
+		local _, source_slot = caption_format(title, "")
+		if (item.type ~= "label" and item.type ~= "command" and item.type ~= "group")
+			or (layout ~= "prefix" and layout ~= "suffix") or type(joiner) ~= "string" or joiner:find("%c")
+			or type(item.id) ~= "string" or item.id == "" or type(item.i18n) ~= "string" or item.i18n == ""
+			or type(title) ~= "string" or title == "" or title == item.i18n or source_slot
+			or type(key) ~= "string" or key == "" or type(getters) ~= "table" or type(getters[key]) ~= "function" then
+			Logger.error(LOG, "Invalid explicit caption source — row refused.")
+			return nil
+		end
+		local value = getters[key]()
+		if type(value) ~= "string" then
+			Logger.error(LOG, "Invalid explicit caption receipt — row refused.")
+			return nil
+		end
+		return layout == "prefix" and title .. joiner .. value or value .. joiner .. title
+	end
+
 	--- Builds the shared native shape for a declared command or checkbox.
 	--- @param item table Canonical declaration.
 	--- @param manifest_key string Owning menu declaration.
@@ -594,6 +631,11 @@ function M.new(deps)
 	--- @param getters table Native state readers.
 	--- @return table|nil row
 	local function command_item(item, manifest_key, commands, getters)
+		local prefix = command_literal_prefix(item)
+		if prefix == nil then
+			Logger.error(LOG, "Invalid literal command prefix — row refused.")
+			return nil
+		end
 		local t = item.type
 		local row_id   = type(item.id) == "string" and item.id or ""
 		local i18n_key = type(item.i18n) == "string" and item.i18n or ""
@@ -615,20 +657,33 @@ function M.new(deps)
 			return nil
 		end
 
+		local title
+		if has_caption_layout(item) then
+			title = explicit_caption(item, getters, i18n.get(i18n_key))
+			if title == nil then return nil end
+		end
 		local disabled = R.resolve_disabled_when(manifest_key, row_id, getters)
 		-- Greyed by `disabled_when` with the reason it declares, the row is
 		-- drawn as the same stand-in as a row this platform has not yet
 		-- ported, « label — head of the reason », with nothing to run: the
 		-- two differ only in how the condition is evaluated.
 		if disabled and type(item.disabled_reason_key) == "string" then
-			return greyed_stand_in(manifest_key,
+			local stand_in = greyed_stand_in(manifest_key,
 				{ id = row_id, i18n = i18n_key, reason_key = item.disabled_reason_key })
+			if stand_in and has_caption_layout(item) then
+				stand_in.title = title .. " — " .. reason_head(i18n.get(item.disabled_reason_key))
+			end
+			if stand_in and rawget(item, "label_prefix") ~= nil then
+				stand_in.title = prefix .. stand_in.title
+			end
+			return stand_in
 		end
 		local built = {
-			title    = i18n.get(i18n_key),
+			title    = title or i18n.get(i18n_key),
 			fn       = fn,
 			disabled = disabled or nil,
 		}
+		if rawget(item, "label_prefix") ~= nil then built.title = prefix .. built.title end
 		-- Only "check" carries a tick. A "command" is a plain action row, and
 		-- giving it `checked = false` would draw an empty checkbox next to a
 		-- row that toggles nothing.
@@ -781,6 +836,23 @@ function M.new(deps)
 			visiting[key] = true
 			local rows = {}
 			for _, item in ipairs(declaration) do
+				local prefix = command_literal_prefix(item)
+				if prefix == nil then
+					Logger.error(LOG, "Invalid literal command prefix in '%s' — rows refused.", key)
+					return nil
+				end
+				local caption_layout, caption_joiner
+				if type(item) == "table" then
+					caption_layout, caption_joiner = rawget(item, "caption_layout"), rawget(item, "caption_joiner")
+				end
+				if (caption_layout ~= nil or caption_joiner ~= nil) and
+					((item.type ~= "label" and item.type ~= "command" and item.type ~= "group")
+					or (caption_layout ~= "prefix" and caption_layout ~= "suffix")
+					or type(caption_joiner) ~= "string" or caption_joiner:find("%c")
+					or type(item.caption_getter) ~= "string" or item.caption_getter == "") then
+					Logger.error(LOG, "Invalid inert caption layout in '%s' — rows refused.", key)
+					return nil
+				end
 				if item.on_refusal ~= nil and item.type ~= "include" then
 					Logger.error(LOG, "Invalid presentation omission policy in '%s' — rows refused.", key)
 					return nil
@@ -847,7 +919,7 @@ function M.new(deps)
 					elseif status_definition and item.type == "label" then
 						row = { label = i18n.get(item.i18n), disabled = true }
 					elseif item.type == "label" then
-						local fields = { type = true, id = true, i18n = true, platforms = true, unavailable = true, caption_getter = true }
+						local fields = { type = true, id = true, i18n = true, platforms = true, unavailable = true, caption_getter = true, caption_layout = true, caption_joiner = true }
 						local valid = type(item.id) == "string" and item.id ~= ""
 							and type(item.i18n) == "string" and item.i18n ~= ""
 							and (item.unavailable == nil or item.unavailable == "hide")
@@ -889,10 +961,15 @@ function M.new(deps)
 						row = R.check_row(key, item.id, commands, getters)
 						if not row then return nil end
 					elseif item.type == "group" and (type(children[item.id]) == "table" or type(children[item.id]) == "function") then
+						local title
+						if has_caption_layout(item) then
+							title = explicit_caption(item, getters, i18n.get(item.i18n))
+							if title == nil then return nil end
+						end
 						local items = children[item.id]
 						if type(items) == "function" then items = native_children(key, item.id, items) end
 						if not items then return nil end
-						row = { label = i18n.get(item.i18n), items = items }
+						row = { label = title or i18n.get(item.i18n), items = items }
 						if item.disabled_when ~= nil and R.resolve_disabled_when(key, item.id, getters) then
 							row.disabled = true
 							row.disabled_reason_key = item.disabled_reason_key
@@ -901,28 +978,39 @@ function M.new(deps)
 						Logger.error(LOG, "Missing child data or unsupported row in template '%s' — provider rows refused.", key)
 						return nil
 					end
-					if row and item.caption_getter ~= nil then
+					if row and item.caption_getter ~= nil and not
+						((item.type == "command" or item.type == "group") and has_caption_layout(item)) then
 						local raw_title = i18n.get(item.i18n)
+						local layout = caption_layout
 						if item.type == "label" or item.type == "section_header" then
 							local _, source_slot = caption_format(raw_title, "")
-							if not source_slot then
+							local valid = layout == nil and source_slot or layout ~= nil and not source_slot
+								and type(raw_title) == "string" and raw_title ~= "" and raw_title ~= item.i18n
+							if not valid then
 								Logger.error(LOG, "Invalid inert caption format in template '%s' — provider rows refused.", key)
 								return nil
 							end
 						end
 						local getter = getters[item.caption_getter]
-						local value = type(getter) == "function" and getter() or nil
+						local value
+						if layout ~= nil then value = ""
+						else value = type(getter) == "function" and getter() or nil end
 						local title = item.type == "section_header" and row.label or raw_title
 						if type(value) ~= "string" then
 							Logger.error(LOG, "Invalid caption getter in template '%s' — provider rows refused.", key)
 							return nil
 						end
 						local caption, formatted = caption_format(title, value)
+						if layout ~= nil then
+							caption = explicit_caption(item, getters, raw_title)
+							if caption == nil then return nil end
+							formatted = true
+						end
 						if (item.type == "label" or item.type == "section_header") and not formatted then
 							Logger.error(LOG, "Invalid inert caption format in template '%s' — provider rows refused.", key)
 							return nil
 						end
-						row.label = caption
+						row.label = prefix .. caption
 					end
 					if row then rows[#rows + 1] = row end
 				end
@@ -1038,6 +1126,11 @@ function M.new(deps)
 		local getters  = (type(ctx) == "table" and type(ctx.state_getters) == "table") and ctx.state_getters or {}
 
 		for _, item in ipairs(menu_def) do
+			local prefix = command_literal_prefix(item)
+			if prefix == nil then
+				Logger.error(LOG, "Invalid literal command prefix in '%s' — row refused.", manifest_key)
+				goto continue
+			end
 			if not is_for_platform(item) then
 				-- A row this platform does not have is hidden: not applicable here
 				-- (`unavailable = "hide"`), or not yet classified. A row declared
@@ -1047,6 +1140,7 @@ function M.new(deps)
 				if item.unavailable == "grey" then
 					local stand_in = greyed_stand_in(manifest_key, item)
 					if stand_in then
+						if rawget(item, "label_prefix") ~= nil then stand_in.title = prefix .. stand_in.title end
 						flush_sep()
 						table.insert(result, stand_in)
 						item_count = item_count + 1
@@ -1163,6 +1257,10 @@ function M.new(deps)
 					goto continue
 				end
 				local label = i18n.get(i18n_key)
+				if has_caption_layout(item) then
+					label = explicit_caption(item, getters, label)
+					if label == nil then goto continue end
+				end
 				local built = nil
 				if type(group_builders[group_id]) == "function" then
 					local _ok
@@ -1391,6 +1489,26 @@ function M.new(deps)
 		return false
 	end
 
+	--- Evaluates the existing predicate once, retaining singleton native field presence.
+	--- @param item table Canonical declaration.
+	--- @param menu_key string Owning menu key.
+	--- @param item_id string Declared identity.
+	--- @param getters table Actual native state readers.
+	--- @return boolean checked, boolean present
+	local function checked_item(item, menu_key, item_id, getters)
+		local keys = item.checked_when
+		if type(keys) ~= "table" or #keys == 0 then return false, true end
+		for _, key in ipairs(keys) do
+			if type(getters) ~= "table" or type(getters[key]) ~= "function" then
+				Logger.error(LOG, "No getter for checked_when key '%s' on item '%s.%s' — treating as unchecked.", key, menu_key, item_id)
+				return false, true
+			end
+			local value = getters[key]()
+			if not value then return false, #keys ~= 1 or value ~= nil end
+		end
+		return true, true
+	end
+
 	--- Evaluates the declarative ``checked_when`` predicate — the mirror of
 	--- ``disabled_when``, checked only when EVERY getter returns truthy.
 	---
@@ -1411,23 +1529,63 @@ function M.new(deps)
 			return false
 		end
 
-		local keys = item.checked_when
-		if type(keys) ~= "table" or #keys == 0 then
-			return false
-		end
-
-		for _, key in ipairs(keys) do
-			if type(getters) ~= "table" or type(getters[key]) ~= "function" then
-				Logger.error(LOG, "No getter for checked_when key '%s' on item '%s.%s' — treating as unchecked.", key, menu_key, item_id)
-				return false
-			end
-			if not getters[key]() then
-				return false
-			end
-		end
-
-		return true
+		local checked = checked_item(item, menu_key, item_id, getters)
+		return checked
 	end
+
+
+	--- Supplies one declared parent around an already completed native subtree.
+	--- @param manifest_key string Owning shared menu declaration.
+	--- @param row_id string Unique declared group identity.
+	--- @param submenu table Finished native child, retained by identity.
+	--- @param getters table Actual native state readers.
+	--- @return table|nil row
+	function R.group_row(manifest_key, row_id, submenu, getters)
+		if type(manifest_key) ~= "string" or manifest_key == "" or type(row_id) ~= "string" or row_id == "" then
+			Logger.error(LOG, "Invalid declared parent identity — provider row refused.")
+			return nil
+		end
+		local selected, matches = nil, 0
+		for _, item in ipairs(get_menu_def(manifest_key)) do
+			if item.id == row_id then selected, matches = item, matches + 1 end
+		end
+		if type(row_id) ~= "string" or row_id == "" or matches ~= 1
+			or selected.type ~= "group" or rawget(selected, "label_prefix") ~= nil or not is_for_platform(selected)
+			or type(selected.i18n) ~= "string" or selected.i18n == "" or type(submenu) ~= "table" then
+			Logger.error(LOG, "Missing or invalid declared parent '%s.%s' — provider row refused.", manifest_key, tostring(row_id))
+			return nil
+		end
+		getters = getters or {}
+		local label = i18n.get(selected.i18n)
+		local caption_key = rawget(selected, "caption_getter")
+		if has_caption_layout(selected) then
+			label = explicit_caption(selected, getters, label)
+			if label == nil then return nil end
+		elseif caption_key ~= nil then
+			local _, source_slot = caption_format(label, "")
+			if type(caption_key) ~= "string" or caption_key == "" or not source_slot
+				or label == selected.i18n or type(getters) ~= "table" or type(getters[caption_key]) ~= "function" then
+				Logger.error(LOG, "Missing or invalid declared parent caption — provider row refused.")
+				return nil
+			end
+			local value = getters[caption_key]()
+			if type(value) ~= "string" then
+				Logger.error(LOG, "Invalid declared parent caption receipt — provider row refused.")
+				return nil
+			end
+			label = caption_format(label, value)
+		end
+		local row = { label = label, submenu = submenu,
+			disabled = R.resolve_disabled_when(manifest_key, row_id, getters) or nil }
+		if row.disabled then row.disabled_reason_key = selected.disabled_reason_key end
+		if type(selected.checked_when) == "table" then
+			local checked, present = checked_item(selected, manifest_key, row_id, getters)
+			if present then row.checked = checked end
+		end
+		return row
+	end
+
+
 
 
 

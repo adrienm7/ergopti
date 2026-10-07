@@ -135,20 +135,82 @@ local function with_api_source(scenario)
 	return result
 end
 
+-- The complete tray requires the actual live-mode reader, not a fabricated state.
+-- Its profiles read an owned physical neutral source through the real preference
+-- transaction preview; engine initialization and native output are not exercised.
+local LIVE_SOURCE_MODULES = {
+	"infra.llm_preferences", "modules.llm.profile_settings", "modules.llm.prediction_engine",
+}
+
+local function with_live_source(context, scenario)
+	if type(context.llm) ~= "table" or context.llm.get_live ~= nil then return scenario() end
+	local prior = {}; for _, name in ipairs(LIVE_SOURCE_MODULES) do prior[name] = rawget(package.loaded, name) end
+	local old_read, old_write = context.llm.get_live, context.llm.set_live
+	local path, preferences, owner = os.tmpname(), nil, { pending = function() return false end }
+	local descriptor
+	local acquired, result = false, nil
+	local ok, detail = xpcall(function()
+		descriptor = assert(io.open(path, "wb")); assert(descriptor:write("")); assert(descriptor:close()); descriptor = nil
+		for _, name in ipairs(LIVE_SOURCE_MODULES) do rawset(package.loaded, name, nil) end
+		preferences = require("infra.llm_preferences")
+		local bytes, status = require("toml_codec.writer").read_classified(path)
+		assert(status == "ok" and bytes == "")
+		assert(preferences.acquire(owner)); acquired = true
+		assert(preferences.with_configuration(owner, { status = status, content = bytes }, function()
+			local engine = require("modules.llm.prediction_engine")
+			assert(engine.get_live() == nil)
+			context.llm.get_live, context.llm.set_live = engine.get_live, engine.set_live
+			result = scenario()
+			return true
+		end))
+	end, debug.traceback)
+	context.llm.get_live, context.llm.set_live = old_read, old_write
+	local released, release_receipt = true, true
+	if acquired then released, release_receipt = pcall(preferences.release, owner) end
+	local closed, close_receipt = true, true
+	if descriptor then closed, close_receipt = pcall(descriptor.close, descriptor) end
+	for _, name in ipairs(LIVE_SOURCE_MODULES) do rawset(package.loaded, name, prior[name]) end
+	local retained = io.open(path, "rb")
+	if retained then assert(retained:close()); assert(os.remove(path)) end
+	assert(released and release_receipt == true and closed and close_receipt == true)
+	for _, name in ipairs(LIVE_SOURCE_MODULES) do
+		helpers.assert_true(rawequal(rawget(package.loaded, name), prior[name]), name)
+	end
+	helpers.assert_true(rawequal(context.llm.get_live, old_read) and rawequal(context.llm.set_live, old_write))
+	if not ok then error(detail, 0) end
+	return result
+end
+
 --- Builds the real tray with a scoped entries source, retaining native callbacks.
 --- @param context table
 --- @return table
 --- Builds with the actual ordered-pair owner over an owned neutral source.
 --- Native editing is not exercised by this menu-shape fixture.
 local function build_fixture_menu(context)
-	local names = {"modules.shortcuts.key_combinations", "infra.key_combinations_scope", "ui.menu.key_combinations"}
-	local magic_path
+	local names = {"modules.shortcuts.key_combinations", "infra.key_combinations_scope", "ui.menu.key_combinations",
+		"adapters.storage", "ui.hotstring_editor.bridge"}
+	local magic_path, editor_directory, editor_source, editor_fs
+	local original_getenv, original_i18n_safe = os.getenv, rawget(_G, "i18n_safe")
+	local all_previous = {}; for name, value in pairs(package.loaded) do all_previous[name] = value end
 	if context.magic_key_source == nil then
 		names[#names + 1] = "modules.hotstrings.magic_key_source"
 		names[#names + 1] = "infra.hotstring_preferences"
 	end
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local ok, rows = pcall(function()
+		local lfs = require("lfs"); editor_fs = lfs
+		editor_directory = os.tmpname(); assert(os.remove(editor_directory)); assert(lfs.mkdir(editor_directory))
+		assert(lfs.mkdir(editor_directory .. "/ergopti_plus"))
+		editor_source = editor_directory .. "/ergopti_plus/storage.json"
+		local seed = assert(io.open(editor_source, "wb"))
+		assert(seed:write('{"hotstring_editor.default_section":"","future":{"keep":true}}\n')); assert(seed:close())
+		os.getenv = function(name)
+			if name == "XDG_CONFIG_HOME" then return editor_directory end
+			return original_getenv(name)
+		end
+		rawset(package.loaded, "adapters.storage", nil); rawset(package.loaded, "ui.hotstring_editor.bridge", nil)
+		helpers.assert_eq(require("ui.hotstring_editor.bridge").get_pref("default_section"), "",
+			"the real editor reads the independent neutral default-section source")
 		if context.magic_key_source == nil then
 			magic_path = os.tmpname()
 			local source = assert(io.open(magic_path, "wb"))
@@ -173,10 +235,39 @@ local function build_fixture_menu(context)
 		package.loaded["infra.key_combinations_scope"] = {retry_restore = function() return true end,
 			edit = function() error("menu-shape fixture cannot publish") end}
 		package.loaded["ui.menu.key_combinations"] = nil
-		return with_api_source(function(builder) return builder.build(context) end)
+		local built = with_live_source(context, function()
+			return with_api_source(function(builder) return builder.build(context) end)
+		end)
+		local source = assert(io.open(editor_source, "rb"))
+		local content = source:read("*a"); assert(source:close())
+		helpers.assert_eq(content, '{"hotstring_editor.default_section":"","future":{"keep":true}}\n',
+			"the actual menu read preserves its independent editor source and foreign metadata")
+		return built
 	end)
+	os.getenv = original_getenv
 	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
-	if magic_path then assert(os.remove(magic_path)) end
+	for name in pairs(package.loaded) do if all_previous[name] == nil then rawset(package.loaded, name, nil) end end
+	for name, value in pairs(all_previous) do rawset(package.loaded, name, value) end
+	rawset(_G, "i18n_safe", original_i18n_safe)
+	-- Independent owned resources retire even when another native cleanup fails.
+	-- Preserve the first exact native error and never return a successful build.
+	local cleanup_ok, cleanup_error = true, nil
+	local function cleanup(action)
+		local retired, failure = pcall(action)
+		if not retired and cleanup_ok then cleanup_ok, cleanup_error = false, failure end
+	end
+	if magic_path then cleanup(function() assert(os.remove(magic_path)) end) end
+	if editor_directory then cleanup(function()
+		local lfs = editor_fs
+		for file in lfs.dir(editor_directory .. "/ergopti_plus") do
+			if file ~= "." and file ~= ".." then assert(os.remove(editor_directory .. "/ergopti_plus/" .. file)) end
+		end
+		assert(lfs.rmdir(editor_directory .. "/ergopti_plus")); assert(lfs.rmdir(editor_directory))
+	end) end
+	helpers.assert_true(rawequal(rawget(_G, "i18n_safe"), original_i18n_safe))
+	for _, name in ipairs(names) do helpers.assert_true(rawequal(rawget(package.loaded, name), saved[name]), name) end
+	helpers.assert_true(rawequal(os.getenv, original_getenv))
+	if not cleanup_ok then error(cleanup_error, 0) end
 	if not ok then error(rows, 0) end
 	return rows
 end
@@ -320,6 +411,7 @@ helpers.describe("menu certification: the manifest's rows are rendered", functio
 			tap_hold_key_tap_caption = i18n.get("tap_hold.tap.none"),
 			tap_hold_key_hold_caption = i18n.get("tap_hold.hold.none"),
 			tap_hold_key_delay_caption = "0 ms",
+			personal_default_label = i18n.get("common.none"),
 		}
 		local checked, missing = 0, {}
 		for menu_key in pairs(root) do
@@ -343,7 +435,13 @@ helpers.describe("menu certification: the manifest's rows are rendered", functio
 						if row.caption_getter ~= nil then
 							local caption = fixture_captions[row.caption_getter]
 							helpers.assert_type(caption, "string", "every declared caption needs independent fixture state")
-							label = string.format(label, caption)
+							if row.caption_layout == "prefix" then
+								helpers.assert_type(row.caption_joiner, "string")
+								label = label .. row.caption_joiner .. caption
+							elseif row.caption_layout == "suffix" then
+								helpers.assert_type(row.caption_joiner, "string")
+								label = caption .. row.caption_joiner .. label
+							else label = string.format(label, caption) end
 						end
 						if not titles[label] then
 							missing[#missing + 1] = menu_key .. "/" .. (row.id or row.i18n)
@@ -935,3 +1033,211 @@ helpers.describe("magic key source: actual complete tray provider", function()
 end)
 
 require("test.menu_dynamic_caption_contract").register(helpers, "linux")
+
+require("test.menu_caption_layout_contract").register(helpers, "linux")
+
+require("test.menu_group_row_contract").register(helpers, "linux")
+
+require("test.menu_command_group_affix_contract").register(helpers, "linux")
+
+
+helpers.describe("Whole LLM tray genuine live owner scope", function()
+	for _, prior_kind in ipairs({ "absent", "false", "existing" }) do
+		for _, raises in ipairs({ false, true }) do
+			helpers.it("restores " .. prior_kind .. " live owner modules after " .. (raises and "raise" or "success"), function()
+				local originals = {}; for _, name in ipairs(LIVE_SOURCE_MODULES) do originals[name] = rawget(package.loaded, name) end
+				local seeds = {}
+				local context = full_context()
+				local before_read, before_write = context.llm.get_live, context.llm.set_live
+				local ok, detail = xpcall(function()
+					for _, name in ipairs(LIVE_SOURCE_MODULES) do
+						local value
+						if prior_kind == "false" then value = false elseif prior_kind == "existing" then value = { sentinel = name } end
+						seeds[name] = value; rawset(package.loaded, name, value)
+					end
+					local ran = false
+					local survived, result = pcall(function()
+						return with_live_source(context, function()
+							ran = true
+							local engine = assert(rawget(package.loaded, "modules.llm.prediction_engine"))
+							helpers.assert_true(rawequal(context.llm.get_live, engine.get_live))
+							helpers.assert_true(rawequal(context.llm.set_live, engine.set_live))
+							helpers.assert_nil(context.llm.get_live())
+							helpers.assert_eq(context.llm.set_live(nil), true)
+							local values, source = require("infra.llm_preferences").get_many({ "llm.profiles.num_predictions" })
+							helpers.assert_eq(source.content, "")
+							helpers.assert_type(values["llm.profiles.num_predictions"], "number")
+							if raises then error("actual live scope sentinel") end
+							return "actual live scope result"
+						end)
+					end)
+					helpers.assert_eq(ran, true)
+					helpers.assert_eq(survived, not raises)
+					if raises then helpers.assert_contains(result, "actual live scope sentinel")
+					else helpers.assert_eq(result, "actual live scope result") end
+					for _, name in ipairs(LIVE_SOURCE_MODULES) do helpers.assert_true(rawequal(rawget(package.loaded, name), seeds[name]), name) end
+					helpers.assert_true(rawequal(context.llm.get_live, before_read))
+					helpers.assert_true(rawequal(context.llm.set_live, before_write))
+				end, debug.traceback)
+				for _, name in ipairs(LIVE_SOURCE_MODULES) do rawset(package.loaded, name, originals[name]) end
+				if not ok then error(detail, 0) end
+			end)
+		end
+	end
+end)
+
+-- The actual initialized locale owner and root renderer, restored as one private cohort.
+local function language_parent_native(language, scenario)
+	local names = { "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu" }
+	local saved = {}; for _, name in ipairs(names) do saved[name] = rawget(package.loaded, name) end
+	local previous_i18n, previous_manifest = i18n, ManifestMenu
+	local ok, detail = xpcall(function()
+		for _, name in ipairs(names) do rawset(package.loaded, name, nil) end
+		i18n = require("infra.i18n"); i18n.init()
+		local owner = { pending = function() return false end }
+		assert(i18n.scope_acquire(owner))
+		local receipt = assert(i18n.scope_capture(owner))
+		assert(i18n.scope_apply(owner, receipt, language))
+		assert(i18n.scope_release(owner)); assert(i18n.scope_forget(owner, receipt))
+		ManifestMenu = require("infra.manifest_menu")
+		local path = require("infra.paths").shared("tests/corpus/menus/language_parent.json")
+		local file = assert(io.open(path, "rb")); local bytes = assert(file:read("*a")); assert(file:close())
+		local corpus = assert(require("json").decode(bytes))
+		assert(i18n.get("menu.global.language") == corpus.parent[language], "genuine locale file is initialized")
+		return with_api_source(function(builder)
+			return scenario(i18n, ManifestMenu, corpus, function(changed)
+				return builder.build({ _version = "9.9.9", on_menu_changed = changed })
+			end)
+		end)
+	end, debug.traceback)
+	i18n, ManifestMenu = previous_i18n, previous_manifest
+	for _, name in ipairs(names) do rawset(package.loaded, name, saved[name]) end
+	for _, name in ipairs(names) do helpers.assert_true(rawequal(rawget(package.loaded, name), saved[name]), name .. " restored") end
+	if not ok then error(detail, 0) end
+end
+
+helpers.describe("complete declared Language parent (Linux)", function()
+	for _, code in ipairs({ "en", "fr" }) do
+		local language = code
+		helpers.it("retains full original hierarchy and same finished child in " .. language, function()
+			language_parent_native(language, function(native, renderer, corpus, build)
+				local original_list, original_group, original_set = native.list_locales, renderer.group_row, native.set_locale
+				local calls, choices, changes, finished, supplied = 0, 0, 0, nil, nil
+				local original_render = renderer.render_rows
+				local ok, detail = xpcall(function()
+					native.list_locales = function() calls = calls + 1; return original_list() end
+					renderer.group_row = function(key, id, child, getters)
+						if key == "top_level" and id == "language" then finished = child end
+						return original_group(key, id, child, getters)
+					end
+					renderer.render_rows = function(rows, key)
+						if key == "language_menu" then supplied = rows end
+						return original_render(rows, key)
+					end
+					native.set_locale = function(...) choices = choices + 1; return original_set(...) end
+					local row = assert(find_item(build(function() changes = changes + 1 end), corpus.parent[language]))
+					helpers.assert_eq(calls, 1, "actual complete locale collection captured once")
+					helpers.assert_eq(choices, 0, "no action during construction")
+					helpers.assert_true(rawequal(row.menu, finished), "GroupRow retains the actual completed child")
+					helpers.assert_eq(#row.menu, #corpus.locales, "complete original hierarchy")
+					local active
+					for index, expected in ipairs(corpus.locales) do
+						local child = row.menu[index]
+						helpers.assert_eq(child.title, expected.linux, "handwritten physical order and caption")
+						helpers.assert_eq(child.checked, expected.code == language, "original active/inactive check states")
+						helpers.assert_type(child.fn, "function", "original native action retained")
+						helpers.assert_true(rawequal(child.fn, supplied[index].action), "admitted original callback identity retained")
+						if expected.code == language then active = child end
+					end
+					assert(active).fn()
+					helpers.assert_eq(choices, 1, "actual original callback reaches the genuine setter")
+					helpers.assert_eq(changes, 1, "unchanged successful choice preserves its original redraw")
+					helpers.assert_eq(native.get_locale(), language, "current identity stays exact")
+				end, debug.traceback)
+				native.list_locales, renderer.group_row, native.set_locale = original_list, original_group, original_set
+				renderer.render_rows = original_render
+				if not ok then error(detail, 0) end
+			end)
+		end)
+	end
+	helpers.it("retains a declared parent for a genuine valid empty collection", function()
+		language_parent_native("en", function(native, _, corpus, build)
+			local original = native.list_locales
+			local ok, detail = xpcall(function()
+				native.list_locales = function() return {} end
+				local row = assert(find_item(build(), corpus.parent.en))
+				helpers.assert_type(row.menu, "table")
+				helpers.assert_eq(#row.menu, 0, "valid empty is not a fabricated locale")
+			end, debug.traceback)
+			native.list_locales = original
+			if not ok then error(detail, 0) end
+		end)
+	end)
+	for _, variant in ipairs({ "nil", "scalar", "malformed", "sparse", "child-withdrawn", "parent-withdrawn", "parent-wrong-kind" }) do
+		local name = variant
+		helpers.it("refuses " .. name .. " without a Language parent", function()
+			language_parent_native("en", function(native, renderer, corpus, build)
+				local root, original = renderer.get_root(), native.list_locales
+				local child, parent = root.language_menu, nil
+				for _, row in ipairs(root.top_level) do if row.id == "language" then parent = row; break end end
+				local kind, id = parent.type, parent.id
+				local ok, detail = xpcall(function()
+					if name == "nil" then native.list_locales = function() return nil end
+					elseif name == "scalar" then native.list_locales = function() return false end
+					elseif name == "malformed" then native.list_locales = function() return { false } end
+					elseif name == "sparse" then native.list_locales = function() return { [2] = "en" } end
+					elseif name == "child-withdrawn" then root.language_menu = {}
+					elseif name == "parent-withdrawn" then parent.id = "withdrawn-language"
+					else parent.type = "label" end
+					local rows = build()
+					helpers.assert_type(rows, "table", "unrelated real root survives refusal")
+					helpers.assert_nil(find_item(rows, corpus.parent.en), "no undeclared/nil-to-empty success")
+				end, debug.traceback)
+				root.language_menu, parent.type, parent.id, native.list_locales = child, kind, id, original
+				if not ok then error(detail, 0) end
+			end)
+		end)
+	end
+end)
+
+
+helpers.describe("Language completed-child admission (linux)", function()
+	for _, mode in ipairs({ "deep", "nil", "scalar" }) do
+		local case = mode
+		helpers.it("keeps finished deep identity and refuses incomplete native result: " .. case, function()
+			language_parent_native("en", function(_, renderer, corpus, build)
+				local original, finished = renderer.render_rows, nil
+				local ok, detail = xpcall(function()
+					renderer.render_rows = function(rows, key)
+						local native = original(rows, key)
+						if key ~= "language_menu" then return native end
+						if case == "nil" then return nil end
+						if case == "scalar" then return false end
+						assert(type(native) == "table" and #native == 21)
+						local leaf = { title = "finished-leaf", fn = native[1].fn }
+						local subtree = { leaf }
+						for _ = 1, 8 do subtree = { { title = "finished-level", menu = subtree } } end
+						native[1].menu = subtree
+						finished = native
+						return native
+					end
+					local parent = find_item(build(), corpus.parent.en)
+					if case == "deep" then
+						helpers.assert_true(parent ~= nil, "finished genuine native result remains attachable")
+						helpers.assert_true(rawequal(parent.menu, finished), "no secondary native-child depth walk or copy")
+						local child = parent.menu[1].menu
+						for _ = 1, 8 do child = child[1].menu end
+						helpers.assert_eq(child[1].title, "finished-leaf", "all finished deep levels retained")
+						helpers.assert_true(rawequal(child[1].fn, finished[1].fn), "finished callback identity retained")
+					else
+						helpers.assert_nil(parent, "failed native rendering never becomes a valid empty parent")
+					end
+				end, debug.traceback)
+				renderer.render_rows = original
+				if not ok then error(detail, 0) end
+			end)
+		end)
+	end
+end)
+
+require("test.menu_command_literal_prefix_contract").register(helpers, "linux")
