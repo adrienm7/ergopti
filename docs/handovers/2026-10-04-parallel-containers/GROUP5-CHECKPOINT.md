@@ -2102,3 +2102,23 @@ fixture entry; the two additions preserve the same ownership. Exact Team witness
 inverses retain the independent historical oracle, assertions and original
 process deadlines. Source-derived controls reproduce the predecessor failure;
 actual macOS execution remains pending.
+
+## Initializer response delivery source closure
+
+The authenticated lower VHD client now checks the real request ID, exact outgoing
+bytes and current peer generation before accepting a canonical ten-byte
+initializer reply. Queue admission acknowledges delivery acceptance, without
+claiming IOKit initialization, DriverKit readiness, installed healthy delivery or
+physical capture. Shutdown cancellation, failed queue ownership, actual socket
+executor dispatch and callback reentry debt retain the original retirement
+guards; native/dispatcher/notification frames require genuine settlement.
+
+The reviewed header and transport compose with exact factory, builder and four
+consumer hashes; current fixture/receipt pins match the same source. Historical
+schema1/41/57 oracles, assertions, native argv and the original 300-second whole
+compilation budget stay intact. Historical Source17 witnesses retain their
+original SDK8ec/Teamdee bytes as historical evidence; the current SDKb4df/Team97
+and formatted reference are preserved by this slice. Portable source and genuine
+Asio/socket controls pass, while Darwin wholeCore compilation, installed healthy
+delivery/capture and separate durable initializer SDK registration remain
+pending. No new native success is claimed; TODO31 and transverse16/38 remain open.

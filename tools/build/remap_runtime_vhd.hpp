@@ -19,6 +19,7 @@ namespace krbn::core_service::daemon { class device_grabber; }
 namespace ergoptiplus::remap::vhd {
 class broker_owner;
 class connection;
+class initializer_delivery;
 namespace detail {
 using auth::detail::cf_owned;
 inline constexpr char daemon_path[] = "/Library/Application Support/org.pqrs/Karabiner-DriverKit-VirtualHIDDevice/Applications/Karabiner-VirtualHIDDevice-Daemon.app";
@@ -334,6 +335,7 @@ public:
 };
 
 class connection final : public std::enable_shared_from_this<connection> {
+  friend class initializer_delivery;
   friend class broker_owner;
   friend class pqrs::unix_domain_stream::impl::client_state;
   friend class pqrs::unix_domain_stream::impl::request_manager;
@@ -361,6 +363,7 @@ class connection final : public std::enable_shared_from_this<connection> {
   bool staged_ = true;
   bool scheduled_ = false;
   bool notified_ = false;
+  bool notification_active_ = false;
   std::uint64_t native_debt_ = 0;
   std::uint64_t dispatch_debt_ = 0;
   std::function<void()> schedule_;
@@ -421,7 +424,7 @@ class connection final : public std::enable_shared_from_this<connection> {
     owner->sessions_.push_back(session);
     const auto executor = socket->get_executor();
     session->schedule_ = [session, executor] {
-      asio::post(executor, [session] { session->close_step(); });
+      asio::dispatch(executor, [session] { session->close_step(); });
     };
     session->close_ = [session, socket] { session->close_native(*socket); };
     // The socket is already in owned custody, even if native identity refuses.
@@ -498,6 +501,7 @@ class connection final : public std::enable_shared_from_this<connection> {
     {
       std::lock_guard<std::recursive_mutex> lock(owner_->mutex_);
       scheduled_ = false;
+      if (notification_active_) return;
       if (!revoked_ || failed_ || completed_ || dispatch_debt_ != 0) return;
       operation = close_;
     }
@@ -506,11 +510,25 @@ class connection final : public std::enable_shared_from_this<connection> {
     {
       std::lock_guard<std::recursive_mutex> lock(owner_->mutex_);
       if (!physical_ || native_debt_ != 0 || dispatch_debt_ != 0 || failed_ || completed_) return;
-      if (!notified_ && completion_) { notified_ = true; notification = completion_; }
+      if (!notified_ && completion_) { notified_ = true; notification = completion_; notification_active_ = true; }
     }
-    if (notification) notification();
+    if (notification) {
+      // An actual peer close observer can reenter retirement before the peer
+      // admits its follow-on dispatcher debt. Retain that notification frame
+      // until it returns; do not hold the owner mutex across user callbacks.
+      try { notification(); }
+      catch (...) {
+        std::lock_guard<std::recursive_mutex> lock(owner_->mutex_);
+        notification_active_ = false;
+        fail_cleanup();
+        return;
+      }
+      std::lock_guard<std::recursive_mutex> lock(owner_->mutex_);
+      notification_active_ = false;
+    }
     {
       std::lock_guard<std::recursive_mutex> lock(owner_->mutex_);
+      if (notification_active_) return;
       if (!physical_ || native_debt_ != 0 || dispatch_debt_ != 0 || failed_ || completed_) return;
       completed_ = true;
       released_schedule = std::move(schedule_); released_close = std::move(close_); released_completion = std::move(completion_);
@@ -520,6 +538,100 @@ class connection final : public std::enable_shared_from_this<connection> {
   bool completed() {
     std::lock_guard<std::recursive_mutex> lock(owner_->mutex_);
     return completed_ && !failed_;
+  }
+};
+
+// This is an observation of one delivered initializer request, never a native
+// initialization-success, initialized-ready, DriverKit or capture capability.
+// Only the actual upper initializer callsite constructs an intent. The actual
+// lower manager binds its own nonzero id, sent bytes and connected generation.
+enum class initializer_kind { keyboard, pointing };
+class initializer_delivery final {
+  friend class pqrs::unix_domain_stream::impl::request_manager;
+  friend class pqrs::unix_domain_stream::impl::client_state;
+  friend class pqrs::karabiner::driverkit::virtual_hid_device_service::client;
+public:
+  enum class observation { unbound, pending, delivered, refused };
+private:
+  const std::vector<std::uint8_t> bytes_;
+  const initializer_kind kind_;
+  std::mutex mutex_;
+  std::weak_ptr<connection> session_;
+  std::uint64_t id_ = 0;
+  observation state_ = observation::unbound;
+  initializer_delivery(std::vector<std::uint8_t> bytes, initializer_kind kind)
+      : bytes_(std::move(bytes)), kind_(kind) {}
+  static std::shared_ptr<initializer_delivery> create(
+      const std::vector<std::uint8_t>& bytes, initializer_kind kind) {
+    return std::shared_ptr<initializer_delivery>(new initializer_delivery(bytes, kind));
+  }
+  void refuse() {
+    std::shared_ptr<connection> session;
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      state_ = observation::refused;
+      session = session_.lock();
+    }
+    // Never hold the intent mutex while entering native owner retirement. That
+    // path can synchronously cancel pending manager rows which contain us.
+    if (session) session->owner_->retire();
+  }
+  bool bind(const std::shared_ptr<connection>& session, std::uint64_t id,
+      const std::vector<std::uint8_t>& sent) {
+    const bool current = session && session->current();
+    bool bound = false;
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      if (state_ == observation::unbound && current && id != 0 &&
+          (kind_ == initializer_kind::keyboard || kind_ == initializer_kind::pointing) &&
+          !bytes_.empty() && bytes_ == sent) {
+        session_ = session;
+        id_ = id;
+        state_ = observation::pending;
+        bound = true;
+      } else state_ = observation::refused;
+    }
+    if (!bound && session) session->owner_->retire();
+    return bound;
+  }
+  void complete(std::uint64_t id, const asio::error_code& error,
+      const std::shared_ptr<std::vector<std::uint8_t>>& reply) {
+    bool canonical = !error && reply && reply->size() == 10;
+    if (canonical) {
+      for (std::size_t at = 0; at < 10; at += 2) {
+        if ((*reply)[at] != at / 2 + 1 || (*reply)[at + 1] > 1) {
+          canonical = false; break;
+        }
+      }
+    }
+    std::shared_ptr<connection> session;
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      session = session_.lock();
+      canonical = canonical && state_ == observation::pending && id == id_;
+    }
+    const bool current = session && session->current();
+    if (!canonical || !current) { refuse(); return; }
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      if (state_ != observation::pending || id != id_) canonical = false;
+      else state_ = observation::delivered;
+    }
+    if (!canonical) refuse();
+  }
+public:
+  observation state() {
+    std::shared_ptr<connection> session;
+    observation result;
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      result = state_;
+      session = session_.lock();
+    }
+    if (result == observation::unbound || result == observation::refused) return result;
+    if (!session || !session->current()) { refuse(); return observation::refused; }
+    std::lock_guard<std::mutex> lock(mutex_);
+    return state_;
   }
 };
 

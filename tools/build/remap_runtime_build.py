@@ -1994,7 +1994,7 @@ def owned_output(status, stdout, stderr):
 
 CURRENT_OWNED_SOURCE_PROFILE = "owned_vhd_broker_source_v1"
 CURRENT_OWNED_SOURCE_FACTORY_SHA256 = (
-    "5fec1b43e836d53ad986400210f5b59e2d634f2584b564c85c6b33df580dcee5"
+    "854dc3ef556e2540d4a64e0d935610a2a2fe8c947e3f7fe315c1641ceaaedd7d"
 )
 _HISTORICAL_OWNED_RECORD_PROFILE = object()
 _CURRENT_OWNED_RECORD_PROFILE = object()
@@ -2285,7 +2285,7 @@ def observe_products(source, owner, *, repository=None):
     return validate_products(result)
 
 
-SOURCE_FACTORY_SHA256 = "5fec1b43e836d53ad986400210f5b59e2d634f2584b564c85c6b33df580dcee5"
+SOURCE_FACTORY_SHA256 = "854dc3ef556e2540d4a64e0d935610a2a2fe8c947e3f7fe315c1641ceaaedd7d"
 _SOURCE_FACTORY = None
 
 

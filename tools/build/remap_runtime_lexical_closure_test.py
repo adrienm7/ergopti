@@ -16,8 +16,8 @@ import zlib
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXED_PROVIDER = "c29ceb96e73655cadea7763805b9468c32744033c2f177bae492e4ce9fe4100a"
-FIXED_FACTORY = "5fec1b43e836d53ad986400210f5b59e2d634f2584b564c85c6b33df580dcee5"
-FIXED_BUILDER = "686fa38236f2dda0671f7d2466767a940aace5dd8189fe46267fd30de39bb4bd"
+FIXED_FACTORY = "854dc3ef556e2540d4a64e0d935610a2a2fe8c947e3f7fe315c1641ceaaedd7d"
+FIXED_BUILDER = "855a36af664122bcb199157eefff63cddbd498ba327e4388aa474fe420bdb8c1"
 OLD_PROVIDER_SHA256 = "a4ef0f4b7bd2c9cdabb4b8eb9e0a7249eab4f9e06f9991bcdb2f59a230220b4f"
 OLD_FACTORY_SHA256 = "70d90ede3bdfbf44e146ba4a26f101ebfec2a1745bc05a8260db001d5a236537"
 # Exact historical producer source bytes, frozen before the closure edit.

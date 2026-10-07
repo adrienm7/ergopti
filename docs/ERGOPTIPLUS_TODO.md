@@ -3307,6 +3307,19 @@ Item30 remains partial; keyboard/device qualification is still required.
   the exact SHA/result, including drive, UNC, case and Unicode cases. Real
   Windows filesystem qualification remains pending; no Windows driver changes
   are included. Item31 and transverse items16/38 remain open.
+  The authenticated VHD client now binds each initializer reply to its actual
+  request-manager ID, outgoing bytes and current connection generation. A
+  canonical ten-byte reply acknowledges acceptance into the delivery queue;
+  it does not prove IOKit initialization, DriverKit readiness or physical input.
+  Queue refusal, shutdown cancellation and callback reentry retain the failed
+  owner and outstanding native/dispatcher/notification frames until genuine
+  retirement. The reviewed header/transport and exact factory/builder/consumer
+  pins preserve all original physical-source checks, historical oracles,
+  assertions and native compilation deadlines. Portable Asio/source controls
+  pass; actual macOS wholeCore compilation within the original 300-second
+  budget, installed healthy delivery and capture remain unqualified. New
+  initializer controls still need their separately owned durable SDK fixture
+  registration. TODO31 and transverse items16/38 remain open.
   The following source projection now captures the authenticated official VHD
   broker prerequisites under a separately closed current profile:34 dependencies,
   31 original inputs,60 owned outputs and4527 staged files plus four links. Current

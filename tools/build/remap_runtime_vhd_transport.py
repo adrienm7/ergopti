@@ -20,7 +20,7 @@ PREIMAGES = (
     (CORE, "9aa96f3ce8e2cc8c07a08f4c0d4630d6a70f82d7959030289b7b0e21c6e7a43a"),
     (UPPER, "0e590ff9f652a92dd40fb9c47dd0d61e98f4eb14f0983918a29b223f9c27a8c7"),
 )
-HEADER_SHA256 = "53b887aab0d3247538123c69c65d8e4aa82eff3cac17f15ccbfabd4a5fcaa24e"
+HEADER_SHA256 = "ca6d4cf40c726ab7c844fdae2bb7ff5dcee476cc2c061944ee76eab385aa1b65"
 
 
 class VHDTransportRefusal(RuntimeError):
@@ -471,7 +471,7 @@ def lower(data):
     r.source = checked_vhd_dispatch_queues(
         r.source, "class client_state final", "if (vhd_owner_) vhd_owner_->failed_cleanup();"
     )
-    return r.result()
+    return initializer_lower(r.result())
 
 
 def upper(data):
@@ -591,7 +591,7 @@ def upper(data):
     # No initialized-ready capability is published by this broker-only slice.
     # Exact initializer ACK and post-initializer typed readiness require the
     # native generation-bound request/delivery bridge, not a method-call flag.
-    return r.result()
+    return initializer_upper(r.result())
 
 
 def core(data):
@@ -649,6 +649,187 @@ def requests(data):
     r.one(
         "  const std::shared_ptr<ergoptiplus::remap::auth::channel_owner> owned_channel_;",
         "  const std::shared_ptr<ergoptiplus::remap::auth::channel_owner> owned_channel_;\n  const std::shared_ptr<ergoptiplus::remap::vhd::broker_owner> vhd_owner_;",
+    )
+    return initializer_requests(r.result())
+
+
+def initializer_lower(data):
+    r = Recipe(data)
+    r.one(
+        "                self->request_manager_.complete(request_id,",
+        """                if (self->vhd_selected_ && request_id != 0 &&
+                    !self->request_manager_.accepts_vhd_response(request_id)) {
+                  if (self->vhd_owner_) self->vhd_owner_->retire();
+                  return;
+                }
+                self->request_manager_.complete(request_id,""",
+    )
+    r.one(
+        "                     owned_async_request_callback owned_callback = nullptr) {",
+        "                     owned_async_request_callback owned_callback = nullptr,\n                     std::shared_ptr<ergoptiplus::remap::vhd::initializer_delivery> initializer = nullptr) {",
+    )
+    r.one(
+        "[weak_self, data, timeout, callback, owned_callback, owned_request]",
+        "[weak_self, data, timeout, callback, owned_callback, owned_request, initializer]",
+    )
+    r.one(
+        "                             owned_callback, owned_request);",
+        "                             owned_callback, owned_request, initializer);",
+    )
+    r.one(
+        "std::shared_ptr<ergoptiplus::remap::auth::channel_owner::construction_marker> owned_request = nullptr) {",
+        "std::shared_ptr<ergoptiplus::remap::auth::channel_owner::construction_marker> owned_request = nullptr,\n                    std::shared_ptr<ergoptiplus::remap::vhd::initializer_delivery> initializer = nullptr) {\n    if (initializer && (!vhd_selected_ || owned_selected_)) { initializer->refuse(); return; }",
+    )
+    r.one("    if (!peer_) {", "    if (!peer_) {\n      if (initializer) initializer->refuse();")
+    r.one(
+        "                                   }, owned_callback, request_operation, owned_request);",
+        "                                   }, owned_callback, request_operation, owned_request, initializer, initializer ? &data : nullptr);",
+    )
+    r.one(
+        "    if (owned_selected_ && id == 0) return;",
+        "    if ((owned_selected_ || vhd_selected_) && id == 0) return;",
+    )
+    r.one(
+        "  void async_request_owned(const std::vector<uint8_t>& data,",
+        """private:
+  friend class pqrs::karabiner::driverkit::virtual_hid_device_service::client;
+  void async_initializer_request(const std::vector<uint8_t>& data,
+      async_request_callback callback,
+      std::shared_ptr<ergoptiplus::remap::vhd::initializer_delivery> intent) const {
+    state_->async_request(data, state_->options_.read_timeout, std::move(callback), nullptr, std::move(intent));
+  }
+public:
+  void async_request_owned(const std::vector<uint8_t>& data,""",
+    )
+    r.source = ordered_vhd_shutdown(r.source)
+    return r.result()
+
+
+def ordered_vhd_shutdown(source):
+    r = Recipe(source.encode("utf-8"))
+    anchor = "  void async_shutdown() {"
+    begin = r.source.index(anchor)
+    end = lambda_end(r.source, begin)
+    original = r.source[begin:end]
+    # The complete original physical close and successor-retention sequence is
+    # transplanted byte-whole. Default and Ergopti-auth shutdown remain whole.
+    tail_begin = original.index("    detach_from_dispatcher(")
+    tail_end = original.rfind("  }")
+    tail = original[tail_begin:tail_end]
+    if tail.count("shared_self->close_peer(asio::error::operation_aborted);") != 1:
+        raise VHDTransportRefusal("vhd_shutdown_tail_refused")
+    branch = (
+        """
+    if (vhd_selected_) {
+      auto retirement_debt = vhd_owner_ ? vhd_owner_->retain_work(ergoptiplus::remap::vhd::broker_owner::queue::dispatch) : nullptr;
+      if (vhd_owner_) vhd_owner_->retire();
+      if (shutdown_started_.exchange(true)) return;
+      auto shared_self = shared_from_this();
+      // Cancellation must admit its existing dispatcher-owned rows before
+      // this client detaches. Actual enqueue refusal still retains a failed
+      // owner; a logical stop never acknowledges native descriptor closure.
+      asio::post(io_ctx_, vhd_native(ergoptiplus::remap::auth::detail::retain_callable(retirement_debt,
+          [this, shared_self, retirement_debt] {
+            shared_self->request_manager_.complete_all(asio::error::operation_aborted);
+            if (!shared_self->enqueue_to_dispatcher(ergoptiplus::remap::auth::detail::retain_callable(retirement_debt,
+                [this, shared_self, retirement_debt] {
+"""
+        + tail
+        + """                }))) {
+              if (auto owner = shared_self->vhd_owner_) {
+                std::lock_guard<std::recursive_mutex> lock(owner->mutex_);
+                owner->failed_cleanup();
+                for (const auto& session : owner->sessions_) session->fail_cleanup();
+              }
+            }
+          })));
+      return;
+    }
+"""
+    )
+    r.one(original, anchor + branch + original[len(anchor) :])
+    return r.source
+
+
+def initializer_upper(data):
+    r = Recipe(data)
+    r.one(
+        "      async_request(make_request_buffer(request::virtual_hid_keyboard_initialize,\n                                        parameters));",
+        "      async_request(make_request_buffer(request::virtual_hid_keyboard_initialize,\n                                        parameters), ergoptiplus::remap::vhd::initializer_kind::keyboard);",
+    )
+    r.one(
+        "      async_request(make_request_buffer(request::virtual_hid_pointing_initialize));",
+        "      async_request(make_request_buffer(request::virtual_hid_pointing_initialize), ergoptiplus::remap::vhd::initializer_kind::pointing);",
+    )
+    r.one(
+        "  void async_request(pqrs::not_null_shared_ptr_t<std::vector<uint8_t>> request_buffer) {\n    vhd_enqueue(vhd_dispatch([this, request_buffer] {\n      if (client_) {\n        client_->async_request(",
+        """  void async_request(pqrs::not_null_shared_ptr_t<std::vector<uint8_t>> request_buffer,
+      std::optional<ergoptiplus::remap::vhd::initializer_kind> initializer_kind = std::nullopt) {
+    auto intent = vhd_selected_ && initializer_kind
+        ? ergoptiplus::remap::vhd::initializer_delivery::create(*request_buffer, *initializer_kind) : nullptr;
+    vhd_enqueue(vhd_dispatch([this, request_buffer, intent] {
+      if (client_) {
+        auto callback =""",
+    )
+    # Reuse the entire original callback callable, its source/currentness guard,
+    # nested dispatcher debt, status processing and ready1 refusal unchanged.
+    r.one(
+        "        auto callback =\n            *request_buffer,\n            vhd_callback(",
+        "        auto callback = vhd_callback(",
+    )
+    r.one(
+        "            }));\n      }\n    }));\n  }\n\n  pqrs::not_null_shared_ptr_t<std::vector<uint8_t>> make_request_buffer",
+        """            });
+        if (intent) client_->async_initializer_request(*request_buffer, std::move(callback), intent);
+        else client_->async_request(*request_buffer, std::move(callback));
+      }
+    }));
+  }
+
+  pqrs::not_null_shared_ptr_t<std::vector<uint8_t>> make_request_buffer""",
+    )
+    return r.result()
+
+
+def initializer_requests(data):
+    r = Recipe(data)
+    r.one(
+        "std::shared_ptr<ergoptiplus::remap::auth::channel_owner::construction_marker> inherited_debt = nullptr) {",
+        "std::shared_ptr<ergoptiplus::remap::auth::channel_owner::construction_marker> inherited_debt = nullptr,\n                 std::shared_ptr<ergoptiplus::remap::vhd::initializer_delivery> initializer = nullptr,\n                 const std::vector<std::uint8_t>* sent = nullptr) {\n    if (initializer && (!vhd_owner_ || owned_channel_)) { initializer->refuse(); return 0; }",
+    )
+    r.one(
+        "    auto id = ++next_request_id_;",
+        """    if (vhd_owner_ && next_request_id_ == std::numeric_limits<request_id>::max()) {
+      if (initializer) initializer->refuse();
+      vhd_owner_->retire(); return 0;
+    }
+    auto id = ++next_request_id_;
+    if (initializer && (!sent || !initializer->bind(vhd_session, id, *sent))) {
+      initializer->refuse(); vhd_owner_->retire(); return 0;
+    }""",
+    )
+    r.one(
+        "                                  .vhd_session = vhd_session,",
+        "                                  .vhd_session = vhd_session,\n                                  .vhd_initializer = initializer,\n                                  .vhd_request_id = id,",
+    )
+    r.one(
+        "private:\n  void callback_error(",
+        """private:
+  friend class client_state;
+  bool accepts_vhd_response(request_id id) {
+    auto row = pending_requests_.find(id);
+    return vhd_owner_ && id != 0 && row != pending_requests_.end() &&
+        row->second.vhd_session && row->second.vhd_session->current();
+  }
+  void callback_error(""",
+    )
+    r.one(
+        "    std::shared_ptr<ergoptiplus::remap::vhd::connection> vhd_session;",
+        "    std::shared_ptr<ergoptiplus::remap::vhd::connection> vhd_session;\n    std::shared_ptr<ergoptiplus::remap::vhd::initializer_delivery> vhd_initializer;\n    request_id vhd_request_id;",
+    )
+    r.one(
+        "    request.timer->cancel();\n    auto vhd_session = request.vhd_session;",
+        "    if (request.vhd_initializer) request.vhd_initializer->complete(request.vhd_request_id, error_code, data);\n    request.timer->cancel();\n    auto vhd_session = request.vhd_session;",
     )
     return r.result()
 

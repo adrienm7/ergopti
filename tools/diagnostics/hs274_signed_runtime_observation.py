@@ -28,7 +28,7 @@ sys.modules[_spec.name] = F
 exec(compile(_data, str(_path), "exec"), F.__dict__)
 FixtureRefusal = F.FixtureRefusal
 require = F.require
-BUILDER_SHA256 = "686fa38236f2dda0671f7d2466767a940aace5dd8189fe46267fd30de39bb4bd"
+BUILDER_SHA256 = "855a36af664122bcb199157eefff63cddbd498ba327e4388aa474fe420bdb8c1"
 TARGETS = (
     (
         "Runtime/ErgoptiPlus-Remap-Core.app/Contents/MacOS/ErgoptiPlus-Remap-Core",

@@ -545,11 +545,11 @@ def _assemble_outputs(originals, dependencies, absolute_deadline):
 VHD_DEPENDENCIES = (
     (
         "tools/build/remap_runtime_vhd.hpp",
-        "53b887aab0d3247538123c69c65d8e4aa82eff3cac17f15ccbfabd4a5fcaa24e",
+        "ca6d4cf40c726ab7c844fdae2bb7ff5dcee476cc2c061944ee76eab385aa1b65",
     ),
     (
         "tools/build/remap_runtime_vhd_transport.py",
-        "53f434f3b56a28364792da77d291eb622daa8310f313ef8551da0e0335bf81cb",
+        "ffad87a2bad7f75a6b0b6d43b8cd1790d0f413f277d53709fbe8fcd7696e7e97",
     ),
 )
 VHD_ORIGINAL_INPUTS = (
