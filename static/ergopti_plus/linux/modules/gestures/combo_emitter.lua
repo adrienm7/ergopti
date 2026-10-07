@@ -254,11 +254,16 @@ function M.press_codes(mods, keys, label)
 		return false
 	end
 
+	local Broker = require("adapters.modifier_broker")
+	local broker = Broker.for_channel(Writer)
+	local reservation = broker and broker.begin() or nil
+	if broker and not reservation then return false end
 	local held = {}
 	local function emit(code, value)
-		if value == PRESS then held[#held + 1] = code end
-		local ok, result = pcall(Writer.emit, code, value)
+		if value == PRESS and not reservation then held[#held + 1] = code end
+		local ok, result = pcall(reservation and reservation.emit or Writer.emit, code, value)
 		if not ok or result ~= true then return false end
+		if value == PRESS and reservation then held[#held + 1] = code end
 		if value == RELEASE then
 			for i = #held, 1, -1 do
 				if held[i] == code then table.remove(held, i); break end
@@ -266,18 +271,31 @@ function M.press_codes(mods, keys, label)
 		end
 		return true
 	end
+	local function settle()
+		if not reservation or reservation.finish() then return true end
+		local Hook = require("adapters.keyboard_hook")
+		if type(Hook.emergency_stop) == "function" then Hook.emergency_stop("gesture output custody unresolved") end
+		return false
+	end
 	local function cleanup()
 		local clean = true
 		for i = #held, 1, -1 do
-			local ok, result = pcall(Writer.emit, held[i], RELEASE)
+			local ok, result = pcall(reservation and reservation.emit or Writer.emit, held[i], RELEASE)
 			if not ok or result ~= true then clean = false end
 		end
+		if not settle() then clean = false end
 		return clean
+	end
+	if reservation then
+		for _, code in ipairs(keys) do
+			if reservation.borrow(code) then settle(); return false end
+		end
 	end
 	local already_down = held_modifier_codes()
 	local owned_mods = {}
 	for _, code in ipairs(mods) do
-		if not already_down[code] then owned_mods[#owned_mods + 1] = code end
+		local borrowed = reservation and reservation.borrow(code) or (not broker and already_down[code])
+		if not borrowed then owned_mods[#owned_mods + 1] = code end
 	end
 	for _, code in ipairs(owned_mods) do
 		if not emit(code, PRESS) then cleanup(); return false end
@@ -292,6 +310,7 @@ function M.press_codes(mods, keys, label)
 		if not emit(owned_mods[i], RELEASE) then cleanup(); return false end
 	end
 
+	if not settle() then return false end
 	Logger.debug(LOG, "Emitted '%s' (%d modifier(s), %d key(s)).", name, #owned_mods, #keys)
 	return true
 end

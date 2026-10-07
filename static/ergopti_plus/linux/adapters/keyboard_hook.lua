@@ -52,6 +52,7 @@ local EvdevCodes = require("infra.evdev_codes")
 local Monotonic = require("infra.monotonic")
 local InputEvent = require("infra.input_event")
 local XkbCapture = require("adapters.xkb_capture")
+local ModifierBroker = require("adapters.modifier_broker")
 
 local LOG = "adapters.keyboard_hook"
 
@@ -119,6 +120,12 @@ local _consumed_down = {}
 local _sync_dropped = {}
 local _forwarded_down = {}
 local _physical_down = {}
+local _broker = nil
+local _output_owners = {}
+local _remapper_generation = 0
+local _synthetic_source_of = {}
+local _event_receipts = setmetatable({}, { __mode = "k" })
+local _wire_source_of = setmetatable({}, { __mode = "k" })
 local _release_forwarded_sources
 
 -- The tap-hold engine (platform/remap/tap_hold_engine), set by the daemon. It rewrites
@@ -434,23 +441,39 @@ end
 
 local function _forward_raw(ev, source)
 	if not _intercept or not _emit_raw or ev.type ~= EVDEV_TYPE_KEY then return true end
-	local ok_emit, emitted = pcall(_emit_raw, ev.code, ev.value)
+	local key = source_key(source, ev.code)
+	local prior = _forwarded_down[key]
+	local owner = _output_owners[key]
+	if not owner then owner = {}; _output_owners[key] = owner end
+	if ev.handoff then
+		local receipt = _broker.handoff(ev.code, ev.handoff, _emit_raw)
+		if _owned_row_receipt and _owned_row_receipt.code == ev.code and _owned_row_receipt.value == ev.value then
+			_owned_row_receipt.count = _owned_row_receipt.count + 1
+			_owned_row_receipt.accepted = receipt.ok
+			_owned_row_receipt.native_writes = receipt.native_writes
+			_owned_row_receipt.disposition = receipt.disposition
+		end
+		return receipt.ok
+	end
+	-- Staging before the callback lets a same-owner stop/remapper withdrawal
+	-- queue its exact inverse instead of publishing a later stranded down.
+	if ev.value == InputEvent.VALUE_DOWN then
+		_forwarded_down[key] = { code = ev.code, source = ev.original_source or _wire_source_of[ev] or source, owner_source = source }
+	elseif ev.value == InputEvent.VALUE_UP then _forwarded_down[key] = nil end
+	local receipt = _broker.edge(owner, ev.code, ev.value, _emit_raw)
 	if _owned_row_receipt and _owned_row_receipt.code == ev.code and _owned_row_receipt.value == ev.value then
 		_owned_row_receipt.count = _owned_row_receipt.count + 1
-		_owned_row_receipt.accepted = ok_emit and emitted == true
+		_owned_row_receipt.accepted = receipt.ok
+		_owned_row_receipt.native_writes = receipt.native_writes
+		_owned_row_receipt.disposition = receipt.disposition
 	end
-	if ok_emit and emitted == true then
-		local key = source_key(source, ev.code)
-		if ev.value == InputEvent.VALUE_UP then
-			_forwarded_down[key] = nil
-		elseif ev.value == InputEvent.VALUE_DOWN then
-			_forwarded_down[key] = { code = ev.code, source = source }
-		end
+	if receipt.ok then
+		if ev.value == InputEvent.VALUE_UP then _output_owners[key] = nil end
 		return true
 	end
-	local reason = ok_emit and "emitter returned false" or tostring(emitted)
-	M.emergency_stop(string.format(
-		"raw pass-through failed (code=%d value=%d): %s", ev.code, ev.value, reason))
+	_forwarded_down[key] = prior
+	M.emergency_stop(string.format("raw ownership settlement failed (code=%d value=%d): %s",
+		ev.code, ev.value, receipt.disposition))
 	return false
 end
 
@@ -469,14 +492,20 @@ local function _resynchronise(source)
 	end
 
 	local slot = keyboard_slot(source)
-	local source_keys, key_err = EvdevReader.pressed_keys(slot, KEY_MAX)
+	local held_receipt = EvdevReader.capture_pressed_keys and EvdevReader.capture_pressed_keys(slot, KEY_MAX) or nil
+	local held_view = held_receipt and EvdevReader.pressed_keys_view(held_receipt) or nil
+	local source_keys, key_err
+	if held_view then
+		source_keys = {}
+		for _, code in ipairs(held_view.down) do source_keys[code] = true end
+	else source_keys, key_err = EvdevReader.pressed_keys(slot, KEY_MAX) end
 	local leds, led_err = EvdevReader.active_leds(slot, LED_CAPSL)
 	if not source_keys or not leds then
 		return false, string.format("state query failed for %s: %s; %s", source,
 			tostring(key_err), tostring(led_err))
 	end
 	for code in pairs(source_keys) do
-		pressed[source_key(source, code)] = { source = source, code = code }
+		pressed[source_key(source, code)] = { source = source, code = code, held_origin = held_receipt }
 	end
 
 	-- The engine's keys are released and its physically held keys consumed:
@@ -502,16 +531,18 @@ local function _resynchronise(source)
 		ordered[#ordered + 1] = { key = key, source = current.source, code = current.code }
 	end
 	table.sort(ordered, function(left, right)
-		local left_modifier = EvdevCodes.MODIFIER_OF[left.code] ~= nil
-		local right_modifier = EvdevCodes.MODIFIER_OF[right.code] ~= nil
+		local left_modifier = _modifier_role(left.code) ~= nil
+		local right_modifier = _modifier_role(right.code) ~= nil
 		if left_modifier ~= right_modifier then return left_modifier end
 		if left.code ~= right.code then return left.code < right.code end
 		return left.key < right.key
 	end)
+	local captured = {}
 	for _, current in ipairs(ordered) do
 		local key = current.key
 		local role = _modifier_role(current.code)
-		if current.code ~= EvdevCodes.KEY_CAPSLOCK then
+		if current.code ~= EvdevCodes.KEY_CAPSLOCK and (not role or not captured[current.code]) then
+			captured[current.code] = true
 			local _, _, capture_err = _capture(current.code, InputEvent.VALUE_DOWN)
 			if capture_err then return false, tostring(capture_err) end
 		end
@@ -525,19 +556,21 @@ local function _resynchronise(source)
 		if down_err or up_err then return false, tostring(down_err or up_err) end
 	end
 
+	if held_receipt and not EvdevReader.pressed_keys_current(held_receipt) then return false, "held source query revoked" end
 	if _intercept then
 		for key, forwarded in pairs(_forwarded_down) do
 			if not pressed[key] then
-				local ok_emit, emitted = pcall(_emit_raw, forwarded.code, InputEvent.VALUE_UP)
-				if not ok_emit or emitted ~= true then
+				local emitted = _forward_raw({ type = EVDEV_TYPE_KEY, code = forwarded.code, value = InputEvent.VALUE_UP,
+					original_source = forwarded.source }, forwarded.owner_source or forwarded.source)
+				if not emitted then
 					return false, "could not release a key lost during queue overflow"
 				end
 			end
 		end
 		for key, current in pairs(pressed) do
 			if not _forwarded_down[key] and not consumed[key] then
-				local ok_emit, emitted = pcall(_emit_raw, current.code, InputEvent.VALUE_DOWN)
-				if not ok_emit or emitted ~= true then
+				local emitted = _forward_raw({ type = EVDEV_TYPE_KEY, code = current.code, value = InputEvent.VALUE_DOWN }, current.source)
+				if not emitted then
 					return false, "could not restore a key held during queue overflow"
 				end
 			end
@@ -549,7 +582,7 @@ local function _resynchronise(source)
 	if _intercept then
 		for key, current in pairs(pressed) do
 			if not consumed[key] then
-				_forwarded_down[key] = { code = current.code, source = current.source }
+				_forwarded_down[key] = { code = current.code, source = current.source, owner_source = current.source }
 			end
 		end
 	end
@@ -648,6 +681,11 @@ local function _dispatch_event(ev, source)
 	-- had pressed it, so the modifier state, the hotstring buffer and the
 	-- virtual keyboard all see one consistent stream.
 	local owned_key = source_key(source, ev.code)
+	if not ev.remapped then
+		if ev.value == InputEvent.VALUE_DOWN and not _physical_down[owned_key] then
+			_physical_down[owned_key] = { source = source, code = ev.code, origin = _event_receipts[ev] }
+		elseif ev.value == InputEvent.VALUE_UP then _physical_down[owned_key] = nil end
+	end
 	if _remap_orphans[owned_key] and not ev.remapped then
 		if ev.value == InputEvent.VALUE_UP then _remap_orphans[owned_key] = nil end
 		return
@@ -660,16 +698,24 @@ local function _dispatch_event(ev, source)
 		-- A callback of that hold may have taken the engine out: the event is
 		-- then the hand's, as with no engine.
 		local out, tap, binding, frame = nil, nil, nil, nil
+		local custody = {}
 		if _remapper then
 			local receipt = _remapper.has_combinations and _combination_source(source) or nil
 			out, tap, binding, frame = _remapper:process(ev.code, ev.value, at_ms, receipt)
+			if _remapper.take_custody then custody = _remapper:take_custody() end
 		end
 		if ev.value == InputEvent.VALUE_UP then
 			_remap_owned[owned_key] = nil
 			_remap_source_of[ev.code] = nil
 		elseif ev.value == InputEvent.VALUE_DOWN then
-			if out then _remap_owned[owned_key] = true end
+			local passed = false
+			for _, row in ipairs(custody) do if row.physical then passed = true end end
+			if out and not passed then _remap_owned[owned_key] = true end
 			_remap_source_of[ev.code] = source
+		end
+		for _, row in ipairs(custody) do
+			_dispatch_event({ type = EVDEV_TYPE_KEY, code = row.code, value = row.value,
+				remapped = true, original_owner = row.physical == true, holder = row.holder }, source)
 		end
 		if out then
 			if frame and frame.owned then
@@ -694,7 +740,9 @@ local function _dispatch_event(ev, source)
 			if exact and exact.begin_delivery and not delivery then return end
 			for _, remapped in ipairs(out) do
 				_dispatch_event({ type = EVDEV_TYPE_KEY, code = remapped.code, value = remapped.value,
-					remapped = true }, source)
+					remapped = true, original_owner = remapped.physical == true,
+					holder = remapped.holder or (exact.output_holder and exact:output_holder(remapped)), handoff = remapped.handoff },
+					remapped.physical and (_remap_source_of[remapped.code] or source) or source)
 				if not _running then
 					if delivery then exact:end_delivery(delivery) end
 					return
@@ -706,21 +754,45 @@ local function _dispatch_event(ev, source)
 		end
 	end
 
-	local physical_key = source_key(source, ev.code)
-	if ev.value == InputEvent.VALUE_DOWN then
-		_physical_down[physical_key] = { source = source, code = ev.code }
-	elseif ev.value == InputEvent.VALUE_UP then
-		_physical_down[physical_key] = nil
+	local original_source = source
+	if ev.remapped and not ev.original_owner then
+		local holder_key = _remapper_generation .. ":" .. (ev.holder or "transient") .. ":" .. ev.code
+		if ev.value == InputEvent.VALUE_DOWN and not _synthetic_source_of[holder_key] then
+			_synthetic_source_of[holder_key] = source
+		end
+		original_source = _synthetic_source_of[holder_key] or source
+		source = "remapper:" .. _remapper_generation .. ":" .. (ev.holder or "transient") .. ":" .. tostring(original_source)
+		if ev.value == InputEvent.VALUE_UP then _synthetic_source_of[holder_key] = nil end
 	end
-
+	_wire_source_of[ev] = original_source
+	-- Observe the role before every XKB transition, including custody handoffs.
 	local pressed = ev.value ~= InputEvent.VALUE_UP
-	-- A modifier's role is read from the state its own press is about to change.
 	local role, role_failed = nil, false
 	if ev.value == InputEvent.VALUE_DOWN then role, role_failed = _modifier_role(ev.code) end
-	-- Every key transition reaches XKB before any routing early-return. Modifier,
-	-- CapsLock and group-switch releases carry no text, but dropping them here
-	-- leaves the state machine permanently different from the desktop.
-	local char, identity, capture_err = _capture(ev.code, ev.value)
+	if ev.handoff then
+		local _, _, capture_err = _capture(ev.code, ev.value)
+		if capture_err then M.emergency_stop("XKB handoff capture refused: " .. tostring(capture_err)); return end
+		_forward_raw(ev, source)
+		return
+	end
+	local modifier_key = source_key(source, ev.code)
+	local held_role = _modifier_down[modifier_key]
+	local aggregate_before = false
+	for _, entry in ipairs(_modifier_order) do
+		if entry.code == ev.code then aggregate_before = true; break end
+	end
+	local is_modifier = _track_modifier(source, ev.code, ev.value, role)
+	local aggregate_after = false
+	for _, entry in ipairs(_modifier_order) do
+		if entry.code == ev.code then aggregate_after = true; break end
+	end
+	local capture_transition = not is_modifier
+		or (ev.value == InputEvent.VALUE_DOWN and not aggregate_before and aggregate_after)
+		or (ev.value == InputEvent.VALUE_UP and aggregate_before and not aggregate_after)
+		or (ev.value == InputEvent.VALUE_REPEAT and held_role ~= nil)
+	local char, identity, capture_err
+	if capture_transition then char, identity, capture_err = _capture(ev.code, ev.value) end
+
 	if capture_err then
 		_xkb_failed("XKB capture failed (code=%d value=%d) — %s.", ev.code, ev.value, tostring(capture_err))
 	elseif ev.value == InputEvent.VALUE_DOWN and not role_failed then
@@ -744,7 +816,6 @@ local function _dispatch_event(ev, source)
 	-- XKB has already consumed the transition above. Modifiers still produce no
 	-- domain event; returning here prevents a test double or a malformed keymap
 	-- from inventing a typed character for a physical modifier.
-	local is_modifier = _track_modifier(source, ev.code, ev.value, role)
 	if is_modifier then
 		_forward_raw(ev, source)
 		return
@@ -889,14 +960,15 @@ end
 --- Releases every key the tap-hold engine holds (a hold modifier, a layer
 --- chord, a one-shot Shift) through the normal path, so the virtual keyboard
 --- and the modifier state both see the key-ups.
-_dispatch_owned_rows = function(rows, source)
+_dispatch_owned_rows = function(rows, source, exact)
 	if #rows == 0 then return true end
 	if not _running or not _intercept or type(_emit_raw) ~= "function" then return false end
 	for _, row in ipairs(rows) do
 		local prior = _owned_row_receipt
 		local receipt = { code = row.code, value = row.value, count = 0, accepted = false }
 		_owned_row_receipt = receipt
-		local dispatched = pcall(_dispatch_event, { type = EVDEV_TYPE_KEY, code = row.code, value = row.value, remapped = true }, source)
+		local dispatched = pcall(_dispatch_event, { type = EVDEV_TYPE_KEY, code = row.code, value = row.value, remapped = true,
+			holder = row.holder or (exact.output_holder and exact:output_holder(row)), handoff = row.handoff, original_owner = row.physical == true }, source)
 		_owned_row_receipt = prior
 		if not dispatched then return false end
 		if receipt.count ~= 1 or receipt.accepted ~= true then return false end
@@ -907,27 +979,50 @@ end
 _deliver_owned_rows = function(exact, rows, source)
 	local token = exact:begin_delivery(rows)
 	if not token then return false end
-	local accepted = _dispatch_owned_rows(rows, source)
+	local accepted = _dispatch_owned_rows(rows, source, exact)
 	if exact:end_delivery(token) ~= true then return false end
 	return accepted
 end
 
+-- A batch retains its producer and native output owner through callbacks.
+-- Withdrawal ends delivery; remaining acknowledged owners clean up through
+-- the existing exact broker, never through a successor remapper generation.
+local function _remapper_batch_current(exact, generation, output)
+	if _remapper == exact and _remapper_generation == generation and _broker == output then return true end
+	if _broker == output then
+		M.emergency_stop("remapper issuer changed during output delivery")
+	elseif output then
+		output.retire()
+	end
+	return false
+end
+
 _release_remapped = function()
 	if not _remapper then return true end
-	if _remapper.has_combinations then
-		local exact = _remapper
+	local exact, generation, output, running = _remapper, _remapper_generation, _broker, _running
+	if exact.has_combinations then
 		local rows = exact:release_all()
+		if exact.take_custody then
+			for _, row in ipairs(exact:take_custody()) do rows[#rows + 1] = row end
+		end
 		local accepted = _deliver_owned_rows(exact, rows, _device)
 		return exact:ack_retirement(accepted, rows) == true
 	end
-	for _, released in ipairs(_remapper:release_all()) do
+	local releases = exact:release_all()
+	if exact.take_custody then
+		for _, row in ipairs(exact:take_custody()) do releases[#releases + 1] = row end
+	end
+	for _, released in ipairs(releases) do
+		if not _remapper_batch_current(exact, generation, output) then return false end
 		local source = _device
 		for _, entry in pairs(_forwarded_down) do
 			if entry.code == released.code then source = entry.source; break end
 		end
 		_dispatch_event({ type = EVDEV_TYPE_KEY, code = released.code, value = released.value,
-			remapped = true }, source)
+			remapped = true, holder = released.holder or (exact.output_holder and exact:output_holder(released)), handoff = released.handoff }, source)
+		if not _remapper_batch_current(exact, generation, output) or (running and not _running) then return false end
 	end
+	return true
 end
 
 --- Tells the engine the time is `now_ms` on the events' clock and dispatches
@@ -936,18 +1031,23 @@ end
 --- @param now_ms number
 _tick_remapper = function(now_ms)
 	if not (_remapper and _intercept) then return end
-	for _, due in ipairs(_remapper:tick(now_ms)) do
+	local exact, generation, output = _remapper, _remapper_generation, _broker
+	local due_rows = exact:tick(now_ms)
+	if exact.take_custody then
+		for _, row in ipairs(exact:take_custody()) do due_rows[#due_rows + 1] = row end
+	end
+	for _, due in ipairs(due_rows) do
+		if not _remapper_batch_current(exact, generation, output) then return false end
 		if due.owned_rows then
-			local exact = _remapper
 			due.frame.ack(_deliver_owned_rows(exact, due.owned_rows, _device))
 		elseif due.tap ~= nil then
 			-- The action of a key replayed under a hold that just came due.
 			if _on_tap then _call_callback("tap action callback", _on_tap, due.tap, due.binding) end
 		else
-			_dispatch_event({ type = EVDEV_TYPE_KEY, code = due.code, value = due.value, remapped = true },
+			_dispatch_event({ type = EVDEV_TYPE_KEY, code = due.code, value = due.value, remapped = true, holder = due.holder or (exact.output_holder and exact:output_holder(due)), handoff = due.handoff, original_owner = due.physical == true },
 				_remap_source_of[due.owner] or _device)
 		end
-		if not _running then return end
+		if not _remapper_batch_current(exact, generation, output) or not _running then return false end
 	end
 end
 
@@ -1005,6 +1105,9 @@ end
 
 local function _read_source(source)
 	local event, status, reason = EvdevReader.read_event(source.slot)
+	if event and EvdevReader.capture_event then
+		_event_receipts[event] = EvdevReader.capture_event(event, source.slot)
+	end
 	if status ~= "fatal" then return event end
 	Logger.error(LOG, "Fatal evdev read on %s — %s; scheduling re-acquisition.",
 		source.path, tostring(reason))
@@ -1183,10 +1286,12 @@ end
 --- held Shift keys into one synthetic LeftShift.
 --- @return table Array of exact evdev keycodes.
 function M.held_text_modifier_codes()
-	local held = {}
+	local held, seen = {}, {}
 	for _, entry in ipairs(_modifier_order) do
 		local role = _modifier_down[entry.key]
-		if role == "shift" or role == "altgr" then held[#held + 1] = entry.code end
+		if role == "shift" or role == "altgr" then
+			if not seen[entry.code] then held[#held + 1] = entry.code; seen[entry.code] = true end
+		end
 	end
 	return held
 end
@@ -1219,10 +1324,12 @@ end
 --- shortcut: accepting a prediction with Alt+1 typed it as Alt+q, Alt+u, …
 --- @return table Ordered evdev keycodes.
 function M.held_shortcut_modifier_codes()
-	local held = {}
+	local held, seen = {}, {}
 	for _, entry in ipairs(_modifier_order) do
 		local role = _modifier_down[entry.key]
-		if role == "ctrl" or role == "alt" or role == "meta" then held[#held + 1] = entry.code end
+		if role == "ctrl" or role == "alt" or role == "meta" then
+			if not seen[entry.code] then held[#held + 1] = entry.code; seen[entry.code] = true end
+		end
 	end
 	return held
 end
@@ -1349,34 +1456,28 @@ end
 --- @return boolean released
 --- @return string|nil detail
 _release_forwarded_sources = function(paths)
-	if not _intercept or type(_emit_raw) ~= "function" then return true end
 	local retiring = {}
 	for _, path in ipairs(paths) do retiring[path] = true end
-	local retained_codes = {}
-	local retiring_entries = {}
+	local entries = {}
 	for key, entry in pairs(_forwarded_down) do
+		if retiring[entry.source] then entries[#entries + 1] = { key = key, entry = entry } end
+	end
+	table.sort(entries, function(left, right) return left.key < right.key end)
+	for _, row in ipairs(entries) do
+		local entry = row.entry
+		if not _forward_raw({ type = EVDEV_TYPE_KEY, code = entry.code, value = InputEvent.VALUE_UP,
+			original_source = entry.source }, entry.owner_source or entry.source) then return false, "owned source retirement refused" end
+		local role = _modifier_down[row.key]
+		_track_modifier(entry.owner_source or entry.source, entry.code, InputEvent.VALUE_UP)
+		local retained = false
+		for _, current in ipairs(_modifier_order) do if current.code == entry.code then retained = true end end
+		if role and not retained then _capture(entry.code, InputEvent.VALUE_UP) end
+	end
+	for key, entry in pairs(_physical_down) do
 		if retiring[entry.source] then
-			retiring_entries[#retiring_entries + 1] = { key = key, code = entry.code }
-		else
-			retained_codes[entry.code] = true
+			_physical_down[key], _consumed_down[key], _pressed_at[key] = nil, nil, nil
 		end
 	end
-	table.sort(retiring_entries, function(left, right)
-		if left.code ~= right.code then return left.code < right.code end
-		return left.key < right.key
-	end)
-	local released_codes = {}
-	for _, entry in ipairs(retiring_entries) do
-		if not retained_codes[entry.code] and not released_codes[entry.code] then
-			local ok_emit, emitted = pcall(_emit_raw, entry.code, InputEvent.VALUE_UP)
-			if not ok_emit or emitted ~= true then
-				return false, string.format("code=%d: %s", entry.code,
-					ok_emit and "emitter returned false" or tostring(emitted))
-			end
-			released_codes[entry.code] = true
-		end
-	end
-	for _, entry in ipairs(retiring_entries) do _forwarded_down[entry.key] = nil end
 	return true
 end
 
@@ -1707,6 +1808,14 @@ function M.start(opts)
 	_forwarded_down = {}
 	_physical_down = {}
 
+	local writer = require("adapters.uinput_writer")
+	_broker = options.outputBroker or ModifierBroker.for_channel(writer) or ModifierBroker.attach(writer)
+	if not _broker and options.requireOutputBroker then
+		Logger.error(LOG, "The exact shared output broker is unavailable — refusing the keyboard device.")
+		return
+	end
+	if not _broker then _broker = ModifierBroker.controlled() end
+
 	-- Resolve the complete source set. A CLI override intentionally remains one
 	-- pinned keyboard, while auto-detection owns every physical keyboard unless a
 	-- consolidated remap output exists.
@@ -1862,8 +1971,16 @@ function M.emergency_stop(reason)
 	-- still holds would stay down in every application once nothing forwards
 	-- its release. The output path may be what failed, so nothing here throws.
 	if _remapper then pcall(function() _remapper:release_all() end) end
-	if type(_emit_raw) == "function" then
-		for _, entry in pairs(_forwarded_down) do pcall(_emit_raw, entry.code, InputEvent.VALUE_UP) end
+	if _broker and _broker.has_debt() then
+		_broker.retire()
+	elseif _broker and type(_emit_raw) == "function" then
+		for key, entry in pairs(_forwarded_down) do
+			local owner = _output_owners[key]
+			if owner then
+				local receipt = _broker.edge(owner, entry.code, InputEvent.VALUE_UP, _emit_raw)
+				if not receipt.ok then _broker.retire(); break end
+			end
+		end
 	end
 	_close_paths(_pointer_devices, pointer_slot)
 	_close_paths(_devices, keyboard_slot)
@@ -1971,6 +2088,7 @@ function M.set_remapper(engine, on_tap)
 	_remap_owned = {}
 	_remap_source_of = {}
 	if engine and engine.activate and engine:activate() ~= true then return false end
+	_remapper_generation = _remapper_generation + 1
 	_remapper = engine
 	_on_tap = type(on_tap) == "function" and on_tap or nil
 	return true
@@ -2051,6 +2169,8 @@ function M._test_drive(events, callbacks, intercept)
 	end
 	local at = 0
 	local cb = callbacks or {}
+	_broker = ModifierBroker.controlled()
+	_output_owners = {}
 
 	EvdevReader._set_backend({
 		open  = function() return 1 end,

@@ -5740,6 +5740,24 @@ portable controls fail before the addition; the candidate passes all 23.
 This is diagnostic instrumentation, not a repair or native qualification; the
 observed hosted delay's cause and the original failed verdict remain unresolved.
 
+Linux original and synthetic modifier holders now share one captured output
+reservation. Two independent original holders retain the modifier until the
+last owner releases; queued original UPs settle inside the synthetic
+transaction before restoration or final commit. A refused inverse retains
+debt and retires only the exact output channel. The shared policy is consumed
+by Linux native adapters, Hook, tap/combination engines and text output; no
+new delivery capability is enabled. Reviewed controlled regressions pass
+416/0 on each Lua ABI, including independent predecessor failures. Full
+Root qualification passes10344 Linux units,189 Linux E2E cases,53 actual
+X11 source checks and all365 JS checks after the staged domain drift replay.
+macOS ports retain16638/0 units and101/0 E2E cases (one driver-specific
+skip). The integration preserves both remap engines across reentrant
+withdrawal; successful inverse UP acknowledgements or exact-channel retirement
+leave no old hold and cannot close a reopened successor channel. Hosted native
+qualification remains pending. The container has no input/uinput devices; its
+window fixture refuses before allocation without the process-children
+supervisor interface. Controlled wire ports do not prove kernel delivery.
+
 - [ ] **96.** Remove the separate Ergopti+ AltGr-adjustments option from the
       Layout menu. Selecting the Ergopti+ keylayout in the emulation picker must
       suffice. Verify that the layout supplies every intended change, retire
@@ -5884,6 +5902,15 @@ OutputTransaction and daemon; coordinate source ownership before admission.
 No production repair, native capability, kernel output or physical qualification
 is claimed. This remains software work, not a device-only check.
 
+Linux text output now reserves the captured modifier/output owner, suspends
+only admitted original holders and restores only surviving owners. An
+original release observed during output prevents its later synthetic
+re-press. Existing map/editor availability and unsupported-seat refusals
+remain unchanged; source-aware physical editor admission, all-owner
+collisions and Unicode/dead-key delivery remain open. This bounded output
+custody repair has independent controlled regressions; hosted native
+qualification remains pending.
+
 - [~] **98.** Replace the fixed "make J the star key" setting with a physical
   key and output chosen by the user: any keyboard position and arbitrary
   character, including choosing no star at all. Integrate with item 97's
@@ -5913,6 +5940,13 @@ retains historical commands and packet ownership; the earlier PC-only software
 deferral is superseded. This item and items16/38 remain open.
 
 Current Group 3 source checkpoint (item 98, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Complete the same arbitrary physical key/output or None owner and star migration, preserving occupied/unknown records without inferring physical J from a logical character. Separate device/evidence boundary: Chosen output across actual layout changes, modifiers and repeats.
+
+The ordinary Linux output custody owner now distinguishes original
+source/key holders from synthetic producer/key holders and spent releases.
+An old spent release cannot lift a successor holder. The independent
+controlled wire expectations pass on both Lua ABIs; arbitrary physical-key
+output selection, occupied-record migration and device acceptance remain
+open. No physical mapping capability is enabled by this repair.
 
 - [~] **101.** Investigate the supplied Windows diagnostic's retained keylogger
   shutdown debt (watchers=0). Keep privacy filtering fail-closed;

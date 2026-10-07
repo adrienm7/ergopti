@@ -293,10 +293,44 @@ end
 --- one modifier (CapsLock and left Ctrl, both Ctrl), two layer keys that are
 --- both Left, a physical Backspace and the layer's are each one key to the
 --- kernel, and the first release must not lift it under the others.
+local output_holders = setmetatable({}, { __mode = "k" })
+
+--- Retains producer custody separately from the stable public event shape.
+local function hold_row(self, out, code, value)
+	local row = { code = code, value = value }
+	output_holders[row] = { engine = self, code = code, value = value }
+	out[#out + 1] = row
+end
+
+--- Reads only this engine's exact, unchanged output row.
+--- @param row table Original emitted row, never a caller copy.
+--- @return string|nil holder Private producer domain or no hold receipt.
+function M:output_holder(row)
+	local owned = output_holders[row]
+	if owned and owned.engine == self and row.code == owned.code and row.value == owned.value then return "hold" end
+	return nil
+end
+
+local function custody(self, code, value, physical)
+	self.output_custody = self.output_custody or {}
+	self.output_custody[#self.output_custody + 1] = { code = code, value = value, physical = physical == true, holder = "hold" }
+end
+
+--- Returns explicit suppressed ownership edges; never invents a native ACK.
+--- @return table rows Original/producer transitions suppressed from the wire.
+function M:take_custody()
+	local rows = self.output_custody or {}
+	self.output_custody = {}
+	return rows
+end
+
 local function press(self, out, code)
 	local refs = (self.key_refs[code] or 0) + 1
 	self.key_refs[code] = refs
-	if refs == 1 and not self.passed_down[code] then out[#out + 1] = { code = code, value = DOWN } end
+	if refs == 1 then
+		if self.passed_down[code] then custody(self, code, DOWN)
+		else hold_row(self, out, code, DOWN) end
+	end
 end
 
 --- Releases a key for one of this engine's holders; only the last sends it
@@ -308,7 +342,8 @@ local function release(self, out, code)
 		return
 	end
 	self.key_refs[code] = nil
-	if not self.passed_down[code] then out[#out + 1] = { code = code, value = UP } end
+	if self.passed_down[code] then custody(self, code, UP)
+	else hold_row(self, out, code, UP) end
 end
 
 --- Appends the events of a chord going down or up.
@@ -346,7 +381,7 @@ local function pass(self, code, value)
 	if value == REPEAT then return nil end
 	if MODIFIER_KEYS[code] then self.modifiers_down[code] = value == DOWN or nil end
 	self.passed_down[code] = value == DOWN or nil
-	if self.key_refs[code] then return {} end
+	if self.key_refs[code] then custody(self, code, value, true); return {} end
 	return nil
 end
 
@@ -376,8 +411,8 @@ end
 --- kernel's one bit for it ends as the user's hand has it.
 local function tap_key(self, out, code)
 	if self.key_refs[code] or self.passed_down[code] then
-		out[#out + 1] = { code = code, value = UP }
-		out[#out + 1] = { code = code, value = DOWN }
+		out[#out + 1] = { code = code, value = UP, handoff = "suspended" }
+		out[#out + 1] = { code = code, value = DOWN, handoff = "restored" }
 	else
 		out[#out + 1] = { code = code, value = DOWN }
 		out[#out + 1] = { code = code, value = UP }
@@ -457,7 +492,7 @@ local function type_text(self, out, text)
 	local steps = self.plan_text(text)
 	if not steps then return { type_text = text } end
 	local lifted = held_level_keys(self)
-	for _, code in ipairs(lifted) do out[#out + 1] = { code = code, value = UP } end
+	for _, code in ipairs(lifted) do out[#out + 1] = { code = code, value = UP, handoff = "suspended" } end
 	for _, step in ipairs(steps) do
 		local mods = {}
 		for _, name in ipairs(step.mods or {}) do
@@ -468,7 +503,7 @@ local function type_text(self, out, text)
 		tap_key(self, out, step.keycode)
 		for index = #mods, 1, -1 do out[#out + 1] = { code = mods[index], value = UP } end
 	end
-	for index = #lifted, 1, -1 do out[#out + 1] = { code = lifted[index], value = DOWN } end
+	for index = #lifted, 1, -1 do out[#out + 1] = { code = lifted[index], value = DOWN, handoff = "restored" } end
 	return nil
 end
 
@@ -533,14 +568,14 @@ local function type_chords(self, out, chords)
 			lifted[#lifted + 1] = code
 		end
 	end
-	for _, code in ipairs(lifted) do out[#out + 1] = { code = code, value = UP } end
+	for _, code in ipairs(lifted) do out[#out + 1] = { code = code, value = UP, handoff = "suspended" } end
 	for _, chord in ipairs(chords) do
 		local press_ctrl = chord.ctrl and not kept_ctrl
 		if press_ctrl then out[#out + 1] = { code = KEY_LEFTCTRL, value = DOWN } end
 		tap_key(self, out, chord.key)
 		if press_ctrl then out[#out + 1] = { code = KEY_LEFTCTRL, value = UP } end
 	end
-	for index = #lifted, 1, -1 do out[#out + 1] = { code = lifted[index], value = DOWN } end
+	for index = #lifted, 1, -1 do out[#out + 1] = { code = lifted[index], value = DOWN, handoff = "restored" } end
 end
 
 --- What LAlt's Backspace tap types instead of a plain Backspace under the keys
@@ -620,7 +655,7 @@ end
 local function replay(self, out, code, value, now_ms)
 	local events, tap, binding = self:process(code, value, now_ms)
 	if events == nil then
-		out[#out + 1] = { code = code, value = value }
+		out[#out + 1] = { code = code, value = value, physical = true }
 	else
 		for _, event in ipairs(events) do out[#out + 1] = event end
 	end
@@ -745,7 +780,7 @@ function M:process(code, value, now_ms)
 	if on_layer then
 		if value == REPEAT then
 			if #on_layer.keys > 0 then
-				out[#out + 1] = { code = on_layer.keys[#on_layer.keys], value = REPEAT }
+				hold_row(self, out, on_layer.keys[#on_layer.keys], REPEAT)
 			end
 		elseif value == UP then
 			self.layer_keys[code] = nil
@@ -951,7 +986,8 @@ function M:release_all()
 	-- Every key this engine holds down, once, whoever of it holds it.
 	-- Keys the hand still holds stay down: they are the kernel's to release.
 	for code in pairs(self.key_refs) do
-		if not self.passed_down[code] then out[#out + 1] = { code = code, value = UP } end
+		if self.passed_down[code] then custody(self, code, UP)
+		else hold_row(self, out, code, UP) end
 	end
 	self.held, self.layer_keys, self.layer_depth = {}, {}, 0
 	self.undecided = nil

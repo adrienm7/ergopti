@@ -55,6 +55,8 @@ return {
 	"tests.unit.adapters.test_keyboard_hook_caps_lock_seed",
 	"tests.unit.adapters.test_keyboard_hook_caps_lock_state",
 	"tests.unit.adapters.test_keyboard_hook_device_watchdog",
+	"tests.unit.adapters.test_modifier_broker_consumers",
+	"tests.unit.adapters.test_modifier_broker_reentrant",
 	"tests.unit.adapters.test_keyboard_hook_safety",
 	"tests.unit.adapters.test_keyboard_hook_xkb_capture",
 	"tests.unit.adapters.test_keyboard_layout",
