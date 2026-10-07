@@ -34,17 +34,24 @@ Test("ctrl-alt numpad: the gate admits a real Ctrl+Alt chord on every layout (ct
 	_CANG_GateHoldsForACtrlAltChord)
 
 _CANG_RegisteredUnderTheirOwnGate() {
-	Body := _DriverFuncBody("RegisterAltGrLayer")
-	At := InStr(Body, 'Hotkey("^!" . SC')
+	Body := _LT_NativeAltGrRegistrationBody()
+	At := RegExMatch(Body, 'm)^[ `t]*HotkeyFn\.Call\("\^!" \. SC,', &Registration)
 	AssertTrue(At > 0, "the Ctrl+Alt Numpad hotkeys must still be registered")
+	Assert(_LT_NativeDelegateIsCode(Body, Registration, "HotkeyFn.Call("), "the Ctrl+Alt registration must be executable native-default code")
 	GatePos := 0
+	CriteriaSeen := 0
 	Scan := 1
-	while (Found := InStr(Body, "HotIf(", , Scan)) and Found < At {
+	while (Found := RegExMatch(Body, "m)^[ `t]*HotIfFn\.Call\(.*$", &Criterion, Scan)) and Found < At {
+		CriteriaSeen += 1
+		Assert(_LT_NativeDelegateIsCode(Body, Criterion, "HotIfFn.Call("), "the governing criterion must be executable native-default code")
 		GatePos := Found
-		Scan := Found + 1
+		Scan := Found + Max(1, Criterion.Len)
 	}
+	Assert(CriteriaSeen > 0, "the native criterion scan must find the actual governing registration criteria")
+	Assert(GatePos > 0, "the Ctrl+Alt registration must retain a preceding native criterion")
 	Gate := SubStr(Body, GatePos, InStr(Body, "`n", , GatePos) - GatePos)
 	AssertTrue(InStr(Gate, "IsCtrlAltNotAltGr()") > 0, "the Ctrl+Alt Numpad hotkeys must be gated on a real Ctrl+Alt chord")
+	AssertFalse(InStr(Gate, "RealAltGrFn.Call()") > 0, "the admitted physical AltGr delegate cannot gate a real Ctrl+Alt chord")
 	AssertFalse(InStr(Gate, "IsRealAltGrPress()") > 0,
 		"the AltGr gate needs the physical AltGr, which a Ctrl+Alt chord never holds")
 }
