@@ -482,6 +482,18 @@ _NRP_SharedPolicyCorpus() {
 		if Row["supported"]
 			AssertEqual(Row["shift"], Actual["shift"], "the non-digit level is independently specified")
 	}
+	; Native dead previews carry no emulation Action/State. Missing source fields
+	; must refuse in either position, without throwing or inventing delivery.
+	for Incomplete in [Map("Kind", "text"),
+		Map("Kind", "dead", "State", "circumflex", "Text", "^"),
+		Map("Kind", "dead", "Action", "circumflex", "Text", "^"),
+		Map("Kind", "dead", "Action", "circumflex", "State", "circumflex")] {
+		Digit := Map("Kind", "text", "Text", "1")
+		AssertFalse(NumberRowPolicySymbolsShift("1", Incomplete, Digit)["supported"],
+			"missing descriptor fields must refuse as the plain source")
+		AssertFalse(NumberRowPolicySymbolsShift("1", Digit, Incomplete)["supported"],
+			"missing descriptor fields must refuse as the shifted source")
+	}
 	for Value in Corpus["invalid_modes"]
 		AssertEqual("", NumberRowPolicyMode(Value), "legacy booleans belong to migration, never runtime truthiness")
 	Owner := Map(), Source := Map()
