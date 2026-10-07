@@ -79,6 +79,10 @@ enum AppKitAdmission {
 
 static enum AppKitAdmission admit_appkit(NSApplication *application) {
     if (application == nil) return AppKitApplicationMissing;
+    /* The required current state needs no transition or redundant setter. */
+    if ([application activationPolicy] == NSApplicationActivationPolicyAccessory) {
+        return AppKitAdmitted;
+    }
     if (![application setActivationPolicy:NSApplicationActivationPolicyAccessory]) {
         return AppKitPolicyRefused;
     }
