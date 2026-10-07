@@ -3915,6 +3915,13 @@ The packaged macOS launch matrix now contains a Karabiner configuration scenario
 The signed native checkpoint 37116923472 reached the actual independent JSON codec and production build/merge owners, then refused its first variant because the canonical French action registry gives distinct Cmd+Tab and Option+F17 outputs the same localized label. Legacy reconstruction now keeps validated action-label candidates: unused descriptive ambiguity cannot block foreign profiles, while a complete historical block referencing distinct candidates remains unowned and refuses publication. The eight real-catalogue default/recommended switch vectors prove merge, exact-source publication and unchanged confirmation locally. Signed native qualification of all eight variants remains pending; the original AppleEvent controls and deadlines remain mandatory.
 
 - [~] **42.** config.toml batch writer follow-ups (`toml-batch-existing-key`):
+  macOS conditional writes, unchanged acknowledgements and removals now
+  support a captured strict final logical admission. The new APIs detach
+  classified source scalars before native callbacks; refused operations
+  preserve external successor bytes and existing release-only cleanup.
+  This is a prerequisite for the closed-schema and retired-Script consumers,
+  which remain pending, together with final-source native qualification.
+
   Current source implements the Windows typed dotted/inline document reader,
   targeted saves and full-state publication. The nineteen FullSnapshot cases
   passed natively in diagnostic run 37466163822 (feature `682d373e` plus one
@@ -4373,6 +4380,32 @@ integrated, then publish one grouped release.
   Native allocators and computed user-data captions alone do not prove missing
   shared policy. Final native binding/order/caption and installed acceptance
   remain required; source review and the local portable gates are insufficient.
+
+  Integrated partial-delivery checkpoint: published Dev8cba7a0c/treec0a8c809
+  includes117 feature commits and the actual create-only lease receipt.
+  Final exact-source CI37547053814 is terminal failed:37jobs,32pass/3fail/2skip.
+  Windows native10089/0/startup/fresh-clone/E2E/package/compiled-install/
+  programmable/evidence/verdict and the entire Linux chain with17 acceptance
+  variants pass. Mac stubbed units/E2E and native canvas12 pass; Package fails
+  on named Sparkle/AppleEvent/GlobalSwitcher receipts, causing Mac Install skip;
+  no precise cause or TCC grant is claimed. Release is skipped. The77-path
+  source equality proof does not establish runtime equivalence or exoneration;
+  changed supplemental macOS launch-gate inverse remains unexecuted there.
+  All six items remain partial:53/86/61 retains200 software sites plus genuine
+  item33 producer gaps and separate installed/device requirements.
+
+  Current qualification checkpoint: own all-OS CI37541202298 tested exact
+  published cee55e1a/treea17350f2: native AHK10089/0, macOS canvas12 and the
+  entire Linux chain with17 install/launch variants pass, but Windows fresh-clone
+  startup fails with downstream phases skipped, and macOS package fails.
+  Corrected Windows CI37543830928 on exact20352/tree6641 is terminal successful:
+  native10089/0, full/fresh-clone startup, E2E, package, installed compiled
+  admission, programmable qualification, mandatory evidence and verdicts pass;
+  Release is skipped. Both new personal-shortcut cases belong to the actual
+  native runner; only aggregate proof is available (earlier individual manifest
+  download403, current individual/artifact fields not downloaded). All six items
+  remain partial:53/86/61 retains200 software construction sites plus separate
+  final integrated-source and installed/device qualification requirements.
 
   The current Windows fixture cohort checks the genuine shared-renderer
   toggle route, captures and restores absent or present dependency state, and
@@ -5375,6 +5408,23 @@ Current Group 3 source checkpoint (item 73, 2026-10-06): [Group 3 current checkp
   presentation-refusal APIs are implemented. The historical classification
   above does not mean these APIs are absent; remaining provider families still
   need genuine shared data/order/policy consumption on the applicable drivers.
+
+  Integrated partial-delivery checkpoint: Dev8cba7a0c/treec0a8c809 contains
+  all117 feature commits. Final CI37547053814 is failed only at macOS Package
+  and its verdicts; Windows10089/0/full installed chain and Linux17 acceptance
+  variants pass, while Mac stubbed units/E2E/native canvas12 pass and Mac
+  Install/Release skip.53/86/61 retains200 software sites. All six items stay
+  partial; items16/38 and source-specific historical receipts remain intact.
+
+  Current qualification checkpoint: exact cee55e1a/treea17350f2 CI37541202298
+  has native AHK10089/0, macOS canvas12 and the entire Linux chain with17
+  install/launch variants passing; Windows fresh-clone and macOS package still
+  fail on that source. Corrected Windows CI37543830928 on exact20352/tree6641
+  is terminal successful across native10089/0, startup/fresh clone, E2E,
+  package, installed compiled/programmable admission and mandatory verdicts;
+  Release is skipped. The two personal-shortcut cases belong to that native
+  runner: aggregate proof only, no individual manifest or artifact fields
+  inferred.53/86/61 retains200 software sites; all six items remain partial.
 
   The generation numeric-boundary family consumes actual shared fragments at
   its four former native constructor sites, preserving cross-driver order and

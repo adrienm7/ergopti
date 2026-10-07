@@ -177,5 +177,976 @@
 		"physical_acceptance": "not executed",
 		"baseline_comparison": "evidence/final-native-baseline-comparison.json",
 		"detail_limits": "All-failures annotation is truncated during case22; 21 complete details are visible, not all50."
+	},
+	"current_successor": {
+		"status": "Partial delivery integrated and published on dev8cba; final exact integrated-source all-OS CI terminal failed only macOS package/verdicts; Windows and Linux chains pass; all six items remain partial",
+		"historical_fields": "Every preceding JSON field, key order and value is preserved as its historical checkpoint; this successor does not retroactively qualify later sources",
+		"prepared_observed_utc": null,
+		"published_feature_head": "20352edb6702bfbb92d4c9ced08fb85f3845cd13",
+		"published_feature_tree": "6641a1bbe62acd44883303c5c32d3a595d7cf149",
+		"source_checkpoints": [
+			{
+				"source_sha": "936dc7fcf4649e86f5813f6f2410b0369e59a38b",
+				"source_tree": "bb24004cd352afd7e9702ed2b9c8ddfb8f33fea5",
+				"incoming_owner_sha": "b70f98236bcaa2fcb8950494a855bdfd97831a9b",
+				"subject": "Published Ubuntu acquisition owner merged",
+				"selected_verifier_exit": 1,
+				"complete_js": {
+					"passed": 362,
+					"failed": 2
+				},
+				"boundary": "Actual private-keyring UID1000 authority refusal in the Ubuntu fixture; the accompanying uninstall failure is retained in its original receipt, not erased"
+			},
+			{
+				"source_sha": "a55a3f1125a21d134e57a901d2c5874aea936a55",
+				"source_tree": "003f54cf04b4b04112b00545eace8dc2954ec716",
+				"incoming_owner_sha": "a576915cf3ffb92e1ce6395fa165c3eda147a134",
+				"subject": "Actual Ollama lifecycle owner fixes merged",
+				"selected_verifier_exit": 0,
+				"complete_js_qualification": "Prior Ubuntu fixture failure still pending at this checkpoint",
+				"native_ahk_local": "UNRUN; source-selected native gates explicitly deferred"
+			},
+			{
+				"source_sha": "61626d91da7f82392aef36efecc2a2d6dd06cf16",
+				"source_tree": "e845a0dd0c7c5bce4fdd7adf39b3f2f1d1cf10c0",
+				"subject": "Three-path Windows LLM fixture cohort published",
+				"source_patch_sha256": "50d68343e3304e8a8b38321b3b2895fcc2d32ed768a074e87cf914bd57789ce1",
+				"source_review_sha256": "5d43de63c62c9c38570fd2c8d4de271fbcbe7c87c93094c9fb98eb9efddf774f",
+				"source_review_status": "SOURCE CLEAR",
+				"selected_verifier_exit": 1,
+				"complete_js": {
+					"passed": 363,
+					"failed": 1
+				},
+				"boundary": "Unchanged Ubuntu fixture prerequisite failure; genuine toggle route, optional dependency-state restoration and genuine English locale isolation are source-reviewed, actual AHK/Win32 unrun"
+			},
+			{
+				"source_sha": "039d3dc2bade18748ade6431b4d161dcf47c9e82",
+				"source_tree": "d950f46a754963c15aadd6ce183f8223eb68039a",
+				"incoming_owner_sha": "de4f253c1301399bba2eb13c4139d5f683ed2667",
+				"subject": "Published Ubuntu fixture ownership correction composed",
+				"selected_verifier_exit": 0,
+				"format": "passed",
+				"complete_js": {
+					"passed": 364,
+					"failed": 0
+				},
+				"native_apt": "Not executed in this container; genuine fixture model is not root-native installation proof",
+				"native_ahk_local": "UNRUN"
+			},
+			{
+				"source_sha": "82363668d7726ce0385d2de2fd16decfdded066b",
+				"source_tree": "cf2900c6b204e55d1634ce78e60a3156d72fc8c4",
+				"subject": "Personal-shortcut frame nine-path cohort published",
+				"complete_js": {
+					"passed": 364,
+					"failed": 0
+				},
+				"portable_macos_units": {
+					"modules": 1535,
+					"passed": 16609,
+					"failed": 0
+				},
+				"linux_units": {
+					"modules": 433,
+					"passed": 10184,
+					"failed": 0
+				},
+				"native_ahk_local": "DEFERRED; original selected exit1 remains historical"
+			},
+			{
+				"source_sha": "cee55e1a5f1fb9e31cff25e4cca1b487f1bf2e45",
+				"source_tree": "a17350f228e83032325b8b8dd886e448d0185cf2",
+				"incoming_owner_sha": "7a75da439661caf8cb94295c809ebf2607a4ef97",
+				"subject": "Actual Dev7a owner source merged",
+				"selected_verifier_exit": 0,
+				"format_files": 247,
+				"ahk_encoding_files": 1861,
+				"complete_js": {
+					"passed": 364,
+					"failed": 0
+				},
+				"portable_macos_units": {
+					"modules": 1535,
+					"passed": 16609,
+					"failed": 0
+				},
+				"linux_units": {
+					"modules": 433,
+					"passed": 10186,
+					"failed": 0
+				},
+				"portable_macos_e2e": {
+					"passed": 101,
+					"total": 101,
+					"skipped": 1
+				},
+				"linux_e2e": {
+					"passed": 189,
+					"total": 189
+				},
+				"native_windows_local": "DEFERRED",
+				"source_review_sha256": "fa7ffd51d8b862bb957e350ca6873ce3138f792cdace084daac60bcce6695996"
+			},
+			{
+				"source_sha": "20352edb6702bfbb92d4c9ced08fb85f3845cd13",
+				"source_tree": "6641a1bbe62acd44883303c5c32d3a595d7cf149",
+				"incoming_owner_sha": "5d1d06854b412e91c9350e05f03b20f83b297db8",
+				"subject": "Actual Dev5d1 clone-local core.longpaths and getter assertion fixture merged",
+				"changed_paths": 3,
+				"selected_verifier_exit": 0,
+				"format": "passed",
+				"complete_js": {
+					"passed": 364,
+					"failed": 0
+				},
+				"source_review_sha256": "ccb2caf776ea98573ae05647f27eab5070b9f989d8a4ed216a0c220cc149d7b5",
+				"native_production_changes": "none; Windows startup CJS fixture correction only",
+				"prior_clone_failure_cause": "UNKNOWN from our generic failure; full-job and artifact redirect403, including escalated attempt"
+			}
+		],
+		"staged_personal_frame": {
+			"parent_source_sha": "039d3dc2bade18748ade6431b4d161dcf47c9e82",
+			"tree": "cf2900c6b204e55d1634ce78e60a3156d72fc8c4",
+			"source_publication_sha": "82363668d7726ce0385d2de2fd16decfdded066b",
+			"status": "Published and all selected executable local gates qualified; initial failure retained",
+			"source_patch_sha256": "fde5e0d58d196d87709c8fce8e918be93bc5ccc40cd8d25bc7f65e8f3357f42b",
+			"source_review_sha256": "ea4a33035beba633b4f420383af9d965dcbe2c02703d4fad84573bb575a93831",
+			"native_menu_census_before": {
+				"windows": 55,
+				"macos": 86,
+				"linux": 61
+			},
+			"native_menu_census_candidate": {
+				"windows": 53,
+				"macos": 86,
+				"linux": 61
+			},
+			"owner_generators": "Two actual fixed-point cycles; no hand-updated generated outputs",
+			"new_windows_native_cases": 2,
+			"new_windows_native_execution": "Both new personal-shortcut cases are registered in genuine native runner; actual current source20352/tree6641 suite10089/0 and all Windows phases pass. Aggregate proof only: earlier375412 individual manifest download403 and current individual case/artifact manifests not downloaded.",
+			"initial_selected_verifier": {
+				"exit": 1,
+				"format": "passed",
+				"ahk_encoding_files": 1859,
+				"ahk_encoding": "passed",
+				"complete_js": {
+					"passed": 364,
+					"failed": 0
+				},
+				"linux_units": {
+					"modules": 433,
+					"passed": 10184,
+					"failed": 0
+				},
+				"portable_macos_units": {
+					"modules": 1535,
+					"passed": 16608,
+					"failed": 1,
+					"case": "waits for the launcher, keeps the previous app and opens the chosen one",
+					"boundary": "Unchanged release-installer fixture; not an installed Hammerspoon result"
+				},
+				"raw_log_sha256": "2d3d2aa646f0c13fde1dfa67dae00299a95cdb6b50172d87aef5faf8c4bc6a3f"
+			},
+			"installer_host_diagnosis": {
+				"actual_process_state": "Z",
+				"actual_parent_pid": 1,
+				"kill_zero_succeeds": true,
+				"source_and_assertions_unchanged": true,
+				"focused_plain": {
+					"passed": 0,
+					"failed": 1
+				},
+				"focused_existing_reaper": {
+					"passed": 1,
+					"failed": 0
+				},
+				"production_fix_claimed": false,
+				"installed_macos_acceptance_claimed": false
+			},
+			"portable_macos_reaper_rerun": {
+				"status": "completed",
+				"session": 67414,
+				"modules": 1535,
+				"passed": 16609,
+				"failed": 0,
+				"exit": 0,
+				"raw_log_sha256": "86aa3e520482162458295e31d928e455c73483eee8919b98ae23363cf44d3f38"
+			},
+			"final_candidate_qualification": {
+				"verifier": "All selected executable local gates pass on frozen cf290 source; original exit1 retained",
+				"receipt": "group1-personal-shortcut-frame-v3-root-qualification.json",
+				"native_windows_local": "DEFERRED"
+			}
+		},
+		"next_exact_source_ci": {
+			"source_sha": "20352edb6702bfbb92d4c9ced08fb85f3845cd13",
+			"tested_ci_sha": "45e74c87b3e1efdbb0719020a4fcc8720a3bac80",
+			"tested_tree": "6641a1bbe62acd44883303c5c32d3a595d7cf149",
+			"run_id": 37543830928,
+			"url": "https://github.com/adrienm7/ergopti/actions/runs/37543830928",
+			"os_lanes": "windows",
+			"status": "completed",
+			"conclusion": "success",
+			"windows_units": {
+				"passed": 10089,
+				"failed": 0
+			},
+			"fresh_clone_startup": "passed",
+			"e2e": "passed",
+			"package": "passed",
+			"install_and_launch": "passed",
+			"release_result": "skipped",
+			"expected_release_input": false,
+			"macos_linux_redispatch": "Not requested for Windows-only startup fixture change",
+			"full_startup": "passed",
+			"compiled_startup_admission": "passed",
+			"programmable_qualification": "passed",
+			"mandatory_evidence": "passed",
+			"windows_verdict": "passed",
+			"selected_os_verdict": "passed",
+			"terminal_jobs": 12,
+			"passed_jobs": 9,
+			"skipped_jobs": 3,
+			"unselected_lanes": ["linux", "macos"],
+			"raw_watch_exit": 0,
+			"raw_watch_sha256": "bdad0daaa43ba2d43bc6f56a3237d8f52122c3892ecb801d13cd6570a6fd1206",
+			"terminal_receipt_path": "/workspace/ergopti-delivery/group1-current-clone-windows-native-ci-terminal.json",
+			"terminal_receipt_sha256": "4674eb1e7a9b4f5435944aa2edc354eaf75219e5394fd0e068400a627b9bedce",
+			"individual_native_case_manifests": null,
+			"downloaded_artifact_identity": null,
+			"qualification_boundary": "Actual named phases qualify exact source20352/tree6641. No individual programmable or personal-case receipt/artifact fields inferred; physical acceptance not executed."
+		},
+		"final_integration": {
+			"integrated_dev_commit": "8cba7a0c45950383904ab6db11274f20823fc465",
+			"integrated_dev_tree": "c0a8c8095a1e9d97a138b37a6365c49dbb5f0bff",
+			"parents": [
+				"5d1d06854b412e91c9350e05f03b20f83b297db8",
+				"d2598009d211ca70d7cb01b36927c9e601e432cb"
+			],
+			"integration_lease_receipt": {
+				"original_path": "/workspace/ergopti-delivery/group1-final-serialized-delivery.json",
+				"captured_path": "/tmp/group1-partial-delivery-integrated-template-v1/captured-evidence/group1-final-serialized-delivery.json",
+				"sha256": "339097c589ef32d1736918e559897b4caedd024113da41ec7fc1cea8808bd1bc"
+			},
+			"integration_lock_sha": "d2598009d211ca70d7cb01b36927c9e601e432cb",
+			"integration_lock_acquisition": "create-only owned lock per actual serialized delivery receipt",
+			"documentation_commit": null,
+			"status": "integrated_dev_published",
+			"feature_commits_integrated": 117,
+			"feature_commit_range": "5d1d06854b412e91c9350e05f03b20f83b297db8..d2598009d211ca70d7cb01b36927c9e601e432cb",
+			"feature_comparison_url": "https://github.com/adrienm7/ergopti/compare/5d1d06854b412e91c9350e05f03b20f83b297db8...d2598009d211ca70d7cb01b36927c9e601e432cb",
+			"complete_feature_commits_sha256": "9881610abe28c584fa68490c5a6d4c2b326849ccf9b2e68da4d95929453c5b13",
+			"integrated_commit_url": "https://github.com/adrienm7/ergopti/commit/8cba7a0c45950383904ab6db11274f20823fc465"
+		},
+		"todo_state": {
+			"items": [5, 7, 33, 42, 54, 81],
+			"status": "all six partial",
+			"removed_items": [],
+			"retained_transverse_items": [16, 38]
+		},
+		"remaining_software": [
+			{
+				"item": 5,
+				"scope": "Complete source-bound scope participation/global composition qualification, runtime acknowledgement, conflict fences and retryable inverse; preserve obsolete and unknown source until explicit cleanup"
+			},
+			{
+				"item": 7,
+				"scope": "Qualify actual installed fresh/existing/moved-folder wizard, chosen-folder state, trigger behavior and restart on each OS; preserve software failure/refusal and rerun contracts"
+			},
+			{
+				"item": 33,
+				"scope": "Complete actual producer-authority publication: Windows keyboard parameter bindings (groups3/7), macOS aggregate Hotstrings category/section/order (group2), Linux dynamic-model catalogue (group4), and other unfinished binding owners; cold/partial/unacknowledged inventories remain unjudged"
+			},
+			{
+				"item": 42,
+				"scope": "Current Windows typed document reader and targeted/full-state writer are implemented; qualify the final composed native/E2E/package/install/restart source. Historical nineteen-case native success is source-specific"
+			},
+			{
+				"items": [54, 81],
+				"scope": "Continue remaining true native menu constructions toward zero using genuine shared declarations; published census53/86/61 remains nonzero. Native and installed qualification is source-specific."
+			}
+		],
+		"device_acceptance": "Installed Windows/macOS wizard/tray/input and restart; Linux physical input/uinput/Wayland and real installed-session restart remain distinct from feasible container/CI software qualification",
+		"evidence_inputs": [
+			{
+				"path": "/workspace/ergopti-delivery/group1-ubuntu-owner-merge-root-failure.json",
+				"sha256": "a9c85a8ab0295c52e0a49c0194eed5a332a77c6678d0f08695f740fd616f3828"
+			},
+			{
+				"path": "/workspace/ergopti-delivery/group1-ollama-owner-merge-root-qualification.json",
+				"sha256": "9b04a206fa94afc9a8e956c503abbff39bfa0d5bef0e6e8f4cd512a07a13502d"
+			},
+			{
+				"path": "/workspace/ergopti-delivery/group1-windows-llm-fixture-cohort3-v1-root-checkpoint-qualification.json",
+				"sha256": "91e94750090016d60aa71470b4c75c2e887880496b9f85fa5218a0b96979ce45"
+			},
+			{
+				"path": "/workspace/ergopti-delivery/group1-ubuntu-harness-successor-root-qualification.json",
+				"sha256": "e421bc14fc447debb7d602066987f6e5cb51d69e7105e0f8191c3461311799bd"
+			},
+			{
+				"path": "/workspace/ergopti-delivery/group1-personal-shortcut-frame-v3-root-adoption.json",
+				"sha256": "48e0fa978ffa8167e424d5793b84e6b86a9439b814ebec19fd3ccb7089c0f44d"
+			},
+			{
+				"path": "/workspace/ergopti-delivery/group1-personal-shortcut-frame-v3-root-initial-failure.json",
+				"sha256": "7d4882c7580a994ddd65f11be22faf4293fb3fbbdaef33d385b570aecc42206b"
+			},
+			{
+				"path": "/workspace/ergopti-delivery/group1-current-ad937-native-ci-progress.json",
+				"sha256": "d7647a54068a1d2c906b3eba3e0c366e89a7312657eb1db709beb15434e05ebc"
+			},
+			{
+				"path": "/workspace/ergopti-delivery/release-installer-reaper-triage-v1/receipt.json",
+				"sha256": "3cb6bd77f36528bd159fcc32bec1c14b8b08251e0b54e93b1f5cc883c819b89b"
+			},
+			{
+				"path": "/workspace/ergopti-delivery/group1-personal-shortcut-frame-v3-root-qualification.json",
+				"sha256": "a406b60aadefd83c478ef6a2de339edb90b836dd25434e8e10a5c81dc0d8a216"
+			},
+			{
+				"path": "/workspace/ergopti-delivery/group1-actions-dev-sync-root-qualification.json",
+				"sha256": "43bed45573b923fcf76d9f53c5fa4ec591b4ad563923c22e9dd3a7fd07a711f8"
+			},
+			{
+				"path": "/workspace/ergopti-delivery/group1-fresh-clone-owner-root-qualification.json",
+				"sha256": "324a444d1faa3a0b2db1658530f586fab45bf5096c2ff220f2880254dc794166"
+			},
+			{
+				"path": "/workspace/ergopti-delivery/group1-actions-composition-native-ci-terminal.json",
+				"sha256": "abdb1eaa953bafdae28b9e7347a6623564b99613cc02f370a8345d3e1e8ca2ba"
+			},
+			{
+				"path": "/workspace/ergopti-delivery/group1-actions-composition-native-ci-latest-status.json",
+				"sha256": "87d5eb574d519e4b08ed08ed7845409842d7ebb41ee6bb3f9f0fe08051837277"
+			},
+			{
+				"path": "/workspace/ergopti-delivery/group1-actions-composition-native-ci-watch.log",
+				"sha256": "73acd72a6d219bcf993c00f1f8a290a2eccb0b9dcc419447495272ab8fb82063"
+			},
+			{
+				"path": "/workspace/ergopti-delivery/group1-current-clone-windows-native-ci.json",
+				"sha256": "73b1b030ee71b79fa125529f36f19240cb24805fdb2a08d6488cd6dc53c8086c"
+			},
+			{
+				"path": "/workspace/ergopti-delivery/group1-foreign-group3-current-windows-terminal.json",
+				"sha256": "92cddcc1016dd863f966ee9a6afdd1c01fd04412a80765f558c6ec52919a3257"
+			},
+			{
+				"path": "/workspace/ergopti-delivery/group1-current-clone-windows-native-ci-terminal.json",
+				"sha256": "4674eb1e7a9b4f5435944aa2edc354eaf75219e5394fd0e068400a627b9bedce"
+			},
+			{
+				"path": "/workspace/ergopti-delivery/group1-current-clone-windows-native-ci-watch.log",
+				"sha256": "bdad0daaa43ba2d43bc6f56a3237d8f52122c3892ecb801d13cd6570a6fd1206"
+			},
+			{
+				"path": "/workspace/ergopti-delivery/group1-current-clone-windows-native-ci-watch.exit",
+				"sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+			},
+			{
+				"original_path": "/workspace/ergopti-delivery/group1-final-serialized-delivery.json",
+				"captured_path": "/tmp/group1-partial-delivery-integrated-template-v1/captured-evidence/group1-final-serialized-delivery.json",
+				"sha256": "339097c589ef32d1736918e559897b4caedd024113da41ec7fc1cea8808bd1bc"
+			},
+			{
+				"original_path": "/workspace/ergopti-delivery/group1-final-integrated-native-ci.json",
+				"captured_path": "/tmp/group1-partial-delivery-integrated-template-v1/captured-evidence/group1-final-integrated-native-ci.json",
+				"sha256": "663c2877f00a4a8b3f8bbdf3c9d09daf0880705871d19f4baa401217ca60586f"
+			},
+			{
+				"original_path": "/workspace/ergopti-delivery/group1-final-integrated-native-ci-terminal.json",
+				"captured_path": "/tmp/group1-partial-delivery-integrated-final-v1/captured-evidence/group1-final-integrated-native-ci-terminal.json",
+				"sha256": "c4373c2fdc6372e7062f37ad4504cd367159a009309d5d703668d22adc03b633"
+			},
+			{
+				"original_path": "/workspace/ergopti-delivery/group1-final-macos-native-owner-source-comparison.json",
+				"captured_path": "/tmp/group1-partial-delivery-integrated-final-v1/captured-evidence/group1-final-macos-native-owner-source-comparison.json",
+				"sha256": "18efe14db690ec48032769a6936baa5491edac902631b70c47d58510c00cbbc1"
+			},
+			{
+				"original_path": "/workspace/ergopti-delivery/group1-final-integrated-native-ci-watch.log",
+				"captured_path": "/tmp/group1-partial-delivery-integrated-final-v1/captured-evidence/group1-final-integrated-native-ci-watch.log",
+				"sha256": "a37105729540ae819b9889ccaa5d741774aefac9af2d54eda24c61380f5cffc6"
+			},
+			{
+				"original_path": "/workspace/ergopti-delivery/group1-final-integrated-native-ci-watch.exit",
+				"captured_path": "/tmp/group1-partial-delivery-integrated-final-v1/captured-evidence/group1-final-integrated-native-ci-watch.exit",
+				"sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+			},
+			{
+				"original_path": "/workspace/ergopti-delivery/group1-final-dev-automatic-runs-followup.json",
+				"captured_path": "/tmp/group1-partial-delivery-integrated-final-v1/captured-evidence/group1-final-dev-automatic-runs-followup.json",
+				"sha256": "46fbe39eaf9755d8d22fb5171b89c8181fb1f742c6a0417447c32e97730e6bee"
+			},
+			{
+				"path": "/tmp/group1-partial-delivery-integrated-final-v1/captured-evidence/automatic-dev-ci-terminal-readonly.json",
+				"sha256": "542bec4e2f8a7cef935151ac015b0acf38bde190563ed7de6071a8b1a8e4b146"
+			}
+		],
+		"remaining_final_note_fields": [
+			"Actual feature deletion and own integration-lease release receipt",
+			"Final documentary commit recorded externally after publication; self SHA remains unknown"
+		],
+		"historical_own_manual_ci": {
+			"run_id": 37530839023,
+			"url": "https://github.com/adrienm7/ergopti/actions/runs/37530839023",
+			"tested_ci_sha": "03f923ee2c39531b9fc7bfcba36f71e9e04ba14f",
+			"tested_tree": "d5e8cec2c87cfc9bd10b5e7c94833526a635367c",
+			"conclusion": "failure",
+			"windows_units": {
+				"passed": 10047,
+				"failed": 4
+			},
+			"corrected_later_source_status": "Four observed Windows fixture subjects and Ubuntu fixture prerequisites now have separately reviewed source successors; this does not turn the old run green or qualify the later source",
+			"release": "skipped",
+			"later_source_excluded": [
+				"61626d91da7f82392aef36efecc2a2d6dd06cf16",
+				"039d3dc2bade18748ade6431b4d161dcf47c9e82",
+				"cf2900c6b204e55d1634ce78e60a3156d72fc8c4"
+			]
+		},
+		"latest_own_manual_ci": {
+			"run_id": 37541202298,
+			"url": "https://github.com/adrienm7/ergopti/actions/runs/37541202298",
+			"tested_ci_sha": "28eda875fd0d6e5d813bbea2b9966c859d11d527",
+			"tested_tree": "a17350f228e83032325b8b8dd886e448d0185cf2",
+			"published_feature_sha": "cee55e1a5f1fb9e31cff25e4cca1b487f1bf2e45",
+			"status": "completed",
+			"conclusion": "failure",
+			"completed_jobs": 37,
+			"release": "skipped",
+			"windows": {
+				"native_units": {
+					"passed": 10089,
+					"failed": 0
+				},
+				"following_phase": "STEP21 fresh Git clone startup failed with generic exit1",
+				"cause": "UNKNOWN from our logs; redirect403 prevented full job/artifact recovery including escalated request",
+				"e2e": "skipped",
+				"package": "skipped",
+				"install_and_launch": "skipped"
+			},
+			"macos": {
+				"units": "passed",
+				"e2e": "passed",
+				"native_canvas": {
+					"captures": 12,
+					"conclusion": "success"
+				},
+				"package": "failure",
+				"install_and_launch": "skipped",
+				"sparkle": ["server-retired", "server-terminal", "server-exit"],
+				"homebrew": "Exact owned AppleEvent receiver no longer live",
+				"global_switcher": "Native prerequisites REFUSED; unqualified, never passed or skipped; no TCC cause proved"
+			},
+			"linux": {
+				"units": "passed",
+				"e2e": "passed",
+				"package": "passed",
+				"install_and_launch_successes": 17,
+				"install_and_launch_variants": [
+					"Install · opensuse",
+					"Run · .rpm",
+					"First install · ubuntu-22.04",
+					"Install · arch",
+					"Run · AppImage",
+					"Install · fedora",
+					"First install · fedora-latest",
+					"First install · alpine",
+					"First install · debian-12",
+					"Install · debian",
+					"First install · debian-13",
+					"First install · opensuse-tumbleweed",
+					"First install · arch",
+					"Run · .deb",
+					"Install · alpine",
+					"First install · ubuntu-24.04",
+					"First install · fedora-41"
+				],
+				"native_distro_units": {
+					"opensuse": {
+						"modules": 433,
+						"passed": 10186,
+						"failed": 0,
+						"exit": 0
+					},
+					"fedora": {
+						"modules": 433,
+						"passed": 10186,
+						"failed": 0,
+						"exit": 0
+					},
+					"arch": {
+						"modules": 433,
+						"passed": 10186,
+						"failed": 0,
+						"exit": 0
+					},
+					"debian": {
+						"modules": 433,
+						"passed": 10186,
+						"failed": 0,
+						"exit": 0
+					},
+					"alpine": {
+						"modules": 433,
+						"passed": 10186,
+						"failed": 0,
+						"exit": 0
+					}
+				},
+				"native_apt_boundary": "Controlled APT unit fixture is distinct from actual native APT policy; these installed scenario successes retain their own source/run scope"
+			},
+			"physical_acceptance": "not executed"
+		},
+		"final_integrated_source_ci": {
+			"source_sha": "8cba7a0c45950383904ab6db11274f20823fc465",
+			"source_tree": "c0a8c8095a1e9d97a138b37a6365c49dbb5f0bff",
+			"tested_ci_sha": "34782db782bf206710cb459890927645bb5f7d26",
+			"previous_ci_sha": "6c9d575ced36354c2ea87e96bd367575a79d2640",
+			"run_id": 37547053814,
+			"url": "https://github.com/adrienm7/ergopti/actions/runs/37547053814",
+			"status": "completed",
+			"conclusion": "failure",
+			"jobs": [
+				{
+					"id": 112553466777,
+					"name": "Validate / Checks and plan",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112553701853,
+					"name": "Core / js",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112553701897,
+					"name": "Core / properties",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112553702015,
+					"name": "macOS / Unit tests (stubbed)",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112553702062,
+					"name": "Linux / Unit tests",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112553702085,
+					"name": "Windows / Unit tests",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112554669046,
+					"name": "Linux / E2E tests",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112556521543,
+					"name": "macOS / E2E tests (stubbed)",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112557262199,
+					"name": "macOS / Native tooltip canvas · 12 captures",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112557262225,
+					"name": "macOS / Package",
+					"status": "completed",
+					"conclusion": "failure"
+				},
+				{
+					"id": 112558418880,
+					"name": "Linux / Package",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112558719919,
+					"name": "Windows / E2E tests (engine)",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112558944498,
+					"name": "Windows / Package",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112558998072,
+					"name": "macOS / Verdict",
+					"status": "completed",
+					"conclusion": "failure"
+				},
+				{
+					"id": 112558998579,
+					"name": "macOS / Install and launch · ${{ matrix.scenario }} · ${{ matrix.runner }}",
+					"status": "completed",
+					"conclusion": "skipped"
+				},
+				{
+					"id": 112559270025,
+					"name": "Windows / Install and launch",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112559298743,
+					"name": "Linux / Install and launch · Install · alpine",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112559298762,
+					"name": "Linux / Install and launch · First install · fedora-latest",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112559298765,
+					"name": "Linux / Install and launch · Install · arch",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112559298768,
+					"name": "Linux / Install and launch · Install · opensuse",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112559298779,
+					"name": "Linux / Install and launch · Install · fedora",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112559298780,
+					"name": "Linux / Install and launch · First install · fedora-41",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112559298795,
+					"name": "Linux / Install and launch · First install · debian-12",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112559298814,
+					"name": "Linux / Install and launch · First install · ubuntu-24.04",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112559298840,
+					"name": "Linux / Install and launch · First install · ubuntu-22.04",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112559298872,
+					"name": "Linux / Install and launch · First install · alpine",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112559298876,
+					"name": "Linux / Install and launch · First install · opensuse-tumbleweed",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112559298884,
+					"name": "Linux / Install and launch · First install · debian-13",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112559298892,
+					"name": "Linux / Install and launch · Run · .deb",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112559298907,
+					"name": "Linux / Install and launch · Install · debian",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112559298942,
+					"name": "Linux / Install and launch · First install · arch",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112559298947,
+					"name": "Linux / Install and launch · Run · .rpm",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112559299004,
+					"name": "Linux / Install and launch · Run · AppImage",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112559616925,
+					"name": "Windows / Verdict",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112560465675,
+					"name": "Linux / Verdict",
+					"status": "completed",
+					"conclusion": "success"
+				},
+				{
+					"id": 112560567583,
+					"name": "Validate / Selected OS verdict",
+					"status": "completed",
+					"conclusion": "failure"
+				},
+				{
+					"id": 112560568850,
+					"name": "Release / Publish",
+					"status": "completed",
+					"conclusion": "skipped"
+				}
+			],
+			"release_result": "skipped",
+			"os_lanes": "all",
+			"expected_release_input": false,
+			"dispatch_receipt": {
+				"original_path": "/workspace/ergopti-delivery/group1-final-integrated-native-ci.json",
+				"captured_path": "/tmp/group1-partial-delivery-integrated-template-v1/captured-evidence/group1-final-integrated-native-ci.json",
+				"sha256": "663c2877f00a4a8b3f8bbdf3c9d09daf0880705871d19f4baa401217ca60586f"
+			},
+			"windows_units": {
+				"passed": 10089,
+				"failed": 0
+			},
+			"macos_units": "passed (stubbed)",
+			"macos_e2e": "passed (stubbed)",
+			"macos_canvas": {
+				"captures": 12,
+				"conclusion": "success"
+			},
+			"macos_package": "failure",
+			"linux_units": "passed",
+			"linux_e2e": "passed",
+			"linux_package": "passed",
+			"installed_results": {
+				"windows": "passed",
+				"linux": {
+					"passed_install_run_first_install_jobs": 17,
+					"variants": [
+						"Install · alpine",
+						"First install · fedora-latest",
+						"Install · arch",
+						"Install · opensuse",
+						"Install · fedora",
+						"First install · fedora-41",
+						"First install · debian-12",
+						"First install · ubuntu-24.04",
+						"First install · ubuntu-22.04",
+						"First install · alpine",
+						"First install · opensuse-tumbleweed",
+						"First install · debian-13",
+						"Run · .deb",
+						"Install · debian",
+						"First install · arch",
+						"Run · .rpm",
+						"Run · AppImage"
+					]
+				},
+				"macos": "skipped after package failure"
+			},
+			"qualification_boundary": "Actual final integrated-source phase outcomes; no individual case/artifact identity inferred, no whole-CI-green or all-six-complete claim.",
+			"terminal_jobs": 37,
+			"passed_jobs": 32,
+			"failed_jobs": 3,
+			"skipped_jobs": 2,
+			"failed_job_names": ["macOS / Package", "macOS / Verdict", "Validate / Selected OS verdict"],
+			"skipped_job_names": [
+				"macOS / Install and launch · ${{ matrix.scenario }} · ${{ matrix.runner }}",
+				"Release / Publish"
+			],
+			"terminal_receipt": {
+				"original_path": "/workspace/ergopti-delivery/group1-final-integrated-native-ci-terminal.json",
+				"captured_path": "/tmp/group1-partial-delivery-integrated-final-v1/captured-evidence/group1-final-integrated-native-ci-terminal.json",
+				"sha256": "c4373c2fdc6372e7062f37ad4504cd367159a009309d5d703668d22adc03b633"
+			},
+			"raw_watch_exit": 1,
+			"raw_watch_sha256": "a37105729540ae819b9889ccaa5d741774aefac9af2d54eda24c61380f5cffc6",
+			"windows_full_startup": "passed",
+			"windows_fresh_clone_startup": "passed",
+			"windows_e2e": "passed",
+			"windows_package": "passed",
+			"windows_install_and_launch": "passed",
+			"windows_compiled_startup_admission": "passed",
+			"windows_programmable_qualification": "passed",
+			"windows_mandatory_evidence": "passed",
+			"windows_verdict": "passed",
+			"macos_install_and_launch": "skipped",
+			"linux_verdict": "passed",
+			"macos_failure_observations": {
+				"sparkle": ["server-retired", "server-terminal", "server-exit"],
+				"homebrew": "Exact owned AppleEvent receiver is no longer live",
+				"global_switcher": "Native prerequisites refused; UNQUALIFIED, never passed or skipped; no TCC grant attempted",
+				"precise_failure_cause_proved": false
+			},
+			"individual_native_case_manifests": null,
+			"downloaded_artifact_identity": null,
+			"physical_acceptance": "not executed"
+		},
+		"foreign_integration_owner": {
+			"lock": "323873fd",
+			"run_id": 37542732140,
+			"status": "completed",
+			"windows_units": "passed",
+			"fresh_clone_startup": "passed",
+			"e2e": "passed",
+			"package": "passed",
+			"install_and_launch": "failure",
+			"failure_cause": null,
+			"tested_ci_sha": "6c9d575ced36354c2ea87e96bd367575a79d2640",
+			"tested_source_tree": "870ecde04d46c62e3fa5d4082bce529155e40806",
+			"receipt_path": "/workspace/ergopti-delivery/group1-foreign-group3-current-windows-terminal.json",
+			"lock_status": "Released by G3 at23:09; parent confirmed no remote lock at23:11:55",
+			"evidence_boundary": "Foreign group3 qualification; no Root source or lock ownership, no precise install failure cause established.",
+			"this_agent_owns_or_changes_lock": false,
+			"conclusion": "failure",
+			"tested_source_sha": "5d1d06854b412e91c9350e05f03b20f83b297db8",
+			"receipt_sha256": "92cddcc1016dd863f966ee9a6afdd1c01fd04412a80765f558c6ec52919a3257",
+			"release": "skipped",
+			"install_failed_steps": [
+				"Test native compiled startup admission",
+				"Qualify programmable hotstrings in the actual compiled package",
+				"Upload mandatory launch evidence"
+			],
+			"historical_lock_status": "still held by foreign G3 owner",
+			"lock_release_comment": "https://github.com/adrienm7/ergopti/issues/86#issuecomment-6027109484",
+			"lock_release_comment_id": 6027109484,
+			"parent_remote_absence_observed_utc": "2026-10-06T23:11:55Z",
+			"native_install_owner_observation": {
+				"boundary": "G3-reported diagnostic, not exact child-result cause proof",
+				"source_location": "tools/test/support/windows-startup-log-runtime.cjs:41",
+				"observation": "readStartupLogCatalog refused the real Python result before compiled startup",
+				"programmable_tests": 23,
+				"programmable_test_execution": "UNEXECUTED due to admission refusal",
+				"precise_child_failure_cause": null,
+				"pid_race_cause_proved": false,
+				"native_changes_by_this_agent": false,
+				"reserved_owner_work": "G3 refusal diagnostic; Windows/G6 lease requested for pinned Node/Python launch setup"
+			}
+		},
+		"todo_qualification_checkpoint": {
+			"items": [54, 81],
+			"native_menu_census": {
+				"windows": 53,
+				"macos": 86,
+				"linux": 61
+			},
+			"remaining_true_native_construction_sites": 200,
+			"kind": "software migration work; separate native/installed/device acceptance also remains",
+			"individual_personal_shortcut_manifest": "Aggregate actual current suite10089/0 proof only; earlier375412 individual download403, current individual case/artifact manifest fields not downloaded",
+			"all_six_partial": true
+		},
+		"device_acceptance_scenarios": {
+			"windows": [
+				"Use a disposable profile and the exact artifact/SHA recorded for the tested source; keep personal configuration outside that profile.",
+				"Replay existing wizard requirements: fresh, existing and moved-folder configurations; seven pages, cancel/rerun, chosen-folder state, trigger changes and a real application restart.",
+				"Inspect the real tray: translated labels/order, checked and grey states, and callbacks from an already open menu under the existing pause/current-source rules.",
+				"Replay existing scope recommend/clear controls: malformed admission refuses; future/obsolete scalar source remains exact; stale writes refuse and inverse/retry retains its existing ownership rules.",
+				"Replay existing dotted/inline save cases, restart the real app and compare unknown source bytes with the same saved source/backup controls."
+			],
+			"macos": [
+				"Use the same disposable-profile and exact artifact/source-SHA discipline for wizard, tray and a real restart.",
+				"Report the named source-build and native cases as passed, failed or unrun. Current Sparkle/Homebrew/GlobalSwitcher failures remain named; no work-log export is required."
+			],
+			"linux": [
+				"Existing virtual X11 probes can pass without proving physical input, uinput, Wayland or an actual daemon restart; replay the latter only in the real installed session."
+			],
+			"scope": "Replay guidance for existing items7/16/38/42; no additional acceptance requirement or reversible test is introduced. Supplemental Group5 Karabiner work is not a Group1 criterion."
+		},
+		"integrated_source_sha": "8cba7a0c45950383904ab6db11274f20823fc465",
+		"integrated_source_tree": "c0a8c8095a1e9d97a138b37a6365c49dbb5f0bff",
+		"integrated_native_input_conservation": {
+			"qualified_windows_source": "20352edb6702bfbb92d4c9ced08fb85f3845cd13",
+			"integrated_source": "8cba7a0c45950383904ab6db11274f20823fc465",
+			"actual_changed_paths": [
+				"docs/ERGOPTIPLUS_TODO.md",
+				"docs/handovers/2026-10-04-config-menus/PARTIAL-DELIVERY.md",
+				"docs/handovers/2026-10-04-config-menus/partial-delivery.json"
+			],
+			"only_documentation_changed": true,
+			"native_production_and_test_inputs_identical": true,
+			"qualification_promoted_to_integrated_ci": false
+		},
+		"macos_native_owner_source_comparison": {
+			"receipt": {
+				"original_path": "/workspace/ergopti-delivery/group1-final-macos-native-owner-source-comparison.json",
+				"captured_path": "/tmp/group1-partial-delivery-integrated-final-v1/captured-evidence/group1-final-macos-native-owner-source-comparison.json",
+				"sha256": "18efe14db690ec48032769a6936baa5491edac902631b70c47d58510c00cbbc1"
+			},
+			"baseline_source": "5d1d06854b412e91c9350e05f03b20f83b297db8",
+			"current_integrated_source": "8cba7a0c45950383904ab6db11274f20823fc465",
+			"checked_native_paths": 77,
+			"paths_equal": 77,
+			"changed_launch_gate": {
+				"path": "tools/diagnostics/macos_launch_gate.py",
+				"source_commit": "bf2c7e9a197b8788f100660f3d0efd7ca2282f52",
+				"scope": "Adds isolated Script participant summary only after required original owners retire in karabiner_config installation scenario; this is not an unchanged file and not executed by the failed Package phase.",
+				"no_direct_brew_acceptance_reference": true
+			},
+			"boundary": "Bounded source conservation and similar failure messages are not proof of cause or exoneration. Supplemental changed launch gate belongs to skipped Mac Install and remains unexecuted."
+		},
+		"automatic_dev_ci": {
+			"run_id": 37546955202,
+			"source_sha": "8cba7a0c45950383904ab6db11274f20823fc465",
+			"status": "completed",
+			"conclusion": "cancelled",
+			"observation_authority": "Actual read-only GitHub run API terminal receipt; earlier active snapshots remain historical",
+			"captured_historical_followup": {
+				"original_path": "/workspace/ergopti-delivery/group1-final-dev-automatic-runs-followup.json",
+				"captured_path": "/tmp/group1-partial-delivery-integrated-final-v1/captured-evidence/group1-final-dev-automatic-runs-followup.json",
+				"sha256": "46fbe39eaf9755d8d22fb5171b89c8181fb1f742c6a0417447c32e97730e6bee"
+			},
+			"actual_terminal_receipt": {
+				"path": "/tmp/group1-partial-delivery-integrated-final-v1/captured-evidence/automatic-dev-ci-terminal-readonly.json",
+				"sha256": "542bec4e2f8a7cef935151ac015b0acf38bde190563ed7de6071a8b1a8e4b146",
+				"read_only_api": "gh run view37546955202 --json databaseId,status,conclusion,headSha,url,event",
+				"status": "completed",
+				"conclusion": "cancelled"
+			}
+		},
+		"delivery_cleanup": {
+			"feature_branch_deletion": "pending actual owner cleanup receipt",
+			"integration_lock_release": "pending actual owner cleanup receipt",
+			"integration_lock_sha": "d2598009d211ca70d7cb01b36927c9e601e432cb",
+			"cleanup_authorization": "Explicitly authorized partial-delivery cleanup; this preparer does not modify branches or leases",
+			"cleanup_receipt": null
+		}
 	}
 }
