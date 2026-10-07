@@ -5660,6 +5660,16 @@ deferral is superseded. This item and items16/38 remain open.
 
 Current Group 3 source checkpoint (item 91, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Complete Windows simultaneous chords, delay/copy, hold arbitration and fake-AltGr-LCtrl hook ownership, then native hook/compiled acceptance on the maintainer Windows workstation. Separate device/evidence boundary: Real key ordering and actual AltGr generation.
 
+The current source adds standard-AltGr suffix registration before the
+standalone prefix owner, retaining admitted pair and fake-Ctrl handback debt.
+Five controlled cases and one interpreted native GUI/hook case are registered;
+the native case explicitly requires interactive execution. Its owned child
+pins the current US HKL, foreground HWND/PID/thread, nonce and retirement.
+Root-selected source gates pass366 JS checks and encoding; actual native
+AltGr hook/priority and physical ordering remain pending. Injected Ctrl/RAlt
+priority is not proof of physical AltGr. Simultaneous chords, third-slot copy,
+first-key hold and genuine raw fake-Ctrl input admission remain open.
+
 - [~] **93.** Linux: the key combinations of item 91. The shared ordered-pair
   model now runs through the actual tap-hold engine, keyboard hook and
   native configuration owner, using the same pair IDs, slots and sections.
