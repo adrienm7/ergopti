@@ -1205,6 +1205,7 @@ Ergopti_OnShutdown(reason, code) {
 			return _LifecycleRefuseShutdown("the recovery handoff failed before terminal teardown")
 		}
 		ShutdownTerminal := true
+		TerminalMenus := 0
 		try UninstallCommit(reason)
 		catch as Err
 			try LoggerError("Lifecycle", "Removal authorization failed during terminal shutdown: {1}.", Err.Message)
@@ -1240,8 +1241,14 @@ Ergopti_OnShutdown(reason, code) {
 		}
 		try LLM_NavEventOwner_Stop(false, true)
 		try TooltipReleaseRenderResources()
-		try MenuPopulation_Shutdown()
-		catch as Err
+		try {
+			; Hold the full native graph before pending roots or callbacks are released.
+			MenuTerminalCritical := Critical("On")
+			try {
+				TerminalMenus := MenuDispatcher_PrepareTerminalRetirement(ShutdownTerminal)
+				MenuPopulation_Shutdown()
+			} finally Critical(MenuTerminalCritical)
+		} catch as Err
 			try LoggerError("Lifecycle", "Native menu preparation teardown failed: {1}.", Err.Message)
 		try MenuStartupCommands_Shutdown()
 		catch as Err
@@ -1273,6 +1280,14 @@ Ergopti_OnShutdown(reason, code) {
 			; Ordinary Exit has no reload-success callback to protect. Every refusal
 			; gate has accepted, so best-effort teardown is terminal here.
 			try _GestureUnhook()
+		; Every genuine veto and producer cleanup has completed. Keep all native
+		; owners alive together while explicitly breaking their callback lists.
+		try {
+			if !(TerminalMenus is MenuTerminalRetirement)
+				throw Error("Terminal native menu graph was not retained")
+			TerminalMenus.Retire(ShutdownTerminal)
+		} catch as Err
+			try LoggerError("Lifecycle", "Terminal native menu retirement failed: {1}.", Err.Message)
 		return 0
 		} finally {
 			if OwnShutdownBundle

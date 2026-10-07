@@ -373,3 +373,162 @@ _MP_BackgroundTimerPreservesPriority() {
 }
 Test("menu population: background timer never interrupts foreground controller initialization (menu-background-priority)",
 	_MP_BackgroundTimerPreservesPriority)
+
+
+
+
+
+; ===========================================
+; ===========================================
+; ======= 8/ Terminal menu retirement =======
+; ===========================================
+; ===========================================
+
+_MP_TerminalRetirementFixture(Callback) {
+	TerminalRoot := Menu()
+	TerminalChild := Menu()
+	TerminalPending := Menu()
+	TerminalForeign := Menu()
+	try {
+		TerminalRoot.Add("owned child", TerminalChild)
+		TerminalChild.Add("child action", (*) => 0)
+		TerminalPending.Add("pending action", (*) => 0)
+		TerminalForeign.Add("unrelated action", (*) => 0)
+		return Callback.Call(TerminalRoot, TerminalChild, TerminalPending, TerminalForeign)
+	} finally {
+		; Keep all four native objects alive while each callback list is released.
+		for FixtureMenu in [TerminalRoot, TerminalChild, TerminalPending, TerminalForeign]
+			FixtureMenu.Delete()
+	}
+}
+
+_MP_TerminalGraphBody(TerminalRoot, TerminalChild, TerminalPending, TerminalForeign) {
+	CapturedHandles := [TerminalRoot.Handle, TerminalChild.Handle, TerminalPending.Handle]
+	TerminalOwner := MenuTerminalRetirement(true, Map(TerminalRoot.Handle, true),
+		TerminalRoot, [TerminalPending, TerminalPending])
+	AssertEqual(3, TerminalOwner.Menus.Length, "registered, unregistered child and detached pending owners must all be retained once")
+	for CapturedHandle in CapturedHandles
+		Assert(TerminalOwner.Handles.Has(CapturedHandle), "every independent native identity must be retained")
+	AssertTrue(TerminalOwner.Retire(true), "terminal retirement must actually clear owned callback lists")
+	for CapturedMenu in [TerminalRoot, TerminalChild, TerminalPending]
+		AssertEqual(0, _MenuItemCount(CapturedMenu), "holding without deleting must not report terminal retirement")
+	AssertEqual(1, _MenuItemCount(TerminalForeign), "an unrelated script-owned menu must stay intact")
+	AssertEqual(CapturedHandles[1], TerminalRoot.Handle)
+	AssertEqual(CapturedHandles[2], TerminalChild.Handle)
+	AssertEqual(CapturedHandles[3], TerminalPending.Handle)
+	AssertTrue(TerminalOwner.Retired)
+	AssertFalse(TerminalOwner.Retire(true), "an already retired owner must not acquire a second deletion pass")
+}
+
+_MP_TerminalGraph() {
+	_MP_TerminalRetirementFixture(_MP_TerminalGraphBody)
+}
+Test("menu terminal retirement: actual registered and unregistered native graph clears items without touching unrelated owners",
+	_MP_TerminalGraph)
+
+/** Binds each refused scalar and accepts only the actual constructor admission error. */
+_MP_TerminalConstructorRefusal(RefusedAdmission, AdmissionRoot, AdmissionPending) {
+	AdmissionError := 0
+	try MenuTerminalRetirement(RefusedAdmission, Map(AdmissionRoot.Handle, true), AdmissionRoot, [AdmissionPending])
+	catch as ConstructorError
+		AdmissionError := ConstructorError
+	AssertTrue(AdmissionError is ValueError, "the actual constructor must refuse the bound scalar with ValueError")
+	AssertEqual("Menu retirement requires irreversible shutdown admission", AdmissionError.Message)
+}
+
+_MP_TerminalAdmissionBody(TerminalRoot, TerminalChild, TerminalPending, TerminalForeign) {
+	for RefusedTerminal in [0, "1", 1.0] {
+		_MP_TerminalConstructorRefusal.Bind(RefusedTerminal, TerminalRoot, TerminalPending).Call()
+		AssertEqual(1, _MenuItemCount(TerminalRoot))
+		AssertEqual(1, _MenuItemCount(TerminalChild))
+	}
+	TerminalOwner := MenuTerminalRetirement(true, Map(TerminalRoot.Handle, true), TerminalRoot, [TerminalPending])
+	AssertThrows(ObjBindMethod(TerminalOwner, "Retire", 0),
+		"an accepted collection cannot borrow nonterminal deletion authority")
+	AssertEqual(1, _MenuItemCount(TerminalChild), "a shutdown veto leaves actual native callbacks intact")
+	AssertFalse(TerminalOwner.Retired)
+	AssertTrue(TerminalOwner.Retire(true))
+}
+
+_MP_TerminalAdmission() {
+	_MP_TerminalRetirementFixture(_MP_TerminalAdmissionBody)
+}
+Test("menu terminal retirement: strict irreversible admission preserves native callbacks after a veto",
+	_MP_TerminalAdmission)
+
+_MP_TerminalPopulationRoots() {
+	global _MenuPopulationBuilding, _MenuPopulationPublished, _MenuDispatchOwnerHandles
+	PreviousBuilding := _MenuPopulationBuilding
+	PreviousPublished := _MenuPopulationPublished
+	PreviousRegistry := _MenuDispatchOwnerHandles
+	BuildingOwner := MenuPopulation()
+	PublishedOwner := MenuPopulation()
+	BuildingLeaf := Menu()
+	PublishedLeaf := Menu()
+	PopulationCritical := Critical("On")
+	try {
+		BuildingLeaf.Add("building action", (*) => 0)
+		PublishedLeaf.Add("published action", (*) => 0)
+		BuildingOwner.Pending[BuildingLeaf.Handle] := {MenuObj: BuildingLeaf}
+		PublishedOwner.Pending[PublishedLeaf.Handle] := {MenuObj: PublishedLeaf}
+		_MenuPopulationBuilding := BuildingOwner
+		_MenuPopulationPublished := PublishedOwner
+		_MenuDispatchOwnerHandles := Map()
+		HeldPopulationMenus := MenuDispatcher_PrepareTerminalRetirement(true)
+		Assert(HeldPopulationMenus.Handles.Has(BuildingLeaf.Handle))
+		Assert(HeldPopulationMenus.Handles.Has(PublishedLeaf.Handle))
+		; Do not retire the returned owner: it also holds the actual shared tray.
+		MenuPopulation_Shutdown()
+		BuildingOwner.Pending.Clear()
+		AssertEqual(0, PublishedOwner.Pending.Count)
+		AssertFalse(_MenuPopulationPublished)
+		AssertEqual(1, _MenuItemCount(BuildingLeaf), "collection itself must not remove native items")
+		AssertEqual(1, _MenuItemCount(PublishedLeaf))
+		Assert(HeldPopulationMenus.Handles.Has(BuildingLeaf.Handle))
+		Assert(HeldPopulationMenus.Handles.Has(PublishedLeaf.Handle))
+	} finally {
+		try {
+			BuildingOwner.Stop()
+			PublishedOwner.Stop()
+			BuildingLeaf.Delete()
+			PublishedLeaf.Delete()
+		} finally {
+			_MenuPopulationBuilding := PreviousBuilding
+			_MenuPopulationPublished := PreviousPublished
+			_MenuDispatchOwnerHandles := PreviousRegistry
+			Critical(PopulationCritical)
+		}
+	}
+}
+Test("menu terminal retirement: both actual population owners remain retained across canonical pending-root release",
+	_MP_TerminalPopulationRoots)
+
+_MP_TerminalLifecycleOrder() {
+	ShutdownSource := _DriverFuncBody("Ergopti_OnShutdown")
+	Assert(ShutdownSource != "", "the actual shutdown owner must exist")
+	ShutdownCode := _DriverMaskNonCode(&ShutdownSource)
+	TerminalPosition := InStr(ShutdownCode, "ShutdownTerminal := true", true)
+	PreparePosition := InStr(ShutdownCode, "MenuDispatcher_PrepareTerminalRetirement(ShutdownTerminal)", true)
+	PopulationPosition := InStr(ShutdownCode, "MenuPopulation_Shutdown()", true)
+	RetirePosition := InStr(ShutdownCode, "TerminalMenus.Retire(ShutdownTerminal)", true)
+	OrdinaryRefusalPosition := InStr(ShutdownCode, "_LifecycleRefuseShutdown(", true, -1)
+	NativeRefusalPosition := InStr(ShutdownCode, "_LifecycleRefuseNativeRetirement(", true, -1)
+	Assert(OrdinaryRefusalPosition > 0 && NativeRefusalPosition > 0,
+		"both ordinary and exact native retirement refusal gates must exist")
+	LastRefusalPosition := Max(OrdinaryRefusalPosition, NativeRefusalPosition)
+	Assert(TerminalPosition > LastRefusalPosition && PreparePosition > TerminalPosition,
+		"no menu owner may be acquired before every real shutdown veto has accepted")
+	Assert(PopulationPosition > PreparePosition && RetirePosition > PopulationPosition,
+		"pending roots must be retained before release and deleted only after producer cleanup")
+	AssertEqual(1, _MP_TerminalCodeCount(ShutdownCode,
+		"\bMenuDispatcher_PrepareTerminalRetirement\(ShutdownTerminal\)"))
+	AssertEqual(1, _MP_TerminalCodeCount(ShutdownCode,
+		"\bTerminalMenus\.Retire\(ShutdownTerminal\)"))
+}
+Test("menu terminal retirement: genuine terminal gates precede collection and final callback release",
+	_MP_TerminalLifecycleOrder)
+
+_MP_TerminalCodeCount(ShutdownCode, Pattern) {
+	RegExReplace(ShutdownCode, Pattern, "", &TerminalMatches)
+	return TerminalMatches
+}

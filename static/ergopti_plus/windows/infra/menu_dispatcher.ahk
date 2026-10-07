@@ -790,3 +790,99 @@ _MenuDispatcherInit() {
 				_MENU_RETRY_DELAY_MS)
 }
 _MenuDispatcherInit()
+
+
+
+
+
+; ===========================================
+; ===========================================
+; ======= 5/ Terminal menu retirement =======
+; ===========================================
+; ===========================================
+
+/** Retains each script-owned native menu before terminal cleanup drops roots. */
+class MenuTerminalRetirement {
+	__New(Terminal, RegisteredRoots, TrayRoot, PendingRoots) {
+		if !(Terminal is Integer) || Terminal != 1
+			throw ValueError("Menu retirement requires irreversible shutdown admission")
+		if !(RegisteredRoots is Map) || !(TrayRoot is Menu) || !(PendingRoots is Array)
+			throw TypeError("Menu retirement requires owned root collections")
+		this.Menus := []
+		this.Handles := Map()
+		this.Retired := false
+		PreviousCritical := Critical("On")
+		try {
+			for RegisteredHandle in RegisteredRoots
+				this._Capture(RegisteredHandle)
+			this._Capture(TrayRoot.Handle)
+			for PendingMenu in PendingRoots {
+				if !(PendingMenu is Menu)
+					throw TypeError("Pending native menu ownership is malformed")
+				this._Capture(PendingMenu.Handle)
+			}
+		} finally Critical(PreviousCritical)
+	}
+
+	_Capture(NativeHandle) {
+		if !(NativeHandle is Integer) || NativeHandle == 0
+			throw TypeError("Native menu ownership requires a nonzero handle")
+		if this.Handles.Has(NativeHandle)
+			return
+		; A stale or foreign HMENU never authorizes deleting a native resource.
+		NativeMenu := MenuFromHandle(NativeHandle)
+		if !(NativeMenu is Menu)
+			return
+		if NativeMenu.Handle != NativeHandle
+			throw Error("Script menu identity changed during terminal collection")
+		this.Handles[NativeHandle] := true
+		this.Menus.Push(NativeMenu)
+		NativeCount := _MenuItemCount(NativeMenu)
+		loop NativeCount {
+			NativeChild := TrayMenuNativeSubmenuHandle(NativeMenu, A_Index - 1)
+			if NativeChild
+				this._Capture(NativeChild)
+		}
+	}
+
+	/** Clears callback-bearing items only while every captured menu stays alive. */
+	Retire(Terminal) {
+		if !(Terminal is Integer) || Terminal != 1
+			throw ValueError("Menu retirement requires irreversible shutdown admission")
+		if this.Retired
+			return false
+		PreviousCritical := Critical("On")
+		try {
+			for RetiringMenu in this.Menus {
+				try RetiringMenu.Delete()
+				catch as RetirementError {
+					if !IsSet(FirstRetirementError)
+						FirstRetirementError := RetirementError
+				}
+			}
+			if IsSet(FirstRetirementError)
+				throw FirstRetirementError
+			this.Retired := true
+			return true
+		} finally Critical(PreviousCritical)
+	}
+}
+
+/** Takes the terminal graph before MenuPopulation_Shutdown releases its roots. */
+MenuDispatcher_PrepareTerminalRetirement(Terminal) {
+	global _MenuDispatchOwnerHandles, _MenuPopulationBuilding, _MenuPopulationPublished
+	if !(Terminal is Integer) || Terminal != 1
+		throw ValueError("Menu retirement requires irreversible shutdown admission")
+	PreviousCritical := Critical("On")
+	try {
+		PendingRoots := []
+		for PopulationOwner in [_MenuPopulationBuilding, _MenuPopulationPublished] {
+			if PopulationOwner is MenuPopulation {
+				for PendingHandle, PendingRecord in PopulationOwner.Pending {
+					PendingRoots.Push(PendingRecord.MenuObj)
+				}
+			}
+		}
+		return MenuTerminalRetirement(Terminal, _MenuDispatchOwnerHandles, A_TrayMenu, PendingRoots)
+	} finally Critical(PreviousCritical)
+}

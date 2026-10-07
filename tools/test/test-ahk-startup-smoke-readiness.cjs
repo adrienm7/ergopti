@@ -8,6 +8,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const vm = require('node:vm');
+const { EventEmitter } = require('node:events');
 
 const ROOT = path.resolve(__dirname, '../..');
 const OWNER = 'tools/test/test-ahk-full-startup-smoke.cjs';
@@ -54,8 +55,8 @@ async function observe(source, root, scenario) {
 							fs.writeFileSync(path.join(windows, '_generated/personal_shortcuts.ahk'), 'inert');
 						}
 					};
-				if (name === 'child_process')
-					return {
+				if (name === 'child_process') {
+					const RecordingPort = {
 						spawnSync(binary, args, options) {
 							assert.equal(binary, process.execPath, 'only the inert recording port is available');
 							assert.equal(args[0], '/ErrorStdOut');
@@ -174,6 +175,49 @@ async function observe(source, root, scenario) {
 							return result;
 						}
 					};
+					RecordingPort.spawn = (binary, args, options) => {
+						assert.equal(options.env.ERGOPTI_STARTUP_SMOKE_NATURAL_EXIT, '1');
+						const result = RecordingPort.spawnSync(binary, args, options);
+						const probe = options.env.ERGOPTI_STARTUP_SMOKE_DIR;
+						const receipt = {
+							schema_version: 1,
+							nonce: options.env.ERGOPTI_STARTUP_SMOKE_NONCE,
+							pid: result.pid,
+							reason: 'Exit',
+							code: 0,
+							accepted: true,
+							logs_flushed: true,
+							veto_exhausted: false
+						};
+						const wrapper = fs.readFileSync(args[1], 'utf8');
+						const integrated =
+							wrapper.includes(
+								'if EnvGet("ERGOPTI_STARTUP_SMOKE_NATURAL_EXIT") == "1"\n\t\t_StartupSmokeNaturalShutdown()\n}'
+							) && wrapper.includes('OnExit(_StartupSmokeNaturalAcceptedExit)');
+						if (scenario === 'natural-pid') receipt.pid--;
+						if (scenario === 'natural-nonce') receipt.nonce = 'f'.repeat(32);
+						if (scenario === 'natural-refused') receipt.accepted = false;
+						if (scenario === 'natural-exhausted') receipt.veto_exhausted = true;
+						if (integrated && scenario !== 'natural-missing')
+							fs.writeFileSync(path.join(probe, 'natural-exit.json'), JSON.stringify(receipt), {
+								flag: 'wx'
+							});
+						const child = new EventEmitter();
+						child.pid = result.pid;
+						child.stdout = new EventEmitter();
+						child.stderr = new EventEmitter();
+						child.stdout.setEncoding = child.stderr.setEncoding = () => {};
+						setImmediate(() => {
+							if (scenario === 'natural-stderr')
+								child.stderr.emit('data', 'owned shutdown refusal\n');
+							child.emit('close', scenario === 'natural-heap' ? 3221226356 : result.status, null);
+						});
+						return child;
+					};
+					return RecordingPort;
+				}
+				if (name === './lib/ahk-startup-natural-exit.cjs')
+					return require(path.join(root, 'tools/test/lib/ahk-startup-natural-exit.cjs'));
 				assert.ok(['fs', 'path', 'node:crypto'].includes(name), 'unexpected dependency: ' + name);
 				return require(name);
 			}
@@ -214,6 +258,13 @@ async function check(source, root = ROOT) {
 		'save-zero',
 		'save-malformed',
 		'first-save-missing',
+		'natural-missing',
+		'natural-pid',
+		'natural-nonce',
+		'natural-refused',
+		'natural-exhausted',
+		'natural-heap',
+		'natural-stderr',
 		'ready'
 	]) {
 		const result = await observe(source, root, scenario);
@@ -228,6 +279,11 @@ async function check(source, root = ROOT) {
 			['first-early-exit', 'first-save-missing'].includes(scenario) ? 0 : 1,
 			scenario + ': the intended real runner branch must execute'
 		);
+		if (scenario.startsWith('natural-'))
+			assert.match(
+				result.diagnostics.join('\n'),
+				/natural-shutdown:.*(retire normally|acknowledgment)/
+			);
 		if (scenario.startsWith('save-'))
 			assert.match(result.diagnostics.join('\n'), /reloaded-config:.*full-save receipt/);
 		if (scenario === 'first-save-missing')
@@ -244,7 +300,7 @@ if (require.main === module)
 	check(fs.readFileSync(path.join(ROOT, OWNER), 'utf8')).then(
 		() =>
 			console.log(
-				'[OK] Twenty-one inert actual startup admission cases reject stale readiness and uncommitted full saves.'
+				'[OK] Twenty-eight inert actual startup admission cases reject stale readiness, uncommitted full saves and false natural shutdown acknowledgment.'
 			),
 		(error) => {
 			console.error(error);
