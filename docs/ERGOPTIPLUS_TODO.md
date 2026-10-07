@@ -5574,6 +5574,13 @@ The fixed Specifications and Capabilities frames of the Windows/macOS per-model 
       uncommitted in the local worktree of `fix/downloads-on-managed-networks`
       when the session stopped; redo it if that worktree is gone.
 
+The portable MLX fingerprint mirror now explicitly owns its fake UV route and
+clears inherited proxy, bypass and CA selections. The unchanged27 assertions
+reproduce21 passes/six failures without the old ambient relay, then pass27/0
+with the correction. Conflicting inherited proxy/CA inputs also pass27/0.
+Production system-routing and opaque-download refusal guards remain unchanged;
+this hermetic fixture correction does not qualify native Mac networking.
+
 The Windows receiving slice adds full-URL native route observations, bounded
 owned curl requests, endpoint-aware updater downloads and shared terminal
 failure actions. Observer publication and refusal rollback now use separate
