@@ -6379,7 +6379,7 @@ qualification, preserving the original key ownership and TLS assertions.
 Manual37670051601 at1b0b3be0a passes shared and Linux unit/official-runtime
 checks, but its early GTK dependency/receiving step exceeds the one-minute
 boundary and subsequent native cases fail before the Nix step. Terminal raw
-logs are still pending; the full failure cause is not yet established. Native
+logs cannot currently be retrieved; the full failure cause is unproved. Native
 GTK and process-group dependencies now also acquire in the existing preparation
 step, before either unchanged one-minute native receiving clock. The original
 in-case signed dependency checks, package lists, actual providers and every
@@ -6396,6 +6396,15 @@ installed-runtime step passes, including the complete seven-case admission.
 The run's shared/Linux unit/official-runtime checks pass, while broader E2E
 fails and package/install remain skipped. Release is skipped. The Nix log-root
 repair is natively qualified; this does not close62 or qualify the full lane.
+
+Commit9d7b838d570004ba66d974a12410d7032df8eb83 preserves every original
+workflow byte while adding early signed dependencies. Local formatting262,
+JS382 and original runtime/temporary-registration controls pass, status0 with
+no signal/error or retained phase. The failed earlier source-registration
+receipts remain; no original assertion is removed or relaxed. Linux-only
+manual37677432702 tests exactly9d7b838d5 and remains in progress at this
+checkpoint. Native E2E/package/install qualification and dev integration remain
+pending. Items36/62 and transversal16/38 stay open.
 
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard
