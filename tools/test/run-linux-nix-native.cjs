@@ -224,6 +224,56 @@ async function run({
 			retained;
 		error(observation);
 		error('::error title=Nix native owned phase::' + observation);
+
+		// Classify only the original closed build capture; every published value
+		// is a fixed literal. These lexical hints never qualify a native case.
+		if (
+			phaseObservation.checkpoint !== 'native-build' ||
+			phaseObservation.boundary !== 'result_or_physical_debt_gate' ||
+			!Number.isSafeInteger(rawStatus) ||
+			rawStatus < 1 ||
+			rawStatus > 255 ||
+			rawSignal !== null ||
+			rawError !== null ||
+			retained !== 'false'
+		)
+			return;
+		const stderr = ownValue('stderr');
+		let kinds = 'unavailable';
+		if (
+			typeof stderr === 'string' &&
+			stderr.length <= 1024 * 1024 &&
+			!/[\u0000\u001b\ufffd\r]/.test(stderr)
+		) {
+			const rules = [
+				[
+					'evaluation',
+					/^[ \t]*error: (?:attribute '[^'\n]{1,128}' missing|undefined variable '[^'\n]{1,128}'|cannot coerce [^\n]{1,256} to a string)(?:[;\n]|$)/m
+				],
+				[
+					'nixpkgs-requirements',
+					/^[ \t]*This version of Nixpkgs requires an implementation of Nix with the following features:/m
+				],
+				['fetch', /^[ \t]*error: (?:unable|failed) to (?:download|fetch) '[^'\n]{1,4096}'/m],
+				[
+					'builder',
+					/^[ \t]*error: builder for '[^'\n]{1,4096}\.drv' failed with exit code [1-9][0-9]{0,2}(?:[;\n]|$)/m
+				],
+				[
+					'dependency',
+					/^[ \t]*error: [1-9][0-9]{0,5} dependencies of derivation '[^'\n]{1,4096}\.drv' failed to build(?:[;\n]|$)/m
+				],
+				['disk-space', /^[ \t]*error: [^\n]{0,4096}No space left on device(?:[;\n]|$)/m]
+			];
+			kinds =
+				rules
+					.filter(([, pattern]) => pattern.test(stderr))
+					.map(([kind]) => kind)
+					.join(',') || 'unknown';
+		}
+		const buildHint = 'NIX_NATIVE_BUILD_ERROR_KINDS kinds=' + kinds;
+		error(buildHint);
+		error('::error title=Nix native build classification::' + buildHint);
 	}
 	try {
 		current();
