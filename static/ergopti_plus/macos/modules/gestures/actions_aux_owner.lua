@@ -571,6 +571,24 @@ function M.run_program(executable, arguments, admitted, parent, source)
 	end, { executable = executable, arguments = arguments, source = source }, "user program", completed, parent, true, admitted)
 end
 
+--- Revalidates a reserved automation descriptor without invoking its service.
+--- @param executable string Canonical chosen program route.
+--- @param arguments table Persisted literal arguments.
+--- @param admitted function Current binding/source admission predicate.
+--- @param parent string Stable action consumer identity.
+--- @return boolean started Readonly query accepted; automation remains unavailable.
+function M.revalidate_automation(executable, arguments, admitted, parent)
+	local Native = require("adapters.apple_shortcuts_native")
+	return start_shell(function(payload, terminal)
+		local handle = Native.revalidate_program(payload.executable, payload.arguments, terminal, admitted)
+		if type(handle) ~= "table" then return false, nil end
+		local ok, receipt = pcall(handle.start)
+		return ok and receipt == true, handle
+	end, { executable = executable, arguments = arguments }, "Apple Shortcut revalidation", function()
+		Logger.error(LOG, "Apple Shortcut invocation refused: remote service retirement is unacknowledged.")
+	end, parent, true, admitted)
+end
+
 function M.stop_programs(parent)
 	local scope = action_scope(parent)
 	local selected = {}
