@@ -1,5 +1,5 @@
 // tools/diagnostics/native_appleevent_probe_receiver.c
-// Owned open-application recipient for non-self native sandbox admission only.
+// Owned private nonce recipient for non-self native sandbox admission only.
 
 #include <Carbon/Carbon.h>
 #include <ApplicationServices/ApplicationServices.h>
@@ -11,10 +11,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include "native_appleevent_probe_protocol.h"
 
-static const AEEventClass probe_class = kCoreEventClass;
-static const AEEventID probe_event = kAEOpenApplication;
-static const AEKeyword nonce_parameter = 0x45674e63; /* EgNc */
+static const AEEventClass probe_class = ERGOPTI_PROBE_EVENT_CLASS;
+static const AEEventID probe_event = ERGOPTI_PROBE_EVENT_ID;
+static const AEKeyword nonce_parameter = ERGOPTI_PROBE_NONCE_PARAMETER;
 static const char *expected_nonce;
 static const char *delivery_path;
 static unsigned int delivered;

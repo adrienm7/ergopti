@@ -278,7 +278,7 @@ check('portable Brew ownership controls remain registered and mandatory', () => 
 	assert.ifError(result.error);
 	assert.strictEqual(result.signal, null, result.stderr);
 	assert.strictEqual(result.status, 0, result.stderr);
-	assert.match(result.stderr, /Ran 39 tests in /);
+	assert.match(result.stderr, /Ran 40 tests in /);
 	assert.match(result.stderr, /\nOK\s*$/);
 	assert.doesNotMatch(result.stderr, /skipped=/);
 });
@@ -369,11 +369,40 @@ check(
 		);
 		assert.match(
 			boundary,
-			/registration_controls\.stdout == "native_appkit_registration_controls=5\\n"/
+			/registration_controls\.stdout\s*==\s*"native_appkit_registration_controls=5\\nnative_private_appleevent_controls=1\\n"/
 		);
 		assert.doesNotMatch(boundary, /NSWorkspace|\/usr\/bin\/open/);
 	}
 );
+
+check('owned AppleEvent probe constructs the shared private SDK event before any delivery', () => {
+	const diagnostic = (name) => fs.readFileSync(path.join(ROOT, 'tools/diagnostics', name), 'utf8');
+	const protocol = diagnostic('native_appleevent_probe_protocol.h');
+	assert.match(protocol, /ERGOPTI_PROBE_EVENT_CLASS \(\(AEEventClass\)0x45675062u\)/);
+	assert.match(protocol, /ERGOPTI_PROBE_EVENT_ID \(\(AEEventID\)0x6e6f6e63u\)/);
+	for (const role of ['sender', 'receiver']) {
+		const source = diagnostic('native_appleevent_probe_' + role + '.c');
+		assert.match(source, /#include "native_appleevent_probe_protocol\.h"/);
+		assert.match(source, /probe_class = ERGOPTI_PROBE_EVENT_CLASS;/);
+		assert.match(source, /probe_event = ERGOPTI_PROBE_EVENT_ID;/);
+		assert.doesNotMatch(source, /kCoreEventClass|kAEOpenApplication/);
+	}
+	const controls = diagnostic('native_appleevent_registration_test.m');
+	assert.match(controls, /assert\(probe_class != kCoreEventClass\);/);
+	assert.match(controls, /AECreateAppleEvent\(probe_class, probe_event, &address,/);
+	assert.match(controls, /AEGetAttributePtr\(&event, keyEventClassAttr, typeType,/);
+	assert.match(controls, /AEGetAttributePtr\(&event, keyEventIDAttr, typeType,/);
+	assert.match(
+		controls,
+		/assert_private_probe_event\(\);\s*puts\("native_appkit_registration_controls=5"\);/
+	);
+	const helper = diagnostic('macos_brew_archive_acceptance.py');
+	assert.match(
+		helper,
+		/registration_controls\.stdout\s*==\s*"native_appkit_registration_controls=5\\nnative_private_appleevent_controls=1\\n"/
+	);
+	assert.match(helper, /"tools\/diagnostics\/native_appleevent_probe_protocol\.h",/);
+});
 
 check('native XCTest invokes actual Brew acceptance and requires its complete receipt', () => {
 	const fixture = fs.readFileSync(

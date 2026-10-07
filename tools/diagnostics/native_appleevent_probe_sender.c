@@ -1,5 +1,5 @@
 // tools/diagnostics/native_appleevent_probe_sender.c
-// Exact kernel-PID open-application sender for native sandbox admission only.
+// Exact kernel-PID private nonce sender for native sandbox admission only.
 
 #include <ApplicationServices/ApplicationServices.h>
 #include <errno.h>
@@ -8,10 +8,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include "native_appleevent_probe_protocol.h"
 
-static const AEEventClass probe_class = kCoreEventClass;
-static const AEEventID probe_event = kAEOpenApplication;
-static const AEKeyword nonce_parameter = 0x45674e63; /* EgNc */
+static const AEEventClass probe_class = ERGOPTI_PROBE_EVENT_CLASS;
+static const AEEventID probe_event = ERGOPTI_PROBE_EVENT_ID;
+static const AEKeyword nonce_parameter = ERGOPTI_PROBE_NONCE_PARAMETER;
 
 static int valid_nonce(const char *value) {
     if (strlen(value) != 36) return 0;
