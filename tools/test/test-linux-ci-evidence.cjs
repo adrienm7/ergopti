@@ -1552,6 +1552,86 @@ for (const [from, to] of unitLogMutations) {
 	assert.notStrictEqual(changed, testLinux);
 	assert.throws(() => assertLinuxUnitFailureLog(changed));
 }
+/**
+ * Keeps the original unit and upload intact, then annotates only their own log.
+ * @param {string} job Actual test-linux job from the canonical pipeline loader.
+ */
+function assertLinuxUnitFailureExcerpt(job) {
+	assertLinuxUnitFailureLog(job);
+	const excerpt = pipeline.step(job, 'Emit Configuration assertion from failed unit log');
+	assert.strictEqual(
+		pipeline.stepField(excerpt, 'if'),
+		"${{ failure() && !cancelled() && steps.linux_unit.outcome == 'failure' }}"
+	);
+	assert.strictEqual(pipeline.stepField(excerpt, 'shell'), 'bash');
+	assert.strictEqual(pipeline.stepField(excerpt, 'working-directory'), null);
+	assert.strictEqual(pipeline.stepField(excerpt, 'continue-on-error'), null);
+	assert.strictEqual(pipeline.stepField(excerpt, 'uses'), null);
+	assert.deepStrictEqual(pipeline.runOf(excerpt), [
+		'node tools/test/linux-unit-failure-excerpt.cjs "$RUNNER_TEMP/linux-unit.log"'
+	]);
+	const steps = pipeline.steps(job);
+	const uploadAt = steps.findIndex((step) => step.name === 'Upload failed unit log');
+	assert.strictEqual(
+		steps[uploadAt + 1]?.name,
+		'Emit Configuration assertion from failed unit log'
+	);
+	assert.strictEqual(steps[uploadAt + 2]?.name, 'Run manual official runtime and model acceptance');
+}
+assertLinuxUnitFailureExcerpt(testLinux);
+const unitExcerptMutations = [
+	[
+		'name: Emit Configuration assertion from failed unit log',
+		'name: Omitted Configuration assertion'
+	],
+	["failure() && !cancelled() && steps.linux_unit.outcome == 'failure'", 'success()'],
+	["failure() && !cancelled() && steps.linux_unit.outcome == 'failure'", 'failure()'],
+	['shell: bash', 'shell: sh'],
+	['shell: bash', 'shell: bash\n        continue-on-error: true'],
+	['shell: bash', 'shell: bash\n        working-directory: static/ergopti_plus/linux'],
+	['"$RUNNER_TEMP/linux-unit.log"', '"$RUNNER_TEMP/another.log"'],
+	['"$RUNNER_TEMP/linux-unit.log"', '"$RUNNER_TEMP/linux-unit.log" || true'],
+	['node tools/test/linux-unit-failure-excerpt.cjs', 'node tools/test/report.cjs']
+];
+assert.strictEqual(
+	unitExcerptMutations.length,
+	9,
+	'every independent excerpt wiring mutation is present'
+);
+for (const [from, to] of unitExcerptMutations) {
+	const excerpt = pipeline.step(testLinux, 'Emit Configuration assertion from failed unit log');
+	assert.strictEqual(excerpt.split(from).length - 1, 1, 'the excerpt mutation anchor is unique');
+	assert.strictEqual(testLinux.split(excerpt).length - 1, 1, 'the actual excerpt step is unique');
+	const changed = testLinux.replace(excerpt, () => excerpt.replace(from, () => to));
+	assert.notStrictEqual(changed, testLinux);
+	assert.throws(() => assertLinuxUnitFailureExcerpt(changed));
+}
+const actualExcerpt = pipeline.step(testLinux, 'Emit Configuration assertion from failed unit log');
+assert.throws(
+	() =>
+		assertLinuxUnitFailureExcerpt(
+			testLinux.replace(actualExcerpt, () => actualExcerpt + '\n\n' + actualExcerpt)
+		),
+	'a duplicate annotation must be rejected by the actual step loader'
+);
+const actualUpload = pipeline.step(testLinux, 'Upload failed unit log');
+assert.strictEqual(testLinux.split(actualUpload).length - 1, 1);
+assert.strictEqual(testLinux.split(actualExcerpt).length - 1, 1);
+const swapMarker = '__ERGOPTI_CONFIGURATION_EXCERPT_SWAP__';
+assert.ok(
+	!testLinux.includes(swapMarker),
+	'the temporary swap marker is absent from the actual job'
+);
+const reorderedExcerpt = testLinux
+	.replace(actualUpload, () => swapMarker)
+	.replace(actualExcerpt, () => actualUpload)
+	.replace(swapMarker, () => actualExcerpt);
+assert.notStrictEqual(reorderedExcerpt, testLinux);
+assert.throws(
+	() => assertLinuxUnitFailureExcerpt(reorderedExcerpt),
+	'the annotation cannot interrupt original unit-to-uploader adjacency'
+);
+
 assert.ok(
 	(
 		pipeline.runOf(

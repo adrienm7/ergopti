@@ -367,6 +367,141 @@ async function testOutputDrain() {
 	}
 }
 
+// The current Linux failure log is public, but the original reporter retains
+// only test names. These independent transcripts prove the receiving CLI
+// publishes the fixed fixture's exact complete assertion and rejects ambiguity.
+const excerptFixture = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-unit-excerpt-'));
+try {
+	const excerptCommand = path.join(__dirname, 'linux-unit-failure-excerpt.cjs');
+	const excerptLog = path.join(excerptFixture, 'linux-unit.log');
+	const caseName = 'routes the Configuration restore row to the recommended hotstrings';
+	const assertion = 'test_hotstrings_scope.lua:435: the restored catalogue fires — actual: false';
+	const inline = `  FAIL ${caseName} — ${assertion}\n`;
+	const detail = `  - ${caseName} : ${assertion}\n    replay: luajit tests/run.lua --only "${caseName}"\n`;
+	const footer =
+		'OVERALL RESULTS:\nTotal modules: 498\nPassed tests:  11224\nFailed tests:  1\n========================================\n';
+	const reporter =
+		'[report:linux-lua] \x1b[31mFAIL\x1b[0m — 11\u202F224 passed, 1 failed (exit 1, format lua).\n';
+	const transcript = inline + footer + detail + reporter;
+	function receiveExcerpt(log) {
+		fs.writeFileSync(excerptLog, log);
+		return spawnSync(process.execPath, [excerptCommand, excerptLog], { encoding: 'utf8' });
+	}
+	const accepted = receiveExcerpt(transcript);
+	check(
+		'Configuration assertion CLI receives the exact complete failure',
+		accepted.status === 0 &&
+			accepted.signal === null &&
+			accepted.stderr === '' &&
+			accepted.stdout ===
+				'::notice title=linux-lua Configuration assertion::routes the Configuration restore row to the recommended hotstrings%0Atest_hotstrings_scope.lua:435: the restored catalogue fires — actual: false\n'
+	);
+	const multiline =
+		'test_hotstrings_scope.lua:429: the Configuration row is registered:\n  expected: "function"\n    actual: "nil"';
+	const escaped = receiveExcerpt(transcript.replaceAll(assertion, multiline));
+	check(
+		'Configuration equality assertion retains both independently known values',
+		escaped.status === 0 &&
+			escaped.stderr === '' &&
+			escaped.stdout ===
+				'::notice title=linux-lua Configuration assertion::routes the Configuration restore row to the recommended hotstrings%0Atest_hotstrings_scope.lua:429: the Configuration row is registered:%0A  expected: "function"%0A    actual: "nil"\n'
+	);
+	const injection = 'test_hotstrings_scope.lua:435: 50%\r\n::error::injected';
+	const safe = receiveExcerpt(transcript.replaceAll(assertion, injection));
+	check(
+		'Configuration assertion escapes percent and every injected command line',
+		safe.status === 0 &&
+			safe.stderr === '' &&
+			safe.stdout ===
+				'::notice title=linux-lua Configuration assertion::routes the Configuration restore row to the recommended hotstrings%0Atest_hotstrings_scope.lua:435: 50%25%0D%0A::error::injected\n'
+	);
+	const refusedLogs = [
+		['missing inline case', transcript.replace(inline, '')],
+		['missing terminal case', inline + footer + reporter],
+		['duplicate inline case', inline + transcript],
+		['duplicate terminal case', transcript.replace(detail, detail + detail)],
+		['other case name', transcript.replaceAll(caseName, 'another failing test')],
+		['truncated replay', transcript.slice(0, transcript.indexOf('    replay:'))],
+		['truncated reporter', transcript.slice(0, -1)],
+		[
+			'truncated inline assertion',
+			transcript.replace(inline, `  FAIL ${caseName} — ${assertion.slice(0, -5)}\n`)
+		],
+		['conflicting assertion copies', transcript.replace(inline, inline.replace('false', 'nil'))],
+		['duplicate footer', transcript.replace(footer, footer + footer)],
+		['duplicate reporter', transcript + reporter],
+		['successful runner footer', transcript.replace('Failed tests:  1', 'Failed tests:  0')],
+		['successful reporter', transcript.replace('(exit 1, format lua)', '(exit 0, format lua)')],
+		['inconsistent failure count', transcript.replace('Failed tests:  1', 'Failed tests:  2')],
+		[
+			'foreign assertion source',
+			transcript.replaceAll('test_hotstrings_scope.lua', 'test_other.lua')
+		],
+		['control byte', transcript.replaceAll(assertion, assertion + '\x00')],
+		[
+			'escaped annotation exceeds budget',
+			transcript.replaceAll(assertion, assertion + '%'.repeat(3000))
+		],
+		[
+			'invalid UTF-8',
+			Buffer.from(transcript.replaceAll(assertion, assertion + '\x7f')).map((byte) =>
+				byte === 0x7f ? 0xff : byte
+			)
+		]
+	];
+	for (const [label, log] of refusedLogs) {
+		const refusal = receiveExcerpt(log);
+		check(
+			`Configuration excerpt refuses ${label} without publishing detail`,
+			refusal.status === 2 &&
+				refusal.signal === null &&
+				refusal.stdout === '' &&
+				refusal.stderr.startsWith('Configuration assertion annotation refused: ') &&
+				!refusal.stderr.includes(assertion)
+		);
+	}
+	for (const args of [
+		[],
+		[excerptLog, excerptLog],
+		[path.join(excerptFixture, 'absent')],
+		[excerptFixture]
+	]) {
+		const refusal = spawnSync(process.execPath, [excerptCommand, ...args], { encoding: 'utf8' });
+		check(
+			'Configuration excerpt refuses argument or read failures without a notice',
+			refusal.status === 2 &&
+				refusal.signal === null &&
+				refusal.stdout === '' &&
+				refusal.stderr.startsWith('Configuration assertion annotation refused: ')
+		);
+	}
+	// A removed no-follow guard must reach a valid log and publish it, so a
+	// decoding refusal cannot accidentally certify symbolic-link isolation.
+	fs.writeFileSync(excerptLog, transcript);
+	if (process.platform !== 'win32') {
+		const link = path.join(excerptFixture, 'foreign-log');
+		fs.symlinkSync(excerptLog, link);
+		const refusal = spawnSync(process.execPath, [excerptCommand, link], { encoding: 'utf8' });
+		check(
+			'Configuration excerpt refuses a symbolic log alias',
+			refusal.status === 2 &&
+				refusal.stdout === '' &&
+				refusal.stderr.startsWith('Configuration assertion annotation refused: ')
+		);
+	}
+	fs.truncateSync(excerptLog, 32 * 1024 * 1024 + 1);
+	const oversized = spawnSync(process.execPath, [excerptCommand, excerptLog], { encoding: 'utf8' });
+	check(
+		'Configuration excerpt refuses oversized input before decoding',
+		oversized.status === 2 &&
+			oversized.stdout === '' &&
+			oversized.stderr ===
+				'Configuration assertion annotation refused: unit log is not a regular bounded file.\n'
+	);
+} finally {
+	fs.rmSync(excerptFixture, { recursive: true, force: true });
+}
+
 testOutputDrain()
 	.then(() => {
 		console.log(

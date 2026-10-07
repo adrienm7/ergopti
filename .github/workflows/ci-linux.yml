@@ -100,6 +100,12 @@ jobs:
           path: ${{ runner.temp }}/linux-unit.log
           if-no-files-found: error
 
+      # The original red unit run owns this public assertion; no rerun is substituted.
+      - name: Emit Configuration assertion from failed unit log
+        if: ${{ failure() && !cancelled() && steps.linux_unit.outcome == 'failure' }}
+        shell: bash
+        run: node tools/test/linux-unit-failure-excerpt.cjs "$RUNNER_TEMP/linux-unit.log"
+
       # This external acceptance is deliberate manual validation, separate from
       # the frozen prerequisite gate and every package/installed-driver subject.
       - name: Run manual official runtime and model acceptance
