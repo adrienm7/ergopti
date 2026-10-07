@@ -4230,6 +4230,15 @@ retains exact runs, source SHAs and continuation requirements.
       retain exact passed/failed/skipped receipts. Keep independent items16/38
       and genuine device validation open.
 
+The new group6 native-receiving source archive preserves the six exact Brew
+preimages and public SDK contract audit. The unconfined positive already passes;
+the sandboxed reply-10004 and separate query-1744 still need causal native
+evidence. An interactive same-executable prerequisite is remaining CODE, with
+real responsible identity/prompt/grant and its effect unmeasured. A public
+permission call can block arbitrarily; the hosted runner cannot supply human
+consent. The original positives, full denial, six Brew cases, clocks and physical
+closure remain mandatory. This source audit does not close36 or16/38.
+
 - [~] **37.** Always show the shipped Ergopti hotstring pack, including when
   its keyboard layout is not installed. Move French `suffixes_a` and magic-key
   `replace` into that extension without a beta compatibility layer. The runtime
@@ -6437,6 +6446,17 @@ CSharp compilation pass;29 independently specified pure-helper controls pass,
 status0 without signal/error or retained phase. No native Windows DLL or TLS
 call ran in this container. Native trust/refusal, full updater staging/cleanup
 and complete Windows E2E/package/install receiving remain pending;62 stays open.
+
+Windows-only manual37682193508 tests exactly6695173f80e1560aca298ce6cab5252019529e6d
+and remains in progress. Linux-only manual37679343730 passes the unchanged unit
+suite and official runtime/model acceptance, then fails its combined dependency
+preparation after ten minutes and subsequent E2E cases. Its terminal result and
+setup log remain pending. No full-lane success is claimed.
+The [native-receiving source archive](handovers/2026-10-04-parallel-containers/GROUP6-NATIVE-RECEIVING-PACKETS-2026-10-07.tar.gz)
+preserves82 exact source/manifest records with separate portable receiving
+summaries, SHA256 d9d2ef1ffb91a82ead067a060d6f9619009d1692276c5ab0afa826dd5baa7903.
+Original source-only packet statuses remain distinct from subsequent execution;
+no raw private captures, signed redirect URLs or private keys are included.
 
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard
