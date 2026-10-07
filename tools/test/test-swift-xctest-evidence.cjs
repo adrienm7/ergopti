@@ -1000,3 +1000,5 @@ try {
 console.log(
 	'[OK] Six lossless closed records, Unicode, source identity and twenty-one mandatory refusal cases are admitted independently of raw XCTest.'
 );
+
+require('./fixtures/tis_observation_projection_control.cjs');

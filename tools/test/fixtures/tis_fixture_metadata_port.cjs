@@ -119,6 +119,12 @@ function createPort(root) {
 		fs.closeSync(descriptor);
 		descriptors.delete(descriptor);
 	};
+	// The observation publisher may write only the already-owned diagnostic streams.
+	port.writeSync = function (descriptor, ...arguments_) {
+		if (descriptor !== 1 && descriptor !== 2)
+			throw new Error('The TIS metadata port refuses a non-diagnostic writer.');
+		return fs.writeSync(descriptor, ...arguments_);
+	};
 	return { port, outstanding: () => descriptors.size };
 }
 

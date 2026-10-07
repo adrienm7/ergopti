@@ -3236,6 +3236,16 @@ assertion failures, two unexpected. Packaging and installation remain
 unqualified. A passing logger rerun does not resolve its earlier intermittent
 lock refusal. No physical magic-key acceptance is inferred.
 
+A held-record TIS diagnostic projector now emits at most8 records with64 events
+each, only closed public source names or digests, explicit omissions and bounded
+qualification witnesses. It builds bytes before foreign output callbacks and
+requires body/closing delivery acknowledgments, including late stdout errors.
+The existing raw native census/admission and assertions are unchanged. Independent
+Node22/24 controls pass45 cases with50 real CLI children; these are diagnostic
+and modeled transport checks, not native TIS or physical-key acceptance. Current
+native375455 passes six source cases on the previous source, not this successor.
+Item30 remains partial; keyboard/device qualification is still required.
+
 - [~] **31.** HS-274 exact physical key accounting with an Ergopti-owned
   background Karabiner runtime (no Karabiner-Elements app). Plan, decisions and
   ADR 011 in the overnight handoff and `static/ergopti_plus/docs/adr/`. WP0-WP2

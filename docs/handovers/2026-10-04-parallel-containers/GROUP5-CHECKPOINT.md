@@ -1524,3 +1524,16 @@ macOS; a symlinked temporary-directory cause is reproduced locally, but its
 native stderr is not retained in the uploaded artifact. Stock calibration and
 Group6 archive acceptance also fail. Compilation, unsigned preparation, signed
 shipping and installation remain unqualified. Items24/30/31/40/43/44 stay open.
+
+## Bounded held TIS observations
+
+Reviewed four-path diagnostic successor preserves the original collector,
+strict native census and all old assertions. At most8 held records/64 events
+are projected, with closed known public IDs or digests and explicit omissions.
+Every body byte is acknowledged before the closing marker; late stdout errors
+and unresolved acknowledgments retain a bounded UNQUALIFIED witness through
+actual process exit. Independent Node22/24 replays pass45 additive cases with
+50 actual CLI children each; original privacy/lifetime failures and causal
+mutants are retained. Windows metadata forwarding is a modeled diagnostic port.
+No native TIS, hardware, packaging or installation acceptance is inferred, and
+item30 stays open. Current previous-source Mac375455 has six native TIS passes.
