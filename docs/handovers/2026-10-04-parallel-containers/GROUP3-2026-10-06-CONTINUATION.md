@@ -1,6 +1,6 @@
 <!-- docs/handovers/2026-10-04-parallel-containers/GROUP3-2026-10-06-CONTINUATION.md -->
 
-# Group 3 continuation — 6 October 2026
+# Group 3 continuation — 6–7 October 2026
 
 All thirteen assigned items remain partial: 63, 71, 73, 91, 93, 96, 97, 98,
 106, 107, 108, 109 and 111. No item is removed. Items 16 and 38 retain their
@@ -8,8 +8,11 @@ validation requirements; item 22 remains withdrawn. This is a source and
 qualification checkpoint, not completion of the group.
 
 The previous 47 owned commits are already in the `origin/dev` ancestor
-`ad937abc84bbecc129f4bea8a42e8cd159fe409f`. Latest composed dev is
-`de4f253c1301399bba2eb13c4139d5f683ed2667`. The feature adds these code changes:
+`ad937abc84bbecc129f4bea8a42e8cd159fe409f`. The first provider integration
+composed dev `de4f253c1301399bba2eb13c4139d5f683ed2667`; the current source
+composes actual dev `2d8d8357e06e76371d41c8c9f4ab8f2fd8bfc939`, preserving
+the configuration group delivery and Windows descendant-PID receipt correction.
+The feature adds these code changes:
 
 - `9e237dc0bc84721d08054ddcf45de4d476d3e1e6`: separately measure GTK spawn,
   durable receipt publication and native waiting without changing the original
@@ -25,9 +28,21 @@ The previous 47 owned commits are already in the `origin/dev` ancestor
   fixture correction and all thirty previous controls while constraining
   modeled private authority to captured identities and exclusive creation.
 
-The provider source tree is `95770d66443288d13229f8126a5d925c55024172`.
+- `f098e95688d822c6ee036c6d392eb4d4ebcd1964`: enable long paths only in
+  the owned native Windows clone before its complete checkout.
+- `0ce682b1ffbb1854fcfe2ed1842f109da5df453c`: retain closed catalogue-reader
+  refusal facts without exposing private streams or changing admission.
+- `92ae2ba0af9f3bc57789d0786c61f4b944ba4564`: initialize the existing pinned
+  Node/Python validation runtimes in the Windows install job.
+- `ba7019021517591434d68e174e6ea00eb020a9e4`: adopt the reviewed readonly
+  Windows key-level/number-row observation precursor from exact preimages.
+- `454847c2fcd04ba0e61697412929632dec492636`: safely refuse incomplete
+  number-row descriptors, preserving the native dead-key assertion.
+
+The original provider source tree is `95770d66443288d13229f8126a5d925c55024172`.
 The no-squash integration `7a75da439661caf8cb94295c809ebf2607a4ef97`
-is confirmed in actual remote `dev`; all feature commits are ancestors.
+is confirmed in actual remote `dev`; all feature commits from that provider
+integration are ancestors.
 
 ## Integrated qualification and clone repair
 
@@ -81,19 +96,47 @@ adds closed refusal facts, retaining the exact original execution, predicate,
 and none on the successor; arbitrary execution throws still propagate by
 identity. No stream, error message, private value or getter is projected.
 Diagnostic successor `0ce682b1ffbb1854fcfe2ed1842f109da5df453c` is published;
-actual Windows replay remains pending. After bounded public ownership
+actual successful Windows replay is recorded below. After bounded public ownership
 coordination, the launch job now initializes Node from `.node-version` and
 Python 3.12 with the same setup actions already used by packaging. This fixes
 the observed Node version drift without changing any admission assertion,
 fixture, receipt, deadline or release policy. Python absence and the original
-refusal cause remain unproved; fresh native installation qualification is
-required.
+refusal cause remain unproved.
 
-Both final manual runs are terminal. Group 3 deleted only its owned
-`323873fd` integration lock and preserved CI-validation `6c9d575`; other
-groups can reserve their final phase. `feat/actions` remains for isolated
-preparation and qualification through `codex/ci-actions`. No feature deletion,
-whole-group completion or successful installed Windows acceptance is claimed.
+[Windows runtime qualification37546977032](https://github.com/adrienm7/ergopti/actions/runs/37546977032)
+tests CI `f3473b8b0fa29ac20032fbd2dc01908ffac5e458`, exact candidate
+`92ae2ba0af9f3bc57789d0786c61f4b944ba4564`, tree
+`2218b95367a00d93b943a9f32852c6b6ee54b191`. All12 jobs are terminal:
+9 PASS / zero FAIL /3 SKIP. Core364 checks/properties, Windows9,734 units,
+70 E2E cases, source/fresh-clone/reload/warm startup, packaging, installed
+native catalogue admission and all23 compiled programmable cases pass.
+Actual install runtimes are Node22.22.2 and CPython3.12.10. Native boot
+records exit0 and acknowledged process-tree closure; Win32 execution remains
+unrun. Linux/macOS are intentionally unselected and Release/Publish skipped.
+The original Python refusal cause remains unknown; later success does not
+retroactively diagnose it. Terminal ZIP SHA-256:
+`72e9320ff21b4ef798717d70b5a8a6d31330c5eba78c4c3f376bb1adf35ce5a3`.
+
+[Configuration integrated qualification37547053814](https://github.com/adrienm7/ergopti/actions/runs/37547053814)
+tests CI `34782db782bf206710cb459890927645bb5f7d26`, exact dev
+`8cba7a0c45950383904ab6db11274f20823fc465`, tree
+`c0a8c8095a1e9d97a138b37a6365c49dbb5f0bff`, all three OS lanes.
+All37 jobs terminate:32 PASS /3 FAIL /2 SKIP. The complete Windows chain
+(10,089 units/E2E/package/install/compiled acceptance) and Linux chain with
+all17 installed variants pass. macOS portable units/E2E and native12
+tooltip captures pass; native package fails on Sparkle retirement, an
+expired Brew AppleEvent receiver and the refused GlobalSwitcher prerequisite.
+macOS install and Release/Publish are skipped; the complete CI is FAILED.
+These foreign software/prerequisite failures remain owned and open.
+No physical acceptance or granted permission is inferred.
+
+At the first integration checkpoint Group3 released only its owned
+`323873fd` lock after both manual runs terminated, leaving validation
+`6c9d575` unchanged. The later isolated preparation uses only
+`codex/ci-actions`; the final phase requires a new create-only empty lock
+from actual latest dev. Successful Windows installed acceptance is now
+qualified above. Whole-group completion is not claimed; final integrated
+qualification and cleanup are recorded separately after actual completion.
 
 ## Actual provider qualification
 
@@ -151,8 +194,9 @@ original UID and exclusive creation. Thirty-one controls preserve all earlier
 assertions; the same added corpus has eleven failing subtests against the
 published pathname-only model. This is controlled ownership modeling, not
 privileged native acquisition. Selected formatting and all 364 JavaScript
-checks pass on the composed source under UID 1000. Final integrated native
-qualification still needs to run.
+checks pass on the composed source under actual UID1000. Integrated
+run37539552261 and configuration run37547053814 subsequently qualify the
+complete hosted Linux chain and all17 installation/run scenarios.
 
 The macOS package failure on `a576915cf` reports an expired owned Brew
 AppleEvent receiver and Sparkle server-retirement refusal. Its owned-program
@@ -179,11 +223,11 @@ prove physical input, X11/Wayland delivery or hardware brightness.
 The final two-source HKL packet is adopted from its exact current preimages,
 using only the reviewed joint patch. `KS_NativeKeyLevel` and
 `KS_NativeNumberRowLevels` capture external scalars once and return detached
-observations without granting input/output/owner or dead-state authority. The
-complete old adapter and test prefixes, ToUnicodeEx flag `0x4`, independent
-ten-key expectations and old assertions remain exact. All six new cases are
+observations without granting input/output/owner or dead-state authority. The initial adoption preserves the complete old adapter and test prefixes,
+ToUnicodeEx flag `0x4`, independent ten-key expectations and old assertions. All six new cases are
 registered through the existing test module; hosted Windows requires genuine
-French and US HKLs. Native execution remains pending. The unchanged layout
+French and US HKLs. Their actual successful execution is recorded below.
+The unchanged layout
 fixture does not supply a new explicit unload receipt; no such lifecycle
 qualification or physical forced-output capability is claimed. Item107 stays
 partial, with native-HKL/Lua forced owners and physical delivery still open.
@@ -202,7 +246,28 @@ field reads, preserving every earlier assertion and native dead-key refusal.
 Eight additional checks require missing Text, Action or State to refuse in
 both source positions independently of native layout availability. Lua
 already safely refuses absent fields; its source and every corpus are
-unchanged. Actual corrected native replay remains required.
+unchanged.
+
+[Corrected Windows qualification37552051028](https://github.com/adrienm7/ergopti/actions/runs/37552051028)
+tests CI `18c69e27a753bec1816e926455e4f1e0ed944afd`, exact candidate
+`454847c2fcd04ba0e61697412929632dec492636`, tree
+`e3c8cc15deb88ffc233db09cbcec1c67ad948d3a`. All12 jobs terminate:
+9 PASS / zero FAIL /3 SKIP. All10,097 units pass with a complete
+10,097-record native manifest. The six new cases pass: two genuine
+French/US HKL probes and four controlled adapter-boundary cases. The
+additional eight missing-field assertions also execute in the existing
+registered policy case. Core364 checks/properties, 70 E2E cases, complete
+source/fresh-clone/reload/warm startup, package/install and all23 compiled
+programmable cases pass, with native exit0 and acknowledged owned
+process-tree closure. Linux/macOS are intentionally unselected;
+Release/Publish skipped and Win32 native execution unrun. Terminal ZIP
+SHA-256: `1505ad60fe61684482c51d27d38e06db8f9cf1c5e64c4bc6384214f95b6f1ba2`.
+
+Only the Windows driver and its CI/test admission source differ from latest
+composed dev. Final integration therefore requires Windows native CI; the
+previous separately qualified Linux scopes and explicit failed macOS package
+scopes remain retained, without rerunning unaffected native lanes. Final
+Dev/tree qualification and branch cleanup follow under a new owned lock.
 
 ## Preserved inactive preparations
 
@@ -253,20 +318,20 @@ and native capability availability remain unchanged.
 
 ## Remaining implementation and device checks
 
-| Item   | Remaining work                                                                                                                                                                                                                                                   |
-| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 63     | Establish the actual repeated-brightness behavior and measured luminance/latency on supported hardware; hosted native process logic is separate.                                                                                                                 |
-| 71     | Qualify full save/upgrade/startup and package installation across the three OSes on final sources, preserving the other groups' consumers.                                                                                                                       |
-| 73     | Recover an original failing backup/log or reproducible configuration transition. The maintainer has no remembered sequence; the three French categories must not be forcibly enabled without evidence.                                                           |
-| 91     | Join actual Windows input/output custody for physical combinations, copy behavior and fake AltGr/LCtrl; coordinate Group 7.                                                                                                                                      |
-| 93     | Compose reviewed one-shot/context/casing sources only after native origin/output/held-key admission. Repair the multi-source Hook witness; simultaneous and cross-device support remain unfinished.                                                              |
-| 96     | Finish actual built-in base/plus layout handoff with empty emulation state; retain the independent AltGr/SC012 vectors.                                                                                                                                          |
-| 97, 98 | Join native Reader observations, Writer acknowledged state, original-event custody and global modifier/latch state. Kernel output and source-aware aggregation remain unqualified.                                                                               |
-| 106    | Obtain Linux/macOS hosted qualification after the Ubuntu prerequisite repair; complete broader automation inventory, real Apple Shortcuts permission/invocation and cross-consumer behavior. Windows provider qualification above covers only its exact tranche. |
-| 107    | Resolve Group 7 ownership and forward-port readonly descriptors from exact preimages, then implement/qualify forced physical digit/symbol output across layouts. No text-preview fallback.                                                                       |
-| 108    | Complete source collision/retargeting and native physical binding joins while preserving the shared editor policy.                                                                                                                                               |
-| 109    | Qualify a fresh, invisible native Variables/KeyHistory refresh without breaking SingleInstance/Reload identity; public AHK support remains unresolved.                                                                                                           |
-| 111    | Obtain Group 5's genuine Mac source/observation/release/retirement ports, wire the product facade and qualify switching on the cursor's screen. Preserve the previously qualified Linux switcher scope.                                                          |
+| Item   | Remaining work                                                                                                                                                                                                                                                              |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 63     | Establish the actual repeated-brightness behavior and measured luminance/latency on supported hardware; hosted native process logic is separate.                                                                                                                            |
+| 71     | Qualify full save/upgrade/startup and package installation across the three OSes on final sources, preserving the other groups' consumers.                                                                                                                                  |
+| 73     | Recover an original failing backup/log or reproducible configuration transition. The maintainer has no remembered sequence; the three French categories must not be forcibly enabled without evidence.                                                                      |
+| 91     | Join actual Windows input/output custody for physical combinations, copy behavior and fake AltGr/LCtrl; coordinate Group 7.                                                                                                                                                 |
+| 93     | Compose reviewed one-shot/context/casing sources only after native origin/output/held-key admission. Repair the multi-source Hook witness; simultaneous and cross-device support remain unfinished.                                                                         |
+| 96     | Finish actual built-in base/plus layout handoff with empty emulation state; retain the independent AltGr/SC012 vectors.                                                                                                                                                     |
+| 97, 98 | Join native Reader observations, Writer acknowledged state, original-event custody and global modifier/latch state. Kernel output and source-aware aggregation remain unqualified.                                                                                          |
+| 106    | Preserve qualified Linux/process/install, signed Mac21-case inventory and Windows34-case provider scopes; finish broader automation inventory, bounded Apple Shortcuts chosen-ID invocation/cancellation and cross-consumer behavior. Keep full macOS package/install open. |
+| 107    | Keep adopted readonly descriptors separate from native-HKL/Lua forced-output owners; implement/qualify joint source/modifier/output provenance and physical digit/symbol delivery. No text-preview fallback.                                                                |
+| 108    | Complete source collision/retargeting and native physical binding joins while preserving the shared editor policy.                                                                                                                                                          |
+| 109    | Qualify a fresh, invisible native Variables/KeyHistory refresh without breaking SingleInstance/Reload identity; public AHK support remains unresolved.                                                                                                                      |
+| 111    | Obtain Group 5's genuine Mac source/observation/release/retirement ports, wire the product facade and qualify switching on the cursor's screen. Preserve the previously qualified Linux switcher scope.                                                                     |
 
 Use physical Windows/macOS checks only for the remaining behavior automation
 cannot establish: real chord/AltGr transitions, brightness and cursor-screen
