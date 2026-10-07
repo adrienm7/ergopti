@@ -1175,3 +1175,105 @@ helpers.describe("cold installed input authority bootstrap (controlled ports)", 
   end)
  end
 end)
+
+helpers.describe("consumed source withdrawal exact native inverse settlement (controlled transport)", function()
+	local Fixture = require("tests.support.input_owner_fixture")
+	local function arm(s)
+		s.pair(); helpers.assert_true(s.armed); s.edge("a", 58, 0, 110)
+	end
+	local function wire(s)
+		local out = {}; for _, row in ipairs(s.rows) do out[#out + 1] = row[1] .. ":" .. row[2] end
+		return table.concat(out, " ")
+	end
+	local function replace(options, id)
+		options.after_sync = function(s, code, value)
+			if code == 42 and value == 1 then
+				local slot, descriptor = "keyboard:" .. s.paths[id], s.descriptor(id)
+				s.old_source = assert(s.reader.capture_source_owner(slot))
+				helpers.assert_true(s.reader.close(slot)); helpers.assert_true(s.reader.open(s.paths[id], slot))
+				helpers.assert_true(s.reader.grab(slot)); s.new_source = assert(s.reader.capture_source_owner(slot))
+				helpers.assert_eq(s.descriptor(id), descriptor)
+			end
+			if options.inverse_callback and code == 42 and value == 0 then options.inverse_callback(s) end
+		end
+	end
+	for _, id in ipairs({ "a", "b" }) do
+		helpers.it("settles acknowledged Shift inverse and cancelled character after actual " .. id .. " FD reuse", function()
+			local options = { recycle_descriptor = true }; replace(options, id)
+			Fixture.with_session(options, function(s)
+				arm(s); s.edge("a", 30, 1, 200)
+				helpers.assert_eq(wire(s), "29:1 29:0 29:1 29:0 42:1 42:0")
+				helpers.assert_eq(s.hook.isRunning(), false); helpers.assert_true(s.broker.output_current())
+				helpers.assert_eq(#s.writer.output_view(s.output).down, 0)
+				helpers.assert_eq(s.reader.source_owner_current(s.old_source), false)
+				helpers.assert_true(s.reader.retire_source(s.old_source)); helpers.assert_true(s.reader.source_owner_current(s.new_source))
+				s.hook.stop(); helpers.assert_true(s.hook.set_remapper(nil))
+				helpers.assert_true(s.reader.source_owner_current(s.new_source), "Original remapper cleanup cannot close successor")
+				helpers.assert_true(s.writer.output_current(s.output), "Healthy original output remains admitted")
+				helpers.assert_eq(wire(s), "29:1 29:0 29:1 29:0 42:1 42:0", "Settlement emits no duplicate inverse or cancelled character")
+				helpers.assert_true(s.reader.retire_source(s.new_source))
+			end)
+		end)
+	end
+	helpers.it("does not acknowledge a queued inverse before original native commit", function()
+		local options = { recycle_descriptor = true }; replace(options, "a")
+		options.inverse_callback = function(s)
+			helpers.assert_eq(s.hook.set_remapper(nil), false, "Native inverse callback remains inside busy commit")
+		end
+		Fixture.with_session(options, function(s)
+			arm(s); s.edge("a", 30, 1, 200)
+			helpers.assert_true(s.hook.set_remapper(nil)); helpers.assert_true(s.reader.source_owner_current(s.new_source))
+			helpers.assert_true(s.reader.retire_source(s.new_source))
+		end)
+	end)
+	helpers.it("retains retirement debt after failed inverse SYN and refused original destroy", function()
+		local options = { recycle_descriptor = true, output_destroy = function() return false end }
+		replace(options, "a"); options.fail_sync = function(_, code, value) return code == 42 and value == 0 end
+		Fixture.with_session(options, function(s)
+			arm(s); s.edge("a", 30, 1, 200)
+			helpers.assert_eq(s.hook.set_remapper(nil), false); local destroys = s.output_destroys
+			helpers.assert_eq(s.hook.set_remapper(nil), false); helpers.assert_eq(s.output_destroys, destroys, "Unknown retirement is not retried")
+			helpers.assert_true(s.broker.has_debt()); helpers.assert_true(s.reader.source_owner_current(s.new_source))
+			helpers.assert_eq(wire(s), "29:1 29:0 29:1 29:0 42:1 42:0")
+			helpers.assert_true(s.reader.retire_source(s.new_source))
+		end)
+	end)
+	helpers.it("refuses a rebound producer ACK while preserving original healthy output", function()
+		local options = { recycle_descriptor = true }; replace(options, "a")
+		options.inverse_callback = function(s)
+			s.original_ack = s.engine.ack_retirement; s.fake_ack_called = false
+			s.engine.ack_retirement = function() s.fake_ack_called = true; return true end
+		end
+		Fixture.with_session(options, function(s)
+			arm(s); s.edge("a", 30, 1, 200)
+			helpers.assert_eq(s.hook.set_remapper(nil), false); helpers.assert_eq(s.fake_ack_called, false)
+			helpers.assert_true(s.writer.output_current(s.output)); s.engine.ack_retirement = s.original_ack
+			helpers.assert_true(s.hook.set_remapper(nil)); helpers.assert_true(s.reader.source_owner_current(s.new_source))
+			helpers.assert_true(s.reader.retire_source(s.new_source))
+		end)
+	end)
+	helpers.it("settles its old opaque holders while preserving an unrelated native Shift owner", function()
+		local options = { recycle_descriptor = true }
+		options.after_sync = function(s, code, value)
+			if code == 30 and value == 1 then
+				local slot = "keyboard:" .. s.paths.a
+				s.old_source = assert(s.reader.capture_source_owner(slot)); helpers.assert_true(s.reader.close(slot))
+				helpers.assert_true(s.reader.open(s.paths.a, slot)); helpers.assert_true(s.reader.grab(slot))
+				s.new_source = assert(s.reader.capture_source_owner(slot))
+			end
+		end
+		Fixture.with_session(options, function(s)
+			arm(s); local other = {}
+			helpers.assert_true(s.broker.edge(other, 42, 1, s.writer.emit).ok)
+			s.edge("a", 30, 1, 200)
+			helpers.assert_eq(wire(s), "29:1 29:0 29:1 29:0 42:1 30:1 30:0")
+			helpers.assert_true(s.hook.set_remapper(nil)); helpers.assert_true(s.broker.output_current())
+			helpers.assert_eq(s.broker.view().owners[other].code, 42)
+			helpers.assert_eq(s.writer.output_view(s.output).down[1], 42, "Unrelated native Shift must remain held")
+			helpers.assert_true(s.reader.source_owner_current(s.new_source)); helpers.assert_true(s.reader.retire_source(s.new_source))
+			helpers.assert_true(s.broker.edge(other, 42, 0, s.writer.emit).ok)
+			helpers.assert_eq(wire(s), "29:1 29:0 29:1 29:0 42:1 30:1 30:0 42:0")
+		end)
+	end)
+
+end)

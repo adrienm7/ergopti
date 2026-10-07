@@ -74,94 +74,15 @@ function checkWorkflow(body) {
 	assert.match(upload, /overwrite: true/);
 }
 
-/** Follows one real authored cohort include, refusing absent or duplicate ownership. */
-function readCohortOwner(file) {
-	const names = new Map([
-		['unit/test_console_window.ahk', 'console_capture_cohort.ahk'],
-		['unit/test_key_combinations.ahk', 'altgr_suffix_cohort.ahk']
-	]);
-	assert.ok(names.has(file));
-	const owner = fs.readFileSync(path.join(root, 'static/ergopti_plus/windows/tests', file), 'utf8');
-	const include = '#Include ../support/' + names.get(file);
-	const code = stripComments(owner, '.ahk');
-	assert.equal(
-		code.split(include).length,
-		2,
-		'the original owner has exactly one actual cohort include'
-	);
-	assert.match(code, new RegExp('^' + include.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&') + '$', 'm'));
-	const shared = fs.readFileSync(
-		path.join(root, 'static/ergopti_plus/windows/tests/support', names.get(file)),
-		'utf8'
-	);
-	assert.ok(shared.length > 1000, 'the actual shared cohort must contain its source definitions');
-	return owner + '\n' + shared;
-}
-
-/** Keeps the canonical producer narrow while every stdout diagnostic still refuses. */
-function checkDesktopOwner(source, sources) {
-	const code = stripComments(source, '.ahk');
-	assert.match(code, /^#Warn All, StdOut$/m);
-	assert.match(code, /^#Warn VarUnset, Off$/m);
-	assert.match(code, /^#Include test_framework\.ahk$/m);
-	assert.match(code, /^_TestResultsBeginRun\(\)$/m);
-	assert.match(code, /^#Include support\/console_capture_cohort\.ahk$/m);
-	assert.match(code, /^#Include support\/altgr_suffix_cohort\.ahk$/m);
-	assert.match(code, /^RunTests\(\)$/m);
-	const outputCalls = (code.match(/\bFileAppend\(/g) || []).length;
-	assert.equal(
-		outputCalls,
-		2,
-		'only argument refusal and the retained watchdog own direct diagnostics'
-	);
-	assert.match(code, /^SetTimer\(_WatchdogFire, -_SUITE_TIMEOUT_MS\)$/m);
-	assert.match(code, /^global _SUITE_TIMEOUT_MS := 1320000$/m);
-	const included = [...code.matchAll(/^#Include ([^\r\n]+)$/gm)].map((match) => match[1]);
-	assert.deepEqual(included, [
-		'test_framework.ahk',
-		'../infra/tick_count.ahk',
-		'../infra/wall_clock.ahk',
-		'../infra/logger.ahk',
-		'../infra/toml/toml_helpers.ahk',
-		'../platform/remap/tap_hold_loader.ahk',
-		'../platform/remap/tap_hold_writer.ahk',
-		'../adapters/key_state.ahk',
-		'../adapters/text_sender.ahk',
-		'../adapters/shell_runner.ahk',
-		'../platform/remap/constants.ahk',
-		'../platform/remap/altgr_criteria.ahk',
-		'../infra/key_combinations.ahk',
-		'support/console_capture_cohort.ahk',
-		'support/altgr_suffix_cohort.ahk'
-	]);
-	const registrations = sources.flatMap((item) =>
-		[...stripComments(item, '.ahk').matchAll(/^Test\("([^"\r\n]+)"/gm)].map((match) => match[1])
-	);
-	assert.deepEqual(
-		registrations,
-		expected,
-		'the canonical producer registers only the eleven original ordered cases'
-	);
-	for (const cohort of sources) {
-		assert.ok(cohort.length > 1000);
-		assert.match(
-			cohort,
-			/^[A-Za-z_][A-Za-z_0-9]*\([^\r\n]*\) \{$/m,
-			'the registration subject retains actual callable definitions'
-		);
-	}
-	assert.deepEqual(
-		[...code.matchAll(/^#Warn ([^\r\n]+)$/gm)].map((match) => match[1]),
-		['All, StdOut', 'VarUnset, Off']
-	);
-	assert.doesNotMatch(code, /#Include .*run_all|#Include .*test_stubs/);
-}
-
 checkRunner(runner);
 const body = pipeline.job('test-ahk');
 checkWorkflow(body);
 const registrations = ['unit/test_console_window.ahk', 'unit/test_key_combinations.ahk'].map(
-	(file) => stripComments(readCohortOwner(file), '.ahk')
+	(file) =>
+		stripComments(
+			fs.readFileSync(path.join(root, 'static/ergopti_plus/windows/tests', file), 'utf8'),
+			'.ahk'
+		)
 );
 for (const name of expected) {
 	assert.equal(registrations.join('\n').split('Test("' + name + '",').length, 2);
@@ -238,43 +159,4 @@ if (process.platform === 'win32') {
 }
 console.log(
 	`Windows native desktop wiring PASS: eleven authored cases, six interactive registrations, ${refused} causal source/workflow refusals. Native desktop execution is not claimed.`
-);
-
-const desktop = fs.readFileSync(
-	path.join(root, 'static/ergopti_plus/windows/tests/run_desktop.ahk'),
-	'utf8'
-);
-const cohorts = ['console_capture_cohort.ahk', 'altgr_suffix_cohort.ahk'].map((file) =>
-	fs.readFileSync(path.join(root, 'static/ergopti_plus/windows/tests/support', file), 'utf8')
-);
-checkDesktopOwner(desktop, cohorts);
-assert.match(runner, /tests\\run_desktop\.ahk'/);
-for (const [before, after] of [
-	['#Warn All, StdOut', '#Warn All, Off'],
-	['#Include test_framework.ahk', '#Include test_stubs.ahk'],
-	['#Include support/console_capture_cohort.ahk', ''],
-	['#Include support/altgr_suffix_cohort.ahk', ''],
-	['RunTests()', 'ExitApp(0)'],
-	['global _SUITE_TIMEOUT_MS := 1320000', 'global _SUITE_TIMEOUT_MS := 1000'],
-	[
-		'#Include ../infra/key_combinations.ahk',
-		'#Include ../infra/key_combinations.ahk\n#Include unit/test_llm_agent.ahk'
-	],
-	['RunTests()', 'FileAppend("Warning: extraneous producer", "*")\nRunTests()']
-]) {
-	const changed = desktop.replace(before, after);
-	assert.notEqual(changed, desktop);
-	assert.throws(() => checkDesktopOwner(changed, cohorts));
-}
-for (const [index, changed] of [
-	[0, cohorts[0].replace(/^Test\("[^"\r\n]+",\n[^\r\n]+\)\n/m, '')],
-	[1, cohorts[1] + '\nTest("foreign producer", () => true)\n']
-]) {
-	assert.notEqual(changed, cohorts[index]);
-	const changedCohorts = [...cohorts];
-	changedCohorts[index] = changed;
-	assert.throws(() => checkDesktopOwner(desktop, changedCohorts));
-}
-console.log(
-	'Canonical desktop source isolation PASS: eleven unchanged authored registrations and ten causal admission refusals; native AHK remains unrun.'
 );

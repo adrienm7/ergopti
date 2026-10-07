@@ -6018,6 +6018,17 @@ separate preparation, deliberately excluded from this hotplug tranche. UI
 OneShot/CapsWord admission and final-source native qualification remain closed;
 item93 remains partial.
 
+Linux source withdrawal now retains the captured retirement owner until its
+original output cohort can settle the acknowledged inverse and cancel only the
+controller-proven unissued tail. This repairs the remapper-retirement failure
+observed in run37622519896 without borrowing a successor, treating a bitmap as
+an ACK, or changing either hardware harness. Independent controls pass161/0
+per Lua ABI; the old producer fails five new assertions. Three independent
+callback-substitution controls preserve the real delayed ACK and refuse all
+counterfeit authority. Final composed software gates and all four mandatory
+hosted kernel scenarios still require qualification. OneShot/CapsWord UI
+admission remains closed and item93 remains partial.
+
 - [ ] **96.** Remove the separate Ergopti+ AltGr-adjustments option from the
       Layout menu. Selecting the Ergopti+ keylayout in the emulation picker must
       suffice. Verify that the layout supplies every intended change, retire
