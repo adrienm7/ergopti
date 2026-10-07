@@ -83,11 +83,17 @@ end
 --- The scalar is captured only inside owned preparation; legacy ports never
 --- gain permission from header values, URLs, owner names or later mutation.
 local function redirect_option_error(request, owned_api)
+	local affinity = request.etag_affinity
+	if affinity ~= nil and type(affinity) ~= "boolean" then return "HTTP ETag affinity option is invalid" end
+	if affinity == true and (request.method ~= "GET" or request.buffered ~= true
+		or request.follow_redirects ~= true or request.output_path ~= nil or request.output_target ~= nil
+		or request.etag_save == nil) then return "HTTP ETag affinity ownership is unavailable" end
+	local paired = request.etag_compare ~= nil and request.etag_save ~= nil
+	local singleton = (request.etag_compare ~= nil or request.etag_save ~= nil) and not paired
 	local managed = request.managed_redirects
 	if managed ~= nil and type(managed) ~= "boolean" then return "HTTP managed redirect option is invalid" end
 	if managed == true and (owned_api ~= true or request.method ~= "GET" or request.buffered ~= true
-		or request.follow_redirects ~= true or request.output_path ~= nil or request.output_target ~= nil
-		or request.etag_compare ~= nil or request.etag_save ~= nil) then
+		or request.follow_redirects ~= true or request.output_path ~= nil or request.output_target ~= nil or singleton) then
 		return "HTTP managed redirect ownership is unavailable"
 	end
 end

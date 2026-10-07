@@ -482,8 +482,16 @@ local function _build_fetch_request(channel, page)
 	-- it from the event-loop thread. A 304 carries no body, so the request is
 	-- conditional only while this process holds the list the saved ETag names.
 	if parent and Fs.exists(parent) then
+		-- Even the cold save-only request needs managed final-endpoint evidence;
+		-- an ordinary singleton cache request retains historical native handling.
+		options.etag_affinity = true
 		options.etag_save = etag_file
-		if _list_cache[cache_key] and Fs.exists(etag_file) then options.etag_compare = etag_file end
+		local cached = _list_cache[cache_key]
+		if type(cached) == "table" and type(cached.validator) == "string"
+			and type(cached.effective_url) == "string" and Fs.exists(etag_file) then
+			options.etag_compare = etag_file
+			options.etag_expected_value, options.etag_expected_url = cached.validator, cached.effective_url
+		end
 	end
 	local url = M.release_api_url()
 	if page then
@@ -617,7 +625,13 @@ local function _fetch_releases(channel, callback)
 					finish(nil, status, "incomplete conditional response", "no_connection")
 					return
 				end
-				body = _list_cache[key]
+				local cached, association = _list_cache[key], result.etag_receipt
+				if type(cached) ~= "table" or type(association) ~= "table"
+					or association.format ~= "curl-etag-final-v1" or association.conditional_sent ~= true
+					or association.effective_url ~= cached.effective_url or association.sent_validator ~= cached.validator then
+					finish(nil, status, "conditional response endpoint association refused", "unexpected"); return
+				end
+				body = cached.body
 				if not body then
 					Logger.warn(LOG, "GitHub answered 304 for channel %s page %d without a cached release page.", channel, page)
 					finish(nil, status, "not modified, and no release page is cached", "unexpected")
@@ -646,7 +660,12 @@ local function _fetch_releases(channel, callback)
 				finish(nil, status, "invalid release page entries", "parse_failed")
 				return
 			end
-			_list_cache[key] = body
+			local association = result.etag_receipt
+			if type(association) == "table" and association.format == "curl-etag-final-v1"
+				and association.associated == true and type(association.validator) == "string"
+				and type(association.effective_url) == "string" then
+				_list_cache[key] = { body = body, validator = association.validator, effective_url = association.effective_url }
+			else _list_cache[key] = nil end
 			for _, entry in ipairs(entries) do chunks[#chunks + 1] = entry end
 			if #entries < RELEASE_PAGE_SIZE or #chunks == count then
 				finish("[" .. table.concat(chunks, ",") .. "]", all_unchanged and 304 or 200, nil)

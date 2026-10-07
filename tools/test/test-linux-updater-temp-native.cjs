@@ -307,3 +307,109 @@ control('legacy family receipt missing mandatory C refused', () =>
 );
 assert.equal(count, 49, 'Independent C receipt extension floor changed');
 console.log('[OK] Linux updater namespace receipts: 17 source controls passed; no native credit.');
+
+// Actual filesystem admission controls; no child process or native qualification.
+if (process.platform === 'linux') {
+	const fs = require('node:fs');
+	const os = require('node:os');
+	const path = require('node:path');
+	const work = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-temp-root-control-'));
+	fs.chmodSync(work, 0o700);
+	const owned = path.join(work, 'owned');
+	fs.mkdirSync(owned, { mode: 0o700 });
+	const select = (selected, extra = {}) =>
+		runner.temporaryWorkRoot({ ...extra, ERGOPTI_UPDATER_TEMP_NATIVE_WORK_ROOT: selected });
+	let admissionCount = 0;
+	function admission(name, body) {
+		body();
+		admissionCount++;
+	}
+	try {
+		admission('existing caller-owned root is selected without allocating', () => {
+			assert.equal(select(owned), owned);
+			assert.deepEqual(fs.readdirSync(owned), []);
+		});
+		admission('explicit root wins over generic TMPDIR', () => {
+			assert.equal(select(owned, { TMPDIR: path.join(work, 'missing-tmpdir') }), owned);
+			assert.equal(fs.existsSync(path.join(work, 'missing-tmpdir')), false);
+		});
+		admission('empty opt-in cannot fall back', () => assert.throws(() => select('')));
+		admission('relative opt-in is refused', () => assert.throws(() => select('relative')));
+		admission('non-string opt-in is refused', () => assert.throws(() => select(7)));
+		admission('missing opt-in is refused without creating it', () => {
+			const missing = path.join(work, 'missing');
+			assert.throws(() => select(missing));
+			assert.equal(fs.existsSync(missing), false);
+		});
+		admission('regular file is refused and preserved', () => {
+			const file = path.join(work, 'file');
+			fs.writeFileSync(file, 'sentinel', { mode: 0o600 });
+			assert.throws(() => select(file));
+			assert.equal(fs.readFileSync(file, 'utf8'), 'sentinel');
+		});
+		admission('symlink root including trailing slash is refused', () => {
+			const link = path.join(work, 'link');
+			fs.symlinkSync(owned, link);
+			assert.throws(() => select(link));
+			assert.throws(() => select(link + path.sep));
+			assert.equal(fs.readlinkSync(link), owned);
+			assert.deepEqual(fs.readdirSync(owned), []);
+		});
+		admission('symlink ancestor cannot hide behind an ordinary leaf', () => {
+			const nested = path.join(owned, 'nested');
+			fs.mkdirSync(nested, { mode: 0o700 });
+			assert.throws(() => select(path.join(work, 'link', 'nested')));
+			assert.deepEqual(fs.readdirSync(nested), []);
+		});
+		admission('public root is refused without chmod or allocation', () => {
+			fs.chmodSync(owned, 0o755);
+			assert.throws(() => select(owned));
+			assert.equal(fs.lstatSync(owned).mode & 0o7777, 0o755);
+			fs.chmodSync(owned, 0o700);
+		});
+		admission('special mode bits are refused without changing owner root', () => {
+			fs.chmodSync(owned, 0o1700);
+			assert.throws(() => select(owned));
+			assert.equal(fs.lstatSync(owned).mode & 0o7777, 0o1700);
+			fs.chmodSync(owned, 0o700);
+		});
+		assert.equal(admissionCount, 11, 'Independent work-root admission floor changed');
+		console.log(
+			'[OK] Linux updater work-root admission: 11 filesystem controls passed; no native credit.'
+		);
+	} finally {
+		// Only this tiny control fixture is disposable, never a native runner work root.
+		fs.rmSync(work, { recursive: true, force: true });
+	}
+}
+
+// Drive the same environment producer used for every native family.
+if (process.platform === 'linux') {
+	const fs = require('node:fs');
+	const os = require('node:os');
+	const path = require('node:path');
+	const work = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-native-tmpdir-control-'));
+	fs.chmodSync(work, 0o700);
+	try {
+		const environment = {
+			ERGOPTI_UPDATER_TEMP_NATIVE_WORK_ROOT: work,
+			TMPDIR: work,
+			PYTHONDONTWRITEBYTECODE: '0',
+			LC_ALL: 'foreign',
+			ERGOPTI_MANAGED_NATIVE_EXPECTED_HEAD: HEAD
+		};
+		assert.equal(runner.temporaryWorkRoot(environment), work);
+		const native = runner.nativeFixtureEnvironment(environment);
+		assert.equal(native.TMPDIR, '/var/tmp/ergopti-cloud-validation');
+		assert.notEqual(native.TMPDIR, work, 'Opted clone root must not replace native fixture policy');
+		assert.equal(native.PYTHONDONTWRITEBYTECODE, '1');
+		assert.equal(native.LC_ALL, 'C.UTF-8');
+		assert.equal(native.ERGOPTI_MANAGED_NATIVE_EXPECTED_HEAD, HEAD);
+		assert.equal(environment.TMPDIR, work, 'Caller environment must remain unchanged');
+		assert.deepEqual(fs.readdirSync(work), []);
+		assert.equal(runner.nativeFixtureEnvironment({}).TMPDIR, '/var/tmp/ergopti-cloud-validation');
+		console.log('[OK] Updater clone opt-in preserves canonical native TMPDIR; no native credit.');
+	} finally {
+		fs.rmSync(work, { recursive: true, force: true });
+	}
+}

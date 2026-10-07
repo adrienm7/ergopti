@@ -5464,6 +5464,38 @@ The fixed Specifications and Capabilities frames of the Windows/macOS per-model 
       uncommitted in the local worktree of `fix/downloads-on-managed-networks`
       when the session stopped; redo it if that worktree is gone.
 
+ETag validators now belong to the final admitted endpoint, with cache endpoint
+and byte identity retained. Every redirect selects its own matching validator;
+an untagged successful response invalidates the prior validator. Real TLS wire
+receiving passes eight total outcomes: two independently authored modes in each
+of the four curl8.14.1/curl7.88.1 and LuaJIT/genuineLua5.4 cohorts. The genuine
+predecessor loses endpoint affinity in all four cohorts. The unchanged original
+seven-mode updater corpus passes28 candidate and28 predecessor observations.
+Legacy singleton cache options retain their original handling; only actual
+updater cold-save admission opts into managed endpoint affinity. The original
+invalid-route fixture again requires proxy-route-invalid before any native
+acquisition, with every callback, status, privacy and closure assertion intact.
+This is endpoint cache migration, not equivalence of curl7 and8 raw ETag files.
+
+The native temporary runner can admit a private absolute current-user0700
+clone root, independently from its unchanged canonical fixture namespace.
+The actual repaired gate passes all five namespace,24 ownership and24 allocation
+controls with zero skipped product checks and physical closure. Heavy clones use
+the admitted private root; native namespace controls retain the canonical root.
+Final ordinary Linux, packaging/install and actual company-network acceptance
+remain separate requirements; item62 stays partial.
+
+The two production-updater fixtures now restore only file-resolved repository
+Lua imports reached by the scenario, including whole prior cache values. Their
+seven original explicit stubs and all98 original assertions remain intact.
+Native ffi/luv/lfs providers and external SDK modules retain their first loaded
+identities; clearing them can reinitialize VM types or retire anchored loop
+userdata. The unrestricted proposed rollback crashed the whole Linux suite and
+was rejected. The unchanged fixtures with the final URL eligibility repair
+complete11242 passing tests and three persistence failures; final composed
+qualification of the scoped repair is still required. Historical Ubuntu
+Configuration assertion432 causality remains unproved.
+
 Manual Linux run37591679813 at9195a6419f4d36581e4404198cd152753791f2e6
 failed the Configuration restore assertion at test_hotstrings_scope.lua:432:
 rolls remained false. Two unrelated passing unsafe-answer fixture names contain

@@ -56,4 +56,37 @@ function M.attach(request, result)
 	return result
 end
 
+--- Parses complete native response header frames from the owned header pipe.
+--- CONNECT and interim frames precede the final response; duplicate ETags refuse association.
+function M.response_etag(bytes, status, validate)
+	if type(bytes) ~= "string" or type(validate) ~= "function" then return nil end
+	local position, final = 1, nil
+	while position <= #bytes do
+		local boundary = bytes:find("\r\n\r\n", position, true)
+		if not boundary then return nil end
+		local block = bytes:sub(position, boundary - 1)
+		local code, rest = block:match("^HTTP/%d[%.%d]* (%d%d%d)[^\r\n]*\r\n(.*)$")
+		if not code then
+			code = block:match("^HTTP/%d[%.%d]* (%d%d%d)[^\r\n]*$")
+			rest = ""
+		end
+		if not code then return nil end
+		local observed = { status = tonumber(code), present = false }
+		for line in (rest .. "\r\n"):gmatch("([^\r\n]*)\r\n") do
+			if line ~= "" then
+				local name, value = line:match("^([^: \t]+):[ \t]*(.*)$")
+				if not name then return nil end
+				if name:lower() == "etag" then
+					if observed.present then return nil end
+					value = value:gsub("[ \t]+$", "")
+					if value == "" or validate("ETag", value) ~= true then return nil end
+					observed.present, observed.value = true, value
+				end
+			end
+		end
+		final, position = observed, boundary + 4
+	end
+	return final and final.status == status and final or nil
+end
+
 return M

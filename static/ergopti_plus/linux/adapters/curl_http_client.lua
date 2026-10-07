@@ -231,12 +231,15 @@ end
 local function finalize_owned(request)
 	local operation = request.operation
 	if not operation or operation._settled or not request.terminal or request.authorizing
-		or request.observing_terminal or request.observing_identity or request.observing_output then return end
+		or request.observing_terminal or request.observing_identity or request.observing_output
+		or request.observing_conditional then return end
 	if output_write_pending(request) then return end
 	if request.identity_owner and not request.identity_owner:is_settled() then return end
+	for _, owner in ipairs(request.etag_owners or {}) do if not owner:is_settled() then return end end
 	if request.spawned and not request.exited then return end
 	if not operation._body_cleanup and request.spawned and not request.group_absent then return end
-	if request.body_readfd ~= nil or request.body_writefd ~= nil then return end
+	if request.body_readfd ~= nil or request.body_writefd ~= nil
+		or request.etag_readfd ~= nil or request.etag_writefd ~= nil then return end
 	for _, receipt in pairs(request.handles) do
 		if receipt.state ~= "closed" then return end
 	end
@@ -298,19 +301,26 @@ retry_owned_cleanup = function(request)
 		end
 	end
 	if request.identity_owner then request.identity_owner:cancel() end
+	for _, owner in ipairs(request.etag_owners or {}) do owner:cancel() end
 	close_body_descriptor(request, "body_readfd")
 	close_body_descriptor(request, "body_writefd")
+	close_body_descriptor(request, "etag_readfd")
+	close_body_descriptor(request, "etag_writefd")
 	if not strong then close_timer(request) end
 	close_stream(request, "stdin")
 	close_stream(request, "body_pipe")
 	close_stream(request, "body_reader")
+	close_stream(request, "etag_reader")
+	close_stream(request, "etag_writer")
 	close_stream(request, "stdout")
 	close_stream(request, "stderr")
 	close_process(request)
 	if strong then
 		local ready = (not request.spawned or request.exited) and request.group_absent
 			and request.body_readfd == nil and request.body_writefd == nil
+			and request.etag_readfd == nil and request.etag_writefd == nil
 		if request.identity_owner and not request.identity_owner:is_settled() then ready = false end
+		for _, owner in ipairs(request.etag_owners or {}) do if not owner:is_settled() then ready = false end end
 		if output_write_pending(request) then ready = false end
 		for handle, receipt in pairs(request.handles) do
 			if handle ~= request.timer and receipt.state ~= "closed" then ready = false end
@@ -332,7 +342,8 @@ end
 settle_owned = function(request)
 	local operation = request.operation
 	if not operation or operation._settled or not request.terminal
-		or request.observing_terminal or request.observing_identity or request.observing_output then return end
+		or request.observing_terminal or request.observing_identity or request.observing_output
+		or request.observing_conditional then return end
 	if not operation._body_cleanup then
 		retry_owned_cleanup(request)
 	else
@@ -381,12 +392,17 @@ local function finish(request, result, suppress_callback)
 		retry_owned_cleanup(request)
 	else
 		if request.identity_owner then request.identity_owner:cancel() end
+		for _, owner in ipairs(request.etag_owners or {}) do owner:cancel() end
 		close_body_descriptor(request, "body_readfd")
 		close_body_descriptor(request, "body_writefd")
+		close_body_descriptor(request, "etag_readfd")
+		close_body_descriptor(request, "etag_writefd")
 		close_timer(request)
 		close_stream(request, "stdin")
 		close_stream(request, "body_pipe")
 		close_stream(request, "body_reader")
+		close_stream(request, "etag_reader")
+		close_stream(request, "etag_writer")
 		close_stream(request, "stdout")
 		close_stream(request, "stderr")
 		close_process(request)
@@ -438,6 +454,45 @@ local function config_quote(value)
 	return '"' .. escaped .. '"'
 end
 
+--- Reads conditional bytes under the existing exact descriptor ledger and timer.
+local function read_etag(request, path, missing_allowed)
+	if request.terminal then return nil end
+	if not owned_authorized(request) then
+		finish(request, { ok = false, status = 0, body = "", error = "request authorization withdrawn" }, true)
+		return nil
+	end
+	request.observing_conditional = true
+	local owner = ExactIdentity.new(luv, function(message) Logger.error(LOG, "%s", message) end)
+	request.etag_owners = request.etag_owners or {}
+	request.etag_owners[#request.etag_owners + 1] = owner
+	local registered = owner:on_settled(function() settle_owned(request) end)
+	local called, bytes = false, nil
+	if registered == true then called, bytes = pcall(owner.read_regular, owner, path, MAX_DIAGNOSTIC_BYTES, missing_allowed) end
+	request.observing_conditional = false
+	if not called then owner:cancel() end
+	if request.terminal then settle_owned(request); return nil end
+	return called and owner:is_settled() and type(bytes) == "string" and bytes or nil
+end
+
+--- Binds the accepted representation only to its actual final endpoint/validator.
+local function attach_etag(request, result)
+	if not request.conditional or request.etag_headers_eof ~= true or request.exit_code ~= 0
+		or request.exit_signal ~= 0 or (result.ok ~= true and result.status ~= 304) then return result end
+	local headers = RedirectReceipt.response_etag(request.etag_headers, result.status, HeaderPolicy.validate)
+	if not headers then return result end
+	local receipt = result.redirect_receipt
+	local effective = type(receipt) == "table" and receipt.effective_url or not request.follow_redirects and request.url or nil
+	if type(effective) ~= "string" then return result end
+	local saved = request.conditional.save and read_etag(request, request.conditional.save, false) or nil
+	if request.terminal then return result end
+	if saved then saved = saved:gsub("[\r\n]", "") end
+	local validator = headers.value or result.status == 304 and request.sent_validator or nil
+	result.etag_receipt = { format = "curl-etag-final-v1", effective_url = effective,
+		conditional_sent = request.sent_validator ~= nil, sent_validator = request.sent_validator,
+		validator = validator, associated = validator ~= nil and saved == validator }
+	return result
+end
+
 --- Builds shell-free curl arguments and the config curl reads from stdin.
 --- @param url string
 --- @param headers table
@@ -474,13 +529,17 @@ local function curl_args(url, headers, body, options)
 	if options.https_only then
 		args[#args + 1] = "--tlsv1.2"
 	end
-	if options.etag_compare then
+	if options.etag_compare and not options.conditional then
 		args[#args + 1] = "--etag-compare"
 		args[#args + 1] = options.etag_compare
 	end
 	if options.etag_save then
 		args[#args + 1] = "--etag-save"
 		args[#args + 1] = options.etag_save
+	end
+	if options.conditional then
+		args[#args + 1] = "--dump-header"
+		args[#args + 1] = "/dev/fd/4"
 	end
 	if options.output_path then
 		args[#args + 1] = "--output"
@@ -537,6 +596,9 @@ local function curl_args(url, headers, body, options)
 				or header_name .. ": " .. header_value
 			lines[#lines + 1] = "header = " .. config_quote(wire_header)
 		end
+	end
+	if options.sent_validator ~= nil then
+		lines[#lines + 1] = "header = " .. config_quote("If-None-Match: " .. options.sent_validator)
 	end
 	-- Curl config lines are limited to 10 MB. A separate inherited pipe carries
 	-- admitted caller text without putting it in a config line, argv or a file.
@@ -656,7 +718,8 @@ end
 --- Completes once both the process and its two output streams ended.
 --- @param request table
 local function maybe_complete(request)
-	if request.terminal or not request.exited or not request.stdout_eof or not request.stderr_eof then
+	if request.terminal or not request.exited or not request.stdout_eof or not request.stderr_eof
+		or request.conditional and not request.etag_headers_eof then
 		return
 	end
 	if request.proxy_selection then
@@ -668,11 +731,9 @@ local function maybe_complete(request)
 			failure_receipt = request.output_failure })
 	elseif request.buffered then
 		request.output_transport_completion = true
-		if request.single_hop_redirect then
-			finish(request, RedirectReceipt.attach(request, native_receipt(request, buffered_result(request))))
-		else
-			finish(request, native_receipt(request, buffered_result(request)))
-		end
+		local result = native_receipt(request, buffered_result(request))
+		if request.single_hop_redirect then result = RedirectReceipt.attach(request, result) end
+		finish(request, attach_etag(request, result))
 	else
 		request.output_transport_completion = true
 		local result = native_receipt(request, streaming_result(request))
@@ -848,6 +909,23 @@ local function admit_metadata(url, headers, body, options)
 			return nil, "native archive output target is invalid"
 		end
 	end
+	for _, key in ipairs({ "etag_compare", "etag_save", "etag_expected_url", "etag_expected_value" }) do
+		local value = options[key]
+		if value ~= nil and (type(value) ~= "string" or value == "" or value:find("[%z\r\n]")) then
+			return nil, "native HTTP conditional options are invalid"
+		end
+	end
+	if (options.etag_expected_url ~= nil or options.etag_expected_value ~= nil) and options.etag_compare == nil then
+		return nil, "native HTTP conditional association is invalid"
+	end
+	if options.etag_affinity ~= nil and type(options.etag_affinity) ~= "boolean" then
+		return nil, "native HTTP ETag affinity option is invalid"
+	end
+	if options.etag_affinity == true and (options.method ~= "GET" or options.buffered ~= true
+		or body ~= nil or options.output_path ~= nil or output_target ~= nil or options.etag_save == nil
+		or not follow_redirects and options.single_hop_redirect ~= true) then
+		return nil, "native HTTP ETag affinity ownership is unavailable"
+	end
 	local timeout_ms = tonumber(options.timeout_ms) or DEFAULT_TIMEOUT_MS
 	if options.prepared_headers ~= nil then
 		local prepared = prepared_headers[options.prepared_headers]
@@ -863,8 +941,10 @@ local function admit_metadata(url, headers, body, options)
 		timeout_ms = timeout_ms,
 		follow_redirects = follow_redirects == true,
 		https_only = options.https_only == true,
+		etag_affinity = options.etag_affinity,
 		etag_compare = options.etag_compare,
 		etag_save = options.etag_save,
+		etag_expected_url = options.etag_expected_url, etag_expected_value = options.etag_expected_value,
 		output_path = options.output_path,
 		output_target = output_target,
 		max_download_bytes = options.max_download_bytes,
@@ -874,6 +954,17 @@ local function admit_metadata(url, headers, body, options)
 		curl_executable_identity_exact = ExactIdentity.copy(options.curl_executable_identity_exact),
 		proxy_metrics_available = options.proxy_metrics_available == true and type(options.curl_executable) == "string",
 	}
+	if options.prepared_headers then
+		local conditional = prepared_headers[options.prepared_headers].conditional
+		if conditional then
+			if conditional.compare ~= options.etag_compare or conditional.save ~= options.etag_save
+				or conditional.affinity ~= options.etag_affinity
+				or conditional.expected_url ~= options.etag_expected_url or conditional.expected_value ~= options.etag_expected_value then
+				return nil, "HTTP prepared conditional validator refused"
+			end
+			request_options.conditional = conditional
+		end
+	end
 	if options.curl_executable ~= nil and (type(options.curl_executable) ~= "string"
 		or options.curl_executable:sub(1, 1) ~= "/" or options.curl_executable:find("[%z\r\n]")) then
 		return nil, "native curl executable is invalid"
@@ -900,7 +991,8 @@ local function admit_metadata(url, headers, body, options)
 		local authority = url:match("^[^:]+://([^/?#]*)")
 		local streamed_archive = output_target ~= nil and request_options.buffered == false
 		if request_options.method ~= "GET" or (not request_options.buffered and not streamed_archive) or body ~= nil
-			or request_options.output_path ~= nil or options.etag_compare ~= nil or options.etag_save ~= nil
+			or request_options.output_path ~= nil
+			or (options.etag_compare ~= nil or options.etag_save ~= nil) and request_options.conditional == nil
 			or request_options.proxy_selection == nil or not authority or authority:find("@", 1, true)
 			or type(json_bytes) ~= "number" or json_bytes < 1 or json_bytes > MAX_DIAGNOSTIC_BYTES or json_bytes % 1 ~= 0
 			or type(url_bytes) ~= "number" or url_bytes < 1 or url_bytes > MAX_DIAGNOSTIC_BYTES or url_bytes % 1 ~= 0
@@ -938,7 +1030,13 @@ function M.preflight(url, headers, body, options)
 		normalized.follow_redirects = allowed
 	end
 	local token = {}
-	prepared_headers[token] = { rows = rows, view = view }
+	local conditional
+	if normalized.method == "GET" and normalized.buffered and (normalized.etag_compare ~= nil or normalized.etag_save ~= nil) then
+		conditional = { compare = normalized.etag_compare, save = normalized.etag_save, affinity = normalized.etag_affinity,
+			expected_url = normalized.etag_expected_url, expected_value = normalized.etag_expected_value, loaded = false }
+	end
+	prepared_headers[token] = { rows = rows, view = view, conditional = conditional }
+	normalized.conditional = conditional
 	normalized.prepared_headers = token
 	local composed, argv = pcall(curl_args, url, view, body, normalized)
 	if not composed then return false, "curl configuration refused" end
@@ -957,7 +1055,7 @@ function M.rebind_prepared_headers(token, headers)
 	local rows, view = HeaderSnapshot.subset(prepared.rows, prepared.view, headers)
 	if not rows then return nil end
 	local rebound = {}
-	prepared_headers[rebound] = { rows = rows, view = view }
+	prepared_headers[rebound] = { rows = rows, view = view, conditional = prepared.conditional }
 	return rebound
 end
 
@@ -1067,6 +1165,8 @@ local function start_request(url, headers, body, options, on_chunk, on_done, ope
 	request.single_hop_redirect = request_options.single_hop_redirect
 	request.single_hop_receipt_bytes = request_options.single_hop_receipt_bytes
 	request.single_hop_url_bytes = request_options.single_hop_url_bytes
+	request.conditional, request.url, request.follow_redirects = request_options.conditional, url, request_options.follow_redirects
+	request.etag_headers, request.etag_headers_eof = "", request.conditional == nil
 	local handles_ok
 	if operation or request.body_owner then
 		if operation then operation._request = request; _owned[owner] = operation end
@@ -1130,6 +1230,27 @@ local function start_request(url, headers, body, options, on_chunk, on_done, ope
 		end
 	end
 
+	if request.conditional then
+		local allocated = pcall(function()
+			for _, field in ipairs({ "etag_reader", "etag_writer" }) do
+				request[field] = assert(luv.new_pipe(false))
+				request.handles[request[field]] = { state = "open" }
+			end
+			local pair = assert(BodyPipe.allocate(luv))
+			request.etag_readfd, request.etag_writefd = pair.read, pair.write
+			for _, field in ipairs({ "etag_readfd", "etag_writefd" }) do
+				local stat = assert(luv.fs_fstat(request[field]))
+				request[field .. "_identity"] = { dev = stat.dev, ino = stat.ino, type = stat.type }
+			end
+			local accepted, error_code = luv.pipe_open(request.etag_reader, pair.read)
+			assert(accepted ~= nil and accepted ~= false and error_code == nil)
+			request.etag_readfd = nil
+			accepted, error_code = luv.pipe_open(request.etag_writer, pair.write)
+			assert(accepted ~= nil and accepted ~= false and error_code == nil)
+			request.etag_writefd = nil
+		end)
+		if not allocated then finish(request, { ok = false, status = 0, body = "", error = "conditional header pipe allocation refused" }); return false end
+	end
 	local timer_ok, timer_result = pcall(NativeTimer.start, luv, request.timer, math.ceil(timeout_ms), 0, function()
 		if request.terminal then return end
 		terminate_group(request)
@@ -1140,6 +1261,27 @@ local function start_request(url, headers, body, options, on_chunk, on_done, ope
 		return false
 	end
 
+	if request.conditional then
+		local conditional = request.conditional
+		if not conditional.loaded then
+			local bytes = ""
+			if conditional.compare then bytes = read_etag(request, conditional.compare, true) end
+			if bytes == nil or request.terminal then
+				finish(request, { ok = false, status = 0, body = "", error = "conditional validator snapshot refused" }); return false
+			end
+			local value = bytes:gsub("[\r\n]", "")
+			if value == "" then value = '""' end
+			if HeaderPolicy.validate("If-None-Match", value) ~= true
+				or conditional.expected_value ~= nil and conditional.expected_value ~= value then
+				finish(request, { ok = false, status = 0, body = "", error = "conditional validator association changed" }); return false
+			end
+			conditional.value, conditional.loaded = value, true
+		end
+		if conditional.compare and (conditional.expected_url == nil or conditional.expected_url == url) then
+			request_options.sent_validator, request.sent_validator = conditional.value, conditional.value
+		end
+		composed = nil -- The only actual wire composition follows owned snapshot admission.
+	end
 	if request_options.curl_executable_identity_exact then
 		local requested = request_options.proxy_metrics_available
 		request_options.proxy_metrics_available = false
@@ -1205,7 +1347,7 @@ local function start_request(url, headers, body, options, on_chunk, on_done, ope
 	end
 	local spawn_ok, process, pid, spawn_error = pcall(luv.spawn, request_options.curl_executable, {
 		args = argv,
-		stdio = { request.stdin, request.stdout, request.stderr, request.body_reader },
+		stdio = { request.stdin, request.stdout, request.stderr, request.body_reader, request.etag_writer },
 		detached = true,
 	}, function(code, signal)
 		request.exited = true
@@ -1235,6 +1377,24 @@ local function start_request(url, headers, body, options, on_chunk, on_done, ope
 		return false
 	end
 	request.body_reader = nil
+	if request.etag_writer then
+		if not close_handle(request.etag_writer, request) then
+			terminate_group(request); finish(request, { ok = false, status = 0, body = "", error = "conditional header writer retirement refused" }); return false
+		end
+		request.etag_writer = nil
+	end
+	if request.etag_reader then
+		local reading, accepted = pcall(luv.read_start, request.etag_reader, function(error_code, bytes)
+			if request.terminal then return end
+			if error_code or bytes ~= nil and (type(bytes) ~= "string" or #bytes > MAX_DIAGNOSTIC_BYTES - #request.etag_headers) then
+				terminate_group(request); finish(request, { ok = false, status = 0, body = "", error = "conditional response headers refused" })
+			elseif bytes == nil then request.etag_headers_eof = true; maybe_complete(request)
+			else request.etag_headers = request.etag_headers .. bytes end
+		end)
+		if not reading or accepted == false or accepted == nil then
+			terminate_group(request); finish(request, { ok = false, status = 0, body = "", error = "conditional header reader activation refused" }); return false
+		end
+	end
 
 	local write_ok, write_result = pcall(luv.write, request.stdin, config, function(write_err)
 		if write_err and not request.terminal then

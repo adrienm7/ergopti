@@ -12,6 +12,7 @@ const {
 } = require('./run-linux-managed-http-native.cjs');
 const { payloadInventory } = require('./run-linux-updater-archive-native.cjs');
 const ROOT = path.resolve(__dirname, '../..');
+const NATIVE_TEMP_PARENT = '/var/tmp/ergopti-cloud-validation';
 const ABIS = ['luajit', 'lua5.4'];
 const NAMESPACE = 'tests/hardware/run_native_artifact_cleanup_retry.py';
 const CAPTURE = 'tests/hardware/run_native_artifact_capture_completion.c';
@@ -56,6 +57,37 @@ const SUMMARY = {
 };
 function refused() {
 	throw new Error('Temporary updater native admission or physical closure refused.');
+}
+// An explicit work root is supplied and owned by the caller; never create it.
+function temporaryWorkRoot(environment) {
+	const configured = Object.hasOwn(environment, 'ERGOPTI_UPDATER_TEMP_NATIVE_WORK_ROOT');
+	let temporaryParent = NATIVE_TEMP_PARENT;
+	if (configured) {
+		const selected = environment.ERGOPTI_UPDATER_TEMP_NATIVE_WORK_ROOT;
+		if (typeof selected !== 'string' || !path.isAbsolute(selected) || selected.includes('\0'))
+			refused();
+		temporaryParent = path.resolve(selected);
+		if (fs.realpathSync(temporaryParent) !== temporaryParent) refused();
+	} else if (!fs.existsSync(temporaryParent)) fs.mkdirSync(temporaryParent, { mode: 0o700 });
+	const temporaryFact = fs.lstatSync(temporaryParent);
+	if (
+		!temporaryFact.isDirectory() ||
+		temporaryFact.isSymbolicLink() ||
+		temporaryFact.uid !== process.getuid() ||
+		(temporaryFact.mode & 0o077) !== 0 ||
+		(configured && (temporaryFact.mode & 0o7777) !== 0o700)
+	)
+		refused();
+	return temporaryParent;
+}
+// The opt-in moves cloned/build inputs only; native fixture policy stays canonical.
+function nativeFixtureEnvironment(environment) {
+	return {
+		...environment,
+		TMPDIR: NATIVE_TEMP_PARENT,
+		PYTHONDONTWRITEBYTECODE: '1',
+		LC_ALL: 'C.UTF-8'
+	};
 }
 function hash(bytes) {
 	return crypto.createHash('sha256').update(bytes).digest('hex');
@@ -238,24 +270,12 @@ async function run({
 		if (!/^[0-9a-f]{40}$/.test(head || '') || !path.isAbsolute(root)) refused();
 		const rootFact = fs.lstatSync(root);
 		if (!rootFact.isDirectory() || rootFact.isSymbolicLink()) refused();
-		const temporaryParent = '/var/tmp/ergopti-cloud-validation';
-		if (!fs.existsSync(temporaryParent)) fs.mkdirSync(temporaryParent, { mode: 0o700 });
-		const temporaryFact = fs.lstatSync(temporaryParent);
-		if (
-			!temporaryFact.isDirectory() ||
-			temporaryFact.isSymbolicLink() ||
-			temporaryFact.uid !== process.getuid() ||
-			(temporaryFact.mode & 0o077) !== 0
-		)
-			refused();
+		const temporaryParent = temporaryWorkRoot(environment);
+		if (temporaryParent !== NATIVE_TEMP_PARENT) temporaryWorkRoot({});
+		current();
 		const work = fs.mkdtempSync(path.join(temporaryParent, 'ergopti-updater-temp-native-'));
 		fs.chmodSync(work, 0o700);
-		const env = {
-			...environment,
-			TMPDIR: temporaryParent,
-			PYTHONDONTWRITEBYTECODE: '1',
-			LC_ALL: 'C.UTF-8'
-		};
+		const env = nativeFixtureEnvironment(environment);
 		for (const key of Object.keys(env)) if (key.startsWith('GIT_')) delete env[key];
 		env.GIT_CONFIG_GLOBAL = '/dev/null';
 		env.GIT_CONFIG_NOSYSTEM = '1';
@@ -734,6 +754,8 @@ if (require.main === module) {
 }
 module.exports = {
 	run,
+	temporaryWorkRoot,
+	nativeFixtureEnvironment,
 	fixtureReceipt,
 	namespaceReceipt,
 	evidenceCount,
