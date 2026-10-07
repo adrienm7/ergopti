@@ -48,13 +48,16 @@ function Write-ManagedRoutesDiagnostic {
 try {
     . $RoutesPath
     $ManagedRoutesDiagnosticStage='abi_sizes'
+    # Select exactly Marshal.SizeOf(Type), avoiding RuntimeType generic binding.
+    $SizeOfType=[Runtime.InteropServices.Marshal].GetMethod('SizeOf',[type[]]@([type]))
+    if($null -eq $SizeOfType){throw 'Native ABI mismatch.'}
     $ExpectedSizes=@(
         @{Type=[type][ErgoptiNativeProxyEx+NativeResult];Size=$(if([IntPtr]::Size -eq 8){16}else{8})},
         @{Type=[type][ErgoptiNativeProxyEx+NativeEntry];Size=$(if([IntPtr]::Size -eq 8){32}else{20})},
         @{Type=[type][ErgoptiNativeProxyEx+AsyncResult];Size=$(if([IntPtr]::Size -eq 8){16}else{8})},
         @{Type=[type][ErgoptiWindowsProxyConfig+NativeConfig];Size=$(if([IntPtr]::Size -eq 8){32}else{16})})
     foreach($Expected in $ExpectedSizes) {
-        if([Runtime.InteropServices.Marshal]::SizeOf($Expected.Type) -ne $Expected.Size){throw 'Native ABI mismatch.'}
+        if($SizeOfType.Invoke($null,[object[]]@($Expected.Type)) -ne $Expected.Size){throw 'Native ABI mismatch.'}
     }
     $ManagedRoutesDiagnosticStage='compile_server'
     Add-Type -TypeDefinition @'

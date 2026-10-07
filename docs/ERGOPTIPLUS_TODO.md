@@ -5574,6 +5574,19 @@ The fixed Specifications and Capabilities frames of the Windows/macOS per-model 
       uncommitted in the local worktree of `fix/downloads-on-managed-networks`
       when the session stopped; redo it if that worktree is gone.
 
+The Windows native routing policy and request/capability workers now admit
+actual decoded JSON Int32/Int64 integers within the original signed Int32
+domain, preserving every semantic limit and the original 64-bit started clock.
+Canonical environment inventory duplicate checks use exact ordinal spelling;
+required lower/upper-case names retain order while exact duplicates still
+refuse. The native route fixture selects Marshal.SizeOf(Type) explicitly and
+retains all four independent ABI size expectations. Genuine PowerShell7.6.6
+on Linux passes64 source-bound policy, lookup, worker-guard and CLR controls
+with physical closure. Predecessor canonical admission and first-revision
+case-insensitive inventory failures are preserved. This is platform/preflight
+evidence; Windows PowerShell5 routing, curl, CA and updater acceptance remain
+pending in the next targeted native CI. Item62 remains open.
+
 The official Linux acceptance now builds its actual original native archive
 helper under the existing930-second subreaper before running the unchanged
 900-second Lua fixture. Fresh generated ELF admission preserves existing
