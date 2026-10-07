@@ -21,7 +21,7 @@ import uuid
 
 BASE_PATH = Path(__file__).resolve().parents[1] / "diagnostics/hs274_native_build.py"
 BASE_SHA256 = "aa54be49feca564a455bc0f1804939a8bf3658ddeb5f56a691a914114c69aee2"
-PROVIDER_SHA256 = "a4ef0f4b7bd2c9cdabb4b8eb9e0a7249eab4f9e06f9991bcdb2f59a230220b4f"
+PROVIDER_SHA256 = "c29ceb96e73655cadea7763805b9468c32744033c2f177bae492e4ce9fe4100a"
 
 
 def _load(name, path, data):
@@ -1994,7 +1994,7 @@ def owned_output(status, stdout, stderr):
 
 CURRENT_OWNED_SOURCE_PROFILE = "owned_vhd_broker_source_v1"
 CURRENT_OWNED_SOURCE_FACTORY_SHA256 = (
-    "70d90ede3bdfbf44e146ba4a26f101ebfec2a1745bc05a8260db001d5a236537"
+    "5fec1b43e836d53ad986400210f5b59e2d634f2584b564c85c6b33df580dcee5"
 )
 _HISTORICAL_OWNED_RECORD_PROFILE = object()
 _CURRENT_OWNED_RECORD_PROFILE = object()
@@ -2285,7 +2285,7 @@ def observe_products(source, owner, *, repository=None):
     return validate_products(result)
 
 
-SOURCE_FACTORY_SHA256 = "70d90ede3bdfbf44e146ba4a26f101ebfec2a1745bc05a8260db001d5a236537"
+SOURCE_FACTORY_SHA256 = "5fec1b43e836d53ad986400210f5b59e2d634f2584b564c85c6b33df580dcee5"
 _SOURCE_FACTORY = None
 
 

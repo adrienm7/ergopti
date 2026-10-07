@@ -13,7 +13,7 @@ import unittest
 
 BUILD = Path(__file__).resolve().parent
 REPOSITORY = BUILD.parent.parent
-FIXED = "70d90ede3bdfbf44e146ba4a26f101ebfec2a1745bc05a8260db001d5a236537"
+FIXED = "5fec1b43e836d53ad986400210f5b59e2d634f2584b564c85c6b33df580dcee5"
 
 
 def retained_module(name, path):

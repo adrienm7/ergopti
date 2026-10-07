@@ -306,7 +306,12 @@ def _inventory(root, relative, pin, absolute_deadline):
         path = root / name
         full = (relative / name).as_posix()
         _require(
-            not path.is_absolute() or path.is_relative_to(root),
+            not path.is_absolute()
+            or path == root
+            or (
+                0 < len(root.parts) < len(path.parts)
+                and path.parents[len(path.parts) - len(root.parts) - 1] == root
+            ),
             "inventory",
             "Source path escapes its checkout",
         )

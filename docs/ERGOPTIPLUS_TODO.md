@@ -3288,6 +3288,25 @@ Item30 remains partial; keyboard/device qualification is still required.
   assumption and fn/globe), WP10 enable and retire. Media metrics identities
   now exist for play/pause, track skips and brightness; production capture and
   native UI/physical acceptance remain unfinished.
+  The fixed-source reader now uses public `Path.parents` and path equality
+  for lexical containment while preserving every original physical source,
+  byte-read, Git, namespace and currentness check. The independent 48-case
+  POSIX/Windows corpus keeps every original value and order; only repository
+  JSON formatting changes. Current factory/builder/consumer pins remain exact,
+  and historical schema1/41/57 oracles remain independent. Portable source
+  checks pass; actual whole four-target macOS compilation within the original
+  300-second budget remains pending. No native speed improvement is claimed.
+  Five ordinary SDK methods now keep one fixture across both Python modes;
+  three original methods had refused their second pass because terminal-ACKed
+  children remain owned until teardown. The two added methods follow the same
+  correction. Exact Team witness inverses preserve the historical oracle, all
+  assertions and the original process deadlines. Source-derived controls
+  reproduce the old refusal; actual macOS execution remains pending.
+  Windows PC follow-up (source semantics only): from the integrated `dev` SHA,
+  run `python tools/build/remap_runtime_lexical_test.py` with Python and retain
+  the exact SHA/result, including drive, UNC, case and Unicode cases. Real
+  Windows filesystem qualification remains pending; no Windows driver changes
+  are included. Item31 and transverse items16/38 remain open.
   The following source projection now captures the authenticated official VHD
   broker prerequisites under a separately closed current profile:34 dependencies,
   31 original inputs,60 owned outputs and4527 staged files plus four links. Current

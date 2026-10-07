@@ -15,7 +15,7 @@ SUBJECT = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = SUBJECT
 exec(compile(SOURCE.read_bytes(), str(SOURCE), "exec"), SUBJECT.__dict__)
 BUILDER = CANDIDATE / "tools/build/remap_runtime_build.py"
-FIXED = "fa6a6915e9152adf3704dde17848d5a2f03866e38c9335b9bcbb09c1c9ae1bef"
+FIXED = "686fa38236f2dda0671f7d2466767a940aace5dd8189fe46267fd30de39bb4bd"
 EXACT_BYTES = 132154
 
 

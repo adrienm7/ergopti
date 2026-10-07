@@ -2077,3 +2077,28 @@ factory and workflows remain untouched.
 Root selected gates and exact final-source manual macOS CI remain necessary.
 This preparation does not qualify protected-root signature or owner retirement
 positives and cannot substitute stdout, PID or process exit for native ACK.
+
+## Reviewed lexical source containment and fixed-source closure
+
+The fixed-source reader now uses public `Path.parents` and path equality for
+lexical containment. All original physical source/read, Git, namespace and
+currentness guards remain whole. The original independent 48-case corpus keeps
+its values and order; only JSON formatting changes. Exact sourcefactory, builder
+and four consumer bindings retain the same current source scope, and the
+historical schema1/41/57 oracles remain independent.
+
+Source-only qualification covers portable lexical, source-capture and refusing
+controls. Actual whole four-target macOS compilation within the original
+300-second budget remains pending; no native speed improvement is claimed.
+Windows PC follow-up is recorded under item31 for the Python drive/UNC/case and
+Unicode source controls; real Windows filesystem behavior remains unqualified.
+No Windows driver, native activation, initialized-ready or capture qualification
+is added. TODO31 and transverse items16/38 stay open; no item is removed.
+
+The same coherent source-validation slice corrects five ordinary SDK methods
+that keep terminal-ACKed children owned until teardown: one fixture now surrounds
+both Python modes. Three original methods had genuinely refused the second
+fixture entry; the two additions preserve the same ownership. Exact Team witness
+inverses retain the independent historical oracle, assertions and original
+process deadlines. Source-derived controls reproduce the predecessor failure;
+actual macOS execution remains pending.

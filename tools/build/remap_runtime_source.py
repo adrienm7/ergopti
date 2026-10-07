@@ -38,7 +38,7 @@ DEPENDENCIES = (
     ),
     (
         "tools/build/remap_runtime_patch.py",
-        "a4ef0f4b7bd2c9cdabb4b8eb9e0a7249eab4f9e06f9991bcdb2f59a230220b4f",
+        "c29ceb96e73655cadea7763805b9468c32744033c2f177bae492e4ce9fe4100a",
     ),
     (
         "tools/diagnostics/hs274-key-element.hpp",
