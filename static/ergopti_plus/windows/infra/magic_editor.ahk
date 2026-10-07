@@ -107,7 +107,7 @@ _MagicEditorScanIdentity(Scan) {
 /** Returns the sole broker lifecycle owner, initialized by the boot cohort. */
 MagicEditorState() {
 	static State := Map("initialized", false, "layouts", Map(), "legacy", Map(),
-		"ordinary_handles", Map(), "ordinary_physical", Map(), "native_handles", Map(), "configuration_generation", 0,
+		"ordinary_handles", Map(), "ordinary_physical", Map(), "native_handles", Map(), "ordinary_restore", Map(), "configuration_generation", 0,
 		"source_generation", 0, "source_signature", "", "hkl", 0, "decision", 0, "ordinary_claim", 0)
 	return State
 }
@@ -406,6 +406,8 @@ MagicEditorStart() {
 	State := MagicEditorState()
 	if State["initialized"]
 		throw Error("The physical Win broker is already initialized.")
+	if State["native_handles"].Count || State["ordinary_restore"].Count
+		throw Error("The physical Win broker still owns unsettled cohort compensation.")
 	LoggerStart("MagicEditor", "Acquiring the shared physical shortcut cohort…")
 	State["hkl"] := KS_ResolveKeyboardLayout()
 	State["source_generation"] += 1
@@ -456,7 +458,7 @@ MagicEditorStart() {
 			"keyboard-win-broker", HotkeyRegistrarResolvedNativeDescriptor("#" . Scan),
 			_MagicEditorBrokerCriterion.Bind(Scan, State["configuration_generation"], State["source_generation"])),
 		"activate", _HotkeyRegistrarActivate, "retire", HotkeyRegistrarUnbind,
-		"set_enabled", HotkeyRegistrarSetEnabled))
+		"set_enabled", HotkeyRegistrarSetEnabled), State["ordinary_restore"])
 	; Every native On is acknowledged while admission is still false. Publish
 	; authority once, only after the full cohort and the personal handoff exist.
 	State["initialized"] := true
@@ -471,14 +473,20 @@ MagicEditorStart() {
  * @param {Array} OrdinaryHandles Existing personal aliases to suspend reversibly.
  * @param {Map} Handles Exact acknowledged handles, including any retirement debt.
  * @param {Map} Ports Registrar reserve, activate, retire and set_enabled owners.
+ * @param {Map} RestoreDebt Retained exact personal handles awaiting restoration.
  * @returns {Boolean} True only after every native acquisition is acknowledged.
  */
-MagicEditorAcquireCohort(Scans, OrdinaryHandles, Handles, Ports) {
+MagicEditorAcquireCohort(Scans, OrdinaryHandles, Handles, Ports, RestoreDebt := unset) {
+	if !IsSet(RestoreDebt)
+		RestoreDebt := MagicEditorState()["ordinary_restore"]
+	if !(Handles is Map) || !(RestoreDebt is Map)
+		throw TypeError("The physical broker requires explicit native and personal custody maps.")
+	if Handles.Count || RestoreDebt.Count
+		throw Error("The physical broker cannot acquire over unsettled cohort compensation.")
 	for Name in ["reserve", "activate", "retire", "set_enabled"] {
 		if !Ports.Has(Name) || !HasMethod(Ports[Name], "Call")
 			throw TypeError("The physical broker requires its exact registrar ports.")
 	}
-	Disabled := []
 	try {
 		for Scan in Scans {
 			Handle := Ports["reserve"].Call(Scan)
@@ -487,46 +495,76 @@ MagicEditorAcquireCohort(Scans, OrdinaryHandles, Handles, Ports) {
 			Handles[Scan] := Handle
 		}
 		for Handle in OrdinaryHandles {
-			if !Ports["set_enabled"].Call(Handle, false)
+			; The native call can change state before returning false or throwing.
+			; Claim its exact restoration duty before crossing that effect boundary.
+			RestoreDebt[Handle] := true
+			Disabled := Ports["set_enabled"].Call(Handle, false)
+			if !((Disabled is Integer) && Disabled == true)
 				throw Error("The ordinary Win owner refused its physical broker handoff.")
-			Disabled.Push(Handle)
 		}
 		for Scan, Handle in Handles {
-			if !Ports["activate"].Call(Handle)
+			Activated := Ports["activate"].Call(Handle)
+			if !((Activated is Integer) && Activated == true)
 				throw Error("The physical Win broker refused native activation: " . Scan)
 		}
 	} catch as Err {
-		Debt := []
-		Retired := []
-		for Scan, Handle in Handles {
-			try {
-				if Ports["retire"].Call(Handle)
-					Retired.Push(Scan)
-				else
-					Debt.Push("retire " . Scan)
-			} catch as Refusal {
-				Debt.Push("retire " . Scan . ": " . Refusal.Message)
-			}
-		}
-		for Scan in Retired
-			Handles.Delete(Scan)
-		for Handle in Disabled {
-			try {
-				if !Ports["set_enabled"].Call(Handle, true)
-					Debt.Push("restore " . Handle)
-			} catch as Refusal {
-				Debt.Push("restore " . Handle . ": " . Refusal.Message)
-			}
-		}
-		if Debt.Length {
-			Detail := ""
-			for Item in Debt
-				Detail .= (Detail == "" ? "" : "; ") . Item
-			throw Error(Err.Message . " Unacknowledged compensation: " . Detail)
-		}
+		Resolution := MagicEditorSettleCohortDebt(Handles, RestoreDebt, Ports)
+		if Resolution["status"] != "settled"
+			throw Error(Err.Message . " Unacknowledged compensation: " . Resolution["detail"])
 		throw Err
 	}
+	; The acknowledged complete broker now owns the intentional personal handoff.
+	RestoreDebt.Clear()
 	return true
+}
+
+/**
+ * Retries only the exact retained native and personal compensation obligations.
+ * Callers keep all cohort criteria inactive until this receipt is settled.
+ * A refusal, malformed acknowledgement or exception never drops handle custody.
+ * @param {Map} Handles Native handles keyed by their original physical scans.
+ * @param {Map} RestoreDebt Exact personal handles retained before disable.
+ * @param {Map} Ports Matching retire and set_enabled native owners.
+ * @returns {Map} Settled or retained receipt with fixed operation/handle details.
+ */
+MagicEditorSettleCohortDebt(Handles, RestoreDebt, Ports) {
+	if !(Handles is Map) || !(RestoreDebt is Map) || !(Ports is Map)
+		throw TypeError("Cohort compensation requires its exact custody and native ports.")
+	for Name in ["retire", "set_enabled"] {
+		if !Ports.Has(Name) || !HasMethod(Ports[Name], "Call")
+			throw TypeError("Cohort compensation requires its exact native owners.")
+	}
+	Debt := [], Retired := [], Restored := []
+	for Scan, Handle in Handles {
+		try {
+			Accepted := Ports["retire"].Call(Handle)
+			if (Accepted is Integer) && Accepted == true
+				Retired.Push(Scan)
+			else
+				Debt.Push("retire " . Scan)
+		} catch as Refusal {
+			Debt.Push("retire " . Scan . ": " . Refusal.Message)
+		}
+	}
+	for Scan in Retired
+		Handles.Delete(Scan)
+	for Handle in RestoreDebt {
+		try {
+			Accepted := Ports["set_enabled"].Call(Handle, true)
+			if (Accepted is Integer) && Accepted == true
+				Restored.Push(Handle)
+			else
+				Debt.Push("restore " . Handle)
+		} catch as Refusal {
+			Debt.Push("restore " . Handle . ": " . Refusal.Message)
+		}
+	}
+	for Handle in Restored
+		RestoreDebt.Delete(Handle)
+	Detail := ""
+	for Item in Debt
+		Detail .= (Detail == "" ? "" : "; ") . Item
+	return Map("status", Handles.Count || RestoreDebt.Count ? "retained" : "settled", "detail", Detail)
 }
 
 /** Reloads the physical cohort on an actual native input-source switch. */
