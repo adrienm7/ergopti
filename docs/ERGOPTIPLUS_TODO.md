@@ -6660,6 +6660,16 @@ is pending; readonly previews do not complete the forced-output policy or
 item107. The existing layout fixture is unchanged; no new explicit HKL unload
 qualification is claimed.
 
+Native observation checkpoint 37549417973 reached all 10,095 registered
+AHK cases: 10,094 passed and one failed. Five new observation cases passed;
+the actual French dead-key refusal exposed an indexed read of an absent
+Action field in the shared AHK descriptor validator. The successor consistently
+uses the existing empty defaults for missing Text, Action and State, preserving
+the native refusal assertion and every independent expectation. Eight added
+missing-field checks exercise both source positions without depending on HKL
+availability. Lua already safely refuses absent fields and is unchanged.
+Corrected native qualification remains required; item107 is partial.
+
 Remaining work for item107 (CI-feasible software first):
 
 - [ ] Software implementation/repair: Implement native-HKL forced-symbol and Linux/macOS forced digit/symbol owners with joint input/source/modifier/output provenance; reconstruct/review the lost number-row runtime preparation. Preserve the acknowledged three-mode policy, schema migration and independent descriptor/dead-state semantics.

@@ -191,6 +191,19 @@ partial, with native-HKL/Lua forced owners and physical delivery still open.
 Patch SHA-256: `7c5129fa21873db9c6424fd93c2ec014d519755457666bbc4365ba7f5811f8df`.
 Independent retained review: `49ac33f9b92fcd94543e910290c82bcd6b6e1ebe420b0a5684c92d18366a88bc`.
 
+[Native Windows checkpoint 37549417973](https://github.com/adrienm7/ergopti/actions/runs/37549417973)
+tested exact CI `1b89b177cd26e8239bec56efee58bab6f5933291`, tree
+`570f488bd04f3fc9fbcb123d29fdd431a0fd1a70`. All 10,095 AHK records reached
+a terminal result: 10,094 PASS / one FAIL. Five new observation cases passed;
+the actual French dead-key refusal exposed the shared AHK validator reading
+an absent Action field after admitting its empty default as a string. The
+reviewed successor uses the existing empty default for all four nonempty
+field reads, preserving every earlier assertion and native dead-key refusal.
+Eight additional checks require missing Text, Action or State to refuse in
+both source positions independently of native layout availability. Lua
+already safely refuses absent fields; its source and every corpus are
+unchanged. Actual corrected native replay remains required.
+
 ## Preserved inactive preparations
 
 [The portable handoff](group3-2026-10-06-inactive-handoff/README.md) retains 17
