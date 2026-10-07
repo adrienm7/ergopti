@@ -5449,6 +5449,14 @@ predecessor reports two passes/three failures. This does not qualify native
 Keychain trust, corporate proxies or transitive Rust/Xet downloads. Item62 and
 its Windows/company-network acceptance requirements remain open.
 
+The shipped MLX dependency pair now pins truststore0.10.4 and includes it in the
+canonical uv lock. The admitted uv0.12.21 generator preserves all41 previous
+package versions; its offline lock check passes and both artifact digests match
+independent official PyPI metadata. The ordinary dependency guard retains all
+seven previous bootstrap controls and adds20 checks: the actual old pair passes
+8/27, while the generated pair passes27/27. Bootstrap controls use modeled uv;
+native frozen bundle sync/import and Keychain acceptance remain unqualified.
+
 Current Linux checkpoint (2026-10-06, working sources over eeb6fd58f):
 retained temporary namespace conflicts now carry an explicit, pre-destructive
 retry disposition. Only the same owner can retry after the independently
