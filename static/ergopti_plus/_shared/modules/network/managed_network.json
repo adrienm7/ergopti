@@ -304,6 +304,15 @@
 				"failure_provenance": ["verified"],
 				"network_status": ["disconnected"]
 			}
+		},
+		{
+			"id": "verified_proxy_resolution_unavailable",
+			"cause": "proxy",
+			"when": {
+				"stage": ["proxy_resolve"],
+				"failure_provenance": ["verified"],
+				"proxy_resolution_status": ["unavailable"]
+			}
 		}
 	],
 	"default_cause": "unknown"

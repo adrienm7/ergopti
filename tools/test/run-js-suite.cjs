@@ -1806,6 +1806,12 @@ const CHECKS = [
 		repro: 'node tools/test/test-mlx-download-trust-activation.cjs'
 	},
 	{
+		name: 'macOS opaque clients refuse unsupported automatic proxy routing',
+		cmd: process.execPath,
+		args: ['tools/test/test-macos-opaque-network-admission.cjs'],
+		repro: 'node tools/test/test-macos-opaque-network-admission.cjs'
+	},
+	{
 		name: 'CPython resolution refuses configured interpreter substitution',
 		cmd: process.execPath,
 		args: ['tools/test/test-python-resolution.cjs'],

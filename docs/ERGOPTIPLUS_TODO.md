@@ -3652,21 +3652,25 @@ the complete three-OS checkpoint remain pending.
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 
-Manual macOS run37599507077 at704598298b2a5ebd3b9827b8fd11355d24eb0d1e
-observes the nonce/PID-bound wrong-key chain sparkle4005/4005/3002. Pinned
-Sparkle2.9.2 uses SUValidationError3002 for the independently confirmed failed
-Ed25519 verification. The native assertion now requires exactly the imported
-SUError.validationError and Sparkle domain; no error union or generic refusal
-replaces it. All other archive/signature/retirement assertions remain. Actual
-corrected native acceptance is still required.
+Manual macOS run37604627108 at35ef2db8fb6d6b920d51ce6ec692e7f124ffe9e7
+passes the real Sparkle cohort with exact XCTest completion: admitted resource
+reads, independently valid foreign-key refusal, installed-key retry,
+installation/relaunch and physical retirement. The original Sparkle-domain
+assertion now requires exactly SUError.validationError3002. Core JS/properties,
+macOS unit/stub E2E and native Canvas pass; overall package/verdict fail because
+Brew remains blocked, installation is skipped, and Release / Publish is skipped.
 
-Brew's same failed deny-removal positive reports nonprompt permission status
--1744 (errAEEventWouldRequireUserConsent). This proves a consent prerequisite
-for the original sender/target, not successful automation or all six archive
-cases. Retain the strict positive/full-policy-denial controls; exercise them
-on macOS with the original sender granted Automation consent, then complete
-ZIP installation, XZ upgrade, refusal/state preservation and physical closure.
-Package/install and transversal16/38 remain pending; item36 stays open.
+Brew's deny-removal positive still fails at exit66, reply-10004 and missing
+second marker. Its nonprompt permission query returns-1744,
+errAEEventWouldRequireUserConsent. This proves a consent prerequisite for that
+attempt, not the sole failure cause or successful automation. The current
+fixture generates fresh signed sender/receiver identities and sends without
+prompting; it supplies no demonstrated consent-grant path. Establish a supported
+admission path for those exact owned identities before promising a personal-Mac
+Automation grant. Terminal consent is not a proved remedy. Preserve both
+positives, full-policy denial, all six Brew cases, original deadlines and
+physical closure. Package/install and transversal16/38 remain pending;
+item36 stays open.
 
 Manual macOS run37588921661 at89085c46707aa9972c787affb0f4102a5c8fff68
 confirms the fixture-key repair: four admitted resource reads, genuine
@@ -5464,6 +5468,33 @@ The fixed Specifications and Capabilities frames of the Windows/macOS per-model 
       uncommitted in the local worktree of `fix/downloads-on-managed-networks`
       when the session stopped; redo it if that worktree is gone.
 
+Actual macOS HF-download and Ollama-pull owners now refuse opaque fetches when
+a verified native configuration needs unsupported PAC/WPAD or SOCKS routing.
+Failed, malformed, duplicate or divergent scoped native facts remain unavailable,
+never manufactured DIRECT. Explicit environment overrides preserve lowercase
+precedence; supported static/no-proxy routes and cached local startup remain.
+The shared classifier maps only verified unsupported resolution to the existing
+proxy cause and21-language messages. Portable receiving passes29 literal route
+and13 phase vectors,28 emitted owner wrappers and21 blocked HF launchers;
+these are controlled shell/source observations, not native Apple/PAC acceptance.
+Four fixed repeated-activation controls preserve one loopback exclusion per
+token and the same UV system-trust flag. Original bootstrap/generation/readiness
+fixtures retain their assertions; executed-wrapper CLI observations and nine
+exceptional close/removal controls cover their new native-task premise.
+Current-source validation passes382 JS checks,16688 macOS unit assertions,
+101 macOS E2E assertions with one declared skip, and11245 Linux unit assertions.
+Native Linux archive, HTTP and runtime checks pass after replaying the four
+resource-affected gates on the owned temporary volume. Genuine Nix admission
+remains unexecuted locally beyond its missing-store prerequisite and requires
+hosted CI; these portable results do not establish native macOS network routing.
+
+Full request-URL PAC/WPAD, ordered fallback/redirects for uv, HTTPX/HF/Xet and
+outgoing Ollama Go requests remain CODE on their actual drivers. System-store
+trust, complete loopback bypass and generic model failure/action integration
+must also be qualified. A successful direct download on a personal Mac cannot
+complete these unsupported routes. Native SystemConfiguration/task/trust and
+installed-network CI/device acceptance remain required; item62 stays partial.
+
 ETag validators now belong to the final admitted endpoint, with cache endpoint
 and byte identity retained. Every redirect selects its own matching validator;
 an untagged successful response invalidates the prior validator. Real TLS wire
@@ -5492,9 +5523,14 @@ Native ffi/luv/lfs providers and external SDK modules retain their first loaded
 identities; clearing them can reinitialize VM types or retire anchored loop
 userdata. The unrestricted proposed rollback crashed the whole Linux suite and
 was rejected. The unchanged fixtures with the final URL eligibility repair
-complete11242 passing tests and three persistence failures; final composed
-qualification of the scoped repair is still required. Historical Ubuntu
-Configuration assertion432 causality remains unproved.
+complete11242 passing tests and three persistence failures. The scoped repair
+passes all11245 tests across499 modules and all nine selected local gates at
+072481c3a9e890d24b16bb46cc93c28d2d277344. Manual Linux run37612794362 passes
+unit/shared checks but fails three native E2E steps: NUL-bearing conditional
+path diagnostics, authenticated no-follow cache admission and Nix pinned-source
+metadata. Packaging/install are skipped; Release is skipped. The first two
+failures are reproduced locally; the Nix cause remains unproved. Historical
+Ubuntu Configuration assertion432 causality also remains unproved.
 
 Manual Linux run37591679813 at9195a6419f4d36581e4404198cd152753791f2e6
 failed the Configuration restore assertion at test_hotstrings_scope.lua:432:
