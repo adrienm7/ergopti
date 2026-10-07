@@ -1167,3 +1167,11 @@ _GTKP_RetiredSettersBody() {
 }
 Test("Gestures: retired tap parameter refuses both setter paths before ports (tap-binding-identity)",
 	TestGestures_RetiredTapSettersRefuse)
+
+
+TestGestures_ScriptLatePublicationRead() {
+	AssertEqual(0, _FeatureStateBootRun("script_late_parameter"),
+		"the compiled Script retirement child must complete all native assertions")
+}
+Test("gestures: late script publication neutralizes retained parameters (script-late-publication)",
+	TestGestures_ScriptLatePublicationRead)

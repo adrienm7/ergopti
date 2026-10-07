@@ -734,3 +734,214 @@ helpers.describe("conditional removal cleanup bridge", function()
 		end)
 	end)
 end)
+
+
+helpers.describe("FileSystem final logical removal admission", function()
+	for _, result in ipairs({ "true", "false", "nil", "truthy", "throw" }) do
+		local mode = result
+		helpers.it("conditional-remove admits only literal true after its final native read: " .. mode, function()
+			with_fixture(function(fixture)
+				local path = os.tmpname()
+				local handle = assert(io.open(path, "wb")); assert(handle:write("owned")); assert(handle:close())
+				local adapter = fixture.make_adapter()
+				local read, remove = adapter.read_with_status, os.remove
+				local reads, admission_read, admissions, unlinks = 0, 0, 0, 0
+				adapter.read_with_status = function(...)
+					local content, status, detail = read(...)
+					reads = reads + 1
+					return content, status, detail
+				end
+				os.remove = function(target)
+					if target == path then
+						unlinks = unlinks + 1
+						helpers.assert_eq(admission_read, reads, "no reader intervenes between final admission and unlink")
+					end
+					return remove(target)
+				end
+				local called, removed, detail, receipt = pcall(adapter.remove_if_unchanged_admitted,
+					path, { status = "ok", content = "owned" }, nil, function()
+						admissions, admission_read = admissions + 1, reads
+						if mode == "throw" then error("controlled removal refusal") end
+						if mode == "true" then return true end
+						if mode == "false" then return false end
+						if mode == "truthy" then return {} end
+					end)
+				os.remove, adapter.read_with_status = remove, read
+				local actual, status = adapter.read_with_status(path)
+				remove(path); remove(path .. fixture.WRITE_LOCK_SUFFIX)
+				helpers.assert_eq(called, true)
+				helpers.assert_eq(removed, mode == "true", tostring(detail))
+				helpers.assert_eq(admissions, 1)
+				helpers.assert_true(admission_read > 0)
+				helpers.assert_eq(unlinks, mode == "true" and 1 or 0)
+				helpers.assert_eq(status, mode == "true" and "absent" or "ok")
+				if mode == "true" then helpers.assert_nil(actual) else helpers.assert_eq(actual, "owned") end
+				helpers.assert_eq(receipt.is_settled(), true)
+			end)
+		end)
+	end
+end)
+
+
+helpers.describe("FileSystem admitted removal retains release ownership", function()
+	for _, permitted in ipairs({ false, true }) do
+		local accepted = permitted
+		helpers.it("settles release-only cleanup without readmission or repeat unlink, accepted=" .. tostring(accepted), function()
+			with_fixture(function(fixture)
+				local path = os.tmpname()
+				local file = assert(io.open(path, "wb")); assert(file:write("owned")); assert(file:close())
+				local release_refused, allowed, admissions, unlinks = true, accepted, 0, 0
+				local adapter = fixture.make_adapter(nil, nil, nil, nil, nil, function() return not release_refused end)
+				local remove, open = os.remove, io.open
+				io.open = function(target, mode)
+					local handle, detail = open(target, mode)
+					if target ~= path .. fixture.WRITE_LOCK_SUFFIX or mode ~= "a+" then return handle, detail end
+					return { close = function() if release_refused then return false end; return handle:close() end }
+				end
+				os.remove = function(target)
+					if target == path then unlinks = unlinks + 1 end
+					return remove(target)
+				end
+				local called, removed, detail, receipt, cleanup = pcall(adapter.remove_if_unchanged_admitted,
+					path, { status = "ok", content = "owned" }, nil, function()
+						admissions = admissions + 1
+						return allowed
+					end)
+				os.remove, io.open = remove, open
+				local actual, status = adapter.read_with_status(path)
+				allowed, release_refused = false, false
+				local cleaned = cleanup()
+				local cleaned_again = cleanup()
+				remove(path); remove(path .. fixture.WRITE_LOCK_SUFFIX)
+				helpers.assert_eq(called, true, tostring(detail))
+				helpers.assert_eq(removed, false)
+				helpers.assert_eq(receipt.removed, accepted)
+				helpers.assert_eq(unlinks, accepted and 1 or 0)
+				helpers.assert_eq(status, accepted and "absent" or "ok")
+				if accepted then helpers.assert_nil(actual) else helpers.assert_eq(actual, "owned") end
+				helpers.assert_eq(cleaned, true)
+				helpers.assert_eq(cleaned_again, true)
+				helpers.assert_eq(receipt.is_settled(), true)
+				helpers.assert_eq(admissions, 1, "release-only cleanup does not repeat logical admission")
+			end)
+		end)
+	end
+end)
+
+
+helpers.describe("FileSystem admitted removal captures exact source before callbacks", function()
+	helpers.it("refuses mutated expected bytes and never unlinks the genuine external source", function()
+		with_fixture(function(fixture)
+			local path = os.tmpname()
+			local function put(content)
+				local file = assert(io.open(path, "wb")); assert(file:write(content)); assert(file:close())
+			end
+			put("owned")
+			local adapter = fixture.make_adapter()
+			local read, remove = adapter.read_with_status, os.remove
+			local expected = { status = "ok", content = "owned" }
+			local observed, admissions, unlinks = false, 0, 0
+			adapter.read_with_status = function(...)
+				if not observed then
+					observed = true; put("external-successor"); expected.content = "external-successor"
+				end
+				return read(...)
+			end
+			os.remove = function(target)
+				if target == path then unlinks = unlinks + 1 end
+				return remove(target)
+			end
+			local called, removed = pcall(adapter.remove_if_unchanged_admitted,
+				path, expected, nil, function() admissions = admissions + 1; return true end)
+			os.remove, adapter.read_with_status = remove, read
+			local file = assert(io.open(path, "rb"))
+			local actual = assert(file:read("*a")); assert(file:close())
+			remove(path); remove(path .. fixture.WRITE_LOCK_SUFFIX)
+			helpers.assert_eq(called, true)
+			helpers.assert_eq(removed, false)
+			helpers.assert_eq(actual, "external-successor")
+			helpers.assert_eq(unlinks, 0)
+			helpers.assert_eq(admissions, 0)
+		end)
+	end)
+end)
+
+
+helpers.describe("FileSystem initializer configuration identities", function()
+	local fields = { "read_with_status", "write_if_unchanged", "write_if_unchanged_admitted",
+		"remove_if_unchanged", "remove_if_unchanged_admitted", "remove_exact", "delete" }
+	local function exercise(body)
+		with_fixture(function(fixture) body(fixture.make_adapter()) end)
+	end
+	helpers.it("returns genuine native identities without IO or invoking any native method", function()
+		exercise(function(adapter)
+			local open, remove, calls = io.open, os.remove, 0
+			local function unexpected() calls = calls + 1; error("identity lookup invoked IO") end
+			io.open, os.remove = unexpected, unexpected
+			local called, owner, reader, writer, publisher, remover, admitted, exact, delete =
+				pcall(adapter.configuration_ports)
+			io.open, os.remove = open, remove
+			helpers.assert_true(called)
+			helpers.assert_true(rawequal(owner, adapter))
+			local actual = { reader, writer, publisher, remover, admitted, exact, delete }
+			for index, field in ipairs(fields) do
+				helpers.assert_true(rawequal(actual[index], rawget(adapter, field)), field)
+			end
+			helpers.assert_eq(calls, 0)
+		end)
+	end)
+	for index, field in ipairs(fields) do
+		helpers.it("retains initializer identity after public export replacement: " .. field, function()
+			exercise(function(adapter)
+				local original = rawget(adapter, field)
+				local calls = 0
+				local function fake() calls = calls + 1; return true end
+				rawset(adapter, field, fake)
+				local called, owner, reader, writer, publisher, remover, admitted, exact, delete =
+					pcall(adapter.configuration_ports)
+				rawset(adapter, field, original)
+				local actual = { reader, writer, publisher, remover, admitted, exact, delete }
+				helpers.assert_true(called)
+				helpers.assert_true(rawequal(owner, adapter))
+				helpers.assert_true(rawequal(actual[index], original), "the receipt retains original absence or method")
+				helpers.assert_eq(rawequal(actual[index], fake), false)
+				helpers.assert_eq(calls, 0)
+			end)
+		end)
+	end
+
+	helpers.it("a borrowed getter retains the actual initializer owner, never a copied receiver", function()
+		exercise(function(adapter)
+			local getter = rawget(adapter, "configuration_ports")
+			local copy = setmetatable({ configuration_ports = getter }, { __eq = function() return true end })
+			local owner = copy.configuration_ports(copy)
+			helpers.assert_true(rawequal(owner, adapter))
+			helpers.assert_eq(rawequal(owner, copy), false)
+		end)
+	end)
+	helpers.it("returned identities are independent scalar values, not a mutable authority table", function()
+		exercise(function(adapter)
+			local owner, reader = adapter.configuration_ports()
+			owner, reader = {}, function() error("mutated result must not be invoked") end
+			local current_owner, current_reader = adapter.configuration_ports()
+			helpers.assert_true(rawequal(current_owner, adapter))
+			helpers.assert_true(rawequal(current_reader, rawget(adapter, "read_with_status")))
+			helpers.assert_eq(rawequal(current_owner, owner), false)
+			helpers.assert_eq(rawequal(current_reader, reader), false)
+		end)
+	end)
+	helpers.it("raw issuer withdrawal is distinguishable from an accessor fallback", function()
+		exercise(function(adapter)
+			local getter, previous = rawget(adapter, "configuration_ports"), getmetatable(adapter)
+			local reached = 0
+			rawset(adapter, "configuration_ports", nil)
+			setmetatable(adapter, { __index = function(_, key)
+				if key == "configuration_ports" then reached = reached + 1; return getter end
+			end })
+			local issuer = rawget(adapter, "configuration_ports")
+			setmetatable(adapter, previous); rawset(adapter, "configuration_ports", getter)
+			helpers.assert_nil(issuer)
+			helpers.assert_eq(reached, 0)
+		end)
+	end)
+end)

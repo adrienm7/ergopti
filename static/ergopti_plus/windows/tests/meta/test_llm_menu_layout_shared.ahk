@@ -213,13 +213,45 @@ _LMLS_CurrentGroupSourceAndDataControls() {
 		AssertFalse(_LMLS_ExecutableCall('Unrelated' . Name . '()', Name), "a longer native callable cannot borrow identity")
 		AssertTrue(_LMLS_ExecutableCall(Name . '()', Name), "the same canonical callable remains admitted")
 	}
-	Rows := _LMLS_ManifestRows(), Groups := 0
+	_LMLS_CurrentRowTypesPolicy(_LMLS_ManifestRows())
+}
+
+; The five fixed parents are declared groups; backend/model/profile remain native.
+_LMLS_CurrentRowTypesPolicy(Rows) {
+	Groups := 0
 	for Row in Rows {
-		if Row["id"] == "llm_trigger" || Row["id"] == "llm_display" || Row["id"] == "llm_navigation" {
-			AssertEqual("group", Row["type"])
+		if Row["id"] == "llm_trigger" || Row["id"] == "llm_display" || Row["id"] == "llm_navigation"
+			|| Row["id"] == "llm_live_mode" || Row["id"] == "llm_generation_settings" {
+			AssertEqual("group", Row["type"], "fixed LLM parents require shared group ownership")
 			Groups += 1
 		} else AssertEqual("dynamic", Row["type"], "other native dynamic domains retain their existing API")
 	}
-	AssertEqual(3, Groups, "exactly the selected genuine fixed parents have shared group ownership")
+	AssertEqual(5, Groups, "exactly the selected genuine fixed parents have shared group ownership")
 }
 Test("llm-menu-layout-shared: true canonical groups require executable native source owners", _LMLS_CurrentGroupSourceAndDataControls)
+
+
+; Withdraw each current row's declared route without deriving expected types.
+_LMLS_CurrentRowTypeWithdrawalControls() {
+	Rows := _LMLS_ManifestRows()
+	AssertEqual(8, Rows.Length, "all current Windows settings rows enter the route controls")
+	_LMLS_CurrentRowTypesPolicy(Rows)
+	for Index, Original in Rows {
+		Mutant := []
+		for Row in Rows
+			Mutant.Push(Row.Clone())
+		Mutant[Index]["type"] := Original["type"] == "group" ? "dynamic" : "group"
+		ExpectedMessage := Original["type"] == "group"
+			? "fixed LLM parents require shared group ownership - expected: <group>, actual: <dynamic>"
+			: "other native dynamic domains retain their existing API - expected: <dynamic>, actual: <group>"
+		Refused := false
+		try _LMLS_CurrentRowTypesPolicy(Mutant)
+		catch as PolicyFailure {
+			if Type(PolicyFailure) != "Error" || PolicyFailure.Message != ExpectedMessage
+				throw PolicyFailure
+			Refused := true
+		}
+		AssertTrue(Refused, "changing one current row's declared route must be refused: " . Original["id"])
+	}
+}
+Test("llm-menu-layout-shared: every current declared native route rejects its type withdrawal", _LMLS_CurrentRowTypeWithdrawalControls)

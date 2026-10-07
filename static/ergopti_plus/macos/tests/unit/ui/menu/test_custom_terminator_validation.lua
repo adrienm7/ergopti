@@ -29,7 +29,7 @@ end
 --- @param mode string Action scenario.
 --- @param outcome string|nil Runtime mutation outcome.
 --- @return table fixture
-local function run_action(mode, outcome)
+local function run_action(mode, outcome, language)
 	local module_names = {
 		"infra.dialog_util",
 		"infra.i18n",
@@ -52,6 +52,7 @@ local function run_action(mode, outcome)
 		reloads = 0,
 		saves = 0,
 		updates = 0,
+		frame_hooks = 0,
 	}
 	local state = {
 		custom_terminators = {},
@@ -63,9 +64,20 @@ local function run_action(mode, outcome)
 	local prompt_calls = 0
 	local invalid_byte = string.char(0xC2)
 
+	-- The actual command affix reader requires real translated prefix data.
+	-- Other old literal fixture captions remain unchanged.
+	local Paths = require("infra.paths")
+	local JsonCodec = require("adapters.json_codec")
+	local Locale = assert(loadfile(Paths.shared("lua/locale/core.lua")))()
+	Locale.init({ json_decode = JsonCodec.decode,
+		resolve_locale_path = function(code) return Paths.shared("data/locales/" .. code .. ".json") end })
+	Locale.set_locale(language or "en")
+	local magic_prefix = Locale.get("menu.hotstrings.magic_key_prefix")
+
 	package.loaded["infra.i18n"] = {
 		get = function(key)
 			if key == "editor.hotstrings.err_id_exists" then return "DUPLICATE:%s" end
+			if key == "menu.hotstrings.magic_key_prefix" or key == "menu.hotstrings.magic_key" then return Locale.get(key) end
 			return key
 		end,
 		section = function(key) return key end,
@@ -90,6 +102,10 @@ local function run_action(mode, outcome)
 			return "button.retry"
 		end,
 	}
+	local renderer = require("infra.manifest_menu")
+	local root = renderer.get_root()
+	local frame = root.hotstrings_magic_trigger_frame
+	local frame_i18n = frame and frame[1].i18n
 	local command_row = require("infra.manifest_menu").command_row
 	local check_row = require("infra.manifest_menu").check_row
 	local get_array = require("infra.manifest_menu").get_array
@@ -97,8 +113,22 @@ local function run_action(mode, outcome)
 		command_row = command_row,
 		check_row = check_row,
 		get_array = get_array,
-		build = function(section, _, _, _, _, providers)
-			if section == "word_expanders_menu" then return providers.word_expander_entries() end
+		template_rows = function(...)
+			local rows = renderer.template_rows(...)
+			if select(1, ...) == "hotstrings_magic_trigger_frame" then
+				if mode == "frame_withdrawal" then root.hotstrings_magic_trigger_frame = nil end
+				if mode == "frame_drift" then frame[1].i18n = "menu.hotstrings.params" end
+				if mode == "frame_slots" then frame.foreign = true end
+				if mode == "frame_meta" then setmetatable(frame, { __len = function() effects.frame_hooks = effects.frame_hooks + 1; return 3 end }) end
+			end
+			return rows
+		end,
+		get_root = renderer.get_root,
+		native_child_rows = renderer.native_child_rows,
+		build = function(section, category, dynamic, groups, context, providers)
+			if section == "word_expanders_menu" then
+				return renderer.build(section, category, dynamic, groups, context, providers)
+			end
 			local rows = {}
 			for _, id in ipairs({ "word_expanders", "magic_key_config" }) do
 				for _, row in ipairs(providers[id]()) do rows[#rows + 1] = row end
@@ -155,7 +185,7 @@ local function run_action(mode, outcome)
 		local Management = require("ui.menu.menu_hotstrings_management")
 		local built = Management.build_management({
 			state = state,
-			paused = false,
+			paused = mode == "paused_magic",
 			keymap = keymap,
 			hotstring_editor = {
 				set_trigger_char = function(char)
@@ -181,12 +211,15 @@ local function run_action(mode, outcome)
 		else
 			row = find_row(built.menu, function(candidate)
 				return type(candidate.label) == "string"
-					and candidate.label:find("menu.hotstrings.magic_key_prefix", 1, true) == 1
+					and candidate.label:find(magic_prefix, 1, true) == 1
 			end)
 		end
-		helpers.assert_type(row, "table", "the target provider row must be reachable")
-		helpers.assert_type(row.action, "function", "the target provider row must be clickable")
-		local result = row.action()
+		local result
+		if mode ~= "frame_withdrawal" and mode ~= "frame_drift" and mode ~= "frame_slots" and mode ~= "frame_meta" and mode ~= "paused_magic" then
+			helpers.assert_type(row, "table", "the target provider row must be reachable")
+			helpers.assert_type(row.action, "function", "the target provider row must be clickable")
+			result = row.action()
+		end
 		for _, def in ipairs(Terminators.get_terminator_defs()) do
 			if def.key == "custom_1" then
 				Terminators.remove_custom_terminator("custom_1")
@@ -198,9 +231,12 @@ local function run_action(mode, outcome)
 			invalid_byte = invalid_byte,
 			result = result,
 			state = state,
+			row = row,
 		}
 	end, debug.traceback)
 
+	root.hotstrings_magic_trigger_frame = frame
+	if frame then frame[1].i18n = frame_i18n; frame.foreign = nil; setmetatable(frame, nil) end
 	for _, name in ipairs(module_names) do package.loaded[name] = saved[name] end
 	if not ok then error(fixture_or_err, 0) end
 	return fixture_or_err
@@ -259,5 +295,42 @@ helpers.describe("custom terminator and magic-key input validation", function()
 		helpers.assert_eq(fixture.effects.reloads, 1)
 	end)
 end)
+
+
+helpers.describe("declared Magic trigger native provider", function()
+	for _, code in ipairs({ "en", "fr" }) do
+		local language = code
+		helpers.it("keeps actual valid native publication and caption in " .. language, function()
+			local fixture = run_action("valid_magic", nil, language)
+			helpers.assert_eq(fixture.row.label, language == "en" and "Magic key: ★" or "Touche magique : ★")
+			helpers.assert_eq(fixture.effects.keymap_sets, 1)
+			helpers.assert_eq(fixture.effects.editor_sets, 1)
+			helpers.assert_eq(fixture.effects.saves, 1)
+			helpers.assert_eq(fixture.effects.reloads, 1)
+		end)
+		helpers.it("keeps the actual paused row with no action in " .. language, function()
+			local fixture = run_action("paused_magic", nil, language)
+			helpers.assert_type(fixture.row, "table")
+			helpers.assert_true(fixture.row.disabled)
+			helpers.assert_nil(fixture.row.action)
+			helpers.assert_eq(fixture.effects.keymap_sets, 0)
+			helpers.assert_eq(fixture.effects.saves, 0)
+			helpers.assert_eq(fixture.effects.reloads, 0)
+		end)
+	end
+	for _, mode_name in ipairs({ "frame_withdrawal", "frame_drift", "frame_slots", "frame_meta" }) do
+		local mode = mode_name
+		helpers.it("refuses genuine late " .. mode .. " without native publication", function()
+			local fixture = run_action(mode)
+			helpers.assert_nil(fixture.row)
+			helpers.assert_eq(fixture.effects.frame_hooks, 0)
+			helpers.assert_eq(fixture.effects.keymap_sets, 0)
+			helpers.assert_eq(fixture.effects.editor_sets, 0)
+			helpers.assert_eq(fixture.effects.saves, 0)
+			helpers.assert_eq(fixture.effects.reloads, 0)
+		end)
+	end
+end)
+
 
 return true

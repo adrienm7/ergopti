@@ -6,6 +6,14 @@
 local M = {}
 local Writer = require("toml_codec.writer")
 local Codec = require("toml_codec")
+local preparation_lookup = assert(rawget(Writer, "preparation_admission"))
+local function preparation_current(check)
+	if check == nil then return true end
+	if not rawequal(rawget(Writer, "preparation_admission"), preparation_lookup) then return false end
+	if type(check) ~= "function" then return false end
+	local called, current = pcall(check)
+	return called and current == true
+end
 
 local function belongs(path, prefix)
 	return path == prefix or path:sub(1, #prefix + 1) == prefix .. "."
@@ -183,7 +191,7 @@ function M.new(options)
 			end
 			-- A preset scope with no configuration rows leaves config.toml alone:
 			-- creating it would also end the first-run state of an absent file.
-			local config, decoded, candidate, source
+			local config, decoded, candidate, source, preparation_check
 			if #updates > 0 or #presets == 0 then
 				local prepared, why
 				prepared, why, candidate, source = prepare_batch(options.path, updates, options.files)
@@ -193,6 +201,8 @@ function M.new(options)
 					or (source.status == "ok" and type(source.content) ~= "string") then
 					return false, "scope preparation did not return an exact source and candidate"
 				end
+				preparation_check = preparation_lookup(options.path, source, candidate)
+				if not preparation_current(preparation_check) then return false, "scope preparation epoch refused" end
 				decoded = Codec.decode(candidate)
 				if type(decoded) ~= "table" then return false, "scope candidate is not valid TOML" end
 				config = { path = options.path, backup_path = options.backup_path, candidate = candidate,
@@ -206,13 +216,24 @@ function M.new(options)
 				files[#files + 1] = file
 			end
 			if config then files[#files + 1] = config end
+			local function prepared_source_current()
+				if not preparation_current(preparation_check) then return false end
+				if preparation_check == nil then return true end
+				local bytes, status = Writer.read_classified(config.path, options.files)
+				return preparation_current(preparation_check) and status == config.source.status
+					and (status ~= "ok" or bytes == config.source.content)
+			end
+			if not prepared_source_current() then return false, "scope preparation changed before capture" end
 			local snapshot = options.capture(source, candidate, updates, rendered)
 			if type(snapshot) ~= "table" then return false, "runtime snapshot was not acknowledged" end
+			if not prepared_source_current() then return false, "scope preparation changed during capture" end
 			debt = { snapshot = snapshot, runtime = false, files = published, cleanup = {} }
 			for _, file in ipairs(files) do
+				if not prepared_source_current() then return false, "scope preparation changed before backup" end
 				local backed, why = back_up(file)
 				if not backed then return false, why end
 			end
+			if not prepared_source_current() then return false, "scope preparation changed before runtime" end
 			-- Capture before invocation because a native callback can mutate and throw.
 			debt.runtime = true
 			if options.apply(decoded, updates, source, candidate, rendered) ~= true then
@@ -221,7 +242,7 @@ function M.new(options)
 			for _, file in ipairs(files) do
 				local expected = file.source.status == "ok" and { status = "ok", content = file.source.content }
 					or { status = "absent" }
-				local done, publish_error, retry_cleanup = Writer.publish_if_unchanged(file.path, file.candidate, options.files, expected)
+				local done, publish_error, retry_cleanup = Writer.publish_if_unchanged(file.path, file.candidate, options.files, expected, nil, preparation_check)
 				if done == true or type(retry_cleanup) == "function" then
 					published[#published + 1] = { path = file.path, source = file.source, candidate = file.candidate,
 						publication_cleanup = type(retry_cleanup) == "function" and retry_cleanup or nil }

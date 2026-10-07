@@ -55,6 +55,38 @@ local function named_upvalue(fn, target)
 	return nil, nil
 end
 
+--- Uses the real migration engine with the fixture's explicit reader seam.
+--- Virtual IO cannot advertise the default native initializer. This context
+--- grants no native destination admission and restores both constructor owners.
+--- @param scenario function
+--- @return any result
+function M.with_migration_reader(scenario)
+	local saved_migration = package.loaded["config_migrate"]
+	local saved_writer = package.loaded["toml_codec.writer"]
+	local migration, boot
+	local ok, result = xpcall(function()
+		package.loaded["config_migrate"] = nil
+		package.loaded["toml_codec.writer"] = nil
+		migration = require("config_migrate")
+		boot = migration.boot
+		migration.boot = function(options)
+			local controlled = {}
+			for key, value in pairs(options) do controlled[key] = value end
+			local adapter = options.file_adapter
+			local read = type(adapter) == "table" and rawget(adapter, "read_with_status")
+			assert(type(read) == "function", "the migration fixture needs its explicit reader")
+			controlled.read = function(path) return read(path) end
+			return boot(controlled)
+		end
+		return scenario()
+	end, debug.traceback)
+	if migration then migration.boot = boot end
+	package.loaded["config_migrate"] = saved_migration
+	package.loaded["toml_codec.writer"] = saved_writer
+	if not ok then error(result, 0) end
+	return result
+end
+
 --- Runs one finish message through the production handler.
 --- @param opts table `{ answers, locale = "true"|"false"|"nil"|"throw",
 ---   write = "true"|"false"|"nil"|"throw", read = function(path)|nil,
@@ -197,7 +229,7 @@ function M.with_finish(opts, scenario)
 			return mode == "true"
 		end,
 	}
-	local ok, err = xpcall(function()
+	local ok, err = xpcall(M.with_migration_reader, debug.traceback, function()
 		local onboarding = require("ui.onboarding")
 		require("tests.support.onboarding_shared_data").install()
 		local handle_message = named_upvalue(onboarding.run, "handle_message")
@@ -209,7 +241,7 @@ function M.with_finish(opts, scenario)
 		debug.setupvalue(onboarding.run, config_path_index, "/virtual/onboarding-config.toml")
 		if opts.answers ~= nil then handle_message({ action = "finish", answers = opts.answers }) end
 		scenario(state, onboarding)
-	end, debug.traceback)
+	end)
 	for _, name in ipairs(MODULE_NAMES) do package.loaded[name] = saved[name] end
 	if not ok then error(err, 0) end
 end

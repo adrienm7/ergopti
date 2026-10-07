@@ -265,7 +265,8 @@ _LBMD_ModelPickerBoundaryConsumer() {
 		"the actual native model-menu consumer must render the complete tail provider")
 	Tail := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_ModelTailRows"))
 	AssertContains(Tail, 'MenuRenderer_StatusRows("llm_menu", "llm_model", "model_picker_tail")')
-	AssertContains(Tail, '"action", (*) => LLM_Menu_PromptAddModel()', "original Add dialog callback body remains native")
+	AssertContains(Tail, '"llm_add_model_entry", (*) => LLM_Menu_PromptAddModel()', "original Add dialog callback body remains native")
+	Assert(_LMNM_AddRoute(Tail), "the named Add binding must reach and join the actual typed tail consumer")
 	AssertContains(Tail, '_LLM_Menu_ModelBrowserRow()', "original browser admission owner remains native")
 	Assert(InStr(Tail, 'Map("separator", true)') == 0, "no native fallback separator may replace a refused declaration")
 }
@@ -763,3 +764,104 @@ _LBMD_ModelHeaderDependencyPresence(Present) {
 }
 for Present in [false, true]
 	Test("model header boundary: dependency prior presence " . Present, _LBMD_ModelHeaderDependencyPresence.Bind(Present))
+
+
+/** Drives each complete sheet through the actual catalogue and Win32 row owner. */
+_LBMD_CompleteModelFrame(Section) {
+	return _LBMD_WithHardwareLocale("en", _LBMD_CompleteModelFrameCurrent.Bind(Section))
+}
+
+_LBMD_CompleteModelFrameCurrent(Section) {
+	global _SharedDir
+	Expected := JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\llm_complete_model_frames.json", "UTF-8"))
+	Model := _LBMD_ReadoutCatalogueModel(Expected["native_model"])
+	Name := Model["name"], Url := Model["urls"]["ollama"]
+	AssertEqual(Expected["raw_source"], Url)
+	Root := _MM_GetManifestRoot(), Frame := Root[Section]
+	Native := 0
+	try {
+		Rows := _LLM_Menu_PerModelRows(Name, Model, Url, Name, false)
+		AssertEqual(t("menu.llm.select_model"), Rows[1]["label"])
+		AssertTrue(HasMethod(Rows[1]["action"], "Call"))
+		AssertTrue(HasMethod(Rows[2]["action"], "Call"), "the actual uninstalled Download action stays native")
+		AssertTrue(Rows[3]["separator"])
+		AssertEqual("Backend: Ollama 🦙", Rows[4]["label"])
+		AssertFalse(Rows[4].Has("action"), "Windows backend information remains inert")
+		AssertFalse(Rows[4].Has("disabled"), "absent action owns native greying without changing the Map ABI")
+		AssertEqual("Source: https://ollama.com/library/qwen3-coder:30b", Rows[5]["label"])
+		AssertTrue(HasMethod(Rows[5]["action"], "Call"))
+		Native := Menu()
+		MenuRenderer_AppendRows(Native, "llm_menu", "llm_model", Rows)
+		Flags := DllCall("GetMenuState", "ptr", Native.Handle, "uint", 3, "uint", 0x400, "uint")
+		Assert(Flags != 0xFFFFFFFF && (Flags & 0x3) != 0, "actual Win32 backend label is disabled by absent action")
+		Root.Delete(Section)
+		AssertEqual(0, _LLM_Menu_PerModelRows(Name, Model, Url, Name, false).Length,
+			"the real allocator must not reconstruct a withdrawn complete frame")
+		Root[Section] := [Map("type", "command", "id", "unbound_complete_model", "i18n", "button.cancel")]
+		AssertEqual(0, _LLM_Menu_PerModelRows(Name, Model, Url, Name, false).Length,
+			"an unbound declared command cannot become an inert model row")
+	} finally {
+		Root[Section] := Frame
+		if Native is Menu
+			_CTC_ReleaseMenu(Native)
+	}
+	Assert(_LLM_Menu_PerModelRows(Name, Model, Url, Name, false).Length > 0,
+		"the repaired declaration consumes the same genuine physical model")
+}
+for Section in ["llm_model_action_rows", "llm_model_identity_rows", "llm_model_spec_rows",
+	"llm_model_capability_rows", "llm_model_hardware_rows"]
+	Test("complete model sheet: actual frame " . Section, _LBMD_CompleteModelFrame.Bind(Section))
+
+
+/** The per-app frame retains lazy native commands and its true empty predicate. */
+_LBMD_CompletePerAppFrame() {
+	global _LLM_Menu
+	Saved := _LLM_Menu
+	Root := _MM_GetManifestRoot(), Original := Root["llm_profile_app_override_frame"]
+	try {
+		_LLM_Menu := Saved.Clone()
+		; Match the genuine menu constructor rather than inheriting another fixture's profile array.
+		_LLM_Menu["user_profiles"] := []
+		_LLM_Menu["app_profile_overrides"] := Map()
+		Empty := _LLM_Menu_PerAppProfileRows()
+		AssertEqual(1, Empty.Length)
+		AssertEqual(t("menu.profiles.override_active_app_with_current"), Empty[1]["label"])
+		AssertTrue(HasMethod(Empty[1]["action"], "Call"))
+		_LLM_Menu["app_profile_overrides"] := Map("editor.exe", "default")
+		Rows := _LLM_Menu_PerAppProfileRows()
+		AssertEqual(3, Rows.Length)
+		AssertTrue(Rows[2]["separator"])
+		AssertEqual("editor.exe  →  " . LLM_Menu_GetProfileLabel("default"), Rows[3]["label"])
+		AssertTrue(HasMethod(Rows[3]["action"], "Call"))
+		Root.Delete("llm_profile_app_override_frame")
+		AssertThrows(_LLM_Menu_PerAppProfileRows, "the actual unowned per-app frame refuses construction")
+		Root["llm_profile_app_override_frame"] := [Map("type", "command", "id", "unbound_profile_override", "i18n", "button.cancel")]
+		AssertThrows(_LLM_Menu_PerAppProfileRows, "the actual unowned per-app frame refuses construction")
+		AssertEqual("default", _LLM_Menu["app_profile_overrides"]["editor.exe"])
+	} finally {
+		Root["llm_profile_app_override_frame"] := Original
+		_LLM_Menu := Saved
+	}
+}
+Test("complete per-app frame: actual empty/populated override owner and strict withdrawal", _LBMD_CompletePerAppFrame)
+
+
+; The native profile reader legitimately requires assigned canonical profile records.
+; Seed a real sparse Array to prove this fixture never inherits another case's holes.
+_LBMD_PerAppFrameIsolatesProfiles() {
+	global _LLM_Menu
+	Saved := _LLM_Menu, Holey := []
+	Holey.Length := 1
+	try {
+		_LLM_Menu := Saved.Clone()
+		_LLM_Menu["user_profiles"] := Holey
+		Owner := _LLM_Menu
+		AssertThrows(LLM_Menu_GetProfileLabel.Bind("default"), "the genuine profile reader rejects an unassigned inherited record")
+		_LBMD_CompletePerAppFrame()
+		AssertEqual(Owner, _LLM_Menu, "the per-app fixture restores the same prior map")
+		AssertEqual(Holey, _LLM_Menu["user_profiles"], "the per-app fixture restores the same prior profile array")
+		AssertFalse(Holey.Has(1), "the fixture cannot fill or mutate the borrowed sparse array")
+	} finally _LLM_Menu := Saved
+}
+Test("per-app fixture: isolate canonical profiles and restore the genuine borrowed sparse array",
+	_LBMD_PerAppFrameIsolatesProfiles)

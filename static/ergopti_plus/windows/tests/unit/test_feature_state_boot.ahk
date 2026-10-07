@@ -114,6 +114,18 @@ TestFeatureStateBootSourceWiring() {
         "feature-state must call the configuration accessor directly")
     AssertTrue(InStr(FeatureStateSource, 'Func("IniCacheGet").Call') = 0,
         "feature-state must not use the boot-fragile Func(...).Call accessor")
+	HarnessSource := FileRead(A_ScriptDir . "\support\feature_state_boot_smoke.ahk", "UTF-8")
+	PolicyInclude := _FeatureStateBootFindOwnerInclude(Source, "TomlConfigParameterBindingStatus")
+	HarnessHelpers := InStr(HarnessSource, _FeatureStateBootNativeInclude(Source, HelpersPos))
+	HarnessLoader := InStr(HarnessSource, PolicyInclude)
+	HarnessState := InStr(HarnessSource, _FeatureStateBootNativeInclude(Source, StatePos))
+	AssertTrue(HarnessHelpers > 0 && HarnessLoader > 0 && HarnessState > 0,
+		"the native child must include the actual configuration-owner parameter policy")
+	AssertTrue(HarnessHelpers < HarnessLoader && HarnessLoader < HarnessState,
+		"the native child preserves the production helper/loader/state dependency order")
+	AssertTrue(InStr(_DriverFuncBody("TomlConfigParameterBindingStatus"),
+		"TomlConfigParameterBindingStatus(BindingId, Catalogue?) {") > 0,
+		"the included native owner declares the actual binding-status callable")
 }
 Test("Feature-state startup: production include order and direct loader dependency stay wired (feature-state-boot-wiring)", TestFeatureStateBootSourceWiring)
 
@@ -158,3 +170,30 @@ TestFeatureStateBootTapBindingSourceWiring() {
 }
 Test("feature-state startup: tap publication source ordering retains the later native read stage (tap-binding-identity)",
 	TestFeatureStateBootTapBindingSourceWiring)
+
+; Follow the real entry-point includes and the canonical definition reader, so
+; moving the policy owner preserves this dependency assertion without a pin.
+_FeatureStateBootFindOwnerInclude(DriverSource, Symbol) {
+	Includes := []
+	for Line in StrSplit(_StripFullLineComments(DriverSource), "`n", "`r") {
+		if !RegExMatch(Line, "^#Include[ `t]+(.+)$", &Directive)
+			continue
+		Operand := Trim(Directive[1])
+		CandidatePath := A_ScriptDir . "\..\" . Operand
+		if !FileExist(CandidatePath)
+			continue
+		CandidateSource := FileRead(CandidatePath, "UTF-8")
+		if !_DriverFindFunctionDefinition(&CandidateSource, Symbol)
+			continue
+		Includes.Push("#Include ..\..\" . StrReplace(Operand, "/", "\"))
+	}
+	if Includes.Length != 1
+		throw Error("The native binding policy must have exactly one real entry-point include owner.")
+	return Includes[1]
+}
+
+_FeatureStateBootNativeInclude(DriverSource, Position) {
+	End := InStr(DriverSource, "`n", false, Position)
+	Line := Trim(SubStr(DriverSource, Position, End ? End - Position : unset), "`r`n `t")
+	return "#Include ..\..\" . StrReplace(SubStr(Line, 10), "/", "\")
+}

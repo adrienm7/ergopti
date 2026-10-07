@@ -1,0 +1,44 @@
+{
+	"section": "top_level",
+	"id": "apps",
+	"row": {
+		"type": "group",
+		"id": "apps",
+		"i18n": "menu.apps.title",
+		"rows": [],
+		"greyed_when_paused": true,
+		"platforms": ["hs"],
+		"reason_key": "platform_reason.tray_top_level_rows_are_each_drivers"
+	},
+	"platform_presence": {
+		"hs": true,
+		"ahk": false,
+		"linux": false
+	},
+	"captions": {
+		"ar": "🛠️ التطبيقات",
+		"cs": "🛠️ Aplikace",
+		"da": "🛠️ Programmer",
+		"de": "🛠️ Anwendungen",
+		"en": "🛠️ Applications",
+		"es": "🛠️ Aplicaciones",
+		"fr": "🛠️ Applications",
+		"he": "🛠️ יישומים",
+		"hi": "🛠️ एप्लिकेशन",
+		"it": "🛠️ Applicazioni",
+		"ja": "🛠️ アプリケーション",
+		"ko": "🛠️ 응용 프로그램",
+		"nl": "🛠️ Toepassingen",
+		"no": "🛠️ Programmer",
+		"pl": "🛠️ Aplikacje",
+		"pt": "🛠️ Aplicativos",
+		"ru": "🛠️ Приложения",
+		"sv": "🛠️ Program",
+		"tr": "🛠️ Uygulamalar",
+		"uk": "🛠️ Програми",
+		"zh": "🛠️ 应用程序"
+	},
+	"installed_order": ["Alpha", "Zebra"],
+	"finished_empty_accepted": true,
+	"callbacks_during_build": 0
+}

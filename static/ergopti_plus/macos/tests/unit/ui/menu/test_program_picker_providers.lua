@@ -238,3 +238,41 @@ helpers.describe("script program native assignment ownership", function()
 		end)
 	end)
 end)
+
+helpers.describe("program fixture final publication admission", function()
+	for _, mode in ipairs({ "false", "nil", "table", "throw" }) do
+		helpers.it("keeps the exact source after final admission " .. mode, function()
+			with_provider("script", {}, function()
+				local port = package.loaded["adapters.file_system"]
+				local before, status = port.read_with_status("config")
+				local called = 0
+				local result = port.write_if_unchanged_admitted("config", "candidate", { status = status, content = before }, nil,
+					function()
+						called = called + 1
+						if mode == "throw" then error("private admission refusal") end
+						if mode == "table" then return {} end
+						if mode == "nil" then return nil end
+						return false
+					end)
+				helpers.assert_eq(result, false)
+				helpers.assert_eq(called, 1)
+				helpers.assert_eq(port.read_with_status("config"), before)
+			end)
+		end)
+	end
+	helpers.it("refuses a genuine external write even when the caller mutates its expected source", function()
+		with_provider("script", {}, function()
+			local port = package.loaded["adapters.file_system"]
+			local before, status = port.read_with_status("config")
+			local expected, external_ack = { status = status, content = before }, nil
+			local result = port.write_if_unchanged_admitted("config", "candidate", expected, nil, function()
+				external_ack = port.write_if_unchanged("config", "external-successor", expected)
+				expected.content = "external-successor"
+				return true
+			end)
+			helpers.assert_eq(external_ack, true)
+			helpers.assert_eq(result, false)
+			helpers.assert_eq(port.read_with_status("config"), "external-successor")
+		end)
+	end)
+end)
