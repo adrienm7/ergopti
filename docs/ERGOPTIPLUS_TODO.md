@@ -4078,6 +4078,15 @@ all 63 original and all 67 current tests; the new positive projection against
 the original helper fails its 16 subcases. Genuine policy-state observation
 and the remaining native lifecycle/install scenarios are still required.
 
+A reviewed additive Sparkle progress diagnostic uses only the existing
+physically closed direct-child capture and authenticated server-retired
+receipt. Fixed PID-bound milestones and the actual admitted resource-read
+counter can locate the original refused-1 deadline without claiming response
+delivery or update success. All 117 original Swift assertion/failure lines
+remain exact and ordered; two new Swift receiving controls still require
+genuine macOS compilation/execution. No deadline, signature expectation,
+readiness predicate, installer authorization or cleanup law is relaxed.
+
 - [~] **37.** Always show the shipped Ergopti hotstring pack, including when
   its keyboard layout is not installed. Move French `suffixes_a` and magic-key
   `replace` into that extension without a beta compatibility layer. The runtime
