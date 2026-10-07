@@ -78,10 +78,79 @@ M.DEFAULT_STATE = {
 -- ==============================
 -- ==============================
 
+--- Checks raw dense arrays without triggering source metamethods.
+--- @param value table Source array.
+--- @param records boolean Whether its values must be plain records.
+--- @return boolean
+local function metrics_dense(value, records)
+	if type(value) ~= "table" or getmetatable(value) ~= nil then return false end
+	local count, maximum = 0, 0
+	for index, row in next, value do
+		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 then return false end
+		if records and (type(row) ~= "table" or getmetatable(row) ~= nil) then return false end
+		count, maximum = count + 1, math.max(maximum, index)
+	end
+	return count == maximum
+end
+
+--- Admits the actual Metrics source structure without interpreting command grammar.
+--- @param renderer table|nil Actual manifest renderer.
+--- @param platform string Native platform token.
+--- @return table|nil root, table|nil top, table|nil children, table|nil parent, table|nil fields
+local function metrics_source(renderer, platform)
+	if type(renderer) ~= "table" or type(rawget(renderer, "get_root")) ~= "function"
+		or type(rawget(renderer, "build")) ~= "function" or type(rawget(renderer, "group_row")) ~= "function" then return nil end
+
+	local ok, root = pcall(renderer.get_root)
+	if not ok then return nil end
+	if type(root) ~= "table" or getmetatable(root) ~= nil then return nil end
+	local top, children = rawget(root, "top_level"), rawget(root, "metrics_menu")
+	if not metrics_dense(top, true) or not metrics_dense(children, true) then return nil end
+	local parent
+	for _, row in next, top do
+		if rawget(row, "id") == "metrics" then
+			if parent then return nil end
+			parent = row
+		end
+	end
+	if parent == nil or rawget(parent, "type") ~= "group" or type(rawget(parent, "i18n")) ~= "string"
+		or rawget(parent, "i18n") == "" or not metrics_dense(rawget(parent, "rows"), true) then return nil end
+	local platforms = rawget(parent, "platforms")
+	if platforms ~= nil then
+		if not metrics_dense(platforms, false) then return nil end
+		local visible = false
+		for _, token in next, platforms do
+			if type(token) ~= "string" then return nil end
+			if token == platform then visible = true end
+		end
+		if not visible then return nil end
+	end
+	local fields = {}
+	for key, value in next, parent do fields[key] = value end
+	return root, top, children, parent, fields
+end
+
+--- Rechecks the captured direct parent fields without source metamethods.
+--- @param parent table Actual direct source row.
+--- @param fields table Captured raw field references and scalar values.
+--- @return boolean
+local function metrics_parent_unchanged(parent, fields)
+	for key, value in next, parent do
+		if not rawequal(value, rawget(fields, key)) then return false end
+	end
+	for key, value in next, fields do
+		if not rawequal(value, rawget(parent, key)) then return false end
+	end
+	return true
+end
+
+
 --- Builds the Keylogger menu item and defines callbacks.
 --- @param ctx table Context containing state, updateMenu, save_prefs, etc.
 --- @return table The menu definition table.
 function M.build(ctx)
+	-- Capture without returning: WPM cleanup/reconciliation remains mandatory.
+	local root, top, section, parent, fields = metrics_source(ManifestMenu, "hs")
 	local state          = ctx.state
 	local save_prefs     = ctx.save_prefs
 	local updateMenu     = ctx.updateMenu
@@ -612,14 +681,17 @@ function M.build(ctx)
 
 	-- The tick mirrors the switch; the parent has no action, since a row that
 	-- opens a submenu is never clicked.
-	return {
-		label   = i18n.get("menu.metrics.title"),
-		checked = state.keylogger_enabled,
-		-- `submenu`: the rows are already materialised by ManifestMenu.build. The
-		-- tray reads provider rows, where a `menu` field is never read, so the
-		-- Metrics entry reached the menu bar with nothing under it.
-		submenu = menu,
-	}
+	if root == nil or not metrics_dense(menu, true) then return nil end
+	local current_root, current_top, current_section, current_parent = metrics_source(ManifestMenu, "hs")
+	if not rawequal(root, current_root) or not rawequal(top, current_top)
+		or not rawequal(section, current_section) or not rawequal(parent, current_parent)
+		or not metrics_parent_unchanged(parent, fields) then return nil end
+	local projected = ManifestMenu.group_row("top_level", "metrics", menu, STATE_GETTERS)
+	current_root, current_top, current_section, current_parent = metrics_source(ManifestMenu, "hs")
+	if not rawequal(root, current_root) or not rawequal(top, current_top)
+		or not rawequal(section, current_section) or not rawequal(parent, current_parent)
+		or not metrics_parent_unchanged(parent, fields) then return nil end
+	return projected
 end
 
 return M

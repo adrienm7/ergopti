@@ -86,14 +86,73 @@ _HS_InvalidateCaches() {
 ; returns row DATA and the renderer builds the item — the row was built three
 ; times before that, once per driver, from a declaration that named only the slot.
 _HS_MagicKeyRows() {
-	return [Map(
-		"label",  t("menu.hotstrings.magic_key_prefix") . ScriptInformation["MagicKey"],
-		"action", MagicKeyEditor
-	)]
+	Root := _MR_GetManifestRoot()
+	Frame := Root is Map ? Root.Get("hotstrings_magic_trigger_frame", false) : false
+	if !(Frame is Array) || Frame.Length != 3
+		return []
+	Snapshot := []
+	for Row in Frame {
+		if !(Row is Map)
+			return []
+		Fields := Map()
+		for Key, Value in Row {
+			if IsObject(Value) && !(Value is Array)
+				return []
+			Fields[Key] := Value is Array ? [Value, Value.Clone()] : Value
+		}
+		Snapshot.Push([Row, Fields])
+	}
+	Rows := MenuRenderer_TemplateRows("hotstrings_magic_trigger_frame", Map("magic_key_change", MagicKeyEditor),
+		Map("magic_key_value", () => ScriptInformation["MagicKey"], "magic_key_ready", () => true), Map())
+	if !(Rows is Array) || _MR_GetManifestRoot() != Root || Root.Get("hotstrings_magic_trigger_frame", false) != Frame
+		return []
+	if Frame.Length != Snapshot.Length
+		return []
+	for Index, Saved in Snapshot {
+		Row := Frame[Index]
+		if Row != Saved[1] || Row.Count != Saved[2].Count
+			return []
+		for Key, Value in Saved[2] {
+			if !Row.Has(Key)
+				return []
+			Current := Row[Key]
+			if Value is Array {
+				if Current != Value[1] || Current.Length != Value[2].Length
+					return []
+				for Slot, Item in Value[2]
+					if Current[Slot] !== Item
+						return []
+			} else if Type(Current) != Type(Value) || Current !== Value
+				return []
+		}
+	}
+	return Rows
 }
 
 ; Dynamic handler: whole-tree bulk actions (force every hotstring section on/off).
 ; Rendered inside the "⚙️ Paramètres hotstrings" group, just after its separator.
+
+; Validate the complete canonical caption map before constructing value rows.
+; Native prompts keep their existing titles; the map owns displayed fixed captions.
+_HS_ParameterDelayCaptions() {
+	Root := _MR_GetManifestRoot()
+	Captions := Root is Map ? Root.Get("hotstrings_delay_captions", false) : false
+	Keys := ["default", "magic_key", "autocorrection", "ai_acceptance", "autocompletion"]
+	if !(Captions is Map) || Captions.Count != Keys.Length
+		return false
+	Declared := Map()
+	Declared.CaseSense := "On"
+	for Key in Keys
+		Declared[Key] := true
+	for Field in Captions
+		if !Declared.Has(Field)
+			return false
+	for Key in Keys {
+		if !Captions.Has(Key) || Type(Captions[Key]) != "String" || Captions[Key] == ""
+			return false
+	}
+	return Captions
+}
 
 ; Dynamic handler: delays & colours sub-menu. Mirrors the Hammerspoon "delays"
 ; submenu — the per-category config window, then quick-access per-delay items
@@ -109,45 +168,40 @@ _HS_DelaysColorsRows(OpenConfigFn := OpenHotstringsConfigWindow) {
 	; `submenu`, so the whole submenu was assembled here; none of these rows
 	; mutates the live menu — each opens a prompt and the tray rebuilds after —
 	; so nothing held them back.
-	Sub := [
-		MenuRenderer_CommandRow("hotstrings_delays_menu", "hotstrings_config_window",
-			Map("hotstrings_config_window", (*) => OpenConfigFn.Call()), Map("hotstrings_config_ready", (*) => true)),
-		Map("separator", true),
-		Map("label", _HS_DefaultDelayLabel(), "action", (*) => _HS_PromptDefaultDelay()),
-		Map("label", _HS_CategoryDelayLabel("magickey", "menu.hotstrings.delay_magic_key"),
-			"action", (*) => _HS_PromptCategoryDelay("magickey", "menu.hotstrings.delay_magic_key")),
-		Map("label", _HS_CategoryDelayLabel("autocorrection", "menu.hotstrings.delay_autocorrection"),
-			"action", (*) => _HS_PromptCategoryDelay("autocorrection", "menu.hotstrings.delay_autocorrection")),
-		Map("separator", true),
-		; AI prediction tooltip auto-dismiss timeout — mirrors the HS "Délai
-		; d'acceptation IA" item. No TOML [_meta] delay backs the "llm_prediction"
-		; key, so its no-override default is the UI constant (20 s); the live
-		; tooltip timer reads the same override (infra/tooltip.ahk).
-		Map("label", _HS_CategoryDelayLabel("llm_prediction", "menu.hotstrings.tooltip_ai_acceptance", UI_LLM_TIMEOUT_SEC),
-			"action", (*) => _HS_PromptCategoryDelay("llm_prediction", "menu.hotstrings.tooltip_ai_acceptance", UI_LLM_TIMEOUT_SEC)),
-		; Dynamic hotstrings (dates, phone/SSN/IBAN prefixes) activation delay —
-		; mirrors the HS "Délai autocomplétion" item. Backed by the
-		; "dynamichotstrings" override; the no-override default is
-		; DYN_HOTSTRINGS_DEFAULT_DELAY (2 s).
-		Map("label", _HS_CategoryDelayLabel("dynamichotstrings", "menu.hotstrings.tooltip_autocompletion", DYN_HOTSTRINGS_DEFAULT_DELAY),
-			"action", (*) => _HS_PromptCategoryDelay("dynamichotstrings", "menu.hotstrings.tooltip_autocompletion", DYN_HOTSTRINGS_DEFAULT_DELAY))
-	]
-	return [Map(
-		"label", t("menu.hotstrings.delays_colors"),
-		"items", Sub)]
+	Captions := _HS_ParameterDelayCaptions()
+	if !(Captions is Map)
+		return []
+	Providers := Map(
+		"parameter_delay_config", (*) => [MenuRenderer_CommandRow("hotstrings_delays_menu", "hotstrings_config_window",
+			Map("hotstrings_config_window", (*) => OpenConfigFn.Call()), Map("hotstrings_config_ready", (*) => true))],
+		"parameter_delay_default", (*) => [Map("label", _HS_DefaultDelayLabel(Captions["default"]), "action", (*) => _HS_PromptDefaultDelay())],
+		"parameter_delay_magic_key", (*) => [Map("label", _HS_CategoryDelayLabel("magickey", Captions["magic_key"]),
+			"action", (*) => _HS_PromptCategoryDelay("magickey", "menu.hotstrings.delay_magic_key"))],
+		"parameter_delay_autocorrection", (*) => [Map("label", _HS_CategoryDelayLabel("autocorrection", Captions["autocorrection"]),
+			"action", (*) => _HS_PromptCategoryDelay("autocorrection", "menu.hotstrings.delay_autocorrection"))],
+		"parameter_delay_ai_acceptance", (*) => [Map("label", _HS_CategoryDelayLabel("llm_prediction", Captions["ai_acceptance"], UI_LLM_TIMEOUT_SEC),
+			"action", (*) => _HS_PromptCategoryDelay("llm_prediction", "menu.hotstrings.tooltip_ai_acceptance", UI_LLM_TIMEOUT_SEC))],
+		"parameter_delay_autocompletion", (*) => [Map("label", _HS_CategoryDelayLabel("dynamichotstrings", Captions["autocompletion"], DYN_HOTSTRINGS_DEFAULT_DELAY),
+			"action", (*) => _HS_PromptCategoryDelay("dynamichotstrings", "menu.hotstrings.tooltip_autocompletion", DYN_HOTSTRINGS_DEFAULT_DELAY))])
+	Sub := MenuRenderer_TemplateRows("hotstrings_delays_frame", Map(), Map(), Providers)
+	if !(Sub is Array)
+		return []
+	Rows := MenuRenderer_TemplateRows("hotstrings_delays_parent", Map(),
+		Map("parameter_parent_ready", (*) => true), Map("parameter_delays_children", Sub))
+	return Rows is Array ? Rows : []
 }
 
 ; Label for the "default expansion delay" item: "Default : <ms>[ (default)]". The
 ; "(default)" marker shows when no global override is set — the effective value
 ; is then the built-in GLOBAL_DEFAULT_DELAY fallback.
-_HS_DefaultDelayLabel() {
+_HS_DefaultDelayLabel(CaptionKey := "menu.hotstrings.tooltip_default") {
 	global _HotstringsOverrides, GLOBAL_DEFAULT_DELAY
 	HasGlobal := _HotstringsOverrides.Has("_global") and _HotstringsOverrides["_global"].Delay != ""
 	Seconds   := HasGlobal ? _HotstringsOverrides["_global"].Delay : GLOBAL_DEFAULT_DELAY
 	Ms        := Round(Seconds * 1000)
 	Display   := (Ms == 0) ? t("menu.hotstrings.infinite") : (Ms . " ms")
 	; menu.settings.default_indicator already carries a leading space.
-	return t("menu.hotstrings.tooltip_default") . " : " . Display . (HasGlobal ? "" : t("menu.settings.default_indicator"))
+	return t(CaptionKey) . " : " . Display . (HasGlobal ? "" : t("menu.settings.default_indicator"))
 }
 
 ; Prompt for and persist the global default expansion delay (entered in ms),
@@ -268,7 +322,11 @@ _HS_WordExpanderRows(Commands := unset) {
 	; ── Built-in catalogue entries, in catalogue order ───────────────────────
 	for _, D in Defs {
 		if (D.Has("type") and D["type"] == "separator") {
-			Rows.Push(Map("separator", true))
+			Boundary := MenuRenderer_TemplateRows("hotstrings_parameter_boundary", Map(), Map(), Map())
+			if !(Boundary is Array)
+				return []
+			for Row in Boundary
+				Rows.Push(Row)
 			continue
 		}
 		Chars := D["chars"]
@@ -284,7 +342,8 @@ _HS_WordExpanderRows(Commands := unset) {
 			"action",  ((CharsArr) => (*) => _HS_DelimToggleEntry(CharsArr))(Chars),
 			"checked", HSE_TerminatorEntryEnabled(Chars, Current) ? true : false))
 	}
-	Rows.Push(Map("separator", true))
+	CatalogueRows := Rows
+	Rows := []
 
 	; ── Custom delimiters: chars in the active string that no catalogue entry
 	;    owns. Structural CR/LF belong to the "enter" entry. ──
@@ -307,6 +366,11 @@ _HS_WordExpanderRows(Commands := unset) {
 		Map("word_expander_add", (*) => _HS_DelimAddCustom()),
 		Map("word_expanders_ready", (*) => !A_IsSuspended)))
 
+	Entries := MenuRenderer_TemplateRows("hotstrings_word_expander_frame", Map(), Map(),
+		Map("parameter_catalogue_entries", (*) => CatalogueRows, "parameter_custom_entries", (*) => Rows))
+	if !(Entries is Array)
+		return []
+
 	if !IsSet(Commands) {
 		Commands := Map(
 			"word_expanders_enable_all", (*) => _HS_DelimSetAll(true),
@@ -317,10 +381,20 @@ _HS_WordExpanderRows(Commands := unset) {
 	GuardedCommands := Map()
 	for Id, Command in Commands
 		GuardedCommands[Id] := _HS_WordExpanderCommand.Bind(Command, Ready)
-	Submenu := MenuRenderer_Build("word_expanders_menu", "HotstringsParams", Map(), Map(),
-		Map("word_expander_entries", (*) => Rows), GuardedCommands,
+	Submenu := MenuRenderer_TemplateRows("word_expanders_menu", GuardedCommands,
+		Map("word_expanders_ready", Ready), Map("word_expander_entries", (*) => Entries))
+	if !(Submenu is Array)
+		return []
+	Parents := MenuRenderer_TemplateRows("hotstrings_word_expander_parent", Map(),
+		Map("parameter_parent_ready", (*) => true), Map("parameter_word_expander_children", Submenu))
+	if !(Parents is Array)
+		return []
+	NativeSubmenu := MenuRenderer_Build("word_expanders_menu", "HotstringsParams", Map(), Map(),
+		Map("word_expander_entries", (*) => Entries), GuardedCommands,
 		Map("word_expanders_ready", Ready))
-	return [Map("label", t("menu.hotstrings.word_expanders"), "submenu", Submenu)]
+	Parents[1]["submenu"] := NativeSubmenu
+	Parents[1].Delete("items")
+	return Parents
 }
 
 ; A native menu can outlive the pause state under which it was rendered. The
@@ -611,8 +685,13 @@ _HS_BoundSectionRows(ExtensionId, Result) {
 				Row := MenuRowFromManifest(Entry, Category)
 				if (Row == "")
 					continue
-				if (First && Result.rows.Length > 0)
-					Result.rows.Push(Map("separator", true))
+				if (First && Result.rows.Length > 0) {
+					Boundary := MenuRenderer_TemplateRows("hotstrings_parameter_boundary", Map(), Map(), Map())
+					if !(Boundary is Array)
+						throw Error("The hotstring extension boundary declaration refused.")
+					for Item in Boundary
+						Result.rows.Push(Item)
+				}
 				First := false
 				Result.rows.Push(Row)
 				if (IsGated && IsCategoryGated(Category) && ReadFeatureStateV2(Entry["path"])["enabled"])
@@ -772,9 +851,12 @@ _HS_PersonalEditorRow(OpenFn, PausedFn := 0) {
 
 ; Dynamic handler: personal hotstrings (personal_hotstrings.toml + pre-scanned ext tree).
 _HS_PersonalRows(Options := unset) {
+	OwnedMenus := [], HandedOff := false
+	PrimaryFailure := 0
+	try {
 	if !IsSet(Options)
 		Options := Map()
-	global ScriptInformation, Features, _PersonalExtTree
+	global ScriptInformation, Features, _PersonalExtTree, _PrevDefaultLabel
 	Rows := []
 	IsGated := IsCategoryGated("Hotstrings")
 	PersonalTomlData := false
@@ -803,20 +885,14 @@ _HS_PersonalRows(Options := unset) {
 		; what they were until 2026-08-07: MenuRenderer_AppendRows renders row DATA
 		; into a menu the CALLER owns, so the driver can hold the reference it needs
 		; and still let the renderer draw every row in it.
-		PersonalMenu       := Menu()
+		PersonalMenu := Menu()
+		OwnedMenus.Push(PersonalMenu)
 		DefaultSectionMenu := Menu()
-		PersonalRows := []
-		PersonalRows.Push(_HS_PersonalEditorRow((*) => OpenPersonalEditor()))
-		PersonalRows.Push(Map("label", t("menu.hotstrings.open_file"), "action", _MakeOpenFileFn(PersonalTomlPath)))
-		PersonalRows.Push(Map("separator", true))
+		OwnedMenus.Push(DefaultSectionMenu)
+		EditorRow := _HS_PersonalEditorRow((*) => OpenPersonalEditor())
 
 		CurDefaultSec := _EditorPrefGet("DefaultSection", "")
 		DefaultRows := []
-		DefaultRows.Push(Map(
-			"label",   t("menu.hotstrings.default_none"),
-			"action",  (*) => _SetPersonalDefaultSection("", PersonalMenu, TomlData, DefaultSectionMenu, DisambiguatedLabels),
-			"checked", (CurDefaultSec == "") ? true : false))
-		DefaultRows.Push(Map("separator", true))
 		for _, SecName in TomlData["sections_order"] {
 			if (SecName == "-")
 				continue
@@ -828,23 +904,44 @@ _HS_PersonalRows(Options := unset) {
 				"action",  _MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData, DefaultSectionMenu, DisambiguatedLabels),
 				"checked", (CurDefaultSec == SecName) ? true : false))
 		}
-		MenuRenderer_AppendRows(DefaultSectionMenu, "hotstrings_menu", "hotstring_personal_default", DefaultRows)
+		DefaultCommands := Map("personal_default_none", (*) => _SetPersonalDefaultSection("", PersonalMenu, TomlData, DefaultSectionMenu, DisambiguatedLabels))
+		DefaultGetters := Map("personal_default_unset", (*) => CurDefaultSec == "", "personal_default_boundary", (*) => true)
+		DefaultProviders := Map("personal_default_choices", (*) => DefaultRows)
+		DefaultFrame := MenuRenderer_TemplateRows("hotstring_personal_default_frame", DefaultCommands, DefaultGetters, DefaultProviders)
+		if !(DefaultFrame is Array)
+			return []
+		if MenuRenderer_AppendTemplate(DefaultSectionMenu, "hotstring_personal_default_frame", DefaultCommands, DefaultGetters, DefaultProviders, &WholeTreeAdmitted) != DefaultRows.Length + 1 || !WholeTreeAdmitted
+			return []
 
 		CurDefaultLabel := (CurDefaultSec == "") ? t("menu.hotstrings.default_none")
 			: (DisambiguatedLabels.Has(CurDefaultSec) ? DisambiguatedLabels[CurDefaultSec] : CurDefaultSec)
-		global _PrevDefaultLabel := CurDefaultLabel
-		PersonalRows.Push(Map(
-			"label",   t("menu.hotstrings.default_category_prefix") . CurDefaultLabel,
-			"submenu", DefaultSectionMenu))
-		PersonalRows.Push(Map(
-			"label",   t("menu.hotstrings.close_on_add"),
-			"action",  (*) => _TogglePersonalCloseOnAdd(PersonalMenu),
-			"checked", (_EditorPrefGet("close_on_add", "1") == "1") ? true : false))
+		DefaultLabelForHandoff := CurDefaultLabel
+		DefaultCaption := MenuRenderer_GroupRow("hotstring_personal_default_parent", "personal_default_caption",
+			DefaultSectionMenu, Map("personal_default_label", (*) => CurDefaultLabel))
+		if !(DefaultCaption is Map)
+			return []
+		DefaultParent := [DefaultCaption]
+		Controls := MenuRenderer_TemplateRows("hotstring_personal_controls_frame",
+			Map("hotstring_file_open", _MakeOpenFileFn(PersonalTomlPath),
+				"personal_close_on_add", (*) => _TogglePersonalCloseOnAdd(PersonalMenu)),
+			Map("hotstring_file_ready", (*) => true, "personal_open_present", (*) => true,
+				"personal_controls_head_boundary", (*) => true, "personal_controls_tail_boundary", (*) => false,
+				"personal_preferences_present", (*) => true, "personal_controls_ready", (*) => true,
+				"personal_close_on_add", (*) => _EditorPrefGet("close_on_add", "1") == "1"),
+			Map("personal_editor", (*) => EditorRow is Map ? [EditorRow] : [],
+				"personal_default_parent", (*) => DefaultParent, "personal_legacy_before", (*) => [], "personal_legacy_after", (*) => []))
+		if !(Controls is Array)
+			return []
+		SectionRows := []
+
 		if (TomlData["sections_order"].Length > 0) {
-			PersonalRows.Push(Map("separator", true))
 			for _, SecName in TomlData["sections_order"] {
 				if (SecName == "-") {
-					PersonalRows.Push(Map("separator", true))
+					Boundary := MenuRenderer_TemplateRows("hotstrings_parameter_boundary", Map(), Map(), Map())
+					if !(Boundary is Array)
+						return []
+					for Separator in Boundary
+						SectionRows.Push(Separator)
 					continue
 				}
 				if !TomlData["sections"].Has(SecName)
@@ -855,10 +952,17 @@ _HS_PersonalRows(Options := unset) {
 				; node (and config.toml section) key the lowercased TOML section name.
 				Row := MenuRowWithLabel("hotstrings.personal." . StrLower(SecName), SecLabel, "Hotstrings")
 				if (Row != "") {
-					PersonalRows.Push(Row)
+					SectionRows.Push(Row)
 				}
 			}
 		}
+		PersonalRows := MenuRenderer_TemplateRows("hotstring_personal_content_frame", Map(),
+			Map("personal_main_boundary", (*) => TomlData["sections_order"].Length > 0,
+				"personal_tree_boundary", (*) => false, "personal_custom_boundary", (*) => false, "personal_empty", (*) => false),
+			Map("personal_controls", (*) => Controls, "personal_main_sections", (*) => SectionRows,
+				"personal_unavailable_directories", (*) => [], "personal_tree", (*) => [], "personal_custom_sections", (*) => []))
+		if !(PersonalRows is Array)
+			return []
 		_HS_CategoryMenu("Personal", "", PersonalRows,
 			(_Targets, Enabled) => HotstringsPersonalScopeApply(Enabled, Options), PersonalMenu)
 		PersonalActiveCount := 0
@@ -890,7 +994,8 @@ _HS_PersonalRows(Options := unset) {
 		RootNode := TreeCopy[""]
 		TreeCopy.Delete("")
 	}
-	_HS_RenderTree(TreeCopy, "", Rows)
+	if _HS_RenderTree(TreeCopy, "", Rows, OwnedMenus) != true
+		return []
 	if (RootNode != false) {
 		FileNodeList := RootNode["tomls"]
 		loop FileNodeList.Length {
@@ -905,10 +1010,30 @@ _HS_PersonalRows(Options := unset) {
 			}
 		}
 		for _, TF in FileNodeList {
-			Rows.Push(_HS_TomlFileRow(TF))
+			FileRow := _HS_TomlFileRow(TF)
+			if !(FileRow is Map)
+				return []
+			OwnedMenus.Push(FileRow["submenu"])
+			Rows.Push(FileRow)
 		}
 	}
+	if IsSet(DefaultLabelForHandoff)
+		_PrevDefaultLabel := DefaultLabelForHandoff
+	HandedOff := true
 	return Rows
+	} catch as ErrorInfo {
+		PrimaryFailure := ErrorInfo
+		throw ErrorInfo
+	} finally {
+		if !HandedOff {
+			try _HS_PersonalReleaseMenus(OwnedMenus)
+			catch as CleanupFailure {
+				if !PrimaryFailure
+					throw CleanupFailure
+				try LoggerError("Hotstrings", "Personal menu cleanup failed after construction refusal: {1}", CleanupFailure.Message)
+			}
+		}
+	}
 }
 
 ; One TOML file of the personal-extensions tree, as a row whose submenu holds
@@ -920,28 +1045,52 @@ _HS_PersonalRows(Options := unset) {
 ; Every level is still drawn by the renderer, which is the point — the driver
 ; decides the SHAPE of the tree, never how a row is drawn.
 _HS_TomlFileRow(TF) {
-	TFMenu := Menu()
-	FileRows := [Map("label", t("menu.hotstrings.open_file"), "action", _MakeOpenFileFn(TF.path))]
+	TFMenu := Menu(), HandedOff := false
+	PrimaryFailure := 0
+	try {
+	ControlRows := [], SectionRows := []
 	Owner := PersonalFileControls.ForPath(TF.path)
 	if Owner is PersonalFileAdoptedOwner {
-		FileRows.Push(Map("separator", true))
 		for Row in _HS_PersonalFileControlRows(Owner, "")
-			FileRows.Push(Row)
+			ControlRows.Push(Row)
 		for Section in Owner.sectionNames {
-			FileRows.Push(Map("label", Section . " (" . FmtCount(Owner.counts[Section]) . ")",
+			SectionRows.Push(Map("label", Section . " (" . FmtCount(Owner.counts[Section]) . ")",
 				"items", _HS_PersonalFileControlRows(Owner, Section), "checked", Owner.Selected(Section)))
 		}
 	} else {
 		Unavailable := _HS_PersonalUnavailableRow("file")
 		if Unavailable is Map
-			FileRows.Push(Unavailable)
+			ControlRows.Push(Unavailable)
 		for _, ES in TF.sections
-			FileRows.Push(Map("label", ES["description"] . " (" . FmtCount(ES["count"]) . ")"))
+			SectionRows.Push(Map("label", ES["description"] . " (" . FmtCount(ES["count"]) . ")"))
 	}
-	MenuRenderer_AppendRows(TFMenu, "hotstrings_menu", "hotstring_personal_ext", FileRows)
-	return Map(
+	Commands := Map("hotstring_file_open", _MakeOpenFileFn(TF.path))
+	Getters := Map("hotstring_file_ready", (*) => true, "personal_file_open_present", (*) => true,
+		"personal_file_boundary", (*) => Owner is PersonalFileAdoptedOwner)
+	Providers := Map("personal_file_controls", (*) => ControlRows, "personal_file_sections", (*) => SectionRows)
+	FileRows := MenuRenderer_TemplateRows("hotstring_personal_file_frame", Commands, Getters, Providers)
+	if !(FileRows is Array)
+		return false
+	if MenuRenderer_AppendTemplate(TFMenu, "hotstring_personal_file_frame", Commands, Getters, Providers, &WholeTreeAdmitted) != 1 + ControlRows.Length + SectionRows.Length || !WholeTreeAdmitted
+		return false
+	Result := Map(
 		"label", TF.stem . " (" . FmtCount(Owner is PersonalFileAdoptedOwner ? Owner.ActiveCount() : TF.count) . ")",
 		"submenu", TFMenu)
+	HandedOff := true
+	return Result
+	} catch as ErrorInfo {
+		PrimaryFailure := ErrorInfo
+		throw ErrorInfo
+	} finally {
+		if !HandedOff {
+			try _HS_PersonalReleaseMenus([TFMenu])
+			catch as CleanupFailure {
+				if !PrimaryFailure
+					throw CleanupFailure
+				try LoggerError("Hotstrings", "Personal menu cleanup failed after construction refusal: {1}", CleanupFailure.Message)
+			}
+		}
+	}
 }
 
 ; Shared declarations own fixed labels, check/command kinds, order and reasons.
@@ -1037,7 +1186,12 @@ _HS_NodeTotal(Node) {
 ; inside one array, and this walk starts a fresh render at each level. So the walk
 ; keeps its own recursion, which is what a filesystem needs, and the renderer
 ; still draws every row, which is what one menu needs.
-_HS_RenderTree(Tree, ParentMenu, Rows := "") {
+_HS_RenderTree(Tree, ParentMenu, Rows := "", OwnedMenus := unset) {
+	LocalOwner := !IsSet(OwnedMenus), HandedOff := false
+	if LocalOwner
+		OwnedMenus := []
+	PrimaryFailure := 0
+	try {
 	FolderNames := []
 	for FolderName in Tree
 		FolderNames.Push(FolderName)
@@ -1055,7 +1209,7 @@ _HS_RenderTree(Tree, ParentMenu, Rows := "") {
 	; The folder rows of THIS level. They go back to the caller when it asked for
 	; data (the top level, which is a list provider) and are rendered into the
 	; parent's menu otherwise (every level below it).
-	FolderRows := (Rows is Array) ? Rows : []
+	FolderRows := []
 	for _, FolderName in FolderNames {
 		Node := Tree[FolderName]
 		if Node.Get("unavailable", false) {
@@ -1065,6 +1219,7 @@ _HS_RenderTree(Tree, ParentMenu, Rows := "") {
 			continue
 		}
 		FolderMenu := Menu()
+		OwnedMenus.Push(FolderMenu)
 		FileNodeList := Node["tomls"]
 		loop FileNodeList.Length {
 			i := A_Index
@@ -1077,24 +1232,104 @@ _HS_RenderTree(Tree, ParentMenu, Rows := "") {
 				}
 			}
 		}
-		; Subfolders first — they render themselves into FolderMenu — then the
-		; files of this folder, appended after them.
-		if (Node["subfolders"].Count > 0)
-			_HS_RenderTree(Node["subfolders"], FolderMenu)
+		SubfolderRows := []
+		if Node["subfolders"].Count > 0 && _HS_RenderTree(Node["subfolders"], "", SubfolderRows, OwnedMenus) != true
+			return false
 		FileRows := []
-		if (Node["subfolders"].Count > 0 and FileNodeList.Length > 0)
-			FileRows.Push(Map("separator", true))
 		for _, TF in FileNodeList {
-			FileRows.Push(_HS_TomlFileRow(TF))
+			FileRow := _HS_TomlFileRow(TF)
+			if !(FileRow is Map)
+				return false
+			OwnedMenus.Push(FileRow["submenu"])
+			FileRows.Push(FileRow)
 		}
-		MenuRenderer_AppendRows(FolderMenu, "hotstrings_menu", "hotstring_personal_ext", FileRows)
+		Providers := Map("personal_folders", (*) => SubfolderRows, "personal_files", (*) => FileRows)
+		Getters := Map("personal_folder_file_boundary", (*) => SubfolderRows.Length > 0 && FileRows.Length > 0)
+		FolderChildren := MenuRenderer_TemplateRows("hotstring_personal_directory_frame", Map(), Getters, Providers)
+		if !(FolderChildren is Array)
+			return false
+		if MenuRenderer_AppendTemplate(FolderMenu, "hotstring_personal_directory_frame", Map(), Getters, Providers, &WholeTreeAdmitted) != SubfolderRows.Length + FileRows.Length || !WholeTreeAdmitted
+			return false
 		FolderTotal := _HS_NodeTotal(Node)
 		FolderLabel := FolderName . (FolderTotal > 0 ? " (" . FmtCount(FolderTotal) . ")" : "")
 		FolderRows.Push(Map("label", FolderLabel, "submenu", FolderMenu))
 	}
-	if !(Rows is Array) {
-		MenuRenderer_AppendRows(ParentMenu, "hotstrings_menu", "hotstring_personal_ext", FolderRows)
+	Providers := Map("personal_folders", (*) => FolderRows, "personal_files", (*) => [])
+	Getters := Map("personal_folder_file_boundary", (*) => false)
+	Rendered := MenuRenderer_TemplateRows("hotstring_personal_directory_frame", Map(), Getters, Providers)
+	if !(Rendered is Array)
+		return false
+	if Rows is Array {
+		for Row in Rendered
+			Rows.Push(Row)
+	} else if MenuRenderer_AppendTemplate(ParentMenu, "hotstring_personal_directory_frame", Map(), Getters, Providers, &WholeTreeAdmitted) != FolderRows.Length || !WholeTreeAdmitted
+		return false
+	HandedOff := true
+	return true
+	} catch as ErrorInfo {
+		PrimaryFailure := ErrorInfo
+		throw ErrorInfo
+	} finally {
+		if LocalOwner && !HandedOff {
+			try _HS_PersonalReleaseMenus(OwnedMenus)
+			catch as CleanupFailure {
+				if !PrimaryFailure
+					throw CleanupFailure
+				try LoggerError("Hotstrings", "Personal menu cleanup failed after construction refusal: {1}", CleanupFailure.Message)
+			}
+		}
 	}
+}
+
+; Release only returned native menus owned by the refused personal frame.
+; Successful handoff keeps every live callback target; dispatcher maps stay native.
+_HS_PersonalReleaseMenus(OwnedMenus) {
+	global _MenuDispatchOwnerHandles
+	Failure := 0, Seen := Map()
+	Release(Child) {
+		Children := [], Handle := 0
+		try {
+			Handle := Child.Handle
+			if Seen.Has(Handle)
+				return
+			Seen[Handle] := true
+			Count := TrayMenuHandleItemCount(Handle)
+			if Count < 0
+				throw Error("The owned personal menu handle is unavailable during release.")
+			loop Count {
+				ChildHandle := TrayMenuSubmenuHandle(Handle, A_Index - 1)
+				if ChildHandle {
+					OwnedChild := MenuFromHandle(ChildHandle)
+					if !(OwnedChild is Menu)
+						throw Error("The owned personal child menu is unavailable during release.")
+					Children.Push(OwnedChild)
+				}
+			}
+		} catch as ErrorInfo {
+			if !Failure
+				Failure := ErrorInfo
+		}
+		for OwnedChild in Children
+			Release(OwnedChild)
+		try {
+			try Child.Delete()
+			finally {
+				; The fresh frame owns this exact empty handle. Retire only its
+				; registration; foreign detached menus retain their native owners.
+				if Handle && TrayMenuHandleItemCount(Handle) == 0
+					&& _MenuDispatchOwnerHandles.Has(Handle)
+					_MenuDispatchOwnerHandles.Delete(Handle)
+				MenuDispatcher_PruneMenu(Child)
+			}
+		} catch as ErrorInfo {
+			if !Failure
+				Failure := ErrorInfo
+		}
+	}
+	for Child in OwnedMenus
+		Release(Child)
+	if Failure
+		throw Failure
 }
 
 ; List provider: explicit group and section choices for the boot-owned catalogue.
@@ -1103,56 +1338,85 @@ _HS_ExtensionRows(Options := unset) {
 	global _HS_ExtensionsCache, Features
 	if !IsSet(Options)
 		Options := Map()
-	Rows := []
-	_HS_PreScanExtensions()
-	if (_HS_ExtensionsCache.Length == 0) {
-		return [Map("label", t("menu.extensions.empty"), "disabled", true)]
-	}
-	MasterOn := IsCategoryGated("Hotstrings")
-	for _, Ext in _HS_ExtensionsCache {
-		ExtRows := []
-		; The categories the extension binds come first: « Hotstrings Ergopti »
-		; opens on SFB reduction and rolls, then any pack of its own.
-		Bound := _HS_BoundCategoryRows(Ext.id)
-		for _, Row in Bound.rows
-			ExtRows.Push(Row)
-		ExtTotalForExt := HotstringExtensions_Count(Features, [Ext], MasterOn) + Bound.total
-		if (Ext.toml_files.Length == 0) {
-			if (Bound.rows.Length == 0)
-				ExtRows.Push(Map("label", t("menu.extensions.empty"), "disabled", true))
-		} else {
-			for _, TF in Ext.toml_files {
-				GroupPath := "hotstrings.groups." . TF.category
-				TFRows := []
-				if (TF.sections.Length == 0) {
-					TFRows.Push(Map("label", t("menu.extensions.empty"), "disabled", true))
-				} else {
-					for _, Sec in TF.sections {
-						SectionPath := "hotstrings.modules." . TF.category . "." . Sec["name"]
-						TFRows.Push(Map(
-							"label",    Sec["description"] . " (" . FmtCount(Sec["count"]) . ")",
-							"checked", ReadFeatureStateV2(SectionPath)["enabled"],
-							"action", _HS_ExtensionToggle.Bind(SectionPath, Options)))
+	OwnedMenus := [], HandedOff := false
+	PrimaryFailure := 0
+	try {
+		Rows := []
+		_HS_PreScanExtensions()
+		if (_HS_ExtensionsCache.Length == 0) {
+			EmptyRows := MenuRenderer_TemplateRows("hotstring_extension_empty_file", Map(), Map(), Map())
+			return EmptyRows is Array ? EmptyRows : []
+		}
+		MasterOn := IsCategoryGated("Hotstrings")
+		for _, Ext in _HS_ExtensionsCache {
+			PackRows := []
+			; The categories the extension binds come first: « Hotstrings Ergopti »
+			; opens on SFB reduction and rolls, then any pack of its own.
+			Bound := _HS_BoundCategoryRows(Ext.id)
+			ExtTotalForExt := HotstringExtensions_Count(Features, [Ext], MasterOn) + Bound.total
+			if (Ext.toml_files.Length == 0) {
+				if (Bound.rows.Length == 0)
+					PackRows := MenuRenderer_TemplateRows("hotstring_extension_empty_file", Map(), Map(), Map())
+			} else {
+				for _, TF in Ext.toml_files {
+					GroupPath := "hotstrings.groups." . TF.category
+					TFRows := []
+					if (TF.sections.Length == 0) {
+						TFRows := MenuRenderer_TemplateRows("hotstring_extension_empty_file", Map(), Map(), Map())
+					} else {
+						for _, Sec in TF.sections {
+							SectionPath := "hotstrings.modules." . TF.category . "." . Sec["name"]
+							TFRows.Push(Map(
+								"label",    Sec["description"] . " (" . FmtCount(Sec["count"]) . ")",
+								"checked", ReadFeatureStateV2(SectionPath)["enabled"],
+								"action", _HS_ExtensionToggle.Bind(SectionPath, Options)))
+						}
 					}
+					if !(TFRows is Array)
+						return []
+					Child := _HS_CategoryMenu(TF.category, TF.path, TFRows,
+						(Targets, Enabled) => HotstringExtensions_SetCategoryEnabled(Targets[1], Enabled, Options))
+					OwnedMenus.Push(Child)
+					PackRows.Push(Map(
+						"label", TF.stem . " (" . FmtCount(HotstringExtensions_Count(Features,
+							[{ toml_files: [TF] }], MasterOn)) . ")",
+						"checked", ReadFeatureStateV2(GroupPath)["enabled"], "submenu", Child))
 				}
-				ExtRows.Push(Map(
-					"label", TF.stem . " (" . FmtCount(HotstringExtensions_Count(Features,
-						[{ toml_files: [TF] }], MasterOn)) . ")",
-					"checked", ReadFeatureStateV2(GroupPath)["enabled"],
-					"submenu", _HS_CategoryMenu(TF.category, TF.path, TFRows,
-						(Targets, Enabled) => HotstringExtensions_SetCategoryEnabled(Targets[1], Enabled, Options))))
+			}
+			if !(PackRows is Array)
+				return []
+			ScopeRows := []
+			if Ext.toml_files.Length || (Ext.HasOwnProp("bound_files") && Ext.bound_files.Length) {
+				for Command in _HS_ExtensionScopeCommandRows(Ext.id, Options)
+					ScopeRows.Push(Command)
+			}
+			ExtRows := MenuRenderer_TemplateRows("hotstring_extension_content_frame", Map(), Map(),
+				Map("extension_bound_head", (*) => Bound.rows, "extension_pack_rows", (*) => PackRows,
+					"extension_scope_tail", (*) => ScopeRows))
+			if !(ExtRows is Array)
+				return []
+			Rows.Push(Map(
+				"label", StrReplace(t("menu.extensions.hotstrings_of"), "%s", Ext.name)
+					. " (" . FmtCount(ExtTotalForExt) . ")",
+				"items", ExtRows))
+		}
+		HandedOff := true
+		return Rows
+	} catch as ErrorInfo {
+		PrimaryFailure := ErrorInfo
+		throw ErrorInfo
+	} finally {
+		if !HandedOff {
+			; Only freshly allocated file-category menus enter OwnedMenus.
+			; Bound.rows and the caller's borrowed SubMenus are never released.
+			try _HS_PersonalReleaseMenus(OwnedMenus)
+			catch as CleanupFailure {
+				if !PrimaryFailure
+					throw CleanupFailure
+				try LoggerError("Hotstrings", "Extension menu cleanup failed after construction refusal: {1}", CleanupFailure.Message)
 			}
 		}
-		if Ext.toml_files.Length || (Ext.HasOwnProp("bound_files") && Ext.bound_files.Length) {
-			for Command in _HS_ExtensionScopeCommandRows(Ext.id, Options)
-				ExtRows.Push(Command)
-		}
-		Rows.Push(Map(
-			"label", StrReplace(t("menu.extensions.hotstrings_of"), "%s", Ext.name)
-				. " (" . FmtCount(ExtTotalForExt) . ")",
-			"items", ExtRows))
 	}
-	return Rows
 }
 
 ; Reuse the shared explicit command declarations; the atomic owner resolves

@@ -135,7 +135,15 @@ function validateProviderStatus(menu) {
 
 /** Validates the child-template composition and caption-reader vocabulary. */
 function validateChildTemplates(menu) {
-	menuAvailability.validateChildTemplates(menu);
+	let english;
+	menuAvailability.validateChildTemplates(menu, (key) => {
+		if (english === undefined) {
+			english = JSON.parse(readFileSync(shared('data/locales/en.json'), 'utf8'));
+			if (!english || typeof english !== 'object' || Array.isArray(english))
+				throw new Error('canonical English captions must be a table');
+		}
+		return Object.hasOwn(english, key) ? english[key] : undefined;
+	});
 }
 
 /** Projects the updater's actual validated registry without inventing a feature enum. */

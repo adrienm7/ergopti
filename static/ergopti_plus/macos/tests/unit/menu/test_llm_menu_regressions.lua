@@ -288,3 +288,23 @@ helpers.describe("Generation numeric boundaries", function()
 		end)
 	end)
 end)
+
+
+helpers.describe("Count fixture authentic whole-frame admission", function()
+	helpers.it("refuses missing non-count commands without delivering the observed transaction", function()
+		with_count_menu(function(menu, _, calls)
+			local native = package.loaded["infra.manifest_menu"]
+			local declaration = native.get_array("llm_generation_context_control")
+			local original = declaration[1]
+			helpers.assert_true(#generation_rows(menu) >= 6)
+			local ok, detail = xpcall(function()
+				declaration[1] = { type = "command", id = "missing_real_context_command", i18n = original.i18n }
+				helpers.assert_eq(menu.build_item(), {})
+				helpers.assert_eq(#calls, 0)
+			end, debug.traceback)
+			declaration[1] = original
+			if not ok then error(detail, 0) end
+			helpers.assert_true(#generation_rows(menu) >= 6)
+		end)
+	end)
+end)

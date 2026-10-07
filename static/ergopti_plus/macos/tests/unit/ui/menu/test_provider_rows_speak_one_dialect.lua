@@ -18,6 +18,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local CaptionFixture = require("tests.support.personal_menu_caption_fixture")
 
 
 --- Builds the actual packaged About provider over controlled native effect ports.
@@ -259,7 +260,7 @@ helpers.describe("provider rows speak the provider dialect (a driver-dialect row
 				save_prefs = function() return true end,
 				updateMenu = function() end,
 			}
-			local rows = Custom.build_custom(ctx, { group_counts = {} }).submenu
+			local rows = CaptionFixture.build_custom(Custom, ctx, { group_counts = {} }).submenu
 			local folder
 			for _, row in ipairs(rows) do if row.title == "tools (2)" then folder = row end end
 			helpers.assert_true(folder ~= nil, "a folder with two personal files must survive rendering")
@@ -390,3 +391,5 @@ helpers.describe("About provider consumes its existing canonical caption declara
 		end)
 	end
 end)
+
+require("test.menu_row_dialect_contract").register(helpers)

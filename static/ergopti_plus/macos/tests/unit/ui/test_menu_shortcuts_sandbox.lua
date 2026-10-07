@@ -79,11 +79,8 @@ helpers.describe("menu_shortcuts: extension sandbox uses the Lua 5.4 load contra
 					section = function(key) return key end,
 					decorate_section = function(value) return value end,
 				}
-				package.loaded["ui.menu.menu_utils"] = {
-					as_provider_row = function(item)
-						return { label = item.title, items = item.menu }
-					end,
-				}
+				package.loaded["ui.menu.menu_utils"] = nil
+				require("ui.menu.menu_utils")
 				local extension_renderer = assert(require("menu.renderer").new({
 					platform = "hs",
 					manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
@@ -371,5 +368,68 @@ helpers.describe("Shortcut extension presentation boundary", function()
 		helpers.assert_eq(ok, false)
 		helpers.assert_true(tostring(detail):find("extension%-boundary%-scoped%-failure") ~= nil)
 		assert_restored()
+	end)
+end)
+
+helpers.describe("complete external Shortcut dialect publication", function()
+	helpers.it("retains physical native and provider children, images, proof and callbacks through the real renderer", function()
+		with_extension_boundary(function(rows, renderer, _, context, effects)
+			local path = context.extension_packs[1].dir .. "/shortcuts/menu.lua"
+			local original_file = assert(io.open(path, "rb")); local original = assert(original_file:read("*a")); assert(original_file:close())
+			local ok, detail = xpcall(function()
+				local file = assert(io.open(path, "wb"))
+				assert(file:write([[
+					add_item({ title = "Hand native", image = "hand-native.svg", fn = function()
+						hs.extension_boundary.actions[#hs.extension_boundary.actions + 1] = "native"
+						return false
+					end })
+					add_item({ label = "Hand provider", checked = false, proof = "1:2", action = function()
+						hs.extension_boundary.actions[#hs.extension_boundary.actions + 1] = "provider"
+						return true
+					end })
+				]])); assert(file:close())
+				local actual = rows()
+				helpers.assert_eq(actual[3].label, "first")
+				helpers.assert_eq(actual[3].items[1].label, "Hand native")
+				helpers.assert_eq(actual[3].items[1].image, "hand-native.svg")
+				helpers.assert_eq(actual[3].items[2].label, "Hand provider")
+				helpers.assert_eq(actual[3].items[2].proof, "1:2")
+				helpers.assert_eq(actual[3].items[2].checked, false)
+				helpers.assert_eq(effects.actions, {})
+				local finished = renderer.render_rows(actual, "extensions_shortcuts")
+				local native_group
+				for _, item in ipairs(finished) do if item.title == "first" then native_group = item end end
+				helpers.assert_not_nil(native_group)
+				helpers.assert_eq(native_group.menu[1].image, "hand-native.svg")
+				helpers.assert_true(rawequal(native_group.menu[1].fn, actual[3].items[1].action))
+				helpers.assert_true(rawequal(native_group.menu[2].fn, actual[3].items[2].action))
+				helpers.assert_eq(native_group.menu[1].fn(), false)
+				helpers.assert_eq(native_group.menu[2].fn(), true)
+				helpers.assert_eq(effects.actions, { "native", "provider" })
+			end, debug.traceback)
+			local restore = assert(io.open(path, "wb")); assert(restore:write(original)); assert(restore:close())
+			if not ok then error(detail, 0) end
+		end)
+	end)
+
+	helpers.it("refuses a physically collected malformed whole tree without hooks or surviving parent rows", function()
+		with_extension_boundary(function(rows, _, _, context, effects)
+			local path = context.extension_packs[1].dir .. "/shortcuts/menu.lua"
+			local original_file = assert(io.open(path, "rb")); local original = assert(original_file:read("*a")); assert(original_file:close())
+			local ok, detail = xpcall(function()
+				local file = assert(io.open(path, "wb"))
+				assert(file:write([[
+					add_item({ title = "Actual valid first", fn = function() error("must not run") end })
+					add_item(setmetatable({ title = "Unadmitted" }, { __index = function()
+						hs.extension_boundary.actions[#hs.extension_boundary.actions + 1] = "foreign hook"
+						error("raw admission must not run this hook")
+					end }))
+				]])); assert(file:close())
+				helpers.assert_eq(rows(), {}, "complete malformed external tree cannot publish a partial extension family")
+				helpers.assert_eq(effects.actions, {})
+			end, debug.traceback)
+			local restore = assert(io.open(path, "wb")); assert(restore:write(original)); assert(restore:close())
+			if not ok then error(detail, 0) end
+		end)
 	end)
 end)

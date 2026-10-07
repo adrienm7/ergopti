@@ -600,3 +600,13 @@ end)
 
 
 require("test.menu_native_child_rows").run(helpers, require("infra.manifest_menu"))
+
+require("test.menu_dynamic_caption_contract").register(helpers, "macos")
+
+require("test.menu_caption_layout_contract").register(helpers, "macos")
+
+require("test.menu_group_row_contract").register(helpers, "macos")
+
+require("test.menu_command_group_affix_contract").register(helpers, "macos")
+
+require("test.menu_command_literal_prefix_contract").register(helpers, "macos")
