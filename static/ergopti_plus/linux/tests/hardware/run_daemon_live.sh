@@ -38,6 +38,16 @@ python3 tests/hardware/atspi_fixture_app.py editor >/dev/null 2>&1 &
 PIDS="${PIDS} $!"
 sleep 2
 
+# Native virtual-keyboard custody runs before the timed tray/daemon host. Its
+# two explicit sources and output use real production FFI ports, then retire.
+luajit tests/hardware/run_modifier_custody.lua
+CUSTODY=$?
+if [ "${CUSTODY}" != "0" ]; then
+	# shellcheck disable=SC2086
+	kill ${PIDS} 2>/dev/null
+	exit "${CUSTODY}"
+fi
+
 # A Cerebras-style API on loopback for the AI phase, answering with ASCII-escaped
 # JSON as Python servers do.
 LLM_READY="$(mktemp -u)"

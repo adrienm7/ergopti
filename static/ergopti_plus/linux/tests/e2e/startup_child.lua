@@ -141,8 +141,8 @@ package.preload["adapters.keyboard_layout"] = function()
 	}
 end
 package.preload["adapters.uinput_writer"] = function()
-	local function ok() return true end
-	return { is_available = ok, open = ok, close = ok, is_open = ok, sync = ok, emit = ok }
+	-- Capability/reservation lifecycle is real Writer logic; syscalls are controlled.
+	return require("tests.fakes").uinput_writer()
 end
 package.preload["adapters.secure_field_detector"] = function()
 	return {

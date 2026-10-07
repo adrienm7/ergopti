@@ -77,6 +77,8 @@ local function revoke_event(code, source)
 		return owner:release_all(), nil, nil, retired_frame(not consumed)
 	end
 	function owner.has_combinations() return true end
+	function owner.take_custody() return base:take_custody() end
+	function owner.output_holder(_, row) return base:output_holder(row) end
 	function owner.activate()
 		if retirement or acting or pending or delivery or next(base.key_refs) or next(base.held) then return false end
 		policy, generation, retirement, acknowledged, runtime_guard, disabled, epoch = nil, nil, nil, false, nil, false, epoch + 1

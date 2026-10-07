@@ -1666,6 +1666,8 @@ local function main()
 		-- which is why the measurement lives there and the accounting here.
 		onHold = on_hold,
 		onEmitRaw  = injector.emit_key,
+		outputBroker = injector.output_broker(),
+		requireOutputBroker = opts.grab == true,
 	})
 	Logger.info(LOG, "Keyboard hook started in %s mode.",
 		opts.grab and "INTERCEPT (device grabbed)" or "OBSERVE (--no-grab)")
