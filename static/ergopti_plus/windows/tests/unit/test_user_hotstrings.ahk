@@ -281,17 +281,39 @@ _UCHRealTypedCallbacks() {
 Test("programmable hotstrings: real callbacks own actions and preserve true false zero and multiline text", _UCHRealTypedCallbacks)
 
 
+/** Publishes a descendant PID only after its exclusive writer has closed. */
+_UCHFixtureChildSource(PidPath) {
+	PendingPath := PidPath . ".pending"
+	; FileAppend holds an exclusive native file handle. A same-volume rename
+	; cannot succeed until that writer has physically closed; no overwrite is allowed.
+	return 'FileAppend(DllCall("GetCurrentProcessId"), "' . PendingPath . '", "UTF-8-RAW")`n'
+		. 'FileMove("' . PendingPath . '", "' . PidPath . '", false)`nSleep(10000)`n'
+}
+
+/** Refuses a read failure before any scalar conversion or process observation. */
+_UCHReadFixturePid(PidPath) {
+	Content := FSReadUtf8ExactBounded(PidPath, 10)
+	if !(Content is String) || !RegExMatch(Content, "\A[1-9][0-9]{0,9}\z")
+		throw Error("Fixture PID receipt is not a canonical positive DWORD.")
+	Pid := Integer(Content)
+	if Pid > 0xFFFFFFFF
+		throw Error("Fixture PID receipt exceeds the native DWORD range.")
+	return Pid
+}
+
+
 _UCHRealCancellationAndErrors() {
 	global _ConfigDir
 	PreviousConfigDir := _ConfigDir
-	PackageRoots := _UCHPackageRoots()
+	PackageRoots := 0
 	Directory := A_Temp . "\ergopti_user_code_cancel_" . DllCall("GetCurrentProcessId") . "_" . Random(1, 0x7fffffff)
-	DirCreate(Directory)
+	Assert(FSCreateDirectoryExclusiveStrict(Directory), "Fixture namespace must be exclusively created")
 	_ConfigDir := Directory . "\"
 	Path := UserHotstringsSourcePath(), ChildPath := Directory . "\child.ahk", PidPath := Directory . "\child.pid"
 	Workers := []
 	try {
-		ChildSource := 'FileAppend(DllCall("GetCurrentProcessId"), "' . PidPath . '", "UTF-8-RAW")`nSleep(10000)`n'
+		PackageRoots := _UCHPackageRoots()
+		ChildSource := _UCHFixtureChildSource(PidPath)
 		Assert(FSWriteCreateDurable(ChildPath, ChildSource))
 		Source := 'ErgoptiDynamicHotstrings(api) {`n`treturn [Map("id", "wait", "suffix", "@wait", "preview", "Wait", "callback", UserWait)]`n}`n'
 			. 'UserWait(context) {`n`tRun(Chr(34) . A_AhkPath . Chr(34) . " /script " . Chr(34) . "' . ChildPath . '" . Chr(34))`n`tSleep(10000)`n`treturn "late"`n}`n'
@@ -305,7 +327,7 @@ _UCHRealCancellationAndErrors() {
 		while !FSStrictExists(PidPath) && TickElapsed(Started) < 10000
 			Sleep(10)
 		Assert(FSStrictExists(PidPath), "Real callback must launch its fixture descendant")
-		ChildPid := Integer(FSReadUtf8Exact(PidPath))
+		ChildPid := _UCHReadFixturePid(PidPath)
 		Assert(ProcessExist(ChildPid), "Descendant is running before native cancellation")
 		Assert(Worker.cancel(), "Cancellation must confirm the whole exact native Job is quiescent")
 		AssertEqual(0, ProcessExist(ChildPid), "Cancellation must retire the callback's descendant")
@@ -330,8 +352,9 @@ _UCHRealCancellationAndErrors() {
 		for Worker in Workers
 			Assert(Worker.cancel(), "Every process/stage owner must retire before fixture teardown")
 		_ConfigDir := PreviousConfigDir
-		_UCHRestorePackageRoots(PackageRoots)
-		for FixturePath in [Path, ChildPath, PidPath]
+		if IsObject(PackageRoots)
+			_UCHRestorePackageRoots(PackageRoots)
+		for FixturePath in [Path, ChildPath, PidPath, PidPath . ".pending"]
 			FSDelete(FixturePath)
 		DirDelete(Directory)
 	}
@@ -380,17 +403,17 @@ Test("programmable hotstrings: canonical preview keeps builtin and declined-buil
 _UCHDisableCancelsFactory() {
 	global _ConfigDir, _UserHotstringsOwner, _UserHotstringsLoader, _UserHotstringsJobs
 	PreviousConfigDir := _ConfigDir, PreviousOwner := _UserHotstringsOwner, PreviousLoader := _UserHotstringsLoader
-	PackageRoots := _UCHPackageRoots()
+	PackageRoots := 0
 	Directory := A_Temp . "\ergopti_user_factory_cancel_" . DllCall("GetCurrentProcessId") . "_" . Random(1, 0x7fffffff)
-	DirCreate(Directory)
+	Assert(FSCreateDirectoryExclusiveStrict(Directory), "Fixture namespace must be exclusively created")
 	_ConfigDir := Directory . "\"
 	Path := UserHotstringsSourcePath(), ChildPath := Directory . "\child.ahk", PidPath := Directory . "\child.pid"
 	Fixture := _UCHFixture()
 	_UserHotstringsOwner := Fixture.owner
 	try {
+		PackageRoots := _UCHPackageRoots()
 		Assert(UserHotstringsSetEnabled(false))
-		Assert(FSWriteCreateDurable(ChildPath,
-			'FileAppend(DllCall("GetCurrentProcessId"), "' . PidPath . '", "UTF-8-RAW")`nSleep(10000)`n'))
+		Assert(FSWriteCreateDurable(ChildPath, _UCHFixtureChildSource(PidPath)))
 		Source := 'ErgoptiDynamicHotstrings(api) {`n`tRun(Chr(34) . A_AhkPath . Chr(34) . " /script " . Chr(34) . "' . ChildPath . '" . Chr(34))`n`tSleep(10000)`n`treturn []`n}`n'
 		Assert(FSWriteCreateDurable(Path, Source))
 		Assert(UserHotstringsSetEnabled(true), "Explicit enable must start the actual source loader")
@@ -398,7 +421,7 @@ _UCHDisableCancelsFactory() {
 		while !FSStrictExists(PidPath) && TickElapsed(Started) < 10000
 			Sleep(10)
 		Assert(FSStrictExists(PidPath), "Real loading factory must launch its fixture descendant")
-		Pid := Integer(FSReadUtf8Exact(PidPath))
+		Pid := _UCHReadFixturePid(PidPath)
 		Assert(ProcessExist(Pid))
 		Assert(UserHotstringsSetEnabled(false), "Live disable must own factory cancellation, not only callback tickets")
 		AssertEqual(0, ProcessExist(Pid), "Successful disable must leave no factory descendant alive")
@@ -409,8 +432,9 @@ _UCHDisableCancelsFactory() {
 	} finally {
 		Assert(UserHotstringsInvalidate("fixture-cleanup"))
 		_ConfigDir := PreviousConfigDir, _UserHotstringsOwner := PreviousOwner, _UserHotstringsLoader := PreviousLoader
-		_UCHRestorePackageRoots(PackageRoots)
-		for FixturePath in [Path, ChildPath, PidPath]
+		if IsObject(PackageRoots)
+			_UCHRestorePackageRoots(PackageRoots)
+		for FixturePath in [Path, ChildPath, PidPath, PidPath . ".pending"]
 			FSDelete(FixturePath)
 		DirDelete(Directory)
 	}

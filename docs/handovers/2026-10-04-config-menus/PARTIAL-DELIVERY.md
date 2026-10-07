@@ -1,3 +1,70 @@
+# Integrated partial delivery: final native CI receipt
+
+Partial delivery is published on Dev `8cba7a0c45950383904ab6db11274f20823fc465`,
+tree `c0a8c8095a1e9d97a138b37a6365c49dbb5f0bff`. Actual no-ff parents are
+Dev `5d1d0685` and feature `d2598009`; all117 feature commits are integrated.
+The create-only lease and merge are bound to the serialized delivery receipt.
+The complete117-commit helper pins `5d1d0685..d2598009`;
+[compare the exact sources](https://github.com/adrienm7/ergopti/compare/5d1d06854b412e91c9350e05f03b20f83b297db8...d2598009d211ca70d7cb01b36927c9e601e432cb).
+
+Final all-OS [CI37547053814](https://github.com/adrienm7/ergopti/actions/runs/37547053814)
+is terminal failed on CI `34782db782bf206710cb459890927645bb5f7d26`, exact
+integrated tree `c0a8c809`. All37jobs are terminal:32pass, three fail and two
+skip. Failures are only macOS Package, macOS Verdict and Selected OS verdict.
+The skipped jobs are the macOS install/launch matrix and Release / Publish.
+The actual watch exits1; Release is skipped with release=false.
+
+Windows native units10089/0, full startup, fresh-clone startup, engine E2E,
+Package, Install and launch, compiled startup admission, programmable
+qualification, mandatory evidence and Windows Verdict all pass. Individual
+programmable/personal-case manifests and artifact identity fields are not
+inferred from the aggregate or named phase results.
+
+Linux units, E2E, Package and Verdict pass, as do all17 Install/Run/First-install
+variants. macOS stubbed units and E2E plus actual native canvas12captures pass.
+macOS Package fails with Sparkle `server-retired`, `server-terminal` and
+`server-exit`, Homebrew's exact owned AppleEvent receiver no longer live, and
+GlobalSwitcher native prerequisites refused: UNQUALIFIED, never passed or
+skipped, with no TCC grant attempted. The exact failure cause is not established;
+Mac install/launch is skipped after Package fails.
+
+The bounded native-owner comparison proves77specific Swift/Brew-helper/
+GlobalSwitcher/macOS-workflow source paths equal to actual Dev5d1. It does not
+prove complete runtime equivalence, a cause, or exoneration. The changed
+`macos_launch_gate.py` from `bf2c7e9a` adds the supplemental isolated Script
+inverse only in the Karabiner installation scenario; it is not unchanged and
+its Mac Install phase is skipped. No additional Karabiner criterion is imposed
+on Group1.
+
+The late Dev automatic run37546955202 on8cba is terminal cancelled in the actual
+read-only GitHub run API receipt. Its earlier zero-run/active follow-up snapshots
+remain historical; they are not terminal proof or this manual run's outcome.
+
+Only these three documentation paths differ from Windows-qualified20352 to
+integrated8cba. Native production/test inputs remain byte-identical. The actual
+final integrated CI now qualifies its named passing phases separately; the
+prior Windows375438 pass, older375412 all-OS failure and foreign G3 failure
+remain exact historical receipts below and in JSON.
+
+All six items remain partial.53/86/61 retains200 software menu construction
+sites; item33 has genuine producer-authority gaps, alongside the existing
+installed/device tasks. Items16/38 are unchanged. This is authorized partial
+delivery, not all-six completion or an all-green CI claim.
+
+Feature deletion and own lease release remain pending their actual cleanup
+receipt. The future documentary commit's self SHA is unknown and stays null;
+an external publication receipt must record it. This private preparer changes
+no Root file, native source, branch or lease.
+
+## Preserved previous feature receipt
+
+The complete V5 Markdown follows unchanged, including its then-pending
+integration statements. Those are historical checkpoints; the actual integrated
+merge and terminal results above own the current continuation. Existing practical
+Windows/macOS/Linux device replay instructions remain unchanged below.
+
+---
+
 # Current configuration and menu partial delivery
 
 Published feature source is `20352edb6702bfbb92d4c9ced08fb85f3845cd13`, tree
