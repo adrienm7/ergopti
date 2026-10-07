@@ -8,6 +8,7 @@ local cases = {
     "timer_stop_false", "timer_stop_nil", "timer_stop_throw", "tap_stop_false",
     "tap_stop_nil", "tap_stop_throw", "source_revoked_after_command", "source_pin_replaced_after_command", "physical_during_command", "long_physical_hold_wrap",
     "command_post_refused_after_delivery", "accessibility_refused", "foreign_event_pid",
+    "identity_prepost_tag", "identity_prepost_pid", "identity_prepost_state",
 }
 local function check(value, message) if not value then error(message, 0) end end
 local function run(mode)
@@ -98,8 +99,15 @@ local function run(mode)
         function e:getType() return self.key == 55 and 12 or (self.down and 10 or 11) end
         function e:getFlags() return { cmd = self.command } end
         function e:getKeyCode() return self.key end
-        function e:setProperty(key, value) self.prop[key] = value; return self end
-        function e:getProperty(key) return self.prop[key] end
+        function e:setProperty(key, value)
+            self.prop[key] = mode == "identity_prepost_tag" and key == 1 and value + 1 or value
+            return self
+        end
+        function e:getProperty(key)
+            if mode == "identity_prepost_pid" and key == 2 then return 999 end
+            if mode == "identity_prepost_state" and key == 3 then return 1 end
+            return self.prop[key]
+        end
         function e:post()
             posts[#posts + 1] = { key = self.key, down = self.down, tag = self.prop[1] }
             if not mode:match("^post_return_without_delivery") then
@@ -241,6 +249,28 @@ local function run(mode)
         check(#posts == 4, "no synthetic repeat or activation fallback may manufacture session retirement")
     end
     if mode == "session_preheld" then check(#posts == 0 and report.status == "refused", "preexisting combined Command refuses before input") end
+    if mode:match("^identity_prepost_") then
+        check(#posts == 0, "pre-post wrong field must refuse before any event effect")
+        check(report and report.status == "refused" and report.reason == "native_event_identity_refused",
+            "the unchanged strict identity guard must produce its original refusal")
+        check(report.cleanup_debt == false and report.tasks_retired == true and report.tap_retired == true
+            and report.timer_retired == true and report.session_retired == true,
+            "pre-post refusal must retain original physical retirement assertions")
+        check(#report.event_identity == 1 and report.event_identity_truncated == false,
+            "the actual refused constructor tuple must be observable exactly once")
+        local tuple = report.event_identity[1]
+        check(tuple.phase == 1 and tuple.cleanup == false, "first original admission must remain distinct from compensation")
+        check(tuple.tag_available == true and tuple.pid_available == true and tuple.state_available == true,
+            "actual integer fields must be available without fabricated defaults")
+        check(tuple.tag == (mode == "identity_prepost_tag" and 0x47534F02 or 0x47534F01),
+            "independent exact pre-post tag must survive diagnostics")
+        check(tuple.source_pid == (mode == "identity_prepost_pid" and 999 or 303),
+            "independent exact pre-post PID must survive diagnostics")
+        check(tuple.source_state == (mode == "identity_prepost_state" and 1 or -1),
+            "independent exact pre-post source state must survive diagnostics")
+        check(tuple.expected_tag == 0x47534F01 and tuple.expected_pid == 303 and tuple.expected_state == -1,
+            "actual fields cannot redefine the independent guard expectation")
+    end
     if mode ~= "accessibility_refused" then check(#activations == 2 and activations[1] == 202 and activations[2] == 101, "only original B then A precondition activations allowed") end
     return true
 end
