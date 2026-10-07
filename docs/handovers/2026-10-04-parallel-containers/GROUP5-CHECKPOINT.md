@@ -1586,3 +1586,19 @@ keeps all28 case bodies/assertions exact; original semantic loader gives2/26,
 corrected28/0 in Lua54, and absent/ambiguous sources refuse. The ratchet remains 75. Amended JIT discovery cannot run because the unchanged canonical helper
 requires table.pack; earlier direct frozen JIT controls are separate evidence.
 Final Root local qualification is recorded separately; actual native UI remains pending.
+
+## Signing within the original live build handoff
+
+Reviewed signer10 composition retains CPP7 factory/provider/auth sources and
+fixturea46 exactly. The opt-in fixed continuation owns explicit existing
+identity/keychain/public leaf, a separate signed copy, five inside-out targets,
+strict signatures and both-architecture requirements; native executable and
+resource transforms must fit a closed comparator. Default unsigned operations,
+bytes, modes and outcome remain exact. Independent95 targeted software tests,
+actual32 dependency captures/recuts and two causal admission mutants qualify
+composition only; author592 software positives remain separate evidence.
+The three native-host cohorts execute modeled Python fixtures, not codesign.
+Swift, actual credentials/signing/Console layout, package/install and live
+authentication remain unqualified. Proposed actual-native signing worker is
+private pending genuine cleanup ACK seam and shared outer-budget coordination;
+original direct unsigned native acceptance remains unchanged. Item31 stays open.

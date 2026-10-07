@@ -4325,6 +4325,19 @@ unqualified until fresh exact-source CI. Monitor30s versus cleanup10s retains
 its existing fail-closed path; no deadline or original assertion is weakened.
 Item31 remains partial, including unsigned/signed artifact and activation work.
 
+An explicit opt-in signing continuation now remains inside the original
+live unsigned build handoff. It requires an existing exact identity, owned
+keychain and matching public leaf; it copies retained unsigned bytes into
+an exclusive signed destination and verifies fixed inside-out signatures,
+per-architecture requirements and bounded executable/resource conservation.
+Unknown native MachO transformations refuse. Default unsigned operations
+and all canonical C++ corrections remain unchanged. Independent composition
+review passes95 targeted software controls with exact source-pin inverses;
+the author preserves592 software positives. These are modeled controls: real
+Core compilation, codesign, credential/native-layout qualification, protected
+shipping and installation remain required. An actual native fixture and its
+outer workflow budget are still being prepared; this does not complete31.
+
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
   listed; see `docs/memory/text-input-and-config.md`. Current source already

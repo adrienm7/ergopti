@@ -14,7 +14,7 @@ import stat
 import sys
 import time
 
-BUILD_SHA256 = "80623fb44e3666abb82c96d7099d1b32fb18b3e3eef9fbae237e074a81a18efc"
+BUILD_SHA256 = "36d8a9e47dd3c7c2ba44b0bbd7fad2fa6770dc10af739f4b7b6ec23e42bfcbd6"
 MAX_FILE_BYTES = 128 * 1024 * 1024
 MAX_TOTAL_BYTES = 512 * 1024 * 1024
 MAX_MEMBERS = 2048

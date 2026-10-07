@@ -369,8 +369,9 @@ def current_shipping(snapshot, deadline):
     _require(current == snapshot, "identity_changed")
 
 
-def prepare_unsigned(owner_snapshot, snapshots, deadline, guard):
-    """Copy only original retained bytes into one exclusive private unsigned layout."""
+@contextmanager
+def _unsigned_handoff_scope(owner_snapshot, snapshots, deadline, guard):
+    """Keep one private held-byte handoff active until its fixed caller retires."""
     _require(type(guard) is _OneUse, "handoff_required")
     with guard.claim():
         _deadline(deadline)
@@ -536,46 +537,50 @@ def prepare_unsigned(owner_snapshot, snapshots, deadline, guard):
             )
             boundary()
         boundary()
-        actual_directories, actual_files = set(), set()
-        pending = [root]
-        try:
-            while pending:
-                _deadline(deadline)
-                directory = pending.pop()
-                with os.scandir(directory) as entries:
-                    while True:
-                        _deadline(deadline)
-                        try:
-                            entry = next(entries)
-                        except StopIteration:
-                            break
-                        relative = str((directory / entry.name).relative_to(root))
-                        _relative(relative)
-                        _require(
-                            relative in planned_directories or relative in planned_files,
-                            "identity_changed",
-                        )
-                        _require(
-                            len(actual_directories) + len(actual_files) < MAX_MEMBERS + 2,
-                            "inventory",
-                        )
-                        path = directory / entry.name
-                        if relative in planned_directories:
-                            _directory(path, 0o755)
-                            actual_directories.add(relative)
-                            pending.append(path)
-                        else:
-                            _, info = _path(path)
-                            _require(stat.S_ISREG(info.st_mode), "identity_changed")
-                            actual_files.add(relative)
-        except OSError as error:
-            raise ArtifactRefusal("consumer_failed") from error
-        _require(
-            actual_directories == planned_directories and actual_files == set(planned_files),
-            "identity_changed",
-        )
+
+        def inventory():
+            actual_directories, actual_files = set(), set()
+            pending = [root]
+            try:
+                while pending:
+                    _deadline(deadline)
+                    directory = pending.pop()
+                    with os.scandir(directory) as entries:
+                        while True:
+                            _deadline(deadline)
+                            try:
+                                entry = next(entries)
+                            except StopIteration:
+                                break
+                            relative = str((directory / entry.name).relative_to(root))
+                            _relative(relative)
+                            _require(
+                                relative in planned_directories or relative in planned_files,
+                                "identity_changed",
+                            )
+                            _require(
+                                len(actual_directories) + len(actual_files) < MAX_MEMBERS + 2,
+                                "inventory",
+                            )
+                            path = directory / entry.name
+                            if relative in planned_directories:
+                                _directory(path, 0o755)
+                                actual_directories.add(relative)
+                                pending.append(path)
+                            else:
+                                _, info = _path(path)
+                                _require(stat.S_ISREG(info.st_mode), "identity_changed")
+                                actual_files.add(relative)
+            except OSError as error:
+                raise ArtifactRefusal("consumer_failed") from error
+            _require(
+                actual_directories == planned_directories and actual_files == set(planned_files),
+                "identity_changed",
+            )
+
+        inventory()
         boundary()
-        return PreparationOutcome(
+        outcome = PreparationOutcome(
             "prepared_unsigned_snapshot",
             root,
             tuple(row[2] for row in _PRODUCTS),
@@ -583,3 +588,38 @@ def prepare_unsigned(owner_snapshot, snapshots, deadline, guard):
             False,
             False,
         )
+
+        active = True
+
+        def admitted():
+            _require(active and guard._state == "active", "handoff_required")
+            _require(not guard._reentered, "reentered")
+            _deadline(deadline)
+
+        class _LiveUnsigned:
+            # This local type closes over original observations, not a path or
+            # caller-supplied receipt. It cannot be reopened after lexical exit.
+            def __init__(self):
+                self.outcome = outcome
+
+            def current(self):
+                admitted()
+                boundary()
+                inventory()
+                boundary()
+                admitted()
+
+            def members(self):
+                admitted()
+                return tuple(created_directories.items()), tuple(completed_files.values())
+
+        try:
+            yield _LiveUnsigned()
+        finally:
+            active = False
+
+
+def prepare_unsigned(owner_snapshot, snapshots, deadline, guard):
+    """Copy only original retained bytes into one exclusive private unsigned layout."""
+    with _unsigned_handoff_scope(owner_snapshot, snapshots, deadline, guard) as live:
+        return live.outcome

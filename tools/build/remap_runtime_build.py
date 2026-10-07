@@ -457,7 +457,7 @@ def _current_build_inputs(source_snapshot, deadline, staged_image):
 
 # Artifact custody is opt-in and outside the original complete factory closure.
 ARTIFACT_RELATIVE = "tools/build/remap_runtime_artifact.py"
-ARTIFACT_SHA256 = "86e8458f29a2cf31864d33a5ef4d58e9934c7241bb2efd8e3c74f73041797482"
+ARTIFACT_SHA256 = "fdeeac8578cb6238b881fd5eff8372c3e47902a2fbcc9a6b536be4c4646eed9b"
 
 
 @dataclass(frozen=True, slots=True)
@@ -570,6 +570,633 @@ class _PreparationSink:
         except (BASE.NativeBuildError, self.module.ArtifactRefusal) as error:
             outcome = PreparationFailure(error.code)
         return CompilationPreparation(record, outcome)
+
+
+MACHO_RELATIVE = "tools/build/remap_runtime_macho.py"
+MACHO_SHA256 = "238fc52ca61326fe05b708954a0d9e84ebecc0f45b5088c06278a3b3ba1eb14b"
+_SIGNED_PRODUCTS = (
+    ("Runtime/ErgoptiPlus-Remap-Core.app", "com.ergoptiplus.remap.core", "ErgoptiPlus-Remap-Core"),
+    (
+        "Runtime/ErgoptiPlus-Remap-Console.app",
+        "com.ergoptiplus.remap.console",
+        "ErgoptiPlus-Remap-Console",
+    ),
+    ("Runtime/bin/ergoptiplus_remap_cli", "com.ergoptiplus.remap.cli", None),
+)
+
+
+@dataclass(frozen=True, slots=True)
+class SigningFailure:
+    """A separate signing refusal preserves compilation and unsigned preparation."""
+
+    code: str
+    status: str = "refused"
+
+
+@dataclass(frozen=True, slots=True)
+class SignedPreparationOutcome:
+    """A fixed signed snapshot, with shipping/install/live authentication unqualified."""
+
+    root: Path
+    products: tuple
+    status: str = "prepared_signed_snapshot"
+    shipping_qualified: bool = False
+    installation_qualified: bool = False
+    authentication_qualified: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class CompilationSigning:
+    """Keep the original completed facts separate from the later signature result."""
+
+    compilation: dict
+    preparation: object
+    signing: object
+
+
+class _SigningSink(_PreparationSink):
+    """The sole fixed signing continuation inside the original unsigned claim.
+
+    This opt-in sink cannot accept products, destinations, command plans,
+    callbacks, a retired root, or receipts as a signing authority.
+    """
+
+    def __init__(
+        self, repository, owner, deadline, owner_identity, identity, keychain, public_leaf
+    ):
+        super().__init__(repository, owner, deadline, owner_identity)
+        self.macho_source = snapshot_inputs(
+            Path(repository), {MACHO_RELATIVE: MACHO_SHA256}, deadline
+        )
+        retained = self.macho_source.files[0]
+        _REQUIRE(retained.path == MACHO_RELATIVE, "source_identity", "Fixed comparator changed")
+        self.macho = _load(
+            "four_target_fixed_macho_comparator", Path(repository) / MACHO_RELATIVE, retained.data
+        )
+        current_inputs(self.macho_source, deadline)
+        self.credentials = (identity, keychain, public_leaf)
+        self.current(deadline)
+
+    def current(self, deadline):
+        super().current(deadline)
+        if hasattr(self, "macho_source"):
+            current_inputs(self.macho_source, deadline)
+
+    def prepare(self, record, inputs, image, retained_products, deadline):
+        unsigned = None
+        require, tick = self.module._require, self.module._deadline
+
+        def current():
+            tick(deadline)
+            try:
+                _current_build_inputs(inputs, deadline, image)
+                for previous, root in retained_products:
+                    current_product(previous, root)
+                    tick(deadline)
+                self.current(deadline)
+                tick(deadline)
+            except OSError as error:
+                raise BASE.NativeBuildError(
+                    "source_identity", "Original retained compilation source became unavailable"
+                ) from error
+
+        try:
+            current()
+            with self.module._unsigned_handoff_scope(
+                self.owner, tuple(self.snapshots), deadline, self.guard
+            ) as live:
+                unsigned = live.outcome
+                directories, files = live.members()
+                held = {row.path: row for row in files}
+                identity, keychain, public_leaf = self.credentials
+                require(
+                    type(identity) is str
+                    and re.fullmatch(r"[0-9A-Fa-f]{40}", identity) is not None
+                    and isinstance(keychain, (str, Path))
+                    and isinstance(public_leaf, (str, Path)),
+                    "signing_credentials",
+                )
+                identity = identity.upper()
+                keychain, public_leaf = Path(keychain), Path(public_leaf)
+
+                def ancestors(path, expected=None):
+                    observations = []
+                    for parent in reversed(path.parents):
+                        tick(deadline)
+                        require(len(observations) < 64, "signing_credentials")
+                        info = parent.lstat()
+                        require(stat.S_ISDIR(info.st_mode), "signing_credentials")
+                        observations.append((parent, _directory_identity(info)))
+                    observations = tuple(observations)
+                    if expected is not None:
+                        require(observations == expected, "identity_changed")
+                    return observations
+
+                try:
+                    leaf = _ordinary(public_leaf, public_leaf.parent, 1024 * 1024)
+                    key_info = keychain.lstat()
+                    require(
+                        public_leaf.is_absolute()
+                        and stat.S_IMODE(leaf.identity[3]) == 0o644
+                        and 0 < len(leaf.data) <= 1024 * 1024
+                        and hashlib.sha1(leaf.data).hexdigest().upper() == identity
+                        and keychain.is_absolute()
+                        and keychain.resolve(strict=True) == keychain
+                        and stat.S_ISREG(key_info.st_mode)
+                        and stat.S_IMODE(key_info.st_mode) == 0o600
+                        and key_info.st_uid == os.getuid()
+                        and key_info.st_nlink == 1
+                        and key_info.st_size > 0,
+                        "signing_credentials",
+                    )
+                    key_stamp = _directory_identity(key_info)
+                    key_ancestors, leaf_ancestors = ancestors(keychain), ancestors(public_leaf)
+                except (OSError, BASE.NativeBuildError) as error:
+                    raise self.module.ArtifactRefusal("signing_credentials") from error
+
+                def credential_current():
+                    try:
+                        require(
+                            _ordinary(public_leaf, public_leaf.parent, 1024 * 1024) == leaf
+                            and keychain.resolve(strict=True) == keychain
+                            and _directory_identity(keychain.lstat()) == key_stamp
+                            and keychain.lstat().st_nlink == 1,
+                            "identity_changed",
+                        )
+                        ancestors(keychain, key_ancestors)
+                        ancestors(public_leaf, leaf_ancestors)
+                    except (OSError, BASE.NativeBuildError) as error:
+                        raise self.module.ArtifactRefusal("identity_changed") from error
+
+                signed = self.owner.path / ".signed-runtime-preparation"
+                work = self.owner.path / ".signed-runtime-verification"
+                require(
+                    not os.path.lexists(signed) and not os.path.lexists(work), "signed_collision"
+                )
+                current()
+                live.current()
+                credential_current()
+                try:
+                    signed.mkdir(mode=0o700)
+                    work.mkdir(mode=0o700)
+                except OSError as error:
+                    raise self.module.ArtifactRefusal("signed_collision") from error
+                root_stamp = _directory_identity(signed.lstat())
+                work_stamp = _directory_identity(work.lstat())
+                directory_stamps = {}
+                for relative, _ in sorted(
+                    directories, key=lambda pair: (pair[0].count("/"), pair[0])
+                ):
+                    current()
+                    live.current()
+                    tick(deadline)
+                    path = signed / relative
+                    path.mkdir(mode=0o700)
+                    selected = _identity(path.lstat())
+                    directory_descriptor = os.open(
+                        path, os.O_RDONLY | os.O_NOFOLLOW | os.O_DIRECTORY
+                    )
+                    try:
+                        require(
+                            _identity(os.fstat(directory_descriptor)) == selected,
+                            "signed_inventory",
+                        )
+                        os.fchmod(directory_descriptor, 0o755)
+                        require(
+                            _identity(os.fstat(directory_descriptor)) == _identity(path.lstat()),
+                            "signed_inventory",
+                        )
+                    finally:
+                        os.close(directory_descriptor)
+                    require(stat.S_IMODE(path.lstat().st_mode) == 0o755, "signed_inventory")
+                    directory_stamps[relative] = _directory_identity(path.lstat())
+                for relative, original in sorted(held.items()):
+                    current()
+                    live.current()
+                    tick(deadline)
+                    path = signed / relative
+                    require(
+                        signed.resolve(strict=True) == signed
+                        and _directory_identity(signed.lstat()) == root_stamp,
+                        "signed_inventory",
+                    )
+                    for retained_directory, retained_stamp in directory_stamps.items():
+                        tick(deadline)
+                        directory = signed / retained_directory
+                        require(
+                            directory.resolve(strict=True) == directory
+                            and _directory_identity(directory.lstat()) == retained_stamp,
+                            "signed_inventory",
+                        )
+                    parent_descriptor = os.open(
+                        path.parent, os.O_RDONLY | os.O_NOFOLLOW | os.O_DIRECTORY
+                    )
+                    descriptor = None
+                    try:
+                        require(
+                            _directory_identity(os.fstat(parent_descriptor))
+                            == directory_stamps[str(path.parent.relative_to(signed))],
+                            "signed_inventory",
+                        )
+                        descriptor = os.open(
+                            path.name,
+                            os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                            original.mode,
+                            dir_fd=parent_descriptor,
+                        )
+                        os.fchmod(descriptor, original.mode)
+                        opened = os.fstat(descriptor)
+                        require(
+                            _identity(opened) == _identity(path.lstat())
+                            and stat.S_ISREG(opened.st_mode)
+                            and opened.st_nlink == 1
+                            and opened.st_uid == os.getuid(),
+                            "signed_inventory",
+                        )
+                        offset = 0
+                        while offset < len(original.data):
+                            tick(deadline)
+                            count = os.write(descriptor, original.data[offset : offset + 65536])
+                            require(
+                                0 < count <= min(65536, len(original.data) - offset),
+                                "signed_inventory",
+                            )
+                            offset += count
+                        completed = os.fstat(descriptor)
+                        require(
+                            _directory_identity(opened) == _directory_identity(completed)
+                            and completed.st_size == len(original.data)
+                            and _identity(completed) == _identity(path.lstat()),
+                            "signed_inventory",
+                        )
+                    finally:
+                        try:
+                            if descriptor is not None:
+                                os.close(descriptor)
+                        finally:
+                            os.close(parent_descriptor)
+                    current()
+                    live.current()
+
+                primaries = {
+                    destination + "/Contents/MacOS/" + executable if executable else destination
+                    for destination, _, executable in _SIGNED_PRODUCTS
+                }
+                require(primaries <= set(held), "signed_inventory")
+                for destination, identifier, executable in _SIGNED_PRODUCTS:
+                    if executable is not None:
+                        try:
+                            metadata = plistlib.loads(
+                                held[destination + "/Contents/Info.plist"].data
+                            )
+                        except (ValueError, TypeError, KeyError, OverflowError) as error:
+                            raise self.module.ArtifactRefusal("signed_content") from error
+                        require(
+                            type(metadata) is dict
+                            and metadata.get("CFBundleIdentifier") == identifier
+                            and metadata.get("CFBundleExecutable") == executable
+                            and metadata.get("CFBundlePackageType") == "APPL",
+                            "signed_content",
+                        )
+                signature_directories = {
+                    destination + "/Contents/_CodeSignature"
+                    for destination, _, executable in _SIGNED_PRODUCTS
+                    if executable
+                }
+                signature_files = {
+                    relative + "/CodeResources" for relative in signature_directories
+                }
+                fixed_directories = set(directory_stamps)
+                previous_files = {}
+                previous_directories = {}
+                signature_work = {}
+
+                def scan():
+                    tick(deadline)
+                    require(
+                        signed.resolve(strict=True) == signed
+                        and _directory_identity(signed.lstat()) == root_stamp
+                        and work.resolve(strict=True) == work
+                        and _directory_identity(work.lstat()) == work_stamp,
+                        "signed_inventory",
+                    )
+                    observed_files, observed_directories = {}, {}
+                    pending, total = [signed], 0
+                    while pending:
+                        directory = pending.pop()
+                        with os.scandir(directory) as entries:
+                            while True:
+                                tick(deadline)
+                                try:
+                                    entry = next(entries)
+                                except StopIteration:
+                                    break
+                                require(
+                                    len(observed_files) + len(observed_directories)
+                                    < self.module.MAX_MEMBERS + 6,
+                                    "signed_inventory",
+                                )
+                                path = directory / entry.name
+                                relative = str(path.relative_to(signed))
+                                require(
+                                    relative in fixed_directories
+                                    or relative in signature_directories
+                                    or relative in held
+                                    or relative in signature_files,
+                                    "signed_inventory",
+                                )
+                                info = path.lstat()
+                                require(
+                                    info.st_uid == os.getuid()
+                                    and path.resolve(strict=True) == path,
+                                    "signed_inventory",
+                                )
+                                if (
+                                    relative in fixed_directories
+                                    or relative in signature_directories
+                                ):
+                                    require(
+                                        stat.S_ISDIR(info.st_mode)
+                                        and stat.S_IMODE(info.st_mode) == 0o755,
+                                        "signed_inventory",
+                                    )
+                                    observed_directories[relative] = _directory_identity(info)
+                                    pending.append(path)
+                                else:
+                                    expected_mode = (
+                                        held[relative].mode if relative in held else 0o644
+                                    )
+                                    require(
+                                        stat.S_ISREG(info.st_mode)
+                                        and stat.S_IMODE(info.st_mode) == expected_mode
+                                        and info.st_nlink == 1
+                                        and info.st_size <= self.module.MAX_FILE_BYTES,
+                                        "signed_inventory",
+                                    )
+                                    total += info.st_size
+                                    require(
+                                        total <= self.module.MAX_TOTAL_BYTES, "signed_inventory"
+                                    )
+                                    try:
+                                        observed_files[relative] = _ordinary(
+                                            path, signed, self.module.MAX_FILE_BYTES
+                                        )
+                                    except BASE.NativeBuildError as error:
+                                        raise self.module.ArtifactRefusal(
+                                            "signed_inventory"
+                                        ) from error
+                    require(
+                        fixed_directories <= set(observed_directories)
+                        and set(held) <= set(observed_files),
+                        "signed_inventory",
+                    )
+                    for relative, stamp in directory_stamps.items():
+                        require(observed_directories[relative] == stamp, "signed_inventory")
+                    tick(deadline)
+                    return observed_directories, observed_files
+
+                def accept(target_primary=None, target_resources=None):
+                    nonlocal previous_files, previous_directories
+                    actual_directories, actual_files = scan()
+                    allowed_directories = set(previous_directories) | fixed_directories
+                    if target_resources is not None:
+                        allowed_directories.add(str(PurePosixPath(target_resources).parent))
+                    require(set(actual_directories) == allowed_directories, "signed_inventory")
+                    for relative, stamp in previous_directories.items():
+                        require(actual_directories[relative] == stamp, "signed_inventory")
+                    allowed_files = set(previous_files) | set(held)
+                    if target_resources is not None:
+                        allowed_files.add(target_resources)
+                    require(set(actual_files) == allowed_files, "signed_inventory")
+                    for relative, observation in actual_files.items():
+                        tick(deadline)
+                        if relative == target_primary:
+                            try:
+                                architecture = self.macho.compare_macho(
+                                    held[relative].data, observation.data, deadline
+                                )
+                            except self.macho.MachORefusal as error:
+                                code = (
+                                    "signed_content" if error.code == "content" else "signed_shape"
+                                )
+                                if error.code == "deadline":
+                                    code = "deadline"
+                                raise self.module.ArtifactRefusal(code) from error
+                            require(architecture == ("x86_64", "arm64"), "signed_shape")
+                        elif relative == target_resources:
+                            try:
+                                resources = plistlib.loads(observation.data)
+                            except (ValueError, TypeError, OverflowError) as error:
+                                raise self.module.ArtifactRefusal("signed_inventory") from error
+                            require(type(resources) is dict, "signed_inventory")
+                        else:
+                            require(
+                                observation.data
+                                == (
+                                    previous_files[relative].data
+                                    if relative in previous_files
+                                    else held[relative].data
+                                ),
+                                "signed_content",
+                            )
+                            if relative in previous_files:
+                                require(observation == previous_files[relative], "signed_inventory")
+                    previous_files, previous_directories = actual_files, actual_directories
+
+                def work_current():
+                    tick(deadline)
+                    found = {}
+                    with os.scandir(work) as entries:
+                        while True:
+                            tick(deadline)
+                            try:
+                                entry = next(entries)
+                            except StopIteration:
+                                break
+                            require(
+                                len(found) < 10 and entry.name in signature_work, "signature_leaf"
+                            )
+                            try:
+                                found[entry.name] = _ordinary(work / entry.name, work, 1024 * 1024)
+                            except BASE.NativeBuildError as error:
+                                raise self.module.ArtifactRefusal("signature_leaf") from error
+                    require(found == signature_work, "signature_leaf")
+
+                def boundary():
+                    current()
+                    live.current()
+                    credential_current()
+                    accept()
+                    work_current()
+                    tick(deadline)
+
+                accept()
+                boundary()
+
+                def phase(
+                    name, command, target_primary=None, target_resources=None, certificate=None
+                ):
+                    boundary()
+                    try:
+                        _RUN_PHASE(name, command, signed, self.owner.path, deadline)
+                    finally:
+                        # Even a failed native child cannot bypass source/unsigned recuts.
+                        current()
+                        live.current()
+                        credential_current()
+                        if target_primary is None:
+                            accept()
+                        else:
+                            accept(target_primary, target_resources)
+                        if certificate is not None:
+                            path = work / certificate
+                            try:
+                                observation = _ordinary(path, work, 1024 * 1024)
+                            except BASE.NativeBuildError as error:
+                                raise self.module.ArtifactRefusal("signature_leaf") from error
+                            require(
+                                stat.S_IMODE(observation.identity[3]) == 0o644
+                                and observation.data == leaf.data,
+                                "signature_leaf",
+                            )
+                            signature_work[certificate] = observation
+                        work_current()
+                        tick(deadline)
+                    boundary()
+                    output = _ordinary(self.owner.path / (name + ".stdout"), self.owner.path, 65536)
+                    errors = _ordinary(self.owner.path / (name + ".stderr"), self.owner.path, 65536)
+                    boundary()
+                    return output.data, errors.data
+
+                identity_stdout, identity_stderr = phase(
+                    "signing_identity",
+                    ["/usr/bin/security", "find-identity", "-p", "codesigning", str(keychain)],
+                )
+                try:
+                    identity_text = (identity_stdout + identity_stderr).decode("utf-8", "strict")
+                except UnicodeError as error:
+                    raise self.module.ArtifactRefusal("signing_credentials") from error
+                matches = re.findall(
+                    r"(?m)^\s*\d+\) ([A-Fa-f0-9]{40}) \"[^\n]*\"\s*$", identity_text
+                )
+                require(
+                    sum(value.upper() == identity for value in matches) == 1, "signing_credentials"
+                )
+                for index, (destination, identifier, executable) in enumerate(_SIGNED_PRODUCTS):
+                    primary = (
+                        destination + "/Contents/MacOS/" + executable if executable else destination
+                    )
+                    targets = (
+                        ((primary, False), (destination, True))
+                        if executable
+                        else ((primary, False),)
+                    )
+                    requirement = (
+                        'identifier "' + identifier + '" and certificate leaf = H"' + identity + '"'
+                    )
+                    for level, (relative, bundle) in enumerate(targets):
+                        target = str(signed / relative)
+                        resources = (
+                            destination + "/Contents/_CodeSignature/CodeResources"
+                            if bundle
+                            else None
+                        )
+                        label = "signing_" + str(index) + "_" + str(level)
+                        phase(
+                            label + "_sign",
+                            [
+                                "/usr/bin/codesign",
+                                "--force",
+                                "--sign",
+                                identity,
+                                "--keychain",
+                                str(keychain),
+                                "--timestamp=none",
+                                "--identifier",
+                                identifier,
+                                "--requirements",
+                                "=designated => " + requirement,
+                                target,
+                            ],
+                            primary,
+                            resources,
+                        )
+                        phase(
+                            label + "_verify",
+                            [
+                                "/usr/bin/codesign",
+                                "--verify",
+                                "--strict",
+                                "--all-architectures",
+                                "-R",
+                                "=" + requirement,
+                                target,
+                            ],
+                        )
+                        for architecture in ("x86_64", "arm64"):
+                            stdout, stderr = phase(
+                                label + "_" + architecture + "_requirement",
+                                [
+                                    "/usr/bin/codesign",
+                                    "-d",
+                                    "-r-",
+                                    "--architecture",
+                                    architecture,
+                                    target,
+                                ],
+                            )
+                            try:
+                                text = (stdout + stderr).decode("utf-8", "strict")
+                            except UnicodeError as error:
+                                raise self.module.ArtifactRefusal(
+                                    "signature_requirement"
+                                ) from error
+                            designated = [
+                                line.strip()
+                                for line in text.splitlines()
+                                if line.startswith("designated => ")
+                            ]
+                            require(len(designated) == 1, "signature_requirement")
+                            rendered = re.fullmatch(
+                                r'designated => identifier "([A-Za-z0-9.]+)" and certificate leaf = H"([A-Fa-f0-9]{40})"',
+                                designated[0],
+                            )
+                            require(
+                                rendered is not None
+                                and rendered.group(1) == identifier
+                                and rendered.group(2).upper() == identity,
+                                "signature_requirement",
+                            )
+                            prefix = label + "_" + architecture + "_leaf_"
+                            require(not os.path.lexists(work / (prefix + "0")), "signed_collision")
+                            phase(
+                                label + "_" + architecture + "_leaf",
+                                [
+                                    "/usr/bin/codesign",
+                                    "--display",
+                                    "--extract-certificates",
+                                    str(work / prefix),
+                                    "--architecture",
+                                    architecture,
+                                    target,
+                                ],
+                                certificate=prefix + "0",
+                            )
+                boundary()
+                signed_outcome = SignedPreparationOutcome(
+                    signed, tuple(row[0] for row in _SIGNED_PRODUCTS)
+                )
+            current()
+        except (BASE.NativeBuildError, self.module.ArtifactRefusal, OSError) as error:
+            code = getattr(error, "code", "signed_inventory")
+            if code == "phase_deadline":
+                code = "deadline"
+            return CompilationSigning(
+                record,
+                unsigned if unsigned is not None else PreparationFailure(code),
+                SigningFailure(code),
+            )
+        return CompilationSigning(record, unsigned, signed_outcome)
 
 
 def _preparation_current(sink, retained, deadline):
@@ -1277,13 +1904,28 @@ def compile_owned_and_prepare(repository, owner, seconds, upstream=None):
     return _compile_owned(repository, owner, seconds, upstream, prepare=True)
 
 
-def _compile_owned(repository, owner, seconds, upstream=None, *, prepare=False):
+def compile_owned_prepare_and_sign(
+    repository, owner, seconds, upstream=None, *, identity, keychain, public_leaf
+):
+    """Opt in to fixed live signing with explicit existing owned credentials."""
+    return _compile_owned(
+        repository,
+        owner,
+        seconds,
+        upstream,
+        prepare=True,
+        signing=(identity, keychain, public_leaf),
+    )
+
+
+def _compile_owned(repository, owner, seconds, upstream=None, *, prepare=False, signing=None):
     """Compile the complete canonical owned tree using the genuine Darwin SDK.
 
     A separate pristine acquisition is retained through all phase boundaries.
     The factory's complete tracked image is published before actual version
     generation. The default skips shipping capture; the opt-in copies retained
-    unsigned snapshots. Neither path signs, installs or authenticates.
+    unsigned snapshots. Only the explicit signing path signs; no path installs or
+    authenticates.
     """
     _REQUIRE(
         type(seconds) is int and seconds == 300,
@@ -1297,7 +1939,9 @@ def _compile_owned(repository, owner, seconds, upstream=None, *, prepare=False):
     )
     deadline = time.monotonic() + seconds
     shipping_sink = (
-        _PreparationSink(repository, owner, deadline, owner_identity) if prepare else None
+        _SigningSink(repository, owner, deadline, owner_identity, *signing)
+        if signing is not None
+        else (_PreparationSink(repository, owner, deadline, owner_identity) if prepare else None)
     )
     factory = _source_factory()
     _factory_operation(factory, factory.capture_dependencies, Path(repository), deadline)
@@ -1804,6 +2448,10 @@ def main(arguments=None):
     parser.add_argument("--ready", action="store_true")
     parser.add_argument("--compile-owned", action="store_true")
     parser.add_argument("--prepare-owned", action="store_true")
+    parser.add_argument("--sign-owned", action="store_true")
+    parser.add_argument("--signing-identity")
+    parser.add_argument("--signing-keychain", type=Path)
+    parser.add_argument("--signing-public-leaf", type=Path)
     parser.add_argument("--source-controls", action="store_true")
     parser.add_argument("--upstream", type=Path)
     parser.add_argument("--observe-products", type=Path)
@@ -1814,12 +2462,29 @@ def main(arguments=None):
             + int(options.ready)
             + int(options.compile_owned)
             + int(options.prepare_owned)
+            + int(options.sign_owned)
             + int(options.source_controls)
             + int(options.observe_products is not None)
         )
         _REQUIRE(
             selected <= 1
-            and (options.upstream is None or options.compile_owned or options.prepare_owned),
+            and (
+                options.upstream is None
+                or options.compile_owned
+                or options.prepare_owned
+                or options.sign_owned
+            )
+            and (
+                options.sign_owned
+                or all(
+                    value is None
+                    for value in (
+                        options.signing_identity,
+                        options.signing_keychain,
+                        options.signing_public_leaf,
+                    )
+                )
+            ),
             "invalid_budget",
             "Conflicting owned preparation modes",
         )
@@ -1830,6 +2495,35 @@ def main(arguments=None):
         if options.ready:
             dependency_ready(options.repository, options.owner, options.budget)
             print("PASS fixed owned build dependencies; source and compilation unexecuted")
+            return 0
+        if options.sign_owned:
+            result = compile_owned_prepare_and_sign(
+                options.repository,
+                options.owner,
+                options.budget,
+                options.upstream,
+                identity=options.signing_identity,
+                keychain=options.signing_keychain,
+                public_leaf=options.signing_public_leaf,
+            )
+            print(
+                "PASS unsigned actual owned four-target compilation; signing and activation unqualified"
+            )
+            if type(result.preparation) is PreparationFailure:
+                print(
+                    "Unsigned runtime preparation refused: " + result.preparation.code,
+                    file=sys.stderr,
+                )
+                return 2
+            print(
+                "PASS retained unsigned runtime snapshot; native shipping and installation unqualified"
+            )
+            if type(result.signing) is SigningFailure:
+                print("Runtime signing refused: " + result.signing.code, file=sys.stderr)
+                return 2
+            print(
+                "PASS fixed signed runtime snapshot; shipping, installation and live authentication unqualified"
+            )
             return 0
         if options.prepare_owned:
             result = compile_owned_and_prepare(
@@ -1880,7 +2574,7 @@ def main(arguments=None):
             )
         except (BASE.NativeBuildError, OSError):
             pass  # Refusal never replaces an earlier receipt or clears retained debt.
-        if options.prepare_owned:
+        if options.prepare_owned or options.sign_owned:
             print(
                 "Owned runtime compilation incomplete; unsigned preparation not completed: "
                 + error.code,
