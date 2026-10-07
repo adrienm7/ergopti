@@ -34,7 +34,7 @@
 		]
 	},
 	"macos": {
-		"count": 31,
+		"count": 30,
 		"sites": [
 			"macos/ui/menu/builder.lua:452 separator",
 			"macos/ui/menu/builder.lua:879 separator",
@@ -64,8 +64,7 @@
 			"macos/ui/menu/menu_paths.lua:610 static",
 			"macos/ui/menu/menu_shortcuts.lua:541 static",
 			"macos/ui/menu/menu_shortcuts.lua:644 separator",
-			"macos/ui/menu/menu_tap_holds.lua:388 separator",
-			"macos/ui/menu/menu_tap_holds.lua:1131 static",
+			"macos/ui/menu/menu_tap_holds.lua:1155 static",
 			"macos/ui/menu/menu_tap_keys.lua:59 static"
 		]
 	},

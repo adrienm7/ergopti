@@ -9202,3 +9202,112 @@ console.log(
 		'[OK] complete Magic trigger: exact declared captions/order and executable native binding/refusal owners.'
 	);
 })();
+
+// Complete Tap-Hold action-picker presentation retains both actual native routes.
+{
+	const assert = require('node:assert/strict');
+	const { nativeTemplateBinding } = require('../lib/menu-template-binding.cjs');
+	const section = 'tap_hold_action_picker_frame';
+	const nativePath = 'macos/ui/menu/menu_tap_holds.lua';
+	const declaration = {
+		[section]: [
+			{ type: 'list', id: 'tap_hold_picker_special_rows', platforms: ['hs'], unavailable: 'hide' },
+			{
+				type: 'include',
+				section: 'tap_hold_action_picker_boundary',
+				present_when: 'tap_hold_picker_has_boundary'
+			},
+			{ type: 'list', id: 'tap_hold_picker_grouped_rows', platforms: ['hs'], unavailable: 'hide' }
+		],
+		tap_hold_action_picker_boundary: [{ type: '---', platforms: ['hs'], unavailable: 'hide' }]
+	};
+	const records = parseToml(readFileSync(MANIFEST_PATH, 'utf8')).menu;
+	const generated = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	for (const [name, rows] of Object.entries(declaration)) {
+		assert.deepEqual(records[name], rows, 'independently specified complete declaration');
+		assert.deepEqual(generated[name], rows, 'actual generator output');
+	}
+	const source = readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus', nativePath), 'utf8');
+	for (const [key, provider] of [
+		['tap_hold_picker_special_rows', 'special_rows'],
+		['tap_hold_picker_grouped_rows', 'grouped_rows']
+	]) {
+		const binds = (candidate, port = 3) =>
+			nativeTemplateBinding(candidate, '.lua', section, key, port);
+		assert.equal(binds(source), true, 'actual typed list provider is executable and published');
+		assert.equal(binds(source, 1), false, 'list data is not a command callback port');
+		for (const candidate of [
+			source.replaceAll(key + ' = ' + provider, key + ' = nil'),
+			source.replaceAll(key + ' = ' + provider, key + ' = {}'),
+			source.replace(
+				'local function ' +
+					provider +
+					'() return ' +
+					(provider === 'special_rows' ? 'special' : 'grouped') +
+					' end',
+				'local function ' + provider + '() end'
+			),
+			source.replaceAll(
+				'ManifestMenu.template_rows("' + section + '"',
+				'ManifestMenu.template_rows("unrelated_action_picker_frame"'
+			)
+		]) {
+			assert.notEqual(candidate, source, 'counterexample must change the actual owner');
+			assert.equal(
+				binds(candidate),
+				false,
+				'withdrawn/noncallable/empty/wrong-frame evidence is refused'
+			);
+		}
+	}
+	const graphSource = readFileSync(resolve(__dirname, 'test-menu-parity.cjs'), 'utf8');
+	const start = graphSource.indexOf('const OPENS_SUBMENU = {');
+	const finish = graphSource.indexOf('\n};', start);
+	assert(start >= 0 && finish > start, 'actual bounded registry');
+	const graph = require('node:vm').runInNewContext(
+		graphSource.slice(start, finish + 3) + '; OPENS_SUBMENU',
+		{},
+		{ timeout: 1000 }
+	);
+	function assertRoutes(value) {
+		for (const root of ['tap_holds', 'key_combinations']) {
+			assert(Array.isArray(value[root]));
+			assert(
+				value[root].includes(root === 'tap_holds' ? 'tap_holds_menu' : 'key_combinations_group'),
+				'original root mapping remains'
+			);
+			const edge = value[root].find((item) => item?.menu === section);
+			assert(edge, 'each actual native publication root owns its complete picker');
+			assert.equal(edge.kind, 'compose');
+			assert.deepEqual([...edge.platforms], ['hs']);
+			assert.equal(edge.native_sources.hs, nativePath);
+		}
+	}
+	assertRoutes(graph);
+	for (const root of ['tap_holds', 'key_combinations']) {
+		for (const mutate of [
+			(value) => {
+				value[root] = value[root].filter((item) => item?.menu !== section);
+			},
+			(value) => {
+				value[root].find((item) => item?.menu === section).kind = 'submenu';
+			},
+			(value) => {
+				value[root].find((item) => item?.menu === section).platforms = ['linux'];
+			},
+			(value) => {
+				value[root].find((item) => item?.menu === section).native_sources.hs =
+					'macos/ui/menu/menu_utils.lua';
+			},
+			(value) => {
+				value[root] = value[root].filter(
+					(item) => item !== (root === 'tap_holds' ? 'tap_holds_menu' : 'key_combinations_group')
+				);
+			}
+		]) {
+			const wrong = structuredClone(graph);
+			mutate(wrong);
+			assert.throws(() => assertRoutes(wrong));
+		}
+	}
+}
