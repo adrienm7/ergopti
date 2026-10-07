@@ -7563,6 +7563,18 @@ acceptance still require hosted qualification; item111 stays partial.
 
 Current Group 3 source checkpoint (item 111, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Complete Mac broker/wiring and exact retirement qualification; preserve final Linux supervision five, external recovery one and window 34 successes without rebuilding the switcher. Separate device/evidence boundary: Genuine dual screens, independent cursor/focus and moved/closed windows.
 
+Twelve published macOS prerequisite corrections are composed through a
+normal merge, retaining their original commit identities. They preserve the
+native closed-owner and refusal gates while correcting current Swift/AppKit
+startup, numeric local Sparkle binding, actual private event-table identity
+and owned AppleEvent fixture observations. The independent source review
+passes163 focused portable controls and verifies all24 merged source images;
+no unrelated Windows feature commits are imported. This is source composition,
+not native acceptance. Exact final-source macOS packaging, installation,
+private-table and AppleEvent qualification remain pending; the separately
+prepared system_app_switcher product packet is not adopted by this merge.
+Item111 and transverse16/38 remain partial.
+
 - [ ] **112.** Accept an AI prediction immediately with its configured
       modifier-plus-digit shortcut, with matching shortcut hints on all three OSes.
 
