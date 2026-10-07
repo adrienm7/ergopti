@@ -1537,3 +1537,15 @@ actual process exit. Independent Node22/24 replays pass45 additive cases with
 mutants are retained. Windows metadata forwarding is a modeled diagnostic port.
 No native TIS, hardware, packaging or installation acceptance is inferred, and
 item30 stays open. Current previous-source Mac375455 has six native TIS passes.
+
+## Canonical disposable observer test root
+
+Independent review adopts only Path(TemporaryDirectory.name).resolve(strict=True)
+in portable test setUp; all46 original test methods/assertions and production
+observer/build/native helpers remain unchanged. Original actual physical TMPDIR
+passes46; a real symlink alias gives9PASS/32FAIL/5ERROR. Successor passes46 in
+both forms and both optimization modes; frozen true late ancestor replacements
+continue to refuse. Native failed child's actual stderr was not in the artifact,
+so native cause attribution stays provisional until fresh exact-source CI.
+This changes test-root construction, not production path admission, deadlines,
+owned compiler behavior, signing or shipping. Item31 remains incomplete.

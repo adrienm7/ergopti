@@ -64,7 +64,7 @@ class ObservationControls(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory(prefix="prepared-observer-controls-")
         self.addCleanup(self.temporary.cleanup)
-        self.root = Path(self.temporary.name)
+        self.root = Path(self.temporary.name).resolve(strict=True)
         self.repository = self.root / "repository"
         for relative in (
             "tools/build/remap_runtime_build.py",

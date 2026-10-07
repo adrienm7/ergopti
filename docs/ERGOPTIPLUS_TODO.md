@@ -4293,6 +4293,15 @@ The current configuration/menu dev composition preserves these physical-session
 sources, process-lifetime retry limits and nonterminal accounting selection.
 Broader native and device acceptance remains separate; item31 stays partial.
 
+The preparation observer's disposable test root is now canonicalized once at
+initial construction. All46 original test methods/assertions remain exact;
+production path/ancestor guards and native helpers are unchanged. Actual Linux
+physical/aliased TMPDIR replays distinguish original alias failures from46
+successor passes, including optimization, while true late ancestor replacements
+still refuse. This fixture-only correction does not establish the cause of the
+native36103-byte stderr failure or qualify actual compilation/preparation.
+Fresh exact-source macOS CI remains required; item31 is still partial.
+
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
   listed; see `docs/memory/text-input-and-config.md`. Current source already
