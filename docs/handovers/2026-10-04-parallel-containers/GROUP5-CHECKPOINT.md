@@ -2122,3 +2122,21 @@ and formatted reference are preserved by this slice. Portable source and genuine
 Asio/socket controls pass, while Darwin wholeCore compilation, installed healthy
 delivery/capture and separate durable initializer SDK registration remain
 pending. No new native success is claimed; TODO31 and transverse16/38 remain open.
+
+## Actual Security SDK path-projection compile correction
+
+Manual macOS run37619482111 on ea317c6f8 fails release-launcher
+compilation at the two owned-reference path lookups: `SecCodeCopyPath`
+requires a static code object. Both calls now use checked nonnull
+`SecCodeCopyStaticCode` projections of the actual retained dynamic
+principal. The original dynamic validity and later fresh signing
+projections retain their order; exact DER, all-architecture, protected
+root/ACL, descriptor, currentness and retirement checks stay whole.
+
+Ten normal/optimized source controls pass and eight omission controls
+refuse. These are source checks, not SDK execution. Actual corrected
+Swift compilation, the original three native refusal cases and
+positive principal/Core qualification remain pending. The failed run
+passes shared checks, macOS stub unit/E2E and tooltip captures; main
+XCTest and the installed launch matrix were not executed. No Group5
+item is removed; TODO31 and transverse items16/38 remain open.

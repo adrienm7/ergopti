@@ -305,8 +305,10 @@ final class OwnedRuntimeServiceReferenceOwner {
 		guard Bundle.main.bundleIdentifier == kErgoptiBundleId, Bundle.main.bundleURL.pathExtension == "app",
 			let executable = Bundle.main.executableURL else { throw OwnedRuntimeReferenceFailure.unavailable }
 		var live: SecCode?, path: CFURL?, code: SecStaticCode?
+		var pathCode: SecStaticCode?
 		guard SecCodeCopySelf([], &live) == errSecSuccess, let live,
-			SecCodeCopyPath(live, [], &path) == errSecSuccess, let path else { throw OwnedRuntimeReferenceFailure.unavailable }
+			SecCodeCopyStaticCode(live, [], &pathCode) == errSecSuccess, let pathCode,
+			SecCodeCopyPath(pathCode, [], &path) == errSecSuccess, let path else { throw OwnedRuntimeReferenceFailure.unavailable }
 		let nativePath = (path as URL).path
 		guard nativePath == executable.path || nativePath == Bundle.main.bundleURL.path else { throw OwnedRuntimeReferenceFailure.unavailable }
 		try check(SecCodeCheckValidity(live, SecCSFlags(rawValue: kSecCSStrictValidate), nil))
@@ -324,7 +326,10 @@ final class OwnedRuntimeServiceReferenceOwner {
 		guard !stopped, let principal, let leaf = principalLeaf, let bundle = launcherBundle, let launcherPath else { throw OwnedRuntimeReferenceFailure.unavailable }
 		try files.verify()
 		var path: CFURL?, code: SecStaticCode?
-		try check(SecCodeCopyPath(principal, [], &path))
+		var pathCode: SecStaticCode?
+		try check(SecCodeCopyStaticCode(principal, [], &pathCode))
+		guard let pathCode else { throw OwnedRuntimeReferenceFailure.unavailable }
+		try check(SecCodeCopyPath(pathCode, [], &path))
 		guard let path, (path as URL).path == launcherPath else { throw OwnedRuntimeReferenceFailure.unavailable }
 		try check(SecCodeCheckValidity(principal, SecCSFlags(rawValue: kSecCSStrictValidate), nil))
 		try check(SecCodeCopyStaticCode(principal, [], &code))

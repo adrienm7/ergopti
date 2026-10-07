@@ -3320,6 +3320,15 @@ Item30 remains partial; keyboard/device qualification is still required.
   budget, installed healthy delivery and capture remain unqualified. New
   initializer controls still need their separately owned durable SDK fixture
   registration. TODO31 and transverse items16/38 remain open.
+  Manual macOS run37619482111 at ea317c6f8 fails release-launcher
+  compilation at two `SecCodeCopyPath` calls: the SDK requires
+  `SecStaticCode`, while the owner supplied retained dynamic `SecCode`.
+  Each lookup now uses a checked static projection of that same dynamic
+  principal. Dynamic validity, later fresh signing projections, exact
+  certificate DER, all-architecture checks and held-source retirement
+  remain unchanged. Source controls pass; corrected Swift compilation
+  and native owner qualification remain pending. That failed run did not
+  execute the main XCTest suite or installation matrix.
   The following source projection now captures the authenticated official VHD
   broker prerequisites under a separately closed current profile:34 dependencies,
   31 original inputs,60 owned outputs and4527 staged files plus four links. Current
