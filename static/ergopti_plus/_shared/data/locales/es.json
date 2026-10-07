@@ -3242,5 +3242,12 @@
 	"physical_shortcuts.position_unavailable": "Esta posición de tecla no está disponible aquí.",
 	"physical_shortcuts.windows_unavailable": "Aún no disponible en Windows: El editor de atajos físicos aún no está disponible en Windows.",
 	"physical_shortcuts.collision": "Esta combinación de teclas ya está en uso. Elige otra.",
-	"physical_shortcuts.window_unavailable": "Esta ventana no está disponible: Intenta abrirla de nuevo."
+	"physical_shortcuts.window_unavailable": "Esta ventana no está disponible: Intenta abrirla de nuevo.",
+	"gestures.system.conflicts_caption": "⚠ %s posibles conflictos",
+	"gestures.system.pinch_enabled": "Gesto de pellizco del sistema : Activado",
+	"gestures.system.pinch_disabled": "Gesto de pellizco del sistema : Desactivado",
+	"gestures.system.pinch_unknown": "Gesto de pellizco del sistema : Gestos del sistema: sin verificar",
+	"gestures.system.slot_unknown_caption": "%s — Gestos del sistema: sin verificar",
+	"gestures.system.slot_configured_caption": "%s — Configurado para ErgoptiPlus",
+	"gestures.system.slot_not_configured_caption": "%s — No configurado para ErgoptiPlus"
 }

@@ -3242,5 +3242,12 @@
 	"physical_shortcuts.position_unavailable": "Це розташування клавіші тут недоступне.",
 	"physical_shortcuts.windows_unavailable": "Поки недоступно у Windows: Редактор фізичних комбінацій клавіш поки недоступний у Windows.",
 	"physical_shortcuts.collision": "Ця комбінація клавіш уже використовується. Виберіть іншу.",
-	"physical_shortcuts.window_unavailable": "Це вікно недоступне: Спробуйте відкрити його знову."
+	"physical_shortcuts.window_unavailable": "Це вікно недоступне: Спробуйте відкрити його знову.",
+	"gestures.system.conflicts_caption": "⚠ Можливі конфлікти: %s",
+	"gestures.system.pinch_enabled": "Системний жест зведення пальців : Увімкнено",
+	"gestures.system.pinch_disabled": "Системний жест зведення пальців : Вимкнено",
+	"gestures.system.pinch_unknown": "Системний жест зведення пальців : Системні жести: не перевірені",
+	"gestures.system.slot_unknown_caption": "%s — Системні жести: не перевірені",
+	"gestures.system.slot_configured_caption": "%s — Налаштовано для ErgoptiPlus",
+	"gestures.system.slot_not_configured_caption": "%s — Не налаштовано для ErgoptiPlus"
 }

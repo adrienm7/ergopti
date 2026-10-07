@@ -3242,5 +3242,12 @@
 	"physical_shortcuts.position_unavailable": "Cette position de touche est indisponible ici.",
 	"physical_shortcuts.windows_unavailable": "Pas encore sur Windows: L’éditeur de raccourcis physiques n’est pas encore disponible sur Windows.",
 	"physical_shortcuts.collision": "Cette combinaison est déjà utilisée. Choisissez-en une autre.",
-	"physical_shortcuts.window_unavailable": "Cette fenêtre est indisponible: Essayez de la rouvrir."
+	"physical_shortcuts.window_unavailable": "Cette fenêtre est indisponible: Essayez de la rouvrir.",
+	"gestures.system.conflicts_caption": "⚠ %s conflit(s) potentiel(s)",
+	"gestures.system.pinch_enabled": "Pincement système : Activé",
+	"gestures.system.pinch_disabled": "Pincement système : Désactivé",
+	"gestures.system.pinch_unknown": "Pincement système : Gestes système : non vérifiés",
+	"gestures.system.slot_unknown_caption": "%s — Gestes système : non vérifiés",
+	"gestures.system.slot_configured_caption": "%s — Configuré pour ErgoptiPlus",
+	"gestures.system.slot_not_configured_caption": "%s — Non configuré pour ErgoptiPlus"
 }
