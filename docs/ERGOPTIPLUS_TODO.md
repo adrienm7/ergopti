@@ -7303,6 +7303,15 @@ Fresh hosted qualification and delivery/clicks remain separate; item109 is parti
 
 Current Group 3 source checkpoint (item 109, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Preserve genuine constructor captions/returns; establish supported fresh invisible Variables/KeyHistory capture before separate owned GUI/title qualification, retaining runtime HWND identity. Separate device/evidence boundary: Physical key history and notification/focus behavior outside observable hosted cases.
 
+Five appended interactive console cases retain the real production owner
+and ten native child probes. They distinguish stale hidden Edit text from
+public ListVars/no-argument KeyHistory refresh, visible/foreground disruption,
+restored final state and explicit KeyHistory capacity. Restoring the final
+state cannot qualify invisible capture. Root-selected portable gates pass;
+actual native execution is pending. Existing console/title and constructor
+assertions remain unchanged. Fresh invisible capture remains unavailable,
+and interpreted checks do not prove compiled console behavior.
+
 - [~] **111.** Provide two distinct, explicitly labelled shared window-switching
   actions on Windows, macOS and Linux: the operating system's normal Alt+Tab switcher
   (the native equivalent on macOS), and switching only among windows on the display
