@@ -2355,3 +2355,21 @@ No final native compilation, resource equivalence or timing improvement is
 claimed. Performance remains UNMEASURED and complete four-product fit under 300
 seconds UNPROVED until targeted Mac CI qualifies the integrated sources. TODO 31
 and transverse 16/38 remain open; no item is removed.
+
+## Actual legacy cleanup and confirmed-source native qualification
+
+Exact-source macOS run37651845110 at8a165c41170c46e5c906507253c7ff4c5d9b16db
+passes the original six-case cleanup method in8.631s and the three confirmed-source
+cohorts of four cases in7.009s,7.180s and6.487s. All three receipt Foundation
+controls and the portable consent/receipt method also pass. These cases execute
+the production JSON/files/backup/CAS paths; owner predicates and interleaving
+remain modeled. The nine inspected implementation/native-caller images match
+that tested SHA byte-for-byte in the inspected successor.
+
+The retained job log is322090 bytes with SHA-256
+dcc00cfc92657d155b006170fe2d5d356dc5e08a2c7589893c70095b83015177.
+The complete Swift step later times out at25 minutes, leaving other tests and
+installation unqualified. This positive native slice does not diagnose the
+unavailable original25-rule backup or qualify real confirmation UI, active lease,
+physical input, packaging or installation. No item is removed;43 and transverse
+16/38 stay open.

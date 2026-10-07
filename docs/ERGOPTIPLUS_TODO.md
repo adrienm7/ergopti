@@ -5886,10 +5886,16 @@ CAS; only owner predicates and interleaving timing are modeled. The original six
 native scenarios, eleven receipt controls and three Foundation methods remain
 unchanged. Independent portable validation passes35 controls in each of normal,
 explicit optimized and inherited optimized modes; six guard-removal mutants
-refuse. Swift compilation and all twelve new native cases remain unexecuted
-locally. Existing controller25/acquisition10/probe10 and SDK30/35/10 budgets are
-unchanged; actual UI/token/lease, user backup, packaging and installation remain
-unqualified. Item43 stays partial.
+refuse. Exact-source macOS run [37651845110](https://github.com/adrienm7/ergopti/actions/runs/37651845110)
+at8a165c41170c46e5c906507253c7ff4c5d9b16db passes all three native cohorts
+(4+4+4 cases), the original six-case cleanup method, all three receipt Foundation
+controls and the portable consent/receipt method. The nine inspected implementation
+and native-caller images are unchanged in the inspected successor. Existing
+controller25/acquisition10/probe10 and SDK30/35/10 budgets remain unchanged.
+The complete Swift step later times out at25 minutes; this does not qualify
+whole-suite success, packaging or installation. Actual confirmation UI/token/lease,
+physical input and the unavailable original25-rule backup remain unqualified.
+Item43 stays partial.
 
 - [~] **44.** CapsWord is no longer cancelled by the pointer when Karabiner
   activated it (AltGr + CapsLock): the watcher probed the variable with
