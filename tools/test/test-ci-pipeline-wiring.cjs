@@ -265,7 +265,6 @@ const STEP_CONDITIONS = [
 	[WINDOWS_BOX, 'package-windows', 'Sign and verify ErgoptiPlus.exe', 'inputs.release'],
 	[WINDOWS_BOX, 'test-ahk', 'Annotate AHK results', 'always()'],
 	[WINDOWS_BOX, 'test-ahk', 'Publish AHK execution manifest', 'always()'],
-	[WINDOWS_BOX, 'test-ahk', 'Publish native desktop AHK evidence', 'always()'],
 	[
 		WINDOWS_BOX,
 		'launch-windows',

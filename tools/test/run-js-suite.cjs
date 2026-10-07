@@ -1063,12 +1063,6 @@ const CHECKS = [
 		repro: 'npm run test:desktop-ci-evidence'
 	},
 	{
-		name: 'Windows native desktop cohorts require exact native completion and mandatory evidence',
-		cmd: process.execPath,
-		args: ['tools/test/test-windows-native-desktop.cjs'],
-		repro: 'npm run test:windows-native-desktop'
-	},
-	{
 		name: 'Compiled upgrade admission requires actual prior-package and committed full-save evidence',
 		cmd: process.execPath,
 		args: ['tools/test/test-compiled-save-upgrade.cjs'],

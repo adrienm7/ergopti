@@ -85,14 +85,8 @@ _KHG_HotIfResetsAreExceptionSafe() {
 	Checked := 0
 	for Name in ["RegisterAltGrLayer", "RegisterShiftLayer"] {
 		Body := _DriverFuncBody(Name)
-		if (Body == "" or (InStr(Body, "HotIf(") == 0 && InStr(Body, "HotIfFn.Call(") == 0))
+		if (Body == "" or InStr(Body, "HotIf(") == 0)
 			continue
-		if Name == "RegisterAltGrLayer" {
-			Body := _LT_NativeAltGrRegistrationBody()
-			Code := _DriverMaskNonCode(&Body)
-			Assert(RegExMatch(Code, "s)\bfinally\s*\{\s*HotIfFn\.Call\(\s*\)"),
-				"the declared native HotIf delegate must reset in the actual finally branch")
-		}
 		Checked += 1
 		Assert(InStr(Body, "finally") > 0,
 			Name . " must reset HotIf in a finally — the criterion is process-wide, so a throw before the reset leaks it into every later Hotkey() call in the driver")

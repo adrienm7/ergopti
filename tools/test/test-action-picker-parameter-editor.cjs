@@ -890,8 +890,8 @@ for (const platform of ['hs', 'linux', 'ahk']) {
 		'Shortcuts structured API controls complete'
 	);
 	check(
-		/Controlled JXA cases: 13 passed, 0 failed; native execution untested/.test(controls.stdout),
-		'all thirteen independent Shortcuts API controls execute'
+		/Controlled JXA cases: 12 passed, 0 failed; native execution untested/.test(controls.stdout),
+		'all twelve independent Shortcuts API controls execute'
 	);
 	const parser = spawnSync(
 		process.platform === 'win32' ? 'python' : 'python3',
@@ -916,8 +916,8 @@ for (const platform of ['hs', 'linux', 'ahk']) {
 		'Shortcuts parser and owned registration controls complete'
 	);
 	check(
-		/Ran 18 tests in /.test(parser.stderr) && /\nOK\s*$/.test(parser.stderr),
-		'all eighteen Shortcuts parser and diagnostic controls execute without skip'
+		/Ran 8 tests in /.test(parser.stderr) && /\nOK\s*$/.test(parser.stderr),
+		'all eight Shortcuts parser controls execute without skip'
 	);
 }
 

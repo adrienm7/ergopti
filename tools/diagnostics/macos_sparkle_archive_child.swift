@@ -143,7 +143,7 @@ final class PrivateArchiveChild: NSObject, NSApplicationDelegate, SPUUserDriver,
 
 	/// Sparkle parses the untouched production appcast. Route only its exact
 	/// admitted request inside this disposable signed app, before native download.
-	func updater(_ updater: SPUUpdater, willDownloadUpdate item: SUAppcastItem, with request: NSMutableURLRequest) {
+	func updater(_ updater: SPUUpdater, willDownloadUpdate item: SUAppcastItem, withRequest request: NSMutableURLRequest) {
 		guard let originText = Bundle.main.object(forInfoDictionaryKey: "FixtureArchiveOrigin") as? String,
 			let owner = Bundle.main.object(forInfoDictionaryKey: "FixtureGitHubOwner") as? String,
 			let repository = Bundle.main.object(forInfoDictionaryKey: "FixtureGitHubRepo") as? String,

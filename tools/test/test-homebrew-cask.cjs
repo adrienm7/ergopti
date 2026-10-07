@@ -278,7 +278,7 @@ check('portable Brew ownership controls remain registered and mandatory', () => 
 	assert.ifError(result.error);
 	assert.strictEqual(result.signal, null, result.stderr);
 	assert.strictEqual(result.status, 0, result.stderr);
-	assert.match(result.stderr, /Ran 51 tests in /);
+	assert.match(result.stderr, /Ran 38 tests in /);
 	assert.match(result.stderr, /\nOK\s*$/);
 	assert.doesNotMatch(result.stderr, /skipped=/);
 });
@@ -312,7 +312,7 @@ check(
 		);
 		assert.match(
 			registration,
-			/NSApplication \*application = \[NSApplication sharedApplication\];\s*struct AppKitPolicyObservation before;\s*const enum AppKitAdmission admission = observe_appkit_admission\(application, &before\);\s*if \(admission != AppKitAdmitted\) \{[\s\S]*?return 65;/
+			/const enum AppKitAdmission admission = admit_appkit\(\[NSApplication sharedApplication\]\);\s*if \(admission != AppKitAdmitted\) \{[\s\S]*?return 65;/
 		);
 		assert.doesNotMatch(receiver, /\bTransformProcessType\s*\(/);
 		const appkitStart = receiver.indexOf('static enum AppKitAdmission admit_appkit(');
@@ -323,17 +323,6 @@ check(
 		);
 		const appkit = receiver.slice(appkitStart, appkitEnd);
 		assert.match(appkit, /if \(application == nil\) return AppKitApplicationMissing;/);
-		const currentPolicy = appkit.indexOf(
-			'if ([application activationPolicy] == NSApplicationActivationPolicyAccessory)'
-		);
-		const setterPolicy = appkit.indexOf(
-			'if (![application setActivationPolicy:NSApplicationActivationPolicyAccessory])'
-		);
-		assert.ok(currentPolicy >= 0 && setterPolicy > currentPolicy);
-		assert.match(
-			appkit,
-			/if \(\[application activationPolicy\] == NSApplicationActivationPolicyAccessory\) \{\s*return AppKitAdmitted;\s*\}/
-		);
 		assert.match(
 			appkit,
 			/if \(!\[application setActivationPolicy:NSApplicationActivationPolicyAccessory\]\) \{\s*return AppKitPolicyRefused;/
@@ -343,8 +332,7 @@ check(
 			/if \(\[application activationPolicy\] != NSApplicationActivationPolicyAccessory\) \{\s*return AppKitPolicyUnconfirmed;/
 		);
 		assert.ok(
-			appkit.indexOf('return AppKitPolicyUnconfirmed;') <
-				appkit.lastIndexOf('return AppKitAdmitted;')
+			appkit.indexOf('return AppKitPolicyUnconfirmed;') < appkit.indexOf('return AppKitAdmitted;')
 		);
 		assert.ok(
 			receiver.indexOf('if (admission != AppKitAdmitted)') <
@@ -363,79 +351,17 @@ check(
 			helper.indexOf('def ', helper.indexOf('def _admit_appleevent_boundary') + 5)
 		);
 		assert.doesNotMatch(boundary, /xcrun/);
-		const pairStart = helper.indexOf('def _build_appleevent_pair(');
-		const pairEnd = helper.indexOf('def _admit_appleevent_boundary(', pairStart);
-		assert.ok(
-			pairStart >= 0 && pairEnd > pairStart,
-			'the real pair compile recipe must be present'
-		);
-		const pairRecipe = helper.slice(pairStart, pairEnd);
 		assert.match(
-			pairRecipe,
-			/\*compiler,\s*"-std=c11",\s*"-O2",\s*"-fobjc-arc",\s*"-framework",\s*"ApplicationServices",\s*"-framework",\s*"Carbon",\s*"-framework",\s*"AppKit",\s*str\(repository \/ "tools\/diagnostics\/native_appleevent_probe_pair\.m"\)/
+			boundary,
+			/if role == "receiver":\s*command \+= \[\s*"-x",\s*"objective-c",\s*"-fobjc-arc",\s*"-framework",\s*"Carbon",\s*"-framework",\s*"AppKit",?\s*\]/
 		);
 		assert.match(
 			boundary,
-			/registration_controls\.stdout\s*==\s*"native_appkit_registration_controls=5\\nnative_private_appleevent_controls=1\\n"/
+			/registration_controls\.stdout == "native_appkit_registration_controls=4\\n"/
 		);
 		assert.doesNotMatch(boundary, /NSWorkspace|\/usr\/bin\/open/);
 	}
 );
-
-check('owned AppleEvent probe constructs the shared private SDK event before any delivery', () => {
-	const diagnostic = (name) => fs.readFileSync(path.join(ROOT, 'tools/diagnostics', name), 'utf8');
-	const protocol = diagnostic('native_appleevent_probe_protocol.h');
-	assert.match(protocol, /ERGOPTI_PROBE_EVENT_CLASS \(\(AEEventClass\)0x45675062u\)/);
-	assert.match(protocol, /ERGOPTI_PROBE_EVENT_ID \(\(AEEventID\)0x6e6f6e63u\)/);
-	for (const role of ['sender', 'receiver']) {
-		const source = diagnostic('native_appleevent_probe_' + role + '.c');
-		assert.match(source, /#include "native_appleevent_probe_protocol\.h"/);
-		assert.match(source, /probe_class = ERGOPTI_PROBE_EVENT_CLASS;/);
-		assert.match(source, /probe_event = ERGOPTI_PROBE_EVENT_ID;/);
-		assert.doesNotMatch(source, /kCoreEventClass|kAEOpenApplication/);
-	}
-	const controls = diagnostic('native_appleevent_registration_test.m');
-	assert.match(controls, /assert\(probe_class != kCoreEventClass\);/);
-	assert.match(controls, /AECreateAppleEvent\(probe_class, probe_event, &address,/);
-	assert.match(controls, /AEGetAttributePtr\(&event, keyEventClassAttr, typeType,/);
-	assert.match(controls, /AEGetAttributePtr\(&event, keyEventIDAttr, typeType,/);
-	assert.match(
-		controls,
-		/assert_private_probe_event\(\);\s*puts\("native_appkit_registration_controls=5"\);/
-	);
-	const helper = diagnostic('macos_brew_archive_acceptance.py');
-	assert.match(
-		helper,
-		/registration_controls\.stdout\s*==\s*"native_appkit_registration_controls=5\\nnative_private_appleevent_controls=1\\n"/
-	);
-	assert.match(helper, /"tools\/diagnostics\/native_appleevent_probe_protocol\.h",/);
-});
-
-check('owned AppleEvent roles use one image without replacing non-self nonce admission', () => {
-	const diagnostic = (name) => fs.readFileSync(path.join(ROOT, 'tools/diagnostics', name), 'utf8');
-	const pair = diagnostic('native_appleevent_probe_pair.m');
-	for (const role of ['receiver', 'sender']) {
-		assert.match(pair, new RegExp('#define main owned_' + role + '_entry'));
-		assert.match(pair, new RegExp('#include "native_appleevent_probe_' + role + '\\.c"'));
-		assert.match(pair, new RegExp('return owned_' + role + '_entry\\(argc - 1, argv \\+ 1\\);'));
-	}
-	const sender = diagnostic('native_appleevent_probe_sender.c');
-	assert.match(sender, /parsed > INT_MAX \|\| parsed == getpid\(\)/);
-	assert.match(sender, /nonce_observation\.matches = read == noErr/);
-	assert.match(sender, /kAEWaitReply \| kAENeverInteract \| kAEDoNotPromptForUserConsent/);
-	assert.doesNotMatch(pair, /TCC|entitlement|AESendMessage|AEPutParamPtr|AEInstallEventHandler/);
-	const helper = diagnostic('macos_brew_archive_acceptance.py');
-	assert.match(
-		helper,
-		/executables = _build_appleevent_pair\(children, repository, root, compiler, nonce\)/
-	);
-	assert.match(
-		helper,
-		/receiver = children\.start\(\s*\[\*executables\["receiver"\], str\(ready\), str\(marker\), nonce\]\s*\)/
-	);
-	assert.match(helper, /sender = \[\*executables\["sender"\], str\(receiver\.pid\), nonce\]/);
-	assert.match(helper, /"tools\/diagnostics\/native_appleevent_probe_pair\.m",/);
-});
 
 check('native XCTest invokes actual Brew acceptance and requires its complete receipt', () => {
 	const fixture = fs.readFileSync(
@@ -604,48 +530,6 @@ check('shared native process ownership controls remain registered and mandatory'
 	assert.match(result.stderr, /\nOK\s*$/);
 	assert.doesNotMatch(result.stderr, /skipped=/);
 });
-
-check(
-	'owned AppleEvent failed sender diagnostics preserve scalar privacy and exact receiver ownership',
-	() => {
-		const diagnostic = (name) =>
-			fs.readFileSync(path.join(ROOT, 'tools/diagnostics', name), 'utf8');
-		const sender = diagnostic('native_appleevent_probe_sender.c');
-		const emission = sender.slice(
-			sender.indexOf('static void emit_sender_diagnostic'),
-			sender.indexOf('int main(')
-		);
-		assert.ok(emission.length > 100);
-		assert.match(emission, /keyErrorNumber, typeWildCard/);
-		assert.match(emission, /actual_type == typeSInt32 && actual_size == sizeof\(number\)/);
-		assert.match(emission, /char diagnostic\[512\]/);
-		assert.doesNotMatch(
-			emission,
-			/keyErrorString|argv\[|expected_nonce|delivery_path|printf\([^;]*stdout/s
-		);
-		const failure = sender.slice(
-			sender.indexOf('if (result != 0)'),
-			sender.lastIndexOf('AEDisposeDesc(&reply)')
-		);
-		assert.match(failure, /emit_sender_diagnostic\(status,/);
-		assert.match(failure, /else \{\s*printf\("native_appleevent_status=%d/);
-		const helper = diagnostic('macos_brew_archive_acceptance.py');
-		assert.match(
-			helper,
-			/children\.groups\.get\(receiver\) is group\s+and group\.process is receiver/
-		);
-		assert.match(helper, /observation = group\.observe_exit\(\)/);
-		assert.match(helper, /except OwnedProcessInterrupted:\s*raise/);
-		assert.match(helper, /sender_failure=_validate_sender_failure\(packet\)/);
-		assert.doesNotMatch(
-			helper.slice(
-				helper.indexOf('def _observe_sender_failure'),
-				helper.indexOf('class PhaseEvidence:')
-			),
-			/killpg|os\.kill|\.settle\(|\.wait_for_exit\(/
-		);
-	}
-);
 
 if (failures > 0) {
 	console.error(`\n${failures} Homebrew cask check(s) failed.`);

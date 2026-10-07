@@ -44,82 +44,6 @@ local EvdevCodes = require("infra.evdev_codes")
 
 local LOG = "gestures.combo_emitter"
 
--- The issuer owns its source factory before later calls can replace cache
--- entries or observation exports. Such a replacement cannot mint authority.
-local trusted_writer_ok, trusted_writer = pcall(require, "adapters.uinput_writer")
-local trusted_broker_ok, trusted_broker = pcall(require, "adapters.modifier_broker")
-local trusted_for_channel = trusted_broker_ok and type(trusted_broker) == "table"
-	and rawget(trusted_broker, "for_channel") or nil
-local trusted_writer_ports = {}
-if trusted_writer_ok and type(trusted_writer) == "table" then
-	for name, port in pairs(trusted_writer) do
-		if type(port) == "function" then trusted_writer_ports[name] = port end
-	end
-end
-
--- Only this issuer can authorize another producer. A status string, copied
--- table or stale channel observation is not a pre-acquisition receipt.
-local unavailable_witnesses = setmetatable({}, { __mode = "k" })
-
-local function outcome(kind)
-	return { kind = kind }
-end
-
-local function witness_current(receipt)
-	if getmetatable(receipt.writer) ~= nil or getmetatable(receipt.broker) ~= nil
-		or not rawequal(package.loaded["adapters.uinput_writer"], receipt.writer)
-		or not rawequal(package.loaded["adapters.modifier_broker"], receipt.broker)
-		or not rawequal(rawget(receipt.broker, "for_channel"), receipt.for_channel) then return false end
-	for name, port in pairs(receipt.ports) do
-		if not rawequal(rawget(receipt.writer, name), port) then return false end
-	end
-	for name, port in pairs(receipt.writer) do
-		if type(port) == "function" and not rawequal(receipt.ports[name], port) then return false end
-	end
-	return receipt.for_channel(receipt.writer) == nil
-end
-
-local function unavailable_outcome(writer, broker, ports, label)
-	if not trusted_writer_ok or not rawequal(writer, trusted_writer) then return nil end
-	if not trusted_broker_ok or not rawequal(broker, trusted_broker)
-		or not rawequal(rawget(broker, "for_channel"), trusted_for_channel) then return nil end
-	for name, port in pairs(trusted_writer_ports) do
-		if not rawequal(ports[name], port) then return nil end
-	end
-	for name, port in pairs(ports) do
-		if not rawequal(trusted_writer_ports[name], port) then return nil end
-	end
-	local observe = ports.unavailable_for_output
-	if type(observe) ~= "function" or type(broker.for_channel) ~= "function" then return nil end
-	local receipt = { writer = writer, broker = broker, for_channel = broker.for_channel, ports = ports }
-	if not witness_current(receipt) then return nil end
-	local ok, unavailable, generation = pcall(observe)
-	if not ok or unavailable ~= true or type(generation) ~= "number"
-		or generation < 0 or generation >= math.huge or generation ~= math.floor(generation)
-		or not witness_current(receipt) then return nil end
-	local result = outcome("unavailable")
-	receipt.generation = generation
-	receipt.label = label
-	unavailable_witnesses[result] = receipt
-	return result
-end
-
---- Consumes one exact positively observed pre-acquisition unavailable receipt.
---- Native refusal, attempted delivery or unsettled debt never creates one.
---- @param result table Opaque second result returned by press().
---- @param label string Exact original combo; another effect cannot borrow the receipt.
---- @return boolean allowed
-function M.can_fallback(result, label)
-	local receipt = unavailable_witnesses[result]
-	if not receipt then return false end
-	unavailable_witnesses[result] = nil
-	if type(result) ~= "table" or getmetatable(result) ~= nil or rawget(result, "kind") ~= "unavailable"
-		or type(label) ~= "string" or label ~= receipt.label or not witness_current(receipt) then return false end
-	for name in pairs(result) do if name ~= "kind" then return false end end
-	local ok, unavailable, generation = pcall(receipt.ports.unavailable_for_output)
-	return ok and unavailable == true and generation == receipt.generation and witness_current(receipt)
-end
-
 -- The evdev value for a press and a release.
 local PRESS = 1
 local RELEASE = 0
@@ -287,12 +211,11 @@ end
 --- Presses a combo on the daemon's uinput device.
 --- @param combo string
 --- @return boolean True when every event was written.
---- @return table Typed outcome; only an issued unavailable receipt permits fallback.
 function M.press(combo)
 	local parsed, unknown = M.parse(combo)
 	if not parsed then
 		Logger.error(LOG, "Cannot emit '%s': %s.", tostring(combo), tostring(unknown))
-		return false, outcome("refused")
+		return false
 	end
 	return M.press_codes(parsed.mods, parsed.keys, combo)
 end
@@ -312,32 +235,29 @@ end
 --- @param keys table Non-empty array of key evdev codes.
 --- @param label string|nil What to call the chord in the log.
 --- @return boolean True when every event was written.
---- @return table Typed outcome retaining unavailable/native-refusal distinction.
 function M.press_codes(mods, keys, label)
 	if type(mods) ~= "table" or type(keys) ~= "table" or #keys == 0 then
 		Logger.error(LOG, "press_codes() needs a modifier list and at least one key.")
-		return false, outcome("refused")
+		return false
 	end
 	local name = label or (table.concat(mods, "+") .. "|" .. table.concat(keys, "+"))
 
 	local ok_writer, Writer = pcall(require, "adapters.uinput_writer")
-	if not ok_writer or type(Writer) ~= "table" or type(Writer.emit) ~= "function" then
+	if not ok_writer or type(Writer.emit) ~= "function" then
 		Logger.error(LOG, "No uinput writer — '%s' cannot be emitted.", name)
-		return false, outcome("refused")
+		return false
 	end
-	local writer_ports = {}
-	for name, port in pairs(Writer) do if type(port) == "function" then writer_ports[name] = port end end
-	local Broker = require("adapters.modifier_broker")
 	if type(Writer.is_open) == "function" and not Writer.is_open() then
 		-- Loud rather than opened here: the daemon owns that device's lifetime,
 		-- and a module that opened it on demand would race the one that closes it.
 		Logger.error(LOG, "The uinput device is not open — '%s' was not emitted.", name)
-		return false, unavailable_outcome(Writer, Broker, writer_ports, name) or outcome("refused")
+		return false
 	end
 
+	local Broker = require("adapters.modifier_broker")
 	local broker = Broker.for_channel(Writer)
 	local reservation = broker and broker.begin() or nil
-	if broker and not reservation then return false, outcome("refused") end
+	if broker and not reservation then return false end
 	local held = {}
 	local function emit(code, value)
 		if value == PRESS and not reservation then held[#held + 1] = code end
@@ -366,14 +286,9 @@ function M.press_codes(mods, keys, label)
 		if not settle() then clean = false end
 		return clean
 	end
-	local function failed()
-		return false, outcome(cleanup() and "native_failed" or "custody_unresolved")
-	end
 	if reservation then
 		for _, code in ipairs(keys) do
-			if reservation.borrow(code) then
-				return false, outcome(settle() and "refused" or "custody_unresolved")
-			end
+			if reservation.borrow(code) then settle(); return false end
 		end
 	end
 	local already_down = held_modifier_codes()
@@ -383,21 +298,21 @@ function M.press_codes(mods, keys, label)
 		if not borrowed then owned_mods[#owned_mods + 1] = code end
 	end
 	for _, code in ipairs(owned_mods) do
-		if not emit(code, PRESS) then return failed() end
+		if not emit(code, PRESS) then cleanup(); return false end
 	end
 	for _, code in ipairs(keys) do
-		if not emit(code, PRESS) then return failed() end
+		if not emit(code, PRESS) then cleanup(); return false end
 	end
 	for i = #keys, 1, -1 do
-		if not emit(keys[i], RELEASE) then return failed() end
+		if not emit(keys[i], RELEASE) then cleanup(); return false end
 	end
 	for i = #owned_mods, 1, -1 do
-		if not emit(owned_mods[i], RELEASE) then return failed() end
+		if not emit(owned_mods[i], RELEASE) then cleanup(); return false end
 	end
 
-	if not settle() then return false, outcome("custody_unresolved") end
+	if not settle() then return false end
 	Logger.debug(LOG, "Emitted '%s' (%d modifier(s), %d key(s)).", name, #owned_mods, #keys)
-	return true, outcome("emitted")
+	return true
 end
 
 return M

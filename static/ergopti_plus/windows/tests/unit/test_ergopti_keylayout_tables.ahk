@@ -600,8 +600,7 @@ _EKT_VariantTruthTable() {
 		AssertEqual("", ErgoptiLayout_BuiltinVariant(Candidate), "unknown typed ownership refuses instead of choosing a variant")
 		AssertFalse(ErgoptiLayout_PlusIsActive(Candidate))
 	}
-	AssertEqual("none", ErgoptiLayout_BuiltinVariant(Map("layout", Map())), "absent variant keeps the declared neutral default")
-	AssertFalse(ErgoptiLayout_PlusIsActive(Map("layout", Map())), "absence never guesses helper ownership")
+	AssertEqual("ergopti", ErgoptiLayout_BuiltinVariant(Map("layout", Map())), "absent variant keeps historical defaults")
 	AssertFalse(ErgoptiLayout_PlusIsActive(Map("layout", Map("ergopti_variant", "ergopti_plus", "emulated_layout", true))),
 		"malformed source intent cannot authorize helper ownership")
 }

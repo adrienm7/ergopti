@@ -44,7 +44,6 @@ local DisplayServer = require("infra.display_server")
 local XkbKeymap = require("infra.xkb_keymap")
 local Keysym = require("infra.keysym")
 local XkbCapture = require("adapters.xkb_capture")
-local inverse_table, inverse_current = XkbCapture.inverse_table, XkbCapture.inverse_current
 local XkbRmlvo = require("infra.xkb_rmlvo")
 local ConfigPaths = require("infra.config_paths")
 local EvdevCodes = require("infra.evdev_codes")
@@ -86,9 +85,6 @@ local MIN_PLAUSIBLE_ENTRIES = 60
 
 -- char → { keycode = integer, level = integer, mods = table }. nil until built.
 local _table = nil
-local _cohort = nil
-local _refresh_epoch = 0
-local _plan_receipts = setmetatable({}, { __mode = "k" })
 
 -- What produced the loaded keymap (a command or "override"), for diagnostics.
 local _source = nil
@@ -118,46 +114,6 @@ local DEAD_SYMBOLS = {
 -- Set once when no keymap could be obtained, so the reason is logged once rather
 -- than per expansion.
 local _reported_absent = false
-
-
---- Detaches keystroke data from producers and callers.
---- @param row table
---- @return table
-local function copy_step(row)
-	local mods = {}
-	for index, mod in ipairs(row.mods) do mods[index] = mod end
-	return { keycode = row.keycode, level = row.level, mods = mods }
-end
-
---- Returns the exact current cohort after any source-observation callback.
---- @param cached boolean|nil True for the final observation-only RAM seal.
---- @return table|nil
-local function current_cohort(cached)
-	local cohort = _cohort
-	if not cohort or cohort.revoked then return nil end
-	local function refuse()
-		cohort.revoked = true
-		return nil
-	end
-	if _table ~= cohort.built then return refuse() end
-	if cohort.receipt then
-		if XkbCapture.inverse_table ~= inverse_table or XkbCapture.inverse_current ~= cohort.check then return refuse() end
-		local ok, current = pcall(cohort.check, cohort.receipt, cached)
-		if not ok or current ~= true then return refuse() end
-	end
-	if _cohort ~= cohort or _table ~= cohort.built then return refuse() end
-	return cohort
-end
-
---- Publishes private data with its exact native or explicit fixture owner.
---- @param built table
---- @param receipt table|nil Native receipt; nil only at an explicit test seam.
-local function publish(built, receipt)
-	local owned = {}
-	for char, row in pairs(built) do owned[char] = copy_step(row) end
-	_table = owned
-	_cohort = { built = owned, receipt = receipt, check = inverse_current }
-end
 
 
 
@@ -311,16 +267,13 @@ end
 --- @param override_path string|nil Optional keymap file to use instead of probing.
 --- @return boolean True when a usable table is loaded.
 function M.refresh(override_path)
-	_refresh_epoch = _refresh_epoch + 1
-	local epoch = _refresh_epoch
-	_table, _base, _cohort = nil, nil, nil
 	Logger.start(LOG, "Resolving the active keyboard layout…")
 
 	local text, source = read_override(override_path), "override"
 	if not text then text, source = dump_keymap() end
 
 	if not text then
-		if _refresh_epoch == epoch then _table, _base, _cohort = nil, nil, nil end
+		_table, _base = nil, nil
 		if not _reported_absent then
 			_reported_absent = true
 			Logger.error(LOG,
@@ -339,9 +292,8 @@ function M.refresh(override_path)
 	-- must still mirror what the desktop types and injection can safely fall back
 	-- to the clipboard.
 	local capture_ok, capture_err = XkbCapture.load(text)
-	if _refresh_epoch ~= epoch then return false end
 	if not capture_ok then
-		if _refresh_epoch == epoch then _table, _base, _cohort = nil, nil, nil end
+		_table, _base = nil, nil
 		Logger.error(LOG, "Active keymap cannot initialise XKB capture via %s — %s.",
 			tostring(source), tostring(capture_err))
 		return false
@@ -350,14 +302,9 @@ function M.refresh(override_path)
 	-- Asked of libxkbcommon on the keymap capture just validated, not parsed
 	-- from the text: the parser assumed standard four-level types, which the
 	-- keypad (NumLock) and the Ergopti layout (Shift on level 3) are not.
-	if XkbCapture.inverse_table ~= inverse_table or XkbCapture.inverse_current ~= inverse_current then return false end
-	-- Explicit files remain the user's logical override. Automatic X11 source
-	-- selection must retain the acknowledgement already owned by the native probe.
-	local require_source = source ~= "override" and DisplayServer.is_x11()
-	local built, inverse_err, receipt = inverse_table(require_source)
-	if _refresh_epoch ~= epoch then return false end
-	if not built or not receipt then
-		if _refresh_epoch == epoch then _table, _cohort = nil, nil end
+	local built, inverse_err = XkbCapture.inverse_table()
+	if not built then
+		_table = nil
 		Logger.error(LOG, "Cannot enumerate the keymap via %s — %s.", tostring(source), tostring(inverse_err))
 		return false
 	end
@@ -367,19 +314,16 @@ function M.refresh(override_path)
 		-- A keymap that parsed to almost nothing is a parse failure wearing the
 		-- shape of a success, and the consequence is silent: every expansion
 		-- quietly reroutes to the clipboard and nobody knows why.
-		if _refresh_epoch == epoch then _table, _base, _cohort = nil, nil, nil end
+		_table, _base = nil, nil
 		Logger.error(LOG, "Keymap parsed to %d character(s) via %s — refusing it as a parse failure.",
 			count, tostring(source))
 		return false
 	end
 
-	local base = M.build_base(text)
-	local check = inverse_current
-	local ok, current = pcall(check, receipt)
-	if _refresh_epoch ~= epoch or XkbCapture.inverse_current ~= check or not ok or current ~= true then return false end
-	publish(built, receipt)
+	_table = built
 	_source = source
-	_base = base
+
+	_base = M.build_base(text)
 	_reported_absent = false
 	Logger.success(LOG, "Layout resolved: %d typable character(s) via %s.", count, tostring(source))
 	return true
@@ -388,7 +332,7 @@ end
 --- What produced the loaded keymap, or nil when none is loaded.
 --- @return string|nil
 function M.source()
-	return current_cohort() and _source or nil
+	return _table and _source or nil
 end
 
 --- The key a shortcut on `char` (Ctrl+V, Super+1, Alt+.) must press in the
@@ -412,8 +356,7 @@ end
 --- @return integer keycode
 --- @return table level_mods The evdev codes to hold with it for its level, often none.
 function M.shortcut_keycode(char, us_code)
-	local cohort = current_cohort()
-	local hit = cohort and cohort.built[char]
+	local hit = _table and _table[char]
 	if not hit then return us_code, {} end
 	if #hit.mods == 0 then return hit.keycode, {} end
 	if char:match("^%w$") then return us_code, {} end
@@ -428,17 +371,15 @@ end
 --- True when a layout table is loaded.
 --- @return boolean
 function M.is_ready()
-	return current_cohort() ~= nil
+	return _table ~= nil
 end
 
 --- Resolves one character to the keystroke that produces it.
 --- @param char string A single UTF-8 character.
 --- @return table|nil { keycode = integer, level = integer, mods = table }.
 function M.resolve(char)
-	if type(char) ~= "string" or char == "" then return nil end
-	local cohort = current_cohort()
-	local hit = cohort and cohort.built[char]
-	return hit and copy_step(hit) or nil
+	if not _table or type(char) ~= "string" or char == "" then return nil end
+	return _table[char]
 end
 
 --- Resolves a whole string, stopping at the first character the layout cannot
@@ -451,45 +392,19 @@ end
 --- @param text string
 --- @return table|nil Array of { keycode, mods } in order, or nil.
 --- @return string|nil The untypable character; nil when the input is malformed.
---- @return table|nil Opaque receipt retaining the exact cohort and plan.
 function M.plan(text)
 	if type(text) ~= "string" then return nil, nil end
 	-- A pattern walk can skip malformed bytes and falsely approve a partial plan.
 	if not Utf8.len(text) then return nil, nil end
-	local cohort = current_cohort()
-	if not cohort then return nil, text:sub(1, 1) end
+	if not _table then return nil, text:sub(1, 1) end
 
 	local plan = {}
 	for char in text:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
-		local hit = cohort.built[char]
+		local hit = _table[char]
 		if not hit then return nil, char end
-		plan[#plan + 1] = copy_step(hit)
+		plan[#plan + 1] = hit
 	end
-	local receipt = {}
-	local retained = {}
-	for index, step in ipairs(plan) do retained[index] = copy_step(step) end
-	_plan_receipts[receipt] = { cohort = cohort, steps = retained }
-	return plan, nil, receipt
-end
-
---- Checks the exact source owner of a previously admitted plan.
---- @param receipt table Opaque receipt returned by plan().
---- @param cached boolean|nil True for the final observation-only RAM seal.
---- @return boolean
-function M.plan_current(receipt, cached)
-	local owned = _plan_receipts[receipt]
-	return owned ~= nil and current_cohort(cached) == owned.cohort
-end
-
---- Returns a fresh copy of the retained plan, never caller-modified data.
---- @param receipt table Opaque receipt returned by plan().
---- @return table|nil
-function M.plan_view(receipt)
-	local owned = _plan_receipts[receipt]
-	if not owned or current_cohort() ~= owned.cohort then return nil end
-	local plan = {}
-	for index, step in ipairs(owned.steps) do plan[index] = copy_step(step) end
-	return plan
+	return plan, nil
 end
 
 --- The level-1 keysym of every key, by evdev keycode: what a plain press types.
@@ -524,12 +439,10 @@ end
 --- Test seam: loads both tables from a keymap dump, or clears them with nil.
 --- @param text string|nil
 function M._load_keymap_for_test(text)
-	_refresh_epoch = _refresh_epoch + 1
 	if text == nil then
-		_table, _base, _cohort = nil, nil, nil
+		_table, _base = nil, nil
 	else
-		publish(M.build(text), nil)
-		_base = M.build_base(text)
+		_table, _base = M.build(text), M.build_base(text)
 	end
 	_reported_absent = false
 end
@@ -537,8 +450,7 @@ end
 --- Test seam: installs a table directly, bypassing the probe.
 --- @param built table|nil
 function M._set_table_for_test(built)
-	_refresh_epoch = _refresh_epoch + 1
-	if built then publish(built, nil) else _table, _cohort = nil, nil end
+	_table = built
 	_reported_absent = false
 end
 

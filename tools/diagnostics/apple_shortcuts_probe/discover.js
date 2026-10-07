@@ -2,19 +2,11 @@
 // Read-only native API probe. No user name is interpolated; no shortcut is run.
 // Shortcuts Events retrieves the full native catalogue. Only output is bounded.
 ObjC.import('Foundation');
-function checkpoint(number) {
-	var data = $.NSString.stringWithString('ASCP:' + number + '\n').dataUsingEncoding(
-		$.NSUTF8StringEncoding
-	);
-	$.NSFileHandle.fileHandleWithStandardError.writeData(data);
-}
 function run() {
 	var stage = 1;
 	try {
 		var app = Application('com.apple.shortcuts.events');
-		checkpoint(1);
 		var catalogue = app.shortcuts();
-		checkpoint(2);
 		if (!Array.isArray(catalogue))
 			return JSON.stringify({
 				version: 1,
@@ -62,9 +54,7 @@ function run() {
 			stage = 2;
 		}
 		stage = 4;
-		checkpoint(3);
 		var after = app.shortcuts();
-		checkpoint(4);
 		if (!Array.isArray(after) || after.length !== count)
 			return JSON.stringify({
 				version: 1,

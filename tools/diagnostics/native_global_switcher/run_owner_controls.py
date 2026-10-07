@@ -1,5 +1,5 @@
 # tools/diagnostics/native_global_switcher/run_owner_controls.py
-"""Run the original controls and private-table regressions in an owned scope."""
+"""Version 1: run the independent Lua controls inside an owned temporary scope."""
 
 import argparse
 from pathlib import Path
@@ -50,13 +50,6 @@ CONTROL_CASES = (
     "command_post_refused_after_delivery",
     "accessibility_refused",
     "foreign_event_pid",
-    "identity_prepost_tag",
-    "identity_prepost_pid",
-    "identity_prepost_state",
-    "private_state_instance",
-    "private_state_selector_refused",
-    "private_state_session_refused",
-    "foreign_event_state",
 )
 
 
@@ -68,7 +61,7 @@ def run_controls(lua, source_directory):
     census = tests.decode("utf-8").split("local cases = {", 1)[-1].split("\n}", 1)[0]
     observed = tuple(re.findall(r'"([a-z_]+)"', census))
     if observed != CONTROL_CASES:
-        raise ValueError("Portable control inventory differs from the reviewed diagnostic version")
+        raise ValueError("Portable control inventory differs from reviewed version 1")
     with tempfile.TemporaryDirectory(prefix="ergopti-global-switcher-controls-") as directory:
         scope = Path(directory)
         (scope / "global-switcher.lua").write_bytes(source)

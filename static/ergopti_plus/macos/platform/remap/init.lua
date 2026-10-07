@@ -4457,7 +4457,7 @@ end
 --- @param sibling table|nil Navigation-layer participant retained with this bulk owner.
 --- @return boolean accepted True when candidate regeneration was accepted, or
 ---   when the candidate persisted while « Ergopti uses Karabiner » is off.
-local function apply_bulk_settings_transaction(label, mutate, on_done, overwrite_corrupt, backup_path, sibling, copy_source)
+local function apply_bulk_settings_transaction(label, mutate, on_done, overwrite_corrupt, backup_path, sibling)
 	if not require_state(label) then
 		invoke_public_callback(label, on_done, false, "not-initialized", 0)
 		return false
@@ -4503,29 +4503,10 @@ local function apply_bulk_settings_transaction(label, mutate, on_done, overwrite
 
 	local snapshot = clone_settings_state(_state)
 	local candidate = clone_settings_state(snapshot)
-	local copy_guard, copy_plan
-	if copy_source ~= nil then
-		-- Claim this copy's configuration owner before its first fresh source IO.
-		copy_guard = { label = label, phase = "copy-source-preparation", snapshot = snapshot }
-		_bulk_settings_transaction = copy_guard
-		local prepared, plan = xpcall(copy_source, debug.traceback)
-		if not prepared or type(plan) ~= "table" or _bulk_settings_transaction ~= copy_guard
-			or not _running or _shutdown_requested then
-			if _bulk_settings_transaction == copy_guard then _bulk_settings_transaction = nil end
-			invoke_public_callback(label, on_done, false, "copy-source-refused", 0)
-			return false
-		end
-		copy_plan = plan
-		candidate.mod_combos_config = plan.mod_combos_config
-		candidate.mod_combos_enabled = plan.mod_combos_enabled
-		candidate.simultaneous_threshold_ms = plan.settings.simultaneous_threshold_ms
-		candidate.combo_symmetric = plan.settings.combo_symmetric
-	end
 	local mutate_ok, change_count_or_err = xpcall(function()
-		return mutate(candidate, copy_plan)
+		return mutate(candidate)
 	end, debug.traceback)
 	if not mutate_ok then
-		if copy_guard and _bulk_settings_transaction == copy_guard then _bulk_settings_transaction = nil end
 		Logger.error(LOG, "%s candidate construction failed: %s.",
 			label, tostring(change_count_or_err))
 		invoke_public_callback(label, on_done, false, "candidate-construction-failed", 0)
@@ -4574,22 +4555,7 @@ local function apply_bulk_settings_transaction(label, mutate, on_done, overwrite
 			return false
 		end
 	end
-	local saved, file
-	if copy_plan ~= nil then
-		local function copy_admitted()
-			if _bulk_settings_transaction ~= transaction or not _running or _shutdown_requested
-				or _enabled_preflight or _enabled_transition then return false end
-			local route = resolve_user_config()
-			return route == copy_plan.path and _bulk_settings_transaction == transaction
-				and _running and not _shutdown_requested and not _enabled_preflight and not _enabled_transition
-		end
-		local called, accepted, _, receipt = pcall(Config.publish_copy_taps_to_chords,
-			copy_plan, resolve_user_config(), copy_admitted)
-		saved, file = called and accepted == true, called and receipt or nil
-		if saved then publish_settings_state(candidate) end
-	else
-		saved, file = persist_and_publish_settings(candidate, overwrite_corrupt, label, expected_source)
-	end
+	local saved, file = persist_and_publish_settings(candidate, overwrite_corrupt, label, expected_source)
 	transaction.file = file
 	if saved ~= true then
 		transaction.failure_reason = "candidate-persistence-failed"
@@ -5549,11 +5515,21 @@ end
 --- @return boolean accepted True only when exact regeneration was accepted.
 function M.copy_tap_actions_to_combos(on_done)
 	Logger.debug(LOG, "Tap-to-combo transaction requested.")
-	return apply_bulk_settings_transaction("Tap-to-combo propagation", function(_, plan)
-		return plan.changes
-	end, on_done, nil, nil, nil, function()
-		return Config.prepare_copy_taps_to_chords(M.MOD_COMBOS, M.AVAILABLE_ACTIONS, resolve_user_config())
-	end)
+	return apply_bulk_settings_transaction("Tap-to-combo propagation", function(candidate)
+		local changed = 0
+		for _, combo_def in ipairs(M.MOD_COMBOS) do
+			local cfg = candidate.mod_combos_config[combo_def.id] or {}
+			local tap = cfg.tap or "none"
+			local combo = cfg.combo or "none"
+			if tap ~= combo then changed = changed + 1 end
+			candidate.mod_combos_config[combo_def.id] = {
+				tap = tap,
+				hold = cfg.hold or "none",
+				combo = tap,
+			}
+		end
+		return changed
+	end, on_done)
 end
 
 
