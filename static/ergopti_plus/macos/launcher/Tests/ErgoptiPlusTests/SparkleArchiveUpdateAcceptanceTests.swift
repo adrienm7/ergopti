@@ -37,6 +37,18 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		}
 	}
 
+	private func collectServerDiagnostic(_ server: OwnedProcess?, stage: String) throws {
+		guard let server, let phaseEvidence else { return }
+		guard phaseEvidence.record("server.observation", status: stage == "readiness-refused" ? "refused" : "pending", server: server.serverDiagnostic(stage: stage)) else {
+			throw Failure.evidence("server-diagnostic-publication")
+		}
+	}
+
+	private func diagnosticRefused() {
+		evidenceRefused = true
+		XCTFail("Safe Sparkle server diagnostic publication refused")
+	}
+
 	private struct Receipt {
 		let status: Int32
 		let stdout: String
@@ -52,13 +64,14 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		let guardianReceipt: URL?
 		let originalExecutable: String
 		private var launched = false
+		private var acquiredPID: Int32 = 0
 		private var startRequested = false
 		private var observedExit = false
 		private var closedStreams: Set<Int> = []
 		private var cachedReceipt: Receipt?
 
 		init(_ executable: String, _ arguments: [String], root: URL,
-			guarded: Bool = false, workerTimeout: Double = 60) throws {
+			guarded: Bool = false, workerTimeout: Double = 60, serverDiagnostics: Bool = false) throws {
 			let identity = UUID().uuidString
 			originalExecutable = executable
 			stdout = root.appendingPathComponent(identity + ".stdout")
@@ -84,6 +97,7 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 				process.arguments = arguments
 			}
 			process.environment = NativeFixtureChildEnvironment.make()
+			if serverDiagnostics { process.environment?["ERGOPTI_SPARKLE_SERVER_DIAGNOSTICS"] = "1" }
 			process.standardOutput = streams[0]
 			process.standardError = streams[1]
 			process.terminationHandler = { [completed] _ in completed.signal() }
@@ -96,11 +110,13 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 			startRequested = true
 			do {
 				try process.run()
+				acquiredPID = process.processIdentifier
 				launched = true
 			} catch {
 				// A failed launch still owns both descriptors, and any native PID
 				// acquired before Foundation reported the failure.
-				launched = process.processIdentifier > 0
+				acquiredPID = process.processIdentifier
+				launched = acquiredPID > 0
 				try? retire()
 				throw error
 			}
@@ -111,6 +127,33 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 			guard completed.wait(timeout: .now() + seconds) == .success else { return false }
 			observedExit = true
 			return !process.isRunning
+		}
+
+		/// No wait, signal, PID reopen or success inference is permitted for diagnostic collection.
+		func serverDiagnostic(stage: String) -> ArchiveAcceptanceEvidence.ServerDiagnostic {
+			guard launched, acquiredPID > 0 else {
+				return .init(stage: stage, pid: acquiredPID, state: "unavailable", nativeStatus: nil, nativeReason: nil, captures: "unavailable")
+			}
+			guard observeExit(0) else {
+				return .init(stage: stage, pid: acquiredPID, state: "pending", nativeStatus: nil, nativeReason: nil, captures: "pending")
+			}
+			let reason = process.terminationReason == .exit ? "exit" : "signal"
+			var diagnostic = ArchiveAcceptanceEvidence.ServerDiagnostic(stage: stage, pid: acquiredPID, state: "terminal",
+				nativeStatus: process.terminationStatus, nativeReason: reason, captures: "unavailable")
+			// finish(0) is legal only after the exact owner's native callback ACK. Its
+			// existing capture bounds and idempotent close/cache remain authoritative.
+			if reason == "exit", let receipt = try? finish(0) {
+				let output = Data(receipt.stdout.utf8), errors = Data(receipt.stderr.utf8)
+				diagnostic = .init(stage: stage, pid: acquiredPID, state: "terminal",
+					nativeStatus: receipt.status, nativeReason: reason, captures: "available")
+				diagnostic.stdoutBytes = output.count; diagnostic.stderrBytes = errors.count
+				diagnostic.stdoutSHA256 = SHA256.hash(data: output).map { String(format: "%02x", $0) }.joined()
+				diagnostic.stderrSHA256 = SHA256.hash(data: errors).map { String(format: "%02x", $0) }.joined()
+				if let marker = ArchiveAcceptanceEvidence.ServerDiagnostic.helperMarker(receipt.stderr, pid: acquiredPID) {
+					diagnostic.helperPhase = marker.0; diagnostic.helperException = marker.1
+				}
+			}
+			return diagnostic
 		}
 
 		private func closeCaptures() throws {
@@ -575,6 +618,7 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		let failuresBefore = try XCTUnwrap(testRun?.failureCount)
 		var passed = false
 		defer {
+			do { try collectServerDiagnostic(server, stage: "before-cleanup") } catch { diagnosticRefused() }
 			checkpoint("cleanup.begin", pids: [application, server].compactMap { $0?.process.processIdentifier }.filter { $0 > 0 })
 			func attempt(_ label: String, _ action: () throws -> Void) {
 				do { try action() }
@@ -601,6 +645,7 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 					let retired = try server.finish(10)
 					guard retired.status == 0 else { throw Failure.evidence("server-retirement") }
 				}
+				do { try collectServerDiagnostic(server, stage: "after-server-exit") } catch { diagnosticRefused() }
 				attempt("server-terminal") {
 					let terminal = try waitFor("server-retired", root: root.appendingPathComponent("www"), seconds: 2)
 					guard terminal["nonce"] as? String == nonce,
@@ -660,10 +705,13 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		let helper = repository.appendingPathComponent("tools/diagnostics/macos_sparkle_archive_fixture.py")
 		let www = root.appendingPathComponent("www")
 		try privateDirectory(www)
-		server = try OwnedProcess("/usr/bin/env", ["python3", helper.path, "serve", www.path, nonce], root: root)
+		server = try OwnedProcess("/usr/bin/env", ["python3", helper.path, "serve", www.path, nonce], root: root, serverDiagnostics: true)
 		commands.append(try XCTUnwrap(server))
 		try server?.start()
-		let listening = try waitFor("server-start", root: www, seconds: 10)
+		let listening = try ArchiveAcceptanceEvidence.preservingPrimaryFailure(
+			operation: { try waitFor("server-start", root: www, seconds: 10) },
+			collect: { try collectServerDiagnostic(server, stage: "readiness-refused") },
+			collectionRefused: { diagnosticRefused() })
 		let port = try XCTUnwrap(listening["port"] as? Int)
 		guard listening["nonce"] as? String == nonce,
 			(listening["pid"] as? NSNumber)?.int32Value == server?.process.processIdentifier,
