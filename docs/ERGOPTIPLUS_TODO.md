@@ -5685,6 +5685,20 @@ Native Darwin publication/package acceptance and genuine device ordering remain
 pending. Windows/Linux simultaneous input still needs its actual native engine;
 this policy does not admit those capabilities.
 
+Native CI follow-up (2026-10-07): exact-source run37592219446 retained two
+Windows failures: the AltGr suffix did not yield to another layer holder, and
+its parse-time predicate reached uninitialized hold globals. Both actual
+suffix declarations now exclude the active layer; their predicate and canonical
+accessors refuse before their owners exist. Seven registered functional cases
+cover layer refusal and independently unset globals. Original228 assertions,
+25 prior test registrations and both native source scanners remain intact;
+only the expected criterion text follows the added layer fence. Independent
+source replay reproduces the old two layer offenders and six unguarded reads,
+then zero of each after the repair; seven causal omissions fail. Covering Root
+gates and native Windows hook/unit/E2E/package/install validation are separate
+requirements. Simultaneous input, fake-Ctrl provenance and physical ordering
+remain open; this repair does not complete the item.
+
 - [~] **93.** Linux: the key combinations of item 91. The shared ordered-pair
   model now runs through the actual tap-hold engine, keyboard hook and
   native configuration owner, using the same pair IDs, slots and sections.

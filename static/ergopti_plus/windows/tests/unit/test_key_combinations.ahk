@@ -879,7 +879,7 @@ _KCT_AltGrSuffixStaticVariants() {
 	Src := _DriverSourceNoComments()
 	for _, Pass in ["false", "true"] {
 		Label := Pass == "true" ? "~SC01D & ~SC138" : "~SC01D & SC138"
-		Expected := "#HotIf KeyCombinationOwnsAltGrSuffix(" . Pass . ")`n"
+		Expected := "#HotIf not LayerEnabled and KeyCombinationOwnsAltGrSuffix(" . Pass . ")`n"
 			. Label . ":: KeyCombinationFireAltGrSuffix(" . Pass . ")`n"
 		Assert(InStr(Src, Expected) > 0, "the actual static custom variant wires " . Pass . " admission to the same owner")
 	}
@@ -968,3 +968,94 @@ _KCT_AltGrNativePriority() {
 }
 Test("key combinations: interpreted native hook selects the earlier custom AltGr owner with bypass control (todo91-altgr-suffix)",
 	_KCT_AltGrNativePriority, true)
+
+
+; The custom suffix is a new press owner, so another key's active layer must
+; win before pair admission or fake-Ctrl handback. These are real criteria and
+; configured pair maps under explicit layer state, with no OS injection.
+_KCT_AltGrSuffixStandsDownOnLayer() {
+	global LayerEnabled
+	SavedLayer := LayerEnabled
+	SavedFamily := _TestSetAltGrFamily(false, true)
+	try {
+		for _, Hold in ["none", "nav", "ctrl+shift", "alt_gr", "ctrl+alt_gr"]
+			_KCT_With(Map("left_alt_then_alt_gr", "caps_word"),
+				Hold == "none" ? Map() : Map("left_alt_then_alt_gr", Hold), Inspect.Bind(Hold))
+	} finally {
+		LayerEnabled := SavedLayer
+		_TestRestoreAltGrFamily(SavedFamily)
+	}
+	Inspect(Hold) {
+		global LayerEnabled, _KeyCombinationTaken
+		Calls := []
+		Effects := []
+		LayerEnabled := true
+		for _, Pass in [false, true] {
+			AssertFalse(KeyCombinationOwnsAltGrSuffix(Pass, _KCT_Keys(["left_alt"], Calls)),
+				Hold . ": another key's layer excludes both actual custom suffix owners")
+			AssertFalse(_KeyCombinationTaken.Has("alt_gr"), "layer refusal cannot publish a pair claim")
+			AssertEqual("", KeyCombinationFireAltGrSuffix(Pass, _KCT_Ports(Effects)),
+				"an unclaimed layer suffix cannot retract Ctrl or dispatch an effect")
+		}
+		AssertEqual(0, Calls.Length, "the layer fence precedes physical-key pair admission")
+		AssertEqual(0, Effects.Length, "another holder's layer receives no pair effect")
+		LayerEnabled := false
+		AssertTrue(KeyCombinationOwnsAltGrSuffix(InStr(Hold, "alt_gr") > 0, _KCT_Keys(["left_alt"], Calls)),
+			"the same configured pair resumes its unchanged native/suppressing variant after the layer closes")
+		AssertTrue(Calls.Length > 0, "the positive control reaches actual pair admission")
+	}
+}
+Test("key combinations: another layer holder wins before AltGr suffix pair admission (altgr-suffix-layer-boot)",
+	_KCT_AltGrSuffixStandsDownOnLayer)
+
+; Deliberately unset actual module globals after installing a valid pair. Each
+; independent case restores every owner in finally; no pre-pump seed list or
+; source scanner exemption substitutes for executing the callable predicate.
+_KCT_AltGrSuffixUnsetState(Missing) {
+	global KEY_COMBINATION_PAIR_SEPARATOR, KEY_COMBINATION_NONE, _TH_HoldOptions, LayerEnabled
+	Saved := { Separator: KEY_COMBINATION_PAIR_SEPARATOR, None: KEY_COMBINATION_NONE,
+		Options: _TH_HoldOptions, Layer: LayerEnabled, Family: _TestSetAltGrFamily(false, true) }
+	try _KCT_With(Map("left_alt_then_alt_gr", "caps_word"), Map(), Inspect)
+	finally {
+		KEY_COMBINATION_PAIR_SEPARATOR := Saved.Separator
+		KEY_COMBINATION_NONE := Saved.None
+		_TH_HoldOptions := Saved.Options
+		LayerEnabled := Saved.Layer
+		_TestRestoreAltGrFamily(Saved.Family)
+	}
+	Inspect() {
+		global KEY_COMBINATION_PAIR_SEPARATOR, KEY_COMBINATION_NONE, _TH_HoldOptions, LayerEnabled
+		global KeyCombinationHolds, _KeyCombinationTaken
+		LayerEnabled := false
+		switch Missing {
+		case "separator":
+			KEY_COMBINATION_PAIR_SEPARATOR := unset
+			AssertEqual("", KeyCombinationPairId("left_alt", "alt_gr"), "unassigned pair grammar refuses")
+		case "none":
+			KEY_COMBINATION_NONE := unset
+			AssertEqual("", KeyCombinationHoldOf("left_alt_then_alt_gr"), "an unassigned canonical empty value is never guessed")
+		case "holds":
+			KeyCombinationHolds := unset
+			AssertEqual("", KeyCombinationHoldOf("left_alt_then_alt_gr"), "an unassigned hold owner refuses")
+		case "catalogue":
+			_TH_HoldOptions := unset
+			AssertEqual(0, TapHoldHoldOptions().Length, "a hold catalogue is unavailable before its shared source is read")
+		case "taken":
+			_KeyCombinationTaken := unset
+		case "layer":
+			LayerEnabled := unset
+		default:
+			throw ValueError("Unknown independent boot control", -1, Missing)
+		}
+		Calls := []
+		for _, Pass in [false, true]
+			AssertFalse(KeyCombinationOwnsAltGrSuffix(Pass, _KCT_Keys(["left_alt"], Calls)),
+				Missing . ": parse-time suffix admission refuses without initialized owners")
+		AssertEqual(0, Calls.Length, "missing boot metadata cannot probe or publish a partial pair")
+		if IsSet(_KeyCombinationTaken)
+			AssertFalse(_KeyCombinationTaken.Has("alt_gr"), "boot refusal leaves no pair claim")
+	}
+}
+for Missing in ["separator", "none", "holds", "catalogue", "taken", "layer"]
+	Test("key combinations: unset " . Missing . " refuses parse-time AltGr suffix ownership (altgr-suffix-layer-boot)",
+		_KCT_AltGrSuffixUnsetState.Bind(Missing))
