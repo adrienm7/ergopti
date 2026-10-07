@@ -2220,3 +2220,23 @@ three Python modes (117); source5 composes only the three actual helper hashes.
 Main/worker wiring is a separate held tranche. Native diagnostic AFTER execution,
 signing, activation, packaging and installation remain unqualified. No feature
 item is removed; TODO31 and transverse16/38 stay open.
+
+## Dormant owned Core reference Main worker source tranche
+
+The reviewed three-path source packet adds one fixed Main role, its worker and
+a diagnostic Python controller under Group3's exact seam grant6039567449. Main's
+four-line insertion is after the private inherited umask and before all seven
+existing roles and GUI initialization. Removing only this insertion recovers
+the entire original Main; the current source11 Owner and generated shared
+reference are unchanged. Borrowed nonblocking stdin is required, no caller
+flags are mutated, and all original current/retire and reservation/ACK refusals
+remain whole.
+
+Actual unchanged full-app payload staging retained908 files and exact reference
+bytes. Private source controls pass16 cases across normal/-O; these are literal
+source checks and predicate models, not Swift or native Main execution. The
+reviewed native8 remains outside published XCTest. Genuine packaged Main/Core,
+protected source prerequisite, Swift/Darwin compilation, signing, readiness,
+install/launchd, stream/capture and physical retirement remain unqualified.
+The worker remains dormant, the controller grants no production authority, and
+no feature item is removed. TODO31 and transverse16/38 stay open.

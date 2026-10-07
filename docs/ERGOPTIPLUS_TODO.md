@@ -4709,6 +4709,23 @@ no native BEFORE assertion is weakened. Actual diagnostic execution after this
 change is unperformed; signing, packaging, installation and activation remain
 unqualified. TODO31 and transverse16/38 stay open.
 
+WP6 now exposes a dormant fixed headless Main role for the reviewed owned
+Core reference worker. The exact four-line branch follows the inherited private
+umask and precedes every existing worker and GUI initialization; all seven
+existing roles and the entire original Main inverse remain unchanged. It keeps
+the current source11 Owner and generated shared reference intact, refuses
+borrowed blocking stdin, and preserves the original reservation/ACK and refusal
+contracts. The Python process controller is diagnostic support, not a runtime
+activation path. Group3 granted exactly this Main seam in comment6039567449.
+
+The genuine unchanged full-app payload stager retained908 files and the exact
+shared reference bytes. Private16 source controls pass in normal/-O; they do
+not execute Main, Security or Swift. The native8 test remains excluded from
+published XCTest until the genuine packaged Main/Core and protected reference
+prerequisites exist. Native Swift/Main execution, signing, readiness, install,
+stream/capture and physical retirement remain unqualified. This dormant source
+tranche does not complete WP6 or TODO31; transverse16/38 stay open.
+
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
   listed; see `docs/memory/text-input-and-config.md`. Current source already
