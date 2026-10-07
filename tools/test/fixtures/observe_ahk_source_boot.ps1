@@ -273,11 +273,39 @@ try {
                 throw
             }
             if (!$cleanupMatches) { continue }
-            if (![SourceBootProcess]::TerminateProcess($handle, 1)) {
+            $cleanupTerminated = [SourceBootProcess]::TerminateProcess($handle, 1)
+            $cleanupTerminateError = if ($cleanupTerminated) { 0 } else {
+                [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+            }
+            if (!$cleanupTerminated) {
                 Write-Warning 'An owned failed source reload could not be terminated.'
             }
-            if ([SourceBootProcess]::WaitForSingleObject($handle, $CleanupTimeoutMs) -ne 0) {
-                throw 'An owned failed source reload could not be reaped.'
+            $cleanupFinalWait = [SourceBootProcess]::WaitForSingleObject($handle, $CleanupTimeoutMs)
+            $cleanupWaitError = if ($cleanupFinalWait -eq [uint32]::MaxValue) {
+                [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+            } else { 0 }
+            if ($cleanupFinalWait -ne 0) {
+                # Capture only closed native results from this already admitted
+                # exact handle. Diagnostics never create termination authority.
+                [uint32]$cleanupExitCode = 0
+                $cleanupExitAccepted = [SourceBootProcess]::GetExitCodeProcess($handle, [ref]$cleanupExitCode)
+                $cleanupExitError = if ($cleanupExitAccepted) { 0 } else {
+                    [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+                }
+                $cleanupEvidence = [ordered]@{
+                    schema_version = 1
+                    identity_matches = [bool]$cleanupMatches
+                    before_wait = [uint32]$cleanupWait
+                    terminate_accepted = [bool]$cleanupTerminated
+                    terminate_error = [int]$cleanupTerminateError
+                    terminal_wait = [uint32]$cleanupFinalWait
+                    wait_error = [int]$cleanupWaitError
+                    exit_query_accepted = [bool]$cleanupExitAccepted
+                    exit_query_error = [int]$cleanupExitError
+                    exit_code = if ($cleanupExitAccepted) { [long]$cleanupExitCode } else { -1 }
+                }
+                throw ('An owned failed source reload could not be reaped. source-reap-evidence=' +
+                    ($cleanupEvidence | ConvertTo-Json -Compress))
             }
         } finally { [void][SourceBootProcess]::CloseHandle($handle) }
     }
