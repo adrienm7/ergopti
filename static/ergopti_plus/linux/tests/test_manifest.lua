@@ -27,6 +27,7 @@ return {
 	"tests.unit.adapters.test_xkb_fixture_secondary_ownership",
 	"tests.unit.modules.test_window_switch_owner",
 	"tests.unit.modules.test_key_combinations",
+	"tests.unit.modules.test_key_combination_chord_policy",
 	"tests.unit.modules.test_native_worker_service",
 	"tests.unit.modules.llm.test_finite_process_port",
 	"tests.unit.modules.llm.test_service_process_port",
