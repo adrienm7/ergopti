@@ -354,9 +354,6 @@ jobs:
   macos:
     name: 'macOS'
     needs: [validate]
-    permissions:
-      contents: read
-      actions: read
     if: needs.validate.outputs.lane_macos == 'true'
     uses: ./.github/workflows/ci-macos.yml
     with:

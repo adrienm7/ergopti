@@ -48,7 +48,7 @@ if (-not $root) { throw 'GITHUB_WORKSPACE must identify the reviewed checkout.' 
 $ahk = Get-ChildItem 'C:\AutoHotkey' -Filter 'AutoHotkey64.exe' |
     Select-Object -First 1 -ExpandProperty FullName
 if (-not $ahk) { throw 'AutoHotkey64.exe not found.' }
-$runner = Join-Path $root 'static\ergopti_plus\windows\tests\run_all.ahk'
+$runner = Join-Path $root 'static\ergopti_plus\windows\tests\run_desktop.ahk'
 if (-not (Test-Path -LiteralPath $runner -PathType Leaf)) { throw 'Canonical test runner not found.' }
 $evidence = Join-Path $env:RUNNER_TEMP 'windows-ahk-native-desktop'
 # A reused evidence path cannot supply this invocation's receipts.
