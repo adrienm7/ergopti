@@ -1134,6 +1134,18 @@ _HSCS_PersonalFrameDelegation(Body) {
 		&& Capture < Controls && Controls < Editor && Editor < Content && Content < Binding && Binding < Render
 }
 
+; Quote each actual source line separately: native PCRE masks short physical
+; strings without the recursion depth of one whole-function continuation.
+_HSCS_PersonalFrameQuotedData(Body) {
+	Quoted := ""
+	for Line in StrSplit(Body, "`n", "`r") {
+		Escaped := StrReplace(Line, Chr(96), Chr(96) . Chr(96))
+		Escaped := StrReplace(Escaped, "'", Chr(96) . "'")
+		Quoted .= "QuotedData := '" . Escaped . "'`n"
+	}
+	return Quoted
+}
+
 _HSCS_PersonalFrameGuardRefuses(Kind) {
 	Body := _DriverFuncBody("_HS_PersonalRows")
 	Assert(Body != "")
@@ -1151,9 +1163,16 @@ _HSCS_PersonalFrameGuardRefuses(Kind) {
 	else if Kind == "render"
 		Mutant := StrReplace(Body, '_HS_CategoryMenu("Personal", "", PersonalRows,', '_HS_CategoryMenu("Personal", "", [],')
 	else if Kind == "quoted"
-		Mutant := "'`n(`n" . Body . "`n)`n'"
+		Mutant := _HSCS_PersonalFrameQuotedData(Body)
 	else
 		Mutant := "/*`n" . Body . "`n*/"
+	if Kind == "quoted" {
+		; This non-anchored actual ownership pattern still matches the raw
+		; quoted data. Only the canonical native mask removes its authority.
+		Pattern := '"personal_controls",[ \t]*\(\*\)[ \t]*=>[ \t]*(Controls)(?:[ \t]*,)'
+		Assert(RegExMatch(Mutant, Pattern), "the quoted actual owner still contains the original non-anchored binding")
+		AssertEqual(0, _HSCS_PersonalFrameStatement(Mutant, Pattern), "physical quoted data must be masked even when its raw ownership pattern matches")
+	}
 	Assert(Mutant != Body, "the actual owner is changed by the independent source control")
 	AssertFalse(_HSCS_PersonalFrameDelegation(Mutant), "missing or data-only frame delegation has no executable authority")
 }
@@ -1193,7 +1212,7 @@ _HSCS_PersonalFrameNativeRefusal() {
 	ReleaseRows() {
 		Failure := 0
 		for Child in Owned {
-			try _CTC_ReleaseMenu(Child)
+			try _HS_PersonalReleaseMenus([Child])
 			catch as ErrorInfo {
 				if !Failure
 					Failure := ErrorInfo
@@ -1349,10 +1368,25 @@ _HSCS_PersonalFileLateLabelFailure(Kind) {
 	SavedCategories := CategoryEnabled, SavedCounts := IsSet(_FmtCountCache) ? _FmtCountCache : unset
 	SavedOwners := PersonalFileControls.owners, SavedInventory := PersonalFileControls.inventory
 	Fixture := _ScopeOwnerFixture(), Owner := false, OwnerOverride := false, ExtraHandles := Map()
-	LateCalls := 0
+	LateCalls := 0, PrimaryFailure := Error("personal late stem failure"), ThrowingMenus := []
+	ThrowAfterDelete(This, *) {
+		Menu.Prototype.Delete.Call(This)
+		throw Error("owned cleanup failure after native delete")
+	}
 	ThrowStem(This, *) {
 		LateCalls += 1
-		throw Error("personal late stem failure")
+		if Kind == "cleanup" {
+			for Handle in _MenuDispatchOwnerHandles {
+				if Before[5].Has(Handle)
+					continue
+				Child := MenuFromHandle(Handle)
+				if Child is Menu {
+					Child.DefineProp("Delete", {Call: ThrowAfterDelete})
+					ThrowingMenus.Push(Child)
+				}
+			}
+		}
+		throw PrimaryFailure
 	}
 	ThrowActiveCount(This, *) {
 		LateCalls += 1
@@ -1386,7 +1420,7 @@ _HSCS_PersonalFileLateLabelFailure(Kind) {
 		AssertEqual(2, Owner.ActiveCount())
 		_FmtCountCache := Map(1, "1")
 		TF := {path: FilePath, stem: "late_label", sections: [], count: 2}
-		if Kind == "stem" {
+		if Kind == "stem" || Kind == "cleanup" {
 			TF.DeleteProp("stem")
 			TF.DefineProp("stem", {Get: ThrowStem})
 		} else if Kind == "format"
@@ -1409,6 +1443,8 @@ _HSCS_PersonalFileLateLabelFailure(Kind) {
 			catch as Failure {
 				Caught := true
 				Assert(InStr(Failure.Message, "personal late"), "the genuine late label failure is propagated")
+				if Kind == "cleanup"
+					Assert(Failure == PrimaryFailure, "cleanup failure cannot replace the original native construction exception")
 			}
 			AssertTrue(Caught, "the actual producer must propagate the label failure")
 			AssertEqual(A_Index, LateCalls, "each construction reaches exactly one native late label operation")
@@ -1422,12 +1458,15 @@ _HSCS_PersonalFileLateLabelFailure(Kind) {
 			AssertEqual(Source, FSReadUtf8Exact(Fixture.path))
 		}
 	} finally {
+		for Child in ThrowingMenus
+			if Child.HasOwnProp("Delete")
+				Child.DeleteProp("Delete")
 		; A regression control may leave a returned native owner: dispose only
 		; its newly registered handles, after the assertions have observed it.
 		try {
 		if IsSet(Before) {
-			for Id, Handle in _MenuDispatchOwnerHandles
-				if !Before[5].Has(Id)
+			for Handle in _MenuDispatchOwnerHandles
+				if !Before[5].Has(Handle)
 					ExtraHandles[Handle] := true
 			for Handle in ExtraHandles {
 				Child := MenuFromHandle(Handle)
@@ -1438,6 +1477,9 @@ _HSCS_PersonalFileLateLabelFailure(Kind) {
 			}
 		}
 		} finally {
+		for Child in ThrowingMenus
+			if Child.HasOwnProp("Delete")
+				Child.DeleteProp("Delete")
 		if OwnerOverride
 			Owner.DeleteProp("ActiveCount")
 		ScriptInformation := SavedInfo, ConfigurationFile := IsSet(SavedConfig) ? SavedConfig : unset
@@ -1447,6 +1489,70 @@ _HSCS_PersonalFileLateLabelFailure(Kind) {
 	}
 		}
 }
-for _HSCS_LateLabelKind in ["stem", "format", "active"]
+for _HSCS_LateLabelKind in ["stem", "format", "active", "cleanup"]
 	Test("shared-personal-frame: genuine native late label failure releases child " . _HSCS_LateLabelKind,
 		_HSCS_PersonalFileLateLabelFailure.Bind(_HSCS_LateLabelKind))
+
+
+; Dispose only a fresh owned tree; a foreign detached command stays live.
+_HSCS_PersonalOwnedTreeRelease(ThrowCleanup) {
+	global _MenuDispatchCallbacks, _MenuDispatchLastFire, _MenuDispatchTokens
+	global _MenuDispatchClickSequences, _MenuDispatchOwnerHandles
+	Root := Menu(), Child := Menu(), Grandchild := Menu(), Sibling := Menu(), Foreign := Menu()
+	CleanupFailure := Error("owned child cleanup failed"), Deletes := 0
+	ThrowAfterDelete(This, *) {
+		Deletes += 1
+		Menu.Prototype.Delete.Call(This)
+		throw CleanupFailure
+	}
+	try {
+		AssertEqual(1, RegisterMenuItem(Foreign, "foreign detached action", _CTC_OwnedMenuProbe.Bind(Foreign, Foreign)))
+		ForeignId := DllCall("GetMenuItemID", "ptr", Foreign.Handle, "int", 0, "uint")
+		Assert(ForeignId != 0xFFFFFFFF && _MenuDispatchCallbacks.Has(ForeignId))
+		ForeignCallback := _MenuDispatchCallbacks[ForeignId]
+		Cleaner := Menu()
+		try Cleaner.Delete()
+		finally MenuDispatcher_PruneMenu(Cleaner)
+		Tables := [_MenuDispatchCallbacks, _MenuDispatchLastFire, _MenuDispatchTokens,
+			_MenuDispatchClickSequences, _MenuDispatchOwnerHandles], Before := []
+		for Table in Tables
+			Before.Push(Table.Clone())
+		AssertEqual(1, RegisterMenuItem(Child, "owned child action", _CTC_OwnedMenuProbe.Bind(Child, Root)))
+		AssertEqual(1, RegisterMenuItem(Grandchild, "owned grandchild action", _CTC_OwnedMenuProbe.Bind(Grandchild, Child)))
+		AssertEqual(1, RegisterMenuItem(Sibling, "owned sibling action", _CTC_OwnedMenuProbe.Bind(Sibling, Root)))
+		Child.Add("owned grandchild", Grandchild)
+		Root.Add("owned child", Child)
+		Root.Add("owned sibling", Sibling)
+		Handles := [Root.Handle, Child.Handle, Grandchild.Handle, Sibling.Handle]
+		if ThrowCleanup
+			Child.DefineProp("Delete", {Call: ThrowAfterDelete})
+		Caught := false
+		try _HS_PersonalReleaseMenus([Root, Child, Sibling])
+		catch as Failure {
+			Caught := true
+			Assert(ThrowCleanup && Failure == CleanupFailure, "attempt-all cleanup retains the exact first failure")
+		}
+		AssertEqual(ThrowCleanup, Caught)
+		AssertEqual(ThrowCleanup ? 1 : 0, Deletes)
+		for Handle in Handles {
+			AssertEqual(0, DllCall("GetMenuItemCount", "ptr", Handle, "int"), "every strongly retained owned native menu was emptied")
+			AssertFalse(_MenuDispatchOwnerHandles.Has(Handle), "only the known empty owned handle is retired")
+		}
+		AssertEqual(1, TrayMenuItemCount(Foreign), "foreign detached native rows survive")
+		Assert(_MenuDispatchCallbacks.Has(ForeignId) && _MenuDispatchCallbacks[ForeignId] == ForeignCallback,
+			"the exact foreign callback survives every owned descendant release")
+		for Index, Table in Tables {
+			AssertEqual(Before[Index].Count, Table.Count, "all owned dispatcher resources return to the captured baseline")
+			for Key, Value in Before[Index]
+				Assert(Table.Has(Key) && Table[Key] == Value, "every pre-existing dispatcher identity is retained")
+		}
+	} finally {
+		if Child.HasOwnProp("Delete")
+			Child.DeleteProp("Delete")
+		try _HS_PersonalReleaseMenus([Root, Child, Grandchild, Sibling])
+		finally _HS_PersonalReleaseMenus([Foreign])
+	}
+}
+for _HSCS_ThrowCleanup in [false, true]
+	Test("shared-personal-frame: owned deep tree cleanup preserves foreign native owner " . _HSCS_ThrowCleanup,
+		_HSCS_PersonalOwnedTreeRelease.Bind(_HSCS_ThrowCleanup))

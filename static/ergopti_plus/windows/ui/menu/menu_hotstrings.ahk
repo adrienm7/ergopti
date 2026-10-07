@@ -852,6 +852,7 @@ _HS_PersonalEditorRow(OpenFn, PausedFn := 0) {
 ; Dynamic handler: personal hotstrings (personal_hotstrings.toml + pre-scanned ext tree).
 _HS_PersonalRows(Options := unset) {
 	OwnedMenus := [], HandedOff := false
+	PrimaryFailure := 0
 	try {
 	if !IsSet(Options)
 		Options := Map()
@@ -1020,9 +1021,18 @@ _HS_PersonalRows(Options := unset) {
 		_PrevDefaultLabel := DefaultLabelForHandoff
 	HandedOff := true
 	return Rows
+	} catch as ErrorInfo {
+		PrimaryFailure := ErrorInfo
+		throw ErrorInfo
 	} finally {
-		if !HandedOff
-			_HS_PersonalReleaseMenus(OwnedMenus)
+		if !HandedOff {
+			try _HS_PersonalReleaseMenus(OwnedMenus)
+			catch as CleanupFailure {
+				if !PrimaryFailure
+					throw CleanupFailure
+				try LoggerError("Hotstrings", "Personal menu cleanup failed after construction refusal: {1}", CleanupFailure.Message)
+			}
+		}
 	}
 }
 
@@ -1036,6 +1046,7 @@ _HS_PersonalRows(Options := unset) {
 ; decides the SHAPE of the tree, never how a row is drawn.
 _HS_TomlFileRow(TF) {
 	TFMenu := Menu(), HandedOff := false
+	PrimaryFailure := 0
 	try {
 	ControlRows := [], SectionRows := []
 	Owner := PersonalFileControls.ForPath(TF.path)
@@ -1067,9 +1078,18 @@ _HS_TomlFileRow(TF) {
 		"submenu", TFMenu)
 	HandedOff := true
 	return Result
+	} catch as ErrorInfo {
+		PrimaryFailure := ErrorInfo
+		throw ErrorInfo
 	} finally {
-		if !HandedOff
-			_HS_PersonalReleaseMenus([TFMenu])
+		if !HandedOff {
+			try _HS_PersonalReleaseMenus([TFMenu])
+			catch as CleanupFailure {
+				if !PrimaryFailure
+					throw CleanupFailure
+				try LoggerError("Hotstrings", "Personal menu cleanup failed after construction refusal: {1}", CleanupFailure.Message)
+			}
+		}
 	}
 }
 
@@ -1170,6 +1190,7 @@ _HS_RenderTree(Tree, ParentMenu, Rows := "", OwnedMenus := unset) {
 	LocalOwner := !IsSet(OwnedMenus), HandedOff := false
 	if LocalOwner
 		OwnedMenus := []
+	PrimaryFailure := 0
 	try {
 	FolderNames := []
 	for FolderName in Tree
@@ -1245,25 +1266,68 @@ _HS_RenderTree(Tree, ParentMenu, Rows := "", OwnedMenus := unset) {
 		return false
 	HandedOff := true
 	return true
+	} catch as ErrorInfo {
+		PrimaryFailure := ErrorInfo
+		throw ErrorInfo
 	} finally {
-		if LocalOwner && !HandedOff
-			_HS_PersonalReleaseMenus(OwnedMenus)
+		if LocalOwner && !HandedOff {
+			try _HS_PersonalReleaseMenus(OwnedMenus)
+			catch as CleanupFailure {
+				if !PrimaryFailure
+					throw CleanupFailure
+				try LoggerError("Hotstrings", "Personal menu cleanup failed after construction refusal: {1}", CleanupFailure.Message)
+			}
+		}
 	}
 }
 
 ; Release only returned native menus owned by the refused personal frame.
 ; Successful handoff keeps every live callback target; dispatcher maps stay native.
 _HS_PersonalReleaseMenus(OwnedMenus) {
-	Failure := 0
-	for Child in OwnedMenus {
+	global _MenuDispatchOwnerHandles
+	Failure := 0, Seen := Map()
+	Release(Child) {
+		Children := [], Handle := 0
+		try {
+			Handle := Child.Handle
+			if Seen.Has(Handle)
+				return
+			Seen[Handle] := true
+			Count := DllCall("GetMenuItemCount", "ptr", Handle, "int")
+			if Count < 0
+				throw Error("The owned personal menu handle is unavailable during release.")
+			loop Count {
+				ChildHandle := DllCall("GetSubMenu", "ptr", Handle, "int", A_Index - 1, "ptr")
+				if ChildHandle {
+					OwnedChild := MenuFromHandle(ChildHandle)
+					if !(OwnedChild is Menu)
+						throw Error("The owned personal child menu is unavailable during release.")
+					Children.Push(OwnedChild)
+				}
+			}
+		} catch as ErrorInfo {
+			if !Failure
+				Failure := ErrorInfo
+		}
+		for OwnedChild in Children
+			Release(OwnedChild)
 		try {
 			try Child.Delete()
-			finally MenuDispatcher_PruneMenu(Child)
+			finally {
+				; The fresh frame owns this exact empty handle. Retire only its
+				; registration; foreign detached menus retain their native owners.
+				if Handle && DllCall("GetMenuItemCount", "ptr", Handle, "int") == 0
+					&& _MenuDispatchOwnerHandles.Has(Handle)
+					_MenuDispatchOwnerHandles.Delete(Handle)
+				MenuDispatcher_PruneMenu(Child)
+			}
 		} catch as ErrorInfo {
 			if !Failure
 				Failure := ErrorInfo
 		}
 	}
+	for Child in OwnedMenus
+		Release(Child)
 	if Failure
 		throw Failure
 }
@@ -1275,6 +1339,7 @@ _HS_ExtensionRows(Options := unset) {
 	if !IsSet(Options)
 		Options := Map()
 	OwnedMenus := [], HandedOff := false
+	PrimaryFailure := 0
 	try {
 		Rows := []
 		_HS_PreScanExtensions()
@@ -1337,20 +1402,19 @@ _HS_ExtensionRows(Options := unset) {
 		}
 		HandedOff := true
 		return Rows
+	} catch as ErrorInfo {
+		PrimaryFailure := ErrorInfo
+		throw ErrorInfo
 	} finally {
 		if !HandedOff {
-			CleanupFailure := 0
-			for Child in OwnedMenus {
-				try {
-					try Child.Delete()
-					finally MenuDispatcher_PruneMenu(Child)
-				} catch as ErrorInfo {
-					if !CleanupFailure
-						CleanupFailure := ErrorInfo
-				}
+			; Only freshly allocated file-category menus enter OwnedMenus.
+			; Bound.rows and the caller's borrowed SubMenus are never released.
+			try _HS_PersonalReleaseMenus(OwnedMenus)
+			catch as CleanupFailure {
+				if !PrimaryFailure
+					throw CleanupFailure
+				try LoggerError("Hotstrings", "Extension menu cleanup failed after construction refusal: {1}", CleanupFailure.Message)
 			}
-			if CleanupFailure
-				throw CleanupFailure
 		}
 	}
 }
