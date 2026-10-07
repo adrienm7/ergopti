@@ -1465,11 +1465,93 @@ for (const boxJob of pipeline.jobs(LINUX_BOX)) {
 // without pipefail, is pinned pipeline-wide by
 // tools/test/test-ci-pipeline-wiring.cjs.
 const testLinux = pipeline.job('test-linux');
-assert.match(
-	pipeline.stepField(pipeline.step(testLinux, 'Run the driver unit test suite'), 'run') ?? '',
-	/^node \.\.\/\.\.\/\.\.\/tools\/test\/report\.cjs --name linux-lua --json "\$\{\{ runner\.temp \}\}\/linux-lua\.json" -- luajit tests\/run\.lua$/,
-	'the unit suite must write the report its evidence counts'
+/**
+ * Requires the actual original unit reporter and its immediate pipeline receipt.
+ * @param {string} job The actual test-linux job from the canonical pipeline loader.
+ */
+function assertLinuxUnitFailureLog(job) {
+	const unit = pipeline.step(job, 'Run the driver unit test suite');
+	assert.strictEqual(pipeline.stepField(unit, 'working-directory'), 'static/ergopti_plus/linux');
+	assert.strictEqual(pipeline.stepField(unit, 'id'), 'linux_unit');
+	assert.strictEqual(pipeline.stepField(unit, 'shell'), 'bash');
+	assert.strictEqual(pipeline.stepField(unit, 'if'), null);
+	assert.strictEqual(pipeline.stepField(unit, 'continue-on-error'), null);
+	const code = pipeline.runOf(unit);
+	assert.ok(Array.isArray(code) && code.length === 7, 'the original unit pipeline must be present');
+	const capture = ' 2>&1 | tee "$RUNNER_TEMP/linux-unit.log"';
+	assert.ok(code[2].endsWith(capture), 'both public streams reach the single log');
+	const reporter = code[2].slice(0, -capture.length);
+	assert.match(
+		reporter,
+		/^node \.\.\/\.\.\/\.\.\/tools\/test\/report\.cjs --name linux-lua --json "\$\{\{ runner\.temp \}\}\/linux-lua\.json" -- luajit tests\/run\.lua$/,
+		'the unit suite must write the report its evidence counts'
+	);
+	assert.deepStrictEqual(
+		code,
+		[
+			'set -euo pipefail',
+			'set +e',
+			reporter + capture,
+			'unit_pipeline_status=("${PIPESTATUS[@]}")',
+			'set -e',
+			'if [ "${unit_pipeline_status[0]}" -ne 0 ]; then exit "${unit_pipeline_status[0]}"; fi',
+			'exit "${unit_pipeline_status[1]}"'
+		],
+		'capture both statuses immediately; retain the reporter failure and refuse a failed log sink'
+	);
+	const upload = pipeline.step(job, 'Upload failed unit log');
+	assert.strictEqual(
+		pipeline.stepField(upload, 'if'),
+		"${{ failure() && !cancelled() && steps.linux_unit.outcome == 'failure' }}"
+	);
+	assert.strictEqual(pipeline.stepField(upload, 'uses'), 'actions/upload-artifact@v4');
+	assert.strictEqual(pipeline.stepField(upload, 'continue-on-error'), null);
+	assert.match(upload, /^          name: linux-unit-failure-log$/m);
+	assert.match(upload, /^          retention-days: 7$/m);
+	assert.match(upload, /^          path: \$\{\{ runner\.temp \}\}\/linux-unit\.log$/m);
+	assert.match(upload, /^          if-no-files-found: error$/m);
+	const steps = pipeline.steps(job);
+	const at = steps.findIndex((step) => step.name === 'Run the driver unit test suite');
+	assert.strictEqual(steps[at + 1]?.name, 'Upload failed unit log');
+}
+assertLinuxUnitFailureLog(testLinux);
+// Build every altered source before the expected rejection: a missing anchor is red.
+const unitLogMutations = [
+	['set -euo pipefail', 'set -eu'],
+	['unit_pipeline_status=("${PIPESTATUS[@]}")', 'unit_pipeline_status=("$?")'],
+	[
+		'unit_pipeline_status=("${PIPESTATUS[@]}")\n          set -e',
+		'set -e\n          unit_pipeline_status=("${PIPESTATUS[@]}")'
+	],
+	['then exit "${unit_pipeline_status[0]}"', 'then exit 0'],
+	['exit "${unit_pipeline_status[1]}"', 'exit 0'],
+	['-- luajit tests/run.lua 2>&1 | tee', '-- luajit tests/run.lua || true 2>&1 | tee'],
+	['-- luajit tests/run.lua 2>&1 | tee', '-- luajit tests/run.lua | tee'],
+	['working-directory: static/ergopti_plus/linux', 'working-directory: static/ergopti_plus'],
+	["failure() && !cancelled() && steps.linux_unit.outcome == 'failure'", 'success()'],
+	["failure() && !cancelled() && steps.linux_unit.outcome == 'failure'", 'failure()'],
+	['path: ${{ runner.temp }}/linux-unit.log', 'path: ${{ runner.temp }}'],
+	['if-no-files-found: error', 'if-no-files-found: ignore']
+];
+assert.strictEqual(
+	unitLogMutations.length,
+	12,
+	'all independent diagnostic wiring mutations are present'
 );
+for (const [from, to] of unitLogMutations) {
+	const unit = pipeline.step(testLinux, 'Run the driver unit test suite');
+	const upload = pipeline.step(testLinux, 'Upload failed unit log');
+	const target = unit.includes(from) ? unit : upload;
+	assert.strictEqual(
+		target.split(from).length - 1,
+		1,
+		'the actual diagnostic mutation anchor is unique'
+	);
+	assert.strictEqual(testLinux.split(target).length - 1, 1, 'the selected actual step is unique');
+	const changed = testLinux.replace(target, () => target.replace(from, () => to));
+	assert.notStrictEqual(changed, testLinux);
+	assert.throws(() => assertLinuxUnitFailureLog(changed));
+}
 assert.ok(
 	(
 		pipeline.runOf(
