@@ -209,20 +209,21 @@ async function run({
 						? rawError
 						: 'other';
 		const retained = hasRetainedPhases() === true ? 'true' : 'false';
-		error(
+		const observation =
 			'NIX_OWNED_PHASE_OBSERVATION checkpoint=' +
-				phaseObservation.checkpoint +
-				' boundary=' +
-				phaseObservation.boundary +
-				' status=' +
-				status +
-				' signal=' +
-				signal +
-				' owner_error=' +
-				ownerError +
-				' retained=' +
-				retained
-		);
+			phaseObservation.checkpoint +
+			' boundary=' +
+			phaseObservation.boundary +
+			' status=' +
+			status +
+			' signal=' +
+			signal +
+			' owner_error=' +
+			ownerError +
+			' retained=' +
+			retained;
+		error(observation);
+		error('::error title=Nix native owned phase::' + observation);
 	}
 	try {
 		current();
