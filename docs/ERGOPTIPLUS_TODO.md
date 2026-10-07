@@ -3147,6 +3147,12 @@ geometry assertions and ten-case receipt remain unchanged. Exact-source native
 UI qualification and physical guardian/tap-hold acceptance remain required.
 This correction does not complete item24.
 
+Actual permission UI run37565110623 at8dfdde104 passes all10 cases, but
+subsequent run37569794578 at137e0cbc8 refuses the same method. Its annotation
+reports unsupported observation, without a qualified detailed cause. The earlier
+positive result does not qualify the final source or physical guardian/Login
+Items/tap-hold behavior. Original assertions and30/35/10 limits remain mandatory.
+
 - [~] **30.** Physical magic-key setting on all three OSes: one
   `hotstrings.magic_key_source` (a KeyboardEvent.code, `auto` by default),
   config schema v5 migrating every spelling of the Windows
@@ -3505,6 +3511,18 @@ seconds of new healthy observation waits, so fit is not guaranteed. A timeout
 is a failed whole qualification. Actual Swift/signing execution remains pending;
 this test cannot qualify the production identity, install or live authentication.
 Item31 and transverse16/38 stay open.
+
+Manual macOS run37569794578 at137e0cbc8 terminates with package and native
+verdict failures; installation is skipped and no release runs. Actual check
+annotations identify two owned runtime preparation failures (exit124 and1)
+and one permission UI refusal. Full native counts and phase causes are unknown
+because the detailed artifact/log destination is denied by the running network
+policy; saving its exact hostname does not itself apply that policy. Two minimal
+assertion-message additions expose only the existing closed retired-child
+classifier in subsequent failures, retaining every operand, expected value,
+branch, invoker and budget. Unknown stderr remains unclassified. Swift/native
+execution of these additions requires the next exact-source CI. Item31 remains
+partial; no deadline is relaxed or failure attributed to runner capacity.
 
 The owned native compilation prerequisite now has a normally discovered Swift
 case for actual unsigned pinned Core-Service and CLI builds. It applies a strict

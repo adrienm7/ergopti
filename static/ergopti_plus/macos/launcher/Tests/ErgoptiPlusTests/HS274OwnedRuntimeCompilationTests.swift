@@ -91,7 +91,8 @@ extension HS274NativePolicyQualificationTests {
 			// A second fresh acquisition retains the pristine input separately from
 			// its full owned stage. Metadata never replaces a native invocation.
 			let compiled = try runOwnedRuntimeCompilation([repository.path, owned.path, "--compile-owned", "--budget", "300"], root: root)
-			XCTAssertEqual(compiled.status, 0)
+			XCTAssertEqual(compiled.status, 0, "Retired owned compilation refusal code: "
+				+ HS274RetiredBuildRefusal.code(compiled.stderr, producer: .owned))
 			XCTAssertTrue(compiled.stderr.isEmpty)
 			guard compiled.status == 0, compiled.stderr.isEmpty else { return }
 			let ownedCheck = #"""

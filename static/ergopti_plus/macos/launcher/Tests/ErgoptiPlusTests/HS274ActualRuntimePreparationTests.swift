@@ -39,7 +39,9 @@ extension HS274NativePolicyQualificationTests {
 			let compilation = "PASS unsigned actual owned four-target compilation; signing and activation unqualified\n"
 			let completed = compilation
 				+ "PASS retained unsigned runtime snapshot; native shipping and installation unqualified\n"
-			XCTAssertEqual(prepared.status, 0, "The genuine opt-in invocation did not complete preparation")
+			XCTAssertEqual(prepared.status, 0, "The genuine opt-in invocation did not complete preparation"
+				+ "; retired owned refusal code: "
+				+ HS274RetiredBuildRefusal.code(prepared.stderr, producer: .owned))
 			if prepared.status == 2, prepared.stdout == compilation {
 				// The original compile receipt survives this later refusal. A fixed
 				// SDK observation confirms metadata only; the status assertion above

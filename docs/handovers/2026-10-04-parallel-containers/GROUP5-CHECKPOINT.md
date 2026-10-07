@@ -1694,3 +1694,20 @@ observation waits, plus potential40 retirement seconds. An unchanged bounded CI
 trial is useful but is not guaranteed to fit. A timeout fails qualification;
 no release, production signing, installation or authentication is authorized
 by this TEST-ONLY mechanical witness. Item31 remains partial.
+
+## Retired owned-build failure messages
+
+The two assertion-message-only hunks use the unchanged closed classifier after
+genuine Guardian return, retaining all assertion values, control flow, stdout,
+cleanup and deadlines. Strict inverses conserve both whole predecessor files;
+the original24 parser cases remain exact. Unknown or preparation-family stderr
+remains unclassified; retirement failures still throw before observation.
+
+Manual macOS run37569794578 at137e0cbc8 fails package/verdicts and skips install.
+Check annotations identify fresh-owned compilation124, prepared runtime1 and
+permission UI1; full counts and phase causes remain unknown. The detailed blob
+is denied on productionresultssa4.blob.core.windows.net. Its precise domain is
+saved in the configuration draft, without claiming live application. The prior
+10-case permission pass on8dfdde104 remains separate from this refusal. Future
+exact-source native CI must preserve all assertions and current budgets. No
+native readiness, installation or completion of items24/31/40 is claimed.
