@@ -167,6 +167,12 @@ const PLAN_STEPS = ['Load the Linux release artifact contract', 'Compute tag and
 // accepted value. Every other step runs whenever its job runs, so no edit can
 // skip a gate while its job stays green.
 const STEP_CONDITIONS = [
+	[
+		LINUX_BOX,
+		'test-linux',
+		'Upload failed unit log',
+		"${{ failure() && !cancelled() && steps.linux_unit.outcome == 'failure' }}"
+	],
 	[LINUX_BOX, 'e2e-linux', 'Qualify genuine Nix installed runtime', NOT_CANCELLED],
 	[LINUX_BOX, 'test-linux', 'Run manual official runtime and model acceptance', MANUAL_RUNTIME_IF],
 	[
@@ -1753,8 +1759,8 @@ for (const [what, rel, from, to] of [
 	[
 		'`|| true` after the Linux unit suite',
 		LINUX_BOX,
-		'-- luajit tests/run.lua\n',
-		'-- luajit tests/run.lua || true\n'
+		'-- luajit tests/run.lua 2>&1 | tee',
+		'-- luajit tests/run.lua || true 2>&1 | tee'
 	],
 	[
 		'`|| true` after the continued evidence verdict',

@@ -5862,6 +5862,14 @@ HTTP, temporary-allocation and runtime controls. Native Swift compilation is
 explicitly deferred. Genuine installed live-download CI on these sources remains
 required; TODO 62 and transversal 16/38 stay open.
 
+The hosted Configuration restore failure remains red despite an unchanged
+local CI-command replay passing all 11,225 tests. A targeted Linux unit-step
+capture preserves the original reporter command and nonzero exit, and uploads
+only that public log after an actual non-cancelled unit failure. The current
+group1 branch's unit step is unchanged; the patch is isolated on group6 and
+preserves all other workflow spans, including the French/German audio packages.
+This diagnostic supplies no successful unit, native packaging or cause credit.
+
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard
   layers on all three drivers. Windows and macOS also support their existing
