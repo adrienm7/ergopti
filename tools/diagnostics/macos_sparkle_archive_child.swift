@@ -96,9 +96,11 @@ final class PrivateArchiveChild: NSObject, NSApplicationDelegate, SPUUserDriver,
 		updater = owner
 		do {
 			try owner.start()
+			record("updater-started-1")
 			guard !owner.automaticallyChecksForUpdates, !owner.automaticallyDownloadsUpdates,
 				!owner.allowsAutomaticUpdates else { throw Failure.refused }
 			owner.checkForUpdates()
+			record("check-requested-1")
 		} catch {
 			record("start-refused", details: ["errors": identities(error)])
 			NSApplication.shared.terminate(nil)

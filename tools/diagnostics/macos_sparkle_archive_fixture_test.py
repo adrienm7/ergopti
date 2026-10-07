@@ -31,6 +31,24 @@ NONCE = "a" * 32
 
 
 class PrivateSparkleTransportTests(unittest.TestCase):
+    @unittest.skipUnless(hasattr(os, "geteuid"), "Actual alias identity needs a POSIX host")
+    def testPhysicalExecutableUsesActualAliasIdentityAndRefusesMissingOrDirectory(self):
+        spec = importlib.util.spec_from_file_location("sparkle_physical_executable", HELPER)
+        helper = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(helper)
+        target = self.root / "physical-image"
+        target.write_bytes(b"independent image bytes")
+        alias = self.root / "owned-image-alias"
+        alias.symlink_to(target)
+        self.assertEqual(helper.physical_executable(str(alias)), str(target))
+        self.assertEqual(helper.physical_executable(str(target)), str(target))
+        with self.assertRaises(FileNotFoundError):
+            helper.physical_executable(str(self.root / "missing"))
+        with self.assertRaises(RuntimeError):
+            helper.physical_executable(str(self.root))
+        with self.assertRaises(RuntimeError):
+            helper.physical_executable("relative-image")
+
     def testNumericLoopbackConstructionNeverConsultsDNS(self):
         spec = importlib.util.spec_from_file_location("private_sparkle_numeric_bind", HELPER)
         helper = importlib.util.module_from_spec(spec)

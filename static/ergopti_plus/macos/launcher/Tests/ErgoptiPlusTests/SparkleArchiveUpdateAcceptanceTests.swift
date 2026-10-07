@@ -649,6 +649,38 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		}
 	}
 
+	func testNativeCensusBindsAnExecutableLaunchedThroughAnOwnedAlias() throws {
+		let parent = try Self.physicalDirectoryURL(manager.temporaryDirectory)
+		let root = parent.appendingPathComponent("ErgoptiSparkleCensusAlias-" + UUID().uuidString)
+		try privateDirectory(root)
+		var child: OwnedProcess?
+		var passed = false
+		let failuresBefore = try XCTUnwrap(testRun?.failureCount)
+		defer {
+			do {
+				try child?.retire()
+				if passed { try manager.removeItem(at: root) }
+				else { XCTFail("Native executable alias control retained at " + root.path) }
+			} catch { XCTFail("Native executable alias retirement refused") }
+		}
+		let image = root.appendingPathComponent("physical-sleep")
+		try manager.copyItem(at: URL(fileURLWithPath: "/bin/sleep"), to: image)
+		let alias = root.appendingPathComponent("owned-image-alias")
+		try manager.createSymbolicLink(at: alias, withDestinationURL: image)
+		child = try OwnedProcess(alias.path, ["10"], root: root)
+		let owner = try XCTUnwrap(child)
+		try owner.start()
+		let observed = try census([root], root: root)
+		XCTAssertTrue(observed.contains {
+			($0["pid"] as? NSNumber)?.int32Value == owner.process.processIdentifier
+				&& $0["executable"] as? String == image.path
+		}, "The actual acquired PID must bind to its physical image through the owned alias")
+		XCTAssertFalse(observed.contains { $0["executable"] as? String == alias.path })
+		try owner.retire()
+		XCTAssertFalse(owner.process.isRunning)
+		passed = testRun?.failureCount == failuresBefore
+	}
+
 	func testDirectNativeChildExitACKAndCaptureRetirementAreIdempotent() throws {
 		let root = manager.temporaryDirectory.resolvingSymlinksInPath()
 			.appendingPathComponent("ErgoptiSparkleChildACK-" + UUID().uuidString)
@@ -891,7 +923,33 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		let actual = try census([root, cache], root: root)
 		XCTAssertTrue(actual.contains { ($0["pid"] as? NSNumber)?.int32Value == application?.process.processIdentifier
 			&& $0["executable"] as? String == installed.appendingPathComponent("Contents/MacOS/PrivateSparkleChild").path })
-		let refusal = try waitFor("refused-1", root: root)
+		let refusal: [String: Any]
+		do { refusal = try waitFor("refused-1", root: root) }
+		catch {
+			let pid = try XCTUnwrap(application).process.processIdentifier
+			let stages = ["started-1", "updater-started-1", "check-requested-1", "start-refused",
+				"unexpected-permission-1", "offered-1", "offer-refused-1", "not-found-1",
+				"transport-refused-1", "routed-1", "download-1", "refused-1", "cycle-refused-1"]
+			for stage in stages {
+				let target = root.appendingPathComponent(stage + ".json")
+				guard manager.fileExists(atPath: target.path) else { continue }
+				let descriptor = open(target.path, O_RDONLY | O_NOFOLLOW)
+				guard descriptor >= 0 else { throw Failure.evidence("child-progress-acquisition") }
+				let stream = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+				defer { try? stream.close() }
+				var metadata = stat()
+				guard fstat(descriptor, &metadata) == 0, metadata.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG),
+					metadata.st_size > 0, metadata.st_size <= 65536,
+					let data = try stream.read(upToCount: 65537), Int64(data.count) == metadata.st_size,
+					let packet = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+					packet["nonce"] as? String == nonce, packet["version"] as? String == "1",
+					(packet["pid"] as? NSNumber)?.int32Value == pid,
+					packet["event"] as? String == stage else { throw Failure.evidence("child-progress-identity") }
+				// Only an exact, owned, closed stage label reaches the XCTest receipt.
+				XCTFail("Native Sparkle progress observed: " + stage)
+			}
+			throw error
+		}
 		_ = try waitFor("cycle-refused-1", root: root)
 		let details = try XCTUnwrap(refusal["details"] as? [String: Any])
 		let errors = try XCTUnwrap(details["errors"] as? [[String: Any]])

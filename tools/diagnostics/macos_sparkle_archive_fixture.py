@@ -398,6 +398,21 @@ def serve(root, nonce):
         )
 
 
+def physical_executable(path):
+    """Resolve a kernel-reported alias using the filesystem, never prefix rules."""
+    if not os.path.isabs(path):
+        raise RuntimeError("Native Sparkle executable path refused")
+    resolved = os.path.realpath(path, strict=True)
+    requested = os.stat(path)
+    physical = os.stat(resolved, follow_symlinks=False)
+    if not stat.S_ISREG(physical.st_mode) or (requested.st_dev, requested.st_ino) != (
+        physical.st_dev,
+        physical.st_ino,
+    ):
+        raise RuntimeError("Native Sparkle executable identity refused")
+    return resolved
+
+
 def census(roots):
     """Read kernel executable paths, never process arguments or foreign secrets."""
     if sys.platform != "darwin":
@@ -431,7 +446,16 @@ def census(roots):
             except ProcessLookupError:
                 continue
             raise NativeCensusRefusal(path_errno, bsd_diagnostic(library, pid, owner))
-        executable = os.fsdecode(buffer.value)
+        try:
+            executable = physical_executable(os.fsdecode(buffer.value))
+        except FileNotFoundError:
+            # A vanished image is never proof that a live process is foreign.
+            # Preserve the existing exact-PID exit observation for this race.
+            try:
+                os.kill(pid, 0)
+            except ProcessLookupError:
+                continue
+            raise
         if any(executable.startswith(str(root) + "/") for root in admitted):
             result.append({"pid": pid, "executable": executable})
     return sorted(result, key=lambda entry: entry["pid"])
