@@ -5722,6 +5722,18 @@ keys. Occupied layout selections and absent, false or malformed values need
 independent migration vectors. No production switch or migration is retired
 until the actual selected-layout contract is qualified.
 
+The Windows picker now submits its existing sparse built-in or registry
+selection through the admitted configuration lifecycle and conditional WAL.
+The resident flags, desired generation and parse cache stay unchanged while
+the successor is pending; launch or late handoff refusal restores the exact
+previous source. Nine appended native cases cover built-in and registry
+selection, false/throwing/malformed launch results, occupied lifecycle owners,
+foreign exclusive backups and source drift. Independent source review and
+packet checks pass; native Windows execution remains unexecuted at this source
+checkpoint. The six historical AltGr descriptors, eight SC012 roll vectors,
+selected-layout differences and existing settings remain unchanged. This
+repair does not establish layout equivalence or retire the separate option.
+
 Remaining work for item96 (CI-feasible software first):
 
 - [ ] Software implementation/repair: Prove the actual empty-emulated-layout picker handoff and selected Ergopti+ behavior across drivers. Resolve or retain wrap/spacing/shift-percent/ligature differences, then retire only proven redundant switch/settings through acknowledged migration; preserve occupied and absent/false/malformed legacy records.
