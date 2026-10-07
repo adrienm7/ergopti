@@ -30,6 +30,10 @@
 int main(int argc, char **argv) {
     if (argc < 2) return 64;
     if (strcmp(argv[1], "receiver") == 0) return owned_receiver_entry(argc - 1, argv + 1);
-    if (strcmp(argv[1], "sender") == 0) return owned_sender_entry(argc - 1, argv + 1);
+    if (strcmp(argv[1], "sender") == 0) {
+        @autoreleasepool {
+            return owned_sender_entry(argc - 1, argv + 1);
+        }
+    }
     return 64;
 }
