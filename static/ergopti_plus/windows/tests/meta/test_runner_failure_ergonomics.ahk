@@ -311,6 +311,9 @@ _TRFE_SharedReceiptWiring() {
 	AssertEqual(1, Count, "entry selection must enter the headless refusal boundary exactly once")
 	RegExReplace(Code, "(?m)^_TestResultsInitializeOrExit\s*\(\s*TEST_RESULTS_FILE\s*\)", "", &Count)
 	AssertEqual(0, Count, "a library include cannot initialize the parent's requested receipt")
+	CanonicalCode := _TRFE_CanonicalDesktopReceiptEntry()
+	Code := StrReplace(Code, CanonicalCode, "", true, &CanonicalCopies)
+	AssertEqual(1, CanonicalCopies, "only the unique named canonical desktop source is removed from the original census")
 	RegExReplace(Code, "(?m)^_TestResultsBeginRun\(\)\s*$", "", &Count)
 	AssertEqual(2, Count, "the unit and E2E entry points initialize before their bootstrap graph")
 	RegExReplace(Code, "(?im)^global\s+TEST_RESULTS_FILE\s*:=\s*_TestResultsPath\s*\(\s*A_ScriptDir[^\r\n]*\r?\n\s*_TestResultsBeginRun\s*\(\s*\)", "", &Count)
@@ -532,3 +535,33 @@ _TRFE_LibraryIncludeIsolation() {
 }
 Test("runner receipt sharing: helper-only child preserves receipts and clean stdout (receipt-sharing)",
 	_TRFE_LibraryIncludeIsolation)
+
+
+; The named desktop entry is separate from the unchanged two-owner admission.
+_TRFE_CanonicalDesktopReceiptEntry() {
+	CanonicalCode := ""
+	CanonicalOwners := 0
+	Loop Files, A_ScriptDir . "\*.ahk", "FR" {
+		CandidateSource := FileRead(A_LoopFileFullPath, "UTF-8")
+		CandidateCode := _DriverMaskNonCode(&CandidateSource)
+		if _DriverTopLevelDefinitionCount(&CandidateCode, "_DesktopRunnerArguments") == 0
+			continue
+		AssertEqual(1, _DriverTopLevelDefinitionCount(&CandidateCode, "_DesktopRunnerArguments"),
+			"the canonical entry owns one actual top-level argument-admission definition")
+		CanonicalOwners += 1
+		CanonicalCode := CandidateCode
+	}
+	AssertEqual(1, CanonicalOwners, "exactly one source owns the named canonical desktop entry")
+	AssertTrue(CanonicalCode != "", "the actual canonical desktop source must be nonempty")
+	RegExReplace(CanonicalCode, "(?m)^_DesktopRunnerArguments\(\)\s*$", "", &ArgumentCalls)
+	AssertEqual(1, ArgumentCalls, "the canonical entry performs its own argument admission once")
+	RegExReplace(CanonicalCode, "(?m)^_TestResultsBeginRun\(\)\s*$", "", &Initializers)
+	AssertEqual(1, Initializers, "the named canonical desktop entry initializes its own receipt exactly once")
+	RegExReplace(CanonicalCode, "(?m)^RunTests\(\)\s*$", "", &SuiteCalls)
+	AssertEqual(1, SuiteCalls, "the canonical receipt belongs to an actual suite entry")
+	EntryPosition := InStr(CanonicalCode, "`n_TestResultsBeginRun()")
+	BootstrapPosition := InStr(CanonicalCode, "`nglobal _SharedDir")
+	AssertTrue(EntryPosition > 0 && BootstrapPosition > EntryPosition,
+		"the named canonical receipt initializes before its genuine production bootstrap")
+	return CanonicalCode
+}
