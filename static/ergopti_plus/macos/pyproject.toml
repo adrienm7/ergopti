@@ -37,7 +37,7 @@ dependencies = [
 	# the download gate (`import huggingface_hub, truststore`) failed with
 	# "huggingface_hub/truststore manquants". Pin to the exact resolved version
 	# once the next `uv sync` writes it to uv.lock.
-	"truststore>=0.9.1",
+	"truststore==0.10.4",
 ]
 
 [tool.uv]

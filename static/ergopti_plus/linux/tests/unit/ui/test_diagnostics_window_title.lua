@@ -12,11 +12,20 @@ local Json = require("json")
 
 helpers.describe("shared application native window titles", function()
 	helpers.it("passes every shared application caption to GTK in every locale", function()
-		local names = { "lgi", "ui.webview_manager", "infra.i18n", "adapters.event_loop" }
+		local names = { "lgi", "ui.webview_manager", "infra.i18n", "adapters.event_loop",
+			"infra.monotonic", "infra.timings", "infra.managed_http_deadline", "adapters.notifier",
+			"ui.webkit_host", "ui.changelog.bridge", "ui.download_window.bridge", "infra.manifest_reader" }
 		local saved = {}
+		local close_fixture
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local ok, failure = xpcall(function()
-			local captured, label, label_key
+			local captured, label, label_key, current_locale, native_fixture
+			close_fixture = function()
+				if native_fixture then
+					assert(native_fixture.close() == true, "exact managed-document native retirement")
+					native_fixture = nil
+				end
+			end
 			local controls = { register = true, connect = true, windows = 0, views = 0, serial = 0 }
 			package.loaded.lgi = {
 				Gtk = {
@@ -74,8 +83,34 @@ helpers.describe("shared application native window titles", function()
 				return label
 			end }
 			package.loaded["ui.webview_manager"] = nil
-			local manager = require("ui.webview_manager")
-			manager.init()
+			local native_manager = require("ui.webview_manager")
+			native_manager.init()
+			-- Managed documents require the real show() reservation and handshake.
+			-- Keep the original low-level GTK path for all other applications.
+			local manager = setmetatable({
+				_create_gtk_window = function(app, html, handler)
+					if app ~= "changelog" and app ~= "download_window" then
+						return native_manager._create_gtk_window(app, html, handler)
+					end
+					native_fixture = require("tests.support.document_fixture").new(app,
+						{ bridge_name = handler.bridge_name, on_message = function() return {} end },
+						{ locale = current_locale })
+					helpers.assert_eq(#native_fixture.windows, 1, "actual manager must reach the GTK factory")
+					local properties = native_fixture.windows[1].properties
+					helpers.assert_type(properties, "table", "actual GTK constructor receives title properties")
+					captured = properties.title
+					native_fixture.handshake()
+					return true
+				end,
+				_destroy_gtk_window = function(app)
+					if native_fixture then
+						local retired = native_fixture.close()
+						if retired == true then native_fixture = nil end
+						return retired
+					end
+					return native_manager._destroy_gtk_window(app)
+				end,
+			}, { __index = native_manager })
 			local function read_json(relative)
 				local path = assert(require("infra.paths").shared(relative))
 				local file = assert(io.open(path, "rb"))
@@ -87,6 +122,7 @@ helpers.describe("shared application native window titles", function()
 			local apps = read_json("ui/apps.manifest.json").apps
 			helpers.assert_eq(#locales, 21)
 			for _, locale in ipairs(locales) do
+				current_locale = locale
 				local strings = read_json("data/locales/" .. locale .. ".json")
 				for app, entry in pairs(apps) do
 					local key = entry.title_key
@@ -123,6 +159,10 @@ helpers.describe("shared application native window titles", function()
 				end
 			end
 		end, debug.traceback)
+		if close_fixture then
+			local closed, err = pcall(close_fixture)
+			if not closed and ok then ok, failure = false, err end
+		end
 		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 		if not ok then error(failure, 0) end
 	end)

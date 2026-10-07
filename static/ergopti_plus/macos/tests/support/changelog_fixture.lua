@@ -13,6 +13,7 @@ local FIXTURE_DIR = (debug.getinfo(1, "S").source:gsub("^@", ""):match("^(.*)[/\
 local SHARED_DEFAULTS = FIXTURE_DIR .. "/../../../_shared/modules/updater/defaults.json"
 -- The real update-channel registry: the channel ids the window accepts.
 local SHARED_CHANNELS = FIXTURE_DIR .. "/../../../_shared/modules/updater/channels.json"
+local SHARED_NETWORK_POLICY = FIXTURE_DIR .. "/../../../_shared/modules/network/managed_network.json"
 
 local function with_changelog(callback)
 	local previous_hs = rawget(_G, "hs")
@@ -26,6 +27,7 @@ local function with_changelog(callback)
 			"infra.i18n",
 			"infra.logger",
 			"infra.paths",
+			"modules.shortcuts.script_control",
 			"hs",
 			"tests.stubs.hs",
 		}, function()
@@ -47,6 +49,20 @@ local function with_changelog(callback)
 				focuses = 0,
 				close_during_show = false,
 			}
+			-- Literal native pause receipts at the actual production module port.
+			-- Each read observes live controlled state; no blanket current-owner hook.
+			state.paused, state.pause_transition = false, false
+			state.script_control = {
+				is_pause_transition_pending = function()
+					if state.on_pause_transition_read then state.on_pause_transition_read() end
+					return state.pause_transition
+				end,
+				is_paused = function()
+					if state.on_pause_read then state.on_pause_read() end
+					return state.paused
+				end,
+			}
+			package.loaded["modules.shortcuts.script_control"] = state.script_control
 			local hs_stub = require("tests.stubs.hs")
 			hs_stub.__reset()
 			hs_stub.http.asyncGet = function(url, headers, on_response)
@@ -109,6 +125,7 @@ local function with_changelog(callback)
 				shared = function(relative)
 					if relative == "modules/updater/defaults.json" then return SHARED_DEFAULTS end
 					if relative == "modules/updater/channels.json" then return SHARED_CHANNELS end
+					if relative == "modules/network/managed_network.json" then return SHARED_NETWORK_POLICY end
 					return "/shared/" .. tostring(relative)
 				end,
 			}
@@ -127,6 +144,8 @@ local function with_changelog(callback)
 					local view = {options = options}
 					function view:evaluateJavaScript(script, callback)
 						state.evaluations[#state.evaluations + 1] = script
+						state.view_evaluations = state.view_evaluations or {}
+						state.view_evaluations[#state.view_evaluations + 1] = { view = self, code = script }
 						state.javascript_callbacks[#state.javascript_callbacks + 1] = callback
 						if state.on_evaluate then state.on_evaluate() end
 						return self

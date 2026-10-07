@@ -247,6 +247,7 @@ _CNR_CurlConfig(Proxy) {
 		Request.Abort()
 	}
 	Req := CurlAsyncRequest(Map("before_launch", Capture,
+		"create_curl_capability", _CurlAuthIntegration_CreateImmediate,
 		"spawn", (*) => Assert(false, "the captured request must not launch")))
 	try {
 		Req.Open("GET", "https://github.com/adrienm7/ergopti/releases.atom", true)
@@ -262,7 +263,8 @@ _CNR_CurlConfig(Proxy) {
 _CNR_CurlUsesProxyAndBestEffortRevocation() {
 	Config := _CNR_CurlConfig("http://proxy.corp:8080")
 	AssertContains(Config, 'proxy = "http://proxy.corp:8080"', "curl must use the selected proxy")
-	AssertContains(Config, "proxy-anyauth", "proxy authentication must be negotiated")
+	AssertContains(Config, "proxy-negotiate", "proxy authentication must use the native integrated scheme")
+	AssertFalse(InStr(Config, "proxy-anyauth"), "native authentication must not permit Basic/Digest downgrade")
 	AssertContains(Config, 'proxy-user = ":"', "the signed-in Windows account must authenticate (SSPI)")
 	AssertContains(Config, "ssl-revoke-best-effort",
 		"an unreachable revocation server of an inspection CA must not fail TLS")
@@ -417,13 +419,34 @@ _CNR_SupersededFeedCannotPublish() {
 Test("changelog: a superseded feed answer cannot publish", _CNR_SupersededFeedCannotPublish)
 
 _CNR_FetchResolvesProxyBeforeCurl() {
-	Body := _DriverFuncBody("_CLW_DoFetch")
-	ResolvePos := InStr(Body, "SystemProxy_ResolveAsync(")
-	CurlPos := InStr(Body, "CurlAsyncRequest()")
-	Assert(ResolvePos > 0 && CurlPos > ResolvePos,
-		"the changelog must resolve the Windows proxy before building its curl request")
-	AssertContains(Body, "Req.SetProxy(Proxy)")
-	AssertContains(Body, "CHANGELOG_SOURCE_TIMEOUT_MS", "each source must carry the shared budget")
+	global _CLW_RequestEpoch, _CLW_Queue, CHANGELOG_SOURCE_TIMEOUT_MS
+	Previous := _CNR_InstallChangelog()
+	State := _ManagedCurlControlState()
+	Request := _ManagedCurlControlNew(State)
+	Request.ManagedRouting := false
+	try {
+		_CLW_BeginWindowSession()
+		Context := _CLW_BeginFetchRequest("main")
+		Port := Map("create_http", _ManagedCallerFactory.Bind(State), "poll", (*) => 0)
+		_CLW_DoFetch(Context, Port)
+		AssertEqual(1, State["spawns"], "the real Versions caller owns one Job for discovery and transfer")
+		AssertTrue(State["input"]["started_tick"] <= State["factory_entered"], "the source clock begins before request acquisition can yield")
+		AssertTrue(State["factory_returned"] - State["input"]["started_tick"] >= 15, "request acquisition cannot reset the original source clock")
+		AssertEqual(CHANGELOG_SOURCE_TIMEOUT_MS, State["input"]["deadline_ms"], "discovery and transfer share the source's original duration")
+		AssertFalse(FileExist(State["directory"] . "transport.json"), "actual caller headers stay unpublished before route/capability admission")
+		_ManagedCurlControlAck(State)
+		Request._PollManagedAdmission()
+		Published := JsonParse(FileRead(State["directory"] . "transport.json", "UTF-8"))
+		AssertTrue(Published["headers"].Length >= 2, "only admitted transport receives the original caller headers")
+		AssertTrue(FSWrite(Request.BodyPath, "[]"))
+		AssertTrue(FSWrite(Request.HeaderPath, "HTTP/1.1 200 OK`r`nContent-Type: application/json`r`n`r`n"))
+		State["callback"].Call(0, '{"schema_version":1,"ok":true,"status":200,"child_quiesced":true,"receipt":{}}', "")
+		_CLW_PollFetch(Request, Context, 0)
+		AssertEqual(1, _CLW_Queue.Length, "the real current Versions poll publishes the accepted response once")
+	} finally {
+		_ManagedCurlControlRelease(State)
+		_CNR_RestoreChangelog(Previous)
+	}
 }
 Test("changelog: every source request is bounded and proxied", _CNR_FetchResolvesProxyBeforeCurl)
 

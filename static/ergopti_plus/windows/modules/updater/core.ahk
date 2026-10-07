@@ -2394,14 +2394,19 @@ Updater_OpenReleasesPage(*) {
 ; Uses If-None-Match when a prior ETag is cached so unchanged feeds return 304
 ; without consuming the GitHub anonymous rate-limit budget.
 Updater_FetchLatestJson(Channel) {
+	Started := A_TickCount
+	RequestOwner := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
 	global _UpdaterFetchCache
 	global UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS
 	global UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS
 	Url := Updater_ReleaseApiUrl()
 	Json := ""
 	try {
-		Req := ComObject("WinHttp.WinHttpRequest.5.1")
-		Req.Open("GET", Url, false)
+		Req := CurlAsyncRequest()
+		Req.SetManagedRouting(0, () => _Updater_RequestPolicy(RequestOwner) == UPDATER_REQUEST_POLICY_ALLOW)
+		Req.SetDeadline(Started, UPDATER_HTTP_RESOLVE_TIMEOUT_MS + UPDATER_HTTP_CONNECT_TIMEOUT_MS
+			+ UPDATER_HTTP_SEND_TIMEOUT_MS + UPDATER_HTTP_RECEIVE_TIMEOUT_MS)
+		Req.Open("GET", Url, true)
 		Req.SetRequestHeader("Accept", "application/vnd.github+json")
 		Req.SetRequestHeader("User-Agent", "ErgoptiPlus-Updater/1.0")
 		; Always-finite timeouts — a 0 in any slot means "infinite" to WinHttp
@@ -2415,10 +2420,13 @@ Updater_FetchLatestJson(Channel) {
 			if (Etag is String and Etag != "")
 				Req.SetRequestHeader("If-None-Match", Etag)
 		}
-		Req.Send()
+		if !Req.Send() || !_HTTP_ManagedWait(Req)
+			throw Error("The exact managed updater request refused completion.")
+		if _Updater_RequestPolicy(RequestOwner) != UPDATER_REQUEST_POLICY_ALLOW
+			return ""
 		Etag := ""
 		try Etag := Req.GetResponseHeader("ETag")
-		Json := _Updater_InterpretResponse(Req.Status, Req.ResponseText, Etag, Channel, Url)
+		Json := _Updater_InterpretResponse(Req.Status, Req.ResponseText, Etag, Channel, Url, RequestOwner)
 	} catch as Err {
 		LoggerWarn("Updater", "HTTP request failed: {1}.", Err.Message)
 	}
@@ -2549,6 +2557,7 @@ _Updater_FetchLatestJsonAsync(Channel, Request, OnJson) {
 ; Immutable request provenance lives with the record so completion,
 ; cancellation and setup failure all answer the same callback exactly once.
 _Updater_RegisterAsyncRequestOwner(Http, Channel, OnJson, Url, Request) {
+	NetworkStart := A_TickCount
 	global _UpdaterAsyncRequests, _UpdaterAsyncCounter
 	global _UpdaterAsyncAdmissionBoundary
 	global _UpdaterActiveAsyncTerminalDeliveryCount
@@ -2567,6 +2576,7 @@ _Updater_RegisterAsyncRequestOwner(Http, Channel, OnJson, Url, Request) {
 	}
 	Record := Map(
 		"http", Http,
+		"network_start_tick", NetworkStart,
 		"channel", Channel,
 		"on_json", OnJson,
 		"url", Url,
@@ -2852,6 +2862,8 @@ _Updater_PrepareLatestAsyncTransport(Owner, FactoryFn := 0) {
 	global UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS
 	global UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS
 	Record := Owner.Record
+	if IsObject(Record["request"]) && Record["request"].HasOwnProp("NetworkFailureReport")
+		Record["request"].DeleteProp("NetworkFailureReport")
 	Req := IsObject(FactoryFn)
 		? FactoryFn.Call()
 		: CurlAsyncRequest()
@@ -2871,10 +2883,17 @@ _Updater_PrepareLatestAsyncTransport(Owner, FactoryFn := 0) {
 	Req.SetRequestHeader("User-Agent", "ErgoptiPlus-Updater/1.0")
 	if !_Updater_AsyncRequestOwned(Owner)
 		return 0
-	; curl ignores the Windows proxy that browsers use; route through it.
-	Proxy := SystemProxy_ForUrl(Record["url"])
-	if (Proxy != "")
-		Req.SetProxy(Proxy)
+	; The actual request owns full native routing; explicit factories retain
+	; their original fixed-route test/compatibility surface.
+	if !IsObject(FactoryFn) {
+		Req.SetManagedRouting(0, () => _Updater_AsyncRequestOwned(Owner))
+		Req.SetDeadline(Record["network_start_tick"], UPDATER_HTTP_RESOLVE_TIMEOUT_MS + UPDATER_HTTP_CONNECT_TIMEOUT_MS
+			+ UPDATER_HTTP_SEND_TIMEOUT_MS + UPDATER_HTTP_RECEIVE_TIMEOUT_MS)
+	} else {
+		Proxy := SystemProxy_ForUrl(Record["url"])
+		if (Proxy != "")
+			Req.SetProxy(Proxy)
+	}
 	Req.SetTimeouts(UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS,
 		UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS)
 	if !_Updater_AsyncRequestOwned(Owner)
@@ -2891,6 +2910,8 @@ _Updater_PrepareReleasesListAsyncTransport(Owner, FactoryFn := 0) {
 	global UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS
 	global UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS
 	Record := Owner.Record
+	if IsObject(Record["request"]) && Record["request"].HasOwnProp("NetworkFailureReport")
+		Record["request"].DeleteProp("NetworkFailureReport")
 	Req := IsObject(FactoryFn)
 		? FactoryFn.Call()
 		: CurlAsyncRequest()
@@ -2908,10 +2929,17 @@ _Updater_PrepareReleasesListAsyncTransport(Owner, FactoryFn := 0) {
 	Req.SetRequestHeader("User-Agent", "ErgoptiPlus-Updater/1.0")
 	if !_Updater_AsyncRequestOwned(Owner)
 		return 0
-	; curl ignores the Windows proxy that browsers use; route through it.
-	Proxy := SystemProxy_ForUrl(Record["url"])
-	if (Proxy != "")
-		Req.SetProxy(Proxy)
+	; The actual request owns full native routing; explicit factories retain
+	; their original fixed-route test/compatibility surface.
+	if !IsObject(FactoryFn) {
+		Req.SetManagedRouting(0, () => _Updater_AsyncRequestOwned(Owner))
+		Req.SetDeadline(Record["network_start_tick"], UPDATER_HTTP_RESOLVE_TIMEOUT_MS + UPDATER_HTTP_CONNECT_TIMEOUT_MS
+			+ UPDATER_HTTP_SEND_TIMEOUT_MS + UPDATER_HTTP_RECEIVE_TIMEOUT_MS)
+	} else {
+		Proxy := SystemProxy_ForUrl(Record["url"])
+		if (Proxy != "")
+			Req.SetProxy(Proxy)
+	}
 	Req.SetTimeouts(UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS,
 		UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS)
 	return _Updater_AsyncRequestOwned(Owner) ? Req : 0
@@ -3085,6 +3113,8 @@ _Updater_PollAsync(id) {
 			Json := ""
 		}
 	}
+	if Json == ""
+		_Updater_AttachManagedNetworkFailure(Owner)
 	if !_Updater_TakeAsyncRequest(id, rec)
 		return false
 	if failed
@@ -3281,6 +3311,8 @@ _Updater_PollReleasesListAsync(id) {
 			try LoggerDebug("Updater", "Async releases-list response read failed: {1}.", Err.Message)
 		}
 	}
+	if Json == ""
+		_Updater_AttachManagedNetworkFailure(Owner)
 	if !_Updater_TakeAsyncRequest(id, rec)
 		return false
 	if failed
@@ -3293,13 +3325,18 @@ _Updater_PollReleasesListAsync(id) {
 ; Fetches the releases LIST endpoint (synchronous, like ``Updater_FetchLatestJson``)
 ; and returns the raw JSON array string. Returns "" on any error.
 Updater_FetchReleasesListJson(Channel := "") {
+	Started := A_TickCount
+	RequestOwner := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
 	global UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS
 	global UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS
 	Url := Updater_ReleaseApiUrl()
 	Json := ""
 	try {
-		Req := ComObject("WinHttp.WinHttpRequest.5.1")
-		Req.Open("GET", Url, false)
+		Req := CurlAsyncRequest()
+		Req.SetManagedRouting(0, () => _Updater_RequestPolicy(RequestOwner) == UPDATER_REQUEST_POLICY_ALLOW)
+		Req.SetDeadline(Started, UPDATER_HTTP_RESOLVE_TIMEOUT_MS + UPDATER_HTTP_CONNECT_TIMEOUT_MS
+			+ UPDATER_HTTP_SEND_TIMEOUT_MS + UPDATER_HTTP_RECEIVE_TIMEOUT_MS)
+		Req.Open("GET", Url, true)
 		Req.SetRequestHeader("Accept", "application/vnd.github+json")
 		Req.SetRequestHeader("User-Agent", "ErgoptiPlus-Updater/1.0")
 		; Always-finite timeouts — a 0 in any slot means "infinite" to WinHttp
@@ -3307,7 +3344,10 @@ Updater_FetchReleasesListJson(Channel := "") {
 		; network recovers. See the constants at the top of this file.
 		Req.SetTimeouts(UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS,
 			UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS)
-		Req.Send()
+		if !Req.Send() || !_HTTP_ManagedWait(Req)
+			throw Error("The exact managed updater request refused completion.")
+		if _Updater_RequestPolicy(RequestOwner) != UPDATER_REQUEST_POLICY_ALLOW
+			return ""
 		if (Req.Status == 200) {
 			Json := Req.ResponseText
 		} else {
@@ -3451,4 +3491,24 @@ Updater_ParseBody(Json) {
 		}
 	}
 	return ""
+}
+
+_Updater_AttachManagedNetworkFailure(Owner) {
+	global UPDATER_REQUEST_POLICY_ALLOW
+	if !_Updater_AsyncRequestOwned(Owner)
+		return false
+	Request := Owner.Record["request"]
+	if !IsObject(Request) || _Updater_RequestPolicy(Request) != UPDATER_REQUEST_POLICY_ALLOW
+		return false
+	Report := ManagedNetworkFailureWindows_FromTransport(Owner.Record.Get("http", 0),
+		() => _Updater_AsyncRequestOwned(Owner) && _Updater_RequestPolicy(Request) == UPDATER_REQUEST_POLICY_ALLOW)
+	if !(Report is Map)
+		return false
+	PreviousCritical := Critical("On")
+	try {
+		if !_Updater_AsyncRequestOwned(Owner) || _Updater_RequestPolicy(Request) != UPDATER_REQUEST_POLICY_ALLOW
+			return false
+		Request.NetworkFailureReport := Report
+		return true
+	} finally Critical(PreviousCritical)
 }
