@@ -87,6 +87,12 @@ const SEPARATOR = '---';
 // a whole submenu unreachable, which is one of the things being checked.
 
 const OPENS_SUBMENU = {
+	keyboard_slots: {
+		menu: 'keyboard_group_frame',
+		platforms: ['hs'],
+		kind: 'compose',
+		native_sources: { hs: 'macos/ui/menu/menu_keyboard_slots.lua' }
+	},
 	magic_key_source: {
 		menu: 'magic_key_source_menu',
 		platforms: ['ahk', 'hs', 'linux'],

@@ -1058,14 +1058,17 @@ for (const [key, list] of Object.entries(manifest)) {
 					['command', 'list'].includes(r.type) &&
 					src[p].nativeSources.some(
 						(native) =>
-							native.src.includes(key) &&
+							(native.src.includes('template_rows') ||
+								native.src.includes('MenuRenderer_TemplateRows')) &&
 							nativeTemplateBinding(
 								native.src,
 								EXT[p],
 								key,
 								r.command || r.id,
 								r.type === 'list' ? 3 : 1,
-								src[p].nativeSources
+								src[p].nativeSources,
+								manifest,
+								p
 							)
 					)
 				)
