@@ -12,7 +12,13 @@
 'use strict';
 
 const assert = require('node:assert/strict');
-const { verify, recordMac, recordWindows } = require('./desktop-ci-evidence.cjs');
+const {
+	verify,
+	verifyWindowsStartup,
+	recordMac,
+	recordWindows,
+	recordWindowsUpgrade
+} = require('./desktop-ci-evidence.cjs');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -20,6 +26,11 @@ const crypto = require('node:crypto');
 const timerContract = require('../diagnostics/hs_delayed_timer_contract.json');
 const karabinerContract = require('../diagnostics/hs_karabiner_config_contract.json');
 const pipeline = require('./ci-pipeline.cjs');
+const {
+	healthyUpgrade,
+	runContractCases,
+	runBoundaryCases
+} = require('./test-compiled-save-upgrade.cjs');
 
 /** Returns the measured native admission summary that every clean launch owes. */
 function timerSummary() {
@@ -115,7 +126,12 @@ for (const platform of ['windows', 'macos']) {
 					failures: [],
 					marker_seen: true,
 					crashed_early: false,
-					...(platform === 'windows' ? { native_startup: windowsStartup() } : {}),
+					...(platform === 'windows'
+						? {
+								native_startup: windowsStartup(),
+								compiled_upgrade: healthyUpgrade()
+							}
+						: {}),
 					...(platform === 'macos' && scenario === 'clean'
 						? { native_delayed_timer: timerSummary() }
 						: {}),
@@ -156,6 +172,15 @@ for (const platform of ['windows', 'macos']) {
 			value.evidence[0].package_sha256 = '';
 		});
 		if (platform === 'windows') {
+			rejects((value) => {
+				delete value.evidence[0].compiled_upgrade;
+			});
+			rejects((value) => {
+				const launch = value.evidence[0].compiled_upgrade.launches[0];
+				launch.native_startup.nonce = value.evidence[0].native_startup.nonce;
+				launch.native_startup.receipt.nonce = launch.native_startup.nonce;
+				launch.full_save.nonce = launch.native_startup.nonce;
+			});
 			rejects((value) => {
 				delete value.evidence[0].native_startup;
 			});
@@ -263,7 +288,11 @@ try {
 	for (const summary of [undefined, {}, { ...timerSummary(), complete: false }]) {
 		fs.writeFileSync(
 			resultFile,
-			JSON.stringify({ scenario: 'clean', failures: [], native_delayed_timer: summary })
+			JSON.stringify({
+				scenario: 'clean',
+				failures: [],
+				native_delayed_timer: summary
+			})
 		);
 		assert.throws(
 			() => recordMac(resultFile, archive, output),
@@ -273,7 +302,11 @@ try {
 	}
 	fs.writeFileSync(
 		resultFile,
-		JSON.stringify({ scenario: 'clean', failures: [], native_delayed_timer: timerSummary() })
+		JSON.stringify({
+			scenario: 'clean',
+			failures: [],
+			native_delayed_timer: timerSummary()
+		})
 	);
 	recordMac(resultFile, archive, output);
 	assert.deepEqual(
@@ -482,6 +515,59 @@ function checkWindowsAdmission(body) {
 	assert.ok(body.indexOf(admission) < body.indexOf('name: Smoke test compiled ErgoptiPlus.exe'));
 }
 checkWindowsAdmission(launch);
+
+/** The actual downloaded candidate must pass both genuine installed launches. */
+function checkCompiledUpgradeGate(body) {
+	const name = 'Qualify compiled prior-release upgrade and installed full save';
+	const step = pipeline.step(body, name);
+	assert.equal(pipeline.stepField(step, 'shell'), 'pwsh');
+	assert.equal(pipeline.stepField(step, 'if'), null);
+	assert.equal(pipeline.stepField(step, 'continue-on-error'), null);
+	assert.equal(pipeline.stepField(step, 'timeout-minutes'), '10');
+	const run = pipeline.runOf(step).join('\n');
+	assert.match(run, /\.\/tools\/test\/run-compiled-save-upgrade\.ps1/);
+	assert.match(
+		run,
+		/-Executable "\$env:RUNNER_TEMP\/package\/ergopti_plus\/windows\/ErgoptiPlus\.exe"/
+	);
+	assert.match(run, /-StartupEvidence "\$env:RUNNER_TEMP\/evidence\.json"/);
+	assert.ok(body.indexOf('name: Smoke test compiled ErgoptiPlus.exe') < body.indexOf(step));
+	assert.ok(
+		body.indexOf(step) <
+			body.indexOf('name: Qualify programmable hotstrings in the actual compiled package')
+	);
+	const dependencies = pipeline.step(body, 'Install locked native acceptance dependencies');
+	assert.equal(pipeline.stepField(dependencies, 'run'), 'npm ci --ignore-scripts');
+	assert.equal(pipeline.stepField(dependencies, 'if'), null);
+	assert.ok(
+		body.indexOf(dependencies) < body.indexOf('name: Test native compiled startup admission')
+	);
+}
+checkCompiledUpgradeGate(launch);
+for (const [from, to] of [
+	[
+		'name: Qualify compiled prior-release upgrade and installed full save',
+		'name: Absent installed acceptance'
+	],
+	['run-compiled-save-upgrade.ps1', 'run-compiled-user-hotstrings.ps1'],
+	[
+		'-StartupEvidence "$env:RUNNER_TEMP/evidence.json"',
+		'-StartupEvidence "$env:RUNNER_TEMP/foreign.json"'
+	],
+	[
+		'timeout-minutes: 10\n        run: |\n          ./tools/test/run-compiled-save-upgrade.ps1',
+		'timeout-minutes: 10\n        continue-on-error: true\n        run: |\n          ./tools/test/run-compiled-save-upgrade.ps1'
+	],
+	[
+		'name: Qualify compiled prior-release upgrade and installed full save\n        shell: pwsh',
+		'name: Qualify compiled prior-release upgrade and installed full save\n        if: false\n        shell: pwsh'
+	],
+	['run: npm ci --ignore-scripts', 'run: echo no locked dependencies']
+]) {
+	const changed = launch.replace(from, to);
+	assert.notEqual(changed, launch, 'the mutation must alter actual installed qualification');
+	assert.throws(() => checkCompiledUpgradeGate(changed));
+}
 
 /** A fresh-clone boot must be an unconditional native Windows gate. */
 function checkFreshSourceBoot(body) {
@@ -927,7 +1013,9 @@ for (const [from, to] of [
 	assert.equal(
 		JSON.parse(
 			describe(
-				{ stderr: 'native.exe : Unhandled Exception: System.InvalidOperationException: ' + known },
+				{
+					stderr: 'native.exe : Unhandled Exception: System.InvalidOperationException: ' + known
+				},
 				compiledFixture
 			)
 		).fixture_refusal,
@@ -940,7 +1028,9 @@ for (const [from, to] of [
 	assert.equal(
 		JSON.parse(
 			describe(
-				{ stderr: 'Unhandled Exception: System.InvalidOperationException: ' + raw },
+				{
+					stderr: 'Unhandled Exception: System.InvalidOperationException: ' + raw
+				},
 				compiledFixture
 			)
 		).fixture_refusal,
@@ -949,7 +1039,9 @@ for (const [from, to] of [
 	assert.equal(
 		JSON.parse(
 			describe(
-				{ stderr: 'Unhandled Exception: System.InvalidOperationException: ' + known + raw },
+				{
+					stderr: 'Unhandled Exception: System.InvalidOperationException: ' + known + raw
+				},
 				compiledFixture
 			)
 		).fixture_refusal,
@@ -963,7 +1055,9 @@ for (const [from, to] of [
 	assert.equal(
 		JSON.parse(
 			describe(
-				{ stderr: 'Unhandled Exception: System.ComponentModel.Win32Exception: ' + raw },
+				{
+					stderr: 'Unhandled Exception: System.ComponentModel.Win32Exception: ' + raw
+				},
 				compiledFixture
 			)
 		).exception_type,
@@ -972,7 +1066,9 @@ for (const [from, to] of [
 	assert.equal(
 		JSON.parse(
 			describe(
-				{ stderr: 'Unhandled Exception: System.ComponentModel.Win32Exception: ' + raw },
+				{
+					stderr: 'Unhandled Exception: System.ComponentModel.Win32Exception: ' + raw
+				},
 				compiledFixture
 			)
 		).fixture_refusal,
@@ -1069,7 +1165,10 @@ for (const [from, to] of [
 		}
 		const foreign = path.join(owned, 'foreign');
 		fs.mkdirSync(foreign);
-		const foreignPort = { statSync: fs.statSync, realpathSync: { native: () => foreign } };
+		const foreignPort = {
+			statSync: fs.statSync,
+			realpathSync: { native: () => foreign }
+		};
 		assert.throws(
 			() => canonicalDirectory(alias, foreignPort),
 			/another file/,
@@ -1252,7 +1351,10 @@ for (const [from, to] of [
 		[
 			'private-code',
 			{
-				error: { code: 'PRIVATE_CATALOG_ERROR', message: 'PRIVATE_CATALOG_ERROR' },
+				error: {
+					code: 'PRIVATE_CATALOG_ERROR',
+					message: 'PRIVATE_CATALOG_ERROR'
+				},
 				status: -2,
 				signal: 'PRIVATE_CATALOG_ERROR'
 			},
@@ -1499,3 +1601,143 @@ require('./support/windows-startup-log-runtime.cjs')();
 	console.log('Actual installed-archive evidence controls: 2');
 }
 // CI_INSTALLED_ARCHIVE_EVIDENCE_END
+
+// The new producer reads actual package/evidence files and appends only its own
+// admitted observation. Every failed attempt must preserve the fresh record.
+{
+	const owned = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-upgrade-producer-'));
+	const oldSha = process.env.GITHUB_SHA;
+	try {
+		process.env.GITHUB_SHA = 'a'.repeat(40);
+		const executable = path.join(owned, 'ErgoptiPlus.exe');
+		fs.writeFileSync(executable, 'independent downloaded package bytes');
+		const digest = crypto.createHash('sha256').update(fs.readFileSync(executable)).digest('hex');
+		const native = windowsStartup();
+		native.executable = executable;
+		native.receipt.executable = executable;
+		native.launched_sha256 = digest;
+		const observation = path.join(owned, 'fresh.json');
+		const output = path.join(owned, 'evidence.json');
+		const upgradeFile = path.join(owned, 'upgrade.json');
+		fs.writeFileSync(
+			observation,
+			JSON.stringify({
+				marker_seen: true,
+				crashed_early: false,
+				marker_seconds: 1,
+				native_startup: native
+			})
+		);
+		recordWindows(observation, executable, output);
+		const fresh = fs.readFileSync(output, 'utf8');
+		const healthy = healthyUpgrade('a'.repeat(40), digest);
+		for (const launch of healthy.launches) {
+			launch.native_startup.executable = executable;
+			launch.native_startup.receipt.executable = executable;
+			launch.full_save.executable = executable;
+		}
+		for (const mutate of [
+			(s) => {
+				delete s.prior_install;
+			},
+			(s) => {
+				delete s.prior_install.native_profile_before_edit;
+			},
+			(s) => {
+				delete s.prior_install.installed_user_edit;
+			},
+			(s) => {
+				s.prior_install.installed_user_edit.after_sha256 = '0'.repeat(64);
+			},
+			(s) => {
+				s.prior_install.installed_user_edit.untouched_after_sha256 = '0'.repeat(64);
+			},
+			(s) => {
+				s.prior_install.package_sha256 = digest;
+			},
+			(s) => {
+				s.launches[0].full_save.committed = 0;
+			},
+			(s) => {
+				s.launches[0].tree_closed = false;
+			},
+			(s) => {
+				s.launches[1].saved_profile.preserved_records = 4;
+			},
+			(s) => {
+				s.launches[1].native_startup.nonce = native.nonce;
+				s.launches[1].native_startup.receipt.nonce = native.nonce;
+				s.launches[1].full_save.nonce = native.nonce;
+			}
+		]) {
+			const refused = structuredClone(healthy);
+			mutate(refused);
+			fs.writeFileSync(upgradeFile, JSON.stringify(refused));
+			assert.throws(() => recordWindowsUpgrade(upgradeFile, executable, output));
+			assert.equal(fs.readFileSync(output, 'utf8'), fresh, 'refusal retains original fresh bytes');
+		}
+		fs.writeFileSync(upgradeFile, JSON.stringify(healthy));
+		recordWindowsUpgrade(upgradeFile, executable, output);
+		const admitted = JSON.parse(fs.readFileSync(output, 'utf8'));
+		assert.deepEqual(admitted.compiled_upgrade, healthy);
+		delete admitted.compiled_upgrade;
+		assert.deepEqual(admitted, JSON.parse(fresh), 'producer preserves the original startup record');
+		const complete = fs.readFileSync(output, 'utf8');
+		assert.throws(() => recordWindowsUpgrade(upgradeFile, executable, output), /already owned/);
+		assert.equal(
+			fs.readFileSync(output, 'utf8'),
+			complete,
+			'duplicate publication cannot alter admitted bytes'
+		);
+	} finally {
+		if (oldSha === undefined) delete process.env.GITHUB_SHA;
+		else process.env.GITHUB_SHA = oldSha;
+		fs.rmSync(owned, { recursive: true });
+	}
+}
+console.log(
+	`Compiled upgrade admission controls: ${runContractCases(verifyWindowsStartup)} passed (Win32 unexecuted); 8 producer controls passed.`
+);
+console.log(
+	`Installed-user boundary controls: ${runBoundaryCases(verifyWindowsStartup)} plus 4 additional producer refusals passed.`
+);
+
+// Portable source ordering complements the unrun actual Win32 lifecycle. The
+// edit must not run against a fresh fixture or a still-owned historical process.
+{
+	const source = fs.readFileSync(path.join(__dirname, 'run-compiled-save-upgrade.ps1'), 'utf8');
+	const ordered = [
+		"$priorNative = Invoke-OwnedBoot $priorExe 'prior'",
+		'$priorLogs = @(Read-StartupLogs)',
+		'foreach ($asset in $contract.extracted_assets)',
+		"$state.failure = 'installed_user_edit'",
+		'if (!$priorNative.tree_closed -or !$state.cleanup_acknowledged',
+		'prepare-installed-user-profile $configFile',
+		'$priorProfileFile =',
+		'native_profile_before_edit = (Get-Content',
+		'installed_user_edit = (Get-Content',
+		"$env:ERGOPTI_STARTUP_SMOKE_FULL_SAVE = '1'"
+	];
+	const accepts = (text) => {
+		const offsets = ordered.map((term) => text.indexOf(term));
+		return offsets.every(
+			(offset, index) => offset >= 0 && (index === 0 || offset > offsets[index - 1])
+		);
+	};
+	assert.ok(
+		accepts(source),
+		'actual driver edits only the admitted, retired old installed source before current boot'
+	);
+	for (const term of ordered) {
+		assert.ok(
+			!accepts(source.replace(term, 'REMOVED_BOUNDARY_CONTROL')),
+			'producer order gate retains ' + term
+		);
+	}
+	const command = 'prepare-installed-user-profile $configFile';
+	const reordered = command + '\n' + source.replace(command, 'REMOVED_BOUNDARY_CONTROL');
+	assert.ok(
+		!accepts(reordered),
+		'an early fresh-profile edit cannot stand in for the installed upgrade boundary'
+	);
+}

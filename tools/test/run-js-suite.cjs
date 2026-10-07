@@ -1063,6 +1063,12 @@ const CHECKS = [
 		repro: 'npm run test:desktop-ci-evidence'
 	},
 	{
+		name: 'Compiled upgrade admission requires actual prior-package and committed full-save evidence',
+		cmd: process.execPath,
+		args: ['tools/test/test-compiled-save-upgrade.cjs'],
+		repro: 'node tools/test/test-compiled-save-upgrade.cjs'
+	},
+	{
 		name: 'macOS canvas job admission and pure Python ownership remain mandatory',
 		cmd: 'node',
 		args: ['tools/test/test-macos-tooltip-canvas-admission.cjs'],

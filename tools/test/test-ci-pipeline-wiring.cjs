@@ -278,6 +278,8 @@ const STEP_CONDITIONS = [
 		'always()'
 	],
 	[WINDOWS_BOX, 'launch-windows', 'Upload mandatory launch evidence', 'always()'],
+	// Failed upgrade setup/launch must retain its negative receipt before the verdict.
+	[WINDOWS_BOX, 'launch-windows', 'Upload mandatory compiled upgrade failure evidence', 'always()'],
 	[LINUX_BOX, 'install-linux', 'Prepare the container', "matrix.kind == 'install'"],
 	[LINUX_BOX, 'install-linux', 'Create the installation user', "matrix.kind == 'install'"],
 	[
