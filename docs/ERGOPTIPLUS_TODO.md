@@ -7417,6 +7417,19 @@ native children remain pending. This interpreted runner cannot qualify
 compiled console capture, physical input or invisible refreshing. Items91,
 109 and16/38 remain partial.
 
+Native console diagnosis (2026-10-07): exact-source Windows run37601124468
+passes10154 main AHK tests, but all five additional native console cases
+reject the receipt shape at test_console_window.ahk:147. The native child
+completes once with exit0 and empty errors; the producer cause is unknown.
+The unchanged strict eight-fact assertion now appends only eleven bounded
+numeric shape facts when it fails, sampling at most4096 decoded characters
+and exposing no receipt text or codepoints. Six independently authored
+scalar vectors accompany this diagnostic. Every original assertion,
+registration, status, identity, retirement owner and deadline remains
+unchanged. Independent source review clears only the diagnostic; actual
+AHK execution and a new native replay remain required. No console fix or
+item109 completion is claimed.
+
 - [~] **111.** Provide two distinct, explicitly labelled shared window-switching
   actions on Windows, macOS and Linux: the operating system's normal Alt+Tab switcher
   (the native equivalent on macOS), and switching only among windows on the display
