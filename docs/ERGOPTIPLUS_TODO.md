@@ -4106,6 +4106,16 @@ added with a strict six-control receipt. Native compilation, both positive
 AppleEvent deliveries, full-policy denial and six Brew archive scenarios remain
 required on these sources; the portable fixture is not real AppKit acceptance.
 
+Corrected native Sparkle compilation in run 37556022981 reaches the actual
+archive case but observes start-refused, zero admitted resource reads and the
+original refused-1 deadline. Neither the missing unchecked progress marker nor
+the plist proves whether native start or immediate policy validation failed.
+The existing catch now emits only a fixed PID-bound stage and typed NSError
+category/code into its original capture. The diagnostic reads that capture only
+after physical retirement; all original admission, signature, update and cleanup
+assertions remain mandatory. Its native compilation/receiving controls and the
+actual refusal identity remain unexecuted until the next macOS validation.
+
 - [~] **37.** Always show the shipped Ergopti hotstring pack, including when
   its keyboard layout is not installed. Move French `suffixes_a` and magic-key
   `replace` into that extension without a beta compatibility layer. The runtime

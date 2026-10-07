@@ -73,6 +73,22 @@ final class PrivateArchiveChild: NSObject, NSApplicationDelegate, SPUUserDriver,
 
 	private enum Failure: Error { case refused }
 
+	/// The original startup admission catch. Labels are fixed; NSError descriptions and
+	/// arbitrary domains never enter the original owned stdout capture.
+	private func startupAdmissionRefusal(_ error: Error, startReturned: Bool) {
+		let native = error as NSError
+		let domain: String
+		switch native.domain {
+		case SUSparkleErrorDomain: domain = "sparkle"
+		case NSCocoaErrorDomain: domain = "cocoa"
+		default: domain = "other"
+		}
+		_ = fputs("SPARKLE_STARTUP_ADMISSION_REFUSAL/1 pid=" + String(ProcessInfo.processInfo.processIdentifier)
+			+ " stage=" + (startReturned ? "policy-validation" : "native-start")
+			+ " domain=" + domain + " code=" + String(native.code) + "\n", stdout)
+		_ = fflush(stdout)
+	}
+
 	/// Capture only typed error identities, not descriptions or signing inputs.
 	private func identities(_ error: Error) -> [[String: Any]] {
 		var result: [[String: Any]] = []
@@ -97,10 +113,12 @@ final class PrivateArchiveChild: NSObject, NSApplicationDelegate, SPUUserDriver,
 		let owner = SPUUpdater(hostBundle: Bundle.main, applicationBundle: Bundle.main,
 			userDriver: self, delegate: self)
 		updater = owner
+		var startReturned = false
 		do {
 			progress("updater-start-attempt")
 			try owner.start()
 			progress("updater-started")
+			startReturned = true
 			guard !owner.automaticallyChecksForUpdates, !owner.automaticallyDownloadsUpdates,
 				!owner.allowsAutomaticUpdates else { throw Failure.refused }
 			progress("updater-policy-admitted")
@@ -108,6 +126,7 @@ final class PrivateArchiveChild: NSObject, NSApplicationDelegate, SPUUserDriver,
 			owner.checkForUpdates()
 		} catch {
 			record("start-refused", details: ["errors": identities(error)])
+			startupAdmissionRefusal(error, startReturned: startReturned)
 			NSApplication.shared.terminate(nil)
 		}
 	}

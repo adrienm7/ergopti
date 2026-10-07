@@ -110,6 +110,43 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		static let unavailable = UpdateProgressFacts(capture: .unavailable, events: [])
 	}
 
+	private enum StartupAdmissionRefusalStage: String { case nativeStart = "native-start", policyValidation = "policy-validation" }
+	private enum StartupAdmissionRefusalDomain: String { case sparkle, cocoa, other }
+	private struct StartupAdmissionRefusalIdentity {
+		let stage: StartupAdmissionRefusalStage
+		let domain: StartupAdmissionRefusalDomain
+		let code: Int64
+	}
+
+	/// Canonical signed native code and a fixed label, tied to this exact child.
+	private static func parseStartupAdmissionRefusalFrame(_ line: String, expectedPID: Int32) -> StartupAdmissionRefusalIdentity? {
+		guard expectedPID > 0 else { return nil }
+		let prefix = "SPARKLE_STARTUP_ADMISSION_REFUSAL/1 pid=" + String(expectedPID) + " stage="
+		guard line.hasPrefix(prefix) else { return nil }
+		let fields = String(line.dropFirst(prefix.count)).components(separatedBy: " domain=")
+		guard fields.count == 2, let stage = StartupAdmissionRefusalStage(rawValue: fields[0]) else { return nil }
+		let codeFields = fields[1].components(separatedBy: " code=")
+		guard codeFields.count == 2, let domain = StartupAdmissionRefusalDomain(rawValue: codeFields[0]),
+			let code = Int64(codeFields[1]), String(code) == codeFields[1] else { return nil }
+		return StartupAdmissionRefusalIdentity(stage: stage, domain: domain, code: code)
+	}
+
+	/// Reuse the complete progress capture. The actual start or immediate policy refusal, noisy frame,
+	/// duplicate identity or foreign PID never substitutes the original catch.
+	private static func parseStartupAdmissionRefusalIdentity(_ text: String, expectedPID: Int32) -> StartupAdmissionRefusalIdentity? {
+		let progress = parseUpdateProgress(text, expectedPID: expectedPID)
+		guard progress.capture == .observed, progress.events.contains(.e9) else { return nil }
+		let frames = text.components(separatedBy: "\n").filter { $0.hasPrefix("SPARKLE_STARTUP_ADMISSION_REFUSAL/1 ") }
+		guard frames.count == 1 else { return nil }
+		return parseStartupAdmissionRefusalFrame(frames[0], expectedPID: expectedPID)
+	}
+
+	private func startupAdmissionRefusalMessage(_ identity: StartupAdmissionRefusalIdentity?) -> String {
+		guard let identity else { return "Native Sparkle startup admission refusal: stage=unavailable domain=unavailable code=unavailable" }
+		return "Native Sparkle startup admission refusal: stage=" + identity.stage.rawValue
+			+ " domain=" + identity.domain.rawValue + " code=" + String(identity.code)
+	}
+
 	/// Parse only complete fixed frames from the existing physically retired
 	/// direct child's cached receipt. An inherited/relaunched PID is not borrowed.
 	private static func parseUpdateProgress(_ text: String, expectedPID: Int32) -> UpdateProgressFacts {
@@ -119,10 +156,19 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 			return UpdateProgressFacts(capture: .malformed, events: [])
 		}
 		let lines = String(text.dropLast()).components(separatedBy: "\n")
-		guard lines.count <= UpdateProgressEvent.allCases.count else { return .unavailable }
+		guard lines.count <= UpdateProgressEvent.allCases.count + 1 else { return .unavailable }
 		let prefix = "SPARKLE_PROGRESS/1 pid=" + String(expectedPID) + " event="
 		var events: [UpdateProgressEvent] = []
+		var startupIdentitySeen = false
 		for line in lines {
+			if line.hasPrefix("SPARKLE_STARTUP_ADMISSION_REFUSAL/1 ") {
+				guard !startupIdentitySeen, events.last == .e9,
+					parseStartupAdmissionRefusalFrame(line, expectedPID: expectedPID) != nil else {
+					return UpdateProgressFacts(capture: .malformed, events: [])
+				}
+				startupIdentitySeen = true
+				continue
+			}
 			guard line.hasPrefix(prefix), let event = UpdateProgressEvent(rawValue: String(line.dropFirst(prefix.count))),
 				!events.contains(event) else {
 				return UpdateProgressFacts(capture: .malformed, events: [])
@@ -389,6 +435,13 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		func observedUpdateProgress() -> UpdateProgressFacts {
 			guard launched, observedExit, let cachedReceipt else { return .unavailable }
 			return SparkleArchiveUpdateAcceptanceTests.parseUpdateProgress(cachedReceipt.stdout,
+				expectedPID: process.processIdentifier)
+		}
+
+		/// Only the original finish() cached receipt: no path/read/wait or signal.
+		func observedStartupAdmissionRefusalIdentity() -> StartupAdmissionRefusalIdentity? {
+			guard launched, observedExit, let cachedReceipt else { return nil }
+			return SparkleArchiveUpdateAcceptanceTests.parseStartupAdmissionRefusalIdentity(cachedReceipt.stdout,
 				expectedPID: process.processIdentifier)
 		}
 
@@ -887,6 +940,40 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		XCTAssertEqual(Self.parseUpdateProgress(text, expectedPID: 0).capture, .unavailable)
 	}
 
+	func testStartupAdmissionRefusalIdentityRequiresExactRetiredProgressAndFixedTypedFields() {
+		let before = "SPARKLE_PROGRESS/1 pid=321 event=started-1\nSPARKLE_PROGRESS/1 pid=321 event=updater-start-attempt\nSPARKLE_PROGRESS/1 pid=321 event=start-refused\n"
+		let frame = "SPARKLE_STARTUP_ADMISSION_REFUSAL/1 pid=321 stage=native-start domain=sparkle code=5\n"
+		let after = "SPARKLE_PROGRESS/1 pid=321 event=terminated-1\n"
+		let text = before + frame + after
+		XCTAssertEqual(Self.parseUpdateProgress(text, expectedPID: 321).capture, .observed)
+		XCTAssertEqual(startupAdmissionRefusalMessage(Self.parseStartupAdmissionRefusalIdentity(text, expectedPID: 321)),
+			"Native Sparkle startup admission refusal: stage=native-start domain=sparkle code=5")
+		XCTAssertEqual(Self.parseStartupAdmissionRefusalIdentity(text.replacingOccurrences(of: "code=5", with: "code=-1"), expectedPID: 321)?.code, -1)
+		XCTAssertEqual(Self.parseStartupAdmissionRefusalIdentity(text.replacingOccurrences(of: "domain=sparkle", with: "domain=other"), expectedPID: 321)?.domain, StartupAdmissionRefusalDomain.other)
+		XCTAssertEqual(Self.parseStartupAdmissionRefusalIdentity(text, expectedPID: 321)?.stage, StartupAdmissionRefusalStage.nativeStart)
+		let policy = before.replacingOccurrences(of: "event=start-refused", with: "event=updater-started\nSPARKLE_PROGRESS/1 pid=321 event=start-refused")
+			+ frame.replacingOccurrences(of: "stage=native-start domain=sparkle code=5", with: "stage=policy-validation domain=other code=0") + after
+		XCTAssertEqual(Self.parseUpdateProgress(policy, expectedPID: 321).capture, .observed)
+		XCTAssertEqual(startupAdmissionRefusalMessage(Self.parseStartupAdmissionRefusalIdentity(policy, expectedPID: 321)),
+			"Native Sparkle startup admission refusal: stage=policy-validation domain=other code=0")
+		let invalid = [text.replacingOccurrences(of: "stage=native-start", with: "stage=invented"), before + after, before + frame + frame + after,
+			text.replacingOccurrences(of: "pid=321 stage=", with: "pid=322 stage="),
+			text.replacingOccurrences(of: "pid=321 stage=", with: "pid=0321 stage="),
+			text.replacingOccurrences(of: "domain=sparkle", with: "domain=private-raw-domain"),
+			text.replacingOccurrences(of: "code=5", with: "code=05"),
+			text.replacingOccurrences(of: "code=5", with: "code=+5"),
+			text.replacingOccurrences(of: "code=5", with: "code=9223372036854775808"),
+			text.replacingOccurrences(of: "code=5", with: "code=5 extra=private-text"),
+			String(text.dropLast()), frame + before + after,
+			before.replacingOccurrences(of: "event=start-refused", with: "event=updater-started") + frame + after]
+		for value in invalid {
+			let identity = Self.parseStartupAdmissionRefusalIdentity(value, expectedPID: 321)
+			XCTAssertNil(identity)
+			XCTAssertEqual(startupAdmissionRefusalMessage(identity), "Native Sparkle startup admission refusal: stage=unavailable domain=unavailable code=unavailable")
+		}
+		XCTAssertNil(Self.parseStartupAdmissionRefusalIdentity(text, expectedPID: 0))
+	}
+
 	func testNetworkProgressCounterDoesNotInventSuccessfulDelivery() {
 		XCTAssertEqual(resourceReadsMessage(NSNumber(value: 0)), "Native Sparkle network progress: admitted_resource_reads=0")
 		XCTAssertEqual(resourceReadsMessage(NSNumber(value: 4)), "Native Sparkle network progress: admitted_resource_reads=4")
@@ -1057,7 +1144,10 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 				}
 				if let application, application.process.processIdentifier > 0 {
 					attempt("application-exit") {
-						defer { print("::notice title=Native Sparkle update::" + updateProgressMessage(application.observedUpdateProgress())) }
+						defer {
+							print("::notice title=Native Sparkle update::" + updateProgressMessage(application.observedUpdateProgress()))
+							print("::notice title=Native Sparkle startup admission refusal::" + startupAdmissionRefusalMessage(application.observedStartupAdmissionRefusalIdentity()))
+						}
 						let retired = try application.finish(15)
 						guard retired.status == 0 else { throw Failure.evidence("application-retirement") }
 					}
