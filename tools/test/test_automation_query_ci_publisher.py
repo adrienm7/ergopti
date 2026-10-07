@@ -356,5 +356,160 @@ class CompilerCustodyTests(unittest.TestCase):
         self.assertIs(P._RETAINED_COMPILERS[id(self.group)], self.group)
 
 
+class CensusFactsTests(unittest.TestCase):
+    setUp = PublisherTests.setUp
+    command_output = PublisherTests.command_output
+
+    def lock_bytes(self, version=3):
+        packet = {
+            "pins": [
+                {
+                    "identity": "sparkle",
+                    "kind": "remoteSourceControl",
+                    "location": "https://github.com/sparkle-project/Sparkle",
+                    "state": {"revision": "b" * 40, "version": "2.9.2"},
+                }
+            ],
+            "version": version,
+        }
+        if version == 3:
+            packet["originHash"] = "c" * 64
+        return json.dumps(packet, indent=2).encode() + b"\n"
+
+    def untracked_lock(self, raw):
+        relative = P.LAUNCHER + "Package.resolved"
+        self.inputs.remove(relative)
+        del self.tracked[relative]
+        path = self.root / relative
+        path.write_bytes(raw)
+        return path
+
+    def refusal(self):
+        P.print.reset_mock()
+        with self.assertRaisesRegex(P.Refused, "^native_input_census_mismatch$"):
+            P.snapshot(self.root, SHA)
+        self.assertEqual(P.print.call_count, 1)
+        arguments, options = P.print.call_args
+        prefix = "Automation query publisher census refusal facts: "
+        self.assertTrue(arguments[0].startswith(prefix))
+        self.assertIs(options["file"], P.sys.stderr)
+        return json.loads(arguments[0][len(prefix) :])
+
+    def test_exact_public_lock_bytes_report_without_admitting_compiler(self):
+        import base64
+
+        raw = self.lock_bytes()
+        self.untracked_lock(raw)
+        packet = self.refusal()
+        self.assertEqual(packet["source_sha"], SHA)
+        self.assertEqual(packet["extra_count"], 1)
+        self.assertTrue(packet["only_root_lockfile_extra"])
+        self.assertFalse(packet["root_lockfile_expected"])
+        self.assertTrue(packet["root_lockfile_observed"])
+        self.assertEqual(packet["missing_paths"], [])
+        lock = packet["lockfile"]
+        self.assertEqual(lock["public_sparkle_schema"], 3)
+        self.assertEqual(lock["byte_count"], len(raw))
+        self.assertEqual(lock["sha256"], hashlib.sha256(raw).hexdigest())
+        self.assertEqual(base64.b64decode(lock["validated_public_bytes_base64"]), raw)
+        self.assertEqual(self.commands, [])
+        self.assertFalse(self.directory.exists())
+
+    def test_both_exact_supported_public_schemas(self):
+        for version in (2, 3):
+            with self.subTest(version=version):
+                self.assertEqual(P.public_sparkle_lock(self.lock_bytes(version)), version)
+
+    def test_unknown_private_fields_never_publish_bytes(self):
+        secret = "PRIVATE_TOKEN_SENTINEL"
+        raw = self.lock_bytes().replace(
+            b'"version": 3', ('"secret": "' + secret + '", "version": 3').encode()
+        )
+        self.untracked_lock(raw)
+        packet = self.refusal()
+        self.assertIsNone(packet["lockfile"]["public_sparkle_schema"])
+        self.assertNotIn("validated_public_bytes_base64", packet["lockfile"])
+        self.assertNotIn(secret, P.print.call_args.args[0])
+
+    def test_duplicate_wrong_repository_pin_and_schema_refuse_payload(self):
+        valid = self.lock_bytes()
+        variants = [
+            valid.replace(b'"version": 3', b'"version": 3, "version": 3'),
+            valid.replace(b'Sparkle"', b'PrivateRepo"'),
+            valid.replace(b'"version": 3', b'"version": true'),
+            valid.replace(b'"2.9.2"', b'"2.9.3"'),
+            valid.replace(b'"pins": [', b'"pins": [null,'),
+            valid.replace(b"c" * 64, b"x" * 64),
+            valid.replace(b"b" * 40, b"x" * 40),
+            b"not json",
+        ]
+        for raw in variants:
+            with self.subTest(raw_sha=hashlib.sha256(raw).hexdigest()):
+                self.assertIsNone(P.public_sparkle_lock(raw))
+
+    def test_symlink_refuses_capture_without_reading_target(self):
+        path = self.untracked_lock(self.lock_bytes())
+        target = self.root / "PRIVATE_UNTRACKED_TARGET"
+        target.write_bytes(self.lock_bytes())
+        path.unlink()
+        path.symlink_to(target)
+        packet = self.refusal()
+        self.assertEqual(packet["lockfile"]["status"], "nonregular")
+        self.assertNotIn("sha256", packet["lockfile"])
+        self.assertNotIn(str(target), P.print.call_args.args[0])
+
+    def test_current_file_change_refuses_hash_and_payload(self):
+        path = self.untracked_lock(self.lock_bytes())
+        original = P.os.read
+        fired = False
+
+        def change(descriptor, count):
+            nonlocal fired
+            raw = original(descriptor, count)
+            if not fired:
+                fired = True
+                path.write_bytes(b"X" + path.read_bytes()[1:])
+            return raw
+
+        with mock.patch.object(P.os, "read", side_effect=change):
+            packet = self.refusal()
+        self.assertTrue(fired)
+        self.assertEqual(packet["lockfile"]["status"], "changed")
+        self.assertNotIn("sha256", packet["lockfile"])
+        self.assertNotIn("validated_public_bytes_base64", packet["lockfile"])
+
+    def test_oversized_lock_has_no_read_hash_or_payload(self):
+        self.untracked_lock(b"x" * 16385)
+        with mock.patch.object(P.os, "read", side_effect=AssertionError("must not read")):
+            packet = self.refusal()
+        self.assertEqual(packet["lockfile"]["status"], "oversized")
+        self.assertEqual(packet["lockfile"]["byte_count"], 16385)
+        self.assertNotIn("sha256", packet["lockfile"])
+
+    def test_missing_trusted_path_and_unknown_extra_name(self):
+        (self.root / (P.LAUNCHER + "Sources/Main.swift")).unlink()
+        extra = self.root / P.LAUNCHER / "PRIVATE_EXTRA_SENTINEL.swift"
+        extra.write_bytes(b"private")
+        packet = self.refusal()
+        self.assertEqual(packet["missing_paths"], [P.LAUNCHER + "Sources/Main.swift"])
+        self.assertTrue(packet["missing_paths_complete"])
+        self.assertEqual(packet["missing_count"], 1)
+        self.assertEqual(packet["extra_count"], 1)
+        self.assertNotIn("PRIVATE_EXTRA_SENTINEL", P.print.call_args.args[0])
+
+    def test_successful_snapshot_produces_no_refusal_facts(self):
+        P.print.reset_mock()
+        self.assertEqual(len(P.snapshot(self.root, SHA)), len(self.inputs) - 2)
+        P.print.assert_not_called()
+
+    def test_reporting_failure_keeps_original_strict_refusal(self):
+        self.untracked_lock(self.lock_bytes())
+        with mock.patch.object(P, "current_lockfile_facts", side_effect=OSError("PRIVATE_FAILURE")):
+            with self.assertRaisesRegex(P.Refused, "^native_input_census_mismatch$"):
+                P.snapshot(self.root, SHA)
+        self.assertEqual(self.commands, [])
+        self.assertFalse(self.directory.exists())
+
+
 if __name__ == "__main__":
     unittest.main()

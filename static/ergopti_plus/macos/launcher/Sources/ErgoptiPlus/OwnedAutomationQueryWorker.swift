@@ -74,6 +74,40 @@ enum OwnedAutomationQueryWorker {
 		return descriptors
 	}
 
+	#if ERGOPTI_GUARDIAN_TEST_SUPPORT
+	/// Debug fixture refusal facts only; raw process identifiers never leave here.
+	private static func fixtureSetup() -> (accepted: Bool, error: Int32, facts: [String]) {
+		var facts: [String] = []
+		func context() -> String {
+			let saved = errno
+			let pid = getpid(), group = getpgrp(), session = getsid(0)
+			errno = saved
+			return "\(pid == group ? 1 : 0) \(pid == session ? 1 : 0) \(group == session ? 1 : 0) \(session > 0 ? 1 : 0)"
+		}
+		func observe(_ phase: String, identityResult: Bool = false, _ syscall: () -> Int32) -> Int32 {
+			let before = context(), beforeError = errno
+			let result = syscall(), afterError = errno
+			let after = context()
+			// Identity returns become -1/error, 0/non-self or 1/self, never raw PIDs.
+			let code = identityResult ? (result < 0 ? -1 : (result == getpid() ? 1 : 0)) : result
+			facts.append("Q1 SETUP \(phase) \(before) \(code) \(beforeError) \(afterError) \(after)")
+			errno = afterError
+			return result
+		}
+		func refused() -> (accepted: Bool, error: Int32, facts: [String]) {
+			return (false, errno == 0 ? EIO : errno, facts)
+		}
+		let session = observe("getsid", identityResult: true) { getsid(0) }
+		if session != getpid() {
+			guard observe("setsid", identityResult: true, { setsid() }) == getpid() else { return refused() }
+		}
+		let flags = observe("getfl") { fcntl(STDIN_FILENO, F_GETFL) }
+		guard flags >= 0,
+			observe("setfl", { fcntl(STDIN_FILENO, F_SETFL, flags | O_NONBLOCK) }) == 0 else { return refused() }
+		return (true, 0, facts)
+	}
+	#endif
+
 	/// Native group custody is retained until the C owner's acknowledged destruction.
 	static func run(arguments: [String]) -> Int32 {
 		guard validRequest(arguments: arguments) else { return 64 }
@@ -83,9 +117,23 @@ enum OwnedAutomationQueryWorker {
 		// Hammerspoon cancels by EOF. Signals cannot interrupt a live custody frame.
 		_ = Darwin.signal(SIGTERM, SIG_IGN)
 		_ = Darwin.signal(SIGINT, SIG_IGN)
+		#if ERGOPTI_GUARDIAN_TEST_SUPPORT
+		if ["fixture", "fixture-overflow", "fixture-stderr", "fixture-wait"].contains(arguments[2]) {
+			let setup = fixtureSetup()
+			if !setup.accepted {
+				for fact in setup.facts { guard marker(fact) else { return 74 } }
+				return marker("Q1 REFUSED \(setup.error)") ? 0 : 74
+			}
+		} else {
 		guard (getsid(0) == getpid() || setsid() == getpid()), nonblocking(STDIN_FILENO) else {
 			return marker("Q1 REFUSED \(errno == 0 ? EIO : errno)") ? 0 : 74
 		}
+		}
+		#else
+		guard (getsid(0) == getpid() || setsid() == getpid()), nonblocking(STDIN_FILENO) else {
+			return marker("Q1 REFUSED \(errno == 0 ? EIO : errno)") ? 0 : 74
+		}
+		#endif
 		prepareLeaseChildReaping()
 		guard let output = makePipe() else { return marker("Q1 REFUSED \(EIO)") ? 0 : 74 }
 		defer { Darwin.close(output[0]) }

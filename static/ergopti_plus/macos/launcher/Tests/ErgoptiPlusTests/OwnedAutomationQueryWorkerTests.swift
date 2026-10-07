@@ -77,6 +77,37 @@ private final class AutomationQueryTestSession {
 			+ " refused=\(status("Q1 REFUSED ")) pending=\(status("Q1 PENDING ")) retired=\(status("Q1 RETIRED "))"
 			+ " markers=\(markers.count) stdoutBytes=\(stdout.count) stderrBytes=\(stderr.count)"
 			+ " bufferedBytes=\(decoder.buffered.count) running=\(running ? 1 : 0) terminal=\(terminal)"
+			+ " setup=\(Self.setupFacts(markers))"
+	}
+
+	/// Accept only fixed syscall phases, boolean relationships and canonical codes.
+	static func setupFacts(_ markers: [String]) -> String {
+		let setup = markers.filter { $0.hasPrefix("Q1 SETUP ") }
+		if setup.isEmpty { return "none" }
+		guard setup.count <= 4 else { return "invalid" }
+		var phases: [String] = [], records: [String] = []
+		for marker in setup {
+			let fields = marker.split(separator: " ", omittingEmptySubsequences: false).map(String.init)
+			guard fields.count == 14, fields[0] == "Q1", fields[1] == "SETUP",
+				["getsid", "setsid", "getfl", "setfl"].contains(fields[2]) else { return "invalid" }
+			let raw = Array(fields.dropFirst(3))
+			let numbers = raw.compactMap { Int32($0) }
+			guard numbers.count == 11, zip(raw, numbers).allSatisfy({ pair in pair.0 == String(pair.1) }),
+				[0, 1, 2, 3, 7, 8, 9, 10].allSatisfy({ numbers[$0] == 0 || numbers[$0] == 1 }),
+				numbers[5] >= 0, numbers[6] >= 0 else { return "invalid" }
+			if fields[2] == "getsid" || fields[2] == "setsid" {
+				guard [-1, 0, 1].contains(numbers[4]) else { return "invalid" }
+			} else if fields[2] == "getfl" {
+				guard numbers[4] >= -1 else { return "invalid" }
+			} else if numbers[4] != -1 && numbers[4] != 0 { return "invalid" }
+			phases.append(fields[2])
+			records.append("\(fields[2]):before=\(numbers[0]),\(numbers[1]),\(numbers[2]),\(numbers[3])"
+				+ ":returnCode=\(numbers[4]),errnoBefore=\(numbers[5]),errnoAfter=\(numbers[6])"
+				+ ":after=\(numbers[7]),\(numbers[8]),\(numbers[9]),\(numbers[10])")
+		}
+		guard [["getsid"], ["getsid", "setsid"], ["getsid", "getfl"], ["getsid", "getfl", "setfl"],
+			["getsid", "setsid", "getfl"], ["getsid", "setsid", "getfl", "setfl"]].contains(phases) else { return "invalid" }
+		return records.joined(separator: ";")
 	}
 
 	func wait(_ predicate: () -> Bool) throws {
@@ -167,5 +198,40 @@ final class OwnedAutomationQueryWorkerTests: XCTestCase {
 		try session.wait { session.markers.contains(where: { $0.hasPrefix("Q1 RETIRED ") }) }
 		try session.finish()
 		XCTAssertFalse(session.markers.contains(where: { $0.hasPrefix("Q1 DATA ") }))
+	}
+
+	func testSetupFactsKeepOnlyTypedGroupRelationships() {
+		let markers = [
+			"Q1 SETUP getsid 1 0 0 1 0 0 0 1 0 0 1",
+			"Q1 SETUP setsid 1 0 0 1 -1 0 1 1 0 0 1", "Q1 REFUSED 1",
+		]
+		XCTAssertEqual(AutomationQueryTestSession.setupFacts(markers),
+			"getsid:before=1,0,0,1:returnCode=0,errnoBefore=0,errnoAfter=0:after=1,0,0,1;"
+				+ "setsid:before=1,0,0,1:returnCode=-1,errnoBefore=0,errnoAfter=1:after=1,0,0,1")
+		XCTAssertEqual(AutomationQueryTestSession.setupFacts(["Q1 REFUSED 1"]), "none")
+	}
+
+	func testSetupFactsRejectRawIdentifiersAndNoncanonicalCodes() {
+		let valid = "Q1 SETUP getsid 1 0 0 1 0 0 0 1 0 0 1"
+		for invalid in [
+			valid.replacingOccurrences(of: "getsid 1", with: "getsid 50001"),
+			"Q1 SETUP getsid 1 0 0 1 50001 0 0 1 0 0 1",
+			"Q1 SETUP getsid 1 0 0 1 0 0 -1 1 0 0 1",
+			"Q1 SETUP getsid 1 0 0 1 0 +0 0 1 0 0 1",
+			"Q1 SETUP getsid 1 0 0 1 0 00 0 1 0 0 1",
+			"Q1 SETUP getsid 1 0 0 1 0 2147483648 0 1 0 0 1",
+			"Q1 SETUP unexpected 1 0 0 1 0 0 0 1 0 0 1",
+			"Q1 SETUP getsid 1 0 0 1 0 0 0 1 0 0 PRIVATE",
+		] {
+			XCTAssertEqual(AutomationQueryTestSession.setupFacts([invalid]), "invalid")
+		}
+	}
+
+	func testSetupFactsRejectChangedPhaseOrderAndUnboundedRecords() {
+		let sid = "Q1 SETUP getsid 1 0 0 1 0 0 0 1 0 0 1"
+		let flags = "Q1 SETUP getfl 1 0 0 1 -1 0 9 1 0 0 1"
+		for invalid in [[flags], [sid, sid], [sid, flags, sid], Array(repeating: sid, count: 5)] {
+			XCTAssertEqual(AutomationQueryTestSession.setupFacts(invalid), "invalid")
+		}
 	}
 }
