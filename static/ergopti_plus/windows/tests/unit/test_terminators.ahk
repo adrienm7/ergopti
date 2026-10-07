@@ -418,11 +418,269 @@ Test("Terminators: star trigger wins over the end-char match on the magic key", 
 
 
 
-; =======================================================
-; =======================================================
-; ======= 4/ Foreign Inline Writer Prerequisite ========
-; =======================================================
-; =======================================================
+; ==============================================================
+; ==============================================================
+; ======= 9/ Typed Custom Terminator Records ====================
+; ==============================================================
+; ==============================================================
+
+_HTR_Source() {
+	return '[private]`ncredential = "keep"`n'
+		. '[["hotstrings"."terminators"]] # owned table array`nkey = "currency"`nchar = "¤"`nlabel = "Currency"`nconsume = true`nmetadata = { future = "keep", count = 7 }`n'
+		. '[[hotstrings.terminators]]`nkey = "smile"`nchar = "😀"`nlabel = "Smile"`nconsume = false`n'
+		. '[[foreign.rows]]`nvalue = "never alter" # foreign comment`n'
+}
+
+_HTR_WithRuntime(Body) {
+	global _HotstringsTerminatorRecords, _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
+	global HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS
+	Saved := { Owner: _HotstringsTerminatorRecords, Word: _HotstringsWordDelimiters,
+		Consumed: _HotstringsConsumedDelimiters, EngineWord: HSE_WORD_TERMINATORS,
+		EngineConsumed: HSE_CONSUMED_DELIMITERS }
+	try {
+		_HotstringsTerminatorRecords := 0
+		_HotstringsWordDelimiters := "!", _HotstringsConsumedDelimiters := "!"
+		return Body.Call()
+	} finally {
+		_HotstringsTerminatorRecords := Saved.Owner
+		_HotstringsWordDelimiters := Saved.Word
+		_HotstringsConsumedDelimiters := Saved.Consumed
+		HSE_WORD_TERMINATORS := Saved.EngineWord
+		HSE_CONSUMED_DELIMITERS := Saved.EngineConsumed
+	}
+}
+
+_HTR_BootProjectionBody() {
+	global _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
+	AssertEqual(true, HotstringsTerminatorRecordsInit(_HTR_Source()))
+	AssertEqual("!¤😀", HotstringsGetWordDelimiters(), "the actual consumer must publish both admitted scalars")
+	AssertEqual("!¤", HotstringsGetConsumedDelimiters(), "only the independently consumed record joins the consumed set")
+	AssertEqual("!", _HotstringsWordDelimiters, "record loading must preserve the historical word preference")
+	AssertEqual("!", _HotstringsConsumedDelimiters, "record loading must preserve the historical consumed preference")
+}
+_HTR_BootProjection() {
+	_HTR_WithRuntime(_HTR_BootProjectionBody)
+}
+Test("terminator-records: actual boot consumer projects AOT and Unicode without changing string controls", _HTR_BootProjection)
+
+_HTR_InlineRecords() {
+	InlineRecordSource := 'hotstrings.terminators = [{ key = "upper", char = "A", label = "Upper", consume = false }, { key = "lower", char = "a", label = "Lower", consume = true }]`n'
+	Resolved := HotstringsTerminatorRecordsResolve(TOML_ParseDocument(InlineRecordSource))
+	AssertEqual(2, Resolved.Records.Length, "case-sensitive scalar identity must match the shared catalogue")
+	AssertEqual("A", Resolved.Records[1].Char)
+	AssertEqual("a", Resolved.Records[2].Char)
+	AssertEqual(0, Resolved.Rejected.Length)
+}
+Test("terminator-records: actual typed inline list preserves case-sensitive scalar identities", _HTR_InlineRecords)
+
+_HTR_InvalidRecords() {
+	InvalidRecordSource := 'hotstrings.terminators = ['
+		. '{ key = "space", char = "¤", label = "Builtin", consume = false },'
+		. '{ key = "two", char = "xy", label = "Two", consume = false },'
+		. '{ key = "integer", char = "¤", label = "Integer", consume = 1 },'
+		. '{ key = "duplicate_char", char = " ", label = "Space", consume = false },'
+		. '{ key = "good", char = "¤", label = "Good", consume = true },'
+		. '{ key = "good", char = "😀", label = "Duplicate", consume = false }]`n'
+	Resolved := HotstringsTerminatorRecordsResolve(TOML_ParseDocument(InvalidRecordSource))
+	AssertEqual(1, Resolved.Records.Length)
+	AssertEqual("good", Resolved.Records[1].Key)
+	AssertEqual(5, Resolved.Rejected.Length)
+	for RejectedOrdinal, Reason in ["key_collision", "invalid_character", "invalid_consume", "character_collision", "key_collision"]
+		AssertEqual(Reason, Resolved.Rejected[RejectedOrdinal]["reason"], "each independently invalid row must retain its refusal reason")
+}
+Test("terminator-records: actual reader quarantines invalid rows and retains the independent valid row", _HTR_InvalidRecords)
+
+_HTR_InvalidScalar() {
+	for InvalidScalar in ["", "ab", Chr(0xD800), Chr(0xDC00), Chr(0xD800) . "a", 0, []]
+		AssertEqual(false, HotstringsTerminatorRecordCharacter(InvalidScalar))
+	AssertEqual(true, HotstringsTerminatorRecordCharacter("😀"))
+	AssertEqual(true, HotstringsTerminatorRecordCharacter("¤"))
+}
+Test("terminator-records: one exact scalar rejects truncated surrogate and malformed inputs", _HTR_InvalidScalar)
+
+_HTR_DuplicateInitBody() {
+	HotstringsTerminatorRecordsInit(_HTR_Source())
+	AssertThrows(HotstringsTerminatorRecordsInit.Bind(""), "a second initializer cannot replace a live boot owner")
+	AssertEqual("!¤😀", HotstringsGetWordDelimiters())
+}
+_HTR_DuplicateInit() {
+	_HTR_WithRuntime(_HTR_DuplicateInitBody)
+}
+Test("terminator-records: explicit initialization rejects a second source owner", _HTR_DuplicateInit)
+
+_HTR_Upsert() {
+	Record := Map("key", "currency", "char", "§", "label", "Updated", "consume", TOML_Bool(false))
+	Plan := HotstringsTerminatorRecordPlan(_HTR_Source(), Map("mode", "upsert", "record", Record))
+	Document := TOML_ParseDocument(Plan.Content)
+	AssertEqual("§", Document["hotstrings"]["terminators"][1]["char"])
+	AssertEqual("keep", Document["hotstrings"]["terminators"][1]["metadata"]["future"])
+	AssertEqual(7, Document["hotstrings"]["terminators"][1]["metadata"]["count"])
+	AssertContains(Plan.Content, '[[foreign.rows]]`nvalue = "never alter" # foreign comment`n')
+	AssertContains(Plan.Content, '[private]`ncredential = "keep"`n')
+	AssertEqual(2, Plan.Settings.Records.Length)
+}
+Test("terminator-records: editing an actual AOT record preserves unknown metadata and foreign spans", _HTR_Upsert)
+
+_HTR_SiblingCollision() {
+	Record := Map("key", "currency", "char", "😀", "label", "Collision", "consume", TOML_Bool(false))
+	AssertThrows(HotstringsTerminatorRecordPlan.Bind(_HTR_Source(),
+		Map("mode", "upsert", "record", Record)), "an earlier row must not steal an admitted later sibling scalar")
+}
+Test("terminator-records: an upsert cannot silently quarantine a later admitted sibling", _HTR_SiblingCollision)
+
+_HTR_Remove() {
+	RemovalSource := _HTR_Source() . '[[hotstrings.terminators]]`nkey = "old_bad"`nchar = "zz"`nlabel = "Keep quarantined"`nconsume = false`nunknown = "retain"`n'
+	Plan := HotstringsTerminatorRecordPlan(RemovalSource, Map("mode", "remove", "key", "currency"))
+	Document := TOML_ParseDocument(Plan.Content)
+	AssertEqual(2, Document["hotstrings"]["terminators"].Length)
+	AssertEqual("smile", Document["hotstrings"]["terminators"][1]["key"])
+	AssertEqual("retain", Document["hotstrings"]["terminators"][2]["unknown"])
+	AssertEqual(1, Plan.Settings.Records.Length)
+	AssertEqual("never alter", Document["foreign"]["rows"][1]["value"])
+}
+Test("terminator-records: removing one admitted record retains quarantined rows and foreign tables", _HTR_Remove)
+
+_HTR_StateBody() {
+	global _HotstringsTerminatorRecords, _HotstringsWordDelimiters
+	Plan := HotstringsTerminatorRecordPlan(_HTR_Source(), Map("mode", "state", "key", "currency", "enabled", false))
+	_HotstringsTerminatorRecords := Plan.Settings
+	_HotstringsWordDelimiters := "!¤"
+	AssertEqual("!😀", HotstringsGetWordDelimiters(), "a disabled record owns its scalar even in the older string")
+	AssertEqual("!", HotstringsGetConsumedDelimiters())
+	AssertEqual("!¤", _HotstringsWordDelimiters, "effective record projection must not rewrite historical preferences")
+	AssertThrows(HotstringsTerminatorRecordPlan.Bind(_HTR_Source(),
+		Map("mode", "state", "key", "currency", "enabled", "false")))
+}
+_HTR_State() {
+	_HTR_WithRuntime(_HTR_StateBody)
+}
+Test("terminator-records: exact record state projection and typed edit preserve legacy strings", _HTR_State)
+
+_HTR_ParentInlineEdit() {
+	ParentFixtureSource := 'hotstrings = { terminators = [{ key = "one", char = "¤", label = "One", consume = false }], unknown = "keep" }`n'
+	AssertEqual(1, HotstringsTerminatorRecordsResolve(TOML_ParseDocument(ParentFixtureSource)).Records.Length)
+	ParentEdited := HotstringsTerminatorRecordPlan(ParentFixtureSource, Map("mode", "remove", "key", "one"))
+	AssertEqual(0, TOML_ParseDocument(ParentEdited.Content)["hotstrings"]["terminators"].Length)
+	AssertEqual("keep", TOML_ParseDocument(ParentEdited.Content)["hotstrings"]["unknown"])
+	AssertContains(ParentEdited.Content, ' unknown = "keep" }`n', "an inline edit preserves the exact unrelated member and closure")
+}
+Test("terminator-records: actual inline parent removal preserves the independent foreign member", _HTR_ParentInlineEdit)
+
+_HTR_Operation() {
+	return Map("mode", "upsert", "record", Map("key", "section", "char", "§",
+		"label", "Section", "consume", TOML_Bool(false)))
+}
+
+_HTR_WalLifecycle(Refuse) {
+	Fixture := _ScopeOwnerFixture()
+	Assert(FSWriteDurable(Fixture.path, _HTR_Source()))
+	Bundle := 0, OnSuccess := 0, OnRefused := 0, Calls := 0
+	Launch(Success, Borrowed, Refused) {
+		Bundle := Borrowed, OnSuccess := Success, OnRefused := Refused
+		Calls += 1
+		return true
+	}
+	Fixture.options["reload"] := Launch
+	try {
+		Receipt := HotstringsTerminatorRecordsEdit(_HTR_Operation(), Fixture.options)
+		AssertEqual(1, Calls, "actual durable publication must reach the reload admission")
+		AssertEqual("pending", Receipt["status"], "durable write is not a runtime acknowledgement")
+		AssertEqual(3, TOML_ParseDocument(FSReadUtf8Exact(Fixture.path))["hotstrings"]["terminators"].Length)
+		Assert(!_ConfigWriteLeaseTryAcquire(Fixture.path, "intruder"), "reload owns the configuration barrier")
+		if Refuse {
+			OnRefused.Call("controlled refusal")
+			AssertEqual("refused", Receipt["status"])
+			AssertEqual(_HTR_Source(), FSReadUtf8Exact(Fixture.path), "the genuine rollback must restore all original bytes")
+			Receipt := HotstringsTerminatorRecordsEdit(_HTR_Operation(), Fixture.options)
+			AssertEqual("pending", Receipt["status"], "settled refusal permits one new admitted retry")
+			OnRefused.Call("controlled second refusal")
+			AssertEqual(_HTR_Source(), FSReadUtf8Exact(Fixture.path))
+		} else {
+			OnSuccess.Call()
+			AssertEqual("committed", Receipt["status"], "only the actual replacement callback acknowledges runtime completion")
+		}
+	} finally {
+		if Bundle is Object
+			_ConfigWriteTerminalRelease(Bundle)
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("terminator-records: genuine WAL commit retains pending ownership until reload ACK", _HTR_WalLifecycle.Bind(false))
+Test("terminator-records: genuine refused reload rolls back exact bytes and permits an admitted retry", _HTR_WalLifecycle.Bind(true))
+
+_HTR_ForeignSource() {
+	Fixture := _ScopeOwnerFixture()
+	Assert(FSWriteDurable(Fixture.path, _HTR_Source()))
+	Port := ConfigTransitionProductionPort(), NativeHash := Port["hash"]
+	Changed := false, Foreign := _HTR_Source() . '# independently changed source`n'
+	Hash(Content) {
+		Digest := NativeHash.Call(Content)
+		if !Changed && Content == _HTR_Source() {
+			Changed := true
+			Assert(FSWriteDurable(Fixture.path, Foreign))
+		}
+		return Digest
+	}
+	Port["hash"] := Hash
+	Fixture.options["port"] := Port
+	Bundle := 0, OnRefused := 0, Launches := 0
+	Launch(Success, Borrowed, Refused) {
+		Launches += 1, Bundle := Borrowed, OnRefused := Refused
+		return true
+	}
+	Fixture.options["reload"] := Launch
+	try {
+		Receipt := HotstringsTerminatorRecordsEdit(_HTR_Operation(), Fixture.options)
+		AssertEqual(0, Launches, "a stale exact-source intent must refuse before reload admission")
+		Assert(Changed, "the actual native hash boundary must exercise the source race")
+		AssertEqual("refused", Receipt["status"])
+		AssertEqual(Foreign, FSReadUtf8Exact(Fixture.path), "a foreign source wins before any replacement")
+	} finally {
+		if HasMethod(OnRefused, "Call")
+			OnRefused.Call("controlled cleanup")
+		if Bundle is Object
+			_ConfigWriteTerminalRelease(Bundle)
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("terminator-records: an independently changed source refuses the actual conditional WAL candidate", _HTR_ForeignSource)
+
+_HTR_TerminalBarrier() {
+	Fixture := _ScopeOwnerFixture()
+	Bundle := _ConfigWriteTerminalTryAcquire([Fixture.path])
+	Assert(Bundle is Object)
+	try {
+		Receipt := HotstringsTerminatorRecordsEdit(_HTR_Operation(), Fixture.options)
+		AssertEqual("refused", Receipt["status"])
+		AssertEqual(Fixture.source, FSReadUtf8Exact(Fixture.path))
+		Assert(_ConfigWriteLeaseSelectOwner(Bundle, Fixture.path) is Object,
+			"the refused record editor must preserve the independently held lifecycle owner")
+	} finally {
+		_ConfigWriteTerminalRelease(Bundle)
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("terminator-records: a genuine foreign terminal barrier refuses before candidate effects", _HTR_TerminalBarrier)
+
+_HTR_ForeignOwnership() {
+	OwnerFeatures := Map(), BeforeCount := OwnerFeatures.Count
+	for ForeignMemberKey in ["terminators", "terminator_states"] {
+		AssertEqual("", TomlConfigUnknownKind(OwnerFeatures, "hotstrings", ForeignMemberKey, &ForeignMemberOwner))
+		AssertEqual("TerminatorRecords", ForeignMemberOwner, "record leaves must not become cleanup candidates")
+	}
+	AssertEqual(BeforeCount, OwnerFeatures.Count, "foreign ownership admission cannot manufacture a Features namespace")
+}
+Test("terminator-records: loader and cleanup recognize the actual foreign record owner", _HTR_ForeignOwnership)
+
+
+
+
+
+; ======================================================
+; ======================================================
+; ======= 5/ Inline Terminator Parent Ownership ========
+; ======================================================
+; ======================================================
 
 _HTRI_Source() {
 	return 'hotstrings = { terminators = [{ key = "currency", char = "¤", label = "Currency", consume = false, metadata = { tag = "retain" } }], terminator_states.currency = true, unknown = { nested = ["a,b", "{keep}", { child = "x=y" }], exact = "a # b" } } # parent comment`n[layout]`nenabled=true`n'
@@ -435,6 +693,33 @@ _HTRI_AssertForeign(InlineContent) {
 	AssertEqual("a,b", TOML_ParseDocument(InlineContent)["hotstrings"]["unknown"]["nested"][1])
 }
 
+_HTRI_DedicatedEdits() {
+	InlineFixtureSource := _HTRI_Source()
+	Edited := HotstringsTerminatorRecordPlan(InlineFixtureSource, Map("mode", "upsert", "record",
+		Map("key", "currency", "char", "¤", "label", "Changed", "consume", TOML_Bool(true))))
+	_HTRI_AssertForeign(Edited.Content)
+	TypedImage := TOML_ParseDocument(Edited.Content)
+	AssertEqual("Changed", TypedImage["hotstrings"]["terminators"][1]["label"])
+	AssertEqual("retain", TypedImage["hotstrings"]["terminators"][1]["metadata"]["tag"])
+	AssertTrue(TypedImage["hotstrings"]["terminators"][1]["consume"].Value)
+	Disabled := HotstringsTerminatorRecordPlan(Edited.Content, Map("mode", "state", "key", "currency", "enabled", 0))
+	_HTRI_AssertForeign(Disabled.Content)
+	AssertEqual(false, TOML_ParseDocument(Disabled.Content)["hotstrings"]["terminator_states"]["currency"].Value)
+	Removed := HotstringsTerminatorRecordPlan(Disabled.Content, Map("mode", "remove", "key", "currency"))
+	_HTRI_AssertForeign(Removed.Content)
+	AssertEqual(0, TOML_ParseDocument(Removed.Content)["hotstrings"]["terminators"].Length)
+}
+Test("terminator-inline: actual typed upsert state and removal preserve complete foreign member spans", _HTRI_DedicatedEdits)
+
+_HTRI_MissingList() {
+	InlineFixtureSource := 'hotstrings = { terminator_states = { future = false }, opaque = ["x,y", { tag = "keep" }] }`n'
+	Inserted := HotstringsTerminatorRecordPlan(InlineFixtureSource, _HTR_Operation())
+	AssertContains(Inserted.Content, ' opaque = ["x,y", { tag = "keep" }] ')
+	InsertedDocument := TOML_ParseDocument(Inserted.Content)
+	AssertEqual("section", InsertedDocument["hotstrings"]["terminators"][1]["key"])
+	AssertEqual(false, InsertedDocument["hotstrings"]["terminator_states"]["future"].Value)
+}
+Test("terminator-inline: inserting an absent list preserves foreign inline metadata and unknown states", _HTRI_MissingList)
 
 _HTRI_CanonicalSibling(InlineLeaf) {
 	InlinePath := _TBUI_NewPath(), InlineFixtureSource := _HTRI_Source()
@@ -474,3 +759,142 @@ _HTRI_ProtectedRefusal(InlineUpdates, InlinePrefixes := []) {
 Test("terminator-inline: the canonical writer cannot replace records with a collapsed flat leaf", _HTRI_ProtectedRefusal.Bind([{ Section: "hotstrings", Key: "terminators", Value: [] }]))
 Test("terminator-inline: a native case alias cannot acquire the closed parent", _HTRI_ProtectedRefusal.Bind([{ Section: "HOTSTRINGS", Key: "custom_pref", Value: "new" }]))
 Test("terminator-inline: namespace replacement cannot delete unknown parent members", _HTRI_ProtectedRefusal.Bind([], ["hotstrings"]))
+
+_HTRI_WalRefusal() {
+	InlineFixture := _ScopeOwnerFixture(), InlineFixtureSource := _HTRI_Source(), RefuseInline := 0
+	InlineLaunch(Succeeded, Borrowed, Refused) {
+		RefuseInline := Refused
+		return true
+	}
+	InlineFixture.options["reload"] := InlineLaunch
+	try {
+		AssertTrue(FSWriteDurable(InlineFixture.path, InlineFixtureSource))
+		InlineReceipt := HotstringsTerminatorRecordsEdit(_HTR_Operation(), InlineFixture.options)
+		AssertEqual("pending", InlineReceipt["status"])
+		AssertEqual(2, TOML_ParseDocument(FSReadUtf8Exact(InlineFixture.path))["hotstrings"]["terminators"].Length)
+		AssertTrue(HasMethod(RefuseInline, "Call"))
+		RefuseInline.Call("controlled inline reload refusal")
+		AssertEqual("refused", InlineReceipt["status"])
+		AssertTrue(FSUtf8ExactMatches(InlineFixture.path, InlineFixtureSource), "actual WAL rollback restores every original inline byte")
+		AssertFalse(_ConfigWriteTerminalIsActive(), "actual refused reload must release its terminal barrier")
+		AssertEqual(0, _ConfigWriteLeaseOwners().Count, "actual refused reload must release every owned path")
+	} finally _ScopeOwnerCleanup(InlineFixture)
+}
+Test("terminator-inline: actual reload refusal rolls back the exact inline parent through the existing WAL", _HTRI_WalRefusal)
+
+
+
+
+
+; =================================================
+; =================================================
+; ======= 6/ Fresh Native Add Record Intent =======
+; =================================================
+; =================================================
+
+_HTRA_Source(Kind) {
+	if Kind == "authored"
+		return 'hotstrings = { terminators = [{ key="custom_A4", char="§", label="Authored", consume=true, metadata={opaque="keep",count=7} }], terminator_states={custom_A4=false, future=true}, unknown={nested="retain"} } # retain parent comment`n[foreign]`nkeep="exact" # retain foreign comment`n'
+	return '[hotstrings]`nterminators=[]`nterminator_states={custom_A4=false, future=true}`n[foreign]`nkeep="exact" # retain foreign comment`n'
+}
+
+_HTRA_MenuAddCollisionBody(Kind) {
+	global _HotstringsTerminatorRecords
+	AddFixture := _ScopeOwnerFixture()
+	AddSource := _HTRA_Source(Kind)
+	AddBundle := 0, AddAcknowledge := 0, AddRefused := 0, AddLaunches := 0
+	AddLaunch(Acknowledge, Borrowed, Refused) {
+		AddBundle := Borrowed, AddAcknowledge := Acknowledge, AddRefused := Refused
+		AddLaunches += 1
+		return true
+	}
+	AddFixture.options["reload"] := AddLaunch
+	try {
+		AssertTrue(FSWriteDurable(AddFixture.path, AddSource))
+		HotstringsTerminatorRecordsInit(AddSource)
+		PriorAddOwner := _HotstringsTerminatorRecords
+		PriorAddDocument := TOML_ParseDocument(AddSource)
+		AddReceipt := _HS_DelimAddRecordCommit("¤", 0, AddFixture.options)
+		AssertEqual(1, AddLaunches, "the actual Add owner must reach real conditional WAL reload admission")
+		AssertEqual("pending", AddReceipt["status"], "durable Add is not a runtime acknowledgment")
+		AssertEqual(PriorAddOwner, _HotstringsTerminatorRecords, "pending Add must not replace the live consumer")
+		AddBytes := FSReadUtf8Exact(AddFixture.path)
+		AddDocument := TOML_ParseDocument(AddBytes)
+		AssertEqual(Kind == "authored" ? 2 : 1, AddDocument["hotstrings"]["terminators"].Length,
+			"native Add must append without overwriting an independently authored key")
+		AddedDefinition := AddDocument["hotstrings"]["terminators"][Kind == "authored" ? 2 : 1]
+		AssertEqual("custom_A4_1", AddedDefinition["key"], "both record and future-state occupation require a fresh exact key")
+		AssertEqual("¤", AddedDefinition["char"])
+		AssertEqual(false, AddedDefinition["consume"].Value)
+		if Kind == "authored" {
+			AssertTrue(TOML_SameValue(PriorAddDocument["hotstrings"]["terminators"][1],
+				AddDocument["hotstrings"]["terminators"][1]), "every original record field and unknown metadata must survive")
+			AssertTrue(TOML_SameValue(PriorAddDocument["hotstrings"]["unknown"],
+				AddDocument["hotstrings"]["unknown"]), "the unrelated inline parent owner must survive")
+		}
+		for PriorStateKey, PriorStateValue in PriorAddDocument["hotstrings"]["terminator_states"]
+			AssertTrue(TOML_SameValue(PriorStateValue, AddDocument["hotstrings"]["terminator_states"][PriorStateKey]),
+				"fresh Add must preserve every existing state owner")
+		AssertEqual(true, AddDocument["hotstrings"]["terminator_states"]["custom_A4_1"].Value,
+			"the new Add intent must explicitly enable only its fresh key")
+		AssertEqual(false, AddDocument["hotstrings"]["terminator_states"]["custom_A4"].Value)
+		AssertContains(AddBytes, '[foreign]`nkeep="exact" # retain foreign comment`n')
+		AddedSettings := HotstringsTerminatorRecordsResolve(AddDocument)
+		AssertEqual(Kind == "authored" ? 2 : 1, AddedSettings.Records.Length)
+		AssertEqual(true, AddedSettings.Records[AddedSettings.Records.Length].Enabled,
+			"a future false state must not silently disable the newly added scalar")
+		AssertTrue(HasMethod(AddAcknowledge, "Call"))
+		AssertTrue(AddAcknowledge.Call(), "the actual retained callback must acknowledge the owned transaction")
+		AssertEqual("committed", AddReceipt["status"])
+		AssertEqual(PriorAddOwner, _HotstringsTerminatorRecords,
+			"the modeled replacement acknowledgment is not a fake local boot")
+	} finally {
+		if HasMethod(AddRefused, "Call")
+			AddRefused.Call("controlled Add fixture cleanup")
+		if AddBundle is Object
+			_ConfigWriteTerminalRelease(AddBundle)
+		_ScopeOwnerCleanup(AddFixture)
+	}
+}
+
+_HTRA_MenuAddCollision(Kind) {
+	_HTR_WithRuntime(_HTRA_MenuAddCollisionBody.Bind(Kind))
+}
+Test("terminator-add: actual native Add preserves an authored generated-key record through WAL acknowledgment",
+	_HTRA_MenuAddCollision.Bind("authored"))
+Test("terminator-add: actual native Add reserves a future false state and explicitly enables its fresh key",
+	_HTRA_MenuAddCollision.Bind("future-state"))
+
+_HTRA_FiniteAllocationAndQuarantinedKeys() {
+	AllocationSource := 'hotstrings = { terminators = [{key="custom_A4",char="§",label="Valid",consume=false},{key="custom_A4_1",char="bad",label="Quarantined",consume=false,unknown="keep"}], terminator_states={custom_A4_2=false, opaque="keep"}, foreign="unchanged" }`n'
+	AddedAllocation := HotstringsTerminatorRecordPlan(AllocationSource, Map("mode", "add", "record",
+		Map("key", "custom_A4", "char", "¤", "label", "Independent currency", "consume", TOML_Bool(false))))
+	AllocationBefore := TOML_ParseDocument(AllocationSource)
+	AllocationAfter := TOML_ParseDocument(AddedAllocation.Content)
+	AssertEqual(3, AllocationAfter["hotstrings"]["terminators"].Length)
+	AssertEqual("custom_A4_3", AllocationAfter["hotstrings"]["terminators"][3]["key"],
+		"quarantined raw keys and future states both reserve their exact identity")
+	loop 2
+		AssertTrue(TOML_SameValue(AllocationBefore["hotstrings"]["terminators"][A_Index],
+			AllocationAfter["hotstrings"]["terminators"][A_Index]))
+	AssertEqual("keep", AllocationAfter["hotstrings"]["terminator_states"]["opaque"])
+	AssertEqual("unchanged", AllocationAfter["hotstrings"]["foreign"])
+	AssertEqual(true, AllocationAfter["hotstrings"]["terminator_states"]["custom_A4_3"].Value)
+	HoleSource := 'hotstrings = { terminators = [], terminator_states={custom_A4=false,custom_A4_2=false} }`n'
+	HolePlan := HotstringsTerminatorRecordPlan(HoleSource, Map("mode", "add", "record",
+		Map("key", "custom_A4", "char", "¤", "label", "Independent currency", "consume", TOML_Bool(false))))
+	AssertEqual("custom_A4_1", TOML_ParseDocument(HolePlan.Content)["hotstrings"]["terminators"][1]["key"],
+		"cardinality bounds the search but must not skip an independently free earlier key")
+}
+Test("terminator-add: finite actual allocation reserves quarantined keys and future states without skipping a free hole",
+	_HTRA_FiniteAllocationAndQuarantinedKeys)
+
+_HTRA_MalformedStatesRefuse() {
+	MalformedAddSource := 'hotstrings = { terminators = [], terminator_states="opaque" }`n'
+	AssertThrows(HotstringsTerminatorRecordPlan.Bind(MalformedAddSource, Map("mode", "add", "record",
+		Map("key", "custom_A4", "char", "¤", "label", "Independent currency", "consume", TOML_Bool(false)))),
+		"Add must not replace an unaddressable existing state owner")
+	AssertEqual('hotstrings = { terminators = [], terminator_states="opaque" }`n', MalformedAddSource)
+}
+Test("terminator-add: an unaddressable existing state owner refuses the new Add intent",
+	_HTRA_MalformedStatesRefuse)
