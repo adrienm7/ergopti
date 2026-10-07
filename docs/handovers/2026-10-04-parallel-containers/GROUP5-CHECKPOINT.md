@@ -1796,3 +1796,21 @@ unmodified in this tranche. Independent qualification covers78 healthy tests,
 12 preimage assertion failures and four causal mutant refusals. Root covering
 checks precede publication. Native replay must identify the actual setup refusal;
 neither the cause nor production signing is qualified. Item31 stays open.
+
+## Active-extension query source prerequisite
+
+The coherent five-path source adds an internal actual properties-request owner,
+standalone native main, ordinary Swift consumer and13 frozen portable controls.
+Two independently reproduced source defects are corrected: harmless read atime
+changes do not invalidate meaningful file stamps, and executing signer providers
+must retain their exact current original source/operation identities. Native
+case bodies, packet contracts and25/30/35/10 budgets remain whole. A separately
+reviewed format amendment preserves complete ASTs; a mechanical signer-reference
+composition binds the actual published ede30 fixture and nothing else. The final
+cohort independently passes39 portable executions and six original source-control
+runs. Native request denial/timeout/refusal stays a named failure; an empty
+property array proves only delivery. Installed/active protection, broker/client
+readiness, approval, provisioning and production callers stay unqualified. Root
+selected gates precede publication; actual Swift/Darwin execution remains CI-only.
+No default, activation, initializer, entitlement, manifest or workflow changes.
+Item31 and transverse16/38 stay open.
