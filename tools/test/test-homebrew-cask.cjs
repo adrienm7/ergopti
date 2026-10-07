@@ -278,7 +278,7 @@ check('portable Brew ownership controls remain registered and mandatory', () => 
 	assert.ifError(result.error);
 	assert.strictEqual(result.signal, null, result.stderr);
 	assert.strictEqual(result.status, 0, result.stderr);
-	assert.match(result.stderr, /Ran 38 tests in /);
+	assert.match(result.stderr, /Ran 39 tests in /);
 	assert.match(result.stderr, /\nOK\s*$/);
 	assert.doesNotMatch(result.stderr, /skipped=/);
 });
@@ -312,7 +312,7 @@ check(
 		);
 		assert.match(
 			registration,
-			/const enum AppKitAdmission admission = admit_appkit\(\[NSApplication sharedApplication\]\);\s*if \(admission != AppKitAdmitted\) \{[\s\S]*?return 65;/
+			/NSApplication \*application = \[NSApplication sharedApplication\];\s*struct AppKitPolicyObservation before;\s*const enum AppKitAdmission admission = observe_appkit_admission\(application, &before\);\s*if \(admission != AppKitAdmitted\) \{[\s\S]*?return 65;/
 		);
 		assert.doesNotMatch(receiver, /\bTransformProcessType\s*\(/);
 		const appkitStart = receiver.indexOf('static enum AppKitAdmission admit_appkit(');
