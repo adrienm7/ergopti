@@ -278,7 +278,7 @@ check('portable Brew ownership controls remain registered and mandatory', () => 
 	assert.ifError(result.error);
 	assert.strictEqual(result.signal, null, result.stderr);
 	assert.strictEqual(result.status, 0, result.stderr);
-	assert.match(result.stderr, /Ran 48 tests in /);
+	assert.match(result.stderr, /Ran 51 tests in /);
 	assert.match(result.stderr, /\nOK\s*$/);
 	assert.doesNotMatch(result.stderr, /skipped=/);
 });
@@ -363,9 +363,16 @@ check(
 			helper.indexOf('def ', helper.indexOf('def _admit_appleevent_boundary') + 5)
 		);
 		assert.doesNotMatch(boundary, /xcrun/);
+		const pairStart = helper.indexOf('def _build_appleevent_pair(');
+		const pairEnd = helper.indexOf('def _admit_appleevent_boundary(', pairStart);
+		assert.ok(
+			pairStart >= 0 && pairEnd > pairStart,
+			'the real pair compile recipe must be present'
+		);
+		const pairRecipe = helper.slice(pairStart, pairEnd);
 		assert.match(
-			boundary,
-			/if role == "receiver":\s*command \+= \[\s*"-x",\s*"objective-c",\s*"-fobjc-arc",\s*"-framework",\s*"Carbon",\s*"-framework",\s*"AppKit",?\s*\]/
+			pairRecipe,
+			/\*compiler,\s*"-std=c11",\s*"-O2",\s*"-fobjc-arc",\s*"-framework",\s*"ApplicationServices",\s*"-framework",\s*"Carbon",\s*"-framework",\s*"AppKit",\s*str\(repository \/ "tools\/diagnostics\/native_appleevent_probe_pair\.m"\)/
 		);
 		assert.match(
 			boundary,
@@ -402,6 +409,32 @@ check('owned AppleEvent probe constructs the shared private SDK event before any
 		/registration_controls\.stdout\s*==\s*"native_appkit_registration_controls=5\\nnative_private_appleevent_controls=1\\n"/
 	);
 	assert.match(helper, /"tools\/diagnostics\/native_appleevent_probe_protocol\.h",/);
+});
+
+check('owned AppleEvent roles use one image without replacing non-self nonce admission', () => {
+	const diagnostic = (name) => fs.readFileSync(path.join(ROOT, 'tools/diagnostics', name), 'utf8');
+	const pair = diagnostic('native_appleevent_probe_pair.m');
+	for (const role of ['receiver', 'sender']) {
+		assert.match(pair, new RegExp('#define main owned_' + role + '_entry'));
+		assert.match(pair, new RegExp('#include "native_appleevent_probe_' + role + '\\.c"'));
+		assert.match(pair, new RegExp('return owned_' + role + '_entry\\(argc - 1, argv \\+ 1\\);'));
+	}
+	const sender = diagnostic('native_appleevent_probe_sender.c');
+	assert.match(sender, /parsed > INT_MAX \|\| parsed == getpid\(\)/);
+	assert.match(sender, /nonce_observation\.matches = read == noErr/);
+	assert.match(sender, /kAEWaitReply \| kAENeverInteract \| kAEDoNotPromptForUserConsent/);
+	assert.doesNotMatch(pair, /TCC|entitlement|AESendMessage|AEPutParamPtr|AEInstallEventHandler/);
+	const helper = diagnostic('macos_brew_archive_acceptance.py');
+	assert.match(
+		helper,
+		/executables = _build_appleevent_pair\(children, repository, root, compiler, nonce\)/
+	);
+	assert.match(
+		helper,
+		/receiver = children\.start\(\s*\[\*executables\["receiver"\], str\(ready\), str\(marker\), nonce\]\s*\)/
+	);
+	assert.match(helper, /sender = \[\*executables\["sender"\], str\(receiver\.pid\), nonce\]/);
+	assert.match(helper, /"tools\/diagnostics\/native_appleevent_probe_pair\.m",/);
 });
 
 check('native XCTest invokes actual Brew acceptance and requires its complete receipt', () => {
