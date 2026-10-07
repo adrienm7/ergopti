@@ -166,6 +166,64 @@ async function run({
 	let work;
 	// Public diagnostics use only lexical checkpoint literals; no private input.
 	let checkpoint = 'source-admission';
+	let phaseObservation; // Fixed passive facts only; no owner/deadline action.
+	function emitPhaseObservation() {
+		if (!phaseObservation) return;
+		const result = phaseObservation.result;
+		const ownValue = (name) => {
+			if (!result || typeof result !== 'object') return undefined;
+			const field = Object.getOwnPropertyDescriptor(result, name);
+			return field && Object.hasOwn(field, 'value') ? field.value : undefined;
+		};
+		const rawStatus = ownValue('status'),
+			rawSignal = ownValue('signal'),
+			rawError = ownValue('error');
+		const status =
+			Number.isSafeInteger(rawStatus) && rawStatus >= 0 && rawStatus <= 255 ? rawStatus : 'unknown';
+		const signal =
+			rawSignal === null
+				? 'none'
+				: rawSignal === undefined
+					? 'unknown'
+					: ['SIGTERM', 'SIGKILL', 'SIGINT', 'SIGABRT', 'SIGSEGV'].includes(rawSignal)
+						? rawSignal
+						: 'other';
+		const knownErrors = [
+			'owned_cleanup_pending',
+			'deadline',
+			'caller_cancelled',
+			'cancel_refused',
+			'capture_bound',
+			'capture_observation_refused',
+			'spawn_refused',
+			'acquisition_refused',
+			'native_closure_unknown',
+			'sink_closure_unknown'
+		];
+		const ownerError =
+			rawError === null
+				? 'none'
+				: rawError === undefined
+					? 'unknown'
+					: knownErrors.includes(rawError)
+						? rawError
+						: 'other';
+		const retained = hasRetainedPhases() === true ? 'true' : 'false';
+		error(
+			'NIX_OWNED_PHASE_OBSERVATION checkpoint=' +
+				phaseObservation.checkpoint +
+				' boundary=' +
+				phaseObservation.boundary +
+				' status=' +
+				status +
+				' signal=' +
+				signal +
+				' owner_error=' +
+				ownerError +
+				' retained=' +
+				retained
+		);
+	}
 	try {
 		current();
 		const head = environment.ERGOPTI_NIX_EXPECTED_HEAD || environment.GITHUB_SHA;
@@ -231,7 +289,9 @@ async function run({
 				refuse();
 		}
 		function executionCurrent() {
+			if (phaseObservation) phaseObservation.boundary = 'clock_or_cancel_fence';
 			current();
+			if (phaseObservation) phaseObservation.boundary = 'execution_source_fence';
 			if (sha(bytes(path.join(root, NODE_OWNER))) !== capturedNodeOwner) refuse();
 			for (const relative of inputs) {
 				if (
@@ -250,7 +310,9 @@ async function run({
 		const env = cleanEnvironment(environment, home, config, tmp);
 		let serial = 0;
 		async function phase(command, args, extra = {}, budgetMs = 60000) {
+			phaseObservation = { checkpoint, boundary: 'entry', result: undefined };
 			executionCurrent();
+			phaseObservation.boundary = 'owned_phase';
 			const result = await ownPhase({
 				command,
 				args,
@@ -265,8 +327,11 @@ async function run({
 				budgetMs,
 				gateDeadline: deadline
 			});
+			phaseObservation.result = result;
 			executionCurrent();
+			phaseObservation.boundary = 'result_or_physical_debt_gate';
 			if (!success(result) || hasRetainedPhases()) refuse();
+			phaseObservation.boundary = 'native_identity_fence';
 			if (
 				sha(bytes(nix)) !== identities.nix ||
 				sha(bytes(path.join(root, 'tools/test/run-linux-managed-http-phase.py'))) !==
@@ -275,6 +340,7 @@ async function run({
 					identities.owner
 			)
 				refuse();
+			phaseObservation.boundary = 'accepted';
 			return result;
 		}
 		async function git(args) {
@@ -420,6 +486,10 @@ async function run({
 		log(SUMMARY);
 		return 0;
 	} catch {
+		// Optional diagnostics cannot replace the original fixed refusal or its cleanup.
+		try {
+			emitPhaseObservation();
+		} catch {}
 		error(
 			'[FAIL] Nix native source/build/runtime or physical closure refused; private inputs retained.'
 		);

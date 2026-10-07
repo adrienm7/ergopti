@@ -5799,6 +5799,18 @@ preserved in the [restored-container checkpoint](handovers/2026-10-06-group6-rec
 The installed native archive/update chain remains required; saved patches do
 not close this item.
 
+Manual run 37546410275 on f346157c726b96e36f12701ea61b60be76e9e3e9
+passes Linux 10142/0, genuine relative-clock 9/0, mandatory temporary updater
+63 unique controls, managed output 18/public 30, and installed archive 3/15,
+with no product skips in those native receipts. The live update instead
+fails before installer acquisition: its first download request was not
+dispatched. Genuine Nix fails at pinned-source-metadata before its native
+build/runtime cases. Additive fixed owned-phase diagnostics preserve the
+original physical owner, clocks, pins and predicates; actual command/fence
+refusal remains to be observed. This is diagnostic work, not a Nix fix or
+native packaging credit. The release-check-to-download physical join and
+the previously recorded company-network implementation remain unfinished.
+
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard
   layers on all three drivers. Windows and macOS also support their existing
