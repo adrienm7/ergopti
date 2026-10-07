@@ -26,6 +26,7 @@ function M.with_session(options, body)
 	function s.descriptor(id) for fd, path in pairs(descriptors) do if path == paths[id] then return fd end end end
 	local symbols = {
 		open = function(path)
+			if options.fail_reader_open then return -1 end
 			local fd
 			if options.recycle_descriptor and #released_fds > 0 then fd = table.remove(released_fds)
 			else serial = serial + 1; fd = serial end
@@ -35,8 +36,14 @@ function M.with_session(options, body)
 			descriptors[fd] = nil; released_fds[#released_fds + 1] = fd
 			return options.fail_reader_close and -1 or 0
 		end,
-		ioctl = function(_, _, argument)
-			if type(argument) == "table" then argument.bytes = string.rep("\0", argument.count or 1) end
+		ioctl = function(_, request, argument)
+			if type(argument) == "table" then
+				argument.bytes = string.rep("\0", argument.count or 1)
+				-- LED_CAPSL is bit one; key-state queries keep their original zero bytes.
+				if options.caps_led and request % 256 == 0x19 then
+					argument.bytes = "\2" .. argument.bytes:sub(2)
+				end
+			end
 			return 0
 		end,
 		read = function(fd, buffer)
@@ -62,7 +69,11 @@ function M.with_session(options, body)
 	Input._reset_measurement()
 	local down = {}
 	local capture = {
-		is_ready = function() return true end, reset_state = function() down = {}; return true end,
+		is_ready = function() return true end, reset_state = function()
+			down = {}
+			if options.on_capture_reset then options.on_capture_reset(s) end
+			return true
+		end,
 		modifier_role = function(code) return require("infra.evdev_codes").MODIFIER_OF[code] end,
 		caps_locked = function() return false end, cancel_compose = function() return true end,
 		peek_text = function(code)
@@ -75,7 +86,7 @@ function M.with_session(options, body)
 			return code == 30 and value ~= 0 and (down[42] and "A" or "a") or nil
 		end,
 	}
-	package.loaded["adapters.xkb_capture"] = capture
+	package.loaded["adapters.xkb_capture"] = options.capture or capture
 	package.loaded["modules.hotstrings.device_finder"] = {
 		find_devices = function() return { paths.a, paths.b }, {} end,
 		is_key_device = function() return true end,
@@ -169,7 +180,9 @@ function M.with_session(options, body)
 				s.after_arm_acquisitions = s.acquisitions
 			end
 		end))
-		s.hook.start({ intercept = true, requireOutputBroker = true, onEmitRaw = s.writer.emit })
+		s.start_options = { intercept = true, requireOutputBroker = true, onEmitRaw = s.writer.emit,
+			onCaptureReacquired = options.on_capture_reacquired }
+		s.hook.start(s.start_options)
 		assert(s.hook.isRunning())
 		s.broker = require("adapters.modifier_broker").for_channel(s.writer)
 		function s.edge(id, code, value, at_ms)
