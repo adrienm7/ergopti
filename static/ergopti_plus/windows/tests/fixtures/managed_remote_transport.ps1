@@ -45,6 +45,15 @@ $Events = @()
 $RootInstalled = $false
 $State = @{ version = 1; state = 'starting'; phase = 'untrusted'; sequence = 0; root_removed = $false; service_stopped = $false }
 function Publish-State {
+    param([string]$TrustStep = '')
+    if ($TrustStep -ne '') {
+        if ($TrustStep -cnotin @('event_received', 'before_open', 'before_enumeration',
+            'before_export', 'before_add', 'after_add', 'before_postcheck', 'before_close')) {
+            throw [ArgumentException]::new('Invalid owned trust diagnostic step.')
+        }
+        # Trust checkpoints must not wait on native TLS observation getters.
+        $State.trust_step = $TrustStep
+    } else {
     try {
     if ($null -ne $Fixture) {
         $State.server_tls_backend = 'native_openssl3'
@@ -65,6 +74,7 @@ function Publish-State {
         }
     }
     } catch { } # Observation cannot suppress the original state write.
+    }
     $State.sequence++
     [IO.File]::WriteAllText($StatePath, ($State | ConvertTo-Json -Compress), [Text.UTF8Encoding]::new($false))
 }
@@ -1043,18 +1053,29 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
     while ([DateTime]::UtcNow -lt $Deadline) {
         $Choice = [Threading.WaitHandle]::WaitAny([Threading.WaitHandle[]]$Events, 1000)
         if ($Choice -eq 0) {
+            Publish-State -TrustStep 'event_received'
             $Store = [Security.Cryptography.X509Certificates.X509Store]::new('Root', 'CurrentUser')
             try {
+                Publish-State -TrustStep 'before_open'
                 $Store.Open([Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
+                Publish-State -TrustStep 'before_enumeration'
                 if (@($Store.Certificates | Where-Object { $_.Thumbprint -ceq $State.root_thumbprint }).Count -ne 0) {
                     throw 'Unique owned root already existed before admission.'
                 }
+                Publish-State -TrustStep 'before_export'
                 $PublicRoot = [Security.Cryptography.X509Certificates.X509Certificate2]::new($Fixture.Root.Export([Security.Cryptography.X509Certificates.X509ContentType]::Cert))
-                try { $Store.Add($PublicRoot) } finally { $PublicRoot.Dispose() }
+                try {
+                    Publish-State -TrustStep 'before_add'
+                    $Store.Add($PublicRoot)
+                    Publish-State -TrustStep 'after_add'
+                } finally { $PublicRoot.Dispose() }
                 $RootInstalled = $true
+                Publish-State -TrustStep 'before_postcheck'
                 if (@($Store.Certificates | Where-Object { $_.Thumbprint -ceq $State.root_thumbprint }).Count -ne 1) {
                     throw 'Unique owned root installation was not acknowledged.'
                 }
+                # Keep the original finally ownership and exception priority.
+                Publish-State -TrustStep 'before_close'
             } finally { $Store.Close(); $Store.Dispose() }
             $Fixture.TrustAdmitted = $true
             $State.phase = 'trusted'
