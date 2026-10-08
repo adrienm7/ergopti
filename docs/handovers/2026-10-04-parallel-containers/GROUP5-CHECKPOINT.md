@@ -2544,3 +2544,46 @@ focused strengthening check, with no scanner or baseline changes. Original
 expectation values and postconditions remain; this explicitly strengthened
 successor does not claim a byte-identical frozen test prefix. Complete selected
 verification is repeated on the final test source before publication.
+
+## Managed unavailable selection and exact native keyboard outcomes
+
+The existing managed history manager delegates unavailable selection through
+its privately captured capture port and original owner/token. No lease, policy
+begin, timer or native acquisition is created. Successful selection is
+nonterminal GAP with the first reason; ordinary terminal failure retains its
+original once-only callback. Existing lifecycle/frame/native/history/final-
+release debt prevents replacement. The existing explicit validated start owns
+later acquisition; production selectors/startup and installed authority remain
+unfinished.
+
+The exact two-source packet preserves all13 original production assertion
+lines and the complete128849-byte original78-case test prefix. Twelve new cases
+fail on the unchanged predecessor. First candidate89/1 reveals an over-specific
+new terminal-status oracle; this failed frozen cohort remains immutable. An
+unchanged-predecessor malformed-start observation passes79 cases and proves
+stopped inside the real refusal callback and retired after unwind. A separately
+reviewed successor preserves that callback assertion and adds actual retirement,
+without changing the first production draft. Final90 manager plus13 capture
+cases pass,103 distinct portable cases with modeled native ports. Independent
+review is SOURCE_ONLY_CLEAR; actual selected gates run separately after adoption.
+No native, signed-runtime, installation or production readiness is granted.
+
+Authentic private CI37790356470 at70a86f7533799cc79c8800059653dd2adee0cfae
+finishes failed. Its separate selected keyboard diagnostic passes all19 cases
+(12 selection,6 probe,1 mapping), script/capture0 and closedTIS transport0 with
+six records. Strict unchanged All-tests reporting refuses the filtered summary
+(reporter1), so diagnostic observation success is not full qualification. Its
+original unfiltered suite completes459 cases:430 pass,14 fail,15 skip, none
+unfinished. Five keyboard failures follow a real unacknowledged outer French
+restoration and retained cleanup debt. The original restoration requirements
+are preserved. Root SDK prerequisite69 has empty stdout and a named unavailable
+stderr; the later JSON error is secondary and its exact native cause requires
+evidence. Package/installation qualification remains failed/skipped.
+
+The failed private workflow also violates four unchanged wiring controls.
+Reviewed workflow-only preparationc705 restores protected adjacency and default
+steps, retaining original full-suite run body and5/25/45 limits. Its exact prior
+private purpose-token row affects only the mandatory Swift environment; no
+canonical Group6 workflow grant is implied. Actual isolated pinnedNode22 selected
+format and all383 JS checks pass. This preparation is not yet published or a
+native result. Items24/30/31/40/43/44 and transverse16/38 remain open.

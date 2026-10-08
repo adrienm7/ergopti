@@ -3355,6 +3355,15 @@ original 25-minute step deadline before any keyboard/TIS method starts.
 Darwin behavior, physical magic-key acceptance and the other native requirements
 remain unexecuted or unqualified; successful compilation does not complete30.
 
+Private macOS run37790356470 at70a86f7533799cc79c8800059653dd2adee0cfae
+executes all19 selected native keyboard cases successfully, with a closed
+six-record TIS diagnostic session. Its unchanged strict whole-suite reporter
+refuses the filtered summary. The subsequent original unfiltered run completes
+459 cases:430 pass,14 fail and15 skip. Five keyboard cases fail there after
+unacknowledged French restoration retains cleanup debt; isolated19/0 does not
+qualify whole-suite restoration or physical ISO/ANSI input. Original deadlines
+and restoration/debt assertions remain mandatory.
+
 - [~] **31.** HS-274 exact physical key accounting with an Ergopti-owned
   background Karabiner runtime (no Karabiner-Elements app). Plan, decisions and
   ADR 011 in the overnight handoff and `static/ergopti_plus/docs/adr/`. WP0-WP2
@@ -4931,6 +4940,19 @@ native ports; the predecessor fails all12 original new cases. Default binding
 remains ledger-neutral. Production selectors, startup composition, genuine
 installed/start authority and native acceptance remain unfinished; this dormant
 operation does not complete WP3 or item31.
+
+The existing managed history manager now delegates unavailable selection to its
+captured source owner/token without beginning a lease, arming a timer or starting
+native work. Its first reason is nonterminal; genuine terminal refusal remains
+once-only. Original suspension, callback and final-release debt still fence
+replacement, and only the existing explicit start can begin real admission.
+All78 original manager cases remain byte-identical;12 new causal cases plus13
+capture cases pass with modeled native ports. The first new retirement oracle
+failure is retained; its separately refined successor is based on an unchanged
+predecessor observation, preserving genuine stopped-in-callback and retired-after-
+unwind behavior. Production selectors, startup and installed/start authority
+remain absent. Full selected gates and native qualification remain separate;
+item31 and transverse16/38 stay open.
 
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
