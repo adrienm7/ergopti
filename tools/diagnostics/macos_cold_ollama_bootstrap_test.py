@@ -7,6 +7,13 @@ import io
 import tarfile
 from pathlib import Path
 import unittest
+import errno
+import os
+import socket
+import subprocess
+from unittest import mock
+
+import macos_cold_ollama_bootstrap as cold
 
 from macos_cold_ollama_bootstrap import (
     SOURCE_PATHS,
@@ -227,6 +234,149 @@ class InstalledArchiveTests(unittest.TestCase):
         (self.directory / "ollama").chmod(0o644)
         with self.assertRaises(RuntimeError):
             compare_installed_archive(self.archive, self.directory)
+
+
+class OfficialClientVersionProbeTests(unittest.TestCase):
+    """Actual loopback lease tests; mocked CLI output gives no native Mac credit."""
+
+    def assert_port_released(self, address):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as successor:
+            successor.bind(address)
+
+    def test_inherited_foreign_host_is_overridden_only_for_the_actual_probe_child(self):
+        foreign = "http://foreign-daemon.invalid:11434"
+        with mock.patch.dict(os.environ, {"OLLAMA_HOST": foreign}):
+            environment = os.environ.copy()
+            before = environment.copy()
+            observed = {}
+
+            def run(arguments, **options):
+                route = options["env"]["OLLAMA_HOST"]
+                self.assertTrue(route.startswith("http://127.0.0.1:"))
+                observed["address"] = ("127.0.0.1", int(route.rsplit(":", 1)[1]))
+                self.assertEqual(
+                    arguments,
+                    [
+                        "/usr/bin/sandbox-exec",
+                        "-f",
+                        "/owned/isolation.sb",
+                        "/owned/ollama",
+                        "--version",
+                    ],
+                )
+                self.assertEqual(
+                    {key: value for key, value in options["env"].items() if key != "OLLAMA_HOST"},
+                    {key: value for key, value in environment.items() if key != "OLLAMA_HOST"},
+                )
+                self.assertEqual(options["timeout"], 30)
+                self.assertIs(options["check"], True)
+                return subprocess.CompletedProcess(
+                    arguments,
+                    0,
+                    stdout="Warning: could not connect to a running Ollama instance\nWarning: client version is 0.24.0\n",
+                    stderr="",
+                )
+
+            with mock.patch.object(cold.subprocess, "run", side_effect=run):
+                receipt = cold.probe_installed_client_version(
+                    Path("/owned/ollama"), Path("/owned/isolation.sb"), environment
+                )
+            self.assertEqual(environment, before)
+            self.assertEqual(os.environ["OLLAMA_HOST"], foreign)
+            self.assertEqual(
+                receipt,
+                {
+                    "kind": "retained non-listening loopback socket",
+                    "address": "127.0.0.1",
+                    "port": observed["address"][1],
+                    "environment_scope": "version child only",
+                    "command_closed": True,
+                    "lease_closed": True,
+                    "client_version": "0.24.0",
+                },
+            )
+            self.assert_port_released(observed["address"])
+
+    def test_real_non_listening_socket_blocks_rebind_and_refuses_connections_until_command_returns(
+        self,
+    ):
+        observed = {}
+
+        def run(arguments, **options):
+            observed["address"] = (
+                "127.0.0.1",
+                int(options["env"]["OLLAMA_HOST"].rsplit(":", 1)[1]),
+            )
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as competitor:
+                with self.assertRaises(OSError) as conflict:
+                    competitor.bind(observed["address"])
+                self.assertEqual(conflict.exception.errno, errno.EADDRINUSE)
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client:
+                client.settimeout(0.2)
+                self.assertEqual(client.connect_ex(observed["address"]), errno.ECONNREFUSED)
+            return subprocess.CompletedProcess(
+                arguments,
+                0,
+                stdout="Warning: could not connect to a running Ollama instance\nWarning: client version is 0.24.0\n",
+                stderr="",
+            )
+
+        with mock.patch.object(cold.subprocess, "run", side_effect=run):
+            cold.probe_installed_client_version(
+                Path("/owned/ollama"), Path("/owned/isolation.sb"), {}
+            )
+        self.assert_port_released(observed["address"])
+
+    def test_literal_local_version_refuses_foreign_server_wrong_version_and_substring_spoof(
+        self,
+    ):
+        for text in (
+            "ollama version is 0.24.0\n",
+            "unexpected startup output\nWarning: could not connect to a running Ollama instance\nWarning: client version is 0.24.0\n",
+            "Warning: could not connect to a running Ollama instance\nWarning: client version is 0.24.1\n",
+            "Warning: could not connect to a running Ollama instance\nWarning: client version is 0.24.0-foreign\n",
+            "Warning: client version is 0.24.0\n",
+            "ollama version is 0.24.0\nWarning: could not connect to a running Ollama instance\nWarning: client version is 0.24.0\n",
+        ):
+            observed = {}
+            with self.subTest(text=text):
+
+                def run(arguments, **options):
+                    observed["address"] = (
+                        "127.0.0.1",
+                        int(options["env"]["OLLAMA_HOST"].rsplit(":", 1)[1]),
+                    )
+                    return subprocess.CompletedProcess(arguments, 0, stdout=text, stderr="")
+
+                with mock.patch.object(cold.subprocess, "run", side_effect=run):
+                    with self.assertRaisesRegex(RuntimeError, "pinned local version"):
+                        cold.probe_installed_client_version(
+                            Path("/owned/ollama"), Path("/owned/isolation.sb"), {}
+                        )
+                self.assert_port_released(observed["address"])
+
+    def test_timeout_and_command_refusal_release_only_the_owned_socket(self):
+        for reason in ("timeout", "exit"):
+            observed = {}
+            with self.subTest(reason=reason):
+
+                def run(arguments, **options):
+                    observed["address"] = (
+                        "127.0.0.1",
+                        int(options["env"]["OLLAMA_HOST"].rsplit(":", 1)[1]),
+                    )
+                    if reason == "timeout":
+                        raise subprocess.TimeoutExpired(arguments, options["timeout"])
+                    raise subprocess.CalledProcessError(77, arguments)
+
+                with mock.patch.object(cold.subprocess, "run", side_effect=run):
+                    with self.assertRaises(
+                        (subprocess.TimeoutExpired, subprocess.CalledProcessError)
+                    ):
+                        cold.probe_installed_client_version(
+                            Path("/owned/ollama"), Path("/owned/isolation.sb"), {}
+                        )
+                self.assert_port_released(observed["address"])
 
 
 if __name__ == "__main__":

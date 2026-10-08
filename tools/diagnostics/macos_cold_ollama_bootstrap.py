@@ -9,6 +9,7 @@ import os
 from pathlib import Path, PurePosixPath
 import platform
 import signal
+import socket
 import shutil
 import stat
 import tarfile
@@ -148,6 +149,49 @@ def qualify_runtime_isolation(paths, profile):
 
 def digest(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def probe_installed_client_version(binary, profile, environment):
+    """Hold an unserved loopback port until the exact version child is reaped."""
+    # The pinned upstream versionHandler prints the daemon version when it
+    # answers. Reserve a non-listening socket so an unrelated daemon can never
+    # supply that answer, without stopping it or changing the caller's route.
+    lease = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    address = None
+    try:
+        lease.bind(("127.0.0.1", 0))
+        address = lease.getsockname()
+        child_environment = environment.copy()
+        child_environment["OLLAMA_HOST"] = "http://127.0.0.1:" + str(address[1])
+        probe = subprocess.run(
+            ["/usr/bin/sandbox-exec", "-f", str(profile), str(binary), "--version"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            env=child_environment,
+            check=True,
+        )
+        # subprocess.run waits/reaps on success or refusal and kills/waits on
+        # timeout. Only then does finally release our exclusive bound socket.
+        expected = [
+            "Warning: could not connect to a running Ollama instance",
+            "Warning: client version is " + OFFICIAL_VERSION,
+        ]
+        if (probe.stdout + probe.stderr).splitlines() != expected:
+            raise RuntimeError("Installed official client does not report the pinned local version")
+    finally:
+        lease.close()
+    if lease.fileno() != -1:
+        raise RuntimeError("Native version probe socket lease remains open")
+    return {
+        "kind": "retained non-listening loopback socket",
+        "address": address[0],
+        "port": address[1],
+        "environment_scope": "version child only",
+        "command_closed": True,
+        "lease_closed": True,
+        "client_version": OFFICIAL_VERSION,
+    }
 
 
 def validate(result, config):
@@ -420,18 +464,7 @@ def receive(app, archive, output, repository):
                 timeout=60,
                 env=environment,
             )
-            probe = subprocess.run(
-                ["/usr/bin/sandbox-exec", "-f", str(profile), str(binary), "--version"],
-                capture_output=True,
-                text=True,
-                timeout=30,
-                env=environment,
-                check=True,
-            )
-            # Ollama may report a missing daemon on stderr. Its local client
-            # version must still be the actual pinned executable's version.
-            if "client version is " + OFFICIAL_VERSION not in probe.stdout + probe.stderr:
-                raise RuntimeError("Installed official client does not report the pinned version")
+            report["version_probe"] = probe_installed_client_version(binary, profile, environment)
             if digest(archive) != OFFICIAL_SHA256:
                 raise RuntimeError("Independent receiving archive changed during installation")
             if any(
@@ -479,4 +512,9 @@ if __name__ == "__main__":
     parser.add_argument("--repository", type=Path, default=REPOSITORY)
     parser.add_argument("--output", type=Path, required=True)
     arguments = parser.parse_args()
-    receive(arguments.app, arguments.official_archive, arguments.output, arguments.repository)
+    receive(
+        arguments.app,
+        arguments.official_archive,
+        arguments.output,
+        arguments.repository,
+    )
