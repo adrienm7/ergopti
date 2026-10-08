@@ -2,6 +2,22 @@
 ; Actual generated staging orchestrator over owned native TLS/PAC/CONNECT.
 ; The only controlled production seams are trusted config/environment readers.
 
+_UpdaterNativeRefusalDiagnostic(ExpectedStage, Receipt) {
+	Receipt := Receipt is Map ? Receipt : Map()
+	StagePattern := "proxy_resolve|proxy_connect|connect|tls|http|file_read|file_write|file_create|file_rename|file_remove"
+	Fact := "expected_stage=" . _ManagedRemoteFixtureDiagnosticEnum(ExpectedStage, StagePattern)
+		. " observed_stage=" . _ManagedRemoteFixtureDiagnosticEnum(Receipt.Get("stage", ""), StagePattern)
+		. " backend=" . _ManagedRemoteFixtureDiagnosticEnum(Receipt.Get("backend", ""),
+			"curl|winhttp|wininet|dotnet|urlsession|gio|native_fs|native_socket")
+	for Pair in [["curl_exit", 255], ["http_status", 599], ["proxy_connect_status", 599]] {
+		Value := Receipt.Get(Pair[1], "")
+		Fact .= " " . Pair[1] . "=" . (Type(Value) == "Integer" && Value >= 0 && Value <= Pair[2]
+			? Format("{:d}", Value) : "unknown")
+	}
+	return Fact . " proxy_mode=" . _ManagedRemoteFixtureDiagnosticEnum(Receipt.Get("proxy_mode", ""),
+		"selected|direct|environment|unavailable")
+}
+
 class _UpdaterNativeTransportOwner extends _ManagedRemoteFixtureOwner {
 	__New() {
 		super.__New()
@@ -41,6 +57,8 @@ class _UpdaterNativeDownloadRun {
 		; Receive the full production swap worker as UTF-8 data; never execute it.
 		this.SwapBytes := _Updater_BuildSwapWorkerScript()
 		this.Digest := "33bc8aab40703678c3ebe94d2dd8f2afff285dd901f9234e841e4679f8204fd5"
+		this.RefusalDiagnosticPrinter := _TestPrint
+		this.RefusalDiagnosticStatus := "not_requested"
 	}
 
 	OnNativeAdopt(State, Native) => this.NativeState := State
@@ -115,6 +133,15 @@ class _UpdaterNativeDownloadRun {
 		AssertTrue(Result["exit"] != 0, "actual refusal cannot return successful READY")
 		Failure := _Updater_ParseStagingFailure(Result["stdout"])
 		AssertTrue(Failure["valid"], "actual worker must publish a bounded native receipt")
+		this.RefusalDiagnosticStatus := "unavailable"
+		try {
+			this.RefusalDiagnosticPrinter.Call("::notice title=Windows native updater refusal diagnostic::"
+				. _UpdaterNativeRefusalDiagnostic(Stage, Failure["receipt"]))
+			this.RefusalDiagnosticStatus := "reported"
+		} catch Any {
+			; Reporting refusal cannot replace the original native acceptance assertions.
+			this.RefusalDiagnosticStatus := "unavailable"
+		}
 		AssertEqual(Reason, Failure["reason"])
 		if Stage != ""
 			AssertEqual(Stage, Failure["receipt"].Get("stage", ""))
@@ -174,6 +201,61 @@ class _UpdaterNativeDownloadRun {
 		return true
 	}
 }
+
+class _UpdaterNativeRefusalDiagnosticControl extends _UpdaterNativeDownloadRun {
+	__New(Printer) {
+		this.RefusalDiagnosticPrinter := Printer
+	}
+
+	Wait() {
+		return Map("exit", 1, "stdout",
+			'{"schema_version":1,"state":"failed","operation":"download","reason":"download",'
+			. '"receipt":{"backend":"curl","stage":"connect","failure_provenance":"verified",'
+			. '"curl_exit":6,"http_status":0,"proxy_connect_status":0,"proxy_mode":"direct"}}')
+	}
+}
+
+_UpdaterNativeRefusalReports(Contract) {
+	Observed := Map("calls", 0, "fact", "")
+	Run := _UpdaterNativeRefusalDiagnosticControl((Text) => (Observed["calls"] += 1, Observed["fact"] := Text))
+	Caught := false
+	try Run.Refused("download", "tls")
+	catch as Failure {
+		Caught := true
+		AssertContains(Failure.Message, "expected: <tls>, actual: <connect>", "the original stage assertion retains priority")
+	}
+	AssertTrue(Caught)
+	AssertEqual(1, Observed["calls"], "the actual refusal entry reports native facts before a stage assertion")
+	AssertContains(Observed["fact"], "curl_exit=6")
+	AssertContains(Observed["fact"], "proxy_mode=direct")
+}
+Test("updater native: refusal emits bounded native facts (managed-fixture-refusal-diagnostic)",
+	_UMF_WithContract.Bind(_UpdaterNativeRefusalReports))
+
+_UpdaterNativeRefusalProjectionAndRefusal(Contract) {
+	Private := "PRIVATE_NATIVE_CONTENT"
+	Fact := _UpdaterNativeRefusalDiagnostic(Private,
+		Map("stage", Private, "backend", Private, "curl_exit", "6", "http_status", 2147483648,
+			"proxy_connect_status", -1, "proxy_mode", Private, "stderr", Private))
+	AssertFalse(InStr(Fact, Private), "no unknown scalar or unused private field can enter the diagnostic")
+	AssertContains(Fact, "curl_exit=unknown http_status=unknown proxy_connect_status=unknown proxy_mode=unknown")
+	Fact := _UpdaterNativeRefusalDiagnostic("tls",
+		Map("stage", "tls", "backend", "curl", "curl_exit", 60, "http_status", 0, "proxy_connect_status", 200, "proxy_mode", "selected"))
+	AssertContains(Fact, "curl_exit=60 http_status=0 proxy_connect_status=200 proxy_mode=selected")
+	Control := Map("calls", 0)
+	Run := _UpdaterNativeRefusalDiagnosticControl(_ManagedRemoteStateWaitPrinterRefused.Bind(Control))
+	Caught := false
+	try Run.Refused("download", "tls")
+	catch as Failure {
+		Caught := true
+		AssertContains(Failure.Message, "expected: <tls>, actual: <connect>", "reporter refusal cannot overwrite a primary stage assertion")
+	}
+	AssertTrue(Caught)
+	AssertEqual(1, Control["calls"], "a refused sink is invoked once without recursion")
+	AssertEqual("unavailable", Run.RefusalDiagnosticStatus)
+}
+Test("updater native: refusal diagnostic excludes content and preserves assertions (managed-fixture-refusal-diagnostic)",
+	_UMF_WithContract.Bind(_UpdaterNativeRefusalProjectionAndRefusal))
 
 _UpdaterNative_Close(Fixture) {
 	Closed := Fixture.Close()

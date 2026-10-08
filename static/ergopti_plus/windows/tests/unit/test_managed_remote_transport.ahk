@@ -322,6 +322,29 @@ _ManagedRemoteFixtureWithLlmTimings(Callback) {
 	}
 }
 
+_ManagedRemoteFixtureDiagnosticEnum(Value, Pattern) {
+	return Value is String && RegExMatch(Value, "\A(?:" . Pattern . ")\z") ? Value : "unknown"
+}
+
+_ManagedRemoteFixtureStateWaitDiagnostic(Role, ExpectedState, ExpectedPhase, PreviousSequence, State, ReadStatus, ReadError) {
+	Observed := State is Map ? State : Map()
+	Sequence := Observed.Get("sequence", "")
+	Relation := "unknown"
+	if Type(Sequence) == "Integer" && Sequence >= 0 && Sequence <= 2147483647
+		&& Type(PreviousSequence) == "Integer" && PreviousSequence >= -1 && PreviousSequence <= 2147483647
+		Relation := Sequence > PreviousSequence ? "newer" : Sequence == PreviousSequence ? "same" : "older"
+	ReadStatus := _ManagedRemoteFixtureDiagnosticEnum(ReadStatus, "not_read|readable|unreadable")
+	ReadError := ReadStatus == "unreadable"
+		? _ManagedRemoteFixtureDiagnosticEnum(ReadError, "Error|OSError|ValueError|TypeError") : "none"
+	return "wait_role=" . _ManagedRemoteFixtureDiagnosticEnum(Role, "startup|trust_install|trust_remove|observe")
+		. " expected_state=" . _ManagedRemoteFixtureDiagnosticEnum(ExpectedState, "starting|ready|stopped|failed")
+		. " expected_phase=" . _ManagedRemoteFixtureDiagnosticEnum(ExpectedPhase, "untrusted|trusted|removed")
+		. " observed_state=" . _ManagedRemoteFixtureDiagnosticEnum(Observed.Get("state", ""), "starting|ready|stopped|failed")
+		. " observed_phase=" . _ManagedRemoteFixtureDiagnosticEnum(Observed.Get("phase", ""), "untrusted|trusted|removed")
+		. " sequence_relation=" . Relation . " last_read=" . ReadStatus . " read_error=" . ReadError
+		. " critical=" . (A_IsCritical != 0 ? "true" : "false") . " suspended=" . (A_IsSuspended ? "true" : "false")
+}
+
 class _ManagedRemoteFixtureOwner {
 	__New() {
 		global _DriverDir, _ManagedRemoteFixtureCleanupExitRegistered
@@ -341,6 +364,8 @@ class _ManagedRemoteFixtureOwner {
 		this.CleanupDiagnosticStatus := "not_requested"
 		this.CleanupDiagnosticPrinter := _TestPrint
 		this.CleanupFailureCheckpointStatus := "not_requested"
+		this.StateWaitDiagnosticStatus := "not_requested"
+		this.StateWaitDiagnosticPrinter := _TestPrint
 		this.Closing := false
 		this.Closed := false
 		this.Requests := Map()
@@ -379,7 +404,7 @@ class _ManagedRemoteFixtureOwner {
 			ObjBindMethod(this, "OnServerDone"), , ObjBindMethod(this, "OnNativeAdopt"), 8192)
 		if !this.Handle.start()
 			throw Error("Actual managed-network native fixture did not start.")
-		this.WaitState("ready", "untrusted", 20000)
+		this.WaitState("ready", "untrusted", 20000, -1, "startup")
 		AssertTrue(this.State.Get("curl_schannel", false), "the actual shipped curl backend must be Schannel")
 		AssertEqual("native_openssl3", this.State.Get("server_tls_backend", ""), "the independent fixture server must execute native TLS")
 		AssertTrue(Type(this.State.Get("server_tls_version", "")) == "Integer"
@@ -434,17 +459,30 @@ class _ManagedRemoteFixtureOwner {
 		return true
 	}
 
-	WaitState(ExpectedState, ExpectedPhase, BudgetMs, PreviousSequence := -1) {
+	WaitState(ExpectedState, ExpectedPhase, BudgetMs, PreviousSequence := -1, Role := "unknown") {
 		Started := A_TickCount
+		ReadStatus := "not_read"
 		while !TickExpired64(Started, BudgetMs) {
 			_SR_TreePoll()
-			if this.ReadState() && this.State.Get("state", "") == ExpectedState
+			Readable := this.ReadState()
+			ReadStatus := Readable ? "readable" : "unreadable"
+			if Readable && this.State.Get("state", "") == ExpectedState
 					&& this.State.Get("phase", "") == ExpectedPhase
 					&& this.State.Get("sequence", -1) > PreviousSequence
 				return true
 			if this.Completions.Length > 0
 				throw Error("Owned fixture settled before its required state acknowledgment.")
 			Sleep(10)
+		}
+		this.StateWaitDiagnosticStatus := "unavailable"
+		try {
+			Fact := _ManagedRemoteFixtureStateWaitDiagnostic(Role, ExpectedState, ExpectedPhase, PreviousSequence,
+				this.State, ReadStatus, this.HasOwnProp("LastStateReadError") ? this.LastStateReadError : "")
+			this.StateWaitDiagnosticPrinter.Call("::notice title=Windows native state wait diagnostic::" . Fact)
+			this.StateWaitDiagnosticStatus := "reported"
+		} catch Any {
+			; Reporting refusal cannot replace the original acknowledgment timeout.
+			this.StateWaitDiagnosticStatus := "unavailable"
 		}
 		throw Error("Owned managed-network fixture state budget expired.")
 	}
@@ -457,7 +495,8 @@ class _ManagedRemoteFixtureOwner {
 	ChangeTrust(Installed) {
 		Sequence := this.State["sequence"]
 		this.Signal(Installed ? "InstallRoot" : "RemoveRoot")
-		this.WaitState("ready", Installed ? "trusted" : "removed", 10000, Sequence)
+		this.WaitState("ready", Installed ? "trusted" : "removed", 10000, Sequence,
+			Installed ? "trust_install" : "trust_remove")
 		if !Installed
 			AssertTrue(this.State.Get("root_removed", false), "exact current-user root removal must be acknowledged")
 	}
@@ -466,7 +505,7 @@ class _ManagedRemoteFixtureOwner {
 		Sequence := this.State["sequence"]
 		Phase := this.State["phase"]
 		this.Signal("Observe")
-		this.WaitState("ready", Phase, 5000, Sequence)
+		this.WaitState("ready", Phase, 5000, Sequence, "observe")
 		if this.State.Get("ServiceFailures", 0) > 0
 			_ManagedRemoteFixtureEmitDiagnostic(this.State)
 		AssertEqual(0, this.State.Get("ServiceFailures", -1), "owned fixture must expose unexpected native service failures")
@@ -993,6 +1032,63 @@ _ManagedRemoteTimingPendingRetirement() {
 }
 Test("managed remote native: pending work retires after timing scope failure (managed-fixture-timing)",
 	_ManagedRemoteTimingPendingRetirement)
+
+_ManagedRemoteStateWaitTimeoutReports() {
+	Fixture := _ManagedRemoteFixtureOwner()
+	Observed := Map("calls", 0, "fact", "")
+	Fixture.State := Map("state", "ready", "phase", "untrusted", "sequence", 3)
+	Fixture.StateWaitDiagnosticPrinter := (Text) => (Observed["calls"] += 1, Observed["fact"] := Text)
+	Caught := false
+	try Fixture.WaitState("ready", "trusted", 0, 3)
+	catch as Failure {
+		Caught := true
+		AssertEqual("Owned managed-network fixture state budget expired.", Failure.Message,
+			"observability retains the original timeout failure")
+	}
+	AssertTrue(Caught)
+	AssertEqual(1, Observed["calls"], "an acknowledgment timeout must report its closed state projection")
+	AssertContains(Observed["fact"], "expected_phase=trusted")
+	AssertContains(Observed["fact"], "observed_phase=untrusted")
+}
+Test("managed remote native: state timeout emits bounded evidence (managed-fixture-wait-diagnostic)",
+	_ManagedRemoteStateWaitTimeoutReports)
+
+_ManagedRemoteStateWaitProjectionAndRefusal() {
+	State := Map("state", "ready", "phase", "untrusted", "sequence", 3)
+	Fact := _ManagedRemoteFixtureStateWaitDiagnostic("observe", "ready", "untrusted", 3, State, "unreadable", "OSError")
+	AssertContains(Fact, "wait_role=observe")
+	AssertContains(Fact, "sequence_relation=same")
+	AssertContains(Fact, "last_read=unreadable read_error=OSError")
+	for Pair in [[2, "older"], [4, "newer"], ["4", "unknown"], [2147483648, "unknown"]] {
+		State["sequence"] := Pair[1]
+		AssertContains(_ManagedRemoteFixtureStateWaitDiagnostic("observe", "ready", "untrusted", 3, State,
+			"readable", "PRIVATE_READ_ERROR"), "sequence_relation=" . Pair[2])
+	}
+	Private := "PRIVATE_STATE_CONTENT"
+	Fact := _ManagedRemoteFixtureStateWaitDiagnostic(Private, Private, Private, Private,
+		Map("state", Private, "phase", Private, "sequence", Private, "body", Private), Private, Private)
+	AssertFalse(InStr(Fact, Private), "unknown state, phase, role and error values cannot expose content")
+	AssertContains(Fact, "observed_state=unknown observed_phase=unknown")
+	Fixture := _ManagedRemoteFixtureOwner()
+	Control := Map("calls", 0)
+	Fixture.StateWaitDiagnosticPrinter := _ManagedRemoteStateWaitPrinterRefused.Bind(Control)
+	Caught := false
+	try Fixture.WaitState("ready", "untrusted", 0)
+	catch as Failure {
+		Caught := true
+		AssertEqual("Owned managed-network fixture state budget expired.", Failure.Message)
+	}
+	AssertTrue(Caught)
+	AssertEqual(1, Control["calls"], "a refused diagnostic cannot recurse through the same sink")
+	AssertEqual("unavailable", Fixture.StateWaitDiagnosticStatus, "the owner retains only bounded reporting refusal")
+}
+
+_ManagedRemoteStateWaitPrinterRefused(Control, Text) {
+	Control["calls"] += 1
+	throw ValueError("PRIVATE_REPORTER_FAILURE")
+}
+Test("managed remote native: state diagnostic refuses content and preserves timeout (managed-fixture-wait-diagnostic)",
+	_ManagedRemoteStateWaitProjectionAndRefusal)
 
 class _ManagedRemotePrimaryControlFixture {
 	__New() {
