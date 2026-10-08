@@ -1,0 +1,165 @@
+{
+	"provenance": "Frozen from existing physical locale bytes before creating the new private native source; expectations use the old literal {app}/{1} substitution and unchanged suffix, never candidate renderers or generated menu data.",
+	"application": "Native% & {app}",
+	"removed_caption": "Native% & {app}  ✗",
+	"sections": {
+		"parent": "agent_linux_disabled_apps_frame",
+		"children": "agent_linux_disabled_apps_children",
+		"remove": "agent_linux_disabled_app_remove",
+		"boundary": "agent_linux_disabled_apps_boundary",
+		"current": "agent_linux_disabled_app_current",
+		"add": "agent_linux_disabled_app_add"
+	},
+	"locales": {
+		"ar": {
+			"parent": "التطبيقات المستبعدة من الوضع التلقائي (1)",
+			"empty_parent": "التطبيقات المستبعدة من الوضع التلقائي (0)",
+			"current": "استبعاد Native% & {app} new (الحالي)",
+			"add": "+ إضافة تطبيق آخر…"
+		},
+		"cs": {
+			"parent": "Aplikace vyloučené z automatického režimu (1)",
+			"empty_parent": "Aplikace vyloučené z automatického režimu (0)",
+			"current": "Vyloučit Native% & {app} new (aktuální)",
+			"add": "+ Přidat další aplikaci…"
+		},
+		"da": {
+			"parent": "Apps udelukket fra automatisk tilstand (1)",
+			"empty_parent": "Apps udelukket fra automatisk tilstand (0)",
+			"current": "Udeluk Native% & {app} new (aktuel)",
+			"add": "+ Tilføj endnu en applikation…"
+		},
+		"de": {
+			"parent": "Vom Automatikmodus ausgeschlossene Apps (1)",
+			"empty_parent": "Vom Automatikmodus ausgeschlossene Apps (0)",
+			"current": "Native% & {app} new ausschließen (aktuell)",
+			"add": "+ Eine weitere Anwendung hinzufügen…"
+		},
+		"en": {
+			"parent": "Apps excluded from the automatic mode (1)",
+			"empty_parent": "Apps excluded from the automatic mode (0)",
+			"current": "Exclude Native% & {app} new (current)",
+			"add": "+ Add another application…"
+		},
+		"es": {
+			"parent": "Aplicaciones excluidas del modo automático (1)",
+			"empty_parent": "Aplicaciones excluidas del modo automático (0)",
+			"current": "Excluir Native% & {app} new (actual)",
+			"add": "+ Añadir otra aplicación…"
+		},
+		"fr": {
+			"parent": "Applications exclues du mode automatique (1)",
+			"empty_parent": "Applications exclues du mode automatique (0)",
+			"current": "Exclure Native% & {app} new (actuelle)",
+			"add": "+ Ajouter une autre application…"
+		},
+		"he": {
+			"parent": "יישומים שהוחרגו מהמצב האוטומטי (1)",
+			"empty_parent": "יישומים שהוחרגו מהמצב האוטומטי (0)",
+			"current": "הדר Native% & {app} new (נוכחי)",
+			"add": "+ הוסף יישום נוסף…"
+		},
+		"hi": {
+			"parent": "स्वचालित मोड से बाहर रखे ऐप (1)",
+			"empty_parent": "स्वचालित मोड से बाहर रखे ऐप (0)",
+			"current": "Native% & {app} new को हटाएं (वर्तमान)",
+			"add": "+ एक और एप जोड़ें…"
+		},
+		"it": {
+			"parent": "App escluse dalla modalità automatica (1)",
+			"empty_parent": "App escluse dalla modalità automatica (0)",
+			"current": "Escludi Native% & {app} new (attuale)",
+			"add": "+ Aggiungi un’altra applicazione…"
+		},
+		"ja": {
+			"parent": "自動モードから除外するアプリ（1）",
+			"empty_parent": "自動モードから除外するアプリ（0）",
+			"current": "Native% & {app} new を除外（現在）",
+			"add": "+ 別のアプリを追加…"
+		},
+		"ko": {
+			"parent": "자동 모드에서 제외된 앱 (1)",
+			"empty_parent": "자동 모드에서 제외된 앱 (0)",
+			"current": "Native% & {app} new 제외 (현재)",
+			"add": "+ 다른 앱 추가…"
+		},
+		"nl": {
+			"parent": "Apps uitgesloten van de automatische modus (1)",
+			"empty_parent": "Apps uitgesloten van de automatische modus (0)",
+			"current": "Native% & {app} new uitsluiten (huidig)",
+			"add": "+ Een andere toepassing toevoegen…"
+		},
+		"no": {
+			"parent": "Apper utelatt fra automatisk modus (1)",
+			"empty_parent": "Apper utelatt fra automatisk modus (0)",
+			"current": "Utelat Native% & {app} new (gjeldende)",
+			"add": "+ Legg til et annet program…"
+		},
+		"pl": {
+			"parent": "Aplikacje wykluczone z trybu automatycznego (1)",
+			"empty_parent": "Aplikacje wykluczone z trybu automatycznego (0)",
+			"current": "Wyklucz Native% & {app} new (bieżąca)",
+			"add": "+ Dodaj inną aplikację…"
+		},
+		"pt": {
+			"parent": "Aplicações excluídas do modo automático (1)",
+			"empty_parent": "Aplicações excluídas do modo automático (0)",
+			"current": "Excluir Native% & {app} new (atual)",
+			"add": "+ Adicionar outra aplicação…"
+		},
+		"ru": {
+			"parent": "Приложения, исключённые из автоматического режима (1)",
+			"empty_parent": "Приложения, исключённые из автоматического режима (0)",
+			"current": "Исключить Native% & {app} new (текущее)",
+			"add": "+ Добавить другое приложение…"
+		},
+		"sv": {
+			"parent": "Appar som undantas från automatiskt läge (1)",
+			"empty_parent": "Appar som undantas från automatiskt läge (0)",
+			"current": "Uteslut Native% & {app} new (aktuell)",
+			"add": "+ Lägg till ett annat program…"
+		},
+		"tr": {
+			"parent": "Otomatik moddan hariç tutulan uygulamalar (1)",
+			"empty_parent": "Otomatik moddan hariç tutulan uygulamalar (0)",
+			"current": "Native% & {app} new uygulamasını dışla (geçerli)",
+			"add": "+ Başka bir uygulama ekle…"
+		},
+		"uk": {
+			"parent": "Застосунки, виключені з автоматичного режиму (1)",
+			"empty_parent": "Застосунки, виключені з автоматичного режиму (0)",
+			"current": "Виключити Native% & {app} new (поточне)",
+			"add": "+ Додати іншу програму…"
+		},
+		"zh": {
+			"parent": "从自动模式中排除的应用（1）",
+			"empty_parent": "从自动模式中排除的应用（0）",
+			"current": "排除 Native% & {app} new（当前）",
+			"add": "+ 添加另一个应用…"
+		}
+	},
+	"prior_locale_sources": {
+		"ar": "a1669afbc1ebd21db88bf90aeca7f2cc455b4072d879ef6d5b18cfe809b88630",
+		"cs": "f2255d91da513ae4a077ecbb8ab296d3168113e8743c3945136a29f27b923aca",
+		"da": "298d4ca0d827b27a92cf3a9f3b0760d2e8885a4a31de41d58b56bdec21aaeaa3",
+		"de": "4cef2f0c83a6a3a9b1a8377cde721309b1ca77be029aa8a9720236d10bc57488",
+		"en": "e740ee35d6c879394821fd658dfa1e0f67be97a41b0bb0cf06adc072fc604417",
+		"es": "b4299d76b88935e3642426776001ae415454bd68c65539fec7f0ca96db202aba",
+		"fr": "c8e94e0d67d63da9729dcc33c282a2ce6b34884e0833dc0ec882b24982cfb01b",
+		"he": "32bd44775bd88fbbabf4851c81943deb1b92b26edda8c1393bb4989bb11e527d",
+		"hi": "a61c1272d272046ad53fffe55fb8a51a728a90f9499108971613209c5a5cf598",
+		"it": "e2a0951cd6e2d6100c2bb72b6e5347b999c58ec2b9267edb029fe77f1fb778ce",
+		"ja": "84efcfe2ebe6110005b01b21b112b0186e9d35a7184cafb93f8b177e53cb3743",
+		"ko": "f9487c83b8ee324754880e8024ed65b3323aea78009057fe256b853efb68f312",
+		"nl": "a5b0baccf7fa7d1d70f245ec2f7d778eef4cfe34d90edeff7a8450382540d293",
+		"no": "07b975b5e03e60a4777d4cce54ebd91d46fd71cc229b9c448caad5c2b9f13dd2",
+		"pl": "7eaae4c9d3782e6d779be52f57b48e939883159a0a28de19c13b186455d90581",
+		"pt": "7a3baaa9fef12992a672390cc2def512122892481ff537f445db3ba2d7c72d02",
+		"ru": "524e86c95a8b8a608a722d607667e9ed01b0c38c282ba475aebc13b7a2a12468",
+		"sv": "023ff9b10340d5280801809d31e90aef7f7281af24283a939664bdf1f80580e3",
+		"tr": "c27b62792acf8f15694704d7a57cf638a52e01ff0ba770c225dc0b1a29d862f9",
+		"uk": "d98d37b6693e8288236179b556db8fbf3b28e722c87bac58276db0fedfc19f74",
+		"zh": "71fabbdeb68f12c2aa0119b96ba29601b1e1c9bfd39907bc3123caff935e12cc"
+	},
+	"current_application": "Native% & {app} new"
+}
