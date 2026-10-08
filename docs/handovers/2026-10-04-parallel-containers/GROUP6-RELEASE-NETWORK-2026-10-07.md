@@ -8,7 +8,103 @@ Differential updates22 remain deliberately outside scope. The maintainer
 authorized partial integration after available container/CI work, followed by
 device validation and any necessary fixes.
 
+## Latest qualification checkpoint, 2026-10-08
+
+The first partial integration remains `09174392102ffe8638435d794f09f41cb85c8dbc`.
+Its 84 feature commits are already in dev. Twelve subsequent repair/checkpoint
+commits through `0f642ba078524e49215aef0dfaba4a02580c8e20`, followed by this
+receiving document, await the second partial integration. Neither TODO36 nor
+TODO62 is complete or removed.
+
+Linux manual [37755062021, attempt 2](https://github.com/adrienm7/ergopti/actions/runs/37755062021/attempts/2)
+at `44525214e4d0763f9c23e7d69828ec6bf3e01871` is terminal PASS. Shared checks,
+11,644 Linux unit assertions, real official Ollama/model acceptance and all 157
+E2E steps pass, with no failed or skipped E2E step. The complete Package job
+passes, including actual SDK Flatpak build/install/launch and tarball receiving.
+All 17 installation variants pass, including both Fedora first-run rows and
+both Alpine rows; none fail or are skipped. Windows and macOS are deliberately
+unselected. Release / Publish is skipped; no release is created.
+
+Attempt 1 of the same run failed during explicit model pull after successful
+unit assertions. The child exited 1, source inventories stayed unchanged and
+physical closure had zero pending descendants. All 1,309 frozen runtime subjects
+are byte-identical to the preceding successful native source at `b4ef975f1`.
+The raw native log remains private; its lower failure cause is unproved. A new
+runner receives the unchanged source successfully in attempt 2. That success
+does not explain the historical failure or weaken its original acceptance.
+
+The Fedora source bootstrap and Alpine headers now have actual hosted
+installation receiving. Local formatting, all 382 JS checks, all 26 Linux
+runtime control groups and all 1,875 AHK BOM/LF checks pass. Genuine host native
+luv compilation/C loading also passes with exact identities and physical
+closure. Host compilation alone is not corporate-network qualification.
+The saved Windows engine carriers and six Brew audit preimages still match the
+current source; those inactive preparations are not integrated implementation.
+
+Windows still has four native failures and the unjoined packaged artifact
+NTLM/SSPI engine. macOS still needs the legitimate same-identity Automation
+prerequisite, complete Brew/package/install acceptance and opaque-client
+full-URL routing. These are CODE and native validation requirements, not only
+checks to perform on a personal device. Corporate-network and physical UI
+acceptance on every OS also remain unrun. Preserve items16/38 and every existing
+independent assertion, source pin, deadline and ownership gate.
+
+Final integration will fetch current dev, reserve an empty `codex/ci-lock`
+commit and preserve this feature history with a no-ff merge. The pending delta
+selects Windows and Linux; macOS production is unchanged since the first merge.
+The completion report and exact manual CI receipt identify the integrated SHA,
+terminal verdict and remaining limitations. No whole-group completion is claimed.
+
 ## Delivered source slices
+
+Source-install checkpoint,2026-10-08: Linux manual37714714116 at9d26b947e
+passes11,644 unit assertions, all157 E2E steps and the complete package job,
+including genuine Flatpak build/install/launch. Three binary installation
+variants pass. The14 failing source variants have distinct closed observations:
+five lack a compiler under--no-deps; seven first-install checkouts omit the
+canonical builder; two Fedora variants stop earlier at the declared unavailable
+LuaJIT networking provider. The compiler/header catalogue projection repairs
+source-install prerequisites without adding a compiler to binary runtime
+requirements or removing any native assertion. The first-install fixture copies
+only the canonical builder closure. Its shared catalogue/generator region is
+owned by group6; unrelated data, workflow steps and locale files remain exact.
+Local causal regression is red on the original catalogue; corrected format,
+all382 JavaScript checks and portable/native producer controls pass. The first
+CI guard replay exposed an incorrectly anchored fixture slice; that harness
+error was corrected before receiving and is not credited as product evidence.
+These source prerequisites now pass final Linux receiving in manual37755062021
+attempt2; the exact current result is recorded above.
+
+The subsequently received Fedora source bootstrap uses
+the unchanged Flatpak luv source26e62e49b0230891ece45a78cc1f63c074e60020 and
+the same six CMake choices. Shared policy declares build/GIO/schema prerequisites
+without inventing a distribution LuaJIT module package. The native producer
+checks the exact fetched revision, Git objects and actual LuaJIT C entry points;
+its output is atomically installed inlinux/native_modules, hashed into the
+ownership manifest and selected by the matching standalone launcher. Existing
+unchanged native-module ownership survives subsequent installs. The first-run
+fixture now also checks the installed native networking probe, preserving every
+previous launcher, runtime, tray and declared-limitation assertion.
+
+Real host compilation and actual native loading pass through a physically
+closed owner. The final producer also passes with deliberately foreign inherited
+GIT_DIR/GIT_INDEX_FILE values; the helper clears only its child repository
+namespace. One initial negative replay had incorrectly assembled positional
+arguments; its retained refusal is a harness error, not product evidence.
+The complete pre-existing Flatpak module projection stays byte-exact. The
+causal bootstrap policy guard fails before the new map;26 recipe/filesystem
+control groups pass afterwards. Full selected local gates and both hosted Fedora first-install variants now
+pass; the latest qualification checkpoint records their exact receiving.
+
+Manual37747891785 atb4ef975f1561c67603dc0679c44be1d57f171eea is terminal
+FAIL: all shared/unit/E2E checks and the complete package job pass;13 of17
+installation variants pass, four fail, none are skipped. Release is skipped.
+The two Fedora rows retain their known unavailable LuaJIT provider refusal.
+Both Alpine rows now reach compilation and expose missinglinux/magic.h;
+musl-dev does not supply the kernel UAPI headers. The additionallinux-headers
+source prerequisite is projected from the shared catalogue and supplied by the
+no-deps CI caller. The causal independent catalogue regression is red before
+this correction. No compiler/runtime assertion or installation row is removed.
 
 - macOS archive migration, Sparkle resource/key/refusal receiving and bounded
   native lifecycle diagnostics. Historical native Sparkle acceptance passed;
@@ -30,7 +126,7 @@ device validation and any necessary fixes.
   All27 original assertions remain; native routing/trust guards are unchanged.
 
 Feature commits remain separate. The final no-ff merge must preserve them.
-Its integrated SHA and terminal manual CI receipt must be recorded after integration.
+The completion report identifies its integrated SHA and terminal manual CI receipt.
 Tests of controlled transports or authored tiny archives do not establish
 official package identity, corporate-network interoperability or device input.
 
@@ -318,7 +414,133 @@ signed-acquisition floor stays36. This removes the combined setup's failure
 propagation without borrowing a failed prerequisite as a successful native
 receipt. Complete Linux E2E/package/install receiving is still required.
 
+The feature's84 atomic commits are integrated without squash at091743921.
+Manual37688807101 receives that exact SHA on all three OS lanes without Release
+and completes with the failures recorded below. Group6 releases its owned
+lock0c66f2c88 after the terminal result at22:16UTC; subsequent feature
+validation does not reserve the integration phase.
+
+A subsequent observational correction routes the existing closed Windows service
+diagnostic through \_TestPrint, the canonical native TAP receipt writer. CI reads
+and prints that transcript only after the AHK process exits; console-only
+FileAppend output is not a reliable channel for this process. The admitted
+stage/kind/HRESULT values and all original native assertions/clocks remain
+unchanged. Manual37690927221 receives exactlyc00cec629 and completes with
+10,268 Windows passes/four failures, unchanged from the preceding native run.
+No admitted service-stage notice is emitted. The channel change therefore has
+no demonstrated native repair credit, and the lower causes remain unknown.
+
 ## Remaining CODE and hosted work
+
+Manual37702753652 attempt1 at2ab4b1a32 ends in failure after audio package
+acquisition exceeds10min and window prerequisite downloads exceed4min. An
+owned-runner apt-get process remains at PID58097 and holds dpkg's frontend
+lock; later acquisitions fail. The exact E2E census is123 successful,
+32 failed/two skipped steps. Package/install and Release are skipped. Attempt2
+uses the same source on a fresh runner: audio acquisition/native receiving pass,
+but the initial owned GTK window misses its unchanged readiness deadline.
+The terminal census is154 successful, one failed/two skipped E2E steps;
+package/install and Release are skipped. The34-case native window cohort is
+unqualified. No source cause or Flatpak SDK result is inferred from this failure.
+
+Group6 takes only the package-linux job condition/comment in ci-linux.yml.
+Manual diagnostics may receive packaging after E2E failure; the unchanged
+E2E dependency retains prior unit success. Automatic runs, cancellation and
+skipped E2E remain refused, and linux-ok still requires every mandatory job,
+subject and source receipt to pass. Release admission remains push-only.
+No existing assertion, receiving clock, installation leg or other workflow
+region changes. The source regression fails before this admission change;
+actual native package and installation receiving remain required.
+
+Manual37688807101 at091743921 is terminal FAIL. Shared checks pass; Linux has
+11,644 unit passes/zero failures and157 successful E2E steps with zero skipped.
+Flatpak package configuration fails because curl requires GSS but the24.08 SDK
+does not supply it. Windows retains the same four failures. Mac's exact Sparkle
+case passes; Brew's unchanged deny-removal AppleEvent positive fails with send0,
+reply-read-1701, error-10004 and no receiver marker; permission query is-1744.
+Native global-switcher and Shortcuts package probes also fail. All installation
+lanes and Release are skipped. The source's full scope remains unqualified.
+
+Windows diagnostic candidate c00cec629 is separately received in37690927221:
+10,268 passes/four unchanged failures, no admitted service-stage notice. Canonical
+TAP output is used, but no successful service diagnosis or transport repair is
+claimed. Raw Windows job and execution-manifest downloads subsequently succeed:
+the complete independent manifest records10,272 executed/timed cases,
+10,268 passed/four failed and no manifest errors. The full log admits the
+same single native-bypass/direct route and no service-stage notice. Restored
+artifact access is not transport qualification. After publication of the
+domain1 draft, genuine Mac artifact downloads succeed;
+the container's files, worktrees and pinned SDKs restore unchanged.
+
+The next Linux correction adds a pinned MIT Kerberos1.22.2 Flatpak dependency,
+commit8570e77819563e036027e1da789d08ec9333ed4d, before curl. Group6 owns only this
+catalogue source inventory and flatpakModules generator region. The existing
+GSS requirement stays enabled and its native prefix is explicitly/app. Missing
+or malformed Kerberos pins are refused. The independent recipe regression fails
+before the fix and passes afterward; complete native Flatpak receiving remains
+required. Other catalogue fields and all historical requirements stay intact.
+
+Manual37695878081 receives exactly2cbcea144 and is terminal FAIL. Shared checks,
+11,644 Linux unit assertions and all157 E2E steps pass, including genuine Nix.
+Package stops at network-krb5 before configuration: the upstream Git source
+has no autogen, autogen.sh or bootstrap script for Flatpak's implicit Autotools
+mode. Installation and Release are skipped. The repaired module instead uses
+explicit SDK commands for autoreconf, configure with prefix/app, build and
+installation. Source pins, library checks, required GSSAPI and all other modules
+remain unchanged; full native package/install qualification is pending.
+
+The same pinned MIT Kerberos source is actually autoreconf-generated, configured,
+compiled and installed in the host container under a private prefix. The original
+disable-static, disable-rpath and without-system-verto choices are preserved.
+Installed krb5-config reports1.22.2 and the expected GSS libraries; the owned phase
+ends with status0, no signal/error and no retained physical debt. Initial isolated
+Autoconf relocation failures are retained separately. This host-source PASS does
+not prove the Flatpak SDK build, recipient trust or authenticated Kerberos traffic.
+
+Manual [37709350150](https://github.com/adrienm7/ergopti/actions/runs/37709350150)
+receives exactly3161aada974499852a30bff5ac2374ee614996b0 and ends in failure.
+Shared checks,11,644 Linux unit assertions and all157 E2E steps pass, with no
+E2E failure or skip. Native window and genuine Nix receiving pass under their
+original assertions; this does not establish the earlier window failure's cause.
+The SDK actually compiles/installs MIT1.22.2 and curl with GSS-API, Kerberos and
+SPNEGO. Package then stops at network-gio-proxy: Meson rejects unknown option
+tests. Installation and Release are skipped; there is no complete package credit.
+
+Group6 owns only the network-gio-proxy option vector in the shared generator.
+The pinned upstream1417a8dd98c46c208853c5ed95de61c384acea21 declares
+installed_tests, so the generator now uses installed_tests=false. Native GnuTLS,
+libproxy/environment/GNOME provider choices, source pins and all other module
+bytes remain exact. An additive independent full-vector regression fails before
+the correction; every old assertion is retained. Generated projections are
+regenerated through their owner. Complete SDK/package/install receiving on the
+new source remains required; built GSS support is not an authenticated session.
+
+The same actual SDK log installs libproxy under/app/lib64, while the retained
+package environment admits providers only under/app/lib. Pinned GIO source
+derives its module destination from libdir as well. Group6 therefore owns only
+the two native Meson providers' directory flags: network-libproxy and
+network-gio-proxy explicitly use libdir=lib. Independent full option vectors
+reject the original implicit paths and retain all preceding provider flags.
+All other module/source/runtime bytes and native assertions remain intact.
+The preceding manual37713678709 at acb14576c continues unchanged; this separate
+follow-up requires its own exact-SHA package/install receiving. No running
+workflow is stopped, resumed or edited to add this source requirement.
+
+Manual37713678709 at acb14576c subsequently completes with shared/unit and
+all157 E2E steps passing. GIO configuration succeeds; native executable linking
+then rejects unresolved Duktape math symbols. Package/verdict fail and
+installation/Release are skipped. The checksum-pinned2.7.0 shared-library
+Makefile ignores LDLIBS and puts LDFLAGS before source objects. Group6 owns only
+network-duktape's build/install link arguments: retain libm with scoped
+no-as-needed/as-needed options, preserving the SDK's preceding flags.
+The independent complete command-vector regression fails against the old recipe.
+Actual host-source build/install reproduces original consumer-link refusal;
+the corrected library records libm and retains RELRO/BIND_NOW, then a genuine
+linked Duktape consumer evaluates Math.sqrt successfully. Both normal/debug
+build roles, source checksum, native tests and all other modules remain intact.
+This is host-source evidence, not a complete SDK/package/install verdict.
+Manual37714714116 on the earlier9d26b947e directory correction stays untouched;
+the new math correction needs its own exact-source hosted receiving.
 
 - **Windows62:** Join one packaged owned curl attempt engine to both the real
   request consumer and artifact staging producer. Bare NTLM-only CONNECT must
@@ -357,28 +579,26 @@ receipt. Complete Linux E2E/package/install receiving is still required.
 
 ## Windows native fix and replay checklist
 
-The following five failures belong to run37651111440 at0b0be55e. Each step
-requires genuine receiving of the unchanged failing assertion, a source fix
-only if the captured evidence demonstrates one, and replay on the final source.
-Their lower causes remain unknown. The current diagnostics are observational.
+The current four failures belong to terminal run37690927221 atc00cec629.
+The historical System32 curl capability failure from37651111440 now passes;
+do not rebuild that qualified path without a regression. Each remaining step
+requires genuine receiving of its unchanged failing assertion, a source fix
+only if captured evidence demonstrates one, and replay on the final source.
+Lower causes remain unknown; the diagnostics are observational.
 
-1. **System32 curl capability completion:** observe the actual cached phase and
-   child/pipe closure at the original completion refusal. Correct a demonstrated
-   capability/retirement defect and replay the same positive and negative
-   controls under the original 8-second request/10-second receiving clocks.
-2. **Canonical WinHTTP vector1:** receive the exact native returned shape,
+1. **Canonical WinHTTP vector1:** receive the exact native returned shape,
    ordered-route and limit facts, then fix the demonstrated guard/provider
    mismatch. Preserve the complete full-URL/PAC vector and native owner; portable
    PowerShell projections do not establish WinHTTP success.
-3. **TLS fixture service failure count:** identify the fixed service failure
+2. **TLS fixture service failure count:** identify the fixed service failure
    stage using the actual retained service receipt. Correct only the demonstrated
    service/receiving defect; retain ephemeral key ownership, the independent
    failure-count expectation and physical server retirement.
-4. **Updater TLS classification:** receive the actual route and trust failure
+3. **Updater TLS classification:** receive the actual route and trust failure
    before changing classification. Preserve the original TLS expectation,
    system trust, proxy refusal and provenance; do not relabel proxy_resolve as
    TLS without evidence or bypass certificate verification.
-5. **Updater cleanup failure count:** receive actual service/child/Job cleanup
+4. **Updater cleanup failure count:** receive actual service/child/Job cleanup
    acknowledgement and correct its demonstrated join/receiving defect. Preserve
    the failure-count assertion and retained debt; root-directory removal is
    not a physical service-closure receipt.
@@ -454,87 +674,107 @@ They contain fixture data and must not be published indiscriminately.
 
 ## Preserved feature commit inventory
 
-The inventory below precedes final receiving/documentation commits. The final
-no-ff merge preserves those commits too; its second parent identifies the final
-feature tip. History-only CI ancestry imports have no source delta and are not
-credited as feature implementation.
+The following 96 atomic feature commits are verified ancestors of
+`0f642ba078524e49215aef0dfaba4a02580c8e20`, in history order. This
+inventory excludes merge-only CI ancestry imports and precedes this final
+receiving document. The final merge second parent and Git history identify
+that additional delivery commit.
 
 ```text
-b21bea3ee test(windows): expose closed managed transport failure facts
-de7c8bc90 test(linux): classify closed native Nix build failures
-0b0be55e3 fix(windows): admit canonical JSON and proxy inventory
-e25d938f9 fix(windows): bind native receiving to current owners
-c18f0796b fix(ci): prepare and observe retained Ollama acceptance
-74ad5da0b fix(windows): repair managed network receiving seams
-d9a0fe9ac fix(ci): admit revision-pinned shallow Nix source
-209b1d950 feat(linux): retain pinned Ollama archive publication
-6855c1e6d test(macos): isolate the MLX fingerprint fixture network route
-1605b63de feat(windows): retain managed network routing and failure ownership
-accb6bd81 fix(ci): expose bounded Nix phase failure observations
-0ef79d773 fix(linux): preserve authenticated no-follow updater caching
-ea3cd24fa fix(linux): preserve conditional path refusal diagnostics
-f7c7d368d fix(macos): refuse unsupported opaque network routes
-072481c3a fix(linux): retain updater ETags at their final endpoint
-35ef2db8f fix(macos): require the observed Sparkle validation error
-22792d207 fix(ci): select complete Linux assertion records before decoding
-704598298 fix(macos): retain bounded native acceptance diagnostics
-1ce802508 fix(macos): include system trust in the frozen MLX lock
-9195a6419 fix(ci): expose the completed Linux configuration assertion
-89085c467 fix(macos): publish the Sparkle fixture signing key
-cfe904758 fix(macos): refuse MLX downloads without system trust activation
-6072016f3 fix(macos): retain typed Sparkle startup refusal evidence
-4f01de5dd fix(macos): confirm existing accessory admission without a setter
-cd198161b fix(ci): retain failed Linux unit reporter logs
-ed979dee8 docs(release): preserve composed qualification and remaining work
-c18442429 fix(macos): correct Sparkle progress enum declarations
-1a2fa790a fix(linux): wait for release-check owner retirement
-67d563584 test(macos): trace actual Sparkle archive update progress
-8f7cecf46 test(linux): expose owned Nix phase refusal boundaries
-3cfad32a6 test(macos): observe actual AppKit activation policy states
-f346157c7 docs(release): record exact native qualification limits
-e9db13486 test(linux): trace actual relative HTTP timer admission
-1016527df test(macos): report exact AppKit receiver refusal reasons
-949eb6eca fix(test): retain native Sparkle fixture root identity
-7e786f7ef fix(test): observe actual asynchronous Linux updater installation
-f7aa85391 fix(linux): retain exact temporary updater native lifetimes
-eeb6fd58f fix(ci): stage an authenticated private curl validation keyring
-5e9a545dd fix(test): distinguish pinned Nix metadata refusal checkpoints
-229545c51 fix(test): expose bounded Sparkle child refusal categories
-ad95a2693 test(macos): retain the updater fixture sleeper parent
-29658bad3 test(macos): observe owned receivers after AppleEvent refusal
-69cda111d test(macos): verify archive signatures with cryptographic oracles
-b8a8363d4 test(linux): report safe native preparation checkpoints
-2069853a7 test(linux): reap owned CLI descendants during settlement
-622aa798b fix(linux): retain admitted legacy HTTP redirect policy
-6c9b334fc test(linux): await native HTTP fixture close acknowledgements
-281ee9a70 test(linux): qualify genuine Nix installed runtime
-bd0a90434 test(macos): expose bounded archive acceptance failure facts
-01834579c fix(linux): retain verified archives through native installation
-a96b224a6 fix(test): use the imported Sparkle download delegate label
-8827c9d32 fix(test): bind Sparkle fixture to numeric loopback
-c9bee527e fix(test): retain owned AppleEvent marker diagnostics
-435f0cf3d fix(test): retain Sparkle startup diagnostics after retirement
-6a07d83a3 fix(network): retain prepared requests through native cleanup
-9f4b8e9c1 docs(release): preserve reviewed group6 recovery sources
-bfcd1abf4 feat(release): qualify retained archive descriptor hashing
-997a71980 feat(release): stage native networking in portable Linux packages
-c4ec2bf45 feat(network): admit buffered GET redirects through native owners
-54493dc2a fix(release): serve Sparkle archives from the retained physical root
-cd71ef559 feat(network): route Linux HTTP through owned native proxy admission
-c622e45d6 fix(release): diagnose actual Sparkle server retirement
-41cc59b49 fix(release): expose bounded native archive XCTest outcomes
-5ce6bc2c9 fix(linux): read native WebKit loading state as a property
-40ddfed7c fix(updater): fence Versions actions to their admitted document
-043f32684 docs(release): record native privilege refusal and Linux inode boundary
-4d026ba9a test(release): expose bounded native AppleEvent reply facts
-cfa27a347 fix(release): bound idle Sparkle server request reads
-7b567bd30 fix(network): retain private Linux remote failure receipts
-9a95d5ce4 fix(release): retain owned canonical Sparkle census paths
-7cff41c28 fix(release): use the documented receiver registration transition
-00a07ff9f docs(network): preserve the corrected Linux producer continuation
-a23db837d test(release): expose owned AppleEvent registration refusal
-2420fe7a2 test(release): identify bounded Sparkle directory refusals
-d95998c0e test(release): expose pre-path Sparkle census refusals
-1d23f689f test(release): expose owned AppleEvent termination facts
-6deec05a9 docs(release): record the integrated qualification verdict
+6deec05a99555607fe00e7aaedba704e8aea0ff3 docs(release): record the integrated qualification verdict
+1d23f689fe6f80393cc06f25c77c2e7cdf52b133 test(release): expose owned AppleEvent termination facts
+d95998c0ed9c4845944a676cb90e4fc3a81fd32d test(release): expose pre-path Sparkle census refusals
+2420fe7a222cbe2c5135206f48df080ed20fd0b9 test(release): identify bounded Sparkle directory refusals
+a23db837d1411acf9f588639b9d6036ab593b6f1 test(release): expose owned AppleEvent registration refusal
+00a07ff9f9d283a26f8f56012a7cb3b42403e832 docs(network): preserve the corrected Linux producer continuation
+7cff41c280643128cd3badf58dd1cd519c610ba3 fix(release): use the documented receiver registration transition
+9a95d5ce4bb20179a1e01860c07eed1231eaf8b2 fix(release): retain owned canonical Sparkle census paths
+7b567bd304e932c467adc6fcc6b70ddef4fe39c5 fix(network): retain private Linux remote failure receipts
+cfa27a347d30403f2d80b5bfa9dfb8bdf598d142 fix(release): bound idle Sparkle server request reads
+4d026ba9abbc8449d68f8be932f21a7e9cac6c0b test(release): expose bounded native AppleEvent reply facts
+043f32684de93b977123d1cfea48cc758d17cbe0 docs(release): record native privilege refusal and Linux inode boundary
+40ddfed7c644b381208aab90fc888e51f0738720 fix(updater): fence Versions actions to their admitted document
+5ce6bc2c9ac682f0764d8f204ef8ca271de18947 fix(linux): read native WebKit loading state as a property
+41cc59b496b8f6dffd8382a0024673cc7e6b75c7 fix(release): expose bounded native archive XCTest outcomes
+c622e45d623c20fdf7b9f1da8ae4f21cfc9064b3 fix(release): diagnose actual Sparkle server retirement
+cd71ef559082f90442f5535d143dc97e269d4004 feat(network): route Linux HTTP through owned native proxy admission
+54493dc2a586181b94969db9bcfa9c0b12cb653a fix(release): serve Sparkle archives from the retained physical root
+c4ec2bf453baa70237ccae0bb3fb7330cebe9c0f feat(network): admit buffered GET redirects through native owners
+997a719804378eab7aa4d1066daabe9f594d6c3e feat(release): stage native networking in portable Linux packages
+bfcd1abf4d968d7fda35577199fb7b0d17edb441 feat(release): qualify retained archive descriptor hashing
+9f4b8e9c16b2b916c5a5e630f5ac6a1b22c91b13 docs(release): preserve reviewed group6 recovery sources
+6a07d83a327c70b1c08ef45c6aac65b14270081c fix(network): retain prepared requests through native cleanup
+435f0cf3d4af22882d0e58c38b6f6f117fe6eb63 fix(test): retain Sparkle startup diagnostics after retirement
+c9bee527e18c5c230f1124f7ad0a79c21f91cb86 fix(test): retain owned AppleEvent marker diagnostics
+8827c9d326dc501cdbe96f838b2f27cfaac9da10 fix(test): bind Sparkle fixture to numeric loopback
+a96b224a676b8267e072069ed57c556a99623327 fix(test): use the imported Sparkle download delegate label
+01834579cbc792473ab56584e21f03a2f96bd2fb fix(linux): retain verified archives through native installation
+bd0a904347c1c3816636e12f3515980a6ae1b396 test(macos): expose bounded archive acceptance failure facts
+281ee9a70905d677e5a2e9d7fef8a26114d53760 test(linux): qualify genuine Nix installed runtime
+6c9b334fca4e1ea5db4e4184dae2ca9f713e8fcf test(linux): await native HTTP fixture close acknowledgements
+622aa798bc609491182e3ad6147cbe42a04f9469 fix(linux): retain admitted legacy HTTP redirect policy
+2069853a796afffa1ca64beed29fd514cece246c test(linux): reap owned CLI descendants during settlement
+b8a8363d49fc9865527584ddf550bea81693de12 test(linux): report safe native preparation checkpoints
+69cda111d647ff16ab175dd23136a11134446289 test(macos): verify archive signatures with cryptographic oracles
+29658bad310351c079716a4ee2ca402c1bddc910 test(macos): observe owned receivers after AppleEvent refusal
+ad95a2693aecb03a0295fe41e17cb4989e3dd1a1 test(macos): retain the updater fixture sleeper parent
+229545c51cdeb1dadb1549413cc636be7e9ff485 fix(test): expose bounded Sparkle child refusal categories
+5e9a545ddbc8d19b830fc01040e79605591f0d44 fix(test): distinguish pinned Nix metadata refusal checkpoints
+eeb6fd58f772be70968e6438e23fe990909c820a fix(ci): stage an authenticated private curl validation keyring
+f7aa85391f76b9683ec6e7730b3ca698ef656044 fix(linux): retain exact temporary updater native lifetimes
+7e786f7ef28425127bf1d56f18a02b204867ffb5 fix(test): observe actual asynchronous Linux updater installation
+949eb6ecaad3efeb020a8b411f49227d1ed49fea fix(test): retain native Sparkle fixture root identity
+1016527df89dbfb2f41cdc94edd69bdb46462efc test(macos): report exact AppKit receiver refusal reasons
+e9db1348625764f7701479f45687b582455c861f test(linux): trace actual relative HTTP timer admission
+f346157c726b96e36f12701ea61b60be76e9e3e9 docs(release): record exact native qualification limits
+3cfad32a65a18faa1a408638c6613b522aa200d6 test(macos): observe actual AppKit activation policy states
+8f7cecf462b0b0f59f1a2d09c7faaa08eb2ab11b test(linux): expose owned Nix phase refusal boundaries
+67d563584b05426f2e2564b61cbbc1ddd61d6eb0 test(macos): trace actual Sparkle archive update progress
+1a2fa790a11c9c12ddc69d8b1478cf085400b28f fix(linux): wait for release-check owner retirement
+c18442429284bbb0e5e5838846333939143f771b fix(macos): correct Sparkle progress enum declarations
+ed979dee84a84ba35fcd592b9f3c2933ccaa50f8 docs(release): preserve composed qualification and remaining work
+cd198161bcff2702d7c987b752e2a66ab0c3505e fix(ci): retain failed Linux unit reporter logs
+4f01de5dd0a9649f8c6a8a1b80e5b95f25c60bf2 fix(macos): confirm existing accessory admission without a setter
+6072016f31f78ab517c31ab4d5c00a6cdf865d42 fix(macos): retain typed Sparkle startup refusal evidence
+cfe904758d6e22d3b173c7e09c31c8157f04f5cc fix(macos): refuse MLX downloads without system trust activation
+89085c46707aa9972c787affb0f4102a5c8fff68 fix(macos): publish the Sparkle fixture signing key
+9195a6419f4d36581e4404198cd152753791f2e6 fix(ci): expose the completed Linux configuration assertion
+1ce80250847d6f15d8699a7c490c378f580a67fa fix(macos): include system trust in the frozen MLX lock
+704598298b2a5ebd3b9827b8fd11355d24eb0d1e fix(macos): retain bounded native acceptance diagnostics
+22792d20764c790b137edf96651b4154db30f0e7 fix(ci): select complete Linux assertion records before decoding
+35ef2db8fb6d6b920d51ce6ec692e7f124ffe9e7 fix(macos): require the observed Sparkle validation error
+072481c3a9e890d24b16bb46cc93c28d2d277344 fix(linux): retain updater ETags at their final endpoint
+f7c7d368d9f7789577af5552f148a7fde69f4310 fix(macos): refuse unsupported opaque network routes
+ea3cd24fa648484f110bfc8c90771e49ac0f91dc fix(linux): preserve conditional path refusal diagnostics
+0ef79d773d0ab68334dd52378b0438d01b5ef18d fix(linux): preserve authenticated no-follow updater caching
+accb6bd81cf83e45f41f069d3ad3a51b04dbbb98 fix(ci): expose bounded Nix phase failure observations
+1605b63ded81da2e4b2e73d796d99bc9ebde5f1e feat(windows): retain managed network routing and failure ownership
+6855c1e6d3b2089a2af299245811f36bf4c3333d test(macos): isolate the MLX fingerprint fixture network route
+209b1d950076c42e77b5621401349009b9654ab6 feat(linux): retain pinned Ollama archive publication
+d9a0fe9ac97ebcd7d5b19ecc354ae3613de6cccb fix(ci): admit revision-pinned shallow Nix source
+74ad5da0be890d43d80070c8cc806fe4cadef1c0 fix(windows): repair managed network receiving seams
+c18f0796b2f708a1650d4a1eb5dc316b7bf263dd fix(ci): prepare and observe retained Ollama acceptance
+e25d938f9c77f49295741b0ba2eb9d5988a965e9 fix(windows): bind native receiving to current owners
+0b0be55e37494ba9043a8dbb467f15f29f2e43c1 fix(windows): admit canonical JSON and proxy inventory
+de7c8bc901595f6047391c90f0162513ed35bc83 test(linux): classify closed native Nix build failures
+b21bea3ee3ed0f3a21b90096ab0e9607a5ac688a test(windows): expose closed managed transport failure facts
+1b0b3be0a9fb6720fd0a19c1c7780f1cecfde36d fix(ci): prepare owned Nix build logs
+9d7b838d570004ba66d974a12410d7032df8eb83 fix(ci): prepare Linux dependencies before native receiving
+ef67fa39075f35b990dbaf0a23dd6d8a4987222a docs(release): record native Nix pass and Linux continuation
+ca50c7269ae3d9958661c65f8b67ab9d46ceb924 test(windows): expose closed single-route origin facts
+6695173f80e1560aca298ce6cab5252019529e6d fix(test): retain ephemeral keys in native Windows TLS fixture
+dab7823faff31f166e68cc3210374af2968711f9 docs(release): preserve native receiving continuations
+6000b8d1df930c7207abb8108031fa75460f3d60 fix(ci): isolate Linux prerequisite acquisition roles
+c00cec62907c148ef4dd595827b0ef452e297929 fix(test): retain Windows service diagnostics in TAP receipts
+2cbcea1441b867e74d1881b620ec3f1582a31a30 fix(flatpak): build the required GSS implementation before curl
+2ab4b1a326e5b646bdfd335316d95fac1eb70cb6 fix(flatpak): bootstrap Kerberos explicitly in the SDK
+533eb8e4513d36625de679dc6df25fa53ebcdb09 docs(network): retain restored Windows native receiving
+3161aada974499852a30bff5ac2374ee614996b0 fix(ci): receive Linux packages after manual E2E failures
+acb14576c412ca55d2e923f20e12a1b68855e604 fix(flatpak): use the declared GIO installed-test option
+9d26b947e40869c023d4b8b6070782680bc4c6ca fix(flatpak): align native providers with the package libdir
+1f45d2e2d6399fd6c959e9c37caa4feb32811ea1 fix(flatpak): retain Duktape native math dependencies
+b4ef975f1561c67603dc0679c44be1d57f171eea fix(linux): provision source archive build prerequisites
+c996c69564dfcea46603e1a1fdbe86c8bf7ed100 fix(linux): bootstrap native LuaJIT networking on Fedora
+44525214e4d0763f9c23e7d69828ec6bf3e01871 fix(linux): include Alpine kernel build headers
+0f642ba078524e49215aef0dfaba4a02580c8e20 docs(release): preserve the latest partial qualification checkpoint
 ```
