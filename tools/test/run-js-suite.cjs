@@ -1992,6 +1992,12 @@ const CHECKS = [
 		repro: 'npm run test:action-picker-parameter-editor'
 	},
 	{
+		name: 'Apple Shortcuts cold CLI diagnostic preserves ownership and never admits a provider',
+		cmd: 'node',
+		args: ['tools/test/test-apple-shortcuts-cold-cli-probe.cjs'],
+		repro: 'npm run test:apple-shortcuts-cold-cli'
+	},
+	{
 		name: 'file-path headers (convention 3, every source file names itself)',
 		cmd: 'node',
 		args: ['tools/lint/audit-file-headers.cjs'],
