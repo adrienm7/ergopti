@@ -143,23 +143,29 @@ static int accepted_tuple(pid_t pid, const struct sockaddr_in *local, const stru
 }
 static int candidate(int descriptor, pid_t pid, const char *executable,
 	uint64_t device, uint64_t inode, const struct timespec *started, uint32_t budget,
-	const ergopti_listener_identity *expected, ergopti_listener_identity *result) {
+	const ergopti_listener_identity *expected, ergopti_listener_identity *result,
+	ergopti_listener_diagnostic *diagnostic) {
 	struct proc_bsdinfo before, after;
+#define WITNESS_ERROR(stage, value) do { \
+	if (diagnostic != NULL) { diagnostic->candidate_stage = stage; diagnostic->candidate_errno = value; } \
+	return value; \
+} while (0)
 	int error = bsd_identity(pid, &before);
-	if (error != 0) { return error; }
+	if (error != 0) { WITNESS_ERROR(1, error); }
 	if (expected != NULL && (before.pbi_pid != (uint32_t)expected->pid
 		|| before.pbi_uid != expected->uid || before.pbi_start_tvsec != expected->start_seconds
-		|| before.pbi_start_tvusec != expected->start_microseconds)) { return ESTALE; }
-	if ((error = path_identity(pid, executable, device, inode)) != 0
-		|| (error = executable_mapping(pid, device, inode, started, budget)) != 0) { return error; }
+		|| before.pbi_start_tvusec != expected->start_microseconds)) { WITNESS_ERROR(2, ESTALE); }
+	if ((error = path_identity(pid, executable, device, inode)) != 0) { WITNESS_ERROR(3, error); }
+	if ((error = executable_mapping(pid, device, inode, started, budget)) != 0) { WITNESS_ERROR(4, error); }
 	struct sockaddr_in local, peer, final_local, final_peer;
-	if ((error = connected_tuple(descriptor, &local, &peer)) != 0
-		|| (error = accepted_tuple(pid, &local, &peer, started, budget)) != 0
-		|| (error = bsd_identity(pid, &after)) != 0
-		|| (error = path_identity(pid, executable, device, inode)) != 0) { return error; }
-	if (!same_process(&before, &after)) { return ESTALE; }
-	if ((error = connected_tuple(descriptor, &final_local, &final_peer)) != 0) { return error; }
-	if (memcmp(&local, &final_local, sizeof(local)) != 0 || memcmp(&peer, &final_peer, sizeof(peer)) != 0) { return ESTALE; }
+	if ((error = connected_tuple(descriptor, &local, &peer)) != 0) { WITNESS_ERROR(5, error); }
+	if ((error = accepted_tuple(pid, &local, &peer, started, budget)) != 0) { WITNESS_ERROR(6, error); }
+	if ((error = bsd_identity(pid, &after)) != 0) { WITNESS_ERROR(7, error); }
+	if ((error = path_identity(pid, executable, device, inode)) != 0) { WITNESS_ERROR(8, error); }
+	if (!same_process(&before, &after)) { WITNESS_ERROR(9, ESTALE); }
+	if ((error = connected_tuple(descriptor, &final_local, &final_peer)) != 0) { WITNESS_ERROR(10, error); }
+	if (memcmp(&local, &final_local, sizeof(local)) != 0 || memcmp(&peer, &final_peer, sizeof(peer)) != 0) { WITNESS_ERROR(11, ESTALE); }
+#undef WITNESS_ERROR
 	*result = (ergopti_listener_identity) { .pid = pid, .uid = before.pbi_uid,
 		.start_seconds = before.pbi_start_tvsec, .start_microseconds = before.pbi_start_tvusec,
 		.device = device, .inode = inode };
@@ -174,10 +180,12 @@ int ergopti_listener_validate(int descriptor, const char *executable,
 	int error = monotonic(&started);
 	if (error != 0) { return error; }
 	return candidate(descriptor, expected->pid, executable, expected->device, expected->inode,
-		&started, remaining_ms, expected, identity);
+		&started, remaining_ms, expected, identity, NULL);
 }
-int ergopti_listener_discover(int descriptor, const char *executable, uint64_t device,
-	uint64_t inode, uint32_t remaining_ms, ergopti_listener_identity *identity) {
+static int discover(int descriptor, const char *executable, uint64_t device,
+	uint64_t inode, uint32_t remaining_ms, ergopti_listener_identity *identity,
+	ergopti_listener_diagnostic *diagnostic) {
+	if (diagnostic != NULL) { *diagnostic = (ergopti_listener_diagnostic) {0}; }
 	if (identity == NULL || executable == NULL || executable[0] != '/' || remaining_ms == 0) { return EINVAL; }
 	struct sockaddr_in local, peer;
 	int error = connected_tuple(descriptor, &local, &peer);
@@ -195,12 +203,24 @@ int ergopti_listener_discover(int descriptor, const char *executable, uint64_t d
 	for (int i = 0; i < count; i++) {
 		if (expired(&started, remaining_ms)) { error = ETIMEDOUT; break; }
 		if (pids[i] <= 0 || path_identity(pids[i], executable, device, inode) != 0) { continue; }
+		if (diagnostic != NULL) { diagnostic->path_matches++; }
 		ergopti_listener_identity found;
-		error = candidate(descriptor, pids[i], executable, device, inode, &started, remaining_ms, NULL, &found);
+		error = candidate(descriptor, pids[i], executable, device, inode, &started, remaining_ms, NULL, &found, diagnostic);
 		if (error == 0) { *identity = found; matches++; }
 		if (matches > 1) { error = EEXIST; break; }
 	}
 	free(pids);
 	if (error == ETIMEDOUT || error == EEXIST) { return error; }
 	return matches == 1 ? 0 : ENOENT;
+}
+
+int ergopti_listener_discover(int descriptor, const char *executable, uint64_t device,
+	uint64_t inode, uint32_t remaining_ms, ergopti_listener_identity *identity) {
+	return discover(descriptor, executable, device, inode, remaining_ms, identity, NULL);
+}
+int ergopti_listener_discover_diagnostic(int descriptor, const char *executable, uint64_t device,
+	uint64_t inode, uint32_t remaining_ms, ergopti_listener_identity *identity,
+	ergopti_listener_diagnostic *diagnostic) {
+	if (diagnostic == NULL) { return EINVAL; }
+	return discover(descriptor, executable, device, inode, remaining_ms, identity, diagnostic);
 }

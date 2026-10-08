@@ -14,6 +14,7 @@ private final class ManagedOllamaTestSession {
 	let runtime: URL
 	let original: URL
 	let peer = Process()
+	private let peerDiagnostics = Pipe()
 	let profile: [String: Any]
 	let device: String
 	let inode: String
@@ -37,14 +38,24 @@ private final class ManagedOllamaTestSession {
 		peer.executableURL = foreign ? original : runtime
 		peer.arguments = [retainedMachO ? ManagedOllamaListenerFixture.retainedFlag : ManagedOllamaListenerFixture.flag, root.path, mode, String(connections)]
 		var environment = ProcessInfo.processInfo.environment; environment["HOME"] = root.path; peer.environment = environment
-		peer.standardInput = FileHandle.nullDevice; peer.standardOutput = FileHandle.nullDevice; peer.standardError = FileHandle.nullDevice
-		try peer.run()
+		peer.standardInput = FileHandle.nullDevice; peer.standardOutput = FileHandle.nullDevice; peer.standardError = peerDiagnostics
+		try peer.run(); try peerDiagnostics.fileHandleForWriting.close()
 		let deadline = ProcessInfo.processInfo.systemUptime + 5
 		var value: [String: Any]?
 		while ProcessInfo.processInfo.systemUptime < deadline {
 			if let bytes = try? Data(contentsOf: root.appendingPathComponent("profile.json")),
 				let fields = try? JSONSerialization.jsonObject(with: bytes) as? [String: Any] { value = fields; break }
-			guard peer.isRunning else { peer.waitUntilExit(); throw Failure.process }
+			guard peer.isRunning else {
+				peer.waitUntilExit()
+				let bytes = peerDiagnostics.fileHandleForReading.readDataToEndOfFile()
+				try peerDiagnostics.fileHandleForReading.close()
+				let text = String(decoding: bytes.prefix(4096), as: UTF8.self)
+				print("ERGOPTI_PEER_EXIT status=\(peer.terminationStatus) reason=\(peer.terminationReason.rawValue) dyld_library_missing=\(text.contains("Library not loaded:") ? 1 : 0) code_signature_failure=\(text.contains("code signature") ? 1 : 0)")
+				for line in text.split(separator: "\n").prefix(16) {
+					if line.hasPrefix("ERGOPTI_RETAINED_IMAGE_") && line.utf8.allSatisfy({ $0 >= 32 && $0 <= 126 }) { print(line) }
+				}
+				throw Failure.process
+			}
 			usleep(10_000)
 		}
 		guard let value else { peer.terminate(); peer.waitUntilExit(); throw Failure.deadline }
@@ -74,15 +85,17 @@ private final class ManagedOllamaTestSession {
 		return fields
 	}
 	func worker(_ fields: [String: Any], probe: Bool) throws -> (Int32, [(UInt8, Data)]) {
-		let process = Process(), input = Pipe(), output = Pipe()
+		let process = Process(), input = Pipe(), output = Pipe(), diagnostics = Pipe()
 		process.executableURL = original
 		if probe { process.arguments = [ManagedOllamaAPIWorker.probeFlag, "5000"] } else {
 			let absolute = fields["timeout_ms"] is NSNull ? "none" : String((fields["timeout_ms"] as! NSNumber).intValue)
 			process.arguments = [ManagedOllamaAPIWorker.requestFlag, String((fields["idle_ms"] as! NSNumber).intValue), absolute]
 		}
-		var environment = ProcessInfo.processInfo.environment; environment["HOME"] = root.path; process.environment = environment
-		process.standardInput = input; process.standardOutput = output; process.standardError = FileHandle.nullDevice
+		var environment = ProcessInfo.processInfo.environment; environment["HOME"] = root.path
+		environment["ERGOPTI_MANAGED_LISTENER_DIAGNOSTICS"] = "1"; process.environment = environment
+		process.standardInput = input; process.standardOutput = output; process.standardError = diagnostics
 		try process.run(); try input.fileHandleForReading.close(); try output.fileHandleForWriting.close()
+		try diagnostics.fileHandleForWriting.close()
 		var payload = try JSONSerialization.data(withJSONObject: fields, options: [.sortedKeys]); payload.append(10)
 		try input.fileHandleForWriting.write(contentsOf: payload); try input.fileHandleForWriting.close()
 		guard ManagedPTYWorker.nonblocking(output.fileHandleForReading.fileDescriptor) else { throw Failure.process }
@@ -98,6 +111,13 @@ private final class ManagedOllamaTestSession {
 		}
 		guard eof && !process.isRunning else { process.terminate(); process.waitUntilExit(); throw Failure.deadline }
 		process.waitUntilExit(); try output.fileHandleForReading.close()
+		let diagnosticBytes = diagnostics.fileHandleForReading.readDataToEndOfFile()
+		try diagnostics.fileHandleForReading.close()
+		for line in String(decoding: diagnosticBytes.prefix(4096), as: UTF8.self).split(separator: "\n").prefix(16) {
+			if line.hasPrefix("ERGOPTI_LISTENER_DIAGNOSTIC "), line.utf8.allSatisfy({ $0 >= 32 && $0 <= 126 }) {
+				print(line)
+			}
+		}
 		var frames: [(UInt8, Data)] = [], offset = 0
 		while offset < bytes.count {
 			guard bytes.count - offset >= 5 else { throw Failure.framing }
@@ -113,6 +133,7 @@ private final class ManagedOllamaTestSession {
 		while peer.isRunning && ProcessInfo.processInfo.systemUptime < deadline { usleep(10_000) }
 		guard !peer.isRunning else { peer.terminate(); peer.waitUntilExit(); throw Failure.deadline }
 		peer.waitUntilExit(); guard peer.terminationStatus == 0 else { throw Failure.process }
+		try peerDiagnostics.fileHandleForReading.close()
 		closed = true; try FileManager.default.removeItem(at: root)
 	}
 	func captured(_ index: Int) throws -> Data {
