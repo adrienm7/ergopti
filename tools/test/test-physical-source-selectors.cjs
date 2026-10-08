@@ -57,7 +57,7 @@ check('main enum schema refuses invalid values and has no native-file alias', ()
 
 check('actual Lua projection supplies ledger and migrations retain selector bytes', () => {
 	const program = String.raw`
-local shared = 'static/ergopti_plus/_shared'
+local shared = assert(arg[1], 'actual absolute shared source path is required')
 package.path = shared .. '/lua/?.lua;' .. shared .. '/lua/?/init.lua;' .. package.path
 local manifest = assert(loadfile('static/ergopti_plus/macos/_generated/features_manifest.lua'))()
 local entry
@@ -92,7 +92,7 @@ print('generated default and 3 actual migration controls passed')
 `;
 	const runtime = findRuntime();
 	assert.ok(runtime, 'an actual Lua runtime is required');
-	const result = spawnSync(runtime, ['-'], { cwd: root, input: program, encoding: 'utf8' });
+	const result = spawnSync(runtime, ['-', shared], { cwd: root, input: program, encoding: 'utf8' });
 	assert.equal(result.status, 0, result.stderr || result.error?.message);
 	assert.match(result.stdout, /3 actual migration controls passed/);
 	for (const driver of ['windows', 'macos', 'linux']) {
@@ -201,7 +201,7 @@ check('all 21 locales contain the complete genuine selector and unavailable capt
 });
 
 check('actual metrics/global restore and clear preserve stream and invalid source intent', () => {
-	const program = String.raw`local shared = 'static/ergopti_plus/_shared'
+	const program = String.raw`local shared = assert(arg[1], 'actual absolute shared source path is required')
 package.path = shared .. '/lua/?.lua;' .. shared .. '/lua/?/init.lua;' .. package.path
 local manifest = assert(loadfile('static/ergopti_plus/macos/_generated/features_manifest.lua'))()
 local defaults = require('config_defaults').new(manifest)
@@ -242,7 +242,7 @@ print('8 actual metrics/global restore/clear retained-source controls passed')
 `;
 	const runtime = findRuntime();
 	assert.ok(runtime, 'an actual Lua runtime is required');
-	const result = spawnSync(runtime, ['-'], { cwd: root, input: program, encoding: 'utf8' });
+	const result = spawnSync(runtime, ['-', shared], { cwd: root, input: program, encoding: 'utf8' });
 	assert.equal(result.status, 0, result.stderr || result.error?.message);
 	assert.match(
 		result.stdout,

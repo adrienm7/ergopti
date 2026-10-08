@@ -3380,6 +3380,12 @@ and restoration/debt assertions remain mandatory.
   assumption and fn/globe), WP10 enable and retire. Media metrics identities
   now exist for play/pause, track skips and brightness; production capture and
   native UI/physical acceptance remain unfinished.
+  Selector regressions now pass the actual absolute shared source directory
+  to each Lua child. This preserves canonical constructor identity without
+  requiring an optional native cwd provider. All three migration vectors,
+  eight restore/clear vectors and six selector cases pass on Lua 5.4 and
+  LuaJIT with LuaFileSystem absent; the hosted correction remains pending.
+  No source-identity policy or runtime authority is changed.
   The fixed-source reader now uses public `Path.parents` and path equality
   for lexical containment while preserving every original physical source,
   byte-read, Git, namespace and currentness check. The independent 48-case
