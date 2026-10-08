@@ -223,6 +223,9 @@ static int native_sort_addresses(void *owner, const char *addresses, char *outpu
 		items[index].sin6_family = AF_INET6;
 		if (InetPtonA(AF_INET6, value, &items[index].sin6_addr) != 1) {
 			if (InetPtonA(AF_INET, value, &ipv4) != 1) { admitted = 0; goto closed; }
+			/* A rejected IPv6 parse may have written a partial address.
+			 * Construct the complete mapped IPv4 address from a clean value. */
+			memset(&items[index].sin6_addr, 0, sizeof(items[index].sin6_addr));
 			items[index].sin6_addr.u.Byte[10] = 255; items[index].sin6_addr.u.Byte[11] = 255;
 			memcpy(&items[index].sin6_addr.u.Byte[12], &ipv4, sizeof(ipv4));
 		}
