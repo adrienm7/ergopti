@@ -60,13 +60,11 @@ _FM_EndIsolated(OldFeatures) {
 ; the absolute path. Tag distinguishes between concurrent fixture files
 ; (one per test); the harness clears any stale copy first.
 _FM_WriteFixture(Tag, Content) {
-	static Sequence := 0
-	Path := A_Temp . "\ergopti_v2_test_" . Tag . "_" . A_ScriptHwnd . "_" . ++Sequence . ".toml"
+	Path := A_Temp . "\ergopti_v2_test_" . Tag . ".toml"
 	if FileExist(Path) {
 		FileDelete(Path)
 	}
 	FileAppend(Content, Path, "UTF-8")
-	_CMJFixtureReadonly(Path)
 	return Path
 }
 
@@ -375,8 +373,6 @@ Test("ManifestBuildFeaturesMap: tap_hold is not a Features sub-tree",
 TestFMv2_ApplyNonexistentFileReturnsZero() {
 	OldFeatures := _FM_BeginIsolated()
 	try {
-		MissingPath := A_Temp . "\nonexistent_ergopti_v2_test.toml"
-		_CMJFixtureReadonly(MissingPath)
 		Applied := ApplyConfigToml(Features, A_Temp . "\nonexistent_ergopti_v2_test.toml")
 		AssertEqual(0, Applied)
 	}
@@ -1615,7 +1611,6 @@ _FMS_ChildPoliciesAndFullSave(Path, ExpectedSave) {
 	Target := ManifestBuildFeaturesMap()
 	try {
 		_CFGFS_Prepare(Path)
-		ConfigMigrateBoot(Path)
 		_ConfigBootRejectedOverrides := 0
 		_ConfigBootOutdatedEntries := Map()
 		ParseConfigTomlFile(Path)
@@ -1656,9 +1651,9 @@ _FMS_ChildPoliciesAndFullSave(Path, ExpectedSave) {
 	}
 }
 _FMS_InlineChildRefusalAndPhysicalPreservation() {
-	_FMS_WithSource("inline_child", _CMJFixtureCurrentSource('[hotstrings]`nautocorrection = { names = { enabled = "true", time_activation_seconds = 0.25, future = "retain" } } # preserve`n'),
+	_FMS_WithSource("inline_child", '[hotstrings]`nautocorrection = { names = { enabled = "true", time_activation_seconds = 0.25, future = "retain" } } # preserve`n',
 		_FMS_ChildPoliciesAndFullSave.Bind(, CONFIG_SAVE_OK))
-	_FMS_WithSource("physical_child", _CMJFixtureCurrentSource('[hotstrings.autocorrection.names]`nenabled = "true" # outdated`ntime_activation_seconds = 0.25`nfuture = "retain" # unknown`n'),
+	_FMS_WithSource("physical_child", '[hotstrings.autocorrection.names]`nenabled = "true" # outdated`ntime_activation_seconds = 0.25`nfuture = "retain" # unknown`n',
 		_FMS_ChildPoliciesAndFullSave.Bind(, CONFIG_SAVE_OK))
 }
 Test("configuration snapshot: inline child policy and actual full-save fences retain obsolete data (config-semantic-snapshot)",

@@ -65,9 +65,7 @@ _CTT_RealCollector(OnboardingSeen) {
 		_LLM_Menu["user_profiles"] := []
 		_LLM_Menu_Loaded := true
 		Legacy := '# unowned dashboard shortcuts`n[metrics]`nmetrics_shortcut_typing = "ctrl+alt+m" # keep typing`nmetrics_shortcut_apps = { future = "keep" } # keep apps`n'
-		Legacy := _CMJFixtureCurrentSource(Legacy)
 		AssertTrue(FSWrite(Path, Legacy))
-		ConfigMigrateBoot(Path)
 		AssertEqual(CONFIG_SAVE_OK, SaveFullConfig(0, (*) => true),
 			"the real full-save collector must produce valid typed updates")
 		for Line in StrSplit(Legacy, "`n") {

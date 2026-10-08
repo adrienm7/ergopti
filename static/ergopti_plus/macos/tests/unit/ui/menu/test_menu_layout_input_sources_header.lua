@@ -10,13 +10,14 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local LayoutFixture = require("tests.support.layout_legacy_caption_fixture")
 
 --- Builds the layout row and renders it the way the tray root does.
 --- @param ctx table Menu context.
 --- @return table rendered submenu rows
 local function tray_rows(ctx)
 	local layout = helpers.load_with_stubs("ui.menu.menu_keyboard_layout")
-	local ManifestMenu = require("infra.manifest_menu")
+	local ManifestMenu = LayoutFixture.install(require("infra.i18n"))
 	local item = layout.build(ctx)
 	helpers.assert_true(type(item) == "table", "menu_keyboard_layout.build must return a row")
 	local row = ManifestMenu.render_rows({ item }, "top_level")[1]
@@ -56,7 +57,7 @@ local function index_of(rows, title)
 	return nil
 end
 
-helpers.describe("layout submenu: the input sources have their own header", function()
+helpers.describe("layout submenu: the input sources have their own header", LayoutFixture.scoped(function()
 	helpers.it("draws « Sources de saisie » right before the input-source rows", function()
 		local rows = tray_rows(make_ctx("v1"))
 		local header = index_of(rows, require("infra.i18n").section("menu.layout.active_layouts"))
@@ -66,4 +67,4 @@ helpers.describe("layout submenu: the input sources have their own header", func
 		helpers.assert_true(rows[header + 1] ~= nil and rows[header + 1].title ~= "-",
 			"the header is followed by the input-source rows")
 	end)
-end)
+end))

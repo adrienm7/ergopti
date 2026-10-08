@@ -6055,5 +6055,283 @@
 			],
 			"unavailable": "hide"
 		}
+	],
+	"layout_switching_frame": [
+		{
+			"type": "check",
+			"id": "layout_switch_toggle",
+			"i18n": "menu.layout.pause_layout_enabled",
+			"checked_when": [
+				"layout_switch_checked"
+			],
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "group",
+			"id": "layout_pause_picker",
+			"i18n": "menu.layout.pause_picker_caption",
+			"caption_getter": "layout_pause_caption",
+			"disabled_when": [
+				"layout_switch_ready"
+			],
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "group",
+			"id": "layout_resume_picker",
+			"i18n": "menu.layout.resume_picker_caption",
+			"caption_getter": "layout_resume_caption",
+			"disabled_when": [
+				"layout_switch_ready"
+			],
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"layout_switch_picker_frame": [
+		{
+			"type": "check",
+			"id": "layout_picker_auto",
+			"i18n": "menu.layout.layout_auto",
+			"checked_when": [
+				"layout_picker_auto_checked"
+			],
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "include",
+			"section": "layout_switch_picker_choices_frame",
+			"present_when": "layout_picker_has_choices"
+		}
+	],
+	"layout_switch_picker_choices_frame": [
+		{
+			"type": "---"
+		},
+		{
+			"type": "list",
+			"id": "layout_picker_choices",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"layout_native_record_choice": [
+		{
+			"type": "check",
+			"id": "layout_native_select",
+			"caption_source": "native",
+			"caption_getter": "layout_native_caption",
+			"checked_when": [
+				"layout_native_selected"
+			],
+			"disabled_when": [
+				"layout_native_ready"
+			],
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"layout_bundle_installed": [
+		{
+			"type": "label",
+			"id": "layout_installed_caption",
+			"i18n": "menu.layout.installed_version",
+			"caption_getters": [
+				"layout_install_scope",
+				"layout_install_latest"
+			],
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"layout_bundle_update": [
+		{
+			"type": "command",
+			"id": "layout_install",
+			"i18n": "menu.layout.update_version",
+			"caption_getters": [
+				"layout_install_scope",
+				"layout_install_old",
+				"layout_install_latest"
+			],
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"layout_bundle_install": [
+		{
+			"type": "command",
+			"id": "layout_install",
+			"i18n": "menu.layout.install_version",
+			"caption_getters": [
+				"layout_install_emoji",
+				"layout_install_scope",
+				"layout_install_latest"
+			],
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"layout_bundle_in_list": [
+		{
+			"type": "label",
+			"id": "layout_in_list_caption",
+			"i18n": "menu.layout.in_list",
+			"caption_getter": "layout_bundle_version",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"layout_bundle_update_install_first": [
+		{
+			"type": "label",
+			"id": "layout_update_install_first_caption",
+			"i18n": "menu.layout.update_list_install_first",
+			"caption_getter": "layout_bundle_version",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"layout_bundle_upgrade": [
+		{
+			"type": "command",
+			"id": "layout_upgrade_list",
+			"i18n": "menu.layout.update_list",
+			"caption_getters": [
+				"layout_bundle_old_version",
+				"layout_bundle_version"
+			],
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"layout_bundle_upgrade_to": [
+		{
+			"type": "command",
+			"id": "layout_upgrade_list",
+			"i18n": "menu.layout.update_list_to",
+			"caption_getter": "layout_bundle_version",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"layout_bundle_variant_added": [
+		{
+			"type": "label",
+			"id": "layout_added_variant_caption",
+			"i18n": "menu.layout.already_added",
+			"caption_getters": [
+				"layout_variant_label",
+				"layout_bundle_version"
+			],
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"layout_bundle_variant_add": [
+		{
+			"type": "command",
+			"id": "layout_enable_variant",
+			"i18n": "menu.layout.native_variant_caption",
+			"caption_getters": [
+				"layout_variant_label",
+				"layout_bundle_version"
+			],
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"layout_bundle_variant_parent": [
+		{
+			"type": "group",
+			"id": "layout_variant_choices",
+			"i18n": "menu.layout.add_to_list",
+			"caption_getter": "layout_bundle_version",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"layout_bundle_install_first": [
+		{
+			"type": "label",
+			"id": "layout_install_first_caption",
+			"i18n": "menu.layout.install_first",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"layout_bundle_frame": [
+		{
+			"type": "list",
+			"id": "layout_bundle_system",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "list",
+			"id": "layout_bundle_user",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "list",
+			"id": "layout_bundle_status",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"layout_native_parent": [
+		{
+			"type": "group",
+			"id": "layout_parent_content",
+			"i18n": "menu.layout.title",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
 	]
 }

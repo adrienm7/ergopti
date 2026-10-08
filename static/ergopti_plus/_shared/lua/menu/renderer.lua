@@ -71,6 +71,82 @@ local function caption_format(format, value)
 	return table.concat(parts), found
 end
 
+-- Ordered typed values consume the original translated format without interpreting native bytes.
+local function caption_values(format, values)
+	if type(format) ~= "string" or type(values) ~= "table" or getmetatable(values) ~= nil then return nil end
+	local count, maximum = 0, 0
+	for key, value in next, values do
+		if type(key) ~= "number" or key < 1 or key % 1 ~= 0 or type(value) ~= "string" then return nil end
+		count, maximum = count + 1, math.max(maximum, key)
+	end
+	if count == 0 or count ~= maximum then return nil end
+	local parts, index, argument = {}, 1, 1
+	while index <= #format do
+		local character, following = format:sub(index, index), format:sub(index + 1, index + 1)
+		if character == "%" and following == "%" then
+			parts[#parts + 1], index = "%", index + 2
+		elseif character == "%" and following == "s" then
+			if values[argument] == nil then return nil end
+			parts[#parts + 1], argument, index = values[argument], argument + 1, index + 2
+		elseif character == "%" then return nil
+		else parts[#parts + 1], index = character, index + 1 end
+	end
+	if argument ~= count + 1 then return nil end
+	return table.concat(parts)
+end
+
+-- Explicit numbered captions retain the original one-value format without interpreting native bytes.
+local function read_numbered_caption(item, getters, i18n)
+	if item.caption_format ~= "numbered" or (item.type ~= "command" and item.type ~= "group")
+		or type(item.id) ~= "string" or item.id == "" or type(item.i18n) ~= "string" or item.i18n == ""
+		or type(item.caption_getter) ~= "string" or item.caption_getter == ""
+		or item.caption_getters ~= nil or item.caption_source ~= nil or item.caption_layout ~= nil
+		or item.caption_joiner ~= nil or item.label_prefix ~= nil or item.reason_key ~= nil
+		or item.disabled_reason_key ~= nil or type(getters) ~= "table" or type(getters[item.caption_getter]) ~= "function" then return nil end
+	local title = i18n.get(item.i18n)
+	if type(title) ~= "string" or title == item.i18n or not title:find("{1}", 1, true)
+		or title:find("[%z\1-\31\127]") or utf8_length(title) == nil then return nil end
+	local remainder = title:gsub("{1}", "")
+	if remainder:find("[{}]") then return nil end
+	local ok, value = pcall(getters[item.caption_getter])
+	if not ok or type(value) ~= "string" or value:find("[%z\1-\31\127]") or utf8_length(value) == nil then return nil end
+	return (title:gsub("{1}", function() return value end))
+end
+
+-- A record caption remains literal native data; the declaration owns its kind and policy.
+local function read_native_caption(item, getters)
+	if item.caption_source ~= "native" or (item.type ~= "check" and item.type ~= "group")
+		or item.i18n ~= nil or item.caption_getters ~= nil or item.label_prefix ~= nil
+		or item.reason_key ~= nil or item.disabled_reason_key ~= nil or item.unavailable ~= "hide"
+		or (item.caption_layout ~= nil or item.caption_joiner ~= nil) or type(item.caption_getter) ~= "string" or item.caption_getter == ""
+		or type(getters) ~= "table" or type(getters[item.caption_getter]) ~= "function" then return nil end
+	local ok, title = pcall(getters[item.caption_getter])
+	if not ok or type(title) ~= "string" or title == "" or title:find("[%z\1-\31\127]") or utf8_length(title) == nil then return nil end
+	return title
+end
+
+local function read_caption_values(item, getters, i18n)
+	local names = item.caption_getters
+	if item.caption_getter ~= nil or item.caption_source ~= nil or item.caption_layout ~= nil or item.caption_joiner ~= nil
+		or not ({command = true, check = true, group = true, label = true})[item.type]
+		or type(item.id) ~= "string" or item.id == "" or type(item.i18n) ~= "string" or item.i18n == ""
+		or type(names) ~= "table" or getmetatable(names) ~= nil then return nil end
+	local count, maximum = 0, 0
+	for index, name in next, names do
+		if type(index) ~= "number" or index < 1 or index % 1 ~= 0 or type(name) ~= "string" or name == ""
+			or type(getters[name]) ~= "function" then return nil end
+		count, maximum = count + 1, math.max(maximum, index)
+	end
+	if count == 0 or count ~= maximum then return nil end
+	local values = {}
+	for index, name in ipairs(names) do
+		local ok, value = pcall(getters[name])
+		if not ok or type(value) ~= "string" then return nil end
+		values[index] = value
+	end
+	return caption_values(i18n.get(item.i18n), values)
+end
+
 -- Used only to report a malformed `new()` call, which by definition happens
 -- before an injected logger exists.
 local BootLogger = require("logger.shim")
@@ -806,7 +882,7 @@ function M.new(deps)
 		local cmd_id = type(item.command) == "string" and item.command or row_id
 		local fn     = commands[cmd_id]
 
-		if row_id == "" or i18n_key == "" then
+		if row_id == "" or (i18n_key == "" and item.caption_source ~= "native") then
 			Logger.warn(LOG, "'%s' item missing id or i18n in '%s' — skipped.", t, manifest_key)
 			return nil
 		end
@@ -820,6 +896,18 @@ function M.new(deps)
 		end
 
 		local title
+		if item.caption_format ~= nil then
+			title = read_numbered_caption(item, getters, i18n)
+			if title == nil then return nil end
+		end
+		if item.caption_source ~= nil then
+			title = read_native_caption(item, getters)
+			if title == nil then return nil end
+		end
+		if item.caption_getters ~= nil then
+			title = read_caption_values(item, getters, i18n)
+			if title == nil then return nil end
+		end
 		if has_caption_layout(item) then
 			title = explicit_caption(item, getters, i18n.get(i18n_key))
 			if title == nil then return nil end
@@ -832,7 +920,7 @@ function M.new(deps)
 		if disabled and type(item.disabled_reason_key) == "string" then
 			local stand_in = greyed_stand_in(manifest_key,
 				{ id = row_id, i18n = i18n_key, reason_key = item.disabled_reason_key })
-			if stand_in and has_caption_layout(item) then
+			if stand_in and (has_caption_layout(item) or item.caption_getters ~= nil) then
 				stand_in.title = title .. " — " .. reason_head(i18n.get(item.disabled_reason_key))
 			end
 			if stand_in and rawget(item, "label_prefix") ~= nil then
@@ -1014,6 +1102,22 @@ function M.new(deps)
 					Logger.error(LOG, "Invalid inert caption layout in '%s' — rows refused.", key)
 					return nil
 				end
+				if item.caption_format ~= nil and is_for_platform(item) and read_numbered_caption(item, getters, i18n) == nil then return nil end
+				if item.caption_source ~= nil and is_for_platform(item) and read_native_caption(item, getters) == nil then return nil end
+				if item.caption_getters ~= nil then
+					local names = item.caption_getters
+					if item.caption_getter ~= nil or item.caption_source ~= nil or caption_layout ~= nil
+						or not ({command = true, check = true, group = true, label = true})[item.type]
+						or type(item.i18n) ~= "string" or item.i18n == ""
+						or type(names) ~= "table" or getmetatable(names) ~= nil then return nil end
+					local count, maximum = 0, 0
+					for index, name in next, names do
+						if type(index) ~= "number" or index < 1 or index % 1 ~= 0
+							or type(name) ~= "string" or name == "" or (is_for_platform(item) and type(getters[name]) ~= "function") then return nil end
+						count, maximum = count + 1, math.max(maximum, index)
+					end
+					if count == 0 or count ~= maximum then return nil end
+				end
 				if item.on_refusal ~= nil and item.type ~= "include" then
 					Logger.error(LOG, "Invalid presentation omission policy in '%s' — rows refused.", key)
 					return nil
@@ -1080,7 +1184,7 @@ function M.new(deps)
 					elseif status_definition and item.type == "label" then
 						row = { label = i18n.get(item.i18n), disabled = true }
 					elseif item.type == "label" then
-						local fields = { type = true, id = true, i18n = true, platforms = true, unavailable = true, caption_getter = true, caption_layout = true, caption_joiner = true }
+						local fields = { type = true, id = true, i18n = true, platforms = true, unavailable = true, caption_getter = true, caption_getters = true, caption_layout = true, caption_joiner = true }
 						local valid = type(item.id) == "string" and item.id ~= ""
 							and type(item.i18n) == "string" and item.i18n ~= ""
 							and (item.unavailable == nil or item.unavailable == "hide")
@@ -1123,6 +1227,14 @@ function M.new(deps)
 						if not row then return nil end
 					elseif item.type == "group" and (type(children[item.id]) == "table" or type(children[item.id]) == "function") then
 						local title
+						if item.caption_format ~= nil then
+							title = read_numbered_caption(item, getters, i18n)
+							if title == nil then return nil end
+						end
+						if item.caption_source ~= nil then
+							title = read_native_caption(item, getters)
+							if title == nil then return nil end
+						end
 						if has_caption_layout(item) then
 							title = explicit_caption(item, getters, i18n.get(item.i18n))
 							if title == nil then return nil end
@@ -1139,7 +1251,12 @@ function M.new(deps)
 						Logger.error(LOG, "Missing child data or unsupported row in template '%s' — provider rows refused.", key)
 						return nil
 					end
-					if row and item.caption_getter ~= nil and not
+					if row and item.caption_getters ~= nil and item.type ~= "command" and item.type ~= "check" then
+						local title = read_caption_values(item, getters, i18n)
+						if title == nil then return nil end
+						row.label = prefix .. title
+					end
+					if row and item.caption_format == nil and item.caption_source == nil and item.caption_getter ~= nil and not
 						((item.type == "command" or item.type == "group") and has_caption_layout(item)) then
 						local raw_title = i18n.get(item.i18n)
 						local layout = caption_layout
@@ -1419,11 +1536,23 @@ function M.new(deps)
 			elseif t == "group" then
 				local group_id  = type(item.id)   == "string" and item.id   or ""
 				local i18n_key  = type(item.i18n) == "string" and item.i18n or ""
-				if group_id == "" or i18n_key == "" then
+				if group_id == "" or (i18n_key == "" and item.caption_source ~= "native") then
 					Logger.warn(LOG, "group item missing id or i18n in '%s' — skipped.", manifest_key)
 					goto continue
 				end
 				local label = i18n.get(i18n_key)
+				if item.caption_format ~= nil then
+					label = read_numbered_caption(item, getters, i18n)
+					if label == nil then goto continue end
+				end
+				if item.caption_source ~= nil then
+					label = read_native_caption(item, getters)
+					if label == nil then goto continue end
+				end
+				if item.caption_getters ~= nil then
+					label = read_caption_values(item, getters, i18n)
+					if label == nil then goto continue end
+				end
 				if has_caption_layout(item) then
 					label = explicit_caption(item, getters, label)
 					if label == nil then goto continue end
@@ -1706,14 +1835,24 @@ function M.new(deps)
 		end
 		if type(row_id) ~= "string" or row_id == "" or matches ~= 1
 			or selected.type ~= "group" or rawget(selected, "label_prefix") ~= nil or not is_for_platform(selected)
-			or type(selected.i18n) ~= "string" or selected.i18n == "" or type(submenu) ~= "table" then
+			or ((type(selected.i18n) ~= "string" or selected.i18n == "") and selected.caption_source ~= "native")
+			or type(submenu) ~= "table" then
 			Logger.error(LOG, "Missing or invalid declared parent '%s.%s' — provider row refused.", manifest_key, tostring(row_id))
 			return nil
 		end
 		getters = getters or {}
 		local label = i18n.get(selected.i18n)
 		local caption_key = rawget(selected, "caption_getter")
-		if has_caption_layout(selected) then
+		if selected.caption_format ~= nil then
+			label = read_numbered_caption(selected, getters, i18n)
+			if label == nil then return nil end
+		elseif selected.caption_source ~= nil then
+			label = read_native_caption(selected, getters)
+			if label == nil then return nil end
+		elseif selected.caption_getters ~= nil then
+			label = read_caption_values(selected, getters, i18n)
+			if label == nil then return nil end
+		elseif has_caption_layout(selected) then
 			label = explicit_caption(selected, getters, label)
 			if label == nil then return nil end
 		elseif caption_key ~= nil then
