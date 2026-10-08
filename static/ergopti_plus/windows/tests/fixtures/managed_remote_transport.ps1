@@ -812,7 +812,11 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
                         finally { client.Close(); lock (gate) clients.Remove(client); }
                     });
                     worker.IsBackground = true;
-                    lock (gate) { clients.Add(client); workers.Add(worker); }
+                    lock (gate) {
+                        // Retirement may have closed its client snapshot after Accept returned.
+                        if (stopping) { client.Close(); continue; }
+                        clients.Add(client); workers.Add(worker);
+                    }
                     worker.Start();
                 } catch (SocketException failure) { if (!stopping) { CaptureServiceFailure("listener_accept", failure); Interlocked.Increment(ref ServiceFailures); } return; }
                 catch (ObjectDisposedException failure) { if (!stopping) { CaptureServiceFailure("listener_accept", failure); Interlocked.Increment(ref ServiceFailures); } return; }

@@ -2133,6 +2133,12 @@ const CHECKS = [
 		repro: 'npm run test:managed-network-failure-ui'
 	},
 	{
+		name: 'managed fixture late accepted clients retain exact retirement ownership',
+		cmd: 'node',
+		args: ['tools/test/test-managed-remote-retirement.cjs'],
+		repro: 'npm run test:managed-remote-retirement'
+	},
+	{
 		name: 'model browser actions retain their operation session across native reuse',
 		cmd: 'node',
 		args: ['tools/test/test-model-browser-session.cjs'],
