@@ -6559,6 +6559,18 @@ Both source identities and every GIO/native assertion remain intact. The
 preceding native run skips installation/Release; final SDK/package/install
 receiving on the new source remains required before any completion claim.
 
+Linux manual37714714116 at9d26b947e passes11,644 unit assertions, all157 E2E
+steps and the complete package job, including actual Flatpak build/install/run
+and tarball installation. Three binary installation variants pass;14 source
+variants fail: five lack a caller-supplied compiler under--no-deps, seven omit
+the canonical builder from the first-install checkout, and two Fedora variants
+refuse because no verified LuaJIT networking provider is declared. Compiler
+and libc-header packages now have a separate shared catalogue projection;
+source installs provision them, binary installs do not, and--no-deps preserves
+caller ownership. CI retains every original installation assertion and supplies
+the missing source prerequisites. Local regression and selected gates pass;
+native receiving of this repair and the separate Fedora provider work remain.
+
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard
   layers on all three drivers. Windows and macOS also support their existing

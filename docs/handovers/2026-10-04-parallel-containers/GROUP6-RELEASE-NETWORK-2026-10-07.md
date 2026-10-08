@@ -10,6 +10,23 @@ device validation and any necessary fixes.
 
 ## Delivered source slices
 
+Source-install checkpoint,2026-10-08: Linux manual37714714116 at9d26b947e
+passes11,644 unit assertions, all157 E2E steps and the complete package job,
+including genuine Flatpak build/install/launch. Three binary installation
+variants pass. The14 failing source variants have distinct closed observations:
+five lack a compiler under--no-deps; seven first-install checkouts omit the
+canonical builder; two Fedora variants stop earlier at the declared unavailable
+LuaJIT networking provider. The compiler/header catalogue projection repairs
+source-install prerequisites without adding a compiler to binary runtime
+requirements or removing any native assertion. The first-install fixture copies
+only the canonical builder closure. Its shared catalogue/generator region is
+owned by group6; unrelated data, workflow steps and locale files remain exact.
+Local causal regression is red on the original catalogue; corrected format,
+all382 JavaScript checks and portable/native producer controls pass. The first
+CI guard replay exposed an incorrectly anchored fixture slice; that harness
+error was corrected before receiving and is not credited as product evidence.
+All manually dispatched final-source native gates remain pending for this repair.
+
 - macOS archive migration, Sparkle resource/key/refusal receiving and bounded
   native lifecycle diagnostics. Historical native Sparkle acceptance passed;
   complete Brew/package/install acceptance remains incomplete.

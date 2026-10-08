@@ -13,6 +13,16 @@ const NETWORK_KEYS = ['gio', 'gobject', 'glib'];
 
 /** Reject data that could escape native metadata, shell literals or Lua strings. */
 function validate(data) {
+	if (Object.keys(data.archive_build_packages || {}).join(',') !== MANAGERS.join(','))
+		throw new TypeError('Incomplete source archive build package mapping.');
+	for (const packages of Object.values(data.archive_build_packages)) {
+		if (packages === null) continue;
+		if (!Array.isArray(packages) || !packages.length || new Set(packages).size !== packages.length)
+			throw new TypeError('Invalid source archive build package list.');
+		for (const pkg of packages)
+			if (typeof pkg !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9+_.-]*$/.test(pkg))
+				throw new TypeError('Invalid source archive build package identity.');
+	}
 	if (data?.version !== 1 || Object.keys(data.libraries || {}).join(',') !== KEYS.join(','))
 		throw new TypeError('Linux runtime catalogue requires its four ordered library identities.');
 	for (const [key, library] of Object.entries(data.libraries)) {
@@ -289,6 +299,12 @@ function render(data, read) {
 			: `\t\tapt:${data.archive_digest_runtime.soname}) _available_apt_runtime_package ${data.archive_digest_runtime.package_alternatives.apt.join(' ')} ;;`
 	);
 	const installer = 'static/ergopti_plus/linux/install.sh';
+	const buildRows = MANAGERS.map((manager) => {
+		const packages = data.archive_build_packages[manager];
+		return packages === null
+			? `\t\t${manager}) return 1 ;;`
+			: `\t\t${manager}) echo "${packages.join(' ')}" ;;`;
+	});
 	result[installer] = projectRegion(
 		projectRegion(read(installer), 'LINUX NATIVE PACKAGES', rows.join('\n')),
 		'LINUX NATIVE CAPABILITIES',
@@ -296,6 +312,11 @@ function render(data, read) {
 			...KEYS.map((key) => `_check_or_install_library ${data.libraries[key].soname}`),
 			'_check_or_install curl'
 		].join('\n')
+	);
+	result[installer] = projectRegion(
+		result[installer],
+		'LINUX ARCHIVE BUILD PACKAGES',
+		`_native_output_build_packages() {\n\tcase "$1" in\n${buildRows.join('\n')}\n\t\t*) return 1 ;;\n\tesac\n}`
 	);
 	result[installer] = projectRegion(
 		result[installer],

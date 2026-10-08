@@ -2141,35 +2141,35 @@ jobs:
             distro: debian
             container: debian:stable-slim
             image: debian:stable-slim
-            prep: apt-get update && apt-get install -y --no-install-recommends bash coreutils findutils grep sed sudo passwd
+            prep: apt-get update && apt-get install -y --no-install-recommends bash coreutils findutils grep sed sudo passwd gcc libc6-dev
           - id: distro-fedora
             kind: install
             label: 'Install · fedora'
             distro: fedora
             container: fedora:latest
             image: fedora:latest
-            prep: dnf install -y bash coreutils findutils grep sed sudo shadow-utils
+            prep: dnf install -y bash coreutils findutils grep sed sudo shadow-utils gcc glibc-devel
           - id: distro-arch
             kind: install
             label: 'Install · arch'
             distro: arch
             container: archlinux:latest
             image: archlinux:latest
-            prep: pacman -Sy --noconfirm bash coreutils findutils grep sed sudo shadow
+            prep: pacman -Sy --noconfirm bash coreutils findutils grep sed sudo shadow gcc glibc
           - id: distro-alpine
             kind: install
             label: 'Install · alpine'
             distro: alpine
             container: alpine:latest
             image: alpine:latest
-            prep: apk add --no-cache bash coreutils findutils grep sed sudo
+            prep: apk add --no-cache bash coreutils findutils grep sed sudo gcc musl-dev
           - id: distro-opensuse
             kind: install
             label: 'Install · opensuse'
             distro: opensuse
             container: opensuse/tumbleweed:latest
             image: opensuse/tumbleweed:latest
-            prep: sed -i 's|http://download.opensuse.org|https://downloadcontent.opensuse.org|g' /etc/zypp/repos.d/*.repo && zypper --non-interactive install bash coreutils findutils grep sed sudo shadow
+            prep: sed -i 's|http://download.opensuse.org|https://downloadcontent.opensuse.org|g' /etc/zypp/repos.d/*.repo && zypper --non-interactive install bash coreutils findutils grep sed sudo shadow gcc glibc-devel
           - id: first-install-ubuntu-22.04
             kind: first
             label: 'First install · ubuntu-22.04'

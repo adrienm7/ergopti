@@ -717,6 +717,36 @@ _native_output_bin_parents() {
 
 # Refuse before compiling, migrating configuration, copying files or replacing
 # the existing generated-helper ownership manifest.
+# BEGIN GENERATED LINUX ARCHIVE BUILD PACKAGES
+_native_output_build_packages() {
+	case "$1" in
+		apt) echo "gcc libc6-dev" ;;
+		dnf) echo "gcc glibc-devel" ;;
+		zypper) echo "gcc glibc-devel" ;;
+		pacman) echo "gcc glibc" ;;
+		xbps) return 1 ;;
+		apk) echo "gcc musl-dev" ;;
+		*) return 1 ;;
+	esac
+}
+# END GENERATED LINUX ARCHIVE BUILD PACKAGES
+
+# Only checkout installs compile this backend. Binary release recipients do
+# not acquire a compiler, and --no-deps leaves the complete toolchain to its
+# caller. The canonical builder still verifies compilation and publication.
+_ensure_native_output_toolchain() {
+	if $SKIP_DEPS; then return 0; fi
+	local manager packages package_name
+	manager="$(_detect_pkg_manager)"
+	if ! packages="$(_native_output_build_packages "$manager")"; then
+		echo "Native archive build prerequisites unavailable; install a C compiler and libc headers, then use --no-deps" >&2
+		return 1
+	fi
+	for package_name in $packages; do
+		_install_required_package "$manager" "$package_name" || return 1
+	done
+}
+
 _native_output_bin_parents || exit 1
 command -v tar >/dev/null || { echo "Native payload copy requires tar" >&2; exit 1; }
 NATIVE_OUTPUT_STAGE=""
@@ -728,6 +758,7 @@ if [ "$SRC_DRIVER" = "${NATIVE_OUTPUT_REPO}/static/ergopti_plus/linux" ]; then
 		echo "Canonical native archive build helper unavailable" >&2
 		exit 1
 	}
+	_ensure_native_output_toolchain || exit 1
 	NATIVE_OUTPUT_STAGE="$(mktemp -d)"
 	# A failed/uncertain compiler leaves its private stage for explicit cleanup;
 	# no recursive trap can erase an unobserved compiler descendant's resources.

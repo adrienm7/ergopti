@@ -149,6 +149,10 @@ mkdir -p "${E2E_HOME}/ergopti/static/layouts"
 cp -r "${SRC}/static/ergopti_plus" "${E2E_HOME}/ergopti/static/"
 cp -r "${SRC}/static/layouts/registry" "${E2E_HOME}/ergopti/static/layouts/"
 cp "${SRC}/package.json" "${E2E_HOME}/ergopti/"
+# Source installs require the reviewed canonical builder, not a host binary.
+# Its explicit source/output arguments need no other tools-tree files.
+mkdir -p "${E2E_HOME}/ergopti/tools/build"
+cp "${SRC}/tools/build/build-linux-native-output.sh" "${E2E_HOME}/ergopti/tools/build/"
 chown -R "${E2E_USER}" "${E2E_HOME}/ergopti"
 
 as_user() {
