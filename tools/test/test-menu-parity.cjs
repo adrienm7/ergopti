@@ -2054,18 +2054,75 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 {
 	const assert = require('node:assert/strict');
 	const { nativeBadgeRootComposition } = require('../lib/menu-native-root-binding.cjs');
-	const controls = require('./fixtures/badge-root-counterexamples.cjs');
+	const controls = require('./fixtures/badge-root-completed-counterexamples.cjs');
 	const target = 'macos_canvas_badge_frame';
 	const sourceFiles = [
 		'macos/ui/menu/init.lua',
 		'macos/ui/menu/builder.lua',
-		'macos/ui/menu/canvas_badge.lua'
+		'macos/ui/menu/canvas_badge.lua',
+		'macos/ui/menu/menu_llm/init.lua'
 	];
 	const sources = Object.fromEntries(
 		sourceFiles.map((file) => [file, fs.readFileSync(path.join(SP, file), 'utf8')])
 	);
 	const admits = (candidate, declarations = manifest, platform = 'hs') =>
 		nativeBadgeRootComposition(candidate, declarations, platform);
+	// The previous physical source/control corpus is frozen independently, never rebuilt from LIVE.
+	const {
+		nativeBadgeRootComposition: predecessorAdmits
+	} = require('../lib/menu-native-root-binding-predecessor.cjs');
+	const predecessorControls = require('./fixtures/badge-root-counterexamples.cjs');
+	const predecessorPath = path.join(__dirname, 'fixtures/badge-root-predecessor');
+	const predecessorSources = Object.fromEntries(
+		sourceFiles
+			.slice(0, 3)
+			.map((file) => [
+				file,
+				fs.readFileSync(path.join(predecessorPath, file.replaceAll('/', '_') + '.txt'), 'utf8')
+			])
+	);
+	const predecessorManifest = JSON.parse(
+		fs.readFileSync(path.join(predecessorPath, 'menu_manifest.json'), 'utf8')
+	);
+	assert.equal(
+		predecessorControls.length,
+		60,
+		'all historical independent controls remain registered'
+	);
+	assert.equal(
+		predecessorAdmits(predecessorSources, predecessorManifest, 'hs'),
+		true,
+		'the genuine historical physical route was admitted'
+	);
+	for (const control of predecessorControls) {
+		const source = predecessorSources[control.path];
+		assert.equal(
+			source.split(control.before).length - 1,
+			1,
+			control.reason + ': immutable historical physical preimage'
+		);
+		const changed = source.replace(control.before, control.after);
+		assert.notEqual(changed, source, control.reason + ': historical source actually changes');
+		assert.equal(
+			predecessorAdmits(
+				{ ...predecessorSources, [control.path]: changed },
+				predecessorManifest,
+				'hs'
+			),
+			false,
+			control.reason
+		);
+	}
+	assert.equal(
+		controls.length,
+		74,
+		'all 60 LIVE successor obligations and 14 new handoff controls execute'
+	);
+	assert.equal(
+		admits(sources),
+		true,
+		'the actual LIVE completed root must be admitted before negative controls'
+	);
 	for (const control of controls) {
 		const source = sources[control.path];
 		assert.equal(
@@ -2101,6 +2158,9 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 		target,
 		'macos_canvas_badge_paused',
 		'macos_canvas_badge_active',
+		'macos_canvas_badge_root',
+		'macos_download_root',
+		'llm_download_shortcut_frame',
 		'top_level'
 	]) {
 		const withdrawn = { ...manifest };
@@ -2132,9 +2192,16 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 		'inert quoted/comment decoys neither create nor withdraw an actual route'
 	);
 	if (admitted) {
-		reachableOn[target] = combineMenuVisibility(PLATFORMS, reachableOn[target], ['hs']);
-		openedBy[target] = 'top_level/native Builder.generate → CanvasBadge.prepend_to';
-		reachedByKinds[target] = { hs: new Set(['compose']) };
+		for (const completedTarget of [target, 'macos_canvas_badge_root', 'macos_download_root']) {
+			reachableOn[completedTarget] = combineMenuVisibility(
+				PLATFORMS,
+				reachableOn[completedTarget],
+				['hs']
+			);
+			openedBy[completedTarget] =
+				'top_level/native Builder.generate → native_composition → CanvasBadge.prepend_to';
+			reachedByKinds[completedTarget] = { hs: new Set(['compose']) };
+		}
 	} else {
 		errors.push(
 			'top_level/native badge: physical root composition refused; declaration remains unreachable'

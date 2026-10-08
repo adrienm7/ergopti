@@ -8900,3 +8900,48 @@ id = "macos_badge_active_caption"
 i18n = "menu.builder.title"
 platforms = ["hs"]
 unavailable = "hide"
+
+# Completed native objects retain their native resource/callback owners.
+# Composition declares order only; no DATA conversion or runtime getter is used.
+[[menu.macos_download_root]]
+type = "native_content"
+id = "download"
+kind = "command"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.macos_download_root]]
+type = "---"
+after = "download"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.macos_download_root]]
+type = "native_content"
+id = "body"
+kind = "rows"
+target = true
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.macos_canvas_badge_root]]
+type = "native_content"
+id = "badge"
+kind = "image"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.macos_canvas_badge_root]]
+type = "native_content"
+id = "boundary"
+kind = "boundary"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.macos_canvas_badge_root]]
+type = "native_content"
+id = "body"
+kind = "rows"
+target = true
+platforms = ["hs"]
+unavailable = "hide"

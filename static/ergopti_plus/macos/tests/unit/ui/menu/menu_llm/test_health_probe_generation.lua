@@ -20,6 +20,8 @@ local MODULES = {
 	"infra.i18n",
 	"ui.menu.menu_llm.models_manager",
 	"ui.menu.menu_llm.profiles_manager",
+	"ui.menu.menu_llm.profile_label",
+	"modules.llm.profiles",
 	"ui.menu.menu_llm.settings_manager",
 	"ui.menu.menu_llm.temperature_panel",
 	"ui.menu.menu_llm.streaming_panel",
@@ -39,7 +41,7 @@ local MODULES = {
 	"modules.llm.ollama_deps_checker",
 }
 
-local function with_fixture(callback, options)
+local function build_fixture(callback, options)
 	return helpers.with_fresh_modules(MODULES, function()
 		local native_renderer = require("infra.manifest_menu")
 		local noop = function() end
@@ -71,11 +73,18 @@ local function with_fixture(callback, options)
 			llm_reset_on_nav = true,
 			llm_active_profile = "basic",
 			llm_profile_shortcuts = {},
+			llm_user_profiles = {},
 		}
 
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.notifications"] = { notify = noop }
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		local locale_file = assert(io.open(helpers.shared("data/locales/en.json"), "r"))
+		local profile_strings = assert(require("json").decode(locale_file:read("*a")))
+		assert(locale_file:close())
+		package.loaded["infra.i18n"] = { get = function(key)
+			if key:match("^menu%.profiles%.") or key:match("^llm%.profile%.") then return profile_strings[key] or key end
+			return key
+		end }
 		package.loaded["ui.menu.shortcut_utils"] = {}
 		package.loaded["modules.llm"] = {
 			DEFAULT_STATE = {
@@ -141,11 +150,6 @@ local function with_fixture(callback, options)
 		}
 		package.loaded["ui.menu.menu_llm.models_manager"] = {
 			new = function() return models end,
-		}
-		package.loaded["ui.menu.menu_llm.profiles_manager"] = {
-			new = function()
-				return { get_menu_item = function() return {} end }
-			end,
 		}
 		package.loaded["ui.menu.menu_llm.settings_manager"] = {
 			new = function()
@@ -245,6 +249,7 @@ local function with_fixture(callback, options)
 			native_child_rows = native_renderer.native_child_rows,
 			get_array = presentation_renderer.get_array,
 			render_rows = function(rows, slot)
+				if slot == "llm_profile" then return presentation_renderer.render_rows(rows, slot) end
 				if slot == "llm_generation_settings" then return native_renderer.render_rows(rows, slot) end
 				return rows
 			end,
@@ -262,6 +267,19 @@ local function with_fixture(callback, options)
 				return items
 			end,
 		}
+		local core = package.loaded["modules.llm"]
+		core.BUILTIN_PROFILES = require("modules.llm.profiles").BUILTIN_PROFILES
+		local profile_constructor_sync = {}
+		core.set_user_profiles = function()
+			profile_constructor_sync[#profile_constructor_sync + 1] = "users"
+			return true
+		end
+		core.set_active_profile = function()
+			profile_constructor_sync[#profile_constructor_sync + 1] = "active"
+			return true
+		end
+		package.loaded["ui.menu.menu_llm.profiles_manager"] = nil
+		require("ui.menu.menu_llm.profiles_manager")
 		package.loaded["modules.llm.mlx_deps_checker"] = require("tests.support.runtime_checker_stub")({
 			check_and_install_deps = accept,
 		})
@@ -354,6 +372,15 @@ local function with_fixture(callback, options)
 		os.execute = previous_os_execute
 		if not ok then error(err, 0) end
 	end)
+end
+
+local function with_fixture(callback, options)
+	local predecessor = {}; for name, value in pairs(package.loaded) do predecessor[name] = value end
+	local outcome = table.pack(xpcall(function() return build_fixture(callback, options) end, debug.traceback))
+	for name in pairs(package.loaded) do if rawget(predecessor, name) == nil then package.loaded[name] = nil end end
+	for name, value in pairs(predecessor) do package.loaded[name] = value end
+	if not outcome[1] then error(outcome[2], 0) end
+	return table.unpack(outcome, 2, outcome.n)
 end
 
 local function find_row(rows, identity)

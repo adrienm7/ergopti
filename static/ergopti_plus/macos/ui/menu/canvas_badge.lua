@@ -42,6 +42,11 @@ function M.prepend_to(items, ctx, on_click)
 		Logger.error(LOG, "Declared canvas badge presentation refused.")
 		return false
 	end
+	local compose = ManifestMenu.native_composition("macos_canvas_badge_root")
+	if type(compose) ~= "function" then
+		Logger.error(LOG, "Declared canvas badge root composition refused.")
+		return false
+	end
 	local display_text = frame[1].label
 	-- Calculate the required canvas width based on the longest root menu item
 	local max_text_width = 0
@@ -124,13 +129,17 @@ function M.prepend_to(items, ctx, on_click)
 	local img = canvas_obj:imageFromCanvas()
 	-- Release the NSWindow handle immediately; the image is already captured
 	canvas_obj:delete()
-	table.insert(items, 1, {
+	local badge = {
 		title = "",
 		image = img,
 		fn    = on_click,
-	})
-	-- The shared frame declares this boundary; hs.menubar consumes its native token.
-	table.insert(items, 2, { title = frame[2].separator and "-" })
+	}
+	local boundary = { title = frame[2].separator and "-" }
+	-- These are completed native objects; the declared frame owns their placement.
+	if compose({ badge = { badge }, boundary = { boundary }, body = items }) ~= true then
+		Logger.error(LOG, "Completed canvas badge root publication refused.")
+		return false
+	end
 end
 
 return M
