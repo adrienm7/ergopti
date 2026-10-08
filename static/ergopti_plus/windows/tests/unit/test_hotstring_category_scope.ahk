@@ -136,7 +136,6 @@ _HSCS_ExtensionMenuOwner(Enabled, LateRefusal, Paused := false) {
 		Fixture.options["roots"] := (*) => [_LCT_RegistryDir()]
 		try {
 			Suspend(false)
-			Fixture.source := _CMJFixtureCurrentSource(Fixture.source)
 			Assert(FSWriteDurable(Fixture.path, Fixture.source))
 			ApplyConfigToml(Features, Fixture.path)
 			CategoryEnabled := Map("Hotstrings", false, "MagicKey", !Enabled)
@@ -248,7 +247,6 @@ _HSCS_ExtensionPackOwnedOwner(Enabled, Removed := false) {
 		Fixture.options["reload"] := Launch
 		Fixture.options["roots"] := (*) => Available ? [Root] : []
 		try {
-			Fixture.source := _CMJFixtureCurrentSource(Fixture.source)
 			Assert(FSWriteDurable(Fixture.path, Fixture.source))
 			Rows := _HS_ExtensionScopeCommandRows("sample", Fixture.options)
 			AssertEqual(2, Rows.Length)
@@ -306,7 +304,6 @@ _HSCS_WithSource(Body) {
 	Fixture := _ScopeOwnerFixture()
 	Fixture.source := '[category_enabled]`nhotstrings = false`nrolls = false`nautocorrection = true`n[hotstrings.rolls.hc]`nenabled = false`ntime_activation_seconds = 0.75`n[hotstrings.rolls.sx]`nenabled = true`n[hotstrings.magic_key.replace]`nenabled = true`n[private]`ncredential = "retain-fixture-value"`n'
 	try {
-		Fixture.source := _CMJFixtureCurrentSource(Fixture.source)
 		Assert(FSWriteDurable(Fixture.path, Fixture.source))
 		_LegacyTopCategoryMap := Map("Rolls", "hotstrings.rolls")
 		Body.Call(Fixture)
@@ -466,7 +463,6 @@ _HSCS_PersonalMenuOwner(Enabled, LateRefusal) {
 	}
 	Fixture.options["reload"] := Launch
 	try {
-		Source := _CMJFixtureCurrentSource(Source)
 		Assert(FSWriteDurable(Fixture.path, Source))
 		ScriptInformation := ScriptInformation.Clone()
 		ScriptInformation["PersonalTomlPath"] := PersonalPath
@@ -657,7 +653,6 @@ _HSCS_DynamicMenuOwner(Enabled, Outcome, Paused := false) {
 	}
 	Fixture.options["reload"] := Launch
 	try {
-		Source := _CMJFixtureCurrentSource(Source)
 		Assert(FSWriteDurable(Fixture.path, Source))
 		Fixture.source := Source
 		Features := ManifestBuildFeaturesMap()
@@ -703,7 +698,6 @@ _HSCS_DynamicMenuOwner(Enabled, Outcome, Paused := false) {
 			Assert(FSWriteDurable(CandidatePath, CandidateBytes))
 			AssertEqual(CandidateBytes, FSReadUtf8Exact(CandidatePath))
 			Target := ManifestBuildFeaturesMap()
-			_CMJFixtureReadonly(CandidatePath)
 			try ApplyConfigToml(Target, CandidatePath)
 			finally {
 				if _TomlFileCache.Has(CandidatePath)
@@ -1229,7 +1223,6 @@ _HSCS_PersonalFrameNativeRefusal() {
 			throw Failure
 	}
 	try {
-		Source := _CMJFixtureCurrentSource(Source)
 		Assert(FSWriteDurable(Fixture.path, Source))
 		Assert(FSWriteDurable(PersonalPath, PersonalSource))
 		ConfigurationFile := Fixture.path
@@ -1413,7 +1406,6 @@ _HSCS_PersonalFileLateLabelFailure(Kind) {
 		Content := '[[alpha]]`n"abcd" = "first"`n[[beta]]`n"qwer" = "second"`n'
 		Source := '[category_enabled]`nhotstrings = true`n[private]`nkeep = "late-label"`n'
 		Assert(FSWriteDurable(FilePath, Content))
-		Source := _CMJFixtureCurrentSource(Source)
 		Assert(FSWriteDurable(Fixture.path, Source))
 		ScriptInformation := SavedInfo.Clone()
 		ScriptInformation["PersonalHotstringsDir"] := Root

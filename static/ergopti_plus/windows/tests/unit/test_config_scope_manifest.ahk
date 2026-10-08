@@ -70,7 +70,6 @@ _ScopeManifestQuotedRoundTrip() {
 		Assert(TOML_BatchWrite(Path, _ConfigPrepareTypedUpdates([Row])))
 		AssertContains(FSReadUtf8Exact(Path), "fast = true", "dynamic Boolean intent must survive admitted serialization")
 		Candidate := Map("hotstrings", Map("modules", Map("ext:ergopti:rolls", Map("fast", false))))
-		_CMJFixtureReadonly(Path)
 		ApplyConfigToml(Candidate, Path)
 		AssertEqual(Candidate["hotstrings"]["modules"]["ext:ergopti:rolls"]["fast"], true,
 			"real loader must address the same unquoted runtime identity")
@@ -110,10 +109,9 @@ Test("config-scope: borrowed candidate admission retains exact lifecycle ownersh
 _ScopeOwnerFixture() {
 	Directory := A_Temp . "\ergopti-scope-" . A_TickCount . "-" . Random(10000, 99999)
 	DirCreate(Directory)
-	Source := _CMJFixtureCurrentSource('[layout]`nergopti_base = true`nergopti_altgr = true`n[llm]`nenabled = true`n[private]`ncredential = "keep"`n')
+	Source := '[layout]`nergopti_base = true`nergopti_altgr = true`n[llm]`nenabled = true`n[private]`ncredential = "keep"`n'
 	Path := Directory . "\config.toml"
 	Assert(FSWriteDurable(Path, Source))
-	ConfigMigrateBoot(Path)
 	Options := Map("path", Path, "locator", Directory . "\paths.toml", "stamp", "scope-test",
 		"settle", (*) => 1, "notify", (*) => 0)
 	return { directory: Directory, path: Path, source: Source, options: Options }
@@ -401,7 +399,7 @@ Test("scope-hash-precondition: extra file hash refusal never publishes a stale i
 ; injected, exactly as the existing scope fixture. No boot warning is authority.
 _ScopeObsoleteSource(Literal, Parent := false) {
 	Assert(ManifestBuildFeaturesMap()["layout"].Has("ergopti_alt_gr"), "the fixture sibling must be a real declared layout setting")
-	return Chr(0xFEFF) . "_meta.schema_version = " . ConfigMigrateCurrentVersion() . "`n" . (Parent
+	return Chr(0xFEFF) . (Parent
 		? '[hotstrings]`nautocorrection = ' . Literal . ' # retain until explicit cleanup`n[layout]`nergopti_alt_gr = true`n[private]`n"literal.dot" = { keep = [1, "x"], date = 1979-05-27 }`n'
 		: '[layout]`nergopti_base = ' . Literal . ' # retain until explicit cleanup`nergopti_alt_gr = true`n[private]`n"literal.dot" = { keep = [1, "x"], date = 1979-05-27 }`n')
 }
@@ -441,7 +439,6 @@ _ScopeObsoleteLeafClear(Literal, Outcome := "complete") {
 			Restart := Fixture.directory . "\restart.toml"
 			Assert(FSWriteDurable(Restart, Expected))
 			RestartSeed := ManifestBuildFeaturesMap()
-			_CMJFixtureReadonly(Restart)
 			ApplyConfigToml(RestartSeed, Restart, &RestartRejected, , &RestartOutdated)
 			AssertEqual(0, RestartRejected)
 			Assert(RestartOutdated.Has("layout`nergopti_base"))

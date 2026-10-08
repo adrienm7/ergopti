@@ -866,16 +866,10 @@ _LifecycleRefuseShutdown(Gate, RequireNativeRetirement := false) {
 	catch as Err
 		try LoggerError("Lifecycle", "Removal cancellation failed during shutdown refusal: {1}.", Err.Message)
 	Honored := LifecycleShutdownVetoHonored()
-	; Exact unsettled reload ownership and genuine mandatory publication debt
-	; are the narrow conditions that may extend the general veto ceiling.
+	; Only an exact unsettled reload owner can extend the general veto ceiling.
 	NativeStopPending := !Honored && IsSet(ReloadTerminalHandoffNativeStopPending)
 		&& ReloadTerminalHandoffNativeStopPending.Call()
-	; An orderly exit cannot destroy the only retained mandatory RAM intent
-	; while its conflicting durable source still belongs to private publication
-	; debt. Keep this narrow condition common to every sibling refusal gate.
-	ConfigIntentPending := IsSet(_ConfigFullSavePublicationDebtNeedsRetention)
-		&& _ConfigFullSavePublicationDebtNeedsRetention.Call()
-	if RequireNativeRetirement || NativeStopPending || ConfigIntentPending {
+	if RequireNativeRetirement || NativeStopPending {
 		Honored := true
 		try KL_CancelShutdown()
 	}

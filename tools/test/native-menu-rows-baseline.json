@@ -33,7 +33,7 @@
 		]
 	},
 	"macos": {
-		"count": 27,
+		"count": 22,
 		"sites": [
 			"macos/ui/menu/builder.lua:452 separator",
 			"macos/ui/menu/builder.lua:876 separator",
@@ -43,17 +43,12 @@
 			"macos/ui/menu/menu_hotstrings.lua:518 separator",
 			"macos/ui/menu/menu_hotstrings_custom.lua:259 static",
 			"macos/ui/menu/menu_hotstrings_management.lua:713 static",
-			"macos/ui/menu/menu_keyboard_layout.lua:475 static",
-			"macos/ui/menu/menu_keyboard_layout.lua:566 static",
-			"macos/ui/menu/menu_keyboard_layout.lua:572 separator",
-			"macos/ui/menu/menu_keyboard_layout.lua:592 static",
-			"macos/ui/menu/menu_keyboard_layout.lua:700 static",
 			"macos/ui/menu/menu_keyboard_slots.lua:152 static",
 			"macos/ui/menu/menu_keyboard_slots.lua:153 static",
 			"macos/ui/menu/menu_keyboard_slots.lua:218 static",
 			"macos/ui/menu/menu_keyboard_slots.lua:219 static",
-			"macos/ui/menu/menu_llm/init.lua:1939 static",
-			"macos/ui/menu/menu_llm/init.lua:1987 native",
+			"macos/ui/menu/menu_llm/init.lua:1955 static",
+			"macos/ui/menu/menu_llm/init.lua:2003 native",
 			"macos/ui/menu/menu_llm/models_manager_mlx_hf.lua:830 static",
 			"macos/ui/menu/menu_llm/profiles_manager.lua:1068 static",
 			"macos/ui/menu/menu_paths.lua:537 static",

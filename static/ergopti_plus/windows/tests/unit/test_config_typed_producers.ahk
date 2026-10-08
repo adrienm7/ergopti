@@ -27,7 +27,6 @@ _CTP_WidgetRoundtrip() {
 	Path := _CTU_NewPath()
 	try {
 		ConfigurationFile := Path
-		ConfigMigrateBoot(Path)
 		AssertTrue(WPMWidget_SaveVisible(true, 0, (*) => 0))
 		AssertTrue(WPMWidget_SaveConfig(true, false, 1, 0, 0, (*) => 0))
 		Target := ManifestBuildFeaturesMap()
