@@ -245,6 +245,7 @@
 			"required": ["enabled"],
 			"properties": {
 				"enabled": { "type": "boolean" },
+				"physical_source": { "type": "string", "enum": ["ledger", "stream"] },
 				"private_filter_enabled": { "type": "boolean" },
 				"secure_filter_enabled": { "type": "boolean" },
 				"system_auth_filter_enabled": { "type": "boolean" },

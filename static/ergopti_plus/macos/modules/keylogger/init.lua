@@ -26,6 +26,7 @@ local utf8     = utf8
 local Logger   = require("infra.logger")
 local Timings  = require("infra.timings")
 local Manifest = require("infra.manifest_reader")
+local ConfigOutdated = require("config_outdated")
 local i18n     = require("infra.i18n")
 local dialog   = require("infra.dialog_util")
 local TeardownTransaction = require("infra.teardown_transaction")
@@ -152,6 +153,7 @@ local NAV_KEY_CODES = {
 -- neutral on every host; visualization parameters do not grant consent.
 M.DEFAULT_STATE = {
 	keylogger_enabled                = Manifest.default_for("metrics.enabled"),
+	keylogger_physical_source        = Manifest.default_for("metrics.physical_source"),
 	keylogger_disabled_apps          = Manifest.default_for("metrics.disabled_apps"),
 	keylogger_encrypt                = Manifest.default_for("metrics.encrypt"),
 	keylogger_menubar_wpm            = Manifest.default_for("metrics.menubar_wpm"),
@@ -173,6 +175,13 @@ M.DEFAULT_STATE = {
 -- ======= 3/ Core State And Lifecycle =======
 -- ===========================================
 -- ===========================================
+
+-- Unselected direct API callers retain their existing ledger behavior. Production
+-- boot transfers a manifest-admitted intent before the first start.
+local _physical_source_intent, _physical_source_applied
+local _physical_source_refused = false
+local _physical_source_started = false
+local _physical_owner, _physical_prepare, _physical_stop, _physical_retired
 
 --- Central shared-state table passed by reference to all sub-modules.
 --- Fields are grouped by concern for readability.
@@ -1017,6 +1026,23 @@ end
 -- ==================================
 -- ==================================
 
+--- Records one admitted boot selector without loading a physical owner while OFF.
+--- Source changes after activation require the existing controlled reload boundary.
+--- @param value string Canonical manifest enum value.
+--- @return boolean admitted Whether this generation can apply the exact intent.
+function M.set_physical_source(value)
+	local entry = Manifest.find_entry_by_path("metrics.physical_source")
+	if type(value) ~= "string" or type(entry) ~= "table" or entry.type ~= "enum"
+		or not ConfigOutdated.manifest_value_fits(entry, value, "hs")
+		or _physical_source_started and _physical_source_applied == nil
+		or _physical_source_applied ~= nil and value ~= _physical_source_applied then
+		_physical_source_refused = true
+		return false
+	end
+	_physical_source_intent, _physical_source_refused = value, false
+	return true
+end
+
 --- Configures encryption and other global options.
 --- This is the single funnel both the boot sync and the menu toggle go through,
 --- which is why the encrypt flag is APPLIED here and not merely recorded: the
@@ -1763,6 +1789,12 @@ local function teardown_runtime(opts)
 	_runtime_generation = _runtime_generation + 1
 	CoreState.is_enabled = false
 	CoreState.is_secure_field = true
+	-- Context and persistence cleanup depend on actual physical-owner settlement;
+	-- an independent teardown sibling would continue even when this fence refuses.
+	if _physical_stop then
+		local called, settled = pcall(_physical_stop, opts ~= nil and opts.process_exit == true)
+		if not called or settled ~= true then return false end
+	end
 	local steps = {
 		{
 			name = "input-source-subscription",
@@ -1936,6 +1968,7 @@ end
 --- Idempotent: calling it a second time while running is a no-op.
 --- @param script_control table The module used to check expansion pauses.
 function M.start(script_control)
+	if _physical_source_refused then return false end
 	return _physical_lifecycle.run("start", function()
 		if CoreState.is_enabled then
 			Logger.warn(LOG, "M.start() called while already running — ignoring.")
@@ -2034,6 +2067,29 @@ function M.start(script_control)
 			end
 			return false
 		end
+		-- A selected but unbound runtime is an explicit GAP before any ledger/tap
+		-- producer may acquire resources. Installed authority is deliberately absent.
+		if _physical_source_intent ~= nil then
+			_physical_source_applied = _physical_source_intent
+			if _physical_source_intent == "stream" then
+				local prepared, accepted = pcall(function()
+					if not _physical_owner then
+						local candidate = require("modules.keylogger.physical_history_owner")
+						_physical_owner = candidate
+						_physical_prepare = assert(rawget(candidate, "prepare"))
+						_physical_stop = assert(rawget(candidate, "stop"))
+						_physical_retired = assert(rawget(candidate, "retired"))
+					end
+					return _physical_prepare()
+				end)
+				if not prepared or accepted ~= true or _physical_source_refused then
+					Logger.warn(LOG, "Keylogger physical source preparation was refused.")
+					teardown_runtime()
+					return false
+				end
+			end
+		end
+		_physical_source_started = true
 		local acquired, acquire_err = xpcall(function()
 			_runtime_generation = _runtime_generation + 1
 			local runtime_generation = _runtime_generation
@@ -2272,6 +2328,10 @@ function M.shutdown()
 	return _physical_lifecycle.run("shutdown", function()
 		-- Process exit/reload: skip the heavy final ingest (see LogManager.stop)
 		local feature_complete = teardown_runtime({ process_exit = true })
+		if _physical_retired then
+			local called, retired = pcall(_physical_retired)
+			if not called or retired ~= true then return false end
+		end
 		if not _kc_bridge_shutdown_complete then
 			local stopped, result = xpcall(KcBridge.stop, debug.traceback)
 			if stopped and result == true then

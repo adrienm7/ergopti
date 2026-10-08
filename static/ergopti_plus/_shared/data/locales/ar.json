@@ -3242,5 +3242,14 @@
 	"physical_shortcuts.position_unavailable": "موضع المفتاح هذا غير متاح هنا.",
 	"physical_shortcuts.windows_unavailable": "غير متاح بعد على Windows: محرر اختصارات المفاتيح الفعلية غير متاح بعد على Windows.",
 	"physical_shortcuts.collision": "تركيبة المفاتيح هذه مستخدمة بالفعل. اختر تركيبة أخرى.",
-	"physical_shortcuts.window_unavailable": "هذه النافذة غير متاحة: حاول فتحها مجددًا."
+	"physical_shortcuts.window_unavailable": "هذه النافذة غير متاحة: حاول فتحها مجددًا.",
+	"menu.global.karabiner_runtime": "محرك Karabiner",
+	"menu.global.karabiner_runtime.owned": "محرك تديره Ergopti",
+	"menu.global.karabiner_runtime.shared": "Karabiner مشترك",
+	"menu.global.karabiner_runtime_unavailable": "المحرك المُدار غير متاح: يلزم تثبيت تم التحقق منه.",
+	"menu.metrics.physical_source": "مصدر سجل الإدخال الفعلي",
+	"menu.metrics.physical_source.ledger": "سجل المفاتيح",
+	"menu.metrics.physical_source.stream": "تدفق أحداث الإدخال الفعلي",
+	"menu.metrics.physical_source_unavailable": "التدفق الفعلي غير متاح: يلزم محرك مثبت تم التحقق منه.",
+	"platform_reason.physical_stream_macos_only": "macOS فقط: منتج أحداث الإدخال الفعلي غير متاح على هذه المنصة."
 }

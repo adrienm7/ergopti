@@ -498,7 +498,16 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 			try("metrics", "keylogger.set_system_auth_filter_enabled", kl.set_system_auth_filter_enabled,
 				state.keylogger_system_auth_filter_enabled)
 		end
-		if state.keylogger_enabled then
+		local physical_source_admitted = true
+		if type(kl.set_physical_source) == "function" then
+			local physical_source = state.keylogger_physical_source
+			if physical_source == nil and type(kl.DEFAULT_STATE) == "table" then
+				physical_source = kl.DEFAULT_STATE.keylogger_physical_source
+			end
+			physical_source_admitted = try_exact("metrics", "keylogger.set_physical_source",
+				kl.set_physical_source, physical_source)
+		end
+		if state.keylogger_enabled and physical_source_admitted then
 			-- Keylogger start is the single biggest boot cost (~1.3 s: SQLite open,
 			-- log-rotation offset replay, export setup). It only feeds typing
 			-- METRICS, so missing the first fraction of a second of keystrokes is

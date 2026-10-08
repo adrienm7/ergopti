@@ -323,6 +323,7 @@ arrow_nav_enabled = false
 
 [metrics]
 enabled = false
+physical_source = "ledger"
 private_filter_enabled = true
 secure_filter_enabled = true
 system_auth_filter_enabled = true

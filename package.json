@@ -373,6 +373,7 @@
 		"test:metrics-privacy-single-source": "node ./tools/test/test-metrics-privacy-single-source.cjs",
 		"test:personal-info-log-sinks-are-judged": "node ./tools/test/test-personal-info-log-sinks-are-judged.cjs",
 		"test:launcher-single-instance": "node ./tools/test/test-launcher-single-instance.cjs",
+		"test:physical-source-selectors": "node ./tools/test/test-physical-source-selectors.cjs",
 		"test:menu-manifest": "node ./tools/test/test-menu-manifest.cjs",
 		"test:locale-catalogue-complete": "node ./tools/test/test-locale-catalogue-complete.cjs",
 		"test:locale-hints-quote-live-labels": "node ./tools/test/test-locale-hints-quote-live-labels.cjs",

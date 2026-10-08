@@ -382,6 +382,29 @@ if (DRIVERS.length < MIN_DRIVERS) {
 	assert.deepEqual(absentErrors, [], 'absence is not a malformed mode or a default flush');
 }
 
+// Physical source is optional and strictly typed; declarations grant no stream authority.
+{
+	const assert = require('node:assert/strict');
+	for (const [value, accepted] of [
+		['ledger', true],
+		['stream', true],
+		['invalid', false],
+		['Ledger', false],
+		[true, false],
+		[0, false],
+		[null, false],
+		[[], false],
+		[{}, false]
+	]) {
+		const errors = [];
+		validate({ metrics: { enabled: false, physical_source: value } }, schema, '', errors);
+		assert.equal(errors.length === 0, accepted, 'typed physical source config value');
+	}
+	const absentErrors = [];
+	validate({ metrics: { enabled: false } }, schema, '', absentErrors);
+	assert.deepEqual(absentErrors, [], 'absence remains a valid neutral source preference');
+}
+
 // Native macOS wrap persistence has typed canonical state and custom-pair shapes.
 {
 	const assert = require('node:assert/strict');

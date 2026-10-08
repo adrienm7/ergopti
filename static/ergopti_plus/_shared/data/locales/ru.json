@@ -3242,5 +3242,14 @@
 	"physical_shortcuts.position_unavailable": "Это положение клавиши здесь недоступно.",
 	"physical_shortcuts.windows_unavailable": "Пока недоступно в Windows: Редактор физических сочетаний клавиш пока недоступен в Windows.",
 	"physical_shortcuts.collision": "Это сочетание клавиш уже используется. Выберите другое.",
-	"physical_shortcuts.window_unavailable": "Это окно недоступно: Попробуйте открыть его снова."
+	"physical_shortcuts.window_unavailable": "Это окно недоступно: Попробуйте открыть его снова.",
+	"menu.global.karabiner_runtime": "Среда выполнения Karabiner",
+	"menu.global.karabiner_runtime.owned": "Среда под управлением Ergopti",
+	"menu.global.karabiner_runtime.shared": "Общий Karabiner",
+	"menu.global.karabiner_runtime_unavailable": "Управляемая среда недоступна: требуется проверенная установка.",
+	"menu.metrics.physical_source": "Источник истории физического ввода",
+	"menu.metrics.physical_source.ledger": "Журнал клавиш",
+	"menu.metrics.physical_source.stream": "Поток физических событий",
+	"menu.metrics.physical_source_unavailable": "Физический поток недоступен: требуется проверенная установленная среда выполнения.",
+	"platform_reason.physical_stream_macos_only": "Только macOS: генератор физических событий недоступен на этой платформе."
 }

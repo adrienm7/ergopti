@@ -1,0 +1,13 @@
+{
+	"$schema": "./runtime_setting.schema.json",
+	"path": "karabiner.runtime",
+	"file": "config_karabiner.toml",
+	"owner": "platform.remap.config",
+	"platforms": ["hs"],
+	"type": "enum",
+	"enum_values": ["shared", "owned"],
+	"default": "shared",
+	"recommended": "shared",
+	"description_key": "menu.global.karabiner_runtime",
+	"unavailable_key": "menu.global.karabiner_runtime_unavailable"
+}

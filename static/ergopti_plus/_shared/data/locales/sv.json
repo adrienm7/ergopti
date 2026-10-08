@@ -3242,5 +3242,14 @@
 	"physical_shortcuts.position_unavailable": "Denna tangentposition är inte tillgänglig här.",
 	"physical_shortcuts.windows_unavailable": "Ännu inte för Windows: Redigeraren för fysiska kortkommandon är ännu inte tillgänglig i Windows.",
 	"physical_shortcuts.collision": "Denna tangentkombination används redan. Välj en annan.",
-	"physical_shortcuts.window_unavailable": "Detta fönster är inte tillgängligt: Försök att öppna det igen."
+	"physical_shortcuts.window_unavailable": "Detta fönster är inte tillgängligt: Försök att öppna det igen.",
+	"menu.global.karabiner_runtime": "Karabiner-körmiljö",
+	"menu.global.karabiner_runtime.owned": "Körmiljö hanterad av Ergopti",
+	"menu.global.karabiner_runtime.shared": "Delad Karabiner",
+	"menu.global.karabiner_runtime_unavailable": "Hanterad körmiljö otillgänglig: en verifierad installation krävs.",
+	"menu.metrics.physical_source": "Källa för fysisk inmatningshistorik",
+	"menu.metrics.physical_source.ledger": "Tangentlogg",
+	"menu.metrics.physical_source.stream": "Ström av fysiska händelser",
+	"menu.metrics.physical_source_unavailable": "Fysisk ström otillgänglig: en verifierad installerad körmiljö krävs.",
+	"platform_reason.physical_stream_macos_only": "Endast macOS: producenten av fysiska händelser är inte tillgänglig på denna plattform."
 }

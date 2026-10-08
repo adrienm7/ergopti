@@ -3242,5 +3242,14 @@
 	"physical_shortcuts.position_unavailable": "מיקום המקש הזה אינו זמין כאן.",
 	"physical_shortcuts.windows_unavailable": "עדיין לא זמין ב־Windows: עורך קיצורי המקשים הפיזיים עדיין אינו זמין ב־Windows.",
 	"physical_shortcuts.collision": "צירוף המקשים הזה כבר בשימוש. בחרו צירוף אחר.",
-	"physical_shortcuts.window_unavailable": "החלון הזה אינו זמין: נסו לפתוח אותו מחדש."
+	"physical_shortcuts.window_unavailable": "החלון הזה אינו זמין: נסו לפתוח אותו מחדש.",
+	"menu.global.karabiner_runtime": "סביבת ריצה של Karabiner",
+	"menu.global.karabiner_runtime.owned": "סביבת ריצה בניהול Ergopti",
+	"menu.global.karabiner_runtime.shared": "Karabiner משותף",
+	"menu.global.karabiner_runtime_unavailable": "סביבת הריצה המנוהלת אינה זמינה: נדרשת התקנה מאומתת.",
+	"menu.metrics.physical_source": "מקור היסטוריית הקלט הפיזי",
+	"menu.metrics.physical_source.ledger": "יומן מקשים",
+	"menu.metrics.physical_source.stream": "זרם אירועים פיזיים",
+	"menu.metrics.physical_source_unavailable": "הזרם הפיזי אינו זמין: נדרשת סביבת ריצה מותקנת ומאומתת.",
+	"platform_reason.physical_stream_macos_only": "macOS בלבד: מפיק האירועים הפיזיים אינו זמין בפלטפורמה זו."
 }

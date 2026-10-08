@@ -1,0 +1,62 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"title": "Native Karabiner runtime setting declaration",
+	"type": "object",
+	"additionalProperties": false,
+	"required": [
+		"$schema",
+		"path",
+		"file",
+		"owner",
+		"platforms",
+		"type",
+		"enum_values",
+		"default",
+		"recommended",
+		"description_key",
+		"unavailable_key"
+	],
+	"properties": {
+		"$schema": {
+			"const": "./runtime_setting.schema.json"
+		},
+		"path": {
+			"const": "karabiner.runtime"
+		},
+		"file": {
+			"const": "config_karabiner.toml"
+		},
+		"owner": {
+			"const": "platform.remap.config"
+		},
+		"platforms": {
+			"const": ["hs"]
+		},
+		"type": {
+			"const": "enum"
+		},
+		"enum_values": {
+			"type": "array",
+			"minItems": 2,
+			"uniqueItems": true,
+			"items": {
+				"type": "string",
+				"minLength": 1
+			}
+		},
+		"default": {
+			"type": "string",
+			"description": "Must be one of the declaration enum_values; defaults are owned only by the declaration."
+		},
+		"recommended": {
+			"type": "string",
+			"description": "Must be one of the declaration enum_values; defaults are owned only by the declaration."
+		},
+		"description_key": {
+			"const": "menu.global.karabiner_runtime"
+		},
+		"unavailable_key": {
+			"const": "menu.global.karabiner_runtime_unavailable"
+		}
+	}
+}
