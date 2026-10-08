@@ -8814,6 +8814,9 @@ Current Group 3 source checkpoint (item 111, 2026-10-06): [Group 3 current check
     `data-i18n-placeholder` and a key in all 21 locale files.
   - Translate the screen-time dashboard weekday labels in charts, main and
     script owners; inspect the typing dashboard's French `+ IA` chip too.
+  - Add the missing `app_category.general` key to all 21 locales. The
+    screen-time dashboard currently displays the raw key; cover localized
+    category rendering and locale completeness with regression tests.
   - Replace French tooltip acceptance/navigation hints from the shared
     tooltip constants with locale-owned text on Windows, macOS and Linux,
     preserving hint/binding agreement and the common design.
