@@ -2566,5 +2566,125 @@ class OwnedConsentUIControls(unittest.TestCase):
             self.assertEqual(owner.active, [])
 
 
+class OwnedAutomationUIFactControls(unittest.TestCase):
+    """Private enum evidence controls do not claim macOS AX observation."""
+
+    @staticmethod
+    def packet():
+        return {
+            "schema": 1,
+            "ax_trusted": True,
+            "requester_qualified": True,
+            "scanned_agents": 2,
+            "windows": 1,
+            "nodes": 7,
+            "candidates": 0,
+            "matches": 0,
+            "first_agent": 1,
+            "first_attribute": "windows",
+            "first_type": "absent",
+            "first_error": -25205,
+        }
+
+    def test_literal_ax_error_and_agent_enum_remain_closed_without_ui_text(self):
+        packet = self.packet()
+        self.assertEqual(probe._validate_owned_automation_ui_fact(packet), packet)
+        for key, value in (
+            ("schema", True),
+            ("ax_trusted", 1),
+            ("scanned_agents", True),
+            ("nodes", 1048577),
+            ("first_agent", 4),
+            ("first_error", 2**31),
+            ("first_attribute", "private-window-title"),
+            ("first_type", "private-text"),
+        ):
+            invalid = dict(packet)
+            invalid[key] = value
+            with self.subTest(key=key), self.assertRaises(probe.AdmissionError):
+                probe._validate_owned_automation_ui_fact(invalid)
+        packet["private_text"] = "not-admitted"
+        with self.assertRaises(probe.AdmissionError):
+            probe._validate_owned_automation_ui_fact(packet)
+
+    def test_private_capture_preserves_primary_native_refusal_and_exports_only_enum_facts(self):
+        with TemporaryDirectory() as directory, patch.object(probe, "NativeProcessGroups"):
+            root = Path(directory)
+            evidence_dir = root / "evidence"
+            evidence_dir.mkdir(mode=0o700)
+            evidence = probe.PhaseEvidence(evidence_dir)
+            owner = probe.Children(root, evidence=evidence)
+            packet = self.packet()
+            primary = subprocess.CompletedProcess(
+                [], 67, "OWNED_AUTOMATION_UI/1 state=observation-refused\n", ""
+            )
+
+            def producer(arguments, **kwargs):
+                self.assertEqual(arguments[:-1], ["/owned/helper", "sender", "receiver", "73"])
+                self.assertEqual(kwargs, {"check": False, "timeout": 2})
+                path = Path(arguments[-1])
+                self.assertEqual(path.parent, root)
+                self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
+                path.write_text(json.dumps(packet))
+                return primary
+
+            owner.run = Mock(side_effect=producer)
+            try:
+                result = probe._owned_automation_ui_run(
+                    owner, ["/owned/helper", "sender", "receiver", "73"], 2
+                )
+                self.assertIs(result, primary)
+                exported = json.loads((evidence_dir / "checkpoint.json").read_text())
+                self.assertEqual(exported["native_ui"], packet)
+                self.assertEqual(exported["phase"], "automation.ui-observation")
+                self.assertEqual(exported["status"], "refused")
+                self.assertFalse(exported["ownership_closed"])
+                self.assertEqual(list(root.glob("automation-ui-fact-*")), [])
+            finally:
+                evidence.close()
+
+    def test_replaced_diagnostic_path_is_neither_read_as_fact_nor_unlinked(self):
+        with TemporaryDirectory() as directory, patch.object(probe, "NativeProcessGroups"):
+            root = Path(directory)
+            owner = probe.Children(root)
+            captured = []
+
+            def producer(arguments, **kwargs):
+                path = Path(arguments[-1])
+                path.unlink()
+                path.write_text("foreign-replacement")
+                captured.append(path)
+                return subprocess.CompletedProcess(
+                    [], 67, "OWNED_AUTOMATION_UI/1 state=observation-refused\n", ""
+                )
+
+            owner.run = Mock(side_effect=producer)
+            with self.assertRaisesRegex(probe.AdmissionError, "identity or bound"):
+                probe._owned_automation_ui_run(
+                    owner, ["/owned/helper", "sender", "receiver", "73"], 2
+                )
+            self.assertEqual(captured[0].read_text(), "foreign-replacement")
+
+    def test_observation_packet_cannot_claim_acceptance_or_physical_closure(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            root.chmod(0o700)
+            for status, closed in (("accepted", False), ("pending", True)):
+                evidence = probe.PhaseEvidence(root)
+                try:
+                    self.assertFalse(
+                        evidence.record(
+                            "automation.ui-observation",
+                            status=status,
+                            closed=closed,
+                            native_ui=self.packet(),
+                        )
+                    )
+                    self.assertTrue(evidence.failed)
+                    self.assertFalse((root / "checkpoint.json").exists())
+                finally:
+                    evidence.close()
+
+
 if __name__ == "__main__":
     unittest.main()

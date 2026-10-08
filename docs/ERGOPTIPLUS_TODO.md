@@ -3690,6 +3690,13 @@ the complete three-OS checkpoint remain pending.
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 
+Homebrew native run 37788799471 on c6e716a85 completes the retained
+owned process cases but refuses the real Brew consent observation. The
+bounded native AX diagnostic now retains only closed agent/attribute/error
+enums and scalar identities. All 90 existing portable assertions remain;
+four new receiving controls require 94 total. The exact native refusal is
+not waived; supported consent qualification and packaging remain pending.
+
 Manual macOS run37604627108 at35ef2db8fb6d6b920d51ce6ec692e7f124ffe9e7
 passes the real Sparkle cohort with exact XCTest completion: admitted resource
 reads, independently valid foreign-key refusal, installed-key retry,
