@@ -79,13 +79,27 @@ enum AppKitAdmission {
 
 static enum AppKitAdmission admit_appkit(NSApplication *application) {
     if (application == nil) return AppKitApplicationMissing;
-    if (![application setActivationPolicy:NSApplicationActivationPolicyAccessory]) {
-        return AppKitPolicyRefused;
+    // An actual existing accessory policy needs no modifying setter. Always
+    // reconfirm it freshly before granting admission, including this branch.
+    const NSApplicationActivationPolicy initial = [application activationPolicy];
+    if (initial != NSApplicationActivationPolicyAccessory) {
+        if (![application setActivationPolicy:NSApplicationActivationPolicyAccessory]) {
+            return AppKitPolicyRefused;
+        }
     }
     if ([application activationPolicy] != NSApplicationActivationPolicyAccessory) {
         return AppKitPolicyUnconfirmed;
     }
     return AppKitAdmitted;
+}
+
+static const char *appkit_policy_label(NSApplicationActivationPolicy policy) {
+    switch (policy) {
+        case NSApplicationActivationPolicyRegular: return "regular";
+        case NSApplicationActivationPolicyAccessory: return "accessory";
+        case NSApplicationActivationPolicyProhibited: return "prohibited";
+        default: return "unrecognized";
+    }
 }
 
 static int receiver_main(int argc, char **argv) {
@@ -95,14 +109,23 @@ static int receiver_main(int argc, char **argv) {
     ProcessSerialNumber serial;
     OSStatus status = GetCurrentProcess(&serial);
     if (status != noErr) {
-        fprintf(stderr, "Owned AppleEvent recipient current-process registration failed: %d\n", (int)status);
+        fprintf(stderr, "Owned AppleEvent recipient registration failed: phase=get-current-process, osstatus=%d\n", (int)status);
         return 65;
     }
-    const enum AppKitAdmission admission = admit_appkit([NSApplication sharedApplication]);
+    NSApplication *application = [NSApplication sharedApplication];
+    const char *initial_policy = application == nil ? "unrecognized" :
+        appkit_policy_label([application activationPolicy]);
+    const enum AppKitAdmission admission = admit_appkit(application);
     if (admission != AppKitAdmitted) {
         // This reason is not an OSStatus. Existing bounded terminal diagnostics
         // retain it as unclassified instead of inventing a Carbon status.
         fprintf(stderr, "Owned AppleEvent recipient AppKit admission refused (reason %d).\n", (int)admission);
+        if (admission == AppKitPolicyRefused) {
+            // A refusal remains mandatory even if both instantaneous states
+            // are accessory. No retry or readiness credit follows these facts.
+            fprintf(stderr, "APPKIT_POLICY/1 initial=%s after=%s\n", initial_policy,
+                appkit_policy_label([application activationPolicy]));
+        }
         return 65;
     }
     const AEEventHandlerUPP handler = NewAEEventHandlerUPP(receive_probe);

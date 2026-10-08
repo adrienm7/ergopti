@@ -122,6 +122,197 @@ _HTTP_CurlRuntimeLimitSupported(CurlExe, VersionFn := 0) {
 		HTTP_CURL_RUNTIME_LIMIT_MIN_VERSION)
 }
 
+
+; Actual curl build observation runs in an exact owned Job. The owning request
+; publishes this object before Start, so immediate completion cannot lose it.
+_HTTP_CurlCapabilityCreate(OnReady, StartTick, TimeoutMs, TickFn := 0) {
+	return CurlCapabilityAdmission(OnReady, StartTick, TimeoutMs, TickFn)
+}
+
+_HTTP_CurlRemaining(StartTick, TimeoutMs, TickFn := 0) {
+	Now := IsObject(TickFn) ? TickFn.Call() : A_TickCount
+	return Max(0, TimeoutMs - TickElapsed64(StartTick, Now))
+}
+
+_HTTP_CurlIntegratedProxyAuthConfig(CapabilityReceipt) {
+	if !(CapabilityReceipt is Map) || CapabilityReceipt.Get("schema_version", 0) != 1
+		return ""
+	Quiesced := CapabilityReceipt.Get("child_quiesced", false)
+	if !(Quiesced is Integer) || Quiesced != true
+		return ""
+	if CapabilityReceipt.Get("state", "") != "ready"
+		|| CapabilityReceipt.Get("backend", "") != "curl"
+		return ""
+	Capability := CapabilityReceipt.Get("capability", 0)
+	if !(Capability is Map) || Capability.Get("tls_backend", "") != "schannel"
+		return ""
+	Sspi := Capability.Get("sspi", false)
+	Spnego := Capability.Get("spnego", false)
+	if !(Sspi is Integer) || Sspi != true || !(Spnego is Integer) || Spnego != true
+		return ""
+	; curl's CLI cannot encode a Negotiate|NTLM-only auth mask. Negotiate
+	; permits the current user's SSPI Negotiate package; no ANYAUTH downgrade.
+	return "proxy-negotiate`nproxy-user = " . _HTTP_CurlConfigQuote(":") . "`n"
+}
+
+class CurlCapabilityAdmission {
+	__New(OnReady, StartTick, TimeoutMs, TickFn := 0) {
+		this.OnReady := OnReady
+		this.StartTick := StartTick
+		this.TimeoutMs := TimeoutMs
+		this.TickFn := TickFn
+		this.Handle := 0
+		this.Capture := 0
+		this.Started := false
+		this.Completed := false
+		this.Cancelled := false
+		this.Published := false
+		this.DeadlineFn := ObjBindMethod(this, "_Deadline")
+		this.RetireFn := ObjBindMethod(this, "Abort")
+	}
+
+	Remaining() {
+		return _HTTP_CurlRemaining(this.StartTick, this.TimeoutMs, this.TickFn)
+	}
+
+	Start() {
+		global _VendorDir
+		if this.Started || this.Completed || this.Cancelled
+			return false
+		this.Started := true
+		try {
+			Remaining := this.Remaining()
+			if Remaining <= 0 {
+				this.Completed := true
+				this._ReleaseTimers()
+				this._Publish(0)
+				return true
+			}
+			Directory := _SR_AcquireCaptureDirectory()
+			this.Capture := Map("TmpFile", Directory . "output.tmp", "CaptureDir", Directory)
+			if !FSWrite(this.Capture["TmpFile"], '{"schema_version":1,"budget_ms":' . Remaining . '}')
+				throw Error("Capability input could not be staged.")
+			if this.Cancelled
+				return this.Abort()
+			this.Handle := ShellRunner_SpawnTreeOwned(
+				A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe",
+				["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
+					_VendorDir . "\ergopti_curl_capabilities_worker.ps1", "-InputPath", this.Capture["TmpFile"]],
+				ObjBindMethod(this, "_OnDone"), 0, 0, 8192)
+			if this.Cancelled
+				return this.Abort()
+			if !(IsObject(this.Handle) && this.Handle.start())
+				throw Error("Capability worker could not start.")
+			if !this.Completed && !this.Cancelled
+				SetTimer(this.DeadlineFn, -Max(1, this.Remaining()))
+			return true
+		} catch {
+			; No native exception, environment or version output reaches logging.
+			this._Publish(0)
+			this.Cancel()
+			return true
+		}
+	}
+
+	_Publish(Receipt) {
+		if this.Published || this.Cancelled
+			return false
+		this.Published := true
+		Callback := this.OnReady
+		this.OnReady := 0
+		try Callback.Call(this, Receipt)
+		catch {
+			try LoggerError("HttpClient", "Curl capability continuation failed.")
+		}
+		return true
+	}
+
+	_OnDone(Code, Out, Err) {
+		if this.Completed
+			return
+		; ShellRunner only dispatches tree completion after zero Job accounting.
+		this.Completed := true
+		this.Handle := 0
+		this._ReleaseTimers()
+		_SystemProxy_CleanupInput(this)
+		if this.Cancelled
+			return
+		Receipt := 0
+		if Code == 0 && Err == "" && StrLen(Out) <= 8192 && this.Remaining() > 0 {
+			try Receipt := JsonParse(Out)
+			catch
+				Receipt := 0
+		}
+		this._Publish(Receipt)
+	}
+
+	_Deadline(*) {
+		if this.Completed || this.Cancelled
+			return
+		Remaining := this.Remaining()
+		if this.Completed || this.Cancelled
+			return
+		if Remaining > 0 {
+			if IsObject(this.DeadlineFn)
+				SetTimer(this.DeadlineFn, -Remaining)
+			return
+		}
+		this._Publish(0)
+		this.Cancel()
+	}
+
+	Cancel(*) {
+		global HTTP_CURL_CLEANUP_RETRY_MS
+		this.Cancelled := true
+		this.OnReady := 0
+		if IsObject(this.DeadlineFn) {
+			SetTimer(this.DeadlineFn, 0)
+			this.DeadlineFn := 0
+		}
+		if this.Completed
+			return _SystemProxy_CleanupInput(this)
+		; Cancellation is reached from the input hook. Physical termination runs
+		; in a timer; the bound object retains the exact child and cleanup debt.
+		SetTimer(this.RetireFn, -HTTP_CURL_CLEANUP_RETRY_MS)
+		return true
+	}
+
+	Abort(*) {
+		global HTTP_CURL_CLEANUP_RETRY_MS
+		this.Cancelled := true
+		this.OnReady := 0
+		if IsObject(this.Handle) && !IsObject(this.RetireFn)
+			this.RetireFn := ObjBindMethod(this, "Abort")
+		RetireFn := this.RetireFn
+		if IsObject(this.DeadlineFn) {
+			SetTimer(this.DeadlineFn, 0)
+			this.DeadlineFn := 0
+		}
+		Retired := !IsObject(this.Handle)
+		if !Retired
+			try Retired := this.Handle.terminate() == true
+			catch
+				Retired := false
+		if !Retired {
+			SetTimer(RetireFn, -HTTP_CURL_CLEANUP_RETRY_MS)
+			return false
+		}
+		this.Handle := 0
+		this.Completed := true
+		this._ReleaseTimers()
+		return _SystemProxy_CleanupInput(this)
+	}
+
+	_ReleaseTimers() {
+		for Name in ["DeadlineFn", "RetireFn"] {
+			Fn := this.%Name%
+			if IsObject(Fn)
+				SetTimer(Fn, 0)
+			this.%Name% := 0
+		}
+	}
+}
+
 _HTTP_CurlSweepOrphans(Directory := A_Temp) {
 	CurrentPid := DllCall("Kernel32\GetCurrentProcessId", "UInt")
 	Loop Files Directory . "\ergopti_http_*.*", "F" {
@@ -256,6 +447,23 @@ class CurlAsyncRequest {
 		this.Headers := Map()
 		this.Proxy := ""
 		this.ProxySelected := false
+		this.ProxyResolver := 0
+		this.ProxySelection := 0
+		this.CapabilityOwner := 0
+		this.ManagedRouting := false
+		this.ManagedTransport := false
+		this.ManagedOwnerCurrent := 0
+		this.ManagedSettingsReader := 0
+		this.ManagedCapture := 0
+		this.ManagedAdmissionFn := 0
+		this.ManagedTransportImage := ""
+		this.ManagedPayloadPublished := false
+		this.NativeReceipt := Map()
+		this.RevocationBestEffort := true
+		this.SendStarted := false
+		this.DeadlineStart := 0
+		this.DeadlineTimeout := 0
+		this.DeadlineFn := 0
 		; "" = the body arrives on stdout as ResponseText (see SetOutputFile).
 		this.OutputPath := ""
 		this.ConnectTimeoutMs := 5000
@@ -301,6 +509,237 @@ class CurlAsyncRequest {
 		this.ProxySelected := true
 	}
 
+	; A readiness owner supplies its original deadline and actual resolver.
+	; SetProxy alone remains an explicit fixed-route compatibility API.
+	; Actual production routes and transport share one request-owned Job. The
+	; legacy fixed-route/fake-port surface remains available to its explicit owner.
+	SetManagedRouting(SettingsReader := 0, OwnerCurrent := 0) {
+		if this.SendStarted
+			throw Error("Managed routing must be configured before dispatch.")
+		this.ManagedRouting := true
+		this.ManagedSettingsReader := SettingsReader
+		this.ManagedOwnerCurrent := OwnerCurrent
+	}
+
+	_ManagedIsLive() {
+		if this.Completed || this.Aborted || A_IsSuspended || this._Remaining() <= 0
+			return false
+		Current := true
+		try {
+			if IsObject(this.ManagedOwnerCurrent)
+				Current := this.ManagedOwnerCurrent.Call() == true
+		} catch {
+			Current := false
+		}
+		; A captured owner check may itself reenter cancellation. Recheck the
+		; facade and the original clock after it returns, before any effect.
+		return Current && !this.Completed && !this.Aborted && !A_IsSuspended && this._Remaining() > 0
+	}
+
+	_SendManaged(Body) {
+		global _VendorDir, _SharedDir, HTTP_CURL_MAX_RESPONSE_BYTES, HTTP_CURL_MAX_HEADER_BYTES
+		this.ManagedTransport := true
+		Directory := _SR_AcquireCaptureDirectory()
+		this.ManagedCapture := Map("TmpFile", Directory . "request.json", "CaptureDir", Directory)
+		Input := '{"schema_version":1,"budget_ms":' . this._Remaining()
+		Input .= ',"started_tick":' . this.DeadlineStart . ',"deadline_ms":' . this.DeadlineTimeout
+		Input .= ',"url":' . JsonStringLiteral(this.Url) . ',"method":' . JsonStringLiteral(this.Method)
+		this.ManagedTransportImage := '{"schema_version":1,"request_id":' . JsonStringLiteral(this.CleanupDebtId)
+		this.ManagedTransportImage .= ',"body":' . JsonStringLiteral(String(Body)) . ',"headers":['
+		HeaderIndex := 0
+		for Name, Value in this.Headers
+			this.ManagedTransportImage .= (HeaderIndex++ > 0 ? "," : "") . '{"name":' . JsonStringLiteral(Name)
+				. ',"value":' . JsonStringLiteral(Value) . '}'
+		this.ManagedTransportImage .= ']}'
+		Input .= ',"body":"","headers":[],"request_id":' . JsonStringLiteral(this.CleanupDebtId)
+		Input .= ',"response_path":' . JsonStringLiteral(this.OutputPath != "" ? this.OutputPath : this.BodyPath)
+		Input .= ',"header_path":' . JsonStringLiteral(this.HeaderPath)
+		Input .= ',"policy_path":' . JsonStringLiteral(_SharedDir . "\modules\network\proxy_policy.json")
+		Input .= ',"defaults_path":' . JsonStringLiteral(_SharedDir . "\modules\updater\defaults.json")
+		Input .= ',"route_path":' . JsonStringLiteral(_VendorDir . "\ergopti_network_routes.ps1")
+		Input .= ',"capability_path":' . JsonStringLiteral(_VendorDir . "\ergopti_curl_capabilities_worker.ps1")
+		Input .= ',"max_response_bytes":' . HTTP_CURL_MAX_RESPONSE_BYTES
+		Input .= ',"max_header_bytes":' . HTTP_CURL_MAX_HEADER_BYTES
+		Input .= ',"connect_timeout_ms":' . this.ConnectTimeoutMs
+		Input .= ',"revocation_best_effort":' . (this.RevocationBestEffort ? "true" : "false")
+		if !this.ManagedRouting && this.ProxySelected
+			Input .= ',"fixed_proxy":' . JsonStringLiteral(this.Proxy)
+		if IsObject(this.ManagedSettingsReader) {
+			Settings := this.ManagedSettingsReader.Call()
+			if !(Settings is Map)
+				throw TypeError("The native settings test reader must return its exact configuration map.")
+			Input .= ',"settings_override":{"Ok":true,"Absent":false,"NativeError":0,"FailureOrigin":""'
+			Input .= ',"AutoDetect":' . (Settings.Get("auto_detect", false) ? "true" : "false")
+			Input .= ',"PacUrl":' . JsonStringLiteral(Settings["pac_url"])
+			Input .= ',"Proxy":' . JsonStringLiteral(Settings["proxy"])
+			Input .= ',"Bypass":' . JsonStringLiteral(Settings["bypass"]) . '}'
+		}
+		Input .= '}'
+		if !this._ManagedIsLive()
+			return this.Abort()
+		if !FSWrite(this.ManagedCapture["TmpFile"], Input)
+			throw Error("The exact managed request input could not be staged.")
+		if !this._ManagedIsLive() {
+			this._Cleanup()
+			return false
+		}
+		BeforeLaunch := this._DispatchPortFn("before_launch")
+		if IsObject(BeforeLaunch)
+			BeforeLaunch.Call(this)
+		if !this._ManagedIsLive() {
+			this._Cleanup()
+			return false
+		}
+		Executable := A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe"
+		Args := ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
+			_VendorDir . "\ergopti_managed_curl_worker.ps1", "-InputPath", this.ManagedCapture["TmpFile"]]
+		SpawnFn := this._DispatchPortFn("spawn")
+		Handle := IsObject(SpawnFn)
+			? SpawnFn.Call(Executable, Args, ObjBindMethod(this, "_OnManagedDone"), 0, 0, 8192)
+			: ShellRunner_SpawnTreeOwned(Executable, Args, ObjBindMethod(this, "_OnManagedDone"), 0, 0, 8192)
+		this.Handle := Handle
+		if !this._ManagedIsLive() {
+			this.Completed := false
+			this.Abort()
+			return false
+		}
+		Started := IsObject(Handle) && Handle.start()
+		if !Started {
+			this.Abort()
+			throw Error("The exact managed request Job did not start.")
+		}
+		if this._ManagedIsLive() {
+			this.ManagedAdmissionFn := ObjBindMethod(this, "_PollManagedAdmission")
+			SetTimer(this.ManagedAdmissionFn, -1)
+		}
+		return true
+	}
+
+	_PollManagedAdmission() {
+		global HTTP_CURL_CLEANUP_RETRY_MS
+		if this.Completed || this.Aborted || this.ManagedPayloadPublished
+			return
+		if !this._ManagedIsLive()
+			return this.Abort()
+		try {
+			Directory := this.ManagedCapture["CaptureDir"]
+			AckPath := Directory . "admission.json"
+			if !FileExist(AckPath) {
+				SetTimer(this.ManagedAdmissionFn, -Min(HTTP_CURL_CLEANUP_RETRY_MS, Max(1, this._Remaining())))
+				return
+			}
+			if FileGetSize(AckPath) > 8192
+				throw Error("Native managed admission exceeded its private bound.")
+			Ack := JsonParse(FileRead(AckPath, "UTF-8"))
+			if !(Ack is Map) || Ack.Get("schema_version", 0) != 1 || Ack.Get("request_id", "") != this.CleanupDebtId
+					|| Ack.Get("state", "") != "ready" || Ack.Get("tls_backend", "") != "schannel"
+					|| !(Ack.Get("child_quiesced", false) is Integer) || Ack["child_quiesced"] != true
+				throw Error("The exact request's native capability admission was refused.")
+			if !this._ManagedIsLive()
+				return this.Abort()
+			; Reserve once before filesystem calls can pump this timer again. Only
+			; a capability receipt from this exact live Job admits secret staging.
+			this.ManagedPayloadPublished := true
+			PayloadImage := this.ManagedTransportImage
+			StagedPath := Directory . "transport.pending"
+			if !FSWrite(StagedPath, PayloadImage)
+				throw Error("The exact admitted transport input could not be staged.")
+			PreviousCritical := Critical("On")
+			try {
+				if !this._ManagedIsLive()
+					throw Error("Native transport input lost its live admission before publication.")
+				if !DllCall("Kernel32\MoveFileW", "WStr", StagedPath, "WStr", Directory . "transport.json", "Int")
+					throw Error("The exact private transport input could not be published.")
+			} finally Critical(PreviousCritical)
+			this._StopManagedAdmission()
+		} catch {
+			this.Abort()
+		}
+	}
+
+	_StopManagedAdmission() {
+		if IsObject(this.ManagedAdmissionFn)
+			SetTimer(this.ManagedAdmissionFn, 0)
+		this.ManagedAdmissionFn := 0
+		this.ManagedTransportImage := ""
+	}
+
+	_OnManagedDone(ExitCode, Stdout, Stderr) {
+		global HTTP_CURL_MAX_RESPONSE_BYTES
+		if this.Completed
+			return
+		this._StopManagedAdmission()
+		; ShellRunner dispatches this callback only after the exact Job reaches
+		; zero accounting. A late terminal never revives expired work.
+		if !this._ManagedIsLive() {
+			this.Aborted := true
+			return this._OnDone(-1, "", "")
+		}
+		Body := ""
+		Valid := false
+		try {
+			Receipt := JsonParse(Stdout)
+			if Receipt is Map && Receipt.Get("schema_version", 0) == 1
+					&& Receipt.Get("child_quiesced", false) is Integer
+					&& Receipt["child_quiesced"] == true {
+				this.NativeReceipt := Receipt.Get("receipt", Map())
+				Valid := ExitCode == 0 && Stderr == "" && Receipt.Get("ok", false) == true
+					&& Receipt.Get("status", 0) is Integer && Receipt["status"] >= 100 && Receipt["status"] <= 599
+				if Valid && this.OutputPath == "" {
+					if FileGetSize(this.BodyPath) > HTTP_CURL_MAX_RESPONSE_BYTES
+						throw Error("The managed response exceeded the canonical byte bound.")
+					Body := FileRead(this.BodyPath, "UTF-8-RAW")
+				}
+			}
+		} catch {
+			Valid := false
+		}
+		return this._OnDone(Valid ? 0 : -1, Body, "")
+	}
+
+	_CleanupManagedCapture() {
+		if !(this.ManagedCapture is Map)
+			return true
+		Directory := this.ManagedCapture["CaptureDir"]
+		for Name in ["capability.json", "payload.bin", "transport.conf", "admission.pending", "admission.json", "transport.pending", "transport.json"]
+			if !FSDelete(Directory . Name)
+				return false
+		if _SR_CaptureRemove(this.ManagedCapture) != 0
+			return false
+		this.ManagedCapture := 0
+		return true
+	}
+
+	SetDeadline(StartTick, TimeoutMs) {
+		this.DeadlineStart := StartTick
+		this.DeadlineTimeout := TimeoutMs
+	}
+
+	_StopDeadline() {
+		if IsObject(this.DeadlineFn)
+			SetTimer(this.DeadlineFn, 0)
+		this.DeadlineFn := 0
+	}
+
+	SetProxyAdmission(Selection, Resolver) {
+		this.ProxySelection := Selection
+		this.ProxyResolver := Resolver
+	}
+
+	_Remaining() {
+		return _HTTP_CurlRemaining(this.DeadlineStart, this.DeadlineTimeout)
+	}
+
+	_Deadline(*) {
+		if this.Completed || this.Aborted
+			return
+		if this._Remaining() > 0 {
+			SetTimer(this.DeadlineFn, -Max(1, this._Remaining()))
+			return
+		}
+		this.Abort()
+	}
+
 	; Makes curl write the response body to Path, byte for byte, instead of
 	; stdout: the stdout collector decodes and trims what it reads, which a
 	; download verified against a checksum afterwards cannot afford. The caller
@@ -320,13 +759,13 @@ class CurlAsyncRequest {
 	Send(Body := "") {
 		if (this.Method == "" || this.Url == "")
 			throw Error("CurlAsyncRequest.Open must succeed before Send.")
-		if IsObject(this.Handle)
-			throw Error("CurlAsyncRequest.Send may run only once.")
 		if this.Completed {
 			if this.Aborted
 				return false
 			throw Error("CurlAsyncRequest.Send may run only once.")
 		}
+		if this.SendStarted || IsObject(this.Handle)
+			throw Error("CurlAsyncRequest.Send may run only once.")
 		CurlExe := A_WinDir . "\System32\curl.exe"
 		if !FileExist(CurlExe)
 			throw Error("The Windows curl transport is unavailable.")
@@ -335,12 +774,91 @@ class CurlAsyncRequest {
 		_HTTP_CurlSweepOrphans()
 		if this.Aborted
 			return false
+		this.SendStarted := true
+		if this.DeadlineTimeout <= 0 {
+			this.DeadlineStart := A_TickCount
+			this.DeadlineTimeout := this.TotalTimeoutMs
+		}
+		if this._Remaining() <= 0
+			return this.Abort()
+		this.DeadlineFn := ObjBindMethod(this, "_Deadline")
+		SetTimer(this.DeadlineFn, -Max(1, this._Remaining()))
+		if this.ManagedRouting || !(this.DispatchPort is Map) {
+			try return this._SendManaged(Body)
+			catch {
+				this.Abort()
+				return false
+			}
+		}
+		if this.Proxy == ""
+			return this._SendCurl(Body)
+		CreateFn := this._DispatchPortFn("create_curl_capability")
+		if !IsObject(CreateFn)
+			CreateFn := _HTTP_CurlCapabilityCreate
+		Owner := CreateFn.Call(ObjBindMethod(this, "_OnCapability", Body),
+			this.DeadlineStart, this.DeadlineTimeout)
+		this.CapabilityOwner := Owner
+		if this.Aborted || this.Completed
+			return Owner.Abort()
+		try Started := Owner.Start()
+		catch
+			Started := false
+		if !Started
+			this.Abort()
+		return true
+	}
 
+	_OnCapability(Body, Owner, Receipt) {
+		if !IsObject(this.CapabilityOwner) || ObjPtr(this.CapabilityOwner) != ObjPtr(Owner)
+			return false
+		this.CapabilityOwner := 0
+		if this.Aborted || this.Completed || this._Remaining() <= 0
+			return this.Abort()
+		AuthConfig := _HTTP_CurlIntegratedProxyAuthConfig(Receipt)
+		if AuthConfig == "" || !RegExMatch(this.Proxy, "i)^https?://")
+			return this.Abort()
+		if IsObject(this.ProxyResolver) {
+			this.ProxyFreshPending := true
+			try {
+				if !this.ProxyResolver.Call(this.Url, ObjBindMethod(this, "_OnFreshProxy", Body, AuthConfig))
+					this.Abort()
+			} catch {
+				this.Abort()
+			}
+			return true
+		}
+		try return this._SendCurl(Body, AuthConfig)
+		catch
+			return this.Abort()
+	}
+
+	_OnFreshProxy(Body, AuthConfig, Selection) {
+		if !this.HasOwnProp("ProxyFreshPending") || !this.ProxyFreshPending
+			return false
+		this.ProxyFreshPending := false
+		if this.Aborted || this.Completed || this._Remaining() <= 0
+			return this.Abort()
+		if !(Selection is Map) || !Selection.Get("ok", false)
+			return this.Abort()
+		this.ProxySelection := Selection
+		this.ProxySelected := !Selection.Get("inherit", false)
+		this.Proxy := this.ProxySelected ? Selection.Get("proxy", "") : ""
+		if this.Proxy != "" && (!SystemProxy_IsValidProxyUrl(this.Proxy) || !RegExMatch(this.Proxy, "i)^https?://"))
+			return this.Abort()
+		try return this._SendCurl(Body, this.Proxy != "" ? AuthConfig : "")
+		catch
+			return this.Abort()
+	}
+
+	_SendCurl(Body, AuthConfig := "") {
+		if this.Aborted || this.Completed || this._Remaining() <= 0
+			return this.Abort()
+		CurlExe := A_WinDir . "\System32\curl.exe"
 		Config := "url = " . _HTTP_CurlConfigQuote(this.Url) . "`n"
 		Config .= "request = " . _HTTP_CurlConfigQuote(this.Method) . "`n"
 		Config .= "silent`nshow-error`n"
 		Config .= "connect-timeout = " . Ceil(this.ConnectTimeoutMs / 1000) . "`n"
-		Config .= "max-time = " . Ceil(this.TotalTimeoutMs / 1000) . "`n"
+		Config .= "max-time = " . Format("{:.3f}", this._Remaining() / 1000) . "`n"
 		Config .= "max-filesize = " . HTTP_CURL_MAX_RESPONSE_BYTES . "`n"
 		Config .= "dump-header = " . _HTTP_CurlConfigQuote(this.HeaderPath) . "`n"
 		Config .= "output = " . _HTTP_CurlConfigQuote(this.OutputPath != "" ? this.OutputPath : "-") . "`n"
@@ -350,9 +868,10 @@ class CurlAsyncRequest {
 		Config .= "ssl-revoke-best-effort`n"
 		if this.ProxySelected
 			Config .= "proxy = " . _HTTP_CurlConfigQuote(this.Proxy) . "`n"
-		if (this.Proxy != "") {
-			Config .= "proxy-anyauth`n"
-			Config .= "proxy-user = " . _HTTP_CurlConfigQuote(":") . "`n"
+		if this.Proxy != "" {
+			if AuthConfig == ""
+				return this.Abort()
+			Config .= AuthConfig
 		}
 		for Name, Value in this.Headers
 			Config .= "header = "
@@ -374,15 +893,37 @@ class CurlAsyncRequest {
 		BeforeLaunchFn := this._DispatchPortFn("before_launch")
 		if IsObject(BeforeLaunchFn)
 			BeforeLaunchFn.Call(this)
-		if this.Aborted
+		if this.Aborted || this._Remaining() <= 0 {
+			this.Abort()
 			return false
+		}
+		if this.ProxySelection is Map {
+			CurrentFn := this.ProxySelection.Get("current", 0)
+			try Current := !IsObject(CurrentFn) || CurrentFn.Call()
+			catch
+				Current := false
+			if !Current {
+				if !this._Cleanup()
+					return this.Abort()
+				if IsObject(this.ProxyResolver) {
+					this.ProxyFreshPending := true
+					try {
+						if !this.ProxyResolver.Call(this.Url, ObjBindMethod(this, "_OnFreshProxy", Body, AuthConfig))
+							this.Abort()
+					} catch
+						this.Abort()
+					return true
+				}
+				return this.Abort()
+			}
+		}
 
 		SpawnFn := this._DispatchPortFn("spawn")
 		Handle := IsObject(SpawnFn)
-			? SpawnFn.Call(CurlExe, ["--config", this.ConfigPath],
+			? SpawnFn.Call(CurlExe, ["--disable", "--config", this.ConfigPath],
 				ObjBindMethod(this, "_OnDone"), 0, 0, HTTP_CURL_MAX_RESPONSE_BYTES)
 			: ShellRunner_SpawnTreeOwned(CurlExe,
-				["--config", this.ConfigPath], ObjBindMethod(this, "_OnDone"), 0, 0,
+				["--disable", "--config", this.ConfigPath], ObjBindMethod(this, "_OnDone"), 0, 0,
 				HTTP_CURL_MAX_RESPONSE_BYTES)
 		this.Handle := Handle
 		if this.Aborted {
@@ -430,11 +971,20 @@ class CurlAsyncRequest {
 	}
 
 	Abort() {
+		this._StopManagedAdmission()
 		if this.Completed {
 			_HTTP_CurlReleaseAbortDebt(this)
 			return true
 		}
 		this.Aborted := true
+		this._StopDeadline()
+		if IsObject(this.CapabilityOwner) {
+			if !this.CapabilityOwner.Abort() {
+				_HTTP_CurlRetainAbortDebt(this)
+				return false
+			}
+			this.CapabilityOwner := 0
+		}
 		Succeeded := true
 		Handle := this.Handle
 		if IsObject(Handle) {
@@ -462,6 +1012,7 @@ class CurlAsyncRequest {
 
 	_OnDone(ExitCode, Stdout, Stderr) {
 		global HTTP_CURL_MAX_HEADER_BYTES
+		this._StopDeadline()
 		; A failed Abort retains the child until either a retry succeeds or its
 		; natural completion callback proves it terminal. Claim the latter without
 		; materializing response artifacts that cancellation will discard.
@@ -508,7 +1059,8 @@ class CurlAsyncRequest {
 			if this.Completed
 				return
 			this.Handle := 0
-			if this.Aborted {
+			if this.Aborted || (this.ManagedTransport && !this._ManagedIsLive()) {
+				this.Aborted := true
 				DiscardedCompletion := true
 			} else if (ExitCode == 0 && !HeaderOversize) {
 				this.Status := Parsed["status"]
@@ -525,7 +1077,14 @@ class CurlAsyncRequest {
 	}
 
 	_Cleanup() {
+		this.ManagedOwnerCurrent := 0
 		Failed := false
+		try {
+			if !this._CleanupManagedCapture()
+				Failed := true
+		} catch {
+			Failed := true
+		}
 		for Path in [this.ConfigPath, this.BodyPath, this.HeaderPath]
 			try {
 				if !FSDelete(Path)
@@ -727,7 +1286,7 @@ SystemProxy_ResolveAsync(Urls, Callback, ReaderFn := 0, SpawnFn := 0, Strict := 
 	global _SYSTEM_PROXY_PAC_CACHE, _SYSTEM_PROXY_PAC_PENDING
 	Config := _SystemProxy_Config(ReaderFn, Strict)
 	ConfigIdentity := _SystemProxy_RefreshCache(Config)
-	Result := Map("_proxy_resolved", true, "_proxy_receipts", Map())
+	Result := Map("_proxy_resolved", true, "_proxy_receipts", Map(), "_proxy_config_identity", ConfigIdentity)
 	Missing := []
 	for Url in Urls {
 		Selection := SystemProxy_SelectStatic(Config, Url, Strict)
@@ -1051,17 +1610,31 @@ SystemProxy_ResolveCurlAsync(Url, Callback, ReaderFn := 0, SpawnFn := 0, EnvFn :
 			return true
 		}
 	}
-	return SystemProxy_ResolveAsync([Url], _SystemProxy_PublishCurlSelection.Bind(Url, Callback), ReaderFn, SpawnFn, true)
+	return SystemProxy_ResolveAsync([Url], _SystemProxy_PublishCurlSelection.Bind(Url, Callback, ReaderFn, EnvFn), ReaderFn, SpawnFn, true)
 }
 
 
 ; Preserve closed native diagnosis without exposing any captured URL or stderr.
-_SystemProxy_PublishCurlSelection(Url, Callback, Resolved) {
+_SystemProxy_PublishCurlSelection(Url, Callback, ReaderFn, EnvFn, Resolved) {
 	Ok := Resolved.Get("_proxy_resolved", false)
 	Metadata := Resolved.Get("_proxy_receipts", Map()).Get(Url, Map())
 	Callback.Call(Map("ok", Ok, "inherit", false, "proxy", Resolved[Url],
 		"source", Ok ? Metadata.Get("source", "system_direct") : "native_refused",
-		"native_error", Metadata.Get("native_error", 0)))
+		"native_error", Metadata.Get("native_error", 0), "current",
+		_SystemProxy_CurlSelectionIsCurrent.Bind(Url, ReaderFn, EnvFn,
+			Resolved.Get("_proxy_config_identity", ""))))
+}
+
+_SystemProxy_CurlSelectionIsCurrent(Url, ReaderFn, EnvFn, Identity) {
+	Parts := _SystemProxy_UrlParts(Url)
+	Names := Parts["scheme"] == "https"
+		? ["https_proxy", "HTTPS_PROXY", "all_proxy", "ALL_PROXY"]
+		: ["http_proxy", "all_proxy", "ALL_PROXY"]
+	for Name in Names
+		if EnvFn.Call(Name) != ""
+			return false
+	Config := _SystemProxy_Config(ReaderFn, true)
+	return _SystemProxy_RefreshCache(Config) == Identity
 }
 
 
@@ -1080,6 +1653,7 @@ _SystemProxy_PublishCurlSelection(Url, Callback, Resolved) {
 ; @param Body     {String}   JSON-encoded request body.
 ; @param Callback {Func}     Called with a Map: { ok, status, body, error }.
 HTTPPost(Url, Headers, Body, Callback) {
+	Started := A_TickCount
 	global _HTTP_ACTIVE_REQUEST, HTTP_TIMEOUT_MS, _HTTP_REQUEST_GENERATION
 	if _HTTP_ACTIVE_REQUEST != 0 {
 		LoggerWarn("HttpClient", "HTTPPost: reentrant call for '{1}' while a request is already active - cancelling the in-flight request first.", Url)
@@ -1095,16 +1669,19 @@ HTTPPost(Url, Headers, Body, Callback) {
 	MyGeneration := _HTTP_REQUEST_GENERATION
 	Result := Map("ok", false, "status", 0, "body", "", "error", "")
 	try {
-		Req := ComObject("WinHttp.WinHttpRequest.5.1")
+		Req := CurlAsyncRequest()
 		_HTTP_ACTIVE_REQUEST := Req
+		Req.SetManagedRouting(0, () => _HTTP_REQUEST_GENERATION == MyGeneration && _HTTP_ACTIVE_REQUEST == Req)
+		Req.SetDeadline(Started, HTTP_TIMEOUT_MS * 4)
 		Req.SetTimeouts(HTTP_TIMEOUT_MS, HTTP_TIMEOUT_MS, HTTP_TIMEOUT_MS, HTTP_TIMEOUT_MS)
-		Req.Open("POST", Url, false)
+		Req.Open("POST", Url, true)
 		; Set caller-supplied headers.
 		if (Headers is Map) {
 			for HName, HVal in Headers
 				Req.SetRequestHeader(HName, HVal)
 		}
-		Req.Send(Body)
+		if !Req.Send(Body) || !_HTTP_ManagedWait(Req)
+			throw Error("The managed HTTP request refused dispatch or completion.")
 		Status := Req.Status
 		RespBody := Req.ResponseText
 		IsOk := Status >= 200 and Status < 300
@@ -1120,7 +1697,7 @@ HTTPPost(Url, Headers, Body, Callback) {
 	; the generation comment above.
 	if (_HTTP_REQUEST_GENERATION == MyGeneration)
 		_HTTP_ACTIVE_REQUEST := 0
-	if Callback != 0 {
+	if Callback != 0 && _HTTP_REQUEST_GENERATION == MyGeneration && !A_IsSuspended {
 		try
 			Callback(Result)
 		catch as Err {
@@ -1134,7 +1711,8 @@ HTTPPost(Url, Headers, Body, Callback) {
 ; the blocked HTTPPost thread unwinds immediately rather than waiting for the
 ; full HTTP_TIMEOUT_MS to elapse.
 HTTPCancel() {
-	global _HTTP_ACTIVE_REQUEST
+	global _HTTP_ACTIVE_REQUEST, _HTTP_REQUEST_GENERATION
+	_HTTP_REQUEST_GENERATION += 1
 	if _HTTP_ACTIVE_REQUEST != 0 {
 		try _HTTP_ACTIVE_REQUEST.Abort()
 		_HTTP_ACTIVE_REQUEST := 0
@@ -1156,3 +1734,16 @@ global ADAPTER_HTTP_CLIENT := Map(
     "cancel",   HTTPCancel,
     "isActive", HTTPIsActive,
 )
+
+; Wait only for an already-owned managed request. Sleep serves AHK's message
+; queue, while the original deadline/current owner still gates every effect.
+_HTTP_ManagedWait(Request) {
+	while !Request.WaitForResponse(0) {
+		if !Request._ManagedIsLive() {
+			Request.Abort()
+			return false
+		}
+		Sleep(10)
+	}
+	return !Request.Aborted && !A_IsSuspended && Request._Remaining() > 0
+}

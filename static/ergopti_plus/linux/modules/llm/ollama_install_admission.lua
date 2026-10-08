@@ -40,13 +40,18 @@ function M.new(resolver, factory, authorized, explicit_consent)
 	owner.current = current
 	local methods = { "prepare", "admit_size", "hash_command", "admit_checksum", "extract_command",
 		"admit_extraction", "publish_command", "admit_publication" }
+	-- Existing injected predecessor controls stay unchanged. The actual native
+	-- files factory exposes all three retained methods; partial support refuses.
+	if files.prepare_retained ~= nil or files.retained_stage ~= nil or files.admit_retained_extraction ~= nil then
+		for _, name in ipairs({ "prepare_retained", "retained_stage", "admit_retained_extraction" }) do methods[#methods + 1] = name end
+	end
 	for _, name in ipairs(methods) do
 		local method_name, invoke = name, files[name]
 		if type(invoke) ~= "function" then return nil, "install_file_port_unavailable" end
 		owner[name] = function(...)
 			local admitted, failure = current()
 			if not admitted then return nil, failure end
-			if method_name == "prepare" then
+			if method_name == "prepare" or method_name == "prepare_retained" then
 				if explicit_consent ~= true then return nil, "install_consent_unavailable" end
 				local called, ready, parent_reason = pcall(prepare_parent, { explicit_consent = true, authorized = current })
 				if not called or ready ~= true then return nil, parent_reason or "install_parent_admission_refused" end
