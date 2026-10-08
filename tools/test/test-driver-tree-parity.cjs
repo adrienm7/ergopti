@@ -172,12 +172,18 @@ const ratio = union.size === 0 ? 0 : (shared.length / union.size) * 100;
 //                    three drivers; the shared ratio rises from 59.3 %.
 //   34/56 (60.7 %) — ui/update_check hosts the shared update-check window on
 //                    all three drivers (the union took the path with macOS).
+//   35/58 (60.3 %) — platform/network records native proxy/runtime ownership on
+//                    all three drivers. Linux binds GIO in an owned child; macOS
+//                    and Windows document their existing native adapter owners.
 //   35/58 (60.3 %) — ui/physical_shortcuts adds one symmetric feature path.
 //                    macOS and Linux host the shared editor; Windows records
 //                    its unavailable native host in a Convention S README.
 //                    That marker declares absence, not runtime support; the
 //                    canonical source predicate below remains unchanged.
-const BASELINE_SHARED = 35;
+//   36/59 (61.0 %) — merge the two symmetric additions above. Their
+//                    independent branch measurements share the same base; both
+//                    paths remain in the combined tracked driver tree.
+const BASELINE_SHARED = 36;
 
 // The union is ratcheted too, downward: a driver that grows a new unshared
 // directory dilutes the ratio even when nothing was removed. Bounding it stops
@@ -218,11 +224,24 @@ const BASELINE_SHARED = 35;
 //   the TCC entry of the embedded runtime), which neither Windows nor Linux
 //   has: a counterpart folder there would host nothing. The geometry gate
 //   records the same exemption for Windows.
+//   57 → 58 on 2026-10-05 — platform/network is added on all three drivers,
+//   paired with BASELINE_SHARED 35. Native GIO runtime/child probes need an
+//   explicit seam; the sibling README files identify their existing native
+//   HTTP/proxy owners without pretending to load GIO or adding wrapper code.
 //   57 → 58 on 2026-10-06 — ui/physical_shortcuts, one path on all three
 //   drivers. Windows carries the explicit Convention S unavailable marker;
 //   the shared-count floor rises to 35 at the same time. No asymmetric path
 //   allowance is added and no native implementation is inferred from a README.
-const BASELINE_UNION = 58;
+//   58 → 59 on 2026-10-06 — preserve both platform/network and
+//   ui/physical_shortcuts at integration. Each adds exactly one symmetric path;
+//   the combined shared floor is 36 and the canonical source floor stays 17.
+//   59 -> 60 on 2026-10-06 - Linux native/archive_output contains the real
+//   retained-directory/O_TMPFILE/linkat implementation in archive_publication.c
+//   and its C ABI header. This is an explicit Linux-only native allowance:
+//   Windows and macOS use their own native file APIs and gain no wrapper folders.
+//   Shared-count36 and canonical-source17 remain unchanged. No generated bin,
+//   private fixture directory or implementation-independent feature is counted.
+const BASELINE_UNION = 60;
 
 // ── The canonical features, the third measurement this gate never had ───────
 //

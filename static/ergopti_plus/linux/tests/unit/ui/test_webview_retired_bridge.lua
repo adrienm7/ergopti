@@ -79,31 +79,42 @@ end)
 --- Only native creation, HTML loading and JavaScript presentation are controlled.
 --- @param run function Receives the actual bridge, manager and presentation receipts.
 local function with_download_page(run)
-	local names = { "ui.webview_manager", "ui.download_window.bridge" }
+	local names = { "lgi", "infra.monotonic", "infra.timings", "infra.managed_http_deadline",
+		"adapters.event_loop", "adapters.notifier", "ui.webkit_host", "ui.webview_manager",
+		"ui.download_window.bridge", "infra.manifest_reader" }
 	local saved = {}
-	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+	for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
+	local document
 	local ok, detail = xpcall(function()
-		local manager = helpers.load_module_with_dependency("ui.webview_manager", "lgi", false)
-		manager.build_page_html = function() return "owned download page fixture" end
-		manager._create_gtk_window = function() return true end
+		package.loaded["ui.download_window.bridge"] = nil
+		local bridge = require("ui.download_window.bridge")
+		document = require("tests.support.document_fixture").new("download_window", bridge, {})
+		local actual_manager = document.manager
 		local world = { evaluated = {}, cancellations = 0 }
-		manager.eval_js = function(app, code)
-			if manager.current_epoch(app) == nil then return false end
-			world.evaluated[#world.evaluated + 1] = code
-			return true
-		end
-		local bridge = helpers.load_module("ui.download_window.bridge")
+		document.on_effect = function(code) world.evaluated[#world.evaluated + 1] = code end
 		world.show = function(label)
 			return bridge.show({ kind = "ollama_model", label = label or "Owned page fixture",
 				on_cancel = function() world.cancellations = world.cancellations + 1; return true end })
 		end
 		world.ready = function()
-			return manager.route_message("download_window", "dl_bridge", "ready",
-				manager.current_epoch("download_window"))
+			if not actual_manager.capture_document_owner("download_window") then return document.handshake() end
+			return document.send("ready")
 		end
+		-- Adapt only the fixture's epoch-bearing native send to the real leased
+		-- document envelope; the actual manager still validates every token.
+		local manager = setmetatable({ route_message = function(app, handler, payload, epoch)
+			if app == "download_window" and handler == "dl_bridge" and epoch == document.view().epoch then
+				return document.send(payload)
+			end
+			return actual_manager.route_message(app, handler, payload, epoch)
+		end }, { __index = actual_manager })
 		run(bridge, manager, world)
 	end, debug.traceback)
-	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+	if document then
+		local closed, failure = pcall(document.close)
+		if not closed and ok then ok, detail = false, failure end
+	end
+	for _, name in ipairs(names) do package.loaded[name] = saved[name].value end
 	if not ok then error(detail, 0) end
 end
 

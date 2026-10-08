@@ -13,6 +13,7 @@ local driver,shared,descendant_marker=assert(arg[1]),assert(arg[2]),arg[3]
 package.path=driver..'/?.lua;'..driver..'/?/init.lua;'..shared..'/?.lua;'..shared..'/?/init.lua;'..package.path
 local uv=require('luv');require('compat.utf8').install()
 local holds,acks,spawned,pids={}, {},0,{}
+local native_exits = {}
 local port_failure
 local allow_signals = descendant_marker == nil or descendant_marker == ''
 
@@ -21,7 +22,13 @@ proxy.close=function(handle,callback)
  return uv.close(handle,function()if callback then if holds.active then acks[#acks+1]=callback else callback() end end end)
 end
 proxy.spawn=function(command,options,callback)
- local process,pid=uv.spawn(command,options,callback)
+ local captured_pid
+ local process,pid=uv.spawn(command,options,function(code,signal)
+  assert(captured_pid ~= nil, 'native exit preceded exact PID capture')
+  native_exits[captured_pid] = { code = code, signal = signal }
+  callback(code,signal)
+ end)
+ captured_pid = pid
  if pid then pids[#pids+1]=pid end
  if process then
   spawned=spawned+1
@@ -81,7 +88,7 @@ local ok,failure=xpcall(function()
  local chunks,result,settled='',nil,0
  local op=retain(Http.post_stream_owned(origin..'/echo',{['X-Private']='PRIVATE-HEADER'},'PRIVATE-POST\n@literal\\u0000',{owner='native-post',timeout_ms=3000,authorized=function()return true end},function(chunk)chunks=chunks..chunk end,function(value)result=value end))
  assert(op.started);op:on_settled(function()settled=settled+1 end)
- until_receipt(function()return #requests==1 and #acks>=6 and op._request.exited and (allow_signals or uv.fs_stat(descendant_marker)~=nil) end)
+ until_receipt(function()return #requests==1 and #acks>=6 and native_exits[pids[1]] ~= nil and (allow_signals or uv.fs_stat(descendant_marker)~=nil) end)
  assert(not op:is_settled() and result==nil and settled==0,'actual exit cannot borrow held native close callbacks')
  assert(requests[1].method=='POST' and requests[1].body=='PRIVATE-POST\n@literal\\u0000','real curl delivers exact inherited-pipe request bytes')
  assert(chunks=='{"status":"success"}\n\0tail','raw streaming response bytes/status separation')

@@ -494,11 +494,20 @@ _LLMRemote_DeleteOwned(req_id, reservation) {
 ; the HTTP status (0 when no response arrived) and the provider's own error
 ; text ("" when none). Callers accept it as an optional trailing argument,
 ; so zero-arg closures keep working where the info is not threaded yet.
-_LLMRemote_FailInfo(Reason, Status := 0, Message := "") {
-    return Map("reason", Reason, "status", Status, "message", Message)
+_LLMRemote_FailInfo(Reason, Status := 0, Message := "", NetworkReport := 0) {
+    Info := Map("reason", Reason, "status", Status, "message", Message)
+    if NetworkReport is Map
+        Info["network_report"] := NetworkReport
+    return Info
 }
 
 _LLMRemote_FailReserved(req_id, reservation, on_fail, Reason := "dispatch") {
+    if reservation.Has("capability_owner") {
+        try reservation["capability_owner"].Cancel()
+        reservation.Delete("capability_owner")
+    }
+    if reservation.Has("proxy_deadline")
+        SetTimer(reservation["proxy_deadline"], 0)
     if !_LLMRemote_DeleteOwned(req_id, reservation)
         return false
     if !reservation["cancelled"]
@@ -686,6 +695,12 @@ _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail,
     }
     if !_LLMRemote_RequestOwns(req_id, reservation)
         return true
+    Remaining := _HTTP_CurlRemaining(reservation["start_tick"], reservation["timeout_ms"], TickFn)
+    if Remaining <= 0
+        return _LLMRemote_FailReserved(req_id, reservation, on_fail, "timeout")
+    timeout_ms := Remaining
+    if !(Port is Map) || Port.Has("managed_settings")
+        return _LLMRemote_DispatchManagedCurl(req_id, reservation, resolved, Url, Payload, Port)
     reservation["transport"] := "curl"
     config_image := _LLMRemote_BuildCurlConfig(
         resolved["Format"], resolved["Token"], Url)
@@ -711,6 +726,27 @@ _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail,
         }
         return true
     }
+    if !ProxySelection.Get("inherit", false) && ProxySelection.Get("proxy", "") != ""
+            && !reservation.Has("curl_capability_receipt") {
+        CreateCapabilityFn := _LLM_CurlArtifactPortFn(Port, "create_curl_capability", _HTTP_CurlCapabilityCreate)
+        ContinueCapabilityFn := _LLMRemote_ContinueCurlCapability.Bind(req_id, reservation,
+            resolved, Url, Payload, on_success, on_fail, Port)
+        try {
+            CapabilityOwner := CreateCapabilityFn.Call(ContinueCapabilityFn,
+                reservation["start_tick"], reservation["timeout_ms"], TickFn)
+            reservation["capability_owner"] := CapabilityOwner
+            if reservation["cancelled"] || !_LLMRemote_RequestOwns(req_id, reservation) {
+                CapabilityOwner.Cancel()
+                _LLMRemote_DeleteOwned(req_id, reservation)
+                return true
+            }
+            if !CapabilityOwner.Start()
+                _LLMRemote_FailReserved(req_id, reservation, on_fail, "proxy_resolution")
+        } catch {
+            _LLMRemote_FailReserved(req_id, reservation, on_fail, "proxy_resolution")
+        }
+        return true
+    }
     if !ProxySelection.Get("inherit", false) {
         Proxy := ProxySelection.Get("proxy", "")
         if !(Proxy is String) || (Proxy != "" && !SystemProxy_IsValidProxyUrl(Proxy)) {
@@ -718,14 +754,18 @@ _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail,
             return true
         }
         config_image .= "proxy = " . _LLMRemote_CurlConfQuote(Proxy) . "`n"
-        if Proxy != ""
-            config_image .= "proxy-anyauth`nproxy-user = " . _LLMRemote_CurlConfQuote(":") . "`n"
+        if Proxy != "" {
+            AuthConfig := _HTTP_CurlIntegratedProxyAuthConfig(reservation.Get("curl_capability_receipt", 0))
+            if AuthConfig == "" || !RegExMatch(Proxy, "i)^https?://")
+                return _LLMRemote_FailReserved(req_id, reservation, on_fail, "proxy_resolution")
+            config_image .= AuthConfig
+        }
     }
     ; Remote-only users never enter either Ollama dispatcher. Schedule the same
     ; bounded common reaper here so a prior crash cannot retain provider tokens,
     ; typed payloads, bodies or terminal sidecars indefinitely.
     try SweepFn.Call()
-    uid := req_id . "_" . TickFn.Call()
+    uid := req_id . "_" . TickFn.Call() . "_" . _HTTP_CurlNextRequestId()
     try tmp_dir := TempDirFn.Call()
     catch as err {
         try LoggerWarn("LLM.remote", "Private curl directory unavailable: {1}.", err.Message)
@@ -763,10 +803,23 @@ _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail,
         _LLMRemote_DeleteOwned(req_id, reservation)
         return true
     }
+    CurrentFn := ProxySelection.Get("current", 0)
+    try Current := !IsObject(CurrentFn) || CurrentFn.Call()
+    catch
+        Current := false
+    Remaining := _HTTP_CurlRemaining(reservation["start_tick"], reservation["timeout_ms"], TickFn)
+    if !Current || Remaining <= 0 {
+        Cleaned := _LLMRemote_CleanupPrePollArtifacts(tmp_payload, tmp_stdout, tmp_config, terminal, DeleteFn)
+        if Remaining <= 0 || !Cleaned
+            return _LLMRemote_FailReserved(req_id, reservation, on_fail, Remaining <= 0 ? "timeout" : "dispatch")
+        reservation["proxy_resolution_done"] := false
+        return _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success,
+            on_fail, Remaining, Port, reservation)
+    }
     ; URL and auth headers come from --config, never from argv (see
     ; _LLMRemote_BuildCurlConfig): argv has no ACL for a same-user reader.
-    curlCmd := '"' . curl_exe . '" -s -S -m '
-        . Max(1, Ceil(timeout_ms / 1000)) . ' '
+    curlCmd := '"' . curl_exe . '" --disable -s -S -m '
+        . Format("{:.3f}", Remaining / 1000) . ' '
         . _LLM_CurlMaxFileSizeArg() . '-X POST '
         . '--config ' . _Q(tmp_config) . ' '
         . '--data-binary @' . _Q(tmp_payload) . ' '
@@ -797,6 +850,72 @@ _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail,
     return true
 }
 
+; The native worker owns PAC, capability/auth and transport as one exact Job.
+; Publish the HTTP facade before staging, Send or any native callback can reenter.
+_LLMRemote_DispatchManagedCurl(req_id, reservation, resolved, Url, Payload, Port := 0) {
+    global LLM_REMOTE_CONNECT_TIMEOUT_MS
+    if !_LLMRemote_RequestOwns(req_id, reservation) || reservation["cancelled"] || A_IsSuspended
+        return false
+    CreateFn := _LLM_CurlArtifactPortFn(Port, "create_http", () => CurlAsyncRequest())
+    Http := CreateFn.Call()
+    reservation["transport"] := "managed_curl"
+    reservation["http"] := Http
+    try {
+        SettingsReader := Port is Map ? Port.Get("managed_settings", 0) : 0
+        Http.SetManagedRouting(SettingsReader, () => _LLMRemote_RequestOwns(req_id, reservation) && !reservation["cancelled"])
+        Http.SetDeadline(reservation["start_tick"], reservation["timeout_ms"])
+        Http.ConnectTimeoutMs := LLM_REMOTE_CONNECT_TIMEOUT_MS
+        Http.RevocationBestEffort := false
+        Http.Open("POST", Url, true)
+        Http.SetRequestHeader("Content-Type", "application/json")
+        _LLMRemoteSetAuthHeaders(Http, resolved["Format"], resolved["Token"])
+        if !_LLMRemote_RequestOwns(req_id, reservation) || reservation["cancelled"] || A_IsSuspended {
+            Http.Abort()
+            _LLMRemote_DeleteOwned(req_id, reservation)
+            return true
+        }
+        if !Http.Send(Payload)
+            throw Error("The owned managed transport refused dispatch.")
+    } catch {
+        Http.Abort()
+        _LLMRemote_FailReserved(req_id, reservation, reservation["on_fail"], "transport")
+        return true
+    }
+    if !_LLMRemote_RequestOwns(req_id, reservation) || reservation["cancelled"] {
+        Http.Abort()
+        _LLMRemote_DeleteOwned(req_id, reservation)
+        return true
+    }
+    _LLMRemote_PollRequest(req_id)
+    return true
+}
+
+; Actual build observation owns a separate exact child. Its continuation
+; obtains a new exact-URL PAC answer after observation, before private staging.
+_LLMRemote_ContinueCurlCapability(req_id, reservation, resolved, Url, Payload,
+        on_success, on_fail, Port, CapabilityOwner, Receipt) {
+    if !reservation.Has("capability_owner")
+            || ObjPtr(reservation["capability_owner"]) != ObjPtr(CapabilityOwner)
+        return false
+    reservation.Delete("capability_owner")
+    if !_LLMRemote_RequestOwns(req_id, reservation)
+        return false
+    if reservation["cancelled"] || A_IsSuspended {
+        _LLMRemote_DeleteOwned(req_id, reservation)
+        return false
+    }
+    TickFn := _LLM_CurlArtifactPortFn(Port, "tick", _LLM_CurlArtifactTick)
+    Remaining := _HTTP_CurlRemaining(reservation["start_tick"], reservation["timeout_ms"], TickFn)
+    if Remaining <= 0
+        return _LLMRemote_FailReserved(req_id, reservation, on_fail, "timeout")
+    if _HTTP_CurlIntegratedProxyAuthConfig(Receipt) == ""
+        return _LLMRemote_FailReserved(req_id, reservation, on_fail, "proxy_resolution")
+    reservation["curl_capability_receipt"] := Receipt
+    reservation["proxy_resolution_done"] := false
+    return _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success,
+        on_fail, Remaining, Port, reservation)
+}
+
 ; The resolver can yield to pause, cancellation, trim or a replacement owner.
 ; Revalidate the captured request before allocating any credential artifacts.
 _LLMRemote_ContinueProxyDispatch(req_id, reservation, resolved, Url, Payload,
@@ -814,12 +933,12 @@ _LLMRemote_ContinueProxyDispatch(req_id, reservation, resolved, Url, Payload,
         SetTimer(reservation["proxy_deadline"], 0)
     TickFn := _LLM_CurlArtifactPortFn(Port, "tick", _LLM_CurlArtifactTick)
     Elapsed := TickElapsed64(reservation["start_tick"], TickFn.Call())
-    if Elapsed >= timeout_ms
+    if Elapsed >= reservation["timeout_ms"]
         return _LLMRemote_FailReserved(req_id, reservation, on_fail, "timeout")
     if !(ProxySelection is Map) || !ProxySelection.Get("ok", false)
         return _LLMRemote_FailReserved(req_id, reservation, on_fail, "proxy_resolution")
     return _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success,
-        on_fail, timeout_ms - Elapsed, Port, reservation, ProxySelection)
+        on_fail, reservation["timeout_ms"] - Elapsed, Port, reservation, ProxySelection)
 }
 
 _LLMRemote_ProxyDeadline(req_id, reservation, on_fail) {
@@ -937,6 +1056,10 @@ LLM_RemoteCancelAsync(req_id) {
     ; carrying request PII on its next iteration, exactly as before.
     entry["cancelled"] := true
     Kills := []
+    if entry.Has("capability_owner") {
+        Kills.Push(Map("cancel", ObjBindMethod(entry["capability_owner"], "Abort")))
+        _LLMRemote_DeleteOwned(req_id, entry)
+    }
     if (entry.Has("transport") and entry["transport"] == "curl") {
         if entry.Has("process_owner")
             Kills.Push(Map("cancel", _LLM_CurlReleaseProcess.Bind(
@@ -959,10 +1082,15 @@ LLM_RemoteCancelAllAsync(SpareKind := "") {
     ; message pump is suspended. The poll tick still performs the temp-file
     ; cleanup on its next iteration, exactly as before.
     Kills := []
+    PendingDeletes := []
     for _id, entry in _LLM_Remote_Async {
         if (SpareKind != "" && entry.Has("kind") && entry["kind"] == SpareKind)
             continue
         entry["cancelled"] := true
+        if entry.Has("capability_owner") {
+            Kills.Push(Map("cancel", ObjBindMethod(entry["capability_owner"], "Abort")))
+            PendingDeletes.Push([_id, entry])
+        }
         if (entry.Has("transport") and entry["transport"] == "curl") {
             if entry.Has("process_owner")
                 Kills.Push(Map("cancel", _LLM_CurlReleaseProcess.Bind(
@@ -971,6 +1099,8 @@ LLM_RemoteCancelAllAsync(SpareKind := "") {
             Kills.Push(Map("http", entry["http"]))
         }
     }
+    for PendingDelete in PendingDeletes
+        _LLMRemote_DeleteOwned(PendingDelete[1], PendingDelete[2])
     LLM_DeferCancelKills(Kills)
 }
 
@@ -1029,6 +1159,10 @@ _LLMRemote_PollRequest(req_id) {
     on_success := entry["on_success"]
     on_fail    := entry["on_fail"]
     entryFormat := entry["format"]
+    NetworkReport := ManagedNetworkFailureWindows_FromTransport(http,
+        () => _LLMRemote_RequestOwns(req_id, entry) && !entry["cancelled"])
+    if !_LLMRemote_RequestOwns(req_id, entry) || entry["cancelled"]
+        return
     _LLM_Remote_Async.Delete(req_id)
     try {
         status := http.Status
@@ -1042,12 +1176,12 @@ _LLMRemote_PollRequest(req_id) {
         entry.Has("model_id_at_dispatch") ? entry["model_id_at_dispatch"] : "")
     if !Classified["terminal_ok"] {
         _LLM_InvokeCallback(on_fail, "on_fail",
-            _LLMRemote_FailInfo("transport", status))
+            _LLMRemote_FailInfo("transport", status, "", NetworkReport))
         return
     }
     if !Classified["ok"] {
         _LLM_InvokeCallback(on_fail, "on_fail",
-            _LLMRemote_FailInfo(Classified["reason"], status, Classified["server_message"]))
+            _LLMRemote_FailInfo(Classified["reason"], status, Classified["server_message"], NetworkReport))
         return
     }
     _LLM_InvokeCallback(on_success, "on_success", Classified["text"], Classified["usage"])
@@ -1211,6 +1345,7 @@ _LLMRemote_CompleteReady(Owner, on_result, reachable) {
 }
 
 LLM_RemoteIsReady_Async(Entry, on_result, Owner := 0, Port := 0) {
+    NetworkStart := A_TickCount
     global LLM_API_PROVIDERS, LLM_LOCAL_API_SERVERS
     global LLM_REMOTE_READY_PING_TIMEOUT_MS, LLM_REMOTE_READY_PING_DEADLINE_MS
 
@@ -1240,6 +1375,9 @@ LLM_RemoteIsReady_Async(Entry, on_result, Owner := 0, Port := 0) {
         return Owner
     }
 
+    Owner["network_start_tick"] := NetworkStart
+    LLM_AuxSchedule(Owner, _LLMRemote_ReadyDeadline.Bind(Owner, on_result),
+        -LLM_REMOTE_READY_PING_DEADLINE_MS)
     Owner["local_server"] := LocalServerAuthTokenAllowed(ProviderId, "", LLM_LOCAL_API_SERVERS)
     ProvFmt := Provider["Format"]
     PingUrl := ""
@@ -1253,12 +1391,17 @@ LLM_RemoteIsReady_Async(Entry, on_result, Owner := 0, Port := 0) {
         return Owner
     }
 
+    if !(Port is Map) || Port.Has("managed_settings") {
+        _LLMRemote_DispatchManagedReady(Owner, on_result, PingUrl, ProvFmt, Token, Port)
+        return Owner
+    }
+
     ResolveFn := _LLM_CurlArtifactPortFn(Port, "resolve_proxy", SystemProxy_ResolveCurlAsync)
     CreateFn := _LLM_CurlArtifactPortFn(Port, "create_http", () => CurlAsyncRequest())
     BindFn := (Http) => LLM_AuxBindResources(Owner, Map("cancel", (*) => Http.Abort()))
     try {
         if !ResolveFn.Call(PingUrl, _LLMRemote_DispatchReady.Bind(
-                Owner, on_result, PingUrl, ProvFmt, Token, Port, CreateFn, BindFn))
+                Owner, on_result, PingUrl, ProvFmt, Token, Port, CreateFn, BindFn, ResolveFn))
             _LLMRemote_CompleteReady(Owner, on_result, false)
     } catch {
         try LoggerError("LLM.remote", "Readiness proxy admission failed.")
@@ -1267,11 +1410,42 @@ LLM_RemoteIsReady_Async(Entry, on_result, Owner := 0, Port := 0) {
     return Owner
 }
 
+; Readiness uses its original 3s origin across every native discovery/auth phase.
+_LLMRemote_DispatchManagedReady(Owner, on_result, PingUrl, ProvFmt, Token, Port := 0) {
+    global LLM_REMOTE_READY_PING_DEADLINE_MS, LLM_REMOTE_READY_PING_TIMEOUT_MS
+    if !_LLMRemote_ReadyOwnerIsCurrent(Owner) || A_IsSuspended
+        return false
+    CreateFn := _LLM_CurlArtifactPortFn(Port, "create_http", () => CurlAsyncRequest())
+    Http := CreateFn.Call()
+    if !LLM_AuxBindResources(Owner, Map("cancel", (*) => Http.Abort()))
+        return false
+    try {
+        Http.SetManagedRouting(Port is Map ? Port.Get("managed_settings", 0) : 0, () => _LLMRemote_ReadyOwnerIsCurrent(Owner))
+        Http.SetDeadline(Owner["network_start_tick"], LLM_REMOTE_READY_PING_DEADLINE_MS)
+        Http.ConnectTimeoutMs := LLM_REMOTE_READY_PING_TIMEOUT_MS
+        Http.Open("GET", PingUrl, true)
+        _LLMRemoteSetAuthHeaders(Http, ProvFmt, Token)
+        if !_LLMRemote_ReadyOwnerIsCurrent(Owner) || A_IsSuspended {
+            Http.Abort()
+            return false
+        }
+        if !Http.Send()
+            throw Error("The exact readiness Job refused dispatch.")
+    } catch {
+        Http.Abort()
+        return _LLMRemote_CompleteReady(Owner, on_result, false)
+    }
+    _LLMRemote_PollReady(Http, on_result, Owner["network_start_tick"], LLM_REMOTE_READY_PING_DEADLINE_MS, Owner)
+    return true
+}
+
 ; Only the still-current auxiliary owner may create or send the readiness child.
-_LLMRemote_DispatchReady(Owner, on_result, PingUrl, ProvFmt, Token, Port, CreateFn, BindFn, ProxySelection) {
+_LLMRemote_DispatchReady(Owner, on_result, PingUrl, ProvFmt, Token, Port, CreateFn, BindFn, ResolveFn, ProxySelection) {
     global LLM_REMOTE_READY_PING_TIMEOUT_MS, LLM_REMOTE_READY_PING_DEADLINE_MS
     if !_LLMRemote_ReadyOwnerIsCurrent(Owner)
         return false
+    if _HTTP_CurlRemaining(Owner["network_start_tick"], LLM_REMOTE_READY_PING_DEADLINE_MS) <= 0
+        return _LLMRemote_CompleteReady(Owner, on_result, false)
     if A_IsSuspended || !(ProxySelection is Map) || !ProxySelection.Get("ok", false)
         return _LLMRemote_CompleteReady(Owner, on_result, false)
     if Owner.Get("proxy_admitted", false)
@@ -1286,6 +1460,10 @@ _LLMRemote_DispatchReady(Owner, on_result, PingUrl, ProvFmt, Token, Port, Create
                         LLM_REMOTE_READY_PING_TIMEOUT_MS, LLM_REMOTE_READY_PING_TIMEOUT_MS)
         if !ProxySelection.Get("inherit", false)
             Http.SetProxy(ProxySelection.Get("proxy", ""))
+        if HasMethod(Http, "SetDeadline")
+            Http.SetDeadline(Owner["network_start_tick"], LLM_REMOTE_READY_PING_DEADLINE_MS)
+        if HasMethod(Http, "SetProxyAdmission")
+            Http.SetProxyAdmission(ProxySelection, ResolveFn)
         _LLMRemoteSetAuthHeaders(Http, ProvFmt, Token)
         if !_LLMRemote_ReadyOwnerIsCurrent(Owner) || A_IsSuspended {
             Http.Abort()
@@ -1299,8 +1477,14 @@ _LLMRemote_DispatchReady(Owner, on_result, PingUrl, ProvFmt, Token, Port, Create
         return false
     }
     PollFn := _LLM_CurlArtifactPortFn(Port, "poll_ready", _LLMRemote_PollReady)
-    PollFn.Call(Http, on_result, A_TickCount, LLM_REMOTE_READY_PING_DEADLINE_MS, Owner)
+    PollFn.Call(Http, on_result, Owner["network_start_tick"], LLM_REMOTE_READY_PING_DEADLINE_MS, Owner)
     return true
+}
+
+_LLMRemote_ReadyDeadline(Owner, on_result) {
+    if !_LLMRemote_ReadyOwnerIsCurrent(Owner)
+        return false
+    return _LLMRemote_CompleteReady(Owner, on_result, false)
 }
 
 ; Polling tick for LLM_RemoteIsReady_Async. Re-arms itself on a relaxed cadence

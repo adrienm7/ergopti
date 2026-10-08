@@ -42,6 +42,82 @@
 // catalogue would expose every native capability to every page.
 // ===========================================================================
 
+// Optional Linux document protocol. Other hosts and pages keep the original
+// payload contract. This private state belongs to this exact JS document.
+const linuxDocumentBridges = new Map();
+
+function getLinuxDocumentNonce(name) {
+	if (window.__ergopti_host !== 'linux' || !['changelog_bridge', 'dl_bridge'].includes(name))
+		return null;
+	let state = linuxDocumentBridges.get(name);
+	if (state) return state.pageNonce;
+	if (!window.crypto || typeof window.crypto.getRandomValues !== 'function') return null;
+	try {
+		const bytes = new Uint8Array(18);
+		window.crypto.getRandomValues(bytes);
+		const pageNonce = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+		state = { pageNonce, generation: 0, token: null, admitted: false };
+		linuxDocumentBridges.set(name, state);
+		return pageNonce;
+	} catch (_) {
+		return null;
+	}
+}
+
+function linuxDocumentMatches(name, generation, token, pageNonce) {
+	const state = linuxDocumentBridges.get(name);
+	return (
+		!!state &&
+		state.generation === generation &&
+		state.token === token &&
+		state.pageNonce === pageNonce
+	);
+}
+
+function initializeLinuxDocumentBridge(name, generation, token, pageNonce) {
+	if (
+		!Number.isSafeInteger(generation) ||
+		generation <= 0 ||
+		typeof token !== 'string' ||
+		!/^[A-Za-z0-9+/]{24}$/.test(token) ||
+		typeof pageNonce !== 'string' ||
+		!/^[0-9a-f]{36}$/.test(pageNonce) ||
+		getLinuxDocumentNonce(name) !== pageNonce
+	)
+		return false;
+	const state = linuxDocumentBridges.get(name);
+	// A queued old challenge must not overwrite the current document's binding.
+	if (!state || generation <= state.generation) return false;
+	state.generation = generation;
+	state.token = token;
+	state.admitted = false;
+	const handlers = window.webkit && window.webkit.messageHandlers;
+	if (!handlers || !handlers[name] || typeof handlers[name].postMessage !== 'function')
+		return false;
+	handlers[name].postMessage({
+		__ergopti_document_ack: { generation, token, page_nonce: pageNonce }
+	});
+	return true;
+}
+
+function confirmLinuxDocumentBridge(name, generation, token, pageNonce) {
+	if (!linuxDocumentMatches(name, generation, token, pageNonce)) return false;
+	const state = linuxDocumentBridges.get(name);
+	if (state.admitted) return false;
+	state.admitted = true;
+	// The native owner admits only this fresh ready after actual ACK and
+	// physical timer retirement; pre-initialization actions remain unavailable.
+	makeHostBridge(name)('ready');
+	return true;
+}
+
+function runLinuxOwnedDocumentEffect(name, generation, token, pageNonce, effect) {
+	if (!linuxDocumentMatches(name, generation, token, pageNonce) || typeof effect !== 'function')
+		return false;
+	effect();
+	return true;
+}
+
 /**
  * Creates a host-agnostic post function for the given WKWebView handler name.
  * Windows (WebView2) is always probed first and the call returns early to avoid
@@ -63,6 +139,20 @@ function makeHostBridge(name) {
 				return;
 			}
 			if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers[name]) {
+				if (window.__ergopti_host === 'linux' && ['changelog_bridge', 'dl_bridge'].includes(name)) {
+					const state = linuxDocumentBridges.get(name);
+					if (!state || !state.admitted) return false;
+					const documentOwner = {
+						generation: state.generation,
+						token: state.token,
+						page_nonce: state.pageNonce
+					};
+					window.webkit.messageHandlers[name].postMessage({
+						__ergopti_document: documentOwner,
+						payload
+					});
+					return true;
+				}
 				window.webkit.messageHandlers[name].postMessage(payload);
 			}
 		} catch (e) {

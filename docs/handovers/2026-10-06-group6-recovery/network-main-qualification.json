@@ -1,0 +1,179 @@
+{
+	"kind": "current-source physical fixture results; not full enterprise/package acceptance",
+	"native": [
+		{
+			"receipt_sha256": "b546b9caae560aa55150848e04a5e94e5a95c41a735bcf137b04709509eac352",
+			"status": "passed",
+			"failure": null,
+			"exit": 0,
+			"fixture": "run_http_preflight_receipts.lua",
+			"expected": 25,
+			"observed_pass_lines": 25,
+			"observed_fail_lines": 0,
+			"unreported_cases": 0,
+			"summary_completed": true,
+			"guardian_terminal": {
+				"code": 1,
+				"status": 0
+			},
+			"physical_child_reap": true,
+			"guardian_closure": {
+				"adopted": 0,
+				"pending": 0,
+				"rescue": 0
+			},
+			"complete_capture": true,
+			"capture_hashes": {
+				"stdout": "e11cf68e9084048f49aff1c8432e7c211e975c13403a4fa71a2ae8b36cb937c6",
+				"stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			"source_hashes": {
+				"tests/hardware/run_http_preflight_receipts.lua": "b813a25f52970b8e21fb305684ce976615b6baeddf48472b4074d6be4a5196dc",
+				"tests/hardware/run_native_subreaper.py": "a9d754ef0da5cac503b957b4f7d9260e91e685c1c3288d7c8a0c587832f44232",
+				"entry.lua.source": "f63a4aa21fcf9bd1270c3ef40123462fdabae681b4c910d2b24aa94cc312ccf0"
+			}
+		},
+		{
+			"receipt_sha256": "862d1b60416a29edd32a6d1e54424000feb8d97039f64c8b279ad9ca243c31d5",
+			"status": "passed",
+			"failure": null,
+			"exit": 0,
+			"fixture": "run_http_body_cleanup_receipts.lua",
+			"expected": 14,
+			"observed_pass_lines": 14,
+			"observed_fail_lines": 0,
+			"unreported_cases": 0,
+			"summary_completed": true,
+			"guardian_terminal": {
+				"code": 1,
+				"status": 0
+			},
+			"physical_child_reap": true,
+			"guardian_closure": {
+				"adopted": 0,
+				"pending": 0,
+				"rescue": 0
+			},
+			"complete_capture": true,
+			"capture_hashes": {
+				"stdout": "ea3502a83cb3d3450810f957e9cae8eaf4a9140f1e6cee55dcc252e93b868b0c",
+				"stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			"source_hashes": {
+				"tests/hardware/run_http_body_cleanup_receipts.lua": "9c00a5881302cea348890a16b116b8258a4b3a233af733fe4bb21b8060f8f00d",
+				"tests/hardware/run_native_subreaper.py": "a9d754ef0da5cac503b957b4f7d9260e91e685c1c3288d7c8a0c587832f44232",
+				"entry.lua.source": "f63a4aa21fcf9bd1270c3ef40123462fdabae681b4c910d2b24aa94cc312ccf0"
+			}
+		}
+	],
+	"fixture_isolation": {
+		"controls": 7,
+		"before": {
+			"LuaJIT": {
+				"passed": 0,
+				"failed": 7
+			},
+			"Lua5.4": {
+				"passed": 0,
+				"failed": 7
+			}
+		},
+		"after": {
+			"LuaJIT": {
+				"passed": 7,
+				"failed": 0
+			},
+			"Lua5.4": {
+				"passed": 7,
+				"failed": 0
+			}
+		},
+		"source_only_peer_manifest": "ca674e282603e61707a06f76591aa40ed605ededbeade26d1426726ec8faa49f",
+		"logs": {
+			"isolation-before-jit.log": "aa6551db59d71c1605fe085739a699033f84850486403e99c8e320f38f6270d0",
+			"isolation-before-lua54.log": "27b5f84fc8d925fe689815edb4ff4d68d9ed164c4e608d7872913561615bfd03",
+			"isolation-after-jit.log": "4537d072c0a5f86048c50415aa63224e25da5780d468e8c4ec7c4402df80ee12",
+			"isolation-after-lua54.log": "4537d072c0a5f86048c50415aa63224e25da5780d468e8c4ec7c4402df80ee12"
+		}
+	},
+	"code_files": {
+		"static/ergopti_plus/_shared/lua/network/http_headers.lua": "36d2fee922269112f69d27da97d99164402c057e3c63427c53fde09f34552807",
+		"static/ergopti_plus/linux/adapters/curl_http_client.lua": "6951fa5209c0819d520d601a3a498d822fc4347bcd4f1d41719d1fbf44a0ac47",
+		"static/ergopti_plus/linux/adapters/http_client.lua": "eb9290ef4b9ba65a0aa76e28358a62b9346fcadde5199db38ab857425fa8691a",
+		"static/ergopti_plus/linux/infra/managed_http.lua": "00b02468def1baa7438c1d8e52f9258f129fdab580f9a14e98f2c1607975c913",
+		"static/ergopti_plus/linux/tests/hardware/run_http_body_cleanup_receipts.lua": "9c00a5881302cea348890a16b116b8258a4b3a233af733fe4bb21b8060f8f00d",
+		"static/ergopti_plus/linux/tests/hardware/run_http_preflight_receipts.lua": "b813a25f52970b8e21fb305684ce976615b6baeddf48472b4074d6be4a5196dc",
+		"static/ergopti_plus/linux/tests/test_manifest.lua": "cfca7baeda531569f65ce654f23993a3e143be804466802dd8685c2c79b221d9",
+		"static/ergopti_plus/linux/tests/unit/adapters/test_managed_http_exact_forwarding.lua": "c57ee51c4e4993dd8f1e1cfa9f50f91d00e5c56a44df1d8c093520288e966745",
+		"static/ergopti_plus/linux/tests/unit/adapters/test_managed_owned_authorization.lua": "eaa067f469e9efddca2c509297080b15dd2af593949cfb27b77cabb8a1a1a5c2",
+		"static/ergopti_plus/linux/tests/unit/infra/test_curl_identity_forwarding.lua": "56002a6c419cf9f5460b382c70d450e377f64375eaeb5571afae675789e48d0f",
+		"static/ergopti_plus/linux/tests/support/prepared_native_ports.lua": "7eb275c89389ff03029101c3731553a2f7deecc6d882c29929d2d37e240ca5b4",
+		"static/ergopti_plus/linux/tests/unit/adapters/test_managed_prepared_queue.lua": "a6db59ce868010fc14621596c6131d282dc83816580f48b67e5b75b2b685992d",
+		"static/ergopti_plus/linux/tests/unit/infra/test_http_headers.lua": "e7182a6bc69adcebc3f811113d4b89713e7cd56356e12f1146b3b2eab8196994",
+		"static/ergopti_plus/linux/tests/unit/infra/test_managed_construction_terminal.lua": "bc3a5a492dfa21c1a9b2c5ec4cfd8efe3e307284739d00295c7ebb34b76b3bb1",
+		"static/ergopti_plus/linux/tests/unit/infra/test_managed_descriptor_cancel.lua": "dbe86985f4a1b103d0167ff5e976cb5d7673ea2a229de3aabd045ca0abf37fdc",
+		"static/ergopti_plus/linux/tests/unit/meta/test_native_descriptor_cancel.lua": "abd8aee69309b488c28bcb9d4d30ff64cd1751043d9ab7de5084dd017a7189e4",
+		"static/ergopti_plus/linux/tests/unit/meta/test_native_prepared_headers.lua": "58ab6f9896979ae8c925398bf69b5380d0dd310925c03d54e4123e5e3e92c52a",
+		"static/ergopti_plus/linux/tests/unit/meta/test_prepared_native_port_import_isolation.lua": "2d19ef3107a5d7f341443fad60ae7da0ad31ade2b6f5a08e579bdd05d6067b57"
+	},
+	"selected_gates": {
+		"exit": 0,
+		"log_sha256": "4feb01a9e3ce57b17fbdaaf8fc17a78640043bdddc224f0033744192bdff5315",
+		"format": {
+			"passed": 220
+		},
+		"js": {
+			"passed": 368,
+			"failed": 0
+		},
+		"hs_e2e": {
+			"passed": 101,
+			"failed": 0,
+			"driver_specific_skipped": 1
+		},
+		"hs_stub_units": {
+			"passed": 14731,
+			"failed": 0
+		},
+		"linux_e2e": {
+			"passed": 189,
+			"failed": 0
+		},
+		"linux_http_stream": {
+			"passed": 262,
+			"failed": 0
+		},
+		"linux_api_auth": {
+			"passed": 48,
+			"failed": 0
+		},
+		"linux_runtime_native": {
+			"passed": 82,
+			"ABIs": ["LuaJIT", "Lua5.4"],
+			"wrapper_teardown_passed": 2
+		},
+		"linux_units": {
+			"passed": 9296,
+			"failed": 0,
+			"modules": 452
+		},
+		"not_run": [
+			"native Windows AHK",
+			"native macOS Swift/install",
+			"managed GET30/output18 final composition",
+			"installed AppImage/Flatpak archive/update chain"
+		]
+	},
+	"first_main_attempt": {
+		"js": {
+			"passed": 366,
+			"failed": 2
+		},
+		"linux_units": {
+			"passed": 9287,
+			"failed": 2
+		},
+		"log_sha256": "2ae915a374e74135ae773d0ca8bb4b219c5aa535169b8a71a806a169afb551e1",
+		"cause": "Shared source header and new weak pcalls corrected; newly frontloaded fake-libuv fixture cached ShellRunner/Monotonic, independently reproduced by all seven receiving controls. Original native four-control deadline and physical-hotstring assertions unchanged and pass in final normal suite."
+	}
+}

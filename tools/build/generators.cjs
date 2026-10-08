@@ -50,7 +50,8 @@ const GENERATORS = [
 			'tools/build/build-linux-deb.sh',
 			'tools/build/build-linux-rpm.sh',
 			'tools/build/PKGBUILD',
-			'tools/build/nix/flake.nix'
+			'tools/build/nix/flake.nix',
+			'tools/build/templates/linux-portable-runtime-env.sh'
 		]
 	},
 	{

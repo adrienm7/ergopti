@@ -34,7 +34,9 @@
     {
       # ── The daemon itself ─────────────────────────────────────────────────
       packages = forAllSystems (system:
-        let pkgs = nixpkgs.legacyPackages.${system};
+        let
+          pkgs = nixpkgs.legacyPackages.${system};
+          runtimeLuaJIT = pkgs.luajit.withPackages (lua: [ lua.luv ]);
         in {
           default = self.packages.${system}.ergopti;
 
@@ -43,14 +45,25 @@
             version = "dev";
             src = ../../..;
 
-            nativeBuildInputs = [ pkgs.makeWrapper ];
-            buildInputs = [ pkgs.luajit pkgs.at-spi2-core ];
+            nativeBuildInputs = [ pkgs.makeWrapper pkgs.wrapGAppsHook3 ];
+            buildInputs = [ runtimeLuaJIT pkgs.at-spi2-core pkgs.gtk3 pkgs.glib-networking pkgs.gsettings-desktop-schemas pkgs.dconf ];
+            dontWrapGApps = true;
+
+            # stdenv supplies the compiler for this derivation's target. A
+            # stdenvNoCC or host-built private fixture cannot provide this ELF.
+            buildPhase = ''
+              runHook preBuild
+              bash tools/build/build-linux-native-output.sh
+              runHook postBuild
+            '';
 
             installPhase = ''
               runHook preInstall
 
               mkdir -p $out/lib/ergopti
               cp -r static/ergopti_plus/linux/. $out/lib/ergopti/
+              install -Dm755 build/linux/linux/bin/libergopti_archive_publication.so \
+                $out/lib/ergopti/bin/libergopti_archive_publication.so
               mkdir -p $out/lib/ergopti/_shared
               cp -r static/ergopti_plus/_shared/. $out/lib/ergopti/_shared/
               # The layout registry below the driver root, where the packages
@@ -64,19 +77,25 @@
               # daemon resolves it that way, so the layout above is part of the
               # contract rather than a convenience.
               mkdir -p $out/bin
-              makeWrapper ${pkgs.luajit}/bin/luajit $out/bin/ergopti-hotstrings \
+              makeWrapper ${runtimeLuaJIT}/bin/luajit $out/bin/ergopti-hotstrings \
                 --add-flags "$out/lib/ergopti/ergopti_hotstrings.lua" \
                 --set LUA_PATH "$out/lib/ergopti/?.lua;$out/lib/ergopti/?/init.lua;$out/lib/ergopti/_shared/lua/?.lua;$out/lib/ergopti/_shared/lua/?/init.lua;;" \
                 --prefix PATH : ${nixpkgs.lib.makeBinPath (with pkgs; [
-                  xclip wl-clipboard xdotool libxkbcommon libnotify
+                  xclip wl-clipboard xdotool libxkbcommon libnotify curl
                 ])} \
                 --prefix LD_LIBRARY_PATH : ${nixpkgs.lib.makeLibraryPath (with pkgs; [
                   # BEGIN GENERATED LINUX NATIVE REQUIREMENTS
-                  libayatana-appindicator gtk3 glib libxkbcommon at-spi2-core xorg.libX11
+                  libayatana-appindicator gtk3 glib libxkbcommon at-spi2-core glib-networking libproxy dconf openssl xorg.libX11
                   # END GENERATED LINUX NATIVE REQUIREMENTS
                 ])}
 
               runHook postInstall
+            '';
+
+            # wrap-gapps collects schemas in preFixup, after installPhase.
+            # Apply the completed owned environment to this single entry point.
+            postFixup = ''
+              wrapGApp "$out/bin/ergopti-hotstrings"
             '';
 
             meta = with nixpkgs.lib; {

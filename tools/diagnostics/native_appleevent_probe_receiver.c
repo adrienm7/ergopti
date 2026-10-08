@@ -80,12 +80,13 @@ enum AppKitAdmission {
 
 static enum AppKitAdmission admit_appkit(NSApplication *application) {
     if (application == nil) return AppKitApplicationMissing;
-    /* The required current state needs no transition or redundant setter. */
-    if ([application activationPolicy] == NSApplicationActivationPolicyAccessory) {
-        return AppKitAdmitted;
-    }
-    if (![application setActivationPolicy:NSApplicationActivationPolicyAccessory]) {
-        return AppKitPolicyRefused;
+    // An actual existing accessory policy needs no modifying setter. Always
+    // reconfirm it freshly before granting admission, including this branch.
+    const NSApplicationActivationPolicy initial = [application activationPolicy];
+    if (initial != NSApplicationActivationPolicyAccessory) {
+        if (![application setActivationPolicy:NSApplicationActivationPolicyAccessory]) {
+            return AppKitPolicyRefused;
+        }
     }
     if ([application activationPolicy] != NSApplicationActivationPolicyAccessory) {
         return AppKitPolicyUnconfirmed;
@@ -124,6 +125,15 @@ static enum AppKitAdmission observe_appkit_admission(NSApplication *application,
     return admission;
 }
 
+static const char *appkit_policy_label(NSApplicationActivationPolicy policy) {
+    switch (policy) {
+        case NSApplicationActivationPolicyRegular: return "regular";
+        case NSApplicationActivationPolicyAccessory: return "accessory";
+        case NSApplicationActivationPolicyProhibited: return "prohibited";
+        default: return "unrecognized";
+    }
+}
+
 static int receiver_main(int argc, char **argv) {
     if (argc != 4 || !valid_nonce(argv[3])) return 64;
     delivery_path = argv[2];
@@ -131,7 +141,7 @@ static int receiver_main(int argc, char **argv) {
     ProcessSerialNumber serial;
     OSStatus status = GetCurrentProcess(&serial);
     if (status != noErr) {
-        fprintf(stderr, "Owned AppleEvent recipient current-process registration failed: %d\n", (int)status);
+        fprintf(stderr, "Owned AppleEvent recipient registration failed: phase=get-current-process, osstatus=%d\n", (int)status);
         return 65;
     }
     NSApplication *application = [NSApplication sharedApplication];
@@ -143,6 +153,12 @@ static int receiver_main(int argc, char **argv) {
         const int reason = (int)admission;
         fprintf(stderr, "Owned AppleEvent recipient AppKit admission refused (reason %d; before %d/%d; after %d/%d).\n",
             reason, before.available, before.policy, after.available, after.policy);
+        if (admission == AppKitPolicyRefused) {
+            // Closed observations cannot change the refusal or create readiness.
+            fprintf(stderr, "APPKIT_POLICY/1 initial=%s after=%s\n",
+                appkit_policy_label((NSApplicationActivationPolicy)before.policy),
+                appkit_policy_label((NSApplicationActivationPolicy)after.policy));
+        }
         return 65;
     }
     const AEEventHandlerUPP handler = NewAEEventHandlerUPP(receive_probe);

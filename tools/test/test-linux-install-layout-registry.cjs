@@ -24,6 +24,7 @@
 'use strict';
 
 const childProcess = require('child_process');
+const assert = require('node:assert/strict');
 const crypto = require('crypto');
 const fs = require('fs');
 const os = require('os');
@@ -231,7 +232,32 @@ const installer = fs.readFileSync(INSTALLER, 'utf8');
 const resolved = installer.indexOf(
 	'SRC_REGISTRY="$(layout_registry_source "${SRC_DRIVER}" "${DRIVERS_ROOT}")"'
 );
-const driverCopy = installer.indexOf('cp -r "${SRC_DRIVER}/." "${LIB_DIR}/linux/"');
+// Both copies preserve the original source/destination contract. The current
+// tar pipeline additionally excludes only the ignored checkout-local backend.
+const sourcePayloadCopy =
+	'tar -C "$SRC_DRIVER" --exclude=\'./bin/libergopti_archive_publication.so\' -cf - . \\\n\t| tar -C "${LIB_DIR}/linux" -xf -';
+function driverPayloadCopyIndex(source) {
+	const legacy = source.indexOf('cp -r "${SRC_DRIVER}/." "${LIB_DIR}/linux/"');
+	return legacy >= 0 ? legacy : source.indexOf(sourcePayloadCopy);
+}
+assert.equal(driverPayloadCopyIndex(sourcePayloadCopy), 0, 'exact target/source tar copy admits');
+assert.equal(
+	driverPayloadCopyIndex('cp -r "${SRC_DRIVER}/." "${LIB_DIR}/linux/"'),
+	0,
+	'original copy contract remains'
+);
+for (const [before, after] of [
+	['"$SRC_DRIVER"', '"$FOREIGN_DRIVER"'],
+	['"${LIB_DIR}/linux"', '"${LIB_DIR}/other"'],
+	["--exclude='./bin/libergopti_archive_publication.so'", "--exclude='./modules'"],
+	['-cf - .', '-cf - native'],
+	['-xf -', '-tf -']
+]) {
+	assert.ok(sourcePayloadCopy.includes(before), 'copy mutation must hit its real protocol');
+	const mutated = sourcePayloadCopy.replace(before, after);
+	assert.equal(driverPayloadCopyIndex(mutated), -1, 'changed copy authority must refuse');
+}
+const driverCopy = driverPayloadCopyIndex(installer);
 const registryCopy = installer.indexOf(
 	'install_layout_registry "${SRC_REGISTRY}" "${LIB_DIR}/linux"'
 );
@@ -277,7 +303,7 @@ try {
 		`source ${shellQuote(bashPath(HELPER))}`,
 		`SRC_REGISTRY="$(layout_registry_source ${shellQuote(bashPath(DRIVER))} ${shellQuote(bashPath(DRIVERS))})"`,
 		`install -d ${shellQuote(bashPath(path.join(lib, 'linux')))} ${shellQuote(bashPath(path.join(lib, '_shared')))}`,
-		`cp -r ${shellQuote(bashPath(DRIVER))}/. ${shellQuote(bashPath(path.join(lib, 'linux')))}/`,
+		`tar -C ${shellQuote(bashPath(DRIVER))} --exclude='./bin/libergopti_archive_publication.so' -cf - . | tar -C ${shellQuote(bashPath(path.join(lib, 'linux')))} -xf -`,
 		`cp -r ${shellQuote(bashPath(SHARED))}/. ${shellQuote(bashPath(path.join(lib, '_shared')))}/`,
 		`install_layout_registry "$SRC_REGISTRY" ${shellQuote(bashPath(path.join(lib, 'linux')))}`,
 		`bash ${shellQuote(bashPath(OWNERSHIP))} ${shellQuote(bashPath(DRIVER))} ${shellQuote(bashPath(SHARED))} ` +

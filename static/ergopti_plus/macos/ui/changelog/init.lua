@@ -56,6 +56,7 @@ local UpdateChannels = require("updater.channels")
 local DocumentCsp = require("webview.document_csp")
 local ReleaseInstall = require("updater.release_install")
 local VersionOrder = require("updater.version")
+local NetworkFailure = require("network.failure")
 
 local LOG = "changelog_window"
 
@@ -166,6 +167,7 @@ local _channel_owner = nil
 local _last_list = nil
 -- The install session (created on the first request).
 local _install_session = nil
+local _failure_contract = nil
 
 -- Test seam: { updater, backup, installer, coordinator }.
 M._deps = nil
@@ -189,6 +191,43 @@ end
 --- @return boolean current
 local function session_is_current(owner, view, controller)
 	return owner ~= nil and _focus_owner == owner and view ~= nil and _wv == view and _ucc == controller
+end
+
+--- Captures one private native/list owner without native capability probes.
+local function install_owner()
+	return { list = _last_list, generation = _fetch_generation,
+		owner = _focus_owner, view = _wv, controller = _ucc }
+end
+
+--- Pure final identity fence, also used after reentrant encoding/native reads.
+local function install_owner_retained(owner)
+	return type(owner) == "table" and owner.list == _last_list
+		and owner.generation == _fetch_generation
+		and session_is_current(owner.owner, owner.view, owner.controller)
+end
+
+--- Observes the actual authoritative pause owner; unknown state refuses actions.
+--- Pending pause/resume inverse debt is distinct from a committed paused flag.
+local function pause_allows_install()
+	local ok, control, pending, paused = pcall(function()
+		local native = require("modules.shortcuts.script_control")
+		return native, native.is_pause_transition_pending, native.is_paused
+	end)
+	if not ok or type(control) ~= "table" or type(pending) ~= "function"
+		or type(paused) ~= "function" then return false end
+	local pending_ok, transitioning = pcall(pending)
+	if not pending_ok or transitioning ~= false
+		or package.loaded["modules.shortcuts.script_control"] ~= control then return false end
+	local paused_ok, suspended = pcall(paused)
+	return paused_ok and suspended == false
+		and package.loaded["modules.shortcuts.script_control"] == control
+end
+
+--- Fresh native action admission; accepted install execution uses a separate owner.
+local function install_owner_current(owner)
+	if not install_owner_retained(owner) or owner.list == nil then return false end
+	if not pause_allows_install() then return false end
+	return install_owner_retained(owner)
 end
 
 -- The shared UI assets live in …/ergopti_plus/_shared/ui/changelog/. Resolved
@@ -216,6 +255,7 @@ local function submit_publication(publication, owner, view, controller)
 	local function current()
 		return session_is_current(owner, view, controller)
 			and (publication.generation == nil or publication.generation == _fetch_generation)
+			and (publication.private_owner == nil or install_owner_retained(publication.private_owner))
 	end
 	if not current() then return false end
 	owner.javascript_failures = owner.javascript_failures or {}
@@ -251,11 +291,13 @@ end
 --- @param code string Raw JavaScript to evaluate.
 --- @param generation number|nil Fetch generation that owns this publication.
 --- @param release_count number|nil Number of releases acknowledged after execution.
-local function eval(code, generation, release_count)
+local function eval(code, generation, release_count, private_owner)
+	if private_owner ~= nil and not install_owner_retained(private_owner) then return false end
 	if generation ~= nil and generation ~= _fetch_generation then return end
 	local owner, view, controller = _focus_owner, _wv, _ucc
+	if private_owner ~= nil then owner, view, controller = private_owner.owner, private_owner.view, private_owner.controller end
 	if not session_is_current(owner, view, controller) then return end
-	local publication = { code = code, generation = generation, release_count = release_count }
+	local publication = { code = code, generation = generation, release_count = release_count, private_owner = private_owner }
 	if _ready then
 		return submit_publication(publication, owner, view, controller)
 	else
@@ -450,11 +492,25 @@ end
 --- The install session, over the configuration backup, the release installer
 --- and the controlled quit.
 --- @return table session
+local function failure_contract()
+	if _failure_contract then return _failure_contract end
+	local path = Paths.shared("modules/network/managed_network.json")
+	local raw = type(path) == "string" and FileSystem.read(path) or nil
+	assert(type(raw) == "string", "the canonical managed network policy is unreadable")
+	_failure_contract = NetworkFailure.new(Json.decode(raw))
+	return _failure_contract
+end
+
 local function install_session()
 	if _install_session then return _install_session end
 	_install_session = ReleaseInstall.new({
 		logger = Logger,
 		log = LOG,
+		failure_contract = failure_contract,
+		acceptance_owner = install_owner,
+		acceptance_current = install_owner_current,
+		failure_owner = install_owner,
+		failure_current = install_owner_current,
 		blocked = install_blocked,
 		find_release = function(tag) return find_release(tag) end,
 		backup = function(release)
@@ -465,9 +521,9 @@ local function install_session()
 		end,
 		resolve_asset = function(release) return deps().installer.find_asset(release) end,
 		download = function(asset, _, done)
-			return deps().installer.stage(asset, function(staged, stage, detail)
+			return deps().installer.stage(asset, function(staged, stage, detail, failure_receipt)
 				done(staged, stage == "verify" and ReleaseInstall.REASON.verify or ReleaseInstall.REASON.download,
-					detail)
+					detail, failure_receipt)
 			end) == true
 		end,
 		install = function(staged)
@@ -478,9 +534,14 @@ local function install_session()
 		restart = function()
 			return deps().coordinator.request_user_exit("release_install") == true
 		end,
-		report = function(message)
+		report = function(message, native_owner)
+			-- Visibility does not cancel an accepted transaction. Only its original
+			-- private recipient may receive phases, including after encoding reentry.
+			local recipient = native_owner or install_owner()
+			if not install_owner_retained(recipient) then return false end
 			local encoded = js_value(message)
-			if encoded then eval(string.format("setInstallProgress(%s)", encoded)) end
+			if not encoded or not install_owner_retained(recipient) then return false end
+			return eval(string.format("setInstallProgress(%s)", encoded), recipient.generation, nil, recipient)
 		end,
 	})
 	return _install_session
@@ -611,6 +672,10 @@ local function ensure_ucc(owner)
 		elseif body.action == "install_release" then
 			-- Only this click installs a chosen release: nothing else calls the session.
 			install_session().install(body.tag, body.channel)
+		elseif body.action == "install_failure_action" then
+			if _install_session then
+				_install_session.failure_action(body.operation, body.epoch, body.id)
+			end
 		elseif body.action == "restore_backup" then
 			restore_from_page(body.id)
 		elseif body.action == "open_url" and type(body.url) == "string" then
@@ -841,6 +906,7 @@ end
 --- Closes the changelog window if open.
 --- @return boolean committed
 function M.close()
+	if _install_session then _install_session.retire() end
 	if _closing then return false end
 	if _opening then
 		_focus_owner = nil

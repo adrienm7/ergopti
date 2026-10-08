@@ -57,7 +57,7 @@ function M.new(deps)
 		local files,reason=admission_new(d.resolver,d.file_factory,authorized,true)
 		if not files then return empty(reason or 'runtime_file_admission_unavailable',done) end
 		-- The phase owns reservation, budget subscription and every native stage.
-		return phase_start({files=files,process=d.process,http=d.http}, {
+		return phase_start({files=files,process=d.process,http=d.http,archive_factory=d.archive_factory}, {
 			asset=plan.asset,explicit_consent=true,authorized=authorized,budget=budget,
 			timeout_ms=bootstrap,helper_timeout_ms=bootstrap},done)
 	end

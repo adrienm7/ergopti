@@ -534,6 +534,9 @@ BootProfile_Stamp("Manifest, updater and locale state initialised")
 #Include vendor/WebView2.ahk
 BootProfile_Stamp("WebView and metrics UI state initialised")
 #Include infra/webview_utils.ahk
+#Include adapters/network_failure_host.ahk
+#Include ui/download_window/session.ahk
+#Include ui/download_window/init.ahk
 #Include ui/console_window.ahk
 #Include modules/keylogger/keylogger_app_categories.ahk
 #Include modules/keylogger/keylogger.ahk
@@ -737,6 +740,9 @@ LoggerInit()
 ; Right after the logger: every later ERROR of the boot can open the error
 ; window, which waits for the driver to be ready before it shows
 ErrorDialog_Init(_IniCache)
+ManagedNetworkFailureWindows_Init()
+Updater_ConfigureManagedFailurePresenter(ManagedNetworkFailureWindows_Contract(),
+	_Updater_ShowManagedDownloadFailure, _Updater_RetireManagedDownloadFailure)
 bootScriptName := IsSet(A_ScriptName) ? A_ScriptName : "ErgoptiPlus"
 if !IsSet(A_ScriptName) && IsSet(A_ScriptFullPath) {
 		bootScriptName := A_ScriptFullPath

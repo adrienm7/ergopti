@@ -11,23 +11,18 @@
 #        AppDir/ergopti.desktop                         desktop entry
 #        AppDir/ergopti.png                             application icon
 #        AppDir/usr/bin/ergopti                         launcher, forwards to AppRun
-#        AppDir/usr/bin/luajit                          bundled runtime, when available
+#        AppDir/usr/bin/luajit                          required bundled runtime
 #        AppDir/usr/lib/ergopti/                        driver tree, flat
 #        AppDir/usr/lib/ergopti/_shared/                shared tree, as a child
 #   2. build/linux/Ergopti-<version>-x86_64.AppImage  — only when appimagetool is
 #      on PATH. Without it the AppDir is left staged and the manual packaging
-#      command is printed, which is how this script stays runnable off Linux.
+#      command is printed. Actual native staging requires Linux x86_64.
 #
-# On the LuaJIT runtime — the honest version. An AppImage is expected to be
-# self-contained, so this script copies the BUILD HOST's luajit into
-# AppDir/usr/bin when one exists. That is a partial guarantee and it is stated
-# as one: a copied host binary still links against the host's libc and libm, so
-# it travels across distributions of a similar vintage, not universally. When
-# the build host has no luajit — which is every non-Linux machine, this one
-# included — nothing is bundled, the omission is logged as a warning, and
-# AppRun falls back to a luajit on the target's PATH. Shipping a fabricated or
-# empty binary would turn a legible "LuaJIT introuvable" into a crash inside a
-# read-only mount, so the fallback is deliberate rather than a shortcut.
+# LuaJIT, luv, curl, native GIO modules, schemas and their linked ELF closure
+# are bundled from trusted build-host packages. The recipient supplies glibc
+# and certificate trust; this remains a similar-vintage Linux package rather
+# than universal binary compatibility. Missing components refuse packaging.
+# Native admission does not prove physical input, PAC or desktop settings.
 #
 # The shared tree is staged as a CHILD of the driver root
 # (usr/lib/ergopti/_shared), matching build-linux-deb.sh and build-linux-rpm.sh.
@@ -142,20 +137,14 @@ echo "  $file_count files copied to usr/lib/ergopti/"
 echo "  Payload check: all ${#REQUIRED_PAYLOAD[@]} required file(s) present"
 
 # ----------------------------------------------------------------------
-# 4. Bundle the LuaJIT runtime when the build host has one
+# 4. Stage and admit the actual native network runtime
 # ----------------------------------------------------------------------
-LUAJIT_SRC="$(command -v luajit 2>/dev/null || true)"
-if [ -n "$LUAJIT_SRC" ]; then
-  cp "$LUAJIT_SRC" "$APPDIR/usr/bin/luajit"
-  chmod 755 "$APPDIR/usr/bin/luajit"
-  echo "  LuaJIT bundled from $LUAJIT_SRC"
-  echo "        (host binary — it still links against this machine's libc, so it"
-  echo "         travels across distributions of a similar vintage, not all of them)"
-else
-  echo "  [WARN] No luajit on the build host — none bundled."
-  echo "         The AppImage will require luajit on the target machine instead."
-  echo "         Build on a Linux host with luajit installed for a self-contained image."
-fi
+# Missing build-host prerequisites are a packaging failure. The same-vintage
+# glibc restriction remains; copying an executable alone is not ELF closure.
+python3 "$SCRIPT_DIR/stage-linux-network-runtime.py" \
+  --appdir "$APPDIR" \
+  --catalogue "$PROJECT_ROOT/static/ergopti_plus/_shared/data/linux_native_runtime.json" \
+  --template "$SCRIPT_DIR/templates/linux-portable-runtime-env.sh"
 
 # ----------------------------------------------------------------------
 # 5. AppRun — the single entry point
@@ -175,18 +164,8 @@ HERE="$(cd "$(dirname "$(readlink -f "$0")")" && pwd -P)"
 
 DRIVER_ROOT="$HERE/usr/lib/ergopti"
 SHARED_LUA="$DRIVER_ROOT/_shared/lua"
-export LUA_PATH="$DRIVER_ROOT/?.lua;$DRIVER_ROOT/?/init.lua;$SHARED_LUA/?.lua;$SHARED_LUA/?/init.lua;;"
-
-# The bundled runtime wins when the build host had one; otherwise fall back to
-# the target's own luajit, which is the documented degraded mode.
-if [ -x "$HERE/usr/bin/luajit" ]; then
-  LUAJIT_BIN="$HERE/usr/bin/luajit"
-elif command -v luajit >/dev/null 2>&1; then
-  LUAJIT_BIN="luajit"
-else
-  echo "Erreur : LuaJIT est introuvable. Installez le paquet \"luajit\"." >&2
-  exit 1
-fi
+source "$DRIVER_ROOT/network-runtime-env.sh" "$HERE/usr" "$DRIVER_ROOT"
+LUAJIT_BIN="$HERE/usr/bin/luajit"
 
 # No arguments means a desktop launch, and the driver gates its whole tray and
 # menu block on --tray. Without it the user gets a running daemon with no icon

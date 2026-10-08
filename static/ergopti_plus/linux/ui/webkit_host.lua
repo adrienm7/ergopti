@@ -264,6 +264,20 @@ end
 --- @param html string
 --- @param app_name string|nil Shared UI application name.
 --- @return string
+--- Returns one opaque native nonce using the existing CSP entropy source.
+--- A short read or failed native close is unavailable, never a guessed token.
+function M.native_nonce()
+	local opened, handle = pcall(io.open, "/dev/urandom", "rb")
+	if not opened or not handle then return nil end
+	local read, random = pcall(handle.read, handle, 18)
+	local closed, close_ack = pcall(handle.close, handle)
+	if not read or type(random) ~= "string" or #random ~= 18 or not closed or close_ack ~= true then return nil end
+	local ok, Base64 = pcall(require, "compat.base64")
+	if not ok or type(Base64.encode) ~= "function" then return nil end
+	local encoded, nonce = pcall(Base64.encode, random)
+	return encoded and type(nonce) == "string" and #nonce == 24 and nonce or nil
+end
+
 function M.inject_no_remote_csp(html, app_name)
 	if type(html) ~= "string" then return html or "" end
 	-- The shared policy replaces the page's browser-host CSP (which would block
@@ -271,12 +285,7 @@ function M.inject_no_remote_csp(html, app_name)
 	-- sources are fetched natively by its bridge (ui/changelog/bridge.lua).
 	local nonce = nil
 	if app_name == "changelog" then
-		local handle = io.open("/dev/urandom", "rb")
-		local random = handle and handle:read(18) or nil
-		if handle then handle:close() end
-		local ok_base64, Base64 = pcall(require, "compat.base64")
-		nonce = ok_base64 and type(random) == "string" and #random == 18
-			and Base64.encode(random) or nil
+		nonce = M.native_nonce()
 		if type(nonce) ~= "string" or nonce == "" then
 			Logger.error(LOG, "Cannot build changelog: CSP nonce generation failed.")
 			return "<html><body><h1>Build error: CSP nonce unavailable</h1></body></html>"
