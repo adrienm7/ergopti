@@ -50,13 +50,58 @@ _ManagedCurlControlState() {
 	return Map("spawns", 0, "starts", 0, "terminates", [], "retire", true)
 }
 
-_ManagedCurlControlAck(State, Mode := "valid") {
+_ManagedCurlControlAck(State, Mode := "valid", OpenFn := 0) {
 	Request := State["request"]
 	Ack := '{"schema_version":1,"state":"ready","request_id":'
 		. JsonStringLiteral(Mode == "foreign" ? "foreign_request" : Request.CleanupDebtId)
 	Ack .= ',"tls_backend":"schannel","child_quiesced":' . (Mode == "forged" ? '"1"' : "true") . '}'
-	AssertTrue(FSWrite(State["directory"] . "admission.json", Ack), "the explicit native-receipt port must stage its owned control")
+	; Match the worker's private stage/rename protocol: the active admission timer
+	; must never see a final receipt while its bytes are still being written.
+	Stage := State["directory"] . "admission.pending"
+	AssertTrue(FSWrite(Stage, Ack, OpenFn), "the explicit native-receipt port must stage its owned control")
+	AssertEqual(1, FSAtomicMoveCreate(Stage, State["directory"] . "admission.json"),
+		"only the complete exact staged admission may acquire the final path")
 }
+
+_ManagedCurlControlAckOpenDuringPoll(State, Path, Mode, Encoding) {
+	File := FileOpen(Path, Mode, Encoding)
+	if !IsObject(File)
+		return File
+	try {
+		State["poll_during_ack_write"] += 1
+		Request := State["request"]
+		Request._PollManagedAdmission()
+		AssertFalse(Request.Aborted, "an incomplete private stage cannot retire the request")
+		AssertFalse(Request.ManagedPayloadPublished, "an incomplete ACK cannot admit secrets")
+		AssertFalse(FileExist(State["directory"] . "admission.json"), "the final ACK stays absent until its staged bytes close")
+		AssertFalse(FileExist(State["directory"] . "transport.json"), "transport stays absent during the controlled publication boundary")
+		return File
+	} catch as Failure {
+		File.Close()
+		throw Failure
+	}
+}
+
+_ManagedCurlControlAckPublicationBoundary() {
+	State := _ManagedCurlControlState()
+	State["poll_during_ack_write"] := 0
+	Request := _ManagedCurlControlNew(State)
+	try {
+		AssertTrue(Request.Send("private-user-payload"))
+		_ManagedCurlControlAck(State, "valid", _ManagedCurlControlAckOpenDuringPoll.Bind(State))
+		AssertEqual(1, State["poll_during_ack_write"], "the control must poll after real file creation and before any ACK bytes")
+		Request._PollManagedAdmission()
+		AssertFalse(Request.Aborted, "complete owned publication preserves the original request")
+		AssertTrue(Request.ManagedPayloadPublished, "only the complete admitted ACK releases transport staging")
+		Published := JsonParse(FileRead(State["directory"] . "transport.json", "UTF-8"))
+		AssertEqual(Request.CleanupDebtId, Published["request_id"], "publication retains the exact native request identity")
+		AssertEqual("private-user-payload", Published["body"])
+		AssertEqual(State["origin"], Request.DeadlineStart, "publication cannot restart the native clock")
+		AssertEqual(20000, Request.DeadlineTimeout, "publication cannot increase the original budget")
+	} finally _ManagedCurlControlRelease(State)
+}
+Test("managed curl owner: a poll during ACK staging cannot observe partial admission (managed-ack-publication)",
+	_ManagedCurlControlAckPublicationBoundary)
 
 _ManagedCurlControlSecretsWaitForNativeAdmission() {
 	State := _ManagedCurlControlState()
@@ -108,6 +153,10 @@ _ManagedCurlControlExpiredAck() {
 	Request := _ManagedCurlControlNew(State)
 	try {
 		AssertTrue(Request.Send("private-user-payload"))
+		; This control manually delivers the poll after expiry. Stop only this
+		; request's admission callback before ACK publication can make it due.
+		AssertTrue(IsObject(Request.ManagedAdmissionFn), "manual expiry must own the actual admission callback")
+		SetTimer(Request.ManagedAdmissionFn, 0)
 		_ManagedCurlControlAck(State)
 		Request.DeadlineStart := 0
 		Request.DeadlineTimeout := 1
