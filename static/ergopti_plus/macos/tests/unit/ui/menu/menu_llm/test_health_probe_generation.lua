@@ -244,7 +244,6 @@ local function build_fixture(callback, options)
 		}))
 		package.loaded["infra.manifest_menu"] = {
 			command_row = native_renderer.command_row,
-			group_row = presentation_renderer.group_row,
 			template_rows = presentation_renderer.template_rows,
 		check_row = native_renderer.check_row,
 			native_child_rows = native_renderer.native_child_rows,

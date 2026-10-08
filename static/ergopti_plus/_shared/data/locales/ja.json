@@ -197,7 +197,6 @@
 	"config_cleanup.intro": "ErgoptiPlus で使われなくなった設定を確認してください。",
 	"dialog.action_picker.disabled": "∅ なし",
 	"dialog.action_picker.label": "アクション:",
-	"dialog.action_picker.menu_label": "アクション:…",
 	"dialog.action_picker.back": "← 戻る",
 	"dialog.action_picker.capture_key": "送信するキーを押すか、その名前を入力してください。",
 	"dialog.action_picker.capture_shortcut": "送信するショートカットを押すか、入力してください。",

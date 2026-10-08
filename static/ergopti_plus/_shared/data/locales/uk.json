@@ -197,7 +197,6 @@
 	"config_cleanup.intro": "Перевірте налаштування, які ErgoptiPlus більше не використовує.",
 	"dialog.action_picker.disabled": "∅ Нічого",
 	"dialog.action_picker.label": "Дія:",
-	"dialog.action_picker.menu_label": "Дія:…",
 	"dialog.action_picker.back": "← Назад",
 	"dialog.action_picker.capture_key": "Натисніть клавішу, яку потрібно надіслати, або введіть її назву.",
 	"dialog.action_picker.capture_shortcut": "Натисніть комбінацію клавіш, яку потрібно надіслати, або введіть її.",

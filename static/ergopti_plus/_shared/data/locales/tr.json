@@ -197,7 +197,6 @@
 	"config_cleanup.intro": "ErgoptiPlus tarafından artık kullanılmayan ayarları inceleyin.",
 	"dialog.action_picker.disabled": "∅ Hiçbir şey",
 	"dialog.action_picker.label": "Eylem:",
-	"dialog.action_picker.menu_label": "Eylem:…",
 	"dialog.action_picker.back": "← Geri",
 	"dialog.action_picker.capture_key": "Gönderilecek tuşa basın veya adını yazın.",
 	"dialog.action_picker.capture_shortcut": "Gönderilecek kısayola basın veya yazın.",

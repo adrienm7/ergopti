@@ -197,7 +197,6 @@
 	"config_cleanup.intro": "Granska inställningarna som ErgoptiPlus inte längre använder.",
 	"dialog.action_picker.disabled": "∅ Ingenting",
 	"dialog.action_picker.label": "Åtgärd:",
-	"dialog.action_picker.menu_label": "Åtgärd:…",
 	"dialog.action_picker.back": "← Tillbaka",
 	"dialog.action_picker.capture_key": "Tryck på tangenten som ska skickas, eller skriv dess namn.",
 	"dialog.action_picker.capture_shortcut": "Tryck på kortkommandot som ska skickas, eller skriv det.",

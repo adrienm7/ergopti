@@ -197,7 +197,6 @@
 	"config_cleanup.intro": "בדקו את ההגדרות שכבר אינן בשימוש ב־ErgoptiPlus.",
 	"dialog.action_picker.disabled": "∅ כלום",
 	"dialog.action_picker.label": "פעולה:",
-	"dialog.action_picker.menu_label": "פעולה:…",
 	"dialog.action_picker.back": "→ חזרה",
 	"dialog.action_picker.capture_key": "הקישו על המקש שיש לשלוח, או הקלידו את שמו.",
 	"dialog.action_picker.capture_shortcut": "הקישו על קיצור המקשים שיש לשלוח, או הקלידו אותו.",

@@ -197,7 +197,6 @@
 	"config_cleanup.intro": "Controlla le impostazioni che ErgoptiPlus non utilizza più.",
 	"dialog.action_picker.disabled": "∅ Niente",
 	"dialog.action_picker.label": "Azione:",
-	"dialog.action_picker.menu_label": "Azione:…",
 	"dialog.action_picker.back": "← Indietro",
 	"dialog.action_picker.capture_key": "Premere il tasto da inviare o digitarne il nome.",
 	"dialog.action_picker.capture_shortcut": "Premere la scorciatoia da inviare o digitarla.",

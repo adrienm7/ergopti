@@ -12,19 +12,19 @@
 			"windows/ui/menu/menu_init.ahk:67 add",
 			"windows/ui/menu/menu_llm/menu_agent.ahk:50 append",
 			"windows/ui/menu/menu_llm/menu_agent.ahk:55 append",
-			"windows/ui/menu/menu_llm/menu_main.ahk:255 add",
-			"windows/ui/menu/menu_llm/menu_main.ahk:374 append",
-			"windows/ui/menu/menu_llm/menu_main.ahk:412 append",
-			"windows/ui/menu/menu_llm/menu_main.ahk:439 append",
-			"windows/ui/menu/menu_llm/menu_main.ahk:446 append",
-			"windows/ui/menu/menu_llm/menu_main.ahk:450 append",
-			"windows/ui/menu/menu_llm/menu_main.ahk:454 append",
-			"windows/ui/menu/menu_llm/menu_main.ahk:458 append",
-			"windows/ui/menu/menu_llm/menu_main.ahk:462 append",
-			"windows/ui/menu/menu_llm/menu_models.ahk:259 append",
-			"windows/ui/menu/menu_llm/menu_models.ahk:291 append",
-			"windows/ui/menu/menu_llm/menu_models.ahk:297 append",
-			"windows/ui/menu/menu_llm/menu_models.ahk:338 append",
+			"windows/ui/menu/menu_llm/menu_main.ahk:177 append",
+			"windows/ui/menu/menu_llm/menu_main.ahk:257 add",
+			"windows/ui/menu/menu_llm/menu_main.ahk:388 append",
+			"windows/ui/menu/menu_llm/menu_main.ahk:397 append",
+			"windows/ui/menu/menu_llm/menu_main.ahk:399 append",
+			"windows/ui/menu/menu_llm/menu_main.ahk:403 append",
+			"windows/ui/menu/menu_llm/menu_main.ahk:407 append",
+			"windows/ui/menu/menu_llm/menu_main.ahk:411 append",
+			"windows/ui/menu/menu_llm/menu_main.ahk:415 append",
+			"windows/ui/menu/menu_llm/menu_models.ahk:257 append",
+			"windows/ui/menu/menu_llm/menu_models.ahk:289 append",
+			"windows/ui/menu/menu_llm/menu_models.ahk:295 append",
+			"windows/ui/menu/menu_llm/menu_models.ahk:336 append",
 			"windows/ui/menu/menu_shortcuts.ahk:195 append",
 			"windows/ui/menu/menu_shortcuts.ahk:200 append",
 			"windows/ui/menu/menu_submenus.ahk:62 separator",
@@ -33,7 +33,7 @@
 		]
 	},
 	"macos": {
-		"count": 21,
+		"count": 22,
 		"sites": [
 			"macos/ui/menu/builder.lua:452 separator",
 			"macos/ui/menu/builder.lua:876 separator",
@@ -47,7 +47,8 @@
 			"macos/ui/menu/menu_keyboard_slots.lua:153 static",
 			"macos/ui/menu/menu_keyboard_slots.lua:218 static",
 			"macos/ui/menu/menu_keyboard_slots.lua:219 static",
-			"macos/ui/menu/menu_llm/init.lua:2001 native",
+			"macos/ui/menu/menu_llm/init.lua:1955 static",
+			"macos/ui/menu/menu_llm/init.lua:2003 native",
 			"macos/ui/menu/menu_llm/models_manager_mlx_hf.lua:830 static",
 			"macos/ui/menu/menu_llm/profiles_manager.lua:1068 static",
 			"macos/ui/menu/menu_paths.lua:537 static",
@@ -59,9 +60,11 @@
 		]
 	},
 	"linux": {
-		"count": 27,
+		"count": 30,
 		"sites": [
 			"linux/ui/menu/menu_builder.lua:255 static",
+			"linux/ui/menu/menu_builder.lua:283 static",
+			"linux/ui/menu/menu_builder.lua:289 static",
 			"linux/ui/menu/menu_builder.lua:369 static",
 			"linux/ui/menu/menu_builder.lua:523 static",
 			"linux/ui/menu/menu_builder.lua:561 static",
@@ -86,8 +89,9 @@
 			"linux/ui/menu/menu_builder.lua:4057 static",
 			"linux/ui/menu/menu_builder.lua:4207 static",
 			"linux/ui/menu/menu_builder.lua:4588 static",
-			"linux/ui/menu/menu_builder.lua:5018 separator",
-			"linux/ui/menu/menu_builder.lua:5042 separator"
+			"linux/ui/menu/menu_builder.lua:4660 static",
+			"linux/ui/menu/menu_builder.lua:4945 separator",
+			"linux/ui/menu/menu_builder.lua:4969 separator"
 		]
 	}
 }

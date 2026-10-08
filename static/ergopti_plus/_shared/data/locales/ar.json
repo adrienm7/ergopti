@@ -197,7 +197,6 @@
 	"config_cleanup.intro": "راجع الإعدادات التي لم يعد ErgoptiPlus يستخدمها.",
 	"dialog.action_picker.disabled": "∅ لا شيء",
 	"dialog.action_picker.label": "الإجراء:",
-	"dialog.action_picker.menu_label": "الإجراء:…",
 	"dialog.action_picker.back": "→ رجوع",
 	"dialog.action_picker.capture_key": "اضغط المفتاح المراد إرساله، أو اكتب اسمه.",
 	"dialog.action_picker.capture_shortcut": "اضغط الاختصار المراد إرساله، أو اكتبه.",
