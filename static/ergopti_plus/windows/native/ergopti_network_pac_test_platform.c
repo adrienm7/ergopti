@@ -18,6 +18,10 @@ static void require(int admitted, const char *stage, int32_t error)
 	if (admitted) return;
 	/* Fixed stage and native integer only; never print captured network metadata. */
 	fprintf(stderr, "NATIVE_PAC_PLATFORM_DIAG stage=%s native_error=%ld\n", stage, (long)error);
+#ifdef ERGOPTI_PAC_PLATFORM_DIAGNOSTICS
+	/* ExitProcess does not run the C stream flush; publish notices first. */
+	(void)fflush(stdout);
+#endif
 	ExitProcess(1);
 }
 
@@ -35,14 +39,14 @@ static void diagnose_sort_shape(void)
 	DWORD returned = 0;
 	int status, native_error;
 	if (input == NULL || output == NULL) {
-		fputs("NATIVE_PAC_SORT_SHAPE allocation=refused\n", stderr); goto closed;
+		fputs("::notice::NATIVE_PAC_SORT_SHAPE allocation=refused\n", stdout); goto closed;
 	}
 	items = (SOCKADDR_IN6 *)((unsigned char *)input + table);
 	input->iAddressCount = (INT)count;
 	items[0].sin6_family = items[1].sin6_family = AF_INET6;
 	if (InetPtonA(AF_INET6, "::ffff:127.0.0.1", &items[0].sin6_addr) != 1 ||
 		InetPtonA(AF_INET6, "::1", &items[1].sin6_addr) != 1) {
-		fputs("NATIVE_PAC_SORT_SHAPE literal_parse=refused\n", stderr); goto closed;
+		fputs("::notice::NATIVE_PAC_SORT_SHAPE literal_parse=refused\n", stdout); goto closed;
 	}
 	for (index = 0; index < count; index++) {
 		input->Address[index].lpSockaddr = (SOCKADDR *)&items[index];
@@ -50,11 +54,11 @@ static void diagnose_sort_shape(void)
 	}
 	socket_owner = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
 	if (socket_owner == INVALID_SOCKET) {
-		fprintf(stderr, "NATIVE_PAC_SORT_SHAPE socket_error=%d\n", WSAGetLastError()); goto closed;
+		fprintf(stdout, "::notice::NATIVE_PAC_SORT_SHAPE socket_error=%d\n", WSAGetLastError()); goto closed;
 	}
 	status = WSAIoctl(socket_owner, SIO_ADDRESS_LIST_SORT, input, (DWORD)bytes, output, (DWORD)bytes, &returned, NULL, NULL);
 	native_error = status == 0 ? 0 : WSAGetLastError();
-	fprintf(stderr, "NATIVE_PAC_SORT_SHAPE status=%d error=%d returned=%lu table=%llu allocated=%llu count=%d\n",
+	fprintf(stdout, "::notice::NATIVE_PAC_SORT_SHAPE status=%d error=%d returned=%lu table=%llu allocated=%llu count=%d\n",
 		status, native_error, (unsigned long)returned, (unsigned long long)table, (unsigned long long)bytes,
 		returned >= sizeof(INT) && returned <= bytes ? output->iAddressCount : -1);
 	if (status == 0 && returned >= table && returned <= bytes && output->iAddressCount >= 0 && output->iAddressCount <= (INT)count) {
@@ -65,13 +69,34 @@ static void diagnose_sort_shape(void)
 				(pointer - first_input) % sizeof(SOCKADDR_IN6) == 0;
 			int output_owned = returned >= table + sizeof(SOCKADDR_IN6) && pointer >= first_output &&
 				pointer - first_output <= (size_t)returned - table - sizeof(SOCKADDR_IN6);
-			fprintf(stderr, "NATIVE_PAC_SORT_SHAPE index=%llu sockaddr_bytes=%d input_owned=%d output_owned=%d\n",
+			fprintf(stdout, "::notice::NATIVE_PAC_SORT_SHAPE index=%llu sockaddr_bytes=%d input_owned=%d output_owned=%d\n",
 				(unsigned long long)index, output->Address[index].iSockaddrLength, input_owned, output_owned);
+			if ((input_owned || (output_owned && pointer % _Alignof(SOCKADDR_IN6) == 0)) &&
+				output->Address[index].iSockaddrLength == (int)sizeof(SOCKADDR_IN6)) {
+				SOCKADDR_IN6 *address = (SOCKADDR_IN6 *)output->Address[index].lpSockaddr;
+				char text[INET6_ADDRSTRLEN];
+				SOCKADDR_IN ipv4;
+				const void *source;
+				int family = address->sin6_family, mapped = 0;
+				int converted, conversion_error;
+				if (family == AF_INET6 && IN6_IS_ADDR_V4MAPPED(&address->sin6_addr)) {
+					mapped = 1; memset(&ipv4, 0, sizeof(ipv4)); ipv4.sin_family = AF_INET;
+					memcpy(&ipv4.sin_addr, &address->sin6_addr.u.Byte[12], sizeof(ipv4.sin_addr));
+					family = AF_INET; source = &ipv4.sin_addr;
+				} else source = &address->sin6_addr;
+				converted = InetNtopA(family, (void *)source, text, sizeof(text)) != NULL;
+				conversion_error = converted ? 0 : WSAGetLastError();
+				fprintf(stdout, "::notice::NATIVE_PAC_SORT_SHAPE index=%llu input_slot=%llu family=%d mapped=%d converted=%d conversion_error=%d ipv4_loopback=%d ipv6_loopback=%d\n",
+					(unsigned long long)index,
+					input_owned ? (unsigned long long)((pointer - first_input) / sizeof(SOCKADDR_IN6)) : (unsigned long long)count,
+					(int)address->sin6_family, mapped, converted, conversion_error,
+					converted && strcmp(text, "127.0.0.1") == 0, converted && strcmp(text, "::1") == 0);
+			}
 		}
 	}
 closed:
 	if (socket_owner != INVALID_SOCKET && closesocket(socket_owner) != 0)
-		fprintf(stderr, "NATIVE_PAC_SORT_SHAPE socket_retirement_error=%d\n", WSAGetLastError());
+		fprintf(stdout, "::notice::NATIVE_PAC_SORT_SHAPE socket_retirement_error=%d\n", WSAGetLastError());
 	free(output); free(input);
 }
 #endif
@@ -104,7 +129,12 @@ int main(void)
 	memset(output, 0, sizeof(output)); error.code = 0; error.domain = ERGOPTI_PAC_ERROR_NONE;
 	status = platform.sort_addresses(platform.owner, "127.0.0.1;::1", output, sizeof(output), &error);
 #ifdef ERGOPTI_PAC_PLATFORM_DIAGNOSTICS
-	if (status != 1 || (strcmp(output, "127.0.0.1;::1") != 0 && strcmp(output, "::1;127.0.0.1") != 0)) diagnose_sort_shape();
+	if (status != 1 || (strcmp(output, "127.0.0.1;::1") != 0 && strcmp(output, "::1;127.0.0.1") != 0)) {
+		fprintf(stdout, "::notice::NATIVE_PAC_SORT_RECEIVING status=%d error=%ld domain=%d output_bytes=%llu forward_literal=%d reverse_literal=%d\n",
+			status, (long)error.code, (int)error.domain, (unsigned long long)strlen(output),
+			strcmp(output, "127.0.0.1;::1") == 0, strcmp(output, "::1;127.0.0.1") == 0);
+		diagnose_sort_shape();
+	}
 #endif
 	require(status == 1 && (strcmp(output, "127.0.0.1;::1") == 0 || strcmp(output, "::1;127.0.0.1") == 0), "native_address_sort", error.code);
 	memset(output, 0, sizeof(output)); error.code = 0; error.domain = ERGOPTI_PAC_ERROR_NONE;
