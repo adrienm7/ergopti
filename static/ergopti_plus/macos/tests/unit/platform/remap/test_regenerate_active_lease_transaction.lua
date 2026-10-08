@@ -31,6 +31,11 @@ end
 --- @return table calls
 local function load_active_remap(options)
 	options = options or {}
+	-- The fixture supplies intent from the real config owner, never native readiness.
+	local default_runtime = helpers.with_stub_scope({ "platform.remap.config" }, function()
+		local RealConfig = helpers.load_with_stubs("platform.remap.config")
+		return RealConfig.build_default_state({}, {}).runtime
+	end)
 	local calls = {
 		phase = "prepared",
 		testing = false,
@@ -75,6 +80,7 @@ local function load_active_remap(options)
 		compute_non_canonical_combos = function() return {} end,
 		load_user_config = function()
 			return {
+				runtime = default_runtime,
 				enabled = true,
 				tap_hold_config = {},
 				mod_combos_config = {},

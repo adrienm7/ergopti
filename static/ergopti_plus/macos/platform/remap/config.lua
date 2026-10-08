@@ -175,6 +175,78 @@ local function load_json_file(path)
 	return data
 end
 
+--- Admits the one shared native selector declaration without granting runtime authority.
+--- @return table|nil setting Valid enum declaration.
+local function runtime_setting()
+	local path = Paths.shared("platform/remap/runtime_setting.json")
+	local setting = type(path) == "string" and load_json_file(path) or nil
+	local fields = { ["$schema"] = true, path = true, file = true, owner = true,
+		platforms = true, type = true, enum_values = true, default = true, recommended = true,
+		description_key = true, unavailable_key = true }
+	local function refused()
+		Logger.error(LOG, "The shared native runtime selector declaration is unavailable or invalid.")
+		return nil
+	end
+	if type(setting) ~= "table" then return refused() end
+	-- The decoder owns its returned tree. Retain our own declaration before
+	-- later source or encoding ports can mutate that borrowed tree.
+	local admitted = {}
+	for key, value in next, setting do admitted[key] = value end
+	for _, key in ipairs({ "platforms", "enum_values" }) do
+		local values = rawget(setting, key)
+		if type(values) == "table" then
+			local retained = {}
+			for index, value in next, values do retained[index] = value end
+			admitted[key] = retained
+		end
+	end
+	setting = admitted
+	local count = 0
+	for key in pairs(setting) do
+		if not fields[key] then return refused() end
+		count = count + 1
+	end
+	if count ~= 11 or setting["$schema"] ~= "./runtime_setting.schema.json"
+		or setting.path ~= "karabiner.runtime" or setting.file ~= "config_karabiner.toml"
+		or setting.owner ~= "platform.remap.config" or setting.type ~= "enum"
+		or type(setting.platforms) ~= "table" or setting.platforms[1] ~= "hs"
+		or type(setting.enum_values) ~= "table"
+		or setting.description_key ~= "menu.global.karabiner_runtime"
+		or setting.unavailable_key ~= "menu.global.karabiner_runtime_unavailable" then return refused() end
+	for index in pairs(setting.platforms) do
+		if index ~= 1 then return refused() end
+	end
+	local values, size = {}, 0
+	for index, value in pairs(setting.enum_values) do
+		if type(index) ~= "number" or index % 1 ~= 0 or index < 1
+			or type(value) ~= "string" or not value:match("^[a-z][a-z0-9_]*$") or values[value] then return refused() end
+		values[value], size = true, size + 1
+	end
+	for index = 1, size do
+		if type(setting.enum_values[index]) ~= "string" then return refused() end
+	end
+	if size < 2 or #setting.enum_values ~= size or not values[setting.default]
+		or not values[setting.recommended] then return refused() end
+	return setting
+end
+
+--- Reads runtime intent with a declared missing-key default and no unsafe fallback.
+--- @param section table|nil Admitted native Karabiner dictionary.
+--- @param setting table Shared enum declaration.
+--- @param path string Exact user settings route.
+--- @return string|nil runtime Valid requested selector.
+local function runtime_leaf(section, setting, path)
+	local value = section and section.runtime
+	if value == nil then return setting.default end
+	for _, candidate in ipairs(setting.enum_values) do
+		if type(value) == "string" and value == candidate then return value end
+	end
+	Outdated.report_in_file(path, { INTEGRATION_SECTION, "runtime" },
+		"a runtime selector must be one of the declared values; native admission is refused", Logger)
+	Logger.error(LOG, "The native Karabiner runtime selector is invalid; refusing the unsafe user config.")
+	return nil
+end
+
 --- Appends the full shared modifier × key matrix used by gesture and tap-hold
 --- action pickers. The labels come verbatim from the catalogue, so "Ctrl + A"
 --- never depends on the active UI language.
@@ -431,6 +503,7 @@ end
 --- @param mod_combos table List from load_mod_combos.
 --- @return table Full default state: {enabled, tap_hold_config, mod_combos_config, timeouts…}
 local function build_state(tap_hold_keys, mod_combos, recommended)
+	local setting = assert(runtime_setting(), "shared native runtime selector declaration is required")
 	local tap_hold_config = {}
 	for _, key_def in ipairs(tap_hold_keys or {}) do
 		local d = recommended and Defaults.tap_hold[key_def.id] or nil
@@ -457,6 +530,7 @@ local function build_state(tap_hold_keys, mod_combos, recommended)
 	end
 
 	return {
+		runtime                   = recommended and setting.recommended or setting.default,
 		enabled                   = M.INTEGRATION_ENABLED_DEFAULT,
 		tap_holds_enabled         = recommended and Manifest.recommended_for("tap_holds.enabled")
 			or Manifest.default_for("tap_holds.enabled"),
@@ -508,6 +582,8 @@ end
 --- @return string status One of "ok", "absent", or "error".
 --- @return table|nil source Optional exact same-read path/status/raw admission receipt.
 function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
+	local setting = runtime_setting()
+	if not setting then return nil, "error" end
 	local data, err, source, shapes = M._load_toml_file(user_config_path)
 
 	if not data then
@@ -539,6 +615,8 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 		end
 		integration_enabled = integration[INTEGRATION_KEY]
 	end
+	local runtime = runtime_leaf(integration, setting, user_config_path)
+	if runtime == nil then return nil, "error" end
 	report_retired_integration(integration, user_config_path)
 
 	-- Saves are sparse against the neutral state: an absent table, key, slot or
@@ -648,6 +726,7 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 
 	Logger.info(LOG, "User config loaded (Ergopti uses Karabiner: %s).", tostring(integration_enabled))
 	return {
+		runtime                   = runtime,
 		enabled                   = integration_enabled,
 		tap_holds_enabled         = tap_holds_enabled,
 		mod_combos_enabled        = mod_combos_enabled,
@@ -658,6 +737,32 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 		simultaneous_threshold_ms = simultaneous_ms,
 		combo_symmetric           = combo_symmetric,
 	}, "ok", source
+end
+
+--- Publishes one exact native configuration candidate through its existing owner.
+--- @param user_config_path string Native settings route.
+--- @param payload string Complete source-bound candidate.
+--- @param source string|nil Exact admitted source bytes.
+--- @param source_status string Classified source status.
+--- @return boolean saved Actual conditional publication result.
+--- @return string|nil reason Publication refusal.
+--- @return table|nil receipt Exact candidate and retained native cleanup.
+local function publish_config_candidate(user_config_path, payload, source, source_status)
+	local publication_source = { status = source_status, content = source }
+	local write_ok, written, detail, retry_cleanup = pcall(FileSystem.write_if_unchanged,
+		user_config_path, payload, publication_source)
+	local receipt = { path = user_config_path, source = publication_source, candidate = payload, verify_absence = true }
+	if type(retry_cleanup) == "function" then receipt.publication_cleanup = retry_cleanup end
+	if not write_ok or written ~= true then
+		Logger.error(LOG, "Cannot atomically publish user config to '%s' — settings NOT saved.",
+			user_config_path)
+		-- A refusal can follow publication. Only its exact native receipt can
+		-- distinguish that inverse from a proven no-effect cleanup on retry.
+		return false, tostring(write_ok and detail or written),
+			type(retry_cleanup) == "function" and receipt or nil
+	end
+	Logger.debug(LOG, "User config saved.")
+	return true, nil, receipt
 end
 
 --- Persists the non-neutral state sparsely to config_karabiner.toml.
@@ -870,21 +975,69 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 		return false
 	end
 
-	local publication_source = { status = source_status, content = source }
-	local write_ok, written, detail, retry_cleanup = pcall(FileSystem.write_if_unchanged,
-		user_config_path, payload, publication_source)
-	local receipt = { path = user_config_path, source = publication_source, candidate = payload, verify_absence = true }
-	if type(retry_cleanup) == "function" then receipt.publication_cleanup = retry_cleanup end
-	if not write_ok or written ~= true then
-		Logger.error(LOG, "Cannot atomically publish user config to '%s' — settings NOT saved.",
-			user_config_path)
-		-- A refusal can follow publication. Only its exact native receipt can
-		-- distinguish that inverse from a proven no-effect cleanup on retry.
-		return false, tostring(write_ok and detail or written),
-			type(retry_cleanup) == "function" and receipt or nil
+	return publish_config_candidate(user_config_path, payload, source, source_status)
+end
+
+--- Publishes only the native runtime preference over an exact admitted source.
+--- This settings choice grants no installed runtime or start authority.
+--- @param value string Requested value from the shared declaration.
+--- @param user_config_path string Exact native configuration route.
+--- @param expected_source table Same-read path, status and raw source receipt.
+--- @return boolean saved Actual conditional publication result.
+--- @return string|nil reason Refusal or retained publication failure.
+--- @return table|nil receipt Exact candidate and retained native cleanup.
+function M.save_runtime(value, user_config_path, expected_source)
+	-- Capture displayed-source custody before any declaration, read or log port.
+	-- A caller still owns its receipt and may change it during those callbacks.
+	local expected_path, expected_status, expected_content
+	if type(expected_source) == "table" then
+		expected_path = rawget(expected_source, "path")
+		expected_status = rawget(expected_source, "status")
+		expected_content = rawget(expected_source, "content")
 	end
-	Logger.debug(LOG, "User config saved.")
-	return true, nil, receipt
+	local setting = runtime_setting()
+	local accepted = false
+	if setting then
+		for _, candidate in ipairs(setting.enum_values) do
+			if type(value) == "string" and value == candidate then accepted = true; break end
+		end
+	end
+	if not accepted or type(user_config_path) ~= "string" or user_config_path == ""
+		or type(expected_source) ~= "table" or expected_path ~= user_config_path
+		or not (expected_status == "absent" and expected_content == nil
+			or expected_status == "ok" and type(expected_content) == "string") then
+		Logger.error(LOG, "Runtime selector publication refused an invalid candidate or source receipt.")
+		return false
+	end
+	local document, reason, source, shapes = M._load_toml_file(user_config_path)
+	if not source or source.path ~= expected_path or source.status ~= expected_status
+		or source.content ~= expected_content or (not document and reason ~= "absent") then
+		Logger.error(LOG, "Runtime selector publication refused an unsafe or changed native source.")
+		return false
+	end
+	document = document or {}
+	local section = document[INTEGRATION_SECTION]
+	if section ~= nil and (type(section) ~= "table" or shapes and shapes.arrays[section]) then
+		Logger.error(LOG, "Runtime selector publication refused a scalar or array Karabiner parent.")
+		return false
+	end
+	local ok, payload = pcall(function()
+		if value ~= setting.default then
+			section = section or {}
+			section.runtime = value
+			document[INTEGRATION_SECTION] = section
+		elseif section ~= nil then
+			section.runtime = nil
+			if next(section) == nil then document[INTEGRATION_SECTION] = nil end
+		end
+		if shapes then return TomlCodec.encode_with_shapes(document, shapes) end
+		return TomlCodec.encode(document)
+	end)
+	if not ok or type(payload) ~= "string" then
+		Logger.error(LOG, "Runtime selector candidate could not be encoded; settings were preserved.")
+		return false
+	end
+	return publish_config_candidate(user_config_path, payload, expected_content, expected_status)
 end
 
 return M

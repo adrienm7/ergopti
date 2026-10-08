@@ -2148,6 +2148,8 @@ pcall(function()
 	if type(karabiner) == "table"
 		and type(karabiner.get_enabled) == "function"
 		and karabiner.get_enabled()
+		and type(karabiner.shared_runtime_selected) == "function"
+		and karabiner.shared_runtime_selected()
 		and type(karabiner.regenerate) == "function" then
 		Logger.info(LOG, "Boot complete — triggering Karabiner async deploy…")
 		karabiner.regenerate()

@@ -33,6 +33,7 @@ local OWNED_MODULES = {
 --- @return table calls Recorded external effects.
 local function run_disabled_init(removal_succeeds)
 	return helpers.with_stub_scope(OWNED_MODULES, function()
+		local RealConfig = helpers.load_with_stubs("platform.remap.config")
 		local calls = {
 			build = 0,
 			merge = 0,
@@ -69,6 +70,7 @@ local function run_disabled_init(removal_succeeds)
 			compute_non_canonical_combos = function() return {} end,
 			load_user_config = function()
 				return {
+					runtime = RealConfig.build_default_state({}, {}).runtime,
 					enabled = false,
 					tap_hold_config = { left_shift = { tap = "none", hold = "none" } },
 					mod_combos_config = {},

@@ -77,7 +77,8 @@ local function wizard_settings(tap_hold_config)
 	local paths = {}
 	package.loaded["platform.remap.config"].load_user_config = function(_, _, path)
 		paths[#paths + 1] = path
-		return { enabled = true, tap_holds_enabled = true, mod_combos_enabled = nil,
+		return { runtime = package.loaded["platform.remap"].get_runtime(),
+			enabled = true, tap_holds_enabled = true, mod_combos_enabled = nil,
 			tap_hold_config = tap_hold_config, mod_combos_config = {},
 			tap_hold_timeout_ms = 200, sticky_timeout_ms = 1000, simultaneous_threshold_ms = 50,
 			combo_symmetric = false }, "ok"
