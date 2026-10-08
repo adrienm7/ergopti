@@ -63,6 +63,7 @@ public sealed class ErgoptiPacFixture : IDisposable
                     string script = bad ? "function FindProxyForURL(url,host) { this is not javascript" :
                         "function FindProxyForURL(url,host) {" +
                         "if (url == 'https://destination.invalid:8443/') return 'PROXY exact.invalid:3128';" +
+                        "if (url == 'https://destination.invalid:8443/private?key=fixture-secret') return 'PROXY exact.invalid:3128';" +
                         "if (url == 'http://destination.invalid:8443/private?key=fixture-secret') return 'PROXY scheme.invalid:8080';" +
                         "if (url == 'https://destination.invalid:9443/') return 'PROXY port.invalid:8090';" +
                         "if (url == 'http://destination.invalid:8443/other?key=fixture-secret') return 'PROXY path.invalid:8091';" +
@@ -152,8 +153,19 @@ try {
     # Execute the actual production script entrypoint, not only its native code.
     # The AHK fixture owner retains and removes this private input after its
     # entire Job-owned tree has acknowledged retirement.
+    $VendorRoot=Split-Path -Parent $WorkerPath
+    $SharedRoot=Join-Path (Split-Path -Parent (Split-Path -Parent $VendorRoot)) '_shared'
+    $PolicyPath=Join-Path $SharedRoot 'modules/network/proxy_policy.json'
+    $DefaultsPath=Join-Path $SharedRoot 'modules/updater/defaults.json'
+    $Defaults=Get-Content -LiteralPath $DefaultsPath -Raw -Encoding UTF8|ConvertFrom-Json
+    $LookupSeconds=$Defaults.release_sources.proxy_resolve_timeout_sec
+    Require (($LookupSeconds -is [int] -or $LookupSeconds -is [long]) -and
+        $LookupSeconds -ge 1 -and $LookupSeconds -le [int]::MaxValue / 1000) 'Canonical native entrypoint deadline was refused.'
+    . (Join-Path $VendorRoot 'ergopti_native_proxy_ex.ps1')
     $EntryInput = @{ version = 1; auto_detect = $false; pac_url = $Server.Url
-        urls = @('https://destination.invalid:8443/private?key=fixture-secret') }
+        urls = @('https://destination.invalid:8443/private?key=fixture-secret')
+        policy_path=$PolicyPath;updater_defaults_path=$DefaultsPath
+        deadline_tick=([ErgoptiNativeProxyEx]::CurrentTick()+$LookupSeconds*1000) }
     [IO.File]::WriteAllText($EntryInputPath, ($EntryInput | ConvertTo-Json -Compress), [Text.UTF8Encoding]::new($false))
     $Launch = [Diagnostics.ProcessStartInfo]::new()
     $Launch.FileName = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'

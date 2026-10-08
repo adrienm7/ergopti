@@ -30,7 +30,7 @@
 		{
 			"source": "static/ergopti_plus/windows/vendor",
 			"dest": "vendor",
-			"why": "Native libraries and PowerShell workers resolved through _VendorDir: sqlite3.dll, 64bit/WebView2Loader.dll, ergopti_nav_owner.dll, the uninstall, crash-report and screen-brightness workers."
+			"why": "Native libraries and PowerShell workers resolved through _VendorDir: sqlite3.dll, 64bit/WebView2Loader.dll, ergopti_nav_owner.dll, the uninstall, crash-report and screen-brightness workers, and the bounded PAC worker with its runtime identity receipt and license."
 		}
 	],
 	"exclude": [
@@ -196,6 +196,22 @@
 		{
 			"source": "static/layouts/registry/ergopti/hotstrings/magickeyreplace.toml",
 			"dest": "static/layouts/registry/ergopti/hotstrings/magickeyreplace.toml"
+		},
+		{
+			"source": "static/ergopti_plus/windows/vendor/ergopti_network_pac.ps1",
+			"dest": "vendor/ergopti_network_pac.ps1"
+		},
+		{
+			"source": "static/ergopti_plus/windows/vendor/ergopti_network_pac.exe",
+			"dest": "vendor/ergopti_network_pac.exe"
+		},
+		{
+			"source": "static/ergopti_plus/windows/vendor/ergopti_network_pac.json",
+			"dest": "vendor/ergopti_network_pac.json"
+		},
+		{
+			"source": "static/ergopti_plus/windows/vendor/ergopti_network_pac.LICENSE.txt",
+			"dest": "vendor/ergopti_network_pac.LICENSE.txt"
 		}
 	]
 }

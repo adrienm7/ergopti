@@ -1280,7 +1280,7 @@ SystemProxy_ForUrl(Url, ReaderFn := 0, SpawnFn := 0) {
 ; settings without reusing the application cache. It reports an unresolved
 ; receipt instead of allowing a caller to mistake static fallback for success.
 SystemProxy_ResolveAsync(Urls, Callback, ReaderFn := 0, SpawnFn := 0, Strict := false, Budget := 0) {
-	global _VendorDir, SYSTEM_PROXY_RESOLVE_TIMEOUT_MS
+	global _VendorDir, _SharedDir, SYSTEM_PROXY_RESOLVE_TIMEOUT_MS
 	if Strict && !(Budget is Map)
 		Budget := Map("start", A_TickCount)
 	global _SYSTEM_PROXY_PAC_CACHE, _SYSTEM_PROXY_PAC_PENDING
@@ -1341,7 +1341,11 @@ SystemProxy_ResolveAsync(Urls, Callback, ReaderFn := 0, SpawnFn := 0, Strict := 
 		}
 		if Strict {
 			Input := '{"version":1,"auto_detect":' . (Config.Get("auto_detect", false) ? "true" : "false")
-				. ',"pac_url":' . JsonStringLiteral(Config["pac_url"]) . ',"urls":['
+				. ',"pac_url":' . JsonStringLiteral(Config["pac_url"])
+				. ',"policy_path":' . JsonStringLiteral(_SharedDir . "\modules\network\proxy_policy.json")
+				. ',"updater_defaults_path":' . JsonStringLiteral(_SharedDir . "\modules\updater\defaults.json")
+				. ',"deadline_tick":' . (DllCall("Kernel32\GetTickCount64", "UInt64")
+					+ TickRemaining64(Budget["start"], SYSTEM_PROXY_RESOLVE_TIMEOUT_MS)) . ',"urls":['
 			for Index, Url in Missing
 				Input .= (Index == 1 ? "" : ",") . JsonStringLiteral(Url)
 			Input .= "]}"
