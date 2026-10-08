@@ -6571,6 +6571,17 @@ caller ownership. CI retains every original installation assertion and supplies
 the missing source prerequisites. Local regression and selected gates pass;
 native receiving of this repair and the separate Fedora provider work remain.
 
+The Fedora source-install bootstrap now uses the same immutable luv commit and
+CMake options as Flatpak, compiling against the recipient's actual LuaJIT and
+retaining its Git/build evidence. GIO, schema and compiler prerequisites come
+from a separate shared package map; the absent distribution LuaJIT package
+remains explicitly absent. The generated module is atomically installed under
+the private driver namespace, recorded in uninstall ownership and selected by
+the standalone launcher. Source/native directory aliases and malformed recipes
+are refused. Genuine host compilation and C-entry loading pass, including a
+foreign inherited Git-namespace control. Full selected gates and hosted Fedora
+first-install receiving remain pending; this does not close item62.
+
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard
   layers on all three drivers. Windows and macOS also support their existing

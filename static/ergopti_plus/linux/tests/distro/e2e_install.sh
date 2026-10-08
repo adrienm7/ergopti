@@ -158,7 +158,7 @@ chown -R "${E2E_USER}" "${E2E_HOME}/ergopti"
 as_user() {
 	# A login shell without a session bus: the shape of a first install over
 	# SSH or from a container, where systemd --user is unreachable.
-	su - "${E2E_USER}" -c "export https_proxy='${https_proxy:-}' HTTPS_PROXY='${HTTPS_PROXY:-}'; $1"
+	su - "${E2E_USER}" -c "export LUA_CPATH='${INSTALLED_LUA_CPATH:-;;}' https_proxy='${https_proxy:-}' HTTPS_PROXY='${HTTPS_PROXY:-}'; $1"
 }
 
 
@@ -174,11 +174,17 @@ grep -E '✔|✗|⚠|→' "${INSTALL_LOG}" | sed 's/^/       /'
 
 LAUNCHER="${E2E_HOME}/.local/bin/ergopti-hotstrings"
 LIB_ROOT="${E2E_HOME}/.local/lib/ergopti"
+INSTALLED_LUA_CPATH="${LIB_ROOT}/linux/native_modules/?.so;;"
 if [ -x "${LAUNCHER}" ]; then ok "launcher installed at ~/.local/bin/ergopti-hotstrings"; else fail "no launcher"; fi
 if as_user "${LAUNCHER} --help" >/dev/null 2>&1; then
 	ok "the launcher runs (--help)"
 else
 	fail "the launcher does not run: $(as_user "${LAUNCHER} --help" 2>&1 | tail -3)"
+fi
+if as_user "luajit ${LIB_ROOT}/linux/platform/network/runtime_probe.lua ${LIB_ROOT}/_shared" >/dev/null 2>&1; then
+	ok "installed networking admits actual LuaJIT luv, GIO and resolver/schema prerequisites"
+else
+	fail "installed native networking prerequisites are unavailable"
 fi
 
 # The installed wrapper's own LUA_PATH, replayed rather than re-typed, so a

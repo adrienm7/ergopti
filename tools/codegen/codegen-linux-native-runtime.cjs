@@ -10,6 +10,14 @@ const LUA_OUTPUT = 'static/ergopti_plus/linux/_generated/native_runtime.lua';
 const MANAGERS = ['apt', 'dnf', 'zypper', 'pacman', 'xbps', 'apk'];
 const KEYS = ['xkbcommon', 'xkbcommon_x11', 'x11', 'x11_xcb'];
 const NETWORK_KEYS = ['gio', 'gobject', 'glib'];
+const LUV_CMAKE_OPTIONS = [
+	'-DLUA_BUILD_TYPE=System',
+	'-DWITH_LUA_ENGINE=LuaJIT',
+	'-DBUILD_MODULE=ON',
+	'-DBUILD_SHARED_LIBS=OFF',
+	'-DBUILD_STATIC_LIBS=OFF',
+	'-DWITH_SHARED_LIBUV=OFF'
+];
 
 /** Reject data that could escape native metadata, shell literals or Lua strings. */
 function validate(data) {
@@ -72,6 +80,16 @@ function validate(data) {
 	)
 		throw new TypeError('Missing explicit portable OpenSSL3 dlopen root.');
 	const network = data.network_runtime;
+	if (Object.keys(network?.source_luv_build_packages || {}).join(',') !== MANAGERS.join(','))
+		throw new TypeError('Incomplete source luv build package mapping.');
+	for (const packages of Object.values(network.source_luv_build_packages)) {
+		if (packages === null) continue;
+		if (!Array.isArray(packages) || !packages.length || new Set(packages).size !== packages.length)
+			throw new TypeError('Invalid source luv build package list.');
+		for (const pkg of packages)
+			if (typeof pkg !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9+_.-]*$/.test(pkg))
+				throw new TypeError('Invalid source luv build package identity.');
+	}
 	if (!network || Object.keys(network.libraries || {}).join(',') !== NETWORK_KEYS.join(','))
 		throw new TypeError('Missing ordered native network library identities.');
 	for (const soname of Object.values(network.libraries))
@@ -153,14 +171,7 @@ function flatpakModules(data) {
 		{
 			name: 'network-luv',
 			buildsystem: 'cmake-ninja',
-			'config-opts': [
-				'-DLUA_BUILD_TYPE=System',
-				'-DWITH_LUA_ENGINE=LuaJIT',
-				'-DBUILD_MODULE=ON',
-				'-DBUILD_SHARED_LIBS=OFF',
-				'-DBUILD_STATIC_LIBS=OFF',
-				'-DWITH_SHARED_LIBUV=OFF'
-			],
+			'config-opts': LUV_CMAKE_OPTIONS,
 			'post-install': ['test -f /app/lib/lua/5.1/luv.so'],
 			source: 'luv'
 		},
@@ -318,6 +329,25 @@ function render(data, read) {
 		'LINUX ARCHIVE BUILD PACKAGES',
 		`_native_output_build_packages() {\n\tcase "$1" in\n${buildRows.join('\n')}\n\t\t*) return 1 ;;\n\tesac\n}`
 	);
+	const luvSource = data.network_runtime.portable.flatpak_sources.luv;
+	const luvBuildRows = MANAGERS.map((manager) => {
+		const packages = data.network_runtime.source_luv_build_packages[manager];
+		return packages === null
+			? `\t\t${manager}) return 1 ;;`
+			: `\t\t${manager}) echo "${packages.join(' ')}" ;;`;
+	});
+	result[installer] = projectRegion(
+		result[installer],
+		'LINUX SOURCE NETWORK BUILD',
+		[
+			`_network_source_build_packages() {\n\tcase "$1" in\n${luvBuildRows.join('\n')}\n\t\t*) return 1 ;;\n\tesac\n}`,
+			'NATIVE_LUV_SOURCE_URL=' + JSON.stringify(luvSource.url),
+			'NATIVE_LUV_SOURCE_REVISION=' + JSON.stringify(luvSource.commit),
+			'NATIVE_LUV_CMAKE_OPTIONS=(' +
+				LUV_CMAKE_OPTIONS.map((option) => JSON.stringify(option)).join(' ') +
+				')'
+		].join('\n')
+	);
 	result[installer] = projectRegion(
 		result[installer],
 		'LINUX NETWORK PROVIDERS',
@@ -370,6 +400,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+	LUV_CMAKE_OPTIONS,
 	SOURCE,
 	LUA_OUTPUT,
 	MANAGERS,
