@@ -100,7 +100,9 @@ class _UpdaterNativeDownloadRun {
 			DirCreate(this.NewExe)
 		AssertEqual(524288, UPDATER_MIN_EXE_SIZE_BYTES,
 			"fixture bytes have an independent fixed size; a changed minimum requires explicit fixture review")
-		Url := "https://managed-fixture.invalid:" . this.Owner.State["tls_port"] . this.Path
+		; The 407 relay has its own reserved authority; HTTPS PAC paths are not routing identity.
+		Host := this.Path == "/updater/407" ? "updater-refusal.managed-fixture.invalid" : "managed-fixture.invalid"
+		Url := "https://" . Host . ":" . this.Owner.State["tls_port"] . this.Path
 		this.StartedTick := A_TickCount
 		this.Transport := _Updater_BuildStagingTransport(
 			_Updater_BuildStagingWorkerScript(), this.SwapBytes, Url, this.Digest,

@@ -896,7 +896,10 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
         leafRequest.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension(usages, true));
         // Reserved DNS name reaches only this owned CONNECT relay, without hosts changes.
         leafRequest.CertificateExtensions.Add(new X509Extension("2.5.29.17",
-            Sequence(Tag(0x82, Encoding.ASCII.GetBytes("managed-fixture.invalid"))), false));
+            (updater ? Sequence(Tag(0x82, Encoding.ASCII.GetBytes("managed-fixture.invalid")),
+                Tag(0x82, Encoding.ASCII.GetBytes("updater-redirect.managed-fixture.invalid")),
+                Tag(0x82, Encoding.ASCII.GetBytes("updater-refusal.managed-fixture.invalid"))) :
+                Sequence(Tag(0x82, Encoding.ASCII.GetBytes("managed-fixture.invalid")))), false));
         string crlUrl = "http://127.0.0.1:" + HttpPort + "/fixture.crl";
         byte[] distribution = Sequence(Sequence(Tag(0xa0, Tag(0xa0, Tag(0x86, Encoding.ASCII.GetBytes(crlUrl))))));
         leafRequest.CertificateExtensions.Add(new X509Extension("2.5.29.31", distribution, false));
@@ -999,7 +1002,9 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
     private void Proxy(TcpClient client)
     {
         NetworkStream source = client.GetStream(); string first = Header(source).Split('\n')[0].Trim();
-        if (first != "CONNECT managed-fixture.invalid:" + TlsPort + " HTTP/1.1") throw new InvalidDataException("Proxy destination escaped fixture.");
+        if (first != "CONNECT managed-fixture.invalid:" + TlsPort + " HTTP/1.1" &&
+            (!updater || first != "CONNECT updater-redirect.managed-fixture.invalid:" + TlsPort + " HTTP/1.1"))
+            throw new InvalidDataException("Proxy destination escaped fixture.");
         using (TcpClient destination = new TcpClient()) {
             lock (gate) clients.Add(destination);
             try {
@@ -1038,10 +1043,9 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
             Interlocked.Increment(ref DownloadCredentials);
             throw new InvalidDataException("Updater origin received credentials.");
         }
-        string origin = "https://managed-fixture.invalid:" + TlsPort;
         if (first == "GET /updater/start HTTP/1.1") {
             Interlocked.Increment(ref DownloadRedirects);
-            Status(tls, "302 Found", "Location: " + origin + "/updater/good?marker=staging-fixture\r\n", new byte[0], 0);
+            Status(tls, "302 Found", "Location: https://updater-redirect.managed-fixture.invalid:" + TlsPort + "/updater/good?marker=staging-fixture\r\n", new byte[0], 0);
         } else if (first == "GET /updater/good?marker=staging-fixture HTTP/1.1") {
             Interlocked.Increment(ref DownloadGood); byte[] bytes = DownloadBytes();
             Status(tls, "200 OK", "", bytes, bytes.Length);
@@ -1082,7 +1086,7 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
     private void RefusalProxy(TcpClient client)
     {
         NetworkStream stream = client.GetStream(); string header = Header(stream);
-        if (header.Split('\n')[0].Trim() != "CONNECT managed-fixture.invalid:" + TlsPort + " HTTP/1.1")
+        if (header.Split('\n')[0].Trim() != "CONNECT updater-refusal.managed-fixture.invalid:" + TlsPort + " HTTP/1.1")
             throw new InvalidDataException("Refusal relay destination escaped fixture.");
         Interlocked.Increment(ref ProxyRefusals);
         if (header.IndexOf("\r\nProxy-Authorization:", StringComparison.OrdinalIgnoreCase) >= 0) {
@@ -1101,17 +1105,20 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
         if (updater && (first == "GET /updater.pac HTTP/1.1" || first == "GET /updater.pac HTTP/1.0")) {
             Interlocked.Increment(ref PacRequests);
             string owned = "https://managed-fixture.invalid:" + TlsPort;
+            // WinHTTP may strip HTTPS paths; fixture route identity uses exact owned authorities.
+            string redirected = "https://updater-redirect.managed-fixture.invalid:" + TlsPort;
+            string refused = "https://updater-refusal.managed-fixture.invalid:" + TlsPort;
             string updaterScript = "function FindProxyForURL(url,host){" +
-                "if(url == '" + owned + "/updater/good?marker=staging-fixture') return 'PROXY 127.0.0.1:" + SecondProxyPort + "';" +
-                "if(url == '" + owned + "/updater/407') return 'PROXY 127.0.0.1:" + RefusalProxyPort + "';" +
-                "if(url == '" + owned + "/updater/slow' || url == '" + owned + "/updater/start' || url == '" + owned + "/updater/401' || url == '" + owned + "/updater/403' || url == '" + owned + "/updater/small' || url == '" + owned + "/updater/wrong-digest' || url == '" + owned + "/updater/truncated') return 'PROXY 127.0.0.1:" + ProxyPort + "';" +
+                "if(host == 'updater-redirect.managed-fixture.invalid' && (url == '" + redirected + "' || url.indexOf('" + redirected + "/') == 0)) return 'PROXY 127.0.0.1:" + SecondProxyPort + "';" +
+                "if(host == 'updater-refusal.managed-fixture.invalid' && (url == '" + refused + "' || url.indexOf('" + refused + "/') == 0)) return 'PROXY 127.0.0.1:" + RefusalProxyPort + "';" +
+                "if(host == 'managed-fixture.invalid' && (url == '" + owned + "' || url.indexOf('" + owned + "/') == 0)) return 'PROXY 127.0.0.1:" + ProxyPort + "';" +
                 "return 'PROXY refused.invalid:9';}";
             Reply(stream, "application/x-ns-proxy-autoconfig", Encoding.UTF8.GetBytes(updaterScript)); return;
         }
         if (first != "GET /proxy.pac HTTP/1.1" && first != "GET /proxy.pac HTTP/1.0") throw new InvalidDataException("HTTP fixture destination mismatch.");
         Interlocked.Increment(ref PacRequests);
         string origin = "https://managed-fixture.invalid:" + TlsPort;
-        string script = "function FindProxyForURL(url,host){if(url == '" + origin + "/v1/models' || url == '" + origin + "/v1/chat/completions?marker=managed-network-fixture') return 'PROXY 127.0.0.1:" + ProxyPort + "'; return 'PROXY refused.invalid:9';}";
+        string script = "function FindProxyForURL(url,host){if(host == 'managed-fixture.invalid' && (url == '" + origin + "' || url.indexOf('" + origin + "/') == 0)) return 'PROXY 127.0.0.1:" + ProxyPort + "'; return 'PROXY refused.invalid:9';}";
         Reply(stream, "application/x-ns-proxy-autoconfig", Encoding.UTF8.GetBytes(script));
     }
     private static byte[] Tag(byte tag, byte[] data)
