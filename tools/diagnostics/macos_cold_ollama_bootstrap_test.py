@@ -379,5 +379,50 @@ class OfficialClientVersionProbeTests(unittest.TestCase):
                 self.assert_port_released(observed["address"])
 
 
+class ColdIsolationLipoGrammarTests(unittest.TestCase):
+    """Portable argv regression against Apple's published grammar, not native credit."""
+
+    def test_input_file_precedes_greedy_verify_arch_arguments(self):
+        # Apple cctools misc/lipo.c, Git blob f7b0fd6ddea7d3c5e77b1789d547542ca7ba74ae,
+        # consumes EVERY argument after -verify_arch as an architecture. Its usage
+        # is lipo <input_file> <command>; a file after arm64 is not a native probe.
+        with tempfile.TemporaryDirectory() as directory:
+            file = Path(directory) / "stock runtime"
+            file.write_bytes(b"portable argv boundary only; not a native binary\n")
+            profile = Path(directory) / "profile"
+            calls = []
+
+            def probe(argv, **_kwargs):
+                calls.append(argv)
+                if argv[0] == "/usr/bin/lipo":
+                    self.assertEqual(argv, ["/usr/bin/lipo", str(file), "-verify_arch", "arm64"])
+                denied = argv[0] == "/usr/bin/sandbox-exec"
+                return cold.subprocess.CompletedProcess(
+                    argv,
+                    126 if denied else 0,
+                    stdout="",
+                    stderr="Operation not permitted" if denied else "",
+                )
+
+            with (
+                mock.patch.object(cold.subprocess, "run", side_effect=probe),
+                mock.patch.object(cold.platform, "machine", return_value="arm64"),
+            ):
+                result = cold.qualify_runtime_isolation([str(file)], profile)
+            self.assertEqual(len(result), 1)
+            self.assertIs(result[0]["read_denied"], True)
+            self.assertIs(result[0]["native"], True)
+            self.assertIs(result[0]["exec_denied"], True)
+            self.assertEqual(
+                calls,
+                [
+                    ["/usr/bin/sandbox-exec", "-f", str(profile), "/bin/cat", str(file)],
+                    ["/usr/bin/lipo", str(file), "-verify_arch", "arm64"],
+                    [str(file), "--version"],
+                    ["/usr/bin/sandbox-exec", "-f", str(profile), str(file), "--version"],
+                ],
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -105,7 +105,7 @@ def qualify_runtime_isolation(paths, profile):
             raise RuntimeError("Cold isolation did not deny real runtime read")
         native = (
             subprocess.run(
-                ["/usr/bin/lipo", "-verify_arch", platform.machine(), path],
+                ["/usr/bin/lipo", path, "-verify_arch", platform.machine()],
                 capture_output=True,
                 timeout=15,
             ).returncode
