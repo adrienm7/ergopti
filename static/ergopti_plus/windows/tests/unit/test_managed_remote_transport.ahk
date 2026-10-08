@@ -55,7 +55,7 @@ _ManagedRemoteFixtureEmitDiagnostic(State) {
 	try {
 		Fact := _ManagedRemoteFixtureDiagnostic(State)
 		if Fact != ""
-			FileAppend("::notice title=Windows native service diagnostic::" . Fact . "`n", "*")
+			_TestPrint("::notice title=Windows native service diagnostic::" . Fact)
 	}
 }
 
