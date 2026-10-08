@@ -221,8 +221,10 @@ function flatpakModules(data) {
 			name: 'network-duktape',
 			buildsystem: 'simple',
 			'build-commands': [
-				'make -f Makefile.sharedlibrary INSTALL_PREFIX=/app LDFLAGS="${LDFLAGS:-} -Wl,--no-as-needed -lm -Wl,--as-needed"',
-				'make -f Makefile.sharedlibrary INSTALL_PREFIX=/app LDFLAGS="${LDFLAGS:-} -Wl,--no-as-needed -lm -Wl,--as-needed" install'
+				// Backport upstream #2480: keep libm after each input under --as-needed.
+				"test \"$(grep -c '\\$(DUKTAPE_SRCDIR)/duktape\\.c$' Makefile.sharedlibrary)\" -eq 2 && sed -i 's|\\$(DUKTAPE_SRCDIR)/duktape\\.c$|$(DUKTAPE_SRCDIR)/duktape.c -lm|' Makefile.sharedlibrary",
+				'make -f Makefile.sharedlibrary INSTALL_PREFIX=/app',
+				'make -f Makefile.sharedlibrary INSTALL_PREFIX=/app install'
 			],
 			source: 'duktape'
 		},
