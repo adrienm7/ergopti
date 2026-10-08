@@ -265,6 +265,9 @@ function flatpakModules(data) {
 				source === 'duktape'
 					? { type: 'archive', url: input.url, sha256: input.sha256 }
 					: { type: 'git', url: input.url, commit: input.commit };
+			// HTTP content encoding must not change bytes before digest verification.
+			// The archive unpacker still owns decompression after authentication.
+			if (pinned.type === 'archive') pinned['disable-http-decompression'] = true;
 			return '  - ' + JSON.stringify({ ...recipe, sources: [pinned] }) + '\n';
 		})
 		.join('');
