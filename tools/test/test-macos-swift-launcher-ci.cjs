@@ -434,9 +434,11 @@ const BOX_FILES = {
 	windows: '.github/workflows/ci-windows.yml',
 	linux: '.github/workflows/ci-linux.yml'
 };
-// Only one supplemental job can run after failed units; it must refuse certification.
+// Supplemental E2E and manual package diagnostics retain their mandatory failure verdicts.
 const LINUX_SUPPLEMENT_REL = '.github/workflows/ci-linux.yml';
 const LINUX_SUPPLEMENT_IF = '${{ !cancelled() }}';
+const LINUX_MANUAL_PACKAGE_IF =
+	"${{ !cancelled() && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}";
 
 /** Admits one exact fail-preserving Linux observation topology, never a conditional-job waiver. */
 function linuxSupplementProblems(files) {
@@ -457,12 +459,14 @@ function linuxSupplementProblems(files) {
 			return ['every Linux job retains its actual failing result'];
 	if (
 		pipeline.field(unit.body, 'if') !== null ||
-		pipeline.field(pack.body, 'if') !== null ||
+		pipeline.field(pack.body, 'if') !== LINUX_MANUAL_PACKAGE_IF ||
 		pipeline.field(install.body, 'if') !== null ||
 		pipeline.field(verdict.body, 'if') !== 'always()' ||
 		pipeline.field(e2e.body, 'if') !== LINUX_SUPPLEMENT_IF
 	)
-		return ['only the exact Linux E2E observation and always-on verdict have conditions'];
+		return [
+			'only exact Linux E2E, manual package diagnostics and the always-on verdict have conditions'
+		];
 	for (const [job, needs] of [
 		[unit, []],
 		[e2e, ['test-linux']],
@@ -519,6 +523,18 @@ function linuxSupplementProblems(files) {
 		!upload.includes('          if-no-files-found: error')
 	)
 		return ['Linux retains the exact mandatory E2E evidence artifact'];
+	const packageSteps = pipeline.steps(pack.body);
+	if (
+		packageSteps.at(-2)?.name !== 'Record mandatory package evidence' ||
+		packageSteps.at(-1)?.name !== 'Upload mandatory package evidence'
+	)
+		return ['Linux diagnostic packaging retains both mandatory certificate steps at the end'];
+	for (const step of packageSteps.slice(-2))
+		if (
+			pipeline.stepField(step.body, 'if') !== null ||
+			pipeline.stepField(step.body, 'continue-on-error') !== null
+		)
+			return ['Linux diagnostic packaging cannot certify a failed package'];
 	const gate = pipeline
 		.steps(verdict.body)
 		.find((step) => step.name === 'Assert all mandatory subjects ran and passed');
@@ -661,6 +677,100 @@ check(
 	'supplement upstream refusal after certification must be rejected'
 );
 
+// The manual extension admits only the exact G6 policy and retains the complete
+// package/install/verdict chain. Every mutation below keeps the old E2E guards.
+const linuxPackageJob = pipeline.job('package-linux');
+const linuxPackageConditionLine = '    if: ' + LINUX_MANUAL_PACKAGE_IF + '\n';
+const linuxPackageEvidence = pipeline.steps(linuxPackageJob).slice(-2);
+const linuxFinalGate = pipeline.step(
+	pipeline.job('linux-ok'),
+	'Assert all mandatory subjects ran and passed'
+);
+for (const [name, from, to] of [
+	['manual package condition omitted', linuxPackageConditionLine, ''],
+	['manual package skipped', linuxPackageConditionLine, '    if: false\n'],
+	['manual package always runs', linuxPackageConditionLine, '    if: always()\n'],
+	[
+		'manual package admits cancelled runs',
+		linuxPackageConditionLine,
+		linuxPackageConditionLine.replace('!cancelled() && ', '')
+	],
+	[
+		'manual package admits automatic E2E failures',
+		linuxPackageConditionLine,
+		linuxPackageConditionLine.replace("github.event_name == 'workflow_dispatch' && ", '')
+	],
+	[
+		'manual package admits skipped E2E',
+		linuxPackageConditionLine,
+		linuxPackageConditionLine.replace(
+			"needs.e2e-linux.result == 'failure'",
+			"needs.e2e-linux.result != 'success'"
+		)
+	],
+	[
+		'manual package omits ordinary success admission',
+		linuxPackageConditionLine,
+		linuxPackageConditionLine.replace("needs.e2e-linux.result == 'success' || ", '')
+	],
+	[
+		'manual package failure forgiven',
+		'  package-linux:\n',
+		'  package-linux:\n    continue-on-error: true\n'
+	],
+	[
+		'installed package failure forgiven',
+		'  install-linux:\n',
+		'  install-linux:\n    continue-on-error: true\n'
+	],
+	['final verdict failure forgiven', '  linux-ok:\n', '  linux-ok:\n    continue-on-error: true\n'],
+	['final verdict omits package result', '      - package-linux\n', ''],
+	[
+		'final verdict fabricates results',
+		linuxFinalGate,
+		linuxFinalGate.replace('NEEDS: ${{ toJSON(needs) }}', 'NEEDS: {}')
+	],
+	[
+		'final mandatory verifier omitted',
+		linuxFinalGate,
+		linuxFinalGate.replace('node tools/test/linux-ci-evidence.cjs verify', 'true')
+	]
+]) {
+	const count = linuxSupplementText.split(from).length - 1;
+	check(count === 1, 'manual package mutation ' + name + ' must have one actual source match');
+	if (count !== 1) continue;
+	const files = pipeline
+		.files()
+		.map((entry) =>
+			entry.rel === LINUX_SUPPLEMENT_REL
+				? { ...entry, text: entry.text.replace(from, () => to) }
+				: entry
+		);
+	check(
+		linuxSupplementProblems(files).length > 0,
+		'manual package mutation ' + name + ' must be rejected'
+	);
+}
+for (const step of linuxPackageEvidence) {
+	const count = linuxSupplementText.split(step.body).length - 1;
+	check(count === 1, 'manual package certificate mutation needs one actual source match');
+	if (count !== 1) continue;
+	for (const addition of ['        if: always()\n', '        continue-on-error: true\n']) {
+		const files = pipeline.files().map((entry) =>
+			entry.rel === LINUX_SUPPLEMENT_REL
+				? {
+						...entry,
+						text: entry.text.replace(step.body, step.body.replace('\n', '\n' + addition))
+					}
+				: entry
+		);
+		check(
+			linuxSupplementProblems(files).length > 0,
+			'manual package certificate condition or forgiveness must be rejected'
+		);
+	}
+}
+
 const ALLOWED_JOB_IFS = {
 	'windows-ok': 'always()',
 	'macos-ok': 'always()',
@@ -673,7 +783,9 @@ for (const rel of Object.values(BOX_FILES)) {
 		const condition = pipeline.field(boxJob.body, 'if');
 		check(
 			condition === null ||
-				ALLOWED_JOB_IFS[boxJob.id] === condition ||
+				(ALLOWED_JOB_IFS[boxJob.id] === condition &&
+					(boxJob.id !== 'package-linux' ||
+						(rel === LINUX_SUPPLEMENT_REL && linuxSupplementErrors.length === 0))) ||
 				(rel === LINUX_SUPPLEMENT_REL &&
 					boxJob.id === 'e2e-linux' &&
 					condition === LINUX_SUPPLEMENT_IF &&
