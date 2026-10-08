@@ -2162,7 +2162,7 @@ jobs:
             distro: alpine
             container: alpine:latest
             image: alpine:latest
-            prep: apk add --no-cache bash coreutils findutils grep sed sudo gcc musl-dev
+            prep: apk add --no-cache bash coreutils findutils grep sed sudo gcc musl-dev linux-headers
           - id: distro-opensuse
             kind: install
             label: 'Install · opensuse'
