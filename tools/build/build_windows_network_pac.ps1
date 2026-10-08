@@ -71,7 +71,7 @@ $Receipt = Get-Content -LiteralPath (Join-Path $Prepared 'source_receipt.json') 
 if ($Receipt.schema_version -ne 1 -or $Receipt.source_fingerprint -cnotmatch '^[0-9a-f]{64}$') {
 	throw 'Generated PAC source receipt refused.'
 }
-$Common = @('/nologo', '/Brepro', '/TC', '/std:c11', '/O2', '/MT', '/guard:cf', '/D_CRT_SECURE_NO_WARNINGS', '/D_WIN32_WINNT=0x0602', ('/I' + $Prepared), ('/I' + $SharedSource), ('/I' + $NativeSource))
+$Common = @('/nologo', '/Brepro', '/std:c11', '/O2', '/MT', '/guard:cf', '/D_CRT_SECURE_NO_WARNINGS', '/D_WIN32_WINNT=0x0602', ('/I' + $Prepared), ('/I' + $SharedSource), ('/I' + $NativeSource))
 $Strict = @('/W4', '/WX', '/wd5105')
 $Link = @('/link', '/Brepro', '/MACHINE:X64', '/DYNAMICBASE', '/HIGHENTROPYVA', '/NXCOMPAT', '/guard:cf', 'ws2_32.lib', 'iphlpapi.lib')
 Push-Location $BuildRoot

@@ -5639,6 +5639,10 @@ The first hosted build exposed redundant error-macro return values under MSVC
 strict warnings. The six call sites now use the identical nonreturning public
 Duktape error API; actual GCC strict-warning compilation and all17 VM controls
 pass. The corrected MSVC build still requires its own hosted receiving.
+The second hosted attempt compiled that C source, then exposed a global /TC
+flag treating linked object files as C. The producer now infers language from
+the authored .c files and sends .obj inputs to the linker; strict warning and
+PE mitigation flags remain unchanged. Complete native artifact receiving is pending.
 
 Windows release asset staging now joins the same bounded curl attempt
 engine as real requests, using the exact selected asset integer token
