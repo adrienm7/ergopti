@@ -13,7 +13,8 @@ import unittest
 
 BUILD = Path(__file__).resolve().parent
 REPOSITORY = BUILD.parent.parent
-FIXED = "854dc3ef556e2540d4a64e0d935610a2a2fe8c947e3f7fe315c1641ceaaedd7d"
+FIXED = "26cbd216dcbd4c03619c43a1823bd00757ad0043865575a783936f50dfdec9a8"
+FIXED_PRODUCER = "9916f622d1c7a89e782fdd9c2621fdd25ae1646fcef35acb46b5ff5299019ea0"
 
 
 def retained_module(name, path):
@@ -279,13 +280,21 @@ class FollowingDependencyControls(PrivateCurrentSourceCase):
             self.subject.compile_owned(self.candidate, self.owner(), 300)
         self.assertEqual(caught.exception.code, "dependency_changed")
 
-    def test_observer_initial_cut_holds_all34_real_inputs(self):
+    def test_observer_initial_cut_holds_all35_real_inputs(self):
         actual = dict(self.scope)
         exec(
             compile(ast.Module(body=[self.initial], type_ignores=[]), str(self.observer), "exec"),
             actual,
         )
-        self.assertEqual(len(actual["dependencies"]), 34)
+        self.assertEqual(len(actual["dependencies"]), 35)
+        self.assertEqual(
+            tuple(
+                (row.path, hashlib.sha256(row.data).hexdigest())
+                for row in actual["dependencies"]
+                if row.path == "tools/build/remap_runtime_producer.py"
+            ),
+            (("tools/build/remap_runtime_producer.py", FIXED_PRODUCER),),
+        )
         self.assertEqual(
             tuple(row.path for row in actual["dependencies"][-2:]),
             ("tools/build/remap_runtime_vhd.hpp", "tools/build/remap_runtime_vhd_transport.py"),

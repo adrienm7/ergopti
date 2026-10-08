@@ -16,8 +16,9 @@ import zlib
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXED_PROVIDER = "c29ceb96e73655cadea7763805b9468c32744033c2f177bae492e4ce9fe4100a"
-FIXED_FACTORY = "854dc3ef556e2540d4a64e0d935610a2a2fe8c947e3f7fe315c1641ceaaedd7d"
-FIXED_BUILDER = "9f1a9890de1588b2b02cc74a107538187407a0901e3e42f1a41c8d6f534bbdc4"
+FIXED_FACTORY = "26cbd216dcbd4c03619c43a1823bd00757ad0043865575a783936f50dfdec9a8"
+FIXED_PRODUCER = "9916f622d1c7a89e782fdd9c2621fdd25ae1646fcef35acb46b5ff5299019ea0"
+FIXED_BUILDER = "d34f55714ce094d7a43d0c4ea36cc8bf4070c92c8009e0677939146d394030b8"
 OLD_PROVIDER_SHA256 = "a4ef0f4b7bd2c9cdabb4b8eb9e0a7249eab4f9e06f9991bcdb2f59a230220b4f"
 OLD_FACTORY_SHA256 = "70d90ede3bdfbf44e146ba4a26f101ebfec2a1745bc05a8260db001d5a236537"
 # Exact historical producer source bytes, frozen before the closure edit.
@@ -660,7 +661,11 @@ class LexicalSourceClosureControls(unittest.TestCase):
                 for target in node.targets
             ):
                 dependencies.extend(ast.literal_eval(node.value))
-        self.assertEqual(len(dependencies), 34)
+        self.assertEqual(len(dependencies), 35)
+        self.assertEqual(
+            tuple(row for row in dependencies if row[0] == "tools/build/remap_runtime_producer.py"),
+            (("tools/build/remap_runtime_producer.py", FIXED_PRODUCER),),
+        )
         paths = {path for path, _ in dependencies} | {
             "tools/build/remap_runtime_source.py",
             "tools/build/remap_runtime_build.py",
@@ -684,7 +689,16 @@ class LexicalSourceClosureControls(unittest.TestCase):
         self.assertEqual(self.builder.CURRENT_OWNED_SOURCE_FACTORY_SHA256, FIXED_FACTORY)
         factory = self.builder._source_factory()
         deadline = time.monotonic() + 60
-        self.assertEqual(len(factory.capture_dependencies(self.root, deadline)), 32)
+        captured = factory.capture_dependencies(self.root, deadline)
+        self.assertEqual(len(captured), 33)
+        self.assertEqual(
+            tuple(
+                (row.path, digest(row.data))
+                for row in captured
+                if row.path == "tools/build/remap_runtime_producer.py"
+            ),
+            (("tools/build/remap_runtime_producer.py", FIXED_PRODUCER),),
+        )
         self.assertEqual(len(factory.capture_vhd_dependencies(self.root, deadline)), 2)
         self.assertEqual(
             self.builder._identifiers(),

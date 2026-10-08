@@ -41,6 +41,10 @@ DEPENDENCIES = (
         "c29ceb96e73655cadea7763805b9468c32744033c2f177bae492e4ce9fe4100a",
     ),
     (
+        "tools/build/remap_runtime_producer.py",
+        "9916f622d1c7a89e782fdd9c2621fdd25ae1646fcef35acb46b5ff5299019ea0",
+    ),
+    (
         "tools/diagnostics/hs274-key-element.hpp",
         "ef68fa1f4298e083db35a25fecfddee111ea1ffc2a1ba3da7d9774daf36c50fa",
     ),
@@ -383,12 +387,13 @@ def load_fixed(name, input_file):
 def capture_dependencies(repository, absolute_deadline):
     require(
         type(DEPENDENCIES) is tuple
-        and len(DEPENDENCIES) == 32
+        and len(DEPENDENCIES) == 33
         and tuple(path for path, _ in DEPENDENCIES)
         == tuple(
             sorted(
                 (
                     "tools/build/remap_runtime_patch.py",
+                    "tools/build/remap_runtime_producer.py",
                     "tools/build/remap_runtime_auth_transport.py",
                     "tools/diagnostics/hs274_raw_patch.py",
                     "tools/diagnostics/hs274_stream_patch.py",
@@ -429,6 +434,7 @@ def _assemble_outputs(originals, dependencies, absolute_deadline):
         "fixed_owned_source_provider", by_path["tools/build/remap_runtime_patch.py"]
     )
     raw = load_fixed("hs274_raw_patch", by_path["tools/diagnostics/hs274_raw_patch.py"])
+    producer = load_fixed("fixed_owned_producer", by_path["tools/build/remap_runtime_producer.py"])
     stream = load_fixed(
         "fixed_owned_source_stream", by_path["tools/diagnostics/hs274_stream_patch.py"]
     )
@@ -505,8 +511,8 @@ def _assemble_outputs(originals, dependencies, absolute_deadline):
         "tools/build/remap_runtime_auth_policy.hpp"
     ].data
     functions = (
-        stream.stream_monitor,
-        raw.instrument_shutdown,
+        lambda source: producer.owned_stream_monitor(stream.stream_monitor(source)),
+        producer.owned_stream_shutdown,
         stream.stream_socket_ops,
         stream.stream_server,
         stream.stream_operations,
@@ -522,7 +528,17 @@ def _assemble_outputs(originals, dependencies, absolute_deadline):
         )
     for name in STREAM_HEADERS:
         path = "src/share/" + name
-        prepared[path] = by_path["tools/diagnostics/" + name].data
+        source = by_path["tools/diagnostics/" + name].data
+        owned_projection = {
+            "hs274-stream-runtime.hpp": producer.owned_stream_runtime,
+            "hs274-stream-baseline-probe.hpp": producer.owned_stream_baseline_probe,
+            "hs274-raw-capture.hpp": producer.owned_stream_record,
+        }.get(name)
+        prepared[path] = (
+            owned_projection(source.decode("utf-8")).encode("utf-8")
+            if owned_projection is not None
+            else source
+        )
     expected_outputs = (
         set(wanted)
         | set(headers)
@@ -604,7 +620,7 @@ def _assemble_vhd_outputs(originals, dependencies, absolute_deadline):
             "Actual official broker caller preimage differs",
         )
         del base_originals[path]
-    base = dict(_assemble_outputs(base_originals, dependencies[:32], absolute_deadline))
+    base = dict(_assemble_outputs(base_originals, dependencies[:33], absolute_deadline))
     require(len(base) == 57, "inventory", "Original auth projection scope differs")
     by_path = {row.path: row for row in dependencies}
     transport = load_fixed(

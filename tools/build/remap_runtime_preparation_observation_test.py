@@ -117,7 +117,7 @@ class ObservationControls(unittest.TestCase):
         self.record.update(
             schema=2,
             source_profile="owned_vhd_broker_source_v1",
-            source_factory_sha256="854dc3ef556e2540d4a64e0d935610a2a2fe8c947e3f7fe315c1641ceaaedd7d",
+            source_factory_sha256="26cbd216dcbd4c03619c43a1823bd00757ad0043865575a783936f50dfdec9a8",
             source_inventory_entries=4505,
             owned_replacements=60,
             staged_files=4527,
