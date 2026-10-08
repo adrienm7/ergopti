@@ -83,7 +83,8 @@
 			"patterns": [
 				"ergopti_plus/macos/data/generate_models.py",
 				"ergopti_plus/_shared/modules/llm/validate_*.py",
-				"ergopti_plus/_shared/modules/llm/install/**"
+				"ergopti_plus/_shared/modules/llm/install/**",
+				"ergopti_plus/_shared/native/**"
 			]
 		}
 	]

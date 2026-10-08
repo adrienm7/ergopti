@@ -93,6 +93,7 @@ graph TD
         MACOS_log_transport["LogTransport.lua"]
         MACOS_modifier_injector["ModifierInjector.lua"]
         MACOS_mouse_control["MouseControl.lua"]
+        MACOS_native_bootstrap_pty["NativeBootstrapPty.lua"]
         MACOS_network_info["NetworkInfo.lua"]
         MACOS_notifier["Notifier.lua"]
         MACOS_one_shot_shift["OneShotShift.lua"]

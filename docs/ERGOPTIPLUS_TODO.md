@@ -5636,6 +5636,15 @@ assertion bodies remain intact; nine causal controls and the actual 30 public
 transport plus 18 retained-output controls pass. Full-suite retries remain
 pending after local disk exhaustion; no native or packaging gate is waived.
 
+The macOS native-network tranche adds NSURLSession/CFNetwork route receiving,
+a bounded private HTTP protocol, an owned PTY bootstrap and verified offline
+Python inputs. The frozen local candidate passes all 17,158 Hammerspoon
+assertions and 386 JavaScript checks in sequence. The final source-reader
+repair also passes all 15 bootstrap and four cold-bootstrap controls.
+Native Swift compilation, real Apple transport, cold installation and
+opaque-client activation still require hosted receiving. Physical company
+network acceptance remains open; these portable results do not close item62.
+
 Windows full-URL PAC source preparation adds a bounded, fresh-script native
 Duktape evaluator with the canonical script, heap, query and deadline limits.
 The real Windows producer will qualify DNS/interface helpers, source identity,

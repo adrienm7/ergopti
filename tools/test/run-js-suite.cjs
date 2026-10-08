@@ -1806,6 +1806,24 @@ const CHECKS = [
 		repro: 'node tools/test/test-mlx-download-trust-activation.cjs'
 	},
 	{
+		name: 'managed native HTTP receives actual pipe closure and shared routing',
+		cmd: process.execPath,
+		args: ['tools/test/test-macos-native-http-receiving.cjs'],
+		repro: 'node tools/test/test-macos-native-http-receiving.cjs'
+	},
+	{
+		name: 'managed bootstrap admits pinned bytes before offline installation',
+		cmd: process.execPath,
+		args: ['tools/test/test-macos-managed-bootstrap-http.cjs'],
+		repro: 'node tools/test/test-macos-managed-bootstrap-http.cjs'
+	},
+	{
+		name: 'managed Python release projections retain the independent official pin',
+		cmd: process.execPath,
+		args: ['tools/test/test-managed-python-release.cjs'],
+		repro: 'node tools/test/test-managed-python-release.cjs'
+	},
+	{
 		name: 'native PAC helpers preserve independent standard function vectors',
 		cmd: process.execPath,
 		args: ['tools/test/test-network-pac-helpers.cjs'],

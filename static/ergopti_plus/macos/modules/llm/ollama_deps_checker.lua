@@ -992,7 +992,7 @@ function M.check_and_install_deps(on_complete, replay_token)
 	_observed_failure_marker = nil
 	task = TaskLifecycle.native("Ollama bootstrap", python_bin,
 		completion_callback, streaming_callback,
-		{ "-u", pty_wrapper_path, "/bin/bash", script_path, resolved_bin or "", install_dir or "" })
+		{ "-u", pty_wrapper_path, "/bin/bash", script_path, resolved_bin or "", install_dir or "", python_bin })
 
 	if not task then
 		owner.authorized = false
