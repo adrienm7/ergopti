@@ -348,8 +348,12 @@ lanes and Release are skipped. The source's full scope remains unqualified.
 Windows diagnostic candidate c00cec629 is separately received in37690927221:
 10,268 passes/four unchanged failures, no admitted service-stage notice. Canonical
 TAP output is used, but no successful service diagnosis or transport repair is
-claimed. Raw job downloads still require productionresultssa7 network access.
-After publication of the domain1 draft, genuine Mac artifact downloads succeed;
+claimed. Raw Windows job and execution-manifest downloads subsequently succeed:
+the complete independent manifest records10,272 executed/timed cases,
+10,268 passed/four failed and no manifest errors. The full log admits the
+same single native-bypass/direct route and no service-stage notice. Restored
+artifact access is not transport qualification. After publication of the
+domain1 draft, genuine Mac artifact downloads succeed;
 the container's files, worktrees and pinned SDKs restore unchanged.
 
 The next Linux correction adds a pinned MIT Kerberos1.22.2 Flatpak dependency,
@@ -414,28 +418,26 @@ not prove the Flatpak SDK build, recipient trust or authenticated Kerberos traff
 
 ## Windows native fix and replay checklist
 
-The following five failures belong to run37651111440 at0b0be55e. Each step
-requires genuine receiving of the unchanged failing assertion, a source fix
-only if the captured evidence demonstrates one, and replay on the final source.
-Their lower causes remain unknown. The current diagnostics are observational.
+The current four failures belong to terminal run37690927221 atc00cec629.
+The historical System32 curl capability failure from37651111440 now passes;
+do not rebuild that qualified path without a regression. Each remaining step
+requires genuine receiving of its unchanged failing assertion, a source fix
+only if captured evidence demonstrates one, and replay on the final source.
+Lower causes remain unknown; the diagnostics are observational.
 
-1. **System32 curl capability completion:** observe the actual cached phase and
-   child/pipe closure at the original completion refusal. Correct a demonstrated
-   capability/retirement defect and replay the same positive and negative
-   controls under the original 8-second request/10-second receiving clocks.
-2. **Canonical WinHTTP vector1:** receive the exact native returned shape,
+1. **Canonical WinHTTP vector1:** receive the exact native returned shape,
    ordered-route and limit facts, then fix the demonstrated guard/provider
    mismatch. Preserve the complete full-URL/PAC vector and native owner; portable
    PowerShell projections do not establish WinHTTP success.
-3. **TLS fixture service failure count:** identify the fixed service failure
+2. **TLS fixture service failure count:** identify the fixed service failure
    stage using the actual retained service receipt. Correct only the demonstrated
    service/receiving defect; retain ephemeral key ownership, the independent
    failure-count expectation and physical server retirement.
-4. **Updater TLS classification:** receive the actual route and trust failure
+3. **Updater TLS classification:** receive the actual route and trust failure
    before changing classification. Preserve the original TLS expectation,
    system trust, proxy refusal and provenance; do not relabel proxy_resolve as
    TLS without evidence or bypass certificate verification.
-5. **Updater cleanup failure count:** receive actual service/child/Job cleanup
+4. **Updater cleanup failure count:** receive actual service/child/Job cleanup
    acknowledgement and correct its demonstrated join/receiving defect. Preserve
    the failure-count assertion and retained debt; root-directory removal is
    not a physical service-closure receipt.
