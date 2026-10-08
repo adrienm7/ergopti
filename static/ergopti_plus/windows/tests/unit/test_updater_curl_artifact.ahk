@@ -46,17 +46,12 @@ class _ArtifactNtlmProxyOwner {
 	OnAdopt(State, Native) => this.NativeState := State
 	OnDone(Code, Out, Err) => this.Results.Push(Map("exit", Code, "stdout", Out, "stderr", Err))
 	Start() {
-		global _DriverDir
 		this.Directory := _SR_AcquireCaptureDirectory()
 		this.Path := this.Directory . "sspi.json"
 		this.Event := DllCall("Kernel32\CreateEventW", "Ptr", 0, "Int", true,
 			"Int", false, "WStr", this.Name, "Ptr")
 		AssertTrue(this.Event && A_LastError != 183, "unique owned SSPI stop event")
-		Args := ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
-			_DriverDir . "\tests\fixtures\artifact_ntlm_proxy.ps1", "-StatePath", this.Path,
-			"-StopEvent", this.Name, "-TlsPort", this.Tls.State["tls_port"], "-ChallengeMode", this.Mode]
-		if this.ServeRemotePac
-			Args.Push("-ServeRemotePac")
+		Args := this.Arguments()
 		this.Handle := ShellRunner_SpawnTreeOwned(_Updater_PowerShellPath(), Args,
 			ObjBindMethod(this, "OnDone"), , ObjBindMethod(this, "OnAdopt"), 8192)
 		AssertTrue(this.Handle.start(), "actual SSPI relay private Job starts")
@@ -70,6 +65,15 @@ class _ArtifactNtlmProxyOwner {
 			Sleep(10)
 		}
 		throw Error("Actual SSPI relay did not become ready.")
+	}
+	Arguments() {
+		global _DriverDir
+		Args := ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
+			_DriverDir . "\tests\fixtures\artifact_ntlm_proxy.ps1", "-StatePath", this.Path,
+			"-StopEvent", this.Name, "-TlsPort", Format("{:d}", this.Tls.State["tls_port"]), "-ChallengeMode", this.Mode]
+		if this.ServeRemotePac
+			Args.Push("-ServeRemotePac")
+		return Args
 	}
 	Read() {
 		try {
@@ -313,3 +317,29 @@ _ArtifactNtlmStartupDiagnosticControls() {
 	AssertEqual("", _ArtifactNtlmStartupDiagnostic(0))
 }
 Test("artifact curl: startup facts preserve strict closure assertions without private compiler text", _ArtifactNtlmStartupDiagnosticControls)
+
+_ArtifactNtlmProxySpawnArgumentControls() {
+	for Pair in [[1, "1"], [43210, "43210"], [65535, "65535"]] {
+		Port := Pair[1]
+		for OrderedPac in [false, true] {
+			Tls := {State: Map("tls_port", Port)}
+			Proxy := _ArtifactNtlmProxyOwner(Tls, "NtlmOnly", OrderedPac)
+			Proxy.Path := "C:\owned-sspi-control\state.json"
+			Args := Proxy.Arguments()
+			AssertEqual("-TlsPort", Args[11], "the real caller argv retains the TLS port argument")
+			AssertEqual("String", Type(Args[12]), "native spawn owns only string argv")
+			AssertEqual(Pair[2], Args[12], "literal boundary ports survive caller serialization")
+			Admission := ShellRunner_ValidateSpawnArgs(_Updater_PowerShellPath(), Args)
+			AssertEqual("", Admission["error"], "the actual SSPI caller reaches the real spawn admission")
+			AssertEqual(0, Admission["bad_arg_index"])
+			AssertEqual(OrderedPac ? 15 : 14, Args.Length)
+			if OrderedPac
+				AssertEqual("-ServeRemotePac", Args[15])
+			Args[12] := Port
+			Refused := ShellRunner_ValidateSpawnArgs(_Updater_PowerShellPath(), Args)
+			AssertEqual("Argument 12 must be a string.", Refused["error"],
+				"the exact old native caller must fail before any owned process is created")
+		}
+	}
+}
+Test("artifact curl: actual SSPI caller serializes its native TLS port before strict spawn admission", _ArtifactNtlmProxySpawnArgumentControls)
