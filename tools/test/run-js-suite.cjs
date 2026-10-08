@@ -37,6 +37,12 @@ const CHECKS = [
 		repro: 'npm run test:linux-source-toolchain'
 	},
 	{
+		name: 'openSUSE first-install prep and requested-capability diagnostics retain native refusal',
+		cmd: process.execPath,
+		args: ['tools/test/test-opensuse-first-install-tooling.cjs'],
+		repro: 'npm run test:opensuse-first-install-tooling'
+	},
+	{
 		name: 'Nix runtime receipts and hosted registration preserve native admission',
 		cmd: process.execPath,
 		args: ['tools/test/test-linux-nix-native.cjs'],
