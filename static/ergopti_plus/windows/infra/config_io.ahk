@@ -61,6 +61,25 @@ global CONFIG_FULL_SAVE_BOOT_DELAY_MS := -500
 ; A one-shot timer is only a wake-up mechanism: Reload terminates it. Keep the
 ; actual full-save obligation in a generation counter so a terminal transition
 ; can synchronously prove that every accepted request reached disk first.
+; A final native acknowledgement may inspect only the original nine native
+; data fields. Named methods/getters cannot execute from that short Critical.
+_ConfigFullSaveCoordinatorDataAdmitted(State) {
+	static DataOwner := _ConfigWriteLeaseDataObject
+	if DataOwner != _ConfigWriteLeaseDataObject || !DataOwner.Call(State,
+		["requested_generation", "committed_generation", "settled_generation",
+		"terminal_required_generation", "bound_path", "bound_path_key",
+		"reload_required", "timer_armed", "reported_failure_generation"])
+		return false
+	for Name in ["requested_generation", "committed_generation", "settled_generation",
+			"terminal_required_generation", "reported_failure_generation"] {
+		if !(State.%Name% is Integer) || State.%Name% < 0
+			return false
+	}
+	return (State.bound_path is String) && (State.bound_path_key is String)
+		&& (State.reload_required is Integer) && (State.reload_required == 0 || State.reload_required == 1)
+		&& (State.timer_armed is Integer) && (State.timer_armed == 0 || State.timer_armed == 1)
+}
+
 _ConfigFullSaveCoordinator(Replacement := unset) {
 	static State := {
 		requested_generation: 0,
@@ -73,13 +92,52 @@ _ConfigFullSaveCoordinator(Replacement := unset) {
 		timer_armed: false,
 		reported_failure_generation: 0
 	}
-	if IsSet(Replacement)
+	if IsSet(Replacement) {
+		if !_ConfigFullSaveCoordinatorDataAdmitted(Replacement)
+			throw ValueError("Full-save replacement requires the original native data fields")
 		State := Replacement
+	}
 	return State
 }
 
-_ConfigFullSaveRequest(TerminalRequired := true, Path := unset) {
+_ConfigFullSaveRequest(TerminalRequired := true, Path := unset, InspectState := unset, RetireIntent := false) {
+	static MandatoryIntents := Map()
 	global ConfigurationFile
+	if IsSet(InspectState) {
+		PreviousCritical := Critical("On")
+		try {
+			if (InspectState is Integer) && InspectState == 0 {
+				for ActualState, ActualIntent in MandatoryIntents {
+					if ActualIntent.required > 0 && _ConfigSchemaEntrySelected(ActualIntent.path)
+							&& _ConfigPublicationHasRecoveryDebt(ActualIntent.path)
+						return true
+				}
+				return false
+			}
+			if !MandatoryIntents.Has(InspectState)
+				return false
+			Intent := MandatoryIntents[InspectState]
+			if (RetireIntent is Integer) && RetireIntent == 2 {
+				return _ConfigFullSaveCoordinatorDataAdmitted(InspectState)
+					&& InspectState.requested_generation == Intent.generation
+					&& InspectState.settled_generation < Intent.generation
+					&& _ConfigSchemaEntrySelected(Intent.path)
+					&& _ConfigPublicationHasRecoveryDebt(Intent.path)
+			}
+			if RetireIntent {
+				if !_ConfigFullSaveCoordinatorDataAdmitted(InspectState)
+						|| InspectState.settled_generation < Intent.generation
+					return false
+				MandatoryIntents.Delete(InspectState)
+				return true
+			}
+			; Malformed public metadata cannot erase an actual accepted request.
+			; No descriptor is read here; both facts came from native owner stores.
+			return Intent.required > 0 && IsSet(ConfigurationFile) && (ConfigurationFile is String)
+				&& _ConfigSchemaEntrySelected(Intent.path)
+				&& _ConfigPublicationHasRecoveryDebt(Intent.path)
+		} finally Critical(PreviousCritical)
+	}
 	RequestPath := IsSet(Path) ? String(Path)
 		: (IsSet(ConfigurationFile) ? String(ConfigurationFile) : "")
 	RequestKey := _ConfigWriteLeaseKey(RequestPath)
@@ -88,8 +146,12 @@ _ConfigFullSaveRequest(TerminalRequired := true, Path := unset) {
 		return 0
 	}
 	State := _ConfigFullSaveCoordinator()
+	if !_ConfigFullSaveCoordinatorDataAdmitted(State)
+		return 0
 	PreviousCritical := Critical("On")
 	try {
+		if !_ConfigFullSaveCoordinatorDataAdmitted(State) || State != _ConfigFullSaveCoordinator()
+			return 0
 		if State.reload_required || _ConfigWriteTerminalIsActive()
 			return 0
 		if State.requested_generation > State.settled_generation {
@@ -100,8 +162,12 @@ _ConfigFullSaveRequest(TerminalRequired := true, Path := unset) {
 			State.bound_path_key := RequestKey
 		}
 		State.requested_generation += 1
-		if TerminalRequired
+		Required := MandatoryIntents.Has(State) ? MandatoryIntents[State].required : 0
+		if TerminalRequired {
 			State.terminal_required_generation := State.requested_generation
+			Required := State.requested_generation
+		}
+		MandatoryIntents[State] := { generation: State.requested_generation, required: Required, path: RequestPath }
 		return State.requested_generation
 	} finally {
 		Critical(PreviousCritical)
@@ -111,7 +177,7 @@ _ConfigFullSaveRequest(TerminalRequired := true, Path := unset) {
 _ConfigFullSaveBoundPath() {
 	State := _ConfigFullSaveCoordinator()
 	PreviousCritical := Critical("On")
-	try return State.bound_path
+	try return _ConfigFullSaveCoordinatorDataAdmitted(State) ? State.bound_path : ""
 	finally Critical(PreviousCritical)
 }
 
@@ -119,7 +185,8 @@ _ConfigFullSavePathMatches(Path) {
 	State := _ConfigFullSaveCoordinator()
 	Key := _ConfigWriteLeaseKey(Path)
 	PreviousCritical := Critical("On")
-	try return State.bound_path_key != "" && State.bound_path_key == Key
+	try return _ConfigFullSaveCoordinatorDataAdmitted(State)
+		&& State.bound_path_key != "" && State.bound_path_key == Key
 	finally Critical(PreviousCritical)
 }
 
@@ -134,14 +201,15 @@ _ConfigFullSaveReleaseBindingIfSettled(State) {
 _ConfigFullSaveHasPending() {
 	State := _ConfigFullSaveCoordinator()
 	PreviousCritical := Critical("On")
-	try return State.requested_generation > State.settled_generation
+	try return !_ConfigFullSaveCoordinatorDataAdmitted(State)
+		|| State.requested_generation > State.settled_generation
 	finally Critical(PreviousCritical)
 }
 
 _ConfigFullSaveCapture() {
 	State := _ConfigFullSaveCoordinator()
 	PreviousCritical := Critical("On")
-	try return State.requested_generation
+	try return _ConfigFullSaveCoordinatorDataAdmitted(State) ? State.requested_generation : 0
 	finally Critical(PreviousCritical)
 }
 
@@ -149,12 +217,16 @@ _ConfigFullSaveAcknowledge(TargetGeneration) {
 	State := _ConfigFullSaveCoordinator()
 	PreviousCritical := Critical("On")
 	try {
+		if !_ConfigFullSaveCoordinatorDataAdmitted(State)
+			return false
 		TargetGeneration := Min(TargetGeneration, State.requested_generation)
 		if (TargetGeneration > State.committed_generation)
 			State.committed_generation := TargetGeneration
 		if (TargetGeneration > State.settled_generation)
 			State.settled_generation := TargetGeneration
 		_ConfigFullSaveReleaseBindingIfSettled(State)
+		_ConfigFullSaveRequest(true, , State, true)
+		return true
 	} finally {
 		Critical(PreviousCritical)
 	}
@@ -169,6 +241,8 @@ _ConfigFullSaveRejectExact(Generation) {
 	State := _ConfigFullSaveCoordinator()
 	PreviousCritical := Critical("On")
 	try {
+		if !_ConfigFullSaveCoordinatorDataAdmitted(State) || _ConfigFullSaveRequest(true, , 0)
+			return false
 		if Generation != State.requested_generation
 				|| Generation != State.settled_generation + 1
 			return false
@@ -223,6 +297,9 @@ _ConfigFullSaveAbandonThrough(TargetGeneration) {
 	State := _ConfigFullSaveCoordinator()
 	PreviousCritical := Critical("On")
 	try {
+		if !_ConfigFullSaveCoordinatorDataAdmitted(State)
+				|| _ConfigFullSaveRequest(true, , 0)
+			return false
 		TargetGeneration := Min(TargetGeneration, State.requested_generation)
 		if (TargetGeneration > State.settled_generation)
 			State.settled_generation := TargetGeneration
@@ -235,8 +312,12 @@ _ConfigFullSaveAbandonThrough(TargetGeneration) {
 _ConfigFullSaveTimerStarted() {
 	State := _ConfigFullSaveCoordinator()
 	PreviousCritical := Critical("On")
-	try State.timer_armed := false
-	finally Critical(PreviousCritical)
+	try {
+		if !_ConfigFullSaveCoordinatorDataAdmitted(State)
+			return false
+		State.timer_armed := false
+		return true
+	} finally Critical(PreviousCritical)
 }
 
 ; Coalesces wake-ups but never erases the generation when SetTimer itself
@@ -254,6 +335,8 @@ _ConfigArmFullSaveRetry(DelayMs, TimerFn := 0) {
 	State := _ConfigFullSaveCoordinator()
 	PreviousCritical := Critical("On")
 	try {
+		if !_ConfigFullSaveCoordinatorDataAdmitted(State)
+			return false
 		if (State.requested_generation <= State.settled_generation)
 			return true
 		if State.timer_armed
@@ -292,14 +375,14 @@ _ConfigQueueFullSave(DelayMs, TimerFn := 0, TerminalRequired := true) {
 ; Critical window and must contain memory swaps only. A throw from either is a
 ; PARTIAL failure because the durable write has already succeeded.
 ConfigCommitUpdates(Path, Updates, Context, WriterFn := 0, NotifyFn := 0,
-		PublishFn := 0, FinalizeFn := 0, CompensateFn := 0) {
+		PublishFn := 0, FinalizeFn := 0, CompensateFn := 0, AdmissionFn := 0) {
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		; The global path owner supplies isolation. Never inherit a caller's
 		; Critical span into durable I/O, finalization, recovery or feedback.
 		Critical("Off")
 		try return ConfigCommitUpdates(Path, Updates, Context, WriterFn,
-			NotifyFn, PublishFn, FinalizeFn, CompensateFn)
+			NotifyFn, PublishFn, FinalizeFn, CompensateFn, AdmissionFn)
 		finally Critical(InheritedCritical)
 	}
 	OwnerToken := _ConfigWriteLeaseTryAcquire(Path, "targeted")
@@ -311,7 +394,7 @@ ConfigCommitUpdates(Path, Updates, Context, WriterFn := 0, NotifyFn := 0,
 				FailureDetail, StateUnchanged)
 	}
 	return _ConfigCommitOwned(OwnerToken, Path, Updates, Context, WriterFn,
-			NotifyFn, PublishFn, FinalizeFn, CompensateFn, false)
+			NotifyFn, PublishFn, FinalizeFn, CompensateFn, false, 0, 0, 0, true, AdmissionFn)
 }
 
 ; Executes one strict update batch while the caller retains its transition
@@ -368,7 +451,13 @@ ConfigCommitBuilt(Path, Context, BuildFn, WriterFn := 0, NotifyFn := 0, Existing
 	CompensateFn := 0
 	RetainFn := 0
 	StateUnchanged := true
+	PlanAdmission := 0
+	NoOpSourceAdmission := 0
 	try {
+		if _ConfigSchemaEntrySelected(Path)
+			NoOpSourceAdmission := ConfigMigrateBoot(Path, "capture_noop")
+		if !_ConfigSchemaEntryAdmitted(Path)
+			throw Error("The native configuration source/schema refused candidate construction")
 		try Plan := BuildFn.Call()
 		catch as Err
 			FailureDetail := "candidate construction failed: " . Err.Message
@@ -379,6 +468,7 @@ ConfigCommitBuilt(Path, Context, BuildFn, WriterFn := 0, NotifyFn := 0, Existing
 			; contract. Even a malformed/noop getter may follow a prepared side effect.
 			CompensateFn := _ConfigPlanGet(Plan, "compensate", 0)
 			RetainFn := _ConfigPlanGet(Plan, "retain", 0)
+			PlanAdmission := _ConfigPlanGet(Plan, "admission", 0)
 			NoOp := !!_ConfigPlanGet(Plan, "noop", false)
 		}
 		if (FailureDetail == "" && !NoOp) {
@@ -400,7 +490,17 @@ ConfigCommitBuilt(Path, Context, BuildFn, WriterFn := 0, NotifyFn := 0, Existing
 			Transferred := true
 			return _ConfigCommitOwned(OwnerToken, Path, Updates, Context, WriterFn,
 					NotifyFn, PublishFn, FinalizeFn, CompensateFn,
-					PublishOnFinalizeFailure, RollbackUpdates, CleanupFn, RetainFn, !Borrowed)
+					PublishOnFinalizeFailure, RollbackUpdates, CleanupFn, RetainFn, !Borrowed, PlanAdmission)
+		}
+		NativePlanAdmission := () => _ConfigWriteLeaseOwns(OwnerToken, Path) && _FSNativeAdmissionAccepted(PlanAdmission)
+		if FailureDetail == "" && NoOp {
+			Acknowledged := HasMethod(NoOpSourceAdmission, "Call")
+				? ConfigSchemaAcknowledgeNoop(Path, NoOpSourceAdmission, NativePlanAdmission)
+				: (!_ConfigSchemaEntrySelected(Path) && FSNativeAcknowledge(NativePlanAdmission))
+			if !Acknowledged {
+				NoOp := false
+				FailureDetail := "the native source or logical owner refused the built-plan noop acknowledgement"
+			}
 		}
 	} catch as Err {
 		FailureDetail := "candidate plan inspection failed: " . Err.Message
@@ -431,12 +531,113 @@ _ConfigPlanGet(Plan, Key, Default := 0) {
 
 _ConfigCommitOwned(OwnerToken, Path, Updates, Context, WriterFn, NotifyFn,
 		PublishFn, FinalizeFn, CompensateFn, PublishOnFinalizeFailure := false,
-		RollbackUpdates := 0, CleanupFn := 0, RetainFn := 0, ReleaseOwner := true) {
+		RollbackUpdates := 0, CleanupFn := 0, RetainFn := 0, ReleaseOwner := true, AdmissionFn := 0, Request := "commit") {
+	static PublicationDebt := Map()
+	; Only these retained genuine producers may prove an already durable full-save
+	; obligation. No supplied collector, writer, snapshot or registration token
+	; can settle the private debt while RAM and disk disagree.
+	static ReconcileOwners := { collect: _ConfigCollectFullSaveUpdates,
+		build: TOML_BuildConfigUpdatedContent, prepare: _ConfigPrepareTypedUpdates,
+		obsolete: ConfigFullSnapshotCaptureObsoleteSource,
+		preserve: ConfigFullSnapshotPreserveObsoleteSource,
+		capture: ConfigMigrateBoot, acknowledge: ConfigSchemaAcknowledgeNoop,
+		coordinator: _ConfigFullSaveCoordinator, coordinator_data: _ConfigFullSaveCoordinatorDataAdmitted,
+		generation_ack: _ConfigFullSaveAcknowledge, generation_capture: _ConfigFullSaveCapture,
+		path_match: _ConfigFullSavePathMatches, request_owner: _ConfigFullSaveRequest }
+	ReconcileOwnersLive() {
+		return ReconcileOwners.collect == _ConfigCollectFullSaveUpdates
+			&& ReconcileOwners.build == TOML_BuildConfigUpdatedContent
+			&& ReconcileOwners.prepare == _ConfigPrepareTypedUpdates
+			&& ReconcileOwners.obsolete == ConfigFullSnapshotCaptureObsoleteSource
+			&& ReconcileOwners.preserve == ConfigFullSnapshotPreserveObsoleteSource
+			&& ReconcileOwners.capture == ConfigMigrateBoot
+			&& ReconcileOwners.acknowledge == ConfigSchemaAcknowledgeNoop
+			&& ReconcileOwners.coordinator == _ConfigFullSaveCoordinator
+			&& ReconcileOwners.coordinator_data == _ConfigFullSaveCoordinatorDataAdmitted
+			&& ReconcileOwners.generation_ack == _ConfigFullSaveAcknowledge
+			&& ReconcileOwners.generation_capture == _ConfigFullSaveCapture
+			&& ReconcileOwners.path_match == _ConfigFullSavePathMatches
+			&& ReconcileOwners.request_owner == _ConfigFullSaveRequest
+	}
+	if Request == "reconcile_full_save" {
+		global ConfigurationFile, _DriverReady, _ConfigBootReadFailed, _ConfigBootRejectedOverrides
+		if !IsSet(ConfigurationFile) || !_ConfigSchemaEntrySelected(Path)
+				|| !IsSet(_DriverReady) || !_DriverReady
+				|| (IsSet(_ConfigBootReadFailed) && _ConfigBootReadFailed)
+				|| (IsSet(_ConfigBootRejectedOverrides) && _ConfigBootRejectedOverrides)
+				|| !ReconcileOwnersLive() || !_ConfigWriteLeaseOwns(OwnerToken, Path)
+			return false
+		CoordinatorState := ReconcileOwners.coordinator.Call()
+		if !ReconcileOwners.coordinator_data.Call(CoordinatorState)
+				|| !ReconcileOwners.request_owner.Call(true, , CoordinatorState, 2)
+				|| !ReconcileOwners.path_match.Call(Path) || !_ConfigFullSaveHasPending()
+			return false
+		DebtKey := _ConfigWriteLeaseKey(Path)
+		PreviousCritical := Critical("On")
+		try {
+			if !PublicationDebt.Has(DebtKey)
+				return false
+			DebtRow := PublicationDebt[DebtKey]
+			TargetGeneration := ReconcileOwners.generation_capture.Call()
+		} finally Critical(PreviousCritical)
+		try {
+			SourceAdmission := ReconcileOwners.capture.Call(Path, "capture_reconcile_noop")
+			if !HasMethod(SourceAdmission, "Call")
+				return false
+			SourceImage := ReconcileOwners.build.Call(Path, [])
+			if !(SourceImage is Map) || SourceImage.Get("status", "") != "ok"
+					|| SourceImage.Get("kind", "") != "rendered"
+				return false
+			ObsoleteSource := ReconcileOwners.obsolete.Call(SourceImage["source_content"])
+			Updates := ReconcileOwners.collect.Call()
+			if !(Updates is Array)
+				return false
+			Updates := ReconcileOwners.prepare.Call(ReconcileOwners.preserve.Call(ObsoleteSource, Updates))
+			Candidate := ReconcileOwners.build.Call(Path, Updates)
+			; Byte equality alone is insufficient: use the actual semantic renderer's
+			; preserve-source decision and require the same genuine source generation.
+			if !(Candidate is Map) || Candidate.Get("status", "") != "ok"
+					|| Candidate.Get("kind", "") != "rendered"
+					|| Candidate.Get("preserve_source", 0) != 1
+					|| Candidate["source_present"] != SourceImage["source_present"]
+					|| StrCompare(Candidate["source_content"], SourceImage["source_content"], true) != 0
+				return false
+			FinalReconcileSource(Source, Present) {
+				if !ReconcileOwnersLive()
+						|| ReconcileOwners.coordinator.Call() != CoordinatorState
+						|| !ReconcileOwners.coordinator_data.Call(CoordinatorState)
+						|| !ReconcileOwners.request_owner.Call(true, , CoordinatorState, 2)
+						|| !_ConfigWriteLeaseOwns(OwnerToken, Path)
+						|| !ReconcileOwners.path_match.Call(Path)
+						|| !PublicationDebt.Has(DebtKey) || PublicationDebt[DebtKey] != DebtRow
+						|| !SourceAdmission.Call(Source, Present)
+					return false
+				; Called by the actual native acknowledgement inside its short restored
+				; Critical span. Newer accepted requests remain pending, never over-acked.
+				PublicationDebt.Delete(DebtKey)
+				ReconcileOwners.generation_ack.Call(TargetGeneration)
+				return true
+			}
+			return ReconcileOwners.acknowledge.Call(Path, FinalReconcileSource)
+		} catch {
+			return false
+		}
+	}
+	if Request == "query_debt" {
+		PreviousCritical := Critical("On")
+		try return PublicationDebt.Has(_ConfigWriteLeaseKey(Path))
+		finally Critical(PreviousCritical)
+	}
+	if Request != "commit"
+		throw ValueError("Unknown native publication request")
 	Failed := false
 	FailureDetail := ""
 	StateUnchanged := true
 	DurableCommitted := false
 	PrimaryFinalized := false
+	LogicalOwnershipLost := false
+	OwnerAdmission := () => _ConfigWriteLeaseOwns(OwnerToken, Path)
+	PublicationAdmission := () => OwnerAdmission.Call() && _FSNativeAdmissionAccepted(AdmissionFn)
 	try {
 		; A misspelled plan callback used to be treated as "not supplied": the
 		; writer committed, publication was skipped, and the gateway returned true.
@@ -447,11 +648,24 @@ _ConfigCommitOwned(OwnerToken, Path, Updates, Context, WriterFn, NotifyFn,
 				&FailureDetail, &StateUnchanged)
 			Failed := true
 		if !Failed && !_ConfigInvokeCommitWriter(Path, Updates, WriterFn,
-				"the configuration writer", &FailureDetail) {
+				"the configuration writer", &FailureDetail, AdmissionFn, OwnerAdmission) {
 			Failed := true
 		}
-		if !Failed
+		if !Failed {
 			DurableCommitted := true
+			PreviousCritical := Critical("On")
+			try {
+				if !PublicationAdmission.Call() {
+					Failed := true
+					StateUnchanged := false
+					LogicalOwnershipLost := true
+					FailureDetail := "the durable write succeeded but logical publication ownership was withdrawn"
+					PublicationDebt[_ConfigWriteLeaseKey(Path)] := { detail: FailureDetail }
+				}
+			} finally Critical(PreviousCritical)
+			if LogicalOwnershipLost
+				_ConfigRunRecoveryRetention(RetainFn, "publication_admission_withdrawn", &FailureDetail, &StateUnchanged)
+		}
 		if Failed && !DurableCommitted {
 			Compensated := _ConfigRunPrecommitCompensation(CompensateFn,
 					&FailureDetail, &StateUnchanged)
@@ -476,7 +690,7 @@ _ConfigCommitOwned(OwnerToken, Path, Updates, Context, WriterFn, NotifyFn,
 		}
 		if DurableCommitted && !Failed
 			PrimaryFinalized := true
-		if DurableCommitted && Failed && (RollbackUpdates is Array) {
+		if DurableCommitted && Failed && !LogicalOwnershipLost && (RollbackUpdates is Array) {
 			; Activation is exception-atomic, so compensation can discard the inert
 			; candidate before restoring the previous durable value. Both operations
 			; remain under this owner; no full-save or sibling writer can interleave.
@@ -520,10 +734,18 @@ _ConfigCommitOwned(OwnerToken, Path, Updates, Context, WriterFn, NotifyFn,
 		ShouldPublish := PrimaryFinalized
 			|| (DurableCommitted && PublishOnFinalizeFailure
 				&& !(RollbackUpdates is Array))
-		if ShouldPublish && HasMethod(PublishFn, "Call") {
+		if ShouldPublish {
 			PublishingAfterFailure := Failed
 			PreviousCritical := Critical("On")
-			try PublishFn.Call()
+			try {
+				if !PublicationAdmission.Call() {
+					LogicalOwnershipLost := true
+					PublicationDebt[_ConfigWriteLeaseKey(Path)] := { detail: "logical ownership was withdrawn after durable acknowledgement" }
+					throw Error("logical publication ownership was withdrawn after durable acknowledgement")
+				}
+				if HasMethod(PublishFn, "Call")
+					PublishFn.Call()
+			}
 			catch as Err {
 				Failed := true
 				StateUnchanged := false
@@ -535,6 +757,8 @@ _ConfigCommitOwned(OwnerToken, Path, Updates, Context, WriterFn, NotifyFn,
 			} finally {
 				Critical(PreviousCritical)
 			}
+			if LogicalOwnershipLost
+				_ConfigRunRecoveryRetention(RetainFn, "publication_admission_withdrawn", &FailureDetail, &StateUnchanged)
 		}
 	} finally {
 		if ReleaseOwner
@@ -545,21 +769,37 @@ _ConfigCommitOwned(OwnerToken, Path, Updates, Context, WriterFn, NotifyFn,
 	return true
 }
 
-_ConfigInvokeCommitWriter(Path, Updates, WriterFn, Stage, &FailureDetail) {
+_ConfigInvokeCommitWriter(Path, Updates, WriterFn, Stage, &FailureDetail, AdmissionFn := 0, OwnerAdmission := 0) {
 	global ConfigurationFile
 	if FileReadActivityBusy(Path) {
 		FailureDetail .= (FailureDetail != "" ? "; " : "") . "an exact configuration read is still in progress"
 		return false
 	}
 	try {
+		NativeAdmission := () => _FSNativeAdmissionAccepted(OwnerAdmission) && _FSNativeAdmissionAccepted(AdmissionFn)
+		Guarded := !((AdmissionFn is Integer) && AdmissionFn == 0)
+		; Typed ownership lookup can touch public binding metadata. Refuse a
+		; withdrawn genuine issuer/lease before that lookup, and retain the same
+		; predicate at the actual native noop or target replacement below.
+		if !NativeAdmission.Call()
+			throw Error("logical publication admission refused before writer invocation")
+		if !_ConfigSchemaEntryAdmitted(Path)
+			throw Error("The native configuration source/schema refused the writer entry")
 		IsConfiguration := IsSet(ConfigurationFile) && ConfigurationFile != ""
 			&& _ConfigWriteLeaseKey(Path) == _ConfigWriteLeaseKey(ConfigurationFile)
 		if IsConfiguration
 			Updates := _ConfigPrepareTypedUpdates(Updates)
-		if HasMethod(WriterFn, "Call")
-			Written := WriterFn.Call(Path, Updates)
-		else
-			Written := IsConfiguration ? TOML_ConfigBatchWrite(Path, Updates) : TOML_BatchWrite(Path, Updates)
+		if HasMethod(WriterFn, "Call") {
+			if Guarded {
+				if WriterFn != TOML_ConfigBatchWrite && WriterFn != TOML_BatchWrite
+					throw Error("a guarded publication cannot invoke an unqualified custom writer")
+				Written := IsConfiguration ? TOML_ConfigBatchWrite(Path, Updates, [], NativeAdmission)
+					: TOML_BatchWrite(Path, Updates, [], NativeAdmission)
+			} else
+				Written := WriterFn.Call(Path, Updates)
+		} else
+			Written := IsConfiguration ? TOML_ConfigBatchWrite(Path, Updates, [], NativeAdmission)
+				: TOML_BatchWrite(Path, Updates, [], NativeAdmission)
 	} catch as Err {
 		FailureDetail .= (FailureDetail != "" ? "; " : "")
 			. Stage . " failed: " . Err.Message
@@ -1212,6 +1452,10 @@ ConfigFullStateCanPersist() {
 	; The boot migration refused the file (a newer schema, a failed migration):
 	; the loaded tree does not describe it, so it must never be serialized over it.
 	if IsSet(ConfigurationFile) {
+		if !ConfigSchemaCanPrepareWrite(ConfigurationFile) {
+			try LoggerError("ConfigIO", "Refusing full-state persistence before a genuine current source/schema handoff.")
+			return false
+		}
 		Refusal := TOML_WriteRefusal(ConfigurationFile)
 		if (Refusal != "") {
 			try LoggerError("ConfigIO", "Refusing full-state persistence: config.toml is read-only for this session ({1}).",
@@ -1259,7 +1503,12 @@ SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
 		; so the write looks perfectly safe while the payload is already wrong.
 		; Returns false — not a bare return — so a caller (and the regression test)
 		; can tell "refused" from "deferred until ready" and from a completed save.
-		if !ConfigFullStateCanPersist() {
+		PublicationDebt := IsSet(ConfigurationFile) && _ConfigPublicationHasRecoveryDebt(ConfigurationFile)
+		if PublicationDebt && (RegisterRequest || HasMethod(WriterFn, "Call") || HasMethod(CollectFn, "Call")) {
+			try LoggerError("ConfigIO", "A retained durable publication debt permits only a genuine default full-save reconciliation of existing requests.")
+			return CONFIG_SAVE_FAILED
+		}
+		if !PublicationDebt && !ConfigFullStateCanPersist() {
 			return CONFIG_SAVE_FAILED
 		}
 		RequestedGeneration := 0
@@ -1270,8 +1519,18 @@ SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
 				return CONFIG_SAVE_FAILED
 			}
 		}
-		if !_ConfigFullSaveHasPending()
-			return CONFIG_SAVE_OK
+		State := _ConfigFullSaveCoordinator()
+		PreviousCritical := Critical("On")
+		try {
+			; Genuine accepted intent/debt cannot be abandoned by a public scalar
+			; edit or valid replacement that merely looks already settled.
+			if !_ConfigFullSaveCoordinatorDataAdmitted(State)
+					|| (_ConfigFullSaveRequest(true, , 0)
+						&& !_ConfigFullSaveRequest(true, , State, 2))
+				return CONFIG_SAVE_FAILED
+			if State.requested_generation <= State.settled_generation
+				return CONFIG_SAVE_OK
+		} finally Critical(PreviousCritical)
 		BoundPath := _ConfigFullSaveBoundPath()
 		; A deferred generation belongs to the path that accepted it. Re-reading
 		; ConfigurationFile here used to silently rebase old-path work onto a newly
@@ -1311,6 +1570,12 @@ SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
 		TargetGeneration := _ConfigFullSaveCapture()
 		Result := CONFIG_SAVE_FAILED
 		try {
+				if PublicationDebt {
+					Reconciled := _ConfigPublicationReconcileFullSave(BoundPath, OwnerToken)
+					if !Reconciled
+						try LoggerError("ConfigIO", "The accepted full-save request conflicts with retained durable publication state; both remain pending until explicit reconciliation.")
+					Result := Reconciled ? CONFIG_SAVE_OK : CONFIG_SAVE_FAILED
+				} else {
 				Phase := "source"
 				try {
 				SourceImage := 0
@@ -1363,8 +1628,9 @@ SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
 					Result := CONFIG_SAVE_OK
 				else
 					Result := CONFIG_SAVE_FAILED
-				if (Result = CONFIG_SAVE_OK)
-						_ConfigFullSaveAcknowledge(TargetGeneration)
+				if (Result = CONFIG_SAVE_OK) && !_ConfigFullSaveAcknowledge(TargetGeneration)
+						Result := CONFIG_SAVE_FAILED
+				}
 		} finally {
 			if !BorrowedOwner
 				_ConfigWriteLeaseRelease(OwnerToken)
@@ -1406,10 +1672,17 @@ _ConfigFullSaveSettleTerminal(OwnerBundle, WriterFn := 0, TimerFn := 0,
 	State := _ConfigFullSaveCoordinator()
 	PreviousCritical := Critical("On")
 	try {
+		if !_ConfigFullSaveCoordinatorDataAdmitted(State)
+			return false
+		ActualMandatoryDebt := _ConfigFullSaveRequest(true, , 0)
+		if ActualMandatoryDebt && !_ConfigFullSaveRequest(true, , State, 2)
+			return false
 		Requested := State.requested_generation
 		Settled := State.settled_generation
 		Required := State.terminal_required_generation
 		BoundPath := State.bound_path
+		if ActualMandatoryDebt && (Requested <= Settled || Required <= Settled)
+			return false
 	} finally Critical(PreviousCritical)
 	if Requested <= Settled
 		return true
@@ -1978,4 +2251,51 @@ ConfigIOShortcutScopeOperations(ScopeId, Mode) {
 	for Row in KeyCombinationScopeRows()
 		Rows.Push(Row)
 	return Rows
+}
+
+
+; Generic data-file gateway paths do not claim configuration journal authority.
+; The selected configuration path has no permissive unconstructed-state fallback.
+_ConfigSchemaEntrySelected(Path) {
+	global ConfigurationFile
+	return IsSet(ConfigurationFile) && ConfigurationFile != ""
+		&& _ConfigWriteLeaseKey(Path) == _ConfigWriteLeaseKey(ConfigurationFile)
+}
+
+_ConfigSchemaEntryAdmitted(Path) {
+	return !_ConfigSchemaEntrySelected(Path) || ConfigSchemaCanPrepareWrite(Path)
+}
+
+
+; This query exposes only a Boolean. Durable-withdrawal rows stay private and
+; cannot be cleared by replacing a public cache/result/phase. A genuine fresh
+; driver process reconciles the persisted source during its ordinary boot. A
+; same-process mandatory request can settle only through the genuine default
+; full-save collector and strict native source-preserving acknowledgement.
+_ConfigPublicationHasRecoveryDebt(Path) {
+	return _ConfigCommitOwned(0, Path, 0, "", 0, 0, 0, 0, 0, false,
+		0, 0, 0, false, 0, "query_debt")
+}
+
+/** Settles only an actual source-preserving default full-save obligation. */
+_ConfigPublicationReconcileFullSave(Path, OwnerToken) {
+	return _ConfigCommitOwned(OwnerToken, Path, 0, "", 0, 0, 0, 0, 0, false,
+		0, 0, 0, false, 0, "reconcile_full_save")
+}
+
+/** Retains only genuine unresolved mandatory intent with private durable debt. */
+_ConfigFullSavePublicationDebtNeedsRetention() {
+	State := _ConfigFullSaveCoordinator()
+	ActualMandatoryDebt := _ConfigFullSaveRequest(true, , 0)
+	if !_ConfigFullSaveCoordinatorDataAdmitted(State)
+		return ActualMandatoryDebt
+	if ActualMandatoryDebt
+		return true
+	PreviousCritical := Critical("On")
+	try {
+		return State.terminal_required_generation > State.settled_generation
+			&& State.requested_generation > State.settled_generation
+			&& State.bound_path != "" && _ConfigSchemaEntrySelected(State.bound_path)
+			&& _ConfigPublicationHasRecoveryDebt(State.bound_path)
+	} finally Critical(PreviousCritical)
 }
