@@ -1,0 +1,221 @@
+{
+	"status": "independently authored provisional outcomes; no implementation-generated expectations; unresolved scope decisions in DESIGN.md",
+	"defaults": {
+		"current_url": "https://updates.example/start",
+		"status": 302,
+		"curl_exit": 0,
+		"num_redirects": 0,
+		"hops": 0,
+		"max_hops": 50,
+		"https_floor": true,
+		"headers": {},
+		"visited": {}
+	},
+	"cases": [
+		{
+			"name": "same origin path retains custom credential",
+			"target": "https://updates.example/next",
+			"headers": { "X-Api-Key": "dummy-key", "Accept": "application/json" },
+			"expected": {
+				"action": "follow",
+				"headers": { "X-Api-Key": "dummy-key", "Accept": "application/json" }
+			}
+		},
+		{
+			"name": "case and default port are same origin",
+			"target": "https://UPDATES.example:443/next",
+			"headers": { "Authorization": "Bearer dummy" },
+			"expected": { "action": "follow", "headers": { "Authorization": "Bearer dummy" } }
+		},
+		{
+			"name": "different port removes credentials",
+			"target": "https://updates.example:444/next",
+			"headers": { "Authorization": "Bearer dummy", "Accept": "application/json" },
+			"expected": { "action": "follow", "headers": { "Accept": "application/json" } }
+		},
+		{
+			"name": "cross origin strips every canonical secret header case insensitively",
+			"target": "https://cdn.example/file",
+			"headers": {
+				"Api-Key": "a",
+				"AUTHORIZATION": "b",
+				"Cookie": "c",
+				"cookie2": "d",
+				"Proxy-Authorization": "e",
+				"X-API-KEY": "f",
+				"X-Goog-Api-Key": "g",
+				"User-Agent": "client",
+				"Accept": ""
+			},
+			"expected": { "action": "follow", "headers": { "User-Agent": "client", "Accept": "" } }
+		},
+		{
+			"name": "https downgrade refused",
+			"target": "http://updates.example/next",
+			"expected": { "action": "refuse", "error": "HTTP redirect protocol refused" }
+		},
+		{
+			"name": "http to https permitted",
+			"current_url": "http://updates.example/start",
+			"https_floor": false,
+			"target": "https://updates.example/next",
+			"headers": { "Cookie": "dummy" },
+			"expected": { "action": "follow", "headers": {} }
+		},
+		{
+			"name": "http same origin permitted without floor",
+			"current_url": "http://updates.example/start",
+			"https_floor": false,
+			"target": "http://updates.example/next",
+			"expected": { "action": "follow" }
+		},
+		{
+			"name": "explicit https floor rejects http from http initial",
+			"current_url": "http://updates.example/start",
+			"target": "http://updates.example/next",
+			"expected": { "action": "refuse", "error": "HTTP redirect protocol refused" }
+		},
+		{
+			"name": "target userinfo refused",
+			"target": "https://dummy-user:dummy-pass@cdn.example/file",
+			"expected": { "action": "refuse", "error": "HTTP redirect URL refused" }
+		},
+		{
+			"name": "file scheme refused",
+			"target": "file:///tmp/redirect",
+			"expected": { "action": "refuse", "error": "HTTP redirect protocol refused" }
+		},
+		{
+			"name": "relative value cannot impersonate native resolved URL",
+			"target": "../next",
+			"expected": { "action": "refuse", "error": "HTTP redirect URL refused" }
+		},
+		{
+			"name": "literal newline refused",
+			"target": "https://cdn.example/a\nb",
+			"expected": { "action": "refuse", "error": "HTTP redirect URL refused" }
+		},
+		{
+			"name": "literal nul refused",
+			"target": "https://cdn.example/a\u0000b",
+			"expected": { "action": "refuse", "error": "HTTP redirect URL refused" }
+		},
+		{
+			"name": "literal space refused",
+			"target": "https://cdn.example/a b",
+			"expected": { "action": "refuse", "error": "HTTP redirect URL refused" }
+		},
+		{
+			"name": "escaped space retained",
+			"target": "https://cdn.example/a%20b?part=1",
+			"expected": { "action": "follow" }
+		},
+		{
+			"name": "invalid port refused",
+			"target": "https://cdn.example:65536/file",
+			"expected": { "action": "refuse", "error": "HTTP redirect URL refused" }
+		},
+		{
+			"name": "last allowed hop admitted",
+			"hops": 49,
+			"target": "https://cdn.example/final",
+			"expected": { "action": "follow", "hops": 50 }
+		},
+		{
+			"name": "hop limit refuses before dispatch",
+			"hops": 50,
+			"target": "https://cdn.example/final",
+			"expected": { "action": "refuse", "error": "HTTP redirect limit reached" }
+		},
+		{
+			"name": "exact prior URL loop refused",
+			"visited": { "https://cdn.example:443/final": true },
+			"target": "https://cdn.example/final",
+			"expected": { "action": "refuse", "error": "HTTP redirect loop refused" }
+		},
+		{
+			"name": "fragment does not bypass loop guard",
+			"visited": { "https://cdn.example:443/final": true },
+			"target": "https://cdn.example/final#two",
+			"expected": { "action": "refuse", "error": "HTTP redirect loop refused" }
+		},
+		{
+			"name": "transport failure never follows Location",
+			"curl_exit": 7,
+			"target": "https://cdn.example/final",
+			"expected": { "action": "terminal" }
+		},
+		{
+			"name": "native prior following is invalid evidence",
+			"num_redirects": 1,
+			"target": "https://cdn.example/final",
+			"expected": { "action": "refuse", "error": "HTTP redirect receipt refused" }
+		},
+		{
+			"name": "successful response is terminal even with target field",
+			"status": 200,
+			"target": "https://cdn.example/final",
+			"expected": { "action": "terminal" }
+		},
+		{
+			"name": "proxy auth rejection is terminal",
+			"status": 407,
+			"target": "https://cdn.example/final",
+			"expected": { "action": "terminal" }
+		},
+		{
+			"name": "missing Location retains redirect response",
+			"target": "",
+			"expected": { "action": "terminal" }
+		},
+		{
+			"name": "GET 301 remains GET",
+			"status": 301,
+			"target": "https://updates.example/final",
+			"expected": { "action": "follow", "method": "GET" }
+		},
+		{
+			"name": "GET 303 remains GET",
+			"status": 303,
+			"target": "https://updates.example/final",
+			"expected": { "action": "follow", "method": "GET" }
+		},
+		{
+			"name": "GET 307 remains GET",
+			"status": 307,
+			"target": "https://updates.example/final",
+			"expected": { "action": "follow", "method": "GET" }
+		},
+		{
+			"name": "GET 308 remains GET",
+			"status": 308,
+			"target": "https://updates.example/final",
+			"expected": { "action": "follow", "method": "GET" }
+		},
+		{
+			"name": "native 300 Location preserves curl behavior",
+			"status": 300,
+			"target": "https://updates.example/final",
+			"expected": { "action": "follow", "method": "GET" }
+		},
+		{
+			"name": "native 304 Location preserves curl behavior without ETag port",
+			"status": 304,
+			"target": "https://updates.example/final",
+			"expected": { "action": "follow", "method": "GET" }
+		},
+		{
+			"name": "native 399 Location preserves curl behavior",
+			"status": 399,
+			"target": "https://updates.example/final",
+			"expected": { "action": "follow", "method": "GET" }
+		},
+		{
+			"name": "original HTTP floor stays HTTP after an intermediate HTTPS upgrade",
+			"current_url": "https://updates.example/intermediate",
+			"https_floor": false,
+			"target": "http://updates.example/final",
+			"expected": { "action": "follow", "method": "GET", "headers": {} }
+		}
+	]
+}

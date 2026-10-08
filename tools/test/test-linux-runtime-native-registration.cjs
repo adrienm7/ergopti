@@ -42,6 +42,7 @@ const SOURCES = [
 	'static/ergopti_plus/linux/tests/hardware/run_native_subreaper.py',
 	'static/ergopti_plus/linux/tests/hardware/run_native_subreaper_teardown.py',
 	'static/ergopti_plus/linux/adapters/http_client.lua',
+	'static/ergopti_plus/linux/adapters/curl_http_client.lua',
 	'static/ergopti_plus/linux/tests/hardware/run_http_owned_post_native.lua',
 	'static/ergopti_plus/linux/tests/hardware/run_http_owned_post_native.py',
 	RUNNER,

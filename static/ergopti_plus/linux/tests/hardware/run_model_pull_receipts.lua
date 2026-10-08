@@ -14,9 +14,25 @@ local Download = require("modules.llm.model_download")
 local Window = require("ui.download_window.bridge")
 local Manager = require("ui.webview_manager")
 local Http = require("adapters.http_client")
+local Json = require("json")
+local ScriptActions = require("modules.shortcuts.script_actions")
 local sockets, requests, checks = {}, 0, 0
 local status, body = 500, '{"error":"fixture failure"}\n'
 local results = {}
+-- Use the same actual pause controller as the daemon. Lifecycle actions are
+-- restricted to the model/window resources this native fixture owns.
+local script_actions = ScriptActions.new({
+	reset = function() Download.shutdown() end,
+	reload = function()
+		Download.shutdown()
+		Manager.hide("download_window")
+	end,
+	quit = function()
+		Download.shutdown()
+		Manager.hide("download_window")
+	end,
+})
+Manager.set_daemon_state({ is_paused = script_actions.is_paused })
 local server = uv.new_tcp()
 assert(server:bind("127.0.0.1", 0))
 local base = "http://127.0.0.1:" .. tostring(server:getsockname().port)
@@ -79,6 +95,45 @@ local function evaluate(view, source)
 	return value
 end
 
+--- Posts from the real page and observes its decoded native response.
+--- The page factory supplies its genuine document binding; no native context,
+--- nonce, token or lease is manufactured by this fixture.
+--- @param view userdata
+--- @param payload any
+--- @return table
+local function bridge_response(view, payload)
+	assert(evaluate(view, "window.__nativePullResponses = []; String(makeHostBridge('dl_bridge')("
+		.. assert(Json.encode(payload)) .. "))") == "true", "actual page bridge must admit the post")
+	local response, pending, failure = nil, false, nil
+	local settled = await(function()
+		if response or failure then return true end
+		if not pending then
+			pending = true
+			view:run_javascript("JSON.stringify(window.__nativePullResponses)", nil, function(_, result)
+				local decoded, values = pcall(function()
+					return Json.decode(view:run_javascript_finish(result):get_js_value():to_string())
+				end)
+				if not decoded or type(values) ~= "table" then
+					failure = "actual page response observation failed"
+				else
+					for _, value in ipairs(values) do
+						if type(value) == "table" and ((payload == "ready" and type(value.pushed) == "boolean")
+							or (type(payload) == "table" and type(value.retried) == "boolean")) then
+							response = value
+							break
+						end
+					end
+				end
+				pending = false
+			end, nil)
+		end
+		return response ~= nil or failure ~= nil
+	end)
+	assert(settled, "actual native progress response did not settle")
+	assert(not failure, failure)
+	return assert(response, "actual native progress response is absent")
+end
+
 --- Requires a meaningful native observation and counts it for CI evidence.
 --- @param condition boolean
 --- @param message string
@@ -94,14 +149,31 @@ local ok, err = xpcall(function()
 	check(await(function() return #results == 1 end), "failed native model pull settles")
 	check(results[1] == false and requests == 1 and not Download.is_active(), "HTTP failure remains a failed pull")
 	status, body = 200, '{"status":"success"}\n'
+	local view = assert(Manager.webview_for("download_window"), "actual progress WebKit view is absent")
+	check(type(view.is_loading) == "boolean", "actual progress native loading property is Boolean")
+	check(await(function() return Manager.capture_document_owner("download_window") ~= nil end),
+		"actual progress document acknowledges native initialization")
+	check(evaluate(view, [[
+		window.__nativePullResponses = [];
+		var priorNativePullResponse = window.__hostBridgeResponse;
+		window.__hostBridgeResponse = function(name, encoded, payload) {
+			if (name === 'dl_bridge') {
+				var response = decodeHostBridgeResponse(encoded, payload);
+				if (response !== null) window.__nativePullResponses.push(response);
+			}
+			if (typeof priorNativePullResponse === 'function') {
+				return priorNativePullResponse.apply(this, arguments);
+			}
+		};
+		typeof makeHostBridge + ':' + typeof decodeHostBridgeResponse;
+	]]) == "function:function", "actual progress page exposes its host post and response decoder")
 	local failed_session = Window.session_id()
-	local failed_epoch = Window.on_message("ready").failure_epoch
+	local failed_epoch = bridge_response(view, "ready").failure_epoch
 	local failed_retry = { action = "failure_action", id = "retry", session = failed_session, epoch = failed_epoch }
-	local retry = Window.on_message(failed_retry)
+	local retry = bridge_response(view, failed_retry)
 	check(retry and retry.retried == true, "failed pull admits retry through the actual progress bridge")
 	check(await(function() return #results == 2 end), "retried native pull settles")
 	check(results[2] == true and requests == 2 and not Download.is_active(), "successful native pull releases transport")
-	local view = assert(Manager.webview_for("download_window"), "actual progress WebKit view is absent")
 	check(await(function() return not view.is_loading end), "actual progress page finishes loading")
 	check(evaluate(view, [[
 		window.nativePullSucceeded = null;
@@ -112,14 +184,14 @@ local ok, err = xpcall(function()
 		};
 		typeof originalDone;
 	]]) == "function", "actual progress page exposes its completion receiver")
-	check(Window.on_message("ready").pushed == true
+	check(bridge_response(view, "ready").pushed == true
 		and evaluate(view, "String(window.nativePullSucceeded)") == "true", "native page receives successful settlement")
 	check(Download.retry() == false, "successful native pull refuses direct stale retry")
-	retry = Window.on_message(failed_retry)
+	retry = bridge_response(view, failed_retry)
 	check(retry and retry.retried == false, "successful native pull refuses stale progress retry")
 	check(requests == 2 and not Download.is_active() and not Http.isActive("ollama_model_pull"),
 		"stale retries cannot reacquire native transport")
-	check(Window.on_message("ready").pushed == true
+	check(bridge_response(view, "ready").pushed == true
 		and evaluate(view, "String(window.nativePullSucceeded)") == "true", "stale retry preserves successful page settlement")
 end, debug.traceback)
 

@@ -79,7 +79,72 @@ jobs:
         # Wrapped in the unified reporter: streams output unchanged, exits with the
         # runner's code (CI gating preserved), and emits GitHub annotations + a JSON
         # summary on failure. report.cjs lives at the repo root tools/.
-        run: node ../../../tools/test/report.cjs --name linux-lua --json "${{ runner.temp }}/linux-lua.json" -- luajit tests/run.lua
+        id: linux_unit
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +e
+          node ../../../tools/test/report.cjs --name linux-lua --json "${{ runner.temp }}/linux-lua.json" -- luajit tests/run.lua 2>&1 | tee "$RUNNER_TEMP/linux-unit.log"
+          unit_pipeline_status=("${PIPESTATUS[@]}")
+          set -e
+          if [ "${unit_pipeline_status[0]}" -ne 0 ]; then exit "${unit_pipeline_status[0]}"; fi
+          exit "${unit_pipeline_status[1]}"
+
+      # A failed unit receipt stays red; this artifact keeps only its public log.
+      - name: Upload failed unit log
+        if: ${{ failure() && !cancelled() && steps.linux_unit.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-unit-failure-log
+          retention-days: 7
+          path: ${{ runner.temp }}/linux-unit.log
+          if-no-files-found: error
+
+      # The original red unit run owns this public assertion; no rerun is substituted.
+      - name: Emit Configuration assertion from failed unit log
+        if: ${{ failure() && !cancelled() && steps.linux_unit.outcome == 'failure' }}
+        shell: bash
+        run: node tools/test/linux-unit-failure-excerpt.cjs "$RUNNER_TEMP/linux-unit.log"
+
+      # Observe genuine native input before unrelated external IA acquisition.
+      - name: Saved ordered-pair Manager — early genuine native source lifetimes
+        if: ${{ !cancelled() && steps.linux_unit.outcome == 'success' }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          set -euo pipefail
+          if ! command -v Xvfb >/dev/null; then
+            echo 'ENVIRONMENT: early saved-pair Manager prerequisite refused: Xvfb is absent' >&2
+            exit 2
+          fi
+          sudo modprobe uinput
+          if sudo python3 tests/hardware/run_manager_input_owner_real.py > "$RUNNER_TEMP/linux-manager-input-owner-early.log" 2>&1; then
+            manager_status=0
+          else
+            manager_status=$?
+          fi
+          cat "$RUNNER_TEMP/linux-manager-input-owner-early.log"
+          exit "$manager_status"
+        timeout-minutes: 3
+
+      # This independent observation grants no success to the failed unit suite.
+      - name: Saved ordered-pair Manager — independent observation after failed units
+        if: ${{ !cancelled() && steps.linux_unit.outcome == 'failure' }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          set -euo pipefail
+          if ! command -v Xvfb >/dev/null; then
+            echo 'ENVIRONMENT: early saved-pair Manager prerequisite refused: Xvfb is absent' >&2
+            exit 2
+          fi
+          sudo modprobe uinput
+          if sudo python3 tests/hardware/run_manager_input_owner_real.py > "$RUNNER_TEMP/linux-manager-input-owner-unit-failure.log" 2>&1; then
+            manager_status=0
+          else
+            manager_status=$?
+          fi
+          cat "$RUNNER_TEMP/linux-manager-input-owner-unit-failure.log"
+          exit "$manager_status"
+        timeout-minutes: 3
 
       # This external acceptance is deliberate manual validation, separate from
       # the frozen prerequisite gate and every package/installed-driver subject.
@@ -129,6 +194,7 @@ jobs:
   e2e-linux:
     name: 'E2E tests'
     needs: [test-linux]
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     env:
       # Python-owned native children also resolve the production shared modules.
@@ -141,7 +207,9 @@ jobs:
         # Test discovery alone does not prove their filesystem admission.
         # Canonical XKB controls below require xkbcli before their first use.
         run: |
-          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y luajit lua-filesystem sqlite3 libxkbcommon-tools xkb-data
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y luajit lua-luv lua-filesystem sqlite3 libxkbcommon-tools xkb-data
+          luajit -e 'assert(require("luv"), "native E2E luv integration is mandatory")'
+        timeout-minutes: 10
 
       # The virtual-keyboard harness, stubbed: this step runs on ubuntu-latest
       # against the pure-Lua hotstring engine — no real evdev device, no ydotool
@@ -164,6 +232,18 @@ jobs:
           luajit tests/e2e/run_e2e.lua | tee "$RUNNER_TEMP/linux-e2e.log"
         timeout-minutes: 5
 
+      # Separate preparation attempts cannot suppress another role's acquisition.
+      # The original signed in-case checks and one-minute receiving clocks remain.
+      - name: Prepare native GTK dependencies
+        if: ${{ !cancelled() }}
+        run: sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends libgtk-3-bin dbus-x11 xvfb x11-utils
+        timeout-minutes: 10
+
+      - name: Prepare native process and compiler dependencies
+        if: ${{ !cancelled() }}
+        run: sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends build-essential curl libffi-dev liblua5.4-dev lua-luv lua5.4 meson ninja-build openssl pkg-config python3 strace
+        timeout-minutes: 10
+
       - name: Launch option-looking application ids through actual GTK desktop entries
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
@@ -177,7 +257,7 @@ jobs:
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
-          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends lua-luv lua5.4 curl openssl python3 strace
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends lua-luv lua5.4 curl openssl python3 strace build-essential meson ninja-build liblua5.4-dev libffi-dev pkg-config
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_process_groups.lua
         timeout-minutes: 1
 
@@ -910,19 +990,19 @@ jobs:
 
       - name: Preserve native updater temporary-file ownership
         if: ${{ !cancelled() }}
-        working-directory: static/ergopti_plus/linux
         run: |
-          python3 tests/hardware/run_updater_temp_ownership_receipts.py
-          ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_updater_temp_ownership_receipts.py
-        timeout-minutes: 2
+          set -euo pipefail
+          export ERGOPTI_MANAGED_NATIVE_EXPECTED_HEAD="$GITHUB_SHA"
+          npm run --silent test:linux:updater-temp-native -- --fixture ownership | tee "$RUNNER_TEMP/linux-updater-temp-ownership.log"
+        timeout-minutes: 22
 
       - name: Acknowledge native updater temporary-allocation refusals
         if: ${{ !cancelled() }}
-        working-directory: static/ergopti_plus/linux
         run: |
-          python3 tests/hardware/run_updater_temp_allocation_receipts.py
-          ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_updater_temp_allocation_receipts.py
-        timeout-minutes: 1
+          set -euo pipefail
+          export ERGOPTI_MANAGED_NATIVE_EXPECTED_HEAD="$GITHUB_SHA"
+          npm run --silent test:linux:updater-temp-native -- --fixture allocation | tee "$RUNNER_TEMP/linux-updater-temp-allocation.log"
+        timeout-minutes: 22
 
       - name: Install native virtual audio locale prerequisites
         if: ${{ !cancelled() }}
@@ -1328,6 +1408,78 @@ jobs:
           npm run test:linux:http-stream | tee "$RUNNER_TEMP/linux-http-stream.log"
         timeout-minutes: 3
 
+      # This lane qualifies native runtime admission and installed helper paths.
+      # Its four actual groups are distinct from factory models and HTTP receipts.
+      - name: Qualify native managed network runtime
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends luajit lua-luv glib-networking gsettings-desktop-schemas
+          npm run test:linux:network-runtime | tee "$RUNNER_TEMP/linux-network-runtime.log"
+        timeout-minutes: 3
+      # Independent NIST vectors use retained, already unlinked descriptors.
+      - name: Qualify native retained FD SHA-256
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          npm run --silent test:linux:fd-sha256-native | tee "$RUNNER_TEMP/linux-fd-sha256-native.log"
+        timeout-minutes: 3
+
+      # Tool admissions are private and scoped; product curl remains unchanged.
+      - name: Prepare authenticated managed HTTP validation tools
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends build-essential pkg-config libssl-dev zlib1g-dev gpgv debian-archive-keyring luajit lua-luv libglib2.0-dev libglib2.0-bin glib-networking gsettings-desktop-schemas dconf-gsettings-backend dbus openssl libnghttp2-14 libidn2-0 librtmp1 libssh2-1t64 libpsl5t64 libgssapi-krb5-2 libsasl2-2 libzstd1 libbrotli1
+          umask 077
+          validation_parent="$RUNNER_TEMP/managed-http-validation"
+          mkdir -m 700 "$validation_parent"
+          if ! python3 -B tools/test/test_validation_keyring_preparation.py > "$validation_parent/keyring.models.stdout.private" 2> "$validation_parent/keyring.models.stderr.private"; then
+            echo "::error::Private validation keyring receiving controls failed; no tool admission."
+            exit 1
+          fi
+          if ! python3 -B tools/test/fixtures/validation-curl/prepare_validation_keyring.py --repo "$GITHUB_WORKSPACE" --destination "$validation_parent/keyring" > "$validation_parent/keyring.stdout.private" 2> "$validation_parent/keyring.stderr.private"; then
+            echo "::error::Authenticated private validation keyring preparation failed; private inputs retained."
+            exit 1
+          fi
+          if python3 -B tools/test/fixtures/validation-curl/setup_validation_curl.py --repo "$GITHUB_WORKSPACE" --destination "$validation_parent/tools" --openssl-prefix /usr --keyring "$validation_parent/keyring/trusted.gpg" --jobs 2 > "$validation_parent/setup.stdout.private" 2> "$validation_parent/setup.stderr.private"; then
+            node tools/test/linux-managed-http-evidence.cjs --tools-env "$validation_parent/tools/TOOLS-ADMISSION.json" "$validation_parent/tools" tools/test/fixtures/validation-curl/PINS.json >> "$GITHUB_ENV"
+          else
+            if ! node tools/test/linux-managed-http-evidence.cjs --setup-diagnostic "$validation_parent/setup.stdout.private"; then echo "::error::Authenticated managed HTTP validation setup failed; fixed diagnostic unavailable; private inputs retained."; fi
+            exit 1
+          fi
+        timeout-minutes: 35
+
+      - name: Qualify native managed HTTP public and retained output
+        if: ${{ !cancelled() }}
+        env:
+          ERGOPTI_MANAGED_NATIVE_EXPECTED_HEAD: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          unset PKG_CONFIG_SYSROOT_DIR ERGOPTI_MANAGED_NATIVE_GIO_SYSROOT
+          npm run --silent test:linux:managed-http-native | tee "$RUNNER_TEMP/linux-managed-http-native.log"
+        timeout-minutes: 35
+
+      # Actual owner-built installed-prefix archive chain; no mocked production I/O.
+      - name: Qualify native updater archive pipeline
+        if: ${{ !cancelled() }}
+        env:
+          # Empty on manual/nonrelease runs: private runner admits package metadata.
+          ERGOPTI_BUILD_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          export ERGOPTI_MANAGED_NATIVE_EXPECTED_HEAD="$GITHUB_SHA"
+          env -u PKG_CONFIG_SYSROOT_DIR -u ERGOPTI_MANAGED_NATIVE_GIO_SYSROOT npm run --silent test:linux:updater-archive-native | tee "$RUNNER_TEMP/linux-updater-archive-native.log"
+        timeout-minutes: 35
+
+      # Controlled metadata and real filesystem guards are separate from native provider proof.
+      - name: Qualify archive crypto and bin parent source controls
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          npm run --silent test:linux:archive-source-controls | tee "$RUNNER_TEMP/linux-archive-source-controls.log"
+        timeout-minutes: 3
+
       # This prerequisite proof is independent of official runtime/model downloads.
       - name: Qualify native runtime prerequisites
         if: ${{ !cancelled() }}
@@ -1458,6 +1610,19 @@ jobs:
           export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
           ERGOPTI_TEST_PRIVATE_DBUS=1 dbus-run-session -- xvfb-run -a luajit tests/hardware/run_notification_text_receipts.lua
         timeout-minutes: 2
+
+      - name: Install portable network staging prerequisites
+        if: ${{ !cancelled() }}
+        run: |
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends \
+            luajit lua-luv curl binutils pkg-config libglib2.0-dev \
+            glib-networking dconf-gsettings-backend gsettings-desktop-schemas
+        timeout-minutes: 20
+
+      - name: Qualify actual staged portable network runtime and retirement
+        if: ${{ !cancelled() }}
+        run: npm run test:linux:portable-network-native
+        timeout-minutes: 10
 
       - name: The webview push reaches a real WebKit page
         if: ${{ !cancelled() }}
@@ -1592,6 +1757,47 @@ jobs:
           exit $STATUS
         timeout-minutes: 5
 
+      # Standard signed-APT Nix tool, one local store, existing physical phase owner.
+      - name: Qualify genuine Nix installed runtime
+        if: ${{ !cancelled() }}
+        env:
+          ERGOPTI_NIX_EXPECTED_HEAD: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends nix-bin
+          # This dedicated ephemeral runner may not adopt an occupied foreign store.
+          if [ -L /nix ] || [ -L /nix/store ] || [ -L /nix/var ] || [ -L /nix/var/nix ] || [ -L /nix/var/log ] || [ -L /nix/var/log/nix ]; then
+            echo "::error::Literal standard Nix store required."
+            exit 1
+          fi
+          if [ -d /nix/store ] && [ -n "$(find /nix/store -mindepth 1 -maxdepth 1 -print -quit)" ]; then
+            echo "::error::Occupied Nix store cannot be adopted."
+            exit 1
+          fi
+          if [ -e /nix/var/nix/db/db.sqlite ]; then
+            echo "::error::Existing Nix database cannot be adopted."
+            exit 1
+          fi
+          if [ -d /nix/var/log/nix ] && [ -n "$(find /nix/var/log/nix -mindepth 1 -maxdepth 1 -print -quit)" ]; then
+            echo "::error::Occupied Nix build logs cannot be adopted."
+            exit 1
+          fi
+          runner_uid=$(id -u)
+          runner_gid=$(id -g)
+          # Builds also write the separate standard log tree; metadata does not.
+          sudo install -d -m 0755 -o "$runner_uid" -g "$runner_gid" /nix/store /nix/var/nix /nix/var/log/nix
+          umask 077
+          npm run --silent test:linux:nix-native | tee "$RUNNER_TEMP/linux-nix-native.log"
+        timeout-minutes: 35
+
+      # A supplementary observation never grants success to a failed prerequisite.
+      - name: Preserve the mandatory upstream unit result
+        if: ${{ !cancelled() }}
+        timeout-minutes: 1
+        env:
+          ERGOPTI_UPSTREAM_UNIT_RESULT: ${{ needs.test-linux.result }}
+        run: test "$ERGOPTI_UPSTREAM_UNIT_RESULT" = success
+
       - name: Record mandatory E2E evidence
         run: |
           set -euo pipefail
@@ -1600,6 +1806,19 @@ jobs:
           native_family_assertions=$(sed -n 's/^Native fixture family receipts: \([0-9][0-9]*\) passed, 0 failed, 0 skipped$/\1/p' "$RUNNER_TEMP/linux-window-switch.log" | tail -1)
           window_switch_assertions=$(sed -n 's/^Native window receipts: \([0-9][0-9]*\) passed, 0 failed, 0 skipped$/\1/p' "$RUNNER_TEMP/linux-window-switch.log" | tail -1)
           http_stream_assertions=$(sed -n 's/^PASS native HTTP streaming receipts: \([0-9][0-9]*\) checks$/\1/p' "$RUNNER_TEMP/linux-http-stream.log" | tail -1)
+          network_runtime_assertions=$(node tools/test/linux-network-runtime-evidence.cjs "$RUNNER_TEMP/linux-network-runtime.log")
+          nix_runtime_assertions=$(node tools/test/run-linux-nix-native.cjs --evidence "$RUNNER_TEMP/linux-nix-native.log" "$GITHUB_SHA")
+          fd_sha256_assertions=$(node tools/test/run-linux-fd-sha256-native.cjs --evidence "$RUNNER_TEMP/linux-fd-sha256-native.log")
+          managed_http_output_assertions=$(node tools/test/linux-managed-http-evidence.cjs --count output "$RUNNER_TEMP/linux-managed-http-native.log" "$GITHUB_SHA")
+          managed_http_public_assertions=$(node tools/test/linux-managed-http-evidence.cjs --count public "$RUNNER_TEMP/linux-managed-http-native.log" "$GITHUB_SHA")
+          updater_native_namespace_assertions=$(node tools/test/run-linux-updater-temp-native.cjs --evidence namespace "$RUNNER_TEMP/linux-updater-temp-ownership.log" "$GITHUB_SHA")
+          updater_temp_ownership_assertions=$(node tools/test/run-linux-updater-temp-native.cjs --evidence ownership "$RUNNER_TEMP/linux-updater-temp-ownership.log" "$GITHUB_SHA")
+          updater_temp_allocation_assertions=$(node tools/test/run-linux-updater-temp-native.cjs --evidence allocation "$RUNNER_TEMP/linux-updater-temp-allocation.log" "$GITHUB_SHA")
+          updater_archive_assertions=$(node tools/test/linux-updater-archive-evidence.cjs archive "$RUNNER_TEMP/linux-updater-archive-native.log")
+          archive_crypto_assertions=$(node tools/test/linux-updater-archive-evidence.cjs crypto "$RUNNER_TEMP/linux-archive-source-controls.log")
+          archive_bin_parent_assertions=$(node tools/test/linux-updater-archive-evidence.cjs parents "$RUNNER_TEMP/linux-archive-source-controls.log")
+          archive_snapshot_assertions=$(node tools/test/linux-updater-archive-evidence.cjs snapshot "$RUNNER_TEMP/linux-archive-source-controls.log")
+          connect_protocol_assertions=$(node tools/test/linux-updater-archive-evidence.cjs connect "$RUNNER_TEMP/linux-archive-source-controls.log")
           node tools/test/linux-ci-evidence.cjs record \
               --job e2e-linux \
               --output "$RUNNER_TEMP/linux-ci-evidence/e2e-linux.json" \
@@ -1615,6 +1834,19 @@ jobs:
               --subject "window-switch-receipts=$window_switch_assertions" \
               --subject "native-fixture-family=$native_family_assertions" \
               --subject "http-stream-receipts=$http_stream_assertions" \
+              --subject "managed-network-runtime=$network_runtime_assertions" \
+              --subject "nix-installed-runtime=$nix_runtime_assertions" \
+              --subject "retained-fd-sha256=$fd_sha256_assertions" \
+              --subject "managed-http-output=$managed_http_output_assertions" \
+              --subject "managed-http-public=$managed_http_public_assertions" \
+              --subject "updater-native-namespace-cleanup=$updater_native_namespace_assertions" \
+              --subject "updater-temp-ownership=$updater_temp_ownership_assertions" \
+              --subject "updater-temp-allocation=$updater_temp_allocation_assertions" \
+              --subject "updater-archive-pipeline=$updater_archive_assertions" \
+              --subject "archive-source-crypto=$archive_crypto_assertions" \
+              --subject "archive-source-bin-parent=$archive_bin_parent_assertions" \
+              --subject "archive-private-snapshot=$archive_snapshot_assertions" \
+              --subject "connect-terminal-protocol-model=$connect_protocol_assertions" \
               --subject x11-display=1 \
               --subject wayland-display=1 \
               --subject tray-symbols=1 \
@@ -1687,7 +1919,9 @@ jobs:
         # (without it the AppImage falls back to a luajit the target must
         # already have), and the tarball smoke runs the installed tree with it.
         run: |
-          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y luajit
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y luajit lua-luv curl binutils pkg-config \
+            libglib2.0-dev glib-networking dconf-gsettings-backend \
+            gsettings-desktop-schemas
 
       - name: Assemble the driver bundle
         shell: bash

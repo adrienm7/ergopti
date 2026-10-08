@@ -71,8 +71,10 @@ _UDRC_DownloadStartsOnlyFromConsent() {
 		"the named 'Update to vX' row must start the download")
 	AssertTrue(_UDRC_OnlyAuditedDownloadCalls(Code, Bodies),
 		"only the four audited consent ports may start a download; checks stop before consent")
-	AssertEqual(1, _UDRC_CountCalls(Code, "_Updater_StartObservedInstall"),
-		"only the native Versions window's install port may start its observed update")
+	AssertEqual(2, _UDRC_CountCalls(Code, "_Updater_StartObservedInstall"),
+		"only the native Versions install port and exact terminal click retry may start an observed update")
+	AssertEqual(1, _UDRC_CountCalls(_DriverFuncBody("_Updater_RetryManagedFailure"), "_Updater_StartObservedInstall"),
+		"only the exact current failed staging intent may enter the retry port")
 	AssertEqual(1, _UDRC_CountCalls(_DriverFuncBody("_Updater_InstallChosenRelease"), "_Updater_StartObservedInstall"),
 		"the native Versions install button owns the observed update port")
 	AssertEqual(1, _UDRC_CountCalls(Code, "_CLW_StartUpdatePath"),

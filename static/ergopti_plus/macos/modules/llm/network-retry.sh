@@ -15,6 +15,13 @@
 # apply_system_network().
 # ============================================================================
 
+# EX_CONFIG: the client cannot apply the configured native route. It does not
+# identify a PAC evaluation failure, and callers must not infer one from it.
+OPAQUE_NETWORK_REFUSAL_EXIT_CODE=78
+# Capture the caller's route before the default/native-curl activation exports
+# system static values. Those exports cannot later become an explicit override.
+OPAQUE_NETWORK_INHERITED_HTTPS_ROUTE="${https_proxy:-${HTTPS_PROXY:-${all_proxy:-${ALL_PROXY:-}}}}"
+
 NETWORK_MAX_RETRIES=6
 NETWORK_BASE_BACKOFF_SEC=5
 CURL_CONNECT_TIMEOUT_SEC=30
@@ -83,6 +90,21 @@ curl_resumable() {
 # sends the local Ollama and MLX servers to the company's.
 LOOPBACK_NO_PROXY="localhost,127.0.0.1,::1"
 
+# Repeated admission checks keep the same child environment. Never append a CA
+# file: uv's native trust selection is the same Boolean activation every time.
+apply_client_network_environment() {
+	local exclusions="${NO_PROXY:-${no_proxy:-}}" host
+	local IFS=,
+	for host in $LOOPBACK_NO_PROXY; do
+		case ",$exclusions," in
+			*",$host,"*) ;;
+			*) exclusions="${exclusions:+$exclusions,}$host" ;;
+		esac
+	done
+	export NO_PROXY="$exclusions" no_proxy="$exclusions"
+	export UV_SYSTEM_CERTS=1
+}
+
 # Reads `scutil --proxy` on stdin and prints NAME=VALUE lines: HTTPS_PROXY
 # and HTTP_PROXY for the enabled entries, NO_PROXY for the exceptions, and
 # PAC_URL when only an automatic configuration is set, which a shell cannot
@@ -123,10 +145,193 @@ system_network_from_scutil() {
 	'
 }
 
+# Reads only the native configuration. The opaque-client receiver replaces
+# this function with literal snapshots; production always uses the native tool.
+opaque_system_proxy_snapshot() {
+	[ -x /usr/sbin/scutil ] || return 1
+	/usr/sbin/scutil --proxy 2>/dev/null
+}
+
+# Automatic configuration has precedence even when static entries coexist.
+# A successfully read dictionary with neither mode enabled admits its static
+# routes or DIRECT. A failed/malformed getter never establishes DIRECT.
+opaque_automatic_mode_from_scutil() {
+	awk '
+		BEGIN {
+			flag_keys[++flag_count] = "HTTPEnable"
+			flag_keys[++flag_count] = "HTTPSEnable"
+			flag_keys[++flag_count] = "SOCKSEnable"
+			flag_keys[++flag_count] = "FTPEnable"
+			flag_keys[++flag_count] = "GopherEnable"
+			flag_keys[++flag_count] = "RTSPEnable"
+			flag_keys[++flag_count] = "ProxyAutoConfigEnable"
+			flag_keys[++flag_count] = "ProxyAutoDiscoveryEnable"
+			flag_keys[++flag_count] = "ExcludeSimpleHostnames"
+			for (i = 1; i <= flag_count; i++) flags[flag_keys[i]] = 1
+			proxy_keys["HTTPEnable"] = "HTTP"
+			proxy_keys["HTTPSEnable"] = "HTTPS"
+			proxy_keys["SOCKSEnable"] = "SOCKS"
+			proxy_keys["FTPEnable"] = "FTP"
+			proxy_keys["GopherEnable"] = "Gopher"
+			proxy_keys["RTSPEnable"] = "RTSP"
+		}
+		function relevant(key) {
+			return flags[key] || key ~ /^(HTTP|HTTPS|SOCKS|FTP|Gopher|RTSP)(Proxy|Port)$/ \
+				|| key == "ProxyAutoConfigURLString"
+		}
+		function fingerprint(node, result, i, key, value, host, port, family) {
+			for (i = 1; i <= flag_count; i++) {
+				key = flag_keys[i]
+				value = field[node, key] == "" ? "0" : field[node, key]
+				result = result SUBSEP key "=" value
+				if (value == "1" && proxy_keys[key] != "") {
+					family = proxy_keys[key]
+					host = field[node, family "Proxy"]
+					port = field[node, family "Port"]
+					if (host == "" || host ~ /[ \t]/ \
+						|| (port != "" && (port !~ /^[0-9]+$/ || port + 0 < 1 || port + 0 > 65535))) bad = 1
+					result = result SUBSEP host SUBSEP port
+				}
+			}
+			if (field[node, "ProxyAutoConfigEnable"] == "1")
+				result = result SUBSEP field[node, "ProxyAutoConfigURLString"]
+			return result SUBSEP exceptions[node]
+		}
+		NF {
+			line = $0
+			sub(/^[ \t]+/, "", line)
+			sub(/[ \t]+$/, "", line)
+			if (!started) {
+				if (line != "<dictionary> {" && line != "<dictionary> {}") { bad = 1; next }
+				started = 1
+				nodes = 1
+				kind[1] = "dictionary"
+				route_dictionary[1] = 1
+				if (line == "<dictionary> {}") closed = 1
+				else { depth = 1; stack[1] = 1 }
+				next
+			}
+			if (closed || depth == 0) { bad = 1; next }
+			if (line == "}") {
+				depth--
+				if (depth == 0) closed = 1
+				next
+			}
+			separator = index(line, " :")
+			if (separator == 0) { bad = 1; next }
+			key = substr(line, 1, separator - 1)
+			value = substr(line, separator + 2)
+			if (value != "" && substr(value, 1, 1) != " ") { bad = 1; next }
+			sub(/^ /, "", value)
+			node = stack[depth]
+			if (kind[node] == "array") {
+				if (key !~ /^(0|[1-9][0-9]*)$/ || key + 0 != next_index[node]++) { bad = 1; next }
+			} else if (key == "" || key ~ /[ \t:{}]/) { bad = 1; next }
+			if (seen_key[node, key]++) { bad = 1; next }
+			container = value == "<dictionary> {" || value == "<array> {" \
+				|| value == "<dictionary> {}" || value == "<array> {}"
+			if (kind[node] == "dictionary" && relevant(key)) {
+				route_dictionary[node] = 1
+				if (container || (flags[key] && value != "0" && value != "1")) { bad = 1; next }
+				field[node, key] = value
+			}
+			if (kind[node] == "dictionary" && key == "ExceptionsList") {
+				route_dictionary[node] = 1
+				if (value != "<array> {" && value != "<array> {}") { bad = 1; next }
+			}
+			if ((key == "__SCOPED__" && value != "<dictionary> {" && value != "<dictionary> {}") \
+				|| (key == "__SUPPLEMENTAL__" && value != "<array> {" && value != "<array> {}")) { bad = 1; next }
+			if (exception_owner[node]) {
+				if (container || value == "") { bad = 1; next }
+				exceptions[exception_owner[node]] = exceptions[exception_owner[node]] SUBSEP value
+			}
+			if (container) {
+				child = ++nodes
+				kind[child] = substr(value, 1, 7) == "<array>" ? "array" : "dictionary"
+				if (key == "ExceptionsList" && kind[node] == "dictionary") exception_owner[child] = node
+				if (key == "__SCOPED__") scoped_container[child] = 1
+				if (key == "__SUPPLEMENTAL__") supplemental_container[child] = 1
+				if (scoped_container[node] || supplemental_container[node]) {
+					if (kind[child] != "dictionary") { bad = 1; next }
+					route_dictionary[child] = 1
+				}
+				if (substr(value, length(value) - 1) != "{}") stack[++depth] = child
+			} else if (scoped_container[node] || supplemental_container[node] \
+				|| value ~ /^<(dictionary|array)>/ || value == "{" || value == "}") { bad = 1; next }
+		}
+		END {
+			if (bad || !started || !closed || depth != 0) exit 1
+			global_route = fingerprint(1)
+			for (node = 2; node <= nodes; node++) {
+				if (route_dictionary[node] && fingerprint(node) != global_route) bad = 1
+			}
+			if (bad) exit 1
+			if (field[1, "ProxyAutoConfigEnable"] == "1") print "pac"
+			else if (field[1, "ProxyAutoDiscoveryEnable"] == "1") print "wpad"
+			else if (field[1, "SOCKSEnable"] == "1" && field[1, "HTTPSEnable"] != "1") print "unsupported"
+			else print "none"
+		}
+	'
+}
+
+# uv, HTTPX/HuggingFace and the owned Ollama Go daemon have no native,
+# per-request full-URL PAC adapter. An explicit HTTPS environment route remains
+# supported; a system automatic route must be refused before any child starts.
+# These facts belong to this admission only, not to unstructured child stderr.
+apply_opaque_system_network() {
+	local relay snapshot mode settings line
+	OPAQUE_NETWORK_FAILURE_PROVENANCE=""
+	OPAQUE_NETWORK_PROXY_RESOLUTION_STATUS=""
+	relay="$OPAQUE_NETWORK_INHERITED_HTTPS_ROUTE"
+	if [ -n "$relay" ]; then
+		# Go does not consume ALL_PROXY. Materialize the selected environment
+		# route as HTTPS_PROXY too, with the shared lowercase-first precedence.
+		export HTTPS_PROXY="$relay" https_proxy="$relay"
+	else
+		if ! snapshot="$(opaque_system_proxy_snapshot)"; then
+			OPAQUE_NETWORK_FAILURE_PROVENANCE=unavailable
+			OPAQUE_NETWORK_PROXY_RESOLUTION_STATUS=unavailable
+			log_error "The system network configuration is unavailable. No download was started."
+			return "$OPAQUE_NETWORK_REFUSAL_EXIT_CODE"
+		fi
+		if ! mode="$(printf '%s\n' "$snapshot" | opaque_automatic_mode_from_scutil)"; then
+			OPAQUE_NETWORK_FAILURE_PROVENANCE=unavailable
+			OPAQUE_NETWORK_PROXY_RESOLUTION_STATUS=unavailable
+			log_error "The system network configuration could not be read. No download was started."
+			return "$OPAQUE_NETWORK_REFUSAL_EXIT_CODE"
+		fi
+		if [ "$mode" != none ]; then
+			OPAQUE_NETWORK_FAILURE_PROVENANCE=verified
+			OPAQUE_NETWORK_PROXY_RESOLUTION_STATUS=unavailable
+			log_error "The system proxy configuration cannot be used by this client. No download was started."
+			return "$OPAQUE_NETWORK_REFUSAL_EXIT_CODE"
+		fi
+		settings="$(printf '%s\n' "$snapshot" | system_network_from_scutil)" || return "$OPAQUE_NETWORK_REFUSAL_EXIT_CODE"
+		while IFS= read -r line; do
+			case "$line" in
+				HTTPS_PROXY=*) export HTTPS_PROXY="${line#HTTPS_PROXY=}" https_proxy="${line#HTTPS_PROXY=}" ;;
+				HTTP_PROXY=*)
+					if [ -z "${http_proxy:-${HTTP_PROXY:-}}" ]; then
+						export HTTP_PROXY="${line#HTTP_PROXY=}" http_proxy="${line#HTTP_PROXY=}"
+					fi ;;
+				NO_PROXY=*)
+					if [ -z "${NO_PROXY:-${no_proxy:-}}" ]; then export NO_PROXY="${line#NO_PROXY=}"; fi ;;
+			esac
+		done <<EOF_OPAQUE_SETTINGS
+$settings
+EOF_OPAQUE_SETTINGS
+	fi
+	apply_client_network_environment
+}
+
 # Exports the system network settings for every child of the calling script.
 # An explicit relay in the environment wins: whoever started the script chose
 # it. The line naming the settings avoids the words a failure classifier reads.
 apply_system_network() {
+	if [ "${1:-}" = opaque ]; then
+		apply_opaque_system_network
+		return $?
+	fi
 	local settings line
 	if [ -z "${HTTPS_PROXY:-}${https_proxy:-}${HTTP_PROXY:-}${http_proxy:-}" ] && [ -x /usr/sbin/scutil ]; then
 		settings="$(/usr/sbin/scutil --proxy 2>/dev/null | system_network_from_scutil)" || settings=""
@@ -146,10 +351,5 @@ EOF_SETTINGS
 			log_info "Downloads use the relay the system network settings name."
 		fi
 	fi
-	local exclusions="${NO_PROXY:-${no_proxy:-}}"
-	export NO_PROXY="${exclusions:+$exclusions,}$LOOPBACK_NO_PROXY"
-	export no_proxy="$NO_PROXY"
-	# uv trusts the keychain's roots, a company inspection certificate
-	# included, instead of its bundled Mozilla list.
-	export UV_SYSTEM_CERTS=1
+	apply_client_network_environment
 }

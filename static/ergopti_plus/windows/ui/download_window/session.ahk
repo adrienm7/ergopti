@@ -1,0 +1,193 @@
+﻿; ui/download_window/session.ahk
+
+; ==============================================================================
+; MODULE: Owned Managed Download Failure Session
+; DESCRIPTION:
+; Keeps the actual native request and receipt private. A page carries only an
+; operation session, failure epoch and action id; each click rechecks both the
+; captured window intent and the current native producer before dispatch.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+class ManagedDownloadFailureSession {
+	static Counter := 0
+	Epoch := 0
+	Owner := 0
+	Receipt := 0
+	Report := 0
+	IsCurrentFn := 0
+	RetryFn := 0
+	OwnedFolderFn := 0
+	Closed := false
+
+	__New() {
+		this.Id := ++ManagedDownloadFailureSession.Counter
+		if this.Id > 9007199254740991
+			throw Error("Managed download failure session exceeds the page integer range")
+	}
+
+	; Publishes one exact native failure; a replacement advances the same-session epoch.
+	; @param Receipt {Map} Typed native receipt, or empty map for unknown.
+	; @param Owner {Object} Exact private producer request, never a page object.
+	; @param IsCurrentFn {Func} Native owner/generation admission closure.
+	; @param RetryFn {Func|Integer} Actual native retry or zero.
+	; @param OwnedFolderFn {Func|Integer} Actual owned folder or zero.
+	; @returns {Boolean} True only while the captured failure is still current.
+	Publish(Receipt, Owner, IsCurrentFn, RetryFn := 0, OwnedFolderFn := 0) {
+		EntryEpoch := this.Epoch
+		if this.Closed || !(Receipt is Map) || !IsObject(Owner)
+			|| !HasMethod(IsCurrentFn, "Call") || !_ManagedNetworkWindows_Current(IsCurrentFn)
+			return false
+		PreviousCritical := Critical("On")
+		try {
+			if this.Closed || this.Epoch != EntryEpoch
+				return false
+			ExpectedEpoch := ++this.Epoch
+			if ExpectedEpoch > 9007199254740991
+				throw Error("Managed download failure epoch exceeds the page integer range")
+			this.Owner := Owner
+			this.Receipt := Receipt
+			this.Report := 0
+			this.IsCurrentFn := IsCurrentFn
+			this.RetryFn := RetryFn
+			this.OwnedFolderFn := OwnedFolderFn
+		} finally {
+			Critical(PreviousCritical)
+		}
+		CurrentFn := this.IsCurrent.Bind(this, Owner, ExpectedEpoch)
+		Report := ManagedNetworkFailureWindows_Classify(Receipt, CurrentFn, RetryFn, OwnedFolderFn)
+		if !this.IsCurrent(Owner, ExpectedEpoch)
+			return false
+		PreviousCritical := Critical("On")
+		try {
+			if this.Closed || this.Owner != Owner || this.Epoch != ExpectedEpoch
+				return false
+			this.Report := Report
+			return true
+		} finally {
+			Critical(PreviousCritical)
+		}
+	}
+
+	; Rebuild actions from native capabilities instead of trusting report rows.
+	PublishReport(Report, Owner, IsCurrentFn, RetryFn := 0, OwnedFolderFn := 0) {
+		EntryEpoch := this.Epoch
+		if this.Closed || !IsObject(Owner) || !ManagedNetworkFailureWindows_CanonicalReport(Report)
+			|| !_ManagedNetworkWindows_Current(IsCurrentFn)
+			return false
+		Snapshot := JsonParse(ManagedNetworkFailureWindows_ReportJson(Report))
+		PreviousCritical := Critical("On")
+		try {
+			if this.Closed || this.Epoch != EntryEpoch
+				return false
+			ExpectedEpoch := ++this.Epoch
+			if ExpectedEpoch > 9007199254740991
+				throw Error("Managed failure epoch exceeds the page integer range")
+			this.Owner := Owner
+			this.Receipt := 0
+			this.Report := 0
+			this.IsCurrentFn := IsCurrentFn
+			this.RetryFn := RetryFn
+			this.OwnedFolderFn := OwnedFolderFn
+		} finally Critical(PreviousCritical)
+		CurrentFn := this.IsCurrent.Bind(this, Owner, ExpectedEpoch)
+		Actions := ManagedNetworkFailureWindows_CurrentActions(Snapshot["cause"], CurrentFn, RetryFn, OwnedFolderFn)
+		if !this.IsCurrent(Owner, ExpectedEpoch)
+			return false
+		PreviousCritical := Critical("On")
+		try {
+			if this.Closed || this.Owner != Owner || this.Epoch != ExpectedEpoch
+				return false
+			this.Report := Map("cause", Snapshot["cause"], "message_key", Snapshot["message_key"], "evidence", Snapshot["evidence"], "actions", Actions)
+			return true
+		} finally Critical(PreviousCritical)
+	}
+
+	; The native admission callback may pump messages; recheck this private intent afterward.
+	IsCurrent(ExpectedOwner, ExpectedEpoch) {
+		if this.Closed || this.Owner != ExpectedOwner || this.Epoch != ExpectedEpoch
+			|| !HasMethod(this.IsCurrentFn, "Call")
+			return false
+		Admitted := _ManagedNetworkWindows_True(this.IsCurrentFn.Call())
+		return Admitted && !this.Closed && this.Owner == ExpectedOwner && this.Epoch == ExpectedEpoch
+	}
+
+	; Every action passes through fresh shared policy and native capability admission.
+	; @param Payload {Map} action/id/session/epoch only; private targets are ignored.
+	; @returns {Boolean} True only when the admitted native action starts.
+	Handle(Payload, PresentationCurrentFn := 0) {
+		if this.Closed || !(this.Report is Map) || !(Payload is Map)
+			return false
+		Session := _ManagedNetwork_Get(Payload, "session")
+		Epoch := _ManagedNetwork_Get(Payload, "epoch")
+		if !(Session is Integer) || Session != this.Id || !(Epoch is Integer) || Epoch != this.Epoch
+			|| !_ManagedNetwork_Equal(_ManagedNetwork_Get(Payload, "action"), "failure_action")
+			return false
+		Id := _ManagedNetwork_Get(Payload, "id")
+		if !(Id is String)
+			return false
+		Owner := this.Owner
+		if !this.IsCurrent(Owner, Epoch)
+			return false
+		CurrentFn := this._Admission.Bind(this, Owner, Epoch, PresentationCurrentFn)
+		RetryFn := HasMethod(this.RetryFn, "Call") ? this._Retry.Bind(this, Owner, Epoch, this.RetryFn, PresentationCurrentFn) : 0
+		return ManagedNetworkFailureWindows_PerformAction(this.Report["cause"], Id,
+			CurrentFn, RetryFn, this.OwnedFolderFn)
+	}
+
+	; Native host callbacks admit the actual controller/document on every capability probe.
+	_Admission(ExpectedOwner, ExpectedEpoch, PresentationCurrentFn) {
+		if !this.IsCurrent(ExpectedOwner, ExpectedEpoch)
+			return false
+		if HasMethod(PresentationCurrentFn, "Call") && !_ManagedNetworkWindows_True(PresentationCurrentFn.Call())
+			return false
+		return !this.Closed && this.Owner == ExpectedOwner && this.Epoch == ExpectedEpoch
+	}
+
+	_Retry(ExpectedOwner, ExpectedEpoch, RetryFn, PresentationCurrentFn := 0) {
+		if !this._Admission(ExpectedOwner, ExpectedEpoch, PresentationCurrentFn)
+			return false
+		; Consume the exact page intent atomically before native retry can fail synchronously.
+		PreviousCritical := Critical("On")
+		try {
+			if this.Closed || this.Owner != ExpectedOwner || this.Epoch != ExpectedEpoch
+				return false
+			this.Retire(ExpectedOwner)
+		} finally {
+			Critical(PreviousCritical)
+		}
+		return _ManagedNetworkWindows_True(RetryFn.Call())
+	}
+
+	; Retires only the supplied exact producer; zero means this session's own teardown.
+	Retire(ExpectedOwner := 0) {
+		PreviousCritical := Critical("On")
+		try {
+			if IsObject(ExpectedOwner) && this.Owner != ExpectedOwner
+				return false
+			this.Epoch += 1
+			this.Owner := 0
+			this.Receipt := 0
+			this.Report := 0
+			this.IsCurrentFn := 0
+			this.RetryFn := 0
+			this.OwnedFolderFn := 0
+			return true
+		} finally {
+			Critical(PreviousCritical)
+		}
+	}
+
+	Close() {
+		this.Closed := true
+		this.Retire()
+	}
+
+	; Encodes only the current canonical report, with no raw receipt or private owner.
+	Json() {
+		if !(this.Report is Map)
+			throw Error("Managed download failure session has no current safe report")
+		return ManagedNetworkFailureWindows_ReportJson(this.Report)
+	}
+}

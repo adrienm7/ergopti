@@ -390,6 +390,7 @@ else
 	# 'uv python find' returns non-zero when no managed interpreter matching
 	# the request is available. In that case we ask uv to download one.
 	if ! "$UV_BIN" python find "$PYTHON_REQUEST" >/dev/null 2>&1; then
+		apply_system_network opaque || exit $?
 		emit_marker "PYTHON_INSTALLING"
 		log_info "Téléchargement de Python $PYTHON_VERSION via uv (interpréteur managé)…"
 		# uv prints "Downloading cpython-3.11.x (45 MB)…" on stderr — we forward
@@ -461,6 +462,7 @@ if [ "$REPAIR_MODE" = "1" ]; then
 	if ! venv_is_removable; then
 		exit 5
 	fi
+	apply_system_network opaque || exit $?
 	for leftover in "$VENV_DIR" "$VENV_DIR".bootstrap.* "$VENV_DIR".rollback.*; do
 		if [ ! -e "$leftover" ] && [ ! -L "$leftover" ]; then
 			continue
@@ -517,6 +519,10 @@ if [ "$VENV_NOT_NATIVE" = "0" ] && [ -x "$VENV_DIR/bin/python" ] && [ -f "$SYNC_
 		fi
 	fi
 fi
+
+# Admission precedes uv venv (which may fetch Python) and uv sync. A verified
+# cached environment returned above requires no opaque network capability.
+apply_system_network opaque || exit $?
 
 # Slow path: real work is about to happen. Emit VENV_SYNC_RAN FIRST so the
 # Hammerspoon caller surfaces a "patientez" notification immediately, then

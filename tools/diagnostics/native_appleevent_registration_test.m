@@ -28,7 +28,9 @@
 - (NSApplicationActivationPolicy)activationPolicy {
     self.readCalls += 1;
     if (self.observationThrows || (self.observationThrowsOnce && self.readCalls == 1)) [NSException raise:NSInternalInconsistencyException format:@"CONTROL_POLICY_OBSERVATION"];
-    return self.setCalls == 0 ? self.initialPolicy : self.observedPolicy;
+    // A failed optional first observation consumes no functional policy state.
+    const unsigned int initialRead = self.observationThrowsOnce ? 2 : 1;
+    return self.readCalls == initialRead ? self.initialPolicy : self.observedPolicy;
 }
 @end
 
@@ -91,9 +93,15 @@ int main(void) {
         alreadyAccessory.observedPolicy = NSApplicationActivationPolicyAccessory;
         alreadyAccessory.acceptsPolicy = NO;
         assert(admit_appkit((NSApplication *)alreadyAccessory) == AppKitAdmitted);
-        assert(alreadyAccessory.setCalls == 0 && alreadyAccessory.readCalls == 1);
-        assert(admit_appkit((NSApplication *)alreadyAccessory) == AppKitAdmitted);
         assert(alreadyAccessory.setCalls == 0 && alreadyAccessory.readCalls == 2);
+        assert(admit_appkit((NSApplication *)alreadyAccessory) == AppKitAdmitted);
+        assert(alreadyAccessory.setCalls == 0 && alreadyAccessory.readCalls == 4);
+        RegistrationProbe *changedAccessory = [RegistrationProbe new];
+        changedAccessory.initialPolicy = NSApplicationActivationPolicyAccessory;
+        changedAccessory.acceptsPolicy = NO;
+        changedAccessory.observedPolicy = NSApplicationActivationPolicyRegular;
+        assert(admit_appkit((NSApplication *)changedAccessory) == AppKitPolicyUnconfirmed);
+        assert(changedAccessory.setCalls == 0 && changedAccessory.readCalls == 2);
         /* Separate metadata controls never provide real NSApplication proof. */
         struct AppKitPolicyObservation observed = observe_appkit_policy(nil);
         assert(observed.available == 0 && observed.policy == 3);
@@ -117,7 +125,7 @@ int main(void) {
         assert(before.available == 0 && before.policy == 3);
         assert(optionalUnavailable.setCalls == 1 && optionalUnavailable.readCalls == 3);
         assert_private_probe_event();
-        puts("native_appkit_registration_controls=5");
+        puts("native_appkit_registration_controls=6");
         puts("native_private_appleevent_controls=1");
         return 0;
     }

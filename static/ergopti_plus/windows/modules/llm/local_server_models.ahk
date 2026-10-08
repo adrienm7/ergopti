@@ -96,8 +96,12 @@ class LocalServerModelsOwner extends _LocalServerModelsTimerNativeAdapter {
 			Http.DispatchPort["before_launch"] := ObjBindMethod(this, "_BeforeLaunch", Record, OriginalBoundary)
 			if !this._IsCurrent(Record) || A_IsSuspended
 				return false
-			Http.Open("GET", RTrim(Url, "/") . "/models", true)
 			Limit := this.Options["timeout_ms"]
+			if !this.Options.Has("request") {
+				Http.SetManagedRouting(0, () => this._IsCurrent(Record))
+				Http.SetDeadline(StartedAt, Limit)
+			}
+			Http.Open("GET", RTrim(Url, "/") . "/models", true)
 			Http.SetTimeouts(Limit, Limit, Limit, Limit)
 			if StrLen(Token) > 0
 				Http.SetRequestHeader("Authorization", "Bearer " . Token)

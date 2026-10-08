@@ -277,6 +277,8 @@ local _channel_persisted = false   -- whether config.toml names the channel (els
 local _installed_launcher = nil  -- wrapper of the installation an update replaced
 local _download_part   = nil
 local _download_dest   = nil
+local native_transfer, native_verified, native_install, native_channel_intent
+local native_generation = 0
 local _verified_archive = nil
 local _verified_release = nil      -- the release record the verified archive belongs to
 
@@ -480,8 +482,16 @@ local function _build_fetch_request(channel, page)
 	-- it from the event-loop thread. A 304 carries no body, so the request is
 	-- conditional only while this process holds the list the saved ETag names.
 	if parent and Fs.exists(parent) then
+		-- Even the cold save-only request needs managed final-endpoint evidence;
+		-- an ordinary singleton cache request retains historical native handling.
+		options.etag_affinity = true
 		options.etag_save = etag_file
-		if _list_cache[cache_key] and Fs.exists(etag_file) then options.etag_compare = etag_file end
+		local cached = _list_cache[cache_key]
+		if type(cached) == "table" and type(cached.validator) == "string"
+			and type(cached.effective_url) == "string" and Fs.exists(etag_file) then
+			options.etag_compare = etag_file
+			options.etag_expected_value, options.etag_expected_url = cached.validator, cached.effective_url
+		end
 	end
 	local url = M.release_api_url()
 	if page then
@@ -498,7 +508,9 @@ M._build_fetch_request = _build_fetch_request
 --- Fetches a GitHub Releases response asynchronously.
 --- @param channel string
 --- @param callback function Receives body, status, error.
---- @return boolean Whether the asynchronous request was dispatched.
+--- @return boolean Whether asynchronous check work was admitted. A native
+--- started=false constructor may still retain pipe/deadline cleanup and its
+--- eventual failure; only physically closed no-acquisition refusal is false.
 local function _fetch_releases(channel, callback)
 	local count = tonumber(M.release_api_url():match("[?&]per_page=(%d+)"))
 	if not count or count < 1 or count % RELEASE_PAGE_SIZE ~= 0 then
@@ -506,11 +518,12 @@ local function _fetch_releases(channel, callback)
 		return false
 	end
 	local chunks, terminal, all_unchanged = {}, false, true
-	local active_key
-	local cancel
+	local active_key, active_page
+	local cancelled = false
+	local cancel, publish_page
 	-- reason: the updater.check_result reason a failure is shown with
 	local function finish(body, status, err, reason)
-		if terminal then return end
+		if terminal or _release_fetch_cancel ~= cancel then return end
 		terminal = true
 		-- Native etag_save can advance its file before transport/JSON acceptance.
 		-- A failed page must fetch fully next time, never pair that file with its
@@ -519,17 +532,90 @@ local function _fetch_releases(channel, callback)
 		if _release_fetch_cancel == cancel then _release_fetch_cancel = nil end
 		callback(body, status, err, reason)
 	end
-	cancel = function() finish(nil, 0, "cancelled", "unexpected") end
+	local function page_current(work)
+		return not terminal and _release_fetch_cancel == cancel and rawequal(active_page, work)
+	end
+	local function signal_page(work)
+		if not page_current(work) or not cancelled or work.signalled or not work.methods then return end
+		work.signalled = true
+		pcall(work.methods.cancel, work.operation)
+	end
+	cancel = function()
+		if terminal or _release_fetch_cancel ~= cancel then return end
+		cancelled = true
+		if active_page then signal_page(active_page); publish_page(active_page) end
+	end
 	_release_fetch_cancel = cancel
 	local fetch_page
+	local accept_page
+	publish_page = function(work)
+		if not page_current(work) or work.constructing or work.publishing or work.delivered
+			or work.uncertain or not work.methods then return end
+		work.publishing = true
+		local called, settled = pcall(work.methods.is_settled, work.operation)
+		if not page_current(work) or work.delivered or not called or settled ~= true then
+			work.publishing = false; return
+		end
+		local received, result = pcall(work.methods.settled_result, work.operation)
+		if not page_current(work) or work.delivered then work.publishing = false; return end
+		if not received or type(result) ~= "table" then
+			work.uncertain = true; work.publishing = false; return
+		end
+		-- No logical callback or public table can substitute this final receipt.
+		work.delivered = true
+		if cancelled then finish(nil, 0, "cancelled", "unexpected")
+		elseif work.sent ~= true and not work.answered then finish(nil, 0, "release page dispatch refused", "no_connection")
+		else accept_page(work, result) end
+		work.publishing = false
+	end
 	fetch_page = function(page)
-		local url, headers, options = M._build_fetch_request(channel, page)
+		if terminal or cancelled or _release_fetch_cancel ~= cancel then return false end
 		local key = channel .. "-page-" .. page .. "-size-" .. RELEASE_PAGE_SIZE
 		active_key = key
-		local answered = false
-		local sent = M._http_client.get(url, headers, options, function(result)
-			if terminal or answered then return end
-			answered = true
+		local work = { constructing = true, page = page, key = key }
+		active_page = work -- Reservation precedes metadata/callback/constructor reentry.
+		local prepared, url, headers, options = pcall(M._build_fetch_request, channel, page)
+		if not page_current(work) then work.constructing = false; return false end
+		if cancelled or not prepared then
+			-- No transport constructor was invoked by this known metadata path.
+			work.constructing = false
+			finish(nil, 0, cancelled and "cancelled" or "release request preparation failed", "unexpected")
+			return false
+		end
+		local get = type(M._http_client) == "table" and rawget(M._http_client, "get") or nil
+		local called, sent, operation = pcall(function()
+			if type(get) ~= "function" then error("release HTTP operation unavailable") end
+			return get(url, headers, options, function()
+				if not page_current(work) or work.answered then return end
+				work.answered = true
+				-- Generic get still reports logical terminals. Only original final
+				-- physical data below can authorize parsing or the next request.
+				publish_page(work)
+			end)
+		end)
+		work.sent, work.operation = sent, operation
+		if called and type(operation) == "table" then
+			local methods = { is_settled = rawget(operation, "is_settled"),
+				on_settled = rawget(operation, "on_settled"), cancel = rawget(operation, "cancel"),
+				settled_result = rawget(operation, "settled_result") }
+			if type(methods.is_settled) == "function" and type(methods.on_settled) == "function"
+				and type(methods.cancel) == "function" and type(methods.settled_result) == "function" then
+				work.methods = methods
+				local registered, accepted = pcall(methods.on_settled, operation, function() publish_page(work) end)
+				if not registered or accepted ~= true then work.uncertain = true end
+			else work.uncertain = true end
+		else work.uncertain = true end
+		work.constructing = false
+		if not page_current(work) then return sent == true end
+		signal_page(work)
+		publish_page(work)
+		-- Unknown constructor/observer debt remains retained; absence of an
+		-- operation or callback cannot fabricate a physically closed refusal.
+		return sent == true or (page_current(work) and not work.delivered)
+	end
+	accept_page = function(work, result)
+			if not page_current(work) then return end
+			local key, page = work.key, work.page
 			local status = tonumber(result and result.status) or 0
 			local body = result and result.body
 			if status == 304 then
@@ -539,7 +625,13 @@ local function _fetch_releases(channel, callback)
 					finish(nil, status, "incomplete conditional response", "no_connection")
 					return
 				end
-				body = _list_cache[key]
+				local cached, association = _list_cache[key], result.etag_receipt
+				if type(cached) ~= "table" or type(association) ~= "table"
+					or association.format ~= "curl-etag-final-v1" or association.conditional_sent ~= true
+					or association.effective_url ~= cached.effective_url or association.sent_validator ~= cached.validator then
+					finish(nil, status, "conditional response endpoint association refused", "unexpected"); return
+				end
+				body = cached.body
 				if not body then
 					Logger.warn(LOG, "GitHub answered 304 for channel %s page %d without a cached release page.", channel, page)
 					finish(nil, status, "not modified, and no release page is cached", "unexpected")
@@ -559,21 +651,27 @@ local function _fetch_releases(channel, callback)
 				finish(nil, status, "invalid release page JSON", "parse_failed")
 				return
 			end
+			if not page_current(work) then return end
+			if cancelled then finish(nil, 0, "cancelled", "unexpected"); return end
 			local entries = Parser.split_releases_array(body)
+			if not page_current(work) then return end
+			if cancelled then finish(nil, 0, "cancelled", "unexpected"); return end
 			if #entries ~= #decoded or #entries > RELEASE_PAGE_SIZE then
 				finish(nil, status, "invalid release page entries", "parse_failed")
 				return
 			end
-			_list_cache[key] = body
+			local association = result.etag_receipt
+			if type(association) == "table" and association.format == "curl-etag-final-v1"
+				and association.associated == true and type(association.validator) == "string"
+				and type(association.effective_url) == "string" then
+				_list_cache[key] = { body = body, validator = association.validator, effective_url = association.effective_url }
+			else _list_cache[key] = nil end
 			for _, entry in ipairs(entries) do chunks[#chunks + 1] = entry end
 			if #entries < RELEASE_PAGE_SIZE or #chunks == count then
 				finish("[" .. table.concat(chunks, ",") .. "]", all_unchanged and 304 or 200, nil)
 			else
 				fetch_page(page + 1)
 			end
-		end)
-		if sent ~= true and not answered then finish(nil, 0, "release page dispatch refused", "no_connection") end
-		return sent == true
 	end
 	return fetch_page(1)
 end
@@ -757,11 +855,13 @@ end
 --- @param channel string|nil Registry channel id; defaults to the active channel.
 --- @param callback function|nil Receives available, release, error and the
 ---   updater.check_result answer (state, latest, other channels, reason).
---- @return boolean Whether the asynchronous request was dispatched.
+--- @return boolean Whether asynchronous check work was admitted. True can
+--- retain an original native start refusal's physical cleanup; it does not
+--- assert that a network request started. Closed no-acquisition refusal is false.
 function M.check_for_updates(channel, callback)
 	channel = channel or _channel
 	local base = { channel = channel, current = M.current_version() }
-	if _state == "checking" or _state == "downloading" or _state == "installing" then
+	if native_channel_intent or _state == "checking" or _state == "downloading" or _state == "installing" then
 		Logger.info(LOG, "Update check skipped: updater busy (%s).", _state)
 		publish_check(callback, false, nil, "updater busy",
 			CheckResult.failure(base, "unexpected", "the updater is busy (" .. _state .. ")"))
@@ -916,7 +1016,7 @@ local function _evaluate_schedule()
 		Logger.debug(LOG, "Update check due (%s) but the driver is paused; the record is left as it is.", reason)
 		return
 	end
-	if _state == "checking" or _state == "downloading" or _state == "installing" then
+	if native_channel_intent or _state == "checking" or _state == "downloading" or _state == "installing" then
 		Logger.info(LOG, "Update check due (%s) but the updater is busy (%s).", reason, _state)
 		return
 	end
@@ -1075,77 +1175,206 @@ end
 --- @param callback function|nil Receives verified path, error, failing stage, native failure receipt.
 --- @param failure_state string The updater state a failure returns to.
 --- @return boolean Whether the checksum request was dispatched.
-local function start_download(release, download_url, callback, failure_state)
-	local allocated, temp_path = pcall(os.tmpname)
-	if not allocated or type(temp_path) ~= "string" or temp_path:sub(1, 1) ~= "/" then
-		if type(callback) == "function" then callback(nil, "temporary path unavailable", "download") end
-		return false
-	end
-	if _verified_archive then Fs.delete(_verified_archive); _verified_archive = nil end
-	_verified_release = nil
-	_download_dest = temp_path .. ".tar.gz"
-	-- os.tmpname reserves a native 0600 inode. Keep it as the download target;
-	-- derived names were never reserved and may belong to another process.
-	_download_part = temp_path
-	_state = "downloading"
+-- Branded native artifacts retain physical owners; display paths are information.
+local function release_snapshot(release)
+ if type(release) ~= "table" then return nil end
+ local copy = {}
+ for _, name in ipairs({ "tag", "download_url", "checksum_url" }) do
+  local value = rawget(release, name)
+  if type(value) ~= "string" or value == "" or value:find("\0", 1, true) then return nil end
+  copy[name] = value
+ end
+ return copy
+end
+local function retire_verified_artifact()
+ if not native_verified then return true end
+ if native_install then return false end
+ local owned = native_verified
+ owned.cancelled = true
+ local called, settled = pcall(owned.methods.retire_artifact, owned.brand)
+ if not called or settled ~= true or native_verified ~= owned then return false end
+ native_verified, _verified_archive, _verified_release = nil, nil, nil
+ return true
+end
+local function native_source(record)
+ if native_transfer ~= record or record.cancelled or record.done or record.generation ~= native_generation
+  or M._http_client ~= record.http then return false end
+ for _, key in ipairs({ "tag", "download_url", "checksum_url" }) do
+  if rawget(record.release, key) ~= record.selected[key] then return false end
+ end
+ local inspected, current
+ if record.execution then inspected, current = pcall(record.execution)
+ elseif type(record.pause) == "function" then
+  local called, paused = pcall(record.pause); inspected, current = called, paused == false
+ else return false end
+ if not inspected or current ~= true then return false end
+ for _, key in ipairs({ "tag", "download_url", "checksum_url" }) do
+  if rawget(record.release, key) ~= record.selected[key] then return false end
+ end
+ return native_transfer == record and not record.cancelled and not record.done
+  and record.generation == native_generation and M._http_client == record.http
+  and _channel == record.channel and (record.execution ~= nil or _is_paused == record.pause)
+end
+local function capture_operation(operation)
+ if type(operation) ~= "table" then return nil end
+ local methods = { is_settled = rawget(operation, "is_settled"),
+  on_settled = rawget(operation, "on_settled"), cancel = rawget(operation, "request_cancel") or rawget(operation, "cancel"),
+  retry_cleanup = rawget(operation, "retry_cleanup") }
+ if type(methods.is_settled) ~= "function" or type(methods.on_settled) ~= "function" or type(methods.cancel) ~= "function" then return nil end
+ return methods
+end
+local function start_native_download(release, download_url, callback, failure_state, execution)
+ if native_transfer or native_install or native_channel_intent then return false end
+ local selected = release_snapshot(release)
+ if not selected or selected.download_url ~= download_url or (execution ~= nil and type(execution) ~= "function") then return false end
+ local previous_state, predecessor = _state, native_verified
+ native_generation = native_generation + 1
+ local record = { selected = selected, release = release, http = M._http_client, pause = _is_paused,
+  generation = native_generation, channel = _channel, constructing = true, received = false, done = false, execution = execution }
+ native_transfer = record -- Reserve admission before retiring any previous verified artifact.
+ _state = "downloading"
+ local function early_refusal(message)
+  if native_transfer == record then
+   record.done, native_transfer = true, nil
+   _state = previous_state
+  end
+  -- Preserve predecessor metadata on source refusal. This is a known
+  -- pre-acquisition failure, not a failed replacement of its verified archive.
+  if type(callback) == "function" then pcall(callback, nil, message, "download") end
+  return false
+ end
+ if not native_source(record) or native_verified ~= predecessor then return early_refusal("update transfer source refused") end
+ if not retire_verified_artifact() or not native_source(record) or native_transfer ~= record then
+  return early_refusal("previous native archive retirement refused")
+ end
+ local deliver
+ local function terminal(path, err, stage, receipt, brand)
+  if record.received then return end
+  record.received = true
+  record.result = { path = path, error = err, stage = stage, receipt = receipt, brand = brand }
+  if deliver then deliver() end
+ end
+ deliver = function()
+  if record.delivering or record.constructing or record.done or record.unknown or not record.operation then return end
+  local operation, captured_result = record.operation, record.result
+  local function intact()
+   return native_transfer == record and not record.done and not record.unknown and not record.constructing
+    and record.generation == native_generation and rawequal(record.operation, operation)
+    and rawequal(record.result, captured_result)
+  end
+  record.delivering = true -- Includes physical source and namespace-cleanup probes.
+  local guarded = pcall(function()
+   if not intact() then return end
+   local checked, physical = pcall(record.methods.is_settled, operation)
+   if not checked or physical ~= true or not intact() then return end
+   local result = captured_result or { error = "update transaction cancelled", stage = "download" }
+   if result.path ~= nil and not record.cancelled then
+    local inspected, current_source = pcall(native_source, record)
+    if not intact() then return end
+    if not inspected or current_source ~= true then
+     record.cancelled = true
+     result.error, result.stage = "update source revoked before archive publication", "download"
+    end
+   end
+   if record.cancelled and result.brand ~= nil then
+    -- Logical cancellation after physical transfer completion must still join
+    -- the actual committed native namespace; transfer ACK alone is insufficient.
+    local retired, closed = pcall(record.artifact_methods.retire_artifact, result.brand)
+    if not intact() then return end
+    if not retired or closed ~= true then
+     if not record.artifact_observing then
+      record.artifact_observing = true
+      local watched, ack = pcall(record.artifact_methods.on_artifact_settled, result.brand, deliver)
+      if not watched or ack ~= true then record.unknown = true end
+     end
+     return
+    end
+   end
+   if not intact() then return end
+   if record.cancelled then result.path, result.brand = nil, nil end
+   local receiving_failure_state = failure_state
+   if record.received and record.original_started == false and record.closed_allocation_refusal == true
+    and result.path == nil and result.brand == nil and type(result.error) == "string" and result.stage == "download" then
+    -- Preserve the pre-acquisition offer only for the fixed allocator fact.
+    -- Error text and a missing target alone do not grant this receiving law.
+    local checked, source_current = pcall(native_source, record)
+    if not intact() then return end
+    if checked and source_current == true and not record.cancelled then receiving_failure_state = previous_state end
+   end
+   record.done, native_transfer = true, nil -- Consume publication before logger/caller reentry.
+   if type(result.path) == "string" and result.brand ~= nil then
+    native_verified = { factory = record.artifact, methods = record.artifact_methods, brand = result.brand,
+     transaction = record.transaction, selected = selected, path = result.path, cancelled = false }
+   end
+   publish_download(callback, result.path, result.error, result.stage, selected, receiving_failure_state, result.receipt)
+  end)
+  record.delivering = false
+  if not guarded then
+   record.unknown = true
+   if not record.signalled then record.signalled = true; pcall(record.methods.cancel, operation) end
+  elseif not record.done and not rawequal(record.result, captured_result) then
+   deliver() -- Only a new authentic first terminal receipt warrants another admission.
+  end
+ end
+ local initialized, flow = pcall(function()
+  local Output = require("infra.archive_output")
+  local Transfer = require("modules.updater.archive_transfer")
+  local Clock = require("infra.monotonic")
+  local native_artifact = rawget(Output, "native_artifact")
+  local make_transfer = rawget(Transfer, "new")
+  if type(native_artifact) ~= "function" or type(make_transfer) ~= "function"
+   or type(rawget(Clock, "has_hires")) ~= "function" or Clock.has_hires() ~= true
+   or type(rawget(Clock, "backend")) ~= "function" or Clock.backend() ~= "luv.hrtime" then return nil end
+  local artifact = native_artifact(LINUX_ASSET_NAME)
+  if type(artifact) ~= "table" then return nil end
+  local methods = {}
+  for _, name in ipairs({ "retire_artifact", "artifact_settled", "on_artifact_settled", "begin_install", "install_current", "install_feed", "finish_install" }) do
+   methods[name] = rawget(artifact, name)
+   if type(methods[name]) ~= "function" then return nil end
+  end
+  record.artifact, record.artifact_methods = artifact, methods
+  local clock = rawget(Clock, "now_ms")
+  if type(clock) ~= "function" then return nil end
+  return make_transfer({ http = record.http, artifact = artifact, defaults = _defs, clock = clock,
+   current = function(token)
+    if record.transaction == nil then record.transaction = token end
+    return rawequal(record.transaction, token) and native_source(record)
+   end,
+   parse_checksum = parse_checksum, owner = REQUEST_OWNER, headers = { ["User-Agent"] = USER_AGENT },
+   max_download_bytes = MAX_DOWNLOAD_BYTES, max_checksum_bytes = MAX_CHECKSUM_BODY_BYTES })
+ end)
+ local started, operation
+ if initialized and type(flow) == "table" and type(rawget(flow, "start")) == "function" then
+  record.flow = flow
+  started, operation = pcall(rawget(flow, "start"), flow, release, terminal)
+ end
+ if started and type(operation) == "table" then
+  record.operation, record.methods = operation, capture_operation(operation)
+  record.original_started = rawget(operation, "started") -- Snapshot before any physical observer/source probe.
+  record.closed_allocation_refusal = rawget(operation, "closed_allocation_refusal") == true
+  if record.methods then
+   local observed, ack = pcall(record.methods.on_settled, operation, deliver)
+   if not observed or ack ~= true then record.unknown = true end
+  else record.unknown = true end
+ elseif started == false then record.unknown = true end
+ record.constructing = false
+ if not record.operation and not record.unknown then
+  record.done, native_transfer = true, nil
+  publish_download(callback, nil, "native archive component unavailable", "download", selected, failure_state)
+  return false -- No pathname reopen/legacy transport fallback.
+ end
+ if record.unknown or record.cancelled then
+  if record.methods then pcall(record.methods.cancel, record.operation) end
+ end
+ deliver()
+ -- A known terminal refusal with the exact original physical ACK did not
+ -- dispatch transport. Pending/queued owners keep their existing admission.
+ if record.received and record.done and record.original_started == false then return false end
+ return record.operation ~= nil and not record.unknown -- Exact owned transaction admission, not HTTP success.
+end
 
-	local function fail(message, stage, failure_receipt)
-		remove_partial_download()
-		publish_download(callback, nil, message, stage or "download", release, failure_state, failure_receipt)
-	end
-	local checksum_dispatched = M._http_client.get(release.checksum_url, {
-		["User-Agent"] = USER_AGENT,
-	}, {
-		owner = REQUEST_OWNER,
-		timeout_ms = RELEASE_TIMEOUT_MS,
-		max_body_bytes = MAX_CHECKSUM_BODY_BYTES,
-		follow_redirects = true,
-		https_only = true,
-	}, function(checksum_result)
-		if not checksum_result or checksum_result.ok ~= true then
-			fail(checksum_result and checksum_result.error or "checksum request failed", "download",
-				type(checksum_result) == "table" and checksum_result.failure_receipt or nil)
-			return
-		end
-		local expected, checksum_error = parse_checksum(checksum_result.body)
-		if not expected then fail(checksum_error, "verify"); return end
-
-		Logger.info(LOG, "Downloading authenticated update to %s.", _download_part)
-		M._http_client.download(download_url, { ["User-Agent"] = USER_AGENT }, _download_part, {
-			owner = REQUEST_OWNER,
-			timeout_ms = DOWNLOAD_TIMEOUT_MS,
-			max_download_bytes = MAX_DOWNLOAD_BYTES,
-			https_only = true,
-		}, function(download_result)
-			if not download_result or download_result.ok ~= true then
-				fail(download_result and download_result.error or "archive request failed", "download",
-					type(download_result) == "table" and download_result.failure_receipt or nil)
-				return
-			end
-			local size = file_size(_download_part)
-			if not size or size <= 0 or size > MAX_DOWNLOAD_BYTES then
-				fail("downloaded archive has an invalid size", "verify")
-				return
-			end
-			M._file_digest.sha256(_download_part, { timeout_ms = RELEASE_TIMEOUT_MS, owner = REQUEST_OWNER },
-				function(actual, digest_error)
-					if not actual then fail(digest_error or "archive digest failed", "verify"); return end
-					if actual ~= expected then fail("SHA-256 checksum mismatch", "verify"); return end
-					local renamed, rename_error = NoReplaceMove.move(_download_part, _download_dest)
-					if not renamed then
-						fail("verified archive publication failed: " .. tostring(rename_error))
-						return
-					end
-					local verified_path = _download_dest
-					Logger.success(LOG, "Downloaded and verified %d bytes to %s.", size, verified_path)
-					publish_download(callback, verified_path, nil, nil, release, failure_state)
-				end)
-		end)
-	end)
-	if not checksum_dispatched and _state == "downloading" then
-		fail("checksum request was not dispatched")
-	end
-	return checksum_dispatched
+local function start_download(release, download_url, callback, failure_state, execution)
+ return start_native_download(release, download_url, callback, failure_state, execution)
 end
 
 --- Downloads and verifies the canonical update archive asynchronously.
@@ -1153,6 +1382,7 @@ end
 --- @param callback function|nil Receives verified path, error, failing stage, native failure receipt.
 --- @return boolean Whether the checksum request was dispatched.
 function M.download_update(url, callback)
+ if native_channel_intent then return false end
 	local release = _cached_release
 	local download_url = url or (release and release.download_url)
 	if not release or type(download_url) ~= "string" or download_url == ""
@@ -1175,7 +1405,8 @@ end
 --- @param release table M.release_record() result.
 --- @param callback function|nil Receives verified path, error, failing stage.
 --- @return boolean Whether the checksum request was dispatched.
-function M.download_release(release, callback)
+function M.download_release(release, callback, native_execution)
+ if native_channel_intent then return false end
 	if type(release) ~= "table" or type(release.tag) ~= "string" or release.tag == ""
 		or type(release.download_url) ~= "string" or release.download_url == ""
 		or type(release.checksum_url) ~= "string" or release.checksum_url == "" then
@@ -1183,13 +1414,13 @@ function M.download_release(release, callback)
 		if type(callback) == "function" then callback(nil, "authenticated release unavailable", "download") end
 		return false
 	end
-	if _state == "checking" or _state == "downloading" or _state == "installing" then
+	if native_channel_intent or _state == "checking" or _state == "downloading" or _state == "installing" then
 		Logger.warn(LOG, "Refused to download %s while the updater is %s.", release.tag, _state)
 		if type(callback) == "function" then callback(nil, "updater is busy", "download") end
 		return false
 	end
 	Logger.info(LOG, "Downloading the chosen release %s.", release.tag)
-	return start_download(release, release.download_url, callback, _state)
+	return start_download(release, release.download_url, callback, _state, native_execution)
 end
 
 --- Cancels any in-flight updater transport or digest and removes partial files.
@@ -1202,14 +1433,34 @@ end
 --- must not pull either out from under it.
 --- @return boolean
 function M.cancel_update()
+ if native_install then return true end -- Accepted installation remains its own physical owner.
+ if native_transfer then
+  local record = native_transfer
+  record.cancelled = true
+  if record.methods and not record.signalled then
+   record.signalled = true; pcall(record.methods.cancel, record.operation)
+  elseif record.methods and type(record.methods.retry_cleanup) == "function" then
+   -- Later explicit cancellation can retry ONLY the captured original known
+   -- namespace conflict. Its operation never resends process signals.
+   pcall(record.methods.retry_cleanup, record.operation)
+  end
+  return true -- Logical cancellation; state stays busy through actual captured settlement.
+ end
+ if not retire_verified_artifact() then return false end
 	local http_cancelled = M._http_client.cancel(REQUEST_OWNER)
 	if http_cancelled and _release_fetch_cancel then _release_fetch_cancel() end
+	if _release_fetch_cancel then
+		-- Accepted cancellation is logical. Keep checking and its exact retained
+		-- page until original HTTP child/deadline retirement authorizes completion.
+		return http_cancelled == true
+	end
 	local digest_cancelled = M._file_digest.cancel(REQUEST_OWNER)
 	if not http_cancelled or not digest_cancelled then return false end
 	if _state == "installing" then return true end
 	remove_partial_download()
 	_download_part = nil
 	_download_dest = nil
+ if not retire_verified_artifact() then return false end
 	if _verified_archive then Fs.delete(_verified_archive); _verified_archive = nil end
 	_verified_release = nil
 	_state = "idle"
@@ -1231,6 +1482,7 @@ end
 --- @param expected_version string|nil The version the archive must carry.
 --- @return boolean true on success.
 local function install_archive(archive_path, expected_version)
+ if native_verified or native_install or native_transfer then return false end -- Native artifacts require the retained async owner.
 	if not archive_path or archive_path ~= _verified_archive or not Fs.exists(archive_path) then
 		Logger.error(LOG, "Refusing an archive not authenticated by this updater: %s.",
 			tostring(archive_path))
@@ -1287,6 +1539,77 @@ function M.install_release_archive(archive_path, tag)
 	return install_archive(archive_path, tag)
 end
 
+--- Accepted installation owns its original script/release and one new deadline.
+--- No display path is reopened; every tar reader comes from the private brand.
+local function install_native_archive(path, tag, callback, admission)
+ local verified = native_verified
+ if native_channel_intent or native_transfer or native_install or not verified or verified.cancelled or path ~= verified.path
+  or tag ~= verified.selected.tag or type(callback) ~= "function" or type(admission) ~= "function" then return false end
+ local resolver, install = rawget(M, "_resolve_installation"), rawget(Installer, "install_owned")
+ if type(resolver) ~= "function" or type(install) ~= "function" then return false end
+ local work = { verified = verified, constructing = true, received = false, done = false }
+ native_install = work -- Original private reservation precedes reentrant native admission.
+ local function identity()
+  return native_install == work and native_verified == verified and not verified.cancelled and not work.done
+   and rawget(M, "_resolve_installation") == resolver and rawget(Installer, "install_owned") == install
+ end
+ local function initial_current()
+  if not identity() then return false end
+  local checked, current = pcall(admission)
+  return checked and current == true and identity()
+ end
+ local function execution_current() return identity() end -- Accepted transaction ignores later page/pause retirement.
+ local checked, context = pcall(resolver)
+ if not checked or type(context) ~= "table" or rawget(context, "kind") ~= "standalone" or not initial_current() then
+  native_install = nil; return false
+ end
+ local captured_context = {}
+ for _, key in ipairs({ "kind", "reason", "install_root", "parent", "wrapper" }) do captured_context[key] = rawget(context, key) end
+ _state = "installing"
+ local reserved, token = pcall(verified.methods.begin_install, verified.brand, verified.transaction, _defs,
+  initial_current, execution_current)
+ if not reserved or token == nil then
+  if native_install == work then native_install = nil; _state = "available" end
+  return false -- begin_install refuses before any native reader acquisition.
+ end
+ work.token = token
+ local function deliver()
+  if work.constructing or work.done or work.unknown or not work.operation or not work.received then return end
+  local probed, physical = pcall(work.methods.is_settled, work.operation)
+  if not probed or physical ~= true or not identity() then return end
+  work.done, native_install = true, nil
+  local completed = work.result.installed == true
+  if completed then
+   native_verified, _verified_archive, _verified_release = nil, nil, nil
+   _installed_launcher, _state = captured_context.wrapper, "idle"
+  else _state = "available" end
+  pcall(callback, completed, work.result.detail, work.result.receipt)
+ end
+ local started, operation = pcall(install, { factory = verified.factory, reservation = token,
+  context = captured_context, expected_version = verified.selected.tag }, function(installed, detail, receipt)
+  if work.received then return end
+  work.received, work.result = true, { installed = installed, detail = detail, receipt = receipt }
+  deliver()
+ end)
+ if started and type(operation) == "table" then
+  work.operation, work.methods = operation, capture_operation(operation)
+  if work.methods then
+   local observed, ack = pcall(work.methods.on_settled, operation, deliver)
+   if not observed or ack ~= true then work.unknown = true end
+  else work.unknown = true end
+ else work.unknown = true end -- A thrown/unknown installer construction may own native work.
+ work.constructing = false
+ if work.unknown and work.methods then pcall(work.methods.cancel, work.operation) end
+ deliver()
+ return work.operation ~= nil and not work.unknown
+end
+function M.install_update_async(path, callback, current)
+ return install_native_archive(path, native_verified and native_verified.selected.tag or nil, callback, current)
+end
+function M.install_release_archive_async(path, tag, callback, current)
+ return install_native_archive(path, tag, callback, current)
+end
+
 --- Whether this installation can replace itself (a standalone install), and
 --- why not otherwise.
 --- @return string kind "standalone", "package" or "unmanaged"
@@ -1321,30 +1644,33 @@ end
 ---   only where config.toml is read).
 --- @return boolean Whether the active channel matches the request.
 function M.set_channel(new_channel)
-	if type(new_channel) ~= "string" or CHANNELS.channel(new_channel) == nil then
-		Logger.warn(LOG, "Unknown channel '%s' — keeping '%s'.", tostring(new_channel), _channel)
-		return false
-	end
-	-- A choice equal to the default is still written: the user picked it, and
-	-- a later build of another channel must not move them off it.
-	if new_channel == _channel and _channel_persisted then return true end
-	if (_state == "checking" or _state == "downloading") and not M.cancel_update() then
-		Logger.error(LOG, "Update channel cannot change while updater ownership is live.")
-		return false
-	end
-
-	if not _persist_channel(new_channel) then
-		Logger.error(LOG, "Update channel '%s' could not be persisted — keeping '%s'.", new_channel, _channel)
-		return false
-	end
-	_channel = new_channel
-	_channel_persisted = true
-	if _verified_archive then Fs.delete(_verified_archive); _verified_archive = nil end
-	_verified_release = nil
-	_state = "idle"
-	_cached_release = nil
-	Logger.info(LOG, "Update channel set to '%s' (persisted).", _channel)
-	return true
+ if native_install or native_channel_intent then return false end
+ if type(new_channel) ~= "string" or CHANNELS.channel(new_channel) == nil then
+  Logger.warn(LOG, "Unknown channel '%s' — keeping '%s'.", tostring(new_channel), _channel)
+  return false
+ end
+ if new_channel == _channel and _channel_persisted then return true end
+ local intent = { channel = _channel, persisted = _channel_persisted, cached = _cached_release,
+  generation = native_generation }
+ native_channel_intent = intent -- Reserve before cancellation/retirement/persistence probes.
+ local function intact()
+  return native_channel_intent == intent and native_install == nil and _channel == intent.channel
+   and _channel_persisted == intent.persisted and _cached_release == intent.cached and native_generation == intent.generation
+ end
+ local guarded, changed = pcall(function()
+  if (_state == "checking" or _state == "downloading") and (not M.cancel_update() or native_transfer ~= nil or _release_fetch_cancel ~= nil) then return false end
+  if not intact() or not retire_verified_artifact() or not intact() then return false end
+  -- Commit persistence/channel/cache only after exact predecessor namespace disposal.
+  if not _persist_channel(new_channel) or not intact() then return false end
+  _channel, _channel_persisted = new_channel, true
+  if _verified_archive then Fs.delete(_verified_archive); _verified_archive = nil end
+  _verified_release, _state, _cached_release = nil, "idle", nil
+  return true
+ end)
+ if native_channel_intent == intent then native_channel_intent = nil end
+ if not guarded or changed ~= true then return false end
+ Logger.info(LOG, "Update channel set to '%s' (persisted).", _channel)
+ return true
 end
 
 --- Returns the current check interval in seconds.
@@ -1402,10 +1728,12 @@ end
 
 --- Clears the cached release data.
 function M.clear_cached_release()
-	if (_state == "checking" or _state == "downloading") and not M.cancel_update() then
+ if native_install or native_channel_intent then return false end
+	if (_state == "checking" or _state == "downloading") and (not M.cancel_update() or native_transfer ~= nil or _release_fetch_cancel ~= nil) then
 		Logger.error(LOG, "Cached release cannot clear while updater ownership is live.")
 		return false
 	end
+ if not retire_verified_artifact() then return false end
 	if _verified_archive then Fs.delete(_verified_archive); _verified_archive = nil end
 	_verified_release = nil
 	_cached_release = nil
@@ -1461,6 +1789,7 @@ end
 --- @param opts table|nil { config_path, channel, interval_sec, on_available,
 ---   is_paused }: is_paused() returning true skips a due check (the pause).
 function M.init(opts)
+ if native_channel_intent or native_transfer or native_install then return false end
 	opts = type(opts) == "table" and opts or {}
 	if opts.is_paused ~= nil and type(opts.is_paused) ~= "function" then
 		error("updater.init: is_paused must be a function", 2)

@@ -218,6 +218,117 @@ def physical_receipt(text):
     return receipt
 
 
+def build_and_run(repository, hardware, command):
+    """Build the original helper and run Lua inside the existing subreaper child.
+
+    The outer owner retains its original 930-second deadline over both stages.
+    A pre-existing helper is preserved and admitted only against a freshly built
+    byte-identical original producer output; no pathname is silently adopted.
+    """
+    assert len(command) == 4 and command[0] in ("luajit", "lua5.4")
+    assert command[1] == str(hardware / "run_ollama_runtime_acceptance.lua")
+    assert command[2] == str(repository) and 0 < int(command[3]) < 65536
+    driver = repository / "static/ergopti_plus/linux"
+    source_directory = driver / "native/archive_output"
+    script = repository / "tools/build/build-linux-native-output.sh"
+    inputs = [
+        script,
+        source_directory / "archive_publication.c",
+        source_directory / "archive_publication.h",
+        Path(__file__).resolve(),
+        hardware / "run_native_subreaper.py",
+        Path(command[1]),
+    ]
+    tools = [Path("/usr/bin/bash").resolve(strict=True), Path("/usr/bin/cc").resolve(strict=True)]
+    for tool in tools:
+        identity = tool.lstat()
+        assert stat.S_ISREG(identity.st_mode) and identity.st_uid == 0
+        assert identity.st_mode & 0o022 == 0 and os.access(tool, os.X_OK)
+        with tool.open("rb") as binary:
+            assert binary.read(4) == b"\x7fELF", "actual trusted native build tool required"
+
+    def source_identity(path):
+        value = path.lstat()
+        assert stat.S_ISREG(value.st_mode), "ordinary native build source/tool required"
+        return (value.st_dev, value.st_ino, value.st_uid, value.st_mode, digest(path))
+
+    before = {str(path): source_identity(path) for path in inputs + tools}
+    profile = Path(os.environ["ERGOPTI_MODEL_RECEIPT_DIR"])
+    identity = profile.lstat()
+    assert stat.S_ISDIR(identity.st_mode) and identity.st_uid == os.getuid()
+    assert identity.st_mode & 0o077 == 0
+    binary_directory = driver / "bin"
+    binary_directory.mkdir(mode=0o755, exist_ok=True)
+    identity = binary_directory.lstat()
+    assert stat.S_ISDIR(identity.st_mode) and identity.st_uid == os.getuid()
+    assert identity.st_mode & 0o022 == 0, "owned native helper directory required"
+    directory_identity = (identity.st_dev, identity.st_ino, identity.st_uid, identity.st_mode)
+    # Own fresh output on the publication filesystem, including separate HOME mounts.
+    output = Path(tempfile.mkdtemp(prefix=".runtime-acceptance-native-", dir=binary_directory))
+    subprocess.run(
+        [
+            str(tools[0]),
+            str(script),
+            "--source-directory",
+            str(source_directory),
+            "--output-directory",
+            str(output),
+        ],
+        env=dict(os.environ, CC=str(tools[1])),
+        check=True,
+    )
+    generated = output / "libergopti_archive_publication.so"
+
+    def native_identity(path):
+        value = path.lstat()
+        assert stat.S_ISREG(value.st_mode) and value.st_uid == os.getuid()
+        assert stat.S_IMODE(value.st_mode) == 0o755 and os.access(path, os.X_OK)
+        with path.open("rb") as binary:
+            assert binary.read(4) == b"\x7fELF", "actual native retained helper required"
+        return (value.st_dev, value.st_ino, value.st_uid, value.st_mode, digest(path))
+
+    generated_identity = native_identity(generated)
+    assert before == {str(path): source_identity(path) for path in inputs + tools}
+    identity = binary_directory.lstat()
+    assert (
+        identity.st_dev,
+        identity.st_ino,
+        identity.st_uid,
+        identity.st_mode,
+    ) == directory_identity
+    installed = binary_directory / generated.name
+    if not os.path.lexists(installed):
+        os.link(generated, installed)  # Atomic no-replace publication of exact owned output.
+    installed_identity = native_identity(installed)
+    assert installed_identity[-1] == generated_identity[-1], (
+        "existing native helper differs from fresh producer"
+    )
+    result = subprocess.run(command, cwd=repository)
+    assert native_identity(generated) == generated_identity
+    assert native_identity(installed) == installed_identity
+    identity = binary_directory.lstat()
+    assert (
+        identity.st_dev,
+        identity.st_ino,
+        identity.st_uid,
+        identity.st_mode,
+    ) == directory_identity
+    assert before == {str(path): source_identity(path) for path in inputs + tools}
+    write_evidence(
+        profile / "native-helper.private.json",
+        {
+            "schema_version": 1,
+            "sources_unchanged": True,
+            "build_inputs": before,
+            "generated_sha256": generated_identity[-1],
+            "installed_sha256": installed_identity[-1],
+            "child_status": result.returncode,
+            "scope": "original native helper build and Lua under existing subreaper deadline",
+        },
+    )
+    return result.returncode
+
+
 def main():
     os.umask(0o077)
     parser = argparse.ArgumentParser()
@@ -225,6 +336,7 @@ def main():
     parser.add_argument("--evidence", type=Path, required=True)
     parser.add_argument("--lua", choices=["luajit", "lua5.4"], default="luajit")
     parser.add_argument("--child-command", nargs=argparse.REMAINDER)
+    parser.add_argument("--build-and-run", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     repository = args.repository.resolve()
     hardware = repository / "static/ergopti_plus/linux/tests/hardware"
@@ -235,6 +347,9 @@ def main():
         owner = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(owner)
         return owner.main(args.child_command, deadline_seconds=930)
+
+    if args.build_and_run is not None:
+        return build_and_run(repository, hardware, args.build_and_run)
 
     evidence = args.evidence.resolve()
     evidence.mkdir(parents=True, exist_ok=True)
@@ -314,7 +429,17 @@ def main():
         subjects.update((repository / "static/ergopti_plus/_shared/modules").rglob("*.json"))
         subjects.update((repository / "static/ergopti_plus/_shared/modules").rglob("*.toml"))
         subjects.update((repository / "static/ergopti_plus/_shared/data/locales").glob("*.json"))
-        subjects.update([Path(__file__).resolve(), hardware / "run_native_subreaper.py"])
+        subjects.update(
+            [
+                Path(__file__).resolve(),
+                hardware / "run_native_subreaper.py",
+                repository / "tools/build/build-linux-native-output.sh",
+                repository
+                / "static/ergopti_plus/linux/native/archive_output/archive_publication.c",
+                repository
+                / "static/ergopti_plus/linux/native/archive_output/archive_publication.h",
+            ]
+        )
 
         def sources():
             return {str(path.relative_to(repository)): digest(path) for path in sorted(subjects)}
@@ -330,6 +455,13 @@ def main():
             "--lua",
             args.lua,
             "--child-command",
+            sys.executable,
+            str(Path(__file__).resolve()),
+            "--repository",
+            str(repository),
+            "--evidence",
+            str(evidence),
+            "--build-and-run",
             args.lua,
             str(hardware / "run_ollama_runtime_acceptance.lua"),
             str(repository),

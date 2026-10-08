@@ -49,6 +49,7 @@ _LLM_Ollama_StopWarmupRequest() {
 }
 
 LLM_OllamaWarmup(model) {
+	Started := A_TickCount
 	global _LLM_Ollama_IsReady, _LLM_Ollama_WarmupGeneration, LLM_OLLAMA_WARMUP_TIMEOUT
 		, _LLM_Ollama_WarmupHttp
 	if (model == "")
@@ -65,6 +66,9 @@ LLM_OllamaWarmup(model) {
 	payload := RegExReplace(payload, '"num_predict":\d+', '"num_predict":1', , 1)
 	try {
 		_LLM_Ollama_WarmupHttp := CurlAsyncRequest()
+		Request := _LLM_Ollama_WarmupHttp
+		Request.SetManagedRouting(0, () => _LLM_Ollama_WarmupGeneration == gen && _LLM_Ollama_WarmupHttp == Request)
+		Request.SetDeadline(Started, LLM_OLLAMA_WARMUP_TIMEOUT)
 		_LLM_Ollama_WarmupHttp.Open("POST", LLM_OLLAMA_BASE_URL "/api/chat", true)
 		_LLM_Ollama_WarmupHttp.SetTimeouts(LLM_OLLAMA_WARMUP_TIMEOUT, LLM_OLLAMA_WARMUP_TIMEOUT,
 			LLM_OLLAMA_WARMUP_TIMEOUT, LLM_OLLAMA_WARMUP_TIMEOUT)
@@ -76,7 +80,7 @@ LLM_OllamaWarmup(model) {
 		_LLM_Ollama_PollGeneric(_LLM_Ollama_WarmupHttp,
 			(status, _body) => _LLM_Ollama_OnWarmupDone(status, gen),
 			() => _LLM_Ollama_OnWarmupPollFailed("timeout", gen),
-			A_TickCount, LLM_OLLAMA_WARMUP_TIMEOUT, _LLM_OLLAMA_WARMUP_POLL_MS)
+			Started, LLM_OLLAMA_WARMUP_TIMEOUT, _LLM_OLLAMA_WARMUP_POLL_MS)
 	} catch as e {
 		try LoggerWarn("LLM.ollama", "Warmup POST failed: {1}.", e.Message)
 		_LLM_Ollama_StopWarmupRequest()

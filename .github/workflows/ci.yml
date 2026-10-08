@@ -351,9 +351,16 @@ jobs:
         if: matrix.suite == 'js'
         run: npm run test:browser:physical-shortcuts
 
+      - name: Test shared Versions installation rendering
+        if: matrix.suite == 'js'
+        run: npm run test:browser:changelog-install
+
   macos:
     name: 'macOS'
     needs: [validate]
+    permissions:
+      contents: read
+      actions: read
     if: needs.validate.outputs.lane_macos == 'true'
     uses: ./.github/workflows/ci-macos.yml
     with:

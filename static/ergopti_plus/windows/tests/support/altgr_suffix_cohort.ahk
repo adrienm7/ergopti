@@ -216,7 +216,14 @@ _KCT_AltGrNativePriority() {
 			Capture := Map("count", 0, "exit", -1, "stdout", "", "stderr", "", "cleanup", "")
 			ObservationGeneration := Random(100000, 999999999)
 			ObservationNote := " [observation unavailable=1]"
-			Handle := ShellRunner_SpawnTreeOwned(A_AhkPath, ["/ErrorStdOut", Probe, Receipt, Nonce, Mode, ObservationGeneration],
+			Arguments := ["/ErrorStdOut", Probe, Receipt, Nonce, Mode, ObservationGeneration . ""]
+			RefusedArguments := Arguments.Clone()
+			RefusedArguments[6] := ObservationGeneration
+			AssertEqual("Argument 6 must be a string.", ShellRunner_ValidateSpawnArgs(A_AhkPath, RefusedArguments)["error"],
+				"the original numeric observation generation must refuse native process acquisition")
+			AssertEqual("", ShellRunner_ValidateSpawnArgs(A_AhkPath, Arguments)["error"],
+				"the same generation must cross the native argv boundary as text")
+			Handle := ShellRunner_SpawnTreeOwned(A_AhkPath, Arguments,
 				_KCT_AltGrChildDone.Bind(Capture))
 			ObservationLease := _KCT_ObservationOpen(Receipt . ".observation")
 			Cleaned := false
