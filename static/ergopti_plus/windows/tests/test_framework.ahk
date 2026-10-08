@@ -69,6 +69,10 @@ if !IsSet(_AHK_ONLY_FILTER)
 if !IsSet(_AHK_QUALIFICATION_PROFILE)
 	global _AHK_QUALIFICATION_PROFILE := ""
 
+; Only the principal runner owns parser registration. Including assertion
+; helpers alone must not create an undeclared function dependency at load time.
+global _TEST_QUALIFICATION_PARSER := 0
+
 ; Desktop-affecting callbacks require an explicit runner flag even when --only
 ; selects them. Hidden process launch does not suppress GUI or keyboard effects.
 if !IsSet(_AHK_INTERACTIVE)
@@ -587,16 +591,35 @@ _SelectTests(Registry, Filter, AllowInteractive, &Excluded) {
 	return Selected
 }
 
+/**
+ * Registers the principal runner's parser once, after its implementation loads.
+ * @param {Func} Parser The actual parser retained by the principal runner.
+ * @returns {Integer} One after exact registration; invalid or repeated calls throw.
+ */
+TestQualificationRegisterParser(Parser) {
+	global _TEST_QUALIFICATION_PARSER
+	if _TEST_QUALIFICATION_PARSER is Func
+		throw Error("The qualification parser is already registered.")
+	if !(Parser is Func)
+		throw TypeError("Qualification parser registration requires a function.")
+	_TEST_QUALIFICATION_PARSER := Parser
+	return 1
+}
+
 ; Qualification deferrals are execution metadata, never native permission.
 _TestDevQualificationName() {
 	global _AHK_DRY_RUN, _AHK_ONLY_FILTER, _AHK_QUALIFICATION_PROFILE
+	global _TEST_QUALIFICATION_PARSER
 	Profile := _AHK_QUALIFICATION_PROFILE
 	if Profile == "" || _AHK_DRY_RUN
 		return ""
 	if _AHK_ONLY_FILTER != ""
 		throw Error("Qualification deferral requires the complete eligible registry.")
+	Parser := _TEST_QUALIFICATION_PARSER
+	if !(Parser is Func)
+		throw Error("The principal runner has not registered its qualification parser.")
 	SplitPath(A_LineFile, , &TestsDir)
-	Policy := JsonParse(FileRead(TestsDir . "\..\..\..\..\.github\ci\dev_release_qualification_exceptions.json", "UTF-8"))
+	Policy := Parser.Call(FileRead(TestsDir . "\..\..\..\..\.github\ci\dev_release_qualification_exceptions.json", "UTF-8"))
 	if !(Policy is Map) || !(Profile == Policy["id"]) || !(EnvGet("GITHUB_ACTIONS") == "true")
 		throw Error("Qualification profile is not authorized.")
 	for Pair in [["GITHUB_REPOSITORY", "repository"], ["GITHUB_EVENT_NAME", "event_name"], ["GITHUB_REF", "ref"],

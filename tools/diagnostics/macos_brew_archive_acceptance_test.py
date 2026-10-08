@@ -9,6 +9,7 @@ import os
 from pathlib import Path, PurePosixPath
 import stat
 import subprocess
+import tempfile
 from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import Mock, patch
@@ -407,7 +408,7 @@ class ArchiveAcceptanceControls(unittest.TestCase):
 
     def test_observed_symlink_cannot_admit_a_host_cache_or_tap(self):
         with TemporaryDirectory() as directory:
-            outer = Path(directory)
+            outer = Path(directory).resolve(strict=True)
             root = outer / "owned"
             foreign = outer / "foreign"
             root.mkdir()
@@ -502,7 +503,7 @@ class ArchiveAcceptanceControls(unittest.TestCase):
 
     def test_missing_declared_format_fails_before_cask_install(self):
         with TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = Path(directory).resolve(strict=True)
             tap = root / "tap"
             tap.mkdir()
             cask = tap / "cask.rb"
@@ -608,6 +609,8 @@ class AppleEventBoundaryControls(unittest.TestCase):
         partial_ready=False,
         registration_output=None,
     ):
+        # The real owner creates its fixture below an already resolved parent.
+        root = Path(root).resolve(strict=True)
         judge = self
 
         class Boundary:
@@ -3057,6 +3060,43 @@ class ConsentPairMergeJoinControls(unittest.TestCase):
             )
             self.assertFalse(hasattr(owner, "automation_sender_name"))
             self.assertFalse(hasattr(owner, "automation_receiver_name"))
+
+
+class PhysicalFixtureRootControls(unittest.TestCase):
+    """Reproduce aliased temporary roots without weakening physical confinement."""
+
+    def test_owned_temp_alias_replays_all_original_path_sensitive_controls(self):
+        with TemporaryDirectory() as directory:
+            outer = Path(directory).resolve(strict=True)
+            physical = outer / "physical" / "temp"
+            physical.mkdir(parents=True)
+            aliases = outer / "aliases"
+            aliases.mkdir()
+            alias = aliases / "temp"
+            with owned_directory_link(outer, alias, physical):
+                self.assertNotEqual(alias, alias.resolve(strict=True))
+                self.assertEqual(alias.resolve(strict=True), physical)
+                with patch.object(tempfile, "tempdir", str(alias)):
+                    suite = unittest.TestLoader().loadTestsFromTestCase(AppleEventBoundaryControls)
+                    self.assertEqual(suite.countTestCases(), 7)
+                    for name in (
+                        "test_observed_symlink_cannot_admit_a_host_cache_or_tap",
+                        "test_missing_declared_format_fails_before_cask_install",
+                    ):
+                        suite.addTest(ArchiveAcceptanceControls(name))
+                    suite.addTest(
+                        SenderFactControls(
+                            "test_deny_removal_failure_stops_before_third_send_and_retains_receiver_owner"
+                        )
+                    )
+                    result = unittest.TestResult()
+                    suite.run(result)
+                self.assertEqual(result.testsRun, 10)
+                self.assertEqual(result.skipped, [])
+                self.assertEqual(result.failures, [])
+                self.assertEqual(result.errors, [])
+            self.assertFalse(alias.exists())
+            self.assertTrue(physical.is_dir())
 
 
 if __name__ == "__main__":

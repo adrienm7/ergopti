@@ -663,6 +663,10 @@ class _ManagedRemoteFixtureOwner {
 		this.GenerationCount := 0
 		this.GenerationDiagnosticPrinter := _TestPrint
 		this.GenerationDiagnosticStatus := "not_requested"
+		this.ReadinessCount := 0
+		this.ReadinessRuns := Map()
+		this.ReadinessDiagnosticPrinter := _TestPrint
+		this.ReadinessDiagnosticStatus := "not_requested"
 		this.Mode := "fixed"
 		this.Capture := 0
 		this.State := Map()
@@ -888,6 +892,10 @@ class _ManagedRemoteFixtureOwner {
 
 	_CheckReadiness(ExpectedSuccess) {
 		global LLM_API_PROVIDERS, LLM_REMOTE_READY_PING_DEADLINE_MS
+		this.ReadinessCount += 1
+		Run := Map("mode", this.Mode, "ordinal", this.ReadinessCount, "http", [], "capture", "retained")
+		this.ReadinessRuns[this.ReadinessCount] := Run
+		ReadyPort := this.Port.Clone()
 		ProviderId := "managed_network_" . this.Identity
 		AssertFalse(LLM_API_PROVIDERS.Has(ProviderId), "owned acceptance provider identity must be unique")
 		Result := []
@@ -895,19 +903,22 @@ class _ManagedRemoteFixtureOwner {
 		ObservedPort := this.Port.Clone()
 		Factory := _LLM_CurlArtifactPortFn(this.Port, "create_http", () => CurlAsyncRequest())
 		ObservedPort["create_http"] := _ManagedRemoteCaptureReadinessHttp.Bind(Observation, Factory)
+		ReadyPort["create_http"] := _ManagedRemoteFixtureCaptureReadinessHttp.Bind(Run, ObservedPort["create_http"])
 		Owner := LLM_AuxBegin(ProviderId, Map("backend", "api", "endpoint", this.BaseUrl, "identity", ProviderId))
 		this.ReadyOwners.Push(Owner)
 		LLM_API_PROVIDERS[ProviderId] := Map("Format", "openai", "BaseUrl", this.BaseUrl)
 		try {
 			LLM_RemoteIsReady_Async(Map("Provider", ProviderId, "Token", "managed-network-fixture-token"),
-				ObjBindMethod(this, "ReadyCompleted", Result, Owner), Owner, ObservedPort)
+				ObjBindMethod(this, "ReadyCompleted", Result, Owner), Owner, ReadyPort)
 			Started := A_TickCount
 			while Result.Length == 0 && !TickExpired64(Started, 18000) {
 				_SR_TreePoll()
 				Sleep(10)
 			}
-			if Result.Length != 1 || Result[1] != ExpectedSuccess
+			if Result.Length != 1 || Result[1] != ExpectedSuccess {
+				_ManagedRemoteFixtureEmitReadinessDiagnostic(this, Run, Result, ExpectedSuccess)
 				_ManagedRemoteEmitReadinessDiagnostic(this, ExpectedSuccess, Result, Observation, Owner, LLM_REMOTE_READY_PING_DEADLINE_MS)
+			}
 			AssertEqual(1, Result.Length, "actual readiness must settle once within its native budget")
 			AssertEqual(ExpectedSuccess, Result[1], "readiness must obey the actual system root and selected relay")
 		} finally {
@@ -1939,6 +1950,12 @@ _ManagedRemoteFixtureGenerationDiagnostic(Mode, Ordinal, ExpectedSuccess, Result
 		. " failure_callbacks=" . (Failure is Array ? _ManagedRemoteFixtureGenerationInteger(Failure.Length, 0, 65535) : "unknown")
 		. " callback_reason=" . Reason
 		. " callback_status=" . _ManagedRemoteFixtureGenerationInteger(_ManagedNetwork_Get(Info, "status", ""), 0, 599)
+	return Fact . _ManagedRemoteFixtureTransportDiagnostic(Receipt, Policy)
+}
+
+; Both checkpoints use the same existing closed receipt parser and field projection.
+_ManagedRemoteFixtureTransportDiagnostic(Receipt, Policy) {
+	Fact := ""
 	Admitted := _ManagedRemoteFixtureGenerationReceipt(Receipt, Policy)
 	Fact .= " native_receipt=" . Admitted["state"]
 	Fields := Admitted["fields"]
@@ -2175,7 +2192,7 @@ _ManagedRemoteEmitReadinessDiagnostic(Fixture, Expected, Results, Observation, O
 		Start := Owner.Get("network_start_tick", 0)
 		Elapsed := Type(Start) == "Integer" && Start > 0 ? TickElapsed64(Start) : "unknown"
 		Fact := _ManagedRemoteReadinessDiagnostic(Fixture.Mode, Expected, Results, Elapsed, Budget, Status, Receipt)
-		Printer := Fixture.HasOwnProp("ReadinessDiagnosticPrinter") ? Fixture.ReadinessDiagnosticPrinter : _TestPrint
+		Printer := Fixture.HasOwnProp("Group6ReadinessDiagnosticPrinter") ? Fixture.Group6ReadinessDiagnosticPrinter : _TestPrint
 		Printer.Call("::notice title=Windows native readiness diagnostic::" . Fact)
 	} catch Any {
 		; Projection/printing failure cannot replace the original readiness assertion.
@@ -2204,7 +2221,7 @@ _ManagedRemoteReadinessDiagnosticControls() {
 }
 Test("managed remote native: readiness observations retain exact factory and closed native facts", _ManagedRemoteReadinessDiagnosticControls)
 
-class _ManagedRemoteReadinessDiagnosticOwner extends _ManagedRemoteFixtureOwner {
+class _ManagedRemoteGroup6ReadinessDiagnosticOwner extends _ManagedRemoteFixtureOwner {
 	__New(Printer) {
 		this.Identity := "readiness_diagnostic_" . _ManagedRemoteFixtureGuid()
 		this.Mode := "fixed"
@@ -2212,7 +2229,11 @@ class _ManagedRemoteReadinessDiagnosticOwner extends _ManagedRemoteFixtureOwner 
 		this.Http := _ManagedRemoteGenerationDiagnosticHttp(_ManagedRemoteGenerationDiagnosticReceipt())
 		this.ReadyOwners := []
 		this.ReadyCancels := []
-		this.ReadinessDiagnosticPrinter := Printer
+		this.Group6ReadinessDiagnosticPrinter := Printer
+		this.ReadinessCount := 0
+		this.ReadinessRuns := Map()
+		this.ReadinessDiagnosticPrinter := _TestPrint
+		this.ReadinessDiagnosticStatus := "not_requested"
 		this.FactoryCalls := 0
 		this.Port := Map("managed_settings", (*) => Map(), "create_http", ObjBindMethod(this, "CreateHttp"))
 	}
@@ -2222,9 +2243,9 @@ class _ManagedRemoteReadinessDiagnosticOwner extends _ManagedRemoteFixtureOwner 
 	}
 }
 
-_ManagedRemoteReadinessDiagnosticProducer(RefusePrinter := false) {
+_ManagedRemoteGroup6ReadinessDiagnosticProducer(RefusePrinter := false) {
 	Control := Map("calls", 0, "fact", "", "refuse", RefusePrinter)
-	Fixture := _ManagedRemoteReadinessDiagnosticOwner(_ManagedRemoteGenerationCollect.Bind(Control))
+	Fixture := _ManagedRemoteGroup6ReadinessDiagnosticOwner(_ManagedRemoteGenerationCollect.Bind(Control))
 	Caught := 0
 	try Fixture.CheckReadiness(true)
 	catch Error as Failure {
@@ -2240,5 +2261,160 @@ _ManagedRemoteReadinessDiagnosticProducer(RefusePrinter := false) {
 	AssertContains(Control["fact"], "curl_exit=60")
 	AssertFalse(InStr(Control["fact"], "managed-fixture.invalid"), "the actual receiving observation never publishes its destination")
 }
-Test("managed remote native: actual readiness receiving entry reports its retained transport", _ManagedRemoteReadinessDiagnosticProducer)
-Test("managed remote native: readiness reporter refusal preserves the original assertion", _ManagedRemoteReadinessDiagnosticProducer.Bind(true))
+Test("managed remote native: actual readiness receiving entry reports its retained transport", _ManagedRemoteGroup6ReadinessDiagnosticProducer)
+Test("managed remote native: readiness reporter refusal preserves the original assertion", _ManagedRemoteGroup6ReadinessDiagnosticProducer.Bind(true))
+
+
+; Capture exact factory returns without changing dispatch, callback or retirement.
+_ManagedRemoteFixtureCaptureReadinessHttp(Run, Factory) {
+	Http := Factory.Call()
+	try Run["http"].Push(Http)
+	catch Any {
+		Run["capture"] := "unavailable"
+	}
+	return Http
+}
+
+_ManagedRemoteFixtureReadinessDiagnostic(Mode, Ordinal, ExpectedSuccess, Result, Created, Status, Capture, Receipt := 0) {
+	global _SharedDir
+	Policy := ManagedNetworkFailureContract(JsonParse(FileRead(_SharedDir . "\modules\network\managed_network.json", "UTF-8"))).Policy
+	Actual := Result is Array && Result.Length == 1 ? _ManagedRemoteFixtureDiagnosticBoolean(Result[1]) : "unknown"
+	Fact := "readiness_mode=" . _ManagedRemoteFixtureDiagnosticEnum(Mode, "fixed|pac")
+		. " readiness_ordinal=" . _ManagedRemoteFixtureGenerationInteger(Ordinal, 1, 4)
+		. " expected_success=" . _ManagedRemoteFixtureDiagnosticBoolean(ExpectedSuccess)
+		. " callbacks=" . (Result is Array ? _ManagedRemoteFixtureGenerationInteger(Result.Length, 0, 65535) : "unknown")
+		. " callback_success=" . Actual
+		. " capture=" . _ManagedRemoteFixtureDiagnosticEnum(Capture, "retained|unavailable")
+		. " http_created=" . _ManagedRemoteFixtureGenerationInteger(Created, 0, 65535)
+		. " request_status=" . _ManagedRemoteFixtureGenerationInteger(Status, 0, 599)
+	return Fact . _ManagedRemoteFixtureTransportDiagnostic(Receipt, Policy)
+}
+
+_ManagedRemoteFixtureEmitReadinessDiagnostic(Fixture, Run, Result, ExpectedSuccess) {
+	Fixture.ReadinessDiagnosticStatus := "unavailable"
+	try {
+		Receipt := 0
+		Created := ""
+		Status := ""
+		Capture := "unavailable"
+		if Run is Map && Fixture.ReadinessRuns is Map
+			&& Fixture.ReadinessRuns.Has(Run["ordinal"]) && Fixture.ReadinessRuns[Run["ordinal"]] == Run {
+			Capture := Run["capture"]
+			if Capture == "retained" && Run["http"] is Array {
+				Created := Run["http"].Length
+				if Created == 1 {
+					Http := Run["http"][1]
+					if Http is CurlAsyncRequest {
+						Status := Http.Status
+						if Type(Http.ManagedTransport) == "Integer" && Http.ManagedTransport == true
+							Receipt := Http.NativeReceipt
+					}
+				}
+			}
+		}
+		Fact := _ManagedRemoteFixtureReadinessDiagnostic(Run["mode"], Run["ordinal"], ExpectedSuccess, Result, Created, Status, Capture, Receipt)
+		Fixture.ReadinessDiagnosticPrinter.Call("::notice title=Windows native readiness diagnostic::" . Fact)
+		Fixture.ReadinessDiagnosticStatus := "reported"
+	} catch Any {
+		; Reporting refusal cannot replace the original readiness assertion.
+		Fixture.ReadinessDiagnosticStatus := "unavailable"
+	}
+}
+
+class _ManagedRemoteReadinessDiagnosticOwner extends _ManagedRemoteGenerationDiagnosticOwner {
+	__New(Printer, Receipt) {
+		super.__New(Printer, Receipt)
+		this.Identity := "readiness-diagnostic-control"
+		this.ReadyOwners := []
+		this.ReadyCancels := []
+		this.ReadinessCount := 0
+		this.ReadinessRuns := Map()
+		this.ReadinessDiagnosticPrinter := Printer
+		this.ReadinessDiagnosticStatus := "not_requested"
+	}
+}
+
+_ManagedRemoteReadinessDiagnosticProducer(RefusePrinter := false, ExpectedSuccess := true, Reachable := false) {
+	Control := Map("calls", 0, "fact", "", "refuse", RefusePrinter)
+	Fixture := _ManagedRemoteReadinessDiagnosticOwner(_ManagedRemoteGenerationCollect.Bind(Control), _ManagedRemoteGenerationDiagnosticReceipt())
+	Fixture.Http.Status := Reachable ? 200 : 0
+	Caught := 0
+	try Fixture.CheckReadiness(ExpectedSuccess)
+	catch Error as Failure {
+		Caught := Failure
+	}
+	if ExpectedSuccess != Reachable {
+		AssertEqual("Error", Type(Caught))
+		AssertEqual("readiness must obey the actual system root and selected relay - expected: <1>, actual: <0>", Caught.Message)
+		AssertEqual(1, Control["calls"], "the actual producer must emit its retained readiness fact before the unchanged assertion")
+		AssertContains(Control["fact"], "readiness_mode=fixed readiness_ordinal=1 expected_success=true callbacks=1 callback_success=false capture=retained http_created=1 request_status=0")
+		AssertContains(Control["fact"], "native_receipt=admitted backend=curl stage=connect")
+		AssertEqual(RefusePrinter ? "unavailable" : "reported", Fixture.ReadinessDiagnosticStatus)
+	} else {
+		AssertEqual(0, Caught)
+		AssertEqual(0, Control["calls"], "an expected false result does not emit a mismatch")
+		AssertEqual("not_requested", Fixture.ReadinessDiagnosticStatus)
+	}
+	AssertTrue(Fixture.Http.Polls >= 2, "the existing real poll delivers the callback")
+	AssertTrue(Fixture.ReadinessRuns[1]["http"][1] == Fixture.Http, "the factory forwarded the same retained transport")
+	for Owner in Fixture.ReadyOwners
+		AssertFalse(LLM_AuxIsCurrent(Owner), "the original owner finishes on the original callback path")
+	for CancelFn in Fixture.ReadyCancels
+		AssertTrue(CancelFn.Call(), "the original exact cancellation remains available")
+	AssertFalse(InStr(Control["fact"], "managed-fixture.invalid"))
+	AssertFalse(InStr(Control["fact"], "PRIVATE_"))
+}
+Test("managed remote native: readiness checkpoint observes actual false callback (managed-fixture-readiness-diagnostic)", _ManagedRemoteReadinessDiagnosticProducer)
+Test("managed remote native: readiness reporter refusal preserves original assertion (managed-fixture-readiness-diagnostic)", _ManagedRemoteReadinessDiagnosticProducer.Bind(true))
+Test("managed remote native: expected false readiness emits no mismatch (managed-fixture-readiness-diagnostic)", _ManagedRemoteReadinessDiagnosticProducer.Bind(false, false))
+Test("managed remote native: successful readiness emits no mismatch (managed-fixture-readiness-diagnostic)", _ManagedRemoteReadinessDiagnosticProducer.Bind(false, true, true))
+
+_ManagedRemoteReadinessDiagnosticScalars(Value) {
+	Fact := _ManagedRemoteFixtureReadinessDiagnostic(Value, Value, Value, [Value], Value, Value, Value, Value)
+	AssertFalse(InStr(Fact, "PRIVATE_"))
+	AssertContains(Fact, "readiness_mode=unknown")
+	AssertContains(Fact, "native_receipt=" . (Value is Map ? "invalid" : "unavailable"))
+}
+for Value in ["PRIVATE_SECRET", 1.5, Map("PRIVATE_FIELD", "PRIVATE_SECRET"), [], "true"]
+	Test("managed remote native: readiness scalar " . Type(Value) . " refuses private facts (managed-fixture-readiness-diagnostic)",
+		_ManagedRemoteReadinessDiagnosticScalars.Bind(Value))
+
+_ManagedRemoteReadinessDiagnosticMalformedReceipt() {
+	Receipt := _ManagedRemoteGenerationDiagnosticReceipt()
+	Receipt["PRIVATE_FIELD"] := "PRIVATE_SECRET"
+	Fact := _ManagedRemoteFixtureReadinessDiagnostic("pac", 3, true, [false], 1, 0, "retained", Receipt)
+	AssertContains(Fact, "native_receipt=invalid")
+	AssertContains(Fact, "backend=unknown")
+	AssertFalse(InStr(Fact, "PRIVATE_"))
+	for Pair in [["stage", "PRIVATE_STAGE"], ["backend", "PRIVATE_BACKEND"], ["curl_exit", 1.5]] {
+		Receipt := _ManagedRemoteGenerationDiagnosticReceipt()
+		Receipt[Pair[1]] := Pair[2]
+		Fact := _ManagedRemoteFixtureReadinessDiagnostic("fixed", 2, true, [false], 1, 0, "retained", Receipt)
+		AssertContains(Fact, "native_receipt=invalid")
+		AssertFalse(InStr(Fact, "PRIVATE_"))
+	}
+	Receipt := _ManagedRemoteGenerationDiagnosticReceipt()
+	Receipt["native_errno"] := "PRIVATE_NOT_AN_INTEGER"
+	Fact := _ManagedRemoteFixtureReadinessDiagnostic("fixed", 2, true, [false], 1, 0, "retained", Receipt)
+	AssertContains(Fact, "native_errno=unknown")
+	AssertFalse(InStr(Fact, "PRIVATE_"))
+}
+Test("managed remote native: readiness malformed receipt emits no native facts (managed-fixture-readiness-diagnostic)", _ManagedRemoteReadinessDiagnosticMalformedReceipt)
+
+
+_ManagedRemoteReadinessFactoryRefusal(Failure) {
+	throw Failure
+}
+
+_ManagedRemoteReadinessFactoryPrimary() {
+	Run := Map("http", [], "capture", "retained")
+	Primary := Error("PRIVATE_FACTORY_REFUSAL")
+	Observed := 0
+	try _ManagedRemoteFixtureCaptureReadinessHttp(Run, _ManagedRemoteReadinessFactoryRefusal.Bind(Primary))
+	catch Any as Failure {
+		Observed := Failure
+	}
+	AssertTrue(Observed == Primary, "observation never replaces the original factory exception")
+	AssertEqual(0, Run["http"].Length)
+}
+Test("managed remote native: readiness capture preserves factory failure (managed-fixture-readiness-diagnostic)", _ManagedRemoteReadinessFactoryPrimary)
