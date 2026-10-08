@@ -177,7 +177,8 @@ emit_marker "OLLAMA_VERIFIED"
 parent_dir="$(dirname "$OLLAMA_INSTALL_DIR")"
 mkdir -p "$parent_dir"
 INSTALL_STAGE="$(mktemp -d "$parent_dir/.ollama.ergopti.XXXXXX")"
-if ! tar -xzf "$archive_path" -C "$INSTALL_STAGE"; then
+# Preserve pinned member modes even under the native private-process umask.
+if ! tar -xzpf "$archive_path" -C "$INSTALL_STAGE"; then
 	log_error "The verified Ollama archive could not be extracted."
 	exit 1
 fi
