@@ -31,7 +31,7 @@ _ManagedRoutes_NativeAcceptance() {
 		AssertTrue(IsObject(Handle) ? Handle.terminate() : true, "the exact owned native fixture tree must physically retire")
 	}
 }
-Test("managed network: real canonical WinHTTP Ex preserves full PAC order and fresh bytes", _ManagedRoutes_NativeAcceptance)
+Test("managed network: real canonical native PAC preserves full URL, order, fresh bytes and current-user SSPI", _ManagedRoutes_NativeAcceptance)
 
 ; The original owner combines both native streams in its stdout callback value.
 ; Emit only the closed frame from that already-settled capture; never raw output.
@@ -39,7 +39,7 @@ _ManagedRoutes_NativeDiagnostic(Observation) {
 	Err := Observation.Get("stdout", "")
 	if !(Err is String) || StrLen(Err) > 8192
 		return
-	Pattern := "m)^ROUTE_DIAG stage=(load_routes|abi_sizes|compile_server|start_server|vector_lookup|vector_receipt|vector_order|fresh_lookup|fresh_order|unsupported_lookup|unsupported_receipt|settings_read|settings_receipt|server_receipt|cleanup)"
+	Pattern := "m)^ROUTE_DIAG stage=(load_routes|abi_sizes|compile_server|start_server|vector_lookup|vector_receipt|vector_order|fresh_lookup|fresh_order|unsupported_lookup|unsupported_receipt|slow_lookup|slow_receipt|slow_owner|pac_auth_lookup|pac_auth_receipt|pac_auth_owner|settings_read|settings_receipt|server_receipt|cleanup)"
 		. " vector=([0-3]) native_observed=([01]) native_errno=(-?(?:0|[1-9][0-9]{0,9}))"
 		. " status=(unknown|unavailable|invalid_configuration|pac_failed|wpad_failed)"
 		. " result_shape=(unknown|null|hashtable|array|other) ok=(unknown|true|false)"
