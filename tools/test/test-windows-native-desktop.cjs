@@ -8,7 +8,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const pipeline = require('./ci-pipeline.cjs');
-const { stripComments } = require('../lib/script-source.cjs');
+const { stripComments, scriptTokens } = require('../lib/script-source.cjs');
 
 const root = path.resolve(__dirname, '../..');
 const runner = fs.readFileSync(path.join(__dirname, 'run-windows-native-desktop.ps1'), 'utf8');
@@ -61,7 +61,9 @@ function checkWorkflow(body) {
 	assert.equal(pipeline.stepField(native, 'run'), './tools/test/run-windows-native-desktop.ps1');
 	assert.equal(pipeline.stepField(native, 'shell'), 'pwsh');
 	assert.equal(pipeline.stepField(native, 'timeout-minutes'), '25');
-	assert.equal(pipeline.stepField(native, 'if'), null);
+	assert.equal(pipeline.stepField(native, 'if'), '${{ !cancelled() }}');
+	assert.equal(pipeline.stepField(main, 'if'), null);
+	assert.equal(pipeline.stepField(main, 'continue-on-error'), null);
 	assert.equal(pipeline.stepField(native, 'continue-on-error'), null);
 	assert.ok(body.indexOf(main) < body.indexOf(native));
 	assert.ok(body.indexOf(native) < body.indexOf(upload));
@@ -74,15 +76,95 @@ function checkWorkflow(body) {
 	assert.match(upload, /overwrite: true/);
 }
 
+/** Follows one real authored cohort include, refusing absent or duplicate ownership. */
+function readCohortOwner(file) {
+	const names = new Map([
+		['unit/test_console_window.ahk', 'console_capture_cohort.ahk'],
+		['unit/test_key_combinations.ahk', 'altgr_suffix_cohort.ahk']
+	]);
+	assert.ok(names.has(file));
+	const owner = fs.readFileSync(path.join(root, 'static/ergopti_plus/windows/tests', file), 'utf8');
+	const include = '#Include ../support/' + names.get(file);
+	const code = stripComments(owner, '.ahk');
+	assert.equal(
+		code.split(include).length,
+		2,
+		'the original owner has exactly one actual cohort include'
+	);
+	assert.match(code, new RegExp('^' + include.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&') + '$', 'm'));
+	const shared = fs.readFileSync(
+		path.join(root, 'static/ergopti_plus/windows/tests/support', names.get(file)),
+		'utf8'
+	);
+	assert.ok(shared.length > 1000, 'the actual shared cohort must contain its source definitions');
+	return owner + '\n' + shared;
+}
+
+/** Keeps the canonical producer narrow while every stdout diagnostic still refuses. */
+function checkDesktopOwner(source, sources) {
+	const code = stripComments(source, '.ahk');
+	assert.match(code, /^#Warn All, StdOut$/m);
+	assert.match(code, /^#Warn VarUnset, Off$/m);
+	assert.match(code, /^#Include test_framework\.ahk$/m);
+	assert.match(code, /^_TestResultsBeginRun\(\)$/m);
+	assert.match(code, /^#Include support\/console_capture_cohort\.ahk$/m);
+	assert.match(code, /^#Include support\/altgr_suffix_cohort\.ahk$/m);
+	assert.match(code, /^RunTests\(\)$/m);
+	const outputCalls = (code.match(/\bFileAppend\(/g) || []).length;
+	assert.equal(
+		outputCalls,
+		2,
+		'only argument refusal and the retained watchdog own direct diagnostics'
+	);
+	assert.match(code, /^SetTimer\(_WatchdogFire, -_SUITE_TIMEOUT_MS\)$/m);
+	assert.match(code, /^global _SUITE_TIMEOUT_MS := 1320000$/m);
+	const included = [...code.matchAll(/^#Include ([^\r\n]+)$/gm)].map((match) => match[1]);
+	assert.deepEqual(included, [
+		'test_framework.ahk',
+		'../infra/tick_count.ahk',
+		'../infra/wall_clock.ahk',
+		'../infra/logger.ahk',
+		'../infra/toml/toml_helpers.ahk',
+		'../platform/remap/tap_hold_loader.ahk',
+		'../platform/remap/tap_hold_writer.ahk',
+		'../adapters/key_state.ahk',
+		'../adapters/text_sender.ahk',
+		'../adapters/process_lifecycle.ahk',
+		'../adapters/shell_runner.ahk',
+		'../platform/remap/constants.ahk',
+		'../platform/remap/altgr_criteria.ahk',
+		'../infra/key_combinations.ahk',
+		'support/console_capture_cohort.ahk',
+		'support/altgr_suffix_cohort.ahk'
+	]);
+	const registrations = sources.flatMap((item) =>
+		[...stripComments(item, '.ahk').matchAll(/^Test\("([^"\r\n]+)"/gm)].map((match) => match[1])
+	);
+	assert.deepEqual(
+		registrations,
+		expected,
+		'the canonical producer registers only the eleven original ordered cases'
+	);
+	for (const cohort of sources) {
+		assert.ok(cohort.length > 1000);
+		assert.match(
+			cohort,
+			/^[A-Za-z_][A-Za-z_0-9]*\([^\r\n]*\) \{$/m,
+			'the registration subject retains actual callable definitions'
+		);
+	}
+	assert.deepEqual(
+		[...code.matchAll(/^#Warn ([^\r\n]+)$/gm)].map((match) => match[1]),
+		['All, StdOut', 'VarUnset, Off']
+	);
+	assert.doesNotMatch(code, /#Include .*run_all|#Include .*test_stubs/);
+}
+
 checkRunner(runner);
 const body = pipeline.job('test-ahk');
 checkWorkflow(body);
 const registrations = ['unit/test_console_window.ahk', 'unit/test_key_combinations.ahk'].map(
-	(file) =>
-		stripComments(
-			fs.readFileSync(path.join(root, 'static/ergopti_plus/windows/tests', file), 'utf8'),
-			'.ahk'
-		)
+	(file) => stripComments(readCohortOwner(file), '.ahk')
 );
 for (const name of expected) {
 	assert.equal(registrations.join('\n').split('Test("' + name + '",').length, 2);
@@ -136,6 +218,44 @@ for (const [before, after] of [
 	assert.throws(() => checkWorkflow(changed));
 	refused += 1;
 }
+// A status function overrides Actions' default success() check, so these
+// original observations run after a failed main suite unless cancelled. The
+// main suite still has its original failing exit and no failure forgiveness.
+const nativeHead = '      - name: Run native desktop AHK cohorts\n';
+const nativeCondition = nativeHead + '        if: ${{ !cancelled() }}\n';
+assert.equal(body.split(nativeCondition).length, 2);
+for (const condition of [
+	'',
+	'false',
+	'success()',
+	'always()',
+	'${{ always() }}',
+	'${{ !failure() }}',
+	'${{ cancelled() }}',
+	'${{ !cancelled() && false }}',
+	'${{ !cancelled() || true }}'
+]) {
+	const changed = body.replace(
+		nativeCondition,
+		nativeHead + (condition ? `        if: ${condition}\n` : '')
+	);
+	assert.notEqual(changed, body);
+	assert.throws(() => checkWorkflow(changed));
+	refused += 1;
+}
+for (const [before, after] of [
+	[nativeHead, '      - name: Omitted native desktop AHK cohorts\n'],
+	['      - name: Run AHK test suite\n', '      - name: Run AHK test suite\n        if: false\n'],
+	[
+		'      - name: Run AHK test suite\n',
+		'      - name: Run AHK test suite\n        continue-on-error: true\n'
+	]
+]) {
+	const changed = body.replace(before, after);
+	assert.notEqual(changed, body);
+	assert.throws(() => checkWorkflow(changed));
+	refused += 1;
+}
 // PowerShell's actual AST and guard are exercised on Windows. These handwritten
 // portable inputs are not native desktop observations or qualification artifacts.
 if (process.platform === 'win32') {
@@ -159,4 +279,160 @@ if (process.platform === 'win32') {
 }
 console.log(
 	`Windows native desktop wiring PASS: eleven authored cases, six interactive registrations, ${refused} causal source/workflow refusals. Native desktop execution is not claimed.`
+);
+
+const desktop = fs.readFileSync(
+	path.join(root, 'static/ergopti_plus/windows/tests/run_desktop.ahk'),
+	'utf8'
+);
+const cohorts = ['console_capture_cohort.ahk', 'altgr_suffix_cohort.ahk'].map((file) =>
+	fs.readFileSync(path.join(root, 'static/ergopti_plus/windows/tests/support', file), 'utf8')
+);
+checkDesktopOwner(desktop, cohorts);
+assert.match(runner, /tests\\run_desktop\.ahk'/);
+for (const [before, after] of [
+	['#Warn All, StdOut', '#Warn All, Off'],
+	['#Include test_framework.ahk', '#Include test_stubs.ahk'],
+	['#Include support/console_capture_cohort.ahk', ''],
+	['#Include support/altgr_suffix_cohort.ahk', ''],
+	['RunTests()', 'ExitApp(0)'],
+	['global _SUITE_TIMEOUT_MS := 1320000', 'global _SUITE_TIMEOUT_MS := 1000'],
+	[
+		'#Include ../infra/key_combinations.ahk',
+		'#Include ../infra/key_combinations.ahk\n#Include unit/test_llm_agent.ahk'
+	],
+	['RunTests()', 'FileAppend("Warning: extraneous producer", "*")\nRunTests()']
+]) {
+	const changed = desktop.replace(before, after);
+	assert.notEqual(changed, desktop);
+	assert.throws(() => checkDesktopOwner(changed, cohorts));
+}
+for (const [index, changed] of [
+	[0, cohorts[0].replace(/^Test\("[^"\r\n]+",\n[^\r\n]+\)\n/m, '')],
+	[1, cohorts[1] + '\nTest("foreign producer", () => true)\n']
+]) {
+	assert.notEqual(changed, cohorts[index]);
+	const changedCohorts = [...cohorts];
+	changedCohorts[index] = changed;
+	assert.throws(() => checkDesktopOwner(desktop, changedCohorts));
+}
+console.log(
+	'Canonical desktop source isolation PASS: eleven unchanged authored registrations and ten causal admission refusals; native AHK remains unrun.'
+);
+
+/** Masks literals as well as comments without altering native declaration offsets. */
+function desktopExecutable(source) {
+	const chunks = [];
+	let prior = 0;
+	const code = stripComments(source, '.ahk');
+	for (const token of scriptTokens(code, '.ahk')) {
+		chunks.push(code.slice(prior, token.start));
+		chunks.push(
+			token.kind === 'string'
+				? code.slice(token.start, token.end).replace(/[^\r\n]/g, ' ')
+				: code.slice(token.start, token.end)
+		);
+		prior = token.end;
+	}
+	return chunks.join('') + code.slice(prior);
+}
+
+/** A genuine included native creator must satisfy both captured ShellRunner references. */
+function checkDesktopNativeCreator(source, readSource) {
+	const includes = [...stripComments(source, '.ahk').matchAll(/^#Include ([^\r\n]+)$/gm)].map(
+		(item) => item[1]
+	);
+	assert.equal(
+		includes.length,
+		16,
+		'the actual canonical graph retains sixteen authored direct includes'
+	);
+	let nativeOwners = 0;
+	let shellOwners = 0;
+	for (const relative of includes) {
+		const owner = readSource(relative);
+		assert.ok(owner.length > 0, 'every actual direct native dependency must be readable');
+		const code = desktopExecutable(owner);
+		const declaration =
+			/^PLC_CreateProcessWithInheritedHandles\(ApplicationPath, CommandBuffer, CreationFlags, StartupInfo, ProcessInfo\) \{/gm;
+		for (const match of code.matchAll(declaration)) {
+			const prefix = code.slice(0, match.index);
+			const depth = [...prefix].reduce(
+				(value, ch) => value + (ch === '{' ? 1 : ch === '}' ? -1 : 0),
+				0
+			);
+			assert.equal(depth, 0, 'the native creator must be an actual top-level exported function');
+			nativeOwners += 1;
+			const bodyTokens = scriptTokens(owner.slice(match.index), '.ahk');
+			let bodyDepth = 0;
+			let end = 0;
+			for (const token of bodyTokens) {
+				if (token.kind === 'symbol' && token.value === '{') bodyDepth += 1;
+				if (token.kind === 'symbol' && token.value === '}' && --bodyDepth === 0) {
+					end = token.end;
+					break;
+				}
+			}
+			assert.ok(end > 0, 'the real native creation body must be complete');
+			const body = owner.slice(match.index, match.index + end);
+			assert.match(desktopExecutable(body), /\bCreated\s*:=\s*DllCall\s*\(/);
+			assert.ok(
+				scriptTokens(body, '.ahk').some(
+					(token) => token.kind === 'string' && token.value === 'Kernel32\\CreateProcessW'
+				),
+				'the actual declaration must retain its genuine native CreateProcessW port'
+			);
+		}
+		if (/^ShellRunner_SpawnTreeOwned\(/m.test(code)) {
+			shellOwners += 1;
+			assert.match(code, /CreateFn\s*:=\s*PLC_CreateProcessWithInheritedHandles/);
+			assert.match(
+				code,
+				/return\s+_SR_TreeCreateSuspended\([^)]*PLC_CreateProcessWithInheritedHandles/
+			);
+		}
+	}
+	assert.equal(
+		nativeOwners,
+		1,
+		'the canonical include graph must supply exactly one native process creator'
+	);
+	assert.equal(
+		shellOwners,
+		1,
+		'the dependency premise must include the actual required ShellRunner owner'
+	);
+}
+
+const desktopRead = (relative) =>
+	fs.readFileSync(path.resolve(root, 'static/ergopti_plus/windows/tests', relative), 'utf8');
+checkDesktopNativeCreator(desktop, desktopRead);
+const nativeRelative = [...stripComments(desktop, '.ahk').matchAll(/^#Include ([^\r\n]+)$/gm)]
+	.map((item) => item[1])
+	.filter((relative) =>
+		/^PLC_CreateProcessWithInheritedHandles\(/m.test(desktopExecutable(desktopRead(relative)))
+	);
+assert.equal(nativeRelative.length, 1);
+const missingCreator = desktop.replace('#Include ' + nativeRelative[0] + '\n', '');
+assert.notEqual(missingCreator, desktop);
+assert.throws(() => checkDesktopOwner(missingCreator, cohorts));
+assert.throws(() => checkDesktopNativeCreator(missingCreator, desktopRead));
+for (const replacement of ['foreign_native_creator', '']) {
+	assert.throws(() =>
+		checkDesktopNativeCreator(desktop, (relative) =>
+			relative === nativeRelative[0]
+				? desktopRead(relative).replace('PLC_CreateProcessWithInheritedHandles(', replacement + '(')
+				: desktopRead(relative)
+		)
+	);
+}
+assert.throws(() =>
+	checkDesktopNativeCreator(desktop, (relative) =>
+		relative === nativeRelative[0]
+			? desktopRead(relative).replace('Kernel32\\CreateProcessW', 'Kernel32\\GetCurrentProcessId')
+			: desktopRead(relative)
+	)
+);
+console.log(
+	'Canonical native creator dependency PASS: actual declaration/default/callsite and four causal omissions refused; native execution remains unrun.'
 );

@@ -90,6 +90,26 @@ jobs:
           if [ "${unit_pipeline_status[0]}" -ne 0 ]; then exit "${unit_pipeline_status[0]}"; fi
           exit "${unit_pipeline_status[1]}"
 
+      # Observe genuine native input before unrelated external IA acquisition.
+      - name: Saved ordered-pair Manager — early genuine native source lifetimes
+        if: ${{ !cancelled() && steps.linux_unit.outcome == 'success' }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          set -euo pipefail
+          if ! command -v Xvfb >/dev/null; then
+            echo 'ENVIRONMENT: early saved-pair Manager prerequisite refused: Xvfb is absent' >&2
+            exit 2
+          fi
+          sudo modprobe uinput
+          if sudo python3 tests/hardware/run_manager_input_owner_real.py > "$RUNNER_TEMP/linux-manager-input-owner-early.log" 2>&1; then
+            manager_status=0
+          else
+            manager_status=$?
+          fi
+          cat "$RUNNER_TEMP/linux-manager-input-owner-early.log"
+          exit "$manager_status"
+        timeout-minutes: 3
+
       # A failed unit receipt stays red; this artifact keeps only its public log.
       - name: Upload failed unit log
         if: ${{ failure() && !cancelled() && steps.linux_unit.outcome == 'failure' }}
@@ -154,6 +174,7 @@ jobs:
   e2e-linux:
     name: 'E2E tests'
     needs: [test-linux]
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     env:
       # Python-owned native children also resolve the production shared modules.
@@ -1312,6 +1333,22 @@ jobs:
           sudo bash static/ergopti_plus/linux/tests/hardware/run_daemon_live.sh
         timeout-minutes: 6
 
+      - name: Saved ordered-pair Manager — genuine native source lifetimes
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        env:
+          LUA_PATH: './?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+        run: |
+          set -euo pipefail
+          if sudo env LUA_PATH="$LUA_PATH" python3 tests/hardware/run_manager_input_owner_real.py > "$RUNNER_TEMP/linux-manager-input-owner.log" 2>&1; then
+            manager_status=0
+          else
+            manager_status=$?
+          fi
+          cat "$RUNNER_TEMP/linux-manager-input-owner.log"
+          exit "$manager_status"
+        timeout-minutes: 3
+
       # The updater a user runs, run: this tree built as an old release and
       # installed with its own install.sh, then its updater finds the newest
       # published release on GitHub, verifies and installs it, and restarts the
@@ -1805,6 +1842,14 @@ jobs:
           retention-days: 7
           path: ${{ runner.temp }}/linux-ci-evidence/e2e-linux.json
           if-no-files-found: error
+
+      # A supplementary observation never grants success to a failed prerequisite.
+      - name: Preserve the mandatory upstream unit result
+        if: ${{ !cancelled() }}
+        timeout-minutes: 1
+        env:
+          ERGOPTI_UPSTREAM_UNIT_RESULT: ${{ needs.test-linux.result }}
+        run: test "$ERGOPTI_UPSTREAM_UNIT_RESULT" = success
 
   # ─────────────────────────────────────────────────
   # 3) Assemble the driver once, build every package, smoke two of them
