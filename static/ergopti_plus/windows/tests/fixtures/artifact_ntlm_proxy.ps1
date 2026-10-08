@@ -8,8 +8,11 @@ param(
     [switch]$ServeRemotePac
 )
 $ErrorActionPreference = 'Stop'
+$StartupStage = 'identity'
+try {
 if ($StopEvent -cnotmatch '^Local\\ErgoptiPlus\.ArtifactNtlm\.[0-9a-f]{32}$' -or
     $TlsPort -lt 1 -or $TlsPort -gt 65535) { throw 'Invalid owned NTLM fixture identity.' }
+$StartupStage = 'compile'
 Add-Type -TypeDefinition @'
 using System;
 using System.Collections.Generic;
@@ -298,6 +301,7 @@ public sealed class ErgoptiArtifactNtlmProxy : IDisposable {
     }
 }
 '@
+$StartupStage = 'sentinel'
 $Proxy = $null
 $Stop = $null
 $State = @{schema_version=1;state='starting';active=0;failures=0;handle_controls=[ErgoptiArtifactNtlmProxy]::HandleControls()}
@@ -314,6 +318,7 @@ function Publish {
     if([IO.File]::Exists($StatePath)){[IO.File]::Delete($StatePath)}
     [IO.File]::Move($Pending,$StatePath)
 }
+$StartupStage = 'service'
 try {
     $Stop=[Threading.EventWaitHandle]::OpenExisting($StopEvent)
     $Proxy=[ErgoptiArtifactNtlmProxy]::new($TlsPort,($ChallengeMode -ceq 'NegotiatePresent'),[bool]$ServeRemotePac)
@@ -329,4 +334,25 @@ try {
 } finally {
     if($null -ne $Proxy){$Proxy.Dispose()}
     if($null -ne $Stop){$Stop.Dispose()}
+}
+} catch {
+    # A failure before the normal state owner must remain observable. Never
+    # overwrite a state already published by that owner or publish raw errors.
+    $StartupFailure = $_
+    $StartupStream = $null
+    try {
+        $CompilerCode = [regex]::Match($StartupFailure.Exception.Message, '\bCS[0-9]{4}\b').Value
+        $StartupReceipt = @{schema_version=1;state='failed';active=0;failures=1;
+            handle_controls=0;startup_stage=$StartupStage;compiler_code=$CompilerCode}
+        $StartupBytes = [Text.Encoding]::UTF8.GetBytes(($StartupReceipt | ConvertTo-Json -Compress))
+        $StartupStream = [IO.File]::Open($StatePath, [IO.FileMode]::CreateNew,
+            [IO.FileAccess]::Write, [IO.FileShare]::None)
+        $StartupStream.Write($StartupBytes, 0, $StartupBytes.Length)
+        $StartupStream.Flush($true)
+    } catch {
+        # Keep the original startup failure even if its passive receipt refuses.
+    } finally {
+        if ($null -ne $StartupStream) { try { $StartupStream.Dispose() } catch { } }
+    }
+    throw $StartupFailure
 }

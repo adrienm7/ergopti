@@ -96,6 +96,15 @@ class _ArtifactNtlmProxyOwner {
 			this.Event := 0
 		}
 		if this.Directory != "" {
+			try {
+				if this.Read() {
+					StartupFact := _ArtifactNtlmStartupDiagnostic(this.State)
+					if StartupFact != ""
+						_TestPrint("::notice title=Windows native SSPI startup diagnostic::" . StartupFact)
+				}
+			} catch Any {
+				; Passive reporting cannot replace the original closure assertion.
+			}
 			AssertTrue(this.Read(), "closed SSPI state remains observable")
 			if this.State.Get("failures", 0) > 0 {
 				Stage := this.State.Get("failure_stage", "")
@@ -280,3 +289,27 @@ _ArtifactCurlProductionDispatchJoin() {
 	AssertEqual("", EnvGet(SizeName), "the temporary transport retires its inherited size")
 }
 Test("artifact curl: production authenticated metadata joins the real private staging transport", _ArtifactCurlProductionDispatchJoin)
+
+_ArtifactNtlmStartupDiagnostic(State) {
+	if !(State is Map)
+		return ""
+	Stage := State.Get("startup_stage", "")
+	Code := State.Get("compiler_code", "")
+	if !(Stage is String) || !RegExMatch(Stage, "\A(?:identity|compile|sentinel|service)\z")
+		|| !(Code is String) || (Code != "" && !RegExMatch(Code, "\ACS[0-9]{4}\z"))
+		return ""
+	return "stage=" . Stage . " compiler=" . (Code == "" ? "unknown" : Code)
+}
+
+_ArtifactNtlmStartupDiagnosticControls() {
+	AssertEqual("stage=compile compiler=CS0246", _ArtifactNtlmStartupDiagnostic(
+		Map("startup_stage", "compile", "compiler_code", "CS0246", "private", "PRIVATE_CERTIFICATE_PATH")))
+	AssertEqual("stage=identity compiler=unknown", _ArtifactNtlmStartupDiagnostic(
+		Map("startup_stage", "identity", "compiler_code", "")))
+	for Pair in [["Compile", "CS0246"], ["PRIVATE_STAGE", ""], ["compile", "CS0246 PRIVATE_PATH"],
+		["compile", "cs0246"], ["compile", 1], [1, ""], ["compile`n", "CS0246"]]
+		AssertEqual("", _ArtifactNtlmStartupDiagnostic(Map("startup_stage", Pair[1], "compiler_code", Pair[2])))
+	AssertEqual("", _ArtifactNtlmStartupDiagnostic(Map()))
+	AssertEqual("", _ArtifactNtlmStartupDiagnostic(0))
+}
+Test("artifact curl: startup facts preserve strict closure assertions without private compiler text", _ArtifactNtlmStartupDiagnosticControls)
