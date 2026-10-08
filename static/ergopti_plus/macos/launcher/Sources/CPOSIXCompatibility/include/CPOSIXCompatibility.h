@@ -5,6 +5,11 @@
 
 #include <sys/types.h>
 
+#if defined(__APPLE__)
+// Public macOS DHCP APIs are not exported by the SystemConfiguration umbrella.
+#include <SystemConfiguration/SCDynamicStoreCopyDHCPInfo.h>
+#endif
+
 #include "OwnedProgramCompatibility.h"
 
 int ergopti_flock_compat(int descriptor, int operation);

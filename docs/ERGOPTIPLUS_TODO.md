@@ -5630,6 +5630,8 @@ The fixed Specifications and Capabilities frames of the Windows/macOS per-model 
       open. macOS system trust and explicit proxy relays are integrated, while
       opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
 
+Actual macOS run37807104214 exposed public DHCP import, audited CFNetwork source type and run-loop mode compiler errors. The native worker now imports the explicit public DHCP header and matches the SDK return type and mode. DHCP/DNS discovery and every existing native assertion remain. Native compilation must requalify the repair; no Swift success is claimed from Linux.
+
 Windows PAC sorting now formats mapped IPv4 through an explicit family and typed address pointer. The optimized C preimage is red and ten guarded postimage cases pass; seventeen Duktape controls also pass. Native sorter bounds and all six original receiving assertions remain. Actual MSVC and native Windows receiving remain required.
 
 Linux CONNECT receiving now distinguishes the admitted certificate-refusal
