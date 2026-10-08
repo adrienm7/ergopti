@@ -104,8 +104,7 @@ final class ManagedHTTPWorkerTests: XCTestCase {
 	}
 	func testWPADMetadataUsesDHCPOwnerOrNativeResolverWithoutSuffixConstruction() throws {
 		XCTAssertEqual(ManagedProxyLookup.discoveryURLs(dhcpOption: nil,
-			searchDomains: ["Engineering.Corp.Example.", "corp.example", "corp.example", "com", "invalid/domain", "-bad.example"])
-			?.map(\.absoluteString), ["http://wpad/wpad.dat"])
+			searchDomains: ["Engineering.Corp.Example.", "corp.example", "corp.example", "com", "invalid/domain", "-bad.example"])?.map(\.absoluteString), ["http://wpad/wpad.dat"])
 		XCTAssertEqual(ManagedProxyLookup.discoveryURLs(dhcpOption: Data("https://pac.corp.example/profile.pac".utf8),
 			searchDomains: ["corp.example"])?.map(\.absoluteString), ["https://pac.corp.example/profile.pac"])
 		for invalid in ["https://name:reserved@pac.corp.example/a", "file:///reserved", "https://pac.corp.example/a#fragment", "http://pac.corp.example/\n"] {

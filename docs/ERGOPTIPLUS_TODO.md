@@ -5632,6 +5632,8 @@ The fixed Specifications and Capabilities frames of the Windows/macOS per-model 
       open. macOS system trust and explicit proxy relays are integrated, while
       opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
 
+Actual ARM and Intel run37821833578 builds the release launcher successfully but stops before SDK tests at a newline-leading optional-chain expression. The test syntax now keeps that expression together, retaining every non-whitespace token and assertion. Native test compilation and the twenty-three SDK cases remain required.
+
 Actual Windows run37821833578 returns a mapped IPv4 value polluted by bytes written during a rejected IPv6 parse. The fallback now reconstructs its complete IN6_ADDR before adding the mapped prefix. Two independently injected partial-write preimages fail; ten causal postimage cases, ten retained typed-format cases and seventeen genuine Duktape controls pass. All six original native receiving assertions and sorter ownership/bounds remain unchanged. The proposed repair still requires actual Windows receiving; no PE producer or AHK acceptance is claimed from the failed run.
 
 Windows native SSPI receiving now registers buffered remote POST and exact full-URL ordered PAC cases using the common owned curl transport. The fixture retains SDK invalid-handle semantics, current-user identity, strict Schannel revocation, exclusive refused-route ownership and physical process/context retirement. Five literal handle controls and the existing twenty-nine common-engine controls pass in Linux PowerShell; these are models, not a native authentication qualification. Actual Windows SSPI, PAC, Root-store trust, packaging and installation remain required.
