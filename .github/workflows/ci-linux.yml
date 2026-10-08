@@ -2141,7 +2141,7 @@ jobs:
             distro: debian
             container: debian:stable-slim
             image: debian:stable-slim
-            prep: apt-get update && apt-get install -y --no-install-recommends bash coreutils findutils grep sed sudo passwd git gcc libc6-dev linux-libc-dev
+            prep: apt-get update && apt-get install -y --no-install-recommends bash coreutils findutils grep sed sudo passwd ca-certificates git gcc libc6-dev linux-libc-dev
           - id: distro-fedora
             kind: install
             label: 'Install · fedora'

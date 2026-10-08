@@ -230,6 +230,31 @@ ${checkoutAssertions[0]}`);
 	assert.equal(result.status, expected, label + ': actual workflow assertion must retain refusal');
 }
 console.log('Actual CI Git/SHA controls: 3 passed; process seam is a model.');
+const debianRow = rows.find((row) => row[1] === 'distro-debian');
+assert.ok(debianRow, 'the actual Debian container preparation is present');
+const debianPrep = debianRow[2].match(/^            prep: (.*)$/m)[1];
+for (const [label, packageStatus, materializeCa, expected] of [
+	['HTTPS checkout prerequisites', 0, true, 0],
+	['package success without CA capability', 0, false, 1],
+	['package refusal before checkout', 7, true, 7]
+]) {
+	const result = run(`set -euo pipefail
+git_ready=false
+ca_ready=false
+apt-get() {
+ if [ "$1" = update ]; then return 0; fi
+ test "$1" = install || return 90
+ if [ ${packageStatus} -ne 0 ]; then return ${packageStatus}; fi
+ for package in "$@"; do
+  if [ "$package" = git ]; then git_ready=true; fi
+  if [ "$package" = ca-certificates ] && ${materializeCa}; then ca_ready=true; fi
+ done
+}
+${debianPrep}
+$git_ready && $ca_ready`);
+	assert.equal(result.status, expected, label + ': actual pre-checkout preparation must own CA');
+}
+console.log('Actual CI HTTPS prerequisite controls: 3 passed; package seam is a model.');
 assert.match(verification, /git -c safe\.directory="\$GITHUB_WORKSPACE" rev-parse HEAD/);
 assert.match(pipeline.runOf(check).join('\n'), /native_source_compile_probe/);
 assert.ok(job.indexOf(check) < job.indexOf(pipeline.step(job, 'Create the installation user')));
