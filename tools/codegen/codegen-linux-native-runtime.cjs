@@ -10,9 +10,27 @@ const LUA_OUTPUT = 'static/ergopti_plus/linux/_generated/native_runtime.lua';
 const MANAGERS = ['apt', 'dnf', 'zypper', 'pacman', 'xbps', 'apk'];
 const KEYS = ['xkbcommon', 'xkbcommon_x11', 'x11', 'x11_xcb'];
 const NETWORK_KEYS = ['gio', 'gobject', 'glib'];
+const LUV_CMAKE_OPTIONS = [
+	'-DLUA_BUILD_TYPE=System',
+	'-DWITH_LUA_ENGINE=LuaJIT',
+	'-DBUILD_MODULE=ON',
+	'-DBUILD_SHARED_LIBS=OFF',
+	'-DBUILD_STATIC_LIBS=OFF',
+	'-DWITH_SHARED_LIBUV=OFF'
+];
 
 /** Reject data that could escape native metadata, shell literals or Lua strings. */
 function validate(data) {
+	if (Object.keys(data.archive_build_packages || {}).join(',') !== MANAGERS.join(','))
+		throw new TypeError('Incomplete source archive build package mapping.');
+	for (const packages of Object.values(data.archive_build_packages)) {
+		if (packages === null) continue;
+		if (!Array.isArray(packages) || !packages.length || new Set(packages).size !== packages.length)
+			throw new TypeError('Invalid source archive build package list.');
+		for (const pkg of packages)
+			if (typeof pkg !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9+_.-]*$/.test(pkg))
+				throw new TypeError('Invalid source archive build package identity.');
+	}
 	if (data?.version !== 1 || Object.keys(data.libraries || {}).join(',') !== KEYS.join(','))
 		throw new TypeError('Linux runtime catalogue requires its four ordered library identities.');
 	for (const [key, library] of Object.entries(data.libraries)) {
@@ -62,6 +80,16 @@ function validate(data) {
 	)
 		throw new TypeError('Missing explicit portable OpenSSL3 dlopen root.');
 	const network = data.network_runtime;
+	if (Object.keys(network?.source_luv_build_packages || {}).join(',') !== MANAGERS.join(','))
+		throw new TypeError('Incomplete source luv build package mapping.');
+	for (const packages of Object.values(network.source_luv_build_packages)) {
+		if (packages === null) continue;
+		if (!Array.isArray(packages) || !packages.length || new Set(packages).size !== packages.length)
+			throw new TypeError('Invalid source luv build package list.');
+		for (const pkg of packages)
+			if (typeof pkg !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9+_.-]*$/.test(pkg))
+				throw new TypeError('Invalid source luv build package identity.');
+	}
 	if (!network || Object.keys(network.libraries || {}).join(',') !== NETWORK_KEYS.join(','))
 		throw new TypeError('Missing ordered native network library identities.');
 	for (const soname of Object.values(network.libraries))
@@ -99,7 +127,7 @@ function validate(data) {
 	const sources = portable.flatpak_sources;
 	if (
 		!sources ||
-		Object.keys(sources).join(',') !== 'luv,schemas,curl,duktape,libproxy,glib_networking'
+		Object.keys(sources).join(',') !== 'luv,schemas,krb5,curl,duktape,libproxy,glib_networking'
 	)
 		throw new TypeError('Incomplete portable native source inventory.');
 	for (const [name, source] of Object.entries(sources)) {
@@ -143,14 +171,7 @@ function flatpakModules(data) {
 		{
 			name: 'network-luv',
 			buildsystem: 'cmake-ninja',
-			'config-opts': [
-				'-DLUA_BUILD_TYPE=System',
-				'-DWITH_LUA_ENGINE=LuaJIT',
-				'-DBUILD_MODULE=ON',
-				'-DBUILD_SHARED_LIBS=OFF',
-				'-DBUILD_STATIC_LIBS=OFF',
-				'-DWITH_SHARED_LIBUV=OFF'
-			],
+			'config-opts': LUV_CMAKE_OPTIONS,
 			'post-install': ['test -f /app/lib/lua/5.1/luv.so'],
 			source: 'luv'
 		},
@@ -162,6 +183,22 @@ function flatpakModules(data) {
 			source: 'schemas'
 		},
 		{
+			name: 'network-krb5',
+			buildsystem: 'simple',
+			'build-commands': [
+				'cd src && autoreconf --verbose --force --install',
+				'cd src && ./configure --prefix=/app --disable-static --disable-rpath --without-system-verto',
+				'make -C src',
+				'make -C src install'
+			],
+			'post-install': [
+				'test -x /app/bin/krb5-config',
+				'test -f /app/lib/libgssapi_krb5.so',
+				'/app/bin/krb5-config --libs gssapi'
+			],
+			source: 'krb5'
+		},
+		{
 			name: 'network-curl',
 			buildsystem: 'cmake-ninja',
 			'config-opts': [
@@ -169,7 +206,8 @@ function flatpakModules(data) {
 				'-DBUILD_SHARED_LIBS=ON',
 				'-DBUILD_TESTING=OFF',
 				'-DCURL_USE_OPENSSL=ON',
-				'-DCURL_USE_GSSAPI=ON'
+				'-DCURL_USE_GSSAPI=ON',
+				'-DGSS_ROOT_DIR=/app'
 			],
 			'post-install': ['test -x /app/bin/curl'],
 			source: 'curl'
@@ -178,8 +216,8 @@ function flatpakModules(data) {
 			name: 'network-duktape',
 			buildsystem: 'simple',
 			'build-commands': [
-				'make -f Makefile.sharedlibrary INSTALL_PREFIX=/app',
-				'make -f Makefile.sharedlibrary INSTALL_PREFIX=/app install'
+				'make -f Makefile.sharedlibrary INSTALL_PREFIX=/app LDFLAGS="${LDFLAGS:-} -Wl,--no-as-needed -lm -Wl,--as-needed"',
+				'make -f Makefile.sharedlibrary INSTALL_PREFIX=/app LDFLAGS="${LDFLAGS:-} -Wl,--no-as-needed -lm -Wl,--as-needed" install'
 			],
 			source: 'duktape'
 		},
@@ -187,6 +225,7 @@ function flatpakModules(data) {
 			name: 'network-libproxy',
 			buildsystem: 'meson',
 			'config-opts': [
+				'-Dlibdir=lib',
 				'-Ddocs=false',
 				'-Dtests=false',
 				'-Dvapi=false',
@@ -204,11 +243,12 @@ function flatpakModules(data) {
 			name: 'network-gio-proxy',
 			buildsystem: 'meson',
 			'config-opts': [
+				'-Dlibdir=lib',
 				'-Dlibproxy=enabled',
 				'-Dgnome_proxy=disabled',
 				'-Dgnutls=enabled',
 				'-Denvironment_proxy=disabled',
-				'-Dtests=false'
+				'-Dinstalled_tests=false'
 			],
 			source: 'glib_networking'
 		}
@@ -270,12 +310,42 @@ function render(data, read) {
 			: `\t\tapt:${data.archive_digest_runtime.soname}) _available_apt_runtime_package ${data.archive_digest_runtime.package_alternatives.apt.join(' ')} ;;`
 	);
 	const installer = 'static/ergopti_plus/linux/install.sh';
+	const buildRows = MANAGERS.map((manager) => {
+		const packages = data.archive_build_packages[manager];
+		return packages === null
+			? `\t\t${manager}) return 1 ;;`
+			: `\t\t${manager}) echo "${packages.join(' ')}" ;;`;
+	});
 	result[installer] = projectRegion(
 		projectRegion(read(installer), 'LINUX NATIVE PACKAGES', rows.join('\n')),
 		'LINUX NATIVE CAPABILITIES',
 		[
 			...KEYS.map((key) => `_check_or_install_library ${data.libraries[key].soname}`),
 			'_check_or_install curl'
+		].join('\n')
+	);
+	result[installer] = projectRegion(
+		result[installer],
+		'LINUX ARCHIVE BUILD PACKAGES',
+		`_native_output_build_packages() {\n\tcase "$1" in\n${buildRows.join('\n')}\n\t\t*) return 1 ;;\n\tesac\n}`
+	);
+	const luvSource = data.network_runtime.portable.flatpak_sources.luv;
+	const luvBuildRows = MANAGERS.map((manager) => {
+		const packages = data.network_runtime.source_luv_build_packages[manager];
+		return packages === null
+			? `\t\t${manager}) return 1 ;;`
+			: `\t\t${manager}) echo "${packages.join(' ')}" ;;`;
+	});
+	result[installer] = projectRegion(
+		result[installer],
+		'LINUX SOURCE NETWORK BUILD',
+		[
+			`_network_source_build_packages() {\n\tcase "$1" in\n${luvBuildRows.join('\n')}\n\t\t*) return 1 ;;\n\tesac\n}`,
+			'NATIVE_LUV_SOURCE_URL=' + JSON.stringify(luvSource.url),
+			'NATIVE_LUV_SOURCE_REVISION=' + JSON.stringify(luvSource.commit),
+			'NATIVE_LUV_CMAKE_OPTIONS=(' +
+				LUV_CMAKE_OPTIONS.map((option) => JSON.stringify(option)).join(' ') +
+				')'
 		].join('\n')
 	);
 	result[installer] = projectRegion(
@@ -330,6 +400,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+	LUV_CMAKE_OPTIONS,
 	SOURCE,
 	LUA_OUTPUT,
 	MANAGERS,
