@@ -2611,6 +2611,75 @@ class OwnedConsentUIControls(unittest.TestCase):
                 settle.assert_called_once_with(child)
             self.assertEqual(owner.active, [])
 
+    def test_pending_native_ipc_then_pressed_reuses_requester_and_original_budget(self):
+        owner, process, group = self.owner(
+            [
+                (0, "OWNED_AUTOMATION_UI/1 state=observation-pending\n", ""),
+                (0, "OWNED_AUTOMATION_UI/1 state=pressed\n", ""),
+            ]
+        )
+        with (
+            patch.object(probe.time, "monotonic", side_effect=(20, 20, 21)),
+            patch.object(probe.time, "sleep") as sleep,
+        ):
+            self.assertEqual(
+                probe.approve_owned_automation_prompt(owner, process, 22, "sender", "receiver"),
+                "pressed",
+            )
+        self.assertEqual(group.observe_exit.call_count, 2)
+        self.assertEqual([c.kwargs["timeout"] for c in owner.run.call_args_list], [2, 1])
+        self.assertTrue(all(c.args[0][-1] == "73136" for c in owner.run.call_args_list))
+        sleep.assert_called_once_with(0.05)
+
+    def test_persistent_pending_native_ipc_is_refused_at_original_deadline(self):
+        owner, process, group = self.owner(
+            [
+                (0, "OWNED_AUTOMATION_UI/1 state=observation-pending\n", ""),
+                (0, "OWNED_AUTOMATION_UI/1 state=observation-pending\n", ""),
+            ]
+        )
+        with (
+            patch.object(probe.time, "monotonic", side_effect=(0, 0, 1, 1, 2)),
+            patch.object(probe.time, "sleep"),
+        ):
+            with self.assertRaisesRegex(probe.AdmissionError, "deadline"):
+                probe.approve_owned_automation_prompt(owner, process, 2, "sender", "receiver")
+        self.assertEqual(owner.run.call_count, 2)
+        self.assertEqual(group.observe_exit.call_count, 3)
+        self.assertEqual([c.kwargs["timeout"] for c in owner.run.call_args_list], [2, 1])
+
+    def test_terminal_requester_after_pending_never_acquires_another_ui(self):
+        owner, process, group = self.owner(
+            [
+                (0, "OWNED_AUTOMATION_UI/1 state=observation-pending\n", ""),
+            ]
+        )
+        group.observe_exit.side_effect = (None, 0)
+        with (
+            patch.object(probe.time, "monotonic", return_value=0),
+            patch.object(probe.time, "sleep"),
+        ):
+            self.assertEqual(
+                probe.approve_owned_automation_prompt(owner, process, 2, "sender", "receiver"),
+                "request-ended",
+            )
+        self.assertEqual(owner.run.call_count, 1)
+
+    def test_pending_native_frame_requires_zero_exit_and_complete_clean_capture(self):
+        for packet in (
+            (67, "OWNED_AUTOMATION_UI/1 state=observation-pending\n", ""),
+            (0, "OWNED_AUTOMATION_UI/1 state=observation-pending\n", "private"),
+            (0, "OWNED_AUTOMATION_UI/1 state=observation-pending\n" * 2, ""),
+        ):
+            with self.subTest(packet=packet):
+                owner, process, group = self.owner([packet])
+                with patch.object(probe.time, "monotonic", return_value=0):
+                    with self.assertRaises(probe.AdmissionError):
+                        probe.approve_owned_automation_prompt(
+                            owner, process, 2, "sender", "receiver"
+                        )
+                self.assertEqual(owner.run.call_count, 1)
+
 
 class OwnedAutomationUIFactControls(unittest.TestCase):
     """Private enum evidence controls do not claim macOS AX observation."""

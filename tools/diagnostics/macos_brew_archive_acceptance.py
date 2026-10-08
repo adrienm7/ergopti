@@ -1268,7 +1268,12 @@ def approve_owned_automation_prompt(children, process, deadline, sender_name, re
             result.stdout,
         )
         require(
-            result.returncode == 0 and result.stdout == "OWNED_AUTOMATION_UI/1 state=absent\n",
+            result.returncode == 0
+            and result.stdout
+            in (
+                "OWNED_AUTOMATION_UI/1 state=absent\n",
+                "OWNED_AUTOMATION_UI/1 state=observation-pending\n",
+            ),
             "Normal owned Automation UI was not qualified: "
             + (frame[1] if frame is not None else "unadmitted-receipt"),
         )

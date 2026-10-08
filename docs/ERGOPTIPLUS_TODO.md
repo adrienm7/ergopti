@@ -3690,6 +3690,8 @@ the complete three-OS checkpoint remain pending.
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 
+Native archive receiving retains a qualified consent requester while its exact nil-window/AXCannotComplete observation is pending, within the original deadline. A vanished Sparkle spectator is ignored only after exact BSD ESRCH plus a fresh process-absence observation. All105 Brew and46 Sparkle original methods remain exact;109 Brew and47 Sparkle controls pass and both preimage receiving regressions are red. Actual AX, Sparkle and archive installation remain required.
+
 Homebrew native run 37788799471 on c6e716a85 completes the retained
 owned process cases but refuses the real Brew consent observation. The
 bounded native AX diagnostic now retains only closed agent/attribute/error

@@ -432,6 +432,35 @@ class NativeBSDDiagnosticControls(unittest.TestCase):
         ctypes.set_errno(errno.ESRCH)
         return 0
 
+    def test_disappearing_pid_requires_fresh_absence_after_exact_native_esrch(self):
+        for final_probe in (ProcessLookupError(), None, PermissionError("PRIVATE")):
+            with self.subTest(final_probe=type(final_probe).__name__):
+                helper = self.helper
+                library, observed = self.library(returned=0, native_errno=errno.ESRCH)
+                library.proc_pidpath = mock.Mock(side_effect=self.path_refusal)
+                inventory = subprocess.CompletedProcess([], 0, stdout="91234 1000\n")
+                with (
+                    mock.patch.object(helper.sys, "platform", "darwin"),
+                    mock.patch.object(helper, "private_directory", return_value=Path("/PRIVATE")),
+                    mock.patch.object(helper.ctypes, "CDLL", return_value=library),
+                    mock.patch.object(helper.os, "geteuid", return_value=1000, create=True),
+                    mock.patch.object(helper.subprocess, "run", return_value=inventory),
+                    mock.patch.object(helper.os, "kill", side_effect=(None, final_probe)) as probe,
+                ):
+                    if isinstance(final_probe, ProcessLookupError):
+                        self.assertEqual(helper.census(["/PRIVATE"]), [])
+                    elif final_probe is None:
+                        with self.assertRaises(helper.NativeCensusRefusal) as caught:
+                            helper.census(["/PRIVATE"])
+                        self.assertEqual(caught.exception.packet["bsd_errno"], errno.ESRCH)
+                    else:
+                        with self.assertRaises(PermissionError):
+                            helper.census(["/PRIVATE"])
+                    self.assertEqual(
+                        probe.call_args_list, [mock.call(91234, 0), mock.call(91234, 0)]
+                    )
+                    self.assertEqual(observed, [(91234, 3, 1, 136, 0)])
+
     def testExactZombieSnapshotRemainsAFailedCensusAndUsesNonzeroArgument(self):
         library, observed = self.library()
         ctypes.set_errno(777)
