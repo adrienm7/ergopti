@@ -5658,6 +5658,13 @@ Native Swift compilation, real Apple transport, cold installation and
 opaque-client activation still require hosted receiving. Physical company
 network acceptance remains open; these portable results do not close item62.
 
+Hosted Windows now passes strict compilation, all17 real VM cases and the
+original IPv4/extended DNS and adapter checks after the overlapped repair.
+The next original address-sort check fails. Its test build now retains only
+bounded ABI shape facts from independent literal loopback inputs; production
+sorter policy and every original native assertion remain unchanged. The
+artifact and production route join remain pending, rather than qualified.
+
 Windows full-URL PAC source preparation adds a bounded, fresh-script native
 Duktape evaluator with the canonical script, heap, query and deadline limits.
 The real Windows producer will qualify DNS/interface helpers, source identity,

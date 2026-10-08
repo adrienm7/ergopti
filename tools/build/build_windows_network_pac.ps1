@@ -80,7 +80,7 @@ try {
 	Invoke-PacBuildCommand 'cl.exe' ($Common + $Strict + @('/c', (Join-Path $SharedSource 'pac_runtime.c'), '/Fopac_runtime.obj'))
 	Invoke-PacBuildCommand 'cl.exe' ($Common + $Strict + @((Join-Path $SharedSource 'test_pac_runtime.c'), 'pac_runtime.obj', 'duktape.obj', '/Fetest_pac_runtime.exe') + $Link)
 	Invoke-PacBuildCommand (Join-Path $BuildRoot 'test_pac_runtime.exe') @($HelperSource)
-	Invoke-PacBuildCommand 'cl.exe' ($Common + $Strict + @((Join-Path $NativeSource 'ergopti_network_pac_platform.c'), (Join-Path $NativeSource 'ergopti_network_pac_test_platform.c'), '/Fetest_native_platform.exe') + $Link)
+	Invoke-PacBuildCommand 'cl.exe' ($Common + $Strict + @((Join-Path $NativeSource 'ergopti_network_pac_platform.c'), (Join-Path $NativeSource 'ergopti_network_pac_test_platform.c'), '/DERGOPTI_PAC_PLATFORM_DIAGNOSTICS', '/Fetest_native_platform.exe') + $Link)
 	Invoke-PacBuildCommand (Join-Path $BuildRoot 'test_native_platform.exe') @()
 	Invoke-PacBuildCommand 'cl.exe' ($Common + $Strict + @((Join-Path $NativeSource 'ergopti_network_pac_platform.c'), (Join-Path $NativeSource 'ergopti_network_pac.c'), 'pac_runtime.obj', 'duktape.obj', '/Feergopti_network_pac.exe') + $Link)
 } finally { Pop-Location }
