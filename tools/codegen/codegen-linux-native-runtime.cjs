@@ -260,6 +260,10 @@ function flatpakModules(data) {
 	];
 	return modules
 		.map(({ source, ...recipe }) => {
+			// Older Flatpak builders leave CMake's lib64 default outside /app/lib.
+			// Every CMake module must share the installed runtime search directory.
+			if (recipe.buildsystem === 'cmake-ninja')
+				recipe['config-opts'].unshift('-DCMAKE_INSTALL_LIBDIR=lib');
 			const input = sources[source];
 			const pinned =
 				source === 'duktape'

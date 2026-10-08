@@ -156,6 +156,17 @@ assert.ok(
 	kerberos['post-install'].includes('test "$(pkg-config --variable=prefix mit-krb5-gssapi)" = /app')
 );
 const flatpakCurl = allModules.find((module) => module.name === 'network-curl');
+assert.ok(
+	flatpakCurl['config-opts'].includes('-DCMAKE_INSTALL_LIBDIR=lib'),
+	'Flatpak curl must resolve its own library through /app/lib'
+);
+for (const module of allModules.filter((entry) => entry.buildsystem === 'cmake-ninja')) {
+	assert.deepEqual(
+		module['config-opts'].filter((option) => option.startsWith('-DCMAKE_INSTALL_LIBDIR')),
+		['-DCMAKE_INSTALL_LIBDIR=lib'],
+		`${module.name} must install libraries in the /app/lib runtime search directory`
+	);
+}
 assert.ok(flatpakCurl['config-opts'].includes('-DCURL_USE_GSSAPI=ON'));
 assert.ok(flatpakCurl['config-opts'].includes('-DGSS_ROOT_DIR=/app'));
 assert.ok(flatpakCurl['post-install'].some((command) => command.includes('GSS-API( |$)')));
