@@ -391,6 +391,7 @@ class PhaseEvidence:
         command=None,
         debt_kinds=(),
         native_terminal=None,
+        native_ui=None,
     ):
         if self.descriptor is None:
             return True
@@ -458,6 +459,14 @@ class PhaseEvidence:
                     and not packet["groups"][0]["closed"],
                     "Native terminal evidence lost its exact unreaped group",
                 )
+            if native_ui is not None:
+                require(
+                    phase == "automation.ui-observation"
+                    and status in ("pending", "refused")
+                    and not closed,
+                    "Automation UI observation cannot claim acceptance or closure",
+                )
+                packet["native_ui"] = _validate_owned_automation_ui_fact(native_ui)
             semantic = json.dumps(packet, sort_keys=True)
             if semantic == self.previous:
                 return not self.failed
@@ -1073,6 +1082,165 @@ def native_compiler(children):
     ]
 
 
+def _validate_owned_automation_ui_fact(packet):
+    """Admit only fixed AX enums and bounded scalar facts, never UI text."""
+    keys = {
+        "schema",
+        "ax_trusted",
+        "requester_qualified",
+        "scanned_agents",
+        "windows",
+        "nodes",
+        "candidates",
+        "matches",
+        "first_agent",
+        "first_attribute",
+        "first_type",
+        "first_error",
+    }
+    require(type(packet) is dict and set(packet) == keys, "Unadmitted Automation UI fact fields")
+    require(
+        type(packet["schema"]) is int and packet["schema"] == 1,
+        "Unadmitted Automation UI fact schema",
+    )
+    require(
+        all(type(packet[key]) is bool for key in ("ax_trusted", "requester_qualified")),
+        "Unadmitted Automation UI boolean kind",
+    )
+    limits = {
+        "scanned_agents": 512,
+        "windows": 4096,
+        "nodes": 1048576,
+        "candidates": 4096,
+        "matches": 4096,
+    }
+    require(
+        all(
+            type(packet[key]) is int and 0 <= packet[key] <= limit for key, limit in limits.items()
+        ),
+        "Unadmitted Automation UI observation count",
+    )
+    require(
+        type(packet["first_agent"]) is int and -1 <= packet["first_agent"] <= 3,
+        "Unadmitted Automation UI agent enum",
+    )
+    require(
+        type(packet["first_error"]) is int and -(2**31) <= packet["first_error"] < 2**31,
+        "Unadmitted Automation UI AXError",
+    )
+    require(
+        type(packet["first_attribute"]) is str
+        and packet["first_attribute"]
+        in {
+            "none",
+            "application",
+            "windows",
+            "window-type",
+            "node-type",
+            "node-limit",
+            "role",
+            "value",
+            "button-title",
+            "button-enabled",
+            "children",
+        },
+        "Unadmitted Automation UI attribute enum",
+    )
+    require(
+        type(packet["first_type"]) is str
+        and packet["first_type"]
+        in {
+            "none",
+            "absent",
+            "ax-element",
+            "string",
+            "array",
+            "number",
+            "other",
+        },
+        "Unadmitted Automation UI type enum",
+    )
+    if packet["first_attribute"] == "none":
+        require(
+            packet["first_agent"] == -1
+            and packet["first_type"] == "none"
+            and packet["first_error"] == 0,
+            "Absent Automation UI refusal differs",
+        )
+    else:
+        require(
+            packet["first_agent"] >= 0 and packet["first_type"] != "none",
+            "Automation UI refusal lacks an agent/type",
+        )
+    return dict(packet)
+
+
+def _owned_automation_ui_run(children, arguments, timeout):
+    """Keep the unchanged primary state and separately capture private enum facts."""
+    if not isinstance(children, Children):
+        return children.run(arguments, check=False, timeout=timeout)
+    path = children.root / ("automation-ui-fact-" + str(uuid.uuid4()))
+    descriptor = os.open(path, os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    before = os.fstat(descriptor)
+    primary_failure = None
+    try:
+        result = children.run([*arguments, str(path)], check=False, timeout=timeout)
+        after = os.fstat(descriptor)
+        named = os.stat(path, follow_symlinks=False)
+        require(
+            stat.S_ISREG(after.st_mode)
+            and after.st_uid == os.getuid()
+            and stat.S_IMODE(after.st_mode) == 0o600
+            and after.st_nlink == 1
+            and (after.st_dev, after.st_ino) == (before.st_dev, before.st_ino)
+            and (named.st_dev, named.st_ino) == (before.st_dev, before.st_ino)
+            and 0 < after.st_size <= 1024,
+            "Owned Automation UI fact identity or bound differs",
+        )
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        data = os.read(descriptor, 1025)
+        require(len(data) == after.st_size, "Owned Automation UI fact changed during capture")
+
+        def unique(pairs):
+            fields = {}
+            for key, value in pairs:
+                require(key not in fields, "Ambiguous Automation UI fact key")
+                fields[key] = value
+            return fields
+
+        packet = _validate_owned_automation_ui_fact(json.loads(data, object_pairs_hook=unique))
+        if children.evidence is not None:
+            require(
+                children.evidence.record(
+                    "automation.ui-observation",
+                    status="refused" if result.returncode else "pending",
+                    native_ui=packet,
+                ),
+                "Owned Automation UI facts could not publish safely",
+            )
+        return result
+    except BaseException as failure:
+        primary_failure = failure
+        raise
+    finally:
+        try:
+            os.close(descriptor)
+        except OSError:
+            if primary_failure is None:
+                raise
+        # The private fixture root owns any failure debt. A pathname replacement
+        # is never removed by this secondary diagnostic channel.
+        try:
+            named = os.stat(path, follow_symlinks=False)
+            if (named.st_dev, named.st_ino) == (before.st_dev, before.st_ino):
+                os.unlink(path)
+        except FileNotFoundError:
+            pass
+        except OSError:
+            if primary_failure is None:
+                raise
+
+
 def approve_owned_automation_prompt(children, process, deadline, sender_name, receiver_name):
     """Press only a qualified native consent prompt while its exact requester is reserved."""
     helper = children.root / "native-appleevent-consent"
@@ -1087,9 +1255,9 @@ def approve_owned_automation_prompt(children, process, deadline, sender_name, re
             return "request-ended"
         remaining = deadline - time.monotonic()
         require(remaining > 0, "Owned Automation prompt exceeded its deadline")
-        result = children.run(
+        result = _owned_automation_ui_run(
+            children,
             [str(helper), sender_name, receiver_name, str(process.pid)],
-            check=False,
             timeout=min(3, remaining),
         )
         require(not result.stderr, "Owned Automation prompt emitted unadmitted diagnostics")
