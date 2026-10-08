@@ -1066,6 +1066,7 @@ def compile_native(source, owner, seconds, seal_path=None, *, metadata_token=Non
                 "CODE_SIGNING_ALLOWED=NO",
                 "CODE_SIGNING_REQUIRED=NO",
                 "GCC_GENERATE_DEBUGGING_SYMBOLS=NO",
+                "SWIFT_ENABLE_EXPLICIT_MODULES=NO",
             ],
             project,
         )

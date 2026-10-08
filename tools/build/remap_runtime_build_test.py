@@ -94,6 +94,7 @@ class PreparationControls(unittest.TestCase):
                 "CODE_SIGNING_ALLOWED=NO",
                 "CODE_SIGNING_REQUIRED=NO",
                 "GCC_GENERATE_DEBUGGING_SYMBOLS=NO",
+                "SWIFT_ENABLE_EXPLICIT_MODULES=NO",
             ],
         )
 
@@ -530,6 +531,7 @@ class PreparationControls(unittest.TestCase):
                     "CODE_SIGNING_ALLOWED=NO",
                     "CODE_SIGNING_REQUIRED=NO",
                     "GCC_GENERATE_DEBUGGING_SYMBOLS=NO",
+                    "SWIFT_ENABLE_EXPLICIT_MODULES=NO",
                 ]
                 if label == "core":
                     expected_command.append("ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS=NO")

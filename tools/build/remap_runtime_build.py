@@ -20,7 +20,7 @@ import time
 import uuid
 
 BASE_PATH = Path(__file__).resolve().parents[1] / "diagnostics/hs274_native_build.py"
-BASE_SHA256 = "ff8de375cb2fc8a801a144974418300e8e290a1efe2107338972b937d659dd80"
+BASE_SHA256 = "6ba213bd8fe086f7b8807974242189917f1cd8ae2b69d30e107ba171ad0d674f"
 PROVIDER_SHA256 = "c29ceb96e73655cadea7763805b9468c32744033c2f177bae492e4ce9fe4100a"
 
 
@@ -698,6 +698,7 @@ def build_command(executable, project):
         "CODE_SIGNING_ALLOWED=NO",
         "CODE_SIGNING_REQUIRED=NO",
         "GCC_GENERATE_DEBUGGING_SYMBOLS=NO",
+        "SWIFT_ENABLE_EXPLICIT_MODULES=NO",
     ]
 
 
