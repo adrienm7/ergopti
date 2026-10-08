@@ -86,24 +86,39 @@ _UpdaterNativeStagingScalarFact(Scalar) {
 }
 
 _UpdaterNativeStagingDiagnosticFact(Diagnostic) {
-	if !(Diagnostic is Map) || Diagnostic.Count != 5
+	if !(Diagnostic is Map) || (Diagnostic.Count != 5 && Diagnostic.Count != 8)
 		return ""
 	for DiagnosticKey in Diagnostic
-		if !(DiagnosticKey is String) || !RegExMatch(DiagnosticKey, "\A(?:schema_version|operation|exception|expected|actual)\z")
+		if !(DiagnosticKey is String) || !RegExMatch(DiagnosticKey, "\A(?:schema_version|operation|exception|expected|actual|observed_stage|exception_family|hresult)\z")
 			return ""
 	DiagnosticOperation := Diagnostic.Get("operation", "")
 	DiagnosticException := Diagnostic.Get("exception", "")
-	if Type(Diagnostic.Get("schema_version", "")) != "Integer" || Diagnostic["schema_version"] != 1
+	if Type(Diagnostic.Get("schema_version", "")) != "Integer"
+		|| !((Diagnostic.Count == 5 && Diagnostic["schema_version"] == 1)
+			|| (Diagnostic.Count == 8 && Diagnostic["schema_version"] == 2))
 		|| !(DiagnosticOperation is String) || !RegExMatch(DiagnosticOperation,
 			"\A(?:metadata|content_length|minimum|digest_format|digest_read|budget|digest_compare|not_file_read)\z")
 		|| !(DiagnosticException is String) || !RegExMatch(DiagnosticException,
 			"\A(?:command_not_found|item_not_found|property_not_found|method_invocation|io|unauthorized|timeout|runtime|other)\z")
 		return ""
+	Extended := ""
+	if Diagnostic["schema_version"] == 2 {
+		ObservedStage := Diagnostic.Get("observed_stage", "")
+		Family := Diagnostic.Get("exception_family", "")
+		Code := Diagnostic.Get("hresult", "")
+		if !(ObservedStage is String) || !RegExMatch(ObservedStage,
+			"\A(?:proxy_resolve|proxy_connect|connect|tls|http|file_create|file_read|file_write|file_remove|file_rename|unknown)\z")
+			|| !(Family is String) || !RegExMatch(Family,
+				"\A(?:win32|web|argument|invalid_operation|security|type_initialization|command_not_found|item_not_found|property_not_found|method_invocation|io|unauthorized|timeout|runtime|other)\z")
+			|| !(Code is Integer) || Code < -2147483648 || Code > 2147483647
+			return ""
+		Extended := " observed_stage=" . ObservedStage . " exception_family=" . Family . " hresult=" . Format("{:d}", Code)
+	}
 	DiagnosticExpected := _UpdaterNativeStagingScalarFact(Diagnostic.Get("expected", 0))
 	DiagnosticActual := _UpdaterNativeStagingScalarFact(Diagnostic.Get("actual", 0))
 	if DiagnosticExpected == "" || DiagnosticActual == ""
 		return ""
-	return "suboperation=" . DiagnosticOperation . " exception=" . DiagnosticException
+	return "suboperation=" . DiagnosticOperation . " exception=" . DiagnosticException . Extended
 		. " expected_" . StrReplace(DiagnosticExpected, " ", " expected_")
 		. " actual_" . StrReplace(DiagnosticActual, " ", " actual_")
 }
@@ -114,7 +129,7 @@ _UpdaterNativeReadStagingDiagnostic(Path) {
 	DiagnosticText := FSReadUtf8Exact(Path)
 	if !(DiagnosticText is String) || StrLen(DiagnosticText) > 2048
 		return ""
-	if RegExMatch(DiagnosticText, '"(?:schema_version|arity|size)"\s*:\s*(?:true|false|null)\b')
+	if RegExMatch(DiagnosticText, '"(?:schema_version|arity|size|hresult)"\s*:\s*(?:true|false|null)\b')
 		return ""
 	return _UpdaterNativeStagingDiagnosticFact(JsonParse(DiagnosticText))
 }
@@ -784,3 +799,26 @@ _UpdaterNativePartialStageDiagnosticControls(Contract) {
 }
 Test("updater native: missing partial stage exposes captured cause without weakening its assertion",
 	(*) => _UpdaterNative_WithContract(_UpdaterNativePartialStageDiagnosticControls))
+
+_UpdaterNativeEarlyStagingFactControls() {
+	Empty := Map("type", "absent", "arity", 0, "size_available", "unavailable")
+	Fact := Map("schema_version", 2, "operation", "not_file_read", "exception", "other",
+		"expected", Empty, "actual", Empty, "observed_stage", "proxy_resolve",
+		"exception_family", "invalid_operation", "hresult", -2146233079)
+	AssertContains(_UpdaterNativeStagingDiagnosticFact(Fact),
+		"observed_stage=proxy_resolve exception_family=invalid_operation hresult=-2146233079",
+		"actual pre-read exception family and stage remain bounded scalars")
+	Fact["hresult"] := "-2146233079"
+	AssertEqual("", _UpdaterNativeStagingDiagnosticFact(Fact), "string native codes are refused")
+	Fact["hresult"] := -2146233079
+	Fact["exception_family"] := "PRIVATE_MESSAGE"
+	AssertEqual("", _UpdaterNativeStagingDiagnosticFact(Fact), "unlisted exception text is refused")
+	Fact["exception_family"] := "invalid_operation"
+	Fact["observed_stage"] := "PRIVATE_URL"
+	AssertEqual("", _UpdaterNativeStagingDiagnosticFact(Fact), "private stage values are refused")
+	Fact["observed_stage"] := "proxy_resolve"
+	Fact.Delete("hresult")
+	AssertEqual("", _UpdaterNativeStagingDiagnosticFact(Fact), "partial extended facts are refused")
+}
+Test("updater fixture: early staging diagnostics retain actual bounded operation provenance",
+	_UpdaterNativeEarlyStagingFactControls)

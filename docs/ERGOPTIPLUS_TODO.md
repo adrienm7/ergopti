@@ -5769,6 +5769,17 @@ The complete macOS Layout presentation family now consumes 17 canonical shared s
       open. macOS system trust and explicit proxy relays are integrated, while
       opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
 
+The early native updater sidecar now retains its exact closed stage,
+exception family and signed HRESULT before file-read admission; v1 remains
+exactly five fields and v2 requires all eight. No message, stack or destination
+is projected. The actual current36-fragment producer feeds the original
+PowerShell digest and observation controls, with three additive observation
+cases. The captured legacy PAC cause is now projected by the original settled
+AHK owner, with exact control/stage matching and bounded closed enums; malformed
+or duplicate notices refuse. Original assertions and clocks remain intact.
+Portable PowerShell controls pass; genuine Windows receiving remains required
+before choosing a fix for the early native failure or closing item62.
+
 Native Windows receiving follow-up (2026-10-08): manual37850871117 at
 `dea3ec72fb11df9780424dcb735c99d7bca8a70c` terminates with failure after the
 unchanged native watchdog:8,135 passed and9 failed results,8,144 of10,438
