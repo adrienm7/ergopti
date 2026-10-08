@@ -147,6 +147,21 @@ class _UpdaterNativeDownloadRun {
 
 	Accepted() {
 		Result := this.Wait()
+		if Result["exit"] != 0 {
+			this.RefusalDiagnosticStatus := "unavailable"
+			try {
+				Failure := _Updater_ParseStagingFailure(Result["stdout"])
+				Reason := _ManagedRemoteFixtureDiagnosticEnum(Failure["reason"], "download|verify|deadline")
+				if Failure["valid"] && Reason != "unknown" {
+					this.RefusalDiagnosticPrinter.Call("::notice title=Windows native updater acceptance refusal diagnostic::reason="
+						. Reason . " " . _UpdaterNativeRefusalDiagnostic("", Failure["receipt"]))
+					this.RefusalDiagnosticStatus := "reported"
+				}
+			} catch Any {
+				; A diagnostic refusal cannot replace the original native exit assertion.
+				this.RefusalDiagnosticStatus := "unavailable"
+			}
+		}
 		AssertEqual(0, Result["exit"])
 		AssertEqual("READY", Result["stdout"], "actual size/digest/persistence checks must produce exact READY")
 		Bytes := FileRead(this.NewExe, "RAW")
@@ -232,10 +247,13 @@ class _UpdaterNativeDownloadRun {
 class _UpdaterNativeRefusalDiagnosticControl extends _UpdaterNativeDownloadRun {
 	__New(Printer, DotNet := false) {
 		this.RefusalDiagnosticPrinter := Printer
+		this.RefusalDiagnosticStatus := "not_requested"
 		this.DotNet := DotNet
 	}
 
 	Wait() {
+		if this.HasOwnProp("FixtureResult")
+			return this.FixtureResult
 		if this.DotNet
 			return Map("exit", 1, "stdout",
 				'{"schema_version":1,"state":"failed","operation":"download","reason":"download",'
@@ -247,6 +265,86 @@ class _UpdaterNativeRefusalDiagnosticControl extends _UpdaterNativeDownloadRun {
 			. '"curl_exit":6,"http_status":0,"proxy_connect_status":0,"proxy_mode":"direct"}}')
 	}
 }
+
+/** The actual acceptance entry must retain its first exit assertion. */
+_UpdaterNativeAcceptedPrimary(Run) {
+	Caught := false
+	try Run.Accepted()
+	catch as Failure {
+		Caught := true
+		AssertContains(Failure.Message, "expected: <0>, actual: <1>",
+			"diagnostic processing cannot overwrite the original acceptance assertion")
+	}
+	AssertTrue(Caught, "a refused actual acceptance entry must still fail")
+}
+
+_UpdaterNativeAcceptedReports(Contract) {
+	for DotNet in [false, true] {
+		for Reason in ["download", "verify", "deadline"] {
+			Observed := Map("calls", 0, "fact", "")
+			Run := _UpdaterNativeRefusalDiagnosticControl(
+				(Text) => (Observed["calls"] += 1, Observed["fact"] := Text), DotNet)
+			Result := Run.Wait()
+			Result["stdout"] := StrReplace(Result["stdout"], '"reason":"download"', '"reason":"' . Reason . '"')
+			Run.FixtureResult := Result
+			_UpdaterNativeAcceptedPrimary(Run)
+			AssertEqual(1, Observed["calls"], "the actual acceptance entry diagnoses before its exit assertion")
+			AssertEqual("reported", Run.RefusalDiagnosticStatus)
+			AssertContains(Observed["fact"], "reason=" . Reason . " expected_stage=unknown observed_stage=connect")
+			if DotNet
+				AssertContains(Observed["fact"], "native_errno_domain=win32 native_errno=12007 tls_status=unavailable")
+			else
+				AssertContains(Observed["fact"], "curl_exit=6 http_status=0 proxy_connect_status=0 proxy_mode=direct")
+			AssertFalse(InStr(Observed["fact"], '"schema_version"'), "raw staging envelopes never enter the diagnostic")
+		}
+	}
+}
+Test("updater native: failed acceptance emits bounded native facts (managed-fixture-accepted-diagnostic)",
+	_UMF_WithContract.Bind(_UpdaterNativeAcceptedReports))
+
+_UpdaterNativeAcceptedReporterRefuses(Contract) {
+	Control := Map("calls", 0)
+	Run := _UpdaterNativeRefusalDiagnosticControl(_ManagedRemoteStateWaitPrinterRefused.Bind(Control))
+	_UpdaterNativeAcceptedPrimary(Run)
+	AssertEqual(1, Control["calls"], "a refused diagnostic sink is attempted once without recursion")
+	AssertEqual("unavailable", Run.RefusalDiagnosticStatus)
+}
+Test("updater native: acceptance reporter refusal preserves the primary assertion (managed-fixture-accepted-diagnostic)",
+	_UMF_WithContract.Bind(_UpdaterNativeAcceptedReporterRefuses))
+
+_UpdaterNativeAcceptedMalformedRefuses(Contract) {
+	Private := "PRIVATE_ACCEPTANCE_CONTENT"
+	Control := _UpdaterNativeRefusalDiagnosticControl((Text) => 0)
+	Valid := Control.Wait()["stdout"]
+	for Raw in [Private, "", "[]", 0, Valid . Private,
+		StrReplace(Valid, '"reason":"download"', '"reason":"' . Private . '"'),
+		StrReplace(Valid, '"reason":"download"', '"reason":"persist"'),
+		StrReplace(Valid, '"backend":"curl"', '"backend":"' . Private . '"'),
+		StrReplace(Valid, '"curl_exit":6', '"curl_exit":"' . Private . '"'),
+		StrReplace(Valid, '"schema_version":1', '"schema_version":1,"private":"' . Private . '"')] {
+		AssertFalse(_Updater_ParseStagingFailure(Raw)["valid"], "each malformed control reaches the actual parser refusal")
+		Observed := Map("calls", 0)
+		Run := _UpdaterNativeRefusalDiagnosticControl((Text) => (Observed["calls"] += 1))
+		Run.FixtureResult := Map("exit", 1, "stdout", Raw)
+		_UpdaterNativeAcceptedPrimary(Run)
+		AssertEqual(0, Observed["calls"], "invalid or private staging data cannot reach the diagnostic sink")
+		AssertEqual("unavailable", Run.RefusalDiagnosticStatus)
+	}
+	Observed := Map("calls", 0)
+	Run := _UpdaterNativeRefusalDiagnosticControl((Text) => (Observed["calls"] += 1))
+	Run.FixtureResult := Map("exit", 0, "stdout", "NOT_READY")
+	Caught := false
+	try Run.Accepted()
+	catch as Failure {
+		Caught := true
+		AssertContains(Failure.Message, "expected: <READY>, actual: <NOT_READY>", "the original successful-exit READY assertion remains mandatory")
+	}
+	AssertTrue(Caught)
+	AssertEqual(0, Observed["calls"], "successful exit never requests a refusal diagnostic")
+	AssertEqual("not_requested", Run.RefusalDiagnosticStatus)
+}
+Test("updater native: acceptance diagnostics refuse malformed data and never relax READY (managed-fixture-accepted-diagnostic)",
+	_UMF_WithContract.Bind(_UpdaterNativeAcceptedMalformedRefuses))
 
 _UpdaterNativeRefusalReports(Contract) {
 	Observed := Map("calls", 0, "fact", "")
