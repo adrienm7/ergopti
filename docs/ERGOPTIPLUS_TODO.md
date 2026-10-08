@@ -5642,6 +5642,13 @@ checksums; all 16 refusal vectors and exact architecture selection pass.
 Native extraction, interpreter execution and the Intel bootstrap helper
 join remain pending; metadata preparation does not qualify installation.
 
+The private macOS wire reader now shares bounded owner startup, frame reading
+and terminal retirement with closed native roles. The existing HTTP role
+still refuses extra terminal fields and unsupported admission errors; its
+ten protocol cases and two real locked Python-client exchanges pass. Five
+additional role controls pass on actual subprocess peers. This portable
+protocol receiving does not prove the Darwin listener or Ollama operation.
+
 The macOS native-network tranche adds NSURLSession/CFNetwork route receiving,
 a bounded private HTTP protocol, an owned PTY bootstrap and verified offline
 Python inputs. The frozen local candidate passes all 17,158 Hammerspoon

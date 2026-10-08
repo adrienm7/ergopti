@@ -110,26 +110,76 @@ class NativeHTTPResponse:
             separators=(",", ":"),
             ensure_ascii=True,
         ).encode("ascii")
-        if len(request) > MAX_REQUEST_BYTES:
+        try:
+            tag, payload = self._open_wire(
+                request,
+                [WORKER_FLAG, str(idle_timeout), str(timeout) if timeout is not None else "none"],
+                timeout,
+                idle_timeout,
+            )
+            self._receive_http_head(tag, payload)
+        except NativeHTTPError:
+            self.close()
+            raise
+        except (OSError, ValueError, TypeError):
+            self.close()
+            raise NativeHTTPError("unavailable") from None
+        except BaseException:
+            # Role-specific initial validation still belongs to the constructor.
+            self.close()
+            raise
+
+    _terminal_reasons = REASONS
+
+    def _open_wire(self, request_bytes, arguments, timeout, idle_timeout):
+        """Open a private bounded role request and return its first frame.
+
+        The signed worker identity and physical lifecycle are shared by native
+        roles. Arguments contain only the fixed role and public timing scalars;
+        role-specific URLs, listener identities and bodies remain on stdin.
+        The caller must close on any subsequent initial-frame validation error.
+        """
+        if hasattr(self, "_process"):
             raise NativeHTTPError("protocol")
         self._started = time.monotonic()
-        self._absolute = self._started + timeout if timeout is not None else None
+        self._absolute = self._started + timeout if _positive_timeout(timeout) else None
         self._idle_timeout = idle_timeout
-        self._idle_deadline = self._started + idle_timeout
+        self._idle_deadline = (
+            self._started + idle_timeout if _positive_timeout(idle_timeout) else self._started
+        )
         self._pending = b""
         self._complete = False
         self._closed = False
+        self._terminal_value = None
         self._process = None
         self._selector = selectors.DefaultSelector()
         try:
+            if timeout is not None and not _positive_timeout(timeout):
+                raise NativeHTTPError("protocol")
+            if not _positive_timeout(idle_timeout):
+                raise NativeHTTPError("protocol")
+            if type(request_bytes) is not bytes or not 0 < len(request_bytes) <= MAX_REQUEST_BYTES:
+                raise NativeHTTPError("protocol")
+            if (
+                not isinstance(arguments, (list, tuple))
+                or not arguments
+                or any(
+                    not isinstance(value, str) or not value or len(value) > 64
+                    for value in arguments
+                )
+            ):
+                raise NativeHTTPError("protocol")
+            flag = arguments[0]
+            if not flag.startswith("--") or any(
+                character not in "-abcdefghijklmnopqrstuvwxyz0123456789" for character in flag
+            ):
+                raise NativeHTTPError("protocol")
+            for value in arguments[1:]:
+                if value != "none" and not _positive_timeout(float(value)):
+                    raise NativeHTTPError("protocol")
             executable = _resolve_worker()
             self._process = subprocess.Popen(
-                [
-                    executable,
-                    WORKER_FLAG,
-                    str(idle_timeout),
-                    str(timeout) if timeout is not None else "none",
-                ],
+                [executable, *arguments],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.DEVNULL,
@@ -140,10 +190,10 @@ class NativeHTTPResponse:
             os.set_blocking(self._process.stdout.fileno(), False)
             self._selector.register(self._process.stdin, selectors.EVENT_WRITE)
             offset = 0
-            while offset < len(request):
+            while offset < len(request_bytes):
                 self._ready()
                 try:
-                    count = os.write(self._process.stdin.fileno(), request[offset:])
+                    count = os.write(self._process.stdin.fileno(), request_bytes[offset:])
                 except BlockingIOError:
                     continue
                 if count <= 0:
@@ -152,30 +202,7 @@ class NativeHTTPResponse:
             self._selector.unregister(self._process.stdin)
             self._process.stdin.close()
             self._selector.register(self._process.stdout, selectors.EVENT_READ)
-            tag, payload = self._frame()
-            if tag == b"C":
-                self._terminal(payload)
-                raise NativeHTTPError("protocol")
-            if tag != b"H":
-                raise NativeHTTPError("protocol")
-            metadata = self._json(payload)
-            if (
-                set(metadata) != {"version", "status", "headers"}
-                or metadata["version"] != 1
-                or type(metadata["version"]) is not int
-            ):
-                raise NativeHTTPError("protocol")
-            if type(metadata["status"]) is not int or not 100 <= metadata["status"] <= 599:
-                raise NativeHTTPError("protocol")
-            if not isinstance(metadata["headers"], list) or any(
-                not isinstance(pair, list)
-                or len(pair) != 2
-                or any(not isinstance(value, str) for value in pair)
-                for pair in metadata["headers"]
-            ):
-                raise NativeHTTPError("protocol")
-            self.status = metadata["status"]
-            self.headers = metadata["headers"]
+            return self._frame()
         except NativeHTTPError:
             self.close()
             raise
@@ -187,6 +214,32 @@ class NativeHTTPResponse:
             # exists. Retire the exact constructor child before propagating it.
             self.close()
             raise
+
+    def _receive_http_head(self, tag, payload):
+        """Validate the existing generic H schema for HTTP-bearing native roles."""
+        if tag == b"C":
+            self._terminal(payload)
+            raise NativeHTTPError("protocol")
+        if tag != b"H":
+            raise NativeHTTPError("protocol")
+        metadata = self._json(payload)
+        if (
+            set(metadata) != {"version", "status", "headers"}
+            or metadata["version"] != 1
+            or type(metadata["version"]) is not int
+        ):
+            raise NativeHTTPError("protocol")
+        if type(metadata["status"]) is not int or not 100 <= metadata["status"] <= 599:
+            raise NativeHTTPError("protocol")
+        if not isinstance(metadata["headers"], list) or any(
+            not isinstance(pair, list)
+            or len(pair) != 2
+            or any(not isinstance(value, str) for value in pair)
+            for pair in metadata["headers"]
+        ):
+            raise NativeHTTPError("protocol")
+        self.status = metadata["status"]
+        self.headers = metadata["headers"]
 
     def _remaining(self):
         now = time.monotonic()
@@ -245,22 +298,35 @@ class NativeHTTPResponse:
             raise NativeHTTPError("protocol")
         return value
 
-    def _terminal(self, payload):
-        value = self._json(payload)
-        if (
-            set(value) != {"version", "success", "reason"}
-            or type(value["version"]) is not int
-            or value["version"] != 1
-        ):
+    @classmethod
+    def _validate_completion(cls, value):
+        """Validate the closed role's common terminal semantics."""
+        if type(value.get("version")) is not int or value["version"] != 1:
             raise NativeHTTPError("protocol")
         if (
-            type(value["success"]) is not bool
-            or not isinstance(value["reason"], str)
-            or value["reason"] not in REASONS
+            type(value.get("success")) is not bool
+            or not isinstance(value.get("reason"), str)
+            or value["reason"] not in cls._terminal_reasons
         ):
             raise NativeHTTPError("protocol")
         if value["success"] != (value["reason"] == "complete"):
             raise NativeHTTPError("protocol")
+
+    def _validate_terminal(self, value):
+        """The generic HTTP role permits exactly its original three C fields."""
+        if set(value) != {"version", "success", "reason"}:
+            raise NativeHTTPError("protocol")
+        self._validate_completion(value)
+
+    @staticmethod
+    def _terminal_error(reason):
+        return NativeHTTPError(reason)
+
+    def _terminal(self, payload):
+        value = self._json(payload)
+        self._validate_terminal(value)
+        # Extension validators cannot bypass the shared completion semantics.
+        self._validate_completion(value)
         if self._read_exact(1, allow_eof=True):
             raise NativeHTTPError("protocol")
         try:
@@ -268,9 +334,10 @@ class NativeHTTPResponse:
         except subprocess.TimeoutExpired:
             raise NativeHTTPError("deadline") from None
         if not value["success"]:
-            raise NativeHTTPError(value["reason"])
+            raise self._terminal_error(value["reason"])
         if code != 0:
             raise NativeHTTPError("protocol")
+        self._terminal_value = value
         self._complete = True
 
     def read(self, maximum=MAX_FRAME_BYTES - 1):

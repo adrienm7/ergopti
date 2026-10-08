@@ -67,6 +67,10 @@ elif mode not in ('redirect','truncated'): frame(b'D',b'N\x00LF')
 if mode=='truncated': sys.exit(0)
 if mode=='invalid-terminal':
     frame(b'C',{'version':1,'success':True,'reason':'certificate'});sys.exit(0)
+if mode=='extra-terminal':
+    frame(b'C',{'version':1,'success':True,'reason':'complete','listener':None});sys.exit(0)
+if mode=='admission-terminal':
+    frame(b'C',{'version':1,'success':False,'reason':'admission'});sys.exit(74)
 frame(b'C',{'version':1,'success':True,'reason':'complete'})
 if mode=='trailing': os.write(1,b'x')
 sys.exit(3 if mode=='bad-exit' else 0)
@@ -108,6 +112,8 @@ class NativePipeReceiving(unittest.TestCase):
             "invalid-terminal",
             "boolean-version",
             "oversize",
+            "extra-terminal",
+            "admission-terminal",
         ):
             with self.subTest(mode=mode), self.assertRaises(NATIVE.NativeHTTPError) as failure:
                 with self.open(mode) as response:
