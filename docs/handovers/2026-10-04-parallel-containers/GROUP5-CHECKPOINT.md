@@ -2436,3 +2436,78 @@ not executed on macOS. Group6 has not granted the workflow environment seam, so
 that row remains absent. Native authenticated HTTP, full compilation, signing,
 packaging and installation remain UNEXECUTED for this source successor.
 Item 31 and transverse 16/38 remain open; no item is removed.
+
+## Fixed root compiler process prerequisite
+
+The source-only reviewed fixed-root process diagnostic now observes both
+independently frozen Darwin SDK ABI oracles through registered ordinary children
+before constructing the new waitid/filesec wrappers or launching sudo. Immutable
+ABI data cannot grant privileged custody. The actual compiler source is copied
+into a root-owned protected namespace; the fixed Apple interpreter, direct root
+compiler/child reservations and genuine privileged terminal retirement ACK remain
+separate requirements. Invalid clocks and expired deadlines refuse before new
+ordinary child acquisition; the copied C input is held and checked around clang.
+The unchanged original guards, frozen oracles and absolute 25-second diagnostic
+budget remain whole, with the existing SDK Guardian budgets of 30/35/10.
+Portable qualification covers 77 unique cases in normal and optimized Python,
+154 executions; an explicit overlapping 13-case recheck adds 26 executions for
+180 total, with zero failures or skips. Modeled native operations and portable
+extracted C controls are not macOS kernel evidence. Independent source review
+and Ruff check/format pass. Actual Darwin SDK, Swift, sudo/root healthy execution
+and the ABI/private-root admission cost within 25 seconds remain UNEXECUTED or
+UNMEASURED. Unknown privileged retirement debt retains a live owner with expired
+operations and no terminal ACK; current Guardian custody remains a production
+HOLD. No signing, installation or runtime qualification is claimed. Item 31 and
+transverse 16/38 remain open; no item is removed.
+
+## Explicit background Carbon-owner rejection assertion
+
+The native compiler checkpoint 37766419477 on private candidate 261abd still
+refused the background XCTest throw assertion despite an explicit Void callback;
+no XCTest started. The test now deliberately catches the constructor error and
+fails any unexpected successful acquisition. An unexpectedly returned owner is
+retained until actual main-queue cleanup before expectation fulfillment. All 12
+methods, other assertions and the original one-second wait remain unchanged.
+Independent source review and strict full forward/reverse checks pass. Actual
+macOS compilation and execution after this successor remain unqualified here;
+preparatory manual run 37778305562 tests exact source on 916238897. Physical
+magic-key acceptance and the other native requirements remain open.
+
+## Current dev composition and authentic native outcome
+
+Feature merge df22409c3ea4a3967ec904b9eb2a266aebc03cc3 retains both
+f8881c450948e95c3510b05859789f210d1fd4eb and current dev
+c417311106a44108d3bfdc7747d2dda937c6229d. The independently reconstructed
+primary union matches all9,123 indexed paths, preserving the fourteen previously
+repaired Group5 images and every incoming Group6 change. Selected verification
+for all331 Group5 paths passes383 JS checks,18,179 Hammerspoon Lua tests,11,649
+Linux Lua tests and both selected E2E suites. Swift is deferred on Linux;
+incoming native Linux qualification remains separately owned. The feature push
+is confirmed remotely, and three exact-SHA automatic workflow queries are empty.
+
+Manual macOS run [37778305562](https://github.com/adrienm7/ergopti/actions/runs/37778305562)
+is terminal failure on private candidate916238897559dcd32eacdab214b8b631dfcc181f.
+Swift compilation succeeds in52.55s. Its authentic transcript has92 XCTest
+starts,83 passes,8 failures,0 skips and one unfinished portable initializer
+method at the unchanged25-minute step deadline. Keyboard/TIS methods have not
+started. The separate pinned Core-Service/CLI native calibration passes181.466s;
+complete four-target preparation fails124 after300.227s, and the baseline/full4/
+separate-Core method fails722.056s. The root prerequisite fails69 after0.247s,
+with primary ABI/compiler/bootstrap cause UNKNOWN without retained stderr.
+Permission UI, private configuration, VHD preparation and disposable signing
+also fail. Native legacy cleanup6, the three consent cohorts of4 and the three
+Foundation receipt methods pass; actual confirmation UI and physical acceptance
+remain unqualified. Core JS/properties, Mac stub suites and native tooltip12
+pass. Installation and Release are skipped. This private trial predates the
+current dev composition and does not qualify its final sources.
+
+The completed-run log archive is genuinely downloaded, SHA256
+078df7ff30f0748a24da2a15640ab494fde51097f9b2007aaf8d1b440165ccf2;
+the329,978-byte Package transcript is SHA256
+1dae3daeba2d339e0d07c6ab5e87597774421c0afca084381e11c3867b312a71.
+Direct job logs and retained artifact downloads refuse at
+productionresultssa11.blob.core.windows.net. The onboarding configuration draft
+adds only this observed domain while preserving existing rules; saving the
+draft has not applied it to the running environment. Detailed retained native
+evidence remains required. Items24/30/31/40/43/44 and transverse16/38 stay open;
+no final integration lock, dev push or feature deletion has occurred.

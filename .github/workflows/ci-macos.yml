@@ -319,11 +319,37 @@ jobs:
           path: ${{ steps.installed-vhd-raw.outputs.evidence_parent }}
           if-no-files-found: error
 
+      - name: Observe selected keyboard and TIS diagnostics
+        id: selected-keyboard-diagnostics
+        env:
+          SWIFT_BACKTRACE: enable=yes
+        run: |
+          set -euo pipefail
+          umask 077
+          diagnostic_root="$(mktemp -d "$RUNNER_TEMP/keyboard-selected-evidence.XXXXXX")"
+          echo "directory=$diagnostic_root" >> "$GITHUB_OUTPUT"
+          diagnostic_log="$(mktemp "$diagnostic_root/xctest.log.XXXXXX")"
+          export ERGOPTI_TIS_EVIDENCE_DIR="$(mktemp -d "$diagnostic_root/tis-session.XXXXXX")"
+          export ERGOPTI_TIS_EVIDENCE_SESSION="$(node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("hex"))')"
+          set +e
+          script -q /dev/null swift test --filter 'Keyboard(SourceTestSelection|SourceProbe|CharacterMapping)Tests' --package-path static/ergopti_plus/macos/launcher --scratch-path "$RUNNER_TEMP/swift-launcher-ci" 2>&1 | tee "$diagnostic_log"
+          diagnostic_pipeline_status=("${PIPESTATUS[@]}")
+          node tools/diagnostics/swift_xctest_evidence.cjs "$diagnostic_log" "${diagnostic_pipeline_status[0]}" "${diagnostic_pipeline_status[1]}" "$diagnostic_root/verdict.json" > "$diagnostic_root/reporter.stdout" 2> "$diagnostic_root/reporter.stderr"
+          diagnostic_reporter_status=$?
+          node tools/diagnostics/tis_evidence_transport.cjs "$ERGOPTI_TIS_EVIDENCE_DIR" "$ERGOPTI_TIS_EVIDENCE_SESSION" > "$diagnostic_root/tis-transport.stdout" 2> "$diagnostic_root/tis-transport.stderr"
+          diagnostic_tis_status=$?
+          set -e
+          printf 'script=%s\ncapture=%s\nreporter=%s\ntis=%s\n' "${diagnostic_pipeline_status[0]}" "${diagnostic_pipeline_status[1]}" "$diagnostic_reporter_status" "$diagnostic_tis_status" > "$diagnostic_root/status.txt"
+          cat "$diagnostic_root/reporter.stdout" "$diagnostic_root/reporter.stderr" "$diagnostic_root/tis-transport.stdout" "$diagnostic_root/tis-transport.stderr"
+          # The independent full suite runs before the final diagnostic adjudication.
+          # Recorded statuses do not prove native input-source retirement.
+          printf 'script=%s\ncapture=%s\nreporter=%s\ntis=%s\n' "${diagnostic_pipeline_status[0]}" "${diagnostic_pipeline_status[1]}" "$diagnostic_reporter_status" "$diagnostic_tis_status" >> "$GITHUB_OUTPUT"
+        timeout-minutes: 5
+
       - name: Run Swift launcher tests
         id: swift-launcher-tests
         env:
           SWIFT_BACKTRACE: enable=yes
-          ERGOPTI_NATIVE_XCODEGEN_METADATA_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/swift-launcher-evidence"
@@ -367,6 +393,28 @@ jobs:
               exit 1
           fi
         timeout-minutes: 25
+
+      - name: Retain selected keyboard and TIS diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: selected-keyboard-diagnostics-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: error
+          path: ${{ steps.selected-keyboard-diagnostics.outputs.directory }}
+
+      - name: Adjudicate selected keyboard diagnostic outcomes
+        if: always()
+        env:
+          DIAGNOSTIC_SCRIPT_STATUS: ${{ steps.selected-keyboard-diagnostics.outputs.script }}
+          DIAGNOSTIC_CAPTURE_STATUS: ${{ steps.selected-keyboard-diagnostics.outputs.capture }}
+          DIAGNOSTIC_REPORTER_STATUS: ${{ steps.selected-keyboard-diagnostics.outputs.reporter }}
+          DIAGNOSTIC_TIS_STATUS: ${{ steps.selected-keyboard-diagnostics.outputs.tis }}
+        run: |
+          set -euo pipefail
+          case "$DIAGNOSTIC_SCRIPT_STATUS:$DIAGNOSTIC_CAPTURE_STATUS:$DIAGNOSTIC_REPORTER_STATUS:$DIAGNOSTIC_TIS_STATUS" in
+              0:0:0:0) ;;
+              *) echo "::error::Selected keyboard diagnostic failed or its status receipt is missing"; exit 1 ;;
+          esac
 
       - name: Retain native legacy-cleanup receipt
         if: always() && (steps.swift-launcher-tests.outcome == 'success' || steps.swift-launcher-tests.outcome == 'failure')
