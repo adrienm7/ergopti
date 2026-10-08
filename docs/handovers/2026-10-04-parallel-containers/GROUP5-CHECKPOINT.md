@@ -2436,3 +2436,26 @@ not executed on macOS. Group6 has not granted the workflow environment seam, so
 that row remains absent. Native authenticated HTTP, full compilation, signing,
 packaging and installation remain UNEXECUTED for this source successor.
 Item 31 and transverse 16/38 remain open; no item is removed.
+
+## Fixed root compiler process prerequisite
+
+The source-only reviewed fixed-root process diagnostic now observes both
+independently frozen Darwin SDK ABI oracles through registered ordinary children
+before constructing the new waitid/filesec wrappers or launching sudo. Immutable
+ABI data cannot grant privileged custody. The actual compiler source is copied
+into a root-owned protected namespace; the fixed Apple interpreter, direct root
+compiler/child reservations and genuine privileged terminal retirement ACK remain
+separate requirements. Invalid clocks and expired deadlines refuse before new
+ordinary child acquisition; the copied C input is held and checked around clang.
+The unchanged original guards, frozen oracles and absolute 25-second diagnostic
+budget remain whole, with the existing SDK Guardian budgets of 30/35/10.
+Portable qualification covers 77 unique cases in normal and optimized Python,
+154 executions; an explicit overlapping 13-case recheck adds 26 executions for
+180 total, with zero failures or skips. Modeled native operations and portable
+extracted C controls are not macOS kernel evidence. Independent source review
+and Ruff check/format pass. Actual Darwin SDK, Swift, sudo/root healthy execution
+and the ABI/private-root admission cost within 25 seconds remain UNEXECUTED or
+UNMEASURED. Unknown privileged retirement debt retains a live owner with expired
+operations and no terminal ACK; current Guardian custody remains a production
+HOLD. No signing, installation or runtime qualification is claimed. Item 31 and
+transverse 16/38 remain open; no item is removed.
