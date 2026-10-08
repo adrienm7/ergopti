@@ -6653,6 +6653,13 @@ is committed; one request is one commit with its regression test.
       regression covers all 21 locales. Linux exposes the same labelled ordered
       tap/hold pairs, with simultaneous input explicitly unavailable.
 
+  The registered Linux provider regression now exercises all182 bindings and
+  all21 real locale dictionaries through the original menu/confirmation chain.
+  LuaJIT and Lua5.4 pass eight cases each, retaining all six original cases.
+  Independently introduced English-fallback and stale-locale-cache omissions
+  are refused on both runtimes. Source/input/native GUI ports are controlled;
+  this does not establish device behavior or the historical category writer.
+
   Remaining software/native qualification: retain the independent label/matrix
   contract and exercise real providers, locale changes and menus on final joined
   sources through affected-driver delivery gates. No writer regression is proved
