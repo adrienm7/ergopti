@@ -630,6 +630,8 @@ _UpdaterNative_ActualDeadlineAndCancellation(Contract, Fixture := unset) {
 				_SR_TreePoll()
 				Sleep(10)
 			}
+			if !FileExist(Run.NewExe) || Run.Results.Length != 0
+				_UpdaterNativeEmitPartialStageDiagnostic(Run, Kind)
 			AssertTrue(FileExist(Run.NewExe) && Run.Results.Length == 0,
 				"actual child must own a live partial stage before cancellation/deadline admission")
 			Fixture.Observe()
@@ -731,3 +733,53 @@ _UpdaterNativeStagingFactControls() {
 }
 Test("updater fixture: staging diagnostics keep closed scalar shapes and privacy",
 	_UpdaterNativeStagingFactControls)
+
+; Observe the captured terminal before the original live-stage assertion fires.
+_UpdaterNativePartialStageDiagnostic(Kind, Completions, State, Elapsed) {
+	Fact := "kind=" . _ManagedRemoteFixtureDiagnosticEnum(Kind, "cancel|deadline")
+		. " elapsed_ms=" . _ManagedRemoteFixtureGenerationInteger(Elapsed, 0, 2147483647)
+		. " callbacks=" . (Completions is Array ? _ManagedRemoteFixtureGenerationInteger(Completions.Length, 0, 65535) : "unknown")
+		. " tree_quiesced=" . (State is Map ? _ManagedRemoteFixtureDiagnosticBoolean(State.Get("TreeQuiesced", "")) : "unknown")
+	if !(Completions is Array) || Completions.Length != 1 || !(Completions[1] is Map)
+		return Fact . " exit=unknown failure=unavailable"
+	Completion := Completions[1]
+	Fact .= " exit=" . _ManagedRemoteFixtureGenerationInteger(Completion.Get("exit", ""), -2147483648, 4294967295)
+	Output := Completion.Get("stdout", 0)
+	if !(Output is String)
+		return Fact . " failure=invalid"
+	Failure := _Updater_ParseStagingFailure(Output)
+	if !Failure["valid"]
+		return Fact . " failure=invalid"
+	return Fact . " failure=admitted reason=" . _ManagedRemoteFixtureDiagnosticEnum(Failure["reason"], "download|verify|deadline")
+		. " " . _UpdaterNativeRefusalDiagnostic("", Failure["receipt"])
+}
+
+_UpdaterNativeEmitPartialStageDiagnostic(Run, Kind) {
+	try {
+		Elapsed := TickElapsed64(Run.StartedTick)
+		Fact := _UpdaterNativePartialStageDiagnostic(Kind, Run.Results, Run.NativeState, Elapsed)
+		Run.RefusalDiagnosticPrinter.Call("::notice title=Windows native partial stage diagnostic::" . Fact)
+		if Run.HasOwnProp("StagingDiagnosticPath") {
+			StagingFact := _UpdaterNativeReadStagingDiagnostic(Run.StagingDiagnosticPath)
+			if StagingFact != ""
+				Run.RefusalDiagnosticPrinter.Call("::notice title=Windows staging suboperation diagnostic::" . StagingFact)
+		}
+	} catch Any {
+		; Observation refusal cannot replace or satisfy the live-stage assertion.
+	}
+}
+
+_UpdaterNativePartialStageDiagnosticControls() {
+	Output := '{"schema_version":1,"state":"failed","operation":"download","reason":"download","receipt":{"backend":"dotnet","stage":"tls","failure_provenance":"verified","tls_status":"untrusted_certificate"},"cleanup_debt":[],"native_cleanup_debt":false}'
+	Fact := _UpdaterNativePartialStageDiagnostic("cancel", [Map("exit", 1, "stdout", Output)], Map("TreeQuiesced", true), 1500)
+	AssertContains(Fact, "kind=cancel elapsed_ms=1500 callbacks=1 tree_quiesced=true exit=1 failure=admitted reason=download")
+	AssertContains(Fact, "observed_stage=tls backend=dotnet")
+	AssertContains(Fact, "tls_status=untrusted_certificate")
+	Fact := _UpdaterNativePartialStageDiagnostic("deadline", [], Map("TreeQuiesced", "true"), "1500")
+	AssertContains(Fact, "elapsed_ms=unknown callbacks=0 tree_quiesced=unknown exit=unknown failure=unavailable")
+	Fact := _UpdaterNativePartialStageDiagnostic("PRIVATE_KIND", [Map("exit", "1", "stdout", "PRIVATE_URL_TOKEN")], Map(), 0)
+	AssertContains(Fact, "kind=unknown")
+	AssertContains(Fact, "exit=unknown failure=invalid")
+	AssertFalse(InStr(Fact, "PRIVATE"), "private stdout never enters the bounded scalar projection")
+}
+Test("updater native: missing partial stage exposes captured cause without weakening its assertion", _UpdaterNativePartialStageDiagnosticControls)

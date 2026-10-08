@@ -247,7 +247,9 @@ public sealed class ErgoptiArtifactNtlmProxy : IDisposable {
                 if(type==1) Interlocked.Increment(ref TypeOne); else Interlocked.Increment(ref TypeThree);
                 if(!hasCredential) {
                     long expiry;
-                    int status=AcquireCredentialsHandle(null,"NTLM",2,IntPtr.Zero,IntPtr.Zero,IntPtr.Zero,IntPtr.Zero,ref credential,out expiry);
+                    // AcceptSecurityContext requires SECPKG_CRED_INBOUND (1), not the
+                    // outbound credential direction used by an SSPI client.
+                    int status=AcquireCredentialsHandle(null,"NTLM",1,IntPtr.Zero,IntPtr.Zero,IntPtr.Zero,IntPtr.Zero,ref credential,out expiry);
                     hasCredential=ValidHandle(credential);
                     if(status!=0 || !hasCredential) { SecurityStatus=status; FailureStage="acquire_credentials";
                         throw new InvalidOperationException("Native inbound credentials refused."); }

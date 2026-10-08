@@ -9,6 +9,11 @@ $Root=Join-Path ([IO.Path]::GetTempPath()) ('ergopti-legacy-retirement-'+[Guid]:
 $Utf8=[Text.UTF8Encoding]::new($false,$true)
 $Failed=$false
 $Child=$null
+$DiagnosticControl=0
+$DiagnosticStage='prepare'
+$DiagnosticExit=-999
+$DiagnosticOut=-1
+$DiagnosticErr=-1
 try {
     $null=[IO.Directory]::CreateDirectory($Root)
     $Source=[IO.File]::ReadAllBytes($WorkerPath)
@@ -40,6 +45,9 @@ function ConvertFrom-ErgoptiPacRoutes {
         @{DebtAt=0;Calls=1;Exit=0;Status='completed';Results=1;Proxy=$true;Raw='raw-fixture.invalid:3128'},
         @{DebtAt=0;Calls=1;Exit=0;Status='completed';Results=1;Proxy=$true;Ipv6=$true;Raw='[2001:db8::1]:3129'})
     foreach($Control in $Controls) {
+        $DiagnosticControl++
+        $DiagnosticStage='prepare_control'
+        $DiagnosticExit=-999;$DiagnosticOut=-1;$DiagnosticErr=-1
         $Case=Join-Path $Root ([Guid]::NewGuid().ToString('N'))
         $null=[IO.Directory]::CreateDirectory($Case)
         $Worker=Join-Path $Case 'worker.ps1'
@@ -65,24 +73,34 @@ function ConvertFrom-ErgoptiPacRoutes {
         $Start.RedirectStandardOutput=$true;$Start.RedirectStandardError=$true
         $Start.Arguments='-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "'+$Worker+'" -InputPath "'+$Input+'"'
         $Clock=[Diagnostics.Stopwatch]::StartNew()
+        $DiagnosticStage='start_child'
         $Child=[Diagnostics.Process]::Start($Start)
         $Output=$Child.StandardOutput.ReadToEndAsync()
         $ErrorOutput=$Child.StandardError.ReadToEndAsync()
+        $DiagnosticStage='child_exit'
         if(-not $Child.WaitForExit(10000)){throw 'Owned protocol control exceeded its process budget.'}
         $Remaining=[int][Math]::Max(0,10000-$Clock.ElapsedMilliseconds)
         if(-not $Output.Wait($Remaining)){throw 'Owned protocol stdout did not retire.'}
         $Remaining=[int][Math]::Max(0,10000-$Clock.ElapsedMilliseconds)
         if(-not $ErrorOutput.Wait($Remaining)){throw 'Owned protocol stderr did not retire.'}
+        $DiagnosticExit=$Child.ExitCode
+        $DiagnosticOut=if($Output.Result.Length -le 8192){$Output.Result.Length}else{-1}
+        $DiagnosticErr=if($ErrorOutput.Result.Length -le 8192){$ErrorOutput.Result.Length}else{-1}
+        $DiagnosticStage='process_receipt'
         if($Output.Result.Length -gt 8192 -or $ErrorOutput.Result -cne '' -or $Child.ExitCode -ne $Control.Exit) {
             throw 'Closed protocol process result was refused.'
         }
+        $DiagnosticStage='frame_parse'
         $Frame=$Output.Result|ConvertFrom-Json
+        $DiagnosticStage='call_count'
         $Calls=[IO.File]::ReadAllText((Join-Path $Case 'count.txt'))
+        $DiagnosticStage='frame_contract'
         if($Calls -cne [string]$Control.Calls -or $Frame.version -ne 1 -or
             $Frame.status -cne $Control.Status -or $Frame.results -isnot [array] -or
             $Frame.results.Count -ne $Control.Results) {
             throw 'Legacy worker started after native debt or published a partial completed receipt.'
         }
+        $DiagnosticStage='raw_proxy_contract'
         if($Control.Proxy -and ($Frame.results[0].ok -ne $true -or
             $Frame.results[0].kind -cne 'named_proxy' -or $Frame.results[0].access_type -ne 3 -or
             $Frame.results[0].proxy -cne $Control.Raw -or
@@ -94,6 +112,7 @@ function ConvertFrom-ErgoptiPacRoutes {
     [Console]::Out.WriteLine('[OK] legacy proxy protocol: first/second native debt refuse whole receipt; normal three-URL and raw host/IPv6 relay controls preserved')
 } catch {
     $Failed=$true
+    try {[Console]::Error.WriteLine('RETIREMENT_DIAG control='+$DiagnosticControl+' stage='+$DiagnosticStage+' child_exit='+$DiagnosticExit+' stdout_units='+$DiagnosticOut+' stderr_units='+$DiagnosticErr)} catch { }
     [Console]::Error.WriteLine('Legacy proxy retirement protocol failed.')
 } finally {
     if($null -ne $Child) {

@@ -14,6 +14,8 @@ using System.Security.Principal;
 using System.Text;
 using System.Threading;
 public sealed class ErgoptiPacNtlmOrigin : IDisposable {
+    // AcceptSecurityContext consumes the WinSDK SECPKG_CRED_INBOUND authority.
+    const int InboundCredentialUse=1;
     [StructLayout(LayoutKind.Sequential)] struct Handle { public IntPtr Lower, Upper; }
     [StructLayout(LayoutKind.Sequential)] struct Buffer { public int Size, Type; public IntPtr Data; }
     [StructLayout(LayoutKind.Sequential)] struct Descriptor { public int Version, Count; public IntPtr Buffers; }
@@ -183,7 +185,7 @@ public sealed class ErgoptiPacNtlmOrigin : IDisposable {
                 if(type==1) Interlocked.Increment(ref TypeOne); else Interlocked.Increment(ref TypeThree);
                 if(!hasCredential) {
                     long expiry;
-                    int status=AcquireCredentialsHandle(null,"NTLM",2,IntPtr.Zero,IntPtr.Zero,IntPtr.Zero,IntPtr.Zero,ref credential,out expiry);
+                    int status=AcquireCredentialsHandle(null,"NTLM",InboundCredentialUse,IntPtr.Zero,IntPtr.Zero,IntPtr.Zero,IntPtr.Zero,ref credential,out expiry);
                     hasCredential=ValidHandle(credential);
                     if(hasCredential)Interlocked.Increment(ref OwnedCredentials);
                     if(status!=0 || !hasCredential) { SecurityStatus=status; FailureStage="acquire_credentials";
