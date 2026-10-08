@@ -71,6 +71,82 @@ local function caption_format(format, value)
 	return table.concat(parts), found
 end
 
+-- Ordered typed values consume the original translated format without interpreting native bytes.
+local function caption_values(format, values)
+	if type(format) ~= "string" or type(values) ~= "table" or getmetatable(values) ~= nil then return nil end
+	local count, maximum = 0, 0
+	for key, value in next, values do
+		if type(key) ~= "number" or key < 1 or key % 1 ~= 0 or type(value) ~= "string" then return nil end
+		count, maximum = count + 1, math.max(maximum, key)
+	end
+	if count == 0 or count ~= maximum then return nil end
+	local parts, index, argument = {}, 1, 1
+	while index <= #format do
+		local character, following = format:sub(index, index), format:sub(index + 1, index + 1)
+		if character == "%" and following == "%" then
+			parts[#parts + 1], index = "%", index + 2
+		elseif character == "%" and following == "s" then
+			if values[argument] == nil then return nil end
+			parts[#parts + 1], argument, index = values[argument], argument + 1, index + 2
+		elseif character == "%" then return nil
+		else parts[#parts + 1], index = character, index + 1 end
+	end
+	if argument ~= count + 1 then return nil end
+	return table.concat(parts)
+end
+
+-- Explicit numbered captions retain the original one-value format without interpreting native bytes.
+local function read_numbered_caption(item, getters, i18n)
+	if item.caption_format ~= "numbered" or (item.type ~= "command" and item.type ~= "group")
+		or type(item.id) ~= "string" or item.id == "" or type(item.i18n) ~= "string" or item.i18n == ""
+		or type(item.caption_getter) ~= "string" or item.caption_getter == ""
+		or item.caption_getters ~= nil or item.caption_source ~= nil or item.caption_layout ~= nil
+		or item.caption_joiner ~= nil or item.label_prefix ~= nil or item.reason_key ~= nil
+		or item.disabled_reason_key ~= nil or type(getters) ~= "table" or type(getters[item.caption_getter]) ~= "function" then return nil end
+	local title = i18n.get(item.i18n)
+	if type(title) ~= "string" or title == item.i18n or not title:find("{1}", 1, true)
+		or title:find("[%z\1-\31\127]") or utf8_length(title) == nil then return nil end
+	local remainder = title:gsub("{1}", "")
+	if remainder:find("[{}]") then return nil end
+	local ok, value = pcall(getters[item.caption_getter])
+	if not ok or type(value) ~= "string" or value:find("[%z\1-\31\127]") or utf8_length(value) == nil then return nil end
+	return (title:gsub("{1}", function() return value end))
+end
+
+-- A record caption remains literal native data; the declaration owns its kind and policy.
+local function read_native_caption(item, getters)
+	if item.caption_source ~= "native" or (item.type ~= "check" and item.type ~= "group")
+		or item.i18n ~= nil or item.caption_getters ~= nil or item.label_prefix ~= nil
+		or item.reason_key ~= nil or item.disabled_reason_key ~= nil or item.unavailable ~= "hide"
+		or (item.caption_layout ~= nil or item.caption_joiner ~= nil) or type(item.caption_getter) ~= "string" or item.caption_getter == ""
+		or type(getters) ~= "table" or type(getters[item.caption_getter]) ~= "function" then return nil end
+	local ok, title = pcall(getters[item.caption_getter])
+	if not ok or type(title) ~= "string" or title == "" or title:find("[%z\1-\31\127]") or utf8_length(title) == nil then return nil end
+	return title
+end
+
+local function read_caption_values(item, getters, i18n)
+	local names = item.caption_getters
+	if item.caption_getter ~= nil or item.caption_source ~= nil or item.caption_layout ~= nil or item.caption_joiner ~= nil
+		or not ({command = true, check = true, group = true, label = true})[item.type]
+		or type(item.id) ~= "string" or item.id == "" or type(item.i18n) ~= "string" or item.i18n == ""
+		or type(names) ~= "table" or getmetatable(names) ~= nil then return nil end
+	local count, maximum = 0, 0
+	for index, name in next, names do
+		if type(index) ~= "number" or index < 1 or index % 1 ~= 0 or type(name) ~= "string" or name == ""
+			or type(getters[name]) ~= "function" then return nil end
+		count, maximum = count + 1, math.max(maximum, index)
+	end
+	if count == 0 or count ~= maximum then return nil end
+	local values = {}
+	for index, name in ipairs(names) do
+		local ok, value = pcall(getters[name])
+		if not ok or type(value) ~= "string" then return nil end
+		values[index] = value
+	end
+	return caption_values(i18n.get(item.i18n), values)
+end
+
 -- Used only to report a malformed `new()` call, which by definition happens
 -- before an injected logger exists.
 local BootLogger = require("logger.shim")
@@ -240,6 +316,23 @@ function M.new(deps)
 			if p == platform then return true end
 		end
 		return false
+	end
+
+	--- Finds the unique native-visible owner of a declared row identity.
+	--- Hidden siblings never decide native captions, readiness or provider status.
+	--- @param menu_key string
+	--- @param item_id string
+	--- @return table|nil
+	local function find_item_by_id(menu_key, item_id)
+		if type(menu_key) ~= "string" or menu_key == "" or type(item_id) ~= "string" or item_id == "" then return nil end
+		local selected
+		for _, item in ipairs(get_menu_def(menu_key)) do
+			if type(item) == "table" and item.id == item_id and is_for_platform(item) then
+				if selected ~= nil then return nil end
+				selected = item
+			end
+		end
+		return selected
 	end
 
 	--- The short form of a translated reason: the text before its first colon,
@@ -511,6 +604,152 @@ function M.new(deps)
 		return rows
 	end
 
+	--- Admits canonical order for completed native rows before their native allocation.
+	--- The returned composer accepts finished objects, never provider DATA/getters.
+	--- It preserves object/resource/callback identity and publishes atomically in
+	--- the declaration's target slot, without invoking any native owner.
+	--- @param manifest_key string Existing canonical composition declaration.
+	--- @return function|nil composer Nil refuses missing/ambiguous policy.
+	function R.native_composition(manifest_key)
+		local function dense(value)
+			if type(value) ~= "table" or getmetatable(value) ~= nil then return nil end
+			local count, maximum = 0, 0
+			for index in next, value do
+				if type(index) ~= "number" or index < 1 or index % 1 ~= 0 then return nil end
+				count, maximum = count + 1, math.max(maximum, index)
+			end
+			if count ~= maximum then return nil end
+			return count
+		end
+		local function admit()
+			if type(manifest_key) ~= "string" or manifest_key == "" then return nil end
+			local declaration = get_menu_def(manifest_key)
+			local count = dense(declaration)
+			if not count or count == 0 then return nil end
+			local policy, identities, target = {}, {}, nil
+			for index = 1, count do
+				local item = rawget(declaration, index)
+				if type(item) ~= "table" or getmetatable(item) ~= nil or not is_for_platform(item) then return nil end
+				if item.type == "native_content" then
+					for field in next, item do
+						if field ~= "type" and field ~= "id" and field ~= "target" and field ~= "kind"
+							and field ~= "platforms" and field ~= "unavailable" then return nil end
+					end
+					if type(item.id) ~= "string" or item.id == "" or identities[item.id]
+						or (item.kind ~= "image" and item.kind ~= "boundary" and item.kind ~= "command" and item.kind ~= "rows")
+						or (item.target ~= nil and (item.target ~= true or item.kind ~= "rows"))
+						or (item.unavailable ~= nil and item.unavailable ~= "hide") then return nil end
+					if item.platforms ~= nil then
+						local n = dense(item.platforms)
+						if not n or n == 0 then return nil end
+						local seen = {}
+						for _, token in ipairs(item.platforms) do
+							if (token ~= "ahk" and token ~= "hs" and token ~= "linux") or seen[token] then return nil end
+							seen[token] = true
+						end
+						if item.unavailable ~= nil and n >= 3 then return nil end
+					elseif item.unavailable ~= nil then return nil end
+					identities[item.id] = true
+					if item.target then
+						if target or index ~= count then return nil end
+						target = item.id
+					end
+					policy[index] = { id = item.id, kind = item.kind, target = item.target or false, source = item,
+						platforms = item.platforms, platform_values = item.platforms and table.concat(item.platforms, ",") or nil, unavailable = item.unavailable }
+				elseif item.type == "---" then
+					for field in next, item do
+						if field ~= "type" and field ~= "after" and field ~= "platforms" and field ~= "unavailable" then return nil end
+					end
+					if type(item.after) ~= "string" or not identities[item.after]
+						or (item.unavailable ~= nil and item.unavailable ~= "hide") then return nil end
+					if item.platforms ~= nil then
+						local n = dense(item.platforms)
+						if not n or n == 0 then return nil end
+						local seen = {}
+						for _, token in ipairs(item.platforms) do
+							if (token ~= "ahk" and token ~= "hs" and token ~= "linux") or seen[token] then return nil end
+							seen[token] = true
+						end
+						if item.unavailable ~= nil and n >= 3 then return nil end
+					elseif item.unavailable ~= nil then return nil end
+					policy[index] = { after = item.after, source = item, platforms = item.platforms,
+						platform_values = item.platforms and table.concat(item.platforms, ",") or nil, unavailable = item.unavailable }
+				else return nil end
+			end
+			if not target then return nil end
+			return policy, identities, target, declaration
+		end
+		local policy, identities, target, source = admit()
+		if not policy then
+			Logger.error(LOG, "Invalid completed-native composition '%s' — admission refused.", tostring(manifest_key))
+			return nil
+		end
+		return function(slots)
+			local current, _, current_target, current_source = admit()
+			if not current or current_source ~= source or #current ~= #policy or current_target ~= target then return false end
+			for index, item in ipairs(policy) do
+				local actual = current[index]
+				if actual.source ~= item.source or actual.id ~= item.id or actual.kind ~= item.kind
+					or actual.target ~= item.target or actual.after ~= item.after or actual.platforms ~= item.platforms
+					or actual.platform_values ~= item.platform_values or actual.unavailable ~= item.unavailable then return false end
+			end
+			if type(slots) ~= "table" or getmetatable(slots) ~= nil then return false end
+			for key in next, slots do if not identities[key] then return false end end
+			local output = rawget(slots, target)
+			local active = {}
+			local function finished(rows, depth, forbidden_target)
+				local count = dense(rows)
+				if not count or active[rows] or depth > MAX_LIST_DEPTH
+					or (forbidden_target ~= nil and rawequal(rows, forbidden_target)) then return false end
+				active[rows] = true
+				for index = 1, count do
+					local row = rawget(rows, index)
+					if type(row) ~= "table" or getmetatable(row) ~= nil then return false end
+					for field in next, row do
+						if field ~= "title" and field ~= "fn" and field ~= "menu" and field ~= "image"
+							and field ~= "checked" and field ~= "disabled" then return false end
+					end
+					local title, action, menu = rawget(row, "title"), rawget(row, "fn"), rawget(row, "menu")
+					local image, checked, disabled = rawget(row, "image"), rawget(row, "checked"), rawget(row, "disabled")
+					if type(title) ~= "string" or (title == "" and image == nil)
+						or (action ~= nil and type(action) ~= "function") or (menu ~= nil and type(menu) ~= "table")
+						or (action ~= nil and menu ~= nil) or (checked ~= nil and type(checked) ~= "boolean")
+						or (disabled ~= nil and type(disabled) ~= "boolean")
+						or (image ~= nil and type(image) ~= "userdata" and type(image) ~= "table" and type(image) ~= "string") then return false end
+					if title == "-" and (action ~= nil or menu ~= nil or image ~= nil or checked ~= nil or disabled ~= nil) then return false end
+					if menu ~= nil and not finished(menu, depth + 1, forbidden_target) then return false end
+				end
+				active[rows] = nil
+				return true
+			end
+			local supplied_arrays = {}
+			for _, item in ipairs(policy) do
+				if item.id then
+					local rows = rawget(slots, item.id)
+					if not finished(rows, 1, item.id ~= target and output or nil) or supplied_arrays[rows] then return false end
+					supplied_arrays[rows] = true
+					if item.kind == "image" or item.kind == "boundary" then
+						if #rows ~= 1 then return false end
+					elseif item.kind == "command" and #rows > 1 then return false end
+					local row = rows[1]
+					if item.kind == "image" and (row.title ~= "" or row.image == nil
+						or type(row.fn) ~= "function" or row.menu ~= nil or row.checked ~= nil or row.disabled ~= nil) then return false end
+					if item.kind == "boundary" and row.title ~= "-" then return false end
+					if item.kind == "command" and row and (row.title == "" or row.title == "-"
+						or type(row.fn) ~= "function" or row.menu ~= nil or row.image ~= nil) then return false end
+				end
+			end
+			local completed = {}
+			for _, item in ipairs(policy) do
+				if item.id then
+					for _, row in ipairs(rawget(slots, item.id)) do completed[#completed + 1] = row end
+				elseif #rawget(slots, item.after) > 0 then completed[#completed + 1] = { title = "-" } end
+			end
+			for index = 1, math.max(#output, #completed) do output[index] = completed[index] end
+			return true
+		end
+	end
+
 	--- Builds a built-in named group that is always rendered the same way.
 	--- @param group_id string
 	--- @param ctx table
@@ -589,10 +828,9 @@ function M.new(deps)
 	--- @param getters table Existing native state readers.
 	--- @return table|nil row
 	function R.choice_row(manifest_key, row_id, commands, getters)
-		for _, item in ipairs(get_menu_def(manifest_key)) do
-			if item.type == "choice" and item.id == row_id and is_for_platform(item) then
-				return choice_row_data(item, manifest_key, commands or {}, getters or {})
-			end
+		local item = find_item_by_id(manifest_key, row_id)
+		if item ~= nil and item.type == "choice" then
+			return choice_row_data(item, manifest_key, commands or {}, getters or {})
 		end
 		Logger.error(LOG, "Missing declared choice '%s.%s' — provider row refused.", manifest_key, row_id)
 		return nil
@@ -644,7 +882,7 @@ function M.new(deps)
 		local cmd_id = type(item.command) == "string" and item.command or row_id
 		local fn     = commands[cmd_id]
 
-		if row_id == "" or i18n_key == "" then
+		if row_id == "" or (i18n_key == "" and item.caption_source ~= "native") then
 			Logger.warn(LOG, "'%s' item missing id or i18n in '%s' — skipped.", t, manifest_key)
 			return nil
 		end
@@ -658,6 +896,18 @@ function M.new(deps)
 		end
 
 		local title
+		if item.caption_format ~= nil then
+			title = read_numbered_caption(item, getters, i18n)
+			if title == nil then return nil end
+		end
+		if item.caption_source ~= nil then
+			title = read_native_caption(item, getters)
+			if title == nil then return nil end
+		end
+		if item.caption_getters ~= nil then
+			title = read_caption_values(item, getters, i18n)
+			if title == nil then return nil end
+		end
 		if has_caption_layout(item) then
 			title = explicit_caption(item, getters, i18n.get(i18n_key))
 			if title == nil then return nil end
@@ -670,7 +920,7 @@ function M.new(deps)
 		if disabled and type(item.disabled_reason_key) == "string" then
 			local stand_in = greyed_stand_in(manifest_key,
 				{ id = row_id, i18n = i18n_key, reason_key = item.disabled_reason_key })
-			if stand_in and has_caption_layout(item) then
+			if stand_in and (has_caption_layout(item) or item.caption_getters ~= nil) then
 				stand_in.title = title .. " — " .. reason_head(i18n.get(item.disabled_reason_key))
 			end
 			if stand_in and rawget(item, "label_prefix") ~= nil then
@@ -703,19 +953,18 @@ function M.new(deps)
 	--- @return table|nil row
 	function R.command_row(manifest_key, row_id, commands, getters)
 		commands, getters = commands or {}, getters or {}
-		for _, item in ipairs(get_menu_def(manifest_key)) do
-			if item.type == "command" and item.id == row_id and is_for_platform(item) then
-				local built = command_item(item, manifest_key, commands, getters)
-				if not built then return nil end
-				local action = built.fn
-				return {
-					label = built.title, disabled = built.disabled,
-					action = type(action) == "function" and function(...)
-						if R.resolve_disabled_when(manifest_key, row_id, getters) then return false end
-						return action(...)
-					end or nil,
-				}
-			end
+		local item = find_item_by_id(manifest_key, row_id)
+		if item ~= nil and item.type == "command" then
+			local built = command_item(item, manifest_key, commands, getters)
+			if not built then return nil end
+			local action = built.fn
+			return {
+				label = built.title, disabled = built.disabled,
+				action = type(action) == "function" and function(...)
+					if R.resolve_disabled_when(manifest_key, row_id, getters) then return false end
+					return action(...)
+				end or nil,
+			}
 		end
 		Logger.error(LOG, "Missing declared command '%s.%s' — provider row refused.", manifest_key, row_id)
 		return nil
@@ -853,6 +1102,22 @@ function M.new(deps)
 					Logger.error(LOG, "Invalid inert caption layout in '%s' — rows refused.", key)
 					return nil
 				end
+				if item.caption_format ~= nil and is_for_platform(item) and read_numbered_caption(item, getters, i18n) == nil then return nil end
+				if item.caption_source ~= nil and is_for_platform(item) and read_native_caption(item, getters) == nil then return nil end
+				if item.caption_getters ~= nil then
+					local names = item.caption_getters
+					if item.caption_getter ~= nil or item.caption_source ~= nil or caption_layout ~= nil
+						or not ({command = true, check = true, group = true, label = true})[item.type]
+						or type(item.i18n) ~= "string" or item.i18n == ""
+						or type(names) ~= "table" or getmetatable(names) ~= nil then return nil end
+					local count, maximum = 0, 0
+					for index, name in next, names do
+						if type(index) ~= "number" or index < 1 or index % 1 ~= 0
+							or type(name) ~= "string" or name == "" or (is_for_platform(item) and type(getters[name]) ~= "function") then return nil end
+						count, maximum = count + 1, math.max(maximum, index)
+					end
+					if count == 0 or count ~= maximum then return nil end
+				end
 				if item.on_refusal ~= nil and item.type ~= "include" then
 					Logger.error(LOG, "Invalid presentation omission policy in '%s' — rows refused.", key)
 					return nil
@@ -919,7 +1184,7 @@ function M.new(deps)
 					elseif status_definition and item.type == "label" then
 						row = { label = i18n.get(item.i18n), disabled = true }
 					elseif item.type == "label" then
-						local fields = { type = true, id = true, i18n = true, platforms = true, unavailable = true, caption_getter = true, caption_layout = true, caption_joiner = true }
+						local fields = { type = true, id = true, i18n = true, platforms = true, unavailable = true, caption_getter = true, caption_getters = true, caption_layout = true, caption_joiner = true }
 						local valid = type(item.id) == "string" and item.id ~= ""
 							and type(item.i18n) == "string" and item.i18n ~= ""
 							and (item.unavailable == nil or item.unavailable == "hide")
@@ -962,6 +1227,14 @@ function M.new(deps)
 						if not row then return nil end
 					elseif item.type == "group" and (type(children[item.id]) == "table" or type(children[item.id]) == "function") then
 						local title
+						if item.caption_format ~= nil then
+							title = read_numbered_caption(item, getters, i18n)
+							if title == nil then return nil end
+						end
+						if item.caption_source ~= nil then
+							title = read_native_caption(item, getters)
+							if title == nil then return nil end
+						end
 						if has_caption_layout(item) then
 							title = explicit_caption(item, getters, i18n.get(item.i18n))
 							if title == nil then return nil end
@@ -978,7 +1251,12 @@ function M.new(deps)
 						Logger.error(LOG, "Missing child data or unsupported row in template '%s' — provider rows refused.", key)
 						return nil
 					end
-					if row and item.caption_getter ~= nil and not
+					if row and item.caption_getters ~= nil and item.type ~= "command" and item.type ~= "check" then
+						local title = read_caption_values(item, getters, i18n)
+						if title == nil then return nil end
+						row.label = prefix .. title
+					end
+					if row and item.caption_format == nil and item.caption_source == nil and item.caption_getter ~= nil and not
 						((item.type == "command" or item.type == "group") and has_caption_layout(item)) then
 						local raw_title = i18n.get(item.i18n)
 						local layout = caption_layout
@@ -1032,9 +1310,16 @@ function M.new(deps)
 	--- @param status string Named native status to project.
 	--- @return table|nil rows
 	function R.status_rows(manifest_key, row_id, status)
-		local owner
-		for _, item in ipairs(get_menu_def(manifest_key)) do
-			if item.id == row_id then owner = item; break end
+		local owner = find_item_by_id(manifest_key, row_id)
+		-- Inert data from a single global declaration is shared across drivers.
+		-- Platform variants still need one native owner; ambiguous data refuses.
+		if owner == nil then
+			for _, item in ipairs(get_menu_def(manifest_key)) do
+				if type(item) == "table" and item.id == row_id then
+					if owner ~= nil then return nil end
+					owner = item
+				end
+			end
 		end
 		local statuses = owner and owner.status_rows
 		local declaration = type(statuses) == "table" and statuses[status]
@@ -1062,19 +1347,18 @@ function M.new(deps)
 	--- @return table|nil row
 	function R.check_row(manifest_key, row_id, commands, getters)
 		commands, getters = commands or {}, getters or {}
-		for _, item in ipairs(get_menu_def(manifest_key)) do
-			if item.type == "check" and item.id == row_id and is_for_platform(item) then
-				local built = command_item(item, manifest_key, commands, getters)
-				if not built then return nil end
-				local action = built.fn
-				return {
-					label = built.title, checked = built.checked, disabled = built.disabled,
-					action = type(action) == "function" and function(...)
-						if R.resolve_disabled_when(manifest_key, row_id, getters) then return false end
-						return action(...)
-					end or nil,
-				}
-			end
+		local item = find_item_by_id(manifest_key, row_id)
+		if item ~= nil and item.type == "check" then
+			local built = command_item(item, manifest_key, commands, getters)
+			if not built then return nil end
+			local action = built.fn
+			return {
+				label = built.title, checked = built.checked, disabled = built.disabled,
+				action = type(action) == "function" and function(...)
+					if R.resolve_disabled_when(manifest_key, row_id, getters) then return false end
+					return action(...)
+				end or nil,
+			}
 		end
 		Logger.error(LOG, "Missing declared checkbox '%s.%s' — provider row refused.", manifest_key, row_id)
 		return nil
@@ -1252,11 +1536,23 @@ function M.new(deps)
 			elseif t == "group" then
 				local group_id  = type(item.id)   == "string" and item.id   or ""
 				local i18n_key  = type(item.i18n) == "string" and item.i18n or ""
-				if group_id == "" or i18n_key == "" then
+				if group_id == "" or (i18n_key == "" and item.caption_source ~= "native") then
 					Logger.warn(LOG, "group item missing id or i18n in '%s' — skipped.", manifest_key)
 					goto continue
 				end
 				local label = i18n.get(i18n_key)
+				if item.caption_format ~= nil then
+					label = read_numbered_caption(item, getters, i18n)
+					if label == nil then goto continue end
+				end
+				if item.caption_source ~= nil then
+					label = read_native_caption(item, getters)
+					if label == nil then goto continue end
+				end
+				if item.caption_getters ~= nil then
+					label = read_caption_values(item, getters, i18n)
+					if label == nil then goto continue end
+				end
 				if has_caption_layout(item) then
 					label = explicit_caption(item, getters, label)
 					if label == nil then goto continue end
@@ -1437,18 +1733,6 @@ function M.new(deps)
 	-- ===== 1.5) Declarative Predicate Resolvers =======
 	-- ==================================================
 
-	--- Finds the manifest item with the given ``id`` inside the ``menu_key`` array.
-	--- @param menu_key string
-	--- @param item_id string
-	--- @return table|nil
-	local function find_item_by_id(menu_key, item_id)
-		for _, item in ipairs(get_menu_def(menu_key)) do
-			if type(item) == "table" and item.id == item_id then
-				return item
-			end
-		end
-		return nil
-	end
 
 	--- Evaluates the declarative ``disabled_when`` predicate of a manifest item
 	--- against a caller-supplied table of canonical state key → zero-arg getter.
@@ -1551,14 +1835,24 @@ function M.new(deps)
 		end
 		if type(row_id) ~= "string" or row_id == "" or matches ~= 1
 			or selected.type ~= "group" or rawget(selected, "label_prefix") ~= nil or not is_for_platform(selected)
-			or type(selected.i18n) ~= "string" or selected.i18n == "" or type(submenu) ~= "table" then
+			or ((type(selected.i18n) ~= "string" or selected.i18n == "") and selected.caption_source ~= "native")
+			or type(submenu) ~= "table" then
 			Logger.error(LOG, "Missing or invalid declared parent '%s.%s' — provider row refused.", manifest_key, tostring(row_id))
 			return nil
 		end
 		getters = getters or {}
 		local label = i18n.get(selected.i18n)
 		local caption_key = rawget(selected, "caption_getter")
-		if has_caption_layout(selected) then
+		if selected.caption_format ~= nil then
+			label = read_numbered_caption(selected, getters, i18n)
+			if label == nil then return nil end
+		elseif selected.caption_source ~= nil then
+			label = read_native_caption(selected, getters)
+			if label == nil then return nil end
+		elseif selected.caption_getters ~= nil then
+			label = read_caption_values(selected, getters, i18n)
+			if label == nil then return nil end
+		elseif has_caption_layout(selected) then
 			label = explicit_caption(selected, getters, label)
 			if label == nil then return nil end
 		elseif caption_key ~= nil then

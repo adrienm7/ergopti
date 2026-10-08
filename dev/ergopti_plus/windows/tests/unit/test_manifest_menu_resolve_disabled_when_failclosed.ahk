@@ -192,3 +192,100 @@ _MMRDW_TemplateGroupThrow(*) {
 	throw Error("group-native-read-refused")
 }
 Test("manifest_menu: template group retains getter refusal platform hide and child admission", _MMRDW_TemplateGroupRefusals)
+
+
+; Native lookup selects a unique visible owner, independently of hidden siblings.
+_MPL_NativeLookup(Mode) {
+	Root := _MR_GetManifestRoot()
+	Key := "__native_visible_lookup_probe"
+	Assert(Root is Map && !Root.Has(Key), "native identity fixture owns its exact temporary section")
+	State := Map("native", 0, "foreign", 0, "actions", 0)
+	Hidden := Map("type", "command", "id", "owned", "i18n", "button.cancel", "platforms", ["hs"],
+		"disabled_when", ["foreign_ready"], "checked_when", ["foreign_checked"],
+		"status_rows", Map("unavailable", [Map("type", "label", "i18n", "button.cancel")]))
+	NativeOwner := Map("type", "command", "id", "owned", "i18n", "button.ok", "platforms", ["ahk"],
+		"disabled_when", ["native_ready"], "checked_when", ["native_checked"],
+		"status_rows", Map("unavailable", [Map("type", "label", "i18n", "button.ok")]))
+	Root[Key] := [Hidden, NativeOwner]
+	Commands := Map("owned", (*) => (State["actions"] += 1, "native-ack"))
+	Getters := Map("native_ready", (*) => (State["native"] += 1, true),
+		"native_checked", (*) => (State["native"] += 1, true),
+		"foreign_ready", (*) => (State["foreign"] += 1, false),
+		"foreign_checked", (*) => (State["foreign"] += 1, false))
+	try {
+		switch Mode {
+			case "hidden-first", "native-first":
+				if Mode == "native-first"
+					Root[Key] := [NativeOwner, Hidden]
+				Assert(_MR_FindItemById(Key, "owned") == NativeOwner, "lookup retains the actual visible source Map")
+				Row := MenuRenderer_CommandRow(Key, "owned", Commands, Getters)
+				Assert(Row is Map, "native command is admitted independently of hidden source order")
+				AssertEqual(t("button.ok"), Row["label"])
+				Assert(!Row.Get("disabled", false))
+				Assert(MenuRenderer_ResolveCheckedWhen(Key, "owned", Getters))
+				AssertEqual(0, State["foreign"], "hidden getters never decide native presentation")
+				AssertEqual("native-ack", Row["action"].Call())
+				AssertEqual(1, State["actions"])
+			case "duplicate-visible":
+				Hidden["platforms"] := ["ahk"]
+				AssertEqual(false, _MR_FindItemById(Key, "owned"))
+				AssertEqual(false, MenuRenderer_CommandRow(Key, "owned", Commands, Getters))
+				Assert(MenuRenderer_ResolveDisabledWhen(Key, "owned", Getters))
+				Assert(!MenuRenderer_ResolveCheckedWhen(Key, "owned", Getters))
+				AssertEqual(0, State["native"])
+				AssertEqual(0, State["foreign"])
+				AssertEqual(0, State["actions"])
+			case "multiple-hidden":
+				Root[Key].Push(Hidden)
+				Assert(_MR_FindItemById(Key, "owned") == NativeOwner)
+				Row := MenuRenderer_CommandRow(Key, "owned", Commands, Getters)
+				Assert(Row is Map)
+				AssertEqual(t("button.ok"), Row["label"])
+				Assert(!Row.Get("disabled", false))
+				AssertEqual(0, State["foreign"])
+			case "withdraw-held", "ambiguous-held":
+				Root[Key] := [NativeOwner, Hidden]
+				Row := MenuRenderer_CommandRow(Key, "owned", Commands, Getters)
+				Assert(Row is Map && !Row.Get("disabled", false), "the real visible predecessor is admitted before withdrawal")
+				if Mode == "withdraw-held"
+					NativeOwner["platforms"] := ["linux"]
+				else
+					Hidden["platforms"] := ["ahk"]
+				AssertEqual(false, Row["action"].Call())
+				AssertEqual(0, State["actions"])
+				AssertEqual(0, State["foreign"])
+				if Mode == "withdraw-held" {
+					NativeOwner["platforms"] := ["ahk"]
+					AssertEqual("native-ack", Row["action"].Call())
+					AssertEqual(1, State["actions"])
+				}
+			case "checkbox":
+				Hidden["type"] := "check", NativeOwner["type"] := "check"
+				Row := MenuRenderer_CheckRow(Key, "owned", Commands, Getters)
+				Assert(Row is Map)
+				AssertEqual(t("button.ok"), Row["label"])
+				Assert(Row["checked"] && !Row.Get("disabled", false))
+				AssertEqual(0, State["foreign"])
+				Hidden["platforms"] := ["ahk"]
+				AssertEqual(false, MenuRenderer_CheckRow(Key, "owned", Commands, Getters))
+				AssertEqual(false, Row["action"].Call())
+				AssertEqual(0, State["actions"])
+			case "status":
+				Rows := MenuRenderer_StatusRows(Key, "owned", "unavailable")
+				Assert(Rows is Array && Rows.Length == 1)
+				AssertEqual(t("button.ok"), Rows[1]["label"])
+				Assert(Rows[1]["disabled"] && !Rows[1].Has("action"))
+				Hidden["platforms"] := ["ahk"]
+				AssertEqual(false, MenuRenderer_StatusRows(Key, "owned", "unavailable"))
+				Hidden["platforms"] := ["hs"], NativeOwner["platforms"] := ["linux"]
+				AssertEqual(false, MenuRenderer_StatusRows(Key, "owned", "unavailable"))
+				AssertEqual(0, State["native"])
+				AssertEqual(0, State["foreign"])
+				AssertEqual(0, State["actions"])
+		}
+	} finally {
+		Root.Delete(Key)
+	}
+}
+for Mode in ["hidden-first", "native-first", "duplicate-visible", "multiple-hidden", "withdraw-held", "ambiguous-held", "checkbox", "status"]
+	Test("native menu identity: " . Mode . " (native-visible-lookup)", _MPL_NativeLookup.Bind(Mode))

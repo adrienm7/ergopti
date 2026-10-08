@@ -2501,7 +2501,7 @@ _Updater_BuildStagingWorkerScript() {
 		. '  if ($ExpectedSize -gt 0 -and $ActualSize -ne $ExpectedSize) { throw "Content-Length mismatch" }' . "`n"
 		. '  if ($ActualSize -lt $MinimumSize) { $State.Reason="verify";throw "Downloaded file is too small" }' . "`n"
 		. '  if ($ExpectedSha256 -cnotmatch "^[0-9a-f]{64}$") { $State.Reason="verify";throw "Missing or invalid trusted SHA-256 digest" }' . "`n"
-		. '  $ActualDigest=(Get-FileHash -LiteralPath $NewExe -Algorithm SHA256).Hash.ToLowerInvariant()' . "`n"
+		. '  $ActualDigest=& { $HashStream=$null; $Hasher=[Security.Cryptography.SHA256]::Create(); try { $HashStream=[IO.File]::Open($NewExe,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read); [BitConverter]::ToString($Hasher.ComputeHash($HashStream)).Replace("-","").ToLowerInvariant() } finally { try { if ($null -ne $HashStream) { $HashStream.Dispose() } } finally { $Hasher.Dispose() } } }' . "`n"
 		. '  $null=Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State' . "`n"
 		. '  if ($ActualDigest -cne $ExpectedSha256) { $State.Reason="verify";throw "SHA-256 digest mismatch" }' . "`n"
 		. '  $SwapSource=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($SwapScriptPayload))' . "`n"

@@ -259,3 +259,8 @@ helpers.describe("menu: no off-platform explanation is rendered on linux", funct
 	end)
 
 end)
+
+require("test.menu_platform_lookup").register(helpers, "linux")
+
+
+require("test.menu_native_composition").register(helpers, "linux")

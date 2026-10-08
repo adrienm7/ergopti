@@ -820,16 +820,13 @@ function M.generate(ctx, menu_mods, actions)
 			return about_item and { about_item } or {}
 		end,
 		["reload"]          = function()
-			-- Strip the leading emoji token — emoji render poorly in native macOS menu bars
 			local row = ManifestMenu.command_row("top_level", "reload", { reload = actions.reload })
 			if not row then return {} end
-			row.label = "↺ " .. row.label:gsub("^%S+ ", "")
 			return { row }
 		end,
 		["quit"]            = function()
 			local row = ManifestMenu.command_row("top_level", "quit", { quit = actions.quit })
 			if not row then return {} end
-			row.label = "✕ " .. row.label:gsub("^%S+ ", "")
 			return { row }
 		end,
 		["debug"]           = function()
@@ -910,9 +907,8 @@ function M.generate(ctx, menu_mods, actions)
 	-- pcall-isolated like every component builder above — an exception here must
 	-- degrade to "no download item", not take down the whole menu-build pipeline.
 	--
-	-- Prepended AFTER the render, in the hs.menubar shape: it is a transient
-	-- progress row the LLM module owns and rebuilds on its own timer, not a row of
-	-- the declared menu.
+	-- The native AI owner returns its finished hs.menubar row. Canonical root
+	-- composition owns its transient placement without converting it to DATA.
 	local _dl_item = nil
 	if type(ctx.llm_handler) == "table" and type(ctx.llm_handler.build_download_item) == "function" then
 		local ok_dl, dl_result = pcall(ctx.llm_handler.build_download_item)
@@ -922,9 +918,10 @@ function M.generate(ctx, menu_mods, actions)
 			Logger.error(LOG, string.format("Error building LLM download item: %s.", tostring(dl_result)))
 		end
 	end
-	if _dl_item then
-		table.insert(rendered, 1, { title = "-" })
-		table.insert(rendered, 1, _dl_item)
+	local compose_download = ManifestMenu.native_composition("macos_download_root")
+	if type(compose_download) ~= "function"
+		or compose_download({ download = _dl_item and { _dl_item } or {}, body = rendered }) ~= true then
+		Logger.error(LOG, "Declared download root composition refused.")
 	end
 
 	-- This is the single highest-blast-radius call in the whole build pipeline:
@@ -932,9 +929,8 @@ function M.generate(ctx, menu_mods, actions)
 	-- here would unwind past every component built above and turn one broken
 	-- badge render into a total menu-rebuild failure.
 	--
-	-- It too runs after the render: the badge is an IMAGE with no text, and a
-	-- provider row with an empty label is dropped by the renderer — correctly, for
-	-- every row but this one.
+	-- Its native owner captures the badge image after sizing the completed root.
+	-- Canonical completed-row composition then owns badge/boundary/body order.
 	local ok_badge, badge_err = pcall(CanvasBadge.prepend_to, rendered, ctx, function()
 		if ctx and ctx.script_control then
 			if type(ctx.script_control.toggle_script_control) == "function" then pcall(ctx.script_control.toggle_script_control) end

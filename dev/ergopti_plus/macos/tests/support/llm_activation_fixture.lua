@@ -20,6 +20,7 @@ local OWNED_MODULES = {
 	"modules.llm",
 	"ui.menu.menu_llm.models_manager",
 	"ui.menu.menu_llm.profiles_manager",
+	"modules.llm.profiles",
 	"ui.menu.menu_llm.settings_manager",
 	"ui.menu.menu_llm.temperature_panel",
 	"ui.menu.menu_llm.streaming_panel",
@@ -111,6 +112,7 @@ local function build_fixture(backend, save_results, options)
 		llm_reset_on_nav = true,
 		llm_active_profile = "basic",
 		llm_profile_shortcuts = {},
+		llm_user_profiles = {},
 	}
 	local last_attempted_enabled = false
 	local runtime_enabled = false
@@ -192,9 +194,16 @@ local function build_fixture(backend, save_results, options)
 			return options.offer_pick(dialog)
 		end,
 	}
+	local locale_file = assert(io.open(helpers.shared("data/locales/en.json"), "r"))
+	local profile_strings = assert(require("json").decode(locale_file:read("*a")))
+	assert(locale_file:close())
+	local function fixture_caption(key)
+		if key:match("^menu%.profiles%.") or key:match("^llm%.profile%.") then return profile_strings[key] or key end
+		return key
+	end
 	-- format keeps its arguments visible: "key|arg1|arg2"
 	package.loaded["infra.i18n"] = {
-		get = function(key) return key end,
+		get = fixture_caption,
 		format = function(key, ...)
 			local parts = { key }
 			local args = table.pack(...)
@@ -305,6 +314,7 @@ local function build_fixture(backend, save_results, options)
 		calls.models_constructed = (calls.models_constructed or 0) + 1
 		return models
 	end }
+	local genuine_profiles_new
 	package.loaded["ui.menu.menu_llm.profiles_manager"] = {
 		new = function(deps)
 			calls.profiles_constructed = (calls.profiles_constructed or 0) + 1
@@ -319,7 +329,11 @@ local function build_fixture(backend, save_results, options)
 				return strict_result(options.profile_constructor_mode,
 					"profile constructor")
 			end
-			return { scope_idle = function() return true end, get_menu_item = function() return {} end }
+			local manager = genuine_profiles_new(deps, models)
+			-- The real constructor owns recovery gates; restore only the explicit fault injections afterward.
+			if type(options.delete_recovery_gate) == "function" then deps.settle_profile_delete_recovery = options.delete_recovery_gate end
+			if type(options.candidate_recovery_gate) == "function" then deps.settle_profile_candidate_recovery = options.candidate_recovery_gate end
+			return manager
 		end,
 	}
 	package.loaded["ui.menu.menu_llm.settings_manager"] = {
@@ -424,6 +438,7 @@ local function build_fixture(backend, save_results, options)
 		template_rows = presentation_renderer.template_rows,
 		get_array = presentation_renderer.get_array,
 		render_rows = function(rows, slot)
+			if slot == "llm_profile" then return presentation_renderer.render_rows(rows, slot) end
 			if slot == "llm_generation_settings" then return native_renderer.render_rows(rows, slot) end
 			return rows
 		end,
@@ -433,6 +448,21 @@ local function build_fixture(backend, save_results, options)
 			return {}
 		end,
 	}
+	local profile_constructor = package.loaded["ui.menu.menu_llm.profiles_manager"]
+	local core = package.loaded["modules.llm"]
+	core.BUILTIN_PROFILES = require("modules.llm.profiles").BUILTIN_PROFILES
+	calls.profile_constructor_sync = {}
+	core.set_user_profiles = function()
+		calls.profile_constructor_sync[#calls.profile_constructor_sync + 1] = "users"
+		return true
+	end
+	core.set_active_profile = function()
+		calls.profile_constructor_sync[#calls.profile_constructor_sync + 1] = "active"
+		return true
+	end
+	package.loaded["ui.menu.menu_llm.profiles_manager"] = nil
+	genuine_profiles_new = require("ui.menu.menu_llm.profiles_manager").new
+	package.loaded["ui.menu.menu_llm.profiles_manager"] = profile_constructor
 	-- The menu reaches the MLX runtime only through its selection entry.
 	local function mlx_selection_bootstrap(callback)
 		calls.bootstrap = calls.bootstrap + 1
@@ -726,7 +756,15 @@ end
 --- @param options table|nil Fault injection and runtime options.
 --- @param callback function Receives action, state and observed calls.
 return function(backend, save_results, options, callback)
-	return helpers.with_fresh_modules(OWNED_MODULES, function()
-		return callback(build_fixture(backend, save_results, options))
-	end)
+	local predecessor = {}; for name, value in pairs(package.loaded) do predecessor[name] = value end
+	local results = table.pack(xpcall(function()
+		return helpers.with_fresh_modules(OWNED_MODULES, function()
+			return callback(build_fixture(backend, save_results, options))
+		end)
+	end, debug.traceback))
+	-- Genuine profile loading may require fresh transitive children; restore every exact raw predecessor.
+	for name in pairs(package.loaded) do if rawget(predecessor, name) == nil then package.loaded[name] = nil end end
+	for name, value in pairs(predecessor) do package.loaded[name] = value end
+	if not results[1] then error(results[2], 0) end
+	return table.unpack(results, 2, results.n)
 end

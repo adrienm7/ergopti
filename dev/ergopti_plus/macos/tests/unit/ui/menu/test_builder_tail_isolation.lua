@@ -135,3 +135,112 @@ helpers.describe("Builder.generate: tail calls (download item, canvas badge) are
 		helpers.assert_true(logged, "Logger.error must fire naming the canvas badge failure")
 	end)
 end)
+
+
+--- Exercises the actual two lifecycle builders through canonical source rows.
+--- @param body function Receives a genuine build closure, root, i18n and actions.
+local function with_lifecycle_root(body)
+	return helpers.with_stub_scope({ "ui.menu.builder", "ui.menu.canvas_badge", "infra.manifest_menu",
+		"menu.renderer", "infra.i18n", "infra.paths", "infra.logger" }, function()
+		local logger = make_error_capturing_logger()
+		package.loaded["infra.logger"] = logger
+		helpers.load_with_stubs("ui.menu.builder")
+		local renderer = require("infra.manifest_menu")
+		local root = renderer.get_root()
+		local commands = {}
+		for _, row in ipairs(root.top_level) do
+			if row.id == "reload" or row.id == "quit" then commands[#commands + 1] = row end
+		end
+		root.top_level = commands
+		-- Canvas allocation has its own native owner/tests. This fixture observes
+		-- only the actual completed command rows handed to that native boundary.
+		package.loaded["ui.menu.canvas_badge"] = { prepend_to = function() end }
+		package.loaded["ui.menu.builder"] = nil
+		local builder = require("ui.menu.builder")
+		local actions = make_actions()
+		local context = { config = { log_level = 2 } }
+		body(function() return builder.generate(context, {}, actions) end, root, require("infra.i18n"), actions)
+	end)
+end
+
+--- Reads independent source locale/caption data without regenerating expectations.
+--- @param relative string Exact shared resource.
+--- @return table
+local function lifecycle_json(relative)
+	local file = assert(io.open(helpers.shared(relative), "rb"))
+	local raw = file:read("*a")
+	file:close()
+	return require("json").decode(raw)
+end
+
+helpers.describe("root lifecycle commands own declared Mac captions and retained native delivery", function()
+	for _, locale in ipairs({ "ar", "cs", "da", "de", "en", "es", "fr", "he", "hi", "it", "ja",
+		"ko", "nl", "no", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }) do
+		helpers.it("preserves independently frozen Reload/Quit captions and native acknowledgments: " .. locale, function()
+			with_lifecycle_root(function(build, _, i18n, actions)
+				local prior = lifecycle_json("tests/corpus/menus/macos_lifecycle_command_captions.json").captions[locale]
+				local strings = lifecycle_json("data/locales/" .. locale .. ".json")
+				i18n.get = function(key) return strings[key] or key end
+				local calls = {}
+				actions.reload = function(value) calls[#calls + 1] = { "reload", value }; return false end
+				actions.quit = function(value) calls[#calls + 1] = { "quit", value }; return true end
+				local rows = build()
+				helpers.assert_eq(#rows, 2, "exactly one native-visible row per command")
+				helpers.assert_eq(rows[1].title, prior.reload.macos)
+				helpers.assert_eq(rows[2].title, prior.quit.macos)
+				helpers.assert_true(rows[1].disabled ~= true and rows[2].disabled ~= true)
+				helpers.assert_eq(rows[1].fn("reload-arg"), false)
+				helpers.assert_eq(rows[2].fn("quit-arg"), true)
+				helpers.assert_eq(calls, { { "reload", "reload-arg" }, { "quit", "quit-arg" } })
+			end)
+		end)
+	end
+		helpers.it("a changed declared caption survives without native prefixing or token stripping", function()
+		with_lifecycle_root(function(build, root, i18n)
+			for _, row in ipairs(root.top_level) do
+				for _, platform in ipairs(row.platforms or {}) do
+					if platform == "hs" then row.i18n = "button.cancel" end
+				end
+			end
+			local rows = build()
+			helpers.assert_eq(#rows, 2)
+			helpers.assert_eq(rows[1].title, i18n.get("button.cancel"))
+			helpers.assert_eq(rows[2].title, i18n.get("button.cancel"))
+		end)
+	end)
+		helpers.it("withdrawing the visible declaration blocks an already rendered callback", function()
+		with_lifecycle_root(function(build, root, _, actions)
+			local called = 0
+			actions.reload = function() called = called + 1; return true end
+			local rows = build()
+			helpers.assert_eq(#rows, 2)
+			helpers.assert_true(rows[1].disabled ~= true)
+			for _, row in ipairs(root.top_level) do
+				if row.id == "reload" and row.i18n == "menu.global.reload_macos" then row.platforms = { "linux" } end
+			end
+			helpers.assert_eq(rows[1].fn(), false)
+			helpers.assert_eq(called, 0)
+		end)
+	end)
+		helpers.it("visible ambiguity refuses a command while its hidden sibling remains harmless", function()
+		with_lifecycle_root(function(build, root, _, actions)
+			local called = 0
+			actions.reload = function() called = called + 1; return true end
+			local initial = build()
+			helpers.assert_eq(#initial, 2)
+			for _, row in ipairs(root.top_level) do
+				if row.id == "reload" and row.i18n == "menu.global.reload" then row.platforms = { "hs" } end
+			end
+			helpers.assert_eq(initial[1].fn(), false)
+			helpers.assert_eq(called, 0)
+		end)
+	end)
+		helpers.it("missing native Reload owner never creates a clickable row", function()
+		with_lifecycle_root(function(build, _, _, actions)
+			actions.reload = nil
+			local rows = build()
+			helpers.assert_eq(#rows, 1)
+			helpers.assert_type(rows[1].fn, "function", "the native Quit owner survives")
+		end)
+	end)
+end)

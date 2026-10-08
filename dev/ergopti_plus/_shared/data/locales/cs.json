@@ -3242,5 +3242,19 @@
 	"physical_shortcuts.position_unavailable": "Tato pozice klávesy zde není dostupná.",
 	"physical_shortcuts.windows_unavailable": "Ve Windows zatím nedostupné: Editor fyzických zkratek zatím není dostupný ve Windows.",
 	"physical_shortcuts.collision": "Tato kombinace kláves se již používá. Vyberte jinou.",
-	"physical_shortcuts.window_unavailable": "Toto okno není dostupné: Zkuste je znovu otevřít."
+	"physical_shortcuts.window_unavailable": "Toto okno není dostupné: Zkuste je znovu otevřít.",
+	"gestures.system.conflicts_caption": "⚠ Možné konflikty: %s",
+	"gestures.system.pinch_enabled": "Systémové gesto sevření : Zapnuto",
+	"gestures.system.pinch_disabled": "Systémové gesto sevření : Zakázáno",
+	"gestures.system.pinch_unknown": "Systémové gesto sevření : Systémová gesta: neověřena",
+	"gestures.system.slot_unknown_caption": "%s — Systémová gesta: neověřena",
+	"gestures.system.slot_configured_caption": "%s — Nastaveno pro ErgoptiPlus",
+	"gestures.system.slot_not_configured_caption": "%s — Nenastaveno pro ErgoptiPlus",
+	"menu.global.reload_macos": "↺ Znovu načíst",
+	"menu.global.quit_macos": "✕ Ukončit",
+	"menu.layout.pause_picker_caption": "  ↳ Rozložení když skript pozastaven : %s",
+	"menu.layout.resume_picker_caption": "  ↳ Rozložení když skript aktivní : %s",
+	"menu.layout.native_variant_caption": "%s v%s",
+	"app_picker.agent_remove_marker": "✗",
+	"app_picker.agent_exclude_current_caption": "Vyloučit %s (aktuální)"
 }

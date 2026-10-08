@@ -3242,5 +3242,19 @@
 	"physical_shortcuts.position_unavailable": "Denna tangentposition är inte tillgänglig här.",
 	"physical_shortcuts.windows_unavailable": "Ännu inte för Windows: Redigeraren för fysiska kortkommandon är ännu inte tillgänglig i Windows.",
 	"physical_shortcuts.collision": "Denna tangentkombination används redan. Välj en annan.",
-	"physical_shortcuts.window_unavailable": "Detta fönster är inte tillgängligt: Försök att öppna det igen."
+	"physical_shortcuts.window_unavailable": "Detta fönster är inte tillgängligt: Försök att öppna det igen.",
+	"gestures.system.conflicts_caption": "⚠ %s möjliga konflikter",
+	"gestures.system.pinch_enabled": "Systemets nypgest : Aktiverad",
+	"gestures.system.pinch_disabled": "Systemets nypgest : Inaktiverad",
+	"gestures.system.pinch_unknown": "Systemets nypgest : Systemgester: inte kontrollerade",
+	"gestures.system.slot_unknown_caption": "%s — Systemgester: inte kontrollerade",
+	"gestures.system.slot_configured_caption": "%s — Konfigurerat för ErgoptiPlus",
+	"gestures.system.slot_not_configured_caption": "%s — Inte konfigurerat för ErgoptiPlus",
+	"menu.global.reload_macos": "↺ Läs in på nytt",
+	"menu.global.quit_macos": "✕ Avsluta",
+	"menu.layout.pause_picker_caption": "  ↳ Layout när skriptet är pausat : %s",
+	"menu.layout.resume_picker_caption": "  ↳ Layout när skriptet är aktivt : %s",
+	"menu.layout.native_variant_caption": "%s v%s",
+	"app_picker.agent_remove_marker": "✗",
+	"app_picker.agent_exclude_current_caption": "Uteslut %s (aktuell)"
 }
