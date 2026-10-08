@@ -7,6 +7,17 @@
 #define main fixture_receiver_entrypoint
 #include "native_appleevent_probe_receiver.c"
 #undef main
+#define main fixture_sender_entrypoint
+#define probe_class fixture_sender_class
+#define probe_event fixture_sender_event
+#define nonce_parameter fixture_sender_parameter
+#define valid_nonce fixture_sender_valid_nonce
+#include "native_appleevent_probe_sender.c"
+#undef valid_nonce
+#undef nonce_parameter
+#undef probe_event
+#undef probe_class
+#undef main
 #include <assert.h>
 
 @interface RegistrationProbe : NSObject
@@ -125,8 +136,53 @@ int main(void) {
         assert(before.available == 0 && before.policy == 3);
         assert(optionalUnavailable.setCalls == 1 && optionalUnavailable.readCalls == 3);
         assert_private_probe_event();
+        /* The sender's independent actual registration body has the same refusal coverage. */
+        assert(admit_sender_appkit(nil) == 1);
+        for (unsigned int mode = 0; mode < 5; mode++) {
+            RegistrationProbe *sender = [RegistrationProbe new];
+            sender.initialPolicy = mode >= 3 ? NSApplicationActivationPolicyAccessory : NSApplicationActivationPolicyRegular;
+            sender.acceptsPolicy = mode == 1 || mode == 2;
+            sender.observedPolicy = mode == 1 || mode == 4 ? NSApplicationActivationPolicyRegular : NSApplicationActivationPolicyAccessory;
+            const int expected[] = {2, 3, 0, 0, 3};
+            assert(admit_sender_appkit((NSApplication *)sender) == expected[mode]);
+            assert(sender.setCalls == (mode >= 3 ? 0 : 1));
+        }
+        assert(sender_identity_equal(NULL, NULL, kSecCodeInfoIdentifier, CFStringGetTypeID()) == -1);
+        const void *keys[] = {kSecCodeInfoIdentifier};
+        const void *values[] = {CFSTR("independent-identifier")};
+        CFDictionaryRef matching = CFDictionaryCreate(kCFAllocatorDefault, keys, values, 1,
+            &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+        assert(matching != NULL);
+        assert(sender_identity_equal(matching, matching, kSecCodeInfoIdentifier, CFStringGetTypeID()) == 1);
+        assert(sender_identity_equal(matching, matching, kSecCodeInfoTeamIdentifier, CFStringGetTypeID()) == -1);
+        assert(sender_identity_equal(matching, matching, kSecCodeInfoIdentifier, CFDataGetTypeID()) == -1);
+        const void *different_values[] = {CFSTR("different-identifier")};
+        CFDictionaryRef different = CFDictionaryCreate(kCFAllocatorDefault, keys, different_values, 1,
+            &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+        assert(different != NULL);
+        assert(sender_identity_equal(matching, different, kSecCodeInfoIdentifier, CFStringGetTypeID()) == 0);
+        const UInt8 first_bytes[] = {0}, second_bytes[] = {1};
+        CFDataRef first_hash = CFDataCreate(kCFAllocatorDefault, first_bytes, sizeof(first_bytes));
+        CFDataRef second_hash = CFDataCreate(kCFAllocatorDefault, second_bytes, sizeof(second_bytes));
+        assert(first_hash != NULL && second_hash != NULL);
+        const void *hash_keys[] = {kSecCodeInfoUnique};
+        const void *first_values[] = {first_hash}, *second_values[] = {second_hash};
+        CFDictionaryRef first = CFDictionaryCreate(kCFAllocatorDefault, hash_keys, first_values, 1,
+            &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+        CFDictionaryRef second = CFDictionaryCreate(kCFAllocatorDefault, hash_keys, second_values, 1,
+            &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+        assert(first != NULL && second != NULL);
+        assert(sender_identity_equal(first, first, kSecCodeInfoUnique, CFDataGetTypeID()) == 1);
+        assert(sender_identity_equal(first, second, kSecCodeInfoUnique, CFDataGetTypeID()) == 0);
+        CFRelease(first); CFRelease(second); CFRelease(first_hash); CFRelease(second_hash);
+        CFRelease(different);
+        CFRelease(matching);
+        assert(observe_sender_policy(nil) == -1);
+        assert_private_probe_event();
         puts("native_appkit_registration_controls=6");
         puts("native_private_appleevent_controls=1");
+        puts("native_sender_registration_controls=6");
+        puts("native_sender_identity_controls=7");
         return 0;
     }
 }
