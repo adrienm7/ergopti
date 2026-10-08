@@ -555,6 +555,17 @@ ConfigMigrateClassify(Model, Registry, &Version) {
 	return "migrate"
 }
 
+; The canonical document owns metadata identity even when the legacy flat
+; operation model cannot address its dotted, inline or quoted source spelling.
+; Non-array metadata tables alone may classify a version; a scalar or table
+; array must never borrow a flattened member's current-version authority.
+_ConfigMigrateClassifyDocument(Document, Registry, &Version) {
+	Version := Registry["unstamped"]
+	if Document.Has("_meta") && !(Document["_meta"] is Map)
+		return "invalid"
+	return ConfigMigrateClassify(Document, Registry, &Version)
+}
+
 ; Runs every step at or above FromVersion that names Driver, then stamps the
 ; registry's current version. Mutates and returns Model.
 ConfigMigrateApplySteps(Model, Registry, Driver, FromVersion, Context := 0) {
@@ -687,15 +698,25 @@ ConfigMigratePlan(Source, Registry, Driver, Context := 0) {
 		_ConfigMigrateRecordValidateModel(Scan, Before)
 		; Raw native cells cannot distinguish dotted and quoted semantic aliases.
 		; This read-only proof leaves that model and every source byte intact.
-		TOML_ParseDocument(Source)
+		Document := TOML_ParseDocument(Source)
 	} catch as Err {
 		Plan["detail"] := "the migration record owner refused: " . Err.Message
 		return Plan
 	}
-	Outcome := ConfigMigrateClassify(Before, Registry, &Version)
+	Outcome := _ConfigMigrateClassifyDocument(Document, Registry, &Version)
 	Plan["version"] := Version
 	if (Outcome != "migrate") {
 		Plan["outcome"] := Outcome
+		return Plan
+	}
+	; Current canonical metadata needs no physical rewrite. An older version
+	; still needs the existing operation owner to address that exact stamp.
+	ConfigMigrateClassify(Before, Registry, &LegacyVersion)
+	if LegacyVersion != Version || (Document.Has("_meta")
+			&& Document["_meta"].Has("schema_version")
+			&& !(Before.Has("_meta") && Before["_meta"].Has("schema_version"))) {
+		Plan["outcome"] := "failed"
+		Plan["detail"] := "legacy metadata is not addressable by this migration owner"
 		return Plan
 	}
 	try _ConfigMigrateRecordValidateSources(Scan, Before, Registry, Driver, Version)
@@ -831,12 +852,12 @@ ConfigMigrateRun(FilePath, Registry := 0, Stamp := "", BackupFn := 0, PublishFn 
 			VersionSource := FSReadStrict(FilePath)
 			VersionScan := _ConfigMigrateRecordScan(VersionSource)
 			_ConfigMigrateRecordValidateModel(VersionScan, Before)
-			TOML_ParseDocument(VersionSource)
+			VersionDocument := TOML_ParseDocument(VersionSource)
 			if !ConfigMigrateSameModel(Before, _ConfigMigrateParse(VersionSource, "the version snapshot"))
 				return Refuse("failed", "the file changed while its physical version ownership was checked")
 		} catch as Err
 			return Refuse("failed", "the physical version owner refused: " . Err.Message)
-		Outcome := ConfigMigrateClassify(Before, Registry, &Version)
+		Outcome := _ConfigMigrateClassifyDocument(VersionDocument, Registry, &Version)
 		Result["from"] := Version
 		switch Outcome {
 			case "current":
@@ -852,6 +873,12 @@ ConfigMigrateRun(FilePath, Registry := 0, Stamp := "", BackupFn := 0, PublishFn 
 			case "unsupported":
 				return Refuse("unsupported", "no migration path from schema v" . Version)
 		}
+
+		ConfigMigrateClassify(Before, Registry, &LegacyVersion)
+		if LegacyVersion != Version || (VersionDocument.Has("_meta")
+				&& VersionDocument["_meta"].Has("schema_version")
+				&& !(Before.Has("_meta") && Before["_meta"].Has("schema_version")))
+			return Refuse("failed", "legacy metadata is not addressable by this migration owner")
 
 		Source := FSReadUtf8Exact(FilePath)
 		if !(Source is String)
