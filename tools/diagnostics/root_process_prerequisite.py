@@ -276,6 +276,19 @@ class PreflightTool:
         else:
             raise Refusal("preflight_tool_role")
         named = self.path.lstat()
+        # Name only the refused role and predicate; keep the original admission guard.
+        require(
+            named.st_uid == 0,
+            "preflight_compiler_owner" if role == "compiler" else "preflight_sdk_owner",
+        )
+        require(
+            not named.st_mode & 0o022,
+            "preflight_compiler_writable" if role == "compiler" else "preflight_sdk_writable",
+        )
+        require(
+            stat.S_ISREG(named.st_mode) if role == "compiler" else stat.S_ISDIR(named.st_mode),
+            "preflight_compiler_kind" if role == "compiler" else "preflight_sdk_kind",
+        )
         require(
             named.st_uid == 0
             and not named.st_mode & 0o022
@@ -909,6 +922,12 @@ def main():
                 "preflight_absolute_deadline",
                 "preflight_acquisition_deadline",
                 "preflight_apple_tool",
+                "preflight_compiler_owner",
+                "preflight_compiler_writable",
+                "preflight_compiler_kind",
+                "preflight_sdk_owner",
+                "preflight_sdk_writable",
+                "preflight_sdk_kind",
                 "preflight_child_already_reaped",
                 "preflight_child_unregistered",
                 "preflight_cleanup_deadline",
