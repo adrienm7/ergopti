@@ -136,7 +136,7 @@ final class KeyboardSourceTestSelection {
 			guard self?.isCurrent == true else { return }
 			// Distributed TIS notifications require the owning main run loop in its
 			// default/common mode. No timer, sleep, polling read, or selection retry.
-			let result = CFRunLoopRunInMode(kCFRunLoopDefaultMode, left, true)
+			let result = CFRunLoopRunInMode(CFRunLoopMode.defaultMode, left, true)
 			if result == .finished || result == .stopped { self?.poison() }
 		})
 

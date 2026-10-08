@@ -40,6 +40,13 @@ function M.start(ports, options, callback)
 	local remaining, budget_current, subscribe = budget.remaining_ms, budget.current, budget.on_cancel
 	local files_current = ports.files.current
 	local start_process, start_http = ports.process.start, ports.http.get_owned
+	local archive_factory = rawget(ports, "archive_factory")
+	local pinned = archive_factory ~= nil
+	local deadline, start_download = budget.deadline_ms, ports.http.download_output_owned
+	if pinned and (type(archive_factory) ~= "table" or type(archive_factory.native_ollama_artifact) ~= "function"
+		or type(deadline) ~= "function" or type(start_download) ~= "function") then
+		return empty_operation("install_retained_port_unavailable", callback)
+	end
 	local cancelled, subscribing, subscribed, delegate = false, false, false, nil
 	local function limit(local_budget)
 		local read, value = pcall(remaining)
@@ -75,7 +82,7 @@ function M.start(ports, options, callback)
 		if current() then result.timeout_ms = limit(value.timeout_ms) else result.timeout_ms = nil end
 		return result
 	end
-	local scoped = { files = ports.files, process = {}, http = {} }
+	local scoped = { files = ports.files, process = {}, http = {}, archive_factory = archive_factory }
 	function scoped.process.start(executable, arguments, value, done)
 		local admitted = stage_options(value)
 		if not admitted.timeout_ms then return empty_operation("install_budget_exhausted", done) end
@@ -86,8 +93,19 @@ function M.start(ports, options, callback)
 		if not admitted.timeout_ms then return empty_operation("install_budget_exhausted", done) end
 		return start_http(url, headers, admitted, done)
 	end
+	if pinned then
+		function scoped.http.download_output_owned(url, headers, target, value, done)
+			local admitted = stage_options(value)
+			local bounded, bound = pcall(deadline)
+			if not admitted.timeout_ms or not bounded or bound ~= value.absolute_deadline_ms then
+				return empty_operation("install_budget_exhausted", done)
+			end
+			return start_download(url, headers, target, admitted, done)
+		end
+	end
 	local captured = copy(options)
 	captured.authorized = current
+	if pinned then captured.budget = { current = budget_current, deadline_ms = deadline, on_cancel = subscribe } end
 	delegate = Installer.start(scoped, captured, callback)
 	if cancelled and not delegate:is_settled() then delegate:cancel() end
 	return delegate

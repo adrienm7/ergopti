@@ -26,6 +26,10 @@ local function updater(version, stored)
 	local config_path = "/virtual/updater-channel-test.toml"
 	local configured = stored and stored["updater.channel"]
 	package.loaded["adapters.file_system"] = setmetatable({
+		exists = function(path)
+			if path:match("/%.cache$") or path:match("/%.cache/ergopti_updater_etag_[^/]+%.txt$") then return true end
+			return fs.exists(path)
+		end,
 		read = function(path)
 			if path == config_path then
 				return configured and ('[updater]\nchannel = "' .. configured .. '"\n') or nil
@@ -104,12 +108,22 @@ helpers.describe("updater: a found release stays found", function()
 		M._http_client = {
 			get = function(_url, _headers, _options, callback)
 				respond(function(body, status, err)
-					callback({ ok = status == 200, body = body or "", status = status, error = err,
-					error_body = status == 304 and "" or nil })
+					local response = { ok = status == 200, body = body or "", status = status, error = err,
+						error_body = status == 304 and "" or nil }
+					if status == 200 or status == 304 then
+						-- This controlled server's final endpoint and validator are
+						-- literal evidence, never copied from expected request values.
+						response.etag_receipt = { format = "curl-etag-final-v1",
+							effective_url = "https://etag-fixture.invalid/channel/page-1", validator = '"CHANNEL"', associated = true,
+							conditional_sent = status == 304, sent_validator = status == 304 and '"CHANNEL"' or nil }
+						if status == 304 then helpers.assert_true(_options.etag_compare ~= nil, "the controlled 304 sent a cached validator") end
+					end
+					callback(response)
 				end)
 				return true
 			end,
 		}
+		M._http_client = require("tests.support.release_http_fixture").attach(M._http_client)
 		M.check_for_updates(nil, function(available, release, err)
 			result = { available = available, release = release, err = err }
 		end)

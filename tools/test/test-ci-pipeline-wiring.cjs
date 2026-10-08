@@ -218,6 +218,19 @@ const RAW_VHD_UPLOAD_TEXT = [
 ].join('\n');
 
 const STEP_CONDITIONS = [
+	[
+		LINUX_BOX,
+		'test-linux',
+		'Emit Configuration assertion from failed unit log',
+		"${{ failure() && !cancelled() && steps.linux_unit.outcome == 'failure' }}"
+	],
+	[
+		LINUX_BOX,
+		'test-linux',
+		'Upload failed unit log',
+		"${{ failure() && !cancelled() && steps.linux_unit.outcome == 'failure' }}"
+	],
+	[LINUX_BOX, 'e2e-linux', 'Qualify genuine Nix installed runtime', NOT_CANCELLED],
 	[LINUX_BOX, 'test-linux', 'Run manual official runtime and model acceptance', MANUAL_RUNTIME_IF],
 	[
 		LINUX_BOX,
@@ -226,9 +239,15 @@ const STEP_CONDITIONS = [
 		MANUAL_RUNTIME_EVIDENCE_IF
 	],
 	[LINUX_BOX, 'e2e-linux', 'Qualify native runtime prerequisites', NOT_CANCELLED],
+	[LINUX_BOX, 'e2e-linux', 'Qualify native retained FD SHA-256', NOT_CANCELLED],
+	[LINUX_BOX, 'e2e-linux', 'Prepare authenticated managed HTTP validation tools', NOT_CANCELLED],
+	[LINUX_BOX, 'e2e-linux', 'Qualify native managed HTTP public and retained output', NOT_CANCELLED],
+	[LINUX_BOX, 'e2e-linux', 'Qualify native updater archive pipeline', NOT_CANCELLED],
+	[LINUX_BOX, 'e2e-linux', 'Qualify archive crypto and bin parent source controls', NOT_CANCELLED],
 	[ENTRY, 'core', 'Install shared UI browsers', "matrix.suite == 'js'"],
 	[ENTRY, 'core', 'Test shared layer editor rendering', "matrix.suite == 'js'"],
 	[ENTRY, 'core', 'Test shared physical shortcut rendering', "matrix.suite == 'js'"],
+	[ENTRY, 'core', 'Test shared Versions installation rendering', "matrix.suite == 'js'"],
 	[ENTRY, 'validate', 'Check hotstring TOML files are sorted and formatted', NOT_CANCELLED],
 	[ENTRY, 'release', 'Create git tag', "steps.preflight.outputs.create_tag == 'true'"],
 	[
@@ -1414,6 +1433,26 @@ mustCatch(
 	'      - name: Omitted native distro unit raw log upload\n',
 	stepProblems
 );
+// The assertion annotation belongs only to the original failed unit run.
+// A skipped or renamed diagnostic must be observed by the normal wiring gate.
+for (const condition of ['', 'success()', 'failure()', 'always()', 'false']) {
+	const head = '      - name: Emit Configuration assertion from failed unit log\n';
+	mustCatch(
+		'Configuration assertion condition ' + condition,
+		LINUX_BOX,
+		head +
+			"        if: ${{ failure() && !cancelled() && steps.linux_unit.outcome == 'failure' }}\n",
+		head + (condition ? '        if: ' + condition + '\n' : ''),
+		stepProblems
+	);
+}
+mustCatch(
+	'missing Configuration assertion diagnostic',
+	LINUX_BOX,
+	'      - name: Emit Configuration assertion from failed unit log\n',
+	'      - name: Omitted Configuration assertion diagnostic\n',
+	stepProblems
+);
 // Upload only closed receipts: the owned script corpus contains newline names,
 // and recursively uploading its private fixture tree also exposes unnecessary data.
 const NATIVE_INVENTORY_ARTIFACT = 'Retain native Hammerspoon provider inventory';
@@ -2272,8 +2311,8 @@ for (const [what, rel, from, to] of [
 	[
 		'`|| true` after the Linux unit suite',
 		LINUX_BOX,
-		'-- luajit tests/run.lua\n',
-		'-- luajit tests/run.lua || true\n'
+		'-- luajit tests/run.lua 2>&1 | tee',
+		'-- luajit tests/run.lua || true 2>&1 | tee'
 	],
 	[
 		'`|| true` after the continued evidence verdict',

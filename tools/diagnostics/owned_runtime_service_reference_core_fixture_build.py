@@ -23,7 +23,7 @@ import uuid
 SOURCE_PINS = (
     (
         "tools/build/remap_runtime_build.py",
-        "f1cd9c3be1c3793a4fb829955406807dcb16df84542aa377af5ce167eb5faf7d",
+        "e8891edda6f25de3ab4361143c51ce55b4289368e6dfb69102f671681081d1d6",
     ),
     (
         "tools/build/remap_runtime_source.py",
@@ -35,7 +35,7 @@ SOURCE_PINS = (
     ),
     (
         "tools/diagnostics/hs274_native_build.py",
-        "aa54be49feca564a455bc0f1804939a8bf3658ddeb5f56a691a914114c69aee2",
+        "ff8de375cb2fc8a801a144974418300e8e290a1efe2107338972b937d659dd80",
     ),
 )
 MAX_BYTES = 128 * 1024 * 1024
@@ -468,6 +468,7 @@ def produce(repository, pristine, owner, seconds=300, *, current_program_source=
             result.products.append(current_program_source)
         result.fixed = _FixedInputs(repository)
         builder = result.fixed.module
+        metadata_token = builder.BASE._take_tool_metadata_token()
         factory = builder._source_factory()
         projection = builder._factory_operation(
             factory, factory.prepare_owned_source, Path(repository), Path(pristine), deadline
@@ -489,7 +490,13 @@ def produce(repository, pristine, owner, seconds=300, *, current_program_source=
             deadline,
         )
         result._current(deadline)
-        binary, acquisition = builder.BASE.acquire_xcodegen(result.owner.path, deadline)
+        binary, acquisition = (
+            builder.BASE.acquire_xcodegen(result.owner.path, deadline)
+            if metadata_token is None
+            else builder.BASE.acquire_xcodegen(
+                result.owner.path, deadline, metadata_token=metadata_token
+            )
+        )
         result.phases.append(acquisition)
         result._current(deadline)
         path = binary.resolve(strict=True)

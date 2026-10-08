@@ -10,6 +10,10 @@ import ssl
 import struct
 import warnings
 import importlib.util
+import inspect
+import urllib.error
+import urllib.parse
+import urllib.request
 import json
 import os
 import subprocess
@@ -769,10 +773,463 @@ class ControllerContract(unittest.TestCase):
         )
 
 
+SOURCE = MODULE_PATH
+API = "https://api.github.com/repos/yonaskolb/XcodeGen/releases/assets/478866069"
+ARCHIVE = "https://github.com/yonaskolb/XcodeGen/releases/download/2.46.0/xcodegen.zip"
+PURPOSE = "ERGOPTI_NATIVE_XCODEGEN_METADATA_TOKEN"
+SENTINEL = "ghs_SYNTHETIC_METADATA_CONTROL_ONLY"
+METADATA = json.dumps(
+    {
+        "id": 478866069,
+        "name": "xcodegen.zip",
+        "size": 4278764,
+        "digest": "sha256:4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806",
+        "browser_download_url": ARCHIVE,
+    }
+).encode()
+
+
+class Reply:
+    def __init__(self, url, body=b"{}", status=200):
+        self.url, self.body, self.status = url, body, status
+        self.headers = {"Content-Length": str(len(body))}
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *arguments):
+        return False
+
+    def geturl(self):
+        return self.url
+
+    def read(self, maximum):
+        result, self.body = self.body[:maximum], self.body[maximum:]
+        return result
+
+
+class MetadataCredentialContracts(unittest.TestCase):
+    def port(self):
+        self.assertIn(
+            "metadata_token",
+            inspect.signature(subject._download_tool_input).parameters,
+            "PREREQUISITE: new optional metadata API is not implemented",
+        )
+        return subject._download_tool_input
+
+    def validator(self):
+        value = getattr(subject, "_validated_tool_metadata_token", None)
+        self.assertTrue(callable(value), "PREREQUISITE: new token validator is not implemented")
+        return value
+
+    def download(
+        self,
+        *,
+        token=None,
+        metadata=True,
+        url=API,
+        body=b"{}",
+        error=None,
+        status=200,
+        final=None,
+        deadline=20.0,
+        clock=0.0,
+        tls_expired=False,
+    ):
+        port = self.port()
+        requests, handler_sets = [], []
+        current = [clock]
+
+        class Opener:
+            def open(self, request, *, timeout):
+                requests.append((request, timeout))
+                if error is not None:
+                    raise error
+                return Reply(final if final is not None else request.full_url, body, status)
+
+        def opener(*handlers):
+            handler_sets.append(handlers)
+            if tls_expired:
+                current[0] = deadline + 1
+            return Opener()
+
+        with (
+            mock.patch.object(subject.urllib.request, "build_opener", side_effect=opener),
+            mock.patch.object(subject.time, "monotonic", side_effect=lambda: current[0]),
+        ):
+            try:
+                result = port(url, 65536, deadline, metadata=metadata, metadata_token=token)
+                return result, requests, handler_sets, None
+            except subject.NativeBuildError as failure:
+                return None, requests, handler_sets, failure
+
+    def test_01_legacy_anonymous_download_remains_unchanged(self):
+        requests, handlers = [], []
+
+        class Opener:
+            def open(self, request, *, timeout):
+                requests.append((request, timeout))
+                return Reply(request.full_url)
+
+        def opener(*values):
+            handlers.extend(values)
+            return Opener()
+
+        with (
+            mock.patch.object(subject.urllib.request, "build_opener", side_effect=opener),
+            mock.patch.object(subject.time, "monotonic", return_value=0.0),
+        ):
+            data, receipt = subject._download_tool_input(API, 65536, 20.0, metadata=True)
+        self.assertEqual(data, b"{}")
+        self.assertEqual(len(requests), 1)
+        request, timeout = requests[0]
+        self.assertIsNone(request.get_header("Authorization"))
+        self.assertEqual(request.get_header("Accept"), "application/vnd.github+json")
+        self.assertEqual(request.get_header("X-github-api-version"), "2022-11-28")
+        self.assertEqual(timeout, 20.0)
+        self.assertTrue(any(type(h) is subject._PinnedToolRedirect for h in handlers))
+        self.assertTrue(
+            any(
+                isinstance(h, urllib.request.HTTPSHandler)
+                and h._context.verify_mode == ssl.CERT_REQUIRED
+                and h._context.check_hostname
+                for h in handlers
+            )
+        )
+        self.assertEqual(
+            receipt,
+            {"status": 200, "TLS": "default-verified", "final_host": "api.github.com", "bytes": 2},
+        )
+
+    def test_02_authenticated_exact_api_uses_one_bearer_request(self):
+        result, requests, handlers, failure = self.download(token=SENTINEL)
+        self.assertIsNone(failure)
+        self.assertEqual(len(requests), 1)
+        request, timeout = requests[0]
+        self.assertEqual(request.full_url, API)
+        self.assertTrue(
+            request.get_header("Authorization") == "Bearer " + SENTINEL,
+            "credential must be confined to the exact request",
+        )
+        self.assertEqual(timeout, 20.0)
+        self.assertEqual(result[0], b"{}")
+        self.assertTrue(
+            any(
+                isinstance(h, urllib.request.HTTPSHandler)
+                and h._context.verify_mode == ssl.CERT_REQUIRED
+                and h._context.check_hostname
+                for h in handlers[0]
+            )
+        )
+
+    def test_03_authenticated_wrong_routes_refuse_before_http(self):
+        for url in (
+            "http://api.github.com/repos/yonaskolb/XcodeGen/releases/assets/478866069",
+            API + "?x=1",
+            API + "#fragment",
+            API + "/",
+            API.replace("478866069", "1"),
+            API.replace("api.github.com", "api.github.com.invalid"),
+            API.replace("api.github.com", "api.github.com:444"),
+            API.replace("api.github.com", "user@api.github.com"),
+            ARCHIVE,
+        ):
+            with self.subTest(route=url):
+                _, requests, _, failure = self.download(token=SENTINEL, url=url)
+                self.assertIsNotNone(failure)
+                self.assertEqual(requests, [])
+                self.assertNotIn(SENTINEL, str(failure))
+
+    def test_04_authenticated_same_and_cross_origin_redirects_refuse(self):
+        _, requests, sets, failure = self.download(token=SENTINEL)
+        self.assertIsNone(failure)
+        handlers = [h for h in sets[0] if isinstance(h, urllib.request.HTTPRedirectHandler)]
+        self.assertEqual(len(handlers), 1)
+        for target in (
+            API,
+            "https://github.com/",
+            "https://objects.githubusercontent.com/",
+            "https://foreign.invalid/",
+        ):
+            with self.subTest(origin=urllib.parse.urlsplit(target).hostname):
+                self.assertIsNone(
+                    handlers[0].redirect_request(requests[0][0], None, 302, "redirect", {}, target)
+                )
+
+    def test_05_archive_is_anonymous_and_cannot_accept_a_metadata_credential(self):
+        result, requests, _, failure = self.download(metadata=False, url=ARCHIVE)
+        self.assertIsNone(failure)
+        self.assertEqual(result[0], b"{}")
+        self.assertIsNone(requests[0][0].get_header("Authorization"))
+        _, requests, _, failure = self.download(metadata=False, url=ARCHIVE, token=SENTINEL)
+        self.assertIsNotNone(failure)
+        self.assertEqual(requests, [])
+
+    def test_06_supplied_credentials_are_bounded_ascii_without_fallback(self):
+        validate = self.validator()
+        self.assertIsNone(validate(None))
+        self.assertTrue(validate(SENTINEL) == SENTINEL)
+        self.assertTrue(validate("A" * 4096) == "A" * 4096)
+        for value in (
+            "",
+            "A" * 4097,
+            "x\r\nInjected: value",
+            "x\x00",
+            "x\t",
+            " x",
+            "x ",
+            "é",
+            b"x",
+            True,
+            7,
+            [],
+        ):
+            with self.subTest(kind=type(value).__name__):
+                with self.assertRaises(subject.NativeBuildError):
+                    validate(value)
+
+    def test_07_bad_credentials_fail_before_http_without_reflection(self):
+        for value in ("", SENTINEL + "\n", "A" * 4097):
+            _, requests, _, failure = self.download(token=value)
+            self.assertIsNotNone(failure)
+            self.assertEqual(requests, [])
+            self.assertNotIn(SENTINEL, str(failure))
+
+    def test_08_http401_403_and_redirect_status_are_terminal_without_retry(self):
+        for code in (301, 302, 307, 401, 403):
+            error = urllib.error.HTTPError(API, code, SENTINEL, {"Authorization": SENTINEL}, None)
+            _, requests, _, failure = self.download(token=SENTINEL, error=error)
+            self.assertEqual(len(requests), 1)
+            self.assertEqual(failure.code, "xcodegen_transport")
+            self.assertEqual(
+                failure.transport_diagnostic, {"kind": "http_status", "http_status": code}
+            )
+            self.assertNotIn(SENTINEL, str(failure))
+            self.assertNotIn("Authorization", json.dumps(failure.transport_diagnostic))
+
+    def test_09_authenticated_final_route_cannot_change(self):
+        for final in (ARCHIVE, "https://api.github.com/other", API + "?changed=1"):
+            _, requests, _, failure = self.download(token=SENTINEL, final=final)
+            self.assertEqual(len(requests), 1)
+            self.assertIsNotNone(failure)
+
+    def test_10_authenticated_body_and_tls_deadlines_do_not_gain_budget(self):
+        _, requests, _, failure = self.download(token=SENTINEL, deadline=-1)
+        self.assertEqual(requests, [])
+        self.assertEqual(failure.code, "phase_deadline")
+        _, requests, _, failure = self.download(token=SENTINEL, tls_expired=True)
+        self.assertEqual(requests, [])
+        self.assertEqual(failure.code, "phase_deadline")
+        _, requests, _, failure = self.download(token=SENTINEL, body=b"x" * 65537)
+        self.assertEqual(len(requests), 1)
+        self.assertEqual(failure.code, "xcodegen_size")
+
+    def test_11_acquisition_sends_no_credential_on_the_archive_request(self):
+        self.assertIn(
+            "metadata_token",
+            inspect.signature(subject.acquire_xcodegen).parameters,
+            "PREREQUISITE: new acquisition API is not implemented",
+        )
+        requests = []
+
+        class Opener:
+            def open(self, request, *, timeout):
+                requests.append(request)
+                return Reply(request.full_url, METADATA if len(requests) == 1 else b"x")
+
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            mock.patch.object(subject.urllib.request, "build_opener", return_value=Opener()),
+            mock.patch.object(subject.time, "monotonic", return_value=0.0),
+        ):
+            owner = Path(directory).resolve()
+            owner.chmod(0o700)
+            with self.assertRaises(subject.NativeBuildError) as caught:
+                subject.acquire_xcodegen(owner, 20.0, metadata_token=SENTINEL)
+            self.assertEqual(caught.exception.code, "xcodegen_size")
+            self.assertEqual(len(requests), 2)
+            self.assertTrue(requests[0].get_header("Authorization") == "Bearer " + SENTINEL)
+            self.assertIsNone(requests[1].get_header("Authorization"))
+            row = json.loads((owner / "xcodegen_acquisition.receipt.json").read_text())
+            self.assertEqual(row["status"], "refused")
+            self.assertEqual(row["acquisition_stage"], "archive")
+            self.assertFalse((owner / "xcodegen-official.zip").exists())
+            self.assertFalse((owner / "xcodegen-package").exists())
+
+    def test_12_authenticated_wrong_metadata_and_duplicate_keys_still_refuse(self):
+        self.assertIn(
+            "metadata_token",
+            inspect.signature(subject.acquire_xcodegen).parameters,
+            "PREREQUISITE: new acquisition API is not implemented",
+        )
+        for body in (
+            b"{}",
+            b'{"id":478866069,"id":478866069}',
+            METADATA.replace(b"4278764", b"4278763"),
+        ):
+            requests = []
+
+            class Opener:
+                def open(self, request, *, timeout):
+                    requests.append(request)
+                    return Reply(request.full_url, body)
+
+            with (
+                tempfile.TemporaryDirectory() as directory,
+                mock.patch.object(subject.urllib.request, "build_opener", return_value=Opener()),
+                mock.patch.object(subject.time, "monotonic", return_value=0.0),
+            ):
+                owner = Path(directory).resolve()
+                owner.chmod(0o700)
+                with self.assertRaises(subject.NativeBuildError) as caught:
+                    subject.acquire_xcodegen(owner, 20.0, metadata_token=SENTINEL)
+                self.assertEqual(caught.exception.code, "xcodegen_metadata")
+                self.assertEqual(len(requests), 1)
+                self.assertEqual(
+                    json.loads((owner / "xcodegen_acquisition.receipt.json").read_text())[
+                        "acquisition_stage"
+                    ],
+                    "metadata",
+                )
+
+    def test_13_worker_consumes_purpose_credential_before_actual_posix_child(self):
+        self.assertTrue(
+            callable(getattr(subject, "_take_tool_metadata_token", None)),
+            "PREREQUISITE: new worker credential consumer is not implemented",
+        )
+        program = """import importlib.util, json, os, subprocess, sys
+spec=importlib.util.spec_from_file_location("isolated_metadata_consumer",sys.argv[1])
+m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+value=m._take_tool_metadata_token()
+child=subprocess.run([sys.executable,"-c","import os;print(int('ERGOPTI_NATIVE_XCODEGEN_METADATA_TOKEN' in os.environ))"],capture_output=True,text=True)
+print(json.dumps({"consumed":type(value) is str and len(value)>0,"parent_absent":'ERGOPTI_NATIVE_XCODEGEN_METADATA_TOKEN' not in os.environ,"child_absent":child.returncode==0 and child.stdout=='0\\n' and child.stderr==''}))
+"""
+        result = subprocess.run(
+            [sys.executable, "-c", program, str(SOURCE)],
+            env={"PATH": os.defpath, PURPOSE: SENTINEL},
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stderr, "")
+        self.assertEqual(
+            json.loads(result.stdout),
+            {"consumed": True, "parent_absent": True, "child_absent": True},
+        )
+        self.assertNotIn(SENTINEL, result.stdout + result.stderr)
+
+    def test_14_ambient_tokens_do_not_supply_absent_purpose_credential(self):
+        self.assertTrue(
+            callable(getattr(subject, "_take_tool_metadata_token", None)),
+            "PREREQUISITE: new worker credential consumer is not implemented",
+        )
+        program = """import importlib.util,json,sys
+spec=importlib.util.spec_from_file_location("isolated_ambient_consumer",sys.argv[1])
+m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+print(json.dumps({"absent":m._take_tool_metadata_token() is None}))
+"""
+        result = subprocess.run(
+            [sys.executable, "-c", program, str(SOURCE)],
+            env={
+                "PATH": os.defpath,
+                "GH_TOKEN": SENTINEL,
+                "GITHUB_TOKEN": SENTINEL,
+                "ERGOPTI_NATIVE_HS_METADATA_TOKEN": SENTINEL,
+            },
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stderr, "")
+        self.assertEqual(json.loads(result.stdout), {"absent": True})
+        self.assertNotIn(SENTINEL, result.stdout + result.stderr)
+
+
+class MetadataWorkerEntryContracts(unittest.TestCase):
+    def test_standalone_main_removes_credential_before_actual_posix_child(self):
+        program = """import importlib.util,json,os,subprocess,sys
+spec=importlib.util.spec_from_file_location("entry_consumer",sys.argv[1])
+m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+observed={}
+def compile_leaf(*args,**kwargs):
+ child=subprocess.run([sys.executable,"-c","import os;print(int('ERGOPTI_NATIVE_XCODEGEN_METADATA_TOKEN' in os.environ))"],capture_output=True,text=True)
+ observed.update(held=type(kwargs.get('metadata_token')) is str and len(kwargs['metadata_token'])>0,parent_absent='ERGOPTI_NATIVE_XCODEGEN_METADATA_TOKEN' not in os.environ,child_absent=child.returncode==0 and child.stdout=='0\\n' and child.stderr=='')
+m.compile_native=compile_leaf
+sys.argv=['owned-native-build','/not-acquired-source','/not-created-owner']
+status=m.main()
+print(json.dumps({'status':status,'observation':observed}))
+"""
+        result = subprocess.run(
+            [sys.executable, "-c", program, str(SOURCE)],
+            env={"PATH": os.defpath, PURPOSE: SENTINEL},
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stderr, "")
+        self.assertEqual(
+            json.loads(result.stdout),
+            {
+                "status": 0,
+                "observation": {"held": True, "parent_absent": True, "child_absent": True},
+            },
+        )
+        self.assertNotIn(SENTINEL, result.stdout + result.stderr)
+
+    def test_standalone_main_refuses_and_consumes_malformed_credential_before_compile(self):
+        program = """import importlib.util,json,os,sys
+spec=importlib.util.spec_from_file_location("entry_refusal",sys.argv[1])
+m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+observed=[]
+def compile_leaf(*args,**kwargs):observed.append('compile-entered')
+m.compile_native=compile_leaf
+sys.argv=['owned-native-build','/not-acquired-source','/not-created-owner']
+status=m.main()
+print(json.dumps({'status':status,'compile_absent':not observed,'parent_absent':'ERGOPTI_NATIVE_XCODEGEN_METADATA_TOKEN' not in os.environ}))
+"""
+        result = subprocess.run(
+            [sys.executable, "-c", program, str(SOURCE)],
+            env={"PATH": os.defpath, PURPOSE: SENTINEL + "\n"},
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(
+            result.stderr,
+            "Native compilation qualification refused: xcodegen_metadata_token; "
+            "Official tool metadata credential is malformed\n",
+        )
+        self.assertEqual(
+            json.loads(result.stdout),
+            {"status": 1, "compile_absent": True, "parent_absent": True},
+        )
+        self.assertNotIn(SENTINEL, result.stdout + result.stderr)
+
+
 if __name__ == "__main__":
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(ControllerContract)
     result = unittest.TextTestRunner(verbosity=2).run(suite)
     successful = result.testsRun == 53 and result.wasSuccessful() and not result.skipped
     if successful:
         print("PASS independent native build controller tests=53 failures=0 errors=0 skipped=0")
+    metadata_suite = unittest.defaultTestLoader.loadTestsFromTestCase(MetadataCredentialContracts)
+    metadata_result = unittest.TextTestRunner(verbosity=2).run(metadata_suite)
+    metadata_successful = (
+        metadata_result.testsRun == 14
+        and metadata_result.wasSuccessful()
+        and not metadata_result.skipped
+    )
+    if not metadata_successful:
+        raise SystemExit(1)
+    entry_suite = unittest.defaultTestLoader.loadTestsFromTestCase(MetadataWorkerEntryContracts)
+    entry_result = unittest.TextTestRunner(verbosity=2).run(entry_suite)
+    entry_successful = (
+        entry_result.testsRun == 2 and entry_result.wasSuccessful() and not entry_result.skipped
+    )
+    if not entry_successful:
+        raise SystemExit(1)
     raise SystemExit(0 if successful else 1)

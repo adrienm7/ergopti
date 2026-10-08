@@ -792,7 +792,15 @@ global _UpdaterDownloadArtifacts := 0
 global _UpdaterDownloadStartedTick := 0
 global _UpdaterStagingTransportCounter := 0
 global UPDATER_STAGING_ENV_MAX_CHARS := 7000
+; Application source-publication budget, not a Windows environment-block limit.
+; Eight individually bounded fragments admit the production worker with room
+; for growth while refusing an unbounded encoded source before any EnvSet.
+global UPDATER_STAGING_MAX_SCRIPT_CHUNKS := 8
 global _UpdaterSwapOwner := 0
+; Boot installs an admitted recovery claim before loading this module. Other
+; ordinary module consumers own an absent target; never overwrite a boot claim.
+if !IsSet(_UpdaterRecoveryPublishTarget)
+	global _UpdaterRecoveryPublishTarget := ""
 global _UpdaterExitIntent := 0
 global _UpdaterExitInvocation := 0
 global _UpdaterSwapTransactionCounter := 0
@@ -1495,22 +1503,42 @@ _Updater_ShowAvailableUpdateCallback(Json, Request, Terminal := 0, NotifyFn := 0
 ; The Versions window's observer of the install it asked for (a release chosen
 ; there, modules/updater/release_install.ahk), or 0. While one is set, the
 ; phases and failures of the transaction go to that window, which shows them
-; with a Retry button, instead of a modal box. Called as (Phase, ReasonKey).
+; with a Retry button. Called as (Phase, ReasonKey, optional FailureReceipt).
 global _UpdaterInstallObserver := 0
+global _UpdaterInstallObserverEpoch := 0
+; The shared failure interpreter and host presenter are initialized once at boot.
+; The private terminal owner never crosses a WebView or a worker command line.
+global _UpdaterManagedFailureContract := 0
+global _UpdaterManagedFailurePresenter := 0
+global _UpdaterManagedFailureRetireFn := 0
+global _UpdaterManagedFailureOwner := 0
 
 ; Tells the Versions window one phase of the install it follows: "installing",
 ; "restarting" or "failed" (which ends the following).
 ; @param Phase {String}
 ; @param ReasonKey {String} Page locale key of a failure.
 ; @returns {Boolean} True when a window follows this install.
-_Updater_NotifyInstallPhase(Phase, ReasonKey := "") {
-	global _UpdaterInstallObserver
-	Observer := _UpdaterInstallObserver
+_Updater_NotifyInstallPhase(Phase, ReasonKey := "", FailureReceipt := 0, ExpectedObserver := unset) {
+	global _UpdaterInstallObserver, _UpdaterInstallObserverEpoch
+	PreviousCritical := Critical("On")
+	try {
+		Observer := IsSet(ExpectedObserver) ? ExpectedObserver : _UpdaterInstallObserver
+		if IsObject(Observer) && Phase == "failed"
+			&& IsObject(_UpdaterInstallObserver) && _UpdaterInstallObserver == Observer {
+			_UpdaterInstallObserver := 0
+			_UpdaterInstallObserverEpoch += 1
+		}
+	} finally {
+		Critical(PreviousCritical)
+	}
 	if !IsObject(Observer)
 		return false
-	if (Phase == "failed")
-		_UpdaterInstallObserver := 0
-	try Observer.Call(Phase, ReasonKey)
+	try {
+		if FailureReceipt is Map
+			Observer.Call(Phase, ReasonKey, FailureReceipt)
+		else
+			Observer.Call(Phase, ReasonKey)
+	}
 	catch as Err
 		try LoggerError("Updater", "The Versions window's install observer raised: {1}.", Err.Message)
 	return true
@@ -1521,8 +1549,8 @@ _Updater_NotifyInstallPhase(Phase, ReasonKey := "") {
 ; @param MessageKey {String} Updater locale key of the modal box.
 ; @param ReasonKey {String} Page locale key of the window's failure.
 ; @param Icon {String} Modal box icon option.
-_Updater_ReportInstallFailure(MessageKey, ReasonKey, Icon := "Icon!") {
-	if _Updater_NotifyInstallPhase("failed", ReasonKey)
+_Updater_ReportInstallFailure(MessageKey, ReasonKey, Icon := "Icon!", FailureReceipt := 0) {
+	if _Updater_NotifyInstallPhase("failed", ReasonKey, FailureReceipt)
 		return
 	Ui_MsgBox(t(MessageKey), t("updater.window_title"), Icon)
 }
@@ -1536,12 +1564,275 @@ _Updater_StagingFailureIsVerification(Stdout) {
 	return (Stdout is String) && (InStr(Stdout, "SHA-256") || InStr(Stdout, "too small"))
 }
 
+
+; Configures only native callbacks. The UI translates the shared contract's
+; safe report; neither the envelope nor the retained owner is a page payload.
+Updater_ConfigureManagedFailurePresenter(Contract, Presenter, RetireFn := 0) {
+	global _UpdaterManagedFailureContract, _UpdaterManagedFailurePresenter
+	global _UpdaterManagedFailureRetireFn
+	if !HasMethod(Contract, "Classify") || !HasMethod(Contract, "Actions")
+		|| !HasMethod(Presenter, "Call")
+		throw TypeError("Invalid managed updater failure presenter")
+	_UpdaterManagedFailureContract := Contract
+	_UpdaterManagedFailurePresenter := Presenter
+	_UpdaterManagedFailureRetireFn := RetireFn
+}
+
+_Updater_GetManagedFailureOwner() {
+	global _UpdaterManagedFailureOwner
+	return _UpdaterManagedFailureOwner
+}
+
+; Versions binds its own private request and original release at dispatch; a
+; newer menu failure cannot become that window's safe report or retry owner.
+_Updater_GetManagedFailureOwnerFor(Request, Release) {
+	Owner := _Updater_GetManagedFailureOwner()
+	if !_Updater_ManagedFailureOwnerIsCurrent(Owner) || Type(Release) != "Object"
+		|| !Release.HasProp("RawJson") || !Release.HasProp("Tag")
+		|| Owner["request"] != Request
+		|| !(Release.RawJson is String) || !(Release.Tag is String)
+		|| StrCompare(Owner["release"].RawJson, Release.RawJson, true) != 0
+		|| StrCompare(Owner["release"].Tag, Release.Tag, true) != 0
+		return 0
+	return Owner
+}
+
+_Updater_ExactFailureField(Record, Name, Default := 0) {
+	if !(Record is Map)
+		return Default
+	for Key, Value in Record
+		if Key is String && StrCompare(Key, Name, true) == 0
+			return Value
+	return Default
+}
+
+; Parsing is after the existing epoch and process-completion fences. Unknown,
+; malformed or extra worker fields can never turn stdout text into a diagnosis.
+; The JSON codec maps both booleans and numbers to AHK integers. Admit this
+; private flag from its actual top-level JSON token, never from truthiness or
+; a regex that can borrow text from a nested receipt string.
+_Updater_StagingNativeDebtToken(Stdout) {
+	NativeDebt := false
+	Seen := Map()
+	Seen.CaseSense := "On"
+	Position := 1
+	_JsonSkipWs(&Stdout, &Position)
+	Position += 1
+	loop {
+		_JsonSkipWs(&Stdout, &Position)
+		if SubStr(Stdout, Position, 1) == "}"
+			return NativeDebt
+		Key := _JsonParseString(&Stdout, &Position, true)
+		if Seen.Has(Key)
+			throw ValueError("Duplicate private staging envelope field")
+		Seen[Key] := true
+		_JsonSkipWs(&Stdout, &Position)
+		Position += 1
+		_JsonSkipWs(&Stdout, &Position)
+		Start := Position
+		_JsonParseValue(&Stdout, &Position, 1)
+		if StrCompare(Key, "native_cleanup_debt", true) == 0 {
+			Token := SubStr(Stdout, Start, Position - Start)
+			if StrCompare(Token, "true", true) == 0
+				NativeDebt := true
+			else if StrCompare(Token, "false", true) == 0
+				NativeDebt := false
+			else
+				throw ValueError("Native cleanup flag is not a JSON boolean")
+		}
+		_JsonSkipWs(&Stdout, &Position)
+		if SubStr(Stdout, Position, 1) == ","
+			Position += 1
+	}
+}
+
+_Updater_ParseStagingFailure(Stdout) {
+	global _UpdaterManagedFailureContract
+	Unknown := Map("valid", false, "reason", "download", "receipt", Map(), "cleanup_debt", [], "native_cleanup_debt", false)
+	if !(Stdout is String) || StrLen(Stdout) > 4096 || _ManagedNetworkWindows_HasStoredNul(Stdout)
+		return Unknown
+	try Envelope := JsonParse(Stdout)
+	catch
+		return Unknown
+	if !(Envelope is Map) || Envelope.Count < 5 || Envelope.Count > 7
+		return Unknown
+	for Key in Envelope
+		if !(Key is String) || !RegExMatch(Key, "^(?:schema_version|state|operation|reason|receipt|cleanup_debt|native_cleanup_debt)$")
+			return Unknown
+	try NativeDebt := _Updater_StagingNativeDebtToken(Stdout)
+	catch
+		return Unknown
+	Version := _Updater_ExactFailureField(Envelope, "schema_version")
+	State := _Updater_ExactFailureField(Envelope, "state")
+	Operation := _Updater_ExactFailureField(Envelope, "operation")
+	if !(Version is Integer) || Version != 1 || !(State is String) || !(Operation is String)
+		|| StrCompare(State, "failed", true) != 0 || StrCompare(Operation, "download", true) != 0
+		return Unknown
+	Reason := _Updater_ExactFailureField(Envelope, "reason", "")
+	if !(Reason is String) || (StrCompare(Reason, "download", true) != 0
+		&& StrCompare(Reason, "verify", true) != 0 && StrCompare(Reason, "deadline", true) != 0)
+		return Unknown
+	Contract := _UpdaterManagedFailureContract
+	Admitted := _Updater_AdmitStagingReceipt(_Updater_ExactFailureField(Envelope, "receipt"), Contract)
+	if !(Admitted is Map)
+		return Unknown
+	Debt := []
+	if _Updater_ExactFailureField(Envelope, "cleanup_debt", -1) != -1 {
+		RawDebt := _Updater_ExactFailureField(Envelope, "cleanup_debt")
+		if !(RawDebt is Array) || RawDebt.Length > 6
+			return Unknown
+		for Entry in RawDebt {
+			if !(Entry is Map) || Entry.Count != 2
+				return Unknown
+			Resource := _Updater_ExactFailureField(Entry, "resource")
+			if !(Resource is String) || !RegExMatch(Resource,
+				"^(?:request|output|input|response|staged_executable|swap_worker)$")
+				return Unknown
+			CleanReceipt := _Updater_AdmitStagingReceipt(_Updater_ExactFailureField(Entry, "receipt"), Contract)
+			if !(CleanReceipt is Map)
+				return Unknown
+			Debt.Push(Map("resource", Resource, "receipt", CleanReceipt))
+		}
+	}
+	return Map("valid", true, "reason", Reason, "receipt", Admitted, "cleanup_debt", Debt, "native_cleanup_debt", NativeDebt)
+}
+
+_Updater_AdmitStagingReceipt(Receipt, Contract) {
+	if !(Receipt is Map) || Receipt.Count > 16
+		return 0
+	if !HasMethod(Contract, "Classify") || !Contract.HasProp("Policy")
+		return Map()
+	Admitted := Map()
+	Admitted.CaseSense := "On"
+	for Field, Value in Receipt {
+		Definition := _ManagedNetwork_Get(Contract.Policy["fields"], Field)
+		if !(Definition is Map) || !_ManagedNetwork_Scalar(Value, Definition)
+			|| (Value is String && StrLen(Value) > 128)
+			return 0
+		Admitted[Field] := Value
+	}
+	return Admitted
+}
+
+_Updater_NewManagedFailureOwner(Release, Request, AssetUrl, Digest, StagingEpoch, ExpectedObserver := unset) {
+	global _UpdaterInstallObserver
+	if !_Updater_RequestContextValid(Request) || Type(Release) != "Object"
+		|| !Release.HasProp("RawJson") || !Release.HasProp("Tag")
+		return 0
+	return Map("release", { RawJson: Release.RawJson, Tag: Release.Tag },
+		"request", Request, "asset_url", AssetUrl, "digest", Digest,
+		"staging_epoch", StagingEpoch, "terminal", false, "retired", false,
+		"install_observer", IsSet(ExpectedObserver) ? ExpectedObserver : _UpdaterInstallObserver)
+}
+
+_Updater_DispatchManagedFailureRetirement(Owner) {
+	global _UpdaterManagedFailureRetireFn
+	if HasMethod(_UpdaterManagedFailureRetireFn, "Call") {
+		try _UpdaterManagedFailureRetireFn.Call(Owner)
+		catch as Err
+			try LoggerWarn("Updater", "Managed failure retirement callback raised {1}; the old owner remains revoked.", Type(Err))
+	}
+}
+
+_Updater_RetireManagedFailure(ExpectedOwner := unset) {
+	global _UpdaterManagedFailureOwner
+	PreviousCritical := Critical("On")
+	try {
+		Owner := _UpdaterManagedFailureOwner
+		if IsSet(ExpectedOwner) && (!(Owner is Map) || Owner != ExpectedOwner)
+			return false
+		_UpdaterManagedFailureOwner := 0
+		if Owner is Map
+			Owner["retired"] := true
+	} finally {
+		Critical(PreviousCritical)
+	}
+	if Owner is Map
+		TimerSetCallback(_Updater_DispatchManagedFailureRetirement.Bind(Owner), -1)
+	return true
+}
+
+; Old pause/channel generations and a newer same-tag request cannot borrow this
+; terminal request's release identity or consent, even if its dialog stays open.
+_Updater_ManagedFailureOwnerIsCurrent(Owner) {
+	global _UpdaterManagedFailureOwner, _UpdaterSelfUpdateEpoch
+	global _UpdaterDownloadInProgress, _UpdaterDownloadWorker, _UpdaterSwapOwner
+	global _UpdaterRecoveryPublishTarget, UPDATER_REQUEST_POLICY_ALLOW
+	if !(Owner is Map) || !(_UpdaterManagedFailureOwner is Map)
+		|| Owner != _UpdaterManagedFailureOwner || !Owner.Get("terminal", false)
+		|| Owner.Get("retired", true) || Owner.Get("staging_epoch", 0) != _UpdaterSelfUpdateEpoch
+		|| _UpdaterDownloadInProgress || IsObject(_UpdaterDownloadWorker)
+		|| (_UpdaterSwapOwner is Map) || _UpdaterRecoveryPublishTarget != ""
+		return false
+	return _Updater_RequestPolicy(Owner["request"]) == UPDATER_REQUEST_POLICY_ALLOW
+}
+
+_Updater_RetryManagedFailure(Owner, Observer := unset) {
+	global BUNDLE_RELEASE_ASSET, _UpdaterInstallObserver
+	if !_Updater_ManagedFailureOwnerIsCurrent(Owner)
+		return false
+	Release := Owner["release"]
+	Asset := _Updater_FindAsset(Release.RawJson, BUNDLE_RELEASE_ASSET, Release.Tag)
+	if !IsObject(Asset) || StrCompare(Asset.Url, Owner["asset_url"], true) != 0
+		|| StrCompare(Asset.Digest, Owner["digest"], true) != 0
+		|| !_Updater_ManagedFailureOwnerIsCurrent(Owner)
+		return false
+	; The existing Critical reservation compares and claims this exact owner.
+	return _Updater_StartObservedInstall(Release, IsSet(Observer) ? Observer : _UpdaterInstallObserver, Owner["request"], Owner) == true
+}
+
+_Updater_PublishManagedFailure(Failure, Owner, StagingEpoch) {
+	global _UpdaterManagedFailureOwner, _UpdaterManagedFailurePresenter
+	global _UpdaterSelfUpdateEpoch, _UpdaterInstallObserver
+	Observer := Owner is Map ? Owner.Get("install_observer", 0) : _UpdaterInstallObserver
+	if Failure.Get("native_cleanup_debt", false)
+		try LoggerWarn("Updater", "Staging reported native resolver retirement debt; its owned process tree has physically retired.")
+	if Failure.Get("cleanup_debt", []).Length > 0
+		try LoggerWarn("Updater", "Staging reported {1} cleanup refusal(s); its process tree has physically retired.",
+			Failure["cleanup_debt"].Length)
+	if !_Updater_EndDownloadTransaction(StagingEpoch)
+		return false
+	PreviousCritical := Critical("On")
+	try {
+		if _UpdaterSelfUpdateEpoch != StagingEpoch
+			return false
+		if Owner is Map && Owner["staging_epoch"] == StagingEpoch {
+			Owner["terminal"] := true
+			Owner["failure"] := Failure
+			_UpdaterManagedFailureOwner := Owner
+		}
+	} finally {
+		Critical(PreviousCritical)
+	}
+	if Owner is Map && !_Updater_ManagedFailureOwnerIsCurrent(Owner)
+		return false
+	if Failure["reason"] == "verify" {
+		if !_Updater_NotifyInstallPhase("failed", "changelog_window.install_error_verify",
+			Failure["receipt"], Observer)
+			Ui_MsgBox(t("updater.install_error_download"), t("updater.window_title"), "Icon!")
+		return true
+	}
+	Observed := _Updater_NotifyInstallPhase("failed",
+		"changelog_window.install_error_download", Failure["receipt"], Observer)
+	if Owner is Map && !_Updater_ManagedFailureOwnerIsCurrent(Owner)
+		return false
+	if !Observed && HasMethod(_UpdaterManagedFailurePresenter, "Call") {
+		try {
+			if _UpdaterManagedFailurePresenter.Call(Failure, Owner) == true
+				return true
+		}
+	}
+	if !Observed
+		Ui_MsgBox(t("updater.install_error_download"), t("updater.window_title"), "Icon!")
+	return true
+}
+
 ; Dispatches the whole staging transaction to a child process. AHK's one
 ; interpreter thread is also the keyboard hook thread, so response-body COM,
 ; disk persistence, integrity checks and swap-script creation must never run here.
 ; This side only validates the request, launches/polls the worker and performs
 ; the final non-blocking process hand-off after the worker reports READY.
-_Updater_TryReserveDownloadTransaction(Request, BoundarySuspended) {
+_Updater_TryReserveDownloadTransaction(Request, BoundarySuspended, ExpectedFailureOwner := 0) {
 	global _UpdaterDownloadInProgress, _UpdaterSelfUpdateEpoch
 	global _UpdaterDownloadRequest, _UpdaterRecoveryPublishTarget
 	global _UpdaterDownloadStartedTick
@@ -1551,11 +1842,15 @@ _Updater_TryReserveDownloadTransaction(Request, BoundarySuspended) {
 		ShouldDrop: false,
 		RecoveryBusy: false,
 		DuplicateDownload: false,
+		RetryStale: false,
 		Epoch: 0
 	}
 	PreviousCritical := Critical("On")
 	try {
-		if (_Updater_RequestPolicy(Request, BoundarySuspended)
+		if ExpectedFailureOwner is Map && (!_Updater_ManagedFailureOwnerIsCurrent(ExpectedFailureOwner)
+			|| ExpectedFailureOwner["request"] != Request) {
+			Outcome.RetryStale := true
+		} else if (_Updater_RequestPolicy(Request, BoundarySuspended)
 			!= UPDATER_REQUEST_POLICY_ALLOW) {
 			Outcome.ShouldDrop := true
 		} else if (_UpdaterRecoveryPublishTarget != "") {
@@ -1563,6 +1858,10 @@ _Updater_TryReserveDownloadTransaction(Request, BoundarySuspended) {
 		} else if _UpdaterDownloadInProgress {
 			Outcome.DuplicateDownload := true
 		} else {
+			if ExpectedFailureOwner is Map
+				_Updater_RetireManagedFailure(ExpectedFailureOwner)
+			else
+				_Updater_RetireManagedFailure()
 			_UpdaterDownloadInProgress := true
 			Outcome.Epoch := ++_UpdaterSelfUpdateEpoch
 			_UpdaterDownloadRequest := Request
@@ -1579,18 +1878,20 @@ _Updater_TryReserveDownloadTransaction(Request, BoundarySuspended) {
 ; can pump lifecycle callbacks: if START itself is interrupted by Pause, there
 ; is deliberately no transaction for cancellation to terminate. The resumed
 ; reservation then observes stale provenance and closes START with WARNING.
-_Updater_BeginDownloadTransaction(Request, BoundarySuspended, Tag, AssetUrl) {
+_Updater_BeginDownloadTransaction(Request, BoundarySuspended, Tag, AssetUrl, ExpectedFailureOwner := 0) {
 	try LoggerStart("Updater", "Downloading update '{1}' from {2}…", Tag, AssetUrl)
 	try {
 		Outcome := _Updater_TryReserveDownloadTransaction(
-			Request, BoundarySuspended)
+			Request, BoundarySuspended, ExpectedFailureOwner)
 	} catch as Err {
 		try LoggerError("Updater", "Download reservation failed after START: {1}.", Err.Message)
 		throw Err
 	}
 	if Outcome.Reserved
 		return Outcome
-	if Outcome.ShouldDrop {
+	if Outcome.RetryStale {
+		try LoggerWarn("Updater", "Download retry cancelled because its exact terminal owner changed.")
+	} else if Outcome.ShouldDrop {
 		try LoggerWarn("Updater", "Download start cancelled before reservation because request policy changed.")
 	} else if Outcome.RecoveryBusy {
 		try LoggerWarn("Updater", "Update reservation refused while rollback recovery became active.")
@@ -1602,10 +1903,12 @@ _Updater_BeginDownloadTransaction(Request, BoundarySuspended, Tag, AssetUrl) {
 	return Outcome
 }
 
-Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, RebuildFn := 0, NotifyFn := 0) {
+Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, RebuildFn := 0, NotifyFn := 0, ExpectedFailureOwner := 0) {
 	global BUNDLE_RELEASE_ASSET
 	global _UpdaterDownloadInProgress
 	global _UpdaterRecoveryPublishTarget, UPDATER_REQUEST_ORIGIN_MANUAL
+	global _UpdaterInstallObserver
+	InstallObserver := _UpdaterInstallObserver
 	HasSuspendOverride := IsSet(IsSuspended)
 	if !IsSet(Request) {
 		if (HasSuspendOverride ? IsSuspended : A_IsSuspended)
@@ -1723,7 +2026,9 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 	; atomically claims the exact request + epoch.
 	BoundarySuspended := HasSuspendOverride ? IsSuspended : A_IsSuspended
 	Reservation := _Updater_BeginDownloadTransaction(
-		Request, BoundarySuspended, Release.Tag, AssetUrl)
+		Request, BoundarySuspended, Release.Tag, AssetUrl, ExpectedFailureOwner)
+	if Reservation.RetryStale
+		return false
 	if Reservation.ShouldDrop {
 		_Updater_RequestMayPublish(Request, BoundarySuspended, NotifyFn)
 		return false
@@ -1748,7 +2053,7 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 	}
 
 	_Updater_StartStagingWorker(AssetUrl, Asset.Digest, NewExe, SwapScriptPath,
-		CurrentExe, Release.Tag, StagingEpoch)
+		CurrentExe, Release.Tag, StagingEpoch, Release, Request, InstallObserver)
 	if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch)
 		return false
 	if IsObject(RebuildFn)
@@ -1800,28 +2105,43 @@ _Updater_EncodeUtf8Payload(Text) {
 ; release metadata as data rather than interpolating it into PowerShell syntax.
 _Updater_BuildStagingTransport(Script, SwapScript, AssetUrl, ExpectedSha256, NewExe,
 	SwapScriptPath, CurrentExe,
-	MinimumSize, TimeoutMs) {
-	global _UpdaterStagingTransportCounter, UPDATER_STAGING_ENV_MAX_CHARS
+	MinimumSize, TimeoutMs, DownloadModulePath := "", DeadlineMs := 0, StartedTick := 0,
+	ProxyPolicyPath := "", UpdaterDefaultsPath := "") {
+	global _UpdaterStagingTransportCounter, UPDATER_STAGING_ENV_MAX_CHARS, UPDATER_STAGING_MAX_SCRIPT_CHUNKS
 	_UpdaterStagingTransportCounter += 1
 	Prefix := "ERGOPTI_UPDATER_" . DllCall("GetCurrentProcessId", "UInt")
 		. "_" . A_TickCount . "_" . _UpdaterStagingTransportCounter
 	ScriptPayload := _Updater_EncodePowerShellCommand(Script)
 	SwapScriptPayload := _Updater_EncodeUtf8Payload(SwapScript)
-	if (ScriptPayload == ""
-		or StrLen(ScriptPayload) > UPDATER_STAGING_ENV_MAX_CHARS)
-		throw ValueError("Encoded staging worker exceeds the environment transport budget")
+	ScriptChunkCount := Ceil(StrLen(ScriptPayload) / UPDATER_STAGING_ENV_MAX_CHARS)
+	if (ScriptPayload == "" or ScriptChunkCount > UPDATER_STAGING_MAX_SCRIPT_CHUNKS)
+		throw ValueError("Encoded staging worker exceeds the bounded chunk transport budget")
 	if (SwapScriptPayload == "")
 		throw ValueError("Encoded swap worker is empty")
 	Environment := [
-		{ Name: Prefix . "_SCRIPT", Value: ScriptPayload },
+		{ Name: Prefix . "_SCRIPT", Value: SubStr(ScriptPayload, 1, UPDATER_STAGING_ENV_MAX_CHARS) },
 		{ Name: Prefix . "_URL", Value: AssetUrl },
 		{ Name: Prefix . "_DIGEST", Value: ExpectedSha256 },
 		{ Name: Prefix . "_NEW_EXE", Value: NewExe },
 		{ Name: Prefix . "_SWAP_PATH", Value: SwapScriptPath },
 		{ Name: Prefix . "_CURRENT", Value: CurrentExe },
 		{ Name: Prefix . "_MINIMUM", Value: MinimumSize },
-		{ Name: Prefix . "_TIMEOUT", Value: TimeoutMs }
+		{ Name: Prefix . "_TIMEOUT", Value: TimeoutMs },
+		{ Name: Prefix . "_DOWNLOAD_MODULE", Value: DownloadModulePath },
+		{ Name: Prefix . "_DEADLINE", Value: DeadlineMs },
+		{ Name: Prefix . "_STARTED_TICK", Value: StartedTick },
+		{ Name: Prefix . "_PROXY_POLICY", Value: ProxyPolicyPath },
+		{ Name: Prefix . "_UPDATER_DEFAULTS", Value: UpdaterDefaultsPath }
 	]
+	Environment.Push({ Name: Prefix . "_SCRIPT_COUNT", Value: ScriptChunkCount })
+	Loop ScriptChunkCount - 1 {
+		ChunkNumber := A_Index + 1
+		Environment.Push({
+			Name: Prefix . "_SCRIPT_" . ChunkNumber,
+			Value: SubStr(ScriptPayload, ((ChunkNumber - 1) * UPDATER_STAGING_ENV_MAX_CHARS) + 1,
+				UPDATER_STAGING_ENV_MAX_CHARS)
+		})
+	}
 	SwapChunkCount := Ceil(StrLen(SwapScriptPayload)
 		/ UPDATER_STAGING_ENV_MAX_CHARS)
 	Environment.Push({ Name: Prefix . "_SWAP_COUNT", Value: SwapChunkCount })
@@ -1839,13 +2159,15 @@ _Updater_BuildStagingTransport(Script, SwapScript, AssetUrl, ExpectedSha256, New
 	}
 	Bootstrap := '$ErrorActionPreference=' . Chr(39) . 'Stop' . Chr(39) . ';'
 		. '$ProgressPreference=' . Chr(39) . 'SilentlyContinue' . Chr(39) . ';'
-		. '$source=[Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($env:' . Prefix . '_SCRIPT));'
+		. '$scriptPayload=$env:' . Prefix . '_SCRIPT;'
+		. 'for($i=2;$i -le [int]$env:' . Prefix . '_SCRIPT_COUNT;$i++){$scriptPayload+=[Environment]::GetEnvironmentVariable(' . Chr(39) . Prefix . '_SCRIPT_' . Chr(39) . '+$i)};'
+		. '$source=[Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($scriptPayload));'
 		. '$swapPayload=' . Chr(39) . Chr(39) . ';'
 		. 'for($i=1;$i -le [int]$env:' . Prefix . '_SWAP_COUNT;$i++){$swapPayload+=[Environment]::GetEnvironmentVariable(' . Chr(39) . Prefix . '_SWAP_' . Chr(39) . '+$i)};'
 		. '$worker=[ScriptBlock]::Create($source);'
 		. '& $worker $env:' . Prefix . '_URL $env:' . Prefix . '_DIGEST $env:' . Prefix . '_NEW_EXE $env:' . Prefix . '_SWAP_PATH $env:' . Prefix . '_CURRENT'
 		. ' ([int64]$env:' . Prefix . '_MINIMUM) ([int]$env:' . Prefix . '_TIMEOUT'
-		. ') $swapPayload'
+		. ') $swapPayload $env:' . Prefix . '_DOWNLOAD_MODULE ([int]$env:' . Prefix . '_DEADLINE) ([int64]$env:' . Prefix . '_STARTED_TICK) $env:' . Prefix . '_PROXY_POLICY $env:' . Prefix . '_UPDATER_DEFAULTS'
 	Args := ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
 		"-EncodedCommand", _Updater_EncodePowerShellCommand(Bootstrap)]
 	for Arg in Args {
@@ -1867,6 +2189,7 @@ _Updater_BuildStagingTransport(Script, SwapScript, AssetUrl, ExpectedSha256, New
 		Args: Args,
 		Environment: Environment,
 		ScriptPayload: ScriptPayload,
+		ScriptChunkCount: ScriptChunkCount,
 		SwapScriptPayload: SwapScriptPayload,
 		SwapChunkCount: SwapChunkCount,
 		Bootstrap: Bootstrap
@@ -1880,14 +2203,20 @@ _Updater_ClearStagingTransport(Transport) {
 		try EnvSet(Pair.Name, "")
 }
 
-_Updater_StartStagingWorker(AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, CurrentExe, Tag, StagingEpoch) {
+_Updater_StartStagingWorker(AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, CurrentExe, Tag, StagingEpoch, Release := 0, Request := 0, InstallObserver := unset) {
 	global _UpdaterDownloadWorker, UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS, UPDATER_MIN_EXE_SIZE_BYTES
+	global _VendorDir, _SharedDir, UPDATER_HTTP_DOWNLOAD_DEADLINE_MS, _UpdaterDownloadStartedTick
 	global _UpdaterDownloadInProgress, _UpdaterSelfUpdateEpoch
 	StagingScript := _Updater_BuildStagingWorkerScript()
 	SwapScript := _Updater_BuildSwapWorkerScript()
+	FailureOwner := IsSet(InstallObserver)
+		? _Updater_NewManagedFailureOwner(Release, Request, AssetUrl,
+			ExpectedSha256, StagingEpoch, InstallObserver)
+		: _Updater_NewManagedFailureOwner(Release, Request, AssetUrl,
+			ExpectedSha256, StagingEpoch)
 	_OnDone := (ExitCode, Stdout, Stderr) => _Updater_PollDownloadAsync(
 		ExitCode, Stdout, Stderr, SwapScriptPath, NewExe, CurrentExe, Tag,
-		StagingEpoch)
+		StagingEpoch, FailureOwner)
 	Transport := 0
 	Worker := 0
 	Started := false
@@ -1896,7 +2225,11 @@ _Updater_StartStagingWorker(AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, Cu
 	try {
 		Transport := _Updater_BuildStagingTransport(
 			StagingScript, SwapScript, AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, CurrentExe,
-			UPDATER_MIN_EXE_SIZE_BYTES, UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS)
+			UPDATER_MIN_EXE_SIZE_BYTES, UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS,
+			_VendorDir . "\ergopti_updater_download.ps1", UPDATER_HTTP_DOWNLOAD_DEADLINE_MS,
+			_UpdaterDownloadStartedTick,
+			_SharedDir . "\modules\network\proxy_policy.json",
+			_SharedDir . "\modules\updater\defaults.json")
 		if _Updater_SelfUpdateEpochIsCurrent(StagingEpoch) {
 			Worker := ShellRunner_SpawnTreeOwned(
 				_Updater_PowerShellPath(), Transport.Args, _OnDone)
@@ -1999,7 +2332,7 @@ _Updater_QuiesceSelfUpdateForSuspend() {
 	return _Updater_RetrySwapCleanupDebt()
 }
 
-_Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePausedRequest := false) {
+_Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePausedRequest := false, ExpectedEpoch := 0) {
 	global _UpdaterDownloadInProgress, _UpdaterDownloadWorker
 	global _UpdaterDownloadRequest
 	global _UpdaterDownloadArtifacts, _UpdaterDownloadStartedTick
@@ -2012,6 +2345,8 @@ _Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePau
 	HadTransaction := false
 	PreviousCritical := Critical("On")
 	try {
+		if ExpectedEpoch && _UpdaterSelfUpdateEpoch != ExpectedEpoch
+			return false
 		HadTransaction := _UpdaterDownloadInProgress
 			or IsObject(_UpdaterDownloadWorker) or (_UpdaterSwapOwner is Map)
 			or IsObject(_UpdaterDownloadRequest)
@@ -2027,6 +2362,7 @@ _Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePau
 		_UpdaterSwapOwner := 0
 		_UpdaterExitIntent := 0
 		_UpdaterExitInvocation := 0
+		_Updater_RetireManagedFailure()
 		_UpdaterDownloadInProgress := false
 		_UpdaterSelfUpdateEpoch += 1
 	} finally {
@@ -2060,35 +2396,66 @@ _Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePau
 ; Enforces one monotonic wall-clock budget for the entire hidden download
 ; process. This is independent from HttpWebRequest's per-operation timeouts.
 _Updater_EnforceDownloadDeadline(NowTick := unset, RebuildMenu := true,
-	NotifyFn := 0, CancelFn := _Updater_CancelSelfUpdateTransaction) {
-	global _UpdaterDownloadInProgress, _UpdaterDownloadStartedTick
+	NotifyFn := 0, CancelFn := _Updater_CancelSelfUpdateTransaction, ExpectedEpoch := 0) {
+	global _UpdaterSelfUpdateEpoch, _UpdaterDownloadInProgress, _UpdaterDownloadStartedTick
 	global UPDATER_HTTP_DOWNLOAD_DEADLINE_MS
-	if !_UpdaterDownloadInProgress or !_UpdaterDownloadStartedTick
-		return false
-	StartedTick := _UpdaterDownloadStartedTick
+	PreviousCritical := Critical("On")
+	try {
+		if ExpectedEpoch && (!_UpdaterDownloadInProgress || _UpdaterSelfUpdateEpoch != ExpectedEpoch)
+			return false
+		if !_UpdaterDownloadInProgress || !_UpdaterDownloadStartedTick
+			return false
+		StartedTick := _UpdaterDownloadStartedTick
+	} finally {
+		Critical(PreviousCritical)
+	}
 	if !IsSet(NowTick)
 		NowTick := A_TickCount
 	if !TickExpired64(StartedTick,
 		UPDATER_HTTP_DOWNLOAD_DEADLINE_MS, NowTick)
 		return false
-	if !CancelFn.Call(
-		"Update download exceeded its absolute wall-clock deadline.",
-		RebuildMenu, false)
+	Cancelled := ExpectedEpoch
+		? CancelFn.Call("Update download exceeded its absolute wall-clock deadline.",
+			RebuildMenu, false, ExpectedEpoch)
+		: CancelFn.Call("Update download exceeded its absolute wall-clock deadline.",
+			RebuildMenu, false)
+	if !Cancelled
 		return false
 	_Updater_SurfaceFailure("updater.install_error_download",
 		"Absolute download deadline exceeded.", NotifyFn)
 	return true
 }
 
+; State-only admission ends before any completion diagnostics, UI or native handoff.
+_Updater_AdmitStagingCompletion(StagingEpoch) {
+	global _UpdaterDownloadWorker
+	PreviousCritical := Critical("On")
+	try {
+		if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch)
+			return false
+		_UpdaterDownloadWorker := 0
+		TimerSetCallback(_Updater_MonitorStagingWorker, 0)
+		return true
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
 ; The only staging completion callback running in AHK. The worker's READY
 ; token means it has already persisted and verified the executable plus the
 ; UTF-8 PowerShell swap worker.
-_Updater_PollDownloadAsync(ExitCode, Stdout, Stderr, SwapScriptPath, NewExe, CurrentExe, Tag, StagingEpoch) {
+_Updater_PollDownloadAsync(ExitCode, Stdout, Stderr, SwapScriptPath, NewExe, CurrentExe, Tag, StagingEpoch, FailureOwner := 0, CompletionTick := unset, DeadlineNotifyFn := 0) {
 	global _UpdaterDownloadWorker
 	if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch)
 		return
-	_UpdaterDownloadWorker := 0
-	SetTimer(_Updater_MonitorStagingWorker, 0)
+	; Completion can arrive after the deadline but before the monitor's tick.
+	; Keep the exact worker/monitor until the original parent budget is admitted.
+	NowTick := IsSet(CompletionTick) ? CompletionTick : A_TickCount
+	if _Updater_EnforceDownloadDeadline(NowTick, true, DeadlineNotifyFn,
+		_Updater_CancelSelfUpdateTransaction, StagingEpoch)
+		return
+	if !_Updater_AdmitStagingCompletion(StagingEpoch)
+		return
 	if A_IsSuspended {
 		try LoggerWarn("Updater", "Update staging completion discarded while suspended.")
 		_Updater_NotifyInstallPhase("failed", "changelog_window.install_error_download")
@@ -2096,13 +2463,9 @@ _Updater_PollDownloadAsync(ExitCode, Stdout, Stderr, SwapScriptPath, NewExe, Cur
 		return
 	}
 	if (ExitCode != 0 or Stdout != "READY") {
-		try LoggerError("Updater", "Update staging worker failed (exit {1}): {2}.", ExitCode, Stdout)
-		; The worker reports a digest or size refusal in its ERR line: that is a
-		; failed verification, anything else a failed download.
-		_Updater_ReportInstallFailure("updater.install_error_download",
-			_Updater_StagingFailureIsVerification(Stdout)
-				? "changelog_window.install_error_verify" : "changelog_window.install_error_download")
-		_Updater_EndDownloadTransaction(StagingEpoch)
+		try LoggerError("Updater", "Update staging worker failed (exit {1}); private output omitted.", ExitCode)
+		Failure := _Updater_ParseStagingFailure(Stdout)
+		_Updater_PublishManagedFailure(Failure, FailureOwner, StagingEpoch)
 		return
 	}
 	try LoggerSuccess("Updater", "Update downloaded and verified for '{1}'.", Tag)
@@ -2119,41 +2482,42 @@ _Updater_PollDownloadAsync(ExitCode, Stdout, Stderr, SwapScriptPath, NewExe, Cur
 	global UPDATER_LAST_NOTIFIED_TAG := ""
 }
 
-; Returns a self-contained worker script. Paths and URLs are passed as argv,
-; never interpolated into the script, so release metadata cannot alter commands.
+; Returns the compact staging orchestrator. Trusted helper paths and release
+; data use the private inherited environment, never PowerShell interpolation.
 _Updater_BuildStagingWorkerScript() {
-	return 'param([string]$Url, [string]$ExpectedSha256, [string]$NewExe, [string]$SwapScriptPath, [string]$CurrentExe, [int64]$MinimumSize, [int]$TimeoutMs, [string]$SwapScriptPayload)' . "`n"
+	return 'param([string]$Url, [string]$ExpectedSha256, [string]$NewExe, [string]$SwapScriptPath, [string]$CurrentExe, [int64]$MinimumSize, [int]$TimeoutMs, [string]$SwapScriptPayload, [string]$DownloadModulePath, [int]$DeadlineMs, [int64]$StartedTick, [string]$ProxyPolicyPath, [string]$UpdaterDefaultsPath, [scriptblock]$ReadConfig=$null, [scriptblock]$ReadEnvironment=$null)' . "`n"
 		. '$ErrorActionPreference = "Stop"' . "`n"
+		. '$State=@{Stage="proxy_resolve";Reason="download";Receipt=@{};CleanupDebt=@()}' . "`n"
+		. 'function CleanWorker($Path,$Name){try{[IO.File]::Delete($Path)}catch{if(Get-Command Add-ErgoptiUpdaterCleanupDebt -ErrorAction SilentlyContinue){Add-ErgoptiUpdaterCleanupDebt $State $Name "file_remove" $_.Exception}else{$State.CleanupDebt+=@{resource=$Name;receipt=@{backend="dotnet";stage="file_remove";failure_provenance="unknown"}}}}}' . "`n"
 		. 'try {' . "`n"
-		. '  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $NewExe) | Out-Null' . "`n"
-		. '  Remove-Item -LiteralPath $NewExe -Force -ErrorAction SilentlyContinue' . "`n"
-		. '  Remove-Item -LiteralPath $SwapScriptPath -Force -ErrorAction SilentlyContinue' . "`n"
-		. '  $Request = [System.Net.HttpWebRequest]::Create($Url)' . "`n"
-		. '  $Request.Method = "GET"' . "`n"
-		. '  $Request.UserAgent = "ErgoptiPlus-Updater/1.0"' . "`n"
-		. '  $Request.Timeout = $TimeoutMs' . "`n"
+		. '  . $DownloadModulePath' . "`n"
+		. '  . (Join-Path (Split-Path -Parent $DownloadModulePath) "ergopti_network_routes.ps1")' . "`n"
+		. '  $Resolver={param($Destination,$Budget) Resolve-ErgoptiNativeNetworkRoutes $Destination $Budget $ReadConfig $ReadEnvironment $ProxyPolicyPath $UpdaterDefaultsPath}' . "`n"
+		. '  $Request=[System.Net.HttpWebRequest]::Create($Url)' . "`n"
 		. '  $Request.ReadWriteTimeout = $TimeoutMs' . "`n"
-		. '  $Response = $Request.GetResponse()' . "`n"
-		. '  if ([int]$Response.StatusCode -ne 200) { throw ("HTTP " + [int]$Response.StatusCode) }' . "`n"
-		. '  $ExpectedSize = [int64]$Response.ContentLength' . "`n"
-		. '  $Input = $Response.GetResponseStream()' . "`n"
-		. '  $Output = [System.IO.File]::Open($NewExe, [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)' . "`n"
-		. '  try { $Input.CopyTo($Output) } finally { $Output.Dispose(); $Input.Dispose(); $Response.Dispose() }' . "`n"
-		. '  $ActualSize = (Get-Item -LiteralPath $NewExe).Length' . "`n"
-		. '  if ($ExpectedSize -gt 0 -and $ActualSize -ne $ExpectedSize) { Remove-Item -LiteralPath $NewExe -Force; throw "Content-Length mismatch" }' . "`n"
-		. '  if ($ActualSize -lt $MinimumSize) { Remove-Item -LiteralPath $NewExe -Force; throw "Downloaded file is too small" }' . "`n"
-		. '  if ($ExpectedSha256 -cnotmatch "^[0-9a-f]{64}$") { Remove-Item -LiteralPath $NewExe -Force; throw "Missing or invalid trusted SHA-256 digest" }' . "`n"
-		. '  $ActualDigest = (Get-FileHash -LiteralPath $NewExe -Algorithm SHA256).Hash.ToLowerInvariant()' . "`n"
-		. '  if ($ActualDigest -cne $ExpectedSha256) { Remove-Item -LiteralPath $NewExe -Force; throw "SHA-256 digest mismatch" }' . "`n"
-		. '  $SwapSource = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($SwapScriptPayload))' . "`n"
-		. '  $Utf8 = [Text.UTF8Encoding]::new($false)' . "`n"
-		. '  [System.IO.File]::WriteAllText($SwapScriptPath, $SwapSource, $Utf8)' . "`n"
+		. '  $ExpectedSize=Invoke-ErgoptiUpdaterDownload $Request $NewExe $TimeoutMs $State $Resolver $DeadlineMs $StartedTick' . "`n"
+		. '  $State.Stage="file_read"' . "`n"
+		. '  $ActualSize=(Get-Item -LiteralPath $NewExe).Length' . "`n"
+		. '  if ($ExpectedSize -gt 0 -and $ActualSize -ne $ExpectedSize) { throw "Content-Length mismatch" }' . "`n"
+		. '  if ($ActualSize -lt $MinimumSize) { $State.Reason="verify";throw "Downloaded file is too small" }' . "`n"
+		. '  if ($ExpectedSha256 -cnotmatch "^[0-9a-f]{64}$") { $State.Reason="verify";throw "Missing or invalid trusted SHA-256 digest" }' . "`n"
+		. '  $ActualDigest=(Get-FileHash -LiteralPath $NewExe -Algorithm SHA256).Hash.ToLowerInvariant()' . "`n"
+		. '  $null=Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State' . "`n"
+		. '  if ($ActualDigest -cne $ExpectedSha256) { $State.Reason="verify";throw "SHA-256 digest mismatch" }' . "`n"
+		. '  $SwapSource=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($SwapScriptPayload))' . "`n"
+		. '  $State.Stage="file_remove";[IO.File]::Delete($SwapScriptPath)' . "`n"
+		. '  $State.Stage="file_write"' . "`n"
+		. '  $null=Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State' . "`n"
+		. '  [IO.File]::WriteAllText($SwapScriptPath,$SwapSource,[Text.UTF8Encoding]::new($false))' . "`n"
+		. '  $null=Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State' . "`n"
 		. '  Write-Output "READY"' . "`n"
 		. '  exit 0' . "`n"
 		. '} catch {' . "`n"
-		. '  try { if ($NewExe -and (Test-Path -LiteralPath $NewExe)) { Remove-Item -LiteralPath $NewExe -Force } } catch {}' . "`n"
-		. '  try { if ($SwapScriptPath -and (Test-Path -LiteralPath $SwapScriptPath)) { Remove-Item -LiteralPath $SwapScriptPath -Force } } catch {}' . "`n"
-		. '  Write-Output ("ERR:" + $_.Exception.Message)' . "`n"
+		. '  $Receipt=@{}' . "`n"
+		. '  if (Get-Command Get-ErgoptiUpdaterFailureReceipt -ErrorAction SilentlyContinue) { $Receipt=Get-ErgoptiUpdaterFailureReceipt $_.Exception $State }' . "`n"
+		. '  CleanWorker $NewExe "staged_executable"' . "`n"
+		. '  CleanWorker $SwapScriptPath "swap_worker"' . "`n"
+		. '  @{schema_version=1;state="failed";operation="download";reason=$State.Reason;receipt=$Receipt;cleanup_debt=$State.CleanupDebt;native_cleanup_debt=[bool]$State.NativeCleanupDebt}|ConvertTo-Json -Depth 4 -Compress' . "`n"
 		. '  exit 1' . "`n"
 		. '}'
 }

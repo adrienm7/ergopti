@@ -351,6 +351,10 @@ jobs:
         if: matrix.suite == 'js'
         run: npm run test:browser:physical-shortcuts
 
+      - name: Test shared Versions installation rendering
+        if: matrix.suite == 'js'
+        run: npm run test:browser:changelog-install
+
   macos:
     name: 'macOS'
     needs: [validate]

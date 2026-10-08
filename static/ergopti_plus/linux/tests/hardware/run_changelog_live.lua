@@ -49,7 +49,14 @@ print("  newest published release: " .. latest .. (latest_is_prerelease and " (p
 
 local Manager = require("ui.webview_manager")
 local Updater = require("modules.updater.manager")
-Manager.set_daemon_state({ _version = "0.0.0-dev.1" })
+-- Actual script-control pause state, with lifecycle callbacks scoped to the
+-- one native changelog window owned by this fixture.
+local script_actions = require("modules.shortcuts.script_actions").new({
+	reset = function() Manager.hide("changelog") end,
+	reload = function() Manager.hide("changelog") end,
+	quit = function() Manager.hide("changelog") end,
+})
+Manager.set_daemon_state({ _version = "0.0.0-dev.1", is_paused = script_actions.is_paused })
 
 local function pump(seconds)
 	for _ = 1, math.max(1, math.floor(seconds / WAIT_SECONDS)) do
@@ -98,6 +105,7 @@ if not Manager.show("changelog") then
 	os.exit(1)
 end
 local webview = Manager.webview_for("changelog")
+expect(type(webview.is_loading) == "boolean", "the native WebKit loading property is Boolean")
 
 local expected_channel = Updater.get_channel() == "dev" and "dev" or "main"
 local STATE = "JSON.stringify({"

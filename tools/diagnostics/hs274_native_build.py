@@ -38,6 +38,7 @@ XCODEGEN_BINARY_SHA256 = "8774da746668bc18fe74e54cbaf10f2631a1fb05947cd374179aa9
 XCODEGEN_BINARY_RELATIVE = "xcodegen/bin/xcodegen"
 XCODEGEN_URL = "https://github.com/yonaskolb/XcodeGen/releases/download/2.46.0/xcodegen.zip"
 XCODEGEN_METADATA_URL = "https://api.github.com/repos/yonaskolb/XcodeGen/releases/assets/478866069"
+XCODEGEN_METADATA_TOKEN_ENV = "ERGOPTI_NATIVE_XCODEGEN_METADATA_TOKEN"
 
 
 class NativeBuildError(RuntimeError):
@@ -307,6 +308,33 @@ class _PinnedToolRedirect(urllib.request.HTTPRedirectHandler):
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
+class _MetadataCredentialRedirect(urllib.request.HTTPRedirectHandler):
+    """Keep the purpose credential confined to its single initial metadata request."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def _validated_tool_metadata_token(value):
+    """Admit an optional bounded printable ASCII credential without reflecting it."""
+    require(
+        value is None
+        or (
+            type(value) is str
+            and 1 <= len(value) <= 4096
+            and all(0x21 <= ord(character) <= 0x7E for character in value)
+        ),
+        "xcodegen_metadata_token",
+        "Official tool metadata credential is malformed",
+    )
+    return value
+
+
+def _take_tool_metadata_token():
+    """Remove the dedicated credential before the worker launches any native child."""
+    return _validated_tool_metadata_token(os.environ.pop(XCODEGEN_METADATA_TOKEN_ENV, None))
+
+
 def _tool_https_url(url):
     """Allow only verified HTTPS destinations belonging to this official acquisition."""
     try:
@@ -382,8 +410,14 @@ def _tool_transport_failure(error):
     return {"kind": "other_transport"}
 
 
-def _download_tool_input(url, maximum, deadline, metadata=False):
+def _download_tool_input(url, maximum, deadline, metadata=False, *, metadata_token=None):
     """Acquire bounded complete bytes through the default verified TLS context."""
+    metadata_token = _validated_tool_metadata_token(metadata_token)
+    require(
+        metadata_token is None or (metadata is True and url == XCODEGEN_METADATA_URL),
+        "xcodegen_metadata_token",
+        "Official tool metadata credential is confined to the fixed metadata URL",
+    )
     _tool_https_url(url)
     require(
         type(deadline) in (int, float) and math.isfinite(deadline) and time.monotonic() < deadline,
@@ -395,9 +429,12 @@ def _download_tool_input(url, maximum, deadline, metadata=False):
         headers.update(
             {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
         )
+    if metadata_token is not None:
+        headers["Authorization"] = "Bearer " + metadata_token
     try:
         opener = urllib.request.build_opener(
-            _PinnedToolRedirect(), urllib.request.HTTPSHandler(context=ssl.create_default_context())
+            _MetadataCredentialRedirect() if metadata_token is not None else _PinnedToolRedirect(),
+            urllib.request.HTTPSHandler(context=ssl.create_default_context()),
         )
         # TLS context/opener acquisition can consume the remaining absolute budget.
         # Admit its freshly measured remainder before passing any timeout to urllib.
@@ -409,6 +446,11 @@ def _download_tool_input(url, maximum, deadline, metadata=False):
             urllib.request.Request(url, headers=headers),
             timeout=min(30, remaining),
         ) as response:
+            require(
+                metadata_token is None or response.geturl() == XCODEGEN_METADATA_URL,
+                "xcodegen_transport",
+                "Official tool authenticated metadata response changed its fixed URL",
+            )
             final = _tool_https_url(response.geturl())
             if response.status != 200:
                 failure = NativeBuildError(
@@ -458,10 +500,12 @@ def _download_tool_input(url, maximum, deadline, metadata=False):
     except (OSError, urllib.error.URLError, http.client.HTTPException) as error:
         failure = NativeBuildError("xcodegen_transport", "Official tool HTTPS acquisition failed")
         failure.transport_diagnostic = _tool_transport_failure(error)
+        if metadata_token is not None:
+            raise failure from None
         raise failure from error
 
 
-def acquire_xcodegen(owner, deadline):
+def acquire_xcodegen(owner, deadline, *, metadata_token=None):
     """Acquire the official fixed tool entirely within the existing worker's budget."""
     owner = validate_owner_root(owner)
     started = time.monotonic()
@@ -469,8 +513,11 @@ def acquire_xcodegen(owner, deadline):
     stage = "metadata"
     write_json(owner / (name + ".begin.json"), {"schema": 1, "phase": name, "status": "pending"})
     try:
+        metadata_options = {}
+        if metadata_token is not None:
+            metadata_options["metadata_token"] = metadata_token
         raw, metadata_transport = _download_tool_input(
-            XCODEGEN_METADATA_URL, 65_536, deadline, metadata=True
+            XCODEGEN_METADATA_URL, 65_536, deadline, metadata=True, **metadata_options
         )
 
         def unique(pairs):
@@ -875,8 +922,9 @@ def run_phase(name, args, cwd, owner, deadline):
     return record
 
 
-def compile_native(source, owner, seconds, seal_path=None):
+def compile_native(source, owner, seconds, seal_path=None, *, metadata_token=None):
     """Calibrate actual unsigned pinned Core-Service/CLI compilation without activation."""
+    metadata_token = _validated_tool_metadata_token(metadata_token)
     owner, seconds = validate_owner_root(owner), validate_budget(seconds)
     require(
         sys.platform == "darwin",
@@ -908,7 +956,10 @@ def compile_native(source, owner, seconds, seal_path=None):
         phases.append(run_phase(name, args, cwd, owner, deadline))
 
     phase("xcode_version", [tools["xcodebuild"], "-version"])
-    binary, acquisition = acquire_xcodegen(owner, deadline)
+    acquisition_options = {}
+    if metadata_token is not None:
+        acquisition_options["metadata_token"] = metadata_token
+    binary, acquisition = acquire_xcodegen(owner, deadline, **acquisition_options)
     phases.append(acquisition)
     tools["xcodegen"] = str(binary)
     phase("xcodegen_version", [tools["xcodegen"], "--version"])
@@ -1067,7 +1118,17 @@ def main():
     parser.add_argument("--candidate-seal", type=Path)
     options = parser.parse_args()
     try:
-        compile_native(options.source, options.owner, options.budget, options.candidate_seal)
+        metadata_token = _take_tool_metadata_token()
+        compilation_options = {}
+        if metadata_token is not None:
+            compilation_options["metadata_token"] = metadata_token
+        compile_native(
+            options.source,
+            options.owner,
+            options.budget,
+            options.candidate_seal,
+            **compilation_options,
+        )
         return 0
     except NativeBuildError as failure:
         try:

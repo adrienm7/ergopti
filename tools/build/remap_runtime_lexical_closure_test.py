@@ -17,7 +17,7 @@ import zlib
 ROOT = Path(__file__).resolve().parents[2]
 FIXED_PROVIDER = "c29ceb96e73655cadea7763805b9468c32744033c2f177bae492e4ce9fe4100a"
 FIXED_FACTORY = "854dc3ef556e2540d4a64e0d935610a2a2fe8c947e3f7fe315c1641ceaaedd7d"
-FIXED_BUILDER = "f1cd9c3be1c3793a4fb829955406807dcb16df84542aa377af5ce167eb5faf7d"
+FIXED_BUILDER = "e8891edda6f25de3ab4361143c51ce55b4289368e6dfb69102f671681081d1d6"
 OLD_PROVIDER_SHA256 = "a4ef0f4b7bd2c9cdabb4b8eb9e0a7249eab4f9e06f9991bcdb2f59a230220b4f"
 OLD_FACTORY_SHA256 = "70d90ede3bdfbf44e146ba4a26f101ebfec2a1745bc05a8260db001d5a236537"
 # Exact historical producer source bytes, frozen before the closure edit.
@@ -678,7 +678,7 @@ class LexicalSourceClosureControls(unittest.TestCase):
         self.assertEqual(digest(self.provider_path.read_bytes()), FIXED_PROVIDER)
         self.assertEqual(digest(self.factory_path.read_bytes()), FIXED_FACTORY)
         self.assertEqual(digest(self.builder_path.read_bytes()), FIXED_BUILDER)
-        self.assertEqual(self.builder_path.stat().st_size, 134077)
+        self.assertEqual(self.builder_path.stat().st_size, 134280)
         self.assertEqual(self.builder.PROVIDER_SHA256, FIXED_PROVIDER)
         self.assertEqual(self.builder.SOURCE_FACTORY_SHA256, FIXED_FACTORY)
         self.assertEqual(self.builder.CURRENT_OWNED_SOURCE_FACTORY_SHA256, FIXED_FACTORY)

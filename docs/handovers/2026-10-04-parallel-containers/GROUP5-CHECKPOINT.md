@@ -2390,3 +2390,13 @@ three typed producer and three SDK assertion refusals. These overlapping cohorts
 are not additive coverage.
 Native AFTER remains UNEXECUTED, performance UNMEASURED and 300-second completion
 UNPROVED. Item 31 and transverse 16/38 remain open; no item is removed.
+
+## Current dev network synchronization
+
+Upstream synchronization with dev091743921 preserves every physical capture,
+context and baseline source from this branch. The historical CI ancestry adds a
+second merge base; explicit comparison with the last integrated dev33a5227 keeps
+its unrelated Group6 network changes and every existing Group5 assertion. The
+combined Swift reporter retains both independent test blocks and all archive
+outcomes in JSON, while visible notices follow the actual fixture cohort. Native
+qualification and items31/16/38 remain open.

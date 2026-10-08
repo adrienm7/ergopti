@@ -169,6 +169,10 @@ local function bootstrap(fixture, extra)
 	return run("cd " .. sh_quote(fixture.root) .. " && FIXTURE_ROOT=" .. sh_quote(fixture.root)
 		.. " HOME=" .. sh_quote(fixture.home)
 		.. " ERGOPTI_CONFIG_DIR=/Applications/ErgoptiPlus.app/Contents/Resources/static "
+		-- The fixture supplies its own network inputs; inherited host lowercase
+		-- routes/CA variables cannot masquerade as the caller's explicit values.
+		.. "HTTPS_PROXY=http://fixture.invalid:3128 https_proxy= HTTP_PROXY= http_proxy= ALL_PROXY= all_proxy= "
+		.. "NO_PROXY= no_proxy= SSL_CERT_FILE= REQUESTS_CA_BUNDLE= "
 		.. (extra or "") .. " bash " .. sh_quote(fixture.script))
 end
 

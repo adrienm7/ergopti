@@ -18,7 +18,7 @@ import threading
 import time
 
 PRODUCER_PATH = "tools/diagnostics/owned_runtime_service_reference_core_fixture_build.py"
-PRODUCER_SHA256 = "9560dca88e587f8f714a61ec676df5d15db74671b666f7dc23082365c9772275"
+PRODUCER_SHA256 = "bbd44055d0e426b78f612a4cb2585b42373045f31042fd2bc4d957905ef4de45"
 MAX_SOURCE_BYTES = 8 * 1024 * 1024
 
 

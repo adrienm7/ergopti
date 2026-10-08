@@ -124,7 +124,7 @@ final class KeyboardSourceTestSelectionTests: XCTestCase {
 
 	func testActualBackgroundThreadCannotAcquireNativeCarbonOwner() {
 		let rejected = expectation(description: "Actual background owner refused before any Carbon read")
-		DispatchQueue.global().async {
+		DispatchQueue.global().async { () -> Void in
 			XCTAssertFalse(Thread.isMainThread)
 			XCTAssertThrowsError(try KeyboardSourceTestSelection())
 			rejected.fulfill()

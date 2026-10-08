@@ -298,6 +298,139 @@ function evaluate(text, scriptStatus, teeStatus, repository = path.resolve(__dir
 	};
 }
 
+/** Fixed native archive cases; arbitrary child text never becomes a notice field. */
+const archiveCases = Object.freeze([
+	[
+		'brew',
+		'-[ErgoptiPlusTests.HomebrewArchiveAcceptanceTests testRealBrewZIPInstallXZUpgradeAndRefusalsPreserveInstalledState]'
+	],
+	[
+		'sparkle',
+		'-[ErgoptiPlusTests.SparkleArchiveUpdateAcceptanceTests testActualSparkleTarXZUpdateRefusesWrongKeyPreservesOldAppAndRetriesThroughRelaunch]'
+	]
+]);
+
+/** Projects authentic case completion independently of another case's failure. */
+function archiveOutcomes(text, scriptStatus, teeStatus) {
+	const script = exitStatus(scriptStatus);
+	const tee = exitStatus(teeStatus);
+	const unavailable = () =>
+		archiveCases.map(([label]) => ({
+			schema: 1,
+			case: label,
+			outcome: 'UNAVAILABLE',
+			basis: 'unavailable',
+			script_status: script,
+			capture_status: tee
+		}));
+	if (tee !== 0) return unavailable();
+	let state = 'before';
+	let active = null;
+	let rootResult = null;
+	let summary = null;
+	let invalid = false;
+	const starts = new Set();
+	const terminals = new Map();
+	for (const line of cleanTranscript(text).split('\n')) {
+		if (/^Test Suite 'All tests' started at /.test(line)) {
+			if (state !== 'before') invalid = true;
+			state = 'running';
+			continue;
+		}
+		const finish = /^Test Suite 'All tests' (passed|failed) at /.exec(line);
+		if (finish) {
+			if (state !== 'running' || active !== null) invalid = true;
+			rootResult = finish[1];
+			state = 'summary';
+			continue;
+		}
+		if (state === 'summary' && line.trim()) {
+			const count =
+				/^\s*Executed (\d+) tests?, with (?:(\d+) tests? skipped and )?(\d+) failures? \((\d+) unexpected\) in /.exec(
+					line
+				);
+			if (!count) invalid = true;
+			else {
+				summary = {
+					tests: Number(count[1]),
+					skipped: Number(count[2] || 0),
+					failures: Number(count[3]),
+					unexpected: Number(count[4])
+				};
+				if (
+					!Object.values(summary).every((value) => Number.isSafeInteger(value) && value <= 1000000)
+				)
+					invalid = true;
+			}
+			state = 'after';
+		}
+		const start = /^Test Case '(.+)' started\.$/.exec(line);
+		const terminal = /^Test Case '(.+)' (passed|failed|skipped) \(\d+(?:\.\d+)? seconds?\)\.$/.exec(
+			line
+		);
+		if (start) {
+			if (state !== 'running' || active !== null || starts.has(start[1])) invalid = true;
+			starts.add(start[1]);
+			active = start[1];
+		} else if (terminal) {
+			if (state !== 'running' || active !== terminal[1] || terminals.has(terminal[1]))
+				invalid = true;
+			terminals.set(terminal[1], terminal[2]);
+			active = null;
+		} else if (/^Test Case /.test(line)) invalid = true;
+	}
+	const failed = [...terminals.values()].filter((value) => value === 'failed').length;
+	const skipped = [...terminals.values()].filter((value) => value === 'skipped').length;
+	if (
+		invalid ||
+		state !== 'after' ||
+		active !== null ||
+		summary === null ||
+		summary.tests === 0 ||
+		starts.size !== summary.tests ||
+		terminals.size !== summary.tests ||
+		[...starts].some((name) => !terminals.has(name)) ||
+		summary.skipped !== skipped ||
+		summary.failures < failed ||
+		summary.unexpected > summary.failures ||
+		(rootResult === 'passed' && (summary.failures !== 0 || failed !== 0 || script !== 0)) ||
+		(rootResult === 'failed' && summary.failures === 0)
+	)
+		return unavailable();
+	const outcomes = { passed: 'PASS', failed: 'FAIL', skipped: 'SKIP' };
+	return archiveCases.map(([label, name]) => ({
+		schema: 1,
+		case: label,
+		outcome: outcomes[terminals.get(name)] || 'UNAVAILABLE',
+		basis: terminals.has(name) ? 'exact-xctest-completion' : 'unavailable',
+		script_status: script,
+		capture_status: tee
+	}));
+}
+
+/** Only closed labels/statuses cross the check API; no native diagnostic bytes. */
+function archiveAnnotation(receipt) {
+	if (
+		receipt.schema !== 1 ||
+		!archiveCases.some(([label]) => label === receipt.case) ||
+		!['PASS', 'FAIL', 'SKIP', 'UNAVAILABLE'].includes(receipt.outcome) ||
+		receipt.basis !==
+			(receipt.outcome === 'UNAVAILABLE' ? 'unavailable' : 'exact-xctest-completion')
+	)
+		throw new TypeError('Invalid native archive XCTest receipt.');
+	return (
+		'::notice title=Native archive XCTest outcome::' +
+		JSON.stringify({
+			schema: 1,
+			case: receipt.case,
+			outcome: receipt.outcome,
+			basis: receipt.basis,
+			script_status: exitStatus(receipt.script_status),
+			capture_status: exitStatus(receipt.capture_status)
+		})
+	);
+}
+
 /** Emits exact causes and persists the verdict beside the uploaded transcript. */
 function main(args = process.argv.slice(2), log = console.log) {
 	let script = 0;
@@ -307,10 +440,28 @@ function main(args = process.argv.slice(2), log = console.log) {
 			throw new Error('Expected transcript path, script status, tee status and verdict path.');
 		script = exitStatus(args[1]);
 		tee = exitStatus(args[2]);
-		const result = evaluate(fs.readFileSync(args[0], 'utf8'), script, tee);
+		const transcript = fs.readFileSync(args[0], 'utf8');
+		const result = evaluate(transcript, script, tee);
+		result.archive_outcomes = archiveOutcomes(transcript, script, tee);
 		fs.writeFileSync(args[3], JSON.stringify(result, null, '\t') + '\n');
+		const lines = cleanTranscript(transcript).split('\n');
+		const archiveObserved = archiveCases.some(([, name]) =>
+			lines.some((line) => line.startsWith(`Test Case '${name}' `))
+		);
+		// Retain all outcomes in JSON; unrelated fixture cohorts stay quiet.
+		if (archiveObserved || !transcript.trim())
+			for (const receipt of result.archive_outcomes) log(archiveAnnotation(receipt));
 		for (const failure of result.failures) log(annotation(failure));
-		if (result.exit_status !== 0) log(phaseAnnotation(result.keyboard_phase_witnesses));
+		const keyboardObserved =
+			result.keyboard_phase_witnesses.accepted ||
+			result.keyboard_phase_witnesses.refused ||
+			lines.some((line) =>
+				/^Test Case '-\[ErgoptiPlusTests\.(?:KeyboardSourceProbeTests|KeyboardCharacterMappingTests) /.test(
+					line
+				)
+			);
+		if (result.exit_status !== 0 && keyboardObserved)
+			log(phaseAnnotation(result.keyboard_phase_witnesses));
 		if (
 			result.exit_status !== 0 &&
 			(result.logger_callback_receipts.accepted || result.logger_callback_receipts.refused)
@@ -321,6 +472,7 @@ function main(args = process.argv.slice(2), log = console.log) {
 		);
 		return result.exit_status;
 	} catch (error) {
+		for (const receipt of archiveOutcomes('', script, tee)) log(archiveAnnotation(receipt));
 		log(annotation({ message: 'Swift XCTest evidence could not be judged: ' + error.message }));
 		return script || tee || 1;
 	}
@@ -334,6 +486,8 @@ module.exports = {
 	phaseAnnotation,
 	loggerReceipts,
 	loggerAnnotation,
+	archiveAnnotation,
+	archiveOutcomes,
 	main
 };
 if (require.main === module) process.exitCode = main();
