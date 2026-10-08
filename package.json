@@ -323,6 +323,7 @@
 		"test:shared-toml-codec-purity": "node ./tools/test/test-shared-toml-codec-purity.cjs",
 		"test:linux-package-layout": "node ./tools/test/test-linux-package-layout.cjs",
 		"test:linux-install-sandbox": "node ./tools/test/test-linux-install-sandbox.cjs",
+		"test:linux-source-toolchain": "node ./tools/test/test-linux-source-toolchain.cjs",
 		"test:linux-package-setup": "node ./tools/test/test-linux-package-setup.cjs",
 		"test:linux-start-at-login": "node ./tools/test/test-linux-start-at-login.cjs",
 		"test:linux-uninstall-sandbox": "node ./tools/test/test-linux-uninstall-sandbox.cjs",

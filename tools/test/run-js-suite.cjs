@@ -31,6 +31,12 @@ const FULL = process.argv.includes('--full');
 // Each check mirrors a CI "Validate ·" step. command/args are run from ROOT.
 const CHECKS = [
 	{
+		name: 'source toolchain admission preserves genuine compiler, headers and checkout',
+		cmd: process.execPath,
+		args: ['tools/test/test-linux-source-toolchain.cjs'],
+		repro: 'npm run test:linux-source-toolchain'
+	},
+	{
 		name: 'Nix runtime receipts and hosted registration preserve native admission',
 		cmd: process.execPath,
 		args: ['tools/test/test-linux-nix-native.cjs'],
