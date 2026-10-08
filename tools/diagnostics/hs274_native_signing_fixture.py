@@ -293,6 +293,68 @@ def _keychain_command_failure(error, arguments, phase):
         return
 
 
+def _completed_command_status(result):
+    """Classify the returned result before a later guard can supersede it."""
+    try:
+        if type(result) is not subprocess.CompletedProcess or type(result.returncode) is not int:
+            return "unclassified"
+        return (
+            "zero" if result.returncode == 0 else "signal" if result.returncode < 0 else "nonzero"
+        )
+    except Exception:
+        return "unclassified"
+
+
+def _keychain_command_outcome_capture(error, status_class):
+    """Attach only a closed completion class to the original settings refusal."""
+    row = _keychain_failure_observation(error)
+    if (
+        row is not None
+        and row["stage"] == "setup_credentials"
+        and row["endpoint"] == "set-keychain-settings"
+        and row["phase"] == "after"
+        and type(status_class) is str
+        and status_class in ("zero", "nonzero", "signal", "unclassified")
+    ):
+        error.keychain_command_outcome = {"status_class": status_class}
+
+
+def _keychain_command_outcome_observation(error):
+    """Decode fixed outcome metadata without raw status, paths or native reads."""
+    try:
+        row = _keychain_failure_observation(error)
+        if (
+            row is None
+            or row["stage"] != "setup_credentials"
+            or row["endpoint"] != "set-keychain-settings"
+            or row["phase"] != "after"
+        ):
+            return None
+        outcome = getattr(error, "keychain_command_outcome", None)
+        if type(outcome) is not dict or set(outcome) != {"status_class"}:
+            return None
+        status_class = outcome["status_class"]
+        if type(status_class) is not str or status_class not in (
+            "zero",
+            "nonzero",
+            "signal",
+            "unclassified",
+        ):
+            return None
+        return {
+            "schema": 1,
+            "kind": "test_only_signer_command_failure_observation",
+            "authority": False,
+            "native_verdict": "unchanged",
+            "stage": "setup_credentials",
+            "endpoint": "set-keychain-settings",
+            "phase": "after",
+            "status_class": status_class,
+        }
+    except Exception:
+        return None
+
+
 def command(arguments, deadline, guard, env=None):
     require(arguments[0] in _NATIVE, "command")
     try:
@@ -313,10 +375,16 @@ def command(arguments, deadline, guard, env=None):
         )
     except (OSError, subprocess.TimeoutExpired) as e:
         raise FixtureRefusal("native_command") from e
+    completed_status = _completed_command_status(result)
     try:
         guard()
     except FixtureRefusal as error:
         _keychain_command_failure(error, arguments, "after")
+        try:
+            _keychain_command_outcome_capture(error, completed_status)
+        except Exception:
+            # A failed diagnostic cannot replace the original identity refusal.
+            pass
         raise
     remaining(deadline)
     require(
@@ -842,6 +910,17 @@ def main(args):
                 + json.dumps(keychain_observation, sort_keys=True, separators=(",", ":")),
                 file=sys.stderr,
             )
+        try:
+            command_observation = _keychain_command_outcome_observation(error)
+            if command_observation is not None:
+                print(
+                    "ERGOPTI_SIGNER_COMMAND_OUTCOME "
+                    + json.dumps(command_observation, sort_keys=True, separators=(",", ":")),
+                    file=sys.stderr,
+                )
+        except Exception:
+            # The original failure status survives best-effort diagnostic output.
+            pass
         return 1
 
 
