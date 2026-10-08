@@ -122,6 +122,7 @@ local KEY_MAP = {
 
 	-- ── Metrics (formerly Keylogger) ───────────────────────────────────────
 	keylogger_enabled                    = { sec = "metrics", key = "enabled"                       },
+	keylogger_physical_source            = { sec = "metrics", key = "physical_source", enum = true   },
 	keylogger_encrypt                    = { sec = "metrics", key = "encrypt"                       },
 	keylogger_float_colors               = { sec = "metrics", key = "float_colors"                  },
 	keylogger_float_graph                = { sec = "metrics", key = "float_graph"                   },

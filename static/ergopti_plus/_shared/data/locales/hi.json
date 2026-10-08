@@ -3242,5 +3242,14 @@
 	"physical_shortcuts.position_unavailable": "यह कुंजी स्थिति यहाँ उपलब्ध नहीं है।",
 	"physical_shortcuts.windows_unavailable": "अभी Windows पर उपलब्ध नहीं: भौतिक कुंजी शॉर्टकट संपादक अभी Windows पर उपलब्ध नहीं है।",
 	"physical_shortcuts.collision": "यह कुंजी संयोजन पहले से उपयोग में है। दूसरा चुनें।",
-	"physical_shortcuts.window_unavailable": "यह विंडो उपलब्ध नहीं है: इसे फिर खोलने की कोशिश करें।"
+	"physical_shortcuts.window_unavailable": "यह विंडो उपलब्ध नहीं है: इसे फिर खोलने की कोशिश करें।",
+	"menu.global.karabiner_runtime": "Karabiner रनटाइम",
+	"menu.global.karabiner_runtime.owned": "Ergopti द्वारा प्रबंधित रनटाइम",
+	"menu.global.karabiner_runtime.shared": "साझा Karabiner",
+	"menu.global.karabiner_runtime_unavailable": "प्रबंधित रनटाइम उपलब्ध नहीं: सत्यापित स्थापना आवश्यक है।",
+	"menu.metrics.physical_source": "भौतिक इनपुट इतिहास का स्रोत",
+	"menu.metrics.physical_source.ledger": "कुंजी लेखा",
+	"menu.metrics.physical_source.stream": "भौतिक घटनाओं की धारा",
+	"menu.metrics.physical_source_unavailable": "भौतिक धारा उपलब्ध नहीं: सत्यापित स्थापित रनटाइम आवश्यक है।",
+	"platform_reason.physical_stream_macos_only": "केवल macOS: इस प्लेटफ़ॉर्म पर भौतिक घटनाओं का उत्पादक उपलब्ध नहीं है।"
 }

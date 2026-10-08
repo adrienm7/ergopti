@@ -3242,5 +3242,14 @@
 	"physical_shortcuts.position_unavailable": "This key position is unavailable here.",
 	"physical_shortcuts.windows_unavailable": "Not yet on Windows: The physical shortcut editor is not yet available on Windows.",
 	"physical_shortcuts.collision": "This key combination is already in use. Choose another.",
-	"physical_shortcuts.window_unavailable": "This window is unavailable: Try reopening it."
+	"physical_shortcuts.window_unavailable": "This window is unavailable: Try reopening it.",
+	"menu.global.karabiner_runtime": "Karabiner runtime",
+	"menu.global.karabiner_runtime.owned": "Ergopti-owned runtime",
+	"menu.global.karabiner_runtime.shared": "Shared Karabiner",
+	"menu.global.karabiner_runtime_unavailable": "Owned runtime unavailable: a verified installation is required.",
+	"menu.metrics.physical_source": "Physical history source",
+	"menu.metrics.physical_source.ledger": "Key ledger",
+	"menu.metrics.physical_source.stream": "Physical event stream",
+	"menu.metrics.physical_source_unavailable": "Physical stream unavailable: a verified installed runtime is required.",
+	"platform_reason.physical_stream_macos_only": "macOS only: the physical event producer is not available on this platform."
 }

@@ -3242,5 +3242,14 @@
 	"physical_shortcuts.position_unavailable": "To położenie klawisza jest tutaj niedostępne.",
 	"physical_shortcuts.windows_unavailable": "Jeszcze niedostępne w Windows: Edytor skrótów fizycznych nie jest jeszcze dostępny w systemie Windows.",
 	"physical_shortcuts.collision": "Ta kombinacja klawiszy jest już używana. Wybierz inną.",
-	"physical_shortcuts.window_unavailable": "To okno jest niedostępne: Spróbuj otworzyć je ponownie."
+	"physical_shortcuts.window_unavailable": "To okno jest niedostępne: Spróbuj otworzyć je ponownie.",
+	"menu.global.karabiner_runtime": "Środowisko wykonawcze Karabiner",
+	"menu.global.karabiner_runtime.owned": "Środowisko zarządzane przez Ergopti",
+	"menu.global.karabiner_runtime.shared": "Współdzielony Karabiner",
+	"menu.global.karabiner_runtime_unavailable": "Zarządzane środowisko niedostępne: wymagana jest zweryfikowana instalacja.",
+	"menu.metrics.physical_source": "Źródło historii wejścia fizycznego",
+	"menu.metrics.physical_source.ledger": "Rejestr klawiszy",
+	"menu.metrics.physical_source.stream": "Strumień zdarzeń fizycznych",
+	"menu.metrics.physical_source_unavailable": "Strumień fizyczny niedostępny: wymagane jest zweryfikowane zainstalowane środowisko wykonawcze.",
+	"platform_reason.physical_stream_macos_only": "Tylko macOS: producent zdarzeń fizycznych jest niedostępny na tej platformie."
 }

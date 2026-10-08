@@ -1279,6 +1279,12 @@ const CHECKS = [
 		repro: 'node tools/test/test-launcher-single-instance.cjs'
 	},
 	{
+		name: 'physical source selector declarations (defaults, migration, native file custody)',
+		cmd: 'node',
+		args: ['tools/test/test-physical-source-selectors.cjs'],
+		repro: 'node tools/test/test-physical-source-selectors.cjs'
+	},
+	{
 		name: 'menu manifest drift (feature paths + i18n keys resolve against manifest.toml)',
 		cmd: 'node',
 		args: ['tools/test/test-menu-manifest.cjs'],

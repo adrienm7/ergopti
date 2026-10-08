@@ -33,8 +33,10 @@ import { fileURLToPath } from 'url';
 import { runInNewContext } from 'vm';
 import sharedPaths from '../lib/paths.cjs';
 import menuAvailability from '../lib/menu-row-availability.cjs';
+import { createRequire } from 'node:module';
 import { validateTiming } from '../../static/ergopti_plus/_shared/modules/updater/schedule.js';
 
+const require = createRequire(import.meta.url);
 const { shared } = sharedPaths;
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -200,6 +202,16 @@ function indentationChoices(feature) {
 }
 
 const CHOICE_REGISTRIES = {
+	'karabiner.runtime': {
+		path: 'karabiner.runtime',
+		source: () => require('../lib/karabiner-runtime-setting.cjs').runtimeSetting(),
+		project: (setting) => {
+			return setting.enum_values.map((value) => ({
+				value,
+				i18n: `${setting.description_key}.${value}`
+			}));
+		}
+	},
 	'llm.indentation': { path: 'llm.display.pred_indent', project: indentationChoices },
 	'updater.channels': { path: 'updater.channel', project: updaterChannelChoices },
 	'updater.check_intervals': {
@@ -253,10 +265,11 @@ function projectChoices(menu, raw) {
 					throw new Error(`${where}: unknown choice_registry or registry-owned path`);
 				if (row.choice_values !== undefined || row.choice_label_prefix !== undefined)
 					throw new Error(`${where}: registry choices own their values, order and label keys`);
-				projectedRegistry = registry.project(numeric.get(row.path));
+				const declaration = registry.source ? registry.source() : numeric.get(row.path);
+				projectedRegistry = registry.project(declaration);
 				feature = {
 					enum_values: projectedRegistry.map((entry) => entry.value),
-					platforms: PLATFORMS
+					platforms: registry.source ? declaration.platforms : PLATFORMS
 				};
 			}
 			if (!feature) throw new Error(`${where} names "${row.path}", which is no enum feature`);

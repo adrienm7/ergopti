@@ -3242,5 +3242,14 @@
 	"physical_shortcuts.position_unavailable": "Esta posição de tecla não está disponível aqui.",
 	"physical_shortcuts.windows_unavailable": "Ainda indisponível no Windows: O editor de atalhos físicos ainda não está disponível no Windows.",
 	"physical_shortcuts.collision": "Esta combinação de teclas já está em uso. Escolha outra.",
-	"physical_shortcuts.window_unavailable": "Esta janela está indisponível: Tente reabri-la."
+	"physical_shortcuts.window_unavailable": "Esta janela está indisponível: Tente reabri-la.",
+	"menu.global.karabiner_runtime": "Ambiente de execução do Karabiner",
+	"menu.global.karabiner_runtime.owned": "Ambiente gerenciado pelo Ergopti",
+	"menu.global.karabiner_runtime.shared": "Karabiner compartilhado",
+	"menu.global.karabiner_runtime_unavailable": "Ambiente gerenciado indisponível: é necessária uma instalação verificada.",
+	"menu.metrics.physical_source": "Fonte do histórico físico",
+	"menu.metrics.physical_source.ledger": "Registro de teclas",
+	"menu.metrics.physical_source.stream": "Fluxo de eventos físicos",
+	"menu.metrics.physical_source_unavailable": "Fluxo físico indisponível: é necessário um ambiente de execução instalado e verificado.",
+	"platform_reason.physical_stream_macos_only": "Apenas macOS: o produtor de eventos físicos não está disponível nesta plataforma."
 }

@@ -3242,5 +3242,14 @@
 	"physical_shortcuts.position_unavailable": "Denne tastposition er ikke tilgængelig her.",
 	"physical_shortcuts.windows_unavailable": "Endnu ikke på Windows: Editoren til fysiske genveje er endnu ikke tilgængelig på Windows.",
 	"physical_shortcuts.collision": "Denne tastkombination er allerede i brug. Vælg en anden.",
-	"physical_shortcuts.window_unavailable": "Dette vindue er ikke tilgængeligt: Prøv at åbne det igen."
+	"physical_shortcuts.window_unavailable": "Dette vindue er ikke tilgængeligt: Prøv at åbne det igen.",
+	"menu.global.karabiner_runtime": "Karabiner-kørselsmiljø",
+	"menu.global.karabiner_runtime.owned": "Kørselsmiljø administreret af Ergopti",
+	"menu.global.karabiner_runtime.shared": "Delt Karabiner",
+	"menu.global.karabiner_runtime_unavailable": "Administreret kørselsmiljø utilgængeligt: en verificeret installation kræves.",
+	"menu.metrics.physical_source": "Kilde til fysisk inputhistorik",
+	"menu.metrics.physical_source.ledger": "Tastelog",
+	"menu.metrics.physical_source.stream": "Strøm af fysiske hændelser",
+	"menu.metrics.physical_source_unavailable": "Fysisk strøm utilgængelig: et verificeret installeret kørselsmiljø kræves.",
+	"platform_reason.physical_stream_macos_only": "Kun macOS: producenten af fysiske hændelser er ikke tilgængelig på denne platform."
 }

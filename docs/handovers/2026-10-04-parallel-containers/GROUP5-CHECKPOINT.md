@@ -2646,3 +2646,26 @@ Mac role/predicate remains unknown. Complete selected gates and publication
 receipts are recorded separately. No Group 5 item is removed; 24, 30, 31, 40,
 43 and 44 and transverse 16/38 remain partial. No final lock, dev push or
 feature deletion occurs at this checkpoint.
+
+## Shared selectors and actual physical-history startup
+
+The declared Hammerspoon physical source is ledger by default, with explicit
+stream intent. The separate shared platform Karabiner declaration remains
+shared by default. Both have strict finite schemas; nine labels have actual
+translations in all 21 locales. Manifest projections are generated, and existing
+live menu assembly remains whole without newly offered callbacks.
+
+Keylogger startup reads the actual admitted preference and binds one retained
+Session/history owner before producers. Stream selection suppresses legacy
+accounting with unavailable GAP while native activation is absent. Original
+ledger startup stays whole. Pause suspends without replacing custody; final
+shutdown retires the real Session before legacy teardown. Runtime source changes
+require controlled reload. The 50 focused portable controls include two
+query-time successor substitutions; genuine Session retirement is observed, and
+both original 48-case prefix and all existing assertions remain whole.
+Independent source reviews and the selectors' earlier full private gate are
+retained; the exact combined 41-source final gate runs separately. Portable
+controls grant no native capture, installed authority or physical qualification.
+TODO31 and transverse16/38 remain open. Shared source-edit ownership is granted
+in issue86 comment6067178486 and acknowledged in6067335501; no final integration
+lock or dev write is part of this slice.

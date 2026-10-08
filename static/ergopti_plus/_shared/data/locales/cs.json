@@ -3242,5 +3242,14 @@
 	"physical_shortcuts.position_unavailable": "Tato pozice klávesy zde není dostupná.",
 	"physical_shortcuts.windows_unavailable": "Ve Windows zatím nedostupné: Editor fyzických zkratek zatím není dostupný ve Windows.",
 	"physical_shortcuts.collision": "Tato kombinace kláves se již používá. Vyberte jinou.",
-	"physical_shortcuts.window_unavailable": "Toto okno není dostupné: Zkuste je znovu otevřít."
+	"physical_shortcuts.window_unavailable": "Toto okno není dostupné: Zkuste je znovu otevřít.",
+	"menu.global.karabiner_runtime": "Běhové prostředí Karabiner",
+	"menu.global.karabiner_runtime.owned": "Běhové prostředí spravované Ergopti",
+	"menu.global.karabiner_runtime.shared": "Sdílený Karabiner",
+	"menu.global.karabiner_runtime_unavailable": "Spravované prostředí není dostupné: je vyžadována ověřená instalace.",
+	"menu.metrics.physical_source": "Zdroj historie fyzického vstupu",
+	"menu.metrics.physical_source.ledger": "Záznam kláves",
+	"menu.metrics.physical_source.stream": "Proud fyzických událostí",
+	"menu.metrics.physical_source_unavailable": "Fyzický proud není dostupný: je vyžadováno ověřené nainstalované běhové prostředí.",
+	"platform_reason.physical_stream_macos_only": "Pouze macOS: producent fyzických událostí není na této platformě dostupný."
 }

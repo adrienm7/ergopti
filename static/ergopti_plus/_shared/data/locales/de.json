@@ -3242,5 +3242,14 @@
 	"physical_shortcuts.position_unavailable": "Diese Tastenposition ist hier nicht verfügbar.",
 	"physical_shortcuts.windows_unavailable": "Noch nicht für Windows: Der Editor für physische Tastenkürzel ist unter Windows noch nicht verfügbar.",
 	"physical_shortcuts.collision": "Diese Tastenkombination wird bereits verwendet. Wählen Sie eine andere.",
-	"physical_shortcuts.window_unavailable": "Dieses Fenster ist nicht verfügbar: Versuchen Sie, es erneut zu öffnen."
+	"physical_shortcuts.window_unavailable": "Dieses Fenster ist nicht verfügbar: Versuchen Sie, es erneut zu öffnen.",
+	"menu.global.karabiner_runtime": "Karabiner-Laufzeit",
+	"menu.global.karabiner_runtime.owned": "Von Ergopti verwaltete Laufzeit",
+	"menu.global.karabiner_runtime.shared": "Gemeinsames Karabiner",
+	"menu.global.karabiner_runtime_unavailable": "Verwaltete Laufzeit nicht verfügbar: eine überprüfte Installation ist erforderlich.",
+	"menu.metrics.physical_source": "Quelle des physischen Eingabeverlaufs",
+	"menu.metrics.physical_source.ledger": "Tastenprotokoll",
+	"menu.metrics.physical_source.stream": "Physischer Ereignisstrom",
+	"menu.metrics.physical_source_unavailable": "Physischer Strom nicht verfügbar: eine überprüfte installierte Laufzeit ist erforderlich.",
+	"platform_reason.physical_stream_macos_only": "Nur macOS: der Erzeuger physischer Ereignisse ist auf dieser Plattform nicht verfügbar."
 }

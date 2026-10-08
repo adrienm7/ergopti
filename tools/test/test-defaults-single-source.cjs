@@ -205,8 +205,10 @@ async function main() {
 	assert.deepEqual(manifest.scopes.llm.restore_exclude, ['llm.enabled']);
 	assert.deepEqual(manifest.scopes.metrics.restore_exclude, [
 		'metrics.enabled',
-		'metrics.metrics_enabled'
+		'metrics.metrics_enabled',
+		'metrics.physical_source'
 	]);
+	assert.deepEqual(manifest.scopes.metrics.clear_exclude, ['metrics.physical_source']);
 	assert(
 		manifest.scopes.global.prefixes.includes('script'),
 		'global scope must include script preferences'

@@ -1507,6 +1507,18 @@ input_altering = true
 type = "boolean"
 description_key = "menu.metrics.enabled"
 
+# Physical history is an opt-in macOS producer; declarations grant no runtime authority.
+[[features.metrics]]
+id = "physical_source"
+platforms = ["hs"]
+default = "ledger"
+recommended = "ledger"
+input_altering = false
+type = "enum"
+enum_values = ["ledger", "stream"]
+description_key = "menu.metrics.physical_source"
+reason_key = "platform_reason.physical_stream_macos_only"
+
 [[features.metrics]]
 id = "private_filter_enabled"
 default = true
@@ -6462,7 +6474,8 @@ dynamic_defaults = [{ prefix = "llm.profiles.shortcuts", depth = 2, suffix = "mo
 
 [scopes.metrics]
 prefixes = ["metrics"]
-restore_exclude = ["metrics.enabled", "metrics.metrics_enabled"]
+restore_exclude = ["metrics.enabled", "metrics.metrics_enabled", "metrics.physical_source"]
+clear_exclude = ["metrics.physical_source"]
 
 [scopes.global]
 includes = ["tap_holds", "shortcuts", "gestures", "keyboard_layout", "hotstrings", "llm", "metrics"]

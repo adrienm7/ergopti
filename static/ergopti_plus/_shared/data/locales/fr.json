@@ -3242,5 +3242,14 @@
 	"physical_shortcuts.position_unavailable": "Cette position de touche est indisponible ici.",
 	"physical_shortcuts.windows_unavailable": "Pas encore sur Windows: L’éditeur de raccourcis physiques n’est pas encore disponible sur Windows.",
 	"physical_shortcuts.collision": "Cette combinaison est déjà utilisée. Choisissez-en une autre.",
-	"physical_shortcuts.window_unavailable": "Cette fenêtre est indisponible: Essayez de la rouvrir."
+	"physical_shortcuts.window_unavailable": "Cette fenêtre est indisponible: Essayez de la rouvrir.",
+	"menu.global.karabiner_runtime": "Runtime Karabiner",
+	"menu.global.karabiner_runtime.owned": "Runtime géré par Ergopti",
+	"menu.global.karabiner_runtime.shared": "Karabiner partagé",
+	"menu.global.karabiner_runtime_unavailable": "Runtime géré indisponible : une installation vérifiée est requise.",
+	"menu.metrics.physical_source": "Source de l’historique physique",
+	"menu.metrics.physical_source.ledger": "Journal des touches",
+	"menu.metrics.physical_source.stream": "Flux d’événements physiques",
+	"menu.metrics.physical_source_unavailable": "Flux physique indisponible : un runtime installé et vérifié est requis.",
+	"platform_reason.physical_stream_macos_only": "macOS uniquement : le producteur d’événements physiques est indisponible sur cette plateforme."
 }
