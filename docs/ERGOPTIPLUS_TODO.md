@@ -7427,6 +7427,17 @@ and installation qualification are still required.
   success does not prove invocation, atomic locking or every consumer. Apple
   Shortcuts remains a read-only observer with unresolved bounded discovery/invocation.
 
+  The read-only JXA diagnostic attempts a fixed same-process preflight with
+  the SDK-owned Apple-event descriptor and Shortcuts read event with
+  prompting disabled. It starts no target and executes no shortcut. Optional
+  bounded observations preserve all four catalogue checkpoints, the existing
+  20-second capture budget, 65,536-byte caps and exact native retirement.
+  Existing Python/JXA/picker controls are already registered. Native
+  qualification of this composed extension remains UNRUN; an unavailable
+  bridge, target-not-running (-600), unreturned call or status zero does not
+  establish the historical catalogue-stall cause, a consent grant or
+  catalogue/invocation success.
+
   Remaining software: inventory supported automation/application providers and
   implement their real availability/invocation contracts. Add bounded Apple
   Shortcuts catalogue ownership, chosen-ID revalidation, safe native invocation,

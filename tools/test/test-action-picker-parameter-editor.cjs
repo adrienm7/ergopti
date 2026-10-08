@@ -971,8 +971,19 @@ for (const platform of ['hs', 'linux', 'ahk']) {
 		'Shortcuts parser and owned registration controls complete'
 	);
 	check(
-		/Ran 18 tests in /.test(parser.stderr) && /\nOK\s*$/.test(parser.stderr),
-		'all eighteen Shortcuts parser and diagnostic controls execute without skip'
+		/Ran 33 tests in /.test(parser.stderr) && /\nOK\s*$/.test(parser.stderr),
+		'all eighteen original, twelve same-principal and three failure-refinement controls execute without skip'
+	);
+	const parserSource = fs.readFileSync(
+		path.join(ROOT, 'tools/diagnostics/apple_shortcuts_probe/test_probe.py'),
+		'utf8'
+	);
+	const originalControls =
+		parserSource.split('class PermissionPreflightControls(')[0].trimEnd() + '\n';
+	check(
+		require('node:crypto').createHash('sha256').update(originalControls).digest('hex') ===
+			'df1903edc2398f0a5385f2bdc9c8217850ce4a0b9d346977070013c589e81074',
+		'all eighteen original Shortcuts control bodies remain byte-exact'
 	);
 }
 
