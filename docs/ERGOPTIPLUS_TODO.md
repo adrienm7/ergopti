@@ -6582,6 +6582,15 @@ are refused. Genuine host compilation and C-entry loading pass, including a
 foreign inherited Git-namespace control. Full selected gates and hosted Fedora
 first-install receiving remain pending; this does not close item62.
 
+Manual37747891785 atb4ef975f1 passes all shared checks, Linux units/E2E,
+the complete package job and13/17 installation variants. Release is skipped.
+The remaining four failures are the two Fedora provider refusals and two
+Alpine source compilations missinglinux/magic.h. The source-build catalogue
+and the unchanged--no-deps caller now also provisionlinux-headers on Alpine;
+no binary runtime dependency or native assertion is removed. The independent
+header-package regression fails before this correction. Final native receiving
+of the combined Fedora/Alpine repairs is still required.
+
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard
   layers on all three drivers. Windows and macOS also support their existing

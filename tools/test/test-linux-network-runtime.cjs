@@ -215,7 +215,7 @@ function portable() {
 				zypper: ['gcc', 'glibc-devel'],
 				pacman: ['gcc', 'glibc'],
 				xbps: null,
-				apk: ['gcc', 'musl-dev']
+				apk: ['gcc', 'musl-dev', 'linux-headers']
 			});
 			for (const mutate of [
 				(data) => delete data.archive_build_packages,

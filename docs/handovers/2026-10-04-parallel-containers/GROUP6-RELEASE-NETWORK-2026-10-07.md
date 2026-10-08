@@ -48,6 +48,16 @@ causal bootstrap policy guard fails before the new map;26 recipe/filesystem
 control groups pass afterwards. Full selected gates and hosted Fedora package
 manager/installation qualification remain pending at this checkpoint.
 
+Manual37747891785 atb4ef975f1561c67603dc0679c44be1d57f171eea is terminal
+FAIL: all shared/unit/E2E checks and the complete package job pass;13 of17
+installation variants pass, four fail, none are skipped. Release is skipped.
+The two Fedora rows retain their known unavailable LuaJIT provider refusal.
+Both Alpine rows now reach compilation and expose missinglinux/magic.h;
+musl-dev does not supply the kernel UAPI headers. The additionallinux-headers
+source prerequisite is projected from the shared catalogue and supplied by the
+no-deps CI caller. The causal independent catalogue regression is red before
+this correction. No compiler/runtime assertion or installation row is removed.
+
 - macOS archive migration, Sparkle resource/key/refusal receiving and bounded
   native lifecycle diagnostics. Historical native Sparkle acceptance passed;
   complete Brew/package/install acceptance remains incomplete.

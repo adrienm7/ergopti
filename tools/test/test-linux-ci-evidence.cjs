@@ -1401,7 +1401,7 @@ for (const [id, buildPackages] of [
 	['distro-debian', ['gcc', 'libc6-dev']],
 	['distro-fedora', ['gcc', 'glibc-devel']],
 	['distro-arch', ['gcc', 'glibc']],
-	['distro-alpine', ['gcc', 'musl-dev']],
+	['distro-alpine', ['gcc', 'musl-dev', 'linux-headers']],
 	['distro-opensuse', ['gcc', 'glibc-devel']]
 ]) {
 	const entry = installJob.match(

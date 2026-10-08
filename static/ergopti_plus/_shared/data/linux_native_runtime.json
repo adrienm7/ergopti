@@ -7,7 +7,7 @@
 		"zypper": ["gcc", "glibc-devel"],
 		"pacman": ["gcc", "glibc"],
 		"xbps": null,
-		"apk": ["gcc", "musl-dev"]
+		"apk": ["gcc", "musl-dev", "linux-headers"]
 	},
 	"libraries": {
 		"xkbcommon": {

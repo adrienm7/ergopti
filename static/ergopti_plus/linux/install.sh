@@ -777,7 +777,7 @@ _native_output_build_packages() {
 		zypper) echo "gcc glibc-devel" ;;
 		pacman) echo "gcc glibc" ;;
 		xbps) return 1 ;;
-		apk) echo "gcc musl-dev" ;;
+		apk) echo "gcc musl-dev linux-headers" ;;
 		*) return 1 ;;
 	esac
 }
