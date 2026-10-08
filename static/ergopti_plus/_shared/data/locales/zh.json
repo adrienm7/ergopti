@@ -3251,5 +3251,8 @@
 	"gestures.system.slot_configured_caption": "%s — 已为 ErgoptiPlus 配置",
 	"gestures.system.slot_not_configured_caption": "%s — 未为 ErgoptiPlus 配置",
 	"menu.global.reload_macos": "↺ 重新加载",
-	"menu.global.quit_macos": "✕ 退出"
+	"menu.global.quit_macos": "✕ 退出",
+	"menu.layout.pause_picker_caption": "  ↳ 脚本暂停时的布局 : %s",
+	"menu.layout.resume_picker_caption": "  ↳ 脚本活跃时的布局 : %s",
+	"menu.layout.native_variant_caption": "%s v%s"
 }

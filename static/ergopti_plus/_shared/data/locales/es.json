@@ -3251,5 +3251,8 @@
 	"gestures.system.slot_configured_caption": "%s — Configurado para ErgoptiPlus",
 	"gestures.system.slot_not_configured_caption": "%s — No configurado para ErgoptiPlus",
 	"menu.global.reload_macos": "↺ Recargar",
-	"menu.global.quit_macos": "✕ Salir"
+	"menu.global.quit_macos": "✕ Salir",
+	"menu.layout.pause_picker_caption": "  ↳ Disposición cuando script pausado : %s",
+	"menu.layout.resume_picker_caption": "  ↳ Disposición cuando script activo : %s",
+	"menu.layout.native_variant_caption": "%s v%s"
 }

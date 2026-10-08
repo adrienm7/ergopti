@@ -3251,5 +3251,8 @@
 	"gestures.system.slot_configured_caption": "%s — تم الإعداد لاستخدام ErgoptiPlus",
 	"gestures.system.slot_not_configured_caption": "%s — لم يتم الإعداد لاستخدام ErgoptiPlus",
 	"menu.global.reload_macos": "↺ إعادة تحميل",
-	"menu.global.quit_macos": "✕ إنهاء"
+	"menu.global.quit_macos": "✕ إنهاء",
+	"menu.layout.pause_picker_caption": "  ↳ التخطيط عند إيقاف البرنامج : %s",
+	"menu.layout.resume_picker_caption": "  ↳ التخطيط عند تشغيل البرنامج : %s",
+	"menu.layout.native_variant_caption": "%s v%s"
 }

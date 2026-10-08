@@ -1274,3 +1274,7 @@ helpers.describe("Complete-menu gesture status fixture owns its native cohort", 
 		helpers.assert_true(#all_titles(rows) > 40, "the original whole-menu row-count floor remains meaningful")
 	end)
 end)
+
+require("test.menu_layout_caption_values_contract").register(helpers, "linux")
+
+require("test.menu_numbered_caption_contract").register(helpers, "linux")

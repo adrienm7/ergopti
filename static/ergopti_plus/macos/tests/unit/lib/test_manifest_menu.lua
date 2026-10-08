@@ -615,3 +615,7 @@ require("test.menu_platform_lookup").register(helpers, "hs")
 
 
 require("test.menu_native_composition").register(helpers, "hs")
+
+require("test.menu_layout_caption_values_contract").register(helpers, "macos")
+
+require("test.menu_numbered_caption_contract").register(helpers, "macos")

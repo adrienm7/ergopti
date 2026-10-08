@@ -9996,3 +9996,366 @@ console.log(
 		'the old physical order oracle is independent and unchanged'
 	);
 }
+
+// Actual macOS layout switching owns the parents and complete automatic/native picker frame.
+{
+	const assert = require('node:assert/strict');
+	const { nativeTemplateBinding } = require('../lib/menu-template-binding.cjs');
+	const declaration = parseToml(readFileSync(MANIFEST_PATH, 'utf8')).menu;
+	const generated = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const expected = {
+		layout_switching_frame: [
+			{
+				type: 'check',
+				id: 'layout_switch_toggle',
+				i18n: 'menu.layout.pause_layout_enabled',
+				checked_when: ['layout_switch_checked'],
+				platforms: ['hs'],
+				unavailable: 'hide'
+			},
+			{
+				type: 'group',
+				id: 'layout_pause_picker',
+				i18n: 'menu.layout.pause_picker_caption',
+				caption_getter: 'layout_pause_caption',
+				disabled_when: ['layout_switch_ready'],
+				platforms: ['hs'],
+				unavailable: 'hide'
+			},
+			{
+				type: 'group',
+				id: 'layout_resume_picker',
+				i18n: 'menu.layout.resume_picker_caption',
+				caption_getter: 'layout_resume_caption',
+				disabled_when: ['layout_switch_ready'],
+				platforms: ['hs'],
+				unavailable: 'hide'
+			}
+		],
+		layout_switch_picker_frame: [
+			{
+				type: 'check',
+				id: 'layout_picker_auto',
+				i18n: 'menu.layout.layout_auto',
+				checked_when: ['layout_picker_auto_checked'],
+				platforms: ['hs'],
+				unavailable: 'hide'
+			},
+			{
+				type: 'include',
+				section: 'layout_switch_picker_choices_frame',
+				present_when: 'layout_picker_has_choices'
+			}
+		],
+		layout_switch_picker_choices_frame: [
+			{ type: '---' },
+			{ type: 'list', id: 'layout_picker_choices', platforms: ['hs'], unavailable: 'hide' }
+		]
+	};
+	for (const [section, rows] of Object.entries(expected)) {
+		assert.deepEqual(declaration[section], rows, 'independent complete switching declaration');
+		assert.deepEqual(generated[section], rows, 'actual generated switching declaration');
+	}
+	const source = readFileSync(
+		resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_keyboard_layout.lua'),
+		'utf8'
+	);
+	for (const [section, key, port] of [
+		['layout_switching_frame', 'layout_switch_toggle', 1],
+		['layout_switching_frame', 'layout_pause_picker', 3],
+		['layout_switching_frame', 'layout_resume_picker', 3],
+		['layout_switch_picker_frame', 'layout_picker_auto', 1],
+		['layout_switch_picker_frame', 'layout_picker_choices', 3]
+	]) {
+		assert.equal(
+			nativeTemplateBinding(source, '.lua', section, key, port),
+			true,
+			'actual executable typed switching owner'
+		);
+		assert.equal(
+			nativeTemplateBinding(source, '.lua', section, key, port === 1 ? 3 : 1),
+			false,
+			'mutation and data ports remain distinct'
+		);
+		const redirected = source.replaceAll('"' + section + '"', '"unrelated_layout_frame"');
+		assert.notEqual(redirected, source);
+		for (const decoy of [
+			'-- ManifestMenu.template_rows("' + section + '", {})',
+			JSON.stringify('ManifestMenu.template_rows("' + section + '", {})')
+		])
+			assert.equal(
+				nativeTemplateBinding(redirected + '\n' + decoy, '.lua', section, key, port),
+				false,
+				'comment/quoted decoy cannot own a declaration'
+			);
+	}
+	const vectors = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/layout_switching_captions.json'), 'utf8')
+	);
+	assert.equal(Object.keys(vectors).length, 21);
+	for (const [locale, prior] of Object.entries(vectors)) {
+		const strings = JSON.parse(readFileSync(resolve(LOCALES_DIR, locale + '.json'), 'utf8'));
+		assert.equal(
+			strings['menu.layout.pause_picker_caption']
+				.split('%s')
+				.join(strings['menu.layout.layout_auto']),
+			prior.pause
+		);
+		assert.equal(
+			strings['menu.layout.resume_picker_caption']
+				.split('%s')
+				.join(strings['menu.layout.layout_auto']),
+			prior.resume
+		);
+		assert.equal(strings['menu.layout.layout_auto'], prior.automatic);
+		assert.equal(strings['menu.layout.pause_layout_enabled'], prior.switch);
+	}
+}
+
+// Ordered original formats and native record captions retain distinct authority.
+{
+	const assert = require('node:assert/strict');
+	const availability = require('../lib/menu-row-availability.cjs');
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/layout_caption_values.json'), 'utf8')
+	);
+	const english = JSON.parse(readFileSync(resolve(LOCALES_DIR, 'en.json'), 'utf8'));
+	const parent = {
+		type: 'group',
+		id: 'genuine_native_parent',
+		caption_source: 'native',
+		caption_getter: 'native',
+		unavailable: 'hide'
+	};
+	availability.validateChildTemplates({ frame: [...corpus.rows, parent] }, (key) => english[key]);
+	for (const [name, alter] of [
+		['empty vector', (row) => (row.caption_getters = [])],
+		['sparse vector', (row) => (row.caption_getters = ['scope', , 'latest'])],
+		['named vector', (row) => (row.caption_getters.extra = 'scope')],
+		['wrong getter', (row) => (row.caption_getters[1] = false)],
+		['wrong arity', (row) => (row.caption_getters = ['scope'])],
+		['mixed scalar', (row) => (row.caption_getter = 'scope')],
+		['mixed joiner', (row) => (row.caption_joiner = '')],
+		['mixed native source', (row) => (row.caption_source = 'native')],
+		[
+			'inert behavior metadata',
+			(row) => {
+				row.type = 'label';
+				row.action = 'foreign';
+			}
+		]
+	]) {
+		const row = structuredClone(corpus.rows[0]);
+		alter(row);
+		assert.throws(
+			() => availability.validateChildTemplates({ frame: [row] }, (key) => english[key]),
+			undefined,
+			name
+		);
+	}
+	for (const original of [corpus.rows[1], parent])
+		for (const [name, change] of [
+			['translation identity', { i18n: 'menu.layout.title' }],
+			['translated vector', { caption_getters: ['native'] }],
+			['empty native getter', { caption_getter: '' }],
+			['wrong native getter', { caption_getter: false }],
+			['foreign native source', { caption_source: 'foreign' }],
+			['native decoration', { caption_joiner: '' }],
+			['foreign row kind', { type: 'command' }]
+		])
+			assert.throws(
+				() =>
+					availability.validateChildTemplates(
+						{ frame: [{ ...original, ...change }] },
+						(key) => english[key]
+					),
+				undefined,
+				name
+			);
+	assert.equal(Object.keys(corpus.expected).length, 21);
+	for (const [locale, expected] of Object.entries(corpus.expected)) {
+		const strings = JSON.parse(readFileSync(resolve(LOCALES_DIR, locale + '.json'), 'utf8'));
+		const parts = strings['menu.layout.update_version'].split('%s');
+		assert.equal(parts.length, 4, 'original locale has three scalar positions');
+		assert.equal(
+			parts[0] +
+				corpus.values.scope +
+				parts[1] +
+				corpus.values.old +
+				parts[2] +
+				corpus.values.latest +
+				parts[3],
+			expected[0]
+		);
+		assert.equal(expected[1], 'Native 100%s && 🦀', 'independent literal native-caption oracle');
+	}
+}
+
+// A forwarded singleton owes the genuine helper, typed callbacks, and finished parent route.
+{
+	const assert = require('node:assert/strict');
+	const { nativeLayoutTemplatePublication } = require('../lib/menu-native-layout-binding.cjs');
+	const declaration = parseToml(readFileSync(MANIFEST_PATH, 'utf8')).menu;
+	const generated = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const native = readFileSync(
+		resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_keyboard_layout.lua'),
+		'utf8'
+	);
+	const sections = [
+		'layout_native_record_choice',
+		'layout_bundle_installed',
+		'layout_bundle_update',
+		'layout_bundle_install',
+		'layout_bundle_in_list',
+		'layout_bundle_update_install_first',
+		'layout_bundle_upgrade',
+		'layout_bundle_upgrade_to',
+		'layout_bundle_variant_added',
+		'layout_bundle_variant_add',
+		'layout_bundle_variant_parent',
+		'layout_bundle_install_first',
+		'layout_bundle_frame',
+		'layout_native_parent'
+	];
+	for (const section of sections) {
+		assert.deepEqual(
+			generated[section],
+			declaration[section],
+			'owning compiler projects the actual declaration'
+		);
+		const credit = (source) =>
+			nativeLayoutTemplatePublication(source, section, declaration[section]);
+		assert.equal(
+			credit(native),
+			true,
+			section + ' has actual native forwarding and final publication'
+		);
+		for (const [name, candidate] of [
+			['quoted producer', JSON.stringify(native)],
+			[
+				'wrong native receiver',
+				native.replace('renderer.template_rows(section,', 'Foreign.template_rows(section,')
+			],
+			[
+				'redirected declaration',
+				native.replaceAll('"' + section + '"', '"withdrawn_layout_frame"')
+			],
+			[
+				'withdrawn finished subtree',
+				native.replace('"layout_parent_content", submenu, {}', '"layout_parent_content", {}, {}')
+			],
+			['discarded custom rows', native.replace('return custom_rows end', 'return {} end')],
+			['discarded native active rows', native.replace('return active_rows end', 'return {} end')],
+			['discarded bundle rows', native.replace('return declared_bundle_rows end', 'return {} end')],
+			['discarded switching rows', native.replace('return switching_rows end', 'return {} end')]
+		]) {
+			assert.notEqual(candidate, native, name + ' changes a genuine measured producer');
+			assert.equal(credit(candidate), false, name + ' cannot earn native frame credit');
+		}
+		assert.equal(nativeLayoutTemplatePublication(native, section, []), false);
+		assert.equal(credit(native), true, 'exact genuine producer restoration recovers credit');
+	}
+}
+
+// Independent numbered policy vectors; actual canonical generator validation owner.
+{
+	const { validateChildTemplates } = require('../lib/menu-row-availability.cjs');
+	const assert = require('node:assert/strict');
+	const row = {
+		type: 'command',
+		id: 'native_action',
+		i18n: 'contract.numbered',
+		caption_getter: 'native_value',
+		caption_format: 'numbered'
+	};
+	for (const title of ['Caption {1}', '50% %s {1} / {1}', 'Empty ({1})'])
+		assert.doesNotThrow(() => validateChildTemplates({ frame: [row] }, () => title));
+	for (const title of [
+		'Caption',
+		'Caption {2}',
+		'Caption {1} {2}',
+		'Caption {{1}}',
+		'Caption {1',
+		'Caption {1}}'
+	])
+		assert.throws(() => validateChildTemplates({ frame: [row] }, () => title), /numbered caption/);
+	for (const change of [
+		{ caption_format: 'foreign' },
+		{ caption_getter: undefined },
+		{ caption_getter: '' },
+		{ caption_getters: ['native_value'] },
+		{ caption_layout: 'suffix', caption_joiner: ' ' },
+		{ caption_source: 'native' },
+		{ label_prefix: '!' },
+		{ type: 'check' },
+		{ id: '' },
+		{ reason_key: 'reason' },
+		{ disabled_reason_key: 'reason' }
+	])
+		assert.throws(
+			() => validateChildTemplates({ frame: [{ ...row, ...change }] }, () => 'Caption {1}'),
+			/numbered caption/
+		);
+	assert.doesNotThrow(() =>
+		validateChildTemplates({ frame: [{ ...row, type: 'group' }] }, () => 'Parent {1}')
+	);
+}
+
+// Source-only successor controls exercise the actual guarded receiver and nested picker owner.
+{
+	const assert = require('node:assert/strict');
+	const { nativeLayoutTemplatePublication } = require('../lib/menu-native-layout-binding.cjs');
+	const declaration = parseToml(readFileSync(MANIFEST_PATH, 'utf8')).menu;
+	const source = readFileSync(
+		resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_keyboard_layout.lua'),
+		'utf8'
+	);
+	for (const [name, candidate] of [
+		[
+			'foreign guarded native receiver',
+			source.replace(
+				'pcall(require, "infra.manifest_menu")',
+				'pcall(require, "infra.foreign_menu")'
+			)
+		],
+		[
+			'withdrawn actual renderer refusal',
+			source.replace('if not ok_mm or type(ManifestMenu.build) ~= "function" then', 'if false then')
+		],
+		['shadowed guarded call owner', 'local pcall = ForeignCall\n' + source]
+	]) {
+		assert.notEqual(candidate, source, name + ' mutates the genuine source owner');
+		for (const section of [
+			'layout_native_record_choice',
+			'layout_bundle_frame',
+			'layout_native_parent'
+		])
+			assert.equal(
+				nativeLayoutTemplatePublication(candidate, section, declaration[section]),
+				false,
+				name
+			);
+	}
+	const candidate = source.replace(
+		'local function picker(current_id, on_pick)',
+		'local function foreign_picker(current_id, on_pick)'
+	);
+	assert.notEqual(candidate, source, 'withdraw the actual nested picker declaration');
+	assert.equal(
+		nativeLayoutTemplatePublication(
+			candidate,
+			'layout_native_record_choice',
+			declaration.layout_native_record_choice
+		),
+		false
+	);
+	assert.equal(
+		nativeLayoutTemplatePublication(
+			source,
+			'layout_native_record_choice',
+			declaration.layout_native_record_choice
+		),
+		true,
+		'restore the actual switching builder and nested picker ownership'
+	);
+}

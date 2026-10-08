@@ -18,6 +18,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local LayoutFixture = require("tests.support.layout_legacy_caption_fixture")
 
 -- The menu modules ui/menu/init.lua loads, under the keys Builder.generate reads.
 local MENU_MODULES = {
@@ -131,6 +132,7 @@ local function build_tray()
 
 	local builder = helpers.load_with_stubs("ui.menu.builder")
 	local i18n = require("infra.i18n")
+	LayoutFixture.install(i18n)
 	-- Every key resolves to text, the way the real catalogue does: a stub that
 	-- echoes keys would make the renderer hide rows a real tray shows.
 	local echo = i18n.get
@@ -185,9 +187,8 @@ local function walk(rows, visit, path, depth)
 	end
 end
 
-local MENU, LINES, BUILD_ERROR = build_tray()
-
-helpers.describe("the real macOS tray: every submenu reaches the menu bar populated", function()
+helpers.describe("the real macOS tray: every submenu reaches the menu bar populated", LayoutFixture.scoped(function()
+	local MENU, LINES, BUILD_ERROR = build_tray()
 	helpers.it("builds without raising", function()
 		helpers.assert_nil(BUILD_ERROR, "Builder.generate raised over the real menu modules")
 		helpers.assert_true(type(MENU) == "table" and #MENU > 0, "the tray must not be empty")
@@ -368,4 +369,4 @@ helpers.describe("the real macOS tray: every submenu reaches the menu bar popula
 			"startup immediately precedes Uninstall")
 		helpers.assert_eq(rows[#rows - 2].title, "-", "a separator sets the installation group apart")
 	end)
-end)
+end))

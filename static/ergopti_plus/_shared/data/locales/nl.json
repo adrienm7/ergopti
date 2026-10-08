@@ -3251,5 +3251,8 @@
 	"gestures.system.slot_configured_caption": "%s — Geconfigureerd voor ErgoptiPlus",
 	"gestures.system.slot_not_configured_caption": "%s — Niet geconfigureerd voor ErgoptiPlus",
 	"menu.global.reload_macos": "↺ Herladen",
-	"menu.global.quit_macos": "✕ Afsluiten"
+	"menu.global.quit_macos": "✕ Afsluiten",
+	"menu.layout.pause_picker_caption": "  ↳ Indeling wanneer script gepauzeerd : %s",
+	"menu.layout.resume_picker_caption": "  ↳ Indeling wanneer script actief : %s",
+	"menu.layout.native_variant_caption": "%s v%s"
 }
