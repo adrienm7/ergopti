@@ -7466,6 +7466,14 @@ Final joined-source gates and remote Shortcut retirement remain required.
   witnesses. Wayland source authority remains explicitly unavailable; menus stay
   reachable. Generic editor readiness does not enable physical delivery.
 
+  The macOS conditional owner now retains its original context, configuration,
+  callback ports and source through construction, projection, registration and
+  delivery. Reentrant retirement, source changes and parent revocation refuse
+  before allocation or execution. Exact registrar retirement is unchanged.
+  All 15 original cases and 79 assertions remain; the expanded registered owner
+  tests pass 22/0 on LuaJIT and Lua 5.4, and the previous source fails all seven
+  added cases. Native TIS/GUI and final installed qualification remain pending.
+
   Remaining software: finish live effective-source retargeting, collisions
   against every owner and current modifier/output custody without overriding
   None/personal records or weakening compensation. Native qualification:
