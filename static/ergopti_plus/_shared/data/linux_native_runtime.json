@@ -1,6 +1,14 @@
 {
 	"version": 1,
-	"description": "Native runtime libraries used by LuaJIT FFI; build headers and Xvfb are validation-only dependencies.",
+	"description": "Native runtime libraries used by LuaJIT FFI and separate source-install compiler prerequisites; Xvfb remains validation-only.",
+	"archive_build_packages": {
+		"apt": ["gcc", "libc6-dev"],
+		"dnf": ["gcc", "glibc-devel"],
+		"zypper": ["gcc", "glibc-devel"],
+		"pacman": ["gcc", "glibc"],
+		"xbps": null,
+		"apk": ["gcc", "musl-dev"]
+	},
 	"libraries": {
 		"xkbcommon": {
 			"soname": "libxkbcommon.so.0",

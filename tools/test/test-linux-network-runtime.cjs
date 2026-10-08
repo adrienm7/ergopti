@@ -43,6 +43,82 @@ function nativeEnvironment(extra) {
 
 /** Tests actual generated installer decisions with private package/runtime witnesses. */
 function portable() {
+	check(
+		'source archive builds declare complete compiler and libc headers separately from runtime',
+		() => {
+			assert.deepEqual(source.archive_build_packages, {
+				apt: ['gcc', 'libc6-dev'],
+				dnf: ['gcc', 'glibc-devel'],
+				zypper: ['gcc', 'glibc-devel'],
+				pacman: ['gcc', 'glibc'],
+				xbps: null,
+				apk: ['gcc', 'musl-dev']
+			});
+			for (const mutate of [
+				(data) => delete data.archive_build_packages,
+				(data) => delete data.archive_build_packages.apk,
+				(data) => (data.archive_build_packages.apt = []),
+				(data) => (data.archive_build_packages.apt = ['gcc', 'gcc']),
+				(data) => (data.archive_build_packages.apt = ['gcc; exit 0'])
+			]) {
+				const invalid = structuredClone(source);
+				mutate(invalid);
+				assert.throws(() => generator.validate(invalid), /archive build/);
+			}
+			const installer = outputs[`${DRIVER}/install.sh`];
+			const functions = ['_native_output_build_packages', '_ensure_native_output_toolchain']
+				.map((name) => shellFunction(installer, name))
+				.join('\n');
+			for (const [manager, packages] of Object.entries(source.archive_build_packages)) {
+				for (const skip of [false, true]) {
+					for (const installStatus of [0, 7]) {
+						const result = spawnSync(bashExecutable(), ['-s'], {
+							input:
+								'set -u\n' +
+								functions +
+								'\n' +
+								`SKIP_DEPS=${skip}\n_detect_pkg_manager() { echo ${manager}; }\n` +
+								`_install_required_package() { printf 'INSTALL %s %s\\n' "$1" "$2"; return ${installStatus}; }\n` +
+								'_ensure_native_output_toolchain\n',
+							encoding: 'utf8',
+							timeout: 5000
+						});
+						assert.ifError(result.error);
+						assert.equal(result.signal, null);
+						assert.equal(result.status, skip || (packages && !installStatus) ? 0 : 1);
+						const expected =
+							skip || !packages ? [] : installStatus ? packages.slice(0, 1) : packages;
+						assert.deepEqual(
+							result.stdout.trim().split('\n').filter(Boolean),
+							expected.map((pkg) => `INSTALL ${manager} ${pkg}`)
+						);
+					}
+				}
+			}
+			const sourceBranch = installer.slice(
+				installer.indexOf('NATIVE_OUTPUT_REPO='),
+				installer.indexOf('# Create destination directories.')
+			);
+			assert.match(
+				sourceBranch,
+				/if \[ "\$SRC_DRIVER" = "\$\{NATIVE_OUTPUT_REPO\}\/static\/ergopti_plus\/linux" \]; then/
+			);
+			assert.ok(
+				sourceBranch.indexOf('_ensure_native_output_toolchain || exit 1') <
+					sourceBranch.indexOf('NATIVE_OUTPUT_STAGE="$(mktemp -d)"')
+			);
+			assert.ok(
+				sourceBranch.indexOf('_ensure_native_output_toolchain || exit 1') >
+					sourceBranch.indexOf('Canonical native archive build helper unavailable')
+			);
+			for (const format of ['deb', 'rpm', 'arch'])
+				assert.ok(
+					generator
+						.requirements(source, format)
+						.every((name) => !['gcc', 'libc6-dev', 'glibc-devel', 'musl-dev'].includes(name))
+				);
+		}
+	);
 	check('original library identities and all historical package requirements survive', () => {
 		assert.deepEqual(generator.KEYS, ['xkbcommon', 'xkbcommon_x11', 'x11', 'x11_xcb']);
 		for (const [format, old] of Object.entries({

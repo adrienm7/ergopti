@@ -1394,6 +1394,40 @@ assert.throws(() =>
 	)
 );
 const prepare = pipeline.step(installJob, 'Prepare the container');
+// --no-deps is deliberately preserved: these five source installs require a
+// compiler supplied by their caller, whereas first-run provisioning belongs
+// to the real installer. Runtime packages must remain absent from preparation.
+for (const [id, buildPackages] of [
+	['distro-debian', ['gcc', 'libc6-dev']],
+	['distro-fedora', ['gcc', 'glibc-devel']],
+	['distro-arch', ['gcc', 'glibc']],
+	['distro-alpine', ['gcc', 'musl-dev']],
+	['distro-opensuse', ['gcc', 'glibc-devel']]
+]) {
+	const entry = installJob.match(
+		new RegExp(`^          - id: ${id}\\n([\\s\\S]*?)(?=^          - id:|^    container:)`, 'm')
+	);
+	assert.ok(entry, `Missing original source-install lane: ${id}`);
+	const prep = entry[1].match(/^            prep: (.+)$/m);
+	assert.ok(prep, `Missing actual preparation: ${id}`);
+	const words = prep[1].split(/\s+/);
+	for (const pkg of buildPackages)
+		assert.ok(words.includes(pkg), `${id} lacks source-build prerequisite ${pkg}`);
+	assert.ok(!words.includes('luajit'), `${id} preparation hides a missing runtime dependency`);
+}
+const firstInstallFixture = fs.readFileSync(
+	path.join(ROOT, 'static/ergopti_plus/linux/tests/distro/e2e_install.sh'),
+	'utf8'
+);
+assert.match(firstInstallFixture, /^mkdir -p "\$\{E2E_HOME\}\/ergopti\/tools\/build"$/m);
+assert.match(
+	firstInstallFixture,
+	/^cp "\$\{SRC\}\/tools\/build\/build-linux-native-output\.sh" "\$\{E2E_HOME\}\/ergopti\/tools\/build\/"$/m
+);
+assert.ok(
+	firstInstallFixture.indexOf('cp "${SRC}/tools/build/build-linux-native-output.sh"') <
+		firstInstallFixture.indexOf('section "Installer"')
+);
 assert.strictEqual(
 	pipeline.stepField(prepare, 'shell'),
 	'sh',
