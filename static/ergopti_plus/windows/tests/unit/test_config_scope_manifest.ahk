@@ -70,7 +70,6 @@ _ScopeManifestQuotedRoundTrip() {
 		Assert(TOML_BatchWrite(Path, _ConfigPrepareTypedUpdates([Row])))
 		AssertContains(FSReadUtf8Exact(Path), "fast = true", "dynamic Boolean intent must survive admitted serialization")
 		Candidate := Map("hotstrings", Map("modules", Map("ext:ergopti:rolls", Map("fast", false))))
-		_CMJFixtureReadonly(Path)
 		ApplyConfigToml(Candidate, Path)
 		AssertEqual(Candidate["hotstrings"]["modules"]["ext:ergopti:rolls"]["fast"], true,
 			"real loader must address the same unquoted runtime identity")
@@ -107,20 +106,12 @@ _ScopeBuiltBorrowedOwner() {
 Test("config-scope: borrowed candidate admission retains exact lifecycle ownership", _ScopeBuiltBorrowedOwner)
 
 ; The filesystem and WAL are real; only replacement-process launch is injected.
-_ScopeOwnerFixture(InitialSource := unset) {
+_ScopeOwnerFixture() {
 	Directory := A_Temp . "\ergopti-scope-" . A_TickCount . "-" . Random(10000, 99999)
 	DirCreate(Directory)
-	if IsSet(InitialSource) {
-		Assert(InitialSource is String, "an ordinary current-schema subject supplies its actual source before native startup")
-		Source := _CMJFixtureCurrentSource(InitialSource)
-	} else
-		Source := _CMJFixtureCurrentSource('[layout]`nergopti_base = true`nergopti_altgr = true`n[llm]`nenabled = true`n[private]`ncredential = "keep"`n')
+	Source := '[layout]`nergopti_base = true`nergopti_altgr = true`n[llm]`nenabled = true`n[private]`ncredential = "keep"`n'
 	Path := Directory . "\config.toml"
 	Assert(FSWriteDurable(Path, Source))
-	Boot := ConfigMigrateBoot(Path)
-	AssertEqual("current", Boot["status"], "the actual source must complete its genuine default constructor")
-	AssertEqual(0, Boot["read_only"])
-	AssertTrue(FSUtf8ExactMatches(Path, Source), "ordinary current startup preserves the independently authored source")
 	Options := Map("path", Path, "locator", Directory . "\paths.toml", "stamp", "scope-test",
 		"settle", (*) => 1, "notify", (*) => 0)
 	return { directory: Directory, path: Path, source: Source, options: Options }
@@ -318,18 +309,15 @@ _ScopeOwnerRetainsRollbackDebt() {
 	global _ConfigTransitionRetainedBarrier
 	PriorRetained := _ConfigTransitionRetainedBarrier
 	Fixture := _ScopeOwnerFixture()
-	Bundle := 0, Handle := -1
+	Bundle := 0, RefuseMove := false
 	Port := ConfigTransitionProductionPort()
-	AssertTrue(ConfigTransitionProductionPort(Port), "this rollback subject retains the actual native port owner")
+	Move(Source, Destination) {
+		return RefuseMove ? false : FSAtomicMoveReplace(Source, Destination)
+	}
+	Port["move_replace"] := Move
 	Launch(_Success, Borrowed, _Refused) {
 		Bundle := Borrowed
-		AssertFalse(FSUtf8ExactMatches(Fixture.path, Fixture.source), "the actual native journal published before physical rollback denial")
-		; Share read/write but deny deletion: the real native replacement must fail.
-		Handle := DllCall("kernel32\CreateFileW", "Str", Fixture.path,
-			"UInt", 0x80000000, "UInt", 3, "Ptr", 0, "UInt", 3,
-			"UInt", 0x00000080, "Ptr", 0, "Ptr")
-		AssertTrue(Handle != -1, "the real Windows non-delete-sharing handle must be acquired")
-		AssertTrue(ConfigTransitionProductionPort(Port), "physical sharing denial does not mutate native callbacks")
+		RefuseMove := true
 		return false
 	}
 	Fixture.options["port"] := Port
@@ -340,23 +328,12 @@ _ScopeOwnerRetainsRollbackDebt() {
 		Assert(_ConfigWriteLeaseSelectOwner(Bundle, Fixture.path) is Object)
 		Assert(!_ConfigWriteLeaseTryAcquire(Fixture.path, "must remain blocked"))
 		AssertEqual(FSReadUtf8Exact(Receipt["backup"]), Fixture.source)
-		AssertTrue(DllCall("kernel32\CloseHandle", "Ptr", Handle, "Int"), "the real sharing denial must close before native recovery")
-		Handle := -1
-		AssertTrue(ConfigTransitionProductionPort(Port), "the same genuine native port admits exact recovery")
+		RefuseMove := false
 		Recovered := ConfigTransitionRollbackOwned(Fixture.options["locator"], Bundle, Port)
 		Assert(ConfigTransitionResultIs(Recovered, "recovered_old"))
 		AssertEqual(FSReadUtf8Exact(Fixture.path), Fixture.source)
 	} finally {
-		if Handle != -1 {
-			AssertTrue(DllCall("kernel32\CloseHandle", "Ptr", Handle, "Int"), "fixture failure must close its genuine native handle")
-			Handle := -1
-		}
 		try {
-			if Bundle is Object {
-				Resolution := ConfigTransitionRollbackOwned(Fixture.options["locator"], Bundle, Port)
-				AssertTrue(ConfigTransitionResultIs(Resolution, "absent") || ConfigTransitionResultIs(Resolution, "recovered_old"),
-					"fixture retirement resolves real native WAL debt before releasing its actual owner")
-			}
 			if Bundle is Object
 				_ConfigWriteTerminalRelease(Bundle)
 		} finally {
@@ -381,12 +358,7 @@ _ScopeExpectedOldHashRefusal(AdditionalFile := false) {
 	TargetPath := AdditionalFile ? Fixture.overrides : Fixture.path
 	Original := AdditionalFile ? Fixture.overrideSource : Fixture.source
 	Changed := Original . "# external edit after candidate read`n"
-	NativePort := ConfigTransitionProductionPort()
-	AssertTrue(ConfigTransitionProductionPort(NativePort), "the genuine canonical port stays owned throughout this precondition-only subject")
-	; A never-issued detached custom port exercises the portable hash refusal.
-	; It cannot qualify config.toml publication as a genuine native writer.
-	Port := NativePort.Clone()
-	AssertFalse(ConfigTransitionProductionPort(Port), "the portable callback copy grants no native authority")
+	Port := ConfigTransitionProductionPort()
 	Rejected := false, Launches := 0, Bundle := 0
 	Hash(Content) {
 		if !Rejected && Content == Original {
@@ -413,7 +385,6 @@ _ScopeExpectedOldHashRefusal(AdditionalFile := false) {
 		AssertEqual(Changed, FSReadUtf8Exact(TargetPath), "the external edit remains authoritative")
 		Assert(!FileExist(Receipt["backup"]), "precondition failure precedes backup effects")
 	} finally {
-		AssertTrue(ConfigTransitionProductionPort(NativePort), "portable hash failure leaves the actual native owner image intact")
 		if Bundle is Object {
 			ConfigTransitionRollbackOwned(Fixture.options["locator"], Bundle, Port)
 			_ConfigWriteTerminalRelease(Bundle)
@@ -428,7 +399,7 @@ Test("scope-hash-precondition: extra file hash refusal never publishes a stale i
 ; injected, exactly as the existing scope fixture. No boot warning is authority.
 _ScopeObsoleteSource(Literal, Parent := false) {
 	Assert(ManifestBuildFeaturesMap()["layout"].Has("ergopti_alt_gr"), "the fixture sibling must be a real declared layout setting")
-	return Chr(0xFEFF) . "_meta.schema_version = " . ConfigMigrateCurrentVersion() . "`n" . (Parent
+	return Chr(0xFEFF) . (Parent
 		? '[hotstrings]`nautocorrection = ' . Literal . ' # retain until explicit cleanup`n[layout]`nergopti_alt_gr = true`n[private]`n"literal.dot" = { keep = [1, "x"], date = 1979-05-27 }`n'
 		: '[layout]`nergopti_base = ' . Literal . ' # retain until explicit cleanup`nergopti_alt_gr = true`n[private]`n"literal.dot" = { keep = [1, "x"], date = 1979-05-27 }`n')
 }
@@ -468,7 +439,6 @@ _ScopeObsoleteLeafClear(Literal, Outcome := "complete") {
 			Restart := Fixture.directory . "\restart.toml"
 			Assert(FSWriteDurable(Restart, Expected))
 			RestartSeed := ManifestBuildFeaturesMap()
-			_CMJFixtureReadonly(Restart)
 			ApplyConfigToml(RestartSeed, Restart, &RestartRejected, , &RestartOutdated)
 			AssertEqual(0, RestartRejected)
 			Assert(RestartOutdated.Has("layout`nergopti_base"))

@@ -3254,5 +3254,7 @@
 	"menu.global.quit_macos": "✕ Salir",
 	"menu.layout.pause_picker_caption": "  ↳ Disposición cuando script pausado : %s",
 	"menu.layout.resume_picker_caption": "  ↳ Disposición cuando script activo : %s",
-	"menu.layout.native_variant_caption": "%s v%s"
+	"menu.layout.native_variant_caption": "%s v%s",
+	"app_picker.agent_remove_marker": "✗",
+	"app_picker.agent_exclude_current_caption": "Excluir %s (actual)"
 }

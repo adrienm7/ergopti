@@ -235,8 +235,6 @@ _A1_WithDesiredFixture(Body) {
 		"categories", CategoryEnabled, "path", ConfigurationFile)
 	Owner := MasterGateState()
 	SavedOwner := Owner.Clone()
-	Directory := A_Temp . "\ergopti-a1-desired-" . A_TickCount . "-" . Random(10000, 99999)
-	DirCreate(Directory)
 	try {
 		Owner["initialized"] := false
 		Features := Map("layout", Map("ergopti_base", true, "ergopti_alt_gr", false),
@@ -246,11 +244,7 @@ _A1_WithDesiredFixture(Body) {
 		TapHold := Map("keys", Map("caps_lock", Map("tap_action", "enter", "hold_modifier", "ctrl")))
 		CategoryEnabled := Map("Layout", false, "Shortcuts", false, "Hotstrings", false,
 			"TapHolds", false, "Rolls", false)
-		ConfigurationFile := Directory . "\config.toml"
-		AssertFalse(FSStrictExists(ConfigurationFile), "desired-state tests own an independent actual absent source")
-		Boot := ConfigMigrateBoot(ConfigurationFile)
-		AssertEqual("absent", Boot["status"], "real native startup precedes these existing desired-state transaction bodies")
-		AssertEqual(0, Boot["read_only"])
+		ConfigurationFile := A_Temp . "\ergopti_a1_desired_" . A_TickCount . ".toml"
 		MasterGateInitialize(Features, TapHold, IsCategoryGated)
 		Body.Call()
 	} finally {
@@ -261,8 +255,6 @@ _A1_WithDesiredFixture(Body) {
 		Owner.Clear()
 		for Key, Value in SavedOwner
 			Owner[Key] := Value
-		if DirExist(Directory)
-			DirDelete(Directory, true)
 	}
 }
 

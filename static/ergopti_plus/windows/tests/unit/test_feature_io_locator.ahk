@@ -185,22 +185,7 @@ _FIL_PersonalSectionSeededSucceedsBody() {
 		"WriteFeatureV2 must succeed once EnsurePersonalHotstringFeature has seeded the section")
 }
 _FIL_PersonalSectionSeededSucceeds() {
-	global ConfigurationFile
-	SavedPath := ConfigurationFile
-	Directory := A_Temp . "\ergopti-feature-seeded-" . A_TickCount . "-" . Random(10000, 99999)
-	DirCreate(Directory)
-	try {
-		ConfigurationFile := Directory . "\config.toml"
-		AssertFalse(FSStrictExists(ConfigurationFile), "the ordinary seeded write starts from a genuine absent source")
-		Boot := ConfigMigrateBoot(ConfigurationFile)
-		AssertEqual("absent", Boot["status"], "the actual default constructor must admit this fresh ordinary-save subject")
-		AssertEqual(0, Boot["read_only"])
-		_FIL_WithFeatures(Map("hotstrings", Map()), _FIL_PersonalSectionSeededSucceedsBody)
-	} finally {
-		ConfigurationFile := SavedPath
-		if DirExist(Directory)
-			DirDelete(Directory, true)
-	}
+	_FIL_WithFeatures(Map("hotstrings", Map()), _FIL_PersonalSectionSeededSucceedsBody)
 }
 Test("feature_io: WriteFeatureV2 succeeds after EnsurePersonalHotstringFeature seeds the section (personal-hotstring-live-toggle-seed)",
 	_FIL_PersonalSectionSeededSucceeds)

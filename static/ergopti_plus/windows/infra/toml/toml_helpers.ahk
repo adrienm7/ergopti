@@ -788,8 +788,8 @@ _TOML_FinalizeBuildResult(Result, SourcePresent, SourceBytes) {
 	return Map("status", "error", "kind", "render_failed", "content", "")
 }
 
-TOML_BatchWrite(Path, Updates, ExactSectionPrefixes := [], AdmissionFn := 0) {
-		return _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, "write", , , false, AdmissionFn)
+TOML_BatchWrite(Path, Updates, ExactSectionPrefixes := []) {
+		return _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, "write")
 }
 
 /** Builds a complete configuration-only semantic candidate without publication. */
@@ -804,19 +804,8 @@ TOML_BuildConfigUpdatedContent(Path, Updates, ExactSectionPrefixes := []) {
 }
 
 /** Publishes semantic configuration effects through the existing guarded stage. */
-TOML_ConfigBatchWrite(Path, Updates, ExactSectionPrefixes := [], AdmissionFn := 0) {
-	Owner := _ConfigWriteLeaseCurrent(Path)
-	Borrowed := _ConfigWriteLeaseOwns(Owner, Path)
-	if !Borrowed
-		Owner := _ConfigWriteLeaseTryAcquire(Path, "native-config-writer")
-	if !(Owner is Object)
-		return false
-	NativeAdmission := () => _ConfigWriteLeaseOwns(Owner, Path) && _FSNativeAdmissionAccepted(AdmissionFn)
-	try return _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, "write", , , true, NativeAdmission)
-	finally {
-		if !Borrowed
-			_ConfigWriteLeaseRelease(Owner)
-	}
+TOML_ConfigBatchWrite(Path, Updates, ExactSectionPrefixes := []) {
+	return _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, "write", , , true)
 }
 
 ; Fresh source authority is checked independently of candidate equality. A
@@ -826,7 +815,7 @@ _TOML_WriteSourceMatches(Path, SourcePresent, SourceBytes) {
 }
 
 _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
-		ProvidedContent := unset, ProvidedPresence := unset, DocumentMode := false, AdmissionFn := 0) {
+		ProvidedContent := unset, ProvidedPresence := unset, DocumentMode := false) {
 		if !(Mode is String) || (Mode != "write" && Mode != "build")
 				throw ValueError("TOML_BatchWrite mode must be 'write' or 'build'")
 		BuildOnly := Mode == "build"
@@ -843,7 +832,7 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 						throw ValueError("ExactSectionPrefixes must contain non-empty strings")
 		}
 		if (!DocumentMode && !BuildOnly && Updates.Length = 0 and ExactSectionPrefixes.Length = 0)
-				return FSNativeAcknowledge(AdmissionFn)
+				return true
 
 		; A config save is a full read-modify-write plus a canonicalisation pass, and
 		; it runs from menu callbacks — so a slow one blocks the tray menu while the
@@ -866,24 +855,7 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 				return false
 		}
 		if DocumentMode {
-			CandidateUpdates := Updates
-			if !SourcePresent {
-				; Genuine first-use absence has no schema metadata to preserve. The
-				; native candidate owner stamps it through the ordinary renderer,
-				; without changing caller updates or admitting a public READY brand.
-				CandidateUpdates := Updates.Clone()
-				ExplicitMetadata := false, MaterializesSource := false
-				for Update in Updates {
-					if !Update.HasOwnProp("Delete") || !Update.Delete
-						MaterializesSource := true
-					if (Update.Section == "_meta" && Update.Key == "schema_version")
-							|| (Update.Section == "" && Update.Key == "_meta")
-						ExplicitMetadata := true
-				}
-				if MaterializesSource && !ExplicitMetadata
-					CandidateUpdates.Push({ Section: "_meta", Key: "schema_version", Value: ConfigMigrateCurrentVersion() })
-			}
-			try Admitted := TOML_BuildConfigDocumentCandidate(SourceBytes, CandidateUpdates, ExactSectionPrefixes)
+			try Admitted := TOML_BuildConfigDocumentCandidate(SourceBytes, Updates, ExactSectionPrefixes)
 			catch as Err {
 				try LoggerError("TomlWrite", "Refusing semantic configuration {1} for '{2}': {3}. No file was changed.", Mode, Path, Err.Message)
 				return false
@@ -1037,29 +1009,14 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 				; identical byte image so the transition does not silently change the
 				; repository's canonical encoding policy.
 				return Map("status", "ok", "kind", "rendered",
-					"content", Admitted["content"], "preserve_source", Admitted["preserve_source"])
+					"content", Admitted["content"])
 		}
 
 		; Admission may retain foreign physical records around canonical owned rows.
 		; Both detached and ordinary modes publish this one qualified image.
 		body := SubStr(Admitted["content"], 2)
-		FinalCandidate := Admitted["content"]
-		NativeNoop := Admitted["preserve_source"]
-		SchemaAdmission := DocumentMode ? (NativeNoop ? ConfigMigrateBoot(Path, "capture_noop")
-			: ConfigMigrateBoot(Path, "capture_write", FinalCandidate)) : 0
-		if DocumentMode && !HasMethod(SchemaAdmission, "Call")
-			return false
-		; These scalars come from this native writer's actual source/candidate,
-		; not mutable public caches or a caller-provided registration receipt.
-		FinalAdmission() {
-			return _FSNativeAdmissionAccepted(AdmissionFn)
-				&& (!DocumentMode || (NativeNoop ? SchemaAdmission.Call(SourceBytes, SourcePresent)
-					: SchemaAdmission.Call(SourceBytes, SourcePresent, FinalCandidate)))
-		}
 
 		if Admitted["preserve_source"] {
-				if !FSNativeAcknowledge(FinalAdmission)
-					return false
 				global _ParseTomlCache
 				if _ParseTomlCache.Has(Path)
 						_ParseTomlCache.Delete(Path)
@@ -1071,8 +1028,6 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 		; A qualified image already on disk needs no stage or atomic replacement.
 		; Keep the generation acknowledgement while preserving its existing inode.
 		if FileExist(Path) && FSUtf8ExactMatches(Path, Chr(0xFEFF) . body) {
-				if !FSNativeAcknowledge(FinalAdmission)
-					return false
 				global _ParseTomlCache
 				if _ParseTomlCache.Has(Path)
 						_ParseTomlCache.Delete(Path)
@@ -1150,7 +1105,7 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 	; Publish only through the same-volume write-through adapter. The WAL may
 	; promote immediately after this return, so a merely visible rename is not a
 	; sufficient durability boundary.
-	Moved := FSAtomicMoveReplace(tmp, Path, &MoveError, FinalAdmission)
+	Moved := FSAtomicMoveReplace(tmp, Path, &MoveError)
 	if !((Moved is Integer) && Moved == 1) {
 		global _ParseTomlCache
 		if _ParseTomlCache.Has(Path)

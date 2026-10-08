@@ -140,6 +140,8 @@ end
 -- transaction preview; engine initialization and native output are not exercised.
 local LIVE_SOURCE_MODULES = {
 	"infra.llm_preferences", "modules.llm.profile_settings", "modules.llm.prediction_engine",
+	-- Settings cache source values, and Agent rows retain that actual module table.
+	"modules.llm.agent_settings", "ui.menu.agent_rows",
 }
 
 local function with_live_source(context, scenario)
@@ -157,6 +159,16 @@ local function with_live_source(context, scenario)
 		assert(status == "ok" and bytes == "")
 		assert(preferences.acquire(owner)); acquired = true
 		assert(preferences.with_configuration(owner, { status = status, content = bytes }, function()
+			-- Independent neutral physical input: both systems are Off, no model or excluded app.
+			local settings = require("modules.llm.agent_settings")
+			for _, system in ipairs({ "system1", "system2" }) do
+				helpers.assert_eq(settings.get_spec(system), "")
+				local model, reason = settings.resolve(system)
+				helpers.assert_nil(model)
+				helpers.assert_eq(reason, "off")
+			end
+			helpers.assert_eq(#settings.get_disabled_apps(), 0)
+			helpers.assert_eq(settings.get_mode(), "off")
 			local engine = require("modules.llm.prediction_engine")
 			assert(engine.get_live() == nil)
 			context.llm.get_live, context.llm.set_live = engine.get_live, engine.set_live
@@ -422,6 +434,10 @@ helpers.describe("menu certification: the manifest's rows are rendered", functio
 			tap_hold_key_hold_caption = i18n.get("tap_hold.hold.none"),
 			tap_hold_key_delay_caption = "0 ms",
 			personal_default_label = i18n.get("common.none"),
+			-- The genuine source scope above owns these independently chosen neutral values.
+			agent_system_backend_current_caption = i18n.get("menu.agent.off"),
+			agent_system_model_caption = "",
+			agent_disabled_apps_count = "0",
 		}
 		local checked, missing = 0, {}
 		for menu_key in pairs(root) do
@@ -445,7 +461,10 @@ helpers.describe("menu certification: the manifest's rows are rendered", functio
 						if row.caption_getter ~= nil then
 							local caption = fixture_captions[row.caption_getter]
 							helpers.assert_type(caption, "string", "every declared caption needs independent fixture state")
-							if row.caption_layout == "prefix" then
+							if row.caption_format == "numbered" then
+								-- Independently fill the declared old one-value caption; native bytes stay literal.
+								label = label:gsub("{1}", function() return caption end)
+							elseif row.caption_layout == "prefix" then
 								helpers.assert_type(row.caption_joiner, "string")
 								label = label .. row.caption_joiner .. caption
 							elseif row.caption_layout == "suffix" then
