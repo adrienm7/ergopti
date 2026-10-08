@@ -289,8 +289,127 @@ class BootstrapDownloadTests(unittest.TestCase):
         ):
             with self.assertRaisesRegex(BOOTSTRAP.BootstrapFailure, "dependency"):
                 BOOTSTRAP.install_python(
-                    "/native/uv", "cpython-3.11-macos-x86_64-none", self.deadline, 1
+                    "/native/uv", "cpython-3.11-macos-x86_64_v3-none", self.deadline, 1
                 )
+
+    def test_intel_interpreter_uses_independent_pin_cache_and_exact_offline_metadata(self):
+        captures = []
+        expected_key = "cpython-3.11.16-darwin-x86_64-none"
+        expected = {
+            "name": "cpython",
+            "arch": {"family": "x86_64", "variant": None},
+            "os": "darwin",
+            "libc": "none",
+            "major": 3,
+            "minor": 11,
+            "patch": 16,
+            "prerelease": "",
+            "variant": None,
+            "build": "20260929",
+            "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20260929/cpython-3.11.16%2B20260929-x86_64-apple-darwin-install_only_stripped.tar.gz",
+            "sha256": "d1143a947050fbbd17edc0d66ff3f7a63205c8364ef108bddfeece5f360096f8",
+        }
+
+        def download(url, output, digest, size, deadline, idle_timeout):
+            self.assertEqual(url, expected["url"])
+            self.assertEqual(digest, expected["sha256"])
+            self.assertEqual(
+                Path(output).name,
+                "d1143a947-cpython-3.11.16-20260929-x86_64-apple-darwin-install_only_stripped.tar.gz",
+            )
+            self.assertIsNone(size)
+            self.assertEqual(deadline, self.deadline)
+            self.assertEqual(idle_timeout, 1)
+            Path(output).write_bytes(b"controlled Intel archive; not native execution proof")
+
+        def run(arguments, deadline, environment):
+            metadata = json.loads(Path(arguments[-1]).read_text())
+            self.assertEqual(metadata, {expected_key: expected})
+            self.assertEqual(
+                arguments[:7],
+                [
+                    "/native/uv",
+                    "python",
+                    "install",
+                    "cpython-3.11.16-macos-x86_64-none",
+                    "--offline",
+                    "--no-config",
+                    "--python-downloads-json-url",
+                ],
+            )
+            self.assertEqual(deadline, self.deadline)
+            self.assertEqual(environment["UV_PYTHON_DOWNLOADS"], "manual")
+            self.assertTrue(Path(environment["UV_PYTHON_CACHE_DIR"]).is_dir())
+            captures.append(environment["UV_PYTHON_CACHE_DIR"])
+            return b""
+
+        with (
+            patch.object(BOOTSTRAP, "download", side_effect=download) as downloader,
+            patch.object(BOOTSTRAP, "_run_uv", side_effect=run),
+        ):
+            BOOTSTRAP.install_python(
+                "/native/uv", "cpython-3.11-macos-x86_64-none", self.deadline, 1
+            )
+        self.assertEqual(downloader.call_count, 1)
+        self.assertEqual(len(captures), 1)
+        self.assertFalse(Path(captures[0]).exists())
+
+    def test_unknown_or_duplicate_catalogue_architectures_refuse_before_network_or_uv(self):
+        original = json.loads(BOOTSTRAP.PYTHON_RELEASE.read_text())
+        arm_key = "cpython-3.11.16-darwin-aarch64-none"
+        intel_key = "cpython-3.11.16-darwin-x86_64-none"
+        variants = []
+        unknown = json.loads(json.dumps(original))
+        unknown["downloads"][intel_key]["arch"]["family"] = "x86_64_v3"
+        variants.append(unknown)
+        duplicate = json.loads(json.dumps(original))
+        duplicate["downloads"][intel_key] = duplicate["downloads"][arm_key]
+        variants.append(duplicate)
+        missing = json.loads(json.dumps(original))
+        del missing["downloads"][intel_key]
+        variants.append(missing)
+        extra = json.loads(json.dumps(original))
+        extra["downloads"]["unknown"] = extra["downloads"][intel_key]
+        variants.append(extra)
+        for variant in variants:
+            catalogue = Path(self.directory.name) / "catalogue.json"
+            catalogue.write_text(json.dumps(variant))
+            with (
+                self.subTest(downloads=list(variant["downloads"])),
+                patch.object(BOOTSTRAP, "PYTHON_RELEASE", catalogue),
+                patch.object(BOOTSTRAP, "download", side_effect=AssertionError("network acquired")),
+                patch.object(BOOTSTRAP, "_run_uv", side_effect=AssertionError("uv acquired")),
+            ):
+                with self.assertRaisesRegex(BOOTSTRAP.BootstrapFailure, "integrity"):
+                    BOOTSTRAP.install_python(
+                        "/native/uv", "cpython-3.11-macos-aarch64-none", self.deadline, 1
+                    )
+
+    def test_malformed_selected_native_identity_refuses_before_any_input_staging(self):
+        original = json.loads(BOOTSTRAP.PYTHON_RELEASE.read_text())
+        key = "cpython-3.11.16-darwin-x86_64-none"
+        variants = [
+            ("url", "https://unqualified.invalid/other"),
+            ("sha256", "D" * 64),
+            ("patch", True),
+            ("variant", "freethreaded"),
+            ("unknown", 1),
+        ]
+        for name, value in variants:
+            invalid = json.loads(json.dumps(original))
+            invalid["downloads"][key][name] = value
+            catalogue = Path(self.directory.name) / "catalogue.json"
+            catalogue.write_text(json.dumps(invalid))
+            with (
+                self.subTest(field=name),
+                patch.object(BOOTSTRAP, "PYTHON_RELEASE", catalogue),
+                patch.object(BOOTSTRAP, "download", side_effect=AssertionError("network acquired")),
+                patch.object(BOOTSTRAP, "_run_uv", side_effect=AssertionError("uv acquired")),
+            ):
+                with self.assertRaisesRegex(BOOTSTRAP.BootstrapFailure, "integrity"):
+                    BOOTSTRAP.install_python(
+                        "/native/uv", "cpython-3.11-macos-x86_64-none", self.deadline, 1
+                    )
 
 
 class NativeSpoolShellTests(unittest.TestCase):

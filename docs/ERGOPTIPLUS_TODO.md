@@ -5636,6 +5636,13 @@ assertion bodies remain intact; nine causal controls and the actual 30 public
 transport plus 18 retained-output controls pass. Full-suite retries remain
 pending after local disk exhaustion; no native or packaging gate is waived.
 
+The managed Python reader now selects the requested native archive from the
+two-row catalogue and sends uv only that reviewed row, with the original
+deadline and checksum fence. All18 bootstrap controls pass, including the
+original ARM cache/offline assertions and independent Intel literal inputs.
+The previous reader fails those retained controls on the two-row catalogue.
+Native archive extraction and execution still require real macOS receiving.
+
 Managed Python metadata now includes independently verified official arm64
 and Intel macOS archives. Both generated records retain literal upstream
 checksums; all 16 refusal vectors and exact architecture selection pass.

@@ -22,7 +22,7 @@ const result = spawnSync(pythonExecutable(), ['tools/test/macos_managed_bootstra
 assert.equal(result.error, undefined, 'the bootstrap receiver must start');
 assert.equal(result.signal, null, 'the bootstrap receiver must close within its bound');
 assert.equal(result.status, 0, result.stderr || result.stdout);
-assert.match(result.stderr, /Ran 15 tests in/);
+assert.match(result.stderr, /Ran 18 tests in/);
 assert.match(result.stderr, /\bOK\b/);
 assert.doesNotMatch(result.stderr, /skipped=/);
 process.stdout.write(result.stdout);

@@ -200,21 +200,91 @@ def _run_uv(arguments, deadline, environment=None):
 
 def install_python(uv, python_request, deadline, idle_timeout):
     """Give genuine uv a pinned native-downloaded archive in its offline cache."""
-    release = json.loads(PYTHON_RELEASE.read_text(encoding="utf-8"))
-    if release["schema_version"] != 1 or len(release["downloads"]) != 1:
-        raise BootstrapFailure("integrity")
-    key, entry = next(iter(release["downloads"].items()))
-    if (
-        python_request != "cpython-3.11-macos-aarch64-none"
-        or entry["name"] != "cpython"
-        or entry["arch"]["family"] != "aarch64"
-        or entry["os"] != "darwin"
-    ):
+    family = {
+        "cpython-3.11-macos-aarch64-none": "aarch64",
+        "cpython-3.11-macos-x86_64-none": "x86_64",
+    }.get(python_request)
+    if family is None:
         raise BootstrapFailure("dependency")
+    release = json.loads(PYTHON_RELEASE.read_text(encoding="utf-8"))
+    if not isinstance(release, dict):
+        raise BootstrapFailure("integrity")
+    downloads = release.get("downloads")
+    if (
+        type(release.get("schema_version")) is not int
+        or release["schema_version"] != 1
+        or not isinstance(downloads, dict)
+        or len(downloads) != 2
+    ):
+        raise BootstrapFailure("integrity")
+    selections = {}
+    for key, candidate in downloads.items():
+        if (
+            not isinstance(candidate, dict)
+            or set(candidate)
+            != {
+                "name",
+                "arch",
+                "os",
+                "libc",
+                "major",
+                "minor",
+                "patch",
+                "prerelease",
+                "url",
+                "sha256",
+                "variant",
+                "build",
+            }
+            or not isinstance(candidate.get("arch"), dict)
+            or set(candidate["arch"]) != {"family", "variant"}
+        ):
+            raise BootstrapFailure("integrity")
+        architecture = candidate["arch"].get("family")
+        if architecture not in ("aarch64", "x86_64") or architecture in selections:
+            raise BootstrapFailure("integrity")
+        if (
+            candidate.get("name") != "cpython"
+            or candidate.get("os") != "darwin"
+            or candidate.get("libc") != "none"
+            or candidate["arch"].get("variant") is not None
+            or candidate.get("variant") is not None
+            or candidate.get("prerelease") != ""
+            or type(candidate.get("major")) is not int
+            or candidate["major"] != 3
+            or type(candidate.get("minor")) is not int
+            or candidate["minor"] != 11
+            or type(candidate.get("patch")) is not int
+            or candidate["patch"] < 0
+            or not isinstance(candidate.get("build"), str)
+            or re.fullmatch(r"[0-9]{8}", candidate["build"]) is None
+            or not isinstance(candidate.get("sha256"), str)
+            or re.fullmatch(r"[a-f0-9]{64}", candidate["sha256"]) is None
+        ):
+            raise BootstrapFailure("integrity")
+        version = "3.11." + str(candidate["patch"])
+        if (
+            key != "cpython-" + version + "-darwin-" + architecture + "-none"
+            or candidate.get("url")
+            != "https://github.com/astral-sh/python-build-standalone/releases/download/"
+            + candidate["build"]
+            + "/cpython-"
+            + version
+            + "%2B"
+            + candidate["build"]
+            + "-"
+            + architecture
+            + "-apple-darwin-install_only_stripped.tar.gz"
+        ):
+            raise BootstrapFailure("integrity")
+        selections[architecture] = (key, candidate)
+    if set(selections) != {"aarch64", "x86_64"}:
+        raise BootstrapFailure("integrity")
+    key, entry = selections[family]
     with tempfile.TemporaryDirectory(prefix="ergopti-python-input-") as folder:
         root = Path(folder)
         metadata = root / "downloads.json"
-        metadata.write_text(json.dumps(release["downloads"]), encoding="utf-8")
+        metadata.write_text(json.dumps({key: entry}), encoding="utf-8")
         # uv deliberately uses '-' for the escaped '+' in its private Python
         # archive cache. Its built-in extraction verifies the complete hash.
         filename = entry["url"].rsplit("/", 1)[-1].replace("%2B", "-")
@@ -232,7 +302,9 @@ def install_python(uv, python_request, deadline, idle_timeout):
             + str(entry["minor"])
             + "."
             + str(entry["patch"])
-            + "-macos-aarch64-none"
+            + "-macos-"
+            + family
+            + "-none"
         )
         _run_uv(
             [
