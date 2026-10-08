@@ -1,6 +1,6 @@
 ﻿; tests/unit/test_updater_managed_transport.ahk
 ; Actual generated staging orchestrator over owned native TLS/PAC/CONNECT.
-; The only controlled production seams are trusted config/environment readers.
+; Trusted readers and passive fixture-only staging observations are declared seams.
 
 _UpdaterNativeRefusalWebStatus(Receipt) {
 	global _UpdaterManagedFailureContract
@@ -41,6 +41,82 @@ _UpdaterNativeRefusalDiagnostic(ExpectedStage, Receipt) {
 		. " native_errno=" . NativeCode . " tls_status=" . _ManagedRemoteFixtureDiagnosticEnum(Receipt.Get("tls_status", ""),
 			"untrusted_certificate|expired_certificate|hostname_mismatch|revoked_certificate|unavailable")
 		. " dotnet_web_status=" . _UpdaterNativeRefusalWebStatus(Receipt)
+}
+
+; The shared failure schema stays unchanged; this private sidecar is observation only.
+_UpdaterNativeObservedStagingScript(OriginalScript) {
+	global _DriverDir
+	Helper := FileRead(_DriverDir . "\tests\fixtures\updater_staging_diagnostic.ps1", "UTF-8")
+	HeaderEnd := InStr(OriginalScript, "`n")
+	if !HeaderEnd
+		throw Error("The actual staging parameter declaration is unavailable.")
+	return SubStr(OriginalScript, 1, HeaderEnd) . Helper . "`n"
+		. '$StagingSource=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String("'
+		. _Updater_EncodeUtf8Payload(OriginalScript) . '"))' . "`n"
+		. '$StagingObserved=New-ErgoptiObservedStagingScript $StagingSource ""' . "`n"
+		. '& ([scriptblock]::Create($StagingObserved.Source)) @PSBoundParameters'
+}
+
+_UpdaterNativeStagingScalarFact(Scalar) {
+	if !(Scalar is Map) || Scalar.Count < 3 || Scalar.Count > 4
+		return ""
+	for DiagnosticKey in Scalar
+		if !(DiagnosticKey is String) || !RegExMatch(DiagnosticKey, "\A(?:type|arity|size_available|size)\z")
+			return ""
+	DiagnosticType := Scalar.Get("type", "")
+	DiagnosticArity := Scalar.Get("arity", -2)
+	DiagnosticAvailability := Scalar.Get("size_available", "")
+	if !(DiagnosticType is String) || !RegExMatch(DiagnosticType, "\A(?:absent|int32|int64|array|string|other)\z")
+		|| !(DiagnosticArity is Integer) || DiagnosticArity < -1 || DiagnosticArity > 1024
+		|| !(DiagnosticAvailability is String) || !RegExMatch(DiagnosticAvailability, "\A(?:available|unavailable)\z")
+		return ""
+	if DiagnosticType == "absent" && DiagnosticArity != 0
+		return ""
+	if DiagnosticType != "absent" && DiagnosticType != "array" && DiagnosticArity != 1
+		return ""
+	DiagnosticSize := "unknown"
+	if DiagnosticAvailability == "available" {
+		if (DiagnosticType != "int32" && DiagnosticType != "int64") || !Scalar.Has("size")
+			|| !(Scalar["size"] is Integer) || Scalar["size"] < -1 || Scalar["size"] > 2147483647
+			return ""
+		DiagnosticSize := Format("{:d}", Scalar["size"])
+	} else if Scalar.Has("size")
+		return ""
+	return "type=" . DiagnosticType . " arity=" . DiagnosticArity . " size=" . DiagnosticSize
+}
+
+_UpdaterNativeStagingDiagnosticFact(Diagnostic) {
+	if !(Diagnostic is Map) || Diagnostic.Count != 5
+		return ""
+	for DiagnosticKey in Diagnostic
+		if !(DiagnosticKey is String) || !RegExMatch(DiagnosticKey, "\A(?:schema_version|operation|exception|expected|actual)\z")
+			return ""
+	DiagnosticOperation := Diagnostic.Get("operation", "")
+	DiagnosticException := Diagnostic.Get("exception", "")
+	if Type(Diagnostic.Get("schema_version", "")) != "Integer" || Diagnostic["schema_version"] != 1
+		|| !(DiagnosticOperation is String) || !RegExMatch(DiagnosticOperation,
+			"\A(?:metadata|content_length|minimum|digest_format|digest_read|budget|digest_compare|not_file_read)\z")
+		|| !(DiagnosticException is String) || !RegExMatch(DiagnosticException,
+			"\A(?:command_not_found|item_not_found|property_not_found|method_invocation|io|unauthorized|timeout|runtime|other)\z")
+		return ""
+	DiagnosticExpected := _UpdaterNativeStagingScalarFact(Diagnostic.Get("expected", 0))
+	DiagnosticActual := _UpdaterNativeStagingScalarFact(Diagnostic.Get("actual", 0))
+	if DiagnosticExpected == "" || DiagnosticActual == ""
+		return ""
+	return "suboperation=" . DiagnosticOperation . " exception=" . DiagnosticException
+		. " expected_" . StrReplace(DiagnosticExpected, " ", " expected_")
+		. " actual_" . StrReplace(DiagnosticActual, " ", " actual_")
+}
+
+_UpdaterNativeReadStagingDiagnostic(Path) {
+	if !(Path is String) || Path == "" || FSSize(Path) > 2048
+		return ""
+	DiagnosticText := FSReadUtf8Exact(Path)
+	if !(DiagnosticText is String) || StrLen(DiagnosticText) > 2048
+		return ""
+	if RegExMatch(DiagnosticText, '"(?:schema_version|arity|size)"\s*:\s*(?:true|false|null)\b')
+		return ""
+	return _UpdaterNativeStagingDiagnosticFact(JsonParse(DiagnosticText))
 }
 
 class _UpdaterNativeTransportOwner extends _ManagedRemoteFixtureOwner {
@@ -95,15 +171,18 @@ class _UpdaterNativeDownloadRun {
 		this.CurrentExe := this.Directory . "existing.exe"
 		this.NewExe := this.Directory . "staged.exe"
 		this.SwapPath := this.Directory . "swap.ps1"
+		this.StagingDiagnosticPath := this.Directory . "staging-diagnostic.json"
 		FileAppend(this.OldBytes, this.CurrentExe, "UTF-8-RAW")
 		if this.DenyFile
 			DirCreate(this.NewExe)
 		AssertEqual(524288, UPDATER_MIN_EXE_SIZE_BYTES,
 			"fixture bytes have an independent fixed size; a changed minimum requires explicit fixture review")
-		Url := "https://managed-fixture.invalid:" . this.Owner.State["tls_port"] . this.Path
+		; The 407 relay has its own reserved authority; HTTPS PAC paths are not routing identity.
+		Host := this.Path == "/updater/407" ? "updater-refusal.managed-fixture.invalid" : "managed-fixture.invalid"
+		Url := "https://" . Host . ":" . this.Owner.State["tls_port"] . this.Path
 		this.StartedTick := A_TickCount
 		this.Transport := _Updater_BuildStagingTransport(
-			_Updater_BuildStagingWorkerScript(), this.SwapBytes, Url, this.Digest,
+			_UpdaterNativeObservedStagingScript(_Updater_BuildStagingWorkerScript()), this.SwapBytes, Url, this.Digest,
 			this.NewExe, this.SwapPath, this.CurrentExe, UPDATER_MIN_EXE_SIZE_BYTES, 5000,
 			_VendorDir . "\ergopti_updater_download.ps1", this.DeadlineMs, this.StartedTick,
 			_SharedDir . "\modules\network\proxy_policy.json",
@@ -113,10 +192,13 @@ class _UpdaterNativeDownloadRun {
 			Prefix := SubStr(ScriptName, 1, StrLen(ScriptName) - StrLen("_SCRIPT"))
 			Pair := {Name: Prefix . "_TEST_PAC", Value: "http://127.0.0.1:" . this.Owner.State["http_port"] . "/updater.pac"}
 			this.Transport.Environment.Push(Pair)
+			DiagnosticPair := {Name: Prefix . "_TEST_STAGING_DIAGNOSTIC", Value: this.StagingDiagnosticPath}
+			this.Transport.Environment.Push(DiagnosticPair)
+			EnvSet(DiagnosticPair.Name, DiagnosticPair.Value)
 			EnvSet(Pair.Name, Pair.Value)
 			; Add declared trusted callbacks to the real transport invocation only.
-			; No worker body, network method, native WinHTTP or integrity check is replaced.
-			Admission := '$ownedPac=$env:' . Pair.Name . ';'
+			; Passive observation chunks preserve every original worker operation and guard.
+			Admission := '$env:ERGOPTI_FIXTURE_STAGING_DIAGNOSTIC=$env:' . DiagnosticPair.Name . ';$ownedPac=$env:' . Pair.Name . ';'
 				. '$reader={param($MaxBytes)[pscustomobject]@{Ok=$true;AutoDetect=$false;Absent=$false;PacUrl=$ownedPac;Proxy="";Bypass="";NativeError=0;FailureOrigin=""}}.GetNewClosure();'
 				. '$environment={param($Name)return ""};'
 			Bootstrap := Admission . this.Transport.Bootstrap . ' -ReadConfig $reader -ReadEnvironment $environment'
@@ -145,6 +227,33 @@ class _UpdaterNativeDownloadRun {
 
 	Accepted() {
 		Result := this.Wait()
+		if Result["exit"] != 0 {
+			this.RefusalDiagnosticStatus := "unavailable"
+			this.StagingDiagnosticStatus := "unavailable"
+			try {
+				if this.HasOwnProp("StagingDiagnosticPath") {
+					StagingFact := _UpdaterNativeReadStagingDiagnostic(this.StagingDiagnosticPath)
+					if StagingFact != "" {
+						this.RefusalDiagnosticPrinter.Call("::notice title=Windows staging suboperation diagnostic::" . StagingFact)
+						this.StagingDiagnosticStatus := "reported"
+					}
+				}
+			} catch Any {
+				this.StagingDiagnosticStatus := "unavailable"
+			}
+			try {
+				Failure := _Updater_ParseStagingFailure(Result["stdout"])
+				Reason := _ManagedRemoteFixtureDiagnosticEnum(Failure["reason"], "download|verify|deadline")
+				if Failure["valid"] && Reason != "unknown" {
+					this.RefusalDiagnosticPrinter.Call("::notice title=Windows native updater acceptance refusal diagnostic::reason="
+						. Reason . " " . _UpdaterNativeRefusalDiagnostic("", Failure["receipt"]))
+					this.RefusalDiagnosticStatus := "reported"
+				}
+			} catch Any {
+				; A diagnostic refusal cannot replace the original native exit assertion.
+				this.RefusalDiagnosticStatus := "unavailable"
+			}
+		}
 		AssertEqual(0, Result["exit"])
 		AssertEqual("READY", Result["stdout"], "actual size/digest/persistence checks must produce exact READY")
 		Bytes := FileRead(this.NewExe, "RAW")
@@ -210,7 +319,7 @@ class _UpdaterNativeDownloadRun {
 				return false
 		}
 		if this.Directory != "" {
-			for Name in ["CurrentExe", "NewExe", "SwapPath"] {
+			for Name in ["CurrentExe", "NewExe", "SwapPath", "StagingDiagnosticPath"] {
 				if !this.HasOwnProp(Name)
 					continue
 				Path := this.%Name%
@@ -230,10 +339,13 @@ class _UpdaterNativeDownloadRun {
 class _UpdaterNativeRefusalDiagnosticControl extends _UpdaterNativeDownloadRun {
 	__New(Printer, DotNet := false) {
 		this.RefusalDiagnosticPrinter := Printer
+		this.RefusalDiagnosticStatus := "not_requested"
 		this.DotNet := DotNet
 	}
 
 	Wait() {
+		if this.HasOwnProp("FixtureResult")
+			return this.FixtureResult
 		if this.DotNet
 			return Map("exit", 1, "stdout",
 				'{"schema_version":1,"state":"failed","operation":"download","reason":"download",'
@@ -245,6 +357,86 @@ class _UpdaterNativeRefusalDiagnosticControl extends _UpdaterNativeDownloadRun {
 			. '"curl_exit":6,"http_status":0,"proxy_connect_status":0,"proxy_mode":"direct"}}')
 	}
 }
+
+/** The actual acceptance entry must retain its first exit assertion. */
+_UpdaterNativeAcceptedPrimary(Run) {
+	Caught := false
+	try Run.Accepted()
+	catch as Failure {
+		Caught := true
+		AssertContains(Failure.Message, "expected: <0>, actual: <1>",
+			"diagnostic processing cannot overwrite the original acceptance assertion")
+	}
+	AssertTrue(Caught, "a refused actual acceptance entry must still fail")
+}
+
+_UpdaterNativeAcceptedReports(Contract) {
+	for DotNet in [false, true] {
+		for Reason in ["download", "verify", "deadline"] {
+			Observed := Map("calls", 0, "fact", "")
+			Run := _UpdaterNativeRefusalDiagnosticControl(
+				(Text) => (Observed["calls"] += 1, Observed["fact"] := Text), DotNet)
+			Result := Run.Wait()
+			Result["stdout"] := StrReplace(Result["stdout"], '"reason":"download"', '"reason":"' . Reason . '"')
+			Run.FixtureResult := Result
+			_UpdaterNativeAcceptedPrimary(Run)
+			AssertEqual(1, Observed["calls"], "the actual acceptance entry diagnoses before its exit assertion")
+			AssertEqual("reported", Run.RefusalDiagnosticStatus)
+			AssertContains(Observed["fact"], "reason=" . Reason . " expected_stage=unknown observed_stage=connect")
+			if DotNet
+				AssertContains(Observed["fact"], "native_errno_domain=win32 native_errno=12007 tls_status=unavailable")
+			else
+				AssertContains(Observed["fact"], "curl_exit=6 http_status=0 proxy_connect_status=0 proxy_mode=direct")
+			AssertFalse(InStr(Observed["fact"], '"schema_version"'), "raw staging envelopes never enter the diagnostic")
+		}
+	}
+}
+Test("updater native: failed acceptance emits bounded native facts (managed-fixture-accepted-diagnostic)",
+	_UMF_WithContract.Bind(_UpdaterNativeAcceptedReports))
+
+_UpdaterNativeAcceptedReporterRefuses(Contract) {
+	Control := Map("calls", 0)
+	Run := _UpdaterNativeRefusalDiagnosticControl(_ManagedRemoteStateWaitPrinterRefused.Bind(Control))
+	_UpdaterNativeAcceptedPrimary(Run)
+	AssertEqual(1, Control["calls"], "a refused diagnostic sink is attempted once without recursion")
+	AssertEqual("unavailable", Run.RefusalDiagnosticStatus)
+}
+Test("updater native: acceptance reporter refusal preserves the primary assertion (managed-fixture-accepted-diagnostic)",
+	_UMF_WithContract.Bind(_UpdaterNativeAcceptedReporterRefuses))
+
+_UpdaterNativeAcceptedMalformedRefuses(Contract) {
+	Private := "PRIVATE_ACCEPTANCE_CONTENT"
+	Control := _UpdaterNativeRefusalDiagnosticControl((Text) => 0)
+	Valid := Control.Wait()["stdout"]
+	for Raw in [Private, "", "[]", 0, Valid . Private,
+		StrReplace(Valid, '"reason":"download"', '"reason":"' . Private . '"'),
+		StrReplace(Valid, '"reason":"download"', '"reason":"persist"'),
+		StrReplace(Valid, '"backend":"curl"', '"backend":"' . Private . '"'),
+		StrReplace(Valid, '"curl_exit":6', '"curl_exit":"' . Private . '"'),
+		StrReplace(Valid, '"schema_version":1', '"schema_version":1,"private":"' . Private . '"')] {
+		AssertFalse(_Updater_ParseStagingFailure(Raw)["valid"], "each malformed control reaches the actual parser refusal")
+		Observed := Map("calls", 0)
+		Run := _UpdaterNativeRefusalDiagnosticControl((Text) => (Observed["calls"] += 1))
+		Run.FixtureResult := Map("exit", 1, "stdout", Raw)
+		_UpdaterNativeAcceptedPrimary(Run)
+		AssertEqual(0, Observed["calls"], "invalid or private staging data cannot reach the diagnostic sink")
+		AssertEqual("unavailable", Run.RefusalDiagnosticStatus)
+	}
+	Observed := Map("calls", 0)
+	Run := _UpdaterNativeRefusalDiagnosticControl((Text) => (Observed["calls"] += 1))
+	Run.FixtureResult := Map("exit", 0, "stdout", "NOT_READY")
+	Caught := false
+	try Run.Accepted()
+	catch as Failure {
+		Caught := true
+		AssertContains(Failure.Message, "expected: <READY>, actual: <NOT_READY>", "the original successful-exit READY assertion remains mandatory")
+	}
+	AssertTrue(Caught)
+	AssertEqual(0, Observed["calls"], "successful exit never requests a refusal diagnostic")
+	AssertEqual("not_requested", Run.RefusalDiagnosticStatus)
+}
+Test("updater native: acceptance diagnostics refuse malformed data and never relax READY (managed-fixture-accepted-diagnostic)",
+	_UMF_WithContract.Bind(_UpdaterNativeAcceptedMalformedRefuses))
 
 _UpdaterNativeRefusalReports(Contract) {
 	Observed := Map("calls", 0, "fact", "")
@@ -512,3 +704,30 @@ Test("updater native: trust entry preserves primary through graceful refusal (ma
 	_UpdaterNativePrimaryActualEntryControl.Bind(_UpdaterNative_ActualDownloadTrustIntegrityAndRefusal))
 Test("updater native: cancellation entry preserves primary through graceful refusal (managed-fixture-primary-cleanup)",
 	_UpdaterNativePrimaryActualEntryControl.Bind(_UpdaterNative_ActualDeadlineAndCancellation))
+
+_UpdaterNativeStagingFactControls() {
+	StagingExpected := Map("type", "array", "arity", 2, "size_available", "unavailable")
+	StagingActual := Map("type", "int64", "arity", 1, "size_available", "available", "size", 524288)
+	StagingRecord := Map("schema_version", 1, "operation", "content_length", "exception", "runtime",
+		"expected", StagingExpected, "actual", StagingActual)
+	StagingText := _UpdaterNativeStagingDiagnosticFact(StagingRecord)
+	AssertContains(StagingText, "expected_type=array expected_arity=2 expected_size=unknown",
+		"an array cannot invent a scalar expected length")
+	AssertContains(StagingText, "actual_size=524288", "actual metadata size stays an integer")
+	StagingActual["size"] := "524288"
+	AssertEqual("", _UpdaterNativeStagingDiagnosticFact(StagingRecord), "string sizes are refused")
+	StagingActual["size"] := 524288
+	StagingExpected["arity"] := "2"
+	AssertEqual("", _UpdaterNativeStagingDiagnosticFact(StagingRecord), "string arity is refused")
+	StagingExpected["arity"] := 2
+	StagingRecord["private_message"] := "PRIVATE_SECRET"
+	AssertEqual("", _UpdaterNativeStagingDiagnosticFact(StagingRecord), "private fields never reach a notice")
+	StagingRecord.Delete("private_message")
+	StagingRecord["operation"] := "PRIVATE_OPERATION"
+	AssertEqual("", _UpdaterNativeStagingDiagnosticFact(StagingRecord), "unknown operations are refused")
+	StagingRecord["operation"] := "content_length"
+	StagingExpected["size"] := 42
+	AssertEqual("", _UpdaterNativeStagingDiagnosticFact(StagingRecord), "unavailable size cannot carry an invented value")
+}
+Test("updater fixture: staging diagnostics keep closed scalar shapes and privacy",
+	_UpdaterNativeStagingFactControls)

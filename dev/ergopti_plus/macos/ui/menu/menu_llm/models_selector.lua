@@ -549,7 +549,6 @@ function M.build(ctx)
 				label    = prefix .. m_name,
 				items    = model_submenu,
 				disabled = paused or nil,
-				action       = function() pcall(function() switch_model(m_name) end) end
 			})
 			end
 		end
@@ -702,8 +701,7 @@ function M.build(ctx)
 					label    = row_label,
 					items    = model_submenu,
 					disabled = paused or nil,
-					-- Clicking the model row title selects it directly (same as "Select model")
-					action       = function() pcall(function() switch_model(m_name) end) end
+					-- AppKit opens this parent; the declared Select child owns delivery.
 				})
 
 				::continue_model::

@@ -53,7 +53,9 @@ local function choose(parameter, clicked, refusal, picked)
 		block_alert = function() observed.dialogs = observed.dialogs + 1; return clicked end,
 	}
 	package.loaded["infra.i18n"] = { get = function(key)
-		return key == "gestures.system.conflicts" and "{1} conflicts" or key
+		if key == "gestures.system.conflicts" then return "{1} conflicts" end
+		if key == "gestures.system.conflicts_caption" then return "%s conflicts" end
+		return key
 	end, section = function(key) return key end }
 	local renderer = assert(require("menu.renderer").new({
 		platform = "hs",
@@ -324,4 +326,87 @@ helpers.describe("Gestures: declared cached-status refresh and actual native cal
 			end)
 		end)
 	end
+end)
+
+
+-- Complete system-status frames preserve independently frozen prior captions.
+helpers.describe("Gestures: complete cached system-status frames", function()
+	local locales = { "ar", "cs", "da", "de", "en", "es", "fr", "he", "hi", "it", "ja",
+		"ko", "nl", "no", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }
+	for _, locale in ipairs(locales) do
+		helpers.it("preserves prior parent and pinch captions without probes: " .. locale, function()
+			with_status_refresh({ locale = locale }, function(f)
+				local vectors = refresh_json(helpers.shared("tests/corpus/menus/gesture_system_status_captions.json")).captions[locale]
+				f.conflicts = { { label = "Independent first conflict" }, { label = "Independent second conflict" } }
+				local group = f.build()[1]
+				helpers.assert_eq(group.title, vectors.conflicts_two)
+				helpers.assert_eq(#group.menu, 4)
+				helpers.assert_eq(group.menu[1].title, "Independent first conflict")
+				helpers.assert_eq(group.menu[2].title, "Independent second conflict")
+				helpers.assert_eq(group.menu[3].title, vectors.pinch_enabled)
+				helpers.assert_eq(group.menu[4].title, f.corpus.captions[locale])
+				f.conflicts = {}
+				for _, pinch in ipairs({ { false, "pinch_disabled" }, { true, "pinch_enabled" }, { nil, "pinch_unknown" } }) do
+					f.pinch = pinch[1]
+					group = f.build()[1]
+					helpers.assert_eq(group.title, vectors.clear)
+					helpers.assert_eq(#group.menu, 2)
+					helpers.assert_eq(group.menu[1].title, vectors[pinch[2]])
+				end
+				helpers.assert_eq(f.settings, 0)
+				helpers.assert_eq(f.refreshes, 0, "menu construction consumes cached native state only")
+				helpers.assert_eq(f.updates, 0)
+			end)
+		end)
+	end
+
+	for _, section in ipairs({ "gesture_system_status_macos_frame", "gesture_system_status_clear",
+		"gesture_system_macos_children", "gesture_system_pinch_frame", "gesture_system_pinch_enabled" }) do
+		helpers.it("refuses withdrawn " .. section .. " without native effects", function()
+			with_status_refresh({}, function(f)
+				f.conflicts = {}
+				f.root[section] = {}
+				helpers.assert_eq(f.build(), {})
+				helpers.assert_eq(f.settings, 0)
+				helpers.assert_eq(f.refreshes, 0)
+			end)
+		end)
+	end
+
+	for _, getter in ipairs({ "gesture_system_pinch_is_enabled", "gesture_system_is_clear" }) do
+		for _, refusal in ipairs({ "missing", "non_boolean", "throw" }) do
+			helpers.it("refuses " .. refusal .. " actual status predicate " .. getter, function()
+				with_status_refresh({}, function(f)
+					f.conflicts = {}
+					local binding = package.loaded["infra.manifest_menu"]
+					local template = binding.template_rows
+					binding.template_rows = function(key, commands, getters, children)
+						if getters and getters[getter] then
+							if refusal == "missing" then getters[getter] = nil
+							elseif refusal == "non_boolean" then getters[getter] = function() return "true" end
+							else getters[getter] = function() error("independent cached predicate refusal", 0) end end
+						end
+						return template(key, commands, getters, children)
+					end
+					helpers.assert_eq(f.build(), {})
+					helpers.assert_eq(f.settings, 0)
+					helpers.assert_eq(f.refreshes, 0)
+				end)
+			end)
+		end
+	end
+
+	helpers.it("holds the actual Settings callback selected at build time", function()
+		with_status_refresh({}, function(f)
+			f.conflicts = {}
+			local calls, replacements = 0, 0
+			f.gestures.open_system_gestures = function(...) calls = calls + 1; return false end
+			local held = f.build()[1].menu[1].fn
+			f.gestures.open_system_gestures = function() replacements = replacements + 1; return true end
+			helpers.assert_eq(held(), false)
+			helpers.assert_eq(calls, 1)
+			helpers.assert_eq(replacements, 0, "native callback capture semantics are preserved")
+			helpers.assert_eq(f.refreshes, 0)
+		end)
+	end)
 end)
