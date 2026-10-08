@@ -11,6 +11,13 @@ skills and durable technical knowledge in routed memory.
 - Treat registered sibling worktrees as active user state. Do not modify,
   delete, or relocate one unless the current request explicitly puts it in
   scope.
+- Reuse owned worktrees instead of creating a full repository copy per probe.
+  Once no task, gate, or retained process needs one, archive it with a
+  recoverable Git snapshot and remove its unused ignored caches. Keep compact
+  proof files rather than complete duplicate checkouts.
+- Measure storage before large validations and clean confirmed unused owned
+  temporary files at completed checkpoints. Age alone does not prove that a
+  workspace is inactive; never delete conversation history databases.
 - Never push `dev` or `main` without explicit authorization in the current
   conversation. Commits and green tests do not imply push permission.
 - Never stop, edit-and-resume or relaunch a running multi-agent workflow to add
