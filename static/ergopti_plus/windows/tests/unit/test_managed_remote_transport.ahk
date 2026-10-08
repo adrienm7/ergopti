@@ -342,6 +342,8 @@ _ManagedRemoteFixtureStateWaitDiagnostic(Role, ExpectedState, ExpectedPhase, Pre
 		. " observed_state=" . _ManagedRemoteFixtureDiagnosticEnum(Observed.Get("state", ""), "starting|ready|stopped|failed")
 		. " observed_phase=" . _ManagedRemoteFixtureDiagnosticEnum(Observed.Get("phase", ""), "untrusted|trusted|removed")
 		. " sequence_relation=" . Relation . " last_read=" . ReadStatus . " read_error=" . ReadError
+		. " trust_step=" . _ManagedRemoteFixtureDiagnosticEnum(Observed.Get("trust_step", ""),
+			"event_received|before_open|before_enumeration|before_export|before_add|after_add|before_postcheck|before_close")
 		. " critical=" . (A_IsCritical != 0 ? "true" : "false") . " suspended=" . (A_IsSuspended ? "true" : "false")
 }
 
@@ -1089,6 +1091,46 @@ _ManagedRemoteStateWaitPrinterRefused(Control, Text) {
 }
 Test("managed remote native: state diagnostic refuses content and preserves timeout (managed-fixture-wait-diagnostic)",
 	_ManagedRemoteStateWaitProjectionAndRefusal)
+
+_ManagedRemoteTrustPublisherIndependent() {
+	global _DriverDir
+	Directory := _SR_AcquireCaptureDirectory()
+	Capture := Map("Directory", Directory, "TmpFile", Directory . "output.tmp")
+	Results := []
+	Handle := 0
+	try {
+		Handle := ShellRunner_SpawnTreeOwned("powershell.exe", ["-NoProfile", "-NonInteractive", "-File",
+			_DriverDir . "\tests\fixtures\managed_remote_trust_diagnostic.ps1", "-SourcePath",
+			_DriverDir . "\tests\fixtures\managed_remote_transport.ps1", "-StatePath", Capture["TmpFile"]],
+			(Code, Out, Err) => Results.Push(Map("exit", Code, "stdout", Out, "stderr", Err)), , , 8192)
+		AssertTrue(Handle.start())
+		Started := A_TickCount
+		while Results.Length == 0 && !TickExpired64(Started, 5000) {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AssertEqual(1, Results.Length, "the real publisher behavior probe must settle once")
+		AssertEqual(0, Results[1]["exit"], "the actual publisher preserves strict trust state and avoids native getters")
+		AssertEqual("OWNED_TRUST_DIAGNOSTIC_PASS", Trim(Results[1]["stdout"], "`r`n "))
+		AssertEqual("", Results[1]["stderr"])
+		for Step in ["event_received", "before_open", "before_enumeration", "before_export", "before_add",
+			"after_add", "before_postcheck", "before_close"] {
+			Fact := _ManagedRemoteFixtureStateWaitDiagnostic("trust_install", "ready", "trusted", 0,
+				Map("trust_step", Step), "readable", "")
+			AssertContains(Fact, "trust_step=" . Step)
+		}
+		Fact := _ManagedRemoteFixtureStateWaitDiagnostic("trust_install", "ready", "trusted", 0,
+			Map("trust_step", "PRIVATE_STEP"), "readable", "")
+		AssertContains(Fact, "trust_step=unknown")
+		AssertFalse(InStr(Fact, "PRIVATE_STEP"))
+	} finally {
+		if IsObject(Handle)
+			AssertTrue(Handle.terminate(), "the exact behavior-probe Job retires even on failure")
+		AssertEqual(0, _SR_CaptureRemove(Capture), "the exact owned receipt directory is retired")
+	}
+}
+Test("managed remote native: trust publisher avoids native observation and preserves acceptance (managed-fixture-trust-diagnostic)",
+	_ManagedRemoteTrustPublisherIndependent)
 
 class _ManagedRemotePrimaryControlFixture {
 	__New() {
