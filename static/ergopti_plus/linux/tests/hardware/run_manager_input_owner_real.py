@@ -44,13 +44,28 @@ def prerequisites():
     if runtime is None or xvfb is None:
         raise RuntimeError("native LuaJIT and Xvfb are mandatory")
     probe = subprocess.run(
-        [runtime, "-e", 'assert(jit and require("ffi") and require("luv"))'],
+        [
+            runtime,
+            "-e",
+            'assert(jit and require("ffi") and require("luv")); '
+            'local ffi = require("ffi"); local runtime = require("_generated.native_runtime"); '
+            'for _, role in ipairs({"x11", "x11_xcb", "xkbcommon", "xkbcommon_x11"}) do '
+            "local bound = pcall(ffi.load, runtime[role]); if not bound then "
+            'io.stdout:write("MANAGER_NATIVE_XKB_PREREQUISITE " .. role .. "\\n"); '
+            "os.exit(2) end end",
+        ],
         check=False,
         timeout=3,
         capture_output=True,
         text=True,
     )
     if probe.returncode != 0:
+        missing = re.fullmatch(
+            r"MANAGER_NATIVE_XKB_PREREQUISITE (x11|x11_xcb|xkbcommon|xkbcommon_x11)\n",
+            probe.stdout,
+        )
+        if probe.returncode == 2 and missing is not None and probe.stderr == "":
+            raise RuntimeError("native desktop source library unavailable: " + missing.group(1))
         raise RuntimeError("native LuaJIT FFI and luv admission failed")
     return runtime, xvfb
 
