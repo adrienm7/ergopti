@@ -223,6 +223,7 @@ int main(int argc, const char **argv) {
         NSMutableArray *approvedApplications = [NSMutableArray array];
         BOOL targetUnqualified = NO;
         BOOL observationRefused = NO;
+        BOOL observationPending = NO;
         NSArray *applications = NSWorkspace.sharedWorkspace.runningApplications;
         if (applications.count > 512) return 68;
         for (NSRunningApplication *application in applications) {
@@ -237,7 +238,13 @@ int main(int argc, const char **argv) {
             CFRelease(process);
             if (![windows isKindOfClass:[NSArray class]] || windows.count > 8) {
                 refused_fact(agentIndex, "windows", windows, attributeError);
-                observationRefused = YES;
+                // A newly appearing OS agent can fail its first AX IPC. Keep
+                // that observation pending within the requester's original
+                // deadline; no partially observed census may press a button.
+                if (windows == nil && attributeError == kAXErrorCannotComplete)
+                    observationPending = YES;
+                else
+                    observationRefused = YES;
                 continue;
             }
             factWindows += (int)windows.count;
@@ -269,6 +276,10 @@ int main(int argc, const char **argv) {
         if (observationRefused) {
             puts("OWNED_AUTOMATION_UI/1 state=observation-refused");
             return 67;
+        }
+        if (observationPending) {
+            puts("OWNED_AUTOMATION_UI/1 state=observation-pending");
+            return 0;
         }
         if (approvedButtons.count == 0) {
             puts("OWNED_AUTOMATION_UI/1 state=absent");
