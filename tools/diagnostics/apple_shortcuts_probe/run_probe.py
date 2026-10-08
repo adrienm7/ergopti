@@ -93,6 +93,7 @@ def observation_interrupted(error, ownership):
 def capture(arguments, native, ownership, evidence, role):
     owners = []
     started = time.monotonic()
+    deadline = started + 20
     failure_kind = "none"
     observed_terminal = None
     primary_error = None
@@ -101,14 +102,14 @@ def capture(arguments, native, ownership, evidence, role):
             group = ownership.acquire_owned(
                 arguments, native, owners.append, stdout=out, stderr=err
             )
-            deadline = time.monotonic() + 20
             while True:
                 observation = group.observe_exit()
                 if observation is not None:
                     observed_terminal = terminal_summary(observation, group)
-                    break
                 if time.monotonic() >= deadline:
                     raise ProbeObservationRefused("deadline")
+                if observed_terminal is not None:
+                    break
                 if os.fstat(out.fileno()).st_size > LIMIT or os.fstat(err.fileno()).st_size > LIMIT:
                     raise ProbeObservationRefused("output_bound")
                 time.sleep(0.02)
