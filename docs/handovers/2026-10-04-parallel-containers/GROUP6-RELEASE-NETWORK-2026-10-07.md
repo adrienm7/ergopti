@@ -430,6 +430,22 @@ The preceding manual37713678709 at acb14576c continues unchanged; this separate
 follow-up requires its own exact-SHA package/install receiving. No running
 workflow is stopped, resumed or edited to add this source requirement.
 
+Manual37713678709 at acb14576c subsequently completes with shared/unit and
+all157 E2E steps passing. GIO configuration succeeds; native executable linking
+then rejects unresolved Duktape math symbols. Package/verdict fail and
+installation/Release are skipped. The checksum-pinned2.7.0 shared-library
+Makefile ignores LDLIBS and puts LDFLAGS before source objects. Group6 owns only
+network-duktape's build/install link arguments: retain libm with scoped
+no-as-needed/as-needed options, preserving the SDK's preceding flags.
+The independent complete command-vector regression fails against the old recipe.
+Actual host-source build/install reproduces original consumer-link refusal;
+the corrected library records libm and retains RELRO/BIND_NOW, then a genuine
+linked Duktape consumer evaluates Math.sqrt successfully. Both normal/debug
+build roles, source checksum, native tests and all other modules remain intact.
+This is host-source evidence, not a complete SDK/package/install verdict.
+Manual37714714116 on the earlier9d26b947e directory correction stays untouched;
+the new math correction needs its own exact-source hosted receiving.
+
 - **Windows62:** Join one packaged owned curl attempt engine to both the real
   request consumer and artifact staging producer. Bare NTLM-only CONNECT must
   use genuine SSPI evidence and one causal fallback after exact first-child and

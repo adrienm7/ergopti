@@ -195,8 +195,8 @@ function flatpakModules(data) {
 			name: 'network-duktape',
 			buildsystem: 'simple',
 			'build-commands': [
-				'make -f Makefile.sharedlibrary INSTALL_PREFIX=/app',
-				'make -f Makefile.sharedlibrary INSTALL_PREFIX=/app install'
+				'make -f Makefile.sharedlibrary INSTALL_PREFIX=/app LDFLAGS="${LDFLAGS:-} -Wl,--no-as-needed -lm -Wl,--as-needed"',
+				'make -f Makefile.sharedlibrary INSTALL_PREFIX=/app LDFLAGS="${LDFLAGS:-} -Wl,--no-as-needed -lm -Wl,--as-needed" install'
 			],
 			source: 'duktape'
 		},
