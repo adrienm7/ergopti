@@ -12,6 +12,20 @@ local fixtures = require("tests.unit.modules.shortcuts.pause_owners.fixtures")
 local OWNER_IDS = fixtures.OWNER_IDS
 local reset_module = fixtures.reset_module
 
+--- Restores exact predecessor modules after the genuine constructor loads its transitive children.
+--- @param callback function Original wiring subject.
+--- @return function scoped Original subject with raw package-cache restoration.
+local function with_preserved_cache(callback)
+	return function()
+		local predecessor = {}; for name, value in pairs(package.loaded) do predecessor[name] = value end
+		local outcome = table.pack(xpcall(callback, debug.traceback))
+		for name in pairs(package.loaded) do if rawget(predecessor, name) == nil then package.loaded[name] = nil end end
+		for name, value in pairs(predecessor) do package.loaded[name] = value end
+		if not outcome[1] then error(outcome[2], 0) end
+		return table.unpack(outcome, 2, outcome.n)
+	end
+end
+
 helpers.describe("HS-012 real shortcuts facade wiring", function()
 	helpers.it("carries pause epoch and both runtime owners through the injected facade", function()
 		local epoch = 41
@@ -305,7 +319,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 
 	end)
 
-	helpers.it("injects one registry identity into real menu startup and switch wiring", function()
+	helpers.it("injects one registry identity into real menu startup and switch wiring", with_preserved_cache(function()
 		local noop = function() return true end
 		local sentinel = {
 			apply_preference = noop,
@@ -315,7 +329,13 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 		local startup_ctx = nil
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.notifications"] = { notify = noop }
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		local locale_file = assert(io.open(helpers.shared("data/locales/en.json"), "r"))
+		local profile_strings = assert(require("json").decode(locale_file:read("*a")))
+		assert(locale_file:close())
+		package.loaded["infra.i18n"] = { get = function(key)
+			if key:match("^menu%.profiles%.") or key:match("^llm%.profile%.") then return profile_strings[key] or key end
+			return key
+		end }
 		package.loaded["ui.menu.shortcut_utils"] = {}
 		package.loaded["modules.llm"] = {
 			DEFAULT_STATE = {
@@ -340,9 +360,6 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 					get_model_info = function() return {} end,
 				}
 			end,
-		}
-		package.loaded["ui.menu.menu_llm.profiles_manager"] = {
-			new = function() return { get_menu_item = function() return {} end } end,
 		}
 		package.loaded["ui.menu.menu_llm.settings_manager"] = {
 			new = function() return {} end,
@@ -399,10 +416,36 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			row_disabled = function() return false end,
 			has_health_dot = function() return false end,
 		}
+		local profile_renderer = assert(require("menu.renderer").new({
+			platform = "hs",
+			manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
+			json_decode = require("json").decode,
+			i18n = {get = package.loaded["infra.i18n"].get, section = package.loaded["infra.i18n"].get},
+			logger = package.loaded["infra.logger"],
+		}))
 		package.loaded["infra.manifest_menu"] = {
-			render_rows = function(rows) return rows end,
+			template_rows = profile_renderer.template_rows,
+			render_rows = function(rows, slot)
+				if slot == "llm_profile" then return profile_renderer.render_rows(rows, slot) end
+				return rows
+			end,
 			build = function() return {} end,
 		}
+		local core = package.loaded["modules.llm"]
+		package.loaded["modules.llm.profiles"] = nil
+		package.loaded["ui.menu.menu_llm.profile_label"] = nil
+		core.BUILTIN_PROFILES = require("modules.llm.profiles").BUILTIN_PROFILES
+		local profile_constructor_sync = {}
+		core.set_user_profiles = function()
+			profile_constructor_sync[#profile_constructor_sync + 1] = "users"
+			return true
+		end
+		core.set_active_profile = function()
+			profile_constructor_sync[#profile_constructor_sync + 1] = "active"
+			return true
+		end
+		package.loaded["ui.menu.menu_llm.profiles_manager"] = nil
+		require("ui.menu.menu_llm.profiles_manager")
 		package.loaded["modules.llm.mlx_deps_checker"] = require("tests.support.runtime_checker_stub")({ check_and_install_deps = noop })
 		package.loaded["modules.llm.ollama_deps_checker"] = require("tests.support.runtime_checker_stub")({ check_and_install_deps = noop })
 		reset_module("ui.menu.menu_llm")
@@ -431,5 +474,5 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			"the menu must pass the exact ScriptControl facade into ModelSwitcher")
 		helpers.assert_true(startup_ctx.deps.script_control == facade,
 			"the menu must pass the exact ScriptControl facade into StartupController")
-	end)
+	end))
 end)

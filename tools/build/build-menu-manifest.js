@@ -55,10 +55,11 @@ const HEADER = {
 		"'feature' = manifest-path toggle, " +
 		"'action' = stateless button, 'dynamic' = rendered by platform code, " +
 		"'group' = named submenu, 'include' = reused child-template section, " +
+		"'native_content' = completed native objects ordered by an admitted composition, " +
 		"'label' = inert provider-template caption, 'section_header' = disabled header, '---' = separator, " +
 		"'list' = rows supplied at build time by a named provider, 'letter_picker' = " +
 		'the A-Z chooser. The last two were in use and undocumented here, which matters ' +
-		"because 'list' is the ONLY type that moves a row from the driver into the " +
+		"because 'list' is the ONLY type that moves provider DATA from the driver into the " +
 		"renderer — 'dynamic' hands the rendering straight back to platform code. " +
 		"'choice' = one enum feature (path) as one row with its values beneath it; its " +
 		"'choices' are projected from the feature's enum_values or registered owner by this generator.",

@@ -4883,7 +4883,7 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 27, macOS 28, Linux 31, each
+  drivers still build (current baseline: Windows 27, macOS 27, Linux 31, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
@@ -4897,8 +4897,22 @@ integrated, then publish one grouped release.
   Original image, click, drawing and retirement owners remain native. Selected
   gates pass 382 JS checks, 17,245 portable macOS and 11,693 Linux units, plus
   portable macOS E2E; native AppKit, packaging and installation qualification
-  remain pending. Root/image placement and download presentation are separate
-  unfinished families.
+  remain pending. The successor declares completed native image/download
+  placement in the shared manifest and rechecks exact declaration identities
+  before atomic native composition. The same 29 shared subjects pass on both
+  Lua runtimes; actual target-alias predecessors fail two of them. Original
+  historical 60 and current 74 source-route controls remain independent.
+  Actual badge/download consumers pass 49/0 and 10/0. Genuine model DATA and
+  profile parent captions are now materialized before native publication;
+  source callbacks and native children retain their proper identities. Focused
+  count/model/settings controls pass 13/0, 25/0 and 194/0. The same model
+  subjects fail 4/25 on original production. Private portable installed boot
+  passes 101 cases with one host-specific scenario skipped, versus 30 earlier
+  failures. Selected portable gates pass 382 JS checks, 17,325 macOS and
+  11,731 Linux units, plus 101 macOS and 189 Linux E2E scenarios; one macOS
+  host scenario is skipped. Windows units are not executed in this container.
+  Final-source native CI, packaging and installation remain pending; these
+  portable receipts do not close the items.
   Reload/Quit captions now come from the canonical native-platform variants,
   retaining all 21 independently frozen prior captions. Unique visible lookup
   refuses hidden-first ownership, withdrawal and duplicate native identities.
@@ -5690,6 +5704,8 @@ The genuine complete Windows profile-frame fixture now initializes its isolated 
 The existing Windows/Linux separator after backend choices now uses one canonical shared child template. Actual backend, model and port callbacks and native ordering are unchanged; macOS had no corresponding separator and remains explicitly hidden and byte-exact. Independent handwritten platform/order tests, actual native producer inversions and both owning generators retain all previous assertions and21 translations. The real remaining census falls from71/102/74 to70/102/73; unexplained platform debt remains104. Focused and French-warm portable controls pass3/0 per runtime versus genuine predecessor1/2. Native AHK, full composed qualification and installed-device acceptance remain separate; items54/81 remain partial.
 
 The fixed Specifications and Capabilities frames of the Windows/macOS per-model detail sheets now consume shared child templates. Existing separators, platform decoration, capability predicates and native callbacks are preserved; Linux has no corresponding detail sheet and retains its declared absence without a native change. The owning generators lower Windows 70/macOS 102/Linux 73 to 66/98/73. Independent source review preserves every predecessor corpus file, all 21 locale files and original registered assertions. Portable Mac owning probes pass 8/0 and French-warm probes pass 5/0 in both Lua runtimes; the genuine original producer gives 6/2 and 3/2. The unchanged Linux whole-tray fixture passes 9/0 in English and French on both runtimes. Final composed native CI, Windows allocator execution and installed-device acceptance remain separate; items 54/81 remain partial.
+
+The completed macOS image/download root now consumes shared typed slot order and conditional boundary policy while preserving the native finished objects, resources and callbacks. The composer re-admits the exact canonical owner and validates every finished tree before mutating its existing target; prefix submenus that alias that target refuse without writes. Independent actual-source controls pass the original60 historical and74 LIVE obligations with genuine positives. Focused shared native controls pass29/0 on each Lua runtime versus the identical29 original composer27/2; the real image producer passes49/0 and the real download producer10/0. Original menu assertions and independently frozen order/caption corpora remain intact. Selected portable gates pass382 JS, 17,325 macOS and11,731 Linux units, plus101 macOS and189 Linux E2E scenarios with one macOS host skip. Windows units remain unexecuted locally; hosted native packaging/installation and item38 device acceptance remain separate. Items54/81 stay partial.
 
 - [ ] **62.** Downloads on managed company networks: system trust and
       system proxy for every download child (Ollama installation/server/pull,
@@ -6961,7 +6977,7 @@ Current Group 3 source checkpoint (item 73, 2026-10-06): [Group 3 current checkp
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 27, macOS 28 and Linux 31 rows are still built by the
+  Windows 27, macOS 27 and Linux 31 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). Read on
   2026-10-01, the sites are of four kinds, and three of them need the
   manifest to say more than it can today:
@@ -6986,8 +7002,22 @@ Current Group 3 source checkpoint (item 73, 2026-10-06): [Group 3 current checkp
   Original image, click, drawing and retirement owners remain native. Selected
   gates pass 382 JS checks, 17,245 portable macOS and 11,693 Linux units, plus
   portable macOS E2E; native AppKit, packaging and installation qualification
-  remain pending. Root/image placement and download presentation are separate
-  unfinished families.
+  remain pending. The successor declares completed native image/download
+  placement in the shared manifest and rechecks exact declaration identities
+  before atomic native composition. The same 29 shared subjects pass on both
+  Lua runtimes; actual target-alias predecessors fail two of them. Original
+  historical 60 and current 74 source-route controls remain independent.
+  Actual badge/download consumers pass 49/0 and 10/0. Genuine model DATA and
+  profile parent captions are now materialized before native publication;
+  source callbacks and native children retain their proper identities. Focused
+  count/model/settings controls pass 13/0, 25/0 and 194/0. The same model
+  subjects fail 4/25 on original production. Private portable installed boot
+  passes 101 cases with one host-specific scenario skipped, versus 30 earlier
+  failures. Selected portable gates pass 382 JS checks, 17,325 macOS and
+  11,731 Linux units, plus 101 macOS and 189 Linux E2E scenarios; one macOS
+  host scenario is skipped. Windows units are not executed in this container.
+  Final-source native CI, packaging and installation remain pending; these
+  portable receipts do not close the items.
   Reload/Quit captions now come from the canonical native-platform variants,
   retaining all 21 independently frozen prior captions. Unique visible lookup
   refuses hidden-first ownership, withdrawal and duplicate native identities.
@@ -7170,6 +7200,8 @@ The fixed API Add-entry affordance and its existing separator now consume canoni
 The existing Windows/Linux separator after backend choices now uses one canonical shared child template. Actual backend, model and port callbacks and native ordering are unchanged; macOS had no corresponding separator and remains explicitly hidden and byte-exact. Independent handwritten platform/order tests, actual native producer inversions and both owning generators retain all previous assertions and21 translations. The real remaining census falls from71/102/74 to70/102/73; unexplained platform debt remains104. Focused and French-warm portable controls pass3/0 per runtime versus genuine predecessor1/2. Native AHK, full composed qualification and installed-device acceptance remain separate; items54/81 remain partial.
 
 The shared per-model Specifications and Capabilities frames retire four genuine Windows and four genuine macOS allocator sites, reducing 70/102/73 to 66/98/73. Linux's actual absence is declared; native callbacks and dynamic detail rows retain their existing owners. Independent source, locale, corpus and original-producer controls are qualified. Final composed native CI, the registered Windows cases and item 38 device acceptance remain open; the remaining 66/98/73 sites keep items 54/81 partial.
+
+The completed macOS image/download root now consumes shared typed slot order and conditional boundary policy while preserving the native finished objects, resources and callbacks. The composer re-admits the exact canonical owner and validates every finished tree before mutating its existing target; prefix submenus that alias that target refuse without writes. Independent actual-source controls pass the original60 historical and74 LIVE obligations with genuine positives. Focused shared native controls pass29/0 on each Lua runtime versus the identical29 original composer27/2; the real image producer passes49/0 and the real download producer10/0. Original menu assertions and independently frozen order/caption corpora remain intact. Selected portable gates pass382 JS, 17,325 macOS and11,731 Linux units, plus101 macOS and189 Linux E2E scenarios with one macOS host skip. Windows units remain unexecuted locally; hosted native packaging/installation and item38 device acceptance remain separate. Items54/81 stay partial.
 
 - [~] **88.** **Partial: native prediction tooltip appearance.** Shared
   llm-line-style policy and the unchanged independent line corpus retain grey
