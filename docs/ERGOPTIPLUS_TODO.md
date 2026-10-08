@@ -6547,6 +6547,18 @@ retain every prior provider flag. Other modules, source pins, runtime lookup,
 native assertions and installed-format requirements remain unchanged. SDK
 compilation and actual installed closure still need final-source receiving.
 
+Manual37713678709 at acb14576c passes shared checks,11,644 unit assertions and
+all157 E2E steps. GIO configuration now succeeds, but executable linking exposes
+unresolved Duktape math symbols. The pinned upstream shared-library Makefile
+does not consume LDLIBS and places LDFLAGS before its source. Its generated
+build/install commands now retain libm explicitly while preserving SDK flags
+and restoring as-needed for later inputs. A genuine checksum-verified host
+source build/install reproduces refused original consumer linking, then passes
+corrected linking and Math.sqrt evaluation with libm, RELRO and BIND_NOW.
+Both source identities and every GIO/native assertion remain intact. The
+preceding native run skips installation/Release; final SDK/package/install
+receiving on the new source remains required before any completion claim.
+
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard
   layers on all three drivers. Windows and macOS also support their existing

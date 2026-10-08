@@ -151,6 +151,12 @@ assert.ok(modules[2]['build-commands'][1].includes('--disable-static'));
 assert.ok(modules[2]['post-install'].includes('test -f /app/lib/libgssapi_krb5.so'));
 assert.ok(modules[3]['config-opts'].includes('-DCURL_USE_GSSAPI=ON'));
 assert.ok(modules[3]['config-opts'].includes('-DGSS_ROOT_DIR=/app'));
+// Upstream places LDFLAGS before its source and does not consume LDLIBS.
+// Retain libm explicitly there, preserving SDK hardening flags and later as-needed.
+assert.deepEqual(modules[4]['build-commands'], [
+	'make -f Makefile.sharedlibrary INSTALL_PREFIX=/app LDFLAGS="${LDFLAGS:-} -Wl,--no-as-needed -lm -Wl,--as-needed"',
+	'make -f Makefile.sharedlibrary INSTALL_PREFIX=/app LDFLAGS="${LDFLAGS:-} -Wl,--no-as-needed -lm -Wl,--as-needed" install'
+]);
 assert.ok(modules[5]['config-opts'].includes('-Dconfig-xdp=true'));
 // The declared package environment resolves native providers from prefix/lib.
 // SDK autodetection must not place either provider in prefix/lib64 instead.
