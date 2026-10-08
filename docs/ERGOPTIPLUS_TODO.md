@@ -5623,6 +5623,12 @@ The fixed Specifications and Capabilities frames of the Windows/macOS per-model 
       open. macOS system trust and explicit proxy relays are integrated, while
       opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
 
+Linux CONNECT receiving now distinguishes the admitted certificate-refusal
+client reset from unknown client or backend failures. All five original model
+assertion bodies remain intact; nine causal controls and the actual 30 public
+transport plus 18 retained-output controls pass. Full-suite retries remain
+pending after local disk exhaustion; no native or packaging gate is waived.
+
 Windows full-URL PAC source preparation adds a bounded, fresh-script native
 Duktape evaluator with the canonical script, heap, query and deadline limits.
 The real Windows producer will qualify DNS/interface helpers, source identity,
