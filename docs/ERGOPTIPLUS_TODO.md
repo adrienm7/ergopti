@@ -5649,6 +5649,14 @@ ten protocol cases and two real locked Python-client exchanges pass. Five
 additional role controls pass on actual subprocess peers. This portable
 protocol receiving does not prove the Darwin listener or Ollama operation.
 
+macOS WPAD source now delegates DNS search to the native resolver instead of
+constructing domain suffixes, while validated DHCP252 still owns discovery.
+Missing/invalid discovery refuses before any origin request. Existing
+component coverage retains its refusal predicates with the intended native
+DNS endpoint; three additive controls and an actual CFNetwork DHCP/PAC wire
+receiver are authored. Swift compilation and these Apple-native assertions
+remain unexecuted until hosted CI; real company DHCP/DNS is a device check.
+
 The macOS native-network tranche adds NSURLSession/CFNetwork route receiving,
 a bounded private HTTP protocol, an owned PTY bootstrap and verified offline
 Python inputs. The frozen local candidate passes all 17,158 Hammerspoon

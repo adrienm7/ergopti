@@ -89,11 +89,18 @@ private func managedPACCallback(_ context: UnsafeMutableRawPointer, _ proxies: C
 	result.received = true
 }
 
+/// Native discovery metadata stays separate from test-owned PAC settings.
+struct ManagedWPADMetadata {
+	let dhcpOption: Data?
+	let searchDomains: [String]
+}
+
 /// Resolves the exact URL explicitly, before origin TLS. An authority-only
 /// CONNECT observation is never used as the PAC input.
 enum ManagedProxyLookup {
 	static func routes(url: URL, budget: TimeInterval, maximumSelections: Int,
-		settingsProvider: () -> CFDictionary? = { CFNetworkCopySystemProxySettings()?.takeRetainedValue() }) -> [[String: Any]]? {
+		settingsProvider: () -> CFDictionary? = { CFNetworkCopySystemProxySettings()?.takeRetainedValue() },
+		discoveryMetadataProvider: () -> ManagedWPADMetadata = { ManagedProxyLookup.discoveryMetadata() }) -> [[String: Any]]? {
 		guard let settings = settingsProvider() else { return nil }
 		let dictionary = (settings as AnyObject) as? [String: Any]
 		let discoveryEnabled = (dictionary?[kCFNetworkProxiesProxyAutoDiscoveryEnable as String] as? NSNumber)?.boolValue == true
@@ -125,17 +132,16 @@ enum ManagedProxyLookup {
 					|| kind == kCFProxyTypeAutoConfigurationJavaScript as String
 			}) {
 			guard let discovered = discover(url: url, deadline: deadline,
-				maximumSelections: maximumSelections) else { return nil }
+				maximumSelections: maximumSelections, metadataProvider: discoveryMetadataProvider) else { return nil }
 			routes = discovered
 		}
 		return routes.isEmpty ? nil : routes
 	}
 
 	/// Public SystemConfiguration metadata for the current primary service.
-	/// DNS discovery uses only explicitly configured search domains, without
-	/// suffix devolution into a parent zone or public suffix.
+	/// The actual resolver owns search order and scoped DNS behavior. Configured
+	/// metadata admits discovery, rather than constructing or devolving suffixes.
 	static func discoveryURLs(dhcpOption: Data?, searchDomains: [String]) -> [URL]? {
-		var result: [URL] = []
 		if let dhcpOption {
 			guard !dhcpOption.isEmpty,
 				let text = String(data: dhcpOption, encoding: .utf8),
@@ -148,23 +154,23 @@ enum ManagedProxyLookup {
 			// is a refusal, rather than an unannounced switch to DNS discovery.
 			return [endpoint]
 		}
-		var seen = Set<String>()
-		for domain in searchDomains {
+		let configured = searchDomains.contains { domain in
 			let normalized = domain.lowercased().hasSuffix(".") ? String(domain.lowercased().dropLast()) : domain.lowercased()
 			let labels = normalized.split(separator: ".", omittingEmptySubsequences: false)
-			guard normalized.utf8.count <= 253, labels.count >= 2,
-				labels.allSatisfy({ label in
+			return normalized.utf8.count <= 253 && !labels.isEmpty
+				&& labels.allSatisfy { label in
 					!label.isEmpty && label.utf8.count <= 63 && label.first != "-" && label.last != "-"
-						&& label.utf8.allSatisfy({ (97...122).contains($0) || (48...57).contains($0) || $0 == 45 })
-				}) else { continue }
-			if seen.insert(normalized).inserted, let endpoint = URL(string: "http://wpad.\(normalized)/wpad.dat") {
-				result.append(endpoint)
-			}
+						&& label.utf8.allSatisfy { (97...122).contains($0) || (48...57).contains($0) || $0 == 45 }
+				}
 		}
-		return result
+		guard configured else { return [] }
+		// CFNetwork performs this lookup through native DNS. Single-label company
+		// domains remain valid; no application public-suffix approximation is used.
+		guard let endpoint = URL(string: "http://wpad/wpad.dat") else { return nil }
+		return [endpoint]
 	}
 
-	static func discover(url: URL, deadline: TimeInterval, maximumSelections: Int) -> [[String: Any]]? {
+	static func discoveryMetadata() -> ManagedWPADMetadata {
 		var option: Data?
 		if let info = SCDynamicStoreCopyDHCPInfo(nil, nil), let native = DHCPInfoGetOptionData(info, 252) {
 			option = native as Data
@@ -172,7 +178,13 @@ enum ManagedProxyLookup {
 		let nativeDNS = SCDynamicStoreCopyValue(nil, "State:/Network/Global/DNS" as CFString) as? [String: Any]
 		var domains = nativeDNS?[kSCPropNetDNSSearchDomains as String] as? [String] ?? []
 		if let domain = nativeDNS?[kSCPropNetDNSDomainName as String] as? String { domains.append(domain) }
-		guard let endpoints = discoveryURLs(dhcpOption: option, searchDomains: domains),
+		return ManagedWPADMetadata(dhcpOption: option, searchDomains: domains)
+	}
+
+	static func discover(url: URL, deadline: TimeInterval, maximumSelections: Int,
+		metadataProvider: () -> ManagedWPADMetadata = { ManagedProxyLookup.discoveryMetadata() }) -> [[String: Any]]? {
+		let metadata = metadataProvider()
+		guard let endpoints = discoveryURLs(dhcpOption: metadata.dhcpOption, searchDomains: metadata.searchDomains),
 			!endpoints.isEmpty, endpoints.count <= maximumSelections else { return nil }
 		for endpoint in endpoints {
 			guard ProcessInfo.processInfo.systemUptime < deadline else { return nil }
@@ -482,6 +494,7 @@ enum ManagedHTTPWorker {
 	static func execute(_ request: ManagedHTTPRequest, maximumSelections: Int,
 		started: TimeInterval = ProcessInfo.processInfo.systemUptime,
 		settingsProvider: () -> CFDictionary? = { CFNetworkCopySystemProxySettings()?.takeRetainedValue() },
+		discoveryMetadataProvider: () -> ManagedWPADMetadata = { ManagedProxyLookup.discoveryMetadata() },
 		output: @escaping (Data) -> Bool) -> Int32 {
 		guard maximumSelections > 0 else { return refuse(reason: "unavailable", status: 78, output: output) }
 		let routes: [[String: Any]]
@@ -491,7 +504,8 @@ enum ManagedHTTPWorker {
 			if let lookupRemaining, lookupRemaining <= 0 { return refuse(reason: "deadline", status: 75, output: output) }
 			guard let selected = ManagedProxyLookup.routes(url: request.url,
 				budget: min(lookupRemaining ?? request.idleTimeout, request.idleTimeout),
-				maximumSelections: maximumSelections, settingsProvider: settingsProvider)
+				maximumSelections: maximumSelections, settingsProvider: settingsProvider,
+				discoveryMetadataProvider: discoveryMetadataProvider)
 			else { return refuse(reason: "unavailable", status: 78, output: output) }
 			routes = selected
 		}

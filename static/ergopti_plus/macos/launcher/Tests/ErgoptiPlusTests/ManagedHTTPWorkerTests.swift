@@ -102,15 +102,58 @@ final class ManagedHTTPWorkerTests: XCTestCase {
 			XCTAssertEqual(direct[key as String] as? Int, 0, "DIRECT disables all inherited system selectors")
 		}
 	}
-	func testWPADMetadataUsesDHCPOwnerOrConfiguredDNSWithoutSuffixDevolution() throws {
+	func testWPADMetadataUsesDHCPOwnerOrNativeResolverWithoutSuffixConstruction() throws {
 		XCTAssertEqual(ManagedProxyLookup.discoveryURLs(dhcpOption: nil,
 			searchDomains: ["Engineering.Corp.Example.", "corp.example", "corp.example", "com", "invalid/domain", "-bad.example"])
-			?.map(\.absoluteString), ["http://wpad.engineering.corp.example/wpad.dat", "http://wpad.corp.example/wpad.dat"])
+			?.map(\.absoluteString), ["http://wpad/wpad.dat"])
 		XCTAssertEqual(ManagedProxyLookup.discoveryURLs(dhcpOption: Data("https://pac.corp.example/profile.pac".utf8),
 			searchDomains: ["corp.example"])?.map(\.absoluteString), ["https://pac.corp.example/profile.pac"])
 		for invalid in ["https://name:reserved@pac.corp.example/a", "file:///reserved", "https://pac.corp.example/a#fragment", "http://pac.corp.example/\n"] {
 			XCTAssertNil(ManagedProxyLookup.discoveryURLs(dhcpOption: Data(invalid.utf8), searchDomains: ["corp.example"]))
 		}
+	}
+
+	func testWPADNativeDNSAdmissionIncludesSingleLabelCompanyDomains() {
+		for domain in ["corp", "CORP.", "engineering.corp.example", "com"] {
+			XCTAssertEqual(ManagedProxyLookup.discoveryURLs(dhcpOption: nil,
+				searchDomains: [domain])?.map(\.absoluteString), ["http://wpad/wpad.dat"],
+				"Configured domains admit the native resolver without guessing suffix ownership")
+		}
+		for domains in [[], [""], ["."], ["invalid/domain"], ["-bad.example"], ["bad..example"],
+			[String(repeating: "x", count: 64)], ["corp\n"], ["corp example"]] {
+			XCTAssertEqual(ManagedProxyLookup.discoveryURLs(dhcpOption: nil,
+				searchDomains: domains)?.map(\.absoluteString), [], "Absent/invalid DNS metadata refuses before lookup")
+		}
+	}
+
+	func testWPADUnresolvedNativeStateNeverFallsBackToInitialDirectOrFixedProxy() throws {
+		let settings: [String: Any] = [kCFNetworkProxiesProxyAutoDiscoveryEnable as String: 1,
+			kCFNetworkProxiesHTTPSEnable as String: 1, kCFNetworkProxiesHTTPSProxy as String: "fixed.example",
+			kCFNetworkProxiesHTTPSPort as String: 3111]
+		for metadata in [ManagedWPADMetadata(dhcpOption: nil, searchDomains: []),
+			ManagedWPADMetadata(dhcpOption: Data("https://reserved:credential@pac.example/a".utf8), searchDomains: ["corp"])] {
+			var metadataReads = 0
+			let selected = ManagedProxyLookup.routes(url: URL(string: "https://origin.example/private?case=one")!,
+				budget: 20, maximumSelections: 16, settingsProvider: { settings as CFDictionary },
+				discoveryMetadataProvider: { metadataReads += 1; return metadata })
+			XCTAssertEqual(metadataReads, 1, "Unresolved autodiscovery joins the native metadata provider exactly once")
+			XCTAssertNil(selected, "Invalid/absent discovery cannot silently select DIRECT or a fixed proxy")
+		}
+	}
+
+	func testResolvedNativePACOwnsDiscoveryWithoutReadingForeignMetadata() throws {
+		let settings: [String: Any] = [kCFNetworkProxiesProxyAutoDiscoveryEnable as String: 1,
+			kCFNetworkProxiesProxyAutoConfigEnable as String: 1,
+			kCFNetworkProxiesProxyAutoConfigJavaScript as String:
+				"function FindProxyForURL(url, host) { return 'PROXY selected.example:3111; DIRECT'; }"]
+		var metadataReads = 0
+		let selected = try XCTUnwrap(ManagedProxyLookup.routes(url: URL(string: "https://origin.example/private?case=two")!,
+			budget: 20, maximumSelections: 16, settingsProvider: { settings as CFDictionary },
+			discoveryMetadataProvider: { metadataReads += 1; return ManagedWPADMetadata(dhcpOption: nil, searchDomains: []) }))
+		XCTAssertEqual(metadataReads, 0, "An already-resolved native PAC candidate owns this request")
+		XCTAssertEqual(selected.count, 2)
+		XCTAssertEqual(selected[0][kCFProxyHostNameKey as String] as? String, "selected.example")
+		XCTAssertEqual(selected[1][kCFProxyTypeKey as String] as? String, kCFProxyTypeNone as String)
 	}
 
 }
