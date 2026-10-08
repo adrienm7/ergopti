@@ -2262,7 +2262,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          # Checkout's temporary HOME does not carry ownership admission into this step.
+          test "$(git -c safe.directory="$GITHUB_WORKSPACE" rev-parse HEAD)" = "$GITHUB_SHA"
           source static/ergopti_plus/linux/install/native_source_build.sh
           native_source_compile_probe "$GITHUB_WORKSPACE/static/ergopti_plus/linux/native/archive_output"
 
