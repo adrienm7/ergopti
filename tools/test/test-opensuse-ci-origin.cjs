@@ -204,7 +204,7 @@ for (const scenario of scenarios) {
 		const output = result.stdout + result.stderr;
 		if (scenario.exit !== 0) {
 			const [solver, download, tls, unknown] = scenario.flags.split(' ');
-			const receipt = `TOOLING: zypper solver=${solver} download=${download} tls=${tls} unknown=${unknown} native_exit=${scenario.exit}`;
+			const receipt = `TOOLING: zypper solver=${solver} download=${download} tls=${tls} unknown=${unknown} missing_requested=unknown native_exit=${scenario.exit}`;
 			assert(
 				output.includes(receipt),
 				`${scenario.name}: exact native exit and closed flags must survive`
