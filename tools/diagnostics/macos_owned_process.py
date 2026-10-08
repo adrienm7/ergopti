@@ -159,7 +159,10 @@ class NativeProcessGroups:
                 continue
             require(
                 received == ctypes.sizeof(info) and info.pid == pid,
-                "Native process-group member identity was unavailable",
+                "Native process-group member identity was unavailable "
+                f"(received_bytes={received}, errno={ctypes.get_errno()}, "
+                f"reserved={int(pid == reserved_leader)}, bsd_pid_match={int(info.pid == pid)}, "
+                f"bsd_pgid_match={int(info.pgid == group_id)}, status={info.status})",
             )
             if info.pgid != group_id:
                 continue  # The census race left this inherited-PGID ownership scope.

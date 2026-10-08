@@ -316,6 +316,40 @@ class OwnedProcessControls(unittest.TestCase):
             native.live_members(73136, 73136)
         native.library.proc_pidinfo.assert_not_called()
 
+    def test_native_identity_refusal_reports_only_bounded_scalar_cause(self):
+        for pid, received, native_errno, reported_pid, reported_group, status in (
+            (73136, 0, 5, 0, 0, 0),
+            (87236, 136, 0, 0, 73136, 2),
+            (87236, 12, 22, 87236, 0, 5),
+        ):
+            with self.subTest(reserved=pid == 73136, received=received):
+                native = owner.NativeProcessGroups.__new__(owner.NativeProcessGroups)
+
+                def listed(_kind, _group, storage, _size):
+                    if storage is None:
+                        return 4
+                    storage[0] = pid
+                    return 4
+
+                def info(_pid, _kind, _zombies, destination, _size):
+                    record = ctypes.cast(destination, ctypes.POINTER(owner.ProcBSDInfo)).contents
+                    record.pid, record.pgid, record.status = reported_pid, reported_group, status
+                    ctypes.set_errno(native_errno)
+                    return received
+
+                native.library = SimpleNamespace(proc_listpids=listed, proc_pidinfo=info)
+                with self.assertRaises(owner.OwnedProcessError) as refused:
+                    native.live_members(73136, 73136)
+                self.assertEqual(
+                    str(refused.exception),
+                    "Native process-group member identity was unavailable "
+                    f"(received_bytes={received}, errno={native_errno}, "
+                    f"reserved={int(pid == 73136)}, bsd_pid_match={int(reported_pid == pid)}, "
+                    f"bsd_pgid_match={int(reported_group == 73136)}, status={status})",
+                )
+                self.assertNotIn(str(pid), str(refused.exception))
+                self.assertNotIn("/", str(refused.exception))
+
     def test_exclusive_terminal_publication_preserves_existing_user_bytes(self):
         with TemporaryDirectory() as directory:
             path = Path(directory) / "terminal.json"
