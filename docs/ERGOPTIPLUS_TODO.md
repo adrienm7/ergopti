@@ -6589,10 +6589,18 @@ Alpine source compilations missinglinux/magic.h. The source-build catalogue
 and the unchanged--no-deps caller now also provisionlinux-headers on Alpine;
 no binary runtime dependency or native assertion is removed. The independent
 header-package regression fails before this correction. Final native receiving
-of the combined Fedora/Alpine repairs is in progress in manual37755062021
-at44525214e4d0763f9c23e7d69828ec6bf3e01871, selecting Linux only. Local
-formatting,382 JS checks and26 runtime-control groups pass; those results
-do not qualify the pending native installation matrix. Item62 remains open.
+of the combined Fedora/Alpine repairs passes in manual37755062021 attempt2
+at44525214e4d0763f9c23e7d69828ec6bf3e01871: shared checks,11,644 Linux unit
+assertions, official Ollama/model acceptance, all157 E2E steps, the complete
+Package job and17/17 installation variants. No E2E/installation variant is
+failed or skipped; Windows/macOS are unselected and Release is skipped.
+Attempt1 failed during explicit model pull with unchanged sources and zero
+pending descendants. Its1,309 runtime subjects match the preceding green
+native source; the lower cause remains unproved. A fresh runner passes the
+unchanged candidate without relaxing any assertion or clock. Local formatting,
+382 JS checks,26 runtime controls and1,875 AHK BOM/LF checks also pass.
+Item62 remains open for the existing Windows/Mac CODE and native/device work;
+items16/38 retain their complete independent requirements.
 
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard
