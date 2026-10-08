@@ -5635,6 +5635,10 @@ The real Windows producer will qualify DNS/interface helpers, source identity,
 PE mitigations and system-only imports before publishing its executable.
 All86 independent helper vectors and17 actual pinned VM controls pass locally;
 Windows compilation, production joins and native route receiving remain pending.
+The first hosted build exposed redundant error-macro return values under MSVC
+strict warnings. The six call sites now use the identical nonreturning public
+Duktape error API; actual GCC strict-warning compilation and all17 VM controls
+pass. The corrected MSVC build still requires its own hosted receiving.
 
 Windows release asset staging now joins the same bounded curl attempt
 engine as real requests, using the exact selected asset integer token
