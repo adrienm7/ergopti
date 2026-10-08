@@ -6518,6 +6518,16 @@ access does not repair WinHTTP, TLS classification or graceful cleanup. The
 handover now lists exactly four current native fixes; the historical System32
 curl capability case passes and must not be rebuilt without a regression.
 
+Manual Linux package receiving now continues after a failed E2E job, retaining
+successful unit admission through the unchanged E2E dependency. Automatic runs
+still require E2E success; cancelled or skipped E2E does not admit packaging.
+The final native verdict still rejects any failed mandatory job or absent
+subject, and Release remains push-only. This allows item62's real Flatpak SDK
+build to be tested while another group's native E2E repair is pending. The
+regression fails against the previous workflow and preserves every existing
+assertion, original receiving clock and package/install requirement. New native
+receiving is pending; this diagnostic admission does not close36/62 or16/38.
+
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard
   layers on all three drivers. Windows and macOS also support their existing

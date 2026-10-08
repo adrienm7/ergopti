@@ -1431,6 +1431,64 @@ assert.deepStrictEqual(
 	PACKAGE_SUBJECTS,
 	'package-linux must be the mandatory owner of the six packaging subjects'
 );
+// Manual diagnostics can qualify packages after failed E2E receiving, while
+// both the mandatory verdict and automatic release admission remain strict.
+const manualPackageJob = pipeline.job('package-linux');
+assert.deepStrictEqual(pipeline.needsOf(manualPackageJob), ['e2e-linux']);
+assert.deepStrictEqual(pipeline.needsOf(pipeline.job('e2e-linux')), ['test-linux']);
+assert.strictEqual(pipeline.field(pipeline.job('e2e-linux'), 'if'), null);
+assert.strictEqual(
+	pipeline.field(manualPackageJob, 'if'),
+	"${{ !cancelled() && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}",
+	'manual packaging must retain unit admission, cancellation and automatic E2E admission'
+);
+// The frozen acceptance table is independent of the workflow expression.
+// Evaluate only after the exact source guard above admits this closed predicate.
+const diagnosticEvents = ['push', 'pull_request', 'workflow_dispatch', 'schedule', 'unknown'];
+const diagnosticResults = ['success', 'failure', 'cancelled', 'skipped', null, 'unknown'];
+const admittedPackageCases = new Set([
+	'push:success:false',
+	'pull_request:success:false',
+	'workflow_dispatch:success:false',
+	'workflow_dispatch:failure:false',
+	'schedule:success:false',
+	'unknown:success:false'
+]);
+const diagnosticExpression = pipeline
+	.field(manualPackageJob, 'if')
+	.slice(3, -2)
+	.replace('needs.e2e-linux.result', "needs['e2e-linux'].result")
+	.replace('needs.e2e-linux.result', "needs['e2e-linux'].result");
+let diagnosticCaseCount = 0;
+for (const event of diagnosticEvents) {
+	for (const result of diagnosticResults) {
+		for (const cancelled of [false, true]) {
+			const actual = require('node:vm').runInNewContext(
+				diagnosticExpression,
+				{
+					cancelled: () => cancelled,
+					needs: { 'e2e-linux': { result } },
+					github: { event_name: event }
+				},
+				{ timeout: 100 }
+			);
+			assert.strictEqual(actual, admittedPackageCases.has(`${event}:${result}:${cancelled}`));
+			diagnosticCaseCount++;
+		}
+	}
+}
+assert.strictEqual(diagnosticCaseCount, 60);
+
+assert.strictEqual(
+	pipeline.field(pipeline.job('release'), 'if'),
+	"github.event_name == 'push' && needs.validate.outputs.release == 'true'",
+	'manual package diagnostics must never publish a release'
+);
+rejects(({ needs }) => {
+	assert.strictEqual(needs['package-linux'].result, 'success');
+	needs['e2e-linux'].result = 'failure';
+}, /mandatory job e2e-linux concluded/);
+
 const packageRecord = pipeline.step(
 	pipeline.job('package-linux'),
 	'Record mandatory package evidence'
