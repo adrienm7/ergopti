@@ -4239,6 +4239,26 @@ permission call can block arbitrarily; the hosted runner cannot supply human
 consent. The original positives, full denial, six Brew cases, clocks and physical
 closure remain mandatory. This source audit does not close36 or16/38.
 
+The 2026-10-08 continuation implements the previously unimplemented bounded
+Automation prerequisite. The same final signed sender requests public OS consent
+on a worker thread inside the exact deny-removal sandbox, followed by a fresh
+nonprompt permission query and both original nonce deliveries. A separate explicit
+opt-in enables normal OS prompt approval using existing Accessibility permission;
+it verifies the reserved sender's signed UUID identity and the Apple-signed
+consent agent, designated requirement and unique window naming both private
+fixtures. Pressing Allow is an observation, never evidence of a permission grant.
+The requester retains its original 30-second deadline, each UI child has at most
+three seconds, and physical retirement remains mandatory after every refusal.
+The existing full-policy denial, all six Brew archive cases, Sparkle refusals and
+transversal16/38 requirements remain unchanged. Private portable controls pass
+90/90, including 18 additions, and all 412 original assertion expressions remain
+unchanged and ordered. Native compilation, actual responsible identity and secure
+prompt admission, the complete macOS Package job and all eleven installation legs
+remain unexecuted on this source. Explicit XCTest/CI fixture opt-ins are prepared;
+quiet invocations never request or approve consent. Item36 stays open until actual
+native receiving succeeds; source preparation and portable controls do not qualify
+the release archive lifecycle.
+
 - [~] **37.** Always show the shipped Ergopti hotstring pack, including when
   its keyboard layout is not installed. Move French `suffixes_a` and magic-key
   `replace` into that extension without a beta compatibility layer. The runtime
