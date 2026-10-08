@@ -60,9 +60,8 @@
 		]
 	},
 	"linux": {
-		"count": 31,
+		"count": 30,
 		"sites": [
-			"linux/ui/menu/agent_rows.lua:199 separator",
 			"linux/ui/menu/menu_builder.lua:255 static",
 			"linux/ui/menu/menu_builder.lua:283 static",
 			"linux/ui/menu/menu_builder.lua:289 static",

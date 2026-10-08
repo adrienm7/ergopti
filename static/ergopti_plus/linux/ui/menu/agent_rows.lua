@@ -70,6 +70,7 @@ end
 --- @return string current The current backend's label.
 --- @return table rows
 local function system_rows(system, dialogs, changed)
+	local ManifestMenu = require("infra.manifest_menu")
 	local spec = AgentSettings.get_spec(system)
 	local parsed = spec ~= "" and require("llm.vision").parse(spec) or nil
 	local choices = AgentSettings.backend_choices(system)
@@ -95,16 +96,19 @@ local function system_rows(system, dialogs, changed)
 		agent_system_is_off = function() return AgentSettings.get_spec(system) == "" end,
 		agent_system_off_ready = function() return type(AgentSettings.set_spec) == "function" end,
 	})
-	if not off then return current_label, {} end
-	local rows = { off }
+	if not off then return current_label, nil end
+	local backend_rows = {}
 	for _, choice in ipairs(choices) do
-		local value = choice.value
-		rows[#rows + 1] = {
-			label = choice.label,
-			checked = parsed ~= nil and parsed.backend == value,
+		local value, label = choice.value, choice.label
+		local record = ManifestMenu.template_rows("agent_linux_system_backend_record", {
 			-- A new backend starts on its default model.
-			action = function() store(value) end,
-		}
+			["agent_system_backend"] = function() store(value) end,
+		}, {
+			agent_system_backend_label = function() return label end,
+			agent_system_backend_selected = function() return parsed ~= nil and parsed.backend == value end,
+		})
+		if not record then return current_label, nil end
+		for _, row in ipairs(record) do backend_rows[#backend_rows + 1] = row end
 	end
 	local resolved = AgentSettings.resolve(system)
 	local model = resolved and resolved.model or (parsed and parsed.model) or ""
@@ -126,12 +130,14 @@ local function system_rows(system, dialogs, changed)
 		end,
 	}, {
 		agent_system_model_ready = function() return parsed ~= nil end,
+		agent_system_model_caption = function() return model end,
 	})
-	if not model_rows then return current_label, {} end
-	for _, row in ipairs(model_rows) do
-		if row.label then row.label = fill(row.label, { model }) end
-		rows[#rows + 1] = row
-	end
+	if not model_rows then return current_label, nil end
+	local rows = ManifestMenu.template_rows("agent_linux_system_children", {}, {}, {
+		["agent_system_off_rows"] = function() return { off } end,
+		["agent_system_backend_rows"] = function() return backend_rows end,
+		["agent_system_model_rows"] = function() return model_rows end,
+	})
 	return current_label, rows
 end
 
@@ -170,6 +176,7 @@ end
 --- @param changed function Redraws the menu.
 --- @return integer count, table rows
 local function disabled_app_rows(llm, dialogs, changed)
+	local ManifestMenu = require("infra.manifest_menu")
 	local apps = AgentSettings.get_disabled_apps()
 	local excluded = {}
 	for _, app in ipairs(apps) do excluded[app] = true end
@@ -183,33 +190,24 @@ local function disabled_app_rows(llm, dialogs, changed)
 		list[#list + 1] = app
 		store(list)
 	end
-	local rows = {}
+	local removed = {}
 	for _, app in ipairs(apps) do
-		rows[#rows + 1] = {
-			label = app .. "  ✗",
-			action = function()
+		local rows = ManifestMenu.template_rows("agent_linux_disabled_app_remove", {
+			["agent_disabled_app_remove"] = function()
 				local list = {}
 				for _, existing in ipairs(AgentSettings.get_disabled_apps()) do
 					if existing ~= app then list[#list + 1] = existing end
 				end
 				store(list)
 			end,
-		}
+		}, { agent_disabled_app_caption = function() return app end })
+		if not rows then return #apps, nil end
+		for _, row in ipairs(rows) do removed[#removed + 1] = row end
 	end
-	if #rows > 0 then rows[#rows + 1] = { separator = true } end
 	local last = llm and type(llm.get_agent_last_app) == "function" and llm.get_agent_last_app() or nil
-	if type(last) == "string" and last ~= "" and not excluded[last] then
-		-- Plain indices: an application name is data, not a pattern replacement.
-		local template = tr("app_picker.exclude_current")
-		local at = template:find("{app}", 1, true)
-		rows[#rows + 1] = {
-			label = at and (template:sub(1, at - 1) .. last .. template:sub(at + 5)) or template,
-			action = function() add(last) end,
-		}
-	end
-	rows[#rows + 1] = {
-		label = tr("app_picker.add_another_app"),
-		action = function()
+	local rows = ManifestMenu.template_rows("agent_linux_disabled_apps_children", {
+		["agent_disabled_app_current"] = function() add(last) end,
+		["agent_disabled_app_add"] = function()
 			local answer = dialogs.prompt(tr("menu.agent.title"), tr("app_picker.search_placeholder"), "", false,
 				running_apps(excluded))
 			if answer == nil then return end
@@ -217,7 +215,15 @@ local function disabled_app_rows(llm, dialogs, changed)
 			if answer == "" then return end
 			add(answer)
 		end,
-	}
+	}, {
+		agent_disabled_apps_present = function() return #apps > 0 end,
+		agent_disabled_app_current_present = function()
+			return type(last) == "string" and last ~= "" and not excluded[last]
+		end,
+		agent_disabled_app_current_caption = function() return last end,
+	}, {
+		["agent_disabled_app_records"] = function() return removed end,
+	})
 	return #apps, rows
 end
 
@@ -244,14 +250,32 @@ function M.build(ctx, dialogs)
 	for _, system in ipairs({ "system1", "system2" }) do
 		handlers["agent_" .. system] = function(target)
 			local current, rows = system_rows(system, dialogs, changed)
-			append(target, { label = fill(tr("menu.agent." .. system), { current }), items = rows },
-				"agent_" .. system)
+			if not rows then return end
+			local getters = { agent_system_backend_current_caption = function() return current end }
+			local frame
+			if system == "system1" then
+				frame = ManifestMenu.template_rows("agent_linux_system1_frame", {}, getters, {
+					["agent_system1"] = function() return rows end,
+				})
+			else
+				frame = ManifestMenu.template_rows("agent_linux_system2_frame", {}, getters, {
+					["agent_system2"] = function() return rows end,
+				})
+			end
+			if not frame then return end
+			for _, row in ipairs(frame) do append(target, row, "agent_" .. system) end
 		end
 	end
 	handlers["agent_disabled_apps"] = function(target)
 		local count, rows = disabled_app_rows(llm, dialogs, changed)
-		append(target, { label = fill(tr("menu.agent.disabled_apps"), { count }), items = rows },
-			"agent_disabled_apps")
+		if not rows then return end
+		local frame = ManifestMenu.template_rows("agent_linux_disabled_apps_frame", {}, {
+			agent_disabled_apps_count = function() return tostring(count) end,
+		}, {
+			["agent_disabled_apps"] = function() return rows end,
+		})
+		if not frame then return end
+		for _, row in ipairs(frame) do append(target, row, "agent_disabled_apps") end
 	end
 	local menu_ctx = {
 		commands = {
