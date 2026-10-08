@@ -210,10 +210,10 @@ function portable() {
 		'source archive builds declare complete compiler and libc headers separately from runtime',
 		() => {
 			assert.deepEqual(source.archive_build_packages, {
-				apt: ['gcc', 'libc6-dev'],
-				dnf: ['gcc', 'glibc-devel'],
-				zypper: ['gcc', 'glibc-devel'],
-				pacman: ['gcc', 'glibc'],
+				apt: ['gcc', 'libc6-dev', 'linux-libc-dev'],
+				dnf: ['gcc', 'glibc-devel', 'kernel-headers'],
+				zypper: ['gcc', 'glibc-devel', 'linux-glibc-devel'],
+				pacman: ['gcc', 'glibc', 'linux-api-headers'],
 				xbps: null,
 				apk: ['gcc', 'musl-dev', 'linux-headers']
 			});
@@ -238,6 +238,11 @@ function portable() {
 						const result = spawnSync(bashExecutable(), ['-s'], {
 							input:
 								'set -u\n' +
+								`SRC_DRIVER='${path
+									.join(ROOT, DRIVER)
+									.replaceAll('\\', '/')
+									.replace(/^([A-Za-z]):/, (_, drive) => '/' + drive.toLowerCase())}'\n` +
+								'NATIVE_PROBE_COUNT=0\nnative_source_compile_probe() { NATIVE_PROBE_COUNT=$((NATIVE_PROBE_COUNT + 1)); [ "$NATIVE_PROBE_COUNT" -gt 1 ]; }\n' +
 								functions +
 								'\n' +
 								`SKIP_DEPS=${skip}\n_detect_pkg_manager() { echo ${manager}; }\n` +
