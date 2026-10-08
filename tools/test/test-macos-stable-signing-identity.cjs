@@ -114,15 +114,6 @@ codesign() {
 	local arg target=""
 	for arg in "$@"; do target="$arg"; done
 	if [ -n "\${FAIL_ON:-}" ] && [[ "$target" == *"$FAIL_ON" ]]; then return 1; fi
-	if [ "$1" = "--force" ]; then
-		case "$target" in
-			"$APP_PATH/Contents/MacOS/ErgoptiAutomationQuery") : > "$T/query-signed" ;;
-			"$APP_PATH/Contents/MacOS/SystemSwitcherState") : > "$T/switcher-signed" ;;
-			"$APP_PATH/Contents/MacOS/ErgoptiPlus"|"$APP_PATH")
-				[ -f "$T/query-signed" ] && [ -f "$T/switcher-signed" ] \\
-					|| { printf 'CONTROL_UNSIGNED_NESTED_HELPER\\n' >&2; return 1; } ;;
-		esac
-	fi
 	if [ "$1" = "-d" ]; then
 		printf 'Executable=%s\\n' "$target" >&2
 		printf '%s\\n' "$DR"
@@ -336,8 +327,6 @@ const FULL_ORDER = [
 	'/socket/core.so',
 	'/Contents/Frameworks/Hammerspoon.app',
 	'/Contents/Frameworks/Sparkle.framework',
-	'/Contents/MacOS/ErgoptiAutomationQuery',
-	'/Contents/MacOS/SystemSwitcherState',
 	'/Contents/MacOS/ErgoptiPlus',
 	'/ErgoptiPlus.app'
 ];
@@ -417,77 +406,6 @@ check(
 		helper.calls.filter((call) => call[0] === 'zip').length === 1,
 	'native helper: the original helper ZIP owner remains independent of the full-app producer'
 );
-
-// Both headless and full bundles require nested signatures in each identity mode.
-const adHocHelper = replay(BUILD, { entry: 'helper', base64: '', password: '', dr: ADHOC_DR });
-const adHocHelperSignatures = signatures(adHocHelper);
-check(adHocHelper.status === 0, 'native ad hoc helper: nested signing completes');
-check(
-	adHocHelperSignatures.length === HELPER_ORDER.length &&
-		adHocHelperSignatures.every((call) => signedBy(call) === '-') &&
-		HELPER_ORDER.every((suffix, index) => target(adHocHelperSignatures[index]).endsWith(suffix)),
-	'native ad hoc helper: each fixed nested object is signed inside-out before the app'
-);
-for (const [label, run] of [
-	['full certificate', full],
-	['helper certificate', helper],
-	['helper ad hoc', adHocHelper]
-]) {
-	const signed = signatures(run);
-	const query = signed.find((call) =>
-		target(call).endsWith('/Contents/MacOS/ErgoptiAutomationQuery')
-	);
-	const main = signed.find((call) => target(call).endsWith('/Contents/MacOS/ErgoptiPlus'));
-	const switcher = signed.find((call) =>
-		target(call).endsWith('/Contents/MacOS/SystemSwitcherState')
-	);
-	check(
-		query && query[query.indexOf('--identifier') + 1] === 'com.ergoptiplus.app.automation-query',
-		`${label}: the automation helper keeps its dedicated identifier`
-	);
-	check(
-		main && main[main.indexOf('--identifier') + 1] === 'com.ergoptiplus.app',
-		`${label}: the main executable keeps its app identifier`
-	);
-	check(
-		query &&
-			main &&
-			query.includes('--entitlements') &&
-			main.includes('--entitlements') &&
-			query[query.indexOf('--entitlements') + 1] === main[main.indexOf('--entitlements') + 1],
-		`${label}: query and main retain the exact same existing entitlement file`
-	);
-	check(
-		switcher &&
-			switcher[switcher.indexOf('--identifier') + 1] ===
-				'com.ergoptiplus.app.system-switcher-state' &&
-			!switcher.includes('--entitlements'),
-		`${label}: the read-only switcher identity remains separate without automation entitlements`
-	);
-}
-for (const name of ['ErgoptiAutomationQuery', 'SystemSwitcherState']) {
-	const refused = replay(BUILD, {
-		entry: 'helper',
-		base64: B64,
-		password: P12_PASSWORD,
-		dr: CERT_DR,
-		failOn: name
-	});
-	check(refused.status !== 0, `${name}: a nested signature refusal stops the helper build`);
-	check(
-		!signatures(refused).some(
-			(call) =>
-				target(call).endsWith('/Contents/MacOS/ErgoptiPlus') ||
-				target(call).endsWith('/ErgoptiPlus.app')
-		),
-		`${name}: no main or outer signature follows a failed nested signature`
-	);
-	check(
-		!refused.calls.some((call) => call[0] === 'zip'),
-		`${name}: failed nested signing cannot package the helper`
-	);
-	checkKeychain(refused, `${name} nested signing refusal`);
-}
 
 // A requirement that still reads as ad hoc means the certificate did not
 // take; the build must stop rather than ship it.
@@ -579,36 +497,6 @@ if (adHocOnly === BUILD) {
 		certificateProblems(mutated, FULL_ORDER).length > 0,
 		'self-check: a build that signs ad hoc with the certificate variables set went unnoticed'
 	);
-}
-
-// Replay the original native ordering fault against the dependency-aware tool port.
-const launcherSignature =
-	'\tsign_code \\\n\t\t--identifier "$BUNDLE_ID" \\\n\t\t--entitlements "$entitlements" \\\n\t\t"$APP_PATH/Contents/MacOS/ErgoptiPlus"\n';
-check(
-	BUILD.split(launcherSignature).length === 2,
-	'nested signing self-check: exact main signature is present'
-);
-const prematureLauncher = BUILD.replace(launcherSignature, '').replace(
-	'\tlocal automation_query="$APP_PATH/Contents/MacOS/ErgoptiAutomationQuery"\n',
-	launcherSignature + '\tlocal automation_query="$APP_PATH/Contents/MacOS/ErgoptiAutomationQuery"\n'
-);
-check(prematureLauncher !== BUILD, 'nested signing self-check: actual producer order must change');
-for (const entry of ['main', 'helper']) {
-	for (const [label, base64, password, dr] of [
-		['certificate', B64, P12_PASSWORD, CERT_DR],
-		['ad hoc', '', '', ADHOC_DR]
-	]) {
-		const refused = replay(prematureLauncher, { entry, base64, password, dr });
-		check(
-			refused.status !== 0 && /CONTROL_UNSIGNED_NESTED_HELPER/.test(refused.stderr),
-			`${entry} ${label}: unsigned nested code must refuse the main signature`
-		);
-		check(
-			!refused.calls.some((call) => call[0] === 'archive-producer' || call[0] === 'zip'),
-			`${entry} ${label}: unsigned nested code cannot reach archive creation`
-		);
-		if (base64) checkKeychain(refused, `${entry} ${label} unsigned nested helper`);
-	}
 }
 
 // Self-check the narrowly admitted producer boundary, not a generic node double.

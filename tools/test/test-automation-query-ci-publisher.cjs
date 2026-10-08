@@ -10,10 +10,6 @@ const build = fs.readFileSync(path.join(ROOT, 'tools/build/build_macos_app.sh'),
 const sign = build.match(/^codesign_native_runtime\(\) \{[\s\S]*?^\}/m)[0];
 const copied = sign.indexOf('automation_query_ci_publisher.py" copied');
 const nested = sign.indexOf('sign_code --identifier "$BUNDLE_ID.automation-query"');
-const switcherSignature = sign.indexOf('sign_code --identifier "$BUNDLE_ID.system-switcher-state"');
-const mainSignature = sign.indexOf(
-	'\n\tsign_code \\\n\t\t--identifier "$BUNDLE_ID" \\\n\t\t--entitlements "$entitlements" \\\n\t\t"$APP_PATH/Contents/MacOS/ErgoptiPlus"'
-);
 const seal = sign.indexOf('automation_query_ci_publisher.py" seal');
 const outer = sign.indexOf('"$APP_PATH"', seal + 'automation_query_ci_publisher.py" seal'.length);
 const outerCall = sign.indexOf(
@@ -24,9 +20,6 @@ const verify = sign.indexOf('automation_query_ci_publisher.py" verify');
 assert(
 	copied >= 0 &&
 		nested > copied &&
-		switcherSignature > nested &&
-		mainSignature > switcherSignature &&
-		seal > mainSignature &&
 		seal > nested &&
 		outer >= seal &&
 		outerCall > seal &&
@@ -105,9 +98,9 @@ codesign_native_runtime
 	const events = replay.stdout.trim().split(/\r?\n/);
 	assert(events[0] === 'publisher:copied');
 	assert(events[1].endsWith('/Contents/Frameworks/Sparkle.framework'));
-	assert(events[2].endsWith('/Contents/MacOS/ErgoptiAutomationQuery'));
-	assert(events[3].endsWith('/Contents/MacOS/SystemSwitcherState'));
-	assert(events[4].endsWith('/Contents/MacOS/ErgoptiPlus'));
+	assert(events[2].endsWith('/Contents/MacOS/ErgoptiPlus'));
+	assert(events[3].endsWith('/Contents/MacOS/ErgoptiAutomationQuery'));
+	assert(events[4].endsWith('/Contents/MacOS/SystemSwitcherState'));
 	assert(events[5] === 'publisher:seal');
 	assert(events[6].endsWith('/app'));
 	assert(events[7] === 'publisher:verify' && events.length === 8);

@@ -22,7 +22,8 @@ function M.with_session(options, body)
 		file:write("controlled input-owner source\n"); file:close()
 		paths[id], queues[path] = path, {}
 	end
-	local s = { rows = {}, captures = {}, paths = paths, acquisitions = 0 }
+	local s = { rows = {}, captures = {}, paths = paths, acquisitions = 0, held = {} }
+	for _, path in pairs(paths) do s.held[path] = {} end
 	function s.descriptor(id) for fd, path in pairs(descriptors) do if path == paths[id] then return fd end end end
 	local symbols = {
 		open = function(path)
@@ -36,9 +37,22 @@ function M.with_session(options, body)
 			descriptors[fd] = nil; released_fds[#released_fds + 1] = fd
 			return options.fail_reader_close and -1 or 0
 		end,
-		ioctl = function(_, request, argument)
+		ioctl = function(fd, request, argument)
 			if type(argument) == "table" then
 				argument.bytes = string.rep("\0", argument.count or 1)
+				if options.position_bits and request % 256 == 0x18 then
+					if options.on_key_query then options.on_key_query(s) end
+					local bytes = {}
+					for index = 1, argument.count do
+						local byte = 0
+						for bit = 0, 7 do
+							if (s.held[descriptors[fd]] or {})[(index - 1) * 8 + bit] then byte = byte + 2 ^ bit end
+						end
+						bytes[index] = string.char(byte)
+					end
+					argument.bytes = table.concat(bytes)
+					return options.short_key_query and 0 or argument.count
+				end
 				-- LED_CAPSL is bit one; key-state queries keep their original zero bytes.
 				if options.caps_led and request % 256 == 0x19 then
 					argument.bytes = "\2" .. argument.bytes:sub(2)
@@ -49,6 +63,13 @@ function M.with_session(options, body)
 		read = function(fd, buffer)
 			local queue = queues[descriptors[fd]]; local bytes = queue and table.remove(queue, 1)
 			if not bytes then return -1 end
+			if options.position_bits then
+				local row = Input.decode(bytes)
+				if row.type == Input.EV_KEY then
+					if row.value == 1 then s.held[descriptors[fd]][row.code] = true
+					elseif row.value == 0 then s.held[descriptors[fd]][row.code] = nil end
+				end
+			end
 			buffer.bytes = bytes; return #bytes
 		end,
 		poll = function(array)
@@ -92,7 +113,7 @@ function M.with_session(options, body)
 		is_key_device = function() return true end,
 		physical_sources = function(devices)
 			local result = {}; for _, path in ipairs(devices) do result[#result + 1] = {
-				path = path, sysfs = "/controlled/source", name = "controlled", physical = true } end
+				path = path, sysfs = "/controlled/source", name = "controlled", physical = s.virtual ~= true } end
 			return result
 		end,
 	}

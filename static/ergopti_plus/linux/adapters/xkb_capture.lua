@@ -114,6 +114,9 @@ local _locale = nil
 local _source_generation = 0
 local _physical_probe_epoch = 0
 local _physical_chord_receipts = setmetatable({}, { __mode = "k" })
+local _chord_output_receipts = setmetatable({}, { __mode = "k" })
+local _chord_output_occurrence = nil
+local original_process
 local _source_group = nil
 local _source_native_generation = nil
 local _capture_group, _capture_generation = nil, 0
@@ -1119,6 +1122,72 @@ function M.chord_source_current(capability)
 	return called and observed == true and private()
 end
 
+-- Output currency is a separate owner. Physical editor receipts retain their
+-- original epoch and never borrow a synthetic transition's acknowledgement.
+function M.capture_chord_output(capability)
+	if not M.chord_source_current(capability) then return nil end
+	local record = _physical_chord_receipts[capability]
+	local copy = {}; for key, value in pairs(record) do copy[key] = value end
+	local owner = {}; _chord_output_receipts[owner] = copy
+	return owner
+end
+
+function M.chord_output_current(owner)
+	local record = _chord_output_receipts[owner]
+	if not record or getmetatable(owner) ~= nil or next(owner) ~= nil then return false end
+	local scope = _chord_output_occurrence
+	local epoch = record.probe_epoch
+	if scope and scope.owner == owner then
+		if scope.processing or scope.refused then return false end
+		epoch = scope.processed and scope.next_epoch or epoch
+	end
+	local function private()
+		return M.process == original_process and _session == record.session and _backend == record.backend
+			and _source_generation == record.epoch and _physical_probe_epoch == epoch
+			and _source_group == record.group and _source_native_generation == record.locked.generation
+			and _keymap_text == record.raw_map and record.session.identity == record.native_map
+	end
+	if not private() then return false end
+	local called, observed = pcall(record.locked.observed_current)
+	return called and observed == true and private()
+end
+
+-- The private Hook producer supplies the dispatch and actual original broker
+-- outcome. This port grants no output rights and never mutates physical proof.
+function M.with_chord_output(owner, code, value, dispatch, acknowledged)
+	local record = _chord_output_receipts[owner]
+	if _chord_output_occurrence then _chord_output_occurrence.refused = true; return false end
+	if not record or not M.chord_output_current(owner)
+		or type(dispatch) ~= "function" or type(acknowledged) ~= "function" then return false end
+	local scope = { owner = owner, next_epoch = record.probe_epoch }
+	_chord_output_occurrence = scope
+	local function process(actual_code, actual_value)
+		if _chord_output_occurrence ~= scope or scope.processing or scope.processed or scope.refused
+			or actual_code ~= code or actual_value ~= value or not M.chord_output_current(owner) then
+			scope.refused = true; return nil, nil, "owned-output-capture-refused"
+		end
+		scope.processing = true
+		local called, text, identity, reason = pcall(original_process, actual_code, actual_value)
+		scope.processing = false
+		scope.processed = true
+		scope.next_epoch = record.probe_epoch + 1
+		if not called or reason ~= nil or not M.chord_output_current(owner) then
+			scope.refused = true
+			return nil, nil, called and reason or "owned-output-capture-error"
+		end
+		return text, identity, nil
+	end
+	local called = pcall(dispatch, process)
+	local observed, accepted = false, false
+	if called and not scope.refused and M.chord_output_current(owner) then
+		observed, accepted = pcall(acknowledged)
+	end
+	local current = called and observed and accepted == true and not scope.refused and M.chord_output_current(owner)
+	if current then record.probe_epoch = scope.next_epoch else _chord_output_receipts[owner] = nil end
+	_chord_output_occurrence = nil
+	return current == true
+end
+
 --- Native-library-only probe; never qualifies desktop source or physical delivery.
 function M._capture_chord_sources_for_test(requests)
 	local _, group = capture_identity()
@@ -1276,4 +1345,5 @@ end
 
 M.EVDEV_TO_XKB_OFFSET = EVDEV_TO_XKB_OFFSET
 
+original_process = M.process
 return M

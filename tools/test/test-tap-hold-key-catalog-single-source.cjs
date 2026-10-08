@@ -408,7 +408,7 @@ function savedLinuxOneShotClosure(sources) {
 		runtime: luaBody(
 			hook,
 			'local function _input_runtime_current(ctx, active)',
-			'local function _input_guard_current(ctx)'
+			'local function _caps_semantics_current(ctx)'
 		),
 		guard: luaBody(
 			hook,
@@ -425,7 +425,13 @@ function savedLinuxOneShotClosure(sources) {
 			'function M.input_owner_current(lease)',
 			'function M.arm_one_shot(lease)'
 		),
-		arm: luaBody(hook, 'function M.arm_one_shot(lease)', 'local function _forward_raw(ev, source)')
+		arm: luaBody(hook, 'function M.arm_one_shot(lease)', 'function M.arm_caps_word(lease)'),
+		caps: luaBody(hook, 'function M.arm_caps_word(lease)', 'function M.plan_caps_word(text)'),
+		semantics: luaBody(
+			hook,
+			'local function _caps_semantics_current(ctx)',
+			'local function _input_guard_current(ctx)'
+		)
 	};
 	if (Object.values(bodies).some((body) => body === '')) return false;
 	const assignment = bodies.build.match(
@@ -446,22 +452,30 @@ function savedLinuxOneShotClosure(sources) {
 		hookAt > managerAt &&
 		daemon.indexOf('TapHold.init({') > hookAt &&
 		keylogger.includes('require("platform.remap.tap_hold_manager")') &&
-		bodies.tap.startsWith('if action == "one_shot_shift" then return "one_shot_shift" end') &&
-		!/(?:capture_input_owner|input_owner_current|arm_one_shot)\s*\(/.test(manager) &&
+		bodies.tap.startsWith(
+			'if action == "one_shot_shift" or action == "caps_word" then return action end'
+		) &&
+		!/(?:capture_input_owner|input_owner_current|arm_one_shot|arm_caps_word)\s*\(/.test(manager) &&
 		bodies.frame.includes('origin_view.origin == "native-evdev" and _remapper_input_owner') &&
 		bodies.frame.includes('origin_view.source == source') &&
 		bodies.frame.includes('callback = _on_tap, at_ms = at_ms') &&
 		bodies.frame.includes('local requested = callback(action, selected)') &&
-		bodies.frame.includes('requested ~= "one_shot_shift" or action ~= tap') &&
+		bodies.frame.includes('requested ~= tap or action ~= tap') &&
 		bodies.frame.includes('local lease = original_input_hook_ports.capture_input_owner()') &&
 		bodies.frame.includes(
 			'if not lease or original_input_hook_ports.input_owner_current(lease) ~= true then return false end'
 		) &&
-		bodies.frame.includes('return original_input_hook_ports.arm_one_shot(lease) == true') &&
+		bodies.frame.includes('if tap == "one_shot_shift" or tap == "caps_word" then') &&
+		bodies.frame.includes(
+			'local arm = tap == "caps_word" and original_input_hook_ports.arm_caps_word or original_input_hook_ports.arm_one_shot'
+		) &&
+		bodies.frame.includes('return arm(lease) == true') &&
 		bodies.frame.includes('and original_input_hook_ports.input_owner_current(lease) == true') &&
-		!/M\.(?:capture_input_owner|input_owner_current|arm_one_shot)\s*\(/.test(bodies.frame) &&
+		!/M\.(?:capture_input_owner|input_owner_current|arm_one_shot|arm_caps_word)\s*\(/.test(
+			bodies.frame
+		) &&
 		hook.includes(
-			'local INPUT_HOOK_PORT_NAMES = { "capture_input_owner", "input_owner_current", "arm_one_shot", "set_remapper", "stop", "emergency_stop", "key_text" }'
+			'local INPUT_HOOK_PORT_NAMES = { "capture_input_owner", "input_owner_current", "arm_one_shot", "arm_caps_word", "plan_caps_word", "set_remapper", "stop", "emergency_stop", "key_text" }'
 		) &&
 		hook.includes(
 			'for _, name in ipairs(INPUT_HOOK_PORT_NAMES) do original_input_hook_ports[name] = rawget(M, name) end'
@@ -492,7 +506,23 @@ function savedLinuxOneShotClosure(sources) {
 		bodies.arm.includes(
 			'local function current() return _input_runtime_current(ctx, not ctx.used) and _input_guard_current(ctx) end'
 		) &&
-		bodies.arm.includes('pcall(_input_ports.arm_one_shot, ctx.issuer, ctx.at_ms, current)')
+		bodies.arm.includes('pcall(_input_ports.arm_one_shot, ctx.issuer, ctx.at_ms, current)') &&
+		bodies.arm.includes('if not ctx or ctx.action ~= "one_shot_shift" or ctx.used or ctx.arming') &&
+		bodies.caps.includes('ctx.action ~= "caps_word"') &&
+		bodies.caps.includes('pcall(caps_ports.capture)') &&
+		bodies.caps.includes('pcall(_input_ports.arm_caps_word, ctx.issuer, current)') &&
+		bodies.caps.includes('published ~= true or not _input_runtime_current(ctx, true)') &&
+		bodies.semantics.includes('if ctx.action ~= "caps_word" then return true end') &&
+		bodies.semantics.includes('NativeCapsWord.capture ~= caps_ports.capture') &&
+		bodies.semantics.includes('caps_ports.current(ctx.semantic_owner) ~= true') &&
+		bodies.semantics.includes(
+			'_input_reader_ports.event_current(ctx.letter_origin, ctx.letter_event,'
+		) &&
+		bodies.guard.includes(
+			'and _caps_semantics_current(ctx) and _input_runtime_current(ctx, false)'
+		) &&
+		hook.includes('local original_caps_constructor = assert(caps_constructor_source') &&
+		hook.includes('local NativeCapsWord = assert(original_caps_constructor())')
 	);
 }
 
@@ -561,24 +591,42 @@ for (const [index, token] of [
 	if (orderedLinuxAdmission(manifest, changed))
 		errors.push('Linux ordered admission accepted a missing native/source boundary');
 }
-// Each new saved-route boundary must independently remain necessary.
+// Each saved-route boundary remains necessary, including the conditional
+// native state owner. Public assignment and recommendations stay unavailable.
 for (const [index, token] of [
 	[0, '_hook == _native_hook'],
 	[0, '_tap_action_set()[action] == true'],
 	[0, '_native_hook = package.loaded["adapters.keyboard_hook"]'],
-	[0, 'if action == "one_shot_shift" then return "one_shot_shift" end'],
+	[0, 'if action == "one_shot_shift" or action == "caps_word" then return action end'],
 	[0, 'function M.init(opts)'],
 	[4, 'origin_view.origin == "native-evdev" and _remapper_input_owner'],
 	[4, 'origin_view.source == source'],
 	[4, 'callback = _on_tap, at_ms = at_ms'],
 	[4, 'local requested = callback(action, selected)'],
-	[4, 'requested ~= "one_shot_shift" or action ~= tap'],
+	[4, 'requested ~= tap or action ~= tap'],
 	[4, 'local lease = original_input_hook_ports.capture_input_owner()'],
 	[
 		4,
 		'if not lease or original_input_hook_ports.input_owner_current(lease) ~= true then return false end'
 	],
-	[4, 'return original_input_hook_ports.arm_one_shot(lease) == true'],
+	[4, 'return arm(lease) == true'],
+	[4, 'if tap == "one_shot_shift" or tap == "caps_word" then'],
+	[
+		4,
+		'local arm = tap == "caps_word" and original_input_hook_ports.arm_caps_word or original_input_hook_ports.arm_one_shot'
+	],
+	[4, 'if not ctx or ctx.action ~= "one_shot_shift" or ctx.used or ctx.arming'],
+	[4, 'ctx.action ~= "caps_word"'],
+	[4, 'pcall(caps_ports.capture)'],
+	[4, 'pcall(_input_ports.arm_caps_word, ctx.issuer, current)'],
+	[4, 'published ~= true or not _input_runtime_current(ctx, true)'],
+	[4, 'if ctx.action ~= "caps_word" then return true end'],
+	[4, 'NativeCapsWord.capture ~= caps_ports.capture'],
+	[4, 'caps_ports.current(ctx.semantic_owner) ~= true'],
+	[4, '_input_reader_ports.event_current(ctx.letter_origin, ctx.letter_event,'],
+	[4, 'and _caps_semantics_current(ctx) and _input_runtime_current(ctx, false)'],
+	[4, 'local original_caps_constructor = assert(caps_constructor_source'],
+	[4, 'local NativeCapsWord = assert(original_caps_constructor())'],
 	[4, 'and original_input_hook_ports.input_owner_current(lease) == true'],
 	[4, '"stop", "emergency_stop", "key_text"'],
 	[

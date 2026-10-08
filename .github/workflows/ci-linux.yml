@@ -106,46 +106,6 @@ jobs:
         shell: bash
         run: node tools/test/linux-unit-failure-excerpt.cjs "$RUNNER_TEMP/linux-unit.log"
 
-      # Observe genuine native input before unrelated external IA acquisition.
-      - name: Saved ordered-pair Manager — early genuine native source lifetimes
-        if: ${{ !cancelled() && steps.linux_unit.outcome == 'success' }}
-        working-directory: static/ergopti_plus/linux
-        run: |
-          set -euo pipefail
-          if ! command -v Xvfb >/dev/null; then
-            echo 'ENVIRONMENT: early saved-pair Manager prerequisite refused: Xvfb is absent' >&2
-            exit 2
-          fi
-          sudo modprobe uinput
-          if sudo python3 tests/hardware/run_manager_input_owner_real.py > "$RUNNER_TEMP/linux-manager-input-owner-early.log" 2>&1; then
-            manager_status=0
-          else
-            manager_status=$?
-          fi
-          cat "$RUNNER_TEMP/linux-manager-input-owner-early.log"
-          exit "$manager_status"
-        timeout-minutes: 3
-
-      # This independent observation grants no success to the failed unit suite.
-      - name: Saved ordered-pair Manager — independent observation after failed units
-        if: ${{ !cancelled() && steps.linux_unit.outcome == 'failure' }}
-        working-directory: static/ergopti_plus/linux
-        run: |
-          set -euo pipefail
-          if ! command -v Xvfb >/dev/null; then
-            echo 'ENVIRONMENT: early saved-pair Manager prerequisite refused: Xvfb is absent' >&2
-            exit 2
-          fi
-          sudo modprobe uinput
-          if sudo python3 tests/hardware/run_manager_input_owner_real.py > "$RUNNER_TEMP/linux-manager-input-owner-unit-failure.log" 2>&1; then
-            manager_status=0
-          else
-            manager_status=$?
-          fi
-          cat "$RUNNER_TEMP/linux-manager-input-owner-unit-failure.log"
-          exit "$manager_status"
-        timeout-minutes: 3
-
       # This external acceptance is deliberate manual validation, separate from
       # the frozen prerequisite gate and every package/installed-driver subject.
       - name: Run manual official runtime and model acceptance
@@ -194,7 +154,6 @@ jobs:
   e2e-linux:
     name: 'E2E tests'
     needs: [test-linux]
-    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     env:
       # Python-owned native children also resolve the production shared modules.
@@ -1353,22 +1312,6 @@ jobs:
           sudo bash static/ergopti_plus/linux/tests/hardware/run_daemon_live.sh
         timeout-minutes: 6
 
-      - name: Saved ordered-pair Manager — genuine native source lifetimes
-        if: ${{ !cancelled() }}
-        working-directory: static/ergopti_plus/linux
-        env:
-          LUA_PATH: './?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
-        run: |
-          set -euo pipefail
-          if sudo env LUA_PATH="$LUA_PATH" python3 tests/hardware/run_manager_input_owner_real.py > "$RUNNER_TEMP/linux-manager-input-owner.log" 2>&1; then
-            manager_status=0
-          else
-            manager_status=$?
-          fi
-          cat "$RUNNER_TEMP/linux-manager-input-owner.log"
-          exit "$manager_status"
-        timeout-minutes: 3
-
       # The updater a user runs, run: this tree built as an old release and
       # installed with its own install.sh, then its updater finds the newest
       # published release on GitHub, verifies and installs it, and restarts the
@@ -1790,14 +1733,6 @@ jobs:
           npm run --silent test:linux:nix-native | tee "$RUNNER_TEMP/linux-nix-native.log"
         timeout-minutes: 35
 
-      # A supplementary observation never grants success to a failed prerequisite.
-      - name: Preserve the mandatory upstream unit result
-        if: ${{ !cancelled() }}
-        timeout-minutes: 1
-        env:
-          ERGOPTI_UPSTREAM_UNIT_RESULT: ${{ needs.test-linux.result }}
-        run: test "$ERGOPTI_UPSTREAM_UNIT_RESULT" = success
-
       - name: Record mandatory E2E evidence
         run: |
           set -euo pipefail
@@ -2206,35 +2141,35 @@ jobs:
             distro: debian
             container: debian:stable-slim
             image: debian:stable-slim
-            prep: apt-get update && apt-get install -y --no-install-recommends bash coreutils findutils grep sed sudo passwd gcc libc6-dev
+            prep: apt-get update && apt-get install -y --no-install-recommends bash coreutils findutils grep sed sudo passwd ca-certificates git gcc libc6-dev linux-libc-dev
           - id: distro-fedora
             kind: install
             label: 'Install · fedora'
             distro: fedora
             container: fedora:latest
             image: fedora:latest
-            prep: dnf install -y bash coreutils findutils grep sed sudo shadow-utils gcc glibc-devel
+            prep: dnf install -y bash coreutils findutils grep sed sudo shadow-utils git gcc glibc-devel kernel-headers
           - id: distro-arch
             kind: install
             label: 'Install · arch'
             distro: arch
             container: archlinux:latest
             image: archlinux:latest
-            prep: pacman -Sy --noconfirm bash coreutils findutils grep sed sudo shadow gcc glibc
+            prep: pacman -Sy --noconfirm bash coreutils findutils grep sed sudo shadow git gcc glibc linux-api-headers
           - id: distro-alpine
             kind: install
             label: 'Install · alpine'
             distro: alpine
             container: alpine:latest
             image: alpine:latest
-            prep: apk add --no-cache bash coreutils findutils grep sed sudo gcc musl-dev linux-headers
+            prep: apk add --no-cache bash coreutils findutils grep sed sudo git gcc musl-dev linux-headers
           - id: distro-opensuse
             kind: install
             label: 'Install · opensuse'
             distro: opensuse
             container: opensuse/tumbleweed:latest
             image: opensuse/tumbleweed:latest
-            prep: sed -i 's|http://download.opensuse.org|https://downloadcontent.opensuse.org|g' /etc/zypp/repos.d/*.repo && zypper --non-interactive install bash coreutils findutils grep sed sudo shadow gcc glibc-devel
+            prep: sed -i 's|http://download.opensuse.org|https://downloadcontent.opensuse.org|g' /etc/zypp/repos.d/*.repo && zypper --non-interactive install bash coreutils findutils grep sed sudo shadow git gcc glibc-devel linux-glibc-devel
           - id: first-install-ubuntu-22.04
             kind: first
             label: 'First install · ubuntu-22.04'
@@ -2285,6 +2220,7 @@ jobs:
             distro: opensuse-tumbleweed
             container: ''
             image: 'opensuse/tumbleweed:latest'
+            prep: sed -i 's|http://download.opensuse.org|https://downloadcontent.opensuse.org|g' /etc/zypp/repos.d/*.repo
           - id: first-install-alpine
             kind: first
             label: 'First install · alpine'
@@ -2320,6 +2256,16 @@ jobs:
         run: dnf install -y git findutils
 
       - uses: actions/checkout@v4
+
+      - name: Verify source compiler and checkout
+        if: matrix.kind == 'install'
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Checkout's temporary HOME does not carry ownership admission into this step.
+          test "$(git -c safe.directory="$GITHUB_WORKSPACE" rev-parse HEAD)" = "$GITHUB_SHA"
+          source static/ergopti_plus/linux/install/native_source_build.sh
+          native_source_compile_probe "$GITHUB_WORKSPACE/static/ergopti_plus/linux/native/archive_output"
 
       - name: Create the installation user
         if: matrix.kind == 'install'
@@ -2526,9 +2472,11 @@ jobs:
         if: matrix.kind == 'first'
         timeout-minutes: 25
         shell: bash
+        env:
+          ERGOPTI_E2E_PREP: ${{ matrix.prep || '' }}
         run: |
           set -euo pipefail
-          export ERGOPTI_E2E_DOCKER_ARGS="-e ERGOPTI_E2E_KNOWN_LIMITATIONS=${{ matrix.known || '' }}"
+          export ERGOPTI_E2E_DOCKER_ARGS="-e ERGOPTI_E2E_PREP -e ERGOPTI_E2E_KNOWN_LIMITATIONS=${{ matrix.known || '' }}"
           bash static/ergopti_plus/linux/tests/distro/run_in_docker.sh '${{ matrix.image }}' \
             | tee "$RUNNER_TEMP/first-install.log"
 

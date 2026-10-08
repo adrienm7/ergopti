@@ -65,6 +65,21 @@ def permission_preflight_summary(raw, role):
     if not raw.startswith(prefix):
         return None, invalid
     remainder = raw[len(prefix) :]
+    unavailable_parts = {
+        b"ASCP:B:API": "api",
+        b"ASCP:B:METADATA": "metadata",
+        b"ASCP:B:CONSTANTS": "constants",
+        b"ASCP:B:DESCRIPTOR": "descriptor",
+        b"ASCP:B:POINTER": "pointer",
+    }
+    unavailable_part = None
+    if remainder.startswith(b"ASCP:B:"):
+        label, separator, remainder = remainder.partition(b"\n")
+        if not separator or label not in unavailable_parts:
+            return None, invalid
+        if not remainder.startswith(b"ASCP:P:UNAVAILABLE\n"):
+            return None, invalid
+        unavailable_part = unavailable_parts[label]
     attempted = False
     call = b"ASCP:P:CALL_ATTEMPT\n"
     if remainder.startswith(call):
@@ -101,6 +116,8 @@ def permission_preflight_summary(raw, role):
         ):
             return None, invalid
         packet["state"] = endings[line]
+        if unavailable_part is not None:
+            packet["unavailable_part"] = unavailable_part
     else:
         return None, invalid
     expected = [b"ASCP:2\n", b"ASCP:3\n", b"ASCP:4\n"]

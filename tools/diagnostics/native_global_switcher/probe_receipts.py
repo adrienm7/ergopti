@@ -15,6 +15,8 @@ def qualify(receipt, fixture_a, fixture_b, hammerspoon_pid):
         return False
     if receipt.get("status") != "observed" or receipt.get("coverage") != "isolated_fixture_only":
         return False
+    if any(type(receipt.get(key)) is not int for key in ("before_pid", "after_pid", "hs_pid")):
+        return False
     if receipt.get("before_pid") != fixture_a or receipt.get("after_pid") != fixture_b:
         return False
     if (

@@ -192,14 +192,14 @@ _TextSenderKeystroke(Mods, Key, Blind := false) {
 	global _TextSenderKeyIsDown
 	Prefix := ""
 	AltGr := false
-	for _, KeystrokeModifierName in Mods {
-		if (StrLower(Trim(KeystrokeModifierName)) == "altgr") {
+	for _, Mod in Mods {
+		if (StrLower(Trim(Mod)) == "altgr") {
 			AltGr := true
 			continue
 		}
-		Symbol := _TextSenderModifierPrefix(KeystrokeModifierName)
+		Symbol := _TextSenderModifierPrefix(Mod)
 		if (Symbol == "") {
-			LoggerWarn("TextSender", "TextPressKey: unknown modifier token '{1}' for key '{2}' - ignored.", KeystrokeModifierName, Key)
+			LoggerWarn("TextSender", "TextPressKey: unknown modifier token '{1}' for key '{2}' - ignored.", Mod, Key)
 			continue
 		}
 		Prefix .= Symbol
