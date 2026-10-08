@@ -247,6 +247,53 @@ assert.deepEqual(
 		'https://github.com/GNOME/glib-networking.git'
 	]
 );
+// Duktape 2.7's Makefile omits libm on both shared-library links. Keep it after
+// the C input so the SDK's --as-needed cannot discard its DT_NEEDED dependency.
+const duktapeMathPatch =
+	"test \"$(grep -c '\\$(DUKTAPE_SRCDIR)/duktape\\.c$' Makefile.sharedlibrary)\" -eq 2 && sed -i 's|\\$(DUKTAPE_SRCDIR)/duktape\\.c$|$(DUKTAPE_SRCDIR)/duktape.c -lm|' Makefile.sharedlibrary";
+assert.deepEqual(modules[4]['build-commands'], [
+	duktapeMathPatch,
+	'make -f Makefile.sharedlibrary INSTALL_PREFIX=/app',
+	'make -f Makefile.sharedlibrary INSTALL_PREFIX=/app install'
+]);
+// Replay the actual recipe command against the two pinned link-body shapes,
+// independently preserving flags, SONAMEs and the separate command-line link.
+const sharedLinkFixture =
+	'libduktape.$(SO_REALNAME_SUFFIX):\n' +
+	'\t$(CC) $(CFLAGS) $(CPPFLAGS) $(LDFLAGS) -shared -fPIC -Wall -Wextra -Os -Wl,$(LD_SONAME_ARG),libduktape.$(SO_SONAME_SUFFIX) \\\n' +
+	'\t\t-o $@ $(DUKTAPE_SRCDIR)/duktape.c\n' +
+	'libduktaped.$(SO_REALNAME_SUFFIX):\n' +
+	'\t$(CC) $(CFLAGS) $(CPPFLAGS) $(LDFLAGS) -shared -fPIC -g -Wall -Wextra -Os -Wl,$(LD_SONAME_ARG),libduktaped.$(SO_SONAME_SUFFIX) \\\n' +
+	'\t\t-o $@ $(DUKTAPE_SRCDIR)/duktape.c\n' +
+	'duk:\n\t$(CC) -o duk examples/cmdline/duk_cmdline.c -lduktape -lm\n';
+for (const [label, input, admitted] of [
+	['pinned release and debug links', sharedLinkFixture, true],
+	['one missing link input', sharedLinkFixture.replace('duktape.c\n', 'foreign.c\n'), false],
+	['already patched inputs', sharedLinkFixture.replaceAll('duktape.c\n', 'duktape.c -lm\n'), false]
+]) {
+	const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-duktape-math-'));
+	try {
+		const makefile = path.join(fixture, 'Makefile.sharedlibrary');
+		fs.writeFileSync(makefile, input, 'utf8');
+		const result = spawnSync(bashExecutable(), ['-c', modules[4]['build-commands'][0]], {
+			cwd: fixture,
+			encoding: 'utf8'
+		});
+		assert.ifError(result.error);
+		assert.equal(result.signal, null, label);
+		assert.equal(result.status, admitted ? 0 : 1, label);
+		assert.equal(result.stdout, '', label);
+		assert.equal(result.stderr, '', label);
+		assert.equal(
+			fs.readFileSync(makefile, 'utf8'),
+			admitted ? input.replaceAll('duktape.c\n', 'duktape.c -lm\n') : input,
+			`${label}: both -lm arguments follow source inputs without changing other bytes`
+		);
+	} finally {
+		fs.rmSync(fixture, { recursive: true, force: true });
+	}
+	passed++;
+}
 assert.ok(modules[0]['config-opts'].includes('-DLUA_BUILD_TYPE=System'));
 assert.equal(modules[2].buildsystem, 'simple');
 assert.equal(modules[2].subdir, undefined);
@@ -261,11 +308,11 @@ assert.ok(modules[2]['build-commands'][1].includes('--disable-static'));
 assert.ok(modules[2]['post-install'].includes('test -f /app/lib/libgssapi_krb5.so'));
 assert.ok(modules[3]['config-opts'].includes('-DCURL_USE_GSSAPI=ON'));
 assert.ok(modules[3]['config-opts'].includes('-DGSS_ROOT_DIR=/app'));
-// Upstream places LDFLAGS before its source and does not consume LDLIBS.
-// Retain libm explicitly there, preserving SDK hardening flags and later as-needed.
+// Preserve SDK flags while retaining libm after each release/debug C input.
 assert.deepEqual(modules[4]['build-commands'], [
-	'make -f Makefile.sharedlibrary INSTALL_PREFIX=/app LDFLAGS="${LDFLAGS:-} -Wl,--no-as-needed -lm -Wl,--as-needed"',
-	'make -f Makefile.sharedlibrary INSTALL_PREFIX=/app LDFLAGS="${LDFLAGS:-} -Wl,--no-as-needed -lm -Wl,--as-needed" install'
+	duktapeMathPatch,
+	'make -f Makefile.sharedlibrary INSTALL_PREFIX=/app',
+	'make -f Makefile.sharedlibrary INSTALL_PREFIX=/app install'
 ]);
 assert.ok(modules[5]['config-opts'].includes('-Dconfig-xdp=true'));
 // The declared package environment resolves native providers from prefix/lib.
