@@ -4967,6 +4967,31 @@ least 17 discovered and 15 executed cases with at most two specifically named
 platform skips. Actual Darwin execution and the underlying native cause remain
 unqualified. This diagnostic does not complete TODO 31 or transverse items 16/38.
 
+Authentic manual macOS run 37806243827 tests private candidate
+fb7549113348a9a7f55b08dbe7cd91ef5cab9118 and finishes failed. The full Swift
+suite starts 110 cases: 102 pass, 7 fail, none skip, and one remains unfinished
+at the unchanged 25-minute deadline. Keyboard/TIS cases never start; packaging
+fails and install/launch is skipped. The two complete four-target compilation
+workers close with status 124 at their unchanged 300-second budgets. Separate
+pinned Core/CLI compilation passes in 261.417 seconds. Metadata and archive
+transport both return verified HTTP 200. Root prerequisite status 69 now names
+preflight_apple_tool; its compiler versus SDK role and failed ownership, mode
+or file-kind predicate remain unknown. Signing retains keychain inode mismatch
+refusals, and permission UI completes no case. These partial positive results
+do not qualify installation, physical input or the owned runtime.
+
+A failure-only diagnostic successor retains the original Apple-tool aggregate
+guard and adds six closed compiler/SDK ownership, writable-mode and file-kind
+reason names. It preserves the same admission predicates, all fixed source
+pins, deadlines, original unavailable prefix, empty stdout and exit 69. No
+paths, uid/mode values or authority are disclosed. The complete original 17
+portable controls remain unchanged; two added methods fail with seven assertion
+failures before implementation and all 19 pass afterwards without skips. The
+Swift discovery and execution floors strengthen to 19 and 17 respectively.
+Independent review is source-only clear; changed native behavior is unexecuted.
+Final selected gates are recorded in the Group 5 checkpoint. Items 31, 16 and 38
+remain open; no item is removed.
+
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
   listed; see `docs/memory/text-input-and-config.md`. Current source already

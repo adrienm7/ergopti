@@ -304,6 +304,45 @@ class FailureDiagnosticControls(unittest.TestCase):
         self.refusal(result, "preflight_sdk_role")
         self.assertNotIn(b"PRIVATE_OWNER_CALLBACK", result.stderr)
 
+    def test_apple_tool_refusals_name_role_and_dimension_before_open(self):
+        import stat
+        from types import SimpleNamespace
+
+        paths = {
+            "compiler": "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang",
+            "sdk": "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+        }
+        for role, path in paths.items():
+            mode = (stat.S_IFREG if role == "compiler" else stat.S_IFDIR) | 0o755
+            for dimension, uid, observed_mode in (
+                ("owner", 501, mode),
+                ("writable", 0, mode | stat.S_IWGRP),
+                ("kind", 0, (stat.S_IFDIR if role == "compiler" else stat.S_IFREG) | 0o755),
+            ):
+                with self.subTest(role=role, dimension=dimension):
+                    named = SimpleNamespace(st_uid=uid, st_mode=observed_mode)
+                    with (
+                        patch.object(subject.Path, "resolve", lambda value, **unused: value),
+                        patch.object(subject.Path, "lstat", return_value=named),
+                        patch.object(subject.os, "open") as opened,
+                    ):
+                        with self.assertRaises(subject.Refusal) as raised:
+                            subject.PreflightTool(path, role)
+                        self.assertEqual(raised.exception.code, f"preflight_{role}_{dimension}")
+                        self.assertEqual(raised.exception.owners, ())
+                        opened.assert_not_called()
+
+    def test_closed_apple_tool_reason_names_preserve_primary_verdict(self):
+        for role in ("compiler", "sdk"):
+            for dimension in ("owner", "writable", "kind"):
+                reason = f"preflight_{role}_{dimension}"
+                body = (
+                    "def failing(*args):\n subject.require(False,"
+                    + repr(reason)
+                    + ")\nsubject.run=failing"
+                )
+                self.refusal(self.invoke(body), reason)
+
 
 if __name__ == "__main__":
     unittest.main()

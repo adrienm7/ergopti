@@ -2608,3 +2608,41 @@ Old-eight-only and zero-test green receipts fail that floor. Portable execution
 and source review do not prove Darwin compilation or root/native readiness.
 Exact composed gates and fresh native CI are recorded separately; TODO 31 and
 transverse items 16/38 stay open. No item is removed.
+
+## Native Mac run 37806243827 and closed tool refusal reasons
+
+Manual [run 37806243827](https://github.com/adrienm7/ergopti/actions/runs/37806243827)
+tests exact private candidate fb7549113348a9a7f55b08dbe7cd91ef5cab9118 and fails.
+Portable units pass 18,205 cases; stub E2E passes 101 with one explicit skip.
+Native tooltip paints 12 retained captures. The full Swift suite starts 110
+cases: 102 pass, 7 fail, zero skip and one remains unfinished at the original
+25-minute deadline. Keyboard/TIS does not start. Packaging fails, install/launch
+is skipped, and no release runs.
+
+Both full four-target workers close with status 124 at their unchanged
+300-second budgets. Standalone pinned Core/CLI compilation passes in 261.417
+seconds; verified metadata/archive acquisition returns HTTP 200. Root status 69
+retains preflight_apple_tool with compiler/SDK role and stat predicate unknown.
+Signing reports keychain inode replacement; permission UI completes zero cases.
+The authentic 332,823-byte package log is SHA256
+e56185866b7f2473fa5a0b40cc633b517284ccafb26f36676c2d74cee1fa6da1.
+The 871,105,855-byte failure archive is SHA256
+7145d1c8cdd15abaae5f73496f639f69388aa522979c25b79bf7b4f96ba71848;
+all 19,054 ZIP entries pass CRC. Compact targeted evidence retains 113 files
+and 1,264,111 bytes, with findings SHA256
+fc28352f568f03c554c1b7a6dcb33dcb93040086e25a37a59a59d18736c27b79.
+Partial positives do not establish packaging, installation or physical proof.
+
+The reviewed diagnostic successor adds only six closed tool-role/predicate
+names while retaining the original aggregate guard and every original fixed
+pin, ownership predicate, deadline and primary verdict. Original 17 Python
+controls are byte-whole; two frozen methods yield seven genuine assertion
+failures before implementation and 19 passing tests after it. The discovered
+Swift method strengthens only its count floors to 19 discovered/17 executed.
+Independent source-only review is SHA256
+c5538825331562a48b0652e78e9a8578e2921c2bb98071a375f716763a52598a.
+Native execution of this successor remains unexecuted, and the actual rejected
+Mac role/predicate remains unknown. Complete selected gates and publication
+receipts are recorded separately. No Group 5 item is removed; 24, 30, 31, 40,
+43 and 44 and transverse 16/38 remain partial. No final lock, dev push or
+feature deletion occurs at this checkpoint.
