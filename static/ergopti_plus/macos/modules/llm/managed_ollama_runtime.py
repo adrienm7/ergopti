@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import platform
 import secrets
+import select
 import signal
 import subprocess
 import sys
@@ -37,7 +38,7 @@ PROXY = load("ergopti_managed_ollama_proxy", SHARED / "python/network_proxy_poli
 
 
 class CurlResponse:
-    """One explicit-environment request; curl is reaped before data delivery."""
+    """Stream one explicit relay request; close and reap before its successor."""
 
     def __init__(
         self,
@@ -51,101 +52,187 @@ class CurlResponse:
         connect_timeout,
         minimum_bytes_per_second,
     ):
-        self.owner = tempfile.TemporaryDirectory(prefix="ergopti-ollama-explicit-")
-        self.body = None
-        child = None
-        metadata = None
+        self.child = None
+        self._header_fd = None
+        self._header_eof = self._body_eof = self._complete = False
+        self._header_count = 0
+        self._pending_headers = bytearray()
+        self._deadline = time.monotonic() + timeout
+        self._idle_timeout = idle_timeout
+        writer = None
         try:
-            root = Path(self.owner.name)
-            body = (root / "body").open("xb+")
-            metadata = (root / "headers").open("xb+")
-            self.body = body
             environment = dict(os.environ)
             scheme = urlsplit(url).scheme
             environment[scheme + "_proxy"] = proxy
-            # The canonical shared policy evaluated bypass for this exact hop.
-            # A second curl parser must not reinterpret a different rule.
+            # Only the canonical policy decides the bypass for this exact hop.
             environment["no_proxy"] = environment["NO_PROXY"] = ""
-            quoted = url.replace("\\", "\\\\").replace('"', '\\"')
-            configuration = ('url = "' + quoted + '"\n').encode("utf-8")
-            child = subprocess.Popen(
+
+            def quoted(value):
+                if not isinstance(value, str) or any(ord(c) < 32 or ord(c) == 127 for c in value):
+                    raise BOOTSTRAP.BootstrapFailure("protocol")
+                return value.replace("\\", "\\\\").replace('"', '\\"')
+
+            configuration = ['url = "' + quoted(url) + '"']
+            for name, value in headers:
+                if not name or any(
+                    c
+                    not in "!#$%&'*+-.^_`|~0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                    for c in name
+                ):
+                    raise BOOTSTRAP.BootstrapFailure("protocol")
+                configuration.append('header = "' + quoted(name + ": " + value) + '"')
+            data = ("\n".join(configuration) + "\n").encode("utf-8")
+            if len(data) > 65536:
+                raise BOOTSTRAP.BootstrapFailure("protocol")
+            self._header_fd, writer = os.pipe()
+            self.child = subprocess.Popen(
                 [
                     "/usr/bin/curl",
+                    "-q",
                     "--silent",
                     "--fail",
                     "--config",
                     "-",
                     "--connect-timeout",
-                    str(min(connect_timeout, timeout)),
+                    str(min(connect_timeout, self._remaining())),
                     "--max-time",
-                    str(timeout),
+                    str(self._remaining()),
                     "--speed-limit",
                     str(minimum_bytes_per_second),
                     "--speed-time",
                     str(max(1, int(idle_timeout))),
-                    "--header",
-                    "Accept-Encoding: identity",
+                    "--suppress-connect-headers",
+                    "--no-buffer",
                     "--output",
-                    "/dev/fd/" + str(body.fileno()),
+                    "-",
                     "--dump-header",
-                    "/dev/fd/" + str(metadata.fileno()),
-                    "--write-out",
-                    "%{http_code}",
+                    "/dev/fd/" + str(writer),
                 ],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.DEVNULL,
-                pass_fds=(body.fileno(), metadata.fileno()),
+                pass_fds=(writer,),
                 env=environment,
             )
-            try:
-                status, _ = child.communicate(configuration, timeout=timeout)
-                if child.returncode != 0 or len(status) != 3 or not status.isdigit():
-                    raise BOOTSTRAP.BootstrapFailure("connect")
-                metadata.seek(0)
-                raw = metadata.read(65537)
-                if len(raw) > 65536:
-                    raise BOOTSTRAP.BootstrapFailure("protocol")
-                blocks = [block for block in raw.split(b"\r\n\r\n") if block.startswith(b"HTTP/")]
-                if not blocks:
-                    raise BOOTSTRAP.BootstrapFailure("protocol")
-                lines = blocks[-1].split(b"\r\n")
-                if lines[0].split(b" ")[1] != status:
-                    raise BOOTSTRAP.BootstrapFailure("protocol")
-                self.status = int(status)
-                self.headers = []
-                for line in lines[1:]:
-                    name, separator, value = line.partition(b":")
-                    if not separator or not name or any(byte < 33 or byte >= 127 for byte in name):
+            os.close(writer)
+            writer = None
+            self._send(data)
+            while True:
+                self._wait([self._header_fd])
+                self._headers_chunk()
+                while b"\r\n\r\n" in self._pending_headers:
+                    block, _, rest = self._pending_headers.partition(b"\r\n\r\n")
+                    self._pending_headers = bytearray(rest)
+                    lines = block.split(b"\r\n")
+                    tokens = lines[0].split(b" ")
+                    if (
+                        len(tokens) < 2
+                        or not tokens[0].startswith(b"HTTP/")
+                        or len(tokens[1]) != 3
+                        or not tokens[1].isdigit()
+                    ):
                         raise BOOTSTRAP.BootstrapFailure("protocol")
-                    self.headers.append((name.decode("ascii"), value.decode("latin-1").strip()))
-                body.flush()
-                body.seek(0)
-            finally:
-                metadata.close()
-                if child.poll() is None:
-                    child.kill()
-                child.wait()
-                if child.stdin and not child.stdin.closed:
-                    child.stdin.close()
-                if child.stdout and not child.stdout.closed:
-                    child.stdout.close()
+                    status = int(tokens[1])
+                    if 100 <= status < 200:
+                        continue
+                    if not 200 <= status <= 599:
+                        raise BOOTSTRAP.BootstrapFailure("protocol")
+                    self.status, self.headers = status, []
+                    for line in lines[1:]:
+                        name, separator, value = line.partition(b":")
+                        if (
+                            not separator
+                            or not name
+                            or any(byte < 33 or byte >= 127 for byte in name)
+                        ):
+                            raise BOOTSTRAP.BootstrapFailure("protocol")
+                        self.headers.append((name.decode("ascii"), value.decode("latin-1").strip()))
+                    return
+                if self._header_eof:
+                    raise BOOTSTRAP.BootstrapFailure("connect")
         except BaseException:
-            if child is not None and child.poll() is None:
-                child.kill()
-                child.wait()
-            if metadata is not None:
-                metadata.close()
+            self.close()
+            raise
+        finally:
+            if writer is not None:
+                os.close(writer)
+
+    def _remaining(self):
+        remaining = self._deadline - time.monotonic()
+        if remaining <= 0:
+            raise BOOTSTRAP.BootstrapFailure("deadline")
+        return remaining
+
+    def _wait(self, descriptors, *, writable=False):
+        budget = min(self._remaining(), self._idle_timeout)
+        ready = select.select(
+            [] if writable else descriptors, descriptors if writable else [], [], budget
+        )
+        selected = ready[1] if writable else ready[0]
+        if not selected:
+            raise BOOTSTRAP.BootstrapFailure("deadline")
+        return selected
+
+    def _send(self, data):
+        descriptor = self.child.stdin.fileno()
+        os.set_blocking(descriptor, False)
+        offset = 0
+        while offset < len(data):
+            self._wait([descriptor], writable=True)
+            try:
+                offset += os.write(descriptor, data[offset : offset + 4096])
+            except BlockingIOError:
+                continue
+        self.child.stdin.close()
+
+    def _headers_chunk(self):
+        chunk = os.read(self._header_fd, 4096)
+        self._header_count += len(chunk)
+        if self._header_count > 65536:
+            raise BOOTSTRAP.BootstrapFailure("protocol")
+        self._pending_headers.extend(chunk)
+        self._header_eof = not chunk
+
+    def read(self, maximum=65535):
+        if self._complete:
+            return b""
+        if type(maximum) is not int or not 1 <= maximum <= 65535:
+            raise BOOTSTRAP.BootstrapFailure("protocol")
+        try:
+            while not self._body_eof or not self._header_eof:
+                descriptors = []
+                if not self._header_eof:
+                    descriptors.append(self._header_fd)
+                if not self._body_eof:
+                    descriptors.append(self.child.stdout.fileno())
+                selected = self._wait(descriptors)
+                if self._header_fd in selected:
+                    self._headers_chunk()
+                if self.child.stdout.fileno() in selected:
+                    chunk = os.read(self.child.stdout.fileno(), maximum)
+                    self._body_eof = not chunk
+                    if chunk:
+                        return chunk
+            if self.child.wait(timeout=self._remaining()) != 0:
+                raise BOOTSTRAP.BootstrapFailure("connect")
+            self._complete = True
+            self.close()
+            return b""
+        except BaseException:
             self.close()
             raise
 
-    def read(self, maximum=65535):
-        return self.body.read(maximum)
-
     def close(self):
-        if self.body is not None:
-            self.body.close()
-        self.owner.cleanup()
+        if self.child is not None:
+            if self.child.poll() is None:
+                self.child.kill()
+            self.child.wait()
+            for stream in (self.child.stdin, self.child.stdout):
+                if stream is not None and not stream.closed:
+                    stream.close()
+        if self._header_fd is not None:
+            descriptor, self._header_fd = self._header_fd, None
+            os.close(descriptor)
 
     def __enter__(self):
         return self

@@ -5632,6 +5632,8 @@ The fixed Specifications and Capabilities frames of the Windows/macOS per-model 
       open. macOS system trust and explicit proxy relays are integrated, while
       opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
 
+The explicit macOS model bootstrap relay now uses bounded header/body pipes instead of buffering the complete download before the canonical pinned-size check. It closes and reaps the actual curl child before redirects, rejects oversized metadata and incomplete successful bodies, and disables curl startup configuration before every other option. Six actual Linux curl relay cases pass, including a causal HOME/CURL_HOME configuration poisoning case; the preimage fails that routing control and three stream controls. Native macOS curl and TLS qualification remains required, and optional model activation stays gated by native source admission.
+
 Actual Windows run37828508949 passes the native PAC producer but fails eight AHK cases. Its existing quiet-success cleanup regression catches an unconditional Group 6 scalar notice. The observation remains bounded and is retained before private removal; publication now follows the original failed-cleanup condition. Successful graceful cleanup and every original receipt assertion remain unchanged. Native replay and the seven other failures remain pending.
 
 Actual ARM and Intel run37821833578 builds the release launcher successfully but stops before SDK tests at a newline-leading optional-chain expression. The test syntax now keeps that expression together, retaining every non-whitespace token and assertion. Native test compilation and the twenty-three SDK cases remain required.
