@@ -629,5 +629,203 @@ class KeychainFailureDiagnosticControls(unittest.TestCase):
         self.assertNotIn("DIAGNOSTIC", output.getvalue())
 
 
+class CommandCompletionOutcomeControls(unittest.TestCase):
+    """Real inode replacement; Security subprocess completion is explicitly modeled."""
+
+    PREFIX = "ERGOPTI_SIGNER_COMMAND_OUTCOME "
+
+    def exercise(self, returncode, *, endpoint="set-keychain-settings", before=False, rewrite=None):
+        import subprocess
+
+        error = F.FixtureRefusal("keychain_changed")
+        events = []
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            keychain = root / "ordinary.keychain"
+            keychain.write_bytes(b"ordinary fixture, not a native keychain")
+            keychain.chmod(0o600)
+            expected = F._stamp(keychain.lstat())
+            result = subprocess.CompletedProcess(
+                [], returncode, b"PRIVATE_STDOUT", b"PRIVATE_STDERR"
+            )
+
+            def replace():
+                replacement = root / "replacement"
+                replacement.write_bytes(keychain.read_bytes())
+                replacement.chmod(0o600)
+                os.replace(replacement, keychain)
+                self.assertNotEqual(keychain.lstat().st_ino, expected[1])
+
+            def guard():
+                events.append("guard")
+                if rewrite is not None and len(events) > 1:
+                    result.returncode = rewrite
+                observed = F._stamp(keychain.lstat())
+                if observed != expected:
+                    F._keychain_failure_capture(
+                        error, observed, list(expected), "setup_credentials"
+                    )
+                    raise error
+
+            def native_port(*args, **kwargs):
+                events.append("returned")
+                replace()
+                return result
+
+            if before:
+                replace()
+            with patch.object(F.subprocess, "run", side_effect=native_port):
+                with self.assertRaises(F.FixtureRefusal) as context:
+                    F.command(
+                        ["/usr/bin/security", endpoint, "PRIVATE_ARG"], time.monotonic() + 5, guard
+                    )
+            self.assertIs(context.exception, error)
+            self.assertEqual(error.code, "keychain_changed")
+            self.assertEqual(events, ["guard"] if before else ["guard", "returned", "guard"])
+            self.assertTrue(keychain.exists(), "Refusal must not delete an unqualified successor")
+        return error
+
+    def observation(self, error):
+        method = getattr(F, "_keychain_command_outcome_observation", None)
+        self.assertTrue(callable(method), "Closed completed-command observation is absent")
+        return method(error)
+
+    def expected(self, status):
+        return {
+            "schema": 1,
+            "kind": "test_only_signer_command_failure_observation",
+            "authority": False,
+            "native_verdict": "unchanged",
+            "stage": "setup_credentials",
+            "endpoint": "set-keychain-settings",
+            "phase": "after",
+            "status_class": status,
+        }
+
+    def output(self, error):
+        output, errors = io.StringIO(), io.StringIO()
+        with (
+            patch.object(F, "setup", side_effect=error),
+            contextlib.redirect_stdout(output),
+            contextlib.redirect_stderr(errors),
+        ):
+            status = F.main(["setup", "/unused", "/unused"])
+        self.assertEqual(status, 1)
+        self.assertEqual(output.getvalue(), "")
+        self.assertEqual(
+            errors.getvalue().splitlines()[0],
+            "Native signing TEST-ONLY fixture refused: keychain_changed",
+        )
+        self.assertNotIn("PRIVATE", errors.getvalue())
+        return errors.getvalue().splitlines()
+
+    def test_returned_zero_nonzero_and_signal_keep_original_inode_refusal(self):
+        import json
+
+        for returncode, status in [(0, "zero"), (17, "nonzero"), (-15, "signal")]:
+            with self.subTest(status=status):
+                error = self.exercise(returncode)
+                self.assertEqual(self.observation(error), self.expected(status))
+                lines = self.output(error)
+                self.assertEqual(len(lines), 3)
+                self.assertTrue(lines[1].startswith("ERGOPTI_SIGNER_KEYCHAIN_DIAGNOSTIC "))
+                self.assertTrue(lines[2].startswith(self.PREFIX))
+                self.assertLessEqual(len(lines[2].encode("utf-8")), 384)
+                self.assertEqual(json.loads(lines[2][len(self.PREFIX) :]), self.expected(status))
+
+    def test_after_guard_cannot_rewrite_captured_command_status(self):
+        self.assertEqual(self.observation(self.exercise(0, rewrite=17)), self.expected("zero"))
+
+    def test_before_guard_and_other_endpoint_do_not_mint_completion(self):
+        for error in [self.exercise(0, before=True), self.exercise(0, endpoint="unlock-keychain")]:
+            self.assertIsNone(self.observation(error))
+            self.assertEqual(len(self.output(error)), 2)
+
+    def test_unknown_status_values_are_closed_and_do_not_call_foreign_methods(self):
+        class ForeignInt(int):
+            def __eq__(self, other):
+                raise AssertionError("Foreign comparison must not run")
+
+            def __lt__(self, other):
+                raise AssertionError("Foreign comparison must not run")
+
+        for status in [True, "PRIVATE_STATUS", object(), ForeignInt(0)]:
+            with self.subTest(status_type=type(status).__name__):
+                error = self.exercise(status)
+                self.assertEqual(self.observation(error), self.expected("unclassified"))
+                self.output(error)
+
+    def test_success_is_silent_and_nonzero_preserves_native_command_refusal(self):
+        import subprocess
+
+        events = []
+
+        def guard():
+            events.append("guard")
+
+        with patch.object(
+            F.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, b"ok", b"")
+        ):
+            self.assertEqual(
+                F.command(
+                    ["/usr/bin/security", "set-keychain-settings"], time.monotonic() + 5, guard
+                ),
+                (b"ok", b""),
+            )
+        self.assertEqual(events, ["guard", "guard"])
+        with patch.object(
+            F.subprocess, "run", return_value=subprocess.CompletedProcess([], 17, b"", b"")
+        ):
+            with self.assertRaises(F.FixtureRefusal) as context:
+                F.command(
+                    ["/usr/bin/security", "set-keychain-settings"], time.monotonic() + 5, guard
+                )
+        self.assertEqual(context.exception.code, "native_command")
+        self.assertIsNone(self.observation(context.exception))
+
+    def test_malformed_completion_payload_cannot_disclose(self):
+        error = self.exercise(0)
+        for payload in [
+            {"status_class": "PRIVATE_STATUS"},
+            {"status_class": True},
+            {"status_class": "zero", "PRIVATE": "/PRIVATE"},
+            "PRIVATE",
+        ]:
+            error.keychain_command_outcome = payload
+            self.assertIsNone(self.observation(error))
+            self.assertEqual(len(self.output(error)), 2)
+
+    def test_annotation_failure_cannot_replace_original_guard_exception(self):
+        with patch.object(
+            F, "_keychain_command_outcome_capture", side_effect=ValueError("PRIVATE"), create=True
+        ):
+            error = self.exercise(0)
+        self.assertIsNone(self.observation(error))
+        self.assertEqual(len(self.output(error)), 2)
+
+    def test_new_output_failure_cannot_replace_original_failure_status(self):
+        import builtins
+
+        error = self.exercise(0)
+        self.assertEqual(self.observation(error), self.expected("zero"))
+        output, errors = io.StringIO(), io.StringIO()
+
+        def print_port(*args, **kwargs):
+            if args and type(args[0]) is str and args[0].startswith(self.PREFIX):
+                raise OSError("PRIVATE")
+            return builtins.print(*args, **kwargs)
+
+        with (
+            patch.object(F, "setup", side_effect=error),
+            patch.object(F, "print", side_effect=print_port, create=True),
+            contextlib.redirect_stdout(output),
+            contextlib.redirect_stderr(errors),
+        ):
+            self.assertEqual(F.main(["setup", "/unused", "/unused"]), 1)
+        self.assertEqual(output.getvalue(), "")
+        self.assertEqual(len(errors.getvalue().splitlines()), 2)
+        self.assertNotIn("PRIVATE", errors.getvalue())
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -105,3 +105,21 @@ extension HS274NativePolicyQualificationTests {
 		}
 	}
 }
+
+extension HS274NativePolicyQualificationTests {
+
+	func testPortableNativeSigningFixtureControlsKeepCompletedOutcomeAndOriginalRefusal() throws {
+		try fixture { root in
+			let script = source("hs274_native_build.py").deletingLastPathComponent()
+				.appendingPathComponent("hs274_native_signing_test.py")
+			// Existing SDK Guardian retains its literal 30/35/10 bounds.
+			let receipt = try run(URL(fileURLWithPath: "/usr/bin/env"), ["python3", script.path], root: root)
+			XCTAssertEqual(receipt.status, 0)
+			XCTAssertEqual(receipt.stdout, "")
+			let summary = try NSRegularExpression(pattern:
+				#"^[.]{47}\n-{70}\nRan 47 tests in [0-9]+(?:\.[0-9]+)?s\n\nOK\n$"#)
+			let range = NSRange(receipt.stderr.startIndex..<receipt.stderr.endIndex, in: receipt.stderr)
+			XCTAssertEqual(summary.firstMatch(in: receipt.stderr, range: range)?.range, range)
+		}
+	}
+}

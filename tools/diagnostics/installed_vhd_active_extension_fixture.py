@@ -25,7 +25,7 @@ def require(value, reason):
         raise FixtureRefusal(reason)
 
 
-SIGNER_SHA256 = "7efe296e0f0fe9040f310fba5e64cbbac1a20481df76e8f5118c200cbe0ab859"
+SIGNER_SHA256 = "f2a492cd326b0808922e4abe0d8e864f5069b6aff772b9399a95e56855fe9bf8"
 MACHO_SHA256 = "238fc52ca61326fe05b708954a0d9e84ebecc0f45b5088c06278a3b3ba1eb14b"
 IDENTIFIER = "org.pqrs.Karabiner-DriverKit-VirtualHIDDevice"
 SIGNING_IDENTIFIER = "com.ergoptiplus.test.vhd-properties"

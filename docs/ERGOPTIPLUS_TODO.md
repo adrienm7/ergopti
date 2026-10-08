@@ -4977,8 +4977,9 @@ pinned Core/CLI compilation passes in 261.417 seconds. Metadata and archive
 transport both return verified HTTP 200. Root prerequisite status 69 now names
 preflight_apple_tool; its compiler versus SDK role and failed ownership, mode
 or file-kind predicate remain unknown. Signing retains keychain inode mismatch
-refusals, and permission UI completes no case. These partial positive results
-do not qualify installation, physical input or the owned runtime.
+refusals. Permission UI has no admitted native result; its unsupported
+zero-count placeholder does not establish how many cases executed. These partial
+positive results do not qualify installation, physical input or the owned runtime.
 
 A failure-only diagnostic successor retains the original Apple-tool aggregate
 guard and adds six closed compiler/SDK ownership, writable-mode and file-kind
@@ -5008,6 +5009,16 @@ retirement and query-time port replacement; original assertions and independent
 expectations stay whole. Final composed gates are recorded separately. Native
 capture, owned runtime admission, installation and physical acceptance remain
 pending; item 31 and transverse 16/38 stay open.
+
+The test-only signing fixture now captures the completed command's closed status
+class before its identity guard can supersede that result. The original keychain
+refusal additionally reports zero, nonzero, signal or unclassified through a
+bounded failure-only row. Its replacement actor and native cause remain unknown.
+Original 39 controls and eight new causal controls pass; one ordinary Swift
+method now runs all 47 with an exact complete summary through the existing SDK
+Guardian. Source-bound fixture consumers use the same reviewed image. Native
+command outcome and full final macOS qualification remain pending. Items 31,
+16 and 38 stay open.
 
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review

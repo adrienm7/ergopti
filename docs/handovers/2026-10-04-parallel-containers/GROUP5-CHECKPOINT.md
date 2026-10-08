@@ -2623,7 +2623,8 @@ Both full four-target workers close with status 124 at their unchanged
 300-second budgets. Standalone pinned Core/CLI compilation passes in 261.417
 seconds; verified metadata/archive acquisition returns HTTP 200. Root status 69
 retains preflight_apple_tool with compiler/SDK role and stat predicate unknown.
-Signing reports keychain inode replacement; permission UI completes zero cases.
+Signing reports keychain inode replacement. Permission UI has no admitted
+native result; its unsupported zero-count placeholder is not an executed census.
 The authentic 332,823-byte package log is SHA256
 e56185866b7f2473fa5a0b40cc633b517284ccafb26f36676c2d74cee1fa6da1.
 The 871,105,855-byte failure archive is SHA256
@@ -2669,3 +2670,32 @@ controls grant no native capture, installed authority or physical qualification.
 TODO31 and transverse16/38 remain open. Shared source-edit ownership is granted
 in issue86 comment6067178486 and acknowledged in6067335501; no final integration
 lock or dev write is part of this slice.
+
+## Closed signer command completion and ordinary control registration
+
+The native signing failure observation now retains the returned Security command
+status class before the original after-command identity guard. The bounded row
+reports only zero, nonzero, signal or unclassified; the original keychain
+refusal and failure exit remain authoritative. Real native command outcome and
+replacement actor are still unknown until a new exact-source macOS run.
+
+The complete original 39 portable controls remain whole. Eight fixed controls
+reproduce 13 predecessor assertions and pass with the diagnostic, including real
+ordinary inode substitution and explicitly modeled Security completion. The
+complete 47 controls pass in normal and optimized interpreter modes. Their script
+previously had no ordinary CI invocation; a single additive Swift method now
+requires its full 47-dot, 47-test, empty-stdout success receipt through the
+unchanged SDK Guardian. Source hashes bind all three existing fixture consumers.
+Swift/Foundation/Guardian execution is unexecuted on this Linux host. Source
+review and selected final gate receipts are retained separately; this slice does
+not complete TODO31 or transverse16/38.
+
+Current feature synchronization includes dev30d98537ecc95853c2ad4718d6a53f116d3ec917.
+The dev84 selected gate passes format, 1,875 AHK encodings, all 387 JavaScript
+checks, actual X11/HTTP/FD digest/runtime checks and 22 archive source controls.
+Seven Linux native gates remain refused: five missing source/toolchain/kernel
+prerequisites and two opaque runtime/staging failures. Their runner/owner sources
+are whole upstream inputs; these results do not qualify them. The added dev30
+Windows diagnostic passes encoding, with native AHK deferred. Both feature
+merge pushes have exact-SHA automatic workflow censuses with zero runs. Final
+dev integration and its lock remain unstarted.
