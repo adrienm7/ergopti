@@ -468,7 +468,8 @@
 		"test:linux:fd-sha256-native": "node ./tools/test/run-linux-fd-sha256-native.cjs",
 		"test:linux-fd-sha256-native-gate": "node ./tools/test/test-linux-fd-sha256-native-gate.cjs",
 		"test:managed-ollama-protocol": "node ./tools/test/test-managed-ollama-protocol.cjs",
-		"test:macos-managed-ollama-catalogue": "node ./tools/test/test-macos-managed-ollama-catalogue.cjs"
+		"test:macos-managed-ollama-catalogue": "node ./tools/test/test-macos-managed-ollama-catalogue.cjs",
+		"test:dev-release-qualification": "node ./tools/test/test-dev-release-qualification.cjs"
 	},
 	"type": "module",
 	"dependencies": {

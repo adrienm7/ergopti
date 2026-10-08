@@ -3728,6 +3728,8 @@ the complete three-OS checkpoint remain pending.
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 
+The latest upstream prerelease qualification policy is composed with the Group 6 producer without duplicate YAML inputs or callers. Its single native Brew-file exclusion keeps the original consent controls in a separate always-included Swift file; both original test method bodies remain byte-identical. The actual release limitations publisher stays inside the footer section markers, with unchanged ordinary-release sections and independent exception-body receiving. Portable selector/consent guards pass; full native Swift and archive receiving remain required, and manual validation never activates the expiring release-only exception.
+
 Native archive receiving retains a qualified consent requester while its exact nil-window/AXCannotComplete observation is pending, within the original deadline. A vanished Sparkle spectator is ignored only after exact BSD ESRCH plus a fresh process-absence observation. All105 Brew and46 Sparkle original methods remain exact;109 Brew and47 Sparkle controls pass and both preimage receiving regressions are red. Actual AX, Sparkle and archive installation remain required.
 
 Homebrew native run 37788799471 on c6e716a85 completes the retained
@@ -9279,6 +9281,41 @@ Current Group 3 source checkpoint (item 111, 2026-10-06): [Group 3 current check
   retirement, no duplicate replay and no publication of unverified success.
   Six controlled real-Notepad caller cases passing do not qualify the
   physical/default InputHook trigger or close this incident.
+
+## Temporary dev release qualification deferrals
+
+The maintainer requested a release before 2026-10-09 09:00 Europe/Paris and
+explicitly authorized temporary test-execution deferrals when necessary.
+The closed policy in `.github/ci/dev_release_qualification_exceptions.json`
+applies only to the dev push prerelease `v0.0.0-dev.156` before 07:00 UTC.
+Main, pull requests, local runs and the next dev tag retain full execution.
+Every deferred qualification remains open and must never count as a pass:
+
+- [ ] Qualify Windows complete full-URL PAC routing, ordered routes and fresh
+      bytes, including actual worker admission and retirement. The original
+      canonical native test and its assertions remain intact.
+- [ ] Qualify the 34 Linux owned-window receipts. The first owned X11 client
+      exceeded its existing five-second visibility deadline before production
+      dispatch; its cause remains unresolved. Keep the independent native
+      fixture-family and external-recovery controls running.
+- [ ] Qualify the complete macOS Brew ZIP/XZ upgrade/refusal boundary. Its
+      unconfined-positive AppleEvent returned consent-required -1744; no Mac
+      is available. Deferring the combined test also defers its archive proof.
+- [ ] Qualify native macOS Shortcuts catalogue discovery. The first
+      `app.shortcuts()` call exceeded twenty seconds; preserve the portable
+      parser/JXA controls and do not infer permission or successful discovery.
+- [ ] Verify the corrected Windows SHA-256 staging operation on hosted
+      Windows. Local actual PowerShell controls, AHK generated-script contract,
+      whole-graph compilation and 70 E2E cases pass; cancelled CI receiving
+      does not prove the complete native download/trust chain.
+- [ ] Publish exact DEFERRED/source-bound receipts and these limitations in
+      the prerelease notes, then complete and re-enable every missing native
+      qualification. The temporary profile expires automatically and cannot
+      justify skipped builds, installs, signing or unrelated tests.
+
+These deferrals do not close groups 2, 4 or 7, the Notepad/default-trigger
+qualification, recurring input incident 114 or promo follow-up 113. Their
+existing requirements and retained evidence remain authoritative.
 
 ## Time estimate
 
