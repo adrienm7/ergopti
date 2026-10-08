@@ -654,12 +654,6 @@ codesign_native_runtime() {
 	local entitlements="$LAUNCHER_DIR/ErgoptiPlus.entitlements"
 	[ -f "$entitlements" ] || fail "Entitlements file missing: $entitlements"
 	sign_code --deep "$APP_PATH/Contents/Frameworks/Sparkle.framework"
-	# Sign the launcher binary with a stable identifier and entitlements.
-	sign_code \
-		--identifier "$BUNDLE_ID" \
-		--entitlements "$entitlements" \
-		"$APP_PATH/Contents/MacOS/ErgoptiPlus"
-
 	local automation_query="$APP_PATH/Contents/MacOS/ErgoptiAutomationQuery"
 	[ -f "$automation_query" ] || fail "Native automation query helper is missing."
 	sign_code --identifier "$BUNDLE_ID.automation-query" --entitlements "$entitlements" "$automation_query"
@@ -670,6 +664,13 @@ codesign_native_runtime() {
 	mkdir -p "$APP_PATH/Contents/Resources"
 	shasum -a 256 "$switcher" | awk '{print $1}' \
 		> "$APP_PATH/Contents/Resources/system-switcher-state.sha256"
+
+	# Signing the main executable also validates the bundle's nested code.
+	# Sign the launcher binary with a stable identifier and entitlements.
+	sign_code \
+		--identifier "$BUNDLE_ID" \
+		--entitlements "$entitlements" \
+		"$APP_PATH/Contents/MacOS/ErgoptiPlus"
 
 	if [ "${ERGOPTI_AUTOMATION_QUERY_CI_PUBLISH:-0}" = "1" ]; then
 		python3 "$REPO_ROOT/tools/build/automation_query_ci_publisher.py" seal \
