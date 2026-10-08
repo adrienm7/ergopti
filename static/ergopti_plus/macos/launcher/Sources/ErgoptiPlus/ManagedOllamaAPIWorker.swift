@@ -250,6 +250,11 @@ enum ManagedOllamaAPIWorker {
 		defer { if !connection.closed { _ = connection.close() } }
 		var listener: ergopti_listener_identity?
 		var failure = "connect"
+		#if ERGOPTI_GUARDIAN_TEST_SUPPORT
+		let diagnosticsEnabled = ProcessInfo.processInfo.environment["ERGOPTI_MANAGED_LISTENER_DIAGNOSTICS"] == "1"
+		var lastDiagnostic: String?
+		var diagnosticCount = 0
+		#endif
 		do {
 			guard fcntl(socket, F_SETFD, FD_CLOEXEC) == 0, ManagedPTYWorker.nonblocking(socket),
 				ManagedPTYWorker.nonblocking(STDOUT_FILENO) else { throw ManagedOllamaFailure.io }
@@ -272,6 +277,18 @@ enum ManagedOllamaAPIWorker {
 				let expected = request.expected
 				let result = request.executable.withCString { path -> Int32 in
 					if var exact = expected { return ergopti_listener_validate(socket, path, &exact, remaining, &observed) }
+					#if ERGOPTI_GUARDIAN_TEST_SUPPORT
+					if diagnosticsEnabled {
+						var diagnostic = ergopti_listener_diagnostic()
+						let result = ergopti_listener_discover_diagnostic(socket, path, request.device, request.inode,
+							remaining, &observed, &diagnostic)
+						let line = "ERGOPTI_LISTENER_DIAGNOSTIC paths=\(diagnostic.path_matches) stage=\(diagnostic.candidate_stage) errno=\(diagnostic.candidate_errno) result=\(result)"
+						if line != lastDiagnostic && diagnosticCount < 8 {
+							_ = fputs(line + "\n", stderr); lastDiagnostic = line; diagnosticCount += 1
+						}
+						return result
+					}
+					#endif
 					return ergopti_listener_discover(socket, path, request.device, request.inode, remaining, &observed)
 				}
 				if result == 0 { listener = observed; break }

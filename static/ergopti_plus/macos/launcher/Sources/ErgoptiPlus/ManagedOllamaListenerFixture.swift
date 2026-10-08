@@ -42,8 +42,12 @@ enum ManagedOllamaListenerFixture {
 			source.setEventHandler { cancellation.cancel() }; source.resume(); signals.append(source)
 		}
 		defer { signals.forEach { $0.cancel() } }
+		func failure(stage: Int, error: Int32) -> Int32 {
+			_ = fputs("ERGOPTI_RETAINED_IMAGE_DIAGNOSTIC stage=\(stage) errno=\(error)\n", stderr)
+			return 74
+		}
 		let descriptor = Darwin.open(arguments[0], O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
-		guard descriptor >= 0 else { return 74 }
+		guard descriptor >= 0 else { return failure(stage: 1, error: errno) }
 		var retained = true
 		defer { if retained { _ = Darwin.close(descriptor) } }
 		var image = stat()
@@ -74,7 +78,7 @@ enum ManagedOllamaListenerFixture {
 				posix_spawn(&child, "/dev/fd/3", &actions, &attributes, arguments.baseAddress, environment.baseAddress)
 			}
 		}
-		guard status == 0, child > 0 else { return 74 }
+		guard status == 0, child > 0 else { return failure(stage: 2, error: status) }
 		let deadline = ProcessInfo.processInfo.systemUptime + 25
 		var observation: Int32 = 0, timedOut = false
 		while true {
@@ -95,6 +99,9 @@ enum ManagedOllamaListenerFixture {
 			"inode": String(UInt64(image.st_ino)), "read_only": true, "reaped": true,
 			"descriptor_closed": true, "exit_status": exit,
 		], options: [.sortedKeys]), publish(receipt, path: arguments[2] + "/retained-image.json") else { return 74 }
+		if timedOut || exit != 0 {
+			_ = fputs("ERGOPTI_RETAINED_IMAGE_EXIT timeout=\(timedOut ? 1 : 0) status=\(exit)\n", stderr)
+		}
 		return !timedOut && exit == 0 ? 0 : 74
 	}
 	static func run(arguments: [String]) -> Int32 {

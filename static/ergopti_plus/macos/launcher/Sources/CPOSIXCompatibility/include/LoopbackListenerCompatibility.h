@@ -19,6 +19,17 @@ typedef struct {
 int ergopti_listener_discover(int connected_socket, const char *executable,
 	uint64_t device, uint64_t inode, uint32_t remaining_ms,
 	ergopti_listener_identity *identity);
+// Diagnostic scalars carry no pathname, HTTP bytes, credentials or environment.
+// The debug fixture can distinguish a missing path candidate from a refused
+// BSD/mapping/socket witness without relaxing the production admission result.
+typedef struct {
+	uint32_t path_matches;
+	uint32_t candidate_stage;
+	int32_t candidate_errno;
+} ergopti_listener_diagnostic;
+int ergopti_listener_discover_diagnostic(int connected_socket, const char *executable,
+	uint64_t device, uint64_t inode, uint32_t remaining_ms,
+	ergopti_listener_identity *identity, ergopti_listener_diagnostic *diagnostic);
 // Every request requires the exact earlier native identity. The same connected
 // socket must remain retained until the request/response is physically closed.
 int ergopti_listener_validate(int connected_socket, const char *executable,
