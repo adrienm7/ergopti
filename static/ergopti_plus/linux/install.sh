@@ -204,6 +204,9 @@ if $SETUP_PERMS_ONLY; then
 	exit 0
 fi
 
+# shellcheck source=install/native_source_build.sh
+source "${SRC_DRIVER}/install/native_source_build.sh"
+
 # ===========================================
 # ===========================================
 # ======= 4/ Dependency Verification =======
@@ -772,10 +775,10 @@ SRC_REGISTRY="$(layout_registry_source "${SRC_DRIVER}" "${DRIVERS_ROOT}")"
 # BEGIN GENERATED LINUX ARCHIVE BUILD PACKAGES
 _native_output_build_packages() {
 	case "$1" in
-		apt) echo "gcc libc6-dev" ;;
-		dnf) echo "gcc glibc-devel" ;;
-		zypper) echo "gcc glibc-devel" ;;
-		pacman) echo "gcc glibc" ;;
+		apt) echo "gcc libc6-dev linux-libc-dev" ;;
+		dnf) echo "gcc glibc-devel kernel-headers" ;;
+		zypper) echo "gcc glibc-devel linux-glibc-devel" ;;
+		pacman) echo "gcc glibc linux-api-headers" ;;
 		xbps) return 1 ;;
 		apk) echo "gcc musl-dev linux-headers" ;;
 		*) return 1 ;;
@@ -788,7 +791,12 @@ _native_output_build_packages() {
 # caller. The canonical builder still verifies compilation and publication.
 _ensure_native_output_toolchain() {
 	if $SKIP_DEPS; then return 0; fi
-	local manager packages package_name
+	local source="${SRC_DRIVER}/native/archive_output"
+	local source_name manager packages package_name
+	for source_name in archive_publication.c archive_publication.h; do
+		[ -f "${source}/${source_name}" ] && [ ! -L "${source}/${source_name}" ] || return 1
+	done
+	if native_source_compile_probe "$source"; then return 0; fi
 	manager="$(_detect_pkg_manager)"
 	if ! packages="$(_native_output_build_packages "$manager")"; then
 		echo "Native archive build prerequisites unavailable; install a C compiler and libc headers, then use --no-deps" >&2
@@ -797,6 +805,10 @@ _ensure_native_output_toolchain() {
 	for package_name in $packages; do
 		_install_required_package "$manager" "$package_name" || return 1
 	done
+	if ! native_source_compile_probe "$source"; then
+		echo "source-build-toolchain-unavailable" >&2
+		return 1
+	fi
 }
 
 _native_output_bin_parents || exit 1

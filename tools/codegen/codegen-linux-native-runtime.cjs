@@ -194,6 +194,8 @@ function flatpakModules(data) {
 			'post-install': [
 				'test -x /app/bin/krb5-config',
 				'test -f /app/lib/libgssapi_krb5.so',
+				'test -f /app/include/gssapi/gssapi.h',
+				'test "$(pkg-config --variable=prefix mit-krb5-gssapi)" = /app',
 				'/app/bin/krb5-config --libs gssapi'
 			],
 			source: 'krb5'
@@ -209,15 +211,20 @@ function flatpakModules(data) {
 				'-DCURL_USE_GSSAPI=ON',
 				'-DGSS_ROOT_DIR=/app'
 			],
-			'post-install': ['test -x /app/bin/curl'],
+			'post-install': [
+				'test -x /app/bin/curl',
+				"features=$(/app/bin/curl --disable --version) && printf '%s\\n' \"$features\" | grep -Eq '^Features: (.* )?GSS-API( |$)' && printf '%s\\n' \"$features\" | grep -Eq '^Features: (.* )?SPNEGO( |$)'"
+			],
 			source: 'curl'
 		},
 		{
 			name: 'network-duktape',
 			buildsystem: 'simple',
 			'build-commands': [
-				'make -f Makefile.sharedlibrary INSTALL_PREFIX=/app LDFLAGS="${LDFLAGS:-} -Wl,--no-as-needed -lm -Wl,--as-needed"',
-				'make -f Makefile.sharedlibrary INSTALL_PREFIX=/app LDFLAGS="${LDFLAGS:-} -Wl,--no-as-needed -lm -Wl,--as-needed" install'
+				// Backport upstream #2480: keep libm after each input under --as-needed.
+				"test \"$(grep -c '\\$(DUKTAPE_SRCDIR)/duktape\\.c$' Makefile.sharedlibrary)\" -eq 2 && sed -i 's|\\$(DUKTAPE_SRCDIR)/duktape\\.c$|$(DUKTAPE_SRCDIR)/duktape.c -lm|' Makefile.sharedlibrary",
+				'make -f Makefile.sharedlibrary INSTALL_PREFIX=/app',
+				'make -f Makefile.sharedlibrary INSTALL_PREFIX=/app install'
 			],
 			source: 'duktape'
 		},
@@ -225,7 +232,6 @@ function flatpakModules(data) {
 			name: 'network-libproxy',
 			buildsystem: 'meson',
 			'config-opts': [
-				'-Dlibdir=lib',
 				'-Ddocs=false',
 				'-Dtests=false',
 				'-Dvapi=false',
@@ -243,7 +249,6 @@ function flatpakModules(data) {
 			name: 'network-gio-proxy',
 			buildsystem: 'meson',
 			'config-opts': [
-				'-Dlibdir=lib',
 				'-Dlibproxy=enabled',
 				'-Dgnome_proxy=disabled',
 				'-Dgnutls=enabled',
@@ -255,11 +260,20 @@ function flatpakModules(data) {
 	];
 	return modules
 		.map(({ source, ...recipe }) => {
+			// Older Flatpak builders leave CMake's lib64 default outside /app/lib.
+			// Every CMake module must share the installed runtime search directory.
+			if (recipe.buildsystem === 'cmake-ninja')
+				recipe['config-opts'].unshift('-DCMAKE_INSTALL_LIBDIR=lib');
+			// Meson's SDK default can be lib64; the installed environment admits lib.
+			if (recipe.buildsystem === 'meson') recipe['config-opts'].unshift('--libdir=lib');
 			const input = sources[source];
 			const pinned =
 				source === 'duktape'
 					? { type: 'archive', url: input.url, sha256: input.sha256 }
 					: { type: 'git', url: input.url, commit: input.commit };
+			// HTTP content encoding must not change bytes before digest verification.
+			// The archive unpacker still owns decompression after authentication.
+			if (pinned.type === 'archive') pinned['disable-http-decompression'] = true;
 			return '  - ' + JSON.stringify({ ...recipe, sources: [pinned] }) + '\n';
 		})
 		.join('');
