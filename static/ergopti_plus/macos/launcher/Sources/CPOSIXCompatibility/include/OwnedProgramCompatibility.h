@@ -37,6 +37,25 @@ int ergopti_owned_program_prepare(
 	char *const environment[],
 	ergopti_owned_program **owner
 );
+// Borrowed tty capability; the caller closes it after preparation. Native
+// ownership, leader reservation and retirement match the original API exactly.
+int ergopti_owned_program_prepare_with_tty(
+	const char *executable,
+	char *const arguments[],
+	char *const environment[],
+	int tty_descriptor,
+	ergopti_owned_program **owner
+);
+// Additionally borrows one regular source descriptor into the child's fixed fd
+// 3. The caller retains both original descriptors until prepare has returned.
+int ergopti_owned_program_prepare_with_tty_source(
+	const char *executable,
+	char *const arguments[],
+	char *const environment[],
+	int tty_descriptor,
+	int source_descriptor,
+	ergopti_owned_program **owner
+);
 ergopti_owned_program_receipt ergopti_owned_program_activate(ergopti_owned_program *owner);
 ergopti_owned_program_receipt ergopti_owned_program_cancel(ergopti_owned_program *owner);
 ergopti_owned_program_receipt ergopti_owned_program_poll(ergopti_owned_program *owner);

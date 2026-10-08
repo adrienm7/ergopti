@@ -226,6 +226,11 @@ end
 -- the flag disagrees with what it finds.
 local ADAPTER_SPECS = {
 	{
+		id       = "adapters.native_bootstrap_pty",
+		contract = { "prepare" },
+		wired    = true,
+	},
+	{
 		id       = "adapters.physical_shortcut_hook",
 		contract = { "new" },
 		-- Structural require reachability; runtime native delivery stays unavailable.

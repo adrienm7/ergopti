@@ -185,10 +185,12 @@ static void program_release_storage(ergopti_owned_program *owner) {
 	free(owner);
 }
 
-int ergopti_owned_program_prepare(
+static int program_prepare(
 	const char *executable,
 	char *const arguments[],
 	char *const environment[],
+	int tty_descriptor,
+	int source_descriptor,
 	ergopti_owned_program **owner_out
 ) {
 	if (owner_out == NULL || *owner_out != NULL || executable == NULL
@@ -244,9 +246,14 @@ int ergopti_owned_program_prepare(
 		&& (error = posix_spawnattr_setsigdefault(&attributes, &default_signals)) == 0
 		&& (error = posix_spawnattr_setsigmask(&attributes, &empty_mask)) == 0) {
 		for (int descriptor = STDIN_FILENO; descriptor <= STDERR_FILENO; descriptor++) {
-			error = posix_spawn_file_actions_addopen(&actions, descriptor, "/dev/null", O_RDWR, 0);
+			error = tty_descriptor < 0
+				? posix_spawn_file_actions_addopen(&actions, descriptor, "/dev/null", O_RDWR, 0)
+				: posix_spawn_file_actions_adddup2(&actions, tty_descriptor, descriptor);
 			if (error != 0) { break; }
 		}
+	}
+	if (error == 0 && source_descriptor >= 0) {
+		error = posix_spawn_file_actions_adddup2(&actions, source_descriptor, STDERR_FILENO + 1);
 	}
 	if (error == 0) {
 		error = posix_spawn(&owner->leader, executable, &actions, &attributes, arguments, environment);
@@ -268,6 +275,45 @@ int ergopti_owned_program_prepare(
 	owner->error_code = error;
 	if (error != 0) { ergopti_owned_program_cancel(owner); }
 	return error;
+}
+
+int ergopti_owned_program_prepare(
+	const char *executable,
+	char *const arguments[],
+	char *const environment[],
+	ergopti_owned_program **owner_out
+) {
+	return program_prepare(executable, arguments, environment, -1, -1, owner_out);
+}
+
+int ergopti_owned_program_prepare_with_tty(
+	const char *executable,
+	char *const arguments[],
+	char *const environment[],
+	int tty_descriptor,
+	ergopti_owned_program **owner_out
+) {
+	// The caller retains this borrowed descriptor. Only the child's three
+	// explicitly duplicated standard streams cross the CLOEXEC-default spawn.
+	if (tty_descriptor <= STDERR_FILENO || isatty(tty_descriptor) != 1) { return EINVAL; }
+	return program_prepare(executable, arguments, environment, tty_descriptor, -1, owner_out);
+}
+
+int ergopti_owned_program_prepare_with_tty_source(
+	const char *executable,
+	char *const arguments[],
+	char *const environment[],
+	int tty_descriptor,
+	int source_descriptor,
+	ergopti_owned_program **owner_out
+) {
+	struct stat source;
+	if (tty_descriptor <= STDERR_FILENO + 1 || isatty(tty_descriptor) != 1
+		|| source_descriptor <= STDERR_FILENO + 1 || fstat(source_descriptor, &source) != 0
+		|| !S_ISREG(source.st_mode)) { return EINVAL; }
+	// Only fixed fd 3 carries the retained source; the child cannot inherit the
+	// guardian's control socket, PTY master or unrelated cancellation authority.
+	return program_prepare(executable, arguments, environment, tty_descriptor, source_descriptor, owner_out);
 }
 
 ergopti_owned_program_receipt ergopti_owned_program_activate(ergopti_owned_program *owner) {

@@ -75,11 +75,13 @@
 			"name": "other-driver-data",
 			"globs": [
 				"static/ergopti_plus/_shared/assets/**",
+				"static/ergopti_plus/_shared/python/**",
+				"static/ergopti_plus/_shared/modules/llm/managed_python_release.json",
 				"static/ergopti_plus/_shared/data/keycodes/evdev.json",
 				"static/ergopti_plus/_shared/data/keycodes/hid_usages.json",
 				"static/ergopti_plus/_shared/modules/features/linux_evidence.json"
 			],
-			"why": "The macOS and Linux tray PNGs, the Linux evdev key codes, the HID usages only the macOS codegen reads, and the Linux feature evidence ledger; the Windows tray uses the .ico files and Windows reads key positions from physical_keys.json."
+			"why": "The macOS and Linux tray PNGs, shared Python runtime and caches, the macOS MLX Python bootstrap catalogue, the Linux evdev key codes, the HID usages only the macOS codegen reads, and the Linux feature evidence ledger; the Windows tray uses the .ico files and Windows reads key positions from physical_keys.json."
 		},
 		{
 			"name": "website-logos",
@@ -97,8 +99,11 @@
 		},
 		{
 			"name": "compile-time-sources",
-			"globs": ["static/ergopti_plus/windows/vendor/*.ahk"],
-			"why": "AutoHotkey libraries #Included when Ahk2Exe compiles the exe, which already contains them. The programmable-hotstring worker is executed separately by the shipped interpreter and must remain a runtime source.",
+			"globs": [
+				"static/ergopti_plus/windows/vendor/*.ahk",
+				"static/ergopti_plus/_shared/native/**"
+			],
+			"why": "AutoHotkey libraries #Included when Ahk2Exe compiles the exe, which already contains them. The programmable-hotstring worker is executed separately by the shipped interpreter and must remain a runtime source. Shared native sources are compiled into platform executables and are never read by the Windows runtime.",
 			"except": ["static/ergopti_plus/windows/vendor/ergopti_user_hotstrings.ahk"]
 		},
 		{

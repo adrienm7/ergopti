@@ -18,6 +18,13 @@ def receive(source, expected_exit_path, vector):
     original_import, original_open = builtins.__import__, builtins.open
     truststore = types.ModuleType("truststore")
     hub = types.ModuleType("huggingface_hub")
+    managed = types.ModuleType("managed_http")
+
+    def install_native():
+        events.append("native_activation")
+        assert "activation" in events, "native HTTP requires prior system trust activation"
+
+    managed.install_huggingface_transport = install_native
 
     def inject():
         events.append("activation")
@@ -30,11 +37,14 @@ def receive(source, expected_exit_path, vector):
     def snapshot_download(*args, **kwargs):
         events.append("snapshot")
         assert "activation" in events, "download requires prior trust activation"
+        assert "native_activation" in events, "download requires prior native client activation"
         assert args == ("org/model",) and kwargs == {"max_workers": 8}
 
     hub.snapshot_download = snapshot_download
 
     def importing(name, *args, **kwargs):
+        if name == "managed_http":
+            return managed
         if name == "truststore":
             events.append("trust_import")
             if vector["truststore"] == "missing":
@@ -79,6 +89,7 @@ def receive(source, expected_exit_path, vector):
     output = io.StringIO()
     with contextlib.ExitStack() as stack:
         stack.enter_context(mock.patch.object(builtins, "__import__", importing))
+        stack.enter_context(mock.patch.object(sys, "path", list(sys.path)))
         stack.enter_context(mock.patch.object(builtins, "open", exit_open))
         stack.enter_context(mock.patch.object(os, "setpgrp", lambda: None, create=True))
         stack.enter_context(mock.patch.object(os.path, "isdir", lambda path: False))
@@ -111,6 +122,11 @@ def receive(source, expected_exit_path, vector):
         )
     else:
         assert events.index("activation") < events.index("hub_import") < events.index("snapshot")
+        assert (
+            events.index("activation")
+            < events.index("native_activation")
+            < events.index("snapshot")
+        )
 
 
 def main():

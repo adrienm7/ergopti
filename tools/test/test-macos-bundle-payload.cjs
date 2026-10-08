@@ -103,6 +103,52 @@ const CURATED_READS = [
 		],
 		targets: ['ergopti_plus/macos/pyproject.toml', 'ergopti_plus/macos/uv.lock'],
 		why: 'the MLX bootstrap fingerprints and syncs the committed Python project'
+	},
+	{
+		reader: 'ergopti_plus/macos/modules/llm/network-retry.sh',
+		needles: ['"$SCRIPT_DIR/managed_bootstrap_http.py"'],
+		targets: ['ergopti_plus/macos/modules/llm/managed_bootstrap_http.py'],
+		why: 'native bootstrap downloads use the bundled offline-input producer'
+	},
+	{
+		reader: 'ergopti_plus/macos/modules/llm/managed_bootstrap_http.py',
+		needles: [
+			'SHARED_ROOT / "data/http/redirect_policy.json"',
+			'SHARED_ROOT / "python/network_proxy_policy.py"',
+			'SHARED_ROOT / "modules/llm/managed_python_release.json"',
+			'DRIVER_ROOT / "platform/network/native_http.py"'
+		],
+		targets: [
+			'ergopti_plus/_shared/data/http/redirect_policy.json',
+			'ergopti_plus/_shared/python/network_proxy_policy.py',
+			'ergopti_plus/_shared/modules/llm/managed_python_release.json',
+			'ergopti_plus/macos/platform/network/native_http.py'
+		],
+		why: 'offline inputs retain the canonical routing policy, pinned Python and native request owner'
+	},
+	{
+		reader: 'ergopti_plus/macos/ui/menu/menu_llm/models_manager_mlx_download.lua',
+		needles: ['from managed_http import install_huggingface_transport'],
+		targets: ['ergopti_plus/macos/platform/network/managed_http.py'],
+		why: 'the emitted Hugging Face downloader activates the bundled native HTTPX transport'
+	},
+	{
+		reader: 'ergopti_plus/macos/platform/network/managed_http.py',
+		needles: [
+			'with_name("native_http.py")',
+			'_ROOT.parent / "_shared/python/network_proxy_policy.py"'
+		],
+		targets: [
+			'ergopti_plus/macos/platform/network/native_http.py',
+			'ergopti_plus/_shared/python/network_proxy_policy.py'
+		],
+		why: 'the HTTPX transport loads the exact native protocol owner and shared policy'
+	},
+	{
+		reader: 'ergopti_plus/_shared/python/network_proxy_policy.py',
+		needles: ['Path(__file__).parent.parent / "modules/network/proxy_policy.json"'],
+		targets: ['ergopti_plus/_shared/modules/network/proxy_policy.json'],
+		why: 'Python routing consumes the same canonical proxy policy as the other clients'
 	}
 ];
 
@@ -122,7 +168,8 @@ const FORBIDDEN = [
 		group: 'developer-tooling',
 		test: (target) =>
 			/(^|\/)(generate_models|validate_[^/]*)\.py$/.test(target) ||
-			target.startsWith(`${SHARED_ROOT}/modules/llm/install/`)
+			target.startsWith(`${SHARED_ROOT}/modules/llm/install/`) ||
+			target.startsWith(`${SHARED_ROOT}/native/`)
 	},
 	{
 		group: 'duplicate-copies',

@@ -74,7 +74,9 @@ curl_resilient() {
 # Downloads a large archive into the file named by "-o", resuming the bytes a
 # previous attempt already wrote. The caller verifies the complete file.
 curl_resumable() {
-	curl -LsSf \
+	local replace_owner=0
+	if [ "${1:-}" = --replace-owner ]; then replace_owner=1; shift; fi
+	local command=(curl -LsSf \
 		--connect-timeout "$CURL_CONNECT_TIMEOUT_SEC" \
 		--speed-limit "$CURL_STALL_BYTES_PER_SEC" \
 		--speed-time "$CURL_STALL_SEC" \
@@ -83,7 +85,92 @@ curl_resumable() {
 		--retry-max-time "$CURL_RETRY_MAX_TIME_SEC" \
 		--retry-all-errors \
 		--continue-at - \
-		"$@"
+		"$@")
+	if [ "$replace_owner" -eq 1 ]; then exec "${command[@]}"; fi
+	"${command[@]}"
+}
+
+# A bundle download crosses the signed native request boundary for each full
+# URL, including redirects. Explicit inherited routes keep the caller's curl
+# selection; they never silently become a different system-selected route.
+# The caller owns the private destination and the pinned complete asset.
+managed_bootstrap_json_string() {
+	local value="$1" character code escaped index
+	local LC_ALL=C
+	printf '"'
+	for ((index=0; index<${#value}; index++)); do
+		character="${value:index:1}"
+		case "$character" in
+			'"') printf '\\"' ;;
+			'\') printf '\\\\' ;;
+			*)
+				printf -v code '%d' "'$character"
+				if [ "$code" -lt 32 ]; then
+					printf -v escaped '\\u%04x' "$code"
+					printf '%s' "$escaped"
+				else
+					printf '%s' "$character"
+				fi
+				;;
+		esac
+	done
+	printf '"'
+}
+
+# The application supplies the exact launcher's native stat identity. A
+# missing Python never permits an uninspected executable from PATH instead.
+managed_bootstrap_launcher_available() {
+	local launcher="${ERGOPTI_LAUNCHER_EXECUTABLE:-}" identity
+	case "$launcher" in */Contents/MacOS/ErgoptiPlus) ;; *) return 1 ;; esac
+	[ -f "$launcher" ] && [ -x "$launcher" ] && [ ! -L "$launcher" ] || return 1
+	identity="$(/usr/bin/stat -f '%d:%i' "$launcher" 2>/dev/null)" || return 1
+	[ "$identity" = "${ERGOPTI_LAUNCHER_DEVICE:-}:${ERGOPTI_LAUNCHER_INODE:-}" ]
+}
+
+managed_bootstrap_download() {
+	local url="$1" output="$2" digest="$3" size="${4:-}" transfer="${5:-resumable}" replace_owner="${6:-}"
+	case "$transfer" in resilient|resumable) ;; *) return 64 ;; esac
+	if [ -n "${ERGOPTI_LAUNCHER_EXECUTABLE:-}" ] && [ -z "$OPAQUE_NETWORK_INHERITED_HTTPS_ROUTE" ]; then
+		if [ ! -x "${ERGOPTI_BOOTSTRAP_PYTHON:-}" ]; then
+			if ! managed_bootstrap_launcher_available; then
+				log_error "The native download input owner is unavailable. No download was started."
+				return "$OPAQUE_NETWORK_REFUSAL_EXIT_CODE"
+			fi
+			local budget_ms=$((CURL_MAX_TIME_SEC * 1000)) payload
+			payload="{\"version\":1,\"url\":$(managed_bootstrap_json_string "$url"),\"sha256\":$(managed_bootstrap_json_string "$digest"),\"output\":$(managed_bootstrap_json_string "$output"),\"timeout_ms\":$budget_ms"
+			if [ -n "$size" ]; then
+				case "$size" in *[!0-9]*|0) return 64 ;; esac
+				payload="$payload,\"size\":$size"
+			fi
+			payload="$payload}"
+			# The native spool reads system routes itself and interprets only
+			# the canonical caller bypass entries from its environment.
+			if [ "$replace_owner" = --replace-owner ]; then
+				exec "$ERGOPTI_LAUNCHER_EXECUTABLE" --managed-bootstrap-download "$budget_ms" <<< "$payload"
+			fi
+			(
+				exec "$ERGOPTI_LAUNCHER_EXECUTABLE" --managed-bootstrap-download "$budget_ms" <<< "$payload"
+			)
+			return $?
+		fi
+		if [ ! -f "$SCRIPT_DIR/managed_bootstrap_http.py" ]; then
+			log_error "The native download input helper is missing. No download was started."
+			return "$OPAQUE_NETWORK_REFUSAL_EXIT_CODE"
+		fi
+		local command=("$ERGOPTI_BOOTSTRAP_PYTHON" "$SCRIPT_DIR/managed_bootstrap_http.py" \
+			--timeout "$CURL_MAX_TIME_SEC" --idle-timeout "$CURL_STALL_SEC" \
+			download --url "$url" --output "$output" --sha256 "$digest")
+		if [ -n "$size" ]; then command+=(--size "$size"); fi
+		if [ "$replace_owner" = --replace-owner ]; then exec "${command[@]}"; fi
+		"${command[@]}"
+		return $?
+	fi
+	# A manual checkout has no signed request worker. Preserve the existing
+	# direct/static/environment implementation, but never pretend it reads PAC.
+	if [ -x /usr/sbin/scutil ]; then apply_system_network opaque || return $?; fi
+	if [ "$transfer" = resilient ]; then curl_resilient -o "$output" "$url"; return $?; fi
+	if [ "$replace_owner" = --replace-owner ]; then curl_resumable --replace-owner -o "$output" "$url"; return $?; fi
+	curl_resumable -o "$output" "$url"
 }
 
 # Loopback hosts never go through a relay: a relay variable without them

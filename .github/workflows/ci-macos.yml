@@ -236,6 +236,14 @@ jobs:
           print(json.dumps({"python": sys.executable, "version": list(sys.version_info[:3]), "nonreaping_apis": list(names)}, sort_keys=True))
           PY
 
+      - name: Prepare locked managed HTTP native clients
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/managed-http-native-clients"
+          python3 tools/test/export-macos-managed-http-test-deps.py static/ergopti_plus/macos/uv.lock > "$RUNNER_TEMP/managed-http-native-clients.requirements"
+          "$RUNNER_TEMP/managed-http-native-clients/bin/python" -m pip install --require-hashes --only-binary=:all: -r "$RUNNER_TEMP/managed-http-native-clients.requirements"
+          echo "ERGOPTI_NATIVE_HTTP_PYTHON=$RUNNER_TEMP/managed-http-native-clients/bin/python" >> "$GITHUB_ENV"
+
       - name: Cache SwiftPM dependencies
         uses: actions/cache@v4
         with:
@@ -272,6 +280,13 @@ jobs:
 
       # Keep XCTest serial: the lease tests install process-wide signal handlers
       # and fork/reap real children, so parallel workers would race each other.
+      - name: Receive actual managed HTTP native clients
+        run: |
+          set -euo pipefail
+          "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only
+          "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py
+        timeout-minutes: 5
+
       - name: Run Swift launcher tests
         id: swift-launcher-tests
         env:
@@ -545,6 +560,12 @@ jobs:
         run: >
           node tools/build/macos-release-archives.cjs --ci-receipt
           "$PWD/build/macos/ErgoptiPlus.app" "$PWD/build/macos"
+
+      - name: Receive actual cold native MLX bootstrap
+        run: |
+          set -euo pipefail
+          python3 tools/diagnostics/macos_cold_bootstrap.py --app "$PWD/build/macos/ErgoptiPlus.app" --output "$RUNNER_TEMP/native-cold-bootstrap"
+        timeout-minutes: 35
 
       # The only launch on macos-latest (macOS 26): every launch leg runs on
       # macos-15 or macos-15-intel.

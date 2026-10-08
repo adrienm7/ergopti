@@ -11,6 +11,7 @@
 # owned by ApiOllama.
 #
 # Usage: ensure-ollama-deps.sh <resolved-executable-or-empty> <install-dir>
+#                            [resolved-native-python]
 # ============================================================================
 
 set -eu
@@ -24,6 +25,7 @@ export PATH="$PATH:/usr/bin:/bin:/usr/sbin:/sbin"
 
 OLLAMA_RESOLVED_BIN="${1:-}"
 OLLAMA_INSTALL_DIR="${2:-}"
+export ERGOPTI_BOOTSTRAP_PYTHON="${3:-}"
 INSTALL_TEMP=""
 INSTALL_STAGE=""
 INSTALL_ROLLBACK=""
@@ -45,6 +47,7 @@ log_error() {
 cleanup_install() {
 	if [ -n "$DOWNLOAD_PID" ]; then
 		kill "$DOWNLOAD_PID" 2>/dev/null || true
+		wait "$DOWNLOAD_PID" 2>/dev/null || true
 	fi
 	if [ -n "$INSTALL_ROLLBACK" ] && [ -e "$INSTALL_ROLLBACK" ]; then
 		if [ ! -e "$OLLAMA_INSTALL_DIR" ]; then
@@ -134,7 +137,7 @@ download_archive() {
 	elif [ "$size" -eq "$OLLAMA_DARWIN_TGZ_BYTES" ]; then
 		return 0
 	fi
-	curl_resumable -o "$archive_path" "$archive_url" &
+	managed_bootstrap_download "$archive_url" "$archive_path" "$OLLAMA_DARWIN_TGZ_SHA256" "$OLLAMA_DARWIN_TGZ_BYTES" resumable --replace-owner &
 	DOWNLOAD_PID=$!
 	while kill -0 "$DOWNLOAD_PID" 2>/dev/null; do
 		report_download_progress
