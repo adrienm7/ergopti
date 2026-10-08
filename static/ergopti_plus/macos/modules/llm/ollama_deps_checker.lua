@@ -80,6 +80,7 @@ local _bootstrap_state      = "pending"
 local _last_failure_message = nil
 local _daemon_state         = "pending"
 local _last_daemon_failure_message = nil
+local _native_pty_preflight_owner = nil
 local _task_running         = false  -- reentrancy guard: prevents duplicate concurrent tasks
 -- Download authority. Only install_for_selection() grants it, after the user
 -- accepted the offer; the next check consumes it, so a boot, an AI enable with
@@ -505,6 +506,10 @@ end
 local function terminate_task_owner(owner, label)
 	if type(owner) ~= "table" or owner.settled == true then return true end
 	owner.authorized = false
+	if type(owner.native_terminal_retry) == "function" then
+		owner.native_terminal_retry()
+		if owner.settled == true then return true end
+	end
 	if owner.termination_accepted == true then return false end
 	local accepted = TaskLifecycle.terminate(owner.task, label)
 	if owner.settled == true then return true end
@@ -519,8 +524,13 @@ quiesce_owned_work = function()
 	local hide_settled = cancel_owned_timer("hide", "Ollama bootstrap auto-hide")
 	local deadline_settled = cancel_owned_timer("deadline", "Ollama dependency bootstrap deadline")
 	local task_settled = terminate_task_owner(_task_owner, "Ollama dependency bootstrap")
+	local preflight_settled = true
+	if _native_pty_preflight_owner ~= nil then
+		preflight_settled = _native_pty_preflight_owner.rollback() == true
+		if preflight_settled then _native_pty_preflight_owner = nil end
+	end
 	return initial_settled == true and hide_settled == true
-		and deadline_settled == true and task_settled == true
+		and deadline_settled == true and task_settled == true and preflight_settled == true
 end
 
 schedule_initial_for_token = function(token)
@@ -778,22 +788,45 @@ function M.check_and_install_deps(on_complete, replay_token)
 	if not _pause_controller.is_current(token, authorization) then
 		return settle_stale_intent()
 	end
-	-- The PTY wrapper runs on an interpreter this Mac runs natively
-	-- (hardening-h-no-rosetta). Without one, the user who asked for the
-	-- install is offered one; a boot check only logs it.
+	-- A native interpreter keeps the existing PTY wrapper. Without Python,
+	-- the signed guardian runs this exact pinned installer and returns its
+	-- physical closure receipt before provisioning or daemon acquisition.
 	local python_bin, python_state = PythonInterpreter.resolve()
+	local native_pty
 	if not python_bin then
-		if install_granted then require("ui.python_runtime_offer").offer(python_state) end
-		return settle_preflight_failure(i18n.get("ollama.deps_failed"))
+		local NativePty = require("adapters.native_bootstrap_pty")
+		local environment = {
+			{ "PROJECT_ROOT", project_root .. "/static/ergopti_plus/macos" },
+			{ "ERGOPTI_NATIVE_ARCH", PythonInterpreter.native_arch() or "" },
+			{ "ERGOPTI_NATIVE_PYTHONS", table.concat(PythonInterpreter.native_candidates(), ":") },
+			{ "ERGOPTI_BOOTSTRAP_OLLAMA_RESOLVED_BIN", resolved_bin or "" },
+			{ "ERGOPTI_BOOTSTRAP_OLLAMA_INSTALL_DIR", install_dir or "" },
+			{ "ERGOPTI_BOOTSTRAP_PYTHON", "" },
+		}
+		if _native_pty_preflight_owner ~= nil then
+			if _native_pty_preflight_owner.rollback() ~= true then
+				return settle_preflight_failure(i18n.get("ollama.deps_failed"))
+			end
+			_native_pty_preflight_owner = nil
+		end
+		local prepared
+		native_pty, prepared = NativePty.prepare(script_path, environment, BOOTSTRAP_TIMEOUT_SEC * 1000)
+		if prepared ~= true then
+			if native_pty ~= nil and native_pty.rollback() ~= true then _native_pty_preflight_owner = native_pty end
+			if install_granted then require("ui.python_runtime_offer").offer(python_state) end
+			return settle_preflight_failure(i18n.get("ollama.deps_failed"))
+		end
 	end
-	local pty_wrapper_path, wrapper_error = PtyProcessGroup.create("Ollama dependency")
-	if not pty_wrapper_path then
+	local pty_wrapper_path, wrapper_error
+	if native_pty == nil then pty_wrapper_path, wrapper_error = PtyProcessGroup.create("Ollama dependency") end
+	if native_pty == nil and not pty_wrapper_path then
 		Logger.error(LOG, "Failed to publish the Ollama process-group wrapper: %s.",
 			tostring(wrapper_error))
 		return settle_preflight_failure(i18n.get("ollama.deps_task_create_failed"))
 	end
 	if not _pause_controller.is_current(token, authorization) then
 		PtyProcessGroup.remove(pty_wrapper_path)
+		if native_pty ~= nil and native_pty.rollback() ~= true then _native_pty_preflight_owner = native_pty end
 		return settle_stale_intent()
 	end
 
@@ -943,6 +976,17 @@ function M.check_and_install_deps(on_complete, replay_token)
 
 	local function process_settled_terminal(args)
 		if owner.terminal_processed == true then return false end
+		if native_pty ~= nil and native_pty.settle(args[1]) ~= true then
+			owner.native_terminal_retry = function() return process_settled_terminal(args) end
+			Logger.error(LOG, "Native Ollama bootstrap retained: physical receipt or cleanup remains unsettled.")
+			if owner_is_current() then
+				_bootstrap_state = "failed"
+				_last_failure_message = i18n.get("ollama.deps_failed")
+				if owns_window() then pcall(llm_progress.set_error, _last_failure_message) end
+			end
+			return false
+		end
+		owner.native_terminal_retry = nil
 		owner.terminal_processed = true
 		release_task_owner(owner)
 		PtyProcessGroup.remove(pty_wrapper_path)
@@ -990,13 +1034,17 @@ function M.check_and_install_deps(on_complete, replay_token)
 	end
 
 	_observed_failure_marker = nil
-	task = TaskLifecycle.native("Ollama bootstrap", python_bin,
-		completion_callback, streaming_callback,
-		{ "-u", pty_wrapper_path, "/bin/bash", script_path, resolved_bin or "", install_dir or "", python_bin })
+	local task_executable, task_arguments = python_bin,
+		{ "-u", pty_wrapper_path, "/bin/bash", script_path, resolved_bin or "", install_dir or "", python_bin }
+	if native_pty ~= nil then task_executable, task_arguments = native_pty.executable, native_pty.arguments end
+	task = TaskLifecycle.native("Ollama bootstrap", task_executable,
+		completion_callback, streaming_callback, task_arguments)
+	if task ~= nil and native_pty ~= nil and native_pty.bind_input(task) ~= true then task = nil end
 
 	if not task then
 		owner.authorized = false
 		PtyProcessGroup.remove(pty_wrapper_path)
+		if native_pty ~= nil and native_pty.rollback() ~= true then _native_pty_preflight_owner = native_pty end
 		return settle_preflight_failure(i18n.get("ollama.deps_task_create_failed"))
 	end
 	owner.task = task
@@ -1036,9 +1084,18 @@ function M.check_and_install_deps(on_complete, replay_token)
 		owner.authorized = false
 		release_task_owner(owner)
 		PtyProcessGroup.remove(pty_wrapper_path)
+		if native_pty ~= nil and native_pty.rollback() ~= true then _native_pty_preflight_owner = native_pty end
 		return settle_preflight_failure(i18n.get("ollama.deps_failed"))
 	end
 
+	if native_pty ~= nil and native_pty.mark_start_attempted() ~= true then
+		owner.dispatching = false
+		owner.authorized = false
+		cancel_owned_timer("deadline", "Ollama dependency bootstrap deadline")
+		release_task_owner(owner)
+		if native_pty.rollback() ~= true then _native_pty_preflight_owner = native_pty end
+		return settle_preflight_failure(i18n.get("ollama.deps_task_start_failed"))
+	end
 	local started = TaskLifecycle.start(task, "Ollama bootstrap")
 	if started ~= true then
 		owner.dispatching = false

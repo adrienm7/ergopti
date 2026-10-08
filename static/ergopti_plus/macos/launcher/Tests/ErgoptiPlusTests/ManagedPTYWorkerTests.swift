@@ -26,13 +26,13 @@ private final class ManagedPTYTestSession {
 	private(set) var bytes = Data()
 	private(set) var errorBytes = Data()
 
-	init(script: String, milliseconds: Int = 10_000, wrongDigest: Bool = false, inheritedStartup: Bool = false) throws {
+	init(script: String, milliseconds: Int = 10_000, wrongDigest: Bool = false, inheritedStartup: Bool = false, sourceName: String = "ensure-mlx-deps.sh") throws {
 		let manager = FileManager.default
 		root = manager.temporaryDirectory.appendingPathComponent("ergopti-native-pty-" + UUID().uuidString).resolvingSymlinksInPath()
 		let app = root.appendingPathComponent("Fixture.app")
 		let contents = app.appendingPathComponent("Contents")
 		let executable = contents.appendingPathComponent("MacOS/ErgoptiPlus")
-		source = contents.appendingPathComponent("Resources/static/ergopti_plus/macos/modules/llm/ensure-mlx-deps.sh")
+		source = contents.appendingPathComponent("Resources/static/ergopti_plus/macos/modules/llm/" + sourceName)
 		receipt = root.appendingPathComponent("receipt.json")
 		try manager.createDirectory(at: executable.deletingLastPathComponent(), withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
 		try manager.createDirectory(at: source.deletingLastPathComponent(), withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
@@ -55,8 +55,17 @@ private final class ManagedPTYTestSession {
 			throw Failure.prerequisite
 		}
 		let digest = wrongDigest ? String(repeating: "0", count: 64) : SHA256.hash(data: sourceBytes).map { String(format: "%02x", $0) }.joined()
+		var pairs = [["PROJECT_ROOT", root.path]]
+		if sourceName == "ensure-ollama-deps.sh" {
+			pairs += [["ERGOPTI_NATIVE_ARCH", "arm64"], ["ERGOPTI_NATIVE_PYTHONS", ""],
+				["ERGOPTI_BOOTSTRAP_OLLAMA_RESOLVED_BIN", ""],
+				["ERGOPTI_BOOTSTRAP_OLLAMA_INSTALL_DIR", root.appendingPathComponent("Library/Application Support/Ergopti/ollama").path],
+				["ERGOPTI_BOOTSTRAP_PYTHON", ""]]
+			var environment = ProcessInfo.processInfo.environment; environment["HOME"] = root.path
+			process.environment = environment
+		}
 		let request: [String: Any] = ["version": 1, "source_path": source.path, "source_sha256": digest,
-			"environment": [["PROJECT_ROOT", root.path]], "timeout_ms": milliseconds,
+			"environment": pairs, "timeout_ms": milliseconds,
 			"receipt_path": receipt.path, "nonce": nonce]
 		process.executableURL = executable
 		process.arguments = ["--managed-pty-worker", String(milliseconds)]
@@ -65,6 +74,11 @@ private final class ManagedPTYTestSession {
 			try Data("printf UNADMITTED-STARTUP\nexit 93\n".utf8).write(to: startup)
 			var environment = ProcessInfo.processInfo.environment
 			environment["BASH_ENV"] = startup.path
+			process.environment = environment
+		}
+		if sourceName == "ensure-ollama-native-deps.sh" {
+			var environment = ProcessInfo.processInfo.environment
+			environment["ERGOPTI_BOOTSTRAP_TIMEOUT_MS"] = "999999999"
 			process.environment = environment
 		}
 		process.standardInput = input
@@ -313,5 +327,41 @@ final class ManagedPTYWorkerTests: XCTestCase {
 			session.process.isRunning else { throw ManagedPTYTestSession.Failure.retirement }
 		XCTAssertEqual(Darwin.kill(session.process.processIdentifier, SIGKILL), 0)
 		try session.finishBridgeHardDeath(observations: originals)
+	}
+
+	func testSecondPinnedInstallerUsesActualTTYRetainedSourceAndOriginalBudget() throws {
+		let session = try ManagedPTYTestSession(script: """
+		#!/bin/bash
+		test "$0" = /dev/fd/3 || exit 91
+		test -t 0 && test -t 1 && test -t 2 || exit 92
+		test "$ERGOPTI_BOOTSTRAP_SCRIPT_DIR" = "${PROJECT_ROOT}/Fixture.app/Contents/Resources/static/ergopti_plus/macos/modules/llm" || exit 93
+		case "$ERGOPTI_BOOTSTRAP_TIMEOUT_MS" in ''|*[!0-9]*) exit 94;; esac
+		test "$ERGOPTI_BOOTSTRAP_TIMEOUT_MS" -gt 0 && test "$ERGOPTI_BOOTSTRAP_TIMEOUT_MS" -le 5000 || exit 95
+		printf 'SECOND-INSTALLER-OWNED\\n'
+		""" + "\n", milliseconds: 5000, sourceName: "ensure-ollama-native-deps.sh")
+		defer { session.cleanup() }
+		try session.finish(worker: 0, admitted: true, exit: 0)
+		XCTAssertTrue(session.bytes.range(of: Data("SECOND-INSTALLER-OWNED".utf8)) != nil)
+	}
+
+	func testThirdInstallerCannotBorrowTheSecondPinnedSourceAdmission() throws {
+		let session = try ManagedPTYTestSession(script: "#!/bin/bash\nprintf UNADMITTED-INSTALLER\n", sourceName: "unadmitted-bootstrap.sh")
+		defer { session.cleanup() }
+		try session.finish(worker: 64, admitted: false, exit: 64)
+		XCTAssertTrue(session.bytes.isEmpty)
+	}
+
+	func testOfficialThirdPinnedInstallerReceivesOnlyItsPrivateEnvironmentContract() throws {
+		let session = try ManagedPTYTestSession(script: """
+		#!/bin/bash
+		test "$0" = /dev/fd/3 && test -t 0 && test -t 1 && test -t 2 || exit 91
+		test -z "$ERGOPTI_BOOTSTRAP_OLLAMA_RESOLVED_BIN" && test -z "$ERGOPTI_BOOTSTRAP_PYTHON" || exit 92
+		test "$ERGOPTI_BOOTSTRAP_OLLAMA_INSTALL_DIR" = "$HOME/Library/Application Support/Ergopti/ollama" || exit 93
+		test "$ERGOPTI_BOOTSTRAP_TIMEOUT_MS" -gt 0 && test "$ERGOPTI_BOOTSTRAP_TIMEOUT_MS" -le 5000 || exit 94
+		printf 'OFFICIAL-INSTALLER-PRIVATE-INPUT\\n'
+		""" + "\n", milliseconds: 5000, sourceName: "ensure-ollama-deps.sh")
+		defer { session.cleanup() }
+		try session.finish(worker: 0, admitted: true, exit: 0)
+		XCTAssertNotNil(session.bytes.range(of: Data("OFFICIAL-INSTALLER-PRIVATE-INPUT".utf8)))
 	}
 }

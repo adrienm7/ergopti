@@ -22,19 +22,34 @@ struct ManagedPTYRequest {
 			let source = fields["source_path"] as? String, source.hasPrefix("/"), !source.utf8.contains(0),
 			let digest = fields["source_sha256"] as? String, digest.utf8.count == 64,
 			digest.utf8.allSatisfy({ (48...57).contains($0) || (97...102).contains($0) }),
-			let pairs = fields["environment"] as? [[String]], pairs.count <= 4,
+			let pairs = fields["environment"] as? [[String]], pairs.count <= 6,
 			let timeout = ManagedBootstrapRequest.integer(fields["timeout_ms"]), timeout > 0, timeout <= Int64(Int32.max),
 			let receipt = fields["receipt_path"] as? String, receipt.hasPrefix("/"), !receipt.utf8.contains(0),
 			let nonce = fields["nonce"] as? String, !nonce.isEmpty, nonce.utf8.count <= 128,
 			nonce.utf8.allSatisfy({ (48...57).contains($0) || (65...90).contains($0) || (97...122).contains($0) || $0 == 45 })
 		else { return nil }
+		let official = URL(fileURLWithPath: source).lastPathComponent == "ensure-ollama-deps.sh"
+		let admittedNames: Set<String> = official ? ["PROJECT_ROOT", "ERGOPTI_NATIVE_ARCH", "ERGOPTI_NATIVE_PYTHONS",
+			"ERGOPTI_BOOTSTRAP_OLLAMA_RESOLVED_BIN", "ERGOPTI_BOOTSTRAP_OLLAMA_INSTALL_DIR", "ERGOPTI_BOOTSTRAP_PYTHON"]
+			: ["PROJECT_ROOT", "ERGOPTI_NATIVE_ARCH", "ERGOPTI_NATIVE_PYTHONS", "ERGOPTI_MLX_REPAIR"]
 		var names = Set<String>()
 		var environment: [(String, String)] = []
 		for pair in pairs {
 			guard pair.count == 2,
-				["PROJECT_ROOT", "ERGOPTI_NATIVE_ARCH", "ERGOPTI_NATIVE_PYTHONS", "ERGOPTI_MLX_REPAIR"].contains(pair[0]),
+				admittedNames.contains(pair[0]),
 				!pair[1].utf8.contains(0), names.insert(pair[0]).inserted else { return nil }
 			environment.append((pair[0], pair[1]))
+		}
+		if official {
+			let values = Dictionary(uniqueKeysWithValues: environment)
+			guard names == admittedNames, values["ERGOPTI_BOOTSTRAP_PYTHON"] == "",
+				["arm64", "x86_64"].contains(values["ERGOPTI_NATIVE_ARCH"] ?? ""),
+				let resolved = values["ERGOPTI_BOOTSTRAP_OLLAMA_RESOLVED_BIN"],
+				resolved.isEmpty || (resolved.hasPrefix("/") && URL(fileURLWithPath: resolved).standardizedFileURL.path == resolved),
+				let home = ProcessInfo.processInfo.environment["HOME"], home.hasPrefix("/"),
+				values["ERGOPTI_BOOTSTRAP_OLLAMA_INSTALL_DIR"] == (resolved.isEmpty
+					? URL(fileURLWithPath: home).appendingPathComponent("Library/Application Support/Ergopti/ollama").standardizedFileURL.path : "")
+			else { return nil }
 		}
 		return ManagedPTYRequest(sourcePath: source, sourceSHA256: digest, environment: environment,
 			timeoutMilliseconds: Int(timeout), receiptPath: receipt, nonce: nonce)
@@ -320,7 +335,11 @@ enum ManagedPTYWorker {
 			let clock = readLine(controlDescriptor, milliseconds: milliseconds, started: received),
 			let started = Double(String(decoding: clock, as: UTF8.self)), started.isFinite,
 			started > 0, started <= ProcessInfo.processInfo.systemUptime else { return 74 }
-		let expected = Bundle.main.bundleURL.appendingPathComponent("Contents/Resources/static/ergopti_plus/macos/modules/llm/ensure-mlx-deps.sh").standardizedFileURL.path
+		let scriptDirectory = Bundle.main.bundleURL.appendingPathComponent("Contents/Resources/static/ergopti_plus/macos/modules/llm")
+		let admittedSources = Set(["ensure-mlx-deps.sh", "ensure-ollama-native-deps.sh", "ensure-ollama-deps.sh"].map {
+			scriptDirectory.appendingPathComponent($0).standardizedFileURL.path
+		})
+		let expected = URL(fileURLWithPath: request.sourcePath).standardizedFileURL.path
 		var cancelled = false
 		var deadline = false
 		var decoder = OwnedProgramLineDecoder(maximumBytes: 128)
@@ -334,7 +353,7 @@ enum ManagedPTYWorker {
 			deadline = ProcessInfo.processInfo.systemUptime - started >= Double(milliseconds) / 1000
 			if deadline || getppid() != parent { cancelled = true }
 		}
-		guard URL(fileURLWithPath: request.sourcePath).standardizedFileURL.path == expected,
+		guard admittedSources.contains(expected),
 			let source = ManagedPTYSource.snapshot(request, interrupted: { consumeControl(); return cancelled }) else {
 			return write(Data("RETIRED 64 64 0\n".utf8), to: controlDescriptor) ? 0 : 74
 		}
@@ -356,6 +375,9 @@ enum ManagedPTYWorker {
 		}
 		for (name, value) in request.environment { environment[name] = value }
 		environment["ERGOPTI_BOOTSTRAP_SCRIPT_DIR"] = URL(fileURLWithPath: expected).deletingLastPathComponent().path
+		// Child phases inherit only the remainder of the original owner budget.
+		let remainingMilliseconds = max(1, Int((started + Double(milliseconds) / 1000 - ProcessInfo.processInfo.systemUptime) * 1000))
+		environment["ERGOPTI_BOOTSTRAP_TIMEOUT_MS"] = String(remainingMilliseconds)
 		guard let argv = duplicateCStringVector(["/bin/bash", "/dev/fd/3"]),
 			let envp = duplicateCStringVector(environment.keys.sorted().map { $0 + "=" + environment[$0]! }) else {
 			let closed = [source, master, slave].map { Darwin.close($0) == 0 }.allSatisfy { $0 }
