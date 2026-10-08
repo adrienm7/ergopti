@@ -5632,6 +5632,8 @@ The fixed Specifications and Capabilities frames of the Windows/macOS per-model 
       open. macOS system trust and explicit proxy relays are integrated, while
       opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
 
+Actual Windows run37828508949 passes the native PAC producer but fails eight AHK cases. Its existing quiet-success cleanup regression catches an unconditional Group 6 scalar notice. The observation remains bounded and is retained before private removal; publication now follows the original failed-cleanup condition. Successful graceful cleanup and every original receipt assertion remain unchanged. Native replay and the seven other failures remain pending.
+
 Actual ARM and Intel run37821833578 builds the release launcher successfully but stops before SDK tests at a newline-leading optional-chain expression. The test syntax now keeps that expression together, retaining every non-whitespace token and assertion. Native test compilation and the twenty-three SDK cases remain required.
 
 Standalone HTTP and model receivers now compile against exact copied production CPOSIX public headers and the SystemConfiguration framework, with original source hashes and physical cleanup retained. Nine portable model controls preserve the original seven; both new compiler-boundary refusal cases fail on the preimage. These controls intercept the compiler and do not claim Apple SDK, model transfer or source execution qualification.

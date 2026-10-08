@@ -979,6 +979,7 @@ class _ManagedRemoteFixtureOwner {
 			return false
 		this.Closing := true
 		FinalState := 0
+		FinalObservation := 0
 		ReceiptRead := "not_read"
 		try {
 			if !this.RetireRequests()
@@ -1005,7 +1006,6 @@ class _ManagedRemoteFixtureOwner {
 				if this.Capture is Map && FileGetSize(this.Capture["TmpFile"]) <= 8192 {
 					FinalObservation := JsonParse(FileRead(this.Capture["TmpFile"], "UTF-8"))
 					_ManagedRemoteFixtureEmitDiagnostic(FinalObservation)
-					_ManagedRemoteFixtureGroup6CleanupDiagnostic(FinalObservation, this.Completions)
 				}
 			}
 			if this.Completions.Length == 1 && this.Completions[1]["exit"] == 0
@@ -1079,9 +1079,11 @@ class _ManagedRemoteFixtureOwner {
 			return false
 		} finally {
 			try {
-				if !this.GracefulReceiptVerified
+				if !this.GracefulReceiptVerified {
+					_ManagedRemoteFixtureGroup6CleanupDiagnostic(FinalObservation, this.Completions)
 					this.CleanupDiagnosticStatus := _ManagedRemoteFixtureEmitCleanupDiagnostic(
 						this.Completions, FinalState, ReceiptRead, this.CleanupDiagnosticPrinter, this.RootStoreScope)
+				}
 			} finally this.Closing := false
 		}
 	}
