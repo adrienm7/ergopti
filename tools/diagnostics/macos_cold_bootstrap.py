@@ -362,7 +362,10 @@ def receive_owned(app, output, expected_sha):
         "isolation": {
             "profile_sha256": digest(profile),
             "paths": denied_paths,
-            "observations": isolation,
+            "observations": [
+                dict(item, device=str(item["device"]), inode=str(item["inode"]))
+                for item in isolation
+            ],
             "host_files_preserved": False,
         },
     }

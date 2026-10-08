@@ -1,6 +1,8 @@
 """Independent receiving rejection cases; these do not emulate native macOS."""
 
 import copy
+import ast
+import json
 import tempfile
 from pathlib import Path
 import unittest
@@ -266,10 +268,22 @@ class ColdIsolationLipoGrammarTests(unittest.TestCase):
             self.assertEqual(
                 calls,
                 [
-                    ["/usr/bin/sandbox-exec", "-f", str(profile), "/bin/cat", str(file)],
+                    [
+                        "/usr/bin/sandbox-exec",
+                        "-f",
+                        str(profile),
+                        "/bin/cat",
+                        str(file),
+                    ],
                     ["/usr/bin/lipo", str(file), "-verify_arch", "arm64"],
                     [str(file), "--version"],
-                    ["/usr/bin/sandbox-exec", "-f", str(profile), str(file), "--version"],
+                    [
+                        "/usr/bin/sandbox-exec",
+                        "-f",
+                        str(profile),
+                        str(file),
+                        "--version",
+                    ],
                 ],
             )
 
@@ -297,6 +311,53 @@ class ColdUvVersionTests(unittest.TestCase):
         ):
             with self.subTest(output=output), self.assertRaises(RuntimeError):
                 cold.validate_uv_version(output)
+
+
+class ColdIdentityReceiptTests(unittest.TestCase):
+    """Frozen APFS identities must survive Python JSON and JavaScript transport."""
+
+    def observation_expression(self):
+        tree = ast.parse(Path(cold.__file__).read_text())
+        expressions = [
+            value
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Dict)
+            for key, value in zip(node.keys, node.values)
+            if isinstance(key, ast.Constant) and key.value == "observations"
+        ]
+        self.assertEqual(len(expressions), 1)
+        return compile(ast.Expression(expressions[0]), "receipt-observations", "eval")
+
+    def test_actual_apfs_inode_survives_json_as_exact_decimal_string(self):
+        isolation = [
+            {
+                "device": 16777230,
+                "inode": 1152921500312523020,
+                "bytes": 118864,
+                "native": False,
+                "path": "/usr/bin/python3",
+            }
+        ]
+        receipt = eval(self.observation_expression(), {"isolation": isolation})
+        received = json.loads(json.dumps(receipt))
+        self.assertEqual(received[0]["device"], "16777230")
+        self.assertEqual(received[0]["inode"], "1152921500312523020")
+        self.assertEqual(received[0]["bytes"], 118864)
+        self.assertIs(received[0]["native"], False)
+        self.assertEqual(received[0]["path"], "/usr/bin/python3")
+        # Physical post-install comparisons retain their original Python ints.
+        self.assertEqual(isolation[0]["inode"], 1152921500312523020)
+        self.assertIs(type(isolation[0]["inode"]), int)
+        self.assertEqual(isolation[0]["device"], 16777230)
+        self.assertIs(type(isolation[0]["device"]), int)
+        self.assertIsNot(receipt[0], isolation[0])
+
+    def test_uint64_boundary_stays_exact_without_float_conversion(self):
+        isolation = [{"device": 9007199254740993, "inode": 18446744073709551615}]
+        receipt = json.loads(
+            json.dumps(eval(self.observation_expression(), {"isolation": isolation}))
+        )
+        self.assertEqual(receipt, [{"device": "9007199254740993", "inode": "18446744073709551615"}])
 
 
 if __name__ == "__main__":

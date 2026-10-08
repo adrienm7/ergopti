@@ -36,7 +36,7 @@ const coldReceipt = spawnSync(
 assert.equal(coldReceipt.error, undefined, 'the independent cold receipt receiver must start');
 assert.equal(coldReceipt.signal, null, 'the independent cold receipt receiver must retire');
 assert.equal(coldReceipt.status, 0, coldReceipt.stderr || coldReceipt.stdout);
-assert.match(coldReceipt.stderr, /Ran 10 tests in/);
+assert.match(coldReceipt.stderr, /Ran 12 tests in/);
 assert.match(coldReceipt.stderr, /\bOK\b/);
 assert.doesNotMatch(coldReceipt.stderr, /skipped=/);
 process.stdout.write(coldReceipt.stdout);
@@ -54,7 +54,7 @@ assert.equal(
 	0,
 	officialColdReceipt.stderr || officialColdReceipt.stdout
 );
-assert.match(officialColdReceipt.stderr, /Ran 17 tests in/);
+assert.match(officialColdReceipt.stderr, /Ran 19 tests in/);
 assert.match(officialColdReceipt.stderr, /\bOK\b/);
 assert.doesNotMatch(officialColdReceipt.stderr, /skipped=/);
 process.stdout.write(officialColdReceipt.stdout);
@@ -68,7 +68,7 @@ const archiveModes = spawnSync(
 assert.equal(archiveModes.error, undefined, 'the actual archive mode receiver must start');
 assert.equal(archiveModes.signal, null, 'the actual archive mode receiver must retire');
 assert.equal(archiveModes.status, 0, archiveModes.stderr || archiveModes.stdout);
-assert.match(archiveModes.stderr, /Ran 2 tests in/);
+assert.match(archiveModes.stderr, /Ran 3 tests in/);
 assert.match(archiveModes.stderr, /\bOK\b/);
 assert.doesNotMatch(archiveModes.stderr, /skipped=/);
 process.stdout.write(archiveModes.stdout);

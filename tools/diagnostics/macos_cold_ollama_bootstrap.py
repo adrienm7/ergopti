@@ -423,7 +423,10 @@ def receive(app, archive, output, repository):
             "kind": "native-scoped-sandbox",
             "paths": denied_paths,
             "profile_sha256": digest(profile),
-            "observations": isolation,
+            "observations": [
+                dict(item, device=str(item["device"]), inode=str(item["inode"]))
+                for item in isolation
+            ],
         },
         "daemon_validation": "not-executed",
         "model_validation": "not-executed",

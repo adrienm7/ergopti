@@ -174,8 +174,8 @@ function coldBootstrapRecord() {
 					{
 						path: '/usr/bin/python3',
 						sha256: '3'.repeat(64),
-						device: 27,
-						inode: 123,
+						device: '27',
+						inode: '123',
 						bytes: 1234,
 						read_denied: true,
 						native: true,
@@ -1870,6 +1870,51 @@ rejectCold((records) => {
 rejectCold((records) => {
 	records[0].receipt.caller.denied_runtime_paths = [];
 });
+
+// Exact uint64 transport is independently pinned to actual APFS and boundary literals.
+for (const field of ['device', 'inode']) {
+	for (const value of ['1', '9007199254740993', '1152921500312523020', '18446744073709551615']) {
+		const records = [coldBootstrapRecord()];
+		records[0].receipt.isolation.observations[0][field] = value;
+		verifyColdBootstrapRecords(records, 'a'.repeat(40));
+	}
+	for (const value of [
+		undefined,
+		null,
+		true,
+		false,
+		1,
+		27,
+		123,
+		Number('1152921500312523020'),
+		9007199254740992,
+		1.5,
+		NaN,
+		Infinity,
+		'',
+		'0',
+		'00',
+		'01',
+		'-1',
+		'+1',
+		'1.0',
+		'1e3',
+		' 1',
+		'1 ',
+		'1\n',
+		'1\r',
+		'1\r\n',
+		'1\u2028',
+		'1\u2029',
+		'18446744073709551616',
+		'99999999999999999999',
+		'100000000000000000000'
+	])
+		rejectCold((records) => {
+			records[0].receipt.isolation.observations[0][field] = value;
+		});
+}
+console.log('Cold exact uint64 identity controls: 8 admissions, 60 refusals');
 
 /** Pins a native arm64 full application job without unrelated dependencies or publication. */
 function checkColdJob(body) {
