@@ -5650,6 +5650,13 @@ The second hosted attempt compiled that C source, then exposed a global /TC
 flag treating linked object files as C. The producer now infers language from
 the authored .c files and sends .obj inputs to the linker; strict warning and
 PE mitigation flags remain unchanged. Complete native artifact receiving is pending.
+The third hosted build passes the 17 real VM controls, then refuses localhost
+DNS with actual Winsock 10022. DNS now uses the supported Unicode overlapped
+event API under the same absolute deadline, with cancellation and completion
+acknowledgment before releasing its native references. Ten controlled lifecycle
+cases and all 17 VM cases pass; all six native platform assertions remain intact.
+The corrected Windows API and complete artifact receiving remain unqualified
+until the next hosted run.
 
 Windows release asset staging now joins the same bounded curl attempt
 engine as real requests, using the exact selected asset integer token
