@@ -1669,9 +1669,134 @@ function assertLinuxUnitFailureExcerpt(job) {
 		steps[uploadAt + 1]?.name,
 		'Emit Configuration assertion from failed unit log'
 	);
-	assert.strictEqual(steps[uploadAt + 2]?.name, 'Run manual official runtime and model acceptance');
+	const nativeSteps = steps.slice(uploadAt + 2, uploadAt + 5);
+	assert.deepStrictEqual(
+		nativeSteps.map((step) => step.name),
+		[
+			'Saved ordered-pair Manager — early genuine native source lifetimes',
+			'Saved ordered-pair Manager — independent observation after failed units',
+			'Run manual official runtime and model acceptance'
+		],
+		'only the exact two independent native observations may precede unchanged manual IA'
+	);
+	const managerScript = [
+		'set -euo pipefail',
+		'if ! command -v Xvfb >/dev/null; then',
+		"  echo 'ENVIRONMENT: early saved-pair Manager prerequisite refused: Xvfb is absent' >&2",
+		'  exit 2',
+		'fi',
+		'sudo modprobe uinput',
+		'if sudo python3 tests/hardware/run_manager_input_owner_real.py > "$RUNNER_TEMP/linux-manager-input-owner-early.log" 2>&1; then',
+		'  manager_status=0',
+		'else',
+		'  manager_status=$?',
+		'fi',
+		'cat "$RUNNER_TEMP/linux-manager-input-owner-early.log"',
+		'exit "$manager_status"'
+	];
+	for (const [index, outcome] of ['success', 'failure'].entries()) {
+		const body = nativeSteps[index].body;
+		assert.strictEqual(
+			pipeline.stepField(body, 'if'),
+			"${{ !cancelled() && steps.linux_unit.outcome == '" + outcome + "' }}"
+		);
+		assert.strictEqual(pipeline.stepField(body, 'continue-on-error'), null);
+		assert.strictEqual(pipeline.stepField(body, 'timeout-minutes'), '3');
+		assert.strictEqual(pipeline.stepField(body, 'working-directory'), 'static/ergopti_plus/linux');
+		assert.strictEqual(pipeline.stepField(body, 'shell'), null);
+		assert.strictEqual(pipeline.stepField(body, 'env'), null);
+		const expected =
+			index === 0
+				? managerScript
+				: managerScript.map((line) =>
+						line.replaceAll(
+							'linux-manager-input-owner-early.log',
+							'linux-manager-input-owner-unit-failure.log'
+						)
+					);
+		assert.deepStrictEqual(
+			pipeline.runOf(body),
+			expected,
+			'the independent native observations retain genuine prerequisites and original native exit'
+		);
+	}
+	const manual = nativeSteps[2].body;
+	assert.strictEqual(
+		pipeline.stepField(manual, 'if'),
+		"${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() }}"
+	);
+	assert.strictEqual(pipeline.stepField(manual, 'continue-on-error'), null);
+	assert.strictEqual(pipeline.stepField(manual, 'timeout-minutes'), '18');
+	assert.deepStrictEqual(pipeline.runOf(manual), [
+		'set -euo pipefail',
+		'sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends curl zstd',
+		'python3 static/ergopti_plus/linux/tests/hardware/run_ollama_runtime_acceptance.py \\',
+		'  --repository "$GITHUB_WORKSPACE" \\',
+		'  --evidence "$RUNNER_TEMP/ollama-runtime-acceptance" \\',
+		'  --lua luajit'
+	]);
 }
 assertLinuxUnitFailureExcerpt(testLinux);
+for (const name of [
+	'Saved ordered-pair Manager — early genuine native source lifetimes',
+	'Saved ordered-pair Manager — independent observation after failed units'
+]) {
+	const step = pipeline.step(testLinux, name);
+	for (const [label, altered] of [
+		['omitted native observation', ''],
+		['duplicated native observation', step + '\n\n' + step],
+		['disabled native observation', step.replace(pipeline.stepField(step, 'if'), 'false')],
+		[
+			'wrong native observation outcome',
+			step
+				.replace("outcome == 'success'", "outcome == 'skipped'")
+				.replace("outcome == 'failure'", "outcome == 'skipped'")
+		],
+		['forgiven native observation', step + '\n        continue-on-error: true'],
+		[
+			'native fixture replaced',
+			step.replace('sudo python3 tests/hardware/run_manager_input_owner_real.py', 'true')
+		],
+		['kernel module load omitted', step.replace('sudo modprobe uinput', 'true')],
+		[
+			'kernel module load forgiven',
+			step.replace('sudo modprobe uinput', 'sudo modprobe uinput || true')
+		],
+		['native status replaced', step.replace('manager_status=$?', 'manager_status=0')],
+		['native exit forged', step.replace('exit "$manager_status"', 'exit 0')],
+		['missing Xvfb passed', step.replace('exit 2', 'exit 0')],
+		['native clock increased', step.replace('timeout-minutes: 3', 'timeout-minutes: 4')],
+		['native shell replaced', step + '\n        shell: bash -c true']
+	]) {
+		assert.strictEqual(
+			testLinux.split(step).length - 1,
+			1,
+			'the actual native observation must occur once'
+		);
+		const changed = testLinux.replace(step, () => altered);
+		assert.notStrictEqual(changed, testLinux, label);
+		assert.throws(() => assertLinuxUnitFailureExcerpt(changed), label);
+	}
+}
+const successNativeStep = pipeline.step(
+	testLinux,
+	'Saved ordered-pair Manager — early genuine native source lifetimes'
+);
+const failureNativeStep = pipeline.step(
+	testLinux,
+	'Saved ordered-pair Manager — independent observation after failed units'
+);
+const nativeOrderMarker = '__ERGOPTI_NATIVE_OBSERVATION_ORDER__';
+assert.ok(!testLinux.includes(nativeOrderMarker));
+const swappedNativeObservations = testLinux
+	.replace(successNativeStep, () => nativeOrderMarker)
+	.replace(failureNativeStep, () => successNativeStep)
+	.replace(nativeOrderMarker, () => failureNativeStep);
+assert.throws(
+	() => assertLinuxUnitFailureExcerpt(swappedNativeObservations),
+	'success and failure-only native observations must keep their exact order'
+);
+
 const unitExcerptMutations = [
 	[
 		'name: Emit Configuration assertion from failed unit log',
