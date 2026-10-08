@@ -2139,36 +2139,41 @@ jobs:
             label: 'Install · debian'
             distro: debian
             container: debian:stable-slim
+            native_manager: apt
             image: debian:stable-slim
-            prep: apt-get update && apt-get install -y --no-install-recommends bash coreutils findutils grep sed sudo passwd
+            prep: apt-get update && apt-get install -y --no-install-recommends bash coreutils findutils grep sed sudo passwd git
           - id: distro-fedora
             kind: install
             label: 'Install · fedora'
             distro: fedora
             container: fedora:latest
+            native_manager: dnf
             image: fedora:latest
-            prep: dnf install -y bash coreutils findutils grep sed sudo shadow-utils
+            prep: dnf install -y bash coreutils findutils grep sed sudo shadow-utils git
           - id: distro-arch
             kind: install
             label: 'Install · arch'
             distro: arch
             container: archlinux:latest
+            native_manager: pacman
             image: archlinux:latest
-            prep: pacman -Sy --noconfirm bash coreutils findutils grep sed sudo shadow
+            prep: pacman -Sy --noconfirm bash coreutils findutils grep sed sudo shadow git
           - id: distro-alpine
             kind: install
             label: 'Install · alpine'
             distro: alpine
             container: alpine:latest
+            native_manager: apk
             image: alpine:latest
-            prep: apk add --no-cache bash coreutils findutils grep sed sudo
+            prep: apk add --no-cache bash coreutils findutils grep sed sudo git
           - id: distro-opensuse
             kind: install
             label: 'Install · opensuse'
             distro: opensuse
             container: opensuse/tumbleweed:latest
+            native_manager: zypper
             image: opensuse/tumbleweed:latest
-            prep: sed -i 's|http://download.opensuse.org|https://downloadcontent.opensuse.org|g' /etc/zypp/repos.d/*.repo && zypper --non-interactive install bash coreutils findutils grep sed sudo shadow
+            prep: sed -i 's|http://download.opensuse.org|https://downloadcontent.opensuse.org|g' /etc/zypp/repos.d/*.repo && zypper --non-interactive install bash coreutils findutils grep sed sudo shadow git
           - id: first-install-ubuntu-22.04
             kind: first
             label: 'First install · ubuntu-22.04'
@@ -2254,6 +2259,29 @@ jobs:
         run: dnf install -y git findutils
 
       - uses: actions/checkout@v4
+
+      - name: Prepare source compiler and headers
+        if: matrix.kind == 'install'
+        shell: bash
+        env:
+          NATIVE_PACKAGE_MANAGER: ${{ matrix.native_manager }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          source static/ergopti_plus/linux/install/native_source_build.sh
+          install_native_package() {
+            case "$1" in
+              apt) apt-get install -y --no-install-recommends "$2" ;;
+              dnf) dnf install -y "$2" ;;
+              zypper) zypper --non-interactive install "$2" ;;
+              pacman) pacman -S --noconfirm "$2" ;;
+              apk) apk add --no-cache "$2" ;;
+              *) return 1 ;;
+            esac
+          }
+          native_source_ensure_prerequisites \
+            "$GITHUB_WORKSPACE/static/ergopti_plus/linux/native/archive_output" \
+            "$NATIVE_PACKAGE_MANAGER" install_native_package
 
       - name: Create the installation user
         if: matrix.kind == 'install'

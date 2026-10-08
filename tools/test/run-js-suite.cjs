@@ -1063,6 +1063,12 @@ const CHECKS = [
 		repro: 'npm run test:linux-ci-evidence'
 	},
 	{
+		name: 'Linux checkout source compiler and header prerequisites',
+		cmd: 'node',
+		args: ['tools/test/test-linux-source-toolchain.cjs'],
+		repro: 'npm run test:linux-source-toolchain'
+	},
+	{
 		name: 'Linux native window receipts retain mandatory npm, planner and CI owners',
 		cmd: 'node',
 		args: ['tools/test/test-linux-window-switch-registration.cjs'],

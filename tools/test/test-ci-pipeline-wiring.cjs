@@ -298,6 +298,8 @@ const STEP_CONDITIONS = [
 	],
 	[WINDOWS_BOX, 'launch-windows', 'Upload mandatory launch evidence', 'always()'],
 	[LINUX_BOX, 'install-linux', 'Prepare the container', "matrix.kind == 'install'"],
+	// Only genuine checkout-install rows acquire their build prerequisites.
+	[LINUX_BOX, 'install-linux', 'Prepare source compiler and headers', "matrix.kind == 'install'"],
 	[LINUX_BOX, 'install-linux', 'Create the installation user', "matrix.kind == 'install'"],
 	[
 		LINUX_BOX,
@@ -1348,6 +1350,32 @@ function stepProblems(files) {
 		problems.push(`STEP_CONDITIONS lists ${key}, which the pipeline no longer has`);
 	return problems;
 }
+
+// Source compilation belongs only to the checkout-install rows. A broader or
+// omitted condition could run package acquisition for an archive-only subject.
+for (const condition of [
+	'',
+	'false',
+	'always()',
+	"matrix.kind == 'first'",
+	"matrix.kind == 'deb'"
+]) {
+	const head = '      - name: Prepare source compiler and headers\n';
+	mustCatch(
+		'source compiler condition ' + condition,
+		LINUX_BOX,
+		head + "        if: matrix.kind == 'install'\n",
+		head + (condition ? '        if: ' + condition + '\n' : ''),
+		stepProblems
+	);
+}
+mustCatch(
+	'missing source compiler preparation',
+	LINUX_BOX,
+	'      - name: Prepare source compiler and headers\n',
+	'      - name: Omitted source compiler preparation\n',
+	stepProblems
+);
 
 // Raw failure logs are diagnostics, separate from success-only distro evidence.
 for (const condition of [

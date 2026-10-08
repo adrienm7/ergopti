@@ -204,6 +204,9 @@ if $SETUP_PERMS_ONLY; then
 	exit 0
 fi
 
+# shellcheck source=install/native_source_build.sh
+source "${SRC_DRIVER}/install/native_source_build.sh"
+
 # ===========================================
 # ===========================================
 # ======= 4/ Dependency Verification =======
@@ -474,6 +477,10 @@ if $SKIP_DEPS; then
 	echo ""
 	echo "=== Dépendances ignorées (--no-deps) ==="
 else
+if native_source_build_required "$SRC_DRIVER"; then
+	native_source_ensure_prerequisites "${SRC_DRIVER}/native/archive_output" \
+		"$(_detect_pkg_manager)" _install_required_package
+fi
 echo ""
 echo "=== Ergopti ${ERGOPTI_VERSION} — vérification des dépendances ==="
 # ydotool is deliberately absent from this list. The daemon writes to
@@ -722,7 +729,7 @@ command -v tar >/dev/null || { echo "Native payload copy requires tar" >&2; exit
 NATIVE_OUTPUT_STAGE=""
 NATIVE_OUTPUT_SOURCE="${SRC_DRIVER}/bin/libergopti_archive_publication.so"
 NATIVE_OUTPUT_REPO="$(cd "${SRC_DRIVER}/../../.." && pwd -P)"
-if [ "$SRC_DRIVER" = "${NATIVE_OUTPUT_REPO}/static/ergopti_plus/linux" ]; then
+if native_source_build_required "$SRC_DRIVER"; then
 	NATIVE_OUTPUT_BUILD="${NATIVE_OUTPUT_REPO}/tools/build/build-linux-native-output.sh"
 	[ -f "$NATIVE_OUTPUT_BUILD" ] && [ ! -L "$NATIVE_OUTPUT_BUILD" ] || {
 		echo "Canonical native archive build helper unavailable" >&2
