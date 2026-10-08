@@ -133,6 +133,14 @@ int main(void)
 		fprintf(stdout, "::notice::NATIVE_PAC_SORT_RECEIVING status=%d error=%ld domain=%d output_bytes=%llu forward_literal=%d reverse_literal=%d\n",
 			status, (long)error.code, (int)error.domain, (unsigned long long)strlen(output),
 			strcmp(output, "127.0.0.1;::1") == 0, strcmp(output, "::1;127.0.0.1") == 0);
+		/* This output derives exclusively from the frozen two-loopback vector,
+		 * never DNS, user configuration, PAC scripts or private request URLs. */
+		if (strlen(output) <= 64) {
+			size_t index;
+			fputs("::notice::NATIVE_PAC_SORT_FIXED_LITERAL output_hex=", stdout);
+			for (index = 0; output[index] != 0; index++) printf("%02x", (unsigned int)(unsigned char)output[index]);
+			putchar('\n');
+		} else fputs("::notice::NATIVE_PAC_SORT_FIXED_LITERAL bounded_output=refused\n", stdout);
 		diagnose_sort_shape();
 	}
 #endif

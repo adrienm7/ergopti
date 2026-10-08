@@ -19,20 +19,25 @@ static uint64_t native_tick(void *owner)
 	return (uint64_t)GetTickCount64();
 }
 
-static int append_address(const SOCKADDR *address, char *output, size_t capacity, int extended)
+static int append_ip_address(int family, const void *source, char *output, size_t capacity)
 {
 	char text[INET6_ADDRSTRLEN];
-	const void *source;
 	size_t used = strlen(output), bytes;
-	if (address->sa_family == AF_INET) source = &((const SOCKADDR_IN *)address)->sin_addr;
-	else if (address->sa_family == AF_INET6 && extended) source = &((const SOCKADDR_IN6 *)address)->sin6_addr;
-	else return 0;
-	if (InetNtopA(address->sa_family, (void *)source, text, sizeof(text)) == NULL) return -1;
+	if (InetNtopA(family, (void *)source, text, sizeof(text)) == NULL) return -1;
 	bytes = strlen(text);
 	if (used >= capacity || bytes >= capacity - used || (used > 0 && bytes >= capacity - used - 1)) return -1;
 	if (used > 0) output[used++] = ';';
 	memcpy(output + used, text, bytes + 1);
 	return 1;
+}
+
+static int append_address(const SOCKADDR *address, char *output, size_t capacity, int extended)
+{
+	if (address->sa_family == AF_INET)
+		return append_ip_address(AF_INET, &((const SOCKADDR_IN *)address)->sin_addr, output, capacity);
+	if (address->sa_family == AF_INET6 && extended)
+		return append_ip_address(AF_INET6, &((const SOCKADDR_IN6 *)address)->sin6_addr, output, capacity);
+	return 0;
 }
 
 static WCHAR *wide_argument(const char *argument)
@@ -233,16 +238,17 @@ static int native_sort_addresses(void *owner, const char *addresses, char *outpu
 	for (index = 0; index < count; index++) {
 		SOCKADDR_IN6 *address = (SOCKADDR_IN6 *)ordered->Address[index].lpSockaddr;
 		uintptr_t pointer = (uintptr_t)address, first = (uintptr_t)items;
-		SOCKADDR_IN ipv4;
+		IN_ADDR ipv4;
 		int added;
 		if (ordered->Address[index].iSockaddrLength != (int)sizeof(SOCKADDR_IN6) || pointer < first ||
 			pointer - first >= count * sizeof(SOCKADDR_IN6) || (pointer - first) % sizeof(SOCKADDR_IN6) != 0) {
 			error->code = 0; error->domain = ERGOPTI_PAC_ERROR_NONE; goto closed;
 		}
 		if (IN6_IS_ADDR_V4MAPPED(&address->sin6_addr)) {
-			memset(&ipv4, 0, sizeof(ipv4)); ipv4.sin_family = AF_INET;
-			memcpy(&ipv4.sin_addr, &address->sin6_addr.u.Byte[12], sizeof(ipv4.sin_addr));
-			added = append_address((SOCKADDR *)&ipv4, output, capacity, 1);
+			/* Keep the mapped address typed: do not re-read a different
+			 * structure's family through an incompatible SOCKADDR alias. */
+			memcpy(&ipv4, &address->sin6_addr.u.Byte[12], sizeof(ipv4));
+			added = append_ip_address(AF_INET, &ipv4, output, capacity);
 		} else added = append_address((SOCKADDR *)address, output, capacity, 1);
 		if (added != 1) { error->code = 0; error->domain = ERGOPTI_PAC_ERROR_NONE; goto closed; }
 	}

@@ -5630,6 +5630,8 @@ The fixed Specifications and Capabilities frames of the Windows/macOS per-model 
       open. macOS system trust and explicit proxy relays are integrated, while
       opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
 
+Windows PAC sorting now formats mapped IPv4 through an explicit family and typed address pointer. The optimized C preimage is red and ten guarded postimage cases pass; seventeen Duktape controls also pass. Native sorter bounds and all six original receiving assertions remain. Actual MSVC and native Windows receiving remain required.
+
 Linux CONNECT receiving now distinguishes the admitted certificate-refusal
 client reset from unknown client or backend failures. All five original model
 assertion bodies remain intact; nine causal controls and the actual 30 public
