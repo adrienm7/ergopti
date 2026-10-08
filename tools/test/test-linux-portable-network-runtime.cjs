@@ -113,6 +113,26 @@ const allModules = generator
 		assert.ok(line.startsWith('  - {'));
 		return JSON.parse(line.slice(4));
 	});
+// HTTP content encoding must preserve every declared archive digest.
+const archiveSources = allModules
+	.flatMap((module) => module.sources)
+	.filter((source) => source.type === 'archive');
+assert.ok(archiveSources.length > 0, 'archive preservation needs a genuine declared archive');
+for (const source of archiveSources)
+	assert.equal(
+		source['disable-http-decompression'],
+		true,
+		'HTTP archive must preserve original declared bytes'
+	);
+for (const source of allModules
+	.flatMap((module) => module.sources)
+	.filter((source) => source.type === 'git'))
+	assert.equal(
+		source['disable-http-decompression'],
+		undefined,
+		'Git sources must not borrow archive options'
+	);
+passed++;
 // A required GSS build must carry its own SDK dependency before curl.
 const kerberos = allModules.find((module) => module.name === 'network-krb5');
 assert.ok(kerberos, 'Flatpak GSS requires a pinned Kerberos build before curl');
