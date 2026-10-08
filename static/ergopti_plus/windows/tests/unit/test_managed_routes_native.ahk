@@ -22,6 +22,7 @@ _ManagedRoutes_NativeAcceptance() {
 		; Optional sink failure cannot replace any original assertion.
 		if Observed[1]["exit"] != 0 {
 			try _ManagedRoutes_NativeDiagnostic(Observed[1])
+			try _ManagedRoutes_NativeUrlDiagnostic(Observed[1])
 		}
 		AssertEqual(0, Observed[1]["exit"], "the canonical native routing entrypoint must qualify")
 		AssertEqual("", Observed[1]["stderr"], "native errors and cleanup refusals must remain red")
@@ -65,4 +66,17 @@ _ManagedRoutes_NativeDiagnostic(Observation) {
 		. " status=" . Fact[5] . " result_shape=" . Fact[6] . " ok=" . Fact[7]
 		. " route_count=" . Fact[8] . " limits=" . Fact[9]
 		. " single_source=" . Fact[10] . " single_kind=" . Fact[11] . "`n", "*")
+}
+
+; Native PAC branches return only fixed fixture identities, never captured URLs.
+_ManagedRoutes_NativeUrlDiagnostic(Observation) {
+	Out := Observation.Get("stdout", "")
+	if !(Out is String) || StrLen(Out) > 8192
+		return
+	Pattern := "m)^ROUTE_URL_DIAG shape=(unavailable|full|path|origin|scheme|other)`r?$"
+	if !RegExMatch(Out, Pattern, &Fact)
+		return
+	if RegExMatch(Out, Pattern, , Fact.Pos + Fact.Len)
+		return
+	_TestPrint("::notice title=Windows native PAC URL shape::shape=" . Fact[1])
 }
