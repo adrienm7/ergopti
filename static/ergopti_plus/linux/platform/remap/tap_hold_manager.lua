@@ -78,7 +78,7 @@ local _generation = 0       -- Revokes queued actions across every runtime insta
 local function _run_tap(action, binding)
 	-- This is intent, not an ACK: only Hook's original live-frame controller
 	-- can mint and publish the input arm. Late public exports grant no authority.
-	if action == "one_shot_shift" then return "one_shot_shift" end
+	if action == "one_shot_shift" or action == "caps_word" then return action end
 	if type(action) == "table" then
 		local ok, result = pcall(function()
 			return require("modules.hotstrings.injector").inject(0, action.type_text)
@@ -242,6 +242,7 @@ local function _build(loaded, boot)
 		one_shot_timeout_ms = Timings.ms("tap_hold", "one_shot_shift_timeout_ms"),
 		key_text = function(code) return _hook.key_text(code) end,
 		plan_text = function(text) return (require("adapters.keyboard_layout").plan(text)) end,
+		caps_word_plan = function(text) return _hook.plan_caps_word(text) end,
 		one_shot_result = _one_shot_result,
 		held_modifiers = function() return _hook.held_modifiers() end,
 		held_text_modifier_codes = function() return _hook.held_text_modifier_codes() end,

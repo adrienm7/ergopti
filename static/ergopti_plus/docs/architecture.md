@@ -39,6 +39,7 @@ graph TD
         LINUX_application_notifier["ApplicationNotifier.lua"]
         LINUX_atspi_focus["AtspiFocus.lua"]
         LINUX_atspi_native_identity["AtspiNativeIdentity.lua"]
+        LINUX_caps_word["CapsWord.lua"]
         LINUX_clipboard["Clipboard.lua"]
         LINUX_crypto["Crypto.lua"]
         LINUX_curl_http_client["CurlHttpClient.lua"]
