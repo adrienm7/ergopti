@@ -271,6 +271,20 @@ enum ManagedOllamaAPIWorker {
 				guard getsockopt(socket, SOL_SOCKET, SO_ERROR, &socketError, &size) == 0,
 					socketError == 0 else { throw ManagedOllamaFailure.io }
 			}
+			#if ERGOPTI_GUARDIAN_TEST_SUPPORT
+			if diagnosticsEnabled, let text = ProcessInfo.processInfo.environment["ERGOPTI_MANAGED_LISTENER_DIAGNOSTIC_PID"],
+				!text.isEmpty, text.utf8.count <= 10, text.first != "0", text.utf8.allSatisfy({ (48...57).contains($0) }),
+				let knownPeer = Int32(text), knownPeer > 0 {
+				var lexical = ergopti_listener_peer_diagnostic(), physical = ergopti_listener_peer_diagnostic()
+				request.executable.withCString { path in
+					ergopti_listener_known_peer_diagnostic(knownPeer, path, request.device, request.inode, &lexical, &physical)
+				}
+				for (kind, facts) in [("LEXICAL", lexical), ("PHYSICAL", physical)] {
+					let line = "ERGOPTI_KNOWN_PEER_\(kind)_DIAGNOSTIC listed=\(facts.listed) pathreceived=\(facts.pathreceived) pathmatches=\(facts.pathmatches) uidmatches=\(facts.uidmatches) devicematches=\(facts.devicematches) inodematches=\(facts.inodematches) list_errno=\(facts.list_errno) path_errno=\(facts.path_errno) stat_errno=\(facts.stat_errno) canonical_errno=\(facts.canonical_errno)"
+					_ = fputs(line + "\n", stderr)
+				}
+			}
+			#endif
 			while listener == nil {
 				var observed = ergopti_listener_identity()
 				let remaining = try connection.remaining()

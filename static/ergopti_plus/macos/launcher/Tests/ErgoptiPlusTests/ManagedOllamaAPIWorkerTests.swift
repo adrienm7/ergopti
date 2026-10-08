@@ -92,7 +92,11 @@ private final class ManagedOllamaTestSession {
 			process.arguments = [ManagedOllamaAPIWorker.requestFlag, String((fields["idle_ms"] as! NSNumber).intValue), absolute]
 		}
 		var environment = ProcessInfo.processInfo.environment; environment["HOME"] = root.path
-		environment["ERGOPTI_MANAGED_LISTENER_DIAGNOSTICS"] = "1"; process.environment = environment
+		environment["ERGOPTI_MANAGED_LISTENER_DIAGNOSTICS"] = "1"
+		if let knownPeer = profile["pid"] as? NSNumber, knownPeer.int64Value > 0, knownPeer.int64Value <= Int64(Int32.max) {
+			environment["ERGOPTI_MANAGED_LISTENER_DIAGNOSTIC_PID"] = String(knownPeer.int64Value)
+		}
+		process.environment = environment
 		process.standardInput = input; process.standardOutput = output; process.standardError = diagnostics
 		try process.run(); try input.fileHandleForReading.close(); try output.fileHandleForWriting.close()
 		try diagnostics.fileHandleForWriting.close()
@@ -115,6 +119,8 @@ private final class ManagedOllamaTestSession {
 		try diagnostics.fileHandleForReading.close()
 		for line in String(decoding: diagnosticBytes.prefix(4096), as: UTF8.self).split(separator: "\n").prefix(16) {
 			if line.hasPrefix("ERGOPTI_LISTENER_DIAGNOSTIC "), line.utf8.allSatisfy({ $0 >= 32 && $0 <= 126 }) {
+				print(line)
+			} else if line.range(of: #"^ERGOPTI_KNOWN_PEER_(LEXICAL|PHYSICAL)_DIAGNOSTIC listed=[01] pathreceived=[01] pathmatches=[01] uidmatches=[01] devicematches=[01] inodematches=[01] list_errno=[0-9]{1,5} path_errno=[0-9]{1,5} stat_errno=[0-9]{1,5} canonical_errno=[0-9]{1,5}$"#, options: .regularExpression) != nil {
 				print(line)
 			}
 		}
