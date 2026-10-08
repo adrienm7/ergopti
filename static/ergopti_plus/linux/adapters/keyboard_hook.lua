@@ -1285,7 +1285,184 @@ local function _run_owned_tap_frame(frame, tap, binding, exact, original_generat
 	end
 end
 
+-- Position capture observes the original stream. It never suppresses a key,
+-- lends a logical-action lease, reserves output or changes the existing mapper.
+local position_capture = { busy = false, tokens = setmetatable({}, { __mode = "k" }) }
+position_capture.reader = {}
+for _, name in ipairs({ "capture_pressed_keys", "pressed_keys_view", "pressed_keys_current" }) do
+	position_capture.reader[name] = rawget(EvdevReader, name)
+end
+position_capture.source = rawget(XkbCapture, "source_generation")
+position_capture.source_file = CapsModuleSource.sibling(caps_hook_source,
+	"adapters/keyboard_hook.lua", "adapters/xkb_capture.lua", caps_directory)
+
+local function position_runtime(record)
+	if not original_reader_load or not _running or not _intercept or _source_reconciliation
+		or not rawequal(_capture_session, record.session) or not rawequal(_capture_options, record.options)
+		or not rawequal(_input_source_owners, record.sources) or not rawequal(_input_source_observers, record.observers)
+		or type(record.sources) ~= "table" or type(record.observers) ~= "table"
+		or _origin_generation ~= record.origin or _origin_ready ~= true
+		or not rawequal(package.loaded["adapters.keyboard_hook"], M)
+		or not rawequal(package.loaded["adapters.evdev_reader"], EvdevReader)
+		or not rawequal(package.loaded["platform.remap.key_combination_engine"], InputIssuer)
+		or not _input_exports_current()
+		or not rawequal(package.loaded["adapters.xkb_capture"], XkbCapture)
+		or rawget(XkbCapture, "source_generation") ~= position_capture.source
+		or not rawequal(package.loaded["modules.hotstrings.device_finder"], record.finder)
+		or type(record.finder) ~= "table" or type(record.classify) ~= "function"
+		or rawget(record.finder, "physical_sources") ~= record.classify then return false end
+	for name, port in pairs(position_capture.exports) do
+		if rawget(M, name) ~= port then return false end
+	end
+	for _, name in ipairs({ "capture_pressed_keys", "pressed_keys_view", "pressed_keys_current" }) do
+		local port = position_capture.reader[name]
+		if type(port) ~= "function" or rawget(EvdevReader, name) ~= port then return false end
+	end
+	for _, path in ipairs(_devices) do
+		local slot = keyboard_slot(path)
+		if _physical_sources[path] ~= true or _sync_dropped[path]
+			or _input_reader_ports.source_owner_current(record.sources[slot], record.observers[slot],
+				_input_reader_ports.capture_source_owner, _input_reader_ports.source_owner_current,
+				_input_reader_ports.retire_source) ~= true then return false end
+	end
+	return #_devices > 0
+end
+
+local function position_page(record)
+	if not rawequal(position_capture.pending, record) or not position_runtime(record) then return false end
+	local called, accepted = pcall(record.current)
+	return called and accepted == true and rawequal(position_capture.pending, record) and position_runtime(record)
+end
+
+--- Reports existing native observation prerequisites without opening a resource.
+--- @return boolean available Source/session readiness, never physical delivery.
+function M.position_capture_available()
+	if position_capture.busy or position_capture.pending or type(position_capture.source) ~= "function" then return false end
+	local info = debug.getinfo(position_capture.source, "S")
+	if not info or not CapsModuleSource.same(info.source, position_capture.source_file, caps_directory) then return false end
+	local finder = package.loaded["modules.hotstrings.device_finder"]
+	if type(finder) ~= "table" then return false end
+	return position_runtime({ session = _capture_session, options = _capture_options,
+		sources = _input_source_owners, observers = _input_source_observers, origin = _origin_generation,
+		finder = finder, classify = rawget(finder, "physical_sources") })
+end
+
+--- Enrolls one exact page's observation-only physical position request.
+--- @param current function Captured page epoch and canonical inventory guard.
+--- @param receive function Receives detached original evdev code/modifiers.
+--- @return table|nil token Exact cancellation identity; never input or output rights.
+function M.capture_position(current, receive)
+	if position_capture.busy or position_capture.pending or type(current) ~= "function"
+		or type(receive) ~= "function" or position_capture.exports.position_capture_available() ~= true then return nil end
+	local info = debug.getinfo(position_capture.source, "S")
+	if not info or not CapsModuleSource.same(info.source, position_capture.source_file, caps_directory) then return nil end
+	local finder = package.loaded["modules.hotstrings.device_finder"]
+	if type(finder) ~= "table" or type(rawget(finder, "physical_sources")) ~= "function" then return nil end
+	local token = {}
+	local record = { current = current, receive = receive, token = token, session = _capture_session,
+		options = _capture_options, sources = _input_source_owners, observers = _input_source_observers,
+		origin = _origin_generation, finder = finder, classify = rawget(finder, "physical_sources") }
+	position_capture.tokens[token] = record
+	position_capture.busy, position_capture.pending = true, record
+	local accepted = position_page(record)
+	position_capture.busy = false
+	if not accepted then
+		if rawequal(position_capture.pending, record) then position_capture.pending = nil end
+		position_capture.tokens[token] = nil
+		return nil
+	end
+	return token
+end
+
+local function finish_position(record)
+	local token = record.token
+	if token == nil then return end
+	position_capture.tokens[token] = true
+	-- LuaJIT may retain a traced record after the call. Completed records carry
+	-- no page closure, token cycle or source owner even in that case.
+	record.token, record.current, record.receive = nil, nil, nil
+	record.session, record.options, record.sources, record.observers, record.finder, record.classify = nil, nil, nil, nil, nil, nil
+end
+
+--- Cancels only the original observation; forwarding and key ownership continue.
+--- @param token table Exact enrollment token, never a browser field.
+--- @return boolean retired
+function M.cancel_position(token)
+	local record = position_capture.tokens[token]
+	if not record or getmetatable(token) ~= nil or next(token) ~= nil then return false end
+	if rawequal(position_capture.pending, record) then position_capture.pending = nil end
+	if record ~= true then finish_position(record) end
+	return true
+end
+
+position_capture.exports = { capture_position = M.capture_position, cancel_position = M.cancel_position,
+	position_capture_available = M.position_capture_available }
+
+local function _observe_position_capture(ev, source)
+	local record = position_capture.pending
+	if not record or position_capture.busy or ev.remapped or ev.type ~= EVDEV_TYPE_KEY
+		or ev.value ~= InputEvent.VALUE_DOWN or EvdevCodes.MODIFIER_OF[ev.code] then return end
+	position_capture.busy = true
+	local function observe()
+		if not position_page(record) then return false end
+		local origin = _event_receipts[ev]
+		local view = origin and _input_reader_ports.event_view(origin)
+		local slot = keyboard_slot(source)
+		if not view or view.origin ~= "native-evdev" or view.source ~= source or view.slot ~= slot
+			or view.code ~= ev.code or view.value ~= ev.value or _physical_sources[source] ~= true then return false end
+		local held, modifiers, found = {}, {}, false
+		local roles = { [EvdevCodes.KEY_LEFTCTRL] = "ctrl", [EvdevCodes.KEY_RIGHTCTRL] = "ctrl",
+			[EvdevCodes.KEY_LEFTALT] = "alt", [EvdevCodes.KEY_LEFTSHIFT] = "shift",
+			[EvdevCodes.KEY_RIGHTSHIFT] = "shift", [EvdevCodes.KEY_LEFTMETA] = "super",
+			[EvdevCodes.KEY_RIGHTMETA] = "super" }
+		local function exact()
+			if not position_runtime(record) or not rawequal(position_capture.pending, record)
+				or _input_reader_ports.event_current(origin) ~= true
+				or _input_reader_ports.source_current(origin, record.sources[slot], record.observers[slot],
+					_input_reader_ports.capture_source_owner, _input_reader_ports.source_owner_current,
+					_input_reader_ports.retire_source) ~= true then return false end
+			for _, receipt in ipairs(held) do
+				if position_capture.reader.pressed_keys_current(receipt) ~= true then return false end
+			end
+			return true
+		end
+		for _, path in ipairs(_devices) do
+			local receipt = position_capture.reader.capture_pressed_keys(keyboard_slot(path))
+			local bits = receipt and position_capture.reader.pressed_keys_view(receipt)
+			if not bits or bits.source ~= path or bits.origin ~= "native-evdev" then return false end
+			held[#held + 1] = receipt
+			if not exact() then return false end
+			for _, code in ipairs(bits.down) do
+				-- Physical RightAlt is not silently reinterpreted as plain Alt;
+				-- AltGr's fake Ctrl and effective layout role require another owner.
+				if code == EvdevCodes.KEY_RIGHTALT then return false end
+				if roles[code] then modifiers[roles[code]] = true end
+				if path == source and code == ev.code then found = true end
+			end
+		end
+		if not found or not exact() then return false end
+		local called, generation, _, source_current = pcall(position_capture.source)
+		if not called or type(generation) ~= "number" or generation < 0 or generation % 1 ~= 0
+			or type(source_current) ~= "function" or not exact() then return false end
+		local function sealed()
+			if not exact() then return false end
+			local seen, current = pcall(source_current)
+			return seen and current == true and exact()
+		end
+		if not sealed() or not position_page(record) or not sealed() then return false end
+		local delivered, accepted = pcall(record.receive, { native_code = ev.code, mods = modifiers })
+		return delivered and accepted == true and sealed() and position_page(record) and sealed()
+	end
+	local called, accepted = pcall(observe)
+	position_capture.busy = false
+	-- A refused attempted primary press never remains armed for a different key.
+	if rawequal(position_capture.pending, record) then position_capture.pending = nil end
+	finish_position(record)
+	return called and accepted == true
+end
+
 local function _dispatch_event(ev, source)
+	_observe_position_capture(ev, source)
 	if _caps_output_occurrence and (ev ~= _caps_output_occurrence.event
 		or source ~= _caps_output_occurrence.source) then _caps_output_occurrence.foreign = true end
 	-- Intercept mode grabbed the device, so nothing reaches the application
