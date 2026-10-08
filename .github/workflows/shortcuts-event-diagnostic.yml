@@ -1,0 +1,37 @@
+# .github/workflows/shortcuts-event-diagnostic.yml
+
+name: Structured Shortcuts event diagnostic
+
+on:
+  push:
+    branches:
+      - codex/apple-shortcuts-event-native
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  observe:
+    name: Observe bounded structured getters on a fresh macOS runner
+    runs-on: macos-15
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      # No CLI query, import or invocation warms the structured service first.
+      - name: Observe structured discovery and closed native error fields
+        run: |
+          python -B tools/diagnostics/apple_shortcuts_probe/run_diagnostic.py \
+            --source-root "$GITHUB_WORKSPACE" \
+            --source-sha "$GITHUB_SHA" \
+            --output "$RUNNER_TEMP/shortcuts-event-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+      - name: Retain the constructed observation
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: shortcuts-event-observation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/shortcuts-event-${{ github.run_id }}-${{ github.run_attempt }}/observation.json
+          if-no-files-found: error

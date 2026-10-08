@@ -90,22 +90,29 @@ def observation_interrupted(error, ownership):
     )
 
 
-def capture(arguments, native, ownership, evidence, role):
+def capture(arguments, native, ownership, evidence, role, *, deadline=None, marker_reader=None):
     owners = []
     started = time.monotonic()
+    absolute_deadline = deadline
+    read_markers = checkpoint_summary if marker_reader is None else marker_reader
     failure_kind = "none"
     observed_terminal = None
     primary_error = None
     with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
         try:
+            if absolute_deadline is not None and time.monotonic() >= absolute_deadline:
+                raise ProbeObservationRefused("deadline")
             group = ownership.acquire_owned(
                 arguments, native, owners.append, stdout=out, stderr=err
             )
-            deadline = time.monotonic() + 20
+            deadline = time.monotonic() + 20 if absolute_deadline is None else absolute_deadline
             while True:
                 observation = group.observe_exit()
                 if observation is not None:
                     observed_terminal = terminal_summary(observation, group)
+                if absolute_deadline is not None and time.monotonic() >= deadline:
+                    raise ProbeObservationRefused("deadline")
+                if observation is not None:
                     break
                 if time.monotonic() >= deadline:
                     raise ProbeObservationRefused("deadline")
@@ -143,7 +150,11 @@ def capture(arguments, native, ownership, evidence, role):
                     )
                     stdout_bytes = os.fstat(out.fileno()).st_size
                     stderr_bytes = os.fstat(err.fileno()).st_size
-                    checkpoint = _checkpoint_from_capture(err, role)
+                    checkpoint = (
+                        _checkpoint_from_capture(err, role)
+                        if marker_reader is None
+                        else _checkpoint_from_capture(err, role, read_markers)
+                    )
                     if (
                         type(stdout_bytes) is not int
                         or stdout_bytes < 0
@@ -204,17 +215,20 @@ def capture(arguments, native, ownership, evidence, role):
         if not 0 < len(raw) <= LIMIT or len(errors) > LIMIT:
             evidence[-1]["observation"]["failure"] = "output_bound"
             raise ProbeObservationRefused("output_bound")
-        checkpoints = checkpoint_summary(errors, role)
+        checkpoints = read_markers(errors, role)
         if not checkpoints["valid"]:
             evidence[-1]["observation"]["failure"] = "diagnostic_shape"
             raise ProbeObservationRefused("diagnostic_shape")
+        if absolute_deadline is not None and time.monotonic() >= deadline:
+            evidence[-1]["observation"]["failure"] = "deadline"
+            raise ProbeObservationRefused("deadline")
         return raw
 
 
-def _checkpoint_from_capture(stream, role):
+def _checkpoint_from_capture(stream, role, marker_reader=checkpoint_summary):
     """Read the same acquired temporary descriptor after physical retirement."""
     stream.seek(0)
-    return checkpoint_summary(stream.read(LIMIT + 1), role)
+    return marker_reader(stream.read(LIMIT + 1), role)
 
 
 def validate(raw):

@@ -1998,6 +1998,12 @@ const CHECKS = [
 		repro: 'npm run test:apple-shortcuts-cold-cli'
 	},
 	{
+		name: 'Shortcuts event diagnostics retain structured getters, deadline and native refusal scalars',
+		cmd: 'node',
+		args: ['tools/test/test-apple-shortcuts-event-diagnostic.cjs'],
+		repro: 'npm run test:apple-shortcuts-event-diagnostic'
+	},
+	{
 		name: 'file-path headers (convention 3, every source file names itself)',
 		cmd: 'node',
 		args: ['tools/lint/audit-file-headers.cjs'],
