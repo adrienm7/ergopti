@@ -3242,5 +3242,19 @@
 	"physical_shortcuts.position_unavailable": "To położenie klawisza jest tutaj niedostępne.",
 	"physical_shortcuts.windows_unavailable": "Jeszcze niedostępne w Windows: Edytor skrótów fizycznych nie jest jeszcze dostępny w systemie Windows.",
 	"physical_shortcuts.collision": "Ta kombinacja klawiszy jest już używana. Wybierz inną.",
-	"physical_shortcuts.window_unavailable": "To okno jest niedostępne: Spróbuj otworzyć je ponownie."
+	"physical_shortcuts.window_unavailable": "To okno jest niedostępne: Spróbuj otworzyć je ponownie.",
+	"gestures.system.conflicts_caption": "⚠ Możliwe konflikty: %s",
+	"gestures.system.pinch_enabled": "Systemowy gest szczypania : Włączone",
+	"gestures.system.pinch_disabled": "Systemowy gest szczypania : Wyłączony",
+	"gestures.system.pinch_unknown": "Systemowy gest szczypania : Gesty systemowe: niezweryfikowane",
+	"gestures.system.slot_unknown_caption": "%s — Gesty systemowe: niezweryfikowane",
+	"gestures.system.slot_configured_caption": "%s — Skonfigurowano dla ErgoptiPlus",
+	"gestures.system.slot_not_configured_caption": "%s — Nie skonfigurowano dla ErgoptiPlus",
+	"menu.global.reload_macos": "↺ Przeładuj",
+	"menu.global.quit_macos": "✕ Zakończ",
+	"menu.layout.pause_picker_caption": "  ↳ Układ gdy skrypt wstrzymany : %s",
+	"menu.layout.resume_picker_caption": "  ↳ Układ gdy skrypt aktywny : %s",
+	"menu.layout.native_variant_caption": "%s v%s",
+	"app_picker.agent_remove_marker": "✗",
+	"app_picker.agent_exclude_current_caption": "Wyklucz %s (bieżąca)"
 }

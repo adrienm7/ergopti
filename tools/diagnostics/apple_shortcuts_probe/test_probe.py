@@ -378,5 +378,81 @@ class ObservationPriorityControls(unittest.TestCase):
         self.assertEqual(observation["metadata_failure"], "capture_io")
 
 
+class CaptureBudgetControls(unittest.TestCase):
+    """Clock ports exercise actual capture without any native Mac invocation."""
+
+    def invoke(self, acquisition_elapsed, observation_elapsed, native_status=0):
+        now = [0.0]
+        calls = []
+        sample = SimpleNamespace(si_pid=321, si_code=1, si_status=native_status)
+        group = SimpleNamespace(process=SimpleNamespace(pid=321, returncode=None))
+
+        def observe():
+            calls.append("observe")
+            now[0] += observation_elapsed
+            return sample
+
+        def settle():
+            calls.append("settle")
+            group.process.returncode = native_status
+            return True
+
+        group.observe_exit = observe
+        group.settle = settle
+        group.receipt = lambda: {"closed": group.process.returncode is not None}
+
+        def acquire(arguments, native, register, **options):
+            calls.append("acquire")
+            register(group)
+            options["stdout"].write(b"{}")
+            options["stderr"].write(b"ASCP:1\n")
+            options["stdout"].flush()
+            options["stderr"].flush()
+            now[0] += acquisition_elapsed
+            return group
+
+        evidence = []
+        ownership = SimpleNamespace(acquire_owned=acquire)
+        caught, raw = None, None
+        with patch.object(subject.time, "monotonic", side_effect=lambda: now[0]):
+            try:
+                raw = subject.capture(["fixture"], object(), ownership, evidence, "discovery")
+            except subject.ProbeObservationRefused as error:
+                caught = error.kind
+        self.assertEqual(calls, ["acquire", "observe", "settle"])
+        self.assertEqual(len(evidence), 1)
+        self.assertTrue(evidence[0]["retirement_ack"])
+        self.assertEqual(evidence[0]["groups"], [{"closed": True}])
+        self.assertEqual(
+            evidence[0]["observation"]["terminal_before_retirement"],
+            {"pid": 321, "code": 1, "status": native_status},
+        )
+        self.assertEqual(group.process.returncode, native_status)
+        return raw, caught, evidence[0]["observation"]
+
+    def test_actual_capture_acquisition_consumes_original_budget(self):
+        raw, failure, observation = self.invoke(19.0, 0.0)
+        self.assertEqual(raw, b"{}")
+        self.assertIsNone(failure)
+        self.assertEqual(observation["failure"], "none")
+        raw, failure, observation = self.invoke(20.0, 0.0)
+        self.assertIsNone(raw)
+        self.assertEqual(failure, "deadline", "acquisition must not start a fresh budget")
+        self.assertEqual(observation["failure"], "deadline")
+        self.assertEqual(observation["elapsed_us"], 20000000)
+
+    def test_actual_capture_late_terminal_refuses_without_rewriting_native_facts(self):
+        raw, failure, observation = self.invoke(0.0, 19.0)
+        self.assertEqual(raw, b"{}")
+        self.assertIsNone(failure)
+        for native_status in (0, 3):
+            with self.subTest(native_status=native_status):
+                raw, failure, observation = self.invoke(0.0, 20.125, native_status)
+                self.assertIsNone(raw)
+                self.assertEqual(failure, "deadline", "a late terminal cannot bypass deadline")
+                self.assertEqual(observation["failure"], "deadline")
+                self.assertEqual(observation["elapsed_us"], 20125000)
+
+
 if __name__ == "__main__":
     unittest.main()

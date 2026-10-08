@@ -3210,7 +3210,24 @@ WP3 prerequisite: the actual macOS physical accounting owner now requires exact 
   admits known expert `[script]`/`[features]` values through their published
   owners, preserves obsolete scalar user-model and section-order rows, and
   checks gesture action-parameter bindings against each driver's complete
-  native gesture inventory. The Lua keyboard owners now publish both logical
+  native gesture inventory. The macOS gesture constructor now also captures its
+  original compatibility accessor, native slot-array identities and ordered
+  scalar image in the genuine shared publication ledger. A copied, withdrawn or
+  replaced owner, accessor or complete slot source remains unjudged without
+  invoking replacement callbacks; exact source repair restores judgment. The
+  independent focused consumer controls pass 188/0 against four predecessor
+  failures, preserving all prior malformed-source assertions and retained
+  parameter bytes. Selected gates pass 382 JS checks, 17,211 portable macOS
+  and 11,693 Linux unit tests, plus both portable E2E suites. Native macOS
+  qualification remains pending;
+  this bounded source-publication correction does not complete item 33.
+  The Windows outdated-load fixture now closes preceding and current genuine
+  logger suppression through the appropriate observer, restoring the exact
+  previous sink even on failure. Every original zero-ERROR and persistence
+  assertion stays intact. Three registered causal controls retain prior ring,
+  queue and native-file evidence and count current ERROR summaries without
+  filtering; actual Windows execution and predecessor replay are pending.
+  The Lua keyboard owners now publish both logical
   identities and the complete 1,536 physical identities from the actual private
   registry, with current source and owner checks. Cold or partial publication
   remains unjudged; Windows keyboard and other binding owners remain pending.
@@ -3240,6 +3257,27 @@ WP3 prerequisite: the actual macOS physical accounting owner now requires exact 
   and session-write refusal (site 108); retired keys reported for explicit
   cleanup are exempt from automatic deletion migrations and remain on disk
   until that cleanup (site 112).
+
+  Windows migration planning and execution now classify metadata through the
+  canonical typed document they already validate. Current dotted, inline and
+  quoted stamps preserve source without a rewrite; scalar/array/invalid/newer
+  metadata and unaddressable older stamps refuse before backup or publication.
+  Twelve independent registered native cases preserve the complete old test
+  prefix and cover exact source, typed foreign neighbors and retained no-op/write
+  refusal. Targeted native CI 37666660242 reaches 10,176 passing assertions
+  and three failures. Its original physical-namespace assertion exposes a
+  status-contract regression: a supported older version with an unaddressable
+  physical owner must be failed, while unsupported denotes a missing migration
+  route. Planning and execution now retain that failed outcome and strengthen
+  the physical-owner reason checks without changing read-only refusal, source,
+  backup or publication assertions. Corrected native execution remains pending.
+  The other two failures are a process-wide ERROR in the outdated load fixture
+  and the native brightness worker; neither cause is inferred from missing
+  artifact access. The existing outdated-load assertion now includes up to eight
+  bounded ASCII logger namespace tags, preserving its original zero-ERROR
+  expectation and process-wide counting. It emits no log bodies or file paths;
+  the exact Windows native run must establish the error owner before any fix. This bounded correction does not grant a genuine
+  constructor-issued source journal or close item 33.
 
   Linux and macOS filesystem modules now expose their genuine initializer
   identity and seven original function or nil identities through a pure tuple.
@@ -4874,13 +4912,88 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 28, macOS 32, Linux 31, each
+  drivers still build (current baseline: Windows 27, macOS 22, Linux 30, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
   existing rows during the migration (proposal in the menu-first-group
   report: most hide; greyed: Linux edit_shortcuts, Linux key
   combinations, Linux metrics shortcut rows, Windows preview_bubbles).
+  The macOS badge caption and following boundary now consume a complete
+  shared frame before native measurement or canvas allocation. Independent
+  consumer tests pass 38/0 against predecessor 26/12; the genuine root route
+  and sixty physical disconnect controls pass without invented submenu IDs.
+  Original image, click, drawing and retirement owners remain native. Selected
+  gates pass 382 JS checks, 17,245 portable macOS and 11,693 Linux units, plus
+  portable macOS E2E; native AppKit, packaging and installation qualification
+  remain pending. The successor declares completed native image/download
+  placement in the shared manifest and rechecks exact declaration identities
+  before atomic native composition. The same 29 shared subjects pass on both
+  Lua runtimes; actual target-alias predecessors fail two of them. Original
+  historical 60 and current 74 source-route controls remain independent.
+  Actual badge/download consumers pass 49/0 and 10/0. Genuine model DATA and
+  profile parent captions are now materialized before native publication;
+  source callbacks and native children retain their proper identities. Focused
+  count/model/settings controls pass 13/0, 25/0 and 194/0. The same model
+  subjects fail 4/25 on original production. Private portable installed boot
+  passes 101 cases with one host-specific scenario skipped, versus 30 earlier
+  failures. Selected portable gates pass 382 JS checks, 17,325 macOS and
+  11,731 Linux units, plus 101 macOS and 189 Linux E2E scenarios; one macOS
+  host scenario is skipped. Windows units are not executed in this container.
+  Final-source native CI, packaging and installation remain pending; these
+  portable receipts do not close the items.
+  Reload/Quit captions now come from the canonical native-platform variants,
+  retaining all 21 independently frozen prior captions. Unique visible lookup
+  refuses hidden-first ownership, withdrawal and duplicate native identities.
+  Focused portable macOS controls pass 8/0 plus 27/0, versus predecessor 1/7
+  and 24/3; Linux lookup controls pass 8/0 versus predecessor 1/7. The current
+  nine-subject lookup contract passes on both Lua engines, preserving shared
+  inert status from a single global declaration without native action ownership.
+  Original lifecycle/status assertions and approved visible order remain; the
+  actual order gate rejects three malformed native declarations. Existing
+  native callback and lifecycle owners remain unchanged; complete selected
+  gates, Windows native execution and installed-device acceptance are pending.
+  Complete cached system-gesture status now consumes shared parent, slot,
+  pinch, reader and refresh frames through genuine native cached providers.
+  Seven additive keys in all 21 locales preserve an independently frozen prior
+  caption corpus; Settings callbacks and deferred probes retain native owners.
+  Portable focused controls pass 81/0 on macOS and 37/0 on Linux, against eleven
+  genuine predecessor failures per driver. Selected formatting, encoding and
+  all 364 JS checks pass; portable Mac units pass 17,128/0 and Linux units
+  10,590/0. Portable E2E passes 101/101 on Mac with one skipped scenario and
+  189/189 on Linux. Linux provider coverage follows the actual published status
+  subtree and retains all original assertions with independent withdrawal
+  controls. Windows parse, unit and E2E execution remain unavailable locally.
+  Both generators retire one Windows and one macOS native site, giving
+  27/29/31. Exact-source native, package and installed qualification remain
+  pending. This family does not complete the item.
+
+  The macOS Tap-Hold action picker now consumes one complete shared frame:
+  genuine Special choices, their conditional boundary and the actual grouped
+  native catalogue. Declaration admission precedes local catalogue reads;
+  withdrawal during an admitted read refuses final publication. Existing
+  Tap/Hold and combination setters, filters, check states and callbacks remain
+  unchanged. The independent candidate controls pass 41/0; the predecessor
+  fails eight declaration/refusal controls. Live registered picker and all
+  five setter routes pass 78/0. Both owning generators retire one real native
+  separator site, giving 28/30/31. Selected formatting, all 364 JS checks,
+  portable Mac E2E and 17,095 Mac unit assertions pass. Complete native
+  qualification remains required; this bounded migration leaves the item partial.
+
+  The macOS keyboard group now consumes one complete shared frame: native
+  fixed children, their conditional boundary, assigned slots and the native
+  Add control. Complete declaration admission precedes genuine assignment and
+  caption reads; retained Add callbacks refuse while paused or disabled. All
+  21 existing translated captions and original picker/persistence owners stay
+  intact. Controlled tests pass 35/0; the eager predecessor fails all six new
+  source-read controls. Current live keyboard/parameter-label controls pass
+  38/0 using the actual renderer; typed port/include and full-tree parity
+  checks pass without raising their baselines. Selected formatting, all 364
+  JS checks, portable Mac E2E and 17,084 Mac unit assertions pass. Native
+  macOS qualification remains pending.
+  The owning generators retire one actual macOS separator site: 28/31/31.
+  This bounded migration does not complete the remaining menu families.
+
   The complete MagicKey source frame now consumes the canonical capture,
   automatic choice, candidate list and separators on all three drivers. Native
   selection, readiness and publication callbacks remain unchanged. Both owners
@@ -5556,6 +5669,22 @@ partial.
 
 Windows workstation handoff (maintainer instruction, 2026-10-04):
 
+The Linux Agent excluded-applications and complete System1/System2 frames
+now consume shared declarations for their parents, children and order.
+Canonical model caption getters are consumed by all three native drivers;
+settings, catalogues, dialog arguments and business callbacks retain their
+existing owners. Independent 21-language expectations are preserved. Focused
+actual cases pass 83 Linux and 51 portable macOS assertions; the same tests
+with only the exact prior published native producer loaded fail 50/83 and
+44/51 respectively. The native boundary removes a leading separator while
+retaining its declared DATA; the independent control checks both stages and
+every remaining callback/check identity. All 22 new Windows subjects pass in
+run 37816803340. Final-source run 37821669361 passes both Lua unit/E2E lanes
+and the complete Linux package/install verdict. Its JS frame consumer assertion
+required the actual captured Linux renderer owner. macOS Brew packaging and two
+Windows network subjects remain failed; dependent Windows E2E/package/install
+and macOS install jobs are skipped. Installed physical acceptance is unexecuted.
+
 - [ ] Execute the existing native per-key command/caption/state/refusal cases and review the still-native Windows menu sites against the actual census (currently 82). Move remaining fixed policy/data to shared declarations without hiding rows or weakening the scanner.
 - [ ] Prepared shared menu packets in docs/handovers/2026-10-04-config-menus are unapplied. Verify their recorded dependencies/preimages, regenerate owner artifacts and qualify all affected drivers after any shared change.
 
@@ -5620,6 +5749,10 @@ The genuine complete Windows profile-frame fixture now initializes its isolated 
 The existing Windows/Linux separator after backend choices now uses one canonical shared child template. Actual backend, model and port callbacks and native ordering are unchanged; macOS had no corresponding separator and remains explicitly hidden and byte-exact. Independent handwritten platform/order tests, actual native producer inversions and both owning generators retain all previous assertions and21 translations. The real remaining census falls from71/102/74 to70/102/73; unexplained platform debt remains104. Focused and French-warm portable controls pass3/0 per runtime versus genuine predecessor1/2. Native AHK, full composed qualification and installed-device acceptance remain separate; items54/81 remain partial.
 
 The fixed Specifications and Capabilities frames of the Windows/macOS per-model detail sheets now consume shared child templates. Existing separators, platform decoration, capability predicates and native callbacks are preserved; Linux has no corresponding detail sheet and retains its declared absence without a native change. The owning generators lower Windows 70/macOS 102/Linux 73 to 66/98/73. Independent source review preserves every predecessor corpus file, all 21 locale files and original registered assertions. Portable Mac owning probes pass 8/0 and French-warm probes pass 5/0 in both Lua runtimes; the genuine original producer gives 6/2 and 3/2. The unchanged Linux whole-tray fixture passes 9/0 in English and French on both runtimes. Final composed native CI, Windows allocator execution and installed-device acceptance remain separate; items 54/81 remain partial.
+
+The completed macOS image/download root now consumes shared typed slot order and conditional boundary policy while preserving the native finished objects, resources and callbacks. The composer re-admits the exact canonical owner and validates every finished tree before mutating its existing target; prefix submenus that alias that target refuse without writes. Independent actual-source controls pass the original60 historical and74 LIVE obligations with genuine positives. Focused shared native controls pass29/0 on each Lua runtime versus the identical29 original composer27/2; the real image producer passes49/0 and the real download producer10/0. Original menu assertions and independently frozen order/caption corpora remain intact. Selected portable gates pass382 JS, 17,325 macOS and11,731 Linux units, plus101 macOS and189 Linux E2E scenarios with one macOS host skip. Windows units remain unexecuted locally; hosted native packaging/installation and item38 device acceptance remain separate. Items54/81 stay partial.
+
+The complete macOS Layout presentation family now consumes 17 canonical shared sections, including switching/pause/resume, genuine native record choices, bundle install/update/status/variant frames and the finished parent. Exactly 3 additive caption keys are translated in all 21 actual catalogues. Existing native TIS, install/consent, Guardian, async and callback owners remain unchanged. The bounded shared caption ABI adds ordered format values, strict native-record captions and an explicit numbered scalar mode while retaining the prior percent-scalar bodies and completed-root composer. Actual private source qualification passes 97 tray,6 async and 17 version subjects, plus 51 Layout and 21 numbered contract subjects on each Lua runtime. New Windows Layout 28 and numbered 22 subjects, plus five genuine throwing-reader/full-group Win32 controls, remain unexecuted locally. Typed group captions retain literal ampersand transport without false empty-key translation warnings; a throwing vector reader refuses before native writes. The complete tray fixture now constructs and restores its renderer inside the same scoped boundary. Registered source controls pass after exact adoption; actual dynamic callback and inert-caption ownership controls retain zero gaps. Seven actual macOS fixture modules pass 40/0 after supplying their required canonical renderer inputs; every original fixture assertion remains, and the provider-label meta subject now proves actual DATA-to-native delivery rather than a withdrawn literal assignment. The owning generator lowers macOS 27 to 22 native sites while Windows 27/Linux 31 remain. These bounded receipts do not replace full-source three-driver CI, packaging/installation or item 38 device acceptance; items 54/81 remain partial.
 
 - [ ] **62.** Downloads on managed company networks: system trust and
       system proxy for every download child (Ollama installation/server/pull,
@@ -7047,7 +7180,7 @@ Current Group 3 source checkpoint (item 73, 2026-10-06): [Group 3 current checkp
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 28, macOS 32 and Linux 31 rows are still built by the
+  Windows 27, macOS 22 and Linux 30 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). Read on
   2026-10-01, the sites are of four kinds, and three of them need the
   manifest to say more than it can today:
@@ -7065,6 +7198,81 @@ Current Group 3 source checkpoint (item 73, 2026-10-06): [Group 3 current checkp
   sites): they follow (b), as part of the template;
   (d) the tray root bootstrap (Windows `tray_bootstrap.ahk`,
   `menu_init.ahk`).
+  The macOS badge caption and following boundary now consume a complete
+  shared frame before native measurement or canvas allocation. Independent
+  consumer tests pass 38/0 against predecessor 26/12; the genuine root route
+  and sixty physical disconnect controls pass without invented submenu IDs.
+  Original image, click, drawing and retirement owners remain native. Selected
+  gates pass 382 JS checks, 17,245 portable macOS and 11,693 Linux units, plus
+  portable macOS E2E; native AppKit, packaging and installation qualification
+  remain pending. The successor declares completed native image/download
+  placement in the shared manifest and rechecks exact declaration identities
+  before atomic native composition. The same 29 shared subjects pass on both
+  Lua runtimes; actual target-alias predecessors fail two of them. Original
+  historical 60 and current 74 source-route controls remain independent.
+  Actual badge/download consumers pass 49/0 and 10/0. Genuine model DATA and
+  profile parent captions are now materialized before native publication;
+  source callbacks and native children retain their proper identities. Focused
+  count/model/settings controls pass 13/0, 25/0 and 194/0. The same model
+  subjects fail 4/25 on original production. Private portable installed boot
+  passes 101 cases with one host-specific scenario skipped, versus 30 earlier
+  failures. Selected portable gates pass 382 JS checks, 17,325 macOS and
+  11,731 Linux units, plus 101 macOS and 189 Linux E2E scenarios; one macOS
+  host scenario is skipped. Windows units are not executed in this container.
+  Final-source native CI, packaging and installation remain pending; these
+  portable receipts do not close the items.
+  Reload/Quit captions now come from the canonical native-platform variants,
+  retaining all 21 independently frozen prior captions. Unique visible lookup
+  refuses hidden-first ownership, withdrawal and duplicate native identities.
+  Focused portable macOS controls pass 8/0 plus 27/0, versus predecessor 1/7
+  and 24/3; Linux lookup controls pass 8/0 versus predecessor 1/7. The current
+  nine-subject lookup contract passes on both Lua engines, preserving shared
+  inert status from a single global declaration without native action ownership.
+  Original lifecycle/status assertions and approved visible order remain; the
+  actual order gate rejects three malformed native declarations. Existing
+  native callback and lifecycle owners remain unchanged; complete selected
+  gates, Windows native execution and installed-device acceptance are pending.
+  Complete cached system-gesture status now consumes shared parent, slot,
+  pinch, reader and refresh frames through genuine native cached providers.
+  Seven additive keys in all 21 locales preserve an independently frozen prior
+  caption corpus; Settings callbacks and deferred probes retain native owners.
+  Portable focused controls pass 81/0 on macOS and 37/0 on Linux, against eleven
+  genuine predecessor failures per driver. Selected formatting, encoding and
+  all 364 JS checks pass; portable Mac units pass 17,128/0 and Linux units
+  10,590/0. Portable E2E passes 101/101 on Mac with one skipped scenario and
+  189/189 on Linux. Linux provider coverage follows the actual published status
+  subtree and retains all original assertions with independent withdrawal
+  controls. Windows parse, unit and E2E execution remain unavailable locally.
+  Both generators retire one Windows and one macOS native site, giving
+  27/29/31. Exact-source native, package and installed qualification remain
+  pending. This family does not complete the item.
+
+  The macOS Tap-Hold action picker now consumes one complete shared frame:
+  genuine Special choices, their conditional boundary and the actual grouped
+  native catalogue. Declaration admission precedes local catalogue reads;
+  withdrawal during an admitted read refuses final publication. Existing
+  Tap/Hold and combination setters, filters, check states and callbacks remain
+  unchanged. The independent candidate controls pass 41/0; the predecessor
+  fails eight declaration/refusal controls. Live registered picker and all
+  five setter routes pass 78/0. Both owning generators retire one real native
+  separator site, giving 28/30/31. Selected formatting, all 364 JS checks,
+  portable Mac E2E and 17,095 Mac unit assertions pass. Complete native
+  qualification remains required; this bounded migration leaves the item partial.
+
+  The macOS keyboard group now consumes one complete shared frame: native
+  fixed children, their conditional boundary, assigned slots and the native
+  Add control. Complete declaration admission precedes genuine assignment and
+  caption reads; retained Add callbacks refuse while paused or disabled. All
+  21 existing translated captions and original picker/persistence owners stay
+  intact. Controlled tests pass 35/0; the eager predecessor fails all six new
+  source-read controls. Current live keyboard/parameter-label controls pass
+  38/0 using the actual renderer; typed port/include and full-tree parity
+  checks pass without raising their baselines. Selected formatting, all 364
+  JS checks, portable Mac E2E and 17,084 Mac unit assertions pass. Native
+  macOS qualification remains pending.
+  The owning generators retire one actual macOS separator site: 28/31/31.
+  This bounded migration does not complete the remaining menu families.
+
   Dynamic caption admission now validates the genuine English formatter
   before lazy getters, with literal and escaped-percent controls. It is a
   renderer prerequisite and does not retire native sites or close this item.
@@ -7159,6 +7367,22 @@ is still required.
 
 Windows workstation handoff (maintainer instruction, 2026-10-04):
 
+The Linux Agent excluded-applications and complete System1/System2 frames
+now consume shared declarations for their parents, children and order.
+Canonical model caption getters are consumed by all three native drivers;
+settings, catalogues, dialog arguments and business callbacks retain their
+existing owners. Independent 21-language expectations are preserved. Focused
+actual cases pass 83 Linux and 51 portable macOS assertions; the same tests
+with only the exact prior published native producer loaded fail 50/83 and
+44/51 respectively. The native boundary removes a leading separator while
+retaining its declared DATA; the independent control checks both stages and
+every remaining callback/check identity. All 22 new Windows subjects pass in
+run 37816803340. Final-source run 37821669361 passes both Lua unit/E2E lanes
+and the complete Linux package/install verdict. Its JS frame consumer assertion
+required the actual captured Linux renderer owner. macOS Brew packaging and two
+Windows network subjects remain failed; dependent Windows E2E/package/install
+and macOS install jobs are skipped. Installed physical acceptance is unexecuted.
+
 - [ ] Continue the remaining Windows menu families using shared templates and the item54 census. canonicalHoldOptions is already shared; do not cosmetically reimplement it.
 - [ ] After every Windows push, cancel automatic runs on its exact SHA. Use manual ci.yml with windows for Windows-only changes, or all affected OS lanes for shared changes; let manual runs finish and record native/E2E/package/install outcomes independently.
 
@@ -7195,6 +7419,10 @@ The fixed API Add-entry affordance and its existing separator now consume canoni
 The existing Windows/Linux separator after backend choices now uses one canonical shared child template. Actual backend, model and port callbacks and native ordering are unchanged; macOS had no corresponding separator and remains explicitly hidden and byte-exact. Independent handwritten platform/order tests, actual native producer inversions and both owning generators retain all previous assertions and21 translations. The real remaining census falls from71/102/74 to70/102/73; unexplained platform debt remains104. Focused and French-warm portable controls pass3/0 per runtime versus genuine predecessor1/2. Native AHK, full composed qualification and installed-device acceptance remain separate; items54/81 remain partial.
 
 The shared per-model Specifications and Capabilities frames retire four genuine Windows and four genuine macOS allocator sites, reducing 70/102/73 to 66/98/73. Linux's actual absence is declared; native callbacks and dynamic detail rows retain their existing owners. Independent source, locale, corpus and original-producer controls are qualified. Final composed native CI, the registered Windows cases and item 38 device acceptance remain open; the remaining 66/98/73 sites keep items 54/81 partial.
+
+The completed macOS image/download root now consumes shared typed slot order and conditional boundary policy while preserving the native finished objects, resources and callbacks. The composer re-admits the exact canonical owner and validates every finished tree before mutating its existing target; prefix submenus that alias that target refuse without writes. Independent actual-source controls pass the original60 historical and74 LIVE obligations with genuine positives. Focused shared native controls pass29/0 on each Lua runtime versus the identical29 original composer27/2; the real image producer passes49/0 and the real download producer10/0. Original menu assertions and independently frozen order/caption corpora remain intact. Selected portable gates pass382 JS, 17,325 macOS and11,731 Linux units, plus101 macOS and189 Linux E2E scenarios with one macOS host skip. Windows units remain unexecuted locally; hosted native packaging/installation and item38 device acceptance remain separate. Items54/81 stay partial.
+
+The complete macOS Layout presentation family now consumes 17 canonical shared sections, including switching/pause/resume, genuine native record choices, bundle install/update/status/variant frames and the finished parent. Exactly 3 additive caption keys are translated in all 21 actual catalogues. Existing native TIS, install/consent, Guardian, async and callback owners remain unchanged. The bounded shared caption ABI adds ordered format values, strict native-record captions and an explicit numbered scalar mode while retaining the prior percent-scalar bodies and completed-root composer. Actual private source qualification passes 97 tray,6 async and 17 version subjects, plus 51 Layout and 21 numbered contract subjects on each Lua runtime. New Windows Layout 28 and numbered 22 subjects, plus five genuine throwing-reader/full-group Win32 controls, remain unexecuted locally. Typed group captions retain literal ampersand transport without false empty-key translation warnings; a throwing vector reader refuses before native writes. The complete tray fixture now constructs and restores its renderer inside the same scoped boundary. Registered source controls pass after exact adoption; actual dynamic callback and inert-caption ownership controls retain zero gaps. Seven actual macOS fixture modules pass 40/0 after supplying their required canonical renderer inputs; every original fixture assertion remains, and the provider-label meta subject now proves actual DATA-to-native delivery rather than a withdrawn literal assignment. The owning generator lowers macOS 27 to 22 native sites while Windows 27/Linux 31 remain. These bounded receipts do not replace full-source three-driver CI, packaging/installation or item 38 device acceptance; items 54/81 remain partial.
 
 - [~] **88.** **Partial: native prediction tooltip appearance.** Shared
   llm-line-style policy and the unchanged independent line corpus retain grey

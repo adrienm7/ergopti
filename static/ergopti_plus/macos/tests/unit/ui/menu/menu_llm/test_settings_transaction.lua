@@ -20,6 +20,8 @@ local MODULES = {
 	"ui.menu.menu_llm.temperature_panel",
 	"ui.menu.menu_llm.models_manager",
 	"ui.menu.menu_llm.profiles_manager",
+	"ui.menu.menu_llm.profile_label",
+	"modules.llm.profiles",
 	"ui.menu.menu_llm.warmup_controller",
 	"ui.menu.menu_llm.backend_panel",
 	"ui.menu.menu_llm.api_panel",
@@ -74,6 +76,29 @@ local function clone_value(value)
 	return clone
 end
 
+--- Captures raw producer references independently of native materialization.
+--- @param root table Genuine source row graph.
+--- @return table snapshot Exact key/value references for every reachable table.
+local function capture_row_graph(root)
+	local snapshot = {}
+	local function capture(node)
+		if type(node) ~= "table" or snapshot[node] then return end
+		local fields = {}; snapshot[node] = fields
+		for key, value in next, node do fields[key] = value; capture(value) end
+	end
+	capture(root)
+	return snapshot
+end
+
+--- Proves all captured rows, resources, callbacks and nested field references remain exact.
+--- @param snapshot table Raw reference graph captured before the handoff.
+local function assert_row_graph_unchanged(snapshot)
+	for node, fields in pairs(snapshot) do
+		for key, value in next, node do helpers.assert_true(rawequal(value, fields[key]), tostring(key)) end
+		for key, value in pairs(fields) do helpers.assert_true(rawequal(rawget(node, key), value), tostring(key)) end
+	end
+end
+
 local function find_item(items, title)
 	for _, item in ipairs(items or {}) do
 		if item.title == title then return item end
@@ -101,6 +126,7 @@ local function with_fixture(options, callback)
 	end
 	local saved_hs = _G.hs
 	local mlx_loaded_dependencies = {}
+	local profile_loaded_dependencies = {}
 	local mlx_previous_json_codec = package.loaded["adapters.json_codec"]
 
 	local state = {
@@ -111,6 +137,7 @@ local function with_fixture(options, callback)
 		llm_model_ollama = "",
 		llm_active_profile = "basic",
 		llm_profile_shortcuts = {},
+		llm_user_profiles = {},
 		llm_debounce = 0.5,
 		llm_max_words = 7,
 		llm_min_words = 2,
@@ -278,7 +305,14 @@ local function with_fixture(options, callback)
 	}
 	package.loaded["infra.logger"] = Logger
 	package.loaded["infra.notifications"] = {notify = function() end}
-	package.loaded["infra.i18n"] = {get = options.translate or function(key) return key end}
+	local locale_file = assert(io.open(helpers.shared("data/locales/en.json"), "r"))
+	local profile_strings = assert(require("json").decode(locale_file:read("*a")))
+	assert(locale_file:close())
+	local function fixture_caption(key)
+		if key:match("^menu%.profiles%.") or key:match("^llm%.profile%.") then return profile_strings[key] or key end
+		return options.translate and options.translate(key) or key
+	end
+	package.loaded["infra.i18n"] = {get = fixture_caption, section = fixture_caption}
 	local prompt_value = options.prompt_value or "0.75"
 	package.loaded["infra.dialog_util"] = {
 		text_prompt = function()
@@ -296,6 +330,7 @@ local function with_fixture(options, callback)
 			return {}
 		end,
 	}
+	local observed_selector_data
 	local display_renderer = assert(require("menu.renderer").new({
 		platform = "hs",
 		manifest_path = function() return helpers.driver_root() .. "../_shared/modules/menu/menu_manifest.json" end,
@@ -347,9 +382,20 @@ local function with_fixture(options, callback)
 			end
 			return root
 		end,
-		i18n = { get = options.translate or function(key) return key end, section = options.translate or function(key) return key end },
+		i18n = { get = fixture_caption, section = fixture_caption },
 		logger = Logger,
 	}))
+	if options.observe_native_model_children then
+		local genuine_render_rows = display_renderer.render_rows
+		display_renderer.render_rows = function(...)
+			local input = select(1, ...)
+			local results = table.pack(genuine_render_rows(...))
+			if observed_selector_data ~= nil and rawequal(input, observed_selector_data) then
+				options.observe_native_model_children(results[1], input)
+			end
+			return table.unpack(results, 1, results.n)
+		end
+	end
 	package.loaded["infra.manifest_menu"] = display_renderer
 
 	local keymap = {}
@@ -476,11 +522,26 @@ local function with_fixture(options, callback)
 		package.loaded["ui.menu.menu_llm.models_manager"] = {
 			new = function() return models end,
 		}
-		package.loaded["ui.menu.menu_llm.profiles_manager"] = {
-			new = function()
-				return {get_menu_item = function() return {} end}
-			end,
-		}
+		local prior_dependencies = {}
+		for name, value in pairs(package.loaded) do prior_dependencies[name] = value end
+		local core = package.loaded["modules.llm"]
+		core.BUILTIN_PROFILES = require("modules.llm.profiles").BUILTIN_PROFILES
+		local profile_constructor_sync = {}
+		core.set_user_profiles = function()
+			profile_constructor_sync[#profile_constructor_sync + 1] = "users"
+			return true
+		end
+		core.set_active_profile = function()
+			profile_constructor_sync[#profile_constructor_sync + 1] = "active"
+			return true
+		end
+		package.loaded["ui.menu.menu_llm.profiles_manager"] = nil
+		require("ui.menu.menu_llm.profiles_manager")
+		for name, value in pairs(package.loaded) do
+			if not rawequal(value, rawget(prior_dependencies, name)) then
+				profile_loaded_dependencies[name] = { value = rawget(prior_dependencies, name) }
+			end
+		end
 		package.loaded["ui.menu.menu_llm.warmup_controller"] = {warmup = noop}
 		package.loaded["ui.menu.menu_llm.backend_panel"] = {
 			is_apple_silicon = function() return false end,
@@ -496,6 +557,7 @@ local function with_fixture(options, callback)
 			package.loaded["ui.menu.menu_llm.models_selector"] = {
 				build = function(ctx)
 					local children = genuine_selector.build(ctx)
+					observed_selector_data = children
 					if options.observe_model_children then options.observe_model_children(children) end
 					return children
 				end,
@@ -645,6 +707,7 @@ local function with_fixture(options, callback)
 	local ok, err = xpcall(function() callback(fixture) end, debug.traceback)
 	_G.hs = saved_hs
 	for name, prior in pairs(mlx_loaded_dependencies) do package.loaded[name] = rawget(prior, "value") end
+	for name, prior in pairs(profile_loaded_dependencies) do package.loaded[name] = rawget(prior, "value") end
 	if options.native_mlx_port then package.loaded["adapters.json_codec"] = mlx_previous_json_codec end
 	for _, name in ipairs(MODULES) do package.loaded[name] = saved_modules[name] end
 	if not ok then error(err, 0) end
@@ -2604,12 +2667,16 @@ helpers.describe("Complete LLM outer boundary context", function()
 		end)
 	end)
 
-	helpers.it("renders MLX after the real selector tail and preserves completed child references", function()
-		local original_children, original_rows, original_tail
+	helpers.it("materializes genuine selector DATA and retains exact completed MLX child references", function()
+		local original_children, original_tail, source_graph, native_children, native_rows, native_graph
 		with_fixture({parent_only = true, native_mlx_port = true, observe_model_children = function(children)
-			original_children = children
-			original_rows = {}; for index, row in ipairs(children) do original_rows[index] = row end
-			original_tail = children[#children]
+			original_children, original_tail = children, children[#children]
+			source_graph = capture_row_graph(children)
+		end, observe_native_model_children = function(children, data)
+			helpers.assert_true(rawequal(data, original_children), "the genuine materializer consumes the exact producer DATA")
+			native_children = children
+			native_rows = {}; for index, row in ipairs(children) do native_rows[index] = row end
+			native_graph = capture_row_graph(native_rows)
 		end}, function(fixture)
 			local rows = fixture.top_level_callbacks().rebuild()
 			helpers.assert_type(rows, "table", table.concat(fixture.errors, "\n"))
@@ -2618,17 +2685,26 @@ helpers.describe("Complete LLM outer boundary context", function()
 				if type(row.title) == "string" and row.title:find("menu.llm.model_label", 1, true) then model = row end
 			end
 			helpers.assert_type(model, "table")
-			helpers.assert_true(rawequal(model.menu, original_children), "the complete native selector tree is retained")
-			for index, original in ipairs(original_rows) do
-				helpers.assert_true(rawequal(model.menu[index], original), "each original completed selector row is retained")
-				helpers.assert_true(rawequal(model.menu[index].action, original.action), "original callback identity is retained")
-				helpers.assert_true(rawequal(model.menu[index].items, original.items), "original completed child identity is retained")
-				helpers.assert_true(rawequal(model.menu[index].image, original.image), "original image identity is retained")
+			helpers.assert_true(rawequal(model.menu, native_children), "the genuine emitted native array reaches its native parent")
+			helpers.assert_true(not rawequal(model.menu, original_children), "DATA is materialized before native publication")
+			assert_row_graph_unchanged(source_graph)
+			assert_row_graph_unchanged(native_graph)
+			for index, original in ipairs(native_rows) do
+				helpers.assert_true(rawequal(model.menu[index], original), "each genuine emitted native row remains exact")
+				helpers.assert_nil(original.label); helpers.assert_nil(original.action); helpers.assert_nil(original.items)
 			end
-			helpers.assert_true(rawequal(model.menu[#original_rows], original_tail))
-			helpers.assert_eq(model.menu[#original_rows + 1].title, "-", "the real leading port boundary follows the genuine tail")
-			helpers.assert_true(model.menu[#original_rows + 2].title:find("menu.llm.mlx_port", 1, true) ~= nil)
-			helpers.assert_type(model.menu[#original_rows + 2].fn, "function")
+			helpers.assert_eq(model.menu[1].title, original_children[1].label, "the independently declared head caption remains")
+			helpers.assert_true(rawequal(model.menu[1].fn, original_children[1].action), "the genuine source command closure remains exact")
+			local retained_tail = model.menu[#native_rows]
+			helpers.assert_true(rawequal(retained_tail, native_rows[#native_rows]))
+			helpers.assert_eq(retained_tail.title, original_tail.label, "the actual source tail caption reaches native output")
+			helpers.assert_true(rawequal(retained_tail.fn, original_tail.action)); helpers.assert_true(rawequal(retained_tail.image, original_tail.image))
+			helpers.assert_eq(model.menu[#native_rows + 1].title, "-", "the real leading port boundary follows the genuine tail")
+			helpers.assert_true(model.menu[#native_rows + 2].title:find("menu.llm.mlx_port", 1, true) ~= nil)
+			helpers.assert_type(model.menu[#native_rows + 2].fn, "function")
+			local compose = assert(package.loaded["infra.manifest_menu"].native_composition("macos_download_root"))
+			helpers.assert_eq(compose({download = {}, body = rows}), true, "the actual completed subtree meets strict native publication")
+			helpers.assert_eq(fixture.calls.save, 0); helpers.assert_eq(fixture.calls.runtime, 0)
 		end)
 	end)
 end)
@@ -2641,40 +2717,71 @@ helpers.describe("Complete LLM MLX canonical context admission", function()
 		end
 	end
 
-	helpers.it("retains valid empty selector data and renders only the real port action", function()
-		local original_children
+	helpers.it("retains valid empty selector DATA and publishes only the genuine native port action", function()
+		local original_children, native_children
 		with_fixture({parent_only = true, native_mlx_port = true, observe_model_children = function(children)
 			-- Exercise the established empty consumer image after the genuine selector ran.
 			original_children = children
 			for index = #children, 1, -1 do children[index] = nil end
+		end, observe_native_model_children = function(children, data)
+			helpers.assert_true(rawequal(data, original_children))
+			helpers.assert_eq(#children, 0, "the genuine materializer emits the original empty context")
+			native_children = children
 		end}, function(fixture)
 			local model = assert(model_row(fixture.top_level_callbacks().rebuild()))
-			helpers.assert_true(rawequal(model.menu, original_children))
+			helpers.assert_true(rawequal(model.menu, native_children), "the actual emitted native array remains the parent's array")
+			helpers.assert_true(not rawequal(model.menu, original_children)); helpers.assert_eq(#original_children, 0, "port append never writes into producer DATA")
 			helpers.assert_eq(#model.menu, 1, "a genuinely empty consumer context has no leading separator")
 			helpers.assert_true(model.menu[1].title:find("menu.llm.mlx_port", 1, true) ~= nil)
 			helpers.assert_type(model.menu[1].fn, "function")
+			helpers.assert_nil(model.menu[1].action); helpers.assert_nil(model.menu[1].label)
 			helpers.assert_eq(fixture.calls.save, 0); helpers.assert_eq(fixture.calls.runtime, 0)
 		end)
 	end)
 
-	helpers.it("preserves the entire deep canonical tail instead of rebuilding completed children", function()
-		local tail, nested, action, image, delivered, original_count = nil, nil, function() end, {}, 0, 0
-		action = function() delivered = delivered + 1 end
+	helpers.it("retains deep emitted native tail identity while strict publication refuses excess depth", function()
+		local tail, nested, source_graph, native_graph, native_children, original_count
+		local image, delivered = {}, 0
+		local action = function() delivered = delivered + 1 end
 		with_fixture({parent_only = true, native_mlx_port = true, observe_model_children = function(children)
-			original_count = #children
+			source_graph = capture_row_graph(children)
+		end, observe_native_model_children = function(children)
+			native_children, original_count = children, #children
 			tail = children[original_count]
-			nested = {label = "owned deep leaf", action = action, image = image}
-			for _ = 1, 12 do nested = {label = "owned deep parent", items = {nested}} end
-			tail.items = {nested}; tail.action = action; tail.image = image
+			-- A bounded adversarial native image must retain identity but never pass the depth policy.
+			nested = {title = "owned deep leaf", fn = action, image = image}
+			for _ = 1, 12 do nested = {title = "owned deep parent", menu = {nested}} end
+			tail.menu = {nested}; tail.fn = nil; tail.image = image
+			native_graph = capture_row_graph({tail})
 		end}, function(fixture)
-			local model = assert(model_row(fixture.top_level_callbacks().rebuild()))
+			local rows = fixture.top_level_callbacks().rebuild()
+			local model = assert(model_row(rows))
 			local retained = model.menu[original_count]
-			helpers.assert_true(rawequal(retained, tail))
-			helpers.assert_true(rawequal(retained.items[1], nested))
-			helpers.assert_true(rawequal(retained.action, action)); helpers.assert_true(rawequal(retained.image, image))
-			helpers.assert_eq(delivered, 0, "rendering does not deliver the original callback")
+			helpers.assert_true(rawequal(model.menu, native_children)); helpers.assert_true(rawequal(retained, tail))
+			helpers.assert_true(rawequal(retained.menu[1], nested)); helpers.assert_true(rawequal(retained.image, image))
+			helpers.assert_nil(retained.fn, "a submenu parent never carries the unreachable command")
+			local leaf = nested; for _ = 1, 12 do leaf = leaf.menu[1] end
+			helpers.assert_true(rawequal(leaf.fn, action)); helpers.assert_true(rawequal(leaf.image, image))
+			assert_row_graph_unchanged(source_graph); assert_row_graph_unchanged(native_graph)
 			helpers.assert_eq(model.menu[#model.menu - 1].title, "-")
 			helpers.assert_type(model.menu[#model.menu].fn, "function")
+			local publication_graph = capture_row_graph(rows)
+			local compose = assert(package.loaded["infra.manifest_menu"].native_composition("macos_download_root"))
+			helpers.assert_eq(compose({download = {}, body = rows}), false, "twelve native levels exceed the actual shared depth policy")
+			assert_row_graph_unchanged(publication_graph); assert_row_graph_unchanged(source_graph)
+			local original_menu = tail.menu
+			local repaired, repair_error = xpcall(function()
+				tail.menu = {leaf}
+				local repaired_graph = capture_row_graph(rows)
+				helpers.assert_eq(compose({download = {}, body = rows}), true, "the same complete native subtree admits after only excess depth is removed")
+				assert_row_graph_unchanged(repaired_graph); assert_row_graph_unchanged(source_graph)
+			end, debug.traceback)
+			tail.menu = original_menu
+			if not repaired then error(repair_error, 0) end
+			assert_row_graph_unchanged(publication_graph); assert_row_graph_unchanged(native_graph)
+			helpers.assert_eq(compose({download = {}, body = rows}), false, "restoring the exact excess-depth subtree restores the strict refusal")
+			assert_row_graph_unchanged(publication_graph); assert_row_graph_unchanged(source_graph)
+			helpers.assert_eq(delivered, 0, "neither handoff nor refused publication delivers the original leaf command")
 			helpers.assert_eq(fixture.calls.save, 0); helpers.assert_eq(fixture.calls.runtime, 0)
 		end)
 	end)

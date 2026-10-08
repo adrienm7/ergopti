@@ -1,0 +1,47 @@
+{
+	"kind": "Independent old physical root composition vectors, frozen before successor qualification; never regenerate from candidate",
+	"source_sha256": {
+		"static/ergopti_plus/macos/ui/menu/builder.lua": "dedd8ad5ca86562ea525459a22b5cefb037b3428b1fe197b959cdd0a45269468",
+		"static/ergopti_plus/macos/ui/menu/canvas_badge.lua": "33a7fbe72b6fd4c68f9104cd629f0a4adf0475d681a49b4c86288c2c2b71a05e"
+	},
+	"vectors": [
+		{
+			"name": "badge_and_download",
+			"badge": true,
+			"download": true,
+			"expected": ["badge", "boundary", "download", "boundary", "body"]
+		},
+		{
+			"name": "badge_no_download",
+			"badge": true,
+			"download": false,
+			"expected": ["badge", "boundary", "body"]
+		},
+		{
+			"name": "download_badge_failure",
+			"badge": false,
+			"download": true,
+			"expected": ["download", "boundary", "body"]
+		},
+		{
+			"name": "both_absent",
+			"badge": false,
+			"download": false,
+			"expected": ["body"]
+		},
+		{
+			"name": "badge_empty_body",
+			"badge": true,
+			"download": false,
+			"body_empty": true,
+			"expected": ["badge", "boundary"]
+		},
+		{
+			"name": "download_empty_body_badge_failure",
+			"badge": false,
+			"download": true,
+			"body_empty": true,
+			"expected": ["download", "boundary"]
+		}
+	]
+}
