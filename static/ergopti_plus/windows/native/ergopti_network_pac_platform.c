@@ -48,31 +48,88 @@ static WCHAR *wide_argument(const char *argument)
 	return wide;
 }
 
+typedef struct {
+	OVERLAPPED overlapped;
+	HANDLE cancellation;
+	ADDRINFOEXW hints;
+	ADDRINFOEXW *addresses;
+	WCHAR *wide;
+	TIMEVAL timeout;
+} dns_operation;
+
+static DWORD dns_remaining(const ergopti_windows_pac_owner *state)
+{
+	uint64_t now = native_tick(NULL), remaining;
+	if (now >= state->limits->deadline_tick) return 0;
+	remaining = state->limits->deadline_tick - now;
+	return remaining > INT_MAX ? (DWORD)INT_MAX : (DWORD)remaining;
+}
+
 static int native_dns(void *owner, const char *host, int extended, char *output, size_t capacity, ergopti_pac_native_error *error)
 {
 	ergopti_windows_pac_owner *state = (ergopti_windows_pac_owner *)owner;
-	ADDRINFOEXW hints, *addresses = NULL, *current;
-	WCHAR *wide;
-	TIMEVAL timeout;
+	dns_operation *operation;
+	ADDRINFOEXW *current;
 	uint64_t now = native_tick(owner), remaining;
 	size_t seen = 0;
-	int status, admitted = 0;
+	int status, admitted = 0, interrupted = 0;
 	if (now >= state->limits->deadline_tick) { error->code = 0; error->domain = ERGOPTI_PAC_ERROR_NONE; return -1; }
 	remaining = state->limits->deadline_tick - now;
 	if (remaining / 1000 > LONG_MAX) { error->code = 0; error->domain = ERGOPTI_PAC_ERROR_NONE; return -1; }
-	timeout.tv_sec = (long)(remaining / 1000); timeout.tv_usec = (long)((remaining % 1000) * 1000);
-	wide = wide_argument(host);
-	if (wide == NULL) { error->code = (int32_t)GetLastError(); error->domain = error->code == 0 ? ERGOPTI_PAC_ERROR_NONE : ERGOPTI_PAC_ERROR_WIN32; return -1; }
-	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = extended ? AF_UNSPEC : AF_INET; hints.ai_socktype = SOCK_STREAM;
-	status = GetAddrInfoExW(wide, NULL, NS_DNS, NULL, &hints, &addresses, &timeout, NULL, NULL, NULL);
-	free(wide);
-	if (status != 0) {
-		if (addresses != NULL) FreeAddrInfoExW(addresses);
-		if (status == WSAHOST_NOT_FOUND || status == WSANO_DATA || status == WSATRY_AGAIN) return 0;
-		error->code = status; error->domain = ERGOPTI_PAC_ERROR_WINSOCK; return -1;
+	operation = (dns_operation *)calloc(1, sizeof(*operation));
+	if (operation == NULL) { error->code = 0; error->domain = ERGOPTI_PAC_ERROR_NONE; return -1; }
+	operation->timeout.tv_sec = (long)(remaining / 1000);
+	operation->timeout.tv_usec = (long)((remaining % 1000) * 1000);
+	operation->wide = wide_argument(host);
+	if (operation->wide == NULL) {
+		error->code = (int32_t)GetLastError(); error->domain = error->code == 0 ? ERGOPTI_PAC_ERROR_NONE : ERGOPTI_PAC_ERROR_WIN32;
+		free(operation); return -1;
 	}
-	for (current = addresses; current != NULL; current = current->ai_next) {
+	operation->overlapped.hEvent = CreateEventW(NULL, TRUE, FALSE, NULL);
+	if (operation->overlapped.hEvent == NULL) {
+		error->code = (int32_t)GetLastError(); error->domain = error->code == 0 ? ERGOPTI_PAC_ERROR_NONE : ERGOPTI_PAC_ERROR_WIN32;
+		free(operation->wide); free(operation); return -1;
+	}
+	operation->hints.ai_family = extended ? AF_UNSPEC : AF_INET;
+	operation->hints.ai_socktype = SOCK_STREAM;
+	/* Use the documented Unicode overlapped event API and retain its
+	 * timeout and referenced storage until physical completion. */
+	status = GetAddrInfoExW(operation->wide, NULL, NS_DNS, NULL, &operation->hints,
+		&operation->addresses, &operation->timeout, &operation->overlapped, NULL, &operation->cancellation);
+	if (status == WSA_IO_PENDING) {
+		DWORD completed = WaitForSingleObject(operation->overlapped.hEvent, dns_remaining(state));
+		if (completed != WAIT_OBJECT_0) {
+			int cancelled;
+			interrupted = 1;
+			if (completed == WAIT_FAILED) {
+				error->code = (int32_t)GetLastError();
+				error->domain = error->code == 0 ? ERGOPTI_PAC_ERROR_NONE : ERGOPTI_PAC_ERROR_WIN32;
+			}
+			cancelled = GetAddrInfoExCancel(&operation->cancellation);
+			completed = WaitForSingleObject(operation->overlapped.hEvent, dns_remaining(state));
+			if (completed != WAIT_OBJECT_0) {
+				/* Cancellation is not completion. Retain every native-referenced
+				 * byte and handle until the private evaluator process is gone;
+				 * the external Job owner proves that physical containment fence. */
+				_Exit(EXIT_FAILURE);
+			}
+			if (cancelled != 0 && cancelled != WSA_INVALID_HANDLE && error->code == 0) {
+				error->code = cancelled; error->domain = ERGOPTI_PAC_ERROR_WINSOCK;
+			}
+		}
+		status = GetAddrInfoExOverlappedResult(&operation->overlapped);
+		if (status == WSAEINPROGRESS || status == WSA_IO_PENDING || status == WSA_IO_INCOMPLETE) {
+			/* An unacknowledged operation must never publish an empty/success
+			 * result or release its OVERLAPPED storage while a provider owns it. */
+			_Exit(EXIT_FAILURE);
+		}
+	}
+	if (interrupted || error->code != 0) { admitted = -1; goto closed; }
+	if (status != 0) {
+		if (status == WSAHOST_NOT_FOUND || status == WSANO_DATA || status == WSATRY_AGAIN) goto closed;
+		error->code = status; error->domain = ERGOPTI_PAC_ERROR_WINSOCK; admitted = -1; goto closed;
+	}
+	for (current = operation->addresses; current != NULL; current = current->ai_next) {
 		int added;
 		if (++seen > state->limits->max_native_queries) { error->code = 0; error->domain = ERGOPTI_PAC_ERROR_NONE; admitted = -1; break; }
 		if (current->ai_addr == NULL || (current->ai_family == AF_INET && current->ai_addrlen < sizeof(SOCKADDR_IN)) ||
@@ -83,7 +140,13 @@ static int native_dns(void *owner, const char *host, int extended, char *output,
 		if (added < 0) { error->code = 0; error->domain = ERGOPTI_PAC_ERROR_NONE; admitted = -1; break; }
 		if (added > 0) { admitted = 1; if (!extended) break; }
 	}
-	FreeAddrInfoExW(addresses);
+closed:
+	if (operation->addresses != NULL) FreeAddrInfoExW(operation->addresses);
+	if (!CloseHandle(operation->overlapped.hEvent)) {
+		error->code = (int32_t)GetLastError(); error->domain = error->code == 0 ? ERGOPTI_PAC_ERROR_NONE : ERGOPTI_PAC_ERROR_WIN32;
+		admitted = -1;
+	}
+	free(operation->wide); free(operation);
 	return admitted;
 }
 
