@@ -1,0 +1,476 @@
+{
+	"status": "PREDECESSOR FAILURES CAPTURED; causal classification requires actual traces",
+	"mode": "predecessor",
+	"entries": [
+		{
+			"abi": "luajit",
+			"cohort": "production",
+			"module": "tests.unit.modules.updater.test_production_manager_owners",
+			"expected": 18,
+			"command": [
+				"/workspace/.tools/native/usr/bin/luajit",
+				"/workspace/scratch/group6-native-updater-96-validation-source-plan2/run_one.lua",
+				"/workspace/scratch/group6-native-updater-96-qualification2/predecessor-production/static/ergopti_plus/linux",
+				"tests.unit.modules.updater.test_production_manager_owners",
+				"18"
+			],
+			"cwd": "/workspace/scratch/group6-native-updater-96-qualification2/predecessor-production/static/ergopti_plus/linux",
+			"status": "TERMINAL",
+			"exit_code": 1,
+			"log": "/workspace/scratch/group6-native-updater-96-qualification2/logs-predecessor/01-luajit-tests.unit.modules.updater.test_production_manager_owners.log",
+			"log_sha256": "8d0a8ec4d10a89ae60dac9e6c6069419ccf39fb42e9a8b1d4afabe236287795c",
+			"counts": {
+				"passed": 8,
+				"failed": 10,
+				"executed": 18,
+				"expected": 18,
+				"skipped": 0
+			},
+			"import_ok": true
+		},
+		{
+			"abi": "luajit",
+			"cohort": "production",
+			"module": "tests.unit.modules.updater.test_archive_transfer_publication",
+			"expected": 4,
+			"command": [
+				"/workspace/.tools/native/usr/bin/luajit",
+				"/workspace/scratch/group6-native-updater-96-validation-source-plan2/run_one.lua",
+				"/workspace/scratch/group6-native-updater-96-qualification2/predecessor-production/static/ergopti_plus/linux",
+				"tests.unit.modules.updater.test_archive_transfer_publication",
+				"4"
+			],
+			"cwd": "/workspace/scratch/group6-native-updater-96-qualification2/predecessor-production/static/ergopti_plus/linux",
+			"status": "TERMINAL",
+			"exit_code": 1,
+			"log": "/workspace/scratch/group6-native-updater-96-qualification2/logs-predecessor/02-luajit-tests.unit.modules.updater.test_archive_transfer_publication.log",
+			"log_sha256": "cbac0129772ef5db087e38d1d6f39d8c998ff8bef50ef2f56bfa792a412dfd11",
+			"counts": {
+				"passed": 2,
+				"failed": 2,
+				"executed": 4,
+				"expected": 4,
+				"skipped": 0
+			},
+			"import_ok": true
+		},
+		{
+			"abi": "luajit",
+			"cohort": "installer",
+			"module": "tests.unit.meta.test_release_install_async",
+			"expected": 15,
+			"command": [
+				"/workspace/.tools/native/usr/bin/luajit",
+				"/workspace/scratch/group6-native-updater-96-validation-source-plan2/run_one.lua",
+				"/workspace/scratch/group6-native-updater-96-qualification2/predecessor-installer/static/ergopti_plus/linux",
+				"tests.unit.meta.test_release_install_async",
+				"15"
+			],
+			"cwd": "/workspace/scratch/group6-native-updater-96-qualification2/predecessor-installer/static/ergopti_plus/linux",
+			"status": "TERMINAL",
+			"exit_code": 0,
+			"log": "/workspace/scratch/group6-native-updater-96-qualification2/logs-predecessor/03-luajit-tests.unit.meta.test_release_install_async.log",
+			"log_sha256": "17e98a5ecd651ab007c8e5eb28bbf40e3b6776aade34ab2edb37ffc74358f06d",
+			"counts": {
+				"passed": 15,
+				"failed": 0,
+				"executed": 15,
+				"expected": 15,
+				"skipped": 0
+			},
+			"import_ok": true
+		},
+		{
+			"abi": "luajit",
+			"cohort": "installer",
+			"module": "tests.unit.meta.test_install_budget",
+			"expected": 10,
+			"command": [
+				"/workspace/.tools/native/usr/bin/luajit",
+				"/workspace/scratch/group6-native-updater-96-validation-source-plan2/run_one.lua",
+				"/workspace/scratch/group6-native-updater-96-qualification2/predecessor-installer/static/ergopti_plus/linux",
+				"tests.unit.meta.test_install_budget",
+				"10"
+			],
+			"cwd": "/workspace/scratch/group6-native-updater-96-qualification2/predecessor-installer/static/ergopti_plus/linux",
+			"status": "TERMINAL",
+			"exit_code": 0,
+			"log": "/workspace/scratch/group6-native-updater-96-qualification2/logs-predecessor/04-luajit-tests.unit.meta.test_install_budget.log",
+			"log_sha256": "ed3d6a482060dc06612ef271125cce56d6932bf56ca2f54473e2b25ff4c8e63b",
+			"counts": {
+				"passed": 10,
+				"failed": 0,
+				"executed": 10,
+				"expected": 10,
+				"skipped": 0
+			},
+			"import_ok": true
+		},
+		{
+			"abi": "luajit",
+			"cohort": "installer",
+			"module": "tests.unit.ui.test_update_check_async_admission",
+			"expected": 4,
+			"command": [
+				"/workspace/.tools/native/usr/bin/luajit",
+				"/workspace/scratch/group6-native-updater-96-validation-source-plan2/run_one.lua",
+				"/workspace/scratch/group6-native-updater-96-qualification2/predecessor-installer/static/ergopti_plus/linux",
+				"tests.unit.ui.test_update_check_async_admission",
+				"4"
+			],
+			"cwd": "/workspace/scratch/group6-native-updater-96-qualification2/predecessor-installer/static/ergopti_plus/linux",
+			"status": "TERMINAL",
+			"exit_code": 0,
+			"log": "/workspace/scratch/group6-native-updater-96-qualification2/logs-predecessor/05-luajit-tests.unit.ui.test_update_check_async_admission.log",
+			"log_sha256": "fa2405f393ff2519baaf61b14e59a0d7f99c3b27447fa57bcd6d8f29886bc4ab",
+			"counts": {
+				"passed": 4,
+				"failed": 0,
+				"executed": 4,
+				"expected": 4,
+				"skipped": 0
+			},
+			"import_ok": true
+		},
+		{
+			"abi": "luajit",
+			"cohort": "installer",
+			"module": "tests.unit.ui.test_changelog_accepted_async",
+			"expected": 8,
+			"command": [
+				"/workspace/.tools/native/usr/bin/luajit",
+				"/workspace/scratch/group6-native-updater-96-validation-source-plan2/run_one.lua",
+				"/workspace/scratch/group6-native-updater-96-qualification2/predecessor-installer/static/ergopti_plus/linux",
+				"tests.unit.ui.test_changelog_accepted_async",
+				"8"
+			],
+			"cwd": "/workspace/scratch/group6-native-updater-96-qualification2/predecessor-installer/static/ergopti_plus/linux",
+			"status": "TERMINAL",
+			"exit_code": 0,
+			"log": "/workspace/scratch/group6-native-updater-96-qualification2/logs-predecessor/06-luajit-tests.unit.ui.test_changelog_accepted_async.log",
+			"log_sha256": "8d204d8f463bd36672e296127897cf5e0c4d9d30ed214ed19e012004501a0ca6",
+			"counts": {
+				"passed": 8,
+				"failed": 0,
+				"executed": 8,
+				"expected": 8,
+				"skipped": 0
+			},
+			"import_ok": true
+		},
+		{
+			"abi": "luajit",
+			"cohort": "installer",
+			"module": "tests.unit.modules.updater.test_install_owned_pre_reader_refusal",
+			"expected": 8,
+			"command": [
+				"/workspace/.tools/native/usr/bin/luajit",
+				"/workspace/scratch/group6-native-updater-96-validation-source-plan2/run_one.lua",
+				"/workspace/scratch/group6-native-updater-96-qualification2/predecessor-installer/static/ergopti_plus/linux",
+				"tests.unit.modules.updater.test_install_owned_pre_reader_refusal",
+				"8"
+			],
+			"cwd": "/workspace/scratch/group6-native-updater-96-qualification2/predecessor-installer/static/ergopti_plus/linux",
+			"status": "TERMINAL",
+			"exit_code": 1,
+			"log": "/workspace/scratch/group6-native-updater-96-qualification2/logs-predecessor/07-luajit-tests.unit.modules.updater.test_install_owned_pre_reader_refusal.log",
+			"log_sha256": "6d6694ae0144b7b0c89bb08e74788700433cdbe30987b6f775748c536cdf113c",
+			"counts": {
+				"passed": 0,
+				"failed": 8,
+				"executed": 8,
+				"expected": 8,
+				"skipped": 0
+			},
+			"import_ok": true
+		},
+		{
+			"abi": "luajit",
+			"cohort": "registry",
+			"module": "tests.unit.infra.test_native_artifact_registry",
+			"expected": 23,
+			"command": [
+				"/workspace/.tools/native/usr/bin/luajit",
+				"/workspace/scratch/group6-native-updater-96-validation-source-plan2/run_one.lua",
+				"/workspace/scratch/group6-native-updater-96-qualification2/predecessor-registry/static/ergopti_plus/linux",
+				"tests.unit.infra.test_native_artifact_registry",
+				"23"
+			],
+			"cwd": "/workspace/scratch/group6-native-updater-96-qualification2/predecessor-registry/static/ergopti_plus/linux",
+			"status": "TERMINAL",
+			"exit_code": 0,
+			"log": "/workspace/scratch/group6-native-updater-96-qualification2/logs-predecessor/08-luajit-tests.unit.infra.test_native_artifact_registry.log",
+			"log_sha256": "2f8f09f907f37b084e6438cdc7859e046dce047a4107a144cbde94483e1de87f",
+			"counts": {
+				"passed": 23,
+				"failed": 0,
+				"executed": 23,
+				"expected": 23,
+				"skipped": 0
+			},
+			"import_ok": true
+		},
+		{
+			"abi": "luajit",
+			"cohort": "registry",
+			"module": "tests.unit.infra.test_native_install_admission",
+			"expected": 6,
+			"command": [
+				"/workspace/.tools/native/usr/bin/luajit",
+				"/workspace/scratch/group6-native-updater-96-validation-source-plan2/run_one.lua",
+				"/workspace/scratch/group6-native-updater-96-qualification2/predecessor-registry/static/ergopti_plus/linux",
+				"tests.unit.infra.test_native_install_admission",
+				"6"
+			],
+			"cwd": "/workspace/scratch/group6-native-updater-96-qualification2/predecessor-registry/static/ergopti_plus/linux",
+			"status": "TERMINAL",
+			"exit_code": 0,
+			"log": "/workspace/scratch/group6-native-updater-96-qualification2/logs-predecessor/09-luajit-tests.unit.infra.test_native_install_admission.log",
+			"log_sha256": "dff5658e52801b76db0b24ce04e9e3d83d63d7960b3dcb47086283084937dd27",
+			"counts": {
+				"passed": 6,
+				"failed": 0,
+				"executed": 6,
+				"expected": 6,
+				"skipped": 0
+			},
+			"import_ok": true
+		},
+		{
+			"abi": "lua54",
+			"cohort": "production",
+			"module": "tests.unit.modules.updater.test_production_manager_owners",
+			"expected": 18,
+			"command": [
+				"/workspace/.tools/native/usr/bin/lua5.4",
+				"/workspace/scratch/group6-native-updater-96-validation-source-plan2/run_one.lua",
+				"/workspace/scratch/group6-native-updater-96-qualification2/predecessor-production/static/ergopti_plus/linux",
+				"tests.unit.modules.updater.test_production_manager_owners",
+				"18"
+			],
+			"cwd": "/workspace/scratch/group6-native-updater-96-qualification2/predecessor-production/static/ergopti_plus/linux",
+			"status": "TERMINAL",
+			"exit_code": 1,
+			"log": "/workspace/scratch/group6-native-updater-96-qualification2/logs-predecessor/10-lua54-tests.unit.modules.updater.test_production_manager_owners.log",
+			"log_sha256": "623d68024512fa75ce7500faadb03a1898a5f155251b00ea8a8b9d94f24bb297",
+			"counts": {
+				"passed": 8,
+				"failed": 10,
+				"executed": 18,
+				"expected": 18,
+				"skipped": 0
+			},
+			"import_ok": true
+		},
+		{
+			"abi": "lua54",
+			"cohort": "production",
+			"module": "tests.unit.modules.updater.test_archive_transfer_publication",
+			"expected": 4,
+			"command": [
+				"/workspace/.tools/native/usr/bin/lua5.4",
+				"/workspace/scratch/group6-native-updater-96-validation-source-plan2/run_one.lua",
+				"/workspace/scratch/group6-native-updater-96-qualification2/predecessor-production/static/ergopti_plus/linux",
+				"tests.unit.modules.updater.test_archive_transfer_publication",
+				"4"
+			],
+			"cwd": "/workspace/scratch/group6-native-updater-96-qualification2/predecessor-production/static/ergopti_plus/linux",
+			"status": "TERMINAL",
+			"exit_code": 1,
+			"log": "/workspace/scratch/group6-native-updater-96-qualification2/logs-predecessor/11-lua54-tests.unit.modules.updater.test_archive_transfer_publication.log",
+			"log_sha256": "7c361720b16cc8d8e4c592f4334974fe1bff08e578ab136eea95cd2f0a2c4ffa",
+			"counts": {
+				"passed": 2,
+				"failed": 2,
+				"executed": 4,
+				"expected": 4,
+				"skipped": 0
+			},
+			"import_ok": true
+		},
+		{
+			"abi": "lua54",
+			"cohort": "installer",
+			"module": "tests.unit.meta.test_release_install_async",
+			"expected": 15,
+			"command": [
+				"/workspace/.tools/native/usr/bin/lua5.4",
+				"/workspace/scratch/group6-native-updater-96-validation-source-plan2/run_one.lua",
+				"/workspace/scratch/group6-native-updater-96-qualification2/predecessor-installer/static/ergopti_plus/linux",
+				"tests.unit.meta.test_release_install_async",
+				"15"
+			],
+			"cwd": "/workspace/scratch/group6-native-updater-96-qualification2/predecessor-installer/static/ergopti_plus/linux",
+			"status": "TERMINAL",
+			"exit_code": 0,
+			"log": "/workspace/scratch/group6-native-updater-96-qualification2/logs-predecessor/12-lua54-tests.unit.meta.test_release_install_async.log",
+			"log_sha256": "17e98a5ecd651ab007c8e5eb28bbf40e3b6776aade34ab2edb37ffc74358f06d",
+			"counts": {
+				"passed": 15,
+				"failed": 0,
+				"executed": 15,
+				"expected": 15,
+				"skipped": 0
+			},
+			"import_ok": true
+		},
+		{
+			"abi": "lua54",
+			"cohort": "installer",
+			"module": "tests.unit.meta.test_install_budget",
+			"expected": 10,
+			"command": [
+				"/workspace/.tools/native/usr/bin/lua5.4",
+				"/workspace/scratch/group6-native-updater-96-validation-source-plan2/run_one.lua",
+				"/workspace/scratch/group6-native-updater-96-qualification2/predecessor-installer/static/ergopti_plus/linux",
+				"tests.unit.meta.test_install_budget",
+				"10"
+			],
+			"cwd": "/workspace/scratch/group6-native-updater-96-qualification2/predecessor-installer/static/ergopti_plus/linux",
+			"status": "TERMINAL",
+			"exit_code": 0,
+			"log": "/workspace/scratch/group6-native-updater-96-qualification2/logs-predecessor/13-lua54-tests.unit.meta.test_install_budget.log",
+			"log_sha256": "ed3d6a482060dc06612ef271125cce56d6932bf56ca2f54473e2b25ff4c8e63b",
+			"counts": {
+				"passed": 10,
+				"failed": 0,
+				"executed": 10,
+				"expected": 10,
+				"skipped": 0
+			},
+			"import_ok": true
+		},
+		{
+			"abi": "lua54",
+			"cohort": "installer",
+			"module": "tests.unit.ui.test_update_check_async_admission",
+			"expected": 4,
+			"command": [
+				"/workspace/.tools/native/usr/bin/lua5.4",
+				"/workspace/scratch/group6-native-updater-96-validation-source-plan2/run_one.lua",
+				"/workspace/scratch/group6-native-updater-96-qualification2/predecessor-installer/static/ergopti_plus/linux",
+				"tests.unit.ui.test_update_check_async_admission",
+				"4"
+			],
+			"cwd": "/workspace/scratch/group6-native-updater-96-qualification2/predecessor-installer/static/ergopti_plus/linux",
+			"status": "TERMINAL",
+			"exit_code": 0,
+			"log": "/workspace/scratch/group6-native-updater-96-qualification2/logs-predecessor/14-lua54-tests.unit.ui.test_update_check_async_admission.log",
+			"log_sha256": "fa2405f393ff2519baaf61b14e59a0d7f99c3b27447fa57bcd6d8f29886bc4ab",
+			"counts": {
+				"passed": 4,
+				"failed": 0,
+				"executed": 4,
+				"expected": 4,
+				"skipped": 0
+			},
+			"import_ok": true
+		},
+		{
+			"abi": "lua54",
+			"cohort": "installer",
+			"module": "tests.unit.ui.test_changelog_accepted_async",
+			"expected": 8,
+			"command": [
+				"/workspace/.tools/native/usr/bin/lua5.4",
+				"/workspace/scratch/group6-native-updater-96-validation-source-plan2/run_one.lua",
+				"/workspace/scratch/group6-native-updater-96-qualification2/predecessor-installer/static/ergopti_plus/linux",
+				"tests.unit.ui.test_changelog_accepted_async",
+				"8"
+			],
+			"cwd": "/workspace/scratch/group6-native-updater-96-qualification2/predecessor-installer/static/ergopti_plus/linux",
+			"status": "TERMINAL",
+			"exit_code": 0,
+			"log": "/workspace/scratch/group6-native-updater-96-qualification2/logs-predecessor/15-lua54-tests.unit.ui.test_changelog_accepted_async.log",
+			"log_sha256": "8d204d8f463bd36672e296127897cf5e0c4d9d30ed214ed19e012004501a0ca6",
+			"counts": {
+				"passed": 8,
+				"failed": 0,
+				"executed": 8,
+				"expected": 8,
+				"skipped": 0
+			},
+			"import_ok": true
+		},
+		{
+			"abi": "lua54",
+			"cohort": "installer",
+			"module": "tests.unit.modules.updater.test_install_owned_pre_reader_refusal",
+			"expected": 8,
+			"command": [
+				"/workspace/.tools/native/usr/bin/lua5.4",
+				"/workspace/scratch/group6-native-updater-96-validation-source-plan2/run_one.lua",
+				"/workspace/scratch/group6-native-updater-96-qualification2/predecessor-installer/static/ergopti_plus/linux",
+				"tests.unit.modules.updater.test_install_owned_pre_reader_refusal",
+				"8"
+			],
+			"cwd": "/workspace/scratch/group6-native-updater-96-qualification2/predecessor-installer/static/ergopti_plus/linux",
+			"status": "TERMINAL",
+			"exit_code": 1,
+			"log": "/workspace/scratch/group6-native-updater-96-qualification2/logs-predecessor/16-lua54-tests.unit.modules.updater.test_install_owned_pre_reader_refusal.log",
+			"log_sha256": "694a5670b208c2169ef8559c881a46f49cb45bc477f53ed54722457a70ea4721",
+			"counts": {
+				"passed": 0,
+				"failed": 8,
+				"executed": 8,
+				"expected": 8,
+				"skipped": 0
+			},
+			"import_ok": true
+		},
+		{
+			"abi": "lua54",
+			"cohort": "registry",
+			"module": "tests.unit.infra.test_native_artifact_registry",
+			"expected": 23,
+			"command": [
+				"/workspace/.tools/native/usr/bin/lua5.4",
+				"/workspace/scratch/group6-native-updater-96-validation-source-plan2/run_one.lua",
+				"/workspace/scratch/group6-native-updater-96-qualification2/predecessor-registry/static/ergopti_plus/linux",
+				"tests.unit.infra.test_native_artifact_registry",
+				"23"
+			],
+			"cwd": "/workspace/scratch/group6-native-updater-96-qualification2/predecessor-registry/static/ergopti_plus/linux",
+			"status": "TERMINAL",
+			"exit_code": 0,
+			"log": "/workspace/scratch/group6-native-updater-96-qualification2/logs-predecessor/17-lua54-tests.unit.infra.test_native_artifact_registry.log",
+			"log_sha256": "2f8f09f907f37b084e6438cdc7859e046dce047a4107a144cbde94483e1de87f",
+			"counts": {
+				"passed": 23,
+				"failed": 0,
+				"executed": 23,
+				"expected": 23,
+				"skipped": 0
+			},
+			"import_ok": true
+		},
+		{
+			"abi": "lua54",
+			"cohort": "registry",
+			"module": "tests.unit.infra.test_native_install_admission",
+			"expected": 6,
+			"command": [
+				"/workspace/.tools/native/usr/bin/lua5.4",
+				"/workspace/scratch/group6-native-updater-96-validation-source-plan2/run_one.lua",
+				"/workspace/scratch/group6-native-updater-96-qualification2/predecessor-registry/static/ergopti_plus/linux",
+				"tests.unit.infra.test_native_install_admission",
+				"6"
+			],
+			"cwd": "/workspace/scratch/group6-native-updater-96-qualification2/predecessor-registry/static/ergopti_plus/linux",
+			"status": "TERMINAL",
+			"exit_code": 0,
+			"log": "/workspace/scratch/group6-native-updater-96-qualification2/logs-predecessor/18-lua54-tests.unit.infra.test_native_install_admission.log",
+			"log_sha256": "dff5658e52801b76db0b24ce04e9e3d83d63d7960b3dcb47086283084937dd27",
+			"counts": {
+				"passed": 6,
+				"failed": 0,
+				"executed": 6,
+				"expected": 6,
+				"skipped": 0
+			},
+			"import_ok": true
+		}
+	],
+	"qualification": "controlled actual callers; no native pipeline/FD/GUI proof",
+	"source_plan_sha256": "daf97537304d2f24828bf7f8e6a40c4d7bd2f11125a02edc05a06ff8ac50386c"
+}

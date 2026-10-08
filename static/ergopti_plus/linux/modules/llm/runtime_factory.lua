@@ -38,6 +38,7 @@ function M.new(engine, profiles)
 	local controller = require("modules.llm.runtime_composition").new({
 		source = source, resolver = resolver, installed = installed,
 		file_factory = require("modules.llm.ollama_install_files"),
+		archive_factory = require("infra.archive_output"),
 		admission = require("modules.llm.ollama_install_admission"),
 		install_phase = require("llm.ollama_install_phase"), process = process,
 		http = require("adapters.http_client"), owned_timer = timer, timings = Timings,

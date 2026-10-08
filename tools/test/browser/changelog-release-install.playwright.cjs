@@ -2,10 +2,10 @@
 
 /**
  * ==============================================================================
- * MODULE: Versions Page One-Click Install (real Chromium render)
+ * MODULE: Versions Page One-Click Install (real Chromium and WebKit)
  * DESCRIPTION:
  * Loads the shared Versions page (_shared/ui/changelog/index.html) in headless
- * Chromium through Playwright, as a Linux-hosted window with a recording bridge,
+ * Chromium and WebKit through Playwright, as a Linux-hosted window with a recording bridge,
  * lists a fixture release list and checks the install buttons and the message
  * a click posts. It complements tools/test/test-changelog-release-install.cjs,
  * which runs the same scripts against a recording DOM in the JS suite: this one
@@ -15,8 +15,8 @@
  * FEATURES & RATIONALE:
  * 1. Network-independent: the bridge is a stub, the locale strings are seeded,
  *    and the fixture list is injected; the page never reaches GitHub.
- * 2. Not in the CI JS suite: the CI image installs no browser. Run it where
- *    Playwright and its Chromium are installed (npm run test:browser:changelog-install).
+ * 2. The Core / js job installs both browsers and runs this gate separately
+ *    from the Node-only suite (npm run test:browser:changelog-install).
  *    A missing Playwright fails the run; it is never reported as a pass.
  * ==============================================================================
  */
@@ -65,109 +65,213 @@ function expect(condition, message) {
 }
 
 (async () => {
-	const { chromium } = loadPlaywright();
-	const browser = await chromium.launch();
-	try {
-		const page = await browser.newPage({ viewport: { width: 860, height: 580 } });
-		const pageErrors = [];
-		page.on('pageerror', (error) => pageErrors.push(error.message));
-		page.on('request', (request) => {
-			if (!request.url().startsWith('file:')) pageErrors.push(`network request: ${request.url()}`);
-		});
-		await page.addInitScript(
-			({ strings, installed }) => {
-				window._i18n_strings = strings;
-				window.__ergopti_host = 'linux';
-				window.__installed_version = installed;
-				window.__subscribed_channel = 'dev';
-				window.__posted = [];
-				window.webkit = {
-					messageHandlers: {
-						changelog_bridge: { postMessage: (payload) => window.__posted.push(payload) }
-					}
-				};
-			},
-			{ strings: EN, installed: INSTALLED }
-		);
-		await page.goto(pathToFileURL(PAGE).href);
-		await page.evaluate((releases) => window.injectReleases(releases, 'dev'), RELEASES);
-
-		for (let index = 0; index < RELEASES.length; index += 1) {
-			await page.click(`.release-item[data-idx="${index}"]`);
-			const tag = RELEASES[index].tag_name;
-			const installed = tag === `v${INSTALLED}`;
-			const button = page.locator('#btn-install');
-			expect(
-				(await button.isVisible()) === !installed,
-				`${tag}: the install button must be ${installed ? 'hidden' : 'visible'}`
+	const { chromium, webkit } = loadPlaywright();
+	for (const [engineName, engine] of [
+		['Chromium', chromium],
+		['WebKit', webkit]
+	]) {
+		const before = checks;
+		const browser = await engine.launch();
+		try {
+			const page = await browser.newPage({ viewport: { width: 860, height: 580 } });
+			const pageErrors = [];
+			page.on('pageerror', (error) => pageErrors.push(error.message));
+			page.on('request', (request) => {
+				if (!request.url().startsWith('file:'))
+					pageErrors.push(`network request: ${request.url()}`);
+			});
+			await page.addInitScript(
+				({ strings, installed }) => {
+					window._i18n_strings = strings;
+					window.__ergopti_host = 'linux';
+					window.__installed_version = installed;
+					window.__subscribed_channel = 'dev';
+					window.__posted = [];
+					window.webkit = {
+						messageHandlers: {
+							changelog_bridge: {
+								postMessage: (envelope) => {
+									const owner = window.__documentOwner;
+									const matches = (value) =>
+										owner &&
+										value &&
+										value.generation === owner.generation &&
+										value.token === owner.token &&
+										value.page_nonce === owner.page_nonce;
+									if (envelope && envelope.__ergopti_document_ack) {
+										window.__documentAcknowledged = matches(envelope.__ergopti_document_ack);
+										return;
+									}
+									if (
+										!window.__documentAcknowledged ||
+										!envelope ||
+										!matches(envelope.__ergopti_document)
+									) {
+										throw new Error('Versions action lacks its acknowledged original document');
+									}
+									window.__posted.push(envelope.payload);
+								}
+							}
+						}
+					};
+				},
+				{ strings: EN, installed: INSTALLED }
 			);
-			expect(
-				await page.locator('#btn-github').isVisible(),
-				`${tag}: « View on GitHub » stays visible`
-			);
-			if (installed) {
-				expect(
-					(await page.locator('.release-item.installed .badge-installed').count()) === 1,
-					'exactly the installed row carries the installed badge'
+			await page.goto(pathToFileURL(PAGE).href);
+			const initialized = await page.evaluate((token) => {
+				const nonce = window.getLinuxDocumentNonce('changelog_bridge');
+				window.__documentOwner = { generation: 1, token, page_nonce: nonce };
+				window.__documentAcknowledged = false;
+				const challenged = window.initializeLinuxDocumentBridge(
+					'changelog_bridge',
+					1,
+					token,
+					nonce
 				);
-				continue;
-			}
-			const label = await button.textContent();
-			const older = tag === 'v0.0.0-dev.139';
+				return (
+					challenged === true &&
+					window.__documentAcknowledged === true &&
+					window.confirmLinuxDocumentBridge('changelog_bridge', 1, token, nonce) === true
+				);
+			}, require('node:crypto').randomBytes(18).toString('base64'));
 			expect(
-				label ===
-					EN[older ? 'changelog_window.rollback_release' : 'changelog_window.install_release'],
-				`${tag}: label « ${label} »`
+				initialized,
+				'the real page answers its intrinsic nonce challenge and exact bridge ACK'
 			);
+			await page.evaluate((releases) => window.injectReleases(releases, 'dev'), RELEASES);
+
+			for (let index = 0; index < RELEASES.length; index += 1) {
+				await page.click(`.release-item[data-idx="${index}"]`);
+				const tag = RELEASES[index].tag_name;
+				const installed = tag === `v${INSTALLED}`;
+				const button = page.locator('#btn-install');
+				expect(
+					(await button.isVisible()) === !installed,
+					`${tag}: the install button must be ${installed ? 'hidden' : 'visible'}`
+				);
+				expect(
+					await page.locator('#btn-github').isVisible(),
+					`${tag}: « View on GitHub » stays visible`
+				);
+				if (installed) {
+					expect(
+						(await page.locator('.release-item.installed .badge-installed').count()) === 1,
+						'exactly the installed row carries the installed badge'
+					);
+					continue;
+				}
+				const label = await button.textContent();
+				const older = tag === 'v0.0.0-dev.139';
+				expect(
+					label ===
+						EN[older ? 'changelog_window.rollback_release' : 'changelog_window.install_release'],
+					`${tag}: label « ${label} »`
+				);
+			}
+
+			await page.click('.release-item[data-idx="3"]');
+			await page.click('#btn-install');
+			const posted = await page.evaluate(() => window.__posted);
+			const installs = posted.filter((payload) => payload && payload.action === 'install_release');
+			expect(
+				installs.length === 1 &&
+					installs[0].tag === 'v0.0.0-dev.139' &&
+					installs[0].channel === 'dev',
+				`one click must post install_release for the selected tag (got ${JSON.stringify(installs)})`
+			);
+			expect(
+				await page.locator('#install-panel').isVisible(),
+				'the progress panel appears at once'
+			);
+			expect(await page.locator('#btn-install').isDisabled(), 'the button waits for the host');
+
+			await page.evaluate(() =>
+				window.setInstallProgress({
+					tag: 'v0.0.0-dev.139',
+					phase: 'failed',
+					reason_key: 'changelog_window.install_error_verify',
+					backup_path: '/tmp/backups/pre-install'
+				})
+			);
+			expect(await page.locator('#btn-install-retry').isVisible(), 'a failure shows Retry');
+			await page.click('#btn-install-retry');
+			const retried = (await page.evaluate(() => window.__posted)).filter(
+				(payload) => payload && payload.action === 'install_release'
+			);
+			expect(retried.length === 2, 'Retry posts the request again');
+			await page.evaluate(() => {
+				window.setInstallProgress({
+					tag: 'v0.0.0-dev.139',
+					phase: 'failed',
+					reason_key: 'changelog_window.install_error_download',
+					backup_path: '/tmp/backups/pre-install',
+					managed_failure: true,
+					operation: 31,
+					failure_epoch: 44,
+					failure_report: {
+						cause: 'proxy',
+						message_key: 'network.failure.proxy',
+						actions: [{ id: 'retry', label_key: 'network.action.retry' }]
+					}
+				});
+				window.__retainedFailureButton = document.querySelector('#install-failure-actions button');
+			});
+			expect(
+				!(await page.locator('#btn-install-retry').isVisible()),
+				'managed failure hides the unbound generic Retry'
+			);
+			const managedRetry = page.locator('#install-failure-actions button');
+			expect(await managedRetry.isVisible(), 'the real managed retry button renders');
+			expect(
+				(await managedRetry.textContent()) === EN['network.action.retry'],
+				'the managed retry uses its actual translated label'
+			);
+			expect(
+				(await page.locator('#install-text').textContent()).includes(EN['network.failure.proxy']),
+				'the real page shows the translated proxy cause'
+			);
+			await managedRetry.click();
+			const actions = await page.evaluate(() =>
+				window.__posted.filter((p) => p && p.action === 'install_failure_action')
+			);
+			expect(
+				actions.length === 1 &&
+					actions[0].operation === 31 &&
+					actions[0].epoch === 44 &&
+					actions[0].id === 'retry',
+				'the real button posts only the exact native terminal operation and failure epoch'
+			);
+			await page.evaluate(() => {
+				window.setInstallProgress({ tag: 'v0.0.0-dev.139', phase: 'installing' });
+				window.__retainedFailureButton.click();
+			});
+			const retired = await page.evaluate(() =>
+				window.__posted.filter((p) => p && p.action === 'install_failure_action')
+			);
+			expect(retired.length === 1, 'the detached real DOM button cannot borrow a later phase');
+			expect(
+				pageErrors.length === 0,
+				`the page raised or reached the network: ${pageErrors.join('; ')}`
+			);
+
+			const shot = process.env.CHANGELOG_SCREENSHOT;
+			if (shot && engineName === 'Chromium') await page.screenshot({ path: shot });
+		} finally {
+			await browser.close();
 		}
 
-		await page.click('.release-item[data-idx="3"]');
-		await page.click('#btn-install');
-		const posted = await page.evaluate(() => window.__posted);
-		const installs = posted.filter((payload) => payload && payload.action === 'install_release');
-		expect(
-			installs.length === 1 &&
-				installs[0].tag === 'v0.0.0-dev.139' &&
-				installs[0].channel === 'dev',
-			`one click must post install_release for the selected tag (got ${JSON.stringify(installs)})`
+		if (failures.length > 0) {
+			console.error(
+				`[FAIL] Versions page install buttons in ${engineName} (${failures.length}/${checks}):`
+			);
+			for (const failure of failures) console.error('  - ' + failure);
+			process.exit(1);
+		}
+		console.log(
+			`[OK] Versions page install buttons render and post in ${engineName} (${checks - before} checks).`
 		);
-		expect(await page.locator('#install-panel').isVisible(), 'the progress panel appears at once');
-		expect(await page.locator('#btn-install').isDisabled(), 'the button waits for the host');
-
-		await page.evaluate(() =>
-			window.setInstallProgress({
-				tag: 'v0.0.0-dev.139',
-				phase: 'failed',
-				reason_key: 'changelog_window.install_error_verify',
-				backup_path: '/tmp/backups/pre-install'
-			})
-		);
-		expect(await page.locator('#btn-install-retry').isVisible(), 'a failure shows Retry');
-		await page.click('#btn-install-retry');
-		const retried = (await page.evaluate(() => window.__posted)).filter(
-			(payload) => payload && payload.action === 'install_release'
-		);
-		expect(retried.length === 2, 'Retry posts the request again');
-		expect(
-			pageErrors.length === 0,
-			`the page raised or reached the network: ${pageErrors.join('; ')}`
-		);
-
-		const shot = process.env.CHANGELOG_SCREENSHOT;
-		if (shot) await page.screenshot({ path: shot });
-	} finally {
-		await browser.close();
 	}
-
-	if (failures.length > 0) {
-		console.error(
-			`[FAIL] Versions page install buttons in Chromium (${failures.length}/${checks}):`
-		);
-		for (const failure of failures) console.error('  - ' + failure);
-		process.exit(1);
-	}
-	console.log(`[OK] Versions page install buttons render and post in Chromium (${checks} checks).`);
 })().catch((error) => {
-	console.error(`[FAIL] Versions page Chromium run: ${error.stack || error.message}`);
+	console.error(`[FAIL] Versions page browser run: ${error.stack || error.message}`);
 	process.exit(1);
 });

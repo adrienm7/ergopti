@@ -4,6 +4,14 @@
 _UFNB_FinalizerRunsNoStagingIo() {
 	Body := _DriverFuncBody("_Updater_PollDownloadAsync")
 	Assert(Body != "", "_Updater_PollDownloadAsync must exist")
+	Admission := _DriverFuncBody("_Updater_AdmitStagingCompletion")
+	Assert(InStr(Body, "_Updater_AdmitStagingCompletion(StagingEpoch)") > 0
+		&& InStr(Admission, "Critical(PreviousCritical)") > 0
+		&& InStr(Admission, "_Updater_SelfUpdateEpochIsCurrent(StagingEpoch)") > 0
+		&& InStr(Admission, "TimerSetCallback(_Updater_MonitorStagingWorker, 0)") > 0,
+		"exact current completion must retire the monitor under a restored state-only admission")
+	for Forbidden in ["_Updater_StartSwapTransaction(", "_Updater_NotifyInstallPhase(", "Logger", "FileRead(", "FileAppend(", "Run(", "Sleep("]
+		Assert(InStr(Admission, Forbidden) = 0, "state-only admission cannot hold Critical over " . Forbidden)
 	Assert(InStr(Body, "Critical(") = 0,
 		"download finalization must not hold Critical across process hand-off (updater-finalize-nonblocking)")
 	for Forbidden in ["ADODB.Stream", "ResponseBody", "SaveToFile", "FileAppend(", "FileGetSize(", "FileDelete(", "Sleep("] {

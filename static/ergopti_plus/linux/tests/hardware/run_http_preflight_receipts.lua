@@ -10,6 +10,7 @@
 
 local uv = require("luv")
 local HTTP = require("adapters.http_client")
+local Curl = require("adapters.curl_http_client")
 assert(uv.getuid() ~= 0, "native preflight checks require an ordinary user")
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-http-preflight-XXXXXX"))
 local path = root .. "/etag"
@@ -44,7 +45,7 @@ end
 local function native_clients_retired()
 	local retained = false
 	uv.walk(function(handle)
-		if not server_handles[handle] and not uv.is_closing(handle) then retained = true end
+		if not server_handles[handle] then retained = true end
 	end)
 	return not retained
 end
@@ -87,6 +88,7 @@ local function check(name, test)
 	local ok, err = xpcall(test, debug.traceback)
 	for index = before + 1, #held do respond(held[index]) end
 	HTTP.cancel(owner)
+	Curl.cancel("independent-owned-invalid")
 	wait_for(native_clients_retired)
 	if ok then print("PASS " .. name) else
 		failures = failures + 1
@@ -171,6 +173,9 @@ check("valid owned replacement composes once and retires its regular predecessor
 end)
 
 check("first owned construction failure retains late native close acknowledgments", function()
+	-- This one historical scenario specifies native late-allocation construction
+	-- debt. The stronger public no-allocation counterpart is exercised below.
+	local HTTP = setmetatable({ get_owned = Curl.get_owned }, { __index = HTTP })
 	local good, bad, before, before_requests = nil, nil, #held, requests
 	assert(HTTP.get(url .. "/held", {}, { owner = owner, timeout_ms = 1500 }, function(value) good = value end))
 	wait_for(function() return #held == before + 1 end)
@@ -187,6 +192,26 @@ check("first owned construction failure retains late native close acknowledgment
 	respond(held[#held])
 	wait_for(function() return good ~= nil end)
 	assert(good.ok and good.body == "abc")
+end)
+
+check("managed first malformed owned metadata refuses before all native allocation", function()
+	local before_handles, before_requests, before_fds = {}, requests, {}
+	uv.walk(function(handle) before_handles[handle] = true end)
+	local scan = assert(uv.fs_scandir("/proc/self/fd"))
+	while true do local name = uv.fs_scandir_next(scan); if not name then break end; before_fds[name] = true end
+	local callbacks, result, conversions = 0, nil, 0
+	local header = setmetatable({}, { __tostring = function()
+		conversions = conversions + 1
+		error("Synthetic fixed public metadata refusal")
+	end })
+	local operation = HTTP.get_owned(url .. "/direct", { ["X-Native"] = header },
+		{ owner = "independent-public-invalid", timeout_ms = 1000 }, function(value) result, callbacks = value, callbacks + 1 end)
+	assert(operation.started == false and operation:is_settled() and conversions == 1)
+	assert(result and not result.ok and result.status == 0 and result.body == "" and callbacks == 1)
+	assert(requests == before_requests)
+	uv.walk(function(handle) assert(before_handles[handle], "preflight acquired a native handle") end)
+	local after = assert(uv.fs_scandir("/proc/self/fd"))
+	while true do local name = uv.fs_scandir_next(after); if not name then break end; assert(before_fds[name], "preflight acquired an FD") end
 end)
 
 check("owned cleanup ownership rejects metadata without evaluating it", function()

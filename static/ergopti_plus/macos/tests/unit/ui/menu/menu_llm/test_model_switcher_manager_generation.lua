@@ -812,6 +812,9 @@ helpers.describe("model manager generation fences", function()
 			}
 			with_fixture(modules, hs_fixture, function()
 				install_common_stubs()
+				-- Load the genuine method while native file lookup is still available.
+				local network = require("modules.llm.network_env")
+				local emitted_network_prelude = assert(network.opaque_prelude("MLX"))
 				local notifications = 0
 				local completions = 0
 				package.loaded["infra.notifications"] = {
@@ -823,9 +826,9 @@ helpers.describe("model manager generation fences", function()
 					complete = function() completions = completions + 1 end,
 				}
 				package.loaded["adapters.task_lifecycle"] = {
-					native = function(label, _, on_done, on_stream)
+					native = function(label, executable, on_done, on_stream, args)
 						local task = {
-							label = label, on_stream = on_stream,
+							label = label, executable = executable, args = args, on_stream = on_stream,
 							terminate_calls = 0, running = false,
 						}
 						function task.on_done(...)
@@ -904,12 +907,6 @@ helpers.describe("model manager generation fences", function()
 					keymap = {set_llm_model = function() runtime_sets = runtime_sets + 1 end},
 				}
 				local obj = {start_server = function() starts = starts + 1; return true end}
-				-- The download exports the system network settings first; the faked
-				-- io.open hides the shared policy file, so its prelude is stubbed.
-				package.loaded["modules.llm.network_env"] = {
-					policy_path = function() return "/fixture/modules/llm/network-retry.sh" end,
-					prelude = function() return "", nil end,
-				}
 				require("ui.menu.menu_llm.models_manager_mlx_download").install({
 					obj = obj, deps = deps, presets = {},
 					project_venv_python_escaped = "/fixture/python",
@@ -928,6 +925,10 @@ helpers.describe("model manager generation fences", function()
 					if task.label == "MLX detached download launcher" then launcher = task end
 				end
 				helpers.assert_not_nil(launcher)
+				helpers.assert_type(launcher.executable, "string")
+				local emitted_launcher = assert(fake_files[launcher.executable])
+				helpers.assert_true(emitted_launcher:find(emitted_network_prelude, 1, true) ~= nil,
+					"the exact original launcher receives the genuine opaque prelude")
 				launcher.on_stream(nil, "__DLPID__:123\n", "")
 				launcher.on_done(0, "", "")
 				helpers.assert_not_nil(deps.active_tasks["download_tail"])
