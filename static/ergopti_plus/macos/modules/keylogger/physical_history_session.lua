@@ -289,6 +289,7 @@ local function new_manager(capacity, on_refused, native_ports)
 	local lease, retained_options, events, deferred
 	local frames, pumping, hint_due = 0, false, false
 	local terminal, finished, notified, reason, observer = false, false, false, nil, nil
+	local unavailable_reason
 	local observer_identity, observer_delivered
 	local starting = false
 	local held = false
@@ -435,6 +436,7 @@ local function new_manager(capacity, on_refused, native_ports)
 		if request == nil then return false, "physical_history_manager_not_prepared" end
 		local candidate = { request = request }
 		lease = candidate
+		unavailable_reason = nil
 		local lease_ports = {}
 		for key, value in pairs(native_ports) do lease_ports[key] = value end
 		candidate.native_observer = function(value)
@@ -561,13 +563,37 @@ local function new_manager(capacity, on_refused, native_ports)
 	initialized = true
 	local bound_ok, actual, failure = pcall(managed_bind, owner)
 	if not bound_ok or type(actual) ~= "table" then return nil, "physical_history_managed_binding_refused" end
-	source = scope_ports(actual, { "identity", "current", "start", "stop_lease", "shutdown", "retired", "lease_identity" })
+	source = scope_ports(actual, { "identity", "current", "start", "stop_lease", "shutdown", "retired", "lease_identity", "select_unavailable" })
 	source_token = source.identity(owner)
 	assert(type(source_token) == "table", "Missing managed physical source identity")
 	local actual_policy = policy_new(owner, { current = source_current, lease_identity = source_identity,
 		retired = function(request) return lease and rawequal(lease.request, request) and lease_retired(lease) end })
 	policy = scope_ports(actual_policy, { "begin", "captured", "admitted", "verdict", "rotate", "continue", "retry_ready", "stop", "status", "subscription", "suspend", "resume" })
 	policy_scope = scope_ports(policy.subscription(), { "identity", "detach", "retired" }); policy_token = policy_scope.identity(owner)
+	--- Delegates unavailable intent without beginning a lease or native work.
+	--- Successful selection stays nonterminal; on_refused still owns terminal
+	--- failures alone. The original source retains GAP and its first reason.
+	---@param message string Explicit unavailable diagnostic, never runtime authority.
+	---@return boolean selected Whether the captured source retained unavailable intent.
+	---@return string|nil refusal Original source or manager refusal.
+	function manager.select_unavailable(message)
+		if terminal or finished then return false, "physical_history_manager_stopped" end
+		if held then return false, "physical_history_manager_suspended" end
+		if frames > 0 or pumping or policy.status().state ~= "prepared" then return false, "physical_history_manager_not_prepared" end
+		local accepted, failure = wrapped(function()
+			if not events.retired() or lease and not lease_retired(lease) then return false, "physical_history_manager_not_prepared" end
+			local selected, refusal = source.select_unavailable(owner, source_token, message)
+			if selected ~= true then return false, refusal end
+			-- Settlement can synchronously latch shutdown or suspension. Keep
+			-- the acquired source custody without publishing stale success.
+			if terminal or finished then return false, "physical_history_manager_stopped" end
+			if held then return false, "physical_history_manager_suspended" end
+			if not source_current() then return false, "physical_history_managed_binding_refused" end
+			unavailable_reason = unavailable_reason or message
+			return true
+		end)
+		return accepted == true, failure
+	end
 	function manager.start(options)
 		if terminal or finished then return false, "physical_history_manager_stopped" end
 		if held then return false, "physical_history_manager_suspended" end
@@ -629,9 +655,11 @@ local function new_manager(capacity, on_refused, native_ports)
 	end
 	function manager.status()
 		local state = policy.status()
+		local explanation = reason
 		if state.state == "suspended" and (frames > 0 or pumping or not events.retired()) then state.state = "suspending" end
+		if state.state == "prepared" and unavailable_reason then state.state, explanation = "unavailable", unavailable_reason end
 		return { state = finished and "retired" or terminal and "stopped" or state.state,
-			reason = reason, retries_used = state.retries }
+			reason = explanation, retries_used = state.retries }
 	end
 	function manager.lease() return lease and lease.view or nil end
 	return manager, nil, manager_shutdown

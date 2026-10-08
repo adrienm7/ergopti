@@ -2512,3 +2512,280 @@ helpers.describe("physical history exact loaded owner forwarding", function()
 		end)
 	end)
 end)
+
+--- Causal controls for the dormant manager's actual unavailable source delegation.
+local function with_unavailable_manager(callback)
+	with_managed_session({ omit_manager = true }, function(_, d)
+		local Capture = require("modules.keylogger.physical_capture")
+		local Policy = require("keylogger.physical_lease_policy")
+		local actual_bind, actual_new = Capture.bind_managed_source, Policy.new
+		d.unavailable_calls, d.begins, d.refused_states = {}, 0, {}
+		Capture.bind_managed_source = function(owner)
+			local capability = actual_bind(owner)
+			if capability then
+				d.managed_owner, d.managed_token, d.managed_capability = owner, capability.identity(owner), capability
+				local actual_select = capability.select_unavailable
+				capability.select_unavailable = function(candidate_owner, candidate_token, reason)
+					d.unavailable_calls[#d.unavailable_calls + 1] = { candidate_owner, candidate_token, reason }
+					return actual_select(candidate_owner, candidate_token, reason)
+				end
+			end
+			return capability
+		end
+		Policy.new = function(...)
+			local actual = actual_new(...)
+			local begin = actual.begin
+			actual.begin = function(...)
+				d.begins = d.begins + 1
+				return begin(...)
+			end
+			return actual
+		end
+		local manager
+		manager = d.adapter.init(128, function(message)
+			d.refusals[#d.refusals + 1] = message
+			d.refused_states[#d.refused_states + 1] = manager.status().state
+		end, { managed = true })
+		helpers.assert_eq(type(manager), "table")
+		helpers.assert_eq(type(manager.select_unavailable), "function")
+		d.manager = manager
+		callback(manager, d)
+	end)
+end
+
+local function unavailable_without_acquisition(manager, d)
+	helpers.assert_eq(manager.select_unavailable("owned_runtime_unbound"), true)
+	helpers.assert_eq(manager.status(), { state = "unavailable", reason = "owned_runtime_unbound", retries_used = 0 })
+	helpers.assert_eq(d.mode.credit_source(), "gap")
+	helpers.assert_eq(d.mode.admitted_capture(), nil)
+	helpers.assert_eq(manager.lease(), nil)
+	helpers.assert_eq(d.begins, 0)
+	helpers.assert_eq(#d.timers, 0)
+	helpers.assert_eq(#d.leases, 0)
+	helpers.assert_eq(#d.observed.spawns, 0)
+	helpers.assert_eq(d.refusals, {})
+end
+
+helpers.describe("manager unavailable stream selection", function()
+	helpers.it("keeps managed initialization neutral and delegates exact custody without acquisition", function()
+		with_unavailable_manager(function(manager, d)
+			helpers.assert_eq(manager.status(), { state = "prepared", retries_used = 0 })
+			helpers.assert_eq(d.mode.credit_source(), "legacy")
+			helpers.assert_eq(d.unavailable_calls, {})
+			unavailable_without_acquisition(manager, d)
+			local call = d.unavailable_calls[1]
+			helpers.assert_eq(rawequal(call[1], d.managed_owner), true)
+			helpers.assert_eq(rawequal(call[2], d.managed_token), true)
+			helpers.assert_eq(call[3], "owned_runtime_unbound")
+			helpers.assert_eq(d.bindings, {})
+			helpers.assert_eq(d.observed.credits, {})
+			helpers.assert_eq(d.observed.releases, {})
+			helpers.assert_eq(d.observed.writes, {})
+		end)
+	end)
+
+	helpers.it("preserves the first unavailable reason without consuming terminal refusal or retry budget", function()
+		with_unavailable_manager(function(manager, d)
+			local settlements = 0
+			helpers.assert_eq(d.mode.bind_settlement({}, function() settlements = settlements + 1; return true end), true)
+			unavailable_without_acquisition(manager, d)
+			helpers.assert_eq(manager.select_unavailable("owned_runtime_unbound"), true)
+			helpers.assert_eq(manager.select_unavailable("another_reason"), false)
+			helpers.assert_eq(manager.status(), { state = "unavailable", reason = "owned_runtime_unbound", retries_used = 0 })
+			helpers.assert_eq(settlements, 1)
+			helpers.assert_eq(d.begins, 0)
+			helpers.assert_eq(d.refusals, {})
+		end)
+	end)
+
+	helpers.it("uses captured source selection despite later public capability replacement", function()
+		with_unavailable_manager(function(manager, d)
+			local replacements = 0
+			d.managed_capability.select_unavailable = function() replacements = replacements + 1; return true end
+			d.managed_capability.current = function() return true end
+			unavailable_without_acquisition(manager, d)
+			helpers.assert_eq(replacements, 0)
+			helpers.assert_eq(#d.unavailable_calls, 1)
+		end)
+	end)
+
+	helpers.it("returns actual settlement refusal while keeping the dormant owner available for exact retry", function()
+		with_unavailable_manager(function(manager, d)
+			local allow = false
+			helpers.assert_eq(d.mode.bind_settlement({}, function() return allow end), true)
+			local accepted, reason = manager.select_unavailable("owned_runtime_unbound")
+			helpers.assert_eq(accepted, false)
+			helpers.assert_eq(reason, "settlement_refused")
+			helpers.assert_eq(manager.status(), { state = "prepared", retries_used = 0 })
+			helpers.assert_eq(d.mode.credit_source(), "legacy")
+			helpers.assert_eq(d.refusals, {})
+			allow = true
+			unavailable_without_acquisition(manager, d)
+		end)
+	end)
+
+	helpers.it("retains final release debt until actual source retirement before one framed completion", function()
+		with_unavailable_manager(function(manager, d)
+			local allow = true
+			helpers.assert_eq(d.mode.bind_settlement({}, function() return allow end), true)
+			unavailable_without_acquisition(manager, d)
+			allow = false
+			local calls, inside = 0, nil
+			helpers.assert_eq(manager.stop(function(value)
+				calls = calls + 1
+				helpers.assert_eq(value, true)
+				inside = manager.retired()
+			end), true)
+			helpers.assert_eq(manager.retired(), false)
+			helpers.assert_eq(manager.status().state, "stopped")
+			helpers.assert_eq(d.mode.credit_source(), "gap")
+			helpers.assert_eq(manager.select_unavailable("owned_runtime_unbound"), false)
+			helpers.assert_eq(manager.start(d.options), false)
+			helpers.assert_eq(calls, 0)
+			allow = true
+			helpers.assert_eq(manager.retired(), true)
+			helpers.assert_eq(calls, 1)
+			helpers.assert_eq(inside, false)
+			helpers.assert_eq(d.mode.credit_source(), "legacy")
+			helpers.assert_eq(manager.stop(), true)
+			helpers.assert_eq(calls, 1)
+		end)
+	end)
+
+	helpers.it("latches reentrant shutdown during selection and releases its actual acquired obligation", function()
+		with_unavailable_manager(function(manager, d)
+			local settlements, inside, nested = 0, nil, nil
+			helpers.assert_eq(d.mode.bind_settlement({}, function()
+				settlements = settlements + 1
+				if settlements == 1 then
+					nested = manager.select_unavailable("owned_runtime_unbound")
+					helpers.assert_eq(manager.stop(), true)
+					inside = manager.retired()
+				end
+				return true
+			end), true)
+			helpers.assert_eq(manager.select_unavailable("owned_runtime_unbound"), false)
+			helpers.assert_eq(nested, false)
+			helpers.assert_eq(inside, false)
+			helpers.assert_eq(settlements, 2)
+			helpers.assert_eq(manager.retired(), true)
+			helpers.assert_eq(d.mode.credit_source(), "legacy")
+			helpers.assert_eq(d.begins, 0)
+			helpers.assert_eq(#d.timers, 0)
+			helpers.assert_eq(#d.observed.spawns, 0)
+			helpers.assert_eq(d.refusals, {})
+		end)
+	end)
+
+	helpers.it("rejects malformed diagnostics through the unchanged terminal refusal contract exactly once", function()
+		with_unavailable_manager(function(manager, d)
+			helpers.assert_eq(manager.select_unavailable("bad\nreason"), false)
+			helpers.assert_eq(d.refused_states, { "stopped" })
+			helpers.assert_eq(manager.status().state, "retired")
+			helpers.assert_eq(manager.retired(), true)
+			helpers.assert_eq(d.refusals, { "physical_history_policy_refused" })
+			helpers.assert_eq(manager.select_unavailable("owned_runtime_unbound"), false)
+			helpers.assert_eq(manager.stop(), true)
+			helpers.assert_eq(d.refusals, { "physical_history_policy_refused" })
+			helpers.assert_eq(d.mode.credit_source(), "legacy")
+			helpers.assert_eq(d.begins, 0)
+			helpers.assert_eq(#d.observed.spawns, 0)
+		end)
+	end)
+
+	helpers.it("does not reconstruct a once-init manager after unavailable selection or final retirement", function()
+		with_unavailable_manager(function(manager, d)
+			unavailable_without_acquisition(manager, d)
+			local duplicate, reason = d.adapter.init(128, function() error("No second owner") end, { managed = true })
+			helpers.assert_eq(duplicate, nil)
+			helpers.assert_eq(reason, "physical_history_session_already_initialized")
+			helpers.assert_eq(manager.stop(), true)
+			helpers.assert_eq(manager.retired(), true)
+			duplicate, reason = d.adapter.init(128, function() error("No second owner") end, { managed = true })
+			helpers.assert_eq(duplicate, nil)
+			helpers.assert_eq(reason, "physical_history_session_already_initialized")
+			helpers.assert_eq(manager.select_unavailable("owned_runtime_unbound"), false)
+			helpers.assert_eq(d.mode.credit_source(), "legacy")
+			helpers.assert_eq(#d.observed.spawns, 0)
+		end)
+	end)
+
+	helpers.it("allows only the existing explicit verified start to clear unavailable status and admit a capture", function()
+		with_unavailable_manager(function(manager, d)
+			unavailable_without_acquisition(manager, d)
+			helpers.assert_eq(manager.start(d.options), true)
+			helpers.assert_eq(manager.status(), { state = "starting", retries_used = 0 })
+			helpers.assert_eq(d.begins, 1)
+			helpers.assert_eq(d.mode.credit_source(), "gap")
+			helpers.assert_eq(d.observed.spawns[1].executable, "/usr/bin/codesign")
+			helpers.assert_eq(d.observed.spawns[1].arguments[4], "=" .. d.options.requirement)
+			d.verify(); d.clock(); d.baseline()
+			helpers.assert_eq(manager.status(), { state = "admitted", retries_used = 0 })
+			helpers.assert_eq(d.mode.credit_source(), "stream")
+			helpers.assert_eq(d.refusals, {})
+			manager.stop(); d.settle_native(); flush_event(d)
+			helpers.assert_eq(manager.retired(), true)
+		end)
+	end)
+
+	helpers.it("holds unavailable selection through suspend and resume without starting a lease", function()
+		with_unavailable_manager(function(manager, d)
+			helpers.assert_eq(manager.suspend(), true)
+			helpers.assert_eq(manager.select_unavailable("owned_runtime_unbound"), false)
+			helpers.assert_eq(d.mode.credit_source(), "legacy")
+			helpers.assert_eq(manager.resume(), true)
+			unavailable_without_acquisition(manager, d)
+			helpers.assert_eq(manager.suspend(), true)
+			helpers.assert_eq(manager.select_unavailable("owned_runtime_unbound"), false)
+			helpers.assert_eq(d.mode.credit_source(), "gap")
+			helpers.assert_eq(manager.quiescent(), true)
+			helpers.assert_eq(manager.resume(), true)
+			helpers.assert_eq(manager.status(), { state = "unavailable", reason = "owned_runtime_unbound", retries_used = 0 })
+			helpers.assert_eq(d.begins, 0)
+			helpers.assert_eq(#d.timers, 0)
+			helpers.assert_eq(#d.observed.spawns, 0)
+		end)
+	end)
+
+	helpers.it("blocks delegation over active capture and retained native/history writer debt", function()
+		with_unavailable_manager(function(manager, d)
+			admit(d)
+			helpers.assert_eq(manager.select_unavailable("owned_runtime_unbound"), false)
+			helpers.assert_eq(d.mode.credit_source(), "stream")
+			local ticket = d.hold_writer("engine")
+			helpers.assert_eq(manager.suspend(), true)
+			helpers.assert_eq(manager.select_unavailable("owned_runtime_unbound"), false)
+			d.settle_native(); flush_event(d)
+			helpers.assert_eq(manager.quiescent(), false)
+			helpers.assert_eq(manager.select_unavailable("owned_runtime_unbound"), false)
+			helpers.assert_eq(#d.unavailable_calls, 0)
+			helpers.assert_eq(#d.observed.spawns, 3)
+			d.finish_writer("engine", ticket); flush_event(d)
+			helpers.assert_eq(manager.quiescent(), true)
+			helpers.assert_eq(manager.stop(), true)
+			helpers.assert_eq(manager.retired(), true)
+			helpers.assert_eq(d.mode.credit_source(), "legacy")
+		end)
+	end)
+
+	helpers.it("retains a reentrant suspend intent without publishing false selection success or starting work", function()
+		with_unavailable_manager(function(manager, d)
+			local settlements = 0
+			helpers.assert_eq(d.mode.bind_settlement({}, function()
+				settlements = settlements + 1
+				if settlements == 1 then helpers.assert_eq(manager.suspend(), true) end
+				return true
+			end), true)
+			helpers.assert_eq(manager.select_unavailable("owned_runtime_unbound"), false)
+			helpers.assert_eq(manager.status().state, "suspended")
+			helpers.assert_eq(d.mode.credit_source(), "gap")
+			helpers.assert_eq(manager.resume(), true)
+			helpers.assert_eq(manager.select_unavailable("owned_runtime_unbound"), true)
+			helpers.assert_eq(manager.status().state, "unavailable")
+			helpers.assert_eq(settlements, 1)
+			helpers.assert_eq(d.begins, 0)
+			helpers.assert_eq(#d.timers, 0)
+			helpers.assert_eq(#d.observed.spawns, 0)
+		end)
+	end)
+end)

@@ -1,0 +1,39 @@
+# .github/workflows/shortcuts-cold-cli-diagnostic.yml
+
+name: Cold Shortcuts CLI diagnostic
+
+on:
+  push:
+    branches:
+      - codex/apple-shortcuts-cold-cli-native
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  observe:
+    name: Observe public CLI on a fresh macOS runner
+    runs-on: macos-15
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      # No Shortcuts help, JXA or other warmup precedes this one acquisition.
+      - name: Observe cold CLI with the owned process supervisor
+        run: |
+          python -B tools/diagnostics/apple_shortcuts_cold_cli_probe.py \
+            --source-root "$GITHUB_WORKSPACE" \
+            --source-sha "$GITHUB_SHA" \
+            --output "$RUNNER_TEMP/cold-shortcuts-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-report" \
+            --private-parent "$RUNNER_TEMP/cold-shortcuts-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-private"
+      # Only the constructed observation is public; raw command captures stay private.
+      - name: Retain the constructed observation
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: cold-shortcuts-observation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/cold-shortcuts-${{ github.run_id }}-${{ github.run_attempt }}-report/observation.json
+          if-no-files-found: error

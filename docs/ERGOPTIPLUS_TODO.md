@@ -3355,6 +3355,15 @@ original 25-minute step deadline before any keyboard/TIS method starts.
 Darwin behavior, physical magic-key acceptance and the other native requirements
 remain unexecuted or unqualified; successful compilation does not complete30.
 
+Private macOS run37790356470 at70a86f7533799cc79c8800059653dd2adee0cfae
+executes all19 selected native keyboard cases successfully, with a closed
+six-record TIS diagnostic session. Its unchanged strict whole-suite reporter
+refuses the filtered summary. The subsequent original unfiltered run completes
+459 cases:430 pass,14 fail and15 skip. Five keyboard cases fail there after
+unacknowledged French restoration retains cleanup debt; isolated19/0 does not
+qualify whole-suite restoration or physical ISO/ANSI input. Original deadlines
+and restoration/debt assertions remain mandatory.
+
 - [~] **31.** HS-274 exact physical key accounting with an Ergopti-owned
   background Karabiner runtime (no Karabiner-Elements app). Plan, decisions and
   ADR 011 in the overnight handoff and `static/ergopti_plus/docs/adr/`. WP0-WP2
@@ -4920,6 +4929,43 @@ portable initializer method when the unchanged25-minute workflow limit expires.
 Later tests are unexecuted. This private trial predates the current dev merge,
 does not qualify final sources or packaging/installation, and grants no runtime
 activation. Item31 and transverse16/38 remain open.
+
+The existing managed capture owner can now select unavailable stream intent
+without a fabricated lease, runtime binding or native operation. Its exact
+owner/token and original settlement select GAP, suppressing legacy credit until
+actual final shutdown releases accounting. Active leases, history custody,
+callback frames and refused release debt still block replacement. Thirteen
+frozen causal regressions and252 existing focused cases pass with modeled
+native ports; the predecessor fails all12 original new cases. Default binding
+remains ledger-neutral. Production selectors, startup composition, genuine
+installed/start authority and native acceptance remain unfinished; this dormant
+operation does not complete WP3 or item31.
+
+The existing managed history manager now delegates unavailable selection to its
+captured source owner/token without beginning a lease, arming a timer or starting
+native work. Its first reason is nonterminal; genuine terminal refusal remains
+once-only. Original suspension, callback and final-release debt still fence
+replacement, and only the existing explicit start can begin real admission.
+All78 original manager cases remain byte-identical;12 new causal cases plus13
+capture cases pass with modeled native ports. The first new retirement oracle
+failure is retained; its separately refined successor is based on an unchanged
+predecessor observation, preserving genuine stopped-in-callback and retired-after-
+unwind behavior. Production selectors, startup and installed/start authority
+remain absent. Full selected gates and native qualification remain separate;
+item31 and transverse16/38 stay open.
+
+The root-process prerequisite now retains its original unavailable prefix,
+empty stdout and exit status 69 while appending one failure-only closed observation.
+Its 54 reason codes come from the unchanged original guards; unknown values and
+OS/subprocess failures disclose no private text. Authority stays false and no
+finer native phase is inferred. All original root/ABI/source/retirement checks
+and deadlines remain unchanged. Frozen portable controls report 10 pass/7 fail
+before the change and 17 pass/0 fail afterwards; five causal mutants remain refused.
+A separate
+normally discovered Swift method runs the actual Python suite, requiring at
+least 17 discovered and 15 executed cases with at most two specifically named
+platform skips. Actual Darwin execution and the underlying native cause remain
+unqualified. This diagnostic does not complete TODO 31 or transverse items 16/38.
 
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
@@ -10650,6 +10696,59 @@ Current Group 3 source checkpoint (item 111, 2026-10-06): [Group 3 current check
   the supported macOS/Linux editors, plus tooltip alignment and appearance on
   all three OSes. This is an unimplemented follow-up; it does not complete the
   existing prediction-input or tooltip validation items.
+
+- [ ] **113.** Fix i18n and performance bugs observed in the English promo video.
+
+  Maintainer report on 2026-10-07, follow-up task `task_a3f680e0`.
+  Prioritize green release qualification, then the Windows incident. Keep one local
+  commit per correction with regression coverage; do not push these changes.
+  - Translate the hotstring editor search placeholder through
+    `data-i18n-placeholder` and a key in all 21 locale files.
+  - Translate the screen-time dashboard weekday labels in charts, main and
+    script owners; inspect the typing dashboard's French `+ IA` chip too.
+  - Add the missing `app_category.general` key to all 21 locales. The
+    screen-time dashboard currently displays the raw key; cover localized
+    category rendering and locale completeness with regression tests.
+  - Replace French tooltip acceptance/navigation hints from the shared
+    tooltip constants with locale-owned text on Windows, macOS and Linux,
+    preserving hint/binding agreement and the common design.
+  - Measure repeated Windows PAC resolution before changing it. Cache by
+    destination with explicit network/proxy-setting invalidation, retain
+    fail-fast resolution errors and check the other two OS implementations.
+  - Remove catalogue placeholders such as `_modifier_chords_placeholder`
+    from sales-page labels/counts, or expand them consistently with the
+    action picker. Test the displayed action count against the real rows.
+
+  Acceptance includes English and other locale coverage, failure/invalidation
+  regressions, cross-driver checks and rerendering `personal-hotstrings`,
+  `screen-time` and `ai-predictions` through `npm run gifs -- ...`. Record the
+  regenerated README GIF paths in the corresponding commits. Preserve the
+  video agent's uncommitted work and never treat rendered media as functional
+  driver qualification.
+
+- [ ] **114.** Diagnose and fix recurring Windows prediction-key and script-chord stalls.
+
+  Maintainer incident on 2026-10-07: AI was enabled with three visible
+  predictions, keys 1–5 produced no result while 6–0 remained usable, and
+  AltGr+Enter also stopped responding. Restarting the driver cleared the
+  state. A similar incident occurred several days earlier; an earlier fix
+  did not prevent recurrence. With three suggestions, keys 4 and 5 must
+  remain available unless another explicitly configured binding owns them.
+
+  Distinguish prediction versus profile bindings, stale native plan/owner
+  state, refusal after consumed input, modifier/prefix state and lifecycle
+  stalls. Observe the actual resident process; loading the DLL elsewhere
+  cannot measure its capture debt. Require an integrated regression for
+  the confirmed cause, recovery without restart, original digit passthrough
+  outside the shown slots and script-management availability.
+
+  Also retain the current Notepad incident: logical native precondition
+  refusals at 21:46:10, 21:48:18 and 22:04:48, and verified effect followed
+  by stale AHK admission at 21:46:11. Improve content-free diagnostics before
+  attributing a cause; keep exact suffix/focus/document guards, worker
+  retirement, no duplicate replay and no publication of unverified success.
+  Six controlled real-Notepad caller cases passing do not qualify the
+  physical/default InputHook trigger or close this incident.
 
 ## Time estimate
 

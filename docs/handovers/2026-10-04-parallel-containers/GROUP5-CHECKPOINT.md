@@ -2511,3 +2511,100 @@ adds only this observed domain while preserving existing rules; saving the
 draft has not applied it to the running environment. Detailed retained native
 evidence remains required. Items24/30/31/40/43/44 and transverse16/38 stay open;
 no final integration lock, dev push or feature deletion has occurred.
+
+## Unavailable stream selection without native acquisition
+
+The existing physical capture capability now selects explicit unavailable
+stream intent through the same exact managed-source owner/token and accounting
+settlement. It acquires no lease, verifier, clock, transport or capture, and
+creates no installed/runtime-ready authority. Binding remains neutral; selection
+retains GAP and suppresses legacy credit. Existing active leases, retained
+history scopes and real retirement obligations refuse replacement. Final
+shutdown alone returns to ledger accounting, with refused release debt visible
+as unsettled. A later genuine start retains its original validation/admission.
+
+Twelve independent new cases are frozen before implementation and fail on the
+predecessor. A separately frozen release-debt control exposes the first draft's
+false diagnostic settlement; its expectation is unchanged after correction.
+Final portable regression13 and original focused capture/accounting/history/
+collision252 pass with modeled native endpoints. These265 distinct cases are
+not actual Mac input or native process proof. The private E2E attempt initially
+lacks bundle assets; after authentic asset preparation, its bounded60-second
+retry remains incomplete. No private E2E pass is claimed. Full selected gates
+are run separately on the adopted sources. The exact two-source patch and
+preimages are reviewed; all35 original capture assertions remain. Selectors,
+production initialization and genuine installed/start authority remain absent.
+Item31 and transverse16/38 stay open.
+
+The first actual selected gate rejects one new test's inline pcall-only assertion;
+its382 other JS checks and all18,192 Lua tests pass, and E2E completes. The
+test now retains the exact false rejection predicate while also checking the
+unchanged original absolute-executable error contract. All13 cases pass in the
+focused strengthening check, with no scanner or baseline changes. Original
+expectation values and postconditions remain; this explicitly strengthened
+successor does not claim a byte-identical frozen test prefix. Complete selected
+verification is repeated on the final test source before publication.
+
+## Managed unavailable selection and exact native keyboard outcomes
+
+The existing managed history manager delegates unavailable selection through
+its privately captured capture port and original owner/token. No lease, policy
+begin, timer or native acquisition is created. Successful selection is
+nonterminal GAP with the first reason; ordinary terminal failure retains its
+original once-only callback. Existing lifecycle/frame/native/history/final-
+release debt prevents replacement. The existing explicit validated start owns
+later acquisition; production selectors/startup and installed authority remain
+unfinished.
+
+The exact two-source packet preserves all13 original production assertion
+lines and the complete128849-byte original78-case test prefix. Twelve new cases
+fail on the unchanged predecessor. First candidate89/1 reveals an over-specific
+new terminal-status oracle; this failed frozen cohort remains immutable. An
+unchanged-predecessor malformed-start observation passes79 cases and proves
+stopped inside the real refusal callback and retired after unwind. A separately
+reviewed successor preserves that callback assertion and adds actual retirement,
+without changing the first production draft. Final90 manager plus13 capture
+cases pass,103 distinct portable cases with modeled native ports. Independent
+review is SOURCE_ONLY_CLEAR; actual selected gates run separately after adoption.
+No native, signed-runtime, installation or production readiness is granted.
+
+Authentic private CI37790356470 at70a86f7533799cc79c8800059653dd2adee0cfae
+finishes failed. Its separate selected keyboard diagnostic passes all19 cases
+(12 selection,6 probe,1 mapping), script/capture0 and closedTIS transport0 with
+six records. Strict unchanged All-tests reporting refuses the filtered summary
+(reporter1), so diagnostic observation success is not full qualification. Its
+original unfiltered suite completes459 cases:430 pass,14 fail,15 skip, none
+unfinished. Five keyboard failures follow a real unacknowledged outer French
+restoration and retained cleanup debt. The original restoration requirements
+are preserved. Root SDK prerequisite69 has empty stdout and a named unavailable
+stderr; the later JSON error is secondary and its exact native cause requires
+evidence. Package/installation qualification remains failed/skipped.
+
+The failed private workflow also violates four unchanged wiring controls.
+Reviewed workflow-only preparationc705 restores protected adjacency and default
+steps, retaining original full-suite run body and5/25/45 limits. Its exact prior
+private purpose-token row affects only the mandatory Swift environment; no
+canonical Group6 workflow grant is implied. Actual isolated pinnedNode22 selected
+format and all383 JS checks pass. This preparation is not yet published or a
+native result. Items24/30/31/40/43/44 and transverse16/38 remain open.
+
+## Failure-only root prerequisite reason observation
+
+Authentic CI 37790356470 at 70a86 retains the original 39-byte unavailable prefix,
+exit status 69 and empty stdout. Its root SDK/ownership cause remains UNKNOWN;
+separate XcodeGen metadata HTTP 403 receipts cannot establish that cause. The diagnostic adds
+one bounded closed JSON line at the existing main failure boundary, preserving
+all source pins, root/tool/ABI ownership, retirement, assertions and deadlines.
+The 54 allowed reason names equal the original literal guard census. Unknown
+refusals and OS/subprocess categories disclose no exception text, paths or
+credentials; authority=false and native_verdict=unchanged.
+
+The complete original eight Python cases and actual root XCTest method remain
+whole. Frozen controls report 10 pass/7 fail before code and 17 pass/0 fail/0 skip
+afterwards. Five causal mutants refuse. The separately discovered Swift method
+executes the actual Python suite with genuine process status, discovered>=17,
+executed=total-minus-skips>=15 and at most two known platform skip identities.
+Old-eight-only and zero-test green receipts fail that floor. Portable execution
+and source review do not prove Darwin compilation or root/native readiness.
+Exact composed gates and fresh native CI are recorded separately; TODO 31 and
+transverse items 16/38 stay open. No item is removed.

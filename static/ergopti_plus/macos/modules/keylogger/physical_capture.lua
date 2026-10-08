@@ -359,7 +359,7 @@ local function start_session(options, source)
 		or session.verdict_publishing or session.stop_publishing) then return false end
 	local candidate = { state = "verifying", options = snapshot_options(options), acquiring = true,
 		token = {}, managed = source }
-	if source then source.last_session = candidate end
+	if source then source.last_session, source.unavailable_reason = candidate, nil end
 	candidate.receiver = Delivery.new({ batch_limit = candidate.options.batch_limit,
 		admit = function(frame)
 			assert(current(candidate) and candidate.state == "opening", "Physical capture admission was revoked")
@@ -551,6 +551,11 @@ end
 --- Returns an independent diagnostic snapshot, never live native ownership tables.
 ---@return table status State, explicit reason and actual settlement verdict.
 function M.status()
+	if managed_source and managed_source.unavailable_reason and not managed_source.closed then
+		return { state = "unavailable", reason = managed_source.unavailable_reason,
+			settled = not managed_source.operation and not managed_source.publishing and not managed_source.releasing
+				and not managed_source.final_requested }
+	end
 	if not session then return { state = dependencies and "idle" or "uninitialized", settled = true } end
 	local settled = not session.acquiring and not session.accounting_transition
 		and not session.clock_starting and not session.clock_publishing
@@ -772,6 +777,36 @@ function M.bind_managed_source(owner)
 	end
 	function capability.lease_identity(candidate_owner, candidate_token)
 		if exact(candidate_owner, candidate_token) and source.last_session then return source.last_session.token end
+	end
+	--- Selects only GAP when the trusted caller has no installed runtime binding.
+	--- No lease, native task, clock or admitted capture is created. The existing
+	--- source retains custody until actual final shutdown releases accounting.
+	---@param candidate_owner table Exact managed source owner.
+	---@param candidate_token table Original managed source token.
+	---@param reason string Explicit diagnostic refusal, never runtime authority.
+	---@return boolean selected Whether this exact source retained the unavailable selection.
+	function capability.select_unavailable(candidate_owner, candidate_token, reason)
+		if not exact(candidate_owner, candidate_token) or not active() or source.operation
+			or source.publishing or source.releasing then return false, "source_identity_refused" end
+		assert(type(reason) == "string" and reason ~= "" and not reason:find("[%z\r\n]"),
+			"Missing physical source unavailable reason")
+		local candidate = source.last_session
+		if candidate and (candidate.state ~= "stopped" or candidate.history_binding ~= nil
+			or candidate.capture ~= nil or candidate.accounting_owned or candidate.verdict_publishing
+			or candidate.stop_publishing) then return false, "source_busy" end
+		return run(function()
+			if source.unavailable_reason then return source.unavailable_reason == reason end
+			if not source.selected then
+				local accepted, failure = Accounting.select_stream(OWNER)
+				if accepted ~= true then return false, failure end
+				-- Settlement may synchronously latch final shutdown. Retain the
+				-- acquired obligation before denying publication; run retires it.
+				source.selected = true
+			end
+			if not active() then return false, "source_identity_refused" end
+			source.unavailable_reason = reason
+			return true
+		end)
 	end
 	function capability.start(candidate_owner, candidate_token, options)
 		if not exact(candidate_owner, candidate_token) or not active() or source.operation

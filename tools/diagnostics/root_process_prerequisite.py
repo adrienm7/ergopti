@@ -884,8 +884,92 @@ def main():
     arguments = parser.parse_args()
     try:
         result = run(arguments.repository, arguments.output)
-    except (Refusal, OSError, subprocess.SubprocessError):
+    except (Refusal, OSError, subprocess.SubprocessError) as error:
         print("UNAVAILABLE: root process prerequisite", file=sys.stderr)
+        # Failure observations name only this boundary; they grant no native authority.
+        reason = "unclassified"
+        if type(error) is Refusal:
+            named = error.code
+            if type(named) is str and named in (
+                "abi_observation_source_pin",
+                "apple_python_identity",
+                "apple_python_role",
+                "digest",
+                "fixed_abi_observation_pin",
+                "fixed_apple_tool",
+                "fixed_bootstrap_pin",
+                "fixed_bridge_pin",
+                "fixed_source_pin",
+                "native_ordinary_caller",
+                "ordinary_child_deadline",
+                "ordinary_child_output_bound",
+                "ordinary_child_reap",
+                "ordinary_output_reader_became_blocking",
+                "ordinary_signal_denial",
+                "preflight_absolute_deadline",
+                "preflight_acquisition_deadline",
+                "preflight_apple_tool",
+                "preflight_child_already_reaped",
+                "preflight_child_unregistered",
+                "preflight_cleanup_deadline",
+                "preflight_clock_refused",
+                "preflight_clock_unavailable",
+                "preflight_compiler_input_pin",
+                "preflight_compiler_output",
+                "preflight_compiler_role",
+                "preflight_native_retirement_debt",
+                "preflight_operation_deadline",
+                "preflight_oracle_source_pin",
+                "preflight_output_became_blocking",
+                "preflight_output_limit",
+                "preflight_output_writer_not_retired",
+                "preflight_owned_child_refused",
+                "preflight_private_parent",
+                "preflight_reap_deadline",
+                "preflight_sdk_role",
+                "preflight_tool_changed",
+                "preflight_tool_path",
+                "preflight_tool_role",
+                "preflight_tool_transcript",
+                "protocol",
+                "published_ordinary_owner_pin",
+                "root_bootstrap_deadline",
+                "root_bootstrap_not_qualified",
+                "root_child_not_protected",
+                "root_locator",
+                "root_protocol_bound",
+                "root_protocol_order",
+                "root_protocol_reader_became_blocking",
+                "runtime_admission_deadline",
+                "runtime_external_library_link",
+                "source",
+                "source_changed",
+                "source_path",
+            ):
+                reason = named
+        elif isinstance(error, OSError):
+            reason = "os_error"
+        elif isinstance(error, subprocess.SubprocessError):
+            reason = "subprocess_error"
+        import json
+
+        observation = {
+            "schema": 1,
+            "kind": "root_process_prerequisite_refusal_observation",
+            "stage": "prerequisite",
+            "reason": reason,
+            "authority": False,
+            "native_verdict": "unchanged",
+        }
+        try:
+            print(
+                "ERGOPTI_ROOT_PREREQUISITE_DIAGNOSTIC "
+                + json.dumps(observation, sort_keys=True, separators=(",", ":")),
+                file=sys.stderr,
+            )
+        except OSError:
+            # The original UNAVAILABLE prefix and69 already refuse qualification.
+            pass
         return 69
     import json
 
