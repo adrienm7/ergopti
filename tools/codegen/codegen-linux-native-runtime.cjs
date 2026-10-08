@@ -240,6 +240,8 @@ function flatpakModules(data) {
 			// Every CMake module must share the installed runtime search directory.
 			if (recipe.buildsystem === 'cmake-ninja')
 				recipe['config-opts'].unshift('-DCMAKE_INSTALL_LIBDIR=lib');
+			// Meson's SDK default can be lib64; the installed environment admits lib.
+			if (recipe.buildsystem === 'meson') recipe['config-opts'].unshift('--libdir=lib');
 			const input = sources[source];
 			const pinned =
 				source === 'duktape' || source === 'krb5'
