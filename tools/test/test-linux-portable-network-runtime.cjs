@@ -152,11 +152,24 @@ assert.ok(modules[2]['post-install'].includes('test -f /app/lib/libgssapi_krb5.s
 assert.ok(modules[3]['config-opts'].includes('-DCURL_USE_GSSAPI=ON'));
 assert.ok(modules[3]['config-opts'].includes('-DGSS_ROOT_DIR=/app'));
 assert.ok(modules[5]['config-opts'].includes('-Dconfig-xdp=true'));
+// The declared package environment resolves native providers from prefix/lib.
+// SDK autodetection must not place either provider in prefix/lib64 instead.
+assert.deepEqual(modules[5]['config-opts'], [
+	'-Dlibdir=lib',
+	'-Ddocs=false',
+	'-Dtests=false',
+	'-Dvapi=false',
+	'-Dintrospection=false',
+	'-Dconfig-xdp=true',
+	'-Dpacrunner-duktape=true',
+	'-Dcurl=true'
+]);
 assert.ok(modules[6]['config-opts'].includes('-Dgnome_proxy=disabled'));
 assert.ok(modules[6]['config-opts'].includes('-Dlibproxy=enabled'));
 // The pinned GIO source declares installed_tests, not libproxy's tests option.
 // Preserve both proxy-provider choices and native TLS while refusing unknown flags.
 assert.deepEqual(modules[6]['config-opts'], [
+	'-Dlibdir=lib',
 	'-Dlibproxy=enabled',
 	'-Dgnome_proxy=disabled',
 	'-Dgnutls=enabled',

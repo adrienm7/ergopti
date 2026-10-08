@@ -204,6 +204,7 @@ function flatpakModules(data) {
 			name: 'network-libproxy',
 			buildsystem: 'meson',
 			'config-opts': [
+				'-Dlibdir=lib',
 				'-Ddocs=false',
 				'-Dtests=false',
 				'-Dvapi=false',
@@ -221,6 +222,7 @@ function flatpakModules(data) {
 			name: 'network-gio-proxy',
 			buildsystem: 'meson',
 			'config-opts': [
+				'-Dlibdir=lib',
 				'-Dlibproxy=enabled',
 				'-Dgnome_proxy=disabled',
 				'-Dgnutls=enabled',

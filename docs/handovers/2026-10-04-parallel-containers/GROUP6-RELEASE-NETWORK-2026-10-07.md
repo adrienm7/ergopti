@@ -419,6 +419,17 @@ the correction; every old assertion is retained. Generated projections are
 regenerated through their owner. Complete SDK/package/install receiving on the
 new source remains required; built GSS support is not an authenticated session.
 
+The same actual SDK log installs libproxy under/app/lib64, while the retained
+package environment admits providers only under/app/lib. Pinned GIO source
+derives its module destination from libdir as well. Group6 therefore owns only
+the two native Meson providers' directory flags: network-libproxy and
+network-gio-proxy explicitly use libdir=lib. Independent full option vectors
+reject the original implicit paths and retain all preceding provider flags.
+All other module/source/runtime bytes and native assertions remain intact.
+The preceding manual37713678709 at acb14576c continues unchanged; this separate
+follow-up requires its own exact-SHA package/install receiving. No running
+workflow is stopped, resumed or edited to add this source requirement.
+
 - **Windows62:** Join one packaged owned curl attempt engine to both the real
   request consumer and artifact staging producer. Bare NTLM-only CONNECT must
   use genuine SSPI evidence and one causal fallback after exact first-child and
