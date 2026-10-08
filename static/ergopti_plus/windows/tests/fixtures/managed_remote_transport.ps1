@@ -120,6 +120,38 @@ function Assert-OwnedFixtureRootScope {
     }
 }
 Assert-OwnedFixtureRootScope $OwnedRootStoreScope
+function Invoke-OwnedRootSnapshot {
+    param($Store, [string]$Thumbprint, [string]$Subject, [bool]$Remove = $false)
+    # Store.Close retires the store handle, not independently acquired wrappers.
+    $Snapshot = $Store.Certificates
+    $PrimaryFailure = $null
+    try {
+        $Found = @($Snapshot | Where-Object { $_.Thumbprint -ceq $Thumbprint })
+        if ($Found.Count -gt 1) { throw 'Ambiguous owned certificate identity.' }
+        foreach ($Certificate in $Found) {
+            if ($Certificate.Subject -cne $Subject) { throw 'Owned certificate subject changed.' }
+            if ($Remove) { $Store.Remove($Certificate) }
+        }
+        return $Found.Count
+    } catch {
+        $PrimaryFailure = $_
+        throw
+    } finally {
+        $ReleaseFailed = $false
+        foreach ($Certificate in $Snapshot) {
+            try { $Certificate.Dispose() }
+            catch { $ReleaseFailed = $true }
+        }
+        if ($ReleaseFailed) {
+            if ($null -eq $PrimaryFailure) {
+                throw [InvalidOperationException]::new('Owned certificate snapshot retirement was refused.')
+            }
+            # Retain the original admission failure and disclose its cleanup debt
+            # only as a typed fact, without serializing any certificate bytes.
+            $PrimaryFailure.Exception.Data['OwnedRootSnapshotRetirementDebt'] = $true
+        }
+    }
+}
 function Remove-OwnedRoot([string]$Thumbprint, [string]$Subject, [string]$Scope) {
     Assert-OwnedFixtureRootScope $Scope
     if ($Thumbprint -cnotmatch '^[0-9A-F]{40}$' -or $Subject -cnotmatch '^CN=ErgoptiPlus managed-network fixture [0-9a-f]{32}$') {
@@ -128,16 +160,11 @@ function Remove-OwnedRoot([string]$Thumbprint, [string]$Subject, [string]$Scope)
     $Store = [Security.Cryptography.X509Certificates.X509Store]::new('Root', $Scope)
     try {
         $Store.Open([Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
-        $Found = @($Store.Certificates | Where-Object { $_.Thumbprint -ceq $Thumbprint })
-        if ($Found.Count -gt 1) { throw 'Ambiguous owned certificate identity.' }
-        foreach ($Certificate in $Found) {
-            if ($Certificate.Subject -cne $Subject) { throw 'Owned certificate subject changed.' }
-            $Store.Remove($Certificate)
-        }
+        $null = Invoke-OwnedRootSnapshot $Store $Thumbprint $Subject $true
     } finally { $Store.Close() }
     $Store.Open([Security.Cryptography.X509Certificates.OpenFlags]::ReadOnly)
     try {
-        if (@($Store.Certificates | Where-Object { $_.Thumbprint -ceq $Thumbprint }).Count -ne 0) {
+        if ((Invoke-OwnedRootSnapshot $Store $Thumbprint $Subject) -ne 0) {
             throw 'Owned declared-scope root removal was not acknowledged.'
         }
     } finally { $Store.Close(); $Store.Dispose() }
@@ -1185,7 +1212,7 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
                 $Store.Open([Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
                 $State.root_install_stage = 'verify_absent'
                 Publish-State -TrustStep 'before_enumeration'
-                if (@($Store.Certificates | Where-Object { $_.Thumbprint -ceq $State.root_thumbprint }).Count -ne 0) {
+                if ((Invoke-OwnedRootSnapshot $Store $State.root_thumbprint $State.root_subject) -ne 0) {
                     throw 'Unique owned root already existed before admission.'
                 }
                 $State.root_install_stage = 'export_public'
@@ -1200,7 +1227,7 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
                 $RootInstalled = $true
                 $State.root_install_stage = 'verify_present'
                 Publish-State -TrustStep 'before_postcheck'
-                if (@($Store.Certificates | Where-Object { $_.Thumbprint -ceq $State.root_thumbprint }).Count -ne 1) {
+                if ((Invoke-OwnedRootSnapshot $Store $State.root_thumbprint $State.root_subject) -ne 1) {
                     throw 'Unique owned root installation was not acknowledged.'
                 }
                 # Keep the original finally ownership and exception priority.
