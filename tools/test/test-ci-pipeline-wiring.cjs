@@ -226,6 +226,12 @@ const STEP_CONDITIONS = [
 	[
 		MACOS_BOX,
 		'package-macos',
+		'Retain scoped native Brew qualification receipt',
+		'${{ always() }}'
+	],
+	[
+		MACOS_BOX,
+		'package-macos',
 		'Retain archive diagnostic session',
 		"${{ always() && steps.swift-launcher-tests.outputs.archive_session_dir != '' }}"
 	],
@@ -1826,8 +1832,8 @@ for (const [what, rel, from, to] of [
 	[
 		'`|| true` after the continued evidence verdict',
 		LINUX_BOX,
-		'              --sha "$GITHUB_SHA"\n          echo "Linux driver:',
-		'              --sha "$GITHUB_SHA" || true\n          echo "Linux driver:'
+		'              --sha "$GITHUB_SHA"\n          echo "Linux mandatory evidence verified;',
+		'              --sha "$GITHUB_SHA" || true\n          echo "Linux mandatory evidence verified;'
 	],
 	[
 		'a `| tee` left without pipefail',
@@ -3341,6 +3347,9 @@ for (const [what, from, to] of [
 ]) {
 	mustCatch(what, LINUX_BOX, from, to, linuxAudioPrerequisiteProblems);
 }
+
+// The temporary Mac exception still requires closed context and retained gates.
+require('./test-macos-dev-qualification-deferral.cjs');
 
 if (errors.length > 0) {
 	console.error(

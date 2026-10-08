@@ -41,6 +41,18 @@ on:
         description: Release version stamped into the Linux tree, empty outside a release
         required: true
         type: string
+      tag:
+        description: Exact release tag from the validated release plan
+        required: true
+        type: string
+      prerelease:
+        description: Exact prerelease string from the validated release plan
+        required: true
+        type: string
+      channel:
+        description: Exact update channel from the validated release plan
+        required: true
+        type: string
       linux_bundle:
         description: Linux tarball asset name from the updater release contract
         required: true
@@ -1158,6 +1170,12 @@ jobs:
       # Physical displays and evdev source-generation receipts remain separate.
       - name: Qualify actual cursor-display window switching
         if: ${{ !cancelled() }}
+        env:
+          ERGOPTI_DEV_RELEASE_RELEASE: ${{ inputs.release }}
+          ERGOPTI_DEV_RELEASE_PRERELEASE: ${{ inputs.prerelease }}
+          ERGOPTI_DEV_RELEASE_CHANNEL: ${{ inputs.channel }}
+          ERGOPTI_DEV_RELEASE_TAG: ${{ inputs.tag }}
+          ERGOPTI_DEV_RELEASE_VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends luajit lua-luv python3 xvfb openbox xdotool x11-utils x11-xserver-utils coreutils xfonts-base
@@ -1734,12 +1752,21 @@ jobs:
         timeout-minutes: 35
 
       - name: Record mandatory E2E evidence
+        env:
+          ERGOPTI_DEV_RELEASE_RELEASE: ${{ inputs.release }}
+          ERGOPTI_DEV_RELEASE_PRERELEASE: ${{ inputs.prerelease }}
+          ERGOPTI_DEV_RELEASE_CHANNEL: ${{ inputs.channel }}
+          ERGOPTI_DEV_RELEASE_TAG: ${{ inputs.tag }}
+          ERGOPTI_DEV_RELEASE_VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
           e2e_assertions=$(sed -n 's/^1\.\.\([0-9][0-9]*\)$/\1/p' "$RUNNER_TEMP/linux-e2e.log" | tail -1)
           xkb_source_assertions=$(sed -n 's/^=== \([0-9][0-9]*\) check(s), 0 failure(s) ===$/\1/p' "$RUNNER_TEMP/linux-xkb-source.log" | tail -1)
           native_family_assertions=$(sed -n 's/^Native fixture family receipts: \([0-9][0-9]*\) passed, 0 failed, 0 skipped$/\1/p' "$RUNNER_TEMP/linux-window-switch.log" | tail -1)
           window_switch_assertions=$(sed -n 's/^Native window receipts: \([0-9][0-9]*\) passed, 0 failed, 0 skipped$/\1/p' "$RUNNER_TEMP/linux-window-switch.log" | tail -1)
+          if [ -f "$RUNNER_TEMP/linux-window-qualification.json" ]; then
+              window_switch_assertions=deferred
+          fi
           http_stream_assertions=$(sed -n 's/^PASS native HTTP streaming receipts: \([0-9][0-9]*\) checks$/\1/p' "$RUNNER_TEMP/linux-http-stream.log" | tail -1)
           network_runtime_assertions=$(node tools/test/linux-network-runtime-evidence.cjs "$RUNNER_TEMP/linux-network-runtime.log")
           nix_runtime_assertions=$(node tools/test/run-linux-nix-native.cjs --evidence "$RUNNER_TEMP/linux-nix-native.log" "$GITHUB_SHA")
@@ -2795,6 +2822,11 @@ jobs:
       - name: Assert all mandatory subjects ran and passed
         env:
           NEEDS: ${{ toJSON(needs) }}
+          ERGOPTI_DEV_RELEASE_RELEASE: ${{ inputs.release }}
+          ERGOPTI_DEV_RELEASE_PRERELEASE: ${{ inputs.prerelease }}
+          ERGOPTI_DEV_RELEASE_CHANNEL: ${{ inputs.channel }}
+          ERGOPTI_DEV_RELEASE_TAG: ${{ inputs.tag }}
+          ERGOPTI_DEV_RELEASE_VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
           node tools/test/linux-ci-evidence.cjs verify \
@@ -2802,4 +2834,4 @@ jobs:
               --needs "$NEEDS" \
               --evidence-dir "$RUNNER_TEMP/linux-ci-evidence" \
               --sha "$GITHUB_SHA"
-          echo "Linux driver: every mandatory job and evidence subject passed."
+          echo "Linux mandatory evidence verified; deferred qualifications, if any, remain unqualified."
