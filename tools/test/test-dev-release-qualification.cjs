@@ -221,6 +221,23 @@ const framework = fs.readFileSync(
 assert(framework.includes('Profile := _AHK_QUALIFICATION_PROFILE'));
 assert(!framework.includes('Profile := EnvGet("ERGOPTI_DEV_QUALIFICATION_PROFILE")'));
 assert(framework.includes('Deferred.Length != 1'));
+// Helper-only children load this complete library without production JSON.
+// A static unresolved parser reference emits a load-time warning before any
+// profile guard can run, and a hidden synchronous child can then block the suite.
+assert(!/\bJsonParse\s*\(/.test(framework), 'helper-only framework has no static JSON dependency');
+assert(framework.includes('if !(Parser is Func)'));
+assert(framework.includes('if _TEST_QUALIFICATION_PARSER is Func'));
+assert(framework.includes('_TEST_QUALIFICATION_PARSER := Parser'));
+assert(framework.includes('Policy := Parser.Call(FileRead('));
+const principal = fs.readFileSync(
+	path.join(ROOT, 'static/ergopti_plus/windows/tests/run_all.ahk'),
+	'utf8'
+);
+const parserInclude = principal.indexOf('#Include ../infra/json.ahk');
+const parserRegistration = principal.indexOf('TestQualificationRegisterParser(JsonParse)');
+assert(parserInclude >= 0 && parserRegistration > parserInclude);
+assert.equal((principal.match(/^TestQualificationRegisterParser\(JsonParse\)$/gm) || []).length, 1);
+assert(principal.includes('#Include unit/test_qualification_parser_owner.ahk'));
 const cliOwner = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-qualification-model-'));
 try {
 	const envFile = path.join(cliOwner, 'github-env.txt');
