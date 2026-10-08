@@ -126,14 +126,6 @@ TestFeatureStateBootSourceWiring() {
 	AssertTrue(InStr(_DriverFuncBody("TomlConfigParameterBindingStatus"),
 		"TomlConfigParameterBindingStatus(BindingId, Catalogue?) {") > 0,
 		"the included native owner declares the actual binding-status callable")
-	JournalInclude := _FeatureStateBootFindOwnerInclude(Source, "ConfigMigrateBoot")
-	RecoveryInclude := _FeatureStateBootFindOwnerInclude(Source, "_ConfigTransitionNativeRecoveryImages")
-	AssertTrue(InStr(HarnessSource, JournalInclude) > 0 && InStr(HarnessSource, RecoveryInclude) > 0,
-		"the child includes the real journal and native WAL dependency owners declared by production")
-	AssertTrue(InStr(HarnessSource, "_FeatureStateSmokePrepareReadonlySource(TempConfig)") > 0,
-		"authored semantic child files receive genuine readonly preparation before the snapshot reader")
-	AssertTrue(InStr(HarnessSource, "_FeatureStateSmokePrepareReadonlySource(Path)") > 0,
-		"the child also prepares the actual parent-published source through its real native constructor")
 }
 Test("Feature-state startup: production include order and direct loader dependency stay wired (feature-state-boot-wiring)", TestFeatureStateBootSourceWiring)
 

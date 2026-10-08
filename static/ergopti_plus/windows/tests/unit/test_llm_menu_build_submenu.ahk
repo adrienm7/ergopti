@@ -393,3 +393,276 @@ _LBMS_ActualWarningAnchor() {
 	}
 }
 Test("llm fixed parents: retained native warning keeps its actual backend anchor", _LBMS_ActualWarningAnchor)
+
+; Genuine backend presentation subjects preserve every prior registered assertion.
+_WBF_WithState(Body) {
+	global _I18nCache, _I18nCacheLoaded
+	Root := _MR_GetManifestRoot(), Previous := Map()
+	for Key in ["llm_backend_parent_ahk", "llm_backend_parent_frame_ahk", "llm_install_warning_frame", "llm_backend_warning_rows_ahk"] {
+		AssertTrue(Root.Has(Key), "the actual native backend frame is declared")
+		Previous[Key] := Root[Key]
+	}
+	HadCache := IsSet(_I18nCache), HadLoaded := IsSet(_I18nCacheLoaded)
+	SavedCache := HadCache ? _I18nCache : false
+	SavedLoaded := HadLoaded ? _I18nCacheLoaded : false
+	try Body.Call(Root)
+	finally {
+		for Key, Value in Previous
+			Root[Key] := Value
+		_I18nCache := HadCache ? SavedCache : unset
+		_I18nCacheLoaded := HadLoaded ? SavedLoaded : unset
+	}
+}
+
+_WBF_Callback(Observed) {
+	Observed["calls"] += 1
+	return Observed["result"]
+}
+
+_WBF_Captions(Root) {
+	global _SharedDir, _I18nCache, _I18nCacheLoaded
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\windows_llm_backend_parent_captions.json", "UTF-8"))
+	AssertEqual(21, Corpus.Count, "the old captions were frozen independently for every supported language")
+	for Language, Subject in Corpus {
+		_I18nCache := JsonParse(FileRead(_SharedDir . "\data\locales\" . Language . ".json", "UTF-8"))
+		_I18nCacheLoaded := true
+		for Caption in [Subject["selected"]["ollama"], Subject["selected"]["api"], Subject["selected"]["unknown"], Subject["literal_native"]] {
+			for Present in [false, true] {
+				Child := Menu(), Target := Menu(), Observed := Map("calls", 0, "result", Map("original", true))
+				Action := _WBF_Callback.Bind(Observed)
+				Warnings := Present ? MenuRenderer_TemplateRows("llm_install_warning_frame", Map("llm_install_warning", Action), Map(), Map()) : []
+				try {
+					Child.Add("Genuine native backend child", Action)
+					Rows := _LLM_Menu_BackendParentRows(Child, Caption, false, Warnings)
+					AssertTrue(Rows is Array)
+					AssertEqual(Present ? 2 : 1, Rows.Length)
+					Parent := Rows[Rows.Length]
+					AssertEqual(Caption, Parent["label"], "native data is neither translated nor used as a format")
+					AssertTrue(Parent["submenu"] == Child, "the finished original Menu identity stays exact")
+					if Present {
+						AssertEqual(Subject["warning"], Rows[1]["label"], "original translated warning precedes the native datum")
+						AssertTrue(Rows[1] == Warnings[1] && Rows[1]["action"] == Warnings[1]["action"], "the original published guarded warning record and action are retained")
+						AssertFalse(Warnings[1]["action"] == Action, "the raw original warning business input retains its canonical readiness guard")
+						AssertTrue(Rows[1]["action"].Call() == Observed["result"], "native warning returns its precise receipt unchanged")
+					}
+					AssertEqual(Present ? 1 : 0, Observed["calls"], "construction never delivers a native callback")
+					AssertEqual(Rows.Length, MenuRenderer_AppendRows(Target, "llm_menu", "llm_backend_parent_frame_ahk", Rows))
+					Labels := _LBMS_Labels(Target)
+					AssertEqual(StrReplace(Caption, "&", "&&"), Labels[Labels.Length], "actual Win32 image uses the original renderer's literal ampersand escape")
+					AssertEqual(Child.Handle, DllCall("GetSubMenu", "ptr", Target.Handle, "int", Labels.Length - 1, "ptr"))
+				} finally {
+					try _CTC_ReleaseMenu(Target)
+					finally {
+						MenuDispatcher_PruneMenu(Target)
+						_CTC_ReleaseMenu(Child)
+					}
+				}
+			}
+		}
+	}
+}
+
+_WBF_DisabledAndOrder(Root) {
+	Observed := Map("calls", 0, "result", true), Action := _WBF_Callback.Bind(Observed)
+	Warnings := MenuRenderer_TemplateRows("llm_install_warning_frame", Map("llm_install_warning", Action), Map(), Map())
+	Child := Menu(), Target := Menu()
+	try {
+		Rows := _LLM_Menu_BackendParentRows(Child, "API 🌐", true, Warnings)
+		AssertTrue(Rows[2].Get("disabled", false), "the resolved disabled flag is preserved")
+		AssertFalse(Rows[1].Get("disabled", false), "the existing installation action remains independent of parent greying")
+		AssertTrue(Rows[2]["submenu"] == Child, "even an empty native Menu is retained")
+		Frame := Root["llm_backend_parent_frame_ahk"]
+		Root["llm_backend_parent_frame_ahk"] := [Frame[2], Frame[1]]
+		Reordered := _LLM_Menu_BackendParentRows(Child, "API 🌐", false, Warnings)
+		AssertTrue(Reordered is Array)
+		AssertTrue(Reordered[1]["submenu"] == Child, "shared order places the actual native child first")
+		AssertTrue(Reordered[2] == Warnings[1] && Reordered[2]["action"] == Warnings[1]["action"], "shared order moves the exact already-published guarded warning")
+		AssertEqual(2, MenuRenderer_AppendRows(Target, "llm_menu", "llm_backend_parent_frame_ahk", Reordered))
+		AssertEqual(Child.Handle, DllCall("GetSubMenu", "ptr", Target.Handle, "int", 0, "ptr"))
+		AssertEqual(0, Observed["calls"])
+	} finally {
+		try _CTC_ReleaseMenu(Target)
+		finally {
+			MenuDispatcher_PruneMenu(Target)
+			_CTC_ReleaseMenu(Child)
+		}
+	}
+}
+
+_WBF_Withdrawal(Root) {
+	Child := Menu()
+	try {
+		for Key in ["llm_backend_parent_ahk", "llm_backend_parent_frame_ahk", "llm_install_warning_frame", "llm_backend_warning_rows_ahk"] {
+			Previous := Root[Key]
+			Root.Delete(Key)
+			try AssertFalse(_LLM_Menu_BackendParentRows(Child, "API 🌐", false, []), "withdrawn presentation refuses whole native frame: " . Key)
+			finally Root[Key] := Previous
+		}
+		AssertFalse(_LLM_Menu_BackendParentRows(Child, "API 🌐", false, [,]), "sparse warning arrays cannot provide a physical row")
+		AssertFalse(_LLM_Menu_BackendParentRows(Map(), "API 🌐", false, []), "public map cannot replace an original Menu")
+		AssertFalse(_LLM_Menu_BackendParentRows(Child, "API 🌐", false, [Map("label", "unknown", "action", (*) => true)]), "foreign warning caption cannot impersonate the actual translated warning")
+		AssertFalse(_LLM_Menu_BackendParentRows(Child, "API 🌐", false, [Map("label", t("menu.llm.warning_install_ollama"), "action", false)]), "uncallable warning refuses before native construction")
+		Parent := Root["llm_backend_parent_ahk"][1].Clone()
+		Parent["caption_source"] := "translated"
+		Root["llm_backend_parent_ahk"] := [Parent]
+		AssertFalse(_LLM_Menu_BackendParentRows(Child, "API 🌐", false, []), "wrong caption source is not a translated identity-format fallback")
+	} finally _CTC_ReleaseMenu(Child)
+}
+
+_WBF_OriginalEntryRefusal(Root) {
+	global _LLM_Menu, _LLM_Menu_Handle
+	SavedMenu := _LLM_Menu, SavedHandle := _LLM_Menu_Handle
+	Target := Menu(), Failure := ""
+	try {
+		_LLM_Menu := Map(), _LLM_Menu_Handle := Target
+		Root.Delete("llm_backend_parent_frame_ahk")
+		try _LLM_Menu_EmitRow("llm_backend", false, false)
+		catch as Err
+			Failure := Err.Message
+		AssertEqual("Declared backend parent frame was refused.", Failure, "actual preexisting entry refuses frame before reading missing native backend state")
+		AssertEqual(0, TrayMenuItemCount(Target), "no partial detached backend or warning was exposed")
+	} finally {
+		_LLM_Menu := SavedMenu, _LLM_Menu_Handle := SavedHandle
+		try _CTC_ReleaseMenu(Target)
+		finally MenuDispatcher_PruneMenu(Target)
+	}
+}
+
+_WBF_ActualBackendRoute(Root) {
+	global _LLM_Menu, _LLM_Menu_Handle
+	SavedMenu := _LBMS_Fixture(), SavedHandle := _LLM_Menu_Handle
+	try {
+		for Backend, Expected in Map("api", "API 🌐", "ollama", "Ollama 🦙") {
+			_LLM_Menu["backend"] := Backend
+			for Present in [false, true] {
+				Target := Menu(), _LLM_Menu_Handle := Target
+				Warnings := Present ? MenuRenderer_TemplateRows("llm_install_warning_frame", Map("llm_install_warning", _LLM_Menu_OnWarningInstallClick), Map(), Map()) : []
+				try {
+					_LLM_Menu_EmitCapturedRow("llm_backend", false, false, false, Warnings, Target, "LLM")
+					Labels := _LBMS_Labels(Target)
+					AssertEqual(Present ? 2 : 1, Labels.Length)
+					AssertEqual(Expected, Labels[Labels.Length], "actual selected original catalogue datum reaches the declared parent")
+					if Present
+						AssertEqual(t("menu.llm.warning_install_ollama"), Labels[1])
+					NativeChild := DllCall("GetSubMenu", "ptr", Target.Handle, "int", Labels.Length - 1, "ptr")
+					AssertTrue(NativeChild != 0 && DllCall("GetMenuItemCount", "ptr", NativeChild, "int") > 0, "actual original backend constructor builds its real child")
+					AssertTrue(_LLM_Menu_Handle == Target, "the real captured emitter remains in its detached native owner")
+				} finally {
+					try _CTC_ReleaseMenu(Target)
+					finally MenuDispatcher_PruneMenu(Target)
+				}
+			}
+		}
+	} finally {
+		_LLM_Menu := SavedMenu, _LLM_Menu_Handle := SavedHandle
+	}
+}
+
+Test("Windows backend frame: all21 frozen captions and genuine native callback/child images", _WBF_WithState.Bind(_WBF_Captions))
+Test("Windows backend frame: resolved disabled state and shared complete-frame reordering", _WBF_WithState.Bind(_WBF_DisabledAndOrder))
+Test("Windows backend frame: current source withdrawal and foreign native identities refuse", _WBF_WithState.Bind(_WBF_Withdrawal))
+Test("Windows backend frame: actual original emitter refuses before unavailable native data", _WBF_WithState.Bind(_WBF_OriginalEntryRefusal))
+Test("Windows backend frame: original actual selected catalogue and captured owner are retained", _WBF_WithState.Bind(_WBF_ActualBackendRoute))
+
+; Calls the unchanged three-argument native entry with the actual state datum absent.
+; A missing backend key alone is deliberately tolerated by the original label lookup.
+_WBF_OriginalEntryParentAdmission(Root) {
+	global _LLM_Menu, _LLM_Menu_Handle
+	HadMenu := IsSet(_LLM_Menu), HadHandle := IsSet(_LLM_Menu_Handle)
+	SavedMenu := HadMenu ? _LLM_Menu : false
+	SavedHandle := HadHandle ? _LLM_Menu_Handle : false
+	try {
+		for Withdrawn in ["llm_backend_parent_ahk", "llm_install_warning_frame"] {
+			Previous := Root[Withdrawn], Target := Menu(), Failure := ""
+			try {
+				_LLM_Menu := unset
+				_LLM_Menu_Handle := Target
+				AssertFalse(IsSet(_LLM_Menu), "actual native backend state datum is absent before the original entry")
+				AssertTrue(Root.Has("llm_backend_parent_frame_ahk"), "the complete genuine backend frame remains present")
+				AssertTrue(Root.Has("llm_install_warning_frame"), "the original warning source is present before the selected withdrawal")
+				Root.Delete(Withdrawn)
+				try _LLM_Menu_EmitRow("llm_backend", false, false)
+				catch as Err
+					Failure := Err.Message
+				AssertEqual("Declared backend parent frame was refused.", Failure,
+					"the original native entry admits parent and inactive conditional warning source before backend datum reads: " . Withdrawn)
+				AssertEqual(0, TrayMenuItemCount(Target), "withdrawn source exposes no partial native backend/warning rows")
+			} finally {
+				Root[Withdrawn] := Previous
+				try _CTC_ReleaseMenu(Target)
+				finally MenuDispatcher_PruneMenu(Target)
+			}
+		}
+	} finally {
+		_LLM_Menu := HadMenu ? SavedMenu : unset
+		_LLM_Menu_Handle := HadHandle ? SavedHandle : unset
+	}
+}
+
+Test("Windows backend frame: original entry admits separate parent and conditional warning before native state reads", _WBF_WithState.Bind(_WBF_OriginalEntryParentAdmission))
+
+; The actual captured record, including its current command guard, has one transport owner.
+_WBF_CurrentGuardedWarningTransport(Root) {
+	global _MenuDispatchCallbacks
+	Seen := Map("calls", 0, "result", Map("original", "guarded-warning-terminal"))
+	Raw := _WBF_Callback.Bind(Seen)
+	Warnings := MenuRenderer_TemplateRows("llm_install_warning_frame", Map("llm_install_warning", Raw), Map(), Map())
+	AssertTrue(Warnings is Array && Warnings.Length == 1)
+	AssertFalse(Warnings[1]["action"] == Raw, "genuine original warning publication retains its current readiness guard")
+	Child := Menu(), Target := Menu()
+	try {
+		Rows := _LLM_Menu_BackendParentRows(Child, "API 🌐", false, Warnings)
+		AssertTrue(Rows is Array && Rows.Length == 2, "a genuine nonempty captured warning is admitted")
+		AssertTrue(Rows[1] == Warnings[1] && Rows[1]["action"] == Warnings[1]["action"],
+			"the complete typed frame transports the exact already-admitted guarded record")
+		AssertEqual(0, Seen["calls"], "warning admission and parent construction do not execute business code")
+		AssertEqual(2, MenuRenderer_AppendRows(Target, "llm_menu", "llm_backend_parent_frame_ahk", Rows))
+		Id := _MenuItemIdAtPosition(Target, 0)
+		AssertTrue(_MenuDispatchCallbacks[Id] == Warnings[1]["action"], "native registry retains the captured canonical guarded action")
+		Previous := Root["llm_install_warning_frame"]
+		try {
+			Root.Delete("llm_install_warning_frame")
+			AssertFalse(_LLM_Menu_BackendParentRows(Child, "API 🌐", false, Warnings), "a typed list cannot hide withdrawal of the actual warning declaration")
+			AssertFalse(_MenuDispatchCallbacks[Id].Call(), "late source withdrawal refuses the raw business input")
+			AssertEqual(0, Seen["calls"], "no business body is invoked by refusal")
+		} finally Root["llm_install_warning_frame"] := Previous
+		AssertTrue(_MenuDispatchCallbacks[Id].Call() == Seen["result"], "repair preserves the original terminal object")
+		AssertEqual(1, Seen["calls"], "only actual native delivery calls the original body")
+	} finally {
+		try _CTC_ReleaseMenu(Target)
+		finally _CTC_ReleaseMenu(Child)
+	}
+}
+
+; Use the actual current captured entry and target, with its native backend datum absent.
+_WBF_CurrentCapturedWarningRefusal(Root) {
+	global _LLM_Menu, _LLM_Menu_Handle
+	HadMenu := IsSet(_LLM_Menu), HadHandle := IsSet(_LLM_Menu_Handle)
+	SavedMenu := HadMenu ? _LLM_Menu : false, SavedHandle := HadHandle ? _LLM_Menu_Handle : false
+	Warnings := MenuRenderer_TemplateRows("llm_install_warning_frame", Map("llm_install_warning", _LLM_Menu_OnWarningInstallClick), Map(), Map())
+	AssertTrue(Warnings is Array && Warnings.Length == 1)
+	try {
+		for Key in ["llm_backend_warning_rows_ahk", "llm_install_warning_frame"] {
+			Previous := Root[Key], Target := Menu(), Failure := ""
+			try {
+				_LLM_Menu := unset, _LLM_Menu_Handle := Target
+				Root.Delete(Key)
+				try _LLM_Menu_EmitCapturedRow("llm_backend", false, false, false, Warnings, Target, "LLM")
+				catch as Err
+					Failure := Err.Message
+				AssertEqual("Declared backend parent frame was refused.", Failure,
+					"actual captured entry refuses withdrawn warning ownership before missing backend data: " . Key)
+				AssertEqual(0, TrayMenuItemCount(Target), "no partial captured warning escapes before declared frame admission")
+			} finally {
+				Root[Key] := Previous
+				_CTC_ReleaseMenu(Target)
+			}
+		}
+	} finally {
+		_LLM_Menu := HadMenu ? SavedMenu : unset
+		_LLM_Menu_Handle := HadHandle ? SavedHandle : unset
+	}
+}
+
+Test("Windows backend frame: exact captured guarded warning survives list and native transport with late refusal", _WBF_WithState.Bind(_WBF_CurrentGuardedWarningTransport))
+Test("Windows backend frame: actual captured entry refuses warning ownership before missing native backend data", _WBF_WithState.Bind(_WBF_CurrentCapturedWarningRefusal))

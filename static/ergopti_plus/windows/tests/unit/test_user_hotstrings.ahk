@@ -518,10 +518,7 @@ _UCHNativePreferences() {
 		Saved := [_ConfigDir, ConfigurationFile, _UserHotstringsOwner, _UserHotstringsLoader, CategoryEnabled,
 			_UserHotstringsLoadEpoch, _UserHotstringsLastRepair, _UserHotstringsRepairPending]
 		State := MasterGateState(), SavedState := State.Clone()
-		Config := '[hotstrings.dynamic.user_code]`nenabled = false`ntime_activation_seconds = 0.75`n'
-			. '[private]`ncredential = "retain-user-code-preferences"`n'
-		Fixture := _ScopeOwnerFixture(Config), SourcePath := Fixture.directory . "\personal_dynamic_hotstrings.ahk"
-		Config := Fixture.source
+		Fixture := _ScopeOwnerFixture(), SourcePath := Fixture.directory . "\personal_dynamic_hotstrings.ahk"
 		Sentinel := Fixture.directory . "\factory-ran.txt"
 		try {
 			State["initialized"] := false
@@ -533,6 +530,8 @@ _UCHNativePreferences() {
 			Node := Features["hotstrings"]["dynamic"]["user_code"]
 			AssertFalse(Node["enabled"], "canonical boot preference is off")
 			Node["time_activation_seconds"] := 0.75
+			Config := '[hotstrings.dynamic.user_code]`nenabled = false`ntime_activation_seconds = 0.75`n'
+				. '[private]`ncredential = "retain-user-code-preferences"`n'
 			Assert(FSWriteDurable(Fixture.path, Config))
 			Source := 'ErgoptiDynamicHotstrings(api) {`n`tFileAppend("unexpected", "' . Sentinel
 				. '", "UTF-8-RAW")`n`treturn []`n}`n'
@@ -752,12 +751,11 @@ _UCHScopedConfiguration(ScopeId, Mode, CancellationRefused := false) {
 	SavedRegistry := IsSet(_PersonalShortcutsRegistry) ? _PersonalShortcutsRegistry : unset
 	SavedKeyboard := IsSet(KeyboardShortcutAssignments) ? KeyboardShortcutAssignments : unset
 	SavedParameters := IsSet(GestureActionParameters) ? GestureActionParameters : unset
-	InitialSuffix := '[hotstrings.dynamic.user_code]`nenabled = true`ntime_activation_seconds = 0.75`nunknown_source_choice = "retain"`n'
-	Fixture := _HotstringsScopeFixture(1, InitialSuffix), Borrowed := 0, Refusal := 0, Launches := 0
+	Fixture := _HotstringsScopeFixture(), Borrowed := 0, Refusal := 0, Launches := 0
 	Native := _UCHFixture()
 	SourcePath := Fixture.directory . "\personal_dynamic_hotstrings.ahk"
 	Source := Chr(0xFEFF) . 'ErgoptiDynamicHotstrings(api) {`n`tthrow Error("source must remain unexecuted by scope publication")`n}`n'
-	Initial := Fixture.source
+	Initial := Fixture.source . '[hotstrings.dynamic.user_code]`nenabled = true`ntime_activation_seconds = 0.75`nunknown_source_choice = "retain"`n'
 	Launch(_Success, Bundle, Refused) {
 		Borrowed := Bundle, Refusal := Refused, Launches += 1
 		; The production shutdown preflight consumes this exact cancellation

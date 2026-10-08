@@ -197,6 +197,7 @@
 	"config_cleanup.intro": "Controleer de instellingen die ErgoptiPlus niet meer gebruikt.",
 	"dialog.action_picker.disabled": "∅ Niets",
 	"dialog.action_picker.label": "Actie:",
+	"dialog.action_picker.menu_label": "Actie:…",
 	"dialog.action_picker.back": "← Terug",
 	"dialog.action_picker.capture_key": "Druk op de toets die verzonden moet worden, of typ de naam ervan.",
 	"dialog.action_picker.capture_shortcut": "Druk op de sneltoets die verzonden moet worden, of typ hem.",

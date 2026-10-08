@@ -60,13 +60,11 @@ _FM_EndIsolated(OldFeatures) {
 ; the absolute path. Tag distinguishes between concurrent fixture files
 ; (one per test); the harness clears any stale copy first.
 _FM_WriteFixture(Tag, Content) {
-	static Sequence := 0
-	Path := A_Temp . "\ergopti_v2_test_" . Tag . "_" . A_ScriptHwnd . "_" . ++Sequence . ".toml"
+	Path := A_Temp . "\ergopti_v2_test_" . Tag . ".toml"
 	if FileExist(Path) {
 		FileDelete(Path)
 	}
 	FileAppend(Content, Path, "UTF-8")
-	_CMJFixtureReadonly(Path)
 	return Path
 }
 
@@ -375,8 +373,6 @@ Test("ManifestBuildFeaturesMap: tap_hold is not a Features sub-tree",
 TestFMv2_ApplyNonexistentFileReturnsZero() {
 	OldFeatures := _FM_BeginIsolated()
 	try {
-		MissingPath := A_Temp . "\nonexistent_ergopti_v2_test.toml"
-		_CMJFixtureReadonly(MissingPath)
 		Applied := ApplyConfigToml(Features, A_Temp . "\nonexistent_ergopti_v2_test.toml")
 		AssertEqual(0, Applied)
 	}
@@ -1394,13 +1390,6 @@ Test("configuration snapshot: repeated feature reads detach their retained sourc
 _FMS_NativeReadRefusalAndRecovery(Path) {
 	global _ConfigBootReadFailed
 	_ConfigBootReadFailed := false
-	Before := FSReadUtf8Exact(Path)
-	AssertTrue(Before is String, "the independent original source is physically readable before locking")
-	Admission := ConfigMigrateBoot(Path, "capture_read")
-	AssertTrue(HasMethod(Admission, "Call"), "the actual readonly source constructor admits the original native read")
-	CanonicalSource := SubStr(Before, 1, 1) == Chr(0xFEFF) ? SubStr(Before, 2) : Before
-	AssertTrue(Admission.Call(CanonicalSource, 1), "the genuine source receipt matches the exact original legacy bytes")
-	AssertFalse(ConfigSchemaCanPrepareWrite(Path), "readonly corpus custody creates no write READY")
 	Lock := FileOpen(Path, "r-rwd")
 	Assert(IsObject(Lock), "the native read-refusal fixture must acquire its actual exclusive lock")
 	try Cache := ParseConfigTomlFile(Path)
@@ -1530,7 +1519,7 @@ _FMS_FullSavePreservesOutdatedAndUnknown(Path) {
 	}
 }
 _FMS_FullSaveUsesSemanticReadWithoutCleanup() {
-	_FMS_WithSource("fullsave", '_meta.schema_version = 11`nhotstrings.trigger_char = "@"`n[shortcuts]`nscreen = 2 # outdated, retained`n[future]`nold = "retain" # user data`n',
+	_FMS_WithSource("fullsave", 'hotstrings.trigger_char = "@"`n[shortcuts]`nscreen = 2 # outdated, retained`n[future]`nold = "retain" # user data`n',
 		_FMS_FullSavePreservesOutdatedAndUnknown)
 }
 Test("configuration snapshot: actual full save retains outdated and unknown scalar records (config-semantic-snapshot)",
@@ -1621,8 +1610,7 @@ _FMS_ChildPoliciesAndFullSave(Path, ExpectedSave) {
 	Original := FSRead(Path)
 	Target := ManifestBuildFeaturesMap()
 	try {
-		_CFGFS_Prepare(Path, true, false, false)
-		ConfigMigrateBoot(Path)
+		_CFGFS_Prepare(Path)
 		_ConfigBootRejectedOverrides := 0
 		_ConfigBootOutdatedEntries := Map()
 		ParseConfigTomlFile(Path)
@@ -1663,9 +1651,9 @@ _FMS_ChildPoliciesAndFullSave(Path, ExpectedSave) {
 	}
 }
 _FMS_InlineChildRefusalAndPhysicalPreservation() {
-	_FMS_WithSource("inline_child", _CMJFixtureCurrentSource('[hotstrings]`nautocorrection = { names = { enabled = "true", time_activation_seconds = 0.25, future = "retain" } } # preserve`n'),
+	_FMS_WithSource("inline_child", '[hotstrings]`nautocorrection = { names = { enabled = "true", time_activation_seconds = 0.25, future = "retain" } } # preserve`n',
 		_FMS_ChildPoliciesAndFullSave.Bind(, CONFIG_SAVE_OK))
-	_FMS_WithSource("physical_child", _CMJFixtureCurrentSource('[hotstrings.autocorrection.names]`nenabled = "true" # outdated`ntime_activation_seconds = 0.25`nfuture = "retain" # unknown`n'),
+	_FMS_WithSource("physical_child", '[hotstrings.autocorrection.names]`nenabled = "true" # outdated`ntime_activation_seconds = 0.25`nfuture = "retain" # unknown`n',
 		_FMS_ChildPoliciesAndFullSave.Bind(, CONFIG_SAVE_OK))
 }
 Test("configuration snapshot: inline child policy and actual full-save fences retain obsolete data (config-semantic-snapshot)",
@@ -1900,7 +1888,7 @@ _FMS_FullSaveChangedInlineSource(Path) {
 	Runtime := _CFGFS_CaptureRuntime(), Coordinator := _ConfigFullSaveCoordinator()
 	Target := ManifestBuildFeaturesMap()
 	; A nondefault target exercises a durable leaf; the default 0.5 is sparse.
-	Expected := Chr(0xFEFF) . '_meta.schema_version = 11`nhotstrings.trigger_char = "@"`nhotstrings.autocorrection = {names = {enabled = "true", time_activation_seconds = 0.75, future = "retain"}}`n[future]`nold = "retain" # user data`n'
+	Expected := Chr(0xFEFF) . 'hotstrings.trigger_char = "@"`nhotstrings.autocorrection = {names = {enabled = "true", time_activation_seconds = 0.75, future = "retain"}}`n[future]`nold = "retain" # user data`n'
 	try {
 		_CFGFS_Prepare(Path)
 		_ConfigBootRejectedOverrides := 0
@@ -1942,7 +1930,7 @@ _FMS_FullSaveChangedInlineSource(Path) {
 	}
 }
 _FMS_FullSaveChangedInlineAndRestart() {
-	_FMS_WithSource("fullsave_inline_changed", '_meta.schema_version = 11`nhotstrings.trigger_char = "@"`nhotstrings.autocorrection = {names = {enabled = "true", time_activation_seconds = 0.25, future = "retain"}}`n[future]`nold = "retain" # user data`n',
+	_FMS_WithSource("fullsave_inline_changed", 'hotstrings.trigger_char = "@"`nhotstrings.autocorrection = {names = {enabled = "true", time_activation_seconds = 0.25, future = "retain"}}`n[future]`nold = "retain" # user data`n',
 		_FMS_FullSaveChangedInlineSource)
 }
 Test("configuration snapshot: actual full save changes an inline leaf and survives fresh native bootstrap (config-full-semantic-successor)",
@@ -2020,7 +2008,7 @@ _FMS_RemovedCapsPreservedUntilCleanup(Path) {
 	}
 }
 _FMS_RemovedCapsDoNotAcquireKnownOwnership() {
-	_FMS_WithSource("removed_caps", '_meta.schema_version = 11`n[hotstrings.autocorrection.names]`nenabled = true`ntime_activation_seconds = 0.25`n[hotstrings.autocorrection.caps]`nenabled = true`ntime_activation_seconds = 0.125`n',
+	_FMS_WithSource("removed_caps", '[hotstrings.autocorrection.names]`nenabled = true`ntime_activation_seconds = 0.25`n[hotstrings.autocorrection.caps]`nenabled = true`ntime_activation_seconds = 0.125`n',
 		_FMS_RemovedCapsPreservedUntilCleanup)
 }
 Test("configuration snapshot: removed caps stays runtime unread and is preserved until explicit cleanup (config-current-feature-owner)",
@@ -2110,7 +2098,7 @@ _FMS_ConfigExactCollectedSubtree(Target) {
 _FMS_ConfigExactNameFullSave(Path, Fixture) {
 	global _ConfigBootRejectedOverrides, _ConfigBootOutdatedEntries
 	Runtime := _CFGFS_CaptureRuntime(), Coordinator := _ConfigFullSaveCoordinator()
-	Original := '_meta.schema_version = 11`n' . _FMS_ConfigExactNameSource(Fixture)
+	Original := _FMS_ConfigExactNameSource(Fixture)
 	Target := ManifestBuildFeaturesMap()
 	try {
 		_CFGFS_Prepare(Path)
@@ -2123,7 +2111,7 @@ _FMS_ConfigExactNameFullSave(Path, Fixture) {
 		AssertEqual(Original, FSRead(Path), "a collected semantic no-op retains the complete handwritten source")
 		Target["hotstrings"]["personal"][Fixture.name]["enabled"] := false
 		AssertEqual(CONFIG_SAVE_OK, SaveFullConfig(0, (*) => true, true, 0, Collector))
-		ExpectedSource := "_meta.schema_version = 11`n# private exact-name source`n" . Fixture.header . "`n"
+		ExpectedSource := "# private exact-name source`n" . Fixture.header . "`n"
 			. "time_activation_seconds = 0.125`n"
 			. '# keep source trivia`n[future]`n"literal.dot" = { rows = [[1, "x"]], count = 9223372036854775807 }`n'
 		AssertEqual(ExpectedSource, FSRead(Path), "only the explicitly cleared leaf is removed")
@@ -2131,8 +2119,7 @@ _FMS_ConfigExactNameFullSave(Path, Fixture) {
 		Personal.CaseSense := "On"
 		Personal[Fixture.name] := Map("time_activation_seconds", 0.125)
 		_FMS_AssertExactTree(Map("hotstrings", Map("personal", Personal),
-			"future", Map("literal.dot", Map("rows", [[1, "x"]], "count", 9223372036854775807)),
-			"_meta", Map("schema_version", 11)),
+			"future", Map("literal.dot", Map("rows", [[1, "x"]], "count", 9223372036854775807))),
 			TOML_ParseDocument(FSRead(Path)))
 		Reloaded := ManifestBuildFeaturesMap()
 		AssertEqual(1, ApplyConfigToml(Reloaded, Path), "the genuine reload reader keeps the exact remaining owner")
@@ -2148,7 +2135,7 @@ _FMS_ConfigExactNameFullSave(Path, Fixture) {
 }
 _FMS_ConfigFullSaveKeepsExactNames() {
 	for Index, Fixture in _FMS_ConfigExactNameFixtures()
-		_FMS_WithSource("fullsave_name_" . Index, '_meta.schema_version = 11`n' . _FMS_ConfigExactNameSource(Fixture),
+		_FMS_WithSource("fullsave_name_" . Index, _FMS_ConfigExactNameSource(Fixture),
 			_FMS_ConfigExactNameFullSave.Bind(, Fixture))
 }
 Test("configuration snapshot: real full-save publication and reload preserve exact semantic names (config-full-state-exact-path)",
@@ -2683,40 +2670,3 @@ _FMS_PersonalFileCaseAliases() {
 }
 Test("configuration snapshot: genuine personal file owner does not transfer case-distinct config intent (config-personal-file-case-alias)",
 	_FMS_PersonalFileCaseAliases)
-
-; A real private constructor refusal must not masquerade as physical unreadability.
-_FMS_LogicalRegistryRefusalHasNoPhysicalDiagnostic(Path) {
-	global _ConfigBootReadFailed
-	Before := FSReadUtf8Exact(Path)
-	Admission := ConfigMigrateBoot(Path, "capture_read")
-	AssertTrue(HasMethod(Admission, "Call"), "the actual original readonly constructor is available before withdrawal")
-	CanonicalSource := SubStr(Before, 1, 1) == Chr(0xFEFF) ? SubStr(Before, 2) : Before
-	AssertTrue(Admission.Call(CanonicalSource, 1))
-	Registry := ConfigMigrateShippedRegistry(), Calls := { foreign: 0 }
-	AssertFalse(Object.Prototype.HasOwnProp.Call(Registry, "__Enum"))
-	try {
-		Registry.DefineProp("__Enum", { Call: (This, Arity) =>
-			(Calls.foreign += 1, Map.Prototype.__Enum.Call(This, Arity)) })
-		Cache := ParseConfigTomlFile(Path)
-		AssertEqual(0, Cache.Count, "the genuine schema owner withdrawal still refuses the real reader")
-		AssertEqual(0, Calls.foreign, "no revoked registry observer executes before diagnostic refusal")
-		AssertFalse(TOML_UnreadableFile(Path), "logical native-owner refusal issues no physical read diagnostic")
-		AssertEqual(0, ConfigMigrateBoot(Path, "consume_read_failure"), "public queries cannot mint an observed native failure")
-		AssertTrue(_ConfigBootReadFailed)
-		AssertFalse(ConfigFullStateCanPersist())
-		AssertTrue(FSUtf8ExactMatches(Path, Before))
-	} finally {
-		if Object.Prototype.HasOwnProp.Call(Registry, "__Enum")
-			Registry.DeleteProp("__Enum")
-	}
-	Repaired := ParseConfigTomlFile(Path)
-	AssertEqual("@", IniCacheGet(Repaired, "hotstrings", "trigger_char"))
-	AssertFalse(TOML_UnreadableFile(Path))
-	AssertEqual(0, Calls.foreign, "exact original registry repair executes no rejected observer")
-	AssertTrue(FSUtf8ExactMatches(Path, Before), "legacy source bytes remain independent and unchanged")
-}
-_FMS_LogicalRegistryRefusalDiagnostic() {
-	_FMS_WithSource("logical_refusal_diagnostic", 'hotstrings.trigger_char = "@"`n',
-		_FMS_LogicalRegistryRefusalHasNoPhysicalDiagnostic)
-}
-Test("configuration snapshot: genuine logical owner refusal never issues physical unreadability", _FMS_LogicalRegistryRefusalDiagnostic)

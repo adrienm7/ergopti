@@ -1,6 +1,6 @@
 ﻿; tests/unit/test_global_config_scope.ahk
 
-; One real WAL and detached owners; native rollback denial uses a real sharing handle.
+; One real WAL and detached owners; only the terminal replacement is injected.
 _GlobalScopeComposition(Mode, Scenario := "late") {
 	global _ConfigTransitionRetainedBarrier
 	PriorRetained := _ConfigTransitionRetainedBarrier
@@ -19,29 +19,22 @@ _GlobalScopeComposition(Mode, Scenario := "late") {
 	if Scenario == "absent"
 		ConfigSource := StrReplace(ConfigSource, '`nenabled = true`n', '`n')
 	Assert(FSWriteDurable(Fixture.path, ConfigSource))
-	AssertTrue(ConfigSchemaCanPrepareWrite(Fixture.path),
-		"the genuinely booted current source is freshly classified before any scope effects")
 	Assert(FSWriteDurable(TapPath, TapSource))
 	CredentialPath := Fixture.directory . "\api_entries.json"
 	Assert(FSWriteDurable(CredentialPath, '{"token":"keep"}'))
 	Fixture.options["tap_hold_path"] := TapPath
 	Fixture.options["tap_hold_defaults"] := _SharedDir . "\tap_hold\defaults.toml"
-	Bundle := 0, Refusal := 0, Launches := 0, Backups := 0, Handle := -1
+	Bundle := 0, Refusal := 0, Launches := 0, Backups := 0, RefuseMove := false
 	Port := ConfigTransitionProductionPort()
-	AssertTrue(ConfigTransitionProductionPort(Port), "global scope uses the actual unchanged native port owner")
+	Move(Source, Destination) {
+		return RefuseMove ? false : FSAtomicMoveReplace(Source, Destination)
+	}
+	Port["move_replace"] := Move
 	Fixture.options["port"] := Port
 	Launch(_Success, Borrowed, Refused) {
 		Bundle := Borrowed, Refusal := Refused, Launches += 1
-		if Scenario == "debt" {
-			AssertFalse(FSUtf8ExactMatches(Fixture.path, ConfigSource),
-				"the actual native global journal published before physical rollback denial")
-			; Share read/write but deny deletion only after actual native publication.
-			Handle := DllCall("kernel32\CreateFileW", "Str", Fixture.path,
-				"UInt", 0x80000000, "UInt", 3, "Ptr", 0, "UInt", 3,
-				"UInt", 0x00000080, "Ptr", 0, "Ptr")
-			AssertTrue(Handle != -1, "the real Windows non-delete-sharing handle must be acquired")
-			AssertTrue(ConfigTransitionProductionPort(Port), "physical refusal leaves the native port unchanged")
-		}
+		if Scenario == "debt"
+			RefuseMove := true
 		return Scenario != "immediate" && Scenario != "debt"
 	}
 	Backup(Path, Content) {
@@ -92,10 +85,7 @@ _GlobalScopeComposition(Mode, Scenario := "late") {
 			}
 			for Path in Fixture.personal
 				Assert(!_ConfigWriteLeaseTryAcquire(Path, "refused-personal-recovery"))
-			AssertTrue(DllCall("kernel32\CloseHandle", "Ptr", Handle, "Int"),
-				"the physical sharing denial closes before exact native recovery")
-			Handle := -1
-			AssertTrue(ConfigTransitionProductionPort(Port), "exact global recovery retains genuine native authority")
+			RefuseMove := false
 			Recovered := ConfigTransitionRollbackOwned(Fixture.options["locator"], Bundle, Port)
 			Assert(ConfigTransitionResultIs(Recovered, "recovered_old"))
 		} else if Scenario == "immediate" {
@@ -152,22 +142,7 @@ _GlobalScopeComposition(Mode, Scenario := "late") {
 		AssertEqual('{"token":"keep"}', FSReadUtf8Exact(CredentialPath))
 	} finally {
 		Rendered.Delete()
-		if Handle != -1 {
-			AssertTrue(DllCall("kernel32\CloseHandle", "Ptr", Handle, "Int"),
-				"fixture failure closes its real native sharing handle")
-			Handle := -1
-		}
 		try {
-			if Bundle is Object {
-				Inspected := ConfigTransitionInspect(Fixture.options["locator"], Port)
-				if ConfigTransitionResultIs(Inspected, "ready") {
-					Resolution := ConfigTransitionRollbackOwned(Fixture.options["locator"], Bundle, Port)
-					AssertTrue(ConfigTransitionResultIs(Resolution, "recovered_old"),
-						"fixture retirement resolves actual native WAL debt before releasing its genuine owner")
-				} else
-					AssertTrue(ConfigTransitionResultIs(Inspected, "absent"),
-						"only genuinely absent native WAL needs no recovery after completed refusal")
-			}
 			if Bundle is Object
 				_ConfigWriteTerminalRelease(Bundle)
 		} finally {

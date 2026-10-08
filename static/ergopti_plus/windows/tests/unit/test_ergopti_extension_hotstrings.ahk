@@ -324,7 +324,6 @@ _EHX_DistanceChoicesSurviveReload(GroupEnabled) {
 				ManifestSparseOperation("category_enabled.distances_reduction", GroupEnabled),
 				ManifestSparseOperation("hotstrings.distances_reduction.qu.enabled", true),
 				ManifestSparseOperation("hotstrings.distances_reduction.comma_j.enabled", false)])))
-			_CMJFixtureReadonly(ConfigPath)
 			Before := FSReadUtf8Exact(ConfigPath)
 			Roots := HotstringExtensions_Roots(Directory, Directory . "missing-bundled", _LCT_RegistryDir())
 			loop 2 {

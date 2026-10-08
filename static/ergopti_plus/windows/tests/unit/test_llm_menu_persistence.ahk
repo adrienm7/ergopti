@@ -663,7 +663,6 @@ _LLM_Persist_AssertCompositeScalarRejected(Key, Literal, Slug) {
 		Toml := "[llm]`n" . Key . " = " . Literal . "`n"
 		try FileDelete(Path)
 		FileAppend(Toml, Path, "UTF-8")
-		_CMJFixtureReadonly(Path)
 		Cache := ParseTomlFile(Path)
 		Assert(IniCacheGet(Cache, "llm", Key) is Array,
 			Slug . " fixture must reach its scalar boundary as an Array")
@@ -789,7 +788,6 @@ _LLM_Persist_AssertFeatureCompositeRejected(Section, Key, OptionKey,
 		try FileDelete(Path)
 		FileAppend("[" . Section . "]`n" . Key . ' = [["sentinel"]]`n',
 			Path, "UTF-8")
-		_CMJFixtureReadonly(Path)
 		AssertEqual(0, ApplyConfigToml(Features, Path),
 			Slug . " fixture must be rejected by the generic TOML loader")
 		Applied := _LLM_Persist_FeaturesGet(FeaturePath)

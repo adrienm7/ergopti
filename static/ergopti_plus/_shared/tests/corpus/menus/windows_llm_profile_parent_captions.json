@@ -1,0 +1,128 @@
+{
+  "ar": {
+    "source_key": "menu.profiles.profile_label_prefix",
+    "source": "الملف الشخصي: %s",
+    "subject": "Profile %s literal / Métier",
+    "expected": "الملف الشخصي: Profile %s literal / Métier"
+  },
+  "cs": {
+    "source_key": "menu.profiles.profile_label_prefix",
+    "source": "Profil: %s",
+    "subject": "Profile %s literal / Métier",
+    "expected": "Profil: Profile %s literal / Métier"
+  },
+  "da": {
+    "source_key": "menu.profiles.profile_label_prefix",
+    "source": "Profil: %s",
+    "subject": "Profile %s literal / Métier",
+    "expected": "Profil: Profile %s literal / Métier"
+  },
+  "de": {
+    "source_key": "menu.profiles.profile_label_prefix",
+    "source": "Profil: %s",
+    "subject": "Profile %s literal / Métier",
+    "expected": "Profil: Profile %s literal / Métier"
+  },
+  "en": {
+    "source_key": "menu.profiles.profile_label_prefix",
+    "source": "Profile: %s",
+    "subject": "Profile %s literal / Métier",
+    "expected": "Profile: Profile %s literal / Métier"
+  },
+  "es": {
+    "source_key": "menu.profiles.profile_label_prefix",
+    "source": "Perfil: %s",
+    "subject": "Profile %s literal / Métier",
+    "expected": "Perfil: Profile %s literal / Métier"
+  },
+  "fr": {
+    "source_key": "menu.profiles.profile_label_prefix",
+    "source": "Profil : %s",
+    "subject": "Profile %s literal / Métier",
+    "expected": "Profil : Profile %s literal / Métier"
+  },
+  "he": {
+    "source_key": "menu.profiles.profile_label_prefix",
+    "source": "פרופיל: %s",
+    "subject": "Profile %s literal / Métier",
+    "expected": "פרופיל: Profile %s literal / Métier"
+  },
+  "hi": {
+    "source_key": "menu.profiles.profile_label_prefix",
+    "source": "प्रोफ़ाइल: %s",
+    "subject": "Profile %s literal / Métier",
+    "expected": "प्रोफ़ाइल: Profile %s literal / Métier"
+  },
+  "it": {
+    "source_key": "menu.profiles.profile_label_prefix",
+    "source": "Profilo: %s",
+    "subject": "Profile %s literal / Métier",
+    "expected": "Profilo: Profile %s literal / Métier"
+  },
+  "ja": {
+    "source_key": "menu.profiles.profile_label_prefix",
+    "source": "プロファイル: %s",
+    "subject": "Profile %s literal / Métier",
+    "expected": "プロファイル: Profile %s literal / Métier"
+  },
+  "ko": {
+    "source_key": "menu.profiles.profile_label_prefix",
+    "source": "프로필: %s",
+    "subject": "Profile %s literal / Métier",
+    "expected": "프로필: Profile %s literal / Métier"
+  },
+  "nl": {
+    "source_key": "menu.profiles.profile_label_prefix",
+    "source": "Profiel: %s",
+    "subject": "Profile %s literal / Métier",
+    "expected": "Profiel: Profile %s literal / Métier"
+  },
+  "no": {
+    "source_key": "menu.profiles.profile_label_prefix",
+    "source": "Profil: %s",
+    "subject": "Profile %s literal / Métier",
+    "expected": "Profil: Profile %s literal / Métier"
+  },
+  "pl": {
+    "source_key": "menu.profiles.profile_label_prefix",
+    "source": "Profil: %s",
+    "subject": "Profile %s literal / Métier",
+    "expected": "Profil: Profile %s literal / Métier"
+  },
+  "pt": {
+    "source_key": "menu.profiles.profile_label_prefix",
+    "source": "Perfil: %s",
+    "subject": "Profile %s literal / Métier",
+    "expected": "Perfil: Profile %s literal / Métier"
+  },
+  "ru": {
+    "source_key": "menu.profiles.profile_label_prefix",
+    "source": "Профиль: %s",
+    "subject": "Profile %s literal / Métier",
+    "expected": "Профиль: Profile %s literal / Métier"
+  },
+  "sv": {
+    "source_key": "menu.profiles.profile_label_prefix",
+    "source": "Profil: %s",
+    "subject": "Profile %s literal / Métier",
+    "expected": "Profil: Profile %s literal / Métier"
+  },
+  "tr": {
+    "source_key": "menu.profiles.profile_label_prefix",
+    "source": "Profil: %s",
+    "subject": "Profile %s literal / Métier",
+    "expected": "Profil: Profile %s literal / Métier"
+  },
+  "uk": {
+    "source_key": "menu.profiles.profile_label_prefix",
+    "source": "Профіль: %s",
+    "subject": "Profile %s literal / Métier",
+    "expected": "Профіль: Profile %s literal / Métier"
+  },
+  "zh": {
+    "source_key": "menu.profiles.profile_label_prefix",
+    "source": "配置：%s",
+    "subject": "Profile %s literal / Métier",
+    "expected": "配置：Profile %s literal / Métier"
+  }
+}
