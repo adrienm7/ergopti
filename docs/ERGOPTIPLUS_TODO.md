@@ -4954,6 +4954,19 @@ unwind behavior. Production selectors, startup and installed/start authority
 remain absent. Full selected gates and native qualification remain separate;
 item31 and transverse16/38 stay open.
 
+The root-process prerequisite now retains its original unavailable prefix,
+empty stdout and exit status 69 while appending one failure-only closed observation.
+Its 54 reason codes come from the unchanged original guards; unknown values and
+OS/subprocess failures disclose no private text. Authority stays false and no
+finer native phase is inferred. All original root/ABI/source/retirement checks
+and deadlines remain unchanged. Frozen portable controls report 10 pass/7 fail
+before the change and 17 pass/0 fail afterwards; five causal mutants remain refused.
+A separate
+normally discovered Swift method runs the actual Python suite, requiring at
+least 17 discovered and 15 executed cases with at most two specifically named
+platform skips. Actual Darwin execution and the underlying native cause remain
+unqualified. This diagnostic does not complete TODO 31 or transverse items 16/38.
+
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
   listed; see `docs/memory/text-input-and-config.md`. Current source already

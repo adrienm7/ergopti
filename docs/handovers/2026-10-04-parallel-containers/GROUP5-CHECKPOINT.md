@@ -2587,3 +2587,24 @@ private purpose-token row affects only the mandatory Swift environment; no
 canonical Group6 workflow grant is implied. Actual isolated pinnedNode22 selected
 format and all383 JS checks pass. This preparation is not yet published or a
 native result. Items24/30/31/40/43/44 and transverse16/38 remain open.
+
+## Failure-only root prerequisite reason observation
+
+Authentic CI 37790356470 at 70a86 retains the original 39-byte unavailable prefix,
+exit status 69 and empty stdout. Its root SDK/ownership cause remains UNKNOWN;
+separate XcodeGen metadata HTTP 403 receipts cannot establish that cause. The diagnostic adds
+one bounded closed JSON line at the existing main failure boundary, preserving
+all source pins, root/tool/ABI ownership, retirement, assertions and deadlines.
+The 54 allowed reason names equal the original literal guard census. Unknown
+refusals and OS/subprocess categories disclose no exception text, paths or
+credentials; authority=false and native_verdict=unchanged.
+
+The complete original eight Python cases and actual root XCTest method remain
+whole. Frozen controls report 10 pass/7 fail before code and 17 pass/0 fail/0 skip
+afterwards. Five causal mutants refuse. The separately discovered Swift method
+executes the actual Python suite with genuine process status, discovered>=17,
+executed=total-minus-skips>=15 and at most two known platform skip identities.
+Old-eight-only and zero-test green receipts fail that floor. Portable execution
+and source review do not prove Darwin compilation or root/native readiness.
+Exact composed gates and fresh native CI are recorded separately; TODO 31 and
+transverse items 16/38 stay open. No item is removed.
