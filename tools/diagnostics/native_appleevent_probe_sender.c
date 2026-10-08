@@ -2,6 +2,8 @@
 // Exact kernel-PID private nonce sender for native sandbox admission only.
 
 #include <ApplicationServices/ApplicationServices.h>
+#import <AppKit/AppKit.h>
+#include <Security/Security.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdbool.h>
@@ -83,6 +85,103 @@ static void emit_sender_diagnostic(OSStatus send_status, int denied,
     }
 }
 
+/* Signed identity observations are metadata, never an authorization receipt. */
+struct SenderIdentityObservation {
+    int self_available, target_available;
+    int self_team, target_team, team_equal, identifier_equal, hash_equal;
+};
+
+static CFDictionaryRef sender_signing_information(pid_t process) {
+    CFNumberRef number = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &process);
+    if (number == NULL) return NULL;
+    const void *keys[] = { kSecGuestAttributePid };
+    const void *values[] = { number };
+    CFDictionaryRef attributes = CFDictionaryCreate(kCFAllocatorDefault, keys, values, 1,
+        &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+    CFRelease(number);
+    if (attributes == NULL) return NULL;
+    SecCodeRef code = NULL;
+    OSStatus status = SecCodeCopyGuestWithAttributes(NULL, attributes, kSecCSDefaultFlags, &code);
+    CFRelease(attributes);
+    if (status != errSecSuccess || code == NULL) {
+        if (code != NULL) CFRelease(code);
+        return NULL;
+    }
+    SecStaticCodeRef static_code = NULL;
+    status = SecCodeCopyStaticCode(code, kSecCSDefaultFlags, &static_code);
+    CFRelease(code);
+    if (status != errSecSuccess || static_code == NULL) {
+        if (static_code != NULL) CFRelease(static_code);
+        return NULL;
+    }
+    CFDictionaryRef information = NULL;
+    status = SecCodeCopySigningInformation(static_code, kSecCSSigningInformation, &information);
+    CFRelease(static_code);
+    if (status != errSecSuccess) {
+        if (information != NULL) CFRelease(information);
+        return NULL;
+    }
+    return information;
+}
+
+static int sender_identity_equal(CFDictionaryRef self, CFDictionaryRef target,
+    CFStringRef key, CFTypeID expected_type) {
+    if (self == NULL || target == NULL) return -1;
+    CFTypeRef left = CFDictionaryGetValue(self, key), right = CFDictionaryGetValue(target, key);
+    if (left == NULL || right == NULL || CFGetTypeID(left) != expected_type ||
+        CFGetTypeID(right) != expected_type) return -1;
+    return CFEqual(left, right) ? 1 : 0;
+}
+
+static struct SenderIdentityObservation observe_sender_identity(pid_t target) {
+    CFDictionaryRef self = sender_signing_information(getpid());
+    CFDictionaryRef other = sender_signing_information(target);
+    struct SenderIdentityObservation observation = {self != NULL, other != NULL, -1, -1, -1, -1, -1};
+    if (self != NULL) {
+        CFTypeRef team = CFDictionaryGetValue(self, kSecCodeInfoTeamIdentifier);
+        observation.self_team = team != NULL && CFGetTypeID(team) == CFStringGetTypeID();
+    }
+    if (other != NULL) {
+        CFTypeRef team = CFDictionaryGetValue(other, kSecCodeInfoTeamIdentifier);
+        observation.target_team = team != NULL && CFGetTypeID(team) == CFStringGetTypeID();
+    }
+    observation.team_equal = sender_identity_equal(self, other, kSecCodeInfoTeamIdentifier, CFStringGetTypeID());
+    observation.identifier_equal = sender_identity_equal(self, other, kSecCodeInfoIdentifier, CFStringGetTypeID());
+    observation.hash_equal = sender_identity_equal(self, other, kSecCodeInfoUnique, CFDataGetTypeID());
+    if (self != NULL) CFRelease(self);
+    if (other != NULL) CFRelease(other);
+    return observation;
+}
+
+/* Actual sender registration is an experiment; it does not grant consent. */
+static int admit_sender_appkit(NSApplication *application) {
+    if (application == nil) return 1;
+    const NSApplicationActivationPolicy initial = [application activationPolicy];
+    if (initial != NSApplicationActivationPolicyAccessory &&
+        ![application setActivationPolicy:NSApplicationActivationPolicyAccessory]) return 2;
+    return [application activationPolicy] == NSApplicationActivationPolicyAccessory ? 0 : 3;
+}
+
+static int observe_sender_policy(NSApplication *application) {
+    if (application == nil) return -1;
+    @try {
+        const NSInteger policy = [application activationPolicy];
+        return policy >= 0 && policy <= 2 ? (int)policy : -1;
+    } @catch (NSException *unavailable) {
+        (void)unavailable;
+        return -1;
+    }
+}
+
+/* A separate closed metadata frame never changes nonce/reply admission. */
+static void emit_sender_identity(const struct SenderIdentityObservation *identity,
+    int before_policy, int after_policy) {
+    fprintf(stderr, "OWNED_APPLEEVENT_IDENTITY/1 before=%d after=%d self=%d target=%d self_team=%d target_team=%d team=%d identifier=%d hash=%d\n",
+        before_policy, after_policy, identity->self_available, identity->target_available,
+        identity->self_team, identity->target_team, identity->team_equal,
+        identity->identifier_equal, identity->hash_equal);
+}
+
 static const char *owned_second_marker_snapshot(const char *expected_nonce) {
     // Information only: the sender already has the exact owned private cwd.
     // Any ambiguous process-local descriptor retires with this failed sender.
@@ -145,6 +244,23 @@ int main(int argc, char **argv) {
     if (errno != 0 || end == argv[1] || *end != '\0' || parsed <= 0 ||
         parsed > INT_MAX || parsed == getpid()) return 64;
     const pid_t recipient = (pid_t)parsed;
+    ProcessSerialNumber serial;
+    const OSStatus registration = GetCurrentProcess(&serial);
+    if (registration != noErr) {
+        fprintf(stderr, "Owned AppleEvent sender current-process registration failed: %d\n", (int)registration);
+        return 65;
+    }
+    NSApplication *application = [NSApplication sharedApplication];
+    const int before_policy = observe_sender_policy(application);
+    const int admission = admit_sender_appkit(application);
+    const int after_policy = observe_sender_policy(application);
+    if (admission != 0) {
+        const struct SenderIdentityObservation unavailable = {0, 0, -1, -1, -1, -1, -1};
+        fprintf(stderr, "Owned AppleEvent sender AppKit admission refused: %d\n", admission);
+        emit_sender_identity(&unavailable, before_policy, after_policy);
+        return 65;
+    }
+    const struct SenderIdentityObservation identity = observe_sender_identity(recipient);
     AEAddressDesc address = {typeNull, NULL};
     AppleEvent event = {typeNull, NULL};
     AppleEvent reply = {typeNull, NULL};
@@ -158,6 +274,7 @@ int main(int argc, char **argv) {
     }
     if (status != noErr) {
         fprintf(stderr, "Owned AppleEvent construction failed: %d\n", (int)status);
+        emit_sender_identity(&identity, before_policy, after_policy);
         AEDisposeDesc(&reply);
         AEDisposeDesc(&event);
         AEDisposeDesc(&address);
@@ -249,6 +366,7 @@ int main(int argc, char **argv) {
             error_read_detail, error_length_detail, error_value_detail);
         if (marker_attempted) fprintf(stderr, ", marker2=%s", marker_snapshot);
         fprintf(stderr, "\n");
+        emit_sender_identity(&identity, before_policy, after_policy);
         // Observe only this failed positive sender's existing target and event.
         // False forbids a consent prompt; the original refusal remains authoritative.
         if (strcmp(argv[3], "success") == 0) {
