@@ -136,6 +136,25 @@
 		},
 		"description": "A provider list is admitted only from recorded distribution metadata; null means no verified repair provider. Actual LuaJIT ABI, supported GIO resolver and required GNOME schema are always re-probed. Libproxy selection does not prove every desktop setting or PAC evaluation.",
 		"curl_package": "curl",
+		"source_luv_build_packages": {
+			"apt": null,
+			"dnf": [
+				"git",
+				"gcc",
+				"glibc-devel",
+				"make",
+				"cmake",
+				"pkgconf-pkg-config",
+				"luajit-devel",
+				"glib-networking",
+				"gsettings-desktop-schemas",
+				"dconf"
+			],
+			"zypper": null,
+			"pacman": null,
+			"xbps": null,
+			"apk": null
+		},
 		"portable": {
 			"gio_modules": ["libgiognomeproxy.so", "libgiolibproxy.so", "libdconfsettings.so"],
 			"system_ca_files": [

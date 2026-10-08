@@ -27,6 +27,27 @@ CI guard replay exposed an incorrectly anchored fixture slice; that harness
 error was corrected before receiving and is not credited as product evidence.
 All manually dispatched final-source native gates remain pending for this repair.
 
+The subsequent Fedora bootstrap is source-only until final receiving. It uses
+the unchanged Flatpak luv source26e62e49b0230891ece45a78cc1f63c074e60020 and
+the same six CMake choices. Shared policy declares build/GIO/schema prerequisites
+without inventing a distribution LuaJIT module package. The native producer
+checks the exact fetched revision, Git objects and actual LuaJIT C entry points;
+its output is atomically installed inlinux/native_modules, hashed into the
+ownership manifest and selected by the matching standalone launcher. Existing
+unchanged native-module ownership survives subsequent installs. The first-run
+fixture now also checks the installed native networking probe, preserving every
+previous launcher, runtime, tray and declared-limitation assertion.
+
+Real host compilation and actual native loading pass through a physically
+closed owner. The final producer also passes with deliberately foreign inherited
+GIT_DIR/GIT_INDEX_FILE values; the helper clears only its child repository
+namespace. One initial negative replay had incorrectly assembled positional
+arguments; its retained refusal is a harness error, not product evidence.
+The complete pre-existing Flatpak module projection stays byte-exact. The
+causal bootstrap policy guard fails before the new map;26 recipe/filesystem
+control groups pass afterwards. Full selected gates and hosted Fedora package
+manager/installation qualification remain pending at this checkpoint.
+
 - macOS archive migration, Sparkle resource/key/refusal receiving and bounded
   native lifecycle diagnostics. Historical native Sparkle acceptance passed;
   complete Brew/package/install acceptance remains incomplete.
