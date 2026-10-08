@@ -20,7 +20,7 @@ import time
 import uuid
 
 BASE_PATH = Path(__file__).resolve().parents[1] / "diagnostics/hs274_native_build.py"
-BASE_SHA256 = "aa54be49feca564a455bc0f1804939a8bf3658ddeb5f56a691a914114c69aee2"
+BASE_SHA256 = "ff8de375cb2fc8a801a144974418300e8e290a1efe2107338972b937d659dd80"
 PROVIDER_SHA256 = "c29ceb96e73655cadea7763805b9468c32744033c2f177bae492e4ce9fe4100a"
 
 
@@ -2671,6 +2671,7 @@ def _compile_owned(
         not any(owner.iterdir()), "unsafe_path", "Actual owned build requires a fresh empty owner"
     )
     deadline = time.monotonic() + seconds
+    metadata_token = BASE._take_tool_metadata_token()
     with _observe_compilation(owner):
         _REQUIRE(
             type(distribution) is bool and (not distribution or (prepare and signing is not None)),
@@ -2716,7 +2717,11 @@ def _compile_owned(
         ]
         if shipping_sink is not None:
             shipping_sink.current(deadline)
-        binary, acquisition = BASE.acquire_xcodegen(owner, deadline)
+        binary, acquisition = (
+            BASE.acquire_xcodegen(owner, deadline)
+            if metadata_token is None
+            else BASE.acquire_xcodegen(owner, deadline, metadata_token=metadata_token)
+        )
         if shipping_sink is not None:
             shipping_sink.current(deadline)
         phases.append(acquisition)

@@ -192,7 +192,7 @@ extension HS274NativePolicyQualificationTests {
 				XCTAssertEqual(partial?["qualification"] as? String,
 					"unsigned_actual_core_constructor_compilation_only")
 				XCTAssertEqual(partial?["producer_sha256"] as? String,
-					"9560dca88e587f8f714a61ec676df5d15db74671b666f7dc23082365c9772275")
+					"bbd44055d0e426b78f612a4cb2585b42373045f31042fd2bc4d957905ef4de45")
 				XCTAssertEqual(partial?["source_factory_sha256"] as? String,
 					"854dc3ef556e2540d4a64e0d935610a2a2fe8c947e3f7fe315c1641ceaaedd7d")
 				XCTAssertEqual(partial?["architectures"] as? [String], ["arm64", "x86_64"])
@@ -444,6 +444,25 @@ extension HS274NativePolicyQualificationTests {
 					XCTAssertTrue(receipt.stderr.contains("Ran 1 test in "))
 					XCTAssertTrue(receipt.stderr.hasSuffix("\nOK\n"))
 				}
+			}
+		}
+	}
+}
+
+extension HS274NativePolicyQualificationTests {
+
+	func testPortableMetadataCompilerCallersKeepPurposeBeforeActualPOSIXChildren() throws {
+		let modes: [[String]] = [[], ["-O"]]
+		try fixture { root in
+			for mode in modes {
+				let script = source("hs274_native_build.py").deletingLastPathComponent()
+					.appendingPathComponent("hs274_native_metadata_caller_test.py")
+				let receipt = try run(URL(fileURLWithPath: "/usr/bin/env"),
+					["python3"] + mode + [script.path], root: root)
+				XCTAssertEqual(receipt.status, 0)
+				XCTAssertTrue(receipt.stdout.isEmpty)
+				XCTAssertTrue(receipt.stderr.contains("Ran 9 tests in "))
+				XCTAssertTrue(receipt.stderr.hasSuffix("\nOK\n"))
 			}
 		}
 	}

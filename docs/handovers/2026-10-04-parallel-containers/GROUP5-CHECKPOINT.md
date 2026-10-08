@@ -2416,3 +2416,23 @@ remain UNEXECUTED, including the earlier permission-stage, source-selection and
 Core asset-policy changes. Release build success does not qualify the test
 suite, packaging, installation or physical keyboards. Item30 and transverse
 16/38 remain open; no item is removed.
+
+## Compiler metadata authentication custody
+
+The three native compiler entries now consume the dedicated XcodeGen metadata
+credential before their first factory, Git or native child. Only the exact pinned
+GitHub API metadata request may receive it; redirects refuse, archives remain
+anonymous, ambient credentials are not borrowed, and malformed values refuse
+before those children. Default Swift children strip this dedicated purpose;
+only the three compiler Guardians explicitly select it. The original budgets,
+physical guards, independent expectations and fixed source bounds remain whole.
+The coherent eighteen-source author qualification passes 576 portable executions;
+its independent review passes 678, retains the four genuine caller BEFORE
+assertion refusals per mode and records 16 targeted mutation assertion refusals.
+These overlapping cohorts are not additive coverage. The nine frozen caller
+controls observe real POSIX child inheritance; modeled Apple phases are not
+Darwin compiler evidence. The added Swift method is normally discovered but has
+not executed on macOS. Group6 has not granted the workflow environment seam, so
+that row remains absent. Native authenticated HTTP, full compilation, signing,
+packaging and installation remain UNEXECUTED for this source successor.
+Item 31 and transverse 16/38 remain open; no item is removed.

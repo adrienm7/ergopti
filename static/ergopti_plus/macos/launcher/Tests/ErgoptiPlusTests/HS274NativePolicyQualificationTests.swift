@@ -43,7 +43,7 @@ final class HS274NativePolicyQualificationTests: XCTestCase {
 		private var cached: Receipt?
 		private let budget: ChildBudget
 
-		init(executable: URL, arguments: [String], repository: URL, root: URL, budget: ChildBudget = .sdk) throws {
+		init(executable: URL, arguments: [String], repository: URL, root: URL, budget: ChildBudget = .sdk, compilationMetadataToken: String? = nil) throws {
 			self.budget = budget
 			let identity = UUID().uuidString
 			output = root.appendingPathComponent(identity + ".stdout")
@@ -60,7 +60,11 @@ final class HS274NativePolicyQualificationTests: XCTestCase {
 			process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
 			process.arguments = ["python3", repository.appendingPathComponent("tools/diagnostics/macos_owned_process.py").path,
 				"run", terminal.path, budget.worker, "--", executable.path] + arguments
-			process.environment = NativeFixtureChildEnvironment.make()
+			var environment = NativeFixtureChildEnvironment.make()
+			if let compilationMetadataToken {
+				environment["ERGOPTI_NATIVE_XCODEGEN_METADATA_TOKEN"] = compilationMetadataToken
+			}
+			process.environment = environment
 			process.standardOutput = streams[0]
 			process.standardError = streams[1]
 			process.terminationHandler = { [completed] _ in completed.signal() }
@@ -274,7 +278,8 @@ final class HS274NativePolicyQualificationTests: XCTestCase {
 	func runSourceCompilation(_ arguments: [String], root: URL) throws -> Receipt {
 		let child = try GuardianChild(executable: URL(fileURLWithPath: "/usr/bin/env"),
 			arguments: ["python3", source("hs274_native_build.py").path] + arguments,
-			repository: Self.repository, root: root, budget: .sourceCalibration)
+			repository: Self.repository, root: root, budget: .sourceCalibration,
+			compilationMetadataToken: NativeFixtureChildEnvironment.compilationMetadataToken())
 		children.append(child)
 		try child.start()
 		let receipt = try child.finish()
@@ -296,7 +301,8 @@ final class HS274NativePolicyQualificationTests: XCTestCase {
 			.deletingLastPathComponent().appendingPathComponent("build/remap_runtime_build.py")
 		let child = try GuardianChild(executable: URL(fileURLWithPath: "/usr/bin/env"),
 			arguments: ["python3", script.path] + arguments,
-			repository: Self.repository, root: root, budget: .sourceCalibration)
+			repository: Self.repository, root: root, budget: .sourceCalibration,
+			compilationMetadataToken: NativeFixtureChildEnvironment.compilationMetadataToken())
 		children.append(child)
 		try child.start()
 		let receipt = try child.finish()
@@ -312,7 +318,8 @@ final class HS274NativePolicyQualificationTests: XCTestCase {
 	func runCoreConstructorCompilation(_ arguments: [String], root: URL) throws -> Receipt {
 		let child = try GuardianChild(executable: URL(fileURLWithPath: "/usr/bin/env"),
 			arguments: ["python3", source("owned_runtime_service_reference_core_fixture_calibration.py").path] + arguments,
-			repository: Self.repository, root: root, budget: .sourceCalibration)
+			repository: Self.repository, root: root, budget: .sourceCalibration,
+			compilationMetadataToken: NativeFixtureChildEnvironment.compilationMetadataToken())
 		children.append(child)
 		try child.start()
 		return try child.finish()
