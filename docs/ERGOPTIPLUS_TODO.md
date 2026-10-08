@@ -3341,6 +3341,17 @@ Core asset-policy changes. Release build success does not qualify the test
 suite, packaging, installation or physical keyboards. Item30 and transverse
 16/38 remain open; no item is removed.
 
+The native compiler checkpoint 37766419477 on private candidate 261abd still
+refused the background XCTest throw assertion despite an explicit Void callback;
+no XCTest started. The test now deliberately catches the constructor error and
+fails any unexpected successful acquisition. An unexpectedly returned owner is
+retained until actual main-queue cleanup before expectation fulfillment. All 12
+methods, other assertions and the original one-second wait remain unchanged.
+Independent source review and strict full forward/reverse checks pass. Actual
+macOS compilation and execution after this successor remain unqualified here;
+preparatory manual run 37778305562 tests exact source on 916238897. Physical
+magic-key acceptance and the other native requirements remain open.
+
 - [~] **31.** HS-274 exact physical key accounting with an Ergopti-owned
   background Karabiner runtime (no Karabiner-Elements app). Plan, decisions and
   ADR 011 in the overnight handoff and `static/ergopti_plus/docs/adr/`. WP0-WP2
