@@ -36,7 +36,7 @@ const coldReceipt = spawnSync(
 assert.equal(coldReceipt.error, undefined, 'the independent cold receipt receiver must start');
 assert.equal(coldReceipt.signal, null, 'the independent cold receipt receiver must retire');
 assert.equal(coldReceipt.status, 0, coldReceipt.stderr || coldReceipt.stdout);
-assert.match(coldReceipt.stderr, /Ran 7 tests in/);
+assert.match(coldReceipt.stderr, /Ran 8 tests in/);
 assert.match(coldReceipt.stderr, /\bOK\b/);
 assert.doesNotMatch(coldReceipt.stderr, /skipped=/);
 process.stdout.write(coldReceipt.stdout);
@@ -54,7 +54,7 @@ assert.equal(
 	0,
 	officialColdReceipt.stderr || officialColdReceipt.stdout
 );
-assert.match(officialColdReceipt.stderr, /Ran 16 tests in/);
+assert.match(officialColdReceipt.stderr, /Ran 17 tests in/);
 assert.match(officialColdReceipt.stderr, /\bOK\b/);
 assert.doesNotMatch(officialColdReceipt.stderr, /skipped=/);
 process.stdout.write(officialColdReceipt.stdout);
