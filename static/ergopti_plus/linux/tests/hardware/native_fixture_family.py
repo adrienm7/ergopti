@@ -161,7 +161,10 @@ class Family:
             # Keep the exact child/pidfd/namespace capabilities and their last
             # positive observations. Unknown census, failed signal, wait, close
             # or namespace removal never becomes an empty-family receipt.
-            self.debt = {"type": type(error).__name__, "errno": getattr(error, "errno", None)}
+            self.debt = {
+                "type": type(error).__name__,
+                "errno": getattr(error, "errno", None),
+            }
             return False
 
     def retire(self):
@@ -181,6 +184,45 @@ class Family:
             time.sleep(0.005)
         return True
 
+    def report_failure(self, reason, exception_type=None):
+        """Observe only this supervisor's unreaped children; never grant success."""
+        packet = {"reason": reason, "supervisor": os.getpid()}
+        if exception_type is not None:
+            packet["exception_type"] = exception_type
+        try:
+            owned = self.children()
+            packet["owned_count"] = len(owned)
+            packet["truncated"] = len(owned) > 32
+            rows = []
+            for pid in owned[:32]:
+                # These are unreaped direct children from our kernel census.
+                # No arguments, environment or arbitrary process data are read.
+                row = {"pid": pid}
+                try:
+                    with Path(f"/proc/{pid}/status").open("rb") as source:
+                        status = source.read(4096).decode("ascii", errors="replace")
+                    for line in status.splitlines():
+                        key, separator, value = line.partition(":")
+                        if separator and key in {"State", "PPid"}:
+                            row[key] = value.strip()[:64]
+                    with Path(f"/proc/{pid}/comm").open("rb") as source:
+                        row["comm"] = source.read(64).decode("ascii", errors="replace").strip()
+                except Exception as error:
+                    row["observation_error"] = type(error).__name__
+                rows.append(row)
+            packet["owned"] = rows
+        except Exception as error:
+            packet["census_error"] = type(error).__name__
+        try:
+            print(
+                "NATIVE_FAMILY_FAILURE " + json.dumps(packet, separators=(",", ":")),
+                file=sys.stderr,
+                flush=True,
+            )
+        except Exception:
+            # A refused diagnostic must not replace the original status/debt.
+            pass
+
     def run(self):
         status = 1
         try:
@@ -197,7 +239,9 @@ class Family:
                 # and could miss its graceful shutdown. The target does not
                 # inherit this supervisor's terminal receipt descriptor.
                 self.child = subprocess.Popen(
-                    self.command, env=dict(os.environ, TMPDIR=str(self.base)), close_fds=True
+                    self.command,
+                    env=dict(os.environ, TMPDIR=str(self.base)),
+                    close_fds=True,
                 )
                 self.acquire(self.child.pid)
                 deadline = time.monotonic() + self.timeout
@@ -220,9 +264,11 @@ class Family:
                 # A successful leader cannot certify live orphan descendants.
                 if status == 0 and self.children():
                     status = 1
+                    self.report_failure("leader-exit-with-owned-children")
         except BaseException as error:
             self.failure = type(error).__name__
             status = 1
+            self.report_failure("supervisor-exception", self.failure)
         finally:
             assert self.retire() is True and self.settled and self.namespace_absent
         self.receipt(
@@ -308,7 +354,10 @@ def run(command, *, timeout, cwd=None, env=None, text=True, capture_output=True)
             packets += chunk
             assert len(packets) <= 4096, "owned receipt stream exceeded its bound"
         frames = [json.loads(line) for line in packets.splitlines()]
-        assert len(frames) == 2 and [row["stage"] for row in frames] == ["ready", "settled"]
+        assert len(frames) == 2 and [row["stage"] for row in frames] == [
+            "ready",
+            "settled",
+        ]
         assert all(row["token"] == token and row["supervisor"] == child.pid for row in frames)
         terminal = frames[-1]
         assert terminal["namespace_absent"] is True
