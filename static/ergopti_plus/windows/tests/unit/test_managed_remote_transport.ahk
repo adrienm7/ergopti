@@ -544,6 +544,8 @@ class _ManagedRemoteFixtureOwner {
 		this.ProxyRuns := []
 		this.Reader := ObjBindMethod(this, "ReadConfig")
 		this.GenerationCount := 0
+		this.GenerationDiagnosticPrinter := _TestPrint
+		this.GenerationDiagnosticStatus := "not_requested"
 		this.Mode := "fixed"
 		this.Capture := 0
 		this.State := Map()
@@ -719,6 +721,8 @@ class _ManagedRemoteFixtureOwner {
 	_CheckGeneration(ExpectedSuccess) {
 		global _LLM_Remote_Async
 		this.GenerationCount += 1
+		DispatchMode := this.Mode
+		DispatchOrdinal := this.GenerationCount
 		ReqId := "managed_network_" . this.Identity . "_" . this.GenerationCount
 		Result := Map("success", [], "failure", [])
 		Resolved := Map("Format", "openai", "Token", "managed-network-fixture-token", "Model", "fixture")
@@ -736,6 +740,10 @@ class _ManagedRemoteFixtureOwner {
 			_SR_TreePoll()
 			Sleep(10)
 		}
+		if Result["success"].Length + Result["failure"].Length != 1
+			|| Result["success"].Length != (ExpectedSuccess ? 1 : 0)
+			|| Result["failure"].Length != (ExpectedSuccess ? 0 : 1)
+			_ManagedRemoteFixtureEmitGenerationDiagnostic(this, ReqId, Reservation, Result, ExpectedSuccess, DispatchMode, DispatchOrdinal)
 		AssertEqual(1, Result["success"].Length + Result["failure"].Length,
 			"actual generation must settle once within the native acceptance budget")
 		AssertEqual(ExpectedSuccess ? 1 : 0, Result["success"].Length,
@@ -1758,3 +1766,240 @@ _ManagedRemotePrimaryPrimitiveControl(Value) {
 for Pair in [["zero", 0], ["empty", ""], ["string", "PRIVATE_BODY_PRIMITIVE"]]
 	Test("managed remote native: " . Pair[1] . " exception retains priority (managed-fixture-primary-cleanup)",
 		_ManagedRemotePrimaryPrimitiveControl.Bind(Pair[2]))
+
+
+; Generation evidence comes only from the exact retained callback and transport.
+_ManagedRemoteFixtureGenerationInteger(Value, Minimum, Maximum) {
+	return Type(Value) == "Integer" && Value >= Minimum && Value <= Maximum
+		? Format("{:d}", Value) : "unknown"
+}
+
+_ManagedRemoteFixtureGenerationReceipt(Receipt, Policy) {
+	if !(Receipt is Map)
+		return Map("state", "unavailable", "fields", Map())
+	if Receipt.Count == 0
+		return Map("state", "missing", "fields", Map())
+	if Receipt.Count > Policy["fields"].Count
+		return Map("state", "invalid", "fields", Map())
+	Fields := Map()
+	Fields.CaseSense := "On"
+	for Name, Value in Receipt {
+		Definition := _ManagedNetwork_Get(Policy["fields"], Name)
+		if !(Definition is Map) || !_ManagedNetwork_Scalar(Value, Definition)
+			|| (Definition["type"] == "integer" && Type(Value) != "Integer")
+			|| (Value is String && (StrLen(Value) > 128 || _ManagedNetworkWindows_HasStoredNul(Value)))
+			return Map("state", "invalid", "fields", Map())
+		Fields[Name] := Value
+	}
+	return Map("state", "admitted", "fields", Fields)
+}
+
+_ManagedRemoteFixtureGenerationDiagnostic(Mode, Ordinal, ExpectedSuccess, Result, Receipt := 0) {
+	global _SharedDir
+	Policy := ManagedNetworkFailureContract(JsonParse(FileRead(_SharedDir . "\modules\network\managed_network.json", "UTF-8"))).Policy
+	Success := Result is Map ? _ManagedNetwork_Get(Result, "success") : 0
+	Failure := Result is Map ? _ManagedNetwork_Get(Result, "failure") : 0
+	Info := Failure is Array && Failure.Length == 1 && Failure[1] is Map ? Failure[1] : Map()
+	Reason := _ManagedRemoteFixtureDiagnosticEnum(_ManagedNetwork_Get(Info, "reason", ""),
+		"transport|timeout|dispatch|proxy_resolution|provider_error|empty_body|malformed_json|unsupported_json_root|unsupported_shape|canonical_empty|trimmed|invalid_model|not_chat|completion")
+	Fact := "generation_mode=" . _ManagedRemoteFixtureDiagnosticEnum(Mode, "fixed|pac")
+		. " generation_ordinal=" . _ManagedRemoteFixtureGenerationInteger(Ordinal, 1, 4)
+		. " expected_success=" . _ManagedRemoteFixtureDiagnosticBoolean(ExpectedSuccess)
+		. " success_callbacks=" . (Success is Array ? _ManagedRemoteFixtureGenerationInteger(Success.Length, 0, 65535) : "unknown")
+		. " failure_callbacks=" . (Failure is Array ? _ManagedRemoteFixtureGenerationInteger(Failure.Length, 0, 65535) : "unknown")
+		. " callback_reason=" . Reason
+		. " callback_status=" . _ManagedRemoteFixtureGenerationInteger(_ManagedNetwork_Get(Info, "status", ""), 0, 599)
+	Admitted := _ManagedRemoteFixtureGenerationReceipt(Receipt, Policy)
+	Fact .= " native_receipt=" . Admitted["state"]
+	Fields := Admitted["fields"]
+	for Name in ["backend", "stage", "failure_provenance", "proxy_mode", "native_errno_domain", "tls_status", "tls_verification", "dotnet_web_status"] {
+		Value := _ManagedNetwork_Get(Fields, Name, "")
+		Definition := Policy["fields"][Name]
+		Fact .= " " . Name . "=" . (Value is String && Value != "" && _ManagedNetwork_Scalar(Value, Definition) ? Value : "unknown")
+	}
+	for Pair in [["curl_exit", 255], ["http_status", 599], ["proxy_connect_status", 599]]
+		Fact .= " " . Pair[1] . "=" . _ManagedRemoteFixtureGenerationInteger(_ManagedNetwork_Get(Fields, Pair[1], ""), 0, Pair[2])
+	Code := _ManagedNetwork_Get(Fields, "native_errno", "")
+	NativeCode := "unknown"
+	if Code is String && RegExMatch(Code, "\A-?(?:0|[1-9][0-9]{0,9})\z") {
+		NativeValue := Integer(Code)
+		if NativeValue >= -2147483648 && NativeValue <= 2147483647
+			NativeCode := Format("{:d}", NativeValue)
+	}
+	return Fact . " native_errno=" . NativeCode
+}
+
+_ManagedRemoteFixtureEmitGenerationDiagnostic(Fixture, ReqId, Reservation, Result, ExpectedSuccess, Mode, Ordinal) {
+	Fixture.GenerationDiagnosticStatus := "unavailable"
+	try {
+		Receipt := 0
+		if Fixture.Requests is Map && Fixture.Requests.Has(ReqId)
+			&& Fixture.Requests[ReqId] == Reservation && Reservation is Map {
+			Http := Reservation.Get("http", 0)
+			if Http is CurlAsyncRequest && Type(Http.ManagedTransport) == "Integer" && Http.ManagedTransport == true
+				Receipt := Http.NativeReceipt
+		}
+		Fact := _ManagedRemoteFixtureGenerationDiagnostic(Mode, Ordinal, ExpectedSuccess, Result, Receipt)
+		Fixture.GenerationDiagnosticPrinter.Call("::notice title=Windows native generation diagnostic::" . Fact)
+		Fixture.GenerationDiagnosticStatus := "reported"
+	} catch Any {
+		; Reporting refusal leaves the original acceptance failure authoritative.
+		Fixture.GenerationDiagnosticStatus := "unavailable"
+	}
+}
+
+
+; The declared HTTP seam drives the actual generation producer without networking.
+class _ManagedRemoteGenerationDiagnosticHttp extends CurlAsyncRequest {
+	__New(Receipt) {
+		super.__New()
+		this.ManagedTransport := true
+		this.NativeReceipt := Receipt
+		this.Polls := 0
+	}
+	SetManagedRouting(Args*) {
+	}
+	SetDeadline(Args*) {
+	}
+	Open(Args*) {
+	}
+	SetRequestHeader(Args*) {
+	}
+	Send(Args*) => true
+	WaitForResponse(Args*) {
+		this.Polls += 1
+		return this.Polls >= 2
+	}
+	Abort() => true
+}
+
+class _ManagedRemoteGenerationDiagnosticOwner extends _ManagedRemoteFixtureOwner {
+	__New(Printer, Receipt) {
+		this.Identity := "generation-diagnostic-control"
+		this.Mode := "fixed"
+		this.GenerationCount := 1
+		this.Requests := Map()
+		this.BaseUrl := "https://managed-fixture.invalid:443/v1"
+		this.Http := _ManagedRemoteGenerationDiagnosticHttp(Receipt)
+		this.Port := Map("managed_settings", ObjBindMethod(this, "ReadConfig"), "create_http", ObjBindMethod(this, "CreateHttp"))
+		this.GenerationDiagnosticPrinter := Printer
+		this.GenerationDiagnosticStatus := "not_requested"
+	}
+	ReadConfig() => Map()
+	CreateHttp() => this.Http
+}
+
+_ManagedRemoteGenerationDiagnosticReceipt() {
+	return Map("backend", "curl", "stage", "connect", "failure_provenance", "verified", "tls_verification", "enforced",
+		"curl_exit", 60, "http_status", 0, "proxy_connect_status", 200, "proxy_mode", "selected")
+}
+
+_ManagedRemoteGenerationCollect(Control, Text) {
+	Control["calls"] += 1
+	Control["fact"] := Text
+	if Control.Get("refuse", false)
+		throw Error("PRIVATE_REPORTER_EXCEPTION")
+}
+
+_ManagedRemoteGenerationDiagnosticProducer(RefusePrinter := false) {
+	global _LLM_Remote_Async
+	Control := Map("calls", 0, "fact", "", "refuse", RefusePrinter)
+	Fixture := _ManagedRemoteGenerationDiagnosticOwner(_ManagedRemoteGenerationCollect.Bind(Control), _ManagedRemoteGenerationDiagnosticReceipt())
+	Caught := 0
+	try Fixture.CheckGeneration(true)
+	catch Error as Failure {
+		Caught := Failure
+	}
+	finally {
+		for ReqId, Reservation in Fixture.Requests {
+			if _LLMRemote_RequestOwns(ReqId, Reservation) {
+				Fixture.Http.Abort()
+				_LLMRemote_DeleteOwned(ReqId, Reservation)
+			}
+		}
+	}
+	AssertEqual("Error", Type(Caught), "only the original generation assertion is expected")
+	AssertEqual("generation must obey actual system-root admission - expected: <1>, actual: <0>", Caught.Message)
+	AssertEqual(1, Control["calls"], "actual producer must expose the owned callback before its original refusal")
+	AssertTrue(Fixture.Http.Polls >= 2, "the real managed poll owns the callback")
+	AssertContains(Control["fact"], "generation_mode=fixed generation_ordinal=2 expected_success=true success_callbacks=0 failure_callbacks=1 callback_reason=transport callback_status=0")
+	AssertContains(Control["fact"], "native_receipt=admitted backend=curl stage=connect")
+	AssertContains(Control["fact"], "proxy_mode=selected")
+	AssertContains(Control["fact"], "curl_exit=60 http_status=0 proxy_connect_status=200")
+	AssertFalse(InStr(Control["fact"], "managed-fixture.invalid"))
+	AssertEqual(RefusePrinter ? "unavailable" : "reported", Fixture.GenerationDiagnosticStatus)
+	for ReqId in Fixture.Requests
+		AssertFalse(_LLM_Remote_Async.Has(ReqId), "no exact controlled request survives the original assertion")
+}
+Test("managed remote native: generation checkpoint observes actual retained callback (managed-fixture-generation-diagnostic)", _ManagedRemoteGenerationDiagnosticProducer)
+Test("managed remote native: generation reporter refusal preserves original assertion (managed-fixture-generation-diagnostic)", _ManagedRemoteGenerationDiagnosticProducer.Bind(true))
+
+_ManagedRemoteGenerationDiagnosticScalars() {
+	Result := Map("success", [], "failure", [Map("reason", "transport", "status", 0, "message", "PRIVATE_MESSAGE")])
+	for Value in [0, 1.0, "1", [], Map(), Buffer(2)] {
+		Fact := _ManagedRemoteFixtureGenerationDiagnostic(Value, Value, Value, Result)
+		AssertContains(Fact, "generation_mode=unknown")
+		AssertContains(Fact, "generation_ordinal=unknown")
+	}
+	for Mode in ["fixed", "pac"] {
+		Fact := _ManagedRemoteFixtureGenerationDiagnostic(Mode, 3, true, Result)
+		AssertContains(Fact, "generation_mode=" . Mode . " generation_ordinal=3")
+		AssertFalse(InStr(Fact, "PRIVATE_"))
+	}
+	for Value in ["PRIVATE_REASON", "Transport", 1, 1.0, [], Map(), Buffer(2)] {
+		Result["failure"][1]["reason"] := Value
+		AssertContains(_ManagedRemoteFixtureGenerationDiagnostic("fixed", 2, true, Result), "callback_reason=unknown")
+	}
+	for Value in [-1, 600, 1.0, "1", [], Map(), Buffer(2)] {
+		Result["failure"][1]["status"] := Value
+		AssertContains(_ManagedRemoteFixtureGenerationDiagnostic("fixed", 2, true, Result), "callback_status=unknown")
+	}
+}
+Test("managed remote native: generation checkpoint closes scalar domains (managed-fixture-generation-diagnostic)", _ManagedRemoteGenerationDiagnosticScalars)
+
+_ManagedRemoteGenerationDiagnosticReceiptControls() {
+	Result := Map("success", [], "failure", [])
+	for Value in [0, 1.0, "PRIVATE_RECEIPT", [], Buffer(2)]
+		AssertContains(_ManagedRemoteFixtureGenerationDiagnostic("pac", 3, true, Result, Value), "native_receipt=unavailable")
+	AssertContains(_ManagedRemoteFixtureGenerationDiagnostic("pac", 3, true, Result, Map()), "native_receipt=missing")
+	for Value in ["PRIVATE_BACKEND", "Curl", 1, 1.0, [], Map(), Buffer(2)] {
+		Receipt := _ManagedRemoteGenerationDiagnosticReceipt()
+		Receipt["backend"] := Value
+		Fact := _ManagedRemoteFixtureGenerationDiagnostic("pac", 3, true, Result, Receipt)
+		AssertContains(Fact, "native_receipt=invalid backend=unknown")
+		AssertFalse(InStr(Fact, "PRIVATE_"))
+	}
+	Receipt := _ManagedRemoteGenerationDiagnosticReceipt()
+	Receipt["PRIVATE_PATH"] := "PRIVATE_BODY"
+	AssertContains(_ManagedRemoteFixtureGenerationDiagnostic("fixed", 2, true, Result, Receipt), "native_receipt=invalid")
+
+	for Name in ["stage", "failure_provenance", "proxy_mode", "native_errno_domain", "tls_status", "tls_verification", "dotnet_web_status"] {
+		for Value in ["PRIVATE_ENUM", 0, 1.0, [], Map(), Buffer(2)] {
+			Receipt := _ManagedRemoteGenerationDiagnosticReceipt()
+			Receipt[Name] := Value
+			AssertContains(_ManagedRemoteFixtureGenerationDiagnostic("pac", 3, true, Result, Receipt), "native_receipt=invalid")
+		}
+	}
+	for Name in ["curl_exit", "http_status", "proxy_connect_status"] {
+		for Value in [1.0, "1", [], Map(), Buffer(2)] {
+			Receipt := _ManagedRemoteGenerationDiagnosticReceipt()
+			Receipt[Name] := Value
+			AssertContains(_ManagedRemoteFixtureGenerationDiagnostic("pac", 3, true, Result, Receipt), "native_receipt=invalid")
+		}
+	}
+	for Pair in [["-2147483648", "-2147483648"], ["2147483647", "2147483647"], ["0", "0"]] {
+		Receipt := _ManagedRemoteGenerationDiagnosticReceipt()
+		Receipt["native_errno_domain"] := "winsock"
+		Receipt["native_errno"] := Pair[1]
+		AssertContains(_ManagedRemoteFixtureGenerationDiagnostic("fixed", 2, true, Result, Receipt), "native_errno=" . Pair[2])
+	}
+
+	for Value in ["PRIVATE_ERRNO", "01", "2147483648", "-2147483649"] {
+		Receipt := _ManagedRemoteGenerationDiagnosticReceipt()
+		Receipt["native_errno"] := Value
+		Fact := _ManagedRemoteFixtureGenerationDiagnostic("fixed", 2, true, Result, Receipt)
+		AssertContains(Fact, "native_errno=unknown")
+		AssertFalse(InStr(Fact, "PRIVATE_"))
+	}
+}
+Test("managed remote native: generation checkpoint rejects malformed native receipt (managed-fixture-generation-diagnostic)", _ManagedRemoteGenerationDiagnosticReceiptControls)
