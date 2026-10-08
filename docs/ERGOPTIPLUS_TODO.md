@@ -5664,6 +5664,21 @@ DNS endpoint; three additive controls and an actual CFNetwork DHCP/PAC wire
 receiver are authored. Swift compilation and these Apple-native assertions
 remain unexecuted until hosted CI; real company DHCP/DNS is a device check.
 
+Optional managed macOS Ollama source now pins actual upstream bytes and a
+native Go producer, preserves the official runtime library tree, and stages
+only source-qualified catalogues from real produced artifacts. Portable
+catalogue18, runtime7, operation8, native-API peer8 and TLS fixture4 controls
+pass; the Go race suite passes36, retaining every original27 case. New installer sources also join
+the independently verified Intel uv and Python records. Compiler inputs stay
+outside app payloads. Native build/signing, actual model create/pull/inference
+and production daemon/source admission remain pending; no unpublished asset
+URL is invented and this preparation does not activate an opaque daemon.
+
+The optional native Go redirect path also strips credentials and cookie-jar
+secrets on changed ports, subdomains and foreign-return chains, vetoes HTTPS
+downgrades, and retains the original redirect callback and rejection policy.
+All36 race-tested controls pass; real macOS model receiving remains pending.
+
 The macOS native-network tranche adds NSURLSession/CFNetwork route receiving,
 a bounded private HTTP protocol, an owned PTY bootstrap and verified offline
 Python inputs. The frozen local candidate passes all 17,158 Hammerspoon

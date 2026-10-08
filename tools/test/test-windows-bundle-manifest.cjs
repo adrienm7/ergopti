@@ -76,6 +76,14 @@ const NEVER_RUNTIME = [
 	['shared test corpora', (arc) => arc.startsWith(`${SHARED_REL}/tests/`)],
 	['Python driver runtime', (arc) => arc.startsWith(`${SHARED_REL}/python/`)],
 	['native compile sources', (arc) => arc.startsWith(`${SHARED_REL}/native/`)],
+	['Go compile sources', (arc) => arc.startsWith(`${SHARED_REL}/go/`)],
+	[
+		'macOS native Ollama catalogue',
+		(arc) =>
+			/^managed_ollama_(?:runtime|release)\.json$/.test(
+				arc.slice(`${SHARED_REL}/modules/llm/`.length)
+			) && arc.startsWith(`${SHARED_REL}/modules/llm/`)
+	],
 	[
 		'macOS Python bootstrap catalogue',
 		(arc) => arc === `${SHARED_REL}/modules/llm/managed_python_release.json`
@@ -668,6 +676,9 @@ function dataReferences(shipped) {
 	const wholePath = new RegExp(`^${PATH_TOKEN.source}$`);
 	for (const arc of shipped) {
 		if (!/\.(?:json|toml)$/.test(arc)) continue;
+		// The audit rejects every foreign/compile-only payload independently.
+		// Such mutation inputs are not Windows data and may have no source file.
+		if (neverRuntime(arc)) continue;
 		const text = read(universe.get(arc));
 		for (const quoted of text.matchAll(/"((?:[^"\\\n]|\\.)*)"|'([^'\n]*)'/g)) {
 			const value = (quoted[1] !== undefined ? quoted[1] : quoted[2]).trim();
@@ -924,6 +935,17 @@ if (selection && refs) {
 		['add', `${SHARED_REL}/python/runtime.bin`, 'an arbitrary Python driver runtime asset'],
 		['add', `${SHARED_REL}/native/network/pac_runtime.c`, 'a native compile source'],
 		['add', `${SHARED_REL}/native/network/pac_runtime.h`, 'a native compile header'],
+		['add', `${SHARED_REL}/go/native_http/transport.go`, 'a Go compile source'],
+		[
+			'add',
+			`${SHARED_REL}/modules/llm/managed_ollama_runtime.json`,
+			'the macOS native Ollama source catalogue'
+		],
+		[
+			'add',
+			`${SHARED_REL}/modules/llm/managed_ollama_release.json`,
+			'the macOS native Ollama produced catalogue'
+		],
 		[
 			'add',
 			`${SHARED_REL}/modules/llm/managed_python_release.json`,

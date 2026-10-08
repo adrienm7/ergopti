@@ -1824,6 +1824,18 @@ const CHECKS = [
 		repro: 'node tools/test/test-managed-python-release.cjs'
 	},
 	{
+		name: 'managed Ollama portable admission and operation retirement',
+		cmd: process.execPath,
+		args: ['tools/test/test-managed-ollama-protocol.cjs'],
+		repro: 'node tools/test/test-managed-ollama-protocol.cjs'
+	},
+	{
+		name: 'managed Ollama catalogue preserves native source and publication admission',
+		cmd: process.execPath,
+		args: ['tools/test/test-macos-managed-ollama-catalogue.cjs'],
+		repro: 'node tools/test/test-macos-managed-ollama-catalogue.cjs'
+	},
+	{
 		name: 'native PAC helpers preserve independent standard function vectors',
 		cmd: process.execPath,
 		args: ['tools/test/test-network-pac-helpers.cjs'],

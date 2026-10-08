@@ -169,7 +169,8 @@ const FORBIDDEN = [
 		test: (target) =>
 			/(^|\/)(generate_models|validate_[^/]*)\.py$/.test(target) ||
 			target.startsWith(`${SHARED_ROOT}/modules/llm/install/`) ||
-			target.startsWith(`${SHARED_ROOT}/native/`)
+			target.startsWith(`${SHARED_ROOT}/native/`) ||
+			target.startsWith(`${SHARED_ROOT}/go/`)
 	},
 	{
 		group: 'duplicate-copies',
