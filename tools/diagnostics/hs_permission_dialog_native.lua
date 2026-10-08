@@ -50,6 +50,74 @@ return function(config)
 		results[#results + 1] = { id = id, passed = true }
 	end
 
+	-- These passive tuples describe first-seen held state, never terminal readiness.
+	local progress_enabled = type(config) == "table" and getmetatable(config) == nil
+		and rawget(config, "progress_observation") == true
+	local progress_pid, progress_version, progress_nonce = hs.processInfo.processID, hs.processInfo.version, config.nonce
+	local progress_cases = {
+		"tap_holds_off_keeps_banner", "accessibility_precedes_login_items", "accessibility_later_native_bridge",
+		"login_items_native_dom_and_window", "unknown_status_keeps_steps", "open_settings_native_bridge",
+		"later_dismisses_and_spends_offer", "explicit_reopen_creates_new_view", "native_delete_reports_close",
+		"observed_ready_auto_closes",
+	}
+	local progress_prefixes = {
+		[1] = { [0] = true, [1] = true }, [1.5] = { [1] = true }, [2] = { [2] = true },
+		[3] = { [2] = true }, [4] = { [2] = true }, [5] = { [3] = true },
+		[6] = { [4] = true }, [7] = { [5] = true }, [8] = { [6] = true },
+		[8.5] = { [7] = true }, [9] = { [8] = true }, [9.5] = { [9] = true },
+		[10] = { [9] = true, [10] = true },
+	}
+	local progress_stages = { [1] = "1", [1.5] = "1.5", [2] = "2", [3] = "3", [4] = "4",
+		[5] = "5", [6] = "6", [7] = "7", [8] = "8", [8.5] = "8.5", [9] = "9",
+		[9.5] = "9.5", [10] = "10" }
+	local progress_seen, progress_sequence, progress_limit = {}, 0, 0
+	for _, counts in pairs(progress_prefixes) do
+		for _ in pairs(counts) do progress_limit = progress_limit + 2 end -- Both Boolean observations; at most 30 tuples.
+	end
+
+	--- Copies a strict original prefix before any foreign encoding or write callback.
+	local function progress_observation()
+		if not progress_enabled then return end
+		local saved_stage, saved_busy = stage, busy
+		if type(results) ~= "table" or getmetatable(results) ~= nil then return end
+		local saved_count = #results
+		if type(saved_stage) ~= "number" or not progress_stages[saved_stage]
+			or type(saved_busy) ~= "boolean" or math.type(saved_count) ~= "integer"
+			or not progress_prefixes[saved_stage][saved_count]
+			or getmetatable(results) ~= nil then return end
+		local slots = 0
+		for key in pairs(results) do
+			if math.type(key) ~= "integer" or key < 1 or key > saved_count then return end
+			slots = slots + 1
+		end
+		if slots ~= saved_count then return end
+		for i = 1, saved_count do
+			local row = rawget(results, i)
+			if type(row) ~= "table" or getmetatable(row) ~= nil
+				or rawget(row, "id") ~= progress_cases[i] or rawget(row, "passed") ~= true then return end
+			local fields = 0
+			for _ in pairs(row) do fields = fields + 1 end
+			if fields ~= 2 then return end
+		end
+		if math.type(progress_pid) ~= "integer" or progress_pid <= 0 or progress_pid > 2147483647
+			or type(progress_nonce) ~= "string" or #progress_nonce ~= 32 or not progress_nonce:match("^[a-f0-9]+$")
+			or type(progress_version) ~= "string" or #progress_version > 32
+			or not progress_version:match("^[A-Za-z0-9][A-Za-z0-9._+%-]*$") then return end
+		local key = progress_stages[saved_stage] .. "/" .. tostring(saved_busy) .. "/" .. saved_count
+		if progress_seen[key] or progress_sequence >= progress_limit then return end
+		-- Publish custody before entering the foreign sink; reentry cannot duplicate it.
+		progress_seen[key] = true
+		progress_sequence = progress_sequence + 1
+		local saved_sequence = progress_sequence
+		pcall(function()
+			local encoded = string.format(
+				'ERGOPTI_PERMISSION_UI_PROGRESS {"schema":1,"kind":"permission_ui_first_seen_progress","authority":false,"native_verdict":"unchanged","pid":%d,"nonce":"%s","version":"%s","sequence":%d,"stage":%s,"busy":%s,"recorded_case_count":%d}\n',
+				progress_pid, progress_nonce, progress_version, saved_sequence, progress_stages[saved_stage],
+				saved_busy and "true" or "false", saved_count)
+			if #encoded <= 512 then io.stderr:write(encoded) end
+		end)
+	end
+
 	local function stage_failure(boundary, saved_stage, saved_checkpoint, saved_count, saved_busy)
 		if not stage_failure_enabled then return end
 		-- Plain saved state is diagnostic only; captured stderr is best effort.
@@ -131,15 +199,18 @@ return function(config)
 	local function javascript(view, source, receive)
 		check(not busy, "Overlapping native JavaScript operation")
 		busy = true
+		progress_observation()
 		view:evaluateJavaScript(source, function(value, err)
 			-- Assertions are evaluated by the outer driver, never swallowed by WebKit's pcall.
 			busy = false
+			progress_observation()
 			if WebViewResult.is_error(err) then failure = "Actual WK evaluation failed"; return end
 			local ok, detail = xpcall(receive, debug.traceback, value)
 			if not ok then failure = detail end
 		end)
 	end
 	local function finish()
+		progress_observation()
 		finish_checkpoint = "entered"
 		if failure ~= nil then
 			stage_failure("failure_finish_entered", stage, finish_checkpoint, #results, busy)
@@ -293,6 +364,7 @@ return function(config)
 		end
 	end
 	observer = hs.timer.new(0.02, function()
+		progress_observation()
 		local ok, detail = xpcall(tick, debug.traceback)
 		if not ok then
 			failure = detail
