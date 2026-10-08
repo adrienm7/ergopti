@@ -5673,6 +5673,13 @@ Native Swift compilation, real Apple transport, cold installation and
 opaque-client activation still require hosted receiving. Physical company
 network acceptance remains open; these portable results do not close item62.
 
+The first address-sort ABI diagnostic confirms valid input-owned pointers
+and an exact two-record returned table, disproving the output-relocation
+hypothesis. No speculative sorter fix was applied. Additional fixed scalar
+receiving/conversion facts now use test-only GitHub notices, retaining all
+six original assertions and the production worker unchanged. Native
+artifact receiving remains pending until those facts establish the cause.
+
 Hosted Windows now passes strict compilation, all17 real VM cases and the
 original IPv4/extended DNS and adapter checks after the overlapped repair.
 The next original address-sort check fails. Its test build now retains only
