@@ -11,17 +11,6 @@
 
 local helpers = require("tests.helpers")
 
---- The business-timing fixture delegates the actual new template ABI and retains native row dialect.
-local function actual_layout_binding()
-	local Json, Paths = require("json"), require("infra.paths")
-	local file = assert(io.open(Paths.shared("data/locales/en.json"), "rb"))
-	local labels = assert(Json.decode(assert(file:read("*a")))); assert(file:close())
-	local i18n = require("infra.i18n")
-	i18n.get = function(key) return labels[key] or key end
-	package.loaded["infra.manifest_menu"] = nil
-	return require("infra.manifest_menu")
-end
-
 
 helpers.describe("menu_keyboard_layout: async layout selection", function()
 	helpers.it("waits for the business terminal instead of the dispatch result", function()
@@ -32,7 +21,6 @@ helpers.describe("menu_keyboard_layout: async layout selection", function()
 			"ui.menu.menu_keyboard_layout",
 			"infra.manifest_menu",
 			"infra.notifications",
-			"infra.i18n",
 		}, function()
 			local input_sources = helpers.load_with_stubs("modules.keymap.input_sources")
 			local install = require("modules.keymap.layout_install")
@@ -60,11 +48,7 @@ helpers.describe("menu_keyboard_layout: async layout selection", function()
 			install.highest_installed = function() return nil end
 
 			package.loaded["infra.notifications"] = { notify = function() end }
-			local actual_manifest = actual_layout_binding()
 			package.loaded["infra.manifest_menu"] = {
-				template_rows = actual_manifest.template_rows,
-				status_rows = actual_manifest.status_rows,
-				group_row = actual_manifest.group_row,
 				build = function(_menu_id, _label, _a, _b, _ctx, providers)
 					return providers.active_layouts()
 				end,
@@ -113,7 +97,6 @@ local function exercise_bundle_action(operation, business_ok)
 		"ui.menu.menu_keyboard_layout",
 		"infra.manifest_menu",
 		"infra.notifications",
-			"infra.i18n",
 	}, function()
 		local input_sources = helpers.load_with_stubs("modules.keymap.input_sources")
 		local install = require("modules.keymap.layout_install")
@@ -161,11 +144,7 @@ local function exercise_bundle_action(operation, business_ok)
 		package.loaded["infra.notifications"] = {
 			notify = function(_title, _body, kind) notices[#notices + 1] = kind end,
 		}
-		local actual_manifest = actual_layout_binding()
-			package.loaded["infra.manifest_menu"] = {
-				template_rows = actual_manifest.template_rows,
-				status_rows = actual_manifest.status_rows,
-				group_row = actual_manifest.group_row,
+		package.loaded["infra.manifest_menu"] = {
 			build = function(_menu_id, _label, _a, _b, _ctx, providers)
 				return providers.layout_bundle()
 			end,
@@ -181,7 +160,7 @@ local function exercise_bundle_action(operation, business_ok)
 		local action = nil
 		if operation == "upgrade" then
 			for _, row in ipairs(built.submenu) do
-				if row.label == "Upgrade active list v2.2.1 → v2.2.2" then action = row.action end
+				if row.label == "menu.layout.update_list" then action = row.action end
 			end
 		else
 			for _, row in ipairs(built.submenu) do
@@ -235,7 +214,6 @@ helpers.describe("menu_keyboard_layout: mixed stable and legacy state", function
 			"ui.menu.menu_keyboard_layout",
 			"infra.manifest_menu",
 			"infra.notifications",
-			"infra.i18n",
 		}, function()
 			local input_sources = helpers.load_with_stubs("modules.keymap.input_sources")
 			local install = require("modules.keymap.layout_install")
@@ -259,11 +237,7 @@ helpers.describe("menu_keyboard_layout: mixed stable and legacy state", function
 				return { name = "Ergopti_v2.2.2.bundle", version = { 2, 2, 2 } }
 			end
 
-			local actual_manifest = actual_layout_binding()
 			package.loaded["infra.manifest_menu"] = {
-				template_rows = actual_manifest.template_rows,
-				status_rows = actual_manifest.status_rows,
-				group_row = actual_manifest.group_row,
 				build = function(_menu_id, _label, _a, _b, _ctx, providers)
 					return providers.layout_bundle()
 				end,
@@ -277,8 +251,8 @@ helpers.describe("menu_keyboard_layout: mixed stable and legacy state", function
 			local cleanup_row = nil
 			local installed_row = nil
 			for _, row in ipairs(built.submenu) do
-				if row.label == "Upgrade active list v2.2.1 → v2.2.2" then cleanup_row = row end
-				if row.label == "All Ergopti variants active v2.2.2 ✅" then installed_row = row end
+				if row.label == "menu.layout.update_list" then cleanup_row = row end
+				if row.label == "menu.layout.in_list" then installed_row = row end
 			end
 			helpers.assert_true(type(cleanup_row) == "table",
 				"an unmatched active layout must keep the legacy cleanup action reachable")

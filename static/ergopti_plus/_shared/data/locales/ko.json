@@ -3251,8 +3251,5 @@
 	"gestures.system.slot_configured_caption": "%s — ErgoptiPlus용으로 설정됨",
 	"gestures.system.slot_not_configured_caption": "%s — ErgoptiPlus용으로 설정되지 않음",
 	"menu.global.reload_macos": "↺ 다시 로드",
-	"menu.global.quit_macos": "✕ 종료",
-	"menu.layout.pause_picker_caption": "  ↳ 스크립트 일시정지 시 레이아웃 : %s",
-	"menu.layout.resume_picker_caption": "  ↳ 스크립트 활성 시 레이아웃 : %s",
-	"menu.layout.native_variant_caption": "%s v%s"
+	"menu.global.quit_macos": "✕ 종료"
 }

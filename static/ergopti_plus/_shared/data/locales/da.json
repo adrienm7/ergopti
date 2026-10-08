@@ -3251,8 +3251,5 @@
 	"gestures.system.slot_configured_caption": "%s — Konfigureret til ErgoptiPlus",
 	"gestures.system.slot_not_configured_caption": "%s — Ikke konfigureret til ErgoptiPlus",
 	"menu.global.reload_macos": "↺ Genindlæs",
-	"menu.global.quit_macos": "✕ Afslut",
-	"menu.layout.pause_picker_caption": "  ↳ Layout når scriptet er sat på pause : %s",
-	"menu.layout.resume_picker_caption": "  ↳ Layout når scriptet er aktivt : %s",
-	"menu.layout.native_variant_caption": "%s v%s"
+	"menu.global.quit_macos": "✕ Afslut"
 }

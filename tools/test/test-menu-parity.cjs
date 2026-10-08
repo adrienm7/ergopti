@@ -1333,62 +1333,6 @@ OPENS_SUBMENU.llm_display.push({
 	kind: 'compose',
 	native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_settings.ahk' }
 });
-// Actual macOS switching uses genuine canonical parents and native picker data.
-OPENS_SUBMENU.layout_switching = {
-	menu: 'layout_switching_frame',
-	platforms: ['hs'],
-	kind: 'compose',
-	native_sources: { hs: 'macos/ui/menu/menu_keyboard_layout.lua' }
-};
-OPENS_SUBMENU.layout_pause_picker = {
-	menu: 'layout_switch_picker_frame',
-	platforms: ['hs'],
-	kind: 'submenu',
-	native_sources: { hs: 'macos/ui/menu/menu_keyboard_layout.lua' }
-};
-OPENS_SUBMENU.layout_resume_picker = {
-	menu: 'layout_switch_picker_frame',
-	platforms: ['hs'],
-	kind: 'submenu',
-	native_sources: { hs: 'macos/ui/menu/menu_keyboard_layout.lua' }
-};
-
-// Compose before PERSONAL_DEFAULT_GROUP_PROOF; preserve all current genuine edges.
-const layoutOwner = (menu) => ({
-	menu,
-	platforms: ['hs'],
-	kind: 'compose',
-	native_sources: { hs: 'macos/ui/menu/menu_keyboard_layout.lua' },
-	forwarded_template: { hs: 'layout' }
-});
-OPENS_SUBMENU.keyboard_layout = [
-	OPENS_SUBMENU.keyboard_layout,
-	layoutOwner('layout_native_parent')
-];
-OPENS_SUBMENU.layout_parent_content = 'layout_menu';
-OPENS_SUBMENU.custom_layouts = layoutOwner('layout_native_record_choice');
-OPENS_SUBMENU.active_layouts = [
-	OPENS_SUBMENU.active_layouts,
-	layoutOwner('layout_native_record_choice')
-];
-OPENS_SUBMENU.layout_picker_choices = layoutOwner('layout_native_record_choice');
-OPENS_SUBMENU.layout_bundle = [
-	'layout_bundle_installed',
-	'layout_bundle_update',
-	'layout_bundle_install',
-	'layout_bundle_in_list',
-	'layout_bundle_update_install_first',
-	'layout_bundle_upgrade',
-	'layout_bundle_upgrade_to',
-	'layout_bundle_variant_parent',
-	'layout_bundle_install_first',
-	'layout_bundle_frame'
-].map(layoutOwner);
-OPENS_SUBMENU.layout_variant_choices = [
-	'layout_bundle_variant_added',
-	'layout_bundle_variant_add'
-].map(layoutOwner);
-
 const PERSONAL_DEFAULT_GROUP_PROOF = OPENS_SUBMENU.hotstring_personal[0].selected_group.ahk;
 
 /**
@@ -1591,7 +1535,6 @@ function isComposedFragment(rows, kinds) {
 		if (
 			['label', 'section_header'].includes(row.type) &&
 			(Object.hasOwn(row, 'caption_getter') ||
-				Object.hasOwn(row, 'caption_getters') ||
 				Object.hasOwn(row, 'caption_layout') ||
 				Object.hasOwn(row, 'caption_joiner'))
 		) {
@@ -2302,32 +2245,26 @@ for (let pass = 0; pass < MENU_KEYS.length + 1; pass += 1) {
 					if (
 						typeof file !== 'string' ||
 						!file.startsWith(driver + '/') ||
-						!(opened.forwarded_template?.[platform] === 'layout'
-							? require('../lib/menu-native-layout-binding.cjs').nativeLayoutTemplatePublication(
+						!(opened.selected_group?.[platform]
+							? publishesSelectedMenuGroup(
 									fs.readFileSync(path.join(SP, file), 'utf8'),
+									path.extname(file),
 									target,
-									manifest[target]
+									manifest[target],
+									opened.selected_group[platform]
 								)
-							: opened.selected_group?.[platform]
-								? publishesSelectedMenuGroup(
-										fs.readFileSync(path.join(SP, file), 'utf8'),
-										path.extname(file),
-										target,
-										manifest[target],
-										opened.selected_group[platform]
-									)
-								: publishesTemplate(
-										fs.readFileSync(path.join(SP, file), 'utf8'),
-										path.extname(file),
-										target
-									) ||
-									publishesIncludedCommands(
-										fs.readFileSync(path.join(SP, file), 'utf8'),
-										path.extname(file),
-										target,
-										manifest,
-										platform
-									))
+							: publishesTemplate(
+									fs.readFileSync(path.join(SP, file), 'utf8'),
+									path.extname(file),
+									target
+								) ||
+								publishesIncludedCommands(
+									fs.readFileSync(path.join(SP, file), 'utf8'),
+									path.extname(file),
+									target,
+									manifest,
+									platform
+								))
 					)
 						errors.push(
 							`${menuKey}/${row.id}: ${kind} ${target} has no native template publication on ${platform}`

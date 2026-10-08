@@ -9,7 +9,6 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local LayoutFixture = require("tests.support.layout_legacy_caption_fixture")
 
 
 
@@ -21,7 +20,7 @@ local LayoutFixture = require("tests.support.layout_legacy_caption_fixture")
 -- ============================================
 -- ============================================
 
-helpers.describe("menu_keyboard_layout: external bundle mutations invalidate discovery", LayoutFixture.scoped(function()
+helpers.describe("menu_keyboard_layout: external bundle mutations invalidate discovery", function()
 	helpers.it("reflects an install, delete, and bundled-version addition on rebuild", function()
 		local saved_hs = rawget(_G, "hs")
 		local saved_popen = io.popen
@@ -39,7 +38,6 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 				"infra.timings",
 				"ui.menu.keymap_lifecycle",
 				"infra.manifest_menu",
-				"infra.paths",
 				"hs",
 				"tests.stubs.hs",
 			}, function()
@@ -48,7 +46,6 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 				_G.hs = hs_stub
 				package.loaded["hs"] = hs_stub
 				package.loaded["infra.logger"] = helpers.make_logger_stub()
-				package.loaded["infra.paths"] = { shared = helpers.shared }
 				package.loaded["infra.text_utils"] = {
 					shell_quote = function(value) return "'" .. tostring(value) .. "'" end,
 					applescript_format = function(template) return template end,
@@ -62,7 +59,6 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 				}
 				package.loaded["infra.i18n"] = {
 					get = function(key) return labels[key] or key end,
-					section = function(key) return key end,
 				}
 				package.loaded["infra.notifications"] = { notify = function() return true end }
 
@@ -149,11 +145,7 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 				package.loaded["infra.deferred_work"] = { after = function() return true end }
 				package.loaded["infra.timings"] = { sec = function() return 0.1 end }
 				package.loaded["ui.menu.keymap_lifecycle"] = { ensure_started = function() return true end }
-				local actual_manifest = LayoutFixture.install(package.loaded["infra.i18n"])
 				package.loaded["infra.manifest_menu"] = {
-					template_rows = actual_manifest.template_rows,
-					group_row = actual_manifest.group_row,
-					status_rows = actual_manifest.status_rows,
 					build = function(_, _, _, _, _, providers)
 						return providers.layout_bundle()
 					end,
@@ -218,4 +210,4 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 		io.popen = saved_popen
 		if not ok then error(err, 0) end
 	end)
-end))
+end)

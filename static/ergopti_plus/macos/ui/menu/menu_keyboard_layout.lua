@@ -191,29 +191,6 @@ local function variant_label(name)
 	return format_ergopti_display(unversioned) or name
 end
 
---- Admits one genuine Layout child through its exact shared presentation declaration.
---- @param section string Complete declared frame.
---- @param commands table Native callbacks.
---- @param getters table Captured native data readers.
---- @param children table|nil Genuine provider children.
---- @return table|nil row
-local function layout_declared_row(section, commands, getters, children)
-	local renderer = require("infra.manifest_menu")
-	local rows = type(renderer.template_rows) == "function"
-		and renderer.template_rows(section, commands or {}, getters or {}, children or {}) or nil
-	if type(rows) ~= "table" or #rows ~= 1 then return nil end
-	return rows[1]
-end
-
---- Native record names are literal OS/user data, with declared checked/disabled policy.
-local function layout_native_choice(caption, selected, ready, callback)
-	return layout_declared_row("layout_native_record_choice", { layout_native_select = callback }, {
-		layout_native_caption = function() return caption end,
-		layout_native_selected = function() return selected == true end,
-		layout_native_ready = function() return ready == true end,
-	})
-end
-
 --- The custom layout picker: the registry layouts the layout manager
 --- installed, the one of the current input source checked; choosing one
 --- makes it the current input source.
@@ -231,7 +208,10 @@ local function custom_layout_rows(update_menu, renderer)
 	end
 	for _, entry in ipairs(picker.layouts) do
 		local id = entry.id
-		local row = layout_native_choice(type(entry.name) == "string" and entry.name or id, picker.active == id, true, function()
+		rows[#rows + 1] = {
+			label   = type(entry.name) == "string" and entry.name or id,
+			checked = picker.active == id or nil,
+			action  = function()
 				defer_tis_call(function()
 					LayoutRegistry.select(id, function(selected)
 						if not selected then
@@ -240,9 +220,8 @@ local function custom_layout_rows(update_menu, renderer)
 						schedule_menu_refresh(update_menu)
 					end)
 				end)
-			end)
-		if not row then return nil end
-		rows[#rows + 1] = row
+			end,
+		}
 	end
 	if #rows == 0 then
 		if type(renderer) ~= "table" or type(renderer.status_rows) ~= "function" then return {} end
@@ -266,19 +245,26 @@ end
 --- @param do_install function Callback invoked when the user clicks install/update.
 --- @return table A single hs.menubar item.
 local function build_install_item(scope_label, emoji_install, installed, latest_name, latest_ver, do_install)
-	local getters = {
-		layout_install_scope = function() return scope_label end,
-		layout_install_emoji = function() return emoji_install end,
-		layout_install_latest = function() return version_str(latest_ver) end,
-		layout_install_old = function() return installed and version_str(installed.version) or "" end,
-	}
+	local latest_str = version_str(latest_ver)
 	if installed and not version_gt(latest_ver, installed.version) then
-		return layout_declared_row("layout_bundle_installed", {}, getters)
+		-- Latest already installed — nothing to do
+		return {
+			label    = string.format(i18n.get("menu.layout.installed_version"), scope_label, latest_str),
+			disabled = true,
+		}
 	end
 	if installed then
-		return layout_declared_row("layout_bundle_update", { layout_install = do_install }, getters)
+		-- An older version is on disk; offer an in-place upgrade
+		local old_str = version_str(installed.version)
+		return {
+			label = string.format(i18n.get("menu.layout.update_version"), scope_label, old_str, latest_str),
+			action    = do_install,
+		}
 	end
-	return layout_declared_row("layout_bundle_install", { layout_install = do_install }, getters)
+	return {
+		label = string.format(i18n.get("menu.layout.install_version"), emoji_install, scope_label, latest_str),
+		action    = do_install,
+	}
 end
 
 function M.build(ctx)
@@ -415,14 +401,17 @@ function M.build(ctx)
 		tostring(latest_installed_anywhere))
 	if all_variants_active and #legacy_active == 0 and installed_ver then
 		-- 1. All variants already in list and up to date
-		bundle_rows[#bundle_rows + 1] = layout_declared_row("layout_bundle_in_list", {}, {
-			layout_bundle_version = function() return version_str(installed_ver) end,
-		})
+		bundle_rows[#bundle_rows + 1] = {
+			label    = string.format(i18n.get("menu.layout.in_list"), version_str(installed_ver)),
+			disabled = true,
+		}
 	elseif #legacy_active > 0 and latest ~= nil and not latest_installed_anywhere then
 		-- 3. Legacy entry active but latest bundle missing — block the upgrade
-		bundle_rows[#bundle_rows + 1] = layout_declared_row("layout_bundle_update_install_first", {}, {
-			layout_bundle_version = function() return latest_str end,
-		})
+		bundle_rows[#bundle_rows + 1] = {
+			label    = string.format(i18n.get("menu.layout.update_list_install_first"),
+				latest_str, latest_str),
+			disabled = true,
+		}
 	elseif #legacy_active > 0 and installed_ver then
 		-- 2. Legacy entry active and a bundle installed — programmatic swap via TIS
 		-- onto the INSTALLED bundle, so its version is the target. The legacy
@@ -431,8 +420,12 @@ function M.build(ctx)
 		-- label drops it instead of printing a placeholder.
 		local legacy_ver = install.layout_version(legacy_active[1])
 		local target_str = version_str(installed_ver)
-		bundle_rows[#bundle_rows + 1] = layout_declared_row(legacy_ver and "layout_bundle_upgrade" or "layout_bundle_upgrade_to", {
-			layout_upgrade_list = function()
+		local list_label = legacy_ver
+			and string.format(i18n.get("menu.layout.update_list"), version_str(legacy_ver), target_str)
+			or  string.format(i18n.get("menu.layout.update_list_to"), target_str)
+		bundle_rows[#bundle_rows + 1] = {
+			label = list_label,
+			action    = function()
 				defer_tis_call(function()
 					upgrade_active_list_async(legacy_active, function(ok)
 						if ok then pcall(notifications.notify, i18n.get("menu.layout.update_list_ok"), nil, "success") end
@@ -441,10 +434,7 @@ function M.build(ctx)
 					end)
 				end)
 			end,
-		}, {
-			layout_bundle_old_version = function() return legacy_ver and version_str(legacy_ver) or "" end,
-			layout_bundle_version = function() return target_str end,
-		})
+		}
 	elseif latest_installed_anywhere then
 		-- 4. Some or no variants present, bundle installed — submenu listing each
 		-- variant. Already-added variants are greyed individually with ✅.
@@ -455,13 +445,14 @@ function M.build(ctx)
 			local label         = variant_label(var.name)
 			local already_added = active_id_set[var.tis_id] == true
 			if already_added then
-				add_sub[#add_sub + 1] = layout_declared_row("layout_bundle_variant_added", {}, {
-					layout_variant_label = function() return label end,
-					layout_bundle_version = function() return latest_str end,
-				})
+				add_sub[#add_sub + 1] = {
+					label    = string.format(i18n.get("menu.layout.already_added"), label, latest_str),
+					disabled = true,
+				}
 			else
-				add_sub[#add_sub + 1] = layout_declared_row("layout_bundle_variant_add", {
-					layout_enable_variant = function()
+				add_sub[#add_sub + 1] = {
+					label = string.format("%s v%s", label, latest_str),
+					action    = function()
 						defer_tis_call(function()
 							enable_keylayout_source_async(var.keylayout, label,
 								function(ok)
@@ -471,23 +462,20 @@ function M.build(ctx)
 								end)
 						end)
 					end,
-				}, {
-					layout_variant_label = function() return label end,
-					layout_bundle_version = function() return latest_str end,
-				})
+				}
 			end
 		end
-		if #add_sub ~= #variants then return nil end
-		local function variant_provider() return add_sub end
-		bundle_rows[#bundle_rows + 1] = layout_declared_row("layout_bundle_variant_parent", {}, {
-			layout_bundle_version = function() return latest_str end,
-		}, { layout_variant_choices = variant_provider })
+		bundle_rows[#bundle_rows + 1] = {
+			label = string.format(i18n.get("menu.layout.add_to_list"), latest_str),
+			items  = add_sub,
+		}
 	else
 		-- 5. Absent and bundle missing — greyed
-		bundle_rows[#bundle_rows + 1] = layout_declared_row("layout_bundle_install_first", {}, {})
+		bundle_rows[#bundle_rows + 1] = {
+			label    = i18n.get("menu.layout.install_first"),
+			disabled = true,
+		}
 	end
-
-	if #bundle_rows ~= (latest and 3 or 1) then return nil end
 
 	-- The separator that stood here is a `---` row in the manifest now.
 
@@ -539,7 +527,14 @@ function M.build(ctx)
 			-- for Ergopti variants). set_input_source_async tries them in order.
 			local target_localised = r.name
 			local target_kl_name   = r.id
-			local row = layout_native_choice(row_label, r.selected, not r.selected, function()
+			rows[#rows + 1] = {
+				label   = row_label,
+				checked = r.selected or nil,
+				-- Greyed out when already selected — clicking the checked
+				-- row would be a no-op TIS call and confuse macOS' input
+				-- source watchers when the menu refreshes mid-frame.
+				disabled = r.selected or nil,
+				action       = function()
 					-- Defer the TIS call out of the menu-click frame so the
 					-- input-source change notification doesn't re-enter HS.
 					defer_tis_call(function()
@@ -547,9 +542,8 @@ function M.build(ctx)
 							schedule_menu_refresh(update_menu)
 						end)
 					end)
-				end)
-			if not row then return nil end
-			rows[#rows + 1] = row
+				end,
+			}
 		end
 	end
 
@@ -564,96 +558,75 @@ function M.build(ctx)
 	local save_prefs = ctx and ctx.save_prefs
 	local hs_paused_pre = ctx and ctx.paused
 
-	local function build_layout_switching_rows()
-		if not state then return {} end
-		local ManifestMenu = require("infra.manifest_menu")
-		local feature_on = state.layout_pause_switch_enabled and true or false
-		local cur_pause, cur_resume = state.layout_on_pause, state.layout_on_resume
-		local function target_label(current)
-			return (current and current ~= false and current ~= "")
-				and display_for_record({ id = current, name = current:gsub("_", " "):gsub("%s+v%d.*$", "") })
-				or i18n.get("menu.layout.layout_auto")
-		end
-		local getters = {
-			layout_switch_checked = function() return feature_on end,
-			layout_switch_ready = function() return feature_on and not hs_paused_pre end,
-			layout_pause_caption = function() return target_label(cur_pause) end,
-			layout_resume_caption = function() return target_label(cur_resume) end,
+	local function build_layout_picker_submenu(current_id, on_pick)
+		local sub = {}
+		-- false / nil / "" all mean "no automatic switch" (the default)
+		local is_auto = (current_id == nil or current_id == false or current_id == "")
+		sub[#sub + 1] = {
+			label   = i18n.get("menu.layout.layout_auto"),
+			checked = is_auto or nil,
+			action      = function()
+				on_pick(nil)
+			end,
 		}
-		local function toggle_switch()
-			state.layout_pause_switch_enabled = not feature_on
-			if save_prefs and save_prefs() ~= true then return false end
-			if update_menu then update_menu() end
-		end
-		local pause_rows, resume_rows = {}, {}
-		local function pause_provider() return pause_rows end
-		local function resume_provider() return resume_rows end
-		-- Empty child providers admit the complete declared parents before native choices.
-		local admission = ManifestMenu.template_rows("layout_switching_frame", {
-			layout_switch_toggle = toggle_switch,
-		}, getters, { layout_pause_picker = pause_provider, layout_resume_picker = resume_provider })
-		if type(admission) ~= "table" or #admission ~= 3 then return nil end
-
-		local function picker(current_id, on_pick)
-			local native_rows = {}
-			local picker_getters = {
-				layout_picker_auto_checked = function()
-					return current_id == nil or current_id == false or current_id == ""
+		sub[#sub + 1] = { separator = true }
+		for _, r in ipairs(records) do
+			local display = display_for_record(r)
+			local rid     = r.id
+			sub[#sub + 1] = {
+				label   = display,
+				checked = (current_id == rid) or nil,
+				action      = function()
+					on_pick(rid)
 				end,
-				layout_picker_has_choices = function() return #records > 0 end,
 			}
-			local function choose_auto() return on_pick(nil) end
-			local function choices_provider() return native_rows end
-			local function declared_rows()
-				return ManifestMenu.template_rows("layout_switch_picker_frame", {
-					layout_picker_auto = choose_auto,
-				}, picker_getters, { layout_picker_choices = choices_provider })
-			end
-			local admitted = declared_rows()
-			if type(admitted) ~= "table" or #admitted ~= 1 + (#records > 0 and 1 or 0) then return nil end
-			for _, record in ipairs(records) do
-				local id = record.id
-				local row = layout_native_choice(display_for_record(record), current_id == id, true, function()
-						local retained = declared_rows()
-						if type(retained) ~= "table" or #retained ~= #native_rows + 2 then return false end
-						return on_pick(id)
-					end)
-				if not row then return nil end
-				native_rows[#native_rows + 1] = row
-			end
-			local rows = declared_rows()
-			if type(rows) ~= "table" or #rows ~= 1 + #records + (#records > 0 and 1 or 0) then return nil end
-			return rows
 		end
-		local function parents_present()
-			local rows = ManifestMenu.template_rows("layout_switching_frame", {
-				layout_switch_toggle = toggle_switch,
-			}, getters, { layout_pause_picker = pause_provider, layout_resume_picker = resume_provider })
-			return type(rows) == "table" and #rows == 3
-		end
-		pause_rows = picker(cur_pause, function(id)
-			if not parents_present() then return false end
-			state.layout_on_pause = id
-			if save_prefs and save_prefs() ~= true then return false end
-			if update_menu then update_menu() end
-		end)
-		resume_rows = picker(cur_resume, function(id)
-			if not parents_present() then return false end
-			state.layout_on_resume = id
-			if save_prefs and save_prefs() ~= true then return false end
-			if update_menu then update_menu() end
-		end)
-		if not pause_rows or not resume_rows then return nil end
-		local rows = ManifestMenu.template_rows("layout_switching_frame", {
-			layout_switch_toggle = toggle_switch,
-		}, getters, { layout_pause_picker = pause_provider, layout_resume_picker = resume_provider })
-		if type(rows) ~= "table" or #rows ~= 3 then return nil end
-		return rows
+		return sub
 	end
-	switching_rows = build_layout_switching_rows()
-	if switching_rows == nil then
-		Logger.error(LOG, "Declared layout switching frame refused.")
-		return nil
+
+	if state then
+		local feature_on = state.layout_pause_switch_enabled and true or false
+
+		-- The separator that stood here is a `---` row in the manifest now.
+		switching_rows[#switching_rows + 1] = {
+			label   = i18n.get("menu.layout.pause_layout_enabled"),
+			checked = feature_on or nil,
+			action      = function()
+				state.layout_pause_switch_enabled = not feature_on
+				if save_prefs and save_prefs() ~= true then return false end
+				if update_menu then update_menu() end
+			end,
+		}
+
+		local cur_pause  = state.layout_on_pause
+		local cur_resume = state.layout_on_resume
+
+		local pause_label = (cur_pause and cur_pause ~= false and cur_pause ~= "")
+			and display_for_record({ id = cur_pause, name = cur_pause:gsub("_", " "):gsub("%s+v%d.*$", "") })
+			or  i18n.get("menu.layout.layout_auto")
+		switching_rows[#switching_rows + 1] = {
+			label    = string.format("  ↳ %s : %s", i18n.get("menu.layout.layout_on_pause"), pause_label),
+			-- Grayed out when the feature is disabled or the script is currently paused
+			disabled = (not feature_on) or hs_paused_pre or nil,
+			items     = build_layout_picker_submenu(cur_pause, function(id)
+				state.layout_on_pause = id
+				if save_prefs and save_prefs() ~= true then return false end
+				if update_menu then update_menu() end
+			end),
+		}
+
+		local resume_label = (cur_resume and cur_resume ~= false and cur_resume ~= "")
+			and display_for_record({ id = cur_resume, name = cur_resume:gsub("_", " "):gsub("%s+v%d.*$", "") })
+			or  i18n.get("menu.layout.layout_auto")
+		switching_rows[#switching_rows + 1] = {
+			label    = string.format("  ↳ %s : %s", i18n.get("menu.layout.layout_on_resume"), resume_label),
+			disabled = (not feature_on) or hs_paused_pre or nil,
+			items     = build_layout_picker_submenu(cur_resume, function(id)
+				state.layout_on_resume = id
+				if save_prefs and save_prefs() ~= true then return false end
+				if update_menu then update_menu() end
+			end),
+		}
 	end
 
 	-- Rendered LAST, once every provider list is filled. The providers are read
@@ -699,36 +672,17 @@ function M.build(ctx)
 	end
 	-- Native-only status never acquires a preference or forced-input writer.
 	render_ctx.commands["number_row_mode"] = function() return false end
-	local function bundle_frame_rows()
-		local function system_provider() return latest and {bundle_rows[1]} or {} end
-		local function user_provider() return latest and {bundle_rows[2]} or {} end
-		local function status_provider() return {bundle_rows[#bundle_rows]} end
-		local rows = ManifestMenu.template_rows("layout_bundle_frame", {}, {}, {
-			layout_bundle_system = system_provider,
-			layout_bundle_user = user_provider,
-			layout_bundle_status = status_provider,
-		})
-		if type(rows) ~= "table" or #rows ~= #bundle_rows then return nil end
-		if latest then return rows end
-		-- The optional inert status may be withdrawn independently of the admitted
-		-- bundle frame. Refusal never replaces it with a native caption or action.
-		local missing = type(ManifestMenu.status_rows) == "function"
-			and ManifestMenu.status_rows("layout_menu", "layout_bundle", "no_bundle") or nil
-		if type(missing) ~= "table" or #missing ~= 1 then return rows end
-		for _, row in ipairs(rows) do missing[#missing + 1] = row end
-		return missing
-	end
-	local declared_bundle_rows = bundle_frame_rows()
-	if declared_bundle_rows == nil then return nil end
 	local custom_rows = custom_layout_rows(update_menu, ManifestMenu)
-	if custom_rows == nil then return nil end
-	local active_rows = active_layout_rows()
-	if active_rows == nil then return nil end
 	local submenu = ManifestMenu.build("layout_menu", "Layout", nil, nil, render_ctx, {
 		["number_row_policy"] = function() return NumberRowPolicy.native_rows(ManifestMenu, render_ctx.commands) end,
 		["custom_layouts"]   = function() return custom_rows end,
-		["active_layouts"]   = function() return active_rows end,
-		["layout_bundle"] = function() return declared_bundle_rows end,
+		["active_layouts"]   = active_layout_rows,
+		["layout_bundle"]    = function()
+			if latest then return bundle_rows end
+			local rows = ManifestMenu.status_rows("layout_menu", "layout_bundle", "no_bundle") or {}
+			for _, row in ipairs(bundle_rows) do rows[#rows + 1] = row end
+			return rows
+		end,
 		["layout_switching"] = function() return switching_rows end,
 		-- The physical magic key, chosen by pressing it or from the candidates.
 		["magic_key_source"] = function()
@@ -742,8 +696,10 @@ function M.build(ctx)
 	-- `submenu`, not `items`: these rows are already materialised. The tray
 	-- renders `items` as provider data, where every `title`/`fn` row is dropped,
 	-- which left this submenu empty on the real menu bar.
-	if type(submenu) ~= "table" or type(ManifestMenu.group_row) ~= "function" then return nil end
-	return ManifestMenu.group_row("layout_native_parent", "layout_parent_content", submenu, {})
+	return {
+		label   = i18n.get("menu.layout.title"),
+		submenu = submenu,
+	}
 end
 
 -- Late-bound test hooks: the helpers below are defined after section 2, so we

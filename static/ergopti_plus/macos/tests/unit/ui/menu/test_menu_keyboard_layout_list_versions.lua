@@ -14,27 +14,7 @@
 
 local helpers = require("tests.helpers")
 
---- The old assertions intentionally retain key-echo captions for unformatted rows.
---- Supply only genuine Layout format strings that the complete caption API now reads.
---- This is fixture input, never an expectation regenerated from the native producer.
-local function install_legacy_layout_formats(translator)
-	translator = translator or require("infra.i18n")
-	local file = assert(io.open(helpers.shared("data/locales/en.json"), "rb"))
-	local catalogue = assert(require("json").decode(file:read("*a")))
-	assert(file:close())
-	local original_get = translator.get
-	translator.get = function(key)
-		local format = catalogue[key]
-		if type(key) == "string" and key:sub(1, #"menu.layout.") == "menu.layout."
-			and type(format) == "string" and format:find("%s", 1, true) then return format end
-		return original_get(key)
-	end
-end
-
 local LABELS = {
-	["menu.layout.pause_picker_caption"] = "  ↳ pause : %s",
-	["menu.layout.resume_picker_caption"] = "  ↳ resume : %s",
-	["menu.layout.native_variant_caption"] = "%s v%s",
 	["menu.layout.update_list"]               = "list v%s -> v%s",
 	["menu.layout.update_list_to"]            = "list -> v%s",
 	["menu.layout.update_list_install_first"] = "list to v%s (install v%s first)",
@@ -96,8 +76,6 @@ local function bundle_labels(opts)
 		local actual_manifest = require("infra.manifest_menu")
 		package.loaded["infra.manifest_menu"] = {
 			status_rows = actual_manifest.status_rows,
-			template_rows = actual_manifest.template_rows,
-			group_row = actual_manifest.group_row,
 			build = function(_menu_id, _label, _a, _b, _ctx, providers)
 				return providers.layout_bundle()
 			end,
@@ -291,8 +269,7 @@ local function with_no_bundle_status(body, labels)
 		sources.set_input_source_async = forbid_effect
 		package.loaded["infra.notifications"] = {notify = forbid_effect}
 		local translator = require("infra.i18n")
-		if labels then translator.get = function(key) return labels[key] or key end
-		else install_legacy_layout_formats(translator) end
+		if labels then translator.get = function(key) return labels[key] or key end end
 		package.loaded["infra.manifest_menu"] = nil
 		local renderer = require("infra.manifest_menu")
 		session.root = renderer.get_root()

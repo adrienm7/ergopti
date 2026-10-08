@@ -13,7 +13,6 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local LayoutFixture = require("tests.support.layout_legacy_caption_fixture")
 
 local MENU_MODULES = {
 	keyboard_layout = "ui.menu.menu_keyboard_layout",
@@ -85,7 +84,6 @@ local function build_tray(paused)
 	end)
 	local builder = helpers.load_with_stubs("ui.menu.builder")
 	local i18n = require("infra.i18n")
-	LayoutFixture.install(i18n)
 	i18n.build_language_menu_items = function()
 		return { { label = "Français", checked = true, action = function() end } }
 	end
@@ -158,7 +156,7 @@ end
 -- ============================
 -- ============================
 
-helpers.describe("the real macOS tray while paused", LayoutFixture.scoped(function()
+helpers.describe("the real macOS tray while paused", function()
 	local menu, build_error = build_tray(true)
 
 	helpers.it("greys every feature row and strips its handler while paused", function()
@@ -192,4 +190,4 @@ helpers.describe("the real macOS tray while paused", LayoutFixture.scoped(functi
 				"'" .. key .. "' must be enabled while running")
 		end
 	end)
-end))
+end)

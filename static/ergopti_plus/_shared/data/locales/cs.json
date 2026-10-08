@@ -3251,8 +3251,5 @@
 	"gestures.system.slot_configured_caption": "%s — Nastaveno pro ErgoptiPlus",
 	"gestures.system.slot_not_configured_caption": "%s — Nenastaveno pro ErgoptiPlus",
 	"menu.global.reload_macos": "↺ Znovu načíst",
-	"menu.global.quit_macos": "✕ Ukončit",
-	"menu.layout.pause_picker_caption": "  ↳ Rozložení když skript pozastaven : %s",
-	"menu.layout.resume_picker_caption": "  ↳ Rozložení když skript aktivní : %s",
-	"menu.layout.native_variant_caption": "%s v%s"
+	"menu.global.quit_macos": "✕ Ukončit"
 }

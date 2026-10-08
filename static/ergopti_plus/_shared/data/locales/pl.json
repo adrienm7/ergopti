@@ -3251,8 +3251,5 @@
 	"gestures.system.slot_configured_caption": "%s — Skonfigurowano dla ErgoptiPlus",
 	"gestures.system.slot_not_configured_caption": "%s — Nie skonfigurowano dla ErgoptiPlus",
 	"menu.global.reload_macos": "↺ Przeładuj",
-	"menu.global.quit_macos": "✕ Zakończ",
-	"menu.layout.pause_picker_caption": "  ↳ Układ gdy skrypt wstrzymany : %s",
-	"menu.layout.resume_picker_caption": "  ↳ Układ gdy skrypt aktywny : %s",
-	"menu.layout.native_variant_caption": "%s v%s"
+	"menu.global.quit_macos": "✕ Zakończ"
 }

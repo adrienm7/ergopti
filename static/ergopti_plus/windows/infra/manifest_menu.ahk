@@ -527,22 +527,15 @@ _MR_CommandLiteralPrefix(Item, &Prefix) {
 		|| Type(_MR_Get(Item, "id")) != "String" || _MR_Get(Item, "id") == ""
 		|| Type(_MR_Get(Item, "i18n")) != "String" || _MR_Get(Item, "i18n") == ""
 		return false
-	return _MR_PlainUnicodeCaption(Prefix)
-}
-
-; One literal Unicode validator serves command decoration and native record names.
-_MR_PlainUnicodeCaption(Caption) {
-	if Type(Caption) != "String"
-		return false
 	Position := 1
-	while Position <= StrLen(Caption) {
-		Unit := Ord(SubStr(Caption, Position, 1))
+	while Position <= StrLen(Prefix) {
+		Unit := Ord(SubStr(Prefix, Position, 1))
 		if Unit < 0x20 || Unit == 0x7F
 			return false
 		if Unit >= 0xD800 && Unit <= 0xDBFF {
-			if Position == StrLen(Caption)
+			if Position == StrLen(Prefix)
 				return false
-			NextUnit := Ord(SubStr(Caption, Position + 1, 1))
+			NextUnit := Ord(SubStr(Prefix, Position + 1, 1))
 			if NextUnit < 0xDC00 || NextUnit > 0xDFFF
 				return false
 			Position += 2
@@ -567,21 +560,13 @@ _MR_CommandRowData(Item, ManifestKey, Commands, StateGetters) {
 	CmdId := _MR_Get(Item, "command", Id)
 	if CmdId == ""
 		CmdId := Id
-	if Id == "" || (I18nKey == "" && _MR_Get(Item, "caption_source") != "native") || !(Commands is Map) || !Commands.Has(CmdId) {
+	if Id == "" || I18nKey == "" || !(Commands is Map) || !Commands.Has(CmdId) {
 		try LoggerError("MenuRenderer", "Missing declaration or command for '{1}.{2}'.", ManifestKey, Id)
 		return false
 	}
 	Label := unset
-	if Item.Has("caption_format") && !_MR_ReadNumberedCaption(Item, StateGetters, &Label)
-		return false
-	if Item.Has("caption_source") && !_MR_ReadNativeCaption(Item, StateGetters, &Label)
-		return false
 	if Item.Has("caption_layout") || Item.Has("caption_joiner") {
 		if !_MR_ExplicitCaption(Item, StateGetters, &Label)
-			return false
-	}
-	if Item.Has("caption_getters") {
-		if !_MR_ReadCaptionValues(Item, StateGetters, &Label)
 			return false
 	}
 	if Item.Has("label_prefix")
@@ -605,7 +590,7 @@ _MR_RenderCommand(ResultMenu, Item, ManifestKey, Commands, StateGetters) {
 	if !(Row is Map)
 		return 0
 	; Keep the existing native stand-in owner and its untracked inert callback.
-	if Row.Has("disabled_reason_key") && (Item.Has("caption_layout") || Item.Has("caption_joiner") || Item.Has("label_prefix") || Item.Has("caption_getters"))
+	if Row.Has("disabled_reason_key") && (Item.Has("caption_layout") || Item.Has("caption_joiner") || Item.Has("label_prefix"))
 		return _MR_RenderGreyedStandIn(ResultMenu,
 			Map("id", _MR_Get(Item, "id"), "i18n", _MR_Get(Item, "i18n"),
 				"reason_key", Row["disabled_reason_key"]), ManifestKey, Row["label"])
@@ -671,23 +656,14 @@ MenuRenderer_GroupRow(ManifestKey, RowId, NativeChild, StateGetters := unset) {
 	}
 	if Type(RowId) != "String" || RowId == "" || Matches != 1
 		|| !(_MR_Get(Selected, "type") == "group") || Selected.Has("label_prefix") || !_MR_IsForAhk(Selected)
-		|| ((Type(_MR_Get(Selected, "i18n")) != "String" || _MR_Get(Selected, "i18n") == "") && _MR_Get(Selected, "caption_source") != "native")
+		|| Type(_MR_Get(Selected, "i18n")) != "String" || _MR_Get(Selected, "i18n") == ""
 		|| !(NativeChild is Menu) {
 		try LoggerError("MenuRenderer", "Missing or invalid declared parent '{1}.{2}' — provider row refused.", ManifestKey, RowId)
 		return false
 	}
 	Getters := IsSet(StateGetters) ? StateGetters : Map()
-	Label := _MR_Get(Selected, "caption_source") == "native" ? "" : t(_MR_Get(Selected, "i18n"))
-	if Selected.Has("caption_format") {
-		if !_MR_ReadNumberedCaption(Selected, Getters, &Label)
-			return false
-	} else if Selected.Has("caption_source") {
-		if !_MR_ReadNativeCaption(Selected, Getters, &Label)
-			return false
-	} else if Selected.Has("caption_getters") {
-		if !_MR_ReadCaptionValues(Selected, Getters, &Label)
-			return false
-	} else if Selected.Has("caption_layout") || Selected.Has("caption_joiner") {
+	Label := t(Selected["i18n"])
+	if Selected.Has("caption_layout") || Selected.Has("caption_joiner") {
 		if !_MR_ExplicitCaption(Selected, Getters, &Label, Label)
 			return false
 	} else if Selected.Has("caption_getter") {
@@ -698,9 +674,7 @@ MenuRenderer_GroupRow(ManifestKey, RowId, NativeChild, StateGetters := unset) {
 			try LoggerError("MenuRenderer", "Missing or invalid declared parent caption — provider row refused.")
 			return false
 		}
-		try Value := Getters[Getter].Call()
-		catch
-			return false
+		Value := Getters[Getter].Call()
 		if Type(Value) != "String" {
 			try LoggerError("MenuRenderer", "Invalid declared parent caption receipt — provider row refused.")
 			return false
@@ -867,9 +841,7 @@ _MR_TemplateRows(ManifestKey, Commands, StateGetters, Children, Visiting, Status
 	for Item in Def {
 		if !_MR_CommandLiteralPrefix(Item, &Prefix)
 			return false
-		if !_MR_CaptionLayoutMetadata(Item) || !_MR_CaptionVectorMetadata(Item, StateGetters, _MR_IsForAhk(Item))
-			|| (Item.Has("caption_format") && _MR_IsForAhk(Item) && !_MR_ReadNumberedCaption(Item, StateGetters, &NumberedCaption))
-			|| (Item.Has("caption_source") && _MR_IsForAhk(Item) && !_MR_ReadNativeCaption(Item, StateGetters, &NativeCaption))
+		if !_MR_CaptionLayoutMetadata(Item)
 			return false
 		if Item.Has("on_refusal") && _MR_Get(Item, "type") != "include" {
 			try LoggerError("MenuRenderer", "Invalid presentation omission policy in '{1}' — rows refused.", ManifestKey)
@@ -945,7 +917,7 @@ _MR_TemplateRows(ManifestKey, Commands, StateGetters, Children, Visiting, Status
 		else if IsSet(StatusDefinition) && ItemType == "label"
 			Row := Map("label", t(Item["i18n"]), "disabled", true)
 		else if ItemType == "label" {
-			Fields := Map("type", true, "id", true, "i18n", true, "platforms", true, "unavailable", true, "caption_getter", true, "caption_getters", true, "caption_layout", true, "caption_joiner", true)
+			Fields := Map("type", true, "id", true, "i18n", true, "platforms", true, "unavailable", true, "caption_getter", true, "caption_layout", true, "caption_joiner", true)
 			I18nKey := _MR_Get(Item, "i18n")
 			Unavailable := _MR_Get(Item, "unavailable")
 			Valid := Type(Id) == "String" && Id != "" && Type(I18nKey) == "String" && I18nKey != ""
@@ -999,10 +971,6 @@ _MR_TemplateRows(ManifestKey, Commands, StateGetters, Children, Visiting, Status
 				return false
 		} else if ItemType == "group" && Children.Has(Id) && (Children[Id] is Array || HasMethod(Children[Id], "Call")) {
 			Label := unset
-			if Item.Has("caption_format") && !_MR_ReadNumberedCaption(Item, StateGetters, &Label)
-				return false
-			if Item.Has("caption_source") && !_MR_ReadNativeCaption(Item, StateGetters, &Label)
-				return false
 			if Item.Has("caption_layout") || Item.Has("caption_joiner") {
 				if !_MR_ExplicitCaption(Item, StateGetters, &Label)
 					return false
@@ -1021,13 +989,8 @@ _MR_TemplateRows(ManifestKey, Commands, StateGetters, Children, Visiting, Status
 			try LoggerError("MenuRenderer", "Missing child data or unsupported row in template '{1}' — provider rows refused.", ManifestKey)
 			return false
 		}
-		if Item.Has("caption_getters") && ItemType != "command" && ItemType != "check" {
-			if !_MR_ReadCaptionValues(Item, StateGetters, &Caption)
-				return false
-			Row["label"] := Prefix . Caption
-		}
 		CaptionGetter := _MR_Get(Item, "caption_getter")
-		if !Item.Has("caption_format") && !Item.Has("caption_source") && CaptionGetter != "" && !((ItemType == "command" || ItemType == "group")
+		if CaptionGetter != "" && !((ItemType == "command" || ItemType == "group")
 			&& (Item.Has("caption_layout") || Item.Has("caption_joiner"))) {
 			if !StateGetters.Has(CaptionGetter) || !HasMethod(StateGetters[CaptionGetter], "Call") {
 				try LoggerError("MenuRenderer", "Missing or invalid caption getter in template '{1}' — provider rows refused.", ManifestKey)
@@ -1066,113 +1029,6 @@ _MR_TemplateRows(ManifestKey, Commands, StateGetters, Children, Visiting, Status
 	}
 	Visiting.Delete(ManifestKey)
 	return Rows
-}
-
-; Explicit numbered formats interpret only their original {1}; native values remain literal.
-_MR_ReadNumberedCaption(Item, Getters, &Caption) {
-	if _MR_Get(Item, "caption_format") != "numbered" || !InStr("|command|group|", "|" . _MR_Get(Item, "type") . "|")
-		|| Type(_MR_Get(Item, "id")) != "String" || _MR_Get(Item, "id") == ""
-		|| Type(_MR_Get(Item, "i18n")) != "String" || _MR_Get(Item, "i18n") == ""
-		|| Item.Has("caption_getters") || Item.Has("caption_source") || Item.Has("caption_layout")
-		|| Item.Has("caption_joiner") || Item.Has("label_prefix") || Item.Has("reason_key")
-		|| Item.Has("disabled_reason_key") || !(Getters is Map)
-		return false
-	Getter := _MR_Get(Item, "caption_getter")
-	if Type(Getter) != "String" || Getter == "" || !Getters.Has(Getter) || !HasMethod(Getters[Getter], "Call")
-		return false
-	Title := t(_MR_Get(Item, "i18n"))
-	if Type(Title) != "String" || Title == _MR_Get(Item, "i18n") || !InStr(Title, "{1}") || !_MR_PlainUnicodeCaption(Title)
-		return false
-	Remainder := StrReplace(Title, "{1}", "")
-	if InStr(Remainder, "{") || InStr(Remainder, "}")
-		return false
-	try Value := Getters[Getter].Call()
-	catch
-		return false
-	if Type(Value) != "String" || !_MR_PlainUnicodeCaption(Value)
-		return false
-	Caption := StrReplace(Title, "{1}", Value)
-	return true
-}
-
-; Record captions are native Unicode data, with kind and policy owned by the declaration.
-_MR_ReadNativeCaption(Item, Getters, &Caption) {
-	if _MR_Get(Item, "caption_source") != "native" || !InStr("|check|group|", "|" . _MR_Get(Item, "type") . "|")
-		|| Item.Has("i18n") || Item.Has("caption_getters") || Item.Has("caption_layout") || Item.Has("caption_joiner")
-		|| Item.Has("label_prefix") || Item.Has("reason_key") || Item.Has("disabled_reason_key")
-		|| _MR_Get(Item, "unavailable") != "hide" || !(Getters is Map)
-		return false
-	Getter := _MR_Get(Item, "caption_getter")
-	if Type(Getter) != "String" || Getter == "" || !Getters.Has(Getter) || !HasMethod(Getters[Getter], "Call")
-		return false
-	try Caption := Getters[Getter].Call()
-	catch
-		return false
-	return Type(Caption) == "String" && Caption != "" && _MR_PlainUnicodeCaption(Caption)
-}
-
-; Ordered getter vectors retain original translated formats and reject malformed native data.
-_MR_CaptionVectorMetadata(Item, Getters, ValidateGetters := true) {
-	if !Item.Has("caption_getters")
-		return true
-	Names := Item["caption_getters"]
-	if Item.Has("caption_getter") || Item.Has("caption_source") || Item.Has("caption_layout")
-		|| Item.Has("caption_joiner") || !(Names is Array) || Names.Length == 0
-		|| !InStr("|command|check|group|label|", "|" . _MR_Get(Item, "type") . "|")
-		|| Type(_MR_Get(Item, "i18n")) != "String" || _MR_Get(Item, "i18n") == ""
-		|| Type(_MR_Get(Item, "id")) != "String" || _MR_Get(Item, "id") == "" || (ValidateGetters && !(Getters is Map))
-		return false
-	loop Names.Length {
-		if !Names.Has(A_Index)
-			return false
-		Name := Names[A_Index]
-		if Type(Name) != "String" || Name == "" || (ValidateGetters && (!Getters.Has(Name) || !HasMethod(Getters[Name], "Call")))
-			return false
-	}
-	return true
-}
-
-_MR_ReadCaptionValues(Item, Getters, &Caption) {
-	if !_MR_CaptionVectorMetadata(Item, Getters)
-		return false
-	Values := []
-	for Getter in Item["caption_getters"] {
-		try Value := Getters[Getter].Call()
-		catch
-			return false
-		if Type(Value) != "String"
-			return false
-		Values.Push(Value)
-	}
-	return _MR_CaptionValues(t(_MR_Get(Item, "i18n")), Values, &Caption)
-}
-
-_MR_CaptionValues(Format, Values, &Caption) {
-	if Type(Format) != "String" || !(Values is Array) || Values.Length == 0
-		return false
-	for Value in Values
-		if Type(Value) != "String"
-			return false
-	Caption := "", Position := 1, Argument := 1
-	while Position <= StrLen(Format) {
-		Character := SubStr(Format, Position, 1), Following := SubStr(Format, Position + 1, 1)
-		if Character == "%" && Following == "%" {
-			Caption .= "%"
-			Position += 2
-		} else if Character == "%" && Following == "s" {
-			if Argument > Values.Length || !Values.Has(Argument)
-				return false
-			Caption .= Values[Argument]
-			Argument += 1
-			Position += 2
-		} else if Character == "%"
-			return false
-		else {
-			Caption .= Character
-			Position += 1
-		}
-	}
-	return Argument == Values.Length + 1
 }
 
 ; Formats supported slots without interpreting percent bytes inside the native value.
@@ -1522,17 +1378,11 @@ MenuRenderer_AppendGroup(TargetMenu, ManifestKey, GroupId, GroupBuilders, Disabl
 _MR_RenderGroup(ResultMenu, Item, CategoryName, GroupBuilders, ManifestKey := "", StateGetters := "", Disabled := unset) {
 	Id    := _MR_Get(Item, "id")
 	I18nKey := _MR_Get(Item, "i18n")
-	if (Id == "" or (I18nKey == "" && _MR_Get(Item, "caption_source") != "native")) {
+	if (Id == "" or I18nKey == "") {
 		try LoggerWarn("MenuRenderer", "group item missing id or i18n — skipped.")
 		return
 	}
-	Label := _MR_Get(Item, "caption_source") == "native" ? "" : t(I18nKey)
-	if Item.Has("caption_format") && !_MR_ReadNumberedCaption(Item, StateGetters, &Label)
-		return false
-	if Item.Has("caption_source") && !_MR_ReadNativeCaption(Item, StateGetters, &Label)
-		return false
-	if Item.Has("caption_getters") && !_MR_ReadCaptionValues(Item, StateGetters, &Label)
-		return false
+	Label := t(I18nKey)
 	if Item.Has("caption_layout") || Item.Has("caption_joiner") {
 		if !_MR_ExplicitCaption(Item, StateGetters, &Label, Label)
 			return false
@@ -1547,10 +1397,6 @@ _MR_RenderGroup(ResultMenu, Item, CategoryName, GroupBuilders, ManifestKey := ""
 	if !(Sub is Menu) {
 		return false
 	}
-	; New typed captions are literal data; preserve the native ampersand transport.
-	; Existing unspecified/scalar group captions retain their prior byte behavior.
-	if Item.Has("caption_source") || Item.Has("caption_getters") || Item.Has("caption_format")
-		Label := StrReplace(Label, "&", "&&")
 	ResultMenu.Add(Label, Sub)
 	if IsSet(Disabled) && Disabled
 		ResultMenu.Disable(Label)
