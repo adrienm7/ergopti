@@ -16,47 +16,116 @@ local directory = assert(uv.fs_mkdtemp("/tmp/ergopti-relative-siblings-XXXXXX"))
 local checks, failures, handles, paths, tokens, pids = 0, 0, {}, {}, {}, {}
 local ABC = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
 
--- Passive private observations: original native functions, callbacks, metadata
--- and result tuples are forwarded once unchanged; no deadline/clock refresh added.
+-- Passive private observations preserve native arguments, result tuples and
+-- callback delivery. Only the active HTTP fixture's exact child/stdin is observed.
 local pack = function(...) return { n = select("#", ...), ... } end
 local unpack_values = table.unpack or unpack
 local active_http_trace
-local function observe_http(phase, delay)
- pcall(function()
-  local trace = active_http_trace
-  if not trace or #trace.events >= 64 then return end
-  local now, cached = uv.hrtime() / 1000000, uv.now()
-  if type(now) ~= "number" or type(cached) ~= "number" then return end
-  trace.events[#trace.events + 1] = { phase = phase, time = now - trace.start,
-   cached = cached - trace.cached, delay = type(delay) == "number" and delay or -1 }
- end)
+local function native_integer(value)
+	if type(value) == "number" and value == value and value % 1 == 0
+		and value >= -2147483648 and value <= 2147483647 then return tostring(value) end
+	return "unavailable"
+end
+local function observe_http(phase, delay, code, signal, ack)
+	pcall(function()
+		local trace = active_http_trace
+		if not trace or #trace.events >= 64 then return end
+		local now, cached = uv.hrtime() / 1000000, uv.now()
+		if type(now) ~= "number" or type(cached) ~= "number" then return end
+		trace.events[#trace.events + 1] = { phase = phase, time = now - trace.start,
+			cached = cached - trace.cached, delay = type(delay) == "number" and delay or -1,
+			code = native_integer(code), signal = native_integer(signal),
+			ack = type(ack) == "boolean" and tostring(ack) or "unavailable",
+			cancel_requested = trace.cancel_requested == true }
+	end)
+end
+local function observe_loop()
+	pcall(function()
+		local trace = active_http_trace
+		if not trace then return end
+		local now = uv.hrtime() / 1000000
+		if trace.last_loop then
+			trace.max_loop_gap = math.max(trace.max_loop_gap or 0, now - trace.last_loop)
+		else observe_http("loop-first-entry") end
+		trace.loop_samples = (trace.loop_samples or 0) + 1
+		trace.last_loop = now
+	end)
 end
 local function flush_http_trace()
- local trace = active_http_trace
- active_http_trace = nil
- if not trace then return end
- pcall(function()
-  io.stderr:write("PRIVATE_RELATIVE_HTTP_TRACE mode=", trace.mode, " clock=", trace.clock, "\n")
-  for _, row in ipairs(trace.events) do
-   io.stderr:write(string.format("PRIVATE_RELATIVE_HTTP_TRACE phase=%s t_ms=%.3f cached_delta_ms=%.3f delay_ms=%.3f\n",
-    row.phase, row.time, row.cached, row.delay))
-  end
- end)
+	local trace = active_http_trace
+	active_http_trace = nil
+	if not trace then return end
+	pcall(function()
+		io.stderr:write("PRIVATE_RELATIVE_HTTP_TRACE mode=", trace.mode, " clock=", trace.clock,
+			string.format(" loop_samples=%d max_loop_gap_ms=%.3f\n", trace.loop_samples or 0, trace.max_loop_gap or 0))
+		for _, row in ipairs(trace.events) do
+			io.stderr:write(string.format("PRIVATE_RELATIVE_HTTP_TRACE phase=%s t_ms=%.3f cached_delta_ms=%.3f delay_ms=%.3f native_code=%s native_signal=%s ack=%s cancel_requested=%s\n",
+				row.phase, row.time, row.cached, row.delay, row.code, row.signal, row.ack, tostring(row.cancel_requested)))
+		end
+	end)
 end
 local NativeTimer = require("infra.native_timer")
 local original_native_start, original_spawn = NativeTimer.start, uv.spawn
+local original_write, original_close, original_kill = uv.write, uv.close, uv.kill
 NativeTimer.start = function(...)
- local delay = select(3, ...)
- observe_http("timer-enter", delay)
- local results = pack(original_native_start(...))
- observe_http("timer-return", delay)
- return unpack_values(results, 1, results.n)
+	local delay = select(3, ...)
+	observe_http("timer-enter", delay)
+	local results = pack(original_native_start(...))
+	observe_http("timer-return", delay)
+	return unpack_values(results, 1, results.n)
 end
 uv.spawn = function(...)
- observe_http("spawn-enter")
- local results = pack(original_spawn(...))
- observe_http("spawn-return")
- return unpack_values(results, 1, results.n)
+	local args, trace = pack(...), active_http_trace
+	if trace and type(args[2]) == "table" and type(args[2].stdio) == "table" then
+		trace.stdin = args[2].stdio[1]
+		local callback = args[3]
+		if type(callback) == "function" then
+			args[3] = function(...)
+				if active_http_trace == trace then observe_http("child-exit", nil, ...) end
+				return callback(...)
+			end
+		end
+	end
+	observe_http("spawn-enter")
+	local results = pack(original_spawn(unpack_values(args, 1, args.n)))
+	if trace then trace.pid = results[2] end
+	observe_http("spawn-return")
+	return unpack_values(results, 1, results.n)
+end
+uv.write = function(...)
+	local args, trace = pack(...), active_http_trace
+	if not trace or args[1] ~= trace.stdin then return original_write(...) end
+	observe_http("config-write-submit")
+	local callback = args[3]
+	if type(callback) == "function" then
+		args[3] = function(...)
+			if active_http_trace == trace then observe_http("config-write-ack", nil, nil, nil, select(1, ...) == nil) end
+			return callback(...)
+		end
+	end
+	return original_write(unpack_values(args, 1, args.n))
+end
+uv.close = function(...)
+	local args, trace = pack(...), active_http_trace
+	if not trace or args[1] ~= trace.stdin then return original_close(...) end
+	observe_http("config-close-submit")
+	local callback = args[2]
+	if type(callback) == "function" then
+		args[2] = function(...)
+			if active_http_trace == trace then observe_http("config-close-ack") end
+			return callback(...)
+		end
+	end
+	return original_close(unpack_values(args, 1, args.n))
+end
+uv.kill = function(...)
+	local trace, pid, signal = active_http_trace, ...
+	if trace and type(trace.pid) == "number" and pid == -trace.pid
+		and (signal == "sigterm" or signal == "sigkill") then
+		trace.cancel_requested = true
+		observe_http("child-cancel-request")
+	end
+	return original_kill(...)
 end
 
 local function retain(handle) handles[#handles + 1] = handle; return handle end
@@ -75,6 +144,7 @@ end
 local function await(predicate)
 	local deadline = uv.hrtime() + 2000000000
 	repeat
+		observe_loop()
 		uv.run("nowait")
 		if predicate() then return end
 		uv.sleep(1)
@@ -107,7 +177,9 @@ local function server()
 	assert(listener:listen(16, function(err)
 		assert(not err, tostring(err))
 		local socket = retain(assert(uv.new_tcp()))
+		observe_http("server-listen-callback")
 		assert(listener:accept(socket))
+		observe_http("server-accepted")
 		local input, handled = "", false
 		socket:read_start(function(read_error, chunk)
 			assert(not read_error, tostring(read_error))
