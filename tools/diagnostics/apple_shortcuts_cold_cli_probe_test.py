@@ -382,7 +382,9 @@ class ColdCliControls(unittest.TestCase):
                         subject.private_directory(root)
                 self.assertEqual(raised.exception.cause, "private_root_refused")
 
-    def run_actual_main(self, publisher=None, sleeper=None, clock=None, printer=None):
+    def run_actual_main(
+        self, publisher=None, sleeper=None, clock=None, printer=None, modeled_version=(3, 13)
+    ):
         """Exercise the real entry with explicit source/native/POSIX recording ports."""
         source_root = Path(subject.__file__).resolve().parents[2]
         output = self.parent / "ergopti-shortcuts-cold-public"
@@ -418,6 +420,8 @@ class ColdCliControls(unittest.TestCase):
         spec = SimpleNamespace(loader=SimpleNamespace(exec_module=lambda module: None))
         with ExitStack() as ports:
             ports.enter_context(mock.patch.object(subject.sys, "platform", "darwin"))
+            # This port models native eligibility; the host interpreter is not Darwin evidence.
+            ports.enter_context(mock.patch.object(subject.sys, "version_info", modeled_version))
             ports.enter_context(
                 mock.patch.object(
                     subject.sys,
@@ -472,6 +476,15 @@ class ColdCliControls(unittest.TestCase):
             return settle()
 
         self.group.settle = future_ack
+
+    def test_actual_main_below_native_python_floor_refuses_before_acquisition(self):
+        with self.assertRaises(subject.ObservationRefused) as raised:
+            self.run_actual_main(modeled_version=(3, 12))
+        self.assertEqual(raised.exception.cause, "native_prerequisite_refused")
+        self.assertEqual(self.acquire_calls, [])
+        self.assertEqual(self.attempts, [])
+        self.assertFalse((self.parent / "ergopti-shortcuts-cold-public").exists())
+        self.assertFalse((self.parent / "ergopti-shortcuts-cold-private").exists())
 
     def test_actual_main_secondary_publication_and_print_failure_cannot_bypass_debt(self):
         self.future_retirement_ack()

@@ -49,7 +49,7 @@ const controls = spawnSync(
 assert.ifError(controls.error);
 assert.equal(controls.signal, null);
 assert.equal(controls.status, 0, controls.stdout + controls.stderr);
-assert.match(controls.stderr, /Ran 25 tests in /);
+assert.match(controls.stderr, /Ran 26 tests in /);
 assert.match(controls.stderr, /\nOK\s*$/);
 assert.doesNotMatch(controls.stderr, /skipped=/);
-process.stdout.write('Cold CLI portable controls: 25 passed; native macOS pending\n');
+process.stdout.write('Cold CLI portable controls: 26 passed; native macOS pending\n');
