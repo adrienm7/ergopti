@@ -8851,3 +8851,34 @@ id = "gesture_system_linux_settings_unavailable"
 i18n = "gestures.system.unknown"
 platforms = ["linux"]
 unavailable = "hide"
+
+# Native macOS canvas/image allocation retains the actual badge click and lifetime.
+# This frame owns only the two existing badge captions and following boundary.
+[[menu.macos_canvas_badge_frame]]
+type = "include"
+section = "macos_canvas_badge_paused"
+present_when = "macos_badge_is_paused"
+
+[[menu.macos_canvas_badge_frame]]
+type = "include"
+section = "macos_canvas_badge_active"
+present_when = "macos_badge_is_active"
+
+[[menu.macos_canvas_badge_frame]]
+type = "---"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.macos_canvas_badge_paused]]
+type = "label"
+id = "macos_badge_paused_caption"
+i18n = "menu.builder.title_paused"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.macos_canvas_badge_active]]
+type = "label"
+id = "macos_badge_active_caption"
+i18n = "menu.builder.title"
+platforms = ["hs"]
+unavailable = "hide"

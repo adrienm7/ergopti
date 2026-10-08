@@ -4883,13 +4883,22 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 27, macOS 29, Linux 31, each
+  drivers still build (current baseline: Windows 27, macOS 28, Linux 31, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
   existing rows during the migration (proposal in the menu-first-group
   report: most hide; greyed: Linux edit_shortcuts, Linux key
   combinations, Linux metrics shortcut rows, Windows preview_bubbles).
+  The macOS badge caption and following boundary now consume a complete
+  shared frame before native measurement or canvas allocation. Independent
+  consumer tests pass 38/0 against predecessor 26/12; the genuine root route
+  and sixty physical disconnect controls pass without invented submenu IDs.
+  Original image, click, drawing and retirement owners remain native. Selected
+  gates pass 382 JS checks, 17,245 portable macOS and 11,693 Linux units, plus
+  portable macOS E2E; native AppKit, packaging and installation qualification
+  remain pending. Root/image placement and download presentation are separate
+  unfinished families.
   Complete cached system-gesture status now consumes shared parent, slot,
   pinch, reader and refresh frames through genuine native cached providers.
   Seven additive keys in all 21 locales preserve an independently frozen prior
@@ -6814,7 +6823,7 @@ Current Group 3 source checkpoint (item 73, 2026-10-06): [Group 3 current checkp
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 27, macOS 29 and Linux 31 rows are still built by the
+  Windows 27, macOS 28 and Linux 31 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). Read on
   2026-10-01, the sites are of four kinds, and three of them need the
   manifest to say more than it can today:
@@ -6832,6 +6841,15 @@ Current Group 3 source checkpoint (item 73, 2026-10-06): [Group 3 current checkp
   sites): they follow (b), as part of the template;
   (d) the tray root bootstrap (Windows `tray_bootstrap.ahk`,
   `menu_init.ahk`).
+  The macOS badge caption and following boundary now consume a complete
+  shared frame before native measurement or canvas allocation. Independent
+  consumer tests pass 38/0 against predecessor 26/12; the genuine root route
+  and sixty physical disconnect controls pass without invented submenu IDs.
+  Original image, click, drawing and retirement owners remain native. Selected
+  gates pass 382 JS checks, 17,245 portable macOS and 11,693 Linux units, plus
+  portable macOS E2E; native AppKit, packaging and installation qualification
+  remain pending. Root/image placement and download presentation are separate
+  unfinished families.
   Complete cached system-gesture status now consumes shared parent, slot,
   pinch, reader and refresh frames through genuine native cached providers.
   Seven additive keys in all 21 locales preserve an independently frozen prior
