@@ -2141,35 +2141,35 @@ jobs:
             distro: debian
             container: debian:stable-slim
             image: debian:stable-slim
-            prep: apt-get update && apt-get install -y --no-install-recommends bash coreutils findutils grep sed sudo passwd gcc libc6-dev
+            prep: apt-get update && apt-get install -y --no-install-recommends bash coreutils findutils grep sed sudo passwd git gcc libc6-dev linux-libc-dev
           - id: distro-fedora
             kind: install
             label: 'Install · fedora'
             distro: fedora
             container: fedora:latest
             image: fedora:latest
-            prep: dnf install -y bash coreutils findutils grep sed sudo shadow-utils gcc glibc-devel
+            prep: dnf install -y bash coreutils findutils grep sed sudo shadow-utils git gcc glibc-devel kernel-headers
           - id: distro-arch
             kind: install
             label: 'Install · arch'
             distro: arch
             container: archlinux:latest
             image: archlinux:latest
-            prep: pacman -Sy --noconfirm bash coreutils findutils grep sed sudo shadow gcc glibc
+            prep: pacman -Sy --noconfirm bash coreutils findutils grep sed sudo shadow git gcc glibc linux-api-headers
           - id: distro-alpine
             kind: install
             label: 'Install · alpine'
             distro: alpine
             container: alpine:latest
             image: alpine:latest
-            prep: apk add --no-cache bash coreutils findutils grep sed sudo gcc musl-dev linux-headers
+            prep: apk add --no-cache bash coreutils findutils grep sed sudo git gcc musl-dev linux-headers
           - id: distro-opensuse
             kind: install
             label: 'Install · opensuse'
             distro: opensuse
             container: opensuse/tumbleweed:latest
             image: opensuse/tumbleweed:latest
-            prep: sed -i 's|http://download.opensuse.org|https://downloadcontent.opensuse.org|g' /etc/zypp/repos.d/*.repo && zypper --non-interactive install bash coreutils findutils grep sed sudo shadow gcc glibc-devel
+            prep: sed -i 's|http://download.opensuse.org|https://downloadcontent.opensuse.org|g' /etc/zypp/repos.d/*.repo && zypper --non-interactive install bash coreutils findutils grep sed sudo shadow git gcc glibc-devel linux-glibc-devel
           - id: first-install-ubuntu-22.04
             kind: first
             label: 'First install · ubuntu-22.04'
@@ -2220,6 +2220,7 @@ jobs:
             distro: opensuse-tumbleweed
             container: ''
             image: 'opensuse/tumbleweed:latest'
+            prep: sed -i 's|http://download.opensuse.org|https://downloadcontent.opensuse.org|g' /etc/zypp/repos.d/*.repo
           - id: first-install-alpine
             kind: first
             label: 'First install · alpine'
@@ -2255,6 +2256,15 @@ jobs:
         run: dnf install -y git findutils
 
       - uses: actions/checkout@v4
+
+      - name: Verify source compiler and checkout
+        if: matrix.kind == 'install'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          source static/ergopti_plus/linux/install/native_source_build.sh
+          native_source_compile_probe "$GITHUB_WORKSPACE/static/ergopti_plus/linux/native/archive_output"
 
       - name: Create the installation user
         if: matrix.kind == 'install'
@@ -2461,9 +2471,11 @@ jobs:
         if: matrix.kind == 'first'
         timeout-minutes: 25
         shell: bash
+        env:
+          ERGOPTI_E2E_PREP: ${{ matrix.prep || '' }}
         run: |
           set -euo pipefail
-          export ERGOPTI_E2E_DOCKER_ARGS="-e ERGOPTI_E2E_KNOWN_LIMITATIONS=${{ matrix.known || '' }}"
+          export ERGOPTI_E2E_DOCKER_ARGS="-e ERGOPTI_E2E_PREP -e ERGOPTI_E2E_KNOWN_LIMITATIONS=${{ matrix.known || '' }}"
           bash static/ergopti_plus/linux/tests/distro/run_in_docker.sh '${{ matrix.image }}' \
             | tee "$RUNNER_TEMP/first-install.log"
 

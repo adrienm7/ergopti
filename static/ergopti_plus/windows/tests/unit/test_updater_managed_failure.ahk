@@ -69,6 +69,41 @@ _UMF_IndependentEnvelopes(Contract) {
 Test("Updater managed failure: independent bounded native receipts (updater-managed-failure)",
 	(*) => _UMF_WithContract(_UMF_IndependentEnvelopes))
 
+_UMF_DotNetWebStatus(Contract) {
+	Prefix := '{"schema_version":1,"state":"failed","operation":"download","reason":"download",'
+		. '"receipt":{"backend":"dotnet","stage":"connect","failure_provenance":"unknown","dotnet_web_status":'
+	Failure := _Updater_ParseStagingFailure(Prefix . '"NameResolutionFailure"}}')
+	AssertTrue(Failure["valid"], "the observed typed .NET status must survive receipt admission")
+	AssertEqual("NameResolutionFailure", Failure["receipt"].Get("dotnet_web_status", ""))
+	AssertEqual("unknown", Contract.Classify(Failure["receipt"], Map())["cause"], "status preservation adds no diagnosis or success")
+	Values := Contract.Policy["fields"]["dotnet_web_status"]["values"]
+	AssertEqual(21, Values.Length, "documented .NET status enum inventory")
+	for Value in Values {
+		Failure := _Updater_ParseStagingFailure(Prefix . JsonStringLiteral(Value) . '}}')
+		AssertTrue(Failure["valid"], "every documented enum value is admitted through the actual parser")
+		AssertEqual(Value, Failure["receipt"].Get("dotnet_web_status", ""))
+		AssertEqual("unknown", Contract.Classify(Failure["receipt"], Map())["cause"])
+		Fact := _UpdaterNativeRefusalDiagnostic("tls", Failure["receipt"])
+		AssertContains(Fact, "dotnet_web_status=" . Value)
+	}
+	for Raw in ['"nameresolutionfailure"', '"PRIVATE_STATUS"', '1', 'null', '[]', '{}', 'true'] {
+		Failure := _Updater_ParseStagingFailure(Prefix . Raw . '}}')
+		AssertFalse(Failure["valid"], "unknown, case aliases and untyped status values stay refused")
+	}
+	Receipt := Map("backend", "dotnet", "stage", "tls", "failure_provenance", "verified",
+		"tls_verification", "enforced", "tls_status", "untrusted_certificate", "dotnet_web_status", "TrustFailure")
+	AssertEqual("certificate", Contract.Classify(Receipt, Map())["cause"], "existing typed TLS rule remains unchanged")
+	Receipt["dotnet_web_status"] := "PRIVATE_STATUS"
+	Report := Contract.Classify(Receipt, Map())
+	AssertEqual("unknown", Report["cause"])
+	AssertEqual("invalid_receipt", Report["evidence"], "bad diagnostic data cannot borrow an otherwise matching TLS rule")
+	Fact := _UpdaterNativeRefusalDiagnostic("tls", Receipt)
+	AssertContains(Fact, "dotnet_web_status=unknown")
+	AssertFalse(InStr(Fact, "PRIVATE_STATUS"))
+}
+Test("Updater managed failure: closed .NET status survives producer receipt admission (updater-dotnet-status)",
+	_UMF_WithContract.Bind(_UMF_DotNetWebStatus))
+
 _UMF_ReceiptObserver() {
 	global _UpdaterInstallObserver
 	Saved := _UpdaterInstallObserver
@@ -221,7 +256,7 @@ _UMF_ActualOwnedFileReceipt() {
 		AssertEqual(1, Observed.Length, "exact native fixture must settle within deadline")
 		AssertEqual(0, Observed[1]["exit"], "actual file denial and independent receipt controls must pass")
 		AssertEqual("", Observed[1]["stderr"], "native errors cannot escape through stderr")
-		AssertEqual("UPDATER_RECEIPT_CONTROLS:20", Observed[1]["stdout"],
+		AssertEqual("UPDATER_RECEIPT_CONTROLS:43", Observed[1]["stdout"],
 			"all declared native/type controls must execute")
 	} finally {
 		if IsObject(Handle)
