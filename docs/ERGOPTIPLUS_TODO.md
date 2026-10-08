@@ -6539,6 +6539,14 @@ Source pins, all other modules, native assertions/clocks and installation legs
 remain intact. New native package/install qualification is still required;
 installed GSS libraries do not establish authenticated enterprise traffic.
 
+The SDK log also places libproxy in/app/lib64, outside the existing package
+environment's/app/lib lookup. The pinned GIO source derives its module directory
+from the selected libdir. Both native Meson providers now explicitly select
+libdir=lib; independent full option vectors fail before this correction and
+retain every prior provider flag. Other modules, source pins, runtime lookup,
+native assertions and installed-format requirements remain unchanged. SDK
+compilation and actual installed closure still need final-source receiving.
+
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard
   layers on all three drivers. Windows and macOS also support their existing
