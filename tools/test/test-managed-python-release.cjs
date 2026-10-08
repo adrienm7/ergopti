@@ -23,15 +23,22 @@ const key = 'cpython-3.11.16-darwin-aarch64-none';
 const url =
 	'https://github.com/astral-sh/python-build-standalone/releases/download/20260929/cpython-3.11.16%2B20260929-aarch64-apple-darwin-install_only_stripped.tar.gz';
 const digest = '53141f31b7cfb2bccf89c2a877827128657dbb8650db06a9a08c7886c28a45ed';
+const intelKey = 'cpython-3.11.16-darwin-x86_64-none';
+const intelURL =
+	'https://github.com/astral-sh/python-build-standalone/releases/download/20260929/cpython-3.11.16%2B20260929-x86_64-apple-darwin-install_only_stripped.tar.gz';
+const intelDigest = 'd1143a947050fbbd17edc0d66ff3f7a63205c8364ef108bddfeece5f360096f8';
 assert.equal(data.uv_release, '0.12.21');
 assert.equal(
 	data.source.sha256,
 	'6167f194053b58a461b6b440bbfff121f0971bd6757fce95cfec90b19ee080df'
 );
 assert.equal(data.source.bytes, 3176495);
-assert.deepEqual(Object.keys(data.downloads), [key]);
+assert.deepEqual(Object.keys(data.downloads), [key, intelKey]);
 assert.equal(data.downloads[key].url, url);
 assert.equal(data.downloads[key].sha256, digest);
+assert.equal(data.downloads[intelKey].url, intelURL);
+assert.equal(data.downloads[intelKey].sha256, intelDigest);
+assert.equal(data.downloads[intelKey].arch.family, 'x86_64');
 const output = render(data);
 assert.ok(output[SHELL_OUTPUT].includes(`MANAGED_PYTHON_URL="${url}"\n`));
 assert.ok(output[SHELL_OUTPUT].includes(`MANAGED_PYTHON_SHA256="${digest}"\n`));
@@ -42,6 +49,16 @@ assert.ok(
 );
 assert.ok(
 	output[SHELL_OUTPUT].includes('MANAGED_PYTHON_REQUEST="cpython-3.11.16-macos-aarch64-none"\n')
+);
+assert.ok(output[SHELL_OUTPUT].includes(`MANAGED_PYTHON_URL="${intelURL}"\n`));
+assert.ok(output[SHELL_OUTPUT].includes(`MANAGED_PYTHON_SHA256="${intelDigest}"\n`));
+assert.ok(
+	output[SHELL_OUTPUT].includes(
+		'MANAGED_PYTHON_CACHE_BASENAME="d1143a947-cpython-3.11.16-20260929-x86_64-apple-darwin-install_only_stripped.tar.gz"\n'
+	)
+);
+assert.ok(
+	output[SHELL_OUTPUT].includes('MANAGED_PYTHON_REQUEST="cpython-3.11.16-macos-x86_64-none"\n')
 );
 assert.deepEqual(JSON.parse(output[METADATA_OUTPUT]), data.downloads);
 assert.ok(Object.values(output).every((contents) => !contents.includes('\r')));
@@ -76,6 +93,26 @@ for (const mutate of [
 	},
 	(value) => {
 		value.downloads[key].unknown = 1;
+	},
+	(value) => {
+		delete value.downloads[intelKey];
+	},
+	(value) => {
+		delete value.downloads[key];
+	},
+	(value) => {
+		value.downloads[intelKey].arch.variant = 'v3';
+	},
+	(value) => {
+		value.downloads[intelKey].url = url;
+	},
+	(value) => {
+		value.downloads[intelKey].sha256 = intelDigest.toUpperCase();
+	},
+	(value) => {
+		const moved = value.downloads[intelKey];
+		moved.build = '20260930';
+		moved.url = moved.url.replaceAll('20260929', '20260930');
 	}
 ]) {
 	const candidate = structuredClone(data);
@@ -100,6 +137,67 @@ try {
 	});
 	assert.equal(parser.error, undefined);
 	assert.equal(parser.status, 0, parser.stderr);
+	for (const [nativeArchitecture, expected] of [
+		[
+			'arm64',
+			[
+				'cpython-3.11.16-macos-aarch64-none',
+				url,
+				digest,
+				'53141f31b-cpython-3.11.16-20260929-aarch64-apple-darwin-install_only_stripped.tar.gz'
+			]
+		],
+		[
+			'x86_64',
+			[
+				'cpython-3.11.16-macos-x86_64-none',
+				intelURL,
+				intelDigest,
+				'd1143a947-cpython-3.11.16-20260929-x86_64-apple-darwin-install_only_stripped.tar.gz'
+			]
+		]
+	]) {
+		const selected = spawnSync(
+			bashExecutable(),
+			[
+				'-c',
+				'source "$1" || exit $?; printf "%s\\n" "$MANAGED_PYTHON_REQUEST" "$MANAGED_PYTHON_URL" "$MANAGED_PYTHON_SHA256" "$MANAGED_PYTHON_CACHE_BASENAME" "$MANAGED_PYTHON_UV_RELEASE" "$MANAGED_PYTHON_DOWNLOADS_BASENAME"',
+				'ergopti-native-python-selection',
+				shell.replace(/\\/g, '/')
+			],
+			{
+				encoding: 'utf8',
+				timeout: 10000,
+				env: { ...process.env, ERGOPTI_NATIVE_ARCH: nativeArchitecture }
+			}
+		);
+		assert.equal(selected.error, undefined);
+		assert.equal(selected.status, 0, selected.stderr);
+		assert.deepEqual(selected.stdout.trimEnd().split('\n'), [
+			...expected,
+			'0.12.21',
+			'managed-python-downloads.json'
+		]);
+	}
+	for (const unsupported of ['i386', 'aarch64', 'arm64; echo unqualified']) {
+		const refused = spawnSync(
+			bashExecutable(),
+			[
+				'-c',
+				'source "$1" || exit $?; echo unqualified',
+				'ergopti-native-python-refusal',
+				shell.replace(/\\/g, '/')
+			],
+			{
+				encoding: 'utf8',
+				timeout: 10000,
+				env: { ...process.env, ERGOPTI_NATIVE_ARCH: unsupported }
+			}
+		);
+		assert.equal(refused.error, undefined);
+		assert.equal(refused.status, 78);
+		assert.equal(refused.stdout, '');
+	}
 	fs.appendFileSync(shell, '\n# Independent drift witness.\n');
 	const drifted = fs.readFileSync(shell);
 	assert.throws(() => generate(temporary, { check: true }), /projection drift/);
@@ -113,5 +211,5 @@ try {
 }
 generate(root, { check: true });
 console.log(
-	'PASS managed Python pins, ten refusal vectors, actual shell syntax and nonmutating drift checks. Native extraction remains separate.'
+	'PASS managed Python arm64/Intel pins, sixteen refusal vectors, actual native-architecture shell selections and nonmutating drift checks. Native archive extraction/execution remains separate.'
 );

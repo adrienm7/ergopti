@@ -6,8 +6,19 @@
 # uv owns hash verification, offline extraction and interpreter publication.
 
 MANAGED_PYTHON_UV_RELEASE="0.12.21"
-MANAGED_PYTHON_REQUEST="cpython-3.11.16-macos-aarch64-none"
-MANAGED_PYTHON_URL="https://github.com/astral-sh/python-build-standalone/releases/download/20260929/cpython-3.11.16%2B20260929-aarch64-apple-darwin-install_only_stripped.tar.gz"
-MANAGED_PYTHON_SHA256="53141f31b7cfb2bccf89c2a877827128657dbb8650db06a9a08c7886c28a45ed"
-MANAGED_PYTHON_CACHE_BASENAME="53141f31b-cpython-3.11.16-20260929-aarch64-apple-darwin-install_only_stripped.tar.gz"
+case "${ERGOPTI_NATIVE_ARCH:-$(/usr/bin/uname -m)}" in
+	arm64)
+		MANAGED_PYTHON_REQUEST="cpython-3.11.16-macos-aarch64-none"
+		MANAGED_PYTHON_URL="https://github.com/astral-sh/python-build-standalone/releases/download/20260929/cpython-3.11.16%2B20260929-aarch64-apple-darwin-install_only_stripped.tar.gz"
+		MANAGED_PYTHON_SHA256="53141f31b7cfb2bccf89c2a877827128657dbb8650db06a9a08c7886c28a45ed"
+		MANAGED_PYTHON_CACHE_BASENAME="53141f31b-cpython-3.11.16-20260929-aarch64-apple-darwin-install_only_stripped.tar.gz"
+		;;
+	x86_64)
+		MANAGED_PYTHON_REQUEST="cpython-3.11.16-macos-x86_64-none"
+		MANAGED_PYTHON_URL="https://github.com/astral-sh/python-build-standalone/releases/download/20260929/cpython-3.11.16%2B20260929-x86_64-apple-darwin-install_only_stripped.tar.gz"
+		MANAGED_PYTHON_SHA256="d1143a947050fbbd17edc0d66ff3f7a63205c8364ef108bddfeece5f360096f8"
+		MANAGED_PYTHON_CACHE_BASENAME="d1143a947-cpython-3.11.16-20260929-x86_64-apple-darwin-install_only_stripped.tar.gz"
+		;;
+	*) return 78 2>/dev/null || exit 78 ;;
+esac
 MANAGED_PYTHON_DOWNLOADS_BASENAME="managed-python-downloads.json"
