@@ -2373,3 +2373,20 @@ installation unqualified. This positive native slice does not diagnose the
 unavailable original25-rule backup or qualify real confirmation UI, active lease,
 physical input, packaging or installation. No item is removed;43 and transverse
 16/38 stay open.
+
+## Separate Core constructor asset-symbol build policy
+
+The separate Core constructor now applies the same Core-only unused asset-symbol
+suppression as the complete four-target builder. Default command, Duktape,
+resources, both architectures, physical guards and original deadlines remain
+whole. Authentic CI376518 compiled Duktape and Core and passed both architecture
+checks, then exceeded 300 seconds before complete artifact qualification; the
+exact downstream guard remains UNKNOWN because no constructor journal exists.
+Portable Source2 author checks pass 74 executions; its independent review passes
+111 and preserves three old-source assertion refusals plus 18 mutation assertion
+refusals. Coherent six-source closure separately passes 120 executions and four
+stale-binding refusals. Independent closure review passes 180 executions, with
+three typed producer and three SDK assertion refusals. These overlapping cohorts
+are not additive coverage.
+Native AFTER remains UNEXECUTED, performance UNMEASURED and 300-second completion
+UNPROVED. Item 31 and transverse 16/38 remain open; no item is removed.

@@ -216,6 +216,129 @@ class CoreFixtureContracts(unittest.TestCase):
             ],
         )
 
+    def test_actual_produce_loop_keeps_native_commands_and_limits_asset_symbols_to_core(self):
+        # Execute the source's real dispatch loop with explicitly modeled native
+        # leaves. This proves command policy, not Darwin compiler completion.
+        import ast
+        from types import SimpleNamespace
+
+        parsed = ast.parse(SOURCE.read_text())
+        producer = next(
+            node
+            for node in parsed.body
+            if isinstance(node, ast.FunctionDef) and node.name == "produce"
+        )
+        loops = [node for node in producer.body[-1].body if isinstance(node, ast.For)]
+        self.assertEqual(len(loops), 2)
+        loop = next(node for node in loops if isinstance(node.target, ast.Tuple))
+        image = self.root / "modeled-source"
+        image.mkdir()
+        recipes = ("vendor/duktape-src", "src/apps/CoreService")
+        outputs = (
+            "build/Release/libduktape.a",
+            "build/Release/ErgoptiPlus-Remap-Core.app/Contents/MacOS/ErgoptiPlus-Remap-Core",
+        )
+        names = ("duktape", "ErgoptiPlus-Remap-Core")
+        for recipe, name in zip(recipes, names):
+            project = image / recipe
+            project.mkdir(parents=True)
+            (project / "project.yml").write_text("name: " + name + "\n")
+        calls, current_cuts = [], []
+        result = SimpleNamespace(
+            image=SimpleNamespace(root=image), products=[], owner=SimpleNamespace(path=self.root)
+        )
+        deadline = __import__("time").monotonic() + 10
+
+        def run(name, arguments, project, supplied_deadline):
+            self.assertEqual(supplied_deadline, deadline)
+            calls.append((name, arguments, project))
+            index = recipes.index(str(project.relative_to(image)))
+            if name.endswith("_generate"):
+                target = project / (names[index] + ".xcodeproj") / "project.pbxproj"
+                target.parent.mkdir()
+                target.write_bytes(b"modeled-generated-recipe")
+            elif name.endswith("_build"):
+                target = project / outputs[index]
+                target.parent.mkdir(parents=True)
+                target.write_bytes(self.actual_two_slice_bytes())
+                if index == 1:
+                    (target.parents[1] / "Info.plist").write_bytes(b"modeled-plist")
+            elif name.endswith("_architectures"):
+                (self.root / (name + ".stdout")).write_bytes(b"arm64 x86_64\n")
+            else:
+                self.fail("Unknown modeled native operation")
+
+        def current(supplied_deadline):
+            self.assertEqual(supplied_deadline, deadline)
+            current_cuts.append("current")
+
+        result._run, result._current = run, current
+        builder = SimpleNamespace(
+            BASE=SimpleNamespace(MAX_INPUT_BYTES=131072),
+            _ordinary=lambda path, root, maximum: SimpleNamespace(data=path.read_bytes()),
+            architectures=lambda data: tuple(data.decode("ascii").split()),
+            validate_plist=mock.Mock(),
+        )
+        namespace = dict(vars(self.api))
+        namespace.update(
+            result=result,
+            builder=builder,
+            tools={
+                "xcodegen": "/actual/xcodegen",
+                "xcodebuild": "/actual/xcodebuild",
+                "xcrun": "/actual/xcrun",
+            },
+            deadline=deadline,
+            repository=self.root,
+        )
+        try:
+            exec(compile(ast.Module(body=[loop], type_ignores=[]), str(SOURCE), "exec"), namespace)
+            self.assertEqual(current_cuts, ["current", "current"])
+            self.assertEqual(len(calls), 6)
+            for index, (recipe, output, label) in enumerate(
+                zip(recipes, outputs, ("duktape", "core"))
+            ):
+                project = image / recipe
+                expected = [
+                    "/actual/xcodebuild",
+                    "-configuration",
+                    "Release",
+                    "-alltargets",
+                    "SYMROOT=" + str(project / "build"),
+                    "ARCHS=arm64 x86_64",
+                    "ONLY_ACTIVE_ARCH=NO",
+                    "CODE_SIGNING_ALLOWED=NO",
+                    "CODE_SIGNING_REQUIRED=NO",
+                    "GCC_GENERATE_DEBUGGING_SYMBOLS=NO",
+                ]
+                if label == "core":
+                    expected.append("ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS=NO")
+                self.assertEqual(
+                    calls[3 * index],
+                    (
+                        "core_fixture_" + label + "_generate",
+                        ["/actual/xcodegen", "generate"],
+                        project,
+                    ),
+                )
+                self.assertEqual(
+                    calls[3 * index + 1], ("core_fixture_" + label + "_build", expected, project)
+                )
+                self.assertEqual(
+                    calls[3 * index + 2],
+                    (
+                        "core_fixture_" + label + "_architectures",
+                        ["/actual/xcrun", "lipo", "-archs", str(project / output)],
+                        project,
+                    ),
+                )
+            builder.validate_plist.assert_called_once_with(
+                b"modeled-plist", "core", repository=self.root, deadline=deadline
+            )
+            self.assertEqual(len(result.products), 7)
+        finally:
+            self.holds.extend(result.products)
+
     def test_fat64_executable_has_exact_two_slices(self):
         self.assertEqual(self.api._macho_slices(self.actual_two_slice_bytes()), ("arm64", "x86_64"))
 

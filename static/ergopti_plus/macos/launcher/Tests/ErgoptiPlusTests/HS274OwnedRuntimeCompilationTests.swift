@@ -192,7 +192,7 @@ extension HS274NativePolicyQualificationTests {
 				XCTAssertEqual(partial?["qualification"] as? String,
 					"unsigned_actual_core_constructor_compilation_only")
 				XCTAssertEqual(partial?["producer_sha256"] as? String,
-					"47f2aee869ea2cfdc8cd2539e892e2ce95337a93bf1a7e2c97040453b79675f2")
+					"9560dca88e587f8f714a61ec676df5d15db74671b666f7dc23082365c9772275")
 				XCTAssertEqual(partial?["source_factory_sha256"] as? String,
 					"854dc3ef556e2540d4a64e0d935610a2a2fe8c947e3f7fe315c1641ceaaedd7d")
 				XCTAssertEqual(partial?["architectures"] as? [String], ["arm64", "x86_64"])

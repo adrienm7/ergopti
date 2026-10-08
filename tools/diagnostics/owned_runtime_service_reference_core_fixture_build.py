@@ -554,9 +554,12 @@ def produce(repository, pristine, owner, seconds=300, *, current_program_source=
                     project / (names[0] + ".xcodeproj") / "project.pbxproj", MAX_BYTES
                 )
             )
+            arguments = _release_command(tools["xcodebuild"], project)
+            if label == "core":
+                arguments.append("ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS=NO")
             result._run(
                 "core_fixture_" + label + "_build",
-                _release_command(tools["xcodebuild"], project),
+                arguments,
                 project,
                 deadline,
             )

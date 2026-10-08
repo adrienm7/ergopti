@@ -4818,6 +4818,21 @@ and interrupted its build; this source change is not declared to fix that
 failure before actual Mac qualification. TODO 31 and transverse 16/38 remain open;
 no item is removed.
 
+The separate Core constructor now applies the same Core-only unused asset-symbol
+suppression as the complete four-target builder. Default command, Duktape,
+resources, both architectures, physical guards and original deadlines remain
+whole. Authentic CI376518 compiled Duktape and Core and passed both architecture
+checks, then exceeded 300 seconds before complete artifact qualification; the
+exact downstream guard remains UNKNOWN because no constructor journal exists.
+Portable Source2 author checks pass 74 executions; its independent review passes
+111 and preserves three old-source assertion refusals plus 18 mutation assertion
+refusals. Coherent six-source closure separately passes 120 executions and four
+stale-binding refusals. Independent closure review passes 180 executions, with
+three typed producer and three SDK assertion refusals. These overlapping cohorts
+are not additive coverage.
+Native AFTER remains UNEXECUTED, performance UNMEASURED and 300-second completion
+UNPROVED. Item 31 and transverse 16/38 remain open; no item is removed.
+
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
   listed; see `docs/memory/text-input-and-config.md`. Current source already
