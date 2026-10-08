@@ -275,6 +275,8 @@ global _DefaultLogsDir := _LogsDir
 ; json.ahk must precede locale.ahk — _I18nLoadLocaleMap delegates to JsonParse.
 #Include ../infra/registry.ahk
 #Include ../infra/json.ahk
+; Keep the standalone assertion library independent of production JSON symbols.
+TestQualificationRegisterParser(JsonParse)
 #Include ../infra/program_parameter.ahk
 #Include ../adapters/program_providers.ahk
 #Include ../ui/action_picker_webview.ahk
@@ -1087,6 +1089,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_run_all_include_integrity.ahk
 #Include meta/test_runner_only_filter.ahk
 #Include meta/test_runner_failure_ergonomics.ahk
+#Include unit/test_qualification_parser_owner.ahk
 #Include meta/test_ahk_os_purity_ratchet.ahk
 #Include meta/test_ahk_os_purity_inputs.ahk
 #Include meta/test_logger_pairing.ahk
