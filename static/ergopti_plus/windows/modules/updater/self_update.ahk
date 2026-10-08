@@ -49,7 +49,7 @@ _Updater_FindAsset(Json, AssetName, Tag) {
 		return 0
 	ExpectedUrl := "https://github.com/" . UPDATER_GH_OWNER . "/"
 		. UPDATER_GH_REPO . "/releases/download/" . Tag . "/" . AssetName
-	for _, Asset in Assets {
+	for AssetIndex, Asset in Assets {
 		if !(Asset is Map)
 			continue
 		if !Asset.Has("name") || !Asset.Has("browser_download_url")
@@ -65,7 +65,17 @@ _Updater_FindAsset(Json, AssetName, Tag) {
 			return 0
 		if !RegExMatch(DigestField, "i)^sha256:([0-9a-f]{64})$", &Match)
 			return 0
-		return { Url: Url, Digest: StrLower(Match[1]) }
+		if !Asset.Has("size") || Type(Asset["size"]) != "Integer"
+			|| Asset["size"] <= 0 || Asset["size"] > 2147483647
+			return 0
+		; JsonParse intentionally represents true as the native integer 1. Use
+		; canonical source spans of this exact selected asset to retain JSON kind,
+		; including decoded keys and the parser's last-member-wins identity.
+		AssetSpans := JsonArrayElementSpans(JsonObjectMemberSpans(Json)["assets"]["text"])
+		SizeToken := JsonObjectMemberSpans(AssetSpans[AssetIndex]["text"])["size"]["text"]
+		if !RegExMatch(SizeToken, "^(?:0|[1-9][0-9]*)$")
+			return 0
+		return { Url: Url, Digest: StrLower(Match[1]), Size: Asset["size"] }
 	}
 	return 0
 }
@@ -2053,7 +2063,7 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 	}
 
 	_Updater_StartStagingWorker(AssetUrl, Asset.Digest, NewExe, SwapScriptPath,
-		CurrentExe, Release.Tag, StagingEpoch, Release, Request, InstallObserver)
+		CurrentExe, Release.Tag, StagingEpoch, Release, Request, InstallObserver, Asset.Size)
 	if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch)
 		return false
 	if IsObject(RebuildFn)
@@ -2106,7 +2116,7 @@ _Updater_EncodeUtf8Payload(Text) {
 _Updater_BuildStagingTransport(Script, SwapScript, AssetUrl, ExpectedSha256, NewExe,
 	SwapScriptPath, CurrentExe,
 	MinimumSize, TimeoutMs, DownloadModulePath := "", DeadlineMs := 0, StartedTick := 0,
-	ProxyPolicyPath := "", UpdaterDefaultsPath := "") {
+	ProxyPolicyPath := "", UpdaterDefaultsPath := "", AuthenticatedSize := 0) {
 	global _UpdaterStagingTransportCounter, UPDATER_STAGING_ENV_MAX_CHARS, UPDATER_STAGING_MAX_SCRIPT_CHUNKS
 	_UpdaterStagingTransportCounter += 1
 	Prefix := "ERGOPTI_UPDATER_" . DllCall("GetCurrentProcessId", "UInt")
@@ -2131,7 +2141,8 @@ _Updater_BuildStagingTransport(Script, SwapScript, AssetUrl, ExpectedSha256, New
 		{ Name: Prefix . "_DEADLINE", Value: DeadlineMs },
 		{ Name: Prefix . "_STARTED_TICK", Value: StartedTick },
 		{ Name: Prefix . "_PROXY_POLICY", Value: ProxyPolicyPath },
-		{ Name: Prefix . "_UPDATER_DEFAULTS", Value: UpdaterDefaultsPath }
+		{ Name: Prefix . "_UPDATER_DEFAULTS", Value: UpdaterDefaultsPath },
+		{ Name: Prefix . "_AUTHENTICATED_SIZE", Value: AuthenticatedSize }
 	]
 	Environment.Push({ Name: Prefix . "_SCRIPT_COUNT", Value: ScriptChunkCount })
 	Loop ScriptChunkCount - 1 {
@@ -2167,7 +2178,7 @@ _Updater_BuildStagingTransport(Script, SwapScript, AssetUrl, ExpectedSha256, New
 		. '$worker=[ScriptBlock]::Create($source);'
 		. '& $worker $env:' . Prefix . '_URL $env:' . Prefix . '_DIGEST $env:' . Prefix . '_NEW_EXE $env:' . Prefix . '_SWAP_PATH $env:' . Prefix . '_CURRENT'
 		. ' ([int64]$env:' . Prefix . '_MINIMUM) ([int]$env:' . Prefix . '_TIMEOUT'
-		. ') $swapPayload $env:' . Prefix . '_DOWNLOAD_MODULE ([int]$env:' . Prefix . '_DEADLINE) ([int64]$env:' . Prefix . '_STARTED_TICK) $env:' . Prefix . '_PROXY_POLICY $env:' . Prefix . '_UPDATER_DEFAULTS'
+		. ') $swapPayload $env:' . Prefix . '_DOWNLOAD_MODULE ([int]$env:' . Prefix . '_DEADLINE) ([int64]$env:' . Prefix . '_STARTED_TICK) $env:' . Prefix . '_PROXY_POLICY $env:' . Prefix . '_UPDATER_DEFAULTS -AuthenticatedSize ([int64]$env:' . Prefix . '_AUTHENTICATED_SIZE)'
 	Args := ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
 		"-EncodedCommand", _Updater_EncodePowerShellCommand(Bootstrap)]
 	for Arg in Args {
@@ -2203,7 +2214,7 @@ _Updater_ClearStagingTransport(Transport) {
 		try EnvSet(Pair.Name, "")
 }
 
-_Updater_StartStagingWorker(AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, CurrentExe, Tag, StagingEpoch, Release := 0, Request := 0, InstallObserver := unset) {
+_Updater_StartStagingWorker(AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, CurrentExe, Tag, StagingEpoch, Release := 0, Request := 0, InstallObserver := unset, AuthenticatedSize := 0) {
 	global _UpdaterDownloadWorker, UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS, UPDATER_MIN_EXE_SIZE_BYTES
 	global _VendorDir, _SharedDir, UPDATER_HTTP_DOWNLOAD_DEADLINE_MS, _UpdaterDownloadStartedTick
 	global _UpdaterDownloadInProgress, _UpdaterSelfUpdateEpoch
@@ -2229,7 +2240,7 @@ _Updater_StartStagingWorker(AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, Cu
 			_VendorDir . "\ergopti_updater_download.ps1", UPDATER_HTTP_DOWNLOAD_DEADLINE_MS,
 			_UpdaterDownloadStartedTick,
 			_SharedDir . "\modules\network\proxy_policy.json",
-			_SharedDir . "\modules\updater\defaults.json")
+			_SharedDir . "\modules\updater\defaults.json", AuthenticatedSize)
 		if _Updater_SelfUpdateEpochIsCurrent(StagingEpoch) {
 			Worker := ShellRunner_SpawnTreeOwned(
 				_Updater_PowerShellPath(), Transport.Args, _OnDone)
@@ -2485,7 +2496,7 @@ _Updater_PollDownloadAsync(ExitCode, Stdout, Stderr, SwapScriptPath, NewExe, Cur
 ; Returns the compact staging orchestrator. Trusted helper paths and release
 ; data use the private inherited environment, never PowerShell interpolation.
 _Updater_BuildStagingWorkerScript() {
-	return 'param([string]$Url, [string]$ExpectedSha256, [string]$NewExe, [string]$SwapScriptPath, [string]$CurrentExe, [int64]$MinimumSize, [int]$TimeoutMs, [string]$SwapScriptPayload, [string]$DownloadModulePath, [int]$DeadlineMs, [int64]$StartedTick, [string]$ProxyPolicyPath, [string]$UpdaterDefaultsPath, [scriptblock]$ReadConfig=$null, [scriptblock]$ReadEnvironment=$null)' . "`n"
+	return 'param([string]$Url, [string]$ExpectedSha256, [string]$NewExe, [string]$SwapScriptPath, [string]$CurrentExe, [int64]$MinimumSize, [int]$TimeoutMs, [string]$SwapScriptPayload, [string]$DownloadModulePath, [int]$DeadlineMs, [int64]$StartedTick, [string]$ProxyPolicyPath, [string]$UpdaterDefaultsPath, [scriptblock]$ReadConfig=$null, [scriptblock]$ReadEnvironment=$null, [int64]$AuthenticatedSize=0)' . "`n"
 		. '$ErrorActionPreference = "Stop"' . "`n"
 		. '$State=@{Stage="proxy_resolve";Reason="download";Receipt=@{};CleanupDebt=@()}' . "`n"
 		. 'function CleanWorker($Path,$Name){try{[IO.File]::Delete($Path)}catch{if(Get-Command Add-ErgoptiUpdaterCleanupDebt -ErrorAction SilentlyContinue){Add-ErgoptiUpdaterCleanupDebt $State $Name "file_remove" $_.Exception}else{$State.CleanupDebt+=@{resource=$Name;receipt=@{backend="dotnet";stage="file_remove";failure_provenance="unknown"}}}}}' . "`n"
@@ -2495,7 +2506,7 @@ _Updater_BuildStagingWorkerScript() {
 		. '  $Resolver={param($Destination,$Budget) Resolve-ErgoptiNativeNetworkRoutes $Destination $Budget $ReadConfig $ReadEnvironment $ProxyPolicyPath $UpdaterDefaultsPath}' . "`n"
 		. '  $Request=[System.Net.HttpWebRequest]::Create($Url)' . "`n"
 		. '  $Request.ReadWriteTimeout = $TimeoutMs' . "`n"
-		. '  $ExpectedSize=Invoke-ErgoptiUpdaterDownload $Request $NewExe $TimeoutMs $State $Resolver $DeadlineMs $StartedTick' . "`n"
+		. '  if ($AuthenticatedSize -gt 0) {$ExpectedSize=Invoke-ErgoptiUpdaterCurlDownload ([Uri]$Url) $NewExe $TimeoutMs $State $Resolver $DeadlineMs $StartedTick $AuthenticatedSize $ProxyPolicyPath $UpdaterDefaultsPath $ReadEnvironment} else {$ExpectedSize=Invoke-ErgoptiUpdaterDownload $Request $NewExe $TimeoutMs $State $Resolver $DeadlineMs $StartedTick}' . "`n"
 		. '  $State.Stage="file_read"' . "`n"
 		. '  $ActualSize=(Get-Item -LiteralPath $NewExe).Length' . "`n"
 		. '  if ($ExpectedSize -gt 0 -and $ActualSize -ne $ExpectedSize) { throw "Content-Length mismatch" }' . "`n"
@@ -2505,18 +2516,19 @@ _Updater_BuildStagingWorkerScript() {
 		. '  $null=Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State' . "`n"
 		. '  if ($ActualDigest -cne $ExpectedSha256) { $State.Reason="verify";throw "SHA-256 digest mismatch" }' . "`n"
 		. '  $SwapSource=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($SwapScriptPayload))' . "`n"
-		. '  $State.Stage="file_remove";[IO.File]::Delete($SwapScriptPath)' . "`n"
+		. '  if ($AuthenticatedSize -le 0) {$State.Stage="file_remove";[IO.File]::Delete($SwapScriptPath)}' . "`n"
 		. '  $State.Stage="file_write"' . "`n"
 		. '  $null=Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State' . "`n"
-		. '  [IO.File]::WriteAllText($SwapScriptPath,$SwapSource,[Text.UTF8Encoding]::new($false))' . "`n"
+		. '  if ($AuthenticatedSize -le 0) {[IO.File]::WriteAllText($SwapScriptPath,$SwapSource,[Text.UTF8Encoding]::new($false))} else {$SwapOutput=$null;try{$State.Stage="file_create";$SwapOutput=[IO.File]::Open($SwapScriptPath,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None);$State.SwapWorkerOwned=$true;$State.Stage="file_write";$SwapBytes=[Text.Encoding]::UTF8.GetBytes($SwapSource);$SwapOutput.Write($SwapBytes,0,$SwapBytes.Length);$SwapOutput.Flush($true)}finally{Close-ErgoptiUpdaterResource $SwapOutput "swap_worker" "file_write" $State}}' . "`n"
 		. '  $null=Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State' . "`n"
+		. '  if ($State.NativeCleanupDebt -or $State.CleanupDebt.Count -ne 0) {throw "Staging resources have unacknowledged retirement"}' . "`n"
 		. '  Write-Output "READY"' . "`n"
 		. '  exit 0' . "`n"
 		. '} catch {' . "`n"
 		. '  $Receipt=@{}' . "`n"
 		. '  if (Get-Command Get-ErgoptiUpdaterFailureReceipt -ErrorAction SilentlyContinue) { $Receipt=Get-ErgoptiUpdaterFailureReceipt $_.Exception $State }' . "`n"
-		. '  CleanWorker $NewExe "staged_executable"' . "`n"
-		. '  CleanWorker $SwapScriptPath "swap_worker"' . "`n"
+		. '  if ($AuthenticatedSize -le 0 -or $State.StagedExecutableOwned) {CleanWorker $NewExe "staged_executable"}' . "`n"
+		. '  if ($AuthenticatedSize -le 0 -or $State.SwapWorkerOwned) {CleanWorker $SwapScriptPath "swap_worker"}' . "`n"
 		. '  @{schema_version=1;state="failed";operation="download";reason=$State.Reason;receipt=$Receipt;cleanup_debt=$State.CleanupDebt;native_cleanup_debt=[bool]$State.NativeCleanupDebt}|ConvertTo-Json -Depth 4 -Compress' . "`n"
 		. '  exit 1' . "`n"
 		. '}'

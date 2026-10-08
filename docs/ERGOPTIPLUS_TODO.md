@@ -5603,6 +5603,14 @@ The fixed Specifications and Capabilities frames of the Windows/macOS per-model 
       open. macOS system trust and explicit proxy relays are integrated, while
       opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
 
+Windows release asset staging now joins the same bounded curl attempt
+engine as real requests, using the exact selected asset integer token
+and byte bound. New receiving requires genuine SSPI NTLM CONNECT, no
+authentication downgrade, exclusive destination creation, preserved
+preexisting files and original deadline/child/pipe retirement. Legacy
+.NET assertions remain intact. Portable parsing and component controls
+pass; Windows native and final-source qualification remain pending.
+
 The maintainer reopened container/hosted-CI continuation after partial
 integration atc417311106a44108d3bfdc7747d2dda937c6229d. Windows native
 receiving now adds only closed URL-shape and final cleanup observations;
