@@ -3254,7 +3254,5 @@
 	"menu.global.quit_macos": "✕ Çıkış",
 	"menu.layout.pause_picker_caption": "  ↳ Betik duraklatıldığında düzen : %s",
 	"menu.layout.resume_picker_caption": "  ↳ Betik etkinken düzen : %s",
-	"menu.layout.native_variant_caption": "%s v%s",
-	"app_picker.agent_remove_marker": "✗",
-	"app_picker.agent_exclude_current_caption": "%s uygulamasını dışla (geçerli)"
+	"menu.layout.native_variant_caption": "%s v%s"
 }

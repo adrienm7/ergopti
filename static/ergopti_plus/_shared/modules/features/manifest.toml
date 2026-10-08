@@ -4366,8 +4366,6 @@ type = "---"
 type = "command"
 id = "agent_system_model"
 i18n = "menu.agent.model"
-caption_getter = "agent_system_model_caption"
-caption_format = "numbered"
 disabled_when = ["agent_system_model_ready"]
 
 # The native observed installed status uses the same model command owner.
@@ -4378,8 +4376,6 @@ type = "---"
 type = "command"
 id = "agent_system_model"
 i18n = "menu.agent.model_installed"
-caption_getter = "agent_system_model_caption"
-caption_format = "numbered"
 disabled_when = ["agent_system_model_ready"]
 
 # The native observed missing status uses the same model command owner.
@@ -4390,8 +4386,6 @@ type = "---"
 type = "command"
 id = "agent_system_model"
 i18n = "menu.agent.model_missing"
-caption_getter = "agent_system_model_caption"
-caption_format = "numbered"
 disabled_when = ["agent_system_model_ready"]
 
 # The Applications submenu, macOS only: it lists the bundled applications
@@ -9124,110 +9118,4 @@ type = "group"
 id = "layout_parent_content"
 i18n = "menu.layout.title"
 platforms = ["hs"]
-unavailable = "hide"
-
-# Linux Agent excluded-app data retains its actual settings and dialog owners.
-[[menu.agent_linux_disabled_apps_frame]]
-type = "group"
-id = "agent_disabled_apps"
-i18n = "menu.agent.disabled_apps"
-caption_getter = "agent_disabled_apps_count"
-caption_format = "numbered"
-platforms = ["linux"]
-unavailable = "hide"
-
-[[menu.agent_linux_disabled_app_remove]]
-type = "command"
-id = "agent_disabled_app_remove"
-i18n = "app_picker.agent_remove_marker"
-caption_getter = "agent_disabled_app_caption"
-caption_layout = "suffix"
-caption_joiner = "  "
-platforms = ["linux"]
-unavailable = "hide"
-
-[[menu.agent_linux_disabled_apps_children]]
-type = "list"
-id = "agent_disabled_app_records"
-platforms = ["linux"]
-unavailable = "hide"
-
-[[menu.agent_linux_disabled_apps_children]]
-type = "include"
-section = "agent_linux_disabled_apps_boundary"
-present_when = "agent_disabled_apps_present"
-
-[[menu.agent_linux_disabled_apps_children]]
-type = "include"
-section = "agent_linux_disabled_app_current"
-present_when = "agent_disabled_app_current_present"
-
-[[menu.agent_linux_disabled_apps_children]]
-type = "include"
-section = "agent_linux_disabled_app_add"
-
-[[menu.agent_linux_disabled_apps_boundary]]
-type = "---"
-platforms = ["linux"]
-unavailable = "hide"
-
-[[menu.agent_linux_disabled_app_current]]
-type = "command"
-id = "agent_disabled_app_current"
-i18n = "app_picker.agent_exclude_current_caption"
-caption_getter = "agent_disabled_app_current_caption"
-platforms = ["linux"]
-unavailable = "hide"
-
-[[menu.agent_linux_disabled_app_add]]
-type = "command"
-id = "agent_disabled_app_add"
-i18n = "app_picker.add_another_app"
-platforms = ["linux"]
-unavailable = "hide"
-
-# Backend descriptors remain native data; shared policy owns their presentation.
-[[menu.agent_linux_system_backend_record]]
-type = "check"
-id = "agent_system_backend"
-caption_source = "native"
-caption_getter = "agent_system_backend_label"
-checked_when = ["agent_system_backend_selected"]
-platforms = ["linux"]
-unavailable = "hide"
-
-[[menu.agent_linux_system_children]]
-type = "list"
-id = "agent_system_off_rows"
-platforms = ["linux"]
-unavailable = "hide"
-
-[[menu.agent_linux_system_children]]
-type = "list"
-id = "agent_system_backend_rows"
-platforms = ["linux"]
-unavailable = "hide"
-
-[[menu.agent_linux_system_children]]
-type = "list"
-id = "agent_system_model_rows"
-platforms = ["linux"]
-unavailable = "hide"
-
-[[menu.agent_linux_system1_frame]]
-type = "group"
-id = "agent_system1"
-i18n = "menu.agent.system1"
-caption_getter = "agent_system_backend_current_caption"
-caption_format = "numbered"
-platforms = ["linux"]
-unavailable = "hide"
-
-[[menu.agent_linux_system2_frame]]
-type = "group"
-id = "agent_system2"
-i18n = "menu.agent.system2"
-caption_getter = "agent_system_backend_current_caption"
-caption_format = "numbered"
-platforms = ["linux"]
 unavailable = "hide"

@@ -3254,7 +3254,5 @@
 	"menu.global.quit_macos": "✕ 종료",
 	"menu.layout.pause_picker_caption": "  ↳ 스크립트 일시정지 시 레이아웃 : %s",
 	"menu.layout.resume_picker_caption": "  ↳ 스크립트 활성 시 레이아웃 : %s",
-	"menu.layout.native_variant_caption": "%s v%s",
-	"app_picker.agent_remove_marker": "✗",
-	"app_picker.agent_exclude_current_caption": "%s 제외 (현재)"
+	"menu.layout.native_variant_caption": "%s v%s"
 }

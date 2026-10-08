@@ -3254,7 +3254,5 @@
 	"menu.global.quit_macos": "✕ Avsluta",
 	"menu.layout.pause_picker_caption": "  ↳ Layout när skriptet är pausat : %s",
 	"menu.layout.resume_picker_caption": "  ↳ Layout när skriptet är aktivt : %s",
-	"menu.layout.native_variant_caption": "%s v%s",
-	"app_picker.agent_remove_marker": "✗",
-	"app_picker.agent_exclude_current_caption": "Uteslut %s (aktuell)"
+	"menu.layout.native_variant_caption": "%s v%s"
 }

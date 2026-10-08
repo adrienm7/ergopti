@@ -4797,8 +4797,6 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 				type: 'command',
 				id: 'agent_system_model',
 				i18n: variant.label_key,
-				caption_getter: 'agent_system_model_caption',
-				caption_format: 'numbered',
 				disabled_when: ['agent_system_model_ready']
 			}
 		]);

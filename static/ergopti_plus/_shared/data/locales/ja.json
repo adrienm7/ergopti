@@ -3254,7 +3254,5 @@
 	"menu.global.quit_macos": "✕ 終了",
 	"menu.layout.pause_picker_caption": "  ↳ スクリプト停止中のレイアウト : %s",
 	"menu.layout.resume_picker_caption": "  ↳ スクリプト有効時のレイアウト : %s",
-	"menu.layout.native_variant_caption": "%s v%s",
-	"app_picker.agent_remove_marker": "✗",
-	"app_picker.agent_exclude_current_caption": "%s を除外（現在）"
+	"menu.layout.native_variant_caption": "%s v%s"
 }

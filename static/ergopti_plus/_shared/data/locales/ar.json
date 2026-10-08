@@ -3254,7 +3254,5 @@
 	"menu.global.quit_macos": "✕ إنهاء",
 	"menu.layout.pause_picker_caption": "  ↳ التخطيط عند إيقاف البرنامج : %s",
 	"menu.layout.resume_picker_caption": "  ↳ التخطيط عند تشغيل البرنامج : %s",
-	"menu.layout.native_variant_caption": "%s v%s",
-	"app_picker.agent_remove_marker": "✗",
-	"app_picker.agent_exclude_current_caption": "استبعاد %s (الحالي)"
+	"menu.layout.native_variant_caption": "%s v%s"
 }

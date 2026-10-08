@@ -3254,7 +3254,5 @@
 	"menu.global.quit_macos": "✕ Ukončit",
 	"menu.layout.pause_picker_caption": "  ↳ Rozložení když skript pozastaven : %s",
 	"menu.layout.resume_picker_caption": "  ↳ Rozložení když skript aktivní : %s",
-	"menu.layout.native_variant_caption": "%s v%s",
-	"app_picker.agent_remove_marker": "✗",
-	"app_picker.agent_exclude_current_caption": "Vyloučit %s (aktuální)"
+	"menu.layout.native_variant_caption": "%s v%s"
 }

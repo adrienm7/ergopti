@@ -4883,7 +4883,7 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 27, macOS 22, Linux 30, each
+  drivers still build (current baseline: Windows 27, macOS 22, Linux 31, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
@@ -5639,18 +5639,6 @@ Selected and hosted native qualification are pending; items 54 and 81 remain
 partial.
 
 Windows workstation handoff (maintainer instruction, 2026-10-04):
-
-  The Linux Agent excluded-applications and complete System1/System2 frames
-  now consume shared declarations for their parents, children and order.
-  Canonical model caption getters are consumed by all three native drivers;
-  settings, catalogues, dialog arguments and business callbacks retain their
-  existing owners. Independent 21-language expectations are preserved. Focused
-  actual cases pass 83 Linux and 51 portable macOS assertions; the same tests
-  with only the exact prior published native producer loaded fail 50/83 and
-  44/51 respectively. The native boundary removes a leading separator while
-  retaining its declared DATA; the independent control checks both stages and
-  every remaining callback/check identity. Final-source hosted qualification of
-  22 new Windows subjects and native packaging/install acceptance remains open.
 
 - [ ] Execute the existing native per-key command/caption/state/refusal cases and review the still-native Windows menu sites against the actual census (currently 82). Move remaining fixed policy/data to shared declarations without hiding rows or weakening the scanner.
 - [ ] Prepared shared menu packets in docs/handovers/2026-10-04-config-menus are unapplied. Verify their recorded dependencies/preimages, regenerate owner artifacts and qualify all affected drivers after any shared change.
@@ -6991,7 +6979,7 @@ Current Group 3 source checkpoint (item 73, 2026-10-06): [Group 3 current checkp
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 27, macOS 22 and Linux 30 rows are still built by the
+  Windows 27, macOS 22 and Linux 31 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). Read on
   2026-10-01, the sites are of four kinds, and three of them need the
   manifest to say more than it can today:
@@ -7177,18 +7165,6 @@ remaining provider rows keep items 54 and 81 partial. Final native qualification
 is still required.
 
 Windows workstation handoff (maintainer instruction, 2026-10-04):
-
-  The Linux Agent excluded-applications and complete System1/System2 frames
-  now consume shared declarations for their parents, children and order.
-  Canonical model caption getters are consumed by all three native drivers;
-  settings, catalogues, dialog arguments and business callbacks retain their
-  existing owners. Independent 21-language expectations are preserved. Focused
-  actual cases pass 83 Linux and 51 portable macOS assertions; the same tests
-  with only the exact prior published native producer loaded fail 50/83 and
-  44/51 respectively. The native boundary removes a leading separator while
-  retaining its declared DATA; the independent control checks both stages and
-  every remaining callback/check identity. Final-source hosted qualification of
-  22 new Windows subjects and native packaging/install acceptance remains open.
 
 - [ ] Continue the remaining Windows menu families using shared templates and the item54 census. canonicalHoldOptions is already shared; do not cosmetically reimplement it.
 - [ ] After every Windows push, cancel automatic runs on its exact SHA. Use manual ci.yml with windows for Windows-only changes, or all affected OS lanes for shared changes; let manual runs finish and record native/E2E/package/install outcomes independently.

@@ -3254,7 +3254,5 @@
 	"menu.global.quit_macos": "✕ 退出",
 	"menu.layout.pause_picker_caption": "  ↳ 脚本暂停时的布局 : %s",
 	"menu.layout.resume_picker_caption": "  ↳ 脚本活跃时的布局 : %s",
-	"menu.layout.native_variant_caption": "%s v%s",
-	"app_picker.agent_remove_marker": "✗",
-	"app_picker.agent_exclude_current_caption": "排除 %s（当前）"
+	"menu.layout.native_variant_caption": "%s v%s"
 }
