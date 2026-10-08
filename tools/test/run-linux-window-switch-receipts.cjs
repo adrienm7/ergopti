@@ -14,6 +14,7 @@
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { spawn } = require('node:child_process');
+const qualification = require('../ci/dev-release-qualification.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const DRIVER = path.join(ROOT, 'static/ergopti_plus/linux');
@@ -32,7 +33,17 @@ async function run({
 	fixtures = FIXTURES,
 	debts = UNRESOLVED,
 	log = console.log,
-	error = console.error
+	error = console.error,
+	qualificationContext = qualification.environmentContext(),
+	qualificationNow = new Date(),
+	recordQualification = (receipt) => {
+		const fs = require('node:fs');
+		if (!process.env.RUNNER_TEMP) throw new Error('Qualification receipt owner unavailable.');
+		fs.writeFileSync(
+			path.join(process.env.RUNNER_TEMP, 'linux-window-qualification.json'),
+			JSON.stringify(receipt, null, 2) + '\n'
+		);
+	}
 } = {}) {
 	if (platform !== 'linux') {
 		log(
@@ -45,6 +56,16 @@ async function run({
 			'[BLOCKED] Earlier native supervisor loss has unresolved descendant debt; external ownership proof is required.'
 		);
 		return 1;
+	}
+	const profile = qualification.resolveQualificationProfile(qualificationContext, qualificationNow);
+	if (profile) {
+		const scope = profile.scopes['linux-window-receipts'];
+		if (
+			fixtures.filter(
+				(fixture) => JSON.stringify(fixture.args) === JSON.stringify([scope.path, ...scope.args])
+			).length !== 1
+		)
+			throw new Error('Qualification fixture must match the complete registry exactly once.');
 	}
 	const env = { ...process.env, LUA_PATH };
 	if (env.ERGOPTI_NATIVE_LUA_CPATH) env.LUA_CPATH = env.ERGOPTI_NATIVE_LUA_CPATH;
@@ -76,6 +97,19 @@ async function run({
 	try {
 		for (const fixture of fixtures) {
 			if (cancellation) return cancellation === 'SIGINT' ? 130 : 143;
+			if (profile) {
+				const scope = profile.scopes['linux-window-receipts'];
+				if (JSON.stringify(fixture.args) === JSON.stringify([scope.path, ...scope.args])) {
+					const receipt = qualification.qualificationReceipt(profile, 'linux-window-receipts', {
+						source_sha: process.env.GITHUB_SHA
+					});
+					recordQualification(receipt);
+					log(
+						'[DEFERRED] linux-window-receipts: ' + scope.reason + ' Native/feature qualified=false.'
+					);
+					continue;
+				}
+			}
 			const result = await new Promise((resolve) => {
 				const token = crypto.randomBytes(16).toString('hex');
 				let child;
@@ -212,7 +246,11 @@ async function run({
 			});
 			if (result !== 0) return result;
 		}
-		log('[OK] Actual virtual X11 routing, input focus and owned settlement passed.');
+		if (profile)
+			log(
+				'[DEFERRED] X11 routing and input focus remain unqualified; native family and external recovery entries completed.'
+			);
+		else log('[OK] Actual virtual X11 routing, input focus and owned settlement passed.');
 		return 0;
 	} finally {
 		for (const [kind, handler] of handlers) signals.removeListener(kind, handler);

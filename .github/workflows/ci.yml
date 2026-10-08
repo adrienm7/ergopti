@@ -43,9 +43,10 @@ permissions:
 
 concurrency:
   # Manual validations retain their own group when one CI branch advances.
-  # Automatic branch runs still supersede an older automatic run.
+  # Dev pushes finish their release; newer work waits instead of starving it.
+  # Pull requests and other automatic branches still supersede older runs.
   group: ci-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'automatic' }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/dev' || github.event_name != 'push' }}
 
 # ========================================================
 # ========================================================
@@ -363,6 +364,8 @@ jobs:
     with:
       release: ${{ needs.validate.outputs.release == 'true' }}
       version: ${{ needs.validate.outputs.version }}
+      tag: ${{ needs.validate.outputs.tag }}
+      prerelease: ${{ needs.validate.outputs.prerelease }}
       channel: ${{ needs.validate.outputs.channel }}
     secrets:
       SPARKLE_PUBLIC_KEY: ${{ secrets.SPARKLE_PUBLIC_KEY }}
@@ -400,6 +403,9 @@ jobs:
     with:
       release: ${{ needs.validate.outputs.release == 'true' }}
       version: ${{ needs.validate.outputs.version }}
+      tag: ${{ needs.validate.outputs.tag }}
+      prerelease: ${{ needs.validate.outputs.prerelease }}
+      channel: ${{ needs.validate.outputs.channel }}
       linux_bundle: ${{ needs.validate.outputs.linux_bundle }}
 
   # A manual subset must still prove every selected lane and shared checks.
@@ -963,6 +969,18 @@ jobs:
                 echo "<!-- /ergopti:section -->"
               } >> "$body_file"
           fi
+
+          node - "$TAG" >> "$body_file" <<'NODE'
+          const policy = require('./.github/ci/dev_release_qualification_exceptions.json');
+          if (process.argv[2] === policy.tag) {
+            console.log('\n### Native validation limitations\n');
+            console.log('This dev prerelease has maintainer-authorized temporary qualification deferrals. Deferred checks are not passes and do not certify the affected features.\n');
+            for (const [scope, record] of Object.entries(policy.scopes)) {
+              console.log('- **DEFERRED — ' + scope + ':** ' + record.reason);
+            }
+            console.log('\nThe CI qualification artifacts record the exact source and missing evidence. Build, signing, installation and all other test requirements remain active. Full execution returns for the next tag or after ' + policy.expires_at + '.\n');
+          }
+          NODE
 
           cat >> "$body_file" << EOF
 

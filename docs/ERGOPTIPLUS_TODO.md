@@ -11038,6 +11038,41 @@ Current Group 3 source checkpoint (item 111, 2026-10-06): [Group 3 current check
   Six controlled real-Notepad caller cases passing do not qualify the
   physical/default InputHook trigger or close this incident.
 
+## Temporary dev release qualification deferrals
+
+The maintainer requested a release before 2026-10-09 09:00 Europe/Paris and
+explicitly authorized temporary test-execution deferrals when necessary.
+The closed policy in `.github/ci/dev_release_qualification_exceptions.json`
+applies only to the dev push prerelease `v0.0.0-dev.156` before 07:00 UTC.
+Main, pull requests, local runs and the next dev tag retain full execution.
+Every deferred qualification remains open and must never count as a pass:
+
+- [ ] Qualify Windows complete full-URL PAC routing, ordered routes and fresh
+      bytes, including actual worker admission and retirement. The original
+      canonical native test and its assertions remain intact.
+- [ ] Qualify the 34 Linux owned-window receipts. The first owned X11 client
+      exceeded its existing five-second visibility deadline before production
+      dispatch; its cause remains unresolved. Keep the independent native
+      fixture-family and external-recovery controls running.
+- [ ] Qualify the complete macOS Brew ZIP/XZ upgrade/refusal boundary. Its
+      unconfined-positive AppleEvent returned consent-required -1744; no Mac
+      is available. Deferring the combined test also defers its archive proof.
+- [ ] Qualify native macOS Shortcuts catalogue discovery. The first
+      `app.shortcuts()` call exceeded twenty seconds; preserve the portable
+      parser/JXA controls and do not infer permission or successful discovery.
+- [ ] Verify the corrected Windows SHA-256 staging operation on hosted
+      Windows. Local actual PowerShell controls, AHK generated-script contract,
+      whole-graph compilation and 70 E2E cases pass; cancelled CI receiving
+      does not prove the complete native download/trust chain.
+- [ ] Publish exact DEFERRED/source-bound receipts and these limitations in
+      the prerelease notes, then complete and re-enable every missing native
+      qualification. The temporary profile expires automatically and cannot
+      justify skipped builds, installs, signing or unrelated tests.
+
+These deferrals do not close groups 2, 4 or 7, the Notepad/default-trigger
+qualification, recurring input incident 114 or promo follow-up 113. Their
+existing requirements and retained evidence remain authoritative.
+
 ## Time estimate
 
 Order-of-magnitude estimate: 40–70 agent-days for the current remaining
