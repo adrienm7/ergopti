@@ -208,7 +208,29 @@ for (const row of rows) {
 	);
 }
 const check = pipeline.step(job, 'Verify source compiler and checkout');
-assert.match(pipeline.runOf(check).join('\n'), /git rev-parse HEAD/);
+const verification = pipeline.runOf(check).join('\n');
+const checkoutAssertions = verification
+	.split('\n')
+	.filter((line) => /^test "\$\(git .+\)" = "\$GITHUB_SHA"$/.test(line));
+assert.equal(checkoutAssertions.length, 1, 'the actual checkout SHA assertion is unique');
+for (const [label, observed, gitStatus, expected] of [
+	['matching checkout with foreign container ownership', 'a'.repeat(40), 0, 0],
+	['wrong checkout SHA', 'b'.repeat(40), 0, 1],
+	['Git observation refusal', 'a'.repeat(40), 128, 1]
+]) {
+	const result = run(`set -euo pipefail
+GITHUB_WORKSPACE='/__w/model repository/model'
+GITHUB_SHA=${quote('a'.repeat(40))}
+git() {
+ test "$#" -eq 4 && test "$1" = -c && test "$2" = "safe.directory=$GITHUB_WORKSPACE" && test "$3" = rev-parse && test "$4" = HEAD || return 128
+ if [ ${gitStatus} -ne 0 ]; then return ${gitStatus}; fi
+ printf '%s\\n' ${quote(observed)}
+}
+${checkoutAssertions[0]}`);
+	assert.equal(result.status, expected, label + ': actual workflow assertion must retain refusal');
+}
+console.log('Actual CI Git/SHA controls: 3 passed; process seam is a model.');
+assert.match(verification, /git -c safe\.directory="\$GITHUB_WORKSPACE" rev-parse HEAD/);
 assert.match(pipeline.runOf(check).join('\n'), /native_source_compile_probe/);
 assert.ok(job.indexOf(check) < job.indexOf(pipeline.step(job, 'Create the installation user')));
 assert.ok(
