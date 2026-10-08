@@ -118,6 +118,7 @@ assert.deepEqual(
 	[
 		'network-luv',
 		'network-schemas',
+		'network-krb5',
 		'network-curl',
 		'network-duktape',
 		'network-libproxy',
@@ -129,6 +130,7 @@ assert.deepEqual(
 	[
 		'https://github.com/luvit/luv.git',
 		'https://github.com/GNOME/gsettings-desktop-schemas.git',
+		'https://github.com/krb5/krb5.git',
 		'https://github.com/curl/curl.git',
 		'https://github.com/svaarala/duktape/releases/download/v2.7.0/duktape-2.7.0.tar.xz',
 		'https://github.com/libproxy/libproxy.git',
@@ -136,9 +138,50 @@ assert.deepEqual(
 	]
 );
 assert.ok(modules[0]['config-opts'].includes('-DLUA_BUILD_TYPE=System'));
-assert.ok(modules[4]['config-opts'].includes('-Dconfig-xdp=true'));
-assert.ok(modules[5]['config-opts'].includes('-Dgnome_proxy=disabled'));
-assert.ok(modules[5]['config-opts'].includes('-Dlibproxy=enabled'));
+assert.equal(modules[2].buildsystem, 'simple');
+assert.equal(modules[2].subdir, undefined);
+assert.deepEqual(modules[2]['build-commands'], [
+	'cd src && autoreconf --verbose --force --install',
+	'cd src && ./configure --prefix=/app --disable-static --disable-rpath --without-system-verto',
+	'make -C src',
+	'make -C src install'
+]);
+assert.equal(modules[2].sources[0].commit, '8570e77819563e036027e1da789d08ec9333ed4d');
+assert.ok(modules[2]['build-commands'][1].includes('--disable-static'));
+assert.ok(modules[2]['post-install'].includes('test -f /app/lib/libgssapi_krb5.so'));
+assert.ok(modules[3]['config-opts'].includes('-DCURL_USE_GSSAPI=ON'));
+assert.ok(modules[3]['config-opts'].includes('-DGSS_ROOT_DIR=/app'));
+// Upstream places LDFLAGS before its source and does not consume LDLIBS.
+// Retain libm explicitly there, preserving SDK hardening flags and later as-needed.
+assert.deepEqual(modules[4]['build-commands'], [
+	'make -f Makefile.sharedlibrary INSTALL_PREFIX=/app LDFLAGS="${LDFLAGS:-} -Wl,--no-as-needed -lm -Wl,--as-needed"',
+	'make -f Makefile.sharedlibrary INSTALL_PREFIX=/app LDFLAGS="${LDFLAGS:-} -Wl,--no-as-needed -lm -Wl,--as-needed" install'
+]);
+assert.ok(modules[5]['config-opts'].includes('-Dconfig-xdp=true'));
+// The declared package environment resolves native providers from prefix/lib.
+// SDK autodetection must not place either provider in prefix/lib64 instead.
+assert.deepEqual(modules[5]['config-opts'], [
+	'-Dlibdir=lib',
+	'-Ddocs=false',
+	'-Dtests=false',
+	'-Dvapi=false',
+	'-Dintrospection=false',
+	'-Dconfig-xdp=true',
+	'-Dpacrunner-duktape=true',
+	'-Dcurl=true'
+]);
+assert.ok(modules[6]['config-opts'].includes('-Dgnome_proxy=disabled'));
+assert.ok(modules[6]['config-opts'].includes('-Dlibproxy=enabled'));
+// The pinned GIO source declares installed_tests, not libproxy's tests option.
+// Preserve both proxy-provider choices and native TLS while refusing unknown flags.
+assert.deepEqual(modules[6]['config-opts'], [
+	'-Dlibdir=lib',
+	'-Dlibproxy=enabled',
+	'-Dgnome_proxy=disabled',
+	'-Dgnutls=enabled',
+	'-Denvironment_proxy=disabled',
+	'-Dinstalled_tests=false'
+]);
 passed++;
 for (const mutate of [
 	(data) => {
@@ -161,6 +204,12 @@ for (const mutate of [
 	},
 	(data) => {
 		data.network_runtime.portable.flatpak_sources.luv.url = 'http://foreign.invalid/source';
+	},
+	(data) => {
+		delete data.network_runtime.portable.flatpak_sources.krb5;
+	},
+	(data) => {
+		data.network_runtime.portable.flatpak_sources.krb5.commit = 'unversioned';
 	}
 ]) {
 	const invalid = structuredClone(catalogue);

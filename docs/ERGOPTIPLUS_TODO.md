@@ -6475,6 +6475,133 @@ receiving clocks/assertions remain unchanged. The independent acquisition floor
 stays36. This fixes the combined setup's failure propagation; actual complete
 Linux qualification must still rerun. Items36/62 and transversal16/38 stay open.
 
+Windows service diagnostics now use the existing native TAP receipt writer.
+The CI-owned AHK process has no reliable console handle; console-only optional
+output can disappear before the retained transcript is printed. The same closed
+stage/kind/HRESULT projection now reaches that transcript and its GitHub notice.
+This changes observation only: every original native assertion, receiving clock,
+retirement requirement and privacy admission stays intact. Genuine receiving
+of this channel remains pending; no native failure is counted as repaired.
+
+Integrated manual37688807101 at091743921 completes with shared checks passing,
+Linux11,644 unit passes/zero failures and all157 E2E steps passing with none
+skipped. The Linux package fails in Flatpak curl configuration because no GSS
+implementation is available in the24.08 SDK. Windows retains its four native
+failures; Mac Sparkle passes, Brew's deny-removal AppleEvent positive fails, and
+the separate native global-switcher/Shortcuts package probes fail. All installed
+runtime lanes and Release are skipped. No complete packaging claim is made.
+
+The Flatpak source inventory now adds MIT Kerberos1.22.2 at the exact upstream
+commit8570e77819563e036027e1da789d08ec9333ed4d before curl. Its native GSS library
+and krb5-config must exist under/app; curl retains mandatory GSSAPI and explicitly
+finds that prefix. The regression fails against the old missing dependency;
+all original source pins, requirements and assertions stay intact. Actual
+Flatpak build/package/installation receiving is pending. This Linux-only
+catalogue/generator region is owned by group6; other fields remain unchanged.
+
+Manual37695878081 at2cbcea144 passes shared checks, Linux11,644 unit assertions
+and all157 E2E steps, including genuine Nix. Package refuses before the Kerberos
+build because Flatpak's implicit Autotools bootstrap requires an autogen script
+that the pinned upstream does not provide. Installation and Release are skipped.
+The generator now declares explicit SDK commands for autoreconf, configuration,
+build and installation under/app; the original source pin, disabled static/rpath
+and bundled-verto choices, GSSAPI requirement and installed-library checks remain.
+Actual host-source compilation/install passes with physical closure; it does not
+qualify the Flatpak SDK. The independent recipe regression fails before this
+repair. Native package/installation receiving on the repaired source is pending.
+
+Windows manual37690927221 atc00cec629 remains terminal FAIL. Restored raw-log
+and execution-manifest downloads confirm10,272 executed/timed cases,
+10,268 passes/four failures and no manifest errors. The canonical route remains
+one native-bypass/direct result; no service-stage notice is admitted. Artifact
+access does not repair WinHTTP, TLS classification or graceful cleanup. The
+handover now lists exactly four current native fixes; the historical System32
+curl capability case passes and must not be rebuilt without a regression.
+
+Manual Linux package receiving now continues after a failed E2E job, retaining
+successful unit admission through the unchanged E2E dependency. Automatic runs
+still require E2E success; cancelled or skipped E2E does not admit packaging.
+The final native verdict still rejects any failed mandatory job or absent
+subject, and Release remains push-only. This allows item62's real Flatpak SDK
+build to be tested while another group's native E2E repair is pending. The
+regression fails against the previous workflow and preserves every existing
+assertion, original receiving clock and package/install requirement. New native
+receiving is pending; this diagnostic admission does not close36/62 or16/38.
+
+Manual37709350150 at3161aada9 passes shared checks, all11,644 Linux unit
+assertions and all157 E2E steps without failures or skips. The Flatpak SDK now
+builds and installs MIT Kerberos1.22.2 and curl with GSS-API/SPNEGO enabled.
+Package then fails at network-gio-proxy because the pinned glib-networking
+source has no Meson tests option. Its declared installed_tests=false replaces
+that unknown flag; GnuTLS and every proxy-provider choice remain unchanged.
+An independent complete option-vector regression fails against the old recipe.
+Source pins, all other modules, native assertions/clocks and installation legs
+remain intact. New native package/install qualification is still required;
+installed GSS libraries do not establish authenticated enterprise traffic.
+
+The SDK log also places libproxy in/app/lib64, outside the existing package
+environment's/app/lib lookup. The pinned GIO source derives its module directory
+from the selected libdir. Both native Meson providers now explicitly select
+libdir=lib; independent full option vectors fail before this correction and
+retain every prior provider flag. Other modules, source pins, runtime lookup,
+native assertions and installed-format requirements remain unchanged. SDK
+compilation and actual installed closure still need final-source receiving.
+
+Manual37713678709 at acb14576c passes shared checks,11,644 unit assertions and
+all157 E2E steps. GIO configuration now succeeds, but executable linking exposes
+unresolved Duktape math symbols. The pinned upstream shared-library Makefile
+does not consume LDLIBS and places LDFLAGS before its source. Its generated
+build/install commands now retain libm explicitly while preserving SDK flags
+and restoring as-needed for later inputs. A genuine checksum-verified host
+source build/install reproduces refused original consumer linking, then passes
+corrected linking and Math.sqrt evaluation with libm, RELRO and BIND_NOW.
+Both source identities and every GIO/native assertion remain intact. The
+preceding native run skips installation/Release; final SDK/package/install
+receiving on the new source remains required before any completion claim.
+
+Linux manual37714714116 at9d26b947e passes11,644 unit assertions, all157 E2E
+steps and the complete package job, including actual Flatpak build/install/run
+and tarball installation. Three binary installation variants pass;14 source
+variants fail: five lack a caller-supplied compiler under--no-deps, seven omit
+the canonical builder from the first-install checkout, and two Fedora variants
+refuse because no verified LuaJIT networking provider is declared. Compiler
+and libc-header packages now have a separate shared catalogue projection;
+source installs provision them, binary installs do not, and--no-deps preserves
+caller ownership. CI retains every original installation assertion and supplies
+the missing source prerequisites. Local regression and selected gates pass;
+native receiving of this repair and the separate Fedora provider work remain.
+
+The Fedora source-install bootstrap now uses the same immutable luv commit and
+CMake options as Flatpak, compiling against the recipient's actual LuaJIT and
+retaining its Git/build evidence. GIO, schema and compiler prerequisites come
+from a separate shared package map; the absent distribution LuaJIT package
+remains explicitly absent. The generated module is atomically installed under
+the private driver namespace, recorded in uninstall ownership and selected by
+the standalone launcher. Source/native directory aliases and malformed recipes
+are refused. Genuine host compilation and C-entry loading pass, including a
+foreign inherited Git-namespace control. Full selected gates and hosted Fedora
+first-install receiving remain pending; this does not close item62.
+
+Manual37747891785 atb4ef975f1 passes all shared checks, Linux units/E2E,
+the complete package job and13/17 installation variants. Release is skipped.
+The remaining four failures are the two Fedora provider refusals and two
+Alpine source compilations missinglinux/magic.h. The source-build catalogue
+and the unchanged--no-deps caller now also provisionlinux-headers on Alpine;
+no binary runtime dependency or native assertion is removed. The independent
+header-package regression fails before this correction. Final native receiving
+of the combined Fedora/Alpine repairs passes in manual37755062021 attempt2
+at44525214e4d0763f9c23e7d69828ec6bf3e01871: shared checks,11,644 Linux unit
+assertions, official Ollama/model acceptance, all157 E2E steps, the complete
+Package job and17/17 installation variants. No E2E/installation variant is
+failed or skipped; Windows/macOS are unselected and Release is skipped.
+Attempt1 failed during explicit model pull with unchanged sources and zero
+pending descendants. Its1,309 runtime subjects match the preceding green
+native source; the lower cause remains unproved. A fresh runner passes the
+unchanged candidate without relaxing any assertion or clock. Local formatting,
+382 JS checks,26 runtime controls and1,875 AHK BOM/LF checks also pass.
+Item62 remains open for the existing Windows/Mac CODE and native/device work;
+items16/38 retain their complete independent requirements.
+
 - [~] **63.** Provide shared screen-brightness up/down actions on all three
   drivers, including supported keyboard and wheel layers. Implemented: the
   translated catalogue, Windows bounded Job-owned WMI worker with complete
