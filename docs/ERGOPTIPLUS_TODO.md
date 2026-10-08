@@ -5630,6 +5630,8 @@ The fixed Specifications and Capabilities frames of the Windows/macOS per-model 
       open. macOS system trust and explicit proxy relays are integrated, while
       opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
 
+Explicit inherited ALL_PROXY aliases retain precedence over native static settings. PAC diagnostics report only the actual native helper capability and never include the configuration URL. Twenty-one actual Bash bootstrap controls pass, with all eighteen original assertion methods and opaque admission preserved. Native macOS routing remains separately required.
+
 Native Ollama API admission now uses the actual SDK mapped source and accepted TCP listener identity before private payload delivery. Eleven PTY and twelve listener XCTest cases preserve the sixteen original test bodies. The original official Ollama installer also has a no-Python PTY caller that joins its exact physical receipt before releasing its task owner. All seventy-two focused Lua cases pass; actual native compilation, retained Mach-O execution and cold installation remain required.
 
 Actual macOS run37807104214 exposed public DHCP import, audited CFNetwork source type and run-loop mode compiler errors. The native worker now imports the explicit public DHCP header and matches the SDK return type and mode. DHCP/DNS discovery and every existing native assertion remain. Native compilation must requalify the repair; no Swift success is claimed from Linux.

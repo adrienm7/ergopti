@@ -420,15 +420,20 @@ apply_system_network() {
 		return $?
 	fi
 	local settings line
-	if [ -z "${HTTPS_PROXY:-}${https_proxy:-}${HTTP_PROXY:-}${http_proxy:-}" ] && [ -x /usr/sbin/scutil ]; then
-		settings="$(/usr/sbin/scutil --proxy 2>/dev/null | system_network_from_scutil)" || settings=""
+	if [ -z "${HTTPS_PROXY:-}${https_proxy:-}${HTTP_PROXY:-}${http_proxy:-}${ALL_PROXY:-}${all_proxy:-}" ]; then
+		# Reuse the native getter; explicit inherited routes never trigger it.
+		settings="$(opaque_system_proxy_snapshot 2>/dev/null | system_network_from_scutil)" || settings=""
 		while IFS= read -r line; do
 			case "$line" in
 				HTTPS_PROXY=*) export HTTPS_PROXY="${line#HTTPS_PROXY=}" https_proxy="${line#HTTPS_PROXY=}" ;;
 				HTTP_PROXY=*) export HTTP_PROXY="${line#HTTP_PROXY=}" http_proxy="${line#HTTP_PROXY=}" ;;
 				NO_PROXY=*) export NO_PROXY="${line#NO_PROXY=}" ;;
 				PAC_URL=*)
-					log_info "The network settings use an automatic configuration (${line#PAC_URL=}) that the installer cannot read: if the download fails, enter the relay by hand in System Settings > Network."
+					if managed_bootstrap_launcher_available; then
+						log_info "Automatic network settings will be evaluated by the native download helper."
+					else
+						log_info "Automatic network settings require the native download helper or an explicit relay."
+					fi
 					;;
 			esac
 		done <<EOF_SETTINGS
