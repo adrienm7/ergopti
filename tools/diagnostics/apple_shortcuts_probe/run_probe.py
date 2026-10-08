@@ -53,9 +53,66 @@ class ProbeObservationRefused(ValueError):
         self.kind = kind
 
 
+def permission_preflight_summary(raw, role):
+    """Parse only a fixed optional diagnostic segment in this owned discovery stream."""
+    absent = {"state": "absent", "call_attempted": False, "native_returned": False}
+    invalid = {"state": "invalid_grammar", "call_attempted": False, "native_returned": False}
+    if type(raw) is not bytes or len(raw) > LIMIT:
+        return None, invalid
+    if role != "discovery" or b"ASCP:P:" not in raw:
+        return raw, absent
+    prefix = b"ASCP:1\nASCP:P:BEGIN\n"
+    if not raw.startswith(prefix):
+        return None, invalid
+    remainder = raw[len(prefix) :]
+    attempted = False
+    call = b"ASCP:P:CALL_ATTEMPT\n"
+    if remainder.startswith(call):
+        attempted = True
+        remainder = remainder[len(call) :]
+    if remainder == b"":
+        return b"ASCP:1\n", {
+            "state": "call_unreturned" if attempted else "preparing",
+            "call_attempted": attempted,
+            "native_returned": False,
+        }
+    line, separator, tail = remainder.partition(b"\n")
+    if not separator:
+        return None, invalid
+    endings = {
+        b"ASCP:P:UNAVAILABLE": "bridge_unavailable",
+        b"ASCP:P:REFUSED": "bridge_refused",
+        b"ASCP:P:INVALID": "invalid_native_status",
+    }
+    packet = {"call_attempted": attempted, "native_returned": False}
+    if line.startswith(b"ASCP:P:RETURN:") and attempted:
+        encoded = line[len(b"ASCP:P:RETURN:") :]
+        try:
+            text = encoded.decode("ascii")
+            code = int(text)
+        except (UnicodeDecodeError, ValueError):
+            return None, invalid
+        if str(code) != text or not -2147483648 <= code <= 2147483647:
+            return None, invalid
+        packet.update({"state": "observed", "native_returned": True, "code": code})
+    elif line in endings:
+        if (line == b"ASCP:P:UNAVAILABLE" and attempted) or (
+            line == b"ASCP:P:INVALID" and not attempted
+        ):
+            return None, invalid
+        packet["state"] = endings[line]
+    else:
+        return None, invalid
+    expected = [b"ASCP:2\n", b"ASCP:3\n", b"ASCP:4\n"]
+    if tail not in [b"".join(expected[:count]) for count in range(4)]:
+        return None, invalid
+    return b"ASCP:1\n" + tail, packet
+
+
 def checkpoint_summary(raw, role):
     """Admit only an ordered fixed marker prefix, never native names or errors."""
     expected = [b"ASCP:1\n", b"ASCP:2\n", b"ASCP:3\n", b"ASCP:4\n"]
+    raw, _ = permission_preflight_summary(raw, role)
     if role != "discovery":
         return {"valid": raw == b"", "last": 0}
     for count in range(5):
@@ -157,6 +214,12 @@ def capture(arguments, native, ownership, evidence, role):
                         or (checkpoint["valid"] is False and checkpoint["last"] != 0)
                     ):
                         raise ProbeObservationRefused("diagnostic_shape")
+                    err.seek(0)
+                    _, preflight = permission_preflight_summary(err.read(LIMIT + 1), role)
+                    if preflight["state"] == "invalid_grammar":
+                        raise ProbeObservationRefused("diagnostic_shape")
+                    if preflight["state"] != "absent":
+                        observation["permission_preflight"] = preflight
                     observation.update(
                         {
                             "elapsed_us": elapsed_us,
@@ -312,7 +375,7 @@ def main():
         require(b"shortcut-name-or-identifier" in help_bytes)
         result["cli_identifier_help_observed"] = True
         raw = capture(
-            ["/usr/bin/osascript", "-l", "JavaScript", str(script)],
+            ["/usr/bin/osascript", "-l", "JavaScript", str(script), "--permission-preflight"],
             native,
             ownership,
             evidence,

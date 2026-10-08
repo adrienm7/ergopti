@@ -975,9 +975,17 @@ function graphProblems(files) {
 				problems.push(`${rel} ${id} must need exactly ${expected.join(', ')}`);
 			}
 			const expectedCondition =
-				index === 4 ? 'always()' : rel === LINUX_BOX && id === 'e2e-linux' ? NOT_CANCELLED : null;
+				index === 4
+					? 'always()'
+					: rel === LINUX_BOX && id === 'e2e-linux'
+						? NOT_CANCELLED
+						: rel === LINUX_BOX && id === 'package-linux'
+							? "${{ !cancelled() && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}"
+							: null;
 			if (job && pipeline.field(job.body, 'if') !== expectedCondition) {
-				problems.push(`${rel} ${id} must keep its exact mandatory job condition`);
+				problems.push(
+					`${rel} ${id} must retain its exact mandatory or manual diagnostic admission`
+				);
 			}
 		}
 		if (rel === MACOS_BOX) {

@@ -39,9 +39,13 @@ global ProbeObservationSerial := 0
 global ProbeObservationScenario := 0
 global ProbeObservationWriting := false
 global ProbeObservationFailed := false
+global ProbeReleaseObservationSerial := 0
+global ProbeReleaseObservationWriting := false
+global ProbeReleaseObservationFailed := false
 OnExit(ProbeRelease)
 SetTimer(() => ExitApp(124), -5000)
 if ProbeObservationGeneration {
+	OnExit(ProbeObserveReleaseExitStart, -1)
 	OnError(ProbeObserveUnhandled)
 	OnExit(ProbeObserveExit)
 	ProbeObservePhase(1)
@@ -142,17 +146,23 @@ ProbeDown(Name, Scan) {
 
 ProbeRelease(*) {
 	global ProbeOwned
+	ProbeReleaseObservePhase(1)
 	for _, Name in ["RAlt", "LCtrl"] {
 		if !ProbeOwned.Has(Name)
 			continue
 		try {
+			ProbeReleaseObservePhase(Name == "RAlt" ? 2 : 6)
 			SendLevel(3)
+			ProbeReleaseObservePhase(Name == "RAlt" ? 3 : 7)
 			SendEvent("{Blind}{" . (Name == "RAlt" ? "SC138" : "SC01D") . " Up}")
+			ProbeReleaseObservePhase(Name == "RAlt" ? 4 : 8)
 			ProbeOwned.Delete(Name)
+			ProbeReleaseObservePhase(Name == "RAlt" ? 5 : 9)
 		} catch Error as Err {
 			FileAppend("Injected release debt: " . Name . " " . Err.Message . "`n", "**", "UTF-8")
 		}
 	}
+	ProbeReleaseObservePhase(10)
 	return ProbeOwned.Count == 0 ? 0 : 1
 }
 
@@ -309,4 +319,39 @@ ProbeObserveUnhandled(PobThrown, PobMode) {
 ProbeObserveExit(PobReason, PobCode) {
 	ProbeObservePhase(14, 0, 0, 0, PobCode)
 	return 0
+}
+
+
+/** Failure observations keep the original release edge and timer behavior unchanged. */
+ProbeObserveReleaseExitStart(PobReason, PobCode) {
+	ProbeReleaseObservePhase(11)
+	ProbeReleaseObservePhase(14, 0, 0, 0, PobCode)
+	return 0
+}
+
+/** Separate bounded channel; existing parser, scalar schema and identity fences stay exact. */
+ProbeReleaseObservePhase(PobStage, PobErrorKind := 0, PobErrorSource := 0, PobErrorLine := 0, PobExitCode := -1) {
+	global ProbeObservationGeneration, ProbeReleaseObservationSerial, ProbeObservationScenario
+	global ProbeReleaseObservationWriting, ProbeReleaseObservationFailed, ProbePid, ProbeThread, ProbeOwned, ProbeEnabled
+	if !ProbeObservationGeneration || ProbeReleaseObservationWriting || ProbeReleaseObservationSerial >= 128 || ProbeReleaseObservationFailed
+		return
+	ProbeReleaseObservationWriting := true
+	try {
+		ProbeReleaseObservationSerial += 1
+		PobRow := A_Args[2] . "|" . ProbePid . "|" . ProbeThread . "|" . ProbeObservationGeneration
+			. "|" . (ProbeEnabled ? 1 : 2) . "|" . ProbeReleaseObservationSerial . "|" . PobStage
+			. "|" . ProbeObservationScenario . "|" . ProbeOwned.Count . "|" . PobErrorKind
+			. "|" . PobErrorSource . "|" . PobErrorLine . "|" . PobExitCode . "`n"
+		; FileAppend excludes all sharing and conflicts with the parent's identity pin.
+		PobStream := FileOpen(A_Args[1] . ".release-observation", "a-d", "UTF-8-RAW")
+		try {
+			if PobStream.Write(PobRow) != StrLen(PobRow)
+				throw Error("Incomplete observation append")
+		} finally PobStream.Close()
+	} catch Any {
+		; Optional observation refusal cannot replace any original effect or verdict.
+		ProbeReleaseObservationFailed := true
+	} finally {
+		ProbeReleaseObservationWriting := false
+	}
 }
