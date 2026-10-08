@@ -893,3 +893,82 @@ helpers.describe("Agent complete declared presentation frames", function()
 		end)
 	end)
 end)
+
+--- Looks up the actual native submenu caption without manufacturing a fallback row.
+local function find(rows, label)
+	for _, row in ipairs(rows) do
+		if row.title == label then return row end
+	end
+end
+
+--- Prior physical 21-language model captions, frozen before the UI handoff.
+local function agent_model_caption_corpus()
+	local file = assert(io.open(helpers.shared("tests/corpus/menus/agent_linux_system_frames.json"), "rb"))
+	local raw = assert(file:read("*a")); assert(file:close())
+	return assert(require("adapters.json_codec").decode(raw))
+end
+
+helpers.describe("Agent canonical model caption getter (agent-model-caption-getter)", function()
+	for _, code in ipairs({ "ar", "cs", "da", "de", "en", "es", "fr", "he", "hi", "it", "ja", "ko", "nl",
+		"no", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }) do
+		local language = code
+		helpers.it("retains the actual model result through its canonical " .. language .. " caption (agent-model-caption-getter)", function()
+			local corpus = agent_model_caption_corpus()
+			with_panel({ llm_agent_system1 = corpus.spec, llm_agent_system2 = corpus.spec, llm_agent_mode = "action", llm_agent_disabled_apps = {} }, function(build, world)
+				local item = assert(build())
+				for _, index in ipairs({ 3, 4 }) do
+					local rows = item.submenu[index].menu
+					helpers.assert_eq(rows[#rows].title, corpus.locales[language].model)
+					helpers.assert_eq(rows[#rows - 1].title, "-")
+					helpers.assert_eq(type(rows[#rows].fn), "function")
+				end
+				helpers.assert_eq(#world.applied, 0)
+			end, language)
+		end)
+	end
+
+	for _, status in ipairs({ "unknown", "installed", "missing" }) do
+		local state = status
+		helpers.it("passes the same native model result for local status " .. state .. " (agent-model-caption-getter)", function()
+			local corpus = agent_model_caption_corpus()
+			with_panel({ llm_agent_system1 = "local|" .. corpus.model, llm_agent_system2 = "local|" .. corpus.model,
+				llm_agent_mode = "action", llm_agent_disabled_apps = {} }, function(build, world)
+				if state ~= "unknown" then world.listed = state == "installed" and { [corpus.model] = true } or {} end
+				local item = assert(build())
+				for _, index in ipairs({ 3, 4 }) do
+					local rows = item.submenu[index].menu
+					local position = state == "missing" and #rows - 1 or #rows
+					local expected = state == "unknown" and "model" or state
+					helpers.assert_eq(rows[position].title, corpus.locales.en[expected])
+					helpers.assert_eq(type(rows[position].fn), "function")
+				end
+				helpers.assert_eq(#world.applied, 0)
+				helpers.assert_eq(#world.installs, 0)
+			end, "en")
+		end)
+	end
+
+	helpers.it("refuses a foreign canonical model getter and repairs both actual native consumers (agent-model-caption-getter)", function()
+		local corpus = agent_model_caption_corpus()
+		local state = { llm_agent_system1 = corpus.spec, llm_agent_system2 = corpus.spec, llm_agent_mode = "action", llm_agent_disabled_apps = {} }
+		with_panel(state, function(build, world)
+			local declaration = require("infra.manifest_menu").get_array("agent_system_model_controls")[2]
+			local getter = declaration.caption_getter
+			local ok, err = pcall(function()
+				declaration.caption_getter = "foreign_model_caption"
+				local item = assert(build())
+				for _, system in ipairs({ "system1", "system2" }) do
+					helpers.assert_nil(find(item.submenu, corpus.locales.en.systems[system].remote),
+						"a refused canonical model cannot publish an empty or fallback System parent")
+				end
+				helpers.assert_eq(state.llm_agent_system1, corpus.spec)
+				helpers.assert_eq(state.llm_agent_system2, corpus.spec)
+				helpers.assert_eq(#world.applied, 0)
+			end)
+			declaration.caption_getter = getter
+			if not ok then error(err, 0) end
+			local repaired = assert(build())
+			helpers.assert_eq(repaired.submenu[3].menu[#repaired.submenu[3].menu].title, corpus.locales.en.model)
+		end, "en")
+	end)
+end)

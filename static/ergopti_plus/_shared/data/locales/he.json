@@ -3242,5 +3242,19 @@
 	"physical_shortcuts.position_unavailable": "מיקום המקש הזה אינו זמין כאן.",
 	"physical_shortcuts.windows_unavailable": "עדיין לא זמין ב־Windows: עורך קיצורי המקשים הפיזיים עדיין אינו זמין ב־Windows.",
 	"physical_shortcuts.collision": "צירוף המקשים הזה כבר בשימוש. בחרו צירוף אחר.",
-	"physical_shortcuts.window_unavailable": "החלון הזה אינו זמין: נסו לפתוח אותו מחדש."
+	"physical_shortcuts.window_unavailable": "החלון הזה אינו זמין: נסו לפתוח אותו מחדש.",
+	"gestures.system.conflicts_caption": "⚠ %s התנגשויות אפשריות",
+	"gestures.system.pinch_enabled": "מחוות הצביטה של המערכת : מופעל",
+	"gestures.system.pinch_disabled": "מחוות הצביטה של המערכת : מושבת",
+	"gestures.system.pinch_unknown": "מחוות הצביטה של המערכת : מחוות מערכת: לא נבדקו",
+	"gestures.system.slot_unknown_caption": "%s — מחוות מערכת: לא נבדקו",
+	"gestures.system.slot_configured_caption": "%s — מוגדר עבור ErgoptiPlus",
+	"gestures.system.slot_not_configured_caption": "%s — לא מוגדר עבור ErgoptiPlus",
+	"menu.global.reload_macos": "↺ טען מחדש",
+	"menu.global.quit_macos": "✕ צא",
+	"menu.layout.pause_picker_caption": "  ↳ פריסה כשהסקריפט מושהה : %s",
+	"menu.layout.resume_picker_caption": "  ↳ פריסה כשהסקריפט פעיל : %s",
+	"menu.layout.native_variant_caption": "%s v%s",
+	"app_picker.agent_remove_marker": "✗",
+	"app_picker.agent_exclude_current_caption": "הדר %s (נוכחי)"
 }

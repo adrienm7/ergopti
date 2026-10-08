@@ -501,7 +501,9 @@ _UpdaterTest_StagingWorkerScriptContract() {
 		"Updater staging worker script must apply a streaming timeout")
 	AssertEqual(true, InStr(Script, "$ActualSize -ne $ExpectedSize") > 0,
 		"Updater staging worker script must keep the truncated-download integrity check")
-	AssertEqual(true, InStr(Script, "Get-FileHash -LiteralPath $NewExe -Algorithm SHA256") > 0,
+	AssertEqual(true, InStr(Script, "$Hasher.ComputeHash($HashStream)") > 0
+		&& InStr(Script, "$HashStream.Dispose()") > 0
+		&& InStr(Script, "$Hasher.Dispose()") > 0,
 		"Updater staging worker must hash the persisted executable before publishing READY")
 	AssertEqual(true, InStr(Script, "$ActualDigest -cne $ExpectedSha256") > 0,
 		"Updater staging worker must reject a byte-mutated executable before swap publication")

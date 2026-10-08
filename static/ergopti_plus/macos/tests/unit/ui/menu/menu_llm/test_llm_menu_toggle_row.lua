@@ -194,3 +194,79 @@ helpers.describe("Genuine temperature fixture dependency", function()
 		end)
 	end)
 end)
+
+
+helpers.describe("actual transient download producer reaches completed root composition", function()
+	for _, task in ipairs({ "download", "download_tail", "install" }) do
+		helpers.it("publishes the exact completed native row and held focus callback: " .. task, function()
+			with_activation("ollama", { true }, nil, function(_, _, calls)
+				local owner_before = package.loaded["ui.download_window"]
+				local task_before = calls.root_deps.active_tasks[task]
+				local focused, resumed, observed = 0, 0, nil
+				local native_build = calls.handler.build_download_item
+				local ok, detail = xpcall(function()
+					package.loaded["ui.download_window"] = { focus = function() focused = focused + 1 end }
+					calls.root_deps.active_tasks[task] = true
+					-- Observe the actual producer's completed result; this wrapper supplies no invented row.
+					calls.handler.build_download_item = function(...)
+						observed = native_build(...)
+						return observed
+					end
+					-- The activation fixture deliberately exposes a subset renderer and key-only i18n.
+					-- Root construction needs the genuine native binding and complete locale owners.
+					local activation_logger = package.loaded["infra.logger"]
+					local owned = { "ui.menu.builder", "ui.menu.canvas_badge", "infra.manifest_menu",
+						"menu.renderer", "infra.i18n", "infra.locale", "locale.core", "infra.logger" }
+					local previous = {}
+					for index, name in ipairs(owned) do previous[index] = package.loaded[name] end
+					helpers.with_fresh_modules(owned, function()
+						-- Retain the fixture's closed log functions; only genuine native read facts are missing.
+						local closed_logger = {}
+						for name, value in pairs(activation_logger) do closed_logger[name] = value end
+						closed_logger.LEVELS = require("logger").LEVELS
+						closed_logger.current_level = closed_logger.LEVELS.WARNING
+						package.loaded["infra.logger"] = closed_logger
+						helpers.assert_true(rawequal(closed_logger.LEVELS, require("logger").LEVELS))
+						helpers.assert_eq(closed_logger.current_level, require("logger").LEVELS.WARNING)
+						for name, value in pairs(activation_logger) do
+							helpers.assert_true(rawequal(closed_logger[name], value), "closed root logger retains " .. name)
+						end
+						local native_i18n = require("infra.i18n")
+						local native_locale = require("infra.locale")
+						native_i18n.set_locale_injector(native_locale.set_locale)
+						native_i18n.set_locale_no_reload("en")
+						local native_renderer = require("infra.manifest_menu")
+						helpers.assert_type(native_renderer.get_root, "function")
+						helpers.assert_type(native_renderer.native_composition, "function")
+						helpers.assert_type(native_i18n.section, "function")
+						helpers.assert_eq(native_locale.current_locale(), native_i18n.get_locale())
+						local builder = require("ui.menu.builder")
+						local menu = builder.generate({ config = { log_level = 2 }, llm_handler = calls.handler,
+							script_control = { toggle = function() resumed = resumed + 1 end } }, {}, {
+							reload = function() return "reload-ack" end, quit = function() return "quit-ack" end })
+						helpers.assert_type(observed, "table", "the actual active-task producer returns a finished row")
+						helpers.assert_eq(menu[1].title, "")
+						helpers.assert_not_nil(menu[1].image)
+						helpers.assert_eq(menu[2], { title = "-" })
+						helpers.assert_true(rawequal(menu[3], observed), "composition preserves the actual finished producer object")
+						helpers.assert_eq(menu[4], { title = "-" })
+						helpers.assert_eq(focused, 0)
+						helpers.assert_eq(resumed, 0)
+						menu[3].fn()
+						helpers.assert_eq(focused, 1)
+						menu[1].fn()
+						helpers.assert_eq(resumed, 1)
+						helpers.assert_eq(calls.saves, 0)
+					end)
+					for index, name in ipairs(owned) do
+						helpers.assert_true(rawequal(package.loaded[name], previous[index]), "fresh root fixture restores " .. name)
+					end
+				end, debug.traceback)
+				calls.handler.build_download_item = native_build
+				calls.root_deps.active_tasks[task] = task_before
+				package.loaded["ui.download_window"] = owner_before
+				if not ok then error(detail, 0) end
+			end)
+		end)
+	end
+end)

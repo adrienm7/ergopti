@@ -308,3 +308,35 @@ helpers.describe("Count fixture authentic whole-frame admission", function()
 		end)
 	end)
 end)
+
+
+helpers.describe("Actual model picker native handoff", function()
+	for _, backend in ipairs({ "ollama", "mlx" }) do
+		helpers.it("completes the genuine " .. backend .. " selector DATA before native publication", function()
+			with_count_menu(function(menu, _, calls)
+				local item = menu.build_item()
+				local data = calls.real_model_selector_rows
+				helpers.assert_type(data, "table", "the actual ModelsSelector constructor must have run")
+				helpers.assert_type(data[1], "table", "the genuine declared No model row must exist")
+				helpers.assert_type(data[1].action, "function", "the selector returns genuine command DATA")
+				helpers.assert_type(data[1].label, "string", "the selector retains its canonical caption")
+				local model
+				for _, row in ipairs(item.submenu) do
+					if type(row.menu) == "table" and row.menu[1]
+						and rawequal(row.menu[1].fn, data[1].action) then model = row.menu; break end
+				end
+				helpers.assert_type(model, "table", "the same command closure reaches the completed model child")
+				helpers.assert_eq(model[1].title, data[1].label, "materialization preserves the actual declared caption")
+				helpers.assert_nil(model[1].action, "provider commands never leak into completed native rows")
+				helpers.assert_nil(model[1].label, "provider captions never leak into completed native rows")
+				helpers.assert_nil(data[1].fn, "materialization does not mutate the producer's original DATA")
+				helpers.assert_nil(data[1].title, "the selector's DATA remains DATA")
+				local renderer = require("infra.manifest_menu")
+				local compose = renderer.native_composition("macos_download_root")
+				helpers.assert_type(compose, "function", "the actual completed-native publication owner admits")
+				helpers.assert_eq(compose({ download = {}, body = item.submenu }), true,
+					"the genuine factory's complete subtree passes strict native ABI publication")
+			end, { real_model_selector = true, backend = backend })
+		end)
+	end
+end)

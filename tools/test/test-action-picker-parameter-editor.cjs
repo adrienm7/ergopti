@@ -916,8 +916,8 @@ for (const platform of ['hs', 'linux', 'ahk']) {
 		'Shortcuts parser and owned registration controls complete'
 	);
 	check(
-		/Ran 18 tests in /.test(parser.stderr) && /\nOK\s*$/.test(parser.stderr),
-		'all eighteen Shortcuts parser and diagnostic controls execute without skip'
+		/Ran 20 tests in /.test(parser.stderr) && /\nOK\s*$/.test(parser.stderr),
+		'all twenty Shortcuts parser and diagnostic controls execute without skip'
 	);
 }
 

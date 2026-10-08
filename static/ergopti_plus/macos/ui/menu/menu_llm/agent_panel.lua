@@ -293,23 +293,25 @@ local function system_rows(ctx, system)
 	local model_commands = {
 		["agent_system_model"] = function() return prompt_model(ctx, system, parsed) end,
 	}
-	local model_getters = {
-		agent_system_model_ready = function() return parsed ~= nil end,
-	}
 	local model_rows
 	if installed == true then
-		model_rows = ManifestMenu.template_rows("agent_system_model_installed_controls", model_commands, model_getters)
+		model_rows = ManifestMenu.template_rows("agent_system_model_installed_controls", model_commands, {
+			agent_system_model_ready = function() return parsed ~= nil end,
+			agent_system_model_caption = function() return model or i18n.get("menu.agent.off") end,
+		})
 	elseif installed == false then
-		model_rows = ManifestMenu.template_rows("agent_system_model_missing_controls", model_commands, model_getters)
+		model_rows = ManifestMenu.template_rows("agent_system_model_missing_controls", model_commands, {
+			agent_system_model_ready = function() return parsed ~= nil end,
+			agent_system_model_caption = function() return model or i18n.get("menu.agent.off") end,
+		})
 	else
-		model_rows = ManifestMenu.template_rows("agent_system_model_controls", model_commands, model_getters)
+		model_rows = ManifestMenu.template_rows("agent_system_model_controls", model_commands, {
+			agent_system_model_ready = function() return parsed ~= nil end,
+			agent_system_model_caption = function() return model or i18n.get("menu.agent.off") end,
+		})
 	end
 	if not model_rows then return {} end
 	for _, row in ipairs(model_rows) do
-		if row.label then
-			local caption = model or i18n.get("menu.agent.off")
-			row.label = row.label:gsub("{1}", function() return caption end)
-		end
 		items[#items + 1] = row
 	end
 	if installed == false then

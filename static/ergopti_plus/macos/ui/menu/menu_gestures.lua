@@ -469,21 +469,32 @@ function M.build(ctx)
 				rows[#rows + 1] = { label = conflict.label, action = gestures.open_system_gestures }
 			end
 			local pinch = gestures.system_pinch_enabled()
-			rows[#rows + 1] = {
-				label = i18n.get("gestures.system.pinch") .. " : "
-					.. i18n.get(pinch == nil and "gestures.system.unknown"
-						or (pinch and "menu.common.enabled" or "common.disabled")),
-				action = gestures.open_system_gestures,
-			}
-			local controls = ManifestMenu.template_rows("gesture_system_status_controls", {
+			local open_settings = gestures.open_system_gestures
+			local children = ManifestMenu.template_rows("gesture_system_macos_children", {
+				["gesture_system_open_enabled_pinch"] = function(...) return open_settings(...) end,
+				["gesture_system_open_disabled_pinch"] = function(...) return open_settings(...) end,
+				["gesture_system_open_unknown_pinch"] = function(...) return open_settings(...) end,
 				["gesture_system_refresh"] = function()
 					return gestures.refresh_system_gestures(ctx.updateMenu)
 				end,
+			}, {
+				["gesture_system_pinch_is_enabled"] = function() return pinch ~= nil and not not pinch end,
+				["gesture_system_pinch_is_disabled"] = function() return pinch ~= nil and not pinch end,
+				["gesture_system_pinch_is_unknown"] = function() return pinch == nil end,
+			}, {
+				["gesture_system_cached_conflicts"] = function() return rows end,
 			})
-			if type(controls) ~= "table" then return {} end
-			for _, row in ipairs(controls) do rows[#rows + 1] = row end
-			return { { label = #conflicts == 0 and i18n.get("gestures.system.clear")
-				or i18n.get("gestures.system.conflicts"):gsub("{1}", function() return tostring(#conflicts) end), items = rows } }
+			if type(children) ~= "table" then return {} end
+			local status = ManifestMenu.template_rows("gesture_system_status_macos_frame", {}, {
+				["gesture_system_is_clear"] = function() return #conflicts == 0 end,
+				["gesture_system_has_conflicts"] = function() return #conflicts > 0 end,
+				["gesture_system_conflict_count"] = function() return tostring(#conflicts) end,
+			}, {
+				["gesture_system_clear_children"] = function() return children end,
+				["gesture_system_conflict_children"] = function() return children end,
+			})
+			if type(status) ~= "table" or #status ~= 1 then return {} end
+			return status
 		end,
 		["gesture_slots_2"] = slots_provider(2),
 		["gesture_slots_3"] = slots_provider(3),

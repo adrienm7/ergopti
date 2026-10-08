@@ -12,13 +12,14 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local LayoutFixture = require("tests.support.layout_legacy_caption_fixture")
 
 --- Builds the layout row and renders it the way the tray root does.
 --- @param ctx table Menu context.
 --- @return table rendered submenu rows
 local function tray_rows(ctx)
 	local layout = helpers.load_with_stubs("ui.menu.menu_keyboard_layout")
-	local ManifestMenu = require("infra.manifest_menu")
+	local ManifestMenu = LayoutFixture.install(require("infra.i18n"))
 	local item = layout.build(ctx)
 	helpers.assert_true(type(item) == "table", "menu_keyboard_layout.build must return a row")
 	local row = ManifestMenu.render_rows({ item }, "top_level")[1]
@@ -58,7 +59,7 @@ local function index_of(rows, title)
 	return nil
 end
 
-helpers.describe("layout submenu: the menubar icon is one choice row", function()
+helpers.describe("layout submenu: the menubar icon is one choice row", LayoutFixture.scoped(function()
 	helpers.it("draws one « Icône de la barre des menus » row with v1 and v2, the current one ticked", function()
 		local ctx = make_ctx("v2")
 		local rows = tray_rows(ctx)
@@ -103,7 +104,7 @@ helpers.describe("layout submenu: the menubar icon is one choice row", function(
 		helpers.assert_eq(layout.DEFAULT_STATE.menubar_icon, Manifest.default_for("ui.menubar_icon"))
 		helpers.assert_eq(layout.DEFAULT_STATE.menubar_icon, "v1")
 	end)
-end)
+end))
 
 helpers.describe("layout submenu: the icon choice is stored in config.toml, not hs.settings", function()
 	helpers.it("no production source keeps the retired hs.settings key", function()
