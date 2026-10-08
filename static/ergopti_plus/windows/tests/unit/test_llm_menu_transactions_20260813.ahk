@@ -120,7 +120,6 @@ _LMT_Notify(Message, Options) {
 }
 
 _LMT_InstallFixture() {
-	static Sequence := 0
 	global Features, _LLM_Menu, ConfigurationFile, LLM_PROFILE_HOTKEY_LIMIT
 	global _LMT_WriterResult, _LMT_WriterCalls, _LMT_ApplyCalls
 	global _LMT_WriterCritical, _LMT_ApplyCritical, _LMT_LiveAtWrite
@@ -133,9 +132,8 @@ _LMT_InstallFixture() {
 		Previous["profile_limit"] := LLM_PROFILE_HOTKEY_LIMIT
 	; The actual profile provider needs the number-row protocol even in a cold fixture.
 	LLM_PROFILE_HOTKEY_LIMIT := 9
-	_LMT_ConfigPath := A_Temp . "\ergopti_llm_menu_transaction_" . A_ScriptHwnd . "_" . ++Sequence . ".toml"
+	_LMT_ConfigPath := A_Temp . "\ergopti_llm_menu_transaction.toml"
 	ConfigurationFile := _LMT_ConfigPath
-	AssertEqual("absent", ConfigMigrateBoot(ConfigurationFile)["status"], "the genuine native transaction fixture constructs strict fresh absence")
 	Features := _LMT_Features()
 	_LLM_Menu := _LMT_Menu()
 	_LMT_WriterResult := 1
@@ -487,9 +485,8 @@ _LMT_InstallApiFixture(Dir := "", WriteFn := FSWriteCreateDurable) {
 		ConfigPath := Dir . "\config.toml"
 		ApiPath := Dir . "\api_entries.json"
 		if WriteFn.Call(ConfigPath,
-				_CMJFixtureCurrentSource('[llm]`nenabled = false`napi_entry_id = "api_old"`n')) != 1
+				'[llm]`nenabled = false`napi_entry_id = "api_old"`n') != 1
 			throw Error("Cannot create initial LLM fixture file: " . ConfigPath)
-		ConfigMigrateBoot(ConfigPath)
 		if WriteFn.Call(ApiPath, _LMT_ApiOldImage()) != 1
 			throw Error("Cannot create initial LLM fixture file: " . ApiPath)
 		CandidateFeatures := _LMT_Features()
@@ -2265,13 +2262,12 @@ _LMT_PrivacyFixture(States, Body) {
 		Features["llm"]["trigger"]["secure_filter_enabled"] := States[2]
 		_LLM_Engine := Map("enabled", true, "backend", "ollama",
 			"disable_url_bars", States[1], "disable_password_fields", States[2])
-		Image := "_meta.schema_version = " . ConfigMigrateCurrentVersion() . "`n# independent native privacy fixture`n[llm]`nenabled = true`n[llm.models]`n"
+		Image := "# independent native privacy fixture`n[llm]`nenabled = true`n[llm.models]`n"
 			. 'selected = "ollama"' . "`n[llm.trigger]`nurl_bar_filter_enabled = "
 			. (States[1] ? "true" : "false") . "`nsecure_filter_enabled = "
 			. (States[2] ? "true" : "false") . "`n[foreign]`n"
 			. 'future = "keep exact" # retained neighbour' . "`n"
 		FileAppend(Image, ConfigurationFile, "UTF-8-RAW")
-		AssertEqual("current", ConfigMigrateBoot(ConfigurationFile)["status"], "the actual current privacy fixture constructs before native writes")
 		Body.Call()
 	} finally {
 		Suspend(SavedSuspend)
@@ -2661,8 +2657,8 @@ _LMT_ApiSemanticDetachedBuilder() {
 	Previous := _LMT_InstallApiFixture()
 	OldRead := _ConfigBootReadFailed, OldRejected := _ConfigBootRejectedOverrides
 	OldOutdated := _ConfigBootOutdatedEntries
-	Source := '_meta.schema_version = ' . ConfigMigrateCurrentVersion() . '`nllm = {enabled = false, api_entry_id = "api_old", future = "retain"}`n[future]`nold = "retain" # user data`n'
-	Expected := Chr(0xFEFF) . '_meta.schema_version = ' . ConfigMigrateCurrentVersion() . '`nllm = {enabled = true, api_entry_id = "api_new", future = "retain"}`n[future]`nold = "retain" # user data`n'
+	Source := 'llm = {enabled = false, api_entry_id = "api_old", future = "retain"}`n[future]`nold = "retain" # user data`n'
+	Expected := Chr(0xFEFF) . 'llm = {enabled = true, api_entry_id = "api_new", future = "retain"}`n[future]`nold = "retain" # user data`n'
 	try {
 		_ConfigBootReadFailed := false
 		_ConfigBootRejectedOverrides := 0

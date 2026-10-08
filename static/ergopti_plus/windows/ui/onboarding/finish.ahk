@@ -200,10 +200,6 @@ _Onboarding_Commit(Locale, ConfigDir, Rows, TapHoldKeys, BeforeReloadFn := 0) {
 		OwnerBundle := AcquireResult["bundle"]
 		ReleaseBundle := true
 		try {
-			if !ConfigSchemaPrepareOwnedSource(CandidateConfig, OwnerBundle) {
-				_Onboarding_CommitError("onboarding.error.commit_source_verification")
-				return false
-			}
 			; A config.toml the wizard creates carries this build's schema version.
 			updates := ConfigMigrateStampNewFile(updates, CandidateConfig)
 			updates := _ConfigPrepareTypedUpdates(updates)
@@ -219,16 +215,6 @@ _Onboarding_Commit(Locale, ConfigDir, Rows, TapHoldKeys, BeforeReloadFn := 0) {
 					"onboarding.error.commit_candidate_render")
 				return false
 			}
-			CandidateAdmission := ConfigMigrateBoot(CandidateConfig, "capture_write",
-				CandidateResult["content"])
-			if !HasMethod(CandidateAdmission, "Call")
-					|| !CandidateAdmission.Call(CandidateResult["source_content"],
-						CandidateResult["source_present"], CandidateResult["content"]) {
-				_Onboarding_CommitError("onboarding.error.commit_source_verification")
-				return false
-			}
-			; This genuine detached rendering admission precedes WAL construction.
-			; Final native acknowledgement transport remains a separate required seam.
 			; Config targets are declared first and the stable locator last. The core
 			; rejects any other locator position, and the WAL publishes before either
 			; target changes, so boot can restore all-old or finish all-new.

@@ -295,6 +295,7 @@ local function system_rows(ctx, system)
 	}
 	local model_getters = {
 		agent_system_model_ready = function() return parsed ~= nil end,
+		agent_system_model_caption = function() return model or i18n.get("menu.agent.off") end,
 	}
 	local model_rows
 	if installed == true then
@@ -306,10 +307,6 @@ local function system_rows(ctx, system)
 	end
 	if not model_rows then return {} end
 	for _, row in ipairs(model_rows) do
-		if row.label then
-			local caption = model or i18n.get("menu.agent.off")
-			row.label = row.label:gsub("{1}", function() return caption end)
-		end
 		items[#items + 1] = row
 	end
 	if installed == false then
