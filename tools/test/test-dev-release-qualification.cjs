@@ -221,6 +221,23 @@ const framework = fs.readFileSync(
 assert(framework.includes('Profile := _AHK_QUALIFICATION_PROFILE'));
 assert(!framework.includes('Profile := EnvGet("ERGOPTI_DEV_QUALIFICATION_PROFILE")'));
 assert(framework.includes('Deferred.Length != 1'));
+// Helper-only children load this complete library without production JSON.
+// A static unresolved parser reference emits a load-time warning before any
+// profile guard can run, and a hidden synchronous child can then block the suite.
+assert(!/\bJsonParse\s*\(/.test(framework), 'helper-only framework has no static JSON dependency');
+assert(framework.includes('if !(Parser is Func)'));
+assert(framework.includes('if _TEST_QUALIFICATION_PARSER is Func'));
+assert(framework.includes('_TEST_QUALIFICATION_PARSER := Parser'));
+assert(framework.includes('Policy := Parser.Call(FileRead('));
+const principal = fs.readFileSync(
+	path.join(ROOT, 'static/ergopti_plus/windows/tests/run_all.ahk'),
+	'utf8'
+);
+const parserInclude = principal.indexOf('#Include ../infra/json.ahk');
+const parserRegistration = principal.indexOf('TestQualificationRegisterParser(JsonParse)');
+assert(parserInclude >= 0 && parserRegistration > parserInclude);
+assert.equal((principal.match(/^TestQualificationRegisterParser\(JsonParse\)$/gm) || []).length, 1);
+assert(principal.includes('#Include unit/test_qualification_parser_owner.ahk'));
 const cliOwner = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-qualification-model-'));
 try {
 	const envFile = path.join(cliOwner, 'github-env.txt');
@@ -285,7 +302,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	let pid = 100;
 	const result = await run({
 		platform: 'linux',
-		qualificationContext: context,
+		...(context === undefined ? {} : { qualificationContext: context }),
 		qualificationNow: now,
 		fixtures: entries,
 		signals,
@@ -345,6 +362,72 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		assert.equal(full.result, 0);
 		assert.equal(full.spawned.length, 2);
 		assert.equal(full.receipts.length, 0);
+
+		const releaseEnvironment = {
+			GITHUB_ACTIONS: ctx.github_actions,
+			GITHUB_REPOSITORY: ctx.repository,
+			GITHUB_EVENT_NAME: ctx.event_name,
+			GITHUB_REF: ctx.ref,
+			ERGOPTI_DEV_RELEASE_RELEASE: 'true',
+			ERGOPTI_DEV_RELEASE_PRERELEASE: ctx.prerelease,
+			ERGOPTI_DEV_RELEASE_CHANNEL: ctx.channel,
+			ERGOPTI_DEV_RELEASE_TAG: ctx.tag,
+			ERGOPTI_DEV_RELEASE_VERSION: ctx.version
+		};
+		const savedEnvironment = new Map(
+			Object.keys(releaseEnvironment).map((key) => [key, process.env[key]])
+		);
+		const embeddedFixtures = [
+			{ args: ['owned-launcher.py', 'owned-hang.lua', 'owned-fork.py'], timeout: 1 }
+		];
+		try {
+			for (const override of [
+				{},
+				{ GITHUB_REF: 'refs/heads/main' },
+				{ GITHUB_EVENT_NAME: 'pull_request' },
+				{ ERGOPTI_DEV_RELEASE_TAG: 'v0.0.0-dev.157', ERGOPTI_DEV_RELEASE_VERSION: '0.0.0-dev.157' }
+			]) {
+				Object.assign(process.env, releaseEnvironment, override);
+				const embedded = await simulate(undefined, 0, embeddedFixtures);
+				assert.equal(embedded.result, 0);
+				assert.equal(embedded.spawned.length, 1);
+				assert.equal(embedded.receipts.length, 0);
+				assert(!embedded.logs.some((line) => line.startsWith('[DEFERRED]')));
+			}
+			Object.assign(process.env, releaseEnvironment);
+			await assert.rejects(
+				() => simulate(q.environmentContext(), 0, embeddedFixtures),
+				/Qualification fixture must match/
+			);
+			await assert.rejects(
+				() => simulate({ ...ctx, unknown: true }),
+				/Invalid closed qualification fields/
+			);
+		} finally {
+			for (const [key, value] of savedEnvironment) {
+				if (value === undefined) delete process.env[key];
+				else process.env[key] = value;
+			}
+		}
+		for (const explicitFull of [
+			{ ...ctx, ref: 'refs/heads/main' },
+			{ ...ctx, event_name: 'pull_request' }
+		]) {
+			const ordinary = await simulate(explicitFull);
+			assert.equal(ordinary.result, 0);
+			assert.equal(ordinary.spawned.length, 2);
+			assert.equal(ordinary.receipts.length, 0);
+		}
+		const wrapperSource = fs.readFileSync(
+			path.join(ROOT, 'tools/test/run-linux-window-switch-receipts.cjs'),
+			'utf8'
+		);
+		assert.equal(
+			wrapperSource.split('run({ qualificationContext: qualification.environmentContext() }).then(')
+				.length,
+			2,
+			'principal CLI requests profile explicitly exactly once'
+		);
 		const deferred = await simulate(ctx);
 		assert.equal(deferred.result, 0);
 		assert.equal(deferred.spawned.length, 1);

@@ -41,6 +41,8 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
 const { byTag, runPage, textNodes } = require('./support/changelog-page-dom.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
@@ -170,9 +172,8 @@ function expand(text, env, escapable) {
  * Interprets the release-body step for one set of inputs and returns the
  * body file it writes.
  */
-function buildCiBody(inputs, changelog) {
+function buildCiBody(inputs, changelog, script = releaseBodyScript()) {
 	const env = { ...inputs };
-	const script = releaseBodyScript();
 	let body = '';
 	let inGroup = false;
 	let skipping = false;
@@ -191,6 +192,29 @@ function buildCiBody(inputs, changelog) {
 			continue;
 		}
 		if (skipping) continue;
+		// A quoted Node heredoc is literal stdin; only TAG is an argv value.
+		// Execute the workflow's actual code instead of copying its note text.
+		if (trimmed === 'node - "$TAG" >> "$body_file" <<\'NODE\'') {
+			const source = [];
+			for (i++; i < script.length && script[i] !== 'NODE'; i++) source.push(script[i]);
+			if (i >= script.length) throw new Error('unterminated Node heredoc in the release-body step');
+			const result = spawnSync(process.execPath, ['-', env.TAG], {
+				input: source.join('\n') + '\n',
+				cwd: ROOT,
+				encoding: 'utf8',
+				env: { ...process.env, ...env },
+				windowsHide: true,
+				timeout: 5000,
+				maxBuffer: 65536
+			});
+			if (result.error) throw result.error;
+			if (result.signal !== null || result.status !== 0 || result.stderr !== '')
+				throw new Error(
+					`Node release-body heredoc failed: status=${result.status}, signal=${result.signal}, stderr=${result.stderr}`
+				);
+			body += result.stdout;
+			continue;
+		}
 		if (/^cat >> "\$body_file" << EOF$/.test(trimmed)) {
 			for (i++; i < script.length && script[i] !== 'EOF'; i++) {
 				body += expand(script[i], env, '$`\\') + '\n';
@@ -300,6 +324,94 @@ function checkCiBody(modules) {
 		bare.format === 'marked' && bare.changelog === '',
 		'an empty changelog must still split as marked'
 	);
+}
+
+/** Actual workflow Node notes must stay scoped without weakening the shell model. */
+function checkNodeBodyInterpreter(modules) {
+	const policy = JSON.parse(
+		fs.readFileSync(path.join(ROOT, '.github/ci/dev_release_qualification_exceptions.json'), 'utf8')
+	);
+	const active = { ...CI_ENV, TAG: policy.tag, VERSION: policy.version, CHANNEL: policy.channel };
+	const body = buildCiBody(active, CHANGELOG_MD);
+	assert.ok(
+		body.includes('### Native validation limitations'),
+		'The actual dev.156 notes block must be executed.'
+	);
+	assert.ok(
+		body.includes('Deferred checks are not passes'),
+		'The actual notes must deny native qualification.'
+	);
+	for (const [scope, record] of Object.entries(policy.scopes)) {
+		const line = '- **DEFERRED — ' + scope + ':** ' + record.reason;
+		assert.equal(
+			body.split(line).length - 1,
+			1,
+			'Every actual declared limitation must occur once.'
+		);
+	}
+	assert.ok(body.includes(policy.expires_at));
+	for (const tag of ['v0.0.0-dev.155', 'v0.0.0-dev.157', 'v1.2.3']) {
+		const other = buildCiBody({ ...CI_ENV, TAG: tag }, CHANGELOG_MD);
+		assert.ok(
+			!other.includes('Native validation limitations'),
+			'Other tags must not borrow these notes.'
+		);
+		assert.ok(!other.includes('**DEFERRED —'));
+	}
+	const parts = modules.splitReleaseBody(body);
+	const baseline = modules.splitReleaseBody(buildCiBody(CI_ENV, CHANGELOG_MD));
+	assert.equal(parts.format, 'marked');
+	assert.equal(parts.title, 'Ergopti ' + policy.version);
+	assert.equal(
+		parts.changelog,
+		baseline.changelog,
+		'Qualification notes cannot contaminate changelog.'
+	);
+	assert.ok(parts.footer.includes('### Native validation limitations'));
+	assert.ok(
+		parts.footer.endsWith(baseline.footer),
+		'The CI credit must remain the final footer text.'
+	);
+	assert.ok(parts.downloads.includes('releases/download/' + policy.tag + '/ErgoptiPlus.exe'));
+	checkPageOrder('CI qualification notes', body, 'Ci: Mark the release body sections');
+	assert.equal(
+		renderPane(body).notes.textContent,
+		renderPane(buildCiBody(CI_ENV, CHANGELOG_MD)).notes.textContent
+	);
+	const command = 'node - "$TAG" >> "$body_file" <<\'NODE\'';
+	assert.equal(
+		buildCiBody(CI_ENV, '', [
+			command,
+			'console.log(JSON.stringify(["$TAG", process.argv[2]]))',
+			'NODE'
+		]),
+		JSON.stringify(['$TAG', CI_ENV.TAG]) + '\n',
+		'A quoted heredoc remains literal while the exact tag is passed through argv.'
+	);
+	assert.throws(
+		() =>
+			buildCiBody(CI_ENV, '', [
+				command,
+				'console.log("partial"); throw Error("controlled-node-refusal")',
+				'NODE'
+			]),
+		/Node release-body heredoc failed/
+	);
+	assert.throws(
+		() => buildCiBody(CI_ENV, '', [command, 'console.error("controlled-node-stderr")', 'NODE']),
+		/Node release-body heredoc failed/
+	);
+	assert.throws(
+		() => buildCiBody(CI_ENV, '', [command, 'console.log("missing terminator")']),
+		/unterminated Node heredoc/
+	);
+	for (const unknown of [
+		'node - "$VERSION" >> "$body_file" <<\'NODE\'',
+		'curl https://example.invalid',
+		'node arbitrary-script.cjs'
+	]) {
+		assert.throws(() => buildCiBody(CI_ENV, '', [unknown]), /unmodelled statement/);
+	}
 }
 
 // ==========================================
@@ -609,6 +721,7 @@ function checkNotesPane() {
 for (const [name, check] of [
 	['vectors', checkVectors],
 	['CI body', checkCiBody],
+	['Node body interpreter', checkNodeBodyInterpreter],
 	['Atom bodies', checkAtomBodies],
 	['Versions page', checkVersionsPage],
 	['prompt notes pane', checkNotesPane]
