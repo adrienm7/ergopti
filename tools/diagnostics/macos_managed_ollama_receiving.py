@@ -368,11 +368,40 @@ class Receiver:
         self.copy_source(
             "static/ergopti_plus/macos/tests/support/native_http_fixture_main.swift", main
         )
+        # SwiftPM provides this production Clang module to the release
+        # launcher. The standalone TLS worker must import the same headers.
+        compatibility_module = self.work / "CPOSIXCompatibility"
+        compatibility_module.mkdir(mode=0o700)
+        for name in (
+            "CPOSIXCompatibility.h",
+            "OwnedProgramCompatibility.h",
+            "LoopbackListenerCompatibility.h",
+        ):
+            relative = (
+                "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/" + name
+            )
+            destination = compatibility_module / name
+            self.copy_source(relative, destination)
+            require(
+                digest(destination) == self.source_hashes[relative],
+                "compatibility_source_copy",
+            )
+        (compatibility_module / "module.modulemap").write_text(
+            "module CPOSIXCompatibility {\n"
+            '  umbrella header "CPOSIXCompatibility.h"\n'
+            "  export *\n"
+            "}\n",
+            encoding="utf-8",
+        )
         self.fixture._command(
             [
                 "/usr/bin/xcrun",
                 "swiftc",
                 "-parse-as-library",
+                "-I",
+                str(compatibility_module),
+                "-framework",
+                "SystemConfiguration",
                 str(worker),
                 str(main),
                 "-o",
