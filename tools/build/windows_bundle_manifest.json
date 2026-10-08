@@ -130,6 +130,10 @@
 	],
 	"required": [
 		{
+			"source": "static/ergopti_plus/windows/vendor/ergopti_curl_attempt.ps1",
+			"dest": "vendor/ergopti_curl_attempt.ps1"
+		},
+		{
 			"source": "static/ergopti_plus/windows/vendor/ergopti_uninstall.ps1",
 			"dest": "vendor/ergopti_uninstall.ps1"
 		},

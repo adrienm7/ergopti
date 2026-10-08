@@ -91,3 +91,32 @@ _JOKN_MemberPathNulRefusals() {
 }
 Test("JSON: public member paths refuse native NUL aliases before lookup (json-member-spans)",
 	_JOKN_MemberPathNulRefusals)
+
+
+_JsonArraySpans_PreserveExactOrderedTokenKinds() {
+	Source := ' [ true , 1, false, 0, "true", null, {"size":true,"\u0073ize":1}, ["é", {"x":"nested"}] ] '
+	Spans := JsonArrayElementSpans(Source)
+	AssertEqual(8, Spans.Length, "independent array element census")
+	Expected := ['true', '1', 'false', '0', '"true"', 'null',
+		'{"size":true,"\u0073ize":1}', '["é", {"x":"nested"}]']
+	for Index, Token in Expected {
+		AssertEqual(Token, Spans[Index]["text"], "ordered original token kind is preserved")
+		AssertEqual(Token, SubStr(Source, Spans[Index]["start"], Spans[Index]["length"]),
+			"original UTF-16 offsets reproduce exact token source")
+	}
+	AssertEqual('1', JsonObjectMemberSpans(Spans[7]["text"])["size"]["text"],
+		"decoded duplicate key preserves last-member-wins kind")
+	AssertEqual(0, JsonArrayElementSpans(" [] ").Length)
+	AssertEqual('"é\uD83D\uDE00"', JsonArrayElementSpans('["é\uD83D\uDE00"]')[1]["text"],
+		"Unicode source spelling is retained, rather than reconstructed from values")
+}
+Test("JSON: array source spans preserve exact ordered token kinds (json-array-spans)",
+	_JsonArraySpans_PreserveExactOrderedTokenKinds)
+
+_JsonArraySpans_RefuseWholeDocumentAndNonArrays() {
+	for Source in ['{}', '"[]"', 'null', 'true', '1', '[1,]', '[1] trailing',
+		'[1, {"x":2} invalid]', '[{"key\u0000hidden":1}]']
+		AssertThrows(JsonArrayElementSpans.Bind(Source), "array source spans retain full canonical validation")
+}
+Test("JSON: array source spans retain whole-document and root refusals (json-array-spans)",
+	_JsonArraySpans_RefuseWholeDocumentAndNonArrays)
