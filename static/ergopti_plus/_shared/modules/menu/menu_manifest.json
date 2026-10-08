@@ -333,12 +333,40 @@
 		{
 			"type": "command",
 			"id": "reload",
-			"i18n": "menu.global.reload"
+			"i18n": "menu.global.reload",
+			"platforms": [
+				"ahk",
+				"linux"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "command",
+			"id": "reload",
+			"i18n": "menu.global.reload_macos",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
 		},
 		{
 			"type": "command",
 			"id": "quit",
-			"i18n": "menu.global.quit"
+			"i18n": "menu.global.quit",
+			"platforms": [
+				"ahk",
+				"linux"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "command",
+			"id": "quit",
+			"i18n": "menu.global.quit_macos",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
 		},
 		{
 			"type": "group",

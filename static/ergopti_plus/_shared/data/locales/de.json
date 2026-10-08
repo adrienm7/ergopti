@@ -3249,5 +3249,7 @@
 	"gestures.system.pinch_unknown": "Systemgeste zum Zusammenziehen : Systemgesten: nicht überprüft",
 	"gestures.system.slot_unknown_caption": "%s — Systemgesten: nicht überprüft",
 	"gestures.system.slot_configured_caption": "%s — Für ErgoptiPlus konfiguriert",
-	"gestures.system.slot_not_configured_caption": "%s — Nicht für ErgoptiPlus konfiguriert"
+	"gestures.system.slot_not_configured_caption": "%s — Nicht für ErgoptiPlus konfiguriert",
+	"menu.global.reload_macos": "↺ Neu laden",
+	"menu.global.quit_macos": "✕ Beenden"
 }

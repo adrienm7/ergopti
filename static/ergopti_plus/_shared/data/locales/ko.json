@@ -3249,5 +3249,7 @@
 	"gestures.system.pinch_unknown": "시스템 핀치 제스처 : 시스템 제스처: 확인되지 않음",
 	"gestures.system.slot_unknown_caption": "%s — 시스템 제스처: 확인되지 않음",
 	"gestures.system.slot_configured_caption": "%s — ErgoptiPlus용으로 설정됨",
-	"gestures.system.slot_not_configured_caption": "%s — ErgoptiPlus용으로 설정되지 않음"
+	"gestures.system.slot_not_configured_caption": "%s — ErgoptiPlus용으로 설정되지 않음",
+	"menu.global.reload_macos": "↺ 다시 로드",
+	"menu.global.quit_macos": "✕ 종료"
 }

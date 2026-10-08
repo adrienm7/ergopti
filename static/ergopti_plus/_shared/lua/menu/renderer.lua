@@ -242,6 +242,23 @@ function M.new(deps)
 		return false
 	end
 
+	--- Finds the unique native-visible owner of a declared row identity.
+	--- Hidden siblings never decide native captions, readiness or provider status.
+	--- @param menu_key string
+	--- @param item_id string
+	--- @return table|nil
+	local function find_item_by_id(menu_key, item_id)
+		if type(menu_key) ~= "string" or menu_key == "" or type(item_id) ~= "string" or item_id == "" then return nil end
+		local selected
+		for _, item in ipairs(get_menu_def(menu_key)) do
+			if type(item) == "table" and item.id == item_id and is_for_platform(item) then
+				if selected ~= nil then return nil end
+				selected = item
+			end
+		end
+		return selected
+	end
+
 	--- The short form of a translated reason: the text before its first colon,
 	--- ASCII or full-width, which every platform reason opens with (« Not on
 	--- macOS yet: … »), or the whole text when it has none.
@@ -589,10 +606,9 @@ function M.new(deps)
 	--- @param getters table Existing native state readers.
 	--- @return table|nil row
 	function R.choice_row(manifest_key, row_id, commands, getters)
-		for _, item in ipairs(get_menu_def(manifest_key)) do
-			if item.type == "choice" and item.id == row_id and is_for_platform(item) then
-				return choice_row_data(item, manifest_key, commands or {}, getters or {})
-			end
+		local item = find_item_by_id(manifest_key, row_id)
+		if item ~= nil and item.type == "choice" then
+			return choice_row_data(item, manifest_key, commands or {}, getters or {})
 		end
 		Logger.error(LOG, "Missing declared choice '%s.%s' — provider row refused.", manifest_key, row_id)
 		return nil
@@ -703,19 +719,18 @@ function M.new(deps)
 	--- @return table|nil row
 	function R.command_row(manifest_key, row_id, commands, getters)
 		commands, getters = commands or {}, getters or {}
-		for _, item in ipairs(get_menu_def(manifest_key)) do
-			if item.type == "command" and item.id == row_id and is_for_platform(item) then
-				local built = command_item(item, manifest_key, commands, getters)
-				if not built then return nil end
-				local action = built.fn
-				return {
-					label = built.title, disabled = built.disabled,
-					action = type(action) == "function" and function(...)
-						if R.resolve_disabled_when(manifest_key, row_id, getters) then return false end
-						return action(...)
-					end or nil,
-				}
-			end
+		local item = find_item_by_id(manifest_key, row_id)
+		if item ~= nil and item.type == "command" then
+			local built = command_item(item, manifest_key, commands, getters)
+			if not built then return nil end
+			local action = built.fn
+			return {
+				label = built.title, disabled = built.disabled,
+				action = type(action) == "function" and function(...)
+					if R.resolve_disabled_when(manifest_key, row_id, getters) then return false end
+					return action(...)
+				end or nil,
+			}
 		end
 		Logger.error(LOG, "Missing declared command '%s.%s' — provider row refused.", manifest_key, row_id)
 		return nil
@@ -1032,9 +1047,16 @@ function M.new(deps)
 	--- @param status string Named native status to project.
 	--- @return table|nil rows
 	function R.status_rows(manifest_key, row_id, status)
-		local owner
-		for _, item in ipairs(get_menu_def(manifest_key)) do
-			if item.id == row_id then owner = item; break end
+		local owner = find_item_by_id(manifest_key, row_id)
+		-- Inert data from a single global declaration is shared across drivers.
+		-- Platform variants still need one native owner; ambiguous data refuses.
+		if owner == nil then
+			for _, item in ipairs(get_menu_def(manifest_key)) do
+				if type(item) == "table" and item.id == row_id then
+					if owner ~= nil then return nil end
+					owner = item
+				end
+			end
 		end
 		local statuses = owner and owner.status_rows
 		local declaration = type(statuses) == "table" and statuses[status]
@@ -1062,19 +1084,18 @@ function M.new(deps)
 	--- @return table|nil row
 	function R.check_row(manifest_key, row_id, commands, getters)
 		commands, getters = commands or {}, getters or {}
-		for _, item in ipairs(get_menu_def(manifest_key)) do
-			if item.type == "check" and item.id == row_id and is_for_platform(item) then
-				local built = command_item(item, manifest_key, commands, getters)
-				if not built then return nil end
-				local action = built.fn
-				return {
-					label = built.title, checked = built.checked, disabled = built.disabled,
-					action = type(action) == "function" and function(...)
-						if R.resolve_disabled_when(manifest_key, row_id, getters) then return false end
-						return action(...)
-					end or nil,
-				}
-			end
+		local item = find_item_by_id(manifest_key, row_id)
+		if item ~= nil and item.type == "check" then
+			local built = command_item(item, manifest_key, commands, getters)
+			if not built then return nil end
+			local action = built.fn
+			return {
+				label = built.title, checked = built.checked, disabled = built.disabled,
+				action = type(action) == "function" and function(...)
+					if R.resolve_disabled_when(manifest_key, row_id, getters) then return false end
+					return action(...)
+				end or nil,
+			}
 		end
 		Logger.error(LOG, "Missing declared checkbox '%s.%s' — provider row refused.", manifest_key, row_id)
 		return nil
@@ -1437,18 +1458,6 @@ function M.new(deps)
 	-- ===== 1.5) Declarative Predicate Resolvers =======
 	-- ==================================================
 
-	--- Finds the manifest item with the given ``id`` inside the ``menu_key`` array.
-	--- @param menu_key string
-	--- @param item_id string
-	--- @return table|nil
-	local function find_item_by_id(menu_key, item_id)
-		for _, item in ipairs(get_menu_def(menu_key)) do
-			if type(item) == "table" and item.id == item_id then
-				return item
-			end
-		end
-		return nil
-	end
 
 	--- Evaluates the declarative ``disabled_when`` predicate of a manifest item
 	--- against a caller-supplied table of canonical state key → zero-arg getter.

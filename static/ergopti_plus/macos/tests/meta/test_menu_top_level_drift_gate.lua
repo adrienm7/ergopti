@@ -44,8 +44,8 @@ local TITLE_KEYS = {
 	configuration   = "menu.configuration.title",
 	language        = "menu.global.language",
 	about           = "menu.about.title",
-	reload          = "menu.global.reload",
-	quit            = "menu.global.quit",
+	reload          = "menu.global.reload_macos",
+	quit            = "menu.global.quit_macos",
 	debug           = "menu.debug.title",
 }
 
@@ -356,6 +356,8 @@ local function lifecycle_manifest(mutator)
 		if row.id == "reload" or row.id == "quit" then
 			row.type = "command"
 			row.i18n = row.id == "reload" and "button.cancel" or "button.ok"
+			-- The canonical declaration now owns the original icon decoration too.
+			row.label_prefix = row.id == "reload" and "↺ " or "✕ "
 			if mutator then mutator(row) end
 		end
 	end

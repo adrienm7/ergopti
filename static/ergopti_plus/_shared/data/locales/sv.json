@@ -3249,5 +3249,7 @@
 	"gestures.system.pinch_unknown": "Systemets nypgest : Systemgester: inte kontrollerade",
 	"gestures.system.slot_unknown_caption": "%s — Systemgester: inte kontrollerade",
 	"gestures.system.slot_configured_caption": "%s — Konfigurerat för ErgoptiPlus",
-	"gestures.system.slot_not_configured_caption": "%s — Inte konfigurerat för ErgoptiPlus"
+	"gestures.system.slot_not_configured_caption": "%s — Inte konfigurerat för ErgoptiPlus",
+	"menu.global.reload_macos": "↺ Läs in på nytt",
+	"menu.global.quit_macos": "✕ Avsluta"
 }

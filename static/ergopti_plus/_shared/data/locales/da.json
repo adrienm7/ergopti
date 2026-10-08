@@ -3249,5 +3249,7 @@
 	"gestures.system.pinch_unknown": "Systemets knibebevægelse : Systembevægelser: ikke kontrolleret",
 	"gestures.system.slot_unknown_caption": "%s — Systembevægelser: ikke kontrolleret",
 	"gestures.system.slot_configured_caption": "%s — Konfigureret til ErgoptiPlus",
-	"gestures.system.slot_not_configured_caption": "%s — Ikke konfigureret til ErgoptiPlus"
+	"gestures.system.slot_not_configured_caption": "%s — Ikke konfigureret til ErgoptiPlus",
+	"menu.global.reload_macos": "↺ Genindlæs",
+	"menu.global.quit_macos": "✕ Afslut"
 }

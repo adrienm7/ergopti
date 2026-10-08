@@ -3249,5 +3249,7 @@
 	"gestures.system.pinch_unknown": "Gesto di pizzicamento del sistema : Gesti di sistema: non verificati",
 	"gestures.system.slot_unknown_caption": "%s — Gesti di sistema: non verificati",
 	"gestures.system.slot_configured_caption": "%s — Configurato per ErgoptiPlus",
-	"gestures.system.slot_not_configured_caption": "%s — Non configurato per ErgoptiPlus"
+	"gestures.system.slot_not_configured_caption": "%s — Non configurato per ErgoptiPlus",
+	"menu.global.reload_macos": "↺ Ricarica",
+	"menu.global.quit_macos": "✕ Esci"
 }

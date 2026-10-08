@@ -3249,5 +3249,7 @@
 	"gestures.system.pinch_unknown": "सिस्टम का पिंच जेस्चर : सिस्टम जेस्चर: जाँच नहीं हुई",
 	"gestures.system.slot_unknown_caption": "%s — सिस्टम जेस्चर: जाँच नहीं हुई",
 	"gestures.system.slot_configured_caption": "%s — ErgoptiPlus के लिए कॉन्फ़िगर किया गया",
-	"gestures.system.slot_not_configured_caption": "%s — ErgoptiPlus के लिए कॉन्फ़िगर नहीं किया गया"
+	"gestures.system.slot_not_configured_caption": "%s — ErgoptiPlus के लिए कॉन्फ़िगर नहीं किया गया",
+	"menu.global.reload_macos": "↺ पुनः लोड करें",
+	"menu.global.quit_macos": "✕ बंद करें"
 }

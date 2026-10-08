@@ -3249,5 +3249,7 @@
 	"gestures.system.pinch_unknown": "Knijpgebaar van het systeem : Systeemgebaren: niet gecontroleerd",
 	"gestures.system.slot_unknown_caption": "%s — Systeemgebaren: niet gecontroleerd",
 	"gestures.system.slot_configured_caption": "%s — Geconfigureerd voor ErgoptiPlus",
-	"gestures.system.slot_not_configured_caption": "%s — Niet geconfigureerd voor ErgoptiPlus"
+	"gestures.system.slot_not_configured_caption": "%s — Niet geconfigureerd voor ErgoptiPlus",
+	"menu.global.reload_macos": "↺ Herladen",
+	"menu.global.quit_macos": "✕ Afsluiten"
 }
