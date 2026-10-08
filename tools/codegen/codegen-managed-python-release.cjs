@@ -40,56 +40,82 @@ function validate(data) {
 	)
 		throw new TypeError('Managed Python upstream metadata identity refused.');
 	const keys = Object.keys(data.downloads || {});
-	if (keys.length !== 1) throw new TypeError('Managed Python platform selection is unavailable.');
-	const key = keys[0],
-		entry = data.downloads[key];
-	exactKeys(entry, [
-		'name',
-		'arch',
-		'os',
-		'libc',
-		'major',
-		'minor',
-		'patch',
-		'prerelease',
-		'url',
-		'sha256',
-		'variant',
-		'build'
-	]);
-	exactKeys(entry.arch, ['family', 'variant']);
+	if (keys.length !== 2) throw new TypeError('Managed Python platform selection is unavailable.');
+	const selections = ['aarch64', 'x86_64'].map((family) => {
+		const matches = keys.filter((key) => data.downloads[key]?.arch?.family === family);
+		if (matches.length !== 1)
+			throw new TypeError('Managed Python native architecture is unavailable or duplicated.');
+		const key = matches[0],
+			entry = data.downloads[key];
+		exactKeys(entry, [
+			'name',
+			'arch',
+			'os',
+			'libc',
+			'major',
+			'minor',
+			'patch',
+			'prerelease',
+			'url',
+			'sha256',
+			'variant',
+			'build'
+		]);
+		exactKeys(entry.arch, ['family', 'variant']);
+		if (
+			entry.name !== 'cpython' ||
+			entry.arch.family !== family ||
+			entry.arch.variant !== null ||
+			entry.os !== 'darwin' ||
+			entry.libc !== 'none' ||
+			entry.variant !== null ||
+			entry.prerelease !== '' ||
+			entry.major !== 3 ||
+			entry.minor !== 11 ||
+			!Number.isSafeInteger(entry.patch) ||
+			entry.patch < 0 ||
+			typeof entry.build !== 'string' ||
+			!/^\d{8}$/.test(entry.build) ||
+			typeof entry.sha256 !== 'string' ||
+			!/^[a-f0-9]{64}$/.test(entry.sha256)
+		)
+			throw new TypeError('Managed Python native platform identity refused.');
+		const version = `${entry.major}.${entry.minor}.${entry.patch}`;
+		if (
+			key !== `cpython-${version}-darwin-${family}-none` ||
+			entry.url !==
+				`https://github.com/astral-sh/python-build-standalone/releases/download/${entry.build}/cpython-${version}%2B${entry.build}-${family}-apple-darwin-install_only_stripped.tar.gz`
+		)
+			throw new TypeError('Managed Python archive identity refused.');
+		return { key, entry, version, nativeArchitecture: family === 'aarch64' ? 'arm64' : 'x86_64' };
+	});
 	if (
-		entry.name !== 'cpython' ||
-		entry.arch.family !== 'aarch64' ||
-		entry.arch.variant !== null ||
-		entry.os !== 'darwin' ||
-		entry.libc !== 'none' ||
-		entry.variant !== null ||
-		entry.prerelease !== '' ||
-		entry.major !== 3 ||
-		entry.minor !== 11 ||
-		!Number.isSafeInteger(entry.patch) ||
-		entry.patch < 0 ||
-		typeof entry.build !== 'string' ||
-		!/^\d{8}$/.test(entry.build) ||
-		typeof entry.sha256 !== 'string' ||
-		!/^[a-f0-9]{64}$/.test(entry.sha256)
+		selections.some(
+			({ entry, version }) =>
+				version !== selections[0].version || entry.build !== selections[0].entry.build
+		)
 	)
-		throw new TypeError('Managed Python native platform identity refused.');
-	const version = `${entry.major}.${entry.minor}.${entry.patch}`;
-	if (
-		key !== `cpython-${version}-darwin-aarch64-none` ||
-		entry.url !==
-			`https://github.com/astral-sh/python-build-standalone/releases/download/${entry.build}/cpython-${version}%2B${entry.build}-aarch64-apple-darwin-install_only_stripped.tar.gz`
-	)
-		throw new TypeError('Managed Python archive identity refused.');
-	return { key, entry, version };
+		throw new TypeError(
+			'Managed Python native architectures require the same interpreter release.'
+		);
+	return selections;
 }
 
 /** Render deterministic projections; the original metadata still owns uv extraction. */
 function render(data) {
-	const { entry, version } = validate(data);
-	const basename = entry.sha256.slice(0, 9) + '-' + entry.url.split('/').at(-1).replace('%2B', '-');
+	const selections = validate(data);
+	const branches = selections
+		.map(({ entry, version, nativeArchitecture }) => {
+			const basename =
+				entry.sha256.slice(0, 9) + '-' + entry.url.split('/').at(-1).replace('%2B', '-');
+			return `\t${nativeArchitecture})
+\t\tMANAGED_PYTHON_REQUEST="cpython-${version}-macos-${entry.arch.family}-none"
+\t\tMANAGED_PYTHON_URL="${entry.url}"
+\t\tMANAGED_PYTHON_SHA256="${entry.sha256}"
+\t\tMANAGED_PYTHON_CACHE_BASENAME="${basename}"
+\t\t;;`;
+		})
+		.join('\n');
 	return {
 		[SHELL_OUTPUT]: `#!/bin/bash
 # modules/llm/managed-python-release.sh
@@ -99,10 +125,10 @@ function render(data) {
 # uv owns hash verification, offline extraction and interpreter publication.
 
 MANAGED_PYTHON_UV_RELEASE="${data.uv_release}"
-MANAGED_PYTHON_REQUEST="cpython-${version}-macos-aarch64-none"
-MANAGED_PYTHON_URL="${entry.url}"
-MANAGED_PYTHON_SHA256="${entry.sha256}"
-MANAGED_PYTHON_CACHE_BASENAME="${basename}"
+case "\${ERGOPTI_NATIVE_ARCH:-$(/usr/bin/uname -m)}" in
+${branches}
+\t*) return 78 2>/dev/null || exit 78 ;;
+esac
 MANAGED_PYTHON_DOWNLOADS_BASENAME="managed-python-downloads.json"
 `,
 		[METADATA_OUTPUT]: JSON.stringify(data.downloads, null, '\t') + '\n'

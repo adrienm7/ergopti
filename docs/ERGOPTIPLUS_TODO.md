@@ -5636,6 +5636,12 @@ assertion bodies remain intact; nine causal controls and the actual 30 public
 transport plus 18 retained-output controls pass. Full-suite retries remain
 pending after local disk exhaustion; no native or packaging gate is waived.
 
+Managed Python metadata now includes independently verified official arm64
+and Intel macOS archives. Both generated records retain literal upstream
+checksums; all 16 refusal vectors and exact architecture selection pass.
+Native extraction, interpreter execution and the Intel bootstrap helper
+join remain pending; metadata preparation does not qualify installation.
+
 The macOS native-network tranche adds NSURLSession/CFNetwork route receiving,
 a bounded private HTTP protocol, an owned PTY bootstrap and verified offline
 Python inputs. The frozen local candidate passes all 17,158 Hammerspoon
