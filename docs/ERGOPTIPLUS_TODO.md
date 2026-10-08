@@ -3254,9 +3254,12 @@ WP3 prerequisite: the actual macOS physical accounting owner now requires exact 
   route. Planning and execution now retain that failed outcome and strengthen
   the physical-owner reason checks without changing read-only refusal, source,
   backup or publication assertions. Corrected native execution remains pending.
-  The other two failures are an unclassified process-wide ERROR in the outdated
-  load fixture and the native brightness worker; neither cause is inferred from
-  missing artifact access. This bounded correction does not grant a genuine
+  The other two failures are a process-wide ERROR in the outdated load fixture
+  and the native brightness worker; neither cause is inferred from missing
+  artifact access. The existing outdated-load assertion now includes up to eight
+  bounded ASCII logger namespace tags, preserving its original zero-ERROR
+  expectation and process-wide counting. It emits no log bodies or file paths;
+  the exact Windows native run must establish the error owner before any fix. This bounded correction does not grant a genuine
   constructor-issued source journal or close item 33.
 
   Linux and macOS filesystem modules now expose their genuine initializer
