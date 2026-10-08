@@ -2511,3 +2511,36 @@ adds only this observed domain while preserving existing rules; saving the
 draft has not applied it to the running environment. Detailed retained native
 evidence remains required. Items24/30/31/40/43/44 and transverse16/38 stay open;
 no final integration lock, dev push or feature deletion has occurred.
+
+## Unavailable stream selection without native acquisition
+
+The existing physical capture capability now selects explicit unavailable
+stream intent through the same exact managed-source owner/token and accounting
+settlement. It acquires no lease, verifier, clock, transport or capture, and
+creates no installed/runtime-ready authority. Binding remains neutral; selection
+retains GAP and suppresses legacy credit. Existing active leases, retained
+history scopes and real retirement obligations refuse replacement. Final
+shutdown alone returns to ledger accounting, with refused release debt visible
+as unsettled. A later genuine start retains its original validation/admission.
+
+Twelve independent new cases are frozen before implementation and fail on the
+predecessor. A separately frozen release-debt control exposes the first draft's
+false diagnostic settlement; its expectation is unchanged after correction.
+Final portable regression13 and original focused capture/accounting/history/
+collision252 pass with modeled native endpoints. These265 distinct cases are
+not actual Mac input or native process proof. The private E2E attempt initially
+lacks bundle assets; after authentic asset preparation, its bounded60-second
+retry remains incomplete. No private E2E pass is claimed. Full selected gates
+are run separately on the adopted sources. The exact two-source patch and
+preimages are reviewed; all35 original capture assertions remain. Selectors,
+production initialization and genuine installed/start authority remain absent.
+Item31 and transverse16/38 stay open.
+
+The first actual selected gate rejects one new test's inline pcall-only assertion;
+its382 other JS checks and all18,192 Lua tests pass, and E2E completes. The
+test now retains the exact false rejection predicate while also checking the
+unchanged original absolute-executable error contract. All13 cases pass in the
+focused strengthening check, with no scanner or baseline changes. Original
+expectation values and postconditions remain; this explicitly strengthened
+successor does not claim a byte-identical frozen test prefix. Complete selected
+verification is repeated on the final test source before publication.

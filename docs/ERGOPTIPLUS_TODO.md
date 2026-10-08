@@ -4921,6 +4921,17 @@ Later tests are unexecuted. This private trial predates the current dev merge,
 does not qualify final sources or packaging/installation, and grants no runtime
 activation. Item31 and transverse16/38 remain open.
 
+The existing managed capture owner can now select unavailable stream intent
+without a fabricated lease, runtime binding or native operation. Its exact
+owner/token and original settlement select GAP, suppressing legacy credit until
+actual final shutdown releases accounting. Active leases, history custody,
+callback frames and refused release debt still block replacement. Thirteen
+frozen causal regressions and252 existing focused cases pass with modeled
+native ports; the predecessor fails all12 original new cases. Default binding
+remains ledger-neutral. Production selectors, startup composition, genuine
+installed/start authority and native acceptance remain unfinished; this dormant
+operation does not complete WP3 or item31.
+
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
   listed; see `docs/memory/text-input-and-config.md`. Current source already
