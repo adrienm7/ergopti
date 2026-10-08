@@ -178,7 +178,8 @@ parent_dir="$(dirname "$OLLAMA_INSTALL_DIR")"
 mkdir -p "$parent_dir"
 INSTALL_STAGE="$(mktemp -d "$parent_dir/.ollama.ergopti.XXXXXX")"
 # Preserve pinned member modes even under the native private-process umask.
-if ! tar -xzpf "$archive_path" -C "$INSTALL_STAGE"; then
+# Preserve literal AppleDouble archive members and their published modes.
+if ! COPYFILE_DISABLE=1 tar -xzpf "$archive_path" -C "$INSTALL_STAGE"; then
 	log_error "The verified Ollama archive could not be extracted."
 	exit 1
 fi

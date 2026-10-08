@@ -314,11 +314,19 @@ function verifyColdBootstrap(report, sha) {
 		);
 		observed.add(item.path);
 		assert.match(item.sha256, /^[a-f0-9]{64}$/);
-		for (const field of ['bytes', 'device', 'inode'])
-			assert.ok(
-				Number.isSafeInteger(item[field]) && item[field] > 0,
-				'Missing physical stock runtime identity'
-			);
+		assert.ok(
+			Number.isSafeInteger(item.bytes) && item.bytes > 0,
+			'Missing physical stock runtime identity'
+		);
+		// APFS identities can exceed JavaScript's exact integer range. Admit only
+		// canonical decimal strings, then bound their exact BigInt values.
+		for (const field of ['device', 'inode']) {
+			assert.equal(typeof item[field], 'string', 'Physical identity must be exact decimal text');
+			assert.match(item[field], /^[1-9][0-9]{0,19}$/, 'Noncanonical physical identity');
+			const identity = BigInt(item[field]);
+			assert.equal(identity.toString(), item[field], 'Noncanonical physical identity bytes');
+			assert.ok(identity <= 18446744073709551615n, 'Physical identity exceeds uint64');
+		}
 		assert.equal(item.read_denied, true, 'Actual stock runtime read was not denied');
 		assert.equal(typeof item.native, 'boolean');
 		assert.equal(item.exec_denied, item.native, 'Native stock runtime exec denial differs');

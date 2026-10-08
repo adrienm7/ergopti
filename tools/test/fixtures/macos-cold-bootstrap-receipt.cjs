@@ -96,8 +96,8 @@ function coldBootstrapRecord() {
 					{
 						path: '/usr/bin/python3',
 						sha256: '3'.repeat(64),
-						device: 27,
-						inode: 123,
+						device: '27',
+						inode: '123',
 						bytes: 1234,
 						read_denied: true,
 						native: true,
