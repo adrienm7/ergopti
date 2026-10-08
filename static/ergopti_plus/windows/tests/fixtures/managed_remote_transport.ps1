@@ -4,16 +4,128 @@ param(
     [Parameter(Mandatory = $true)][string]$StatePath,
     [Parameter(Mandatory = $true)][string]$EventPrefix,
     [ValidateSet('Serve', 'ServeUpdater', 'Cleanup')][string]$Mode = 'Serve',
+    [Parameter(Mandatory = $true)][string]$OwnedRootStoreScope,
     [string]$OwnedRootThumbprint = '',
     [string]$OwnedRootSubject = ''
 )
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
-function Remove-OwnedRoot([string]$Thumbprint, [string]$Subject) {
+function Get-OwnedFixtureTokenElevation {
+    if (-not ('ErgoptiOwnedFixtureToken' -as [type])) {
+        Add-Type -TypeDefinition @'
+using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using System.Runtime.ExceptionServices;
+public static class ErgoptiOwnedFixtureToken {
+    private static readonly List<Observation> debt = new List<Observation>();
+    [DllImport("kernel32.dll", ExactSpelling = true)]
+    private static extern IntPtr GetCurrentProcess();
+    [DllImport("advapi32.dll", SetLastError = true)]
+    private static extern bool OpenProcessToken(IntPtr process, UInt32 access, out IntPtr token);
+    [DllImport("advapi32.dll", SetLastError = true)]
+    private static extern bool GetTokenInformation(IntPtr token, Int32 kind, out UInt32 value, UInt32 size, out UInt32 returned);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool CloseHandle(IntPtr handle);
+    private static IntPtr OpenNative() {
+        IntPtr token;
+        if (!OpenProcessToken(GetCurrentProcess(), 8, out token)) {
+            throw new InvalidOperationException("Owned fixture token acquisition was refused.");
+        }
+        return token;
+    }
+    private static bool QueryNative(IntPtr token) {
+        UInt32 elevated, returned;
+        if (!GetTokenInformation(token, 20, out elevated, 4, out returned) || returned != 4) {
+            throw new InvalidOperationException("Owned fixture token elevation query was refused.");
+        }
+        return elevated != 0;
+    }
+    public sealed class Observation {
+        private readonly Func<IntPtr> open;
+        private readonly Func<IntPtr, bool> query;
+        private readonly Func<IntPtr, bool> close;
+        private bool attempted;
+        public IntPtr Token { get; private set; }
+        public bool Complete { get; private set; }
+        public Exception QueryFailure { get; private set; }
+        public Exception RetirementFailure { get; private set; }
+        public string RetirementStatus { get; private set; }
+        public Observation(Func<IntPtr> open, Func<IntPtr, bool> query, Func<IntPtr, bool> close) {
+            this.open = open; this.query = query; this.close = close;
+            RetirementStatus = "not_requested";
+        }
+        public bool Observe() {
+            if (attempted || debt.Count != 0) {
+                throw new InvalidOperationException("Unretired token ownership prevents a new permission observation.");
+            }
+            attempted = true;
+            Token = open();
+            if (Token == IntPtr.Zero) { throw new InvalidOperationException("Owned fixture token acquisition was refused."); }
+            bool elevated = false;
+            try { elevated = query(Token); }
+            catch (Exception failure) { QueryFailure = failure; }
+            bool retired = Retire();
+            if (QueryFailure != null) { ExceptionDispatchInfo.Capture(QueryFailure).Throw(); }
+            if (!retired && RetirementFailure != null) { ExceptionDispatchInfo.Capture(RetirementFailure).Throw(); }
+            if (!retired) { throw new InvalidOperationException("Owned fixture token retirement was refused."); }
+            Complete = true;
+            return elevated;
+        }
+        public bool Retire() {
+            if (Token == IntPtr.Zero) { return true; }
+            bool closed = false;
+            try { closed = close(Token); }
+            catch (Exception failure) {
+                RetirementStatus = "unavailable";
+                if (RetirementFailure == null) { RetirementFailure = failure; }
+            }
+            if (!closed) {
+                RetirementStatus = "unavailable";
+                if (!debt.Contains(this)) { debt.Add(this); }
+                return false;
+            }
+            Token = IntPtr.Zero;
+            RetirementStatus = "acknowledged";
+            debt.Remove(this);
+            return true;
+        }
+    }
+    public static int PendingRetirements { get { return debt.Count; } }
+    public static void RetryRetirement() {
+        foreach (Observation owner in debt.ToArray()) { owner.Retire(); }
+    }
+    public static bool ReadElevation() {
+        Observation owner = new Observation(OpenNative, QueryNative, CloseHandle);
+        return owner.Observe();
+    }
+}
+'@ -ErrorAction Stop
+    }
+    return [ErgoptiOwnedFixtureToken]::ReadElevation()
+}
+function Assert-OwnedFixtureRootScope {
+    param([string]$Scope, [scriptblock]$ReadElevation = { Get-OwnedFixtureTokenElevation })
+    if ($Scope -cnotin @('CurrentUser', 'LocalMachine')) {
+        throw [ArgumentException]::new('Owned fixture root-store scope is invalid.')
+    }
+    if ($Scope -ceq 'LocalMachine') {
+        if ($env:GITHUB_ACTIONS -cne 'true' -or $env:RUNNER_ENVIRONMENT -cne 'github-hosted') {
+            throw [InvalidOperationException]::new('Machine scope requires the explicit hosted ephemeral CI context.')
+        }
+        $Elevated = & $ReadElevation
+        if ($Elevated -isnot [bool] -or -not $Elevated) {
+            throw [InvalidOperationException]::new('Machine scope requires verified native token elevation.')
+        }
+    }
+}
+Assert-OwnedFixtureRootScope $OwnedRootStoreScope
+function Remove-OwnedRoot([string]$Thumbprint, [string]$Subject, [string]$Scope) {
+    Assert-OwnedFixtureRootScope $Scope
     if ($Thumbprint -cnotmatch '^[0-9A-F]{40}$' -or $Subject -cnotmatch '^CN=ErgoptiPlus managed-network fixture [0-9a-f]{32}$') {
         throw 'Invalid owned certificate identity.'
     }
-    $Store = [Security.Cryptography.X509Certificates.X509Store]::new('Root', 'CurrentUser')
+    $Store = [Security.Cryptography.X509Certificates.X509Store]::new('Root', $Scope)
     try {
         $Store.Open([Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
         $Found = @($Store.Certificates | Where-Object { $_.Thumbprint -ceq $Thumbprint })
@@ -26,13 +138,16 @@ function Remove-OwnedRoot([string]$Thumbprint, [string]$Subject) {
     $Store.Open([Security.Cryptography.X509Certificates.OpenFlags]::ReadOnly)
     try {
         if (@($Store.Certificates | Where-Object { $_.Thumbprint -ceq $Thumbprint }).Count -ne 0) {
-            throw 'Owned current-user root removal was not acknowledged.'
+            throw 'Owned declared-scope root removal was not acknowledged.'
         }
     } finally { $Store.Close(); $Store.Dispose() }
 }
 if ($Mode -ceq 'Cleanup') {
     try {
-        Remove-OwnedRoot $OwnedRootThumbprint $OwnedRootSubject
+        Remove-OwnedRoot $OwnedRootThumbprint $OwnedRootSubject $OwnedRootStoreScope
+        $CleanupReceipt = @{ version = 1; operation = 'root_cleanup'; root_store_scope = $OwnedRootStoreScope;
+            root_thumbprint = $OwnedRootThumbprint; root_subject = $OwnedRootSubject; root_removed = $true }
+        [IO.File]::WriteAllText($StatePath, ($CleanupReceipt | ConvertTo-Json -Compress), [Text.UTF8Encoding]::new($false))
         [Console]::Out.WriteLine('OWNED_ROOT_REMOVED')
         exit 0
     } catch {
@@ -43,7 +158,8 @@ if ($Mode -ceq 'Cleanup') {
 $Fixture = $null
 $Events = @()
 $RootInstalled = $false
-$State = @{ version = 1; state = 'starting'; phase = 'untrusted'; sequence = 0; root_removed = $false; service_stopped = $false }
+$State = @{ version = 1; state = 'starting'; phase = 'untrusted'; sequence = 0;
+    root_store_scope = $OwnedRootStoreScope; root_removed = $false; service_stopped = $false }
 function Publish-State {
     param([string]$TrustStep = '')
     if ($TrustStep -ne '') {
@@ -1054,7 +1170,7 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
         $Choice = [Threading.WaitHandle]::WaitAny([Threading.WaitHandle[]]$Events, 1000)
         if ($Choice -eq 0) {
             Publish-State -TrustStep 'event_received'
-            $Store = [Security.Cryptography.X509Certificates.X509Store]::new('Root', 'CurrentUser')
+            $Store = [Security.Cryptography.X509Certificates.X509Store]::new('Root', $OwnedRootStoreScope)
             try {
                 Publish-State -TrustStep 'before_open'
                 $Store.Open([Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
@@ -1080,7 +1196,7 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
             $Fixture.TrustAdmitted = $true
             $State.phase = 'trusted'
         } elseif ($Choice -eq 1) {
-            Remove-OwnedRoot $State.root_thumbprint $State.root_subject
+            Remove-OwnedRoot $State.root_thumbprint $State.root_subject $OwnedRootStoreScope
             $RootInstalled = $false
             $State.root_removed = $true
             $Fixture.TrustAdmitted = $false
@@ -1104,7 +1220,7 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
     try {
         if ($null -ne $Fixture) { $Fixture.Dispose(); $State.service_stopped = $true }
         if ($State.ContainsKey('root_thumbprint')) {
-            Remove-OwnedRoot $State.root_thumbprint $State.root_subject
+            Remove-OwnedRoot $State.root_thumbprint $State.root_subject $OwnedRootStoreScope
             $RootInstalled = $false
             $State.root_removed = $true
         }

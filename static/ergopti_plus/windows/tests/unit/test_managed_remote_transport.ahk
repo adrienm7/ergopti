@@ -61,7 +61,7 @@ _ManagedRemoteFixtureEmitDiagnostic(State) {
 
 ; Graceful receipt failures also occur without any native service exception.
 ; Project only gate outcomes; private state, streams and exception text stay owned.
-_ManagedRemoteFixtureCleanupDiagnostic(Completions, State, ReadStatus) {
+_ManagedRemoteFixtureCleanupDiagnostic(Completions, State, ReadStatus, ExpectedScope := 0) {
 	Facts := Map("completion", "false", "exit", "unknown", "marker", "unknown", "stderr", "unknown",
 		"receipt", "false", "state", "unknown", "root_removed", "unknown", "service_stopped", "unknown",
 		"tls_streams", "unknown", "tls_modules", "unknown", "tls_fences", "unknown", "tls_sources", "unknown")
@@ -104,6 +104,12 @@ _ManagedRemoteFixtureCleanupDiagnostic(Completions, State, ReadStatus) {
 			Gate := Key
 		Fields .= " " . Key . "=" . Value
 	}
+	if ExpectedScope is String {
+		ScopeMatched := ReadStatus == "readable" && _ManagedRemoteFixtureRootScopeMatches(State, ExpectedScope)
+		Fields .= " root_scope=" . (ScopeMatched ? "true" : "false")
+		if Gate == "none" && !ScopeMatched
+			Gate := "root_scope"
+	}
 	return "cleanup_gate=" . Gate . " receipt_read=" . ReadStatus . Fields
 }
 
@@ -111,12 +117,12 @@ _ManagedRemoteFixtureDiagnosticBoolean(Value) {
 	return Type(Value) == "Integer" && (Value == 0 || Value == 1) ? (Value ? "true" : "false") : "unknown"
 }
 
-_ManagedRemoteFixtureEmitCleanupDiagnostic(Completions, State, ReadStatus, PrintFn := unset) {
+_ManagedRemoteFixtureEmitCleanupDiagnostic(Completions, State, ReadStatus, PrintFn := unset, ExpectedScope := 0) {
 	if !IsSet(PrintFn)
 		PrintFn := _TestPrint
 	try {
 		PrintFn.Call("::notice title=Windows native fixture cleanup diagnostic::"
-			. _ManagedRemoteFixtureCleanupDiagnostic(Completions, State, ReadStatus))
+			. _ManagedRemoteFixtureCleanupDiagnostic(Completions, State, ReadStatus, ExpectedScope))
 		return "reported"
 	} catch {
 		; The owner retains refusal without recursively calling the unavailable sink.
@@ -176,7 +182,8 @@ _ManagedRemoteFixtureCleanupReceiptControls() {
 		Fixture := _ManagedRemoteFixtureOwner()
 		Directory := _SR_AcquireCaptureDirectory()
 		Fixture.Capture := Map("TmpFile", Directory . "output.tmp", "CaptureDir", Directory)
-		State := Valid ? '{"state":"stopped","root_removed":true,"service_stopped":true,"server_tls_owned_streams":0,"server_tls_owned_modules":0,"server_tls_owned_source_fences":0,"server_tls_source_unchanged":true}' : "PRIVATE_INVALID_JSON"
+		State := Valid ? '{"root_store_scope":"' . Fixture.RootStoreScope
+			. '","state":"stopped","root_removed":true,"service_stopped":true,"server_tls_owned_streams":0,"server_tls_owned_modules":0,"server_tls_owned_source_fences":0,"server_tls_source_unchanged":true}' : "PRIVATE_INVALID_JSON"
 		FileAppend(State, Fixture.Capture["TmpFile"], "UTF-8-RAW")
 		Fixture.Completions.Push(Map("exit", 0, "stdout", "OWNED_FIXTURE_STOPPED_ROOT_REMOVED", "stderr", ""))
 		Offset := FileGetSize(TEST_RESULTS_FILE)
@@ -347,9 +354,170 @@ _ManagedRemoteFixtureStateWaitDiagnostic(Role, ExpectedState, ExpectedPhase, Pre
 		. " critical=" . (A_IsCritical != 0 ? "true" : "false") . " suspended=" . (A_IsSuspended ? "true" : "false")
 }
 
+_ManagedRemoteFixtureSelectRootScope(Scope, Actions, Runner) {
+	if Scope == "" {
+		if StrCompare(Actions, "true", true) == 0
+			throw Error("CI native fixture requires an explicit root-store scope.")
+		return "CurrentUser"
+	}
+	if StrCompare(Scope, "CurrentUser", true) == 0 {
+		if StrCompare(Actions, "true", true) == 0
+			throw Error("CI native fixture requires the explicit machine root-store scope.")
+		return "CurrentUser"
+	}
+	if StrCompare(Scope, "LocalMachine", true) != 0
+		throw Error("Native fixture root-store scope is invalid.")
+	if StrCompare(Actions, "true", true) != 0 || StrCompare(Runner, "github-hosted", true) != 0
+		throw Error("Machine root-store scope requires the explicit hosted ephemeral CI context.")
+	return "LocalMachine"
+}
+
+_ManagedRemoteFixtureTokenOpen() {
+	Token := 0
+	if !DllCall("Advapi32\OpenProcessToken", "Ptr", DllCall("Kernel32\GetCurrentProcess", "Ptr"),
+		"UInt", 0x0008, "Ptr*", &Token, "Int")
+		throw Error("Native fixture token acquisition was refused.")
+	return Token
+}
+
+_ManagedRemoteFixtureTokenQuery(Token) {
+	Elevation := Buffer(4, 0)
+	Returned := 0
+	if !DllCall("Advapi32\GetTokenInformation", "Ptr", Token, "Int", 20, "Ptr", Elevation,
+		"UInt", Elevation.Size, "UInt*", &Returned, "Int") || Returned != Elevation.Size
+		throw Error("Native fixture token elevation query was refused.")
+	return NumGet(Elevation, 0, "UInt") != 0
+}
+
+_ManagedRemoteFixtureTokenClose(Token) {
+	return DllCall("Kernel32\CloseHandle", "Ptr", Token, "Int") != 0
+}
+
+global _ManagedRemoteFixtureTokenDebt := Map()
+global _ManagedRemoteFixtureTokenExitRegistered := false
+
+_ManagedRemoteFixtureRetryTokenRetirement(*) {
+	global _ManagedRemoteFixtureTokenDebt
+	for Identity, Owner in _ManagedRemoteFixtureTokenDebt.Clone()
+		Owner.Retire()
+}
+
+class _ManagedRemoteFixtureTokenOwner {
+	__New(Port) {
+		this.Port := Port
+		this.Token := 0
+		this.Attempted := false
+		this.ObservationComplete := false
+		this.RetirementStatus := "not_requested"
+		this.QueryFailed := false
+		this.QueryFailure := 0
+		this.RetirementFailed := false
+		this.RetirementFailure := 0
+	}
+
+	Observe() {
+		global _ManagedRemoteFixtureTokenDebt
+		if this.Attempted || _ManagedRemoteFixtureTokenDebt.Count != 0
+			throw Error("Unretired token ownership prevents a new permission observation.")
+		this.Attempted := true
+		this.Token := this.Port["open"].Call()
+		if Type(this.Token) != "Integer" || this.Token == 0
+			throw Error("Native fixture token acquisition was refused.")
+		Elevated := false
+		try {
+			Elevated := this.Port["query"].Call(this.Token)
+			if Type(Elevated) != "Integer" || (Elevated != 0 && Elevated != 1)
+				throw Error("Native fixture token observation was invalid.")
+		} catch Any as Failure {
+			this.QueryFailed := true
+			this.QueryFailure := Failure
+		}
+		Retired := this.Retire()
+		if this.QueryFailed
+			throw this.QueryFailure
+		if !Retired
+			if this.RetirementFailed
+				throw this.RetirementFailure
+		if !Retired
+			throw Error("Native fixture token retirement was refused.")
+		this.ObservationComplete := true
+		return Elevated
+	}
+
+	Retire() {
+		global _ManagedRemoteFixtureTokenDebt
+		if this.Token == 0
+			return true
+		Closed := false
+		try Closed := this.Port["close"].Call(this.Token)
+		catch Any as Failure {
+			this.RetirementStatus := "unavailable"
+			if !this.RetirementFailed {
+				this.RetirementFailed := true
+				this.RetirementFailure := Failure
+			}
+		}
+		if Type(Closed) != "Integer" || Closed != 1 {
+			this.RetirementStatus := "unavailable"
+			_ManagedRemoteFixtureTokenDebt[ObjPtr(this)] := this
+			return false
+		}
+		this.Token := 0
+		this.RetirementStatus := "acknowledged"
+		if _ManagedRemoteFixtureTokenDebt.Has(ObjPtr(this))
+			_ManagedRemoteFixtureTokenDebt.Delete(ObjPtr(this))
+		return true
+	}
+}
+
+_ManagedRemoteFixtureTokenElevation(Port := 0) {
+	global _ManagedRemoteFixtureTokenExitRegistered
+	if !_ManagedRemoteFixtureTokenExitRegistered {
+		OnExit(_ManagedRemoteFixtureRetryTokenRetirement)
+		_ManagedRemoteFixtureTokenExitRegistered := true
+	}
+	if !(Port is Map)
+		Port := Map("open", _ManagedRemoteFixtureTokenOpen, "query", _ManagedRemoteFixtureTokenQuery, "close", _ManagedRemoteFixtureTokenClose)
+	Owner := _ManagedRemoteFixtureTokenOwner(Port)
+	return Owner.Observe()
+}
+
+_ManagedRemoteFixtureRequireRootScope(Scope, ReadElevation := _ManagedRemoteFixtureTokenElevation) {
+	if StrCompare(Scope, "CurrentUser", true) == 0
+		return true
+	if StrCompare(Scope, "LocalMachine", true) != 0
+		throw Error("Native fixture root-store scope is invalid.")
+	Elevated := ReadElevation.Call()
+	if Type(Elevated) != "Integer" || Elevated != 1
+		throw Error("Machine root-store scope requires verified native token elevation.")
+	return true
+}
+
+_ManagedRemoteFixtureRootScopeMatches(State, Scope) {
+	return State is Map && State.Get("root_store_scope", 0) is String
+		&& StrCompare(State["root_store_scope"], Scope, true) == 0
+}
+
+_ManagedRemoteFixtureRootIdentityMatches(State, Scope, Thumbprint, Subject) {
+	return _ManagedRemoteFixtureRootScopeMatches(State, Scope)
+		&& State.Get("root_thumbprint", 0) is String && State.Get("root_subject", 0) is String
+		&& StrCompare(State["root_thumbprint"], Thumbprint, true) == 0
+		&& StrCompare(State["root_subject"], Subject, true) == 0
+}
+
+_ManagedRemoteFixtureRootCleanupMatches(State, Scope, Thumbprint, Subject) {
+	return _ManagedRemoteFixtureRootIdentityMatches(State, Scope, Thumbprint, Subject)
+		&& Type(State.Get("version", "")) == "Integer" && State["version"] == 1
+		&& State.Get("operation", "") is String && StrCompare(State["operation"], "root_cleanup", true) == 0
+		&& Type(State.Get("root_removed", "")) == "Integer" && State["root_removed"] == 1
+}
+
 class _ManagedRemoteFixtureOwner {
 	__New() {
 		global _DriverDir, _ManagedRemoteFixtureCleanupExitRegistered
+		Scope := _ManagedRemoteFixtureSelectRootScope(EnvGet("ERGOPTI_MANAGED_FIXTURE_ROOT_SCOPE"),
+			EnvGet("GITHUB_ACTIONS"), EnvGet("RUNNER_ENVIRONMENT"))
+		this.DefineProp("RootStoreScope", {Get: (*) => Scope})
 		this.Identity := _ManagedRemoteFixtureGuid()
 		this.Prefix := "Local\ErgoptiPlus.ManagedNetworkFixture." . this.Identity
 		this.Script := _DriverDir . "\tests\fixtures\managed_remote_transport.ps1"
@@ -386,6 +554,7 @@ class _ManagedRemoteFixtureOwner {
 	}
 
 	Start(ServerMode := "Serve") {
+		_ManagedRemoteFixtureRequireRootScope(this.RootStoreScope)
 		if ServerMode != "Serve" && ServerMode != "ServeUpdater"
 			throw ValueError("Unsupported owned fixture mode")
 		Directory := _SR_AcquireCaptureDirectory()
@@ -402,7 +571,8 @@ class _ManagedRemoteFixtureOwner {
 		}
 		this.Handle := ShellRunner_SpawnTreeOwned("powershell.exe",
 			["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
-				this.Script, "-StatePath", this.Capture["TmpFile"], "-EventPrefix", this.Prefix, "-Mode", ServerMode],
+				this.Script, "-StatePath", this.Capture["TmpFile"], "-EventPrefix", this.Prefix, "-Mode", ServerMode,
+				"-OwnedRootStoreScope", this.RootStoreScope],
 			ObjBindMethod(this, "OnServerDone"), , ObjBindMethod(this, "OnNativeAdopt"), 8192)
 		if !this.Handle.start()
 			throw Error("Actual managed-network native fixture did not start.")
@@ -453,6 +623,11 @@ class _ManagedRemoteFixtureOwner {
 		}
 		if !(State is Map) || State.Get("version", 0) != 1
 			throw Error("Actual fixture published an unsupported state receipt.")
+		if !_ManagedRemoteFixtureRootScopeMatches(State, this.RootStoreScope)
+			throw Error("Owned fixture root-store scope was not acknowledged.")
+		if this.RootThumbprint != "" && !_ManagedRemoteFixtureRootIdentityMatches(State,
+			this.RootStoreScope, this.RootThumbprint, this.RootSubject)
+			throw Error("Owned fixture certificate identity was not acknowledged.")
 		if State.Get("state", "") == "failed" {
 			_ManagedRemoteFixtureEmitDiagnostic(State)
 			throw Error("Actual managed-network fixture reported native failure.")
@@ -500,7 +675,7 @@ class _ManagedRemoteFixtureOwner {
 		this.WaitState("ready", Installed ? "trusted" : "removed", 10000, Sequence,
 			Installed ? "trust_install" : "trust_remove")
 		if !Installed
-			AssertTrue(this.State.Get("root_removed", false), "exact current-user root removal must be acknowledged")
+			AssertTrue(this.State.Get("root_removed", false), "exact declared-scope root removal must be acknowledged")
 	}
 
 	Observe() {
@@ -712,6 +887,9 @@ class _ManagedRemoteFixtureOwner {
 					ReceiptRead := FinalState is Map ? "readable" : "invalid"
 					this.GracefulReceiptVerified := FinalState is Map && FinalState.Get("state", "") == "stopped"
 						&& FinalState.Get("root_removed", false) && FinalState.Get("service_stopped", false)
+						&& _ManagedRemoteFixtureRootScopeMatches(FinalState, this.RootStoreScope)
+						&& (this.RootThumbprint == "" || _ManagedRemoteFixtureRootIdentityMatches(FinalState,
+							this.RootStoreScope, this.RootThumbprint, this.RootSubject))
 					if this.GracefulReceiptVerified {
 						this.GracefulReceiptVerified := false
 						AssertEqual(0, FinalState.Get("server_tls_owned_streams", -1), "all actual native TLS connections retired before service acknowledgment")
@@ -728,11 +906,13 @@ class _ManagedRemoteFixtureOwner {
 			; after every server descendant is gone, including failed shutdowns.
 			if this.RootThumbprint != "" && !this.RootRemovalVerified {
 				if !IsObject(this.CleanupHandle) {
+					_ManagedRemoteFixtureRequireRootScope(this.RootStoreScope)
 					this.CleanupHandle := ShellRunner_SpawnTreeOwned("powershell.exe",
 						["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
 							this.Script, "-StatePath", this.Capture["TmpFile"], "-EventPrefix", this.Prefix,
 							"-Mode", "Cleanup", "-OwnedRootThumbprint", this.RootThumbprint,
-							"-OwnedRootSubject", this.RootSubject], ObjBindMethod(this, "OnCleanupDone"), , , 8192)
+							"-OwnedRootSubject", this.RootSubject, "-OwnedRootStoreScope", this.RootStoreScope],
+						ObjBindMethod(this, "OnCleanupDone"), , , 8192)
 					if !this.CleanupHandle.start()
 						return false
 				}
@@ -750,6 +930,9 @@ class _ManagedRemoteFixtureOwner {
 					this.CleanupCompletions := []
 					return false
 				}
+				CleanupState := JsonParse(FileRead(this.Capture["TmpFile"], "UTF-8"))
+				if !_ManagedRemoteFixtureRootCleanupMatches(CleanupState, this.RootStoreScope, this.RootThumbprint, this.RootSubject)
+					return false
 				this.RootRemovalVerified := true
 			}
 			if this.Capture is Map && _SR_CaptureRemove(this.Capture) != 0
@@ -768,7 +951,7 @@ class _ManagedRemoteFixtureOwner {
 			try {
 				if !this.GracefulReceiptVerified
 					this.CleanupDiagnosticStatus := _ManagedRemoteFixtureEmitCleanupDiagnostic(
-						this.Completions, FinalState, ReceiptRead, this.CleanupDiagnosticPrinter)
+						this.Completions, FinalState, ReceiptRead, this.CleanupDiagnosticPrinter, this.RootStoreScope)
 			} finally this.Closing := false
 		}
 	}
@@ -1131,6 +1314,301 @@ _ManagedRemoteTrustPublisherIndependent() {
 }
 Test("managed remote native: trust publisher avoids native observation and preserves acceptance (managed-fixture-trust-diagnostic)",
 	_ManagedRemoteTrustPublisherIndependent)
+
+_ManagedRemoteScopeWithEnvironment(Scope, Actions, Runner, Callback) {
+	Saved := Map()
+	for Pair in [["ERGOPTI_MANAGED_FIXTURE_ROOT_SCOPE", Scope], ["GITHUB_ACTIONS", Actions], ["RUNNER_ENVIRONMENT", Runner]] {
+		Saved[Pair[1]] := EnvGet(Pair[1])
+		EnvSet(Pair[1], Pair[2])
+	}
+	try Callback.Call()
+	finally {
+		for Name, Value in Saved
+			EnvSet(Name, Value)
+	}
+}
+
+_ManagedRemoteScopeRejectsLowerCaseBody() {
+	Caught := false
+	try _ManagedRemoteFixtureOwner()
+	catch as Failure
+		Caught := true
+	AssertTrue(Caught, "the actual fixture constructor must reject a case-insensitive root-store alias before acquisition")
+}
+Test("managed remote native: root scope rejects case aliases (managed-fixture-root-scope)",
+	_ManagedRemoteScopeWithEnvironment.Bind("currentuser", "", "", _ManagedRemoteScopeRejectsLowerCaseBody))
+
+_ManagedRemoteScopeRejectsReceiptBody() {
+	Fixture := _ManagedRemoteFixtureOwner()
+	Directory := _SR_AcquireCaptureDirectory()
+	Capture := Map("Directory", Directory, "TmpFile", Directory . "output.tmp")
+	Fixture.Capture := Capture
+	try {
+		FileAppend('{"version":1,"state":"ready","phase":"untrusted","sequence":1,"root_store_scope":"LocalMachine"}',
+			Capture["TmpFile"], "UTF-8-RAW")
+		Caught := false
+		try Fixture.ReadState()
+		catch as Failure
+			Caught := true
+		AssertTrue(Caught, "the actual receipt reader must reject a different declared root-store scope")
+	} finally AssertEqual(0, _SR_CaptureRemove(Capture))
+}
+Test("managed remote native: receipt rejects wrong root scope (managed-fixture-root-scope)",
+	_ManagedRemoteScopeWithEnvironment.Bind("", "", "", _ManagedRemoteScopeRejectsReceiptBody))
+
+_ManagedRemoteScopePolicyControls() {
+	AssertEqual("CurrentUser", _ManagedRemoteFixtureSelectRootScope("", "", ""))
+	AssertEqual("CurrentUser", _ManagedRemoteFixtureSelectRootScope("CurrentUser", "", ""))
+	AssertEqual("LocalMachine", _ManagedRemoteFixtureSelectRootScope("LocalMachine", "true", "github-hosted"))
+	for ProbeCase in [["", "true", "github-hosted"], ["CurrentUser", "true", "github-hosted"],
+		["localmachine", "true", "github-hosted"], ["LocalMachine", "", ""],
+		["LocalMachine", "TRUE", "github-hosted"], ["LocalMachine", "true", "self-hosted"],
+		["LocalMachine", "true", "GITHUB-HOSTED"], ["CurrentUser ", "", ""]] {
+		Caught := false
+		try _ManagedRemoteFixtureSelectRootScope(ProbeCase*)
+		catch as Failure
+			Caught := true
+		AssertTrue(Caught, "unknown scope and unqualified machine context cannot become a local fallback")
+	}
+	Control := Map("calls", 0)
+	Reader := (*) => (Control["calls"] += 1, false)
+	AssertTrue(_ManagedRemoteFixtureRequireRootScope("CurrentUser", Reader))
+	AssertEqual(0, Control["calls"], "local CurrentUser never requires an elevated token")
+	for Value in [0, 2, "1", 1.0] {
+		Caught := false
+		try _ManagedRemoteFixtureRequireRootScope("LocalMachine", (*) => Value)
+		catch as Failure
+			Caught := true
+		AssertTrue(Caught, "machine permission needs the native reader's exact boolean contract")
+	}
+	AssertTrue(_ManagedRemoteFixtureRequireRootScope("LocalMachine", (*) => true))
+	Primary := ValueError("controlled native token query failure")
+	Caught := false
+	try _ManagedRemoteFixtureRequireRootScope("LocalMachine", _ManagedRemoteScopeQueryFailed.Bind(Primary))
+	catch Any as Failure {
+		Caught := true
+		AssertTrue(Failure == Primary, "query failure cannot turn into permission or a fallback")
+	}
+	AssertTrue(Caught)
+}
+
+_ManagedRemoteScopeQueryFailed(Primary) {
+	throw Primary
+}
+Test("managed remote native: closed scope and permission contracts fail fast (managed-fixture-root-scope)",
+	_ManagedRemoteScopePolicyControls)
+
+_ManagedRemoteScopeImmutableBody() {
+	Fixture := _ManagedRemoteFixtureOwner()
+	AssertEqual("LocalMachine", Fixture.RootStoreScope)
+	EnvSet("ERGOPTI_MANAGED_FIXTURE_ROOT_SCOPE", "CurrentUser")
+	EnvSet("GITHUB_ACTIONS", "")
+	EnvSet("RUNNER_ENVIRONMENT", "")
+	AssertEqual("LocalMachine", Fixture.RootStoreScope, "later environment changes cannot select a different cleanup scope")
+	Caught := false
+	try Fixture.RootStoreScope := "CurrentUser"
+	catch as Failure
+		Caught := true
+	AssertTrue(Caught, "the captured root-store scope cannot be assigned by a caller")
+}
+Test("managed remote native: scope remains owned across environment changes (managed-fixture-root-scope)",
+	_ManagedRemoteScopeWithEnvironment.Bind("LocalMachine", "true", "github-hosted", _ManagedRemoteScopeImmutableBody))
+
+_ManagedRemoteScopeCleanupReceiptControls() {
+	Thumbprint := "00112233445566778899AABBCCDDEEFF00112233"
+	Subject := "CN=ErgoptiPlus managed-network fixture 00112233445566778899aabbccddeeff"
+	State := Map("version", 1, "operation", "root_cleanup", "root_store_scope", "LocalMachine",
+		"root_thumbprint", Thumbprint, "root_subject", Subject, "root_removed", true)
+	AssertTrue(_ManagedRemoteFixtureRootCleanupMatches(State, "LocalMachine", Thumbprint, Subject))
+	for Pair in [["root_store_scope", "CurrentUser"], ["root_store_scope", "localmachine"],
+		["root_store_scope", 1], ["root_thumbprint", "different"], ["root_subject", "different"],
+		["root_removed", "true"], ["operation", "ROOT_CLEANUP"], ["version", "1"]] {
+		Invalid := State.Clone()
+		Invalid[Pair[1]] := Pair[2]
+		AssertFalse(_ManagedRemoteFixtureRootCleanupMatches(Invalid, "LocalMachine", Thumbprint, Subject),
+			"a marker cannot prove absence for the wrong exact ownership tuple")
+	}
+	for Key in ["root_store_scope", "root_thumbprint", "root_subject", "root_removed"] {
+		Invalid := State.Clone()
+		Invalid.Delete(Key)
+		AssertFalse(_ManagedRemoteFixtureRootCleanupMatches(Invalid, "LocalMachine", Thumbprint, Subject))
+	}
+}
+Test("managed remote native: cleanup requires exact scope and certificate receipt (managed-fixture-root-scope)",
+	_ManagedRemoteScopeCleanupReceiptControls)
+
+_ManagedRemoteScopeNativeRefusalBody() {
+	Elevated := _ManagedRemoteFixtureTokenElevation()
+	AssertTrue(Type(Elevated) == "Integer" && (Elevated == 0 || Elevated == 1))
+	Fixture := _ManagedRemoteFixtureOwner()
+	if Elevated {
+		AssertTrue(_ManagedRemoteFixtureRequireRootScope(Fixture.RootStoreScope),
+			"an elevated process still proves permission through its native token")
+		AssertEqual(0, Fixture.Capture)
+		return
+	}
+	Caught := false
+	try Fixture.Start()
+	catch as Failure
+		Caught := true
+	AssertTrue(Caught, "intent strings alone cannot permit native machine-store acquisition")
+	AssertEqual(0, Fixture.Capture)
+	AssertEqual(0, Fixture.Handle)
+	AssertEqual(0, Fixture.Events.Count)
+	AssertEqual("", Fixture.RootThumbprint)
+}
+Test("managed remote native: native non-elevated machine guard precedes acquisition (managed-fixture-root-scope)",
+	_ManagedRemoteScopeWithEnvironment.Bind("LocalMachine", "true", "github-hosted", _ManagedRemoteScopeNativeRefusalBody))
+
+_ManagedRemoteScopeProducerControl() {
+	global _DriverDir
+	Results := []
+	Handle := ShellRunner_SpawnTreeOwned("powershell.exe", ["-NoProfile", "-NonInteractive", "-File",
+		_DriverDir . "\tests\fixtures\managed_remote_scope_control.ps1", "-SourcePath",
+		_DriverDir . "\tests\fixtures\managed_remote_transport.ps1"],
+		(Code, Out, Err) => Results.Push(Map("exit", Code, "stdout", Out, "stderr", Err)), , , 8192)
+	try {
+		AssertTrue(Handle.start())
+		Started := A_TickCount
+		while Results.Length == 0 && !TickExpired64(Started, 5000) {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AssertEqual(1, Results.Length)
+		AssertEqual(0, Results[1]["exit"], "the actual producer and remover guards enforce native permission before store access")
+		AssertEqual("OWNED_ROOT_SCOPE_CONTROL_PASS", Trim(Results[1]["stdout"], "`r`n "))
+		AssertEqual("", Results[1]["stderr"])
+	} finally AssertTrue(Handle.terminate(), "the exact scope behavior-probe Job retires")
+}
+Test("managed remote native: producer and cleanup guard own token and scope (managed-fixture-root-scope)",
+	_ManagedRemoteScopeProducerControl)
+
+class _ManagedRemoteScopeClosedCleanupHandle {
+	terminate() {
+		return true
+	}
+}
+
+_ManagedRemoteScopeCleanupActualBody() {
+	for Valid in [false, true] {
+		Fixture := _ManagedRemoteFixtureOwner()
+		Fixture.RootThumbprint := "00112233445566778899AABBCCDDEEFF00112233"
+		Fixture.RootSubject := "CN=ErgoptiPlus managed-network fixture " . Fixture.Identity
+		Directory := _SR_AcquireCaptureDirectory()
+		Capture := Map("CaptureDir", Directory, "TmpFile", Directory . "output.tmp")
+		Fixture.Capture := Capture
+		Fixture.CleanupHandle := _ManagedRemoteScopeClosedCleanupHandle()
+		Fixture.CleanupCompletions.Push(Map("exit", 0, "stdout", "OWNED_ROOT_REMOVED", "stderr", ""))
+		Scope := Valid ? "CurrentUser" : "LocalMachine"
+		FileAppend('{"version":1,"operation":"root_cleanup","root_store_scope":"' . Scope
+			. '","root_thumbprint":"' . Fixture.RootThumbprint . '","root_subject":"' . Fixture.RootSubject
+			. '","root_removed":true}', Capture["TmpFile"], "UTF-8-RAW")
+		try {
+			AssertEqual(Valid, Fixture.Close(), "the actual cleanup path rejects a marker for the wrong captured scope")
+			AssertEqual(Valid, Fixture.RootRemovalVerified, "wrong-scope absence cannot release root cleanup ownership")
+			AssertFalse(Fixture.GracefulReceiptVerified, "scope acknowledgment cannot grant an absent graceful service receipt")
+		} finally {
+			if !Valid
+				AssertEqual(0, _SR_CaptureRemove(Capture))
+		}
+	}
+}
+Test("managed remote native: actual cleanup marker requires scoped receipt (managed-fixture-root-scope)",
+	_ManagedRemoteScopeWithEnvironment.Bind("", "", "", _ManagedRemoteScopeCleanupActualBody))
+
+_ManagedRemoteTokenQueryControl(Control, Token) {
+	Control["queries"] += 1
+	AssertEqual(Control["token"], Token, "permission observes only the exact acquired token")
+	if Control["query_failure"]
+		throw Control["primary"]
+	return true
+}
+
+_ManagedRemoteTokenCloseControl(Control, Token) {
+	Control["closes"] += 1
+	AssertEqual(Control["token"], Token, "every retry retains the same exact retirement capability")
+	if Control["close_throw"] && !Control["ack"]
+		throw Control["secondary"]
+	return Control["ack"]
+}
+
+_ManagedRemoteTokenDebtControls() {
+	global _ManagedRemoteFixtureTokenDebt
+	AssertEqual(0, _ManagedRemoteFixtureTokenDebt.Count)
+	for QueryFailure in [false, true] {
+		for CloseThrow in [false, true] {
+			Control := Map("token", 12345, "queries", 0, "closes", 0, "ack", false,
+				"query_failure", QueryFailure, "close_throw", CloseThrow,
+				"primary", ValueError("controlled query failure"), "secondary", TypeError("controlled close failure"))
+			Port := Map("open", (*) => Control["token"], "query", _ManagedRemoteTokenQueryControl.Bind(Control),
+				"close", _ManagedRemoteTokenCloseControl.Bind(Control))
+			Owner := _ManagedRemoteFixtureTokenOwner(Port)
+			try {
+				Caught := false
+				try Owner.Observe()
+				catch Any as Failure {
+					Caught := true
+					if QueryFailure
+						AssertTrue(Failure == Control["primary"], "close refusal cannot overwrite the original query exception")
+					else if CloseThrow
+						AssertTrue(Failure == Control["secondary"], "a close exception remains the first failure when query succeeded")
+				}
+				AssertTrue(Caught, "successful query plus incomplete retirement never grants permission")
+				AssertEqual(12345, Owner.Token)
+				AssertFalse(Owner.ObservationComplete)
+				AssertEqual(1, _ManagedRemoteFixtureTokenDebt.Count)
+				AssertTrue(_ManagedRemoteFixtureTokenDebt[ObjPtr(Owner)] == Owner)
+				FirstCloseFailure := Owner.RetirementFailure
+				Control["secondary"] := Error("controlled later close failure")
+				AssertFalse(Owner.Retire(), "debt remains owned until the exact close acknowledgment")
+				if CloseThrow
+					AssertTrue(Owner.RetirementFailure == FirstCloseFailure, "retirement retry preserves its first exception")
+				Blocked := false
+				try _ManagedRemoteFixtureTokenElevation(Port)
+				catch Any
+					Blocked := true
+				AssertTrue(Blocked, "incomplete debt cannot be retried as a permission observation")
+				AssertEqual(1, Control["queries"], "retirement retries never query or reuse incomplete authorization")
+				Control["ack"] := true
+				_ManagedRemoteFixtureRetryTokenRetirement()
+				AssertEqual(0, Owner.Token)
+				AssertEqual(0, _ManagedRemoteFixtureTokenDebt.Count)
+				AssertEqual("acknowledged", Owner.RetirementStatus)
+				AssertFalse(Owner.ObservationComplete, "late close acknowledgment cannot authorize the failed observation")
+				Blocked := false
+				try Owner.Observe()
+				catch Any
+					Blocked := true
+				AssertTrue(Blocked, "the completed retirement cannot reopen the same observation")
+				AssertEqual(1, Control["queries"])
+			} finally {
+				Control["ack"] := true
+				Owner.Retire()
+			}
+		}
+	}
+	for QueryFailure in [false, true] {
+		Control := Map("token", 12345, "queries", 0, "closes", 0, "ack", true,
+			"query_failure", QueryFailure, "close_throw", false, "primary", ValueError("controlled query failure"))
+		Port := Map("open", (*) => Control["token"], "query", _ManagedRemoteTokenQueryControl.Bind(Control),
+			"close", _ManagedRemoteTokenCloseControl.Bind(Control))
+		Owner := _ManagedRemoteFixtureTokenOwner(Port)
+		Caught := false
+		try AssertTrue(Owner.Observe(), "complete query and close return the actual permission result")
+		catch Any as Failure {
+			Caught := true
+			AssertTrue(Failure == Control["primary"], "acknowledged retirement preserves a failed query")
+		}
+		AssertEqual(QueryFailure, Caught)
+		AssertEqual(!QueryFailure, Owner.ObservationComplete)
+		AssertEqual(0, Owner.Token)
+		AssertEqual(0, _ManagedRemoteFixtureTokenDebt.Count)
+		AssertEqual(1, Control["queries"])
+		AssertEqual(1, Control["closes"])
+	}
+}
+Test("managed remote native: token query and close failures retain exact debt (managed-fixture-token-debt)",
+	_ManagedRemoteTokenDebtControls)
 
 class _ManagedRemotePrimaryControlFixture {
 	__New() {
