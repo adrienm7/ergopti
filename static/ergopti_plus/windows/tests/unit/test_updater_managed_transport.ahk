@@ -187,8 +187,11 @@ _UpdaterNative_Close(Fixture) {
 	AssertEqual(0, Fixture.Events.Count, "actual owned native event handles close")
 }
 
-_UpdaterNative_ActualDownloadTrustIntegrityAndRefusal(Contract) {
-	Fixture := _UpdaterNativeTransportOwner()
+_UpdaterNative_ActualDownloadTrustIntegrityAndRefusal(Contract, Fixture := unset) {
+	if !IsSet(Fixture)
+		Fixture := _UpdaterNativeTransportOwner()
+	PrimaryFailure := 0
+	BodyFailed := false
 	try {
 		Fixture.Start("ServeUpdater")
 		for Port in ["second_proxy_port", "refusal_proxy_port"]
@@ -234,7 +237,10 @@ _UpdaterNative_ActualDownloadTrustIntegrityAndRefusal(Contract) {
 		AssertEqual("certificate", Contract.Classify(Failure["receipt"], Map())["cause"])
 		Fixture.Observe()
 		AssertEqual(7, Fixture.State["DownloadRequests"], "removal and filesystem refusal reach no additional HTTPS handlers")
-	} finally _UpdaterNative_Close(Fixture)
+	} catch Any as Failure {
+		PrimaryFailure := Failure
+		BodyFailed := true
+	} finally _ManagedRemoteFixtureFinalize(Fixture, BodyFailed, PrimaryFailure, _UpdaterNative_Close.Bind(Fixture))
 }
 
 _UpdaterNative_WithContract(Callback) {
@@ -249,7 +255,7 @@ _UpdaterNative_WithContract(Callback) {
 Test("updater native: actual generated staging CA/PAC integrity and refusals preserve old app",
 	(*) => _UpdaterNative_WithContract(_UpdaterNative_ActualDownloadTrustIntegrityAndRefusal))
 
-_UpdaterNative_ActualDeadlineAndCancellation(Contract) {
+_UpdaterNative_ActualDeadlineAndCancellation(Contract, Fixture := unset) {
 	global _UpdaterDownloadInProgress, _UpdaterDownloadWorker, _UpdaterDownloadRequest
 	global _UpdaterDownloadArtifacts, _UpdaterDownloadStartedTick, _UpdaterSelfUpdateEpoch
 	global _UpdaterSwapOwner, _UpdaterExitIntent, _UpdaterExitInvocation
@@ -260,7 +266,10 @@ _UpdaterNative_ActualDeadlineAndCancellation(Contract) {
 		_UpdaterDownloadArtifacts, _UpdaterDownloadStartedTick, _UpdaterSelfUpdateEpoch,
 		_UpdaterSwapOwner, _UpdaterExitIntent, _UpdaterExitInvocation,
 		_UpdaterInstallObserver, _UpdaterManagedFailureOwner, UPDATER_HTTP_DOWNLOAD_DEADLINE_MS]
-	Fixture := _UpdaterNativeTransportOwner()
+	if !IsSet(Fixture)
+		Fixture := _UpdaterNativeTransportOwner()
+	PrimaryFailure := 0
+	BodyFailed := false
 	try {
 		Fixture.Start("ServeUpdater")
 		Fixture.ChangeTrust(true)
@@ -325,10 +334,13 @@ _UpdaterNative_ActualDeadlineAndCancellation(Contract) {
 				"idempotent cancellation cannot publish another terminal")
 			AssertEqual(1, Phases.Length)
 		}
+	} catch Any as Failure {
+		PrimaryFailure := Failure
+		BodyFailed := true
 	} finally {
 		; The fixture ledger independently retains every actual worker even if
 		; the production cancellation path refuses or an assertion throws.
-		try _UpdaterNative_Close(Fixture)
+		try _ManagedRemoteFixtureFinalize(Fixture, BodyFailed, PrimaryFailure, _UpdaterNative_Close.Bind(Fixture))
 		finally {
 			_UpdaterDownloadInProgress := Saved[1]
 			_UpdaterDownloadWorker := Saved[2]
@@ -347,3 +359,18 @@ _UpdaterNative_ActualDeadlineAndCancellation(Contract) {
 }
 Test("updater native: actual original deadline/cancellation retire owned Job and partial stage",
 	(*) => _UpdaterNative_WithContract(_UpdaterNative_ActualDeadlineAndCancellation))
+
+_UpdaterNativePrimaryActualEntryControl(Entry) {
+	Fixture := _ManagedRemotePrimaryControlFixture()
+	Observed := 0
+	try Entry.Call(Map(), Fixture)
+	catch as Failure
+		Observed := Failure
+	AssertEqual(1, Fixture.StartCalls, "the real updater entry must execute the controlled failing body")
+	AssertEqual(1, Fixture.CloseCalls, "the original updater cleanup assertions must execute once")
+	AssertTrue(Observed == Fixture.Primary, "the real updater entry must retain the exact body exception through failed graceful cleanup")
+}
+Test("updater native: trust entry preserves primary through graceful refusal (managed-fixture-primary-cleanup)",
+	_UpdaterNativePrimaryActualEntryControl.Bind(_UpdaterNative_ActualDownloadTrustIntegrityAndRefusal))
+Test("updater native: cancellation entry preserves primary through graceful refusal (managed-fixture-primary-cleanup)",
+	_UpdaterNativePrimaryActualEntryControl.Bind(_UpdaterNative_ActualDeadlineAndCancellation))

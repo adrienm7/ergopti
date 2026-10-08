@@ -317,6 +317,7 @@ class _ManagedRemoteFixtureOwner {
 		this.GracefulReceiptVerified := false
 		this.CleanupDiagnosticStatus := "not_requested"
 		this.CleanupDiagnosticPrinter := _TestPrint
+		this.CleanupFailureCheckpointStatus := "not_requested"
 		this.Closing := false
 		this.Closed := false
 		this.Requests := Map()
@@ -707,8 +708,52 @@ class _ManagedRemoteFixtureOwner {
 	}
 }
 
-_ManagedRemote_ActualSystemTrustAndSelectedTransport() {
-	Fixture := _ManagedRemoteFixtureOwner()
+; Secondary cleanup evidence must survive without replacing the body's exception.
+_ManagedRemoteFixtureFinalize(Fixture, BodyFailed, PrimaryFailure, CleanupFn, PrintFn := unset) {
+	if !IsSet(PrintFn)
+		PrintFn := _TestPrint
+	try CleanupFn.Call()
+	catch Any as CleanupFailure {
+		Kind := "other"
+		switch Type(CleanupFailure) {
+			case "Error": Kind := "error"
+			case "ValueError": Kind := "value_error"
+			case "TypeError": Kind := "type_error"
+		}
+		Fixture.CleanupFailureCheckpointStatus := "unavailable"
+		try {
+			PrintFn.Call("::notice title=Windows native fixture cleanup failure::body_failed="
+				. (BodyFailed ? "true" : "false") . " cleanup_failed=true cleanup_exception=" . Kind)
+			Fixture.CleanupFailureCheckpointStatus := "reported"
+		} catch Any {
+			; Retain reporting refusal locally; retrying the same sink would mask priority.
+			Fixture.CleanupFailureCheckpointStatus := "unavailable"
+		}
+		if BodyFailed
+			throw PrimaryFailure
+		throw CleanupFailure
+	}
+	if BodyFailed
+		throw PrimaryFailure
+}
+
+_ManagedRemote_Close(Fixture) {
+	Closed := Fixture.Close()
+	if !Closed
+		Fixture.RetainCleanup()
+	AssertTrue(Closed, "owned fixture/curl trees, exact root thumbprint and private state must be fully retired")
+	if Fixture.RootThumbprint != "" {
+		AssertTrue(Fixture.RootRemovalVerified, "independent cleanup must acknowledge exact-thumbprint absence")
+		AssertTrue(Fixture.GracefulReceiptVerified, "native service or graceful cleanup failures must remain red after independent root removal")
+	}
+	AssertEqual(0, Fixture.Events.Count, "every owned native event handle must close")
+}
+
+_ManagedRemote_ActualSystemTrustAndSelectedTransport(Fixture := unset) {
+	if !IsSet(Fixture)
+		Fixture := _ManagedRemoteFixtureOwner()
+	PrimaryFailure := 0
+	BodyFailed := false
 	try {
 		for Name in ["https_proxy", "HTTPS_PROXY", "all_proxy", "ALL_PROXY", "no_proxy", "NO_PROXY"]
 			AssertEqual("", EnvGet(Name), "explicit inherited proxy/bypass overrides make this controlled native qualification unavailable")
@@ -738,17 +783,137 @@ _ManagedRemote_ActualSystemTrustAndSelectedTransport() {
 		AssertEqual(4, Fixture.State["Requests"], "removing the exact root must restore authenticated transport refusal")
 		AssertTrue(Fixture.State["ProxyConnects"] >= 8, "all eight production transports must pass through the owned relay")
 		AssertTrue(Fixture.State["FailedTls"] >= 4, "actual untrusted handshakes must fail before and after system trust admission")
-	} finally {
-		Closed := Fixture.Close()
-		if !Closed
-			Fixture.RetainCleanup()
-		AssertTrue(Closed, "owned fixture/curl trees, exact root thumbprint and private state must be fully retired")
-		if Fixture.RootThumbprint != "" {
-			AssertTrue(Fixture.RootRemovalVerified, "independent cleanup must acknowledge exact-thumbprint absence")
-			AssertTrue(Fixture.GracefulReceiptVerified, "native service or graceful cleanup failures must remain red after independent root removal")
-		}
-		AssertEqual(0, Fixture.Events.Count, "every owned native event handle must close")
-	}
+	} catch Any as Failure {
+		PrimaryFailure := Failure
+		BodyFailed := true
+	} finally _ManagedRemoteFixtureFinalize(Fixture, BodyFailed, PrimaryFailure, _ManagedRemote_Close.Bind(Fixture))
 }
 Test("managed remote native: actual system CA and static/PAC transport preserve strict TLS and exact cleanup",
 	_ManagedRemote_ActualSystemTrustAndSelectedTransport)
+
+class _ManagedRemotePrimaryControlFixture {
+	__New() {
+		this.Primary := ValueError("PRIVATE_BODY_FAILURE")
+		this.RootThumbprint := "controlled"
+		this.RootRemovalVerified := true
+		this.GracefulReceiptVerified := false
+		this.Events := Map()
+		this.StartCalls := 0
+		this.CloseCalls := 0
+	}
+
+	Start(*) {
+		this.StartCalls += 1
+		throw this.Primary
+	}
+
+	Close() {
+		this.CloseCalls += 1
+		return true
+	}
+}
+
+_ManagedRemotePrimaryActualEntryControl() {
+	Fixture := _ManagedRemotePrimaryControlFixture()
+	SavedEnvironment := Map()
+	for Name in ["https_proxy", "HTTPS_PROXY", "all_proxy", "ALL_PROXY", "no_proxy", "NO_PROXY"] {
+		SavedEnvironment[Name] := EnvGet(Name)
+		EnvSet(Name, "")
+	}
+	Observed := 0
+	try {
+		try _ManagedRemote_ActualSystemTrustAndSelectedTransport(Fixture)
+		catch as Failure
+			Observed := Failure
+	} finally {
+		for Name, Value in SavedEnvironment
+			EnvSet(Name, Value)
+	}
+	AssertEqual(1, Fixture.StartCalls, "the real entry must execute the controlled failing body")
+	AssertEqual(1, Fixture.CloseCalls, "the original cleanup assertions must still execute once")
+	AssertTrue(Observed == Fixture.Primary, "the real entry must retain the exact body exception when its graceful cleanup assertion also fails")
+}
+Test("managed remote native: actual entry preserves primary through graceful refusal (managed-fixture-primary-cleanup)",
+	_ManagedRemotePrimaryActualEntryControl)
+
+_ManagedRemotePrimaryBodyControl(State, Refused) {
+	State.BodyCalls += 1
+	if Refused
+		throw State.Primary
+}
+
+_ManagedRemotePrimaryCleanupControl(State, Refused) {
+	State.CleanupCalls += 1
+	if Refused
+		throw State.Cleanup
+}
+
+_ManagedRemotePrimaryPrintControl(State, Refused, Line) {
+	State.PrintCalls += 1
+	State.Lines.Push(Line)
+	if Refused
+		throw Error("PRIVATE_REPORTER_FAILURE")
+}
+
+_ManagedRemotePrimaryCombinationControl(BodyRefused, CleanupRefused, ReporterRefused) {
+	State := {BodyCalls: 0, CleanupCalls: 0, PrintCalls: 0, Lines: [],
+		Primary: ValueError("PRIVATE_BODY_FAILURE"), Cleanup: TypeError("PRIVATE_CLEANUP_FAILURE")}
+	Fixture := {CleanupFailureCheckpointStatus: "not_requested"}
+	PrimaryFailure := 0
+	BodyFailed := false
+	Observed := 0
+	Expected := BodyRefused ? State.Primary : (CleanupRefused ? State.Cleanup : 0)
+	OriginalStack := IsObject(Expected) ? Expected.Stack : ""
+	try {
+		try _ManagedRemotePrimaryBodyControl(State, BodyRefused)
+		catch Any as Failure
+		{
+			PrimaryFailure := Failure
+			BodyFailed := true
+		}
+		finally _ManagedRemoteFixtureFinalize(Fixture, BodyFailed, PrimaryFailure,
+			_ManagedRemotePrimaryCleanupControl.Bind(State, CleanupRefused),
+			_ManagedRemotePrimaryPrintControl.Bind(State, ReporterRefused))
+	} catch Any as Failure {
+		Observed := Failure
+	}
+	AssertEqual(1, State.BodyCalls, "the body executes exactly once")
+	AssertEqual(1, State.CleanupCalls, "cleanup executes exactly once for either body outcome")
+	AssertTrue(Observed == Expected, "body failure takes priority; cleanup failure remains fatal after a successful body")
+	if IsObject(Expected)
+		AssertEqual(OriginalStack, Observed.Stack, "rethrow preserves the original exception's source stack")
+	AssertEqual(CleanupRefused ? 1 : 0, State.PrintCalls, "reporter refusal cannot recurse or print a successful cleanup")
+	AssertEqual(CleanupRefused ? (ReporterRefused ? "unavailable" : "reported") : "not_requested",
+		Fixture.CleanupFailureCheckpointStatus, "reporting refusal remains inspectable without altering either exception")
+	for Line in State.Lines {
+		AssertEqual("::notice title=Windows native fixture cleanup failure::body_failed="
+			. (BodyRefused ? "true" : "false") . " cleanup_failed=true cleanup_exception=type_error", Line)
+		AssertFalse(InStr(Line, "PRIVATE_"), "no exception text enters the cleanup checkpoint")
+	}
+}
+for Pair in [[false, false], [false, true], [true, false], [true, true]] {
+	for ReporterRefused in [false, true]
+		Test("managed remote native: body=" . Pair[1] . " cleanup=" . Pair[2] . " reporter=" . ReporterRefused
+			. " preserves failure priority (managed-fixture-primary-cleanup)",
+			_ManagedRemotePrimaryCombinationControl.Bind(Pair[1], Pair[2], ReporterRefused))
+}
+
+_ManagedRemotePrimaryPrimitiveControl(Value) {
+	State := {CleanupCalls: 0, PrintCalls: 0, Lines: [], Cleanup: TypeError("PRIVATE_CLEANUP_FAILURE")}
+	Fixture := {CleanupFailureCheckpointStatus: "not_requested"}
+	Observed := 0
+	Caught := false
+	try _ManagedRemoteFixtureFinalize(Fixture, true, Value,
+		_ManagedRemotePrimaryCleanupControl.Bind(State, true), _ManagedRemotePrimaryPrintControl.Bind(State, false))
+	catch Any as Failure {
+		Observed := Failure
+		Caught := true
+	}
+	AssertTrue(Caught, "even a zero or empty-string primary exception must be rethrown")
+	AssertEqual(Value, Observed, "exception priority does not depend on truthiness or object type")
+	AssertEqual(1, State.CleanupCalls)
+	AssertEqual(1, State.PrintCalls)
+}
+for Pair in [["zero", 0], ["empty", ""], ["string", "PRIVATE_BODY_PRIMITIVE"]]
+	Test("managed remote native: " . Pair[1] . " exception retains priority (managed-fixture-primary-cleanup)",
+		_ManagedRemotePrimaryPrimitiveControl.Bind(Pair[2]))
