@@ -944,8 +944,16 @@ function graphProblems(files) {
 			if (!job || JSON.stringify(pipeline.needsOf(job.body)) !== JSON.stringify(expected)) {
 				problems.push(`${rel} ${id} must need exactly ${expected.join(', ')}`);
 			}
-			if (job && pipeline.field(job.body, 'if') !== (index === 4 ? 'always()' : null)) {
-				problems.push(`${rel} ${id} must run on every profile; only the verdict uses always()`);
+			const expectedCondition =
+				index === 4
+					? 'always()'
+					: rel === LINUX_BOX && id === 'package-linux'
+						? "${{ !cancelled() && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}"
+						: null;
+			if (job && pipeline.field(job.body, 'if') !== expectedCondition) {
+				problems.push(
+					`${rel} ${id} must retain its exact mandatory or manual diagnostic admission`
+				);
 			}
 		}
 		if (rel === MACOS_BOX) {

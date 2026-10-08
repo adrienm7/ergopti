@@ -34,8 +34,8 @@
  *    semantics. The launcher log the tests leave is removed before the app is
  *    built, and the tests build in a scratch path of their own, the only
  *    SwiftPM tree the cache restores.
- * 2. Requires every job of an OS lane to gate its lane: no job-level `if:`
- *    beyond the two allow-listed ones and no `continue-on-error`, the release
+ * 2. Requires every job of an OS lane to gate its lane: only exact pinned
+ *    verdict/diagnostic conditions and no `continue-on-error`, the release
  *    job waiting on the three lanes through its implicit `success()` (no status
  *    function), and ci.yml calling the lane that holds the Swift steps. No step
  *    of the pipeline may set `continue-on-error` beyond the report-only AHK
@@ -425,10 +425,10 @@ check(
 
 // The lane result is the aggregate gate. A job-level `if:` or `continue-on-error`
 // is how a job becomes skipped or ignored while its lane still reports success,
-// which is what the old aggregate's "skipped counts as green" bug did. Only two
-// jobs may carry one: the release-only Windows packaging, which must not run
-// outside a release, and the Linux evidence gate, which must run after a
-// failure to name it.
+// which is what the old aggregate's "skipped counts as green" bug did. Only
+// exact verdict conditions and the Linux manual packaging extension are allowed.
+// The latter retains ordinary admission and adds diagnostic receiving after a
+// manual E2E failure; every mandatory failure still rejects the lane verdict.
 const BOX_FILES = {
 	macos: MACOS_BOX,
 	windows: '.github/workflows/ci-windows.yml',
@@ -437,7 +437,9 @@ const BOX_FILES = {
 const ALLOWED_JOB_IFS = {
 	'windows-ok': 'always()',
 	'macos-ok': 'always()',
-	'linux-ok': 'always()'
+	'linux-ok': 'always()',
+	'package-linux':
+		"${{ !cancelled() && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}"
 };
 for (const rel of Object.values(BOX_FILES)) {
 	for (const boxJob of pipeline.jobs(rel)) {
