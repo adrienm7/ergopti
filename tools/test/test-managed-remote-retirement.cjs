@@ -241,6 +241,35 @@ finishStagingObservation(stagingOwned, stagingResult, () => {
 	);
 });
 
+// Exercise only the actual generated digest/integrity region with module
+// autoload disabled: no download, TLS, certificate store or resident driver.
+const digestOwned = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-staging-digest-'));
+const digestResult = spawnSync(
+	powershell,
+	[
+		'-NoProfile',
+		'-NonInteractive',
+		'-ExecutionPolicy',
+		'Bypass',
+		'-File',
+		path.join(__dirname, 'test_updater_staging_digest.ps1'),
+		'-WorkerSourcePath',
+		path.join(__dirname, '../../static/ergopti_plus/windows/modules/updater/self_update.ahk'),
+		'-OwnedFilePath',
+		path.join(digestOwned, 'pure-fact.json')
+	],
+	{ encoding: 'utf8', windowsHide: true, maxBuffer: 65536 }
+);
+finishStagingObservation(digestOwned, digestResult, () => {
+	assert.ifError(digestResult.error);
+	assert.equal(digestResult.status, 0, digestResult.stdout + digestResult.stderr);
+	assert.equal(digestResult.stderr, '');
+	assert.equal(
+		digestResult.stdout.trim(),
+		'PASS: actual staging digest checks=6 network=0 certificate=0'
+	);
+});
+
 const script = path.join(__dirname, 'test_managed_remote_retirement.ps1');
 const result = spawnSync(
 	powershell,
