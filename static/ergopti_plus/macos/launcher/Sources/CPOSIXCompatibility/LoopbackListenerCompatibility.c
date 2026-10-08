@@ -60,6 +60,62 @@ static int path_identity(pid_t pid, const char *executable, uint64_t device, uin
 	}
 	return 0;
 }
+// A known fixture PID is diagnostic input only. This observation does not
+// participate in discovering, selecting or validating a connected socket.
+void ergopti_listener_known_peer_diagnostic(pid_t pid, const char *executable,
+	uint64_t device, uint64_t inode, ergopti_listener_peer_diagnostic *lexical,
+	ergopti_listener_peer_diagnostic *physical) {
+	if (lexical == NULL || physical == NULL) { return; }
+	memset(lexical, 0, sizeof(*lexical));
+	memset(physical, 0, sizeof(*physical));
+	if (pid <= 0 || executable == NULL) { lexical->path_errno = EINVAL; *physical = *lexical; return; }
+	errno = 0;
+	int needed = proc_listallpids(NULL, 0);
+	if (needed <= 0 || needed > 65536) {
+		lexical->list_errno = needed < 0 && errno != 0 ? errno : EOVERFLOW;
+	} else {
+		size_t capacity = (size_t)needed + 32;
+		pid_t *pids = calloc(capacity, sizeof(*pids));
+		if (pids == NULL) { lexical->list_errno = ENOMEM; } else {
+			errno = 0;
+			int count = proc_listallpids(pids, (int)(capacity * sizeof(*pids)));
+			if (count <= 0 || (size_t)count >= capacity) {
+				lexical->list_errno = count < 0 && errno != 0 ? errno : EOVERFLOW;
+			} else {
+				for (int index = 0; index < count; index++) {
+					if (pids[index] == pid) { lexical->listed = 1; break; }
+				}
+			}
+			free(pids);
+		}
+	}
+	char path[PROC_PIDPATHINFO_MAXSIZE] = {0};
+	errno = 0;
+	int count = proc_pidpath(pid, path, sizeof(path));
+	if (count <= 0 || (size_t)count >= sizeof(path) || memchr(path, 0, sizeof(path)) == NULL) {
+		lexical->path_errno = errno == 0 ? EIO : errno;
+		*physical = *lexical;
+		return;
+	}
+	lexical->pathreceived = 1;
+	lexical->pathmatches = strcmp(path, executable) == 0;
+	struct stat named;
+	errno = 0;
+	if (lstat(path, &named) != 0) { lexical->stat_errno = errno; } else {
+		lexical->uidmatches = named.st_uid == geteuid();
+		lexical->devicematches = (uint64_t)(uint32_t)named.st_dev == device;
+		lexical->inodematches = (uint64_t)named.st_ino == inode;
+		if (!S_ISREG(named.st_mode)) { lexical->stat_errno = ESTALE; }
+	}
+	*physical = *lexical;
+	physical->pathmatches = 0;
+	errno = 0;
+	char *canonical = realpath(executable, NULL);
+	if (canonical == NULL) { physical->canonical_errno = errno == 0 ? EIO : errno; } else {
+		physical->pathmatches = strcmp(path, canonical) == 0;
+		free(canonical);
+	}
+}
 static int executable_mapping(pid_t pid, uint64_t device, uint64_t inode,
 	const struct timespec *started, uint32_t budget) {
 	uint64_t address = 0;
