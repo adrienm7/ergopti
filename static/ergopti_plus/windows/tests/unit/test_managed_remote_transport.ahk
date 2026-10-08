@@ -1375,11 +1375,7 @@ _ManagedRemoteScopePolicyControls() {
 	AssertTrue(_ManagedRemoteFixtureRequireRootScope("CurrentUser", Reader))
 	AssertEqual(0, Control["calls"], "local CurrentUser never requires an elevated token")
 	for Value in [0, 2, "1", 1.0] {
-		Caught := false
-		try _ManagedRemoteFixtureRequireRootScope("LocalMachine", (*) => Value)
-		catch as Failure
-			Caught := true
-		AssertTrue(Caught, "machine permission needs the native reader's exact boolean contract")
+		_ManagedRemoteScopeAssertInvalidPermission(Value, _ManagedRemoteScopePermissionValue.Bind(Value))
 	}
 	AssertTrue(_ManagedRemoteFixtureRequireRootScope("LocalMachine", (*) => true))
 	Primary := ValueError("controlled native token query failure")
@@ -1390,6 +1386,32 @@ _ManagedRemoteScopePolicyControls() {
 		AssertTrue(Failure == Primary, "query failure cannot turn into permission or a fallback")
 	}
 	AssertTrue(Caught)
+}
+
+_ManagedRemoteScopePermissionValue(Value) => Value
+
+_ManagedRemoteScopeObservePermission(Control, Reader) {
+	Control["calls"] += 1
+	Value := Reader.Call()
+	Control["observed"].Push(Value)
+	return Value
+}
+
+_ManagedRemoteScopeAssertInvalidPermission(Value, Reader) {
+	Control := Map("calls", 0, "observed", [])
+	Caught := false
+	try _ManagedRemoteFixtureRequireRootScope("LocalMachine", _ManagedRemoteScopeObservePermission.Bind(Control, Reader))
+	catch Any as Failure {
+		Caught := true
+		AssertEqual("Error", Type(Failure), "invalid permission must reach the guard instead of failing a captured-variable read")
+		AssertEqual("Machine root-store scope requires verified native token elevation.", Failure.Message,
+			"only the actual permission refusal satisfies this negative control")
+	}
+	AssertTrue(Caught, "machine permission needs the native reader's exact boolean contract")
+	AssertEqual(1, Control["calls"], "each independent invalid permission invokes its reader once")
+	AssertEqual(1, Control["observed"].Length, "the reader must return a real value to the guard")
+	AssertEqual(Type(Value), Type(Control["observed"][1]), "the observed permission retains its original type")
+	AssertEqual(Value, Control["observed"][1], "the actual invalid permission reaches the guard unchanged")
 }
 
 _ManagedRemoteScopeQueryFailed(Primary) {
