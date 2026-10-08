@@ -3327,6 +3327,20 @@ cache/notification timing remains UNKNOWN. The new12 controlled Swift methods
 and actual native AFTER require macOS CI; no fix, physical keyboard, package or
 installation acceptance is claimed. Item30 and transverse16/38 remain partial.
 
+Actual manual macOS run37664683956 at7176df2d8 compiles the release launcher
+but fails Swift test compilation with two unique source errors repeated39 times;
+zero XCTest methods start. The keyboard-selection fixture now uses the Swift
+CFRunLoopMode.defaultMode constant and gives its existing background Dispatch
+closure an explicit nonthrowing Void result. Exact two-source byte inverses
+preserve all12 controlled methods, original assertions, selection/restoration
+order, cleanup custody, absolute5s cap and SDK/workflow budgets. Independent
+source-only review is clear; it executes no portable behavior tests and creates
+no replacement oracle. Actual Swift compilation and Darwin behavior AFTER
+remain UNEXECUTED, including the earlier permission-stage, source-selection and
+Core asset-policy changes. Release build success does not qualify the test
+suite, packaging, installation or physical keyboards. Item30 and transverse
+16/38 remain open; no item is removed.
+
 - [~] **31.** HS-274 exact physical key accounting with an Ergopti-owned
   background Karabiner runtime (no Karabiner-Elements app). Plan, decisions and
   ADR 011 in the overnight handoff and `static/ergopti_plus/docs/adr/`. WP0-WP2
@@ -4840,6 +4854,24 @@ its unrelated Group6 network changes and every existing Group5 assertion. The
 combined Swift reporter retains both independent test blocks and all archive
 outcomes in JSON, while visible notices follow the actual fixture cohort. Native
 qualification and items31/16/38 remain open.
+
+The three native compiler entries now consume the dedicated XcodeGen metadata
+credential before their first factory, Git or native child. Only the exact pinned
+GitHub API metadata request may receive it; redirects refuse, archives remain
+anonymous, ambient credentials are not borrowed, and malformed values refuse
+before those children. Default Swift children strip this dedicated purpose;
+only the three compiler Guardians explicitly select it. The original budgets,
+physical guards, independent expectations and fixed source bounds remain whole.
+The coherent eighteen-source author qualification passes 576 portable executions;
+its independent review passes 678, retains the four genuine caller BEFORE
+assertion refusals per mode and records 16 targeted mutation assertion refusals.
+These overlapping cohorts are not additive coverage. The nine frozen caller
+controls observe real POSIX child inheritance; modeled Apple phases are not
+Darwin compiler evidence. The added Swift method is normally discovered but has
+not executed on macOS. Group6 has not granted the workflow environment seam, so
+that row remains absent. Native authenticated HTTP, full compilation, signing,
+packaging and installation remain UNEXECUTED for this source successor.
+Item 31 and transverse 16/38 remain open; no item is removed.
 
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review

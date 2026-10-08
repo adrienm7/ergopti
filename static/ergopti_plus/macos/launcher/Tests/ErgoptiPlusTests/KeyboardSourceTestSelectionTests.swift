@@ -126,8 +126,17 @@ final class KeyboardSourceTestSelectionTests: XCTestCase {
 		let rejected = expectation(description: "Actual background owner refused before any Carbon read")
 		DispatchQueue.global().async { () -> Void in
 			XCTAssertFalse(Thread.isMainThread)
-			XCTAssertThrowsError(try KeyboardSourceTestSelection())
-			rejected.fulfill()
+			do {
+				let unexpectedOwner = try KeyboardSourceTestSelection()
+				XCTFail("A background thread unexpectedly acquired the native Carbon owner")
+				// Even unexpected ownership must retire on the actual main run loop.
+				DispatchQueue.main.async {
+					unexpectedOwner.close()
+					rejected.fulfill()
+				}
+			} catch {
+				rejected.fulfill()
+			}
 		}
 		wait(for: [rejected], timeout: 1)
 	}
