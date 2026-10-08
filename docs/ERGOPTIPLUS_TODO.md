@@ -8678,6 +8678,56 @@ Current Group 3 source checkpoint (item 111, 2026-10-06): [Group 3 current check
   all three OSes. This is an unimplemented follow-up; it does not complete the
   existing prediction-input or tooltip validation items.
 
+- [ ] **113.** Fix i18n and performance bugs observed in the English promo video.
+
+  Maintainer report on 2026-10-07, follow-up task `task_a3f680e0`.
+  Prioritize green release qualification, then the Windows incident. Keep one local
+  commit per correction with regression coverage; do not push these changes.
+  - Translate the hotstring editor search placeholder through
+    `data-i18n-placeholder` and a key in all 21 locale files.
+  - Translate the screen-time dashboard weekday labels in charts, main and
+    script owners; inspect the typing dashboard's French `+ IA` chip too.
+  - Replace French tooltip acceptance/navigation hints from the shared
+    tooltip constants with locale-owned text on Windows, macOS and Linux,
+    preserving hint/binding agreement and the common design.
+  - Measure repeated Windows PAC resolution before changing it. Cache by
+    destination with explicit network/proxy-setting invalidation, retain
+    fail-fast resolution errors and check the other two OS implementations.
+  - Remove catalogue placeholders such as `_modifier_chords_placeholder`
+    from sales-page labels/counts, or expand them consistently with the
+    action picker. Test the displayed action count against the real rows.
+
+  Acceptance includes English and other locale coverage, failure/invalidation
+  regressions, cross-driver checks and rerendering `personal-hotstrings`,
+  `screen-time` and `ai-predictions` through `npm run gifs -- ...`. Record the
+  regenerated README GIF paths in the corresponding commits. Preserve the
+  video agent's uncommitted work and never treat rendered media as functional
+  driver qualification.
+
+- [ ] **114.** Diagnose and fix recurring Windows prediction-key and script-chord stalls.
+
+  Maintainer incident on 2026-10-07: AI was enabled with three visible
+  predictions, keys 1–5 produced no result while 6–0 remained usable, and
+  AltGr+Enter also stopped responding. Restarting the driver cleared the
+  state. A similar incident occurred several days earlier; an earlier fix
+  did not prevent recurrence. With three suggestions, keys 4 and 5 must
+  remain available unless another explicitly configured binding owns them.
+
+  Distinguish prediction versus profile bindings, stale native plan/owner
+  state, refusal after consumed input, modifier/prefix state and lifecycle
+  stalls. Observe the actual resident process; loading the DLL elsewhere
+  cannot measure its capture debt. Require an integrated regression for
+  the confirmed cause, recovery without restart, original digit passthrough
+  outside the shown slots and script-management availability.
+
+  Also retain the current Notepad incident: logical native precondition
+  refusals at 21:46:10, 21:48:18 and 22:04:48, and verified effect followed
+  by stale AHK admission at 21:46:11. Improve content-free diagnostics before
+  attributing a cause; keep exact suffix/focus/document guards, worker
+  retirement, no duplicate replay and no publication of unverified success.
+  Six controlled real-Notepad caller cases passing do not qualify the
+  physical/default InputHook trigger or close this incident.
+
 ## Time estimate
 
 Order-of-magnitude estimate: 40–70 agent-days for the current remaining
