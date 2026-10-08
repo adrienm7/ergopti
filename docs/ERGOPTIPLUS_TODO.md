@@ -10751,6 +10751,13 @@ Current Group 3 source checkpoint (item 111, 2026-10-06): [Group 3 current check
   video agent's uncommitted work and never treat rendered media as functional
   driver qualification.
 
+  Maintainer follow-up on 2026-10-08: `menu.layout.ctrl_magic_save` is
+  missing from every locale, and `app_category.general` still renders as a
+  raw key in the screen-time dashboard. Add both keys to all 21 locale owners
+  and cover the actual menu/dashboard consumers on Windows, macOS and Linux
+  with regression tests. These observations remain open; rendered promo media
+  does not qualify a driver correction.
+
 - [ ] **114.** Diagnose and fix recurring Windows prediction-key and script-chord stalls.
 
   Maintainer incident on 2026-10-07: AI was enabled with three visible
