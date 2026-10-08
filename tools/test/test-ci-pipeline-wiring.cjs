@@ -181,6 +181,30 @@ const MACOS_NATIVE_STEP_CONDITIONS = [
 	[
 		MACOS_BOX,
 		'managed-ollama-native',
+		'Qualify actual explicit curl stream ownership',
+		'${{ !cancelled() }}'
+	],
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
+		'Receive actual independent managed HTTP native clients',
+		'${{ !cancelled() }}'
+	],
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
+		'Upload the actual managed native release asset',
+		'inputs.release'
+	],
+	[
+		MACOS_BOX,
+		'package-macos',
+		'Upload the catalogue sealed into the signed application',
+		'inputs.release'
+	],
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
 		'Retain independent native launcher compiler diagnostics',
 		'always()'
 	],
@@ -995,7 +1019,9 @@ function graphProblems(files) {
 						? rel === MACOS_BOX
 							? MACOS_VERDICT_NEEDS
 							: sequence.slice(0, 4)
-						: [sequence[index - 1]];
+						: rel === MACOS_BOX && id === 'package-macos'
+							? ['e2e-hs', 'managed-ollama-native']
+							: [sequence[index - 1]];
 			if (!job || JSON.stringify(pipeline.needsOf(job.body)) !== JSON.stringify(expected)) {
 				problems.push(`${rel} ${id} must need exactly ${expected.join(', ')}`);
 			}
@@ -1080,6 +1106,14 @@ for (const [what, from, to] of [
 ]) {
 	mustCatch(what, MACOS_BOX, from, to, graphProblems);
 }
+
+mustCatch(
+	'native producer omitted from application packaging',
+	MACOS_BOX,
+	'    needs: [e2e-hs, managed-ollama-native]\n',
+	'    needs: e2e-hs\n',
+	graphProblems
+);
 
 // Both independent native entries must feed the verdict and must never become optional.
 for (const id of MACOS_NATIVE_ENTRIES) {
@@ -2962,13 +2996,14 @@ const directDistroUnitStep =
 	'        shell: bash\n        run: |\n          ' +
 	DISTRO_UNIT_COMMAND +
 	'\n';
-const directDistroFiles = pipeline
-	.files()
-	.map((entry) =>
-		entry.rel === LINUX_BOX
-			? { ...entry, text: entry.text.replace(distroUnitBody, directDistroUnitStep) }
-			: entry
-	);
+const directDistroFiles = pipeline.files().map((entry) =>
+	entry.rel === LINUX_BOX
+		? {
+				...entry,
+				text: entry.text.replace(distroUnitBody, directDistroUnitStep)
+			}
+		: entry
+);
 assert.deepEqual(
 	distroUnitProblems(directDistroFiles),
 	[],
@@ -3306,7 +3341,10 @@ assert.ok(
 	'physical renderer before layer renderer must refuse'
 );
 for (const changed of [undefined, 'node ./tools/test/browser/layer-editor.playwright.cjs']) {
-	const scripts = { ...PHYSICAL_BROWSER_SCRIPTS, [PHYSICAL_BROWSER_ALIAS]: changed };
+	const scripts = {
+		...PHYSICAL_BROWSER_SCRIPTS,
+		[PHYSICAL_BROWSER_ALIAS]: changed
+	};
 	assert.ok(
 		physicalBrowserProblems(pipeline.files(), scripts).length > 0,
 		'missing or redirected physical browser alias must refuse'

@@ -140,8 +140,9 @@ check(
 );
 // Fail fast: a red Hammerspoon suite spends no macOS minutes.
 check(
-	JSON.stringify(pipeline.needsOf(pipeline.job('package-macos'))) === JSON.stringify(['e2e-hs']),
-	`package-macos must need e2e-hs alone, got [${pipeline.needsOf(pipeline.job('package-macos')).join(', ')}]`
+	JSON.stringify(pipeline.needsOf(pipeline.job('package-macos'))) ===
+		JSON.stringify(['e2e-hs', 'managed-ollama-native']),
+	`package-macos must need e2e-hs and both native producers, got [${pipeline.needsOf(pipeline.job('package-macos')).join(', ')}]`
 );
 
 // The launcher build and XCTest precede the app build. LauncherLogTests append
