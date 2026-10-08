@@ -73,7 +73,7 @@ Add-Type -TypeDefinition $PipeSource
 foreach ($Case in @(
     @{text='';maximum=1;refused=$false},
     @{text='abcd';maximum=4;refused=$false},
-    @{text='éΩ😀';maximum=4;refused=$false},
+    @{text=(-join ([char[]]@(0x00E9,0x03A9,0xD83D,0xDE00)));maximum=4;refused=$false},
     @{text='abcde';maximum=4;refused=$true},
     @{text=('x' * 1048576);maximum=1024;refused=$true}
 )) {
