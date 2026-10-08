@@ -127,7 +127,8 @@ assert.deepEqual(kerberos.sources, [
 	{
 		type: 'archive',
 		url: 'https://web.mit.edu/kerberos/dist/krb5/1.22/krb5-1.22.2.tar.gz',
-		sha256: '3243ffbc8ea4d4ac22ddc7dd2a1dc54c57874c40648b60ff97009763554eaf13'
+		sha256: '3243ffbc8ea4d4ac22ddc7dd2a1dc54c57874c40648b60ff97009763554eaf13',
+		'disable-http-decompression': true
 	}
 ]);
 assert.ok(kerberos['config-opts'].includes('--libdir=/app/lib'));

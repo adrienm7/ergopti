@@ -239,6 +239,9 @@ function flatpakModules(data) {
 				source === 'duktape' || source === 'krb5'
 					? { type: 'archive', url: input.url, sha256: input.sha256 }
 					: { type: 'git', url: input.url, commit: input.commit };
+			// MIT serves the signed gzip archive with HTTP content encoding too.
+			// Preserve its signed bytes instead of hashing the decompressed tar.
+			if (source === 'krb5') pinned['disable-http-decompression'] = true;
 			return '  - ' + JSON.stringify({ ...recipe, sources: [pinned] }) + '\n';
 		})
 		.join('');
