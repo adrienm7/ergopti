@@ -336,6 +336,24 @@ no demonstrated native repair credit, and the lower causes remain unknown.
 
 ## Remaining CODE and hosted work
 
+Manual37702753652 attempt1 at2ab4b1a32 ends in failure after audio package
+acquisition exceeds10min and window prerequisite downloads exceed4min. An
+owned-runner apt-get process remains at PID58097 and holds dpkg's frontend
+lock; later acquisitions fail. The exact E2E census is123 successful,
+32 failed/two skipped steps. Package/install and Release are skipped. Attempt2
+uses the same source on a fresh runner: audio acquisition/native receiving pass,
+while native window qualification fails again; its terminal cause and remaining
+receiving are pending. These failures do not prove the Flatpak SDK recipe.
+
+Group6 takes only the package-linux job condition/comment in ci-linux.yml.
+Manual diagnostics may receive packaging after E2E failure; the unchanged
+E2E dependency retains prior unit success. Automatic runs, cancellation and
+skipped E2E remain refused, and linux-ok still requires every mandatory job,
+subject and source receipt to pass. Release admission remains push-only.
+No existing assertion, receiving clock, installation leg or other workflow
+region changes. The source regression fails before this admission change;
+actual native package and installation receiving remain required.
+
 Manual37688807101 at091743921 is terminal FAIL. Shared checks pass; Linux has
 11,644 unit passes/zero failures and157 successful E2E steps with zero skipped.
 Flatpak package configuration fails because curl requires GSS but the24.08 SDK

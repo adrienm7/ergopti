@@ -1827,10 +1827,10 @@ jobs:
   # renamed below to a name that carries no version at all, so no asset can be
   # misnamed and the website's exact-name lookup keeps working.
   #
-  # After e2e-linux: a push whose unit or E2E suite fails spends nothing on
-  # packaging, and every other job of the lane starts from here, so the lane
-  # has one entry. Packaging used to run in parallel with the tests, which
-  # saved a few minutes but drew a second entry into the run graph.
+  # After e2e-linux: automatic runs require successful unit and E2E receiving.
+  # Manual diagnostics can still receive packages after an E2E failure, with
+  # successful unit admission retained through the E2E dependency. linux-ok
+  # continues to reject every failed mandatory job and missing native subject.
   #
   # The Flatpak and tarball smokes run here, on the build host, because neither
   # needs a pristine machine: the build only runs `flatpak build-bundle`, so
@@ -1841,6 +1841,7 @@ jobs:
     name: 'Package'
     runs-on: ubuntu-latest
     needs: [e2e-linux]
+    if: ${{ !cancelled() && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}
     env:
       ERGOPTI_BUILD_VERSION: ${{ inputs.version }}
       LINUX_BUNDLE_ASSET: ${{ inputs.linux_bundle }}

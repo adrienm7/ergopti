@@ -437,7 +437,9 @@ const BOX_FILES = {
 const ALLOWED_JOB_IFS = {
 	'windows-ok': 'always()',
 	'macos-ok': 'always()',
-	'linux-ok': 'always()'
+	'linux-ok': 'always()',
+	'package-linux':
+		"${{ !cancelled() && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}"
 };
 for (const rel of Object.values(BOX_FILES)) {
 	for (const boxJob of pipeline.jobs(rel)) {
