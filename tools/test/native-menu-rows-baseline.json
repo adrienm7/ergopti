@@ -33,12 +33,11 @@
 		]
 	},
 	"macos": {
-		"count": 29,
+		"count": 28,
 		"sites": [
 			"macos/ui/menu/builder.lua:452 separator",
 			"macos/ui/menu/builder.lua:879 separator",
 			"macos/ui/menu/builder.lua:926 separator",
-			"macos/ui/menu/canvas_badge.lua:123 separator",
 			"macos/ui/menu/menu_gestures.lua:205 static",
 			"macos/ui/menu/menu_gestures.lua:257 static",
 			"macos/ui/menu/menu_hotstrings.lua:297 static",

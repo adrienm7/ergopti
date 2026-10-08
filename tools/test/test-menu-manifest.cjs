@@ -9573,3 +9573,133 @@ console.log(
 		);
 	}
 }
+
+// A native root badge consumes actual shared captions and boundary before drawing.
+{
+	const assert = require('node:assert/strict');
+	const { nativeTemplateBinding } = require('../lib/menu-template-binding.cjs');
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const section = 'macos_canvas_badge_frame';
+	const declaration = {
+		[section]: [
+			{
+				type: 'include',
+				section: 'macos_canvas_badge_paused',
+				present_when: 'macos_badge_is_paused'
+			},
+			{
+				type: 'include',
+				section: 'macos_canvas_badge_active',
+				present_when: 'macos_badge_is_active'
+			},
+			{ type: '---', platforms: ['hs'], unavailable: 'hide' }
+		],
+		macos_canvas_badge_paused: [
+			{
+				type: 'label',
+				id: 'macos_badge_paused_caption',
+				i18n: 'menu.builder.title_paused',
+				platforms: ['hs'],
+				unavailable: 'hide'
+			}
+		],
+		macos_canvas_badge_active: [
+			{
+				type: 'label',
+				id: 'macos_badge_active_caption',
+				i18n: 'menu.builder.title',
+				platforms: ['hs'],
+				unavailable: 'hide'
+			}
+		]
+	};
+	const records = parseToml(readFileSync(MANIFEST_PATH, 'utf8')).menu;
+	const generated = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	for (const [name, rows] of Object.entries(declaration)) {
+		assert.deepEqual(records[name], rows, 'independently specified root-badge declaration');
+		assert.deepEqual(generated[name], rows, 'actual owner-generated declaration');
+	}
+	const prior = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/macos_canvas_badge_captions.json'), 'utf8')
+	);
+	assert.equal(
+		Object.keys(prior.captions).length,
+		21,
+		'all original caption pairs are independently frozen'
+	);
+	for (const [locale, captions] of Object.entries(prior.captions)) {
+		const strings = JSON.parse(
+			readFileSync(resolve(LOCALES_DIR, locale + '.json'), 'utf8').replace(/^\uFEFF/, '')
+		);
+		assert.equal(strings['menu.builder.title'], captions.active);
+		assert.equal(strings['menu.builder.title_paused'], captions.paused);
+	}
+	const source = readFileSync(
+		resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/canvas_badge.lua'),
+		'utf8'
+	);
+	for (const [key, expression] of [
+		['macos_badge_is_paused', 'not not paused'],
+		['macos_badge_is_active', 'not paused']
+	]) {
+		const binds = (candidate, port = 2) =>
+			nativeTemplateBinding(candidate, '.lua', section, key, port);
+		assert.equal(binds(source), true, 'actual strict predicate is published at the getter port');
+		assert.equal(binds(source, 1), false, 'state predicate is not a native command');
+		for (const replacement of ['nil', '{}', 'function() end']) {
+			const candidate = source.replace(
+				'[' + JSON.stringify(key) + '] = function() return ' + expression + ' end',
+				'[' + JSON.stringify(key) + '] = ' + replacement
+			);
+			assert.notEqual(candidate, source, 'counterexample changes the actual binding');
+			assert.equal(
+				binds(candidate),
+				false,
+				'withdrawn/noncallable/empty getter evidence is refused'
+			);
+		}
+		const wrongFrame = source.replace(
+			'ManifestMenu.template_rows("' + section + '"',
+			'ManifestMenu.template_rows("unrelated_badge_frame"'
+		);
+		assert.notEqual(wrongFrame, source);
+		assert.equal(
+			binds(wrongFrame),
+			false,
+			'quoted IDs cannot substitute for actual frame consumption'
+		);
+	}
+	function executableSequence(candidate, expected) {
+		const actual = scriptTokens(candidate, '.lua');
+		const tokens = scriptTokens(expected, '.lua');
+		return actual.some((_, at) =>
+			tokens.every(
+				(token, offset) =>
+					actual[at + offset]?.kind === token.kind && actual[at + offset]?.value === token.value
+			)
+		);
+	}
+	const chain = [
+		['macos/ui/menu/init.lua', 'local Builder = require("ui.menu.builder")'],
+		['macos/ui/menu/init.lua', 'pcall(Builder.generate, ctx, menu_mods, actions)'],
+		['macos/ui/menu/builder.lua', 'local CanvasBadge = require("ui.menu.canvas_badge")'],
+		['macos/ui/menu/builder.lua', 'pcall(CanvasBadge.prepend_to, rendered, ctx, function()'],
+		['macos/ui/menu/canvas_badge.lua', 'function M.prepend_to(items, ctx, on_click)'],
+		['macos/ui/menu/canvas_badge.lua', 'local ManifestMenu = require("infra.manifest_menu")']
+	];
+	for (const [path, call] of chain) {
+		const actual = readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus', path), 'utf8');
+		assert.equal(
+			executableSequence(actual, call),
+			true,
+			'the actual root producer reaches the badge consumer'
+		);
+		assert.equal(executableSequence('-- ' + call, call), false, 'comment-only evidence is refused');
+		assert.equal(executableSequence(JSON.stringify(call), call), false, 'quoted source is refused');
+		assert.equal(
+			executableSequence(call.replace(/Builder|CanvasBadge|ManifestMenu|M\./, 'Unrelated.'), call),
+			false,
+			'wrong native owner is refused'
+		);
+	}
+}

@@ -2050,6 +2050,98 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 	}
 }
 
+// A root presentation is reached by its real native producer, never a synthetic clicked row.
+{
+	const assert = require('node:assert/strict');
+	const { nativeBadgeRootComposition } = require('../lib/menu-native-root-binding.cjs');
+	const controls = require('./fixtures/badge-root-counterexamples.cjs');
+	const target = 'macos_canvas_badge_frame';
+	const sourceFiles = [
+		'macos/ui/menu/init.lua',
+		'macos/ui/menu/builder.lua',
+		'macos/ui/menu/canvas_badge.lua'
+	];
+	const sources = Object.fromEntries(
+		sourceFiles.map((file) => [file, fs.readFileSync(path.join(SP, file), 'utf8')])
+	);
+	const admits = (candidate, declarations = manifest, platform = 'hs') =>
+		nativeBadgeRootComposition(candidate, declarations, platform);
+	for (const control of controls) {
+		const source = sources[control.path];
+		assert.equal(
+			source.split(control.before).length - 1,
+			1,
+			control.reason + ': exact physical counterexample preimage'
+		);
+		const changed = source.replace(control.before, control.after);
+		assert.notEqual(changed, source, control.reason + ': source was actually changed');
+		assert.equal(admits({ ...sources, [control.path]: changed }), false, control.reason);
+	}
+	for (const file of sourceFiles) {
+		assert.equal(admits({ ...sources, [file]: '' }), false, 'missing physical route owner');
+		assert.equal(
+			admits({ ...sources, [file]: JSON.stringify(sources[file]) }),
+			false,
+			'quoted physical source supplies no route'
+		);
+		assert.equal(
+			admits({ ...sources, [file]: '--[=[\n' + sources[file] + '\n]=]' }),
+			false,
+			'comment-only physical source supplies no route'
+		);
+	}
+	for (const platform of ['ahk', 'linux', 'HS', '', undefined]) {
+		assert.equal(
+			nativeBadgeRootComposition(sources, manifest, platform),
+			false,
+			'root edge only exists on its actual native platform'
+		);
+	}
+	for (const section of [
+		target,
+		'macos_canvas_badge_paused',
+		'macos_canvas_badge_active',
+		'top_level'
+	]) {
+		const withdrawn = { ...manifest };
+		delete withdrawn[section];
+		assert.equal(admits(sources, withdrawn), false, 'missing actual canonical root or descendant');
+	}
+	const wrongOs = {
+		...manifest,
+		macos_canvas_badge_active: manifest.macos_canvas_badge_active.map((row) => ({
+			...row,
+			platforms: ['linux']
+		}))
+	};
+	assert.equal(
+		admits(sources, wrongOs),
+		false,
+		'wrong-platform caption cannot supply the native root'
+	);
+	const quotedDecoy = {
+		...sources,
+		'macos/ui/menu/builder.lua':
+			sources['macos/ui/menu/builder.lua'] +
+			'\n-- pcall(CanvasBadge.prepend_to, rendered, ctx, function())\nlocal inert_badge_quote = "pcall(CanvasBadge.prepend_to, rendered, ctx, function())"\n'
+	};
+	const admitted = admits(sources);
+	assert.equal(
+		admits(quotedDecoy),
+		admitted,
+		'inert quoted/comment decoys neither create nor withdraw an actual route'
+	);
+	if (admitted) {
+		reachableOn[target] = combineMenuVisibility(PLATFORMS, reachableOn[target], ['hs']);
+		openedBy[target] = 'top_level/native Builder.generate → CanvasBadge.prepend_to';
+		reachedByKinds[target] = { hs: new Set(['compose']) };
+	} else {
+		errors.push(
+			'top_level/native badge: physical root composition refused; declaration remains unreachable'
+		);
+	}
+}
+
 // Iterated to a fixed point rather than walked once: the graph is shallow today
 // but a group nested inside a group would make a single pass depth-dependent,
 // and a check that silently depends on declaration order is a check that breaks
