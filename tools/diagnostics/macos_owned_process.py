@@ -65,6 +65,19 @@ class ProcBSDInfo(ctypes.Structure):
     )
 
 
+class ProcBSDShortInfo(ctypes.Structure):
+    """Apple SDK PROC_PIDT_SHORTBSDINFO, independently checked by the native receiving gate."""
+
+    _fields_ = (
+        [(name, ctypes.c_uint32) for name in ("pid", "ppid", "pgid", "status")]
+        + [("comm", ctypes.c_char * 16)]
+        + [
+            (name, ctypes.c_uint32)
+            for name in ("flags", "uid", "gid", "ruid", "rgid", "svuid", "svgid", "reserved")
+        ]
+    )
+
+
 class NativeProcessGroups:
     """Admit actual macOS nonreaping waits and native inherited-PGID census."""
 
@@ -87,6 +100,9 @@ class NativeProcessGroups:
             "This Python runtime does not expose native WNOWAIT ownership",
         )
         require(ctypes.sizeof(ProcBSDInfo) == 136, "Unsupported native PROC_PIDTBSDINFO ABI")
+        require(
+            ctypes.sizeof(ProcBSDShortInfo) == 64, "Unsupported native PROC_PIDT_SHORTBSDINFO ABI"
+        )
         self.library = ctypes.CDLL("/usr/lib/libproc.dylib", use_errno=True)
         self.library.proc_listpids.argtypes = [
             ctypes.c_uint32,
@@ -109,8 +125,12 @@ class NativeProcessGroups:
         require(
             process.returncode is None, "Leader was reaped before native process-group retirement"
         )
+        return self.terminal_observation(process.pid)
+
+    def terminal_observation(self, pid):
+        """Read twice from the kernel without releasing this direct child's reservation."""
         try:
-            observation = os.waitid(os.P_PID, process.pid, os.WEXITED | os.WNOHANG | os.WNOWAIT)
+            observation = os.waitid(os.P_PID, pid, os.WEXITED | os.WNOHANG | os.WNOWAIT)
         except ChildProcessError as failure:
             raise OwnedProcessError(
                 "Direct child reservation was lost; no further group signal is permitted"
@@ -118,13 +138,13 @@ class NativeProcessGroups:
         if observation is None or observation.si_pid == 0:
             return None
         require(
-            observation.si_pid == process.pid
+            observation.si_pid == pid
             and observation.si_code in (os.CLD_EXITED, os.CLD_KILLED, os.CLD_DUMPED),
             "Unexpected native nonreaping child observation",
         )
         # A repeated actual native observation admits WNOWAIT's behavior, rather
         # than merely assuming the flag is implemented because it is exported.
-        repeated = os.waitid(os.P_PID, process.pid, os.WEXITED | os.WNOHANG | os.WNOWAIT)
+        repeated = os.waitid(os.P_PID, pid, os.WEXITED | os.WNOHANG | os.WNOWAIT)
         require(
             repeated is not None
             and repeated.si_pid == observation.si_pid
@@ -133,6 +153,40 @@ class NativeProcessGroups:
             "Native WNOWAIT did not preserve the exact child's terminal observation",
         )
         return observation
+
+    def held_terminal(self, pid):
+        """Prove an exact direct-child reservation without accepting an acquired PID alone."""
+        observation = self.terminal_observation(pid)
+        require(observation is not None, "Reserved privileged leader is not our terminal child")
+        return observation
+
+    def privileged_terminal_identity(self, pid, group_id):
+        """Read public cross-UID BSD identity only for an actually held direct-child zombie.
+
+        XNU permits SHORTBSDINFO across UID boundaries, including zombies when
+        arg=1. Full BSD identity remains mandatory for all other group members.
+        No missing record, UID error or changed terminal observation is ignored.
+        """
+        require(pid == group_id, "Privileged identity requires the exact reserved group leader")
+        before = self.held_terminal(pid)
+        info = ProcBSDShortInfo()
+        ctypes.set_errno(0)
+        received = self.library.proc_pidinfo(pid, 13, 1, ctypes.byref(info), ctypes.sizeof(info))
+        require(
+            received == ctypes.sizeof(info)
+            and info.pid == pid
+            and info.ppid == os.getpid()
+            and info.pgid == group_id
+            and info.status == 5,
+            "Reserved privileged leader identity was unavailable or changed",
+        )
+        after = self.held_terminal(pid)
+        require(
+            (before.si_pid, before.si_code, before.si_status)
+            == (after.si_pid, after.si_code, after.si_status),
+            "Reserved privileged leader terminal observation changed",
+        )
+        return info, after
 
     def live_members(self, group_id, reserved_leader):
         """Exclude zombie records, never an unobserved live group leader."""
@@ -147,6 +201,7 @@ class NativeProcessGroups:
         )
         live = []
         reserved_zombie_seen = False
+        privileged_observation = None
         for pid in storage[: written // ctypes.sizeof(ctypes.c_int)]:
             if pid <= 0:
                 continue
@@ -157,6 +212,9 @@ class NativeProcessGroups:
             )  # PROC_PIDTBSDINFO, include zombies
             if received == 0 and ctypes.get_errno() == errno.ESRCH:
                 continue
+            if received == 0 and ctypes.get_errno() == errno.EPERM and pid == reserved_leader:
+                info, privileged_observation = self.privileged_terminal_identity(pid, group_id)
+                received = ctypes.sizeof(info)
             require(
                 received == ctypes.sizeof(info) and info.pid == pid,
                 "Native process-group member identity was unavailable "
@@ -175,6 +233,17 @@ class NativeProcessGroups:
             if info.status != 5:
                 live.append(pid)
         require(reserved_zombie_seen, "Native census did not prove the reserved zombie leader")
+        if privileged_observation is not None:
+            final = self.held_terminal(reserved_leader)
+            require(
+                (final.si_pid, final.si_code, final.si_status)
+                == (
+                    privileged_observation.si_pid,
+                    privileged_observation.si_code,
+                    privileged_observation.si_status,
+                ),
+                "Reserved privileged leader was lost during group census",
+            )
         return live
 
 

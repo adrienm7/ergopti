@@ -752,9 +752,27 @@ check('shared native process ownership controls remain registered and mandatory'
 	assert.ifError(result.error);
 	assert.strictEqual(result.signal, null, result.stderr);
 	assert.strictEqual(result.status, 0, result.stderr);
-	assert.match(result.stderr, /Ran 18 tests in /);
+	assert.match(result.stderr, /Ran 29 tests in /);
 	assert.match(result.stderr, /\nOK\s*$/);
 	assert.doesNotMatch(result.stderr, /skipped=/);
+	const workflow = require('yaml').parse(
+		fs.readFileSync(path.join(ROOT, '.github/workflows/ci-macos.yml'), 'utf8')
+	);
+	const command =
+		'"$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py';
+	for (const [job, name] of [
+		['managed-ollama-native', 'Receive actual independent managed HTTP native clients'],
+		['package-macos', 'Receive actual managed HTTP native clients']
+	]) {
+		const steps = workflow.jobs[job].steps.filter((step) => step.name === name);
+		assert.strictEqual(steps.length, 1, `${job} needs one actual native receiving owner`);
+		const script = steps[0].run;
+		assert.ok(script.startsWith('set -euo pipefail\nstatus=0\n'));
+		assert.strictEqual(script.split(command).length - 1, 1);
+		assert.ok(script.includes(`${command} || status=1\n`));
+		assert.ok(script.endsWith('exit "$status"\n'));
+		assert.notStrictEqual(steps[0]['continue-on-error'], true);
+	}
 });
 
 // SENDER_INTERNAL_MARKER_DIAGNOSTIC_BEGIN
