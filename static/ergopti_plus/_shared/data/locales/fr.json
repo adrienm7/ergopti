@@ -3249,5 +3249,7 @@
 	"gestures.system.pinch_unknown": "Pincement système : Gestes système : non vérifiés",
 	"gestures.system.slot_unknown_caption": "%s — Gestes système : non vérifiés",
 	"gestures.system.slot_configured_caption": "%s — Configuré pour ErgoptiPlus",
-	"gestures.system.slot_not_configured_caption": "%s — Non configuré pour ErgoptiPlus"
+	"gestures.system.slot_not_configured_caption": "%s — Non configuré pour ErgoptiPlus",
+	"menu.global.reload_macos": "↺ Recharger",
+	"menu.global.quit_macos": "✕ Quitter"
 }

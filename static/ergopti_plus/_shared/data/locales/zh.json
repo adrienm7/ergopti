@@ -3249,5 +3249,7 @@
 	"gestures.system.pinch_unknown": "系统捏合手势 : 系统手势：尚未验证",
 	"gestures.system.slot_unknown_caption": "%s — 系统手势：尚未验证",
 	"gestures.system.slot_configured_caption": "%s — 已为 ErgoptiPlus 配置",
-	"gestures.system.slot_not_configured_caption": "%s — 未为 ErgoptiPlus 配置"
+	"gestures.system.slot_not_configured_caption": "%s — 未为 ErgoptiPlus 配置",
+	"menu.global.reload_macos": "↺ 重新加载",
+	"menu.global.quit_macos": "✕ 退出"
 }

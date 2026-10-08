@@ -178,7 +178,7 @@ end)
 local function with_lifecycle_declarations(callback)
 	local renderer = require("infra.manifest_menu")
 	local rows = renderer.get_array("top_level")
-	local saved, owned = {}, {}
+	local saved, owned, native_counts = {}, {}, {}
 	for index, row in ipairs(rows) do
 		if row.id == "reload" or row.id == "quit" then
 			saved[index] = row
@@ -186,10 +186,20 @@ local function with_lifecycle_declarations(callback)
 			for key, value in pairs(row) do copy[key] = value end
 			copy.type = "command"
 			copy.i18n = row.id == "reload" and "button.cancel" or "button.ok"
-			rows[index], owned[row.id] = copy, copy
+			rows[index] = copy
+			local native = copy.platforms == nil
+			for _, platform in ipairs(copy.platforms or {}) do
+				if platform == "linux" then native = true end
+			end
+			if native then
+				owned[row.id] = copy
+				native_counts[row.id] = (native_counts[row.id] or 0) + 1
+			end
 		end
 	end
 	local ok, err = pcall(function()
+		helpers.assert_eq(native_counts.reload, 1, "the fixture mutates exactly one native Reload declaration")
+		helpers.assert_eq(native_counts.quit, 1, "the fixture mutates exactly one native Quit declaration")
 		helpers.assert_true(owned.reload ~= nil and owned.quit ~= nil, "the real root declares both commands")
 		callback(helpers.load_module("ui.menu.menu_builder"), owned)
 	end)

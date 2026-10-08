@@ -3891,11 +3891,29 @@ reason_key = "platform_reason.tray_top_level_rows_are_each_drivers"
 type = "command"
 id = "reload"
 i18n = "menu.global.reload"
+platforms = ["ahk", "linux"]
+unavailable = "hide"
+
+[[menu.top_level]]
+type = "command"
+id = "reload"
+i18n = "menu.global.reload_macos"
+platforms = ["hs"]
+unavailable = "hide"
 
 [[menu.top_level]]
 type = "command"
 id = "quit"
 i18n = "menu.global.quit"
+platforms = ["ahk", "linux"]
+unavailable = "hide"
+
+[[menu.top_level]]
+type = "command"
+id = "quit"
+i18n = "menu.global.quit_macos"
+platforms = ["hs"]
+unavailable = "hide"
 
 [[menu.top_level]]
 type = "group"

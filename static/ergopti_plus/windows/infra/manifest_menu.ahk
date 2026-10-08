@@ -1457,16 +1457,21 @@ _MR_BuildBuiltinGroup(GroupId, CategoryName) {
 ; =======================================================
 ; =======================================================
 
-; Finds the manifest item with the given ``id`` inside the ``MenuKey`` array.
-; Returns the item Map, or ``false`` if not found.
+; Finds the unique item with the given ``id`` visible to the native Windows menu.
+; Hidden siblings cannot decide a native caption, readiness gate or provider status.
+; Returns the original item Map, or ``false`` for a missing or ambiguous owner.
 _MR_FindItemById(MenuKey, ItemId) {
-	MenuDef := _MR_GetMenuDef(MenuKey)
-	for Item in MenuDef {
-		if (Item is Map) and _MR_Get(Item, "id") == ItemId {
-			return Item
+	if Type(MenuKey) != "String" || MenuKey == "" || Type(ItemId) != "String" || ItemId == ""
+		return false
+	Selected := false
+	for Item in _MR_GetMenuDef(MenuKey) {
+		if (Item is Map) && _MR_Get(Item, "id") == ItemId && _MR_IsForAhk(Item) {
+			if Selected is Map
+				return false
+			Selected := Item
 		}
 	}
-	return false
+	return Selected
 }
 
 ; Evaluates the declarative ``disabled_when`` predicate of a manifest item
