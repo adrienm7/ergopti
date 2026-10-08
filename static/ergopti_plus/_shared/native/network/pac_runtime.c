@@ -109,17 +109,17 @@ static duk_ret_t native_query(duk_context *context)
 	char *output;
 	ergopti_pac_native_error error = {0, ERGOPTI_PAC_ERROR_NONE};
 	size_t length;
-	if (ergopti_pac_should_interrupt(state)) return duk_error(context, DUK_ERR_ERROR, "PAC budget expired.");
+	if (ergopti_pac_should_interrupt(state)) duk_error_raw(context, (duk_errcode_t)DUK_ERR_ERROR, (const char *)DUK_FILE_MACRO, (duk_int_t)DUK_LINE_MACRO, "PAC budget expired.");
 	if (state->receipt.native_queries >= state->limits->max_native_queries) {
 		state->native_failed = 1;
-		return duk_error(context, DUK_ERR_ERROR, "PAC native query bound refused.");
+		duk_error_raw(context, (duk_errcode_t)DUK_ERR_ERROR, (const char *)DUK_FILE_MACRO, (duk_int_t)DUK_LINE_MACRO, "PAC native query bound refused.");
 	}
 	state->receipt.native_queries++;
 	if (mode != 1) {
 		argument = duk_require_lstring(context, 0, &argument_bytes);
 		if (argument_bytes == 0 || argument_bytes > state->limits->max_input_bytes ||
 			memchr(argument, 0, argument_bytes) != NULL)
-			return duk_error(context, DUK_ERR_TYPE_ERROR, "PAC native argument refused.");
+			duk_error_raw(context, (duk_errcode_t)DUK_ERR_TYPE_ERROR, (const char *)DUK_FILE_MACRO, (duk_int_t)DUK_LINE_MACRO, "PAC native argument refused.");
 	}
 	if (mode == 0) extended = duk_require_boolean(context, 1);
 	else if (mode == 1) extended = duk_require_boolean(context, 0);
@@ -129,20 +129,20 @@ static duk_ret_t native_query(duk_context *context)
 	if (mode == 0) result = state->platform->dns(state->platform->owner, argument, extended, output, state->limits->max_output_bytes + 1, &error);
 	else if (mode == 1) result = state->platform->local_addresses(state->platform->owner, extended, output, state->limits->max_output_bytes + 1, &error);
 	else result = state->platform->sort_addresses(state->platform->owner, argument, output, state->limits->max_output_bytes + 1, &error);
-	if (ergopti_pac_should_interrupt(state)) return duk_error(context, DUK_ERR_ERROR, "PAC budget expired.");
+	if (ergopti_pac_should_interrupt(state)) duk_error_raw(context, (duk_errcode_t)DUK_ERR_ERROR, (const char *)DUK_FILE_MACRO, (duk_int_t)DUK_LINE_MACRO, "PAC budget expired.");
 	if (result < 0) {
 		state->native_failed = 1;
 		state->receipt.native_error = error.code;
 		if (error.code != 0 && error.domain >= ERGOPTI_PAC_ERROR_WIN32 && error.domain <= ERGOPTI_PAC_ERROR_POSIX)
 			state->receipt.native_error_domain = error.domain;
-		return duk_error(context, DUK_ERR_ERROR, "PAC native observation refused.");
+		duk_error_raw(context, (duk_errcode_t)DUK_ERR_ERROR, (const char *)DUK_FILE_MACRO, (duk_int_t)DUK_LINE_MACRO, "PAC native observation refused.");
 	}
 	if (result == 0) { duk_pop(context); duk_push_null(context); return 1; }
 	length = 0;
 	while (length <= state->limits->max_output_bytes && output[length] != 0) length++;
 	if (length == 0 || length > state->limits->max_output_bytes) {
 		state->native_failed = 1;
-		return duk_error(context, DUK_ERR_ERROR, "PAC native output refused.");
+		duk_error_raw(context, (duk_errcode_t)DUK_ERR_ERROR, (const char *)DUK_FILE_MACRO, (duk_int_t)DUK_LINE_MACRO, "PAC native output refused.");
 	}
 	duk_push_lstring(context, output, length);
 	duk_remove(context, -2);
