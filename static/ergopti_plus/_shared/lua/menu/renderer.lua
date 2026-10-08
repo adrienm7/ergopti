@@ -528,6 +528,152 @@ function M.new(deps)
 		return rows
 	end
 
+	--- Admits canonical order for completed native rows before their native allocation.
+	--- The returned composer accepts finished objects, never provider DATA/getters.
+	--- It preserves object/resource/callback identity and publishes atomically in
+	--- the declaration's target slot, without invoking any native owner.
+	--- @param manifest_key string Existing canonical composition declaration.
+	--- @return function|nil composer Nil refuses missing/ambiguous policy.
+	function R.native_composition(manifest_key)
+		local function dense(value)
+			if type(value) ~= "table" or getmetatable(value) ~= nil then return nil end
+			local count, maximum = 0, 0
+			for index in next, value do
+				if type(index) ~= "number" or index < 1 or index % 1 ~= 0 then return nil end
+				count, maximum = count + 1, math.max(maximum, index)
+			end
+			if count ~= maximum then return nil end
+			return count
+		end
+		local function admit()
+			if type(manifest_key) ~= "string" or manifest_key == "" then return nil end
+			local declaration = get_menu_def(manifest_key)
+			local count = dense(declaration)
+			if not count or count == 0 then return nil end
+			local policy, identities, target = {}, {}, nil
+			for index = 1, count do
+				local item = rawget(declaration, index)
+				if type(item) ~= "table" or getmetatable(item) ~= nil or not is_for_platform(item) then return nil end
+				if item.type == "native_content" then
+					for field in next, item do
+						if field ~= "type" and field ~= "id" and field ~= "target" and field ~= "kind"
+							and field ~= "platforms" and field ~= "unavailable" then return nil end
+					end
+					if type(item.id) ~= "string" or item.id == "" or identities[item.id]
+						or (item.kind ~= "image" and item.kind ~= "boundary" and item.kind ~= "command" and item.kind ~= "rows")
+						or (item.target ~= nil and (item.target ~= true or item.kind ~= "rows"))
+						or (item.unavailable ~= nil and item.unavailable ~= "hide") then return nil end
+					if item.platforms ~= nil then
+						local n = dense(item.platforms)
+						if not n or n == 0 then return nil end
+						local seen = {}
+						for _, token in ipairs(item.platforms) do
+							if (token ~= "ahk" and token ~= "hs" and token ~= "linux") or seen[token] then return nil end
+							seen[token] = true
+						end
+						if item.unavailable ~= nil and n >= 3 then return nil end
+					elseif item.unavailable ~= nil then return nil end
+					identities[item.id] = true
+					if item.target then
+						if target or index ~= count then return nil end
+						target = item.id
+					end
+					policy[index] = { id = item.id, kind = item.kind, target = item.target or false, source = item,
+						platforms = item.platforms, platform_values = item.platforms and table.concat(item.platforms, ",") or nil, unavailable = item.unavailable }
+				elseif item.type == "---" then
+					for field in next, item do
+						if field ~= "type" and field ~= "after" and field ~= "platforms" and field ~= "unavailable" then return nil end
+					end
+					if type(item.after) ~= "string" or not identities[item.after]
+						or (item.unavailable ~= nil and item.unavailable ~= "hide") then return nil end
+					if item.platforms ~= nil then
+						local n = dense(item.platforms)
+						if not n or n == 0 then return nil end
+						local seen = {}
+						for _, token in ipairs(item.platforms) do
+							if (token ~= "ahk" and token ~= "hs" and token ~= "linux") or seen[token] then return nil end
+							seen[token] = true
+						end
+						if item.unavailable ~= nil and n >= 3 then return nil end
+					elseif item.unavailable ~= nil then return nil end
+					policy[index] = { after = item.after, source = item, platforms = item.platforms,
+						platform_values = item.platforms and table.concat(item.platforms, ",") or nil, unavailable = item.unavailable }
+				else return nil end
+			end
+			if not target then return nil end
+			return policy, identities, target, declaration
+		end
+		local policy, identities, target, source = admit()
+		if not policy then
+			Logger.error(LOG, "Invalid completed-native composition '%s' — admission refused.", tostring(manifest_key))
+			return nil
+		end
+		return function(slots)
+			local current, _, current_target, current_source = admit()
+			if not current or current_source ~= source or #current ~= #policy or current_target ~= target then return false end
+			for index, item in ipairs(policy) do
+				local actual = current[index]
+				if actual.source ~= item.source or actual.id ~= item.id or actual.kind ~= item.kind
+					or actual.target ~= item.target or actual.after ~= item.after or actual.platforms ~= item.platforms
+					or actual.platform_values ~= item.platform_values or actual.unavailable ~= item.unavailable then return false end
+			end
+			if type(slots) ~= "table" or getmetatable(slots) ~= nil then return false end
+			for key in next, slots do if not identities[key] then return false end end
+			local output = rawget(slots, target)
+			local active = {}
+			local function finished(rows, depth, forbidden_target)
+				local count = dense(rows)
+				if not count or active[rows] or depth > MAX_LIST_DEPTH
+					or (forbidden_target ~= nil and rawequal(rows, forbidden_target)) then return false end
+				active[rows] = true
+				for index = 1, count do
+					local row = rawget(rows, index)
+					if type(row) ~= "table" or getmetatable(row) ~= nil then return false end
+					for field in next, row do
+						if field ~= "title" and field ~= "fn" and field ~= "menu" and field ~= "image"
+							and field ~= "checked" and field ~= "disabled" then return false end
+					end
+					local title, action, menu = rawget(row, "title"), rawget(row, "fn"), rawget(row, "menu")
+					local image, checked, disabled = rawget(row, "image"), rawget(row, "checked"), rawget(row, "disabled")
+					if type(title) ~= "string" or (title == "" and image == nil)
+						or (action ~= nil and type(action) ~= "function") or (menu ~= nil and type(menu) ~= "table")
+						or (action ~= nil and menu ~= nil) or (checked ~= nil and type(checked) ~= "boolean")
+						or (disabled ~= nil and type(disabled) ~= "boolean")
+						or (image ~= nil and type(image) ~= "userdata" and type(image) ~= "table" and type(image) ~= "string") then return false end
+					if title == "-" and (action ~= nil or menu ~= nil or image ~= nil or checked ~= nil or disabled ~= nil) then return false end
+					if menu ~= nil and not finished(menu, depth + 1, forbidden_target) then return false end
+				end
+				active[rows] = nil
+				return true
+			end
+			local supplied_arrays = {}
+			for _, item in ipairs(policy) do
+				if item.id then
+					local rows = rawget(slots, item.id)
+					if not finished(rows, 1, item.id ~= target and output or nil) or supplied_arrays[rows] then return false end
+					supplied_arrays[rows] = true
+					if item.kind == "image" or item.kind == "boundary" then
+						if #rows ~= 1 then return false end
+					elseif item.kind == "command" and #rows > 1 then return false end
+					local row = rows[1]
+					if item.kind == "image" and (row.title ~= "" or row.image == nil
+						or type(row.fn) ~= "function" or row.menu ~= nil or row.checked ~= nil or row.disabled ~= nil) then return false end
+					if item.kind == "boundary" and row.title ~= "-" then return false end
+					if item.kind == "command" and row and (row.title == "" or row.title == "-"
+						or type(row.fn) ~= "function" or row.menu ~= nil or row.image ~= nil) then return false end
+				end
+			end
+			local completed = {}
+			for _, item in ipairs(policy) do
+				if item.id then
+					for _, row in ipairs(rawget(slots, item.id)) do completed[#completed + 1] = row end
+				elseif #rawget(slots, item.after) > 0 then completed[#completed + 1] = { title = "-" } end
+			end
+			for index = 1, math.max(#output, #completed) do output[index] = completed[index] end
+			return true
+		end
+	end
+
 	--- Builds a built-in named group that is always rendered the same way.
 	--- @param group_id string
 	--- @param ctx table

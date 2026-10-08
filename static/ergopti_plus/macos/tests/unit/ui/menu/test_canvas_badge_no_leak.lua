@@ -384,3 +384,90 @@ helpers.describe("canvas badge consumes declared captions and boundary before na
 		end)
 	end)
 end)
+
+
+helpers.describe("canvas badge completed native root composition", function()
+	helpers.it("obeys actual canonical placement without rebuilding the native image callback or body", function()
+		with_badge_frame(function(module, effects, renderer)
+			local declaration = renderer.get_array("macos_canvas_badge_root")
+			local first, second = declaration[1], declaration[2]
+			local body, clicked = { title = "Actual body" }, 0
+			local action = function(...) clicked = clicked + 1; return ... end
+			local items = { body }
+			local ok, detail = xpcall(function()
+				declaration[1], declaration[2] = second, first
+				module.prepend_to(items, {}, action)
+				helpers.assert_eq(items[1], { title = "-" }, "the actual catalogue orders the boundary before the image")
+				helpers.assert_true(rawequal(items[2].image, DUMMY_IMAGE))
+				helpers.assert_true(rawequal(items[2].fn, action))
+				helpers.assert_true(rawequal(items[3], body))
+				helpers.assert_eq(clicked, 0)
+				helpers.assert_eq(items[2].fn("native-result"), "native-result")
+				helpers.assert_eq(clicked, 1)
+				helpers.assert_eq(effects.events, { "image", "delete" })
+			end, debug.traceback)
+			declaration[1], declaration[2] = first, second
+			if not ok then error(detail, 0) end
+		end)
+	end)
+	for _, field in ipairs({ "kind", "id", "target" }) do
+		helpers.it("refuses unadmitted completed-root policy before canvas allocation: " .. field, function()
+			with_badge_frame(function(module, effects, renderer)
+				local row = renderer.get_array("macos_canvas_badge_root")[1]
+				local previous = row[field]
+				local body = { title = "Actual body" }
+				local items = { body }
+				local ok, detail = xpcall(function()
+					row[field] = field == "target" and true or ""
+					helpers.assert_eq(module.prepend_to(items, {}, function() error("must not click") end), false)
+					helpers.assert_eq(effects.create_count, 0)
+					helpers.assert_eq(effects.delete_count, 0)
+					helpers.assert_eq(effects.draws, 0)
+					helpers.assert_eq(#items, 1)
+					helpers.assert_true(rawequal(items[1], body))
+				end, debug.traceback)
+				row[field] = previous
+				if not ok then error(detail, 0) end
+			end)
+		end)
+	end
+	helpers.it("keeps the historical badge boundary even when the native body is empty", function()
+		with_badge_frame(function(module, effects)
+			local items = {}
+			module.prepend_to(items, {}, function() end)
+			helpers.assert_eq(#items, 2)
+			helpers.assert_true(rawequal(items[1].image, DUMMY_IMAGE))
+			helpers.assert_eq(items[2], { title = "-" })
+			helpers.assert_eq(effects.create_count, effects.delete_count)
+		end)
+	end)
+end)
+
+helpers.describe("completed root retains independent old physical order vectors", function()
+	local prior = badge_json("tests/corpus/menus/macos_native_root_order.json")
+	for _, vector in ipairs(prior.vectors) do
+		helpers.it("preserves prior object order and boundary ownership: " .. vector.name, function()
+			with_badge_frame(function(module, effects, renderer)
+				local body, download = { title = "Actual completed body" }, { title = "Completed download", fn = function() return "download-ack" end }
+				local items = vector.body_empty and {} or { body }
+				local compose = assert(renderer.native_composition("macos_download_root"))
+				helpers.assert_eq(compose({ download = vector.download and { download } or {}, body = items }), true)
+				if vector.badge then module.prepend_to(items, {}, function() return "image-ack" end) end
+				helpers.assert_eq(#items, #vector.expected)
+				for index, kind in ipairs(vector.expected) do
+					local actual = items[index]
+					if kind == "badge" then
+						helpers.assert_eq(actual.title, "")
+						helpers.assert_true(rawequal(actual.image, DUMMY_IMAGE))
+						helpers.assert_eq(actual.fn(), "image-ack")
+					elseif kind == "boundary" then helpers.assert_eq(actual, { title = "-" })
+					elseif kind == "download" then helpers.assert_true(rawequal(actual, download))
+					elseif kind == "body" then helpers.assert_true(rawequal(actual, body))
+					else error("unknown independently frozen prior role") end
+				end
+				helpers.assert_eq(effects.create_count, vector.badge and 1 or 0)
+				helpers.assert_eq(effects.create_count, effects.delete_count)
+			end)
+		end)
+	end
+end)

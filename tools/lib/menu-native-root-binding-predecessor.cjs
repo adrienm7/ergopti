@@ -1,3 +1,5 @@
+// tools/lib/menu-native-root-binding-predecessor.cjs
+
 // tools/lib/menu-native-root-binding.cjs
 
 'use strict';
@@ -10,57 +12,6 @@ const { nativeTemplateBinding } = require('./menu-template-binding.cjs');
 function nativeBadgeRootComposition(sources, manifest, platform) {
 	if (platform !== 'hs') return false;
 	const declaration = {
-		llm_download_shortcut_frame: [
-			{
-				type: 'command',
-				id: 'llm_download_shortcut',
-				i18n: 'menu.llm.show_download_window',
-				platforms: ['hs'],
-				unavailable: 'hide'
-			}
-		],
-		macos_canvas_badge_root: [
-			{
-				type: 'native_content',
-				id: 'badge',
-				kind: 'image',
-				platforms: ['hs'],
-				unavailable: 'hide'
-			},
-			{
-				type: 'native_content',
-				id: 'boundary',
-				kind: 'boundary',
-				platforms: ['hs'],
-				unavailable: 'hide'
-			},
-			{
-				type: 'native_content',
-				id: 'body',
-				kind: 'rows',
-				target: true,
-				platforms: ['hs'],
-				unavailable: 'hide'
-			}
-		],
-		macos_download_root: [
-			{
-				type: 'native_content',
-				id: 'download',
-				kind: 'command',
-				platforms: ['hs'],
-				unavailable: 'hide'
-			},
-			{ type: '---', after: 'download', platforms: ['hs'], unavailable: 'hide' },
-			{
-				type: 'native_content',
-				id: 'body',
-				kind: 'rows',
-				target: true,
-				platforms: ['hs'],
-				unavailable: 'hide'
-			}
-		],
 		macos_canvas_badge_frame: [
 			{
 				type: 'include',
@@ -100,10 +51,7 @@ function nativeBadgeRootComposition(sources, manifest, platform) {
 	const init = sources?.['macos/ui/menu/init.lua'];
 	const builder = sources?.['macos/ui/menu/builder.lua'];
 	const badge = sources?.['macos/ui/menu/canvas_badge.lua'];
-	const llm = sources?.['macos/ui/menu/menu_llm/init.lua'];
-	if (
-		![init, builder, badge, llm].every((source) => typeof source === 'string' && source.length > 0)
-	)
+	if (![init, builder, badge].every((source) => typeof source === 'string' && source.length > 0))
 		return false;
 
 	function lex(source) {
@@ -454,48 +402,12 @@ function nativeBadgeRootComposition(sources, manifest, platform) {
 			prepend,
 			'if type(frame) ~= "table" or #frame ~= 2 or type(frame[1].label) ~= "string" or frame[1].label == "" or frame[2].separator ~= true then'
 		) ||
-		!unique(
-			prepend,
-			'Logger.error(LOG, "Declared canvas badge presentation refused.") return false'
-		) ||
-		!soleLocal(
-			prepend,
-			'compose',
-			'local compose = ManifestMenu.native_composition("macos_canvas_badge_root")'
-		) ||
-		!unique(
-			prepend,
-			'if type(compose) ~= "function" then Logger.error(LOG, "Declared canvas badge root composition refused.") return false end'
-		) ||
+		!unique(prepend, 'return false') ||
 		!unique(prepend, 'text = display_text') ||
 		!soleLocal(prepend, 'img', 'local img = canvas_obj:imageFromCanvas()') ||
 		!unique(prepend, 'canvas_obj:delete()') ||
-		!soleLocal(prepend, 'badge', 'local badge = { title = "", image = img, fn = on_click, }') ||
-		!soleLocal(prepend, 'boundary', 'local boundary = { title = frame[2].separator and "-" }') ||
-		!unique(
-			prepend,
-			'if compose({ badge = { badge }, boundary = { boundary }, body = items }) ~= true then'
-		) ||
-		!soleLocal(
-			generate,
-			'compose_download',
-			'local compose_download = ManifestMenu.native_composition("macos_download_root")'
-		) ||
-		!unique(
-			generate,
-			'if type(compose_download) ~= "function" or compose_download({ download = _dl_item and { _dl_item } or {}, body = rendered }) ~= true then'
-		) ||
-		!unique(generate, 'local _dl_item = nil') ||
-		!unique(
-			generate,
-			'if type(ctx.llm_handler) == "table" and type(ctx.llm_handler.build_download_item) == "function" then'
-		) ||
-		!unique(generate, 'local ok_dl, dl_result = pcall(ctx.llm_handler.build_download_item)') ||
-		!unique(generate, 'if ok_dl then _dl_item = dl_result') ||
-		!unique(
-			generate,
-			'Logger.error(LOG, string.format("Error building LLM download item: %s.", tostring(dl_result)))'
-		)
+		!unique(prepend, 'table.insert(items, 1, { title = "", image = img, fn = on_click, })') ||
+		!unique(prepend, 'table.insert(items, 2, { title = frame[2].separator and "-" })')
 	)
 		return false;
 	for (const [key, expression] of [
@@ -517,58 +429,6 @@ function nativeBadgeRootComposition(sources, manifest, platform) {
 		)
 			return false;
 	}
-	// The optional completed download is the actual exported native producer's result.
-	const safeRequire = body(init, 'local function safe_require(module_id, label)');
-	const create = body(llm, 'function M.create(deps)');
-	const createMenu = body(llm, 'local function create_menu(deps)');
-	const download = createMenu && body(createMenu.source, 'local function build_download_item()');
-	if (
-		!safeRequire ||
-		!create ||
-		!createMenu ||
-		!download ||
-		!soleBinding(safeRequire, 'mod_or_err', 'local ok, mod_or_err = pcall(require, module_id)') ||
-		!unique(safeRequire, 'return mod_or_err') ||
-		!unique(lex(init), 'llm = safe_require("ui.menu.menu_llm", "AI menu")') ||
-		!soleBinding(start, 'res', 'local ok_h, res = pcall(menu_mods.llm.create, {') ||
-		!unique(start, 'if ok_h then llm_handler = res') ||
-		!unique(start, 'llm_handler = llm_handler,') ||
-		matches(start, 'ctx.llm_handler =').length ||
-		writes(start, 'llm_handler').length !== 2 ||
-		!soleBinding(
-			create,
-			'result',
-			'local ok, result = xpcall(create_menu, debug.traceback, deps)'
-		) ||
-		!unique(create, 'return type(result) == "table" and result or {}') ||
-		!soleLocal(lex(llm), 'create_menu', 'local function create_menu(deps)') ||
-		!unique(createMenu, 'build_download_item = build_download_item,') ||
-		!imported(llm, 'ManifestMenu', 'infra.manifest_menu', download) ||
-		!soleLocal(
-			download,
-			'rows',
-			'local rows = ManifestMenu.template_rows("llm_download_shortcut_frame", {'
-		) ||
-		!unique(
-			download,
-			'if type(rows) ~= "table" or #rows ~= 1 or type(rows[1].action) ~= "function" then return nil end'
-		) ||
-		!soleLocal(download, 'row', 'local row = rows[1]') ||
-		!unique(download, 'return { title = row.label, fn = row.action }') ||
-		!soleBinding(
-			generate,
-			'dl_result',
-			'local ok_dl, dl_result = pcall(ctx.llm_handler.build_download_item)'
-		) ||
-		!soleBinding(
-			generate,
-			'ok_dl',
-			'local ok_dl, dl_result = pcall(ctx.llm_handler.build_download_item)'
-		) ||
-		writes(generate, '_dl_item').length !== 2
-	)
-		return false;
-
 	// Ordering is part of this physical route: admission precedes native work;
 	// capture precedes deletion, which precedes publication into the returned list.
 	const position = (unit, statement) => matches(unit, statement, 0)[0];
@@ -584,19 +444,8 @@ function nativeBadgeRootComposition(sources, manifest, platform) {
 			position(prepend, 'local img = canvas_obj:imageFromCanvas()') &&
 		position(prepend, 'local img = canvas_obj:imageFromCanvas()') <
 			position(prepend, 'canvas_obj:delete()') &&
-		position(prepend, 'local compose = ManifestMenu.native_composition(') <
-			position(prepend, 'local canvas_obj = hs.canvas.new({') &&
-		position(prepend, 'canvas_obj:delete()') < position(prepend, 'local badge = {') &&
-		position(prepend, 'local badge = {') < position(prepend, 'local boundary = {') &&
-		position(prepend, 'local boundary = {') <
-			position(
-				prepend,
-				'if compose({ badge = { badge }, boundary = { boundary }, body = items }) ~= true then'
-			) &&
-		position(generate, 'local rendered = ManifestMenu.render_rows(items, "top_level")') <
-			position(generate, 'local compose_download = ManifestMenu.native_composition(') &&
-		position(generate, 'local compose_download = ManifestMenu.native_composition(') <
-			position(generate, 'pcall(CanvasBadge.prepend_to, rendered, ctx, function()') &&
+		position(prepend, 'canvas_obj:delete()') < position(prepend, 'table.insert(items, 1, {') &&
+		position(prepend, 'table.insert(items, 1, {') < position(prepend, 'table.insert(items, 2, {') &&
 		position(generate, 'local rendered = ManifestMenu.render_rows(items, "top_level")') <
 			position(generate, 'pcall(CanvasBadge.prepend_to, rendered, ctx, function()') &&
 		position(generate, 'pcall(CanvasBadge.prepend_to, rendered, ctx, function()') <

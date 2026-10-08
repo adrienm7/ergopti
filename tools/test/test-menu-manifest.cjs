@@ -9813,3 +9813,186 @@ console.log(
 		'the actual native lifecycle builder cannot replace its declared caption'
 	);
 }
+
+// Completed native root objects retain actual image/callback owners; the catalogue orders typed roles.
+{
+	const assert = require('node:assert/strict');
+	const declaration = {
+		macos_download_root: [
+			{
+				type: 'native_content',
+				id: 'download',
+				kind: 'command',
+				platforms: ['hs'],
+				unavailable: 'hide'
+			},
+			{ type: '---', after: 'download', platforms: ['hs'], unavailable: 'hide' },
+			{
+				type: 'native_content',
+				id: 'body',
+				kind: 'rows',
+				target: true,
+				platforms: ['hs'],
+				unavailable: 'hide'
+			}
+		],
+		macos_canvas_badge_root: [
+			{
+				type: 'native_content',
+				id: 'badge',
+				kind: 'image',
+				platforms: ['hs'],
+				unavailable: 'hide'
+			},
+			{
+				type: 'native_content',
+				id: 'boundary',
+				kind: 'boundary',
+				platforms: ['hs'],
+				unavailable: 'hide'
+			},
+			{
+				type: 'native_content',
+				id: 'body',
+				kind: 'rows',
+				target: true,
+				platforms: ['hs'],
+				unavailable: 'hide'
+			}
+		]
+	};
+	const canonical = parseToml(readFileSync(MANIFEST_PATH, 'utf8')).menu;
+	const projected = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	for (const [key, rows] of Object.entries(declaration)) {
+		assert.deepEqual(canonical[key], rows, 'independent finished kind/role/placement declaration');
+		assert.deepEqual(
+			projected[key],
+			rows,
+			'actual compiler preserves the complete source declaration'
+		);
+	}
+	const { validateNativeCompositions } = require('../lib/menu-row-availability.cjs');
+	assert.doesNotThrow(() => validateNativeCompositions(declaration));
+	const controls = [
+		[
+			'duplicate slot',
+			(m) => {
+				m.macos_canvas_badge_root[1].id = 'badge';
+			}
+		],
+		[
+			'unknown role',
+			(m) => {
+				m.macos_canvas_badge_root[0].kind = 'unowned';
+			}
+		],
+		[
+			'role hides behavior',
+			(m) => {
+				m.macos_canvas_badge_root[0].command = 'unowned';
+			}
+		],
+		[
+			'role hides fake getter',
+			(m) => {
+				m.macos_canvas_badge_root[0].present_when = 'unowned';
+			}
+		],
+		[
+			'no target',
+			(m) => {
+				delete m.macos_canvas_badge_root[2].target;
+			}
+		],
+		[
+			'early target',
+			(m) => {
+				m.macos_canvas_badge_root[0].target = true;
+			}
+		],
+		[
+			'image target',
+			(m) => {
+				m.macos_canvas_badge_root[2].kind = 'image';
+			}
+		],
+		[
+			'invalid native token',
+			(m) => {
+				m.macos_canvas_badge_root[0].platforms = ['HS'];
+			}
+		],
+		[
+			'fake hide',
+			(m) => {
+				m.macos_canvas_badge_root[0].platforms = ['ahk', 'hs', 'linux'];
+			}
+		],
+		[
+			'boundary unknown owner',
+			(m) => {
+				m.macos_download_root[1].after = 'unowned';
+			}
+		],
+		[
+			'boundary future owner',
+			(m) => {
+				m.macos_download_root[1].after = 'body';
+			}
+		],
+		[
+			'boundary hides behavior',
+			(m) => {
+				m.macos_download_root[1].command = 'unowned';
+			}
+		]
+	];
+	for (const [name, corrupt] of controls) {
+		const candidate = JSON.parse(JSON.stringify(declaration));
+		corrupt(candidate);
+		assert.notDeepEqual(candidate, declaration, name + ': genuine physical schema mutation');
+		assert.throws(() => validateNativeCompositions(candidate), undefined, name);
+	}
+	const prior = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/macos_native_root_order.json'), 'utf8')
+	);
+	assert.deepEqual(
+		prior.vectors,
+		[
+			{
+				name: 'badge_and_download',
+				badge: true,
+				download: true,
+				expected: ['badge', 'boundary', 'download', 'boundary', 'body']
+			},
+			{
+				name: 'badge_no_download',
+				badge: true,
+				download: false,
+				expected: ['badge', 'boundary', 'body']
+			},
+			{
+				name: 'download_badge_failure',
+				badge: false,
+				download: true,
+				expected: ['download', 'boundary', 'body']
+			},
+			{ name: 'both_absent', badge: false, download: false, expected: ['body'] },
+			{
+				name: 'badge_empty_body',
+				badge: true,
+				download: false,
+				body_empty: true,
+				expected: ['badge', 'boundary']
+			},
+			{
+				name: 'download_empty_body_badge_failure',
+				badge: false,
+				download: true,
+				body_empty: true,
+				expected: ['download', 'boundary']
+			}
+		],
+		'the old physical order oracle is independent and unchanged'
+	);
+}
