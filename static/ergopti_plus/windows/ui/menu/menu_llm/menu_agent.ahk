@@ -97,14 +97,12 @@ _LLM_Agent_SystemRow(Key) {
 	Model := LLM_Agent_ResolveModel(Parsed, LLM_Agent_Config(), LLM_API_PROVIDERS)
 	ModelRows := MenuRenderer_TemplateRows("agent_system_model_controls",
 		Map("agent_system_model", _LLM_Agent_MenuPromptModel.Bind(Key)),
-		Map("agent_system_model_ready", (*) => Current != ""), Map())
+		Map("agent_system_model_ready", (*) => Current != "",
+			"agent_system_model_caption", (*) => Model), Map())
 	if !(ModelRows is Array)
 		return Map("label", StrReplace(t("menu.agent." . SubStr(Key, 7)), "{1}", CurrentLabel), "items", [])
-	for Row in ModelRows {
-		if Row.Has("label")
-			Row["label"] := StrReplace(Row["label"], "{1}", Model)
+	for Row in ModelRows
 		Items.Push(Row)
-	}
 	return Map("label", StrReplace(t("menu.agent." . SubStr(Key, 7)), "{1}", CurrentLabel), "items", Items)
 }
 

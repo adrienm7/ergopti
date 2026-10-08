@@ -4797,6 +4797,8 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 				type: 'command',
 				id: 'agent_system_model',
 				i18n: variant.label_key,
+				caption_getter: 'agent_system_model_caption',
+				caption_format: 'numbered',
 				disabled_when: ['agent_system_model_ready']
 			}
 		]);
@@ -4809,7 +4811,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	for (const [driver, relative, call] of [
 		['windows', 'ui/menu/menu_llm/menu_agent.ahk', 'MenuRenderer_TemplateRows'],
 		['macos', 'ui/menu/menu_llm/agent_panel.lua', 'ManifestMenu.template_rows'],
-		['linux', 'ui/menu/agent_rows.lua', 'require("infra.manifest_menu").template_rows']
+		['linux', 'ui/menu/agent_rows.lua', 'ManifestMenu.template_rows']
 	]) {
 		const source = readFileSync(
 			resolve(REPO_ROOT, 'static/ergopti_plus', driver, relative),
