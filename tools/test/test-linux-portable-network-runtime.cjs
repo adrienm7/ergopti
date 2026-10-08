@@ -231,6 +231,14 @@ assert.ok(modules[0]['config-opts'].includes('-DLUA_BUILD_TYPE=System'));
 assert.ok(modules[4]['config-opts'].includes('-Dconfig-xdp=true'));
 assert.ok(modules[5]['config-opts'].includes('-Dgnome_proxy=disabled'));
 assert.ok(modules[5]['config-opts'].includes('-Dlibproxy=enabled'));
+// The pinned GIO source declares installed_tests; libproxy's tests option is foreign.
+assert.deepEqual(modules[5]['config-opts'], [
+	'-Dlibproxy=enabled',
+	'-Dgnome_proxy=disabled',
+	'-Dgnutls=enabled',
+	'-Denvironment_proxy=disabled',
+	'-Dinstalled_tests=false'
+]);
 passed++;
 for (const mutate of [
 	(data) => {
