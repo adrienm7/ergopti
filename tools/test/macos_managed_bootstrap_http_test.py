@@ -413,6 +413,22 @@ class BootstrapDownloadTests(unittest.TestCase):
 
 
 class NativeSpoolShellTests(unittest.TestCase):
+    # Replay only the native tool availability/output boundary in this child
+    # shell. Every other test/file/process predicate remains the Bash builtin.
+    # This seam works for both original direct scutil and shared getter callers.
+    scutil_receiver = r"""
+function [() {
+    if builtin test "$#" -eq 3 && builtin test "$1" = -x && builtin test "$2" = /usr/sbin/scutil; then
+        return 0
+    fi
+    builtin [ "$@"
+}
+function /usr/sbin/scutil() {
+    if [ -n "${SNAPSHOT_TRACE:-}" ]; then printf 'read\n' >> "$SNAPSHOT_TRACE"; fi
+    cat "$SNAPSHOT"
+}
+"""
+
     def test_private_json_preserves_independent_control_and_unicode_vectors(self):
         script = ROOT / "static/ergopti_plus/macos/modules/llm/network-retry.sh"
         for value in ("plain", 'quote"back\\slash', "line\nreturn\rtab\t", "\x01\x1f", "é日本🙂"):
@@ -479,6 +495,207 @@ class NativeSpoolShellTests(unittest.TestCase):
             self.assertEqual(captured["sha256"], "1" * 64)
             self.assertEqual(captured["timeout_ms"], 600000)
             self.assertEqual(captured["size"], 5)
+
+    def test_explicit_all_proxy_aliases_survive_native_static_settings_without_lookup(self):
+        script = ROOT / "static/ergopti_plus/macos/modules/llm/network-retry.sh"
+        cases = [
+            (
+                {"ALL_PROXY": "http://upper.invalid:3111"},
+                ["", "http://upper.invalid:3111", "http://upper.invalid:3111"],
+            ),
+            (
+                {"all_proxy": "http://lower.invalid:3222"},
+                ["http://lower.invalid:3222", "", "http://lower.invalid:3222"],
+            ),
+            (
+                {
+                    "all_proxy": "http://lower.invalid:3222",
+                    "ALL_PROXY": "http://upper.invalid:3111",
+                },
+                [
+                    "http://lower.invalid:3222",
+                    "http://upper.invalid:3111",
+                    "http://lower.invalid:3222",
+                ],
+            ),
+        ]
+        with tempfile.TemporaryDirectory(prefix="ergopti-system-network-") as folder:
+            trace = Path(folder) / "native-getter"
+            snapshot = Path(folder) / "snapshot"
+            snapshot.write_text(
+                "<dictionary> {\n  HTTPSEnable : 1\n  HTTPSProxy : static.invalid\n  HTTPSPort : 3333\n}\n"
+            )
+            for selected, expected in cases:
+                environment = dict(
+                    os.environ, SNAPSHOT_TRACE=str(trace), NO_PROXY=".bypass.invalid", no_proxy=""
+                )
+                for key in (
+                    "https_proxy",
+                    "HTTPS_PROXY",
+                    "http_proxy",
+                    "HTTP_PROXY",
+                    "all_proxy",
+                    "ALL_PROXY",
+                ):
+                    environment.pop(key, None)
+                environment.update(selected)
+                command = r"""
+set -u
+source "$1"
+log_info() { printf '%s\n' "$*"; }
+log_error() { printf '%s\n' "$*"; }
+apply_system_network
+printf '%s\n' "${all_proxy:-}" "${ALL_PROXY:-}" "$OPAQUE_NETWORK_INHERITED_HTTPS_ROUTE" "${https_proxy:-}" "${HTTPS_PROXY:-}" "$NO_PROXY" "$UV_SYSTEM_CERTS"
+"""
+                with self.subTest(selectors=selected):
+                    replay = command.replace(
+                        "apply_system_network\n",
+                        self.scutil_receiver + "\napply_system_network\n",
+                        1,
+                    )
+                    result = subprocess.run(
+                        [bash_executable(), "-c", replay, "receiving", str(script)],
+                        env=environment,
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(
+                        result.stdout.splitlines(),
+                        expected + ["", "", ".bypass.invalid,localhost,127.0.0.1,::1", "1"],
+                    )
+                    self.assertFalse(
+                        trace.exists(),
+                        "Explicit ALL routes prevent even the native settings lookup",
+                    )
+                    self.assertEqual(result.stderr, "")
+
+    def test_automatic_configuration_logs_only_fixed_actual_helper_availability(self):
+        script = ROOT / "static/ergopti_plus/macos/modules/llm/network-retry.sh"
+        with tempfile.TemporaryDirectory(prefix="ergopti-system-pac-log-") as folder:
+            snapshot = Path(folder) / "snapshot"
+            snapshot.write_text(
+                "<dictionary> {\n  ProxyAutoConfigEnable : 1\n  ProxyAutoConfigURLString : https://reserved:credential@pac.invalid/private?token=reserved\n}\n"
+            )
+            for available, expected in [
+                (0, "Automatic network settings will be evaluated by the native download helper."),
+                (
+                    1,
+                    "Automatic network settings require the native download helper or an explicit relay.",
+                ),
+            ]:
+                environment = dict(os.environ)
+                for key in (
+                    "https_proxy",
+                    "HTTPS_PROXY",
+                    "http_proxy",
+                    "HTTP_PROXY",
+                    "all_proxy",
+                    "ALL_PROXY",
+                ):
+                    environment.pop(key, None)
+                command = r"""
+set -u
+source "$1"
+log_info() { printf '%s\n' "$*"; }
+log_error() { printf '%s\n' "$*"; }
+managed_bootstrap_launcher_available() { return "$AVAILABLE"; }
+apply_system_network
+"""
+                # Metadata/getter and positive native availability are explicit
+                # callee seams, not proof of real macOS configuration or signing.
+                command = command.replace(
+                    "apply_system_network\n", self.scutil_receiver + "\napply_system_network\n", 1
+                )
+                environment.update(SNAPSHOT=str(snapshot), AVAILABLE=str(available))
+                with self.subTest(available=available):
+                    result = subprocess.run(
+                        [bash_executable(), "-c", command, "receiving", str(script)],
+                        env=environment,
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(result.stdout, expected + "\n")
+                    self.assertEqual(result.stderr, "")
+                    for private in (
+                        "credential",
+                        "pac.invalid",
+                        "private",
+                        "token=reserved",
+                        "https://",
+                    ):
+                        self.assertNotIn(private, result.stdout + result.stderr)
+
+    def test_missing_native_helper_refuses_before_curl_or_successor_without_private_pac_logs(self):
+        script = ROOT / "static/ergopti_plus/macos/modules/llm/network-retry.sh"
+        with tempfile.TemporaryDirectory(prefix="ergopti-system-pac-refusal-") as folder:
+            directory = Path(folder)
+            snapshot = directory / "snapshot"
+            snapshot.write_text(
+                "<dictionary> {\n  ProxyAutoConfigEnable : 1\n  ProxyAutoConfigURLString : https://pac.invalid/private?token=reserved\n}\n"
+            )
+            environment = dict(
+                os.environ,
+                SNAPSHOT=str(snapshot),
+                ERGOPTI_BOOTSTRAP_PYTHON="",
+                ERGOPTI_LAUNCHER_EXECUTABLE=str(
+                    directory / "missing.app/Contents/MacOS/ErgoptiPlus"
+                ),
+                OUTPUT=str(directory / "asset"),
+            )
+            for key in (
+                "https_proxy",
+                "HTTPS_PROXY",
+                "http_proxy",
+                "HTTP_PROXY",
+                "all_proxy",
+                "ALL_PROXY",
+            ):
+                environment.pop(key, None)
+            command = r"""
+set -u
+source "$1"
+log_info() { printf '%s\n' "$*"; }
+log_error() { printf '%s\n' "$*"; }
+curl_resumable() { printf 'CURL_STARTED\n'; return 0; }
+curl_resilient() { printf 'CURL_STARTED\n'; return 0; }
+apply_system_network
+if managed_bootstrap_download https://origin.invalid/path "$OUTPUT" "$DIGEST" 7 resumable; then
+    printf 'SUCCESSOR_STARTED\n'
+else
+    exit $?
+fi
+"""
+            environment["DIGEST"] = "1" * 64
+            command = command.replace(
+                "apply_system_network\n", self.scutil_receiver + "\napply_system_network\n", 1
+            )
+            result = subprocess.run(
+                [bash_executable(), "-c", command, "receiving", str(script)],
+                env=environment,
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            self.assertEqual(result.returncode, 78, result.stderr)
+            self.assertEqual(
+                result.stdout,
+                "Automatic network settings require the native download helper or an explicit relay.\n"
+                "The native download input owner is unavailable. No download was started.\n",
+            )
+            self.assertEqual(result.stderr, "")
+            self.assertFalse(Path(environment["OUTPUT"]).exists())
+            for private_or_success in (
+                "pac.invalid",
+                "private",
+                "token=reserved",
+                "CURL_STARTED",
+                "SUCCESSOR_STARTED",
+            ):
+                self.assertNotIn(private_or_success, result.stdout + result.stderr)
 
 
 if __name__ == "__main__":
