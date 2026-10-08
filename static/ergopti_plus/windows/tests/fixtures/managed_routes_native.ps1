@@ -292,6 +292,24 @@ public sealed class ErgoptiOrderedPacServer : IDisposable
 } catch {
     $Failed=$true
     Write-ManagedRoutesDiagnostic
+    try {
+        if($null -ne $AuthenticationServer) {
+            $AuthStage=$AuthenticationServer.FailureStage
+            if($AuthStage -cnotin @('none','acquire_credentials','accept_context','context_token','identity_match')){$AuthStage='other'}
+            $AuthValues=@($AuthenticationServer.Bare,$AuthenticationServer.TypeOne,$AuthenticationServer.TypeThree,
+                $AuthenticationServer.Authenticated,$AuthenticationServer.Responses,$AuthenticationServer.Failures,
+                $AuthenticationServer.Active,$AuthenticationServer.OwnedCredentials,$AuthenticationServer.OwnedContexts,
+                $AuthenticationServer.OwnedTokens,$AuthenticationServer.OwnedBuffers)
+            $AuthValid=$AuthenticationServer.SecurityStatus -is [int] -and $AuthenticationServer.IdentityMatched -is [bool]
+            foreach($Value in $AuthValues){if($Value -isnot [int] -or $Value -lt 0 -or $Value -gt 256){$AuthValid=$false}}
+            if($AuthValid) {
+                [Console]::Error.WriteLine(('PAC_AUTH_DIAG stage={0} security_status={1} identity={2} bare={3} type_one={4} type_three={5} authenticated={6} responses={7} failures={8} active={9} credentials={10} contexts={11} tokens={12} buffers={13}' -f
+                    $AuthStage,$AuthenticationServer.SecurityStatus,[int]$AuthenticationServer.IdentityMatched,
+                    $AuthValues[0],$AuthValues[1],$AuthValues[2],$AuthValues[3],$AuthValues[4],$AuthValues[5],
+                    $AuthValues[6],$AuthValues[7],$AuthValues[8],$AuthValues[9],$AuthValues[10]))
+            }
+        }
+    } catch { }
     if($ManagedRoutesDiagnosticVector -eq 1 -and $ManagedRoutesDiagnosticStage -eq 'vector_receipt' -and $null -ne $Server) {
         # A second genuine native lookup identifies only fixed URL-shape branches.
         # It cannot replace or rescue any of the original full-URL assertions.

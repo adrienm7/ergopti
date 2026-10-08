@@ -793,6 +793,8 @@ _CNR_ControlledNativePacFixture() {
 			Sleep(10)
 		}
 		AssertEqual(1, Observed.Length, "owned native fixture must settle within its bounded test budget")
+		if Observed[1]["exit"] != 0
+			try _CNR_NativePacDiagnostic(Observed[1])
 		AssertEqual(0, Observed[1]["exit"], "real WinHTTP PAC ABI and destination policy must agree")
 		AssertEqual("", Observed[1]["stderr"], "native fixture must expose no hidden failure")
 		AssertContains(Observed[1]["stdout"], "[OK] 11 controlled native WinHTTP PAC fixtures")
@@ -818,3 +820,18 @@ _CNR_NativeEndpointPolicy() {
 	AssertFalse(_SystemProxy_NativeBypassIsUsable("internal.invalid:8443"), "unsupported bypass ports must be refused")
 }
 Test("system proxy native: one usable relay or supported scheme map is selected without truncating failover", _CNR_NativeEndpointPolicy)
+
+; Project only enumerated stages and bounded scalars from the settled owner capture.
+_CNR_NativePacDiagnostic(Observation) {
+	Out := Observation.Get("stdout", "")
+	if !(Out is String) || StrLen(Out) > 8192
+		return
+	Pattern := "m)^PROXY_NATIVE_DIAG stage=(abi|native_cases|https_scope|direct|bad_script|missing_script|failover|entrypoint_input|entrypoint_start|entrypoint_wait|entrypoint_process|entrypoint_privacy|entrypoint_frame|server_receipt) passed=([0-9]{1,2})`r?$"
+	if !RegExMatch(Out, Pattern, &Fact)
+		return
+	if RegExMatch(Out, Pattern, , Fact.Pos + Fact.Len)
+		return
+	if Integer(Fact[2]) > 11
+		return
+	_TestPrint("::notice title=Windows canonical PAC entrypoint::" . SubStr(Fact[0], StrLen("PROXY_NATIVE_DIAG ")+1))
+}

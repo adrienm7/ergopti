@@ -23,6 +23,7 @@ _ManagedRoutes_NativeAcceptance() {
 		if Observed[1]["exit"] != 0 {
 			try _ManagedRoutes_NativeDiagnostic(Observed[1])
 			try _ManagedRoutes_NativeUrlDiagnostic(Observed[1])
+			try _ManagedRoutes_NativeAuthDiagnostic(Observed[1])
 		}
 		AssertEqual(0, Observed[1]["exit"], "the canonical native routing entrypoint must qualify")
 		AssertEqual("", Observed[1]["stderr"], "native errors and cleanup refusals must remain red")
@@ -79,4 +80,23 @@ _ManagedRoutes_NativeUrlDiagnostic(Observation) {
 	if RegExMatch(Out, Pattern, , Fact.Pos + Fact.Len)
 		return
 	_TestPrint("::notice title=Windows native PAC URL shape::shape=" . Fact[1])
+}
+
+; Project only enumerated stages and bounded scalars from the settled owner capture.
+_ManagedRoutes_NativeAuthDiagnostic(Observation) {
+	Out := Observation.Get("stdout", "")
+	if !(Out is String) || StrLen(Out) > 8192
+		return
+	Pattern := "m)^PAC_AUTH_DIAG stage=(none|acquire_credentials|accept_context|context_token|identity_match|other) security_status=(-?(?:0|[1-9][0-9]{0,9})) identity=([01]) bare=([0-9]{1,3}) type_one=([0-9]{1,3}) type_three=([0-9]{1,3}) authenticated=([0-9]{1,3}) responses=([0-9]{1,3}) failures=([0-9]{1,3}) active=([0-9]{1,3}) credentials=([0-9]{1,3}) contexts=([0-9]{1,3}) tokens=([0-9]{1,3}) buffers=([0-9]{1,3})`r?$"
+	if !RegExMatch(Out, Pattern, &Fact)
+		return
+	if RegExMatch(Out, Pattern, , Fact.Pos + Fact.Len)
+		return
+	if Integer(Fact[2]) < -2147483648 || Integer(Fact[2]) > 2147483647
+		return
+	loop 11 {
+		if Integer(Fact[A_Index + 3]) > 256
+			return
+	}
+	_TestPrint("::notice title=Windows PAC origin authentication::" . SubStr(Fact[0], StrLen("PAC_AUTH_DIAG ")+1))
 }

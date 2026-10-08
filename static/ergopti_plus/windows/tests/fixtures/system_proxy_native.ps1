@@ -93,8 +93,13 @@ public sealed class ErgoptiPacFixture : IDisposable
     }
 }
 '@
+$ProxyNativeDiagnosticStage='abi'
+$Passed=0
 function Require([bool]$Condition, [string]$Message) {
-    if (-not $Condition) { throw $Message }
+    if (-not $Condition) {
+        try {[Console]::Error.WriteLine('PROXY_NATIVE_DIAG stage='+$script:ProxyNativeDiagnosticStage+' passed='+$script:Passed)} catch { }
+        throw $Message
+    }
 }
 $OptionsSize = [Runtime.InteropServices.Marshal]::SizeOf([type][ErgoptiNativeProxy+AutoProxyOptions])
 $ProxySize = [Runtime.InteropServices.Marshal]::SizeOf([type][ErgoptiNativeProxy+ProxyInfo])
@@ -112,6 +117,7 @@ try {
         @{ url = 'http://destination.invalid:8443/other?key=fixture-secret'; proxy = 'path.invalid:8091' },
         @{ url = 'http://destination.invalid:8443/private?key=other-secret'; proxy = 'query.invalid:8092' }
     )
+    $ProxyNativeDiagnosticStage='native_cases'
     foreach ($Probe in $Cases) {
         $Result = [ErgoptiNativeProxy]::Resolve($Probe.url, $Server.Url, $false)
         Require ($Result.Ok -and $Result.Kind -ceq 'named_proxy' -and $Result.AccessType -eq 3 -and
@@ -120,6 +126,7 @@ try {
     }
     # Real Windows WinHTTP passes HTTPS scheme/host/port plus root to the PAC;
     # HTTP retains path/query. Preserve both independent native policy controls.
+    $ProxyNativeDiagnosticStage='https_scope'
     foreach ($PrivateHttps in @('https://destination.invalid:8443/other?key=fixture-secret',
         'https://destination.invalid:8443/private?key=other-secret')) {
         $HttpsReceipt = [ErgoptiNativeProxy]::Resolve($PrivateHttps, $Server.Url, $false)
@@ -128,16 +135,20 @@ try {
             $HttpsReceipt.NativeError -eq 0) 'Native HTTPS privacy scope changed.'
     }
     $Passed++
+    $ProxyNativeDiagnosticStage='direct'
     $Direct = [ErgoptiNativeProxy]::Resolve('https://destination.invalid/direct', $Server.Url, $false)
     Require ($Direct.Ok -and $Direct.Kind -ceq 'no_proxy' -and $Direct.AccessType -eq 1 -and
         $Direct.Proxy -ceq '' -and $Direct.NativeError -eq 0) 'PAC DIRECT lacks native acknowledgment.'
     $Passed++
+    $ProxyNativeDiagnosticStage='bad_script'
     $Bad = [ErgoptiNativeProxy]::Resolve('https://destination.invalid/private', $Server.Url.Replace('fixture.pac', 'bad.pac'), $false)
     Require (-not $Bad.Ok -and $Bad.Kind -ceq 'refused' -and $Bad.NativeError -ne 0) 'Invalid PAC must retain native failure.'
     $Passed++
+    $ProxyNativeDiagnosticStage='missing_script'
     $Missing = [ErgoptiNativeProxy]::Resolve('https://destination.invalid/private', $Server.Url.Replace('fixture.pac', 'missing.pac'), $false)
     Require (-not $Missing.Ok -and $Missing.Kind -ceq 'refused' -and $Missing.NativeError -ne 0) 'Unavailable configured PAC cannot become direct.'
     $Passed++
+    $ProxyNativeDiagnosticStage='failover'
     $Failover = [ErgoptiNativeProxy]::Resolve('http://destination.invalid/failover', $Server.Url, $false)
     Require ($Failover.Ok -and $Failover.Kind -ceq 'named_proxy' -and $Failover.AccessType -eq 3 -and $Failover.NativeError -eq 0) 'Valid multi-proxy PAC did not produce a native named-proxy receipt.'
     if ($Failover.Proxy -ceq 'first.invalid:80') {
@@ -153,6 +164,7 @@ try {
     # Execute the actual production script entrypoint, not only its native code.
     # The AHK fixture owner retains and removes this private input after its
     # entire Job-owned tree has acknowledged retirement.
+    $ProxyNativeDiagnosticStage='entrypoint_input'
     $VendorRoot=Split-Path -Parent $WorkerPath
     $SharedRoot=Join-Path (Split-Path -Parent (Split-Path -Parent $VendorRoot)) '_shared'
     $PolicyPath=Join-Path $SharedRoot 'modules/network/proxy_policy.json'
@@ -178,13 +190,18 @@ try {
     $Child = [Diagnostics.Process]::new()
     $Child.StartInfo = $Launch
     try {
+    $ProxyNativeDiagnosticStage='entrypoint_start'
         Require ($Child.Start()) 'Native production worker did not start.'
+    $ProxyNativeDiagnosticStage='entrypoint_wait'
         Require ($Child.WaitForExit(10000)) 'Native production worker exceeded its owned entrypoint budget.'
         $EntryOut = $Child.StandardOutput.ReadToEnd()
         $EntryErr = $Child.StandardError.ReadToEnd()
+    $ProxyNativeDiagnosticStage='entrypoint_process'
         Require ($Child.ExitCode -eq 0 -and $EntryErr -ceq '') 'Native production worker entrypoint failed.'
+    $ProxyNativeDiagnosticStage='entrypoint_privacy'
         Require (-not $EntryOut.Contains('fixture-secret') -and -not $EntryOut.Contains($Server.Url)) 'Native receipt exposed private input.'
         $EntryReceipt = $EntryOut | ConvertFrom-Json
+    $ProxyNativeDiagnosticStage='entrypoint_frame'
         Require ($EntryReceipt.version -eq 1 -and $EntryReceipt.status -ceq 'completed' -and
             $EntryReceipt.results.Count -eq 1 -and $EntryReceipt.results[0].ok -eq $true -and
             $EntryReceipt.results[0].kind -ceq 'named_proxy' -and $EntryReceipt.results[0].access_type -eq 3 -and
@@ -195,6 +212,7 @@ try {
         # Dispose for retirement: the AHK finally must terminate the exact tree.
         $Child.Dispose()
     }
+    $ProxyNativeDiagnosticStage='server_receipt'
     Require ($Server.Requests.Count -ge 3) 'Native PAC server was not contacted for controlled scripts.'
 } finally {
     $Server.Dispose()
