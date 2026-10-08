@@ -8,6 +8,38 @@ Differential updates22 remain deliberately outside scope. The maintainer
 authorized partial integration after available container/CI work, followed by
 device validation and any necessary fixes.
 
+## Latest qualification checkpoint, 2026-10-08
+
+The first partial integration remains `09174392102ffe8638435d794f09f41cb85c8dbc`.
+Its 84 feature commits are already in dev. Eleven subsequent repair commits
+through `44525214e4d0763f9c23e7d69828ec6bf3e01871` await the next partial
+integration. Neither TODO36 nor TODO62 is complete or removed.
+
+Linux manual [37747891785](https://github.com/adrienm7/ergopti/actions/runs/37747891785)
+at `b4ef975f1561c67603dc0679c44be1d57f171eea` is terminal FAIL. Shared checks,
+Linux units, all 157 E2E steps and the complete Package job pass. This includes
+actual SDK Flatpak build/install/launch and tarball installation. Installation
+passes 13 of 17 rows, fails four and skips none. The failing rows are both Fedora
+LuaJIT-provider refusals and both Alpine missing-kernel-header compilations.
+Windows and macOS are deliberately unselected; Release is skipped.
+
+The Fedora bootstrap and Alpine headers are now repaired in source. Local
+formatting, all 382 JS checks and all 26 Linux runtime control groups pass.
+The genuine host native luv build and C-entry loading also pass, with exact
+source identities and physical closure. Host compilation does not qualify
+Fedora package acquisition or installed behavior. Manual
+[37755062021](https://github.com/adrienm7/ergopti/actions/runs/37755062021)
+receives exactly `44525214e4d0763f9c23e7d69828ec6bf3e01871` with only the Linux
+lane selected. At this checkpoint it is IN PROGRESS, not a passing receipt.
+
+Windows still has four native failures and the unjoined packaged artifact
+NTLM/SSPI engine. macOS still needs the legitimate same-identity Automation
+prerequisite, complete Brew/package/install acceptance and opaque-client
+full-URL routing. These are CODE and native validation requirements, not only
+checks to perform on a personal device. Corporate-network and physical UI
+acceptance on every OS also remain unrun. Preserve items16/38 and every existing
+independent assertion, source pin, deadline and ownership gate.
+
 ## Delivered source slices
 
 Source-install checkpoint,2026-10-08: Linux manual37714714116 at9d26b947e
@@ -626,87 +658,106 @@ They contain fixture data and must not be published indiscriminately.
 
 ## Preserved feature commit inventory
 
-The inventory below precedes final receiving/documentation commits. The final
-no-ff merge preserves those commits too; its second parent identifies the final
-feature tip. History-only CI ancestry imports have no source delta and are not
-credited as feature implementation.
+The following 95 atomic feature commits are verified ancestors of
+`44525214e4d0763f9c23e7d69828ec6bf3e01871`, in history order. This
+inventory excludes merge-only CI ancestry imports and precedes this receiving
+checkpoint and later integration receipts. The final merge second parent and
+Git history identify those additional delivery commits.
 
 ```text
-b21bea3ee test(windows): expose closed managed transport failure facts
-de7c8bc90 test(linux): classify closed native Nix build failures
-0b0be55e3 fix(windows): admit canonical JSON and proxy inventory
-e25d938f9 fix(windows): bind native receiving to current owners
-c18f0796b fix(ci): prepare and observe retained Ollama acceptance
-74ad5da0b fix(windows): repair managed network receiving seams
-d9a0fe9ac fix(ci): admit revision-pinned shallow Nix source
-209b1d950 feat(linux): retain pinned Ollama archive publication
-6855c1e6d test(macos): isolate the MLX fingerprint fixture network route
-1605b63de feat(windows): retain managed network routing and failure ownership
-accb6bd81 fix(ci): expose bounded Nix phase failure observations
-0ef79d773 fix(linux): preserve authenticated no-follow updater caching
-ea3cd24fa fix(linux): preserve conditional path refusal diagnostics
-f7c7d368d fix(macos): refuse unsupported opaque network routes
-072481c3a fix(linux): retain updater ETags at their final endpoint
-35ef2db8f fix(macos): require the observed Sparkle validation error
-22792d207 fix(ci): select complete Linux assertion records before decoding
-704598298 fix(macos): retain bounded native acceptance diagnostics
-1ce802508 fix(macos): include system trust in the frozen MLX lock
-9195a6419 fix(ci): expose the completed Linux configuration assertion
-89085c467 fix(macos): publish the Sparkle fixture signing key
-cfe904758 fix(macos): refuse MLX downloads without system trust activation
-6072016f3 fix(macos): retain typed Sparkle startup refusal evidence
-4f01de5dd fix(macos): confirm existing accessory admission without a setter
-cd198161b fix(ci): retain failed Linux unit reporter logs
-ed979dee8 docs(release): preserve composed qualification and remaining work
-c18442429 fix(macos): correct Sparkle progress enum declarations
-1a2fa790a fix(linux): wait for release-check owner retirement
-67d563584 test(macos): trace actual Sparkle archive update progress
-8f7cecf46 test(linux): expose owned Nix phase refusal boundaries
-3cfad32a6 test(macos): observe actual AppKit activation policy states
-f346157c7 docs(release): record exact native qualification limits
-e9db13486 test(linux): trace actual relative HTTP timer admission
-1016527df test(macos): report exact AppKit receiver refusal reasons
-949eb6eca fix(test): retain native Sparkle fixture root identity
-7e786f7ef fix(test): observe actual asynchronous Linux updater installation
-f7aa85391 fix(linux): retain exact temporary updater native lifetimes
-eeb6fd58f fix(ci): stage an authenticated private curl validation keyring
-5e9a545dd fix(test): distinguish pinned Nix metadata refusal checkpoints
-229545c51 fix(test): expose bounded Sparkle child refusal categories
-ad95a2693 test(macos): retain the updater fixture sleeper parent
-29658bad3 test(macos): observe owned receivers after AppleEvent refusal
-69cda111d test(macos): verify archive signatures with cryptographic oracles
-b8a8363d4 test(linux): report safe native preparation checkpoints
-2069853a7 test(linux): reap owned CLI descendants during settlement
-622aa798b fix(linux): retain admitted legacy HTTP redirect policy
-6c9b334fc test(linux): await native HTTP fixture close acknowledgements
-281ee9a70 test(linux): qualify genuine Nix installed runtime
-bd0a90434 test(macos): expose bounded archive acceptance failure facts
-01834579c fix(linux): retain verified archives through native installation
-a96b224a6 fix(test): use the imported Sparkle download delegate label
-8827c9d32 fix(test): bind Sparkle fixture to numeric loopback
-c9bee527e fix(test): retain owned AppleEvent marker diagnostics
-435f0cf3d fix(test): retain Sparkle startup diagnostics after retirement
-6a07d83a3 fix(network): retain prepared requests through native cleanup
-9f4b8e9c1 docs(release): preserve reviewed group6 recovery sources
-bfcd1abf4 feat(release): qualify retained archive descriptor hashing
-997a71980 feat(release): stage native networking in portable Linux packages
-c4ec2bf45 feat(network): admit buffered GET redirects through native owners
-54493dc2a fix(release): serve Sparkle archives from the retained physical root
-cd71ef559 feat(network): route Linux HTTP through owned native proxy admission
-c622e45d6 fix(release): diagnose actual Sparkle server retirement
-41cc59b49 fix(release): expose bounded native archive XCTest outcomes
-5ce6bc2c9 fix(linux): read native WebKit loading state as a property
-40ddfed7c fix(updater): fence Versions actions to their admitted document
-043f32684 docs(release): record native privilege refusal and Linux inode boundary
-4d026ba9a test(release): expose bounded native AppleEvent reply facts
-cfa27a347 fix(release): bound idle Sparkle server request reads
-7b567bd30 fix(network): retain private Linux remote failure receipts
-9a95d5ce4 fix(release): retain owned canonical Sparkle census paths
-7cff41c28 fix(release): use the documented receiver registration transition
-00a07ff9f docs(network): preserve the corrected Linux producer continuation
-a23db837d test(release): expose owned AppleEvent registration refusal
-2420fe7a2 test(release): identify bounded Sparkle directory refusals
-d95998c0e test(release): expose pre-path Sparkle census refusals
-1d23f689f test(release): expose owned AppleEvent termination facts
-6deec05a9 docs(release): record the integrated qualification verdict
+6deec05a99555607fe00e7aaedba704e8aea0ff3 docs(release): record the integrated qualification verdict
+1d23f689fe6f80393cc06f25c77c2e7cdf52b133 test(release): expose owned AppleEvent termination facts
+d95998c0ed9c4845944a676cb90e4fc3a81fd32d test(release): expose pre-path Sparkle census refusals
+2420fe7a222cbe2c5135206f48df080ed20fd0b9 test(release): identify bounded Sparkle directory refusals
+a23db837d1411acf9f588639b9d6036ab593b6f1 test(release): expose owned AppleEvent registration refusal
+00a07ff9f9d283a26f8f56012a7cb3b42403e832 docs(network): preserve the corrected Linux producer continuation
+7cff41c280643128cd3badf58dd1cd519c610ba3 fix(release): use the documented receiver registration transition
+9a95d5ce4bb20179a1e01860c07eed1231eaf8b2 fix(release): retain owned canonical Sparkle census paths
+7b567bd304e932c467adc6fcc6b70ddef4fe39c5 fix(network): retain private Linux remote failure receipts
+cfa27a347d30403f2d80b5bfa9dfb8bdf598d142 fix(release): bound idle Sparkle server request reads
+4d026ba9abbc8449d68f8be932f21a7e9cac6c0b test(release): expose bounded native AppleEvent reply facts
+043f32684de93b977123d1cfea48cc758d17cbe0 docs(release): record native privilege refusal and Linux inode boundary
+40ddfed7c644b381208aab90fc888e51f0738720 fix(updater): fence Versions actions to their admitted document
+5ce6bc2c9ac682f0764d8f204ef8ca271de18947 fix(linux): read native WebKit loading state as a property
+41cc59b496b8f6dffd8382a0024673cc7e6b75c7 fix(release): expose bounded native archive XCTest outcomes
+c622e45d623c20fdf7b9f1da8ae4f21cfc9064b3 fix(release): diagnose actual Sparkle server retirement
+cd71ef559082f90442f5535d143dc97e269d4004 feat(network): route Linux HTTP through owned native proxy admission
+54493dc2a586181b94969db9bcfa9c0b12cb653a fix(release): serve Sparkle archives from the retained physical root
+c4ec2bf453baa70237ccae0bb3fb7330cebe9c0f feat(network): admit buffered GET redirects through native owners
+997a719804378eab7aa4d1066daabe9f594d6c3e feat(release): stage native networking in portable Linux packages
+bfcd1abf4d968d7fda35577199fb7b0d17edb441 feat(release): qualify retained archive descriptor hashing
+9f4b8e9c16b2b916c5a5e630f5ac6a1b22c91b13 docs(release): preserve reviewed group6 recovery sources
+6a07d83a327c70b1c08ef45c6aac65b14270081c fix(network): retain prepared requests through native cleanup
+435f0cf3d4af22882d0e58c38b6f6f117fe6eb63 fix(test): retain Sparkle startup diagnostics after retirement
+c9bee527e18c5c230f1124f7ad0a79c21f91cb86 fix(test): retain owned AppleEvent marker diagnostics
+8827c9d326dc501cdbe96f838b2f27cfaac9da10 fix(test): bind Sparkle fixture to numeric loopback
+a96b224a676b8267e072069ed57c556a99623327 fix(test): use the imported Sparkle download delegate label
+01834579cbc792473ab56584e21f03a2f96bd2fb fix(linux): retain verified archives through native installation
+bd0a904347c1c3816636e12f3515980a6ae1b396 test(macos): expose bounded archive acceptance failure facts
+281ee9a70905d677e5a2e9d7fef8a26114d53760 test(linux): qualify genuine Nix installed runtime
+6c9b334fca4e1ea5db4e4184dae2ca9f713e8fcf test(linux): await native HTTP fixture close acknowledgements
+622aa798bc609491182e3ad6147cbe42a04f9469 fix(linux): retain admitted legacy HTTP redirect policy
+2069853a796afffa1ca64beed29fd514cece246c test(linux): reap owned CLI descendants during settlement
+b8a8363d49fc9865527584ddf550bea81693de12 test(linux): report safe native preparation checkpoints
+69cda111d647ff16ab175dd23136a11134446289 test(macos): verify archive signatures with cryptographic oracles
+29658bad310351c079716a4ee2ca402c1bddc910 test(macos): observe owned receivers after AppleEvent refusal
+ad95a2693aecb03a0295fe41e17cb4989e3dd1a1 test(macos): retain the updater fixture sleeper parent
+229545c51cdeb1dadb1549413cc636be7e9ff485 fix(test): expose bounded Sparkle child refusal categories
+5e9a545ddbc8d19b830fc01040e79605591f0d44 fix(test): distinguish pinned Nix metadata refusal checkpoints
+eeb6fd58f772be70968e6438e23fe990909c820a fix(ci): stage an authenticated private curl validation keyring
+f7aa85391f76b9683ec6e7730b3ca698ef656044 fix(linux): retain exact temporary updater native lifetimes
+7e786f7ef28425127bf1d56f18a02b204867ffb5 fix(test): observe actual asynchronous Linux updater installation
+949eb6ecaad3efeb020a8b411f49227d1ed49fea fix(test): retain native Sparkle fixture root identity
+1016527df89dbfb2f41cdc94edd69bdb46462efc test(macos): report exact AppKit receiver refusal reasons
+e9db1348625764f7701479f45687b582455c861f test(linux): trace actual relative HTTP timer admission
+f346157c726b96e36f12701ea61b60be76e9e3e9 docs(release): record exact native qualification limits
+3cfad32a65a18faa1a408638c6613b522aa200d6 test(macos): observe actual AppKit activation policy states
+8f7cecf462b0b0f59f1a2d09c7faaa08eb2ab11b test(linux): expose owned Nix phase refusal boundaries
+67d563584b05426f2e2564b61cbbc1ddd61d6eb0 test(macos): trace actual Sparkle archive update progress
+1a2fa790a11c9c12ddc69d8b1478cf085400b28f fix(linux): wait for release-check owner retirement
+c18442429284bbb0e5e5838846333939143f771b fix(macos): correct Sparkle progress enum declarations
+ed979dee84a84ba35fcd592b9f3c2933ccaa50f8 docs(release): preserve composed qualification and remaining work
+cd198161bcff2702d7c987b752e2a66ab0c3505e fix(ci): retain failed Linux unit reporter logs
+4f01de5dd0a9649f8c6a8a1b80e5b95f25c60bf2 fix(macos): confirm existing accessory admission without a setter
+6072016f31f78ab517c31ab4d5c00a6cdf865d42 fix(macos): retain typed Sparkle startup refusal evidence
+cfe904758d6e22d3b173c7e09c31c8157f04f5cc fix(macos): refuse MLX downloads without system trust activation
+89085c46707aa9972c787affb0f4102a5c8fff68 fix(macos): publish the Sparkle fixture signing key
+9195a6419f4d36581e4404198cd152753791f2e6 fix(ci): expose the completed Linux configuration assertion
+1ce80250847d6f15d8699a7c490c378f580a67fa fix(macos): include system trust in the frozen MLX lock
+704598298b2a5ebd3b9827b8fd11355d24eb0d1e fix(macos): retain bounded native acceptance diagnostics
+22792d20764c790b137edf96651b4154db30f0e7 fix(ci): select complete Linux assertion records before decoding
+35ef2db8fb6d6b920d51ce6ec692e7f124ffe9e7 fix(macos): require the observed Sparkle validation error
+072481c3a9e890d24b16bb46cc93c28d2d277344 fix(linux): retain updater ETags at their final endpoint
+f7c7d368d9f7789577af5552f148a7fde69f4310 fix(macos): refuse unsupported opaque network routes
+ea3cd24fa648484f110bfc8c90771e49ac0f91dc fix(linux): preserve conditional path refusal diagnostics
+0ef79d773d0ab68334dd52378b0438d01b5ef18d fix(linux): preserve authenticated no-follow updater caching
+accb6bd81cf83e45f41f069d3ad3a51b04dbbb98 fix(ci): expose bounded Nix phase failure observations
+1605b63ded81da2e4b2e73d796d99bc9ebde5f1e feat(windows): retain managed network routing and failure ownership
+6855c1e6d3b2089a2af299245811f36bf4c3333d test(macos): isolate the MLX fingerprint fixture network route
+209b1d950076c42e77b5621401349009b9654ab6 feat(linux): retain pinned Ollama archive publication
+d9a0fe9ac97ebcd7d5b19ecc354ae3613de6cccb fix(ci): admit revision-pinned shallow Nix source
+74ad5da0be890d43d80070c8cc806fe4cadef1c0 fix(windows): repair managed network receiving seams
+c18f0796b2f708a1650d4a1eb5dc316b7bf263dd fix(ci): prepare and observe retained Ollama acceptance
+e25d938f9c77f49295741b0ba2eb9d5988a965e9 fix(windows): bind native receiving to current owners
+0b0be55e37494ba9043a8dbb467f15f29f2e43c1 fix(windows): admit canonical JSON and proxy inventory
+de7c8bc901595f6047391c90f0162513ed35bc83 test(linux): classify closed native Nix build failures
+b21bea3ee3ed0f3a21b90096ab0e9607a5ac688a test(windows): expose closed managed transport failure facts
+1b0b3be0a9fb6720fd0a19c1c7780f1cecfde36d fix(ci): prepare owned Nix build logs
+9d7b838d570004ba66d974a12410d7032df8eb83 fix(ci): prepare Linux dependencies before native receiving
+ef67fa39075f35b990dbaf0a23dd6d8a4987222a docs(release): record native Nix pass and Linux continuation
+ca50c7269ae3d9958661c65f8b67ab9d46ceb924 test(windows): expose closed single-route origin facts
+6695173f80e1560aca298ce6cab5252019529e6d fix(test): retain ephemeral keys in native Windows TLS fixture
+dab7823faff31f166e68cc3210374af2968711f9 docs(release): preserve native receiving continuations
+6000b8d1df930c7207abb8108031fa75460f3d60 fix(ci): isolate Linux prerequisite acquisition roles
+c00cec62907c148ef4dd595827b0ef452e297929 fix(test): retain Windows service diagnostics in TAP receipts
+2cbcea1441b867e74d1881b620ec3f1582a31a30 fix(flatpak): build the required GSS implementation before curl
+2ab4b1a326e5b646bdfd335316d95fac1eb70cb6 fix(flatpak): bootstrap Kerberos explicitly in the SDK
+533eb8e4513d36625de679dc6df25fa53ebcdb09 docs(network): retain restored Windows native receiving
+3161aada974499852a30bff5ac2374ee614996b0 fix(ci): receive Linux packages after manual E2E failures
+acb14576c412ca55d2e923f20e12a1b68855e604 fix(flatpak): use the declared GIO installed-test option
+9d26b947e40869c023d4b8b6070782680bc4c6ca fix(flatpak): align native providers with the package libdir
+1f45d2e2d6399fd6c959e9c37caa4feb32811ea1 fix(flatpak): retain Duktape native math dependencies
+b4ef975f1561c67603dc0679c44be1d57f171eea fix(linux): provision source archive build prerequisites
+c996c69564dfcea46603e1a1fdbe86c8bf7ed100 fix(linux): bootstrap native LuaJIT networking on Fedora
+44525214e4d0763f9c23e7d69828ec6bf3e01871 fix(linux): include Alpine kernel build headers
 ```

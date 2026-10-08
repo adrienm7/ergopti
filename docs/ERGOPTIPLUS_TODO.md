@@ -6589,7 +6589,10 @@ Alpine source compilations missinglinux/magic.h. The source-build catalogue
 and the unchanged--no-deps caller now also provisionlinux-headers on Alpine;
 no binary runtime dependency or native assertion is removed. The independent
 header-package regression fails before this correction. Final native receiving
-of the combined Fedora/Alpine repairs is still required.
+of the combined Fedora/Alpine repairs is in progress in manual37755062021
+at44525214e4d0763f9c23e7d69828ec6bf3e01871, selecting Linux only. Local
+formatting,382 JS checks and26 runtime-control groups pass; those results
+do not qualify the pending native installation matrix. Item62 remains open.
 
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard
