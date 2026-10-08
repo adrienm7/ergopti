@@ -33,12 +33,25 @@ global ProbeHkl := DllCall("GetKeyboardLayout", "uint", 0, "ptr")
 global ProbeOwned := Map()
 global ProbeCounts := Map("suppress", 0, "native", 0, "ordinary", 0, "fallback", 0)
 global ProbeReceipt := ""
+global ProbeObservationGeneration := A_Args.Length >= 4 && RegExMatch(A_Args[4], "^[1-9][0-9]{0,8}$")
+	? Integer(A_Args[4]) : 0
+global ProbeObservationSerial := 0
+global ProbeObservationScenario := 0
+global ProbeObservationWriting := false
+global ProbeObservationFailed := false
 OnExit(ProbeRelease)
 SetTimer(() => ExitApp(124), -5000)
+if ProbeObservationGeneration {
+	OnError(ProbeObserveUnhandled)
+	OnExit(ProbeObserveExit)
+	ProbeObservePhase(1)
+}
 try {
 	ProbeRun()
 	ExitApp(0)
 } catch Error as Err {
+	PobCaughtFacts := ProbeObservationErrorFacts(Err)
+	ProbeObservePhase(15, PobCaughtFacts[1], PobCaughtFacts[2], PobCaughtFacts[3])
 	FileAppend(Err.Message . "`n" . Err.Stack . "`n", "**", "UTF-8")
 	ExitApp(1)
 }
@@ -51,34 +64,47 @@ try {
 
 ProbeRun() {
 	global ProbeWindow, ProbePair, ProbeNative, ProbeCounts, ProbeReceipt
-	global ProbePid, ProbeThread, ProbeHkl, ProbeOwned
+	global ProbePid, ProbeThread, ProbeHkl, ProbeOwned, ProbeObservationScenario
+	ProbeObservePhase(2)
 	if ProbeHkl != 0x04090409
 		throw Error("The controlled hook probe requires the existing exact US HKL.")
+	ProbeObservePhase(3)
 	ProbeWindow := Gui("+ToolWindow", "Owned key-combination hook probe")
 	ProbeWindow.AddEdit("w180 h30")
 	ProbeWindow.Show("w200 h70")
+	ProbeObservePhase(4)
 	if !WinWaitActive("ahk_id " . ProbeWindow.Hwnd, , 1) || !ProbeAdmission()
 		throw Error("The controlled hook probe could not admit its exact owned foreground.")
+	ProbeObservePhase(5)
 	ProbeReceipt := A_Args[2] . "|" . ProbePid . "|" . ProbeThread . "|" . ProbeWindow.Hwnd
 		. "|" . Format("{:08X}", ProbeHkl) . "|injected-registration`n"
 	try {
 		for _, Scenario in ["suppress", "native", "fallback"] {
+			ProbeObservationScenario += 1
 			ProbePair := Scenario != "fallback"
 			ProbeNative := Scenario == "native"
 			for Kind in ProbeCounts
 				ProbeCounts[Kind] := 0
+			ProbeObservePhase(6)
 			ProbeDown("LCtrl", "SC01D")
+			ProbeObservePhase(7)
+			ProbeObservePhase(8)
 			ProbeDown("RAlt", "SC138")
+			ProbeObservePhase(9)
 			Sleep(80)
+			ProbeObservePhase(10)
 			if ProbeRelease() != 0
 				throw Error("The controlled hook probe retained injected modifier release debt.")
+			ProbeObservePhase(11)
 			Sleep(80)
 			if !ProbeAdmission()
 				throw Error("The controlled hook observation lost its exact source/foreground fence.")
 			ProbeReceipt .= Scenario . "|" . ProbeCounts["suppress"] . "|" . ProbeCounts["native"]
 				. "|" . ProbeCounts["ordinary"] . "|" . ProbeCounts["fallback"] . "|" . ProbeOwned.Count . "`n"
+			ProbeObservePhase(12)
 		}
 		FileAppend(ProbeReceipt, A_Args[1], "UTF-8-RAW")
+		ProbeObservePhase(13)
 	} finally {
 		if ProbeRelease() == 0
 			ProbeWindow.Destroy()
@@ -202,4 +228,85 @@ TapHoldPressIsOwned(KeyId) {
 
 TextSendMenuMask() {
 	return true
+}
+
+
+/** Records only declared scalar phases in the parent's pinned diagnostic file. */
+ProbeObservePhase(PobStage, PobErrorKind := 0, PobErrorSource := 0, PobErrorLine := 0, PobExitCode := -1) {
+	global ProbeObservationGeneration, ProbeObservationSerial, ProbeObservationScenario
+	global ProbeObservationWriting, ProbeObservationFailed, ProbePid, ProbeThread, ProbeOwned, ProbeEnabled
+	if !ProbeObservationGeneration || ProbeObservationWriting || ProbeObservationSerial >= 128 || ProbeObservationFailed
+		return
+	ProbeObservationWriting := true
+	try {
+		ProbeObservationSerial += 1
+		PobRow := A_Args[2] . "|" . ProbePid . "|" . ProbeThread . "|" . ProbeObservationGeneration
+			. "|" . (ProbeEnabled ? 1 : 2) . "|" . ProbeObservationSerial . "|" . PobStage
+			. "|" . ProbeObservationScenario . "|" . ProbeOwned.Count . "|" . PobErrorKind
+			. "|" . PobErrorSource . "|" . PobErrorLine . "|" . PobExitCode . "`n"
+		; FileAppend excludes all sharing and conflicts with the parent's identity pin.
+		PobStream := FileOpen(A_Args[1] . ".observation", "a-d", "UTF-8-RAW")
+		try {
+			if PobStream.Write(PobRow) != StrLen(PobRow)
+				throw Error("Incomplete observation append")
+		} finally PobStream.Close()
+	} catch Any {
+		; Optional observation refusal cannot replace any original effect or verdict.
+		ProbeObservationFailed := true
+	} finally {
+		ProbeObservationWriting := false
+	}
+}
+
+/** Reads only native data descriptors; custom exception getters are never invoked. */
+ProbeObservationErrorFacts(PobThrown) {
+	PobKind := 0, PobSource := 0, PobLine := 0
+	if !IsObject(PobThrown)
+		return [0, 0, 0]
+	for PobIndex, PobPrototype in [Error.Prototype, ValueError.Prototype, TypeError.Prototype,
+		UnsetError.Prototype, OSError.Prototype, TargetError.Prototype, TimeoutError.Prototype, MemoryError.Prototype] {
+		if ObjGetBase(PobThrown) == PobPrototype {
+			PobKind := PobIndex
+			break
+		}
+	}
+	if !PobKind
+		return [0, 0, 0]
+	try {
+		PobGetDescriptor := GetMethod(Object.Prototype, "GetOwnPropDesc")
+		PobFile := PobGetDescriptor.Call(PobThrown, "File")
+		PobNumber := PobGetDescriptor.Call(PobThrown, "Line")
+		if ObjHasOwnProp(PobFile, "Value") && PobFile.Value is String && StrLen(PobFile.Value) <= 2048
+			&& ObjHasOwnProp(PobNumber, "Value") && PobNumber.Value is Integer
+			&& PobNumber.Value > 0 && PobNumber.Value <= 65535 {
+			SplitPath(PobFile.Value, &PobLeaf)
+			for PobIndex, PobName in ["key_combination_altgr_suffix_probe.ahk", "key_combination_keys.ahk", "altgr.ahk"] {
+				if PobLeaf == PobName {
+					PobSource := PobIndex
+					PobLine := PobNumber.Value
+					break
+				}
+			}
+		}
+	} catch Any {
+		PobSource := 0, PobLine := 0
+	}
+	return [PobKind, PobSource, PobLine]
+}
+
+/** Observes unhandled errors without suppressing the original native handler. */
+ProbeObserveUnhandled(PobThrown, PobMode) {
+	try {
+		PobFacts := ProbeObservationErrorFacts(PobThrown)
+		ProbeObservePhase(16, PobFacts[1], PobFacts[2], PobFacts[3])
+	} catch Any {
+		; An optional observer cannot replace default native error propagation.
+	}
+	return 0
+}
+
+/** Exit notification does not alter the original release callback or exit code. */
+ProbeObserveExit(PobReason, PobCode) {
+	ProbeObservePhase(14, 0, 0, 0, PobCode)
+	return 0
 }

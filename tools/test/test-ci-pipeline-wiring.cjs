@@ -92,6 +92,7 @@ const ROOT = 'validate';
 const RELEASE_INPUT = `\${{ needs.${ROOT}.outputs.release == 'true' }}`;
 const RELEASE_IF = `github.event_name == 'push' && needs.${ROOT}.outputs.release == 'true'`;
 const NOT_CANCELLED = '${{ !cancelled() }}';
+const EARLY_MANAGER_IF = "${{ !cancelled() && steps.linux_unit.outcome == 'success' }}";
 const MANUAL_RUNTIME_IF =
 	"${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() }}";
 const MANUAL_RUNTIME_EVIDENCE_IF =
@@ -167,6 +168,12 @@ const PLAN_STEPS = ['Load the Linux release artifact contract', 'Compute tag and
 // accepted value. Every other step runs whenever its job runs, so no edit can
 // skip a gate while its job stays green.
 const STEP_CONDITIONS = [
+	[
+		LINUX_BOX,
+		'test-linux',
+		'Saved ordered-pair Manager — early genuine native source lifetimes',
+		EARLY_MANAGER_IF
+	],
 	[
 		LINUX_BOX,
 		'test-linux',
@@ -284,6 +291,7 @@ const STEP_CONDITIONS = [
 	[WINDOWS_BOX, 'package-windows', 'Sign and verify ErgoptiPlus.exe', 'inputs.release'],
 	[WINDOWS_BOX, 'test-ahk', 'Annotate AHK results', 'always()'],
 	[WINDOWS_BOX, 'test-ahk', 'Publish AHK execution manifest', 'always()'],
+	[WINDOWS_BOX, 'test-ahk', 'Run native desktop AHK cohorts', NOT_CANCELLED],
 	[WINDOWS_BOX, 'test-ahk', 'Publish native desktop AHK evidence', 'always()'],
 	[
 		WINDOWS_BOX,
@@ -944,8 +952,10 @@ function graphProblems(files) {
 			if (!job || JSON.stringify(pipeline.needsOf(job.body)) !== JSON.stringify(expected)) {
 				problems.push(`${rel} ${id} must need exactly ${expected.join(', ')}`);
 			}
-			if (job && pipeline.field(job.body, 'if') !== (index === 4 ? 'always()' : null)) {
-				problems.push(`${rel} ${id} must run on every profile; only the verdict uses always()`);
+			const expectedCondition =
+				index === 4 ? 'always()' : rel === LINUX_BOX && id === 'e2e-linux' ? NOT_CANCELLED : null;
+			if (job && pipeline.field(job.body, 'if') !== expectedCondition) {
+				problems.push(`${rel} ${id} must keep its exact mandatory job condition`);
 			}
 		}
 		if (rel === MACOS_BOX) {
@@ -1003,6 +1013,352 @@ for (const [what, from, to] of [
 ]) {
 	mustCatch(what, MACOS_BOX, from, to, graphProblems);
 }
+
+/** Rejects packaging admission after a supplementary E2E observation of failed units. */
+function linuxUpstreamResultProblems(files) {
+	const entry = files.find((candidate) => candidate.rel === LINUX_BOX);
+	const job =
+		entry && pipeline.jobsOfText(entry.text, LINUX_BOX).find((item) => item.id === HARNESS_JOB);
+	if (!job) return ['the supplemental Linux observation must retain its E2E job'];
+	const unit = pipeline.jobsOfText(entry.text, LINUX_BOX).find((item) => item.id === 'test-linux');
+	if (
+		!unit ||
+		pipeline.field(unit.body, 'continue-on-error') !== null ||
+		pipeline.field(job.body, 'continue-on-error') !== null
+	)
+		return ['the original Linux units and supplemental E2E job must never forgive failure'];
+	const steps = pipeline.steps(job.body);
+	const name = 'Preserve the mandatory upstream unit result';
+	const matches = steps.filter((candidate) => candidate.name === name);
+	if (matches.length !== 1 || steps.at(-1).name !== name)
+		return ['Linux E2E must reject failed units once, after all observations and evidence'];
+	const body = matches[0].body;
+	if (
+		pipeline.stepField(body, 'if') !== NOT_CANCELLED ||
+		pipeline.stepField(body, 'timeout-minutes') !== '1' ||
+		pipeline.stepField(body, 'continue-on-error') !== null ||
+		pipeline.stepField(body, 'shell') !== null ||
+		pipeline.stepField(body, 'working-directory') !== null ||
+		pipeline.stepField(body, 'run') !== 'test "$ERGOPTI_UPSTREAM_UNIT_RESULT" = success' ||
+		pipeline.stepField(body, 'env') !==
+			'ERGOPTI_UPSTREAM_UNIT_RESULT: ${{ needs.test-linux.result }}'
+	)
+		return ['Linux E2E must reject the exact real upstream unit result without forgiveness'];
+	return [];
+}
+
+const EARLY_MANAGER_NAME =
+	'Saved ordered-pair Manager \u2014 early genuine native source lifetimes';
+const EARLY_MANAGER_SCRIPT = [
+	'set -euo pipefail',
+	'if ! command -v Xvfb >/dev/null; then',
+	"  echo 'ENVIRONMENT: early saved-pair Manager prerequisite refused: Xvfb is absent' >&2",
+	'  exit 2',
+	'fi',
+	'sudo modprobe uinput',
+	'if sudo python3 tests/hardware/run_manager_input_owner_real.py > "$RUNNER_TEMP/linux-manager-input-owner-early.log" 2>&1; then',
+	'  manager_status=0',
+	'else',
+	'  manager_status=$?',
+	'fi',
+	'cat "$RUNNER_TEMP/linux-manager-input-owner-early.log"',
+	'exit "$manager_status"'
+];
+const ORIGINAL_MANAGER_UNIT_SCRIPT = [
+	'set -euo pipefail',
+	'set +e',
+	'node ../../../tools/test/report.cjs --name linux-lua --json "${{ runner.temp }}/linux-lua.json" -- luajit tests/run.lua 2>&1 | tee "$RUNNER_TEMP/linux-unit.log"',
+	'unit_pipeline_status=("${PIPESTATUS[@]}")',
+	'set -e',
+	'if [ "${unit_pipeline_status[0]}" -ne 0 ]; then exit "${unit_pipeline_status[0]}"; fi',
+	'exit "${unit_pipeline_status[1]}"'
+];
+const ORIGINAL_MANAGER_MANUAL_SCRIPT = [
+	'set -euo pipefail',
+	'sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends curl zstd',
+	'python3 static/ergopti_plus/linux/tests/hardware/run_ollama_runtime_acceptance.py \\',
+	'  --repository "$GITHUB_WORKSPACE" \\',
+	'  --evidence "$RUNNER_TEMP/ollama-runtime-acceptance" \\',
+	'  --lua luajit'
+];
+const ORIGINAL_LATE_MANAGER_BODY =
+	'      - name: Saved ordered-pair Manager \u2014 genuine native source lifetimes\n        if: ${{ !cancelled() }}\n        working-directory: static/ergopti_plus/linux\n        env:\n          LUA_PATH: \'./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;\'\n        run: |\n          set -euo pipefail\n          if sudo env LUA_PATH="$LUA_PATH" python3 tests/hardware/run_manager_input_owner_real.py > "$RUNNER_TEMP/linux-manager-input-owner.log" 2>&1; then\n            manager_status=0\n          else\n            manager_status=$?\n          fi\n          cat "$RUNNER_TEMP/linux-manager-input-owner.log"\n          exit "$manager_status"\n        timeout-minutes: 3';
+const ORIGINAL_MANAGER_DAEMON_BODY =
+	'      - name: The whole daemon, live \u2014 a trigger typed, a tray shown\n        if: ${{ !cancelled() }}\n        run: |\n          sudo modprobe uinput\n          # lua-luv as install.sh installs it: the daemon\'s timers and every\n          # HTTP request (the AI phase) run on it.\n          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends at-spi2-core openbox python3-gi gir1.2-gtk-3.0 \\\n            dbus-x11 xvfb x11-xkb-utils libayatana-appindicator3-1 lua-luv\n          sudo bash static/ergopti_plus/linux/tests/hardware/run_daemon_live.sh\n        timeout-minutes: 6';
+
+/** Keeps the early native observation supplemental to actual units and late native admission. */
+function earlyManagerProblems(files) {
+	const entry = files.find((item) => item.rel === LINUX_BOX);
+	const jobs = entry && pipeline.jobsOfText(entry.text, LINUX_BOX);
+	const unit = jobs && jobs.find((job) => job.id === 'test-linux');
+	const e2e = jobs && jobs.find((job) => job.id === HARNESS_JOB);
+	if (
+		!unit ||
+		!e2e ||
+		pipeline.field(unit.body, 'if') !== null ||
+		pipeline.field(unit.body, 'continue-on-error') !== null
+	)
+		return ['the early Manager observation cannot replace or forgive the original unit entry'];
+	const steps = pipeline.steps(unit.body);
+	const original = steps.filter((step) => step.name === 'Run the driver unit test suite');
+	const early = steps.filter((step) => step.name === EARLY_MANAGER_NAME);
+	const manual = steps.filter(
+		(step) => step.name === 'Run manual official runtime and model acceptance'
+	);
+	if (
+		original.length !== 1 ||
+		early.length !== 1 ||
+		manual.length !== 1 ||
+		steps.indexOf(early[0]) !== steps.indexOf(original[0]) + 1 ||
+		steps.indexOf(early[0]) >= steps.indexOf(manual[0])
+	)
+		return [
+			'the early Manager observation must follow actual units and precede unchanged manual IA acquisition'
+		];
+	if (
+		pipeline.stepField(original[0].body, 'if') !== null ||
+		pipeline.stepField(original[0].body, 'continue-on-error') !== null ||
+		pipeline.stepField(original[0].body, 'id') !== 'linux_unit' ||
+		JSON.stringify(pipeline.runOf(original[0].body)) !==
+			JSON.stringify(ORIGINAL_MANAGER_UNIT_SCRIPT)
+	)
+		return ['the original unit runner, failing exit and receipt authority must remain exact'];
+	if (
+		pipeline.stepField(manual[0].body, 'if') !== MANUAL_RUNTIME_IF ||
+		pipeline.stepField(manual[0].body, 'continue-on-error') !== null ||
+		pipeline.stepField(manual[0].body, 'timeout-minutes') !== '18' ||
+		JSON.stringify(pipeline.runOf(manual[0].body)) !==
+			JSON.stringify(ORIGINAL_MANAGER_MANUAL_SCRIPT)
+	)
+		return ['the original manual IA acquisition and eighteen-minute budget must remain exact'];
+	const body = early[0].body;
+	if (
+		pipeline.stepField(body, 'if') !== EARLY_MANAGER_IF ||
+		pipeline.stepField(body, 'continue-on-error') !== null ||
+		pipeline.stepField(body, 'timeout-minutes') !== '3' ||
+		pipeline.stepField(body, 'working-directory') !== 'static/ergopti_plus/linux' ||
+		pipeline.stepField(body, 'shell') !== null ||
+		JSON.stringify(pipeline.runOf(body)) !== JSON.stringify(EARLY_MANAGER_SCRIPT)
+	)
+		return [
+			'the early Manager observation must retain exact real prerequisites, native command and failing exit'
+		];
+	const lateSteps = pipeline.steps(e2e.body);
+	const late = lateSteps.filter(
+		(step) => step.name === 'Saved ordered-pair Manager — genuine native source lifetimes'
+	);
+	const daemon = lateSteps.filter(
+		(step) => step.name === 'The whole daemon, live — a trigger typed, a tray shown'
+	);
+	if (
+		late.length !== 1 ||
+		daemon.length !== 1 ||
+		late[0].body !== ORIGINAL_LATE_MANAGER_BODY ||
+		daemon[0].body !== ORIGINAL_MANAGER_DAEMON_BODY ||
+		lateSteps.indexOf(late[0]) !== lateSteps.indexOf(daemon[0]) + 1
+	)
+		return [
+			'the original later Manager fixture and genuine daemon/kernel prerequisites must remain mandatory'
+		];
+	return [];
+}
+
+errors.push(...earlyManagerProblems(pipeline.files()));
+const earlyManagerStep = pipeline.step(pipeline.job('test-linux'), EARLY_MANAGER_NAME);
+
+const originalManagerUnitBody = pipeline.step(
+	pipeline.job('test-linux'),
+	'Run the driver unit test suite'
+);
+mustCatch(
+	'early Manager moved before actual units',
+	LINUX_BOX,
+	originalManagerUnitBody +
+		'\n\n      # Observe genuine native input before unrelated external IA acquisition.\n' +
+		earlyManagerStep,
+	earlyManagerStep + '\n\n' + originalManagerUnitBody,
+	earlyManagerProblems
+);
+
+for (const [what, from, to] of [
+	['early Manager omitted', earlyManagerStep, ''],
+	[
+		'early Manager failure forgiven',
+		earlyManagerStep,
+		earlyManagerStep + '\n        continue-on-error: true'
+	],
+	[
+		'early Manager fake success',
+		earlyManagerStep,
+		earlyManagerStep.replace('exit "$manager_status"', 'exit 0')
+	],
+	[
+		'early Manager command removed',
+		earlyManagerStep,
+		earlyManagerStep.replace('sudo python3 tests/hardware/run_manager_input_owner_real.py', 'true')
+	],
+	[
+		'early Manager kernel prerequisite removed',
+		earlyManagerStep,
+		earlyManagerStep.replace('sudo modprobe uinput', 'true')
+	],
+	[
+		'early Manager kernel prerequisite failure swallowed',
+		earlyManagerStep,
+		earlyManagerStep.replace('sudo modprobe uinput', 'sudo modprobe uinput || true')
+	],
+	[
+		'early Manager Xvfb prerequisite removed',
+		earlyManagerStep,
+		earlyManagerStep.replace('command -v Xvfb', 'true')
+	],
+	[
+		'early Manager missing Xvfb read as success',
+		earlyManagerStep,
+		earlyManagerStep.replace('exit 2', 'exit 0')
+	],
+	[
+		'early Manager budget increased',
+		earlyManagerStep,
+		earlyManagerStep.replace('timeout-minutes: 3', 'timeout-minutes: 4')
+	],
+	[
+		'early Manager command context replaced',
+		earlyManagerStep,
+		earlyManagerStep + '\n        shell: bash -c true'
+	],
+	['later Manager removed', ORIGINAL_LATE_MANAGER_BODY, ''],
+	[
+		'later Manager replaced by early result',
+		ORIGINAL_LATE_MANAGER_BODY,
+		ORIGINAL_LATE_MANAGER_BODY.replace(
+			'sudo env LUA_PATH="$LUA_PATH" python3 tests/hardware/run_manager_input_owner_real.py',
+			'true'
+		)
+	],
+	['genuine daemon/kernel prerequisite removed', ORIGINAL_MANAGER_DAEMON_BODY, ''],
+	[
+		'manual IA acquisition removed',
+		'      - name: Run manual official runtime and model acceptance',
+		'      - name: Omitted manual official runtime and model acceptance'
+	],
+	['manual IA budget changed', '        timeout-minutes: 18', '        timeout-minutes: 19'],
+	[
+		'original units switched off',
+		'      - name: Run the driver unit test suite\n',
+		'      - name: Run the driver unit test suite\n        if: false\n'
+	],
+	[
+		'original units failure forgiven',
+		'      - name: Run the driver unit test suite\n',
+		'      - name: Run the driver unit test suite\n        continue-on-error: true\n'
+	]
+]) {
+	mustCatch(what, LINUX_BOX, from, to, earlyManagerProblems);
+}
+for (const condition of [
+	'',
+	'false',
+	'success()',
+	NOT_CANCELLED,
+	"${{ !cancelled() && steps.linux_unit.outcome == 'failure' }}"
+]) {
+	mustCatch(
+		'early Manager condition changed ' + condition,
+		LINUX_BOX,
+		earlyManagerStep,
+		earlyManagerStep.replace(
+			'        if: ' + EARLY_MANAGER_IF + '\n',
+			condition ? '        if: ' + condition + '\n' : ''
+		),
+		earlyManagerProblems
+	);
+}
+
+errors.push(...linuxUpstreamResultProblems(pipeline.files()));
+const upstreamResultStep = pipeline.step(
+	pipeline.job(HARNESS_JOB),
+	'Preserve the mandatory upstream unit result'
+);
+for (const [what, from, to] of [
+	['missing upstream result step', upstreamResultStep, ''],
+	['forgiven E2E job', '  e2e-linux:\n', '  e2e-linux:\n    continue-on-error: true\n'],
+	['forgiven original unit job', '  test-linux:\n', '  test-linux:\n    continue-on-error: true\n'],
+	[
+		'upstream result command shell replaced',
+		upstreamResultStep,
+		upstreamResultStep + '\n        shell: bash -c true'
+	],
+	[
+		'changed upstream result command context',
+		upstreamResultStep,
+		upstreamResultStep + '\n        working-directory: /'
+	],
+	[
+		'forgiven upstream unit failure',
+		upstreamResultStep,
+		upstreamResultStep + '\n        continue-on-error: true'
+	],
+	[
+		'hard-coded upstream success',
+		'ERGOPTI_UPSTREAM_UNIT_RESULT: ${{ needs.test-linux.result }}',
+		'ERGOPTI_UPSTREAM_UNIT_RESULT: success'
+	],
+	[
+		'wrong upstream authority',
+		'ERGOPTI_UPSTREAM_UNIT_RESULT: ${{ needs.test-linux.result }}',
+		'ERGOPTI_UPSTREAM_UNIT_RESULT: ${{ needs.e2e-linux.result }}'
+	],
+	[
+		'upstream failure changed to success',
+		'run: test "$ERGOPTI_UPSTREAM_UNIT_RESULT" = success',
+		'run: true'
+	],
+	[
+		'swallowed upstream refusal',
+		'run: test "$ERGOPTI_UPSTREAM_UNIT_RESULT" = success',
+		'run: test "$ERGOPTI_UPSTREAM_UNIT_RESULT" = success || true'
+	],
+	[
+		'disabled upstream result check',
+		upstreamResultStep,
+		upstreamResultStep.replace(NOT_CANCELLED, 'false')
+	],
+	[
+		'success-only upstream result check',
+		upstreamResultStep,
+		upstreamResultStep.replace(NOT_CANCELLED, 'success()')
+	],
+	[
+		'changed upstream result budget',
+		upstreamResultStep,
+		upstreamResultStep.replace('timeout-minutes: 1', 'timeout-minutes: 2')
+	]
+]) {
+	mustCatch(what, LINUX_BOX, from, to, linuxUpstreamResultProblems);
+}
+for (const condition of ['', 'false', 'success()', 'always()', '${{ !cancelled() && false }}']) {
+	mustCatch(
+		'changed supplementary Linux E2E job condition ' + condition,
+		LINUX_BOX,
+		'    needs: [test-linux]\n    if: ' + NOT_CANCELLED + '\n',
+		'    needs: [test-linux]\n' + (condition ? '    if: ' + condition + '\n' : ''),
+		graphProblems
+	);
+}
+const upstreamEvidenceStep = pipeline.step(
+	pipeline.job(HARNESS_JOB),
+	'Upload mandatory E2E evidence'
+);
+mustCatch(
+	'upstream unit check moved before E2E evidence',
+	LINUX_BOX,
+	upstreamEvidenceStep +
+		'\n\n      # A supplementary observation never grants success to a failed prerequisite.\n' +
+		upstreamResultStep,
+	upstreamResultStep + '\n\n' + upstreamEvidenceStep,
+	linuxUpstreamResultProblems
+);
 
 errors.push(...graphProblems(pipeline.files()));
 for (const [what, rel, from, to] of [
@@ -1351,6 +1707,43 @@ function stepProblems(files) {
 		problems.push(`STEP_CONDITIONS lists ${key}, which the pipeline no longer has`);
 	return problems;
 }
+
+// Only this original Windows desktop cohort step may bypass a prior failure.
+// Exact !cancelled() keeps cancellation meaningful without forgiving main red.
+for (const condition of [
+	'',
+	'false',
+	'success()',
+	'always()',
+	'${{ always() }}',
+	'${{ !failure() }}',
+	'${{ cancelled() }}',
+	'${{ !cancelled() && false }}',
+	'${{ !cancelled() || true }}'
+]) {
+	const head = '      - name: Run native desktop AHK cohorts\n';
+	mustCatch(
+		'Windows native desktop condition ' + (condition || 'missing'),
+		WINDOWS_BOX,
+		head + `        if: ${NOT_CANCELLED}\n`,
+		head + (condition ? `        if: ${condition}\n` : ''),
+		stepProblems
+	);
+}
+mustCatch(
+	'missing Windows native desktop cohort step',
+	WINDOWS_BOX,
+	'      - name: Run native desktop AHK cohorts\n',
+	'      - name: Omitted native desktop AHK cohorts\n',
+	stepProblems
+);
+mustCatch(
+	'Windows native desktop condition cannot skip the ordinary main suite',
+	WINDOWS_BOX,
+	'      - name: Run AHK test suite\n',
+	`      - name: Run AHK test suite\n        if: ${NOT_CANCELLED}\n`,
+	stepProblems
+);
 
 // Raw failure logs are diagnostics, separate from success-only distro evidence.
 for (const condition of [
