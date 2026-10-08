@@ -1,6 +1,14 @@
 {
 	"version": 1,
-	"description": "Native runtime libraries used by LuaJIT FFI; build headers and Xvfb are validation-only dependencies.",
+	"description": "Native runtime libraries used by LuaJIT FFI and separate source-install compiler prerequisites; Xvfb remains validation-only.",
+	"archive_build_packages": {
+		"apt": ["gcc", "libc6-dev"],
+		"dnf": ["gcc", "glibc-devel"],
+		"zypper": ["gcc", "glibc-devel"],
+		"pacman": ["gcc", "glibc"],
+		"xbps": null,
+		"apk": ["gcc", "musl-dev", "linux-headers"]
+	},
 	"libraries": {
 		"xkbcommon": {
 			"soname": "libxkbcommon.so.0",
@@ -128,6 +136,25 @@
 		},
 		"description": "A provider list is admitted only from recorded distribution metadata; null means no verified repair provider. Actual LuaJIT ABI, supported GIO resolver and required GNOME schema are always re-probed. Libproxy selection does not prove every desktop setting or PAC evaluation.",
 		"curl_package": "curl",
+		"source_luv_build_packages": {
+			"apt": null,
+			"dnf": [
+				"git",
+				"gcc",
+				"glibc-devel",
+				"make",
+				"cmake",
+				"pkgconf-pkg-config",
+				"luajit-devel",
+				"glib-networking",
+				"gsettings-desktop-schemas",
+				"dconf"
+			],
+			"zypper": null,
+			"pacman": null,
+			"xbps": null,
+			"apk": null
+		},
 		"portable": {
 			"gio_modules": ["libgiognomeproxy.so", "libgiolibproxy.so", "libdconfsettings.so"],
 			"system_ca_files": [
@@ -145,6 +172,10 @@
 				"schemas": {
 					"url": "https://github.com/GNOME/gsettings-desktop-schemas.git",
 					"commit": "cf1946e8886bb29d9c4b793d0ee4253e38ae6fa8"
+				},
+				"krb5": {
+					"url": "https://github.com/krb5/krb5.git",
+					"commit": "8570e77819563e036027e1da789d08ec9333ed4d"
 				},
 				"curl": {
 					"url": "https://github.com/curl/curl.git",
