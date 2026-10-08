@@ -14,8 +14,18 @@ _UpdaterNativeRefusalDiagnostic(ExpectedStage, Receipt) {
 		Fact .= " " . Pair[1] . "=" . (Type(Value) == "Integer" && Value >= 0 && Value <= Pair[2]
 			? Format("{:d}", Value) : "unknown")
 	}
+	NativeCode := "unknown"
+	RawCode := Receipt.Get("native_errno", "")
+	if RawCode is String && RegExMatch(RawCode, "\A-?(?:0|[1-9][0-9]{0,9})\z") {
+		Value := Integer(RawCode)
+		if Value >= -2147483648 && Value <= 2147483647
+			NativeCode := Format("{:d}", Value)
+	}
 	return Fact . " proxy_mode=" . _ManagedRemoteFixtureDiagnosticEnum(Receipt.Get("proxy_mode", ""),
 		"selected|direct|environment|unavailable")
+		. " native_errno_domain=" . _ManagedRemoteFixtureDiagnosticEnum(Receipt.Get("native_errno_domain", ""), "posix|win32|winsock")
+		. " native_errno=" . NativeCode . " tls_status=" . _ManagedRemoteFixtureDiagnosticEnum(Receipt.Get("tls_status", ""),
+			"untrusted_certificate|expired_certificate|hostname_mismatch|revoked_certificate|unavailable")
 }
 
 class _UpdaterNativeTransportOwner extends _ManagedRemoteFixtureOwner {
@@ -203,11 +213,17 @@ class _UpdaterNativeDownloadRun {
 }
 
 class _UpdaterNativeRefusalDiagnosticControl extends _UpdaterNativeDownloadRun {
-	__New(Printer) {
+	__New(Printer, DotNet := false) {
 		this.RefusalDiagnosticPrinter := Printer
+		this.DotNet := DotNet
 	}
 
 	Wait() {
+		if this.DotNet
+			return Map("exit", 1, "stdout",
+				'{"schema_version":1,"state":"failed","operation":"download","reason":"download",'
+				. '"receipt":{"backend":"dotnet","stage":"connect","failure_provenance":"unknown",'
+				. '"native_errno_domain":"win32","native_errno":"12007","tls_status":"unavailable"}}')
 		return Map("exit", 1, "stdout",
 			'{"schema_version":1,"state":"failed","operation":"download","reason":"download",'
 			. '"receipt":{"backend":"curl","stage":"connect","failure_provenance":"verified",'
@@ -256,6 +272,31 @@ _UpdaterNativeRefusalProjectionAndRefusal(Contract) {
 }
 Test("updater native: refusal diagnostic excludes content and preserves assertions (managed-fixture-refusal-diagnostic)",
 	_UMF_WithContract.Bind(_UpdaterNativeRefusalProjectionAndRefusal))
+
+_UpdaterNativeDotNetProjection(Contract) {
+	Observed := Map("calls", 0, "fact", "")
+	Run := _UpdaterNativeRefusalDiagnosticControl((Text) => (Observed["calls"] += 1, Observed["fact"] := Text), true)
+	Caught := false
+	try Run.Refused("download", "tls")
+	catch as Failure {
+		Caught := true
+		AssertContains(Failure.Message, "expected: <tls>, actual: <connect>")
+	}
+	AssertTrue(Caught)
+	AssertEqual(1, Observed["calls"])
+	AssertContains(Observed["fact"], "backend=dotnet")
+	AssertContains(Observed["fact"], "native_errno_domain=win32 native_errno=12007 tls_status=unavailable")
+	for Pair in [["-2147483648", "-2147483648"], ["2147483647", "2147483647"],
+		["2147483648", "unknown"], ["-2147483649", "unknown"], ["PRIVATE_ERRNO", "unknown"], [12007, "unknown"]] {
+		Fact := _UpdaterNativeRefusalDiagnostic("tls", Map("native_errno", Pair[1]))
+		AssertContains(Fact, "native_errno=" . Pair[2] . " tls_status=unknown")
+		AssertFalse(InStr(Fact, "PRIVATE_ERRNO"))
+	}
+	Fact := _UpdaterNativeRefusalDiagnostic("tls", Map("native_errno_domain", "PRIVATE_DOMAIN", "tls_status", "PRIVATE_TLS"))
+	AssertContains(Fact, "native_errno_domain=unknown native_errno=unknown tls_status=unknown")
+}
+Test("updater native: dotnet receipt exposes only typed native facts (managed-fixture-refusal-diagnostic)",
+	_UMF_WithContract.Bind(_UpdaterNativeDotNetProjection))
 
 _UpdaterNative_Close(Fixture) {
 	Closed := Fixture.Close()
