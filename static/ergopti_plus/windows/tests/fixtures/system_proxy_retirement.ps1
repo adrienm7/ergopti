@@ -112,6 +112,19 @@ function ConvertFrom-ErgoptiPacRoutes {
     [Console]::Out.WriteLine('[OK] legacy proxy protocol: first/second native debt refuse whole receipt; normal three-URL and raw host/IPv6 relay controls preserved')
 } catch {
     $Failed=$true
+    $Cause='other'
+    $CauseLine=0
+    if($null -ne $_.InvocationInfo) {
+        $CauseLine=[int]$_.InvocationInfo.ScriptLineNumber
+        if($CauseLine -lt 0 -or $CauseLine -gt 4096){$CauseLine=0}
+        if($_.FullyQualifiedErrorId -like 'CommandNotFound*' -and
+            $_.InvocationInfo.InvocationName -ceq 'Get-FileHash') {$Cause='get_file_hash_command_missing'}
+    }
+    if($_.FullyQualifiedErrorId -ceq 'PropertyNotFoundStrict') {$Cause='optional_control_property_missing'}
+    if($_.Exception.Message -ceq 'Production worker source identity was not preserved.') {$Cause='source_identity_mismatch'}
+    # Only enumerated source causes and bounded line/control scalars reach CI.
+    try {[Console]::Out.WriteLine('::notice title=Windows legacy PAC closed cause::control='+$DiagnosticControl+
+        ' stage='+$DiagnosticStage+' cause='+$Cause+' line='+$CauseLine)} catch { }
     try {[Console]::Error.WriteLine('RETIREMENT_DIAG control='+$DiagnosticControl+' stage='+$DiagnosticStage+' child_exit='+$DiagnosticExit+' stdout_units='+$DiagnosticOut+' stderr_units='+$DiagnosticErr)} catch { }
     [Console]::Error.WriteLine('Legacy proxy retirement protocol failed.')
 } finally {

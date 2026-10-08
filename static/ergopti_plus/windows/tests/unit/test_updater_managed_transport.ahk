@@ -769,7 +769,7 @@ _UpdaterNativeEmitPartialStageDiagnostic(Run, Kind) {
 	}
 }
 
-_UpdaterNativePartialStageDiagnosticControls() {
+_UpdaterNativePartialStageDiagnosticControls(Contract) {
 	Output := '{"schema_version":1,"state":"failed","operation":"download","reason":"download","receipt":{"backend":"dotnet","stage":"tls","failure_provenance":"verified","tls_status":"untrusted_certificate"},"cleanup_debt":[],"native_cleanup_debt":false}'
 	Fact := _UpdaterNativePartialStageDiagnostic("cancel", [Map("exit", 1, "stdout", Output)], Map("TreeQuiesced", true), 1500)
 	AssertContains(Fact, "kind=cancel elapsed_ms=1500 callbacks=1 tree_quiesced=true exit=1 failure=admitted reason=download")
@@ -782,4 +782,5 @@ _UpdaterNativePartialStageDiagnosticControls() {
 	AssertContains(Fact, "exit=unknown failure=invalid")
 	AssertFalse(InStr(Fact, "PRIVATE"), "private stdout never enters the bounded scalar projection")
 }
-Test("updater native: missing partial stage exposes captured cause without weakening its assertion", _UpdaterNativePartialStageDiagnosticControls)
+Test("updater native: missing partial stage exposes captured cause without weakening its assertion",
+	(*) => _UpdaterNative_WithContract(_UpdaterNativePartialStageDiagnosticControls))
