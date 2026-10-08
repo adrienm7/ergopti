@@ -6909,6 +6909,19 @@ The shared per-model Specifications and Capabilities frames retire four genuine 
   so it is prerequisite regression proof only. The picker stays closed
   until a genuine saved-configuration Manager supplement is qualified.
 
+  The persistent Caps Word software tranche now uses the original cold
+  native semantic constructor and separate physical input and output occurrence
+  receipts. Per-letter original XKB plans, ACKs and stale-source/reentry
+  refusals retain the existing modifier broker. The strict Lua limit remains
+  60 upvalues; a byte-exact tail extraction fixes the observed maximum63
+  regression (new maximum49). Five new modules are explicitly registered.
+  Component qualification passes390 cases on each Lua ABI and11 real XKB
+  scenarios with modeled kernel output. The exact joined software tree passes
+  12,149 registered Linux tests. A genuine kernel probe is present, but hosted
+  execution and application/server-modifier delivery are not yet qualified.
+  Public Caps Word and OneShot recommendations remain closed pending those
+  receipts; this does not complete item93 or qualify physical hardware.
+
   Native source25 qualification 37636576661 tests the exact feature tree:
   10,979 units, actual E2E, 132 input-owner controls with all four mandatory
   kernel scenarios and 81 modifier-custody controls pass. Package and all17
