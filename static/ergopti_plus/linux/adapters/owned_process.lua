@@ -53,9 +53,17 @@ end
 
 --- Publishes the result only after every physically owned resource settles.
 --- @param request table
+local function stdin_settled(request)
+	local input = request.stdin_owner
+	if not input then return true end
+	local called, ack = pcall(input.is_settled, input.source)
+	return called and ack == true and request.stdin_owner == input
+end
+
 local function settle(request)
 	if request.settled or not request.terminal or request.dispatching then return end
 	if request.spawned and (not request.exited or not request.group_absent) then return end
+	if not stdin_settled(request) or request.settled then return end
 	for _, receipt in pairs(request.handles) do
 		if receipt.state ~= "closed" then return end
 	end
@@ -100,6 +108,12 @@ local function close_handle(request, handle)
 	if not receipt then return false end
 	if receipt.state == "closed" or receipt.state == "closing" then return true end
 	if receipt.kind == "process" and not request.exited then return false end
+	if receipt.kind == "stdin" then
+		local input = request.stdin_owner
+		local called, ready = pcall(input.can_close, input.source)
+		if not called or ready ~= true or request.stdin_owner ~= input
+			or request.handles[handle] ~= receipt or receipt.state ~= "open" then return false end
+	end
 	if receipt.active then
 		local stop = native.timer_stop
 		if receipt.kind == "stdout" or receipt.kind == "stderr" then stop = native.read_stop end
@@ -202,6 +216,7 @@ retry_cleanup = function(request)
 		end
 		watch_cleanup(request)
 	end
+	close_handle(request, request.stdin)
 	close_handle(request, request.timeout)
 	close_handle(request, request.stdout)
 	close_handle(request, request.stderr)
@@ -226,6 +241,10 @@ local function finish(request, reason)
 			error = reason,
 		}
 	end
+	if request.stdin_owner and not request.stdin_cancelled then
+		request.stdin_cancelled = true -- Reserve before private worker reentry.
+		pcall(request.stdin_owner.cancel, request.stdin_owner.source)
+	end
 	retry_cleanup(request)
 end
 
@@ -233,7 +252,12 @@ end
 --- @param request table
 local function maybe_complete(request)
 	if request.terminal or not request.exited or not request.stdout_eof or not request.stderr_eof then return end
+	if not stdin_settled(request) then return end
 	local reason = request.exit_code ~= 0 and "process exited unsuccessfully" or nil
+	if request.stdin_owner then
+		local called, result = pcall(request.stdin_owner.result, request.stdin_owner.source)
+		if not called or type(result) ~= "table" or result.ok ~= true then reason = "native stdin feed failed" end
+	end
 	finish(request, reason)
 end
 
@@ -317,6 +341,34 @@ function M.start(executable, args, options, callback)
 		request.callback = function() end
 		return refuse("a completion callback is required")
 	end
+	-- A raw private stdin PIPE transfers handle-close ownership only. No archive
+	-- descriptor or publication pointer crosses this bridge. Capture original
+	-- receiver/methods before any fallible source admission or native allocation.
+	if options.stdin_owner ~= nil then
+		local source = options.stdin_owner
+		if type(source) ~= "table" then return refuse("invalid stdin owner") end
+		local input = { source = source, handle = rawget(source, "handle") }
+		if type(input.handle) ~= "userdata" then return refuse("native stdin pipe required") end
+		for _, name in ipairs({ "cancel", "is_settled", "on_settled", "can_close", "result" }) do
+			input[name] = rawget(source, name)
+			if type(input[name]) ~= "function" then return refuse("invalid stdin owner methods") end
+		end
+		request.stdin_owner = input
+		if not own_handle(request, input.handle, "stdin") then return refuse("stdin ownership capture refused") end
+		local called, ack = pcall(input.on_settled, input.source, function()
+			if request.stdin_owner ~= input or not stdin_settled(request) then return end
+			local observed, result = pcall(input.result, input.source)
+			if not observed or type(result) ~= "table" or result.ok ~= true then
+				finish(request, "native stdin feed failed")
+			elseif not request.dispatching then
+				close_handle(request, request.stdin)
+				maybe_complete(request)
+			end
+			if request.terminal then retry_cleanup(request) end
+		end)
+		if not called or ack ~= true then return refuse("stdin settlement subscription refused") end
+		if request.terminal then return refuse("native stdin feed failed") end
+	end
 	if type(request.owner) ~= "string" or request.owner == "" then return refuse("a process owner is required") end
 	local refusal = Shell.validate_spawn_args(executable, args)
 	if refusal ~= "" then return refuse("argument vector refused: " .. refusal) end
@@ -356,7 +408,7 @@ function M.start(executable, args, options, callback)
 	-- The source can change while a fallible allocator invokes another owner.
 	if not authorized(request) then return refuse("process source admission refused") end
 	local spawned, process, pid = pcall(native.spawn, executable, {
-		args = args, stdio = { nil, request.stdout, request.stderr },
+		args = args, stdio = { request.stdin, request.stdout, request.stderr },
 		detached = true, env = options.env, cwd = options.cwd,
 	}, function(code, signal)
 		request.exited = true
@@ -411,6 +463,7 @@ function M.start(executable, args, options, callback)
 		end) then return refuse("native process deadline refused") end
 	end
 	request.dispatching = false
+	if request.stdin_owner and stdin_settled(request) then close_handle(request, request.stdin) end
 	if request.terminal then retry_cleanup(request) else observe_exit(request) end
 	return operation
 end

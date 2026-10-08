@@ -57,3 +57,49 @@ Extract into a new owned scratch directory, inspect `PRODUCTION-MANIFEST.json`
 and `SHA256.json`, and compare current preimages before proposing any changes.
 The archive contains preparations, not shipped code or completed functionality.
 No reviewed blocker is waived by preserving it.
+
+## Corrected six-blocker source/control continuation
+
+The adjacent `linux-six-blockers-continuation.tar.gz` preserves a later reviewed
+candidate, not an integrated native HTTP producer. Its SHA-256 is
+`614b8d8b9e87dc08f875ab3a55852cc6087af05f35e8b247bfe56818e8bd0d54`
+(153,039 bytes, 70 regular members). The original archive above is unchanged.
+
+This candidate corrects owned cancellation/activity, both successor APIs behind
+cleanup debt, supported resolver failure fallback, queued request expiry, proxy
+timeout publication and delayed success admission at the absolute deadline.
+Four additional review controls retain timer-close debt after expiry or failed
+arming, aggregate cancellation refusal, and prevent reentrant acquisition after
+synchronous cancellation. No original public assertions are weakened.
+
+The qualified scope is 101 model/native-port controls and four actual LuaJIT/luv
+timer controls, all passing without skips. The saved producer passes two and
+fails eleven of the same thirteen public cases; the corrected candidate passes
+all thirteen. Each additional review control first fails its saved candidate
+checkpoint, then passes its correction. The actual timer cases restore the exact
+initial `uv.walk` inventory; they spawn no process and do not prove the final
+GIO/curl/PAC/CONNECT producer or installed application.
+
+Extract outside the checkout and inspect `README.md`, `MANIFEST.json`,
+`FINAL-SOURCE-MANIFEST.json`, `VALIDATION.json`, `REVIEW.md` and
+`owner-bridge/PROPOSAL.md`. All member hashes, sizes and membership were checked;
+the included `generate-archive.py --output <path-outside-extracted-payload>`
+independently reproduces the exact archive bytes. The archive excludes raw logs,
+transcripts, environment dumps, credentials and private native captures.
+
+Native-owner publication and one-core composition remain prerequisites. Remote
+`fix/linux` advanced to `e88fad68953e6a7906372684aab5285e82ddcd65`; its HTTP core,
+timer, body-pipe helper and independent HTTP assertions are byte-identical to
+the packet's `ec9673283b6d2eb1dadc7914cbcfba5043f94957` prerequisite and are not
+yet integrated into dev `02ad69e06ecea424de11facf3dced404a6fdd602`. Preserve the
+latest native body's pipe, descriptor/close acknowledgements, body budget,
+POST303 and globoff behavior. The archived older extracted curl engine is only
+for causal replay and must never replace that owner's current core. Reuse the
+published timer helper; the prepared deadline ledger owns only its own close ACK.
+
+The proposed private preflight, physical dispatch, cancellation receipt,
+pre-close logical observer and proxy metrics surface remains source-only.
+Actual final network/privacy controls, E2E, packaging and installation are
+unexecuted for this corrected packet. Per-hop PAC redirects, updater file retry
+leases, owned Ollama traffic and enterprise CA/auth/WPAD remain TODO62/16/38
+requirements. This preservation removes no TODO item or validation requirement.

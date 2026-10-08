@@ -87,6 +87,7 @@ global _UC_ResetDone   := true
 ; @param Current {String} The installed version.
 ; @returns {Boolean} shown
 UpdateCheck_Begin(Request, Current) {
+	ManagedNetworkTerminalFailure.Retire("updater_check")
 	global _UC_RequestId, _UC_Release
 	_UC_RequestId := Request.RequestId
 	_UC_Release := 0
@@ -117,13 +118,19 @@ UpdateCheck_ShowResult(Request, Answer) {
 		Reason := Answer.Get("reason", "")
 		if !UC_REASONS.Has(Reason)
 			throw ValueError("Unknown update-check failure reason: " . Reason)
-		State["reason_key"] := UC_REASONS[Reason]
-		State["detail"] := Answer.Get("detail", "")
+		NetworkKey := ManagedNetworkFailureWindows_MessageKey(Answer.Get("network_report", 0))
+		State["reason_key"] := NetworkKey != "" ? NetworkKey : UC_REASONS[Reason]
+		State["detail"] := NetworkKey != "" ? "" : Answer.Get("detail", "")
 		State["log_path"] := LoggerTodayLogPath()
 	}
 	_UC_Release := (Phase == "available") ? Answer["release"] : 0
 	LoggerInfo("UpdateCheck", "Update check window: {1} (channel {2}).", Phase, Request.Channel)
-	return _UpdateCheck_Present(State)
+	Accepted := _UpdateCheck_Present(State)
+	if Accepted && Phase == "error" && ManagedNetworkFailureWindows_CanonicalReport(Answer.Get("network_report", 0))
+		_UpdateCheck_ShowManagedFailure(Request, State, Answer["network_report"])
+	else
+		ManagedNetworkTerminalFailure.Retire("updater_check")
+	return Accepted
 }
 
 ; Offers a release a manual check found: the window shows it with its Update
@@ -522,6 +529,7 @@ _UpdateCheck_NativeClick(Name, Channel, *) {
 ; Closes the window: the controller first, while its host window lives, then
 ; the window.
 _UpdateCheck_CloseWindow() {
+	ManagedNetworkTerminalFailure.Retire("updater_check")
 	global _UC_Gui, _UC_Controller, _UC_WebView, _UC_MsgSub, _UC_ResetDone, _UC_WindowEpoch, _UC_State
 	global _UC_Release, _UC_RequestId, _UC_Native
 	SavedGui := IsSet(_UC_Gui) ? _UC_Gui : 0
@@ -632,4 +640,27 @@ _UpdateCheck_Act(Epoch, Name, Channel, BornSuspended := false, Effects := 0) {
 	_UpdateCheck_Send(Epoch, '{"type":"action","action":' . JsonStringLiteral(Name)
 		. ',"ok":' . (Outcome["ok"] ? "true" : "false")
 		. ',"missing":' . (Outcome["missing"] ? "true" : "false") . '}')
+}
+
+_UpdateCheck_ManagedCurrent(Owner) {
+	global _UC_ResetDone, _UC_WindowEpoch, _UC_RequestId, _UC_State, UPDATER_REQUEST_POLICY_ALLOW
+	return !_UC_ResetDone && _UC_WindowEpoch == Owner.epoch && _UC_RequestId == Owner.request.RequestId
+		&& _UC_State == Owner.state && _UC_State is Map && _UC_State.Get("state", "") == "error"
+		&& _Updater_RequestPolicy(Owner.request) == UPDATER_REQUEST_POLICY_ALLOW
+}
+
+_UpdateCheck_ShowManagedFailure(Request, State, Report, PresentFn := 0) {
+	global _UC_WindowEpoch
+	Owner := {request: Request, state: State, epoch: _UC_WindowEpoch}
+	return ManagedNetworkTerminalFailure.Publish("updater_check", Report, () => _UpdateCheck_ManagedCurrent(Owner),
+		"update_check.window_title", () => _UpdateCheck_RetryManaged(Owner), PresentFn)
+}
+
+_UpdateCheck_RetryManaged(Owner) {
+	if !_UpdateCheck_ManagedCurrent(Owner)
+		return false
+	global _UC_RequestId, _UC_ResetDone
+	BeforeRequest := _UC_RequestId
+	Updater_OneClickUpdate()
+	return !_UC_ResetDone && _UC_RequestId != BeforeRequest
 }

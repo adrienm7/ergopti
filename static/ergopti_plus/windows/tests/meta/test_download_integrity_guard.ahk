@@ -77,8 +77,26 @@ Test("updater: UPDATER_MIN_EXE_SIZE_BYTES constant declared (download-no-integri
 ; ===================================================
 ; ===================================================
 
-_DIG_ContentLengthCheckPresent() {
+
+; Guard the live selected native owner and its caller together. The orchestrator
+; delegates response streaming to the exact vendor helper selected at launch.
+_DIG_StagingOwnerClosure() {
+	Start := _DriverFuncBody("_Updater_StartStagingWorker")
 	Worker := _DriverFuncBody("_Updater_BuildStagingWorkerScript")
+	Assert(InStr(Start, '_VendorDir . "\ergopti_updater_download.ps1"') > 0,
+		"actual staging launch must bind the exact native download helper path")
+	Assert(InStr(Worker, '  . $DownloadModulePath') > 0
+		&& InStr(Worker, '$ExpectedSize=Invoke-ErgoptiUpdaterDownload $Request $NewExe $TimeoutMs $State $Resolver $DeadlineMs $StartedTick') > 0,
+		"actual worker must load and invoke the selected native owner with the original absolute clock")
+	SplitPath(A_ScriptDir, , &Root)
+	Vendor := FileRead(Root . "\vendor\ergopti_updater_download.ps1", "UTF-8")
+	Assert(InStr(Vendor, "function Invoke-ErgoptiUpdaterDownload") > 0,
+		"selected native stream owner must exist in its bound runtime source")
+	return Worker . "`n" . Vendor
+}
+
+_DIG_ContentLengthCheckPresent() {
+	Worker := _DIG_StagingOwnerClosure()
 	Assert(Worker != "", "The isolated staging worker must exist")
 	Assert(InStr(Worker, "$ExpectedSize = [int64]$Response.ContentLength") > 0,
 		"Worker must read Content-Length before accepting a downloaded executable (download-no-integrity-partial-safety)")
@@ -98,7 +116,11 @@ Test("updater: install path rejects downloads smaller than UPDATER_MIN_EXE_SIZE_
 _DIG_PartialFileDeleted() {
 	Worker := _DriverFuncBody("_Updater_BuildStagingWorkerScript")
 	Mismatch := InStr(Worker, "$ActualSize -ne $ExpectedSize")
-	Remove := InStr(Worker, "Remove-Item -LiteralPath $NewExe -Force", false, Mismatch)
+	Remove := InStr(Worker, 'CleanWorker $NewExe "staged_executable"', false, Mismatch)
+	CatchPos := InStr(Worker, "} catch {", false, Mismatch)
+	Assert(InStr(Worker, 'function CleanWorker($Path,$Name){try{[IO.File]::Delete($Path)}catch{') > 0
+		&& CatchPos > Mismatch && Remove > CatchPos,
+		"actual mismatch catch must call the exact native delete helper before failure publication")
 	Assert(Mismatch > 0 and Remove > Mismatch,
 		"Worker must delete the partial file on size mismatch — leaving it behind risks the swap script installing a corrupted binary (download-no-integrity-partial-safety)")
 }

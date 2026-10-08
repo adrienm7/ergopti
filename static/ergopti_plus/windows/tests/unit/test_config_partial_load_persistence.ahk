@@ -40,17 +40,25 @@ _CPL_FullSavePreservesRejectedPreference(Invalid := true, Literal := "2") {
 		AssertTrue(FSWrite(Path, Original))
 		AssertEqual(Invalid ? 1 : 2, ApplyBootConfigToml(Target, Path))
 		Errors := 0
+		ErrorNamespaces := "", ErrorNamespaceCount := 0
 		PartialLogged := false
 		SuccessLogged := false
 		OutdatedNamed := false
 		for Line in Logs {
 			Errors += InStr(Line, "[ERROR]", true) ? 1 : 0
+			if InStr(Line, "[ERROR]", true) && ErrorNamespaceCount < 8 {
+				Namespace := RegExMatch(Line, "\[ERROR\] \[([A-Za-z][A-Za-z0-9_.:-]{0,47})\]", &NamespaceMatch)
+					? NamespaceMatch[1] : "unclassified"
+				ErrorNamespaces .= (ErrorNamespaceCount ? ", " : "") . Namespace
+				ErrorNamespaceCount += 1
+			}
 			PartialLogged := PartialLogged || InStr(Line, "v2 config only partially applied")
 			SuccessLogged := SuccessLogged || InStr(Line, "v2 config applied (")
 			OutdatedNamed := OutdatedNamed || (InStr(Line, "[WARNING]", true)
 				&& InStr(Line, "outdated configuration value(s)") && InStr(Line, "[shortcuts].screen"))
 		}
-		AssertEqual(0, Errors, "an outdated value is never an ERROR (config-outdated-windows)")
+		AssertEqual(0, Errors, "an outdated value is never an ERROR (config-outdated-windows); "
+			. "captured error namespaces: " . ErrorNamespaces)
 		AssertFalse(PartialLogged, "an outdated value is not a partial load")
 		AssertTrue(SuccessLogged, "the load of every other value completes")
 		AssertEqual(Invalid, !!OutdatedNamed, "the outdated value is named in one warning")

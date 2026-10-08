@@ -20,6 +20,7 @@ local MODULES = {
 	"infra.notifications",
 	"modules.llm",
 	"modules.llm.network_env",
+	"modules.llm.opaque_network_admission",
 	"ui.download_window",
 	"ui.download_window.javascript",
 	"ui.ui_builder",
@@ -326,7 +327,7 @@ local function with_fixture(plan, callback)
 				if behavior.construct == "throw" then error("injected constructor failure") end
 				if behavior.construct == "false" then return false end
 				if behavior.construct == "nil" then return nil end
-				local task = {kind = kind, done = on_done, stream = on_stream,
+				local task = {kind = kind, path = path, args = _args, done = on_done, stream = on_stream,
 					behavior = behavior, running_state = false}
 				function task:start()
 					local start_mode = self.behavior.start
@@ -353,7 +354,7 @@ local function with_fixture(plan, callback)
 					end
 					if self.behavior.complete_on_start then
 						self.running_state = false
-						self.done(self.behavior.complete_code or 0, "", "")
+						self.done(self.behavior.complete_code or 0, "", self.behavior.complete_stderr or "")
 					end
 					if self.behavior.stream_on_start
 						and self.behavior.stream_after_complete_on_start == true then
@@ -388,9 +389,9 @@ local function with_fixture(plan, callback)
 					end
 					return result_value(self.behavior.terminate, self)
 				end
-				function task:complete(code)
+				function task:complete(code, stderr)
 					self.running_state = false
-					return self.done(code or 0, "", "")
+					return self.done(code or 0, "", stderr or "")
 				end
 				function task:isRunning()
 					local probe_mode = self.behavior.running_probe
@@ -399,8 +400,8 @@ local function with_fixture(plan, callback)
 					end
 					return result_value(probe_mode, self.running_state)
 				end
-				function task:emit(text)
-					return self.stream(self, text, "")
+				function task:emit(text, stderr)
+					return self.stream(self, text or "", stderr or "")
 				end
 				if behavior.pause_on_construct then
 					reenter_pause(behavior.pause_on_construct,
@@ -500,9 +501,11 @@ local function with_fixture(plan, callback)
 			end
 			-- The download script exports the system network settings first; the
 			-- fixture's file system has no shared policy file to source.
-			package.loaded["modules.llm.network_env"] = {
+			if plan.network_admission then package.loaded["modules.llm.opaque_network_admission"] = plan.network_admission end
+			package.loaded["modules.llm.network_env"] = plan.network_env or {
 				policy_path = function() return "/fixture/modules/llm/network-retry.sh" end,
 				prelude = function() return "", nil end,
+				opaque_prelude = function() return "", nil end,
 			}
 			package.loaded["modules.llm"] = {
 				DEFAULT_STATE = {llm_num_predictions = 1},
@@ -565,7 +568,7 @@ local function with_fixture(plan, callback)
 				obj = obj,
 				deps = deps,
 				presets = {},
-				project_venv_python_escaped = "/fixture/python",
+				project_venv_python_escaped = plan.project_venv_python_escaped or "/fixture/python",
 				invalidate_installed_cache = function()
 					records.cache_invalidations = (records.cache_invalidations or 0) + 1
 					return true

@@ -720,8 +720,12 @@ _CMG_CanonicalMetadataBoot(Metadata, ExpectedStatus, ExpectedVersion) {
 		Plan := ConfigMigratePlan(Source, Registry, "ahk")
 		AssertEqual(ExpectedStatus, Plan["outcome"], "canonical metadata owns the pure plan")
 		AssertFalse(Plan.Has("candidate"), "current or refused metadata has no rewrite candidate")
+		if ExpectedStatus == "failed"
+			AssertContains(Plan["detail"], "legacy metadata is not addressable", "the actual physical owner supplies the refusal")
 		Result := ConfigMigrateRun(Path, Registry, _CMG_STAMP, Backup, Publish)
-		AssertEqual(ExpectedStatus, Result["status"], "the genuine native boot owner has the same decision")
+		AssertEqual(ExpectedStatus, Result["status"], "the native migration runner has the same decision")
+		if ExpectedStatus == "failed"
+			AssertContains(Result["detail"], "legacy metadata is not addressable", "the runner preserves the physical ownership reason")
 		AssertEqual(0, Calls.Backup, "metadata classification precedes every backup effect")
 		AssertEqual(0, Calls.Publish, "metadata classification precedes every publication effect")
 		AssertEqual("", Result["backup"], "no unused backup intention may be published")
@@ -764,8 +768,8 @@ for Index, Subject in [
 	{ Metadata: '_meta = { schema_version=false }', Status: "invalid" },
 	{ Metadata: '_meta.schema_version = 3', Status: "newer" },
 	{ Metadata: '_meta = { schema_version=3 }', Status: "newer" },
-	{ Metadata: '_meta.schema_version = 1', Status: "unsupported" },
-	{ Metadata: '_meta = { schema_version=1 }', Status: "unsupported" }
+	{ Metadata: '_meta.schema_version = 1', Status: "failed" },
+	{ Metadata: '_meta = { schema_version=1 }', Status: "failed" }
 ] {
 	Test("config migrate: canonical metadata refuses before backup and publication " . Index,
 		_CMG_CanonicalMetadataBoot.Bind(Subject.Metadata, Subject.Status, 0))

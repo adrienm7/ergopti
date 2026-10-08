@@ -715,7 +715,7 @@ ConfigMigratePlan(Source, Registry, Driver, Context := 0) {
 	if LegacyVersion != Version || (Document.Has("_meta")
 			&& Document["_meta"].Has("schema_version")
 			&& !(Before.Has("_meta") && Before["_meta"].Has("schema_version"))) {
-		Plan["outcome"] := "unsupported"
+		Plan["outcome"] := "failed"
 		Plan["detail"] := "legacy metadata is not addressable by this migration owner"
 		return Plan
 	}
@@ -878,7 +878,7 @@ ConfigMigrateRun(FilePath, Registry := 0, Stamp := "", BackupFn := 0, PublishFn 
 		if LegacyVersion != Version || (VersionDocument.Has("_meta")
 				&& VersionDocument["_meta"].Has("schema_version")
 				&& !(Before.Has("_meta") && Before["_meta"].Has("schema_version")))
-			return Refuse("unsupported", "legacy metadata is not addressable by this migration owner")
+			return Refuse("failed", "legacy metadata is not addressable by this migration owner")
 
 		Source := FSReadUtf8Exact(FilePath)
 		if !(Source is String)

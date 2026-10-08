@@ -99,6 +99,7 @@ function M.new(directory, backend)
 	local prepared, checksum_admitted, extraction_admitted = false, false, false
 	local archive_identity, stage_identity, verified_size
 	local paths = {}
+	local retained_stage = false
 
 	local function stat(path)
 		local called, value, _, code = pcall(fs.fs_lstat, path)
@@ -197,6 +198,31 @@ function M.new(directory, backend)
 		return { archive = paths.archive, stage = paths.stage, directory = paths.directory }
 	end
 
+	--- Prepares only the original installation stage; archive bytes stay private
+	--- in archive_output's retained native owner and never enter a display path.
+	function owner.prepare_retained()
+		if prepared or #directories > 0 then return nil, "install_prepare_already_owned" end
+		local target, target_reason = stat(directory)
+		if target or target_reason ~= "absent" then return nil, "install_target_not_absent" end
+		local accepted, reason = ensure_directory(parent, true)
+		if not accepted then return nil, reason end
+		local stage, receipt = private_directory(".ollama-stage-")
+		if not stage then return nil, receipt end
+		paths.stage, paths.directory, stage_identity = stage, directory, receipt
+		prepared, retained_stage = true, true
+		return { stage = stage, directory = directory }
+	end
+
+	--- Grants the exact current private stage for the admitted branded reader.
+	function owner.retained_stage(current)
+		if not prepared or not retained_stage or type(current) ~= "function" then return nil, "archive_not_verified" end
+		local called, active = pcall(current)
+		if not called or active ~= true or not exact_directory(paths.stage, stage_identity) then return nil, "archive_not_verified" end
+		called, active = pcall(current)
+		if not called or active ~= true or not exact_directory(paths.stage, stage_identity) then return nil, "archive_not_verified" end
+		return paths.stage
+	end
+
 	--- Requires the exact downloaded regular file and the pinned byte count.
 	--- @param asset table Canonical { bytes }.
 	--- @return boolean
@@ -255,9 +281,9 @@ function M.new(directory, backend)
 	--- @param result table Exact physically settled extraction receipt.
 	--- @return boolean
 	--- @return string|nil reason
-	function owner.admit_extraction(result)
+	local function admit_extraction(result, verified)
 		extraction_admitted = false
-		if not checksum_admitted or type(result) ~= "table" or result.ok ~= true or result.exit_code ~= 0
+		if not verified or type(result) ~= "table" or result.ok ~= true or result.exit_code ~= 0
 			or not exact_directory(paths.stage, stage_identity) then return false, "archive_extraction_refused" end
 		-- lstat does not protect intermediate components. Reject bin/lib links
 		-- before looking up or chmod'ing any descendant outside the private tree.
@@ -278,6 +304,15 @@ function M.new(directory, backend)
 		end
 		extraction_admitted = true
 		return true
+	end
+	function owner.admit_extraction(result) return admit_extraction(result, checksum_admitted) end
+	function owner.admit_retained_extraction(result, current)
+		if not owner.retained_stage(current) then return false, "archive_extraction_refused" end
+		local admitted, reason = admit_extraction(result, true)
+		if admitted and not owner.retained_stage(current) then
+			extraction_admitted = false; return false, "archive_extraction_refused"
+		end
+		return admitted, reason
 	end
 
 	--- Builds no-clobber publication; a zero exit alone cannot prove it moved.
