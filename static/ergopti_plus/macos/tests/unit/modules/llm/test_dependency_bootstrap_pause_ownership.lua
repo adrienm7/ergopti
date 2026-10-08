@@ -1111,3 +1111,91 @@ helpers.describe("HS-012 dependency bootstrap backend isolation", function()
 		helpers.assert_true(ollama_source:find("mlx_dependency_bootstrap", 1, true) == nil)
 	end)
 end)
+
+helpers.describe("Native official Ollama bootstrap receipt join", function()
+	local function with_native_fixture(options, callback)
+		helpers.with_stub_scope({ "adapters.native_bootstrap_pty", "adapters.python_interpreter" }, function()
+			local fixture = load_fixture(options)
+			local python = get_upvalue(fixture.check_impl, "PythonInterpreter")
+			helpers.assert_not_nil(python)
+			python.resolve = function() return nil, { reason = "none_native" } end
+			python.native_arch = function() return "arm64" end
+			python.native_candidates = function() return {} end
+			fixture.native_ready = false
+			fixture.native_settle_calls = 0
+			fixture.native_marked = false
+			package.loaded["adapters.native_bootstrap_pty"] = {
+				prepare = function(path, environment, budget)
+					fixture.native_source, fixture.native_environment, fixture.native_budget = path, environment, budget
+					return {
+						executable = "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus",
+						arguments = { "--managed-pty-worker", "1800000" },
+						bind_input = function(task) fixture.native_bound = task; return true end,
+						mark_start_attempted = function() fixture.native_marked = true; return true end,
+						rollback = function() fixture.native_rolled_back = true; return true end,
+						settle = function(code)
+							fixture.native_settle_calls = fixture.native_settle_calls + 1
+							fixture.native_code = code
+							return fixture.native_ready
+						end,
+					}, true
+				end,
+			}
+			callback(fixture)
+		end)
+	end
+
+	helpers.it("emits the exact existing official source and private argv equivalents without Python", function()
+		with_native_fixture({}, function(fixture)
+			helpers.assert_true(fixture.checker.check_and_install_deps())
+			helpers.assert_eq(fixture.native_source, "/repo/static/ergopti_plus/macos/modules/llm/ensure-ollama-deps.sh")
+			local environment = {}
+			for _, pair in ipairs(fixture.native_environment) do environment[pair[1]] = pair[2] end
+			helpers.assert_eq(#fixture.native_environment, 6)
+			helpers.assert_eq(environment.PROJECT_ROOT, "/repo/static/ergopti_plus/macos")
+			helpers.assert_eq(environment.ERGOPTI_NATIVE_ARCH, "arm64")
+			helpers.assert_eq(environment.ERGOPTI_BOOTSTRAP_OLLAMA_RESOLVED_BIN, "/fixture/ollama")
+			helpers.assert_eq(environment.ERGOPTI_BOOTSTRAP_OLLAMA_INSTALL_DIR, "")
+			helpers.assert_eq(environment.ERGOPTI_BOOTSTRAP_PYTHON, "")
+			helpers.assert_eq(fixture.native_bound, fixture.tasks[1])
+			helpers.assert_true(fixture.native_marked)
+			helpers.assert_eq(fixture.tasks[1].args[1], "--managed-pty-worker")
+			helpers.assert_eq(fixture.native_budget, 1800000)
+			fixture.native_ready = true
+			fixture.tasks[1]:complete(0)
+			helpers.assert_eq(fixture.native_code, 0)
+			helpers.assert_eq(fixture.daemon_calls, 1)
+		end)
+	end)
+
+	helpers.it("retains callback-only success and retries its exact receipt during pause", function()
+		with_native_fixture({}, function(fixture)
+			helpers.assert_true(fixture.checker.check_and_install_deps())
+			fixture.tasks[1]:complete(0)
+			helpers.assert_eq(fixture.checker.provisioning_idle(), false)
+			helpers.assert_eq(fixture.daemon_calls, 0)
+			helpers.assert_eq(fixture.owner.pause(), false)
+			helpers.assert_eq(#fixture.tasks, 1)
+			fixture.native_ready = true
+			helpers.assert_eq(fixture.owner.pause(), true)
+			helpers.assert_eq(fixture.checker.provisioning_idle(), true)
+			helpers.assert_eq(fixture.daemon_calls, 0, "a stale callback must not start a daemon after receipt recovery")
+		end)
+	end)
+
+	for _, mode in ipairs({ "false", "nil", "throw" }) do
+		helpers.it("retains native receipt debt after original start " .. mode, function()
+			with_native_fixture({ start_mode = mode }, function(fixture)
+				helpers.assert_eq(fixture.checker.check_and_install_deps(), false)
+				helpers.assert_true(fixture.native_marked)
+				helpers.assert_eq(fixture.checker.provisioning_idle(), false)
+				fixture.tasks[1]:complete(143)
+				helpers.assert_eq(fixture.checker.provisioning_idle(), false)
+				fixture.native_ready = true
+				helpers.assert_eq(fixture.owner.pause(), true)
+				helpers.assert_eq(fixture.checker.provisioning_idle(), true)
+				helpers.assert_eq(fixture.daemon_calls, 0)
+			end)
+		end)
+	end
+end)

@@ -17,15 +17,19 @@
 set -eu
 set -o pipefail 2>/dev/null || true
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+if [ "$0" = "/dev/fd/3" ] && [ -n "${ERGOPTI_BOOTSTRAP_SCRIPT_DIR:-}" ]; then
+	SCRIPT_DIR="$ERGOPTI_BOOTSTRAP_SCRIPT_DIR"
+else
+	SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+fi
 NETWORK_RETRY_LIB="$SCRIPT_DIR/network-retry.sh"
 OLLAMA_RELEASE_FILE="$SCRIPT_DIR/ollama-release.sh"
 # System tools stay reachable when the caller hands over a minimal PATH.
 export PATH="$PATH:/usr/bin:/bin:/usr/sbin:/sbin"
 
-OLLAMA_RESOLVED_BIN="${1:-}"
-OLLAMA_INSTALL_DIR="${2:-}"
-export ERGOPTI_BOOTSTRAP_PYTHON="${3:-}"
+OLLAMA_RESOLVED_BIN="${1:-${ERGOPTI_BOOTSTRAP_OLLAMA_RESOLVED_BIN:-}}"
+OLLAMA_INSTALL_DIR="${2:-${ERGOPTI_BOOTSTRAP_OLLAMA_INSTALL_DIR:-}}"
+export ERGOPTI_BOOTSTRAP_PYTHON="${3:-${ERGOPTI_BOOTSTRAP_PYTHON:-}}"
 INSTALL_TEMP=""
 INSTALL_STAGE=""
 INSTALL_ROLLBACK=""
