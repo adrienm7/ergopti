@@ -5927,5 +5927,46 @@
 			],
 			"unavailable": "hide"
 		}
+	],
+	"macos_canvas_badge_frame": [
+		{
+			"type": "include",
+			"section": "macos_canvas_badge_paused",
+			"present_when": "macos_badge_is_paused"
+		},
+		{
+			"type": "include",
+			"section": "macos_canvas_badge_active",
+			"present_when": "macos_badge_is_active"
+		},
+		{
+			"type": "---",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"macos_canvas_badge_paused": [
+		{
+			"type": "label",
+			"id": "macos_badge_paused_caption",
+			"i18n": "menu.builder.title_paused",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"macos_canvas_badge_active": [
+		{
+			"type": "label",
+			"id": "macos_badge_active_caption",
+			"i18n": "menu.builder.title",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
 	]
 }
