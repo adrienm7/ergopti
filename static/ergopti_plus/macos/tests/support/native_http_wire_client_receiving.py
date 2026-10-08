@@ -62,6 +62,15 @@ class RealNativeClientReceiving(unittest.TestCase):
             shutil.copy2(MAC / "platform/network" / name, native)
         source = MAC / "launcher/Sources/ErgoptiPlus/ManagedHTTPWorker.swift"
         fixture_source = Path(__file__).with_name("native_http_fixture_main.swift")
+        compatibility_headers = MAC / "launcher/Sources/CPOSIXCompatibility/include"
+        compatibility_sources = tuple(
+            compatibility_headers / name
+            for name in (
+                "CPOSIXCompatibility.h",
+                "OwnedProgramCompatibility.h",
+                "LoopbackListenerCompatibility.h",
+            )
+        )
         # Retain exact compiler inputs in the private packet. A concurrent edit
         # refuses qualification, even if swiftc itself returned success.
         observed = {
@@ -69,6 +78,7 @@ class RealNativeClientReceiving(unittest.TestCase):
             for path in (
                 source,
                 fixture_source,
+                *compatibility_sources,
                 MAC / "platform/network/native_http.py",
                 MAC / "platform/network/managed_http.py",
                 ROOT / "static/ergopti_plus/_shared/python/network_proxy_policy.py",
@@ -80,11 +90,33 @@ class RealNativeClientReceiving(unittest.TestCase):
         shutil.copy2(source, worker_copy)
         shutil.copy2(fixture_source, main_copy)
         try:
+            # SwiftPM supplies this real Clang module to the release launcher.
+            # Standalone receiving must import the identical public C headers,
+            # including the explicit public macOS DHCP declarations.
+            compatibility_module = cls.root / "CPOSIXCompatibility"
+            compatibility_module.mkdir(mode=0o700)
+            for header in compatibility_sources:
+                destination = compatibility_module / header.name
+                shutil.copy2(header, destination)
+                relative = str(header.relative_to(ROOT))
+                if hashlib.sha256(destination.read_bytes()).hexdigest() != observed[relative]:
+                    raise RuntimeError("Native compatibility source changed before compilation")
+            (compatibility_module / "module.modulemap").write_text(
+                "module CPOSIXCompatibility {\n"
+                '  umbrella header "CPOSIXCompatibility.h"\n'
+                "  export *\n"
+                "}\n",
+                encoding="utf-8",
+            )
             cls.fixture._command(
                 [
                     "/usr/bin/xcrun",
                     "swiftc",
                     "-parse-as-library",
+                    "-I",
+                    str(compatibility_module),
+                    "-framework",
+                    "SystemConfiguration",
                     str(worker_copy),
                     str(main_copy),
                     "-o",

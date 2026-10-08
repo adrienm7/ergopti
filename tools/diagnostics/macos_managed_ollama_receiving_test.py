@@ -11,7 +11,7 @@ import ssl
 import unittest
 import tempfile
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 ROOT = Path(os.environ.get("ERGOPTI_RECEIVING_REPOSITORY", Path(__file__).resolve().parents[2]))
 
@@ -30,6 +30,80 @@ WIRE = load(
     "registry_wire", ROOT / "static/ergopti_plus/macos/tests/support/native_http_wire_fixture.py"
 )
 MODEL = load("registry_model", ROOT / "tools/diagnostics/ollama_native_tiny_gguf.py")
+
+
+class StandaloneCompilerControls(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.subject = RECEIVING.Receiver.__new__(RECEIVING.Receiver)
+        self.subject.root = ROOT
+        self.subject.mac = ROOT / "static/ergopti_plus/macos"
+        self.subject.work = Path(temporary.name)
+        self.subject.source_hashes = {}
+        self.subject.payload = Mock(return_value=self.subject.work / "payload")
+        self.fixture = SimpleNamespace(_command=Mock())
+        self.wire = SimpleNamespace(WireFixture=Mock(return_value=self.fixture))
+
+    def test_exact_public_headers_and_system_framework_at_compiler_boundary(self):
+        class CompilerBoundary(Exception):
+            pass
+
+        def inspect(arguments, *, timeout):
+            self.assertEqual(timeout, 90)
+            self.assertEqual(arguments[:3], ["/usr/bin/xcrun", "swiftc", "-parse-as-library"])
+            self.assertIn("-I", arguments)
+            module = Path(arguments[arguments.index("-I") + 1])
+            self.assertEqual(module, self.subject.work / "CPOSIXCompatibility")
+            self.assertEqual(module.stat().st_mode & 0o777, 0o700)
+            self.assertEqual(
+                (module / "module.modulemap").read_text(),
+                "module CPOSIXCompatibility {\n"
+                '  umbrella header "CPOSIXCompatibility.h"\n'
+                "  export *\n}\n",
+            )
+            for name in [
+                "CPOSIXCompatibility.h",
+                "OwnedProgramCompatibility.h",
+                "LoopbackListenerCompatibility.h",
+            ]:
+                relative = (
+                    "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/" + name
+                )
+                original = (ROOT / relative).read_bytes()
+                self.assertEqual((module / name).read_bytes(), original)
+                self.assertEqual(
+                    self.subject.source_hashes[relative],
+                    hashlib.sha256(original).hexdigest(),
+                )
+            self.assertEqual(arguments[arguments.index("-framework") + 1], "SystemConfiguration")
+            raise CompilerBoundary()
+
+        self.fixture._command.side_effect = inspect
+        with (
+            patch.object(RECEIVING, "load", return_value=self.wire),
+            patch.object(RECEIVING, "Registry"),
+            self.assertRaises(CompilerBoundary),
+        ):
+            self.subject.prepare()
+        self.fixture._command.assert_called_once()
+
+    def test_changed_public_header_copy_refuses_before_compiler(self):
+        original_copy = self.subject.copy_source
+
+        def mutate(relative, destination):
+            original_copy(relative, destination)
+            if relative.endswith("/CPOSIXCompatibility.h"):
+                destination.write_bytes(b"foreign declarations")
+
+        self.subject.copy_source = mutate
+        with (
+            patch.object(RECEIVING, "load", return_value=self.wire),
+            patch.object(RECEIVING, "Registry"),
+            self.assertRaisesRegex(RuntimeError, "compatibility_source_copy"),
+        ):
+            self.subject.prepare()
+        self.fixture._command.assert_not_called()
 
 
 class RetainedSourceControls(unittest.TestCase):
