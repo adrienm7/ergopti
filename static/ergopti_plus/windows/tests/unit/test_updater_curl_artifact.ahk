@@ -30,7 +30,7 @@ _ArtifactCurlFactoryControls() {
 Test("artifact curl: independent factory namespace and causal fallback model controls", _ArtifactCurlFactoryControls)
 
 class _ArtifactNtlmProxyOwner {
-	__New(Tls, Mode) {
+	__New(Tls, Mode, ServeRemotePac := false) {
 		this.Directory := ""
 		this.Event := 0
 		this.Handle := 0
@@ -38,6 +38,7 @@ class _ArtifactNtlmProxyOwner {
 		this.Results := []
 		this.Tls := Tls
 		this.Mode := Mode
+		this.ServeRemotePac := ServeRemotePac
 		this.Identity := _ManagedRemoteFixtureGuid()
 		this.Name := "Local\ErgoptiPlus.ArtifactNtlm." . this.Identity
 		this.State := Map()
@@ -51,10 +52,12 @@ class _ArtifactNtlmProxyOwner {
 		this.Event := DllCall("Kernel32\CreateEventW", "Ptr", 0, "Int", true,
 			"Int", false, "WStr", this.Name, "Ptr")
 		AssertTrue(this.Event && A_LastError != 183, "unique owned SSPI stop event")
-		this.Handle := ShellRunner_SpawnTreeOwned(_Updater_PowerShellPath(),
-			["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
-				_DriverDir . "\tests\fixtures\artifact_ntlm_proxy.ps1", "-StatePath", this.Path,
-				"-StopEvent", this.Name, "-TlsPort", this.Tls.State["tls_port"], "-ChallengeMode", this.Mode],
+		Args := ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
+			_DriverDir . "\tests\fixtures\artifact_ntlm_proxy.ps1", "-StatePath", this.Path,
+			"-StopEvent", this.Name, "-TlsPort", this.Tls.State["tls_port"], "-ChallengeMode", this.Mode]
+		if this.ServeRemotePac
+			Args.Push("-ServeRemotePac")
+		this.Handle := ShellRunner_SpawnTreeOwned(_Updater_PowerShellPath(), Args,
 			ObjBindMethod(this, "OnDone"), , ObjBindMethod(this, "OnAdopt"), 8192)
 		AssertTrue(this.Handle.start(), "actual SSPI relay private Job starts")
 		Started := A_TickCount
@@ -106,6 +109,7 @@ class _ArtifactNtlmProxyOwner {
 			AssertEqual(0, this.Results[1]["exit"], "SSPI service closes with no retained thread or security-context debt")
 			AssertEqual("OWNED_SSPI_PROXY_STOPPED", Trim(this.Results[1]["stdout"], "`r`n "))
 			AssertEqual("", this.Results[1]["stderr"])
+			AssertEqual(5, this.State.Get("handle_controls", 0), "literal SDK sentinel controls remain separate from actual native exchange")
 			AssertEqual("stopped", this.State.Get("state", ""))
 			AssertEqual(0, this.State.Get("active", -1))
 			AssertEqual(0, this.State.Get("failures", -1))

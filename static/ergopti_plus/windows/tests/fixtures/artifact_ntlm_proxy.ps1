@@ -4,7 +4,8 @@ param(
     [Parameter(Mandatory = $true)][string]$StatePath,
     [Parameter(Mandatory = $true)][string]$StopEvent,
     [Parameter(Mandatory = $true)][int]$TlsPort,
-    [ValidateSet('NtlmOnly', 'NegotiatePresent')][string]$ChallengeMode = 'NtlmOnly'
+    [ValidateSet('NtlmOnly', 'NegotiatePresent')][string]$ChallengeMode = 'NtlmOnly',
+    [switch]$ServeRemotePac
 )
 $ErrorActionPreference = 'Stop'
 if ($StopEvent -cnotmatch '^Local\\ErgoptiPlus\.ArtifactNtlm\.[0-9a-f]{32}$' -or
@@ -26,38 +27,78 @@ public sealed class ErgoptiArtifactNtlmProxy : IDisposable {
     [StructLayout(LayoutKind.Sequential)] struct Descriptor { public int Version, Count; public IntPtr Buffers; }
     [DllImport("secur32.dll", CharSet=CharSet.Unicode)] static extern int AcquireCredentialsHandle(
         string principal, string package, int use, IntPtr logon, IntPtr authentication,
-        IntPtr callback, IntPtr argument, out Handle credential, out long expiry);
+        IntPtr callback, IntPtr argument, ref Handle credential, out long expiry);
     [DllImport("secur32.dll", EntryPoint="AcceptSecurityContext")] static extern int AcceptFirst(
         ref Handle credential, IntPtr context, ref Descriptor input, int flags, int representation,
-        out Handle result, ref Descriptor output, out int attributes, out long expiry);
+        ref Handle result, ref Descriptor output, out int attributes, out long expiry);
     [DllImport("secur32.dll", EntryPoint="AcceptSecurityContext")] static extern int AcceptNext(
         ref Handle credential, ref Handle context, ref Descriptor input, int flags, int representation,
-        out Handle result, ref Descriptor output, out int attributes, out long expiry);
-    [DllImport("secur32.dll")] static extern int QuerySecurityContextToken(ref Handle context, out IntPtr token);
+        ref Handle result, ref Descriptor output, out int attributes, out long expiry);
+    [DllImport("secur32.dll")] static extern int QuerySecurityContextToken(ref Handle context, ref IntPtr token);
     [DllImport("secur32.dll")] static extern int DeleteSecurityContext(ref Handle context);
     [DllImport("secur32.dll")] static extern int FreeCredentialsHandle(ref Handle credential);
     [DllImport("secur32.dll")] static extern int FreeContextBuffer(IntPtr buffer);
     [DllImport("kernel32.dll", SetLastError=true)] static extern bool CloseHandle(IntPtr handle);
+    // WinSDK SecInvalidateHandle/SecIsValidHandle use both ULONG_PTR(-1)
+    // fields; a zero field is not by itself an invalid SSPI handle.
+    static Handle InvalidHandle() { return new Handle { Lower=new IntPtr(-1), Upper=new IntPtr(-1) }; }
+    static bool ValidHandle(Handle handle) { return handle.Lower!=new IntPtr(-1) && handle.Upper!=new IntPtr(-1); }
+    public static int HandleControls() {
+        // Literal SDK sentinel controls do not claim native SSPI allocation.
+        if(ValidHandle(InvalidHandle())) throw new InvalidDataException("SDK-invalid sentinel was admitted.");
+        if(ValidHandle(new Handle { Lower=new IntPtr(-1), Upper=IntPtr.Zero })) throw new InvalidDataException("Invalid lower sentinel was admitted.");
+        if(ValidHandle(new Handle { Lower=IntPtr.Zero, Upper=new IntPtr(-1) })) throw new InvalidDataException("Invalid upper sentinel was admitted.");
+        if(!ValidHandle(new Handle { Lower=IntPtr.Zero, Upper=IntPtr.Zero })) throw new InvalidDataException("Zero SSPI handle was guessed invalid.");
+        if(!ValidHandle(new Handle { Lower=new IntPtr(17), Upper=new IntPtr(23) })) throw new InvalidDataException("Literal SDK-valid handle was refused.");
+        return 5;
+    }
     readonly TcpListener listener = new TcpListener(IPAddress.Loopback, 0);
     readonly object gate = new object();
     readonly List<TcpClient> clients = new List<TcpClient>();
     readonly List<Thread> workers = new List<Thread>();
     readonly int targetPort;
     readonly bool advertiseNegotiate;
+    readonly bool serveRemotePac;
+    readonly int closedPort;
+    readonly Socket refusedRoute;
     readonly SecurityIdentifier expectedUser;
     readonly Thread acceptor;
     volatile bool stopping;
     public int Port { get { return ((IPEndPoint)listener.LocalEndpoint).Port; } }
-    public int Bare, TypeOne, TypeThree, Authenticated, Negotiate, Failures, Active;
-    public bool IdentityMatched;
+    public int Bare, TypeOne, TypeThree, Authenticated, Negotiate, Failures, Active, PacRequests;
+    public bool IdentityMatched, RefusedRouteVerified;
     public int SecurityStatus;
     public string FailureStage="none";
-    public ErgoptiArtifactNtlmProxy(int port, bool negotiate) {
-        targetPort=port; advertiseNegotiate=negotiate;
-        using (WindowsIdentity current=WindowsIdentity.GetCurrent()) { expectedUser=current.User; }
-        if (expectedUser==null) throw new InvalidOperationException("Missing current-user identity.");
-        listener.Start();
-        acceptor=new Thread(Accept); acceptor.IsBackground=true; acceptor.Start();
+    public ErgoptiArtifactNtlmProxy(int port, bool negotiate) : this(port,negotiate,false) { }
+    public ErgoptiArtifactNtlmProxy(int port, bool negotiate, bool pac) {
+        targetPort=port; advertiseNegotiate=negotiate; serveRemotePac=pac;
+        try {
+            if(pac) {
+                // Keep this first route exclusively bound without Listen. It
+                // refuses TCP while other fixture listeners cannot reuse it.
+                refusedRoute=new Socket(AddressFamily.InterNetwork,SocketType.Stream,ProtocolType.Tcp);
+                refusedRoute.ExclusiveAddressUse=true;
+                refusedRoute.Bind(new IPEndPoint(IPAddress.Loopback,0));
+                closedPort=((IPEndPoint)refusedRoute.LocalEndPoint).Port;
+                using(TcpClient probe=new TcpClient()) {
+                    try {
+                        probe.Connect(IPAddress.Loopback,closedPort);
+                        throw new InvalidOperationException("The owned first PAC route did not refuse TCP.");
+                    } catch(SocketException failure) {
+                        if(failure.SocketErrorCode!=SocketError.ConnectionRefused) throw;
+                        RefusedRouteVerified=true;
+                    }
+                }
+            }
+            using (WindowsIdentity current=WindowsIdentity.GetCurrent()) { expectedUser=current.User; }
+            if (expectedUser==null) throw new InvalidOperationException("Missing current-user identity.");
+            listener.Start();
+            acceptor=new Thread(Accept); acceptor.IsBackground=true; acceptor.Start();
+        } catch {
+            listener.Stop();
+            if(refusedRoute!=null) refusedRoute.Dispose();
+            throw;
+        }
     }
     void Accept() {
         try {
@@ -98,25 +139,38 @@ public sealed class ErgoptiArtifactNtlmProxy : IDisposable {
     }
     byte[] AcceptToken(ref Handle credential, ref Handle context, ref bool hasContext,
         byte[] token, out bool complete) {
-        IntPtr inputData=Marshal.AllocHGlobal(token.Length);
-        IntPtr inputBuffer=Marshal.AllocHGlobal(Marshal.SizeOf(typeof(Buffer)));
-        IntPtr outputBuffer=Marshal.AllocHGlobal(Marshal.SizeOf(typeof(Buffer)));
+        IntPtr inputData=IntPtr.Zero, inputBuffer=IntPtr.Zero, outputBuffer=IntPtr.Zero;
         IntPtr providerOutput=IntPtr.Zero;
         try {
+            // Each allocation joins ownership before the next allocation can
+            // fail; the finally also covers partial buffer construction.
+            inputData=Marshal.AllocHGlobal(token.Length);
+            inputBuffer=Marshal.AllocHGlobal(Marshal.SizeOf(typeof(Buffer)));
+            outputBuffer=Marshal.AllocHGlobal(Marshal.SizeOf(typeof(Buffer)));
             Marshal.Copy(token,0,inputData,token.Length);
             Marshal.StructureToPtr(new Buffer { Size=token.Length,Type=2,Data=inputData },inputBuffer,false);
             Marshal.StructureToPtr(new Buffer { Size=0,Type=2,Data=IntPtr.Zero },outputBuffer,false);
             Descriptor input=new Descriptor { Version=0,Count=1,Buffers=inputBuffer };
             Descriptor output=new Descriptor { Version=0,Count=1,Buffers=outputBuffer };
-            Handle next; int flags; long expiry;
-            int status=hasContext ? AcceptNext(ref credential,ref context,ref input,0x900,0x10,out next,ref output,out flags,out expiry) :
-                AcceptFirst(ref credential,IntPtr.Zero,ref input,0x900,0x10,out next,ref output,out flags,out expiry);
+            Handle next=InvalidHandle(); int flags; long expiry;
+            int status=hasContext ? AcceptNext(ref credential,ref context,ref input,0x900,0x10,ref next,ref output,out flags,out expiry) :
+                AcceptFirst(ref credential,IntPtr.Zero,ref input,0x900,0x10,ref next,ref output,out flags,out expiry);
             // A failed native call may still allocate an output token. Capture
             // its pointer before interpreting status so every branch frees it.
             Buffer buffer=(Buffer)Marshal.PtrToStructure(outputBuffer,typeof(Buffer)); providerOutput=buffer.Data;
+            // Account any SDK-valid returned context before interpreting status.
+            // Ref output starts invalid, so an untouched failed native call
+            // cannot fabricate retirement authority from a zero-initialized out.
+            if(ValidHandle(next)) {
+                if(hasContext && (context.Lower!=next.Lower || context.Upper!=next.Upper)) {
+                    if(DeleteSecurityContext(ref context)!=0) Interlocked.Increment(ref Failures);
+                }
+                context=next; hasContext=true;
+            }
             // CONNECTION and ALLOCATE_MEMORY bind this exchange to its socket.
             if(status!=0 && status!=0x90312) { SecurityStatus=status; FailureStage="accept_context"; throw new InvalidOperationException("Native SSPI acceptance refused."); }
-            context=next; hasContext=true; complete=status==0;
+            if(!hasContext) throw new InvalidOperationException("Native SSPI accepted without a context.");
+            complete=status==0;
             if(buffer.Size<0 || buffer.Size>65536 || (buffer.Size>0 && providerOutput==IntPtr.Zero))
                 throw new InvalidDataException("Native SSPI token exceeded its bound.");
             byte[] result=new byte[buffer.Size];
@@ -124,22 +178,30 @@ public sealed class ErgoptiArtifactNtlmProxy : IDisposable {
             return result;
         } finally {
             Array.Clear(token,0,token.Length);
-            for(int n=0;n<token.Length;n++) Marshal.WriteByte(inputData,n,0);
+            if(inputData!=IntPtr.Zero) {
+                for(int n=0;n<token.Length;n++) Marshal.WriteByte(inputData,n,0);
+            }
             if(providerOutput!=IntPtr.Zero && FreeContextBuffer(providerOutput)!=0) Interlocked.Increment(ref Failures);
-            Marshal.FreeHGlobal(outputBuffer); Marshal.FreeHGlobal(inputBuffer); Marshal.FreeHGlobal(inputData);
+            if(outputBuffer!=IntPtr.Zero) Marshal.FreeHGlobal(outputBuffer);
+            if(inputBuffer!=IntPtr.Zero) Marshal.FreeHGlobal(inputBuffer);
+            if(inputData!=IntPtr.Zero) Marshal.FreeHGlobal(inputData);
         }
     }
     bool SameUser(ref Handle context) {
-        IntPtr token;
-        int status=QuerySecurityContextToken(ref context,out token);
-        if(status!=0 || token==IntPtr.Zero) { SecurityStatus=status; FailureStage="context_token"; return false; }
+        IntPtr token=IntPtr.Zero;
         try {
+            int status=QuerySecurityContextToken(ref context,ref token);
+            if(status!=0 || token==IntPtr.Zero) { SecurityStatus=status; FailureStage="context_token"; return false; }
             using(WindowsIdentity identity=new WindowsIdentity(token)) { return expectedUser.Equals(identity.User); }
-        } finally { if(!CloseHandle(token)) Interlocked.Increment(ref Failures); }
+        } finally {
+            // Account any token actually returned by the native call even
+            // when its status refuses identity publication.
+            if(token!=IntPtr.Zero && !CloseHandle(token)) Interlocked.Increment(ref Failures);
+        }
     }
     void Serve(TcpClient client) {
         Interlocked.Increment(ref Active);
-        Handle credential=new Handle(), context=new Handle();
+        Handle credential=InvalidHandle(), context=InvalidHandle();
         bool hasCredential=false, hasContext=false;
         TcpClient upstream=null;
         try {
@@ -148,6 +210,15 @@ public sealed class ErgoptiArtifactNtlmProxy : IDisposable {
             for(int round=0;round<4;round++) {
                 string header=ReadHeader(stream);
                 string[] lines=header.Split(new string[]{"\r\n"},StringSplitOptions.None);
+                if(serveRemotePac && lines[0]=="GET /remote-ordered.pac HTTP/1.1") {
+                    string destination="https://managed-fixture.invalid:"+targetPort+"/v1/chat/completions?marker=managed-network-fixture";
+                    string script="function FindProxyForURL(url,host){if(url==='"+destination+"')return 'PROXY 127.0.0.1:"+
+                        closedPort+"; PROXY 127.0.0.1:"+Port+"; DIRECT';return 'DIRECT';}";
+                    byte[] bytes=Encoding.UTF8.GetBytes(script);
+                    Write(stream,"HTTP/1.1 200 OK\r\nConnection: close\r\nCache-Control: no-store\r\nContent-Type: application/x-ns-proxy-autoconfig\r\nContent-Length: "+bytes.Length+"\r\n\r\n");
+                    stream.Write(bytes,0,bytes.Length); stream.Flush();
+                    Interlocked.Increment(ref PacRequests); return;
+                }
                 if(lines[0]!="CONNECT managed-fixture.invalid:"+targetPort+" HTTP/1.1")
                     throw new InvalidDataException("Unexpected owned CONNECT target.");
                 string authorization=null;
@@ -173,10 +244,10 @@ public sealed class ErgoptiArtifactNtlmProxy : IDisposable {
                 if(type==1) Interlocked.Increment(ref TypeOne); else Interlocked.Increment(ref TypeThree);
                 if(!hasCredential) {
                     long expiry;
-                    int status=AcquireCredentialsHandle(null,"NTLM",2,IntPtr.Zero,IntPtr.Zero,IntPtr.Zero,IntPtr.Zero,out credential,out expiry);
-                    if(status!=0) { SecurityStatus=status; FailureStage="acquire_credentials";
+                    int status=AcquireCredentialsHandle(null,"NTLM",2,IntPtr.Zero,IntPtr.Zero,IntPtr.Zero,IntPtr.Zero,ref credential,out expiry);
+                    hasCredential=ValidHandle(credential);
+                    if(status!=0 || !hasCredential) { SecurityStatus=status; FailureStage="acquire_credentials";
                         throw new InvalidOperationException("Native inbound credentials refused."); }
-                    hasCredential=true;
                 }
                 bool complete;
                 byte[] output=AcceptToken(ref credential,ref context,ref hasContext,token,out complete);
@@ -213,6 +284,7 @@ public sealed class ErgoptiArtifactNtlmProxy : IDisposable {
     }
     public void Dispose() {
         stopping=true; listener.Stop();
+        if(refusedRoute!=null) refusedRoute.Dispose();
         lock(gate) { foreach(TcpClient client in clients) client.Close(); }
         Stopwatch deadline=Stopwatch.StartNew();
         bool retired=acceptor.Join(3000);
@@ -228,13 +300,14 @@ public sealed class ErgoptiArtifactNtlmProxy : IDisposable {
 '@
 $Proxy = $null
 $Stop = $null
-$State = @{schema_version=1;state='starting';active=0;failures=0}
+$State = @{schema_version=1;state='starting';active=0;failures=0;handle_controls=[ErgoptiArtifactNtlmProxy]::HandleControls()}
 function Publish {
     if ($null -ne $Proxy) {
         $State.bare=$Proxy.Bare; $State.type_one=$Proxy.TypeOne; $State.type_three=$Proxy.TypeThree
         $State.authenticated=$Proxy.Authenticated; $State.negotiate=$Proxy.Negotiate
         $State.identity_matched=$Proxy.IdentityMatched; $State.active=$Proxy.Active; $State.failures=$Proxy.Failures
-        $State.security_status=$Proxy.SecurityStatus; $State.failure_stage=$Proxy.FailureStage
+        $State.security_status=$Proxy.SecurityStatus; $State.failure_stage=$Proxy.FailureStage; $State.pac_requests=$Proxy.PacRequests
+        $State.refused_route_verified=$Proxy.RefusedRouteVerified
     }
     $Pending=$StatePath+'.pending'
     [IO.File]::WriteAllText($Pending,($State|ConvertTo-Json -Compress),[Text.UTF8Encoding]::new($false))
@@ -243,7 +316,7 @@ function Publish {
 }
 try {
     $Stop=[Threading.EventWaitHandle]::OpenExisting($StopEvent)
-    $Proxy=[ErgoptiArtifactNtlmProxy]::new($TlsPort,($ChallengeMode -ceq 'NegotiatePresent'))
+    $Proxy=[ErgoptiArtifactNtlmProxy]::new($TlsPort,($ChallengeMode -ceq 'NegotiatePresent'),[bool]$ServeRemotePac)
     $State.port=$Proxy.Port; $State.state='ready'; Publish
     while(-not $Stop.WaitOne(100)){Publish}
     $Proxy.Dispose(); $State.state='stopped'; Publish
