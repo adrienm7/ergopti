@@ -5630,6 +5630,8 @@ The fixed Specifications and Capabilities frames of the Windows/macOS per-model 
       open. macOS system trust and explicit proxy relays are integrated, while
       opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
 
+Canonical process ownership now preserves supplied stdin and defaults to DEVNULL only when absent. Both new real Linux child regressions fail on the old duplicate-keyword call and pass after the repair; all fifteen original assertion bodies remain. Seventeen controls cover actual PIPE bytes and default/explicit EOF. Darwin process-group and native network receiving still require CI.
+
 Explicit inherited ALL_PROXY aliases retain precedence over native static settings. PAC diagnostics report only the actual native helper capability and never include the configuration URL. Twenty-one actual Bash bootstrap controls pass, with all eighteen original assertion methods and opaque admission preserved. Native macOS routing remains separately required.
 
 Native Ollama API admission now uses the actual SDK mapped source and accepted TCP listener identity before private payload delivery. Eleven PTY and twelve listener XCTest cases preserve the sixteen original test bodies. The original official Ollama installer also has a no-Python PTY caller that joins its exact physical receipt before releasing its task owner. All seventy-two focused Lua cases pass; actual native compilation, retained Mach-O execution and cold installation remain required.
