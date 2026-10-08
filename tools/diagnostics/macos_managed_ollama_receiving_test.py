@@ -9,6 +9,9 @@ import os
 from pathlib import Path
 import ssl
 import unittest
+import tempfile
+from types import SimpleNamespace
+from unittest.mock import Mock
 
 ROOT = Path(os.environ.get("ERGOPTI_RECEIVING_REPOSITORY", Path(__file__).resolve().parents[2]))
 
@@ -27,6 +30,89 @@ WIRE = load(
     "registry_wire", ROOT / "static/ergopti_plus/macos/tests/support/native_http_wire_fixture.py"
 )
 MODEL = load("registry_model", ROOT / "tools/diagnostics/ollama_native_tiny_gguf.py")
+
+
+class RetainedSourceControls(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        self.binary = self.root / "ollama"
+        self.binary.write_bytes(b"independent source bytes; filesystem policy only")
+        self.binary.chmod(0o755)
+        observed = self.binary.stat()
+        self.session = {
+            "version": 1,
+            "token": "a" * 64,
+            "port": "11434",
+            "source_commit": "b" * 40,
+            "asset_sha256": "c" * 64,
+            "binary_sha256": hashlib.sha256(self.binary.read_bytes()).hexdigest(),
+            "device": str(observed.st_dev),
+            "inode": str(observed.st_ino),
+        }
+
+    def test_actual_readonly_descriptor_and_hash_preserve_exec_offset(self):
+        descriptor = RECEIVING.retained_source(self.binary, self.session)
+        try:
+            RECEIVING.check_retained_source(self.binary, descriptor, self.session)
+            self.assertEqual(os.lseek(descriptor, 0, os.SEEK_CUR), 0)
+            self.assertEqual(os.pread(descriptor, 11, 0), b"independent")
+            with self.assertRaises(OSError):
+                os.write(descriptor, b"changed")
+        finally:
+            os.close(descriptor)
+
+    def test_pre_exec_changed_pathname_refuses_before_private_env_dispatch(self):
+        groups = SimpleNamespace(acquire_owned=Mock())
+        subject = RECEIVING.Receiver.__new__(RECEIVING.Receiver)
+        subject.binary = self.binary
+        subject.work = self.root
+        subject.http_environment = {}
+        subject.http_payload = self.root
+        subject.options = SimpleNamespace(profile="pac-inline")
+        subject.daemon = None
+        subject.receipt = {}
+        subject.fixture = SimpleNamespace(groups=groups, native_groups=object())
+        session_path = self.root / "private-session.json"
+
+        def create_session(deadline, port):
+            session_path.write_text(json.dumps(self.session | {"port": str(port)}))
+            self.binary.unlink()
+            self.binary.write_bytes(b"foreign pathname replacement")
+            self.binary.chmod(0o755)
+            return session_path
+
+        subject.runtime = SimpleNamespace(
+            create_session=create_session,
+            POLICY=load(
+                "source_receiving_policy",
+                ROOT / "static/ergopti_plus/_shared/python/managed_ollama_runtime.py",
+            ),
+        )
+        original_descriptor = os.open(self.binary, os.O_RDONLY)
+        try:
+            with self.assertRaisesRegex(RuntimeError, "actual_retained_source_identity"):
+                subject.start()
+            groups.acquire_owned.assert_not_called()
+            self.assertEqual(self.binary.read_bytes(), b"foreign pathname replacement")
+        finally:
+            subject.stop()
+            os.close(original_descriptor)
+
+    def test_held_descriptor_refuses_changed_path_and_changed_bytes(self):
+        descriptor = RECEIVING.retained_source(self.binary, self.session)
+        try:
+            self.binary.write_bytes(b"changed in place")
+            with self.assertRaisesRegex(RuntimeError, "actual_retained_source_bytes"):
+                RECEIVING.check_retained_source(self.binary, descriptor, self.session)
+            self.binary.unlink()
+            self.binary.write_bytes(b"foreign replacement")
+            self.binary.chmod(0o755)
+            with self.assertRaisesRegex(RuntimeError, "actual_retained_source_identity"):
+                RECEIVING.check_retained_source(self.binary, descriptor, self.session)
+        finally:
+            os.close(descriptor)
 
 
 class ActualPeerReceiving(unittest.TestCase):
