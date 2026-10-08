@@ -11,26 +11,35 @@ device validation and any necessary fixes.
 ## Latest qualification checkpoint, 2026-10-08
 
 The first partial integration remains `09174392102ffe8638435d794f09f41cb85c8dbc`.
-Its 84 feature commits are already in dev. Eleven subsequent repair commits
-through `44525214e4d0763f9c23e7d69828ec6bf3e01871` await the next partial
-integration. Neither TODO36 nor TODO62 is complete or removed.
+Its 84 feature commits are already in dev. Twelve subsequent repair/checkpoint
+commits through `0f642ba078524e49215aef0dfaba4a02580c8e20`, followed by this
+receiving document, await the second partial integration. Neither TODO36 nor
+TODO62 is complete or removed.
 
-Linux manual [37747891785](https://github.com/adrienm7/ergopti/actions/runs/37747891785)
-at `b4ef975f1561c67603dc0679c44be1d57f171eea` is terminal FAIL. Shared checks,
-Linux units, all 157 E2E steps and the complete Package job pass. This includes
-actual SDK Flatpak build/install/launch and tarball installation. Installation
-passes 13 of 17 rows, fails four and skips none. The failing rows are both Fedora
-LuaJIT-provider refusals and both Alpine missing-kernel-header compilations.
-Windows and macOS are deliberately unselected; Release is skipped.
+Linux manual [37755062021, attempt 2](https://github.com/adrienm7/ergopti/actions/runs/37755062021/attempts/2)
+at `44525214e4d0763f9c23e7d69828ec6bf3e01871` is terminal PASS. Shared checks,
+11,644 Linux unit assertions, real official Ollama/model acceptance and all 157
+E2E steps pass, with no failed or skipped E2E step. The complete Package job
+passes, including actual SDK Flatpak build/install/launch and tarball receiving.
+All 17 installation variants pass, including both Fedora first-run rows and
+both Alpine rows; none fail or are skipped. Windows and macOS are deliberately
+unselected. Release / Publish is skipped; no release is created.
 
-The Fedora bootstrap and Alpine headers are now repaired in source. Local
-formatting, all 382 JS checks and all 26 Linux runtime control groups pass.
-The genuine host native luv build and C-entry loading also pass, with exact
-source identities and physical closure. Host compilation does not qualify
-Fedora package acquisition or installed behavior. Manual
-[37755062021](https://github.com/adrienm7/ergopti/actions/runs/37755062021)
-receives exactly `44525214e4d0763f9c23e7d69828ec6bf3e01871` with only the Linux
-lane selected. At this checkpoint it is IN PROGRESS, not a passing receipt.
+Attempt 1 of the same run failed during explicit model pull after successful
+unit assertions. The child exited 1, source inventories stayed unchanged and
+physical closure had zero pending descendants. All 1,309 frozen runtime subjects
+are byte-identical to the preceding successful native source at `b4ef975f1`.
+The raw native log remains private; its lower failure cause is unproved. A new
+runner receives the unchanged source successfully in attempt 2. That success
+does not explain the historical failure or weaken its original acceptance.
+
+The Fedora source bootstrap and Alpine headers now have actual hosted
+installation receiving. Local formatting, all 382 JS checks, all 26 Linux
+runtime control groups and all 1,875 AHK BOM/LF checks pass. Genuine host native
+luv compilation/C loading also passes with exact identities and physical
+closure. Host compilation alone is not corporate-network qualification.
+The saved Windows engine carriers and six Brew audit preimages still match the
+current source; those inactive preparations are not integrated implementation.
 
 Windows still has four native failures and the unjoined packaged artifact
 NTLM/SSPI engine. macOS still needs the legitimate same-identity Automation
@@ -39,6 +48,12 @@ full-URL routing. These are CODE and native validation requirements, not only
 checks to perform on a personal device. Corporate-network and physical UI
 acceptance on every OS also remain unrun. Preserve items16/38 and every existing
 independent assertion, source pin, deadline and ownership gate.
+
+Final integration will fetch current dev, reserve an empty `codex/ci-lock`
+commit and preserve this feature history with a no-ff merge. The pending delta
+selects Windows and Linux; macOS production is unchanged since the first merge.
+The completion report and exact manual CI receipt identify the integrated SHA,
+terminal verdict and remaining limitations. No whole-group completion is claimed.
 
 ## Delivered source slices
 
@@ -57,9 +72,10 @@ Local causal regression is red on the original catalogue; corrected format,
 all382 JavaScript checks and portable/native producer controls pass. The first
 CI guard replay exposed an incorrectly anchored fixture slice; that harness
 error was corrected before receiving and is not credited as product evidence.
-All manually dispatched final-source native gates remain pending for this repair.
+These source prerequisites now pass final Linux receiving in manual37755062021
+attempt2; the exact current result is recorded above.
 
-The subsequent Fedora bootstrap is source-only until final receiving. It uses
+The subsequently received Fedora source bootstrap uses
 the unchanged Flatpak luv source26e62e49b0230891ece45a78cc1f63c074e60020 and
 the same six CMake choices. Shared policy declares build/GIO/schema prerequisites
 without inventing a distribution LuaJIT module package. The native producer
@@ -77,8 +93,8 @@ namespace. One initial negative replay had incorrectly assembled positional
 arguments; its retained refusal is a harness error, not product evidence.
 The complete pre-existing Flatpak module projection stays byte-exact. The
 causal bootstrap policy guard fails before the new map;26 recipe/filesystem
-control groups pass afterwards. Full selected gates and hosted Fedora package
-manager/installation qualification remain pending at this checkpoint.
+control groups pass afterwards. Full selected local gates and both hosted Fedora first-install variants now
+pass; the latest qualification checkpoint records their exact receiving.
 
 Manual37747891785 atb4ef975f1561c67603dc0679c44be1d57f171eea is terminal
 FAIL: all shared/unit/E2E checks and the complete package job pass;13 of17
@@ -110,7 +126,7 @@ this correction. No compiler/runtime assertion or installation row is removed.
   All27 original assertions remain; native routing/trust guards are unchanged.
 
 Feature commits remain separate. The final no-ff merge must preserve them.
-Its integrated SHA and terminal manual CI receipt must be recorded after integration.
+The completion report identifies its integrated SHA and terminal manual CI receipt.
 Tests of controlled transports or authored tiny archives do not establish
 official package identity, corporate-network interoperability or device input.
 
@@ -658,11 +674,11 @@ They contain fixture data and must not be published indiscriminately.
 
 ## Preserved feature commit inventory
 
-The following 95 atomic feature commits are verified ancestors of
-`44525214e4d0763f9c23e7d69828ec6bf3e01871`, in history order. This
-inventory excludes merge-only CI ancestry imports and precedes this receiving
-checkpoint and later integration receipts. The final merge second parent and
-Git history identify those additional delivery commits.
+The following 96 atomic feature commits are verified ancestors of
+`0f642ba078524e49215aef0dfaba4a02580c8e20`, in history order. This
+inventory excludes merge-only CI ancestry imports and precedes this final
+receiving document. The final merge second parent and Git history identify
+that additional delivery commit.
 
 ```text
 6deec05a99555607fe00e7aaedba704e8aea0ff3 docs(release): record the integrated qualification verdict
@@ -760,4 +776,5 @@ acb14576c412ca55d2e923f20e12a1b68855e604 fix(flatpak): use the declared GIO inst
 b4ef975f1561c67603dc0679c44be1d57f171eea fix(linux): provision source archive build prerequisites
 c996c69564dfcea46603e1a1fdbe86c8bf7ed100 fix(linux): bootstrap native LuaJIT networking on Fedora
 44525214e4d0763f9c23e7d69828ec6bf3e01871 fix(linux): include Alpine kernel build headers
+0f642ba078524e49215aef0dfaba4a02580c8e20 docs(release): preserve the latest partial qualification checkpoint
 ```
