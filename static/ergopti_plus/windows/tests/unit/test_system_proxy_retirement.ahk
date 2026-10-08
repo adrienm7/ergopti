@@ -42,5 +42,52 @@ _SystemProxy_RetirementDiagnostic(Observation) {
 		return
 	if Integer(Fact[4]) > 8192 || Integer(Fact[5]) > 8192
 		return
+	Cause := _SystemProxy_RetirementCauseFact(Out, Fact[1], Fact[2])
+	if Cause != ""
+		_TestPrint("::notice title=Windows legacy PAC closed cause::" . Cause)
 	_TestPrint("::notice title=Windows legacy PAC retirement::" . SubStr(Fact[0], StrLen("RETIREMENT_DIAG ")+1))
 }
+
+; A child notice remains captured until this settled owner validates its closed fields.
+_SystemProxy_RetirementCauseFact(Out, Control, Stage) {
+	if !(Out is String) || StrLen(Out) > 8192
+		return ""
+	Pattern := "m)^::notice title=Windows legacy PAC closed cause::control=([0-5]) stage=(prepare|prepare_control|start_child|child_exit|process_receipt|frame_parse|call_count|frame_contract|raw_proxy_contract) cause=(other|get_file_hash_command_missing|optional_control_property_missing|source_identity_mismatch) line=(0|[1-9][0-9]{0,3})`r?$"
+	if !RegExMatch(Out, Pattern, &Fact)
+		return ""
+	if RegExMatch(Out, Pattern, , Fact.Pos + Fact.Len)
+		return ""
+	if Fact[1] != Control || Fact[2] != Stage || Integer(Fact[4]) > 4096
+		return ""
+	return "control=" . Fact[1] . " stage=" . Fact[2] . " cause=" . Fact[3] . " line=" . Fact[4]
+}
+
+_SystemProxy_RetirementCauseProjectionControls() {
+	Prefix := "::notice title=Windows legacy PAC closed cause::"
+	Fields := "control=1 stage=prepare_control cause=get_file_hash_command_missing line=55"
+	AssertEqual(Fields, _SystemProxy_RetirementCauseFact(Prefix . Fields . "`n", "1", "prepare_control"))
+	AssertEqual(Fields, _SystemProxy_RetirementCauseFact(Prefix . Fields . "`r`n", "1", "prepare_control"))
+	for Cause in ["other", "optional_control_property_missing", "source_identity_mismatch"] {
+		Value := "control=1 stage=prepare_control cause=" . Cause . " line=0"
+		AssertEqual(Value, _SystemProxy_RetirementCauseFact(Prefix . Value, "1", "prepare_control"))
+	}
+	for Value in [Prefix . Fields . "`n" . Prefix . Fields,
+		Prefix . StrReplace(Fields, "control=1", "control=2"),
+		Prefix . StrReplace(Fields, "control=1", "control=6"),
+		Prefix . StrReplace(Fields, "control=1", "control=01"),
+		Prefix . StrReplace(Fields, "prepare_control", "frame_parse"),
+		Prefix . StrReplace(Fields, "prepare_control", "unadmitted"),
+		Prefix . StrReplace(Fields, "get_file_hash_command_missing", "raw_error"),
+		Prefix . StrReplace(Fields, "line=55", "line=4097"),
+		Prefix . StrReplace(Fields, "line=55", "line=0055"),
+		Prefix . StrReplace(Fields, "line=55", "line=-1"),
+		Prefix . Fields . " extra=value", "arbitrary " . Prefix . Fields] {
+		AssertEqual("", _SystemProxy_RetirementCauseFact(Value, "1", "prepare_control"),
+			"unadmitted or mismatched captured causes must remain private")
+	}
+	AssertEqual("", _SystemProxy_RetirementCauseFact(Map(), "1", "prepare_control"))
+	AssertEqual("", _SystemProxy_RetirementCauseFact(Prefix . Fields . StrReplace(Format("{:8193}", ""), " ", "x"), "1", "prepare_control"))
+	Boundary := StrReplace(Fields, "line=55", "line=4096")
+	AssertEqual(Boundary, _SystemProxy_RetirementCauseFact(Prefix . Boundary, "1", "prepare_control"))
+}
+Test("managed network: closed legacy cause projection refuses foreign, duplicate and unbounded receipts", _SystemProxy_RetirementCauseProjectionControls)

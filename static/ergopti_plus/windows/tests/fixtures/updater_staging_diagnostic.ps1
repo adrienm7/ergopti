@@ -33,7 +33,17 @@ function Write-ErgoptiStagingDiagnostic {
             elseif ($Exception -is [UnauthorizedAccessException]) { 'unauthorized' }
             elseif ($Exception -is [TimeoutException]) { 'timeout' }
             elseif ($Exception -is [System.Management.Automation.RuntimeException]) { 'runtime' } else { 'other' }
-        $Fact = @{ schema_version = 1; operation = $Operation; exception = $Kind;
+        $Family = if ($Exception -is [ComponentModel.Win32Exception]) { 'win32' }
+            elseif ($Exception -is [Net.WebException]) { 'web' }
+            elseif ($Exception -is [ArgumentException]) { 'argument' }
+            elseif ($Exception -is [InvalidOperationException]) { 'invalid_operation' }
+            elseif ($Exception -is [Security.SecurityException]) { 'security' }
+            elseif ($Exception -is [TypeInitializationException]) { 'type_initialization' }
+            else { $Kind }
+        $SafeStage = if ($Stage -cin @('proxy_resolve', 'proxy_connect', 'connect', 'tls', 'http',
+            'file_create', 'file_read', 'file_write', 'file_remove', 'file_rename')) { $Stage } else { 'unknown' }
+        $Fact = @{ schema_version = 2; operation = $Operation; exception = $Kind;
+            observed_stage = $SafeStage; exception_family = $Family; hresult = [int]$Exception.HResult;
             expected = (Get-ErgoptiStagingScalarFact $Expected); actual = (Get-ErgoptiStagingScalarFact $Actual) }
         $Bytes = [Text.UTF8Encoding]::new($false).GetBytes(($Fact | ConvertTo-Json -Depth 3 -Compress))
         if ($Bytes.Length -gt 2048) { throw 'Diagnostic bound refused.' }
