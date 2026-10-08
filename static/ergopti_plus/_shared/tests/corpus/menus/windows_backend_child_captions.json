@@ -1,317 +1,317 @@
 {
-  "ar": {
-    "sources": {
-      "menu.llm.backend_api_suffix": "مزوّد عن بُعد",
-      "menu.llm.backend_ollama_suffix": "قياسي",
-      "menu.llm.ollama_port_label": "منفذ خادم Ollama: %s",
-      "menu.llm.reset_label": "  ↳ إعادة تعيين (الافتراضي: %s)"
-    },
-    "api": "API 🌐 — مزوّد عن بُعد",
-    "ollama": "Ollama 🦙 — قياسي",
-    "port_default": "منفذ خادم Ollama: 11434",
-    "port_custom": "منفذ خادم Ollama: 11555",
-    "reset_default": "  ↳ إعادة تعيين (الافتراضي: 11434)",
-    "literal_subject": "%s & café — literal",
-    "port_literal": "منفذ خادم Ollama: %s & café — literal"
-  },
-  "cs": {
-    "sources": {
-      "menu.llm.backend_api_suffix": "Vzdálený poskytovatel",
-      "menu.llm.backend_ollama_suffix": "Standardní",
-      "menu.llm.ollama_port_label": "Port serveru Ollama: %s",
-      "menu.llm.reset_label": "  ↳ Resetovat (výchozí: %s)"
-    },
-    "api": "API 🌐 — Vzdálený poskytovatel",
-    "ollama": "Ollama 🦙 — Standardní",
-    "port_default": "Port serveru Ollama: 11434",
-    "port_custom": "Port serveru Ollama: 11555",
-    "reset_default": "  ↳ Resetovat (výchozí: 11434)",
-    "literal_subject": "%s & café — literal",
-    "port_literal": "Port serveru Ollama: %s & café — literal"
-  },
-  "da": {
-    "sources": {
-      "menu.llm.backend_api_suffix": "Ekstern udbyder",
-      "menu.llm.backend_ollama_suffix": "Standard",
-      "menu.llm.ollama_port_label": "Ollama-serverport: %s",
-      "menu.llm.reset_label": "  ↳ Nulstil (standard: %s)"
-    },
-    "api": "API 🌐 — Ekstern udbyder",
-    "ollama": "Ollama 🦙 — Standard",
-    "port_default": "Ollama-serverport: 11434",
-    "port_custom": "Ollama-serverport: 11555",
-    "reset_default": "  ↳ Nulstil (standard: 11434)",
-    "literal_subject": "%s & café — literal",
-    "port_literal": "Ollama-serverport: %s & café — literal"
-  },
-  "de": {
-    "sources": {
-      "menu.llm.backend_api_suffix": "Entfernter Anbieter",
-      "menu.llm.backend_ollama_suffix": "Standard",
-      "menu.llm.ollama_port_label": "Ollama-Server-Port: %s",
-      "menu.llm.reset_label": "  ↳ Zurücksetzen (Standard: %s)"
-    },
-    "api": "API 🌐 — Entfernter Anbieter",
-    "ollama": "Ollama 🦙 — Standard",
-    "port_default": "Ollama-Server-Port: 11434",
-    "port_custom": "Ollama-Server-Port: 11555",
-    "reset_default": "  ↳ Zurücksetzen (Standard: 11434)",
-    "literal_subject": "%s & café — literal",
-    "port_literal": "Ollama-Server-Port: %s & café — literal"
-  },
-  "en": {
-    "sources": {
-      "menu.llm.backend_api_suffix": "Remote provider",
-      "menu.llm.backend_ollama_suffix": "Standard",
-      "menu.llm.ollama_port_label": "Ollama server port: %s",
-      "menu.llm.reset_label": "  ↳ Reset (default: %s)"
-    },
-    "api": "API 🌐 — Remote provider",
-    "ollama": "Ollama 🦙 — Standard",
-    "port_default": "Ollama server port: 11434",
-    "port_custom": "Ollama server port: 11555",
-    "reset_default": "  ↳ Reset (default: 11434)",
-    "literal_subject": "%s & café — literal",
-    "port_literal": "Ollama server port: %s & café — literal"
-  },
-  "es": {
-    "sources": {
-      "menu.llm.backend_api_suffix": "Proveedor remoto",
-      "menu.llm.backend_ollama_suffix": "Estándar",
-      "menu.llm.ollama_port_label": "Puerto del servidor Ollama: %s",
-      "menu.llm.reset_label": "  ↳ Restablecer (predeterminado: %s)"
-    },
-    "api": "API 🌐 — Proveedor remoto",
-    "ollama": "Ollama 🦙 — Estándar",
-    "port_default": "Puerto del servidor Ollama: 11434",
-    "port_custom": "Puerto del servidor Ollama: 11555",
-    "reset_default": "  ↳ Restablecer (predeterminado: 11434)",
-    "literal_subject": "%s & café — literal",
-    "port_literal": "Puerto del servidor Ollama: %s & café — literal"
-  },
-  "fr": {
-    "sources": {
-      "menu.llm.backend_api_suffix": "Fournisseur distant",
-      "menu.llm.backend_ollama_suffix": "Standard",
-      "menu.llm.ollama_port_label": "Port du serveur Ollama : %s",
-      "menu.llm.reset_label": "  ↳ Réinitialiser (défaut : %s)"
-    },
-    "api": "API 🌐 — Fournisseur distant",
-    "ollama": "Ollama 🦙 — Standard",
-    "port_default": "Port du serveur Ollama : 11434",
-    "port_custom": "Port du serveur Ollama : 11555",
-    "reset_default": "  ↳ Réinitialiser (défaut : 11434)",
-    "literal_subject": "%s & café — literal",
-    "port_literal": "Port du serveur Ollama : %s & café — literal"
-  },
-  "he": {
-    "sources": {
-      "menu.llm.backend_api_suffix": "ספק מרוחק",
-      "menu.llm.backend_ollama_suffix": "רגיל",
-      "menu.llm.ollama_port_label": "פורט שרת Ollama: %s",
-      "menu.llm.reset_label": "  ↳ אפס (ברירת מחדל: %s)"
-    },
-    "api": "API 🌐 — ספק מרוחק",
-    "ollama": "Ollama 🦙 — רגיל",
-    "port_default": "פורט שרת Ollama: 11434",
-    "port_custom": "פורט שרת Ollama: 11555",
-    "reset_default": "  ↳ אפס (ברירת מחדל: 11434)",
-    "literal_subject": "%s & café — literal",
-    "port_literal": "פורט שרת Ollama: %s & café — literal"
-  },
-  "hi": {
-    "sources": {
-      "menu.llm.backend_api_suffix": "दूरस्थ प्रदाता",
-      "menu.llm.backend_ollama_suffix": "मानक",
-      "menu.llm.ollama_port_label": "Ollama सर्वर पोर्ट: %s",
-      "menu.llm.reset_label": "  ↳ रीसेट (डिफ़ॉल्ट: %s)"
-    },
-    "api": "API 🌐 — दूरस्थ प्रदाता",
-    "ollama": "Ollama 🦙 — मानक",
-    "port_default": "Ollama सर्वर पोर्ट: 11434",
-    "port_custom": "Ollama सर्वर पोर्ट: 11555",
-    "reset_default": "  ↳ रीसेट (डिफ़ॉल्ट: 11434)",
-    "literal_subject": "%s & café — literal",
-    "port_literal": "Ollama सर्वर पोर्ट: %s & café — literal"
-  },
-  "it": {
-    "sources": {
-      "menu.llm.backend_api_suffix": "Provider remoto",
-      "menu.llm.backend_ollama_suffix": "Standard",
-      "menu.llm.ollama_port_label": "Porta del server Ollama: %s",
-      "menu.llm.reset_label": "  ↳ Reimposta (predefinito: %s)"
-    },
-    "api": "API 🌐 — Provider remoto",
-    "ollama": "Ollama 🦙 — Standard",
-    "port_default": "Porta del server Ollama: 11434",
-    "port_custom": "Porta del server Ollama: 11555",
-    "reset_default": "  ↳ Reimposta (predefinito: 11434)",
-    "literal_subject": "%s & café — literal",
-    "port_literal": "Porta del server Ollama: %s & café — literal"
-  },
-  "ja": {
-    "sources": {
-      "menu.llm.backend_api_suffix": "リモート プロバイダ",
-      "menu.llm.backend_ollama_suffix": "標準",
-      "menu.llm.ollama_port_label": "Ollama サーバーポート: %s",
-      "menu.llm.reset_label": "  ↳ リセット（デフォルト: %s）"
-    },
-    "api": "API 🌐 — リモート プロバイダ",
-    "ollama": "Ollama 🦙 — 標準",
-    "port_default": "Ollama サーバーポート: 11434",
-    "port_custom": "Ollama サーバーポート: 11555",
-    "reset_default": "  ↳ リセット（デフォルト: 11434）",
-    "literal_subject": "%s & café — literal",
-    "port_literal": "Ollama サーバーポート: %s & café — literal"
-  },
-  "ko": {
-    "sources": {
-      "menu.llm.backend_api_suffix": "원격 공급자",
-      "menu.llm.backend_ollama_suffix": "표준",
-      "menu.llm.ollama_port_label": "Ollama 서버 포트: %s",
-      "menu.llm.reset_label": "  ↳ 초기화 (기본값: %s)"
-    },
-    "api": "API 🌐 — 원격 공급자",
-    "ollama": "Ollama 🦙 — 표준",
-    "port_default": "Ollama 서버 포트: 11434",
-    "port_custom": "Ollama 서버 포트: 11555",
-    "reset_default": "  ↳ 초기화 (기본값: 11434)",
-    "literal_subject": "%s & café — literal",
-    "port_literal": "Ollama 서버 포트: %s & café — literal"
-  },
-  "nl": {
-    "sources": {
-      "menu.llm.backend_api_suffix": "Externe provider",
-      "menu.llm.backend_ollama_suffix": "Standaard",
-      "menu.llm.ollama_port_label": "Ollama-serverpoort: %s",
-      "menu.llm.reset_label": "  ↳ Herstellen (standaard: %s)"
-    },
-    "api": "API 🌐 — Externe provider",
-    "ollama": "Ollama 🦙 — Standaard",
-    "port_default": "Ollama-serverpoort: 11434",
-    "port_custom": "Ollama-serverpoort: 11555",
-    "reset_default": "  ↳ Herstellen (standaard: 11434)",
-    "literal_subject": "%s & café — literal",
-    "port_literal": "Ollama-serverpoort: %s & café — literal"
-  },
-  "no": {
-    "sources": {
-      "menu.llm.backend_api_suffix": "Ekstern leverandør",
-      "menu.llm.backend_ollama_suffix": "Standard",
-      "menu.llm.ollama_port_label": "Ollama-serverport: %s",
-      "menu.llm.reset_label": "  ↳ Tilbakestill (standard: %s)"
-    },
-    "api": "API 🌐 — Ekstern leverandør",
-    "ollama": "Ollama 🦙 — Standard",
-    "port_default": "Ollama-serverport: 11434",
-    "port_custom": "Ollama-serverport: 11555",
-    "reset_default": "  ↳ Tilbakestill (standard: 11434)",
-    "literal_subject": "%s & café — literal",
-    "port_literal": "Ollama-serverport: %s & café — literal"
-  },
-  "pl": {
-    "sources": {
-      "menu.llm.backend_api_suffix": "Zewnętrzny dostawca",
-      "menu.llm.backend_ollama_suffix": "Standardowy",
-      "menu.llm.ollama_port_label": "Port serwera Ollama: %s",
-      "menu.llm.reset_label": "  ↳ Resetuj (domyślnie: %s)"
-    },
-    "api": "API 🌐 — Zewnętrzny dostawca",
-    "ollama": "Ollama 🦙 — Standardowy",
-    "port_default": "Port serwera Ollama: 11434",
-    "port_custom": "Port serwera Ollama: 11555",
-    "reset_default": "  ↳ Resetuj (domyślnie: 11434)",
-    "literal_subject": "%s & café — literal",
-    "port_literal": "Port serwera Ollama: %s & café — literal"
-  },
-  "pt": {
-    "sources": {
-      "menu.llm.backend_api_suffix": "Fornecedor remoto",
-      "menu.llm.backend_ollama_suffix": "Padrão",
-      "menu.llm.ollama_port_label": "Porta do servidor Ollama: %s",
-      "menu.llm.reset_label": "  ↳ Redefinir (padrão: %s)"
-    },
-    "api": "API 🌐 — Fornecedor remoto",
-    "ollama": "Ollama 🦙 — Padrão",
-    "port_default": "Porta do servidor Ollama: 11434",
-    "port_custom": "Porta do servidor Ollama: 11555",
-    "reset_default": "  ↳ Redefinir (padrão: 11434)",
-    "literal_subject": "%s & café — literal",
-    "port_literal": "Porta do servidor Ollama: %s & café — literal"
-  },
-  "ru": {
-    "sources": {
-      "menu.llm.backend_api_suffix": "Удалённый провайдер",
-      "menu.llm.backend_ollama_suffix": "Стандартный",
-      "menu.llm.ollama_port_label": "Порт сервера Ollama: %s",
-      "menu.llm.reset_label": "  ↳ Сбросить (по умолчанию: %s)"
-    },
-    "api": "API 🌐 — Удалённый провайдер",
-    "ollama": "Ollama 🦙 — Стандартный",
-    "port_default": "Порт сервера Ollama: 11434",
-    "port_custom": "Порт сервера Ollama: 11555",
-    "reset_default": "  ↳ Сбросить (по умолчанию: 11434)",
-    "literal_subject": "%s & café — literal",
-    "port_literal": "Порт сервера Ollama: %s & café — literal"
-  },
-  "sv": {
-    "sources": {
-      "menu.llm.backend_api_suffix": "Fjärrleverantör",
-      "menu.llm.backend_ollama_suffix": "Standard",
-      "menu.llm.ollama_port_label": "Ollama-serverport: %s",
-      "menu.llm.reset_label": "  ↳ Återställ (standard: %s)"
-    },
-    "api": "API 🌐 — Fjärrleverantör",
-    "ollama": "Ollama 🦙 — Standard",
-    "port_default": "Ollama-serverport: 11434",
-    "port_custom": "Ollama-serverport: 11555",
-    "reset_default": "  ↳ Återställ (standard: 11434)",
-    "literal_subject": "%s & café — literal",
-    "port_literal": "Ollama-serverport: %s & café — literal"
-  },
-  "tr": {
-    "sources": {
-      "menu.llm.backend_api_suffix": "Uzak sağlayıcı",
-      "menu.llm.backend_ollama_suffix": "Standart",
-      "menu.llm.ollama_port_label": "Ollama sunucu bağlantı noktası: %s",
-      "menu.llm.reset_label": "  ↳ Sıfırla (varsayılan: %s)"
-    },
-    "api": "API 🌐 — Uzak sağlayıcı",
-    "ollama": "Ollama 🦙 — Standart",
-    "port_default": "Ollama sunucu bağlantı noktası: 11434",
-    "port_custom": "Ollama sunucu bağlantı noktası: 11555",
-    "reset_default": "  ↳ Sıfırla (varsayılan: 11434)",
-    "literal_subject": "%s & café — literal",
-    "port_literal": "Ollama sunucu bağlantı noktası: %s & café — literal"
-  },
-  "uk": {
-    "sources": {
-      "menu.llm.backend_api_suffix": "Віддалений постачальник",
-      "menu.llm.backend_ollama_suffix": "Стандартний",
-      "menu.llm.ollama_port_label": "Порт сервера Ollama: %s",
-      "menu.llm.reset_label": "  ↳ Скинути (за замовчуванням: %s)"
-    },
-    "api": "API 🌐 — Віддалений постачальник",
-    "ollama": "Ollama 🦙 — Стандартний",
-    "port_default": "Порт сервера Ollama: 11434",
-    "port_custom": "Порт сервера Ollama: 11555",
-    "reset_default": "  ↳ Скинути (за замовчуванням: 11434)",
-    "literal_subject": "%s & café — literal",
-    "port_literal": "Порт сервера Ollama: %s & café — literal"
-  },
-  "zh": {
-    "sources": {
-      "menu.llm.backend_api_suffix": "远程提供商",
-      "menu.llm.backend_ollama_suffix": "标准",
-      "menu.llm.ollama_port_label": "Ollama 服务器端口：%s",
-      "menu.llm.reset_label": "  ↳ 重置（默认: %s）"
-    },
-    "api": "API 🌐 — 远程提供商",
-    "ollama": "Ollama 🦙 — 标准",
-    "port_default": "Ollama 服务器端口：11434",
-    "port_custom": "Ollama 服务器端口：11555",
-    "reset_default": "  ↳ 重置（默认: 11434）",
-    "literal_subject": "%s & café — literal",
-    "port_literal": "Ollama 服务器端口：%s & café — literal"
-  }
+	"ar": {
+		"sources": {
+			"menu.llm.backend_api_suffix": "مزوّد عن بُعد",
+			"menu.llm.backend_ollama_suffix": "قياسي",
+			"menu.llm.ollama_port_label": "منفذ خادم Ollama: %s",
+			"menu.llm.reset_label": "  ↳ إعادة تعيين (الافتراضي: %s)"
+		},
+		"api": "API 🌐 — مزوّد عن بُعد",
+		"ollama": "Ollama 🦙 — قياسي",
+		"port_default": "منفذ خادم Ollama: 11434",
+		"port_custom": "منفذ خادم Ollama: 11555",
+		"reset_default": "  ↳ إعادة تعيين (الافتراضي: 11434)",
+		"literal_subject": "%s & café — literal",
+		"port_literal": "منفذ خادم Ollama: %s & café — literal"
+	},
+	"cs": {
+		"sources": {
+			"menu.llm.backend_api_suffix": "Vzdálený poskytovatel",
+			"menu.llm.backend_ollama_suffix": "Standardní",
+			"menu.llm.ollama_port_label": "Port serveru Ollama: %s",
+			"menu.llm.reset_label": "  ↳ Resetovat (výchozí: %s)"
+		},
+		"api": "API 🌐 — Vzdálený poskytovatel",
+		"ollama": "Ollama 🦙 — Standardní",
+		"port_default": "Port serveru Ollama: 11434",
+		"port_custom": "Port serveru Ollama: 11555",
+		"reset_default": "  ↳ Resetovat (výchozí: 11434)",
+		"literal_subject": "%s & café — literal",
+		"port_literal": "Port serveru Ollama: %s & café — literal"
+	},
+	"da": {
+		"sources": {
+			"menu.llm.backend_api_suffix": "Ekstern udbyder",
+			"menu.llm.backend_ollama_suffix": "Standard",
+			"menu.llm.ollama_port_label": "Ollama-serverport: %s",
+			"menu.llm.reset_label": "  ↳ Nulstil (standard: %s)"
+		},
+		"api": "API 🌐 — Ekstern udbyder",
+		"ollama": "Ollama 🦙 — Standard",
+		"port_default": "Ollama-serverport: 11434",
+		"port_custom": "Ollama-serverport: 11555",
+		"reset_default": "  ↳ Nulstil (standard: 11434)",
+		"literal_subject": "%s & café — literal",
+		"port_literal": "Ollama-serverport: %s & café — literal"
+	},
+	"de": {
+		"sources": {
+			"menu.llm.backend_api_suffix": "Entfernter Anbieter",
+			"menu.llm.backend_ollama_suffix": "Standard",
+			"menu.llm.ollama_port_label": "Ollama-Server-Port: %s",
+			"menu.llm.reset_label": "  ↳ Zurücksetzen (Standard: %s)"
+		},
+		"api": "API 🌐 — Entfernter Anbieter",
+		"ollama": "Ollama 🦙 — Standard",
+		"port_default": "Ollama-Server-Port: 11434",
+		"port_custom": "Ollama-Server-Port: 11555",
+		"reset_default": "  ↳ Zurücksetzen (Standard: 11434)",
+		"literal_subject": "%s & café — literal",
+		"port_literal": "Ollama-Server-Port: %s & café — literal"
+	},
+	"en": {
+		"sources": {
+			"menu.llm.backend_api_suffix": "Remote provider",
+			"menu.llm.backend_ollama_suffix": "Standard",
+			"menu.llm.ollama_port_label": "Ollama server port: %s",
+			"menu.llm.reset_label": "  ↳ Reset (default: %s)"
+		},
+		"api": "API 🌐 — Remote provider",
+		"ollama": "Ollama 🦙 — Standard",
+		"port_default": "Ollama server port: 11434",
+		"port_custom": "Ollama server port: 11555",
+		"reset_default": "  ↳ Reset (default: 11434)",
+		"literal_subject": "%s & café — literal",
+		"port_literal": "Ollama server port: %s & café — literal"
+	},
+	"es": {
+		"sources": {
+			"menu.llm.backend_api_suffix": "Proveedor remoto",
+			"menu.llm.backend_ollama_suffix": "Estándar",
+			"menu.llm.ollama_port_label": "Puerto del servidor Ollama: %s",
+			"menu.llm.reset_label": "  ↳ Restablecer (predeterminado: %s)"
+		},
+		"api": "API 🌐 — Proveedor remoto",
+		"ollama": "Ollama 🦙 — Estándar",
+		"port_default": "Puerto del servidor Ollama: 11434",
+		"port_custom": "Puerto del servidor Ollama: 11555",
+		"reset_default": "  ↳ Restablecer (predeterminado: 11434)",
+		"literal_subject": "%s & café — literal",
+		"port_literal": "Puerto del servidor Ollama: %s & café — literal"
+	},
+	"fr": {
+		"sources": {
+			"menu.llm.backend_api_suffix": "Fournisseur distant",
+			"menu.llm.backend_ollama_suffix": "Standard",
+			"menu.llm.ollama_port_label": "Port du serveur Ollama : %s",
+			"menu.llm.reset_label": "  ↳ Réinitialiser (défaut : %s)"
+		},
+		"api": "API 🌐 — Fournisseur distant",
+		"ollama": "Ollama 🦙 — Standard",
+		"port_default": "Port du serveur Ollama : 11434",
+		"port_custom": "Port du serveur Ollama : 11555",
+		"reset_default": "  ↳ Réinitialiser (défaut : 11434)",
+		"literal_subject": "%s & café — literal",
+		"port_literal": "Port du serveur Ollama : %s & café — literal"
+	},
+	"he": {
+		"sources": {
+			"menu.llm.backend_api_suffix": "ספק מרוחק",
+			"menu.llm.backend_ollama_suffix": "רגיל",
+			"menu.llm.ollama_port_label": "פורט שרת Ollama: %s",
+			"menu.llm.reset_label": "  ↳ אפס (ברירת מחדל: %s)"
+		},
+		"api": "API 🌐 — ספק מרוחק",
+		"ollama": "Ollama 🦙 — רגיל",
+		"port_default": "פורט שרת Ollama: 11434",
+		"port_custom": "פורט שרת Ollama: 11555",
+		"reset_default": "  ↳ אפס (ברירת מחדל: 11434)",
+		"literal_subject": "%s & café — literal",
+		"port_literal": "פורט שרת Ollama: %s & café — literal"
+	},
+	"hi": {
+		"sources": {
+			"menu.llm.backend_api_suffix": "दूरस्थ प्रदाता",
+			"menu.llm.backend_ollama_suffix": "मानक",
+			"menu.llm.ollama_port_label": "Ollama सर्वर पोर्ट: %s",
+			"menu.llm.reset_label": "  ↳ रीसेट (डिफ़ॉल्ट: %s)"
+		},
+		"api": "API 🌐 — दूरस्थ प्रदाता",
+		"ollama": "Ollama 🦙 — मानक",
+		"port_default": "Ollama सर्वर पोर्ट: 11434",
+		"port_custom": "Ollama सर्वर पोर्ट: 11555",
+		"reset_default": "  ↳ रीसेट (डिफ़ॉल्ट: 11434)",
+		"literal_subject": "%s & café — literal",
+		"port_literal": "Ollama सर्वर पोर्ट: %s & café — literal"
+	},
+	"it": {
+		"sources": {
+			"menu.llm.backend_api_suffix": "Provider remoto",
+			"menu.llm.backend_ollama_suffix": "Standard",
+			"menu.llm.ollama_port_label": "Porta del server Ollama: %s",
+			"menu.llm.reset_label": "  ↳ Reimposta (predefinito: %s)"
+		},
+		"api": "API 🌐 — Provider remoto",
+		"ollama": "Ollama 🦙 — Standard",
+		"port_default": "Porta del server Ollama: 11434",
+		"port_custom": "Porta del server Ollama: 11555",
+		"reset_default": "  ↳ Reimposta (predefinito: 11434)",
+		"literal_subject": "%s & café — literal",
+		"port_literal": "Porta del server Ollama: %s & café — literal"
+	},
+	"ja": {
+		"sources": {
+			"menu.llm.backend_api_suffix": "リモート プロバイダ",
+			"menu.llm.backend_ollama_suffix": "標準",
+			"menu.llm.ollama_port_label": "Ollama サーバーポート: %s",
+			"menu.llm.reset_label": "  ↳ リセット（デフォルト: %s）"
+		},
+		"api": "API 🌐 — リモート プロバイダ",
+		"ollama": "Ollama 🦙 — 標準",
+		"port_default": "Ollama サーバーポート: 11434",
+		"port_custom": "Ollama サーバーポート: 11555",
+		"reset_default": "  ↳ リセット（デフォルト: 11434）",
+		"literal_subject": "%s & café — literal",
+		"port_literal": "Ollama サーバーポート: %s & café — literal"
+	},
+	"ko": {
+		"sources": {
+			"menu.llm.backend_api_suffix": "원격 공급자",
+			"menu.llm.backend_ollama_suffix": "표준",
+			"menu.llm.ollama_port_label": "Ollama 서버 포트: %s",
+			"menu.llm.reset_label": "  ↳ 초기화 (기본값: %s)"
+		},
+		"api": "API 🌐 — 원격 공급자",
+		"ollama": "Ollama 🦙 — 표준",
+		"port_default": "Ollama 서버 포트: 11434",
+		"port_custom": "Ollama 서버 포트: 11555",
+		"reset_default": "  ↳ 초기화 (기본값: 11434)",
+		"literal_subject": "%s & café — literal",
+		"port_literal": "Ollama 서버 포트: %s & café — literal"
+	},
+	"nl": {
+		"sources": {
+			"menu.llm.backend_api_suffix": "Externe provider",
+			"menu.llm.backend_ollama_suffix": "Standaard",
+			"menu.llm.ollama_port_label": "Ollama-serverpoort: %s",
+			"menu.llm.reset_label": "  ↳ Herstellen (standaard: %s)"
+		},
+		"api": "API 🌐 — Externe provider",
+		"ollama": "Ollama 🦙 — Standaard",
+		"port_default": "Ollama-serverpoort: 11434",
+		"port_custom": "Ollama-serverpoort: 11555",
+		"reset_default": "  ↳ Herstellen (standaard: 11434)",
+		"literal_subject": "%s & café — literal",
+		"port_literal": "Ollama-serverpoort: %s & café — literal"
+	},
+	"no": {
+		"sources": {
+			"menu.llm.backend_api_suffix": "Ekstern leverandør",
+			"menu.llm.backend_ollama_suffix": "Standard",
+			"menu.llm.ollama_port_label": "Ollama-serverport: %s",
+			"menu.llm.reset_label": "  ↳ Tilbakestill (standard: %s)"
+		},
+		"api": "API 🌐 — Ekstern leverandør",
+		"ollama": "Ollama 🦙 — Standard",
+		"port_default": "Ollama-serverport: 11434",
+		"port_custom": "Ollama-serverport: 11555",
+		"reset_default": "  ↳ Tilbakestill (standard: 11434)",
+		"literal_subject": "%s & café — literal",
+		"port_literal": "Ollama-serverport: %s & café — literal"
+	},
+	"pl": {
+		"sources": {
+			"menu.llm.backend_api_suffix": "Zewnętrzny dostawca",
+			"menu.llm.backend_ollama_suffix": "Standardowy",
+			"menu.llm.ollama_port_label": "Port serwera Ollama: %s",
+			"menu.llm.reset_label": "  ↳ Resetuj (domyślnie: %s)"
+		},
+		"api": "API 🌐 — Zewnętrzny dostawca",
+		"ollama": "Ollama 🦙 — Standardowy",
+		"port_default": "Port serwera Ollama: 11434",
+		"port_custom": "Port serwera Ollama: 11555",
+		"reset_default": "  ↳ Resetuj (domyślnie: 11434)",
+		"literal_subject": "%s & café — literal",
+		"port_literal": "Port serwera Ollama: %s & café — literal"
+	},
+	"pt": {
+		"sources": {
+			"menu.llm.backend_api_suffix": "Fornecedor remoto",
+			"menu.llm.backend_ollama_suffix": "Padrão",
+			"menu.llm.ollama_port_label": "Porta do servidor Ollama: %s",
+			"menu.llm.reset_label": "  ↳ Redefinir (padrão: %s)"
+		},
+		"api": "API 🌐 — Fornecedor remoto",
+		"ollama": "Ollama 🦙 — Padrão",
+		"port_default": "Porta do servidor Ollama: 11434",
+		"port_custom": "Porta do servidor Ollama: 11555",
+		"reset_default": "  ↳ Redefinir (padrão: 11434)",
+		"literal_subject": "%s & café — literal",
+		"port_literal": "Porta do servidor Ollama: %s & café — literal"
+	},
+	"ru": {
+		"sources": {
+			"menu.llm.backend_api_suffix": "Удалённый провайдер",
+			"menu.llm.backend_ollama_suffix": "Стандартный",
+			"menu.llm.ollama_port_label": "Порт сервера Ollama: %s",
+			"menu.llm.reset_label": "  ↳ Сбросить (по умолчанию: %s)"
+		},
+		"api": "API 🌐 — Удалённый провайдер",
+		"ollama": "Ollama 🦙 — Стандартный",
+		"port_default": "Порт сервера Ollama: 11434",
+		"port_custom": "Порт сервера Ollama: 11555",
+		"reset_default": "  ↳ Сбросить (по умолчанию: 11434)",
+		"literal_subject": "%s & café — literal",
+		"port_literal": "Порт сервера Ollama: %s & café — literal"
+	},
+	"sv": {
+		"sources": {
+			"menu.llm.backend_api_suffix": "Fjärrleverantör",
+			"menu.llm.backend_ollama_suffix": "Standard",
+			"menu.llm.ollama_port_label": "Ollama-serverport: %s",
+			"menu.llm.reset_label": "  ↳ Återställ (standard: %s)"
+		},
+		"api": "API 🌐 — Fjärrleverantör",
+		"ollama": "Ollama 🦙 — Standard",
+		"port_default": "Ollama-serverport: 11434",
+		"port_custom": "Ollama-serverport: 11555",
+		"reset_default": "  ↳ Återställ (standard: 11434)",
+		"literal_subject": "%s & café — literal",
+		"port_literal": "Ollama-serverport: %s & café — literal"
+	},
+	"tr": {
+		"sources": {
+			"menu.llm.backend_api_suffix": "Uzak sağlayıcı",
+			"menu.llm.backend_ollama_suffix": "Standart",
+			"menu.llm.ollama_port_label": "Ollama sunucu bağlantı noktası: %s",
+			"menu.llm.reset_label": "  ↳ Sıfırla (varsayılan: %s)"
+		},
+		"api": "API 🌐 — Uzak sağlayıcı",
+		"ollama": "Ollama 🦙 — Standart",
+		"port_default": "Ollama sunucu bağlantı noktası: 11434",
+		"port_custom": "Ollama sunucu bağlantı noktası: 11555",
+		"reset_default": "  ↳ Sıfırla (varsayılan: 11434)",
+		"literal_subject": "%s & café — literal",
+		"port_literal": "Ollama sunucu bağlantı noktası: %s & café — literal"
+	},
+	"uk": {
+		"sources": {
+			"menu.llm.backend_api_suffix": "Віддалений постачальник",
+			"menu.llm.backend_ollama_suffix": "Стандартний",
+			"menu.llm.ollama_port_label": "Порт сервера Ollama: %s",
+			"menu.llm.reset_label": "  ↳ Скинути (за замовчуванням: %s)"
+		},
+		"api": "API 🌐 — Віддалений постачальник",
+		"ollama": "Ollama 🦙 — Стандартний",
+		"port_default": "Порт сервера Ollama: 11434",
+		"port_custom": "Порт сервера Ollama: 11555",
+		"reset_default": "  ↳ Скинути (за замовчуванням: 11434)",
+		"literal_subject": "%s & café — literal",
+		"port_literal": "Порт сервера Ollama: %s & café — literal"
+	},
+	"zh": {
+		"sources": {
+			"menu.llm.backend_api_suffix": "远程提供商",
+			"menu.llm.backend_ollama_suffix": "标准",
+			"menu.llm.ollama_port_label": "Ollama 服务器端口：%s",
+			"menu.llm.reset_label": "  ↳ 重置（默认: %s）"
+		},
+		"api": "API 🌐 — 远程提供商",
+		"ollama": "Ollama 🦙 — 标准",
+		"port_default": "Ollama 服务器端口：11434",
+		"port_custom": "Ollama 服务器端口：11555",
+		"reset_default": "  ↳ 重置（默认: 11434）",
+		"literal_subject": "%s & café — literal",
+		"port_literal": "Ollama 服务器端口：%s & café — literal"
+	}
 }

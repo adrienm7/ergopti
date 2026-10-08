@@ -1051,19 +1051,19 @@ _WBC_CompleteFrameOrderAndIdentity(Root) {
 	Observed := Map("calls", 0, "result", true), Action := _WBC_Callback.Bind(Observed)
 	Choice := Map("label", "fixture choice transport receipt", "action", Action, "checked", true)
 	Port := Map("label", "fixture port transport receipt", "action", Action)
-	Local := Map("label", "fixture local transport receipt", "action", Action)
+	LocalReceipt := Map("label", "fixture local transport receipt", "action", Action)
 	Frame := Root["llm_backend_child_frame_ahk"], Original := Frame.Clone()
 	try {
-		Rows := _LLM_Menu_BackendChildFrameRows([Choice], [Port], [Local])
-		AssertTrue(Rows[1] == Choice && Rows[3] == Port && Rows[4] == Local, "the real typed ports retain complete native row identities")
+		Rows := _LLM_Menu_BackendChildFrameRows([Choice], [Port], [LocalReceipt])
+		AssertTrue(Rows[1] == Choice && Rows[3] == Port && Rows[4] == LocalReceipt, "the real typed ports retain complete native row identities")
 		AssertTrue(Rows[2]["separator"])
 		Root["llm_backend_child_frame_ahk"] := [Original[4], Original[3], Original[2], Original[1]]
-		Rows := _LLM_Menu_BackendChildFrameRows([Choice], [Port], [Local])
-		AssertTrue(Rows[1] == Local && Rows[2] == Port && Rows[4] == Choice, "the genuine canonical frame owns complete family order")
+		Rows := _LLM_Menu_BackendChildFrameRows([Choice], [Port], [LocalReceipt])
+		AssertTrue(Rows[1] == LocalReceipt && Rows[2] == Port && Rows[4] == Choice, "the genuine canonical frame owns complete family order")
 		AssertTrue(Rows[3]["separator"])
 		AssertEqual(0, Observed["calls"], "shared composition never invokes a native callback")
-		AssertFalse(_LLM_Menu_BackendChildFrameRows([,], [Port], [Local]), "a sparse array is not a genuine native row cohort")
-		AssertFalse(_LLM_Menu_BackendChildFrameRows([false], [Port], [Local]), "a nonrow cannot impersonate a native cohort")
+		AssertFalse(_LLM_Menu_BackendChildFrameRows([,], [Port], [LocalReceipt]), "a sparse array is not a genuine native row cohort")
+		AssertFalse(_LLM_Menu_BackendChildFrameRows([false], [Port], [LocalReceipt]), "a nonrow cannot impersonate a native cohort")
 	} finally Root["llm_backend_child_frame_ahk"] := Frame
 }
 

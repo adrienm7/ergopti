@@ -1522,39 +1522,58 @@ OPENS_SUBMENU.llm_profile_parent = [
 ];
 
 // Existing native catalogue data owns brands and choices; the consumed shared frames own presentation.
-for (const menu of ['llm_backend_option_caption_frame_ahk', 'llm_backend_ollama_port_frame_ahk', 'llm_backend_child_frame_ahk']) {
+for (const menu of [
+	'llm_backend_option_caption_frame_ahk',
+	'llm_backend_ollama_port_frame_ahk',
+	'llm_backend_child_frame_ahk'
+]) {
 	OPENS_SUBMENU.llm_backend.push({
-		menu, platforms: ['ahk'], kind: 'compose',
+		menu,
+		platforms: ['ahk'],
+		kind: 'compose',
 		native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_models.ahk' }
 	});
 }
 
 // Actual native selected provider parent and its complete warning publication frame.
 OPENS_SUBMENU.llm_backend.push({
-	menu: 'llm_backend_parent_frame_ahk', platforms: ['ahk'], kind: 'compose',
+	menu: 'llm_backend_parent_frame_ahk',
+	platforms: ['ahk'],
+	kind: 'compose',
 	native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_main.ahk' }
 });
 OPENS_SUBMENU.llm_backend.push({
-	menu: 'llm_backend_parent_ahk', platforms: ['ahk'], kind: 'compose',
+	menu: 'llm_backend_parent_ahk',
+	platforms: ['ahk'],
+	kind: 'compose',
 	selected_group: {
 		ahk: {
 			row: {
-				type: 'group', id: 'llm_backend_parent', caption_source: 'native',
-				caption_getter: 'llm_backend_parent_caption', disabled_when: ['llm_backend_parent_ready'],
-				platforms: ['ahk'], unavailable: 'hide'
+				type: 'group',
+				id: 'llm_backend_parent',
+				caption_source: 'native',
+				caption_getter: 'llm_backend_parent_caption',
+				disabled_when: ['llm_backend_parent_ready'],
+				platforms: ['ahk'],
+				unavailable: 'hide'
 			},
 			owner_signature: '_LLM_Menu_BackendParentRows(NativeChild, Caption, Disabled, WarningRows) {',
 			call: 'Parent := MenuRenderer_GroupRow("llm_backend_parent_ahk", "llm_backend_parent", NativeChild, Getters)',
 			handoff: 'ParentRows := [Parent]',
-			consumer: "Map(\"llm_backend_parent_rows\", (*) => ParentRows,\n\t\t\t\"llm_backend_warning_rows\", (*) => Admission[\"warning_rows\"])"
+			consumer:
+				'Map("llm_backend_parent_rows", (*) => ParentRows,\n\t\t\t"llm_backend_warning_rows", (*) => Admission["warning_rows"])'
 		}
 	},
 	native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_main.ahk' }
 });
-OPENS_SUBMENU.llm_backend_parent = [{
-	menu: 'llm_backend_choice_boundary', platforms: ['ahk'], kind: 'compose',
-	native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_models.ahk' }
-}];
+OPENS_SUBMENU.llm_backend_parent = [
+	{
+		menu: 'llm_backend_choice_boundary',
+		platforms: ['ahk'],
+		kind: 'compose',
+		native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_models.ahk' }
+	}
+];
 
 const PERSONAL_DEFAULT_GROUP_PROOF = OPENS_SUBMENU.hotstring_personal[0].selected_group.ahk;
 
@@ -1866,21 +1885,77 @@ const {
 	const source = fs.readFileSync(path.join(SP, 'macos/ui/menu/menu_llm/init.lua'), 'utf8');
 	const builder = fs.readFileSync(path.join(SP, 'macos/ui/menu/builder.lua'), 'utf8');
 	const rows = manifest.llm_native_parent;
-	const credits = (candidate = source, caller = builder, definition = rows, top = manifest.top_level, ...platformArgs) =>
-		nativeLlmParentPublication(candidate, caller, definition, top, platformArgs.length === 0 ? 'hs' : platformArgs[0]);
-	assert.equal(credits(), true, 'actual imported parent binds its completed child to the real top-level caller');
+	const credits = (
+		candidate = source,
+		caller = builder,
+		definition = rows,
+		top = manifest.top_level,
+		...platformArgs
+	) =>
+		nativeLlmParentPublication(
+			candidate,
+			caller,
+			definition,
+			top,
+			platformArgs.length === 0 ? 'hs' : platformArgs[0]
+		);
+	assert.equal(
+		credits(),
+		true,
+		'actual imported parent binds its completed child to the real top-level caller'
+	);
 	const controls = [
-		['local ManifestMenu     = require("infra.manifest_menu")', 'local ManifestMenu     = require("foreign.renderer")', 'foreign parent import'],
-		['return ManifestMenu.group_row("llm_native_parent", "llm_parent_content", main_menu, {', 'return Foreign.group_row("llm_native_parent", "llm_parent_content", main_menu, {', 'foreign caption owner'],
-		['return ManifestMenu.group_row("llm_native_parent", "llm_parent_content", main_menu, {', 'return ManifestMenu.group_row("llm_native_parent", "foreign_parent", main_menu, {', 'foreign row identity'],
-		['return ManifestMenu.group_row("llm_native_parent", "llm_parent_content", main_menu, {', 'return ManifestMenu.group_row("llm_native_parent", "llm_parent_content", {}, {', 'discarded native child'],
-		['llm_parent_enabled = function() return state.llm_enabled or nil end,', 'llm_parent_enabled = function() return state.llm_enabled == true end,', 'lost original absent checked field'],
-		['main_menu = ManifestMenu.build("llm_menu", "LLM", handlers, group_builders, render_ctx, list_providers) or {}', 'main_menu = {}', 'unused child producer'],
-		['llm_toggle = toggle_action,', 'llm_toggle = function() return false end,', 'foreign switch callback'],
-		['build_item          = build_item,', 'build_item          = function() return {} end,', 'unused parent exporter'],
-		['local ok, result = xpcall(create_menu, debug.traceback, deps)', 'local ok, result = true, {}', 'unused real handler factory']
+		[
+			'local ManifestMenu     = require("infra.manifest_menu")',
+			'local ManifestMenu     = require("foreign.renderer")',
+			'foreign parent import'
+		],
+		[
+			'return ManifestMenu.group_row("llm_native_parent", "llm_parent_content", main_menu, {',
+			'return Foreign.group_row("llm_native_parent", "llm_parent_content", main_menu, {',
+			'foreign caption owner'
+		],
+		[
+			'return ManifestMenu.group_row("llm_native_parent", "llm_parent_content", main_menu, {',
+			'return ManifestMenu.group_row("llm_native_parent", "foreign_parent", main_menu, {',
+			'foreign row identity'
+		],
+		[
+			'return ManifestMenu.group_row("llm_native_parent", "llm_parent_content", main_menu, {',
+			'return ManifestMenu.group_row("llm_native_parent", "llm_parent_content", {}, {',
+			'discarded native child'
+		],
+		[
+			'llm_parent_enabled = function() return state.llm_enabled or nil end,',
+			'llm_parent_enabled = function() return state.llm_enabled == true end,',
+			'lost original absent checked field'
+		],
+		[
+			'main_menu = ManifestMenu.build("llm_menu", "LLM", handlers, group_builders, render_ctx, list_providers) or {}',
+			'main_menu = {}',
+			'unused child producer'
+		],
+		[
+			'llm_toggle = toggle_action,',
+			'llm_toggle = function() return false end,',
+			'foreign switch callback'
+		],
+		[
+			'build_item          = build_item,',
+			'build_item          = function() return {} end,',
+			'unused parent exporter'
+		],
+		[
+			'local ok, result = xpcall(create_menu, debug.traceback, deps)',
+			'local ok, result = true, {}',
+			'unused real handler factory'
+		]
 	];
-	assert.equal(controls.length, 9, 'all independently authored actual native-owner withdrawal controls remain registered');
+	assert.equal(
+		controls.length,
+		9,
+		'all independently authored actual native-owner withdrawal controls remain registered'
+	);
 	for (const [before, after, reason] of controls) {
 		assert.equal(source.split(before).length - 1, 1, reason + ': exact actual source preimage');
 		const candidate = source.replace(before, after);
@@ -1888,11 +1963,17 @@ const {
 		assert.equal(credits(candidate), false, reason);
 	}
 	const callerControls = [
-		['local ManifestMenu = require("infra.manifest_menu")', 'local ManifestMenu = require("foreign.renderer")'],
+		[
+			'local ManifestMenu = require("infra.manifest_menu")',
+			'local ManifestMenu = require("foreign.renderer")'
+		],
 		['return ManifestMenu.get_root()', 'return {}'],
 		['for _, entry in ipairs(data.top_level) do', 'for _, entry in ipairs({}) do'],
 		['::continue::', '::foreign_continue::'],
-		['local ok_b, llm_item = pcall(ctx.llm_handler.build_item)', 'local ok_b, llm_item = true, nil'],
+		[
+			'local ok_b, llm_item = pcall(ctx.llm_handler.build_item)',
+			'local ok_b, llm_item = true, nil'
+		],
 		['return llm_item and { llm_item } or {}', 'return {}'],
 		['for _, row in ipairs(builders[id]() or {}) do', 'for _, row in ipairs({}) do'],
 		['local rendered = ManifestMenu.render_rows(items, "top_level")', 'local rendered = {}']
@@ -1900,22 +1981,58 @@ const {
 	assert.equal(callerControls.length, 8, 'all actual tray transport withdrawals remain registered');
 	for (const [before, after] of callerControls) {
 		assert.equal(builder.split(before).length - 1, 1, 'exact current caller preimage');
-		assert.equal(credits(source, builder.replace(before, after)), false, 'actual caller/result transport must remain live');
+		assert.equal(
+			credits(source, builder.replace(before, after)),
+			false,
+			'actual caller/result transport must remain live'
+		);
 	}
 	for (const candidate of ['', JSON.stringify(source), '--[=[\n' + source + '\n]=]'])
 		assert.equal(credits(candidate), false, 'no quoted/comment-only or absent parent source route');
 	for (const caller of ['', JSON.stringify(builder), '--[=[\n' + builder + '\n]=]'])
-		assert.equal(credits(source, caller), false, 'no quoted/comment-only or absent native caller route');
-	for (const definition of [[], [rows[0], rows[0]], [{ ...rows[0], type: 'command' }],
-		[{ ...rows[0], checked_when: [] }], [{ ...rows[0], platforms: ['linux'] }], [{ ...rows[0], id: 'foreign_parent' }]])
-		assert.equal(credits(source, builder, definition), false, 'missing, ambiguous or foreign canonical parent earns no credit');
-	assert.equal(credits(source, builder, rows, manifest.top_level.filter((row) => row.id !== 'llm')), false,
-		'withdrawn real top-level owner earns no live credit');
+		assert.equal(
+			credits(source, caller),
+			false,
+			'no quoted/comment-only or absent native caller route'
+		);
+	for (const definition of [
+		[],
+		[rows[0], rows[0]],
+		[{ ...rows[0], type: 'command' }],
+		[{ ...rows[0], checked_when: [] }],
+		[{ ...rows[0], platforms: ['linux'] }],
+		[{ ...rows[0], id: 'foreign_parent' }]
+	])
+		assert.equal(
+			credits(source, builder, definition),
+			false,
+			'missing, ambiguous or foreign canonical parent earns no credit'
+		);
+	assert.equal(
+		credits(
+			source,
+			builder,
+			rows,
+			manifest.top_level.filter((row) => row.id !== 'llm')
+		),
+		false,
+		'withdrawn real top-level owner earns no live credit'
+	);
 	for (const platform of ['ahk', 'linux', 'HS', '', undefined])
-		assert.equal(credits(source, builder, rows, manifest.top_level, platform), false, 'parent proof is native HS only');
-	assert.equal(credits(source + '\n-- ManifestMenu.group_row("llm_native_parent", "llm_parent_content", fake, {})\n' +
-		'local inert_parent_text = "ManifestMenu.group_row(\\\"llm_native_parent\\\", \\\"llm_parent_content\\\", fake, {})"\n'), true,
-		'inert text neither supplies nor withdraws executable parent authority');
+		assert.equal(
+			credits(source, builder, rows, manifest.top_level, platform),
+			false,
+			'parent proof is native HS only'
+		);
+	assert.equal(
+		credits(
+			source +
+				'\n-- ManifestMenu.group_row("llm_native_parent", "llm_parent_content", fake, {})\n' +
+				'local inert_parent_text = "ManifestMenu.group_row(\\\"llm_native_parent\\\", \\\"llm_parent_content\\\", fake, {})"\n'
+		),
+		true,
+		'inert text neither supplies nor withdraws executable parent authority'
+	);
 	assert.equal(credits(), true, 'exact source repair restores the genuine live parent');
 }
 
@@ -2707,34 +2824,36 @@ for (let pass = 0; pass < MENU_KEYS.length + 1; pass += 1) {
 							? require('../lib/menu-native-llm-parent-binding.cjs').nativeLlmParentPublication(
 									fs.readFileSync(path.join(SP, file), 'utf8'),
 									fs.readFileSync(path.join(SP, 'macos/ui/menu/builder.lua'), 'utf8'),
-									manifest[target], manifest.top_level, platform
+									manifest[target],
+									manifest.top_level,
+									platform
 								)
 							: opened.forwarded_template?.[platform] === 'layout'
-							? require('../lib/menu-native-layout-binding.cjs').nativeLayoutTemplatePublication(
-									fs.readFileSync(path.join(SP, file), 'utf8'),
-									target,
-									manifest[target]
-								)
-							: opened.selected_group?.[platform]
-								? publishesSelectedMenuGroup(
+								? require('../lib/menu-native-layout-binding.cjs').nativeLayoutTemplatePublication(
 										fs.readFileSync(path.join(SP, file), 'utf8'),
-										path.extname(file),
 										target,
-										manifest[target],
-										opened.selected_group[platform]
+										manifest[target]
 									)
-								: publishesTemplate(
-										fs.readFileSync(path.join(SP, file), 'utf8'),
-										path.extname(file),
-										target
-									) ||
-									publishesIncludedCommands(
-										fs.readFileSync(path.join(SP, file), 'utf8'),
-										path.extname(file),
-										target,
-										manifest,
-										platform
-									))
+								: opened.selected_group?.[platform]
+									? publishesSelectedMenuGroup(
+											fs.readFileSync(path.join(SP, file), 'utf8'),
+											path.extname(file),
+											target,
+											manifest[target],
+											opened.selected_group[platform]
+										)
+									: publishesTemplate(
+											fs.readFileSync(path.join(SP, file), 'utf8'),
+											path.extname(file),
+											target
+										) ||
+										publishesIncludedCommands(
+											fs.readFileSync(path.join(SP, file), 'utf8'),
+											path.extname(file),
+											target,
+											manifest,
+											platform
+										))
 					)
 						errors.push(
 							`${menuKey}/${row.id}: ${kind} ${target} has no native template publication on ${platform}`
@@ -4489,15 +4608,31 @@ function languageParentSource(source, driver) {
 	const fs = require('node:fs');
 	const path = require('node:path');
 	const base = path.resolve(__dirname, '../..', 'static/ergopti_plus');
-	const menu = JSON.parse(fs.readFileSync(path.join(base, '_shared/modules/menu/menu_manifest.json'), 'utf8'));
-	const hand = JSON.parse(fs.readFileSync(path.join(base, '_shared/tests/corpus/menus/linux_about_parent.json'), 'utf8'));
-	assert.deepEqual(menu.top_level.filter((row) => row.id === 'about'),
-		[{type: 'group', id: 'about', i18n: 'menu.about.title', rows: []}]);
-	assert.deepEqual(hand.prior_top_level_record, {id: 'about'});
-	assert.deepEqual(menu.about_menu, hand.about_child_declarations, 'all original child identities and behavior metadata remain unchanged');
-	assert.equal(Object.keys(hand.locales).length, 21, 'all independently frozen caption sources execute');
+	const menu = JSON.parse(
+		fs.readFileSync(path.join(base, '_shared/modules/menu/menu_manifest.json'), 'utf8')
+	);
+	const hand = JSON.parse(
+		fs.readFileSync(path.join(base, '_shared/tests/corpus/menus/linux_about_parent.json'), 'utf8')
+	);
+	assert.deepEqual(
+		menu.top_level.filter((row) => row.id === 'about'),
+		[{ type: 'group', id: 'about', i18n: 'menu.about.title', rows: [] }]
+	);
+	assert.deepEqual(hand.prior_top_level_record, { id: 'about' });
+	assert.deepEqual(
+		menu.about_menu,
+		hand.about_child_declarations,
+		'all original child identities and behavior metadata remain unchanged'
+	);
+	assert.equal(
+		Object.keys(hand.locales).length,
+		21,
+		'all independently frozen caption sources execute'
+	);
 	for (const [code, prior] of Object.entries(hand.locales)) {
-		const labels = JSON.parse(fs.readFileSync(path.join(base, '_shared/data/locales', code + '.json'), 'utf8'));
+		const labels = JSON.parse(
+			fs.readFileSync(path.join(base, '_shared/data/locales', code + '.json'), 'utf8')
+		);
 		assert.equal(labels['menu.about.title'], prior.about_parent);
 		assert.equal(labels['menu.about.changelog'], prior.changelog);
 		assert.equal(labels['menu.about.open_releases_page'], prior.releases_page);
@@ -4638,44 +4773,101 @@ function languageParentSource(source, driver) {
 				'return ManifestMenu.group_row("top_level", "about", rows, render_ctx.state_getters)'
 			];
 			if (!chronology.every((statement) => hasStatement(native, statement))) return false;
-			const nativeTokens = scriptTokens(native, '.lua'), depths = tokenDepths(nativeTokens);
+			const nativeTokens = scriptTokens(native, '.lua'),
+				depths = tokenDepths(nativeTokens);
 			let previous = -1;
 			for (const statement of chronology) {
 				const wanted = scriptTokens(statement, '.lua');
-				const at = nativeTokens.findIndex((_, index) => index > previous && depths[index] === 0 &&
-					wanted.every((token, offset) => nativeTokens[index + offset]?.kind === token.kind &&
-						nativeTokens[index + offset]?.value === token.value));
+				const at = nativeTokens.findIndex(
+					(_, index) =>
+						index > previous &&
+						depths[index] === 0 &&
+						wanted.every(
+							(token, offset) =>
+								nativeTokens[index + offset]?.kind === token.kind &&
+								nativeTokens[index + offset]?.value === token.value
+						)
+				);
 				if (at < 0) return false;
 				previous = at;
 			}
 			const guard = ownerBody(source, 'local function about_source(renderer, platform)');
-			if (!hasStatement(guard, 'local top, children = rawget(root, "top_level"), rawget(root, "about_menu")')) return false;
-			if (!hasStatement(guard, 'if not about_dense(top, true) or not about_dense(children, true) or #children == 0 then return nil end')) return false;
-			if (!hasStatement(publicOwner, 'return ManifestMenu.render_rows(rows, "top_level")')) return false;
+			if (
+				!hasStatement(
+					guard,
+					'local top, children = rawget(root, "top_level"), rawget(root, "about_menu")'
+				)
+			)
+				return false;
+			if (
+				!hasStatement(
+					guard,
+					'if not about_dense(top, true) or not about_dense(children, true) or #children == 0 then return nil end'
+				)
+			)
+				return false;
+			if (!hasStatement(publicOwner, 'return ManifestMenu.render_rows(rows, "top_level")'))
+				return false;
 			const tokens = scriptTokens(publicOwner, '.lua');
 			const binding = scriptTokens('["about"] = _build_about', '.lua');
-			return tokens.some((_, index) => binding.every((token, offset) =>
-				tokens[index + offset]?.kind === token.kind && tokens[index + offset]?.value === token.value));
-		} catch { return false; }
+			return tokens.some((_, index) =>
+				binding.every(
+					(token, offset) =>
+						tokens[index + offset]?.kind === token.kind &&
+						tokens[index + offset]?.value === token.value
+				)
+			);
+		} catch {
+			return false;
+		}
 	}
 	const source = fs.readFileSync(path.join(base, 'linux/ui/menu/menu_builder.lua'), 'utf8');
-	assert.equal(admits(source), true, 'the actual registered public native About route consumes its true canonical parent');
+	assert.equal(
+		admits(source),
+		true,
+		'the actual registered public native About route consumes its true canonical parent'
+	);
 	for (const [before, after, reason] of [
-		['return ManifestMenu.group_row("top_level", "about", rows, render_ctx.state_getters)',
-			'return Foreign.group_row("top_level", "about", rows, render_ctx.state_getters)', 'foreign renderer'],
-		['return ManifestMenu.group_row("top_level", "about", rows, render_ctx.state_getters)',
-			'return ManifestMenu.group_row("top_level", "debug", rows, render_ctx.state_getters)', 'wrong actual parent'],
-		['return ManifestMenu.group_row("top_level", "about", rows, render_ctx.state_getters)',
-			'return ManifestMenu.group_row("about_menu", "about", rows, render_ctx.state_getters)', 'wrong catalogue owner'],
-		['return ManifestMenu.group_row("top_level", "about", rows, render_ctx.state_getters)',
-			'return ManifestMenu.group_row("top_level", "about", {}, render_ctx.state_getters)', 'disconnected finished child'],
-		['local root, top, section, parent, fields = about_source(ManifestMenu, "linux")',
-			'local root, top, section, parent, fields = about_source(Foreign, "linux")', 'foreign source admission'],
-		['["about"]           = _build_about,', '["about"]           = _build_debug,', 'missing actual public producer'],
-		['or not about_parent_unchanged(parent, fields) then return nil end',
-			'or false then return nil end', 'missing actual source identity refusal'],
-		['return ManifestMenu.render_rows(rows, "top_level")',
-			'return rows', 'missing actual native rendering boundary']
+		[
+			'return ManifestMenu.group_row("top_level", "about", rows, render_ctx.state_getters)',
+			'return Foreign.group_row("top_level", "about", rows, render_ctx.state_getters)',
+			'foreign renderer'
+		],
+		[
+			'return ManifestMenu.group_row("top_level", "about", rows, render_ctx.state_getters)',
+			'return ManifestMenu.group_row("top_level", "debug", rows, render_ctx.state_getters)',
+			'wrong actual parent'
+		],
+		[
+			'return ManifestMenu.group_row("top_level", "about", rows, render_ctx.state_getters)',
+			'return ManifestMenu.group_row("about_menu", "about", rows, render_ctx.state_getters)',
+			'wrong catalogue owner'
+		],
+		[
+			'return ManifestMenu.group_row("top_level", "about", rows, render_ctx.state_getters)',
+			'return ManifestMenu.group_row("top_level", "about", {}, render_ctx.state_getters)',
+			'disconnected finished child'
+		],
+		[
+			'local root, top, section, parent, fields = about_source(ManifestMenu, "linux")',
+			'local root, top, section, parent, fields = about_source(Foreign, "linux")',
+			'foreign source admission'
+		],
+		[
+			'["about"]           = _build_about,',
+			'["about"]           = _build_debug,',
+			'missing actual public producer'
+		],
+		[
+			'or not about_parent_unchanged(parent, fields) then return nil end',
+			'or false then return nil end',
+			'missing actual source identity refusal'
+		],
+		[
+			'return ManifestMenu.render_rows(rows, "top_level")',
+			'return rows',
+			'missing actual native rendering boundary'
+		]
 	]) {
 		assert.equal(source.split(before).length - 1, 1, reason + ': exact source preimage');
 		assert.equal(admits(source.replace(before, after)), false, reason);

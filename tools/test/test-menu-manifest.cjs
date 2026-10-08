@@ -10362,7 +10362,6 @@ console.log(
 	);
 }
 
-
 // Complete Windows profile parent placement uses the original native profile child.
 {
 	const assert = require('node:assert/strict');
@@ -10374,9 +10373,13 @@ console.log(
 	const frame = 'llm_profile_parent_frame_ahk';
 	const group = 'llm_profile_parent_ahk';
 	const parent = {
-		type: 'group', id: 'llm_profile_parent', i18n: 'menu.profiles.profile_label_prefix',
-		caption_getter: 'llm_profile_parent_caption', disabled_when: ['llm_profile_parent_ready'],
-		platforms: ['ahk'], unavailable: 'hide'
+		type: 'group',
+		id: 'llm_profile_parent',
+		i18n: 'menu.profiles.profile_label_prefix',
+		caption_getter: 'llm_profile_parent_caption',
+		disabled_when: ['llm_profile_parent_ready'],
+		platforms: ['ahk'],
+		unavailable: 'hide'
 	};
 	const expected = [
 		{ type: 'list', id: 'llm_profile_parent_rows', platforms: ['ahk'], unavailable: 'hide' },
@@ -10393,15 +10396,26 @@ console.log(
 		assert(at >= 0, 'actual appended owner signature has a source floor');
 		return candidate.slice(at + 1);
 	};
-	const binds = (candidate, port = 3) => nativeTemplateBinding(owner(candidate), '.ahk', frame, 'llm_profile_parent_rows', port);
+	const binds = (candidate, port = 3) =>
+		nativeTemplateBinding(owner(candidate), '.ahk', frame, 'llm_profile_parent_rows', port);
 	assert.equal(binds(source), true, 'actual typed list provider supplies the complete parent');
 	assert.equal(binds(source, 1), false, 'a native child list is not a command port');
 	for (const candidate of [
-		source.replaceAll('"llm_profile_parent_rows", (*) => ParentRows', '"llm_profile_parent_rows", false'),
-		source.replaceAll('MenuRenderer_TemplateRows("' + frame + '"', 'MenuRenderer_TemplateRows("withdrawn_profile_frame"')
+		source.replaceAll(
+			'"llm_profile_parent_rows", (*) => ParentRows',
+			'"llm_profile_parent_rows", false'
+		),
+		source.replaceAll(
+			'MenuRenderer_TemplateRows("' + frame + '"',
+			'MenuRenderer_TemplateRows("withdrawn_profile_frame"'
+		)
 	]) {
 		assert.notEqual(candidate, source);
-		assert.equal(binds(candidate), false, 'withdrawn/empty/uncallable publication evidence refuses');
+		assert.equal(
+			binds(candidate),
+			false,
+			'withdrawn/empty/uncallable publication evidence refuses'
+		);
 	}
 	const proof = {
 		row: parent,
@@ -10410,43 +10424,77 @@ console.log(
 		handoff: 'ParentRows := [Parent]',
 		consumer: 'Map("llm_profile_parent_rows", (*) => ParentRows)'
 	};
-	const authentic = (candidate) => publishesSelectedMenuGroup(candidate, '.ahk', group, [parent], proof);
+	const authentic = (candidate) =>
+		publishesSelectedMenuGroup(candidate, '.ahk', group, [parent], proof);
 	assert.equal(authentic(source), true, 'actual GroupRow result reaches the native list port');
 	for (const candidate of [
 		source.replace(proof.call, '; ' + proof.call),
-		source.replace(proof.call, proof.call.replace('MenuRenderer_GroupRow', 'Foreign.MenuRenderer_GroupRow')),
+		source.replace(
+			proof.call,
+			proof.call.replace('MenuRenderer_GroupRow', 'Foreign.MenuRenderer_GroupRow')
+		),
 		source.replace('ParentRows := [Parent]', 'ParentRows := []'),
 		source.replace(proof.consumer, 'Map("foreign_profile_rows", (*) => ParentRows)'),
-		source.replace(proof.owner_signature, '_Unused_ProfileParentRows(NativeChild, Caption, Disabled) {')
+		source.replace(
+			proof.owner_signature,
+			'_Unused_ProfileParentRows(NativeChild, Caption, Disabled) {'
+		)
 	]) {
 		assert.notEqual(candidate, source);
-		assert.equal(authentic(candidate), false, 'quoted/commented/foreign/withdrawn result cannot own publication');
+		assert.equal(
+			authentic(candidate),
+			false,
+			'quoted/commented/foreign/withdrawn result cannot own publication'
+		);
 	}
-	const tokens = (text) => scriptTokens(text, '.ahk').map((token) => token.kind + ':' + token.value);
+	const tokens = (text) =>
+		scriptTokens(text, '.ahk').map((token) => token.kind + ':' + token.value);
 	const contains = (haystack, needle) => {
-		const all = tokens(haystack), wanted = tokens(needle);
+		const all = tokens(haystack),
+			wanted = tokens(needle);
 		return all.some((_, at) => wanted.every((token, i) => all[at + i] === token));
 	};
-	const handoff = 'ProfileRows := _LLM_Menu_ProfileParentRows(ProfileMenu, ProfileCaption, disabled)';
-	const consumer = 'MenuRenderer_AppendRows(_LLM_Menu_Handle, "llm_menu", "llm_profile_parent_frame_ahk", ProfileRows)';
+	const handoff =
+		'ProfileRows := _LLM_Menu_ProfileParentRows(ProfileMenu, ProfileCaption, disabled)';
+	const consumer =
+		'MenuRenderer_AppendRows(_LLM_Menu_Handle, "llm_menu", "llm_profile_parent_frame_ahk", ProfileRows)';
 	assert(contains(source, 'ProfileMenu := LLM_Menu_BuildProfileMenu()'));
-	assert(contains(source, handoff), 'actual emitter passes the original child and current profile datum');
+	assert(
+		contains(source, handoff),
+		'actual emitter passes the original child and current profile datum'
+	);
 	assert(contains(source, consumer), 'actual emitter consumes the admitted whole frame');
 	for (const statement of [handoff, consumer]) {
 		const candidate = source.replace(statement, '; ' + statement);
 		assert.notEqual(candidate, source);
-		assert.equal(contains(candidate, statement), false, 'a commented real handoff is not executable evidence');
+		assert.equal(
+			contains(candidate, statement),
+			false,
+			'a commented real handoff is not executable evidence'
+		);
 	}
-	const corpus = JSON.parse(readFileSync(resolve(SHARED, 'tests/corpus/menus/windows_llm_profile_parent_captions.json'), 'utf8'));
+	const corpus = JSON.parse(
+		readFileSync(
+			resolve(SHARED, 'tests/corpus/menus/windows_llm_profile_parent_captions.json'),
+			'utf8'
+		)
+	);
 	assert.equal(Object.keys(corpus).length, 21);
 	for (const [language, subject] of Object.entries(corpus)) {
-		const locale = JSON.parse(readFileSync(resolve(SHARED, 'data/locales/' + language + '.json'), 'utf8'));
-		assert.equal(locale[subject.source_key], subject.source, 'old translated source was frozen before the candidate');
+		const locale = JSON.parse(
+			readFileSync(resolve(SHARED, 'data/locales/' + language + '.json'), 'utf8')
+		);
+		assert.equal(
+			locale[subject.source_key],
+			subject.source,
+			'old translated source was frozen before the candidate'
+		);
 		assert.equal(subject.expected, subject.source.replaceAll('%s', subject.subject));
 	}
-	console.log('[OK] complete Windows profile parent: original child, whole frame, 21 independent captions and typed source withdrawal.');
+	console.log(
+		'[OK] complete Windows profile parent: original child, whole frame, 21 independent captions and typed source withdrawal.'
+	);
 }
-
 
 // Complete Windows backend choice/port/reset presentation consumes genuine native data.
 {
@@ -10470,28 +10518,68 @@ console.log(
 	assert.deepEqual(records[frame], expected);
 	assert.deepEqual(generated[frame], expected);
 	assert.deepEqual(records.llm_backend_option_caption_frame_ahk, [
-		{ type: 'include', section: 'llm_backend_ollama_option_caption_ahk', present_when: 'llm_backend_option_is_ollama' },
-		{ type: 'include', section: 'llm_backend_api_option_caption_ahk', present_when: 'llm_backend_option_is_api' }
+		{
+			type: 'include',
+			section: 'llm_backend_ollama_option_caption_ahk',
+			present_when: 'llm_backend_option_is_ollama'
+		},
+		{
+			type: 'include',
+			section: 'llm_backend_api_option_caption_ahk',
+			present_when: 'llm_backend_option_is_api'
+		}
 	]);
-	assert.deepEqual(generated.llm_backend_option_caption_frame_ahk, records.llm_backend_option_caption_frame_ahk);
+	assert.deepEqual(
+		generated.llm_backend_option_caption_frame_ahk,
+		records.llm_backend_option_caption_frame_ahk
+	);
 	for (const id of ['ollama', 'api']) {
 		const section = 'llm_backend_' + id + '_option_caption_ahk';
-		const caption = [{ type: 'label', id: 'llm_backend_' + id + '_option_caption',
-			i18n: 'menu.llm.backend_' + id + '_suffix', caption_getter: 'llm_backend_option_brand',
-			caption_layout: 'suffix', caption_joiner: ' — ', platforms: ['ahk'], unavailable: 'hide' }];
+		const caption = [
+			{
+				type: 'label',
+				id: 'llm_backend_' + id + '_option_caption',
+				i18n: 'menu.llm.backend_' + id + '_suffix',
+				caption_getter: 'llm_backend_option_brand',
+				caption_layout: 'suffix',
+				caption_joiner: ' — ',
+				platforms: ['ahk'],
+				unavailable: 'hide'
+			}
+		];
 		assert.deepEqual(records[section], caption);
 		assert.deepEqual(generated[section], caption);
 	}
-	assert.deepEqual(records.llm_backend_ollama_port_control_ahk, [{ type: 'command',
-		id: 'llm_backend_ollama_port', i18n: 'menu.llm.ollama_port_label',
-		caption_getter: 'llm_backend_ollama_port_caption', platforms: ['ahk'], unavailable: 'hide' }]);
-	assert.deepEqual(generated.llm_backend_ollama_port_control_ahk, records.llm_backend_ollama_port_control_ahk);
+	assert.deepEqual(records.llm_backend_ollama_port_control_ahk, [
+		{
+			type: 'command',
+			id: 'llm_backend_ollama_port',
+			i18n: 'menu.llm.ollama_port_label',
+			caption_getter: 'llm_backend_ollama_port_caption',
+			platforms: ['ahk'],
+			unavailable: 'hide'
+		}
+	]);
+	assert.deepEqual(
+		generated.llm_backend_ollama_port_control_ahk,
+		records.llm_backend_ollama_port_control_ahk
+	);
 	assert.deepEqual(records.llm_backend_ollama_port_frame_ahk, [
 		{ type: 'include', section: 'llm_backend_ollama_port_control_ahk' },
-		{ type: 'include', section: 'llm_native_numeric_reset', present_when: 'llm_backend_ollama_port_customized' }
+		{
+			type: 'include',
+			section: 'llm_native_numeric_reset',
+			present_when: 'llm_backend_ollama_port_customized'
+		}
 	]);
-	assert.deepEqual(generated.llm_backend_ollama_port_frame_ahk, records.llm_backend_ollama_port_frame_ahk);
-	const source = readFileSync(resolve(SHARED, '../windows/ui/menu/menu_llm/menu_models.ahk'), 'utf8');
+	assert.deepEqual(
+		generated.llm_backend_ollama_port_frame_ahk,
+		records.llm_backend_ollama_port_frame_ahk
+	);
+	const source = readFileSync(
+		resolve(SHARED, '../windows/ui/menu/menu_llm/menu_models.ahk'),
+		'utf8'
+	);
 	const signature = '_LLM_Menu_BackendChildFrameRows(ChoiceRows, PortRows, LocalRows) {';
 	const start = source.indexOf('\n' + signature);
 	assert(start >= 0, 'the actual complete native frame owner has a source floor');
@@ -10500,27 +10588,61 @@ console.log(
 		const row = [{ type: 'list', id: key, platforms: ['ahk'], unavailable: 'hide' }];
 		assert.deepEqual(records[section], row);
 		assert.deepEqual(generated[section], row);
-		const binds = (native, definition = generated, port = 3) => nativeTemplateBinding(native, '.ahk', section, key, port, [{ src: native }], definition, 'ahk');
-		assert.equal(binds(owner), true, 'the actual native row cohort reaches its transitive typed list');
-		assert.equal(binds(owner, generated, 1), false, 'native row data cannot supply the callback port');
+		const binds = (native, definition = generated, port = 3) =>
+			nativeTemplateBinding(
+				native,
+				'.ahk',
+				section,
+				key,
+				port,
+				[{ src: native }],
+				definition,
+				'ahk'
+			);
+		assert.equal(
+			binds(owner),
+			true,
+			'the actual native row cohort reaches its transitive typed list'
+		);
+		assert.equal(
+			binds(owner, generated, 1),
+			false,
+			'native row data cannot supply the callback port'
+		);
 		for (const candidate of [
 			owner.replace('"' + key + '", (*) => ' + datum, '"' + key + '", false'),
-			owner.replace('Rows := MenuRenderer_TemplateRows("' + frame + '"', 'Rows := Foreign.MenuRenderer_TemplateRows("' + frame + '"')
+			owner.replace(
+				'Rows := MenuRenderer_TemplateRows("' + frame + '"',
+				'Rows := Foreign.MenuRenderer_TemplateRows("' + frame + '"'
+			)
 		]) {
 			assert.notEqual(candidate, owner);
-			assert.equal(binds(candidate), false, 'a foreign or uncallable source cannot own the complete native row cohort');
+			assert.equal(
+				binds(candidate),
+				false,
+				'a foreign or uncallable source cannot own the complete native row cohort'
+			);
 		}
 		for (const defect of ['missing', 'cycle', 'redirected']) {
 			const changed = structuredClone(generated);
 			if (defect === 'missing') delete changed[section];
 			if (defect === 'cycle') changed[section] = [{ type: 'include', section: frame }];
-			if (defect === 'redirected') changed[frame] = changed[frame].map(row => row.section === section ? { ...row, section: 'foreign_backend_child_block' } : row);
-			assert.equal(binds(owner, changed), false, 'a missing, cyclic or redirected physical owner grants no typed evidence');
+			if (defect === 'redirected')
+				changed[frame] = changed[frame].map((row) =>
+					row.section === section ? { ...row, section: 'foreign_backend_child_block' } : row
+				);
+			assert.equal(
+				binds(owner, changed),
+				false,
+				'a missing, cyclic or redirected physical owner grants no typed evidence'
+			);
 		}
 	}
-	const tokens = text => scriptTokens(text, '.ahk').map(token => token.kind + ':' + token.value);
+	const tokens = (text) =>
+		scriptTokens(text, '.ahk').map((token) => token.kind + ':' + token.value);
 	const contains = (text, statement) => {
-		const actual = tokens(text), wanted = tokens(statement);
+		const actual = tokens(text),
+			wanted = tokens(statement);
 		return actual.some((_, at) => wanted.every((token, offset) => actual[at + offset] === token));
 	};
 	for (const statement of [
@@ -10535,24 +10657,52 @@ console.log(
 		'Customized := !(CurrentPort = DefaultPort)',
 		'Map("llm_backend_ollama_port", Prompt, "llm_native_numeric_reset", Reset)'
 	]) {
-		assert(contains(source, statement), 'actual original producer/callback receipt reaches the declared frame');
+		assert(
+			contains(source, statement),
+			'actual original producer/callback receipt reaches the declared frame'
+		);
 		const candidate = source.replace(statement, '; ' + statement);
 		assert.notEqual(candidate, source);
-		assert.equal(contains(candidate, statement), false, 'commented source cannot supply the actual transport');
+		assert.equal(
+			contains(candidate, statement),
+			false,
+			'commented source cannot supply the actual transport'
+		);
 	}
-	const corpus = JSON.parse(readFileSync(resolve(SHARED, 'tests/corpus/menus/windows_backend_child_captions.json'), 'utf8'));
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/windows_backend_child_captions.json'), 'utf8')
+	);
 	assert.equal(Object.keys(corpus).length, 21);
 	for (const [language, subject] of Object.entries(corpus)) {
-		const locale = JSON.parse(readFileSync(resolve(SHARED, 'data/locales/' + language + '.json'), 'utf8'));
+		const locale = JSON.parse(
+			readFileSync(resolve(SHARED, 'data/locales/' + language + '.json'), 'utf8')
+		);
 		for (const [key, value] of Object.entries(subject.sources)) assert.equal(locale[key], value);
 		assert.equal(subject.api, 'API 🌐 — ' + subject.sources['menu.llm.backend_api_suffix']);
-		assert.equal(subject.ollama, 'Ollama 🦙 — ' + subject.sources['menu.llm.backend_ollama_suffix']);
-		assert.equal(subject.port_default, subject.sources['menu.llm.ollama_port_label'].replaceAll('%s', '11434'));
-		assert.equal(subject.port_custom, subject.sources['menu.llm.ollama_port_label'].replaceAll('%s', '11555'));
-		assert.equal(subject.reset_default, subject.sources['menu.llm.reset_label'].replaceAll('%s', '11434'));
-		assert.equal(subject.port_literal, subject.sources['menu.llm.ollama_port_label'].replaceAll('%s', subject.literal_subject));
+		assert.equal(
+			subject.ollama,
+			'Ollama 🦙 — ' + subject.sources['menu.llm.backend_ollama_suffix']
+		);
+		assert.equal(
+			subject.port_default,
+			subject.sources['menu.llm.ollama_port_label'].replaceAll('%s', '11434')
+		);
+		assert.equal(
+			subject.port_custom,
+			subject.sources['menu.llm.ollama_port_label'].replaceAll('%s', '11555')
+		);
+		assert.equal(
+			subject.reset_default,
+			subject.sources['menu.llm.reset_label'].replaceAll('%s', '11434')
+		);
+		assert.equal(
+			subject.port_literal,
+			subject.sources['menu.llm.ollama_port_label'].replaceAll('%s', subject.literal_subject)
+		);
 	}
-	console.log('[OK] actual Windows backend child: original brands/catalogue/callbacks, complete shared numeric/order frame, 21 frozen caption images and genuine typed source refusal.');
+	console.log(
+		'[OK] actual Windows backend child: original brands/catalogue/callbacks, complete shared numeric/order frame, 21 frozen caption images and genuine typed source refusal.'
+	);
 }
 
 // Native backend data remains a datum while the manifest owns the complete warning/parent frame.
@@ -10566,9 +10716,13 @@ console.log(
 	const frame = 'llm_backend_parent_frame_ahk';
 	const group = 'llm_backend_parent_ahk';
 	const parent = {
-		type: 'group', id: 'llm_backend_parent', caption_source: 'native',
-		caption_getter: 'llm_backend_parent_caption', disabled_when: ['llm_backend_parent_ready'],
-		platforms: ['ahk'], unavailable: 'hide'
+		type: 'group',
+		id: 'llm_backend_parent',
+		caption_source: 'native',
+		caption_getter: 'llm_backend_parent_caption',
+		disabled_when: ['llm_backend_parent_ready'],
+		platforms: ['ahk'],
+		unavailable: 'hide'
 	};
 	const expected = [
 		{ type: 'include', section: 'llm_backend_warning_rows_ahk' },
@@ -10580,41 +10734,76 @@ console.log(
 	assert.deepEqual(generated[group], [parent]);
 	const source = readFileSync(resolve(SHARED, '../windows/ui/menu/menu_llm/menu_main.ahk'), 'utf8');
 	const signature = '_LLM_Menu_BackendParentRows(NativeChild, Caption, Disabled, WarningRows) {';
-	const owner = candidate => {
+	const owner = (candidate) => {
 		const at = candidate.indexOf('\n' + signature);
 		assert(at >= 0, 'actual backend provider has an executable source floor');
 		return candidate.slice(at + 1);
 	};
-	const binds = (candidate, port = 3) => nativeTemplateBinding(owner(candidate), '.ahk', frame, 'llm_backend_parent_rows', port);
-	assert.equal(binds(source), true, 'actual finished parent reaches the typed native child-list port');
+	const binds = (candidate, port = 3) =>
+		nativeTemplateBinding(owner(candidate), '.ahk', frame, 'llm_backend_parent_rows', port);
+	assert.equal(
+		binds(source),
+		true,
+		'actual finished parent reaches the typed native child-list port'
+	);
 	assert.equal(binds(source, 1), false, 'a native Menu parent is not a command port');
 	for (const candidate of [
-		source.replaceAll('"llm_backend_parent_rows", (*) => ParentRows', '"llm_backend_parent_rows", false'),
-		source.replaceAll('MenuRenderer_TemplateRows("' + frame + '"', 'MenuRenderer_TemplateRows("foreign_backend_frame"')
+		source.replaceAll(
+			'"llm_backend_parent_rows", (*) => ParentRows',
+			'"llm_backend_parent_rows", false'
+		),
+		source.replaceAll(
+			'MenuRenderer_TemplateRows("' + frame + '"',
+			'MenuRenderer_TemplateRows("foreign_backend_frame"'
+		)
 	]) {
 		assert.notEqual(candidate, source);
-		assert.equal(binds(candidate), false, 'withdrawn or uncallable native parent publication refuses');
+		assert.equal(
+			binds(candidate),
+			false,
+			'withdrawn or uncallable native parent publication refuses'
+		);
 	}
 	const proof = {
-		row: parent, owner_signature: signature,
+		row: parent,
+		owner_signature: signature,
 		call: 'Parent := MenuRenderer_GroupRow("llm_backend_parent_ahk", "llm_backend_parent", NativeChild, Getters)',
-		handoff: 'ParentRows := [Parent]', consumer: "Map(\"llm_backend_parent_rows\", (*) => ParentRows,\n\t\t\t\"llm_backend_warning_rows\", (*) => Admission[\"warning_rows\"])"
+		handoff: 'ParentRows := [Parent]',
+		consumer:
+			'Map("llm_backend_parent_rows", (*) => ParentRows,\n\t\t\t"llm_backend_warning_rows", (*) => Admission["warning_rows"])'
 	};
-	const authentic = candidate => publishesSelectedMenuGroup(candidate, '.ahk', group, [parent], proof);
-	assert.equal(authentic(source), true, 'actual GroupRow native caption retains the finished original Menu child');
+	const authentic = (candidate) =>
+		publishesSelectedMenuGroup(candidate, '.ahk', group, [parent], proof);
+	assert.equal(
+		authentic(source),
+		true,
+		'actual GroupRow native caption retains the finished original Menu child'
+	);
 	for (const candidate of [
 		source.replace(proof.call, '; ' + proof.call),
-		source.replace(proof.call, proof.call.replace('MenuRenderer_GroupRow', 'Foreign.MenuRenderer_GroupRow')),
+		source.replace(
+			proof.call,
+			proof.call.replace('MenuRenderer_GroupRow', 'Foreign.MenuRenderer_GroupRow')
+		),
 		source.replaceAll('ParentRows := [Parent]', 'ParentRows := []'),
 		source.replace(proof.consumer, 'Map("foreign_backend_rows", (*) => ParentRows)'),
-		source.replace(signature, '_Unused_BackendParentRows(NativeChild, Caption, Disabled, WarningRows) {')
+		source.replace(
+			signature,
+			'_Unused_BackendParentRows(NativeChild, Caption, Disabled, WarningRows) {'
+		)
 	]) {
 		assert.notEqual(candidate, source);
-		assert.equal(authentic(candidate), false, 'commented, foreign or discarded GroupRow results cannot claim the real backend');
+		assert.equal(
+			authentic(candidate),
+			false,
+			'commented, foreign or discarded GroupRow results cannot claim the real backend'
+		);
 	}
-	const tokens = text => scriptTokens(text, '.ahk').map(token => token.kind + ':' + token.value);
+	const tokens = (text) =>
+		scriptTokens(text, '.ahk').map((token) => token.kind + ':' + token.value);
 	const contains = (text, statement) => {
-		const actual = tokens(text), expected = tokens(statement);
+		const actual = tokens(text),
+			expected = tokens(statement);
 		return actual.some((_, at) => expected.every((token, i) => actual[at + i] === token));
 	};
 	for (const statement of [
@@ -10624,15 +10813,29 @@ console.log(
 		'BackendRows := _LLM_Menu_BackendParentRows(BackendMenu, BackendCaption, disabled, WarningRows)',
 		'MenuRenderer_AppendRows(_LLM_Menu_Handle, "llm_menu", "llm_backend_parent_frame_ahk", BackendRows)'
 	]) {
-		assert(contains(source, statement), 'actual original provider/captured warning/native child publication is executable');
+		assert(
+			contains(source, statement),
+			'actual original provider/captured warning/native child publication is executable'
+		);
 		const candidate = source.replace(statement, '; ' + statement);
 		assert.notEqual(candidate, source);
-		assert.equal(contains(candidate, statement), false, 'a commented native handoff is not execution evidence');
+		assert.equal(
+			contains(candidate, statement),
+			false,
+			'a commented native handoff is not execution evidence'
+		);
 	}
-	const corpus = JSON.parse(readFileSync(resolve(SHARED, 'tests/corpus/menus/windows_llm_backend_parent_captions.json'), 'utf8'));
+	const corpus = JSON.parse(
+		readFileSync(
+			resolve(SHARED, 'tests/corpus/menus/windows_llm_backend_parent_captions.json'),
+			'utf8'
+		)
+	);
 	assert.equal(Object.keys(corpus).length, 21);
 	for (const [language, subject] of Object.entries(corpus)) {
-		const locale = JSON.parse(readFileSync(resolve(SHARED, 'data/locales/' + language + '.json'), 'utf8'));
+		const locale = JSON.parse(
+			readFileSync(resolve(SHARED, 'data/locales/' + language + '.json'), 'utf8')
+		);
 		for (const [key, value] of Object.entries(subject.sources))
 			assert.equal(locale[key], value, 'all original translated warning/option sources stay exact');
 		assert.equal(subject.warning, subject.sources['menu.llm.warning_install_ollama']);
@@ -10641,7 +10844,9 @@ console.log(
 		assert.equal(subject.selected.ollama, 'Ollama 🦙');
 		assert.equal(subject.literal_native, 'Local %s & café — literal');
 	}
-	console.log('[OK] actual Windows backend complete frame: genuine native datum, warning order, original callback/Menu and all21 old captions.');
+	console.log(
+		'[OK] actual Windows backend complete frame: genuine native datum, warning order, original callback/Menu and all21 old captions.'
+	);
 }
 
 // Linux About consumes the genuine top-level owner and preserves its completed native child.
@@ -10651,15 +10856,31 @@ console.log(
 	const fs = require('node:fs');
 	const path = require('node:path');
 	const base = path.resolve(__dirname, '../..', 'static/ergopti_plus');
-	const menu = JSON.parse(fs.readFileSync(path.join(base, '_shared/modules/menu/menu_manifest.json'), 'utf8'));
-	const hand = JSON.parse(fs.readFileSync(path.join(base, '_shared/tests/corpus/menus/linux_about_parent.json'), 'utf8'));
-	assert.deepEqual(menu.top_level.filter((row) => row.id === 'about'),
-		[{type: 'group', id: 'about', i18n: 'menu.about.title', rows: []}]);
-	assert.deepEqual(hand.prior_top_level_record, {id: 'about'});
-	assert.deepEqual(menu.about_menu, hand.about_child_declarations, 'all original child identities and behavior metadata remain unchanged');
-	assert.equal(Object.keys(hand.locales).length, 21, 'all independently frozen caption sources execute');
+	const menu = JSON.parse(
+		fs.readFileSync(path.join(base, '_shared/modules/menu/menu_manifest.json'), 'utf8')
+	);
+	const hand = JSON.parse(
+		fs.readFileSync(path.join(base, '_shared/tests/corpus/menus/linux_about_parent.json'), 'utf8')
+	);
+	assert.deepEqual(
+		menu.top_level.filter((row) => row.id === 'about'),
+		[{ type: 'group', id: 'about', i18n: 'menu.about.title', rows: [] }]
+	);
+	assert.deepEqual(hand.prior_top_level_record, { id: 'about' });
+	assert.deepEqual(
+		menu.about_menu,
+		hand.about_child_declarations,
+		'all original child identities and behavior metadata remain unchanged'
+	);
+	assert.equal(
+		Object.keys(hand.locales).length,
+		21,
+		'all independently frozen caption sources execute'
+	);
 	for (const [code, prior] of Object.entries(hand.locales)) {
-		const labels = JSON.parse(fs.readFileSync(path.join(base, '_shared/data/locales', code + '.json'), 'utf8'));
+		const labels = JSON.parse(
+			fs.readFileSync(path.join(base, '_shared/data/locales', code + '.json'), 'utf8')
+		);
 		assert.equal(labels['menu.about.title'], prior.about_parent);
 		assert.equal(labels['menu.about.changelog'], prior.changelog);
 		assert.equal(labels['menu.about.open_releases_page'], prior.releases_page);
@@ -10800,44 +11021,101 @@ console.log(
 				'return ManifestMenu.group_row("top_level", "about", rows, render_ctx.state_getters)'
 			];
 			if (!chronology.every((statement) => hasStatement(native, statement))) return false;
-			const nativeTokens = scriptTokens(native, '.lua'), depths = tokenDepths(nativeTokens);
+			const nativeTokens = scriptTokens(native, '.lua'),
+				depths = tokenDepths(nativeTokens);
 			let previous = -1;
 			for (const statement of chronology) {
 				const wanted = scriptTokens(statement, '.lua');
-				const at = nativeTokens.findIndex((_, index) => index > previous && depths[index] === 0 &&
-					wanted.every((token, offset) => nativeTokens[index + offset]?.kind === token.kind &&
-						nativeTokens[index + offset]?.value === token.value));
+				const at = nativeTokens.findIndex(
+					(_, index) =>
+						index > previous &&
+						depths[index] === 0 &&
+						wanted.every(
+							(token, offset) =>
+								nativeTokens[index + offset]?.kind === token.kind &&
+								nativeTokens[index + offset]?.value === token.value
+						)
+				);
 				if (at < 0) return false;
 				previous = at;
 			}
 			const guard = ownerBody(source, 'local function about_source(renderer, platform)');
-			if (!hasStatement(guard, 'local top, children = rawget(root, "top_level"), rawget(root, "about_menu")')) return false;
-			if (!hasStatement(guard, 'if not about_dense(top, true) or not about_dense(children, true) or #children == 0 then return nil end')) return false;
-			if (!hasStatement(publicOwner, 'return ManifestMenu.render_rows(rows, "top_level")')) return false;
+			if (
+				!hasStatement(
+					guard,
+					'local top, children = rawget(root, "top_level"), rawget(root, "about_menu")'
+				)
+			)
+				return false;
+			if (
+				!hasStatement(
+					guard,
+					'if not about_dense(top, true) or not about_dense(children, true) or #children == 0 then return nil end'
+				)
+			)
+				return false;
+			if (!hasStatement(publicOwner, 'return ManifestMenu.render_rows(rows, "top_level")'))
+				return false;
 			const tokens = scriptTokens(publicOwner, '.lua');
 			const binding = scriptTokens('["about"] = _build_about', '.lua');
-			return tokens.some((_, index) => binding.every((token, offset) =>
-				tokens[index + offset]?.kind === token.kind && tokens[index + offset]?.value === token.value));
-		} catch { return false; }
+			return tokens.some((_, index) =>
+				binding.every(
+					(token, offset) =>
+						tokens[index + offset]?.kind === token.kind &&
+						tokens[index + offset]?.value === token.value
+				)
+			);
+		} catch {
+			return false;
+		}
 	}
 	const source = fs.readFileSync(path.join(base, 'linux/ui/menu/menu_builder.lua'), 'utf8');
-	assert.equal(admits(source), true, 'the actual registered public native About route consumes its true canonical parent');
+	assert.equal(
+		admits(source),
+		true,
+		'the actual registered public native About route consumes its true canonical parent'
+	);
 	for (const [before, after, reason] of [
-		['return ManifestMenu.group_row("top_level", "about", rows, render_ctx.state_getters)',
-			'return Foreign.group_row("top_level", "about", rows, render_ctx.state_getters)', 'foreign renderer'],
-		['return ManifestMenu.group_row("top_level", "about", rows, render_ctx.state_getters)',
-			'return ManifestMenu.group_row("top_level", "debug", rows, render_ctx.state_getters)', 'wrong actual parent'],
-		['return ManifestMenu.group_row("top_level", "about", rows, render_ctx.state_getters)',
-			'return ManifestMenu.group_row("about_menu", "about", rows, render_ctx.state_getters)', 'wrong catalogue owner'],
-		['return ManifestMenu.group_row("top_level", "about", rows, render_ctx.state_getters)',
-			'return ManifestMenu.group_row("top_level", "about", {}, render_ctx.state_getters)', 'disconnected finished child'],
-		['local root, top, section, parent, fields = about_source(ManifestMenu, "linux")',
-			'local root, top, section, parent, fields = about_source(Foreign, "linux")', 'foreign source admission'],
-		['["about"]           = _build_about,', '["about"]           = _build_debug,', 'missing actual public producer'],
-		['or not about_parent_unchanged(parent, fields) then return nil end',
-			'or false then return nil end', 'missing actual source identity refusal'],
-		['return ManifestMenu.render_rows(rows, "top_level")',
-			'return rows', 'missing actual native rendering boundary']
+		[
+			'return ManifestMenu.group_row("top_level", "about", rows, render_ctx.state_getters)',
+			'return Foreign.group_row("top_level", "about", rows, render_ctx.state_getters)',
+			'foreign renderer'
+		],
+		[
+			'return ManifestMenu.group_row("top_level", "about", rows, render_ctx.state_getters)',
+			'return ManifestMenu.group_row("top_level", "debug", rows, render_ctx.state_getters)',
+			'wrong actual parent'
+		],
+		[
+			'return ManifestMenu.group_row("top_level", "about", rows, render_ctx.state_getters)',
+			'return ManifestMenu.group_row("about_menu", "about", rows, render_ctx.state_getters)',
+			'wrong catalogue owner'
+		],
+		[
+			'return ManifestMenu.group_row("top_level", "about", rows, render_ctx.state_getters)',
+			'return ManifestMenu.group_row("top_level", "about", {}, render_ctx.state_getters)',
+			'disconnected finished child'
+		],
+		[
+			'local root, top, section, parent, fields = about_source(ManifestMenu, "linux")',
+			'local root, top, section, parent, fields = about_source(Foreign, "linux")',
+			'foreign source admission'
+		],
+		[
+			'["about"]           = _build_about,',
+			'["about"]           = _build_debug,',
+			'missing actual public producer'
+		],
+		[
+			'or not about_parent_unchanged(parent, fields) then return nil end',
+			'or false then return nil end',
+			'missing actual source identity refusal'
+		],
+		[
+			'return ManifestMenu.render_rows(rows, "top_level")',
+			'return rows',
+			'missing actual native rendering boundary'
+		]
 	]) {
 		assert.equal(source.split(before).length - 1, 1, reason + ': exact source preimage');
 		assert.equal(admits(source.replace(before, after)), false, reason);
@@ -10863,12 +11141,42 @@ console.log(
 	assert.equal(proves(source, 'slot_binding_frame', 'slot_binding_pick'), true);
 	assert.equal(proves(source, 'slot_binding_clear_frame', 'slot_binding_clear'), true);
 	for (const [from, to, section, key] of [
-		['local function pick()', 'local function withdrawn_pick()', 'slot_binding_frame', 'slot_binding_pick'],
-		['["slot_binding_pick"] = pick', '["slot_binding_pick"] = "pick"', 'slot_binding_frame', 'slot_binding_pick'],
-		['local function clear()', 'local function withdrawn_clear()', 'slot_binding_clear_frame', 'slot_binding_clear'],
-		['["slot_binding_clear"] = clear', '["slot_binding_clear"] = "clear"', 'slot_binding_clear_frame', 'slot_binding_clear'],
-		['ManifestMenu.template_rows("slot_binding_frame"', 'Foreign.ManifestMenu.template_rows("slot_binding_frame"', 'slot_binding_frame', 'slot_binding_pick'],
-		['ManifestMenu.template_rows("slot_binding_frame"', 'ManifestMenu.template_rows("withdrawn_slot_frame"', 'slot_binding_clear_frame', 'slot_binding_clear'],
+		[
+			'local function pick()',
+			'local function withdrawn_pick()',
+			'slot_binding_frame',
+			'slot_binding_pick'
+		],
+		[
+			'["slot_binding_pick"] = pick',
+			'["slot_binding_pick"] = "pick"',
+			'slot_binding_frame',
+			'slot_binding_pick'
+		],
+		[
+			'local function clear()',
+			'local function withdrawn_clear()',
+			'slot_binding_clear_frame',
+			'slot_binding_clear'
+		],
+		[
+			'["slot_binding_clear"] = clear',
+			'["slot_binding_clear"] = "clear"',
+			'slot_binding_clear_frame',
+			'slot_binding_clear'
+		],
+		[
+			'ManifestMenu.template_rows("slot_binding_frame"',
+			'Foreign.ManifestMenu.template_rows("slot_binding_frame"',
+			'slot_binding_frame',
+			'slot_binding_pick'
+		],
+		[
+			'ManifestMenu.template_rows("slot_binding_frame"',
+			'ManifestMenu.template_rows("withdrawn_slot_frame"',
+			'slot_binding_clear_frame',
+			'slot_binding_clear'
+		]
 	]) {
 		assert.equal(source.split(from).length, 2, `unique actual slot-frame owner: ${from}`);
 		const withdrawn = source.replace(from, to);

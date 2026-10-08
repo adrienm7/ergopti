@@ -143,6 +143,133 @@ const powershell = path.join(
 	'System32/WindowsPowerShell/v1.0/powershell.exe'
 );
 assert.ok(fs.existsSync(powershell), 'The real Windows PowerShell runtime is required.');
+// The staging sidecar is exercised with actual generated source and explicit
+// observation functions only; this does not qualify HTTP, TLS or certificate stores.
+const os = require('node:os');
+/** Retire only the exact fixture namespace after a known synchronous terminal. */
+function retireStagingObservation(directory, terminal, files = fs) {
+	if (
+		!terminal ||
+		terminal.error ||
+		terminal.signal != null ||
+		!Number.isInteger(terminal.status)
+	) {
+		return 'retained_unknown_terminal';
+	}
+	try {
+		const directoryStat = files.lstatSync(directory);
+		if (!directoryStat.isDirectory() || directoryStat.isSymbolicLink())
+			return 'retained_unexpected_type';
+		const entries = files.readdirSync(directory);
+		if (entries.length > 1 || (entries.length === 1 && entries[0] !== 'pure-fact.json')) {
+			return 'retained_unexpected_entries';
+		}
+		const fact = path.join(directory, 'pure-fact.json');
+		if (entries.length === 1) {
+			const factStat = files.lstatSync(fact);
+			if (!factStat.isFile() || factStat.isSymbolicLink()) return 'retained_unexpected_type';
+			files.unlinkSync(fact);
+		}
+		files.rmdirSync(directory);
+		return 'closed';
+	} catch {
+		return 'retained_cleanup_refused';
+	}
+}
+
+/** A cleanup/report failure never replaces the exact original test failure. */
+function finishStagingObservation(
+	directory,
+	terminal,
+	assertions,
+	report = console.error,
+	files = fs
+) {
+	let failed = false;
+	let primary;
+	try {
+		assertions();
+	} catch (error) {
+		failed = true;
+		primary = error;
+	}
+	const cleanup = retireStagingObservation(directory, terminal, files);
+	finishStagingObservation.lastCleanupStatus = cleanup;
+	finishStagingObservation.lastReportStatus = 'not_required';
+	if (cleanup !== 'closed') {
+		try {
+			report('STAGING_OBSERVATION_CLEANUP status=' + cleanup);
+			finishStagingObservation.lastReportStatus = 'reported';
+		} catch (reportFailure) {
+			finishStagingObservation.lastReportStatus = 'unavailable';
+			if (!failed) throw reportFailure;
+		}
+		if (!failed) throw new Error('Staging observation cleanup refused: ' + cleanup);
+	}
+	if (failed) throw primary;
+}
+
+const stagingOwned = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-staging-observation-'));
+const stagingResult = spawnSync(
+	powershell,
+	[
+		'-NoProfile',
+		'-NonInteractive',
+		'-ExecutionPolicy',
+		'Bypass',
+		'-File',
+		path.join(__dirname, 'test_updater_staging_observation.ps1'),
+		'-WorkerSourcePath',
+		path.join(__dirname, '../../static/ergopti_plus/windows/modules/updater/self_update.ahk'),
+		'-HelperPath',
+		path.join(
+			__dirname,
+			'../../static/ergopti_plus/windows/tests/fixtures/updater_staging_diagnostic.ps1'
+		),
+		'-OwnedDirectory',
+		stagingOwned
+	],
+	{ encoding: 'utf8', windowsHide: true, maxBuffer: 65536 }
+);
+finishStagingObservation(stagingOwned, stagingResult, () => {
+	assert.ifError(stagingResult.error);
+	assert.equal(stagingResult.status, 0, stagingResult.stdout + stagingResult.stderr);
+	assert.equal(stagingResult.stderr, '');
+	assert.equal(
+		stagingResult.stdout.trim(),
+		'PASS: staging observation checks=5 native_watch=0 network=0 certificate=0'
+	);
+});
+
+// Exercise only the actual generated digest/integrity region with module
+// autoload disabled: no download, TLS, certificate store or resident driver.
+const digestOwned = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-staging-digest-'));
+const digestResult = spawnSync(
+	powershell,
+	[
+		'-NoProfile',
+		'-NonInteractive',
+		'-ExecutionPolicy',
+		'Bypass',
+		'-File',
+		path.join(__dirname, 'test_updater_staging_digest.ps1'),
+		'-WorkerSourcePath',
+		path.join(__dirname, '../../static/ergopti_plus/windows/modules/updater/self_update.ahk'),
+		'-OwnedFilePath',
+		path.join(digestOwned, 'pure-fact.json')
+	],
+	{ encoding: 'utf8', windowsHide: true, maxBuffer: 65536 }
+);
+finishStagingObservation(digestOwned, digestResult, () => {
+	assert.ifError(digestResult.error);
+	assert.equal(digestResult.status, 0, digestResult.stdout + digestResult.stderr);
+	assert.equal(digestResult.stderr, '');
+	assert.equal(
+		digestResult.stdout.trim(),
+		'PASS: actual staging digest checks=6 network=0 certificate=0'
+	);
+});
+
 const script = path.join(__dirname, 'test_managed_remote_retirement.ps1');
 const result = spawnSync(
 	powershell,

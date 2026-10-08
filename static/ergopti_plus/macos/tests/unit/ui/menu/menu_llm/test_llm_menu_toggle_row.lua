@@ -281,6 +281,8 @@ local function outer_parent_corpus()
 end
 
 local function with_genuine_outer_parent(calls, callback)
+	-- The actual API backend has no local health probe; no refresh port is suppressed.
+	helpers.assert_eq(calls.root_deps.state.llm_backend, "api")
 	local port = package.loaded["infra.manifest_menu"]
 	local before_build, before_group = port.build, port.group_row
 	local activation_logger = package.loaded["infra.logger"]
@@ -299,18 +301,25 @@ local function with_genuine_outer_parent(calls, callback)
 			native_i18n.set_locale_no_reload("en")
 			local native = require("infra.manifest_menu")
 			local capture = {}
-			-- The handler captured this port before the fresh scope. Delegate its
-			-- actual build to the genuine native binding, retaining its exact result.
-			port.build = function(...)
+			-- The producer requires this genuine table at call time. Observe that
+			-- owner, rather than the older port captured by its outer constructor.
+			local actual_build = native.build
+			helpers.assert_type(actual_build, "function")
+			native.build = function(...)
 				local args = { ... }
-				local child = native.build(...)
+				local child = actual_build(...)
 				if args[1] == "llm_menu" then
 					capture.render_ctx, capture.child = args[5], child
 				end
 				return child
 			end
 			port.group_row = native.group_row
-			callback(native, native_i18n, capture)
+			local observed_ok, observed_detail = xpcall(function()
+				callback(native, native_i18n, capture)
+			end, debug.traceback)
+			native.build = actual_build
+			helpers.assert_true(rawequal(native.build, actual_build))
+			if not observed_ok then error(observed_detail, 0) end
 		end)
 	end, debug.traceback)
 	port.build, port.group_row = before_build, before_group
@@ -328,7 +337,7 @@ helpers.describe("genuine shared outer IA parent", function()
 	helpers.assert_eq(#corpus.states, 3)
 	for _, expected in ipairs(corpus.captions) do
 		helpers.it("retains original title, optional checked field and native subtree: " .. expected.locale, function()
-			with_activation("ollama", { true }, nil, function(_, state, calls)
+			with_activation("api", { true }, nil, function(_, state, calls)
 				with_genuine_outer_parent(calls, function(_, native_i18n, capture)
 					native_i18n.set_locale_no_reload(expected.locale)
 					for _, vector in ipairs(corpus.states) do
@@ -354,7 +363,7 @@ helpers.describe("genuine shared outer IA parent", function()
 	end
 	for _, scenario in ipairs({ "withdrawn", "duplicate", "command", "wrong-platform" }) do
 		helpers.it("refuses actual canonical parent " .. scenario .. " and repairs without side effects", function()
-			with_activation("ollama", { true }, nil, function(_, state, calls)
+			with_activation("api", { true }, nil, function(_, state, calls)
 				with_genuine_outer_parent(calls, function(native)
 					state.llm_enabled = true
 					local root = native.get_root()
@@ -386,7 +395,7 @@ helpers.describe("genuine shared outer IA parent", function()
 		end)
 	end
 	helpers.it("uses actual canonical caption policy rather than the former hardcoded parent key", function()
-		with_activation("ollama", { true }, nil, function(_, _, calls)
+		with_activation("api", { true }, nil, function(_, _, calls)
 			with_genuine_outer_parent(calls, function(native, native_i18n)
 				local row = native.get_array("llm_native_parent")[1]
 				local predecessor = row.i18n
@@ -407,7 +416,7 @@ end)
 
 helpers.describe("actual outer IA parent reaches real tray transport", function()
 	helpers.it("hands the genuine completed child and toggle into the actual Builder", function()
-		with_activation("ollama", { true }, nil, function(_, state, calls)
+		with_activation("api", { true }, nil, function(_, state, calls)
 			state.llm_enabled = true
 			local original_build = calls.handler.build_item
 			local observed
