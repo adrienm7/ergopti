@@ -2400,3 +2400,19 @@ its unrelated Group6 network changes and every existing Group5 assertion. The
 combined Swift reporter retains both independent test blocks and all archive
 outcomes in JSON, while visible notices follow the actual fixture cohort. Native
 qualification and items31/16/38 remain open.
+
+## Native keyboard-selection fixture compilation
+
+Actual manual macOS run37664683956 at7176df2d8 compiles the release launcher
+but fails Swift test compilation with two unique source errors repeated39 times;
+zero XCTest methods start. The keyboard-selection fixture now uses the Swift
+CFRunLoopMode.defaultMode constant and gives its existing background Dispatch
+closure an explicit nonthrowing Void result. Exact two-source byte inverses
+preserve all12 controlled methods, original assertions, selection/restoration
+order, cleanup custody, absolute5s cap and SDK/workflow budgets. Independent
+source-only review is clear; it executes no portable behavior tests and creates
+no replacement oracle. Actual Swift compilation and Darwin behavior AFTER
+remain UNEXECUTED, including the earlier permission-stage, source-selection and
+Core asset-policy changes. Release build success does not qualify the test
+suite, packaging, installation or physical keyboards. Item30 and transverse
+16/38 remain open; no item is removed.
