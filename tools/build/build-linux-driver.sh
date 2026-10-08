@@ -215,6 +215,7 @@ REQUIRED_FILES=(
 	"linux/static/layouts/registry/ergopti/hotstrings/suffixes_a.toml"
 	"linux/static/layouts/registry/ergopti/hotstrings/magickeyreplace.toml"
 	"linux/install/layout_registry.sh"
+	"linux/install/native_source_build.sh"
 	"_shared/modules/updater/defaults.json"
 	# The daemon migrates config.toml at start; without the registry or the
 	# engine every session would refuse to write it.

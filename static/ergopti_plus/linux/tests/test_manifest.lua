@@ -523,4 +523,9 @@ return {
 	"tests.unit.ui.test_config_cleanup_session",
 	"tests.unit.ui.test_wpm_readouts",
 	"tests.unit.ui.test_windows_focused_not_topmost",
+	"tests.unit.adapters.test_caps_word_output_custody",
+	"tests.unit.adapters.test_caps_word_semantic_owner",
+	"tests.unit.modules.test_caps_word_constructor_custody",
+	"tests.unit.modules.test_caps_word_independent_custody",
+	"tests.unit.modules.test_caps_word_native_owner",
 }

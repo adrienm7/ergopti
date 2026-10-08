@@ -17,10 +17,22 @@ function permissionPreflight() {
 		var eventClass = $.kAECoreSuite,
 			eventID = $.kAEGetData,
 			targetType = $.typeApplicationBundleID;
+		// Fixed failure-only annotations identify the original unavailable guard;
+		// they never change bridge admission or disclose exception/native values.
+		if (typeof $.AEDeterminePermissionToAutomateTarget !== 'function') {
+			checkpoint('B:API');
+			checkpoint('P:UNAVAILABLE');
+			return;
+		}
 		if (
-			typeof $.AEDeterminePermissionToAutomateTarget !== 'function' ||
 			!$.NSAppleEventDescriptor ||
-			typeof $.NSAppleEventDescriptor.descriptorWithBundleIdentifier !== 'function' ||
+			typeof $.NSAppleEventDescriptor.descriptorWithBundleIdentifier !== 'function'
+		) {
+			checkpoint('B:METADATA');
+			checkpoint('P:UNAVAILABLE');
+			return;
+		}
+		if (
 			[eventClass, eventID, targetType].some(function (value) {
 				return (
 					typeof value !== 'number' ||
@@ -31,6 +43,7 @@ function permissionPreflight() {
 				);
 			})
 		) {
+			checkpoint('B:CONSTANTS');
 			checkpoint('P:UNAVAILABLE');
 			return;
 		}
@@ -38,6 +51,7 @@ function permissionPreflight() {
 			'com.apple.shortcuts.events'
 		);
 		if (!descriptor || descriptor.descriptorType !== targetType) {
+			checkpoint('B:DESCRIPTOR');
 			checkpoint('P:UNAVAILABLE');
 			return;
 		}
@@ -45,6 +59,7 @@ function permissionPreflight() {
 		// through the call and the post-call read; never copy or reinterpret it.
 		var pointer = descriptor.aeDesc;
 		if (!pointer) {
+			checkpoint('B:POINTER');
 			checkpoint('P:UNAVAILABLE');
 			return;
 		}

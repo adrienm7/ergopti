@@ -575,5 +575,81 @@ class PermissionPreflightControls(unittest.TestCase):
             )
 
 
+class UnavailableRefinementControls(unittest.TestCase):
+    capture_case = CaptureDiagnosticControls.capture_case
+    first = b"ASCP:1\nASCP:P:BEGIN\n"
+
+    def test_fixed_failure_labels_preserve_original_refusal_and_catalogue_checkpoints(self):
+        for label, part in (
+            (b"API", "api"),
+            (b"METADATA", "metadata"),
+            (b"CONSTANTS", "constants"),
+            (b"DESCRIPTOR", "descriptor"),
+            (b"POINTER", "pointer"),
+        ):
+            for tail in (b"", b"ASCP:2\n", b"ASCP:2\nASCP:3\nASCP:4\n"):
+                markers = self.first + b"ASCP:B:" + label + b"\nASCP:P:UNAVAILABLE\n" + tail
+                raw, observation = subject.permission_preflight_summary(markers, "discovery")
+                self.assertEqual(raw, b"ASCP:1\n" + tail)
+                self.assertEqual(
+                    observation,
+                    {
+                        "state": "bridge_unavailable",
+                        "call_attempted": False,
+                        "native_returned": False,
+                        "unavailable_part": part,
+                    },
+                )
+                self.assertNotIn("code", observation)
+                self.assertNotIn("permission_granted", observation)
+
+    def test_unknown_duplicate_foreign_or_post_call_failure_annotation_refuses(self):
+        for middle in (
+            b"ASCP:B:PRIVATE\n",
+            b"ASCP:B:api\n",
+            b"ASCP:B:API",
+            b"ASCP:B:API\nASCP:B:POINTER\n",
+            b"ASCP:P:CALL_ATTEMPT\nASCP:B:API\n",
+            b"ASCP:B:API\nASCP:P:CALL_ATTEMPT\n",
+            b"ASCP:B:API\nASCP:P:RETURN:0\n",
+        ):
+            markers = self.first + middle + b"ASCP:P:UNAVAILABLE\n"
+            raw, observation = subject.permission_preflight_summary(markers, "discovery")
+            self.assertIsNone(raw)
+            self.assertEqual(observation["state"], "invalid_grammar")
+            self.assertNotIn("PRIVATE", json.dumps(observation))
+        for ending in (
+            b"ASCP:P:REFUSED\n",
+            b"ASCP:P:INVALID\n",
+            b"ASCP:P:RETURN:0\n",
+            b"ASCP:P:CALL_ATTEMPT\nASCP:P:REFUSED\n",
+        ):
+            markers = self.first + b"ASCP:B:API\n" + ending
+            raw, observation = subject.permission_preflight_summary(markers, "discovery")
+            self.assertIsNone(raw)
+            self.assertEqual(observation["state"], "invalid_grammar")
+        valid = self.first + b"ASCP:B:API\nASCP:P:UNAVAILABLE\n"
+        for role in ("help", "foreign", None):
+            self.assertEqual(subject.checkpoint_summary(valid, role), {"valid": False, "last": 0})
+
+    def test_actual_owned_deadline_retirement_preserves_failure_only_refinement(self):
+        markers = self.first + b"ASCP:B:API\nASCP:P:UNAVAILABLE\n"
+        raw, failure, evidence = self.capture_case(None, code=-15, timeout=True, errors=markers)
+        self.assertIsNone(raw)
+        self.assertEqual(failure, "deadline")
+        self.assertTrue(evidence["retirement_ack"])
+        self.assertEqual(evidence["registered"], 1)
+        self.assertEqual(evidence["observation"]["checkpoint"], {"valid": True, "last": 1})
+        self.assertEqual(
+            evidence["observation"]["permission_preflight"],
+            {
+                "state": "bridge_unavailable",
+                "call_attempted": False,
+                "native_returned": False,
+                "unavailable_part": "api",
+            },
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

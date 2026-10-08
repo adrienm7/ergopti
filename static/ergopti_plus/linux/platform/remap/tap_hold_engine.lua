@@ -43,6 +43,7 @@
 
 local EvdevCodes = require("infra.evdev_codes")
 local OneShotShift = require("tap_hold.one_shot_shift")
+local CapsWord = require("tap_hold.caps_word")
 
 local M = {}
 
@@ -178,6 +179,7 @@ function M.new(opts)
 		one_shot_timeout_ms = assert(tonumber(options.one_shot_timeout_ms), "one_shot_timeout_ms is required"),
 		key_text = options.key_text,
 		plan_text = options.plan_text,
+		caps_word_plan = options.caps_word_plan,
 		one_shot_result = options.one_shot_result,
 		held_modifiers = options.held_modifiers,
 		held_text_modifier_codes = options.held_text_modifier_codes,
@@ -435,9 +437,12 @@ end
 ---   in Shift, which types its capital; "text": type `text` instead of it.
 --- @return string|nil text
 local input_arms = setmetatable({}, { __mode = "k" })
+local caps_word_owners = setmetatable({}, { __mode = "k" })
+local caps_word_presses = setmetatable({}, { __mode = "k" })
 
 --- Publishes the existing logical deadline without acquiring output authority.
 local function arm_one_shot(self, now_ms, guard)
+	if caps_word_owners[self] then return false end
 	if type(now_ms) ~= "number" or now_ms ~= now_ms or math.abs(now_ms) == math.huge
 		or type(self.key_text) ~= "function" or type(self.plan_text) ~= "function"
 		or type(self.one_shot_result) ~= "function" then return false end
@@ -463,6 +468,8 @@ end
 --- Observes private logical ownership without calling an external provider.
 --- @return string|nil state
 function M:input_arm_state()
+	local caps = caps_word_owners[self]
+	if caps then return caps.pending and "consumed" or caps.active and "armed" or nil end
 	local arm = input_arms[self]
 	return arm and arm.state or nil
 end
@@ -470,6 +477,12 @@ end
 --- Clears only an unspent logical arm; consumed output requires release_all ACK.
 --- @return boolean cleared
 function M:clear_input_arm()
+	local caps = caps_word_owners[self]
+	if caps then
+		caps.active = false
+		if caps.pending then return false end
+		caps_word_owners[self] = nil
+	end
 	local arm = input_arms[self]
 	if arm and arm.state == "consumed" then return false end
 	if arm then self.one_shot_until, input_arms[self] = nil, nil end
@@ -480,6 +493,38 @@ local function input_arm_current(self, arm)
 	if not arm then return true end
 	local ok, current = pcall(arm.current)
 	return ok and current == true and input_arms[self] == arm
+end
+
+--- Arms an independent persistent word; no OneShot deadline or special result is used.
+--- @param guard function Original installed input/source/output currentness.
+--- @return boolean
+function M:arm_caps_word(guard)
+	if type(guard) ~= "function" or type(self.key_text) ~= "function"
+		or type(self.caps_word_plan) ~= "function" or input_arms[self] then return false end
+	local prior = caps_word_owners[self]
+	if prior and (prior.pending or prior.processing) then return false end
+	local called, current = pcall(guard)
+	if not called or current ~= true then return false end
+	if prior then prior.active = false; caps_word_owners[self] = nil; return true end
+	caps_word_owners[self] = { current = guard, active = true }
+	caps_word_presses[self] = caps_word_presses[self] or {}
+	return true
+end
+
+--- Acknowledges only the original complete character batch after native delivery.
+--- @param rows table Exact rows prepared by this owner.
+--- @return boolean
+function M:ack_caps_word(rows)
+	local owner = caps_word_owners[self]
+	if not owner or owner.pending ~= rows then return false end
+	owner.pending = nil
+	if not owner.active then caps_word_owners[self] = nil end
+	return true
+end
+
+local function caps_word_current(self, owner)
+	local called, current = pcall(owner.current)
+	return called and current == true and owner.active == true and caps_word_owners[self] == owner
 end
 
 local function take_one_shot(self, code, now_ms)
@@ -567,11 +612,73 @@ local function type_text(self, out, text)
 	return nil
 end
 
+local function caps_word_input(self, out, code, value, receipt)
+	local owner, presses = caps_word_owners[self], caps_word_presses[self]
+	if owner and (owner.pending or owner.processing) then owner.active = false; return true end
+	local source = type(receipt) == "table" and receipt.source or "software-only"
+	local press_key = tostring(source) .. "\0" .. code
+	local physical_press = presses and presses[press_key]
+	if value == UP and physical_press then presses[press_key] = nil; return true end
+	if value == REPEAT and physical_press then
+		if not owner or not owner.active then return true end
+	elseif value ~= DOWN or not owner or not owner.active then return false end
+	if not caps_word_current(self, owner) then self:clear_input_arm(); return true end
+	if MODIFIER_KEYS[code] then return false end
+	local control = EvdevCodes.CONTROL_NAME_OF[code]
+	if code == M.KEY_CODES.space or code == EvdevCodes.KEY_CAPSLOCK or CapsWord.cancels(control) then
+		owner.active = false; caps_word_owners[self] = nil; return false
+	end
+	owner.processing = true
+	local got_text, text = pcall(self.key_text, code)
+	owner.processing = false
+	if not got_text then owner.active = false; caps_word_owners[self] = nil; return physical_press ~= nil end
+	if not caps_word_current(self, owner) then self:clear_input_arm(); return true end
+	if text == nil and control ~= "backspace" then
+		owner.active = false; caps_word_owners[self] = nil; return false
+	end
+	local upper = CapsWord.uppercase(text) or (physical_press and type(text) == "string" and text or nil)
+	if not upper then return false end
+	owner.processing = true
+	local got_plan, plan, plan_current = pcall(self.caps_word_plan, upper)
+	owner.processing = false
+	if not got_plan then owner.active = false; caps_word_owners[self] = nil; return physical_press ~= nil end
+	if type(plan) ~= "table" or #plan == 0 or type(plan_current) ~= "function"
+		or not caps_word_current(self, owner) or plan_current() ~= true then
+		owner.active = false; caps_word_owners[self] = nil; return physical_press ~= nil
+	end
+	local lifted = held_level_keys(self)
+	if not caps_word_current(self, owner) or plan_current() ~= true then return true end
+	for _, step in ipairs(plan) do
+		if type(step.keycode) ~= "number" or step.keycode % 1 ~= 0 or type(step.mods) ~= "table" then return true end
+		for _, role in ipairs(step.mods) do if role ~= "shift" then return true end end
+	end
+	for _, level in ipairs(lifted) do out[#out + 1] = { code = level, value = UP, handoff = "suspended" } end
+	for _, step in ipairs(plan) do
+		for _, role in ipairs(step.mods) do press(self, out, EvdevCodes.LEVEL_MODIFIER_CODE[role]) end
+		tap_key(self, out, step.keycode)
+		for index = #step.mods, 1, -1 do release(self, out, EvdevCodes.LEVEL_MODIFIER_CODE[step.mods[index]]) end
+	end
+	for index = #lifted, 1, -1 do out[#out + 1] = { code = lifted[index], value = DOWN, handoff = "restored" } end
+	owner.pending = out
+	presses[press_key] = { source = owner }
+	return true
+end
+
+-- A remapped key tap is also a word boundary when its actual output is one.
+local function cancel_caps_word_control(self, code)
+	local owner = caps_word_owners[self]
+	if owner and (code == M.KEY_CODES.space or CapsWord.cancels(EvdevCodes.CONTROL_NAME_OF[code])) then
+		owner.active = false
+		if not owner.pending then caps_word_owners[self] = nil end
+	end
+end
+
 --- Types the key a tap stands for, exactly as the same key pressed by hand
 --- would reach an armed one-shot Shift. A tap bypassing it typed its Enter
 --- unshifted and left the Shift for the next letter.
 --- @return table|nil tap Text for the injector, as type_text returns it.
 local function type_tap(self, out, code, now_ms)
+	cancel_caps_word_control(self, code)
 	local verdict, text = take_one_shot(self, code, now_ms)
 	if verdict == "text" then return type_text(self, out, text) end
 	if verdict == "shift" then press(self, out, KEY_LEFTSHIFT) end
@@ -788,6 +895,7 @@ local function press_layer_key(self, code, spec)
 	local out = {}
 	local chords = spec.chords or { spec }
 	for index, item in ipairs(chords) do
+		for _, output_code in ipairs(item.keys or {}) do cancel_caps_word_control(self, output_code) end
 		chord_events(self, out, item, DOWN)
 		if index < #chords then chord_events(self, out, item, UP) end
 	end
@@ -811,7 +919,7 @@ end
 --- @return string|table|nil tap What to run after them: a catalogue action, or
 ---   { type_text } for text the layout cannot type
 --- @return string|nil binding Exact tap_hold__ source of a catalogue action.
-function M:process(code, value, now_ms)
+function M:process(code, value, now_ms, receipt)
 	local config = self.by_code[code]
 	local out = {}
 	if value == DOWN then
@@ -958,6 +1066,8 @@ function M:process(code, value, now_ms)
 		return out, config.tap, "tap_hold__" .. config.id
 	end
 
+	if caps_word_input(self, out, code, value, receipt) then return out end
+
 	-- A key the one-shot Shift replaced by its result: its repeats and its
 	-- release belong to the result, which is already typed.
 	if self.one_shot_swallowed[code] then
@@ -1006,6 +1116,8 @@ end
 --- A click, its release or a wheel turn: it makes every held tap-hold key a
 --- chord.
 function M:activity()
+	local caps = caps_word_owners[self]
+	if caps then caps.active = false; if not caps.pending then caps_word_owners[self] = nil end end
 	cancel_taps(self, nil, true)
 end
 
@@ -1061,6 +1173,7 @@ function M:release_all()
 	self.undecided = nil
 	self.one_shot_until, self.one_shot_keys, self.key_refs = nil, {}, {}
 	input_arms[self] = nil
+	caps_word_owners[self], caps_word_presses[self] = nil, nil
 	self.one_shot_swallowed, self.instant_down = {}, {}
 	self.native_keys, self.modifiers_down, self.passed_down = {}, {}, {}
 	-- The hook swallows the rest of every key it took from this engine, so

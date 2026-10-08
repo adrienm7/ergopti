@@ -40,6 +40,32 @@
 		"native_errno": {
 			"type": "string"
 		},
+		"dotnet_web_status": {
+			"type": "string",
+			"values": [
+				"Success",
+				"NameResolutionFailure",
+				"ConnectFailure",
+				"ReceiveFailure",
+				"SendFailure",
+				"PipelineFailure",
+				"RequestCanceled",
+				"ProtocolError",
+				"ConnectionClosed",
+				"TrustFailure",
+				"SecureChannelFailure",
+				"ServerProtocolViolation",
+				"KeepAliveFailure",
+				"Pending",
+				"Timeout",
+				"ProxyNameResolutionFailure",
+				"UnknownError",
+				"MessageLengthLimitExceeded",
+				"CacheEntryNotFound",
+				"RequestProhibitedByCachePolicy",
+				"RequestProhibitedByProxy"
+			]
+		},
 		"curl_exit": {
 			"type": "integer"
 		},

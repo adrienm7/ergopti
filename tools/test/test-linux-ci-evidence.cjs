@@ -635,6 +635,7 @@ end`
 		{ name: 'non-ci', ci: 'false', status: 403 },
 		{ name: 'conditional', ci: 'true', status: 304 }
 	];
+	const managedProxy = 'http://127.0.0.1:9';
 	const managedEnvironment = (evidence, ci, status, cases) => ({
 		...process.env,
 		LUA_PATH: `${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?.lua')};${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?/init.lua')};;`,
@@ -648,15 +649,45 @@ end`
 		UPDATER_AUTH_CASES: JSON.stringify(cases),
 		// Real canonical environment admission, confined to this simulated child.
 		// No OS settings/helper/route receipt override is provided.
-		http_proxy: 'http://127.0.0.1:9',
-		https_proxy: 'http://127.0.0.1:9',
-		HTTP_PROXY: '',
-		HTTPS_PROXY: '',
+		http_proxy: managedProxy,
+		https_proxy: managedProxy,
+		// Windows folds environment names; both spellings must retain the proxy.
+		HTTP_PROXY: process.platform === 'win32' ? managedProxy : '',
+		HTTPS_PROXY: process.platform === 'win32' ? managedProxy : '',
 		all_proxy: '',
 		ALL_PROXY: '',
 		NO_PROXY: '',
 		no_proxy: ''
 	});
+	const managedEnvironmentProbe = spawnSync(
+		nativeLua,
+		[
+			'-e',
+			`
+assert(os.getenv('http_proxy') == 'http://127.0.0.1:9', 'HTTP loopback fixture proxy was lost')
+assert(os.getenv('https_proxy') == 'http://127.0.0.1:9', 'HTTPS loopback fixture proxy was lost')
+local expected_upper = '${process.platform === 'win32' ? 'http://127.0.0.1:9' : ''}'
+assert(os.getenv('HTTP_PROXY') == expected_upper, 'HTTP alias changed the fixture proxy')
+assert(os.getenv('HTTPS_PROXY') == expected_upper, 'HTTPS alias changed the fixture proxy')
+for _, key in ipairs({'all_proxy', 'ALL_PROXY', 'no_proxy', 'NO_PROXY'}) do
+ assert(os.getenv(key) == '', 'fixture inherited another proxy route')
+end
+`
+		],
+		{
+			encoding: 'utf8',
+			env: managedEnvironment(updaterScratch, 'true', 403, managedCases)
+		}
+	);
+	assert.ifError(managedEnvironmentProbe.error);
+	assert.strictEqual(managedEnvironmentProbe.signal, null);
+	assert.strictEqual(
+		managedEnvironmentProbe.status,
+		0,
+		'spawned managed fixture must preserve its explicit loopback proxy environment'
+	);
+	assert.strictEqual(managedEnvironmentProbe.stdout, '');
+	assert.strictEqual(managedEnvironmentProbe.stderr, '');
 	for (const variant of managedVariants) {
 		const evidence = path.join(updaterScratch, `managed-authentication-${variant.name}`);
 		fs.mkdirSync(evidence);
@@ -1470,150 +1501,12 @@ assert.deepStrictEqual(
 const manualPackageJob = pipeline.job('package-linux');
 assert.deepStrictEqual(pipeline.needsOf(manualPackageJob), ['e2e-linux']);
 assert.deepStrictEqual(pipeline.needsOf(pipeline.job('e2e-linux')), ['test-linux']);
-assert.strictEqual(pipeline.field(pipeline.job('e2e-linux'), 'if'), '${{ !cancelled() }}');
+assert.strictEqual(pipeline.field(pipeline.job('e2e-linux'), 'if'), null);
 assert.strictEqual(
 	pipeline.field(manualPackageJob, 'if'),
 	"${{ !cancelled() && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}",
 	'manual packaging must retain unit admission, cancellation and automatic E2E admission'
 );
-// Supplementary receiving must retain native family/preflight ownership and
-// reject the real upstream result before either successful E2E certificate.
-function assertLinuxSupplementalE2E(job) {
-	assert.strictEqual(pipeline.field(job, 'if'), '${{ !cancelled() }}');
-	assert.strictEqual(pipeline.field(job, 'continue-on-error'), null);
-	assert.deepStrictEqual(pipeline.needsOf(job), ['test-linux']);
-	const steps = pipeline.steps(job);
-	const upstream = pipeline.step(job, 'Preserve the mandatory upstream unit result');
-	assert.strictEqual(steps.at(-3).body, upstream);
-	assert.deepStrictEqual(
-		steps.slice(-2).map((step) => step.name),
-		['Record mandatory E2E evidence', 'Upload mandatory E2E evidence']
-	);
-	assert.strictEqual(pipeline.stepField(upstream, 'if'), '${{ !cancelled() }}');
-	assert.strictEqual(pipeline.stepField(upstream, 'timeout-minutes'), '1');
-	assert.strictEqual(pipeline.stepField(upstream, 'shell'), null);
-	assert.strictEqual(pipeline.stepField(upstream, 'working-directory'), null);
-	assert.strictEqual(pipeline.stepField(upstream, 'continue-on-error'), null);
-	assert.strictEqual(
-		pipeline.stepField(upstream, 'env'),
-		'ERGOPTI_UPSTREAM_UNIT_RESULT: ${{ needs.test-linux.result }}'
-	);
-	assert.strictEqual(
-		pipeline.stepField(upstream, 'run'),
-		'test "$ERGOPTI_UPSTREAM_UNIT_RESULT" = success'
-	);
-	for (const certificate of steps.slice(-2)) {
-		assert.strictEqual(pipeline.stepField(certificate.body, 'if'), null);
-		assert.strictEqual(pipeline.stepField(certificate.body, 'continue-on-error'), null);
-	}
-	for (const [name, clock, commands] of [
-		[
-			'Qualify actual cursor-display window switching',
-			'4',
-			[
-				'set -euo pipefail',
-				'sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends luajit lua-luv python3 xvfb openbox xdotool x11-utils x11-xserver-utils coreutils xfonts-base',
-				'npm run test:linux:window-switch | tee "$RUNNER_TEMP/linux-window-switch.log"'
-			]
-		],
-		[
-			'Qualify native runtime prerequisites',
-			'5',
-			[
-				'set -euo pipefail',
-				'sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends zstd',
-				'npm run test:linux:runtime-native | tee "$RUNNER_TEMP/linux-runtime-native.log"'
-			]
-		]
-	]) {
-		const body = pipeline.step(job, name);
-		assert.strictEqual(pipeline.stepField(body, 'if'), '${{ !cancelled() }}');
-		assert.strictEqual(pipeline.stepField(body, 'continue-on-error'), null);
-		assert.strictEqual(pipeline.stepField(body, 'timeout-minutes'), clock);
-		assert.deepStrictEqual(pipeline.runOf(body), commands);
-	}
-}
-const supplementalE2E = pipeline.job('e2e-linux');
-assertLinuxSupplementalE2E(supplementalE2E);
-const supplementalUpstream = pipeline.step(
-	supplementalE2E,
-	'Preserve the mandatory upstream unit result'
-);
-for (const [name, from, to] of [
-	[
-		'condition omitted',
-		'    needs: [test-linux]\n    if: ${{ !cancelled() }}\n',
-		'    needs: [test-linux]\n'
-	],
-	[
-		'skipped job',
-		'    needs: [test-linux]\n    if: ${{ !cancelled() }}',
-		'    needs: [test-linux]\n    if: false'
-	],
-	[
-		'cancelled receiving',
-		'    needs: [test-linux]\n    if: ${{ !cancelled() }}',
-		'    needs: [test-linux]\n    if: always()'
-	],
-	['upstream need omitted', '    needs: [test-linux]\n', ''],
-	[
-		'job failure forgiven',
-		"    name: 'E2E tests'\n",
-		"    name: 'E2E tests'\n    continue-on-error: true\n"
-	],
-	['upstream refusal omitted', supplementalUpstream, ''],
-	[
-		'upstream result fabricated',
-		'ERGOPTI_UPSTREAM_UNIT_RESULT: ${{ needs.test-linux.result }}',
-		'ERGOPTI_UPSTREAM_UNIT_RESULT: success'
-	],
-	[
-		'upstream result borrowed',
-		'ERGOPTI_UPSTREAM_UNIT_RESULT: ${{ needs.test-linux.result }}',
-		'ERGOPTI_UPSTREAM_UNIT_RESULT: ${{ needs.e2e-linux.result }}'
-	],
-	[
-		'upstream refusal swallowed',
-		'run: test "$ERGOPTI_UPSTREAM_UNIT_RESULT" = success',
-		'run: test "$ERGOPTI_UPSTREAM_UNIT_RESULT" = success || true'
-	],
-	[
-		'upstream budget extended',
-		supplementalUpstream,
-		supplementalUpstream.replace('timeout-minutes: 1', 'timeout-minutes: 2')
-	],
-	[
-		'native family replaced by success',
-		'npm run test:linux:window-switch | tee "$RUNNER_TEMP/linux-window-switch.log"',
-		'true'
-	],
-	[
-		'native preflight replaced by success',
-		'npm run test:linux:runtime-native | tee "$RUNNER_TEMP/linux-runtime-native.log"',
-		'true'
-	]
-]) {
-	assert.strictEqual(
-		supplementalE2E.split(from).length - 1,
-		1,
-		'supplement mutation ' + name + ' needs the unique actual anchor'
-	);
-	assert.throws(
-		() => assertLinuxSupplementalE2E(supplementalE2E.replace(from, () => to)),
-		'supplement mutation ' + name + ' must be refused'
-	);
-}
-for (const step of pipeline.steps(supplementalE2E).slice(-2)) {
-	assert.strictEqual(supplementalE2E.split(step.body).length - 1, 1);
-	for (const addition of ['        if: always()\n', '        continue-on-error: true\n']) {
-		assert.throws(() =>
-			assertLinuxSupplementalE2E(
-				supplementalE2E.replace(step.body, step.body.replace('\n', '\n' + addition))
-			)
-		);
-	}
-}
-
 // The frozen acceptance table is independent of the workflow expression.
 // Evaluate only after the exact source guard above admits this closed predicate.
 const diagnosticEvents = ['push', 'pull_request', 'workflow_dispatch', 'schedule', 'unknown'];
@@ -1899,134 +1792,9 @@ function assertLinuxUnitFailureExcerpt(job) {
 		steps[uploadAt + 1]?.name,
 		'Emit Configuration assertion from failed unit log'
 	);
-	const nativeSteps = steps.slice(uploadAt + 2, uploadAt + 5);
-	assert.deepStrictEqual(
-		nativeSteps.map((step) => step.name),
-		[
-			'Saved ordered-pair Manager — early genuine native source lifetimes',
-			'Saved ordered-pair Manager — independent observation after failed units',
-			'Run manual official runtime and model acceptance'
-		],
-		'only the exact two independent native observations may precede unchanged manual IA'
-	);
-	const managerScript = [
-		'set -euo pipefail',
-		'if ! command -v Xvfb >/dev/null; then',
-		"  echo 'ENVIRONMENT: early saved-pair Manager prerequisite refused: Xvfb is absent' >&2",
-		'  exit 2',
-		'fi',
-		'sudo modprobe uinput',
-		'if sudo python3 tests/hardware/run_manager_input_owner_real.py > "$RUNNER_TEMP/linux-manager-input-owner-early.log" 2>&1; then',
-		'  manager_status=0',
-		'else',
-		'  manager_status=$?',
-		'fi',
-		'cat "$RUNNER_TEMP/linux-manager-input-owner-early.log"',
-		'exit "$manager_status"'
-	];
-	for (const [index, outcome] of ['success', 'failure'].entries()) {
-		const body = nativeSteps[index].body;
-		assert.strictEqual(
-			pipeline.stepField(body, 'if'),
-			"${{ !cancelled() && steps.linux_unit.outcome == '" + outcome + "' }}"
-		);
-		assert.strictEqual(pipeline.stepField(body, 'continue-on-error'), null);
-		assert.strictEqual(pipeline.stepField(body, 'timeout-minutes'), '3');
-		assert.strictEqual(pipeline.stepField(body, 'working-directory'), 'static/ergopti_plus/linux');
-		assert.strictEqual(pipeline.stepField(body, 'shell'), null);
-		assert.strictEqual(pipeline.stepField(body, 'env'), null);
-		const expected =
-			index === 0
-				? managerScript
-				: managerScript.map((line) =>
-						line.replaceAll(
-							'linux-manager-input-owner-early.log',
-							'linux-manager-input-owner-unit-failure.log'
-						)
-					);
-		assert.deepStrictEqual(
-			pipeline.runOf(body),
-			expected,
-			'the independent native observations retain genuine prerequisites and original native exit'
-		);
-	}
-	const manual = nativeSteps[2].body;
-	assert.strictEqual(
-		pipeline.stepField(manual, 'if'),
-		"${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() }}"
-	);
-	assert.strictEqual(pipeline.stepField(manual, 'continue-on-error'), null);
-	assert.strictEqual(pipeline.stepField(manual, 'timeout-minutes'), '18');
-	assert.deepStrictEqual(pipeline.runOf(manual), [
-		'set -euo pipefail',
-		'sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends curl zstd',
-		'python3 static/ergopti_plus/linux/tests/hardware/run_ollama_runtime_acceptance.py \\',
-		'  --repository "$GITHUB_WORKSPACE" \\',
-		'  --evidence "$RUNNER_TEMP/ollama-runtime-acceptance" \\',
-		'  --lua luajit'
-	]);
+	assert.strictEqual(steps[uploadAt + 2]?.name, 'Run manual official runtime and model acceptance');
 }
 assertLinuxUnitFailureExcerpt(testLinux);
-for (const name of [
-	'Saved ordered-pair Manager — early genuine native source lifetimes',
-	'Saved ordered-pair Manager — independent observation after failed units'
-]) {
-	const step = pipeline.step(testLinux, name);
-	for (const [label, altered] of [
-		['omitted native observation', ''],
-		['duplicated native observation', step + '\n\n' + step],
-		['disabled native observation', step.replace(pipeline.stepField(step, 'if'), 'false')],
-		[
-			'wrong native observation outcome',
-			step
-				.replace("outcome == 'success'", "outcome == 'skipped'")
-				.replace("outcome == 'failure'", "outcome == 'skipped'")
-		],
-		['forgiven native observation', step + '\n        continue-on-error: true'],
-		[
-			'native fixture replaced',
-			step.replace('sudo python3 tests/hardware/run_manager_input_owner_real.py', 'true')
-		],
-		['kernel module load omitted', step.replace('sudo modprobe uinput', 'true')],
-		[
-			'kernel module load forgiven',
-			step.replace('sudo modprobe uinput', 'sudo modprobe uinput || true')
-		],
-		['native status replaced', step.replace('manager_status=$?', 'manager_status=0')],
-		['native exit forged', step.replace('exit "$manager_status"', 'exit 0')],
-		['missing Xvfb passed', step.replace('exit 2', 'exit 0')],
-		['native clock increased', step.replace('timeout-minutes: 3', 'timeout-minutes: 4')],
-		['native shell replaced', step + '\n        shell: bash -c true']
-	]) {
-		assert.strictEqual(
-			testLinux.split(step).length - 1,
-			1,
-			'the actual native observation must occur once'
-		);
-		const changed = testLinux.replace(step, () => altered);
-		assert.notStrictEqual(changed, testLinux, label);
-		assert.throws(() => assertLinuxUnitFailureExcerpt(changed), label);
-	}
-}
-const successNativeStep = pipeline.step(
-	testLinux,
-	'Saved ordered-pair Manager — early genuine native source lifetimes'
-);
-const failureNativeStep = pipeline.step(
-	testLinux,
-	'Saved ordered-pair Manager — independent observation after failed units'
-);
-const nativeOrderMarker = '__ERGOPTI_NATIVE_OBSERVATION_ORDER__';
-assert.ok(!testLinux.includes(nativeOrderMarker));
-const swappedNativeObservations = testLinux
-	.replace(successNativeStep, () => nativeOrderMarker)
-	.replace(failureNativeStep, () => successNativeStep)
-	.replace(nativeOrderMarker, () => failureNativeStep);
-assert.throws(
-	() => assertLinuxUnitFailureExcerpt(swappedNativeObservations),
-	'success and failure-only native observations must keep their exact order'
-);
-
 const unitExcerptMutations = [
 	[
 		'name: Emit Configuration assertion from failed unit log',

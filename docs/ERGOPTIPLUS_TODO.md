@@ -6653,6 +6653,13 @@ is committed; one request is one commit with its regression test.
       regression covers all 21 locales. Linux exposes the same labelled ordered
       tap/hold pairs, with simultaneous input explicitly unavailable.
 
+  The registered Linux provider regression now exercises all182 bindings and
+  all21 real locale dictionaries through the original menu/confirmation chain.
+  LuaJIT and Lua5.4 pass eight cases each, retaining all six original cases.
+  Independently introduced English-fallback and stale-locale-cache omissions
+  are refused on both runtimes. Source/input/native GUI ports are controlled;
+  this does not establish device behavior or the historical category writer.
+
   Remaining software/native qualification: retain the independent label/matrix
   contract and exercise real providers, locale changes and menus on final joined
   sources through affected-driver delivery gates. No writer regression is proved
@@ -6902,6 +6909,26 @@ The shared per-model Specifications and Capabilities frames retire four genuine 
   so it is prerequisite regression proof only. The picker stays closed
   until a genuine saved-configuration Manager supplement is qualified.
 
+  The persistent Caps Word software tranche now uses the original cold
+  native semantic constructor and separate physical input and output occurrence
+  receipts. Per-letter original XKB plans, ACKs and stale-source/reentry
+  refusals retain the existing modifier broker. The strict Lua limit remains
+  60 upvalues; a byte-exact tail extraction fixes the observed maximum63
+  regression (new maximum49). Five new modules are explicitly registered.
+  Component qualification passes390 cases on each Lua ABI and11 real XKB
+  scenarios with modeled kernel output. The exact joined software tree passes
+  12,149 registered Linux tests. A genuine kernel probe is present, but hosted
+  execution and application/server-modifier delivery are not yet qualified.
+  Public Caps Word and OneShot recommendations remain closed pending those
+  receipts; this does not complete item93 or qualify physical hardware.
+
+  Source review identifies missing server-side output custody: acknowledged
+  KEY/SYN writes do not acknowledge Xorg modifier state. A fresh native state
+  read can advance the input epoch independently of map/group generation.
+  A future output receipt must join the original Writer edge, device, server
+  event and complete state while retaining original physical admission. Real
+  core/XIM/XI2 application observations remain unexecuted.
+
   Native source25 qualification 37636576661 tests the exact feature tree:
   10,979 units, actual E2E, 132 input-owner controls with all four mandatory
   kernel scenarios and 81 modifier-custody controls pass. Package and all17
@@ -6952,6 +6979,16 @@ The shared per-model Specifications and Capabilities frames retire four genuine 
   are prerequisites, not assignment authority. Active new physical delivery remains
   unavailable on Linux/macOS; fixed accent menus/defaults are not retired.
 
+  The Linux observer now captures an admitted physical position through the
+  original Reader, Hook and source witness before remapping. Shared request
+  ownership and the thin host rejoin the original page, source, callbacks and
+  cancellation acknowledgement after external reads; retired records relinquish
+  their retained callbacks. Controlled components pass 33/0 on LuaJIT and Lua
+  5.4, with all six omission controls failing. The registered browser scenario
+  retains its original 17 assertions and adds 21 exercised Chromium assertions;
+  hosted Chromium/WebKit and real native capture remain to qualify. Public
+  physical delivery stays unavailable until the remaining owners are complete.
+
   Remaining software: complete genuine capture, current effective-source and
   all-owner collision admission, joint input/source/modifier/output custody,
   arbitrary Unicode and real dead-key composition. Reconstruct and review any
@@ -6969,6 +7006,11 @@ The shared per-model Specifications and Capabilities frames retire four genuine 
   existing records. Linux output custody separates original/synthetic holders
   and spent releases, protecting successor holds. This does not enable new
   physical assignments; Linux/macOS delivery remains unavailable.
+
+  The same optional position-capture observer is shared with item 97 and does
+  not infer a physical J position from a saved character. Late cancelled or
+  superseded request callbacks cannot alter the draft. This adds no output or
+  star-migration authority; native capture and the software work below remain.
 
   Remaining software: complete item 97's native capture/source/collision/output
   owners and prove acknowledged star-setting migration while preserving occupied
@@ -7385,6 +7427,17 @@ and installation qualification are still required.
   success does not prove invocation, atomic locking or every consumer. Apple
   Shortcuts remains a read-only observer with unresolved bounded discovery/invocation.
 
+  The read-only JXA diagnostic attempts a fixed same-process preflight with
+  the SDK-owned Apple-event descriptor and Shortcuts read event with
+  prompting disabled. It starts no target and executes no shortcut. Optional
+  bounded observations preserve all four catalogue checkpoints, the existing
+  20-second capture budget, 65,536-byte caps and exact native retirement.
+  Existing Python/JXA/picker controls are already registered. Native
+  qualification of this composed extension remains UNRUN; an unavailable
+  bridge, target-not-running (-600), unreturned call or status zero does not
+  establish the historical catalogue-stall cause, a consent grant or
+  catalogue/invocation success.
+
   Remaining software: inventory supported automation/application providers and
   implement their real availability/invocation contracts. Add bounded Apple
   Shortcuts catalogue ownership, chosen-ID revalidation, safe native invocation,
@@ -7445,6 +7498,14 @@ Final joined-source gates and remote Shortcut retirement remain required.
   session refresh retain their original native/logical issuer and source/group
   witnesses. Wayland source authority remains explicitly unavailable; menus stay
   reachable. Generic editor readiness does not enable physical delivery.
+
+  The macOS conditional owner now retains its original context, configuration,
+  callback ports and source through construction, projection, registration and
+  delivery. Reentrant retirement, source changes and parent revocation refuse
+  before allocation or execution. Exact registrar retirement is unchanged.
+  All 15 original cases and 79 assertions remain; the expanded registered owner
+  tests pass 22/0 on LuaJIT and Lua 5.4, and the previous source fails all seven
+  added cases. Native TIS/GUI and final installed qualification remain pending.
 
   Remaining software: finish live effective-source retargeting, collisions
   against every owner and current modifier/output custody without overriding
@@ -7548,6 +7609,66 @@ Final joined-source gates and remote Shortcut retirement remain required.
   the supported macOS/Linux editors, plus tooltip alignment and appearance on
   all three OSes. This is an unimplemented follow-up; it does not complete the
   existing prediction-input or tooltip validation items.
+
+- [ ] **113.** Fix i18n and performance bugs observed in the English promo video.
+
+  Maintainer report on 2026-10-07, follow-up task `task_a3f680e0`.
+  Prioritize green release qualification, then the Windows incident. Keep one local
+  commit per correction with regression coverage; do not push these changes.
+  - Translate the hotstring editor search placeholder through
+    `data-i18n-placeholder` and a key in all 21 locale files.
+  - Translate the screen-time dashboard weekday labels in charts, main and
+    script owners; inspect the typing dashboard's French `+ IA` chip too.
+  - Add the missing `app_category.general` key to all 21 locales. The
+    screen-time dashboard currently displays the raw key; cover localized
+    category rendering and locale completeness with regression tests.
+  - Replace French tooltip acceptance/navigation hints from the shared
+    tooltip constants with locale-owned text on Windows, macOS and Linux,
+    preserving hint/binding agreement and the common design.
+  - Measure repeated Windows PAC resolution before changing it. Cache by
+    destination with explicit network/proxy-setting invalidation, retain
+    fail-fast resolution errors and check the other two OS implementations.
+  - Remove catalogue placeholders such as `_modifier_chords_placeholder`
+    from sales-page labels/counts, or expand them consistently with the
+    action picker. Test the displayed action count against the real rows.
+
+  Acceptance includes English and other locale coverage, failure/invalidation
+  regressions, cross-driver checks and rerendering `personal-hotstrings`,
+  `screen-time` and `ai-predictions` through `npm run gifs -- ...`. Record the
+  regenerated README GIF paths in the corresponding commits. Preserve the
+  video agent's uncommitted work and never treat rendered media as functional
+  driver qualification.
+
+  Maintainer follow-up on 2026-10-08: `menu.layout.ctrl_magic_save` is
+  missing from every locale, and `app_category.general` still renders as a
+  raw key in the screen-time dashboard. Add both keys to all 21 locale owners
+  and cover the actual menu/dashboard consumers on Windows, macOS and Linux
+  with regression tests. These observations remain open; rendered promo media
+  does not qualify a driver correction.
+
+- [ ] **114.** Diagnose and fix recurring Windows prediction-key and script-chord stalls.
+
+  Maintainer incident on 2026-10-07: AI was enabled with three visible
+  predictions, keys 1–5 produced no result while 6–0 remained usable, and
+  AltGr+Enter also stopped responding. Restarting the driver cleared the
+  state. A similar incident occurred several days earlier; an earlier fix
+  did not prevent recurrence. With three suggestions, keys 4 and 5 must
+  remain available unless another explicitly configured binding owns them.
+
+  Distinguish prediction versus profile bindings, stale native plan/owner
+  state, refusal after consumed input, modifier/prefix state and lifecycle
+  stalls. Observe the actual resident process; loading the DLL elsewhere
+  cannot measure its capture debt. Require an integrated regression for
+  the confirmed cause, recovery without restart, original digit passthrough
+  outside the shown slots and script-management availability.
+
+  Also retain the current Notepad incident: logical native precondition
+  refusals at 21:46:10, 21:48:18 and 22:04:48, and verified effect followed
+  by stale AHK admission at 21:46:11. Improve content-free diagnostics before
+  attributing a cause; keep exact suffix/focus/document guards, worker
+  retirement, no duplicate replay and no publication of unverified success.
+  Six controlled real-Notepad caller cases passing do not qualify the
+  physical/default InputHook trigger or close this incident.
 
 ## Time estimate
 

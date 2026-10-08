@@ -197,6 +197,7 @@ function permissionCase(options = {}, args) {
 		}
 	};
 	if (options.noFunction) delete api.AEDeterminePermissionToAutomateTarget;
+	if (options.noMetadata) delete api.NSAppleEventDescriptor;
 	const context = {
 		ObjC: {
 			import(name) {
@@ -376,4 +377,67 @@ test('native metadata import never binds a guessed ABI or launches target', () =
 assert.equal(passed - beforePermissionTests, 12);
 process.stdout.write(
 	'Permission preflight JXA controls: 12 passed, 0 failed; native execution UNRUN\n'
+);
+
+// Authored independently of the producer: all original unavailable boundaries
+// retain their refusal and add only a fixed failure annotation before it.
+const beforeUnavailableRefinement = passed;
+test('each unavailable boundary emits only its fixed pre-call label and original refusal', () => {
+	for (const [options, label] of [
+		[{ noFunction: true }, 'API'],
+		[{ noMetadata: true }, 'METADATA'],
+		[{ badConstant: true }, 'CONSTANTS'],
+		[{ badDescriptor: true }, 'DESCRIPTOR'],
+		[{ noPointer: true }, 'POINTER']
+	]) {
+		const result = permissionCase(options);
+		originalCatalogue(result);
+		assert.deepEqual(
+			result.markers.filter((value) => value.startsWith('ASCP:B:')),
+			['ASCP:B:' + label + '\n']
+		);
+		assert.deepEqual(onlyPreflight(result), ['ASCP:P:BEGIN\n', 'ASCP:P:UNAVAILABLE\n']);
+		assert.equal(result.calls.filter((value) => value[0] === 'native').length, 0);
+		assert.ok(
+			result.markers.indexOf('ASCP:B:' + label + '\n') <
+				result.markers.indexOf('ASCP:P:UNAVAILABLE\n')
+		);
+	}
+});
+test('failure refinement never labels returned native results or exceptions', () => {
+	for (const options of [
+		{ code: 0 },
+		{ code: -1744 },
+		{ nativeThrow: true },
+		{ importThrow: true },
+		{ pointerThrow: true }
+	]) {
+		const result = permissionCase(options);
+		originalCatalogue(result);
+		assert.deepEqual(
+			result.markers.filter((value) => value.startsWith('ASCP:B:')),
+			[]
+		);
+		assert.equal(
+			result.markers.some((value) => value.includes('PRIVATE')),
+			false
+		);
+	}
+});
+test('unavailable labels preserve original catalogue refusal and never grant authority', () => {
+	const result = permissionCase({ noFunction: true, catalogueThrow: true });
+	assert.equal(result.value.status, 'refused');
+	assert.equal(result.value.reason, 'native_refused');
+	assert.deepEqual(result.markers, [
+		'ASCP:1\n',
+		'ASCP:P:BEGIN\n',
+		'ASCP:B:API\n',
+		'ASCP:P:UNAVAILABLE\n'
+	]);
+	assert.equal(result.calls.filter((value) => value[0] === 'catalogue').length, 1);
+	assert.equal(Object.hasOwn(result.value, 'permission'), false);
+});
+assert.equal(passed - beforeUnavailableRefinement, 3);
+process.stdout.write(
+	'Unavailable refinement JXA controls: 3 passed, 0 failed; native execution UNRUN\n'
 );

@@ -2,10 +2,10 @@
 	"version": 1,
 	"description": "Native runtime libraries used by LuaJIT FFI and separate source-install compiler prerequisites; Xvfb remains validation-only.",
 	"archive_build_packages": {
-		"apt": ["gcc", "libc6-dev"],
-		"dnf": ["gcc", "glibc-devel"],
-		"zypper": ["gcc", "glibc-devel"],
-		"pacman": ["gcc", "glibc"],
+		"apt": ["gcc", "libc6-dev", "linux-libc-dev"],
+		"dnf": ["gcc", "glibc-devel", "kernel-headers"],
+		"zypper": ["gcc", "glibc-devel", "linux-glibc-devel"],
+		"pacman": ["gcc", "glibc", "linux-api-headers"],
 		"xbps": null,
 		"apk": ["gcc", "musl-dev", "linux-headers"]
 	},
