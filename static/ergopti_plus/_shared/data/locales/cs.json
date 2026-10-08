@@ -3249,5 +3249,7 @@
 	"gestures.system.pinch_unknown": "Systémové gesto sevření : Systémová gesta: neověřena",
 	"gestures.system.slot_unknown_caption": "%s — Systémová gesta: neověřena",
 	"gestures.system.slot_configured_caption": "%s — Nastaveno pro ErgoptiPlus",
-	"gestures.system.slot_not_configured_caption": "%s — Nenastaveno pro ErgoptiPlus"
+	"gestures.system.slot_not_configured_caption": "%s — Nenastaveno pro ErgoptiPlus",
+	"menu.global.reload_macos": "↺ Znovu načíst",
+	"menu.global.quit_macos": "✕ Ukončit"
 }

@@ -1836,8 +1836,34 @@ checkPrivacyTriggerControls();
 	assert.deepEqual(
 		manifest.top_level.filter((row) => row.id === 'reload' || row.id === 'quit'),
 		[
-			{ type: 'command', id: 'reload', i18n: 'menu.global.reload' },
-			{ type: 'command', id: 'quit', i18n: 'menu.global.quit' }
+			{
+				type: 'command',
+				id: 'reload',
+				i18n: 'menu.global.reload',
+				platforms: ['ahk', 'linux'],
+				unavailable: 'hide'
+			},
+			{
+				type: 'command',
+				id: 'reload',
+				i18n: 'menu.global.reload_macos',
+				platforms: ['hs'],
+				unavailable: 'hide'
+			},
+			{
+				type: 'command',
+				id: 'quit',
+				i18n: 'menu.global.quit',
+				platforms: ['ahk', 'linux'],
+				unavailable: 'hide'
+			},
+			{
+				type: 'command',
+				id: 'quit',
+				i18n: 'menu.global.quit_macos',
+				platforms: ['hs'],
+				unavailable: 'hide'
+			}
 		],
 		'the existing root owns both lifecycle labels and their order'
 	);
@@ -9702,4 +9728,88 @@ console.log(
 			'wrong native owner is refused'
 		);
 	}
+}
+
+// Disjoint caption variants retain one existing lifecycle identity per native OS.
+{
+	const assert = require('node:assert/strict');
+	const menu = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const prior = JSON.parse(
+		readFileSync(
+			resolve(SHARED, 'tests/corpus/menus/macos_lifecycle_command_captions.json'),
+			'utf8'
+		)
+	);
+	assert.equal(
+		Object.keys(prior.captions).length,
+		21,
+		'all prior physical caption pairs are independently frozen'
+	);
+	for (const platform of ['ahk', 'hs', 'linux']) {
+		const projected = menu.top_level.filter(
+			(row) => ['reload', 'quit'].includes(row.id) && row.platforms.includes(platform)
+		);
+		assert.equal(
+			projected.length,
+			2,
+			'exactly one native-visible owner per actual lifecycle identity'
+		);
+		assert.deepEqual(
+			projected.map((row) => row.id),
+			['reload', 'quit'],
+			'the original two native command identities/order remain unchanged'
+		);
+		assert.deepEqual(
+			projected.map((row) => row.i18n),
+			platform === 'hs'
+				? ['menu.global.reload_macos', 'menu.global.quit_macos']
+				: ['menu.global.reload', 'menu.global.quit']
+		);
+	}
+	for (const [locale, commands] of Object.entries(prior.captions)) {
+		const strings = JSON.parse(
+			readFileSync(resolve(LOCALES_DIR, locale + '.json'), 'utf8').replace(/^\uFEFF/, '')
+		);
+		for (const id of ['reload', 'quit']) {
+			assert.equal(
+				strings['menu.global.' + id],
+				commands[id].other,
+				'Windows/Linux keep the exact independently frozen caption'
+			);
+			assert.equal(
+				strings['menu.global.' + id + '_macos'],
+				commands[id].macos,
+				'Mac consumes the exact independently frozen prior display caption'
+			);
+		}
+	}
+	const source = readFileSync(
+		resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/builder.lua'),
+		'utf8'
+	);
+	const first = source.indexOf('["reload"]          = function()');
+	const last = source.indexOf('["debug"]           = function()', first);
+	assert(
+		first >= 0 && last > first,
+		'both actual lifecycle builders have a bounded physical owner'
+	);
+	const tokens = require('../lib/script-source.cjs').scriptTokens(
+		source.slice(first, last),
+		'.lua'
+	);
+	assert(
+		tokens.length > 20,
+		'a quoted/commented declaration cannot supply the native command builders'
+	);
+	assert(
+		!tokens.some(
+			(token, at) =>
+				token.kind === 'identifier' &&
+				token.value === 'row' &&
+				tokens[at + 1]?.value === '.' &&
+				tokens[at + 2]?.value === 'label' &&
+				tokens[at + 3]?.value === '='
+		),
+		'the actual native lifecycle builder cannot replace its declared caption'
+	);
 }

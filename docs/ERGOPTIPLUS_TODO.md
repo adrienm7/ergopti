@@ -4899,6 +4899,17 @@ integrated, then publish one grouped release.
   portable macOS E2E; native AppKit, packaging and installation qualification
   remain pending. Root/image placement and download presentation are separate
   unfinished families.
+  Reload/Quit captions now come from the canonical native-platform variants,
+  retaining all 21 independently frozen prior captions. Unique visible lookup
+  refuses hidden-first ownership, withdrawal and duplicate native identities.
+  Focused portable macOS controls pass 8/0 plus 27/0, versus predecessor 1/7
+  and 24/3; Linux lookup controls pass 8/0 versus predecessor 1/7. The current
+  nine-subject lookup contract passes on both Lua engines, preserving shared
+  inert status from a single global declaration without native action ownership.
+  Original lifecycle/status assertions and approved visible order remain; the
+  actual order gate rejects three malformed native declarations. Existing
+  native callback and lifecycle owners remain unchanged; complete selected
+  gates, Windows native execution and installed-device acceptance are pending.
   Complete cached system-gesture status now consumes shared parent, slot,
   pinch, reader and refresh frames through genuine native cached providers.
   Seven additive keys in all 21 locales preserve an independently frozen prior
@@ -6850,6 +6861,17 @@ Current Group 3 source checkpoint (item 73, 2026-10-06): [Group 3 current checkp
   portable macOS E2E; native AppKit, packaging and installation qualification
   remain pending. Root/image placement and download presentation are separate
   unfinished families.
+  Reload/Quit captions now come from the canonical native-platform variants,
+  retaining all 21 independently frozen prior captions. Unique visible lookup
+  refuses hidden-first ownership, withdrawal and duplicate native identities.
+  Focused portable macOS controls pass 8/0 plus 27/0, versus predecessor 1/7
+  and 24/3; Linux lookup controls pass 8/0 versus predecessor 1/7. The current
+  nine-subject lookup contract passes on both Lua engines, preserving shared
+  inert status from a single global declaration without native action ownership.
+  Original lifecycle/status assertions and approved visible order remain; the
+  actual order gate rejects three malformed native declarations. Existing
+  native callback and lifecycle owners remain unchanged; complete selected
+  gates, Windows native execution and installed-device acceptance are pending.
   Complete cached system-gesture status now consumes shared parent, slot,
   pinch, reader and refresh frames through genuine native cached providers.
   Seven additive keys in all 21 locales preserve an independently frozen prior

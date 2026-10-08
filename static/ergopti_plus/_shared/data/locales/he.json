@@ -3249,5 +3249,7 @@
 	"gestures.system.pinch_unknown": "מחוות הצביטה של המערכת : מחוות מערכת: לא נבדקו",
 	"gestures.system.slot_unknown_caption": "%s — מחוות מערכת: לא נבדקו",
 	"gestures.system.slot_configured_caption": "%s — מוגדר עבור ErgoptiPlus",
-	"gestures.system.slot_not_configured_caption": "%s — לא מוגדר עבור ErgoptiPlus"
+	"gestures.system.slot_not_configured_caption": "%s — לא מוגדר עבור ErgoptiPlus",
+	"menu.global.reload_macos": "↺ טען מחדש",
+	"menu.global.quit_macos": "✕ צא"
 }

@@ -3249,5 +3249,7 @@
 	"gestures.system.pinch_unknown": "システムのピンチジェスチャー : システムジェスチャー：未確認",
 	"gestures.system.slot_unknown_caption": "%s — システムジェスチャー：未確認",
 	"gestures.system.slot_configured_caption": "%s — ErgoptiPlus 用に設定済み",
-	"gestures.system.slot_not_configured_caption": "%s — ErgoptiPlus 用に未設定"
+	"gestures.system.slot_not_configured_caption": "%s — ErgoptiPlus 用に未設定",
+	"menu.global.reload_macos": "↺ リロード",
+	"menu.global.quit_macos": "✕ 終了"
 }

@@ -610,3 +610,5 @@ require("test.menu_group_row_contract").register(helpers, "macos")
 require("test.menu_command_group_affix_contract").register(helpers, "macos")
 
 require("test.menu_command_literal_prefix_contract").register(helpers, "macos")
+
+require("test.menu_platform_lookup").register(helpers, "hs")

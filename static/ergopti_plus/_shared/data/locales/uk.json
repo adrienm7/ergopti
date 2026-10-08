@@ -3249,5 +3249,7 @@
 	"gestures.system.pinch_unknown": "Системний жест зведення пальців : Системні жести: не перевірені",
 	"gestures.system.slot_unknown_caption": "%s — Системні жести: не перевірені",
 	"gestures.system.slot_configured_caption": "%s — Налаштовано для ErgoptiPlus",
-	"gestures.system.slot_not_configured_caption": "%s — Не налаштовано для ErgoptiPlus"
+	"gestures.system.slot_not_configured_caption": "%s — Не налаштовано для ErgoptiPlus",
+	"menu.global.reload_macos": "↺ Перезавантажити",
+	"menu.global.quit_macos": "✕ Вийти"
 }

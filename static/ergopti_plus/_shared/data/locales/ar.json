@@ -3249,5 +3249,7 @@
 	"gestures.system.pinch_unknown": "إيماءة القرص في النظام : إيماءات النظام: لم يتم التحقق منها",
 	"gestures.system.slot_unknown_caption": "%s — إيماءات النظام: لم يتم التحقق منها",
 	"gestures.system.slot_configured_caption": "%s — تم الإعداد لاستخدام ErgoptiPlus",
-	"gestures.system.slot_not_configured_caption": "%s — لم يتم الإعداد لاستخدام ErgoptiPlus"
+	"gestures.system.slot_not_configured_caption": "%s — لم يتم الإعداد لاستخدام ErgoptiPlus",
+	"menu.global.reload_macos": "↺ إعادة تحميل",
+	"menu.global.quit_macos": "✕ إنهاء"
 }

@@ -820,16 +820,13 @@ function M.generate(ctx, menu_mods, actions)
 			return about_item and { about_item } or {}
 		end,
 		["reload"]          = function()
-			-- Strip the leading emoji token — emoji render poorly in native macOS menu bars
 			local row = ManifestMenu.command_row("top_level", "reload", { reload = actions.reload })
 			if not row then return {} end
-			row.label = "↺ " .. row.label:gsub("^%S+ ", "")
 			return { row }
 		end,
 		["quit"]            = function()
 			local row = ManifestMenu.command_row("top_level", "quit", { quit = actions.quit })
 			if not row then return {} end
-			row.label = "✕ " .. row.label:gsub("^%S+ ", "")
 			return { row }
 		end,
 		["debug"]           = function()
