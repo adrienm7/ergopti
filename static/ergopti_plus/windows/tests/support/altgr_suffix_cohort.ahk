@@ -226,6 +226,7 @@ _KCT_AltGrNativePriority() {
 			Handle := ShellRunner_SpawnTreeOwned(A_AhkPath, Arguments,
 				_KCT_AltGrChildDone.Bind(Capture))
 			ObservationLease := _KCT_ObservationOpen(Receipt . ".observation")
+			ReleaseObservationLease := _KCT_ObservationOpen(Receipt . ".release-observation")
 			Cleaned := false
 			ChildPid := 0
 			try {
@@ -239,10 +240,14 @@ _KCT_AltGrNativePriority() {
 				}
 			} finally {
 				ObservationNote := _KCT_ObservationRead(ObservationLease, ChildPid, Nonce, Mode, ObservationGeneration)
+				ReleaseObservationNote := _KCT_ObservationRead(ReleaseObservationLease, ChildPid, Nonce, Mode, ObservationGeneration)
+				ObservationNote .= StrReplace(ReleaseObservationNote, "[observation ", "[release observation ")
 				try Cleaned := Handle.terminate()
 				catch Error as Err
 					Capture["cleanup"] := Err.Message
 				if !_KCT_ObservationClose(ObservationLease)
+					CleanupDebt := true
+				if !_KCT_ObservationClose(ReleaseObservationLease)
 					CleanupDebt := true
 				if !Cleaned
 					CleanupDebt := true
