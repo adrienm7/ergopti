@@ -1289,22 +1289,27 @@ Test("config journal: genuine registry sparse cell cannot hide behind unchanged 
 Test("config journal: genuine published sparse row array retires to actual native reread", _CMJ_GenuineDenseArrayMutation.Bind(true))
 
 _CMJ_BootRegistryWithdrawal(When := "prepared") {
-	global ConfigurationFile, FSWriteDurable, _LOGGER_TEST_SINK
+	global ConfigurationFile, _LOGGER_TEST_SINK, LOGGER_MIN_LEVEL
 	OldPath := IsSet(ConfigurationFile) ? ConfigurationFile : unset
 	Dir := _CMG_NewDir(), Path := Dir . "\config.toml"
 	Registry := ConfigMigrateShippedRegistry(), Step := Registry["steps"][1], Reason := Step["reason"]
 	Source := '[_meta]`nschema_version = ' . Registry["unstamped"] . '`n[hotstrings]`ntrigger_char = "@"`n'
 	NativeWrite := FSWriteDurable, PreviousSink := _LOGGER_TEST_SINK
-	Seen := { stage: 0, completed: 0 }
-	StageWrite(Destination, Content) {
-		Result := NativeWrite.Call(Destination, Content)
-		if InStr(Destination, "-migration-") && Result {
+	PreviousLevel := LOGGER_MIN_LEVEL
+	Seen := { stage: 0, completed: 0, stage_paths: [], stage_content: "", source_unchanged: false }
+	Observe(Line) {
+		if When == "stage" && InStr(Line, "[INFO] [ConfigMigrate] Verified durable migration stage '")
+				&& InStr(Line, "' for '" . Path . "' before native publication.") {
 			Seen.stage += 1
+			; Inspect the real default writer's verified stage, then withdraw its
+			; original registry before the actual final native move can run.
+			loop Files Path . "." . A_ScriptHwnd . "-migration-*.stage", "F" {
+				Seen.stage_paths.Push(A_LoopFileFullPath)
+				Seen.stage_content := FSReadUtf8Exact(A_LoopFileFullPath)
+			}
+			Seen.source_unchanged := FSUtf8ExactMatches(Path, Source)
 			Step["reason"] := Reason . " withdrawn after actual durable stage"
 		}
-		return Result
-	}
-	Observe(Line) {
 		if InStr(Line, "[SUCCESS] [ConfigMigrate] Migrated '") {
 			Seen.completed += 1
 			Step["reason"] := Reason . " withdrawn after genuine native publication"
@@ -1320,10 +1325,11 @@ _CMJ_BootRegistryWithdrawal(When := "prepared") {
 		switch When {
 			case "prepared":
 				Step["reason"] := Reason . " withdrawn after genuine prepare"
-			case "stage":
-				FSWriteDurable := StageWrite
-			case "completed":
+			case "stage", "completed":
+				; Close the preceding observer cohort before enabling this one.
 				_LoggerFlushRepeats(true)
+				LOGGER_MIN_LEVEL := "INFO"
+				_LoggerRefreshFastFlags()
 				LoggerSetTestSink(Observe)
 		}
 		Result := ConfigMigrateBoot(Path)
@@ -1341,6 +1347,10 @@ _CMJ_BootRegistryWithdrawal(When := "prepared") {
 			AssertTrue(FSUtf8ExactMatches(Result["backup"], Source), "the real backup preserves the complete original source")
 			if When == "stage" {
 				AssertEqual(1, Seen.stage, "withdrawal occurs after the real default durable staging write")
+				AssertEqual(1, Seen.stage_paths.Length, "the observer must inspect exactly one real owned native stage")
+				AssertTrue(Seen.source_unchanged, "the native source remains original when the verified stage is observed")
+				AssertEqual(ConfigMigrateCurrentVersion(), TOML_ParseDocument(Seen.stage_content)["_meta"]["schema_version"],
+					"the actual durable staged bytes contain the genuinely migrated current schema")
 				AssertTrue(FSUtf8ExactMatches(Path, Source), "the actual native final rename refuses the withdrawn owner")
 			} else {
 				AssertEqual(1, Seen.completed, "the real default native migration completed before final handoff withdrawal")
@@ -1351,12 +1361,17 @@ _CMJ_BootRegistryWithdrawal(When := "prepared") {
 		Step["reason"] := Reason
 		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "repair does not resurrect this session's refused initial boot")
 	} finally {
-		FSWriteDurable := NativeWrite
-		try _LoggerFlushRepeats(true)
-		finally LoggerSetTestSink(PreviousSink)
-		Step["reason"] := Reason
-		ConfigurationFile := IsSet(OldPath) ? OldPath : unset
-		_CMJ_Cleanup(Dir, Path)
+		try {
+			; Close this real observer cohort before restoring the exact previous sink.
+			try _LoggerFlushRepeats(true)
+			finally LoggerSetTestSink(PreviousSink)
+		} finally {
+			LOGGER_MIN_LEVEL := PreviousLevel
+			_LoggerRefreshFastFlags()
+			Step["reason"] := Reason
+			ConfigurationFile := IsSet(OldPath) ? OldPath : unset
+			_CMJ_Cleanup(Dir, Path)
+		}
 	}
 }
 for When in ["prepared", "stage", "completed"]

@@ -790,6 +790,10 @@ _ConfigMigratePublish(FilePath, Candidate, Source, AdmissionFn := 0) {
 		try FSDelete(StagePath)
 		return "the staging file could not be written and verified"
 	}
+	; Report verified staging before the final source/native admission boundary;
+	; this identifies the owned path without disclosing configuration content.
+	try LoggerInfo("ConfigMigrate", "Verified durable migration stage '{1}' for '{2}' before native publication.",
+		StagePath, FilePath)
 	if !FSUtf8ExactMatches(FilePath, Source) {
 		try FSDelete(StagePath)
 		return "the file changed after it was read"
