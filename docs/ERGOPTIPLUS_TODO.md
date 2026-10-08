@@ -3349,8 +3349,11 @@ retained until actual main-queue cleanup before expectation fulfillment. All 12
 methods, other assertions and the original one-second wait remain unchanged.
 Independent source review and strict full forward/reverse checks pass. Actual
 macOS compilation and execution after this successor remain unqualified here;
-preparatory manual run 37778305562 tests exact source on 916238897. Physical
-magic-key acceptance and the other native requirements remain open.
+preparatory manual run 37778305562 tests exact source on 916238897. That run
+now compiles the Swift tests successfully in 52.55 seconds, but reaches the
+original 25-minute step deadline before any keyboard/TIS method starts.
+Darwin behavior, physical magic-key acceptance and the other native requirements
+remain unexecuted or unqualified; successful compilation does not complete30.
 
 - [~] **31.** HS-274 exact physical key accounting with an Ergopti-owned
   background Karabiner runtime (no Karabiner-Elements app). Plan, decisions and
@@ -4905,6 +4908,19 @@ operations and no terminal ACK; current Guardian custody remains a production
 HOLD. No signing, installation or runtime qualification is claimed. Item 31 and
 transverse 16/38 remain open; no item is removed.
 
+Actual preparatory macOS run37778305562 at916238897 now passes Swift test
+compilation and the separate pinned Core-Service/CLI calibration in181.466s.
+The complete four-target preparation still refuses124 after300.227s; the
+baseline/full-build/separate-Core case fails after722.056s. The new root probe
+fails69 after0.247s; its primary retained stderr is unavailable, so the failing
+ABI/compiler/bootstrap boundary remains UNKNOWN. Permission UI, private
+configuration, VHD preparation and disposable signing also fail. The authentic
+transcript contains92 XCTest starts:83 pass,8 fail,0 skip and one unfinished
+portable initializer method when the unchanged25-minute workflow limit expires.
+Later tests are unexecuted. This private trial predates the current dev merge,
+does not qualify final sources or packaging/installation, and grants no runtime
+activation. Item31 and transverse16/38 remain open.
+
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
   listed; see `docs/memory/text-input-and-config.md`. Current source already
@@ -6416,6 +6432,14 @@ The complete Swift step later times out at25 minutes; this does not qualify
 whole-suite success, packaging or installation. Actual confirmation UI/token/lease,
 physical input and the unavailable original25-rule backup remain unqualified.
 Item43 stays partial.
+
+The authentic transcript of preparatory macOS run37778305562 at916238897
+again passes the original six-case cleanup method, all three confirmed-source
+four-case cohorts and all three Foundation receipt methods. The raw receipt
+artifact remains blocked by the cloud network policy. The whole Swift step
+times out, with packaging and installation skipped; these passing methods do
+not qualify final-source confirmation UI, physical input or the unavailable
+historical25-rule configuration. Item43 remains partial.
 
 - [~] **44.** CapsWord is no longer cancelled by the pointer when Karabiner
   activated it (AltGr + CapsLock): the watcher probed the variable with
