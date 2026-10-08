@@ -42,6 +42,7 @@ _RejectRunnerArguments(Message) {
 global _AHK_DRY_RUN := false
 global _AHK_ONLY_FILTER := ""
 global _AHK_INTERACTIVE := false
+global _AHK_QUALIFICATION_PROFILE := ""
 _riArgIndex := 1
 while (_riArgIndex <= A_Args.Length) {
 	_riArg := A_Args[_riArgIndex]
@@ -49,6 +50,13 @@ while (_riArgIndex <= A_Args.Length) {
 		_AHK_DRY_RUN := true
 	else if (_riArg == "--interactive")
 		_AHK_INTERACTIVE := true
+	else if (SubStr(_riArg, 1, 24) == "--qualification-profile=") {
+		if _AHK_QUALIFICATION_PROFILE != ""
+			_RejectRunnerArguments("--qualification-profile may be supplied only once")
+		_AHK_QUALIFICATION_PROFILE := SubStr(_riArg, 25)
+		if _AHK_QUALIFICATION_PROFILE == ""
+			_RejectRunnerArguments("--qualification-profile requires a non-empty id")
+	}
 	else if (_riArg == "--only" || SubStr(_riArg, 1, 7) == "--only=") {
 		if StrLen(_AHK_ONLY_FILTER) > 0
 			_RejectRunnerArguments("--only may be supplied only once")

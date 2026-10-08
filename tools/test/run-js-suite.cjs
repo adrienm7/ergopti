@@ -31,6 +31,12 @@ const FULL = process.argv.includes('--full');
 // Each check mirrors a CI "Validate ·" step. command/args are run from ROOT.
 const CHECKS = [
 	{
+		name: 'dev156 qualification deferrals retain full default execution and strict accounting',
+		cmd: process.execPath,
+		args: ['tools/test/test-dev-release-qualification.cjs'],
+		repro: 'npm run test:dev-release-qualification'
+	},
+	{
 		name: 'source toolchain admission preserves genuine compiler, headers and checkout',
 		cmd: process.execPath,
 		args: ['tools/test/test-linux-source-toolchain.cjs'],

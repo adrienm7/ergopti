@@ -41,6 +41,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { spawnSync } = require('node:child_process');
 const { byTag, runPage, textNodes } = require('./support/changelog-page-dom.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
@@ -191,6 +192,23 @@ function buildCiBody(inputs, changelog) {
 			continue;
 		}
 		if (skipping) continue;
+		if (trimmed === 'node - "$TAG" >> "$body_file" <<\'NODE\'') {
+			const program = [];
+			for (i++; i < script.length && script[i] !== 'NODE'; i++) program.push(script[i]);
+			if (i >= script.length) throw new Error('unterminated Node heredoc in the release-body step');
+			const result = spawnSync(process.execPath, ['-', env.TAG], {
+				cwd: ROOT,
+				input: program.join('\n'),
+				encoding: 'utf8',
+				timeout: 10000,
+				maxBuffer: 65536
+			});
+			if (result.error || result.signal || result.status !== 0) {
+				throw new Error('the actual release qualification body producer failed');
+			}
+			body += result.stdout;
+			continue;
+		}
 		if (/^cat >> "\$body_file" << EOF$/.test(trimmed)) {
 			for (i++; i < script.length && script[i] !== 'EOF'; i++) {
 				body += expand(script[i], env, '$`\\') + '\n';
@@ -292,6 +310,29 @@ function checkCiBody(modules) {
 		JSON.stringify(markers.map((m) => /=([a-z]+)/.exec(m)[1])) ===
 			JSON.stringify(modules.RELEASE_BODY_SECTIONS),
 		`CI must emit every section the splitter knows, in order (got ${markers.join(', ')})`
+	);
+
+	// Replay the actual policy publisher, retaining explicit unqualified labels.
+	const qualification = require('../../.github/ci/dev_release_qualification_exceptions.json');
+	const qualifiedBody = buildCiBody(
+		{ ...env, TAG: qualification.tag, VERSION: qualification.version },
+		CHANGELOG_MD
+	);
+	const qualifiedParts = modules.splitReleaseBody(qualifiedBody);
+	expect(qualifiedParts.format === 'marked', 'the exception body must retain every section marker');
+	expect(
+		qualifiedParts.footer.includes('Deferred checks are not passes'),
+		'the real publisher must disclose unqualified native checks'
+	);
+	for (const [scope, record] of Object.entries(qualification.scopes)) {
+		expect(
+			qualifiedParts.footer.includes(scope + ':** ' + record.reason),
+			'the actual body must retain each deferred scope and reason'
+		);
+	}
+	expect(
+		!body.includes('Native validation limitations'),
+		'ordinary release tags must not inherit a foreign qualification exception'
 	);
 
 	// Without a changelog file the step still writes a marked, valid body.

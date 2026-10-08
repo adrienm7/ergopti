@@ -14,6 +14,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const qualification = require('../ci/dev-release-qualification.cjs');
 
 function fail(message) {
 	throw new Error(message);
@@ -81,13 +82,39 @@ function validateEvidenceDocument(document, expectedSha) {
 	}
 }
 
-function verifyAggregate({ manifest, needs, evidence, expectedSha }) {
+function verifyAggregate({
+	manifest,
+	needs,
+	evidence,
+	expectedSha,
+	qualificationContext = qualification.environmentContext(),
+	qualificationNow = new Date()
+}) {
 	validateManifest(manifest);
 	if (!needs || Array.isArray(needs)) fail('needs must be an object');
 
 	const indexedEvidence = new Map();
+	const deferredEvidence = new Map();
 	for (const document of evidence) {
 		validateEvidenceDocument(document, expectedSha);
+		if (document.qualification !== undefined) {
+			if (
+				document.job !== 'e2e-linux' ||
+				Object.hasOwn(document.subjects, 'window-switch-receipts')
+			)
+				fail('Invalid deferred Linux evidence subject.');
+			qualification.validateQualificationReceipt(
+				document.qualification,
+				'linux-window-receipts',
+				expectedSha,
+				qualificationContext,
+				qualificationNow
+			);
+			const key = 'e2e-linux/window-switch-receipts';
+			if (deferredEvidence.has(key) || indexedEvidence.has(key))
+				fail('Duplicate deferred Linux evidence.');
+			deferredEvidence.set(key, document.qualification);
+		}
 		const contract = manifest.jobs[document.job];
 		if (!contract) fail(`evidence names unclassified job ${document.job}`);
 		for (const [subject, assertions] of Object.entries(document.subjects)) {
@@ -95,7 +122,8 @@ function verifyAggregate({ manifest, needs, evidence, expectedSha }) {
 				fail(`evidence names unclassified subject ${document.job}/${subject}`);
 			}
 			const key = `${document.job}/${subject}`;
-			if (indexedEvidence.has(key)) fail(`duplicate evidence for ${key}`);
+			if (indexedEvidence.has(key) || deferredEvidence.has(key))
+				fail(`duplicate evidence for ${key}`);
 			indexedEvidence.set(key, assertions);
 		}
 	}
@@ -120,6 +148,7 @@ function verifyAggregate({ manifest, needs, evidence, expectedSha }) {
 		for (const [subject, floor] of Object.entries(contract.subjects)) {
 			const key = `${job}/${subject}`;
 			const assertions = indexedEvidence.get(key);
+			if (!assertions && deferredEvidence.has(key)) continue;
 			if (!assertions) fail(`successful job ${job} has no evidence for ${subject}`);
 			if (assertions < floor)
 				fail(`${key} recorded ${assertions} assertion(s), expected at least ${floor}`);
@@ -129,6 +158,7 @@ function verifyAggregate({ manifest, needs, evidence, expectedSha }) {
 	for (const job of Object.keys(needs)) {
 		if (!manifest.jobs[job]) fail(`needs contains unclassified Linux job ${job}`);
 	}
+	return { qualified: deferredEvidence.size === 0, deferred: [...deferredEvidence.values()] };
 }
 
 function record(options) {
@@ -144,9 +174,35 @@ function record(options) {
 		if (!options[field]) fail(`record requires --${field.replace(/_/g, '-')}`);
 	}
 	const subjects = {};
+	let deferredReceipt;
+	const profile = qualification.resolveQualificationProfile(qualification.environmentContext());
 	for (const specification of options.subjects) {
+		if (specification === 'window-switch-receipts=deferred') {
+			if (
+				options.job !== 'e2e-linux' ||
+				!profile ||
+				deferredReceipt ||
+				Object.hasOwn(subjects, 'window-switch-receipts')
+			)
+				fail('Unauthorized or duplicate deferred Linux subject.');
+			if (!process.env.RUNNER_TEMP) fail('Qualification receipt owner unavailable.');
+			deferredReceipt = readJson(
+				path.join(process.env.RUNNER_TEMP, 'linux-window-qualification.json'),
+				'qualification receipt'
+			);
+			qualification.validateQualificationReceipt(
+				deferredReceipt,
+				'linux-window-receipts',
+				options.sha,
+				qualification.environmentContext()
+			);
+			continue;
+		}
+
 		const match = specification.match(/^([^=]+)=([1-9]\d*)$/);
 		if (!match) fail(`invalid --subject value: ${specification}`);
+		if (match[1] === 'window-switch-receipts' && deferredReceipt)
+			fail('Deferred evidence cannot also claim executed assertions.');
 		if (subjects[match[1]]) fail(`duplicate subject: ${match[1]}`);
 		subjects[match[1]] = Number(match[2]);
 	}
@@ -161,6 +217,7 @@ function record(options) {
 		interpreter: options.interpreter,
 		subjects
 	};
+	if (deferredReceipt) document.qualification = deferredReceipt;
 	fs.mkdirSync(path.dirname(options.output), { recursive: true });
 	fs.writeFileSync(options.output, `${JSON.stringify(document, null, 2)}\n`);
 }
@@ -184,12 +241,16 @@ function main(argv) {
 		for (const field of ['manifest', 'needs', 'evidence_dir', 'sha']) {
 			if (!options[field]) fail(`verify requires --${field.replace(/_/g, '-')}`);
 		}
-		verifyAggregate({
+		const result = verifyAggregate({
 			manifest: readJson(options.manifest, 'manifest'),
 			needs: JSON.parse(options.needs),
 			evidence: loadEvidence(options.evidence_dir),
 			expectedSha: options.sha
 		});
+		if (!result.qualified)
+			process.stdout.write(
+				'[DEFERRED] Linux native window qualification: ' + JSON.stringify(result) + '\n'
+			);
 		return;
 	}
 	fail('usage: linux-ci-evidence.cjs <record|verify> [options]');

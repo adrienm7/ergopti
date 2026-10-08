@@ -16,12 +16,16 @@ on:
         description: True when ci.yml's plan resolved a free release tag
         required: true
         type: boolean
-      tag:
-        description: Actual ci.yml release tag; empty for unpublished manual CI
-        required: true
-        type: string
       version:
         description: Release version without the leading v; empty unless release, so the build stamps 0.0.0-dev
+        required: true
+        type: string
+      tag:
+        description: Exact release tag from the canonical plan; empty unless release
+        required: true
+        type: string
+      prerelease:
+        description: Exact prerelease string from the canonical plan; empty unless release
         required: true
         type: string
       channel:
@@ -457,6 +461,12 @@ jobs:
     timeout-minutes: 45
     outputs:
       scenarios: ${{ steps.profile.outputs.scenarios }}
+    env:
+      ERGOPTI_DEV_RELEASE_RELEASE: ${{ inputs.release }}
+      ERGOPTI_DEV_RELEASE_PRERELEASE: ${{ inputs.prerelease }}
+      ERGOPTI_DEV_RELEASE_CHANNEL: ${{ inputs.channel }}
+      ERGOPTI_DEV_RELEASE_TAG: ${{ inputs.tag }}
+      ERGOPTI_DEV_RELEASE_VERSION: ${{ inputs.version }}
 
     steps:
       # A depth-1 clone: the build reads tracked files and HEAD, never history.
@@ -518,6 +528,29 @@ jobs:
 
       - name: Lint remap guardian LaunchAgent
         run: plutil -lint static/ergopti_plus/macos/launcher/com.ergoptiplus.remap-guardian.plist
+
+      # The helper refuses foreign contexts; inactive policy retains full tests.
+      - name: Prepare scoped native qualification profile
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/dev-release-qualification"
+          node tools/ci/dev-release-qualification.cjs \
+            --scope macos-brew-archive --github-env "$GITHUB_ENV" \
+            --receipt "$RUNNER_TEMP/dev-release-qualification/macos-brew-archive.json"
+
+      - name: Run portable Brew ownership and refusal controls
+        run: python3 -m unittest discover -s tools/diagnostics -p macos_brew_archive_acceptance_test.py -v
+
+      # Verify the real manifest output before any test source can be excluded.
+      - name: Verify scoped Swift test target exclusion
+        shell: bash
+        run: |
+          set -euo pipefail
+          swift package dump-package --package-path static/ergopti_plus/macos/launcher \
+            > "$RUNNER_TEMP/dev-release-qualification/swift-package.json"
+          node tools/test/test-macos-dev-qualification-deferral.cjs \
+            --package-dump "$RUNNER_TEMP/dev-release-qualification/swift-package.json"
 
       - name: Build release launcher
         shell: bash
@@ -608,6 +641,14 @@ jobs:
               exit 1
           fi
         timeout-minutes: 10
+
+      - name: Retain scoped native Brew qualification receipt
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-brew-qualification-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/dev-release-qualification/macos-brew-archive.json
+          if-no-files-found: error
 
       - name: Upload Swift launcher failure transcript
         if: ${{ failure() && steps.swift-launcher-tests.outcome == 'failure' }}
@@ -730,11 +771,37 @@ jobs:
       - name: Observe native Apple Shortcuts discovery
         if: ${{ always() }}
         run: |
+          set -euo pipefail
           python3 -m unittest discover -s tools/diagnostics/apple_shortcuts_probe -p test_probe.py -v
-          python3 tools/diagnostics/apple_shortcuts_probe/run_probe.py \
-            --source-root "$GITHUB_WORKSPACE" \
-            --source-sha "$GITHUB_SHA" \
-            --output "$RUNNER_TEMP/group3-apple-shortcuts-probe"
+          node tools/diagnostics/apple_shortcuts_probe/test_probe.cjs
+          node tools/ci/dev-release-qualification.cjs \
+            --scope macos-shortcuts-discovery --github-env "$GITHUB_ENV" \
+            --receipt "$RUNNER_TEMP/dev-release-qualification/macos-shortcuts-discovery.json"
+          shortcuts_mode="$(node - "$RUNNER_TEMP/dev-release-qualification/macos-shortcuts-discovery.json" <<'NODE'
+          const fs = require('node:fs');
+          const policy = require('./tools/ci/dev-release-qualification.cjs');
+          const receipt = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          if (receipt.schema !== 1 || receipt.scope !== 'macos-shortcuts-discovery' ||
+              receipt.source_sha !== process.env.GITHUB_SHA || receipt.qualified !== false ||
+              !['full', 'deferred'].includes(receipt.status)) throw Error('Invalid native qualification receipt');
+          const context = policy.environmentContext();
+          if (receipt.status === 'deferred') {
+            policy.validateQualificationReceipt(receipt, 'macos-shortcuts-discovery', process.env.GITHUB_SHA, context);
+          } else if (receipt.profile_id !== null || policy.resolveQualificationProfile(context) !== null ||
+              Object.keys(receipt).sort().join('|') !== 'profile_id|qualified|schema|scope|source_sha|status') {
+            throw Error('Invalid full native qualification receipt');
+          }
+          process.stdout.write(receipt.status);
+          NODE
+          )"
+          if [ "$shortcuts_mode" = full ]; then
+            python3 tools/diagnostics/apple_shortcuts_probe/run_probe.py \
+              --source-root "$GITHUB_WORKSPACE" \
+              --source-sha "$GITHUB_SHA" \
+              --output "$RUNNER_TEMP/group3-apple-shortcuts-probe"
+          else
+            echo "::warning title=Native Shortcuts qualification DEFERRED::Temporary dev prerelease exception; discovery remains unqualified."
+          fi
         timeout-minutes: 2
 
       - name: Retain native Apple Shortcuts observation
@@ -742,7 +809,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: native-apple-shortcuts-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/group3-apple-shortcuts-probe
+          path: |
+            ${{ runner.temp }}/group3-apple-shortcuts-probe
+            ${{ runner.temp }}/dev-release-qualification/macos-shortcuts-discovery.json
           if-no-files-found: error
 
       # LauncherLogTests append to the real launcher log,
