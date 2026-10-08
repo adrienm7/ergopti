@@ -43,7 +43,7 @@ if ($Mode -ceq 'Cleanup') {
 $Fixture = $null
 $Events = @()
 $RootInstalled = $false
-$State = @{ version = 1; state = 'starting'; phase = 'untrusted'; sequence = 0; root_removed = $false; service_stopped = $false }
+$State = @{ version = 1; state = 'starting'; phase = 'untrusted'; sequence = 0; root_removed = $false; service_stopped = $false; root_install_stage = 'none' }
 function Publish-State {
     try {
     if ($null -ne $Fixture) {
@@ -1039,20 +1039,34 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
     while ([DateTime]::UtcNow -lt $Deadline) {
         $Choice = [Threading.WaitHandle]::WaitAny([Threading.WaitHandle[]]$Events, 1000)
         if ($Choice -eq 0) {
+            # Publish fixed boundaries before calls that may block in the native store provider.
+            # This observes the existing trust transaction without changing its permissions.
+            $State.root_install_stage = 'create_store'; Publish-State
             $Store = [Security.Cryptography.X509Certificates.X509Store]::new('Root', 'CurrentUser')
             try {
+                $State.root_install_stage = 'open_store'; Publish-State
                 $Store.Open([Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
+                $State.root_install_stage = 'verify_absent'; Publish-State
                 if (@($Store.Certificates | Where-Object { $_.Thumbprint -ceq $State.root_thumbprint }).Count -ne 0) {
                     throw 'Unique owned root already existed before admission.'
                 }
+                $State.root_install_stage = 'export_public'; Publish-State
                 $PublicRoot = [Security.Cryptography.X509Certificates.X509Certificate2]::new($Fixture.Root.Export([Security.Cryptography.X509Certificates.X509ContentType]::Cert))
-                try { $Store.Add($PublicRoot) } finally { $PublicRoot.Dispose() }
+                try {
+                    $State.root_install_stage = 'add_root'; Publish-State
+                    $Store.Add($PublicRoot)
+                } finally { $PublicRoot.Dispose() }
                 $RootInstalled = $true
+                $State.root_install_stage = 'verify_present'; Publish-State
                 if (@($Store.Certificates | Where-Object { $_.Thumbprint -ceq $State.root_thumbprint }).Count -ne 1) {
                     throw 'Unique owned root installation was not acknowledged.'
                 }
-            } finally { $Store.Close(); $Store.Dispose() }
+            } finally {
+                $State.root_install_stage = 'close_store'; Publish-State
+                $Store.Close(); $Store.Dispose()
+            }
             $Fixture.TrustAdmitted = $true
+            $State.root_install_stage = 'complete'
             $State.phase = 'trusted'
         } elseif ($Choice -eq 1) {
             Remove-OwnedRoot $State.root_thumbprint $State.root_subject

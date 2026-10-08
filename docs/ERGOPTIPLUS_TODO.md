@@ -5623,6 +5623,13 @@ The fixed Specifications and Capabilities frames of the Windows/macOS per-model 
       open. macOS system trust and explicit proxy relays are integrated, while
       opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
 
+Windows full-URL PAC source preparation adds a bounded, fresh-script native
+Duktape evaluator with the canonical script, heap, query and deadline limits.
+The real Windows producer will qualify DNS/interface helpers, source identity,
+PE mitigations and system-only imports before publishing its executable.
+All86 independent helper vectors and17 actual pinned VM controls pass locally;
+Windows compilation, production joins and native route receiving remain pending.
+
 Windows release asset staging now joins the same bounded curl attempt
 engine as real requests, using the exact selected asset integer token
 and byte bound. New receiving requires genuine SSPI NTLM CONNECT, no
