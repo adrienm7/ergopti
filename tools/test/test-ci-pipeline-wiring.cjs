@@ -92,6 +92,10 @@ const ROOT = 'validate';
 const RELEASE_INPUT = `\${{ needs.${ROOT}.outputs.release == 'true' }}`;
 const RELEASE_IF = `github.event_name == 'push' && needs.${ROOT}.outputs.release == 'true'`;
 const NOT_CANCELLED = '${{ !cancelled() }}';
+const EARLY_MANAGER_IF = "${{ !cancelled() && steps.linux_unit.outcome == 'success' }}";
+const FAILED_UNIT_MANAGER_IF = "${{ !cancelled() && steps.linux_unit.outcome == 'failure' }}";
+const FAILED_UNIT_MANAGER_NAME =
+	'Saved ordered-pair Manager \u2014 independent observation after failed units';
 const MANUAL_RUNTIME_IF =
 	"${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() }}";
 const MANUAL_RUNTIME_EVIDENCE_IF =
@@ -167,6 +171,26 @@ const PLAN_STEPS = ['Load the Linux release artifact contract', 'Compute tag and
 // accepted value. Every other step runs whenever its job runs, so no edit can
 // skip a gate while its job stays green.
 const STEP_CONDITIONS = [
+	[LINUX_BOX, 'test-linux', FAILED_UNIT_MANAGER_NAME, FAILED_UNIT_MANAGER_IF],
+	[
+		LINUX_BOX,
+		'test-linux',
+		'Saved ordered-pair Manager — early genuine native source lifetimes',
+		EARLY_MANAGER_IF
+	],
+	[
+		LINUX_BOX,
+		'test-linux',
+		'Emit Configuration assertion from failed unit log',
+		"${{ failure() && !cancelled() && steps.linux_unit.outcome == 'failure' }}"
+	],
+	[
+		LINUX_BOX,
+		'test-linux',
+		'Upload failed unit log',
+		"${{ failure() && !cancelled() && steps.linux_unit.outcome == 'failure' }}"
+	],
+	[LINUX_BOX, 'e2e-linux', 'Qualify genuine Nix installed runtime', NOT_CANCELLED],
 	[LINUX_BOX, 'test-linux', 'Run manual official runtime and model acceptance', MANUAL_RUNTIME_IF],
 	[
 		LINUX_BOX,
@@ -175,9 +199,15 @@ const STEP_CONDITIONS = [
 		MANUAL_RUNTIME_EVIDENCE_IF
 	],
 	[LINUX_BOX, 'e2e-linux', 'Qualify native runtime prerequisites', NOT_CANCELLED],
+	[LINUX_BOX, 'e2e-linux', 'Qualify native retained FD SHA-256', NOT_CANCELLED],
+	[LINUX_BOX, 'e2e-linux', 'Prepare authenticated managed HTTP validation tools', NOT_CANCELLED],
+	[LINUX_BOX, 'e2e-linux', 'Qualify native managed HTTP public and retained output', NOT_CANCELLED],
+	[LINUX_BOX, 'e2e-linux', 'Qualify native updater archive pipeline', NOT_CANCELLED],
+	[LINUX_BOX, 'e2e-linux', 'Qualify archive crypto and bin parent source controls', NOT_CANCELLED],
 	[ENTRY, 'core', 'Install shared UI browsers', "matrix.suite == 'js'"],
 	[ENTRY, 'core', 'Test shared layer editor rendering', "matrix.suite == 'js'"],
 	[ENTRY, 'core', 'Test shared physical shortcut rendering', "matrix.suite == 'js'"],
+	[ENTRY, 'core', 'Test shared Versions installation rendering', "matrix.suite == 'js'"],
 	[ENTRY, 'validate', 'Check hotstring TOML files are sorted and formatted', NOT_CANCELLED],
 	[ENTRY, 'release', 'Create git tag', "steps.preflight.outputs.create_tag == 'true'"],
 	[
@@ -387,6 +417,24 @@ const STEP_CONDITIONS = [
 		'install-linux',
 		'Upload mandatory AppImage smoke evidence',
 		"matrix.kind == 'appimage'"
+	],
+	[
+		MACOS_BOX,
+		'package-macos',
+		'Build the signed readonly helper diagnostic',
+		"${{ always() && !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/codex/ci-actions' && !inputs.release }}"
+	],
+	[
+		MACOS_BOX,
+		'package-macos',
+		'Observe the signed readonly query without granting consent',
+		"${{ always() && !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/codex/ci-actions' && !inputs.release && steps.mac79_native_helper_build.outcome == 'success' }}"
+	],
+	[
+		MACOS_BOX,
+		'package-macos',
+		'Retain the private signed helper observation evidence',
+		"${{ always() && !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/codex/ci-actions' && !inputs.release }}"
 	]
 ];
 // test-linux runs each harness under !cancelled(), so a red one hides no other;
@@ -926,8 +974,10 @@ function graphProblems(files) {
 			if (!job || JSON.stringify(pipeline.needsOf(job.body)) !== JSON.stringify(expected)) {
 				problems.push(`${rel} ${id} must need exactly ${expected.join(', ')}`);
 			}
-			if (job && pipeline.field(job.body, 'if') !== (index === 4 ? 'always()' : null)) {
-				problems.push(`${rel} ${id} must run on every profile; only the verdict uses always()`);
+			const expectedCondition =
+				index === 4 ? 'always()' : rel === LINUX_BOX && id === 'e2e-linux' ? NOT_CANCELLED : null;
+			if (job && pipeline.field(job.body, 'if') !== expectedCondition) {
+				problems.push(`${rel} ${id} must keep its exact mandatory job condition`);
 			}
 		}
 		if (rel === MACOS_BOX) {
@@ -984,6 +1034,557 @@ for (const [what, from, to] of [
 	['conditional native canvas job', '  tooltip-canvas:\n', '  tooltip-canvas:\n    if: false\n']
 ]) {
 	mustCatch(what, MACOS_BOX, from, to, graphProblems);
+}
+
+/** Rejects packaging admission after a supplementary E2E observation of failed units. */
+function linuxUpstreamResultProblems(files) {
+	const entry = files.find((candidate) => candidate.rel === LINUX_BOX);
+	const job =
+		entry && pipeline.jobsOfText(entry.text, LINUX_BOX).find((item) => item.id === HARNESS_JOB);
+	if (!job) return ['the supplemental Linux observation must retain its E2E job'];
+	const unit = pipeline.jobsOfText(entry.text, LINUX_BOX).find((item) => item.id === 'test-linux');
+	if (
+		!unit ||
+		pipeline.field(unit.body, 'continue-on-error') !== null ||
+		pipeline.field(job.body, 'continue-on-error') !== null
+	)
+		return ['the original Linux units and supplemental E2E job must never forgive failure'];
+	const steps = pipeline.steps(job.body);
+	const name = 'Preserve the mandatory upstream unit result';
+	const matches = steps.filter((candidate) => candidate.name === name);
+	if (
+		matches.length !== 1 ||
+		steps.at(-3).name !== name ||
+		steps.at(-2).name !== 'Record mandatory E2E evidence' ||
+		steps.at(-1).name !== 'Upload mandatory E2E evidence'
+	)
+		return [
+			'Linux E2E must reject failed units once, before recording or uploading its certificate'
+		];
+	for (const certificate of steps.slice(-2)) {
+		if (
+			pipeline.stepField(certificate.body, 'if') !== null ||
+			pipeline.stepField(certificate.body, 'continue-on-error') !== null
+		)
+			return ['Linux E2E certificate steps require successful native and upstream admission'];
+	}
+	const body = matches[0].body;
+	if (
+		pipeline.stepField(body, 'if') !== NOT_CANCELLED ||
+		pipeline.stepField(body, 'timeout-minutes') !== '1' ||
+		pipeline.stepField(body, 'continue-on-error') !== null ||
+		pipeline.stepField(body, 'shell') !== null ||
+		pipeline.stepField(body, 'working-directory') !== null ||
+		pipeline.stepField(body, 'run') !== 'test "$ERGOPTI_UPSTREAM_UNIT_RESULT" = success' ||
+		pipeline.stepField(body, 'env') !==
+			'ERGOPTI_UPSTREAM_UNIT_RESULT: ${{ needs.test-linux.result }}'
+	)
+		return ['Linux E2E must reject the exact real upstream unit result without forgiveness'];
+	return [];
+}
+
+const EARLY_MANAGER_NAME =
+	'Saved ordered-pair Manager \u2014 early genuine native source lifetimes';
+const EARLY_MANAGER_SCRIPT = [
+	'set -euo pipefail',
+	'if ! command -v Xvfb >/dev/null; then',
+	"  echo 'ENVIRONMENT: early saved-pair Manager prerequisite refused: Xvfb is absent' >&2",
+	'  exit 2',
+	'fi',
+	'sudo modprobe uinput',
+	'if sudo python3 tests/hardware/run_manager_input_owner_real.py > "$RUNNER_TEMP/linux-manager-input-owner-early.log" 2>&1; then',
+	'  manager_status=0',
+	'else',
+	'  manager_status=$?',
+	'fi',
+	'cat "$RUNNER_TEMP/linux-manager-input-owner-early.log"',
+	'exit "$manager_status"'
+];
+const ORIGINAL_MANAGER_UNIT_SCRIPT = [
+	'set -euo pipefail',
+	'set +e',
+	'node ../../../tools/test/report.cjs --name linux-lua --json "${{ runner.temp }}/linux-lua.json" -- luajit tests/run.lua 2>&1 | tee "$RUNNER_TEMP/linux-unit.log"',
+	'unit_pipeline_status=("${PIPESTATUS[@]}")',
+	'set -e',
+	'if [ "${unit_pipeline_status[0]}" -ne 0 ]; then exit "${unit_pipeline_status[0]}"; fi',
+	'exit "${unit_pipeline_status[1]}"'
+];
+const ORIGINAL_MANAGER_MANUAL_SCRIPT = [
+	'set -euo pipefail',
+	'sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends curl zstd',
+	'python3 static/ergopti_plus/linux/tests/hardware/run_ollama_runtime_acceptance.py \\',
+	'  --repository "$GITHUB_WORKSPACE" \\',
+	'  --evidence "$RUNNER_TEMP/ollama-runtime-acceptance" \\',
+	'  --lua luajit'
+];
+const ORIGINAL_LATE_MANAGER_BODY =
+	'      - name: Saved ordered-pair Manager \u2014 genuine native source lifetimes\n        if: ${{ !cancelled() }}\n        working-directory: static/ergopti_plus/linux\n        env:\n          LUA_PATH: \'./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;\'\n        run: |\n          set -euo pipefail\n          if sudo env LUA_PATH="$LUA_PATH" python3 tests/hardware/run_manager_input_owner_real.py > "$RUNNER_TEMP/linux-manager-input-owner.log" 2>&1; then\n            manager_status=0\n          else\n            manager_status=$?\n          fi\n          cat "$RUNNER_TEMP/linux-manager-input-owner.log"\n          exit "$manager_status"\n        timeout-minutes: 3';
+const ORIGINAL_MANAGER_DAEMON_BODY =
+	'      - name: The whole daemon, live \u2014 a trigger typed, a tray shown\n        if: ${{ !cancelled() }}\n        run: |\n          sudo modprobe uinput\n          # lua-luv as install.sh installs it: the daemon\'s timers and every\n          # HTTP request (the AI phase) run on it.\n          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends at-spi2-core openbox python3-gi gir1.2-gtk-3.0 \\\n            dbus-x11 xvfb x11-xkb-utils libayatana-appindicator3-1 lua-luv\n          sudo bash static/ergopti_plus/linux/tests/hardware/run_daemon_live.sh\n        timeout-minutes: 6';
+
+/** Keeps the early native observation supplemental to actual units and late native admission. */
+function earlyManagerProblems(files) {
+	const entry = files.find((item) => item.rel === LINUX_BOX);
+	const jobs = entry && pipeline.jobsOfText(entry.text, LINUX_BOX);
+	const unit = jobs && jobs.find((job) => job.id === 'test-linux');
+	const e2e = jobs && jobs.find((job) => job.id === HARNESS_JOB);
+	if (
+		!unit ||
+		!e2e ||
+		pipeline.field(unit.body, 'if') !== null ||
+		pipeline.field(unit.body, 'continue-on-error') !== null
+	)
+		return ['the early Manager observation cannot replace or forgive the original unit entry'];
+	const steps = pipeline.steps(unit.body);
+	const original = steps.filter((step) => step.name === 'Run the driver unit test suite');
+	const early = steps.filter((step) => step.name === EARLY_MANAGER_NAME);
+	const manual = steps.filter(
+		(step) => step.name === 'Run manual official runtime and model acceptance'
+	);
+	if (
+		original.length !== 1 ||
+		early.length !== 1 ||
+		manual.length !== 1 ||
+		steps.indexOf(early[0]) !== steps.indexOf(original[0]) + 3 ||
+		steps[steps.indexOf(original[0]) + 1].name !== 'Upload failed unit log' ||
+		steps[steps.indexOf(original[0]) + 2].name !==
+			'Emit Configuration assertion from failed unit log' ||
+		steps.indexOf(early[0]) >= steps.indexOf(manual[0])
+	)
+		return [
+			'the early Manager observation must follow actual units and precede unchanged manual IA acquisition'
+		];
+	if (
+		pipeline.stepField(original[0].body, 'if') !== null ||
+		pipeline.stepField(original[0].body, 'continue-on-error') !== null ||
+		pipeline.stepField(original[0].body, 'id') !== 'linux_unit' ||
+		JSON.stringify(pipeline.runOf(original[0].body)) !==
+			JSON.stringify(ORIGINAL_MANAGER_UNIT_SCRIPT)
+	)
+		return ['the original unit runner, failing exit and receipt authority must remain exact'];
+	if (
+		pipeline.stepField(manual[0].body, 'if') !== MANUAL_RUNTIME_IF ||
+		pipeline.stepField(manual[0].body, 'continue-on-error') !== null ||
+		pipeline.stepField(manual[0].body, 'timeout-minutes') !== '18' ||
+		JSON.stringify(pipeline.runOf(manual[0].body)) !==
+			JSON.stringify(ORIGINAL_MANAGER_MANUAL_SCRIPT)
+	)
+		return ['the original manual IA acquisition and eighteen-minute budget must remain exact'];
+	const body = early[0].body;
+	if (
+		pipeline.stepField(body, 'if') !== EARLY_MANAGER_IF ||
+		pipeline.stepField(body, 'continue-on-error') !== null ||
+		pipeline.stepField(body, 'timeout-minutes') !== '3' ||
+		pipeline.stepField(body, 'working-directory') !== 'static/ergopti_plus/linux' ||
+		pipeline.stepField(body, 'shell') !== null ||
+		JSON.stringify(pipeline.runOf(body)) !== JSON.stringify(EARLY_MANAGER_SCRIPT)
+	)
+		return [
+			'the early Manager observation must retain exact real prerequisites, native command and failing exit'
+		];
+	const lateSteps = pipeline.steps(e2e.body);
+	const late = lateSteps.filter(
+		(step) => step.name === 'Saved ordered-pair Manager — genuine native source lifetimes'
+	);
+	const daemon = lateSteps.filter(
+		(step) => step.name === 'The whole daemon, live — a trigger typed, a tray shown'
+	);
+	if (
+		late.length !== 1 ||
+		daemon.length !== 1 ||
+		late[0].body !== ORIGINAL_LATE_MANAGER_BODY ||
+		daemon[0].body !== ORIGINAL_MANAGER_DAEMON_BODY ||
+		lateSteps.indexOf(late[0]) !== lateSteps.indexOf(daemon[0]) + 1
+	)
+		return [
+			'the original later Manager fixture and genuine daemon/kernel prerequisites must remain mandatory'
+		];
+	return [];
+}
+
+errors.push(...earlyManagerProblems(pipeline.files()));
+const earlyManagerStep = pipeline.step(pipeline.job('test-linux'), EARLY_MANAGER_NAME);
+
+const originalManagerUnitBody = pipeline.step(
+	pipeline.job('test-linux'),
+	'Run the driver unit test suite'
+);
+const originalManagerUnitOffset = pipeline.file(LINUX_BOX).indexOf(originalManagerUnitBody);
+const earlyManagerOffset = pipeline
+	.file(LINUX_BOX)
+	.indexOf(earlyManagerStep, originalManagerUnitOffset);
+assert.ok(
+	originalManagerUnitOffset >= 0 && earlyManagerOffset > originalManagerUnitOffset,
+	'the actual unit/diagnostic/early-observation span must exist'
+);
+const originalUnitObservationSpan = pipeline
+	.file(LINUX_BOX)
+	.slice(originalManagerUnitOffset, earlyManagerOffset + earlyManagerStep.length);
+mustCatch(
+	'early Manager moved before actual units',
+	LINUX_BOX,
+	originalUnitObservationSpan,
+	earlyManagerStep + '\n\n' + originalUnitObservationSpan.replace(earlyManagerStep, ''),
+	earlyManagerProblems
+);
+
+for (const [what, from, to] of [
+	['early Manager omitted', earlyManagerStep, ''],
+	[
+		'early Manager failure forgiven',
+		earlyManagerStep,
+		earlyManagerStep + '\n        continue-on-error: true'
+	],
+	[
+		'early Manager fake success',
+		earlyManagerStep,
+		earlyManagerStep.replace('exit "$manager_status"', 'exit 0')
+	],
+	[
+		'early Manager command removed',
+		earlyManagerStep,
+		earlyManagerStep.replace('sudo python3 tests/hardware/run_manager_input_owner_real.py', 'true')
+	],
+	[
+		'early Manager kernel prerequisite removed',
+		earlyManagerStep,
+		earlyManagerStep.replace('sudo modprobe uinput', 'true')
+	],
+	[
+		'early Manager kernel prerequisite failure swallowed',
+		earlyManagerStep,
+		earlyManagerStep.replace('sudo modprobe uinput', 'sudo modprobe uinput || true')
+	],
+	[
+		'early Manager Xvfb prerequisite removed',
+		earlyManagerStep,
+		earlyManagerStep.replace('command -v Xvfb', 'true')
+	],
+	[
+		'early Manager missing Xvfb read as success',
+		earlyManagerStep,
+		earlyManagerStep.replace('exit 2', 'exit 0')
+	],
+	[
+		'early Manager budget increased',
+		earlyManagerStep,
+		earlyManagerStep.replace('timeout-minutes: 3', 'timeout-minutes: 4')
+	],
+	[
+		'early Manager command context replaced',
+		earlyManagerStep,
+		earlyManagerStep + '\n        shell: bash -c true'
+	],
+	['later Manager removed', ORIGINAL_LATE_MANAGER_BODY, ''],
+	[
+		'later Manager replaced by early result',
+		ORIGINAL_LATE_MANAGER_BODY,
+		ORIGINAL_LATE_MANAGER_BODY.replace(
+			'sudo env LUA_PATH="$LUA_PATH" python3 tests/hardware/run_manager_input_owner_real.py',
+			'true'
+		)
+	],
+	['genuine daemon/kernel prerequisite removed', ORIGINAL_MANAGER_DAEMON_BODY, ''],
+	[
+		'manual IA acquisition removed',
+		'      - name: Run manual official runtime and model acceptance',
+		'      - name: Omitted manual official runtime and model acceptance'
+	],
+	['manual IA budget changed', '        timeout-minutes: 18', '        timeout-minutes: 19'],
+	[
+		'original units switched off',
+		'      - name: Run the driver unit test suite\n',
+		'      - name: Run the driver unit test suite\n        if: false\n'
+	],
+	[
+		'original units failure forgiven',
+		'      - name: Run the driver unit test suite\n',
+		'      - name: Run the driver unit test suite\n        continue-on-error: true\n'
+	]
+]) {
+	mustCatch(what, LINUX_BOX, from, to, earlyManagerProblems);
+}
+for (const condition of [
+	'',
+	'false',
+	'success()',
+	NOT_CANCELLED,
+	"${{ !cancelled() && steps.linux_unit.outcome == 'failure' }}"
+]) {
+	mustCatch(
+		'early Manager condition changed ' + condition,
+		LINUX_BOX,
+		earlyManagerStep,
+		earlyManagerStep.replace(
+			'        if: ' + EARLY_MANAGER_IF + '\n',
+			condition ? '        if: ' + condition + '\n' : ''
+		),
+		earlyManagerProblems
+	);
+}
+
+/** Keeps failed-unit observations separate from mandatory success and late admission. */
+function failedUnitManagerObservationProblems(files) {
+	const inherited = [...earlyManagerProblems(files), ...linuxUpstreamResultProblems(files)];
+	const entry = files.find((item) => item.rel === LINUX_BOX);
+	const job =
+		entry && pipeline.jobsOfText(entry.text, LINUX_BOX).find((item) => item.id === 'test-linux');
+	if (!job)
+		return [...inherited, 'the failed-unit Manager observation must retain the original unit job'];
+	const steps = pipeline.steps(job.body);
+	const failures = steps.filter((step) => step.name === FAILED_UNIT_MANAGER_NAME);
+	const successes = steps.filter((step) => step.name === EARLY_MANAGER_NAME);
+	if (
+		FAILED_UNIT_MANAGER_NAME === EARLY_MANAGER_NAME ||
+		failures.length !== 1 ||
+		successes.length !== 1 ||
+		steps.indexOf(failures[0]) !== steps.indexOf(successes[0]) + 1
+	)
+		return [
+			...inherited,
+			'failed-unit Manager observation must be unique and follow its unchanged success-only sibling'
+		];
+	const body = failures[0].body;
+	const expected = EARLY_MANAGER_SCRIPT.map((line) =>
+		line.replaceAll(
+			'linux-manager-input-owner-early.log',
+			'linux-manager-input-owner-unit-failure.log'
+		)
+	);
+	if (
+		pipeline.stepField(body, 'if') !== FAILED_UNIT_MANAGER_IF ||
+		pipeline.stepField(body, 'continue-on-error') !== null ||
+		pipeline.stepField(body, 'timeout-minutes') !== '3' ||
+		pipeline.stepField(body, 'working-directory') !== 'static/ergopti_plus/linux' ||
+		pipeline.stepField(body, 'shell') !== null ||
+		pipeline.stepField(body, 'env') !== null ||
+		JSON.stringify(pipeline.runOf(body)) !== JSON.stringify(expected)
+	)
+		inherited.push(
+			'failed-unit Manager observation must retain failure-only admission, genuine native prerequisites and actual exit without certificate credit'
+		);
+	return inherited;
+}
+
+errors.push(...failedUnitManagerObservationProblems(pipeline.files()));
+const failedUnitManagerStep = pipeline.step(pipeline.job('test-linux'), FAILED_UNIT_MANAGER_NAME);
+for (const [what, from, to] of [
+	['failed-unit Manager observation omitted', failedUnitManagerStep, ''],
+	[
+		'failed-unit Manager observation renamed to success-only sibling',
+		failedUnitManagerStep,
+		failedUnitManagerStep.replace(FAILED_UNIT_MANAGER_NAME, EARLY_MANAGER_NAME)
+	],
+	[
+		'failed-unit Manager failure forgiven',
+		failedUnitManagerStep,
+		failedUnitManagerStep + '\n        continue-on-error: true'
+	],
+	[
+		'failed-unit Manager false success',
+		failedUnitManagerStep,
+		failedUnitManagerStep.replace('exit "$manager_status"', 'exit 0')
+	],
+	[
+		'failed-unit Manager native command removed',
+		failedUnitManagerStep,
+		failedUnitManagerStep.replace(
+			'sudo python3 tests/hardware/run_manager_input_owner_real.py',
+			'true'
+		)
+	],
+	[
+		'failed-unit Manager native module load removed',
+		failedUnitManagerStep,
+		failedUnitManagerStep.replace('sudo modprobe uinput', 'true')
+	],
+	[
+		'failed-unit Manager native module load forgiven',
+		failedUnitManagerStep,
+		failedUnitManagerStep.replace('sudo modprobe uinput', 'sudo modprobe uinput || true')
+	],
+	[
+		'failed-unit Manager Xvfb prerequisite removed',
+		failedUnitManagerStep,
+		failedUnitManagerStep.replace('command -v Xvfb', 'true')
+	],
+	[
+		'failed-unit Manager Xvfb refusal read as success',
+		failedUnitManagerStep,
+		failedUnitManagerStep.replace('exit 2', 'exit 0')
+	],
+	[
+		'failed-unit Manager clock increased',
+		failedUnitManagerStep,
+		failedUnitManagerStep.replace('timeout-minutes: 3', 'timeout-minutes: 4')
+	],
+	[
+		'failed-unit Manager native status discarded',
+		failedUnitManagerStep,
+		failedUnitManagerStep.replace('manager_status=$?', 'manager_status=0')
+	],
+	[
+		'failed-unit Manager log replaces success evidence',
+		failedUnitManagerStep,
+		failedUnitManagerStep.replaceAll(
+			'linux-manager-input-owner-unit-failure.log',
+			'linux-manager-input-owner-early.log'
+		)
+	],
+	[
+		'failed-unit Manager command context replaced',
+		failedUnitManagerStep,
+		failedUnitManagerStep + '\n        shell: bash -c true'
+	],
+	[
+		'failed-unit Manager fake environment authority',
+		failedUnitManagerStep,
+		failedUnitManagerStep + '\n        env:\n          ERGOPTI_MANAGER_TEST_LUA: true'
+	],
+	[
+		'failed-unit Manager continued original units',
+		'      - name: Run the driver unit test suite\n',
+		'      - name: Run the driver unit test suite\n        continue-on-error: true\n'
+	],
+	[
+		'failed-unit Manager original units switched off',
+		'      - name: Run the driver unit test suite\n',
+		'      - name: Run the driver unit test suite\n        if: false\n'
+	]
+]) {
+	mustCatch(what, LINUX_BOX, from, to, failedUnitManagerObservationProblems);
+}
+for (const condition of [
+	'',
+	'false',
+	'success()',
+	NOT_CANCELLED,
+	EARLY_MANAGER_IF,
+	"${{ !cancelled() && steps.linux_unit.outcome == 'skipped' }}",
+	"${{ !cancelled() && steps.linux_unit.outcome != 'success' }}"
+]) {
+	mustCatch(
+		'failed-unit Manager observation condition changed ' + condition,
+		LINUX_BOX,
+		failedUnitManagerStep,
+		failedUnitManagerStep.replace(
+			'        if: ' + FAILED_UNIT_MANAGER_IF + '\n',
+			condition ? '        if: ' + condition + '\n' : ''
+		),
+		failedUnitManagerObservationProblems
+	);
+}
+mustCatch(
+	'failed-unit Manager observation moved before success sibling',
+	LINUX_BOX,
+	earlyManagerStep +
+		'\n\n      # This independent observation grants no success to the failed unit suite.\n' +
+		failedUnitManagerStep,
+	failedUnitManagerStep + '\n\n' + earlyManagerStep,
+	failedUnitManagerObservationProblems
+);
+
+errors.push(...linuxUpstreamResultProblems(pipeline.files()));
+const upstreamResultStep = pipeline.step(
+	pipeline.job(HARNESS_JOB),
+	'Preserve the mandatory upstream unit result'
+);
+for (const [what, from, to] of [
+	['missing upstream result step', upstreamResultStep, ''],
+	['forgiven E2E job', '  e2e-linux:\n', '  e2e-linux:\n    continue-on-error: true\n'],
+	['forgiven original unit job', '  test-linux:\n', '  test-linux:\n    continue-on-error: true\n'],
+	[
+		'upstream result command shell replaced',
+		upstreamResultStep,
+		upstreamResultStep + '\n        shell: bash -c true'
+	],
+	[
+		'changed upstream result command context',
+		upstreamResultStep,
+		upstreamResultStep + '\n        working-directory: /'
+	],
+	[
+		'forgiven upstream unit failure',
+		upstreamResultStep,
+		upstreamResultStep + '\n        continue-on-error: true'
+	],
+	[
+		'hard-coded upstream success',
+		'ERGOPTI_UPSTREAM_UNIT_RESULT: ${{ needs.test-linux.result }}',
+		'ERGOPTI_UPSTREAM_UNIT_RESULT: success'
+	],
+	[
+		'wrong upstream authority',
+		'ERGOPTI_UPSTREAM_UNIT_RESULT: ${{ needs.test-linux.result }}',
+		'ERGOPTI_UPSTREAM_UNIT_RESULT: ${{ needs.e2e-linux.result }}'
+	],
+	[
+		'upstream failure changed to success',
+		'run: test "$ERGOPTI_UPSTREAM_UNIT_RESULT" = success',
+		'run: true'
+	],
+	[
+		'swallowed upstream refusal',
+		'run: test "$ERGOPTI_UPSTREAM_UNIT_RESULT" = success',
+		'run: test "$ERGOPTI_UPSTREAM_UNIT_RESULT" = success || true'
+	],
+	[
+		'disabled upstream result check',
+		upstreamResultStep,
+		upstreamResultStep.replace(NOT_CANCELLED, 'false')
+	],
+	[
+		'success-only upstream result check',
+		upstreamResultStep,
+		upstreamResultStep.replace(NOT_CANCELLED, 'success()')
+	],
+	[
+		'changed upstream result budget',
+		upstreamResultStep,
+		upstreamResultStep.replace('timeout-minutes: 1', 'timeout-minutes: 2')
+	]
+]) {
+	mustCatch(what, LINUX_BOX, from, to, linuxUpstreamResultProblems);
+}
+for (const condition of ['', 'false', 'success()', 'always()', '${{ !cancelled() && false }}']) {
+	mustCatch(
+		'changed supplementary Linux E2E job condition ' + condition,
+		LINUX_BOX,
+		'    needs: [test-linux]\n    if: ' + NOT_CANCELLED + '\n',
+		'    needs: [test-linux]\n' + (condition ? '    if: ' + condition + '\n' : ''),
+		graphProblems
+	);
+}
+const upstreamEvidenceStep = pipeline.step(
+	pipeline.job(HARNESS_JOB),
+	'Upload mandatory E2E evidence'
+);
+const upstreamRecordStep = pipeline.step(
+	pipeline.job(HARNESS_JOB),
+	'Record mandatory E2E evidence'
+);
+mustCatch(
+	'upstream unit check moved after E2E certification',
+	LINUX_BOX,
+	upstreamResultStep + '\n\n' + upstreamRecordStep + '\n\n' + upstreamEvidenceStep,
+	upstreamRecordStep + '\n\n' + upstreamEvidenceStep + '\n\n' + upstreamResultStep,
+	linuxUpstreamResultProblems
+);
+for (const certificate of [upstreamRecordStep, upstreamEvidenceStep]) {
+	mustCatch(
+		'certificate admits failed upstream units',
+		LINUX_BOX,
+		certificate,
+		certificate.replace('\n', '\n        if: ' + NOT_CANCELLED + '\n'),
+		linuxUpstreamResultProblems
+	);
+	mustCatch(
+		'certificate forgives failure',
+		LINUX_BOX,
+		certificate,
+		certificate + '\n        continue-on-error: true',
+		linuxUpstreamResultProblems
+	);
 }
 
 errors.push(...graphProblems(pipeline.files()));
@@ -1116,7 +1717,15 @@ function permissionProblems(files) {
 		}
 		for (const candidate of pipeline.jobsOfText(entry.text, entry.rel)) {
 			const value = pipeline.field(candidate.body, 'permissions');
-			const expected = entry.rel === ENTRY && candidate.id === 'release' ? 'contents: write' : null;
+			const diagnosticReader =
+				(entry.rel === ENTRY && candidate.id === 'macos') ||
+				(entry.rel === MACOS_BOX && candidate.id === 'package-macos');
+			const expected =
+				entry.rel === ENTRY && candidate.id === 'release'
+					? 'contents: write'
+					: diagnosticReader
+						? 'contents: read actions: read'
+						: null;
 			if (value !== expected) {
 				problems.push(
 					`${entry.rel} job ${candidate.id} must ${expected ? `grant exactly ${expected}` : 'not widen the permissions'}, got: ${value}`
@@ -1394,6 +2003,26 @@ mustCatch(
 	LINUX_BOX,
 	'      - name: Upload the native distro unit log\n',
 	'      - name: Omitted native distro unit raw log upload\n',
+	stepProblems
+);
+// The assertion annotation belongs only to the original failed unit run.
+// A skipped or renamed diagnostic must be observed by the normal wiring gate.
+for (const condition of ['', 'success()', 'failure()', 'always()', 'false']) {
+	const head = '      - name: Emit Configuration assertion from failed unit log\n';
+	mustCatch(
+		'Configuration assertion condition ' + condition,
+		LINUX_BOX,
+		head +
+			"        if: ${{ failure() && !cancelled() && steps.linux_unit.outcome == 'failure' }}\n",
+		head + (condition ? '        if: ' + condition + '\n' : ''),
+		stepProblems
+	);
+}
+mustCatch(
+	'missing Configuration assertion diagnostic',
+	LINUX_BOX,
+	'      - name: Emit Configuration assertion from failed unit log\n',
+	'      - name: Omitted Configuration assertion diagnostic\n',
 	stepProblems
 );
 // Upload only closed receipts: the owned script corpus contains newline names,
@@ -1787,8 +2416,8 @@ for (const [what, rel, from, to] of [
 	[
 		'`|| true` after the Linux unit suite',
 		LINUX_BOX,
-		'-- luajit tests/run.lua\n',
-		'-- luajit tests/run.lua || true\n'
+		'-- luajit tests/run.lua 2>&1 | tee',
+		'-- luajit tests/run.lua || true 2>&1 | tee'
 	],
 	[
 		'`|| true` after the continued evidence verdict',
@@ -3272,6 +3901,355 @@ for (const [what, from, to] of [
 	]
 ]) {
 	mustCatch(what, LINUX_BOX, from, to, linuxAudioPrerequisiteProblems);
+}
+
+// This private diagnostic overlay admits no new product or release authority.
+const READONLY_HELPER_IF =
+	"${{ always() && !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/codex/ci-actions' && !inputs.release }}";
+const READONLY_QUERY_IF = READONLY_HELPER_IF.replace(
+	' }}',
+	" && steps.mac79_native_helper_build.outcome == 'success' }}"
+);
+const READONLY_BUILD_NAME = 'Build the signed readonly helper diagnostic';
+const READONLY_QUERY_NAME = 'Observe the signed readonly query without granting consent';
+const READONLY_UPLOAD_NAME = 'Retain the private signed helper observation evidence';
+
+/** Executes the actual workflow's pure ledger admissions against independent typed vectors. */
+function readonlyLedgerControls(source) {
+	const controls =
+		'import copy\nimport json\nimport sys\n\nnamespace = {"__name__": "policy_controls"}\nexec(compile(sys.stdin.read(), "actual-workflow-ledger-guard", "exec"), namespace)\nadmit = namespace["admit"]\nadmit_run = namespace["admit_run"]\nunique = namespace["unique"]\nsource_sha = "a" * 40\nrun_id = 17\nattempt = 3\nnames = ["Validate / Checks and plan", "Core / js", "Core / properties"]\npacket = {"total_count": 3, "jobs": [{"name": name, "run_id": 17, "run_attempt": 3,\n          "head_sha": source_sha, "status": "completed", "conclusion": "success"} for name in names]}\nrun = {"id": 17, "run_attempt": 3, "head_sha": source_sha, "head_branch": "codex/ci-actions",\n       "event": "workflow_dispatch", "path": ".github/workflows/ci.yml", "name": "CI",\n       "repository": {"full_name": "adrienm7/ergopti"}, "head_repository": {"full_name": "adrienm7/ergopti"}}\nrecords = []\n\n\ndef accepted(label, callback):\n    callback()\n    records.append({"name": label, "refused": False})\n\n\ndef refused(label, callback):\n    try:\n        callback()\n    except RuntimeError:\n        records.append({"name": label, "refused": True})\n        return\n    raise AssertionError("Actual workflow guard admitted: " + label)\n\n\nexpected = {"source_sha": source_sha, "ci_run_id": 17, "ci_run_attempt": 3,\n            "shared_jobs": sorted(names), "shared_jobs_successful": True}\naccepted("all three actual fixed shared jobs", lambda: (_ for _ in ()).throw(AssertionError())\n         if admit(copy.deepcopy(packet), source_sha, 17, 3) != expected else None)\naccepted("actual fixed run cohort", lambda: (_ for _ in ()).throw(AssertionError())\n         if admit_run(copy.deepcopy(run), source_sha, 17, 3) is not True else None)\nfor label, value in [("missing packet", None), ("list packet", []), ("typed count", {"total_count": True, "jobs": packet["jobs"]}),\n                     ("truncated", {"total_count": 4, "jobs": packet["jobs"]}), ("unknown packet key", {**packet, "other": True}),\n                     ("missing jobs", {"total_count": 3}), ("typed jobs", {"total_count": 3, "jobs": "wrong"})]:\n    refused(label, lambda value=value: admit(value, source_sha, 17, 3))\nfor index, name in enumerate(names):\n    value = copy.deepcopy(packet)\n    value["jobs"].pop(index)\n    value["total_count"] = 2\n    refused(name + " missing", lambda value=value: admit(value, source_sha, 17, 3))\n    value = copy.deepcopy(packet)\n    value["jobs"].append(copy.deepcopy(value["jobs"][index]))\n    value["total_count"] = 4\n    refused(name + " duplicate", lambda value=value: admit(value, source_sha, 17, 3))\n    for field, bad_values in {"run_id": [True, "17", 18, None], "run_attempt": [True, "3", 4, None],\n                             "head_sha": ["b" * 40, None], "status": ["queued", "in_progress", None],\n                             "conclusion": ["failure", "skipped", "cancelled", None]}.items():\n        for bad in bad_values:\n            value = copy.deepcopy(packet)\n            value["jobs"][index][field] = bad\n            refused(name + " wrong " + field + "=" + str(bad), lambda value=value: admit(value, source_sha, 17, 3))\nfor field, bad in [("id", True), ("id", 18), ("run_attempt", "3"), ("run_attempt", 4),\n                   ("head_sha", "b" * 40), ("head_branch", "dev"), ("head_branch", "refs/heads/codex/ci-actions"),\n                   ("event", "push"), ("path", ".github/workflows/other.yml"), ("name", "Other")]:\n    value = copy.deepcopy(run)\n    value[field] = bad\n    refused("run cohort wrong " + field + "=" + str(bad), lambda value=value: admit_run(value, source_sha, 17, 3))\nfor field in run:\n    value = copy.deepcopy(run)\n    del value[field]\n    refused("run cohort missing " + field, lambda value=value: admit_run(value, source_sha, 17, 3))\nfor field in ["repository", "head_repository"]:\n    for bad in [None, {"full_name": "fork/ergopti"}, {"full_name": True}]:\n        value = copy.deepcopy(run)\n        value[field] = bad\n        refused("run cohort wrong " + field + "=" + str(bad), lambda value=value: admit_run(value, source_sha, 17, 3))\nfor context in [(source_sha, True, 3), (source_sha, 17, True), (source_sha, 0, 3), (source_sha, 17, 0),\n                ("bad-source", 17, 3), (None, 17, 3)]:\n    refused("typed admission context " + str(context), lambda context=context: admit(copy.deepcopy(packet), *context))\nrefused("duplicate public JSON field", lambda: json.loads(\'{"total_count": 0, "total_count": 3}\', object_pairs_hook=unique))\n# Exercise the unchanged actual entry point with controlled public-read ports.\n# These ports qualify admission and receipt bytes; they do not qualify HTTP or native execution.\nimport os\nimport pathlib\nimport tempfile\nmain = namespace["main"]\nbase_context = {"GITHUB_SHA": source_sha, "GITHUB_RUN_ID": "17", "GITHUB_RUN_ATTEMPT": "3",\n                "GITHUB_REPOSITORY": "adrienm7/ergopti", "GITHUB_EVENT_NAME": "workflow_dispatch",\n                "GITHUB_REF": "refs/heads/codex/ci-actions"}\nbase_url = "https://api.github.com/repos/adrienm7/ergopti/actions/runs/17/attempts/3"\n\n\ndef entry_case(label, context, run_record, job_packet, allowed):\n    previous = dict(os.environ)\n    calls = []\n    with tempfile.TemporaryDirectory(prefix="mac79-ledger-control-") as temporary:\n        folder = pathlib.Path(temporary) / "mac79-native-helper-evidence"\n        folder.mkdir()\n        target = folder / "shared-jobs.json"\n        os.environ.update(base_context)\n        os.environ.update(context)\n        os.environ["RUNNER_TEMP"] = temporary\n        def controlled_read(url):\n            calls.append(url)\n            if len(calls) == 1 and url == base_url:\n                return copy.deepcopy(run_record)\n            if len(calls) == 2 and url == base_url + "/jobs?per_page=100":\n                return copy.deepcopy(job_packet)\n            raise AssertionError("Unexpected public ledger source or read order")\n        original = namespace["public_json"]\n        namespace["public_json"] = controlled_read\n        try:\n            if allowed:\n                main()\n                value = json.loads(target.read_text())\n                wanted = {**expected, "workflow_path": ".github/workflows/ci.yml", "event": "workflow_dispatch",\n                          "branch": "codex/ci-actions", "public_ledger_observed": True}\n                assert value == wanted and value["shared_jobs_successful"] is True\n                assert calls == [base_url, base_url + "/jobs?per_page=100"]\n            else:\n                try:\n                    main()\n                except RuntimeError:\n                    pass\n                else:\n                    raise AssertionError("Entry point admitted " + label)\n                assert not target.exists()\n                if context:\n                    assert not calls, "Invalid context must refuse before public reads"\n            records.append({"name": "actual main controlled public ports: " + label, "refused": not allowed})\n        finally:\n            namespace["public_json"] = original\n            os.environ.clear()\n            os.environ.update(previous)\n\n\nentry_case("healthy source and exclusive receipt", {}, run, packet, True)\nfor key, bad in [("GITHUB_SHA", "b"), ("GITHUB_RUN_ID", "0"), ("GITHUB_RUN_ATTEMPT", "01"),\n                 ("GITHUB_REPOSITORY", "fork/ergopti"), ("GITHUB_EVENT_NAME", "push"),\n                 ("GITHUB_REF", "refs/heads/dev")]:\n    entry_case("invalid " + key, {key: bad}, run, packet, False)\nfor key, bad in [("head_sha", "b" * 40), ("run_attempt", 2), ("event", "push"),\n                 ("head_branch", "dev"), ("path", ".github/workflows/other.yml")]:\n    value = copy.deepcopy(run)\n    value[key] = bad\n    entry_case("wrong public run " + key, {}, value, packet, False)\nfor index, name in enumerate(names):\n    value = copy.deepcopy(packet)\n    value["jobs"][index]["conclusion"] = "failure"\n    entry_case("red " + name, {}, run, value, False)\n# Actual header writer and wire function controls use one public, nonsecret constant.\nimport traceback\nimport urllib.error\nimport urllib.request\nledger_request = namespace["ledger_request"]\nwire = namespace["public_json"]\nno_redirect = namespace["LedgerNoRedirect"]\nconstant = "CONTROLLED_NON_SECRET_DIAGNOSTIC_TOKEN_9137"\nfor url in [base_url, base_url + "/jobs?per_page=100"]:\n    request = ledger_request(url, "17", "3", constant)\n    assert type(request) is urllib.request.Request\n    assert request.full_url == url and request.get_method() == "GET"\n    assert request.get_header("Authorization") == "Bearer " + constant\n    assert set(dict(request.header_items())) == {"Accept", "X-github-api-version", "User-agent", "Authorization"}\n    accepted("actual fixed GET and Authorization header writer", lambda: None)\nfor label, url in [("HTTP URL", base_url.replace("https:", "http:")), ("foreign host", base_url.replace("api.github.com", "example.invalid")),\n                   ("other repository", base_url.replace("adrienm7/ergopti", "fork/ergopti")), ("other attempt", base_url[:-1] + "4"),\n                   ("unbounded page", base_url + "/jobs?per_page=101"), ("other endpoint", base_url + "/logs"),\n                   ("token in URL", base_url + "?token=" + constant)]:\n    refused("actual header writer refuses " + label, lambda url=url: ledger_request(url, "17", "3", constant))\nfor index, token in enumerate([None, "", "a b", "a\\rb", "a\\nb", "a\\x00b", "\u00e9", "x" * 4097]):\n    refused("actual header writer rejects token control " + str(index), lambda token=token: ledger_request(base_url, "17", "3", token))\nfor run_value, attempt_value in [(17, "3"), ("17", 3), ("0", "3"), ("17", "01"), (None, "3")]:\n    refused("actual header writer rejects typed fixed endpoint context", lambda: ledger_request(base_url, run_value, attempt_value, constant))\nrefused("actual redirect handler refuses another credential destination",\n        lambda: no_redirect().redirect_request(ledger_request(base_url, "17", "3", constant), None, 302,\n                                               constant, {"Authorization": constant}, "https://example.invalid/"))\n\n\nclass WireResponse:\n    def __init__(self, payload, url):\n        self.payload = payload\n        self.url = url\n        self.reads = []\n        self.closed = False\n    def __enter__(self):\n        return self\n    def __exit__(self, *_):\n        self.closed = True\n    def geturl(self):\n        return self.url\n    def read(self, limit):\n        self.reads.append(limit)\n        return self.payload\n\n\ndef wire_control(label, outcome, allowed, expected_status=0):\n    previous = dict(os.environ)\n    original = urllib.request.build_opener\n    calls = []\n    response = WireResponse(json.dumps(packet).encode(), base_url)\n    if outcome == "redirected":\n        response.url = "https://example.invalid/"\n    elif outcome == "oversized":\n        response.payload = b"x" * (512 * 1024 + 1)\n    elif outcome == "oversized-valid-json":\n        response.payload = b"{}" + b" " * (512 * 1024 - 1)\n        assert json.loads(response.payload) == {}\n        assert len(response.payload) == 512 * 1024 + 1\n    elif outcome == "invalid-json":\n        response.payload = constant.encode()\n    elif outcome == "duplicate-json":\n        response.payload = b\'{"jobs": [], "jobs": []}\'\n    class ControlledOpener:\n        def open(self, request, timeout):\n            calls.append(request.full_url)\n            assert request.full_url == base_url and timeout == 10\n            assert request.get_method() == "GET" and request.get_header("Authorization") == "Bearer " + constant\n            if outcome == "HTTP403":\n                raise urllib.error.HTTPError(base_url, 403, constant, {"Authorization": constant}, None)\n            if outcome == "wire-error":\n                raise urllib.error.URLError(constant)\n            return response\n    def controlled_factory(*handlers):\n        assert len(handlers) == 1 and type(handlers[0]) is no_redirect\n        return ControlledOpener()\n    try:\n        os.environ.update(base_context)\n        os.environ["ERGOPTI_DIAGNOSTIC_LEDGER_TOKEN"] = constant\n        urllib.request.build_opener = controlled_factory\n        if allowed:\n            assert wire(base_url) == packet\n        else:\n            try:\n                wire(base_url)\n            except RuntimeError as failure:\n                assert str(failure) == "The fixed authenticated GitHub ledger read was refused (status " + str(expected_status) + ")."\n                assert failure.__suppress_context__ is True\n                assert constant not in str(failure) and constant not in traceback.format_exc()\n            else:\n                raise AssertionError("Actual wire admitted " + label)\n        assert calls == [base_url], "One source read must never retry or use another producer"\n        if outcome == "redirected":\n            assert not response.reads and response.closed\n        elif outcome not in ["HTTP403", "wire-error"]:\n            assert response.reads == [512 * 1024 + 1] and response.closed\n        records.append({"name": "actual authenticated wire controlled port: " + label, "refused": not allowed})\n    finally:\n        urllib.request.build_opener = original\n        os.environ.clear()\n        os.environ.update(previous)\n\n\nwire_control("healthy exact bounded JSON", "healthy", True)\nwire_control("HTTP status with private exception context", "HTTP403", False, 403)\nwire_control("transport exception with private message", "wire-error", False)\nwire_control("changed response source never read", "redirected", False)\nwire_control("bounded body ceiling", "oversized", False)\nwire_control("bounded valid JSON body ceiling", "oversized-valid-json", False)\nwire_control("malformed body is never echoed", "invalid-json", False)\nwire_control("duplicate JSON fields refuse", "duplicate-json", False)\n\nprint(json.dumps({"cases": len(records), "records": records, "classification": "Actual admission/main/header writer/authenticated wire with controlled transport; no credential/native execution"}))\n';
+	const program =
+		'SOURCE = ' + JSON.stringify(source) + '\n' + controls.replace('sys.stdin.read()', 'SOURCE');
+	const result = spawnSync(process.platform === 'win32' ? 'python' : 'python3', ['-'], {
+		cwd: pipeline.ROOT,
+		encoding: 'utf8',
+		input: program,
+		timeout: 15000
+	});
+	if (result.status !== 0) return false;
+	try {
+		return JSON.parse(result.stdout).cases >= 144;
+	} catch {
+		return false;
+	}
+}
+
+/** Requires the fixed signed product owner and actual current-run Core admission. */
+function readonlyHelperProblems(files) {
+	const source = files.find((entry) => entry.rel === MACOS_BOX);
+	const job =
+		source &&
+		pipeline.jobsOfText(source.text, MACOS_BOX).find((item) => item.id === 'package-macos');
+	if (!job) return ['the readonly diagnostic requires the original package job'];
+	const steps = pipeline.steps(job.body);
+	const names = [READONLY_BUILD_NAME, READONLY_QUERY_NAME, READONLY_UPLOAD_NAME];
+	const found = names.map((name) => steps.filter((step) => step.name === name));
+	if (found.some((matches) => matches.length !== 1))
+		return ['the readonly diagnostic requires three unique authored steps'];
+	const [build, query, upload] = found.map((matches) => matches[0]);
+	const problems = [];
+	const before = steps.findIndex(
+		(step) => step.name === 'Retain native Apple Shortcuts observation'
+	);
+	const after = steps.findIndex(
+		(step) => step.name === 'Remove the launcher log the Swift tests wrote'
+	);
+	if (
+		!(
+			steps.indexOf(build) === before + 1 &&
+			steps.indexOf(query) === before + 2 &&
+			steps.indexOf(upload) === before + 3 &&
+			after === before + 4
+		)
+	)
+		problems.push(
+			'the readonly diagnostic must follow the original observations without moving original steps'
+		);
+	for (const [step, expected] of [
+		[build, READONLY_HELPER_IF],
+		[query, READONLY_QUERY_IF],
+		[upload, READONLY_HELPER_IF]
+	]) {
+		if (pipeline.stepField(step.body, 'if') !== expected)
+			problems.push(
+				'the readonly diagnostic must keep exact manual/private/nonrelease/noncancelled admission'
+			);
+		if (pipeline.stepField(step.body, 'continue-on-error') !== null)
+			problems.push('the readonly diagnostic cannot forgive its original nonzero status');
+	}
+	if (
+		pipeline.field(job.body, 'timeout-minutes') !== '45' ||
+		pipeline.stepField(build.body, 'timeout-minutes') !== '10' ||
+		pipeline.stepField(query.body, 'timeout-minutes') !== '2'
+	)
+		problems.push('the readonly diagnostic cannot broaden existing native deadlines');
+	const script = (pipeline.runOf(build.body) || []).join('\n');
+	const python = /^python3 - <<'PY'\n([\s\S]*?)\nPY$/m.exec(script);
+	const compiler = script.indexOf('bash tools/build/build_macos_app.sh --native-helper-only');
+	if (
+		!python ||
+		!(compiler > script.indexOf(python[0])) ||
+		script.indexOf('set +e') < script.indexOf(python[0]) ||
+		!script.startsWith('set -euo pipefail\n') ||
+		!script.includes('test "$(git rev-parse HEAD)" = "$GITHUB_SHA"')
+	)
+		problems.push(
+			'native compilation must follow executed fail-fast same-source shared-job admission'
+		);
+	if (
+		!python ||
+		!python[1].includes('admit_run(public_json(url), source_sha, int(run), int(attempt))') ||
+		!python[1].includes(
+			'receipt = admit(public_json(url + "/jobs?per_page=100"), source_sha, int(run), int(attempt))'
+		) ||
+		!python[1].endsWith('if __name__ == "__main__":\n    main()') ||
+		/GITHUB_TOKEN|GH_TOKEN/.test(python[1])
+	)
+		problems.push(
+			'the readonly Core prerequisite must execute its authenticated exact GitHub ledger guard'
+		);
+	if (python && !readonlyLedgerControls(python[1]))
+		problems.push(
+			'the actual public ledger admissions must refuse all independent typed/stale/missing Core controls'
+		);
+	for (const line of [
+		"ERGOPTI_AUTOMATION_QUERY_CI_PUBLISH: '1'",
+		"MACOS_SIGNING_CERTIFICATE_BASE64: ''",
+		"MACOS_SIGNING_CERTIFICATE_PASSWORD: ''"
+	])
+		if (!build.body.includes(line))
+			problems.push('the private diagnostic must retain its fixed ad hoc source owner');
+	if (
+		!script.includes(
+			'ERGOPTI_BUILD_COMMIT="$GITHUB_SHA" bash tools/build/build_macos_app.sh --native-helper-only'
+		)
+	)
+		problems.push('the readonly helper must receive its exact source commit locally');
+	const observe = logicalLines(query.body)
+		.join('\n')
+		.replace(/[ \t]+/g, ' ');
+	if (
+		!observe.includes(
+			'python3 tools/diagnostics/program_actions/run_signed_query_probe.py --source-root "$PWD" --source-sha "$GITHUB_SHA" --app "$PWD/build/macos-native-helper/ErgoptiPlus.app" --build-receipt "$PWD/build/macos-native-helper/ErgoptiPlus.app/Contents/Resources/automation-query-build.json" --output "$RUNNER_TEMP/mac79-native-helper-evidence/query"'
+		) ||
+		!observe.includes('exit "${native_query_status[0]}"') ||
+		!observe.includes('if [ "${native_query_status[0]}" -eq 0 ]; then') ||
+		!observe.includes('native_query_status=("${PIPESTATUS[@]}")') ||
+		/--fixture-id|--cancel-held|\|\|\s*true/.test(observe)
+	)
+		problems.push(
+			'the fixed readonly query must retain signed provenance and its actual PARTIAL/refusal exit'
+		);
+	if (
+		pipeline.stepField(upload.body, 'uses') !== 'actions/upload-artifact@v4' ||
+		!upload.body.includes('if-no-files-found: error') ||
+		!upload.body.includes('retention-days: 3') ||
+		/\.zip|release-assets|assets-/.test(upload.body)
+	)
+		problems.push(
+			'the private diagnostic must retain only its bounded observations, never publication binaries'
+		);
+	return problems;
+}
+
+errors.push(...readonlyHelperProblems(pipeline.files()));
+for (const safeguard of [
+	'always() && ',
+	'!cancelled() && ',
+	"github.event_name == 'workflow_dispatch' && ",
+	"github.ref == 'refs/heads/codex/ci-actions' && ",
+	' && !inputs.release'
+]) {
+	for (const [name, condition] of [
+		[READONLY_BUILD_NAME, READONLY_HELPER_IF],
+		[READONLY_QUERY_NAME, READONLY_QUERY_IF],
+		[READONLY_UPLOAD_NAME, READONLY_HELPER_IF]
+	]) {
+		mustCatch(
+			'readonly diagnostic drops ' + safeguard + ' in ' + name,
+			MACOS_BOX,
+			'      - name: ' +
+				name +
+				'\n' +
+				(name === READONLY_BUILD_NAME ? '        id: mac79_native_helper_build\n' : '') +
+				'        if: ' +
+				condition +
+				'\n',
+			'      - name: ' +
+				name +
+				'\n' +
+				(name === READONLY_BUILD_NAME ? '        id: mac79_native_helper_build\n' : '') +
+				'        if: ' +
+				condition.replace(safeguard, '') +
+				'\n',
+			readonlyHelperProblems
+		);
+	}
+}
+for (const [what, from, to] of [
+	[
+		'inert entry point before retained guards',
+		'          def main():\n',
+		'          def main():\n              return\n'
+	],
+	[
+		'Core source admission bypass',
+		'    receipt = admit(public_json(url + "/jobs?per_page=100"), source_sha, int(run), int(attempt))',
+		'    receipt = {}'
+	],
+	[
+		'wrong source run path',
+		'"path": ".github/workflows/ci.yml", "name": "CI"',
+		'"path": ".github/workflows/ci-other.yml", "name": "CI"'
+	],
+	[
+		'missing executable public run admission',
+		'    admit_run(public_json(url), source_sha, int(run), int(attempt))',
+		'    pass'
+	],
+	['full app substituted for finite helper', '--native-helper-only 2>&1', '--wrong-helper 2>&1'],
+	[
+		'forgiven native query outcome',
+		'          exit "${native_query_status[0]}"',
+		'          exit 0'
+	],
+	[
+		'fake build receipt source',
+		'--build-receipt "$PWD/build/macos-native-helper/ErgoptiPlus.app/Contents/Resources/automation-query-build.json"',
+		'--build-receipt "$RUNNER_TEMP/fabricated.json"'
+	]
+]) {
+	mustCatch('readonly diagnostic ' + what, MACOS_BOX, from, to, readonlyHelperProblems);
+}
+const readonlyCoreHead = "  core:\n    name: 'Core / ${{ matrix.suite }}'\n    needs: [validate]\n";
+mustCatch(
+	'mandatory Core loses its actual validate ancestor',
+	ENTRY,
+	readonlyCoreHead,
+	readonlyCoreHead.replace('needs: [validate]', 'needs: []'),
+	graphProblems
+);
+
+// The diagnostic's existing two GETs require the builtin job token's Actions read scope.
+const READONLY_JOB_PERMISSIONS = 'contents: read actions: read';
+const READONLY_TOKEN_ENV = 'ERGOPTI_DIAGNOSTIC_LEDGER_TOKEN: ${{ github.token }}';
+function readonlyAuthenticatedProblems(files) {
+	const root = files.find((entry) => entry.rel === ENTRY);
+	const mac = files.find((entry) => entry.rel === MACOS_BOX);
+	const caller = root && pipeline.jobsOfText(root.text, ENTRY).find((job) => job.id === 'macos');
+	const packageJob =
+		mac && pipeline.jobsOfText(mac.text, MACOS_BOX).find((job) => job.id === 'package-macos');
+	const problems = [];
+	for (const job of [caller, packageJob]) {
+		if (!job || pipeline.field(job.body, 'permissions') !== READONLY_JOB_PERMISSIONS)
+			problems.push(
+				'only the exact diagnostic caller and package job must retain both readonly permissions'
+			);
+	}
+	const build =
+		packageJob && pipeline.steps(packageJob.body).find((step) => step.name === READONLY_BUILD_NAME);
+	if (
+		!build ||
+		!build.body.includes(READONLY_TOKEN_ENV) ||
+		mac.text.split(READONLY_TOKEN_ENV).length - 1 !== 1 ||
+		build.body.split('${{ github.token }}').length - 1 !== 1 ||
+		!build.body.includes('os.environ.get("ERGOPTI_DIAGNOSTIC_LEDGER_TOKEN")')
+	)
+		problems.push('only the fixed helper read environment may receive its builtin github.token');
+	const script = build ? (pipeline.runOf(build.body) || []).join('\n') : '';
+	const source = /^python3 - <<'PY'\n([\s\S]*?)\nPY$/m.exec(script);
+	if (
+		!source ||
+		!source[1].includes('urllib.request.build_opener(LedgerNoRedirect())') ||
+		!source[1].includes('with opener.open(request, timeout=10) as response:') ||
+		!source[1].includes('"Authorization": "Bearer " + token') ||
+		/\bprint\s*\(|GITHUB_TOKEN|GH_TOKEN|secrets\./.test(source[1]) ||
+		!readonlyLedgerControls(source[1])
+	)
+		problems.push(
+			'the actual authenticated writer must retain fixed GET destinations, header custody, no redirects or credential diagnostics'
+		);
+	const retirement = '\nunset ERGOPTI_DIAGNOSTIC_LEDGER_TOKEN\n';
+	const retirementAt = script.indexOf(retirement);
+	const compilerAt = script.indexOf('bash tools/build/build_macos_app.sh --native-helper-only');
+	if (
+		!source ||
+		script.split(retirement).length !== 2 ||
+		retirementAt < script.indexOf(source[0]) + source[0].length ||
+		compilerAt < retirementAt + retirement.length
+	)
+		problems.push(
+			'the ledger token must retire after successful admission and before compiler entry'
+		);
+	return problems;
+}
+errors.push(...readonlyAuthenticatedProblems(pipeline.files()));
+for (const [rel, prefix] of [
+	[ENTRY, "  macos:\n    name: 'macOS'\n    needs: [validate]\n"],
+	[MACOS_BOX, "  package-macos:\n    name: 'Package'\n    needs: e2e-hs\n"]
+]) {
+	const permissions = prefix + '    permissions:\n      contents: read\n      actions: read\n';
+	for (const [what, replacement] of [
+		['missing job grant', prefix],
+		['missing Actions read', prefix + '    permissions:\n      contents: read\n'],
+		['missing Contents read', prefix + '    permissions:\n      actions: read\n'],
+		['Actions write substituted', permissions.replace('actions: read', 'actions: write')]
+	]) {
+		mustCatch(
+			'readonly authenticated diagnostic ' + what + ' in ' + rel,
+			rel,
+			permissions,
+			replacement,
+			readonlyAuthenticatedProblems
+		);
+	}
+}
+for (const [what, from, to] of [
+	['missing builtin token', '          ' + READONLY_TOKEN_ENV + '\n', ''],
+	['token retirement removed', '          unset ERGOPTI_DIAGNOSTIC_LEDGER_TOKEN\n', ''],
+	[
+		'other secret substituted',
+		READONLY_TOKEN_ENV,
+		'ERGOPTI_DIAGNOSTIC_LEDGER_TOKEN: ${{ secrets.OTHER_TOKEN }}'
+	],
+	[
+		'repository token secret substituted',
+		READONLY_TOKEN_ENV,
+		'ERGOPTI_DIAGNOSTIC_LEDGER_TOKEN: ${{ secrets.GITHUB_TOKEN }}'
+	],
+	[
+		'Authorization header removed',
+		'"Authorization": "Bearer " + token',
+		'"NoAuthorization": "Bearer " + token'
+	],
+	[
+		'foreign endpoint substituted',
+		'base = ("https://api.github.com/repos/adrienm7/ergopti/actions/runs/" + run',
+		'base = ("https://example.invalid/repos/adrienm7/ergopti/actions/runs/" + run'
+	],
+	[
+		'redirect handler removed',
+		'urllib.request.build_opener(LedgerNoRedirect())',
+		'urllib.request.build_opener()'
+	],
+	[
+		'wire exceptions leaked',
+		'raise RuntimeError("The fixed authenticated GitHub ledger read was refused (status " + str(status) + ").") from None',
+		'raise failure'
+	],
+	[
+		'token diagnostics added',
+		'    request = ledger_request(url, os.environ.get("GITHUB_RUN_ID")',
+		'    print(os.environ.get("ERGOPTI_DIAGNOSTIC_LEDGER_TOKEN"))\n              request = ledger_request(url, os.environ.get("GITHUB_RUN_ID")'
+	]
+]) {
+	mustCatch(
+		'readonly authenticated diagnostic ' + what,
+		MACOS_BOX,
+		from,
+		to,
+		readonlyAuthenticatedProblems
+	);
 }
 
 if (errors.length > 0) {

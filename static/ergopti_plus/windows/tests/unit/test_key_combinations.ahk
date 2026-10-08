@@ -870,9 +870,19 @@ _KCT_ObservationActualFile() {
 		AssertEqual(" [observation records=1,phase=8,scenario=1,owned=1,error=0,source=0,line=0,exit=-1]",
 			_KCT_ObservationRead(Lease, 7319, "suffix-123456-7319", "candidate", 9472))
 		RenameRefused := false
-		try FileMove(Path, Root . "\substituted.txt")
-		catch OSError
+		OSErrorCatchHit := false
+		try {
+			try FileMove(Path, Root . "\substituted.txt")
+			catch OSError
+				OSErrorCatchHit := true
+		} catch Error as Err {
+			RenameErrorCode := A_LastError
+			AssertEqual("Error", Type(Err), "FileMove publishes its counted generic error rather than OSError")
+			AssertEqual(1, Err.Extra, "the exact owned source is the single refused native rename")
+			AssertEqual(32, RenameErrorCode, "the refusal is native sharing denial rather than an unrelated file error")
 			RenameRefused := true
+		}
+		AssertFalse(OSErrorCatchHit, "the original OSError-only catch cannot consume FileMove's generic failure")
 		AssertTrue(RenameRefused, "the exact native file remains pinned without delete sharing")
 		NulBytes := Buffer(9, 0)
 		Loop 8

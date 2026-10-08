@@ -1,0 +1,304 @@
+<!-- docs/handovers/2026-10-06-group6-recovery/linux-native-checkpoint.md -->
+
+# Group 6 Linux native checkpoint
+
+This checkpoint records working sources over HEAD
+`a96b224a676b8267e072069ed57c556a99623327`, including the listing-cap repair and genuine three-case rollback replay.
+It does not qualify a later committed or integrated SHA. TODO 36/62 and the
+transversal requirements 16/38 remain open. No release was published.
+
+| Observation                  | Result                                                     | Practical limit                                                 |
+| ---------------------------- | ---------------------------------------------------------- | --------------------------------------------------------------- |
+| Complete JavaScript gate     | 375 passed, zero failed                                    | Linux host; native Swift requires macOS                         |
+| Normal Linux suite           | 495 modules, 10,106 passed, zero failed                    | Includes the fifteen added listing-policy controls              |
+| Focused updater controls     | 124 passed per actual Lua ABI                              | Model coverage, separate from installed native pipeline         |
+| Uninstrumented body-pipe     | 20 passed, original 1 ms budgets                           | Same actual libuv/curl corpus, not enterprise sessions          |
+| Strict managed native runner | Output18 and public30 passed, closure complete             | Actual two curl ABIs; no physical company-network claim         |
+| Source controls              | Metadata8/filesystem4/private Git5/modeled CONNECT5 passed | Distinct actual filesystem/Git and modeled protocol credit      |
+| Archive receiving controls   | Registration89 and receipt19 passed                        | Native pipeline receipts remain separately mandatory            |
+| Portable native gate         | AppDir7 and PPID2 passed                                   | Not a whole packaged desktop session                            |
+| Genuine AppImage             | Build/extraction/launcher/runtime probe passed             | Host Lua/library overrides removed; final-source matrix pending |
+| Genuine installed updater    | Three native cases/fifteen checks passed, zero skipped     | Final committed/integrated source and package matrix pending    |
+
+The real AppImage has 17,230,328 bytes and SHA-256
+`024429d3e90c3316dfd44ddf3139915e3bbd28f897ad8b0da86f8d4fcaa16c0f`.
+The verified official packaging tool has SHA-256
+`95cbe7cce9717fce90c484e34052ee7c7f1d7635b33c12525b4776826a7d29b6`.
+Extraction and every actual command use the existing physical process owner.
+The test build uses source-owned version metadata and the genuine stamp writer;
+it is neither a published release nor a version-upgrade acceptance claim.
+
+Actual private native receipts are retained under the canonical
+`/var/tmp/ergopti-cloud-validation` directory. Finite root log/result bindings
+are in `/workspace/scratch/group6-post-app4-repairs-2026-10-06`.
+`js-stamp-owner-repair.result.json` records the final complete JavaScript pass;
+`managed18-public30-result.json` records the actual strict native pass;
+`portable-native-after-schema-repair.result.json` records the actual portable
+pass. `actual-payload-inventory-order-proof.json` preserves the old Python
+versus Node mismatch, identical file/path/mode/digest sets and byte-order fix.
+All failed native attempts and private diagnostics remain retained.
+
+The first real tar listings contain 117,004 and 229,756 bytes. A separately
+captured shared 8,388,608-byte listing bound now admits them while preserving
+the generic 65,536-byte process bound and the extraction bound. Three genuine
+native scenarios pass: verified install, wrong digest refusal, and an actually
+executed replacement launcher which writes an independent private marker and
+exits 42. The third scenario verifies restoration of the complete previous
+inode/path/type/mode/ownership/content tree, absent backup, and native closure.
+The final native log SHA-256 is
+`3f5ed5e3f527d5d398f4ab3bf41b2ab06f25acea330dc930e7f0c71ea3853bd1`.
+`archive3-rollback.result.json` binds this working-source qualification.
+
+The listing controls pass 17/23/8 cases under each actual Lua ABI: thirty-three
+original controls and fifteen additions. The first scratch harness count
+mistakenly expected 21 instead of 23 supervisor cases; its refusal is retained.
+Three Lua 5.4 model cases initially failed because a local helper shadowed the
+global compiler; the explicit `_G.load` correction passes them. The archive
+receiving controls retain original 19/89 floors and pass four/eight additions.
+No EOF, native closure, ownership or failure assertion was relaxed.
+
+Windows resumes from the twelve explicit steps in the existing
+[Windows handover](../2026-10-04-group6-windows/README.md).
+Exact macOS run 37494074376 failed native Sparkle/Brew acceptance while core,
+portable Hammerspoon and tooltip checks passed; installation was skipped.
+The newly added fixed diagnostics still require macOS execution. Flatpak,
+Nix and final three-OS packaging/install results must be reported separately.
+
+Use the owned `codex/ci-release-network` branch for test dispatches. Final
+integration alone requires an absent remote `codex/ci-lock`, its explicit group6
+reservation and exclusive `codex/ci-validation` ownership. An existing owner
+must release its own lock; never replace it. Fetch current dev and preserve
+other groups, including the Linux locale packages, before merging without
+squash or publishing any dev update. Cancel only exact-SHA automatic workflows;
+manual CI must reach its terminal result.
+
+The full scoped replay is bound by `final-scoped-verify.result.json` and raw
+log SHA-256 `cb6da532c1648a88cf62701d3fbcb97f75e8b06da21f3234d8cf4780052158f2`.
+Hammerspoon has 15,154 passing portable tests in 1,529 modules. The replay
+originally reports two failing gates: an incorrectly anchored stamping
+mutation and the unavailable native window-switch supervisor prerequisite.
+The reviewed stamping-owner correction then passes its original negative
+observations and the full 375-check JavaScript gate. Swift remains explicitly
+deferred to macOS. The window-switch fixture is blocked before allocating a
+child or namespace; this cloud result does not qualify its real X11 behavior.
+
+A real read-only user/mount namespace prerequisite passes for a prospective
+private Nix store (`mARqQ5`). The official Nix cache HTTPS prerequisite returns
+HTTP 403 (`ezWQZG`), with physical closure and no retained debt. This does not
+qualify a Nix build; the prepared hosted qualification remains separate.
+
+## Hosted Nix qualification registration
+
+The reviewed source packet adds one bounded Linux E2E step and seven native
+claims; existing subject floors, release decisions, owner retirement and
+package assertions remain intact. Its 35 independent source/configuration/
+receipt controls pass. The complete JavaScript suite passes 376 checks on
+working sources over fd107685ae2ff2cedbe8edb559a54b4886d0954b. The raw log
+SHA-256 is `bbe11c52436b4b3d2b1f93f669ed6ad61574b69d243d7d59970dd901a925ff1b`.
+This is source qualification, not seven native Nix results. The local
+cache prerequisite remains HTTP403; hosted execution is pending.
+
+Manual all-OS CI [37511777225](https://github.com/adrienm7/ergopti/actions/runs/37511777225)
+tests exact fd107685ae2ff2cedbe8edb559a54b4886d0954b. Core JavaScript/properties
+and all three unit lanes pass; portable macOS E2E and native tooltip pass.
+Linux E2E and native macOS packaging fail; macOS installation is skipped.
+The Linux HTTP failures are being reproduced against their original strict
+assertions. The native Sparkle diagnostics prove authentic opposite-key
+signatures and identical copied payload while byte equality is false;
+Brew independently reports an unavailable unconfined AppleEvent boundary
+with send status -600 and exit66. These failures are not native passes.
+The final integrated SHA still requires its own terminal qualification.
+
+## Native temporary lifetime checkpoint, 2026-10-06
+
+Working sources over `eeb6fd58f772be70968e6438e23fe990909c820a` pass all
+63 mandatory controls in the original bounded native owner: capture4,
+namespace5, SHA-2563 per ABI, ownership12 per ABI and allocation12 per ABI.
+Every phase exits zero with physical closure and zero product skips. The root
+result `ergopti-group6-command-5e04sH/RESULT.json` records no retained debt.
+The private `ergopti-updater-temp-native-7VN9EM/QUALIFICATION.json` has SHA-256
+`42f77d98a2b73ead9619d6994c493f2dcefeb9cfece9977167614cab453bd2e8`
+and source inventory
+`9a61d7d65477c2f1fc0ce292e9a184c1bbef7880dd0e9193cc476f04a36e5e57`.
+The genuinely compiled pinned CFFI provider passes22 vendor controls; its
+original optional union-by-value control skips77 and contributes no product
+acceptance credit. The native C library hash is
+`8bbf342bc647fbf91054f01d6712860e4008fa965e2d5f0d049eaddd3083c9a4`.
+
+The preceding complete selected replay passes379 JavaScript controls,
+Linux E2E and10,140 Linux unit tests in496 modules, actual X11 keymap53,
+HTTP streaming262/API authentication48, installed updater3 cases/15 checks,
+managed output18/public30, GIO runtime4 groups and retained FD digest12.
+Window supervision refuses before child/namespace acquisition; Nix refuses
+at the local-store checkpoint. The stale C5 source identity then refused before
+its assertions; the independently reviewed one-literal rebind preserves the
+complete original five-case oracle and the subsequent63-control replay passes.
+The complete replay's outer result `ergopti-group6-command-Kvu4aq/RESULT.json`
+records exit1 and no retained debt. It must not be called a full green gate.
+
+The native path failure reproduces against the original C helper with the same
+four-case harness. The corrected helper retires only its acquired descriptors;
+completed namespace conflicts still refuse destructive cleanup. The exact
+SHA-256 abc, embedded-NUL and empty-input vectors pass on both actual ABIs.
+The original Lua5.4 unsigned-byte call fails conversion before hashing; the
+correction copies precisely the original bytes into the declared native input.
+These controls do not qualify enterprise authentication, real installed GUI
+input, Windows or macOS. Final committed/integrated CI remains required.
+
+## Installed live fixture and remaining company-network implementation
+
+The live fixture now uses the real pause lifetime and asynchronous updater
+callback, preserving original release identity, stamps, installed-state,
+restart and rollback checks. Its local genuine installer reaches an unavailable
+privilege prerequisite: UID1000, no sudo/pkexec, command exit127. Controlled
+async/pause controls and normal units are successful; this refused attempt is
+not an installed native success. Hosted installation is required on the final
+candidate. No privilege stub or skipped assertion was introduced.
+
+The current source audit identifies implementation work as well as acceptance
+work. TODO62 must retain these concrete continuations:
+
+- Configure outgoing downloads of an owned Linux Ollama server, whose current
+  runtime inherits the environment and OLLAMA_HOST; supervising its localhost
+  API request does not configure registry/model connections.
+- Implement destination-specific managed redirects for the Ollama archive
+  installer and release-page ETag requests, currently outside the ordinary
+  managed-hop path.
+- Implement PAC/WPAD consumption for macOS installer/Ollama/MLX child paths;
+  the shell network preamble currently declares this unsupported.
+- Implement explicit integrated proxy authentication admission and native
+  negotiation. Selected proxy URLs alone do not prove Kerberos/SSO support.
+- Produce trustworthy outgoing Ollama failure evidence. A remote NDJSON error
+  and a receipt for a localhost connection cannot prove a corporate certificate
+  or proxy cause.
+- Separately qualify genuine corporate CA stores, PAC/WPAD acquisition and
+  authenticated enterprise sessions, then final AppImage/Flatpak/Nix builds,
+  installations and runtime probes. Local cache/store refusals are not passes.
+
+The twelve preserved Windows continuation steps remain the maintainer's PC
+work. macOS additionally requires genuine AppKit AppleEvent delivery/refusal,
+all six generated-cask install/upgrade/refusal/retry cases, actual Sparkle
+wrong-key rejection and successful update/relaunch, exact closure and final
+package/installation/launch acceptance. Diagnostics do not complete these
+functional requirements. Items36/62 and transversal16/38 remain open.
+
+## Final reviewed diagnostic cohort, 2026-10-06
+
+Three independent source tranches are committed as 949eb6ecaad3efeb020a8b411f49227d1ed49fea,
+1016527df89dbfb2f41cdc94edd69bdb46462efc and
+e9db1348625764f7701479f45687b582455c861f. The feature also merges
+origin/dev 5d1d06854b412e91c9350e05f03b20f83b297db8, preserving the other
+groups' work and Windows private-clone long-path correction.
+
+The shared local receiving cohort passed formatting, all 379 JavaScript checks,
+15,154 Hammerspoon stub units in 1,529 modules, and 10,142 Linux units in 496
+modules. Its genuine relative-clock fixture passed all nine original cases,
+including first/second loopback requests 56.24/52.00ms under the unchanged
+100 ms deadline and 40 ms server delay. The private owner acknowledged closure
+with no retained phases. Swift compilation is explicitly deferred to macOS.
+
+The earlier full a5a07 range is FAIL despite these other successes: native
+temporary controls 63/0, archive installation/rollback 3 cases/15 checks,
+streaming 262/API 48, runtime 82 and actual X11 keymap 53. Window supervision
+refuses before child/namespace acquisition; Nix refuses at local-store and
+its seven native cases remain unexecuted. The privileged live updater fixture
+also refuses in this container at exit 127 without sudo/pkexec; this is separate
+from the passed private archive installation/rollback fixture.
+
+Manual run [37540551778](https://github.com/adrienm7/ergopti/actions/runs/37540551778)
+actually tested a5a07d6dbefeefecb578be93e79d82a95da1bdfb and ended FAIL.
+Linux units 10141/1 retain the first HTTP timeout 208.57 ms/status 0; the next
+request succeeds 55.91 ms/status 200. Linux E2E/package/install were skipped.
+Native Windows units 9734/0 passed, but the job refused its private long-path
+clone before later stages; the group 3 correction is now merged from dev.
+Both owned native macOS archive cases failed: Sparkle reported target-root
+with child exit 78, and Brew observed unconfined receiver CLD_EXITED/code 1,
+status 65 before every sender or sandbox-policy comparison. The AppKit reason
+is unknown until the new exact enum diagnostic runs. Packaging/install and
+Release/Publish were skipped. Neither failure establishes a TCC cause.
+
+The Sparkle correction signs and compares captured native POSIX root strings
+instead of Foundation URL spelling; all 117 native assertion/failure lines
+remain intact. The AppKit diagnostic retains all 59 receiving test bodies and
+adds four controls: original 59/current 63 pass, while the new enum case against
+the original reader fails its three expected subcases. These models do not
+qualify authentic AppKit initialization or AppleEvent delivery.
+
+Four serialized genuine clock comparisons pass 9/0: original dev 7a75/current
+a5a07, each once unchanged and once with the reviewed passive diagnostic. The
+first original replay's HTTP 403 is retained separately; only the common child
+NO_PROXY/no_proxy=127.0.0.1,localhost prerequisite was corrected. No timing,
+assertion, native callback, budget, warm-up or retry changed. These local passes
+do not establish the hosted timeout cause. Source packet/cohort bindings,
+original failures, exact captured logs and physical owner receipts remain
+private in the restored container; committed source and this checkpoint own
+the reproducible continuation.
+
+The remaining company-network implementation list above and the twelve
+Windows PC steps still apply. Items 36/62 and transversal requirements 16/38
+remain open. Next qualification uses the group-owned CI test branch; final
+integration reserves codex/ci-lock exclusively and tests the exact integrated
+SHA on codex/ci-validation without publishing any release.
+
+## Composed release-check and Swift correction, 2026-10-07
+
+The Linux retirement correction is committed as
+1a2fa790a11c9c12ddc69d8b1478cf085400b28f. Its final managed receipt is
+source-bound and detached, and the release manager waits for the original
+physical child/deadline acknowledgement before parsing or publishing results.
+The original producer fails 22 of the same 25 new controls on each actual Lua
+ABI; the corrected producer passes all 25 plus all 134 historical cases per
+ABI. The five entire old fixture modules retain their original assertions,
+including the 34 independent JSON vectors. Explicit scripted fixture ownership
+provides no native IO credit or production Boolean-only fallback.
+
+The composed local 15-path working-source qualification over
+2ef3cc25a2b703c56e7eecb75355b38cd97d9138 passes all 11 selected gates.
+The physically closed root QevMgp result has SHA-256
+35860c65c3cf31ade38489078c0e4f8294f8933e98068e37f7d2ab44f87e6f50,
+status zero and no retained debt. Its complete raw stdout has SHA-256
+e29845000e2596a2f5edc2dd117653a47384453e14c79f51b3ad999dfa93750f.
+
+| Scope                             | Result                                            | Limit                                                             |
+| --------------------------------- | ------------------------------------------------- | ----------------------------------------------------------------- |
+| JavaScript                        | 379 passed, zero failed                           | Source and portable controls                                      |
+| Portable macOS                    | 16,675 passed, zero failed; 1,537 modules         | Hammerspoon stubs, not native Swift                               |
+| Linux units                       | 11,225 passed, zero failed; 498 modules           | Includes explicit scripted HTTP owners                            |
+| Native Linux HTTP                 | Streaming262/API48 passed                         | Loopback, not an enterprise session                               |
+| Native Linux temporary lifetime   | 63 distinct product controls passed; zero skipped | Original optional CFFI union control skipped77, no product credit |
+| Native Linux archive              | Three cases/fifteen checks passed; zero skipped   | Private installed archive, not the whole packaged desktop         |
+| Native Linux managed HTTP/runtime | Output18/public30 and runtime82 passed            | Original physical owners closed                                   |
+| Native Swift                      | Deferred to macOS                                 | No Linux compilation claim                                        |
+
+The syntax-only Swift correction c18442429284bbb0e5e5838846333939143f771b
+removes the 13 invalid separators introduced by the progress diagnostic while
+retaining all 42 event identities/values/order and every current assertion.
+Manual run [37551458196](https://github.com/adrienm7/ergopti/actions/runs/37551458196)
+on exact67d563584b05426f2e2564b61cbbc1ddd61d6eb0 failed at this native compile
+boundary. It yielded no new AppKit or Sparkle runtime fact. macOS portable
+unit/E2E/tooltip checks passed; installation was skipped.
+
+That same run failed Linux units with 11,199 passes and one failure:
+`routes the Configuration restore row to the recommended hotstrings`.
+The check annotation identifies test_hotstrings_scope.lua:409 but does not
+expose the actual assertion. Job-log delivery remained Forbidden; source
+candidates are not a demonstrated cause. Linux E2E/package/install were
+skipped, including the new Nix phase diagnostic and live download. Windows
+was not selected. Release/Publish was skipped.
+
+The feature composes current dev70fda177fd4c1411197aec908aadb954f01c8ca1
+in ece8de48ef87437355c0224ac625c8e4256c1deb. Manual all-OS run
+[37556022981](https://github.com/adrienm7/ergopti/actions/runs/37556022981)
+tests that exact composed source on codex/ci-release-network. Its result is
+pending at this checkpoint. It is not an integrated-dev qualification.
+Every own push cancels only its exact-SHA automatic runs; manual runs continue.
+The final integration lock currently belongs to group3; it must release its
+own lock before group6 reserves a new one. No TODO item has been removed.
+
+The implementation continuations above, twelve Windows steps, native macOS
+acceptance, and transversal16/38 still apply. In particular, outgoing Ollama,
+managed ETag/archive redirects, macOS child PAC/WPAD and integrated enterprise
+authentication are remaining code work, not merely local PC verification.
+The commit inventory in [group6-commits.md](group6-commits.md) records the
+prepared feature commits; their presence in origin/dev must be proved after
+serialized integration.

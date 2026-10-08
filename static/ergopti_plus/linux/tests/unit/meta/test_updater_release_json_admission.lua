@@ -61,6 +61,7 @@ helpers.describe("public updater release JSON admission", function()
 					callback({ ok = true, status = 200, body = vector.body, error_body = "", headers = {} })
 					return true
 				end }
+				M._http_client = require("tests.support.release_http_fixture").attach(M._http_client)
 				helpers.assert_true(M.check_for_updates("main", function(available, release, err, result)
 					calls = calls + 1
 					answer = { available = available, release = release, error = err, result = result }

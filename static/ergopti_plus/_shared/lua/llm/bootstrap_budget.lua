@@ -18,7 +18,7 @@ end
 --- @param duration_ms integer Positive shared dependency bootstrap timing.
 --- @param ports table { now_ms, after } with a physically owned timer operation.
 --- @return table owner cancel/retire/finish/is_settled/on_settled.
---- @return table capability Opaque bound current/remaining_ms/reason/on_cancel.
+--- @return table capability Opaque bound current/remaining_ms/deadline_ms/reason/on_cancel.
 function M.new(duration_ms, ports)
 	assert(integer(duration_ms) and duration_ms > 0 and type(ports) == "table"
 		and type(ports.now_ms) == "function" and type(ports.after) == "function", "bootstrap budget ports are invalid")
@@ -51,6 +51,12 @@ function M.new(duration_ms, ports)
 		return deadline - now
 	end
 	function api.remaining_ms() return remaining() end
+	--- Projects the original master bound without recomputing a relative deadline.
+	--- @return integer|nil deadline_ms
+	function api.deadline_ms()
+		local value = remaining()
+		return value ~= nil and value > 0 and not cancelled and not complete and deadline or nil
+	end
 	function api.current()
 		local value = remaining()
 		return value ~= nil and value > 0 and not cancelled and not complete

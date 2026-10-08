@@ -884,6 +884,9 @@ _HC_PublishProbe(WindowEpoch, Id, Result, Sections) {
 	global _HC_WindowEpoch, _HC_Session
 	if (WindowEpoch != _HC_WindowEpoch) || !(_HC_Session is Map)
 		return
+	Report := Result.Get("network_report", 0)
+	if Result.Has("network_report")
+		Result.Delete("network_report")
 	Snapshot := _HC_Session["snapshot"]
 	Snapshot["probes"][Id] := Result
 	for SectionId, Values in Sections {
@@ -892,6 +895,8 @@ _HC_PublishProbe(WindowEpoch, Id, Result, Sections) {
 	}
 	_HC_Send(WindowEpoch, '{"type":"probe","id":' . _HC_JsStr(Id) . ',"result":' . _HC_ValueToJson(Result)
 		. ',"sections":' . _HC_ValueToJson(Sections) . '}')
+	if ManagedNetworkFailureWindows_CanonicalReport(Report)
+		_HC_ShowManagedFailure(WindowEpoch, Id, Result, Report)
 }
 
 ; Converts an AHK value to JSON: Maps become objects, Arrays arrays, numbers
@@ -954,6 +959,7 @@ _HC_Close() {
 }
 
 _HC_Reset() {
+	ManagedNetworkTerminalFailure.Retire("diagnostics")
 	global _HC_Controller, _HC_WebView, _HC_MsgSub, _HC_ResetDone
 	global _HC_WindowEpoch, _HC_Session, _HC_ReuseKey
 
@@ -972,4 +978,27 @@ _HC_Reset() {
 	}
 	_HC_Controller := unset
 	_HC_WebView    := unset
+}
+
+_HC_ManagedTerminalCurrent(Owner) {
+	global _HC_WindowEpoch, _HC_ResetDone, _HC_Session, _HC_ProbeRun
+	return !_HC_ResetDone && _HC_WindowEpoch == Owner.epoch && _HC_Session == Owner.session
+		&& _HC_Session is Map && _HC_ProbeRun == Owner.run && IsObject(Owner.run) && !Owner.run.Cancelled
+		&& _HC_Session["snapshot"]["probes"].Get(Owner.id, 0) == Owner.result && !A_IsSuspended
+}
+
+_HC_ShowManagedFailure(WindowEpoch, Id, Result, Report, PresentFn := 0) {
+	global _HC_Session, _HC_ProbeRun
+	Owner := {epoch: WindowEpoch, session: _HC_Session, run: _HC_ProbeRun, id: Id, result: Result}
+	return ManagedNetworkTerminalFailure.Publish("diagnostics", Report,
+		() => _HC_ManagedTerminalCurrent(Owner), "healthcheck.section.network", () => _HC_RetryManaged(Owner), PresentFn)
+}
+
+_HC_RetryManaged(Owner) {
+	if !_HC_ManagedTerminalCurrent(Owner)
+		return false
+	global _HC_ProbeRun, _HC_WindowEpoch, _HC_ResetDone
+	_HC_RestartProbes(Owner.epoch)
+	return !_HC_ResetDone && _HC_WindowEpoch == Owner.epoch && IsObject(_HC_ProbeRun)
+		&& _HC_ProbeRun != Owner.run && !_HC_ProbeRun.Cancelled
 }
