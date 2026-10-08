@@ -41,6 +41,28 @@ try {
         $Result.native_errno_domain -eq 'win32' -and $Result.native_errno -eq '5') 'Actual owned file denial was not preserved.'
     $Passed++
 
+    $PolicyPath = Join-Path (Split-Path -Parent (Split-Path -Parent $HelperPath)) '../_shared/modules/network/managed_network.json'
+    $Policy = Get-Content -LiteralPath $PolicyPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    $NativeNames = [Enum]::GetNames([System.Net.WebExceptionStatus])
+    Require ($NativeNames.Count -eq $Policy.fields.dotnet_web_status.values.Count) 'Canonical .NET status inventory differs from the documented runtime enum.'
+    foreach ($Name in $NativeNames) {
+        Require ($Policy.fields.dotnet_web_status.values -ccontains $Name) 'A documented runtime status is missing from the canonical closed enum.'
+    }
+    foreach ($Status in [Enum]::GetValues([System.Net.WebExceptionStatus])) {
+        $Typed = [System.Net.WebException]::new('private exception content', $Status)
+        $Result = Receipt $Typed 'connect'
+        Require ($Result.dotnet_web_status -ceq [string]$Status) 'Documented WebException status disappeared from the native receipt.'
+        Require (-not $Result.ContainsKey('native_errno')) 'Managed WebException status invented an OS errno.'
+        $Passed++
+    }
+    $UnknownStatus = [System.Net.WebException]::new('NameResolutionFailure', [Enum]::ToObject([System.Net.WebExceptionStatus], 999))
+    $Result = Receipt $UnknownStatus 'connect'
+    Require (-not $Result.ContainsKey('dotnet_web_status')) 'An undefined WebException status was admitted.'
+    $Passed++
+    $Result = Receipt ([Exception]::new('NameResolutionFailure')) 'connect'
+    Require (-not $Result.ContainsKey('dotnet_web_status')) 'Exception text invented a typed WebException status.'
+    $Passed++
+
     $NetworkRead = [IO.IOException]::new('disk full permission denied SHA-256 secret-url')
     $Result = Receipt $NetworkRead 'connect'
     Require (-not $Result.ContainsKey('native_errno') -and $Result.failure_provenance -eq 'unknown' -and
