@@ -6528,6 +6528,17 @@ regression fails against the previous workflow and preserves every existing
 assertion, original receiving clock and package/install requirement. New native
 receiving is pending; this diagnostic admission does not close36/62 or16/38.
 
+Manual37709350150 at3161aada9 passes shared checks, all11,644 Linux unit
+assertions and all157 E2E steps without failures or skips. The Flatpak SDK now
+builds and installs MIT Kerberos1.22.2 and curl with GSS-API/SPNEGO enabled.
+Package then fails at network-gio-proxy because the pinned glib-networking
+source has no Meson tests option. Its declared installed_tests=false replaces
+that unknown flag; GnuTLS and every proxy-provider choice remain unchanged.
+An independent complete option-vector regression fails against the old recipe.
+Source pins, all other modules, native assertions/clocks and installation legs
+remain intact. New native package/install qualification is still required;
+installed GSS libraries do not establish authenticated enterprise traffic.
+
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard
   layers on all three drivers. Windows and macOS also support their existing
