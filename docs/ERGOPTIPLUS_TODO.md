@@ -6510,6 +6510,14 @@ Actual host-source compilation/install passes with physical closure; it does not
 qualify the Flatpak SDK. The independent recipe regression fails before this
 repair. Native package/installation receiving on the repaired source is pending.
 
+Windows manual37690927221 atc00cec629 remains terminal FAIL. Restored raw-log
+and execution-manifest downloads confirm10,272 executed/timed cases,
+10,268 passes/four failures and no manifest errors. The canonical route remains
+one native-bypass/direct result; no service-stage notice is admitted. Artifact
+access does not repair WinHTTP, TLS classification or graceful cleanup. The
+handover now lists exactly four current native fixes; the historical System32
+curl capability case passes and must not be rebuilt without a regression.
+
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard
   layers on all three drivers. Windows and macOS also support their existing
