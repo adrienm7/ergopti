@@ -159,6 +159,7 @@ return function(run)
 					end
 					if options.config_error then return nil, "error" end
 					return {
+						runtime = RealConfig.build_default_state({}, {}).runtime,
 						enabled = options.initially_enabled ~= false,
 						tap_hold_config = {},
 						mod_combos_config = {},

@@ -5020,6 +5020,32 @@ Guardian. Source-bound fixture consumers use the same reviewed image. Native
 command outcome and full final macOS qualification remain pending. Items 31,
 16 and 38 stay open.
 
+Native runtime intent now loads and persists through the shared remap declaration
+and exact native configuration source receipt. Missing intent retains the declared
+shared default; unsupported owned intent keeps saved consent but refuses shared
+path resolution, acquisition, regeneration and settings mutation. Boot enters
+the shared deployment path only through the admitted shared predicate. Original
+publication, installer joins and local resource cleanup remain mandatory.
+
+The inert controller retains its published module and exact query/stop functions
+before logger or configuration callbacks. Replacement cannot borrow another
+controller's absence or publish a late terminal stop, revoke or teardown success.
+The original 58 focused controls and eight frozen custody regressions pass;
+independent terminal controls also refuse omitted guards. Configuration controls
+pass 281 cases across 17 modules. Final composed gates, runtime menu binding,
+owned native start, installation and physical acceptance remain pending. This
+coherent configuration/admission tranche does not complete item31 or16/38.
+
+The first complete composed gate fails: 387 of 388 JS checks pass, while
+portable macOS reports 18,119 passing and 220 failing cases. Linux passes
+11,651 cases. Reviewed corrections restore the initializer's sole literal
+success return and the test's existing movable source locator; unchanged
+HS019 and the pinned-read guard pass. The other 219 failures are reproduced
+missing runtime inputs in seven legacy fixtures. Genuine scoped configuration
+inputs restore all 233 unchanged controls; independent replay also passes the
+34 existing missing/owned refusal controls. Final composed verification remains
+pending. No assertion, native requirement or item is waived.
+
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
   listed; see `docs/memory/text-input-and-config.md`. Current source already

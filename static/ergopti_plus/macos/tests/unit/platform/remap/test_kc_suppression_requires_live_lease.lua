@@ -20,6 +20,11 @@ local TOKEN = "0123456789abcdef0123456789abcdef"
 --- @return table ctx Observable lease and suppression state.
 local function load_remap(initially_enabled, options)
 	options = options or {}
+	-- The fixture supplies intent from the real config owner, never native readiness.
+	local default_runtime = helpers.with_stub_scope({ "platform.remap.config" }, function()
+		local RealConfig = helpers.load_with_stubs("platform.remap.config")
+		return RealConfig.build_default_state({}, {}).runtime
+	end)
 	local ctx = {
 		suppresses_personal_output = false,
 		start_callback = nil,
@@ -53,6 +58,7 @@ local function load_remap(initially_enabled, options)
 		compute_non_canonical_combos = function() return {} end,
 		load_user_config = function()
 			return {
+				runtime = default_runtime,
 				enabled = initially_enabled,
 				tap_hold_config = { caps = { tap = "ergopti_output", hold = "none" } },
 				mod_combos_config = {},

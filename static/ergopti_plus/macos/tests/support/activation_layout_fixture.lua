@@ -120,6 +120,11 @@ local function with_remap(options, body)
 	end
 
 	local ok, err = xpcall(function()
+		-- The fixture supplies intent from the real config owner, never native readiness.
+		local default_runtime = helpers.with_stub_scope({ "platform.remap.config" }, function()
+			local RealConfig = helpers.load_with_stubs("platform.remap.config")
+			return RealConfig.build_default_state({}, {}).runtime
+		end)
 		local logger = helpers.make_logger_stub()
 		for _, level in ipairs({ "debug", "info", "warn", "error", "success" }) do
 			logger[level] = function(_, message, ...)
@@ -156,6 +161,7 @@ local function with_remap(options, body)
 			compute_non_canonical_combos = function() return {} end,
 			load_user_config = function()
 				return {
+					runtime = default_runtime,
 					enabled = options.enabled ~= false,
 					tap_hold_config = {},
 					mod_combos_config = {},

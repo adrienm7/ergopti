@@ -3073,7 +3073,10 @@ schedule_layout_refresh = function(
 end
 
 --- Opens the Karabiner-Elements GUI for the user on explicit request.
-function M.open_gui() KeLifecycle.open_gui() end
+function M.open_gui()
+	if M.runtime_unavailable_reason() ~= nil then return false end
+	KeLifecycle.open_gui()
+end
 
 --- Offers the Login Items steps to the presenter the boot registered. The
 --- remap bridge owns no window; without a presenter (a bare bridge, as in
@@ -3282,6 +3285,11 @@ end
 --- @return boolean accepted True when the rules were removed and the
 ---   regeneration requested; its outcome reaches on_done.
 function M.remove_legacy_rules(on_done, confirmation)
+	if M.runtime_unavailable_reason() ~= nil then
+		invoke_public_callback("remove legacy rules", on_done, false,
+			{ stage = "removal", reason = M.runtime_unavailable_reason(), removed_count = 0 })
+		return false
+	end
 	Logger.info(LOG, "Removal of the legacy Karabiner rules requested.")
 	local function settle(ok, result)
 		invoke_public_callback("remove legacy rules", on_done, ok, result)
@@ -3342,6 +3350,10 @@ end
 --- @param on_done function|nil Callback fn(ok, reason).
 --- @return boolean accepted
 function M.open_login_items(on_done)
+	if M.runtime_unavailable_reason() ~= nil then
+		invoke_public_callback("open Login Items", on_done, false, M.runtime_unavailable_reason())
+		return false
+	end
 	local settled = false
 	local dispatching = true
 	local function settle(ok, reason)
@@ -3372,6 +3384,10 @@ end
 --- @param on_done function|nil Callback fn(ok, reason).
 --- @return boolean accepted
 function M.open_guardian_settings(on_done)
+	if M.runtime_unavailable_reason() ~= nil then
+		invoke_public_callback("open guardian settings", on_done, false, M.runtime_unavailable_reason())
+		return false
+	end
 	if not require_state("open_guardian_settings") then
 		invoke_public_callback("open guardian settings", on_done, false, "not-initialized")
 		return false
@@ -3577,6 +3593,43 @@ function M.get_enabled()
 	return _state.enabled == true
 end
 
+--- Returns the selected backend intent without claiming native readiness.
+--- @return string|nil runtime Settings intent admitted by the config owner.
+function M.get_runtime()
+	return _state and _state.runtime or nil
+end
+
+--- Reports only whether boot may enter the existing shared deployment path.
+--- READY remains exclusively the exact native controller's observation.
+--- @return boolean selected Whether the supported shared backend was selected.
+function M.shared_runtime_selected()
+	return _state ~= nil and _state.runtime == "shared" and M.runtime_unavailable_reason() == nil
+end
+
+--- Returns a closed developer reason for an unavailable selected backend.
+--- User presentation resolves the shared selector locale key instead of this code.
+--- @return string|nil reason Closed unavailable status, or nil for shared intent.
+function M.runtime_unavailable_reason()
+	return _state and _state.runtime_unavailable_reason or nil
+end
+
+--- Proves the inert settings lifecycle never acquired a controller generation.
+--- An initialized or unreadable controller must retain its existing exact fence.
+--- @return boolean absent True only for actual uninitialized, token-free custody.
+function M.runtime_not_acquired()
+	local custody = _state and _state.runtime_custody
+	if not custody or not custody.current() then return false end
+	local ok, initialized = pcall(custody.is_initialized)
+	if not ok or initialized ~= false or not custody.current() then return false end
+	local status_ok, phase, snapshot = pcall(custody.status)
+	if not status_ok or phase ~= "uninitialized" or type(snapshot) ~= "table"
+		or rawget(snapshot, "phase") ~= "uninitialized" or rawget(snapshot, "token") ~= nil
+		or not custody.current() then return false end
+	local final_ok, final_initialized = pcall(custody.is_initialized)
+	return final_ok and final_initialized == false and custody.current()
+end
+
+
 --- The remap guardian's state for the diagnostics permissions table, read
 --- from memory without any native observation or side effect.
 --- @return string state `ready`, `requires_approval`, `unavailable`,
@@ -3585,6 +3638,7 @@ end
 function M.guardian_state()
 	if not _state then return GUARDIAN_STATE_UNKNOWN end
 	if _state.enabled ~= true then return GUARDIAN_STATE_NOT_USED end
+	if M.runtime_unavailable_reason() ~= nil then return "unavailable" end
 	local ok, _, snapshot = pcall(LeaseController.status)
 	if not ok or type(snapshot) ~= "table" then return GUARDIAN_STATE_UNKNOWN end
 	local status = snapshot.guardian_status
@@ -3600,6 +3654,10 @@ end
 --- @param onboarding_gate table|nil Private exact-settlement continuation token.
 --- @return boolean True when accepted or already settled.
 function M.set_enabled(value, on_done, onboarding_gate)
+	if M.runtime_unavailable_reason() ~= nil then
+		invoke_public_callback("set_enabled", on_done, false, M.runtime_unavailable_reason())
+		return false
+	end
 	if not require_state("set_enabled") then
 		invoke_public_callback("set_enabled", on_done, false, "not-initialized")
 		return false
@@ -4080,6 +4138,10 @@ end
 --- @param on_done function|nil Callback fn(ok, reason, removed_count).
 --- @return boolean accepted True when accepted or settled successfully.
 function M.remove_from_karabiner(on_done)
+	if M.runtime_unavailable_reason() ~= nil then
+		invoke_public_callback("remove from Karabiner", on_done, false, M.runtime_unavailable_reason(), 0)
+		return false
+	end
 	Logger.info(LOG, "Remove Ergopti from Karabiner requested.")
 	if not require_state("remove_from_karabiner") then
 		invoke_public_callback("remove from Karabiner", on_done, false, "not-initialized", 0)
@@ -4514,6 +4576,10 @@ end
 --- @return boolean accepted True when candidate regeneration was accepted, or
 ---   when the candidate persisted while « Ergopti uses Karabiner » is off.
 local function apply_bulk_settings_transaction(label, mutate, on_done, overwrite_corrupt, backup_path, sibling)
+	if M.runtime_unavailable_reason() ~= nil then
+		invoke_public_callback(label, on_done, false, M.runtime_unavailable_reason(), 0)
+		return false
+	end
 	if not require_state(label) then
 		invoke_public_callback(label, on_done, false, "not-initialized", 0)
 		return false
@@ -4656,6 +4722,7 @@ end
 --- @param overwrite_corrupt boolean|nil Explicit reset-only overwrite intent.
 --- @return boolean committed
 local function commit_state_mutation(mutate, overwrite_corrupt)
+	if M.runtime_unavailable_reason() ~= nil then return false end
 	if not _running or _shutdown_requested then
 		Logger.error(LOG, "Karabiner setting mutation refused while lifecycle is inactive.")
 		return false
@@ -5193,6 +5260,7 @@ end
 --- @return boolean saved
 --- @return string|nil err Why nothing was saved.
 function M.save_recommended_keys(request)
+	if M.runtime_unavailable_reason() ~= nil then return false, M.runtime_unavailable_reason() end
 	local label = "Recommended tap-hold save"
 	local path = type(request) == "table" and request.path or nil
 	if type(path) ~= "string" or path == "" or type(request.backup_path) ~= "string"
@@ -5216,6 +5284,7 @@ function M.save_recommended_keys(request)
 		Logger.error(LOG, "%s refused: '%s' is unsafe.", label, path)
 		return false, "'" .. path .. "' is unsafe"
 	end
+	if state.runtime ~= "shared" then return false, "runtime-unavailable" end
 	local bindings, refusal = recommended_bindings(request.keys, key_defs, state.tap_hold_config)
 	if not bindings then
 		Logger.error(LOG, "%s refused: %s.", label, tostring(refusal))
@@ -5478,6 +5547,10 @@ local REMAP_SCOPE_SECTIONS = { tap_holds = "tap_holds", shortcuts = "mod_combos"
 --- @param on_done function|nil Callback fn(ok, reason, change_count, layer_receipt).
 --- @return boolean accepted True only when exact regeneration was accepted.
 function M.apply_scope(request, on_done)
+	if M.runtime_unavailable_reason() ~= nil then
+		invoke_public_callback("Remap scope", on_done, false, M.runtime_unavailable_reason(), 0)
+		return false
+	end
 	local label = "Remap scope"
 	local section = type(request) == "table" and REMAP_SCOPE_SECTIONS[request.scope] or nil
 	local declared = false
@@ -5619,6 +5692,10 @@ function M.regenerate(
 	regeneration_context,
 	guardian_ready_capability
 )
+	if M.runtime_unavailable_reason() ~= nil then
+		invoke_public_callback("regenerate", on_done, false, M.runtime_unavailable_reason())
+		return false
+	end
 	_legacy_cleanup_offered.confirmation_generation = _legacy_cleanup_offered.confirmation_generation + 1
 	if regeneration_context == nil then
 		local retained = _deferred_layout_regeneration
@@ -6098,6 +6175,11 @@ end
 --- @param on_done function|nil Callback fn(ok, reason) after the exact fence.
 --- @return boolean True when the stop transaction was accepted or completed.
 function M.stop_lease(on_done)
+	if M.runtime_unavailable_reason() ~= nil
+		and (settle_bulk_settings_before_lifecycle("Inert lease stop", "explicit-lease-stop-requested") ~= true or M.has_pending_settings_save()) then
+		invoke_public_callback("stop lease", on_done, false, "settings-recovery-pending")
+		return false
+	end
 	_legacy_cleanup_offered.confirmation_generation = _legacy_cleanup_offered.confirmation_generation + 1
 	if not require_state("stop_lease") then
 		invoke_public_callback("stop lease", on_done, false, "not-initialized")
@@ -6110,7 +6192,11 @@ function M.stop_lease(on_done)
 	Logger.start(LOG, "Stopping the exact Ergopti Karabiner lease by user request…")
 	local callback_fired = false
 	local callback_succeeded = false
+	local custody = _state.runtime_custody
 	local function finish_stop(stopped, reason)
+		if stopped == true and custody and not custody.current() then
+			stopped, reason = false, "runtime-custody-unsettled"
+		end
 		if callback_fired then
 			Logger.warn(LOG, "Duplicate explicit Karabiner lease-stop callback ignored.")
 			return
@@ -6122,10 +6208,22 @@ function M.stop_lease(on_done)
 		else
 			Logger.error(LOG, "Exact Ergopti Karabiner lease stop failed: %s.", tostring(reason))
 		end
+		if stopped == true and custody and not custody.current() then
+			stopped, reason = false, "runtime-custody-unsettled"
+		end
+		callback_succeeded = stopped == true
 		invoke_public_callback("stop lease", on_done, stopped == true, reason)
 		replay_pending_layout_refresh()
 	end
 	local stop_ok, accepted_or_err = xpcall(function()
+		if M.runtime_not_acquired() then
+			finish_stop(true, "runtime-not-acquired")
+			return true
+		end
+		if custody then
+			if not custody.fence_current() then return false end
+			return custody.stop("menu_stop", finish_stop)
+		end
 		return LeaseController.stop("menu_stop", finish_stop)
 	end, debug.traceback)
 	if not stop_ok then
@@ -6167,6 +6265,14 @@ function M.pause(on_done, onboarding_gate)
 		end)
 		if callback_fired then return continuation_result end
 		return accepted == true
+	end
+	if M.runtime_unavailable_reason() ~= nil then
+		local settled = _running and not _shutdown_requested
+			and settle_bulk_settings_before_lifecycle("Inert pause", "script-pause-requested") == true
+			and not M.has_pending_settings_save()
+		local absent = settled and M.runtime_not_acquired()
+		invoke_public_callback("pause", on_done, absent, absent and "runtime-not-acquired" or "runtime-custody-unsettled")
+		return absent
 	end
 	cancel_guardian_regeneration_wait("script-pause-requested")
 	cancel_deferred_layout_regeneration("script-pause-requested")
@@ -6266,6 +6372,14 @@ function M.resume(on_done)
 		invoke_public_callback("resume", on_done, false, "integration-disabled")
 		return false
 	end
+	if M.runtime_unavailable_reason() ~= nil then
+		local settled = _running and not _shutdown_requested
+			and settle_bulk_settings_before_lifecycle("Inert resume", "script-resume-requested") == true
+			and not M.has_pending_settings_save()
+		local absent = settled and M.runtime_not_acquired()
+		invoke_public_callback("resume", on_done, absent, absent and "runtime-not-acquired" or "runtime-custody-unsettled")
+		return absent
+	end
 	cancel_lease_recovery("script-resume-requested")
 	if _enabled_transition and _enabled_transition.kind == "disabling" then
 		Logger.debug(LOG, "Resume skipped — Karabiner disable fencing is in progress.")
@@ -6338,8 +6452,30 @@ end
 --- @param file_system table FileSystem port adapter (adapters/file_system.lua).
 ---   Used to resolve the KE config path through hs.fs.pathToAbsolute so the
 ---   module never hard-codes OS path logic outside the port boundary.
---- @return boolean initialized True only after every required owner commits.
+--- @return boolean initialized True after settings commit; native readiness is separate.
 function M.init(file_system)
+	-- Retain native custody before any config, logger or injected port callback.
+	-- These capabilities belong only to inert settings and never to persistence.
+	local initialized_port = rawget(LeaseController, "is_initialized")
+	local status_port = rawget(LeaseController, "status")
+	local stop_port = rawget(LeaseController, "stop")
+	local published = rawget(package.loaded, "platform.remap.lease_controller") == LeaseController
+	local custody = {
+		is_initialized = initialized_port,
+		status = status_port,
+		stop = stop_port,
+		fence_current = function()
+			return published and rawget(package.loaded, "platform.remap.lease_controller") == LeaseController
+				and type(stop_port) == "function" and rawget(LeaseController, "stop") == stop_port
+		end,
+		current = function()
+			return published and rawget(package.loaded, "platform.remap.lease_controller") == LeaseController
+				and type(initialized_port) == "function" and type(status_port) == "function"
+				and rawget(LeaseController, "is_initialized") == initialized_port
+				and rawget(LeaseController, "status") == status_port
+				and rawget(LeaseController, "stop") == stop_port
+		end,
+	}
 	Logger.start(LOG, "Initializing Karabiner bridge…")
 
 	if type(file_system) ~= "table" or type(file_system.expand_path) ~= "function" then
@@ -6352,17 +6488,6 @@ function M.init(file_system)
 		return false
 	end
 
-	-- Resolve the KE output path through the FileSystem port so path logic is
-	-- centralised in the adapter and not duplicated across modules.
-	-- The env-var override is checked first to support CI and headless testing.
-	local env_override = os.getenv("ERGOPTI_KARABINER_OUT")
-	if env_override and env_override ~= "" then
-		KARABINER_OUT = env_override
-		Logger.info(LOG, "KE config path overridden by ERGOPTI_KARABINER_OUT: '%s'.", KARABINER_OUT)
-	else
-		KARABINER_OUT = file_system.expand_path(KARABINER_KE_TILDE_PATH)
-		Logger.info(LOG, "KE config path resolved: '%s'.", KARABINER_OUT)
-	end
 
 	-- Load shared data files first — required before load_user_config() can
 	-- call build_default_state() on first launch
@@ -6388,288 +6513,315 @@ function M.init(file_system)
 	local user_cfg, user_config_status = timed("load_user_config", function()
 		return Config.load_user_config(M.TAP_HOLD_KEYS, M.MOD_COMBOS, resolve_user_config())
 	end)
-	if user_config_status == "error" or type(user_cfg) ~= "table" then
+	if user_config_status == "error" or type(user_cfg) ~= "table"
+		or type(user_cfg.runtime) ~= "string" or user_cfg.runtime == "" then
 		Logger.error(LOG, "Karabiner bridge initialization refused because its user config is unsafe.")
 		return false
 	end
-	local first_launch = user_config_status == "absent"
+	if user_cfg.runtime ~= "shared" then
+		_state = clone_settings_state(user_cfg)
+		_state.runtime_unavailable_reason = "runtime-unavailable"
+		_state.runtime_custody = custody
+		_lifecycle_epoch = _lifecycle_epoch + 1
+		_running = true
+		_shutdown_requested = false
+		Logger.warn(LOG, "Selected native runtime '%s' has no verified installed start binding.", tostring(user_cfg.runtime))
+		Logger.success(LOG, "Karabiner settings loaded; the selected runtime remains unavailable.")
+	else
 
-	--- Retains failed boot publication before any remap runtime or native lease.
-	--- Failed native publication retains cleanup only: these saved defaults or
-	--- migrations are not a runtime candidate to compensate by resetting bytes.
-	--- @param saved boolean Literal publication result.
-	--- @param file table|nil Private native publication receipt.
-	--- @param label string Private publication owner label.
-	--- @return boolean acknowledged
-	local function retain_startup_publication(saved, file, label)
-		if saved ~= true and type(file) == "table" then
-			_bulk_settings_transaction = { label = label, detached = true,
-				file = file, phase = "rollback-sibling" }
-		end
-		return saved == true
-	end
-	local tab_cfg      = user_cfg.tap_hold_config and user_cfg.tap_hold_config.tab
-	if type(tab_cfg) == "table" and tab_cfg.tap == "cmd_tab" then
-		tab_cfg.tap = "alt_tab_windows"
-		-- The save is refused when the file on disk is unparseable, so announcing
-		-- the migration unconditionally would claim a persistence that never happened.
-		local saved, _, file = Config.save_user_config(user_cfg, resolve_user_config())
-		if retain_startup_publication(saved, file, "Startup tab action migration") then
-			Logger.info(LOG, "Migrated tab.tap: 'cmd_tab' → 'alt_tab_windows'.")
-		elseif _bulk_settings_transaction ~= nil then
-			Logger.warn(LOG, "tab.tap migration publication remains unacknowledged.")
+		-- Resolve the KE output path through the FileSystem port so path logic is
+		-- centralised in the adapter and not duplicated across modules.
+		-- The env-var override is checked first to support CI and headless testing.
+		local env_override = os.getenv("ERGOPTI_KARABINER_OUT")
+		if env_override and env_override ~= "" then
+			KARABINER_OUT = env_override
+			Logger.info(LOG, "KE config path overridden by ERGOPTI_KARABINER_OUT: '%s'.", KARABINER_OUT)
 		else
-			Logger.warn(LOG, "tab.tap migrated in memory only — the user config was not written.")
+			KARABINER_OUT = file_system.expand_path(KARABINER_KE_TILDE_PATH)
+			Logger.info(LOG, "KE config path resolved: '%s'.", KARABINER_OUT)
 		end
-	end
 
-	-- A first-launch save has no live runtime to publish. Make the same persisted
-	-- payload before native initialization so failed release cannot leave a
-	-- partially started bridge reporting successful boot.
-	if first_launch then
-		local startup = clone_settings_state(user_cfg)
-		startup.tap_holds_enabled = user_cfg.tap_holds_enabled ~= false
-		local saved, _, file = Config.save_user_config(startup, resolve_user_config())
-		if retain_startup_publication(saved, file, "Startup default configuration") then
-			Logger.info(LOG, "Default config written to '%s'.", resolve_user_config())
-		elseif _bulk_settings_transaction ~= nil then
-			Logger.error(LOG, "Default config publication remains unacknowledged in '%s'.", resolve_user_config())
-		else
-			Logger.error(LOG, "Default config could NOT be written to '%s' — settings will not survive a restart.",
-				resolve_user_config())
-		end
-	end
 
-	-- Establish no native lease or runtime until the saved decision is readable
-	-- and every private startup writer receipt has settled. This reuses init's
-	-- existing refusal boundary; retries only release the exact original writer.
-	if _bulk_settings_transaction ~= nil or not LeaseController.init(on_lease_phase) then
-		if _bulk_settings_transaction ~= nil then
-			Logger.error(LOG, "Karabiner initialization refused before startup publication cleanup settled.")
-		else
-			Logger.error(LOG, "Exact Karabiner lease controller initialization failed — remapping stays fail-closed.")
-		end
-		return false
-	end
+		local first_launch = user_config_status == "absent"
 
-	_state = {
-		enabled                   = user_cfg.enabled,
-		tap_holds_enabled         = user_cfg.tap_holds_enabled ~= false,
-		mod_combos_enabled        = user_cfg.mod_combos_enabled,
-		tap_hold_config           = user_cfg.tap_hold_config,
-		mod_combos_config         = user_cfg.mod_combos_config,
-		tap_hold_timeout_ms       = user_cfg.tap_hold_timeout_ms,
-		sticky_timeout_ms         = user_cfg.sticky_timeout_ms,
-		simultaneous_threshold_ms = user_cfg.simultaneous_threshold_ms,
-		combo_symmetric           = user_cfg.combo_symmetric,
-		watcher                   = nil,
-		hotkey_cycle_windows      = nil,
-		hotkey_alt_tab_windows    = nil,
-		hotkey_alt_tab_apps       = nil,
-		hotkey_alt_tab_monitor    = nil,
-	}
-	_lifecycle_epoch = _lifecycle_epoch + 1
-	local observer_epoch = _lifecycle_epoch
-	local recovery_observer = function(token, reason)
-		if observer_epoch ~= _lifecycle_epoch or not _running or _shutdown_requested then return end
-		local status_ok, phase, snapshot = xpcall(LeaseController.status, debug.traceback)
-		if not status_ok then
-			Logger.error(LOG, "Karabiner variable-writer recovery could not verify its exact lease: %s.",
-				tostring(phase))
-			return
+		--- Retains failed boot publication before any remap runtime or native lease.
+		--- Failed native publication retains cleanup only: these saved defaults or
+		--- migrations are not a runtime candidate to compensate by resetting bytes.
+		--- @param saved boolean Literal publication result.
+		--- @param file table|nil Private native publication receipt.
+		--- @param label string Private publication owner label.
+		--- @return boolean acknowledged
+		local function retain_startup_publication(saved, file, label)
+			if saved ~= true and type(file) == "table" then
+				_bulk_settings_transaction = { label = label, detached = true,
+					file = file, phase = "rollback-sibling" }
+			end
+			return saved == true
 		end
-		if type(snapshot) ~= "table" or snapshot.token ~= token then
-			Logger.debug(LOG,
-				"Ignoring obsolete variable-writer failure for retired Karabiner generation %s.",
-				tostring(token))
-			return
+		local tab_cfg      = user_cfg.tap_hold_config and user_cfg.tap_hold_config.tab
+		if type(tab_cfg) == "table" and tab_cfg.tap == "cmd_tab" then
+			tab_cfg.tap = "alt_tab_windows"
+			-- The save is refused when the file on disk is unparseable, so announcing
+			-- the migration unconditionally would claim a persistence that never happened.
+			local saved, _, file = Config.save_user_config(user_cfg, resolve_user_config())
+			if retain_startup_publication(saved, file, "Startup tab action migration") then
+				Logger.info(LOG, "Migrated tab.tap: 'cmd_tab' → 'alt_tab_windows'.")
+			elseif _bulk_settings_transaction ~= nil then
+				Logger.warn(LOG, "tab.tap migration publication remains unacknowledged.")
+			else
+				Logger.warn(LOG, "tab.tap migrated in memory only — the user config was not written.")
+			end
 		end
-		if type(begin_lease_recovery) ~= "function" then
-			Logger.error(LOG, "Karabiner variable-writer recovery API is unavailable.")
-			return
+
+		-- A first-launch save has no live runtime to publish. Make the same persisted
+		-- payload before native initialization so failed release cannot leave a
+		-- partially started bridge reporting successful boot.
+		if first_launch then
+			local startup = clone_settings_state(user_cfg)
+			startup.tap_holds_enabled = user_cfg.tap_holds_enabled ~= false
+			local saved, _, file = Config.save_user_config(startup, resolve_user_config())
+			if retain_startup_publication(saved, file, "Startup default configuration") then
+				Logger.info(LOG, "Default config written to '%s'.", resolve_user_config())
+			elseif _bulk_settings_transaction ~= nil then
+				Logger.error(LOG, "Default config publication remains unacknowledged in '%s'.", resolve_user_config())
+			else
+				Logger.error(LOG, "Default config could NOT be written to '%s' — settings will not survive a restart.",
+					resolve_user_config())
+			end
 		end
-		Logger.warn(LOG,
-			"Karabiner variable writer poisoned generation %s; retaining bounded recovery after STOPPED (%s).",
-			tostring(token), tostring(reason))
-		begin_lease_recovery(token, true)
-	end
-	local observer_ok, observer_registered = xpcall(function()
-		return KeVariables.set_recovery_observer(recovery_observer)
-	end, debug.traceback)
-	if not observer_ok or observer_registered ~= true then
-		_shutdown_requested = true
-		_state.enabled = false
-		Logger.error(LOG, "Karabiner bridge initialization refused because variable-writer recovery is unavailable: %s.",
-			tostring(observer_registered))
-		local stop_ok, stopped_or_err = xpcall(function()
-			return LeaseController.stop("variable-writer-recovery-unavailable")
+
+		-- Establish no native lease or runtime until the saved decision is readable
+		-- and every private startup writer receipt has settled. This reuses init's
+		-- existing refusal boundary; retries only release the exact original writer.
+		if _bulk_settings_transaction ~= nil or not LeaseController.init(on_lease_phase) then
+			if _bulk_settings_transaction ~= nil then
+				Logger.error(LOG, "Karabiner initialization refused before startup publication cleanup settled.")
+			else
+				Logger.error(LOG, "Exact Karabiner lease controller initialization failed — remapping stays fail-closed.")
+			end
+			return false
+		end
+
+		_state = {
+			runtime                   = user_cfg.runtime,
+			enabled                   = user_cfg.enabled,
+			tap_holds_enabled         = user_cfg.tap_holds_enabled ~= false,
+			mod_combos_enabled        = user_cfg.mod_combos_enabled,
+			tap_hold_config           = user_cfg.tap_hold_config,
+			mod_combos_config         = user_cfg.mod_combos_config,
+			tap_hold_timeout_ms       = user_cfg.tap_hold_timeout_ms,
+			sticky_timeout_ms         = user_cfg.sticky_timeout_ms,
+			simultaneous_threshold_ms = user_cfg.simultaneous_threshold_ms,
+			combo_symmetric           = user_cfg.combo_symmetric,
+			watcher                   = nil,
+			hotkey_cycle_windows      = nil,
+			hotkey_alt_tab_windows    = nil,
+			hotkey_alt_tab_apps       = nil,
+			hotkey_alt_tab_monitor    = nil,
+		}
+		_lifecycle_epoch = _lifecycle_epoch + 1
+		local observer_epoch = _lifecycle_epoch
+		local recovery_observer = function(token, reason)
+			if observer_epoch ~= _lifecycle_epoch or not _running or _shutdown_requested then return end
+			local status_ok, phase, snapshot = xpcall(LeaseController.status, debug.traceback)
+			if not status_ok then
+				Logger.error(LOG, "Karabiner variable-writer recovery could not verify its exact lease: %s.",
+					tostring(phase))
+				return
+			end
+			if type(snapshot) ~= "table" or snapshot.token ~= token then
+				Logger.debug(LOG,
+					"Ignoring obsolete variable-writer failure for retired Karabiner generation %s.",
+					tostring(token))
+				return
+			end
+			if type(begin_lease_recovery) ~= "function" then
+				Logger.error(LOG, "Karabiner variable-writer recovery API is unavailable.")
+				return
+			end
+			Logger.warn(LOG,
+				"Karabiner variable writer poisoned generation %s; retaining bounded recovery after STOPPED (%s).",
+				tostring(token), tostring(reason))
+			begin_lease_recovery(token, true)
+		end
+		local observer_ok, observer_registered = xpcall(function()
+			return KeVariables.set_recovery_observer(recovery_observer)
 		end, debug.traceback)
-		if not stop_ok or stopped_or_err ~= true then
-			Logger.error(LOG, "Karabiner lease rollback after recovery-observer refusal failed: %s.",
-				tostring(stopped_or_err))
+		if not observer_ok or observer_registered ~= true then
+			_shutdown_requested = true
+			_state.enabled = false
+			Logger.error(LOG, "Karabiner bridge initialization refused because variable-writer recovery is unavailable: %s.",
+				tostring(observer_registered))
+			local stop_ok, stopped_or_err = xpcall(function()
+				return LeaseController.stop("variable-writer-recovery-unavailable")
+			end, debug.traceback)
+			if not stop_ok or stopped_or_err ~= true then
+				Logger.error(LOG, "Karabiner lease rollback after recovery-observer refusal failed: %s.",
+					tostring(stopped_or_err))
+			end
+			return false
 		end
-		return false
-	end
-	_ke_variables_recovery_observer = recovery_observer
-	-- Karabiner has no tray row, so the states that need the user — its helper
-	-- held until approved in Login Items, or not registered at all — reach them
-	-- as a notice.
-	_guardian_notice = GuardianNotice.new({
-		notify        = Notifications.notify,
-		text          = i18n.get,
-		open_settings = function(on_done) return M.open_guardian_settings(on_done) end,
-		open_login_items = function(on_done) return M.open_login_items(on_done) end,
-		present_approval = function() return present_approval_steps() end,
-		logger        = Logger,
-		log           = LOG,
-	})
-	_running = true
-	_shutdown_requested = false
+		_ke_variables_recovery_observer = recovery_observer
+		-- Karabiner has no tray row, so the states that need the user — its helper
+		-- held until approved in Login Items, or not registered at all — reach them
+		-- as a notice.
+		_guardian_notice = GuardianNotice.new({
+			notify        = Notifications.notify,
+			text          = i18n.get,
+			open_settings = function(on_done) return M.open_guardian_settings(on_done) end,
+			open_login_items = function(on_done) return M.open_login_items(on_done) end,
+			present_approval = function() return present_approval_steps() end,
+			logger        = Logger,
+			log           = LOG,
+		})
+		_running = true
+		_shutdown_requested = false
 
-	-- Persisted mappings do not prove that this Hammerspoon generation owns the
-	-- corresponding output keycodes. READY will populate the set after deployment.
-	clear_managed_output_set()
-	-- The switch is read before any lease or guardian work: off means no token,
-	-- no worker and no ErgoptiPlus rule left in the user's karabiner.json.
-	if not _state.enabled then
-		Logger.info(LOG, "Ergopti does not use Karabiner — no lease or guardian will be acquired.")
-		remove_managed_rules("Karabiner integration off at startup")
-	end
+		-- Persisted mappings do not prove that this Hammerspoon generation owns the
+		-- corresponding output keycodes. READY will populate the set after deployment.
+		clear_managed_output_set()
+		-- The switch is read before any lease or guardian work: off means no token,
+		-- no worker and no ErgoptiPlus rule left in the user's karabiner.json.
+		if not _state.enabled then
+			Logger.info(LOG, "Ergopti does not use Karabiner — no lease or guardian will be acquired.")
+			remove_managed_rules("Karabiner integration off at startup")
+		end
 
-	if _state.enabled then
-		Logger.info(LOG, "Integration enabled — deploy will be triggered from init.lua boot completion.")
-		-- Do NOT call M.regenerate() here: hs.timer callbacks scheduled during
-		-- module initialization do not fire reliably. The main init.lua calls
-		-- M.regenerate() explicitly at the very end of its boot sequence, once
-		-- the event loop is guaranteed to be running.
-	end
+		if _state.enabled then
+			Logger.info(LOG, "Integration enabled — deploy will be triggered from init.lua boot completion.")
+			-- Do NOT call M.regenerate() here: hs.timer callbacks scheduled during
+			-- module initialization do not fire reliably. The main init.lua calls
+			-- M.regenerate() explicitly at the very end of its boot sequence, once
+			-- the event loop is guaranteed to be running.
+		end
 
-	-- Gesture probes and F17 sentinels are lease-owned resources. Starting them
-	-- here would intercept or mutate a personal Karabiner setup while Ergopti is
-	-- disabled/starting; READY starts them through start_lease_bound_inputs().
+		-- Gesture probes and F17 sentinels are lease-owned resources. Starting them
+		-- here would intercept or mutate a personal Karabiner setup while Ergopti is
+		-- disabled/starting; READY starts them through start_lease_bound_inputs().
 
-	local input_source_watcher_started = timed("start_input_source_watcher", function()
-		return Watchers.start_input_source_watcher(function(layout_name)
-			run_async_step("Input-source callback", function()
-				local epoch = _lifecycle_epoch
-				if not is_current_lifecycle(epoch) then return end
-				_layout_event_serial = _layout_event_serial + 1
-				Logger.start(LOG, "Layout change detected — scheduling settled refresh for layout '%s'…",
-					tostring(layout_name))
-				schedule_layout_refresh(layout_name, "Layout-change", epoch)
+		local input_source_watcher_started = timed("start_input_source_watcher", function()
+			return Watchers.start_input_source_watcher(function(layout_name)
+				run_async_step("Input-source callback", function()
+					local epoch = _lifecycle_epoch
+					if not is_current_lifecycle(epoch) then return end
+					_layout_event_serial = _layout_event_serial + 1
+					Logger.start(LOG, "Layout change detected — scheduling settled refresh for layout '%s'…",
+						tostring(layout_name))
+					schedule_layout_refresh(layout_name, "Layout-change", epoch)
+				end)
 			end)
 		end)
-	end)
-	if input_source_watcher_started ~= true then
-		_running = false
-		_shutdown_requested = true
-		_lifecycle_epoch = _lifecycle_epoch + 1
-		_state.enabled = false
-		clear_ke_variables_recovery_observer()
-		Logger.error(LOG,
-			"Karabiner bridge initialization refused because layout observation is unavailable.")
-		return false
-	end
+		if input_source_watcher_started ~= true then
+			_running = false
+			_shutdown_requested = true
+			_lifecycle_epoch = _lifecycle_epoch + 1
+			_state.enabled = false
+			clear_ke_variables_recovery_observer()
+			Logger.error(LOG,
+				"Karabiner bridge initialization refused because layout observation is unavailable.")
+			return false
+		end
 
-	-- Wake-from-sleep refresh of the layout-dependent key codes.
-	--
-	-- Every action carrying a logical_char is resolved against whatever layout was
-	-- active when the list was built, and the only thing that re-resolves them is
-	-- the input-source watcher above. That fires on
-	-- AppleSelectedInputSourcesChangedNotification, which is NOT delivered for a
-	-- layout that changed while the machine was asleep — and the TIS layer can
-	-- settle differently across a wake. So the list could hold the key codes of a
-	-- layout that is no longer active, Karabiner would be handed a config remapping
-	-- the wrong physical keys, and nothing re-derived it until the user switched
-	-- layout by hand.
-	--
-	-- The gestures module carries this same pattern for its touch device, for the
-	-- same reason: after a wake the OS reports state the process still believes.
-	local ok_cw, cw = pcall(require, "hs.caffeinate.watcher")
-	if ok_cw and type(cw) == "table" and type(cw.new) == "function" then
-		local wake_epoch = _lifecycle_epoch
-		local wake_candidate = nil
-		local function handle_wake(event)
-			if event ~= cw.systemDidWake and event ~= cw.screensDidUnlock then return end
-			if _wake_watcher ~= wake_candidate or _wake_watcher_committed ~= true then return end
-			if not is_current_lifecycle(wake_epoch) then return end
+		-- Wake-from-sleep refresh of the layout-dependent key codes.
+		--
+		-- Every action carrying a logical_char is resolved against whatever layout was
+		-- active when the list was built, and the only thing that re-resolves them is
+		-- the input-source watcher above. That fires on
+		-- AppleSelectedInputSourcesChangedNotification, which is NOT delivered for a
+		-- layout that changed while the machine was asleep — and the TIS layer can
+		-- settle differently across a wake. So the list could hold the key codes of a
+		-- layout that is no longer active, Karabiner would be handed a config remapping
+		-- the wrong physical keys, and nothing re-derived it until the user switched
+		-- layout by hand.
+		--
+		-- The gestures module carries this same pattern for its touch device, for the
+		-- same reason: after a wake the OS reports state the process still believes.
+		local ok_cw, cw = pcall(require, "hs.caffeinate.watcher")
+		if ok_cw and type(cw) == "table" and type(cw.new) == "function" then
+			local wake_epoch = _lifecycle_epoch
+			local wake_candidate = nil
+			local function handle_wake(event)
+				if event ~= cw.systemDidWake and event ~= cw.screensDidUnlock then return end
+				if _wake_watcher ~= wake_candidate or _wake_watcher_committed ~= true then return end
+				if not is_current_lifecycle(wake_epoch) then return end
 
-			-- Renew the exact generation before any layout work. Sleep can fence the
-			-- private watchdog while Hammerspoon still believes the previous state.
-			-- This step is independent and guarded so a layout failure cannot suppress
-			-- the first post-wake liveness proof.
-			if _state.enabled == true then
-				local refresh_ok, refreshed = run_async_step(
-					"Wake exact-lease liveness refresh",
-					LeaseController.refresh_liveness
-				)
-				if not refresh_ok or refreshed ~= true then
-					Logger.warn(LOG, "Wake refresh could not renew the exact Karabiner lease liveness.")
+				-- Renew the exact generation before any layout work. Sleep can fence the
+				-- private watchdog while Hammerspoon still believes the previous state.
+				-- This step is independent and guarded so a layout failure cannot suppress
+				-- the first post-wake liveness proof.
+				if _state.enabled == true then
+					local refresh_ok, refreshed = run_async_step(
+						"Wake exact-lease liveness refresh",
+						LeaseController.refresh_liveness
+					)
+					if not refresh_ok or refreshed ~= true then
+						Logger.warn(LOG, "Wake refresh could not renew the exact Karabiner lease liveness.")
+					end
 				end
+				if not is_current_lifecycle(wake_epoch) then return end
+				-- Wake and input-source notifications share the same post-TIS-settle
+				-- pipeline. Resolving immediately here can read the pre-sleep key map, and
+				-- omitting the sibling shortcut rebind leaves Hammerspoon on old scancodes.
+				_layout_event_serial = _layout_event_serial + 1
+				schedule_layout_refresh(nil, "Wake", wake_epoch)
 			end
-			if not is_current_lifecycle(wake_epoch) then return end
-			-- Wake and input-source notifications share the same post-TIS-settle
-			-- pipeline. Resolving immediately here can read the pre-sleep key map, and
-			-- omitting the sibling shortcut rebind leaves Hammerspoon on old scancodes.
-			_layout_event_serial = _layout_event_serial + 1
-			schedule_layout_refresh(nil, "Wake", wake_epoch)
-		end
-		local function on_wake(event)
-			run_async_step("Wake callback", function() handle_wake(event) end)
-		end
+			local function on_wake(event)
+				run_async_step("Wake callback", function() handle_wake(event) end)
+			end
 
-		if release_wake_watcher("Previous wake watcher") ~= true then
-			Logger.error(LOG, "Wake watcher construction refused while exact cleanup is pending.")
-		else
-			local created, watcher_or_err = pcall(cw.new, on_wake)
-			local watcher_type = type(watcher_or_err)
-			if not created or (watcher_type ~= "table" and watcher_type ~= "userdata")
-				or type(watcher_or_err.start) ~= "function" then
-				Logger.error(LOG, "Wake watcher construction failed: %s.", tostring(watcher_or_err))
+			if release_wake_watcher("Previous wake watcher") ~= true then
+				Logger.error(LOG, "Wake watcher construction refused while exact cleanup is pending.")
 			else
-				wake_candidate = watcher_or_err
-				_wake_watcher = watcher_or_err
-				_wake_watcher_committed = false
-				local started, start_result = pcall(function() return watcher_or_err:start() end)
-				if not started or start_result == nil or start_result == false then
-					Logger.error(LOG, "Wake watcher start failed: %s.", tostring(start_result))
-					release_wake_watcher("Failed wake watcher rollback")
+				local created, watcher_or_err = pcall(cw.new, on_wake)
+				local watcher_type = type(watcher_or_err)
+				if not created or (watcher_type ~= "table" and watcher_type ~= "userdata")
+					or type(watcher_or_err.start) ~= "function" then
+					Logger.error(LOG, "Wake watcher construction failed: %s.", tostring(watcher_or_err))
 				else
-					_wake_watcher_committed = true
+					wake_candidate = watcher_or_err
+					_wake_watcher = watcher_or_err
+					_wake_watcher_committed = false
+					local started, start_result = pcall(function() return watcher_or_err:start() end)
+					if not started or start_result == nil or start_result == false then
+						Logger.error(LOG, "Wake watcher start failed: %s.", tostring(start_result))
+						release_wake_watcher("Failed wake watcher rollback")
+					else
+						_wake_watcher_committed = true
+					end
 				end
 			end
+		else
+			Logger.warn(LOG, "hs.caffeinate.watcher unavailable — layout key codes will not be "
+				.. "re-resolved after a wake.")
 		end
-	else
-		Logger.warn(LOG, "hs.caffeinate.watcher unavailable — layout key codes will not be "
-			.. "re-resolved after a wake.")
-	end
 
-	local active_combos = 0
-	for _, combo_def in ipairs(M.MOD_COMBOS) do
-		local cfg = _state.mod_combos_config[combo_def.id] or {}
-		if type(cfg) == "table"
-			and (cfg.tap ~= "none" or cfg.hold ~= "none" or cfg.combo ~= "none") then
-			active_combos = active_combos + 1
+		local active_combos = 0
+		for _, combo_def in ipairs(M.MOD_COMBOS) do
+			local cfg = _state.mod_combos_config[combo_def.id] or {}
+			if type(cfg) == "table"
+				and (cfg.tap ~= "none" or cfg.hold ~= "none" or cfg.combo ~= "none") then
+				active_combos = active_combos + 1
+			end
 		end
-	end
 
-	-- Defer the first-run health check so it never blocks boot. The wizard
-	-- only surfaces a dialog when a KE dependency is missing; otherwise it
-	-- exits silently. A logged callback boundary keeps onboarding failure from
-	-- aborting the timer while still making it visible in the file logger.
-	-- The session guard prevents the dialog from re-appearing on every
-	-- hs.reload() within the same Hammerspoon session.
-	if _state.enabled and not _wizard_ran_this_session then
-		_wizard_ran_this_session = true
-		local wizard_epoch = _lifecycle_epoch
-		if schedule_first_run_wizard(wizard_epoch) ~= true then
-			Logger.error(LOG, "First-run wizard timer could not be scheduled or settled.")
+		-- Defer the first-run health check so it never blocks boot. The wizard
+		-- only surfaces a dialog when a KE dependency is missing; otherwise it
+		-- exits silently. A logged callback boundary keeps onboarding failure from
+		-- aborting the timer while still making it visible in the file logger.
+		-- The session guard prevents the dialog from re-appearing on every
+		-- hs.reload() within the same Hammerspoon session.
+		if _state.enabled and not _wizard_ran_this_session then
+			_wizard_ran_this_session = true
+			local wizard_epoch = _lifecycle_epoch
+			if schedule_first_run_wizard(wizard_epoch) ~= true then
+				Logger.error(LOG, "First-run wizard timer could not be scheduled or settled.")
+			end
 		end
-	end
 
-	Logger.success(LOG,
-		"Karabiner bridge initialized (%d action(s), %d combo(s) active).",
-		#M.AVAILABLE_ACTIONS, active_combos)
+		Logger.success(LOG,
+			"Karabiner bridge initialized (%d action(s), %d combo(s) active).",
+			#M.AVAILABLE_ACTIONS, active_combos)
+	end
 	return true
 end
 
@@ -6724,6 +6876,14 @@ end
 --- disabled hotkey with an unfenced Karabiner generation.
 --- @return boolean stopped True only when every local resource was released.
 function M.teardown_local()
+	local custody = _state and _state.runtime_custody
+	if custody and not custody.current() then return false end
+	local initialized_before
+	if custody then
+		local ok, initialized = pcall(custody.is_initialized)
+		if not ok or type(initialized) ~= "boolean" or not custody.current() then return false end
+		initialized_before = initialized
+	end
 	if _enabled_transition ~= nil and _enabled_transition.file ~= nil then
 		local transaction = _enabled_transition
 		if transaction.before_lifecycle() ~= true then
@@ -6734,7 +6894,17 @@ function M.teardown_local()
 	if settle_bulk_settings_before_lifecycle("Karabiner local teardown", "local-teardown") ~= true then
 		return false
 	end
-	local status_ok, phase = xpcall(LeaseController.status, debug.traceback)
+	if custody and not custody.current() then return false end
+	if M.runtime_unavailable_reason() ~= nil and not M.runtime_not_acquired() then
+		local ok, initialized = pcall(custody.is_initialized)
+		if not ok or initialized ~= true or not custody.current() then
+			Logger.error(LOG, "Inert Karabiner teardown refused unreadable controller custody.")
+			return false
+		end
+	end
+	local status_ok, phase, snapshot = xpcall(custody and custody.status or LeaseController.status, debug.traceback)
+	if custody and (not custody.current() or type(snapshot) ~= "table"
+		or rawget(snapshot, "phase") ~= phase or rawget(snapshot, "token") ~= nil) then return false end
 	if not status_ok then
 		Logger.error(LOG, "Cannot verify the exact lease before local teardown: %s.", tostring(phase))
 		return false
@@ -6744,7 +6914,17 @@ function M.teardown_local()
 			tostring(phase))
 		return false
 	end
+	if custody and not custody.current() then return false end
 	local teardown_ok, teardown_result = xpcall(stop_local_resources, debug.traceback)
+	if custody then
+		if not custody.current() then return false end
+		local final_ok, final_phase, final_snapshot = pcall(custody.status)
+		if not final_ok or not custody.current() or (final_phase ~= "idle" and final_phase ~= "uninitialized")
+			or type(final_snapshot) ~= "table" or rawget(final_snapshot, "phase") ~= final_phase
+			or rawget(final_snapshot, "token") ~= nil then return false end
+		local initialized_ok, initialized = pcall(custody.is_initialized)
+		if not initialized_ok or initialized ~= initialized_before or not custody.current() then return false end
+	end
 	if not teardown_ok or teardown_result ~= true then
 		Logger.error(LOG, "Exact lease is fenced but local Karabiner teardown failed: %s.",
 			tostring(teardown_result))
@@ -6761,6 +6941,7 @@ end
 --- @param on_done function|nil Callback fn(fenced, reason).
 --- @return boolean True when exact revocation was accepted.
 function M.revoke(reason, on_done)
+	local custody = _state and _state.runtime_custody
 	if _enabled_transition ~= nil and _enabled_transition.file ~= nil then
 		local transaction = _enabled_transition
 		if transaction.before_lifecycle() ~= true then
@@ -6800,6 +6981,9 @@ function M.revoke(reason, on_done)
 	local lease_succeeded = false
 	local lease_detail = nil
 	local function settle_revoke(ok, detail)
+		if ok == true and custody and not custody.current() then
+			ok, detail = false, "runtime-custody-unsettled"
+		end
 		if callback_fired then
 			Logger.warn(LOG, "Duplicate Ergopti Karabiner revocation completion ignored.")
 			return
@@ -6841,7 +7025,15 @@ function M.revoke(reason, on_done)
 		onboarding_detail = "onboarding-stop-rejected"
 	end
 	local call_ok, accepted_or_err = xpcall(function()
-		return LeaseController.stop(reason or "hammerspoon_shutdown", function(stopped, stop_reason)
+		if M.runtime_not_acquired() then
+			lease_done = true
+			lease_succeeded = true
+			lease_detail = "runtime-not-acquired"
+			settle_join_if_ready()
+			return true
+		end
+		if custody and not custody.fence_current() then return false end
+		return (custody and custody.stop or LeaseController.stop)(reason or "hammerspoon_shutdown", function(stopped, stop_reason)
 			if lease_done then
 				Logger.warn(LOG, "Duplicate lease half of Karabiner revocation ignored.")
 				return

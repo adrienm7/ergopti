@@ -2699,3 +2699,46 @@ are whole upstream inputs; these results do not qualify them. The added dev30
 Windows diagnostic passes encoding, with native AHK deferred. Both feature
 merge pushes have exact-SHA automatic workflow censuses with zero runs. Final
 dev integration and its lock remain unstarted.
+
+## Native runtime configuration and retained controller admission
+
+A3 typed persistence and B2 inert admission are adopted together over the published
+shared remap declaration. The reader captures its declaration and displayed
+source before foreign callbacks; conditional publication owns only runtime intent
+and preserves the original native publication/debt receipt. The existing shared
+lifecycle remains the supported path. Unsupported intent retains consent and
+settings while refusing shared acquisition, mutation and regeneration.
+
+Controller module/query/stop identity is retained at the beginning of initialization,
+before logger or configuration callbacks. Actual controller replacement, hidden
+acquisition and late completion cannot mint absence or terminal acknowledgment.
+Existing installer joins, settings debt, local cleanup and fixed public snapshots
+remain whole; private custody is excluded from the persistence boundary.
+
+The original 58 admission controls plus eight frozen custody cases pass. Independent
+review adds six terminal-currentness controls and refuses three omitted-guard
+mutants. Configuration qualification passes 281 controls in 17 modules, including
+four independently frozen source/declaration callback cases. These are portable
+source/state proofs. Root selected final gates and actual native macOS execution
+remain separate qualification steps. UI binding, owned installation/start and
+complete item31/transverse16/38 remain unfinished.
+
+The feature now includes upstream dev23d9b560e8ae4f80585b8f8e3da2f94325d7d462.
+Its six diagnostic test paths are conserved as upstream inputs. The next composed
+local gate also covers their JavaScript/encoding and Linux unit checks; Windows
+native execution remains deferred to the dedicated manual CI. Final dev integration,
+its lock and codex/ci-validation remain untouched.
+
+The first full composed gate is retained as failed: JavaScript 387/388 and
+portable macOS 18,119 passed / 220 failed. Linux passes 11,651 cases with no
+failures. The two-source reviewed successor joins both runtime branches at the
+original sole literal success return and uses the existing unique boot-source
+locator. All original HS019 assertions and the pinned-read baseline stay whole;
+five focused HS019 controls and the 75/75 pinned-read guard pass after adoption.
+The other 219 failures reproduce missing runtime inputs in seven legacy fixtures.
+The unchanged 21-module cohort passes 233 cases on the predecessor, fails 219
+cases with incomplete inputs, and passes all 233 with genuine scoped configuration
+inputs. Independent replay passes these and 34 existing missing/owned refusal
+controls. Every original assertion, callback fault and cleanup remains whole.
+Final composed verification remains pending. Native macOS and Windows execution
+remain unexecuted; these partial results close no TODO item.

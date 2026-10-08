@@ -46,6 +46,11 @@ local helpers = require("tests.helpers")
 --- @param paused boolean What shortcuts.is_paused() reports.
 --- @return table karabiner, table deploys
 local function load_karabiner(paused)
+	-- The fixture supplies intent from the real config owner, never native readiness.
+	local default_runtime = helpers.with_stub_scope({ "platform.remap.config" }, function()
+		local RealConfig = helpers.load_with_stubs("platform.remap.config")
+		return RealConfig.build_default_state({}, {}).runtime
+	end)
 	package.loaded["modules.shortcuts"] = { is_paused = function() return paused end }
 	package.loaded["platform.remap.config"] = {
 		load_available_actions = function() return { { id = "none" } } end,
@@ -54,6 +59,7 @@ local function load_karabiner(paused)
 		compute_non_canonical_combos = function() return {} end,
 		load_user_config = function()
 			return {
+				runtime = default_runtime,
 				enabled = true,
 				tap_hold_config = {},
 				mod_combos_config = {},
